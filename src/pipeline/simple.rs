@@ -1,29 +1,42 @@
 use bytemuck::{Pod, Zeroable};
+use glam::{vec3, vec4, Vec3, Vec4};
 use wgpu::include_wgsl;
 
-use crate::{WgpuContext, WgpuBuffer};
+use crate::{WgpuBuffer, WgpuContext};
+
+use super::Pipeline;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 pub struct SimpleVertex {
-    pub position: [f32; 3],
-    pub color: [f32; 4],
+    pub position: Vec3,
+    _padding: f32,
+    pub color: Vec4,
+}
+
+impl SimpleVertex {
+    pub fn new(position: Vec3, color: Vec4) -> Self {
+        Self { position, _padding: 0.0, color }
+    }
 }
 
 impl SimpleVertex {
     pub fn test_data() -> Vec<Self> {
         vec![
             Self {
-                position: [0.0, 0.0, 0.0],
-                color: [1.0, 0.0, 0.0, 1.0],
+                position: vec3(0.0, 0.0, 0.0),
+                _padding: 0.0,
+                color: vec4(1.0, 0.0, 0.0, 1.0),
             },
             Self {
-                position: [0.0, 1.0, 0.0],
-                color: [0.0, 1.0, 0.0, 1.0],
+                position: vec3(0.0, 1.0, 0.0),
+                _padding: 0.0,
+                color: vec4(0.0, 1.0, 0.0, 1.0),
             },
             Self {
-                position: [1.0, 0.0, 0.0],
-                color: [0.0, 0.0, 1.0, 1.0],
+                position: vec3(1.0, 0.0, 0.0),
+                _padding: 0.0,
+                color: vec4(0.0, 0.0, 1.0, 1.0),
             },
         ]
     }
@@ -42,7 +55,7 @@ impl SimpleVertex {
                     format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
-                    offset: size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    offset: size_of::<[f32; 4]>() as wgpu::BufferAddress,
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x4,
                 },
@@ -67,8 +80,11 @@ impl SimplePipeline {
             push_constant_ranges: &[],
         }
     }
+}
+impl Pipeline for SimplePipeline {
+    type Vertex = SimpleVertex;
 
-    pub fn new(ctx: &WgpuContext) -> Self {
+    fn new(ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = ctx;
 
         let module = &device.create_shader_module(include_wgsl!("../../shader/simple.wgsl"));
@@ -101,11 +117,11 @@ impl SimplePipeline {
         Self { pipeline }
     }
 
-    pub fn render(
+    fn render(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         target: &wgpu::TextureView,
-        vertex_buffer: &WgpuBuffer<SimpleVertex>,
+        vertex_buffer: &WgpuBuffer<Self::Vertex>,
     ) {
         let render_pass_desc = wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),

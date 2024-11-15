@@ -1,6 +1,8 @@
+use core::f32;
+
+use glam::dvec2;
 use ranim::{
-    pipeline::simple::{SimplePipeline, SimpleVertex},
-    WgpuBuffer, WgpuContext,
+    mobject::{Arc, Polygon}, pipeline::{simple::{SimplePipeline, SimpleVertex}, Pipeline}, Renderable, WgpuBuffer, WgpuContext
 };
 
 const TEXTURE_DIMS: (usize, usize) = (512, 512);
@@ -31,14 +33,25 @@ async fn run() {
         mapped_at_creation: false,
     });
 
-    let pipeline = SimplePipeline::new(&ctx);
-
-    let data = SimpleVertex::test_data();
+    // let data = SimpleVertex::test_data();
+    // let arc = Arc {angle: std::f64::consts::PI / 2.0 };
+    // let data = arc.vertex_data();
+    let polygon = Polygon::from_verticies(vec![
+        dvec2(-0.5, 0.0),
+        // dvec2(0.0, 0.2),
+        dvec2(0.2, 0.3),
+        dvec2(0.0, 0.7),
+        // dvec2(0.5, -0.3),
+        dvec2(0.5, 0.0),
+    ]);
+    let data = polygon.vertex_data();
+    // println!("{:?}", data);
     // context setup done
 
     let vertex_buffer = WgpuBuffer::new_init(&ctx, &data, wgpu::BufferUsages::VERTEX);
     let texture_view = render_target.create_view(&wgpu::TextureViewDescriptor::default());
 
+    let pipeline = SimplePipeline::new(&ctx);
     let mut encoder = ctx
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor {

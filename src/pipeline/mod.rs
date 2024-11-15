@@ -1,7 +1,15 @@
+use crate::{WgpuBuffer, WgpuContext};
+
 pub mod simple;
 
-use std::ops::Deref;
+pub trait Pipeline {
+    type Vertex: bytemuck::Pod + bytemuck::Zeroable;
 
-use wgpu::util::DeviceExt;
-
-use crate::WgpuContext;
+    fn new(ctx: &WgpuContext) -> Self;
+    fn render(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        target: &wgpu::TextureView,
+        vertex_buffer: &WgpuBuffer<Self::Vertex>,
+    );
+}
