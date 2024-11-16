@@ -1,10 +1,13 @@
 use bytemuck::{Pod, Zeroable};
-use glam::{vec3, vec4, Vec3, Vec4};
-use wgpu::include_wgsl;
+use glam::{vec3, vec4, Mat4, Vec3, Vec4};
+use wgpu::{include_wgsl, BindGroupLayoutEntry, DepthStencilState};
 
-use crate::{WgpuBuffer, WgpuContext};
+use crate::{
+    camera::{CameraUniforms, CameraUniformsBindGroup},
+    WgpuBuffer, WgpuContext,
+};
 
-use super::Pipeline;
+use super::RenderPipeline;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
@@ -16,7 +19,11 @@ pub struct SimpleVertex {
 
 impl SimpleVertex {
     pub fn new(position: Vec3, color: Vec4) -> Self {
-        Self { position, _padding: 0.0, color }
+        Self {
+            position,
+            _padding: 0.0,
+            color,
+        }
     }
 }
 
@@ -73,16 +80,19 @@ impl SimplePipeline {
         wgpu::TextureFormat::Rgba8UnormSrgb
     }
 
-    pub fn layout_desc<'a>() -> wgpu::PipelineLayoutDescriptor<'a> {
-        wgpu::PipelineLayoutDescriptor {
-            label: Some("Simple Pipeline Layout"),
-            bind_group_layouts: &[],
-            push_constant_ranges: &[],
-        }
+    pub fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
+        ctx.device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Simple Pipeline Layout"),
+                bind_group_layouts: &[&CameraUniformsBindGroup::bind_group_layout(ctx)],
+                push_constant_ranges: &[],
+            })
     }
 }
-impl Pipeline for SimplePipeline {
+
+impl RenderPipeline for SimplePipeline {
     type Vertex = SimpleVertex;
+    type Uniforms = CameraUniforms;
 
     fn new(ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = ctx;
@@ -90,7 +100,7 @@ impl Pipeline for SimplePipeline {
         let module = &device.create_shader_module(include_wgsl!("../../shader/simple.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Simple Pipeline"),
-            layout: Some(&device.create_pipeline_layout(&Self::layout_desc())),
+            layout: Some(&Self::pipeline_layout(ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
@@ -108,7 +118,13 @@ impl Pipeline for SimplePipeline {
                 })],
             }),
             primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
             cache: None,
@@ -120,13 +136,15 @@ impl Pipeline for SimplePipeline {
     fn render(
         &self,
         encoder: &mut wgpu::CommandEncoder,
-        target: &wgpu::TextureView,
+        target_view: &wgpu::TextureView,
+        depth_view: Option<&wgpu::TextureView>,
         vertex_buffer: &WgpuBuffer<Self::Vertex>,
+        bindgroups: &[&wgpu::BindGroup],
     ) {
         let render_pass_desc = wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &target,
+                view: &target_view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -138,12 +156,24 @@ impl Pipeline for SimplePipeline {
                     store: wgpu::StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: depth_view.map(|view| {
+                wgpu::RenderPassDepthStencilAttachment {
+                    view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }
+            }),
             occlusion_query_set: None,
             timestamp_writes: None,
         };
         let mut render_pass = encoder.begin_render_pass(&render_pass_desc);
         render_pass.set_pipeline(&self.pipeline);
+        for (i, bindgroup) in bindgroups.iter().cloned().enumerate() {
+            render_pass.set_bind_group(i as u32, bindgroup, &[]);
+        }
         render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
         render_pass.draw(0..vertex_buffer.len() as u32, 0..1);
     }

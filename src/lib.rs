@@ -1,15 +1,17 @@
-use std::ops::Deref;
+use std::{any::TypeId, ops::Deref};
 
-use pipeline::Pipeline;
+use pipeline::RenderPipeline;
 // use pyo3::prelude::*;
 use wgpu::util::DeviceExt;
 
 pub mod mobject;
 pub mod pipeline;
+pub mod camera;
 
 pub trait Renderable {
-    type Pipeline: Pipeline;
-    fn vertex_data(&self) -> Vec<<Self::Pipeline as Pipeline>::Vertex>;
+    type Vertex: bytemuck::Pod + bytemuck::Zeroable;
+    fn pipeline_id(&self) -> TypeId;
+    fn vertex_data(&self) -> Vec<Self::Vertex>;
 }
 
 pub struct WgpuContext {
@@ -89,7 +91,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable> WgpuBuffer<T> {
         self.size() / std::mem::size_of::<T>() as u64
     }
 
-    pub fn prepare(&mut self, ctx: &WgpuContext, data: &[T]) {
+    pub fn prepare_from_slice(&mut self, ctx: &WgpuContext, data: &[T]) {
         if self.size() < std::mem::size_of_val(data) as u64 {
             self.buffer = ctx
                 .device

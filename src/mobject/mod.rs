@@ -1,4 +1,5 @@
 use core::f32;
+use std::any::TypeId;
 
 use bezier_rs::{
     Bezier, BezierHandles, Identifier, Join, ManipulatorGroup, Subpath, SubpathTValue,
@@ -9,7 +10,7 @@ use itertools::Itertools;
 use crate::{
     pipeline::{
         simple::{SimplePipeline, SimpleVertex},
-        Pipeline,
+        RenderPipeline,
     },
     Renderable,
 };
@@ -30,9 +31,13 @@ pub struct Arc {
 }
 
 impl Renderable for Arc {
-    type Pipeline = SimplePipeline;
+    type Vertex = SimpleVertex;
 
-    fn vertex_data(&self) -> Vec<<Self::Pipeline as Pipeline>::Vertex> {
+    fn pipeline_id(&self) -> TypeId {
+        std::any::TypeId::of::<SimplePipeline>()
+    }
+
+    fn vertex_data(&self) -> Vec<Self::Vertex> {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
 
@@ -75,9 +80,13 @@ impl Polygon {
 }
 
 impl Renderable for Polygon {
-    type Pipeline = SimplePipeline;
+    type Vertex = SimpleVertex;
 
-    fn vertex_data(&self) -> Vec<<Self::Pipeline as Pipeline>::Vertex> {
+    fn pipeline_id(&self) -> TypeId {
+        std::any::TypeId::of::<SimplePipeline>()
+    }
+
+    fn vertex_data(&self) -> Vec<Self::Vertex> {
         // TODO: Handle 0 len
         if self.vertices.len() == 0 {
             return vec![];
@@ -153,13 +162,18 @@ pub struct VMobject {
 }
 
 impl<ManipulatorGroupId: Identifier> Renderable for Subpath<ManipulatorGroupId> {
-    type Pipeline = SimplePipeline;
-    fn vertex_data(&self) -> Vec<<Self::Pipeline as Pipeline>::Vertex> {
+    type Vertex = SimpleVertex;
+
+    fn pipeline_id(&self) -> TypeId {
+        std::any::TypeId::of::<SimplePipeline>()
+    }
+
+    fn vertex_data(&self) -> Vec<Self::Vertex> {
         const POLYLINE_FACTOR: usize = 100;
         const MAX_STEPS: usize = 256;
 
         // https://github.com/3b1b/manim/blob/master/manimlib/shaders/quadratic_bezier/stroke/geom.glsl
-        let inner_path = self.offset(0.1, Join::Bevel);
+        let inner_path = self.offset(1.0, Join::Bevel);
         let outer_path = self.offset(0.0, Join::Bevel);
         let mut vertices = vec![];
         for i in 0..MAX_STEPS {
@@ -178,10 +192,6 @@ impl<ManipulatorGroupId: Identifier> Renderable for Subpath<ManipulatorGroupId> 
             outer_path.evaluate(SubpathTValue::GlobalEuclidean(0.0)),
             outer_path.evaluate(SubpathTValue::GlobalEuclidean(1.0))
         );
-
-        // vertices.iter_mut().for_each(|v| {
-        //     *v /= 5.0;
-        // });
 
         vertices
             .windows(3)

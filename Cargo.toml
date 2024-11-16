@@ -12,9 +12,11 @@ edition = "2021"
 async-channel = "2.3.1"
 bezier-rs = "0.4.0"
 bytemuck = { version = "1.19.0", features = ["derive"] }
+env_logger = "0.11.5"
 glam = { version = "0.24.2", features = ["bytemuck"] }
 image = "0.25.5"
 itertools = "0.13.0"
+log = "0.4.22"
 pollster = "0.4.0"
 # pyo3 = "0.22.0"
 uuid = { version = "1.11.0", features = ["v4"] }
