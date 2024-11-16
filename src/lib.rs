@@ -1,7 +1,5 @@
 use std::{any::TypeId, ops::Deref};
 
-use pipeline::RenderPipeline;
-// use pyo3::prelude::*;
 use wgpu::util::DeviceExt;
 
 pub mod mobject;

@@ -1,6 +1,6 @@
 use bytemuck::{Pod, Zeroable};
-use glam::{vec3, vec4, Mat4, Vec3, Vec4};
-use wgpu::{include_wgsl, BindGroupLayoutEntry, DepthStencilState};
+use glam::{vec3, vec4, Vec3, Vec4};
+use wgpu::include_wgsl;
 
 use crate::{
     camera::{CameraUniforms, CameraUniformsBindGroup},

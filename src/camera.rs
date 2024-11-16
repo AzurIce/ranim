@@ -1,7 +1,6 @@
 use std::{any::TypeId, collections::HashMap};
 
 use glam::{Mat4, Vec3};
-use image::{ImageBuffer, Rgba};
 use log::{debug, trace, warn};
 
 use crate::{
@@ -11,10 +10,6 @@ use crate::{
     },
     WgpuBuffer, WgpuContext,
 };
-
-const ASPECT_RATIO: f32 = 16.0 / 9.0;
-const FRAME_WIDTH: usize = 1280;
-const FRAME_HEIGHT: usize = (FRAME_WIDTH as f32 / ASPECT_RATIO) as usize;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
