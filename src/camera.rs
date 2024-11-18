@@ -1,15 +1,7 @@
-use std::{any::TypeId, collections::HashMap};
-
 use glam::{Mat4, Vec3};
 use log::{debug, trace, warn};
 
-use crate::{
-    pipeline::{
-        simple::{SimplePipeline, SimpleVertex},
-        RenderPipeline,
-    },
-    WgpuBuffer, WgpuContext,
-};
+use crate::{mobject::Mobject, pipeline::PipelineVertex, RanimContext, WgpuBuffer, WgpuContext};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -134,11 +126,11 @@ impl Camera {
         }
     }
 
-    pub fn render(
+    pub fn render<Vertex: PipelineVertex>(
         &mut self,
-        ctx: &WgpuContext,
-        vertex_buffer: &WgpuBuffer<SimpleVertex>,
+        ctx: &mut RanimContext,
         texture_data: &mut Vec<u8>,
+        object: &Mobject<Vertex>,
     ) {
         debug!("[Camera] Rendering...");
 
@@ -147,7 +139,7 @@ impl Camera {
         self.refresh_uniforms();
         debug!("[Camera]: Uniforms: {:?}", self.uniforms);
         trace!("[Camera] uploading camera uniforms to buffer...");
-        ctx.queue.write_buffer(
+        ctx.wgpu_ctx.queue.write_buffer(
             &self.uniforms_buffer,
             0,
             bytemuck::cast_slice(&[self.uniforms]),
@@ -157,13 +149,6 @@ impl Camera {
             warn!("[Camera] texture data len mismatch, resizing...");
             texture_data.resize(self.frame.size.0 * self.frame.size.1 * 4, 0);
         }
-        enum Pipeline {
-            Simple(SimplePipeline),
-        }
-        let mut pipelines = HashMap::<TypeId, Pipeline>::new();
-        let id = std::any::TypeId::of::<SimplePipeline>();
-        let pipeline = SimplePipeline::new(&ctx);
-        pipelines.insert(id, Pipeline::Simple(pipeline));
 
         let texture_view = self
             .target_texture
@@ -171,23 +156,22 @@ impl Camera {
         let depth_view = self
             .depth_texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = ctx
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+        let mut encoder =
+            ctx.wgpu_ctx
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
 
         {
-            let pipeline = pipelines.get(&id).unwrap();
-            match pipeline {
-                Pipeline::Simple(p) => p.render(
-                    &mut encoder,
-                    &texture_view,
-                    Some(&depth_view),
-                    &vertex_buffer,
-                    &[&self.uniforms_bind_group.bind_group],
-                ),
-            }
+            let pipeline = ctx.get_or_init_pipeline::<Vertex::Pipeline>();
+            object.render(
+                pipeline,
+                &mut encoder,
+                &texture_view,
+                Some(&depth_view),
+                &[&self.uniforms_bind_group.bind_group],
+            );
             encoder.copy_texture_to_buffer(
                 wgpu::ImageCopyTexture {
                     aspect: wgpu::TextureAspect::All,
@@ -205,7 +189,7 @@ impl Camera {
                 },
                 self.target_texture.size(),
             );
-            ctx.queue.submit(Some(encoder.finish()));
+            ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
         }
 
         pollster::block_on(async {
@@ -217,7 +201,10 @@ impl Camera {
             buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
                 tx.send_blocking(result).unwrap()
             });
-            ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+            ctx.wgpu_ctx
+                .device
+                .poll(wgpu::Maintain::Wait)
+                .panic_on_timeout();
             rx.recv().await.unwrap().unwrap();
 
             {

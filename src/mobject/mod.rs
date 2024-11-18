@@ -1,172 +1,71 @@
-use core::f32;
-use std::any::TypeId;
+pub mod geometry;
 
-use bezier_rs::{Bezier, Identifier, Join, Subpath, SubpathTValue};
-use glam::{dvec2, vec3, vec4, DVec2};
-use itertools::Itertools;
+use crate::pipeline::PipelineVertex;
+use crate::{WgpuBuffer, WgpuContext};
 
-use crate::{
-    pipeline::simple::{SimplePipeline, SimpleVertex},
-    Renderable,
-};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Id(u128);
-
-impl Identifier for Id {
-    fn new() -> Self {
-        Self(uuid::Uuid::new_v4().as_u128())
-    }
+pub struct Mobject<Vertex: PipelineVertex> {
+    points: Vec<Vertex>,
+    buffer: WgpuBuffer<Vertex>,
 }
 
-/// A part of a circle
-pub struct Arc {
-    /// Angle in radians of the arc
-    pub angle: f64,
-}
-
-impl Renderable for Arc {
-    type Vertex = SimpleVertex;
-
-    fn pipeline_id(&self) -> TypeId {
-        std::any::TypeId::of::<SimplePipeline>()
+impl<Vertex: PipelineVertex> Mobject<Vertex> {
+    pub fn from_pipeline_vertex(ctx: &WgpuContext, points: impl Into<Vec<Vertex>>) -> Self {
+        let points = points.into();
+        let buffer = WgpuBuffer::new_init(&ctx, &points, wgpu::BufferUsages::VERTEX);
+        Self { points, buffer }
     }
 
-    fn vertex_data(&self) -> Vec<Self::Vertex> {
-        const NUM_SEGMENTS: usize = 8;
-        let len = 2 * NUM_SEGMENTS + 1;
-
-        let angle_step = self.angle / (len - 1) as f64;
-        let mut points = (0..len)
-            .map(|i| {
-                let angle = i as f64 * angle_step;
-                println!("{i}/{len} angle: {:?}", angle / std::f64::consts::PI);
-                dvec2(angle.cos() as f64, angle.sin() as f64)
-            })
-            .collect::<Vec<_>>();
-
-        let theta = self.angle / NUM_SEGMENTS as f64;
-        points.iter_mut().skip(1).step_by(2).for_each(|p| {
-            *p /= (theta / 2.0).cos();
-        });
-        println!("start: {:?}, end: {:?}", points[0], points[len - 1]);
-
-        let beziers = points
-            .iter()
-            .step_by(2)
-            .zip(points.iter().skip(1).step_by(2))
-            .zip(points.iter().skip(2).step_by(2))
-            .map(|((p1, p2), p3)| Bezier::from_quadratic_dvec2(*p1, *p2, *p3))
-            .collect::<Vec<_>>();
-        let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, false);
-
-        subpath.vertex_data()
-    }
-}
-
-pub struct Polygon {
-    vertices: Vec<DVec2>,
-}
-
-impl Polygon {
-    pub fn from_verticies(vertices: Vec<DVec2>) -> Self {
-        Self { vertices }
-    }
-}
-
-impl Renderable for Polygon {
-    type Vertex = SimpleVertex;
-
-    fn pipeline_id(&self) -> TypeId {
-        std::any::TypeId::of::<SimplePipeline>()
+    pub fn update_from_pipeline_vertex(&mut self, ctx: &WgpuContext, points: Vec<Vertex>) {
+        self.points = points;
+        self.buffer.prepare_from_slice(ctx, &self.points);
     }
 
-    fn vertex_data(&self) -> Vec<Self::Vertex> {
-        // TODO: Handle 0 len
-        if self.vertices.len() == 0 {
-            return vec![];
+    pub fn vertex_buffer(&self) -> &WgpuBuffer<Vertex> {
+        &self.buffer
+    }
+
+    pub fn render(
+        &self,
+        pipeline: &Vertex::Pipeline,
+        encoder: &mut wgpu::CommandEncoder,
+        target_view: &wgpu::TextureView,
+        depth_view: Option<&wgpu::TextureView>,
+        bindgroups: &[&wgpu::BindGroup],
+    ) {
+        let render_pass_desc = wgpu::RenderPassDescriptor {
+            label: Some("Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &target_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    }),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: depth_view.map(|view| {
+                wgpu::RenderPassDepthStencilAttachment {
+                    view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }
+            }),
+            occlusion_query_set: None,
+            timestamp_writes: None,
+        };
+        let mut render_pass = encoder.begin_render_pass(&render_pass_desc);
+        render_pass.set_pipeline(&pipeline);
+        for (i, bindgroup) in bindgroups.iter().cloned().enumerate() {
+            render_pass.set_bind_group(i as u32, bindgroup, &[]);
         }
-
-        let vertices = self.vertices.clone();
-
-        let anchors = vertices;
-        let handles = anchors
-            .windows(2)
-            .map(|window| 0.5 * (window[0] + window[1]))
-            .collect::<Vec<_>>();
-        println!("anchors: {:?}", anchors.len());
-        println!("handles: {:?}", handles.len());
-
-        assert_eq!(anchors.len(), handles.len() + 1);
-
-        let points = anchors
-            .into_iter()
-            .interleave(handles.into_iter())
-            .collect::<Vec<_>>();
-        println!("points: {:?}, {:?}", points.len(), points);
-        let beziers = points
-            .iter()
-            .step_by(2)
-            .zip(
-                points
-                    .iter()
-                    .skip(1)
-                    .chain(points.iter().take(1))
-                    .step_by(2),
-            )
-            .zip(
-                points
-                    .iter()
-                    .skip(2)
-                    .chain(points.iter().take(2))
-                    .step_by(2),
-            )
-            .map(|((p1, p2), p3)| {
-                println!("({:?}, {:?}, {:?})", p1, p2, p3);
-                Bezier::from_quadratic_dvec2(*p1, *p2, *p3)
-            })
-            .collect::<Vec<_>>();
-        println!("beziers: {:?}", beziers.len());
-        let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, true);
-        subpath.vertex_data()
-    }
-}
-
-impl<ManipulatorGroupId: Identifier> Renderable for Subpath<ManipulatorGroupId> {
-    type Vertex = SimpleVertex;
-
-    fn pipeline_id(&self) -> TypeId {
-        std::any::TypeId::of::<SimplePipeline>()
-    }
-
-    fn vertex_data(&self) -> Vec<Self::Vertex> {
-        const MAX_STEPS: usize = 256;
-
-        // https://github.com/3b1b/manim/blob/master/manimlib/shaders/quadratic_bezier/stroke/geom.glsl
-        let inner_path = self.offset(1.0, Join::Bevel);
-        let outer_path = self.offset(0.0, Join::Bevel);
-        let mut vertices = vec![];
-        for i in 0..MAX_STEPS {
-            let t = i as f64 / (MAX_STEPS - 1) as f64;
-            vertices.push(inner_path.evaluate(SubpathTValue::GlobalEuclidean(t)));
-            vertices.push(outer_path.evaluate(SubpathTValue::GlobalEuclidean(t)));
-        }
-
-        println!(
-            "inner_start: {:?}, inner_end: {:?}",
-            inner_path.evaluate(SubpathTValue::GlobalEuclidean(0.0)),
-            inner_path.evaluate(SubpathTValue::GlobalEuclidean(1.0))
-        );
-        println!(
-            "outer_start: {:?}, outer_end: {:?}",
-            outer_path.evaluate(SubpathTValue::GlobalEuclidean(0.0)),
-            outer_path.evaluate(SubpathTValue::GlobalEuclidean(1.0))
-        );
-
-        vertices
-            .windows(3)
-            .flatten()
-            .map(|p| SimpleVertex::new(vec3(p.x as f32, p.y as f32, 0.0), vec4(1.0, 0.0, 0.0, 1.0)))
-            .collect()
+        render_pass.set_vertex_buffer(0, self.buffer.slice(..));
+        render_pass.draw(0..self.buffer.len() as u32, 0..1);
     }
 }

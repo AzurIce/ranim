@@ -1,14 +1,18 @@
 use env_logger::Env;
 use glam::dvec2;
-use ranim::{camera::Camera, mobject::Polygon, Renderable, WgpuBuffer, WgpuContext};
+use ranim::{
+    camera::Camera,
+    mobject::{geometry::Polygon, Mobject},
+    RanimContext,
+};
 
 async fn run() {
     env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
 
-    let ctx = WgpuContext::new().await;
+    let mut ctx = RanimContext::new();
 
     let size = (1280, 720);
-    let mut camera = Camera::new(&ctx, size.0, size.1);
+    let mut camera = Camera::new(&ctx.wgpu_ctx, size.0, size.1);
     camera.frame.set_fovy(std::f32::consts::PI / 2.0);
 
     // let data = SimpleVertex::test_data();
@@ -20,14 +24,10 @@ async fn run() {
         dvec2(0.0, 70.0),
         dvec2(50.0, 0.0),
     ]);
-    let data = polygon.vertex_data();
-    // println!("{:?}", data);
-    // context setup done
-
-    let vertex_buffer = WgpuBuffer::new_init(&ctx, &data, wgpu::BufferUsages::VERTEX);
+    let mobject = Mobject::from_pipeline_vertex(&ctx.wgpu_ctx, polygon);
 
     let mut texture_data = vec![0; size.0 * size.1 * 4];
-    camera.render(&ctx, &vertex_buffer, &mut texture_data);
+    camera.render(&mut ctx, &mut texture_data, &mobject);
 
     use image::{ImageBuffer, Rgba};
     let buffer =

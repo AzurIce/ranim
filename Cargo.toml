@@ -8,7 +8,15 @@ edition = "2021"
 # name = "ranim"
 # crate-type = ["cdylib", "rlib"]
 
+[workspace]
+members = ["packages/*"]
+
+[workspace.dependencies]
+ranim = { path = "." }
+ranim_derive = { path = "packages/ranim_derive" }
+
 [dependencies]
+ranim_derive.workspace = true
 async-channel = "2.3.1"
 bezier-rs = "0.4.0"
 bytemuck = { version = "1.19.0", features = ["derive"] }

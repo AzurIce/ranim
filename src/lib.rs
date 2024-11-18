@@ -1,15 +1,45 @@
-use std::{any::TypeId, ops::Deref};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    ops::Deref,
+};
 
+use pipeline::RenderPipeline;
 use wgpu::util::DeviceExt;
 
+pub mod camera;
 pub mod mobject;
 pub mod pipeline;
-pub mod camera;
+pub mod utils;
 
-pub trait Renderable {
-    type Vertex: bytemuck::Pod + bytemuck::Zeroable;
-    fn pipeline_id(&self) -> TypeId;
-    fn vertex_data(&self) -> Vec<Self::Vertex>;
+pub struct RanimContext {
+    pub wgpu_ctx: WgpuContext,
+    pub pipelines: HashMap<TypeId, Box<dyn Any>>,
+}
+
+impl RanimContext {
+    pub fn new() -> Self {
+        let wgpu_ctx = pollster::block_on(WgpuContext::new());
+        let pipelines = HashMap::<TypeId, Box<dyn Any>>::new();
+
+        // let id = std::any::TypeId::of::<SimplePipeline>();
+        // let pipeline = SimplePipeline::new(&wgpu_ctx);
+        // pipelines.insert(id, Box::new(pipeline));
+
+        Self {
+            wgpu_ctx,
+            pipelines,
+        }
+    }
+
+    pub fn get_or_init_pipeline<P: RenderPipeline + 'static>(&mut self) -> &P {
+        let id = std::any::TypeId::of::<P>();
+        self.pipelines
+            .entry(id)
+            .or_insert_with(|| Box::new(P::new(&self.wgpu_ctx)))
+            .downcast_ref::<P>()
+            .unwrap()
+    }
 }
 
 pub struct WgpuContext {
@@ -124,3 +154,39 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable> WgpuBuffer<T> {
 //     m.add_function(wrap_pyfunction!(sum_matrix, m)?)?;
 //     Ok(())
 // }
+
+/// Stores custom, user-provided types.
+#[derive(Default, Debug)]
+pub struct Storage {
+    pipelines: HashMap<TypeId, Box<dyn Any + Send>>,
+}
+
+impl Storage {
+    /// Returns `true` if `Storage` contains a type `T`.
+    pub fn has<T: 'static>(&self) -> bool {
+        self.pipelines.contains_key(&TypeId::of::<T>())
+    }
+
+    /// Inserts the data `T` in to [`Storage`].
+    pub fn store<T: 'static + Send>(&mut self, data: T) {
+        let _ = self.pipelines.insert(TypeId::of::<T>(), Box::new(data));
+    }
+
+    /// Returns a reference to the data with type `T` if it exists in [`Storage`].
+    pub fn get<T: 'static>(&self) -> Option<&T> {
+        self.pipelines.get(&TypeId::of::<T>()).map(|pipeline| {
+            pipeline
+                .downcast_ref::<T>()
+                .expect("Value with this type does not exist in Storage.")
+        })
+    }
+
+    /// Returns a mutable reference to the data with type `T` if it exists in [`Storage`].
+    pub fn get_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.pipelines.get_mut(&TypeId::of::<T>()).map(|pipeline| {
+            pipeline
+                .downcast_mut::<T>()
+                .expect("Value with this type does not exist in Storage.")
+        })
+    }
+}

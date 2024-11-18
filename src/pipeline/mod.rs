@@ -1,17 +1,23 @@
-use crate::{WgpuBuffer, WgpuContext};
+use std::ops::Deref;
+
+use crate::WgpuContext;
 
 pub mod simple;
 
-pub trait RenderPipeline {
-    type Vertex: bytemuck::Pod + bytemuck::Zeroable;
+pub trait PipelineVertex: bytemuck::Pod + bytemuck::Zeroable {
+    type Pipeline: RenderPipeline;
+
+    fn pipeline_id() -> std::any::TypeId {
+        std::any::TypeId::of::<Self::Pipeline>()
+    }
+
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
+}
+
+pub trait RenderPipeline: Deref<Target = wgpu::RenderPipeline> {
+    type Vertex: PipelineVertex;
     type Uniforms: bytemuck::Pod + bytemuck::Zeroable;
-    fn new(ctx: &WgpuContext) -> Self where Self: Sized;
-    fn render(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        target_view: &wgpu::TextureView,
-        depth_view: Option<&wgpu::TextureView>,
-        vertex_buffer: &WgpuBuffer<Self::Vertex>,
-        bindgroups: &[&wgpu::BindGroup],
-    );
+    fn new(ctx: &WgpuContext) -> Self
+    where
+        Self: Sized;
 }

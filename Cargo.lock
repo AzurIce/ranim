@@ -1246,8 +1246,17 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "pollster",
+ "ranim_derive",
  "uuid",
  "wgpu",
+]
+
+[[package]]
+name = "ranim_derive"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
