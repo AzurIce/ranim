@@ -3,6 +3,7 @@ pub mod geometry;
 use std::sync::{Arc, Mutex};
 
 use glam::{ivec3, vec3, vec4, IVec3, Mat3, Vec3};
+use palette::{rgb, Srgba};
 
 use crate::pipeline::{simple, PipelineVertex};
 use crate::utils::{resize_preserving_order, Id};
@@ -57,20 +58,28 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
         pipeline: &Vertex::Pipeline,
         encoder: &mut wgpu::CommandEncoder,
         target_view: &wgpu::TextureView,
+        multisample_view: Option<&wgpu::TextureView>,
         depth_view: Option<&wgpu::TextureView>,
         bindgroups: &[&wgpu::BindGroup],
     ) {
+        let bg = Srgba::from_u32::<rgb::channels::Rgba>(0x333333FF).into_linear();
         let render_pass_desc = wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &target_view,
-                resolve_target: None,
+                view: match multisample_view {
+                    Some(view) => view,
+                    None => target_view,
+                },
+                resolve_target: match multisample_view {
+                    Some(_) => Some(target_view),
+                    None => None,
+                },
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
+                        r: bg.red,
+                        g: bg.green,
+                        b: bg.blue,
+                        a: bg.alpha,
                     }),
                     store: wgpu::StoreOp::Store,
                 },
@@ -179,7 +188,7 @@ impl Mobject<simple::Vertex> {
     }
 
     /// Shift the mobject by a given vector.
-    pub fn shift(&mut self, shift: Vec3) {
+    pub fn shift(&mut self, shift: Vec3) -> &mut Self {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
@@ -188,10 +197,11 @@ impl Mobject<simple::Vertex> {
             },
             TransformAnchor::origin(),
         );
+        self
     }
 
     /// Scale the mobject by a given vector.
-    pub fn scale(&mut self, scale: Vec3, anchor: TransformAnchor) {
+    pub fn scale(&mut self, scale: Vec3, anchor: TransformAnchor) -> &mut Self {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
@@ -200,10 +210,11 @@ impl Mobject<simple::Vertex> {
             },
             anchor,
         );
+        self
     }
 
     /// Rotate the mobject by a given angle about a given axis.
-    pub fn rotate(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) {
+    pub fn rotate(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self {
         let axis = axis.normalize();
         let rotation = Mat3::from_axis_angle(axis, angle);
 
@@ -215,10 +226,23 @@ impl Mobject<simple::Vertex> {
             },
             anchor,
         );
+        self
     }
 }
 
 impl Mobject<simple::Vertex> {
+    pub fn set_color(&mut self, color: Srgba) {
+        let color = vec4(color.red, color.green, color.blue, color.alpha);
+
+        self.apply_points_function(
+            |points| {
+                points.iter_mut().for_each(|p| {
+                    p.set_color(color);
+                });
+            },
+            TransformAnchor::origin(),
+        );
+    }
     pub fn set_opacity(&mut self, opacity: f32) {
         self.apply_points_function(
             |points| {

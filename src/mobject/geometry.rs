@@ -50,7 +50,7 @@ impl Into<Vec<simple::Vertex>> for Arc {
 
 #[derive(Debug, Clone)]
 pub struct Polygon {
-    vertices: Vec<DVec2>,
+    pub vertices: Vec<DVec2>,
 }
 
 impl Into<Vec<simple::Vertex>> for Polygon {

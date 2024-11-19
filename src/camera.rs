@@ -57,6 +57,7 @@ pub struct Camera {
     pub frame: CameraFrame,
     pub fps: u32,
     uniforms: CameraUniforms,
+    multisample_texture: wgpu::Texture,
     target_texture: wgpu::Texture,
     texture_data: Option<Vec<u8>>,
     depth_texture: wgpu::Texture,
@@ -71,7 +72,7 @@ impl Camera {
         let frame = CameraFrame::new_with_size(width, height);
 
         let target_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
+            label: Some("Target Texture"),
             size: wgpu::Extent3d {
                 width: width as u32,
                 height: height as u32,
@@ -84,15 +85,29 @@ impl Camera {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[wgpu::TextureFormat::Rgba8UnormSrgb],
         });
-        let depth_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
+        let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Multisample Texture"),
             size: wgpu::Extent3d {
                 width: width as u32,
                 height: height as u32,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count: 4,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[wgpu::TextureFormat::Rgba8UnormSrgb],
+        });
+        let depth_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depth Texture"),
+            size: wgpu::Extent3d {
+                width: width as u32,
+                height: height as u32,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 4,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
@@ -122,6 +137,7 @@ impl Camera {
             fps: 60,
             uniforms,
             target_texture,
+            multisample_texture,
             texture_data: None,
             depth_texture,
             output_staging_buffer,
@@ -153,8 +169,11 @@ impl Camera {
             object.prepare(&ctx.wgpu_ctx);
         }
 
-        let texture_view = self
+        let target_view = self
             .target_texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let multisample_view = self
+            .multisample_texture
             .create_view(&wgpu::TextureViewDescriptor::default());
         let depth_view = self
             .depth_texture
@@ -172,7 +191,8 @@ impl Camera {
                 object.render(
                     pipeline,
                     &mut encoder,
-                    &texture_view,
+                    &target_view,
+                    Some(&multisample_view),
                     Some(&depth_view),
                     &[&self.uniforms_bind_group.bind_group],
                 );
