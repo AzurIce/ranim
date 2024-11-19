@@ -1,5 +1,5 @@
 use glam::{Mat4, Vec3};
-use log::{debug, trace, warn};
+use log::{debug, trace};
 
 use crate::{mobject::Mobject, pipeline::PipelineVertex, RanimContext, WgpuBuffer, WgpuContext};
 
@@ -55,6 +55,7 @@ impl CameraUniformsBindGroup {
 
 pub struct Camera {
     pub frame: CameraFrame,
+    pub fps: u32,
     uniforms: CameraUniforms,
     target_texture: wgpu::Texture,
     texture_data: Option<Vec<u8>>,
@@ -117,8 +118,9 @@ impl Camera {
         let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
 
         Self {
-            uniforms,
             frame,
+            fps: 60,
+            uniforms,
             target_texture,
             texture_data: None,
             depth_texture,
@@ -131,7 +133,7 @@ impl Camera {
     pub fn render<Vertex: PipelineVertex>(
         &mut self,
         ctx: &mut RanimContext,
-        object: &mut Mobject<Vertex>,
+        objects: &mut Vec<Mobject<Vertex>>,
     ) {
         debug!("[Camera] Rendering...");
 
@@ -147,7 +149,9 @@ impl Camera {
         );
 
         // Preparing the object
-        object.prepare(&ctx.wgpu_ctx);
+        for object in objects.iter_mut() {
+            object.prepare(&ctx.wgpu_ctx);
+        }
 
         let texture_view = self
             .target_texture
@@ -164,27 +168,30 @@ impl Camera {
 
         {
             let pipeline = ctx.get_or_init_pipeline::<Vertex::Pipeline>();
-            object.render(
-                pipeline,
-                &mut encoder,
-                &texture_view,
-                Some(&depth_view),
-                &[&self.uniforms_bind_group.bind_group],
-            );
+            for object in objects {
+                object.render(
+                    pipeline,
+                    &mut encoder,
+                    &texture_view,
+                    Some(&depth_view),
+                    &[&self.uniforms_bind_group.bind_group],
+                );
+            }
             ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
         }
     }
 
     pub fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
-        let mut texture_data = self.texture_data.take().unwrap_or(
-            vec![0; self.frame.size.0 * self.frame.size.1 * 4],
-        );
+        let mut texture_data =
+            self.texture_data
+                .take()
+                .unwrap_or(vec![0; self.frame.size.0 * self.frame.size.1 * 4]);
 
-        let mut encoder =
-            ctx.device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
 
         {
             encoder.copy_texture_to_buffer(

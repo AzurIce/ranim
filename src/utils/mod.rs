@@ -1,3 +1,5 @@
+pub mod rate_functions;
+
 use bezier_rs::{Identifier, Join, Subpath, SubpathTValue};
 use glam::{vec3, vec4};
 
@@ -47,4 +49,9 @@ pub fn sub_path_to_vertex<Id: Identifier>(subpath: Subpath<Id>) -> Vec<simple::V
         .flatten()
         .map(|p| simple::Vertex::new(vec3(p.x as f32, p.y as f32, 0.0), vec4(1.0, 0.0, 0.0, 1.0)))
         .collect::<Vec<_>>()
+}
+
+pub fn resize_preserving_order<T: Clone>(vec: &Vec<T>, new_len: usize) -> Vec<T> {
+    let indices = (0..new_len).map(|i| i * vec.len() / new_len);
+    indices.map(|i| vec[i].clone()).collect()
 }

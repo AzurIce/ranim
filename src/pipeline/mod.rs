@@ -20,6 +20,8 @@ pub trait PipelineVertex: bytemuck::Pod + bytemuck::Zeroable {
 
     fn color(&self) -> Vec4;
     fn set_color(&mut self, color: Vec4);
+
+    fn interpolate(&self, other: &Self, t: f32) -> Self;
 }
 
 /// A render pipeline.

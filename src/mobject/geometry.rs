@@ -24,7 +24,7 @@ impl Into<Vec<simple::Vertex>> for Arc {
         let mut points = (0..len)
             .map(|i| {
                 let angle = i as f64 * angle_step;
-                println!("{i}/{len} angle: {:?}", angle / std::f64::consts::PI);
+                // println!("{i}/{len} angle: {:?}", angle / std::f64::consts::PI);
                 dvec2(angle.cos() as f64, angle.sin() as f64)
             })
             .collect::<Vec<_>>();
@@ -33,7 +33,7 @@ impl Into<Vec<simple::Vertex>> for Arc {
         points.iter_mut().skip(1).step_by(2).for_each(|p| {
             *p /= (theta / 2.0).cos();
         });
-        println!("start: {:?}, end: {:?}", points[0], points[len - 1]);
+        // println!("start: {:?}, end: {:?}", points[0], points[len - 1]);
 
         let beziers = points
             .iter()

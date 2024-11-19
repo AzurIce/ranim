@@ -8,6 +8,7 @@ use pipeline::RenderPipeline;
 use wgpu::util::DeviceExt;
 
 pub mod camera;
+pub mod animation;
 pub mod scene;
 pub mod mobject;
 pub mod pipeline;

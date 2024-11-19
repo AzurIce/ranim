@@ -2,10 +2,10 @@ pub mod geometry;
 
 use std::sync::{Arc, Mutex};
 
-use glam::{ivec3, vec3, IVec3, Mat3, Vec3};
+use glam::{ivec3, vec3, vec4, IVec3, Mat3, Vec3};
 
 use crate::pipeline::{simple, PipelineVertex};
-use crate::utils::Id;
+use crate::utils::{resize_preserving_order, Id};
 use crate::{WgpuBuffer, WgpuContext};
 
 // TODO: instead of cloning, implement a ExtractMobject
@@ -38,7 +38,10 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
     }
 
     pub fn update_buffer(&mut self, ctx: &WgpuContext) {
-        self.buffer.lock().unwrap().prepare_from_slice(ctx, &self.points);
+        self.buffer
+            .lock()
+            .unwrap()
+            .prepare_from_slice(ctx, &self.points);
     }
 
     pub fn vertex_buffer(&self) -> &Mutex<WgpuBuffer<Vertex>> {
@@ -160,14 +163,18 @@ impl Mobject<simple::Vertex> {
         };
 
         let mut points = self.points.clone();
-        points
-            .iter_mut()
-            .for_each(|p| p.set_position(p.position + anchor));
+        if anchor != Vec3::ZERO {
+            points
+                .iter_mut()
+                .for_each(|p| p.set_position(p.position + anchor));
+        }
 
         f(&mut points);
-        points
-            .iter_mut()
-            .for_each(|p| p.set_position(p.position - anchor));
+        if anchor != Vec3::ZERO {
+            points
+                .iter_mut()
+                .for_each(|p| p.set_position(p.position - anchor));
+        }
         self.points = points;
     }
 
@@ -208,5 +215,48 @@ impl Mobject<simple::Vertex> {
             },
             anchor,
         );
+    }
+}
+
+impl Mobject<simple::Vertex> {
+    pub fn set_opacity(&mut self, opacity: f32) {
+        self.apply_points_function(
+            |points| {
+                points.iter_mut().for_each(|p| {
+                    p.set_color(vec4(p.color.x, p.color.y, p.color.z, opacity));
+                });
+            },
+            TransformAnchor::origin(),
+        );
+    }
+}
+
+impl Mobject<simple::Vertex> {
+    pub fn resize_points(&mut self, len: usize) {
+        self.points = resize_preserving_order(&self.points, len);
+    }
+
+    pub fn aligned_with_mobject(&self, target: &Mobject<simple::Vertex>) -> bool {
+        self.points.len() == target.points.len()
+    }
+
+    pub fn align_with_mobject(&mut self, target: &mut Mobject<simple::Vertex>) {
+        let max_len = self.points.len().max(target.points.len());
+        self.resize_points(max_len);
+        target.resize_points(max_len);
+    }
+
+    pub fn interpolate_with_mobject(&mut self, target: &Mobject<simple::Vertex>, t: f32) {
+        let points = self
+            .points
+            .iter()
+            .zip(target.points.iter())
+            .map(|(p1, p2)| {
+                let position = p1.position.lerp(p2.position, t);
+                let color = p1.color.lerp(p2.color, t);
+                simple::Vertex::new(position, color)
+            })
+            .collect();
+        self.points = points;
     }
 }

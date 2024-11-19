@@ -57,6 +57,14 @@ impl PipelineVertex for Vertex {
     fn set_color(&mut self, color: Vec4) {
         self.color = color;
     }
+
+    fn interpolate(&self, other: &Self, t: f32) -> Self {
+        Self {
+            position: self.position.lerp(other.position, t),
+            color: self.color.lerp(other.color, t),
+            ..*self
+        }
+    }
 }
 
 impl Vertex {
@@ -140,7 +148,7 @@ impl RenderPipeline for Pipeline {
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: Self::output_format(),
-                    blend: None,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
