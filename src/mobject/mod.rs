@@ -11,7 +11,7 @@ use crate::{WgpuBuffer, WgpuContext};
 
 pub struct ExtractedMobject<Vertex: PipelineVertex> {
     pub id: Id,
-    pipeline_id: std::any::TypeId,
+    pub pipeline_id: std::any::TypeId,
     pub points: Arc<RwLock<Vec<Vertex>>>,
     pub buffer: WgpuBuffer<Vertex>,
 }

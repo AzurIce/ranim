@@ -1,16 +1,28 @@
-use std::{fs, path::Path};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    fs,
+    path::Path,
+};
 
 use image::{ImageBuffer, Rgba};
 use log::trace;
 
 use crate::{
-    animation::Animation, camera::Camera, mobject::{ExtractedMobject, Mobject}, pipeline::simple, RanimContext,
-    WgpuContext,
+    animation::Animation,
+    camera::Camera,
+    mobject::Mobject,
+    pipeline::{simple, PipelineVertex},
+    utils::Id,
+    RanimContext, WgpuContext,
 };
 
 pub struct Scene {
     pub camera: Camera,
-    pub mobjects: Vec<ExtractedMobject<simple::Vertex>>,
+    /// Mobjects in the scene, they are actually [`crate::mobject::ExtractedMobject`]
+    ///
+    /// (Mobject's id, Mobject's pipeline id, Mobject)
+    pub mobjects: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     pub time: f32,
     pub frame_count: usize,
 }
@@ -19,32 +31,57 @@ impl Scene {
     pub fn new(ctx: &WgpuContext) -> Self {
         Self {
             camera: Camera::new(ctx, 1920, 1080),
-            mobjects: Vec::new(),
+            mobjects: HashMap::new(),
             time: 0.0,
             frame_count: 0,
         }
     }
 
-    pub fn add_mobject(&mut self, ctx: &mut RanimContext, mobject: &Mobject<simple::Vertex>) {
-        self.mobjects.retain(|m| m.id != mobject.id);
-        self.mobjects.push(mobject.extract(&ctx.wgpu_ctx));
+    pub fn remove_mobject(&mut self, id: Id) {
+        self.mobjects.iter_mut().for_each(|(_, mobject_vec)| {
+            mobject_vec.retain(|(mobject_id, _)| mobject_id != &id);
+        });
     }
 
-    pub fn add_mobjects(&mut self, ctx: &mut RanimContext, mobjects: Vec<Mobject<simple::Vertex>>) {
-        self.mobjects
-            .retain(|m| !mobjects.iter().any(|m2| m2.id == m.id));
-        self.mobjects.extend(mobjects.iter().map(|m| m.extract(&ctx.wgpu_ctx)));
+    pub fn add_mobject<Vertex: PipelineVertex>(
+        &mut self,
+        ctx: &mut RanimContext,
+        mobject: &Mobject<Vertex>,
+    ) {
+        let mobject = mobject.extract(&ctx.wgpu_ctx);
+
+        let mobject_vec = self.mobjects.entry(mobject.pipeline_id).or_default();
+        mobject_vec.retain(|(id, _)| id != &mobject.id);
+        mobject_vec.push((mobject.id, Box::new(mobject)));
+    }
+
+    pub fn add_mobjects<Vertex: PipelineVertex>(
+        &mut self,
+        ctx: &mut RanimContext,
+        mobjects: Vec<Mobject<Vertex>>,
+    ) {
+        // Should be faster?
+        self.mobjects.iter_mut().for_each(|(_, mobject_vec)| {
+            mobject_vec.retain(|(id, _)| !mobjects.iter().any(|m| id == &m.id))
+        });
+        mobjects.iter().for_each(|m| {
+            let mobject = m.extract(&ctx.wgpu_ctx);
+            self.mobjects
+                .entry(mobject.pipeline_id)
+                .or_default()
+                .push((mobject.id, Box::new(mobject)));
+        });
     }
 
     pub fn render_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
-        self.camera.render(ctx, &mut self.mobjects);
+        self.camera.render::<simple::Pipeline>(ctx, &mut self.mobjects);
         self.save_frame_to_image(ctx, path);
     }
 
     pub fn update_frame(&mut self, ctx: &mut RanimContext, dt: f32) {
         self.time += dt;
         // self.update_mobjects(dt);
-        self.camera.render(ctx, &mut self.mobjects);
+        self.camera.render::<simple::Pipeline>(ctx, &mut self.mobjects);
     }
 
     pub fn save_frame_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
@@ -86,7 +123,7 @@ impl Scene {
             self.save_frame_to_image(ctx, path);
         }
         if animation.should_remove() {
-            self.mobjects.retain(|m| m.id != animation.mobject.id);
+            self.remove_mobject(animation.mobject.id);
             None
         } else {
             Some(animation.mobject)

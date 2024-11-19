@@ -1,9 +1,15 @@
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+};
+
 use glam::{Mat4, Vec3};
 use log::{debug, trace};
 use palette::{rgb, Srgba};
 
 use crate::{
-    mobject::ExtractedMobject, pipeline::PipelineVertex, RanimContext, WgpuBuffer, WgpuContext,
+    mobject::ExtractedMobject, pipeline::RenderPipeline, utils::Id, RanimContext, WgpuBuffer,
+    WgpuContext,
 };
 
 #[repr(C)]
@@ -149,11 +155,22 @@ impl Camera {
         }
     }
 
-    pub fn render<Vertex: PipelineVertex>(
+    pub fn render<Pipeline: RenderPipeline + 'static>(
         &mut self,
         ctx: &mut RanimContext,
-        objects: &mut Vec<ExtractedMobject<Vertex>>,
+        objects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     ) {
+        let objects = objects
+            .entry(std::any::TypeId::of::<Pipeline>())
+            .or_default();
+        let mut objects = objects
+            .into_iter()
+            .map(|(_, mobject)| {
+                mobject
+                    .downcast_mut::<ExtractedMobject<Pipeline::Vertex>>()
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
         trace!("[Camera] Rendering...");
 
         // Update the uniforms buffer
@@ -168,7 +185,7 @@ impl Camera {
         );
 
         // Preparing the object
-        for object in objects.iter_mut() {
+        for object in &mut objects {
             object.prepare(&ctx.wgpu_ctx);
         }
 
@@ -188,7 +205,7 @@ impl Camera {
                     label: Some("Render Encoder"),
                 });
 
-        let pipeline = ctx.get_or_init_pipeline::<Vertex::Pipeline>();
+        let pipeline = ctx.get_or_init_pipeline::<Pipeline>();
         let bg = Srgba::from_u32::<rgb::channels::Rgba>(0x333333FF).into_linear();
         let render_pass_desc = wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),

@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use env_logger::Env;
-use glam::{dvec2, vec3, Vec3};
+use glam::{dvec2, Vec3};
 use log::info;
 use palette::{rgb, Srgba};
 use ranim::{
