@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use bytemuck::{Pod, Zeroable};
 use glam::{vec3, vec4, Vec3, Vec4};
@@ -15,7 +15,7 @@ use super::{PipelineVertex, RenderPipeline};
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 pub struct Vertex {
     pub position: Vec3,
-    _padding: f32,
+    pub(crate) _padding: f32,
     pub color: Vec4,
 }
 
@@ -41,32 +41,21 @@ impl PipelineVertex for Vertex {
             ],
         }
     }
-}
 
-impl Into<Vec<Vertex>> for Vertices {
-    fn into(self) -> Vec<Vertex> {
-        self.0
+    fn position(&self) -> Vec3 {
+        self.position
     }
-}
 
-pub struct Vertices(Vec<Vertex>);
-
-impl Into<Vertices> for Vec<Vertex> {
-    fn into(self) -> Vertices {
-        Vertices(self)
+    fn set_position(&mut self, position: Vec3) {
+        self.position = position;
     }
-}
 
-impl Deref for Vertices {
-    type Target = Vec<Vertex>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn color(&self) -> Vec4 {
+        self.color
     }
-}
 
-impl DerefMut for Vertices {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    fn set_color(&mut self, color: Vec4) {
+        self.color = color;
     }
 }
 

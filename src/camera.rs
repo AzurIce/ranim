@@ -130,7 +130,7 @@ impl Camera {
         &mut self,
         ctx: &mut RanimContext,
         texture_data: &mut Vec<u8>,
-        object: &Mobject<Vertex>,
+        object: &mut Mobject<Vertex>,
     ) {
         debug!("[Camera] Rendering...");
 
@@ -144,6 +144,9 @@ impl Camera {
             0,
             bytemuck::cast_slice(&[self.uniforms]),
         );
+
+        // Preparing the object
+        object.prepare(&ctx.wgpu_ctx);
 
         if texture_data.len() != self.frame.size.0 * self.frame.size.1 * 4 {
             warn!("[Camera] texture data len mismatch, resizing...");

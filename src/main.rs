@@ -1,8 +1,8 @@
 use env_logger::Env;
-use glam::dvec2;
+use glam::{dvec2, vec3, Vec3};
 use ranim::{
     camera::Camera,
-    mobject::{geometry::Polygon, Mobject},
+    mobject::{geometry::Polygon, Mobject, TransformAnchor},
     RanimContext,
 };
 
@@ -24,10 +24,20 @@ async fn run() {
         dvec2(0.0, 70.0),
         dvec2(50.0, 0.0),
     ]);
-    let mobject = Mobject::from_pipeline_vertex(&ctx.wgpu_ctx, polygon);
+    let mut mobject = Mobject::from_pipeline_vertex(&ctx.wgpu_ctx, polygon);
+
+    mobject.shift(vec3(100.0, 0.0, 0.0));
+    mobject.scale(vec3(2.0, 4.0, 1.0), TransformAnchor::origin());
+    mobject.shift(vec3(-100.0, 0.0, 0.0));
+    mobject.rotate(
+        std::f32::consts::PI / 4.0,
+        Vec3::Z,
+        TransformAnchor::origin(),
+    );
+    mobject.shift(vec3(0.0, 50.0, 0.0));
 
     let mut texture_data = vec![0; size.0 * size.1 * 4];
-    camera.render(&mut ctx, &mut texture_data, &mobject);
+    camera.render(&mut ctx, &mut texture_data, &mut mobject);
 
     use image::{ImageBuffer, Rgba};
     let buffer =
