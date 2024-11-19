@@ -3,11 +3,6 @@ name = "ranim"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-# [lib]
-# name = "ranim"
-# crate-type = ["cdylib", "rlib"]
-
 [workspace]
 members = ["packages/*"]
 
@@ -26,7 +21,6 @@ image = "0.25.5"
 itertools = "0.13.0"
 log = "0.4.22"
 pollster = "0.4.0"
-# pyo3 = "0.22.0"
 uuid = { version = "1.11.0", features = ["v4"] }
 wgpu = "23.0.0"
 palette = "0.7.6"
