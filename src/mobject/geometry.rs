@@ -1,35 +1,54 @@
 use bezier_rs::{Bezier, Subpath};
-use glam::{dvec2, DVec2};
+use glam::{vec2, DVec2};
 use itertools::Itertools;
 
 use crate::{
     pipeline::simple,
-    utils::{sub_path_to_vertex, Id},
+    utils::{sub_path_to_vertex, Id, SubpathWidth},
 };
+
+use super::ToMobject;
 
 /// A part of a circle
 // #[mobject(SimplePipeline)]
 #[derive(Debug, Clone)]
 pub struct Arc {
     /// Angle in radians of the arc
-    pub angle: f64,
+    pub angle: f32,
+    pub radius: f32,
+    pub width: SubpathWidth,
 }
 
-impl Into<Vec<simple::Vertex>> for Arc {
-    fn into(self) -> Vec<simple::Vertex> {
+impl Arc {
+    pub fn new(angle: f32) -> Self {
+        Self { angle, radius: 1.0, width: SubpathWidth::Middle(1.0) }
+    }
+    pub fn with_radius(mut self, radius: f32) -> Self {
+        self.radius = radius;
+        self
+    }
+    pub fn with_width(mut self, width: SubpathWidth) -> Self {
+        self.width = width;
+        self
+    }
+}
+
+impl ToMobject for Arc {
+    type Pipeline = simple::Pipeline;
+
+    fn vertex(&self) -> Vec<simple::Vertex> {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
 
-        let angle_step = self.angle / (len - 1) as f64;
+        let angle_step = self.angle / (len - 1) as f32;
         let mut points = (0..len)
             .map(|i| {
-                let angle = i as f64 * angle_step;
-                // println!("{i}/{len} angle: {:?}", angle / std::f64::consts::PI);
-                dvec2(angle.cos() as f64, angle.sin() as f64)
+                let angle = i as f32 * angle_step;
+                vec2(angle.cos() as f32, angle.sin() as f32)
             })
             .collect::<Vec<_>>();
 
-        let theta = self.angle / NUM_SEGMENTS as f64;
+        let theta = self.angle / NUM_SEGMENTS as f32;
         points.iter_mut().skip(1).step_by(2).for_each(|p| {
             *p /= (theta / 2.0).cos();
         });
@@ -40,21 +59,37 @@ impl Into<Vec<simple::Vertex>> for Arc {
             .step_by(2)
             .zip(points.iter().skip(1).step_by(2))
             .zip(points.iter().skip(2).step_by(2))
-            .map(|((p1, p2), p3)| Bezier::from_quadratic_dvec2(*p1, *p2, *p3))
+            .map(|((&p1, &p2), &p3)| {
+                let [p1, p2, p3] = [p1 * self.radius, p2 * self.radius, p3 * self.radius];
+                Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
+            })
             .collect::<Vec<_>>();
         let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, false);
 
-        sub_path_to_vertex(subpath)
+        sub_path_to_vertex(subpath, self.width)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Polygon {
     pub vertices: Vec<DVec2>,
+    pub width: SubpathWidth,
 }
 
-impl Into<Vec<simple::Vertex>> for Polygon {
-    fn into(self) -> Vec<simple::Vertex> {
+impl Polygon {
+    pub fn new(vertices: Vec<DVec2>) -> Self {
+        Self { vertices, width: SubpathWidth::Middle(1.0) }
+    }
+    pub fn with_width(mut self, width: SubpathWidth) -> Self {
+        self.width = width;
+        self
+    }
+}
+
+impl ToMobject for Polygon {
+    type Pipeline = simple::Pipeline;
+
+    fn vertex(&self) -> Vec<simple::Vertex> {
         // TODO: Handle 0 len
         if self.vertices.len() == 0 {
             return vec![].into();
@@ -67,8 +102,8 @@ impl Into<Vec<simple::Vertex>> for Polygon {
             .windows(2)
             .map(|window| 0.5 * (window[0] + window[1]))
             .collect::<Vec<_>>();
-        println!("anchors: {:?}", anchors.len());
-        println!("handles: {:?}", handles.len());
+        // println!("anchors: {:?}", anchors.len());
+        // println!("handles: {:?}", handles.len());
 
         assert_eq!(anchors.len(), handles.len() + 1);
 
@@ -76,7 +111,7 @@ impl Into<Vec<simple::Vertex>> for Polygon {
             .into_iter()
             .interleave(handles.into_iter())
             .collect::<Vec<_>>();
-        println!("points: {:?}, {:?}", points.len(), points);
+        // println!("points: {:?}, {:?}", points.len(), points);
         let beziers = points
             .iter()
             .step_by(2)
@@ -95,18 +130,12 @@ impl Into<Vec<simple::Vertex>> for Polygon {
                     .step_by(2),
             )
             .map(|((p1, p2), p3)| {
-                println!("({:?}, {:?}, {:?})", p1, p2, p3);
+                // println!("({:?}, {:?}, {:?})", p1, p2, p3);
                 Bezier::from_quadratic_dvec2(*p1, *p2, *p3)
             })
             .collect::<Vec<_>>();
-        println!("beziers: {:?}", beziers.len());
+        // println!("beziers: {:?}", beziers.len());
         let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, true);
-        sub_path_to_vertex(subpath)
-    }
-}
-
-impl Polygon {
-    pub fn from_verticies(vertices: Vec<DVec2>) -> Self {
-        Self { vertices }
+        sub_path_to_vertex(subpath, self.width)
     }
 }

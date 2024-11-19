@@ -1,15 +1,16 @@
 use std::{fs, path::Path};
 
 use image::{ImageBuffer, Rgba};
+use log::trace;
 
 use crate::{
-    animation::Animation, camera::Camera, mobject::Mobject, pipeline::simple, RanimContext,
+    animation::Animation, camera::Camera, mobject::{ExtractedMobject, Mobject}, pipeline::simple, RanimContext,
     WgpuContext,
 };
 
 pub struct Scene {
     pub camera: Camera,
-    pub mobjects: Vec<Mobject<simple::Vertex>>,
+    pub mobjects: Vec<ExtractedMobject<simple::Vertex>>,
     pub time: f32,
     pub frame_count: usize,
 }
@@ -24,15 +25,15 @@ impl Scene {
         }
     }
 
-    pub fn add_mobject(&mut self, mobject: &Mobject<simple::Vertex>) {
+    pub fn add_mobject(&mut self, ctx: &mut RanimContext, mobject: &Mobject<simple::Vertex>) {
         self.mobjects.retain(|m| m.id != mobject.id);
-        self.mobjects.push(mobject.clone());
+        self.mobjects.push(mobject.extract(&ctx.wgpu_ctx));
     }
 
-    pub fn add_mobjects(&mut self, mobjects: Vec<Mobject<simple::Vertex>>) {
+    pub fn add_mobjects(&mut self, ctx: &mut RanimContext, mobjects: Vec<Mobject<simple::Vertex>>) {
         self.mobjects
             .retain(|m| !mobjects.iter().any(|m2| m2.id == m.id));
-        self.mobjects.extend(mobjects);
+        self.mobjects.extend(mobjects.iter().map(|m| m.extract(&ctx.wgpu_ctx)));
     }
 
     pub fn render_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
@@ -63,6 +64,7 @@ impl Scene {
         ctx: &mut RanimContext,
         mut animation: Animation,
     ) -> Option<Mobject<simple::Vertex>> {
+        trace!("[Scene] Playing animation {:?}...", animation.mobject.id);
         // TODO: handle the precision problem
         let frames = animation.config.calc_frames(self.camera.fps as f32);
 
@@ -73,7 +75,7 @@ impl Scene {
             let alpha = t / animation.config.run_time.as_secs_f32();
             let alpha = (animation.config.rate_func)(alpha);
             animation.interpolate(alpha);
-            self.add_mobject(&animation.mobject);
+            self.add_mobject(ctx, &animation.mobject);
             self.update_frame(ctx, dt);
             self.frame_count += 1;
             let path = format!("output/image-{:04}.png", self.frame_count);
