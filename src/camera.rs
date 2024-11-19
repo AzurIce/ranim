@@ -57,6 +57,7 @@ pub struct Camera {
     pub frame: CameraFrame,
     uniforms: CameraUniforms,
     target_texture: wgpu::Texture,
+    texture_data: Option<Vec<u8>>,
     depth_texture: wgpu::Texture,
     output_staging_buffer: wgpu::Buffer,
 
@@ -119,6 +120,7 @@ impl Camera {
             uniforms,
             frame,
             target_texture,
+            texture_data: None,
             depth_texture,
             output_staging_buffer,
             uniforms_buffer,
@@ -129,7 +131,6 @@ impl Camera {
     pub fn render<Vertex: PipelineVertex>(
         &mut self,
         ctx: &mut RanimContext,
-        texture_data: &mut Vec<u8>,
         object: &mut Mobject<Vertex>,
     ) {
         debug!("[Camera] Rendering...");
@@ -147,11 +148,6 @@ impl Camera {
 
         // Preparing the object
         object.prepare(&ctx.wgpu_ctx);
-
-        if texture_data.len() != self.frame.size.0 * self.frame.size.1 * 4 {
-            warn!("[Camera] texture data len mismatch, resizing...");
-            texture_data.resize(self.frame.size.0 * self.frame.size.1 * 4, 0);
-        }
 
         let texture_view = self
             .target_texture
@@ -175,6 +171,22 @@ impl Camera {
                 Some(&depth_view),
                 &[&self.uniforms_bind_group.bind_group],
             );
+            ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+        }
+    }
+
+    pub fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
+        let mut texture_data = self.texture_data.take().unwrap_or(
+            vec![0; self.frame.size.0 * self.frame.size.1 * 4],
+        );
+
+        let mut encoder =
+            ctx.device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
+
+        {
             encoder.copy_texture_to_buffer(
                 wgpu::ImageCopyTexture {
                     aspect: wgpu::TextureAspect::All,
@@ -192,7 +204,7 @@ impl Camera {
                 },
                 self.target_texture.size(),
             );
-            ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+            ctx.queue.submit(Some(encoder.finish()));
         }
 
         pollster::block_on(async {
@@ -204,10 +216,7 @@ impl Camera {
             buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
                 tx.send_blocking(result).unwrap()
             });
-            ctx.wgpu_ctx
-                .device
-                .poll(wgpu::Maintain::Wait)
-                .panic_on_timeout();
+            ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
             rx.recv().await.unwrap().unwrap();
 
             {
@@ -216,6 +225,9 @@ impl Camera {
             }
         });
         self.output_staging_buffer.unmap();
+
+        self.texture_data = Some(texture_data);
+        &self.texture_data.as_ref().unwrap()
     }
 
     pub fn refresh_uniforms(&mut self) {
@@ -226,10 +238,10 @@ impl Camera {
 
 /// Default pos is at the origin, looking to the negative z-axis
 pub struct CameraFrame {
-    fovy: f32,
-    size: (usize, usize),
-    pos: Vec3,
-    rotation: Mat4,
+    pub fovy: f32,
+    pub size: (usize, usize),
+    pub pos: Vec3,
+    pub rotation: Mat4,
 }
 
 impl CameraFrame {

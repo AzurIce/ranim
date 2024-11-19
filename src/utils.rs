@@ -6,9 +6,15 @@ use crate::pipeline::simple;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
 
+impl Id {
+    pub fn new() -> Self {
+        Self(uuid::Uuid::new_v4().as_u128())
+    }
+}
+
 impl Identifier for Id {
     fn new() -> Self {
-        Self(uuid::Uuid::new_v4().as_u128())
+        Self::new()
     }
 }
 

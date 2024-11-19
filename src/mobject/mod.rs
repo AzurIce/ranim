@@ -1,13 +1,20 @@
 pub mod geometry;
 
+use std::sync::{Arc, Mutex};
+
 use glam::{ivec3, vec3, IVec3, Mat3, Vec3};
 
 use crate::pipeline::{simple, PipelineVertex};
+use crate::utils::Id;
 use crate::{WgpuBuffer, WgpuContext};
 
+// TODO: instead of cloning, implement a ExtractMobject
+
+#[derive(Clone)]
 pub struct Mobject<Vertex: PipelineVertex> {
+    pub id: Id,
     points: Vec<Vertex>,
-    buffer: WgpuBuffer<Vertex>,
+    buffer: Arc<Mutex<WgpuBuffer<Vertex>>>,
 }
 
 impl<Vertex: PipelineVertex> Mobject<Vertex> {
@@ -18,7 +25,11 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
             &points,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
-        Self { points, buffer }
+        Self {
+            id: Id::new(),
+            points,
+            buffer: Arc::new(Mutex::new(buffer)),
+        }
     }
 
     pub fn update_from_pipeline_vertex(&mut self, ctx: &WgpuContext, points: Vec<Vertex>) {
@@ -27,10 +38,10 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
     }
 
     pub fn update_buffer(&mut self, ctx: &WgpuContext) {
-        self.buffer.prepare_from_slice(ctx, &self.points);
+        self.buffer.lock().unwrap().prepare_from_slice(ctx, &self.points);
     }
 
-    pub fn vertex_buffer(&self) -> &WgpuBuffer<Vertex> {
+    pub fn vertex_buffer(&self) -> &Mutex<WgpuBuffer<Vertex>> {
         &self.buffer
     }
 
@@ -79,8 +90,11 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
         for (i, bindgroup) in bindgroups.iter().cloned().enumerate() {
             render_pass.set_bind_group(i as u32, bindgroup, &[]);
         }
-        render_pass.set_vertex_buffer(0, self.buffer.slice(..));
-        render_pass.draw(0..self.buffer.len() as u32, 0..1);
+        {
+            let buffer = self.buffer.lock().unwrap();
+            render_pass.set_vertex_buffer(0, buffer.slice(..));
+            render_pass.draw(0..buffer.len() as u32, 0..1);
+        }
     }
 }
 
