@@ -1,5 +1,7 @@
 # Ranim
 
+https://github.com/user-attachments/assets/0cdbd136-6b87-4c17-9eec-fec0e0aacf16
+
 > [basic.mp4](./assets/basic.mp4)
 
 Ranim is an animation engine crate implemented in pure rust, inspired by [Manim](https://github.com/3b1b/manim/tree/master).
