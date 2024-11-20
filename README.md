@@ -11,6 +11,11 @@ It is now just a pure rust crate, but in the future, it may support python throu
 > [!WARNING]
 > Currently, the project is WIP. It only supports some basic *mobjects* and *animations*, the apis are unstable and may change frequently, the documentation is also not complete.
 
+## Dependencies
+
+runtime dependencies:
+- ffmpeg: ranim spawns a ffmpeg process to encode videos
+
 ## Installation
 
 Currently, it is not published to crates.io, but you can add it to your `Cargo.toml`'s `[dependencies]` section with git url:
