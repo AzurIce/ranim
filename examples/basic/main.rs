@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
 use env_logger::Env;
+use log::info;
 use ranim::glam::{vec2, Vec3};
 use ranim::palette::{rgb, Srgba};
-use log::info;
 use ranim::{
     animation::{fading::Fading, transform::Transform, Animation, AnimationConfig},
     mobject::{

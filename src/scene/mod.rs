@@ -7,7 +7,7 @@ use std::{
     path::Path,
 };
 
-use file_writer::FileWriter;
+use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
 use log::trace;
 
@@ -36,13 +36,14 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new(ctx: &WgpuContext) -> Self {
-        let camera = Camera::new(ctx, 1920, 1080);
-        let video_writer = FileWriter::builder()
-            .with_size(1920, 1080)
-            .with_fps(camera.fps)
-            .build();
-
+    pub fn new_with_video_writer_builder(ctx: &WgpuContext, builder: FileWriterBuilder) -> Self {
+        let camera = Camera::new(
+            ctx,
+            builder.width as usize,
+            builder.height as usize,
+            builder.fps,
+        );
+        let video_writer = builder.build();
         Self {
             camera,
             mobjects: HashMap::new(),
@@ -51,6 +52,11 @@ impl Scene {
             video_writer: Some(video_writer),
             save_frame: true,
         }
+    }
+
+    /// With default [`FileWriterBuilder`]
+    pub fn new(ctx: &WgpuContext) -> Self {
+        Self::new_with_video_writer_builder(ctx, FileWriter::builder())
     }
 
     pub fn remove_mobject(&mut self, id: Id) {

@@ -2,4 +2,4 @@
 
 This example demonstrates the basic usage of `ranim`.
 
-![basic.mp4](../../assets/basic.mp4)
+> [basic.mp4](../../assets/basic.mp4)

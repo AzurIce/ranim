@@ -78,7 +78,7 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
+    pub fn new(ctx: &WgpuContext, width: usize, height: usize, fps: u32) -> Self {
         let frame = CameraFrame::new_with_size(width, height);
 
         let target_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
@@ -144,7 +144,7 @@ impl Camera {
 
         Self {
             frame,
-            fps: 60,
+            fps,
             uniforms,
             target_texture,
             multisample_texture,
