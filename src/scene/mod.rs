@@ -1,3 +1,5 @@
+pub mod file_writer;
+
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
@@ -5,6 +7,7 @@ use std::{
     path::Path,
 };
 
+use file_writer::FileWriter;
 use image::{ImageBuffer, Rgba};
 use log::trace;
 
@@ -25,15 +28,28 @@ pub struct Scene {
     pub mobjects: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     pub time: f32,
     pub frame_count: usize,
+
+    /// The writer for the output.mp4 video
+    pub video_writer: Option<FileWriter>,
+    /// Whether to save the frame to 'output/image-x.png'
+    pub save_frame: bool,
 }
 
 impl Scene {
     pub fn new(ctx: &WgpuContext) -> Self {
+        let camera = Camera::new(ctx, 1920, 1080);
+        let video_writer = FileWriter::builder()
+            .with_size(1920, 1080)
+            .with_fps(camera.fps)
+            .build();
+
         Self {
-            camera: Camera::new(ctx, 1920, 1080),
+            camera,
             mobjects: HashMap::new(),
             time: 0.0,
             frame_count: 0,
+            video_writer: Some(video_writer),
+            save_frame: true,
         }
     }
 
@@ -74,14 +90,27 @@ impl Scene {
     }
 
     pub fn render_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
-        self.camera.render::<simple::Pipeline>(ctx, &mut self.mobjects);
+        self.camera
+            .render::<simple::Pipeline>(ctx, &mut self.mobjects);
         self.save_frame_to_image(ctx, path);
     }
 
     pub fn update_frame(&mut self, ctx: &mut RanimContext, dt: f32) {
         self.time += dt;
         // self.update_mobjects(dt);
-        self.camera.render::<simple::Pipeline>(ctx, &mut self.mobjects);
+        self.camera
+            .render::<simple::Pipeline>(ctx, &mut self.mobjects);
+        if let Some(writer) = &mut self.video_writer {
+            writer.write_frame(&self.camera.get_rendered_texture(&ctx.wgpu_ctx));
+        }
+        if self.save_frame {
+            let path = format!("output/image-{:04}.png", self.frame_count);
+            let dir = Path::new(&path).parent().unwrap();
+            if !dir.exists() {
+                fs::create_dir_all(dir).unwrap();
+            }
+            self.save_frame_to_image(ctx, path);
+        }
     }
 
     pub fn save_frame_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
@@ -115,12 +144,6 @@ impl Scene {
             self.add_mobject(ctx, &animation.mobject);
             self.update_frame(ctx, dt);
             self.frame_count += 1;
-            let path = format!("output/image-{:04}.png", self.frame_count);
-            let dir = Path::new(&path).parent().unwrap();
-            if !dir.exists() {
-                fs::create_dir_all(dir).unwrap();
-            }
-            self.save_frame_to_image(ctx, path);
         }
         if animation.should_remove() {
             self.remove_mobject(animation.mobject.id);
