@@ -59,9 +59,9 @@ impl Scene {
         Self::new_with_video_writer_builder(ctx, FileWriter::builder())
     }
 
-    pub fn remove_mobject(&mut self, id: Id) {
+    pub fn remove_mobject<Vertex: PipelineVertex>(&mut self, mobject: &Mobject<Vertex>) {
         self.mobjects.iter_mut().for_each(|(_, mobject_vec)| {
-            mobject_vec.retain(|(mobject_id, _)| mobject_id != &id);
+            mobject_vec.retain(|(mobject_id, _)| mobject_id != mobject.id());
         });
     }
 
@@ -80,11 +80,11 @@ impl Scene {
     pub fn add_mobjects<Vertex: PipelineVertex>(
         &mut self,
         ctx: &mut RanimContext,
-        mobjects: Vec<Mobject<Vertex>>,
+        mobjects: &[Mobject<Vertex>],
     ) {
         // Should be faster?
         self.mobjects.iter_mut().for_each(|(_, mobject_vec)| {
-            mobject_vec.retain(|(id, _)| !mobjects.iter().any(|m| id == &m.id))
+            mobject_vec.retain(|(id, _)| !mobjects.iter().any(|m| id == m.id()));
         });
         mobjects.iter().for_each(|m| {
             let mobject = m.extract(&ctx.wgpu_ctx);
@@ -136,7 +136,8 @@ impl Scene {
         ctx: &mut RanimContext,
         mut animation: Animation<Vertex>,
     ) -> Option<Mobject<Vertex>> {
-        trace!("[Scene] Playing animation {:?}...", animation.mobject.id);
+        self.add_mobject(ctx, &animation.mobject);
+        trace!("[Scene] Playing animation {:?}...", animation.mobject.id());
         // TODO: handle the precision problem
         let frames = animation.config.calc_frames(self.camera.fps as f32);
 
@@ -147,12 +148,11 @@ impl Scene {
             let alpha = t / animation.config.run_time.as_secs_f32();
             let alpha = (animation.config.rate_func)(alpha);
             animation.interpolate(alpha);
-            self.add_mobject(ctx, &animation.mobject);
             self.update_frame(ctx, dt);
             self.frame_count += 1;
         }
         if animation.should_remove() {
-            self.remove_mobject(animation.mobject.id);
+            self.remove_mobject(&animation.mobject);
             None
         } else {
             Some(animation.mobject)
