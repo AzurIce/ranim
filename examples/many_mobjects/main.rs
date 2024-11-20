@@ -46,7 +46,7 @@ fn main() {
         let t = Instant::now();
         for j in 0..ncol {
             let angle = std::f32::consts::PI * j as f32 / (ncol - 1) as f32 * 360.0 / 180.0;
-            let color = start_color.lerp(end_color, i as f32 / nrow as f32);
+            let color = start_color.lerp(end_color, i as f32 / (nrow - 1) as f32);
             let offset = vec3(
                 j as f32 * step_x + step_x / 2.0 + j as f32 * gap + padding,
                 i as f32 * step_y + step_y / 2.0 + i as f32 * gap + padding,
