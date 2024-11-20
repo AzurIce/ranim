@@ -5,7 +5,7 @@ use std::sync::{Arc, RwLock};
 use glam::{ivec3, vec3, vec4, IVec3, Mat3, Vec3};
 use palette::Srgba;
 
-use crate::pipeline::{simple, PipelineVertex, RenderPipeline};
+use crate::pipeline::{PipelineVertex, RenderPipeline};
 use crate::utils::{resize_preserving_order, Id};
 use crate::{WgpuBuffer, WgpuContext};
 
@@ -42,23 +42,22 @@ pub trait ToMobject {
         Self: Sized,
     {
         let points = self.vertex();
-        Mobject::new(std::any::TypeId::of::<Self::Pipeline>(), points)
+        Mobject::new::<Self::Pipeline>(points)
     }
 }
 
 #[derive(Clone)]
 pub struct Mobject<Vertex: PipelineVertex> {
     pub id: Id,
-    pipeline_id: std::any::TypeId,
+    pub pipeline_id: std::any::TypeId,
     points: Arc<RwLock<Vec<Vertex>>>,
-    // buffer: Arc<Mutex<WgpuBuffer<Vertex>>>,
 }
 
 impl<Vertex: PipelineVertex> Mobject<Vertex> {
-    fn new(pipeline_id: std::any::TypeId, points: impl Into<Vec<Vertex>>) -> Self {
+    fn new<Pipeline: RenderPipeline + 'static>(points: impl Into<Vec<Vertex>>) -> Self {
         Self {
             id: Id::new(),
-            pipeline_id,
+            pipeline_id: std::any::TypeId::of::<Pipeline>(),
             points: Arc::new(RwLock::new(points.into())),
         }
     }
@@ -102,7 +101,7 @@ impl TransformAnchor {
     }
 }
 
-impl Mobject<simple::Vertex> {
+impl<Vertex: PipelineVertex> Mobject<Vertex> {
     /// Get the bounding box of the mobject.
     /// min, mid, max
     pub fn get_bounding_box(&self) -> [Vec3; 3] {
@@ -110,12 +109,12 @@ impl Mobject<simple::Vertex> {
 
         let min = points
             .iter()
-            .map(|p| p.position)
+            .map(|p| p.position())
             .reduce(|acc, e| acc.min(e))
             .unwrap();
         let max = points
             .iter()
-            .map(|p| p.position)
+            .map(|p| p.position())
             .reduce(|acc, e| acc.min(e))
             .unwrap();
         let mid = (min + max) / 2.0;
@@ -136,7 +135,7 @@ impl Mobject<simple::Vertex> {
     /// Apply a function to the points of the mobject about the point.
     pub fn apply_points_function(
         &mut self,
-        f: impl Fn(&mut Vec<simple::Vertex>),
+        f: impl Fn(&mut Vec<Vertex>),
         anchor: TransformAnchor,
     ) {
         let anchor = match anchor {
@@ -148,7 +147,7 @@ impl Mobject<simple::Vertex> {
         if anchor != Vec3::ZERO {
             points
                 .iter_mut()
-                .for_each(|p| p.set_position(p.position + anchor));
+                .for_each(|p| p.set_position(p.position() + anchor));
         }
 
         f(&mut points);
@@ -156,7 +155,7 @@ impl Mobject<simple::Vertex> {
         if anchor != Vec3::ZERO {
             points
                 .iter_mut()
-                .for_each(|p| p.set_position(p.position - anchor));
+                .for_each(|p| p.set_position(p.position() - anchor));
         }
     }
 
@@ -165,7 +164,7 @@ impl Mobject<simple::Vertex> {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
-                    p.set_position(p.position + shift);
+                    p.set_position(p.position() + shift);
                 });
             },
             TransformAnchor::origin(),
@@ -178,7 +177,7 @@ impl Mobject<simple::Vertex> {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
-                    p.set_position(p.position * scale);
+                    p.set_position(p.position() * scale);
                 });
             },
             anchor,
@@ -194,7 +193,7 @@ impl Mobject<simple::Vertex> {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
-                    p.set_position(rotation * p.position);
+                    p.set_position(rotation * p.position());
                 });
             },
             anchor,
@@ -203,7 +202,7 @@ impl Mobject<simple::Vertex> {
     }
 }
 
-impl Mobject<simple::Vertex> {
+impl<Vertex: PipelineVertex> Mobject<Vertex> {
     pub fn set_color(&mut self, color: Srgba) {
         let color = vec4(color.red, color.green, color.blue, color.alpha);
 
@@ -220,7 +219,7 @@ impl Mobject<simple::Vertex> {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
-                    p.set_color(vec4(p.color.x, p.color.y, p.color.z, opacity));
+                    p.set_color(vec4(p.color().x, p.color().y, p.color().z, opacity));
                 });
             },
             TransformAnchor::origin(),
@@ -228,7 +227,7 @@ impl Mobject<simple::Vertex> {
     }
 }
 
-impl Mobject<simple::Vertex> {
+impl<Vertex: PipelineVertex> Mobject<Vertex> {
     pub fn vertex_cnt(&self) -> usize {
         self.points.read().unwrap().len()
     }
@@ -238,24 +237,24 @@ impl Mobject<simple::Vertex> {
         *points = resize_preserving_order(&points, len);
     }
 
-    pub fn aligned_with_mobject(&self, target: &Mobject<simple::Vertex>) -> bool {
+    pub fn aligned_with_mobject(&self, target: &Mobject<Vertex>) -> bool {
         self.vertex_cnt() == target.vertex_cnt()
     }
 
-    pub fn align_with_mobject(&mut self, target: &mut Mobject<simple::Vertex>) {
+    pub fn align_with_mobject(&mut self, target: &mut Mobject<Vertex>) {
         let max_len = self.vertex_cnt().max(target.vertex_cnt());
         self.resize_points(max_len);
         target.resize_points(max_len);
     }
 
-    pub fn interpolate_with_mobject(&mut self, target: &Mobject<simple::Vertex>, t: f32) {
+    pub fn interpolate_with_mobject(&mut self, target: &Mobject<Vertex>, t: f32) {
         let mut points = self.points.write().unwrap();
         points
             .iter_mut()
             .zip(target.points.read().unwrap().iter())
             .for_each(|(p1, p2)| {
-                p1.set_position(p1.position.lerp(p2.position, t));
-                p1.set_color(p1.color.lerp(p2.color, t));
+                p1.set_position(p1.position().lerp(p2.position(), t));
+                p1.set_color(p1.color().lerp(p2.color(), t));
             });
     }
 }

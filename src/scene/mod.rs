@@ -131,11 +131,11 @@ impl Scene {
     /// Play an animation
     ///
     /// See [`Animation`].
-    pub fn play(
+    pub fn play<Vertex: PipelineVertex>(
         &mut self,
         ctx: &mut RanimContext,
-        mut animation: Animation,
-    ) -> Option<Mobject<simple::Vertex>> {
+        mut animation: Animation<Vertex>,
+    ) -> Option<Mobject<Vertex>> {
         trace!("[Scene] Playing animation {:?}...", animation.mobject.id);
         // TODO: handle the precision problem
         let frames = animation.config.calc_frames(self.camera.fps as f32);

@@ -21,7 +21,7 @@ pub trait PipelineVertex: bytemuck::Pod + bytemuck::Zeroable {
 /// A render pipeline.
 pub trait RenderPipeline: Deref<Target = wgpu::RenderPipeline> {
     /// The vertex type.
-    type Vertex: PipelineVertex;
+    type Vertex: PipelineVertex + Clone;
 
     /// The uniform type.
     type Uniforms: bytemuck::Pod + bytemuck::Zeroable;
