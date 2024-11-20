@@ -2,7 +2,7 @@ pub mod geometry;
 
 use std::sync::{Arc, RwLock};
 
-use glam::{ivec3, vec3, vec4, IVec3, Mat3, Vec3};
+use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3};
 use palette::Srgba;
 
 use crate::pipeline::{PipelineVertex, RenderPipeline};
@@ -35,15 +35,9 @@ impl<Vertex: PipelineVertex> ExtractedMobject<Vertex> {
 pub trait ToMobject {
     type Pipeline: RenderPipeline + 'static;
 
-    fn vertex(&self) -> Vec<<Self::Pipeline as RenderPipeline>::Vertex>;
-
     fn to_mobject(self) -> Mobject<<Self::Pipeline as RenderPipeline>::Vertex>
     where
-        Self: Sized,
-    {
-        let points = self.vertex();
-        Mobject::new::<Self::Pipeline>(points)
-    }
+        Self: Sized;
 }
 
 #[derive(Clone)]
@@ -141,11 +135,7 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
     }
 
     /// Apply a function to the points of the mobject about the point.
-    pub fn apply_points_function(
-        &mut self,
-        f: impl Fn(&mut Vec<Vertex>),
-        anchor: TransformAnchor,
-    ) {
+    pub fn apply_points_function(&mut self, f: impl Fn(&mut Vec<Vertex>), anchor: TransformAnchor) {
         let anchor = match anchor {
             TransformAnchor::Point(x) => x,
             TransformAnchor::Edge(x) => self.get_bounding_box_point(x),
@@ -206,6 +196,43 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
             },
             anchor,
         );
+        self
+    }
+
+    pub fn get_start_position(&self) -> Option<Vec3> {
+        self.points.read().unwrap().first().map(|p| p.position())
+    }
+
+    pub fn get_end_position(&self) -> Option<Vec3> {
+        self.points.read().unwrap().last().map(|p| p.position())
+    }
+
+    pub fn put_start_and_end_on(&mut self, start: Vec3, end: Vec3) -> &mut Self {
+        let (cur_start, cur_end) = (
+            self.get_start_position().unwrap_or_default(),
+            self.get_end_position().unwrap_or_default(),
+        );
+        let cur_v = cur_end - cur_start;
+        if cur_v.length_squared() <= f32::EPSILON {
+            return self;
+        }
+
+        let v = end - start;
+        self.scale(
+            Vec3::splat(v.length() / cur_v.length()),
+            TransformAnchor::Point(cur_start),
+        );
+        let angle = cur_v.y.atan2(-cur_v.x) - v.y.atan2(-v.x) + std::f32::consts::PI / 2.0;
+        self.rotate(angle, Vec3::Z, TransformAnchor::origin());
+        let cur_xy = vec2(cur_v.x, cur_v.y);
+        let cur_xy = cur_xy * cur_xy.abs().normalize();
+
+        let xy = vec2(v.x, v.y);
+        let xy = xy * xy.abs().normalize();
+        let angle = cur_v.z.atan2(-cur_xy.length()) - v.z.atan2(-xy.length());
+        self.rotate(angle, vec3(-v.y, v.x, 0.0), TransformAnchor::origin());
+        self.shift(start - self.get_start_position().unwrap());
+
         self
     }
 }
