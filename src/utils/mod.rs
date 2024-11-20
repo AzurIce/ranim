@@ -28,6 +28,12 @@ pub enum SubpathWidth {
     Middle(f32),
 }
 
+impl Default for SubpathWidth {
+    fn default() -> Self {
+        Self::Middle(1.0)
+    }
+}
+
 pub fn beziers_to_vertex(beziers: Vec<Bezier>, width: SubpathWidth, closed: bool) -> Vec<simple::Vertex> {
     trace!("converting subpath to vertex: {:?}", beziers.len());
     const MAX_STEPS: usize = 256;

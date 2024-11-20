@@ -54,7 +54,7 @@ fn main() {
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
-        .with_width(SubpathWidth::Middle(20.0))
+        .with_stroke_width(SubpathWidth::Middle(20.0))
         .to_mobject();
     arc.set_color(Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into());
 
