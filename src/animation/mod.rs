@@ -3,7 +3,7 @@ pub mod transform;
 
 use std::time;
 
-use crate::{mobject::Mobject, pipeline::simple, utils::rate_functions::smooth};
+use crate::{mobject::Mobject, pipeline::PipelineVertex, utils::rate_functions::smooth};
 
 pub struct AnimationConfig {
     pub run_time: time::Duration,
@@ -46,14 +46,14 @@ impl AnimationConfig {
     }
 }
 
-pub trait AnimationFunc {
+pub trait AnimationFunc<Vertex: PipelineVertex> {
     #[allow(unused)]
-    fn pre_anim(&mut self, mobject: &mut Mobject<simple::Vertex>) {}
+    fn pre_anim(&mut self, mobject: &mut Mobject<Vertex>) {}
 
-    fn interpolate(&mut self, mobject: &mut Mobject<simple::Vertex>, alpha: f32);
+    fn interpolate(&mut self, mobject: &mut Mobject<Vertex>, alpha: f32);
 
     #[allow(unused)]
-    fn post_anim(&mut self, mobject: &mut Mobject<simple::Vertex>) {}
+    fn post_anim(&mut self, mobject: &mut Mobject<Vertex>) {}
 }
 
 /// A struct representing an animation
@@ -71,17 +71,17 @@ pub trait AnimationFunc {
 /// [`AnimationConfig::remove`].
 /// If `remove` is `true`, the scene will remove the mobject from the scene and return `None`.
 /// Otherwise, the scene will return the modified mobject and keep it in the scene.
-pub struct Animation {
+pub struct Animation<Vertex: PipelineVertex> {
     /// The mobject to be animated, will take the ownership of it, and return by scene's [`crate::scene::Scene::play`] method
-    pub mobject: Mobject<simple::Vertex>,
-    pub func: Box<dyn AnimationFunc>,
+    pub mobject: Mobject<Vertex>,
+    pub func: Box<dyn AnimationFunc<Vertex>>,
     pub config: AnimationConfig,
 }
 
-impl Animation {
+impl<Vertex: PipelineVertex> Animation<Vertex> {
     pub fn new(
-        mobject: Mobject<simple::Vertex>,
-        func: impl AnimationFunc + 'static,
+        mobject: Mobject<Vertex>,
+        func: impl AnimationFunc<Vertex> + 'static,
         config: AnimationConfig,
     ) -> Self {
         Self {
