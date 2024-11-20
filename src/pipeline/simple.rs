@@ -18,6 +18,12 @@ pub struct Vertex {
     pub color: Vec4,
 }
 
+impl Default for Vertex {
+    fn default() -> Self {
+        Self::new(Vec3::ZERO, Vec4::ZERO)
+    }
+}
+
 impl PipelineVertex for Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem::size_of;

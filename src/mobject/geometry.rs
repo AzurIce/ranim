@@ -1,10 +1,11 @@
-use bezier_rs::{Bezier, Subpath};
+use bezier_rs::Bezier;
 use glam::{vec2, Vec2};
 use itertools::Itertools;
+// use log::trace;
 
 use crate::{
     pipeline::simple,
-    utils::{sub_path_to_vertex, Id, SubpathWidth},
+    utils::{beziers_to_vertex, SubpathWidth},
 };
 
 use super::ToMobject;
@@ -21,7 +22,11 @@ pub struct Arc {
 
 impl Arc {
     pub fn new(angle: f32) -> Self {
-        Self { angle, radius: 1.0, width: SubpathWidth::Middle(1.0) }
+        Self {
+            angle,
+            radius: 1.0,
+            width: SubpathWidth::Middle(1.0),
+        }
     }
     pub fn with_radius(mut self, radius: f32) -> Self {
         self.radius = radius;
@@ -52,7 +57,7 @@ impl ToMobject for Arc {
         points.iter_mut().skip(1).step_by(2).for_each(|p| {
             *p /= (theta / 2.0).cos();
         });
-        // println!("start: {:?}, end: {:?}", points[0], points[len - 1]);
+        // trace!("start: {:?}, end: {:?}", points[0], points[len - 1]);
 
         let beziers = points
             .iter()
@@ -64,9 +69,9 @@ impl ToMobject for Arc {
                 Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
             })
             .collect::<Vec<_>>();
-        let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, false);
 
-        sub_path_to_vertex(subpath, self.width)
+        // trace!("beziers: {:?}", beziers.len());
+        beziers_to_vertex(beziers, self.width, false)
     }
 }
 
@@ -78,7 +83,10 @@ pub struct Polygon {
 
 impl Polygon {
     pub fn new(vertices: Vec<Vec2>) -> Self {
-        Self { vertices, width: SubpathWidth::Middle(1.0) }
+        Self {
+            vertices,
+            width: SubpathWidth::Middle(1.0),
+        }
     }
     pub fn with_width(mut self, width: SubpathWidth) -> Self {
         self.width = width;
@@ -131,7 +139,6 @@ impl ToMobject for Polygon {
             })
             .collect::<Vec<_>>();
         // println!("beziers: {:?}", beziers.len());
-        let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, true);
-        sub_path_to_vertex(subpath, self.width)
+        beziers_to_vertex(beziers, self.width, true)
     }
 }

@@ -6,7 +6,7 @@ use crate::RanimContext;
 
 pub mod simple;
 
-pub trait PipelineVertex: bytemuck::Pod + bytemuck::Zeroable {
+pub trait PipelineVertex: bytemuck::Pod + bytemuck::Zeroable + Default {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
 
     fn position(&self) -> Vec3;
