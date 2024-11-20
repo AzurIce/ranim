@@ -13,16 +13,16 @@ pub struct ExtractedMobject<Vertex: PipelineVertex> {
     pub id: Id,
     pub pipeline_id: std::any::TypeId,
     pub points: Arc<RwLock<Vec<Vertex>>>,
-    pub buffer: WgpuBuffer<Vertex>,
+    pub(crate) buffer: WgpuBuffer<Vertex>,
 }
 
 impl<Vertex: PipelineVertex> ExtractedMobject<Vertex> {
-    pub fn update_buffer(&mut self, ctx: &WgpuContext) {
+    pub(crate) fn update_buffer(&mut self, ctx: &WgpuContext) {
         self.buffer
             .prepare_from_slice(ctx, &self.points.read().unwrap());
     }
 
-    pub fn prepare(&mut self, ctx: &WgpuContext) {
+    pub(crate) fn prepare(&mut self, ctx: &WgpuContext) {
         self.update_buffer(ctx);
     }
 
@@ -63,7 +63,7 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
         }
     }
 
-    pub fn extract(&self, ctx: &WgpuContext) -> ExtractedMobject<Vertex> {
+    pub(crate) fn extract(&self, ctx: &WgpuContext) -> ExtractedMobject<Vertex> {
         let Mobject {
             id,
             pipeline_id,

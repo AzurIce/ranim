@@ -5,8 +5,7 @@ use glam::{vec3, vec4, Vec3, Vec4};
 use wgpu::include_wgsl;
 
 use crate::{
-    camera::{CameraUniforms, CameraUniformsBindGroup},
-    WgpuContext,
+    camera::{CameraUniforms, CameraUniformsBindGroup}, RanimContext, WgpuContext
 };
 
 use super::{PipelineVertex, RenderPipeline};
@@ -109,11 +108,11 @@ impl Deref for Pipeline {
 }
 
 impl Pipeline {
-    pub fn output_format() -> wgpu::TextureFormat {
+    fn output_format() -> wgpu::TextureFormat {
         wgpu::TextureFormat::Rgba8UnormSrgb
     }
 
-    pub fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
+    fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
         ctx.device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Simple Pipeline Layout"),
@@ -127,13 +126,13 @@ impl RenderPipeline for Pipeline {
     type Vertex = Vertex;
     type Uniforms = CameraUniforms;
 
-    fn new(ctx: &WgpuContext) -> Self {
-        let WgpuContext { device, .. } = ctx;
+    fn new(ctx: &RanimContext) -> Self {
+        let WgpuContext { device, .. } = &ctx.wgpu_ctx;
 
         let module = &device.create_shader_module(include_wgsl!("../../shader/simple.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Simple Pipeline"),
-            layout: Some(&Self::pipeline_layout(ctx)),
+            layout: Some(&Self::pipeline_layout(&ctx.wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),

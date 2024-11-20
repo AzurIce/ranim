@@ -23,7 +23,7 @@ fn main() {
 
     let mut ctx = RanimContext::new();
 
-    let mut scene = Scene::new(&ctx.wgpu_ctx);
+    let mut scene = Scene::new(&ctx);
     let t = Instant::now();
 
     let mut polygon = Polygon::new(vec![

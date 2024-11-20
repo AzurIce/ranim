@@ -41,7 +41,7 @@ pub struct CameraUniformsBindGroup {
 }
 
 impl CameraUniformsBindGroup {
-    pub fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
+    pub(crate) fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
         ctx.device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Simple Pipeline Uniforms"),
@@ -49,7 +49,7 @@ impl CameraUniformsBindGroup {
             })
     }
 
-    pub fn new(ctx: &WgpuContext, uniforms_buffer: &WgpuBuffer<CameraUniforms>) -> Self {
+    pub(crate) fn new(ctx: &WgpuContext, uniforms_buffer: &WgpuBuffer<CameraUniforms>) -> Self {
         let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Camera Uniforms"),
             layout: &Self::bind_group_layout(ctx),
@@ -78,9 +78,10 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(ctx: &WgpuContext, width: usize, height: usize, fps: u32) -> Self {
+    pub(crate) fn new(ctx: &RanimContext, width: usize, height: usize, fps: u32) -> Self {
         let frame = CameraFrame::new_with_size(width, height);
 
+        let ctx = &ctx.wgpu_ctx;
         let target_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Target Texture"),
             size: wgpu::Extent3d {
@@ -247,7 +248,7 @@ impl Camera {
         self.texture_data_updated = false;
     }
 
-    pub fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
+    fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
         let mut texture_data =
             self.texture_data
                 .take()
@@ -301,7 +302,7 @@ impl Camera {
         self.texture_data_updated = true;
     }
 
-    pub fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
+    pub(crate) fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
         if !self.texture_data_updated {
             self.update_rendered_texture_data(ctx);
         }
