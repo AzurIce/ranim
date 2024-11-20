@@ -7,12 +7,6 @@ use crate::WgpuContext;
 pub mod simple;
 
 pub trait PipelineVertex: bytemuck::Pod + bytemuck::Zeroable {
-    type Pipeline: RenderPipeline;
-
-    fn pipeline_id() -> std::any::TypeId {
-        std::any::TypeId::of::<Self::Pipeline>()
-    }
-
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
 
     fn position(&self) -> Vec3;
