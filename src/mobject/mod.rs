@@ -48,12 +48,20 @@ pub trait ToMobject {
 
 #[derive(Clone)]
 pub struct Mobject<Vertex: PipelineVertex> {
-    pub id: Id,
-    pub pipeline_id: std::any::TypeId,
+    id: Id,
+    pipeline_id: std::any::TypeId,
     points: Arc<RwLock<Vec<Vertex>>>,
 }
 
 impl<Vertex: PipelineVertex> Mobject<Vertex> {
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
+
+    pub fn pipeline_id(&self) -> &std::any::TypeId {
+        &self.pipeline_id
+    }
+
     fn new<Pipeline: RenderPipeline + 'static>(points: impl Into<Vec<Vertex>>) -> Self {
         Self {
             id: Id::new(),
@@ -203,7 +211,7 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
 }
 
 impl<Vertex: PipelineVertex> Mobject<Vertex> {
-    pub fn set_color(&mut self, color: Srgba) {
+    pub fn set_color(&mut self, color: Srgba) -> &mut Self {
         let color = vec4(color.red, color.green, color.blue, color.alpha);
 
         self.apply_points_function(
@@ -214,8 +222,9 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
             },
             TransformAnchor::origin(),
         );
+        self
     }
-    pub fn set_opacity(&mut self, opacity: f32) {
+    pub fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
@@ -224,6 +233,7 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
             },
             TransformAnchor::origin(),
         );
+        self
     }
 }
 
