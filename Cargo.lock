@@ -1335,7 +1335,6 @@ dependencies = [
  "log",
  "palette",
  "pollster",
- "ranim_derive",
  "uuid",
  "wgpu",
 ]
