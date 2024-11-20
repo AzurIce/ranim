@@ -24,6 +24,7 @@ pollster = "0.4.0"
 uuid = { version = "1.11.0", features = ["v4"] }
 wgpu = "23.0.0"
 palette = "0.7.6"
+anyhow = "1.0.93"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
