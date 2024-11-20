@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
 use env_logger::Env;
-use glam::{dvec2, Vec3};
+use ranim::glam::{vec2, Vec3};
+use ranim::palette::{rgb, Srgba};
 use log::info;
-use palette::{rgb, Srgba};
 use ranim::{
     animation::{fading::Fading, transform::Transform, Animation, AnimationConfig},
     mobject::{
@@ -17,9 +17,9 @@ use ranim::{
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("ranim=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
 
     let mut ctx = RanimContext::new();
 
@@ -27,10 +27,10 @@ fn main() {
     let t = Instant::now();
 
     let mut polygon = Polygon::new(vec![
-        dvec2(-100.0, 0.0),
-        dvec2(20.0, 30.0),
-        dvec2(0.0, 70.0),
-        dvec2(50.0, 0.0),
+        vec2(-100.0, 0.0),
+        vec2(20.0, 30.0),
+        vec2(0.0, 70.0),
+        vec2(50.0, 0.0),
     ])
     .with_width(SubpathWidth::Middle(20.0))
     .to_mobject();
@@ -73,5 +73,5 @@ fn main() {
         Animation::new(arc, Fading::Out, AnimationConfig::default().remove()),
     );
 
-    info!("Total Time: {:?}", t.elapsed());
+    info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

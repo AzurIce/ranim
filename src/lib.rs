@@ -7,6 +7,9 @@ use std::{
 use pipeline::RenderPipeline;
 use wgpu::util::DeviceExt;
 
+pub use glam;
+pub use palette;
+
 pub mod camera;
 pub mod animation;
 pub mod scene;

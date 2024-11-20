@@ -1,5 +1,5 @@
 use bezier_rs::{Bezier, Subpath};
-use glam::{vec2, DVec2};
+use glam::{vec2, Vec2};
 use itertools::Itertools;
 
 use crate::{
@@ -72,12 +72,12 @@ impl ToMobject for Arc {
 
 #[derive(Debug, Clone)]
 pub struct Polygon {
-    pub vertices: Vec<DVec2>,
+    pub vertices: Vec<Vec2>,
     pub width: SubpathWidth,
 }
 
 impl Polygon {
-    pub fn new(vertices: Vec<DVec2>) -> Self {
+    pub fn new(vertices: Vec<Vec2>) -> Self {
         Self { vertices, width: SubpathWidth::Middle(1.0) }
     }
     pub fn with_width(mut self, width: SubpathWidth) -> Self {
@@ -102,8 +102,6 @@ impl ToMobject for Polygon {
             .windows(2)
             .map(|window| 0.5 * (window[0] + window[1]))
             .collect::<Vec<_>>();
-        // println!("anchors: {:?}", anchors.len());
-        // println!("handles: {:?}", handles.len());
 
         assert_eq!(anchors.len(), handles.len() + 1);
 
@@ -111,7 +109,6 @@ impl ToMobject for Polygon {
             .into_iter()
             .interleave(handles.into_iter())
             .collect::<Vec<_>>();
-        // println!("points: {:?}, {:?}", points.len(), points);
         let beziers = points
             .iter()
             .step_by(2)
@@ -129,9 +126,8 @@ impl ToMobject for Polygon {
                     .chain(points.iter().take(2))
                     .step_by(2),
             )
-            .map(|((p1, p2), p3)| {
-                // println!("({:?}, {:?}, {:?})", p1, p2, p3);
-                Bezier::from_quadratic_dvec2(*p1, *p2, *p3)
+            .map(|((&p1, &p2), &p3)| {
+                Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
             })
             .collect::<Vec<_>>();
         // println!("beziers: {:?}", beziers.len());
