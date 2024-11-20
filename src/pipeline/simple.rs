@@ -20,8 +20,6 @@ pub struct Vertex {
 }
 
 impl PipelineVertex for Vertex {
-    type Pipeline = Pipeline;
-
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem::size_of;
         wgpu::VertexBufferLayout {
