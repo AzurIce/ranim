@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use glam::{Vec3, Vec4};
 
-use crate::WgpuContext;
+use crate::RanimContext;
 
 pub mod simple;
 
@@ -22,9 +22,11 @@ pub trait PipelineVertex: bytemuck::Pod + bytemuck::Zeroable {
 pub trait RenderPipeline: Deref<Target = wgpu::RenderPipeline> {
     /// The vertex type.
     type Vertex: PipelineVertex;
+
     /// The uniform type.
     type Uniforms: bytemuck::Pod + bytemuck::Zeroable;
-    fn new(ctx: &WgpuContext) -> Self
+
+    fn new(ctx: &RanimContext) -> Self
     where
         Self: Sized;
 }

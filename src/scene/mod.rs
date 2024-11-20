@@ -17,7 +17,7 @@ use crate::{
     mobject::Mobject,
     pipeline::{simple, PipelineVertex},
     utils::Id,
-    RanimContext, WgpuContext,
+    RanimContext,
 };
 
 pub struct Scene {
@@ -36,7 +36,7 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new_with_video_writer_builder(ctx: &WgpuContext, builder: FileWriterBuilder) -> Self {
+    pub fn new_with_video_writer_builder(ctx: &RanimContext, builder: FileWriterBuilder) -> Self {
         let camera = Camera::new(
             ctx,
             builder.width as usize,
@@ -55,7 +55,7 @@ impl Scene {
     }
 
     /// With default [`FileWriterBuilder`]
-    pub fn new(ctx: &WgpuContext) -> Self {
+    pub fn new(ctx: &RanimContext) -> Self {
         Self::new_with_video_writer_builder(ctx, FileWriter::builder())
     }
 
