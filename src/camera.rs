@@ -69,6 +69,7 @@ pub struct Camera {
     multisample_texture: wgpu::Texture,
     target_texture: wgpu::Texture,
     texture_data: Option<Vec<u8>>,
+    texture_data_updated: bool,
     depth_texture: wgpu::Texture,
     output_staging_buffer: wgpu::Buffer,
 
@@ -148,6 +149,7 @@ impl Camera {
             target_texture,
             multisample_texture,
             texture_data: None,
+            texture_data_updated: false,
             depth_texture,
             output_staging_buffer,
             uniforms_buffer,
@@ -242,9 +244,10 @@ impl Camera {
             }
         }
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+        self.texture_data_updated = false;
     }
 
-    pub fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
+    pub fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
         let mut texture_data =
             self.texture_data
                 .take()
@@ -295,6 +298,13 @@ impl Camera {
         self.output_staging_buffer.unmap();
 
         self.texture_data = Some(texture_data);
+        self.texture_data_updated = true;
+    }
+
+    pub fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
+        if !self.texture_data_updated {
+            self.update_rendered_texture_data(ctx);
+        }
         &self.texture_data.as_ref().unwrap()
     }
 
