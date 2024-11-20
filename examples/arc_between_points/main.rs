@@ -49,7 +49,7 @@ fn main() {
 
             let color = start_color.lerp(end_color, j as f32 / (ntan - 1) as f32);
             let mut arc = ArcBetweenPoints::new(Vec3::ZERO, end, angle)
-                .with_width(SubpathWidth::Middle(width))
+                .with_stroke_width(SubpathWidth::Middle(width))
                 .to_mobject();
 
             arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into());

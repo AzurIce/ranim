@@ -54,7 +54,7 @@ fn main() {
             );
             let mut arc = Arc::new(angle)
                 .with_radius(step_y / 2.0)
-                .with_width(SubpathWidth::Middle(2.0))
+                .with_stroke_width(SubpathWidth::Middle(2.0))
                 .to_mobject();
 
             arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into())

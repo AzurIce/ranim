@@ -1,5 +1,5 @@
 use bezier_rs::Bezier;
-use glam::{vec2, Vec2, Vec3};
+use glam::{vec2, vec3, Vec2, Vec3};
 use itertools::Itertools;
 // use log::trace;
 
@@ -8,7 +8,7 @@ use crate::{
     utils::{beziers_to_vertex, SubpathWidth},
 };
 
-use super::{Mobject, ToMobject};
+use super::{Mobject, ToMobject, TransformAnchor};
 
 /// A part of a circle
 // #[mobject(SimplePipeline)]
@@ -17,7 +17,7 @@ pub struct Arc {
     /// Angle in radians of the arc
     pub angle: f32,
     pub radius: f32,
-    pub width: SubpathWidth,
+    pub stroke_width: SubpathWidth,
 }
 
 impl Arc {
@@ -25,15 +25,15 @@ impl Arc {
         Self {
             angle,
             radius: 1.0,
-            width: SubpathWidth::Middle(1.0),
+            stroke_width: SubpathWidth::default(),
         }
     }
     pub fn with_radius(mut self, radius: f32) -> Self {
         self.radius = radius;
         self
     }
-    pub fn with_width(mut self, width: SubpathWidth) -> Self {
-        self.width = width;
+    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+        self.stroke_width = stroke_width;
         self
     }
 }
@@ -71,7 +71,11 @@ impl ToMobject for Arc {
             .collect::<Vec<_>>();
 
         // trace!("beziers: {:?}", beziers.len());
-        Mobject::new::<Self::Pipeline>(beziers_to_vertex(beziers, self.width, false))
+        Mobject::new::<Self::Pipeline>(beziers_to_vertex(
+            beziers,
+            self.stroke_width,
+            self.angle == std::f32::consts::TAU,
+        ))
     }
 }
 
@@ -79,7 +83,7 @@ pub struct ArcBetweenPoints {
     pub start: Vec3,
     pub end: Vec3,
     pub angle: f32,
-    pub width: SubpathWidth,
+    pub stroke_width: SubpathWidth,
 }
 
 impl ArcBetweenPoints {
@@ -88,11 +92,11 @@ impl ArcBetweenPoints {
             start,
             end,
             angle,
-            width: SubpathWidth::Middle(1.0),
+            stroke_width: SubpathWidth::default(),
         }
     }
-    pub fn with_width(mut self, width: SubpathWidth) -> Self {
-        self.width = width;
+    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+        self.stroke_width = stroke_width;
         self
     }
 }
@@ -102,9 +106,113 @@ impl ToMobject for ArcBetweenPoints {
 
     fn to_mobject(self) -> Mobject<simple::Vertex> {
         let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
-        let arc = Arc::new(self.angle).with_radius(radius).with_width(self.width);
+        let arc = Arc::new(self.angle)
+            .with_radius(radius)
+            .with_stroke_width(self.stroke_width);
         let mut mobject = arc.to_mobject();
         mobject.put_start_and_end_on(self.start, self.end);
+        mobject
+    }
+}
+
+pub struct Circle {
+    pub radius: f32,
+    pub stroke_width: SubpathWidth,
+}
+
+impl Circle {
+    pub fn new(radius: f32) -> Self {
+        Self {
+            radius,
+            stroke_width: SubpathWidth::default(),
+        }
+    }
+
+    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+        self.stroke_width = stroke_width;
+        self
+    }
+}
+
+impl ToMobject for Circle {
+    type Pipeline = simple::Pipeline;
+
+    fn to_mobject(self) -> Mobject<simple::Vertex> {
+        Arc::new(std::f32::consts::TAU)
+            .with_radius(self.radius)
+            .with_stroke_width(self.stroke_width)
+            .to_mobject()
+    }
+}
+
+pub struct Dot {
+    pub point: Vec3,
+    pub radius: f32,
+    pub stroke_width: SubpathWidth,
+}
+
+impl Dot {
+    pub fn new(point: Vec3) -> Self {
+        Self {
+            point,
+            radius: 0.08,
+            stroke_width: SubpathWidth::default(),
+        }
+    }
+
+    pub fn small(mut self) -> Self {
+        self.radius = 0.04;
+        self
+    }
+
+    pub fn with_radius(mut self, radius: f32) -> Self {
+        self.radius = radius;
+        self
+    }
+
+    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+        self.stroke_width = stroke_width;
+        self
+    }
+}
+
+impl ToMobject for Dot {
+    type Pipeline = simple::Pipeline;
+
+    fn to_mobject(self) -> Mobject<simple::Vertex> {
+        let mut mobject = Circle::new(self.radius)
+            .with_stroke_width(self.stroke_width)
+            .to_mobject();
+        mobject.shift(self.point);
+        mobject
+    }
+}
+
+pub struct Ellipse {
+    pub width: f32,
+    pub height: f32,
+    pub stroke_width: SubpathWidth,
+}
+
+impl Ellipse {
+    pub fn new(width: f32, height: f32) -> Self {
+        Self { width, height, stroke_width: SubpathWidth::default() }
+    }
+
+    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+        self.stroke_width = stroke_width;
+        self
+    }
+}
+
+impl ToMobject for Ellipse {
+    type Pipeline = simple::Pipeline;
+
+    fn to_mobject(self) -> Mobject<simple::Vertex> {
+        let mut mobject = Circle::new(self.width)
+            .with_stroke_width(self.stroke_width)
+            .to_mobject();
+        mobject.scale(vec3(self.width, self.height, 1.0), TransformAnchor::origin());
         mobject
     }
 }
