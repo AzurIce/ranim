@@ -1324,6 +1324,7 @@ checksum = "9c8a99fddc9f0ba0a85884b8d14e3592853e787d581ca1816c91349b10e4eeab"
 name = "ranim"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-channel",
  "bezier-rs",
  "bytemuck",

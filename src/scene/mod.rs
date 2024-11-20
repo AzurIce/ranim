@@ -5,11 +5,12 @@ use std::{
     collections::HashMap,
     fs,
     path::Path,
+    time::Duration,
 };
 
 use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
-use log::trace;
+use log::{trace, warn};
 
 use crate::{
     animation::Animation,
@@ -65,34 +66,27 @@ impl Scene {
         });
     }
 
-    pub fn add_mobject<Vertex: PipelineVertex>(
+    pub fn try_add_mobject<Vertex: PipelineVertex>(
         &mut self,
         ctx: &mut RanimContext,
         mobject: &Mobject<Vertex>,
-    ) {
+    ) -> anyhow::Result<()> {
+        if self.is_mobject_exist(mobject) {
+            return Err(anyhow::anyhow!("mobject already exists"));
+        }
         let mobject = mobject.extract(&ctx.wgpu_ctx);
-
-        let mobject_vec = self.mobjects.entry(mobject.pipeline_id).or_default();
-        mobject_vec.retain(|(id, _)| id != &mobject.id);
-        mobject_vec.push((mobject.id, Box::new(mobject)));
+        self.mobjects
+            .entry(mobject.pipeline_id)
+            .or_default()
+            .push((mobject.id, Box::new(mobject)));
+        Ok(())
     }
 
-    pub fn add_mobjects<Vertex: PipelineVertex>(
-        &mut self,
-        ctx: &mut RanimContext,
-        mobjects: &[Mobject<Vertex>],
-    ) {
-        // Should be faster?
-        self.mobjects.iter_mut().for_each(|(_, mobject_vec)| {
-            mobject_vec.retain(|(id, _)| !mobjects.iter().any(|m| id == m.id()));
-        });
-        mobjects.iter().for_each(|m| {
-            let mobject = m.extract(&ctx.wgpu_ctx);
-            self.mobjects
-                .entry(mobject.pipeline_id)
-                .or_default()
-                .push((mobject.id, Box::new(mobject)));
-        });
+    pub fn is_mobject_exist<Vertex: PipelineVertex>(&self, mobject: &Mobject<Vertex>) -> bool {
+        self.mobjects
+            .get(mobject.pipeline_id())
+            .map(|mobject_vec| mobject_vec.iter().any(|(id, _)| id == mobject.id()))
+            .unwrap_or(false)
     }
 
     pub fn render_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
@@ -136,7 +130,9 @@ impl Scene {
         ctx: &mut RanimContext,
         mut animation: Animation<Vertex>,
     ) -> Option<Mobject<Vertex>> {
-        self.add_mobject(ctx, &animation.mobject);
+        if let Err(err) = self.try_add_mobject(ctx, &animation.mobject) {
+            warn!("[Scene] Failed to add mobject {:?}: {}", animation.mobject.id(), err);
+        }
         trace!("[Scene] Playing animation {:?}...", animation.mobject.id());
         // TODO: handle the precision problem
         let frames = animation.config.calc_frames(self.camera.fps as f32);
@@ -156,6 +152,17 @@ impl Scene {
             None
         } else {
             Some(animation.mobject)
+        }
+    }
+
+    /// Keep the scene static for a given duration
+    pub fn wait(&mut self, ctx: &mut RanimContext, duration: Duration) {
+        let frames = (duration.as_secs_f32() * self.camera.fps as f32) as usize;
+
+        let dt = duration.as_secs_f32() / (frames - 1) as f32;
+        for _ in 0..frames {
+            self.update_frame(ctx, dt);
+            self.frame_count += 1;
         }
     }
 }
