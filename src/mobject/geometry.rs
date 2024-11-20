@@ -1,5 +1,5 @@
 use bezier_rs::Bezier;
-use glam::{vec2, Vec2};
+use glam::{vec2, Vec2, Vec3};
 use itertools::Itertools;
 // use log::trace;
 
@@ -8,7 +8,7 @@ use crate::{
     utils::{beziers_to_vertex, SubpathWidth},
 };
 
-use super::ToMobject;
+use super::{Mobject, ToMobject};
 
 /// A part of a circle
 // #[mobject(SimplePipeline)]
@@ -41,7 +41,7 @@ impl Arc {
 impl ToMobject for Arc {
     type Pipeline = simple::Pipeline;
 
-    fn vertex(&self) -> Vec<simple::Vertex> {
+    fn to_mobject(self) -> Mobject<simple::Vertex> {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
 
@@ -71,7 +71,41 @@ impl ToMobject for Arc {
             .collect::<Vec<_>>();
 
         // trace!("beziers: {:?}", beziers.len());
-        beziers_to_vertex(beziers, self.width, false)
+        Mobject::new::<Self::Pipeline>(beziers_to_vertex(beziers, self.width, false))
+    }
+}
+
+pub struct ArcBetweenPoints {
+    pub start: Vec3,
+    pub end: Vec3,
+    pub angle: f32,
+    pub width: SubpathWidth,
+}
+
+impl ArcBetweenPoints {
+    pub fn new(start: Vec3, end: Vec3, angle: f32) -> Self {
+        Self {
+            start,
+            end,
+            angle,
+            width: SubpathWidth::Middle(1.0),
+        }
+    }
+    pub fn with_width(mut self, width: SubpathWidth) -> Self {
+        self.width = width;
+        self
+    }
+}
+
+impl ToMobject for ArcBetweenPoints {
+    type Pipeline = simple::Pipeline;
+
+    fn to_mobject(self) -> Mobject<simple::Vertex> {
+        let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
+        let arc = Arc::new(self.angle).with_radius(radius).with_width(self.width);
+        let mut mobject = arc.to_mobject();
+        mobject.put_start_and_end_on(self.start, self.end);
+        mobject
     }
 }
 
@@ -97,10 +131,10 @@ impl Polygon {
 impl ToMobject for Polygon {
     type Pipeline = simple::Pipeline;
 
-    fn vertex(&self) -> Vec<simple::Vertex> {
+    fn to_mobject(self) -> Mobject<simple::Vertex> {
         // TODO: Handle 0 len
         if self.vertices.len() == 0 {
-            return vec![].into();
+            return Mobject::new::<Self::Pipeline>(vec![]);
         }
 
         let vertices = self.vertices.clone();
@@ -139,6 +173,6 @@ impl ToMobject for Polygon {
             })
             .collect::<Vec<_>>();
         // println!("beziers: {:?}", beziers.len());
-        beziers_to_vertex(beziers, self.width, true)
+        Mobject::new::<Self::Pipeline>(beziers_to_vertex(beziers, self.width, true))
     }
 }
