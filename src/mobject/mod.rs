@@ -34,9 +34,9 @@ impl<Vertex: RendererVertex> ExtractedMobject<Vertex> {
 }
 
 pub trait ToMobject {
-    type Pipeline: RenderPipeline + 'static;
+    type Renderer: Renderer + 'static;
 
-    fn to_mobject(self) -> Mobject<<Self::Pipeline as RenderPipeline>::Vertex>
+    fn to_mobject(self) -> Mobject<<Self::Renderer as Renderer>::Vertex>
     where
         Self: Sized;
 }
