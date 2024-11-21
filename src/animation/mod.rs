@@ -3,7 +3,7 @@ pub mod transform;
 
 use std::time;
 
-use crate::{mobject::Mobject, pipeline::PipelineVertex, utils::rate_functions::smooth};
+use crate::{mobject::Mobject, renderer::RendererVertex, utils::rate_functions::smooth};
 
 pub struct AnimationConfig {
     pub run_time: time::Duration,
@@ -46,7 +46,7 @@ impl AnimationConfig {
     }
 }
 
-pub trait AnimationFunc<Vertex: PipelineVertex> {
+pub trait AnimationFunc<Vertex: RendererVertex> {
     #[allow(unused)]
     fn pre_anim(&mut self, mobject: &mut Mobject<Vertex>) {}
 
@@ -71,14 +71,14 @@ pub trait AnimationFunc<Vertex: PipelineVertex> {
 /// [`AnimationConfig::remove`].
 /// If `remove` is `true`, the scene will remove the mobject from the scene and return `None`.
 /// Otherwise, the scene will return the modified mobject and keep it in the scene.
-pub struct Animation<Vertex: PipelineVertex> {
+pub struct Animation<Vertex: RendererVertex> {
     /// The mobject to be animated, will take the ownership of it, and return by scene's [`crate::scene::Scene::play`] method
     pub mobject: Mobject<Vertex>,
     pub func: Box<dyn AnimationFunc<Vertex>>,
     pub config: AnimationConfig,
 }
 
-impl<Vertex: PipelineVertex> Animation<Vertex> {
+impl<Vertex: RendererVertex> Animation<Vertex> {
     pub fn new(
         mobject: Mobject<Vertex>,
         func: impl AnimationFunc<Vertex> + 'static,

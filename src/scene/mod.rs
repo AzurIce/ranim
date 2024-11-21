@@ -13,19 +13,15 @@ use image::{ImageBuffer, Rgba};
 use log::{trace, warn};
 
 use crate::{
-    animation::Animation,
-    camera::Camera,
-    mobject::Mobject,
-    pipeline::{simple, PipelineVertex},
-    utils::Id,
-    RanimContext,
+    animation::Animation, camera::Camera, mobject::Mobject,
+    renderer::{vmobject::VMobjectRenderer, RendererVertex}, utils::Id, RanimContext,
 };
 
 pub struct Scene {
     pub camera: Camera,
     /// Mobjects in the scene, they are actually [`crate::mobject::ExtractedMobject`]
     ///
-    /// (Mobject's id, Mobject's pipeline id, Mobject)
+    /// Mobject's renderer id -> Vec<(Mobject's id, Mobject)>
     pub mobjects: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     pub time: f32,
     pub frame_count: usize,
@@ -60,13 +56,13 @@ impl Scene {
         Self::new_with_video_writer_builder(ctx, FileWriter::builder())
     }
 
-    pub fn remove_mobject<Vertex: PipelineVertex>(&mut self, mobject: &Mobject<Vertex>) {
+    pub fn remove_mobject<Vertex: RendererVertex>(&mut self, mobject: &Mobject<Vertex>) {
         self.mobjects.iter_mut().for_each(|(_, mobject_vec)| {
             mobject_vec.retain(|(mobject_id, _)| mobject_id != mobject.id());
         });
     }
 
-    pub fn try_add_mobject<Vertex: PipelineVertex>(
+    pub fn try_add_mobject<Vertex: RendererVertex>(
         &mut self,
         ctx: &mut RanimContext,
         mobject: &Mobject<Vertex>,
@@ -76,22 +72,22 @@ impl Scene {
         }
         let mobject = mobject.extract(&ctx.wgpu_ctx);
         self.mobjects
-            .entry(mobject.pipeline_id)
+            .entry(mobject.renderer_id)
             .or_default()
             .push((mobject.id, Box::new(mobject)));
         Ok(())
     }
 
-    pub fn is_mobject_exist<Vertex: PipelineVertex>(&self, mobject: &Mobject<Vertex>) -> bool {
+    pub fn is_mobject_exist<Vertex: RendererVertex>(&self, mobject: &Mobject<Vertex>) -> bool {
         self.mobjects
-            .get(mobject.pipeline_id())
+            .get(mobject.renderer_id())
             .map(|mobject_vec| mobject_vec.iter().any(|(id, _)| id == mobject.id()))
             .unwrap_or(false)
     }
 
     pub fn render_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
         self.camera
-            .render::<simple::Pipeline>(ctx, &mut self.mobjects);
+            .render::<VMobjectRenderer>(ctx, &mut self.mobjects);
         self.save_frame_to_image(ctx, path);
     }
 
@@ -99,7 +95,7 @@ impl Scene {
         self.time += dt;
         // self.update_mobjects(dt);
         self.camera
-            .render::<simple::Pipeline>(ctx, &mut self.mobjects);
+            .render::<VMobjectRenderer>(ctx, &mut self.mobjects);
         if let Some(writer) = &mut self.video_writer {
             writer.write_frame(&self.camera.get_rendered_texture(&ctx.wgpu_ctx));
         }
@@ -125,13 +121,17 @@ impl Scene {
     /// Play an animation
     ///
     /// See [`Animation`].
-    pub fn play<Vertex: PipelineVertex>(
+    pub fn play<Vertex: RendererVertex>(
         &mut self,
         ctx: &mut RanimContext,
         mut animation: Animation<Vertex>,
     ) -> Option<Mobject<Vertex>> {
         if let Err(err) = self.try_add_mobject(ctx, &animation.mobject) {
-            warn!("[Scene] Failed to add mobject {:?}: {}", animation.mobject.id(), err);
+            warn!(
+                "[Scene] Failed to add mobject {:?}: {}",
+                animation.mobject.id(),
+                err
+            );
         }
         trace!("[Scene] Playing animation {:?}...", animation.mobject.id());
         // TODO: handle the precision problem

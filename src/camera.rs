@@ -5,11 +5,9 @@ use std::{
 
 use glam::{Mat4, Vec3};
 use log::{debug, trace};
-use palette::{rgb, Srgba};
 
 use crate::{
-    mobject::ExtractedMobject, pipeline::RenderPipeline, utils::Id, RanimContext, WgpuBuffer,
-    WgpuContext,
+    mobject::ExtractedMobject, renderer::Renderer, utils::Id, RanimContext, WgpuBuffer, WgpuContext,
 };
 
 #[repr(C)]
@@ -158,19 +156,17 @@ impl Camera {
         }
     }
 
-    pub fn render<Pipeline: RenderPipeline + 'static>(
+    pub fn render<R: Renderer + 'static>(
         &mut self,
         ctx: &mut RanimContext,
         objects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     ) {
-        let objects = objects
-            .entry(std::any::TypeId::of::<Pipeline>())
-            .or_default();
+        let objects = objects.entry(std::any::TypeId::of::<R>()).or_default();
         let mut objects = objects
             .into_iter()
             .map(|(_, mobject)| {
                 mobject
-                    .downcast_mut::<ExtractedMobject<Pipeline::Vertex>>()
+                    .downcast_mut::<ExtractedMobject<R::Vertex>>()
                     .unwrap()
             })
             .collect::<Vec<_>>();
@@ -208,42 +204,14 @@ impl Camera {
                     label: Some("Render Encoder"),
                 });
 
-        let pipeline = ctx.get_or_init_pipeline::<Pipeline>();
-        let bg = Srgba::from_u32::<rgb::channels::Rgba>(0x333333FF).into_linear();
-        let render_pass_desc = wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &multisample_view,
-                resolve_target: Some(&target_view),
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: bg.red,
-                        g: bg.green,
-                        b: bg.blue,
-                        a: bg.alpha,
-                    }),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-        };
         {
-            let mut render_pass = encoder.begin_render_pass(&render_pass_desc);
-            render_pass.set_pipeline(&pipeline);
+            let mut render_pass =
+                R::begin_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
+            // bind group 0 is reserved for camera uniforms
             render_pass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
-            for object in objects {
-                object.render(&mut render_pass);
-            }
+            R::render(ctx, &mut render_pass, &mut objects);
         }
+
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
         self.texture_data_updated = false;
     }
