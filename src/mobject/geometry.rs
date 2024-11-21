@@ -1,7 +1,7 @@
 use bezier_rs::Bezier;
 use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use itertools::Itertools;
-use palette::{rgb, Srgba};
+use palette::{rgb, IntoColor, Srgba};
 // use log::trace;
 
 use crate::{
@@ -61,27 +61,21 @@ impl ToMobject for Arc {
         });
         // trace!("start: {:?}, end: {:?}", points[0], points[len - 1]);
 
-        // let beziers = points
-        //     .iter()
-        //     .step_by(2)
-        //     .zip(points.iter().skip(1).step_by(2))
-        //     .zip(points.iter().skip(2).step_by(2))
-        //     .map(|((&p1, &p2), &p3)| {
-        //         let [p1, p2, p3] = [p1 * self.radius, p2 * self.radius, p3 * self.radius];
-        //         Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
-        //     })
-        //     .collect::<Vec<_>>();
+        let beziers = points
+            .iter()
+            .step_by(2)
+            .zip(points.iter().skip(1).step_by(2))
+            .zip(points.iter().skip(2).step_by(2))
+            .map(|((&p1, &p2), &p3)| {
+                let [p1, p2, p3] = [p1, p2, p3];
+                Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
+            })
+            .collect::<Vec<_>>();
 
-        // trace!("beziers: {:?}", beziers.len());
-        // Mobject::new::<VMobjectRenderer>(beziers_to_stroke(
-        //     beziers,
-        //     self.stroke_width,
-        //     self.angle == std::f32::consts::TAU,
-        // ))
         if self.angle == std::f32::consts::TAU {
-            BezierShape::closed(points)
+            BezierShape::closed(beziers)
         } else {
-            BezierShape::unclosed(points)
+            BezierShape::unclosed(beziers)
         }
         .with_width(self.stroke_width)
         .to_mobject()
@@ -275,37 +269,37 @@ impl ToMobject for Polygon {
             .into_iter()
             .interleave(handles.into_iter())
             .collect::<Vec<_>>();
-        // let beziers = points
-        //     .iter()
-        //     .step_by(2)
-        //     .zip(
-        //         points
-        //             .iter()
-        //             .skip(1)
-        //             .chain(points.iter().take(1))
-        //             .step_by(2),
-        //     )
-        //     .zip(
-        //         points
-        //             .iter()
-        //             .skip(2)
-        //             .chain(points.iter().take(2))
-        //             .step_by(2),
-        //     )
-        //     .map(|((&p1, &p2), &p3)| {
-        //         Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
-        //     })
-        //     .collect::<Vec<_>>();
+        let beziers = points
+            .iter()
+            .step_by(2)
+            .zip(
+                points
+                    .iter()
+                    .skip(1)
+                    .chain(points.iter().take(1))
+                    .step_by(2),
+            )
+            .zip(
+                points
+                    .iter()
+                    .skip(2)
+                    .chain(points.iter().take(2))
+                    .step_by(2),
+            )
+            .map(|((&p1, &p2), &p3)| {
+                Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
+            })
+            .collect::<Vec<_>>();
         // println!("beziers: {:?}", beziers.len());
         // Mobject::new::<VMobjectRenderer>(beziers_to_stroke(beziers, self.width, true))
-        BezierShape::closed(points)
+        BezierShape::closed(beziers)
             .with_width(self.width)
             .to_mobject()
     }
 }
 
 pub struct BezierShape {
-    pub points: Vec<Vec2>,
+    pub beziers: Vec<Bezier>,
     pub width: SubpathWidth,
     pub stroke_color: Vec4,
     pub fill_color: Vec4,
@@ -313,17 +307,17 @@ pub struct BezierShape {
 }
 
 impl BezierShape {
-    pub fn closed(points: Vec<Vec2>) -> Self {
+    pub fn closed(beziers: Vec<Bezier>) -> Self {
         Self {
             closed: true,
-            ..Self::unclosed(points)
+            ..Self::unclosed(beziers)
         }
     }
 
-    pub fn unclosed(points: Vec<Vec2>) -> Self {
+    pub fn unclosed(beziers: Vec<Bezier>) -> Self {
         let stroke_color: Srgba = Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into();
         Self {
-            points,
+            beziers,
             width: SubpathWidth::Middle(1.0),
             stroke_color: vec4(
                 stroke_color.red,
@@ -359,44 +353,8 @@ impl ToMobject for BezierShape {
     where
         Self: Sized,
     {
-        let points = self.points.clone();
-
-        let anchors = points;
-        let handles = anchors
-            .windows(2)
-            .map(|window| 0.5 * (window[0] + window[1]))
-            .collect::<Vec<_>>();
-
-        assert_eq!(anchors.len(), handles.len() + 1);
-
-        let points = anchors
-            .into_iter()
-            .interleave(handles.into_iter())
-            .collect::<Vec<_>>();
-
-        let beziers = points
-            .iter()
-            .step_by(2)
-            .zip(
-                points
-                    .iter()
-                    .skip(1)
-                    .chain(points.iter().take(1))
-                    .step_by(2),
-            )
-            .zip(
-                points
-                    .iter()
-                    .skip(2)
-                    .chain(points.iter().take(2))
-                    .step_by(2),
-            )
-            .map(|((&p1, &p2), &p3)| {
-                Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
-            })
-            .collect::<Vec<_>>();
-
-        let beziers = beziers
+        let beziers = self
+            .beziers
             .into_iter()
             .filter(|bezier| !bezier.is_point())
             .collect::<Vec<_>>();
