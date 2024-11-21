@@ -4,18 +4,19 @@ use std::{
     ops::Deref,
 };
 
+use log::trace;
 use pipeline::RenderPipeline;
 use wgpu::util::DeviceExt;
 
 pub use glam;
 pub use palette;
 
-pub(crate) mod renderer;
-pub(crate) mod pipeline;
-pub mod camera;
 pub mod animation;
-pub mod scene;
+pub mod camera;
 pub mod mobject;
+pub(crate) mod pipeline;
+pub(crate) mod renderer;
+pub mod scene;
 pub mod utils;
 
 pub struct RanimContext {
@@ -41,14 +42,17 @@ impl RanimContext {
             let pipeline = P::new(&self);
             self.pipelines.insert(id, Box::new(pipeline));
         }
-        self.pipelines.get(&id).unwrap().downcast_ref::<P>().unwrap()
+        self.pipelines
+            .get(&id)
+            .unwrap()
+            .downcast_ref::<P>()
+            .unwrap()
     }
 }
 
 pub(crate) struct WgpuContext {
     // pub instance: wgpu::Instance,
     // pub adapter: wgpu::Adapter,
-
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
 }
@@ -106,6 +110,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable> WgpuBuffer<T> {
     // }
 
     pub(crate) fn new_init(ctx: &WgpuContext, data: &[T], usage: wgpu::BufferUsages) -> Self {
+        // trace!("[WgpuBuffer]: new_init, {} {:?}", data.len(), usage);
         Self {
             buffer: ctx
                 .device
@@ -129,7 +134,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable> WgpuBuffer<T> {
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Simple Vertex Buffer"),
                     contents: bytemuck::cast_slice(data),
-                    usage: wgpu::BufferUsages::VERTEX,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 });
         } else {
             ctx.queue.write_buffer(self, 0, bytemuck::cast_slice(data));

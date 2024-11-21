@@ -170,13 +170,13 @@ impl Camera {
                     .unwrap()
             })
             .collect::<Vec<_>>();
-        trace!("[Camera] Rendering...");
+        // trace!("[Camera] Rendering...");
 
         // Update the uniforms buffer
-        trace!("[Camera]: Refreshing uniforms...");
+        // trace!("[Camera]: Refreshing uniforms...");
         self.refresh_uniforms();
-        debug!("[Camera]: Uniforms: {:?}", self.uniforms);
-        trace!("[Camera] uploading camera uniforms to buffer...");
+        // debug!("[Camera]: Uniforms: {:?}", self.uniforms);
+        // trace!("[Camera] uploading camera uniforms to buffer...");
         ctx.wgpu_ctx.queue.write_buffer(
             &self.uniforms_buffer,
             0,
@@ -308,13 +308,13 @@ impl CameraFrame {
     }
 
     pub fn rescale_factors(&self) -> Vec3 {
-        trace!("[CameraFrame] Calculating rescale factors...");
+        // trace!("[CameraFrame] Calculating rescale factors...");
         let res = Vec3::new(
             2.0 / self.size.0 as f32,
             2.0 / self.size.1 as f32,
             1.0 / self.get_focal_distance(),
         );
-        trace!("[CameraFrame] Rescale factors: {:?}", res);
+        // trace!("[CameraFrame] Rescale factors: {:?}", res);
         res
     }
 

@@ -34,12 +34,10 @@ impl Default for SubpathWidth {
     }
 }
 
-pub fn beziers_to_fill(
-    beziers: &Vec<Bezier>,
-    fill_color: Vec4,
-) -> Vec<VMobjectVertex> {
+const MAX_STEPS: usize = 128;
+
+pub fn beziers_to_fill(beziers: &Vec<Bezier>, fill_color: Vec4) -> Vec<VMobjectVertex> {
     trace!("converting subpath to vertex: {:?}", beziers.len());
-    const MAX_STEPS: usize = 256;
 
     let subpath: Subpath<Id> = Subpath::from_beziers(beziers, true);
     if subpath.len() == 0 {
@@ -66,7 +64,6 @@ pub fn beziers_to_stroke(
     closed: bool,
 ) -> Vec<VMobjectVertex> {
     trace!("converting subpath to vertex: {:?}", beziers.len());
-    const MAX_STEPS: usize = 256;
 
     let subpath: Subpath<Id> = Subpath::from_beziers(beziers, closed);
     if subpath.len() == 0 {
@@ -110,4 +107,9 @@ pub fn beziers_to_stroke(
 pub fn resize_preserving_order<T: Clone>(vec: &Vec<T>, new_len: usize) -> Vec<T> {
     let indices = (0..new_len).map(|i| i * vec.len() / new_len);
     indices.map(|i| vec[i].clone()).collect()
+}
+
+pub fn extend_with_last<T: Clone + Default>(vec: &mut Vec<T>, new_len: usize) {
+    let v = vec![vec.last().cloned().unwrap_or_default(); new_len - vec.len()];
+    vec.extend(v.into_iter())
 }
