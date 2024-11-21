@@ -5,9 +5,8 @@ use std::sync::{Arc, RwLock};
 use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3};
 use palette::Srgba;
 
-use crate::pipeline::RenderPipeline;
 use crate::renderer::{Renderer, RendererVertex};
-use crate::utils::{resize_preserving_order, Id};
+use crate::utils::{extend_with_last, resize_preserving_order, Id};
 use crate::{WgpuBuffer, WgpuContext};
 
 pub struct ExtractedMobject<Vertex: RendererVertex> {
@@ -272,7 +271,11 @@ impl<Vertex: RendererVertex> Mobject<Vertex> {
 
     pub fn resize_points(&mut self, len: usize) {
         let mut points = self.points.write().unwrap();
-        *points = resize_preserving_order(&points, len);
+        if points.len() < len {
+            extend_with_last(&mut points, len);
+        } else {
+            *points = resize_preserving_order(&points, len);
+        }
     }
 
     pub fn aligned_with_mobject(&self, target: &Mobject<Vertex>) -> bool {

@@ -1,5 +1,7 @@
 pub mod vmobject;
 
+use std::fmt::Debug;
+
 use glam::{Vec3, Vec4};
 
 use crate::{mobject::ExtractedMobject, RanimContext};
@@ -21,7 +23,7 @@ pub trait Renderer {
     );
 }
 
-pub trait RendererVertex: bytemuck::Pod + bytemuck::Zeroable + Default {
+pub trait RendererVertex: bytemuck::Pod + bytemuck::Zeroable + Default + Debug {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
 
     fn position(&self) -> Vec3;
