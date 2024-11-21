@@ -1,12 +1,13 @@
 use bezier_rs::Bezier;
-use glam::{vec2, vec3, Vec2, Vec3};
+use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use itertools::Itertools;
+use palette::{rgb, Srgba};
 // use log::trace;
 
 use crate::{
     pipeline::simple,
     renderer::vmobject::{VMobjectRenderer, VMobjectVertex},
-    utils::{beziers_to_vertex, SubpathWidth},
+    utils::{beziers_to_fill, beziers_to_stroke, SubpathWidth},
 };
 
 use super::{Mobject, ToMobject, TransformAnchor};
@@ -40,7 +41,7 @@ impl Arc {
 }
 
 impl ToMobject for Arc {
-    type Pipeline = simple::Pipeline;
+    type Renderer = VMobjectRenderer;
 
     fn to_mobject(self) -> Mobject<VMobjectVertex> {
         const NUM_SEGMENTS: usize = 8;
@@ -50,7 +51,7 @@ impl ToMobject for Arc {
         let mut points = (0..len)
             .map(|i| {
                 let angle = i as f32 * angle_step;
-                vec2(angle.cos() as f32, angle.sin() as f32)
+                vec2(angle.cos() as f32, angle.sin() as f32) * self.radius
             })
             .collect::<Vec<_>>();
 
@@ -60,23 +61,30 @@ impl ToMobject for Arc {
         });
         // trace!("start: {:?}, end: {:?}", points[0], points[len - 1]);
 
-        let beziers = points
-            .iter()
-            .step_by(2)
-            .zip(points.iter().skip(1).step_by(2))
-            .zip(points.iter().skip(2).step_by(2))
-            .map(|((&p1, &p2), &p3)| {
-                let [p1, p2, p3] = [p1 * self.radius, p2 * self.radius, p3 * self.radius];
-                Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
-            })
-            .collect::<Vec<_>>();
+        // let beziers = points
+        //     .iter()
+        //     .step_by(2)
+        //     .zip(points.iter().skip(1).step_by(2))
+        //     .zip(points.iter().skip(2).step_by(2))
+        //     .map(|((&p1, &p2), &p3)| {
+        //         let [p1, p2, p3] = [p1 * self.radius, p2 * self.radius, p3 * self.radius];
+        //         Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
+        //     })
+        //     .collect::<Vec<_>>();
 
         // trace!("beziers: {:?}", beziers.len());
-        Mobject::new::<VMobjectRenderer>(beziers_to_vertex(
-            beziers,
-            self.stroke_width,
-            self.angle == std::f32::consts::TAU,
-        ))
+        // Mobject::new::<VMobjectRenderer>(beziers_to_stroke(
+        //     beziers,
+        //     self.stroke_width,
+        //     self.angle == std::f32::consts::TAU,
+        // ))
+        if self.angle == std::f32::consts::TAU {
+            BezierShape::closed(points)
+        } else {
+            BezierShape::unclosed(points)
+        }
+        .with_width(self.stroke_width)
+        .to_mobject()
     }
 }
 
@@ -103,7 +111,7 @@ impl ArcBetweenPoints {
 }
 
 impl ToMobject for ArcBetweenPoints {
-    type Pipeline = simple::Pipeline;
+    type Renderer = VMobjectRenderer;
 
     fn to_mobject(self) -> Mobject<VMobjectVertex> {
         let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
@@ -136,7 +144,7 @@ impl Circle {
 }
 
 impl ToMobject for Circle {
-    type Pipeline = simple::Pipeline;
+    type Renderer = VMobjectRenderer;
 
     fn to_mobject(self) -> Mobject<VMobjectVertex> {
         Arc::new(std::f32::consts::TAU)
@@ -178,7 +186,7 @@ impl Dot {
 }
 
 impl ToMobject for Dot {
-    type Pipeline = simple::Pipeline;
+    type Renderer = VMobjectRenderer;
 
     fn to_mobject(self) -> Mobject<VMobjectVertex> {
         let mut mobject = Circle::new(self.radius)
@@ -211,7 +219,7 @@ impl Ellipse {
 }
 
 impl ToMobject for Ellipse {
-    type Pipeline = simple::Pipeline;
+    type Renderer = VMobjectRenderer;
 
     fn to_mobject(self) -> Mobject<VMobjectVertex> {
         let mut mobject = Circle::new(self.width)
@@ -245,7 +253,7 @@ impl Polygon {
 }
 
 impl ToMobject for Polygon {
-    type Pipeline = simple::Pipeline;
+    type Renderer = VMobjectRenderer;
 
     fn to_mobject(self) -> Mobject<VMobjectVertex> {
         // TODO: Handle 0 len
@@ -267,6 +275,105 @@ impl ToMobject for Polygon {
             .into_iter()
             .interleave(handles.into_iter())
             .collect::<Vec<_>>();
+        // let beziers = points
+        //     .iter()
+        //     .step_by(2)
+        //     .zip(
+        //         points
+        //             .iter()
+        //             .skip(1)
+        //             .chain(points.iter().take(1))
+        //             .step_by(2),
+        //     )
+        //     .zip(
+        //         points
+        //             .iter()
+        //             .skip(2)
+        //             .chain(points.iter().take(2))
+        //             .step_by(2),
+        //     )
+        //     .map(|((&p1, &p2), &p3)| {
+        //         Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
+        //     })
+        //     .collect::<Vec<_>>();
+        // println!("beziers: {:?}", beziers.len());
+        // Mobject::new::<VMobjectRenderer>(beziers_to_stroke(beziers, self.width, true))
+        BezierShape::closed(points)
+            .with_width(self.width)
+            .to_mobject()
+    }
+}
+
+pub struct BezierShape {
+    pub points: Vec<Vec2>,
+    pub width: SubpathWidth,
+    pub stroke_color: Vec4,
+    pub fill_color: Vec4,
+    pub closed: bool,
+}
+
+impl BezierShape {
+    pub fn closed(points: Vec<Vec2>) -> Self {
+        Self {
+            closed: true,
+            ..Self::unclosed(points)
+        }
+    }
+
+    pub fn unclosed(points: Vec<Vec2>) -> Self {
+        let stroke_color: Srgba = Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into();
+        Self {
+            points,
+            width: SubpathWidth::Middle(1.0),
+            stroke_color: vec4(
+                stroke_color.red,
+                stroke_color.green,
+                stroke_color.blue,
+                stroke_color.alpha,
+            ),
+            fill_color: Vec4::ZERO,
+            closed: false,
+        }
+    }
+
+    pub fn with_width(mut self, width: SubpathWidth) -> Self {
+        self.width = width;
+        self
+    }
+
+    pub fn with_stroke_color(mut self, stroke_color: Vec4) -> Self {
+        self.stroke_color = stroke_color;
+        self
+    }
+
+    pub fn with_fill_color(mut self, fill_color: Vec4) -> Self {
+        self.fill_color = fill_color;
+        self
+    }
+}
+
+impl ToMobject for BezierShape {
+    type Renderer = VMobjectRenderer;
+
+    fn to_mobject(self) -> Mobject<<Self::Renderer as crate::renderer::Renderer>::Vertex>
+    where
+        Self: Sized,
+    {
+        let points = self.points.clone();
+
+        let anchors = points;
+        let handles = anchors
+            .windows(2)
+            .map(|window| 0.5 * (window[0] + window[1]))
+            .collect::<Vec<_>>();
+
+        assert_eq!(anchors.len(), handles.len() + 1);
+
+        let points = anchors
+            .into_iter()
+            .interleave(handles.into_iter())
+            .collect::<Vec<_>>();
+
         let beziers = points
             .iter()
             .step_by(2)
@@ -288,7 +395,18 @@ impl ToMobject for Polygon {
                 Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
             })
             .collect::<Vec<_>>();
-        // println!("beziers: {:?}", beziers.len());
-        Mobject::new::<VMobjectRenderer>(beziers_to_vertex(beziers, self.width, true))
+
+        let beziers = beziers
+            .into_iter()
+            .filter(|bezier| !bezier.is_point())
+            .collect::<Vec<_>>();
+
+        let mut vertices = beziers_to_stroke(&beziers, self.width, self.stroke_color, self.closed);
+
+        if self.closed {
+            vertices.extend(beziers_to_fill(&beziers, self.fill_color).into_iter());
+        }
+
+        Mobject::new::<VMobjectRenderer>(vertices)
     }
 }

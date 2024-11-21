@@ -1,7 +1,7 @@
 pub mod rate_functions;
 
 use bezier_rs::{Bezier, Identifier, Join, Subpath, SubpathTValue};
-use glam::{vec3, vec4};
+use glam::{vec3, vec4, Vec4};
 use log::trace;
 
 use crate::renderer::vmobject::VMobjectVertex;
@@ -34,20 +34,41 @@ impl Default for SubpathWidth {
     }
 }
 
-pub fn beziers_to_vertex(
-    beziers: Vec<Bezier>,
+pub fn beziers_to_fill(
+    beziers: &Vec<Bezier>,
+    fill_color: Vec4,
+) -> Vec<VMobjectVertex> {
+    trace!("converting subpath to vertex: {:?}", beziers.len());
+    const MAX_STEPS: usize = 256;
+
+    let subpath: Subpath<Id> = Subpath::from_beziers(beziers, true);
+    if subpath.len() == 0 {
+        return vec![VMobjectVertex::default(); 3];
+    }
+
+    let mut vertices = vec![];
+    for i in 0..MAX_STEPS {
+        let t = i as f64 / (MAX_STEPS - 1) as f64;
+        vertices.push(subpath.evaluate(SubpathTValue::GlobalEuclidean(t)));
+    }
+
+    vertices
+        .windows(3)
+        .flatten()
+        .map(|p| VMobjectVertex::new(vec3(p.x as f32, p.y as f32, 0.0), fill_color))
+        .collect::<Vec<_>>()
+}
+
+pub fn beziers_to_stroke(
+    beziers: &Vec<Bezier>,
     width: SubpathWidth,
+    stroke_color: Vec4,
     closed: bool,
 ) -> Vec<VMobjectVertex> {
     trace!("converting subpath to vertex: {:?}", beziers.len());
     const MAX_STEPS: usize = 256;
 
-    let beziers = beziers
-        .into_iter()
-        .filter(|bezier| !bezier.is_point())
-        .collect::<Vec<_>>();
-    let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, closed);
-
+    let subpath: Subpath<Id> = Subpath::from_beziers(beziers, closed);
     if subpath.len() == 0 {
         return vec![VMobjectVertex::default(); 3];
     }
@@ -82,7 +103,7 @@ pub fn beziers_to_vertex(
     vertices
         .windows(3)
         .flatten()
-        .map(|p| VMobjectVertex::new(vec3(p.x as f32, p.y as f32, 0.0), vec4(1.0, 0.0, 0.0, 1.0)))
+        .map(|p| VMobjectVertex::new(vec3(p.x as f32, p.y as f32, 0.0), stroke_color))
         .collect::<Vec<_>>()
 }
 
