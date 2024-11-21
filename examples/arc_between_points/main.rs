@@ -19,8 +19,10 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=trace"))
         .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=info"))
-        .init();
+    env_logger::Builder::from_env(
+        Env::default().default_filter_or("arc_between_points=info,ranim=trace"),
+    )
+    .init();
 
     let mut ctx = RanimContext::new();
 
@@ -34,36 +36,40 @@ fn main() {
     let ntan = 16;
     let nrad = 5;
 
-    let rad_step = 250.0 / (nrad - 1) as f32;
+    let rad_step = 250.0 / nrad as f32;
     let width_step = 50.0 / (nrad as f32).powi(2);
-    let angle_step = std::f32::consts::PI * 2.0 / nrad as f32;
+    let angle_step = std::f32::consts::PI * 7.0 / 4.0 / nrad as f32;
 
-    for i in 0..nrad {
-        let t = Instant::now();
-        let rad = rad_step * i as f32;
-        let width = width_step * ((nrad - i) as f32).powi(2);
-        let angle = angle_step * (i + 1) as f32;
-        for j in 0..ntan {
-            let end = Mat3::from_rotation_z(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)
-                * vec3(rad, 0.0, 0.0);
+    let i = 2;
+    // for i in 0..nrad {
+    let t = Instant::now();
+    let rad = rad_step * (i + 1) as f32;
+    let width = width_step * ((nrad - i) as f32).powi(2);
+    let angle = angle_step * (i + 1) as f32;
+    for j in 0..ntan {
+        let end = Mat3::from_rotation_z(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)
+            * vec3(rad, 0.0, 0.0);
 
-            let color = start_color.lerp(end_color, j as f32 / (ntan - 1) as f32);
-            let mut arc = ArcBetweenPoints::new(Vec3::ZERO, end, angle)
-                .with_stroke_width(SubpathWidth::Middle(width))
-                .to_mobject();
+        let color = start_color.lerp(end_color, j as f32 / (ntan - 1) as f32);
+        let mut arc = ArcBetweenPoints::new(Vec3::ZERO, end, angle)
+            .with_stroke_width(SubpathWidth::Middle(width))
+            .to_mobject();
 
-            arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into());
-            scene.play(
-                &mut ctx,
-                Animation::new(
-                    arc,
-                    Fading::In,
-                    AnimationConfig::default()
-                        .run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32)),
-                ),
-            );
-        }
-        info!("rad [{i}/{nrad}] cost: {:?}", t.elapsed());
+        arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into());
+        scene.play(
+            &mut ctx,
+            Animation::new(
+                arc,
+                Fading::In,
+                AnimationConfig::default()
+                    .run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32)),
+            ),
+        );
+        // }
+        info!(
+            "rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}",
+            t.elapsed()
+        );
     }
 
     info!(
