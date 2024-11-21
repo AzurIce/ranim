@@ -5,6 +5,7 @@ use itertools::Itertools;
 
 use crate::{
     pipeline::simple,
+    renderer::vmobject::{VMobjectRenderer, VMobjectVertex},
     utils::{beziers_to_vertex, SubpathWidth},
 };
 
@@ -41,7 +42,7 @@ impl Arc {
 impl ToMobject for Arc {
     type Pipeline = simple::Pipeline;
 
-    fn to_mobject(self) -> Mobject<simple::Vertex> {
+    fn to_mobject(self) -> Mobject<VMobjectVertex> {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
 
@@ -71,7 +72,7 @@ impl ToMobject for Arc {
             .collect::<Vec<_>>();
 
         // trace!("beziers: {:?}", beziers.len());
-        Mobject::new::<Self::Pipeline>(beziers_to_vertex(
+        Mobject::new::<VMobjectRenderer>(beziers_to_vertex(
             beziers,
             self.stroke_width,
             self.angle == std::f32::consts::TAU,
@@ -104,7 +105,7 @@ impl ArcBetweenPoints {
 impl ToMobject for ArcBetweenPoints {
     type Pipeline = simple::Pipeline;
 
-    fn to_mobject(self) -> Mobject<simple::Vertex> {
+    fn to_mobject(self) -> Mobject<VMobjectVertex> {
         let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
         let arc = Arc::new(self.angle)
             .with_radius(radius)
@@ -137,7 +138,7 @@ impl Circle {
 impl ToMobject for Circle {
     type Pipeline = simple::Pipeline;
 
-    fn to_mobject(self) -> Mobject<simple::Vertex> {
+    fn to_mobject(self) -> Mobject<VMobjectVertex> {
         Arc::new(std::f32::consts::TAU)
             .with_radius(self.radius)
             .with_stroke_width(self.stroke_width)
@@ -179,7 +180,7 @@ impl Dot {
 impl ToMobject for Dot {
     type Pipeline = simple::Pipeline;
 
-    fn to_mobject(self) -> Mobject<simple::Vertex> {
+    fn to_mobject(self) -> Mobject<VMobjectVertex> {
         let mut mobject = Circle::new(self.radius)
             .with_stroke_width(self.stroke_width)
             .to_mobject();
@@ -196,7 +197,11 @@ pub struct Ellipse {
 
 impl Ellipse {
     pub fn new(width: f32, height: f32) -> Self {
-        Self { width, height, stroke_width: SubpathWidth::default() }
+        Self {
+            width,
+            height,
+            stroke_width: SubpathWidth::default(),
+        }
     }
 
     pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
@@ -208,11 +213,14 @@ impl Ellipse {
 impl ToMobject for Ellipse {
     type Pipeline = simple::Pipeline;
 
-    fn to_mobject(self) -> Mobject<simple::Vertex> {
+    fn to_mobject(self) -> Mobject<VMobjectVertex> {
         let mut mobject = Circle::new(self.width)
             .with_stroke_width(self.stroke_width)
             .to_mobject();
-        mobject.scale(vec3(self.width, self.height, 1.0), TransformAnchor::origin());
+        mobject.scale(
+            vec3(self.width, self.height, 1.0),
+            TransformAnchor::origin(),
+        );
         mobject
     }
 }
@@ -239,10 +247,10 @@ impl Polygon {
 impl ToMobject for Polygon {
     type Pipeline = simple::Pipeline;
 
-    fn to_mobject(self) -> Mobject<simple::Vertex> {
+    fn to_mobject(self) -> Mobject<VMobjectVertex> {
         // TODO: Handle 0 len
         if self.vertices.len() == 0 {
-            return Mobject::new::<Self::Pipeline>(vec![]);
+            return Mobject::new::<VMobjectRenderer>(vec![]);
         }
 
         let vertices = self.vertices.clone();
@@ -281,6 +289,6 @@ impl ToMobject for Polygon {
             })
             .collect::<Vec<_>>();
         // println!("beziers: {:?}", beziers.len());
-        Mobject::new::<Self::Pipeline>(beziers_to_vertex(beziers, self.width, true))
+        Mobject::new::<VMobjectRenderer>(beziers_to_vertex(beziers, self.width, true))
     }
 }

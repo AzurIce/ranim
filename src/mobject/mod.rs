@@ -5,18 +5,19 @@ use std::sync::{Arc, RwLock};
 use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3};
 use palette::Srgba;
 
-use crate::pipeline::{PipelineVertex, RenderPipeline};
+use crate::pipeline::RenderPipeline;
+use crate::renderer::{Renderer, RendererVertex};
 use crate::utils::{resize_preserving_order, Id};
 use crate::{WgpuBuffer, WgpuContext};
 
-pub struct ExtractedMobject<Vertex: PipelineVertex> {
+pub struct ExtractedMobject<Vertex: RendererVertex> {
     pub id: Id,
-    pub pipeline_id: std::any::TypeId,
+    pub renderer_id: std::any::TypeId,
     pub points: Arc<RwLock<Vec<Vertex>>>,
     pub(crate) buffer: WgpuBuffer<Vertex>,
 }
 
-impl<Vertex: PipelineVertex> ExtractedMobject<Vertex> {
+impl<Vertex: RendererVertex> ExtractedMobject<Vertex> {
     pub(crate) fn update_buffer(&mut self, ctx: &WgpuContext) {
         self.buffer
             .prepare_from_slice(ctx, &self.points.read().unwrap());
@@ -41,25 +42,25 @@ pub trait ToMobject {
 }
 
 #[derive(Clone)]
-pub struct Mobject<Vertex: PipelineVertex> {
+pub struct Mobject<Vertex: RendererVertex> {
     id: Id,
-    pipeline_id: std::any::TypeId,
+    renderer_id: std::any::TypeId,
     points: Arc<RwLock<Vec<Vertex>>>,
 }
 
-impl<Vertex: PipelineVertex> Mobject<Vertex> {
+impl<Vertex: RendererVertex> Mobject<Vertex> {
     pub fn id(&self) -> &Id {
         &self.id
     }
 
-    pub fn pipeline_id(&self) -> &std::any::TypeId {
-        &self.pipeline_id
+    pub fn renderer_id(&self) -> &std::any::TypeId {
+        &self.renderer_id
     }
 
-    fn new<Pipeline: RenderPipeline + 'static>(points: impl Into<Vec<Vertex>>) -> Self {
+    fn new<R: Renderer + 'static>(points: impl Into<Vec<Vertex>>) -> Self {
         Self {
             id: Id::new(),
-            pipeline_id: std::any::TypeId::of::<Pipeline>(),
+            renderer_id: std::any::TypeId::of::<R>(),
             points: Arc::new(RwLock::new(points.into())),
         }
     }
@@ -67,7 +68,7 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
     pub(crate) fn extract(&self, ctx: &WgpuContext) -> ExtractedMobject<Vertex> {
         let Mobject {
             id,
-            pipeline_id,
+            renderer_id,
             points,
         } = self.clone();
         let buffer = WgpuBuffer::new_init(
@@ -77,7 +78,7 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
         );
         ExtractedMobject {
             id,
-            pipeline_id,
+            renderer_id,
             points,
             buffer,
         }
@@ -103,7 +104,7 @@ impl TransformAnchor {
     }
 }
 
-impl<Vertex: PipelineVertex> Mobject<Vertex> {
+impl<Vertex: RendererVertex> Mobject<Vertex> {
     /// Get the bounding box of the mobject.
     /// min, mid, max
     pub fn get_bounding_box(&self) -> [Vec3; 3] {
@@ -237,7 +238,7 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
     }
 }
 
-impl<Vertex: PipelineVertex> Mobject<Vertex> {
+impl<Vertex: RendererVertex> Mobject<Vertex> {
     pub fn set_color(&mut self, color: Srgba) -> &mut Self {
         let color = vec4(color.red, color.green, color.blue, color.alpha);
 
@@ -264,7 +265,7 @@ impl<Vertex: PipelineVertex> Mobject<Vertex> {
     }
 }
 
-impl<Vertex: PipelineVertex> Mobject<Vertex> {
+impl<Vertex: RendererVertex> Mobject<Vertex> {
     pub fn vertex_cnt(&self) -> usize {
         self.points.read().unwrap().len()
     }

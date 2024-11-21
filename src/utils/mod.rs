@@ -4,7 +4,7 @@ use bezier_rs::{Bezier, Identifier, Join, Subpath, SubpathTValue};
 use glam::{vec3, vec4};
 use log::trace;
 
-use crate::pipeline::simple;
+use crate::renderer::vmobject::VMobjectVertex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
@@ -34,7 +34,11 @@ impl Default for SubpathWidth {
     }
 }
 
-pub fn beziers_to_vertex(beziers: Vec<Bezier>, width: SubpathWidth, closed: bool) -> Vec<simple::Vertex> {
+pub fn beziers_to_vertex(
+    beziers: Vec<Bezier>,
+    width: SubpathWidth,
+    closed: bool,
+) -> Vec<VMobjectVertex> {
     trace!("converting subpath to vertex: {:?}", beziers.len());
     const MAX_STEPS: usize = 256;
 
@@ -45,7 +49,7 @@ pub fn beziers_to_vertex(beziers: Vec<Bezier>, width: SubpathWidth, closed: bool
     let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, closed);
 
     if subpath.len() == 0 {
-        return vec![simple::Vertex::default(); 3];
+        return vec![VMobjectVertex::default(); 3];
     }
 
     // https://github.com/3b1b/manim/blob/master/manimlib/shaders/quadratic_bezier/stroke/geom.glsl
@@ -63,7 +67,11 @@ pub fn beziers_to_vertex(beziers: Vec<Bezier>, width: SubpathWidth, closed: bool
             subpath.offset(-w as f64 / 2.0, Join::Bevel),
         ),
     };
-    trace!("inner: {:?}, outer: {:?}", inner_path.len(), outer_path.len());
+    trace!(
+        "inner: {:?}, outer: {:?}",
+        inner_path.len(),
+        outer_path.len()
+    );
     let mut vertices = vec![];
     for i in 0..MAX_STEPS {
         let t = i as f64 / (MAX_STEPS - 1) as f64;
@@ -74,7 +82,7 @@ pub fn beziers_to_vertex(beziers: Vec<Bezier>, width: SubpathWidth, closed: bool
     vertices
         .windows(3)
         .flatten()
-        .map(|p| simple::Vertex::new(vec3(p.x as f32, p.y as f32, 0.0), vec4(1.0, 0.0, 0.0, 1.0)))
+        .map(|p| VMobjectVertex::new(vec3(p.x as f32, p.y as f32, 0.0), vec4(1.0, 0.0, 0.0, 1.0)))
         .collect::<Vec<_>>()
 }
 

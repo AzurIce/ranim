@@ -10,26 +10,24 @@ use wgpu::util::DeviceExt;
 pub use glam;
 pub use palette;
 
+pub(crate) mod renderer;
+pub(crate) mod pipeline;
 pub mod camera;
 pub mod animation;
 pub mod scene;
 pub mod mobject;
-pub mod pipeline;
 pub mod utils;
 
 pub struct RanimContext {
     pub(crate) wgpu_ctx: WgpuContext,
     pub pipelines: HashMap<TypeId, Box<dyn Any>>,
+    // pub renderers: HashMap<TypeId, Box<dyn Any>>,
 }
 
 impl RanimContext {
     pub fn new() -> Self {
         let wgpu_ctx = pollster::block_on(WgpuContext::new());
         let pipelines = HashMap::<TypeId, Box<dyn Any>>::new();
-
-        // let id = std::any::TypeId::of::<SimplePipeline>();
-        // let pipeline = SimplePipeline::new(&wgpu_ctx);
-        // pipelines.insert(id, Box::new(pipeline));
 
         Self {
             wgpu_ctx,

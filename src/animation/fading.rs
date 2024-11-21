@@ -1,4 +1,4 @@
-use crate::{mobject::Mobject, pipeline::PipelineVertex};
+use crate::{mobject::Mobject, renderer::RendererVertex};
 
 use super::AnimationFunc;
 
@@ -7,7 +7,7 @@ pub enum Fading {
     In,
 }
 
-impl<Vertex: PipelineVertex> AnimationFunc<Vertex> for Fading {
+impl<Vertex: RendererVertex> AnimationFunc<Vertex> for Fading {
     fn pre_anim(&mut self, mobject: &mut Mobject<Vertex>) {
         match self {
             Fading::Out => mobject.set_opacity(1.0),
