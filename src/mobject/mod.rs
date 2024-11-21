@@ -48,6 +48,10 @@ pub struct Mobject<Vertex: RendererVertex> {
 }
 
 impl<Vertex: RendererVertex> Mobject<Vertex> {
+    pub(crate) fn into_points(self) -> Vec<Vertex> {
+        self.points.read().unwrap().clone()
+    }
+
     pub fn id(&self) -> &Id {
         &self.id
     }
@@ -56,7 +60,7 @@ impl<Vertex: RendererVertex> Mobject<Vertex> {
         &self.renderer_id
     }
 
-    fn new<R: Renderer + 'static>(points: impl Into<Vec<Vertex>>) -> Self {
+    pub(crate) fn new<R: Renderer + 'static>(points: impl Into<Vec<Vertex>>) -> Self {
         Self {
             id: Id::new(),
             renderer_id: std::any::TypeId::of::<R>(),

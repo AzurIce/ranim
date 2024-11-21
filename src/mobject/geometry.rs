@@ -1,6 +1,7 @@
 use bezier_rs::Bezier;
 use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use itertools::Itertools;
+use log::{error, trace};
 use palette::{rgb, IntoColor, Srgba};
 // use log::trace;
 
