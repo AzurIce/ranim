@@ -9,6 +9,14 @@ use crate::renderer::{Renderer, RendererVertex};
 use crate::utils::{extend_with_last, resize_preserving_order, Id};
 use crate::{WgpuBuffer, WgpuContext};
 
+pub trait ToMobject {
+    type Renderer: Renderer + 'static;
+
+    fn to_mobject(self) -> Mobject<Self::Renderer>
+    where
+        Self: Sized;
+}
+
 pub struct ExtractedMobject<Vertex: RendererVertex> {
     pub id: Id,
     pub renderer_id: std::any::TypeId,
@@ -16,39 +24,22 @@ pub struct ExtractedMobject<Vertex: RendererVertex> {
     pub(crate) buffer: WgpuBuffer<Vertex>,
 }
 
-impl<Vertex: RendererVertex> ExtractedMobject<Vertex> {
-    pub(crate) fn update_buffer(&mut self, ctx: &WgpuContext) {
-        self.buffer
-            .prepare_from_slice(ctx, &self.points.read().unwrap());
-    }
-
-    pub(crate) fn prepare(&mut self, ctx: &WgpuContext) {
-        self.update_buffer(ctx);
-    }
-
-    pub fn render(&mut self, render_pass: &mut wgpu::RenderPass) {
-        render_pass.set_vertex_buffer(0, self.buffer.slice(..));
-        render_pass.draw(0..self.buffer.len() as u32, 0..1);
-    }
-}
-
-pub trait ToMobject {
-    type Renderer: Renderer + 'static;
-
-    fn to_mobject(self) -> Mobject<<Self::Renderer as Renderer>::Vertex>
-    where
-        Self: Sized;
-}
-
-#[derive(Clone)]
-pub struct Mobject<Vertex: RendererVertex> {
+pub struct Mobject<R: Renderer + 'static> {
     id: Id,
-    renderer_id: std::any::TypeId,
-    points: Arc<RwLock<Vec<Vertex>>>,
+    points: Arc<RwLock<Vec<R::Vertex>>>,
 }
 
-impl<Vertex: RendererVertex> Mobject<Vertex> {
-    pub(crate) fn into_points(self) -> Vec<Vertex> {
+impl<R: Renderer> Clone for Mobject<R> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            points: self.points.clone(),
+        }
+    }
+}
+
+impl<R: Renderer> Mobject<R> {
+    pub(crate) fn into_points(self) -> Vec<R::Vertex> {
         self.points.read().unwrap().clone()
     }
 
@@ -56,24 +47,15 @@ impl<Vertex: RendererVertex> Mobject<Vertex> {
         &self.id
     }
 
-    pub fn renderer_id(&self) -> &std::any::TypeId {
-        &self.renderer_id
-    }
-
-    pub(crate) fn new<R: Renderer + 'static>(points: impl Into<Vec<Vertex>>) -> Self {
+    pub(crate) fn new(points: impl Into<Vec<R::Vertex>>) -> Self {
         Self {
             id: Id::new(),
-            renderer_id: std::any::TypeId::of::<R>(),
             points: Arc::new(RwLock::new(points.into())),
         }
     }
 
-    pub(crate) fn extract(&self, ctx: &WgpuContext) -> ExtractedMobject<Vertex> {
-        let Mobject {
-            id,
-            renderer_id,
-            points,
-        } = self.clone();
+    pub(crate) fn extract(&self, ctx: &WgpuContext) -> ExtractedMobject<R::Vertex> {
+        let Mobject { id, points } = self.clone();
         let buffer = WgpuBuffer::new_init(
             &ctx,
             &self.points.read().unwrap(),
@@ -81,7 +63,7 @@ impl<Vertex: RendererVertex> Mobject<Vertex> {
         );
         ExtractedMobject {
             id,
-            renderer_id,
+            renderer_id: std::any::TypeId::of::<R>(),
             points,
             buffer,
         }
@@ -107,7 +89,7 @@ impl TransformAnchor {
     }
 }
 
-impl<Vertex: RendererVertex> Mobject<Vertex> {
+impl<R: Renderer> Mobject<R> {
     /// Get the bounding box of the mobject.
     /// min, mid, max
     pub fn get_bounding_box(&self) -> [Vec3; 3] {
@@ -139,7 +121,11 @@ impl<Vertex: RendererVertex> Mobject<Vertex> {
     }
 
     /// Apply a function to the points of the mobject about the point.
-    pub fn apply_points_function(&mut self, f: impl Fn(&mut Vec<Vertex>), anchor: TransformAnchor) {
+    pub fn apply_points_function(
+        &mut self,
+        f: impl Fn(&mut Vec<R::Vertex>),
+        anchor: TransformAnchor,
+    ) {
         let anchor = match anchor {
             TransformAnchor::Point(x) => x,
             TransformAnchor::Edge(x) => self.get_bounding_box_point(x),
@@ -241,7 +227,7 @@ impl<Vertex: RendererVertex> Mobject<Vertex> {
     }
 }
 
-impl<Vertex: RendererVertex> Mobject<Vertex> {
+impl<R: Renderer> Mobject<R> {
     pub fn set_color(&mut self, color: Srgba) -> &mut Self {
         let color = vec4(color.red, color.green, color.blue, color.alpha);
 
@@ -268,7 +254,7 @@ impl<Vertex: RendererVertex> Mobject<Vertex> {
     }
 }
 
-impl<Vertex: RendererVertex> Mobject<Vertex> {
+impl<R: Renderer> Mobject<R> {
     pub fn vertex_cnt(&self) -> usize {
         self.points.read().unwrap().len()
     }
@@ -282,17 +268,17 @@ impl<Vertex: RendererVertex> Mobject<Vertex> {
         }
     }
 
-    pub fn aligned_with_mobject(&self, target: &Mobject<Vertex>) -> bool {
+    pub fn aligned_with_mobject(&self, target: &Mobject<R>) -> bool {
         self.vertex_cnt() == target.vertex_cnt()
     }
 
-    pub fn align_with_mobject(&mut self, target: &mut Mobject<Vertex>) {
+    pub fn align_with_mobject(&mut self, target: &mut Mobject<R>) {
         let max_len = self.vertex_cnt().max(target.vertex_cnt());
         self.resize_points(max_len);
         target.resize_points(max_len);
     }
 
-    pub fn interpolate_with_mobject(&mut self, target: &Mobject<Vertex>, t: f32) {
+    pub fn interpolate_with_mobject(&mut self, target: &Mobject<R>, t: f32) {
         let mut points = self.points.write().unwrap();
         points
             .iter_mut()

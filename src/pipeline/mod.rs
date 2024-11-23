@@ -3,6 +3,7 @@ use std::ops::Deref;
 use crate::{renderer::RendererVertex, RanimContext};
 
 pub mod simple;
+pub mod vmobject_fill;
 
 
 /// A render pipeline.

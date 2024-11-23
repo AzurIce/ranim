@@ -4,17 +4,21 @@ use std::{
     ops::Deref,
 };
 
-use log::trace;
 use pipeline::RenderPipeline;
 use wgpu::util::DeviceExt;
 
 pub use glam;
 pub use palette;
 
+/// Blueprints are the data structures that are used to create [`Rabject`]s
+pub mod blueprint;
+/// Rabjects are the objects that can be manuplated and rendered
+pub mod rabject;
 pub mod animation;
 pub mod camera;
 pub mod mobject;
 pub(crate) mod pipeline;
+/// Renderers implements a whole set of rendering steps
 pub(crate) mod renderer;
 pub mod scene;
 pub mod utils;
@@ -139,62 +143,5 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable> WgpuBuffer<T> {
         } else {
             ctx.queue.write_buffer(self, 0, bytemuck::cast_slice(data));
         }
-    }
-}
-
-// /// Sum two matrices.
-// #[pyfunction]
-// fn sum_matrix(a: Vec<Vec<f64>>, b: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
-//     a.into_iter()
-//         .zip(b.into_iter())
-//         .map(|(a, b)| {
-//             a.into_iter()
-//                 .zip(b.into_iter())
-//                 .map(|(a, b)| a + b)
-//                 .collect()
-//         })
-//         .collect()
-// }
-
-// /// A Python module implemented in Rust.
-// #[pymodule]
-// fn ranim(m: &Bound<'_, PyModule>) -> PyResult<()> {
-//     m.add_function(wrap_pyfunction!(sum_matrix, m)?)?;
-//     Ok(())
-// }
-
-/// Stores custom, user-provided types.
-#[derive(Default, Debug)]
-pub struct Storage {
-    pipelines: HashMap<TypeId, Box<dyn Any + Send>>,
-}
-
-impl Storage {
-    /// Returns `true` if `Storage` contains a type `T`.
-    pub fn has<T: 'static>(&self) -> bool {
-        self.pipelines.contains_key(&TypeId::of::<T>())
-    }
-
-    /// Inserts the data `T` in to [`Storage`].
-    pub fn store<T: 'static + Send>(&mut self, data: T) {
-        let _ = self.pipelines.insert(TypeId::of::<T>(), Box::new(data));
-    }
-
-    /// Returns a reference to the data with type `T` if it exists in [`Storage`].
-    pub fn get<T: 'static>(&self) -> Option<&T> {
-        self.pipelines.get(&TypeId::of::<T>()).map(|pipeline| {
-            pipeline
-                .downcast_ref::<T>()
-                .expect("Value with this type does not exist in Storage.")
-        })
-    }
-
-    /// Returns a mutable reference to the data with type `T` if it exists in [`Storage`].
-    pub fn get_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.pipelines.get_mut(&TypeId::of::<T>()).map(|pipeline| {
-            pipeline
-                .downcast_mut::<T>()
-                .expect("Value with this type does not exist in Storage.")
-        })
     }
 }

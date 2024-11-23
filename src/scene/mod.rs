@@ -13,8 +13,12 @@ use image::{ImageBuffer, Rgba};
 use log::{trace, warn};
 
 use crate::{
-    animation::Animation, camera::Camera, mobject::Mobject,
-    renderer::{vmobject::VMobjectRenderer, RendererVertex}, utils::Id, RanimContext,
+    animation::Animation,
+    camera::Camera,
+    mobject::Mobject,
+    renderer::{vmobject::VMobjectRenderer, Renderer},
+    utils::Id,
+    RanimContext,
 };
 
 pub struct Scene {
@@ -56,16 +60,16 @@ impl Scene {
         Self::new_with_video_writer_builder(ctx, FileWriter::builder())
     }
 
-    pub fn remove_mobject<Vertex: RendererVertex>(&mut self, mobject: &Mobject<Vertex>) {
+    pub fn remove_mobject<R: Renderer>(&mut self, mobject: &Mobject<R>) {
         self.mobjects.iter_mut().for_each(|(_, mobject_vec)| {
             mobject_vec.retain(|(mobject_id, _)| mobject_id != mobject.id());
         });
     }
 
-    pub fn try_add_mobject<Vertex: RendererVertex>(
+    pub fn try_add_mobject<R: Renderer>(
         &mut self,
         ctx: &mut RanimContext,
-        mobject: &Mobject<Vertex>,
+        mobject: &Mobject<R>,
     ) -> anyhow::Result<()> {
         if self.is_mobject_exist(mobject) {
             return Err(anyhow::anyhow!("mobject already exists"));
@@ -78,9 +82,9 @@ impl Scene {
         Ok(())
     }
 
-    pub fn is_mobject_exist<Vertex: RendererVertex>(&self, mobject: &Mobject<Vertex>) -> bool {
+    pub fn is_mobject_exist<R: Renderer>(&self, mobject: &Mobject<R>) -> bool {
         self.mobjects
-            .get(mobject.renderer_id())
+            .get(&std::any::TypeId::of::<R>())
             .map(|mobject_vec| mobject_vec.iter().any(|(id, _)| id == mobject.id()))
             .unwrap_or(false)
     }
@@ -121,11 +125,11 @@ impl Scene {
     /// Play an animation
     ///
     /// See [`Animation`].
-    pub fn play<Vertex: RendererVertex>(
+    pub fn play<R: Renderer>(
         &mut self,
         ctx: &mut RanimContext,
-        mut animation: Animation<Vertex>,
-    ) -> Option<Mobject<Vertex>> {
+        mut animation: Animation<R>,
+    ) -> Option<Mobject<R>> {
         if let Err(err) = self.try_add_mobject(ctx, &animation.mobject) {
             warn!(
                 "[Scene] Failed to add mobject {:?}: {}",

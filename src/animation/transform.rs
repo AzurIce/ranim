@@ -1,21 +1,21 @@
-use crate::{mobject::Mobject, renderer::RendererVertex};
+use crate::{mobject::Mobject, renderer::Renderer};
 
 use super::AnimationFunc;
 
-pub struct Transform<Vertex: RendererVertex> {
-    target: Mobject<Vertex>,
+pub struct Transform<R: Renderer> {
+    target: Mobject<R>,
 }
 
-impl<Vertex: RendererVertex> Transform<Vertex> {
-    pub fn new(target: &Mobject<Vertex>) -> Self {
+impl<R: Renderer> Transform<R> {
+    pub fn new(target: &Mobject<R>) -> Self {
         Self {
             target: target.clone(),
         }
     }
 }
 
-impl<Vertex: RendererVertex> AnimationFunc<Vertex> for Transform<Vertex> {
-    fn interpolate(&mut self, mobject: &mut Mobject<Vertex>, alpha: f32) {
+impl<R: Renderer> AnimationFunc<R> for Transform<R> {
+    fn interpolate(&mut self, mobject: &mut Mobject<R>, alpha: f32) {
         if !mobject.aligned_with_mobject(&self.target) {
             mobject.align_with_mobject(&mut self.target);
         }

@@ -1,16 +1,10 @@
 pub mod rate_functions;
 
 use bezier_rs::{Bezier, Identifier, Join, Subpath, SubpathTValue};
-use glam::{vec3, vec4, Vec3, Vec4};
+use glam::{vec3, Vec4};
 use log::trace;
 
-use crate::{
-    mobject::Mobject,
-    renderer::{
-        vmobject::{VMobjectRenderer, VMobjectVertex},
-        RendererVertex,
-    },
-};
+use crate::renderer::vmobject::VMobjectVertex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
@@ -120,14 +114,4 @@ pub fn resize_preserving_order<T: Clone>(vec: &Vec<T>, new_len: usize) -> Vec<T>
 pub fn extend_with_last<T: Clone + Default>(vec: &mut Vec<T>, new_len: usize) {
     let v = vec![vec.last().cloned().unwrap_or_default(); new_len - vec.len()];
     vec.extend(v.into_iter())
-}
-
-pub fn put_start_and_end_on<T: RendererVertex + Default>(
-    vec: Vec<T>,
-    start: Vec3,
-    end: Vec3,
-) -> Vec<T> {
-    let mut mobject = Mobject::new::<VMobjectRenderer>(vec);
-    mobject.put_start_and_end_on(start, end);
-    mobject.into_points()
 }
