@@ -1,3 +1,6 @@
+use bezier_rs::Bezier;
+use flo_curves::bezier::path::BezierPathBuilder;
+use kurbo::BezPath;
 use palette::{rgb, Srgba};
 
 use crate::{mobject::ExtractedMobject, pipeline::simple, RanimContext};
@@ -9,6 +12,8 @@ use glam::{Vec3, Vec4};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
+/// VMobjectVertex is the data of vectorized path,
+/// they will be used to generate the actual vertices on [`VMobjectRenderer::prepare`]
 pub struct VMobjectVertex {
     pub position: Vec3,
     pub(crate) _padding: f32,
@@ -117,6 +122,32 @@ impl Renderer for VMobjectRenderer {
         })
     }
 
+    fn prepare(ctx: &mut RanimContext, mobjects: &mut Vec<&mut ExtractedMobject<Self::Vertex>>) {
+        for mobject in mobjects {
+            let points = mobject.points.read().unwrap();
+
+            let mut path = BezierPathBuilder::start(points[0].position());
+            for [cp, p] in points[1..].chunks(2) {
+                path.curve_to((cp.position(), cp.position()), p.position());
+            }
+
+            let beziers = points
+                .iter()
+                .step_by(2)
+                .zip(points.iter().skip(1).step_by(2))
+                .zip(points.iter().skip(2).step_by(2))
+                .map(|((&p1, &p2), &p3)| {
+                    let [p1, p2, p3] = [p1, p2, p3].map(|p| p.position().as_dvec2());
+                    Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
+                })
+                .collect::<Vec<_>>();
+
+            mobject
+                .buffer
+                .prepare_from_slice(&ctx.wgpu_ctx, &mobject.points.read().unwrap());
+        }
+    }
+
     fn render<'a>(
         ctx: &mut RanimContext,
         pass: &mut wgpu::RenderPass<'a>,
@@ -124,7 +155,8 @@ impl Renderer for VMobjectRenderer {
     ) {
         pass.set_pipeline(ctx.get_or_init_pipeline::<simple::Pipeline>());
         for mobject in mobjects {
-            mobject.render(pass);
+            pass.set_vertex_buffer(0, mobject.buffer.slice(..));
+            pass.draw(0..mobject.buffer.len() as u32, 0..1);
         }
     }
 }

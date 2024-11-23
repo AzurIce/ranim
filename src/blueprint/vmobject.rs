@@ -1,17 +1,13 @@
 use bezier_rs::Bezier;
 use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use itertools::Itertools;
-use log::{error, trace};
-use palette::{rgb, IntoColor, Srgba};
-// use log::trace;
+use palette::{rgb, Srgba};
 
 use crate::{
-    pipeline::simple,
-    renderer::vmobject::{VMobjectRenderer, VMobjectVertex},
-    utils::{beziers_to_fill, beziers_to_stroke, SubpathWidth},
+    mobject::TransformAnchor, rabject::{vmobject::VMobject, RabjectWithId}, renderer::vmobject::VMobjectRenderer, utils::{beziers_to_fill, beziers_to_stroke, SubpathWidth}
 };
 
-use super::{Mobject, ToMobject, TransformAnchor};
+use super::Blueprint;
 
 /// A part of a circle
 // #[mobject(SimplePipeline)]
@@ -41,10 +37,8 @@ impl Arc {
     }
 }
 
-impl ToMobject for Arc {
-    type Renderer = VMobjectRenderer;
-
-    fn to_mobject(self) -> Mobject<VMobjectVertex> {
+impl Blueprint<VMobject> for Arc {
+    fn build(self) -> RabjectWithId<VMobject> {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
 
@@ -79,7 +73,7 @@ impl ToMobject for Arc {
             BezierShape::unclosed(beziers)
         }
         .with_width(self.stroke_width)
-        .to_mobject()
+        .build()
     }
 }
 
@@ -105,15 +99,13 @@ impl ArcBetweenPoints {
     }
 }
 
-impl ToMobject for ArcBetweenPoints {
-    type Renderer = VMobjectRenderer;
-
-    fn to_mobject(self) -> Mobject<VMobjectVertex> {
+impl Blueprint<VMobject> for ArcBetweenPoints {
+    fn build(self) -> RabjectWithId<VMobject> {
         let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
         let arc = Arc::new(self.angle)
             .with_radius(radius)
             .with_stroke_width(self.stroke_width);
-        let mut mobject = arc.to_mobject();
+        let mut mobject = arc.build();
         mobject.put_start_and_end_on(self.start, self.end);
         mobject
     }
@@ -138,14 +130,12 @@ impl Circle {
     }
 }
 
-impl ToMobject for Circle {
-    type Renderer = VMobjectRenderer;
-
-    fn to_mobject(self) -> Mobject<VMobjectVertex> {
+impl Blueprint<VMobject> for Circle {
+    fn build(self) -> RabjectWithId<VMobject> {
         Arc::new(std::f32::consts::TAU)
             .with_radius(self.radius)
             .with_stroke_width(self.stroke_width)
-            .to_mobject()
+            .build()
     }
 }
 
@@ -180,13 +170,11 @@ impl Dot {
     }
 }
 
-impl ToMobject for Dot {
-    type Renderer = VMobjectRenderer;
-
-    fn to_mobject(self) -> Mobject<VMobjectVertex> {
+impl Blueprint<VMobject> for Dot {
+    fn build(self) -> RabjectWithId<VMobject> {
         let mut mobject = Circle::new(self.radius)
             .with_stroke_width(self.stroke_width)
-            .to_mobject();
+            .build();
         mobject.shift(self.point);
         mobject
     }
@@ -213,13 +201,11 @@ impl Ellipse {
     }
 }
 
-impl ToMobject for Ellipse {
-    type Renderer = VMobjectRenderer;
-
-    fn to_mobject(self) -> Mobject<VMobjectVertex> {
+impl Blueprint<VMobject> for Ellipse {
+    fn build(self) -> RabjectWithId<VMobject> {
         let mut mobject = Circle::new(self.width)
             .with_stroke_width(self.stroke_width)
-            .to_mobject();
+            .build();
         mobject.scale(
             vec3(self.width, self.height, 1.0),
             TransformAnchor::origin(),
@@ -247,13 +233,11 @@ impl Polygon {
     }
 }
 
-impl ToMobject for Polygon {
-    type Renderer = VMobjectRenderer;
-
-    fn to_mobject(self) -> Mobject<VMobjectVertex> {
+impl Blueprint<VMobject> for Polygon {
+    fn build(self) -> RabjectWithId<VMobject> {
         // TODO: Handle 0 len
         if self.vertices.len() == 0 {
-            return Mobject::new::<VMobjectRenderer>(vec![]);
+            return VMobject::from_points(vec![]).into();
         }
 
         let vertices = self.vertices.clone();
@@ -295,7 +279,7 @@ impl ToMobject for Polygon {
         // Mobject::new::<VMobjectRenderer>(beziers_to_stroke(beziers, self.width, true))
         BezierShape::closed(beziers)
             .with_width(self.width)
-            .to_mobject()
+            .build()
     }
 }
 
@@ -347,13 +331,8 @@ impl BezierShape {
     }
 }
 
-impl ToMobject for BezierShape {
-    type Renderer = VMobjectRenderer;
-
-    fn to_mobject(self) -> Mobject<<Self::Renderer as crate::renderer::Renderer>::Vertex>
-    where
-        Self: Sized,
-    {
+impl Blueprint<VMobject> for BezierShape {
+    fn build(self) -> RabjectWithId<VMobject> {
         let beziers = self
             .beziers
             .into_iter()
@@ -366,6 +345,6 @@ impl ToMobject for BezierShape {
             vertices.extend(beziers_to_fill(&beziers, self.fill_color).into_iter());
         }
 
-        Mobject::new::<VMobjectRenderer>(vertices)
+        VMobject::from_points(vertices).into()
     }
 }

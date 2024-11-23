@@ -3,7 +3,7 @@ pub mod transform;
 
 use std::time;
 
-use crate::{mobject::Mobject, renderer::RendererVertex, utils::rate_functions::smooth};
+use crate::{mobject::Mobject, renderer::Renderer, utils::rate_functions::smooth};
 
 pub struct AnimationConfig {
     pub run_time: time::Duration,
@@ -30,7 +30,7 @@ impl AnimationConfig {
         self.run_time = run_time;
         self
     }
-    
+
     pub fn rate_func(mut self, rate_func: Box<dyn Fn(f32) -> f32>) -> Self {
         self.rate_func = rate_func;
         self
@@ -46,42 +46,42 @@ impl AnimationConfig {
     }
 }
 
-pub trait AnimationFunc<Vertex: RendererVertex> {
+pub trait AnimationFunc<R: Renderer> {
     #[allow(unused)]
-    fn pre_anim(&mut self, mobject: &mut Mobject<Vertex>) {}
+    fn pre_anim(&mut self, mobject: &mut Mobject<R>) {}
 
-    fn interpolate(&mut self, mobject: &mut Mobject<Vertex>, alpha: f32);
+    fn interpolate(&mut self, mobject: &mut Mobject<R>, alpha: f32);
 
     #[allow(unused)]
-    fn post_anim(&mut self, mobject: &mut Mobject<Vertex>) {}
+    fn post_anim(&mut self, mobject: &mut Mobject<R>) {}
 }
 
 /// A struct representing an animation
-/// 
+///
 /// The creation of an animation takes the ownership of the mobject to be animated (which is called "the animated mobject"), and
 /// during the animation, this mobject's properties will be modified, but keeps the same id.
-/// 
+///
 /// An [`Animation`] doesn't plays itself, it just describe what an animation like.
 /// To play an animation, should use [`crate::scene::Scene`]'s [`crate::scene::Scene::play`] method.
-/// 
+///
 /// The scene will use [`Animation::func`]'s [`AnimationFunc::interpolate`] method to modify the mobject,
 /// and then use [`crate::scene::Scene::add_mobject`] to update the mobject.
-/// 
+///
 /// When the animation is done, the scene will return an [`Option<Mobject>`] according to
 /// [`AnimationConfig::remove`].
 /// If `remove` is `true`, the scene will remove the mobject from the scene and return `None`.
 /// Otherwise, the scene will return the modified mobject and keep it in the scene.
-pub struct Animation<Vertex: RendererVertex> {
+pub struct Animation<R: Renderer> {
     /// The mobject to be animated, will take the ownership of it, and return by scene's [`crate::scene::Scene::play`] method
-    pub mobject: Mobject<Vertex>,
-    pub func: Box<dyn AnimationFunc<Vertex>>,
+    pub mobject: Mobject<R>,
+    pub func: Box<dyn AnimationFunc<R>>,
     pub config: AnimationConfig,
 }
 
-impl<Vertex: RendererVertex> Animation<Vertex> {
+impl<R: Renderer> Animation<R> {
     pub fn new(
-        mobject: Mobject<Vertex>,
-        func: impl AnimationFunc<Vertex> + 'static,
+        mobject: Mobject<R>,
+        func: impl AnimationFunc<R> + 'static,
         config: AnimationConfig,
     ) -> Self {
         Self {
@@ -100,4 +100,3 @@ impl<Vertex: RendererVertex> Animation<Vertex> {
         self.func.interpolate(&mut self.mobject, alpha);
     }
 }
-

@@ -4,7 +4,6 @@ use std::{
 };
 
 use glam::{Mat4, Vec3};
-use log::{debug, trace};
 
 use crate::{
     mobject::ExtractedMobject, renderer::Renderer, utils::Id, RanimContext, WgpuBuffer, WgpuContext,
@@ -184,9 +183,7 @@ impl Camera {
         );
 
         // Preparing the object
-        for object in &mut objects {
-            object.prepare(&ctx.wgpu_ctx);
-        }
+        R::prepare(ctx, &mut objects);
 
         let target_view = self
             .target_texture
