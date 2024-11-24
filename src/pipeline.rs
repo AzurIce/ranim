@@ -2,9 +2,6 @@ use std::{fmt::Debug, ops::Deref};
 
 use crate::RanimContext;
 
-// pub mod simple;
-pub mod vmobject_fill;
-
 /// A render pipeline.
 pub trait RenderPipeline: Deref<Target = wgpu::RenderPipeline> {
     /// The vertex type.

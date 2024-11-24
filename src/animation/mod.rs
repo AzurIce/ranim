@@ -1,9 +1,7 @@
 pub mod fading;
 pub mod transform;
 
-use std::{any::Any, ops::Deref, time};
-
-use log::trace;
+use std::time;
 
 use crate::{
     rabject::{Rabject, RabjectWithId},
@@ -54,6 +52,7 @@ impl AnimationConfig {
 }
 
 pub trait AnimationFunc<R: Rabject> {
+    #[allow(unused)]
     fn prepare(&mut self, rabject: &mut RabjectWithId<R>, scene: &mut Scene) {}
     #[allow(unused)]
     fn pre_anim(&mut self, rabject: &mut RabjectWithId<R>) {}
@@ -63,6 +62,7 @@ pub trait AnimationFunc<R: Rabject> {
     #[allow(unused)]
     fn post_anim(&mut self, rabject: &mut RabjectWithId<R>) {}
 
+    #[allow(unused)]
     fn cleanup(&mut self, rabject: &mut RabjectWithId<R>, scene: &mut Scene) {}
 }
 
@@ -81,9 +81,12 @@ pub trait AnimationFunc<R: Rabject> {
 /// [`AnimationConfig::remove`].
 /// If `remove` is `true`, the scene will remove the mobject from the scene and return `None`.
 /// Otherwise, the scene will return the modified mobject and keep it in the scene.
+
 pub struct Animation<R: Rabject> {
     /// The mobject to be animated, will take the ownership of it, and return by scene's [`crate::scene::Scene::play`] method
     pub rabject: RabjectWithId<R>,
+    // start_rabject: Option<RabjectWithId<R>>,
+    // end_rabject: Option<RabjectWithId<R>>,
     pub func: Box<dyn AnimationFunc<R>>,
     pub config: AnimationConfig,
 }

@@ -10,16 +10,11 @@ use wgpu::util::DeviceExt;
 pub use glam;
 pub use palette;
 
-/// Blueprints are the data structures that are used to create [`Rabject`]s
-pub mod blueprint;
 /// Rabjects are the objects that can be manuplated and rendered
 pub mod rabject;
 pub mod animation;
 pub mod camera;
-// pub mod mobject;
 pub(crate) mod pipeline;
-/// Renderers implements a whole set of rendering steps
-// pub(crate) mod renderer;
 pub mod scene;
 pub mod utils;
 
@@ -81,10 +76,6 @@ impl WgpuContext {
             queue,
         }
     }
-}
-
-pub fn foo() {
-    println!("Hello, world!");
 }
 
 pub(crate) struct WgpuBuffer<T: bytemuck::Pod + bytemuck::Zeroable> {
