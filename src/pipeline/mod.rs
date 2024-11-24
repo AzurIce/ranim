@@ -1,19 +1,22 @@
-use std::ops::Deref;
+use std::{fmt::Debug, ops::Deref};
 
-use crate::{renderer::RendererVertex, RanimContext};
+use crate::RanimContext;
 
-pub mod simple;
+// pub mod simple;
 pub mod vmobject_fill;
-
 
 /// A render pipeline.
 pub trait RenderPipeline: Deref<Target = wgpu::RenderPipeline> {
     /// The vertex type.
-    /// 
+    ///
     /// used to define the vertex format.
-    type Vertex: RendererVertex + Clone;
+    type Vertex: PipelineVertex;
 
     fn new(ctx: &RanimContext) -> Self
     where
         Self: Sized;
+}
+
+pub trait PipelineVertex: bytemuck::Pod + bytemuck::Zeroable + Clone + Debug {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
 }

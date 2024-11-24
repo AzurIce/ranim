@@ -3,9 +3,9 @@ use std::time::{Duration, Instant};
 use env_logger::Env;
 use glam::{Mat3, Vec3};
 use log::info;
+use ranim::blueprint::vmobject::ArcBetweenPoints;
+use ranim::blueprint::Blueprint;
 use ranim::glam::vec3;
-use ranim::mobject::geometry::ArcBetweenPoints;
-use ranim::mobject::ToMobject;
 use ranim::palette::{rgb, Srgba};
 use ranim::{
     animation::{fading::Fading, Animation, AnimationConfig},
@@ -27,7 +27,6 @@ fn main() {
     let mut ctx = RanimContext::new();
 
     let mut scene = Scene::new(&ctx);
-    let t = Instant::now();
 
     let start_color: Srgba = Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into();
     let start_color = vec3(start_color.red, start_color.green, start_color.blue);
@@ -53,7 +52,7 @@ fn main() {
         let color = start_color.lerp(end_color, j as f32 / (ntan - 1) as f32);
         let mut arc = ArcBetweenPoints::new(Vec3::ZERO, end, angle)
             .with_stroke_width(SubpathWidth::Middle(width))
-            .to_mobject();
+            .build();
 
         arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into());
         scene.play(

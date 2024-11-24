@@ -3,10 +3,10 @@ use std::ops::Deref;
 use wgpu::include_wgsl;
 
 use crate::{
-    camera::CameraUniformsBindGroup, renderer::vmobject::VMobjectVertex, RanimContext, WgpuContext
+    camera::CameraUniformsBindGroup, renderer::vmobject::VMobjectVertex, RanimContext, WgpuContext,
 };
 
-use super::{RendererVertex, RenderPipeline};
+use super::RenderPipeline;
 
 pub struct Pipeline {
     pub pipeline: wgpu::RenderPipeline,

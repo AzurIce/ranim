@@ -4,9 +4,15 @@ use std::{
 };
 
 use glam::{Mat4, Vec3};
+use log::{debug, trace};
 
 use crate::{
-    mobject::ExtractedMobject, renderer::Renderer, utils::Id, RanimContext, WgpuBuffer, WgpuContext,
+    rabject::{ExtractedRabjectWithId, Rabject},
+    // renderer::Renderer,
+    utils::Id,
+    RanimContext,
+    WgpuBuffer,
+    WgpuContext,
 };
 
 #[repr(C)]
@@ -155,20 +161,19 @@ impl Camera {
         }
     }
 
-    pub fn render<R: Renderer + 'static>(
+    pub fn render<R: Rabject>(
         &mut self,
         ctx: &mut RanimContext,
-        objects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
+        rabjects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     ) {
-        let objects = objects.entry(std::any::TypeId::of::<R>()).or_default();
-        let mut objects = objects
-            .into_iter()
-            .map(|(_, mobject)| {
-                mobject
-                    .downcast_mut::<ExtractedMobject<R::Vertex>>()
-                    .unwrap()
-            })
+        let Some(rabjects) = rabjects.get_mut(&std::any::TypeId::of::<R>()) else {
+            return;
+        };
+        let mut rabjects = rabjects
+            .iter_mut()
+            .map(|(_, rabject)| rabject.downcast_mut::<ExtractedRabjectWithId<R>>().unwrap())
             .collect::<Vec<_>>();
+
         // trace!("[Camera] Rendering...");
 
         // Update the uniforms buffer
@@ -183,7 +188,13 @@ impl Camera {
         );
 
         // Preparing the object
-        R::prepare(ctx, &mut objects);
+        // trace!(
+        //     "[Camera] Updating render resources for {} rabjects",
+        //     rabjects.len()
+        // );
+        // for rabject in &mut rabjects {
+        //     R::update_render_resource(ctx, rabject);
+        // }
 
         let target_view = self
             .target_texture
@@ -202,11 +213,17 @@ impl Camera {
                 });
 
         {
+            // let mut render_pass =
+            //     R::begin_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
+            // trace!("[Camera] Render pass begins");
             let mut render_pass =
-                R::begin_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
+                R::begin_render_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
             // bind group 0 is reserved for camera uniforms
             render_pass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
-            R::render(ctx, &mut render_pass, &mut objects);
+            // trace!("[Camera] Rendering {} rabjects", rabjects.len());
+            for rabject in rabjects {
+                R::render(ctx, &mut render_pass, &rabject.render_resource);
+            }
         }
 
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
