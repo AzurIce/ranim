@@ -1,7 +1,9 @@
 pub mod fading;
 pub mod transform;
 
-use std::{ops::Deref, time};
+use std::{any::Any, ops::Deref, time};
+
+use log::trace;
 
 use crate::{
     rabject::{Rabject, RabjectWithId},
@@ -112,6 +114,7 @@ impl<R: Rabject> Animation<R> {
             let alpha = t / self.config.run_time.as_secs_f32();
             let alpha = (self.config.rate_func)(alpha);
             self.func.interpolate(&mut self.rabject, alpha);
+            scene.insert_rabject(ctx, &self.rabject);
             scene.update_frame(ctx, dt);
             scene.frame_count += 1;
         }

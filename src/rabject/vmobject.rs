@@ -14,7 +14,7 @@ use crate::{
 
 use super::{ExtractedRabjectWithId, Interpolatable, Rabject, RabjectWithId};
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct VMobjectPoint {
     pub pos: Vec3,
     pub fill_color: Vec4,
@@ -44,17 +44,18 @@ impl VMobjectPoint {
         self.stroke_color
     }
     pub fn set_stroke_color(&mut self, color: Vec4) {
-        self.fill_color = color;
+        self.stroke_color = color;
     }
     pub fn fill_color(&self) -> Vec4 {
         self.fill_color
     }
     pub fn set_fill_color(&mut self, color: Vec4) {
+        // trace!("point set_fill_color: {:?}", color);
         self.fill_color = color;
     }
 }
 
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct VMobjectStrokeVertex {
     pub pos: Vec4,
@@ -102,7 +103,6 @@ impl VMobject {
     }
 
     pub fn from_points(points: Vec<Vec3>) -> Self {
-        trace!("[VMobject] from_points");
         assert!(points.len() % 2 == 1); // must be odd number of points
 
         let points = points
@@ -118,9 +118,17 @@ impl VMobject {
         Self { points }
     }
 
+    pub fn is_closed(&self) -> bool {
+        if self.points.is_empty() {
+            return false;
+        }
+
+        self.points.first() == self.points.last()
+    }
+
     fn parse_stroke(&self) -> Vec<VMobjectStrokeVertex> {
         if self.points.is_empty() {
-            return vec![];
+            return vec![VMobjectStrokeVertex::default(); 3];
         }
 
         // TODO: implement bezier
@@ -128,14 +136,10 @@ impl VMobject {
     }
 
     pub fn parse_fill(&self) -> Vec<VMobjectFillVertex> {
-        if self.points.is_empty() {
-            return vec![];
+        if self.points.is_empty() || !self.is_closed() {
+            return vec![VMobjectFillVertex::default(); 3];
         }
 
-        trace!(
-            "[VMobject] parse_fill: {:?}",
-            self.points.first().unwrap().fill_color
-        );
         let mut vertices = Vec::with_capacity(self.points.len() * 3); // not acurate
         let base_point = self.points.first().unwrap();
         self.points
@@ -185,7 +189,6 @@ impl Rabject for VMobject {
         render_resource: &mut Self::RenderResource,
     ) {
         let fill_vertices = rabject.parse_fill();
-        trace!("[VMobject] update_render_resource: fill_vertices");
         render_resource
             .fill_vertex_buffer
             .prepare_from_slice(&ctx.wgpu_ctx, &fill_vertices);
@@ -203,7 +206,7 @@ impl Rabject for VMobject {
     ) -> wgpu::RenderPass<'a> {
         let bg = Srgba::from_u32::<rgb::channels::Rgba>(0x333333FF).into_linear();
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
+            label: Some("VMobject Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &multisample_view,
                 resolve_target: Some(&target_view),
@@ -413,16 +416,18 @@ impl VMobject {
         self
     }
     pub fn set_fill_color(&mut self, color: Srgba) -> &mut Self {
+        trace!("set fill color: {:?}", color);
         let color = vec4(color.red, color.green, color.blue, color.alpha);
 
-        self.apply_points_function(
-            |points| {
-                points.iter_mut().for_each(|p| {
-                    p.set_fill_color(color);
-                });
-            },
-            TransformAnchor::origin(),
-        );
+        self.points.iter_mut().for_each(|p| p.set_fill_color(color));
+        // self.apply_points_function(
+        //     |points| {
+        //         points.iter_mut().for_each(|p| {
+        //             p.set_fill_color(color);
+        //         });
+        //     },
+        //     TransformAnchor::origin(),
+        // );
         self
     }
     pub fn set_color(&mut self, color: Srgba) -> &mut Self {

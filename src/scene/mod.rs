@@ -128,9 +128,10 @@ impl Scene {
         ctx: &mut RanimContext,
         animation: Animation<R>,
     ) -> Option<RabjectWithId<R>> {
-        self.insert_rabject(ctx, &animation.rabject);
-
-        trace!("[Scene] Playing animation {:?}...", animation.rabject.id());
+        // trace!(
+        //     "[Scene] Playing animation on {:?}...",
+        //     animation.rabject.id()
+        // );
         animation.play(ctx, self)
     }
 

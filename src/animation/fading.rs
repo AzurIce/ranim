@@ -1,4 +1,10 @@
-use crate::{rabject::{vmobject::VMobject, RabjectWithId}, scene::Scene};
+use log::trace;
+use palette::{Srgb, Srgba};
+
+use crate::{
+    rabject::{vmobject::VMobject, RabjectWithId},
+    scene::Scene,
+};
 
 use super::AnimationFunc;
 

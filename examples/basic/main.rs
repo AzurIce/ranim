@@ -18,13 +18,13 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace"))
-        .init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
 
     let mut ctx = RanimContext::new();
 
     let mut scene = Scene::new(&ctx);
     let t = Instant::now();
+    info!("running...");
 
     let mut polygon = Polygon::new(vec![
         vec2(-100.0, 0.0),
