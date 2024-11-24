@@ -1,13 +1,46 @@
-
 use std::ops::Deref;
 
+use glam::Vec4;
 use wgpu::include_wgsl;
 
-use crate::{
-    camera::CameraUniformsBindGroup, renderer::vmobject::VMobjectVertex, RanimContext, WgpuContext
-};
+use crate::{camera::CameraUniformsBindGroup, RanimContext, WgpuContext};
 
-use super::{RendererVertex, RenderPipeline};
+use super::{PipelineVertex, RenderPipeline};
+
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct VMobjectFillVertex {
+    pub pos: Vec4,
+    pub fill_color: Vec4,
+    pub unit_normal: Vec4,
+}
+
+impl PipelineVertex for VMobjectFillVertex {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        use std::mem::size_of;
+        wgpu::VertexBufferLayout {
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: size_of::<[f32; 8]>() as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+            ],
+        }
+    }
+}
 
 pub struct Pipeline {
     pub pipeline: wgpu::RenderPipeline,
@@ -36,12 +69,12 @@ impl Pipeline {
 }
 
 impl RenderPipeline for Pipeline {
-    type Vertex = VMobjectVertex;
+    type Vertex = VMobjectFillVertex;
 
     fn new(ctx: &RanimContext) -> Self {
         let WgpuContext { device, .. } = &ctx.wgpu_ctx;
 
-        let module = &device.create_shader_module(include_wgsl!("../../shader/simple.wgsl"));
+        let module = &device.create_shader_module(include_wgsl!("../../shader/vmobject_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Fill Pipeline"),
             layout: Some(&Self::pipeline_layout(&ctx.wgpu_ctx)),

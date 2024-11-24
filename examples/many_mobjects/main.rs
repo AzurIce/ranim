@@ -2,12 +2,12 @@ use std::time::{Duration, Instant};
 
 use env_logger::Env;
 use log::info;
+use ranim::blueprint::vmobject::Arc;
+use ranim::blueprint::Blueprint;
 use ranim::glam::vec3;
-use ranim::mobject::ToMobject;
 use ranim::palette::{rgb, Srgba};
 use ranim::{
     animation::{fading::Fading, Animation, AnimationConfig},
-    mobject::geometry::Arc,
     scene::Scene,
     utils::SubpathWidth,
     RanimContext,
@@ -17,7 +17,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("many_objects=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("many_mobjects=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("many_mobjects=info,ranim=trace")).init();
 
     let mut ctx = RanimContext::new();
 
@@ -55,10 +55,12 @@ fn main() {
             let mut arc = Arc::new(angle)
                 .with_radius(step_y / 2.0)
                 .with_stroke_width(SubpathWidth::Middle(10.0 * j as f32))
-                .to_mobject();
+                .build();
 
             arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into())
                 .shift(frame_start + offset);
+            // let _ = scene.insert_rabject(&mut ctx, &arc);
+            // scene.wait(&mut ctx, Duration::from_secs_f32(0.02));
             scene.play(
                 &mut ctx,
                 Animation::new(

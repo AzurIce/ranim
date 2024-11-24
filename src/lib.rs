@@ -16,10 +16,10 @@ pub mod blueprint;
 pub mod rabject;
 pub mod animation;
 pub mod camera;
-pub mod mobject;
+// pub mod mobject;
 pub(crate) mod pipeline;
 /// Renderers implements a whole set of rendering steps
-pub(crate) mod renderer;
+// pub(crate) mod renderer;
 pub mod scene;
 pub mod utils;
 

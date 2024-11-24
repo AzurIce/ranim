@@ -4,7 +4,13 @@ use itertools::Itertools;
 use palette::{rgb, Srgba};
 
 use crate::{
-    mobject::TransformAnchor, rabject::{vmobject::VMobject, RabjectWithId}, renderer::vmobject::VMobjectRenderer, utils::{beziers_to_fill, beziers_to_stroke, SubpathWidth}
+    rabject::{
+        vmobject::{TransformAnchor, VMobject, VMobjectPoint},
+        RabjectWithId,
+    },
+    // renderer::vmobject::VMobjectRenderer,
+    // utils::{beziers_to_fill, beziers_to_stroke},
+    utils::SubpathWidth,
 };
 
 use super::Blueprint;
@@ -46,7 +52,7 @@ impl Blueprint<VMobject> for Arc {
         let mut points = (0..len)
             .map(|i| {
                 let angle = i as f32 * angle_step;
-                vec2(angle.cos() as f32, angle.sin() as f32) * self.radius
+                vec2(angle.cos() as f32, angle.sin() as f32).extend(0.0) * self.radius
             })
             .collect::<Vec<_>>();
 
@@ -55,25 +61,7 @@ impl Blueprint<VMobject> for Arc {
             *p /= (theta / 2.0).cos();
         });
         // trace!("start: {:?}, end: {:?}", points[0], points[len - 1]);
-
-        let beziers = points
-            .iter()
-            .step_by(2)
-            .zip(points.iter().skip(1).step_by(2))
-            .zip(points.iter().skip(2).step_by(2))
-            .map(|((&p1, &p2), &p3)| {
-                let [p1, p2, p3] = [p1, p2, p3];
-                Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
-            })
-            .collect::<Vec<_>>();
-
-        if self.angle == std::f32::consts::TAU {
-            BezierShape::closed(beziers)
-        } else {
-            BezierShape::unclosed(beziers)
-        }
-        .with_width(self.stroke_width)
-        .build()
+        VMobject::from_points(points).into()
     }
 }
 
@@ -216,14 +204,14 @@ impl Blueprint<VMobject> for Ellipse {
 
 #[derive(Debug, Clone)]
 pub struct Polygon {
-    pub vertices: Vec<Vec2>,
+    pub corner_points: Vec<Vec2>,
     pub width: SubpathWidth,
 }
 
 impl Polygon {
-    pub fn new(vertices: Vec<Vec2>) -> Self {
+    pub fn new(corner_points: Vec<Vec2>) -> Self {
         Self {
-            vertices,
+            corner_points,
             width: SubpathWidth::Middle(1.0),
         }
     }
@@ -236,115 +224,79 @@ impl Polygon {
 impl Blueprint<VMobject> for Polygon {
     fn build(self) -> RabjectWithId<VMobject> {
         // TODO: Handle 0 len
-        if self.vertices.len() == 0 {
+        if self.corner_points.len() == 0 {
             return VMobject::from_points(vec![]).into();
         }
 
-        let vertices = self.vertices.clone();
+        let vertices = self.corner_points.into_iter().map(|v| v.extend(0.0)).collect::<Vec<_>>();
 
-        let anchors = vertices;
-        let handles = anchors
-            .windows(2)
-            .map(|window| 0.5 * (window[0] + window[1]))
-            .collect::<Vec<_>>();
-
-        assert_eq!(anchors.len(), handles.len() + 1);
-
-        let points = anchors
-            .into_iter()
-            .interleave(handles.into_iter())
-            .collect::<Vec<_>>();
-        let beziers = points
-            .iter()
-            .step_by(2)
-            .zip(
-                points
-                    .iter()
-                    .skip(1)
-                    .chain(points.iter().take(1))
-                    .step_by(2),
-            )
-            .zip(
-                points
-                    .iter()
-                    .skip(2)
-                    .chain(points.iter().take(2))
-                    .step_by(2),
-            )
-            .map(|((&p1, &p2), &p3)| {
-                Bezier::from_quadratic_dvec2(p1.as_dvec2(), p2.as_dvec2(), p3.as_dvec2())
-            })
-            .collect::<Vec<_>>();
-        // println!("beziers: {:?}", beziers.len());
-        // Mobject::new::<VMobjectRenderer>(beziers_to_stroke(beziers, self.width, true))
-        BezierShape::closed(beziers)
-            .with_width(self.width)
-            .build()
+        let polygon = VMobject::from_corner_points(vertices).into();
+        polygon
     }
 }
 
-pub struct BezierShape {
-    pub beziers: Vec<Bezier>,
-    pub width: SubpathWidth,
-    pub stroke_color: Vec4,
-    pub fill_color: Vec4,
-    pub closed: bool,
-}
+// pub struct BezierShape {
+//     pub beziers: Vec<Bezier>,
+//     pub width: SubpathWidth,
+//     pub stroke_color: Vec4,
+//     pub fill_color: Vec4,
+//     pub closed: bool,
+// }
 
-impl BezierShape {
-    pub fn closed(beziers: Vec<Bezier>) -> Self {
-        Self {
-            closed: true,
-            ..Self::unclosed(beziers)
-        }
-    }
+// impl BezierShape {
+//     pub fn closed(beziers: Vec<Bezier>) -> Self {
+//         Self {
+//             closed: true,
+//             ..Self::unclosed(beziers)
+//         }
+//     }
 
-    pub fn unclosed(beziers: Vec<Bezier>) -> Self {
-        let stroke_color: Srgba = Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into();
-        Self {
-            beziers,
-            width: SubpathWidth::Middle(1.0),
-            stroke_color: vec4(
-                stroke_color.red,
-                stroke_color.green,
-                stroke_color.blue,
-                stroke_color.alpha,
-            ),
-            fill_color: Vec4::ZERO,
-            closed: false,
-        }
-    }
+//     pub fn unclosed(beziers: Vec<Bezier>) -> Self {
+//         let stroke_color: Srgba = Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into();
+//         Self {
+//             beziers,
+//             width: SubpathWidth::Middle(1.0),
+//             stroke_color: vec4(
+//                 stroke_color.red,
+//                 stroke_color.green,
+//                 stroke_color.blue,
+//                 stroke_color.alpha,
+//             ),
+//             fill_color: Vec4::ZERO,
+//             closed: false,
+//         }
+//     }
 
-    pub fn with_width(mut self, width: SubpathWidth) -> Self {
-        self.width = width;
-        self
-    }
+//     pub fn with_width(mut self, width: SubpathWidth) -> Self {
+//         self.width = width;
+//         self
+//     }
 
-    pub fn with_stroke_color(mut self, stroke_color: Vec4) -> Self {
-        self.stroke_color = stroke_color;
-        self
-    }
+//     pub fn with_stroke_color(mut self, stroke_color: Vec4) -> Self {
+//         self.stroke_color = stroke_color;
+//         self
+//     }
 
-    pub fn with_fill_color(mut self, fill_color: Vec4) -> Self {
-        self.fill_color = fill_color;
-        self
-    }
-}
+//     pub fn with_fill_color(mut self, fill_color: Vec4) -> Self {
+//         self.fill_color = fill_color;
+//         self
+//     }
+// }
 
-impl Blueprint<VMobject> for BezierShape {
-    fn build(self) -> RabjectWithId<VMobject> {
-        let beziers = self
-            .beziers
-            .into_iter()
-            .filter(|bezier| !bezier.is_point())
-            .collect::<Vec<_>>();
+// impl Blueprint<VMobject> for BezierShape {
+//     fn build(self) -> RabjectWithId<VMobject> {
+//         let beziers = self
+//             .beziers
+//             .into_iter()
+//             .filter(|bezier| !bezier.is_point())
+//             .collect::<Vec<_>>();
 
-        let mut vertices = beziers_to_stroke(&beziers, self.width, self.stroke_color, self.closed);
+//         let mut vertices = beziers_to_stroke(&beziers, self.width, self.stroke_color, self.closed);
 
-        if self.closed {
-            vertices.extend(beziers_to_fill(&beziers, self.fill_color).into_iter());
-        }
+//         if self.closed {
+//             vertices.extend(beziers_to_fill(&beziers, self.fill_color).into_iter());
+//         }
 
-        VMobject::from_points(vertices).into()
-    }
-}
+//         VMobject::from_points(vertices).into()
+//     }
+// }

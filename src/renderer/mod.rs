@@ -29,15 +29,3 @@ pub trait Renderer: 'static {
         mobjects: &mut Vec<&mut ExtractedMobject<Self::Vertex>>,
     );
 }
-
-pub trait RendererVertex: bytemuck::Pod + bytemuck::Zeroable + Default + Debug {
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
-
-    fn position(&self) -> Vec3;
-    fn set_position(&mut self, position: Vec3);
-
-    fn color(&self) -> Vec4;
-    fn set_color(&mut self, color: Vec4);
-
-    fn interpolate(&self, other: &Self, t: f32) -> Self;
-}

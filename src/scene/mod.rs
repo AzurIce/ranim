@@ -15,18 +15,17 @@ use log::{trace, warn};
 use crate::{
     animation::Animation,
     camera::Camera,
-    mobject::Mobject,
-    renderer::{vmobject::VMobjectRenderer, Renderer},
+    rabject::{vmobject::VMobject, ExtractedRabjectWithId, Rabject, RabjectWithId},
     utils::Id,
     RanimContext,
 };
 
 pub struct Scene {
     pub camera: Camera,
-    /// Mobjects in the scene, they are actually [`crate::mobject::ExtractedMobject`]
+    /// Rabjects in the scene, they are actually [`crate::rabject::ExtractedRabjectWithId`]
     ///
-    /// Mobject's renderer id -> Vec<(Mobject's id, Mobject)>
-    pub mobjects: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
+    /// Rabject's type id -> Vec<(Rabject's id, ExtractedRabject<Rabject>)>
+    pub rabjects: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     pub time: f32,
     pub frame_count: usize,
 
@@ -47,7 +46,7 @@ impl Scene {
         let video_writer = builder.build();
         Self {
             camera,
-            mobjects: HashMap::new(),
+            rabjects: HashMap::new(),
             time: 0.0,
             frame_count: 0,
             video_writer: Some(video_writer),
@@ -60,46 +59,45 @@ impl Scene {
         Self::new_with_video_writer_builder(ctx, FileWriter::builder())
     }
 
-    pub fn remove_mobject<R: Renderer>(&mut self, mobject: &Mobject<R>) {
-        self.mobjects.iter_mut().for_each(|(_, mobject_vec)| {
-            mobject_vec.retain(|(mobject_id, _)| mobject_id != mobject.id());
+    pub fn remove_rabject<R: Rabject>(&mut self, rabject: &RabjectWithId<R>) {
+        self.rabjects.iter_mut().for_each(|(_, rabject_vec)| {
+            rabject_vec.retain(|(rabject_id, _)| rabject_id != rabject.id());
         });
     }
 
-    pub fn try_add_mobject<R: Renderer>(
+    pub fn insert_rabject<R: Rabject>(
         &mut self,
         ctx: &mut RanimContext,
-        mobject: &Mobject<R>,
-    ) -> anyhow::Result<()> {
-        if self.is_mobject_exist(mobject) {
-            return Err(anyhow::anyhow!("mobject already exists"));
+        rabject: &RabjectWithId<R>,
+    ) {
+        let entry = self
+            .rabjects
+            .entry(std::any::TypeId::of::<R>())
+            .or_default();
+        if let Some((_, extracted)) = entry.iter_mut().find(|(id, _)| id == rabject.id()) {
+            let extracted: &mut ExtractedRabjectWithId<R> = extracted.downcast_mut().unwrap();
+            extracted.update_render_resource(ctx, rabject);
+        } else {
+            entry.push((*rabject.id(), Box::new(rabject.extract(ctx))));
         }
-        let mobject = mobject.extract(&ctx.wgpu_ctx);
-        self.mobjects
-            .entry(mobject.renderer_id)
-            .or_default()
-            .push((mobject.id, Box::new(mobject)));
-        Ok(())
     }
 
-    pub fn is_mobject_exist<R: Renderer>(&self, mobject: &Mobject<R>) -> bool {
-        self.mobjects
+    pub fn is_rabject_exist<R: Rabject>(&self, rabject: &RabjectWithId<R>) -> bool {
+        self.rabjects
             .get(&std::any::TypeId::of::<R>())
-            .map(|mobject_vec| mobject_vec.iter().any(|(id, _)| id == mobject.id()))
+            .map(|rabject_vec| rabject_vec.iter().any(|(id, _)| id == rabject.id()))
             .unwrap_or(false)
     }
 
     pub fn render_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
-        self.camera
-            .render::<VMobjectRenderer>(ctx, &mut self.mobjects);
+        self.camera.render::<VMobject>(ctx, &mut self.rabjects);
         self.save_frame_to_image(ctx, path);
     }
 
     pub fn update_frame(&mut self, ctx: &mut RanimContext, dt: f32) {
         self.time += dt;
         // self.update_mobjects(dt);
-        self.camera
-            .render::<VMobjectRenderer>(ctx, &mut self.mobjects);
+        self.camera.render::<VMobject>(ctx, &mut self.rabjects);
         if let Some(writer) = &mut self.video_writer {
             writer.write_frame(&self.camera.get_rendered_texture(&ctx.wgpu_ctx));
         }
@@ -125,38 +123,15 @@ impl Scene {
     /// Play an animation
     ///
     /// See [`Animation`].
-    pub fn play<R: Renderer>(
+    pub fn play<R: Rabject>(
         &mut self,
         ctx: &mut RanimContext,
-        mut animation: Animation<R>,
-    ) -> Option<Mobject<R>> {
-        if let Err(err) = self.try_add_mobject(ctx, &animation.mobject) {
-            warn!(
-                "[Scene] Failed to add mobject {:?}: {}",
-                animation.mobject.id(),
-                err
-            );
-        }
-        trace!("[Scene] Playing animation {:?}...", animation.mobject.id());
-        // TODO: handle the precision problem
-        let frames = animation.config.calc_frames(self.camera.fps as f32);
+        animation: Animation<R>,
+    ) -> Option<RabjectWithId<R>> {
+        self.insert_rabject(ctx, &animation.rabject);
 
-        let dt = animation.config.run_time.as_secs_f32() / (frames - 1) as f32;
-        for t in (0..frames).map(|x| x as f32 * dt) {
-            // TODO: implement mobject's updaters
-            // animation.update_mobjects(dt);
-            let alpha = t / animation.config.run_time.as_secs_f32();
-            let alpha = (animation.config.rate_func)(alpha);
-            animation.interpolate(alpha);
-            self.update_frame(ctx, dt);
-            self.frame_count += 1;
-        }
-        if animation.should_remove() {
-            self.remove_mobject(&animation.mobject);
-            None
-        } else {
-            Some(animation.mobject)
-        }
+        trace!("[Scene] Playing animation {:?}...", animation.rabject.id());
+        animation.play(ctx, self)
     }
 
     /// Keep the scene static for a given duration
