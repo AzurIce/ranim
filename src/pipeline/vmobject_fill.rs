@@ -7,7 +7,7 @@ use crate::{camera::CameraUniformsBindGroup, RanimContext, WgpuContext};
 
 use super::{PipelineVertex, RenderPipeline};
 
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct VMobjectFillVertex {
     pub pos: Vec4,
