@@ -4,7 +4,6 @@ use std::{
 };
 
 use glam::{Mat4, Vec3};
-use log::{debug, trace};
 
 use crate::{
     rabject::{ExtractedRabjectWithId, Rabject},
@@ -169,7 +168,7 @@ impl Camera {
         let Some(rabjects) = rabjects.get_mut(&std::any::TypeId::of::<R>()) else {
             return;
         };
-        let mut rabjects = rabjects
+        let rabjects = rabjects
             .iter_mut()
             .map(|(_, rabject)| rabject.downcast_mut::<ExtractedRabjectWithId<R>>().unwrap())
             .collect::<Vec<_>>();
@@ -186,15 +185,6 @@ impl Camera {
             0,
             bytemuck::cast_slice(&[self.uniforms]),
         );
-
-        // Preparing the object
-        // trace!(
-        //     "[Camera] Updating render resources for {} rabjects",
-        //     rabjects.len()
-        // );
-        // for rabject in &mut rabjects {
-        //     R::update_render_resource(ctx, rabject);
-        // }
 
         let target_view = self
             .target_texture
@@ -213,14 +203,10 @@ impl Camera {
                 });
 
         {
-            // let mut render_pass =
-            //     R::begin_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
-            // trace!("[Camera] Render pass begins");
             let mut render_pass =
                 R::begin_render_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
             // bind group 0 is reserved for camera uniforms
             render_pass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
-            // trace!("[Camera] Rendering {} rabjects", rabjects.len());
             for rabject in rabjects {
                 R::render(ctx, &mut render_pass, &rabject.render_resource);
             }

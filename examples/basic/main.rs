@@ -2,13 +2,13 @@ use std::time::{Duration, Instant};
 
 use env_logger::Env;
 use log::info;
-use ranim::blueprint::Blueprint;
 use ranim::glam::{vec2, Vec3};
 use ranim::palette::{rgb, Srgba};
 use ranim::rabject::vmobject::TransformAnchor;
+use ranim::rabject::Blueprint;
 use ranim::{
     animation::{fading::Fading, transform::Transform, Animation, AnimationConfig},
-    blueprint::vmobject::{Arc, Polygon},
+    rabject::vmobject::{Arc, Polygon},
     scene::Scene,
     utils::SubpathWidth,
     RanimContext,

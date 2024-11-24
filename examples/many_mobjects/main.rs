@@ -2,10 +2,10 @@ use std::time::{Duration, Instant};
 
 use env_logger::Env;
 use log::info;
-use ranim::blueprint::vmobject::Arc;
-use ranim::blueprint::Blueprint;
 use ranim::glam::vec3;
 use ranim::palette::{rgb, Srgba};
+use ranim::rabject::vmobject::Arc;
+use ranim::rabject::Blueprint;
 use ranim::{
     animation::{fading::Fading, Animation, AnimationConfig},
     scene::Scene,
@@ -17,7 +17,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("many_objects=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("many_mobjects=info,ranim=trace")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("many_mobjects=info")).init();
 
     let mut ctx = RanimContext::new();
 

@@ -3,10 +3,10 @@ use std::time::{Duration, Instant};
 use env_logger::Env;
 use glam::{Mat3, Vec3};
 use log::info;
-use ranim::blueprint::vmobject::ArcBetweenPoints;
-use ranim::blueprint::Blueprint;
 use ranim::glam::vec3;
 use ranim::palette::{rgb, Srgba};
+use ranim::rabject::vmobject::ArcBetweenPoints;
+use ranim::rabject::Blueprint;
 use ranim::{
     animation::{fading::Fading, Animation, AnimationConfig},
     scene::Scene,
@@ -20,7 +20,7 @@ fn main() {
         .init();
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(
-        Env::default().default_filter_or("arc_between_points=info,ranim=trace"),
+        Env::default().default_filter_or("arc_between_points=info"),
     )
     .init();
 

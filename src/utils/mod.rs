@@ -1,8 +1,6 @@
 pub mod rate_functions;
 
-use bezier_rs::{Bezier, Identifier, Join, Subpath, SubpathTValue};
-use glam::{vec3, Vec4};
-use log::trace;
+use bezier_rs::Identifier;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
@@ -32,7 +30,7 @@ impl Default for SubpathWidth {
     }
 }
 
-const MAX_STEPS: usize = 128;
+// const MAX_STEPS: usize = 128;
 
 // pub fn beziers_to_fill(beziers: &Vec<Bezier>, fill_color: Vec4) -> Vec<VMobjectVertex> {
 //     trace!("converting subpath to vertex: {:?}", beziers.len());

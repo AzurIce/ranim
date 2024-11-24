@@ -10,7 +10,6 @@ use std::{
 
 use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
-use log::{trace, warn};
 
 use crate::{
     animation::Animation,

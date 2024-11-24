@@ -4,6 +4,11 @@ use std::ops::{Deref, DerefMut};
 
 use crate::{utils::Id, RanimContext};
 
+/// Blueprints are the data structures that are used to create [`Rabject`]s
+pub trait Blueprint<T: Rabject> {
+    fn build(self) -> RabjectWithId<T>;
+}
+
 pub trait Rabject: 'static + Clone {
     type RenderResource;
 

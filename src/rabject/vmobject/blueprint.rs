@@ -1,19 +1,13 @@
-use bezier_rs::Bezier;
-use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
-use itertools::Itertools;
-use palette::{rgb, Srgba};
+use glam::{vec2, vec3, Vec2, Vec3};
 
 use crate::{
     rabject::{
-        vmobject::{TransformAnchor, VMobject, VMobjectPoint},
-        RabjectWithId,
+        vmobject::{TransformAnchor, VMobject}, Blueprint, RabjectWithId
     },
     // renderer::vmobject::VMobjectRenderer,
     // utils::{beziers_to_fill, beziers_to_stroke},
-    utils::SubpathWidth,
+    utils::SubpathWidth, 
 };
-
-use super::Blueprint;
 
 /// A part of a circle
 // #[mobject(SimplePipeline)]
@@ -228,7 +222,11 @@ impl Blueprint<VMobject> for Polygon {
             return VMobject::from_points(vec![]).into();
         }
 
-        let vertices = self.corner_points.into_iter().map(|v| v.extend(0.0)).collect::<Vec<_>>();
+        let vertices = self
+            .corner_points
+            .into_iter()
+            .map(|v| v.extend(0.0))
+            .collect::<Vec<_>>();
 
         let polygon = VMobject::from_corner_points(vertices).into();
         polygon

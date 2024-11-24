@@ -1,18 +1,16 @@
+mod blueprint;
+mod pipeline;
+pub use blueprint::*;
+
 use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
 use log::trace;
 use palette::{rgb, Srgba};
 
-use crate::{
-    pipeline::{
-        vmobject_fill::{self, VMobjectFillVertex},
-        PipelineVertex,
-    },
-    utils::{extend_with_last, resize_preserving_order},
-    RanimContext, WgpuBuffer,
-};
+use crate::{utils::resize_preserving_order, RanimContext, WgpuBuffer};
+use pipeline::{FillPipeline, VMobjectFillVertex};
 
-use super::{ExtractedRabjectWithId, Interpolatable, Rabject, RabjectWithId};
+use super::{Interpolatable, Rabject, RabjectWithId};
 
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct VMobjectPoint {
@@ -238,7 +236,7 @@ impl Rabject for VMobject {
         render_pass: &mut wgpu::RenderPass<'a>,
         render_resource: &Self::RenderResource,
     ) {
-        let pipeline_vmobject_fill = ctx.get_or_init_pipeline::<vmobject_fill::Pipeline>();
+        let pipeline_vmobject_fill = ctx.get_or_init_pipeline::<FillPipeline>();
         render_pass.set_pipeline(&pipeline_vmobject_fill);
         render_pass.set_vertex_buffer(0, render_resource.fill_vertex_buffer.slice(..));
         render_pass.draw(0..render_resource.fill_vertex_buffer.len() as u32, 0..1);

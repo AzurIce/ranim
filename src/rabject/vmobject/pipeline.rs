@@ -1,25 +1,60 @@
+
 use std::ops::Deref;
 
+use glam::Vec4;
 use wgpu::include_wgsl;
 
-use crate::{
-    camera::CameraUniformsBindGroup, renderer::vmobject::VMobjectVertex, RanimContext, WgpuContext,
-};
+use crate::{camera::CameraUniformsBindGroup, RanimContext, WgpuContext};
 
-use super::RenderPipeline;
+use crate::pipeline::{PipelineVertex, RenderPipeline};
 
-pub struct Pipeline {
+#[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct VMobjectFillVertex {
+    pub pos: Vec4,
+    pub fill_color: Vec4,
+    pub unit_normal: Vec4,
+}
+
+impl PipelineVertex for VMobjectFillVertex {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        use std::mem::size_of;
+        wgpu::VertexBufferLayout {
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: size_of::<[f32; 8]>() as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+            ],
+        }
+    }
+}
+
+pub struct FillPipeline {
     pub pipeline: wgpu::RenderPipeline,
 }
 
-impl Deref for Pipeline {
+impl Deref for FillPipeline {
     type Target = wgpu::RenderPipeline;
     fn deref(&self) -> &Self::Target {
         &self.pipeline
     }
 }
 
-impl Pipeline {
+impl FillPipeline {
     fn output_format() -> wgpu::TextureFormat {
         wgpu::TextureFormat::Rgba8UnormSrgb
     }
@@ -27,22 +62,22 @@ impl Pipeline {
     fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
         ctx.device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Simple Pipeline Layout"),
+                label: Some("VMobject Fill Pipeline Layout"),
                 bind_group_layouts: &[&CameraUniformsBindGroup::bind_group_layout(ctx)],
                 push_constant_ranges: &[],
             })
     }
 }
 
-impl RenderPipeline for Pipeline {
-    type Vertex = VMobjectVertex;
+impl RenderPipeline for FillPipeline {
+    type Vertex = VMobjectFillVertex;
 
     fn new(ctx: &RanimContext) -> Self {
         let WgpuContext { device, .. } = &ctx.wgpu_ctx;
 
-        let module = &device.create_shader_module(include_wgsl!("../../shader/simple.wgsl"));
+        let module = &device.create_shader_module(include_wgsl!("../../../shader/vmobject_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Simple Pipeline"),
+            label: Some("VMobject Fill Pipeline"),
             layout: Some(&Self::pipeline_layout(&ctx.wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
