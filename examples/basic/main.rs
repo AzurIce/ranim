@@ -18,7 +18,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace")).init();
 
     let mut ctx = RanimContext::new();
 
