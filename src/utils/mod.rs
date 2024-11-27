@@ -1,10 +1,6 @@
 pub mod rate_functions;
 
-use bezier_rs::{Bezier, Identifier, Join, Subpath, SubpathTValue};
-use glam::{vec2, vec3, vec4, Mat3, Vec2, Vec3, Vec3Swizzles, Vec4};
-use log::trace;
-
-use crate::rabject::vmobject::{VMobjectPoint, VMobjectStrokeVertex};
+use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
@@ -12,12 +8,6 @@ pub struct Id(u128);
 impl Id {
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().as_u128())
-    }
-}
-
-impl Identifier for Id {
-    fn new() -> Self {
-        Self::new()
     }
 }
 
@@ -66,7 +56,7 @@ pub fn convert_to_3d(p: Vec2, origin: Vec3, basis: (Vec3, Vec3)) -> Vec3 {
 
 pub fn rotation_between_vectors(v1: Vec3, v2: Vec3) -> Mat3 {
     // trace!("rotation_between_vectors: v1: {:?}, v2: {:?}", v1, v2);
-    
+
     if (v2 - v1).length() < std::f32::EPSILON {
         return Mat3::IDENTITY;
     }
@@ -92,88 +82,6 @@ pub fn angle_between_vectors(v1: Vec3, v2: Vec3) -> f32 {
     (v1.dot(v2) / (v1.length() * v2.length()))
         .clamp(-1.0, 1.0)
         .acos()
-}
-
-const MAX_STEPS: usize = 128;
-
-// pub fn beziers_to_fill(beziers: &Vec<Bezier>, fill_color: Vec4) -> Vec<VMobjectVertex> {
-//     trace!("converting subpath to vertex: {:?}", beziers.len());
-
-//     let subpath: Subpath<Id> = Subpath::from_beziers(beziers, true);
-//     if subpath.len() == 0 {
-//         return vec![VMobjectVertex::default(); 3];
-//     }
-
-//     let mut vertices = vec![];
-//     for i in 0..MAX_STEPS {
-//         let t = i as f64 / (MAX_STEPS - 1) as f64;
-//         vertices.push(subpath.evaluate(SubpathTValue::GlobalEuclidean(t)));
-//     }
-
-//     vertices
-//         .windows(3)
-//         .flatten()
-//         .map(|p| VMobjectVertex::new(vec3(p.x as f32, p.y as f32, 0.0), fill_color))
-//         .collect::<Vec<_>>()
-// }
-
-/// Convert a series of points to stroke vertices.
-///
-/// points are Anchor-Handle-Anchor-Handle-...-Anchor series
-// pub fn points_to_stroke(points: &Vec<VMobjectPoint>) -> Vec<VMobjectStrokeVertex> {
-
-// }
-
-pub fn beziers_to_stroke(
-    beziers: &Vec<Bezier>,
-    width: SubpathWidth,
-    stroke_color: Vec4,
-    closed: bool,
-) -> Vec<VMobjectStrokeVertex> {
-    trace!("converting subpath to vertex: {:?}", beziers.len());
-
-    let subpath: Subpath<Id> = Subpath::from_beziers(beziers, closed);
-    if subpath.len() == 0 {
-        return vec![VMobjectStrokeVertex::default(); 3];
-    }
-
-    // https://github.com/3b1b/manim/blob/master/manimlib/shaders/quadratic_bezier/stroke/geom.glsl
-    let (inner_path, outer_path) = match width {
-        SubpathWidth::Inner(w) => (
-            subpath.offset(w as f64, Join::Bevel),
-            subpath.offset(0.0, Join::Bevel),
-        ),
-        SubpathWidth::Outer(w) => (
-            subpath.offset(0.0, Join::Bevel),
-            subpath.offset(-w as f64, Join::Bevel),
-        ),
-        SubpathWidth::Middle(w) => (
-            subpath.offset(w as f64 / 2.0, Join::Bevel),
-            subpath.offset(-w as f64 / 2.0, Join::Bevel),
-        ),
-    };
-    trace!(
-        "inner: {:?}, outer: {:?}",
-        inner_path.len(),
-        outer_path.len()
-    );
-    let mut vertices = vec![];
-    for i in 0..MAX_STEPS {
-        let t = i as f64 / (MAX_STEPS - 1) as f64;
-        vertices.push(inner_path.evaluate(SubpathTValue::GlobalEuclidean(t)));
-        trace!("{:?}", vertices.last().unwrap());
-        vertices.push(outer_path.evaluate(SubpathTValue::GlobalEuclidean(t)));
-        trace!("{:?}", vertices.last().unwrap());
-    }
-
-    vertices
-        .windows(3)
-        .flatten()
-        .map(|p| VMobjectStrokeVertex {
-            pos: vec4(p.x as f32, p.y as f32, 0.0, 1.0),
-            stroke_color,
-        })
-        .collect::<Vec<_>>()
 }
 
 pub fn resize_preserving_order<T: Clone>(vec: &Vec<T>, new_len: usize) -> Vec<T> {

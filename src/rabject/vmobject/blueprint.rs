@@ -1,13 +1,8 @@
 use glam::{vec2, vec3, Vec2, Vec3};
 
-use crate::{
-    rabject::{
-        vmobject::{TransformAnchor, VMobject},
-        Blueprint, RabjectWithId,
-    },
-    // renderer::vmobject::VMobjectRenderer,
-    // utils::{beziers_to_fill, beziers_to_stroke},
-    utils::SubpathWidth,
+use crate::rabject::{
+    vmobject::{TransformAnchor, VMobject},
+    Blueprint, RabjectWithId,
 };
 
 /// A part of a circle
