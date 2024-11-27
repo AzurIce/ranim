@@ -1,20 +1,18 @@
 use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-    ops::Deref,
+    any::{Any, TypeId}, collections::HashMap, fmt::Debug, ops::Deref
 };
 
-use pipeline::RenderPipeline;
+use pipeline::Pipeline;
 use wgpu::util::DeviceExt;
 
 pub use glam;
 pub use palette;
 
-/// Rabjects are the objects that can be manuplated and rendered
-pub mod rabject;
 pub mod animation;
 pub mod camera;
 pub(crate) mod pipeline;
+/// Rabjects are the objects that can be manuplated and rendered
+pub mod rabject;
 pub mod scene;
 pub mod utils;
 
@@ -35,7 +33,7 @@ impl RanimContext {
         }
     }
 
-    pub fn get_or_init_pipeline<P: RenderPipeline + 'static>(&mut self) -> &P {
+    pub fn get_or_init_pipeline<P: Pipeline + 'static>(&mut self) -> &P {
         let id = std::any::TypeId::of::<P>();
         if !self.pipelines.contains_key(&id) {
             let pipeline = P::new(&self);
@@ -78,12 +76,14 @@ impl WgpuContext {
     }
 }
 
-pub(crate) struct WgpuBuffer<T: bytemuck::Pod + bytemuck::Zeroable> {
+pub(crate) struct WgpuBuffer<T: bytemuck::Pod + bytemuck::Zeroable + Debug> {
     pub buffer: wgpu::Buffer,
+    usage: wgpu::BufferUsages,
+    len: usize,
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable> Deref for WgpuBuffer<T> {
+impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> Deref for WgpuBuffer<T> {
     type Target = wgpu::Buffer;
 
     fn deref(&self) -> &Self::Target {
@@ -91,18 +91,20 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable> Deref for WgpuBuffer<T> {
     }
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable> WgpuBuffer<T> {
-    // pub(crate) fn new(ctx: &WgpuContext, size: u64, usage: wgpu::BufferUsages) -> Self {
-    //     Self {
-    //         buffer: ctx.device.create_buffer(&wgpu::BufferDescriptor {
-    //             label: Some("Simple Vertex Buffer"),
-    //             size,
-    //             usage,
-    //             mapped_at_creation: false,
-    //         }),
-    //         _phantom: std::marker::PhantomData,
-    //     }
-    // }
+impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
+    pub(crate) fn new(ctx: &WgpuContext, size: u64, usage: wgpu::BufferUsages) -> Self {
+        Self {
+            buffer: ctx.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Simple Vertex Buffer"),
+                size,
+                usage,
+                mapped_at_creation: false,
+            }),
+            usage,
+            len: 0,
+            _phantom: std::marker::PhantomData,
+        }
+    }
 
     pub(crate) fn new_init(ctx: &WgpuContext, data: &[T], usage: wgpu::BufferUsages) -> Self {
         // trace!("[WgpuBuffer]: new_init, {} {:?}", data.len(), usage);
@@ -114,12 +116,14 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable> WgpuBuffer<T> {
                     contents: bytemuck::cast_slice(data),
                     usage,
                 }),
+            usage,
+            len: data.len(),
             _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn len(&self) -> u64 {
-        self.size() / std::mem::size_of::<T>() as u64
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     pub(crate) fn prepare_from_slice(&mut self, ctx: &WgpuContext, data: &[T]) {
@@ -129,10 +133,12 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable> WgpuBuffer<T> {
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Simple Vertex Buffer"),
                     contents: bytemuck::cast_slice(data),
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    usage: self.usage,
                 });
         } else {
             ctx.queue.write_buffer(self, 0, bytemuck::cast_slice(data));
+            ctx.queue.submit([]);
         }
+        self.len = data.len();
     }
 }

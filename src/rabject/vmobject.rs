@@ -7,23 +7,27 @@ use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3, Vec3Swizzles, Vec4};
 use itertools::Itertools;
 use log::trace;
 use palette::{rgb, Srgba};
+use wgpu::BindGroupLayoutDescriptor;
 
 use crate::{
-    pipeline::PipelineVertex, utils::{
+    pipeline::Vertex,
+    utils::{
         convert_to_2d, convert_to_3d, generate_basis, project, resize_preserving_order, Id,
         SubpathWidth,
-    }, RanimContext, WgpuBuffer
+    },
+    RanimContext, WgpuBuffer,
 };
-use pipeline::{FillPipeline, StrokePipeline, VMobjectFillVertex};
+use pipeline::{ComputePipeline, FillPipeline, StrokePipeline, VMobjectFillVertex};
 
 use super::{Interpolatable, Rabject, RabjectWithId};
 
-#[derive(Clone, Default, Debug, PartialEq)]
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Default, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct VMobjectPoint {
     pub pos: Vec3,
-    pub fill_color: Vec4,
-    pub stroke_color: Vec4,
     pub stroke_width: f32,
+    pub stroke_color: Vec4,
+    pub fill_color: Vec4,
 }
 
 impl Interpolatable for VMobjectPoint {
@@ -57,16 +61,22 @@ impl VMobjectPoint {
         // trace!("point set_fill_color: {:?}", color);
         self.fill_color = color;
     }
+    pub fn stroke_width(&self) -> f32 {
+        self.stroke_width
+    }
+    pub fn set_stroke_width(&mut self, width: f32) {
+        self.stroke_width = width;
+    }
 }
 
+#[repr(C, align(16))]
 #[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
 pub struct VMobjectStrokeVertex {
     pub pos: Vec4,
     pub stroke_color: Vec4,
 }
 
-impl PipelineVertex for VMobjectStrokeVertex {
+impl Vertex for VMobjectStrokeVertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
@@ -161,6 +171,11 @@ impl VMobject {
         self.points.first() == self.points.last()
     }
 
+    fn points(&self) -> &[VMobjectPoint] {
+        &self.points
+    }
+
+    #[deprecated = "Use compute pipeline instead"]
     fn parse_stroke(&self) -> Vec<VMobjectStrokeVertex> {
         if self.points.is_empty() {
             return vec![VMobjectStrokeVertex::default(); 3];
@@ -169,6 +184,7 @@ impl VMobject {
         // Used to determine how many lines to break the curve into
         const POLYLINE_FACTOR: f32 = 100.0;
         const MAX_STEPS: usize = 32;
+        // const MAX_STEPS: usize = 16;
         let unit_normal = self.get_unit_normal();
 
         let projected_points = self
@@ -214,7 +230,7 @@ impl VMobject {
 
         let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, self.is_closed());
         let length = subpath.length(None);
-        let cnt = ((POLYLINE_FACTOR * length as f32).ceil() as usize).max(MAX_STEPS);
+        let cnt = ((POLYLINE_FACTOR * length as f32).ceil() as usize).min(MAX_STEPS);
 
         let width = SubpathWidth::Middle(20.0);
         let (inner_path, outer_path) = match width {
@@ -237,6 +253,7 @@ impl VMobject {
         //     outer_path.len()
         // );
         let mut vertices = Vec::with_capacity(MAX_STEPS * 2);
+        println!("cnt: {:?}", cnt);
         for i in 0..cnt {
             let t = i as f64 / (cnt - 1) as f64;
 
@@ -264,8 +281,9 @@ impl VMobject {
         }
 
         let stroke_vertices: Vec<VMobjectStrokeVertex> = vertices
-            .windows(3)
-            .flatten()
+            // .windows(3)
+            // .flatten()
+            .iter()
             .cloned()
             .map(|p| {
                 VMobjectPoint {
@@ -276,7 +294,11 @@ impl VMobject {
             })
             .collect();
 
-        // trace!("stroke_vertices: {:?}, {:?}", stroke_vertices.len(), stroke_vertices);
+        trace!(
+            "stroke_vertices: {:?}, {:?}",
+            stroke_vertices.len(),
+            stroke_vertices
+        );
 
         // let beziers = points_2d.
 
@@ -353,26 +375,150 @@ impl VMobject {
     }
 }
 
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct ComputeUniform {
+    unit_normal: Vec3,
+    _padding: f32,
+}
+
 pub struct VMObjectRenderResource {
+    points_buffer: WgpuBuffer<VMobjectPoint>,
+    compute_uniform_buffer: WgpuBuffer<ComputeUniform>,
     fill_vertex_buffer: WgpuBuffer<VMobjectFillVertex>,
-    stroke_vertex_buffer: WgpuBuffer<VMobjectStrokeVertex>,
+    stroke_vertices_buffer: WgpuBuffer<VMobjectStrokeVertex>,
+    compute_bind_group: wgpu::BindGroup,
+    render_bind_group: wgpu::BindGroup,
+}
+
+impl VMObjectRenderResource {
+    pub fn compute_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+        device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("VMObject Compute Bind Group Layout"),
+            entries: &[
+                // Points
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Vertices
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Uniforms
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        })
+    }
+    pub fn render_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+        device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("VMObject Bind Group Layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        })
+    }
 }
 
 impl Rabject for VMobject {
     type RenderResource = VMObjectRenderResource;
 
     fn init_render_resource(ctx: &mut RanimContext, rabject: &Self) -> Self::RenderResource {
+        let points_buffer = WgpuBuffer::new_init(
+            &ctx.wgpu_ctx,
+            &rabject.points(),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        );
+        let stroke_vertices_buffer = WgpuBuffer::new(
+            &ctx.wgpu_ctx,
+            (std::mem::size_of::<VMobjectStrokeVertex>() * 1024) as u64,
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        );
+        let compute_uniform_buffer = WgpuBuffer::new(
+            &ctx.wgpu_ctx,
+            std::mem::size_of::<ComputeUniform>() as u64,
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        );
+
+        let compute_bind_group_layout =
+            VMObjectRenderResource::compute_bind_group_layout(&ctx.wgpu_ctx.device);
+        let render_bind_group_layout =
+            VMObjectRenderResource::render_bind_group_layout(&ctx.wgpu_ctx.device);
+
+        let compute_bind_group =
+            ctx.wgpu_ctx
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("VMObject Compute Bind Group"),
+                    layout: &compute_bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: points_buffer.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: stroke_vertices_buffer.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: compute_uniform_buffer.as_entire_binding(),
+                        },
+                    ],
+                });
+
+        let render_bind_group = ctx
+            .wgpu_ctx
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("VMObject Render Bind Group"),
+                layout: &render_bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: stroke_vertices_buffer.as_entire_binding(),
+                }],
+            });
+
         Self::RenderResource {
+            points_buffer,
             fill_vertex_buffer: WgpuBuffer::new_init(
                 &ctx.wgpu_ctx,
                 &rabject.parse_fill(),
                 wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             ),
-            stroke_vertex_buffer: WgpuBuffer::new_init(
-                &ctx.wgpu_ctx,
-                &rabject.parse_stroke(),
-                wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            ),
+            stroke_vertices_buffer,
+            compute_uniform_buffer,
+            compute_bind_group,
+            render_bind_group,
         }
     }
 
@@ -381,14 +527,62 @@ impl Rabject for VMobject {
         rabject: &RabjectWithId<Self>,
         render_resource: &mut Self::RenderResource,
     ) {
-        let fill_vertices = rabject.parse_fill();
+        // trace!(
+        //     "[VMobject::update_render_resource]: updating points: {:?}",
+        //     rabject.points()
+        // );
         render_resource
-            .fill_vertex_buffer
-            .prepare_from_slice(&ctx.wgpu_ctx, &fill_vertices);
-        let stroke_vertices = rabject.parse_stroke();
-        render_resource
-            .stroke_vertex_buffer
-            .prepare_from_slice(&ctx.wgpu_ctx, &stroke_vertices);
+            .points_buffer
+            .prepare_from_slice(&ctx.wgpu_ctx, &rabject.points());
+
+        let unit_normal = rabject.get_unit_normal();
+        render_resource.compute_uniform_buffer.prepare_from_slice(
+            &ctx.wgpu_ctx,
+            &[ComputeUniform {
+                unit_normal,
+                _padding: 0.0,
+            }],
+        );
+        // let fill_vertices = rabject.parse_fill();
+        // render_resource
+        //     .fill_vertex_buffer
+        //     .prepare_from_slice(&ctx.wgpu_ctx, &fill_vertices);
+        // let stroke_vertices = rabject.parse_stroke();
+        // trace!(
+        //     "[VMobject::update_render_resource]: stroke_vertices {:?}",
+        //     stroke_vertices.len(),
+        // );
+        // render_resource
+        //     .stroke_vertices_buffer
+        //     .prepare_from_slice(&ctx.wgpu_ctx, &stroke_vertices);
+    }
+
+    fn begin_compute_pass<'a>(
+        encoder: &'a mut wgpu::CommandEncoder,
+    ) -> Option<wgpu::ComputePass<'a>> {
+        Some(encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("VMObject Compute Pass"),
+            timestamp_writes: None,
+        }))
+    }
+
+    fn compute<'a>(
+        ctx: &mut crate::RanimContext,
+        compute_pass: &mut wgpu::ComputePass<'a>,
+        render_resource: &Self::RenderResource,
+    ) {
+        // trace!(
+        //     "[VMobject::compute]: points_buffer len: {}",
+        //     render_resource.points_buffer.len()
+        // );
+        // trace!(
+        //     "[VMobject::compute]: dispatch workgroups: {}",
+        //     render_resource.points_buffer.len() / 2
+        // );
+        let pipeline = ctx.get_or_init_pipeline::<ComputePipeline>();
+        compute_pass.set_pipeline(&pipeline);
+        compute_pass.set_bind_group(0, &render_resource.compute_bind_group, &[]);
+        compute_pass.dispatch_workgroups(render_resource.points_buffer.len() as u32 / 2, 1, 1);
     }
 
     fn begin_render_pass<'a>(
@@ -437,8 +631,12 @@ impl Rabject for VMobject {
         // render_pass.draw(0..render_resource.fill_vertex_buffer.len() as u32, 0..1);
         let pipeline_vmobject_stroke = ctx.get_or_init_pipeline::<StrokePipeline>();
         render_pass.set_pipeline(&pipeline_vmobject_stroke);
-        render_pass.set_vertex_buffer(0, render_resource.stroke_vertex_buffer.slice(..));
-        render_pass.draw(0..render_resource.stroke_vertex_buffer.len() as u32, 0..1);
+        render_pass.set_bind_group(1, &render_resource.render_bind_group, &[]);
+        // render_pass.set_vertex_buffer(0, render_resource.stroke_vertices_buffer.slice(..));
+        // let len = render_resource.stroke_vertices_buffer.len();
+        let len = render_resource.points_buffer.len() as u32 / 2 * 16;
+        trace!("draw {}", len);
+        render_pass.draw(0..len, 0..1);
     }
 }
 
@@ -642,6 +840,17 @@ impl VMobject {
 }
 
 impl VMobject {
+    pub fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+        self.apply_points_function(
+            |points| {
+                points.iter_mut().for_each(|p| {
+                    p.set_stroke_width(width);
+                });
+            },
+            TransformAnchor::origin(),
+        );
+        self
+    }
     pub fn set_stroke_color(&mut self, color: Srgba) -> &mut Self {
         let color = vec4(color.red, color.green, color.blue, color.alpha);
 

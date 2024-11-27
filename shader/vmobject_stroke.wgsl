@@ -5,6 +5,12 @@ struct Uniforms {
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+@group(1) @binding(0) var<storage> vertices: array<Vertex>;
+
+struct Vertex {
+    pos: vec4<f32>,
+    color: vec4<f32>,
+}
 
 struct VertexInput {
     @location(0) pos: vec4<f32>,
@@ -17,8 +23,12 @@ struct VertexOutput {
 }
 
 @vertex
-fn vs_main(in: VertexInput) -> VertexOutput {
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+    let pos = vec2(f32(vertex_index) / 80.0, 0.0);
+    var in = vertices[vertex_index];
+
     var out: VertexOutput;
+    // out.position = vec4<f32>(pos, 0.0, 1.0);
     out.position = uniforms.matrix * in.pos;
 
     out.position.x *= uniforms.rescale_factors.x;
@@ -27,6 +37,13 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     // out.position.w = 1.0 - out.position.z;
 
     out.color = in.color;
+    // out.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+    // var inpos = uniforms.matrix * in.pos;
+    // inpos.x *= uniforms.rescale_factors.x;
+    // inpos.y *= uniforms.rescale_factors.y;
+    // inpos.z *= uniforms.rescale_factors.z;
+
+    // out.color = abs(inpos);
     return out;
 }
 

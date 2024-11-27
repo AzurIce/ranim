@@ -2,11 +2,12 @@ use glam::{vec2, vec3, Vec2, Vec3};
 
 use crate::{
     rabject::{
-        vmobject::{TransformAnchor, VMobject}, Blueprint, RabjectWithId
+        vmobject::{TransformAnchor, VMobject},
+        Blueprint, RabjectWithId,
     },
     // renderer::vmobject::VMobjectRenderer,
     // utils::{beziers_to_fill, beziers_to_stroke},
-    utils::SubpathWidth, 
+    utils::SubpathWidth,
 };
 
 /// A part of a circle
@@ -199,17 +200,17 @@ impl Blueprint<VMobject> for Ellipse {
 #[derive(Debug, Clone)]
 pub struct Polygon {
     pub corner_points: Vec<Vec2>,
-    pub width: SubpathWidth,
+    pub width: f32,
 }
 
 impl Polygon {
     pub fn new(corner_points: Vec<Vec2>) -> Self {
         Self {
             corner_points,
-            width: SubpathWidth::Middle(1.0),
+            width: 10.0,
         }
     }
-    pub fn with_width(mut self, width: SubpathWidth) -> Self {
+    pub fn with_width(mut self, width: f32) -> Self {
         self.width = width;
         self
     }
@@ -228,8 +229,9 @@ impl Blueprint<VMobject> for Polygon {
             .map(|v| v.extend(0.0))
             .collect::<Vec<_>>();
 
-        let polygon = VMobject::from_corner_points(vertices).into();
-        polygon
+        let mut mobject = VMobject::from_corner_points(vertices);
+        mobject.set_stroke_width(self.width);
+        mobject.into()
     }
 }
 

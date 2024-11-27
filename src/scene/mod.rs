@@ -10,6 +10,7 @@ use std::{
 
 use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
+use log::trace;
 
 use crate::{
     animation::Animation,
@@ -69,6 +70,7 @@ impl Scene {
         ctx: &mut RanimContext,
         rabject: &RabjectWithId<R>,
     ) {
+        trace!("[Scene::insert_rabject]: inserting rabject: {:?}", rabject.id());
         let entry = self
             .rabjects
             .entry(std::any::TypeId::of::<R>())

@@ -27,12 +27,13 @@ fn main() {
     info!("running...");
 
     let mut polygon = Polygon::new(vec![
-        vec2(-100.0, 0.0),
-        vec2(20.0, 30.0),
-        vec2(0.0, 70.0),
-        vec2(50.0, 0.0),
+        vec2(-100.0, -300.0),
+        vec2(0.0, 0.0),
+        vec2(200.0, 300.0),
+        vec2(0.0, 700.0),
+        vec2(500.0, 0.0),
     ])
-    .with_width(SubpathWidth::Middle(20.0))
+    .with_width(20.0)
     .build();
     polygon
         .set_color(Srgba::from_u32::<rgb::channels::Rgba>(0xE65A4CFF).into())
@@ -52,6 +53,8 @@ fn main() {
             ),
         )
         .unwrap();
+    // scene.insert_rabject(&mut ctx, &polygon);
+    // scene.insert_rabject(&mut ctx, &polygon);
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
@@ -69,6 +72,7 @@ fn main() {
             ),
         )
         .unwrap();
+    // scene.render_to_image(&mut ctx, "output.png");
     scene.play(
         &mut ctx,
         Animation::new(arc, Fading::Out, AnimationConfig::default().remove()),

@@ -2,7 +2,7 @@ pub mod vmobject;
 
 use std::ops::{Deref, DerefMut};
 
-use crate::{utils::Id, RanimContext};
+use crate::{utils::Id, RanimContext, WgpuContext};
 
 /// Blueprints are the data structures that are used to create [`Rabject`]s
 pub trait Blueprint<T: Rabject> {
@@ -21,6 +21,21 @@ pub trait Rabject: 'static + Clone {
         render_resource: &mut Self::RenderResource,
     ) where
         Self: Sized;
+
+    #[allow(unused_variables)]
+    fn begin_compute_pass<'a>(
+        encoder: &'a mut wgpu::CommandEncoder,
+    ) -> Option<wgpu::ComputePass<'a>> {
+        None
+    }
+
+    #[allow(unused_variables)]
+    fn compute<'a>(
+        ctx: &mut RanimContext,
+        compute_pass: &mut wgpu::ComputePass<'a>,
+        render_resource: &Self::RenderResource,
+    ) {
+    }
 
     fn begin_render_pass<'a>(
         encoder: &'a mut wgpu::CommandEncoder,
