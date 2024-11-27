@@ -18,8 +18,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info"))
-        .init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
 
     let mut ctx = RanimContext::new();
 
@@ -57,7 +56,7 @@ fn main() {
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
-        .with_stroke_width(SubpathWidth::Middle(20.0))
+        .with_stroke_width(20.0)
         .build();
     arc.set_color(Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into());
 

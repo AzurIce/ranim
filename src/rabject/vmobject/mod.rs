@@ -280,9 +280,12 @@ impl Rabject for VMobject {
             (std::mem::size_of::<VMobjectFillVertex>() * 1024) as u64,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
-        let compute_uniform_buffer = WgpuBuffer::new(
+        let compute_uniform_buffer = WgpuBuffer::new_init(
             &ctx.wgpu_ctx,
-            std::mem::size_of::<ComputeUniform>() as u64,
+            &[ComputeUniform {
+                unit_normal: rabject.get_unit_normal(),
+                _padding: 0.0,
+            }],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         );
 

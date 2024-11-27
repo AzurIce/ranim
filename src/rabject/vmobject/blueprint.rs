@@ -17,7 +17,7 @@ pub struct Arc {
     /// Angle in radians of the arc
     pub angle: f32,
     pub radius: f32,
-    pub stroke_width: SubpathWidth,
+    pub stroke_width: f32,
 }
 
 impl Arc {
@@ -25,14 +25,14 @@ impl Arc {
         Self {
             angle,
             radius: 1.0,
-            stroke_width: SubpathWidth::default(),
+            stroke_width: 10.0,
         }
     }
     pub fn with_radius(mut self, radius: f32) -> Self {
         self.radius = radius;
         self
     }
-    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+    pub fn with_stroke_width(mut self, stroke_width: f32) -> Self {
         self.stroke_width = stroke_width;
         self
     }
@@ -56,7 +56,9 @@ impl Blueprint<VMobject> for Arc {
             *p /= (theta / 2.0).cos();
         });
         // trace!("start: {:?}, end: {:?}", points[0], points[len - 1]);
-        VMobject::from_points(points).into()
+        let mut vmobject = VMobject::from_points(points);
+        vmobject.set_stroke_width(self.stroke_width);
+        vmobject.into()
     }
 }
 
@@ -64,7 +66,7 @@ pub struct ArcBetweenPoints {
     pub start: Vec3,
     pub end: Vec3,
     pub angle: f32,
-    pub stroke_width: SubpathWidth,
+    pub stroke_width: f32,
 }
 
 impl ArcBetweenPoints {
@@ -73,10 +75,10 @@ impl ArcBetweenPoints {
             start,
             end,
             angle,
-            stroke_width: SubpathWidth::default(),
+            stroke_width: 10.0,
         }
     }
-    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+    pub fn with_stroke_width(mut self, stroke_width: f32) -> Self {
         self.stroke_width = stroke_width;
         self
     }
@@ -96,18 +98,18 @@ impl Blueprint<VMobject> for ArcBetweenPoints {
 
 pub struct Circle {
     pub radius: f32,
-    pub stroke_width: SubpathWidth,
+    pub stroke_width: f32,
 }
 
 impl Circle {
     pub fn new(radius: f32) -> Self {
         Self {
             radius,
-            stroke_width: SubpathWidth::default(),
+            stroke_width: 10.0,
         }
     }
 
-    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+    pub fn with_stroke_width(mut self, stroke_width: f32) -> Self {
         self.stroke_width = stroke_width;
         self
     }
@@ -125,7 +127,7 @@ impl Blueprint<VMobject> for Circle {
 pub struct Dot {
     pub point: Vec3,
     pub radius: f32,
-    pub stroke_width: SubpathWidth,
+    pub stroke_width: f32,
 }
 
 impl Dot {
@@ -133,7 +135,7 @@ impl Dot {
         Self {
             point,
             radius: 0.08,
-            stroke_width: SubpathWidth::default(),
+            stroke_width: 10.0,
         }
     }
 
@@ -147,7 +149,7 @@ impl Dot {
         self
     }
 
-    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+    pub fn with_stroke_width(mut self, stroke_width: f32) -> Self {
         self.stroke_width = stroke_width;
         self
     }
@@ -166,7 +168,7 @@ impl Blueprint<VMobject> for Dot {
 pub struct Ellipse {
     pub width: f32,
     pub height: f32,
-    pub stroke_width: SubpathWidth,
+    pub stroke_width: f32,
 }
 
 impl Ellipse {
@@ -174,11 +176,11 @@ impl Ellipse {
         Self {
             width,
             height,
-            stroke_width: SubpathWidth::default(),
+            stroke_width: 10.0,
         }
     }
 
-    pub fn with_stroke_width(mut self, stroke_width: SubpathWidth) -> Self {
+    pub fn with_stroke_width(mut self, stroke_width: f32) -> Self {
         self.stroke_width = stroke_width;
         self
     }
