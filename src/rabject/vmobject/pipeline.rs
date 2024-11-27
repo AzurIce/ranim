@@ -1,4 +1,3 @@
-
 use std::ops::Deref;
 
 use glam::Vec4;
@@ -6,9 +5,9 @@ use wgpu::include_wgsl;
 
 use crate::{camera::CameraUniformsBindGroup, RanimContext, WgpuContext};
 
-use crate::pipeline::{PipelineVertex, RenderPipeline};
+use crate::pipeline::{Pipeline, Vertex};
 
-use super::VMobjectStrokeVertex;
+use super::{VMObjectRenderResource, VMobjectStrokeVertex};
 
 #[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
@@ -18,7 +17,7 @@ pub struct VMobjectFillVertex {
     pub unit_normal: Vec4,
 }
 
-impl PipelineVertex for VMobjectFillVertex {
+impl Vertex for VMobjectFillVertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem::size_of;
         wgpu::VertexBufferLayout {
@@ -71,20 +70,19 @@ impl FillPipeline {
     }
 }
 
-impl RenderPipeline for FillPipeline {
-    type Vertex = VMobjectFillVertex;
-
+impl Pipeline for FillPipeline {
     fn new(ctx: &RanimContext) -> Self {
         let WgpuContext { device, .. } = &ctx.wgpu_ctx;
 
-        let module = &device.create_shader_module(include_wgsl!("../../../shader/vmobject_fill.wgsl"));
+        let module =
+            &device.create_shader_module(include_wgsl!("../../../shader/vmobject_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Fill Pipeline"),
             layout: Some(&Self::pipeline_layout(&ctx.wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
-                buffers: &[Self::Vertex::desc()],
+                buffers: &[VMobjectFillVertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -138,26 +136,29 @@ impl StrokePipeline {
         ctx.device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("VMobject Fill Pipeline Layout"),
-                bind_group_layouts: &[&CameraUniformsBindGroup::bind_group_layout(ctx)],
+                bind_group_layouts: &[
+                    &CameraUniformsBindGroup::bind_group_layout(ctx),
+                    &VMObjectRenderResource::render_bind_group_layout(&ctx.device),
+                ],
                 push_constant_ranges: &[],
             })
     }
 }
 
-impl RenderPipeline for StrokePipeline {
-    type Vertex = VMobjectStrokeVertex;
-
+impl Pipeline for StrokePipeline {
     fn new(ctx: &RanimContext) -> Self {
         let WgpuContext { device, .. } = &ctx.wgpu_ctx;
 
-        let module = &device.create_shader_module(include_wgsl!("../../../shader/vmobject_stroke.wgsl"));
+        let module =
+            &device.create_shader_module(include_wgsl!("../../../shader/vmobject_stroke.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Stroke Pipeline"),
             layout: Some(&Self::pipeline_layout(&ctx.wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
-                buffers: &[Self::Vertex::desc()],
+                // buffers: &[VMobjectStrokeVertex::desc()],
+                buffers: &[],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -170,7 +171,11 @@ impl RenderPipeline for StrokePipeline {
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
-            primitive: wgpu::PrimitiveState::default(),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleStrip,
+                // topology: wgpu::PrimitiveTopology::PointList,
+                ..Default::default()
+            },
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
                 depth_write_enabled: true,
@@ -184,6 +189,45 @@ impl RenderPipeline for StrokePipeline {
                 alpha_to_coverage_enabled: false,
             },
             multiview: None,
+            cache: None,
+        });
+
+        Self { pipeline }
+    }
+}
+
+pub struct ComputePipeline {
+    pub pipeline: wgpu::ComputePipeline,
+}
+
+impl Deref for ComputePipeline {
+    type Target = wgpu::ComputePipeline;
+    fn deref(&self) -> &Self::Target {
+        &self.pipeline
+    }
+}
+
+impl Pipeline for ComputePipeline {
+    fn new(ctx: &RanimContext) -> Self {
+        let WgpuContext { device, .. } = &ctx.wgpu_ctx;
+
+        let module =
+            &device.create_shader_module(include_wgsl!("../../../shader/vmobject_compute.wgsl"));
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("VMobject Compute Pipeline Layout"),
+            bind_group_layouts: &[&VMObjectRenderResource::compute_bind_group_layout(
+                &ctx.wgpu_ctx.device,
+            )],
+            push_constant_ranges: &[],
+        });
+
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("VMobject Compute Pipeline"),
+            layout: Some(&pipeline_layout),
+            module,
+            entry_point: Some("cs_main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
             cache: None,
         });
 

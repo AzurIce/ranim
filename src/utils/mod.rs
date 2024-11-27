@@ -43,7 +43,7 @@ pub fn project(p: Vec3, unit_normal: Vec3) -> Vec3 {
 }
 
 pub fn generate_basis(unit_normal: Vec3) -> (Vec3, Vec3) {
-    trace!("generating basis for {:?}", unit_normal);
+    // trace!("generating basis for {:?}", unit_normal);
     let u = if unit_normal.x != 0.0 || unit_normal.y != 0.0 {
         vec3(-unit_normal.y, unit_normal.x, 0.0)
     } else {
@@ -54,7 +54,7 @@ pub fn generate_basis(unit_normal: Vec3) -> (Vec3, Vec3) {
 }
 
 pub fn convert_to_2d(p: Vec3, origin: Vec3, basis: (Vec3, Vec3)) -> Vec2 {
-    trace!("converting {:?} by {:?} and {:?}", p, origin, basis);
+    // trace!("converting {:?} by {:?} and {:?}", p, origin, basis);
     let p_local = p - origin;
     vec2(basis.0.dot(p_local), basis.1.dot(p_local))
 }

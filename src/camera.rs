@@ -4,6 +4,7 @@ use std::{
 };
 
 use glam::{Mat4, Vec3};
+use log::debug;
 
 use crate::{
     rabject::{ExtractedRabjectWithId, Rabject},
@@ -178,7 +179,7 @@ impl Camera {
         // Update the uniforms buffer
         // trace!("[Camera]: Refreshing uniforms...");
         self.refresh_uniforms();
-        // debug!("[Camera]: Uniforms: {:?}", self.uniforms);
+        debug!("[Camera]: Uniforms: {:?}", self.uniforms);
         // trace!("[Camera] uploading camera uniforms to buffer...");
         ctx.wgpu_ctx.queue.write_buffer(
             &self.uniforms_buffer,
@@ -199,20 +200,27 @@ impl Camera {
             ctx.wgpu_ctx
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
+                    label: Some("Encoder"),
                 });
+
+        if let Some(mut compute_pass) = R::begin_compute_pass(&mut encoder) {
+            for rabject in &rabjects {
+                R::compute(ctx, &mut compute_pass, &rabject.render_resource);
+            }
+        }
 
         {
             let mut render_pass =
                 R::begin_render_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
             // bind group 0 is reserved for camera uniforms
             render_pass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
-            for rabject in rabjects {
+            for rabject in &rabjects {
                 R::render(ctx, &mut render_pass, &rabject.render_resource);
             }
         }
 
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+
         self.texture_data_updated = false;
     }
 
