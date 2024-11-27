@@ -10,7 +10,6 @@ use ranim::{
     animation::{fading::Fading, transform::Transform, Animation, AnimationConfig},
     rabject::vmobject::{Arc, Polygon},
     scene::Scene,
-    utils::SubpathWidth,
     RanimContext,
 };
 

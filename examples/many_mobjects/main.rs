@@ -9,7 +9,6 @@ use ranim::rabject::Blueprint;
 use ranim::{
     animation::{fading::Fading, Animation, AnimationConfig},
     scene::Scene,
-    utils::SubpathWidth,
     RanimContext,
 };
 
