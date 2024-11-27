@@ -137,7 +137,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
                 });
         } else {
             ctx.queue.write_buffer(self, 0, bytemuck::cast_slice(data));
-            ctx.queue.submit([]);
+            // ctx.queue.submit([]);
         }
         self.len = data.len();
     }
