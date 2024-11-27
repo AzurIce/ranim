@@ -19,10 +19,8 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=trace"))
         .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(
-        Env::default().default_filter_or("arc_between_points=info"),
-    )
-    .init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=info"))
+        .init();
 
     let mut ctx = RanimContext::new();
 
@@ -51,7 +49,7 @@ fn main() {
 
         let color = start_color.lerp(end_color, j as f32 / (ntan - 1) as f32);
         let mut arc = ArcBetweenPoints::new(Vec3::ZERO, end, angle)
-            .with_stroke_width(SubpathWidth::Middle(width))
+            .with_stroke_width(width)
             .build();
 
         arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into());
