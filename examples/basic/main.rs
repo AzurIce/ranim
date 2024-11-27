@@ -18,7 +18,8 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info"))
+        .init();
 
     let mut ctx = RanimContext::new();
 
@@ -53,8 +54,6 @@ fn main() {
             ),
         )
         .unwrap();
-    // scene.insert_rabject(&mut ctx, &polygon);
-    // scene.insert_rabject(&mut ctx, &polygon);
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
@@ -72,7 +71,6 @@ fn main() {
             ),
         )
         .unwrap();
-    // scene.render_to_image(&mut ctx, "output.png");
     scene.play(
         &mut ctx,
         Animation::new(arc, Fading::Out, AnimationConfig::default().remove()),

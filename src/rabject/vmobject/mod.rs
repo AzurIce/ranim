@@ -1,20 +1,15 @@
 mod blueprint;
 mod pipeline;
-use bezier_rs::{Bezier, Join, Subpath, SubpathTValue};
 pub use blueprint::*;
 
-use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3, Vec3Swizzles, Vec4};
+use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
 use log::trace;
 use palette::{rgb, Srgba};
 use wgpu::BindGroupLayoutDescriptor;
 
 use crate::{
-    pipeline::Vertex,
-    utils::{
-        convert_to_2d, convert_to_3d, generate_basis, project, resize_preserving_order, Id,
-        SubpathWidth,
-    },
+    utils::{resize_preserving_order, rotation_between_vectors},
     RanimContext, WgpuBuffer,
 };
 use pipeline::{ComputePipeline, FillPipeline, StrokePipeline, VMobjectFillVertex};
@@ -68,54 +63,22 @@ impl VMobjectPoint {
         self.stroke_width = width;
     }
 }
+// #[repr(C, align(16))]
+// #[derive(Clone, Copy, Default, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+// pub struct VMobjectComputePoint {
+//     pub pos: Vec3,
+//     pub stroke_width: f32,
+//     pub stroke_color: Vec4,
+//     pub fill_color: Vec4,
+//     pub angle: f32,
+//     _padding: [f32; 3],
+// }
 
 #[repr(C, align(16))]
 #[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct VMobjectStrokeVertex {
     pub pos: Vec4,
     pub stroke_color: Vec4,
-}
-
-impl Vertex for VMobjectStrokeVertex {
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x4,
-                },
-                wgpu::VertexAttribute {
-                    offset: size_of::<[f32; 4]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x4,
-                },
-            ],
-        }
-    }
-}
-
-impl From<VMobjectPoint> for VMobjectStrokeVertex {
-    fn from(point: VMobjectPoint) -> Self {
-        // trace!("[VMobject] VMobjectStrokeVertex: {:?}", point);
-        Self {
-            pos: point.pos.extend(1.0),
-            stroke_color: point.stroke_color,
-        }
-    }
-}
-
-impl From<VMobjectPoint> for VMobjectFillVertex {
-    fn from(point: VMobjectPoint) -> Self {
-        // trace!("[VMobject] VMobjectFillVertex: {:?}", point);
-        Self {
-            pos: point.pos.extend(1.0),
-            fill_color: point.fill_color,
-            unit_normal: Vec4::ZERO,
-        }
-    }
 }
 
 #[derive(Clone, Default)]
@@ -131,11 +94,13 @@ impl VMobject {
         }
         // Close the polygon
         points.push(points[0]);
+        // println!("points: {:?}", points);
 
         let anchors = points;
         let handles = anchors
-            .windows(2)
-            .map(|window| 0.5 * (window[0] + window[1]))
+            .iter()
+            .zip(anchors.iter().skip(1))
+            .map(|(&a, &b)| 0.5 * (a + b))
             .collect::<Vec<_>>();
 
         // Interleave anchors and handles
@@ -143,6 +108,7 @@ impl VMobject {
             .into_iter()
             .interleave(handles.into_iter())
             .collect();
+        // println!("points: {:?}", points);
 
         Self::from_points(points)
     }
@@ -168,187 +134,14 @@ impl VMobject {
             return false;
         }
 
-        self.points.first() == self.points.last()
+        self.points.first().unwrap().pos == self.points.last().unwrap().pos
     }
 
     fn points(&self) -> &[VMobjectPoint] {
         &self.points
     }
 
-    #[deprecated = "Use compute pipeline instead"]
-    fn parse_stroke(&self) -> Vec<VMobjectStrokeVertex> {
-        if self.points.is_empty() {
-            return vec![VMobjectStrokeVertex::default(); 3];
-        }
-
-        // Used to determine how many lines to break the curve into
-        const POLYLINE_FACTOR: f32 = 100.0;
-        const MAX_STEPS: usize = 32;
-        // const MAX_STEPS: usize = 16;
-        let unit_normal = self.get_unit_normal();
-
-        let projected_points = self
-            .points
-            .iter()
-            .map(|p| VMobjectPoint {
-                pos: project(p.position(), unit_normal),
-                ..p.clone()
-            })
-            .collect::<Vec<_>>();
-        let origin = projected_points[0].position();
-        let basis = generate_basis(unit_normal);
-        let points_2d = projected_points
-            .iter()
-            .map(|p| VMobjectPoint {
-                pos: convert_to_2d(p.position(), origin, basis).extend(0.0),
-                ..p.clone()
-            })
-            .collect::<Vec<_>>();
-
-        let segments = points_2d
-            .iter()
-            .step_by(2)
-            .zip(points_2d.iter().skip(1).step_by(2))
-            .zip(points_2d.iter().skip(2).step_by(2))
-            .map(|((p0, p1), p2)| {
-                (
-                    p0,
-                    Bezier::from_quadratic_dvec2(
-                        p0.position().xy().as_dvec2(),
-                        p1.position().xy().as_dvec2(),
-                        p2.position().xy().as_dvec2(),
-                    ),
-                )
-            })
-            .filter(|(_, b)| !b.is_point())
-            .collect::<Vec<_>>();
-
-        trace!("segments: {:?}", segments);
-
-        let beziers = segments.iter().map(|(_, b)| b).cloned().collect::<Vec<_>>();
-        let segments = segments.into_iter().map(|(p, _)| p).collect::<Vec<_>>();
-
-        let subpath: Subpath<Id> = Subpath::from_beziers(&beziers, self.is_closed());
-        let length = subpath.length(None);
-        let cnt = ((POLYLINE_FACTOR * length as f32).ceil() as usize).min(MAX_STEPS);
-
-        let width = SubpathWidth::Middle(20.0);
-        let (inner_path, outer_path) = match width {
-            SubpathWidth::Inner(w) => (
-                subpath.offset(w as f64, Join::Bevel),
-                subpath.offset(0.0, Join::Bevel),
-            ),
-            SubpathWidth::Outer(w) => (
-                subpath.offset(0.0, Join::Bevel),
-                subpath.offset(-w as f64, Join::Bevel),
-            ),
-            SubpathWidth::Middle(w) => (
-                subpath.offset(w as f64 / 2.0, Join::Bevel),
-                subpath.offset(-w as f64 / 2.0, Join::Bevel),
-            ),
-        };
-        // trace!(
-        //     "inner: {:?}, outer: {:?}",
-        //     inner_path.len(),
-        //     outer_path.len()
-        // );
-        let mut vertices = Vec::with_capacity(MAX_STEPS * 2);
-        println!("cnt: {:?}", cnt);
-        for i in 0..cnt {
-            let t = i as f64 / (cnt - 1) as f64;
-
-            let segment_index = (t * (segments.len() - 1) as f64).floor() as usize;
-            let segment_index_next = (t * (segments.len() - 1) as f64).ceil() as usize;
-            let point = segments[segment_index].lerp(
-                &segments[segment_index_next],
-                (t * segments.len() as f64 - segment_index as f64) as f32,
-            );
-
-            vertices.push(VMobjectPoint {
-                pos: inner_path
-                    .evaluate(SubpathTValue::GlobalEuclidean(t))
-                    .as_vec2()
-                    .extend(0.0),
-                ..point.clone()
-            });
-            vertices.push(VMobjectPoint {
-                pos: outer_path
-                    .evaluate(SubpathTValue::GlobalEuclidean(t))
-                    .as_vec2()
-                    .extend(0.0),
-                ..point.clone()
-            });
-        }
-
-        let stroke_vertices: Vec<VMobjectStrokeVertex> = vertices
-            // .windows(3)
-            // .flatten()
-            .iter()
-            .cloned()
-            .map(|p| {
-                VMobjectPoint {
-                    pos: convert_to_3d(p.position().xy(), origin, basis),
-                    ..p
-                }
-                .into()
-            })
-            .collect();
-
-        trace!(
-            "stroke_vertices: {:?}, {:?}",
-            stroke_vertices.len(),
-            stroke_vertices
-        );
-
-        // let beziers = points_2d.
-
-        // let points_3d = points_2d
-        //     .iter()
-        //     .map(|p| {
-        //         VMobjectPoint convert_to_3d(*p, origin, basis))
-        //     .collect::<Vec<_>>();
-
-        // self.points
-        //     .iter()
-        //     .step_by(2)
-        //     .zip(self.points.iter().skip(1).step_by(2))
-        //     .zip(self.points.iter().skip(2).step_by(2))
-        //     .for_each(|((p0, p1), p2)| {
-        //         let area = 0.5
-        //             * (p1.position() - p0.position())
-        //                 .cross(p2.position() - p0.position())
-        //                 .length();
-        //         let cnt = (POLYLINE_FACTOR * area.sqrt()).ceil() as usize;
-        //         let n = MAX_STEPS.min(2 + cnt);
-
-        //         let projected = |v: Vec3| v - unit_normal * unit_normal.dot(v);
-        //         let projected_p0 = projected(p0.position());
-        //         let projected_p1 = projected(p1.position());
-        //         let projected_p2 = projected(p2.position());
-
-        //         let xx = unit_normal.cross(projected_p1 - projected_p0).normalize();
-        //         let yy = unit_normal.cross(xx).normalize();
-
-        //         let p0_2d = vec2(xx.dot(projected_p0), yy.dot(projected_p0));
-        //         let p1_2d = vec2(xx.dot(projected_p1), yy.dot(projected_p1));
-        //         let p2_2d = vec2(xx.dot(projected_p2), yy.dot(projected_p2));
-
-        //         for i in 0..n {
-        //             let t = i as f32 / (n - 1) as f32;
-
-        //             let point = point_on_quadratic(t);
-        //             let tangent = tangent_on_quadratic(t);
-
-        //             let step = unit_normal.cross(tangent).normalize();
-
-        //             let stroke_width = p0.stroke_width.lerp(&p2.stroke_width, t);
-        //             let color = p0.stroke_color().lerp(p2.stroke_color(), t);
-        //         }
-        //     });
-
-        stroke_vertices
-    }
-
+    /*
     pub fn parse_fill(&self) -> Vec<VMobjectFillVertex> {
         if self.points.is_empty() || !self.is_closed() {
             return vec![VMobjectFillVertex::default(); 3];
@@ -373,6 +166,7 @@ impl VMobject {
             });
         vertices.into_iter().map(|v| v.into()).collect()
     }
+    */
 }
 
 #[repr(C, align(16))]
@@ -384,6 +178,7 @@ struct ComputeUniform {
 
 pub struct VMObjectRenderResource {
     points_buffer: WgpuBuffer<VMobjectPoint>,
+    joint_angles_buffer: WgpuBuffer<f32>,
     compute_uniform_buffer: WgpuBuffer<ComputeUniform>,
     fill_vertex_buffer: WgpuBuffer<VMobjectFillVertex>,
     stroke_vertices_buffer: WgpuBuffer<VMobjectStrokeVertex>,
@@ -407,9 +202,20 @@ impl VMObjectRenderResource {
                     },
                     count: None,
                 },
-                // Vertices
+                // Joint Angles
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Vertices
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -420,7 +226,7 @@ impl VMObjectRenderResource {
                 },
                 // Uniforms
                 wgpu::BindGroupLayoutEntry {
-                    binding: 2,
+                    binding: 3,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -449,6 +255,7 @@ impl VMObjectRenderResource {
     }
 }
 
+const MAX_STEP: u32 = 16;
 impl Rabject for VMobject {
     type RenderResource = VMObjectRenderResource;
 
@@ -458,10 +265,20 @@ impl Rabject for VMobject {
             &rabject.points(),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
+        let joint_angles_buffer = WgpuBuffer::new_init(
+            &ctx.wgpu_ctx,
+            &rabject.get_joint_angles(),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        );
         let stroke_vertices_buffer = WgpuBuffer::new(
             &ctx.wgpu_ctx,
             (std::mem::size_of::<VMobjectStrokeVertex>() * 1024) as u64,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        );
+        let fill_vertex_buffer = WgpuBuffer::new(
+            &ctx.wgpu_ctx,
+            (std::mem::size_of::<VMobjectFillVertex>() * 1024) as u64,
+            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
         let compute_uniform_buffer = WgpuBuffer::new(
             &ctx.wgpu_ctx,
@@ -487,10 +304,14 @@ impl Rabject for VMobject {
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
-                            resource: stroke_vertices_buffer.as_entire_binding(),
+                            resource: joint_angles_buffer.as_entire_binding(),
                         },
                         wgpu::BindGroupEntry {
                             binding: 2,
+                            resource: stroke_vertices_buffer.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
                             resource: compute_uniform_buffer.as_entire_binding(),
                         },
                     ],
@@ -510,11 +331,8 @@ impl Rabject for VMobject {
 
         Self::RenderResource {
             points_buffer,
-            fill_vertex_buffer: WgpuBuffer::new_init(
-                &ctx.wgpu_ctx,
-                &rabject.parse_fill(),
-                wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            ),
+            joint_angles_buffer,
+            fill_vertex_buffer,
             stroke_vertices_buffer,
             compute_uniform_buffer,
             compute_bind_group,
@@ -527,13 +345,13 @@ impl Rabject for VMobject {
         rabject: &RabjectWithId<Self>,
         render_resource: &mut Self::RenderResource,
     ) {
-        // trace!(
-        //     "[VMobject::update_render_resource]: updating points: {:?}",
-        //     rabject.points()
-        // );
+        // println!("{:?}", rabject.points());
         render_resource
             .points_buffer
             .prepare_from_slice(&ctx.wgpu_ctx, &rabject.points());
+        render_resource
+            .joint_angles_buffer
+            .prepare_from_slice(&ctx.wgpu_ctx, &rabject.get_joint_angles());
 
         let unit_normal = rabject.get_unit_normal();
         render_resource.compute_uniform_buffer.prepare_from_slice(
@@ -543,18 +361,11 @@ impl Rabject for VMobject {
                 _padding: 0.0,
             }],
         );
+        ctx.wgpu_ctx.queue.submit([]);
         // let fill_vertices = rabject.parse_fill();
         // render_resource
         //     .fill_vertex_buffer
         //     .prepare_from_slice(&ctx.wgpu_ctx, &fill_vertices);
-        // let stroke_vertices = rabject.parse_stroke();
-        // trace!(
-        //     "[VMobject::update_render_resource]: stroke_vertices {:?}",
-        //     stroke_vertices.len(),
-        // );
-        // render_resource
-        //     .stroke_vertices_buffer
-        //     .prepare_from_slice(&ctx.wgpu_ctx, &stroke_vertices);
     }
 
     fn begin_compute_pass<'a>(
@@ -582,6 +393,11 @@ impl Rabject for VMobject {
         let pipeline = ctx.get_or_init_pipeline::<ComputePipeline>();
         compute_pass.set_pipeline(&pipeline);
         compute_pass.set_bind_group(0, &render_resource.compute_bind_group, &[]);
+        // number of segments
+        trace!(
+            "dispatch workgroups: {}",
+            render_resource.points_buffer.len() / 2
+        );
         compute_pass.dispatch_workgroups(render_resource.points_buffer.len() as u32 / 2, 1, 1);
     }
 
@@ -634,7 +450,7 @@ impl Rabject for VMobject {
         render_pass.set_bind_group(1, &render_resource.render_bind_group, &[]);
         // render_pass.set_vertex_buffer(0, render_resource.stroke_vertices_buffer.slice(..));
         // let len = render_resource.stroke_vertices_buffer.len();
-        let len = render_resource.points_buffer.len() as u32 / 2 * 16;
+        let len = render_resource.points_buffer.len() as u32 / 2 * MAX_STEP * 2;
         trace!("draw {}", len);
         render_pass.draw(0..len, 0..1);
     }
@@ -660,6 +476,71 @@ impl TransformAnchor {
 }
 
 impl VMobject {
+    pub fn get_anchor_position(&self, anchor_index: usize) -> Vec3 {
+        self.points[anchor_index * 2].position()
+    }
+    pub fn get_point_handles_position(&self, handle_index: usize) -> (Option<Vec3>, Option<Vec3>) {
+        let index = handle_index * 2;
+        let (mut hpre, mut hnext) = if index == 0 {
+            (None, Some(self.points[index + 1].position()))
+        } else if index == self.points.len() - 1 {
+            (Some(self.points[index - 1].position()), None)
+        } else {
+            (
+                Some(self.points[index - 1].position()),
+                Some(self.points[index + 1].position()),
+            )
+        };
+        if self.is_closed() {
+            if index == 0 {
+                hpre = Some(self.points[self.points.len() - 2].position());
+            } else if index == self.points.len() - 1 {
+                hnext = Some(self.points[1].position());
+            }
+        }
+        (hpre, hnext)
+    }
+    pub fn get_joint_angles(&self) -> Vec<f32> {
+        assert!(self.points.len() >= 3);
+        let mut joint_angles = (0..self.points.len() / 2)
+            .map(|anchor_index| {
+                let (hpre, hnext) = self.get_point_handles_position(anchor_index);
+
+                let (Some(hpre), Some(hnext)) = (hpre, hnext) else {
+                    return 0.0;
+                };
+                let anchor = self.get_anchor_position(anchor_index);
+
+                let v_in = (anchor - hpre).normalize();
+                let v_out = (hnext - anchor).normalize();
+
+                let unit_normal = self.get_unit_normal();
+
+                let mat = rotation_between_vectors(Vec3::Z, unit_normal);
+
+                let v_in = mat * v_in;
+                let v_out = mat * v_out;
+
+                let v_in_angle = v_in.y.atan2(v_in.x);
+                let v_out_angle = v_out.y.atan2(v_out.x);
+                let angle = v_out_angle - v_in_angle;
+                // println!("[{anchor_index}]: angle: {:?}", angle);
+                if angle > std::f32::consts::PI {
+                    angle - std::f32::consts::TAU
+                } else if angle < -std::f32::consts::PI {
+                    angle + std::f32::consts::TAU
+                } else {
+                    angle
+                }
+            })
+            .collect::<Vec<_>>();
+        if self.is_closed() {
+            joint_angles.push(joint_angles[0]);
+        }
+        trace!("[VMobject::get_joint_angles] {:?}", joint_angles);
+        joint_angles
+    }
+
     /// Get the bounding box of the mobject.
     /// min, mid, max
     pub fn get_bounding_box(&self) -> [Vec3; 3] {
@@ -701,7 +582,7 @@ impl VMobject {
         let sum_and_diffs = anchors
             .iter()
             .zip(anchors.iter().skip(1).chain(anchors.iter().take(1)))
-            .map(|(p0, p1)| (p0.position() + p1.position(), p0.position() - p1.position()))
+            .map(|(p0, p1)| (p0.position() + p1.position(), p1.position() - p0.position()))
             .collect::<Vec<_>>();
 
         let x = sum_and_diffs
@@ -725,6 +606,7 @@ impl VMobject {
             return Vec3::Z;
         }
         let area_vector = self.get_area_vector();
+        // trace!("area_vector: {:?}", area_vector);
         if area_vector == Vec3::ZERO {
             let v1 = (self.points[1].position() - self.points[0].position()).normalize();
             let v2 = (self.points[2].position() - self.points[0].position()).normalize();

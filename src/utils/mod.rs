@@ -1,7 +1,7 @@
 pub mod rate_functions;
 
 use bezier_rs::{Bezier, Identifier, Join, Subpath, SubpathTValue};
-use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec3Swizzles, Vec4};
+use glam::{vec2, vec3, vec4, Mat3, Vec2, Vec3, Vec3Swizzles, Vec4};
 use log::trace;
 
 use crate::rabject::vmobject::{VMobjectPoint, VMobjectStrokeVertex};
@@ -48,7 +48,8 @@ pub fn generate_basis(unit_normal: Vec3) -> (Vec3, Vec3) {
         vec3(-unit_normal.y, unit_normal.x, 0.0)
     } else {
         vec3(1.0, 0.0, 0.0)
-    }.normalize();
+    }
+    .normalize();
     let v = unit_normal.cross(u).normalize();
     (u, v)
 }
@@ -61,6 +62,36 @@ pub fn convert_to_2d(p: Vec3, origin: Vec3, basis: (Vec3, Vec3)) -> Vec2 {
 
 pub fn convert_to_3d(p: Vec2, origin: Vec3, basis: (Vec3, Vec3)) -> Vec3 {
     origin + basis.0 * p.x + basis.1 * p.y
+}
+
+pub fn rotation_between_vectors(v1: Vec3, v2: Vec3) -> Mat3 {
+    // trace!("rotation_between_vectors: v1: {:?}, v2: {:?}", v1, v2);
+    
+    if (v2 - v1).length() < std::f32::EPSILON {
+        return Mat3::IDENTITY;
+    }
+    let mut axis = v1.cross(v2);
+    if axis.length() < std::f32::EPSILON {
+        axis = v1.cross(Vec3::Y);
+    }
+    if axis.length() < std::f32::EPSILON {
+        axis = v1.cross(Vec3::Z);
+    }
+    // trace!("axis: {:?}", axis);
+
+    let angle = angle_between_vectors(v1, v2);
+    // trace!("angle: {:?}", angle);
+    Mat3::from_axis_angle(axis, angle)
+}
+
+pub fn angle_between_vectors(v1: Vec3, v2: Vec3) -> f32 {
+    if v1.length() == 0.0 || v2.length() == 0.0 {
+        return 0.0;
+    }
+
+    (v1.dot(v2) / (v1.length() * v2.length()))
+        .clamp(-1.0, 1.0)
+        .acos()
 }
 
 const MAX_STEPS: usize = 128;
