@@ -96,7 +96,7 @@ pub struct Animation<R: Rabject> {
     /// The mobject to be animated, will take the ownership of it, and return by scene's [`crate::scene::Scene::play`] method
     pub(crate) rabject: RabjectWithId<R>,
 
-    pub(crate) func: Box<dyn AnimationFunc<R>>,
+    pub func: Box<dyn AnimationFunc<R>>,
     pub(crate) config: AnimationConfig<R>,
 }
 
