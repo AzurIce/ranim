@@ -7,7 +7,7 @@ use crate::{camera::CameraUniformsBindGroup, RanimContext, WgpuContext};
 
 use crate::pipeline::{Pipeline, Vertex};
 
-use super::VMObjectRenderResource;
+use super::render::VMObjectRenderResource;
 
 #[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]

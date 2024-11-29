@@ -1,16 +1,14 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use env_logger::Env;
 use log::info;
 use ranim::animation::transform::Transform;
-use ranim::glam::{vec2, Vec3};
+use ranim::glam::vec2;
 use ranim::palette::{rgb, Srgba};
-use ranim::rabject::vmobject::TransformAnchor;
 use ranim::rabject::Blueprint;
 use ranim::{
     rabject::vmobject::{Arc, Polygon},
     scene::Scene,
-    utils::SubpathWidth,
     RanimContext,
 };
 
@@ -48,48 +46,12 @@ fn main() {
 
     transform.func.interpolate(&mut polygon, 0.0);
     scene.insert_rabject(&mut ctx, &polygon);
-    // polygon.align_with(&mut arc);
-    // scene.insert_rabject(&mut ctx, &polygon);
-    // scene.wait(&mut ctx, Duration::from_secs_f32(1.0));
     scene.render_to_image(&mut ctx, "output-0.png");
 
     transform.func.interpolate(&mut polygon, 0.5);
     scene.insert_rabject(&mut ctx, &polygon);
-    // polygon.align_with(&mut arc);
-    // scene.insert_rabject(&mut ctx, &polygon);
-    // scene.wait(&mut ctx, Duration::from_secs_f32(1.0));
     scene.render_to_image(&mut ctx, "output-0.5.png");
-    // let arc = scene
-    //     .play(
-    //         &mut ctx,
-    //         Transform::new(polygon, arc).config(|c| {
-    //             c.set_run_time(Duration::from_secs_f32(0.1));
-    //         }),
-    //     )
-    //     .unwrap();
 
-    // scene.render_to_image(&mut ctx, "output3.png");
-
-    // let mut polygon = Polygon::new(vec![
-    //     vec2(-100.0, 0.0),
-    //     vec2(20.0, 30.0),
-    //     vec2(0.0, 70.0),
-    //     vec2(50.0, 0.0),
-    // ])
-    // .with_width(20.0)
-    // .build();
-
-    // polygon
-    //     .set_color(Srgba::from_u32::<rgb::channels::Rgba>(0xE65A4CFF).into())
-    //     .rotate(
-    //         std::f32::consts::PI / 4.0,
-    //         Vec3::Z,
-    //         TransformAnchor::origin(),
-    //     );
-    // polygon.align_with_rabject(&mut arc);
-
-    // scene.insert_rabject(&mut ctx, &polygon);
-    // scene.wait(&mut ctx, Duration::from_secs_f32(1.0));
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

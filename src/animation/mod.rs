@@ -1,7 +1,7 @@
 pub mod fading;
 pub mod transform;
 
-use std::{ops::Deref, time};
+use std::time;
 
 use log::trace;
 
