@@ -28,10 +28,10 @@ fn main() {
 
     let mut polygon = Polygon::new(vec![
         vec2(-100.0, -300.0),
-        vec2(0.0, 0.0),
-        vec2(200.0, 300.0),
-        vec2(0.0, 700.0),
         vec2(500.0, 0.0),
+        vec2(0.0, 700.0),
+        vec2(200.0, 300.0),
+        vec2(0.0, 0.0),
     ])
     .with_width(20.0)
     .build();
@@ -57,6 +57,8 @@ fn main() {
             }),
         )
         .unwrap();
+
+    // scene.render_to_image(&mut ctx, "output3.png");
 
     // let mut polygon = Polygon::new(vec![
     //     vec2(-100.0, 0.0),
