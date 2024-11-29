@@ -209,14 +209,14 @@ impl Camera {
             }
         }
 
-        // ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+        ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
         
-        // let mut encoder =
-        //     ctx.wgpu_ctx
-        //         .device
-        //         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        //             label: Some("Encoder"),
-        //         });
+        let mut encoder =
+            ctx.wgpu_ctx
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Encoder"),
+                });
 
         {
             let mut render_pass =

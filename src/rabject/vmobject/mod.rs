@@ -405,6 +405,13 @@ impl Rabject for VMobject {
             }],
         );
         ctx.wgpu_ctx.queue.submit([]);
+        // loop {
+        //     let res = ctx.wgpu_ctx.device.poll(wgpu::Maintain::Wait);
+        //     trace!("poll");
+        //     if res.is_queue_empty() {
+        //         break;
+        //     }
+        // }
         // let fill_vertices = rabject.parse_fill();
         // render_resource
         //     .fill_vertex_buffer

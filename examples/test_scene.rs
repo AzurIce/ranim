@@ -44,19 +44,29 @@ fn main() {
         .build();
     arc.set_color(Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into());
 
+    let mut transform = Transform::new(polygon.clone(), arc);
+
+    transform.func.interpolate(&mut polygon, 0.0);
+    scene.insert_rabject(&mut ctx, &polygon);
     // polygon.align_with(&mut arc);
     // scene.insert_rabject(&mut ctx, &polygon);
     // scene.wait(&mut ctx, Duration::from_secs_f32(1.0));
-    // scene.render_to_image(&mut ctx, "output2.png");
+    scene.render_to_image(&mut ctx, "output-0.png");
 
-    let arc = scene
-        .play(
-            &mut ctx,
-            Transform::new(polygon, arc).config(|c| {
-                c.set_run_time(Duration::from_secs_f32(0.1));
-            }),
-        )
-        .unwrap();
+    transform.func.interpolate(&mut polygon, 0.5);
+    scene.insert_rabject(&mut ctx, &polygon);
+    // polygon.align_with(&mut arc);
+    // scene.insert_rabject(&mut ctx, &polygon);
+    // scene.wait(&mut ctx, Duration::from_secs_f32(1.0));
+    scene.render_to_image(&mut ctx, "output-0.5.png");
+    // let arc = scene
+    //     .play(
+    //         &mut ctx,
+    //         Transform::new(polygon, arc).config(|c| {
+    //             c.set_run_time(Duration::from_secs_f32(0.1));
+    //         }),
+    //     )
+    //     .unwrap();
 
     // scene.render_to_image(&mut ctx, "output3.png");
 

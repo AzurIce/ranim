@@ -21,8 +21,8 @@ impl Transform {
         if !aligned_source.is_aligned(&aligned_target) {
             aligned_source.align_with(&mut aligned_target);
         }
-        trace!("[Transform::new] aligned_source: {:#?}", aligned_source.points());
-        trace!("[Transform::new] aligned_target: {:#?}", aligned_target.points());
+        // trace!("[Transform::new] aligned_source: {:#?}", aligned_source.points());
+        // trace!("[Transform::new] aligned_target: {:#?}", aligned_target.points());
 
         Animation::new(
             rabject,
@@ -51,7 +51,7 @@ impl AnimationFunc<VMobject> for Transform {
             .zip(self.aligned_target.points().iter())
             .map(|(p1, p2)| p1.lerp(p2, alpha))
             .collect();
-        trace!("[Transform::interpolate] t: {alpha} points: {:#?}", points);
+        // trace!("[Transform::interpolate] t: {alpha} points: {:#?}", points);
         rabject.set_points(points);
     }
 

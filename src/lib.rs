@@ -1,5 +1,8 @@
 use std::{
-    any::{Any, TypeId}, collections::HashMap, fmt::Debug, ops::Deref
+    any::{Any, TypeId},
+    collections::HashMap,
+    fmt::Debug,
+    ops::Deref,
 };
 
 use pipeline::Pipeline;
@@ -136,8 +139,18 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
                     usage: self.usage,
                 });
         } else {
-            ctx.queue.write_buffer(self, 0, bytemuck::cast_slice(data));
-            // ctx.queue.submit([]);
+            {
+                let mut view = ctx
+                    .queue
+                    .write_buffer_with(
+                        self,
+                        0,
+                        wgpu::BufferSize::new(std::mem::size_of_val(data) as u64).unwrap(),
+                    )
+                    .unwrap();
+                view.copy_from_slice(bytemuck::cast_slice(data));
+            }
+            ctx.queue.submit([]);
         }
         self.len = data.len();
     }
