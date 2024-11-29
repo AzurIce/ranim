@@ -120,7 +120,10 @@ impl<R: Rabject> Animation<R> {
     }
 
     pub fn play(mut self, ctx: &mut RanimContext, scene: &mut Scene) -> Option<RabjectWithId<R>> {
-        trace!("[Animation] Playing animation on {:?}...", self.rabject.id());
+        trace!(
+            "[Animation] Playing animation on {:?}...",
+            self.rabject.id()
+        );
         self.func.prepare(&mut self.rabject, scene);
         self.func.pre_anim(&mut self.rabject);
         scene.insert_rabject(ctx, &self.rabject);

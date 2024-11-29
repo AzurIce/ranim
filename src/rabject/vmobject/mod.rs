@@ -1,6 +1,6 @@
 mod blueprint;
 mod pipeline;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, thread, time::Duration};
 
 pub use blueprint::*;
 
@@ -282,7 +282,10 @@ impl Rabject for VMobject {
         let points = rabject.points();
         let joint_angles = rabject.get_joint_angles();
         let unit_normal = rabject.get_unit_normal();
-        trace!("INIT points: {:?}", points);
+        trace!(
+            "INIT points: {:?}",
+            points.iter().map(|p| p.position()).collect::<Vec<_>>()
+        );
         trace!("INIT joint_angles: {:?}", joint_angles);
         trace!("INIT unit_normal: {:?}", unit_normal);
 
@@ -878,11 +881,11 @@ impl VMobject {
             return self;
         }
 
-        // trace!(
-        //     "[VMobject] {} align to {}",
-        //     self.points.len(),
-        //     target.points.len()
-        // );
+        trace!(
+            "[VMobject] {} align to {}",
+            self.points.len(),
+            target.points.len()
+        );
         // trace!(
         //     "[VMobject] self: {:?}",
         //     self.points.iter().map(|p| p.position()).collect::<Vec<_>>()
@@ -910,7 +913,7 @@ impl VMobject {
             .map(|b| (b[2].position() - b[0].position()).length())
             .collect::<Vec<_>>();
 
-        let n = target.points.len() - self.points.len();
+        let n = (target.points.len() - self.points.len()) / 2;
         let mut ipc = vec![0; beziers.len()];
         for _ in 0..n {
             let i = lens
@@ -944,6 +947,7 @@ impl VMobject {
         // );
 
         self.points = new_points;
+        trace!("[VMobject] aligned points: {}", self.points.len());
 
         self
     }
