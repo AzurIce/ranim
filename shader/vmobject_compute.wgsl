@@ -48,7 +48,7 @@ fn cs_main(
     for (var i = 0u; i < MAX_STEP; i ++) {
         let t = f32(i) / f32(MAX_STEP - 1);
         var vertex: Vertex;
-        // vertex.pos = vec4<f32>(point_on_quadratic(t, c0, c1, c2), 0.0);
+        // vertex.pos = vec4<f32>(point_on_quadratic(t, c0, c1, c2), 1.0);
         // vertex.pos = vec4<f32>(p0.pos, 1.0);
         // vertex.color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
 
@@ -84,9 +84,7 @@ fn cs_main(
 
             var vertex: Vertex;
             vertex.pos = vec4<f32>(point + dist_to_curve * step, 1.0);
-            // vertex.pos = vec4<f32>(point, 1.0);
             vertex.color = color;
-            // vertex.color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
 
             vertices[global_invocation_id.x * MAX_STEP * 2 + i * 2 + (u32(sign) + 1) / 2] = vertex;
         }
