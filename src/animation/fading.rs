@@ -1,10 +1,23 @@
 use crate::rabject::{vmobject::VMobject, RabjectWithId};
 
-use super::AnimationFunc;
+use super::{Animation, AnimationConfig, AnimationFunc};
 
 pub enum Fading {
     Out,
     In,
+}
+
+impl Fading {
+    pub fn fade_in(rabject: RabjectWithId<VMobject>) -> Animation<VMobject> {
+        Animation::new(rabject, Self::In)
+    }
+
+    pub fn fade_out(rabject: RabjectWithId<VMobject>) -> Animation<VMobject> {
+        Animation::new(rabject, Self::Out).with_config(AnimationConfig {
+            remove: true,
+            ..AnimationConfig::default()
+        })
+    }
 }
 
 impl AnimationFunc<VMobject> for Fading {

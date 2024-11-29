@@ -179,7 +179,7 @@ impl Camera {
         // Update the uniforms buffer
         // trace!("[Camera]: Refreshing uniforms...");
         self.refresh_uniforms();
-        debug!("[Camera]: Uniforms: {:?}", self.uniforms);
+        // debug!("[Camera]: Uniforms: {:?}", self.uniforms);
         // trace!("[Camera] uploading camera uniforms to buffer...");
         ctx.wgpu_ctx.queue.write_buffer(
             &self.uniforms_buffer,

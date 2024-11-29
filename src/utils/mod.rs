@@ -2,6 +2,8 @@ pub mod rate_functions;
 
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
+use crate::rabject::Interpolatable;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
 
@@ -92,4 +94,39 @@ pub fn resize_preserving_order<T: Clone>(vec: &Vec<T>, new_len: usize) -> Vec<T>
 pub fn extend_with_last<T: Clone + Default>(vec: &mut Vec<T>, new_len: usize) {
     let v = vec![vec.last().cloned().unwrap_or_default(); new_len - vec.len()];
     vec.extend(v.into_iter())
+}
+
+/// Returns the point on a quadratic bezier curve at the given parameter.
+pub fn point_on_quadratic_bezier<T: Interpolatable>(
+    points: &[T; 3],
+    t: f32,
+) -> T {
+    let t = t.clamp(0.0, 1.0);
+    let p1 = points[0].lerp(&points[1], t);
+    let p2 = points[1].lerp(&points[2], t);
+    let p = p1.lerp(&p2, t);
+
+    p
+    // let c0 = (1.0 - t) * (1.0 - t);
+    // let c1 = 2.0 * t * (1.0 - t);
+    // let c2 = t * t;
+    // points[0] * c0 + points[1] * c1 + points[2] * c2
+}
+
+/// Returns the control points of the given part of a quadratic bezier curve.
+pub fn partial_quadratic_bezier<T: Interpolatable>(
+    points: &[T; 3],
+    a: f32,
+    b: f32,
+) -> [T; 3] {
+    let a = a.clamp(0.0, 1.0);
+    let b = b.clamp(0.0, 1.0);
+
+    let h0 = point_on_quadratic_bezier(points, a);
+    let h2 = point_on_quadratic_bezier(points, b);
+
+    let h1_prime = points[1].lerp(&points[2], a);
+    let end_prop = (b - a) / (1.0 - a);
+    let h1 = h0.lerp(&h1_prime, end_prop);
+    [h0, h1, h2]
 }

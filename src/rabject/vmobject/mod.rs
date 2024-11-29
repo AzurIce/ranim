@@ -1,15 +1,20 @@
 mod blueprint;
 mod pipeline;
+use std::cmp::Ordering;
+
 pub use blueprint::*;
 
 use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
-use log::trace;
+use log::{trace, warn};
 use palette::{rgb, Srgba};
 use wgpu::BindGroupLayoutDescriptor;
 
 use crate::{
-    utils::{resize_preserving_order, rotation_between_vectors},
+    utils::{
+        extend_with_last, partial_quadratic_bezier, resize_preserving_order,
+        rotation_between_vectors,
+    },
     RanimContext, WgpuBuffer,
 };
 use pipeline::{ComputePipeline, FillPipeline, StrokePipeline, VMobjectFillVertex};
@@ -81,7 +86,7 @@ pub struct VMobjectStrokeVertex {
     pub stroke_color: Vec4,
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct VMobject {
     points: Vec<VMobjectPoint>, // anchor-handle-anchor-handle-...-anchor
 }
@@ -137,8 +142,12 @@ impl VMobject {
         self.points.first().unwrap().pos == self.points.last().unwrap().pos
     }
 
-    fn points(&self) -> &[VMobjectPoint] {
+    pub fn points(&self) -> &[VMobjectPoint] {
         &self.points
+    }
+
+    pub fn set_points(&mut self, points: Vec<VMobjectPoint>) {
+        self.points = points;
     }
 
     /*
@@ -260,6 +269,7 @@ impl Rabject for VMobject {
     type RenderResource = VMObjectRenderResource;
 
     fn init_render_resource(ctx: &mut RanimContext, rabject: &Self) -> Self::RenderResource {
+        // trace!("INIT: {:?}", rabject.points().iter().map(|p| p.position()).collect::<Vec<_>>());
         let points_buffer = WgpuBuffer::new_init(
             &ctx.wgpu_ctx,
             &rabject.points(),
@@ -348,7 +358,15 @@ impl Rabject for VMobject {
         rabject: &RabjectWithId<Self>,
         render_resource: &mut Self::RenderResource,
     ) {
-        // println!("{:?}", rabject.points());
+        // trace!(
+        //     "UPDATE points: {:?}",
+        //     rabject
+        //         .points()
+        //         .iter()
+        //         .map(|p| p.position())
+        //         .collect::<Vec<_>>()
+        // );
+        // trace!("UPDATE angles: {:?}", rabject.get_joint_angles());
         render_resource
             .points_buffer
             .prepare_from_slice(&ctx.wgpu_ctx, &rabject.points());
@@ -357,6 +375,7 @@ impl Rabject for VMobject {
             .prepare_from_slice(&ctx.wgpu_ctx, &rabject.get_joint_angles());
 
         let unit_normal = rabject.get_unit_normal();
+        trace!("UPDATE unit_normal: {:?}", unit_normal);
         render_resource.compute_uniform_buffer.prepare_from_slice(
             &ctx.wgpu_ctx,
             &[ComputeUniform {
@@ -513,16 +532,26 @@ impl VMobject {
                     return 0.0;
                 };
                 let anchor = self.get_anchor_position(anchor_index);
+                // trace!(
+                //     "[{anchor_index}]: anchor: {:?}, hpre: {:?}, hnext: {:?}",
+                //     anchor,
+                //     hpre,
+                //     hnext
+                // );
 
                 let v_in = (anchor - hpre).normalize();
                 let v_out = (hnext - anchor).normalize();
+                // trace!("[{anchor_index}]: v_in: {:?}, v_out: {:?}", v_in, v_out);
 
                 let unit_normal = self.get_unit_normal();
+                // trace!("[{anchor_index}]: unit_normal: {:?}", unit_normal);
 
                 let mat = rotation_between_vectors(Vec3::Z, unit_normal);
+                // trace!("[{anchor_index}]: mat: {:?}", mat);
 
                 let v_in = mat * v_in;
                 let v_out = mat * v_out;
+                // trace!("[{anchor_index}]: v_in: {:?}, v_out: {:?}", v_in, v_out);
 
                 let v_in_angle = v_in.y.atan2(v_in.x);
                 let v_out_angle = v_out.y.atan2(v_out.x);
@@ -540,7 +569,7 @@ impl VMobject {
         if self.is_closed() {
             joint_angles.push(joint_angles[0]);
         }
-        trace!("[VMobject::get_joint_angles] {:?}", joint_angles);
+        // trace!("[VMobject::get_joint_angles] {:?}", joint_angles);
         joint_angles
     }
 
@@ -611,9 +640,20 @@ impl VMobject {
         let area_vector = self.get_area_vector();
         // trace!("area_vector: {:?}", area_vector);
         if area_vector == Vec3::ZERO {
+            // warn!("[VMobject] area_vector is zero");
             let v1 = (self.points[1].position() - self.points[0].position()).normalize();
             let v2 = (self.points[2].position() - self.points[0].position()).normalize();
-            return v1.cross(v2).normalize();
+            // trace!("v1: {:?}, v2: {:?}", v1, v2);
+            // trace!("cross: {:?}", v1.cross(v2));
+            let v = v1.cross(v2);
+
+            // TODO: fix this
+            return if v.is_nan() || v == Vec3::ZERO {
+                // warn!("v is nan or zero {:?}, use Z", v);
+                Vec3::Z
+            } else {
+                v.normalize()
+            };
         }
         area_vector.normalize()
     }
@@ -754,14 +794,6 @@ impl VMobject {
         let color = vec4(color.red, color.green, color.blue, color.alpha);
 
         self.points.iter_mut().for_each(|p| p.set_fill_color(color));
-        // self.apply_points_function(
-        //     |points| {
-        //         points.iter_mut().for_each(|p| {
-        //             p.set_fill_color(color);
-        //         });
-        //     },
-        //     TransformAnchor::origin(),
-        // );
         self
     }
     pub fn set_color(&mut self, color: Srgba) -> &mut Self {
@@ -770,46 +802,139 @@ impl VMobject {
         self
     }
     pub fn set_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.apply_points_function(
-            |points| {
-                points.iter_mut().for_each(|p| {
-                    p.set_fill_color(vec4(
-                        p.fill_color().x,
-                        p.fill_color().y,
-                        p.fill_color().z,
-                        opacity,
-                    ));
-                    p.set_stroke_color(vec4(
-                        p.stroke_color().x,
-                        p.stroke_color().y,
-                        p.stroke_color().z,
-                        opacity,
-                    ));
-                });
-            },
-            TransformAnchor::origin(),
-        );
+        self.points.iter_mut().for_each(|p| {
+            p.set_fill_color(vec4(
+                p.fill_color().x,
+                p.fill_color().y,
+                p.fill_color().z,
+                opacity,
+            ));
+            p.set_stroke_color(vec4(
+                p.stroke_color().x,
+                p.stroke_color().y,
+                p.stroke_color().z,
+                opacity,
+            ));
+        });
         self
     }
 }
 
 impl VMobject {
-    pub fn resize_points(&mut self, len: usize) {
-        // if self.points.len() < len {
-        //     extend_with_last(&mut self.points, len);
-        // } else {
-        self.points = resize_preserving_order(&self.points, len);
-        // }
-    }
+    // pub fn resize_points(&mut self, len: usize) {
+    //     if self.points.len() == len {
+    //         return;
+    //     }
+    //     if self.points.len() < len {
+    //         extend_with_last(&mut self.points, len);
+    //     } else {
+    //         self.points = resize_preserving_order(&self.points, len);
+    //     }
+    // }
 
-    pub fn aligned_with_rabject(&self, target: &Self) -> bool {
+    // pub fn aligned_with_rabject(&self, target: &Self) -> bool {
+    //     self.points.len() == target.points.len()
+    // }
+
+    // pub fn align_with_rabject(&mut self, target: &mut Self) {
+    //     let max_len = self.points.len().max(target.points.len());
+    //     self.resize_points(max_len);
+    //     target.resize_points(max_len);
+    // }
+
+    pub fn is_aligned(&self, target: &Self) -> bool {
         self.points.len() == target.points.len()
     }
 
-    pub fn align_with_rabject(&mut self, target: &mut Self) {
-        let max_len = self.points.len().max(target.points.len());
-        self.resize_points(max_len);
-        target.resize_points(max_len);
+    /// Align the mobject to the target mobject.
+    pub fn align_to(&mut self, target: &Self) -> &mut Self {
+        if self.points.len() >= target.points.len() {
+            return self;
+        }
+
+        trace!(
+            "[VMobject] {} align to {}",
+            self.points.len(),
+            target.points.len()
+        );
+        trace!(
+            "[VMobject] self: {:?}",
+            self.points.iter().map(|p| p.position()).collect::<Vec<_>>()
+        );
+        trace!(
+            "[VMobject] target: {:?}",
+            target
+                .points
+                .iter()
+                .map(|p| p.position())
+                .collect::<Vec<_>>()
+        );
+
+        let beziers = self
+            .points
+            .iter()
+            .step_by(2)
+            .zip(self.points.iter().skip(1).step_by(2))
+            .zip(self.points.iter().skip(2).step_by(2))
+            .map(|((&p0, &p1), &p2)| [p0, p1, p2])
+            .collect::<Vec<_>>();
+
+        let mut lens = beziers
+            .iter()
+            .map(|b| (b[2].position() - b[0].position()).length())
+            .collect::<Vec<_>>();
+
+        let n = target.points.len() - self.points.len();
+        let mut ipc = vec![0; beziers.len()];
+        for _ in 0..n {
+            let i = lens
+                .iter()
+                .position_max_by(|x, y| x.partial_cmp(y).unwrap_or(Ordering::Equal))
+                .unwrap();
+            ipc[i] += 1;
+            lens[i] *= ipc[i] as f32 / (ipc[i] + 1) as f32;
+        }
+
+        let mut new_points = vec![self.points[0]];
+        for (bezier, ipc) in beziers.iter().zip(ipc.into_iter()) {
+            let alphas = (0..ipc + 2)
+                .map(|i| i as f32 / (ipc + 1) as f32)
+                .collect::<Vec<_>>();
+
+            for (a, b) in alphas.iter().zip(alphas.iter().skip(1)) {
+                trace!("[VMobject] a: {}, b: {}", *a, *b);
+                let bezier = partial_quadratic_bezier(bezier, *a, *b);
+                trace!(
+                    "[VMobject] bezier: {:?}",
+                    bezier.iter().map(|p| p.position()).collect::<Vec<_>>()
+                );
+                new_points.extend(bezier.iter().skip(1));
+            }
+        }
+
+        trace!(
+            "[VMobject] new_points: {:?}",
+            new_points.iter().map(|p| p.position()).collect::<Vec<_>>()
+        );
+
+        self.points = new_points;
+
+        self
+    }
+
+    /// Align both mobject to the longer one.
+    pub fn align_with(&mut self, target: &mut Self) -> &mut Self {
+        // trace!(
+        //     "[VMobject] {} align with {}",
+        //     self.points().len(),
+        //     target.points().len()
+        // );
+        if self.points.len() > target.points.len() {
+            target.align_to(self)
+        } else {
+            self.align_to(target)
+        };
+        self
     }
 
     pub fn interpolate_with_rabject(&mut self, target: &Self, t: f32) {

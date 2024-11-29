@@ -60,6 +60,7 @@ impl Scene {
     }
 
     pub fn remove_rabject<R: Rabject>(&mut self, rabject: &RabjectWithId<R>) {
+        trace!("[Scene::remove_rabject]: removing rabject: {:?}", rabject.id());
         self.rabjects.iter_mut().for_each(|(_, rabject_vec)| {
             rabject_vec.retain(|(rabject_id, _)| rabject_id != rabject.id());
         });

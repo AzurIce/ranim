@@ -1,40 +1,49 @@
 use std::ops::DerefMut;
 
-use crate::{rabject::{vmobject::VMobject, Interpolatable, RabjectWithId}, scene::Scene};
+use crate::rabject::{vmobject::VMobject, Interpolatable, RabjectWithId};
 
-use super::AnimationFunc;
+use super::{Animation, AnimationConfig, AnimationFunc};
 
 pub struct Transform {
-    target: RabjectWithId<VMobject>,
-    source: Option<RabjectWithId<VMobject>>,
-
-    aligned_target: Option<RabjectWithId<VMobject>>,
+    aligned_source: RabjectWithId<VMobject>,
+    aligned_target: RabjectWithId<VMobject>,
 }
 
 impl Transform {
-    pub fn new(target: &RabjectWithId<VMobject>) -> Self {
-        Self {
-            source: None,
-            target: target.clone(),
-            aligned_target: None,
+    pub fn new(
+        rabject: RabjectWithId<VMobject>,
+        target: RabjectWithId<VMobject>,
+    ) -> Animation<VMobject> {
+        let mut aligned_source = rabject.clone();
+        let mut aligned_target = target.clone();
+        if !aligned_source.is_aligned(&aligned_target) {
+            aligned_source.align_with(&mut aligned_target);
         }
+
+        Animation::new(
+            rabject,
+            Self {
+                aligned_source,
+                aligned_target,
+            },
+        )
+        .with_config(AnimationConfig {
+            end_rabject: Some(target),
+            ..AnimationConfig::default()
+        })
     }
 }
 
 impl AnimationFunc<VMobject> for Transform {
-    fn prepare(&mut self, rabject: &mut RabjectWithId<VMobject>, _: &mut Scene) {
-        self.source = Some(rabject.clone());
-        self.aligned_target = Some(self.target.clone());
-        if !rabject.aligned_with_rabject(&self.aligned_target.as_ref().unwrap()) {
-            rabject.align_with_rabject(&mut self.aligned_target.as_mut().unwrap());
-        }
+    fn pre_anim(&mut self, rabject: &mut RabjectWithId<VMobject>) {
+        rabject.set_points(self.aligned_source.points().to_vec());
     }
 
     fn interpolate(&mut self, rabject: &mut RabjectWithId<VMobject>, alpha: f32) {
-        *(rabject.deref_mut()) = self.source.as_ref().unwrap().lerp(&self.aligned_target.as_ref().unwrap(), alpha);
+        *(rabject.deref_mut()) = self.aligned_source.lerp(&self.aligned_target, alpha);
     }
 
     fn post_anim(&mut self, rabject: &mut RabjectWithId<VMobject>) {
-        *rabject = self.target.clone();
+        rabject.set_points(self.aligned_target.points().to_vec());
     }
 }

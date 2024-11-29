@@ -1,7 +1,8 @@
+use std::ops::Deref;
 use std::time::{Duration, Instant};
 
 use env_logger::Env;
-use log::info;
+use log::{debug, info};
 use ranim::glam::{vec2, Vec3};
 use ranim::palette::{rgb, Srgba};
 use ranim::rabject::vmobject::TransformAnchor;
@@ -17,7 +18,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace")).init();
 
     let mut ctx = RanimContext::new();
 
@@ -42,16 +43,20 @@ fn main() {
             TransformAnchor::origin(),
         );
 
+    println!("{:?}", polygon.points());
+    println!("{:?}", polygon.get_joint_angles());
     let polygon = scene
         .play(
             &mut ctx,
-            Animation::new(
-                polygon,
-                Fading::In,
-                AnimationConfig::default().run_time(Duration::from_secs(1)),
-            ),
+            Fading::fade_in(polygon).config(|config| {
+                config.set_run_time(Duration::from_secs(1));
+            }),
         )
         .unwrap();
+    println!("{:?}", polygon.points());
+    println!("{:?}", polygon.get_joint_angles());
+    scene.remove_rabject(&polygon);
+    scene.insert_rabject(&mut ctx, &polygon);
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
@@ -62,17 +67,10 @@ fn main() {
     let arc = scene
         .play(
             &mut ctx,
-            Animation::new(
-                polygon,
-                Transform::new(&arc),
-                AnimationConfig::default().run_time(Duration::from_secs(2)),
-            ),
+            Transform::new(polygon, arc)
         )
         .unwrap();
-    scene.play(
-        &mut ctx,
-        Animation::new(arc, Fading::Out, AnimationConfig::default().remove()),
-    );
+    scene.play(&mut ctx, Fading::fade_out(arc));
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

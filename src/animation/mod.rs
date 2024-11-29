@@ -1,7 +1,9 @@
 pub mod fading;
 pub mod transform;
 
-use std::time;
+use std::{ops::Deref, time};
+
+use log::trace;
 
 use crate::{
     rabject::{Rabject, RabjectWithId},
@@ -10,39 +12,47 @@ use crate::{
     RanimContext,
 };
 
-pub struct AnimationConfig {
-    pub run_time: time::Duration,
-    pub rate_func: Box<dyn Fn(f32) -> f32>,
-    pub remove: bool,
+pub struct AnimationConfig<R: Rabject> {
+    pub(crate) run_time: time::Duration,
+    pub(crate) rate_func: Box<dyn Fn(f32) -> f32>,
+    /// Whether the mobject will be removed from the scene after the animation
+    pub(crate) remove: bool,
+    /// The rabject will be inserted into the scene after the animation
+    pub(crate) end_rabject: Option<RabjectWithId<R>>,
 }
 
-impl Default for AnimationConfig {
+impl<R: Rabject> Default for AnimationConfig<R> {
     /// Default animation config
     /// - run_time: 1.0s
-    /// - rate_func: linear
+    /// - rate_func: smooth
     /// - remove: false
+    /// - end_rabject: None
     fn default() -> Self {
         Self {
             run_time: time::Duration::from_secs_f32(1.0),
             rate_func: Box::new(smooth),
+
             remove: false,
+            end_rabject: None,
         }
     }
 }
 
-impl AnimationConfig {
-    pub fn run_time(mut self, run_time: time::Duration) -> Self {
+impl<R: Rabject> AnimationConfig<R> {
+    pub fn set_run_time(&mut self, run_time: time::Duration) -> &mut Self {
         self.run_time = run_time;
         self
     }
-
-    pub fn rate_func(mut self, rate_func: Box<dyn Fn(f32) -> f32>) -> Self {
+    pub fn set_rate_func(&mut self, rate_func: Box<dyn Fn(f32) -> f32>) -> &mut Self {
         self.rate_func = rate_func;
         self
     }
-
-    pub fn remove(mut self) -> Self {
-        self.remove = true;
+    pub fn set_remove(&mut self, remove: bool) -> &mut Self {
+        self.remove = remove;
+        self
+    }
+    pub fn set_end_rabject(&mut self, end_rabject: Option<RabjectWithId<R>>) -> &mut Self {
+        self.end_rabject = end_rabject;
         self
     }
 
@@ -84,29 +94,36 @@ pub trait AnimationFunc<R: Rabject> {
 
 pub struct Animation<R: Rabject> {
     /// The mobject to be animated, will take the ownership of it, and return by scene's [`crate::scene::Scene::play`] method
-    pub rabject: RabjectWithId<R>,
-    // start_rabject: Option<RabjectWithId<R>>,
-    // end_rabject: Option<RabjectWithId<R>>,
-    pub func: Box<dyn AnimationFunc<R>>,
-    pub config: AnimationConfig,
+    pub(crate) rabject: RabjectWithId<R>,
+
+    pub(crate) func: Box<dyn AnimationFunc<R>>,
+    pub(crate) config: AnimationConfig<R>,
 }
 
 impl<R: Rabject> Animation<R> {
-    pub fn new(
-        rabject: RabjectWithId<R>,
-        func: impl AnimationFunc<R> + 'static,
-        config: AnimationConfig,
-    ) -> Self {
+    pub fn new(rabject: RabjectWithId<R>, func: impl AnimationFunc<R> + 'static) -> Self {
         Self {
             rabject,
             func: Box::new(func),
-            config,
+            config: Default::default(),
         }
     }
 
+    pub fn with_config(mut self, config: AnimationConfig<R>) -> Self {
+        self.config = config;
+        self
+    }
+
+    pub fn config(mut self, config: impl FnOnce(&mut AnimationConfig<R>)) -> Self {
+        config(&mut self.config);
+        self
+    }
+
     pub fn play(mut self, ctx: &mut RanimContext, scene: &mut Scene) -> Option<RabjectWithId<R>> {
+        trace!("[Animation] Playing animation on {:?}...", self.rabject.id());
         self.func.prepare(&mut self.rabject, scene);
         self.func.pre_anim(&mut self.rabject);
+        scene.insert_rabject(ctx, &self.rabject);
 
         let frames = self.config.calc_frames(scene.camera.fps as f32);
 
@@ -123,7 +140,14 @@ impl<R: Rabject> Animation<R> {
         }
 
         self.func.post_anim(&mut self.rabject);
+        scene.insert_rabject(ctx, &self.rabject);
         self.func.cleanup(&mut self.rabject, scene);
+
+        if let Some(end_rabject) = self.config.end_rabject {
+            scene.remove_rabject(&self.rabject);
+            scene.insert_rabject(ctx, &end_rabject);
+            return Some(end_rabject);
+        }
 
         if self.config.remove {
             scene.remove_rabject(&self.rabject);
