@@ -139,7 +139,16 @@ impl VMobject {
             return false;
         }
 
-        self.points.first().unwrap().pos == self.points.last().unwrap().pos
+        // trace!(
+        //     "[VMobject::is_closed] first: {:?}, last: {:?}",
+        //     self.points.first().unwrap().pos,
+        //     self.points.last().unwrap().pos
+        // );
+        // trace!(
+        //     "[VMobject::is_closed] distance: {}",
+        //     (self.points.first().unwrap().pos - self.points.last().unwrap().pos).length()
+        // );
+        (self.points.first().unwrap().pos - self.points.last().unwrap().pos).length() < f32::EPSILON
     }
 
     pub fn points(&self) -> &[VMobjectPoint] {
@@ -270,14 +279,21 @@ impl Rabject for VMobject {
 
     fn init_render_resource(ctx: &mut RanimContext, rabject: &Self) -> Self::RenderResource {
         // trace!("INIT: {:?}", rabject.points().iter().map(|p| p.position()).collect::<Vec<_>>());
+        let points = rabject.points();
+        let joint_angles = rabject.get_joint_angles();
+        let unit_normal = rabject.get_unit_normal();
+        trace!("INIT points: {:?}", points);
+        trace!("INIT joint_angles: {:?}", joint_angles);
+        trace!("INIT unit_normal: {:?}", unit_normal);
+
         let points_buffer = WgpuBuffer::new_init(
             &ctx.wgpu_ctx,
-            &rabject.points(),
+            &points,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
         let joint_angles_buffer = WgpuBuffer::new_init(
             &ctx.wgpu_ctx,
-            &rabject.get_joint_angles(),
+            &joint_angles,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
         let stroke_vertices_buffer = WgpuBuffer::new(
@@ -293,7 +309,7 @@ impl Rabject for VMobject {
         let compute_uniform_buffer = WgpuBuffer::new_init(
             &ctx.wgpu_ctx,
             &[ComputeUniform {
-                unit_normal: rabject.get_unit_normal(),
+                unit_normal,
                 _padding: 0.0,
             }],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
@@ -358,24 +374,26 @@ impl Rabject for VMobject {
         rabject: &RabjectWithId<Self>,
         render_resource: &mut Self::RenderResource,
     ) {
-        // trace!(
-        //     "UPDATE points: {:?}",
-        //     rabject
-        //         .points()
-        //         .iter()
-        //         .map(|p| p.position())
-        //         .collect::<Vec<_>>()
-        // );
-        // trace!("UPDATE angles: {:?}", rabject.get_joint_angles());
+        let points = rabject.points();
+        let joint_angles = rabject.get_joint_angles();
+        let unit_normal = rabject.get_unit_normal();
+        trace!("UPDATE joint_angles: {:?}", joint_angles);
+        trace!("UPDATE unit_normal: {:?}", unit_normal);
+        trace!(
+            "UPDATE points: {:?}",
+            rabject
+                .points()
+                .iter()
+                .map(|p| p.position())
+                .collect::<Vec<_>>()
+        );
         render_resource
             .points_buffer
-            .prepare_from_slice(&ctx.wgpu_ctx, &rabject.points());
+            .prepare_from_slice(&ctx.wgpu_ctx, &points);
         render_resource
             .joint_angles_buffer
-            .prepare_from_slice(&ctx.wgpu_ctx, &rabject.get_joint_angles());
+            .prepare_from_slice(&ctx.wgpu_ctx, &joint_angles);
 
-        let unit_normal = rabject.get_unit_normal();
-        trace!("UPDATE unit_normal: {:?}", unit_normal);
         render_resource.compute_uniform_buffer.prepare_from_slice(
             &ctx.wgpu_ctx,
             &[ComputeUniform {
@@ -566,9 +584,11 @@ impl VMobject {
                 }
             })
             .collect::<Vec<_>>();
-        if self.is_closed() {
-            joint_angles.push(joint_angles[0]);
-        }
+        joint_angles.push(if self.is_closed() {
+            joint_angles[0]
+        } else {
+            0.0
+        });
         // trace!("[VMobject::get_joint_angles] {:?}", joint_angles);
         joint_angles
     }
@@ -605,6 +625,11 @@ impl VMobject {
 
     /// Get the area vector of the polygon of anchors.
     pub fn get_area_vector(&self) -> Vec3 {
+        // trace!(
+        //     "[VMobject::get_area_vector] points: {}, closed: {}",
+        //     self.points.len(),
+        //     self.is_closed()
+        // );
         if self.points.is_empty() || !self.is_closed() {
             return Vec3::ZERO;
         }
@@ -634,11 +659,12 @@ impl VMobject {
     }
 
     pub fn get_unit_normal(&self) -> Vec3 {
+        // trace!("[VMobject::get_unit_normal] points: {:?}", self.points.len());
         if self.points.len() < 3 {
             return Vec3::Z;
         }
         let area_vector = self.get_area_vector();
-        // trace!("area_vector: {:?}", area_vector);
+        // trace!("[VMobject::get_unit_normal] area_vector: {:?}", area_vector);
         if area_vector == Vec3::ZERO {
             // warn!("[VMobject] area_vector is zero");
             let v1 = (self.points[1].position() - self.points[0].position()).normalize();
@@ -852,23 +878,23 @@ impl VMobject {
             return self;
         }
 
-        trace!(
-            "[VMobject] {} align to {}",
-            self.points.len(),
-            target.points.len()
-        );
-        trace!(
-            "[VMobject] self: {:?}",
-            self.points.iter().map(|p| p.position()).collect::<Vec<_>>()
-        );
-        trace!(
-            "[VMobject] target: {:?}",
-            target
-                .points
-                .iter()
-                .map(|p| p.position())
-                .collect::<Vec<_>>()
-        );
+        // trace!(
+        //     "[VMobject] {} align to {}",
+        //     self.points.len(),
+        //     target.points.len()
+        // );
+        // trace!(
+        //     "[VMobject] self: {:?}",
+        //     self.points.iter().map(|p| p.position()).collect::<Vec<_>>()
+        // );
+        // trace!(
+        //     "[VMobject] target: {:?}",
+        //     target
+        //         .points
+        //         .iter()
+        //         .map(|p| p.position())
+        //         .collect::<Vec<_>>()
+        // );
 
         let beziers = self
             .points
@@ -902,20 +928,20 @@ impl VMobject {
                 .collect::<Vec<_>>();
 
             for (a, b) in alphas.iter().zip(alphas.iter().skip(1)) {
-                trace!("[VMobject] a: {}, b: {}", *a, *b);
+                // trace!("[VMobject] a: {}, b: {}", *a, *b);
                 let bezier = partial_quadratic_bezier(bezier, *a, *b);
-                trace!(
-                    "[VMobject] bezier: {:?}",
-                    bezier.iter().map(|p| p.position()).collect::<Vec<_>>()
-                );
+                // trace!(
+                //     "[VMobject] bezier: {:?}",
+                //     bezier.iter().map(|p| p.position()).collect::<Vec<_>>()
+                // );
                 new_points.extend(bezier.iter().skip(1));
             }
         }
 
-        trace!(
-            "[VMobject] new_points: {:?}",
-            new_points.iter().map(|p| p.position()).collect::<Vec<_>>()
-        );
+        // trace!(
+        //     "[VMobject] new_points: {:?}",
+        //     new_points.iter().map(|p| p.position()).collect::<Vec<_>>()
+        // );
 
         self.points = new_points;
 

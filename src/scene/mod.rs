@@ -77,6 +77,7 @@ impl Scene {
             .entry(std::any::TypeId::of::<R>())
             .or_default();
         if let Some((_, extracted)) = entry.iter_mut().find(|(id, _)| id == rabject.id()) {
+            trace!("[Scene::insert_rabject]: already_exist, updating rabject: {:?}", rabject.id());
             let extracted: &mut ExtractedRabjectWithId<R> = extracted.downcast_mut().unwrap();
             extracted.update_render_resource(ctx, rabject);
         } else {

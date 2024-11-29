@@ -4,7 +4,7 @@ use std::{
 };
 
 use glam::{Mat4, Vec3};
-use log::debug;
+use log::{debug, trace};
 
 use crate::{
     rabject::{ExtractedRabjectWithId, Rabject},
@@ -209,6 +209,15 @@ impl Camera {
             }
         }
 
+        // ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+        
+        // let mut encoder =
+        //     ctx.wgpu_ctx
+        //         .device
+        //         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        //             label: Some("Encoder"),
+        //         });
+
         {
             let mut render_pass =
                 R::begin_render_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
@@ -280,6 +289,7 @@ impl Camera {
 
     pub(crate) fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
         if !self.texture_data_updated {
+            // trace!("[Camera] Updating rendered texture data...");
             self.update_rendered_texture_data(ctx);
         }
         &self.texture_data.as_ref().unwrap()

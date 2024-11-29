@@ -1,5 +1,7 @@
 use std::ops::DerefMut;
 
+use log::trace;
+
 use crate::rabject::{vmobject::VMobject, Interpolatable, RabjectWithId};
 
 use super::{Animation, AnimationConfig, AnimationFunc};
@@ -40,7 +42,15 @@ impl AnimationFunc<VMobject> for Transform {
     }
 
     fn interpolate(&mut self, rabject: &mut RabjectWithId<VMobject>, alpha: f32) {
-        *(rabject.deref_mut()) = self.aligned_source.lerp(&self.aligned_target, alpha);
+        let points = self
+            .aligned_source
+            .points()
+            .iter()
+            .zip(self.aligned_target.points().iter())
+            .map(|(p1, p2)| p1.lerp(p2, alpha))
+            .collect();
+        // trace!("[Transform::interpolate] t: {alpha} points: {:?}", points);
+        rabject.set_points(points);
     }
 
     fn post_anim(&mut self, rabject: &mut RabjectWithId<VMobject>) {
