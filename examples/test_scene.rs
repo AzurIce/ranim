@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 use env_logger::Env;
 use log::info;
+use ranim::animation::transform::Transform;
 use ranim::glam::{vec2, Vec3};
 use ranim::palette::{rgb, Srgba};
 use ranim::rabject::vmobject::TransformAnchor;
@@ -25,15 +26,37 @@ fn main() {
     let mut scene = Scene::new(&ctx);
     let t = Instant::now();
 
+    let mut polygon = Polygon::new(vec![
+        vec2(-100.0, -300.0),
+        vec2(0.0, 0.0),
+        vec2(200.0, 300.0),
+        vec2(0.0, 700.0),
+        vec2(500.0, 0.0),
+    ])
+    .with_width(20.0)
+    .build();
+    scene.insert_rabject(&mut ctx, &polygon);
+    // scene.render_to_image(&mut ctx, "output1.png");
+
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
         .with_stroke_width(20.0)
         .build();
     arc.set_color(Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into());
 
-    scene.insert_rabject(&mut ctx, &arc);
-    scene.render_to_image(&mut ctx, "output.png");
-    // scene.wait(&mut output, Duration::from_secs_f32(1.0));
+    // polygon.align_with(&mut arc);
+    // scene.insert_rabject(&mut ctx, &polygon);
+    // scene.wait(&mut ctx, Duration::from_secs_f32(1.0));
+    // scene.render_to_image(&mut ctx, "output2.png");
+
+    let arc = scene
+        .play(
+            &mut ctx,
+            Transform::new(polygon, arc).config(|c| {
+                c.set_run_time(Duration::from_secs_f32(0.1));
+            }),
+        )
+        .unwrap();
 
     // let mut polygon = Polygon::new(vec![
     //     vec2(-100.0, 0.0),
