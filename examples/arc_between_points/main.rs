@@ -7,11 +7,7 @@ use ranim::glam::vec3;
 use ranim::palette::{rgb, Srgba};
 use ranim::rabject::vmobject::ArcBetweenPoints;
 use ranim::rabject::Blueprint;
-use ranim::{
-    animation::{fading::Fading, Animation, AnimationConfig},
-    scene::Scene,
-    RanimContext,
-};
+use ranim::{animation::fading::Fading, scene::Scene, RanimContext};
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -54,12 +50,9 @@ fn main() {
             arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into());
             scene.play(
                 &mut ctx,
-                Animation::new(
-                    arc,
-                    Fading::In,
-                    AnimationConfig::default()
-                        .run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32)),
-                ),
+                Fading::fade_in(arc).config(|config| {
+                    config.set_run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32));
+                }),
             );
         }
         info!(
