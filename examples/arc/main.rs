@@ -3,21 +3,16 @@ use std::time::{Duration, Instant};
 use env_logger::Env;
 use log::info;
 use ranim::glam::vec3;
-use ranim::mobject::ToMobject;
 use ranim::palette::{rgb, Srgba};
-use ranim::{
-    animation::{fading::Fading, Animation, AnimationConfig},
-    mobject::geometry::Arc,
-    scene::Scene,
-    utils::SubpathWidth,
-    RanimContext,
-};
+use ranim::rabject::vmobject::Arc;
+use ranim::rabject::Blueprint;
+use ranim::{animation::fading::Fading, scene::Scene, RanimContext};
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("many_objects=trace")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("arc=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("many_mobjects=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("arc=info")).init();
 
     let mut ctx = RanimContext::new();
 
@@ -54,18 +49,18 @@ fn main() {
             );
             let mut arc = Arc::new(angle)
                 .with_radius(step_y / 2.0)
-                .with_stroke_width(SubpathWidth::Middle(10.0 * j as f32))
-                .to_mobject();
+                .with_stroke_width(10.0 * j as f32)
+                .build();
 
             arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into())
                 .shift(frame_start + offset);
+            // let _ = scene.insert_rabject(&mut ctx, &arc);
+            // scene.wait(&mut ctx, Duration::from_secs_f32(0.02));
             scene.play(
                 &mut ctx,
-                Animation::new(
-                    arc,
-                    Fading::In,
-                    AnimationConfig::default().run_time(Duration::from_secs_f32(0.02)),
-                ),
+                Fading::fade_in(arc).config(|config| {
+                    config.set_run_time(Duration::from_secs_f32(0.02));
+                }),
             );
         }
         info!("row [{i}/{nrow}] cost: {:?}", t.elapsed());

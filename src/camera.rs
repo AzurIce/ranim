@@ -4,11 +4,18 @@ use std::{
 };
 
 use glam::{Mat4, Vec3};
-use log::{debug, trace};
 
 use crate::{
-    mobject::ExtractedMobject, renderer::Renderer, utils::Id, RanimContext, WgpuBuffer, WgpuContext,
+    rabject::{ExtractedRabjectWithId, Rabject},
+    // renderer::Renderer,
+    utils::Id,
+    RanimContext,
+    WgpuBuffer,
+    WgpuContext,
 };
+
+#[allow(unused)]
+use log::{debug, trace};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -156,20 +163,19 @@ impl Camera {
         }
     }
 
-    pub fn render<R: Renderer + 'static>(
+    pub fn render<R: Rabject>(
         &mut self,
         ctx: &mut RanimContext,
-        objects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
+        rabjects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     ) {
-        let objects = objects.entry(std::any::TypeId::of::<R>()).or_default();
-        let mut objects = objects
-            .into_iter()
-            .map(|(_, mobject)| {
-                mobject
-                    .downcast_mut::<ExtractedMobject<R::Vertex>>()
-                    .unwrap()
-            })
+        let Some(rabjects) = rabjects.get_mut(&std::any::TypeId::of::<R>()) else {
+            return;
+        };
+        let rabjects = rabjects
+            .iter_mut()
+            .map(|(_, rabject)| rabject.downcast_mut::<ExtractedRabjectWithId<R>>().unwrap())
             .collect::<Vec<_>>();
+
         // trace!("[Camera] Rendering...");
 
         // Update the uniforms buffer
@@ -182,11 +188,6 @@ impl Camera {
             0,
             bytemuck::cast_slice(&[self.uniforms]),
         );
-
-        // Preparing the object
-        for object in &mut objects {
-            object.prepare(&ctx.wgpu_ctx);
-        }
 
         let target_view = self
             .target_texture
@@ -201,18 +202,36 @@ impl Camera {
             ctx.wgpu_ctx
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
+                    label: Some("Encoder"),
+                });
+
+        if let Some(mut compute_pass) = R::begin_compute_pass(&mut encoder) {
+            for rabject in &rabjects {
+                R::compute(ctx, &mut compute_pass, &rabject.render_resource);
+            }
+        }
+
+        ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+        
+        let mut encoder =
+            ctx.wgpu_ctx
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Encoder"),
                 });
 
         {
             let mut render_pass =
-                R::begin_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
+                R::begin_render_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
             // bind group 0 is reserved for camera uniforms
             render_pass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
-            R::render(ctx, &mut render_pass, &mut objects);
+            for rabject in &rabjects {
+                R::render(ctx, &mut render_pass, &rabject.render_resource);
+            }
         }
 
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+
         self.texture_data_updated = false;
     }
 
@@ -272,6 +291,7 @@ impl Camera {
 
     pub(crate) fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
         if !self.texture_data_updated {
+            // trace!("[Camera] Updating rendered texture data...");
             self.update_rendered_texture_data(ctx);
         }
         &self.texture_data.as_ref().unwrap()

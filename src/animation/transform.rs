@@ -1,24 +1,57 @@
-use crate::{mobject::Mobject, renderer::RendererVertex};
+use crate::rabject::{vmobject::VMobject, Interpolatable, RabjectWithId};
 
-use super::AnimationFunc;
+use super::{Animation, AnimationConfig, AnimationFunc};
 
-pub struct Transform<Vertex: RendererVertex> {
-    target: Mobject<Vertex>,
+pub struct Transform {
+    aligned_source: RabjectWithId<VMobject>,
+    aligned_target: RabjectWithId<VMobject>,
 }
 
-impl<Vertex: RendererVertex> Transform<Vertex> {
-    pub fn new(target: &Mobject<Vertex>) -> Self {
-        Self {
-            target: target.clone(),
+impl Transform {
+    pub fn new(
+        rabject: RabjectWithId<VMobject>,
+        target: RabjectWithId<VMobject>,
+    ) -> Animation<VMobject> {
+        let mut aligned_source = rabject.clone();
+        let mut aligned_target = target.clone();
+        if !aligned_source.is_aligned(&aligned_target) {
+            aligned_source.align_with(&mut aligned_target);
         }
+        // trace!("[Transform::new] aligned_source: {:#?}", aligned_source.points());
+        // trace!("[Transform::new] aligned_target: {:#?}", aligned_target.points());
+
+        Animation::new(
+            rabject,
+            Self {
+                aligned_source,
+                aligned_target,
+            },
+        )
+        .with_config(AnimationConfig {
+            end_rabject: Some(target),
+            ..AnimationConfig::default()
+        })
     }
 }
 
-impl<Vertex: RendererVertex> AnimationFunc<Vertex> for Transform<Vertex> {
-    fn interpolate(&mut self, mobject: &mut Mobject<Vertex>, alpha: f32) {
-        if !mobject.aligned_with_mobject(&self.target) {
-            mobject.align_with_mobject(&mut self.target);
-        }
-        mobject.interpolate_with_mobject(&self.target, alpha);
+impl AnimationFunc<VMobject> for Transform {
+    fn pre_anim(&mut self, rabject: &mut RabjectWithId<VMobject>) {
+        rabject.set_points(self.aligned_source.points().to_vec());
+    }
+
+    fn interpolate(&mut self, rabject: &mut RabjectWithId<VMobject>, alpha: f32) {
+        let points = self
+            .aligned_source
+            .points()
+            .iter()
+            .zip(self.aligned_target.points().iter())
+            .map(|(p1, p2)| p1.lerp(p2, alpha))
+            .collect();
+        // trace!("[Transform::interpolate] t: {alpha} points: {:#?}", points);
+        rabject.set_points(points);
+    }
+
+    fn post_anim(&mut self, rabject: &mut RabjectWithId<VMobject>) {
+        rabject.set_points(self.aligned_target.points().to_vec());
     }
 }

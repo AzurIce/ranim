@@ -188,15 +188,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bezier-rs"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bde3aa314326e2f984f81adcb399c64b93eed3c0f2cd4258b711bf494c5741de"
-dependencies = [
- "glam",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -599,7 +590,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5418c17512bdf42730f9032c74e1ae39afc408745ebb2acf72fbc4691c17945"
 dependencies = [
  "bytemuck",
- "serde",
 ]
 
 [[package]]
@@ -1326,7 +1316,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-channel",
- "bezier-rs",
  "bytemuck",
  "env_logger",
  "glam",
