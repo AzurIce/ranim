@@ -1,7 +1,3 @@
-use std::ops::DerefMut;
-
-use log::trace;
-
 use crate::rabject::{vmobject::VMobject, Interpolatable, RabjectWithId};
 
 use super::{Animation, AnimationConfig, AnimationFunc};

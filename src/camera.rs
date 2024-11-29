@@ -4,7 +4,6 @@ use std::{
 };
 
 use glam::{Mat4, Vec3};
-use log::{debug, trace};
 
 use crate::{
     rabject::{ExtractedRabjectWithId, Rabject},
@@ -14,6 +13,9 @@ use crate::{
     WgpuBuffer,
     WgpuContext,
 };
+
+#[allow(unused)]
+use log::{debug, trace};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]

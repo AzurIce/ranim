@@ -1,25 +1,22 @@
 mod blueprint;
 mod pipeline;
-use std::{cmp::Ordering, thread, time::Duration};
+pub mod render;
+use std::cmp::Ordering;
 
 pub use blueprint::*;
 
 use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
-use log::{trace, warn};
 use palette::{rgb, Srgba};
-use wgpu::BindGroupLayoutDescriptor;
+use render::VMObjectRenderResource;
 
-use crate::{
-    utils::{
-        extend_with_last, partial_quadratic_bezier, resize_preserving_order,
-        rotation_between_vectors,
-    },
-    RanimContext, WgpuBuffer,
-};
-use pipeline::{ComputePipeline, FillPipeline, StrokePipeline, VMobjectFillVertex};
+use crate::utils::{partial_quadratic_bezier, rotation_between_vectors};
+use pipeline::{ComputePipeline, StrokePipeline};
 
-use super::{Interpolatable, Rabject, RabjectWithId};
+use super::{Interpolatable, Rabject};
+
+#[allow(unused)]
+use log::{trace, warn};
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Default, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
@@ -194,262 +191,9 @@ struct ComputeUniform {
     _padding: f32,
 }
 
-pub struct VMObjectRenderResource {
-    points_buffer: WgpuBuffer<VMobjectPoint>,
-    joint_angles_buffer: WgpuBuffer<f32>,
-    compute_uniform_buffer: WgpuBuffer<ComputeUniform>,
-    fill_vertex_buffer: WgpuBuffer<VMobjectFillVertex>,
-    stroke_vertices_buffer: WgpuBuffer<VMobjectStrokeVertex>,
-    compute_bind_group: wgpu::BindGroup,
-    render_bind_group: wgpu::BindGroup,
-}
-
-impl VMObjectRenderResource {
-    pub fn compute_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-        device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("VMObject Compute Bind Group Layout"),
-            entries: &[
-                // Points
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                // Joint Angles
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                // Vertices
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                // Uniforms
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        })
-    }
-    pub fn render_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-        device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("VMObject Bind Group Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        })
-    }
-
-    pub fn create_compute_bind_group(
-        ctx: &RanimContext,
-        points_buffer: &wgpu::Buffer,
-        joint_angles_buffer: &wgpu::Buffer,
-        stroke_vertices_buffer: &wgpu::Buffer,
-        compute_uniform_buffer: &wgpu::Buffer,
-    ) -> wgpu::BindGroup {
-        ctx.wgpu_ctx
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("VMObject Compute Bind Group"),
-                layout: &Self::compute_bind_group_layout(&ctx.wgpu_ctx.device),
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: points_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: joint_angles_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: stroke_vertices_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: compute_uniform_buffer.as_entire_binding(),
-                    },
-                ],
-            })
-    }
-
-    pub fn create_render_bind_group(
-        ctx: &RanimContext,
-        stroke_vertices_buffer: &wgpu::Buffer,
-    ) -> wgpu::BindGroup {
-        ctx.wgpu_ctx
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("VMObject Render Bind Group"),
-                layout: &Self::render_bind_group_layout(&ctx.wgpu_ctx.device),
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: stroke_vertices_buffer.as_entire_binding(),
-                }],
-            })
-    }
-}
-
 const MAX_STEP: u32 = 16;
 impl Rabject for VMobject {
     type RenderResource = VMObjectRenderResource;
-
-    fn init_render_resource(ctx: &mut RanimContext, rabject: &Self) -> Self::RenderResource {
-        // trace!("INIT: {:?}", rabject.points().iter().map(|p| p.position()).collect::<Vec<_>>());
-        let points = rabject.points();
-        let joint_angles = rabject.get_joint_angles();
-        let unit_normal = rabject.get_unit_normal();
-        trace!(
-            "INIT points: {:?}",
-            points.iter().map(|p| p.position()).collect::<Vec<_>>()
-        );
-        trace!("INIT joint_angles: {:?}", joint_angles);
-        trace!("INIT unit_normal: {:?}", unit_normal);
-
-        let points_buffer = WgpuBuffer::new_init(
-            &ctx.wgpu_ctx,
-            &points,
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        );
-        let joint_angles_buffer = WgpuBuffer::new_init(
-            &ctx.wgpu_ctx,
-            &joint_angles,
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        );
-        let stroke_vertices_buffer = WgpuBuffer::new(
-            &ctx.wgpu_ctx,
-            (std::mem::size_of::<VMobjectStrokeVertex>() * 1024) as u64,
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        );
-        let fill_vertex_buffer = WgpuBuffer::new(
-            &ctx.wgpu_ctx,
-            (std::mem::size_of::<VMobjectFillVertex>() * 1024) as u64,
-            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        );
-        let compute_uniform_buffer = WgpuBuffer::new_init(
-            &ctx.wgpu_ctx,
-            &[ComputeUniform {
-                unit_normal,
-                _padding: 0.0,
-            }],
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        );
-
-        let compute_bind_group_layout =
-            VMObjectRenderResource::compute_bind_group_layout(&ctx.wgpu_ctx.device);
-        let render_bind_group_layout =
-            VMObjectRenderResource::render_bind_group_layout(&ctx.wgpu_ctx.device);
-
-        let compute_bind_group = VMObjectRenderResource::create_compute_bind_group(
-            &ctx,
-            &points_buffer,
-            &joint_angles_buffer,
-            &stroke_vertices_buffer,
-            &compute_uniform_buffer,
-        );
-
-        let render_bind_group =
-            VMObjectRenderResource::create_render_bind_group(&ctx, &stroke_vertices_buffer);
-
-        Self::RenderResource {
-            points_buffer,
-            joint_angles_buffer,
-            fill_vertex_buffer,
-            stroke_vertices_buffer,
-            compute_uniform_buffer,
-            compute_bind_group,
-            render_bind_group,
-        }
-    }
-
-    fn update_render_resource(
-        ctx: &mut crate::RanimContext,
-        rabject: &RabjectWithId<Self>,
-        render_resource: &mut Self::RenderResource,
-    ) {
-        let points = rabject.points();
-        let joint_angles = rabject.get_joint_angles();
-        let unit_normal = rabject.get_unit_normal();
-        trace!("UPDATE joint_angles: {:?}", joint_angles);
-        trace!("UPDATE unit_normal: {:?}", unit_normal);
-        trace!(
-            "UPDATE points: {:?}",
-            rabject
-                .points()
-                .iter()
-                .map(|p| p.position())
-                .collect::<Vec<_>>()
-        );
-        render_resource
-            .points_buffer
-            .prepare_from_slice(&ctx.wgpu_ctx, &points);
-        render_resource
-            .joint_angles_buffer
-            .prepare_from_slice(&ctx.wgpu_ctx, &joint_angles);
-        render_resource.compute_uniform_buffer.prepare_from_slice(
-            &ctx.wgpu_ctx,
-            &[ComputeUniform {
-                unit_normal,
-                _padding: 0.0,
-            }],
-        );
-        ctx.wgpu_ctx.queue.submit([]);
-
-        render_resource.compute_bind_group = VMObjectRenderResource::create_compute_bind_group(
-            ctx,
-            &render_resource.points_buffer,
-            &render_resource.joint_angles_buffer,
-            &render_resource.stroke_vertices_buffer,
-            &render_resource.compute_uniform_buffer,
-        );
-        render_resource.render_bind_group = VMObjectRenderResource::create_render_bind_group(
-            ctx,
-            &render_resource.stroke_vertices_buffer,
-        );
-        // loop {
-        //     let res = ctx.wgpu_ctx.device.poll(wgpu::Maintain::Wait);
-        //     trace!("poll");
-        //     if res.is_queue_empty() {
-        //         break;
-        //     }
-        // }
-        // let fill_vertices = rabject.parse_fill();
-        // render_resource
-        //     .fill_vertex_buffer
-        //     .prepare_from_slice(&ctx.wgpu_ctx, &fill_vertices);
-    }
 
     fn begin_compute_pass<'a>(
         encoder: &'a mut wgpu::CommandEncoder,
@@ -465,14 +209,6 @@ impl Rabject for VMobject {
         compute_pass: &mut wgpu::ComputePass<'a>,
         render_resource: &Self::RenderResource,
     ) {
-        // trace!(
-        //     "[VMobject::compute]: points_buffer len: {}",
-        //     render_resource.points_buffer.len()
-        // );
-        // trace!(
-        //     "[VMobject::compute]: dispatch workgroups: {}",
-        //     render_resource.points_buffer.len() / 2
-        // );
         let pipeline = ctx.get_or_init_pipeline::<ComputePipeline>();
         compute_pass.set_pipeline(&pipeline);
         compute_pass.set_bind_group(0, &render_resource.compute_bind_group, &[]);

@@ -15,7 +15,7 @@ use log::trace;
 use crate::{
     animation::Animation,
     camera::Camera,
-    rabject::{vmobject::VMobject, ExtractedRabjectWithId, Rabject, RabjectWithId},
+    rabject::{vmobject::VMobject, ExtractedRabjectWithId, Rabject, RabjectWithId, RenderResource},
     utils::Id,
     RanimContext,
 };
@@ -79,7 +79,7 @@ impl Scene {
         if let Some((_, extracted)) = entry.iter_mut().find(|(id, _)| id == rabject.id()) {
             trace!("[Scene::insert_rabject]: already_exist, updating rabject: {:?}", rabject.id());
             let extracted: &mut ExtractedRabjectWithId<R> = extracted.downcast_mut().unwrap();
-            extracted.update_render_resource(ctx, rabject);
+            extracted.update(ctx, rabject);
         } else {
             entry.push((*rabject.id(), Box::new(rabject.extract(ctx))));
         }

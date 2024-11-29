@@ -9,18 +9,15 @@ pub trait Blueprint<T: Rabject> {
     fn build(self) -> RabjectWithId<T>;
 }
 
-pub trait Rabject: 'static + Clone {
-    type RenderResource;
-
+pub trait RenderResource<T: Rabject> {
     /// Used to initialize the render resource when the rabject is extracted
-    fn init_render_resource(ctx: &mut RanimContext, rabject: &Self) -> Self::RenderResource;
+    fn init(ctx: &mut RanimContext, rabject: &T) -> Self;
 
-    fn update_render_resource(
-        ctx: &mut RanimContext,
-        rabject: &RabjectWithId<Self>,
-        render_resource: &mut Self::RenderResource,
-    ) where
-        Self: Sized;
+    fn update(&mut self, ctx: &mut RanimContext, rabject: &RabjectWithId<T>);
+}
+
+pub trait Rabject: 'static + Clone {
+    type RenderResource: RenderResource<Self>;
 
     #[allow(unused_variables)]
     fn begin_compute_pass<'a>(
@@ -88,7 +85,7 @@ impl<T: Rabject> RabjectWithId<T> {
     pub fn extract(&self, ctx: &mut RanimContext) -> ExtractedRabjectWithId<T> {
         ExtractedRabjectWithId {
             id: self.id,
-            render_resource: T::init_render_resource(ctx, &self.rabject),
+            render_resource: T::RenderResource::init(ctx, &self.rabject),
         }
     }
 }
@@ -103,9 +100,19 @@ impl<T: Rabject> ExtractedRabjectWithId<T> {
     pub fn id(&self) -> &Id {
         &self.id
     }
+}
 
-    pub fn update_render_resource(&mut self, ctx: &mut RanimContext, rabject: &RabjectWithId<T>) {
-        T::update_render_resource(ctx, rabject, &mut self.render_resource);
+impl<T: Rabject> Deref for ExtractedRabjectWithId<T> {
+    type Target = T::RenderResource;
+
+    fn deref(&self) -> &Self::Target {
+        &self.render_resource
+    }
+}
+
+impl<T: Rabject> DerefMut for ExtractedRabjectWithId<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.render_resource
     }
 }
 
