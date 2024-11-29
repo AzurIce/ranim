@@ -271,6 +271,55 @@ impl VMObjectRenderResource {
             }],
         })
     }
+
+    pub fn create_compute_bind_group(
+        ctx: &RanimContext,
+        points_buffer: &wgpu::Buffer,
+        joint_angles_buffer: &wgpu::Buffer,
+        stroke_vertices_buffer: &wgpu::Buffer,
+        compute_uniform_buffer: &wgpu::Buffer,
+    ) -> wgpu::BindGroup {
+        ctx.wgpu_ctx
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("VMObject Compute Bind Group"),
+                layout: &Self::compute_bind_group_layout(&ctx.wgpu_ctx.device),
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: points_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: joint_angles_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: stroke_vertices_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: compute_uniform_buffer.as_entire_binding(),
+                    },
+                ],
+            })
+    }
+
+    pub fn create_render_bind_group(
+        ctx: &RanimContext,
+        stroke_vertices_buffer: &wgpu::Buffer,
+    ) -> wgpu::BindGroup {
+        ctx.wgpu_ctx
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("VMObject Render Bind Group"),
+                layout: &Self::render_bind_group_layout(&ctx.wgpu_ctx.device),
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: stroke_vertices_buffer.as_entire_binding(),
+                }],
+            })
+    }
 }
 
 const MAX_STEP: u32 = 16;
@@ -323,43 +372,16 @@ impl Rabject for VMobject {
         let render_bind_group_layout =
             VMObjectRenderResource::render_bind_group_layout(&ctx.wgpu_ctx.device);
 
-        let compute_bind_group =
-            ctx.wgpu_ctx
-                .device
-                .create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("VMObject Compute Bind Group"),
-                    layout: &compute_bind_group_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: points_buffer.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: joint_angles_buffer.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: stroke_vertices_buffer.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 3,
-                            resource: compute_uniform_buffer.as_entire_binding(),
-                        },
-                    ],
-                });
+        let compute_bind_group = VMObjectRenderResource::create_compute_bind_group(
+            &ctx,
+            &points_buffer,
+            &joint_angles_buffer,
+            &stroke_vertices_buffer,
+            &compute_uniform_buffer,
+        );
 
-        let render_bind_group = ctx
-            .wgpu_ctx
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("VMObject Render Bind Group"),
-                layout: &render_bind_group_layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: stroke_vertices_buffer.as_entire_binding(),
-                }],
-            });
+        let render_bind_group =
+            VMObjectRenderResource::create_render_bind_group(&ctx, &stroke_vertices_buffer);
 
         Self::RenderResource {
             points_buffer,
@@ -396,7 +418,6 @@ impl Rabject for VMobject {
         render_resource
             .joint_angles_buffer
             .prepare_from_slice(&ctx.wgpu_ctx, &joint_angles);
-
         render_resource.compute_uniform_buffer.prepare_from_slice(
             &ctx.wgpu_ctx,
             &[ComputeUniform {
@@ -405,6 +426,18 @@ impl Rabject for VMobject {
             }],
         );
         ctx.wgpu_ctx.queue.submit([]);
+
+        render_resource.compute_bind_group = VMObjectRenderResource::create_compute_bind_group(
+            ctx,
+            &render_resource.points_buffer,
+            &render_resource.joint_angles_buffer,
+            &render_resource.stroke_vertices_buffer,
+            &render_resource.compute_uniform_buffer,
+        );
+        render_resource.render_bind_group = VMObjectRenderResource::create_render_bind_group(
+            ctx,
+            &render_resource.stroke_vertices_buffer,
+        );
         // loop {
         //     let res = ctx.wgpu_ctx.device.poll(wgpu::Maintain::Wait);
         //     trace!("poll");
