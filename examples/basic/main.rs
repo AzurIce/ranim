@@ -17,7 +17,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace")).init();
 
     let mut ctx = RanimContext::new();
 
@@ -35,30 +35,30 @@ fn main() {
     .with_width(20.0)
     .build();
     polygon
-        .set_color(Srgba::from_u32::<rgb::channels::Rgba>(0xE65A4CFF).into())
-        .rotate(
-            std::f32::consts::PI / 4.0,
-            Vec3::Z,
-            TransformAnchor::origin(),
-        );
+        .set_color(Srgba::from_u32::<rgb::channels::Rgba>(0xE65A4CFF).into());
+        // .rotate(
+        //     std::f32::consts::PI / 4.0,
+        //     Vec3::Z,
+        //     TransformAnchor::origin(),
+        // );
 
     let polygon = scene
         .play(
             &mut ctx,
             Fading::fade_in(polygon).config(|config| {
-                config.set_run_time(Duration::from_secs(1));
+                config.set_run_time(Duration::from_secs_f32(0.1));
             }),
         )
         .unwrap();
 
-    let mut arc = Arc::new(std::f32::consts::PI / 2.0)
-        .with_radius(100.0)
-        .with_stroke_width(20.0)
-        .build();
-    arc.set_color(Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into());
+    // let mut arc = Arc::new(std::f32::consts::PI / 2.0)
+    //     .with_radius(100.0)
+    //     .with_stroke_width(20.0)
+    //     .build();
+    // arc.set_color(Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into());
 
-    let arc = scene.play(&mut ctx, Transform::new(polygon, arc)).unwrap();
-    scene.play(&mut ctx, Fading::fade_out(arc));
+    // let arc = scene.play(&mut ctx, Transform::new(polygon, arc)).unwrap();
+    // scene.play(&mut ctx, Fading::fade_out(arc));
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

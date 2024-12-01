@@ -9,13 +9,13 @@ use std::{
 };
 
 use file_writer::{FileWriter, FileWriterBuilder};
-use image::{ImageBuffer, Rgba};
+use image::{DynamicImage, ImageBuffer, Rgba};
 use log::trace;
 
 use crate::{
     animation::Animation,
     camera::Camera,
-    rabject::{vmobject::VMobject, ExtractedRabjectWithId, Rabject, RabjectWithId, RenderResource},
+    rabject::{vmobject::VMobject, ExtractedRabjectWithId, Rabject, RabjectWithId, RenderInstance},
     utils::Id,
     RanimContext,
 };
@@ -60,7 +60,10 @@ impl Scene {
     }
 
     pub fn remove_rabject<R: Rabject>(&mut self, rabject: &RabjectWithId<R>) {
-        trace!("[Scene::remove_rabject]: removing rabject: {:?}", rabject.id());
+        trace!(
+            "[Scene::remove_rabject]: removing rabject: {:?}",
+            rabject.id()
+        );
         self.rabjects.iter_mut().for_each(|(_, rabject_vec)| {
             rabject_vec.retain(|(rabject_id, _)| rabject_id != rabject.id());
         });
@@ -71,13 +74,19 @@ impl Scene {
         ctx: &mut RanimContext,
         rabject: &RabjectWithId<R>,
     ) {
-        trace!("[Scene::insert_rabject]: inserting rabject: {:?}", rabject.id());
+        trace!(
+            "[Scene::insert_rabject]: inserting rabject: {:?}",
+            rabject.id()
+        );
         let entry = self
             .rabjects
             .entry(std::any::TypeId::of::<R>())
             .or_default();
         if let Some((_, extracted)) = entry.iter_mut().find(|(id, _)| id == rabject.id()) {
-            trace!("[Scene::insert_rabject]: already_exist, updating rabject: {:?}", rabject.id());
+            trace!(
+                "[Scene::insert_rabject]: already_exist, updating rabject: {:?}",
+                rabject.id()
+            );
             let extracted: &mut ExtractedRabjectWithId<R> = extracted.downcast_mut().unwrap();
             extracted.update(ctx, rabject);
         } else {
@@ -117,10 +126,21 @@ impl Scene {
     pub fn save_frame_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
         let size = self.camera.frame.size;
         let texture_data = self.camera.get_rendered_texture(&ctx.wgpu_ctx);
-        let buffer =
-            ImageBuffer::<Rgba<u8>, _>::from_raw(size.0 as u32, size.1 as u32, texture_data)
-                .unwrap();
-        buffer.save(path).unwrap();
+        let data: &[half::f16] = bytemuck::cast_slice(texture_data);
+        let data = data
+            .to_vec()
+            .into_iter()
+            .map(|f| f.to_f32())
+            .collect::<Vec<_>>();
+        let buffer = ImageBuffer::<Rgba<f32>, _>::from_raw(
+            size.0 as u32,
+            size.1 as u32,
+            data,
+        )
+        .unwrap();
+        let image = DynamicImage::ImageRgba32F(buffer);
+        let image = image.to_rgba8();
+        image.save(path).unwrap();
     }
 
     /// Play an animation

@@ -1,30 +1,37 @@
 #[allow(unused)]
 use log::trace;
 
-use crate::{rabject::{RabjectWithId, RenderResource}, RanimContext, WgpuBuffer};
+use crate::{
+    rabject::{RabjectWithId, RenderInstance},
+    RanimContext, WgpuBuffer,
+};
 
-use super::{pipeline::VMobjectFillVertex, ComputeUniform, VMobject, VMobjectPoint, VMobjectStrokeVertex};
+use super::{ComputeUniform, VMobject, VMobjectFillVertex, VMobjectPoint, VMobjectStrokeVertex};
 
-pub struct VMObjectRenderResource {
-    /// COMPUTE INPUT: the points of the VMObject
-    pub(super) points_buffer: WgpuBuffer<VMobjectPoint>,
-    /// COMPUTE INPUT: the joint angles of the VMObject
-    pub(super) joint_angles_buffer: WgpuBuffer<f32>,
-    /// COMPUTE INPUT: the unit normal of the VMObject
-    pub(super) compute_uniform_buffer: WgpuBuffer<ComputeUniform>,
-
-    /// RENDER-FILL INPUT: the vertices of the VMObject filled with color
-    pub(super) fill_vertex_buffer: WgpuBuffer<VMobjectFillVertex>,
-    /// RENDER-STROKE INPUT: the vertices of the VMObject stroked
-    pub(super) stroke_vertices_buffer: WgpuBuffer<VMobjectStrokeVertex>,
-
-    /// COMPUTE BIND GROUP: 0-points, 1-joint angles, 2-stroke vertices, 3-compute uniforms
-    pub(super) compute_bind_group: wgpu::BindGroup,
-    /// RENDER-FILL BIND GROUP: 0-stroke vertices
-    pub(super) render_bind_group: wgpu::BindGroup,
+impl VMobject {
+    pub fn render_fill(&self) {}
 }
 
-impl VMObjectRenderResource {
+pub struct VMObjectRenderInstance {
+    /// COMPUTE INPUT: the points of the VMObject
+    pub(crate) points_buffer: WgpuBuffer<VMobjectPoint>,
+    /// COMPUTE INPUT: the joint angles of the VMObject
+    pub(crate) joint_angles_buffer: WgpuBuffer<f32>,
+    /// COMPUTE INPUT: the unit normal of the VMObject
+    pub(crate) compute_uniform_buffer: WgpuBuffer<ComputeUniform>,
+
+    /// RENDER-FILL INPUT: the vertices of the VMObject filled with color
+    pub(crate) fill_vertices_buffer: WgpuBuffer<VMobjectFillVertex>,
+    /// RENDER-STROKE INPUT: the vertices of the VMObject stroked
+    pub(crate) stroke_vertices_buffer: WgpuBuffer<VMobjectStrokeVertex>,
+
+    /// COMPUTE BIND GROUP: 0-points, 1-joint angles, 2-stroke vertices, 3-compute uniforms
+    pub(crate) compute_bind_group: wgpu::BindGroup,
+    /// RENDER-STROKE BIND GROUP: 0-stroke vertices
+    pub(crate) render_stroke_bind_group: wgpu::BindGroup,
+}
+
+impl VMObjectRenderInstance {
     pub fn compute_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("VMObject Compute Bind Group Layout"),
@@ -142,7 +149,7 @@ impl VMObjectRenderResource {
     }
 }
 
-impl RenderResource<VMobject> for VMObjectRenderResource {
+impl RenderInstance<VMobject> for VMObjectRenderInstance {
     fn init(ctx: &mut RanimContext, rabject: &VMobject) -> Self {
         // trace!("INIT: {:?}", rabject.points().iter().map(|p| p.position()).collect::<Vec<_>>());
         let points = rabject.points();
@@ -192,17 +199,17 @@ impl RenderResource<VMobject> for VMObjectRenderResource {
             &compute_uniform_buffer,
         );
 
-        let render_bind_group =
-            VMObjectRenderResource::create_render_bind_group(&ctx, &stroke_vertices_buffer);
+        let render_stroke_bind_group =
+            VMObjectRenderInstance::create_render_bind_group(&ctx, &stroke_vertices_buffer);
 
         Self {
             points_buffer,
             joint_angles_buffer,
-            fill_vertex_buffer,
+            fill_vertices_buffer: fill_vertex_buffer,
             stroke_vertices_buffer,
             compute_uniform_buffer,
             compute_bind_group,
-            render_bind_group,
+            render_stroke_bind_group,
         }
     }
 
@@ -210,6 +217,7 @@ impl RenderResource<VMobject> for VMObjectRenderResource {
         let points = rabject.points();
         let joint_angles = rabject.get_joint_angles();
         let unit_normal = rabject.get_unit_normal();
+        let fill_vertices = rabject.parse_fill();
         // trace!("UPDATE joint_angles: {:?}", joint_angles);
         // trace!("UPDATE unit_normal: {:?}", unit_normal);
         // trace!(
@@ -220,6 +228,13 @@ impl RenderResource<VMobject> for VMObjectRenderResource {
         //         .map(|p| p.position())
         //         .collect::<Vec<_>>()
         // );
+        trace!(
+            "UPDATE fill_vertices: {:?}",
+            fill_vertices
+                .iter()
+                .map(|v| v.pos)
+                .collect::<Vec<_>>()
+        );
         self.points_buffer
             .prepare_from_slice(&ctx.wgpu_ctx, &points);
         self.joint_angles_buffer
@@ -231,16 +246,18 @@ impl RenderResource<VMobject> for VMObjectRenderResource {
                 _padding: 0.0,
             }],
         );
+        self.fill_vertices_buffer
+            .prepare_from_slice(&ctx.wgpu_ctx, &fill_vertices);
         ctx.wgpu_ctx.queue.submit([]);
 
-        self.compute_bind_group = VMObjectRenderResource::create_compute_bind_group(
+        self.compute_bind_group = VMObjectRenderInstance::create_compute_bind_group(
             ctx,
             &self.points_buffer,
             &self.joint_angles_buffer,
             &self.stroke_vertices_buffer,
             &self.compute_uniform_buffer,
         );
-        self.render_bind_group =
-            VMObjectRenderResource::create_render_bind_group(ctx, &self.stroke_vertices_buffer);
+        self.render_stroke_bind_group =
+            VMObjectRenderInstance::create_render_bind_group(ctx, &self.stroke_vertices_buffer);
     }
 }

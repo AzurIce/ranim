@@ -1,4 +1,3 @@
-
 struct Uniforms {
     matrix: mat4x4<f32>,
     rescale_factors: vec3<f32>,
@@ -35,26 +34,18 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
-    // @builtin(frag_depth) depth: f32,
+    @builtin(frag_depth) depth: f32,
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     var out: FragmentOutput;
 
-    var color = in.color;
-    color.a *= 0.95;
-
-    // out.depth = in.position.z;
-    out.color = color;
+    out.color = in.color;
+    out.depth = in.position.z;
     if in.face < 0.0 {
-        out.color.a = -color.a / (1.0 - color.a);
-        // out.color.a = 0.0;
-        // out.color.a = -color.a;
-        // out.color = vec4<f32>(1.0, 0.0, 0.0, 0.1);
-        // out.depth = 1.0;
-    } else {
-        // out.color = vec4<f32>(0.0, 1.0, 0.0, 0.1);
+        out.color.a = -in.color.a / (1.0 - in.color.a);
+        out.depth = 1.0;
     }
     return out;
 }

@@ -670,6 +670,7 @@ version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dd08c532ae367adf81c312a4580bc67f1d0fe8bc9c460520283f4c0ff277888"
 dependencies = [
+ "bytemuck",
  "cfg-if",
  "crunchy",
 ]
@@ -1319,6 +1320,7 @@ dependencies = [
  "bytemuck",
  "env_logger",
  "glam",
+ "half",
  "image",
  "itertools 0.13.0",
  "log",

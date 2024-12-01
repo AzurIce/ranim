@@ -1,5 +1,4 @@
 mod blueprint;
-mod pipeline;
 pub mod render;
 use std::cmp::Ordering;
 
@@ -7,11 +6,13 @@ pub use blueprint::*;
 
 use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
-use palette::{rgb, Srgba};
-use render::VMObjectRenderResource;
+use palette::Srgba;
+use render::VMObjectRenderInstance;
 
-use crate::utils::{partial_quadratic_bezier, rotation_between_vectors};
-use pipeline::{ComputePipeline, StrokePipeline};
+use crate::{
+    renderer::vmobject::VMobjectRenderer,
+    utils::{partial_quadratic_bezier, rotation_between_vectors},
+};
 
 use super::{Interpolatable, Rabject};
 
@@ -65,16 +66,14 @@ impl VMobjectPoint {
         self.stroke_width = width;
     }
 }
-// #[repr(C, align(16))]
-// #[derive(Clone, Copy, Default, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-// pub struct VMobjectComputePoint {
-//     pub pos: Vec3,
-//     pub stroke_width: f32,
-//     pub stroke_color: Vec4,
-//     pub fill_color: Vec4,
-//     pub angle: f32,
-//     _padding: [f32; 3],
-// }
+
+#[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct VMobjectFillVertex {
+    pub pos: Vec3,
+    pub face: f32,
+    pub fill_color: Vec4,
+}
 
 #[repr(C, align(16))]
 #[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -136,15 +135,6 @@ impl VMobject {
             return false;
         }
 
-        // trace!(
-        //     "[VMobject::is_closed] first: {:?}, last: {:?}",
-        //     self.points.first().unwrap().pos,
-        //     self.points.last().unwrap().pos
-        // );
-        // trace!(
-        //     "[VMobject::is_closed] distance: {}",
-        //     (self.points.first().unwrap().pos - self.points.last().unwrap().pos).length()
-        // );
         (self.points.first().unwrap().pos - self.points.last().unwrap().pos).length() < f32::EPSILON
     }
 
@@ -156,123 +146,62 @@ impl VMobject {
         self.points = points;
     }
 
-    /*
     pub fn parse_fill(&self) -> Vec<VMobjectFillVertex> {
-        if self.points.is_empty() || !self.is_closed() {
+        let points = &self.points;
+        if points.is_empty() || !self.is_closed() {
             return vec![VMobjectFillVertex::default(); 3];
         }
 
-        let mut vertices = Vec::with_capacity(self.points.len() * 3); // not acurate
-        let base_point = self.points.first().unwrap();
+        let mut vertices = Vec::with_capacity(points.len() * 3); // not acurate
+        let base_point = points.first().unwrap();
         let unit_normal = self.get_unit_normal();
-        self.points
+        points
             .iter()
-            .cloned()
-            .zip(
-                self.points
-                    .iter()
-                    .skip(1)
-                    .cloned()
-                    .zip(self.points.iter().skip(2).cloned()),
-            )
-            .for_each(|(p1, (p2, p3))| {
-                vertices.extend_from_slice(&[base_point.clone(), p1.clone(), p3.clone()]);
-                vertices.extend_from_slice(&[p1.clone(), p2.clone(), p3.clone()]);
+            .step_by(2)
+            .zip(points.iter().skip(1).step_by(2))
+            .zip(points.iter().skip(2).step_by(2))
+            .for_each(|((p0, p1), p2)| {
+                let v1 = p0.pos - base_point.pos;
+                let v2 = p2.pos - base_point.pos;
+                let mat = Mat3::from_cols(unit_normal, v1, v2);
+                let face = mat.determinant();
+
+                let normal = v1.cross(v2).normalize();
+                if normal == Vec3::ZERO {
+                    return;
+                }
+                vertices.extend_from_slice(&[
+                    (base_point.clone(), face),
+                    (p0.clone(), face),
+                    (p2.clone(), face),
+                ]);
+                vertices.extend_from_slice(&[
+                    (p0.clone(), face),
+                    (p1.clone(), face),
+                    (p2.clone(), face),
+                ]);
             });
-        vertices.into_iter().map(|v| v.into()).collect()
+        vertices
+            .into_iter()
+            .map(|(v, face)| VMobjectFillVertex {
+                pos: v.pos,
+                face,
+                fill_color: v.fill_color,
+            })
+            .collect()
     }
-    */
 }
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct ComputeUniform {
+pub(crate) struct ComputeUniform {
     unit_normal: Vec3,
     _padding: f32,
 }
 
-const MAX_STEP: u32 = 16;
 impl Rabject for VMobject {
-    type RenderResource = VMObjectRenderResource;
-
-    fn begin_compute_pass<'a>(
-        encoder: &'a mut wgpu::CommandEncoder,
-    ) -> Option<wgpu::ComputePass<'a>> {
-        Some(encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("VMObject Compute Pass"),
-            timestamp_writes: None,
-        }))
-    }
-
-    fn compute<'a>(
-        ctx: &mut crate::RanimContext,
-        compute_pass: &mut wgpu::ComputePass<'a>,
-        render_resource: &Self::RenderResource,
-    ) {
-        let pipeline = ctx.get_or_init_pipeline::<ComputePipeline>();
-        compute_pass.set_pipeline(&pipeline);
-        compute_pass.set_bind_group(0, &render_resource.compute_bind_group, &[]);
-        // number of segments
-        trace!(
-            "dispatch workgroups: {}",
-            render_resource.points_buffer.len() / 2
-        );
-        compute_pass.dispatch_workgroups(render_resource.points_buffer.len() as u32 / 2, 1, 1);
-    }
-
-    fn begin_render_pass<'a>(
-        encoder: &'a mut wgpu::CommandEncoder,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-    ) -> wgpu::RenderPass<'a> {
-        let bg = Srgba::from_u32::<rgb::channels::Rgba>(0x333333FF).into_linear();
-        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("VMobject Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &multisample_view,
-                resolve_target: Some(&target_view),
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: bg.red,
-                        g: bg.green,
-                        b: bg.blue,
-                        a: bg.alpha,
-                    }),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-        })
-    }
-
-    fn render<'a>(
-        ctx: &mut crate::RanimContext,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        render_resource: &Self::RenderResource,
-    ) {
-        // let pipeline_vmobject_fill = ctx.get_or_init_pipeline::<FillPipeline>();
-        // render_pass.set_pipeline(&pipeline_vmobject_fill);
-        // render_pass.set_vertex_buffer(0, render_resource.fill_vertex_buffer.slice(..));
-        // render_pass.draw(0..render_resource.fill_vertex_buffer.len() as u32, 0..1);
-        let pipeline_vmobject_stroke = ctx.get_or_init_pipeline::<StrokePipeline>();
-        render_pass.set_pipeline(&pipeline_vmobject_stroke);
-        render_pass.set_bind_group(1, &render_resource.render_bind_group, &[]);
-        // render_pass.set_vertex_buffer(0, render_resource.stroke_vertices_buffer.slice(..));
-        // let len = render_resource.stroke_vertices_buffer.len();
-        let len = render_resource.points_buffer.len() as u32 / 2 * MAX_STEP * 2;
-        trace!("draw {}", len);
-        render_pass.draw(0..len, 0..1);
-    }
+    type Renderer = VMobjectRenderer;
+    type RenderInstance = VMObjectRenderInstance;
 }
 
 pub enum TransformAnchor {
