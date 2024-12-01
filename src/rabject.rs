@@ -2,14 +2,14 @@ pub mod vmobject;
 
 use std::ops::{Deref, DerefMut};
 
-use crate::{utils::Id, RanimContext};
+use crate::{renderer::{RenderResource, Renderer}, utils::Id, RanimContext};
 
 /// Blueprints are the data structures that are used to create [`Rabject`]s
 pub trait Blueprint<T: Rabject> {
     fn build(self) -> RabjectWithId<T>;
 }
 
-pub trait RenderResource<T: Rabject> {
+pub trait RenderInstance<T: Rabject> {
     /// Used to initialize the render resource when the rabject is extracted
     fn init(ctx: &mut RanimContext, rabject: &T) -> Self;
 
@@ -17,35 +17,40 @@ pub trait RenderResource<T: Rabject> {
 }
 
 pub trait Rabject: 'static + Clone {
-    type RenderResource: RenderResource<Self>;
+    type Renderer: Renderer<Self> + RenderResource;
+    type RenderInstance: RenderInstance<Self>;
 
-    #[allow(unused_variables)]
-    fn begin_compute_pass<'a>(
-        encoder: &'a mut wgpu::CommandEncoder,
-    ) -> Option<wgpu::ComputePass<'a>> {
-        None
-    }
+    // #[allow(unused_variables)]
+    // fn begin_compute_pass<'a>(
+    //     encoder: &'a mut wgpu::CommandEncoder,
+    // ) -> Option<wgpu::ComputePass<'a>> {
+    //     None
+    // }
 
-    #[allow(unused_variables)]
-    fn compute<'a>(
-        ctx: &mut RanimContext,
-        compute_pass: &mut wgpu::ComputePass<'a>,
-        render_resource: &Self::RenderResource,
-    ) {
-    }
+    // #[allow(unused_variables)]
+    // fn compute<'a>(
+    //     ctx: &mut RanimContext,
+    //     compute_pass: &mut wgpu::ComputePass<'a>,
+    //     render_resource: &Self::RenderInstance,
+    // ) {
+    // }
 
-    fn begin_render_pass<'a>(
-        encoder: &'a mut wgpu::CommandEncoder,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-    ) -> wgpu::RenderPass<'a>;
+    // fn begin_render_pass<'a>(
+    //     encoder: &'a mut wgpu::CommandEncoder,
+    //     multisample_view: &wgpu::TextureView,
+    //     target_view: &wgpu::TextureView,
+    //     depth_view: &wgpu::TextureView,
+    // ) -> wgpu::RenderPass<'a>;
 
-    fn render<'a>(
-        ctx: &mut RanimContext,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        render_resource: &Self::RenderResource,
-    );
+    // fn render<'a>(
+    //     ctx: &mut RanimContext,
+    //     // render_pass: &mut wgpu::RenderPass<'a>,
+    //     multisample_view: &wgpu::TextureView,
+    //     target_view: &wgpu::TextureView,
+    //     depth_view: &wgpu::TextureView,
+    //     uniforms_bind_group: &wgpu::BindGroup,
+    //     render_resource: &Self::RenderInstance,
+    // );
 }
 
 #[derive(Clone)]
@@ -85,7 +90,7 @@ impl<T: Rabject> RabjectWithId<T> {
     pub fn extract(&self, ctx: &mut RanimContext) -> ExtractedRabjectWithId<T> {
         ExtractedRabjectWithId {
             id: self.id,
-            render_resource: T::RenderResource::init(ctx, &self.rabject),
+            render_resource: T::RenderInstance::init(ctx, &self.rabject),
         }
     }
 }
@@ -93,7 +98,7 @@ impl<T: Rabject> RabjectWithId<T> {
 pub struct ExtractedRabjectWithId<T: Rabject> {
     id: Id,
     // rabject: Arc<RwLock<T>>,
-    pub(crate) render_resource: T::RenderResource,
+    pub(crate) render_resource: T::RenderInstance,
 }
 
 impl<T: Rabject> ExtractedRabjectWithId<T> {
@@ -103,7 +108,7 @@ impl<T: Rabject> ExtractedRabjectWithId<T> {
 }
 
 impl<T: Rabject> Deref for ExtractedRabjectWithId<T> {
-    type Target = T::RenderResource;
+    type Target = T::RenderInstance;
 
     fn deref(&self) -> &Self::Target {
         &self.render_resource

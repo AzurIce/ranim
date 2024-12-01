@@ -3,9 +3,10 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     ops::Deref,
+    sync::Arc,
 };
 
-use pipeline::Pipeline;
+use renderer::RenderResource;
 use wgpu::util::DeviceExt;
 
 pub use glam;
@@ -13,40 +14,61 @@ pub use palette;
 
 pub mod animation;
 pub mod camera;
-pub(crate) mod pipeline;
 /// Rabjects are the objects that can be manuplated and rendered
 pub mod rabject;
+pub(crate) mod renderer;
 pub mod scene;
 pub mod utils;
 
+#[derive(Default)]
+pub struct RenderResourceStorage {
+    inner: HashMap<TypeId, Box<dyn Any>>,
+}
+
+impl RenderResourceStorage {
+    pub fn get_or_init<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &P {
+        let id = std::any::TypeId::of::<P>();
+        if !self.inner.contains_key(&id) {
+            let pipeline = P::new(ctx);
+            self.inner.insert(id, Box::new(pipeline));
+        }
+        self.inner.get(&id).unwrap().downcast_ref::<P>().unwrap()
+    }
+    pub fn get_or_init_mut<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &mut P {
+        let id = std::any::TypeId::of::<P>();
+        if !self.inner.contains_key(&id) {
+            let pipeline = P::new(ctx);
+            self.inner.insert(id, Box::new(pipeline));
+        }
+        self.inner
+            .get_mut(&id)
+            .unwrap()
+            .downcast_mut::<P>()
+            .unwrap()
+    }
+}
+
 pub struct RanimContext {
-    pub(crate) wgpu_ctx: WgpuContext,
-    pub pipelines: HashMap<TypeId, Box<dyn Any>>,
-    // pub renderers: HashMap<TypeId, Box<dyn Any>>,
+    pub(crate) wgpu_ctx: Arc<WgpuContext>,
+    pub pipelines: RenderResourceStorage,
+    pub renderers: RenderResourceStorage,
 }
 
 impl RanimContext {
     pub fn new() -> Self {
-        let wgpu_ctx = pollster::block_on(WgpuContext::new());
-        let pipelines = HashMap::<TypeId, Box<dyn Any>>::new();
+        let wgpu_ctx = Arc::new(pollster::block_on(WgpuContext::new()));
+        let pipelines = RenderResourceStorage::default();
+        let renderers = RenderResourceStorage::default();
 
         Self {
             wgpu_ctx,
             pipelines,
+            renderers,
         }
     }
 
-    pub fn get_or_init_pipeline<P: Pipeline + 'static>(&mut self) -> &P {
-        let id = std::any::TypeId::of::<P>();
-        if !self.pipelines.contains_key(&id) {
-            let pipeline = P::new(&self);
-            self.pipelines.insert(id, Box::new(pipeline));
-        }
-        self.pipelines
-            .get(&id)
-            .unwrap()
-            .downcast_ref::<P>()
-            .unwrap()
+    pub fn wgpu_ctx(&self) -> Arc<WgpuContext> {
+        self.wgpu_ctx.clone()
     }
 }
 
