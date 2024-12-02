@@ -146,6 +146,36 @@ impl VMobject {
         self.points = points;
     }
 
+    /// Get the unit normal if it's a polygon.
+    ///
+    /// https://stackoverflow.com/questions/22838071/robust-polygon-normal-calculation
+    /// https://www.khronos.org/opengl/wiki/Calculating_a_Surface_Normal
+    /// https://github.com/MIERUNE/earcut-rs/blob/3898cc009723bbef827ba6ce1339c240ece52484/src/utils3d.rs#L9
+    pub fn get_unit_normal(&self) -> Vec3 {
+        if !self.is_closed() || self.points.len() < 5 {
+            return Vec3::Z;
+        }
+
+        let anchors = self
+            .points
+            .iter()
+            .step_by(2)
+            .map(|p| p.position())
+            .collect::<Vec<_>>();
+
+        let normal = anchors
+            .iter()
+            .skip(1)
+            .fold((Vec3::ZERO, anchors[0]), |(acc, pre), &e| {
+                (acc + pre.cross(e), e)
+            })
+            .0;
+        if normal.length() < f32::EPSILON {
+            return Vec3::Z;
+        }
+        normal.normalize()
+    }
+
     pub fn parse_fill(&self) -> Vec<VMobjectFillVertex> {
         let points = &self.points;
         if points.is_empty() || !self.is_closed() {
@@ -366,31 +396,31 @@ impl VMobject {
         0.5 * vec3(x, y, z)
     }
 
-    pub fn get_unit_normal(&self) -> Vec3 {
-        // trace!("[VMobject::get_unit_normal] points: {:?}", self.points.len());
-        if self.points.len() < 3 {
-            return Vec3::Z;
-        }
-        let area_vector = self.get_area_vector();
-        // trace!("[VMobject::get_unit_normal] area_vector: {:?}", area_vector);
-        if area_vector == Vec3::ZERO {
-            // warn!("[VMobject] area_vector is zero");
-            let v1 = (self.points[1].position() - self.points[0].position()).normalize();
-            let v2 = (self.points[2].position() - self.points[0].position()).normalize();
-            // trace!("v1: {:?}, v2: {:?}", v1, v2);
-            // trace!("cross: {:?}", v1.cross(v2));
-            let v = v1.cross(v2);
+    // pub fn get_unit_normal(&self) -> Vec3 {
+    //     // trace!("[VMobject::get_unit_normal] points: {:?}", self.points.len());
+    //     if self.points.len() < 3 {
+    //         return Vec3::Z;
+    //     }
+    //     let area_vector = self.get_area_vector();
+    //     // trace!("[VMobject::get_unit_normal] area_vector: {:?}", area_vector);
+    //     if area_vector == Vec3::ZERO {
+    //         // warn!("[VMobject] area_vector is zero");
+    //         let v1 = (self.points[1].position() - self.points[0].position()).normalize();
+    //         let v2 = (self.points[2].position() - self.points[0].position()).normalize();
+    //         // trace!("v1: {:?}, v2: {:?}", v1, v2);
+    //         // trace!("cross: {:?}", v1.cross(v2));
+    //         let v = v1.cross(v2);
 
-            // TODO: fix this
-            return if v.is_nan() || v == Vec3::ZERO {
-                // warn!("v is nan or zero {:?}, use Z", v);
-                Vec3::Z
-            } else {
-                v.normalize()
-            };
-        }
-        area_vector.normalize()
-    }
+    //         // TODO: fix this
+    //         return if v.is_nan() || v == Vec3::ZERO {
+    //             // warn!("v is nan or zero {:?}, use Z", v);
+    //             Vec3::Z
+    //         } else {
+    //             v.normalize()
+    //         };
+    //     }
+    //     area_vector.normalize()
+    // }
 
     /// Apply a function to the points of the mobject about the point.
     pub fn apply_points_function(
