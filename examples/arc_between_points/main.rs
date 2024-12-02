@@ -7,7 +7,7 @@ use log::info;
 use ranim::glam::vec3;
 use ranim::rabject::vmobject::ArcBetweenPoints;
 use ranim::rabject::{Blueprint, Interpolatable};
-use ranim::{animation::fading::Fading, scene::Scene, RanimContext};
+use ranim::{animation::fading::Fading, scene::Scene};
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -17,9 +17,7 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=info"))
         .init();
 
-    let mut ctx = RanimContext::new();
-
-    let mut scene = Scene::new(&ctx);
+    let mut scene = Scene::new();
 
     let start_color = Srgba::hex("FF8080FF").unwrap();
     let end_color = Srgba::hex("58C4DDFF").unwrap();
@@ -46,12 +44,9 @@ fn main() {
                 .build();
             arc.set_color(color);
 
-            scene.play(
-                &mut ctx,
-                Fading::fade_in(arc).config(|config| {
-                    config.set_run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32));
-                }),
-            );
+            scene.play(Fading::fade_in(arc).config(|config| {
+                config.set_run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32));
+            }));
         }
         info!(
             "rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}",

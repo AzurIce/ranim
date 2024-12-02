@@ -10,19 +10,15 @@ use ranim::{
     animation::{fading::Fading, transform::Transform},
     rabject::vmobject::{Arc, Polygon},
     scene::Scene,
-    RanimContext,
 };
 
 fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info"))
-        .init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
 
-    let mut ctx = RanimContext::new();
-
-    let mut scene = Scene::new(&ctx);
+    let mut scene = Scene::new();
     let t = Instant::now();
     info!("running...");
 
@@ -42,12 +38,9 @@ fn main() {
     );
 
     let polygon = scene
-        .play(
-            &mut ctx,
-            Fading::fade_in(polygon).config(|config| {
-                config.set_run_time(Duration::from_secs_f32(1.0));
-            }),
-        )
+        .play(Fading::fade_in(polygon).config(|config| {
+            config.set_run_time(Duration::from_secs_f32(1.0));
+        }))
         .unwrap();
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
@@ -56,8 +49,8 @@ fn main() {
         .build();
     arc.set_color(Srgba::hex("58C4DDFF").unwrap());
 
-    let arc = scene.play(&mut ctx, Transform::new(polygon, arc)).unwrap();
-    scene.play(&mut ctx, Fading::fade_out(arc));
+    let arc = scene.play(Transform::new(polygon, arc)).unwrap();
+    scene.play(Fading::fade_out(arc));
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

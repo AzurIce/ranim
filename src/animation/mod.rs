@@ -9,7 +9,7 @@ use crate::{
     rabject::{Rabject, RabjectWithId},
     scene::Scene,
     utils::rate_functions::smooth,
-    RanimContext,
+    RanimContext, WgpuContext,
 };
 
 pub struct AnimationConfig<R: Rabject> {
@@ -119,14 +119,14 @@ impl<R: Rabject> Animation<R> {
         self
     }
 
-    pub fn play(mut self, ctx: &mut RanimContext, scene: &mut Scene) -> Option<RabjectWithId<R>> {
+    pub fn play(mut self, scene: &mut Scene) -> Option<RabjectWithId<R>> {
         trace!(
             "[Animation] Playing animation on {:?}...",
             self.rabject.id()
         );
         self.func.prepare(&mut self.rabject, scene);
         self.func.pre_anim(&mut self.rabject);
-        scene.insert_rabject(ctx, &self.rabject);
+        scene.insert_rabject(&self.rabject);
 
         let frames = self.config.calc_frames(scene.camera.fps as f32);
 
@@ -137,18 +137,18 @@ impl<R: Rabject> Animation<R> {
             let alpha = t / self.config.run_time.as_secs_f32();
             let alpha = (self.config.rate_func)(alpha);
             self.func.interpolate(&mut self.rabject, alpha);
-            scene.insert_rabject(ctx, &self.rabject);
-            scene.update_frame(ctx, dt);
+            scene.insert_rabject(&self.rabject);
+            scene.update_frame(dt);
             scene.frame_count += 1;
         }
 
         self.func.post_anim(&mut self.rabject);
-        scene.insert_rabject(ctx, &self.rabject);
+        scene.insert_rabject(&self.rabject);
         self.func.cleanup(&mut self.rabject, scene);
 
         if let Some(end_rabject) = self.config.end_rabject {
             scene.remove_rabject(&self.rabject);
-            scene.insert_rabject(ctx, &end_rabject);
+            scene.insert_rabject(&end_rabject);
             return Some(end_rabject);
         }
 
