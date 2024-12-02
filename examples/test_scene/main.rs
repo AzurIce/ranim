@@ -9,7 +9,6 @@ use ranim::rabject::Blueprint;
 use ranim::{
     rabject::vmobject::{Arc, Polygon},
     scene::Scene,
-    RanimContext,
 };
 
 fn main() {
@@ -19,9 +18,7 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace"))
         .init();
 
-    let mut ctx = RanimContext::new();
-
-    let mut scene = Scene::new(&ctx);
+    let mut scene = Scene::new();
     let t = Instant::now();
 
     let mut polygon = Polygon::new(vec![
@@ -33,7 +30,7 @@ fn main() {
     ])
     .with_width(20.0)
     .build();
-    scene.insert_rabject(&mut ctx, &polygon);
+    scene.insert_rabject(&polygon);
     // scene.render_to_image(&mut ctx, "output1.png");
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
@@ -45,13 +42,12 @@ fn main() {
     let mut transform = Transform::new(polygon.clone(), arc);
 
     transform.func.interpolate(&mut polygon, 0.0);
-    scene.insert_rabject(&mut ctx, &polygon);
-    scene.render_to_image(&mut ctx, "output-0.png");
+    scene.insert_rabject(&polygon);
+    scene.render_to_image("output-0.png");
 
     transform.func.interpolate(&mut polygon, 0.5);
-    scene.insert_rabject(&mut ctx, &polygon);
-    scene.render_to_image(&mut ctx, "output-0.5.png");
-
+    scene.insert_rabject(&polygon);
+    scene.render_to_image("output-0.5.png");
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

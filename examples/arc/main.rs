@@ -6,7 +6,7 @@ use log::info;
 use ranim::glam::vec3;
 use ranim::rabject::vmobject::Arc;
 use ranim::rabject::{Blueprint, Interpolatable};
-use ranim::{animation::fading::Fading, scene::Scene, RanimContext};
+use ranim::{animation::fading::Fading, scene::Scene};
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -14,9 +14,7 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("arc=info")).init();
 
-    let mut ctx = RanimContext::new();
-
-    let mut scene = Scene::new(&ctx);
+    let mut scene = Scene::new();
     let t = Instant::now();
 
     let start_color = Srgba::hex("FF8080FF").unwrap();
@@ -53,12 +51,9 @@ fn main() {
             arc.set_color(color).shift(frame_start + offset);
             // let _ = scene.insert_rabject(&mut ctx, &arc);
             // scene.wait(&mut ctx, Duration::from_secs_f32(0.02));
-            scene.play(
-                &mut ctx,
-                Fading::fade_in(arc).config(|config| {
-                    config.set_run_time(Duration::from_secs_f32(0.02));
-                }),
-            );
+            scene.play(Fading::fade_in(arc).config(|config| {
+                config.set_run_time(Duration::from_secs_f32(0.02));
+            }));
         }
         info!("row [{i}/{nrow}] cost: {:?}", t.elapsed());
     }
