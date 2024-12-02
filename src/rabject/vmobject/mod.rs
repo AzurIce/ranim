@@ -1,12 +1,12 @@
 mod blueprint;
 pub mod render;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, fmt::Debug};
 
+use bevy_color::{Color, LinearRgba, Srgba};
 pub use blueprint::*;
 
-use glam::{ivec3, vec2, vec3, vec4, IVec3, Mat3, Vec3, Vec4};
+use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
-use palette::Srgba;
 use render::VMObjectRenderInstance;
 
 use crate::{
@@ -24,17 +24,28 @@ use log::{trace, warn};
 pub struct VMobjectPoint {
     pub pos: Vec3,
     pub stroke_width: f32,
-    pub stroke_color: Vec4,
-    pub fill_color: Vec4,
+    pub stroke_color: LinearRgba,
+    pub fill_color: LinearRgba,
+}
+
+impl Interpolatable for LinearRgba {
+    fn lerp(&self, target: &Self, t: f32) -> Self {
+        Self {
+            red: self.red.lerp(&target.red, t),
+            green: self.green.lerp(&target.green, t),
+            blue: self.blue.lerp(&target.blue, t),
+            alpha: self.alpha.lerp(&target.alpha, t),
+        }
+    }
 }
 
 impl Interpolatable for VMobjectPoint {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         Self {
             pos: self.pos.lerp(target.pos, t),
-            stroke_color: self.stroke_color.lerp(target.stroke_color, t),
+            stroke_color: self.stroke_color.lerp(&target.stroke_color, t),
             stroke_width: self.stroke_width.lerp(&target.stroke_width, t),
-            fill_color: self.fill_color.lerp(target.fill_color, t),
+            fill_color: self.fill_color.lerp(&target.fill_color, t),
         }
     }
 }
@@ -46,18 +57,18 @@ impl VMobjectPoint {
     pub fn set_position(&mut self, pos: Vec3) {
         self.pos = vec3(pos.x, pos.y, pos.z);
     }
-    pub fn stroke_color(&self) -> Vec4 {
+    pub fn stroke_color(&self) -> LinearRgba {
         self.stroke_color
     }
-    pub fn set_stroke_color(&mut self, color: Vec4) {
-        self.stroke_color = color;
+    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba>) {
+        self.stroke_color = color.into();
     }
-    pub fn fill_color(&self) -> Vec4 {
+    pub fn fill_color(&self) -> LinearRgba {
         self.fill_color
     }
-    pub fn set_fill_color(&mut self, color: Vec4) {
+    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba>) {
         // trace!("point set_fill_color: {:?}", color);
-        self.fill_color = color;
+        self.fill_color = color.into();
     }
     pub fn stroke_width(&self) -> f32 {
         self.stroke_width
@@ -72,7 +83,7 @@ impl VMobjectPoint {
 pub struct VMobjectFillVertex {
     pub pos: Vec3,
     pub face: f32,
-    pub fill_color: Vec4,
+    pub fill_color: LinearRgba,
 }
 
 #[repr(C, align(16))]
@@ -121,9 +132,9 @@ impl VMobject {
             .into_iter()
             .map(|p| VMobjectPoint {
                 pos: p,
-                stroke_color: vec4(1.0, 0.0, 0.0, 1.0),
+                stroke_color: Srgba::new(1.0, 0.0, 0.0, 1.0).into(),
                 stroke_width: 1.0,
-                fill_color: vec4(0.0, 0.0, 1.0, 0.5),
+                fill_color: Srgba::new(0.0, 0.0, 1.0, 0.5).into(),
             })
             .collect();
 
@@ -540,45 +551,30 @@ impl VMobject {
         );
         self
     }
-    pub fn set_stroke_color(&mut self, color: Srgba) -> &mut Self {
-        let color = vec4(color.red, color.green, color.blue, color.alpha);
+    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy + Clone) -> &mut Self {
+        // let color = vec4(color.red, color.green, color.blue, color.alpha);
 
-        self.apply_points_function(
-            |points| {
-                points.iter_mut().for_each(|p| {
-                    p.set_stroke_color(color);
-                });
-            },
-            TransformAnchor::origin(),
-        );
+        self.points.iter_mut().for_each(|p| {
+            p.set_stroke_color(color);
+        });
         self
     }
-    pub fn set_fill_color(&mut self, color: Srgba) -> &mut Self {
+    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy + Clone) -> &mut Self {
         trace!("set fill color: {:?}", color);
-        let color = vec4(color.red, color.green, color.blue, color.alpha);
+        // let color = vec4(color.red, color.green, color.blue, color.alpha);
 
         self.points.iter_mut().for_each(|p| p.set_fill_color(color));
         self
     }
-    pub fn set_color(&mut self, color: Srgba) -> &mut Self {
+    pub fn set_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy + Clone) -> &mut Self {
         trace!("[VMobject] set_color: {:?}", color);
         self.set_fill_color(color).set_stroke_color(color);
         self
     }
     pub fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.points.iter_mut().for_each(|p| {
-            p.set_fill_color(vec4(
-                p.fill_color().x,
-                p.fill_color().y,
-                p.fill_color().z,
-                opacity,
-            ));
-            p.set_stroke_color(vec4(
-                p.stroke_color().x,
-                p.stroke_color().y,
-                p.stroke_color().z,
-                opacity,
-            ));
+            p.fill_color.alpha = opacity;
+            p.stroke_color.alpha = opacity;
         });
         self
     }

@@ -1,12 +1,12 @@
 use std::time::{Duration, Instant};
 
+use bevy_color::Srgba;
 use env_logger::Env;
 use glam::{Mat3, Vec3};
 use log::info;
 use ranim::glam::vec3;
-use ranim::palette::{rgb, Srgba};
 use ranim::rabject::vmobject::ArcBetweenPoints;
-use ranim::rabject::Blueprint;
+use ranim::rabject::{Blueprint, Interpolatable};
 use ranim::{animation::fading::Fading, scene::Scene, RanimContext};
 
 fn main() {
@@ -21,10 +21,8 @@ fn main() {
 
     let mut scene = Scene::new(&ctx);
 
-    let start_color: Srgba = Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into();
-    let start_color = vec3(start_color.red, start_color.green, start_color.blue);
-    let end_color: Srgba = Srgba::from_u32::<rgb::channels::Rgba>(0xE65A4CFF).into();
-    let end_color = vec3(end_color.red, end_color.green, end_color.blue);
+    let start_color = Srgba::hex("FF8080FF").unwrap();
+    let end_color = Srgba::hex("58C4DDFF").unwrap();
     let ntan = 16;
     let nrad = 5;
 
@@ -39,15 +37,15 @@ fn main() {
         let width = width_step * ((nrad - i) as f32).powi(2);
         let angle = angle_step * (i + 1) as f32;
         for j in 0..ntan {
+            let color = start_color.lerp(&end_color, j as f32 / (ntan - 1) as f32);
             let end = Mat3::from_rotation_z(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)
                 * vec3(rad, 0.0, 0.0);
 
-            let color = start_color.lerp(end_color, j as f32 / (ntan - 1) as f32);
             let mut arc = ArcBetweenPoints::new(Vec3::ZERO, end, angle)
                 .with_stroke_width(width)
                 .build();
+            arc.set_color(color);
 
-            arc.set_color(Srgba::from_components((color.x, color.y, color.z, 1.0)).into());
             scene.play(
                 &mut ctx,
                 Fading::fade_in(arc).config(|config| {

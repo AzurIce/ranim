@@ -4,7 +4,7 @@ use log::trace;
 use wgpu::include_wgsl;
 
 use crate::{
-    camera::CameraUniformsBindGroup,
+    camera::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
     rabject::vmobject::{render::VMObjectRenderInstance, VMobject, VMobjectFillVertex},
     RenderResourceStorage, WgpuContext,
 };
@@ -249,7 +249,7 @@ impl Deref for FillPipeline {
 
 impl FillPipeline {
     fn output_format() -> wgpu::TextureFormat {
-        wgpu::TextureFormat::Rgba8Unorm
+        OUTPUT_TEXTURE_FORMAT
     }
 
     fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
@@ -346,7 +346,7 @@ impl Deref for StrokePipeline {
 
 impl StrokePipeline {
     fn output_format() -> wgpu::TextureFormat {
-        wgpu::TextureFormat::Rgba8Unorm
+        OUTPUT_TEXTURE_FORMAT
     }
 
     fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {

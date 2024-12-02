@@ -10,7 +10,7 @@ use renderer::RenderResource;
 use wgpu::util::DeviceExt;
 
 pub use glam;
-pub use palette;
+pub use bevy_color;
 
 pub mod animation;
 pub mod camera;

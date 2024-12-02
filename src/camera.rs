@@ -3,8 +3,8 @@ use std::{
     collections::HashMap,
 };
 
+use bevy_color::Color;
 use glam::{Mat4, Vec3};
-use palette::{rgb, Srgba};
 
 use crate::{
     rabject::{ExtractedRabjectWithId, Rabject},
@@ -78,7 +78,7 @@ pub struct Camera {
     multisample_view: wgpu::TextureView,
     depth_stencil_view: wgpu::TextureView,
 
-    output_view: wgpu::TextureView,
+    // output_view: wgpu::TextureView,
     output_staging_buffer: wgpu::Buffer,
     output_texture_data: Option<Vec<u8>>,
     output_texture_updated: bool,
@@ -87,10 +87,13 @@ pub struct Camera {
     uniforms_bind_group: CameraUniformsBindGroup,
 }
 
+pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+
 impl Camera {
     pub(crate) fn new(ctx: &RanimContext, width: usize, height: usize, fps: u32) -> Self {
         let frame = CameraFrame::new_with_size(width, height);
 
+        let format = OUTPUT_TEXTURE_FORMAT;
         let ctx = &ctx.wgpu_ctx;
         let render_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Target Texture"),
@@ -102,13 +105,13 @@ impl Camera {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::COPY_SRC
                 | wgpu::TextureUsages::COPY_DST,
             view_formats: &[
-                wgpu::TextureFormat::Rgba8Unorm,
                 wgpu::TextureFormat::Rgba8UnormSrgb,
+                wgpu::TextureFormat::Rgba8Unorm,
             ],
         });
         let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
@@ -121,9 +124,12 @@ impl Camera {
             mip_level_count: 1,
             sample_count: 4,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+            view_formats: &[
+                wgpu::TextureFormat::Rgba8UnormSrgb,
+                wgpu::TextureFormat::Rgba8Unorm,
+            ],
         });
         let depth_stencil_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Depth Stencil Texture"),
@@ -159,17 +165,19 @@ impl Camera {
         let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
 
         let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            format: Some(format),
             ..Default::default()
         });
-        let multisample_view =
-            multisample_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
         let depth_stencil_view =
             depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let output_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
-            ..Default::default()
-        });
+        // let output_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
+        //     format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
+        //     ..Default::default()
+        // });
 
         Self {
             frame,
@@ -184,7 +192,7 @@ impl Camera {
             multisample_view,
             depth_stencil_view,
             // Outputs
-            output_view,
+            // output_view,
             output_staging_buffer,
             output_texture_data: None,
             output_texture_updated: false,
@@ -230,19 +238,21 @@ impl Camera {
 
         // Clear
         {
-            let bg = Srgba::from_u32::<rgb::channels::Rgba>(0x333333FF).into_linear();
+            let bg = Color::srgba_u8(0x33, 0x33, 0x33, 0xff).to_linear();
+            // let bg = Color::srgba_u8(41, 171, 202, 255).to_linear();
+            let bg = wgpu::Color {
+                r: bg.red as f64,
+                g: bg.green as f64,
+                b: bg.blue as f64,
+                a: bg.alpha as f64,
+            };
             let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("VMobject Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &self.multisample_view,
                     resolve_target: Some(&self.render_view),
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: bg.red,
-                            g: bg.green,
-                            b: bg.blue,
-                            a: bg.alpha,
-                        }),
+                        load: wgpu::LoadOp::Clear(bg),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
