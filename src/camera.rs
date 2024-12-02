@@ -7,7 +7,10 @@ use glam::{Mat4, Vec3};
 use palette::{rgb, Srgba};
 
 use crate::{
-    rabject::{ExtractedRabjectWithId, Rabject}, renderer::Renderer, utils::Id, RanimContext, WgpuBuffer, WgpuContext
+    rabject::{ExtractedRabjectWithId, Rabject},
+    renderer::Renderer,
+    utils::Id,
+    RanimContext, WgpuBuffer, WgpuContext,
 };
 
 #[allow(unused)]
@@ -67,13 +70,18 @@ pub struct Camera {
     pub frame: CameraFrame,
     pub fps: u32,
     uniforms: CameraUniforms,
+    render_texture: wgpu::Texture,
     multisample_texture: wgpu::Texture,
-    rendering_texture: wgpu::Texture,
-    target_texture: wgpu::Texture,
-    texture_data: Option<Vec<u8>>,
-    texture_data_updated: bool,
-    depth_texture: wgpu::Texture,
+    depth_stencil_texture: wgpu::Texture,
+
+    render_view: wgpu::TextureView,
+    multisample_view: wgpu::TextureView,
+    depth_stencil_view: wgpu::TextureView,
+
+    output_view: wgpu::TextureView,
     output_staging_buffer: wgpu::Buffer,
+    output_texture_data: Option<Vec<u8>>,
+    output_texture_updated: bool,
 
     uniforms_buffer: WgpuBuffer<CameraUniforms>,
     uniforms_bind_group: CameraUniformsBindGroup,
@@ -84,21 +92,7 @@ impl Camera {
         let frame = CameraFrame::new_with_size(width, height);
 
         let ctx = &ctx.wgpu_ctx;
-        let rendering_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Rendering Texture"),
-            size: wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[wgpu::TextureFormat::Rgba16Float],
-        });
-        let target_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+        let render_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Target Texture"),
             size: wgpu::Extent3d {
                 width: width as u32,
@@ -108,11 +102,14 @@ impl Camera {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float,
+            format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::COPY_SRC
                 | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[wgpu::TextureFormat::Rgba16Float],
+            view_formats: &[
+                wgpu::TextureFormat::Rgba8Unorm,
+                wgpu::TextureFormat::Rgba8UnormSrgb,
+            ],
         });
         let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Multisample Texture"),
@@ -124,9 +121,9 @@ impl Camera {
             mip_level_count: 1,
             sample_count: 4,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba16Float,
+            format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[wgpu::TextureFormat::Rgba16Float],
+            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
         });
         let depth_stencil_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Depth Stencil Texture"),
@@ -144,7 +141,7 @@ impl Camera {
         });
         let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: (width * height * 8) as u64,
+            size: (width * height * 4) as u64,
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
@@ -161,17 +158,37 @@ impl Camera {
         );
         let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
 
+        let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            ..Default::default()
+        });
+        let multisample_view =
+            multisample_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let depth_stencil_view =
+            depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let output_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
+            ..Default::default()
+        });
+
         Self {
             frame,
             fps,
             uniforms,
-            rendering_texture,
-            target_texture,
+            // Textures
+            render_texture,
             multisample_texture,
-            texture_data: None,
-            texture_data_updated: false,
-            depth_texture: depth_stencil_texture,
+            depth_stencil_texture,
+            // Texture views
+            render_view,
+            multisample_view,
+            depth_stencil_view,
+            // Outputs
+            output_view,
             output_staging_buffer,
+            output_texture_data: None,
+            output_texture_updated: false,
+            // Uniforms
             uniforms_buffer,
             uniforms_bind_group,
         }
@@ -205,38 +222,20 @@ impl Camera {
             bytemuck::cast_slice(&[self.uniforms]),
         );
 
-        let rendering_view = self
-            .rendering_texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        let target_view = self
-            .target_texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        let multisample_view = self
-            .multisample_texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        let depth_view = self
-            .depth_texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder =
-            wgpu_ctx
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Encoder"),
-                });
+        let mut encoder = wgpu_ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Encoder"),
+            });
 
-        // if let Some(mut compute_pass) = R::begin_compute_pass(&mut encoder) {
-        //     for rabject in &rabjects {
-        //         R::compute(ctx, &mut compute_pass, &rabject.render_resource);
-        //     }
-        // }
-
+        // Clear
         {
             let bg = Srgba::from_u32::<rgb::channels::Rgba>(0x333333FF).into_linear();
             let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("VMobject Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &multisample_view,
-                    resolve_target: Some(&rendering_view),
+                    view: &self.multisample_view,
+                    resolve_target: Some(&self.render_view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: bg.red,
@@ -248,7 +247,7 @@ impl Camera {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &depth_view,
+                    view: &self.depth_stencil_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -262,47 +261,8 @@ impl Camera {
                 timestamp_writes: None,
             });
         }
-
-        // encoder.copy_texture_to_texture(wgpu::ImageCopyTexture {
-        //     texture: &self.rendering_texture,
-        //     aspect: wgpu::TextureAspect::All,
-        //         mip_level: 0,
-        //         origin: wgpu::Origin3d::ZERO,
-        //     },
-        //     wgpu::ImageCopyTexture {
-        //         texture: &self.target_texture,
-        //         aspect: wgpu::TextureAspect::All,
-        //         mip_level: 0,
-        //         origin: wgpu::Origin3d::ZERO,
-        //     },
-        //     self.rendering_texture.size(),
-        // );
-
         wgpu_ctx.queue.submit(Some(encoder.finish()));
 
-        // let mut encoder =
-        //     ctx.wgpu_ctx
-        //         .device
-        //         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        //             label: Some("Encoder"),
-        //         });
-
-        {
-            // let mut render_pass =
-            //     R::begin_render_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
-            // bind group 0 is reserved for camera uniforms
-            // render_pass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
-            // for rabject in &rabjects {
-            //     R::render(
-            //         ctx,
-            //         &multisample_view,
-            //         &target_view,
-            //         &depth_view,
-            //         &self.uniforms_bind_group.bind_group,
-            //         &rabject.render_resource,
-            //     );
-            // }
-        }
         let instances = rabjects
             .iter()
             .map(|rabject| &rabject.render_resource)
@@ -313,21 +273,23 @@ impl Camera {
             &wgpu_ctx,
             pipelines,
             &instances,
-            &multisample_view,
-            &target_view,
-            &depth_view,
+            &self.multisample_view,
+            &self.render_view,
+            &self.depth_stencil_view,
             &self.uniforms_bind_group.bind_group,
         );
-        // ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
 
-        self.texture_data_updated = false;
+        self.output_texture_updated = false;
     }
 
     fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
         let mut texture_data =
-            self.texture_data
-                .take()
-                .unwrap_or(vec![0; self.frame.size.0 * self.frame.size.1 * 8]);
+            self.output_texture_data.take().unwrap_or(vec![
+                0;
+                self.frame.size.0
+                    * self.frame.size.1
+                    * 4
+            ]);
 
         let mut encoder = ctx
             .device
@@ -338,7 +300,7 @@ impl Camera {
         encoder.copy_texture_to_buffer(
             wgpu::ImageCopyTexture {
                 aspect: wgpu::TextureAspect::All,
-                texture: &self.target_texture,
+                texture: &self.render_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
             },
@@ -346,11 +308,11 @@ impl Camera {
                 buffer: &self.output_staging_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some((self.frame.size.0 * 8) as u32),
+                    bytes_per_row: Some((self.frame.size.0 * 4) as u32),
                     rows_per_image: Some(self.frame.size.1 as u32),
                 },
             },
-            self.target_texture.size(),
+            self.render_texture.size(),
         );
         ctx.queue.submit(Some(encoder.finish()));
 
@@ -373,16 +335,16 @@ impl Camera {
         });
         self.output_staging_buffer.unmap();
 
-        self.texture_data = Some(texture_data);
-        self.texture_data_updated = true;
+        self.output_texture_data = Some(texture_data);
+        self.output_texture_updated = true;
     }
 
     pub(crate) fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
-        if !self.texture_data_updated {
+        if !self.output_texture_updated {
             // trace!("[Camera] Updating rendered texture data...");
             self.update_rendered_texture_data(ctx);
         }
-        &self.texture_data.as_ref().unwrap()
+        &self.output_texture_data.as_ref().unwrap()
     }
 
     pub fn refresh_uniforms(&mut self) {

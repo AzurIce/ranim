@@ -5,7 +5,7 @@ use crate::{rabject::Rabject, RenderResourceStorage, WgpuContext};
 pub mod vmobject;
 
 /// A render resource.
-pub(crate) trait RenderResource {
+pub trait RenderResource {
     fn new(ctx: &WgpuContext) -> Self
     where
         Self: Sized;
