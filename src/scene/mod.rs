@@ -9,7 +9,7 @@ use std::{
 };
 
 use file_writer::{FileWriter, FileWriterBuilder};
-use image::{DynamicImage, ImageBuffer, Rgba};
+use image::{ImageBuffer, Rgba};
 use log::trace;
 
 use crate::{
@@ -126,21 +126,9 @@ impl Scene {
     pub fn save_frame_to_image(&mut self, ctx: &mut RanimContext, path: impl AsRef<Path>) {
         let size = self.camera.frame.size;
         let texture_data = self.camera.get_rendered_texture(&ctx.wgpu_ctx);
-        let data: &[half::f16] = bytemuck::cast_slice(texture_data);
-        let data = data
-            .to_vec()
-            .into_iter()
-            .map(|f| f.to_f32())
-            .collect::<Vec<_>>();
-        let buffer = ImageBuffer::<Rgba<f32>, _>::from_raw(
-            size.0 as u32,
-            size.1 as u32,
-            data,
-        )
-        .unwrap();
-        let image = DynamicImage::ImageRgba32F(buffer);
-        let image = image.to_rgba8();
-        image.save(path).unwrap();
+        let buffer: ImageBuffer<Rgba<u8>, &[u8]> =
+            ImageBuffer::from_raw(size.0 as u32, size.1 as u32, texture_data).unwrap();
+        buffer.save(path).unwrap();
     }
 
     /// Play an animation

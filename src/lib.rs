@@ -72,7 +72,7 @@ impl RanimContext {
     }
 }
 
-pub(crate) struct WgpuContext {
+pub struct WgpuContext {
     // pub instance: wgpu::Instance,
     // pub adapter: wgpu::Adapter,
     pub device: wgpu::Device,

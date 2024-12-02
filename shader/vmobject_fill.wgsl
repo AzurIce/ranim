@@ -48,7 +48,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     // out.depth = in.position.z;
     out.color = color;
     if in.face < 0.0 {
-        out.color.a = -color.a / (1.0 - color.a);
+        // out.color.a = -color.a / (1.0 - color.a);
         // out.color.a = 0.0;
         // out.color.a = -color.a;
         // out.color = vec4<f32>(1.0, 0.0, 0.0, 0.1);

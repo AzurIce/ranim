@@ -5,39 +5,17 @@ use wgpu::include_wgsl;
 
 use crate::{
     camera::CameraUniformsBindGroup,
-    rabject::{
-        vmobject::{render::VMObjectRenderInstance, VMobject, VMobjectFillVertex},
-        Rabject, RabjectWithId,
-    },
-    RanimContext, RenderResourceStorage, WgpuContext,
+    rabject::vmobject::{render::VMObjectRenderInstance, VMobject, VMobjectFillVertex},
+    RenderResourceStorage, WgpuContext,
 };
 
 use super::{RenderResource, Renderer, Vertex};
 
-pub struct VMobjectRenderer {
-    alpha_texture: wgpu::Texture,
-}
+pub struct VMobjectRenderer {}
 
 impl RenderResource for VMobjectRenderer {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
-        let WgpuContext { device, .. } = wgpu_ctx;
-
-        let alpha_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("VMobject Alpha Texture"),
-            size: wgpu::Extent3d {
-                width: 1,
-                height: 1,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        });
-
-        Self { alpha_texture }
+        Self {}
     }
 }
 
@@ -180,70 +158,6 @@ impl Vertex for VMobjectFillVertex {
     }
 }
 
-pub struct DepthPipeline {
-    pub pipeline: wgpu::RenderPipeline,
-}
-
-impl Deref for DepthPipeline {
-    type Target = wgpu::RenderPipeline;
-    fn deref(&self) -> &Self::Target {
-        &self.pipeline
-    }
-}
-
-impl DepthPipeline {
-    fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
-        ctx.device
-            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("VMobject Fill Pipeline Layout"),
-                bind_group_layouts: &[&CameraUniformsBindGroup::bind_group_layout(ctx)],
-                push_constant_ranges: &[],
-            })
-    }
-}
-
-impl RenderResource for DepthPipeline {
-    fn new(wgpu_ctx: &WgpuContext) -> Self {
-        let WgpuContext { device, .. } = wgpu_ctx;
-
-        let module =
-            &device.create_shader_module(include_wgsl!("../../shader/vmobject_depth.wgsl"));
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("VMobject Depth Pipeline"),
-            layout: Some(&Self::pipeline_layout(&wgpu_ctx)),
-            vertex: wgpu::VertexState {
-                module,
-                entry_point: Some("vs_main"),
-                buffers: &[VMobjectFillVertex::desc()],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module,
-                entry_point: Some("fs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 4,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-            cache: None,
-        });
-
-        Self { pipeline }
-    }
-}
-
 pub struct StencilPipeline {
     pub pipeline: wgpu::RenderPipeline,
 }
@@ -333,10 +247,9 @@ impl Deref for FillPipeline {
     }
 }
 
-
 impl FillPipeline {
     fn output_format() -> wgpu::TextureFormat {
-        wgpu::TextureFormat::Rgba16Float
+        wgpu::TextureFormat::Rgba8Unorm
     }
 
     fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
@@ -387,7 +300,7 @@ impl RenderResource for FillPipeline {
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth24PlusStencil8,
-                depth_write_enabled: false,
+                depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::Less,
                 stencil: wgpu::StencilState {
                     front: wgpu::StencilFaceState {
@@ -433,7 +346,7 @@ impl Deref for StrokePipeline {
 
 impl StrokePipeline {
     fn output_format() -> wgpu::TextureFormat {
-        wgpu::TextureFormat::Rgba16Float
+        wgpu::TextureFormat::Rgba8Unorm
     }
 
     fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
@@ -483,7 +396,7 @@ impl RenderResource for StrokePipeline {
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth24PlusStencil8,
                 depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
+                depth_compare: wgpu::CompareFunction::LessEqual,
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
