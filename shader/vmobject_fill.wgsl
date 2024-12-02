@@ -43,7 +43,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     var out: FragmentOutput;
 
     var color = in.color;
-    color.a *= 0.95;
+    // color.a *= 0.95;
 
     // out.depth = in.position.z;
     out.color = color;

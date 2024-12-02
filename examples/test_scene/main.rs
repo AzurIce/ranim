@@ -1,10 +1,10 @@
 use std::time::Instant;
 
+use bevy_color::Srgba;
 use env_logger::Env;
 use log::info;
 use ranim::animation::transform::Transform;
 use ranim::glam::vec2;
-use ranim::palette::{rgb, Srgba};
 use ranim::rabject::Blueprint;
 use ranim::{
     rabject::vmobject::{Arc, Polygon},
@@ -40,7 +40,7 @@ fn main() {
         .with_radius(100.0)
         .with_stroke_width(20.0)
         .build();
-    arc.set_color(Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into());
+    arc.set_color(Srgba::hex("29ABCAFF").unwrap());
 
     let mut transform = Transform::new(polygon.clone(), arc);
 

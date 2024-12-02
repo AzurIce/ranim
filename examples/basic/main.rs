@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
+use bevy_color::Srgba;
 use env_logger::Env;
 use log::info;
 use ranim::glam::{vec2, Vec3};
-use ranim::palette::{rgb, Srgba};
 use ranim::rabject::vmobject::TransformAnchor;
 use ranim::rabject::Blueprint;
 use ranim::{
@@ -17,7 +17,8 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace"))
+        .init();
 
     let mut ctx = RanimContext::new();
 
@@ -34,13 +35,11 @@ fn main() {
     ])
     .with_width(20.0)
     .build();
-    polygon
-        .set_color(Srgba::from_u32::<rgb::channels::Rgba>(0xE65A4CFF).into())
-        .rotate(
-            std::f32::consts::PI / 4.0,
-            Vec3::Z,
-            TransformAnchor::origin(),
-        );
+    polygon.set_color(Srgba::hex("FC6255FF").unwrap()).rotate(
+        std::f32::consts::PI / 4.0,
+        Vec3::Z,
+        TransformAnchor::origin(),
+    );
 
     let polygon = scene
         .play(
@@ -55,7 +54,7 @@ fn main() {
         .with_radius(100.0)
         .with_stroke_width(20.0)
         .build();
-    arc.set_color(Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into());
+    arc.set_color(Srgba::hex("58C4DDFF").unwrap());
 
     let arc = scene.play(&mut ctx, Transform::new(polygon, arc)).unwrap();
     scene.play(&mut ctx, Fading::fade_out(arc));

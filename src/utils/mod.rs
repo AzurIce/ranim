@@ -1,5 +1,6 @@
 pub mod rate_functions;
 
+use bevy_color::Srgba;
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
 use crate::rabject::Interpolatable;
@@ -129,4 +130,15 @@ pub fn partial_quadratic_bezier<T: Interpolatable>(
     let end_prop = (b - a) / (1.0 - a);
     let h1 = h0.lerp(&h1_prime, end_prop);
     [h0, h1, h2]
+}
+
+impl Interpolatable for Srgba {
+    fn lerp(&self, other: &Self, t: f32) -> Self {
+        Self {
+            red: self.red.lerp(&other.red, t),
+            green: self.green.lerp(&other.green, t),
+            blue: self.blue.lerp(&other.blue, t),
+            alpha: self.alpha.lerp(&other.alpha, t),
+        }
+    }
 }
