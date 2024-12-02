@@ -17,7 +17,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace"))
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info"))
         .init();
 
     let mut ctx = RanimContext::new();
@@ -35,7 +35,7 @@ fn main() {
     ])
     .with_width(20.0)
     .build();
-    polygon.set_color(Srgba::hex("FC6255FF").unwrap()).rotate(
+    polygon.set_color(Srgba::hex("FF8080FF").unwrap()).rotate(
         std::f32::consts::PI / 4.0,
         Vec3::Z,
         TransformAnchor::origin(),
