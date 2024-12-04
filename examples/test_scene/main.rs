@@ -28,7 +28,7 @@ fn main() {
         vec2(200.0, 300.0),
         vec2(0.0, 0.0),
     ])
-    .with_width(20.0)
+    .with_stroke_width(20.0)
     .build();
     scene.insert_rabject(&polygon);
     // scene.render_to_image(&mut ctx, "output1.png");
