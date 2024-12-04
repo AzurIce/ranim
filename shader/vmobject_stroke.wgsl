@@ -31,11 +31,11 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     // } else {
     //     out.position = vec4<f32>(-0.5, -0.5, 0.0, 1.0);
     // }
-    out.position = in.pos;
+    out.position = uniforms.matrix * in.pos;
 
-    out.position.x *= uniforms.rescale_factors.x;
-    out.position.y *= uniforms.rescale_factors.y;
-    out.position.z *= uniforms.rescale_factors.z;
+    // out.position.x *= uniforms.rescale_factors.x;
+    // out.position.y *= uniforms.rescale_factors.y;
+    // out.position.z *= uniforms.rescale_factors.z;
     // out.position.w = 1.0 - out.position.z;
 
     out.color = in.color;

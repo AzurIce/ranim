@@ -197,18 +197,18 @@ impl Blueprint<VMobject> for Ellipse {
 #[derive(Debug, Clone)]
 pub struct Polygon {
     pub corner_points: Vec<Vec2>,
-    pub width: f32,
+    pub stroke_width: f32,
 }
 
 impl Polygon {
     pub fn new(corner_points: Vec<Vec2>) -> Self {
         Self {
             corner_points,
-            width: 10.0,
+            stroke_width: 10.0,
         }
     }
-    pub fn with_width(mut self, width: f32) -> Self {
-        self.width = width;
+    pub fn with_stroke_width(mut self, stroke_width: f32) -> Self {
+        self.stroke_width = stroke_width;
         self
     }
 }
@@ -227,73 +227,67 @@ impl Blueprint<VMobject> for Polygon {
             .collect::<Vec<_>>();
 
         let mut mobject = VMobject::from_corner_points(vertices);
-        mobject.set_stroke_width(self.width);
+        mobject.set_stroke_width(self.stroke_width);
         mobject.into()
     }
 }
 
-// pub struct BezierShape {
-//     pub beziers: Vec<Bezier>,
-//     pub width: SubpathWidth,
-//     pub stroke_color: Vec4,
-//     pub fill_color: Vec4,
-//     pub closed: bool,
-// }
+pub struct Rect {
+    pub width: f32,
+    pub height: f32,
+    pub stroke_width: f32,
+}
 
-// impl BezierShape {
-//     pub fn closed(beziers: Vec<Bezier>) -> Self {
-//         Self {
-//             closed: true,
-//             ..Self::unclosed(beziers)
-//         }
-//     }
+impl Rect {
+    pub fn new(width: f32, height: f32) -> Self {
+        Self {
+            width,
+            height,
+            stroke_width: 10.0,
+        }
+    }
+    pub fn with_stroke_width(mut self, stroke_width: f32) -> Self {
+        self.stroke_width = stroke_width;
+        self
+    }
+}
 
-//     pub fn unclosed(beziers: Vec<Bezier>) -> Self {
-//         let stroke_color: Srgba = Srgba::from_u32::<rgb::channels::Rgba>(0x29ABCAFF).into();
-//         Self {
-//             beziers,
-//             width: SubpathWidth::Middle(1.0),
-//             stroke_color: vec4(
-//                 stroke_color.red,
-//                 stroke_color.green,
-//                 stroke_color.blue,
-//                 stroke_color.alpha,
-//             ),
-//             fill_color: Vec4::ZERO,
-//             closed: false,
-//         }
-//     }
+impl Blueprint<VMobject> for Rect {
+    fn build(self) -> RabjectWithId<VMobject> {
+        let mobject = Polygon::new(vec![
+            vec2(0.0, 0.0),
+            vec2(self.width, 0.0),
+            vec2(self.width, self.height),
+            vec2(0.0, self.height),
+        ])
+        .with_stroke_width(self.stroke_width)
+        .build();
+        mobject.into()
+    }
+}
 
-//     pub fn with_width(mut self, width: SubpathWidth) -> Self {
-//         self.width = width;
-//         self
-//     }
+pub struct Square {
+    pub side_length: f32,
+    pub stroke_width: f32,
+}
 
-//     pub fn with_stroke_color(mut self, stroke_color: Vec4) -> Self {
-//         self.stroke_color = stroke_color;
-//         self
-//     }
+impl Square {
+    pub fn new(side_length: f32) -> Self {
+        Self {
+            side_length,
+            stroke_width: 10.0,
+        }
+    }
+    pub fn with_stroke_width(mut self, stroke_width: f32) -> Self {
+        self.stroke_width = stroke_width;
+        self
+    }
+}
 
-//     pub fn with_fill_color(mut self, fill_color: Vec4) -> Self {
-//         self.fill_color = fill_color;
-//         self
-//     }
-// }
-
-// impl Blueprint<VMobject> for BezierShape {
-//     fn build(self) -> RabjectWithId<VMobject> {
-//         let beziers = self
-//             .beziers
-//             .into_iter()
-//             .filter(|bezier| !bezier.is_point())
-//             .collect::<Vec<_>>();
-
-//         let mut vertices = beziers_to_stroke(&beziers, self.width, self.stroke_color, self.closed);
-
-//         if self.closed {
-//             vertices.extend(beziers_to_fill(&beziers, self.fill_color).into_iter());
-//         }
-
-//         VMobject::from_points(vertices).into()
-//     }
-// }
+impl Blueprint<VMobject> for Square {
+    fn build(self) -> RabjectWithId<VMobject> {
+        Rect::new(self.side_length, self.side_length)
+            .with_stroke_width(self.stroke_width)
+            .build()
+    }
+}

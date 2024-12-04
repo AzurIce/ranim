@@ -1,6 +1,8 @@
 use std::ops::Deref;
 
+#[allow(unused_imports)]
 use log::trace;
+
 use wgpu::include_wgsl;
 
 use crate::{
@@ -48,10 +50,10 @@ impl Renderer<VMobject> for VMobjectRenderer {
             for render_instance in render_instances {
                 pass.set_bind_group(0, &render_instance.compute_bind_group, &[]);
                 // number of segments
-                trace!(
-                    "dispatch workgroups: {}",
-                    render_instance.points_buffer.len() / 2
-                );
+                // trace!(
+                //     "dispatch workgroups: {}",
+                //     render_instance.points_buffer.len() / 2
+                // );
                 pass.dispatch_workgroups(render_instance.points_buffer.len() as u32 / 2, 1, 1);
             }
         }
@@ -123,7 +125,7 @@ impl Renderer<VMobject> for VMobjectRenderer {
             for render_instance in render_instances {
                 pass.set_bind_group(1, &render_instance.render_stroke_bind_group, &[]);
                 let len = render_instance.points_buffer.len() as u32 / 2 * MAX_STEP * 2;
-                trace!("draw {}", len);
+                // trace!("draw {}", len);
                 pass.draw(0..len, 0..1);
             }
         }
