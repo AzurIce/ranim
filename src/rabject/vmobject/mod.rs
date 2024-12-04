@@ -2,7 +2,7 @@ mod blueprint;
 pub mod render;
 use std::{cmp::Ordering, fmt::Debug};
 
-use bevy_color::{Color, LinearRgba, Srgba};
+use bevy_color::{LinearRgba, Srgba};
 pub use blueprint::*;
 
 use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3, Vec4};

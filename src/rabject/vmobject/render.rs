@@ -155,6 +155,7 @@ impl RenderInstance<VMobject> for VMObjectRenderInstance {
         let points = rabject.points();
         let joint_angles = rabject.get_joint_angles();
         let unit_normal = rabject.get_unit_normal();
+        let fill_vertices = rabject.parse_fill();
         // trace!(
         //     "INIT points: {:?}",
         //     points.iter().map(|p| p.position()).collect::<Vec<_>>()
@@ -177,9 +178,9 @@ impl RenderInstance<VMobject> for VMObjectRenderInstance {
             (std::mem::size_of::<VMobjectStrokeVertex>() * 1024) as u64,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
-        let fill_vertex_buffer = WgpuBuffer::new(
+        let fill_vertex_buffer = WgpuBuffer::new_init(
             &ctx.wgpu_ctx,
-            (std::mem::size_of::<VMobjectFillVertex>() * 1024) as u64,
+            &fill_vertices,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
         let compute_uniform_buffer = WgpuBuffer::new_init(

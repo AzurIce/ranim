@@ -4,7 +4,7 @@ use std::{
 };
 
 use bevy_color::Color;
-use glam::{Mat4, Vec3};
+use glam::{vec3, Mat4, Vec3};
 
 use crate::{
     rabject::{ExtractedRabjectWithId, Rabject},
@@ -20,7 +20,7 @@ use log::{debug, trace};
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 /// Uniforms for the camera
 pub struct CameraUniforms {
-    view_mat: Mat4,
+    view_projection_mat: Mat4,
     frame_rescale_factors: Vec3,
     _padding: f32,
 }
@@ -71,8 +71,8 @@ pub struct Camera {
     pub fps: u32,
     uniforms: CameraUniforms,
     render_texture: wgpu::Texture,
-    multisample_texture: wgpu::Texture,
-    depth_stencil_texture: wgpu::Texture,
+    // multisample_texture: wgpu::Texture,
+    // depth_stencil_texture: wgpu::Texture,
 
     render_view: wgpu::TextureView,
     multisample_view: wgpu::TextureView,
@@ -153,7 +153,7 @@ impl Camera {
         });
 
         let uniforms = CameraUniforms {
-            view_mat: frame.view_matrix(),
+            view_projection_mat: frame.view_projection_matrix(),
             frame_rescale_factors: frame.rescale_factors(),
             _padding: 0.0,
         };
@@ -185,8 +185,8 @@ impl Camera {
             uniforms,
             // Textures
             render_texture,
-            multisample_texture,
-            depth_stencil_texture,
+            // multisample_texture,
+            // depth_stencil_texture,
             // Texture views
             render_view,
             multisample_view,
@@ -222,7 +222,7 @@ impl Camera {
         // Update the uniforms buffer
         // trace!("[Camera]: Refreshing uniforms...");
         self.refresh_uniforms();
-        // debug!("[Camera]: Uniforms: {:?}", self.uniforms);
+        debug!("[Camera]: Uniforms: {:?}", self.uniforms);
         // trace!("[Camera] uploading camera uniforms to buffer...");
         wgpu_ctx.queue.write_buffer(
             &self.uniforms_buffer,
@@ -358,7 +358,7 @@ impl Camera {
     }
 
     pub fn refresh_uniforms(&mut self) {
-        self.uniforms.view_mat = self.frame.view_matrix();
+        self.uniforms.view_projection_mat = self.frame.view_projection_matrix();
         self.uniforms.frame_rescale_factors = self.frame.rescale_factors();
     }
 }
@@ -375,7 +375,7 @@ impl CameraFrame {
     pub fn new_with_size(width: usize, height: usize) -> Self {
         Self {
             size: (width, height),
-            fovy: std::f32::consts::PI / 4.0,
+            fovy: std::f32::consts::PI / 2.0,
             pos: Vec3::ZERO,
             rotation: Mat4::IDENTITY,
         }
@@ -384,7 +384,21 @@ impl CameraFrame {
 
 impl CameraFrame {
     pub fn view_matrix(&self) -> Mat4 {
-        self.rotation.inverse() * Mat4::from_translation(-self.pos)
+        Mat4::look_at_rh(vec3(0.0, 0.0, 540.0), Vec3::NEG_Z, Vec3::Y)
+        // self.rotation.inverse() * Mat4::from_translation(-self.pos)
+    }
+
+    pub fn projection_matrix(&self) -> Mat4 {
+        Mat4::perspective_rh(
+            self.fovy,
+            self.size.0 as f32 / self.size.1 as f32,
+            0.1,
+            1000.0,
+        )
+    }
+
+    pub fn view_projection_matrix(&self) -> Mat4 {
+        self.projection_matrix() * self.view_matrix()
     }
 
     pub fn rescale_factors(&self) -> Vec3 {

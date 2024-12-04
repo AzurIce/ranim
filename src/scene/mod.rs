@@ -57,6 +57,13 @@ impl Scene {
         }
     }
 
+    /// The size of the camera frame
+    /// 
+    /// for a `scene`, this is equal to `scene.camera.frame.size`
+    pub fn size(&self) -> (usize, usize) {
+        self.camera.frame.size
+    }
+
     /// With default [`FileWriterBuilder`]
     pub fn new() -> Self {
         Self::new_with_video_writer_builder(FileWriter::builder())
