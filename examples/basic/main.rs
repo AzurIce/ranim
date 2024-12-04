@@ -23,13 +23,13 @@ fn main() {
     info!("running...");
 
     let mut polygon = Polygon::new(vec![
-        vec2(-100.0, -300.0),
         vec2(0.0, 0.0),
-        vec2(200.0, 300.0),
-        vec2(0.0, 700.0),
+        vec2(-100.0, -300.0),
         vec2(500.0, 0.0),
+        vec2(0.0, 700.0),
+        vec2(200.0, 300.0),
     ])
-    .with_width(20.0)
+    .with_stroke_width(0.0)
     .build();
     polygon.set_color(Srgba::hex("FF8080FF").unwrap()).rotate(
         std::f32::consts::PI / 4.0,
