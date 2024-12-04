@@ -2,7 +2,7 @@
 
 This example demonstrates `Arc`.
 
-https://github.com/user-attachments/assets/a4471ff2-9573-444a-860a-c93efea9d3fa
+https://github.com/user-attachments/assets/cc5a9fc4-4b04-4708-8aa2-81990fb18674
 
 > [arc.mp4](../../assets/arc.mp4)
 
