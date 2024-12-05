@@ -1,4 +1,7 @@
-use crate::rabject::{vmobject::VMobject, Interpolatable, RabjectWithId};
+use crate::{
+    interpolate::Interpolatable,
+    rabject::{vmobject::VMobject, RabjectWithId},
+};
 
 use super::{Animation, AnimationConfig, AnimationFunc};
 

@@ -1,9 +1,11 @@
 pub mod rate_functions;
 
+use std::{any::{Any, TypeId}, collections::HashMap};
+
 use bevy_color::Srgba;
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
-use crate::rabject::Interpolatable;
+use crate::{interpolate::Interpolatable, renderer::RenderResource, WgpuContext};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
@@ -11,6 +13,34 @@ pub struct Id(u128);
 impl Id {
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().as_u128())
+    }
+}
+
+#[derive(Default)]
+pub struct RenderResourceStorage {
+    inner: HashMap<TypeId, Box<dyn Any>>,
+}
+
+impl RenderResourceStorage {
+    pub fn get_or_init<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &P {
+        let id = std::any::TypeId::of::<P>();
+        if !self.inner.contains_key(&id) {
+            let pipeline = P::new(ctx);
+            self.inner.insert(id, Box::new(pipeline));
+        }
+        self.inner.get(&id).unwrap().downcast_ref::<P>().unwrap()
+    }
+    pub fn get_or_init_mut<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &mut P {
+        let id = std::any::TypeId::of::<P>();
+        if !self.inner.contains_key(&id) {
+            let pipeline = P::new(ctx);
+            self.inner.insert(id, Box::new(pipeline));
+        }
+        self.inner
+            .get_mut(&id)
+            .unwrap()
+            .downcast_mut::<P>()
+            .unwrap()
     }
 }
 

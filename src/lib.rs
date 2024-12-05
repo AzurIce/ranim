@@ -1,14 +1,13 @@
 use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
     fmt::Debug,
     ops::Deref,
     sync::Arc,
 };
 
-use renderer::RenderResource;
+use utils::RenderResourceStorage;
 use wgpu::util::DeviceExt;
 
+pub mod interpolate;
 pub use glam;
 pub mod color;
 
@@ -20,33 +19,6 @@ pub(crate) mod renderer;
 pub mod scene;
 pub mod utils;
 
-#[derive(Default)]
-pub struct RenderResourceStorage {
-    inner: HashMap<TypeId, Box<dyn Any>>,
-}
-
-impl RenderResourceStorage {
-    pub fn get_or_init<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &P {
-        let id = std::any::TypeId::of::<P>();
-        if !self.inner.contains_key(&id) {
-            let pipeline = P::new(ctx);
-            self.inner.insert(id, Box::new(pipeline));
-        }
-        self.inner.get(&id).unwrap().downcast_ref::<P>().unwrap()
-    }
-    pub fn get_or_init_mut<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &mut P {
-        let id = std::any::TypeId::of::<P>();
-        if !self.inner.contains_key(&id) {
-            let pipeline = P::new(ctx);
-            self.inner.insert(id, Box::new(pipeline));
-        }
-        self.inner
-            .get_mut(&id)
-            .unwrap()
-            .downcast_mut::<P>()
-            .unwrap()
-    }
-}
 
 pub struct RanimContext {
     pub(crate) wgpu_ctx: Arc<WgpuContext>,

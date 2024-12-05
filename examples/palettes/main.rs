@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use env_logger::Env;
 use glam::vec3;
 use ranim::color::palettes::manim::*;

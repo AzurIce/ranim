@@ -4,8 +4,9 @@ use bevy_color::Srgba;
 use env_logger::Env;
 use log::info;
 use ranim::glam::vec3;
+use ranim::interpolate::Interpolatable;
 use ranim::rabject::vmobject::Arc;
-use ranim::rabject::{Blueprint, Interpolatable};
+use ranim::rabject::Blueprint;
 use ranim::{animation::fading::Fading, scene::Scene};
 
 fn main() {
