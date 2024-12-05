@@ -10,11 +10,10 @@ use itertools::Itertools;
 use render::VMObjectRenderInstance;
 
 use crate::{
-    renderer::vmobject::VMobjectRenderer,
-    utils::{partial_quadratic_bezier, rotation_between_vectors},
+    interpolate::Interpolatable, renderer::vmobject::VMobjectRenderer, utils::{partial_quadratic_bezier, rotation_between_vectors}
 };
 
-use super::{Interpolatable, Rabject};
+use super::Rabject;
 
 #[allow(unused)]
 use log::{trace, warn};
@@ -26,17 +25,6 @@ pub struct VMobjectPoint {
     pub stroke_width: f32,
     pub stroke_color: LinearRgba,
     pub fill_color: LinearRgba,
-}
-
-impl Interpolatable for LinearRgba {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
-        Self {
-            red: self.red.lerp(&target.red, t),
-            green: self.green.lerp(&target.green, t),
-            blue: self.blue.lerp(&target.blue, t),
-            alpha: self.alpha.lerp(&target.alpha, t),
-        }
-    }
 }
 
 impl Interpolatable for VMobjectPoint {
@@ -551,7 +539,10 @@ impl VMobject {
         );
         self
     }
-    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy + Clone) -> &mut Self {
+    pub fn set_stroke_color(
+        &mut self,
+        color: impl Into<LinearRgba> + Debug + Copy + Clone,
+    ) -> &mut Self {
         // let color = vec4(color.red, color.green, color.blue, color.alpha);
 
         self.points.iter_mut().for_each(|p| {
@@ -559,7 +550,10 @@ impl VMobject {
         });
         self
     }
-    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy + Clone) -> &mut Self {
+    pub fn set_fill_color(
+        &mut self,
+        color: impl Into<LinearRgba> + Debug + Copy + Clone,
+    ) -> &mut Self {
         trace!("set fill color: {:?}", color);
         // let color = vec4(color.red, color.green, color.blue, color.alpha);
 
