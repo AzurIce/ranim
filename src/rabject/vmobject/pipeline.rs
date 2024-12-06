@@ -1,137 +1,12 @@
 use std::ops::Deref;
 
-#[allow(unused_imports)]
-use log::trace;
-
-use wgpu::include_wgsl;
-
 use crate::{
     camera::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
-    rabject::vmobject::{render::VMObjectRenderInstance, VMobject, VMobjectFillVertex},
-    RenderResourceStorage, WgpuContext,
+    rabject::{RenderResource, Vertex},
+    WgpuContext,
 };
 
-use super::{RenderResource, Renderer, Vertex};
-
-pub struct VMobjectRenderer {}
-
-impl RenderResource for VMobjectRenderer {
-    fn new(_wgpu_ctx: &WgpuContext) -> Self {
-        Self {}
-    }
-}
-
-const MAX_STEP: u32 = 16;
-impl Renderer<VMobject> for VMobjectRenderer {
-    fn render(
-        &self,
-        wgpu_ctx: &WgpuContext,
-        pipelines: &mut RenderResourceStorage,
-        render_instances: &[&VMObjectRenderInstance],
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-        uniforms_bind_group: &wgpu::BindGroup,
-    ) {
-        let mut encoder = wgpu_ctx
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("VMObject Render Encoder"),
-            });
-
-        // Compute pass for stroke
-        {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("VMObject Compute Pass"),
-                timestamp_writes: None,
-            });
-            let pipeline = pipelines.get_or_init::<ComputePipeline>(wgpu_ctx);
-            pass.set_pipeline(&pipeline);
-            for render_instance in render_instances {
-                pass.set_bind_group(0, &render_instance.compute_bind_group, &[]);
-                // number of segments
-                // trace!(
-                //     "dispatch workgroups: {}",
-                //     render_instance.points_buffer.len() / 2
-                // );
-                pass.dispatch_workgroups(render_instance.points_buffer.len() as u32 / 2, 1, 1);
-            }
-        }
-
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("VMobject Stencil Pass"),
-                color_attachments: &[],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &depth_view,
-                    depth_ops: None,
-                    stencil_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    }),
-                }),
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-            pass.set_bind_group(0, uniforms_bind_group, &[]);
-
-            let pipeline = pipelines.get_or_init::<StencilPipeline>(wgpu_ctx);
-            pass.set_pipeline(&pipeline);
-            for render_instance in render_instances {
-                pass.set_vertex_buffer(0, render_instance.fill_vertices_buffer.slice(..));
-                pass.draw(0..render_instance.fill_vertices_buffer.len() as u32, 0..1);
-            }
-        }
-
-        // Render pass for fill and stroke
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("VMobject Fill Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &multisample_view,
-                    resolve_target: Some(&target_view),
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &depth_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Discard,
-                    }),
-                    stencil_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Discard,
-                    }),
-                }),
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-            // let mut pass =
-            //     Self::begin_render_pass(&mut encoder, &multisample_view, &target_view, &depth_view);
-            pass.set_bind_group(0, uniforms_bind_group, &[]);
-
-            let pipeline_vmobject_fill = pipelines.get_or_init::<FillPipeline>(wgpu_ctx);
-            pass.set_pipeline(&pipeline_vmobject_fill);
-            for render_instance in render_instances {
-                pass.set_vertex_buffer(0, render_instance.fill_vertices_buffer.slice(..));
-                pass.draw(0..render_instance.fill_vertices_buffer.len() as u32, 0..1);
-            }
-
-            let pipeline_vmobject_stroke = pipelines.get_or_init::<StrokePipeline>(wgpu_ctx);
-            pass.set_pipeline(&pipeline_vmobject_stroke);
-            for render_instance in render_instances {
-                pass.set_bind_group(1, &render_instance.render_stroke_bind_group, &[]);
-                let len = render_instance.points_buffer.len() as u32 / 2 * MAX_STEP * 2;
-                // trace!("draw {}", len);
-                pass.draw(0..len, 0..1);
-            }
-        }
-        wgpu_ctx.queue.submit(Some(encoder.finish()));
-    }
-}
+use super::{primitive::VMobjectPrimitive, VMobjectFillVertex};
 
 impl Vertex for VMobjectFillVertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
@@ -186,7 +61,8 @@ impl RenderResource for StencilPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module = &device.create_shader_module(include_wgsl!("../../shader/vmobject_fill.wgsl"));
+        let module =
+            &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Stencil Pipeline"),
             layout: Some(&Self::pipeline_layout(&wgpu_ctx)),
@@ -268,7 +144,8 @@ impl RenderResource for FillPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module = &device.create_shader_module(include_wgsl!("../../shader/vmobject_fill.wgsl"));
+        let module =
+            &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Fill Pipeline"),
             layout: Some(&Self::pipeline_layout(&wgpu_ctx)),
@@ -357,7 +234,7 @@ impl StrokePipeline {
                 label: Some("VMobject Fill Pipeline Layout"),
                 bind_group_layouts: &[
                     &CameraUniformsBindGroup::bind_group_layout(ctx),
-                    &VMObjectRenderInstance::render_bind_group_layout(&ctx.device),
+                    &VMobjectPrimitive::render_bind_group_layout(&ctx.device),
                 ],
                 push_constant_ranges: &[],
             })
@@ -368,8 +245,8 @@ impl RenderResource for StrokePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module =
-            &device.create_shader_module(include_wgsl!("../../shader/vmobject_stroke.wgsl"));
+        let module = &device
+            .create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_stroke.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Stroke Pipeline"),
             layout: Some(&Self::pipeline_layout(&wgpu_ctx)),
@@ -430,12 +307,12 @@ impl RenderResource for ComputePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module =
-            &device.create_shader_module(include_wgsl!("../../shader/vmobject_compute.wgsl"));
+        let module = &device
+            .create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_compute.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("VMobject Compute Pipeline Layout"),
-            bind_group_layouts: &[&VMObjectRenderInstance::compute_bind_group_layout(&device)],
+            bind_group_layouts: &[&VMobjectPrimitive::compute_bind_group_layout(&device)],
             push_constant_ranges: &[],
         });
 

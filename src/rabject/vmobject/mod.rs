@@ -1,5 +1,9 @@
 mod blueprint;
-pub mod render;
+// pub mod extract;
+// pub mod render;
+pub mod pipeline;
+pub mod primitive;
+
 use std::{cmp::Ordering, fmt::Debug};
 
 use bevy_color::{LinearRgba, Srgba};
@@ -7,13 +11,16 @@ pub use blueprint::*;
 
 use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
-use render::VMObjectRenderInstance;
+use primitive::{ExtractedVMobject, VMobjectPrimitive};
+// use render::VMObjectRenderInstance;
 
 use crate::{
-    interpolate::Interpolatable, renderer::vmobject::VMobjectRenderer, utils::{partial_quadratic_bezier, rotation_between_vectors}
+    interpolate::Interpolatable,
+    scene::Entity,
+    utils::{partial_quadratic_bezier, rotation_between_vectors, Id},
 };
 
-use super::Rabject;
+use super::{Rabject, RabjectId};
 
 #[allow(unused)]
 use log::{trace, warn};
@@ -228,9 +235,37 @@ pub(crate) struct ComputeUniform {
     _padding: f32,
 }
 
+pub struct VMobjectId(Id);
+impl RabjectId for VMobjectId {
+    fn from_id(id: Id) -> Self {
+        Self(id)
+    }
+
+    fn to_id(&self) -> Id {
+        self.0
+    }
+}
+
 impl Rabject for VMobject {
-    type Renderer = VMobjectRenderer;
-    type RenderInstance = VMObjectRenderInstance;
+    type Data = Self;
+    type Id = VMobjectId;
+    type RenderData = ExtractedVMobject;
+    type RenderResource = VMobjectPrimitive;
+
+    fn insert_to_scene(self, scene: &mut crate::scene::Scene) -> Self::Id {
+        let entity = Entity {
+            rabject: self,
+            children: vec![],
+            render_data: None,
+            render_resource: None,
+        };
+        VMobjectId::from_id(scene.insert_entity(entity))
+    }
+
+    fn remove_from_scene(scene: &mut crate::scene::Scene, id: Self::Id) {
+        let id = id.to_id();
+        scene.remove_entity(id);
+    }
 }
 
 pub enum TransformAnchor {
