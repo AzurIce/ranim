@@ -6,12 +6,7 @@ use std::{
 use bevy_color::Color;
 use glam::{vec3, Mat4, Vec3};
 
-use crate::{
-    rabject::{ExtractedRabjectWithId, Rabject},
-    renderer::Renderer,
-    utils::Id,
-    RanimContext, WgpuBuffer, WgpuContext,
-};
+use crate::{rabject::Rabject, utils::Id, RanimContext, WgpuBuffer, WgpuContext};
 
 #[allow(unused)]
 use log::{debug, trace};
@@ -73,7 +68,6 @@ pub struct Camera {
     render_texture: wgpu::Texture,
     // multisample_texture: wgpu::Texture,
     // depth_stencil_texture: wgpu::Texture,
-
     render_view: wgpu::TextureView,
     multisample_view: wgpu::TextureView,
     depth_stencil_view: wgpu::TextureView,
@@ -202,34 +196,7 @@ impl Camera {
         }
     }
 
-    pub fn render<R: Rabject>(
-        &mut self,
-        ctx: &mut RanimContext,
-        rabjects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
-    ) {
-        let Some(rabjects) = rabjects.get_mut(&std::any::TypeId::of::<R>()) else {
-            return;
-        };
-        let rabjects = rabjects
-            .iter_mut()
-            .map(|(_, rabject)| rabject.downcast_mut::<ExtractedRabjectWithId<R>>().unwrap())
-            .collect::<Vec<_>>();
-
-        let wgpu_ctx = ctx.wgpu_ctx();
-
-        // trace!("[Camera] Rendering...");
-
-        // Update the uniforms buffer
-        // trace!("[Camera]: Refreshing uniforms...");
-        self.refresh_uniforms();
-        debug!("[Camera]: Uniforms: {:?}", self.uniforms);
-        // trace!("[Camera] uploading camera uniforms to buffer...");
-        wgpu_ctx.queue.write_buffer(
-            &self.uniforms_buffer,
-            0,
-            bytemuck::cast_slice(&[self.uniforms]),
-        );
-
+    fn clear_screen(&self, wgpu_ctx: &WgpuContext) {
         let mut encoder = wgpu_ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -272,6 +239,37 @@ impl Camera {
             });
         }
         wgpu_ctx.queue.submit(Some(encoder.finish()));
+    }
+
+    pub fn render<R: Rabject>(
+        &mut self,
+        ctx: &mut RanimContext,
+        rabjects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
+    ) {
+        let Some(rabjects) = rabjects.get_mut(&std::any::TypeId::of::<R>()) else {
+            return;
+        };
+        let rabjects = rabjects
+            .iter_mut()
+            .map(|(_, rabject)| rabject.downcast_mut::<ExtractedRabjectWithId<R>>().unwrap())
+            .collect::<Vec<_>>();
+
+        let wgpu_ctx = ctx.wgpu_ctx();
+
+        // trace!("[Camera] Rendering...");
+
+        // Update the uniforms buffer
+        // trace!("[Camera]: Refreshing uniforms...");
+        self.refresh_uniforms();
+        debug!("[Camera]: Uniforms: {:?}", self.uniforms);
+        // trace!("[Camera] uploading camera uniforms to buffer...");
+        wgpu_ctx.queue.write_buffer(
+            &self.uniforms_buffer,
+            0,
+            bytemuck::cast_slice(&[self.uniforms]),
+        );
+
+        self.clear_screen(&wgpu_ctx);
 
         let instances = rabjects
             .iter()

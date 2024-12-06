@@ -1,11 +1,14 @@
 pub mod rate_functions;
 
-use std::{any::{Any, TypeId}, collections::HashMap};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+};
 
 use bevy_color::Srgba;
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
-use crate::{interpolate::Interpolatable, renderer::RenderResource, WgpuContext};
+use crate::{interpolate::Interpolatable, rabject::RenderResource, WgpuContext};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
@@ -128,10 +131,7 @@ pub fn extend_with_last<T: Clone + Default>(vec: &mut Vec<T>, new_len: usize) {
 }
 
 /// Returns the point on a quadratic bezier curve at the given parameter.
-pub fn point_on_quadratic_bezier<T: Interpolatable>(
-    points: &[T; 3],
-    t: f32,
-) -> T {
+pub fn point_on_quadratic_bezier<T: Interpolatable>(points: &[T; 3], t: f32) -> T {
     let t = t.clamp(0.0, 1.0);
     let p1 = points[0].lerp(&points[1], t);
     let p2 = points[1].lerp(&points[2], t);
@@ -145,11 +145,7 @@ pub fn point_on_quadratic_bezier<T: Interpolatable>(
 }
 
 /// Returns the control points of the given part of a quadratic bezier curve.
-pub fn partial_quadratic_bezier<T: Interpolatable>(
-    points: &[T; 3],
-    a: f32,
-    b: f32,
-) -> [T; 3] {
+pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f32, b: f32) -> [T; 3] {
     let a = a.clamp(0.0, 1.0);
     let b = b.clamp(0.0, 1.0);
 

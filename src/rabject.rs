@@ -1,132 +1,178 @@
+pub mod group;
 pub mod vmobject;
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
-use crate::{renderer::{RenderResource, Renderer}, utils::Id, RanimContext};
+use crate::{
+    // renderer::{RenderResource, Renderer},
+    scene::{Entity, Scene},
+    utils::{Id, RenderResourceStorage},
+    RanimContext,
+    WgpuContext,
+};
+
+/// A render resource.
+pub trait RenderResource {
+    fn new(ctx: &WgpuContext) -> Self
+    where
+        Self: Sized;
+}
+
+pub trait Vertex: bytemuck::Pod + bytemuck::Zeroable + Clone + Debug {
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;
+}
 
 /// Blueprints are the data structures that are used to create [`Rabject`]s
 pub trait Blueprint<T: Rabject> {
-    fn build(self) -> RabjectWithId<T>;
+    fn build(self) -> T;
 }
 
-pub trait RenderInstance<T: Rabject> {
-    /// Used to initialize the render resource when the rabject is extracted
-    fn init(ctx: &mut RanimContext, rabject: &T) -> Self;
+// pub trait RenderInstance<T: Rabject> {
+//     /// Used to initialize the render resource when the rabject is extracted
+//     fn init(ctx: &mut RanimContext, rabject: &T) -> Self;
 
-    fn update(&mut self, ctx: &mut RanimContext, rabject: &RabjectWithId<T>);
+//     fn update(&mut self, ctx: &mut RanimContext, rabject: &RabjectWithId<T>);
+// }
+
+pub trait RabjectId {
+    fn from_id(id: Id) -> Self;
+    fn to_id(&self) -> Id;
 }
 
-pub trait Rabject: 'static + Clone {
-    type Renderer: Renderer<Self> + RenderResource;
-    type RenderInstance: RenderInstance<Self>;
+/// The rabject is the basic object in Ranim.
+///
+/// ## Id
+/// The [`Rabject::Id`] is a type to identify the rabject. It can be a simple wrapper of [`Id`] like this:
+/// ```rust
+/// struct MyRabjectId(Id);
+/// impl RabjectId for MyRabjectId {
+///     fn from_id(id: Id) -> Self { Self(id) }
+///     fn to_id(self) -> Id { self.0 }
+/// }
+/// ```
+///
+/// The reason it exist is just to make the rabject management functions of [`Scene`] support type inference.
+///
+/// ## RenderData
+/// The [`Rabject::RenderData`] is the data that is extracted from the rabject and used to initialize/update the render resource.
+///
+/// ## RenderResource
+/// The [`Rabject::RenderResource`] is the resource that is used to render the rabject.
+pub trait Rabject: 'static + Sized {
+    type Id;
+    type Data;
+    type RenderData: Default;
+    type RenderResource: Primitive;
 
-    // #[allow(unused_variables)]
-    // fn begin_compute_pass<'a>(
-    //     encoder: &'a mut wgpu::CommandEncoder,
-    // ) -> Option<wgpu::ComputePass<'a>> {
-    //     None
-    // }
+    fn insert_to_scene(self, scene: &mut Scene) -> Self::Id;
 
-    // #[allow(unused_variables)]
-    // fn compute<'a>(
-    //     ctx: &mut RanimContext,
-    //     compute_pass: &mut wgpu::ComputePass<'a>,
-    //     render_resource: &Self::RenderInstance,
-    // ) {
-    // }
+    fn remove_from_scene(scene: &mut Scene, id: Self::Id);
 
-    // fn begin_render_pass<'a>(
-    //     encoder: &'a mut wgpu::CommandEncoder,
-    //     multisample_view: &wgpu::TextureView,
-    //     target_view: &wgpu::TextureView,
-    //     depth_view: &wgpu::TextureView,
-    // ) -> wgpu::RenderPass<'a>;
-
-    // fn render<'a>(
-    //     ctx: &mut RanimContext,
-    //     // render_pass: &mut wgpu::RenderPass<'a>,
-    //     multisample_view: &wgpu::TextureView,
-    //     target_view: &wgpu::TextureView,
-    //     depth_view: &wgpu::TextureView,
-    //     uniforms_bind_group: &wgpu::BindGroup,
-    //     render_resource: &Self::RenderInstance,
-    // );
-}
-
-#[derive(Clone)]
-pub struct RabjectWithId<T: Rabject> {
-    id: Id,
-    rabject: T,
-}
-
-impl<T: Rabject> Deref for RabjectWithId<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.rabject
+    fn extract(&self) -> Self::RenderData {
+        Default::default()
     }
 }
 
-impl<T: Rabject> DerefMut for RabjectWithId<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.rabject
+pub trait Primitive {
+    type Data;
+    fn init(ctx: &mut RanimContext, data: &Self::Data) -> Self;
+    fn update(&mut self, ctx: &mut RanimContext, data: &Self::Data);
+    fn render(
+        &self,
+        wgpu_ctx: &WgpuContext,
+        pipelines: &mut RenderResourceStorage,
+        multisample_view: &wgpu::TextureView,
+        target_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        uniforms_bind_group: &wgpu::BindGroup,
+    );
+}
+
+impl Primitive for () {
+    type Data = ();
+    fn init(ctx: &mut RanimContext, data: &Self::Data) -> Self {
+        ()
     }
-}
-
-impl<T: Rabject> From<T> for RabjectWithId<T> {
-    fn from(rabject: T) -> Self {
-        Self {
-            id: Id::new(),
-            rabject,
-        }
+    fn render(
+        &self,
+        wgpu_ctx: &WgpuContext,
+        pipelines: &mut RenderResourceStorage,
+        multisample_view: &wgpu::TextureView,
+        target_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        uniforms_bind_group: &wgpu::BindGroup,
+    ) {
     }
+    fn update(&mut self, ctx: &mut RanimContext, data: &Self::Data) {}
 }
 
-impl<T: Rabject> RabjectWithId<T> {
-    pub fn id(&self) -> &Id {
-        &self.id
-    }
+// #[derive(Clone)]
+// pub struct RabjectWithId<T: Rabject> {
+//     id: Id,
+//     rabject: T,
+// }
 
-    pub fn extract(&self, ctx: &mut RanimContext) -> ExtractedRabjectWithId<T> {
-        ExtractedRabjectWithId {
-            id: self.id,
-            render_resource: T::RenderInstance::init(ctx, &self.rabject),
-        }
-    }
-}
+// impl<T: Rabject> Deref for RabjectWithId<T> {
+//     type Target = T;
 
-pub struct ExtractedRabjectWithId<T: Rabject> {
-    id: Id,
-    // rabject: Arc<RwLock<T>>,
-    pub(crate) render_resource: T::RenderInstance,
-}
+//     fn deref(&self) -> &Self::Target {
+//         &self.rabject
+//     }
+// }
 
-impl<T: Rabject> ExtractedRabjectWithId<T> {
-    pub fn id(&self) -> &Id {
-        &self.id
-    }
-}
+// impl<T: Rabject> DerefMut for RabjectWithId<T> {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.rabject
+//     }
+// }
 
-impl<T: Rabject> Deref for ExtractedRabjectWithId<T> {
-    type Target = T::RenderInstance;
+// impl<T: Rabject> From<T> for RabjectWithId<T> {
+//     fn from(rabject: T) -> Self {
+//         Self {
+//             id: Id::new(),
+//             rabject,
+//         }
+//     }
+// }
 
-    fn deref(&self) -> &Self::Target {
-        &self.render_resource
-    }
-}
+// impl<T: Rabject> RabjectWithId<T> {
+//     pub fn id(&self) -> &Id {
+//         &self.id
+//     }
 
-impl<T: Rabject> DerefMut for ExtractedRabjectWithId<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.render_resource
-    }
-}
+//     pub fn extract(&self, ctx: &mut RanimContext) -> ExtractedRabjectWithId<T> {
+//         ExtractedRabjectWithId {
+//             id: self.id,
+//             render_resource: T::RenderInstance::init(ctx, &self.rabject),
+//         }
+//     }
+// }
 
-pub trait Interpolatable {
-    fn lerp(&self, target: &Self, t: f32) -> Self;
-}
+// pub struct ExtractedRabjectWithId<T: Rabject> {
+//     id: Id,
+//     // rabject: Arc<RwLock<T>>,
+//     pub(crate) render_resource: T::RenderInstance,
+// }
 
-impl Interpolatable for f32 {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
-        self + (target - self) * t
-    }
-}
+// impl<T: Rabject> ExtractedRabjectWithId<T> {
+//     pub fn id(&self) -> &Id {
+//         &self.id
+//     }
+// }
+
+// impl<T: Rabject> Deref for ExtractedRabjectWithId<T> {
+//     type Target = T::RenderInstance;
+
+//     fn deref(&self) -> &Self::Target {
+//         &self.render_resource
+//     }
+// }
+
+// impl<T: Rabject> DerefMut for ExtractedRabjectWithId<T> {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.render_resource
+//     }
+// }
