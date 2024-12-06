@@ -5,8 +5,14 @@ use std::{
 
 use bevy_color::Color;
 use glam::{vec3, Mat4, Vec3};
+use log::error;
 
-use crate::{rabject::Rabject, utils::Id, RanimContext, WgpuBuffer, WgpuContext};
+use crate::{
+    rabject::{Primitive, Rabject},
+    scene::RabjectStore,
+    utils::Id,
+    RanimContext, WgpuBuffer, WgpuContext,
+};
 
 #[allow(unused)]
 use log::{debug, trace};
@@ -196,7 +202,7 @@ impl Camera {
         }
     }
 
-    fn clear_screen(&self, wgpu_ctx: &WgpuContext) {
+    pub fn clear_screen(&mut self, wgpu_ctx: &WgpuContext) {
         let mut encoder = wgpu_ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -239,27 +245,10 @@ impl Camera {
             });
         }
         wgpu_ctx.queue.submit(Some(encoder.finish()));
+        self.output_texture_updated = false;
     }
 
-    pub fn render<R: Rabject>(
-        &mut self,
-        ctx: &mut RanimContext,
-        rabjects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
-    ) {
-        let Some(rabjects) = rabjects.get_mut(&std::any::TypeId::of::<R>()) else {
-            return;
-        };
-        let rabjects = rabjects
-            .iter_mut()
-            .map(|(_, rabject)| rabject.downcast_mut::<ExtractedRabjectWithId<R>>().unwrap())
-            .collect::<Vec<_>>();
-
-        let wgpu_ctx = ctx.wgpu_ctx();
-
-        // trace!("[Camera] Rendering...");
-
-        // Update the uniforms buffer
-        // trace!("[Camera]: Refreshing uniforms...");
+    pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext) {
         self.refresh_uniforms();
         debug!("[Camera]: Uniforms: {:?}", self.uniforms);
         // trace!("[Camera] uploading camera uniforms to buffer...");
@@ -268,24 +257,42 @@ impl Camera {
             0,
             bytemuck::cast_slice(&[self.uniforms]),
         );
+    }
 
-        self.clear_screen(&wgpu_ctx);
-
-        let instances = rabjects
-            .iter()
-            .map(|rabject| &rabject.render_resource)
+    pub fn render<R: Rabject + 'static>(
+        &mut self,
+        ctx: &mut RanimContext,
+        entities: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
+    ) {
+        let Some(entities) = entities.get_mut(&std::any::TypeId::of::<R>()) else {
+            error!(
+                "[Camera::render]: failed to find entities of type {:?}",
+                std::any::TypeId::of::<R>()
+            );
+            error!("available types: {:?}", entities.keys());
+            return;
+        };
+        let entities = entities
+            .iter_mut()
+            .map(|(id, rabject)| (id, rabject.downcast_mut::<RabjectStore<R>>().unwrap()))
             .collect::<Vec<_>>();
-        let renderer = ctx.renderers.get_or_init_mut::<R::Renderer>(&wgpu_ctx);
+
+        let wgpu_ctx = ctx.wgpu_ctx();
+
+        // trace!("[Camera] Rendering...");
+
         let pipelines = &mut ctx.pipelines;
-        renderer.render(
-            &wgpu_ctx,
-            pipelines,
-            &instances,
-            &self.multisample_view,
-            &self.render_view,
-            &self.depth_stencil_view,
-            &self.uniforms_bind_group.bind_group,
-        );
+        for (id, entity) in entities.iter() {
+            trace!("[Camera] Rendering entity {:?}", id);
+            entity.render_resource.as_ref().unwrap().render(
+                &wgpu_ctx,
+                pipelines,
+                &self.multisample_view,
+                &self.render_view,
+                &self.depth_stencil_view,
+                &self.uniforms_bind_group.bind_group,
+            );
+        }
 
         self.output_texture_updated = false;
     }

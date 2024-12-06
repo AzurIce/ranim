@@ -6,7 +6,7 @@ use std::time;
 use log::trace;
 
 use crate::{
-    rabject::{Rabject, RabjectWithId},
+    rabject::{Rabject},
     scene::Scene,
     utils::rate_functions::smooth,
 };
@@ -125,7 +125,7 @@ impl<R: Rabject> Animation<R> {
         );
         self.func.prepare(&mut self.rabject, scene);
         self.func.pre_anim(&mut self.rabject);
-        scene.insert_rabject(&self.rabject);
+        scene.insert(&self.rabject);
 
         let frames = self.config.calc_frames(scene.camera.fps as f32);
 
@@ -136,23 +136,23 @@ impl<R: Rabject> Animation<R> {
             let alpha = t / self.config.run_time.as_secs_f32();
             let alpha = (self.config.rate_func)(alpha);
             self.func.interpolate(&mut self.rabject, alpha);
-            scene.insert_rabject(&self.rabject);
+            scene.insert(&self.rabject);
             scene.update_frame(dt);
             scene.frame_count += 1;
         }
 
         self.func.post_anim(&mut self.rabject);
-        scene.insert_rabject(&self.rabject);
+        scene.insert(&self.rabject);
         self.func.cleanup(&mut self.rabject, scene);
 
         if let Some(end_rabject) = self.config.end_rabject {
-            scene.remove_rabject(&self.rabject);
-            scene.insert_rabject(&end_rabject);
+            scene.remove(&self.rabject);
+            scene.insert(&end_rabject);
             return Some(end_rabject);
         }
 
         if self.config.remove {
-            scene.remove_rabject(&self.rabject);
+            scene.remove(&self.rabject);
             None
         } else {
             Some(self.rabject)

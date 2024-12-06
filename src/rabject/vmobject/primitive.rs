@@ -1,19 +1,12 @@
-use bevy_color::LinearRgba;
+use crate::WgpuContext;
+use crate::{rabject::Primitive, WgpuBuffer};
 use glam::{Vec3, Vec4};
-use log::trace;
-
-use crate::{rabject::Primitive, RanimContext, WgpuBuffer};
 
 use super::pipeline::{ComputePipeline, FillPipeline, StencilPipeline, StrokePipeline};
+use super::{VMobjectFillVertex, VMobjectPoint};
 
-#[repr(C, align(16))]
-#[derive(Clone, Copy, Default, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct VMobjectPoint {
-    pub pos: Vec3,
-    pub stroke_width: f32,
-    pub stroke_color: LinearRgba,
-    pub fill_color: LinearRgba,
-}
+#[allow(unused_imports)]
+use log::{info, trace};
 
 #[derive(Debug)]
 pub struct ExtractedVMobject {
@@ -39,14 +32,6 @@ impl Default for ExtractedVMobject {
 pub(crate) struct ComputeUniform {
     unit_normal: Vec3,
     _padding: f32,
-}
-
-#[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
-pub struct VMobjectFillVertex {
-    pub pos: Vec3,
-    pub face: f32,
-    pub fill_color: LinearRgba,
 }
 
 #[repr(C, align(16))]
@@ -79,7 +64,8 @@ const MAX_STEP: u32 = 16;
 impl Primitive for VMobjectPrimitive {
     type Data = ExtractedVMobject;
 
-    fn init(ctx: &mut RanimContext, data: &Self::Data) -> Self {
+    fn init(wgpu_ctx: &WgpuContext, data: &Self::Data) -> Self {
+        // info!("[VMobjectPrimitive::init]: {:?}", data);
         let ExtractedVMobject {
             points,
             joint_angles,
@@ -88,27 +74,27 @@ impl Primitive for VMobjectPrimitive {
         } = data;
 
         let points_buffer = WgpuBuffer::new_init(
-            &ctx.wgpu_ctx,
+            wgpu_ctx,
             &points,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
         let joint_angles_buffer = WgpuBuffer::new_init(
-            &ctx.wgpu_ctx,
+            wgpu_ctx,
             &joint_angles,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
         let stroke_vertices_buffer = WgpuBuffer::new(
-            &ctx.wgpu_ctx,
+            wgpu_ctx,
             (std::mem::size_of::<VMobjectStrokeVertex>() * 1024) as u64,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
         let fill_vertices_buffer = WgpuBuffer::new_init(
-            &ctx.wgpu_ctx,
+            wgpu_ctx,
             &fill_triangles,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
         let compute_uniform_buffer = WgpuBuffer::new_init(
-            &ctx.wgpu_ctx,
+            wgpu_ctx,
             &[ComputeUniform {
                 unit_normal: *unit_normal,
                 _padding: 0.0,
@@ -117,7 +103,7 @@ impl Primitive for VMobjectPrimitive {
         );
 
         let compute_bind_group = Self::create_compute_bind_group(
-            &ctx,
+            wgpu_ctx,
             &points_buffer,
             &joint_angles_buffer,
             &stroke_vertices_buffer,
@@ -125,7 +111,7 @@ impl Primitive for VMobjectPrimitive {
         );
 
         let render_stroke_bind_group =
-            Self::create_render_bind_group(&ctx, &stroke_vertices_buffer);
+            Self::create_render_bind_group(wgpu_ctx, &stroke_vertices_buffer);
 
         Self {
             points_buffer,
@@ -138,7 +124,8 @@ impl Primitive for VMobjectPrimitive {
         }
     }
 
-    fn update(&mut self, ctx: &mut crate::RanimContext, data: &Self::Data) {
+    fn update(&mut self, wgpu_ctx: &WgpuContext, data: &Self::Data) {
+        // info!("[VMobjectPrimitive::update]: {:?}", data);
         let ExtractedVMobject {
             points,
             joint_angles,
@@ -146,35 +133,34 @@ impl Primitive for VMobjectPrimitive {
             fill_triangles,
         } = data;
 
-        self.points_buffer
-            .prepare_from_slice(&ctx.wgpu_ctx, &points);
+        self.points_buffer.prepare_from_slice(wgpu_ctx, &points);
         self.joint_angles_buffer
-            .prepare_from_slice(&ctx.wgpu_ctx, &joint_angles);
+            .prepare_from_slice(wgpu_ctx, &joint_angles);
         self.compute_uniform_buffer.prepare_from_slice(
-            &ctx.wgpu_ctx,
+            wgpu_ctx,
             &[ComputeUniform {
                 unit_normal: *unit_normal,
                 _padding: 0.0,
             }],
         );
         self.fill_vertices_buffer
-            .prepare_from_slice(&ctx.wgpu_ctx, &fill_triangles);
-        ctx.wgpu_ctx.queue.submit([]);
+            .prepare_from_slice(wgpu_ctx, &fill_triangles);
+        wgpu_ctx.queue.submit(None);
 
         self.compute_bind_group = Self::create_compute_bind_group(
-            ctx,
+            wgpu_ctx,
             &self.points_buffer,
             &self.joint_angles_buffer,
             &self.stroke_vertices_buffer,
             &self.compute_uniform_buffer,
         );
         self.render_stroke_bind_group =
-            Self::create_render_bind_group(ctx, &self.stroke_vertices_buffer);
+            Self::create_render_bind_group(wgpu_ctx, &self.stroke_vertices_buffer);
     }
 
     fn render(
         &self,
-        wgpu_ctx: &crate::WgpuContext,
+        wgpu_ctx: &WgpuContext,
         pipelines: &mut crate::utils::RenderResourceStorage,
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
@@ -198,7 +184,7 @@ impl Primitive for VMobjectPrimitive {
             pass.set_bind_group(0, &self.compute_bind_group, &[]);
             // number of segments
             let len = self.points_buffer.len() / 2;
-            // trace!("dispatch workgroups: {}", len);
+            trace!("dispatch workgroups: {}", len);
             pass.dispatch_workgroups(len as u32, 1, 1);
         }
 
@@ -210,7 +196,7 @@ impl Primitive for VMobjectPrimitive {
                     view: &depth_view,
                     depth_ops: None,
                     stencil_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
+                        load: wgpu::LoadOp::Clear(0),
                         store: wgpu::StoreOp::Store,
                     }),
                 }),
@@ -241,7 +227,7 @@ impl Primitive for VMobjectPrimitive {
                     view: &depth_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Discard,
+                        store: wgpu::StoreOp::Store,
                     }),
                     stencil_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -264,7 +250,7 @@ impl Primitive for VMobjectPrimitive {
             pass.set_pipeline(&pipeline_vmobject_stroke);
             pass.set_bind_group(1, &self.render_stroke_bind_group, &[]);
             let len = self.points_buffer.len() as u32 / 2 * MAX_STEP * 2;
-            // trace!("draw {}", len);
+            trace!("draw {}", len);
             pass.draw(0..len, 0..1);
         }
         wgpu_ctx.queue.submit(Some(encoder.finish()));
@@ -340,17 +326,17 @@ impl VMobjectPrimitive {
     }
 
     pub fn create_compute_bind_group(
-        ctx: &RanimContext,
+        wgpu_ctx: &WgpuContext,
         points_buffer: &wgpu::Buffer,
         joint_angles_buffer: &wgpu::Buffer,
         stroke_vertices_buffer: &wgpu::Buffer,
         compute_uniform_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
-        ctx.wgpu_ctx
+        wgpu_ctx
             .device
             .create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("VMObject Compute Bind Group"),
-                layout: &Self::compute_bind_group_layout(&ctx.wgpu_ctx.device),
+                layout: &Self::compute_bind_group_layout(&wgpu_ctx.device),
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -373,14 +359,14 @@ impl VMobjectPrimitive {
     }
 
     pub fn create_render_bind_group(
-        ctx: &RanimContext,
+        wgpu_ctx: &WgpuContext,
         stroke_vertices_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
-        ctx.wgpu_ctx
+        wgpu_ctx
             .device
             .create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("VMObject Render Bind Group"),
-                layout: &Self::render_bind_group_layout(&ctx.wgpu_ctx.device),
+                layout: &Self::render_bind_group_layout(&wgpu_ctx.device),
                 entries: &[wgpu::BindGroupEntry {
                     binding: 0,
                     resource: stroke_vertices_buffer.as_entire_binding(),
