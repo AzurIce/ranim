@@ -5,28 +5,36 @@ use std::{
     collections::HashMap,
     fs,
     path::Path,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
-use log::trace;
+use log::{debug, info};
 
 use crate::{
-    animation::Animation,
     camera::Camera,
-    rabject::{group::VGroup, vmobject::VMobject, Rabject, RabjectId},
+    rabject::{
+        vgroup::{VGroup, VGroupPrimitive},
+        vmobject::{primitive::VMobjectPrimitive, VMobject},
+        Primitive, Rabject, RabjectId,
+    },
     utils::Id,
     RanimContext,
 };
 
+#[allow(unused)]
+use log::trace;
+
 /// An entity in the scene
 ///
 /// rabject --extract--> render_data --init--> render_resource
-pub struct Entity<R: Rabject> {
+pub struct RabjectStore<R: Rabject> {
+    /// The rabject
     pub rabject: R,
-    pub children: Vec<Id>,
+    /// The extracted data from the rabject
     pub render_data: Option<R::RenderData>,
+    /// The prepared render resource of the rabject
     pub render_resource: Option<R::RenderResource>,
 }
 
@@ -35,12 +43,12 @@ pub struct Scene {
     pub camera: Camera,
     /// Entities in the scene
     ///
-    /// Rabject's type id -> Vec<(Rabject's id, Entity<Rabject>)>
-    pub entities: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
+    /// Rabject's type id -> Vec<(Rabject's id, RabjectStore<Rabject>)>
+    pub rabjects: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     /// Rabjects in the scene, they are actually [`crate::rabject::ExtractedRabjectWithId`]
     ///
     /// Rabject's type id -> Vec<(Rabject's id, ExtractedRabject<Rabject>)>
-    pub rabjects: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
+    // pub rabjects: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
     pub time: f32,
     pub frame_count: usize,
 
@@ -55,10 +63,15 @@ impl Scene {
     /// Low level api to insert an entity to the scene directly
     ///
     /// For high level api, see [`Scene::insert`]
-    pub fn insert_entity<R: Rabject + 'static>(&mut self, entity: Entity<R>) -> Id {
+    pub fn insert_entity<R: Rabject + 'static>(&mut self, entity: RabjectStore<R>) -> Id {
         let id = Id::new();
+        debug!(
+            "[Scene::insert_entity]: inserting entity {:?} of type {:?}",
+            id,
+            std::any::TypeId::of::<R>()
+        );
         let entry = self
-            .entities
+            .rabjects
             .entry(std::any::TypeId::of::<R>())
             .or_default();
         entry.push((id, Box::new(entity)));
@@ -68,35 +81,38 @@ impl Scene {
     /// Low level api to remove an entity from the scene directly
     ///
     /// For high level api, see [`Scene::remove`]
-    pub fn remove_entity(&mut self, id: Id) {
-        for entry in self.entities.values_mut() {
-            entry.retain(|(eid, _)| id != *eid);
+    pub fn remove_entity(&mut self, id: &Id) {
+        for entry in self.rabjects.values_mut() {
+            entry.retain(|(eid, _)| id != eid);
         }
     }
 
     /// Low level api to get reference of an entity from the scene directly
     ///
     /// For high level api, see [`Scene::get`]
-    pub fn get_entity<R: Rabject + 'static>(&self, id: Id) -> Option<&Entity<R>> {
-        self.entities
+    pub fn get_entity<R: Rabject + 'static>(&self, id: &Id) -> Option<&RabjectStore<R>> {
+        self.rabjects
             .get(&std::any::TypeId::of::<R>())
             .and_then(|e| {
                 e.iter()
-                    .find(|(eid, _)| id == *eid)
-                    .map(|(_, e)| e.downcast_ref::<Entity<R>>().unwrap())
+                    .find(|(eid, _)| id == eid)
+                    .map(|(_, e)| e.downcast_ref::<RabjectStore<R>>().unwrap())
             })
     }
 
     /// Low level api to get mutable reference of an entity from the scene directly
     ///
     /// For high level api, see [`Scene::get_mut`]
-    pub fn get_entity_mut<R: Rabject + 'static>(&mut self, id: Id) -> Option<&mut Entity<R>> {
-        self.entities
+    pub fn get_entity_mut<R: Rabject + 'static>(
+        &mut self,
+        id: &Id,
+    ) -> Option<&mut RabjectStore<R>> {
+        self.rabjects
             .get_mut(&std::any::TypeId::of::<R>())
             .and_then(|e| {
                 e.iter_mut()
-                    .find(|(eid, _)| id == *eid)
-                    .map(|(_, e)| e.downcast_mut::<Entity<R>>().unwrap())
+                    .find(|(eid, _)| id == eid)
+                    .map(|(_, e)| e.downcast_mut::<RabjectStore<R>>().unwrap())
             })
     }
 }
@@ -106,40 +122,95 @@ impl Scene {
     /// Insert a rabject to the scene
     ///
     /// See [`Rabject::insert_to_scene`]
-    pub fn insert<R: Rabject + 'static>(&mut self, rabject: R) -> <R as Rabject>::Id {
-        Box::new(rabject).insert_to_scene(self)
+    pub fn insert<R: Rabject + 'static>(&mut self, rabject: R) -> RabjectId<R> {
+        let entity = RabjectStore {
+            rabject,
+            render_data: None,
+            render_resource: None,
+        };
+        RabjectId::from_id(self.insert_entity(entity))
     }
 
     /// Remove a rabject from the scene
     ///
     /// See [`Rabject::remove_from_scene`]
-    pub fn remove<R: Rabject + 'static>(&mut self, id: <R as Rabject>::Id) {
-        R::remove_from_scene(self, id);
+    pub fn remove<R: Rabject>(&mut self, id: &RabjectId<R>) {
+        self.remove_entity(id);
     }
 
     /// Get a reference of a rabject from the scene
-    pub fn get<R: Rabject + 'static>(&self, id: <R as Rabject>::Id) -> Option<&R> {
-        self.get_entity::<R>(id.to_id()).map(|e| &e.rabject)
+    pub fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&R> {
+        self.get_entity::<R>(id).map(|e| &e.rabject)
     }
 
     /// Get a mutable reference of a rabject from the scene
-    pub fn get_mut<R: Rabject + 'static>(&mut self, id: <R as Rabject>::Id) -> Option<&mut R> {
-        self.get_entity_mut::<R>(id.to_id()).map(|e| &mut e.rabject)
+    pub fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut R> {
+        self.get_entity_mut::<R>(id).map(|e| &mut e.rabject)
     }
 }
 
 // the core phases
 impl Scene {
     pub fn extract(&mut self) {
-        for (type_id, entities) in self.entities.iter_mut() {
-            for (id, entity) in entities.iter_mut() {
-                if let Some(entity) = entity.downcast_mut::<Entity<VMobject>>() {
+        info!("[Scene]: EXTRACT STAGE START");
+        let t = Instant::now();
+        for (_, entities) in self.rabjects.iter_mut() {
+            for (_, entity) in entities.iter_mut() {
+                if let Some(entity) = entity.downcast_mut::<RabjectStore<VMobject>>() {
                     entity.render_data = Some(entity.rabject.extract());
-                } else if let Some(entity) = entity.downcast_mut::<Entity<VGroup>>() {
+                } else if let Some(entity) = entity.downcast_mut::<RabjectStore<VGroup>>() {
                     entity.render_data = Some(entity.rabject.extract());
                 }
             }
         }
+        info!("[Scene]: EXTRACT STAGE END, took {:?}", t.elapsed());
+    }
+
+    pub fn prepare(&mut self) {
+        info!("[Scene]: PREPARE STAGE START");
+        let t = Instant::now();
+        for (_, entities) in self.rabjects.iter_mut() {
+            for (_, entity) in entities.iter_mut() {
+                if let Some(entity) = entity.downcast_mut::<RabjectStore<VMobject>>() {
+                    if let Some(render_resource) = entity.render_resource.as_mut() {
+                        render_resource.update(
+                            &mut self.ctx.wgpu_ctx,
+                            &entity.render_data.as_ref().unwrap(),
+                        );
+                    } else {
+                        entity.render_resource = Some(VMobjectPrimitive::init(
+                            &mut self.ctx.wgpu_ctx,
+                            &entity.render_data.as_ref().unwrap(),
+                        ));
+                    }
+                } else if let Some(entity) = entity.downcast_mut::<RabjectStore<VGroup>>() {
+                    if let Some(render_resource) = entity.render_resource.as_mut() {
+                        render_resource.update(
+                            &mut self.ctx.wgpu_ctx,
+                            &entity.render_data.as_ref().unwrap(),
+                        );
+                    } else {
+                        entity.render_resource = Some(VGroupPrimitive::init(
+                            &mut self.ctx.wgpu_ctx,
+                            &entity.render_data.as_ref().unwrap(),
+                        ));
+                    }
+                }
+            }
+        }
+        info!("[Scene]: PREPARE STAGE END, took {:?}", t.elapsed());
+    }
+
+    pub fn render(&mut self) {
+        info!("[Scene]: RENDER STAGE START");
+        let t = Instant::now();
+        self.camera.update_uniforms(&self.ctx.wgpu_ctx);
+        self.camera.clear_screen(&self.ctx.wgpu_ctx);
+        self.camera
+            .render::<VMobject>(&mut self.ctx, &mut self.rabjects);
+        self.camera
+            .render::<VGroup>(&mut self.ctx, &mut self.rabjects);
+        info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
     }
 }
 
@@ -156,7 +227,6 @@ impl Scene {
         Self {
             ctx,
             camera,
-            entities: HashMap::new(),
             rabjects: HashMap::new(),
             time: 0.0,
             frame_count: 0,
@@ -177,71 +247,19 @@ impl Scene {
         Self::new_with_video_writer_builder(FileWriter::builder())
     }
 
-    // pub fn remove_rabject<R: Rabject>(&mut self, rabject: &RabjectWithId<R>) {
-    //     trace!(
-    //         "[Scene::remove_rabject]: removing rabject: {:?}",
-    //         rabject.id()
-    //     );
-    //     self.rabjects.iter_mut().for_each(|(_, rabject_vec)| {
-    //         rabject_vec.retain(|(rabject_id, _)| rabject_id != rabject.id());
-    //     });
-    // }
-
-    // pub fn insert_group(&mut self, group: &Group) {
-    //     for child in group.children.iter() {
-    //         if let Some(rabject) = child.downcast_ref::<RabjectWithId<VMobject>>() {
-    //             self.insert_rabject(rabject);
-    //         }
-    //     }
-    // }
-
-    // pub fn remove_group(&mut self, group: &Group) {
-    //     for child in group.children.iter() {
-    //         if let Some(rabject) = child.downcast_ref::<RabjectWithId<VMobject>>() {
-    //             self.remove_rabject(rabject);
-    //         }
-    //     }
-    // }
-
-    // pub fn insert_rabject<R: Rabject>(&mut self, rabject: &R) -> Id {
-    //     trace!(
-    //         "[Scene::insert_rabject]: inserting rabject: {:?}",
-    //         rabject.id()
-    //     );
-    //     let entry = self
-    //         .rabjects
-    //         .entry(std::any::TypeId::of::<R>())
-    //         .or_default();
-    //     if let Some((_, extracted)) = entry.iter_mut().find(|(id, _)| id == rabject.id()) {
-    //         trace!(
-    //             "[Scene::insert_rabject]: already_exist, updating rabject: {:?}",
-    //             rabject.id()
-    //         );
-    //         let extracted: &mut ExtractedRabjectWithId<R> = extracted.downcast_mut().unwrap();
-    //         extracted.update(&mut self.ctx, rabject);
-    //     } else {
-    //         entry.push((*rabject.id(), Box::new(rabject.extract(&mut self.ctx))));
-    //     }
-    // }
-
-    // pub fn is_rabject_exist<R: Rabject>(&self, rabject: &RabjectWithId<R>) -> bool {
-    //     self.rabjects
-    //         .get(&std::any::TypeId::of::<R>())
-    //         .map(|rabject_vec| rabject_vec.iter().any(|(id, _)| id == rabject.id()))
-    //         .unwrap_or(false)
-    // }
-
     pub fn render_to_image(&mut self, path: impl AsRef<Path>) {
-        self.camera
-            .render::<VMobject>(&mut self.ctx, &mut self.rabjects);
+        self.extract();
+        self.prepare();
+        self.render();
         self.save_frame_to_image(path);
     }
 
     pub fn update_frame(&mut self, dt: f32) {
         self.time += dt;
         // self.update_mobjects(dt);
-        self.camera
-            .render::<VMobject>(&mut self.ctx, &mut self.rabjects);
+        self.extract();
+        self.prepare();
+        self.render();
         if let Some(writer) = &mut self.video_writer {
             writer.write_frame(&self.camera.get_rendered_texture(&self.ctx.wgpu_ctx));
         }
@@ -256,11 +274,14 @@ impl Scene {
     }
 
     pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
+        info!("[Scene]: SAVE FRAME TO IMAGE START");
+        let t = Instant::now();
         let size = self.camera.frame.size;
         let texture_data = self.camera.get_rendered_texture(&self.ctx.wgpu_ctx);
         let buffer: ImageBuffer<Rgba<u8>, &[u8]> =
             ImageBuffer::from_raw(size.0 as u32, size.1 as u32, texture_data).unwrap();
         buffer.save(path).unwrap();
+        info!("[Scene]: SAVE FRAME TO IMAGE END, took {:?}", t.elapsed());
     }
 
     // /// Play an animation

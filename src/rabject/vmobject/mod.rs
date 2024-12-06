@@ -1,6 +1,4 @@
 mod blueprint;
-// pub mod extract;
-// pub mod render;
 pub mod pipeline;
 pub mod primitive;
 
@@ -12,18 +10,16 @@ pub use blueprint::*;
 use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
 use primitive::{ExtractedVMobject, VMobjectPrimitive};
-// use render::VMObjectRenderInstance;
 
 use crate::{
     interpolate::Interpolatable,
-    scene::Entity,
-    utils::{partial_quadratic_bezier, rotation_between_vectors, Id},
+    utils::{partial_quadratic_bezier, rotation_between_vectors},
 };
 
-use super::{Rabject, RabjectId};
+use super::Rabject;
 
 #[allow(unused)]
-use log::{trace, warn};
+use log::{info, trace, warn};
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Default, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
@@ -228,43 +224,17 @@ impl VMobject {
     }
 }
 
-#[repr(C, align(16))]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct ComputeUniform {
-    unit_normal: Vec3,
-    _padding: f32,
-}
-
-pub struct VMobjectId(Id);
-impl RabjectId for VMobjectId {
-    fn from_id(id: Id) -> Self {
-        Self(id)
-    }
-
-    fn to_id(&self) -> Id {
-        self.0
-    }
-}
-
 impl Rabject for VMobject {
-    type Data = Self;
-    type Id = VMobjectId;
     type RenderData = ExtractedVMobject;
     type RenderResource = VMobjectPrimitive;
 
-    fn insert_to_scene(self, scene: &mut crate::scene::Scene) -> Self::Id {
-        let entity = Entity {
-            rabject: self,
-            children: vec![],
-            render_data: None,
-            render_resource: None,
-        };
-        VMobjectId::from_id(scene.insert_entity(entity))
-    }
-
-    fn remove_from_scene(scene: &mut crate::scene::Scene, id: Self::Id) {
-        let id = id.to_id();
-        scene.remove_entity(id);
+    fn extract(&self) -> Self::RenderData {
+        ExtractedVMobject {
+            points: self.points.clone(),
+            joint_angles: self.get_joint_angles(),
+            unit_normal: self.get_unit_normal(),
+            fill_triangles: self.parse_fill(),
+        }
     }
 }
 

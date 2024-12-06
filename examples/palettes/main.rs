@@ -7,11 +7,9 @@ use ranim::scene::Scene;
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace"))
-        .init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info"))
-        .init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info")).init();
     let mut scene = Scene::new();
 
     let colors = vec![
@@ -41,11 +39,12 @@ fn main() {
         let w_step = (width - 2 * padding) / cols;
         for (j, color) in row.iter().enumerate() {
             let x = padding + j * w_step;
-            let mut square = Rect::new(w_step as f32, h_step as f32)
-                .with_stroke_width(0.0)
-                .build();
-            square.shift(vec3(x as f32 + offset_x, y as f32 + offset_y, 0.0)).set_color(*color);
-            scene.insert_rabject(&square);
+            let mut square = Rect::new(w_step as f32, h_step as f32).build();
+            square
+                .shift(vec3(x as f32 + offset_x, y as f32 + offset_y, 0.0))
+                .set_color(*color)
+                .set_stroke_width(0.0);
+            scene.insert(square);
         }
     }
     // scene.wait(Duration::from_secs(1));
