@@ -7,20 +7,22 @@ use std::{
 use utils::RenderResourceStorage;
 use wgpu::util::DeviceExt;
 
-pub mod interpolate;
 pub use glam;
+pub mod prelude {
+    pub use crate::interpolate::Interpolatable;
+
+    pub use crate::animation::transform::Alignable;
+    pub use crate::animation::fading::Opacity;
+}
+
+mod interpolate;
 pub mod color;
 pub mod updater;
 
-// pub mod prelude {
-//     pub use crate::scene::Scene;
-// }
-
 pub mod animation;
 pub mod camera;
-/// Rabjects are the objects that can be manuplated and rendered
+/// Rabjects are the basic objects in ranim scene
 pub mod rabject;
-// pub(crate) mod renderer;
 pub mod scene;
 pub mod utils;
 

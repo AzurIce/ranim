@@ -13,6 +13,7 @@ use primitive::{ExtractedVMobject, VMobjectPrimitive};
 
 use crate::{
     interpolate::Interpolatable,
+    prelude::{Alignable, Opacity},
     utils::{partial_quadratic_bezier, rotation_between_vectors},
 };
 
@@ -235,6 +236,10 @@ impl Rabject for VMobject {
             unit_normal: self.get_unit_normal(),
             fill_triangles: self.parse_fill(),
         }
+    }
+
+    fn update_from(&mut self, other: &Self) {
+        self.set_points(other.points.clone());
     }
 }
 
@@ -579,6 +584,26 @@ impl VMobject {
     }
 }
 
+impl Opacity for VMobject {
+    fn set_opacity(&mut self, opacity: f32) {
+        self.set_opacity(opacity);
+    }
+}
+
+impl Alignable for VMobject {
+    fn is_aligned(&self, target: &Self) -> bool {
+        self.points.len() == target.points.len()
+    }
+
+    fn align_with(&mut self, target: &mut Self) {
+        if self.points.len() > target.points.len() {
+            target.align_to(self)
+        } else {
+            self.align_to(target)
+        };
+    }
+}
+
 impl VMobject {
     // pub fn resize_points(&mut self, len: usize) {
     //     if self.points.len() == len {
@@ -600,10 +625,6 @@ impl VMobject {
     //     self.resize_points(max_len);
     //     target.resize_points(max_len);
     // }
-
-    pub fn is_aligned(&self, target: &Self) -> bool {
-        self.points.len() == target.points.len()
-    }
 
     /// Align the mobject to the target mobject.
     pub fn align_to(&mut self, target: &Self) -> &mut Self {
@@ -679,21 +700,6 @@ impl VMobject {
         self.points = new_points;
         trace!("[VMobject] aligned points: {}", self.points.len());
 
-        self
-    }
-
-    /// Align both mobject to the longer one.
-    pub fn align_with(&mut self, target: &mut Self) -> &mut Self {
-        // trace!(
-        //     "[VMobject] {} align with {}",
-        //     self.points().len(),
-        //     target.points().len()
-        // );
-        if self.points.len() > target.points.len() {
-            target.align_to(self)
-        } else {
-            self.align_to(target)
-        };
         self
     }
 

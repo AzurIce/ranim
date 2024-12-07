@@ -1,4 +1,8 @@
-use crate::{utils::RenderResourceStorage, WgpuContext};
+use crate::{
+    prelude::{Alignable, Interpolatable, Opacity},
+    utils::RenderResourceStorage,
+    WgpuContext,
+};
 
 use super::{
     vmobject::{
@@ -8,6 +12,7 @@ use super::{
     Primitive, Rabject,
 };
 
+#[derive(Clone)]
 pub struct VGroup {
     pub(crate) children: Vec<VMobject>,
 }
@@ -66,5 +71,56 @@ impl Rabject for VGroup {
 
     fn extract(&self) -> Self::RenderData {
         self.children.iter().map(|e| e.extract()).collect()
+    }
+
+    fn update_from(&mut self, other: &Self) {
+        self.children = other.children.clone();
+    }
+}
+
+impl Alignable for VGroup {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.children.len() == other.children.len()
+            && self
+                .children
+                .iter()
+                .zip(other.children.iter())
+                .all(|(a, b)| a.is_aligned(b))
+    }
+
+    fn align_with(&mut self, other: &mut Self) {
+        let max_len = self.children.len().max(other.children.len());
+        if self.children.len() < max_len {
+            self.children.resize(max_len, VMobject::default());
+        } else {
+            other.children.resize(max_len, VMobject::default());
+        }
+
+        self.children
+            .iter_mut()
+            .zip(other.children.iter_mut())
+            .for_each(|(a, b)| {
+                a.align_with(b);
+            });
+    }
+}
+
+impl Interpolatable for VGroup {
+    fn lerp(&self, other: &Self, alpha: f32) -> Self {
+        Self::new(
+            self.children
+                .iter()
+                .zip(other.children.iter())
+                .map(|(a, b)| a.lerp(b, alpha))
+                .collect(),
+        )
+    }
+}
+
+impl Opacity for VGroup {
+    fn set_opacity(&mut self, opacity: f32) {
+        self.children.iter_mut().for_each(|e| {
+            e.set_opacity(opacity);
+        });
     }
 }
