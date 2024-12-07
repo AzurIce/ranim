@@ -37,11 +37,15 @@ fn main() {
         TransformAnchor::origin(),
     );
 
-    let polygon = scene
-        .play(Fading::fade_in(polygon).config(|config| {
-            config.set_run_time(Duration::from_secs_f32(1.0));
-        }))
-        .unwrap();
+    let polygon = scene.insert(polygon);
+    scene.insert_updater(polygon, Fading::fade_in());
+    scene.wait(Duration::from_secs_f32(1.0));
+
+    // let polygon = scene
+    //     .play(Fading::fade_in(polygon).config(|config| {
+    //         config.set_run_time(Duration::from_secs_f32(1.0));
+    //     }))
+    //     .unwrap();
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
@@ -49,8 +53,12 @@ fn main() {
         .build();
     arc.set_color(Srgba::hex("58C4DDFF").unwrap());
 
-    let arc = scene.play(Transform::new(polygon, arc)).unwrap();
-    scene.play(Fading::fade_out(arc));
+    let _src = scene.get(polygon).unwrap().clone();
+    scene.insert_updater(polygon, Transform::new(_src, arc));
+    scene.wait(Duration::from_secs_f32(1.0));
+
+    // let arc = scene.play(Transform::new(polygon, arc)).unwrap();
+    // scene.play(Fading::fade_out(arc));
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

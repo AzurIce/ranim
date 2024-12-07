@@ -10,9 +10,13 @@ use wgpu::util::DeviceExt;
 pub mod interpolate;
 pub use glam;
 pub mod color;
-pub mod prelude;
+pub mod updater;
 
-// pub mod animation;
+// pub mod prelude {
+//     pub use crate::scene::Scene;
+// }
+
+pub mod animation;
 pub mod camera;
 /// Rabjects are the objects that can be manuplated and rendered
 pub mod rabject;
