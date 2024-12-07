@@ -54,8 +54,8 @@ fn main() {
 
     // let arc = scene.insert(arc);
     let vgroup1 = scene.insert(VGroup::new(vec![arc, polygon]));
-    let _src = scene.get(vgroup1).unwrap().clone();
-    scene.play(vgroup1, Fading::fade_in());
+    let _src = scene.get(&vgroup1).unwrap().clone();
+    scene.play(&vgroup1, Fading::fade_in());
 
     let mut circle = Circle::new(100.0).build();
     circle.shift(vec3(-100.0, 0.0, 0.0));
@@ -63,8 +63,7 @@ fn main() {
     square.shift(vec3(100.0, 0.0, 0.0));
     let vgroup2 = VGroup::new(vec![circle, square]);
 
-    let _src = scene.get(vgroup1).unwrap().clone();
-    scene.play(vgroup1, Transform::new(_src, vgroup2.clone()));
+    scene.play(&vgroup1, Transform::new(vgroup2.clone()));
     scene.remove(vgroup1);
     let vgroup2 = scene.insert(vgroup2);
 
@@ -79,13 +78,10 @@ fn main() {
     dot.set_color(palettes::manim::GREEN_C);
 
     let vgroup3 = VGroup::new(vec![dot, ellipse]);
-    let _src = scene.get(vgroup2).unwrap().clone();
-    scene.play(vgroup2, Transform::new(_src, vgroup3.clone()));
-    scene.remove(vgroup2);
+    scene.play_remove(vgroup2, Transform::new(vgroup3.clone()));
     let vgroup3 = scene.insert(vgroup3);
 
-    scene.play(vgroup3, Fading::fade_out());
-    scene.remove(vgroup3);
+    scene.play_remove(vgroup3, Fading::fade_out());
 
     info!(
         "Rendered {} frames in {:?}",

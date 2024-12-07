@@ -41,7 +41,7 @@ fn main() {
 
     let polygon = scene.insert(polygon);
     scene.play(
-        polygon,
+        &polygon,
         Fading::fade_in().config(|config| {
             config.set_run_time(Duration::from_secs_f32(1.0));
         }),
@@ -53,11 +53,10 @@ fn main() {
         .build();
     arc.set_color(palettes::manim::BLUE_C);
 
-    let _src = scene.get(polygon).unwrap().clone();
-    scene.play(polygon, Transform::new(_src, arc.clone()));
+    scene.play(&polygon, Transform::new(arc.clone()));
 
     let arc = scene.insert(arc);
-    scene.play(arc, Fading::fade_out());
+    scene.play(&arc, Fading::fade_out());
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

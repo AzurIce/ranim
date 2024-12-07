@@ -47,7 +47,7 @@ fn main() {
 
             let arc = scene.insert(arc);
             scene.play(
-                arc,
+                &arc,
                 Fading::fade_in().config(|config| {
                     config.set_run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32));
                 }),
