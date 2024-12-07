@@ -23,9 +23,7 @@ impl Default for FileWriterBuilder {
             height: 1080,
             fps: 60,
 
-            vf_args: vec![
-                "eq=saturation=1.0:gamma=1.0".to_string(),
-            ],
+            vf_args: vec!["eq=saturation=1.0:gamma=1.0".to_string()],
             video_codec: "libx264".to_string(),
             pixel_format: "yuv420p".to_string(),
         }

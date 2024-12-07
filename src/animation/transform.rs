@@ -42,7 +42,11 @@ impl<R: Rabject + Alignable + Interpolatable> AnimationFunc<R> for Transform<R> 
     }
 
     fn interpolate(&mut self, rabject: &mut R, alpha: f32) {
-        let interpolated = self.aligned_source.as_ref().unwrap().lerp(&self.aligned_target, alpha);
+        let interpolated = self
+            .aligned_source
+            .as_ref()
+            .unwrap()
+            .lerp(&self.aligned_target, alpha);
         rabject.update_from(&interpolated);
     }
 

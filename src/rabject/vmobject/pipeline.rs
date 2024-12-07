@@ -65,7 +65,7 @@ impl RenderResource for StencilPipeline {
             &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Stencil Pipeline"),
-            layout: Some(&Self::pipeline_layout(&wgpu_ctx)),
+            layout: Some(&Self::pipeline_layout(wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
@@ -148,7 +148,7 @@ impl RenderResource for FillPipeline {
             &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Fill Pipeline"),
-            layout: Some(&Self::pipeline_layout(&wgpu_ctx)),
+            layout: Some(&Self::pipeline_layout(wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
@@ -249,7 +249,7 @@ impl RenderResource for StrokePipeline {
             .create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_stroke.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Stroke Pipeline"),
-            layout: Some(&Self::pipeline_layout(&wgpu_ctx)),
+            layout: Some(&Self::pipeline_layout(wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
@@ -312,7 +312,7 @@ impl RenderResource for ComputePipeline {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("VMobject Compute Pipeline Layout"),
-            bind_group_layouts: &[&VMobjectPrimitive::compute_bind_group_layout(&device)],
+            bind_group_layouts: &[&VMobjectPrimitive::compute_bind_group_layout(device)],
             push_constant_ranges: &[],
         });
 

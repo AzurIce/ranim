@@ -75,12 +75,12 @@ impl Primitive for VMobjectPrimitive {
 
         let points_buffer = WgpuBuffer::new_init(
             wgpu_ctx,
-            &points,
+            points,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
         let joint_angles_buffer = WgpuBuffer::new_init(
             wgpu_ctx,
-            &joint_angles,
+            joint_angles,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
         let stroke_vertices_buffer = WgpuBuffer::new(
@@ -90,7 +90,7 @@ impl Primitive for VMobjectPrimitive {
         );
         let fill_vertices_buffer = WgpuBuffer::new_init(
             wgpu_ctx,
-            &fill_triangles,
+            fill_triangles,
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
         let compute_uniform_buffer = WgpuBuffer::new_init(
@@ -133,9 +133,9 @@ impl Primitive for VMobjectPrimitive {
             fill_triangles,
         } = data;
 
-        self.points_buffer.prepare_from_slice(wgpu_ctx, &points);
+        self.points_buffer.prepare_from_slice(wgpu_ctx, points);
         self.joint_angles_buffer
-            .prepare_from_slice(wgpu_ctx, &joint_angles);
+            .prepare_from_slice(wgpu_ctx, joint_angles);
         self.compute_uniform_buffer.prepare_from_slice(
             wgpu_ctx,
             &[ComputeUniform {
@@ -180,7 +180,7 @@ impl Primitive for VMobjectPrimitive {
                 timestamp_writes: None,
             });
             let pipeline = pipelines.get_or_init::<ComputePipeline>(wgpu_ctx);
-            pass.set_pipeline(&pipeline);
+            pass.set_pipeline(pipeline);
             pass.set_bind_group(0, &self.compute_bind_group, &[]);
             // number of segments
             let len = self.points_buffer.len() / 2;
@@ -206,7 +206,7 @@ impl Primitive for VMobjectPrimitive {
             pass.set_bind_group(0, uniforms_bind_group, &[]);
 
             let pipeline = pipelines.get_or_init::<StencilPipeline>(wgpu_ctx);
-            pass.set_pipeline(&pipeline);
+            pass.set_pipeline(pipeline);
             pass.set_vertex_buffer(0, self.fill_vertices_buffer.slice(..));
             pass.draw(0..self.fill_vertices_buffer.len() as u32, 0..1);
         }
@@ -242,12 +242,12 @@ impl Primitive for VMobjectPrimitive {
             pass.set_bind_group(0, uniforms_bind_group, &[]);
 
             let pipeline_vmobject_fill = pipelines.get_or_init::<FillPipeline>(wgpu_ctx);
-            pass.set_pipeline(&pipeline_vmobject_fill);
+            pass.set_pipeline(pipeline_vmobject_fill);
             pass.set_vertex_buffer(0, self.fill_vertices_buffer.slice(..));
             pass.draw(0..self.fill_vertices_buffer.len() as u32, 0..1);
 
             let pipeline_vmobject_stroke = pipelines.get_or_init::<StrokePipeline>(wgpu_ctx);
-            pass.set_pipeline(&pipeline_vmobject_stroke);
+            pass.set_pipeline(pipeline_vmobject_stroke);
             pass.set_bind_group(1, &self.render_stroke_bind_group, &[]);
             let len = self.points_buffer.len() as u32 / 2 * MAX_STEP * 2;
             trace!("draw {}", len);

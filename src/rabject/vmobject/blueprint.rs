@@ -42,7 +42,7 @@ impl Blueprint<VMobject> for Arc {
         let mut points = (0..len)
             .map(|i| {
                 let angle = i as f32 * angle_step;
-                vec2(angle.cos() as f32, angle.sin() as f32).extend(0.0) * self.radius
+                vec2(angle.cos(), angle.sin()).extend(0.0) * self.radius
             })
             .collect::<Vec<_>>();
 
@@ -219,7 +219,7 @@ impl Blueprint<VMobject> for Polygon {
     fn build(self) -> VMobject {
         // TODO: Handle 0 len
         if self.corner_points.len() == 0 {
-            return VMobject::from_points(vec![]).into();
+            return VMobject::from_points(vec![]);
         }
 
         let vertices = self
@@ -230,7 +230,7 @@ impl Blueprint<VMobject> for Polygon {
 
         let mut mobject = VMobject::from_corner_points(vertices);
         mobject.set_stroke_width(self.stroke_width);
-        mobject.into()
+        mobject
     }
 }
 
@@ -264,7 +264,7 @@ impl Blueprint<VMobject> for Rect {
         ])
         .with_stroke_width(self.stroke_width)
         .build();
-        mobject.into()
+        mobject
     }
 }
 
