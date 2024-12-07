@@ -29,7 +29,7 @@ fn main() {
         vec2(0.0, 700.0),
         vec2(200.0, 300.0),
     ])
-    .with_stroke_width(0.0)
+    .with_stroke_width(10.0)
     .build();
     polygon.set_color(Srgba::hex("FF8080FF").unwrap()).rotate(
         std::f32::consts::PI / 4.0,
@@ -37,15 +37,11 @@ fn main() {
         TransformAnchor::origin(),
     );
 
+    scene.wait(Duration::from_secs_f32(0.5));
     let polygon = scene.insert(polygon);
     scene.insert_updater(polygon, Fading::fade_in());
-    scene.wait(Duration::from_secs_f32(1.0));
-
-    // let polygon = scene
-    //     .play(Fading::fade_in(polygon).config(|config| {
-    //         config.set_run_time(Duration::from_secs_f32(1.0));
-    //     }))
-    //     .unwrap();
+    scene.advance(Duration::from_secs_f32(1.0));
+    scene.wait(Duration::from_secs_f32(0.5));
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
@@ -54,8 +50,15 @@ fn main() {
     arc.set_color(Srgba::hex("58C4DDFF").unwrap());
 
     let _src = scene.get(polygon).unwrap().clone();
-    scene.insert_updater(polygon, Transform::new(_src, arc));
-    scene.wait(Duration::from_secs_f32(1.0));
+    scene.insert_updater(polygon, Transform::new(_src, arc.clone()));
+    scene.advance(Duration::from_secs_f32(1.0));
+    scene.wait(Duration::from_secs_f32(0.5));
+
+    scene.remove(polygon);
+    let arc = scene.insert(arc);
+
+    scene.insert_updater(arc, Fading::fade_out());
+    scene.advance(Duration::from_secs_f32(1.0));
 
     // let arc = scene.play(Transform::new(polygon, arc)).unwrap();
     // scene.play(Fading::fade_out(arc));

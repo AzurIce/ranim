@@ -101,11 +101,10 @@ impl Scene {
         self.updaters.iter_mut().for_each(|(_, updaters)| {
             if let Some(updaters) = updaters.downcast_mut::<Vec<(Id, UpdaterStore<VMobject>)>>() {
                 updaters.retain_mut(|(_, updater_store)| {
-                    let rabject = self
-                        .rabjects
+                    self.rabjects
                         .get_mut::<VMobject>(&updater_store.target_id)
-                        .unwrap();
-                    updater_store.updater.on_update(rabject, dt)
+                        .map(|rabject| updater_store.updater.on_update(rabject, dt))
+                        .unwrap_or(false)
                 });
             }
         });
@@ -217,10 +216,12 @@ impl Scene {
         self.save_frame_to_image(path);
     }
 
-    pub fn update_frame(&mut self, dt: f32) {
-        self.tick(dt);
-        self.extract();
-        self.prepare();
+    pub fn update_frame(&mut self, update: bool) {
+        // TODO: solve the problem that the new inserted rabjects needs update
+        if update || true {
+            self.extract();
+            self.prepare();
+        }
         self.render();
         if let Some(writer) = &mut self.video_writer {
             writer.write_frame(&self.camera.get_rendered_texture(&self.ctx.wgpu_ctx));
@@ -278,13 +279,24 @@ impl Scene {
     //     animation.play(self)
     // }
 
+    /// Advance the scene by a given duration
+    pub fn advance(&mut self, duration: Duration) {
+        let dt = self.tick_duration().as_secs_f32();
+        let frames = (duration.as_secs_f32() / dt).ceil() as usize;
+
+        for _ in 0..frames {
+            self.tick(dt);
+            self.update_frame(true);
+        }
+    }
+
     /// Keep the scene static for a given duration
     pub fn wait(&mut self, duration: Duration) {
         let dt = self.tick_duration().as_secs_f32();
         let frames = (duration.as_secs_f32() / dt).ceil() as usize;
 
         for _ in 0..frames {
-            self.update_frame(dt);
+            self.update_frame(false);
         }
     }
 }
