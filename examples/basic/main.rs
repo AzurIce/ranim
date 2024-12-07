@@ -39,8 +39,7 @@ fn main() {
 
     scene.wait(Duration::from_secs_f32(0.5));
     let polygon = scene.insert(polygon);
-    scene.insert_updater(polygon, Fading::fade_in());
-    scene.advance(Duration::from_secs_f32(1.0));
+    scene.play(polygon, Fading::fade_in());
     scene.wait(Duration::from_secs_f32(0.5));
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
@@ -50,15 +49,13 @@ fn main() {
     arc.set_color(Srgba::hex("58C4DDFF").unwrap());
 
     let _src = scene.get(polygon).unwrap().clone();
-    scene.insert_updater(polygon, Transform::new(_src, arc.clone()));
-    scene.advance(Duration::from_secs_f32(1.0));
+    scene.play(polygon, Transform::new(_src, arc.clone()));
     scene.wait(Duration::from_secs_f32(0.5));
 
     scene.remove(polygon);
     let arc = scene.insert(arc);
 
-    scene.insert_updater(arc, Fading::fade_out());
-    scene.advance(Duration::from_secs_f32(1.0));
+    scene.play(arc, Fading::fade_out());
 
     // let arc = scene.play(Transform::new(polygon, arc)).unwrap();
     // scene.play(Fading::fade_out(arc));

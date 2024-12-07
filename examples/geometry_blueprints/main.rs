@@ -39,11 +39,13 @@ fn main() {
         TransformAnchor::origin(),
     );
 
-    let polygon = scene
-        .play(Fading::fade_in(polygon).config(|config| {
+    let polygon = scene.insert(polygon);
+    scene.play(
+        polygon,
+        Fading::fade_in().config(|config| {
             config.set_run_time(Duration::from_secs_f32(1.0));
-        }))
-        .unwrap();
+        }),
+    );
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
@@ -51,8 +53,11 @@ fn main() {
         .build();
     arc.set_color(palettes::manim::BLUE_C);
 
-    let arc = scene.play(Transform::new(polygon, arc)).unwrap();
-    scene.play(Fading::fade_out(arc));
+    let _src = scene.get(polygon).unwrap().clone();
+    scene.play(polygon, Transform::new(_src, arc.clone()));
+
+    let arc = scene.insert(arc);
+    scene.play(arc, Fading::fade_out());
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }
