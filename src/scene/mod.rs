@@ -75,21 +75,21 @@ impl Scene {
     ///
     /// See [`RabjectStores::remove`]
     pub fn remove<R: Rabject>(&mut self, id: RabjectId<R>) {
-        self.rabjects.remove(&id);
+        self.rabjects.remove(id);
     }
 
     /// Get a reference of a rabject from the scene
     ///
     /// See [`RabjectStores::get`]
     pub fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&R> {
-        self.rabjects.get(&id)
+        self.rabjects.get(id)
     }
 
     /// Get a mutable reference of a rabject from the scene
     ///
     /// See [`RabjectStores::get_mut`]
     pub fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut R> {
-        self.rabjects.get_mut(&id)
+        self.rabjects.get_mut(id)
     }
 }
 
@@ -158,25 +158,25 @@ impl Scene {
                 if let Some(entity) = entity.downcast_mut::<RabjectStore<VMobject>>() {
                     if let Some(render_resource) = entity.render_resource.as_mut() {
                         render_resource.update(
-                            &mut self.ctx.wgpu_ctx,
-                            &entity.render_data.as_ref().unwrap(),
+                            &self.ctx.wgpu_ctx,
+                            entity.render_data.as_ref().unwrap(),
                         );
                     } else {
                         entity.render_resource = Some(VMobjectPrimitive::init(
-                            &mut self.ctx.wgpu_ctx,
-                            &entity.render_data.as_ref().unwrap(),
+                            &self.ctx.wgpu_ctx,
+                            entity.render_data.as_ref().unwrap(),
                         ));
                     }
                 } else if let Some(entity) = entity.downcast_mut::<RabjectStore<VGroup>>() {
                     if let Some(render_resource) = entity.render_resource.as_mut() {
                         render_resource.update(
-                            &mut self.ctx.wgpu_ctx,
-                            &entity.render_data.as_ref().unwrap(),
+                            &self.ctx.wgpu_ctx,
+                            entity.render_data.as_ref().unwrap(),
                         );
                     } else {
                         entity.render_resource = Some(VGroupPrimitive::init(
-                            &mut self.ctx.wgpu_ctx,
-                            &entity.render_data.as_ref().unwrap(),
+                            &self.ctx.wgpu_ctx,
+                            entity.render_data.as_ref().unwrap(),
                         ));
                     }
                 }
@@ -195,6 +195,12 @@ impl Scene {
         self.camera
             .render::<VGroup>(&mut self.ctx, &mut self.rabjects);
         // info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
+    }
+}
+
+impl Default for Scene {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -247,7 +253,7 @@ impl Scene {
         }
         self.render();
         if let Some(writer) = &mut self.video_writer {
-            writer.write_frame(&self.camera.get_rendered_texture(&self.ctx.wgpu_ctx));
+            writer.write_frame(self.camera.get_rendered_texture(&self.ctx.wgpu_ctx));
         }
         if self.save_frame {
             let path = format!("output/image-{:04}.png", self.frame_count);
@@ -324,13 +330,21 @@ impl Scene {
     /// ```
     ///
     /// See [`Animation`] and [`Updater`].
-    pub fn play<R: Rabject + 'static>(&mut self, target_id: &RabjectId<R>, animation: Animation<R>) {
-        let run_time = animation.config.run_time.clone();
+    pub fn play<R: Rabject + 'static>(
+        &mut self,
+        target_id: &RabjectId<R>,
+        animation: Animation<R>,
+    ) {
+        let run_time = animation.config.run_time;
         self.insert_updater(target_id, animation);
         self.advance(run_time);
     }
 
-    pub fn play_remove<R: Rabject + 'static>(&mut self, target_id: RabjectId<R>, animation: Animation<R>) {
+    pub fn play_remove<R: Rabject + 'static>(
+        &mut self,
+        target_id: RabjectId<R>,
+        animation: Animation<R>,
+    ) {
         self.play(&target_id, animation);
         self.remove(target_id);
     }

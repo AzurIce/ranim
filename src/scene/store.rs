@@ -1,6 +1,13 @@
-use std::{any::{Any, TypeId}, collections::HashMap, ops::{Deref, DerefMut}};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
 
-use crate::{rabject::{Rabject, RabjectId}, utils::Id};
+use crate::{
+    rabject::{Rabject, RabjectId},
+    utils::Id,
+};
 
 #[allow(unused_imports)]
 use log::debug;
@@ -58,9 +65,9 @@ impl RabjectStores {
     /// Low level api to remove an entity from the store directly
     ///
     /// For high level api, see [`RabjectStores::remove`]
-    pub fn remove_entity(&mut self, id: &Id) {
+    pub fn remove_entity(&mut self, id: Id) {
         for entry in self.inner.values_mut() {
-            entry.retain(|(eid, _)| id != eid);
+            entry.retain(|(eid, _)| id != *eid);
         }
     }
 
@@ -105,8 +112,8 @@ impl RabjectStores {
     }
 
     /// Remove a rabject from the store
-    pub fn remove<R: Rabject>(&mut self, id: &RabjectId<R>) {
-        self.remove_entity(id);
+    pub fn remove<R: Rabject>(&mut self, id: RabjectId<R>) {
+        self.remove_entity(*id);
     }
 
     /// Get a reference of a rabject from the store
@@ -119,4 +126,3 @@ impl RabjectStores {
         self.get_entity_mut::<R>(id).map(|e| &mut e.rabject)
     }
 }
-

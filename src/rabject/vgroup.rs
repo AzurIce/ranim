@@ -32,7 +32,7 @@ impl Primitive for VGroupPrimitive {
     fn init(wgpu_ctx: &WgpuContext, data: &Self::Data) -> Self {
         let children = data
             .iter()
-            .map(|e| VMobjectPrimitive::init(wgpu_ctx, &e))
+            .map(|e| VMobjectPrimitive::init(wgpu_ctx, e))
             .collect::<Vec<_>>();
         Self { children }
     }

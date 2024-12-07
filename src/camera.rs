@@ -359,7 +359,7 @@ impl Camera {
             // trace!("[Camera] Updating rendered texture data...");
             self.update_rendered_texture_data(ctx);
         }
-        &self.output_texture_data.as_ref().unwrap()
+        self.output_texture_data.as_ref().unwrap()
     }
 
     pub fn refresh_uniforms(&mut self) {
@@ -407,14 +407,11 @@ impl CameraFrame {
     }
 
     pub fn rescale_factors(&self) -> Vec3 {
-        // trace!("[CameraFrame] Calculating rescale factors...");
-        let res = Vec3::new(
+        Vec3::new(
             2.0 / self.size.0 as f32,
             2.0 / self.size.1 as f32,
             1.0 / self.get_focal_distance(),
-        );
-        // trace!("[CameraFrame] Rescale factors: {:?}", res);
-        res
+        )
     }
 
     pub fn get_focal_distance(&self) -> f32 {

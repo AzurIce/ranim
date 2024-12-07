@@ -1,8 +1,4 @@
-use std::{
-    fmt::Debug,
-    ops::Deref,
-    sync::Arc,
-};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 use utils::RenderResourceStorage;
 use wgpu::util::DeviceExt;
@@ -11,12 +7,12 @@ pub use glam;
 pub mod prelude {
     pub use crate::interpolate::Interpolatable;
 
-    pub use crate::animation::transform::Alignable;
     pub use crate::animation::fading::Opacity;
+    pub use crate::animation::transform::Alignable;
 }
 
-mod interpolate;
 pub mod color;
+mod interpolate;
 pub mod updater;
 
 pub mod animation;
@@ -26,11 +22,16 @@ pub mod rabject;
 pub mod scene;
 pub mod utils;
 
-
 pub struct RanimContext {
     pub(crate) wgpu_ctx: Arc<WgpuContext>,
     pub pipelines: RenderResourceStorage,
     pub renderers: RenderResourceStorage,
+}
+
+impl Default for RanimContext {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RanimContext {

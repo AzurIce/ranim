@@ -203,16 +203,8 @@ impl VMobject {
                 if normal == Vec3::ZERO {
                     return;
                 }
-                vertices.extend_from_slice(&[
-                    (base_point.clone(), face),
-                    (p0.clone(), face),
-                    (p2.clone(), face),
-                ]);
-                vertices.extend_from_slice(&[
-                    (p0.clone(), face),
-                    (p1.clone(), face),
-                    (p2.clone(), face),
-                ]);
+                vertices.extend_from_slice(&[(*base_point, face), (*p0, face), (*p2, face)]);
+                vertices.extend_from_slice(&[(*p0, face), (*p1, face), (*p2, face)]);
             });
         vertices
             .into_iter()
@@ -363,11 +355,11 @@ impl VMobject {
         let bb = self.get_bounding_box();
         let signum = (edge.signum() + IVec3::ONE).as_uvec3();
 
-        return vec3(
+        vec3(
             bb[signum.x as usize].x,
             bb[signum.y as usize].y,
             bb[signum.z as usize].z,
-        );
+        )
     }
 
     /// Get the area vector of the polygon of anchors.
@@ -549,10 +541,7 @@ impl VMobject {
         );
         self
     }
-    pub fn set_stroke_color(
-        &mut self,
-        color: impl Into<LinearRgba> + Debug + Copy + Clone,
-    ) -> &mut Self {
+    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy) -> &mut Self {
         // let color = vec4(color.red, color.green, color.blue, color.alpha);
 
         self.points.iter_mut().for_each(|p| {
@@ -560,17 +549,14 @@ impl VMobject {
         });
         self
     }
-    pub fn set_fill_color(
-        &mut self,
-        color: impl Into<LinearRgba> + Debug + Copy + Clone,
-    ) -> &mut Self {
+    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy) -> &mut Self {
         trace!("set fill color: {:?}", color);
         // let color = vec4(color.red, color.green, color.blue, color.alpha);
 
         self.points.iter_mut().for_each(|p| p.set_fill_color(color));
         self
     }
-    pub fn set_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy + Clone) -> &mut Self {
+    pub fn set_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy) -> &mut Self {
         trace!("[VMobject] set_color: {:?}", color);
         self.set_fill_color(color).set_stroke_color(color);
         self

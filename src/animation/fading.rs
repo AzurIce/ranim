@@ -1,4 +1,4 @@
-use crate::rabject::{vmobject::VMobject, Rabject};
+use crate::rabject::Rabject;
 
 use super::{Animation, AnimationFunc};
 

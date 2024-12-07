@@ -64,7 +64,7 @@ impl AnimationConfig {
 ///
 /// The `alpha` is calculated by the wrapper [`Animation`],
 /// and the [`Animation`] is actually just an [`Updater`].
-/// 
+///
 /// See [`Animation`], [`Updater`]
 pub trait AnimationFunc<R: Rabject> {
     #[allow(unused)]

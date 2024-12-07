@@ -108,9 +108,7 @@ pub trait Primitive {
 /// An empty implementation, for the case that some rabject doesn't need to be rendered (but why?)
 impl Primitive for () {
     type Data = ();
-    fn init(_wgpu_ctx: &WgpuContext, _data: &Self::Data) -> Self {
-        ()
-    }
+    fn init(_wgpu_ctx: &WgpuContext, _data: &Self::Data) -> Self {}
     fn update(&mut self, _wgpu_ctx: &WgpuContext, _data: &Self::Data) {}
     fn render(
         &self,
