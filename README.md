@@ -35,3 +35,10 @@ cargo run --example <example-name>
 ```
 
 and you can use `--release` flag for faster rendering.
+
+## Design
+
+Once the design is stablized, I may write about it.
+
+For now, you can check out the code and some PRs:
+- [PR#5: Refactor object management and logic/rendering phases](https://github.com/AzurIce/ranim/pull/5)
