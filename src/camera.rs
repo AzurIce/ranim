@@ -5,10 +5,11 @@ use std::{
 
 use bevy_color::Color;
 use glam::{vec3, Mat4, Vec3};
+use log::error;
 
 use crate::{
-    rabject::{ExtractedRabjectWithId, Rabject},
-    renderer::Renderer,
+    rabject::{Primitive, Rabject},
+    scene::store::RabjectStore,
     utils::Id,
     RanimContext, WgpuBuffer, WgpuContext,
 };
@@ -73,7 +74,6 @@ pub struct Camera {
     render_texture: wgpu::Texture,
     // multisample_texture: wgpu::Texture,
     // depth_stencil_texture: wgpu::Texture,
-
     render_view: wgpu::TextureView,
     multisample_view: wgpu::TextureView,
     depth_stencil_view: wgpu::TextureView,
@@ -202,34 +202,7 @@ impl Camera {
         }
     }
 
-    pub fn render<R: Rabject>(
-        &mut self,
-        ctx: &mut RanimContext,
-        rabjects: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
-    ) {
-        let Some(rabjects) = rabjects.get_mut(&std::any::TypeId::of::<R>()) else {
-            return;
-        };
-        let rabjects = rabjects
-            .iter_mut()
-            .map(|(_, rabject)| rabject.downcast_mut::<ExtractedRabjectWithId<R>>().unwrap())
-            .collect::<Vec<_>>();
-
-        let wgpu_ctx = ctx.wgpu_ctx();
-
-        // trace!("[Camera] Rendering...");
-
-        // Update the uniforms buffer
-        // trace!("[Camera]: Refreshing uniforms...");
-        self.refresh_uniforms();
-        debug!("[Camera]: Uniforms: {:?}", self.uniforms);
-        // trace!("[Camera] uploading camera uniforms to buffer...");
-        wgpu_ctx.queue.write_buffer(
-            &self.uniforms_buffer,
-            0,
-            bytemuck::cast_slice(&[self.uniforms]),
-        );
-
+    pub fn clear_screen(&mut self, wgpu_ctx: &WgpuContext) {
         let mut encoder = wgpu_ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -272,22 +245,54 @@ impl Camera {
             });
         }
         wgpu_ctx.queue.submit(Some(encoder.finish()));
+        self.output_texture_updated = false;
+    }
 
-        let instances = rabjects
-            .iter()
-            .map(|rabject| &rabject.render_resource)
-            .collect::<Vec<_>>();
-        let renderer = ctx.renderers.get_or_init_mut::<R::Renderer>(&wgpu_ctx);
-        let pipelines = &mut ctx.pipelines;
-        renderer.render(
-            &wgpu_ctx,
-            pipelines,
-            &instances,
-            &self.multisample_view,
-            &self.render_view,
-            &self.depth_stencil_view,
-            &self.uniforms_bind_group.bind_group,
+    pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext) {
+        self.refresh_uniforms();
+        debug!("[Camera]: Uniforms: {:?}", self.uniforms);
+        // trace!("[Camera] uploading camera uniforms to buffer...");
+        wgpu_ctx.queue.write_buffer(
+            &self.uniforms_buffer,
+            0,
+            bytemuck::cast_slice(&[self.uniforms]),
         );
+    }
+
+    pub fn render<R: Rabject + 'static>(
+        &mut self,
+        ctx: &mut RanimContext,
+        entities: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
+    ) {
+        let Some(entities) = entities.get_mut(&std::any::TypeId::of::<R>()) else {
+            error!(
+                "[Camera::render]: failed to find entities of type {:?}",
+                std::any::TypeId::of::<R>()
+            );
+            error!("available types: {:?}", entities.keys());
+            return;
+        };
+        let entities = entities
+            .iter_mut()
+            .map(|(id, rabject)| (id, rabject.downcast_mut::<RabjectStore<R>>().unwrap()))
+            .collect::<Vec<_>>();
+
+        let wgpu_ctx = ctx.wgpu_ctx();
+
+        // trace!("[Camera] Rendering...");
+
+        let pipelines = &mut ctx.pipelines;
+        for (id, entity) in entities.iter() {
+            trace!("[Camera] Rendering entity {:?}", id);
+            entity.render_resource.as_ref().unwrap().render(
+                &wgpu_ctx,
+                pipelines,
+                &self.multisample_view,
+                &self.render_view,
+                &self.depth_stencil_view,
+                &self.uniforms_bind_group.bind_group,
+            );
+        }
 
         self.output_texture_updated = false;
     }
@@ -354,7 +359,7 @@ impl Camera {
             // trace!("[Camera] Updating rendered texture data...");
             self.update_rendered_texture_data(ctx);
         }
-        &self.output_texture_data.as_ref().unwrap()
+        self.output_texture_data.as_ref().unwrap()
     }
 
     pub fn refresh_uniforms(&mut self) {
@@ -402,14 +407,11 @@ impl CameraFrame {
     }
 
     pub fn rescale_factors(&self) -> Vec3 {
-        // trace!("[CameraFrame] Calculating rescale factors...");
-        let res = Vec3::new(
+        Vec3::new(
             2.0 / self.size.0 as f32,
             2.0 / self.size.1 as f32,
             1.0 / self.get_focal_distance(),
-        );
-        // trace!("[CameraFrame] Rescale factors: {:?}", res);
-        res
+        )
     }
 
     pub fn get_focal_distance(&self) -> f32 {

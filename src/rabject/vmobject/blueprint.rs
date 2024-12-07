@@ -2,7 +2,7 @@ use glam::{vec2, vec3, Vec2, Vec3};
 
 use crate::rabject::{
     vmobject::{TransformAnchor, VMobject},
-    Blueprint, RabjectWithId,
+    Blueprint,
 };
 
 /// A part of a circle
@@ -34,7 +34,7 @@ impl Arc {
 }
 
 impl Blueprint<VMobject> for Arc {
-    fn build(self) -> RabjectWithId<VMobject> {
+    fn build(self) -> VMobject {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
 
@@ -42,7 +42,7 @@ impl Blueprint<VMobject> for Arc {
         let mut points = (0..len)
             .map(|i| {
                 let angle = i as f32 * angle_step;
-                vec2(angle.cos() as f32, angle.sin() as f32).extend(0.0) * self.radius
+                vec2(angle.cos(), angle.sin()).extend(0.0) * self.radius
             })
             .collect::<Vec<_>>();
 
@@ -53,7 +53,7 @@ impl Blueprint<VMobject> for Arc {
         // trace!("start: {:?}, end: {:?}", points[0], points[len - 1]);
         let mut vmobject = VMobject::from_points(points);
         vmobject.set_stroke_width(self.stroke_width);
-        vmobject.into()
+        vmobject
     }
 }
 
@@ -80,7 +80,7 @@ impl ArcBetweenPoints {
 }
 
 impl Blueprint<VMobject> for ArcBetweenPoints {
-    fn build(self) -> RabjectWithId<VMobject> {
+    fn build(self) -> VMobject {
         let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
         let arc = Arc::new(self.angle)
             .with_radius(radius)
@@ -111,11 +111,13 @@ impl Circle {
 }
 
 impl Blueprint<VMobject> for Circle {
-    fn build(self) -> RabjectWithId<VMobject> {
-        Arc::new(std::f32::consts::TAU)
+    fn build(self) -> VMobject {
+        let mut vmobject = Arc::new(std::f32::consts::TAU)
             .with_radius(self.radius)
             .with_stroke_width(self.stroke_width)
-            .build()
+            .build();
+        // vmobject.points.push(vmobject.points[0]);
+        vmobject
     }
 }
 
@@ -151,7 +153,7 @@ impl Dot {
 }
 
 impl Blueprint<VMobject> for Dot {
-    fn build(self) -> RabjectWithId<VMobject> {
+    fn build(self) -> VMobject {
         let mut mobject = Circle::new(self.radius)
             .with_stroke_width(self.stroke_width)
             .build();
@@ -182,8 +184,8 @@ impl Ellipse {
 }
 
 impl Blueprint<VMobject> for Ellipse {
-    fn build(self) -> RabjectWithId<VMobject> {
-        let mut mobject = Circle::new(self.width)
+    fn build(self) -> VMobject {
+        let mut mobject = Circle::new(1.0)
             .with_stroke_width(self.stroke_width)
             .build();
         mobject.scale(
@@ -214,10 +216,10 @@ impl Polygon {
 }
 
 impl Blueprint<VMobject> for Polygon {
-    fn build(self) -> RabjectWithId<VMobject> {
+    fn build(self) -> VMobject {
         // TODO: Handle 0 len
         if self.corner_points.len() == 0 {
-            return VMobject::from_points(vec![]).into();
+            return VMobject::from_points(vec![]);
         }
 
         let vertices = self
@@ -228,7 +230,7 @@ impl Blueprint<VMobject> for Polygon {
 
         let mut mobject = VMobject::from_corner_points(vertices);
         mobject.set_stroke_width(self.stroke_width);
-        mobject.into()
+        mobject
     }
 }
 
@@ -253,7 +255,7 @@ impl Rect {
 }
 
 impl Blueprint<VMobject> for Rect {
-    fn build(self) -> RabjectWithId<VMobject> {
+    fn build(self) -> VMobject {
         let mobject = Polygon::new(vec![
             vec2(0.0, 0.0),
             vec2(self.width, 0.0),
@@ -262,7 +264,7 @@ impl Blueprint<VMobject> for Rect {
         ])
         .with_stroke_width(self.stroke_width)
         .build();
-        mobject.into()
+        mobject
     }
 }
 
@@ -285,7 +287,7 @@ impl Square {
 }
 
 impl Blueprint<VMobject> for Square {
-    fn build(self) -> RabjectWithId<VMobject> {
+    fn build(self) -> VMobject {
         Rect::new(self.side_length, self.side_length)
             .with_stroke_width(self.stroke_width)
             .build()

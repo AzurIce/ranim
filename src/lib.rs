@@ -1,29 +1,37 @@
-use std::{
-    fmt::Debug,
-    ops::Deref,
-    sync::Arc,
-};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 use utils::RenderResourceStorage;
 use wgpu::util::DeviceExt;
 
-pub mod interpolate;
 pub use glam;
+pub mod prelude {
+    pub use crate::interpolate::Interpolatable;
+
+    pub use crate::animation::fading::Opacity;
+    pub use crate::animation::transform::Alignable;
+}
+
 pub mod color;
+mod interpolate;
+pub mod updater;
 
 pub mod animation;
 pub mod camera;
-/// Rabjects are the objects that can be manuplated and rendered
+/// Rabjects are the basic objects in ranim scene
 pub mod rabject;
-pub(crate) mod renderer;
 pub mod scene;
 pub mod utils;
-
 
 pub struct RanimContext {
     pub(crate) wgpu_ctx: Arc<WgpuContext>,
     pub pipelines: RenderResourceStorage,
     pub renderers: RenderResourceStorage,
+}
+
+impl Default for RanimContext {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RanimContext {

@@ -10,7 +10,6 @@ impl Interpolatable for f32 {
     }
 }
 
-
 impl Interpolatable for LinearRgba {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         Self {
