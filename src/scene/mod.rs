@@ -94,10 +94,9 @@ impl Scene {
 // the core phases
 impl Scene {
     pub fn tick(&mut self, dt: f32) {
-        info!("[Scene]: TICK STAGE START");
-        let t = Instant::now();
+        // info!("[Scene]: TICK STAGE START");
+        // let t = Instant::now();
         self.time += dt;
-        self.frame_count += 1;
 
         self.updaters.iter_mut().for_each(|(_, updaters)| {
             if let Some(updaters) = updaters.downcast_mut::<Vec<(Id, UpdaterStore<VMobject>)>>() {
@@ -113,15 +112,30 @@ impl Scene {
                         })
                         .unwrap_or(false)
                 });
+            } else if let Some(updaters) =
+                updaters.downcast_mut::<Vec<(Id, UpdaterStore<VGroup>)>>()
+            {
+                updaters.retain_mut(|(_, updater_store)| {
+                    self.rabjects
+                        .get_mut::<VGroup>(&updater_store.target_id)
+                        .map(|rabject| {
+                            let keep = updater_store.updater.on_update(rabject, dt);
+                            if !keep {
+                                updater_store.updater.on_destroy(rabject);
+                            }
+                            keep
+                        })
+                        .unwrap_or(false)
+                });
             }
         });
 
-        info!("[Scene]: TICK STAGE END, took {:?}", t.elapsed());
+        // info!("[Scene]: TICK STAGE END, took {:?}", t.elapsed());
     }
 
     pub fn extract(&mut self) {
-        info!("[Scene]: EXTRACT STAGE START");
-        let t = Instant::now();
+        // info!("[Scene]: EXTRACT STAGE START");
+        // let t = Instant::now();
         for (_, entities) in self.rabjects.iter_mut() {
             for (_, entity) in entities.iter_mut() {
                 if let Some(rabject_store) = entity.downcast_mut::<RabjectStore<VMobject>>() {
@@ -131,12 +145,12 @@ impl Scene {
                 }
             }
         }
-        info!("[Scene]: EXTRACT STAGE END, took {:?}", t.elapsed());
+        // info!("[Scene]: EXTRACT STAGE END, took {:?}", t.elapsed());
     }
 
     pub fn prepare(&mut self) {
-        info!("[Scene]: PREPARE STAGE START");
-        let t = Instant::now();
+        // info!("[Scene]: PREPARE STAGE START");
+        // let t = Instant::now();
         for (_, entities) in self.rabjects.iter_mut() {
             for (_, entity) in entities.iter_mut() {
                 if let Some(entity) = entity.downcast_mut::<RabjectStore<VMobject>>() {
@@ -166,19 +180,19 @@ impl Scene {
                 }
             }
         }
-        info!("[Scene]: PREPARE STAGE END, took {:?}", t.elapsed());
+        // info!("[Scene]: PREPARE STAGE END, took {:?}", t.elapsed());
     }
 
     pub fn render(&mut self) {
-        info!("[Scene]: RENDER STAGE START");
-        let t = Instant::now();
+        // info!("[Scene]: RENDER STAGE START");
+        // let t = Instant::now();
         self.camera.update_uniforms(&self.ctx.wgpu_ctx);
         self.camera.clear_screen(&self.ctx.wgpu_ctx);
         self.camera
             .render::<VMobject>(&mut self.ctx, &mut self.rabjects);
         self.camera
             .render::<VGroup>(&mut self.ctx, &mut self.rabjects);
-        info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
+        // info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
     }
 }
 
@@ -245,14 +259,14 @@ impl Scene {
     }
 
     pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
-        info!("[Scene]: SAVE FRAME TO IMAGE START");
-        let t = Instant::now();
+        // info!("[Scene]: SAVE FRAME TO IMAGE START");
+        // let t = Instant::now();
         let size = self.camera.frame.size;
         let texture_data = self.camera.get_rendered_texture(&self.ctx.wgpu_ctx);
         let buffer: ImageBuffer<Rgba<u8>, &[u8]> =
             ImageBuffer::from_raw(size.0 as u32, size.1 as u32, texture_data).unwrap();
         buffer.save(path).unwrap();
-        info!("[Scene]: SAVE FRAME TO IMAGE END, took {:?}", t.elapsed());
+        // info!("[Scene]: SAVE FRAME TO IMAGE END, took {:?}", t.elapsed());
     }
 
     pub fn tick_duration(&self) -> Duration {
@@ -280,7 +294,7 @@ impl Scene {
     }
 
     /// Play an animation
-    /// 
+    ///
     /// This is equal to:
     /// ```rust
     /// let run_time = animation.config.run_time.clone();
@@ -289,17 +303,15 @@ impl Scene {
     /// ```
     ///
     /// See [`Animation`] and [`Updater`].
-    pub fn play<R: Rabject + 'static>(
-        &mut self,
-        target_id: RabjectId<R>,
-        animation: Animation<R>,
-    ) {
+    pub fn play<R: Rabject + 'static>(&mut self, target_id: RabjectId<R>, animation: Animation<R>) {
         let run_time = animation.config.run_time.clone();
         self.insert_updater(target_id, animation);
         self.advance(run_time);
     }
 
     /// Advance the scene by a given duration
+    ///
+    /// this method writes frames
     pub fn advance(&mut self, duration: Duration) {
         let dt = self.tick_duration().as_secs_f32();
         let frames = (duration.as_secs_f32() / dt).ceil() as usize;
@@ -311,6 +323,8 @@ impl Scene {
     }
 
     /// Keep the scene static for a given duration
+    ///
+    /// this method writes frames
     pub fn wait(&mut self, duration: Duration) {
         let dt = self.tick_duration().as_secs_f32();
         let frames = (duration.as_secs_f32() / dt).ceil() as usize;

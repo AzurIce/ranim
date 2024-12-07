@@ -112,10 +112,12 @@ impl Circle {
 
 impl Blueprint<VMobject> for Circle {
     fn build(self) -> VMobject {
-        Arc::new(std::f32::consts::TAU)
+        let mut vmobject = Arc::new(std::f32::consts::TAU)
             .with_radius(self.radius)
             .with_stroke_width(self.stroke_width)
-            .build()
+            .build();
+        // vmobject.points.push(vmobject.points[0]);
+        vmobject
     }
 }
 
@@ -183,7 +185,7 @@ impl Ellipse {
 
 impl Blueprint<VMobject> for Ellipse {
     fn build(self) -> VMobject {
-        let mut mobject = Circle::new(self.width)
+        let mut mobject = Circle::new(1.0)
             .with_stroke_width(self.stroke_width)
             .build();
         mobject.scale(

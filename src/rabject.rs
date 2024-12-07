@@ -81,11 +81,13 @@ impl<R: Rabject> Deref for RabjectId<R> {
 ///
 /// ## RenderResource
 /// The [`Rabject::RenderResource`] is the resource that is used to render the rabject.
-pub trait Rabject {
+pub trait Rabject: Clone {
     type RenderData: Default;
     type RenderResource: Primitive;
 
     fn extract(&self) -> Self::RenderData;
+
+    fn update_from(&mut self, other: &Self);
 }
 
 pub trait Primitive {
