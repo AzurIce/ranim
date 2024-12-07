@@ -1,6 +1,6 @@
-use crate::rabject::{vmobject::VMobject, Rabject};
+use crate::rabject::vmobject::VMobject;
 
-use super::{Animation, AnimationConfig, AnimationFunc};
+use super::{Animation, AnimationFunc};
 
 pub enum Fading {
     Out,
