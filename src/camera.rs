@@ -9,7 +9,7 @@ use log::error;
 
 use crate::{
     rabject::{Primitive, Rabject},
-    scene::RabjectStore,
+    scene::store::RabjectStore,
     utils::Id,
     RanimContext, WgpuBuffer, WgpuContext,
 };

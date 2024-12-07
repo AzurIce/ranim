@@ -37,7 +37,16 @@ pub trait Blueprint<T: Rabject> {
 //     fn to_id(&self) -> Id;
 // }
 
+#[derive(Debug)]
 pub struct RabjectId<R: Rabject>(Id, PhantomData<R>);
+
+impl<R: Rabject> Copy for RabjectId<R> {}
+
+impl<R: Rabject> Clone for RabjectId<R> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
 
 impl<R: Rabject> RabjectId<R> {
     pub fn from_id(id: Id) -> Self {
