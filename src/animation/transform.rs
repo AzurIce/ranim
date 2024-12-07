@@ -1,60 +1,56 @@
-use crate::{
-    interpolate::Interpolatable,
-    rabject::{vmobject::VMobject, RabjectWithId},
-};
+use crate::{interpolate::Interpolatable, rabject::Rabject};
 
-use super::{Animation, AnimationConfig, AnimationFunc};
+use super::{Animation, AnimationFunc};
 
-pub struct Transform {
-    aligned_source: RabjectWithId<VMobject>,
-    aligned_target: RabjectWithId<VMobject>,
+/// A transform animation func
+pub struct Transform<R: Rabject + Alignable + Interpolatable> {
+    aligned_source: Option<R>,
+    aligned_target: R,
 }
 
-impl Transform {
-    pub fn new(
-        rabject: RabjectWithId<VMobject>,
-        target: RabjectWithId<VMobject>,
-    ) -> Animation<VMobject> {
-        let mut aligned_source = rabject.clone();
-        let mut aligned_target = target.clone();
-        if !aligned_source.is_aligned(&aligned_target) {
-            aligned_source.align_with(&mut aligned_target);
-        }
-        // trace!("[Transform::new] aligned_source: {:#?}", aligned_source.points());
-        // trace!("[Transform::new] aligned_target: {:#?}", aligned_target.points());
+/// A trait for aligning two rabjects
+///
+/// Alignment is actually the meaning of preparation for interpolation.
+///
+/// For example, if we want to interpolate two VMobjects, we need to
+/// align their inner data structure `Vec<VMobjectPoint>` to the same length.
+pub trait Alignable {
+    fn is_aligned(&self, other: &Self) -> bool;
+    fn align_with(&mut self, other: &mut Self);
+}
 
-        Animation::new(
-            rabject,
-            Self {
-                aligned_source,
-                aligned_target,
-            },
-        )
-        .with_config(AnimationConfig {
-            end_rabject: Some(target),
-            ..AnimationConfig::default()
+impl<R: Rabject + Alignable + Interpolatable + 'static> Transform<R> {
+    pub fn new(target: R) -> Animation<R> {
+        let aligned_target = target.clone();
+
+        Animation::new(Self {
+            aligned_source: None,
+            aligned_target,
         })
     }
 }
 
-impl AnimationFunc<VMobject> for Transform {
-    fn pre_anim(&mut self, rabject: &mut RabjectWithId<VMobject>) {
-        rabject.set_points(self.aligned_source.points().to_vec());
+impl<R: Rabject + Alignable + Interpolatable> AnimationFunc<R> for Transform<R> {
+    fn pre_anim(&mut self, rabject: &mut R) {
+        let mut aligned_source = rabject.clone();
+        if !aligned_source.is_aligned(&self.aligned_target) {
+            aligned_source.align_with(&mut self.aligned_target);
+        }
+        self.aligned_source = Some(aligned_source);
+
+        rabject.update_from(self.aligned_source.as_ref().unwrap());
     }
 
-    fn interpolate(&mut self, rabject: &mut RabjectWithId<VMobject>, alpha: f32) {
-        let points = self
+    fn interpolate(&mut self, rabject: &mut R, alpha: f32) {
+        let interpolated = self
             .aligned_source
-            .points()
-            .iter()
-            .zip(self.aligned_target.points().iter())
-            .map(|(p1, p2)| p1.lerp(p2, alpha))
-            .collect();
-        // trace!("[Transform::interpolate] t: {alpha} points: {:#?}", points);
-        rabject.set_points(points);
+            .as_ref()
+            .unwrap()
+            .lerp(&self.aligned_target, alpha);
+        rabject.update_from(&interpolated);
     }
 
-    fn post_anim(&mut self, rabject: &mut RabjectWithId<VMobject>) {
-        rabject.set_points(self.aligned_target.points().to_vec());
+    fn post_anim(&mut self, rabject: &mut R) {
+        rabject.update_from(&self.aligned_target);
     }
 }

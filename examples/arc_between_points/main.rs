@@ -5,7 +5,7 @@ use env_logger::Env;
 use glam::{Mat3, Vec3};
 use log::info;
 use ranim::glam::vec3;
-use ranim::interpolate::Interpolatable;
+use ranim::prelude::*;
 use ranim::rabject::vmobject::ArcBetweenPoints;
 use ranim::rabject::Blueprint;
 use ranim::{animation::fading::Fading, scene::Scene};
@@ -45,9 +45,13 @@ fn main() {
                 .build();
             arc.set_color(color);
 
-            scene.play(Fading::fade_in(arc).config(|config| {
-                config.set_run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32));
-            }));
+            let arc = scene.insert(arc);
+            scene.play(
+                &arc,
+                Fading::fade_in().config(|config| {
+                    config.set_run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32));
+                }),
+            );
         }
         info!(
             "rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}",

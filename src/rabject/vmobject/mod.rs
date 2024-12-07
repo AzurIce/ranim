@@ -1,5 +1,7 @@
 mod blueprint;
-pub mod render;
+pub mod pipeline;
+pub mod primitive;
+
 use std::{cmp::Ordering, fmt::Debug};
 
 use bevy_color::{LinearRgba, Srgba};
@@ -7,16 +9,18 @@ pub use blueprint::*;
 
 use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
-use render::VMObjectRenderInstance;
+use primitive::{ExtractedVMobject, VMobjectPrimitive};
 
 use crate::{
-    interpolate::Interpolatable, renderer::vmobject::VMobjectRenderer, utils::{partial_quadratic_bezier, rotation_between_vectors}
+    interpolate::Interpolatable,
+    prelude::{Alignable, Opacity},
+    utils::{partial_quadratic_bezier, rotation_between_vectors},
 };
 
 use super::Rabject;
 
 #[allow(unused)]
-use log::{trace, warn};
+use log::{info, trace, warn};
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Default, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
@@ -199,16 +203,8 @@ impl VMobject {
                 if normal == Vec3::ZERO {
                     return;
                 }
-                vertices.extend_from_slice(&[
-                    (base_point.clone(), face),
-                    (p0.clone(), face),
-                    (p2.clone(), face),
-                ]);
-                vertices.extend_from_slice(&[
-                    (p0.clone(), face),
-                    (p1.clone(), face),
-                    (p2.clone(), face),
-                ]);
+                vertices.extend_from_slice(&[(*base_point, face), (*p0, face), (*p2, face)]);
+                vertices.extend_from_slice(&[(*p0, face), (*p1, face), (*p2, face)]);
             });
         vertices
             .into_iter()
@@ -221,16 +217,22 @@ impl VMobject {
     }
 }
 
-#[repr(C, align(16))]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct ComputeUniform {
-    unit_normal: Vec3,
-    _padding: f32,
-}
-
 impl Rabject for VMobject {
-    type Renderer = VMobjectRenderer;
-    type RenderInstance = VMObjectRenderInstance;
+    type RenderData = ExtractedVMobject;
+    type RenderResource = VMobjectPrimitive;
+
+    fn extract(&self) -> Self::RenderData {
+        ExtractedVMobject {
+            points: self.points.clone(),
+            joint_angles: self.get_joint_angles(),
+            unit_normal: self.get_unit_normal(),
+            fill_triangles: self.parse_fill(),
+        }
+    }
+
+    fn update_from(&mut self, other: &Self) {
+        self.set_points(other.points.clone());
+    }
 }
 
 pub enum TransformAnchor {
@@ -353,11 +355,11 @@ impl VMobject {
         let bb = self.get_bounding_box();
         let signum = (edge.signum() + IVec3::ONE).as_uvec3();
 
-        return vec3(
+        vec3(
             bb[signum.x as usize].x,
             bb[signum.y as usize].y,
             bb[signum.z as usize].z,
-        );
+        )
     }
 
     /// Get the area vector of the polygon of anchors.
@@ -539,10 +541,7 @@ impl VMobject {
         );
         self
     }
-    pub fn set_stroke_color(
-        &mut self,
-        color: impl Into<LinearRgba> + Debug + Copy + Clone,
-    ) -> &mut Self {
+    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy) -> &mut Self {
         // let color = vec4(color.red, color.green, color.blue, color.alpha);
 
         self.points.iter_mut().for_each(|p| {
@@ -550,17 +549,14 @@ impl VMobject {
         });
         self
     }
-    pub fn set_fill_color(
-        &mut self,
-        color: impl Into<LinearRgba> + Debug + Copy + Clone,
-    ) -> &mut Self {
+    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy) -> &mut Self {
         trace!("set fill color: {:?}", color);
         // let color = vec4(color.red, color.green, color.blue, color.alpha);
 
         self.points.iter_mut().for_each(|p| p.set_fill_color(color));
         self
     }
-    pub fn set_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy + Clone) -> &mut Self {
+    pub fn set_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy) -> &mut Self {
         trace!("[VMobject] set_color: {:?}", color);
         self.set_fill_color(color).set_stroke_color(color);
         self
@@ -571,6 +567,26 @@ impl VMobject {
             p.stroke_color.alpha = opacity;
         });
         self
+    }
+}
+
+impl Opacity for VMobject {
+    fn set_opacity(&mut self, opacity: f32) {
+        self.set_opacity(opacity);
+    }
+}
+
+impl Alignable for VMobject {
+    fn is_aligned(&self, target: &Self) -> bool {
+        self.points.len() == target.points.len()
+    }
+
+    fn align_with(&mut self, target: &mut Self) {
+        if self.points.len() > target.points.len() {
+            target.align_to(self)
+        } else {
+            self.align_to(target)
+        };
     }
 }
 
@@ -595,10 +611,6 @@ impl VMobject {
     //     self.resize_points(max_len);
     //     target.resize_points(max_len);
     // }
-
-    pub fn is_aligned(&self, target: &Self) -> bool {
-        self.points.len() == target.points.len()
-    }
 
     /// Align the mobject to the target mobject.
     pub fn align_to(&mut self, target: &Self) -> &mut Self {
@@ -674,21 +686,6 @@ impl VMobject {
         self.points = new_points;
         trace!("[VMobject] aligned points: {}", self.points.len());
 
-        self
-    }
-
-    /// Align both mobject to the longer one.
-    pub fn align_with(&mut self, target: &mut Self) -> &mut Self {
-        // trace!(
-        //     "[VMobject] {} align with {}",
-        //     self.points().len(),
-        //     target.points().len()
-        // );
-        if self.points.len() > target.points.len() {
-            target.align_to(self)
-        } else {
-            self.align_to(target)
-        };
         self
     }
 
