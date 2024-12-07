@@ -103,7 +103,13 @@ impl Scene {
                 updaters.retain_mut(|(_, updater_store)| {
                     self.rabjects
                         .get_mut::<VMobject>(&updater_store.target_id)
-                        .map(|rabject| updater_store.updater.on_update(rabject, dt))
+                        .map(|rabject| {
+                            let keep = updater_store.updater.on_update(rabject, dt);
+                            if !keep {
+                                updater_store.updater.on_destroy(rabject);
+                            }
+                            keep
+                        })
                         .unwrap_or(false)
                 });
             }
@@ -255,8 +261,12 @@ impl Scene {
     pub fn insert_updater<R: Rabject + 'static, U: Updater<R> + 'static>(
         &mut self,
         target_id: RabjectId<R>,
-        updater: U,
+        mut updater: U,
     ) {
+        {
+            let target = self.get_mut::<R>(target_id).unwrap();
+            updater.on_create(target);
+        }
         let updater = Box::new(updater);
         let entry = self
             .updaters
