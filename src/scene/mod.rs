@@ -17,6 +17,7 @@ use log::{debug, info};
 use store::{RabjectStore, RabjectStores};
 
 use crate::{
+    animation::Animation,
     camera::Camera,
     rabject::{
         vgroup::{VGroup, VGroupPrimitive},
@@ -278,16 +279,25 @@ impl Scene {
             .push((*target_id, UpdaterStore { updater, target_id }));
     }
 
-    // /// Play an animation
-    // ///
-    // /// See [`Animation`].
-    // pub fn play<R: Rabject>(&mut self, animation: Animation<R>) -> Option<RabjectWithId<R>> {
-    //     // trace!(
-    //     //     "[Scene] Playing animation on {:?}...",
-    //     //     animation.rabject.id()
-    //     // );
-    //     animation.play(self)
-    // }
+    /// Play an animation
+    /// 
+    /// This is equal to:
+    /// ```rust
+    /// let run_time = animation.config.run_time.clone();
+    /// scene.insert_updater(target_id, animation);
+    /// scene.advance(run_time);
+    /// ```
+    ///
+    /// See [`Animation`] and [`Updater`].
+    pub fn play<R: Rabject + 'static>(
+        &mut self,
+        target_id: RabjectId<R>,
+        animation: Animation<R>,
+    ) {
+        let run_time = animation.config.run_time.clone();
+        self.insert_updater(target_id, animation);
+        self.advance(run_time);
+    }
 
     /// Advance the scene by a given duration
     pub fn advance(&mut self, duration: Duration) {
