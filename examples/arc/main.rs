@@ -52,7 +52,7 @@ fn main() {
             arc.set_color(color).shift(frame_start + offset);
             let arc = scene.insert(arc);
             scene.play(
-                arc,
+                &arc,
                 Fading::fade_in().config(|config| {
                     config.set_run_time(Duration::from_secs_f32(0.02));
                 }),

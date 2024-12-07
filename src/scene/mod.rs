@@ -6,15 +6,17 @@ use std::{
     collections::HashMap,
     fs,
     path::Path,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
+use store::{RabjectStore, RabjectStores};
 
 #[allow(unused_imports)]
 use log::{debug, info};
-use store::{RabjectStore, RabjectStores};
+#[allow(unused_imports)]
+use std::time::Instant;
 
 use crate::{
     animation::Animation,
@@ -79,14 +81,14 @@ impl Scene {
     /// Get a reference of a rabject from the scene
     ///
     /// See [`RabjectStores::get`]
-    pub fn get<R: Rabject + 'static>(&self, id: RabjectId<R>) -> Option<&R> {
+    pub fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&R> {
         self.rabjects.get(&id)
     }
 
     /// Get a mutable reference of a rabject from the scene
     ///
     /// See [`RabjectStores::get_mut`]
-    pub fn get_mut<R: Rabject + 'static>(&mut self, id: RabjectId<R>) -> Option<&mut R> {
+    pub fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut R> {
         self.rabjects.get_mut(&id)
     }
 }
@@ -273,9 +275,10 @@ impl Scene {
         Duration::from_secs_f32(1.0 / self.camera.fps as f32)
     }
 
+    /// Insert an updater for a target rabject
     pub fn insert_updater<R: Rabject + 'static, U: Updater<R> + 'static>(
         &mut self,
-        target_id: RabjectId<R>,
+        target_id: &RabjectId<R>,
         mut updater: U,
     ) {
         {
@@ -290,7 +293,25 @@ impl Scene {
         entry
             .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
             .unwrap()
-            .push((*target_id, UpdaterStore { updater, target_id }));
+            .push((
+                **target_id,
+                UpdaterStore {
+                    updater,
+                    target_id: *target_id,
+                },
+            ));
+    }
+
+    /// Remove an updater for a target rabject
+    pub fn remove_updater<R: Rabject + 'static>(&mut self, target_id: RabjectId<R>) {
+        let entry = self
+            .updaters
+            .entry(TypeId::of::<R>())
+            .or_insert(Box::new(Vec::<(Id, UpdaterStore<R>)>::new()));
+        entry
+            .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
+            .unwrap()
+            .retain(|(id, _)| *id != *target_id);
     }
 
     /// Play an animation
@@ -303,10 +324,15 @@ impl Scene {
     /// ```
     ///
     /// See [`Animation`] and [`Updater`].
-    pub fn play<R: Rabject + 'static>(&mut self, target_id: RabjectId<R>, animation: Animation<R>) {
+    pub fn play<R: Rabject + 'static>(&mut self, target_id: &RabjectId<R>, animation: Animation<R>) {
         let run_time = animation.config.run_time.clone();
         self.insert_updater(target_id, animation);
         self.advance(run_time);
+    }
+
+    pub fn play_remove<R: Rabject + 'static>(&mut self, target_id: RabjectId<R>, animation: Animation<R>) {
+        self.play(&target_id, animation);
+        self.remove(target_id);
     }
 
     /// Advance the scene by a given duration

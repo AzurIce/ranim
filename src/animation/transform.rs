@@ -4,7 +4,7 @@ use super::{Animation, AnimationFunc};
 
 /// A transform animation func
 pub struct Transform<R: Rabject + Alignable + Interpolatable> {
-    aligned_source: R,
+    aligned_source: Option<R>,
     aligned_target: R,
 }
 
@@ -20,17 +20,11 @@ pub trait Alignable {
 }
 
 impl<R: Rabject + Alignable + Interpolatable + 'static> Transform<R> {
-    pub fn new(rabject: R, target: R) -> Animation<R> {
-        let mut aligned_source = rabject.clone();
-        let mut aligned_target = target.clone();
-        if !aligned_source.is_aligned(&aligned_target) {
-            aligned_source.align_with(&mut aligned_target);
-        }
-        // trace!("[Transform::new] aligned_source: {:#?}", aligned_source.points());
-        // trace!("[Transform::new] aligned_target: {:#?}", aligned_target.points());
+    pub fn new(target: R) -> Animation<R> {
+        let aligned_target = target.clone();
 
         Animation::new(Self {
-            aligned_source,
+            aligned_source: None,
             aligned_target,
         })
     }
@@ -38,11 +32,17 @@ impl<R: Rabject + Alignable + Interpolatable + 'static> Transform<R> {
 
 impl<R: Rabject + Alignable + Interpolatable> AnimationFunc<R> for Transform<R> {
     fn pre_anim(&mut self, rabject: &mut R) {
-        rabject.update_from(&self.aligned_source);
+        let mut aligned_source = rabject.clone();
+        if !aligned_source.is_aligned(&self.aligned_target) {
+            aligned_source.align_with(&mut self.aligned_target);
+        }
+        self.aligned_source = Some(aligned_source);
+
+        rabject.update_from(self.aligned_source.as_ref().unwrap());
     }
 
     fn interpolate(&mut self, rabject: &mut R, alpha: f32) {
-        let interpolated = self.aligned_source.lerp(&self.aligned_target, alpha);
+        let interpolated = self.aligned_source.as_ref().unwrap().lerp(&self.aligned_target, alpha);
         rabject.update_from(&interpolated);
     }
 
