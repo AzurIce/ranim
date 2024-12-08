@@ -3,13 +3,13 @@ use std::time::{Duration, Instant};
 use env_logger::Env;
 use glam::{vec2, Vec3};
 use log::info;
+use ranim::prelude::*;
 use ranim::color::palettes;
 use ranim::rabject::vmobject::TransformAnchor;
-use ranim::rabject::Blueprint;
 use ranim::{
     animation::{fading::Fading, transform::Transform},
     rabject::vmobject::{Arc, Polygon},
-    scene::Scene,
+    scene::SceneBuilder,
 };
 
 fn main() {
@@ -20,7 +20,7 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("geometry_blueprints=info"))
         .init();
 
-    let mut scene = Scene::new();
+    let mut scene = SceneBuilder::new("geometry_blueprints").build();
     let t = Instant::now();
     info!("running...");
 

@@ -9,22 +9,20 @@ use ranim::animation::transform::Transform;
 use ranim::color::palettes;
 // use ranim::animation::transform::Transform;
 use ranim::glam::vec2;
+use ranim::prelude::*;
 use ranim::rabject::vgroup::VGroup;
+use ranim::rabject::vmobject::{Arc, Polygon};
 use ranim::rabject::vmobject::{Circle, Dot, Ellipse, Square, TransformAnchor};
-use ranim::rabject::Blueprint;
-use ranim::{
-    rabject::vmobject::{Arc, Polygon},
-    scene::Scene,
-};
+use ranim::scene::SceneBuilder;
 
 fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace"))
+    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info"))
         .init();
 
-    let mut scene = Scene::new();
+    let mut scene = SceneBuilder::new("test_scene").build();
     let start = Instant::now();
 
     let mut polygon = Polygon::new(vec![
