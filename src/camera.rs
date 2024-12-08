@@ -8,10 +8,7 @@ use glam::{vec3, Mat4, Vec3};
 use log::error;
 
 use crate::{
-    rabject::{Primitive, Rabject},
-    scene::store::RabjectStore,
-    utils::Id,
-    RanimContext, WgpuBuffer, WgpuContext,
+    context::{RanimContext, WgpuContext}, rabject::{Primitive, Rabject}, scene::store::RabjectStore, utils::{wgpu::WgpuBuffer, Id}
 };
 
 #[allow(unused)]

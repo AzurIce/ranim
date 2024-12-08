@@ -22,12 +22,12 @@ pub trait Opacity {
 }
 
 impl<R: Rabject + Opacity> AnimationFunc<R> for Fading {
-    fn pre_anim(&mut self, rabject: &mut R) {
-        match self {
-            Fading::Out => rabject.set_opacity(1.0),
-            Fading::In => rabject.set_opacity(0.0),
-        };
-    }
+    // fn pre_anim(&mut self, rabject: &mut R) {
+    //     match self {
+    //         Fading::Out => rabject.set_opacity(1.0),
+    //         Fading::In => rabject.set_opacity(0.0),
+    //     };
+    // }
 
     fn interpolate(&mut self, rabject: &mut R, alpha: f32) {
         match self {
