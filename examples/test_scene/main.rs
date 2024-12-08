@@ -71,7 +71,7 @@ fn main() {
 
     let mut ellipse = Ellipse::new(100.0, 200.0).build();
     ellipse
-        // .set_color(palettes::manim::YELLOW_B.with_alpha(0.5))
+        .set_color(palettes::manim::YELLOW_B.with_alpha(0.5))
         .set_stroke_color(palettes::manim::YELLOW_B);
 
     let mut dot = Dot::new(vec3(0.0, -100.0, 0.0)).build();

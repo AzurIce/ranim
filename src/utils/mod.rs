@@ -1,4 +1,5 @@
 pub mod rate_functions;
+pub mod wgpu;
 
 use std::{
     any::{Any, TypeId},
@@ -8,7 +9,7 @@ use std::{
 use bevy_color::Srgba;
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
-use crate::{interpolate::Interpolatable, rabject::RenderResource, WgpuContext};
+use crate::{interpolate::Interpolatable, rabject::RenderResource, context::WgpuContext};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);

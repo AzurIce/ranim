@@ -38,11 +38,17 @@ impl Blueprint<VMobject> for Arc {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
 
-        let angle_step = self.angle / (len - 1) as f32;
         let mut points = (0..len)
             .map(|i| {
-                let angle = i as f32 * angle_step;
-                vec2(angle.cos(), angle.sin()).extend(0.0) * self.radius
+                let angle = self.angle * i as f32 / (len - 1) as f32;
+                let (mut x, mut y) = (angle.cos(), angle.sin());
+                if x.abs() < 1.8e-7 {
+                    x = 0.0;
+                }
+                if y.abs() < 1.8e-7 {
+                    y = 0.0;
+                }
+                vec2(x, y).extend(0.0) * self.radius
             })
             .collect::<Vec<_>>();
 
@@ -112,12 +118,10 @@ impl Circle {
 
 impl Blueprint<VMobject> for Circle {
     fn build(self) -> VMobject {
-        let mut vmobject = Arc::new(std::f32::consts::TAU)
+        Arc::new(std::f32::consts::TAU)
             .with_radius(self.radius)
             .with_stroke_width(self.stroke_width)
-            .build();
-        // vmobject.points.push(vmobject.points[0]);
-        vmobject
+            .build()
     }
 }
 
@@ -291,5 +295,22 @@ impl Blueprint<VMobject> for Square {
         Rect::new(self.side_length, self.side_length)
             .with_stroke_width(self.stroke_width)
             .build()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::rabject::Blueprint;
+
+    use super::*;
+
+    #[test]
+    fn test_arc() {
+        let arc = Arc::new(std::f32::consts::PI).build();
+        assert!(!arc.is_closed());
+
+        let arc = Arc::new(std::f32::consts::TAU).build();
+        assert_eq!(arc.points().first(), arc.points().last());
+        assert!(arc.is_closed());
     }
 }
