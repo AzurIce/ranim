@@ -7,7 +7,7 @@ use std::{cmp::Ordering, fmt::Debug};
 use bevy_color::{LinearRgba, Srgba};
 pub use blueprint::*;
 
-use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3, Vec4};
+use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec2, Vec3, Vec4};
 use itertools::Itertools;
 use primitive::{ExtractedVMobject, VMobjectPrimitive};
 
@@ -74,7 +74,7 @@ impl VMobjectPoint {
 #[repr(C)]
 pub struct VMobjectFillVertex {
     pub pos: Vec3,
-    pub face: f32,
+    pub fill_all: u32,
     pub fill_color: LinearRgba,
 }
 
@@ -179,6 +179,7 @@ impl VMobject {
         normal.normalize()
     }
 
+    // TODO: do this in compute shader
     pub fn parse_fill(&self) -> Vec<VMobjectFillVertex> {
         let points = &self.points;
         if points.is_empty() || !self.is_closed() {
@@ -196,21 +197,21 @@ impl VMobject {
             .for_each(|((p0, p1), p2)| {
                 let v1 = p0.pos - base_point.pos;
                 let v2 = p2.pos - base_point.pos;
-                let mat = Mat3::from_cols(unit_normal, v1, v2);
-                let face = mat.determinant();
+                // let mat = Mat3::from_cols(unit_normal, v1, v2);
+                // let face = mat.determinant();
 
                 let normal = v1.cross(v2).normalize();
                 if normal == Vec3::ZERO {
                     return;
                 }
-                vertices.extend_from_slice(&[(*base_point, face), (*p0, face), (*p2, face)]);
-                vertices.extend_from_slice(&[(*p0, face), (*p1, face), (*p2, face)]);
+                vertices.extend_from_slice(&[(*base_point, 1), (*p0, 1), (*p2, 1)]);
+                vertices.extend_from_slice(&[(*p0, 0), (*p1, 0), (*p2, 0)]);
             });
         vertices
             .into_iter()
-            .map(|(v, face)| VMobjectFillVertex {
+            .map(|(v, fill_all)| VMobjectFillVertex {
                 pos: v.pos,
-                face,
+                fill_all,
                 fill_color: v.fill_color,
             })
             .collect()
