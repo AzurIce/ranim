@@ -3,7 +3,7 @@ use std::ops::Deref;
 use crate::{
     camera::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
     rabject::{RenderResource, Vertex},
-    WgpuContext,
+    context::WgpuContext,
 };
 
 use super::{primitive::VMobjectPrimitive, VMobjectFillVertex};
@@ -23,7 +23,7 @@ impl Vertex for VMobjectFillVertex {
                 wgpu::VertexAttribute {
                     offset: size_of::<[f32; 3]>() as wgpu::BufferAddress,
                     shader_location: 1,
-                    format: wgpu::VertexFormat::Float32,
+                    format: wgpu::VertexFormat::Uint32,
                 },
                 wgpu::VertexAttribute {
                     offset: size_of::<[f32; 4]>() as wgpu::BufferAddress,

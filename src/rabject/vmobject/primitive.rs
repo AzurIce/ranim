@@ -1,5 +1,5 @@
-use crate::WgpuContext;
-use crate::{rabject::Primitive, WgpuBuffer};
+use crate::context::WgpuContext;
+use crate::{rabject::Primitive, utils::wgpu::WgpuBuffer};
 use glam::{Vec3, Vec4};
 
 use super::pipeline::{ComputePipeline, FillPipeline, StencilPipeline, StrokePipeline};

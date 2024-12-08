@@ -5,7 +5,7 @@ use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 
 use crate::{
     utils::{Id, RenderResourceStorage},
-    WgpuContext,
+    context::WgpuContext,
 };
 
 /// A render resource.
@@ -20,7 +20,7 @@ pub trait Vertex: bytemuck::Pod + bytemuck::Zeroable + Clone + Debug {
 }
 
 /// Blueprints are the data structures that are used to create [`Rabject`]s
-pub trait Blueprint<T: Rabject> {
+pub trait Blueprint<T> {
     fn build(self) -> T;
 }
 
