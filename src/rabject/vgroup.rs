@@ -1,7 +1,7 @@
 use crate::{
     prelude::{Alignable, Interpolatable, Opacity},
     utils::RenderResourceStorage,
-    WgpuContext,
+    context::WgpuContext,
 };
 
 use super::{
