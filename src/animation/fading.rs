@@ -1,19 +1,33 @@
-use crate::rabject::Rabject;
+use crate::{prelude::Interpolatable, rabject::Rabject};
 
 use super::{Animation, AnimationFunc};
 
-pub enum Fading {
+pub enum FadingType {
     Out,
     In,
 }
 
-impl Fading {
-    pub fn fade_in<R: Rabject + Opacity>() -> Animation<R> {
-        Animation::new(Self::In)
+pub struct Fading<R: Rabject + Opacity + Interpolatable> {
+    pub(crate) src: Option<R>,
+    pub(crate) dst: Option<R>,
+    pub(crate) fading_type: FadingType,
+}
+
+impl<R: Rabject + Opacity + Interpolatable + 'static> Fading<R> {
+    pub fn fade_in() -> Animation<R> {
+        Animation::new(Self {
+            src: None,
+            dst: None,
+            fading_type: FadingType::In,
+        })
     }
 
-    pub fn fade_out<R: Rabject + Opacity>() -> Animation<R> {
-        Animation::new(Self::Out)
+    pub fn fade_out() -> Animation<R> {
+        Animation::new(Self {
+            src: None,
+            dst: None,
+            fading_type: FadingType::Out,
+        })
     }
 }
 
@@ -21,18 +35,25 @@ pub trait Opacity {
     fn set_opacity(&mut self, opacity: f32);
 }
 
-impl<R: Rabject + Opacity> AnimationFunc<R> for Fading {
-    // fn pre_anim(&mut self, rabject: &mut R) {
-    //     match self {
-    //         Fading::Out => rabject.set_opacity(1.0),
-    //         Fading::In => rabject.set_opacity(0.0),
-    //     };
-    // }
+impl<R: Rabject + Opacity + Interpolatable> AnimationFunc<R> for Fading<R> {
+    fn pre_anim(&mut self, rabject: &mut R) {
+        self.src = Some(rabject.clone());
+        self.dst = Some(rabject.clone());
+        match self.fading_type {
+            FadingType::Out => self.dst.as_mut(),
+            FadingType::In => self.src.as_mut(),
+        }
+        .unwrap()
+        .set_opacity(0.0);
+    }
 
     fn interpolate(&mut self, rabject: &mut R, alpha: f32) {
-        match self {
-            Fading::Out => rabject.set_opacity(1.0 - alpha),
-            Fading::In => rabject.set_opacity(alpha),
-        };
+        rabject.update_from(
+            &self
+                .src
+                .as_ref()
+                .unwrap()
+                .lerp(self.dst.as_ref().unwrap(), alpha),
+        );
     }
 }
