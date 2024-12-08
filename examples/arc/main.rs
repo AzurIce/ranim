@@ -6,8 +6,7 @@ use log::info;
 use ranim::glam::vec3;
 use ranim::prelude::*;
 use ranim::rabject::vmobject::Arc;
-use ranim::rabject::Blueprint;
-use ranim::{animation::fading::Fading, scene::Scene};
+use ranim::{animation::fading::Fading, scene::SceneBuilder};
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -15,7 +14,7 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("arc=info")).init();
 
-    let mut scene = Scene::new();
+    let mut scene = SceneBuilder::new("arc").build();
     let t = Instant::now();
 
     let start_color = Srgba::hex("FF8080FF").unwrap();

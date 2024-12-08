@@ -7,7 +7,7 @@ use std::{cmp::Ordering, fmt::Debug};
 use bevy_color::{LinearRgba, Srgba};
 pub use blueprint::*;
 
-use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec2, Vec3, Vec4};
+use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
 use primitive::{ExtractedVMobject, VMobjectPrimitive};
 
@@ -188,7 +188,7 @@ impl VMobject {
 
         let mut vertices = Vec::with_capacity(points.len() * 3); // not acurate
         let base_point = points.first().unwrap();
-        let unit_normal = self.get_unit_normal();
+        // let unit_normal = self.get_unit_normal();
         points
             .iter()
             .step_by(2)

@@ -1,9 +1,13 @@
 example target:
-    rm -rf examples/{{target}}/output*
+    # -rm -rf examples/{{target}}/output/*
+    # -rm -rf output/{{target}}/*
+    # -mkdir examples/{{target}}/output
+
     cargo run --example {{target}} --release
-    mv output* examples/{{target}}/
-    -cp examples/{{target}}/output.mp4 assets/{{target}}.mp4
-    -cp examples/{{target}}/output.png assets/{{target}}.png
+
+    # cp output/{{target}}/* examples/{{target}}/output/
+    -cp output/{{target}}/output.mp4 assets/{{target}}.mp4
+    -cp output/{{target}}/output.png assets/{{target}}.png
 
 examples:
     just example arc

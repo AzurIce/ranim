@@ -7,8 +7,7 @@ use log::info;
 use ranim::glam::vec3;
 use ranim::prelude::*;
 use ranim::rabject::vmobject::ArcBetweenPoints;
-use ranim::rabject::Blueprint;
-use ranim::{animation::fading::Fading, scene::Scene};
+use ranim::{animation::fading::Fading, scene::SceneBuilder};
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -18,7 +17,7 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=info"))
         .init();
 
-    let mut scene = Scene::new();
+    let mut scene = SceneBuilder::new("arc_between_points").build();
 
     let start_color = Srgba::hex("FF8080FF").unwrap();
     let end_color = Srgba::hex("58C4DDFF").unwrap();

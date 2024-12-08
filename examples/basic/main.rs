@@ -4,12 +4,12 @@ use bevy_color::Srgba;
 use env_logger::Env;
 use log::info;
 use ranim::glam::{vec2, Vec3};
+use ranim::prelude::*;
 use ranim::rabject::vmobject::TransformAnchor;
-use ranim::rabject::Blueprint;
 use ranim::{
     animation::{fading::Fading, transform::Transform},
     rabject::vmobject::{Arc, Polygon},
-    scene::Scene,
+    scene::SceneBuilder,
 };
 
 fn main() {
@@ -18,7 +18,7 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
 
-    let mut scene = Scene::new();
+    let mut scene = SceneBuilder::new("basic").build();
     let t = Instant::now();
     info!("running...");
 

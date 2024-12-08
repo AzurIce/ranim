@@ -1,16 +1,16 @@
 use env_logger::Env;
 use glam::vec3;
+use ranim::prelude::*;
 use ranim::color::palettes::manim::*;
 use ranim::rabject::vmobject::Rect;
-use ranim::rabject::Blueprint;
-use ranim::scene::Scene;
+use ranim::scene::SceneBuilder;
 
 fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace")).init();
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info")).init();
-    let mut scene = Scene::new();
+    let mut scene = SceneBuilder::new("palettes").build();
 
     let colors = vec![
         vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],

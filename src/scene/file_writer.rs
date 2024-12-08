@@ -4,6 +4,7 @@ use std::{
     process::{Child, ChildStdin, Command, Stdio},
 };
 
+#[derive(Debug, Clone)]
 pub struct FileWriterBuilder {
     pub file_path: PathBuf,
     pub width: u32,
@@ -31,6 +32,11 @@ impl Default for FileWriterBuilder {
 }
 
 impl FileWriterBuilder {
+    pub fn with_file_path(mut self, file_path: PathBuf) -> Self {
+        self.file_path = file_path;
+        self
+    }
+
     pub fn with_size(mut self, width: u32, height: u32) -> Self {
         self.width = width;
         self.height = height;
@@ -42,7 +48,7 @@ impl FileWriterBuilder {
         self
     }
 
-    pub fn with_fast_encoding(mut self) -> Self {
+    pub fn enable_fast_encoding(mut self) -> Self {
         self.video_codec = "libx264rgb".to_string();
         self.pixel_format = "rgb32".to_string();
         self
@@ -69,6 +75,7 @@ impl FileWriterBuilder {
         //         .map(|s| s.to_string_lossy())
         //         .unwrap_or("mp4".into())
         // ));
+        std::fs::create_dir_all(self.file_path.parent().unwrap()).unwrap();
 
         let mut command = Command::new("ffmpeg");
         #[rustfmt::skip]
