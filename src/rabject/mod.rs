@@ -1,5 +1,7 @@
 pub mod vgroup;
+pub mod vpath;
 pub mod vmobject;
+pub mod svg_mobject;
 
 use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 

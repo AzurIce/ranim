@@ -85,6 +85,7 @@ pub struct VMobjectStrokeVertex {
     pub stroke_color: Vec4,
 }
 
+/// The VMobject is actually a list of quadratic bezier curves.
 #[derive(Debug, Clone, Default)]
 pub struct VMobject {
     points: Vec<VMobjectPoint>, // anchor-handle-anchor-handle-...-anchor
