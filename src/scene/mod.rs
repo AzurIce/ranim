@@ -23,6 +23,8 @@ use crate::{
     camera::Camera,
     context::RanimContext,
     rabject::{
+        group::{Group, GroupPrimitive},
+        svg_mobject::{SvgMobject, SvgPrimitive},
         vgroup::{VGroup, VGroupPrimitive},
         vmobject::{primitive::VMobjectPrimitive, VMobject},
         vpath::{primitive::VPathPrimitive, VPath},
@@ -228,6 +230,14 @@ impl Scene {
                     rabject_store.render_data = Some(rabject_store.rabject.extract());
                 } else if let Some(rabject_store) = entity.downcast_mut::<RabjectStore<VPath>>() {
                     rabject_store.render_data = Some(rabject_store.rabject.extract());
+                } else if let Some(rabject_store) =
+                    entity.downcast_mut::<RabjectStore<Group<VPath>>>()
+                {
+                    rabject_store.render_data = Some(rabject_store.rabject.extract());
+                } else if let Some(rabject_store) =
+                    entity.downcast_mut::<RabjectStore<SvgMobject>>()
+                {
+                    rabject_store.render_data = Some(rabject_store.rabject.extract());
                 }
             }
         }
@@ -269,6 +279,20 @@ impl Scene {
                             entity.render_data.as_ref().unwrap(),
                         ));
                     }
+                } else if let Some(rabject_store) =
+                    entity.downcast_mut::<RabjectStore<Group<VPath>>>()
+                {
+                    rabject_store.render_resource = Some(GroupPrimitive::init(
+                        &self.ctx.wgpu_ctx,
+                        rabject_store.render_data.as_ref().unwrap(),
+                    ));
+                } else if let Some(rabject_store) =
+                    entity.downcast_mut::<RabjectStore<SvgMobject>>()
+                {
+                    rabject_store.render_resource = Some(SvgPrimitive::init(
+                        &self.ctx.wgpu_ctx,
+                        rabject_store.render_data.as_ref().unwrap(),
+                    ));
                 }
             }
         }
@@ -286,6 +310,10 @@ impl Scene {
             .render::<VGroup>(&mut self.ctx, &mut self.rabjects);
         self.camera
             .render::<VPath>(&mut self.ctx, &mut self.rabjects);
+        self.camera
+            .render::<Group<VPath>>(&mut self.ctx, &mut self.rabjects);
+        self.camera
+            .render::<SvgMobject>(&mut self.ctx, &mut self.rabjects);
         // info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
     }
 }

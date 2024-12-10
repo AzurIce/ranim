@@ -10,6 +10,7 @@ use ranim::color::palettes;
 // use ranim::animation::transform::Transform;
 use ranim::glam::vec2;
 use ranim::prelude::*;
+use ranim::rabject::svg_mobject::SvgMobject;
 use ranim::rabject::vgroup::VGroup;
 use ranim::rabject::vmobject::{Arc, Polygon};
 use ranim::rabject::vmobject::{Circle, Dot, Ellipse, Square, TransformAnchor};
@@ -39,29 +40,35 @@ fn main() {
     // );
     // let vpath3 = scene.insert(cubic);
 
-    let points = vec![
-        VPathPoint::new(
-            Vec3::ZERO,
-            Some(vec3(100.0, 100.0, 0.0)),
-            Some(vec3(100.0, -100.0, 0.0)),
-        ),
-        VPathPoint::new(
-            vec3(300.0, 0.0, 0.0),
-            Some(vec3(200.0, -100.0, 0.0)),
-            Some(vec3(200.0, 100.0, 0.0)),
-        ),
-        VPathPoint::new(
-            Vec3::ZERO,
-            Some(vec3(100.0, 100.0, 0.0)),
-            Some(vec3(100.0, -100.0, 0.0)),
-        ),
-    ];
+    // let offset = vec3(100.0, 100.0, 0.0);
+    // let offset = Vec3::ZERO;
+    // let points = vec![
+    //     VPathPoint::new(
+    //         Vec3::ZERO + offset,
+    //         Some(vec3(10.0, 100.0, 0.0) + offset),
+    //         Some(vec3(10.0, -100.0, 0.0) + offset),
+    //     ),
+    //     VPathPoint::new(
+    //         vec3(300.0, 0.0, 0.0) + offset,
+    //         Some(vec3(200.0, -100.0, 0.0) + offset),
+    //         Some(vec3(200.0, 100.0, 0.0) + offset),
+    //     ),
+    //     VPathPoint::new(
+    //         Vec3::ZERO + offset,
+    //         Some(vec3(10.0, 100.0, 0.0) + offset),
+    //         Some(vec3(10.0, -100.0, 0.0) + offset),
+    //     ),
+    // ];
 
-    let close = VPath { points };
+    // let close = VPath { points };
 
-    let vpath4 = scene.insert(close);
+    // let vpath4 = scene.insert(close);
 
-    scene.render_to_image("vpath.png");
+    // scene.render_to_image("vpath.png");
+
+    let svg = SvgMobject::from_path("assets/test.svg");
+    let svg = scene.insert(svg);
+    scene.render_to_image("svg.png");
 
     // let mut polygon = Polygon::new(vec![
     //     vec2(-100.0, -300.0),
