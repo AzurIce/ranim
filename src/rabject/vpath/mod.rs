@@ -7,6 +7,7 @@ use crate::{prelude::Interpolatable, utils::rotation_between_vectors};
 
 use super::Rabject;
 
+pub mod blueprint;
 pub mod pipeline;
 pub mod primitive;
 
@@ -53,6 +54,15 @@ impl VPathPoint {
             stroke_width: 10.0,
             fill_color: Srgba::BLUE.with_alpha(0.2).into(),
         }
+    }
+    pub fn set_stroke_color(&mut self, color: LinearRgba) {
+        self.stroke_color = color;
+    }
+    pub fn set_stroke_width(&mut self, width: f32) {
+        self.stroke_width = width;
+    }
+    pub fn set_fill_color(&mut self, color: LinearRgba) {
+        self.fill_color = color;
     }
 }
 
@@ -125,7 +135,7 @@ impl VPath {
     }
     pub fn get_joint_angles(&self) -> Vec<f32> {
         assert!(self.points.len() >= 2);
-        let mut joint_angles = self
+        let joint_angles = self
             .points
             .iter()
             .map(|point| {
@@ -167,12 +177,6 @@ impl VPath {
                 }
             })
             .collect::<Vec<_>>();
-        // joint_angles.push(if self.is_closed() {
-        //     joint_angles[0]
-        // } else {
-        //     0.0
-        // });
-        // trace!("[VMobject::get_joint_angles] {:?}", joint_angles);
         joint_angles
     }
 
@@ -251,5 +255,19 @@ impl VPath {
                 VPathPoint::new(end, Some(control2), None),
             ],
         }
+    }
+
+    pub fn set_stroke_color(&mut self, color: LinearRgba) {
+        self.points
+            .iter_mut()
+            .for_each(|p| p.set_stroke_color(color));
+    }
+    pub fn set_stroke_width(&mut self, width: f32) {
+        self.points
+            .iter_mut()
+            .for_each(|p| p.set_stroke_width(width));
+    }
+    pub fn set_fill_color(&mut self, color: LinearRgba) {
+        self.points.iter_mut().for_each(|p| p.set_fill_color(color));
     }
 }

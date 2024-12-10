@@ -1,0 +1,20 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450.26481186822053 272.8769109053689"
+    width="450.26481186822053" height="272.8769109053689">
+    <!-- svg-source:excalidraw -->
+
+    <defs>
+        <style class="style-fonts">
+
+        </style>
+
+    </defs>
+    <rect x="0" y="0" width="450.26481186822053" height="272.8769109053689" fill="#ffffff"></rect>
+    <g stroke-linecap="round">
+        <g transform="translate(9.7627150502056 263.38352371101854) rotate(0 215.12722778320312 -125.23634338378906)">
+            <path
+                d="M1.11 -0.51 C27.96 -42.12, 89.66 -232.1, 161.22 -249.99 C232.79 -267.88, 385.81 -131.71, 430.5 -107.85 M0.24 -1.82 C27.43 -43.77, 91.75 -234.36, 163.35 -251.86 C234.96 -269.36, 385.56 -130.59, 429.87 -106.8"
+                stroke="#1e1e1e" stroke-width="2" fill="none"></path>
+        </g>
+    </g>
+    <mask></mask>
+</svg>
