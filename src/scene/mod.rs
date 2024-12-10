@@ -25,6 +25,7 @@ use crate::{
     rabject::{
         vgroup::{VGroup, VGroupPrimitive},
         vmobject::{primitive::VMobjectPrimitive, VMobject},
+        vpath::{primitive::VPathPrimitive, VPath},
         Primitive, Rabject, RabjectId,
     },
     updater::Updater,
@@ -225,6 +226,8 @@ impl Scene {
                     rabject_store.render_data = Some(rabject_store.rabject.extract());
                 } else if let Some(rabject_store) = entity.downcast_mut::<RabjectStore<VGroup>>() {
                     rabject_store.render_data = Some(rabject_store.rabject.extract());
+                } else if let Some(rabject_store) = entity.downcast_mut::<RabjectStore<VPath>>() {
+                    rabject_store.render_data = Some(rabject_store.rabject.extract());
                 }
             }
         }
@@ -256,6 +259,16 @@ impl Scene {
                             entity.render_data.as_ref().unwrap(),
                         ));
                     }
+                } else if let Some(entity) = entity.downcast_mut::<RabjectStore<VPath>>() {
+                    if let Some(render_resource) = entity.render_resource.as_mut() {
+                        render_resource
+                            .update(&self.ctx.wgpu_ctx, entity.render_data.as_ref().unwrap());
+                    } else {
+                        entity.render_resource = Some(VPathPrimitive::init(
+                            &self.ctx.wgpu_ctx,
+                            entity.render_data.as_ref().unwrap(),
+                        ));
+                    }
                 }
             }
         }
@@ -271,6 +284,8 @@ impl Scene {
             .render::<VMobject>(&mut self.ctx, &mut self.rabjects);
         self.camera
             .render::<VGroup>(&mut self.ctx, &mut self.rabjects);
+        self.camera
+            .render::<VPath>(&mut self.ctx, &mut self.rabjects);
         // info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
     }
 }
