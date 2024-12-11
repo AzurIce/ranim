@@ -21,7 +21,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace")).init();
 
     let mut scene = SceneBuilder::new("test_scene").build();
     let start = Instant::now();

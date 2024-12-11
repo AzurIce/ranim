@@ -5,12 +5,71 @@ use std::{
 };
 
 use crate::{
-    rabject::{Rabject, RabjectId},
-    utils::Id,
+    context::WgpuContext,
+    rabject::{Primitive, Rabject, RabjectId},
+    utils::{Id, RenderResourceStorage},
 };
 
 #[allow(unused_imports)]
 use log::debug;
+
+pub trait RenderableAny: Renderable + Any {}
+
+impl<T: Renderable + Any> RenderableAny for T {}
+
+pub trait Renderable {
+    fn extract(&mut self);
+    fn check_extract(&self) -> bool;
+    fn prepare(&mut self, wgpu_ctx: &WgpuContext);
+    fn render(
+        &self,
+        _wgpu_ctx: &WgpuContext,
+        _pipelines: &mut RenderResourceStorage,
+        _multisample_view: &wgpu::TextureView,
+        _target_view: &wgpu::TextureView,
+        _depth_view: &wgpu::TextureView,
+        _uniforms_bind_group: &wgpu::BindGroup,
+    );
+}
+
+impl<R: Rabject + 'static> Renderable for RabjectStore<R> {
+    fn extract(&mut self) {
+        self.render_data = Some(self.rabject.extract());
+    }
+    fn check_extract(&self) -> bool {
+        self.render_data.is_some()
+    }
+    fn prepare(&mut self, wgpu_ctx: &WgpuContext) {
+        if let Some(render_resource) = self.render_resource.as_mut() {
+            render_resource.update(wgpu_ctx, self.render_data.as_ref().unwrap());
+        } else {
+            self.render_resource = Some(R::RenderResource::init(
+                wgpu_ctx,
+                self.render_data.as_ref().unwrap(),
+            ));
+        }
+    }
+    fn render(
+        &self,
+        _wgpu_ctx: &WgpuContext,
+        _pipelines: &mut RenderResourceStorage,
+        _multisample_view: &wgpu::TextureView,
+        _target_view: &wgpu::TextureView,
+        _depth_view: &wgpu::TextureView,
+        _uniforms_bind_group: &wgpu::BindGroup,
+    ) {
+        if let Some(render_resource) = self.render_resource.as_ref() {
+            render_resource.render(
+                _wgpu_ctx,
+                _pipelines,
+                _multisample_view,
+                _target_view,
+                _depth_view,
+                _uniforms_bind_group,
+            );
+        }
+    }
+}
 
 /// An entity in the scene
 ///
@@ -29,11 +88,11 @@ pub struct RabjectStores {
     /// The rabjects
     ///
     /// Rabject's type id -> Vec<(Rabject's id, RabjectStore<Rabject>)>
-    inner: HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
+    inner: HashMap<TypeId, Vec<(Id, Box<dyn RenderableAny>)>>,
 }
 
 impl Deref for RabjectStores {
-    type Target = HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>;
+    type Target = HashMap<TypeId, Vec<(Id, Box<dyn RenderableAny>)>>;
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
@@ -78,7 +137,7 @@ impl RabjectStores {
         self.inner.get(&std::any::TypeId::of::<R>()).and_then(|e| {
             e.iter()
                 .find(|(eid, _)| id == eid)
-                .map(|(_, e)| e.downcast_ref::<RabjectStore<R>>().unwrap())
+                .map(|(_, e)| (e as &dyn Any).downcast_ref::<RabjectStore<R>>().unwrap())
         })
     }
 
@@ -92,9 +151,11 @@ impl RabjectStores {
         self.inner
             .get_mut(&std::any::TypeId::of::<R>())
             .and_then(|e| {
-                e.iter_mut()
-                    .find(|(eid, _)| id == eid)
-                    .map(|(_, e)| e.downcast_mut::<RabjectStore<R>>().unwrap())
+                e.iter_mut().find(|(eid, _)| id == eid).map(|(_, e)| {
+                    (e as &mut dyn Any)
+                        .downcast_mut::<RabjectStore<R>>()
+                        .unwrap()
+                })
             })
     }
 }

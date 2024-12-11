@@ -1,18 +1,16 @@
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-};
+
 
 use bevy_color::Color;
 use glam::{vec3, Mat4, Vec3};
-use log::error;
 
 use crate::{
-    context::{RanimContext, WgpuContext}, rabject::{Primitive, Rabject}, scene::store::RabjectStore, utils::{wgpu::WgpuBuffer, Id}
+    context::{RanimContext, WgpuContext},
+    scene::store::RabjectStores,
+    utils::wgpu::WgpuBuffer,
 };
 
 #[allow(unused)]
-use log::{debug, trace};
+use log::{debug, trace, error};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -256,39 +254,22 @@ impl Camera {
         );
     }
 
-    pub fn render<R: Rabject + 'static>(
-        &mut self,
-        ctx: &mut RanimContext,
-        entities: &mut HashMap<TypeId, Vec<(Id, Box<dyn Any>)>>,
-    ) {
-        let Some(entities) = entities.get_mut(&std::any::TypeId::of::<R>()) else {
-            error!(
-                "[Camera::render]: failed to find entities of type {:?}",
-                std::any::TypeId::of::<R>()
-            );
-            error!("available types: {:?}", entities.keys());
-            return;
-        };
-        let entities = entities
-            .iter_mut()
-            .map(|(id, rabject)| (id, rabject.downcast_mut::<RabjectStore<R>>().unwrap()))
-            .collect::<Vec<_>>();
-
+    pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut RabjectStores) {
         let wgpu_ctx = ctx.wgpu_ctx();
 
-        // trace!("[Camera] Rendering...");
-
         let pipelines = &mut ctx.pipelines;
-        for (id, entity) in entities.iter() {
-            trace!("[Camera] Rendering entity {:?}", id);
-            entity.render_resource.as_ref().unwrap().render(
-                &wgpu_ctx,
-                pipelines,
-                &self.multisample_view,
-                &self.render_view,
-                &self.depth_stencil_view,
-                &self.uniforms_bind_group.bind_group,
-            );
+        for (_type_id, entities) in entities.iter() {
+            for (id, entity) in entities.iter() {
+                trace!("[Camera] Rendering entity {:?}", id);
+                entity.render(
+                    &wgpu_ctx,
+                    pipelines,
+                    &self.multisample_view,
+                    &self.render_view,
+                    &self.depth_stencil_view,
+                    &self.uniforms_bind_group.bind_group,
+                );
+            }
         }
 
         self.output_texture_updated = false;
