@@ -11,7 +11,7 @@ use std::{
 
 use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
-use store::{RabjectStore, RabjectStores};
+use store::{RabjectStore, RabjectStores, Renderable};
 
 #[allow(unused_imports)]
 use log::{debug, info};
@@ -224,21 +224,7 @@ impl Scene {
         // let t = Instant::now();
         for (_, entities) in self.rabjects.iter_mut() {
             for (_, entity) in entities.iter_mut() {
-                if let Some(rabject_store) = entity.downcast_mut::<RabjectStore<VMobject>>() {
-                    rabject_store.render_data = Some(rabject_store.rabject.extract());
-                } else if let Some(rabject_store) = entity.downcast_mut::<RabjectStore<VGroup>>() {
-                    rabject_store.render_data = Some(rabject_store.rabject.extract());
-                } else if let Some(rabject_store) = entity.downcast_mut::<RabjectStore<VPath>>() {
-                    rabject_store.render_data = Some(rabject_store.rabject.extract());
-                } else if let Some(rabject_store) =
-                    entity.downcast_mut::<RabjectStore<Group<VPath>>>()
-                {
-                    rabject_store.render_data = Some(rabject_store.rabject.extract());
-                } else if let Some(rabject_store) =
-                    entity.downcast_mut::<RabjectStore<SvgMobject>>()
-                {
-                    rabject_store.render_data = Some(rabject_store.rabject.extract());
-                }
+                entity.extract();
             }
         }
         // info!("[Scene]: EXTRACT STAGE END, took {:?}", t.elapsed());
@@ -249,51 +235,7 @@ impl Scene {
         // let t = Instant::now();
         for (_, entities) in self.rabjects.iter_mut() {
             for (_, entity) in entities.iter_mut() {
-                if let Some(entity) = entity.downcast_mut::<RabjectStore<VMobject>>() {
-                    if let Some(render_resource) = entity.render_resource.as_mut() {
-                        render_resource
-                            .update(&self.ctx.wgpu_ctx, entity.render_data.as_ref().unwrap());
-                    } else {
-                        entity.render_resource = Some(VMobjectPrimitive::init(
-                            &self.ctx.wgpu_ctx,
-                            entity.render_data.as_ref().unwrap(),
-                        ));
-                    }
-                } else if let Some(entity) = entity.downcast_mut::<RabjectStore<VGroup>>() {
-                    if let Some(render_resource) = entity.render_resource.as_mut() {
-                        render_resource
-                            .update(&self.ctx.wgpu_ctx, entity.render_data.as_ref().unwrap());
-                    } else {
-                        entity.render_resource = Some(VGroupPrimitive::init(
-                            &self.ctx.wgpu_ctx,
-                            entity.render_data.as_ref().unwrap(),
-                        ));
-                    }
-                } else if let Some(entity) = entity.downcast_mut::<RabjectStore<VPath>>() {
-                    if let Some(render_resource) = entity.render_resource.as_mut() {
-                        render_resource
-                            .update(&self.ctx.wgpu_ctx, entity.render_data.as_ref().unwrap());
-                    } else {
-                        entity.render_resource = Some(VPathPrimitive::init(
-                            &self.ctx.wgpu_ctx,
-                            entity.render_data.as_ref().unwrap(),
-                        ));
-                    }
-                } else if let Some(rabject_store) =
-                    entity.downcast_mut::<RabjectStore<Group<VPath>>>()
-                {
-                    rabject_store.render_resource = Some(GroupPrimitive::init(
-                        &self.ctx.wgpu_ctx,
-                        rabject_store.render_data.as_ref().unwrap(),
-                    ));
-                } else if let Some(rabject_store) =
-                    entity.downcast_mut::<RabjectStore<SvgMobject>>()
-                {
-                    rabject_store.render_resource = Some(SvgPrimitive::init(
-                        &self.ctx.wgpu_ctx,
-                        rabject_store.render_data.as_ref().unwrap(),
-                    ));
-                }
+                entity.prepare(&self.ctx.wgpu_ctx);
             }
         }
         // info!("[Scene]: PREPARE STAGE END, took {:?}", t.elapsed());
@@ -304,16 +246,7 @@ impl Scene {
         // let t = Instant::now();
         self.camera.update_uniforms(&self.ctx.wgpu_ctx);
         self.camera.clear_screen(&self.ctx.wgpu_ctx);
-        self.camera
-            .render::<VMobject>(&mut self.ctx, &mut self.rabjects);
-        self.camera
-            .render::<VGroup>(&mut self.ctx, &mut self.rabjects);
-        self.camera
-            .render::<VPath>(&mut self.ctx, &mut self.rabjects);
-        self.camera
-            .render::<Group<VPath>>(&mut self.ctx, &mut self.rabjects);
-        self.camera
-            .render::<SvgMobject>(&mut self.ctx, &mut self.rabjects);
+        self.camera.render(&mut self.ctx, &mut self.rabjects);
         // info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
     }
 }

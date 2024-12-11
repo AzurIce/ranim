@@ -1,5 +1,5 @@
 use bevy_color::{Alpha, Srgba};
-use glam::{vec3, Vec3};
+use glam::{vec3};
 use log::warn;
 use usvg::{
     tiny_skia_path::{PathSegment, Point},
@@ -25,7 +25,7 @@ pub enum SvgNode {
 
 impl SvgNode {
     pub fn path(path: &Path, transform: Option<Transform>) -> Self {
-        println!("{:?}", path);
+        // println!("{:?}", path);
         let segments = path.data().segments().into_iter().collect::<Vec<_>>();
 
         let point2vec3 = |p: &Point| {
@@ -43,7 +43,7 @@ impl SvgNode {
 
         let mut paths = vec![];
         for segment in segments.get(1..).unwrap() {
-            println!("{:?}", segment);
+            // println!("{:?}", segment);
             builder = match segment {
                 PathSegment::MoveTo(p) => {
                     warn!("should not have move to in the middle of the path");

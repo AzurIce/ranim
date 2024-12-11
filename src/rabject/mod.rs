@@ -6,6 +6,9 @@ pub mod group;
 
 use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 
+use glam::Vec3;
+use vmobject::TransformAnchor;
+
 use crate::{
     utils::{Id, RenderResourceStorage},
     context::WgpuContext,
@@ -26,19 +29,6 @@ pub trait Vertex: bytemuck::Pod + bytemuck::Zeroable + Clone + Debug {
 pub trait Blueprint<T> {
     fn build(self) -> T;
 }
-
-// pub trait RenderInstance<T: Rabject> {
-//     /// Used to initialize the render resource when the rabject is extracted
-//     fn init(ctx: &mut RanimContext, rabject: &T) -> Self;
-
-//     fn update(&mut self, ctx: &mut RanimContext, rabject: &RabjectWithId<T>);
-// }
-
-// pub trait RabjectId {
-//     type Rabject: Rabject;
-//     fn from_id(id: Id) -> Self;
-//     fn to_id(&self) -> Id;
-// }
 
 #[derive(Debug)]
 pub struct RabjectId<R: Rabject>(Id, PhantomData<R>);
@@ -86,7 +76,7 @@ impl<R: Rabject> Deref for RabjectId<R> {
 /// The [`Rabject::RenderResource`] is the resource that is used to render the rabject.
 pub trait Rabject: Clone {
     type RenderData: Default;
-    type RenderResource: Primitive;
+    type RenderResource: Primitive<Data = Self::RenderData>;
 
     fn extract(&self) -> Self::RenderData;
 
@@ -123,4 +113,10 @@ impl Primitive for () {
         _uniforms_bind_group: &wgpu::BindGroup,
     ) {
     }
+}
+
+pub trait Transformable {
+    fn shift(&mut self, offset: Vec3) -> &mut Self;
+    fn rotate(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self;
+    fn scale(&mut self, scale: Vec3) -> &mut Self;
 }
