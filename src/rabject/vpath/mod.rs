@@ -69,6 +69,7 @@ impl VPathPoint {
 #[derive(Default, Debug, Clone)]
 pub struct VPath {
     pub points: Vec<VPathPoint>,
+    pub paint_order: usvg::PaintOrder,
 }
 
 impl Rabject for VPath {
@@ -97,6 +98,7 @@ impl Rabject for VPath {
             points,
             unit_normal: self.get_unit_normal(),
             fill_triangles: self.parse_fill(),
+            render_order: self.paint_order,
         }
     }
 
@@ -236,6 +238,7 @@ impl VPath {
                 VPathPoint::new(start, None, Some(mid)),
                 VPathPoint::new(end, Some(mid), None),
             ],
+            ..Default::default()
         }
     }
 
@@ -245,6 +248,7 @@ impl VPath {
                 VPathPoint::new(start, None, Some(control)),
                 VPathPoint::new(end, Some(control), None),
             ],
+            ..Default::default()
         }
     }
 
@@ -254,6 +258,7 @@ impl VPath {
                 VPathPoint::new(start, None, Some(control1)),
                 VPathPoint::new(end, Some(control2), None),
             ],
+            ..Default::default()
         }
     }
 

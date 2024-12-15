@@ -66,9 +66,9 @@ fn main() {
 
     // scene.render_to_image("vpath.png");
 
-    let svg = SvgMobject::from_path("assets/test.svg");
+    let svg = SvgMobject::from_path("assets/Ghostscript_Tiger.svg");
     let svg = scene.insert(svg);
-    scene.render_to_image("svg.png");
+    scene.render_to_image("Ghostscript_Tiger.png");
 
     // let mut polygon = Polygon::new(vec![
     //     vec2(-100.0, -300.0),

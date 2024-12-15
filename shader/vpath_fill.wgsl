@@ -33,6 +33,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     // out.face = in.face;
     out.position = uniforms.matrix * vec4<f32>(in.pos, 1.0);
+    out.position.y *= -1.0;
     if in.fill_type == 1 {
         if in.vertex_index % 3 == 0 {
             out.uv_coord = SIMPLE_CUBIC[0];
