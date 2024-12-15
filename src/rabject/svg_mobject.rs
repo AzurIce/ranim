@@ -61,6 +61,10 @@ impl SvgNode {
         }
         paths.push(builder.build());
 
+        paths.iter_mut().for_each(|p| {
+            p.paint_order = path.paint_order();
+        });
+
         // Set stroke styles
         if let Some(stroke) = path.stroke() {
             paths.iter_mut().for_each(|p| {
@@ -105,9 +109,13 @@ impl SvgNode {
         let children = group
             .children()
             .iter()
-            .map(|child| match child {
-                Node::Group(group) => SvgNode::group(group),
-                Node::Path(path) => SvgNode::path(path, Some(group.abs_transform())),
+            .filter_map(|child| match child {
+                Node::Group(group) => Some(SvgNode::group(group)),
+                Node::Path(path) => if path.is_visible() {
+                    Some(SvgNode::path(path, Some(group.abs_transform())))
+                } else {
+                    None
+                },
                 Node::Image(image) => {
                     unimplemented!()
                 }

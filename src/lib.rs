@@ -19,4 +19,4 @@ pub mod rabject;
 pub mod scene;
 pub mod utils;
 pub mod context;
-
+pub mod vello;

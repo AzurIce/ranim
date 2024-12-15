@@ -17,6 +17,7 @@ impl Blueprint<VPath> for VPathBuilder {
     fn build(self) -> VPath {
         VPath {
             points: self.points,
+            ..Default::default()
         }
     }
 }

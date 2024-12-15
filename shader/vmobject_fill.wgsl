@@ -39,6 +39,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
         out.uv_coord = SIMPLE_QUADRATIC[2];
     }
 
+    out.position.y *= -1.0;
     // out.position.x *= uniforms.rescale_factors.x;
     // out.position.y *= uniforms.rescale_factors.y;
     // out.position.z *= uniforms.rescale_factors.z;
