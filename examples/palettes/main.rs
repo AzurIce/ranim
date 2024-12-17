@@ -44,7 +44,7 @@ fn main() {
                 .shift(vec3(x as f32 + offset_x, y as f32 + offset_y, 0.0))
                 .set_color(*color)
                 .set_stroke_width(0.0);
-            scene.insert(square);
+            scene.update_or_insert(square);
         }
     }
     // scene.wait(Duration::from_secs(1));

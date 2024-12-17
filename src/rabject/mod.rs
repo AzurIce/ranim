@@ -1,3 +1,5 @@
+/// A canvas is basicaly a Scene for 2d objects.
+pub mod canvas;
 pub mod vgroup;
 pub mod vpath;
 pub mod vmobject;
@@ -10,9 +12,30 @@ use glam::Vec3;
 use vmobject::TransformAnchor;
 
 use crate::{
-    utils::{Id, RenderResourceStorage},
-    context::WgpuContext,
+    context::WgpuContext, scene::store::RabjectStore, utils::{Id, RenderResourceStorage}
 };
+
+pub trait RabjectContainer {
+    /// Update or insert a rabject
+    ///
+    /// See [`RabjectStores::insert`]
+    fn update_or_insert<R: Rabject + 'static>(&mut self, rabject: R) -> RabjectId<R>;
+
+    /// Remove a rabject
+    ///
+    /// See [`RabjectStores::remove`]
+    fn remove<R: Rabject>(&mut self, id: RabjectId<R>);
+
+    /// Get a reference of a rabject
+    ///
+    /// See [`RabjectStores::get`]
+    fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&RabjectStore<R>>;
+
+    /// Get a mutable reference of a rabject
+    ///
+    /// See [`RabjectStores::get_mut`]
+    fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut RabjectStore<R>>;
+}
 
 /// A render resource.
 pub trait RenderResource {
@@ -30,8 +53,13 @@ pub trait Blueprint<T> {
     fn build(self) -> T;
 }
 
-#[derive(Debug)]
 pub struct RabjectId<R: Rabject>(Id, PhantomData<R>);
+
+impl<R: Rabject> Debug for RabjectId<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RabjectId({:?})", self.0)
+    }
+}
 
 impl<R: Rabject> Copy for RabjectId<R> {}
 

@@ -11,7 +11,7 @@ use std::{
 
 use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
-use store::{RabjectStore, RabjectStores, Renderable};
+use store::{Entity, RabjectStore, RabjectStores};
 
 #[allow(unused_imports)]
 use log::{debug, info};
@@ -28,7 +28,7 @@ use crate::{
         vgroup::{VGroup, VGroupPrimitive},
         vmobject::{primitive::VMobjectPrimitive, VMobject},
         vpath::{primitive::VPathPrimitive, VPath},
-        Primitive, Rabject, RabjectId,
+        Primitive, Rabject, RabjectContainer, RabjectId,
     },
     updater::Updater,
     utils::Id,
@@ -130,10 +130,10 @@ pub struct Scene {
     pub camera: Camera,
     /// Rabjects in the scene
     pub rabjects: RabjectStores,
-    /// Updaters for the rabjects
-    ///
-    /// Rabject's type id -> Vec<(Updater's id, Updater<Rabject>)>
-    pub updaters: HashMap<TypeId, Box<dyn Any>>,
+    // /// Updaters for the rabjects
+    // ///
+    // /// Rabject's type id -> Vec<(Updater's id, Updater<Rabject>)>
+    // pub updaters: HashMap<TypeId, Box<dyn Any>>,
 
     pub time: f32,
     pub frame_count: usize,
@@ -146,33 +146,32 @@ pub struct Scene {
     pub save_frames: bool,
 }
 
-// Entity management
-impl Scene {
+impl RabjectContainer for Scene {
     /// Insert a rabject to the scene
     ///
     /// See [`RabjectStores::insert`]
-    pub fn insert<R: Rabject + 'static>(&mut self, rabject: R) -> RabjectId<R> {
-        self.rabjects.insert(rabject)
+    fn update_or_insert<R: Rabject + 'static>(&mut self, rabject: R) -> RabjectId<R> {
+        self.rabjects.update_or_insert(rabject)
     }
 
     /// Remove a rabject from the scene
     ///
     /// See [`RabjectStores::remove`]
-    pub fn remove<R: Rabject>(&mut self, id: RabjectId<R>) {
+    fn remove<R: Rabject>(&mut self, id: RabjectId<R>) {
         self.rabjects.remove(id);
     }
 
     /// Get a reference of a rabject from the scene
     ///
     /// See [`RabjectStores::get`]
-    pub fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&R> {
+    fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&RabjectStore<R>> {
         self.rabjects.get(id)
     }
 
     /// Get a mutable reference of a rabject from the scene
     ///
     /// See [`RabjectStores::get_mut`]
-    pub fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut R> {
+    fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut RabjectStore<R>> {
         self.rabjects.get_mut(id)
     }
 }
@@ -183,39 +182,11 @@ impl Scene {
         // info!("[Scene]: TICK STAGE START");
         // let t = Instant::now();
         self.time += dt;
-
-        self.updaters.iter_mut().for_each(|(_, updaters)| {
-            if let Some(updaters) = updaters.downcast_mut::<Vec<(Id, UpdaterStore<VMobject>)>>() {
-                updaters.retain_mut(|(_, updater_store)| {
-                    self.rabjects
-                        .get_mut::<VMobject>(&updater_store.target_id)
-                        .map(|rabject| {
-                            let keep = updater_store.updater.on_update(rabject, dt);
-                            if !keep {
-                                updater_store.updater.on_destroy(rabject);
-                            }
-                            keep
-                        })
-                        .unwrap_or(false)
-                });
-            } else if let Some(updaters) =
-                updaters.downcast_mut::<Vec<(Id, UpdaterStore<VGroup>)>>()
-            {
-                updaters.retain_mut(|(_, updater_store)| {
-                    self.rabjects
-                        .get_mut::<VGroup>(&updater_store.target_id)
-                        .map(|rabject| {
-                            let keep = updater_store.updater.on_update(rabject, dt);
-                            if !keep {
-                                updater_store.updater.on_destroy(rabject);
-                            }
-                            keep
-                        })
-                        .unwrap_or(false)
-                });
+        for (_, entities) in self.rabjects.iter_mut() {
+            for (_, entity) in entities.iter_mut() {
+                entity.tick(dt);
             }
-        });
-
+        }
         // info!("[Scene]: TICK STAGE END, took {:?}", t.elapsed());
     }
 
@@ -259,7 +230,7 @@ impl Default for Scene {
 
             camera: Camera::new(&ctx, 1920, 1080, 60),
             rabjects: RabjectStores::default(),
-            updaters: HashMap::new(),
+            // updaters: HashMap::new(),
             time: 0.0,
             frame_count: 0,
             video_writer: None,
@@ -343,44 +314,44 @@ impl Scene {
         Duration::from_secs_f32(1.0 / self.camera.fps as f32)
     }
 
-    /// Insert an updater for a target rabject
-    pub fn insert_updater<R: Rabject + 'static, U: Updater<R> + 'static>(
-        &mut self,
-        target_id: &RabjectId<R>,
-        mut updater: U,
-    ) {
-        {
-            let target = self.get_mut::<R>(target_id).unwrap();
-            updater.on_create(target);
-        }
-        let updater = Box::new(updater);
-        let entry = self
-            .updaters
-            .entry(TypeId::of::<R>())
-            .or_insert(Box::new(Vec::<(Id, UpdaterStore<R>)>::new()));
-        entry
-            .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
-            .unwrap()
-            .push((
-                **target_id,
-                UpdaterStore {
-                    updater,
-                    target_id: *target_id,
-                },
-            ));
-    }
+    // /// Insert an updater for a target rabject
+    // pub fn insert_updater<R: Rabject + 'static, U: Updater<R> + 'static>(
+    //     &mut self,
+    //     target_id: &RabjectId<R>,
+    //     mut updater: U,
+    // ) {
+    //     {
+    //         let target = self.get_mut::<R>(target_id).unwrap();
+    //         updater.on_create(target);
+    //     }
+    //     let updater = Box::new(updater);
+    //     let entry = self
+    //         .updaters
+    //         .entry(TypeId::of::<R>())
+    //         .or_insert(Box::new(Vec::<(Id, UpdaterStore<R>)>::new()));
+    //     entry
+    //         .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
+    //         .unwrap()
+    //         .push((
+    //             **target_id,
+    //             UpdaterStore {
+    //                 updater,
+    //                 target_id: *target_id,
+    //             },
+    //         ));
+    // }
 
-    /// Remove an updater for a target rabject
-    pub fn remove_updater<R: Rabject + 'static>(&mut self, target_id: RabjectId<R>) {
-        let entry = self
-            .updaters
-            .entry(TypeId::of::<R>())
-            .or_insert(Box::new(Vec::<(Id, UpdaterStore<R>)>::new()));
-        entry
-            .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
-            .unwrap()
-            .retain(|(id, _)| *id != *target_id);
-    }
+    // /// Remove an updater for a target rabject
+    // pub fn remove_updater<R: Rabject + 'static>(&mut self, target_id: RabjectId<R>) {
+    //     let entry = self
+    //         .updaters
+    //         .entry(TypeId::of::<R>())
+    //         .or_insert(Box::new(Vec::<(Id, UpdaterStore<R>)>::new()));
+    //     entry
+    //         .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
+    //         .unwrap()
+    //         .retain(|(id, _)| *id != *target_id);
+    // }
 
     /// Play an animation
     ///
@@ -398,7 +369,8 @@ impl Scene {
         animation: Animation<R>,
     ) {
         let run_time = animation.config.run_time;
-        self.insert_updater(target_id, animation);
+        self.get_mut(target_id).unwrap().insert_updater(animation);
+        // self.insert_updater(target_id, animation);
         self.advance(run_time);
     }
 
