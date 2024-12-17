@@ -16,7 +16,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace")).init();
 
     let mut scene = SceneBuilder::new("basic").build();
     let t = Instant::now();
@@ -38,7 +38,9 @@ fn main() {
     );
 
     scene.wait(Duration::from_secs_f32(0.5));
-    let polygon = scene.insert(polygon);
+    let polygon = scene.update_or_insert(polygon);
+
+    info!("polygon fade_in");
     scene.play(&polygon, Fading::fade_in());
     scene.wait(Duration::from_secs_f32(0.5));
 
@@ -48,12 +50,14 @@ fn main() {
         .build();
     arc.set_color(Srgba::hex("58C4DDFF").unwrap());
 
+    info!("polygon transform to arc");
     scene.play(&polygon, Transform::new(arc.clone()));
     scene.wait(Duration::from_secs_f32(0.5));
 
     scene.remove(polygon);
-    let arc = scene.insert(arc);
+    let arc = scene.update_or_insert(arc);
 
+    info!("arc fade_out");
     scene.play(&arc, Fading::fade_out());
 
     // let arc = scene.play(Transform::new(polygon, arc)).unwrap();

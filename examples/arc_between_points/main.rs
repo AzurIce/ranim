@@ -44,7 +44,7 @@ fn main() {
                 .build();
             arc.set_color(color);
 
-            let arc = scene.insert(arc);
+            let arc = scene.update_or_insert(arc);
             scene.play(
                 &arc,
                 Fading::fade_in().config(|config| {

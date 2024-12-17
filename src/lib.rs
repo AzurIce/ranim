@@ -5,7 +5,7 @@ pub mod prelude {
     pub use crate::animation::fading::Opacity;
     pub use crate::animation::transform::Alignable;
 
-    pub use crate::rabject::Blueprint;
+    pub use crate::rabject::{Blueprint, RabjectContainer};
 }
 
 pub mod color;
