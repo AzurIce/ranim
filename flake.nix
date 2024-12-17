@@ -1,14 +1,14 @@
 {
   description = "ranim";
 
-  nixConfig = {
-    extra-substituters = [
-      "https://mirrors.ustc.edu.cn/nix-channels/store"
-    ];
-    trusted-substituters = [
-      "https://mirrors.ustc.edu.cn/nix-channels/store"
-    ];
-  };
+  # nixConfig = {
+  #   extra-substituters = [
+  #     "https://mirrors.ustc.edu.cn/nix-channels/store"
+  #   ];
+  #   trusted-substituters = [
+  #     "https://mirrors.ustc.edu.cn/nix-channels/store"
+  #   ];
+  # };
 
 
   inputs = {
