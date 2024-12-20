@@ -38,7 +38,7 @@ fn main() {
     );
 
     scene.wait(Duration::from_secs_f32(0.5));
-    let polygon = scene.update_or_insert(polygon);
+    let polygon = scene.insert(polygon);
 
     info!("polygon fade_in");
     scene.play(&polygon, Fading::fade_in());
@@ -55,7 +55,7 @@ fn main() {
     scene.wait(Duration::from_secs_f32(0.5));
 
     scene.remove(polygon);
-    let arc = scene.update_or_insert(arc);
+    let arc = scene.insert(arc);
 
     info!("arc fade_out");
     scene.play(&arc, Fading::fade_out());

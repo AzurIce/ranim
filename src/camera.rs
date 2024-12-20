@@ -1,18 +1,21 @@
-
-
 use bevy_color::Color;
 use glam::{vec3, Mat4, Vec3};
+use wgpu::RenderPassDescriptor;
 
 use crate::{
+    canvas::pipeline::BlendPipeline,
     context::{RanimContext, WgpuContext},
-    scene::store::RabjectStores,
+    scene::{
+        entity::{Entity, EntityAny},
+        store::EntityStore,
+    },
     utils::wgpu::WgpuBuffer,
 };
 
 #[allow(unused)]
-use log::{debug, trace, error};
+use log::{debug, error, trace};
 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 /// Uniforms for the camera
 pub struct CameraUniforms {
@@ -69,17 +72,17 @@ pub struct Camera {
     render_texture: wgpu::Texture,
     // multisample_texture: wgpu::Texture,
     // depth_stencil_texture: wgpu::Texture,
-    render_view: wgpu::TextureView,
-    multisample_view: wgpu::TextureView,
-    depth_stencil_view: wgpu::TextureView,
+    pub(crate) render_view: wgpu::TextureView,
+    pub(crate) multisample_view: wgpu::TextureView,
+    pub(crate) depth_stencil_view: wgpu::TextureView,
 
     // output_view: wgpu::TextureView,
     output_staging_buffer: wgpu::Buffer,
     output_texture_data: Option<Vec<u8>>,
-    output_texture_updated: bool,
+    pub(crate) output_texture_updated: bool,
 
     uniforms_buffer: WgpuBuffer<CameraUniforms>,
-    uniforms_bind_group: CameraUniformsBindGroup,
+    pub(crate) uniforms_bind_group: CameraUniformsBindGroup,
 }
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -254,25 +257,44 @@ impl Camera {
         );
     }
 
-    pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut RabjectStores) {
-        let wgpu_ctx = ctx.wgpu_ctx();
+    pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut EntityStore<Self>) {
+        self.update_uniforms(&ctx.wgpu_ctx);
+        self.clear_screen(&ctx.wgpu_ctx);
+        for (id, entity) in entities.iter_mut() {
+            trace!("[Scene] Rendering entity {:?}", id);
+            entity.render(ctx, self);
+        }
+        self.output_texture_updated = false;
+    }
 
-        let pipelines = &mut ctx.pipelines;
-        for (_type_id, entities) in entities.iter() {
-            for (id, entity) in entities.iter() {
-                trace!("[Camera] Rendering entity {:?}", id);
-                entity.render(
-                    &wgpu_ctx,
-                    pipelines,
-                    &self.multisample_view,
-                    &self.render_view,
-                    &self.depth_stencil_view,
-                    &self.uniforms_bind_group.bind_group,
-                );
-            }
+    pub fn blend(&mut self, ctx: &mut RanimContext, bind_group: &wgpu::BindGroup) {
+        let pipeline = ctx.pipelines.get_or_init::<BlendPipeline>(&ctx.wgpu_ctx);
+        let mut encoder = ctx
+            .wgpu_ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Blend"),
+            });
+
+        {
+            let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Blend Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.multisample_view,
+                    resolve_target: Some(&self.render_view),
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                ..Default::default()
+            });
+            pass.set_bind_group(0, bind_group, &[]);
+            pass.set_pipeline(pipeline);
+            pass.draw(0..6, 0..1);
         }
 
-        self.output_texture_updated = false;
+        ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
     }
 
     fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {

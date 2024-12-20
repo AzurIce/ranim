@@ -39,7 +39,7 @@ fn main() {
         TransformAnchor::origin(),
     );
 
-    let polygon = scene.update_or_insert(polygon);
+    let polygon = scene.insert(polygon);
     scene.play(
         &polygon,
         Fading::fade_in().config(|config| {
@@ -55,7 +55,7 @@ fn main() {
 
     scene.play(&polygon, Transform::new(arc.clone()));
 
-    let arc = scene.update_or_insert(arc);
+    let arc = scene.insert(arc);
     scene.play(&arc, Fading::fade_out());
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());

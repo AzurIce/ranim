@@ -1,224 +1,112 @@
 use std::{
-    any::{Any, TypeId},
     collections::HashMap,
+    fmt::Debug,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
-use crate::{
-    context::WgpuContext,
-    prelude::RabjectContainer,
-    rabject::{Primitive, Rabject, RabjectId},
-    updater::Updater,
-    utils::{Id, RenderResourceStorage},
-};
+use crate::utils::Id;
 
 #[allow(unused_imports)]
 use log::debug;
 
-use super::UpdaterStore;
+use super::entity::EntityAny;
 
-pub trait EntityAny: Entity + Any {
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
+pub struct EntityId<E: EntityAny>(Id, PhantomData<E>);
 
-impl<T: Entity + Any> EntityAny for T {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
+impl<E: EntityAny> Debug for EntityId<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EntityId({:?})", self.0)
     }
 }
 
-pub trait Entity {
-    fn tick(&mut self, dt: f32);
-    fn extract(&mut self);
-    fn check_extract(&self) -> bool;
-    fn prepare(&mut self, wgpu_ctx: &WgpuContext);
-    fn render(
-        &self,
-        _wgpu_ctx: &WgpuContext,
-        _pipelines: &mut RenderResourceStorage,
-        _multisample_view: &wgpu::TextureView,
-        _target_view: &wgpu::TextureView,
-        _depth_view: &wgpu::TextureView,
-        _uniforms_bind_group: &wgpu::BindGroup,
-    );
-}
+impl<E: EntityAny> Copy for EntityId<E> {}
 
-impl<R: Rabject + 'static> Entity for RabjectStore<R> {
-    fn tick(&mut self, dt: f32) {
-        let rabject = &mut self.rabject;
-        self.updaters.retain_mut(|(_, updater)| {
-            let keep = updater.on_update(rabject, dt);
-            if !keep {
-                updater.on_destroy(rabject);
-            }
-            keep
-        });
-    }
-    fn extract(&mut self) {
-        self.render_data = Some(self.rabject.extract());
-    }
-    fn check_extract(&self) -> bool {
-        self.render_data.is_some()
-    }
-    fn prepare(&mut self, wgpu_ctx: &WgpuContext) {
-        if let Some(render_resource) = self.render_resource.as_mut() {
-            render_resource.update(wgpu_ctx, self.render_data.as_ref().unwrap());
-        } else {
-            self.render_resource = Some(R::RenderResource::init(
-                wgpu_ctx,
-                self.render_data.as_ref().unwrap(),
-            ));
-        }
-    }
-    fn render(
-        &self,
-        _wgpu_ctx: &WgpuContext,
-        _pipelines: &mut RenderResourceStorage,
-        _multisample_view: &wgpu::TextureView,
-        _target_view: &wgpu::TextureView,
-        _depth_view: &wgpu::TextureView,
-        _uniforms_bind_group: &wgpu::BindGroup,
-    ) {
-        if let Some(render_resource) = self.render_resource.as_ref() {
-            render_resource.render(
-                _wgpu_ctx,
-                _pipelines,
-                _multisample_view,
-                _target_view,
-                _depth_view,
-                _uniforms_bind_group,
-            );
-        }
+impl<E: EntityAny> Clone for EntityId<E> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
 
-/// An entity in the scene
-///
-/// rabject --extract--> render_data --init--> render_resource
-pub struct RabjectStore<R: Rabject> {
-    /// The rabject
-    pub(crate) rabject: R,
-    /// The updaters for this rabject
-    ///
-    /// A vector of updater's id and updater itself
-    /// Vec<(Id, Updater<Rabject>)>
-    pub(crate) updaters: Vec<(Id, Box<dyn Updater<R>>)>,
-    /// The extracted data from the rabject
-    pub(crate) render_data: Option<R::RenderData>,
-    /// The prepared render resource of the rabject
-    pub(crate) render_resource: Option<R::RenderResource>,
+impl<E: EntityAny> EntityId<E> {
+    pub fn from_id(id: Id) -> Self {
+        Self(id, PhantomData)
+    }
 }
 
-impl<R: Rabject> Deref for RabjectStore<R> {
-    type Target = R;
+impl<E: EntityAny> Deref for EntityId<E> {
+    type Target = Id;
     fn deref(&self) -> &Self::Target {
-        &self.rabject
+        &self.0
     }
 }
 
-impl<R: Rabject> DerefMut for RabjectStore<R> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.rabject
+/// A store of entities
+///
+/// Entity's type id -> Vec<(Entity's id, Entity)>
+pub struct EntityStore<R> {
+    inner: HashMap<Id, Box<dyn EntityAny<Renderer = R>>>,
+}
+
+impl<Renderer> Default for EntityStore<Renderer> {
+    fn default() -> Self {
+        Self {
+            inner: HashMap::new(),
+        }
     }
 }
 
-impl<R: Rabject> RabjectStore<R> {
-    pub fn insert_updater(&mut self, mut updater: impl Updater<R> + 'static) -> Id {
-        let id = Id::new();
-        updater.on_create(self);
-        self.updaters.push((id, Box::new(updater)));
-        id
-    }
-    pub fn remove_updater(&mut self, id: Id) {
-        self.updaters.retain(|(eid, _)| *eid != id);
-    }
-}
-
-#[derive(Default)]
-pub struct RabjectStores {
-    /// The rabjects
-    ///
-    /// Rabject's type id -> Vec<(Rabject's id, RabjectStore<Rabject>)>
-    inner: HashMap<TypeId, Vec<(Id, Box<dyn EntityAny>)>>,
-}
-
-impl Deref for RabjectStores {
-    type Target = HashMap<TypeId, Vec<(Id, Box<dyn EntityAny>)>>;
+impl<R> Deref for EntityStore<R> {
+    type Target = HashMap<Id, Box<dyn EntityAny<Renderer = R>>>;
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl DerefMut for RabjectStores {
+impl<R> DerefMut for EntityStore<R> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
 // Entity management
-impl RabjectContainer for RabjectStores {
-    /// Insert a rabject to the store
-    fn update_or_insert<R: Rabject + 'static>(&mut self, rabject: R) -> RabjectId<R> {
+impl<R: 'static> EntityStore<R> {
+    pub fn insert<E: EntityAny<Renderer = R>>(&mut self, entity: E) -> EntityId<E> {
         let id = Id::new();
         debug!(
-            "[RabjectStores::insert_entity]: inserting entity {:?} of type {:?}",
+            "[RabjectStores::insert]: inserting entity {:?} of type {:?}",
             id,
-            std::any::TypeId::of::<R>()
+            std::any::TypeId::of::<E>()
         );
-        let entry = self.inner.entry(std::any::TypeId::of::<R>()).or_default();
-        let entity = RabjectStore {
-            rabject,
-            updaters: vec![],
-            render_data: None,
-            render_resource: None,
-        };
-        entry.push((id, Box::new(entity)));
-        debug!(
-            "[RabjectStores::update_or_insert]: inserted entity {:?}",
-            id
-        );
-        RabjectId::from_id(id)
+        self.inner.insert(id, Box::new(entity));
+        debug!("[RabjectStores::insert]: inserted entity {:?}", id);
+        EntityId::from_id(id)
     }
 
-    /// Remove a rabject from the store
-    fn remove<R: Rabject>(&mut self, id: RabjectId<R>) {
+    pub fn remove<E: EntityAny<Renderer = R>>(&mut self, id: EntityId<E>) {
         debug!("[RabjectStores::remove]: removing entity {:?}", id);
-        for entry in self.inner.values_mut() {
-            entry.retain(|(eid, _)| *id != *eid);
-        }
+        self.inner.remove(&id);
     }
 
-    /// Get a reference of a rabject from the store
-    fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&RabjectStore<R>> {
+    pub fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> Option<&E> {
         debug!(
             "[RabjectStores::get]: getting entity {:?} of type {:?}",
             id,
-            std::any::TypeId::of::<R>()
+            std::any::TypeId::of::<E>()
         );
-        self.inner.get(&std::any::TypeId::of::<R>()).and_then(|e| {
-            e.iter()
-                .find(|(eid, _)| **id == *eid)
-                .map(|(_, e)| (e as &dyn Any).downcast_ref::<RabjectStore<R>>().unwrap())
-        })
+        self.inner
+            .get(&id)
+            .and_then(|e| e.as_any().downcast_ref::<E>())
     }
 
-    /// Get a mutable reference of a rabject from the store
-    fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut RabjectStore<R>> {
+    pub fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> Option<&mut E> {
         debug!(
             "[RabjectStores::get_mut]: getting entity {:?} of type {:?}",
             id,
-            std::any::TypeId::of::<R>()
+            std::any::TypeId::of::<E>()
         );
         self.inner
-            .get_mut(&std::any::TypeId::of::<R>())
-            .and_then(|e| {
-                e.iter_mut()
-                    .find(|(eid, _)| **id == *eid)
-                    .map(|(_, e)| e.as_any_mut().downcast_mut::<RabjectStore<R>>().unwrap())
-            })
+            .get_mut(&id)
+            .and_then(|e| e.as_any_mut().downcast_mut::<E>())
     }
 }

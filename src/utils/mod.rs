@@ -402,3 +402,58 @@ pub fn decode_raw_raster_image(
     .into_rgba8();
     Ok(res)
 }
+
+pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8> {
+    use ::wgpu;
+    let mut texture_data = vec![0u8; (texture.size().width * texture.size().height * 4) as usize];
+
+    let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Output Staging Buffer"),
+        size: (texture.size().width * texture.size().height * 4) as u64,
+        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Get Texture Data"),
+        });
+    encoder.copy_texture_to_buffer(
+        wgpu::ImageCopyTexture {
+            aspect: wgpu::TextureAspect::All,
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+        },
+        wgpu::ImageCopyBuffer {
+            buffer: &output_staging_buffer,
+            layout: wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some((texture.size().width * 4) as u32),
+                rows_per_image: Some(texture.size().height as u32),
+            },
+        },
+        texture.size(),
+    );
+    ctx.queue.submit(Some(encoder.finish()));
+    pollster::block_on(async {
+        let buffer_slice = output_staging_buffer.slice(..);
+
+        // NOTE: We have to create the mapping THEN device.poll() before await
+        // the future. Otherwise the application will freeze.
+        let (tx, rx) = async_channel::bounded(1);
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send_blocking(result).unwrap()
+        });
+        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        rx.recv().await.unwrap().unwrap();
+
+        {
+            let view = buffer_slice.get_mapped_range();
+            texture_data.copy_from_slice(&view);
+        }
+    });
+    output_staging_buffer.unmap();
+    texture_data
+}
