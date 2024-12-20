@@ -5,7 +5,7 @@ use primitive::{ExtractedVPath, VPathPrimitive};
 
 use crate::{prelude::Interpolatable, utils::rotation_between_vectors};
 
-use super::Rabject;
+use crate::rabject::Rabject;
 
 pub mod blueprint;
 pub mod pipeline;

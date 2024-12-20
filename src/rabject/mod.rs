@@ -1,10 +1,10 @@
-/// A canvas is basicaly a Scene for 2d objects.
-pub mod canvas;
-pub mod vgroup;
-pub mod vpath;
-pub mod vmobject;
-pub mod svg_mobject;
 pub mod group;
+// pub mod svg_mobject;
+pub mod vgroup;
+pub mod vmobject;
+// pub mod vpath;
+pub mod rabject2d;
+pub mod entity;
 
 use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 
@@ -12,30 +12,9 @@ use glam::Vec3;
 use vmobject::TransformAnchor;
 
 use crate::{
-    context::WgpuContext, scene::store::RabjectStore, utils::{Id, RenderResourceStorage}
+    context::WgpuContext,
+    utils::{Id, RenderResourceStorage},
 };
-
-pub trait RabjectContainer {
-    /// Update or insert a rabject
-    ///
-    /// See [`RabjectStores::insert`]
-    fn update_or_insert<R: Rabject + 'static>(&mut self, rabject: R) -> RabjectId<R>;
-
-    /// Remove a rabject
-    ///
-    /// See [`RabjectStores::remove`]
-    fn remove<R: Rabject>(&mut self, id: RabjectId<R>);
-
-    /// Get a reference of a rabject
-    ///
-    /// See [`RabjectStores::get`]
-    fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&RabjectStore<R>>;
-
-    /// Get a mutable reference of a rabject
-    ///
-    /// See [`RabjectStores::get_mut`]
-    fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut RabjectStore<R>>;
-}
 
 /// A render resource.
 pub trait RenderResource {
@@ -84,31 +63,19 @@ impl<R: Rabject> Deref for RabjectId<R> {
 
 /// The rabject is the basic object in Ranim.
 ///
-/// ## Id
-/// The [`Rabject::Id`] is a type to identify the rabject. It can be a simple wrapper of [`Id`] like this:
-/// ```rust
-/// struct MyRabjectId(Id);
-/// impl RabjectId for MyRabjectId {
-///     type Rabject = MyRabject;
-///     fn from_id(id: Id) -> Self { Self(id) }
-///     fn to_id(self) -> Id { self.0 }
-/// }
-/// ```
-///
-/// The reason it exist is just to make the rabject management functions of [`Scene`] support type inference.
-///
 /// ## RenderData
 /// The [`Rabject::RenderData`] is the data that is extracted from the rabject and used to initialize/update the render resource.
 ///
 /// ## RenderResource
 /// The [`Rabject::RenderResource`] is the resource that is used to render the rabject.
-pub trait Rabject: Clone {
-    type RenderData: Default;
+pub trait Rabject {
+    type RenderData;
     type RenderResource: Primitive<Data = Self::RenderData>;
 
-    fn extract(&self) -> Self::RenderData;
+    #[allow(unused)]
+    fn tick(&mut self, dt: f32) {}
 
-    fn update_from(&mut self, other: &Self);
+    fn extract(&self) -> Self::RenderData;
 }
 
 pub trait Primitive {
@@ -121,9 +88,19 @@ pub trait Primitive {
         pipelines: &mut RenderResourceStorage,
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
+        depth_stencil_view: &wgpu::TextureView,
         uniforms_bind_group: &wgpu::BindGroup,
     );
+}
+
+pub trait Updatable {
+    fn update_from(&mut self, other: &Self);
+}
+
+impl<T: Clone> Updatable for T {
+    fn update_from(&mut self, other: &Self) {
+        *self = other.clone();
+    }
 }
 
 /// An empty implementation, for the case that some rabject doesn't need to be rendered (but why?)

@@ -72,10 +72,6 @@ impl Rabject for VGroup {
     fn extract(&self) -> Self::RenderData {
         self.children.iter().map(|e| e.extract()).collect()
     }
-
-    fn update_from(&mut self, other: &Self) {
-        self.children = other.children.clone();
-    }
 }
 
 impl Alignable for VGroup {

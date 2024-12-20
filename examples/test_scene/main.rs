@@ -3,72 +3,70 @@ use std::time::{Duration, Instant};
 use bevy_color::Alpha;
 use env_logger::Env;
 use glam::{vec3, Vec3};
+use image::{ImageBuffer, Rgba};
 use log::info;
 use ranim::animation::fading::Fading;
 use ranim::animation::transform::Transform;
+use ranim::canvas::Canvas;
 use ranim::color::palettes;
+use ranim::context::RanimContext;
 // use ranim::animation::transform::Transform;
 use ranim::glam::vec2;
-use ranim::prelude::*;
-use ranim::rabject::svg_mobject::SvgMobject;
+use ranim::rabject::rabject2d;
+use ranim::{prelude::*, rabject};
+// use ranim::rabject::svg_mobject::SvgMobject;
 use ranim::rabject::vgroup::VGroup;
 use ranim::rabject::vmobject::{Arc, Polygon};
 use ranim::rabject::vmobject::{Circle, Dot, Ellipse, Square, TransformAnchor};
-use ranim::rabject::vpath::{VPath, VPathPoint};
-use ranim::scene::SceneBuilder;
+use ranim::scene::entity::Entity;
+// use ranim::rabject::vpath::{VPath, VPathPoint};
+use ranim::scene::{Scene, SceneBuilder};
+use ranim::utils::get_texture_data;
 
 fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace"))
+        .init();
 
     let mut scene = SceneBuilder::new("test_scene").build();
-    let start = Instant::now();
+    let canvas = scene.insert_new_canvas(1920, 1080);
+    {
+        let canvas = scene.get_mut(&canvas);
+        let quad = rabject2d::vpath::VPath::quad(
+            Vec3::ZERO,
+            vec3(100.0, 100.0, 0.0),
+            vec3(200.0, 0.0, 0.0),
+        );
+        let quad = canvas.insert_rabject(quad);
 
-    // let line = VPath::line(Vec3::ZERO, vec3(100.0, 100.0, 0.0));
-    // let vpath = scene.insert(line);
+        let svg = rabject2d::svg_mobject::SvgMobject::from_path("assets/Ghostscript_Tiger.svg");
+        let svg = canvas.insert(svg);
+    }
 
-    // let quad = VPath::quad(Vec3::ZERO, vec3(100.0, 100.0, 0.0), vec3(200.0, 0.0, 0.0));
-    // let vpath2 = scene.insert(quad);
+    let square = rabject::vmobject::Square::new(500.0).build();
+    // let square = scene.insert_rabject(square);
+    // {
+    //     let square = scene.get(&square);
+    //     let points = square.points();
+    //     println!("points: {:?}", points);
+    // }
 
-    // let cubic = VPath::cubic(
-    //     Vec3::ZERO,
-    //     vec3(100.0, 100.0, 0.0),
-    //     vec3(200.0, 100.0, 0.0),
-    //     vec3(300.0, 0.0, 0.0),
-    // );
-    // let vpath3 = scene.insert(cubic);
+    scene.render_to_image("test_scene.png");
+    // {
+    //     let canvas = scene.get(&canvas);
+    //     let data = get_texture_data(&scene.ctx.wgpu_ctx, &canvas.camera.render_texture);
+    //     let image = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(
+    //         canvas.camera.viewport_width,
+    //         canvas.camera.viewport_height,
+    //         data,
+    //     )
+    //     .unwrap();
+    //     image.save("test_scene_canvas.png").unwrap();
+    // }
 
-    // let offset = vec3(100.0, 100.0, 0.0);
-    // let offset = Vec3::ZERO;
-    // let points = vec![
-    //     VPathPoint::new(
-    //         Vec3::ZERO + offset,
-    //         Some(vec3(10.0, 100.0, 0.0) + offset),
-    //         Some(vec3(10.0, -100.0, 0.0) + offset),
-    //     ),
-    //     VPathPoint::new(
-    //         vec3(300.0, 0.0, 0.0) + offset,
-    //         Some(vec3(200.0, -100.0, 0.0) + offset),
-    //         Some(vec3(200.0, 100.0, 0.0) + offset),
-    //     ),
-    //     VPathPoint::new(
-    //         Vec3::ZERO + offset,
-    //         Some(vec3(10.0, 100.0, 0.0) + offset),
-    //         Some(vec3(10.0, -100.0, 0.0) + offset),
-    //     ),
-    // ];
-
-    // let close = VPath { points };
-
-    // let vpath4 = scene.insert(close);
-
-    // scene.render_to_image("vpath.png");
-
-    let svg = SvgMobject::from_path("assets/Ghostscript_Tiger.svg");
-    let svg = scene.update_or_insert(svg);
-    scene.render_to_image("Ghostscript_Tiger.png");
+    // scene.render_to_image("Ghostscript_Tiger.png");
 
     // let mut polygon = Polygon::new(vec![
     //     vec2(-100.0, -300.0),
@@ -125,9 +123,9 @@ fn main() {
     // let vgroup3 = scene.insert(vgroup3);
     // scene.play_remove(vgroup3, Fading::fade_out());
 
-    info!(
-        "Rendered {} frames in {:?}",
-        scene.frame_count,
-        start.elapsed()
-    );
+    // info!(
+    //     "Rendered {} frames in {:?}",
+    //     scene.frame_count,
+    //     start.elapsed()
+    // );
 }

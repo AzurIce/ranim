@@ -1,47 +1,27 @@
+pub mod entity;
 pub mod file_writer;
 pub mod store;
 
 use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     time::Duration,
 };
 
+use entity::Entity;
 use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
-use store::{Entity, RabjectStore, RabjectStores};
+use store::{EntityId, EntityStore};
 
 #[allow(unused_imports)]
 use log::{debug, info};
 #[allow(unused_imports)]
 use std::time::Instant;
 
-use crate::{
-    animation::Animation,
-    camera::Camera,
-    context::RanimContext,
-    rabject::{
-        group::{Group, GroupPrimitive},
-        svg_mobject::{SvgMobject, SvgPrimitive},
-        vgroup::{VGroup, VGroupPrimitive},
-        vmobject::{primitive::VMobjectPrimitive, VMobject},
-        vpath::{primitive::VPathPrimitive, VPath},
-        Primitive, Rabject, RabjectContainer, RabjectId,
-    },
-    updater::Updater,
-    utils::Id,
-};
+use crate::{animation::Animation, camera::Camera, canvas::Canvas, context::RanimContext, rabject::{entity::RabjectEntity, Rabject}};
 
 #[allow(unused)]
 use log::trace;
-pub struct UpdaterStore<R: Rabject> {
-    /// The updater
-    pub updater: Box<dyn Updater<R>>,
-    /// The id of the target rabject
-    pub target_id: RabjectId<R>,
-}
 
 /// A builder for [`Scene`]
 pub struct SceneBuilder {
@@ -123,18 +103,16 @@ impl SceneBuilder {
     }
 }
 
+/// A Scene manage, update and render entities
+///
+/// It should render it's result into a texture
 pub struct Scene {
-    ctx: RanimContext,
+    pub ctx: RanimContext,
     /// The name of the scene
     pub name: String,
     pub camera: Camera,
-    /// Rabjects in the scene
-    pub rabjects: RabjectStores,
-    // /// Updaters for the rabjects
-    // ///
-    // /// Rabject's type id -> Vec<(Updater's id, Updater<Rabject>)>
-    // pub updaters: HashMap<TypeId, Box<dyn Any>>,
-
+    /// Entities in the scene
+    pub entities: EntityStore<Camera>,
     pub time: f32,
     pub frame_count: usize,
 
@@ -146,33 +124,34 @@ pub struct Scene {
     pub save_frames: bool,
 }
 
-impl RabjectContainer for Scene {
-    /// Insert a rabject to the scene
-    ///
-    /// See [`RabjectStores::insert`]
-    fn update_or_insert<R: Rabject + 'static>(&mut self, rabject: R) -> RabjectId<R> {
-        self.rabjects.update_or_insert(rabject)
+/// Entity management
+impl Scene {
+    pub fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas> {
+        let canvas = Canvas::new(&self.ctx.wgpu_ctx, width, height);
+        self.entities.insert(canvas)
+    }
+    pub fn insert_rabject<R: Rabject + 'static>(&mut self, rabject: R) -> EntityId<RabjectEntity<R>> {
+        let entity = RabjectEntity {
+            rabject,
+            updaters: vec![],
+            render_data: None,
+            render_resource: None,
+        };
+        self.entities.insert(entity)
     }
 
-    /// Remove a rabject from the scene
-    ///
-    /// See [`RabjectStores::remove`]
-    fn remove<R: Rabject>(&mut self, id: RabjectId<R>) {
-        self.rabjects.remove(id);
+    pub fn insert<E: Entity<Renderer = Camera> + 'static>(&mut self, entity: E) -> EntityId<E> {
+        self.entities.insert(entity)
     }
-
-    /// Get a reference of a rabject from the scene
-    ///
-    /// See [`RabjectStores::get`]
-    fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&RabjectStore<R>> {
-        self.rabjects.get(id)
+    pub fn remove<E: Entity<Renderer = Camera> + 'static>(&mut self, id: EntityId<E>) {
+        self.entities.remove(id);
     }
-
-    /// Get a mutable reference of a rabject from the scene
-    ///
-    /// See [`RabjectStores::get_mut`]
-    fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut RabjectStore<R>> {
-        self.rabjects.get_mut(id)
+    // If you have an entity id, then the entity must be in the scene, because remove consumes the id
+    pub fn get<E: Entity<Renderer = Camera> + 'static>(&self, id: &EntityId<E>) -> &E {
+        self.entities.get(id).unwrap()
+    }
+    pub fn get_mut<E: Entity<Renderer = Camera> + 'static>(&mut self, id: &EntityId<E>) -> &mut E {
+        self.entities.get_mut(id).unwrap()
     }
 }
 
@@ -182,10 +161,8 @@ impl Scene {
         // info!("[Scene]: TICK STAGE START");
         // let t = Instant::now();
         self.time += dt;
-        for (_, entities) in self.rabjects.iter_mut() {
-            for (_, entity) in entities.iter_mut() {
-                entity.tick(dt);
-            }
+        for (_, entity) in self.entities.iter_mut() {
+            entity.tick(dt);
         }
         // info!("[Scene]: TICK STAGE END, took {:?}", t.elapsed());
     }
@@ -193,10 +170,8 @@ impl Scene {
     pub fn extract(&mut self) {
         // info!("[Scene]: EXTRACT STAGE START");
         // let t = Instant::now();
-        for (_, entities) in self.rabjects.iter_mut() {
-            for (_, entity) in entities.iter_mut() {
-                entity.extract();
-            }
+        for (_, entity) in self.entities.iter_mut() {
+            entity.extract();
         }
         // info!("[Scene]: EXTRACT STAGE END, took {:?}", t.elapsed());
     }
@@ -204,10 +179,8 @@ impl Scene {
     pub fn prepare(&mut self) {
         // info!("[Scene]: PREPARE STAGE START");
         // let t = Instant::now();
-        for (_, entities) in self.rabjects.iter_mut() {
-            for (_, entity) in entities.iter_mut() {
-                entity.prepare(&self.ctx.wgpu_ctx);
-            }
+        for (_, entity) in self.entities.iter_mut() {
+            entity.prepare(&mut self.ctx);
         }
         // info!("[Scene]: PREPARE STAGE END, took {:?}", t.elapsed());
     }
@@ -215,9 +188,7 @@ impl Scene {
     pub fn render(&mut self) {
         // info!("[Scene]: RENDER STAGE START");
         // let t = Instant::now();
-        self.camera.update_uniforms(&self.ctx.wgpu_ctx);
-        self.camera.clear_screen(&self.ctx.wgpu_ctx);
-        self.camera.render(&mut self.ctx, &mut self.rabjects);
+        self.camera.render(&mut self.ctx, &mut self.entities);
         // info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
     }
 }
@@ -225,12 +196,12 @@ impl Scene {
 impl Default for Scene {
     fn default() -> Self {
         let ctx = RanimContext::new();
+
         Self {
             name: "scene".to_string(),
 
             camera: Camera::new(&ctx, 1920, 1080, 60),
-            rabjects: RabjectStores::default(),
-            // updaters: HashMap::new(),
+            entities: EntityStore::default(),
             time: 0.0,
             frame_count: 0,
             video_writer: None,
@@ -314,45 +285,6 @@ impl Scene {
         Duration::from_secs_f32(1.0 / self.camera.fps as f32)
     }
 
-    // /// Insert an updater for a target rabject
-    // pub fn insert_updater<R: Rabject + 'static, U: Updater<R> + 'static>(
-    //     &mut self,
-    //     target_id: &RabjectId<R>,
-    //     mut updater: U,
-    // ) {
-    //     {
-    //         let target = self.get_mut::<R>(target_id).unwrap();
-    //         updater.on_create(target);
-    //     }
-    //     let updater = Box::new(updater);
-    //     let entry = self
-    //         .updaters
-    //         .entry(TypeId::of::<R>())
-    //         .or_insert(Box::new(Vec::<(Id, UpdaterStore<R>)>::new()));
-    //     entry
-    //         .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
-    //         .unwrap()
-    //         .push((
-    //             **target_id,
-    //             UpdaterStore {
-    //                 updater,
-    //                 target_id: *target_id,
-    //             },
-    //         ));
-    // }
-
-    // /// Remove an updater for a target rabject
-    // pub fn remove_updater<R: Rabject + 'static>(&mut self, target_id: RabjectId<R>) {
-    //     let entry = self
-    //         .updaters
-    //         .entry(TypeId::of::<R>())
-    //         .or_insert(Box::new(Vec::<(Id, UpdaterStore<R>)>::new()));
-    //     entry
-    //         .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
-    //         .unwrap()
-    //         .retain(|(id, _)| *id != *target_id);
-    // }
-
     /// Play an animation
     ///
     /// This is equal to:
@@ -365,18 +297,18 @@ impl Scene {
     /// See [`Animation`] and [`Updater`].
     pub fn play<R: Rabject + 'static>(
         &mut self,
-        target_id: &RabjectId<R>,
+        target_id: &EntityId<RabjectEntity<R>>,
         animation: Animation<R>,
     ) {
         let run_time = animation.config.run_time;
-        self.get_mut(target_id).unwrap().insert_updater(animation);
+        self.get_mut(target_id).insert_updater(animation);
         // self.insert_updater(target_id, animation);
         self.advance(run_time);
     }
 
     pub fn play_remove<R: Rabject + 'static>(
         &mut self,
-        target_id: RabjectId<R>,
+        target_id: EntityId<RabjectEntity<R>>,
         animation: Animation<R>,
     ) {
         self.play(&target_id, animation);

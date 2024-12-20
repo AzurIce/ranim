@@ -3,9 +3,8 @@ use std::sync::Arc;
 use crate::utils::RenderResourceStorage;
 
 pub struct RanimContext {
-    pub(crate) wgpu_ctx: Arc<WgpuContext>,
+    pub wgpu_ctx: Arc<WgpuContext>,
     pub pipelines: RenderResourceStorage,
-    pub renderers: RenderResourceStorage,
 }
 
 impl Default for RanimContext {
@@ -18,12 +17,10 @@ impl RanimContext {
     pub fn new() -> Self {
         let wgpu_ctx = Arc::new(pollster::block_on(WgpuContext::new()));
         let pipelines = RenderResourceStorage::default();
-        let renderers = RenderResourceStorage::default();
 
         Self {
             wgpu_ctx,
             pipelines,
-            renderers,
         }
     }
 

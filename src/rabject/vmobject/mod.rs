@@ -231,10 +231,6 @@ impl Rabject for VMobject {
             fill_triangles: self.parse_fill(),
         }
     }
-
-    fn update_from(&mut self, other: &Self) {
-        self.set_points(other.points.clone());
-    }
 }
 
 pub enum TransformAnchor {
