@@ -6,6 +6,7 @@ use crate::{
 
 use super::{Primitive, Rabject};
 
+/// A group of same type [`Rabject`]s
 #[derive(Clone)]
 pub struct Group<R: Rabject> {
     pub(crate) children: Vec<R>,
@@ -66,13 +67,9 @@ impl<R: Rabject> Rabject for Group<R> {
     fn extract(&self) -> Self::RenderData {
         self.children.iter().map(|e| e.extract()).collect()
     }
-
-    fn update_from(&mut self, other: &Self) {
-        self.children = other.children.clone();
-    }
 }
 
-impl<R: Rabject + Alignable + Default> Alignable for Group<R> {
+impl<R: Rabject + Alignable + Default + Clone> Alignable for Group<R> {
     fn is_aligned(&self, other: &Self) -> bool {
         self.children.len() == other.children.len()
             && self

@@ -1,5 +1,5 @@
+use super::pipeline::{ComputePipeline, FillPipeline, StrokePipeline};
 use crate::context::WgpuContext;
-use crate::rabject::vpath::pipeline::{ComputePipeline, FillPipeline, StrokePipeline};
 use crate::{rabject::Primitive, utils::wgpu::WgpuBuffer};
 use bevy_color::LinearRgba;
 use glam::{Vec3, Vec4};
@@ -29,6 +29,7 @@ pub struct ExtractedVPath {
     pub points: Vec<VPathPoint>,
     pub unit_normal: Vec3,
     pub fill_triangles: Vec<VPathFillVertex>,
+    pub render_order: usvg::PaintOrder,
 }
 
 impl Default for ExtractedVPath {
@@ -37,6 +38,7 @@ impl Default for ExtractedVPath {
             points: vec![VPathPoint::default(); 3],
             unit_normal: Vec3::ZERO,
             fill_triangles: vec![VPathFillVertex::default(); 3],
+            render_order: Default::default(),
         }
     }
 }
@@ -70,6 +72,8 @@ pub struct VPathPrimitive {
     pub(crate) compute_bind_group: wgpu::BindGroup,
     /// RENDER-STROKE BIND GROUP: 0-stroke vertices
     pub(crate) render_stroke_bind_group: wgpu::BindGroup,
+
+    pub paint_order: usvg::PaintOrder,
 }
 
 const MAX_STEP: u32 = 16;
@@ -82,6 +86,7 @@ impl Primitive for VPathPrimitive {
             points,
             unit_normal,
             fill_triangles,
+            render_order,
         } = data;
 
         let points_buffer = WgpuBuffer::new_init(
@@ -125,6 +130,7 @@ impl Primitive for VPathPrimitive {
             compute_uniform_buffer,
             compute_bind_group,
             render_stroke_bind_group,
+            paint_order: *render_order,
         }
     }
 
@@ -134,6 +140,7 @@ impl Primitive for VPathPrimitive {
             points,
             unit_normal,
             fill_triangles,
+            render_order,
         } = data;
 
         self.points_buffer.prepare_from_slice(wgpu_ctx, points);
@@ -156,6 +163,7 @@ impl Primitive for VPathPrimitive {
         );
         self.render_stroke_bind_group =
             Self::create_render_bind_group(wgpu_ctx, &self.stroke_vertices_buffer);
+        self.paint_order = *render_order;
     }
 
     fn render(
@@ -239,17 +247,36 @@ impl Primitive for VPathPrimitive {
             });
             pass.set_bind_group(0, uniforms_bind_group, &[]);
 
-            let pipeline_fill = pipelines.get_or_init::<FillPipeline>(wgpu_ctx);
-            pass.set_pipeline(pipeline_fill);
-            pass.set_vertex_buffer(0, self.fill_vertices_buffer.slice(..));
-            pass.draw(0..self.fill_vertices_buffer.len() as u32, 0..1);
+            match self.paint_order {
+                usvg::PaintOrder::FillAndStroke => {
+                    let pipeline_fill = pipelines.get_or_init::<FillPipeline>(wgpu_ctx);
+                    pass.set_pipeline(pipeline_fill);
+                    pass.set_vertex_buffer(0, self.fill_vertices_buffer.slice(..));
+                    pass.draw(0..self.fill_vertices_buffer.len() as u32, 0..1);
 
-            let pipeline_vmobject_stroke = pipelines.get_or_init::<StrokePipeline>(wgpu_ctx);
-            pass.set_pipeline(pipeline_vmobject_stroke);
-            pass.set_bind_group(1, &self.render_stroke_bind_group, &[]);
-            let len = (self.points_buffer.len() - 1) as u32 * MAX_STEP * 2;
-            trace!("draw {}", len);
-            pass.draw(0..len, 0..1);
+                    let pipeline_vmobject_stroke =
+                        pipelines.get_or_init::<StrokePipeline>(wgpu_ctx);
+                    pass.set_pipeline(pipeline_vmobject_stroke);
+                    pass.set_bind_group(1, &self.render_stroke_bind_group, &[]);
+                    let len = (self.points_buffer.len() - 1) as u32 * MAX_STEP * 2;
+                    trace!("draw {}", len);
+                    pass.draw(0..len, 0..1);
+                }
+                usvg::PaintOrder::StrokeAndFill => {
+                    let pipeline_vmobject_stroke =
+                        pipelines.get_or_init::<StrokePipeline>(wgpu_ctx);
+                    pass.set_pipeline(pipeline_vmobject_stroke);
+                    pass.set_bind_group(1, &self.render_stroke_bind_group, &[]);
+                    let len = (self.points_buffer.len() - 1) as u32 * MAX_STEP * 2;
+                    trace!("draw {}", len);
+                    pass.draw(0..len, 0..1);
+
+                    let pipeline_fill = pipelines.get_or_init::<FillPipeline>(wgpu_ctx);
+                    pass.set_pipeline(pipeline_fill);
+                    pass.set_vertex_buffer(0, self.fill_vertices_buffer.slice(..));
+                    pass.draw(0..self.fill_vertices_buffer.len() as u32, 0..1);
+                }
+            }
         }
         wgpu_ctx.queue.submit(Some(encoder.finish()));
     }

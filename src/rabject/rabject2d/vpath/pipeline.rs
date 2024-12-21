@@ -1,14 +1,29 @@
 use std::ops::Deref;
 
+use bevy_color::LinearRgba;
+use glam::Vec3;
+
 use crate::{
-    camera::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
-    rabject::{RenderResource, Vertex},
+    scene::world::camera::OUTPUT_TEXTURE_FORMAT,
+    scene::canvas::camera::CameraUniformsBindGroup,
     context::WgpuContext,
+    rabject::{RenderResource, Vertex},
 };
 
-use super::{primitive::VMobjectPrimitive, VMobjectFillVertex};
+use super::primitive::VPathPrimitive;
 
-impl Vertex for VMobjectFillVertex {
+#[derive(Default, Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct VPathFillVertex {
+    pub pos: Vec3,
+    /// 0: fill all
+    /// 1: 0, 1, 2
+    /// 2: 0, 2, 3
+    pub fill_type: u32,
+    pub fill_color: LinearRgba,
+}
+
+impl Vertex for VPathFillVertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem::size_of;
         wgpu::VertexBufferLayout {
@@ -61,15 +76,14 @@ impl RenderResource for StencilPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_fill.wgsl"));
+        let module = &device.create_shader_module(wgpu::include_wgsl!("./shader/vpath_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("VMobject Stencil Pipeline"),
+            label: Some("VPath Stencil Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
-                buffers: &[VMobjectFillVertex::desc()],
+                buffers: &[VPathFillVertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -133,7 +147,7 @@ impl FillPipeline {
     fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
         ctx.device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("VMobject Fill Pipeline Layout"),
+                label: Some("VPath Fill Pipeline Layout"),
                 bind_group_layouts: &[&CameraUniformsBindGroup::bind_group_layout(ctx)],
                 push_constant_ranges: &[],
             })
@@ -144,15 +158,14 @@ impl RenderResource for FillPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_fill.wgsl"));
+        let module = &device.create_shader_module(wgpu::include_wgsl!("./shader/vpath_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("VMobject Fill Pipeline"),
+            label: Some("VPath Fill Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
-                buffers: &[VMobjectFillVertex::desc()],
+                buffers: &[VPathFillVertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -231,10 +244,10 @@ impl StrokePipeline {
     fn pipeline_layout(ctx: &WgpuContext) -> wgpu::PipelineLayout {
         ctx.device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("VMobject Fill Pipeline Layout"),
+                label: Some("VPath Stroke Pipeline Layout"),
                 bind_group_layouts: &[
                     &CameraUniformsBindGroup::bind_group_layout(ctx),
-                    &VMobjectPrimitive::render_bind_group_layout(&ctx.device),
+                    &VPathPrimitive::render_bind_group_layout(&ctx.device),
                 ],
                 push_constant_ranges: &[],
             })
@@ -245,15 +258,14 @@ impl RenderResource for StrokePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module = &device
-            .create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_stroke.wgsl"));
+        let module =
+            &device.create_shader_module(wgpu::include_wgsl!("./shader/vpath_stroke.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("VMobject Stroke Pipeline"),
+            label: Some("VPath Stroke Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
-                // buffers: &[VMobjectStrokeVertex::desc()],
                 buffers: &[],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
@@ -307,17 +319,17 @@ impl RenderResource for ComputePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module = &device
-            .create_shader_module(wgpu::include_wgsl!("../../../shader/vmobject_compute.wgsl"));
+        let module =
+            &device.create_shader_module(wgpu::include_wgsl!("./shader/vpath_compute.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("VMobject Compute Pipeline Layout"),
-            bind_group_layouts: &[&VMobjectPrimitive::compute_bind_group_layout(device)],
+            label: Some("VPath Compute Pipeline Layout"),
+            bind_group_layouts: &[&VPathPrimitive::compute_bind_group_layout(device)],
             push_constant_ranges: &[],
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("VMobject Compute Pipeline"),
+            label: Some("VPath Compute Pipeline"),
             layout: Some(&pipeline_layout),
             module,
             entry_point: Some("cs_main"),

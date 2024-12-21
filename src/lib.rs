@@ -13,10 +13,8 @@ mod interpolate;
 pub mod updater;
 
 pub mod animation;
-pub mod camera;
+pub mod context;
 /// Rabjects are the basic objects in ranim scene
 pub mod rabject;
 pub mod scene;
 pub mod utils;
-pub mod context;
-

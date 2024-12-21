@@ -5,20 +5,20 @@ use env_logger::Env;
 use log::info;
 use ranim::glam::{vec2, Vec3};
 use ranim::prelude::*;
-use ranim::rabject::vmobject::TransformAnchor;
+use ranim::rabject::TransformAnchor;
 use ranim::{
     animation::{fading::Fading, transform::Transform},
-    rabject::vmobject::{Arc, Polygon},
-    scene::SceneBuilder,
+    rabject::rabject2d::blueprint::{Arc, Polygon},
+    scene::world::WorldBuilder,
 };
 
 fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace")).init();
 
-    let mut scene = SceneBuilder::new("basic").build();
+    let mut world = WorldBuilder::new("basic").build();
     let t = Instant::now();
     info!("running...");
 
@@ -37,10 +37,12 @@ fn main() {
         TransformAnchor::origin(),
     );
 
-    scene.wait(Duration::from_secs_f32(0.5));
-    let polygon = scene.insert(polygon);
-    scene.play(&polygon, Fading::fade_in());
-    scene.wait(Duration::from_secs_f32(0.5));
+    world.wait(Duration::from_secs_f32(0.5));
+    let polygon = world.insert(polygon);
+
+    info!("polygon fade_in");
+    world.play(&polygon, Fading::fade_in());
+    world.wait(Duration::from_secs_f32(0.5));
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
         .with_radius(100.0)
@@ -48,16 +50,18 @@ fn main() {
         .build();
     arc.set_color(Srgba::hex("58C4DDFF").unwrap());
 
-    scene.play(&polygon, Transform::new(arc.clone()));
-    scene.wait(Duration::from_secs_f32(0.5));
+    info!("polygon transform to arc");
+    world.play(&polygon, Transform::new(arc.clone()));
+    world.wait(Duration::from_secs_f32(0.5));
 
-    scene.remove(polygon);
-    let arc = scene.insert(arc);
+    world.remove(polygon);
+    let arc = world.insert(arc);
 
-    scene.play(&arc, Fading::fade_out());
+    info!("arc fade_out");
+    world.play(&arc, Fading::fade_out());
 
     // let arc = scene.play(Transform::new(polygon, arc)).unwrap();
     // scene.play(Fading::fade_out(arc));
 
-    info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
+    info!("Rendered {} frames in {:?}", world.frame_count, t.elapsed());
 }
