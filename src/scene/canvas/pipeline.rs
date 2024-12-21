@@ -1,9 +1,7 @@
 use std::ops::Deref;
 
-use wgpu::VertexBufferLayout;
-
 use crate::{
-    camera::OUTPUT_TEXTURE_FORMAT,
+    scene::world::camera::OUTPUT_TEXTURE_FORMAT,
     context::WgpuContext,
     rabject::{RenderResource, Vertex},
 };
@@ -96,7 +94,7 @@ impl CanvasPipeline {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Canvas Pipeline Layout"),
                 bind_group_layouts: &[
-                    &crate::camera::CameraUniformsBindGroup::bind_group_layout(ctx),
+                    &crate::scene::world::camera::CameraUniformsBindGroup::bind_group_layout(ctx),
                     &TextureBindGroup::bind_group_layout(ctx),
                 ],
                 push_constant_ranges: &[],

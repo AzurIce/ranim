@@ -6,6 +6,7 @@ use crate::{
 
 use super::{Primitive, Rabject};
 
+/// A group of same type [`Rabject`]s
 #[derive(Clone)]
 pub struct Group<R: Rabject> {
     pub(crate) children: Vec<R>,

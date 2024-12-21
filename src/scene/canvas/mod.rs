@@ -4,19 +4,18 @@ pub mod pipeline;
 use std::ops::{Deref, DerefMut};
 
 use camera::CanvasCamera;
-use glam::{vec2, vec3, Vec2, Vec3};
+use glam::{vec2, Vec2, Vec3};
 use log::trace;
 use pipeline::CanvasPipeline;
-use wgpu::util::DeviceExt;
 
-use crate::camera::Camera;
 use crate::context::WgpuContext;
-use crate::rabject::rabject2d::entity::RabjectEntity;
-use crate::rabject::{Rabject, Vertex};
+use crate::rabject::Vertex;
 use crate::scene::entity::Entity;
 
-use crate::scene::store::{EntityId, EntityStore};
+use crate::scene::store::EntityStore;
 use crate::utils::wgpu::WgpuBuffer;
+
+use super::world::camera::Camera;
 
 /// A canvas is basically a 2d scene
 ///
@@ -31,8 +30,8 @@ pub struct Canvas {
     center_point: Vec3,
     up_normal: Vec3,
     unit_normal: Vec3,
-    pub camera: CanvasCamera,
-    pub entities: EntityStore<CanvasCamera>,
+    camera: CanvasCamera,
+    entities: EntityStore<CanvasCamera>,
     vertex_buffer: WgpuBuffer<CanvasVertex>,
 }
 
@@ -46,21 +45,6 @@ impl Deref for Canvas {
 impl DerefMut for Canvas {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.entities
-    }
-}
-
-impl Canvas {
-    pub fn insert_rabject<R: Rabject + 'static>(
-        &mut self,
-        rabject: R,
-    ) -> EntityId<RabjectEntity<R>> {
-        let entity = RabjectEntity {
-            rabject,
-            updaters: vec![],
-            render_data: None,
-            render_resource: None,
-        };
-        self.insert(entity)
     }
 }
 
@@ -119,11 +103,6 @@ impl Canvas {
         let tr = self.center_point - left_normal * half_width + self.up_normal * half_height;
         let bl = self.center_point + left_normal * half_width - self.up_normal * half_height;
         let br = self.center_point - left_normal * half_width - self.up_normal * half_height;
-        // let u = 0.5;
-        // let tl = vec3(-u, -u, 0.0);
-        // let tr = vec3(u, -u, 0.0);
-        // let bl = vec3(-u, u, 0.0);
-        // let br = vec3(u, u, 0.0);
         [
             CanvasVertex {
                 position: tl,
@@ -167,7 +146,6 @@ impl Entity for Canvas {
             rabject.prepare(ctx);
         }
         let vertices = self.vertices();
-        println!("{:?}", vertices);
         self.vertex_buffer
             .prepare_from_slice(&ctx.wgpu_ctx, &vertices);
     }

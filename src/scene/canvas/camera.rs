@@ -155,7 +155,7 @@ pub struct CanvasCamera {
     pub render_view: wgpu::TextureView,
     pub multisample_view: wgpu::TextureView,
     pub depth_stencil_view: wgpu::TextureView,
-    pub uniforms_buffer: WgpuBuffer<CameraUniforms>,
+    uniforms_buffer: WgpuBuffer<CameraUniforms>,
     pub uniforms_bind_group: CameraUniformsBindGroup,
     pub blend_bind_group: TextureBindGroup,
     pub result_bind_group: TextureBindGroup,

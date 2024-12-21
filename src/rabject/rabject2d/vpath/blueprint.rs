@@ -1,7 +1,7 @@
 use glam::Vec3;
 use log::warn;
 
-use crate::rabject::Blueprint;
+use crate::rabject::{rabject2d::RabjectEntity2d, Blueprint};
 
 use super::{VPath, VPathPoint};
 
@@ -13,12 +13,13 @@ pub struct VPathBuilder {
     points: Vec<VPathPoint>,
 }
 
-impl Blueprint<VPath> for VPathBuilder {
-    fn build(self) -> VPath {
+impl Blueprint<RabjectEntity2d<VPath>> for VPathBuilder {
+    fn build(self) -> RabjectEntity2d<VPath> {
         VPath {
             points: self.points,
             ..Default::default()
         }
+        .into()
     }
 }
 

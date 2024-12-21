@@ -1,15 +1,6 @@
-use std::{
-    any::Any,
-    ops::{Deref, DerefMut},
-};
+use std::any::Any;
 
-use crate::{
-    camera::{Camera},
-    context::RanimContext,
-    rabject::{Primitive, Rabject},
-    updater::Updater,
-    utils::Id,
-};
+use crate::context::RanimContext;
 
 pub trait EntityAny: Entity + Any {
     fn as_any(&self) -> &dyn Any;

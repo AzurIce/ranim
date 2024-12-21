@@ -1,16 +1,27 @@
+#[deprecated(note = "use rabject2d instead")]
+pub mod vmobject;
+#[deprecated(note = "use rabject2d instead")]
+pub mod vpath;
+
 use std::ops::{Deref, DerefMut};
 
-use log::trace;
+use crate::{context::RanimContext, scene::{entity::Entity, world::camera::Camera}, updater::Updater, utils::Id};
 
-use crate::canvas::camera::CanvasCamera;
-use crate::{context::RanimContext, scene::entity::Entity, updater::Updater, utils::Id};
+use super::{Primitive, Rabject};
 
-use crate::rabject::{Primitive, Rabject};
+impl<R: Rabject> From<R> for RabjectEntity3d<R> {
+    fn from(rabject: R) -> Self {
+        Self {
+            rabject,
+            updaters: vec![],
+            render_data: None,
+            render_resource: None,
+        }
+    }
+}
 
-/// An rabject entity in the scene
-///
-/// rabject --extract--> render_data --init--> render_resource
-pub struct RabjectEntity<R: Rabject> {
+/// An rabject entity in the scene, rendered with [`Camera`]
+pub struct RabjectEntity3d<R: Rabject> {
     /// The rabject
     pub(crate) rabject: R,
     /// The updaters of this rabject
@@ -21,20 +32,20 @@ pub struct RabjectEntity<R: Rabject> {
     pub(crate) render_resource: Option<R::RenderResource>,
 }
 
-impl<R: Rabject> Deref for RabjectEntity<R> {
+impl<R: Rabject> Deref for RabjectEntity3d<R> {
     type Target = R;
     fn deref(&self) -> &Self::Target {
         &self.rabject
     }
 }
 
-impl<R: Rabject> DerefMut for RabjectEntity<R> {
+impl<R: Rabject> DerefMut for RabjectEntity3d<R> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.rabject
     }
 }
 
-impl<R: Rabject> RabjectEntity<R> {
+impl<R: Rabject> RabjectEntity3d<R> {
     pub fn insert_updater(&mut self, mut updater: impl Updater<R> + 'static) -> Id {
         let id = Id::new();
         updater.on_create(self);
@@ -46,8 +57,8 @@ impl<R: Rabject> RabjectEntity<R> {
     }
 }
 
-impl<R: Rabject + 'static> Entity for RabjectEntity<R> {
-    type Renderer = CanvasCamera;
+impl<R: Rabject + 'static> Entity for RabjectEntity3d<R> {
+    type Renderer = Camera;
 
     fn tick(&mut self, dt: f32) {
         let rabject = &mut self.rabject;
@@ -74,7 +85,6 @@ impl<R: Rabject + 'static> Entity for RabjectEntity<R> {
         }
     }
     fn render(&mut self, ctx: &mut RanimContext, renderer: &mut Self::Renderer) {
-        trace!("[rabject2d::entity::RabjectEntity] rendering...");
         let wgpu_ctx = ctx.wgpu_ctx();
         let pipelines = &mut ctx.pipelines;
 

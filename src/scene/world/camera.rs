@@ -3,12 +3,9 @@ use glam::{vec3, Mat4, Vec3};
 use wgpu::RenderPassDescriptor;
 
 use crate::{
-    canvas::pipeline::BlendPipeline,
     context::{RanimContext, WgpuContext},
-    scene::{
-        entity::{Entity, EntityAny},
-        store::EntityStore,
-    },
+    scene::canvas::pipeline::BlendPipeline,
+    scene::store::EntityStore,
     utils::wgpu::WgpuBuffer,
 };
 
@@ -269,12 +266,12 @@ impl Camera {
 
     pub fn blend(&mut self, ctx: &mut RanimContext, bind_group: &wgpu::BindGroup) {
         let pipeline = ctx.pipelines.get_or_init::<BlendPipeline>(&ctx.wgpu_ctx);
-        let mut encoder = ctx
-            .wgpu_ctx
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Blend"),
-            });
+        let mut encoder =
+            ctx.wgpu_ctx
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Blend"),
+                });
 
         {
             let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {

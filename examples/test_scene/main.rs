@@ -1,27 +1,12 @@
-use std::time::{Duration, Instant};
-
-use bevy_color::Alpha;
 use env_logger::Env;
 use glam::{vec3, Vec3};
-use image::{ImageBuffer, Rgba};
-use log::info;
-use ranim::animation::fading::Fading;
-use ranim::animation::transform::Transform;
-use ranim::canvas::Canvas;
-use ranim::color::palettes;
-use ranim::context::RanimContext;
-// use ranim::animation::transform::Transform;
-use ranim::glam::vec2;
-use ranim::rabject::rabject2d;
-use ranim::{prelude::*, rabject};
-// use ranim::rabject::svg_mobject::SvgMobject;
-use ranim::rabject::vgroup::VGroup;
-use ranim::rabject::vmobject::{Arc, Polygon};
-use ranim::rabject::vmobject::{Circle, Dot, Ellipse, Square, TransformAnchor};
-use ranim::scene::entity::Entity;
-// use ranim::rabject::vpath::{VPath, VPathPoint};
-use ranim::scene::{Scene, SceneBuilder};
-use ranim::utils::get_texture_data;
+use ranim::{
+    color::palettes, prelude::*, rabject::rabject2d::{
+        blueprint::{Rect, Square},
+        svg::Svg,
+        vpath::{blueprint::VPathBuilder, VPath},
+    }, scene::world::WorldBuilder
+};
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -30,28 +15,25 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace"))
         .init();
 
-    let mut scene = SceneBuilder::new("test_scene").build();
+    let mut scene = WorldBuilder::new("test_scene").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
     {
         let canvas = scene.get_mut(&canvas);
-        let quad = rabject2d::vpath::VPath::quad(
-            Vec3::ZERO,
-            vec3(100.0, 100.0, 0.0),
-            vec3(200.0, 0.0, 0.0),
-        );
-        let quad = canvas.insert_rabject(quad);
+        let quad = VPathBuilder::start(Vec3::ZERO)
+            .quad_to(vec3(100.0, 100.0, 0.0), vec3(200.0, 0.0, 0.0))
+            .build();
+        let quad = canvas.insert(quad);
 
-        let svg = rabject2d::svg_mobject::SvgMobject::from_path("assets/Ghostscript_Tiger.svg");
+        let mut square = Rect::new(100.0, 100.0).build();
+        square
+            .shift(vec3(100.0, 100.0, 0.0))
+            .set_color(palettes::manim::BLUE_C)
+            .set_stroke_width(0.0);
+        let square = canvas.insert(square);
+
+        let svg = Svg::from_path("assets/Ghostscript_Tiger.svg");
         let svg = canvas.insert(svg);
     }
-
-    let square = rabject::vmobject::Square::new(500.0).build();
-    // let square = scene.insert_rabject(square);
-    // {
-    //     let square = scene.get(&square);
-    //     let points = square.points();
-    //     println!("points: {:?}", points);
-    // }
 
     scene.render_to_image("test_scene.png");
     // {

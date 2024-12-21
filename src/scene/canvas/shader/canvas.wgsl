@@ -22,7 +22,7 @@ struct VertexOutput {
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.position = uniforms.matrix * vec4<f32>(in.position / 2.0, 1.0);
+    out.position = uniforms.matrix * vec4<f32>(in.position, 1.0);
     out.uv = in.uv;
 
     return out;
@@ -30,8 +30,8 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // return textureSample(canvas_texture, canvas_texture_sampler, in.uv);
+    return textureSample(canvas_texture, canvas_texture_sampler, in.uv);
     // return vec4<f32>(1.0, 0.0, 0.0, 1.0);
-    return vec4<f32>(in.uv, 0.0, 1.0);
+    // return vec4<f32>(in.uv, 0.0, 1.0);
 }
 
