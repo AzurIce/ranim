@@ -2,15 +2,15 @@ use std::fs;
 
 use usvg::{Options, Tree};
 
-use crate::{canvas::camera::CanvasCamera, scene::entity::Entity, utils};
+use crate::{scene::canvas::camera::CanvasCamera, scene::entity::Entity, utils};
 
 #[derive(Clone)]
-pub struct SvgMobject {
+pub struct Svg {
     tree: usvg::Tree,
     scene: vello::Scene,
 }
 
-impl SvgMobject {
+impl Svg {
     pub fn from_path(path: &str) -> Self {
         let str = fs::read_to_string(path).unwrap();
         let tree = Tree::from_str(&str, &Options::default()).unwrap();
@@ -24,7 +24,7 @@ impl SvgMobject {
 }
 
 #[allow(unused)]
-impl Entity for SvgMobject {
+impl Entity for Svg {
     type Renderer = CanvasCamera;
 
     fn tick(&mut self, dt: f32) {}

@@ -7,13 +7,14 @@ use std::{cmp::Ordering, fmt::Debug};
 use bevy_color::{LinearRgba, Srgba};
 pub use blueprint::*;
 
-use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3, Vec4};
+use glam::{vec2, vec3, IVec3, Mat3, Vec3, Vec4};
 use itertools::Itertools;
 use primitive::{ExtractedVMobject, VMobjectPrimitive};
 
 use crate::{
     interpolate::Interpolatable,
     prelude::{Alignable, Opacity},
+    rabject::TransformAnchor,
     utils::{partial_quadratic_bezier, rotation_between_vectors},
 };
 
@@ -230,25 +231,6 @@ impl Rabject for VMobject {
             unit_normal: self.get_unit_normal(),
             fill_triangles: self.parse_fill(),
         }
-    }
-}
-
-pub enum TransformAnchor {
-    Point(Vec3),
-    Edge(IVec3),
-}
-
-impl TransformAnchor {
-    pub fn point(x: f32, y: f32, z: f32) -> Self {
-        Self::Point(vec3(x, y, z))
-    }
-
-    pub fn origin() -> Self {
-        Self::Point(Vec3::ZERO)
-    }
-
-    pub fn edge(x: i32, y: i32, z: i32) -> Self {
-        Self::Edge(ivec3(x, y, z))
     }
 }
 

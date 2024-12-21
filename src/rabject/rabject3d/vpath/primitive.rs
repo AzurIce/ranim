@@ -1,5 +1,5 @@
+use super::pipeline::{ComputePipeline, FillPipeline, StrokePipeline};
 use crate::context::WgpuContext;
-use crate::rabject::vpath::pipeline::{ComputePipeline, FillPipeline, StrokePipeline};
 use crate::{rabject::Primitive, utils::wgpu::WgpuBuffer};
 use bevy_color::LinearRgba;
 use glam::{Vec3, Vec4};

@@ -1,17 +1,19 @@
+use std::fmt::Debug;
+
 use bevy_color::{Alpha, LinearRgba, Srgba};
-use glam::Vec3;
+use glam::{vec2, vec3, IVec3, Mat3, Vec3};
 use pipeline::VPathFillVertex;
 use primitive::{ExtractedVPath, VPathPrimitive};
 
 use crate::{prelude::Interpolatable, utils::rotation_between_vectors};
 
-use crate::rabject::Rabject;
+use crate::rabject::{Rabject, TransformAnchor};
 
 pub mod blueprint;
 pub mod pipeline;
 pub mod primitive;
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct VPathPoint {
     pub position: Vec3,
     pub prev_handle: Option<Vec3>,
@@ -45,9 +47,9 @@ impl Interpolatable for VPathPoint {
 }
 
 impl VPathPoint {
-    pub fn new(pos: Vec3, prev_handle: Option<Vec3>, next_handle: Option<Vec3>) -> Self {
+    pub fn new(position: Vec3, prev_handle: Option<Vec3>, next_handle: Option<Vec3>) -> Self {
         Self {
-            position: pos,
+            position,
             prev_handle,
             next_handle,
             stroke_color: Srgba::RED.with_alpha(0.5).into(),
@@ -55,14 +57,30 @@ impl VPathPoint {
             fill_color: Srgba::BLUE.with_alpha(0.2).into(),
         }
     }
-    pub fn set_stroke_color(&mut self, color: LinearRgba) {
-        self.stroke_color = color;
+    pub fn position(&self) -> Vec3 {
+        self.position
+    }
+    pub fn set_position(&mut self, position: Vec3) {
+        self.position = position;
+    }
+    pub fn stroke_color(&self) -> LinearRgba {
+        self.stroke_color
+    }
+    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba>) {
+        self.stroke_color = color.into();
+    }
+    pub fn fill_color(&self) -> LinearRgba {
+        self.fill_color
+    }
+    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba>) {
+        // trace!("point set_fill_color: {:?}", color);
+        self.fill_color = color.into();
+    }
+    pub fn stroke_width(&self) -> f32 {
+        self.stroke_width
     }
     pub fn set_stroke_width(&mut self, width: f32) {
         self.stroke_width = width;
-    }
-    pub fn set_fill_color(&mut self, color: LinearRgba) {
-        self.fill_color = color;
     }
 }
 
@@ -70,6 +88,12 @@ impl VPathPoint {
 pub struct VPath {
     pub points: Vec<VPathPoint>,
     pub paint_order: usvg::PaintOrder,
+}
+
+impl VPath {
+    pub fn points(&self) -> &[VPathPoint] {
+        &self.points
+    }
 }
 
 impl Rabject for VPath {
@@ -258,17 +282,161 @@ impl VPath {
         }
     }
 
-    pub fn set_stroke_color(&mut self, color: LinearRgba) {
+    pub fn set_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy) -> &mut Self {
+        self.set_stroke_color(color);
+        self.set_fill_color(color);
+        self
+    }
+    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy) -> &mut Self {
         self.points
             .iter_mut()
             .for_each(|p| p.set_stroke_color(color));
+        self
     }
-    pub fn set_stroke_width(&mut self, width: f32) {
+    pub fn set_stroke_width(&mut self, width: f32) -> &mut Self {
         self.points
             .iter_mut()
             .for_each(|p| p.set_stroke_width(width));
+        self
     }
-    pub fn set_fill_color(&mut self, color: LinearRgba) {
+    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba> + Debug + Copy) -> &mut Self {
         self.points.iter_mut().for_each(|p| p.set_fill_color(color));
+        self
+    }
+}
+
+impl VPath {
+    /// Get the bounding box of the mobject.
+    /// min, mid, max
+    pub fn get_bounding_box(&self) -> [Vec3; 3] {
+        let min = self
+            .points
+            .iter()
+            .map(|p| p.position)
+            .reduce(|acc, e| acc.min(e))
+            .unwrap();
+        let max = self
+            .points
+            .iter()
+            .map(|p| p.position)
+            .reduce(|acc, e| acc.min(e))
+            .unwrap();
+        let mid = (min + max) / 2.0;
+        [min, mid, max]
+    }
+
+    pub fn get_bounding_box_point(&self, edge: IVec3) -> Vec3 {
+        let bb = self.get_bounding_box();
+        let signum = (edge.signum() + IVec3::ONE).as_uvec3();
+
+        vec3(
+            bb[signum.x as usize].x,
+            bb[signum.y as usize].y,
+            bb[signum.z as usize].z,
+        )
+    }
+    /// Apply a function to the points of the mobject about the point.
+    pub fn apply_points_function(
+        &mut self,
+        f: impl Fn(&mut Vec<VPathPoint>),
+        anchor: TransformAnchor,
+    ) {
+        let anchor = match anchor {
+            TransformAnchor::Point(x) => x,
+            TransformAnchor::Edge(x) => self.get_bounding_box_point(x),
+        };
+
+        if anchor != Vec3::ZERO {
+            self.points
+                .iter_mut()
+                .for_each(|p| {
+                    p.position += anchor;
+                    p.prev_handle = p.prev_handle.map(|h| h + anchor);
+                    p.next_handle = p.next_handle.map(|h| h + anchor);
+                });
+        }
+
+        f(&mut self.points);
+
+        if anchor != Vec3::ZERO {
+            self.points
+                .iter_mut()
+                .for_each(|p| {
+                    p.position -= anchor;
+                    p.prev_handle = p.prev_handle.map(|h| h - anchor);
+                    p.next_handle = p.next_handle.map(|h| h - anchor);
+                });
+        }
+    }
+
+    /// Shift the mobject by a given vector.
+    pub fn shift(&mut self, shift: Vec3) -> &mut Self {
+        self.points.iter_mut().for_each(|p| {
+            p.position += shift;
+            p.prev_handle = p.prev_handle.map(|h| h + shift);
+            p.next_handle = p.next_handle.map(|h| h + shift);
+        });
+        self
+    }
+
+    /// Scale the mobject by a given vector.
+    pub fn scale(&mut self, scale: Vec3, anchor: TransformAnchor) -> &mut Self {
+        self.apply_points_function(
+            |points| {
+                points.iter_mut().for_each(|p| {
+                    p.position *= scale;
+                    p.prev_handle = p.prev_handle.map(|h| h * scale);
+                    p.next_handle = p.next_handle.map(|h| h * scale);
+                });
+            },
+            anchor,
+        );
+        self
+    }
+
+    /// Rotate the mobject by a given angle about a given axis.
+    pub fn rotate(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self {
+        let axis = axis.normalize();
+        let rotation = Mat3::from_axis_angle(axis, angle);
+
+        self.apply_points_function(
+            |points| {
+                points.iter_mut().for_each(|p| {
+                    p.position = rotation * p.position;
+                    p.prev_handle = p.prev_handle.map(|h| rotation * h);
+                    p.next_handle = p.next_handle.map(|h| rotation * h);
+                });
+            },
+            anchor,
+        );
+        self
+    }
+    pub fn put_start_and_end_on(&mut self, start: Vec3, end: Vec3) -> &mut Self {
+        let (cur_start, cur_end) = (
+            self.points.first().map(|p| p.position).unwrap_or_default(),
+            self.points.last().map(|p| p.position).unwrap_or_default(),
+        );
+        let cur_v = cur_end - cur_start;
+        if cur_v.length_squared() <= f32::EPSILON {
+            return self;
+        }
+
+        let v = end - start;
+        self.scale(
+            Vec3::splat(v.length() / cur_v.length()),
+            TransformAnchor::Point(cur_start),
+        );
+        let angle = cur_v.y.atan2(-cur_v.x) - v.y.atan2(-v.x) + std::f32::consts::PI / 2.0;
+        self.rotate(angle, Vec3::Z, TransformAnchor::origin());
+        let cur_xy = vec2(cur_v.x, cur_v.y);
+        let cur_xy = cur_xy * cur_xy.abs().normalize();
+
+        let xy = vec2(v.x, v.y);
+        let xy = xy * xy.abs().normalize();
+        let angle = cur_v.z.atan2(-cur_xy.length()) - v.z.atan2(-xy.length());
+        self.rotate(angle, vec3(-v.y, v.x, 0.0), TransformAnchor::origin());
+        self.shift(start - self.points.first().unwrap().position);
+
+        self
     }
 }

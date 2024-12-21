@@ -88,25 +88,33 @@ impl<R: 'static> EntityStore<R> {
         self.inner.remove(&id);
     }
 
-    pub fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> Option<&E> {
+    pub fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> &E {
         debug!(
             "[RabjectStores::get]: getting entity {:?} of type {:?}",
             id,
             std::any::TypeId::of::<E>()
         );
+        // Since removing an entity consumes the [`EntityId`],
+        // so if we have a reference of [`EntityId`], the entity
+        // must be there and we can safely unwrap it.
         self.inner
             .get(&id)
             .and_then(|e| e.as_any().downcast_ref::<E>())
+            .unwrap()
     }
 
-    pub fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> Option<&mut E> {
+    pub fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> &mut E {
         debug!(
             "[RabjectStores::get_mut]: getting entity {:?} of type {:?}",
             id,
             std::any::TypeId::of::<E>()
         );
+        // Since removing an entity consumes the [`EntityId`],
+        // so if we have a reference of [`EntityId`], the entity
+        // must be there and we can safely unwrap it.
         self.inner
             .get_mut(&id)
             .and_then(|e| e.as_any_mut().downcast_mut::<E>())
+            .unwrap()
     }
 }
