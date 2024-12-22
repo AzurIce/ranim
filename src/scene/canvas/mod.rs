@@ -15,9 +15,11 @@ use crate::scene::entity::Entity;
 use crate::scene::store::EntityStore;
 use crate::utils::wgpu::WgpuBuffer;
 
-use super::world::camera::Camera;
+use crate::scene::SceneCamera;
 
-/// A canvas is basically a 2d scene
+/// A canvas is basically a 2d scene with a camera
+///
+/// To create a canvas, use [`crate::scene::Scene::insert_new_canvas`]
 ///
 /// # Coordinate System
 ///
@@ -129,7 +131,7 @@ impl Canvas {
 }
 
 impl Entity for Canvas {
-    type Renderer = Camera;
+    type Renderer = SceneCamera;
 
     fn tick(&mut self, dt: f32) {
         for (_, rabject) in self.entities.iter_mut() {

@@ -2,7 +2,8 @@ use std::fs;
 
 use usvg::{Options, Tree};
 
-use crate::{scene::canvas::camera::CanvasCamera, scene::entity::Entity, utils};
+use crate::scene::{canvas::camera::CanvasCamera, Entity};
+use crate::utils;
 
 #[derive(Clone)]
 pub struct Svg {

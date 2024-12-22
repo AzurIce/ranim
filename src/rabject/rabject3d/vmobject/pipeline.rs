@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::{
-    scene::world::camera::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
+    scene::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
     rabject::{RenderResource, Vertex},
     context::WgpuContext,
 };

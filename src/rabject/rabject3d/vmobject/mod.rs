@@ -153,9 +153,9 @@ impl VMobject {
 
     /// Get the unit normal if it's a polygon.
     ///
-    /// https://stackoverflow.com/questions/22838071/robust-polygon-normal-calculation
-    /// https://www.khronos.org/opengl/wiki/Calculating_a_Surface_Normal
-    /// https://github.com/MIERUNE/earcut-rs/blob/3898cc009723bbef827ba6ce1339c240ece52484/src/utils3d.rs#L9
+    /// <https://stackoverflow.com/questions/22838071/robust-polygon-normal-calculation>
+    /// <https://www.khronos.org/opengl/wiki/Calculating_a_Surface_Normal>
+    /// <https://github.com/MIERUNE/earcut-rs/blob/3898cc009723bbef827ba6ce1339c240ece52484/src/utils3d.rs#L9>
     pub fn get_unit_normal(&self) -> Vec3 {
         if !self.is_closed() || self.points.len() < 5 {
             return Vec3::Z;

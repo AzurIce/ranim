@@ -1,7 +1,5 @@
 use std::{
     collections::HashMap,
-    fmt::Debug,
-    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
@@ -10,36 +8,7 @@ use crate::utils::Id;
 #[allow(unused_imports)]
 use log::debug;
 
-use super::entity::EntityAny;
-
-pub struct EntityId<E: EntityAny>(Id, PhantomData<E>);
-
-impl<E: EntityAny> Debug for EntityId<E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "EntityId({:?})", self.0)
-    }
-}
-
-impl<E: EntityAny> Copy for EntityId<E> {}
-
-impl<E: EntityAny> Clone for EntityId<E> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<E: EntityAny> EntityId<E> {
-    pub fn from_id(id: Id) -> Self {
-        Self(id, PhantomData)
-    }
-}
-
-impl<E: EntityAny> Deref for EntityId<E> {
-    type Target = Id;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+use super::{EntityAny, EntityId};
 
 /// A store of entities
 ///

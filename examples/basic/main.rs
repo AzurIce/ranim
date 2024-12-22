@@ -9,7 +9,7 @@ use ranim::rabject::TransformAnchor;
 use ranim::{
     animation::{fading::Fading, transform::Transform},
     rabject::rabject2d::blueprint::{Arc, Polygon},
-    scene::world::WorldBuilder,
+    scene::scene::SceneBuilder,
 };
 
 fn main() {
@@ -18,7 +18,7 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace")).init();
 
-    let mut world = WorldBuilder::new("basic").build();
+    let mut world = SceneBuilder::new("basic").build();
     let t = Instant::now();
     info!("running...");
 
