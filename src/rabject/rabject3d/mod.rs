@@ -5,7 +5,7 @@ pub mod vpath;
 
 use std::ops::{Deref, DerefMut};
 
-use crate::{context::RanimContext, scene::{entity::Entity, world::camera::Camera}, updater::Updater, utils::Id};
+use crate::{context::RanimContext, scene::{Entity, SceneCamera}, updater::Updater, utils::Id};
 
 use super::{Primitive, Rabject};
 
@@ -58,7 +58,7 @@ impl<R: Rabject> RabjectEntity3d<R> {
 }
 
 impl<R: Rabject + 'static> Entity for RabjectEntity3d<R> {
-    type Renderer = Camera;
+    type Renderer = SceneCamera;
 
     fn tick(&mut self, dt: f32) {
         let rabject = &mut self.rabject;

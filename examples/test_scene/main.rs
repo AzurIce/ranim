@@ -5,7 +5,7 @@ use ranim::{
         blueprint::{Rect, Square},
         svg::Svg,
         vpath::{blueprint::VPathBuilder, VPath},
-    }, scene::world::WorldBuilder
+    }, scene::scene::SceneBuilder
 };
 
 fn main() {
@@ -15,7 +15,7 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace"))
         .init();
 
-    let mut scene = WorldBuilder::new("test_scene").build();
+    let mut scene = SceneBuilder::new("test_scene").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
     {
         let canvas = scene.get_mut(&canvas);

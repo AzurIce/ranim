@@ -3,14 +3,14 @@ use glam::vec3;
 use ranim::color::palettes::manim::*;
 use ranim::prelude::*;
 use ranim::rabject::rabject2d::blueprint::Rect;
-use ranim::scene::world::WorldBuilder;
+use ranim::scene::scene::SceneBuilder;
 
 fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace")).init();
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info,ranim=trace")).init();
-    let mut world = WorldBuilder::new("palettes").build();
+    let mut world = SceneBuilder::new("palettes").build();
     let (width, height) = world.size();
     let canvas = world.insert_new_canvas(width as u32, height as u32);
     {

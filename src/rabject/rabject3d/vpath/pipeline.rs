@@ -4,7 +4,7 @@ use bevy_color::LinearRgba;
 use glam::Vec3;
 
 use crate::{
-    scene::world::camera::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
+    scene::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
     context::WgpuContext,
     rabject::{RenderResource, Vertex},
 };
