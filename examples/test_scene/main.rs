@@ -1,74 +1,54 @@
-use std::time::{Duration, Instant};
-
-use bevy_color::Alpha;
 use env_logger::Env;
 use glam::{vec3, Vec3};
-use log::info;
-use ranim::animation::fading::Fading;
-use ranim::animation::transform::Transform;
-use ranim::color::palettes;
-// use ranim::animation::transform::Transform;
-use ranim::glam::vec2;
-use ranim::prelude::*;
-use ranim::rabject::svg_mobject::SvgMobject;
-use ranim::rabject::vgroup::VGroup;
-use ranim::rabject::vmobject::{Arc, Polygon};
-use ranim::rabject::vmobject::{Circle, Dot, Ellipse, Square, TransformAnchor};
-use ranim::rabject::vpath::{VPath, VPathPoint};
-use ranim::scene::SceneBuilder;
+use ranim::{
+    color::palettes, prelude::*, rabject::rabject2d::{
+        blueprint::{Rect, Square},
+        svg::Svg,
+        vpath::{blueprint::VPathBuilder, VPath},
+    }, scene::SceneBuilder
+};
 
 fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace"))
+        .init();
 
     let mut scene = SceneBuilder::new("test_scene").build();
-    let start = Instant::now();
+    let canvas = scene.insert_new_canvas(1920, 1080);
+    {
+        let canvas = scene.get_mut(&canvas);
+        let quad = VPathBuilder::start(Vec3::ZERO)
+            .quad_to(vec3(100.0, 100.0, 0.0), vec3(200.0, 0.0, 0.0))
+            .build();
+        let quad = canvas.insert(quad);
 
-    // let line = VPath::line(Vec3::ZERO, vec3(100.0, 100.0, 0.0));
-    // let vpath = scene.insert(line);
+        let mut square = Rect::new(100.0, 100.0).build();
+        square
+            .shift(vec3(100.0, 100.0, 0.0))
+            .set_color(palettes::manim::BLUE_C)
+            .set_stroke_width(0.0);
+        let square = canvas.insert(square);
 
-    // let quad = VPath::quad(Vec3::ZERO, vec3(100.0, 100.0, 0.0), vec3(200.0, 0.0, 0.0));
-    // let vpath2 = scene.insert(quad);
+        let svg = Svg::from_path("assets/Ghostscript_Tiger.svg");
+        let svg = canvas.insert(svg);
+    }
 
-    // let cubic = VPath::cubic(
-    //     Vec3::ZERO,
-    //     vec3(100.0, 100.0, 0.0),
-    //     vec3(200.0, 100.0, 0.0),
-    //     vec3(300.0, 0.0, 0.0),
-    // );
-    // let vpath3 = scene.insert(cubic);
+    scene.render_to_image("test_scene.png");
+    // {
+    //     let canvas = scene.get(&canvas);
+    //     let data = get_texture_data(&scene.ctx.wgpu_ctx, &canvas.camera.render_texture);
+    //     let image = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(
+    //         canvas.camera.viewport_width,
+    //         canvas.camera.viewport_height,
+    //         data,
+    //     )
+    //     .unwrap();
+    //     image.save("test_scene_canvas.png").unwrap();
+    // }
 
-    // let offset = vec3(100.0, 100.0, 0.0);
-    // let offset = Vec3::ZERO;
-    // let points = vec![
-    //     VPathPoint::new(
-    //         Vec3::ZERO + offset,
-    //         Some(vec3(10.0, 100.0, 0.0) + offset),
-    //         Some(vec3(10.0, -100.0, 0.0) + offset),
-    //     ),
-    //     VPathPoint::new(
-    //         vec3(300.0, 0.0, 0.0) + offset,
-    //         Some(vec3(200.0, -100.0, 0.0) + offset),
-    //         Some(vec3(200.0, 100.0, 0.0) + offset),
-    //     ),
-    //     VPathPoint::new(
-    //         Vec3::ZERO + offset,
-    //         Some(vec3(10.0, 100.0, 0.0) + offset),
-    //         Some(vec3(10.0, -100.0, 0.0) + offset),
-    //     ),
-    // ];
-
-    // let close = VPath { points };
-
-    // let vpath4 = scene.insert(close);
-
-    // scene.render_to_image("vpath.png");
-
-    let svg = SvgMobject::from_path("assets/test.svg");
-    let svg = scene.insert(svg);
-    scene.render_to_image("svg.png");
+    // scene.render_to_image("Ghostscript_Tiger.png");
 
     // let mut polygon = Polygon::new(vec![
     //     vec2(-100.0, -300.0),
@@ -125,9 +105,9 @@ fn main() {
     // let vgroup3 = scene.insert(vgroup3);
     // scene.play_remove(vgroup3, Fading::fade_out());
 
-    info!(
-        "Rendered {} frames in {:?}",
-        scene.frame_count,
-        start.elapsed()
-    );
+    // info!(
+    //     "Rendered {} frames in {:?}",
+    //     scene.frame_count,
+    //     start.elapsed()
+    // );
 }

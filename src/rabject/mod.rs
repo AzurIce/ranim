@@ -1,17 +1,15 @@
-pub mod vgroup;
-pub mod vpath;
-pub mod vmobject;
-pub mod svg_mobject;
+pub mod rabject2d;
+pub mod rabject3d;
+
 pub mod group;
 
 use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 
-use glam::Vec3;
-use vmobject::TransformAnchor;
+use glam::{ivec3, vec3, IVec3, Vec3};
 
 use crate::{
-    utils::{Id, RenderResourceStorage},
     context::WgpuContext,
+    utils::{Id, RenderResourceStorage},
 };
 
 /// A render resource.
@@ -30,8 +28,13 @@ pub trait Blueprint<T> {
     fn build(self) -> T;
 }
 
-#[derive(Debug)]
 pub struct RabjectId<R: Rabject>(Id, PhantomData<R>);
+
+impl<R: Rabject> Debug for RabjectId<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RabjectId({:?})", self.0)
+    }
+}
 
 impl<R: Rabject> Copy for RabjectId<R> {}
 
@@ -56,31 +59,19 @@ impl<R: Rabject> Deref for RabjectId<R> {
 
 /// The rabject is the basic object in Ranim.
 ///
-/// ## Id
-/// The [`Rabject::Id`] is a type to identify the rabject. It can be a simple wrapper of [`Id`] like this:
-/// ```rust
-/// struct MyRabjectId(Id);
-/// impl RabjectId for MyRabjectId {
-///     type Rabject = MyRabject;
-///     fn from_id(id: Id) -> Self { Self(id) }
-///     fn to_id(self) -> Id { self.0 }
-/// }
-/// ```
-///
-/// The reason it exist is just to make the rabject management functions of [`Scene`] support type inference.
-///
 /// ## RenderData
 /// The [`Rabject::RenderData`] is the data that is extracted from the rabject and used to initialize/update the render resource.
 ///
 /// ## RenderResource
 /// The [`Rabject::RenderResource`] is the resource that is used to render the rabject.
-pub trait Rabject: Clone {
-    type RenderData: Default;
+pub trait Rabject {
+    type RenderData;
     type RenderResource: Primitive<Data = Self::RenderData>;
 
-    fn extract(&self) -> Self::RenderData;
+    #[allow(unused)]
+    fn tick(&mut self, dt: f32) {}
 
-    fn update_from(&mut self, other: &Self);
+    fn extract(&self) -> Self::RenderData;
 }
 
 pub trait Primitive {
@@ -93,9 +84,19 @@ pub trait Primitive {
         pipelines: &mut RenderResourceStorage,
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
+        depth_stencil_view: &wgpu::TextureView,
         uniforms_bind_group: &wgpu::BindGroup,
     );
+}
+
+pub trait Updatable {
+    fn update_from(&mut self, other: &Self);
+}
+
+impl<T: Clone> Updatable for T {
+    fn update_from(&mut self, other: &Self) {
+        *self = other.clone();
+    }
 }
 
 /// An empty implementation, for the case that some rabject doesn't need to be rendered (but why?)
@@ -119,4 +120,26 @@ pub trait Transformable {
     fn shift(&mut self, offset: Vec3) -> &mut Self;
     fn rotate(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self;
     fn scale(&mut self, scale: Vec3) -> &mut Self;
+}
+
+/// The anchor of the transformation.
+pub enum TransformAnchor {
+    /// A point anchor
+    Point(Vec3),
+    /// An edge anchor, use -1, 0, 1 to specify the edge on each axis
+    Edge(IVec3),
+}
+
+impl TransformAnchor {
+    pub fn point(x: f32, y: f32, z: f32) -> Self {
+        Self::Point(vec3(x, y, z))
+    }
+
+    pub fn origin() -> Self {
+        Self::Point(Vec3::ZERO)
+    }
+
+    pub fn edge(x: i32, y: i32, z: i32) -> Self {
+        Self::Edge(ivec3(x, y, z))
+    }
 }

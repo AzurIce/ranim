@@ -5,10 +5,10 @@ use env_logger::Env;
 use log::info;
 use ranim::glam::{vec2, Vec3};
 use ranim::prelude::*;
-use ranim::rabject::vmobject::TransformAnchor;
+use ranim::rabject::TransformAnchor;
 use ranim::{
     animation::{fading::Fading, transform::Transform},
-    rabject::vmobject::{Arc, Polygon},
+    rabject::rabject2d::blueprint::{Arc, Polygon},
     scene::SceneBuilder,
 };
 
@@ -16,9 +16,11 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace"))
+        .init();
 
     let mut scene = SceneBuilder::new("basic").build();
+    let canvas = scene.insert_new_canvas(1920, 1080);
     let t = Instant::now();
     info!("running...");
 
@@ -37,9 +39,10 @@ fn main() {
         TransformAnchor::origin(),
     );
 
+    // 0.5s wait -> fade in -> 0.5s wait
     scene.wait(Duration::from_secs_f32(0.5));
-    let polygon = scene.insert(polygon);
-    scene.play(&polygon, Fading::fade_in());
+    let polygon = scene.get_mut(&canvas).insert(polygon);
+    scene.play_in_canvas(&canvas, &polygon, Fading::fade_in());
     scene.wait(Duration::from_secs_f32(0.5));
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
@@ -47,14 +50,15 @@ fn main() {
         .with_stroke_width(20.0)
         .build();
     arc.set_color(Srgba::hex("58C4DDFF").unwrap());
-
-    scene.play(&polygon, Transform::new(arc.clone()));
+    info!("polygon transform to arc");
+    scene.play_in_canvas(&canvas, &polygon, Transform::new(arc.clone()));
     scene.wait(Duration::from_secs_f32(0.5));
 
-    scene.remove(polygon);
-    let arc = scene.insert(arc);
+    scene.get_mut(&canvas).remove(polygon);
+    let arc = scene.get_mut(&canvas).insert(arc);
 
-    scene.play(&arc, Fading::fade_out());
+    info!("arc fade_out");
+    scene.play_in_canvas(&canvas, &arc, Fading::fade_out());
 
     // let arc = scene.play(Transform::new(polygon, arc)).unwrap();
     // scene.play(Fading::fade_out(arc));

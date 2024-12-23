@@ -9,18 +9,19 @@ members = ["packages/*"]
 [dependencies]
 # ranim_derive.workspace = true
 async-channel = "2.3.1"
-bytemuck = { version = "1.19.0", features = ["derive"] }
+bytemuck = { version = "1.20.0", features = ["derive"] }
 env_logger = "0.11.5"
-glam = { version = "0.24.2", features = ["bytemuck"] }
+glam = { version = "0.29.2", features = ["bytemuck"] }
 image = "0.25.5"
 itertools = "0.13.0"
 log = "0.4.22"
 pollster = "0.4.0"
 uuid = { version = "1.11.0", features = ["v4"] }
-wgpu = "23.0.0"
+wgpu = "23.0.1"
 anyhow = "1.0.93"
 bevy_color = "0.15.1"
 usvg = "0.44.0"
+vello = { git = "https://github.com/linebender/vello" }
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

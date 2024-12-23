@@ -1,4 +1,4 @@
-use crate::{interpolate::Interpolatable, rabject::Rabject};
+use crate::{interpolate::Interpolatable, rabject::{Rabject, Updatable}};
 
 use super::{Animation, AnimationFunc};
 
@@ -19,7 +19,7 @@ pub trait Alignable {
     fn align_with(&mut self, other: &mut Self);
 }
 
-impl<R: Rabject + Alignable + Interpolatable + 'static> Transform<R> {
+impl<R: Rabject + Alignable + Interpolatable + Clone + 'static> Transform<R> {
     pub fn new(target: R) -> Animation<R> {
         let aligned_target = target.clone();
 
@@ -30,7 +30,7 @@ impl<R: Rabject + Alignable + Interpolatable + 'static> Transform<R> {
     }
 }
 
-impl<R: Rabject + Alignable + Interpolatable> AnimationFunc<R> for Transform<R> {
+impl<R: Rabject + Alignable + Interpolatable + Clone> AnimationFunc<R> for Transform<R> {
     fn pre_anim(&mut self, rabject: &mut R) {
         let mut aligned_source = rabject.clone();
         if !aligned_source.is_aligned(&self.aligned_target) {

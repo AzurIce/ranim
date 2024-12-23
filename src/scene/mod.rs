@@ -1,47 +1,41 @@
+/// 2d scene
+pub mod canvas;
+mod entity;
 pub mod file_writer;
-pub mod store;
+mod store;
+
+pub use entity::*;
+pub use store::*;
 
 use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
     fs,
+    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
     time::Duration,
 };
 
-use file_writer::{FileWriter, FileWriterBuilder};
-use image::{ImageBuffer, Rgba};
-use store::{RabjectStore, RabjectStores, Renderable};
-
-#[allow(unused_imports)]
-use log::{debug, info};
-#[allow(unused_imports)]
-use std::time::Instant;
-
 use crate::{
     animation::Animation,
-    camera::Camera,
     context::RanimContext,
-    rabject::{
-        group::{Group, GroupPrimitive},
-        svg_mobject::{SvgMobject, SvgPrimitive},
-        vgroup::{VGroup, VGroupPrimitive},
-        vmobject::{primitive::VMobjectPrimitive, VMobject},
-        vpath::{primitive::VPathPrimitive, VPath},
-        Primitive, Rabject, RabjectId,
-    },
-    updater::Updater,
-    utils::Id,
+    rabject::{rabject2d::RabjectEntity2d, rabject3d::RabjectEntity3d, Rabject},
+};
+use bevy_color::Color;
+use glam::{vec3, Mat4, Vec3};
+use wgpu::RenderPassDescriptor;
+
+use crate::{
+    context::WgpuContext, scene::canvas::pipeline::BlendPipeline, utils::wgpu::WgpuBuffer,
 };
 
 #[allow(unused)]
-use log::trace;
-pub struct UpdaterStore<R: Rabject> {
-    /// The updater
-    pub updater: Box<dyn Updater<R>>,
-    /// The id of the target rabject
-    pub target_id: RabjectId<R>,
-}
+use log::{debug, error, info, trace};
+
+use canvas::Canvas;
+use file_writer::{FileWriter, FileWriterBuilder};
+use image::{ImageBuffer, Rgba};
+
+#[allow(unused_imports)]
+use std::time::Instant;
 
 /// A builder for [`Scene`]
 pub struct SceneBuilder {
@@ -123,18 +117,16 @@ impl SceneBuilder {
     }
 }
 
+/// A 3d Scene
+///
+///
 pub struct Scene {
-    ctx: RanimContext,
+    pub ctx: RanimContext,
     /// The name of the scene
     pub name: String,
-    pub camera: Camera,
-    /// Rabjects in the scene
-    pub rabjects: RabjectStores,
-    /// Updaters for the rabjects
-    ///
-    /// Rabject's type id -> Vec<(Updater's id, Updater<Rabject>)>
-    pub updaters: HashMap<TypeId, Box<dyn Any>>,
-
+    pub camera: SceneCamera,
+    /// Entities in the scene
+    pub entities: EntityStore<SceneCamera>,
     pub time: f32,
     pub frame_count: usize,
 
@@ -146,34 +138,24 @@ pub struct Scene {
     pub save_frames: bool,
 }
 
-// Entity management
+impl Deref for Scene {
+    type Target = EntityStore<SceneCamera>;
+    fn deref(&self) -> &Self::Target {
+        &self.entities
+    }
+}
+
+impl DerefMut for Scene {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.entities
+    }
+}
+
+/// Entity management
 impl Scene {
-    /// Insert a rabject to the scene
-    ///
-    /// See [`RabjectStores::insert`]
-    pub fn insert<R: Rabject + 'static>(&mut self, rabject: R) -> RabjectId<R> {
-        self.rabjects.insert(rabject)
-    }
-
-    /// Remove a rabject from the scene
-    ///
-    /// See [`RabjectStores::remove`]
-    pub fn remove<R: Rabject>(&mut self, id: RabjectId<R>) {
-        self.rabjects.remove(id);
-    }
-
-    /// Get a reference of a rabject from the scene
-    ///
-    /// See [`RabjectStores::get`]
-    pub fn get<R: Rabject + 'static>(&self, id: &RabjectId<R>) -> Option<&R> {
-        self.rabjects.get(id)
-    }
-
-    /// Get a mutable reference of a rabject from the scene
-    ///
-    /// See [`RabjectStores::get_mut`]
-    pub fn get_mut<R: Rabject + 'static>(&mut self, id: &RabjectId<R>) -> Option<&mut R> {
-        self.rabjects.get_mut(id)
+    pub fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas> {
+        let canvas = Canvas::new(&self.ctx.wgpu_ctx, width, height);
+        self.entities.insert(canvas)
     }
 }
 
@@ -183,49 +165,17 @@ impl Scene {
         // info!("[Scene]: TICK STAGE START");
         // let t = Instant::now();
         self.time += dt;
-
-        self.updaters.iter_mut().for_each(|(_, updaters)| {
-            if let Some(updaters) = updaters.downcast_mut::<Vec<(Id, UpdaterStore<VMobject>)>>() {
-                updaters.retain_mut(|(_, updater_store)| {
-                    self.rabjects
-                        .get_mut::<VMobject>(&updater_store.target_id)
-                        .map(|rabject| {
-                            let keep = updater_store.updater.on_update(rabject, dt);
-                            if !keep {
-                                updater_store.updater.on_destroy(rabject);
-                            }
-                            keep
-                        })
-                        .unwrap_or(false)
-                });
-            } else if let Some(updaters) =
-                updaters.downcast_mut::<Vec<(Id, UpdaterStore<VGroup>)>>()
-            {
-                updaters.retain_mut(|(_, updater_store)| {
-                    self.rabjects
-                        .get_mut::<VGroup>(&updater_store.target_id)
-                        .map(|rabject| {
-                            let keep = updater_store.updater.on_update(rabject, dt);
-                            if !keep {
-                                updater_store.updater.on_destroy(rabject);
-                            }
-                            keep
-                        })
-                        .unwrap_or(false)
-                });
-            }
-        });
-
+        for (_, entity) in self.entities.iter_mut() {
+            entity.tick(dt);
+        }
         // info!("[Scene]: TICK STAGE END, took {:?}", t.elapsed());
     }
 
     pub fn extract(&mut self) {
         // info!("[Scene]: EXTRACT STAGE START");
         // let t = Instant::now();
-        for (_, entities) in self.rabjects.iter_mut() {
-            for (_, entity) in entities.iter_mut() {
-                entity.extract();
-            }
+        for (_, entity) in self.entities.iter_mut() {
+            entity.extract();
         }
         // info!("[Scene]: EXTRACT STAGE END, took {:?}", t.elapsed());
     }
@@ -233,10 +183,8 @@ impl Scene {
     pub fn prepare(&mut self) {
         // info!("[Scene]: PREPARE STAGE START");
         // let t = Instant::now();
-        for (_, entities) in self.rabjects.iter_mut() {
-            for (_, entity) in entities.iter_mut() {
-                entity.prepare(&self.ctx.wgpu_ctx);
-            }
+        for (_, entity) in self.entities.iter_mut() {
+            entity.prepare(&mut self.ctx);
         }
         // info!("[Scene]: PREPARE STAGE END, took {:?}", t.elapsed());
     }
@@ -244,9 +192,7 @@ impl Scene {
     pub fn render(&mut self) {
         // info!("[Scene]: RENDER STAGE START");
         // let t = Instant::now();
-        self.camera.update_uniforms(&self.ctx.wgpu_ctx);
-        self.camera.clear_screen(&self.ctx.wgpu_ctx);
-        self.camera.render(&mut self.ctx, &mut self.rabjects);
+        self.camera.render(&mut self.ctx, &mut self.entities);
         // info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
     }
 }
@@ -254,12 +200,12 @@ impl Scene {
 impl Default for Scene {
     fn default() -> Self {
         let ctx = RanimContext::new();
+
         Self {
             name: "scene".to_string(),
 
-            camera: Camera::new(&ctx, 1920, 1080, 60),
-            rabjects: RabjectStores::default(),
-            updaters: HashMap::new(),
+            camera: SceneCamera::new(&ctx, 1920, 1080, 60),
+            entities: EntityStore::default(),
             time: 0.0,
             frame_count: 0,
             video_writer: None,
@@ -282,7 +228,7 @@ impl Scene {
 
         let mut scene = Self::default();
         scene.name = name;
-        scene.camera = Camera::new(&scene.ctx, width, height, fps);
+        scene.camera = SceneCamera::new(&scene.ctx, width, height, fps);
         scene
     }
 
@@ -343,45 +289,6 @@ impl Scene {
         Duration::from_secs_f32(1.0 / self.camera.fps as f32)
     }
 
-    /// Insert an updater for a target rabject
-    pub fn insert_updater<R: Rabject + 'static, U: Updater<R> + 'static>(
-        &mut self,
-        target_id: &RabjectId<R>,
-        mut updater: U,
-    ) {
-        {
-            let target = self.get_mut::<R>(target_id).unwrap();
-            updater.on_create(target);
-        }
-        let updater = Box::new(updater);
-        let entry = self
-            .updaters
-            .entry(TypeId::of::<R>())
-            .or_insert(Box::new(Vec::<(Id, UpdaterStore<R>)>::new()));
-        entry
-            .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
-            .unwrap()
-            .push((
-                **target_id,
-                UpdaterStore {
-                    updater,
-                    target_id: *target_id,
-                },
-            ));
-    }
-
-    /// Remove an updater for a target rabject
-    pub fn remove_updater<R: Rabject + 'static>(&mut self, target_id: RabjectId<R>) {
-        let entry = self
-            .updaters
-            .entry(TypeId::of::<R>())
-            .or_insert(Box::new(Vec::<(Id, UpdaterStore<R>)>::new()));
-        entry
-            .downcast_mut::<Vec<(Id, UpdaterStore<R>)>>()
-            .unwrap()
-            .retain(|(id, _)| *id != *target_id);
-    }
-
     /// Play an animation
     ///
     /// This is equal to:
@@ -394,21 +301,42 @@ impl Scene {
     /// See [`Animation`] and [`Updater`].
     pub fn play<R: Rabject + 'static>(
         &mut self,
-        target_id: &RabjectId<R>,
+        target_id: &EntityId<RabjectEntity3d<R>>,
         animation: Animation<R>,
     ) {
         let run_time = animation.config.run_time;
-        self.insert_updater(target_id, animation);
+        self.get_mut(target_id).insert_updater(animation);
         self.advance(run_time);
     }
 
     pub fn play_remove<R: Rabject + 'static>(
         &mut self,
-        target_id: RabjectId<R>,
+        target_id: EntityId<RabjectEntity3d<R>>,
         animation: Animation<R>,
     ) {
         self.play(&target_id, animation);
         self.remove(target_id);
+    }
+
+    pub fn play_in_canvas<R: Rabject + 'static>(
+        &mut self,
+        canvas_id: &EntityId<Canvas>,
+        target_id: &EntityId<RabjectEntity2d<R>>,
+        animation: Animation<R>,
+    ) {
+        let run_time = animation.config.run_time;
+        self.get_mut(canvas_id).get_mut(target_id).insert_updater(animation);
+        self.advance(run_time);
+    }
+
+    pub fn play_remove_in_canvas<R: Rabject + 'static>(
+        &mut self,
+        canvas_id: &EntityId<Canvas>,
+        target_id: EntityId<RabjectEntity2d<R>>,
+        animation: Animation<R>,
+    ) {
+        self.play_in_canvas(canvas_id, &target_id, animation);
+        self.get_mut(canvas_id).remove(target_id);
     }
 
     /// Advance the scene by a given duration
@@ -434,5 +362,419 @@ impl Scene {
         for _ in 0..frames {
             self.update_frame(false);
         }
+    }
+}
+
+#[repr(C, align(16))]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+/// Uniforms for the camera
+pub struct CameraUniforms {
+    view_projection_mat: Mat4,
+    frame_rescale_factors: Vec3,
+    _padding: f32,
+}
+
+impl CameraUniforms {
+    pub fn as_bind_group_layout_entry() -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::all(),
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }
+    }
+}
+
+pub struct CameraUniformsBindGroup {
+    pub bind_group: wgpu::BindGroup,
+}
+
+impl CameraUniformsBindGroup {
+    pub(crate) fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
+        ctx.device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Simple Pipeline Uniforms"),
+                entries: &[CameraUniforms::as_bind_group_layout_entry()],
+            })
+    }
+
+    pub(crate) fn new(ctx: &WgpuContext, uniforms_buffer: &WgpuBuffer<CameraUniforms>) -> Self {
+        let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Camera Uniforms"),
+            layout: &Self::bind_group_layout(ctx),
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(uniforms_buffer.as_entire_buffer_binding()),
+            }],
+        });
+        Self { bind_group }
+    }
+}
+
+pub struct SceneCamera {
+    pub frame: CameraFrame,
+    pub fps: u32,
+    uniforms: CameraUniforms,
+    render_texture: wgpu::Texture,
+    // multisample_texture: wgpu::Texture,
+    // depth_stencil_texture: wgpu::Texture,
+    pub(crate) render_view: wgpu::TextureView,
+    pub(crate) multisample_view: wgpu::TextureView,
+    pub(crate) depth_stencil_view: wgpu::TextureView,
+
+    // output_view: wgpu::TextureView,
+    output_staging_buffer: wgpu::Buffer,
+    output_texture_data: Option<Vec<u8>>,
+    pub(crate) output_texture_updated: bool,
+
+    uniforms_buffer: WgpuBuffer<CameraUniforms>,
+    pub(crate) uniforms_bind_group: CameraUniformsBindGroup,
+}
+
+pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+
+impl SceneCamera {
+    pub(crate) fn new(ctx: &RanimContext, width: usize, height: usize, fps: u32) -> Self {
+        let frame = CameraFrame::new_with_size(width, height);
+
+        let format = OUTPUT_TEXTURE_FORMAT;
+        let ctx = &ctx.wgpu_ctx;
+        let render_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Target Texture"),
+            size: wgpu::Extent3d {
+                width: width as u32,
+                height: height as u32,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[
+                wgpu::TextureFormat::Rgba8UnormSrgb,
+                wgpu::TextureFormat::Rgba8Unorm,
+            ],
+        });
+        let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Multisample Texture"),
+            size: wgpu::Extent3d {
+                width: width as u32,
+                height: height as u32,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 4,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[
+                wgpu::TextureFormat::Rgba8UnormSrgb,
+                wgpu::TextureFormat::Rgba8Unorm,
+            ],
+        });
+        let depth_stencil_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depth Stencil Texture"),
+            size: wgpu::Extent3d {
+                width: width as u32,
+                height: height as u32,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 4,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth24PlusStencil8,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: (width * height * 4) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let uniforms = CameraUniforms {
+            view_projection_mat: frame.view_projection_matrix(),
+            frame_rescale_factors: frame.rescale_factors(),
+            _padding: 0.0,
+        };
+        let uniforms_buffer = WgpuBuffer::new_init(
+            ctx,
+            &[uniforms],
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        );
+        let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
+
+        let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
+        let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
+        let depth_stencil_view =
+            depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        // let output_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
+        //     format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
+        //     ..Default::default()
+        // });
+
+        Self {
+            frame,
+            fps,
+            uniforms,
+            // Textures
+            render_texture,
+            // multisample_texture,
+            // depth_stencil_texture,
+            // Texture views
+            render_view,
+            multisample_view,
+            depth_stencil_view,
+            // Outputs
+            // output_view,
+            output_staging_buffer,
+            output_texture_data: None,
+            output_texture_updated: false,
+            // Uniforms
+            uniforms_buffer,
+            uniforms_bind_group,
+        }
+    }
+
+    pub fn clear_screen(&mut self, wgpu_ctx: &WgpuContext) {
+        let mut encoder = wgpu_ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Encoder"),
+            });
+
+        // Clear
+        {
+            let bg = Color::srgba_u8(0x33, 0x33, 0x33, 0xff).to_linear();
+            // let bg = Color::srgba_u8(41, 171, 202, 255).to_linear();
+            let bg = wgpu::Color {
+                r: bg.red as f64,
+                g: bg.green as f64,
+                b: bg.blue as f64,
+                a: bg.alpha as f64,
+            };
+            let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("VMobject Clear Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.multisample_view,
+                    resolve_target: Some(&self.render_view),
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(bg),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_stencil_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+        }
+        wgpu_ctx.queue.submit(Some(encoder.finish()));
+        self.output_texture_updated = false;
+    }
+
+    pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext) {
+        self.refresh_uniforms();
+        // debug!("[Camera]: Uniforms: {:?}", self.uniforms);
+        // trace!("[Camera] uploading camera uniforms to buffer...");
+        wgpu_ctx.queue.write_buffer(
+            &self.uniforms_buffer,
+            0,
+            bytemuck::cast_slice(&[self.uniforms]),
+        );
+    }
+
+    pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut EntityStore<Self>) {
+        self.update_uniforms(&ctx.wgpu_ctx);
+        self.clear_screen(&ctx.wgpu_ctx);
+        for (id, entity) in entities.iter_mut() {
+            trace!("[Scene] Rendering entity {:?}", id);
+            entity.render(ctx, self);
+        }
+        self.output_texture_updated = false;
+    }
+
+    pub fn blend(&mut self, ctx: &mut RanimContext, bind_group: &wgpu::BindGroup) {
+        let pipeline = ctx.pipelines.get_or_init::<BlendPipeline>(&ctx.wgpu_ctx);
+        let mut encoder =
+            ctx.wgpu_ctx
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Blend"),
+                });
+
+        {
+            let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Blend Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.multisample_view,
+                    resolve_target: Some(&self.render_view),
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                ..Default::default()
+            });
+            pass.set_bind_group(0, bind_group, &[]);
+            pass.set_pipeline(pipeline);
+            pass.draw(0..6, 0..1);
+        }
+
+        ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+    }
+
+    fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
+        let mut texture_data =
+            self.output_texture_data.take().unwrap_or(vec![
+                0;
+                self.frame.size.0
+                    * self.frame.size.1
+                    * 4
+            ]);
+
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTexture {
+                aspect: wgpu::TextureAspect::All,
+                texture: &self.render_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+            },
+            wgpu::ImageCopyBuffer {
+                buffer: &self.output_staging_buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some((self.frame.size.0 * 4) as u32),
+                    rows_per_image: Some(self.frame.size.1 as u32),
+                },
+            },
+            self.render_texture.size(),
+        );
+        ctx.queue.submit(Some(encoder.finish()));
+
+        pollster::block_on(async {
+            let buffer_slice = self.output_staging_buffer.slice(..);
+
+            // NOTE: We have to create the mapping THEN device.poll() before await
+            // the future. Otherwise the application will freeze.
+            let (tx, rx) = async_channel::bounded(1);
+            buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+                tx.send_blocking(result).unwrap()
+            });
+            ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+            rx.recv().await.unwrap().unwrap();
+
+            {
+                let view = buffer_slice.get_mapped_range();
+                texture_data.copy_from_slice(&view);
+            }
+        });
+        self.output_staging_buffer.unmap();
+
+        self.output_texture_data = Some(texture_data);
+        self.output_texture_updated = true;
+    }
+
+    pub(crate) fn get_rendered_texture(&mut self, ctx: &WgpuContext) -> &[u8] {
+        if !self.output_texture_updated {
+            // trace!("[Camera] Updating rendered texture data...");
+            self.update_rendered_texture_data(ctx);
+        }
+        self.output_texture_data.as_ref().unwrap()
+    }
+
+    pub fn refresh_uniforms(&mut self) {
+        self.uniforms.view_projection_mat = self.frame.view_projection_matrix();
+        self.uniforms.frame_rescale_factors = self.frame.rescale_factors();
+    }
+}
+
+/// Default pos is at the origin, looking to the negative z-axis
+pub struct CameraFrame {
+    pub fovy: f32,
+    pub size: (usize, usize),
+    pub pos: Vec3,
+    pub rotation: Mat4,
+}
+
+impl CameraFrame {
+    pub fn new_with_size(width: usize, height: usize) -> Self {
+        Self {
+            size: (width, height),
+            fovy: std::f32::consts::PI / 2.0,
+            pos: Vec3::ZERO,
+            rotation: Mat4::IDENTITY,
+        }
+    }
+}
+
+impl CameraFrame {
+    pub fn view_matrix(&self) -> Mat4 {
+        Mat4::look_at_rh(vec3(0.0, 0.0, 540.0), Vec3::NEG_Z, Vec3::Y)
+        // self.rotation.inverse() * Mat4::from_translation(-self.pos)
+    }
+
+    pub fn projection_matrix(&self) -> Mat4 {
+        Mat4::perspective_rh(
+            self.fovy,
+            self.size.0 as f32 / self.size.1 as f32,
+            0.1,
+            1000.0,
+        )
+    }
+
+    pub fn view_projection_matrix(&self) -> Mat4 {
+        self.projection_matrix() * self.view_matrix()
+    }
+
+    pub fn rescale_factors(&self) -> Vec3 {
+        Vec3::new(
+            2.0 / self.size.0 as f32,
+            2.0 / self.size.1 as f32,
+            1.0 / self.get_focal_distance(),
+        )
+    }
+
+    pub fn get_focal_distance(&self) -> f32 {
+        0.5 * self.size.1 as f32 / (0.5 * self.fovy).tan()
+    }
+}
+
+impl CameraFrame {
+    pub fn set_fovy(&mut self, fovy: f32) {
+        self.fovy = fovy;
+    }
+
+    pub fn move_to(&mut self, pos: Vec3) {
+        self.pos = pos;
     }
 }

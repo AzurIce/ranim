@@ -4,7 +4,7 @@ use bevy_color::LinearRgba;
 use glam::Vec3;
 
 use crate::{
-    camera::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
+    scene::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
     context::WgpuContext,
     rabject::{RenderResource, Vertex},
 };
@@ -76,7 +76,7 @@ impl RenderResource for StencilPipeline {
         let WgpuContext { device, .. } = wgpu_ctx;
 
         let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vpath_fill.wgsl"));
+            &device.create_shader_module(wgpu::include_wgsl!("../../../../shader/vpath_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VPath Stencil Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
@@ -159,7 +159,7 @@ impl RenderResource for FillPipeline {
         let WgpuContext { device, .. } = wgpu_ctx;
 
         let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vpath_fill.wgsl"));
+            &device.create_shader_module(wgpu::include_wgsl!("../../../../shader/vpath_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VPath Fill Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
@@ -260,7 +260,7 @@ impl RenderResource for StrokePipeline {
         let WgpuContext { device, .. } = wgpu_ctx;
 
         let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vpath_stroke.wgsl"));
+            &device.create_shader_module(wgpu::include_wgsl!("../../../../shader/vpath_stroke.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VPath Stroke Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
@@ -321,7 +321,7 @@ impl RenderResource for ComputePipeline {
         let WgpuContext { device, .. } = wgpu_ctx;
 
         let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../shader/vpath_compute.wgsl"));
+            &device.create_shader_module(wgpu::include_wgsl!("../../../../shader/vpath_compute.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("VPath Compute Pipeline Layout"),
