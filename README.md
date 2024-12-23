@@ -6,12 +6,6 @@ https://github.com/user-attachments/assets/7a4847f4-8d76-4a65-8f50-59d94fc868c3
 
 Ranim is an animation engine crate implemented in pure rust, inspired by [Manim](https://github.com/3b1b/manim/tree/master).
 
-It is now just a pure rust crate, but in the future, there are many possibilities:
-- It may support interactive scene, like manim's `interact` mode.
-- It may support web through wasm, and make scenes renderable and interactable in browser.
-- It may support python through pyo3, and offers the same api as manim to render manim's scenes directly.
-- ......
-
 > [!WARNING]
 > Currently, the project is WIP. It only supports some basic *mobjects* and *animations*, the apis are unstable and may change frequently, the documentation is also not complete.
 
