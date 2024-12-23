@@ -3,7 +3,7 @@ use glam::vec3;
 use ranim::color::palettes::manim::*;
 use ranim::prelude::*;
 use ranim::rabject::rabject2d::blueprint::Rect;
-use ranim::scene::scene::SceneBuilder;
+use ranim::scene::SceneBuilder;
 
 fn main() {
     #[cfg(debug_assertions)]

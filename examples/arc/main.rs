@@ -5,7 +5,7 @@ use env_logger::Env;
 use log::info;
 use ranim::glam::vec3;
 use ranim::prelude::*;
-use ranim::rabject::vmobject::Arc;
+use ranim::rabject::rabject2d::blueprint::Arc;
 use ranim::{animation::fading::Fading, scene::SceneBuilder};
 
 fn main() {
@@ -15,6 +15,7 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("arc=info")).init();
 
     let mut scene = SceneBuilder::new("arc").build();
+    let canvas = scene.insert_new_canvas(1920, 1080);
     let t = Instant::now();
 
     let start_color = Srgba::hex("FF8080FF").unwrap();
@@ -49,8 +50,9 @@ fn main() {
                 .build();
 
             arc.set_color(color).shift(frame_start + offset);
-            let arc = scene.insert(arc);
-            scene.play(
+            let arc = scene.get_mut(&canvas).insert(arc);
+            scene.play_in_canvas(
+                &canvas,
                 &arc,
                 Fading::fade_in().config(|config| {
                     config.set_run_time(Duration::from_secs_f32(0.02));

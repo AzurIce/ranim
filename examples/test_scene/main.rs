@@ -5,7 +5,7 @@ use ranim::{
         blueprint::{Rect, Square},
         svg::Svg,
         vpath::{blueprint::VPathBuilder, VPath},
-    }, scene::scene::SceneBuilder
+    }, scene::SceneBuilder
 };
 
 fn main() {
