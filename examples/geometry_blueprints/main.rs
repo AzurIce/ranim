@@ -3,12 +3,12 @@ use std::time::{Duration, Instant};
 use env_logger::Env;
 use glam::{vec2, Vec3};
 use log::info;
-use ranim::prelude::*;
 use ranim::color::palettes;
-use ranim::rabject::vmobject::TransformAnchor;
+use ranim::prelude::*;
+use ranim::rabject::TransformAnchor;
 use ranim::{
     animation::{fading::Fading, transform::Transform},
-    rabject::vmobject::{Arc, Polygon},
+    rabject::rabject2d::blueprint::{Arc, Polygon},
     scene::SceneBuilder,
 };
 
@@ -21,6 +21,7 @@ fn main() {
         .init();
 
     let mut scene = SceneBuilder::new("geometry_blueprints").build();
+    let canvas = scene.insert_new_canvas(1920, 1080);
     let t = Instant::now();
     info!("running...");
 
@@ -39,8 +40,9 @@ fn main() {
         TransformAnchor::origin(),
     );
 
-    let polygon = scene.insert(polygon);
-    scene.play(
+    let polygon = scene.get_mut(&canvas).insert(polygon);
+    scene.play_in_canvas(
+        &canvas,
         &polygon,
         Fading::fade_in().config(|config| {
             config.set_run_time(Duration::from_secs_f32(1.0));
@@ -53,10 +55,10 @@ fn main() {
         .build();
     arc.set_color(palettes::manim::BLUE_C);
 
-    scene.play(&polygon, Transform::new(arc.clone()));
+    scene.play_in_canvas(&canvas, &polygon, Transform::new(arc.clone()));
 
-    let arc = scene.insert(arc);
-    scene.play(&arc, Fading::fade_out());
+    let arc = scene.get_mut(&canvas).insert(arc);
+    scene.play_in_canvas(&canvas, &arc, Fading::fade_out());
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

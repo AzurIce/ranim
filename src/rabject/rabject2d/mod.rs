@@ -90,7 +90,7 @@ impl<R: Rabject + 'static> Entity for RabjectEntity2d<R> {
         }
     }
     fn render(&mut self, ctx: &mut RanimContext, renderer: &mut Self::Renderer) {
-        trace!("[rabject2d::entity::RabjectEntity] rendering...");
+        // trace!("[rabject2d::entity::RabjectEntity] rendering...");
         let wgpu_ctx = ctx.wgpu_ctx();
         let pipelines = &mut ctx.pipelines;
 

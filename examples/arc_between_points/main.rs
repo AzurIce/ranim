@@ -6,7 +6,7 @@ use glam::{Mat3, Vec3};
 use log::info;
 use ranim::glam::vec3;
 use ranim::prelude::*;
-use ranim::rabject::vmobject::ArcBetweenPoints;
+use ranim::rabject::rabject2d::blueprint::ArcBetweenPoints;
 use ranim::{animation::fading::Fading, scene::SceneBuilder};
 
 fn main() {
@@ -18,6 +18,7 @@ fn main() {
         .init();
 
     let mut scene = SceneBuilder::new("arc_between_points").build();
+    let canvas = scene.insert_new_canvas(1920, 1080);
 
     let start_color = Srgba::hex("FF8080FF").unwrap();
     let end_color = Srgba::hex("58C4DDFF").unwrap();
@@ -44,8 +45,9 @@ fn main() {
                 .build();
             arc.set_color(color);
 
-            let arc = scene.insert(arc);
-            scene.play(
+            let arc = scene.get_mut(&canvas).insert(arc);
+            scene.play_in_canvas(
+                &canvas,
                 &arc,
                 Fading::fade_in().config(|config| {
                     config.set_run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32));
