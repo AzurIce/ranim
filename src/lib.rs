@@ -69,7 +69,7 @@
 //! scene.render_to_image("hello.png");
 //! ```
 //! 
-//! Then you will find a `output/scene-hello/hello.png` in your current directory.
+//! Then you will find `hello.png` in `output/scene-hello/hello.png`.
 
 pub use glam;
 pub mod prelude {

@@ -1,10 +1,16 @@
+use std::cmp::Ordering;
 use std::fmt::Debug;
 
 use bevy_color::{Alpha, LinearRgba, Srgba};
 use glam::{vec2, vec3, IVec3, Mat3, Vec3};
+use itertools::Itertools;
+use log::trace;
 use pipeline::VPathFillVertex;
 use primitive::{ExtractedVPath, VPathPrimitive};
 
+use crate::prelude::{Alignable, Opacity};
+use crate::utils::bezier::trim_cubic_bezier;
+use crate::utils::partial_cubic_bezier;
 use crate::{prelude::Interpolatable, utils::rotation_between_vectors};
 
 use crate::rabject::{Rabject, TransformAnchor};
@@ -81,6 +87,10 @@ impl VPathPoint {
     }
     pub fn set_stroke_width(&mut self, width: f32) {
         self.stroke_width = width;
+    }
+    pub fn set_opacity(&mut self, opacity: f32) {
+        self.fill_color = self.fill_color.with_alpha(opacity);
+        self.stroke_color = self.stroke_color.with_alpha(opacity);
     }
 }
 
@@ -347,25 +357,21 @@ impl VPath {
         };
 
         if anchor != Vec3::ZERO {
-            self.points
-                .iter_mut()
-                .for_each(|p| {
-                    p.position += anchor;
-                    p.prev_handle = p.prev_handle.map(|h| h + anchor);
-                    p.next_handle = p.next_handle.map(|h| h + anchor);
-                });
+            self.points.iter_mut().for_each(|p| {
+                p.position += anchor;
+                p.prev_handle = p.prev_handle.map(|h| h + anchor);
+                p.next_handle = p.next_handle.map(|h| h + anchor);
+            });
         }
 
         f(&mut self.points);
 
         if anchor != Vec3::ZERO {
-            self.points
-                .iter_mut()
-                .for_each(|p| {
-                    p.position -= anchor;
-                    p.prev_handle = p.prev_handle.map(|h| h - anchor);
-                    p.next_handle = p.next_handle.map(|h| h - anchor);
-                });
+            self.points.iter_mut().for_each(|p| {
+                p.position -= anchor;
+                p.prev_handle = p.prev_handle.map(|h| h - anchor);
+                p.next_handle = p.next_handle.map(|h| h - anchor);
+            });
         }
     }
 
@@ -438,5 +444,122 @@ impl VPath {
         self.shift(start - self.points.first().unwrap().position);
 
         self
+    }
+}
+
+impl VPath {
+    pub fn align_to(&mut self, target: &Self) -> &mut Self {
+        if self.points.len() >= target.points.len() {
+            return self;
+        }
+
+        trace!(
+            "[VPath] {} align to {}",
+            self.points.len(),
+            target.points.len()
+        );
+
+        let beziers = self
+            .points
+            .iter()
+            .zip(self.points.iter().skip(1))
+            .collect::<Vec<_>>();
+
+        let mut lens = beziers
+            .iter()
+            .map(|(p0, p1)| (p1.position - p0.position).length())
+            .collect::<Vec<_>>();
+        // println!("{:?}", lens);
+
+        let n = target.points.len() - self.points.len();
+        let mut ipc = vec![0; beziers.len()];
+        for _ in 0..n {
+            let i = lens
+                .iter()
+                .position_max_by(|x, y| x.partial_cmp(y).unwrap_or(Ordering::Equal))
+                .unwrap();
+            ipc[i] += 1;
+            lens[i] *= ipc[i] as f32 / (ipc[i] + 1) as f32;
+        }
+
+        // println!("{:?}", lens);
+        // println!("{:?}", ipc);
+
+        let mut new_points = vec![self.points[0]];
+        for (bezier, ipc) in beziers.iter().zip(ipc.into_iter()) {
+            trace!("bezier: {:?}, ipc: {}", bezier, ipc);
+            let alphas = (0..ipc + 2)
+                .map(|i| i as f32 / (ipc + 1) as f32)
+                .collect::<Vec<_>>();
+            trace!("alphas: {:?}", alphas);
+
+            for (a, b) in alphas.iter().zip(alphas.iter().skip(1)) {
+                // let mut point_a = bezier.0.lerp(bezier.1, *a);
+                let mut point_b = bezier.0.lerp(bezier.1, *b);
+
+                let bezier = [
+                    bezier.0.position,
+                    bezier.0.next_handle.unwrap_or(bezier.0.position),
+                    bezier.1.prev_handle.unwrap_or(bezier.1.position),
+                    bezier.1.position,
+                ];
+                trace!("bezier: {:?}", bezier);
+
+                let partial_bezier = trim_cubic_bezier(&bezier, *a, *b);
+                trace!("partial_bezier: {:?}", partial_bezier);
+                // point_a.position = partial_bezier[0];
+                // point_a.next_handle = Some(partial_bezier[1]);
+                new_points.last_mut().unwrap().next_handle = Some(partial_bezier[1]);
+                point_b.prev_handle = Some(partial_bezier[2]);
+                point_b.position = partial_bezier[3];
+
+                new_points.push(point_b);
+            }
+        }
+
+        // trace!(
+        //     "[VPath] new_points: {:?}",
+        //     new_points.iter().map(|p| p.position()).collect::<Vec<_>>()
+        // );
+
+        self.points = new_points;
+        trace!("[VPath] aligned points: {}", self.points.len());
+
+        self
+    }
+}
+
+impl Alignable for VPath {
+    fn is_aligned(&self, target: &Self) -> bool {
+        self.points.len() == target.points.len()
+    }
+
+    fn align_with(&mut self, target: &mut Self) {
+        if self.points.len() > target.points.len() {
+            target.align_to(self)
+        } else {
+            self.align_to(target)
+        };
+    }
+}
+
+impl Interpolatable for VPath {
+    fn lerp(&self, target: &Self, t: f32) -> Self {
+        let mut new = self.clone();
+        new.points = self
+            .points
+            .iter()
+            .zip(target.points.iter())
+            .map(|(p1, p2)| p1.lerp(p2, t))
+            .collect();
+        new
+    }
+}
+
+impl Opacity for VPath {
+    fn set_opacity(&mut self, opacity: f32) {
+        self.points.iter_mut().for_each(|p| {
+            p.set_opacity(opacity);
+        });
     }
 }

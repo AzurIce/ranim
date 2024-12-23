@@ -152,12 +152,12 @@ impl Entity for Canvas {
             .prepare_from_slice(&ctx.wgpu_ctx, &vertices);
     }
     fn render(&mut self, ctx: &mut crate::context::RanimContext, renderer: &mut Self::Renderer) {
-        trace!("[Canvas] rendering inner entities...");
+        // trace!("[Canvas] rendering inner entities...");
         // First render inner entities to camera's render_texture
         self.camera.render(ctx, &mut self.entities);
 
         // Then render the canvas to 3d scene
-        trace!("[Canvas] rendering canvas...");
+        // trace!("[Canvas] rendering canvas...");
         let pipeline = ctx.pipelines.get_or_init::<CanvasPipeline>(&ctx.wgpu_ctx);
         let mut encoder =
             ctx.wgpu_ctx

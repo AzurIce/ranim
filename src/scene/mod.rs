@@ -17,7 +17,7 @@ use std::{
 use crate::{
     animation::Animation,
     context::RanimContext,
-    rabject::{rabject3d::RabjectEntity3d, Rabject},
+    rabject::{rabject2d::RabjectEntity2d, rabject3d::RabjectEntity3d, Rabject},
 };
 use bevy_color::Color;
 use glam::{vec3, Mat4, Vec3};
@@ -306,7 +306,6 @@ impl Scene {
     ) {
         let run_time = animation.config.run_time;
         self.get_mut(target_id).insert_updater(animation);
-        // self.insert_updater(target_id, animation);
         self.advance(run_time);
     }
 
@@ -317,6 +316,27 @@ impl Scene {
     ) {
         self.play(&target_id, animation);
         self.remove(target_id);
+    }
+
+    pub fn play_in_canvas<R: Rabject + 'static>(
+        &mut self,
+        canvas_id: &EntityId<Canvas>,
+        target_id: &EntityId<RabjectEntity2d<R>>,
+        animation: Animation<R>,
+    ) {
+        let run_time = animation.config.run_time;
+        self.get_mut(canvas_id).get_mut(target_id).insert_updater(animation);
+        self.advance(run_time);
+    }
+
+    pub fn play_remove_in_canvas<R: Rabject + 'static>(
+        &mut self,
+        canvas_id: &EntityId<Canvas>,
+        target_id: EntityId<RabjectEntity2d<R>>,
+        animation: Animation<R>,
+    ) {
+        self.play_in_canvas(canvas_id, &target_id, animation);
+        self.get_mut(canvas_id).remove(target_id);
     }
 
     /// Advance the scene by a given duration
@@ -578,7 +598,7 @@ impl SceneCamera {
 
     pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext) {
         self.refresh_uniforms();
-        debug!("[Camera]: Uniforms: {:?}", self.uniforms);
+        // debug!("[Camera]: Uniforms: {:?}", self.uniforms);
         // trace!("[Camera] uploading camera uniforms to buffer...");
         wgpu_ctx.queue.write_buffer(
             &self.uniforms_buffer,
