@@ -55,8 +55,7 @@ impl Blueprint<RabjectEntity2d<VPath>> for Arc {
             *p /= (theta / 2.0).cos();
         });
 
-        let mut builder = VPathBuilder::start(points[0]);
-        points
+        let mut builder = points
             .iter()
             .skip(1)
             .step_by(2)

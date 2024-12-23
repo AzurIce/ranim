@@ -347,8 +347,7 @@ impl CanvasCamera {
                 1.0 / self.viewport_height as f32,
                 1.0,
             ));
-        debug!("[CanvasCamera]: Uniforms: {:?}", mat4);
-        // trace!("[Camera] uploading camera uniforms to buffer...");
+        // debug!("[CanvasCamera]: Uniforms: {:?}", mat4);
         wgpu_ctx
             .queue
             .write_buffer(&self.uniforms_buffer, 0, bytemuck::cast_slice(&[mat4]));
@@ -360,16 +359,16 @@ impl CanvasCamera {
         // For the entities renders with wgpu, this renders the entities to camera's render_texture
         // For the entities renders with vello, this does nothing
         for (id, entity) in entities.iter_mut() {
-            trace!("[CanvasCamera] rendering entity {:?}...", id);
+            // trace!("[CanvasCamera] rendering entity {:?}...", id);
             entity.render(ctx, self);
         }
 
         // This renders the vello scene to the canvas texture
-        trace!("[CanvasCamera] rendering vello scene...");
+        // trace!("[CanvasCamera] rendering vello scene...");
         self.render_vello_scene(&ctx.wgpu_ctx);
 
         // This blends the vello scene onto the canvas texture
-        trace!("[CanvasCamera] blending...");
+        // trace!("[CanvasCamera] blending...");
         let pipeline = ctx.pipelines.get_or_init::<BlendPipeline>(&ctx.wgpu_ctx);
         let mut encoder =
             ctx.wgpu_ctx

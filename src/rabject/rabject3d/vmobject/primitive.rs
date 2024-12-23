@@ -184,7 +184,7 @@ impl Primitive for VMobjectPrimitive {
             pass.set_bind_group(0, &self.compute_bind_group, &[]);
             // number of segments
             let len = self.points_buffer.len() / 2;
-            trace!("dispatch workgroups: {}", len);
+            // trace!("dispatch workgroups: {}", len);
             pass.dispatch_workgroups(len as u32, 1, 1);
         }
 
@@ -250,7 +250,7 @@ impl Primitive for VMobjectPrimitive {
             pass.set_pipeline(pipeline_vmobject_stroke);
             pass.set_bind_group(1, &self.render_stroke_bind_group, &[]);
             let len = self.points_buffer.len() as u32 / 2 * MAX_STEP * 2;
-            trace!("draw {}", len);
+            // trace!("draw {}", len);
             pass.draw(0..len, 0..1);
         }
         wgpu_ctx.queue.submit(Some(encoder.finish()));
