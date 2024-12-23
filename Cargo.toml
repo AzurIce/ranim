@@ -1,10 +1,15 @@
 [package]
 name = "ranim"
-version = "0.1.0"
+description = "An animation engine inspired by Manim"
+repository = "https://github.com/AzurIce/ranim"
+version = "0.0.0"
 edition = "2021"
+readme = "README.md"
+license = "MIT"
+keywords = ["animation", "manim"]
 
-[workspace]
-members = ["packages/*"]
+# [workspace]
+# members = ["packages/*"]
 
 [dependencies]
 # ranim_derive.workspace = true
