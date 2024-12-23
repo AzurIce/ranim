@@ -1,15 +1,15 @@
 pub mod rate_functions;
 pub mod wgpu;
+pub mod bezier;
 
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
 };
 
-use bevy_color::Srgba;
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
-use crate::{interpolate::Interpolatable, rabject::RenderResource, context::WgpuContext};
+use crate::{context::WgpuContext, interpolate::Interpolatable, rabject::RenderResource};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
@@ -161,13 +161,318 @@ pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f32, b: f
     [h0, h1, h2]
 }
 
-impl Interpolatable for Srgba {
-    fn lerp(&self, other: &Self, t: f32) -> Self {
-        Self {
-            red: self.red.lerp(&other.red, t),
-            green: self.green.lerp(&other.green, t),
-            blue: self.blue.lerp(&other.blue, t),
-            alpha: self.alpha.lerp(&other.alpha, t),
+pub fn point_on_cubic_bezier<T: Interpolatable>(points: &[T; 4], t: f32) -> T {
+    let t = t.clamp(0.0, 1.0);
+    let p1 = point_on_quadratic_bezier((&points[0..3]).try_into().unwrap(), t);
+    let p2 = point_on_quadratic_bezier((&points[1..4]).try_into().unwrap(), t);
+    p1.lerp(&p2, t)
+}
+
+pub fn partial_cubic_bezier<T: Interpolatable>(points: &[T; 4], a: f32, b: f32) -> [T; 4] {
+    let a = a.clamp(0.0, 1.0);
+    let b = b.clamp(0.0, 1.0);
+
+    // Compute points on the curve at parameters `a` and `b`
+    let p0 = point_on_cubic_bezier(points, a);
+    let p3 = point_on_cubic_bezier(points, b);
+
+    // Compute intermediate control points
+    let p1_prime = points[0].lerp(&points[1], a);
+    let p2_prime = points[1].lerp(&points[2], a);
+    let p3_prime = points[2].lerp(&points[3], a);
+
+    let p1_double_prime = p1_prime.lerp(&p2_prime, a);
+    let p2_double_prime = p2_prime.lerp(&p3_prime, a);
+
+    let q1 = p0.lerp(&p1_double_prime, (b - a) / (1.0 - a));
+    let q2 = p1_double_prime.lerp(&p2_double_prime, (b - a) / (1.0 - a));
+
+    [p0, q1, q2, p3]
+}
+
+pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8> {
+    use ::wgpu;
+    let mut texture_data = vec![0u8; (texture.size().width * texture.size().height * 4) as usize];
+
+    let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Output Staging Buffer"),
+        size: (texture.size().width * texture.size().height * 4) as u64,
+        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Get Texture Data"),
+        });
+    encoder.copy_texture_to_buffer(
+        wgpu::ImageCopyTexture {
+            aspect: wgpu::TextureAspect::All,
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+        },
+        wgpu::ImageCopyBuffer {
+            buffer: &output_staging_buffer,
+            layout: wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some((texture.size().width * 4) as u32),
+                rows_per_image: Some(texture.size().height as u32),
+            },
+        },
+        texture.size(),
+    );
+    ctx.queue.submit(Some(encoder.finish()));
+    pollster::block_on(async {
+        let buffer_slice = output_staging_buffer.slice(..);
+
+        // NOTE: We have to create the mapping THEN device.poll() before await
+        // the future. Otherwise the application will freeze.
+        let (tx, rx) = async_channel::bounded(1);
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send_blocking(result).unwrap()
+        });
+        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        rx.recv().await.unwrap().unwrap();
+
+        {
+            let view = buffer_slice.get_mapped_range();
+            texture_data.copy_from_slice(&view);
+        }
+    });
+    output_staging_buffer.unmap();
+    texture_data
+}
+
+// Following code is copied from https://github.com/linebender/vello_svg
+// Copyright 2023 the Vello Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
+use vello::kurbo::{Affine, BezPath, Point, Rect, Stroke};
+use vello::peniko::{Blob, Brush, Color, Fill, Image};
+use vello::Scene;
+
+pub fn to_affine(ts: &usvg::Transform) -> Affine {
+    let usvg::Transform {
+        sx,
+        kx,
+        ky,
+        sy,
+        tx,
+        ty,
+    } = ts;
+    Affine::new([sx, kx, ky, sy, tx, ty].map(|&x| f64::from(x)))
+}
+
+pub fn to_stroke(stroke: &usvg::Stroke) -> Stroke {
+    let mut conv_stroke = Stroke::new(stroke.width().get() as f64)
+        .with_caps(match stroke.linecap() {
+            usvg::LineCap::Butt => vello::kurbo::Cap::Butt,
+            usvg::LineCap::Round => vello::kurbo::Cap::Round,
+            usvg::LineCap::Square => vello::kurbo::Cap::Square,
+        })
+        .with_join(match stroke.linejoin() {
+            usvg::LineJoin::Miter | usvg::LineJoin::MiterClip => vello::kurbo::Join::Miter,
+            usvg::LineJoin::Round => vello::kurbo::Join::Round,
+            usvg::LineJoin::Bevel => vello::kurbo::Join::Bevel,
+        })
+        .with_miter_limit(stroke.miterlimit().get() as f64);
+    if let Some(dash_array) = stroke.dasharray().as_ref() {
+        conv_stroke = conv_stroke.with_dashes(
+            stroke.dashoffset() as f64,
+            dash_array.iter().map(|x| *x as f64),
+        );
+    }
+    conv_stroke
+}
+
+pub fn to_bez_path(path: &usvg::Path) -> BezPath {
+    let mut local_path = BezPath::new();
+    // The semantics of SVG paths don't line up with `BezPath`; we
+    // must manually track initial points
+    let mut just_closed = false;
+    let mut most_recent_initial = (0., 0.);
+    for elt in path.data().segments() {
+        match elt {
+            usvg::tiny_skia_path::PathSegment::MoveTo(p) => {
+                if std::mem::take(&mut just_closed) {
+                    local_path.move_to(most_recent_initial);
+                }
+                most_recent_initial = (p.x.into(), p.y.into());
+                local_path.move_to(most_recent_initial);
+            }
+            usvg::tiny_skia_path::PathSegment::LineTo(p) => {
+                if std::mem::take(&mut just_closed) {
+                    local_path.move_to(most_recent_initial);
+                }
+                local_path.line_to(Point::new(p.x as f64, p.y as f64));
+            }
+            usvg::tiny_skia_path::PathSegment::QuadTo(p1, p2) => {
+                if std::mem::take(&mut just_closed) {
+                    local_path.move_to(most_recent_initial);
+                }
+                local_path.quad_to(
+                    Point::new(p1.x as f64, p1.y as f64),
+                    Point::new(p2.x as f64, p2.y as f64),
+                );
+            }
+            usvg::tiny_skia_path::PathSegment::CubicTo(p1, p2, p3) => {
+                if std::mem::take(&mut just_closed) {
+                    local_path.move_to(most_recent_initial);
+                }
+                local_path.curve_to(
+                    Point::new(p1.x as f64, p1.y as f64),
+                    Point::new(p2.x as f64, p2.y as f64),
+                    Point::new(p3.x as f64, p3.y as f64),
+                );
+            }
+            usvg::tiny_skia_path::PathSegment::Close => {
+                just_closed = true;
+                local_path.close_path();
+            }
         }
     }
+
+    local_path
+}
+
+pub fn into_image(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> Image {
+    let (width, height) = (image.width(), image.height());
+    let image_data: Vec<u8> = image.into_vec();
+    Image::new(
+        Blob::new(std::sync::Arc::new(image_data)),
+        vello::peniko::Format::Rgba8,
+        width,
+        height,
+    )
+}
+
+pub fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, Affine)> {
+    match paint {
+        usvg::Paint::Color(color) => Some((
+            Brush::Solid(Color::from_rgba8(
+                color.red,
+                color.green,
+                color.blue,
+                opacity.to_u8(),
+            )),
+            Affine::IDENTITY,
+        )),
+        usvg::Paint::LinearGradient(gr) => {
+            let stops: Vec<vello::peniko::ColorStop> = gr
+                .stops()
+                .iter()
+                .map(|stop| {
+                    let cstop = vello::peniko::ColorStop::from((
+                        stop.offset().get(),
+                        Color::from_rgba8(
+                            stop.color().red,
+                            stop.color().green,
+                            stop.color().blue,
+                            (stop.opacity() * opacity).to_u8(),
+                        ),
+                    ));
+                    cstop
+                })
+                .collect();
+            let start = Point::new(gr.x1() as f64, gr.y1() as f64);
+            let end = Point::new(gr.x2() as f64, gr.y2() as f64);
+            let arr = [
+                gr.transform().sx,
+                gr.transform().ky,
+                gr.transform().kx,
+                gr.transform().sy,
+                gr.transform().tx,
+                gr.transform().ty,
+            ]
+            .map(f64::from);
+            let transform = Affine::new(arr);
+            let gradient =
+                vello::peniko::Gradient::new_linear(start, end).with_stops(stops.as_slice());
+            Some((Brush::Gradient(gradient), transform))
+        }
+        usvg::Paint::RadialGradient(gr) => {
+            let stops: Vec<vello::peniko::ColorStop> = gr
+                .stops()
+                .iter()
+                .map(|stop| {
+                    vello::peniko::ColorStop::from((
+                        stop.offset().get(),
+                        Color::from_rgba8(
+                            stop.color().red,
+                            stop.color().green,
+                            stop.color().blue,
+                            (stop.opacity() * opacity).to_u8(),
+                        ),
+                    ))
+                })
+                .collect();
+
+            let start_center = Point::new(gr.cx() as f64, gr.cy() as f64);
+            let end_center = Point::new(gr.fx() as f64, gr.fy() as f64);
+            let start_radius = 0_f32;
+            let end_radius = gr.r().get();
+            let arr = [
+                gr.transform().sx,
+                gr.transform().ky,
+                gr.transform().kx,
+                gr.transform().sy,
+                gr.transform().tx,
+                gr.transform().ty,
+            ]
+            .map(f64::from);
+            let transform = Affine::new(arr);
+            let gradient = vello::peniko::Gradient::new_two_point_radial(
+                start_center,
+                start_radius,
+                end_center,
+                end_radius,
+            )
+            .with_stops(stops.as_slice());
+            Some((Brush::Gradient(gradient), transform))
+        }
+        usvg::Paint::Pattern(_) => None,
+    }
+}
+
+/// Error handler function for [`super::append_tree_with`] which draws a transparent red box
+/// instead of unsupported SVG features
+pub fn default_error_handler(scene: &mut Scene, node: &usvg::Node) {
+    let bb = node.bounding_box();
+    let rect = Rect {
+        x0: bb.left() as f64,
+        y0: bb.top() as f64,
+        x1: bb.right() as f64,
+        y1: bb.bottom() as f64,
+    };
+    scene.fill(
+        Fill::NonZero,
+        Affine::IDENTITY,
+        Color::from_rgba8(255, 0, 0, 128),
+        None,
+        &rect,
+    );
+}
+
+pub fn decode_raw_raster_image(
+    img: &usvg::ImageKind,
+) -> Result<image::RgbaImage, image::ImageError> {
+    let res = match img {
+        usvg::ImageKind::JPEG(data) => {
+            image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)
+        }
+        usvg::ImageKind::PNG(data) => {
+            image::load_from_memory_with_format(data, image::ImageFormat::Png)
+        }
+        usvg::ImageKind::GIF(data) => {
+            image::load_from_memory_with_format(data, image::ImageFormat::Gif)
+        }
+        usvg::ImageKind::WEBP(data) => {
+            image::load_from_memory_with_format(data, image::ImageFormat::WebP)
+        }
+        usvg::ImageKind::SVG(_) => unreachable!(),
+    }?
+    .into_rgba8();
+    Ok(res)
 }

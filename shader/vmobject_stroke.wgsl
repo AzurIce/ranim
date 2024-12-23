@@ -32,6 +32,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     //     out.position = vec4<f32>(-0.5, -0.5, 0.0, 1.0);
     // }
     out.position = uniforms.matrix * in.pos;
+    out.position.y *= -1.0;
 
     // out.position.x *= uniforms.rescale_factors.x;
     // out.position.y *= uniforms.rescale_factors.y;
