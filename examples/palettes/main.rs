@@ -9,12 +9,14 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info,ranim=trace")).init();
-    let mut world = SceneBuilder::new("palettes").build();
-    let (width, height) = world.size();
-    let canvas = world.insert_new_canvas(width as u32, height as u32);
+    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info")).init();
+
+    let mut scene = SceneBuilder::new("palettes").build();
+    let (width, height) = scene.size();
+    let canvas = scene.insert_new_canvas(width as u32, height as u32);
     {
-        let canvas = world.get_mut(&canvas);
+        let canvas = scene.entities.get_mut(&canvas);
+        scene.camera.center_canvas_in_frame(canvas);
 
         let colors = vec![
             vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],
@@ -52,5 +54,5 @@ fn main() {
         }
     }
     // scene.wait(Duration::from_secs(1));
-    world.render_to_image("./output.png");
+    scene.render_to_image("./output.png");
 }

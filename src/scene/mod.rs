@@ -325,7 +325,9 @@ impl Scene {
         animation: Animation<R>,
     ) {
         let run_time = animation.config.run_time;
-        self.get_mut(canvas_id).get_mut(target_id).insert_updater(animation);
+        self.get_mut(canvas_id)
+            .get_mut(target_id)
+            .insert_updater(animation);
         self.advance(run_time);
     }
 
@@ -433,6 +435,19 @@ pub struct SceneCamera {
 
     uniforms_buffer: WgpuBuffer<CameraUniforms>,
     pub(crate) uniforms_bind_group: CameraUniformsBindGroup,
+}
+
+impl Deref for SceneCamera {
+    type Target = CameraFrame;
+    fn deref(&self) -> &Self::Target {
+        &self.frame
+    }
+}
+
+impl DerefMut for SceneCamera {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.frame
+    }
 }
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -723,7 +738,9 @@ pub struct CameraFrame {
     pub fovy: f32,
     pub size: (usize, usize),
     pub pos: Vec3,
-    pub rotation: Mat4,
+    pub up: Vec3,
+    pub facing: Vec3,
+    // pub rotation: Mat4,
 }
 
 impl CameraFrame {
@@ -732,15 +749,20 @@ impl CameraFrame {
             size: (width, height),
             fovy: std::f32::consts::PI / 2.0,
             pos: Vec3::ZERO,
-            rotation: Mat4::IDENTITY,
+            up: Vec3::Y,
+            facing: Vec3::NEG_Z,
+            // rotation: Mat4::IDENTITY,
         }
     }
 }
 
 impl CameraFrame {
+    pub fn ratio(&self) -> f32 {
+        self.size.0 as f32 / self.size.1 as f32
+    }
     pub fn view_matrix(&self) -> Mat4 {
-        Mat4::look_at_rh(vec3(0.0, 0.0, 540.0), Vec3::NEG_Z, Vec3::Y)
-        // self.rotation.inverse() * Mat4::from_translation(-self.pos)
+        // Mat4::look_at_rh(vec3(0.0, 0.0, 1080.0), Vec3::NEG_Z, Vec3::Y)
+        Mat4::look_at_rh(self.pos, self.pos + self.facing, self.up)
     }
 
     pub fn projection_matrix(&self) -> Mat4 {
@@ -770,11 +792,38 @@ impl CameraFrame {
 }
 
 impl CameraFrame {
-    pub fn set_fovy(&mut self, fovy: f32) {
+    pub fn set_fovy(&mut self, fovy: f32) -> &mut Self {
         self.fovy = fovy;
+        self
     }
 
-    pub fn move_to(&mut self, pos: Vec3) {
+    pub fn move_to(&mut self, pos: Vec3) -> &mut Self {
         self.pos = pos;
+        self
+    }
+
+    pub fn center_canvas_in_frame(&mut self, canvas: &Canvas) -> &mut Self {
+        let center = canvas.center();
+        let canvas_ratio = canvas.height() / canvas.width();
+
+        let height = if self.ratio() > canvas_ratio {
+            canvas.height()
+        } else {
+            canvas.width() / self.ratio()
+        };
+
+        let distance = height * 0.5 / (0.5 * self.fovy).tan();
+
+        self.up = canvas.up_normal();
+        self.pos = center + canvas.unit_normal() * distance;
+        self.facing = -canvas.unit_normal();
+        trace!(
+            "[Camera] centered canvas in frame, pos: {:?}, facing: {:?}, up: {:?}",
+            self.pos,
+            self.facing,
+            self.up
+        );
+
+        self
     }
 }
