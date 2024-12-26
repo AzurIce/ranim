@@ -343,11 +343,11 @@ impl CanvasCamera {
         let mat4 = Mat4::from_scale(Vec3::splat(self.scale))
             * Mat4::from_translation(self.offset.extend(0.0))
             * Mat4::from_scale(vec3(
-                1.0 / self.viewport_width as f32,
-                1.0 / self.viewport_height as f32,
+                1.0 / (0.5 * self.viewport_width as f32),
+                1.0 / (0.5 * self.viewport_height as f32),
                 1.0,
             ));
-        // debug!("[CanvasCamera]: Uniforms: {:?}", mat4);
+        debug!("[CanvasCamera]: Uniforms: {:?}", mat4);
         wgpu_ctx
             .queue
             .write_buffer(&self.uniforms_buffer, 0, bytemuck::cast_slice(&[mat4]));

@@ -1,4 +1,5 @@
 pub mod rabject2d;
+#[deprecated = "Use 2d instead for now"]
 pub mod rabject3d;
 
 pub mod group;

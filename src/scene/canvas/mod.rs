@@ -32,9 +32,27 @@ pub struct Canvas {
     center_point: Vec3,
     up_normal: Vec3,
     unit_normal: Vec3,
-    camera: CanvasCamera,
+    pub camera: CanvasCamera,
     entities: EntityStore<CanvasCamera>,
     vertex_buffer: WgpuBuffer<CanvasVertex>,
+}
+
+impl Canvas {
+    pub fn center(&self) -> Vec3 {
+        self.center_point
+    }
+    pub fn width(&self) -> f32 {
+        self.camera.viewport_width as f32
+    }
+    pub fn height(&self) -> f32 {
+        self.camera.viewport_height as f32
+    }
+    pub fn up_normal(&self) -> Vec3 {
+        self.up_normal
+    }
+    pub fn unit_normal(&self) -> Vec3 {
+        self.unit_normal
+    }
 }
 
 impl Deref for Canvas {

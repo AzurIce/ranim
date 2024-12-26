@@ -1,6 +1,6 @@
 use glam::{vec2, vec3, Vec2, Vec3};
 
-use crate::rabject::{rabject3d::vmobject::VMobject, Blueprint, TransformAnchor};
+use crate::rabject::{rabject3d::{vmobject::VMobject, RabjectEntity3d}, Blueprint, TransformAnchor};
 
 /// A part of a circle
 // #[mobject(SimplePipeline)]
@@ -216,11 +216,11 @@ impl Polygon {
     }
 }
 
-impl Blueprint<VMobject> for Polygon {
-    fn build(self) -> VMobject {
+impl Blueprint<RabjectEntity3d<VMobject>> for Polygon {
+    fn build(self) -> RabjectEntity3d<VMobject> {
         // TODO: Handle 0 len
         if self.corner_points.len() == 0 {
-            return VMobject::from_points(vec![]);
+            return VMobject::from_points(vec![]).into();
         }
 
         let vertices = self
@@ -231,7 +231,7 @@ impl Blueprint<VMobject> for Polygon {
 
         let mut mobject = VMobject::from_corner_points(vertices);
         mobject.set_stroke_width(self.stroke_width);
-        mobject
+        mobject.into()
     }
 }
 
@@ -255,8 +255,8 @@ impl Rect {
     }
 }
 
-impl Blueprint<VMobject> for Rect {
-    fn build(self) -> VMobject {
+impl Blueprint<RabjectEntity3d<VMobject>> for Rect {
+    fn build(self) -> RabjectEntity3d<VMobject> {
         let mobject = Polygon::new(vec![
             vec2(0.0, 0.0),
             vec2(self.width, 0.0),
@@ -265,7 +265,7 @@ impl Blueprint<VMobject> for Rect {
         ])
         .with_stroke_width(self.stroke_width)
         .build();
-        mobject
+        mobject.into()
     }
 }
 
@@ -287,8 +287,8 @@ impl Square {
     }
 }
 
-impl Blueprint<VMobject> for Square {
-    fn build(self) -> VMobject {
+impl Blueprint<RabjectEntity3d<VMobject>> for Square {
+    fn build(self) -> RabjectEntity3d<VMobject> {
         Rect::new(self.side_length, self.side_length)
             .with_stroke_width(self.stroke_width)
             .build()
