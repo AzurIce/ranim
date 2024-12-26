@@ -14,9 +14,10 @@ fn main() {
     let mut scene = SceneBuilder::new("palettes").build();
     let (width, height) = scene.size();
     let canvas = scene.insert_new_canvas(width as u32, height as u32);
+    scene.center_canvas_in_frame(&canvas);
+
     {
-        let canvas = scene.entities.get_mut(&canvas);
-        scene.camera.center_canvas_in_frame(canvas);
+        let canvas = scene.get_mut(&canvas);
 
         let colors = vec![
             vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],

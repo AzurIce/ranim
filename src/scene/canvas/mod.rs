@@ -5,7 +5,6 @@ use std::ops::{Deref, DerefMut};
 
 use camera::CanvasCamera;
 use glam::{vec2, Vec2, Vec3};
-use log::trace;
 use pipeline::CanvasPipeline;
 
 use crate::context::WgpuContext;

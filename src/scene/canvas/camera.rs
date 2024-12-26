@@ -2,7 +2,6 @@ use std::{num::NonZeroUsize, ops::Deref};
 
 use bevy_color::Color;
 use glam::{vec3, Mat4, Vec2, Vec3};
-use log::{debug, trace};
 
 use crate::{
     context::{RanimContext, WgpuContext},
@@ -11,6 +10,9 @@ use crate::{
 };
 
 use super::pipeline::BlendPipeline;
+
+#[allow(unused)]
+use log::{debug, trace};
 
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -358,7 +360,7 @@ impl CanvasCamera {
         self.clear_screen(&ctx.wgpu_ctx);
         // For the entities renders with wgpu, this renders the entities to camera's render_texture
         // For the entities renders with vello, this does nothing
-        for (id, entity) in entities.iter_mut() {
+        for (_id, entity) in entities.iter_mut() {
             // trace!("[CanvasCamera] rendering entity {:?}...", id);
             entity.render(ctx, self);
         }

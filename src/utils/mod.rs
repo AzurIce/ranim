@@ -1,6 +1,6 @@
+pub mod bezier;
 pub mod rate_functions;
 pub mod wgpu;
-pub mod bezier;
 
 use std::{
     any::{Any, TypeId},
@@ -9,7 +9,7 @@ use std::{
 
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
-use crate::{context::WgpuContext, interpolate::Interpolatable, rabject::RenderResource};
+use crate::{context::WgpuContext, rabject::RenderResource};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
@@ -137,57 +137,6 @@ pub fn resize_preserving_order<T: Clone>(vec: &[T], new_len: usize) -> Vec<T> {
 pub fn extend_with_last<T: Clone + Default>(vec: &mut Vec<T>, new_len: usize) {
     let v = vec![vec.last().cloned().unwrap_or_default(); new_len - vec.len()];
     vec.extend(v)
-}
-
-/// Returns the point on a quadratic bezier curve at the given parameter.
-pub fn point_on_quadratic_bezier<T: Interpolatable>(points: &[T; 3], t: f32) -> T {
-    let t = t.clamp(0.0, 1.0);
-    let p1 = points[0].lerp(&points[1], t);
-    let p2 = points[1].lerp(&points[2], t);
-    p1.lerp(&p2, t)
-}
-
-/// Returns the control points of the given part of a quadratic bezier curve.
-pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f32, b: f32) -> [T; 3] {
-    let a = a.clamp(0.0, 1.0);
-    let b = b.clamp(0.0, 1.0);
-
-    let h0 = point_on_quadratic_bezier(points, a);
-    let h2 = point_on_quadratic_bezier(points, b);
-
-    let h1_prime = points[1].lerp(&points[2], a);
-    let end_prop = (b - a) / (1.0 - a);
-    let h1 = h0.lerp(&h1_prime, end_prop);
-    [h0, h1, h2]
-}
-
-pub fn point_on_cubic_bezier<T: Interpolatable>(points: &[T; 4], t: f32) -> T {
-    let t = t.clamp(0.0, 1.0);
-    let p1 = point_on_quadratic_bezier((&points[0..3]).try_into().unwrap(), t);
-    let p2 = point_on_quadratic_bezier((&points[1..4]).try_into().unwrap(), t);
-    p1.lerp(&p2, t)
-}
-
-pub fn partial_cubic_bezier<T: Interpolatable>(points: &[T; 4], a: f32, b: f32) -> [T; 4] {
-    let a = a.clamp(0.0, 1.0);
-    let b = b.clamp(0.0, 1.0);
-
-    // Compute points on the curve at parameters `a` and `b`
-    let p0 = point_on_cubic_bezier(points, a);
-    let p3 = point_on_cubic_bezier(points, b);
-
-    // Compute intermediate control points
-    let p1_prime = points[0].lerp(&points[1], a);
-    let p2_prime = points[1].lerp(&points[2], a);
-    let p3_prime = points[2].lerp(&points[3], a);
-
-    let p1_double_prime = p1_prime.lerp(&p2_prime, a);
-    let p2_double_prime = p2_prime.lerp(&p3_prime, a);
-
-    let q1 = p0.lerp(&p1_double_prime, (b - a) / (1.0 - a));
-    let q2 = p1_double_prime.lerp(&p2_double_prime, (b - a) / (1.0 - a));
-
-    [p0, q1, q2, p3]
 }
 
 pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8> {

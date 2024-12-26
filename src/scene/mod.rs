@@ -20,7 +20,7 @@ use crate::{
     rabject::{rabject2d::RabjectEntity2d, rabject3d::RabjectEntity3d, Rabject},
 };
 use bevy_color::Color;
-use glam::{vec3, Mat4, Vec3};
+use glam::{Mat4, Vec3};
 use wgpu::RenderPassDescriptor;
 
 use crate::{
@@ -287,6 +287,18 @@ impl Scene {
 
     pub fn tick_duration(&self) -> Duration {
         Duration::from_secs_f32(1.0 / self.camera.fps as f32)
+    }
+
+    /// Center the canvas in the frame
+    /// 
+    /// It is equal to:
+    /// ```rust
+    ///    let canvas = self.entities.get(canvas_id);
+    ///    self.camera.center_canvas_in_frame(canvas);
+    /// ```
+    pub fn center_canvas_in_frame(&mut self, canvas_id: &EntityId<Canvas>) {
+        let canvas = self.entities.get(canvas_id);
+        self.camera.center_canvas_in_frame(canvas);
     }
 
     /// Play an animation

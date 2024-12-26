@@ -16,6 +16,7 @@ fn main() {
 
     let mut scene = SceneBuilder::new("arc").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
+    scene.center_canvas_in_frame(&canvas);
     let t = Instant::now();
 
     let start_color = Srgba::hex("FF8080FF").unwrap();

@@ -15,7 +15,7 @@ use crate::{
     interpolate::Interpolatable,
     prelude::{Alignable, Opacity},
     rabject::TransformAnchor,
-    utils::{partial_quadratic_bezier, rotation_between_vectors},
+    utils::{bezier::partial_quadratic_bezier, rotation_between_vectors},
 };
 
 use super::Rabject;

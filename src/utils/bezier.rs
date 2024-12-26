@@ -1,5 +1,4 @@
 use glam::Vec3;
-use log::trace;
 
 use crate::prelude::Interpolatable;
 
@@ -29,12 +28,34 @@ pub fn split_cubic_bezier(bezier: &[Vec3; 4], t: f32) -> ([Vec3; 4], [Vec3; 4]) 
 }
 
 pub fn trim_cubic_bezier(bezier: &[Vec3; 4], a: f32, b: f32) -> [Vec3; 4] {
-    trace!("trim_cubic_bezier: {:?}, {:?}, {:?}", bezier, a, b);
+    // trace!("trim_cubic_bezier: {:?}, {:?}, {:?}", bezier, a, b);
     let (a, b) = if a > b { (b, a) } else { (a, b) };
     let end_on_b = split_cubic_bezier(bezier, b).0;
-    trace!("end_on_b: {:?}", end_on_b);
+    // trace!("end_on_b: {:?}", end_on_b);
     let a = a / b;
     let result = split_cubic_bezier(&end_on_b, a).1;
-    trace!("result: {:?}", result);
+    // trace!("result: {:?}", result);
     result
+}
+
+/// Returns the point on a quadratic bezier curve at the given parameter.
+pub fn point_on_quadratic_bezier<T: Interpolatable>(points: &[T; 3], t: f32) -> T {
+    let t = t.clamp(0.0, 1.0);
+    let p1 = points[0].lerp(&points[1], t);
+    let p2 = points[1].lerp(&points[2], t);
+    p1.lerp(&p2, t)
+}
+
+/// Returns the control points of the given part of a quadratic bezier curve.
+pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f32, b: f32) -> [T; 3] {
+    let a = a.clamp(0.0, 1.0);
+    let b = b.clamp(0.0, 1.0);
+
+    let h0 = point_on_quadratic_bezier(points, a);
+    let h2 = point_on_quadratic_bezier(points, b);
+
+    let h1_prime = points[1].lerp(&points[2], a);
+    let end_prop = (b - a) / (1.0 - a);
+    let h1 = h0.lerp(&h1_prime, end_prop);
+    [h0, h1, h2]
 }

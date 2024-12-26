@@ -7,8 +7,6 @@ pub mod blueprint;
 
 use std::ops::{Deref, DerefMut};
 
-use log::trace;
-
 use crate::scene::canvas::camera::CanvasCamera;
 use crate::{context::RanimContext, scene::Entity, updater::Updater, utils::Id};
 
