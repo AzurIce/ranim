@@ -1,6 +1,6 @@
 # Ranim
 
-https://github.com/user-attachments/assets/7a4847f4-8d76-4a65-8f50-59d94fc868c3
+https://github.com/user-attachments/assets/49971627-dbc1-4edf-85b6-24e4734b81a8
 
 > [basic.mp4](./assets/basic.mp4)
 
