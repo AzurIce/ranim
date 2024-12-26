@@ -16,11 +16,13 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace"))
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info"))
         .init();
 
     let mut scene = SceneBuilder::new("basic").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
+    scene.center_canvas_in_frame(&canvas);
+
     let t = Instant::now();
     info!("running...");
 
@@ -50,6 +52,7 @@ fn main() {
         .with_stroke_width(20.0)
         .build();
     arc.set_color(Srgba::hex("58C4DDFF").unwrap());
+
     info!("polygon transform to arc");
     scene.play_in_canvas(&canvas, &polygon, Transform::new(arc.clone()));
     scene.wait(Duration::from_secs_f32(0.5));
@@ -59,9 +62,6 @@ fn main() {
 
     info!("arc fade_out");
     scene.play_in_canvas(&canvas, &arc, Fading::fade_out());
-
-    // let arc = scene.play(Transform::new(polygon, arc)).unwrap();
-    // scene.play(Fading::fade_out(arc));
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

@@ -33,7 +33,7 @@ impl Arc {
 
 impl Blueprint<RabjectEntity2d<VPath>> for Arc {
     fn build(self) -> RabjectEntity2d<VPath> {
-        const NUM_SEGMENTS: usize = 8;
+        const NUM_SEGMENTS: usize = 16;
         let len = 2 * NUM_SEGMENTS + 1;
 
         let mut points = (0..len)

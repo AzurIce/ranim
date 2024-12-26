@@ -19,6 +19,7 @@ fn main() {
 
     let mut scene = SceneBuilder::new("arc_between_points").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
+    scene.center_canvas_in_frame(&canvas);
 
     let start_color = Srgba::hex("FF8080FF").unwrap();
     let end_color = Srgba::hex("58C4DDFF").unwrap();

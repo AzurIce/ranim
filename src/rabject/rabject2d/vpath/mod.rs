@@ -10,7 +10,6 @@ use primitive::{ExtractedVPath, VPathPrimitive};
 
 use crate::prelude::{Alignable, Opacity};
 use crate::utils::bezier::trim_cubic_bezier;
-use crate::utils::partial_cubic_bezier;
 use crate::{prelude::Interpolatable, utils::rotation_between_vectors};
 
 use crate::rabject::{Rabject, TransformAnchor};
