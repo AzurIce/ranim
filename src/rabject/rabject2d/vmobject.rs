@@ -1,43 +1,42 @@
+use log::trace;
 use vello::kurbo;
 
-use crate::scene::{canvas::camera::CanvasCamera, Entity};
+use crate::{
+    prelude::{Alignable, Interpolatable},
+    scene::{canvas::camera::CanvasCamera, Entity},
+};
 
 use super::bez_path::BezPath;
 
-#[derive(Clone)]
-pub enum VMobject {
-    Group(Vec<VMobject>),
-    Path(BezPath),
+#[derive(Clone, Debug)]
+pub struct VMobject {
+    subpaths: Vec<BezPath>,
 }
 
+// impl Default for VMobject {
+//     fn default() -> Self {
+//         VMobject::Path(BezPath::default())
+//     }
+// }
+
 impl VMobject {
+    pub fn empty() -> Self {
+        VMobject { subpaths: vec![] }
+    }
+    pub fn new(subpaths: Vec<BezPath>) -> Self {
+        Self { subpaths }
+    }
     pub fn apply_affine(&mut self, affine: kurbo::Affine) {
-        match self {
-            VMobject::Group(children) => {
-                for child in children {
-                    child.apply_affine(affine);
-                }
-            }
-            VMobject::Path(path) => path.apply_affine(affine),
+        for path in self.subpaths.iter_mut() {
+            path.apply_affine(affine);
         }
     }
-    
-    pub fn print_tree(&self, indent: usize) {
-        let indent_str = (0..indent).map(|_| "  ").collect::<String>();
-        match self {
-            VMobject::Group(children) => {
-                println!("{}Group(", indent_str);
-                for child in children {
-                    child.print_tree(indent + 1);
-                }
-                println!("{})", indent_str);
-            }
-            VMobject::Path(path) => {
-                println!("{}Path({:?})", indent_str, path);
-            }
-        }
+    pub fn push(&mut self, path: BezPath) {
+        self.subpaths.push(path);
     }
-    
+    pub fn extend(&mut self, paths: Vec<BezPath>) {
+        self.subpaths.extend(paths);
+    }
 }
 
 impl Entity for VMobject {
@@ -46,13 +45,49 @@ impl Entity for VMobject {
     fn extract(&mut self) {}
     fn prepare(&mut self, _ctx: &crate::context::RanimContext) {}
     fn render(&mut self, _ctx: &mut crate::context::RanimContext, renderer: &mut Self::Renderer) {
-        match self {
-            VMobject::Group(children) => {
-                for child in children {
-                    child.render(_ctx, renderer);
-                }
-            }
-            VMobject::Path(node) => node.render(_ctx, renderer),
+        for path in self.subpaths.iter_mut() {
+            path.render(_ctx, renderer);
         }
+    }
+}
+
+impl Alignable for VMobject {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.subpaths.len() == other.subpaths.len()
+            && self
+                .subpaths
+                .iter()
+                .zip(other.subpaths.iter())
+                .all(|(a, b)| a.is_aligned(b))
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        let len = self.subpaths.len().max(other.subpaths.len());
+        if self.subpaths.len() < len {
+            self.subpaths
+                .resize(len, self.subpaths.last().cloned().unwrap());
+        } else {
+            other
+                .subpaths
+                .resize(len, other.subpaths.last().cloned().unwrap());
+        }
+        println!("self: {}", self.subpaths.len());
+        println!("other: {}", other.subpaths.len());
+
+        self.subpaths
+            .iter_mut()
+            .zip(other.subpaths.iter_mut())
+            .for_each(|(a, b)| a.align_with(b));
+    }
+}
+
+impl Interpolatable for VMobject {
+    fn lerp(&self, target: &Self, t: f32) -> Self {
+        let subpaths = self
+            .subpaths
+            .iter()
+            .zip(target.subpaths.iter())
+            .map(|(a, b)| a.lerp(b, t))
+            .collect();
+        VMobject { subpaths }
     }
 }

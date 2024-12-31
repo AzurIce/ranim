@@ -11,7 +11,7 @@ use crate::context::WgpuContext;
 use crate::rabject::Vertex;
 use crate::scene::entity::Entity;
 
-use crate::scene::store::EntityStore;
+use crate::scene::store::EntitiesStore;
 use crate::utils::wgpu::WgpuBuffer;
 
 use crate::scene::SceneCamera;
@@ -32,7 +32,7 @@ pub struct Canvas {
     up_normal: Vec3,
     unit_normal: Vec3,
     pub camera: CanvasCamera,
-    entities: EntityStore<CanvasCamera>,
+    entities: EntitiesStore<CanvasCamera>,
     vertex_buffer: WgpuBuffer<CanvasVertex>,
 }
 
@@ -55,7 +55,7 @@ impl Canvas {
 }
 
 impl Deref for Canvas {
-    type Target = EntityStore<CanvasCamera>;
+    type Target = EntitiesStore<CanvasCamera>;
     fn deref(&self) -> &Self::Target {
         &self.entities
     }

@@ -30,7 +30,7 @@ use crate::{
 #[allow(unused)]
 use log::{debug, error, info, trace};
 
-use canvas::Canvas;
+use canvas::{camera::CanvasCamera, Canvas};
 use file_writer::{FileWriter, FileWriterBuilder};
 use image::{ImageBuffer, Rgba};
 
@@ -126,7 +126,7 @@ pub struct Scene {
     pub name: String,
     pub camera: SceneCamera,
     /// Entities in the scene
-    pub entities: EntityStore<SceneCamera>,
+    pub entities: EntitiesStore<SceneCamera>,
     pub time: f32,
     pub frame_count: usize,
 
@@ -139,7 +139,7 @@ pub struct Scene {
 }
 
 impl Deref for Scene {
-    type Target = EntityStore<SceneCamera>;
+    type Target = EntitiesStore<SceneCamera>;
     fn deref(&self) -> &Self::Target {
         &self.entities
     }
@@ -205,7 +205,7 @@ impl Default for Scene {
             name: "scene".to_string(),
 
             camera: SceneCamera::new(&ctx, 1920, 1080, 60),
-            entities: EntityStore::default(),
+            entities: EntitiesStore::default(),
             time: 0.0,
             frame_count: 0,
             video_writer: None,
@@ -311,30 +311,30 @@ impl Scene {
     /// ```
     ///
     /// See [`Animation`] and [`Updater`].
-    pub fn play<R: Rabject + 'static>(
+    pub fn play<E: Entity<Renderer = SceneCamera> + 'static>(
         &mut self,
-        target_id: &EntityId<RabjectEntity3d<R>>,
-        animation: Animation<R>,
+        target_id: &EntityId<E>,
+        animation: Animation<E>,
     ) {
         let run_time = animation.config.run_time;
         self.get_mut(target_id).insert_updater(animation);
         self.advance(run_time);
     }
 
-    pub fn play_remove<R: Rabject + 'static>(
+    pub fn play_remove<E: Entity<Renderer = SceneCamera> + 'static>(
         &mut self,
-        target_id: EntityId<RabjectEntity3d<R>>,
-        animation: Animation<R>,
+        target_id: EntityId<E>,
+        animation: Animation<E>,
     ) {
         self.play(&target_id, animation);
         self.remove(target_id);
     }
 
-    pub fn play_in_canvas<R: Rabject + 'static>(
+    pub fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
         &mut self,
         canvas_id: &EntityId<Canvas>,
-        target_id: &EntityId<RabjectEntity2d<R>>,
-        animation: Animation<R>,
+        target_id: &EntityId<E>,
+        animation: Animation<E>,
     ) {
         let run_time = animation.config.run_time;
         self.get_mut(canvas_id)
@@ -343,11 +343,11 @@ impl Scene {
         self.advance(run_time);
     }
 
-    pub fn play_remove_in_canvas<R: Rabject + 'static>(
+    pub fn play_remove_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
         &mut self,
         canvas_id: &EntityId<Canvas>,
-        target_id: EntityId<RabjectEntity2d<R>>,
-        animation: Animation<R>,
+        target_id: EntityId<E>,
+        animation: Animation<E>,
     ) {
         self.play_in_canvas(canvas_id, &target_id, animation);
         self.get_mut(canvas_id).remove(target_id);
@@ -634,7 +634,7 @@ impl SceneCamera {
         );
     }
 
-    pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut EntityStore<Self>) {
+    pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut EntitiesStore<Self>) {
         self.update_uniforms(&ctx.wgpu_ctx);
         self.clear_screen(&ctx.wgpu_ctx);
         for (id, entity) in entities.iter_mut() {

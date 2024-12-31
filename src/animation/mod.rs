@@ -3,7 +3,7 @@ pub mod transform;
 
 use std::time;
 
-use crate::{rabject::Rabject, updater::Updater, utils::rate_functions::smooth};
+use crate::{updater::Updater, utils::rate_functions::smooth};
 
 #[allow(unused)]
 use log::trace;
@@ -66,44 +66,44 @@ impl AnimationConfig {
 /// and the [`Animation`] is actually just an [`Updater`].
 ///
 /// See [`Animation`], [`Updater`]
-pub trait AnimationFunc<R: Rabject> {
+pub trait AnimationFunc<T> {
     #[allow(unused)]
-    fn pre_anim(&mut self, rabject: &mut R) {}
+    fn pre_anim(&mut self, rabject: &mut T) {}
 
-    fn interpolate(&mut self, rabject: &mut R, alpha: f32);
+    fn interpolate(&mut self, rabject: &mut T, alpha: f32);
 
     #[allow(unused)]
-    fn post_anim(&mut self, rabject: &mut R) {}
+    fn post_anim(&mut self, rabject: &mut T) {}
 }
 
 /// A [`Updater`] wraps an [`AnimationFunc`]
 ///
 /// See [`AnimationFunc`]
-pub struct Animation<R: Rabject> {
+pub struct Animation<T> {
     acc_t: f32,
 
-    pub func: Box<dyn AnimationFunc<R>>,
+    pub func: Box<dyn AnimationFunc<T>>,
     pub(crate) config: AnimationConfig,
 }
 
-impl<R: Rabject> Updater<R> for Animation<R> {
-    fn on_create(&mut self, rabject: &mut R) {
+impl<T> Updater<T> for Animation<T> {
+    fn on_create(&mut self, rabject: &mut T) {
         self.func.pre_anim(rabject);
     }
-    fn on_update(&mut self, rabject: &mut R, dt: f32) -> bool {
+    fn on_update(&mut self, rabject: &mut T, dt: f32) -> bool {
         self.acc_t += dt;
         let alpha = self.acc_t / self.config.run_time.as_secs_f32();
         let alpha = (self.config.rate_func)(alpha);
         self.func.interpolate(rabject, alpha);
         self.acc_t <= self.config.run_time.as_secs_f32()
     }
-    fn on_destroy(&mut self, rabject: &mut R) {
+    fn on_destroy(&mut self, rabject: &mut T) {
         self.func.post_anim(rabject);
     }
 }
 
-impl<R: Rabject> Animation<R> {
-    pub fn new(func: impl AnimationFunc<R> + 'static) -> Self {
+impl<T> Animation<T> {
+    pub fn new(func: impl AnimationFunc<T> + 'static) -> Self {
         Self {
             func: Box::new(func),
             config: Default::default(),

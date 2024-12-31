@@ -7,13 +7,13 @@ pub enum FadingType {
     In,
 }
 
-pub struct Fading<R: Rabject + Opacity + Interpolatable + Clone> {
+pub struct Fading<R: Opacity + Interpolatable + Clone> {
     pub(crate) src: Option<R>,
     pub(crate) dst: Option<R>,
     pub(crate) fading_type: FadingType,
 }
 
-impl<R: Rabject + Opacity + Interpolatable + Clone + 'static> Fading<R> {
+impl<R: Opacity + Interpolatable + Clone + 'static> Fading<R> {
     pub fn fade_in() -> Animation<R> {
         Animation::new(Self {
             src: None,
@@ -35,7 +35,7 @@ pub trait Opacity {
     fn set_opacity(&mut self, opacity: f32);
 }
 
-impl<R: Rabject + Opacity + Interpolatable + Clone> AnimationFunc<R> for Fading<R> {
+impl<R: Opacity + Interpolatable + Clone> AnimationFunc<R> for Fading<R> {
     fn pre_anim(&mut self, rabject: &mut R) {
         self.src = Some(rabject.clone());
         self.dst = Some(rabject.clone());

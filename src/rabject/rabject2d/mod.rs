@@ -111,3 +111,20 @@ impl<R: Rabject + 'static> Entity for RabjectEntity2d<R> {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use crate::{prelude::Alignable, rabject::{rabject2d::vmobject::VMobject, Blueprint}};
+
+    use super::{bez_path::BezPath, blueprint::Arc};
+
+    #[test]
+    fn test_align_svg() {
+        let mut svg: VMobject = super::svg::Svg::from_path("assets/Ghostscript_Tiger.svg").into();
+        let mut arc: VMobject = BezPath::arc(2.0 * std::f32::consts::PI, 10.0).build().into();
+        assert!(!svg.is_aligned(&arc));
+        svg.align_with(&mut arc);
+        assert!(svg.is_aligned(&arc));
+    }
+}

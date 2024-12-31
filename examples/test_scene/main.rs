@@ -1,10 +1,21 @@
+use std::time::Duration;
+
 use env_logger::Env;
 use glam::{vec3, Vec3};
 use ranim::{
-    color::palettes, prelude::*, rabject::rabject2d::{
-        bez_path::BezPath, blueprint::{Rect, Square}, svg::Svg, vpath::{blueprint::VPathBuilder, VPath}
-    }, scene::SceneBuilder
+    animation::transform::Transform,
+    color::palettes,
+    prelude::*,
+    rabject::rabject2d::{
+        bez_path::BezPath,
+        blueprint::{Rect, Square},
+        svg::Svg,
+        vmobject::VMobject,
+        vpath::{blueprint::VPathBuilder, VPath},
+    },
+    scene::SceneBuilder,
 };
+use vello::kurbo::Affine;
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -16,7 +27,7 @@ fn main() {
     let mut scene = SceneBuilder::new("test_scene").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
     scene.center_canvas_in_frame(&canvas);
-    {
+    let (svg, arc) = {
         let canvas = scene.get_mut(&canvas);
         // let quad = VPathBuilder::start(Vec3::ZERO)
         //     .quad_to(vec3(100.0, 100.0, 0.0), vec3(200.0, 0.0, 0.0))
@@ -31,17 +42,21 @@ fn main() {
         // let square = canvas.insert(square);
 
         // let svg = Svg::from_path("assets/Ghostscript_Tiger.svg");
-        let svg = Svg::from_path("assets/text.svg");
+        let mut svg: VMobject = Svg::from_path("assets/text.svg").into();
         let svg = canvas.insert(svg);
 
         // let arc = BezPath::arc(std::f32::consts::PI * 2.0, 100.0);
         // let arc = canvas.insert(arc);
 
-        let arc = BezPath::arc(std::f32::consts::PI, 100.0).build();
-        let arc = canvas.insert(arc);
-    }
+        let mut arc: VMobject = BezPath::arc(std::f32::consts::PI, 100.0).build().into();
+        arc.apply_affine(Affine::translate((960.0, 540.0)));
+        (svg, arc)
+    };
 
-    scene.render_to_image("test_scene.png");
+    scene.wait(Duration::from_secs_f32(0.5));
+    scene.play_in_canvas(&canvas, &svg, Transform::new(arc));
+    scene.wait(Duration::from_secs_f32(0.5));
+    // scene.render_to_image("test_scene.png");
     // {
     //     let canvas = scene.get(&canvas);
     //     let data = get_texture_data(&scene.ctx.wgpu_ctx, &canvas.camera.render_texture);
