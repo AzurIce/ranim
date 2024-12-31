@@ -2,9 +2,7 @@ use env_logger::Env;
 use glam::{vec3, Vec3};
 use ranim::{
     color::palettes, prelude::*, rabject::rabject2d::{
-        blueprint::{Rect, Square},
-        svg::Svg,
-        vpath::{blueprint::VPathBuilder, VPath},
+        bez_path::BezPath, blueprint::{Rect, Square}, svg::Svg, vpath::{blueprint::VPathBuilder, VPath}
     }, scene::SceneBuilder
 };
 
@@ -17,22 +15,30 @@ fn main() {
 
     let mut scene = SceneBuilder::new("test_scene").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
+    scene.center_canvas_in_frame(&canvas);
     {
         let canvas = scene.get_mut(&canvas);
-        let quad = VPathBuilder::start(Vec3::ZERO)
-            .quad_to(vec3(100.0, 100.0, 0.0), vec3(200.0, 0.0, 0.0))
-            .build();
-        let quad = canvas.insert(quad);
+        // let quad = VPathBuilder::start(Vec3::ZERO)
+        //     .quad_to(vec3(100.0, 100.0, 0.0), vec3(200.0, 0.0, 0.0))
+        //     .build();
+        // let quad = canvas.insert(quad);
 
-        let mut square = Rect::new(100.0, 100.0).build();
-        square
-            .shift(vec3(100.0, 100.0, 0.0))
-            .set_color(palettes::manim::BLUE_C)
-            .set_stroke_width(0.0);
-        let square = canvas.insert(square);
+        // let mut square = Rect::new(100.0, 100.0).build();
+        // square
+        //     .shift(vec3(100.0, 100.0, 0.0))
+        //     .set_color(palettes::manim::BLUE_C)
+        //     .set_stroke_width(0.0);
+        // let square = canvas.insert(square);
 
-        let svg = Svg::from_path("assets/Ghostscript_Tiger.svg");
+        // let svg = Svg::from_path("assets/Ghostscript_Tiger.svg");
+        let svg = Svg::from_path("assets/text.svg");
         let svg = canvas.insert(svg);
+
+        // let arc = BezPath::arc(std::f32::consts::PI * 2.0, 100.0);
+        // let arc = canvas.insert(arc);
+
+        let arc = BezPath::arc(std::f32::consts::PI, 100.0).build();
+        let arc = canvas.insert(arc);
     }
 
     scene.render_to_image("test_scene.png");
