@@ -1,23 +1,86 @@
 use std::{
+    any::Any,
     collections::HashMap,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
-use crate::utils::Id;
+use crate::{updater::Updater, utils::Id};
 
 #[allow(unused_imports)]
 use log::debug;
 
-use super::{EntityAny, EntityId};
+use super::{Entity, EntityAny, EntityId};
+
+pub struct EntityStore<E: EntityAny> {
+    inner: E,
+    pub(crate) updaters: Vec<(Id, Box<dyn Updater<E>>)>,
+}
+
+impl<E: EntityAny> Deref for EntityStore<E> {
+    type Target = E;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<E: EntityAny> DerefMut for EntityStore<E> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<E: EntityAny> EntityStore<E> {
+    pub fn new(entity: E) -> Self {
+        Self {
+            inner: entity,
+            updaters: Vec::new(),
+        }
+    }
+    pub fn insert_updater(&mut self, mut updater: impl Updater<E> + 'static) -> Id {
+        let id = Id::new();
+        updater.on_create(self);
+        self.updaters.push((id, Box::new(updater)));
+        id
+    }
+    pub fn remove_updater(&mut self, id: Id) {
+        self.updaters.retain(|(eid, _)| *eid != id);
+    }
+}
+
+impl<T: EntityAny> Entity for EntityStore<T> {
+    type Renderer = T::Renderer;
+
+    fn tick(&mut self, dt: f32) {
+        self.inner.tick(dt);
+        let entity = &mut self.inner;
+        self.updaters.retain_mut(|(_, updater)| {
+            let keep = updater.on_update(entity, dt);
+            if !keep {
+                updater.on_destroy(entity);
+            }
+            keep
+        });
+    }
+    fn extract(&mut self) {
+        self.inner.extract();
+    }
+    fn prepare(&mut self, ctx: &crate::context::RanimContext) {
+        self.inner.prepare(ctx);
+    }
+    fn render(&mut self, ctx: &mut crate::context::RanimContext, renderer: &mut Self::Renderer) {
+        self.inner.render(ctx, renderer);
+    }
+}
 
 /// A store of entities
 ///
-/// Entity's type id -> Vec<(Entity's id, Entity)>
-pub struct EntityStore<R> {
+/// Entity's type id -> Vec<(Entity's id, EntityStore(Entity))>
+pub struct EntitiesStore<R> {
     inner: HashMap<Id, Box<dyn EntityAny<Renderer = R>>>,
 }
 
-impl<Renderer> Default for EntityStore<Renderer> {
+impl<Renderer> Default for EntitiesStore<Renderer> {
     fn default() -> Self {
         Self {
             inner: HashMap::new(),
@@ -25,21 +88,21 @@ impl<Renderer> Default for EntityStore<Renderer> {
     }
 }
 
-impl<R> Deref for EntityStore<R> {
+impl<R> Deref for EntitiesStore<R> {
     type Target = HashMap<Id, Box<dyn EntityAny<Renderer = R>>>;
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl<R> DerefMut for EntityStore<R> {
+impl<R> DerefMut for EntitiesStore<R> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
 // Entity management
-impl<R: 'static> EntityStore<R> {
+impl<R: 'static> EntitiesStore<R> {
     pub fn insert<E: EntityAny<Renderer = R>>(&mut self, entity: E) -> EntityId<E> {
         let id = Id::new();
         debug!(
@@ -47,7 +110,7 @@ impl<R: 'static> EntityStore<R> {
             id,
             std::any::TypeId::of::<E>()
         );
-        self.inner.insert(id, Box::new(entity));
+        self.inner.insert(id, Box::new(EntityStore::new(entity)));
         debug!("[RabjectStores::insert]: inserted entity {:?}", id);
         EntityId::from_id(id)
     }
@@ -57,7 +120,7 @@ impl<R: 'static> EntityStore<R> {
         self.inner.remove(&id);
     }
 
-    pub fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> &E {
+    pub fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> &EntityStore<E> {
         debug!(
             "[RabjectStores::get]: getting entity {:?} of type {:?}",
             id,
@@ -68,11 +131,11 @@ impl<R: 'static> EntityStore<R> {
         // must be there and we can safely unwrap it.
         self.inner
             .get(&id)
-            .and_then(|e| e.as_any().downcast_ref::<E>())
+            .and_then(|e| e.as_any().downcast_ref::<EntityStore<E>>())
             .unwrap()
     }
 
-    pub fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> &mut E {
+    pub fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> &mut EntityStore<E> {
         debug!(
             "[RabjectStores::get_mut]: getting entity {:?} of type {:?}",
             id,
@@ -83,7 +146,7 @@ impl<R: 'static> EntityStore<R> {
         // must be there and we can safely unwrap it.
         self.inner
             .get_mut(&id)
-            .and_then(|e| e.as_any_mut().downcast_mut::<E>())
+            .and_then(|e| e.as_any_mut().downcast_mut::<EntityStore<E>>())
             .unwrap()
     }
 }

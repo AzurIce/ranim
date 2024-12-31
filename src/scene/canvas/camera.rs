@@ -5,7 +5,7 @@ use glam::{vec3, Mat4, Vec2, Vec3};
 
 use crate::{
     context::{RanimContext, WgpuContext},
-    scene::store::EntityStore,
+    scene::store::EntitiesStore,
     utils::wgpu::WgpuBuffer,
 };
 
@@ -355,9 +355,10 @@ impl CanvasCamera {
             .write_buffer(&self.uniforms_buffer, 0, bytemuck::cast_slice(&[mat4]));
     }
 
-    pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut EntityStore<Self>) {
+    pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut EntitiesStore<Self>) {
         self.update_uniforms(&ctx.wgpu_ctx);
         self.clear_screen(&ctx.wgpu_ctx);
+        self.vello_scene.reset();
         // For the entities renders with wgpu, this renders the entities to camera's render_texture
         // For the entities renders with vello, this does nothing
         for (_id, entity) in entities.iter_mut() {

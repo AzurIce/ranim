@@ -1,9 +1,11 @@
+use log::trace;
+
 use crate::{interpolate::Interpolatable, rabject::{Rabject, Updatable}};
 
 use super::{Animation, AnimationFunc};
 
 /// A transform animation func
-pub struct Transform<R: Rabject + Alignable + Interpolatable> {
+pub struct Transform<R: Alignable + Interpolatable> {
     aligned_source: Option<R>,
     aligned_target: R,
 }
@@ -19,9 +21,9 @@ pub trait Alignable {
     fn align_with(&mut self, other: &mut Self);
 }
 
-impl<R: Rabject + Alignable + Interpolatable + Clone + 'static> Transform<R> {
+impl<R: Alignable + Interpolatable + Clone + 'static> Transform<R> {
     pub fn new(target: R) -> Animation<R> {
-        let aligned_target = target.clone();
+        let aligned_target = target.into();
 
         Animation::new(Self {
             aligned_source: None,
@@ -30,27 +32,28 @@ impl<R: Rabject + Alignable + Interpolatable + Clone + 'static> Transform<R> {
     }
 }
 
-impl<R: Rabject + Alignable + Interpolatable + Clone> AnimationFunc<R> for Transform<R> {
-    fn pre_anim(&mut self, rabject: &mut R) {
-        let mut aligned_source = rabject.clone();
+impl<T: Alignable + Interpolatable + Clone> AnimationFunc<T> for Transform<T> {
+    fn pre_anim(&mut self, entity: &mut T) {
+        trace!("transform pre_anim");
+        let mut aligned_source = entity.clone();
         if !aligned_source.is_aligned(&self.aligned_target) {
             aligned_source.align_with(&mut self.aligned_target);
         }
         self.aligned_source = Some(aligned_source);
 
-        rabject.update_from(self.aligned_source.as_ref().unwrap());
+        entity.update_from(self.aligned_source.as_ref().unwrap());
     }
 
-    fn interpolate(&mut self, rabject: &mut R, alpha: f32) {
+    fn interpolate(&mut self, entity: &mut T, alpha: f32) {
         let interpolated = self
             .aligned_source
             .as_ref()
             .unwrap()
             .lerp(&self.aligned_target, alpha);
-        rabject.update_from(&interpolated);
+        entity.update_from(&interpolated);
     }
 
-    fn post_anim(&mut self, rabject: &mut R) {
+    fn post_anim(&mut self, rabject: &mut T) {
         rabject.update_from(&self.aligned_target);
     }
 }
