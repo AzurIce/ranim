@@ -4,6 +4,8 @@ pub mod svg;
 pub mod vpath;
 /// blueprints
 pub mod blueprint;
+pub mod bez_path;
+pub mod vmobject;
 
 use std::ops::{Deref, DerefMut};
 

@@ -1,14 +1,102 @@
 use std::fs;
 
+use itertools::Itertools;
+use log::trace;
 use usvg::{Options, Tree};
+use vello::kurbo;
 
+use crate::rabject::rabject2d::bez_path::{FillOptions, StrokeOptions};
 use crate::scene::{canvas::camera::CanvasCamera, Entity};
 use crate::utils;
 
+use super::bez_path::BezPath;
+use super::vmobject::VMobject;
+
 #[derive(Clone)]
 pub struct Svg {
-    tree: usvg::Tree,
-    scene: vello::Scene,
+    inner: VMobject,
+    // tree: usvg::Tree,
+    // scene: vello::Scene,
+}
+
+impl TryFrom<&usvg::Path> for BezPath {
+    type Error = anyhow::Error;
+    fn try_from(path: &usvg::Path) -> Result<Self, Self::Error> {
+        if !path.is_visible() {
+            anyhow::bail!("path is not visible");
+        }
+        let inner = utils::to_bez_path(path);
+
+        let stroke = path.stroke().and_then(|s| {
+            utils::to_brush(s.paint(), s.opacity()).map(|(brush, transform)| StrokeOptions {
+                style: utils::to_stroke(s),
+                brush,
+                transform: Some(transform),
+            })
+        });
+
+        let fill = path.fill().and_then(|f| {
+            utils::to_brush(f.paint(), f.opacity()).map(|(brush, transform)| FillOptions {
+                style: match f.rule() {
+                    usvg::FillRule::NonZero => vello::peniko::Fill::NonZero,
+                    usvg::FillRule::EvenOdd => vello::peniko::Fill::EvenOdd,
+                },
+                brush,
+                transform: Some(transform),
+            })
+        });
+
+        Ok(BezPath {
+            inner,
+            stroke,
+            fill,
+        })
+    }
+}
+
+impl TryFrom<&usvg::Path> for VMobject {
+    type Error = anyhow::Error;
+    fn try_from(value: &usvg::Path) -> Result<Self, Self::Error> {
+        BezPath::try_from(value).map(VMobject::Path)
+    }
+}
+
+impl From<&usvg::Group> for VMobject {
+    fn from(group: &usvg::Group) -> Self {
+        VMobject::Group(
+            group
+                .children()
+                .iter()
+                .filter_map(|node| VMobject::try_from(node).ok())
+                .collect::<Vec<VMobject>>(),
+        )
+    }
+}
+
+impl TryFrom<&usvg::Node> for VMobject {
+    type Error = anyhow::Error;
+    fn try_from(node: &usvg::Node) -> Result<Self, Self::Error> {
+        // trace!(
+        //     "try from node: {}, transform: {:#?}",
+        //     node.id(),
+        //     node.abs_transform()
+        // );
+        let vmobject = match node {
+            usvg::Node::Path(path) => {
+                let mut vmobject = VMobject::try_from(path.as_ref())?;
+                let transform = utils::to_affine(&node.abs_transform());
+                vmobject.apply_affine(transform);
+                vmobject
+            }
+            usvg::Node::Group(group) => {
+                // TODO: support clip-path
+                VMobject::from(group.as_ref())
+            }
+            _ => anyhow::bail!("unsupported node: {}", node.id()),
+        };
+
+        Ok(vmobject)
+    }
 }
 
 impl Svg {
@@ -19,8 +107,16 @@ impl Svg {
     }
 
     pub fn from_tree(tree: Tree) -> Self {
-        let scene = vello::Scene::new();
-        Self { tree, scene }
+        // let scene = vello::Scene::new();
+
+        let vmobject = VMobject::try_from(tree.root()).unwrap();
+        // vmobject.print_tree(2);
+
+        Self {
+            inner: vmobject,
+            // scene,
+            // tree,
+        }
     }
 }
 
@@ -32,13 +128,14 @@ impl Entity for Svg {
     fn extract(&mut self) {}
     fn prepare(&mut self, ctx: &crate::context::RanimContext) {}
     fn render(&mut self, ctx: &mut crate::context::RanimContext, renderer: &mut Self::Renderer) {
-        self.scene.reset();
+        self.inner.render(ctx, renderer);
+        /* self.scene.reset();
         encode_group_to_scene(
             &mut self.scene,
             &self.tree.root(),
             vello::kurbo::Affine::IDENTITY,
         );
-        renderer.vello_scene.append(&self.scene, None);
+        renderer.vello_scene.append(&self.scene, None); */
     }
 }
 
@@ -53,6 +150,7 @@ fn encode_group_to_scene(
             usvg::Node::Group(g) => {
                 let mut pushed_clip = false;
                 if let Some(clip_path) = g.clip_path() {
+                    trace!("clip path: {}", clip_path.id());
                     if let Some(usvg::Node::Path(clip_path)) = clip_path.root().children().first() {
                         // support clip-path with a single path
                         let local_path = utils::to_bez_path(clip_path);
@@ -79,19 +177,24 @@ fn encode_group_to_scene(
                 if !path.is_visible() {
                     continue;
                 }
-                let local_path = utils::to_bez_path(path);
+
+                let mut local_path = utils::to_bez_path(path);
+                local_path.apply_affine(transform);
 
                 let do_fill = |scene: &mut vello::Scene| {
                     if let Some(fill) = &path.fill() {
                         if let Some((brush, brush_transform)) =
                             utils::to_brush(fill.paint(), fill.opacity())
                         {
+                            // let brush_transform = brush_transform * transform;
                             scene.fill(
                                 match fill.rule() {
                                     usvg::FillRule::NonZero => vello::peniko::Fill::NonZero,
                                     usvg::FillRule::EvenOdd => vello::peniko::Fill::EvenOdd,
                                 },
-                                transform,
+                                kurbo::Affine::IDENTITY,
+                                // kurbo::Affine::translate((400.0, 400.0)),
+                                // transform,
                                 &brush,
                                 Some(brush_transform),
                                 &local_path,
@@ -107,7 +210,8 @@ fn encode_group_to_scene(
                             let conv_stroke = utils::to_stroke(stroke);
                             scene.stroke(
                                 &conv_stroke,
-                                transform,
+                                kurbo::Affine::IDENTITY,
+                                // transform,
                                 &brush,
                                 Some(brush_transform),
                                 &local_path,
