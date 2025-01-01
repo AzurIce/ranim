@@ -12,7 +12,7 @@ use vello::{
 };
 
 use crate::{
-    prelude::{Alignable, Interpolatable},
+    prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
     utils::bezier::divide_segment_to_n_part,
 };
@@ -224,6 +224,19 @@ pub struct StrokeOptions {
     pub brush: Brush,
 }
 
+impl StrokeOptions {
+    pub fn with_opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity;
+        self.brush = self.brush.clone().with_alpha(opacity);
+        self
+    }
+    pub fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.opacity = opacity;
+        self.brush = self.brush.clone().with_alpha(opacity);
+        self
+    }
+}
+
 impl Interpolatable for kurbo::Stroke {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         kurbo::Stroke {
@@ -303,6 +316,19 @@ pub struct FillOptions {
     pub brush: Brush,
 }
 
+impl FillOptions {
+    pub fn with_opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity;
+        self.brush = self.brush.clone().with_alpha(opacity);
+        self
+    }
+    pub fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.opacity = opacity;
+        self.brush = self.brush.clone().with_alpha(opacity);
+        self
+    }
+}
+
 impl Interpolatable for FillOptions {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         FillOptions {
@@ -345,9 +371,8 @@ impl BezPath {
         ]));
         self
     }
-    pub fn set_stroke_alpha(&mut self, alpha: f32) -> &mut Self {
-        self.stroke.opacity = alpha;
-        self.stroke.brush = self.stroke.brush.clone().with_alpha(alpha);
+    pub fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.stroke.set_opacity(opacity);
         self
     }
     pub fn set_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
@@ -365,14 +390,8 @@ impl BezPath {
         ]));
         self
     }
-    pub fn set_fill_alpha(&mut self, alpha: f32) -> &mut Self {
-        self.fill.opacity = alpha;
-        self.fill.brush = self.fill.brush.clone().with_alpha(alpha);
-        self
-    }
-    pub fn set_alpha(&mut self, alpha: f32) -> &mut Self {
-        self.set_stroke_alpha(alpha);
-        self.set_fill_alpha(alpha);
+    pub fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.fill.set_opacity(opacity);
         self
     }
     // transforms
@@ -412,5 +431,13 @@ impl Entity for BezPath {
             self.stroke.transform,
             &self.inner,
         );
+    }
+}
+
+impl Opacity for BezPath {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.set_stroke_opacity(opacity);
+        self.set_fill_opacity(opacity);
+        self
     }
 }
