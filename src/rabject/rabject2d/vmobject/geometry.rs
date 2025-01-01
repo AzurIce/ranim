@@ -83,7 +83,7 @@ impl Blueprint<VMobject> for Arc {
             fill,
         };
 
-        path.set_stroke_width(self.stroke_width).set_fill_alpha(0.0);
+        path.set_stroke_width(self.stroke_width).set_fill_opacity(0.0);
 
         VMobject::new(vec![path])
     }

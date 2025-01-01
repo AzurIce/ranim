@@ -11,6 +11,7 @@ use crate::{
 use super::bez_path::BezPath;
 
 pub mod geometry;
+pub mod svg;
 
 #[derive(Clone, Debug)]
 pub struct VMobject {
@@ -52,7 +53,7 @@ impl VMobject {
     }
     pub fn set_fill_alpha(&mut self, alpha: f32) -> &mut Self {
         self.subpaths.iter_mut().for_each(|p| {
-            p.set_fill_alpha(alpha);
+            p.set_fill_opacity(alpha);
         });
         self
     }
@@ -176,7 +177,7 @@ impl Interpolatable for VMobject {
 impl Opacity for VMobject {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.subpaths.iter_mut().for_each(|p| {
-            p.set_alpha(opacity);
+            p.set_opacity(opacity);
         });
         self
     }

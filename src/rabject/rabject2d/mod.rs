@@ -1,106 +1,20 @@
 pub mod bez_path;
-/// blueprints
-#[deprecated = "Use vmobject based on vello instead"]
-pub mod blueprint;
-/// svg from [`usvg::Tree`]`
-pub mod svg;
 pub mod vmobject;
-/// 2d vectorized path formed with cubic bezier segments
-#[deprecated = "Use vmobject based on vello instead"]
-pub mod vpath;
-
-use std::ops::{Deref, DerefMut};
-
-use crate::scene::canvas::camera::CanvasCamera;
-use crate::{context::RanimContext, scene::Entity};
-
-use crate::rabject::{Primitive, Rabject};
-
-impl<R: Rabject> From<R> for RabjectEntity2d<R> {
-    fn from(rabject: R) -> Self {
-        Self {
-            rabject,
-            render_data: None,
-            render_resource: None,
-        }
-    }
-}
-
-/// An rabject entity in the scene, rendered with [`CanvasCamera`]
-pub struct RabjectEntity2d<R: Rabject> {
-    /// The rabject
-    pub(crate) rabject: R,
-    /// The extracted data from the rabject
-    pub(crate) render_data: Option<R::RenderData>,
-    /// The prepared render resource of the rabject
-    pub(crate) render_resource: Option<R::RenderResource>,
-}
-
-impl<R: Rabject> Deref for RabjectEntity2d<R> {
-    type Target = R;
-    fn deref(&self) -> &Self::Target {
-        &self.rabject
-    }
-}
-
-impl<R: Rabject> DerefMut for RabjectEntity2d<R> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.rabject
-    }
-}
-
-impl<R: Rabject + 'static> Entity for RabjectEntity2d<R> {
-    type Renderer = CanvasCamera;
-
-    fn tick(&mut self, _dt: f32) {}
-    fn extract(&mut self) {
-        self.render_data = Some(self.rabject.extract());
-    }
-    fn prepare(&mut self, ctx: &RanimContext) {
-        let wgpu_ctx = ctx.wgpu_ctx();
-        if let Some(render_resource) = self.render_resource.as_mut() {
-            render_resource.update(&wgpu_ctx, self.render_data.as_ref().unwrap());
-        } else {
-            self.render_resource = Some(R::RenderResource::init(
-                &wgpu_ctx,
-                self.render_data.as_ref().unwrap(),
-            ));
-        }
-    }
-    fn render(&mut self, ctx: &mut RanimContext, renderer: &mut Self::Renderer) {
-        // trace!("[rabject2d::entity::RabjectEntity] rendering...");
-        let wgpu_ctx = ctx.wgpu_ctx();
-        let pipelines = &mut ctx.pipelines;
-
-        let multisample_view = &renderer.multisample_view;
-        let target_view = &renderer.render_view;
-        let depth_stencil_view = &renderer.depth_stencil_view;
-        let uniforms_bind_group = &renderer.uniforms_bind_group.bind_group;
-
-        if let Some(render_resource) = self.render_resource.as_ref() {
-            render_resource.render(
-                &wgpu_ctx,
-                pipelines,
-                multisample_view,
-                target_view,
-                depth_stencil_view,
-                uniforms_bind_group,
-            );
-        }
-    }
-}
 
 #[cfg(test)]
 mod test {
     use crate::{
         prelude::Alignable,
-        rabject::{rabject2d::vmobject::VMobject, Blueprint},
+        rabject::{
+            rabject2d::vmobject::{geometry::Arc, svg::Svg},
+            Blueprint,
+        },
     };
 
     #[test]
     fn test_align_svg() {
-        let mut svg: VMobject = super::svg::Svg::from_path("assets/Ghostscript_Tiger.svg").into();
-        let mut arc: VMobject = VMobject::blueprint_arc(2.0 * std::f32::consts::PI)
+        let mut svg = Svg::from_file("assets/Ghostscript_Tiger.svg").build();
+        let mut arc = Arc::new(2.0 * std::f32::consts::PI)
             .with_radius(10.0)
             .build();
         assert!(!svg.is_aligned(&arc));
