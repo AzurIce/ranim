@@ -36,7 +36,7 @@ fn main() {
         let rad = rad_step * (i + 1) as f32;
         let width = width_step * ((nrad - i) as f32).powi(2);
         let angle = angle_step * (i + 1) as f32;
-        
+
         for j in 0..ntan {
             let color = start_color.lerp(&end_color, j as f32 / (ntan - 1) as f32);
             let vec = Mat2::from_angle(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)

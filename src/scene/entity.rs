@@ -1,6 +1,6 @@
 use std::{any::Any, fmt::Debug, marker::PhantomData, ops::Deref};
 
-use crate::{context::RanimContext, rabject::Primitive, utils::Id};
+use crate::{context::RanimContext, utils::Id};
 
 pub trait EntityAny: Entity + Any {
     fn as_any(&self) -> &dyn Any;
@@ -54,4 +54,3 @@ impl<E: EntityAny> Deref for EntityId<E> {
         &self.0
     }
 }
-

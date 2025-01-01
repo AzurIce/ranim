@@ -4,9 +4,9 @@ use bevy_color::LinearRgba;
 use glam::Vec3;
 
 use crate::{
-    scene::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
     context::WgpuContext,
     rabject::{RenderResource, Vertex},
+    scene::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
 };
 
 use super::primitive::VPathPrimitive;
@@ -259,8 +259,8 @@ impl RenderResource for StrokePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../../shader/vpath_stroke.wgsl"));
+        let module = &device
+            .create_shader_module(wgpu::include_wgsl!("../../../../shader/vpath_stroke.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VPath Stroke Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
@@ -320,8 +320,8 @@ impl RenderResource for ComputePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../../shader/vpath_compute.wgsl"));
+        let module = &device
+            .create_shader_module(wgpu::include_wgsl!("../../../../shader/vpath_compute.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("VPath Compute Pipeline Layout"),

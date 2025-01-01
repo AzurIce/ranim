@@ -1,6 +1,6 @@
 use glam::Vec3;
 use itertools::Itertools;
-use vello::kurbo::{ParamCurve, PathSeg, QuadBez};
+use vello::kurbo::{ParamCurve, PathSeg};
 
 use crate::prelude::Interpolatable;
 
@@ -61,7 +61,6 @@ pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f32, b: f
     let h1 = h0.lerp(&h1_prime, end_prop);
     [h0, h1, h2]
 }
-
 
 pub fn divide_segment_to_n_part(segment: PathSeg, n: usize) -> Vec<PathSeg> {
     let alpha = (0..=n).map(|i| i as f64 / n as f64);

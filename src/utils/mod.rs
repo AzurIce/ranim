@@ -441,11 +441,11 @@ pub fn affine_from_vec(cur_vec: Vec2, target_vec: Vec2) -> kurbo::Affine {
     };
 
     // Calculate rotation angle
-    let angle = cur_vec.y.atan2(-cur_vec.x) - target_vec.y.atan2(-target_vec.x) + std::f32::consts::PI / 2.0;
+    let angle = cur_vec.y.atan2(-cur_vec.x) - target_vec.y.atan2(-target_vec.x)
+        + std::f32::consts::PI / 2.0;
 
     // Build the transformation:
     // 1. Scale
     // 2. Rotate
-    kurbo::Affine::scale(scale as f64)
-        .then_rotate(angle as f64)
+    kurbo::Affine::scale(scale as f64).then_rotate(angle as f64)
 }

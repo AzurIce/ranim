@@ -5,7 +5,12 @@ pub mod vpath;
 
 use std::ops::{Deref, DerefMut};
 
-use crate::{context::RanimContext, scene::{Entity, SceneCamera}, updater::Updater, utils::Id};
+use crate::{
+    context::RanimContext,
+    scene::{Entity, SceneCamera},
+    updater::Updater,
+    utils::Id,
+};
 
 use super::{Primitive, Rabject};
 

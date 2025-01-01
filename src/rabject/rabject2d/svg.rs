@@ -1,6 +1,5 @@
 use std::fs;
 
-use itertools::Itertools;
 use log::trace;
 use usvg::{Options, Tree};
 use vello::kurbo;
@@ -27,26 +26,32 @@ impl TryFrom<&usvg::Path> for BezPath {
         }
         let inner = utils::to_bez_path(path);
 
-        let stroke = path.stroke().and_then(|s| {
-            utils::to_brush(s.paint(), s.opacity()).map(|(brush, transform)| StrokeOptions {
-                style: utils::to_stroke(s),
-                brush,
-                transform: Some(transform),
-                opacity: s.opacity().get(),
+        let stroke = path
+            .stroke()
+            .and_then(|s| {
+                utils::to_brush(s.paint(), s.opacity()).map(|(brush, transform)| StrokeOptions {
+                    style: utils::to_stroke(s),
+                    brush,
+                    transform: Some(transform),
+                    opacity: s.opacity().get(),
+                })
             })
-        }).unwrap_or_default();
+            .unwrap_or_default();
 
-        let fill = path.fill().and_then(|f| {
-            utils::to_brush(f.paint(), f.opacity()).map(|(brush, transform)| FillOptions {
-                style: match f.rule() {
-                    usvg::FillRule::NonZero => vello::peniko::Fill::NonZero,
-                    usvg::FillRule::EvenOdd => vello::peniko::Fill::EvenOdd,
-                },
-                brush,
-                transform: Some(transform),
-                opacity: f.opacity().get(),
+        let fill = path
+            .fill()
+            .and_then(|f| {
+                utils::to_brush(f.paint(), f.opacity()).map(|(brush, transform)| FillOptions {
+                    style: match f.rule() {
+                        usvg::FillRule::NonZero => vello::peniko::Fill::NonZero,
+                        usvg::FillRule::EvenOdd => vello::peniko::Fill::EvenOdd,
+                    },
+                    brush,
+                    transform: Some(transform),
+                    opacity: f.opacity().get(),
+                })
             })
-        }).unwrap_or_default();
+            .unwrap_or_default();
 
         Ok(BezPath {
             inner,

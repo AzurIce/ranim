@@ -14,11 +14,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    animation::Animation,
-    context::RanimContext,
-    rabject::{rabject2d::RabjectEntity2d, rabject3d::RabjectEntity3d, Rabject},
-};
+use crate::{animation::Animation, context::RanimContext};
 use bevy_color::Color;
 use glam::{Mat4, Vec3};
 use wgpu::RenderPassDescriptor;
@@ -290,7 +286,7 @@ impl Scene {
     }
 
     /// Center the canvas in the frame
-    /// 
+    ///
     /// It is equal to:
     /// ```rust
     ///    let canvas = self.entities.get(canvas_id);

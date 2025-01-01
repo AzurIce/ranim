@@ -4,10 +4,10 @@ use bevy_color::LinearRgba;
 use glam::Vec3;
 
 use crate::{
-    scene::OUTPUT_TEXTURE_FORMAT,
-    scene::canvas::camera::CameraUniformsBindGroup,
     context::WgpuContext,
     rabject::{RenderResource, Vertex},
+    scene::canvas::camera::CameraUniformsBindGroup,
+    scene::OUTPUT_TEXTURE_FORMAT,
 };
 
 use super::primitive::VPathPrimitive;
