@@ -250,20 +250,3 @@ impl Blueprint<VMobject> for Square {
             .build()
     }
 }
-
-#[cfg(test)]
-mod test {
-    use crate::rabject::Blueprint;
-
-    use super::*;
-
-    // #[test]
-    // fn test_arc() {
-    //     let arc = Arc::new(std::f32::consts::PI).build();
-    //     assert!(!arc.is_closed());
-
-    //     let arc = Arc::new(std::f32::consts::TAU).build();
-    //     assert_eq!(arc.points().first(), arc.points().last());
-    //     assert!(arc.is_closed());
-    // }
-}

@@ -1,16 +1,18 @@
 pub mod bez_path;
 /// blueprints
+#[deprecated = "Use vmobject based on vello instead"]
 pub mod blueprint;
 /// svg from [`usvg::Tree`]`
 pub mod svg;
 pub mod vmobject;
 /// 2d vectorized path formed with cubic bezier segments
+#[deprecated = "Use vmobject based on vello instead"]
 pub mod vpath;
 
 use std::ops::{Deref, DerefMut};
 
 use crate::scene::canvas::camera::CanvasCamera;
-use crate::{context::RanimContext, scene::Entity, updater::Updater, utils::Id};
+use crate::{context::RanimContext, scene::Entity};
 
 use crate::rabject::{Primitive, Rabject};
 

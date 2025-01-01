@@ -1,6 +1,4 @@
-use log::trace;
-
-use crate::{interpolate::Interpolatable, rabject::{Rabject, Updatable}};
+use crate::{interpolate::Interpolatable, rabject::Updatable};
 
 use super::{Animation, AnimationFunc};
 

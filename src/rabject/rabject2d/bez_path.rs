@@ -6,7 +6,6 @@ use std::{
 use bevy_color::LinearRgba;
 use glam::FloatExt;
 use itertools::Itertools;
-use log::trace;
 use vello::{
     kurbo::{self, Affine, CubicBez, Line, PathSeg, QuadBez},
     peniko::{self, color::AlphaColor, Brush},
@@ -14,7 +13,6 @@ use vello::{
 
 use crate::{
     prelude::{Alignable, Interpolatable},
-    rabject::Blueprint,
     scene::{canvas::camera::CanvasCamera, Entity},
     utils::bezier::divide_segment_to_n_part,
 };
@@ -286,7 +284,7 @@ impl Default for StrokeOptions {
     fn default() -> Self {
         Self {
             opacity: 1.0,
-            style: kurbo::Stroke{
+            style: kurbo::Stroke {
                 start_cap: kurbo::Cap::Square,
                 end_cap: kurbo::Cap::Square,
                 ..Default::default()

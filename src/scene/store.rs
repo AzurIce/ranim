@@ -1,7 +1,5 @@
 use std::{
-    any::Any,
     collections::HashMap,
-    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 

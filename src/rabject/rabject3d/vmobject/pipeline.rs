@@ -1,9 +1,9 @@
 use std::ops::Deref;
 
 use crate::{
-    scene::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
-    rabject::{RenderResource, Vertex},
     context::WgpuContext,
+    rabject::{RenderResource, Vertex},
+    scene::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
 };
 
 use super::{primitive::VMobjectPrimitive, VMobjectFillVertex};
@@ -61,8 +61,8 @@ impl RenderResource for StencilPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../../shader/vmobject_fill.wgsl"));
+        let module = &device
+            .create_shader_module(wgpu::include_wgsl!("../../../../shader/vmobject_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Stencil Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
@@ -144,8 +144,8 @@ impl RenderResource for FillPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module =
-            &device.create_shader_module(wgpu::include_wgsl!("../../../../shader/vmobject_fill.wgsl"));
+        let module = &device
+            .create_shader_module(wgpu::include_wgsl!("../../../../shader/vmobject_fill.wgsl"));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Fill Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
@@ -245,8 +245,9 @@ impl RenderResource for StrokePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module = &device
-            .create_shader_module(wgpu::include_wgsl!("../../../../shader/vmobject_stroke.wgsl"));
+        let module = &device.create_shader_module(wgpu::include_wgsl!(
+            "../../../../shader/vmobject_stroke.wgsl"
+        ));
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("VMobject Stroke Pipeline"),
             layout: Some(&Self::pipeline_layout(wgpu_ctx)),
@@ -307,8 +308,9 @@ impl RenderResource for ComputePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module = &device
-            .create_shader_module(wgpu::include_wgsl!("../../../../shader/vmobject_compute.wgsl"));
+        let module = &device.create_shader_module(wgpu::include_wgsl!(
+            "../../../../shader/vmobject_compute.wgsl"
+        ));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("VMobject Compute Pipeline Layout"),
