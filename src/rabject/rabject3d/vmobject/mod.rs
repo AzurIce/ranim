@@ -551,8 +551,9 @@ impl VMobject {
 }
 
 impl Opacity for VMobject {
-    fn set_opacity(&mut self, opacity: f32) {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.set_opacity(opacity);
+        self
     }
 }
 
