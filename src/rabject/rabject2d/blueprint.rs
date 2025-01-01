@@ -1,6 +1,6 @@
 use glam::{vec2, vec3, Vec2, Vec3};
 
-use super::{vpath::{blueprint::*, VPath}, RabjectEntity2d};
+use super::{vmobject::VMobject, vpath::{blueprint::*, VPath}, RabjectEntity2d};
 use crate::rabject::{Blueprint, TransformAnchor};
 
 /// A part of a circle

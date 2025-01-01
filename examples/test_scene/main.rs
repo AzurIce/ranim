@@ -10,7 +10,7 @@ use ranim::{
         bez_path::BezPath,
         blueprint::{Rect, Square},
         svg::Svg,
-        vmobject::VMobject,
+        vmobject::{geometry::Arc, VMobject},
         vpath::{blueprint::VPathBuilder, VPath},
     },
     scene::SceneBuilder,
@@ -48,7 +48,10 @@ fn main() {
         // let arc = BezPath::arc(std::f32::consts::PI * 2.0, 100.0);
         // let arc = canvas.insert(arc);
 
-        let mut arc: VMobject = BezPath::arc(std::f32::consts::PI, 100.0).build().into();
+        let mut arc: VMobject = Arc::new(std::f32::consts::PI)
+            .with_radius(100.0)
+            .build()
+            .into();
         arc.apply_affine(Affine::translate((960.0, 540.0)));
         (svg, arc)
     };

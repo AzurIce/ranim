@@ -92,8 +92,10 @@ impl<T> Updater<T> for Animation<T> {
     }
     fn on_update(&mut self, rabject: &mut T, dt: f32) -> bool {
         self.acc_t += dt;
-        let alpha = self.acc_t / self.config.run_time.as_secs_f32();
+        let alpha = (self.acc_t / self.config.run_time.as_secs_f32()).clamp(0.0, 1.0);
+
         let alpha = (self.config.rate_func)(alpha);
+
         self.func.interpolate(rabject, alpha);
         self.acc_t <= self.config.run_time.as_secs_f32()
     }

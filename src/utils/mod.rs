@@ -198,7 +198,7 @@ pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8>
 // Copyright 2023 the Vello Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use vello::kurbo::{Affine, BezPath, Point, Rect, Stroke};
+use vello::kurbo::{self, Affine, BezPath, Point, Rect, Stroke};
 use vello::peniko::{Blob, Brush, Color, Fill, Image};
 use vello::Scene;
 
@@ -424,4 +424,28 @@ pub fn decode_raw_raster_image(
     }?
     .into_rgba8();
     Ok(res)
+}
+
+/// Calculate affine transformation that maps `cur_vec` to `target_vec`
+pub fn affine_from_vec(cur_vec: Vec2, target_vec: Vec2) -> kurbo::Affine {
+    // Calculate lengths
+    let cur_len = cur_vec.length();
+    let target_len = target_vec.length();
+
+    // println!("cur_len: {}, target_len: {}", cur_len, target_len);
+    // Calculate scaling factor
+    let scale = if cur_len.abs() < 1e-6 {
+        1.0
+    } else {
+        target_len / cur_len
+    };
+
+    // Calculate rotation angle
+    let angle = cur_vec.y.atan2(-cur_vec.x) - target_vec.y.atan2(-target_vec.x) + std::f32::consts::PI / 2.0;
+
+    // Build the transformation:
+    // 1. Scale
+    // 2. Rotate
+    kurbo::Affine::scale(scale as f64)
+        .then_rotate(angle as f64)
 }

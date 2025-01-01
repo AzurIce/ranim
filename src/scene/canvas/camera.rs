@@ -9,10 +9,12 @@ use crate::{
     utils::wgpu::WgpuBuffer,
 };
 
-use super::pipeline::BlendPipeline;
+// use super::pipeline::BlendPipeline;
 
 #[allow(unused)]
 use log::{debug, trace};
+
+use super::pipeline::BlendPipeline;
 
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -368,8 +370,22 @@ impl CanvasCamera {
 
         // This renders the vello scene to the canvas texture
         // trace!("[CanvasCamera] rendering vello scene...");
-        self.render_vello_scene(&ctx.wgpu_ctx);
+        self.vello_renderer
+            .render_to_texture(
+                &ctx.wgpu_ctx.device,
+                &ctx.wgpu_ctx.queue,
+                &self.vello_scene,
+                &self.vello_view,
+                &vello::RenderParams {
+                    base_color: vello::peniko::Color::TRANSPARENT,
+                    width: self.viewport_width,
+                    height: self.viewport_height,
+                    antialiasing_method: vello::AaConfig::Msaa16,
+                },
+            )
+            .unwrap();
 
+        // TODO: implement a blit pipeline
         // This blends the vello scene onto the canvas texture
         // trace!("[CanvasCamera] blending...");
         let pipeline = ctx.pipelines.get_or_init::<BlendPipeline>(&ctx.wgpu_ctx);
@@ -399,21 +415,5 @@ impl CanvasCamera {
         }
 
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
-    }
-    pub fn render_vello_scene(&mut self, ctx: &WgpuContext) {
-        self.vello_renderer
-            .render_to_texture(
-                &ctx.device,
-                &ctx.queue,
-                &self.vello_scene,
-                &self.vello_view,
-                &vello::RenderParams {
-                    base_color: vello::peniko::Color::TRANSPARENT,
-                    width: self.viewport_width,
-                    height: self.viewport_height,
-                    antialiasing_method: vello::AaConfig::Msaa16,
-                },
-            )
-            .unwrap();
     }
 }

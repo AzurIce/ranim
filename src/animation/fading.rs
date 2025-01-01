@@ -32,11 +32,11 @@ impl<R: Opacity + Interpolatable + Clone + 'static> Fading<R> {
 }
 
 pub trait Opacity {
-    fn set_opacity(&mut self, opacity: f32);
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self;
 }
 
-impl<R: Opacity + Interpolatable + Clone> AnimationFunc<R> for Fading<R> {
-    fn pre_anim(&mut self, rabject: &mut R) {
+impl<T: Opacity + Interpolatable + Clone> AnimationFunc<T> for Fading<T> {
+    fn pre_anim(&mut self, rabject: &mut T) {
         self.src = Some(rabject.clone());
         self.dst = Some(rabject.clone());
         match self.fading_type {
@@ -47,8 +47,8 @@ impl<R: Opacity + Interpolatable + Clone> AnimationFunc<R> for Fading<R> {
         .set_opacity(0.0);
     }
 
-    fn interpolate(&mut self, rabject: &mut R, alpha: f32) {
-        rabject.update_from(
+    fn interpolate(&mut self, entity: &mut T, alpha: f32) {
+        entity.update_from(
             &self
                 .src
                 .as_ref()
