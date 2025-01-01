@@ -1,8 +1,8 @@
 use env_logger::Env;
-use glam::vec3;
+use glam::vec2;
 use ranim::color::palettes::manim::*;
 use ranim::prelude::*;
-use ranim::rabject::rabject2d::blueprint::Rect;
+use ranim::rabject::rabject2d::vmobject::geometry::Rect;
 use ranim::scene::SceneBuilder;
 
 fn main() {
@@ -33,7 +33,6 @@ fn main() {
             vec![GREY_BROWN, LIGHT_BROWN, PINK, LIGHT_PINK, ORANGE],
         ];
 
-        let (offset_x, offset_y) = (width as f32 / -2.0, height as f32 / -2.0);
         let padding = 100;
 
         let rows = colors.len();
@@ -47,7 +46,7 @@ fn main() {
                 let x = padding + j * w_step;
                 let mut square = Rect::new(w_step as f32, h_step as f32).build();
                 square
-                    .shift(vec3(x as f32 + offset_x, y as f32 + offset_y, 0.0))
+                    .shift(vec2(x as f32, y as f32))
                     .set_color(*color)
                     .set_stroke_width(0.0);
                 canvas.insert(square);

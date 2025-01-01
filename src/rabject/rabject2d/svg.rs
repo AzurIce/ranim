@@ -32,8 +32,9 @@ impl TryFrom<&usvg::Path> for BezPath {
                 style: utils::to_stroke(s),
                 brush,
                 transform: Some(transform),
+                opacity: s.opacity().get(),
             })
-        });
+        }).unwrap_or_default();
 
         let fill = path.fill().and_then(|f| {
             utils::to_brush(f.paint(), f.opacity()).map(|(brush, transform)| FillOptions {
@@ -43,8 +44,9 @@ impl TryFrom<&usvg::Path> for BezPath {
                 },
                 brush,
                 transform: Some(transform),
+                opacity: f.opacity().get(),
             })
-        });
+        }).unwrap_or_default();
 
         Ok(BezPath {
             inner,

@@ -1,11 +1,11 @@
-/// svg from [`usvg::Tree`]`
-pub mod svg;
-/// 2d vectorized path formed with cubic bezier segments
-pub mod vpath;
+pub mod bez_path;
 /// blueprints
 pub mod blueprint;
-pub mod bez_path;
+/// svg from [`usvg::Tree`]`
+pub mod svg;
 pub mod vmobject;
+/// 2d vectorized path formed with cubic bezier segments
+pub mod vpath;
 
 use std::ops::{Deref, DerefMut};
 
@@ -18,7 +18,6 @@ impl<R: Rabject> From<R> for RabjectEntity2d<R> {
     fn from(rabject: R) -> Self {
         Self {
             rabject,
-            updaters: vec![],
             render_data: None,
             render_resource: None,
         }
@@ -29,8 +28,6 @@ impl<R: Rabject> From<R> for RabjectEntity2d<R> {
 pub struct RabjectEntity2d<R: Rabject> {
     /// The rabject
     pub(crate) rabject: R,
-    /// The updaters of this rabject
-    pub(crate) updaters: Vec<(Id, Box<dyn Updater<R>>)>,
     /// The extracted data from the rabject
     pub(crate) render_data: Option<R::RenderData>,
     /// The prepared render resource of the rabject
@@ -50,31 +47,10 @@ impl<R: Rabject> DerefMut for RabjectEntity2d<R> {
     }
 }
 
-impl<R: Rabject> RabjectEntity2d<R> {
-    pub fn insert_updater(&mut self, mut updater: impl Updater<R> + 'static) -> Id {
-        let id = Id::new();
-        updater.on_create(self);
-        self.updaters.push((id, Box::new(updater)));
-        id
-    }
-    pub fn remove_updater(&mut self, id: Id) {
-        self.updaters.retain(|(eid, _)| *eid != id);
-    }
-}
-
 impl<R: Rabject + 'static> Entity for RabjectEntity2d<R> {
     type Renderer = CanvasCamera;
 
-    fn tick(&mut self, dt: f32) {
-        let rabject = &mut self.rabject;
-        self.updaters.retain_mut(|(_, updater)| {
-            let keep = updater.on_update(rabject, dt);
-            if !keep {
-                updater.on_destroy(rabject);
-            }
-            keep
-        });
-    }
+    fn tick(&mut self, _dt: f32) {}
     fn extract(&mut self) {
         self.render_data = Some(self.rabject.extract());
     }
@@ -114,15 +90,17 @@ impl<R: Rabject + 'static> Entity for RabjectEntity2d<R> {
 
 #[cfg(test)]
 mod test {
-
-    use crate::{prelude::Alignable, rabject::{rabject2d::vmobject::VMobject, Blueprint}};
-
-    use super::{bez_path::BezPath, blueprint::Arc};
+    use crate::{
+        prelude::Alignable,
+        rabject::{rabject2d::vmobject::VMobject, Blueprint},
+    };
 
     #[test]
     fn test_align_svg() {
         let mut svg: VMobject = super::svg::Svg::from_path("assets/Ghostscript_Tiger.svg").into();
-        let mut arc: VMobject = BezPath::arc(2.0 * std::f32::consts::PI, 10.0).build().into();
+        let mut arc: VMobject = VMobject::blueprint_arc(2.0 * std::f32::consts::PI)
+            .with_radius(10.0)
+            .build();
         assert!(!svg.is_aligned(&arc));
         svg.align_with(&mut arc);
         assert!(svg.is_aligned(&arc));

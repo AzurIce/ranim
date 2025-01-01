@@ -556,9 +556,10 @@ impl Interpolatable for VPath {
 }
 
 impl Opacity for VPath {
-    fn set_opacity(&mut self, opacity: f32) {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.points.iter_mut().for_each(|p| {
             p.set_opacity(opacity);
         });
+        self
     }
 }

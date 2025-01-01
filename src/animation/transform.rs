@@ -34,7 +34,6 @@ impl<R: Alignable + Interpolatable + Clone + 'static> Transform<R> {
 
 impl<T: Alignable + Interpolatable + Clone> AnimationFunc<T> for Transform<T> {
     fn pre_anim(&mut self, entity: &mut T) {
-        trace!("transform pre_anim");
         let mut aligned_source = entity.clone();
         if !aligned_source.is_aligned(&self.aligned_target) {
             aligned_source.align_with(&mut self.aligned_target);

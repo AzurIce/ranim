@@ -2,10 +2,10 @@ use std::time::{Duration, Instant};
 
 use bevy_color::Srgba;
 use env_logger::Env;
+use glam::vec2;
 use log::info;
-use ranim::glam::vec3;
 use ranim::prelude::*;
-use ranim::rabject::rabject2d::blueprint::Arc;
+use ranim::rabject::rabject2d::vmobject::VMobject;
 use ranim::{animation::fading::Fading, scene::SceneBuilder};
 
 fn main() {
@@ -30,27 +30,21 @@ fn main() {
     let step_y =
         (scene.camera.frame.size.1 as f32 - padding * 2.0 - gap * (nrow - 1) as f32) / nrow as f32;
 
-    let frame_start = vec3(
-        scene.camera.frame.size.0 as f32,
-        scene.camera.frame.size.1 as f32,
-        0.0,
-    ) / -2.0;
     for i in 0..nrow {
         let t = Instant::now();
         for j in 0..ncol {
             let angle = std::f32::consts::PI * j as f32 / (ncol - 1) as f32 * 360.0 / 180.0;
             let color = start_color.lerp(&end_color, i as f32 / (nrow - 1) as f32);
-            let offset = vec3(
+            let offset = vec2(
                 j as f32 * step_x + step_x / 2.0 + j as f32 * gap + padding,
                 i as f32 * step_y + step_y / 2.0 + i as f32 * gap + padding,
-                0.0,
             );
-            let mut arc = Arc::new(angle)
+            let mut arc = VMobject::blueprint_arc(angle)
                 .with_radius(step_y / 2.0)
                 .with_stroke_width(10.0 * j as f32)
                 .build();
 
-            arc.set_color(color).shift(frame_start + offset);
+            arc.set_color(color).set_fill_alpha(0.0).shift(offset);
             let arc = scene.get_mut(&canvas).insert(arc);
             scene.play_in_canvas(
                 &canvas,
