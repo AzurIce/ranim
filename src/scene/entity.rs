@@ -54,4 +54,3 @@ impl<E: EntityAny> Deref for EntityId<E> {
         &self.0
     }
 }
-

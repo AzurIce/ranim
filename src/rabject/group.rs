@@ -109,9 +109,10 @@ impl<R: Rabject + Interpolatable> Interpolatable for Group<R> {
 }
 
 impl<R: Rabject + Opacity> Opacity for Group<R> {
-    fn set_opacity(&mut self, opacity: f32) {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.children.iter_mut().for_each(|e| {
             e.set_opacity(opacity);
         });
+        self
     }
 }

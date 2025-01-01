@@ -2,11 +2,10 @@ use std::time::{Duration, Instant};
 
 use bevy_color::Srgba;
 use env_logger::Env;
-use glam::{Mat3, Vec3};
+use glam::{vec2, Mat2};
 use log::info;
-use ranim::glam::vec3;
 use ranim::prelude::*;
-use ranim::rabject::rabject2d::blueprint::ArcBetweenPoints;
+use ranim::rabject::rabject2d::vmobject::VMobject;
 use ranim::{animation::fading::Fading, scene::SceneBuilder};
 
 fn main() {
@@ -20,6 +19,7 @@ fn main() {
     let mut scene = SceneBuilder::new("arc_between_points").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
     scene.center_canvas_in_frame(&canvas);
+    let center = vec2(1920.0 / 2.0, 1080.0 / 2.0);
 
     let start_color = Srgba::hex("FF8080FF").unwrap();
     let end_color = Srgba::hex("58C4DDFF").unwrap();
@@ -36,15 +36,17 @@ fn main() {
         let rad = rad_step * (i + 1) as f32;
         let width = width_step * ((nrad - i) as f32).powi(2);
         let angle = angle_step * (i + 1) as f32;
+
         for j in 0..ntan {
             let color = start_color.lerp(&end_color, j as f32 / (ntan - 1) as f32);
-            let end = Mat3::from_rotation_z(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)
-                * vec3(rad, 0.0, 0.0);
+            let vec = Mat2::from_angle(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)
+                * vec2(rad, 0.0);
 
-            let mut arc = ArcBetweenPoints::new(Vec3::ZERO, end, angle)
-                .with_stroke_width(width)
-                .build();
-            arc.set_color(color);
+            let mut arc =
+                VMobject::blueprint_arc_between_points(center, center + vec, angle).build();
+            arc.set_color(color)
+                .set_fill_alpha(0.0)
+                .set_stroke_width(width);
 
             let arc = scene.get_mut(&canvas).insert(arc);
             scene.play_in_canvas(

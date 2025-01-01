@@ -1,17 +1,18 @@
-use std::cmp::Ordering;
+use std::{
+    cmp::Ordering,
+    ops::{Deref, DerefMut},
+};
 
 use bevy_color::LinearRgba;
 use glam::FloatExt;
 use itertools::Itertools;
-use log::trace;
 use vello::{
     kurbo::{self, Affine, CubicBez, Line, PathSeg, QuadBez},
     peniko::{self, color::AlphaColor, Brush},
 };
 
 use crate::{
-    prelude::{Alignable, Interpolatable},
-    rabject::Blueprint,
+    prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
     utils::bezier::divide_segment_to_n_part,
 };
@@ -21,8 +22,21 @@ use super::vmobject::VMobject;
 #[derive(Clone, Debug)]
 pub struct BezPath {
     pub inner: kurbo::BezPath,
-    pub stroke: Option<StrokeOptions>,
-    pub fill: Option<FillOptions>,
+    pub stroke: StrokeOptions,
+    pub fill: FillOptions,
+}
+
+impl Deref for BezPath {
+    type Target = kurbo::BezPath;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for BezPath {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
 }
 
 impl Into<VMobject> for BezPath {
@@ -196,25 +210,31 @@ impl Interpolatable for BezPath {
     fn lerp(&self, other: &Self, t: f32) -> Self {
         BezPath {
             inner: self.inner.lerp(&other.inner, t),
-            stroke: self
-                .stroke
-                .as_ref()
-                .zip(other.stroke.as_ref())
-                .map(|(a, b)| a.lerp(&b, t)),
-            fill: self
-                .fill
-                .as_ref()
-                .zip(other.fill.as_ref())
-                .map(|(a, b)| a.lerp(&b, t)),
+            stroke: self.stroke.lerp(&other.stroke, t),
+            fill: self.fill.lerp(&other.fill, t),
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct StrokeOptions {
+    pub opacity: f32, // Because we can't get opacity from peniko's Brush
     pub style: kurbo::Stroke,
     pub transform: Option<Affine>,
     pub brush: Brush,
+}
+
+impl StrokeOptions {
+    pub fn with_opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity;
+        self.brush = self.brush.clone().with_alpha(opacity);
+        self
+    }
+    pub fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.opacity = opacity;
+        self.brush = self.brush.clone().with_alpha(opacity);
+        self
+    }
 }
 
 impl Interpolatable for kurbo::Stroke {
@@ -259,6 +279,7 @@ impl Interpolatable for peniko::Brush {
 impl Interpolatable for StrokeOptions {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         StrokeOptions {
+            opacity: self.opacity.lerp(target.opacity, t),
             style: self.style.lerp(&target.style, t),
             transform: if t == 0.0 {
                 self.transform
@@ -275,7 +296,12 @@ impl Interpolatable for StrokeOptions {
 impl Default for StrokeOptions {
     fn default() -> Self {
         Self {
-            style: kurbo::Stroke::default(),
+            opacity: 1.0,
+            style: kurbo::Stroke {
+                start_cap: kurbo::Cap::Square,
+                end_cap: kurbo::Cap::Square,
+                ..Default::default()
+            },
             transform: None,
             brush: Brush::Solid(peniko::color::palette::css::RED),
         }
@@ -284,14 +310,29 @@ impl Default for StrokeOptions {
 
 #[derive(Clone, Debug)]
 pub struct FillOptions {
+    pub opacity: f32, // Because we can't get opacity from peniko's Brush
     pub style: peniko::Fill,
     pub transform: Option<Affine>,
     pub brush: Brush,
 }
 
+impl FillOptions {
+    pub fn with_opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity;
+        self.brush = self.brush.clone().with_alpha(opacity);
+        self
+    }
+    pub fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.opacity = opacity;
+        self.brush = self.brush.clone().with_alpha(opacity);
+        self
+    }
+}
+
 impl Interpolatable for FillOptions {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         FillOptions {
+            opacity: self.opacity.lerp(target.opacity, t),
             style: if t == 0.0 { self.style } else { target.style },
             transform: if t == 0.0 {
                 self.transform
@@ -306,6 +347,7 @@ impl Interpolatable for FillOptions {
 impl Default for FillOptions {
     fn default() -> Self {
         Self {
+            opacity: 1.0,
             style: peniko::Fill::NonZero,
             transform: None,
             brush: Brush::Solid(peniko::color::palette::css::BLUE),
@@ -313,126 +355,58 @@ impl Default for FillOptions {
     }
 }
 
-pub struct ArcBezPathBlueprint {
-    pub angle: f32,
-    pub radius: f32,
-    pub x_rotation: f32,
-    pub stroke_width: f32,
-}
-
-impl ArcBezPathBlueprint {
-    pub fn with_stroke_width(mut self, width: f32) -> Self {
-        self.stroke_width = width;
+impl BezPath {
+    pub fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+        self.stroke.style.width = width as f64;
         self
     }
-}
+    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba>) -> &mut Self {
+        let color = color.into();
 
-impl Default for ArcBezPathBlueprint {
-    fn default() -> Self {
-        Self {
-            angle: 0.0,
-            radius: 0.0,
-            x_rotation: 0.0,
-            stroke_width: 10.0,
-        }
+        self.stroke.brush = peniko::Brush::Solid(AlphaColor::new([
+            color.red,
+            color.green,
+            color.blue,
+            self.stroke.opacity,
+        ]));
+        self
     }
-}
-
-impl Blueprint<BezPath> for ArcBezPathBlueprint {
-    fn build(self) -> BezPath {
-        // when x_rotation is 0.0, the arc starts from (radius, 0.0) and goes clockwise
-        let start = (
-            self.radius * self.x_rotation.cos(),
-            self.radius * self.x_rotation.sin(),
-        );
-
-        let path = kurbo::BezPath::from_vec(
-            [kurbo::PathEl::MoveTo(
-                (start.0 as f64, start.1 as f64).into(),
-            )]
-            .into_iter()
-            .chain(
-                kurbo::Arc::new(
-                    (0.0, 0.0),
-                    (self.radius as f64, self.radius as f64),
-                    0.0,
-                    self.angle as f64,
-                    0.0, // std::f64::consts::PI / 2.0,
-                )
-                .append_iter(0.1),
-            )
-            .collect(),
-        );
-
-        let stroke = Some(StrokeOptions::default());
-        let fill = Some(FillOptions::default());
-
-        BezPath {
-            inner: path,
-            stroke,
-            fill,
-        }
+    pub fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.stroke.set_opacity(opacity);
+        self
     }
-}
-
-impl BezPath {
-    pub fn arc(angle: f32, radius: f32) -> ArcBezPathBlueprint {
-        ArcBezPathBlueprint {
-            angle,
-            radius,
-            ..Default::default()
-        }
+    pub fn set_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
+        self.set_stroke_color(color);
+        self.set_fill_color(color);
+        self
     }
-}
-
-impl BezPath {
-    pub fn set_stroke_width(&mut self, width: f32) {
-        if let Some(stroke) = &mut self.stroke {
-            stroke.style.width = width as f64;
-        }
+    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba>) -> &mut Self {
+        let color = color.into();
+        self.fill.brush = peniko::Brush::Solid(AlphaColor::new([
+            color.red,
+            color.green,
+            color.blue,
+            self.fill.opacity,
+        ]));
+        self
     }
-    pub fn set_stroke_color(&mut self, color: LinearRgba) {
-        if let Some(stroke) = &mut self.stroke {
-            stroke.brush = peniko::Brush::Solid(AlphaColor::new([
-                color.red,
-                color.green,
-                color.blue,
-                color.alpha,
-            ]));
-        }
+    pub fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.fill.set_opacity(opacity);
+        self
     }
-    pub fn set_stroke_alpha(&mut self, alpha: f32) {
-        if let Some(mut stroke) = self.stroke.take() {
-            stroke.brush = stroke.brush.with_alpha(alpha);
-            self.stroke = Some(stroke);
-        }
-    }
-    /* pub fn set_fill_color(&mut self, color: Option<LinearRgba>) {
-        self.fill =
-            color.map(|c| peniko::Brush::Solid(AlphaColor::new([c.red, c.green, c.blue, c.alpha])));
-    }
-    pub fn set_fill_alpha(&mut self, alpha: f32) {
-        if let Some(fill) = self.fill.take() {
-            self.fill = Some(fill.with_alpha(alpha));
-        }
-    }
-    pub fn set_alpha(&mut self, alpha: f32) {
-        self.set_stroke_alpha(alpha);
-        self.set_fill_alpha(alpha);
-    } */
     // transforms
-    pub fn apply_affine(&mut self, affine: kurbo::Affine) {
-        self.inner.apply_affine(affine);
-    }
-    pub fn shift(&mut self, shift: (f32, f32)) {
+    pub fn shift(&mut self, shift: (f32, f32)) -> &mut Self {
         self.inner
             .apply_affine(kurbo::Affine::translate((shift.0 as f64, shift.1 as f64)));
+        self
     }
-    pub fn rotate(&mut self, angle: f32) {
+    pub fn rotate(&mut self, angle: f32) -> &mut Self {
         self.inner.apply_affine(kurbo::Affine::rotate(angle as f64));
+        self
     }
-    pub fn scale(&mut self, scale: f32) {
+    pub fn scale(&mut self, scale: f32) -> &mut Self {
         self.inner.apply_affine(kurbo::Affine::scale(scale as f64));
+        self
     }
 }
 
@@ -443,23 +417,27 @@ impl Entity for BezPath {
     fn extract(&mut self) {}
     fn prepare(&mut self, _ctx: &crate::context::RanimContext) {}
     fn render(&mut self, _ctx: &mut crate::context::RanimContext, renderer: &mut Self::Renderer) {
-        if let Some(fill_options) = self.fill.as_ref() {
-            renderer.vello_scene.fill(
-                fill_options.style,
-                kurbo::Affine::IDENTITY,
-                &fill_options.brush,
-                fill_options.transform,
-                &self.inner,
-            );
-        }
-        if let Some(stroke_options) = self.stroke.as_ref() {
-            renderer.vello_scene.stroke(
-                &stroke_options.style,
-                kurbo::Affine::IDENTITY,
-                &stroke_options.brush,
-                stroke_options.transform,
-                &self.inner,
-            );
-        }
+        renderer.vello_scene.fill(
+            self.fill.style,
+            kurbo::Affine::IDENTITY,
+            &self.fill.brush,
+            self.fill.transform,
+            &self.inner,
+        );
+        renderer.vello_scene.stroke(
+            &self.stroke.style,
+            kurbo::Affine::IDENTITY,
+            &self.stroke.brush,
+            self.stroke.transform,
+            &self.inner,
+        );
+    }
+}
+
+impl Opacity for BezPath {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.set_stroke_opacity(opacity);
+        self.set_fill_opacity(opacity);
+        self
     }
 }
