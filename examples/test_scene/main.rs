@@ -1,19 +1,13 @@
 use std::time::Duration;
 
 use env_logger::Env;
-use glam::{vec3, Vec3};
+use glam::vec2;
 use ranim::{
     animation::transform::Transform,
-    color::palettes,
     prelude::*,
-    rabject::rabject2d::{
-        bez_path::BezPath,
-        blueprint::{Rect, Square},
-        svg::Svg,
-        vmobject::{geometry::Arc, VMobject},
-        vpath::{blueprint::VPathBuilder, VPath},
-    },
+    rabject::rabject2d::vmobject::{geometry::Arc, svg::Svg, VMobject},
     scene::SceneBuilder,
+    typst,
 };
 use vello::kurbo::Affine;
 
@@ -42,24 +36,29 @@ fn main() {
         // let square = canvas.insert(square);
 
         // let svg = Svg::from_path("assets/Ghostscript_Tiger.svg");
-        let mut svg: VMobject = Svg::from_path("assets/text.svg").into();
+        // let svg = Svg::from_file("assets/text.svg").build();
+        let svg = typst!(r#"
+            #text(20pt)[hello]
+        "#
+        );
+        let mut svg = Svg::from_tree(svg).build();
+        svg.shift(vec2(1920.0 / 2.0, 1280.0 / 2.0));
         let svg = canvas.insert(svg);
 
         // let arc = BezPath::arc(std::f32::consts::PI * 2.0, 100.0);
         // let arc = canvas.insert(arc);
 
-        let mut arc: VMobject = Arc::new(std::f32::consts::PI)
+        let mut arc = Arc::new(std::f32::consts::PI)
             .with_radius(100.0)
-            .build()
-            .into();
+            .build();
         arc.apply_affine(Affine::translate((960.0, 540.0)));
         (svg, arc)
     };
+    scene.render_to_image("test_scene.png");
 
     scene.wait(Duration::from_secs_f32(0.5));
     scene.play_in_canvas(&canvas, &svg, Transform::new(arc));
     scene.wait(Duration::from_secs_f32(0.5));
-    // scene.render_to_image("test_scene.png");
     // {
     //     let canvas = scene.get(&canvas);
     //     let data = get_texture_data(&scene.ctx.wgpu_ctx, &canvas.camera.render_texture);

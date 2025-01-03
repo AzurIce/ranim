@@ -1,6 +1,7 @@
 pub mod bezier;
 pub mod rate_functions;
 pub mod wgpu;
+pub mod typst;
 
 use std::{
     any::{Any, TypeId},

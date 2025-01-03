@@ -634,7 +634,7 @@ impl SceneCamera {
         self.update_uniforms(&ctx.wgpu_ctx);
         self.clear_screen(&ctx.wgpu_ctx);
         for (id, entity) in entities.iter_mut() {
-            trace!("[Scene] Rendering entity {:?}", id);
+            // trace!("[Scene] Rendering entity {:?}", id);
             entity.render(ctx, self);
         }
         self.output_texture_updated = false;

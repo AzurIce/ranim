@@ -1604,6 +1604,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "pollster",
+ "regex",
  "usvg",
  "uuid",
  "vello",
