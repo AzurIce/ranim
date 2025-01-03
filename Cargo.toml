@@ -27,6 +27,7 @@ anyhow = "1.0.93"
 bevy_color = "0.15.1"
 usvg = "0.44.0"
 vello = { git = "https://github.com/linebender/vello" }
+regex = "1.11.1"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

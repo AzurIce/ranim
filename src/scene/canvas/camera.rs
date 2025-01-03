@@ -351,7 +351,7 @@ impl CanvasCamera {
                 1.0 / (0.5 * self.viewport_height as f32),
                 1.0,
             ));
-        debug!("[CanvasCamera]: Uniforms: {:?}", mat4);
+        // debug!("[CanvasCamera]: Uniforms: {:?}", mat4);
         wgpu_ctx
             .queue
             .write_buffer(&self.uniforms_buffer, 0, bytemuck::cast_slice(&[mat4]));

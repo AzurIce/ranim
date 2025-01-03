@@ -11,7 +11,8 @@ Ranim is an animation engine crate implemented in pure rust, inspired by [Manim]
 
 ## Dependencies
 
-runtime dependencies:
+Runtime dependencies:
+- typst: for fonts and maths rendering
 - ffmpeg: ranim spawns a ffmpeg process to encode videos
 
 ## Installation
