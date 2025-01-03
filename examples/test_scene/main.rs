@@ -7,7 +7,7 @@ use ranim::{
     prelude::*,
     rabject::rabject2d::vmobject::{geometry::Arc, svg::Svg, VMobject},
     scene::SceneBuilder,
-    typst,
+    typst_svg, typst_tree,
 };
 use vello::kurbo::Affine;
 
@@ -37,7 +37,7 @@ fn main() {
 
         // let svg = Svg::from_path("assets/Ghostscript_Tiger.svg");
         // let svg = Svg::from_file("assets/text.svg").build();
-        let svg = typst!(r#"
+        let svg = typst_tree!(r#"
             #text(20pt)[hello]
         "#
         );
