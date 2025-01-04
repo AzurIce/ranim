@@ -14,3 +14,6 @@ examples:
     just example arc_between_points
     just example basic
     just example palettes
+
+clean:
+    rm **/*.log

@@ -12,7 +12,7 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info")).init();
 
     let mut scene = SceneBuilder::new("palettes").build();
-    let (width, height) = scene.size();
+    let (width, height) = scene.frame_size();
     let canvas = scene.insert_new_canvas(width as u32, height as u32);
     scene.center_canvas_in_frame(&canvas);
 

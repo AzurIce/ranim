@@ -3,9 +3,9 @@ use std::time::Duration;
 use env_logger::Env;
 use glam::vec2;
 use ranim::{
-    animation::transform::Transform,
+    animation::{fading::Fading, transform::Transform},
     prelude::*,
-    rabject::rabject2d::vmobject::{geometry::Arc, svg::Svg, VMobject},
+    rabject::rabject2d::vmobject::{geometry::Arc, svg::Svg},
     scene::SceneBuilder,
     typst_svg, typst_tree,
 };
@@ -21,44 +21,26 @@ fn main() {
     let mut scene = SceneBuilder::new("test_scene").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
     scene.center_canvas_in_frame(&canvas);
-    let (svg, arc) = {
-        let canvas = scene.get_mut(&canvas);
-        // let quad = VPathBuilder::start(Vec3::ZERO)
-        //     .quad_to(vec3(100.0, 100.0, 0.0), vec3(200.0, 0.0, 0.0))
-        //     .build();
-        // let quad = canvas.insert(quad);
 
-        // let mut square = Rect::new(100.0, 100.0).build();
-        // square
-        //     .shift(vec3(100.0, 100.0, 0.0))
-        //     .set_color(palettes::manim::BLUE_C)
-        //     .set_stroke_width(0.0);
-        // let square = canvas.insert(square);
+    let svg = typst_tree!(
+        r#"
+        #text(20pt)[hello]
+    "#
+    );
 
-        // let svg = Svg::from_path("assets/Ghostscript_Tiger.svg");
-        // let svg = Svg::from_file("assets/text.svg").build();
-        let svg = typst_tree!(r#"
-            #text(20pt)[hello]
-        "#
-        );
-        let mut svg = Svg::from_tree(svg).build();
-        svg.shift(vec2(1920.0 / 2.0, 1280.0 / 2.0));
-        let svg = canvas.insert(svg);
-
-        // let arc = BezPath::arc(std::f32::consts::PI * 2.0, 100.0);
-        // let arc = canvas.insert(arc);
-
-        let mut arc = Arc::new(std::f32::consts::PI)
-            .with_radius(100.0)
-            .build();
-        arc.apply_affine(Affine::translate((960.0, 540.0)));
-        (svg, arc)
-    };
+    let mut svg = Svg::from_tree(svg).build();
+    svg.shift(vec2(1920.0 / 2.0, 1280.0 / 2.0));
+    let svg = scene.play_in_canvas(&canvas, svg, Fading::fade_in());
+   
     scene.render_to_image("test_scene.png");
+    
+    scene.wait(Duration::from_secs_f32(0.5));
+    let mut arc = Arc::new(std::f32::consts::PI).with_radius(100.0).build();
+    arc.apply_affine(Affine::translate((960.0, 540.0)));
 
+    let arc = scene.play_in_canvas(&canvas, svg, Transform::new(arc));
     scene.wait(Duration::from_secs_f32(0.5));
-    scene.play_in_canvas(&canvas, &svg, Transform::new(arc));
-    scene.wait(Duration::from_secs_f32(0.5));
+
     // {
     //     let canvas = scene.get(&canvas);
     //     let data = get_texture_data(&scene.ctx.wgpu_ctx, &canvas.camera.render_texture);
