@@ -4,7 +4,7 @@ use bevy_color::Srgba;
 use env_logger::Env;
 use log::info;
 use ranim::glam::vec2;
-use ranim::prelude::*;
+use ranim::{prelude::*, typst_svg};
 use ranim::rabject::rabject2d::vmobject::{
     geometry::{Arc, Polygon},
     svg::Svg,
@@ -30,6 +30,14 @@ fn main() {
     let t = Instant::now();
     info!("running...");
 
+    let mut ranim_text = Svg::from_svg(&typst_svg!("#text(60pt)[Ranim]")).build();
+    ranim_text.shift(center - ranim_text.bounding_box().center());
+
+    // 0.5s wait -> fade in -> 0.5s wait
+    scene.wait(Duration::from_secs_f32(0.5));
+    let ranim_text = scene.play_in_canvas(&canvas, ranim_text, Fading::fade_in());
+    scene.wait(Duration::from_secs_f32(0.5));
+
     let mut polygon = Polygon::new(vec![
         vec2(0.0, 0.0),
         vec2(-100.0, -300.0),
@@ -47,7 +55,7 @@ fn main() {
 
     // 0.5s wait -> fade in -> 0.5s wait
     scene.wait(Duration::from_secs_f32(0.5));
-    let polygon = scene.play_in_canvas(&canvas, polygon, Fading::fade_in());
+    let polygon = scene.play_in_canvas(&canvas, ranim_text, Transform::new(polygon));
     scene.wait(Duration::from_secs_f32(0.5));
 
     let mut svg = Svg::from_svg(SVG).build();
@@ -70,5 +78,5 @@ fn main() {
     info!("arc fade_out");
     scene.play_remove_in_canvas(&canvas, arc, Fading::fade_out());
 
-    info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
+    info!("Rendered {} frames({}s) in {:?}", scene.frame_count, scene.time, t.elapsed());
 }
