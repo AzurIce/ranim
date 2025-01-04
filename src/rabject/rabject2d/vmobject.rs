@@ -5,13 +5,23 @@ use vello::kurbo::{self, Affine, PathEl};
 use crate::{
     prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
-    utils::affine_from_vec,
+    utils::{affine_from_vec, math::Rect},
 };
 
-use super::bez_path::BezPath;
+use super::{bez_path::BezPath, BoundingBox};
 
 pub mod geometry;
 pub mod svg;
+
+impl BoundingBox for VMobject {
+    fn bounding_box(&self) -> Rect {
+        self.subpaths
+            .iter()
+            .map(|p| p.bounding_box())
+            .reduce(|acc, e| acc.union(&e))
+            .unwrap()
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct VMobject {

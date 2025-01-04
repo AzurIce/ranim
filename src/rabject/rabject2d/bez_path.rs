@@ -4,20 +4,20 @@ use std::{
 };
 
 use bevy_color::LinearRgba;
-use glam::FloatExt;
+use glam::{vec2, FloatExt, Vec2};
 use itertools::Itertools;
 use vello::{
-    kurbo::{self, Affine, CubicBez, Line, PathSeg, QuadBez},
+    kurbo::{self, Affine, CubicBez, Line, PathSeg, QuadBez, Shape},
     peniko::{self, color::AlphaColor, Brush},
 };
 
 use crate::{
     prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
-    utils::bezier::divide_segment_to_n_part,
+    utils::{bezier::divide_segment_to_n_part, math::Rect},
 };
 
-use super::vmobject::VMobject;
+use super::{vmobject::VMobject, BoundingBox};
 
 #[derive(Clone, Debug)]
 pub struct BezPath {
@@ -36,6 +36,12 @@ impl Deref for BezPath {
 impl DerefMut for BezPath {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
+    }
+}
+
+impl BoundingBox for BezPath {
+    fn bounding_box(&self) -> Rect {
+        self.inner.bounding_box().into()
     }
 }
 

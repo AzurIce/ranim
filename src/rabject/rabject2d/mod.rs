@@ -1,5 +1,13 @@
+use glam::Vec2;
+
+use crate::utils::math::Rect;
+
 pub mod bez_path;
 pub mod vmobject;
+
+pub trait BoundingBox {
+    fn bounding_box(&self) -> Rect;
+}
 
 #[cfg(test)]
 mod test {
