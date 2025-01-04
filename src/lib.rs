@@ -39,7 +39,7 @@
 //! {
 //!     let canvas = scene.get_mut(canvas);
 //!
-//!     // Create a Rabject2dEntity<VPath> with a closed path formed by 5 points
+//!     // Create a VMobject with a closed path formed by 5 points
 //!     let mut polygon = Polygon::new(vec![
 //!         vec2(0.0, 0.0),
 //!         vec2(-100.0, -300.0),
@@ -56,12 +56,13 @@
 //!         TransformAnchor::origin(),
 //!     );
 //!
+//!     // Insert the VMobject and get its id
 //!     let polygon = canvas.insert(polygon);
 //! }
 //! ```
 //!
 //! Now the [`scene::Scene`] contains a [`scene::canvas::Canvas`], and in the canvas,
-//! there is a [`scene::Entity`] built by the [`rabject::rabject2d::blueprint::Polygon`] blueprint.
+//! there is a [`scene::Entity`] built by the [`crate::rabject::rabject2d::vmobject::geometry::Polygon`] blueprint.
 //!
 //! Finally, to render the scene, use [`scene::Scene::render_to_image`]:
 //!

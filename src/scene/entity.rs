@@ -34,13 +34,6 @@ impl<E: EntityAny> Debug for EntityId<E> {
     }
 }
 
-impl<E: EntityAny> Copy for EntityId<E> {}
-
-impl<E: EntityAny> Clone for EntityId<E> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
 
 impl<E: EntityAny> EntityId<E> {
     pub fn from_id(id: Id) -> Self {

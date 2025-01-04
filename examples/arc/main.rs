@@ -45,10 +45,9 @@ fn main() {
                 .build();
 
             arc.set_color(color).set_fill_alpha(0.0).shift(offset);
-            let arc = scene.get_mut(&canvas).insert(arc);
-            scene.play_in_canvas(
+            let _arc = scene.play_in_canvas(
                 &canvas,
-                &arc,
+                arc,
                 Fading::fade_in().config(|config| {
                     config.set_run_time(Duration::from_secs_f32(0.02));
                 }),

@@ -5,7 +5,10 @@ use env_logger::Env;
 use log::info;
 use ranim::glam::vec2;
 use ranim::prelude::*;
-use ranim::rabject::rabject2d::vmobject::{geometry::{Arc, Polygon}, svg::Svg};
+use ranim::rabject::rabject2d::vmobject::{
+    geometry::{Arc, Polygon},
+    svg::Svg,
+};
 use ranim::{
     animation::{fading::Fading, transform::Transform},
     scene::SceneBuilder,
@@ -44,8 +47,14 @@ fn main() {
 
     // 0.5s wait -> fade in -> 0.5s wait
     scene.wait(Duration::from_secs_f32(0.5));
-    let polygon = scene.get_mut(&canvas).insert(polygon);
-    scene.play_in_canvas(&canvas, &polygon, Fading::fade_in());
+    let polygon = scene.play_in_canvas(&canvas, polygon, Fading::fade_in());
+    scene.wait(Duration::from_secs_f32(0.5));
+
+    let mut svg = Svg::from_svg(SVG).build();
+    svg.shift(center);
+
+    info!("polygon transform to svg");
+    let svg = scene.play_in_canvas(&canvas, polygon, Transform::new(svg.clone()));
     scene.wait(Duration::from_secs_f32(0.5));
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
@@ -54,26 +63,12 @@ fn main() {
         .build();
     arc.set_color(Srgba::hex("58C4DDFF").unwrap()).shift(center);
 
-
-    let mut svg = Svg::from_svg(SVG).build();
-    svg.shift(center);
-    
-    info!("polygon transform to svg");
-    scene.play_in_canvas(&canvas, &polygon, Transform::new(svg.clone()));
-    scene.wait(Duration::from_secs_f32(0.5));
-
-    scene.get_mut(&canvas).remove(polygon);
-    let svg = scene.get_mut(&canvas).insert(svg);
-
     info!("svg transform to arc");
-    scene.play_in_canvas(&canvas, &svg, Transform::new(arc.clone()));
+    let arc = scene.play_in_canvas(&canvas, svg, Transform::new(arc.clone()));
     scene.wait(Duration::from_secs_f32(0.5));
-
-    scene.get_mut(&canvas).remove(svg);
-    let arc = scene.get_mut(&canvas).insert(arc);
 
     info!("arc fade_out");
-    scene.play_in_canvas(&canvas, &arc, Fading::fade_out());
+    scene.play_remove_in_canvas(&canvas, arc, Fading::fade_out());
 
     info!("Rendered {} frames in {:?}", scene.frame_count, t.elapsed());
 }

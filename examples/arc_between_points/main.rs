@@ -48,10 +48,9 @@ fn main() {
                 .set_fill_alpha(0.0)
                 .set_stroke_width(width);
 
-            let arc = scene.get_mut(&canvas).insert(arc);
-            scene.play_in_canvas(
+            let _arc = scene.play_in_canvas(
                 &canvas,
-                &arc,
+                arc,
                 Fading::fade_in().config(|config| {
                     config.set_run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32));
                 }),

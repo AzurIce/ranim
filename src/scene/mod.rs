@@ -14,7 +14,10 @@ use std::{
     time::Duration,
 };
 
-use crate::{animation::Animation, context::RanimContext};
+use crate::{
+    animation::{AnimateTarget, Animation},
+    context::RanimContext,
+};
 use bevy_color::Color;
 use glam::{Mat4, Vec3};
 use wgpu::RenderPassDescriptor;
@@ -117,21 +120,21 @@ impl SceneBuilder {
 ///
 ///
 pub struct Scene {
-    pub ctx: RanimContext,
+    ctx: RanimContext,
     /// The name of the scene
-    pub name: String,
+    name: String,
     pub camera: SceneCamera,
     /// Entities in the scene
-    pub entities: EntitiesStore<SceneCamera>,
+    entities: EntitiesStore<SceneCamera>,
     pub time: f32,
     pub frame_count: usize,
 
     /// The writer for the output.mp4 video
-    pub video_writer: Option<FileWriter>,
+    video_writer: Option<FileWriter>,
     /// Whether to auto create a [`FileWriter`] to output the video
     video_writer_builder: Option<FileWriterBuilder>,
     /// Whether to save the frames
-    pub save_frames: bool,
+    save_frames: bool,
 }
 
 impl Deref for Scene {
@@ -231,7 +234,7 @@ impl Scene {
     /// The size of the camera frame
     ///
     /// for a `scene`, this is equal to `scene.camera.frame.size`
-    pub fn size(&self) -> (usize, usize) {
+    pub fn frame_size(&self) -> (usize, usize) {
         self.camera.frame.size
     }
 
@@ -299,53 +302,86 @@ impl Scene {
 
     /// Play an animation
     ///
-    /// This is equal to:
+    /// The different target_type is corresponding to different [`AnimateTarget`]:
+    /// - [`Entity`] represents an entity that is not existed in the scene 
+    /// 
+    ///   It corresponds to [`AnimateTarget::Insert`], the entity will
+    ///   be inserted into the scene before animation plays
+    /// - [`EntityId`] represents an entity that is existed in the scene
+    ///   It corresponds to [`AnimateTarget::Existed`]
+    /// 
+    /// Should note that this function takes the ownership of the entity or its id and returns the id.
+    /// 
+    /// If you want to remove the entity after animation plays, you can use [`Scene::play_remove`].
+    /// 
+    /// For playing animation in a canvas, see [`Scene::play_in_canvas`] and [`Scene::play_remove_in_canvas`].
+    /// 
+    /// The actual "playing" part is equal to:
     /// ```rust
-    /// let run_time = animation.config.run_time.clone();
-    /// scene.insert_updater(target_id, animation);
-    /// scene.advance(run_time);
+    /// let run_time = animation.config.run_time;
+    /// self.get_mut(&entity_id).insert_updater(animation);
+    /// self.advance(run_time);
     /// ```
     ///
-    /// See [`Animation`] and [`Updater`].
-    pub fn play<E: Entity<Renderer = SceneCamera> + 'static>(
+    /// See [`Animation`] and [`crate::updater::Updater`].
+    pub fn play<'a, E: Entity<Renderer = SceneCamera> + 'static>(
         &mut self,
-        target_id: &EntityId<E>,
+        target: impl Into<AnimateTarget<E>>,
         animation: Animation<E>,
-    ) {
+    ) -> EntityId<E> {
+        let target = target.into();
+
+        let entity_id = match target {
+            AnimateTarget::Insert(entity) => self.insert(entity),
+            AnimateTarget::Existed(entity_id) => entity_id,
+        };
+
         let run_time = animation.config.run_time;
-        self.get_mut(target_id).insert_updater(animation);
+        self.get_mut(&entity_id).insert_updater(animation);
         self.advance(run_time);
+        entity_id
     }
 
-    pub fn play_remove<E: Entity<Renderer = SceneCamera> + 'static>(
+    pub fn play_remove<'a, E: Entity<Renderer = SceneCamera> + 'static>(
         &mut self,
         target_id: EntityId<E>,
         animation: Animation<E>,
     ) {
-        self.play(&target_id, animation);
+        let target_id = self.play(target_id, animation);
         self.remove(target_id);
     }
 
-    pub fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
+    /// Play an animation in a canvas
+    ///
+    /// Same like [`Scene::play`], but the animation will be played in a canvas
+    ///
+    /// See [`Animation`] and [`crate::updater::Updater`].
+    pub fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static, T: Into<AnimateTarget<E>>>(
         &mut self,
         canvas_id: &EntityId<Canvas>,
-        target_id: &EntityId<E>,
+        target: T,
         animation: Animation<E>,
-    ) {
+    ) -> EntityId<E> {
+        let target = target.into();
+
+        let entity_id = match target {
+            AnimateTarget::Insert(entity) => self.get_mut(canvas_id).insert(entity),
+            AnimateTarget::Existed(entity_id) => entity_id,
+        };
+
         let run_time = animation.config.run_time;
-        self.get_mut(canvas_id)
-            .get_mut(target_id)
-            .insert_updater(animation);
+        self.get_mut(canvas_id).get_mut(&entity_id).insert_updater(animation);
         self.advance(run_time);
+        entity_id
     }
 
-    pub fn play_remove_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
+    pub fn play_remove_in_canvas<'a, E: Entity<Renderer = CanvasCamera> + 'static>(
         &mut self,
         canvas_id: &EntityId<Canvas>,
         target_id: EntityId<E>,
         animation: Animation<E>,
     ) {
-        self.play_in_canvas(canvas_id, &target_id, animation);
+        let target_id = self.play_in_canvas(canvas_id, target_id, animation);
         self.get_mut(canvas_id).remove(target_id);
     }
 

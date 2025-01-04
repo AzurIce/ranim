@@ -3,7 +3,7 @@ pub mod transform;
 
 use std::time;
 
-use crate::{updater::Updater, utils::rate_functions::smooth};
+use crate::{scene::{Entity, EntityId}, updater::Updater, utils::rate_functions::smooth};
 
 #[allow(unused)]
 use log::trace;
@@ -68,12 +68,45 @@ impl AnimationConfig {
 /// See [`Animation`], [`Updater`]
 pub trait AnimationFunc<T> {
     #[allow(unused)]
-    fn pre_anim(&mut self, rabject: &mut T) {}
+    fn pre_anim(&mut self, entity: &mut T);
 
-    fn interpolate(&mut self, rabject: &mut T, alpha: f32);
+    fn interpolate(&mut self, entity: &mut T, alpha: f32);
 
     #[allow(unused)]
-    fn post_anim(&mut self, rabject: &mut T) {}
+    fn post_anim(&mut self, entity: &mut T) {}
+}
+
+// /// An [`AnimationAction`] specifies what to do with the animatied entity
+// pub enum AnimationAction<T: Entity + 'static> {
+//     /// Insert the entity into the scene, and animate it
+//     InsertAndAnimate(T),
+//     /// Animate the entity, and remove it from the scene
+//     AnimateAndRemove(EntityId<T>),
+//     /// Just animate
+//     Animate(EntityId<T>),
+// }
+
+pub enum AnimateTarget<T: Entity + 'static> {
+    Insert(T),
+    Existed(EntityId<T>),
+    // Remove(EntityId<T>),
+}
+
+impl<T: Entity + 'static> From<T> for AnimateTarget<T> {
+    fn from(value: T) -> Self {
+        Self::Insert(value)
+    }
+}
+
+// impl<'a, T: Entity + 'static> From<&'a EntityId<T>> for AnimateTarget<'a, T> {
+//     fn from(value: &'a EntityId<T>) -> Self {
+//         Self::Existed(value)
+//     }
+// }
+impl<T: Entity + 'static> From<EntityId<T>> for AnimateTarget<T> {
+    fn from(value: EntityId<T>) -> Self {
+        Self::Existed(value)
+    }
 }
 
 /// A [`Updater`] wraps an [`AnimationFunc`]
@@ -82,25 +115,26 @@ pub trait AnimationFunc<T> {
 pub struct Animation<T> {
     acc_t: f32,
 
+    // action: AnimationAction<T>,
     pub func: Box<dyn AnimationFunc<T>>,
     pub(crate) config: AnimationConfig,
 }
 
 impl<T> Updater<T> for Animation<T> {
-    fn on_create(&mut self, rabject: &mut T) {
-        self.func.pre_anim(rabject);
+    fn on_create(&mut self, entity: &mut T) {
+        self.func.pre_anim(entity);
     }
-    fn on_update(&mut self, rabject: &mut T, dt: f32) -> bool {
+    fn on_update(&mut self, entity: &mut T, dt: f32) -> bool {
         self.acc_t += dt;
         let alpha = (self.acc_t / self.config.run_time.as_secs_f32()).clamp(0.0, 1.0);
 
         let alpha = (self.config.rate_func)(alpha);
 
-        self.func.interpolate(rabject, alpha);
+        self.func.interpolate(entity, alpha);
         self.acc_t <= self.config.run_time.as_secs_f32()
     }
-    fn on_destroy(&mut self, rabject: &mut T) {
-        self.func.post_anim(rabject);
+    fn on_destroy(&mut self, entity: &mut T) {
+        self.func.post_anim(entity);
     }
 }
 
