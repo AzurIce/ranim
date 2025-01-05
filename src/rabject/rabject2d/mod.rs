@@ -1,5 +1,3 @@
-use glam::Vec2;
-
 use crate::utils::math::Rect;
 
 pub mod bez_path;
