@@ -3,7 +3,7 @@ use std::time::Duration;
 use env_logger::Env;
 use glam::vec2;
 use ranim::{
-    animation::{fading::Fading, transform::Transform},
+    animation::{creation::Creation, fading::Fading, transform::Transform},
     prelude::*,
     rabject::rabject2d::{
         bez_path::{BezPath, FillOptions, StrokeOptions},
@@ -13,10 +13,17 @@ use ranim::{
             VMobject,
         },
     },
-    scene::SceneBuilder,
+    scene::{canvas::Canvas, EntityId, Scene, SceneBuilder},
     typst_svg, typst_tree,
 };
 use vello::kurbo;
+
+fn create_and_uncreate(scene: &mut Scene, canvas: &EntityId<Canvas>, vmobject: VMobject) {
+    let vmobject = scene.play_in_canvas(&canvas, vmobject, Creation::create());
+    scene.wait(Duration::from_secs_f32(0.5));
+    scene.play_remove_in_canvas(&canvas, vmobject, Creation::un_create());
+    scene.wait(Duration::from_secs_f32(0.5));
+}
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -30,28 +37,13 @@ fn main() {
     scene.center_canvas_in_frame(&canvas);
     let center = (1920.0 / 2.0, 1080.0 / 2.0);
 
-    let path = kurbo::BezPath::from_vec(vec![
-        kurbo::PathEl::MoveTo((0.0, 0.0).into()),
-        kurbo::PathEl::LineTo((0.0, 0.0).into()),
-        kurbo::PathEl::ClosePath,
-    ]);
-    let path = BezPath {
-        inner: path,
-        stroke: StrokeOptions::default(),
-        fill: FillOptions::default(),
-    };
-    let mut m = VMobject::new(vec![path]);
-    m.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - m.bounding_box().center());
-    let m = scene.get_mut(&canvas).insert(m);
-
-    let typ = "#text(60pt)[R]";
+    let typ = "#text(60pt)[Ranim]";
 
     let svg = typst_tree!(typ);
     let mut svg = Svg::from_tree(svg).build();
     svg.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - svg.bounding_box().center());
-    
-    let svg = scene.play_in_canvas(&canvas, m, Transform::new(svg));
-    scene.wait(Duration::from_secs_f32(0.5));
+
+    create_and_uncreate(&mut scene, &canvas, svg.clone());
 
     // let mut square = Square::new(100.0).build();
     // square.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - square.bounding_box().center());
@@ -68,12 +60,10 @@ fn main() {
     .build();
     polygon.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - polygon.bounding_box().center());
 
-    let polygon = scene.play_in_canvas(&canvas, svg, Transform::new(polygon));
+    
+    create_and_uncreate(&mut scene, &canvas, polygon.clone());
 
-    {
-        let polygon = scene.get(&canvas).get(&polygon);
-        println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n{:?}", polygon.subpaths[0].elements());
-    }
+    let polygon = scene.play_in_canvas(&canvas, svg, Transform::new(polygon));
 
     let svg = typst_tree!(typ);
     let mut svg = Svg::from_tree(svg).build();

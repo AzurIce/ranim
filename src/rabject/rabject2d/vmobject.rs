@@ -1,8 +1,11 @@
+use std::ops::Range;
+
 use bevy_color::LinearRgba;
 use glam::{vec2, Vec2};
 use vello::kurbo::{self, Affine, PathEl};
 
 use crate::{
+    animation::creation::{Empty, Partial},
     prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
     utils::{affine_from_vec, math::Rect},
@@ -207,6 +210,23 @@ impl Opacity for VMobject {
             p.set_opacity(opacity);
         });
         self
+    }
+}
+
+impl Empty for VMobject {
+    fn empty() -> Self {
+        VMobject { subpaths: vec![] }
+    }
+}
+
+impl Partial for VMobject {
+    fn get_partial(&self, range: Range<f32>) -> Self {
+        let subpaths = self
+            .subpaths
+            .iter()
+            .map(|p| p.get_partial(range.clone()))
+            .collect();
+        VMobject { subpaths }
     }
 }
 
