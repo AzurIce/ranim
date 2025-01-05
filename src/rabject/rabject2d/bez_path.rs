@@ -6,15 +6,23 @@ use std::{
 use bevy_color::LinearRgba;
 use glam::{vec2, FloatExt, Vec2};
 use itertools::Itertools;
+use log::trace;
 use vello::{
-    kurbo::{self, Affine, CubicBez, Line, PathSeg, QuadBez, Shape},
-    peniko::{self, color::AlphaColor, Brush},
+    kurbo::{self, Affine, CubicBez, Line, PathEl, PathSeg, QuadBez, Shape},
+    peniko::{
+        self,
+        color::{palette::css::TRANSPARENT, AlphaColor},
+        Brush,
+    },
 };
 
 use crate::{
     prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
-    utils::{bezier::divide_segment_to_n_part, math::Rect},
+    utils::{
+        bezier::{align_subpath, divide_elements},
+        math::Rect,
+    },
 };
 
 use super::{vmobject::VMobject, BoundingBox};
@@ -52,40 +60,38 @@ impl Into<VMobject> for BezPath {
 }
 
 impl BezPath {
-    pub fn get_matched_segments(&mut self, len: usize) -> Vec<PathSeg> {
-        let mut lens = self
-            .inner
-            .segments()
-            .map(|seg| match seg {
-                kurbo::PathSeg::Line(Line { p0, p1 }) => p0.distance(p1),
-                kurbo::PathSeg::Quad(QuadBez { p0, p2, .. }) => p0.distance(p2),
-                kurbo::PathSeg::Cubic(CubicBez { p0, p3, .. }) => p0.distance(p3),
-            })
-            .collect::<Vec<_>>();
-        // println!("get_matched_segments {} from {} {}", len, self.inner.segments().try_len().unwrap_or(0), lens.len());
-
-        let n = len - lens.len();
-        let mut ipc = vec![0; lens.len()];
-        for _ in 0..n {
-            let i = lens
-                .iter()
-                .position_max_by(|x, y| x.partial_cmp(y).unwrap_or(Ordering::Equal))
-                .unwrap();
-            ipc[i] += 1;
-            lens[i] *= ipc[i] as f64 / (ipc[i] + 1) as f64;
+    pub fn air() -> Self {
+        Self {
+            inner: kurbo::BezPath::from_vec(vec![
+                kurbo::PathEl::MoveTo((0.0, 0.0).into()),
+                kurbo::PathEl::LineTo((0.0, 0.0).into()),
+                kurbo::PathEl::ClosePath,
+            ]),
+            stroke: StrokeOptions::default().with_opacity(0.0),
+            fill: FillOptions::default().with_opacity(0.0),
         }
+    }
+    pub fn subpath_cnt(&self) -> usize {
+        self.inner
+            .elements()
+            .iter()
+            .filter(|e| matches!(e, PathEl::MoveTo(_)))
+            .count()
+    }
+    pub fn extend_subpaths_with_air(&mut self, n: usize) {
+        assert!(!self.inner.elements().is_empty());
 
-        let mut new_segments = Vec::with_capacity(len);
-        self.inner.segments().zip(ipc).for_each(|(seg, ipc)| {
-            if ipc > 0 {
-                let divided = divide_segment_to_n_part(seg, ipc + 1);
-                new_segments.extend(divided)
-            } else {
-                new_segments.push(seg)
-            }
-        });
-
-        new_segments
+        // let p = self.bounding_box().center();
+        // let p = kurbo::Point::new(p.x as f64, p.y as f64)
+        let p = match self.inner.elements()[0] {
+            PathEl::MoveTo(p) => p,
+            _ => unreachable!(),
+        };
+        let mut elements = self.elements().to_vec();
+        for _ in 0..n {
+            elements.extend_from_slice(&[PathEl::MoveTo(p), PathEl::LineTo(p), PathEl::ClosePath]);
+        }
+        self.inner = kurbo::BezPath::from_vec(elements);
     }
 }
 
@@ -181,23 +187,57 @@ impl Alignable for BezPath {
     }
 
     fn align_with(&mut self, other: &mut Self) {
-        let self_len = self.inner.segments().count();
-        let other_len = other.inner.segments().count();
-        // println!(">>>> aligning BezPath {} {}", self_len, other_len);
-        let len = self_len.max(other_len);
+        // 1. Align subpath count
+        let self_subpath_cnt = self.subpath_cnt();
+        let other_subpath_cnt = other.subpath_cnt();
+        // trace!(
+        //     "[BezPath] aligning BezPath subpaths from {} to {}",
+        //     self_subpath_cnt,
+        //     other_subpath_cnt
+        // );
+        let diff = (self_subpath_cnt as i32 - other_subpath_cnt as i32).abs() as usize;
+        if diff > 0 {
+            if self_subpath_cnt < other_subpath_cnt {
+                self.extend_subpaths_with_air(diff);
+            } else {
+                other.extend_subpaths_with_air(diff);
+            }
+        } else {
+        }
+        // trace!("aligned subpaths cnt");
+        // trace!(
+        //     "self {}: {:?}",
+        //     self.subpath_cnt(),
+        //     self.inner.elements().to_vec()
+        // );
+        // trace!(
+        //     "other {}: {:?}",
+        //     other.subpath_cnt(),
+        //     other.inner.elements().to_vec()
+        // );
 
-        let mut self_segs = self.get_matched_segments(len);
-        let mut other_segs = other.get_matched_segments(len);
-        // println!("<<<< aligned BezPath {} {}", self_segs.len(), other_segs.len());
-
-        self_segs
+        // trace!("aligning subpaths...");
+        // 2. Align subpaths
+        let mut self_subpaths = divide_elements(self.inner.elements().to_vec());
+        let mut other_subpaths = divide_elements(other.inner.elements().to_vec());
+        self_subpaths
             .iter_mut()
-            .zip(other_segs.iter_mut())
-            .for_each(|(a, b)| {
-                a.align_with(b);
-            });
-        self.inner = kurbo::BezPath::from_path_segments(self_segs.into_iter());
-        other.inner = kurbo::BezPath::from_path_segments(other_segs.into_iter());
+            .zip(other_subpaths.iter_mut())
+            .for_each(|(a, b)| align_subpath(a, b));
+        self.inner = self_subpaths.into_iter().flatten().collect();
+        other.inner = other_subpaths.into_iter().flatten().collect();
+
+        // trace!("aligned subpaths");
+        // trace!(
+        //     "self {}: {:?}",
+        //     self.subpath_cnt(),
+        //     self.inner.elements().to_vec()
+        // );
+        // trace!(
+        //     "other {}: {:?}",
+        //     other.subpath_cnt(),
+        //     other.inner.elements().to_vec()
+        // );
     }
 }
 
@@ -272,8 +312,10 @@ impl Interpolatable for kurbo::Stroke {
 impl Interpolatable for peniko::Brush {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         if let (peniko::Brush::Solid(a), peniko::Brush::Solid(b)) = (self, target) {
+            // return peniko::Brush::Solid(TRANSPARENT);
             return peniko::Brush::Solid(a.lerp(*b, t, peniko::color::HueDirection::Shorter));
         }
+        // return peniko::Brush::Solid(TRANSPARENT);
         if t == 0.0 {
             self.clone()
         } else {
@@ -401,9 +443,9 @@ impl BezPath {
         self
     }
     // transforms
-    pub fn shift(&mut self, shift: (f32, f32)) -> &mut Self {
+    pub fn shift(&mut self, shift: Vec2) -> &mut Self {
         self.inner
-            .apply_affine(kurbo::Affine::translate((shift.0 as f64, shift.1 as f64)));
+            .apply_affine(kurbo::Affine::translate((shift.x as f64, shift.y as f64)));
         self
     }
     pub fn rotate(&mut self, angle: f32) -> &mut Self {
@@ -445,5 +487,20 @@ impl Opacity for BezPath {
         self.set_stroke_opacity(opacity);
         self.set_fill_opacity(opacity);
         self
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use vello::kurbo;
+
+    #[test]
+    fn foo() {
+        let path = kurbo::BezPath::from_vec(vec![
+            kurbo::PathEl::MoveTo((0.0, 0.0).into()),
+            kurbo::PathEl::LineTo((0.0, 0.0).into()),
+            kurbo::PathEl::ClosePath,
+        ]);
+        println!("{:?}", path.segments().collect::<Vec<_>>());
     }
 }

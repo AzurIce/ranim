@@ -1,5 +1,6 @@
 use bevy_color::LinearRgba;
 use glam::{vec2, Vec2};
+use log::trace;
 use vello::kurbo::{self, Affine, PathEl};
 
 use crate::{
@@ -25,7 +26,7 @@ impl BoundingBox for VMobject {
 
 #[derive(Clone, Debug)]
 pub struct VMobject {
-    subpaths: Vec<BezPath>,
+    pub subpaths: Vec<BezPath>,
 }
 
 impl VMobject {
@@ -66,6 +67,14 @@ impl VMobject {
             p.set_fill_opacity(alpha);
         });
         self
+    }
+}
+
+impl IntoIterator for VMobject {
+    type Item = BezPath;
+    type IntoIter = std::vec::IntoIter<BezPath>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.subpaths.into_iter()
     }
 }
 
@@ -155,20 +164,29 @@ impl Alignable for VMobject {
                 .all(|(a, b)| a.is_aligned(b))
     }
     fn align_with(&mut self, other: &mut Self) {
+        // trace!(
+        //     "[VMobject] aligning from {} to {}...",
+        //     self.subpaths.len(),
+        //     other.subpaths.len()
+        // );
+        // trace!("[VMobject] resizing subpaths...");
         let len = self.subpaths.len().max(other.subpaths.len());
         if self.subpaths.len() < len {
-            self.subpaths
-                .resize(len, self.subpaths.last().cloned().unwrap());
+            let mut air = BezPath::air();
+            air.shift(self.bounding_box().center());
+            self.subpaths.resize(len, air);
         } else {
-            other
-                .subpaths
-                .resize(len, other.subpaths.last().cloned().unwrap());
+            let mut air = BezPath::air();
+            air.shift(other.bounding_box().center());
+            other.subpaths.resize(len, air);
         }
 
+        // trace!("[VMobject] aligning subpaths...");
         self.subpaths
             .iter_mut()
             .zip(other.subpaths.iter_mut())
             .for_each(|(a, b)| a.align_with(b));
+        // trace!("[VMobject] aligned")
     }
 }
 
@@ -190,5 +208,37 @@ impl Opacity for VMobject {
             p.set_opacity(opacity);
         });
         self
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use glam::vec2;
+
+    use crate::{prelude::Alignable, rabject::Blueprint, typst_tree};
+
+    use super::{geometry::Polygon, svg::Svg};
+
+    #[test]
+    fn foo() {
+        let svg = typst_tree!(r#"#text(60pt)[R]"#);
+        let mut svg = Svg::from_tree(svg).build();
+
+        let mut polygon = Polygon::new(vec![
+            vec2(0.0, 0.0),
+            vec2(-100.0, -200.0),
+            vec2(400.0, 0.0),
+            vec2(0.0, 600.0),
+            vec2(100.0, 200.0),
+        ])
+        .build();
+
+        println!("#### Before Align ####");
+        println!("svg {} subpaths", svg.subpaths[0].subpath_cnt());
+        println!("polygon {} subpaths", polygon.subpaths[0].subpath_cnt());
+        svg.align_with(&mut polygon);
+        println!("#### After Align ####");
+        println!("svg {} subpaths", svg.subpaths[0].subpath_cnt());
+        println!("polygon {} subpaths", polygon.subpaths[0].subpath_cnt());
     }
 }

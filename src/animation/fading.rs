@@ -56,4 +56,8 @@ impl<T: Opacity + Interpolatable + Clone> AnimationFunc<T> for Fading<T> {
                 .lerp(self.dst.as_ref().unwrap(), alpha),
         );
     }
+
+    fn post_anim(&mut self, entity: &mut T) {
+        entity.update_from(self.dst.as_ref().unwrap());
+    }
 }

@@ -48,10 +48,11 @@ macro_rules! typst_svg {
 
 #[macro_export]
 macro_rules! typst_tree {
-    ($typst_code:expr) => {
+    ($typst_code:expr) => {{
+        use $crate::typst_svg;
         usvg::Tree::from_str(&typst_svg!($typst_code), &usvg::Options::default())
             .expect("failed to parse svg")
-    };
+    }};
 }
 
 #[cfg(test)]
@@ -64,6 +65,10 @@ mod test {
         println!("{}", svg);
         let svg = typst_svg!(r#"
             #text(20pt)[你好]
+        "#);
+        println!("{}", svg);
+        let svg = typst_svg!(r#"
+            #text(60pt)[R]
         "#);
         println!("{}", svg);
     }

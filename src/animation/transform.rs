@@ -50,7 +50,7 @@ impl<T: Alignable + Interpolatable + Clone> AnimationFunc<T> for Transform<T> {
         entity.update_from(&interpolated);
     }
 
-    fn post_anim(&mut self, rabject: &mut T) {
-        rabject.update_from(&self.aligned_target);
+    fn post_anim(&mut self, entity: &mut T) {
+        entity.update_from(&self.aligned_target);
     }
 }
