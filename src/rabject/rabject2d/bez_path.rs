@@ -1,13 +1,15 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Range};
 
 use bevy_color::LinearRgba;
 use glam::{FloatExt, Vec2};
+use log::trace;
 use vello::{
-    kurbo::{self, Affine, CubicBez, Line, PathEl, PathSeg, QuadBez, Shape},
+    kurbo::{self, Affine, CubicBez, Line, ParamCurve, PathEl, PathSeg, QuadBez, Shape},
     peniko::{self, color::AlphaColor, Brush},
 };
 
 use crate::{
+    animation::creation::Partial,
     prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
     utils::{
@@ -70,14 +72,20 @@ impl BezPath {
             .count()
     }
     pub fn extend_subpaths_with_air(&mut self, n: usize) {
-        assert!(!self.inner.elements().is_empty());
+        // assert!(!self.inner.elements().is_empty());
 
         // let p = self.bounding_box().center();
         // let p = kurbo::Point::new(p.x as f64, p.y as f64)
-        let p = match self.inner.elements()[0] {
-            PathEl::MoveTo(p) => p,
-            _ => unreachable!(),
-        };
+        let p = self
+            .inner
+            .elements()
+            .first()
+            .cloned()
+            .map(|e| match e {
+                PathEl::MoveTo(p) => p,
+                _ => unreachable!(),
+            })
+            .unwrap_or((0.0, 0.0).into());
         let mut elements = self.elements().to_vec();
         for _ in 0..n {
             elements.extend_from_slice(&[PathEl::MoveTo(p), PathEl::LineTo(p), PathEl::ClosePath]);
@@ -193,21 +201,8 @@ impl Alignable for BezPath {
             } else {
                 other.extend_subpaths_with_air(diff);
             }
-        } else {
         }
-        // trace!("aligned subpaths cnt");
-        // trace!(
-        //     "self {}: {:?}",
-        //     self.subpath_cnt(),
-        //     self.inner.elements().to_vec()
-        // );
-        // trace!(
-        //     "other {}: {:?}",
-        //     other.subpath_cnt(),
-        //     other.inner.elements().to_vec()
-        // );
 
-        // trace!("aligning subpaths...");
         // 2. Align subpaths
         let mut self_subpaths = divide_elements(self.inner.elements().to_vec());
         let mut other_subpaths = divide_elements(other.inner.elements().to_vec());
@@ -217,18 +212,42 @@ impl Alignable for BezPath {
             .for_each(|(a, b)| align_subpath(a, b));
         self.inner = self_subpaths.into_iter().flatten().collect();
         other.inner = other_subpaths.into_iter().flatten().collect();
+    }
+}
 
-        // trace!("aligned subpaths");
-        // trace!(
-        //     "self {}: {:?}",
-        //     self.subpath_cnt(),
-        //     self.inner.elements().to_vec()
-        // );
-        // trace!(
-        //     "other {}: {:?}",
-        //     other.subpath_cnt(),
-        //     other.inner.elements().to_vec()
-        // );
+impl Partial for BezPath {
+    fn get_partial(&self, range: Range<f32>) -> Self {
+        Self {
+            inner: self.inner.get_partial(range.clone()),
+            stroke: self.stroke.clone(),
+            fill: self.fill.clone(),
+        }
+    }
+}
+
+impl Partial for kurbo::BezPath {
+    fn get_partial(&self, range: Range<f32>) -> Self {
+        let segments = self.segments().collect::<Vec<_>>();
+        let (a, b) = (range.start, range.end);
+        let a = a * segments.len() as f32;
+        let b = b * segments.len() as f32;
+        let a_ceil = a.ceil() as usize;
+        let b_floor = b.floor() as usize;
+
+        let mut partial_segments = vec![];
+        let left_remain = a + 1.0 - a_ceil as f32;
+        if a != a_ceil as f32 {
+            partial_segments.push(segments[a_ceil-1].subsegment(left_remain as f64..1.0));
+        }
+        if a_ceil != b_floor {
+            partial_segments.extend(segments[a_ceil..b_floor].to_vec());
+        }
+        let right_remain = b - b_floor as f32;
+        if b != b_floor as f32 {
+            partial_segments.push(segments[b_floor].subsegment(0.0..right_remain as f64));
+        }
+
+        kurbo::BezPath::from_path_segments(partial_segments.into_iter())
     }
 }
 
