@@ -5,11 +5,18 @@ use glam::vec2;
 use ranim::{
     animation::{fading::Fading, transform::Transform},
     prelude::*,
-    rabject::rabject2d::vmobject::{geometry::Arc, svg::Svg},
+    rabject::rabject2d::{
+        bez_path::{BezPath, FillOptions, StrokeOptions},
+        vmobject::{
+            geometry::{Arc, Polygon, Square},
+            svg::Svg,
+            VMobject,
+        },
+    },
     scene::SceneBuilder,
     typst_svg, typst_tree,
 };
-use vello::kurbo::Affine;
+use vello::kurbo;
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -21,25 +28,58 @@ fn main() {
     let mut scene = SceneBuilder::new("test_scene").build();
     let canvas = scene.insert_new_canvas(1920, 1080);
     scene.center_canvas_in_frame(&canvas);
+    let center = (1920.0 / 2.0, 1080.0 / 2.0);
 
-    let svg = typst_tree!(
-        r#"
-        #text(20pt)[hello]
-    "#
-    );
+    let path = kurbo::BezPath::from_vec(vec![
+        kurbo::PathEl::MoveTo((0.0, 0.0).into()),
+        kurbo::PathEl::LineTo((0.0, 0.0).into()),
+        kurbo::PathEl::ClosePath,
+    ]);
+    let path = BezPath {
+        inner: path,
+        stroke: StrokeOptions::default(),
+        fill: FillOptions::default(),
+    };
+    let mut m = VMobject::new(vec![path]);
+    m.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - m.bounding_box().center());
+    let m = scene.get_mut(&canvas).insert(m);
 
+    let typ = "#text(60pt)[R]";
+
+    let svg = typst_tree!(typ);
     let mut svg = Svg::from_tree(svg).build();
-    svg.shift(vec2(1920.0 / 2.0, 1280.0 / 2.0));
-    let svg = scene.play_in_canvas(&canvas, svg, Fading::fade_in());
-   
-    scene.render_to_image("test_scene.png");
+    svg.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - svg.bounding_box().center());
     
+    let svg = scene.play_in_canvas(&canvas, m, Transform::new(svg));
     scene.wait(Duration::from_secs_f32(0.5));
-    let mut arc = Arc::new(std::f32::consts::PI).with_radius(100.0).build();
-    arc.apply_affine(Affine::translate((960.0, 540.0)));
 
-    let arc = scene.play_in_canvas(&canvas, svg, Transform::new(arc));
-    scene.wait(Duration::from_secs_f32(0.5));
+    // let mut square = Square::new(100.0).build();
+    // square.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - square.bounding_box().center());
+
+    // let _square = scene.play_in_canvas(&canvas, svg, Transform::new(square));
+
+    let mut polygon = Polygon::new(vec![
+        vec2(0.0, 0.0),
+        vec2(-100.0, -200.0),
+        vec2(400.0, 0.0),
+        vec2(-100.0, 200.0),
+    ])
+    .with_stroke_width(10.0)
+    .build();
+    polygon.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - polygon.bounding_box().center());
+
+    let polygon = scene.play_in_canvas(&canvas, svg, Transform::new(polygon));
+
+    {
+        let polygon = scene.get(&canvas).get(&polygon);
+        println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n{:?}", polygon.subpaths[0].elements());
+    }
+
+    let svg = typst_tree!(typ);
+    let mut svg = Svg::from_tree(svg).build();
+    svg.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - svg.bounding_box().center());
+
+    let _svg = scene.play_in_canvas(&canvas, polygon, Transform::new(svg));
 
     // {
     //     let canvas = scene.get(&canvas);

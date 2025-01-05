@@ -83,7 +83,8 @@ impl Blueprint<VMobject> for Arc {
             fill,
         };
 
-        path.set_stroke_width(self.stroke_width).set_fill_opacity(0.0);
+        path.set_stroke_width(self.stroke_width)
+            .set_fill_opacity(0.0);
 
         VMobject::new(vec![path])
     }
@@ -165,22 +166,21 @@ impl Blueprint<VMobject> for Polygon {
         // TODO: Handle
         assert!(self.corner_points.len() >= 3);
 
-        let path: kurbo::BezPath = [PathEl::MoveTo(
-            kurbo::Point::new(
-                self.corner_points[0].x as f64,
-                self.corner_points[0].y as f64,
+        let start_point = kurbo::Point::new(
+            self.corner_points[0].x as f64,
+            self.corner_points[0].y as f64,
+        );
+
+        let path: kurbo::BezPath = [PathEl::MoveTo(start_point)]
+            .into_iter()
+            .chain(
+                self.corner_points
+                    .iter()
+                    .skip(1)
+                    .map(|p| PathEl::LineTo((p.x as f64, p.y as f64).into())),
             )
-            .into(),
-        )]
-        .into_iter()
-        .chain(
-            self.corner_points
-                .iter()
-                .skip(1)
-                .map(|p| PathEl::LineTo((p.x as f64, p.y as f64).into())),
-        )
-        .chain([PathEl::ClosePath].into_iter())
-        .collect();
+            .chain([PathEl::LineTo(start_point), PathEl::ClosePath].into_iter())
+            .collect();
 
         let mut path = BezPath {
             inner: path,
