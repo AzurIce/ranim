@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 
 use glam::Vec3;
 use itertools::Itertools;
-use log::trace;
 use vello::kurbo::{self, BezPath, CubicBez, Line, ParamCurve, PathEl, PathSeg, QuadBez};
 
 use crate::prelude::{Alignable, Interpolatable};

@@ -1,6 +1,5 @@
 use bevy_color::LinearRgba;
 use glam::{vec2, Vec2};
-use log::trace;
 use vello::kurbo::{self, Affine, PathEl};
 
 use crate::{

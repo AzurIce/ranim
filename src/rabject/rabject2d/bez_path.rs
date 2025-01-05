@@ -1,19 +1,10 @@
-use std::{
-    cmp::Ordering,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
 use bevy_color::LinearRgba;
-use glam::{vec2, FloatExt, Vec2};
-use itertools::Itertools;
-use log::trace;
+use glam::{FloatExt, Vec2};
 use vello::{
     kurbo::{self, Affine, CubicBez, Line, PathEl, PathSeg, QuadBez, Shape},
-    peniko::{
-        self,
-        color::{palette::css::TRANSPARENT, AlphaColor},
-        Brush,
-    },
+    peniko::{self, color::AlphaColor, Brush},
 };
 
 use crate::{
@@ -316,7 +307,8 @@ impl Interpolatable for peniko::Brush {
             return peniko::Brush::Solid(a.lerp(*b, t, peniko::color::HueDirection::Shorter));
         }
         // return peniko::Brush::Solid(TRANSPARENT);
-        if t == 0.0 {
+        // TODO: make this better
+        if t < 0.5 {
             self.clone()
         } else {
             target.clone()
