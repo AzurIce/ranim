@@ -1,7 +1,6 @@
 pub mod fading;
 pub mod transform;
 pub mod creation;
-pub mod write;
 
 use std::time;
 
@@ -9,6 +8,10 @@ use crate::{scene::{Entity, EntityId}, updater::Updater, utils::rate_functions::
 
 #[allow(unused)]
 use log::trace;
+
+pub struct Enter;
+
+
 
 pub struct AnimationConfig {
     pub run_time: time::Duration,

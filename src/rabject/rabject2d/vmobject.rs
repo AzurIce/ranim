@@ -5,7 +5,7 @@ use glam::{vec2, Vec2};
 use vello::kurbo::{self, Affine, PathEl};
 
 use crate::{
-    animation::{creation::{Empty, Partial}, write::{Fill, Stroke}},
+    animation::{creation::{Empty, Partial, Fill, Stroke}},
     prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
     utils::{affine_from_vec, math::Rect},

@@ -78,8 +78,7 @@ pub mod prelude {
 
     pub use crate::animation::fading::Opacity;
     pub use crate::animation::transform::Alignable;
-    pub use crate::animation::creation::{Partial, Empty};
-    pub use crate::animation::write::{Fill, Stroke};
+    pub use crate::animation::creation::{Partial, Empty, Fill, Stroke};
     pub use crate::rabject::rabject2d::BoundingBox;
 
     pub use crate::rabject::Blueprint;

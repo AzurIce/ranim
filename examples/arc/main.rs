@@ -4,9 +4,10 @@ use bevy_color::Srgba;
 use env_logger::Env;
 use glam::vec2;
 use log::info;
+use ranim::animation::fading;
 use ranim::prelude::*;
 use ranim::rabject::rabject2d::vmobject::VMobject;
-use ranim::{animation::fading::Fading, scene::SceneBuilder};
+use ranim::scene::SceneBuilder;
 
 fn main() {
     #[cfg(debug_assertions)]
@@ -48,7 +49,7 @@ fn main() {
             let _arc = scene.play_in_canvas(
                 &canvas,
                 arc,
-                Fading::fade_in().config(|config| {
+                fading::fade_in().config(|config| {
                     config.set_run_time(Duration::from_secs_f32(0.02));
                 }),
             );
