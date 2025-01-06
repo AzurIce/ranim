@@ -291,6 +291,10 @@ impl StrokeOptions {
         self.brush = self.brush.clone().with_alpha(opacity);
         self
     }
+    pub fn with_brush(mut self, brush: Brush) -> Self {
+        self.brush = brush;
+        self
+    }
 }
 
 impl Interpolatable for kurbo::Stroke {

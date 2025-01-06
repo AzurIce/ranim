@@ -3,6 +3,7 @@ pub mod rate_functions;
 pub mod wgpu;
 pub mod typst;
 pub mod math;
+pub mod brush;
 
 use std::{
     any::{Any, TypeId},

@@ -1,6 +1,7 @@
 pub mod fading;
 pub mod transform;
 pub mod creation;
+pub mod write;
 
 use std::time;
 
@@ -12,6 +13,7 @@ use log::trace;
 pub struct AnimationConfig {
     pub run_time: time::Duration,
     pub rate_func: Box<dyn Fn(f32) -> f32>,
+    pub lag_ratio: Option<f32>,
     // /// Whether the mobject will be removed from the scene after the animation
     // pub(crate) remove: bool,
     // /// The rabject will be inserted into the scene after the animation
@@ -28,6 +30,7 @@ impl Default for AnimationConfig {
         Self {
             run_time: time::Duration::from_secs_f32(1.0),
             rate_func: Box::new(smooth),
+            lag_ratio: None,
             // remove: false,
             // end_rabject: None,
         }
@@ -41,6 +44,10 @@ impl AnimationConfig {
     }
     pub fn set_rate_func(&mut self, rate_func: Box<dyn Fn(f32) -> f32>) -> &mut Self {
         self.rate_func = rate_func;
+        self
+    }
+    pub fn set_lag_ratio(&mut self, lag_ratio: Option<f32>) -> &mut Self {
+        self.lag_ratio = lag_ratio;
         self
     }
     // pub fn set_remove(&mut self, remove: bool) -> &mut Self {
@@ -69,7 +76,7 @@ impl AnimationConfig {
 /// See [`Animation`], [`Updater`]
 pub trait AnimationFunc<T> {
     #[allow(unused)]
-    fn pre_anim(&mut self, entity: &mut T);
+    fn init(&mut self, entity: &mut T);
 
     fn interpolate(&mut self, entity: &mut T, alpha: f32);
 
@@ -123,7 +130,7 @@ pub struct Animation<T> {
 
 impl<T> Updater<T> for Animation<T> {
     fn on_create(&mut self, entity: &mut T) {
-        self.func.pre_anim(entity);
+        self.func.init(entity);
     }
     fn on_update(&mut self, entity: &mut T, dt: f32) -> bool {
         self.acc_t += dt;

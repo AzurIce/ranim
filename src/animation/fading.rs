@@ -36,7 +36,7 @@ pub trait Opacity {
 }
 
 impl<T: Opacity + Interpolatable + Clone> AnimationFunc<T> for Fading<T> {
-    fn pre_anim(&mut self, rabject: &mut T) {
+    fn init(&mut self, rabject: &mut T) {
         self.src = Some(rabject.clone());
         self.dst = Some(rabject.clone());
         match self.fading_type {
