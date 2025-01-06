@@ -53,3 +53,46 @@ impl Rect {
         vec2(x, y)
     }
 }
+
+/// Interpolate between two integers
+/// 
+/// return integer and the sub progress to the next integer
+pub fn interpolate_usize(a: usize, b: usize, t: f32) -> (usize, f32) {
+    assert!(b >= a);
+    let t = t.clamp(0.0, 1.0) as f32;
+    let v = b - a;
+
+    let p = v as f32 * t;
+
+    (a + p.floor() as usize, p.fract())
+}
+
+#[cfg(test)]
+mod test {
+    use core::f32;
+
+    use super::*;
+
+    #[test]
+    fn test_interpolate_usize() {
+        let test = |(x, t): (usize, f32), (expected_x, expected_t): (usize, f32)| {
+            assert_eq!(x, expected_x);
+            assert!((t - expected_t).abs() < f32::EPSILON);
+        };
+
+        test(interpolate_usize(0, 10, 0.0), (0, 0.0));
+        test(interpolate_usize(0, 10, 0.5), (5, 0.0));
+        test(interpolate_usize(0, 10, 1.0), (10, 0.0));
+
+        test(interpolate_usize(0, 1, 0.0), (0, 0.0));
+        test(interpolate_usize(0, 1, 0.5), (0, 0.5));
+        test(interpolate_usize(0, 1, 1.0), (1, 0.0));
+
+        test(interpolate_usize(0, 2, 0.0), (0, 0.0));
+        test(interpolate_usize(0, 2, 0.2), (0, 0.4));
+        test(interpolate_usize(0, 2, 0.4), (0, 0.8));
+        test(interpolate_usize(0, 2, 0.6), (1, 0.2));
+        test(interpolate_usize(0, 2, 0.8), (1, 0.6));
+        test(interpolate_usize(0, 2, 1.0), (2, 0.0));
+    }
+}

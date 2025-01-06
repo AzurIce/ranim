@@ -3,7 +3,7 @@ use std::time::Duration;
 use env_logger::Env;
 use glam::vec2;
 use ranim::{
-    animation::{creation::Creation, fading::Fading, transform::Transform},
+    animation::{creation::{Create, Uncreate}, fading::Fading, transform::Transform, write::{Unwrite, Write}},
     prelude::*,
     rabject::rabject2d::{
         bez_path::{BezPath, FillOptions, StrokeOptions},
@@ -19,9 +19,16 @@ use ranim::{
 use vello::kurbo;
 
 fn create_and_uncreate(scene: &mut Scene, canvas: &EntityId<Canvas>, vmobject: VMobject) {
-    let vmobject = scene.play_in_canvas(&canvas, vmobject, Creation::create());
+    let vmobject = scene.play_in_canvas(&canvas, vmobject, Create::new() );
     scene.wait(Duration::from_secs_f32(0.5));
-    scene.play_remove_in_canvas(&canvas, vmobject, Creation::un_create());
+    scene.play_remove_in_canvas(&canvas, vmobject, Uncreate::new());
+    scene.wait(Duration::from_secs_f32(0.5));
+}
+
+fn write_and_unwrite(scene: &mut Scene, canvas: &EntityId<Canvas>, vmobject: VMobject) {
+    let vmobject = scene.play_in_canvas(&canvas, vmobject, Write::new());
+    scene.wait(Duration::from_secs_f32(0.5));
+    scene.play_remove_in_canvas(&canvas, vmobject, Unwrite::new());
     scene.wait(Duration::from_secs_f32(0.5));
 }
 
@@ -41,9 +48,10 @@ fn main() {
 
     let svg = typst_tree!(typ);
     let mut svg = Svg::from_tree(svg).build();
+    println!("{:?}", svg.subpaths[0].stroke);
     svg.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - svg.bounding_box().center());
 
-    create_and_uncreate(&mut scene, &canvas, svg.clone());
+    write_and_unwrite(&mut scene, &canvas, svg.clone());
 
     // let mut square = Square::new(100.0).build();
     // square.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - square.bounding_box().center());
@@ -59,9 +67,8 @@ fn main() {
     .with_stroke_width(10.0)
     .build();
     polygon.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - polygon.bounding_box().center());
-
     
-    create_and_uncreate(&mut scene, &canvas, polygon.clone());
+    write_and_unwrite(&mut scene, &canvas, polygon.clone());
 
     let polygon = scene.play_in_canvas(&canvas, svg, Transform::new(polygon));
 

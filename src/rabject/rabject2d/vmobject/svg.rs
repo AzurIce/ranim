@@ -3,7 +3,13 @@ use std::path::Path;
 use log::warn;
 use usvg::{Options, Tree};
 
-use crate::{rabject::{rabject2d::bez_path::{BezPath, FillOptions, StrokeOptions}, Blueprint}, utils};
+use crate::{
+    rabject::{
+        rabject2d::bez_path::{BezPath, FillOptions, StrokeOptions},
+        Blueprint,
+    },
+    utils,
+};
 
 use super::VMobject;
 
@@ -80,18 +86,6 @@ impl TryFrom<&usvg::Path> for BezPath {
         }
         let inner = utils::to_bez_path(path);
 
-        let stroke = path
-            .stroke()
-            .and_then(|s| {
-                utils::to_brush(s.paint(), s.opacity()).map(|(brush, transform)| StrokeOptions {
-                    style: utils::to_stroke(s),
-                    brush,
-                    transform: Some(transform),
-                    opacity: s.opacity().get(),
-                })
-            })
-            .unwrap_or(StrokeOptions::default().with_opacity(0.0));
-
         let fill = path
             .fill()
             .and_then(|f| {
@@ -106,6 +100,22 @@ impl TryFrom<&usvg::Path> for BezPath {
                 })
             })
             .unwrap_or(FillOptions::default().with_opacity(0.0));
+
+        let stroke = path
+            .stroke()
+            .and_then(|s| {
+                utils::to_brush(s.paint(), s.opacity()).map(|(brush, transform)| StrokeOptions {
+                    style: utils::to_stroke(s),
+                    brush,
+                    transform: Some(transform),
+                    opacity: s.opacity().get(),
+                })
+            })
+            .unwrap_or(
+                StrokeOptions::default()
+                    .with_brush(fill.brush.clone())
+                    .with_opacity(0.0),
+            );
 
         Ok(BezPath {
             inner,

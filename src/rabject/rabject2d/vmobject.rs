@@ -5,7 +5,7 @@ use glam::{vec2, Vec2};
 use vello::kurbo::{self, Affine, PathEl};
 
 use crate::{
-    animation::creation::{Empty, Partial},
+    animation::{creation::{Empty, Partial}, write::{Fill, Stroke}},
     prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
     utils::{affine_from_vec, math::Rect},
@@ -43,24 +43,6 @@ impl VMobject {
     pub fn set_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
         self.subpaths.iter_mut().for_each(|p| {
             p.set_color(color);
-        });
-        self
-    }
-    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
-        self.subpaths.iter_mut().for_each(|p| {
-            p.set_fill_color(color);
-        });
-        self
-    }
-    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
-        self.subpaths.iter_mut().for_each(|p| {
-            p.set_stroke_color(color);
-        });
-        self
-    }
-    pub fn set_stroke_width(&mut self, width: f32) -> &mut Self {
-        self.subpaths.iter_mut().for_each(|p| {
-            p.set_stroke_width(width);
         });
         self
     }
@@ -201,6 +183,42 @@ impl Interpolatable for VMobject {
             .map(|(a, b)| a.lerp(b, t))
             .collect();
         VMobject { subpaths }
+    }
+}
+
+impl Fill for VMobject {
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.subpaths.iter_mut().for_each(|p| {
+            p.set_fill_opacity(opacity);
+        });
+        self
+    }
+    fn set_fill_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
+        self.subpaths.iter_mut().for_each(|p| {
+            p.set_fill_color(color);
+        });
+        self
+    }
+}
+
+impl Stroke for VMobject {
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.subpaths.iter_mut().for_each(|p| {
+            p.set_stroke_opacity(opacity);
+        });
+        self
+    }
+    fn set_stroke_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
+        self.subpaths.iter_mut().for_each(|p| {
+            p.set_stroke_color(color);
+        });
+        self
+    }
+    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+        self.subpaths.iter_mut().for_each(|p| {
+            p.set_stroke_width(width);
+        });
+        self
     }
 }
 
