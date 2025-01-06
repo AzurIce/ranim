@@ -3,32 +3,28 @@ use std::time::Duration;
 use env_logger::Env;
 use glam::vec2;
 use ranim::{
-    animation::{creation::{Create, Uncreate}, fading::Fading, transform::Transform, write::{Unwrite, Write}},
+    animation::{creation, transform::Transform},
     prelude::*,
-    rabject::rabject2d::{
-        bez_path::{BezPath, FillOptions, StrokeOptions},
-        vmobject::{
-            geometry::{Arc, Polygon, Square},
-            svg::Svg,
-            VMobject,
-        },
+    rabject::rabject2d::vmobject::{
+        geometry::{Arc, Polygon, Square},
+        svg::Svg,
+        VMobject,
     },
     scene::{canvas::Canvas, EntityId, Scene, SceneBuilder},
     typst_svg, typst_tree,
 };
-use vello::kurbo;
 
 fn create_and_uncreate(scene: &mut Scene, canvas: &EntityId<Canvas>, vmobject: VMobject) {
-    let vmobject = scene.play_in_canvas(&canvas, vmobject, Create::new() );
+    let vmobject = scene.play_in_canvas(&canvas, vmobject, creation::create());
     scene.wait(Duration::from_secs_f32(0.5));
-    scene.play_remove_in_canvas(&canvas, vmobject, Uncreate::new());
+    scene.play_remove_in_canvas(&canvas, vmobject, creation::uncreate());
     scene.wait(Duration::from_secs_f32(0.5));
 }
 
 fn write_and_unwrite(scene: &mut Scene, canvas: &EntityId<Canvas>, vmobject: VMobject) {
-    let vmobject = scene.play_in_canvas(&canvas, vmobject, Write::new());
+    let vmobject = scene.play_in_canvas(&canvas, vmobject, creation::write());
     scene.wait(Duration::from_secs_f32(0.5));
-    scene.play_remove_in_canvas(&canvas, vmobject, Unwrite::new());
+    scene.play_remove_in_canvas(&canvas, vmobject, creation::unwrite());
     scene.wait(Duration::from_secs_f32(0.5));
 }
 
@@ -67,7 +63,7 @@ fn main() {
     .with_stroke_width(10.0)
     .build();
     polygon.shift(vec2(1920.0 / 2.0, 1080.0 / 2.0) - polygon.bounding_box().center());
-    
+
     write_and_unwrite(&mut scene, &canvas, polygon.clone());
 
     let polygon = scene.play_in_canvas(&canvas, svg, Transform::new(polygon));

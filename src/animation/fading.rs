@@ -2,6 +2,24 @@ use crate::{prelude::Interpolatable, rabject::Updatable};
 
 use super::{Animation, AnimationFunc};
 
+pub fn fade_in<T: Opacity + Interpolatable + Clone + 'static>() -> Animation<T> {
+    Animation::new(Fading {
+        src: None,
+        dst: None,
+        fading_type: FadingType::In,
+    })
+}
+
+pub fn fade_out<T: Opacity + Interpolatable + Clone + 'static>() -> Animation<T> {
+    Animation::new(Fading {
+        src: None,
+        dst: None,
+        fading_type: FadingType::Out,
+    })
+}
+
+// ---------------------------------------------------- //
+
 pub enum FadingType {
     Out,
     In,
@@ -11,24 +29,6 @@ pub struct Fading<R: Opacity + Interpolatable + Clone> {
     pub(crate) src: Option<R>,
     pub(crate) dst: Option<R>,
     pub(crate) fading_type: FadingType,
-}
-
-impl<R: Opacity + Interpolatable + Clone + 'static> Fading<R> {
-    pub fn fade_in() -> Animation<R> {
-        Animation::new(Self {
-            src: None,
-            dst: None,
-            fading_type: FadingType::In,
-        })
-    }
-
-    pub fn fade_out() -> Animation<R> {
-        Animation::new(Self {
-            src: None,
-            dst: None,
-            fading_type: FadingType::Out,
-        })
-    }
 }
 
 pub trait Opacity {
