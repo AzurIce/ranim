@@ -120,7 +120,7 @@ impl SceneBuilder {
 ///
 ///
 pub struct Scene {
-    ctx: RanimContext,
+    pub ctx: RanimContext,
     /// The name of the scene
     name: String,
     pub camera: SceneCamera,
@@ -303,19 +303,19 @@ impl Scene {
     /// Play an animation
     ///
     /// The different target_type is corresponding to different [`AnimateTarget`]:
-    /// - [`Entity`] represents an entity that is not existed in the scene 
-    /// 
+    /// - [`Entity`] represents an entity that is not existed in the scene
+    ///
     ///   It corresponds to [`AnimateTarget::Insert`], the entity will
     ///   be inserted into the scene before animation plays
     /// - [`EntityId`] represents an entity that is existed in the scene
     ///   It corresponds to [`AnimateTarget::Existed`]
-    /// 
+    ///
     /// Should note that this function takes the ownership of the entity or its id and returns the id.
-    /// 
+    ///
     /// If you want to remove the entity after animation plays, you can use [`Scene::play_remove`].
-    /// 
+    ///
     /// For playing animation in a canvas, see [`Scene::play_in_canvas`] and [`Scene::play_remove_in_canvas`].
-    /// 
+    ///
     /// The actual "playing" part is equal to:
     /// ```rust
     /// let run_time = animation.config.run_time;
@@ -356,7 +356,10 @@ impl Scene {
     /// Same like [`Scene::play`], but the animation will be played in a canvas
     ///
     /// See [`Animation`] and [`crate::updater::Updater`].
-    pub fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static, T: Into<AnimateTarget<E>>>(
+    pub fn play_in_canvas<
+        E: Entity<Renderer = CanvasCamera> + 'static,
+        T: Into<AnimateTarget<E>>,
+    >(
         &mut self,
         canvas_id: &EntityId<Canvas>,
         target: T,
@@ -370,7 +373,9 @@ impl Scene {
         };
 
         let run_time = animation.config.run_time;
-        self.get_mut(canvas_id).get_mut(&entity_id).insert_updater(animation);
+        self.get_mut(canvas_id)
+            .get_mut(&entity_id)
+            .insert_updater(animation);
         self.advance(run_time);
         entity_id
     }
@@ -495,6 +500,7 @@ impl DerefMut for SceneCamera {
 }
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+const ALIGNMENT: usize = 256;
 
 impl SceneCamera {
     pub(crate) fn new(ctx: &RanimContext, width: usize, height: usize, fps: u32) -> Self {
@@ -552,9 +558,11 @@ impl SceneCamera {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
+        let bytes_per_row =
+            ((width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
         let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: (width * height * 4) as u64,
+            size: (bytes_per_row * height) as u64,
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
@@ -707,13 +715,12 @@ impl SceneCamera {
     }
 
     fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
+        let bytes_per_row =
+            ((self.frame.size.0 * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
         let mut texture_data =
-            self.output_texture_data.take().unwrap_or(vec![
-                0;
-                self.frame.size.0
-                    * self.frame.size.1
-                    * 4
-            ]);
+            self.output_texture_data
+                .take()
+                .unwrap_or(vec![0; self.frame.size.0 * self.frame.size.1 * 4]);
 
         let mut encoder = ctx
             .device
@@ -732,7 +739,7 @@ impl SceneCamera {
                 buffer: &self.output_staging_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some((self.frame.size.0 * 4) as u32),
+                    bytes_per_row: Some(bytes_per_row as u32),
                     rows_per_image: Some(self.frame.size.1 as u32),
                 },
             },
@@ -754,7 +761,14 @@ impl SceneCamera {
 
             {
                 let view = buffer_slice.get_mapped_range();
-                texture_data.copy_from_slice(&view);
+                // texture_data.copy_from_slice(&view);
+                for y in 0..self.frame.size.1 {
+                    let src_row_start = y * bytes_per_row;
+                    let dst_row_start = y * self.frame.size.0 * 4;
+
+                    texture_data[dst_row_start..dst_row_start + self.frame.size.0 * 4]
+                        .copy_from_slice(&view[src_row_start..src_row_start + self.frame.size.0 * 4]);
+                }
             }
         });
         self.output_staging_buffer.unmap();

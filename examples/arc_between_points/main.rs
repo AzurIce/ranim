@@ -46,7 +46,7 @@ fn main() {
             let mut arc =
                 VMobject::blueprint_arc_between_points(center, center + vec, angle).build();
             arc.set_color(color)
-                .set_fill_alpha(0.0)
+                .set_fill_opacity(0.0)
                 .set_stroke_width(width);
 
             let _arc = scene.play_in_canvas(

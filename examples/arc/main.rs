@@ -45,7 +45,7 @@ fn main() {
                 .with_stroke_width(10.0 * j as f32)
                 .build();
 
-            arc.set_color(color).set_fill_alpha(0.0).shift(offset);
+            arc.set_color(color).set_fill_opacity(0.0).shift(offset);
             let _arc = scene.play_in_canvas(
                 &canvas,
                 arc,

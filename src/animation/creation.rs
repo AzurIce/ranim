@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use bevy_color::LinearRgba;
+use bevy_color::{LinearRgba, Srgba};
 
 use crate::{prelude::Interpolatable, rabject::Updatable};
 
@@ -201,11 +201,11 @@ pub trait Empty {
 
 pub trait Fill {
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self;
-    fn set_fill_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self;
+    fn set_fill_color(&mut self, color: Srgba) -> &mut Self;
 }
 
 pub trait Stroke {
     fn set_stroke_width(&mut self, width: f32) -> &mut Self;
-    fn set_stroke_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self;
+    fn set_stroke_color(&mut self, color: Srgba) -> &mut Self;
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self;
 }

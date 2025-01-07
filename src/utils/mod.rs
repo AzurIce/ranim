@@ -1,9 +1,9 @@
 pub mod bezier;
-pub mod rate_functions;
-pub mod wgpu;
-pub mod typst;
-pub mod math;
 pub mod brush;
+pub mod math;
+pub mod rate_functions;
+pub mod typst;
+pub mod wgpu;
 
 use std::{
     any::{Any, TypeId},
@@ -142,13 +142,17 @@ pub fn extend_with_last<T: Clone + Default>(vec: &mut Vec<T>, new_len: usize) {
     vec.extend(v)
 }
 
+// Should not be called frequently
 pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8> {
+    const ALIGNMENT: usize = 256;
     use ::wgpu;
-    let mut texture_data = vec![0u8; (texture.size().width * texture.size().height * 4) as usize];
+    let bytes_per_row =
+        ((texture.size().width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
+    let mut texture_data = vec![0u8; bytes_per_row * texture.size().height as usize];
 
     let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Output Staging Buffer"),
-        size: (texture.size().width * texture.size().height * 4) as u64,
+        size: (bytes_per_row * texture.size().height as usize) as u64,
         usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
@@ -169,7 +173,7 @@ pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8>
             buffer: &output_staging_buffer,
             layout: wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some((texture.size().width * 4) as u32),
+                bytes_per_row: Some(bytes_per_row as u32),
                 rows_per_image: Some(texture.size().height as u32),
             },
         },
@@ -190,7 +194,16 @@ pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8>
 
         {
             let view = buffer_slice.get_mapped_range();
-            texture_data.copy_from_slice(&view);
+            // texture_data.copy_from_slice(&view);
+            for y in 0..texture.size().height as usize {
+                let src_row_start = y * bytes_per_row;
+                let dst_row_start = y * texture.size().width as usize * 4;
+
+                texture_data[dst_row_start..dst_row_start + texture.size().width as usize * 4]
+                    .copy_from_slice(
+                        &view[src_row_start..src_row_start + texture.size().width as usize * 4],
+                    );
+            }
         }
     });
     output_staging_buffer.unmap();
@@ -302,15 +315,10 @@ pub fn into_image(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> Image 
 
 pub fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, Affine)> {
     match paint {
-        usvg::Paint::Color(color) => Some((
-            Brush::Solid(Color::from_rgba8(
-                color.red,
-                color.green,
-                color.blue,
-                opacity.to_u8(),
-            )),
-            Affine::IDENTITY,
-        )),
+        usvg::Paint::Color(color) => {
+            let color = Color::from_rgba8(color.red, color.green, color.blue, opacity.to_u8());
+            Some((Brush::Solid(color), Affine::IDENTITY))
+        }
         usvg::Paint::LinearGradient(gr) => {
             let stops: Vec<vello::peniko::ColorStop> = gr
                 .stops()
