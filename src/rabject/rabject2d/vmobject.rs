@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use bevy_color::LinearRgba;
+use bevy_color::{LinearRgba, Srgba};
 use glam::{vec2, Vec2};
 use vello::kurbo::{self, Affine, PathEl};
 
@@ -40,15 +40,9 @@ impl VMobject {
         self.apply_affine(Affine::rotate(angle as f64));
         self
     }
-    pub fn set_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
+    pub fn set_color(&mut self, color: Srgba) -> &mut Self {
         self.subpaths.iter_mut().for_each(|p| {
             p.set_color(color);
-        });
-        self
-    }
-    pub fn set_fill_alpha(&mut self, alpha: f32) -> &mut Self {
-        self.subpaths.iter_mut().for_each(|p| {
-            p.set_fill_opacity(alpha);
         });
         self
     }
@@ -193,7 +187,7 @@ impl Fill for VMobject {
         });
         self
     }
-    fn set_fill_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
+    fn set_fill_color(&mut self, color: Srgba) -> &mut Self {
         self.subpaths.iter_mut().for_each(|p| {
             p.set_fill_color(color);
         });
@@ -208,7 +202,7 @@ impl Stroke for VMobject {
         });
         self
     }
-    fn set_stroke_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
+    fn set_stroke_color(&mut self, color: Srgba) -> &mut Self {
         self.subpaths.iter_mut().for_each(|p| {
             p.set_stroke_color(color);
         });

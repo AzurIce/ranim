@@ -264,11 +264,13 @@ impl CanvasCamera {
         });
         let depth_stencil_view =
             depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let vello_view = vello_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+        let vello_view = vello_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        // Although the vello texture is Rgba8Unorm format, the vello outputs are Rgba8UnormSrgb
+        let blend_input_view = vello_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
             ..Default::default()
         });
-        let blend_bind_group = TextureBindGroup::new(ctx, &vello_view);
+        let blend_bind_group = TextureBindGroup::new(ctx, &blend_input_view);
         let result_bind_group = TextureBindGroup::new(ctx, &render_view);
 
         let vello_scene = vello::Scene::new();

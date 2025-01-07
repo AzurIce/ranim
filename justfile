@@ -16,4 +16,4 @@ examples:
     just example palettes
 
 clean:
-    rm **/*.log
+    -rm *.log

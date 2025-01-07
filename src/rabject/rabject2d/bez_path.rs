@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut, Range};
 
-use bevy_color::LinearRgba;
+use bevy_color::{LinearRgba, Srgba};
 use glam::{FloatExt, Vec2};
 use log::trace;
 use vello::{
@@ -423,9 +423,7 @@ impl BezPath {
         self.stroke.style.width = width as f64;
         self
     }
-    pub fn set_stroke_color(&mut self, color: impl Into<LinearRgba>) -> &mut Self {
-        let color = color.into();
-
+    pub fn set_stroke_color(&mut self, color: Srgba) -> &mut Self {
         self.stroke.brush = peniko::Brush::Solid(AlphaColor::new([
             color.red,
             color.green,
@@ -438,19 +436,21 @@ impl BezPath {
         self.stroke.set_opacity(opacity);
         self
     }
-    pub fn set_color(&mut self, color: impl Into<LinearRgba> + Copy) -> &mut Self {
+    pub fn set_color(&mut self, color: Srgba) -> &mut Self {
         self.set_stroke_color(color);
         self.set_fill_color(color);
         self
     }
-    pub fn set_fill_color(&mut self, color: impl Into<LinearRgba>) -> &mut Self {
-        let color = color.into();
-        self.fill.brush = peniko::Brush::Solid(AlphaColor::new([
+    pub fn set_fill_color(&mut self, color: Srgba) -> &mut Self {
+        println!("r: {}, g: {}, b: {}", color.red, color.green, color.blue);
+        let color = AlphaColor::new([
             color.red,
             color.green,
             color.blue,
             self.fill.opacity,
-        ]));
+        ]);
+        println!("{:?}", color);
+        self.fill.brush = peniko::Brush::Solid(color);
         self
     }
     pub fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
