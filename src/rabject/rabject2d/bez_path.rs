@@ -1,8 +1,7 @@
 use std::ops::{Deref, DerefMut, Range};
 
-use bevy_color::{LinearRgba, Srgba};
+use bevy_color::Srgba;
 use glam::{FloatExt, Vec2};
-use log::trace;
 use vello::{
     kurbo::{self, Affine, CubicBez, Line, ParamCurve, PathEl, PathSeg, QuadBez, Shape},
     peniko::{self, color::AlphaColor, Brush},
@@ -237,7 +236,7 @@ impl Partial for kurbo::BezPath {
         let mut partial_segments = vec![];
         let left_remain = a + 1.0 - a_ceil as f32;
         if a != a_ceil as f32 {
-            partial_segments.push(segments[a_ceil-1].subsegment(left_remain as f64..1.0));
+            partial_segments.push(segments[a_ceil - 1].subsegment(left_remain as f64..1.0));
         }
         if a_ceil != b_floor {
             partial_segments.extend(segments[a_ceil..b_floor].to_vec());
@@ -443,12 +442,7 @@ impl BezPath {
     }
     pub fn set_fill_color(&mut self, color: Srgba) -> &mut Self {
         println!("r: {}, g: {}, b: {}", color.red, color.green, color.blue);
-        let color = AlphaColor::new([
-            color.red,
-            color.green,
-            color.blue,
-            self.fill.opacity,
-        ]);
+        let color = AlphaColor::new([color.red, color.green, color.blue, self.fill.opacity]);
         println!("{:?}", color);
         self.fill.brush = peniko::Brush::Solid(color);
         self

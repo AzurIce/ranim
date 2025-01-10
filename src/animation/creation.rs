@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use bevy_color::{LinearRgba, Srgba};
+use bevy_color::Srgba;
 
 use crate::{prelude::Interpolatable, rabject::Updatable};
 
@@ -13,11 +13,13 @@ pub fn uncreate<T: Partial + Empty + Interpolatable + Clone + 'static>() -> Anim
     Animation::new(Uncreate::default())
 }
 
-pub fn write<T: Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>() -> Animation<T> {
+pub fn write<T: Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>() -> Animation<T>
+{
     Animation::new(Write::default())
 }
 
-pub fn unwrite<T: Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>() -> Animation<T> {
+pub fn unwrite<T: Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>(
+) -> Animation<T> {
     Animation::new(Unwrite::default())
 }
 
@@ -29,9 +31,7 @@ pub struct Create<T: Partial + Empty + Interpolatable + Clone> {
 
 impl<T: Partial + Empty + Interpolatable + Clone> Default for Create<T> {
     fn default() -> Self {
-        Self {
-            original: None,
-        }
+        Self { original: None }
     }
 }
 
@@ -57,9 +57,7 @@ pub struct Uncreate<T: Partial + Empty + Interpolatable + Clone> {
 
 impl<T: Partial + Empty + Interpolatable + Clone> Default for Uncreate<T> {
     fn default() -> Self {
-        Self {
-            original: None,
-        }
+        Self { original: None }
     }
 }
 
@@ -86,7 +84,7 @@ impl<T: Partial + Empty + Interpolatable + Clone + 'static> AnimationFunc<T> for
 }
 
 /// Write
-/// 
+///
 /// First update with partial from 0.0..0.0 to 0.0..1.0, then lerp fill_opacity to 1.0
 pub struct Write<T: Partial + Empty + Stroke + Fill + Interpolatable + Clone> {
     pub(crate) original: Option<T>,
@@ -139,7 +137,7 @@ impl<T: Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static> Anim
 }
 
 /// Unwrite
-/// 
+///
 /// First lerp fill_opacity to 0.0, then update with partial from 0.0..1.0 to 0.0..0.0
 pub struct Unwrite<T: Partial + Empty + Stroke + Fill + Interpolatable + Clone> {
     pub(crate) original: Option<T>,

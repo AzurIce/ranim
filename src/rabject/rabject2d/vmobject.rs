@@ -1,11 +1,11 @@
 use std::ops::Range;
 
-use bevy_color::{LinearRgba, Srgba};
+use bevy_color::Srgba;
 use glam::{vec2, Vec2};
 use vello::kurbo::{self, Affine, PathEl};
 
 use crate::{
-    animation::{creation::{Empty, Partial, Fill, Stroke}},
+    animation::creation::{Empty, Fill, Partial, Stroke},
     prelude::{Alignable, Interpolatable, Opacity},
     scene::{canvas::camera::CanvasCamera, Entity},
     utils::{affine_from_vec, math::Rect},
