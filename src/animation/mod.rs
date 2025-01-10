@@ -17,10 +17,6 @@ pub struct AnimationConfig {
     pub run_time: time::Duration,
     pub rate_func: Box<dyn Fn(f32) -> f32>,
     pub lag_ratio: Option<f32>,
-    // /// Whether the mobject will be removed from the scene after the animation
-    // pub(crate) remove: bool,
-    // /// The rabject will be inserted into the scene after the animation
-    // pub(crate) end_rabject: Option<RabjectWithId<R>>,
 }
 
 impl Default for AnimationConfig {
@@ -53,14 +49,6 @@ impl AnimationConfig {
         self.lag_ratio = lag_ratio;
         self
     }
-    // pub fn set_remove(&mut self, remove: bool) -> &mut Self {
-    //     self.remove = remove;
-    //     self
-    // }
-    // pub fn set_end_rabject(&mut self, end_rabject: Option<RabjectWithId<R>>) -> &mut Self {
-    //     self.end_rabject = end_rabject;
-    //     self
-    // }
 
     pub fn calc_frames(&self, fps: f32) -> usize {
         (self.run_time.as_secs_f32() * fps).ceil() as usize
