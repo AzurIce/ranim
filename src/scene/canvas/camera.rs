@@ -308,21 +308,21 @@ impl CanvasCamera {
 
         // Clear
         {
-            let bg = Color::srgba_u8(0x33, 0x33, 0x33, 0xff).to_linear();
+            // let bg = Color::srgba_u8(0x33, 0x33, 0x33, 0xff).to_linear();
             // let bg = Color::srgba_u8(41, 171, 202, 255).to_linear();
-            let bg = wgpu::Color {
-                r: bg.red as f64,
-                g: bg.green as f64,
-                b: bg.blue as f64,
-                a: bg.alpha as f64,
-            };
+            // let bg = wgpu::Color {
+            //     r: bg.red as f64,
+            //     g: bg.green as f64,
+            //     b: bg.blue as f64,
+            //     a: bg.alpha as f64,
+            // };
             let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("VMobject Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &self.multisample_view,
                     resolve_target: Some(&self.render_view),
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(bg),
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
