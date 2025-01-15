@@ -18,7 +18,7 @@ use crate::{
     animation::{AnimateTarget, Animation},
     context::RanimContext,
 };
-use bevy_color::Color;
+use bevy_color::{Color, LinearRgba};
 use glam::{Mat4, Vec3};
 use wgpu::RenderPassDescriptor;
 
@@ -155,6 +155,9 @@ impl Scene {
     pub fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas> {
         let canvas = Canvas::new(&self.ctx.wgpu_ctx, width, height);
         self.entities.insert(canvas)
+    }
+    pub fn set_clear_color(&mut self, clear_color: impl Into<LinearRgba>) {
+        self.camera.set_clear_color(clear_color);
     }
 }
 
@@ -398,8 +401,13 @@ impl Scene {
         let frames = (duration.as_secs_f32() / dt).ceil() as usize;
 
         for _ in 0..frames {
+            let start = Instant::now();
             self.tick(dt);
+            trace!("[Scene/advance] tick cost: {:?}", start.elapsed());
+            let t = Instant::now();
             self.update_frame(true);
+            trace!("[Scene/advance] update_frame cost: {:?}", t.elapsed());
+            trace!("[Scene/advance] one complete frame cost: {:?}", start.elapsed());
         }
     }
 
@@ -411,7 +419,9 @@ impl Scene {
         let frames = (duration.as_secs_f32() / dt).ceil() as usize;
 
         for _ in 0..frames {
+            let start = Instant::now();
             self.update_frame(false);
+            trace!("[Scene/wait] one complete frame(update_frame) cost: {:?}", start.elapsed());
         }
     }
 }
@@ -468,6 +478,7 @@ impl CameraUniformsBindGroup {
 
 pub struct SceneCamera {
     pub frame: CameraFrame,
+    clear_color: wgpu::Color,
     pub fps: u32,
     uniforms: CameraUniforms,
     render_texture: wgpu::Texture,
@@ -484,6 +495,19 @@ pub struct SceneCamera {
 
     uniforms_buffer: WgpuBuffer<CameraUniforms>,
     pub(crate) uniforms_bind_group: CameraUniformsBindGroup,
+}
+
+impl SceneCamera {
+    pub fn set_clear_color(&mut self, clear_color: impl Into<LinearRgba>) {
+        let clear_color = clear_color.into();
+        self.clear_color = wgpu::Color {
+            r: clear_color.red as f64,
+            g: clear_color.green as f64,
+            b: clear_color.blue as f64,
+            a: clear_color.alpha as f64,
+        };
+        self.clear_color = wgpu::Color::WHITE;
+    }
 }
 
 impl Deref for SceneCamera {
@@ -558,8 +582,7 @@ impl SceneCamera {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
-        let bytes_per_row =
-            ((width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
+        let bytes_per_row = ((width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
         let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
             size: (bytes_per_row * height) as u64,
@@ -593,9 +616,18 @@ impl SceneCamera {
         //     format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
         //     ..Default::default()
         // });
+        let bg = Color::srgba_u8(0x33, 0x33, 0x33, 0xff).to_linear();
+        // let bg = Color::srgba_u8(41, 171, 202, 255).to_linear();
+        let clear_color = wgpu::Color {
+            r: bg.red as f64,
+            g: bg.green as f64,
+            b: bg.blue as f64,
+            a: bg.alpha as f64,
+        };
 
         Self {
             frame,
+            clear_color,
             fps,
             uniforms,
             // Textures
@@ -626,21 +658,13 @@ impl SceneCamera {
 
         // Clear
         {
-            let bg = Color::srgba_u8(0x33, 0x33, 0x33, 0xff).to_linear();
-            // let bg = Color::srgba_u8(41, 171, 202, 255).to_linear();
-            let bg = wgpu::Color {
-                r: bg.red as f64,
-                g: bg.green as f64,
-                b: bg.blue as f64,
-                a: bg.alpha as f64,
-            };
             let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("VMobject Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &self.multisample_view,
                     resolve_target: Some(&self.render_view),
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(bg),
+                        load: wgpu::LoadOp::Clear(self.clear_color),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -718,9 +742,12 @@ impl SceneCamera {
         let bytes_per_row =
             ((self.frame.size.0 * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
         let mut texture_data =
-            self.output_texture_data
-                .take()
-                .unwrap_or(vec![0; self.frame.size.0 * self.frame.size.1 * 4]);
+            self.output_texture_data.take().unwrap_or(vec![
+                0;
+                self.frame.size.0
+                    * self.frame.size.1
+                    * 4
+            ]);
 
         let mut encoder = ctx
             .device
@@ -767,7 +794,9 @@ impl SceneCamera {
                     let dst_row_start = y * self.frame.size.0 * 4;
 
                     texture_data[dst_row_start..dst_row_start + self.frame.size.0 * 4]
-                        .copy_from_slice(&view[src_row_start..src_row_start + self.frame.size.0 * 4]);
+                        .copy_from_slice(
+                            &view[src_row_start..src_row_start + self.frame.size.0 * 4],
+                        );
                 }
             }
         });

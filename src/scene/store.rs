@@ -103,27 +103,27 @@ impl<R> DerefMut for EntitiesStore<R> {
 impl<R: 'static> EntitiesStore<R> {
     pub fn insert<E: EntityAny<Renderer = R>>(&mut self, entity: E) -> EntityId<E> {
         let id = Id::new();
-        debug!(
-            "[RabjectStores::insert]: inserting entity {:?} of type {:?}",
-            id,
-            std::any::TypeId::of::<E>()
-        );
+        // debug!(
+        //     "[RabjectStores::insert]: inserting entity {:?} of type {:?}",
+        //     id,
+        //     std::any::TypeId::of::<E>()
+        // );
         self.inner.insert(id, Box::new(EntityStore::new(entity)));
-        debug!("[RabjectStores::insert]: inserted entity {:?}", id);
+        // debug!("[RabjectStores::insert]: inserted entity {:?}", id);
         EntityId::from_id(id)
     }
 
     pub fn remove<E: EntityAny<Renderer = R>>(&mut self, id: EntityId<E>) {
-        debug!("[RabjectStores::remove]: removing entity {:?}", id);
+        // debug!("[RabjectStores::remove]: removing entity {:?}", id);
         self.inner.remove(&id);
     }
 
     pub fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> &EntityStore<E> {
-        debug!(
-            "[RabjectStores::get]: getting entity {:?} of type {:?}",
-            id,
-            std::any::TypeId::of::<E>()
-        );
+        // debug!(
+        //     "[RabjectStores::get]: getting entity {:?} of type {:?}",
+        //     id,
+        //     std::any::TypeId::of::<E>()
+        // );
         // Since removing an entity consumes the [`EntityId`],
         // so if we have a reference of [`EntityId`], the entity
         // must be there and we can safely unwrap it.
@@ -134,11 +134,11 @@ impl<R: 'static> EntitiesStore<R> {
     }
 
     pub fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> &mut EntityStore<E> {
-        debug!(
-            "[RabjectStores::get_mut]: getting entity {:?} of type {:?}",
-            id,
-            std::any::TypeId::of::<E>()
-        );
+        // debug!(
+        //     "[RabjectStores::get_mut]: getting entity {:?} of type {:?}",
+        //     id,
+        //     std::any::TypeId::of::<E>()
+        // );
         // Since removing an entity consumes the [`EntityId`],
         // so if we have a reference of [`EntityId`], the entity
         // must be there and we can safely unwrap it.
