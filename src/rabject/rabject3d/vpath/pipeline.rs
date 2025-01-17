@@ -6,7 +6,7 @@ use glam::Vec3;
 use crate::{
     context::WgpuContext,
     rabject::{RenderResource, Vertex},
-    scene::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
+    render::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
 };
 
 use super::primitive::VPathPrimitive;

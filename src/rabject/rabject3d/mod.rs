@@ -7,7 +7,8 @@ use std::ops::{Deref, DerefMut};
 
 use crate::{
     context::RanimContext,
-    scene::{Entity, SceneCamera},
+    world::{Entity},
+    render::Renderer,
     updater::Updater,
     utils::Id,
 };
@@ -63,7 +64,7 @@ impl<R: Rabject> RabjectEntity3d<R> {
 }
 
 impl<R: Rabject + 'static> Entity for RabjectEntity3d<R> {
-    type Renderer = SceneCamera;
+    type Renderer = Renderer;
 
     fn tick(&mut self, dt: f32) {
         let rabject = &mut self.rabject;

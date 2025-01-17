@@ -10,7 +10,7 @@ use vello::{
 use crate::{
     animation::creation::Partial,
     prelude::{Alignable, Interpolatable, Opacity},
-    scene::{canvas::camera::CanvasCamera, Entity},
+    world::{canvas::camera::CanvasCamera, Entity},
     utils::{
         bezier::{align_subpath, divide_elements},
         math::Rect,

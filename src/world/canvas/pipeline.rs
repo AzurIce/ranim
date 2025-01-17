@@ -3,7 +3,7 @@ use std::ops::Deref;
 use crate::{
     context::WgpuContext,
     rabject::{RenderResource, Vertex},
-    scene::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
+    render::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT},
 };
 
 use super::{camera::TextureBindGroup, CanvasVertex};

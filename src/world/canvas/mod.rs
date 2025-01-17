@@ -9,12 +9,12 @@ use pipeline::CanvasPipeline;
 
 use crate::context::WgpuContext;
 use crate::rabject::Vertex;
-use crate::scene::entity::Entity;
+use super::entity::Entity;
 
-use crate::scene::store::EntitiesStore;
+use super::store::EntitiesStore;
 use crate::utils::wgpu::WgpuBuffer;
 
-use crate::scene::SceneCamera;
+use crate::render::Renderer;
 
 /// A canvas is basically a 2d scene with a camera
 ///
@@ -148,7 +148,7 @@ impl Canvas {
 }
 
 impl Entity for Canvas {
-    type Renderer = SceneCamera;
+    type Renderer = Renderer;
 
     fn tick(&mut self, dt: f32) {
         for (_, rabject) in self.entities.iter_mut() {

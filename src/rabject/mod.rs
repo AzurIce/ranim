@@ -1,3 +1,4 @@
+#[deprecated = "Now the 2d and 3d are merged, everything is 3d"]
 pub mod rabject2d;
 #[deprecated = "Use 2d instead for now"]
 pub mod rabject3d;
