@@ -1,5 +1,4 @@
 pub mod bezier;
-pub mod brush;
 pub mod math;
 pub mod rate_functions;
 pub mod typst;
@@ -307,7 +306,7 @@ pub fn into_image(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> Image 
     let image_data: Vec<u8> = image.into_vec();
     Image::new(
         Blob::new(std::sync::Arc::new(image_data)),
-        vello::peniko::Format::Rgba8,
+        vello::peniko::ImageFormat::Rgba8,
         width,
         height,
     )

@@ -37,3 +37,9 @@ Once the design is stablized, I may write about it.
 
 For now, you can check out the code and some PRs:
 - [PR#5: Refactor object management and logic/rendering phases](https://github.com/AzurIce/ranim/pull/5)
+
+## Thanks
+
+- [3b1b/manim](https://github.com/3b1b/manim)
+- [ManimCommunity/manim](https://github.com/ManimCommunity/manim/)
+- [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim)

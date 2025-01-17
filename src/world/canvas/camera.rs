@@ -1,11 +1,10 @@
 use std::{num::NonZeroUsize, ops::Deref};
 
-use bevy_color::Color;
 use glam::{vec3, Mat4, Vec2, Vec3};
 
 use crate::{
     context::{RanimContext, WgpuContext},
-    scene::store::EntitiesStore,
+    world::store::EntitiesStore,
     utils::wgpu::WgpuBuffer,
 };
 

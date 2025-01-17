@@ -99,9 +99,16 @@ impl<R> DerefMut for EntitiesStore<R> {
     }
 }
 
+pub trait Store<R: 'static> {
+    fn insert<E: EntityAny<Renderer = R>>(&mut self, entity: E) -> EntityId<E>;
+    fn remove<E: EntityAny<Renderer = R>>(&mut self, id: EntityId<E>);
+    fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> &EntityStore<E>;
+    fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> &mut EntityStore<E>;
+}
+
 // Entity management
-impl<R: 'static> EntitiesStore<R> {
-    pub fn insert<E: EntityAny<Renderer = R>>(&mut self, entity: E) -> EntityId<E> {
+impl<R: 'static> Store<R> for EntitiesStore<R> {
+    fn insert<E: EntityAny<Renderer = R>>(&mut self, entity: E) -> EntityId<E> {
         let id = Id::new();
         // debug!(
         //     "[RabjectStores::insert]: inserting entity {:?} of type {:?}",
@@ -113,12 +120,12 @@ impl<R: 'static> EntitiesStore<R> {
         EntityId::from_id(id)
     }
 
-    pub fn remove<E: EntityAny<Renderer = R>>(&mut self, id: EntityId<E>) {
+    fn remove<E: EntityAny<Renderer = R>>(&mut self, id: EntityId<E>) {
         // debug!("[RabjectStores::remove]: removing entity {:?}", id);
         self.inner.remove(&id);
     }
 
-    pub fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> &EntityStore<E> {
+    fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> &EntityStore<E> {
         // debug!(
         //     "[RabjectStores::get]: getting entity {:?} of type {:?}",
         //     id,
@@ -133,7 +140,7 @@ impl<R: 'static> EntitiesStore<R> {
             .unwrap()
     }
 
-    pub fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> &mut EntityStore<E> {
+    fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> &mut EntityStore<E> {
         // debug!(
         //     "[RabjectStores::get_mut]: getting entity {:?} of type {:?}",
         //     id,

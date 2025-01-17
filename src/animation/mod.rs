@@ -4,7 +4,7 @@ pub mod creation;
 
 use std::time;
 
-use crate::{scene::{Entity, EntityId}, updater::Updater, utils::rate_functions::smooth};
+use crate::{world::{Entity, EntityId}, updater::Updater, utils::rate_functions::smooth};
 
 #[allow(unused)]
 use log::trace;

@@ -7,7 +7,7 @@ use vello::kurbo::{self, Affine, PathEl};
 use crate::{
     animation::creation::{Empty, Fill, Partial, Stroke},
     prelude::{Alignable, Interpolatable, Opacity},
-    scene::{canvas::camera::CanvasCamera, Entity},
+    world::{canvas::camera::CanvasCamera, Entity},
     utils::{affine_from_vec, math::Rect},
 };
 
