@@ -1,9 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
-use glam::{Vec3, Vec4};
+use glam::Vec3;
 use itertools::Itertools;
-
-use crate::items::Extract;
 
 use super::ComponentData;
 
@@ -42,7 +40,7 @@ impl ComponentData<VPoint> {
 
         let mut i = 0;
         for (j, (a, b)) in self.iter().tuple_windows().enumerate() {
-            // Subpath ends at j + 1 with a = end_p, b = NAN 
+            // Subpath ends at j + 1 with a = end_p, b = NAN
             // or ends at vec boundary with b = end_p
             if *b == VPoint::NAN || j == self.len() - 2 {
                 let end_p = if *b == VPoint::NAN { a } else { b };

@@ -34,7 +34,6 @@ impl<E: EntityAny> Debug for EntityId<E> {
     }
 }
 
-
 impl<E: EntityAny> EntityId<E> {
     pub fn from_id(id: Id) -> Self {
         Self(id, PhantomData)

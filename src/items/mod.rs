@@ -5,4 +5,3 @@ pub trait Extract {
 
     fn extract(&self) -> Self::ExtractData;
 }
-

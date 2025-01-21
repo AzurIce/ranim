@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use glam::{Vec3, Vec4};
+use glam::Vec4;
 
 use crate::{context::WgpuContext, rabject::RenderResource, render::OUTPUT_TEXTURE_FORMAT};
 
@@ -32,19 +32,15 @@ impl RenderResource for DebugPipeline {
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
-                buffers: &[
-                    wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<Vec4>() as u64,
-                        step_mode: wgpu::VertexStepMode::Vertex,
-                        attributes: &[
-                            wgpu::VertexAttribute {
-                                shader_location: 0,
-                                format: wgpu::VertexFormat::Float32x4,
-                                offset: 0,
-                            }
-                        ]
-                    }
-                ],
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vec4>() as u64,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[wgpu::VertexAttribute {
+                        shader_location: 0,
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                    }],
+                }],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {

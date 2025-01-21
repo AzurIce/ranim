@@ -1,17 +1,19 @@
+pub mod creation;
 pub mod fading;
 pub mod transform;
-pub mod creation;
 
 use std::time;
 
-use crate::{world::{Entity, EntityId}, updater::Updater, utils::rate_functions::smooth};
+use crate::{
+    updater::Updater,
+    utils::rate_functions::smooth,
+    world::{Entity, EntityId},
+};
 
 #[allow(unused)]
 use log::trace;
 
 pub struct Enter;
-
-
 
 pub struct AnimationConfig {
     pub run_time: time::Duration,

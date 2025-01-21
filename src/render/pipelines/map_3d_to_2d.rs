@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use glam::{Vec3, Vec4};
+use glam::Vec4;
 
 use crate::{
     context::WgpuContext,
@@ -82,7 +82,7 @@ impl ComputeBindGroup {
             ],
         })
     }
-    pub fn new(
+    pub(crate) fn new(
         ctx: &WgpuContext,
         points3d_buffer: &WgpuBuffer<Vec4>,
         points2d_buffer: &WgpuBuffer<Vec4>,
@@ -92,7 +92,7 @@ impl ComputeBindGroup {
         }
     }
 
-    pub fn update(
+    pub(crate) fn update(
         &mut self,
         ctx: &WgpuContext,
         points3d_buffer: &WgpuBuffer<Vec4>,

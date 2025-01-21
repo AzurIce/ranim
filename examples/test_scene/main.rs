@@ -6,7 +6,11 @@ use ranim::{
     animation::{creation, transform::Transform},
     items::vitem::VItem,
     prelude::*,
-    rabject::rabject3d::{vmobject::{Square, VMobject}, vpath::blueprint::VPathBuilder, RabjectEntity3d},
+    rabject::rabject3d::{
+        vmobject::{Square, VMobject},
+        vpath::blueprint::VPathBuilder,
+        RabjectEntity3d,
+    },
     render::Renderer,
     typst_svg, typst_tree,
     world::{EntityId, World},
@@ -91,8 +95,8 @@ impl Scenee for TestScene {
         app.insert(square);
         let s: RabjectEntity3d<VMobject> = Square::new(10.0).build();
         app.insert(s);
-        app.render_to_image("test.png");
-        // app.wait(Duration::from_secs_f32(1.0));
+        // app.render_to_image("test.png");
+        app.wait(Duration::from_secs_f32(1.0));
         // let path = VPathBuilder::start(vec3(0.0, 0.0, 0.0))
         //     .line_to(vec3(100.0, 200.0, 0.0))
         //     .line_to(vec3(-100.0, -100.0, 0.0))
