@@ -1,26 +1,30 @@
+pub mod pipelines;
+pub mod primitives;
+
 use bevy_color::Color;
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use log::trace;
 
 use crate::{
     context::{RanimContext, WgpuContext},
     utils::wgpu::WgpuBuffer,
-    world::{canvas::Canvas, EntitiesStore},
+    world::EntitiesStore,
 };
 
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 /// Uniforms for the camera
 pub struct CameraUniforms {
-    view_projection_mat: Mat4,
-    frame_rescale_factors: Vec3,
-    _padding: f32,
+    proj_mat: Mat4,
+    view_mat: Mat4,
+    half_frame_size: Vec2,
+    _padding: [f32; 2],
 }
 
 impl CameraUniforms {
-    pub fn as_bind_group_layout_entry() -> wgpu::BindGroupLayoutEntry {
+    pub fn as_bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
-            binding: 0,
+            binding,
             visibility: wgpu::ShaderStages::all(),
             ty: wgpu::BindingType::Buffer {
                 ty: wgpu::BufferBindingType::Uniform,
@@ -41,7 +45,7 @@ impl CameraUniformsBindGroup {
         ctx.device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Simple Pipeline Uniforms"),
-                entries: &[CameraUniforms::as_bind_group_layout_entry()],
+                entries: &[CameraUniforms::as_bind_group_layout_entry(0)],
             })
     }
 
@@ -153,10 +157,12 @@ impl Renderer {
         });
 
         let uniforms = CameraUniforms {
-            view_projection_mat: frame.view_projection_matrix(),
-            frame_rescale_factors: frame.rescale_factors(),
-            _padding: 0.0,
+            proj_mat: frame.projection_matrix(),
+            view_mat: frame.view_matrix(),
+            half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
+            _padding: [0.0; 2],
         };
+        trace!("init renderer uniform: {:?}", uniforms);
         let uniforms_buffer = WgpuBuffer::new_init(
             ctx,
             &[uniforms],
@@ -212,6 +218,7 @@ impl Renderer {
     }
 
     pub fn clear_screen(&mut self, wgpu_ctx: &WgpuContext) {
+        trace!("clear screen {:?}", self.clear_color);
         let mut encoder = wgpu_ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -252,7 +259,7 @@ impl Renderer {
     pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut EntitiesStore<Renderer>) {
         self.clear_screen(&ctx.wgpu_ctx);
         for (id, entity) in entities.iter_mut() {
-            // trace!("[Scene] Rendering entity {:?}", id);
+            trace!("[Scene] Rendering entity {:?}", id);
             entity.render(ctx, self);
         }
         self.output_texture_updated = false;
@@ -333,9 +340,13 @@ impl Renderer {
     }
 
     pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext, camera_frame: &CameraFrame) {
-        self.uniforms.view_projection_mat = camera_frame.view_projection_matrix();
-        self.uniforms.frame_rescale_factors = camera_frame.rescale_factors();
-        // debug!("[Camera]: Uniforms: {:?}", self.uniforms);
+        self.uniforms.proj_mat = camera_frame.projection_matrix();
+        self.uniforms.view_mat = camera_frame.view_matrix();
+        self.uniforms.half_frame_size = Vec2::new(
+            camera_frame.size.0 as f32 / 2.0,
+            camera_frame.size.1 as f32 / 2.0,
+        );
+        trace!("Uniforms: {:?}", self.uniforms);
         // trace!("[Camera] uploading camera uniforms to buffer...");
         wgpu_ctx.queue.write_buffer(
             &self.uniforms_buffer,
@@ -357,14 +368,22 @@ pub struct CameraFrame {
 
 impl CameraFrame {
     pub fn new_with_size(width: usize, height: usize) -> Self {
-        Self {
+        let mut camera_frame = Self {
             size: (width, height),
             fovy: std::f32::consts::PI / 2.0,
             pos: Vec3::ZERO,
             up: Vec3::Y,
             facing: Vec3::NEG_Z,
             // rotation: Mat4::IDENTITY,
-        }
+        };
+        camera_frame.center_canvas_in_frame(
+            Vec3::ZERO,
+            width as f32,
+            height as f32,
+            Vec3::Y,
+            Vec3::Z,
+        );
+        camera_frame
     }
 }
 
@@ -389,18 +408,6 @@ impl CameraFrame {
     pub fn view_projection_matrix(&self) -> Mat4 {
         self.projection_matrix() * self.view_matrix()
     }
-
-    pub fn rescale_factors(&self) -> Vec3 {
-        Vec3::new(
-            2.0 / self.size.0 as f32,
-            2.0 / self.size.1 as f32,
-            1.0 / self.get_focal_distance(),
-        )
-    }
-
-    pub fn get_focal_distance(&self) -> f32 {
-        0.5 * self.size.1 as f32 / (0.5 * self.fovy).tan()
-    }
 }
 
 impl CameraFrame {
@@ -414,21 +421,29 @@ impl CameraFrame {
         self
     }
 
-    pub fn center_canvas_in_frame(&mut self, canvas: &Canvas) -> &mut Self {
-        let center = canvas.center();
-        let canvas_ratio = canvas.height() / canvas.width();
+    pub fn center_canvas_in_frame(
+        &mut self,
+        center: Vec3,
+        width: f32,
+        height: f32,
+        up: Vec3,
+        normal: Vec3,
+    ) -> &mut Self {
+        let canvas_ratio = height / width;
+        let up = up.normalize();
+        let normal = normal.normalize();
 
         let height = if self.ratio() > canvas_ratio {
-            canvas.height()
+            height
         } else {
-            canvas.width() / self.ratio()
+            width / self.ratio()
         };
 
         let distance = height * 0.5 / (0.5 * self.fovy).tan();
 
-        self.up = canvas.up_normal();
-        self.pos = center + canvas.unit_normal() * distance;
-        self.facing = -canvas.unit_normal();
+        self.up = up;
+        self.pos = center + normal * distance;
+        self.facing = -normal;
         trace!(
             "[Camera] centered canvas in frame, pos: {:?}, facing: {:?}, up: {:?}",
             self.pos,
@@ -437,5 +452,37 @@ impl CameraFrame {
         );
 
         self
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use env_logger::Env;
+    use image::ImageBuffer;
+
+    use super::*;
+    use crate::{
+        context::{RanimContext, WgpuContext},
+        items::vitem::VItem,
+        rabject::rabject3d::RabjectEntity3d,
+        world::{Store, World},
+    };
+
+    #[test]
+    fn test_render_vitem() {
+        env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
+        let mut ctx = RanimContext::new();
+        let mut world = World::new();
+        let vitem: RabjectEntity3d<VItem> = VItem::square().into();
+        let id = world.insert(vitem);
+        world.extract();
+        world.prepare(&ctx);
+        world.prepare(&ctx);
+
+        let mut renderer = Renderer::new(&ctx, 1920, 1080);
+        renderer.render(&mut ctx, &mut world.entities);
+        let data = renderer.get_rendered_texture_data(&ctx.wgpu_ctx);
+        let image = ImageBuffer::<image::Rgba<u8>, _>::from_raw(1920, 1080, data.to_vec()).unwrap();
+        image.save("./output.png");
     }
 }

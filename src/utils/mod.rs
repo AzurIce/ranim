@@ -3,13 +3,15 @@ pub mod math;
 pub mod rate_functions;
 pub mod typst;
 pub mod wgpu;
+pub mod refresh;
 
 use std::{
     any::{Any, TypeId},
-    collections::HashMap,
+    collections::HashMap, fmt::Debug,
 };
 
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
+use wgpu::WgpuBuffer;
 
 use crate::{context::WgpuContext, rabject::RenderResource};
 

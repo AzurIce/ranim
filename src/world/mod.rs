@@ -1,4 +1,4 @@
-pub mod canvas;
+// pub mod canvas;
 mod entity;
 mod store;
 

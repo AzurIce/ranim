@@ -1,0 +1,208 @@
+use std::ops::Deref;
+
+use glam::{Vec2, Vec3, Vec4};
+
+use crate::{
+    context::WgpuContext,
+    rabject::RenderResource,
+    render::{CameraUniformsBindGroup, WgpuBuffer, OUTPUT_TEXTURE_FORMAT},
+};
+
+pub struct RenderBindGroup(wgpu::BindGroup);
+
+impl Deref for RenderBindGroup {
+    type Target = wgpu::BindGroup;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl RenderBindGroup {
+    pub fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
+        ctx.device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("VItem Render Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            })
+    }
+
+    fn new_bind_group(
+        ctx: &WgpuContext,
+        points: &WgpuBuffer<Vec4>,
+        fill_rgbas: &WgpuBuffer<Vec4>,
+        stroke_rgbas: &WgpuBuffer<Vec4>,
+        stroke_widths: &WgpuBuffer<f32>,
+    ) -> wgpu::BindGroup {
+        ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("VItem Render Bind Group"),
+            layout: &RenderBindGroup::bind_group_layout(ctx),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(points.as_entire_buffer_binding()),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Buffer(fill_rgbas.as_entire_buffer_binding()),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Buffer(
+                        stroke_rgbas.as_entire_buffer_binding(),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Buffer(
+                        stroke_widths.as_entire_buffer_binding(),
+                    ),
+                },
+            ],
+        })
+    }
+    pub fn new(
+        ctx: &WgpuContext,
+        points: &WgpuBuffer<Vec4>,
+        fill_rgbas: &WgpuBuffer<Vec4>,
+        stroke_rgbas: &WgpuBuffer<Vec4>,
+        stroke_widths: &WgpuBuffer<f32>,
+    ) -> Self {
+        Self(Self::new_bind_group(
+            ctx,
+            points,
+            fill_rgbas,
+            stroke_rgbas,
+            stroke_widths,
+        ))
+    }
+
+    pub fn update(
+        &mut self,
+        ctx: &WgpuContext,
+        points: &WgpuBuffer<Vec4>,
+        fill_rgbas: &WgpuBuffer<Vec4>,
+        stroke_rgbas: &WgpuBuffer<Vec4>,
+        stroke_widths: &WgpuBuffer<f32>,
+    ) {
+        self.0 = Self::new_bind_group(ctx, points, fill_rgbas, stroke_rgbas, stroke_widths);
+    }
+}
+
+pub struct VItemPipeline {
+    pipeline: wgpu::RenderPipeline,
+}
+
+impl Deref for VItemPipeline {
+    type Target = wgpu::RenderPipeline;
+    fn deref(&self) -> &Self::Target {
+        &self.pipeline
+    }
+}
+
+impl RenderResource for VItemPipeline {
+    fn new(wgpu_ctx: &WgpuContext) -> Self {
+        let WgpuContext { device, .. } = wgpu_ctx;
+
+        let module = &device.create_shader_module(wgpu::include_wgsl!("./shaders/vitem.wgsl"));
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("VItem Pipeline Layout"),
+            bind_group_layouts: &[
+                &CameraUniformsBindGroup::bind_group_layout(wgpu_ctx),
+                &RenderBindGroup::bind_group_layout(wgpu_ctx),
+            ],
+            push_constant_ranges: &[],
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("VItem Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module,
+                entry_point: Some("vs_main"),
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vec2>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x2,
+                        offset: 0,
+                        shader_location: 0,
+                    }],
+                }],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module,
+                entry_point: Some("fs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: OUTPUT_TEXTURE_FORMAT,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleStrip,
+                // topology: wgpu::PrimitiveTopology::PointList,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            // depth_stencil: Some(wgpu::DepthStencilState {
+            //     format: wgpu::TextureFormat::Depth32Float,
+            //     depth_write_enabled: true,
+            //     depth_compare: wgpu::CompareFunction::LessEqual,
+            //     stencil: wgpu::StencilState::default(),
+            //     bias: wgpu::DepthBiasState::default(),
+            // }),
+            multisample: wgpu::MultisampleState {
+                count: 4,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+            cache: None,
+        });
+
+        Self { pipeline }
+    }
+}

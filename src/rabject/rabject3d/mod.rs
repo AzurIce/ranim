@@ -33,7 +33,7 @@ pub struct RabjectEntity3d<R: Rabject> {
     /// The updaters of this rabject
     pub(crate) updaters: Vec<(Id, Box<dyn Updater<R>>)>,
     /// The extracted data from the rabject
-    pub(crate) render_data: Option<R::RenderData>,
+    pub(crate) render_data: Option<R::ExtractData>,
     /// The prepared render resource of the rabject
     pub(crate) render_resource: Option<R::RenderResource>,
 }
