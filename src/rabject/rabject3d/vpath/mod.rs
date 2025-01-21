@@ -73,10 +73,10 @@ pub struct VPath {
 }
 
 impl Rabject for VPath {
-    type RenderData = ExtractedVPath;
+    type ExtractData = ExtractedVPath;
     type RenderResource = VPathPrimitive;
 
-    fn extract(&self) -> Self::RenderData {
+    fn extract(&self) -> Self::ExtractData {
         let joint_angles = self.get_joint_angles();
         let points = self
             .points

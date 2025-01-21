@@ -54,6 +54,10 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
         self.len
     }
 
+    pub fn set_len(&mut self, len: usize) {
+        self.len = len;
+    }
+
     pub(crate) fn prepare_from_slice(&mut self, ctx: &WgpuContext, data: &[T]) {
         if self.size() < std::mem::size_of_val(data) as u64 {
             self.buffer = ctx

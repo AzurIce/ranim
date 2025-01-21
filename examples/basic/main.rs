@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use bevy_color::Srgba;
 use env_logger::Env;
 use log::info;
-use ranim::animation::fading;
+use ranim::animation::creation;
 use ranim::glam::vec2;
 use ranim::rabject::rabject2d::vmobject::{
     geometry::{Arc, Polygon},
@@ -33,7 +33,7 @@ fn main() {
 
     // 0.5s wait -> fade in -> 0.5s wait
     scene.wait(Duration::from_secs_f32(0.5));
-    let ranim_text = scene.play_in_canvas(&canvas, ranim_text, fading::fade_in());
+    let ranim_text = scene.play_in_canvas(&canvas, ranim_text, creation::write());
     scene.wait(Duration::from_secs_f32(0.5));
 
     let mut polygon = Polygon::new(vec![
@@ -74,7 +74,7 @@ fn main() {
     scene.wait(Duration::from_secs_f32(0.5));
 
     info!("arc fade_out");
-    scene.play_remove_in_canvas(&canvas, arc, fading::fade_out());
+    scene.play_remove_in_canvas(&canvas, arc, creation::uncreate());
 
     info!(
         "Rendered {} frames({}s) in {:?}",

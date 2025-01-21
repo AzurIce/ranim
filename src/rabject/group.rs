@@ -61,10 +61,10 @@ impl<R: Primitive> Primitive for GroupPrimitive<R> {
 }
 
 impl<R: Rabject> Rabject for Group<R> {
-    type RenderData = Vec<R::RenderData>;
+    type ExtractData = Vec<R::ExtractData>;
     type RenderResource = GroupPrimitive<R::RenderResource>;
 
-    fn extract(&self) -> Self::RenderData {
+    fn extract(&self) -> Self::ExtractData {
         self.children.iter().map(|e| e.extract()).collect()
     }
 }

@@ -159,7 +159,7 @@ pub fn align_segments(a: Vec<PathSeg>, b: Vec<PathSeg>) -> (Vec<PathSeg>, Vec<Pa
         (a, b)
     };
     a.iter_mut().zip(b.iter_mut()).for_each(|(a, b)| {
-        a.align_with(b);
+        // a.align_with(b);
     });
     // trace!("self_segs: {:?}", a);
     // trace!("other_segs: {:?}", b);

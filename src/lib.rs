@@ -85,8 +85,11 @@ use image::{ImageBuffer, Rgba};
 use log::trace;
 use render::{CameraFrame, Renderer};
 use world::{
-    canvas::{camera::CanvasCamera, Canvas},
-    Entity, EntityId, Store, World,
+    // canvas::{camera::CanvasCamera, Canvas},
+    Entity,
+    EntityId,
+    Store,
+    World,
 };
 pub mod prelude {
     pub use crate::interpolate::Interpolatable;
@@ -104,7 +107,9 @@ mod interpolate;
 pub mod updater;
 
 pub mod animation;
+pub mod components;
 pub mod context;
+pub mod items;
 pub mod rabject;
 pub mod render;
 pub mod utils;
@@ -155,26 +160,28 @@ pub trait RanimApp: Store<Renderer> {
         animation: Animation<E>,
     );
 
-    /// Play an animation in a canvas
-    ///
-    /// Same like [`Scene::play`], but the animation will be played in a canvas
-    ///
-    /// See [`Animation`] and [`crate::updater::Updater`].
-    fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static, T: Into<AnimateTarget<E>>>(
-        &mut self,
-        canvas_id: &EntityId<Canvas>,
-        target: T,
-        animation: Animation<E>,
-    ) -> EntityId<E>;
-    fn play_remove_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
-        &mut self,
-        canvas_id: &EntityId<Canvas>,
-        target_id: EntityId<E>,
-        animation: Animation<E>,
-    );
-    fn center_canvas_in_frame(&mut self, canvas_id: &EntityId<Canvas>);
+    // /// Play an animation in a canvas
+    // ///
+    // /// Same like [`Scene::play`], but the animation will be played in a canvas
+    // ///
+    // /// See [`Animation`] and [`crate::updater::Updater`].
+    // fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static, T: Into<AnimateTarget<E>>>(
+    //     &mut self,
+    //     canvas_id: &EntityId<Canvas>,
+    //     target: T,
+    //     animation: Animation<E>,
+    // ) -> EntityId<E>;
+    // fn play_remove_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
+    //     &mut self,
+    //     canvas_id: &EntityId<Canvas>,
+    //     target_id: EntityId<E>,
+    //     animation: Animation<E>,
+    // );
+    // fn center_canvas_in_frame(&mut self, canvas_id: &EntityId<Canvas>);
     fn wait(&mut self, duration: Duration);
-    fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas>;
+    // fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas>;
+
+    fn render_to_image(&mut self, filename: impl AsRef<str>);
 }
 
 pub struct RanimRenderApp {
@@ -293,13 +300,13 @@ impl RanimRenderApp {
         self.frame_count += 1;
     }
 
-    pub fn render_to_image(&mut self, world: &mut World, filename: impl AsRef<str>) {
-        let filename = filename.as_ref();
-        world.extract();
-        world.prepare(&self.ctx);
-        self.renderer.render(&mut self.ctx, &mut world.entities);
-        self.save_frame_to_image(PathBuf::from(format!("output/{}/{}", "world", filename)));
-    }
+    // pub fn render_to_image(&mut self, world: &mut World, filename: impl AsRef<str>) {
+    //     let filename = filename.as_ref();
+    //     world.extract();
+    //     world.prepare(&self.ctx);
+    //     self.renderer.render(&mut self.ctx, &mut world.entities);
+    //     self.save_frame_to_image(PathBuf::from(format!("output/{}/{}", "world", filename)));
+    // }
 
     pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
         let dir = path.as_ref().parent().unwrap();
@@ -369,36 +376,44 @@ impl RanimApp for RanimRenderApp {
         self.remove(target_id);
     }
 
-    fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static, T: Into<AnimateTarget<E>>>(
-        &mut self,
-        canvas_id: &EntityId<Canvas>,
-        target: T,
-        animation: Animation<E>,
-    ) -> EntityId<E> {
-        let target = target.into();
-
-        let entity_id = match target {
-            AnimateTarget::Insert(entity) => self.get_mut(canvas_id).insert(entity),
-            AnimateTarget::Existed(entity_id) => entity_id,
-        };
-
-        let run_time = animation.config.run_time;
-        self.get_mut(canvas_id)
-            .get_mut(&entity_id)
-            .insert_updater(animation);
-        self.advance(run_time);
-        entity_id
+    fn render_to_image(&mut self, filename: impl AsRef<str>) {
+        let filename = filename.as_ref();
+        self.world.extract();
+        self.world.prepare(&self.ctx);
+        self.renderer.render(&mut self.ctx, &mut self.world.entities);
+        self.save_frame_to_image(PathBuf::from(format!("output/{}/{}", "world", filename)));
     }
 
-    fn play_remove_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
-        &mut self,
-        canvas_id: &EntityId<Canvas>,
-        target_id: EntityId<E>,
-        animation: Animation<E>,
-    ) {
-        let target_id = self.play_in_canvas(canvas_id, target_id, animation);
-        self.get_mut(canvas_id).remove(target_id);
-    }
+    // fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static, T: Into<AnimateTarget<E>>>(
+    //     &mut self,
+    //     canvas_id: &EntityId<Canvas>,
+    //     target: T,
+    //     animation: Animation<E>,
+    // ) -> EntityId<E> {
+    //     let target = target.into();
+
+    //     let entity_id = match target {
+    //         AnimateTarget::Insert(entity) => self.get_mut(canvas_id).insert(entity),
+    //         AnimateTarget::Existed(entity_id) => entity_id,
+    //     };
+
+    //     let run_time = animation.config.run_time;
+    //     self.get_mut(canvas_id)
+    //         .get_mut(&entity_id)
+    //         .insert_updater(animation);
+    //     self.advance(run_time);
+    //     entity_id
+    // }
+
+    // fn play_remove_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
+    //     &mut self,
+    //     canvas_id: &EntityId<Canvas>,
+    //     target_id: EntityId<E>,
+    //     animation: Animation<E>,
+    // ) {
+    //     let target_id = self.play_in_canvas(canvas_id, target_id, animation);
+    //     self.get_mut(canvas_id).remove(target_id);
+    // }
 
     fn wait(&mut self, duration: Duration) {
         let dt = self.tick_duration().as_secs_f32();
@@ -413,15 +428,15 @@ impl RanimApp for RanimRenderApp {
             );
         }
     }
-    fn center_canvas_in_frame(&mut self, canvas_id: &EntityId<Canvas>) {
-        let canvas = self.world.get(canvas_id);
-        self.camera_frame.center_canvas_in_frame(canvas);
-        self.renderer
-            .update_uniforms(&self.ctx.wgpu_ctx, &self.camera_frame);
-    }
+    // fn center_canvas_in_frame(&mut self, canvas_id: &EntityId<Canvas>) {
+    //     let canvas = self.world.get(canvas_id);
+    //     self.camera_frame.center_canvas_in_frame(canvas);
+    //     self.renderer
+    //         .update_uniforms(&self.ctx.wgpu_ctx, &self.camera_frame);
+    // }
 
-    fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas> {
-        let canvas = Canvas::new(&self.ctx.wgpu_ctx, width, height);
-        self.world.insert(canvas)
-    }
+    // fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas> {
+    //     let canvas = Canvas::new(&self.ctx.wgpu_ctx, width, height);
+    //     self.world.insert(canvas)
+    // }
 }

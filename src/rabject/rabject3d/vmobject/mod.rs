@@ -221,10 +221,10 @@ impl VMobject {
 }
 
 impl Rabject for VMobject {
-    type RenderData = ExtractedVMobject;
+    type ExtractData = ExtractedVMobject;
     type RenderResource = VMobjectPrimitive;
 
-    fn extract(&self) -> Self::RenderData {
+    fn extract(&self) -> Self::ExtractData {
         ExtractedVMobject {
             points: self.points.clone(),
             joint_angles: self.get_joint_angles(),

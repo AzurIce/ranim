@@ -1,5 +1,5 @@
-#[deprecated = "Now the 2d and 3d are merged, everything is 3d"]
-pub mod rabject2d;
+// #[deprecated = "Now the 2d and 3d are merged, everything is 3d"]
+// pub mod rabject2d;
 #[deprecated = "Use 2d instead for now"]
 pub mod rabject3d;
 
@@ -67,13 +67,10 @@ impl<R: Rabject> Deref for RabjectId<R> {
 /// ## RenderResource
 /// The [`Rabject::RenderResource`] is the resource that is used to render the rabject.
 pub trait Rabject {
-    type RenderData;
-    type RenderResource: Primitive<Data = Self::RenderData>;
+    type ExtractData;
+    type RenderResource: Primitive<Data = Self::ExtractData>;
 
-    #[allow(unused)]
-    fn tick(&mut self, dt: f32) {}
-
-    fn extract(&self) -> Self::RenderData;
+    fn extract(&self) -> Self::ExtractData;
 }
 
 pub trait Primitive {
