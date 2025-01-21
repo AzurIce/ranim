@@ -1,9 +1,6 @@
-// #[deprecated = "Now the 2d and 3d are merged, everything is 3d"]
-// pub mod rabject2d;
-#[deprecated = "Use 2d instead for now"]
+#[deprecated = "Use the new render system based on SDF instead"]
 pub mod rabject3d;
-
-pub mod group;
+// pub mod group;
 
 use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 

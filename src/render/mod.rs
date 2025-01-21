@@ -462,7 +462,7 @@ mod test {
 
     use super::*;
     use crate::{
-        context::{RanimContext, WgpuContext},
+        context::RanimContext,
         items::vitem::VItem,
         rabject::rabject3d::RabjectEntity3d,
         world::{Store, World},

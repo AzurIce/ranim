@@ -2,8 +2,6 @@ use std::ops::{Deref, DerefMut};
 
 use glam::Vec3;
 
-use crate::prelude::Alignable;
-
 #[derive(Debug, Clone)]
 pub struct Points {
     inner: Vec<Vec3>,
@@ -11,10 +9,9 @@ pub struct Points {
 
 // impl Alignable for Points {
 //     fn align_with(&mut self, other: &mut Self) {
-        
+
 //     }
 // }
-
 
 impl Deref for Points {
     type Target = Vec<Vec3>;

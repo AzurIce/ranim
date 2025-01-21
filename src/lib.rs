@@ -380,7 +380,8 @@ impl RanimApp for RanimRenderApp {
         let filename = filename.as_ref();
         self.world.extract();
         self.world.prepare(&self.ctx);
-        self.renderer.render(&mut self.ctx, &mut self.world.entities);
+        self.renderer
+            .render(&mut self.ctx, &mut self.world.entities);
         self.save_frame_to_image(PathBuf::from(format!("output/{}/{}", "world", filename)));
     }
 

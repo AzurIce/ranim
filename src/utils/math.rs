@@ -1,20 +1,10 @@
 use glam::{vec2, IVec2, Vec2};
-use vello::kurbo;
 
 /// A rectangle in 2D space
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {
     min: Vec2,
     max: Vec2,
-}
-
-impl From<kurbo::Rect> for Rect {
-    fn from(rect: kurbo::Rect) -> Self {
-        Self {
-            min: vec2(rect.x0 as f32, rect.y0 as f32),
-            max: vec2(rect.x1 as f32, rect.y1 as f32),
-        }
-    }
 }
 
 impl Rect {
@@ -33,7 +23,6 @@ impl Rect {
         (self.min + self.max) / 2.0
     }
 
-
     /// Get the point of the rectangle
     /// ```text
     /// (-1,-1)-----(0,-1)-----(1,-1)
@@ -47,15 +36,27 @@ impl Rect {
         let center = self.center();
         let max = self.max;
 
-        let x = if edge.x < 0 { min.x } else if edge.x == 0 { center.x } else { max.x };
-        let y = if edge.y < 0 { min.y } else if edge.y == 0 { center.y } else { max.y };
+        let x = if edge.x < 0 {
+            min.x
+        } else if edge.x == 0 {
+            center.x
+        } else {
+            max.x
+        };
+        let y = if edge.y < 0 {
+            min.y
+        } else if edge.y == 0 {
+            center.y
+        } else {
+            max.y
+        };
 
         vec2(x, y)
     }
 }
 
 /// Interpolate between two integers
-/// 
+///
 /// return integer and the sub progress to the next integer
 pub fn interpolate_usize(a: usize, b: usize, t: f32) -> (usize, f32) {
     assert!(b >= a);

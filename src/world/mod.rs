@@ -76,7 +76,6 @@ impl World {
         }
     }
 
-
     // /// Keep the scene static for a given duration
     // ///
     // /// this method writes frames

@@ -1,4 +1,4 @@
-use glam::{vec3, Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec4};
 use log::trace;
 
 use crate::{
@@ -7,8 +7,8 @@ use crate::{
     rabject,
     render::{
         pipelines::{
-            debug::DebugPipeline, map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup,
-            Map3dTo2dPipeline, VItemPipeline,
+            map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup, Map3dTo2dPipeline,
+            VItemPipeline,
         },
         WgpuBuffer,
     },
@@ -164,7 +164,7 @@ impl Primitive for VItemPrimitive {
         pipelines: &mut crate::utils::RenderResourceStorage,
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
-        depth_stencil_view: &wgpu::TextureView,
+        _depth_stencil_view: &wgpu::TextureView,
         uniforms_bind_group: &wgpu::BindGroup,
     ) {
         trace!("render");

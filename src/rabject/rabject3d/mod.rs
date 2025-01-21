@@ -5,13 +5,7 @@ pub mod vpath;
 
 use std::ops::{Deref, DerefMut};
 
-use crate::{
-    context::RanimContext,
-    world::{Entity},
-    render::Renderer,
-    updater::Updater,
-    utils::Id,
-};
+use crate::{context::RanimContext, render::Renderer, updater::Updater, utils::Id, world::Entity};
 
 use super::{Primitive, Rabject};
 

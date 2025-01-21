@@ -1,17 +1,17 @@
 pub mod bezier;
 pub mod math;
 pub mod rate_functions;
+pub mod refresh;
 pub mod typst;
 pub mod wgpu;
-pub mod refresh;
 
 use std::{
     any::{Any, TypeId},
-    collections::HashMap, fmt::Debug,
+    collections::HashMap,
+    fmt::Debug,
 };
 
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
-use wgpu::WgpuBuffer;
 
 use crate::{context::WgpuContext, rabject::RenderResource};
 
@@ -164,15 +164,15 @@ pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8>
             label: Some("Get Texture Data"),
         });
     encoder.copy_texture_to_buffer(
-        wgpu::ImageCopyTexture {
+        wgpu::TexelCopyTextureInfo {
             aspect: wgpu::TextureAspect::All,
             texture: &texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
         },
-        wgpu::ImageCopyBuffer {
+        wgpu::TexelCopyBufferInfo {
             buffer: &output_staging_buffer,
-            layout: wgpu::ImageDataLayout {
+            layout: wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(bytes_per_row as u32),
                 rows_per_image: Some(texture.size().height as u32),
@@ -209,255 +209,4 @@ pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8>
     });
     output_staging_buffer.unmap();
     texture_data
-}
-
-// Following code is copied from https://github.com/linebender/vello_svg
-// Copyright 2023 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-use vello::kurbo::{self, Affine, BezPath, Point, Rect, Stroke};
-use vello::peniko::{Blob, Brush, Color, Fill, Image};
-use vello::Scene;
-
-pub fn to_affine(ts: &usvg::Transform) -> Affine {
-    let usvg::Transform {
-        sx,
-        kx,
-        ky,
-        sy,
-        tx,
-        ty,
-    } = ts;
-    Affine::new([sx, kx, ky, sy, tx, ty].map(|&x| f64::from(x)))
-}
-
-pub fn to_stroke(stroke: &usvg::Stroke) -> Stroke {
-    let mut conv_stroke = Stroke::new(stroke.width().get() as f64)
-        .with_caps(match stroke.linecap() {
-            usvg::LineCap::Butt => vello::kurbo::Cap::Butt,
-            usvg::LineCap::Round => vello::kurbo::Cap::Round,
-            usvg::LineCap::Square => vello::kurbo::Cap::Square,
-        })
-        .with_join(match stroke.linejoin() {
-            usvg::LineJoin::Miter | usvg::LineJoin::MiterClip => vello::kurbo::Join::Miter,
-            usvg::LineJoin::Round => vello::kurbo::Join::Round,
-            usvg::LineJoin::Bevel => vello::kurbo::Join::Bevel,
-        })
-        .with_miter_limit(stroke.miterlimit().get() as f64);
-    if let Some(dash_array) = stroke.dasharray().as_ref() {
-        conv_stroke = conv_stroke.with_dashes(
-            stroke.dashoffset() as f64,
-            dash_array.iter().map(|x| *x as f64),
-        );
-    }
-    conv_stroke
-}
-
-pub fn to_bez_path(path: &usvg::Path) -> BezPath {
-    let mut local_path = BezPath::new();
-    // The semantics of SVG paths don't line up with `BezPath`; we
-    // must manually track initial points
-    let mut just_closed = false;
-    let mut most_recent_initial = (0., 0.);
-    for elt in path.data().segments() {
-        match elt {
-            usvg::tiny_skia_path::PathSegment::MoveTo(p) => {
-                if std::mem::take(&mut just_closed) {
-                    local_path.move_to(most_recent_initial);
-                }
-                most_recent_initial = (p.x.into(), p.y.into());
-                local_path.move_to(most_recent_initial);
-            }
-            usvg::tiny_skia_path::PathSegment::LineTo(p) => {
-                if std::mem::take(&mut just_closed) {
-                    local_path.move_to(most_recent_initial);
-                }
-                local_path.line_to(Point::new(p.x as f64, p.y as f64));
-            }
-            usvg::tiny_skia_path::PathSegment::QuadTo(p1, p2) => {
-                if std::mem::take(&mut just_closed) {
-                    local_path.move_to(most_recent_initial);
-                }
-                local_path.quad_to(
-                    Point::new(p1.x as f64, p1.y as f64),
-                    Point::new(p2.x as f64, p2.y as f64),
-                );
-            }
-            usvg::tiny_skia_path::PathSegment::CubicTo(p1, p2, p3) => {
-                if std::mem::take(&mut just_closed) {
-                    local_path.move_to(most_recent_initial);
-                }
-                local_path.curve_to(
-                    Point::new(p1.x as f64, p1.y as f64),
-                    Point::new(p2.x as f64, p2.y as f64),
-                    Point::new(p3.x as f64, p3.y as f64),
-                );
-            }
-            usvg::tiny_skia_path::PathSegment::Close => {
-                just_closed = true;
-                local_path.close_path();
-            }
-        }
-    }
-
-    local_path
-}
-
-pub fn into_image(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> Image {
-    let (width, height) = (image.width(), image.height());
-    let image_data: Vec<u8> = image.into_vec();
-    Image::new(
-        Blob::new(std::sync::Arc::new(image_data)),
-        vello::peniko::ImageFormat::Rgba8,
-        width,
-        height,
-    )
-}
-
-pub fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, Affine)> {
-    match paint {
-        usvg::Paint::Color(color) => {
-            let color = Color::from_rgba8(color.red, color.green, color.blue, opacity.to_u8());
-            Some((Brush::Solid(color), Affine::IDENTITY))
-        }
-        usvg::Paint::LinearGradient(gr) => {
-            let stops: Vec<vello::peniko::ColorStop> = gr
-                .stops()
-                .iter()
-                .map(|stop| {
-                    let cstop = vello::peniko::ColorStop::from((
-                        stop.offset().get(),
-                        Color::from_rgba8(
-                            stop.color().red,
-                            stop.color().green,
-                            stop.color().blue,
-                            (stop.opacity() * opacity).to_u8(),
-                        ),
-                    ));
-                    cstop
-                })
-                .collect();
-            let start = Point::new(gr.x1() as f64, gr.y1() as f64);
-            let end = Point::new(gr.x2() as f64, gr.y2() as f64);
-            let arr = [
-                gr.transform().sx,
-                gr.transform().ky,
-                gr.transform().kx,
-                gr.transform().sy,
-                gr.transform().tx,
-                gr.transform().ty,
-            ]
-            .map(f64::from);
-            let transform = Affine::new(arr);
-            let gradient =
-                vello::peniko::Gradient::new_linear(start, end).with_stops(stops.as_slice());
-            Some((Brush::Gradient(gradient), transform))
-        }
-        usvg::Paint::RadialGradient(gr) => {
-            let stops: Vec<vello::peniko::ColorStop> = gr
-                .stops()
-                .iter()
-                .map(|stop| {
-                    vello::peniko::ColorStop::from((
-                        stop.offset().get(),
-                        Color::from_rgba8(
-                            stop.color().red,
-                            stop.color().green,
-                            stop.color().blue,
-                            (stop.opacity() * opacity).to_u8(),
-                        ),
-                    ))
-                })
-                .collect();
-
-            let start_center = Point::new(gr.cx() as f64, gr.cy() as f64);
-            let end_center = Point::new(gr.fx() as f64, gr.fy() as f64);
-            let start_radius = 0_f32;
-            let end_radius = gr.r().get();
-            let arr = [
-                gr.transform().sx,
-                gr.transform().ky,
-                gr.transform().kx,
-                gr.transform().sy,
-                gr.transform().tx,
-                gr.transform().ty,
-            ]
-            .map(f64::from);
-            let transform = Affine::new(arr);
-            let gradient = vello::peniko::Gradient::new_two_point_radial(
-                start_center,
-                start_radius,
-                end_center,
-                end_radius,
-            )
-            .with_stops(stops.as_slice());
-            Some((Brush::Gradient(gradient), transform))
-        }
-        usvg::Paint::Pattern(_) => None,
-    }
-}
-
-/// Error handler function for [`super::append_tree_with`] which draws a transparent red box
-/// instead of unsupported SVG features
-pub fn default_error_handler(scene: &mut Scene, node: &usvg::Node) {
-    let bb = node.bounding_box();
-    let rect = Rect {
-        x0: bb.left() as f64,
-        y0: bb.top() as f64,
-        x1: bb.right() as f64,
-        y1: bb.bottom() as f64,
-    };
-    scene.fill(
-        Fill::NonZero,
-        Affine::IDENTITY,
-        Color::from_rgba8(255, 0, 0, 128),
-        None,
-        &rect,
-    );
-}
-
-pub fn decode_raw_raster_image(
-    img: &usvg::ImageKind,
-) -> Result<image::RgbaImage, image::ImageError> {
-    let res = match img {
-        usvg::ImageKind::JPEG(data) => {
-            image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)
-        }
-        usvg::ImageKind::PNG(data) => {
-            image::load_from_memory_with_format(data, image::ImageFormat::Png)
-        }
-        usvg::ImageKind::GIF(data) => {
-            image::load_from_memory_with_format(data, image::ImageFormat::Gif)
-        }
-        usvg::ImageKind::WEBP(data) => {
-            image::load_from_memory_with_format(data, image::ImageFormat::WebP)
-        }
-        usvg::ImageKind::SVG(_) => unreachable!(),
-    }?
-    .into_rgba8();
-    Ok(res)
-}
-
-/// Calculate affine transformation that maps `cur_vec` to `target_vec`
-pub fn affine_from_vec(cur_vec: Vec2, target_vec: Vec2) -> kurbo::Affine {
-    // Calculate lengths
-    let cur_len = cur_vec.length();
-    let target_len = target_vec.length();
-
-    // println!("cur_len: {}, target_len: {}", cur_len, target_len);
-    // Calculate scaling factor
-    let scale = if cur_len.abs() < 1e-6 {
-        1.0
-    } else {
-        target_len / cur_len
-    };
-
-    // Calculate rotation angle
-    let angle = cur_vec.y.atan2(-cur_vec.x) - target_vec.y.atan2(-target_vec.x)
-        + std::f32::consts::PI / 2.0;
-
-    // Build the transformation:
-    // 1. Scale
-    // 2. Rotate
-    kurbo::Affine::scale(scale as f64).then_rotate(angle as f64)
 }
