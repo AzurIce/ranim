@@ -1,16 +1,28 @@
 use std::ops::{Deref, DerefMut};
 
 use glam::Vec3;
-use itertools::Itertools;
+
+use super::Transform3d;
 
 use super::ComponentData;
 
 /// VPoints is used to represent a bunch of cubic bezier paths.
 ///
 /// Every 4 elements in the inner vector is a cubic bezier path
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct VPoint(Vec3);
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VPoint(pub Vec3);
+
+impl Default for VPoint {
+    fn default() -> Self {
+        Vec3::ZERO.into()
+    }
+}
+
+impl From<Vec3> for VPoint {
+    fn from(value: Vec3) -> Self {
+        Self(value)
+    }
+}
 
 impl Deref for VPoint {
     type Target = Vec3;
@@ -25,12 +37,12 @@ impl DerefMut for VPoint {
     }
 }
 
-impl VPoint {
-    pub const ZERO: Self = Self(Vec3::ZERO);
-    pub const NAN: Self = Self(Vec3::NAN);
-
-    pub fn new(vec3: Vec3) -> Self {
-        Self(vec3)
+impl Transform3d for VPoint {
+    fn position(&self) -> Vec3 {
+        self.0
+    }
+    fn position_mut(&mut self) -> &mut Vec3 {
+        &mut self.0
     }
 }
 
@@ -38,18 +50,21 @@ impl ComponentData<VPoint> {
     pub fn get_closepath_flags(&self) -> Vec<bool> {
         let mut flags = vec![false; self.len()];
 
+        // println!("{:?}", self.0);
         let mut i = 0;
-        for (j, (a, b)) in self.iter().tuple_windows().enumerate() {
-            // Subpath ends at j + 1 with a = end_p, b = NAN
-            // or ends at vec boundary with b = end_p
-            if *b == VPoint::NAN || j == self.len() - 2 {
-                let end_p = if *b == VPoint::NAN { a } else { b };
-                if end_p == self.get(i).unwrap() {
-                    flags[i..=j + 1].fill(true);
+        for (j, chunk) in self.0[1..].chunks_exact(2).enumerate() {
+            // println!("{:?}", (j, chunk));
+            let cur_idx = 1 + j * 2;
+            let [a, b] = chunk else { unreachable!() };
+            if b == a || cur_idx == self.len() - 2 {
+                if b == self.get(cur_idx + 1).unwrap() {
+                    flags[i..=cur_idx + 1].fill(true);
                 }
-                i = j + 2;
+                i = cur_idx + 2;
             }
         }
+
+        // println!("{:?}", flags);
 
         flags
     }

@@ -1,5 +1,4 @@
 use glam::{Vec2, Vec4};
-use log::trace;
 
 use crate::{
     context::WgpuContext,
@@ -70,7 +69,7 @@ impl rabject::Primitive for VItemPrimitive {
 impl Primitive for VItemPrimitive {
     type Data = ExtractedVItem;
     fn init(ctx: &WgpuContext, data: &Self::Data) -> Self {
-        trace!("init");
+        // trace!("init");
         let points3d_buffer = WgpuBuffer::new_init(
             ctx,
             &data.points,
@@ -127,9 +126,9 @@ impl Primitive for VItemPrimitive {
         }
     }
     fn update(&mut self, wgpu_ctx: &crate::context::WgpuContext, data: &Self::Data) {
-        trace!("update, data: {:?}", data.points);
-        trace!("points3d len: {}", self.points3d_buffer.len());
-        trace!("points2d len: {}", self.points3d_buffer.len());
+        // trace!("update, data: {:?}", data.points);
+        // trace!("points3d len: {}", self.points3d_buffer.len());
+        // trace!("points2d len: {}", self.points3d_buffer.len());
         self.points3d_buffer
             .prepare_from_slice(wgpu_ctx, &data.points);
         self.fill_rgbas
@@ -167,7 +166,7 @@ impl Primitive for VItemPrimitive {
         _depth_stencil_view: &wgpu::TextureView,
         uniforms_bind_group: &wgpu::BindGroup,
     ) {
-        trace!("render");
+        // trace!("render");
         let mut encoder = wgpu_ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
