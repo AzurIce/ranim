@@ -14,7 +14,7 @@ use primitive::{ExtractedVMobject, VMobjectPrimitive};
 use crate::{
     interpolate::Interpolatable,
     prelude::{Alignable, Opacity},
-    rabject::TransformAnchor,
+    components::TransformAnchor,
     utils::{bezier::partial_quadratic_bezier, rotation_between_vectors},
 };
 

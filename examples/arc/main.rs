@@ -6,7 +6,7 @@ use glam::vec2;
 use log::info;
 use ranim::animation::fading;
 use ranim::prelude::*;
-use ranim::rabject::rabject2d::vmobject::VMobject;
+use ranim::items::vitem::VItem;
 use ranim::scene::SceneBuilder;
 
 fn main() {

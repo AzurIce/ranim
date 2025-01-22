@@ -162,7 +162,7 @@ impl Renderer {
             half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
             _padding: [0.0; 2],
         };
-        trace!("init renderer uniform: {:?}", uniforms);
+        // trace!("init renderer uniform: {:?}", uniforms);
         let uniforms_buffer = WgpuBuffer::new_init(
             ctx,
             &[uniforms],
@@ -218,7 +218,7 @@ impl Renderer {
     }
 
     pub fn clear_screen(&mut self, wgpu_ctx: &WgpuContext) {
-        trace!("clear screen {:?}", self.clear_color);
+        // trace!("clear screen {:?}", self.clear_color);
         let mut encoder = wgpu_ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -258,8 +258,8 @@ impl Renderer {
 
     pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut EntitiesStore<Renderer>) {
         self.clear_screen(&ctx.wgpu_ctx);
-        for (id, entity) in entities.iter_mut() {
-            trace!("[Scene] Rendering entity {:?}", id);
+        for (_id, entity) in entities.iter_mut() {
+            // trace!("[Scene] Rendering entity {:?}", id);
             entity.render(ctx, self);
         }
         self.output_texture_updated = false;
@@ -279,15 +279,15 @@ impl Renderer {
             });
 
         encoder.copy_texture_to_buffer(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 aspect: wgpu::TextureAspect::All,
                 texture: &self.render_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
             },
-            wgpu::ImageCopyBuffer {
+            wgpu::TexelCopyBufferInfo {
                 buffer: &self.output_staging_buffer,
-                layout: wgpu::ImageDataLayout {
+                layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(bytes_per_row as u32),
                     rows_per_image: Some(self.size.1 as u32),
@@ -346,7 +346,7 @@ impl Renderer {
             camera_frame.size.0 as f32 / 2.0,
             camera_frame.size.1 as f32 / 2.0,
         );
-        trace!("Uniforms: {:?}", self.uniforms);
+        // trace!("Uniforms: {:?}", self.uniforms);
         // trace!("[Camera] uploading camera uniforms to buffer...");
         wgpu_ctx.queue.write_buffer(
             &self.uniforms_buffer,
@@ -444,12 +444,12 @@ impl CameraFrame {
         self.up = up;
         self.pos = center + normal * distance;
         self.facing = -normal;
-        trace!(
-            "[Camera] centered canvas in frame, pos: {:?}, facing: {:?}, up: {:?}",
-            self.pos,
-            self.facing,
-            self.up
-        );
+        // trace!(
+        //     "[Camera] centered canvas in frame, pos: {:?}, facing: {:?}, up: {:?}",
+        //     self.pos,
+        //     self.facing,
+        //     self.up
+        // );
 
         self
     }

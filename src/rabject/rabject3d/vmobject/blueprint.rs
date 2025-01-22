@@ -1,9 +1,9 @@
 use glam::{vec2, vec3, Vec2, Vec3};
 
-use crate::rabject::{
+use crate::{components::TransformAnchor, rabject::{
     rabject3d::{vmobject::VMobject, RabjectEntity3d},
-    Blueprint, TransformAnchor,
-};
+    Blueprint,
+}};
 
 /// A part of a circle
 // #[mobject(SimplePipeline)]

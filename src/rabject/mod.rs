@@ -112,30 +112,3 @@ impl Primitive for () {
     }
 }
 
-pub trait Transformable {
-    fn shift(&mut self, offset: Vec3) -> &mut Self;
-    fn rotate(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self;
-    fn scale(&mut self, scale: Vec3) -> &mut Self;
-}
-
-/// The anchor of the transformation.
-pub enum TransformAnchor {
-    /// A point anchor
-    Point(Vec3),
-    /// An edge anchor, use -1, 0, 1 to specify the edge on each axis
-    Edge(IVec3),
-}
-
-impl TransformAnchor {
-    pub fn point(x: f32, y: f32, z: f32) -> Self {
-        Self::Point(vec3(x, y, z))
-    }
-
-    pub fn origin() -> Self {
-        Self::Point(Vec3::ZERO)
-    }
-
-    pub fn edge(x: i32, y: i32, z: i32) -> Self {
-        Self::Edge(ivec3(x, y, z))
-    }
-}
