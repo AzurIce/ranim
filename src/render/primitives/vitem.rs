@@ -1,4 +1,5 @@
 use glam::{Vec2, Vec4};
+use log::trace;
 
 use crate::{
     context::WgpuContext,
@@ -126,7 +127,8 @@ impl Primitive for VItemPrimitive {
         }
     }
     fn update(&mut self, wgpu_ctx: &crate::context::WgpuContext, data: &Self::Data) {
-        // trace!("update, data: {:?}", data.points);
+        // trace!("update, data.points: {:?}", data.points);
+        // trace!("update, data.fill_rgbas: {:?}", data.fill_rgbas);
         // trace!("points3d len: {}", self.points3d_buffer.len());
         // trace!("points2d len: {}", self.points3d_buffer.len());
         self.points3d_buffer

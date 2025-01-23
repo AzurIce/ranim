@@ -462,10 +462,7 @@ mod test {
 
     use super::*;
     use crate::{
-        context::RanimContext,
-        items::vitem::VItem,
-        rabject::rabject3d::RabjectEntity3d,
-        world::{Store, World},
+        context::RanimContext, items::vitem::{Square, VItem}, prelude::Blueprint, rabject::rabject3d::RabjectEntity3d, world::{Store, World}
     };
 
     #[test]
@@ -473,7 +470,8 @@ mod test {
         env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
         let mut ctx = RanimContext::new();
         let mut world = World::new();
-        let vitem: RabjectEntity3d<VItem> = VItem::square().into();
+        let vitem: RabjectEntity3d<VItem> = Square(100.0).build().into();
+        // let vitem: RabjectEntity3d<VItem> = VItem::square().into();
         let id = world.insert(vitem);
         world.extract();
         world.prepare(&ctx);
