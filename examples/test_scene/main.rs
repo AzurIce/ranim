@@ -10,7 +10,7 @@ use ranim::{
     render::Renderer,
     typst_svg, typst_tree,
     world::{EntityId, World},
-    AppOptions, RanimApp, RanimRenderApp, Scenee,
+    AppOptions, RanimApp, RanimRenderApp, Scene,
 };
 
 // fn create_and_uncreate<T: RanimApp>(scene: &mut T, canvas: &EntityId<Canvas>, vmobject: VMobject) {
@@ -80,7 +80,7 @@ use ranim::{
 #[derive(Default)]
 struct TestScene;
 
-impl Scenee for TestScene {
+impl Scene for TestScene {
     fn desc() -> ranim::SceneDesc {
         ranim::SceneDesc {
             name: "Test Scene".to_string(),

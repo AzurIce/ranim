@@ -83,6 +83,11 @@ impl<T: Default + Clone> ComponentData<T> {
         let last = self.last().cloned().unwrap_or_default();
         self.resize(new_len, last);
     }
+
+    pub fn set_all(&mut self, value: impl Into<T>) {
+        let value = value.into();
+        self.iter_mut().for_each(|x| *x = value.clone());
+    }
 }
 
 // MARK: Transformable

@@ -57,7 +57,7 @@ impl ComponentData<VPoint> {
             let cur_idx = 1 + j * 2;
             let [a, b] = chunk else { unreachable!() };
             if b == a || cur_idx == self.len() - 2 {
-                if b == self.get(cur_idx + 1).unwrap() {
+                if b == self.get(i).unwrap() {
                     flags[i..=cur_idx + 1].fill(true);
                 }
                 i = cur_idx + 2;

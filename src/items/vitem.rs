@@ -24,8 +24,8 @@ pub struct VItem {
 impl VItem {
     pub fn from_vpoints(vpoints: Vec<Vec3>) -> Self {
         let stroke_widths = vec![1.0; vpoints.len()];
-        let stroke_rgbas = vec![vec4(1.0, 0.0, 0.0, 1.0); vpoints.len()];
-        let fill_rgbas = vec![vec4(0.0, 1.0, 0.0, 0.5); vpoints.len()];
+        let stroke_rgbas = vec![vec4(1.0, 0.0, 0.0, 1.0); (vpoints.len() + 1) / 2];
+        let fill_rgbas = vec![vec4(0.0, 1.0, 0.0, 0.5); (vpoints.len() + 1) / 2];
         Self {
             vpoints: vpoints.into(),
             stroke_rgbas: stroke_rgbas.into(),
@@ -39,9 +39,9 @@ impl VItem {
             .extend_from_vec(vpoints.iter().cloned().map(Into::into).collect());
 
         let len = self.vpoints.len();
-        self.fill_rgbas.resize_with_last(len);
-        self.stroke_rgbas.resize_with_last(len);
-        self.stroke_widths.resize_with_last(len);
+        self.fill_rgbas.resize_with_last((len + 1) / 2);
+        self.stroke_rgbas.resize_with_last((len + 1) / 2);
+        self.stroke_widths.resize_with_last((len + 1) / 2);
     }
 }
 
@@ -221,5 +221,20 @@ impl Blueprint<VItem> for Ellipse {
             .vpoints
             .scale(vec3(self.0, self.1, 1.0), TransformAnchor::origin());
         mobject
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_arc() {
+        let arc = Arc {
+            angle: std::f32::consts::PI / 2.0,
+            radius: 1.0,
+        }
+        .build();
+        println!("{:?}", arc.vpoints);
     }
 }
