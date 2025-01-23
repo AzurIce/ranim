@@ -14,7 +14,7 @@ fn point(idx: u32) -> vec2<f32> {
     return points[idx].xy;
 }
 fn is_closed(idx: u32) -> bool {
-    return points[idx].z != 0.0;
+    return bool(points[idx].z);
 }
 
 struct SubpathAttr {
@@ -59,15 +59,15 @@ fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
     return vec3(m + m, -n - m, n - m) * sqrt(-p / 3.0) + offset;
 }
 
-fn distance_bezier(pos: vec2<f32>, a: vec2<f32>, _b: vec2<f32>, c: vec2<f32>) -> f32 {
-    var b = mix(_b + vec2(1e-4), _b, abs(sign(_b * 2.0 - a - c)));
+fn distance_bezier(pos: vec2<f32>, A: vec2<f32>, _B: vec2<f32>, C: vec2<f32>) -> f32 {
+    var B = mix(_B + vec2(1e-4), _B, abs(sign(_B * 2.0 - A - C)));
 
-    let aa = b - a;
-    let bb = a - b * 2.0 + c;
-    let cc = a * 2.0;
-    let dd = a - pos.xy;
+    let a = B - A;
+    let b = A - B * 2.0 + C;
+    let c = a * 2.0;
+    let d = A - pos;
     
-    let k = vec3(3.0 * dot(aa, bb), 2.0 * dot(aa, aa) + dot(dd, bb), dot(dd, aa) / dot(bb, bb));
+    let k = vec3(3.0 * dot(a, b), 2.0 * dot(a, a) + dot(d, b), dot(d, a)) / dot(b, b);
     let solved = solve_cubic(k.x, k.y, k.z);
     let t = vec3(
         clamp(solved.x, 0.0, 1.0),
@@ -75,19 +75,19 @@ fn distance_bezier(pos: vec2<f32>, a: vec2<f32>, _b: vec2<f32>, c: vec2<f32>) ->
         clamp(solved.z, 0.0, 1.0),
     );
 
-    var ppos = a + (cc + bb * t.x) * t.x;
-    var dis = length(ppos - pos.xy);
-    ppos = a + (cc + bb * t.y) + t.y;
-    dis = min(dis, length(ppos - pos.xy));
-    ppos = a + (cc + bb * t.z) + t.z;
-    dis = min(dis, length(ppos - pos.xy));
+    var ppos = A + (c + b * t.x) * t.x;
+    var dis = length(ppos - pos);
+    ppos = A + (c + b * t.y) + t.y;
+    dis = min(dis, length(ppos - pos));
+    ppos = A + (c + b * t.z) + t.z;
+    dis = min(dis, length(ppos - pos));
 
     return dis;
 }
 
 fn distance_line(pos: vec2<f32>, A: vec2<f32>, B: vec2<f32>) -> f32 {
     let e = B - A;
-    let w = pos.xy - A;
+    let w = pos - A;
     let b = w - e * clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
     return length(b);
 }
@@ -146,6 +146,7 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
         let v2 = normalize(c - b);
 
         let is_line = abs(cross_2d(v1, v2)) < 0.0001 && dot(v1, v2) > 0.0;
+        // let is_line = true;
         let dist = select(distance_bezier(pos, a, b, c), distance_line(pos, a, c), is_line);
         if dist < attr.d {
             attr.d = dist;
@@ -159,8 +160,7 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
     return attr;
 }
 
-@fragment
-fn fs_main(@location(0) pos: vec2<f32>) -> @location(0) vec4<f32> {
+fn render(pos: vec2<f32>) -> vec4<f32> {
     let points_len = arrayLength(&points);
 
     var idx = 0u;
@@ -181,8 +181,8 @@ fn fs_main(@location(0) pos: vec2<f32>) -> @location(0) vec4<f32> {
     let sgn_d = sgn * d;
     // return vec4(vec3(sgn_d), 1.0);
 
-    let e = points[idx + 1u].xy - points[idx].xy;
-    let w = pos.xy - points[idx].xy;
+    let e = point(idx + 1u).xy - point(idx).xy;
+    let w = pos.xy - point(idx).xy;
     let ratio = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
     let anchor_index = idx / 2;
 
@@ -196,6 +196,24 @@ fn fs_main(@location(0) pos: vec2<f32>) -> @location(0) vec4<f32> {
 
     var f_color = blend_color(stroke_rgba, fill_rgba);
 
+    return f_color;
+}
+
+fn render_control_points(pos: vec2<f32>) -> vec4<f32> {
+    let points_len = arrayLength(&points);
+
+    var d = length(pos - point(0u));
+    for (var i = 1u; i < points_len; i++) {
+        d = min(d, length(pos - point(i)));
+    }
+    return select(vec4(0.0), vec4(1.0), d < 1);
+}
+
+@fragment
+fn fs_main(@location(0) pos: vec2<f32>) -> @location(0) vec4<f32> {
+    var f_color: vec4<f32>;
+    f_color = render(pos);
+    // f_color = blend_color(f_color, render_control_points(pos));
     return f_color;
 }
 

@@ -99,6 +99,7 @@ pub mod prelude {
     pub use crate::animation::transform::Alignable;
 
     pub use crate::rabject::Blueprint;
+    pub use crate::RenderScene;
 }
 
 pub mod color;
@@ -119,9 +120,25 @@ pub struct SceneDesc {
     pub name: String,
 }
 
-pub trait Scenee {
+pub trait Scene {
     fn desc() -> SceneDesc;
     fn construct<T: RanimApp>(&mut self, app: &mut T);
+}
+
+pub trait RenderScene {
+    fn render(self) where Self: Sized;
+}
+
+impl<T: Scene> RenderScene for  T {
+    fn render(self) where Self: Sized {
+        let mut scene = self;
+        let desc = T::desc();
+        let mut app = RanimRenderApp::new(AppOptions {
+            output_path: PathBuf::from(format!("./output/{}/output.mp4", desc.name)),
+            ..Default::default()
+        });
+        scene.construct(&mut app);
+    }
 }
 
 pub trait RanimApp: Store<Renderer> {
@@ -182,6 +199,9 @@ pub trait RanimApp: Store<Renderer> {
     // fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas>;
 
     fn render_to_image(&mut self, filename: impl AsRef<str>);
+
+    fn camera(&self) -> &CameraFrame;
+    fn camera_mut(&mut self) -> &mut CameraFrame;
 }
 
 pub struct RanimRenderApp {
@@ -208,6 +228,7 @@ pub struct AppOptions {
     pub frame_size: (u32, u32),
     pub frame_rate: u32,
     pub save_frames: bool,
+    pub output_path: PathBuf
 }
 
 impl Default for AppOptions {
@@ -216,6 +237,7 @@ impl Default for AppOptions {
             frame_size: (1920, 1080),
             frame_rate: 60,
             save_frames: false,
+            output_path: PathBuf::from("./output.mp4")
         }
     }
 }
@@ -241,7 +263,8 @@ impl RanimRenderApp {
             video_writer_builder: Some(
                 FileWriterBuilder::default()
                     .with_fps(options.frame_rate)
-                    .with_size(options.frame_size.0, options.frame_size.1),
+                    .with_size(options.frame_size.0, options.frame_size.1)
+                    .with_file_path(options.output_path),
             ),
             save_frames: options.save_frames,
             fps: options.frame_rate,
@@ -349,6 +372,12 @@ impl Store<Renderer> for RanimRenderApp {
 }
 
 impl RanimApp for RanimRenderApp {
+    fn camera(&self) -> &CameraFrame {
+        &self.camera_frame
+    }
+    fn camera_mut(&mut self) -> &mut CameraFrame {
+        &mut self.camera_frame
+    }
     fn play<E: Entity<Renderer = Renderer> + 'static, T: Into<AnimateTarget<E>>>(
         &mut self,
         target: T,

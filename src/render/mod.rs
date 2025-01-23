@@ -458,11 +458,16 @@ impl CameraFrame {
 #[cfg(test)]
 mod test {
     use env_logger::Env;
+    use glam::vec3;
     use image::ImageBuffer;
 
     use super::*;
     use crate::{
-        context::RanimContext, items::vitem::{Square, VItem}, prelude::Blueprint, rabject::rabject3d::RabjectEntity3d, world::{Store, World}
+        context::RanimContext,
+        items::vitem::{Arc, Square, VItem},
+        prelude::Blueprint,
+        rabject::rabject3d::RabjectEntity3d,
+        world::{Store, World},
     };
 
     #[test]
@@ -470,7 +475,19 @@ mod test {
         env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
         let mut ctx = RanimContext::new();
         let mut world = World::new();
-        let vitem: RabjectEntity3d<VItem> = Square(100.0).build().into();
+        // let vitem: RabjectEntity3d<VItem> = Square(100.0).build().into();
+        // let id = world.insert(vitem);
+        // let vitem: RabjectEntity3d<VItem> = Arc {
+        //     angle: std::f32::consts::PI / 4.0,
+        //     radius: 300.0,
+        // }
+        // .build()
+        // .into();
+        let vitem: RabjectEntity3d<VItem> = VItem::from_vpoints(vec![
+            vec3(0.0, 0.0, 0.0),
+            vec3(50.0, 100.0, 0.0),
+            vec3(100.0, 0.0, 0.0),
+        ]).into();
         // let vitem: RabjectEntity3d<VItem> = VItem::square().into();
         let id = world.insert(vitem);
         world.extract();
