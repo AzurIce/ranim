@@ -4,8 +4,7 @@ use glam::Vec4;
 
 use crate::{
     context::WgpuContext,
-    rabject::RenderResource,
-    render::{CameraUniforms, WgpuBuffer},
+    render::{CameraUniforms, RenderResource, WgpuBuffer},
 };
 
 pub struct Map3dTo2dPipeline {

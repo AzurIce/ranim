@@ -1,10 +1,8 @@
 use glam::{Vec2, Vec4};
-use log::trace;
 
 use crate::{
     context::WgpuContext,
     items::vitem::ExtractedVItem,
-    rabject,
     render::{
         pipelines::{
             map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup, Map3dTo2dPipeline,
@@ -36,35 +34,6 @@ pub struct VItemPrimitive {
 
     /// RENDER BIND GROUP 1: 0-points, 1-fill_rgbas, 2-stroke_rgbas, 3-stroke_widths
     pub(crate) render_bind_group: RenderBindGroup,
-}
-
-impl rabject::Primitive for VItemPrimitive {
-    type Data = ExtractedVItem;
-    fn init(wgpu_ctx: &WgpuContext, data: &Self::Data) -> Self {
-        Primitive::init(wgpu_ctx, data)
-    }
-    fn update(&mut self, wgpu_ctx: &WgpuContext, data: &Self::Data) {
-        Primitive::update(self, wgpu_ctx, data)
-    }
-    fn render(
-        &self,
-        wgpu_ctx: &WgpuContext,
-        pipelines: &mut crate::utils::RenderResourceStorage,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
-        depth_stencil_view: &wgpu::TextureView,
-        uniforms_bind_group: &wgpu::BindGroup,
-    ) {
-        Primitive::render(
-            self,
-            wgpu_ctx,
-            pipelines,
-            multisample_view,
-            target_view,
-            depth_stencil_view,
-            uniforms_bind_group,
-        );
-    }
 }
 
 impl Primitive for VItemPrimitive {
@@ -159,50 +128,54 @@ impl Primitive for VItemPrimitive {
         }
         self.points2d_buffer.set_len(data.points.len());
     }
-    fn render(
-        &self,
+    fn start_compute_pass<'a>(
         wgpu_ctx: &crate::context::WgpuContext,
         pipelines: &mut crate::utils::RenderResourceStorage,
+        encoder: &'a mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+    ) -> wgpu::ComputePass<'a> {
+        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("VItem Map Points Compute Pass"),
+            timestamp_writes: None,
+        });
+        cpass.set_pipeline(pipelines.get_or_init::<Map3dTo2dPipeline>(&wgpu_ctx));
+        cpass.set_bind_group(0, uniforms_bind_group, &[]);
+        cpass
+    }
+    fn compute_command(&self, cpass: &mut wgpu::ComputePass) {
+        cpass.set_bind_group(1, &*self.compute_bind_group, &[]);
+        cpass.dispatch_workgroups(((self.points3d_buffer.len() + 255) / 256) as u32, 1, 1);
+    }
+    fn start_render_pass<'a>(
+        wgpu_ctx: &WgpuContext,
+        pipelines: &mut crate::utils::RenderResourceStorage,
+        encoder: &'a mut wgpu::CommandEncoder,
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
         _depth_stencil_view: &wgpu::TextureView,
         uniforms_bind_group: &wgpu::BindGroup,
-    ) {
-        // trace!("render");
-        let mut encoder = wgpu_ctx
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        {
-            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("VItem Map Points Compute Pass"),
-                timestamp_writes: None,
-            });
-            cpass.set_pipeline(pipelines.get_or_init::<Map3dTo2dPipeline>(&wgpu_ctx));
-            cpass.set_bind_group(0, uniforms_bind_group, &[]);
-            cpass.set_bind_group(1, &*self.compute_bind_group, &[]);
-            cpass.dispatch_workgroups(((self.points3d_buffer.len() + 255) / 256) as u32, 1, 1);
-        }
-        {
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("VItem Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: multisample_view,
-                    resolve_target: Some(target_view),
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-            rpass.set_pipeline(pipelines.get_or_init::<VItemPipeline>(&wgpu_ctx));
-            rpass.set_bind_group(0, uniforms_bind_group, &[]);
-            rpass.set_bind_group(1, &*self.render_bind_group, &[]);
-            rpass.set_vertex_buffer(0, self.clip_box_buffer.slice(..));
-            rpass.draw(0..self.clip_box_buffer.len() as u32, 0..1);
-        }
-        wgpu_ctx.queue.submit(Some(encoder.finish()));
+    ) -> wgpu::RenderPass<'a> {
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("VItem Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: multisample_view,
+                resolve_target: Some(target_view),
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+        rpass.set_pipeline(pipelines.get_or_init::<VItemPipeline>(&wgpu_ctx));
+        rpass.set_bind_group(0, uniforms_bind_group, &[]);
+        rpass
+    }
+    fn render_command(&self, rpass: &mut wgpu::RenderPass) {
+        rpass.set_bind_group(1, &*self.render_bind_group, &[]);
+        rpass.set_vertex_buffer(0, self.clip_box_buffer.slice(..));
+        rpass.draw(0..self.clip_box_buffer.len() as u32, 0..1);
     }
 }

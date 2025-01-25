@@ -4,8 +4,7 @@ use glam::{Vec2, Vec4};
 
 use crate::{
     context::WgpuContext,
-    rabject::RenderResource,
-    render::{CameraUniformsBindGroup, WgpuBuffer, OUTPUT_TEXTURE_FORMAT},
+    render::{CameraUniformsBindGroup, RenderResource, WgpuBuffer, OUTPUT_TEXTURE_FORMAT},
 };
 
 pub struct RenderBindGroup(wgpu::BindGroup);

@@ -1,56 +1,46 @@
 use std::{
+    any::{Any, TypeId},
     collections::HashMap,
-    ops::{Deref, DerefMut},
 };
 
-use crate::{updater::Updater, utils::Id};
+use crate::{
+    context::RanimContext, items::Entity, render::primitives::Primitive, updater::Updater,
+    utils::Id,
+};
 
 #[allow(unused_imports)]
 use log::debug;
 
-use super::{Entity, EntityAny, EntityId};
+use super::EntityId;
 
-pub struct EntityStore<E: EntityAny> {
-    inner: E,
-    pub(crate) updaters: Vec<(Id, Box<dyn Updater<E>>)>,
+pub struct EntityCell<T: Entity> {
+    inner: T,
+    pub(crate) extract_data: Option<T::ExtractData>,
+    pub(crate) primitive: Option<T::Primitive>,
+    pub(crate) updaters: Vec<(Id, Box<dyn Updater<T>>)>,
 }
 
-impl<E: EntityAny> Deref for EntityStore<E> {
-    type Target = E;
-    fn deref(&self) -> &Self::Target {
+impl<T: Entity> AsRef<T> for EntityCell<T> {
+    fn as_ref(&self) -> &T {
         &self.inner
     }
 }
-
-impl<E: EntityAny> DerefMut for EntityStore<E> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+impl<T: Entity> AsMut<T> for EntityCell<T> {
+    fn as_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 }
 
-impl<E: EntityAny> EntityStore<E> {
-    pub fn new(entity: E) -> Self {
+impl<T: Entity> EntityCell<T> {
+    pub fn new(inner: T) -> Self {
         Self {
-            inner: entity,
-            updaters: Vec::new(),
+            inner,
+            extract_data: None,
+            primitive: None,
+            updaters: vec![],
         }
     }
-    pub fn insert_updater(&mut self, mut updater: impl Updater<E> + 'static) -> Id {
-        let id = Id::new();
-        updater.on_create(self);
-        self.updaters.push((id, Box::new(updater)));
-        id
-    }
-    pub fn remove_updater(&mut self, id: Id) {
-        self.updaters.retain(|(eid, _)| *eid != id);
-    }
-}
-
-impl<T: EntityAny> Entity for EntityStore<T> {
-    type Renderer = T::Renderer;
-
-    fn tick(&mut self, dt: f32) {
-        self.inner.tick(dt);
+    pub fn tick(&mut self, dt: f32) {
         let entity = &mut self.inner;
         self.updaters.retain_mut(|(_, updater)| {
             let keep = updater.on_update(entity, dt);
@@ -60,25 +50,36 @@ impl<T: EntityAny> Entity for EntityStore<T> {
             keep
         });
     }
-    fn extract(&mut self) {
-        self.inner.extract();
+    pub fn extract(&mut self) {
+        self.extract_data = self.inner.extract();
     }
-    fn prepare(&mut self, ctx: &crate::context::RanimContext) {
-        self.inner.prepare(ctx);
+    pub fn prepare(&mut self, ctx: &RanimContext) {
+        let wgpu_ctx = ctx.wgpu_ctx();
+        let Some(extract_data) = self.extract_data.as_ref() else {
+            return;
+        };
+        if let Some(primitive) = self.primitive.as_mut() {
+            primitive.update(&wgpu_ctx, extract_data);
+        } else {
+            self.primitive = Some(T::Primitive::init(&wgpu_ctx, extract_data));
+        }
     }
-    fn render(&mut self, ctx: &mut crate::context::RanimContext, renderer: &mut Self::Renderer) {
-        self.inner.render(ctx, renderer);
+    pub fn insert_updater(&mut self, mut updater: impl Updater<T> + 'static) -> Id {
+        let id = Id::new();
+        updater.on_create(&mut self.inner);
+        self.updaters.push((id, Box::new(updater)));
+        id
+    }
+    pub fn remove_updater(&mut self, id: Id) {
+        self.updaters.retain(|(eid, _)| *eid != id);
     }
 }
 
-/// A store of entities
-///
-/// Entity's type id -> Vec<(Entity's id, EntityStore(Entity))>
-pub struct EntitiesStore<R> {
-    inner: HashMap<Id, Box<dyn EntityAny<Renderer = R>>>,
+pub struct EntityStore<T: Entity> {
+    inner: HashMap<Id, EntityCell<T>>,
 }
 
-impl<Renderer> Default for EntitiesStore<Renderer> {
+impl<T: Entity> Default for EntityStore<T> {
     fn default() -> Self {
         Self {
             inner: HashMap::new(),
@@ -86,72 +87,87 @@ impl<Renderer> Default for EntitiesStore<Renderer> {
     }
 }
 
-impl<R> Deref for EntitiesStore<R> {
-    type Target = HashMap<Id, Box<dyn EntityAny<Renderer = R>>>;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+impl<T: Entity> EntityStore<T> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Id, &EntityCell<T>)> {
+        self.inner.iter()
+    }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&Id, &mut EntityCell<T>)> {
+        self.inner.iter_mut()
     }
 }
 
-impl<R> DerefMut for EntitiesStore<R> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-pub trait Store<R: 'static> {
-    fn insert<E: EntityAny<Renderer = R>>(&mut self, entity: E) -> EntityId<E>;
-    fn remove<E: EntityAny<Renderer = R>>(&mut self, id: EntityId<E>);
-    fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> &EntityStore<E>;
-    fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> &mut EntityStore<E>;
-}
-
-// Entity management
-impl<R: 'static> Store<R> for EntitiesStore<R> {
-    fn insert<E: EntityAny<Renderer = R>>(&mut self, entity: E) -> EntityId<E> {
+impl<T: Entity> Store<T> for EntityStore<T> {
+    fn insert(&mut self, entity: T) -> EntityId<T> {
         let id = Id::new();
-        // debug!(
-        //     "[RabjectStores::insert]: inserting entity {:?} of type {:?}",
-        //     id,
-        //     std::any::TypeId::of::<E>()
-        // );
-        self.inner.insert(id, Box::new(EntityStore::new(entity)));
+        self.inner.insert(id, EntityCell::new(entity));
         // debug!("[RabjectStores::insert]: inserted entity {:?}", id);
         EntityId::from_id(id)
     }
 
-    fn remove<E: EntityAny<Renderer = R>>(&mut self, id: EntityId<E>) {
+    fn remove(&mut self, id: EntityId<T>) {
         // debug!("[RabjectStores::remove]: removing entity {:?}", id);
         self.inner.remove(&id);
     }
 
-    fn get<E: EntityAny<Renderer = R>>(&self, id: &EntityId<E>) -> &EntityStore<E> {
-        // debug!(
-        //     "[RabjectStores::get]: getting entity {:?} of type {:?}",
-        //     id,
-        //     std::any::TypeId::of::<E>()
-        // );
+    fn get(&self, id: &EntityId<T>) -> &EntityCell<T> {
         // Since removing an entity consumes the [`EntityId`],
         // so if we have a reference of [`EntityId`], the entity
         // must be there and we can safely unwrap it.
-        self.inner
-            .get(&id)
-            .and_then(|e| e.as_any().downcast_ref::<EntityStore<E>>())
-            .unwrap()
+        self.inner.get(&id).unwrap()
     }
 
-    fn get_mut<E: EntityAny<Renderer = R>>(&mut self, id: &EntityId<E>) -> &mut EntityStore<E> {
-        // debug!(
-        //     "[RabjectStores::get_mut]: getting entity {:?} of type {:?}",
-        //     id,
-        //     std::any::TypeId::of::<E>()
-        // );
+    fn get_mut(&mut self, id: &EntityId<T>) -> &mut EntityCell<T> {
         // Since removing an entity consumes the [`EntityId`],
         // so if we have a reference of [`EntityId`], the entity
         // must be there and we can safely unwrap it.
-        self.inner
-            .get_mut(&id)
-            .and_then(|e| e.as_any_mut().downcast_mut::<EntityStore<E>>())
+        self.inner.get_mut(&id).unwrap()
+    }
+}
+
+pub struct EntityStores {
+    /// TypeId of T -> EntityStore<T>
+    stores: HashMap<TypeId, Box<dyn Any>>,
+}
+
+impl Default for EntityStores {
+    fn default() -> Self {
+        Self {
+            stores: HashMap::new(),
+        }
+    }
+}
+
+impl EntityStores {
+    pub fn get_store<T: Entity + 'static>(&self) -> Option<&EntityStore<T>> {
+        self.stores
+            .get(&std::any::TypeId::of::<T>())
+            .map(|s| s.downcast_ref::<EntityStore<T>>().unwrap())
+    }
+    pub fn get_store_mut<T: Entity + 'static>(&mut self) -> Option<&mut EntityStore<T>> {
+        self.stores
+            .get_mut(&std::any::TypeId::of::<T>())
+            .map(|s| s.downcast_mut::<EntityStore<T>>().unwrap())
+    }
+    pub fn init_store<T: Entity + 'static>(&mut self) {
+        self.stores
+            .entry(std::any::TypeId::of::<T>())
+            .or_insert(Box::<EntityStore<T>>::default());
+    }
+    pub fn entry_or_default<T: Entity + 'static>(&mut self) -> &mut EntityStore<T> {
+        self.stores
+            .entry(std::any::TypeId::of::<T>())
+            .or_insert(Box::<EntityStore<T>>::default())
+            .downcast_mut::<EntityStore<T>>()
             .unwrap()
     }
 }
+
+pub trait Store<T: Entity> {
+    fn get(&self, id: &EntityId<T>) -> &EntityCell<T>;
+    fn get_mut(&mut self, id: &EntityId<T>) -> &mut EntityCell<T>;
+    fn insert(&mut self, entity: T) -> EntityId<T>;
+    fn remove(&mut self, id: EntityId<T>);
+}
+
+// Entity management
+// impl<R: 'static> Store for EntitiesStore<R> {}

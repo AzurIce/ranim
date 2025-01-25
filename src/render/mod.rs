@@ -3,12 +3,13 @@ pub mod primitives;
 
 use bevy_color::Color;
 use glam::{Mat4, Vec2, Vec3};
-use log::trace;
+use primitives::Primitive;
 
 use crate::{
     context::{RanimContext, WgpuContext},
+    items::{vitem::VItem, Entity},
     utils::wgpu::WgpuBuffer,
-    world::EntitiesStore,
+    world::World,
 };
 
 #[repr(C, align(16))]
@@ -256,12 +257,62 @@ impl Renderer {
         self.output_texture_updated = false;
     }
 
-    pub fn render(&mut self, ctx: &mut RanimContext, entities: &mut EntitiesStore<Renderer>) {
-        self.clear_screen(&ctx.wgpu_ctx);
-        for (_id, entity) in entities.iter_mut() {
-            // trace!("[Scene] Rendering entity {:?}", id);
-            entity.render(ctx, self);
+    fn render_entities<T: Entity>(
+        &mut self,
+        ctx: &mut RanimContext,
+        encoder: &mut wgpu::CommandEncoder,
+        world: &mut World,
+    ) {
+        if let Some(store) = world.entity_stores.get_store::<VItem>() {
+            {
+                let mut cpass = T::Primitive::start_compute_pass(
+                    &ctx.wgpu_ctx,
+                    &mut ctx.pipelines,
+                    encoder,
+                    &self.uniforms_bind_group.bind_group,
+                );
+
+                for (_id, entity) in store.iter() {
+                    if let Some(primitive) = &entity.primitive {
+                        primitive.compute_command(&mut cpass);
+                    }
+                    // trace!("[Scene] Rendering entity {:?}", id);
+                    // entity.render(ctx, self);
+                }
+            }
+            {
+                let mut rpass = T::Primitive::start_render_pass(
+                    &ctx.wgpu_ctx,
+                    &mut ctx.pipelines,
+                    encoder,
+                    &self.multisample_view,
+                    &self.render_view,
+                    &self.depth_stencil_view,
+                    &self.uniforms_bind_group.bind_group,
+                );
+                for (_id, entity) in store.iter() {
+                    if let Some(primitive) = &entity.primitive {
+                        primitive.render_command(&mut rpass);
+                    }
+                    // trace!("[Scene] Rendering entity {:?}", id);
+                    // entity.render(ctx, self);
+                }
+            }
         }
+    }
+
+    pub fn render(&mut self, ctx: &mut RanimContext, world: &mut World) {
+        self.clear_screen(&ctx.wgpu_ctx);
+
+        let mut encoder = ctx
+            .wgpu_ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        self.render_entities::<VItem>(ctx, &mut encoder, world);
+
+        ctx.wgpu_ctx.queue.submit([encoder.finish()]);
+
         self.output_texture_updated = false;
     }
     fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
@@ -455,6 +506,13 @@ impl CameraFrame {
     }
 }
 
+/// A render resource.
+pub trait RenderResource {
+    fn new(ctx: &WgpuContext) -> Self
+    where
+        Self: Sized;
+}
+
 #[cfg(test)]
 mod test {
     use env_logger::Env;
@@ -465,8 +523,7 @@ mod test {
     use crate::{
         context::RanimContext,
         items::vitem::{Arc, Square, VItem},
-        prelude::Blueprint,
-        rabject::rabject3d::RabjectEntity3d,
+        // rabject::rabject3d::RabjectEntity3d,
         world::{Store, World},
     };
 
@@ -483,11 +540,11 @@ mod test {
         // }
         // .build()
         // .into();
-        let vitem: RabjectEntity3d<VItem> = VItem::from_vpoints(vec![
+        let vitem = VItem::from_vpoints(vec![
             vec3(0.0, 0.0, 0.0),
             vec3(50.0, 100.0, 0.0),
             vec3(100.0, 0.0, 0.0),
-        ]).into();
+        ]);
         // let vitem: RabjectEntity3d<VItem> = VItem::square().into();
         let id = world.insert(vitem);
         world.extract();
@@ -495,7 +552,7 @@ mod test {
         world.prepare(&ctx);
 
         let mut renderer = Renderer::new(&ctx, 1920, 1080);
-        renderer.render(&mut ctx, &mut world.entities);
+        renderer.render(&mut ctx, &mut world);
         let data = renderer.get_rendered_texture_data(&ctx.wgpu_ctx);
         let image = ImageBuffer::<image::Rgba<u8>, _>::from_raw(1920, 1080, data.to_vec()).unwrap();
         image.save("./output.png");

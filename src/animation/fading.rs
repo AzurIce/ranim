@@ -1,4 +1,5 @@
-use crate::{prelude::Interpolatable, rabject::Updatable};
+use crate::items::Updatable;
+use crate::prelude::Interpolatable;
 
 use super::{Animation, AnimationFunc};
 

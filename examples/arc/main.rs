@@ -7,7 +7,7 @@ use glam::vec2;
 use log::info;
 use ranim::animation::fading;
 use ranim::items::vitem::{Arc, VItem};
-use ranim::rabject::rabject3d::RabjectEntity3d;
+// use ranim::rabject::rabject3d::RabjectEntity3d;
 use ranim::{prelude::*, Scene};
 
 struct ArcScene;
@@ -49,7 +49,7 @@ impl Scene for ArcScene {
                 arc.stroke_rgbas.set_all(color);
                 arc.fill_rgbas.set_all(color.with_alpha(0.0));
                 arc.vpoints.shift(offset.extend(0.0));
-                app.insert(Into::<RabjectEntity3d<VItem>>::into(arc));
+                let arc = app.insert(arc);
                 app.wait(Duration::from_secs_f32(0.02));
                 // let _arc = scene.play_in_canvas(
                 //     &canvas,
