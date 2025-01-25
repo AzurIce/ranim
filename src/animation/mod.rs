@@ -4,11 +4,7 @@ pub mod transform;
 
 use std::time;
 
-use crate::{
-    updater::Updater,
-    utils::rate_functions::smooth,
-    world::{Entity, EntityId},
-};
+use crate::{updater::Updater, utils::rate_functions::smooth, world::EntityId};
 
 #[allow(unused)]
 use log::trace;
@@ -87,13 +83,13 @@ pub trait AnimationFunc<T> {
 //     Animate(EntityId<T>),
 // }
 
-pub enum AnimateTarget<T: Entity + 'static> {
+pub enum AnimateTarget<T> {
     Insert(T),
     Existed(EntityId<T>),
     // Remove(EntityId<T>),
 }
 
-impl<T: Entity + 'static> From<T> for AnimateTarget<T> {
+impl<T> From<T> for AnimateTarget<T> {
     fn from(value: T) -> Self {
         Self::Insert(value)
     }
@@ -104,7 +100,7 @@ impl<T: Entity + 'static> From<T> for AnimateTarget<T> {
 //         Self::Existed(value)
 //     }
 // }
-impl<T: Entity + 'static> From<EntityId<T>> for AnimateTarget<T> {
+impl<T> From<EntityId<T>> for AnimateTarget<T> {
     fn from(value: EntityId<T>) -> Self {
         Self::Existed(value)
     }

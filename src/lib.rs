@@ -82,11 +82,11 @@ use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
+use items::Entity;
 use log::trace;
 use render::{CameraFrame, Renderer};
 use world::{
-    // canvas::{camera::CanvasCamera, Canvas},
-    Entity,
+    EntityCell,
     EntityId,
     Store,
     World,
@@ -98,8 +98,8 @@ pub mod prelude {
     pub use crate::animation::fading::Opacity;
     pub use crate::animation::transform::Alignable;
 
-    pub use crate::rabject::Blueprint;
     pub use crate::RenderScene;
+    pub use crate::items::Blueprint;
 }
 
 pub mod color;
@@ -111,7 +111,6 @@ pub mod animation;
 pub mod components;
 pub mod context;
 pub mod items;
-pub mod rabject;
 pub mod render;
 pub mod utils;
 pub mod world;
@@ -126,11 +125,16 @@ pub trait Scene {
 }
 
 pub trait RenderScene {
-    fn render(self) where Self: Sized;
+    fn render(self)
+    where
+        Self: Sized;
 }
 
-impl<T: Scene> RenderScene for  T {
-    fn render(self) where Self: Sized {
+impl<T: Scene> RenderScene for T {
+    fn render(self)
+    where
+        Self: Sized,
+    {
         let mut scene = self;
         let desc = T::desc();
         let mut app = RanimRenderApp::new(AppOptions {
@@ -141,7 +145,8 @@ impl<T: Scene> RenderScene for  T {
     }
 }
 
-pub trait RanimApp: Store<Renderer> {
+// MARK: RanimApp Trait
+pub trait RanimApp {
     /// Play an animation
     ///
     /// The different target_type is corresponding to different [`AnimateTarget`]:
@@ -166,12 +171,12 @@ pub trait RanimApp: Store<Renderer> {
     /// ```
     ///
     /// See [`Animation`] and [`crate::updater::Updater`].
-    fn play<E: Entity<Renderer = Renderer> + 'static, T: Into<AnimateTarget<E>>>(
+    fn play<E: Entity + 'static, T: Into<AnimateTarget<E>>>(
         &mut self,
         target: T,
         animation: Animation<E>,
     ) -> EntityId<E>;
-    fn play_remove<E: Entity<Renderer = Renderer> + 'static>(
+    fn play_remove<E: Entity + 'static>(
         &mut self,
         target_id: EntityId<E>,
         animation: Animation<E>,
@@ -202,8 +207,14 @@ pub trait RanimApp: Store<Renderer> {
 
     fn camera(&self) -> &CameraFrame;
     fn camera_mut(&mut self) -> &mut CameraFrame;
+
+    fn get<T: Entity + 'static>(&self, id: &EntityId<T>) -> &EntityCell<T>;
+    fn get_mut<T: Entity + 'static>(&mut self, id: &EntityId<T>) -> &mut EntityCell<T>;
+    fn insert<T: Entity + 'static>(&mut self, entity: T) -> EntityId<T>;
+    fn remove<T: Entity + 'static>(&mut self, id: EntityId<T>);
 }
 
+/// MARK: RanimRenderApp
 pub struct RanimRenderApp {
     ctx: RanimContext,
 
@@ -228,7 +239,7 @@ pub struct AppOptions {
     pub frame_size: (u32, u32),
     pub frame_rate: u32,
     pub save_frames: bool,
-    pub output_path: PathBuf
+    pub output_path: PathBuf,
 }
 
 impl Default for AppOptions {
@@ -237,7 +248,7 @@ impl Default for AppOptions {
             frame_size: (1920, 1080),
             frame_rate: 60,
             save_frames: false,
-            output_path: PathBuf::from("./output.mp4")
+            output_path: PathBuf::from("./output.mp4"),
         }
     }
 }
@@ -303,8 +314,7 @@ impl RanimRenderApp {
             self.world.extract();
             self.world.prepare(&self.ctx);
         }
-        self.renderer
-            .render(&mut self.ctx, &mut self.world.entities);
+        self.renderer.render(&mut self.ctx, &mut self.world);
 
         // `output_video` is true
         if let Some(video_writer) = self.video_writer.as_mut() {
@@ -347,38 +357,28 @@ impl RanimRenderApp {
     }
 }
 
-impl Store<Renderer> for RanimRenderApp {
-    fn insert<E: world::EntityAny<Renderer = Renderer>>(
-        &mut self,
-        entity: E,
-    ) -> world::EntityId<E> {
-        self.world.insert(entity)
-    }
-    fn remove<E: world::EntityAny<Renderer = Renderer>>(&mut self, id: world::EntityId<E>) {
-        self.world.remove(id);
-    }
-    fn get<E: world::EntityAny<Renderer = Renderer>>(
-        &self,
-        id: &world::EntityId<E>,
-    ) -> &world::EntityStore<E> {
+/// MARK: RanimRenderApp's RanimApp impl
+impl RanimApp for RanimRenderApp {
+    fn get<T: Entity + 'static>(&self, id: &EntityId<T>) -> &EntityCell<T> {
         self.world.get(id)
     }
-    fn get_mut<E: world::EntityAny<Renderer = Renderer>>(
-        &mut self,
-        id: &world::EntityId<E>,
-    ) -> &mut world::EntityStore<E> {
+    fn get_mut<T: Entity + 'static>(&mut self, id: &EntityId<T>) -> &mut EntityCell<T> {
         self.world.get_mut(id)
     }
-}
+    fn insert<T: Entity + 'static>(&mut self, entity: T) -> EntityId<T> {
+        self.world.insert(entity)
+    }
+    fn remove<T: Entity + 'static>(&mut self, id: EntityId<T>) {
+        self.world.remove(id);
+    }
 
-impl RanimApp for RanimRenderApp {
     fn camera(&self) -> &CameraFrame {
         &self.camera_frame
     }
     fn camera_mut(&mut self) -> &mut CameraFrame {
         &mut self.camera_frame
     }
-    fn play<E: Entity<Renderer = Renderer> + 'static, T: Into<AnimateTarget<E>>>(
+    fn play<E: Entity + 'static, T: Into<AnimateTarget<E>>>(
         &mut self,
         target: T,
         animation: Animation<E>,
@@ -396,7 +396,7 @@ impl RanimApp for RanimRenderApp {
         entity_id
     }
 
-    fn play_remove<E: Entity<Renderer = Renderer> + 'static>(
+    fn play_remove<E: Entity + 'static>(
         &mut self,
         target_id: EntityId<E>,
         animation: Animation<E>,
@@ -409,41 +409,9 @@ impl RanimApp for RanimRenderApp {
         let filename = filename.as_ref();
         self.world.extract();
         self.world.prepare(&self.ctx);
-        self.renderer
-            .render(&mut self.ctx, &mut self.world.entities);
+        self.renderer.render(&mut self.ctx, &mut self.world);
         self.save_frame_to_image(PathBuf::from(format!("output/{}/{}", "world", filename)));
     }
-
-    // fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static, T: Into<AnimateTarget<E>>>(
-    //     &mut self,
-    //     canvas_id: &EntityId<Canvas>,
-    //     target: T,
-    //     animation: Animation<E>,
-    // ) -> EntityId<E> {
-    //     let target = target.into();
-
-    //     let entity_id = match target {
-    //         AnimateTarget::Insert(entity) => self.get_mut(canvas_id).insert(entity),
-    //         AnimateTarget::Existed(entity_id) => entity_id,
-    //     };
-
-    //     let run_time = animation.config.run_time;
-    //     self.get_mut(canvas_id)
-    //         .get_mut(&entity_id)
-    //         .insert_updater(animation);
-    //     self.advance(run_time);
-    //     entity_id
-    // }
-
-    // fn play_remove_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
-    //     &mut self,
-    //     canvas_id: &EntityId<Canvas>,
-    //     target_id: EntityId<E>,
-    //     animation: Animation<E>,
-    // ) {
-    //     let target_id = self.play_in_canvas(canvas_id, target_id, animation);
-    //     self.get_mut(canvas_id).remove(target_id);
-    // }
 
     fn wait(&mut self, duration: Duration) {
         let dt = self.tick_duration().as_secs_f32();
@@ -463,10 +431,5 @@ impl RanimApp for RanimRenderApp {
     //     self.camera_frame.center_canvas_in_frame(canvas);
     //     self.renderer
     //         .update_uniforms(&self.ctx.wgpu_ctx, &self.camera_frame);
-    // }
-
-    // fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas> {
-    //     let canvas = Canvas::new(&self.ctx.wgpu_ctx, width, height);
-    //     self.world.insert(canvas)
     // }
 }

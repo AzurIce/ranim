@@ -13,7 +13,7 @@ use std::{
 
 use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
-use crate::{context::WgpuContext, rabject::RenderResource};
+use crate::{context::WgpuContext, render::RenderResource};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Id(u128);
@@ -29,6 +29,7 @@ impl Id {
         Self(uuid::Uuid::new_v4().as_u128())
     }
 }
+
 
 #[derive(Default)]
 pub struct RenderResourceStorage {

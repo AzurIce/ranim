@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 pub struct CachedMethod<T> {
     func: fn() -> T,
     cache: Option<T>,

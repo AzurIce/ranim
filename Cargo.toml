@@ -27,6 +27,7 @@ anyhow = "1.0.95"
 bevy_color = "0.15.2"
 usvg = "0.44.0"
 regex = "1.11.1"
+wgpu-profiler = "0.21.0"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

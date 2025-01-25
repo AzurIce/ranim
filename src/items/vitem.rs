@@ -6,12 +6,10 @@ use log::trace;
 
 use crate::{
     components::{rgba::Rgba, vpoint::VPoint, width::Width, ComponentData, TransformAnchor},
-    prelude::Blueprint,
-    rabject::Rabject,
     render::primitives::vitem::VItemPrimitive,
 };
 
-use super::Extract;
+use super::{Blueprint, Entity};
 
 #[derive(Debug, Clone)]
 pub struct VItem {
@@ -52,10 +50,11 @@ pub struct ExtractedVItem {
     pub fill_rgbas: Vec<Vec4>,
 }
 
-impl Extract for VItem {
+impl Entity for VItem {
     type ExtractData = ExtractedVItem;
-    fn extract(&self) -> Self::ExtractData {
-        ExtractedVItem {
+    type Primitive = VItemPrimitive;
+    fn extract(&self) -> Option<Self::ExtractData> {
+        Some(ExtractedVItem {
             points: self
                 .vpoints
                 .iter()
@@ -65,17 +64,17 @@ impl Extract for VItem {
             stroke_widths: self.stroke_widths.iter().map(|w| *w.deref()).collect(),
             stroke_rgbas: self.stroke_rgbas.iter().map(|c| *c.deref()).collect(),
             fill_rgbas: self.fill_rgbas.iter().map(|c| *c.deref()).collect(),
-        }
+        })
     }
 }
 
-impl Rabject for VItem {
-    type ExtractData = ExtractedVItem;
-    type RenderResource = VItemPrimitive;
-    fn extract(&self) -> Self::ExtractData {
-        Extract::extract(self)
-    }
-}
+// impl Rabject for VItem {
+//     type ExtractData = ExtractedVItem;
+//     type RenderResource = VItemPrimitive;
+//     fn extract(&self) -> Self::ExtractData {
+//         Renderable::extract(self)
+//     }
+// }
 
 // MARK: Blueprints
 

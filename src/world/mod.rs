@@ -5,9 +5,10 @@ mod store;
 pub use entity::*;
 pub use store::*;
 
-use std::ops::{Deref, DerefMut};
-
-use crate::{context::RanimContext, render::Renderer};
+use crate::{
+    context::RanimContext,
+    items::{vitem::VItem, Entity},
+};
 
 #[allow(unused)]
 use log::{debug, error, info, trace};
@@ -16,20 +17,7 @@ use log::{debug, error, info, trace};
 use std::time::Instant;
 
 pub struct World {
-    pub(crate) entities: EntitiesStore<Renderer>,
-}
-
-impl Deref for World {
-    type Target = EntitiesStore<Renderer>;
-    fn deref(&self) -> &Self::Target {
-        &self.entities
-    }
-}
-
-impl DerefMut for World {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.entities
-    }
+    pub(crate) entity_stores: EntityStores,
 }
 
 // Core phases
@@ -37,7 +25,7 @@ impl World {
     pub fn tick(&mut self, dt: f32) {
         // info!("[Scene]: TICK STAGE START");
         // let t = Instant::now();
-        for (_, entity) in self.entities.iter_mut() {
+        for (_, entity) in self.entity_stores.entry_or_default::<VItem>().iter_mut() {
             entity.tick(dt);
         }
         // info!("[Scene]: TICK STAGE END, took {:?}", t.elapsed());
@@ -46,7 +34,7 @@ impl World {
     pub fn extract(&mut self) {
         // info!("[Scene]: EXTRACT STAGE START");
         // let t = Instant::now();
-        for (_, entity) in self.entities.iter_mut() {
+        for (_, entity) in self.entity_stores.entry_or_default::<VItem>().iter_mut() {
             entity.extract();
         }
         // info!("[Scene]: EXTRACT STAGE END, took {:?}", t.elapsed());
@@ -55,24 +43,33 @@ impl World {
     pub fn prepare(&mut self, ctx: &RanimContext) {
         // info!("[Scene]: PREPARE STAGE START");
         // let t = Instant::now();
-        for (_, entity) in self.entities.iter_mut() {
+        for (_, entity) in self.entity_stores.entry_or_default::<VItem>().iter_mut() {
             entity.prepare(ctx);
         }
         // info!("[Scene]: PREPARE STAGE END, took {:?}", t.elapsed());
     }
+}
 
-    // pub fn render(&mut self) {
-    //     // info!("[Scene]: RENDER STAGE START");
-    //     // let t = Instant::now();
-    //     self.camera.render(&mut self.ctx, &mut self.entities);
-    //     // info!("[Scene]: RENDER STAGE END, took {:?}", t.elapsed());
-    // }
+impl<T: Entity + 'static> Store<T> for World {
+    fn get(&self, id: &EntityId<T>) -> &EntityCell<T> {
+        // If you have an EntityId of type T, then you must have been insert it into the store
+        self.entity_stores.get_store::<T>().unwrap().get(id)
+    }
+    fn get_mut(&mut self, id: &EntityId<T>) -> &mut EntityCell<T> {
+        self.entity_stores.get_store_mut::<T>().unwrap().get_mut(id)
+    }
+    fn insert(&mut self, entity: T) -> EntityId<T> {
+        self.entity_stores.entry_or_default::<T>().insert(entity)
+    }
+    fn remove(&mut self, id: EntityId<T>) {
+        self.entity_stores.get_store_mut::<T>().unwrap().remove(id)
+    }
 }
 
 impl World {
     pub(crate) fn new() -> Self {
         Self {
-            entities: EntitiesStore::default(),
+            entity_stores: EntityStores::default(),
         }
     }
 
