@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use glam::{vec2, vec3, vec4, Vec3, Vec4};
 use itertools::Itertools;
 use log::trace;
@@ -41,40 +39,24 @@ impl VItem {
         self.stroke_rgbas.resize_with_last((len + 1) / 2);
         self.stroke_widths.resize_with_last((len + 1) / 2);
     }
-}
 
-pub struct ExtractedVItem {
-    pub points: Vec<Vec4>,
-    pub stroke_widths: Vec<f32>,
-    pub stroke_rgbas: Vec<Vec4>,
-    pub fill_rgbas: Vec<Vec4>,
-}
-
-impl Entity for VItem {
-    type ExtractData = ExtractedVItem;
-    type Primitive = VItemPrimitive;
-    fn extract(&self) -> Option<Self::ExtractData> {
-        Some(ExtractedVItem {
-            points: self
-                .vpoints
-                .iter()
-                .zip(self.vpoints.get_closepath_flags().iter())
-                .map(|(p, f)| vec4(p.x, p.y, p.z, if *f { 1.0 } else { 0.0 }))
-                .collect(),
-            stroke_widths: self.stroke_widths.iter().map(|w| *w.deref()).collect(),
-            stroke_rgbas: self.stroke_rgbas.iter().map(|c| *c.deref()).collect(),
-            fill_rgbas: self.fill_rgbas.iter().map(|c| *c.deref()).collect(),
-        })
+    pub(crate) fn get_render_points(&self) -> Vec<Vec4> {
+        self.vpoints
+            .iter()
+            .zip(self.vpoints.get_closepath_flags().iter())
+            .map(|(p, f)| vec4(p.x, p.y, p.z, if *f { 1.0 } else { 0.0 }))
+            .collect()
     }
 }
 
-// impl Rabject for VItem {
-//     type ExtractData = ExtractedVItem;
-//     type RenderResource = VItemPrimitive;
-//     fn extract(&self) -> Self::ExtractData {
-//         Renderable::extract(self)
-//     }
-// }
+impl Entity for VItem {
+    type ExtractData = VItem;
+    type Primitive = VItemPrimitive;
+
+    fn extract(&self) -> Option<Self::ExtractData> {
+        Some(self.clone())
+    }
+}
 
 // MARK: Blueprints
 

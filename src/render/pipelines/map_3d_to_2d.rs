@@ -1,10 +1,8 @@
 use std::ops::Deref;
 
-use glam::Vec4;
-
 use crate::{
     context::WgpuContext,
-    render::{CameraUniforms, RenderResource, WgpuBuffer},
+    render::{CameraUniforms, RenderResource},
 };
 
 pub struct Map3dTo2dPipeline {
@@ -59,8 +57,8 @@ impl ComputeBindGroup {
 
     fn new_bind_group(
         ctx: &WgpuContext,
-        points3d_buffer: &WgpuBuffer<Vec4>,
-        points2d_buffer: &WgpuBuffer<Vec4>,
+        points3d_buffer: &wgpu::Buffer,
+        points2d_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Map 3D to 2D Compute Bind Group"),
@@ -83,8 +81,8 @@ impl ComputeBindGroup {
     }
     pub(crate) fn new(
         ctx: &WgpuContext,
-        points3d_buffer: &WgpuBuffer<Vec4>,
-        points2d_buffer: &WgpuBuffer<Vec4>,
+        points3d_buffer: &wgpu::Buffer,
+        points2d_buffer: &wgpu::Buffer,
     ) -> Self {
         Self {
             bind_group: Self::new_bind_group(ctx, points3d_buffer, points2d_buffer),
@@ -94,8 +92,8 @@ impl ComputeBindGroup {
     pub(crate) fn update(
         &mut self,
         ctx: &WgpuContext,
-        points3d_buffer: &WgpuBuffer<Vec4>,
-        points2d_buffer: &WgpuBuffer<Vec4>,
+        points3d_buffer: &wgpu::Buffer,
+        points2d_buffer: &wgpu::Buffer,
     ) {
         self.bind_group = Self::new_bind_group(ctx, points3d_buffer, points2d_buffer);
     }
