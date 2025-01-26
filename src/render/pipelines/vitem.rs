@@ -1,10 +1,10 @@
 use std::ops::Deref;
 
-use glam::{Vec2, Vec4};
+use glam::Vec2;
 
 use crate::{
     context::WgpuContext,
-    render::{CameraUniformsBindGroup, RenderResource, WgpuBuffer, OUTPUT_TEXTURE_FORMAT},
+    render::{CameraUniformsBindGroup, RenderResource, OUTPUT_TEXTURE_FORMAT},
 };
 
 pub struct RenderBindGroup(wgpu::BindGroup);
@@ -68,10 +68,10 @@ impl RenderBindGroup {
 
     fn new_bind_group(
         ctx: &WgpuContext,
-        points: &WgpuBuffer<Vec4>,
-        fill_rgbas: &WgpuBuffer<Vec4>,
-        stroke_rgbas: &WgpuBuffer<Vec4>,
-        stroke_widths: &WgpuBuffer<f32>,
+        points: &wgpu::Buffer,
+        fill_rgbas: &wgpu::Buffer,
+        stroke_rgbas: &wgpu::Buffer,
+        stroke_widths: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("VItem Render Bind Group"),
@@ -102,10 +102,10 @@ impl RenderBindGroup {
     }
     pub(crate) fn new(
         ctx: &WgpuContext,
-        points: &WgpuBuffer<Vec4>,
-        fill_rgbas: &WgpuBuffer<Vec4>,
-        stroke_rgbas: &WgpuBuffer<Vec4>,
-        stroke_widths: &WgpuBuffer<f32>,
+        points: &wgpu::Buffer,
+        fill_rgbas: &wgpu::Buffer,
+        stroke_rgbas: &wgpu::Buffer,
+        stroke_widths: &wgpu::Buffer,
     ) -> Self {
         Self(Self::new_bind_group(
             ctx,
@@ -119,10 +119,10 @@ impl RenderBindGroup {
     pub(crate) fn update(
         &mut self,
         ctx: &WgpuContext,
-        points: &WgpuBuffer<Vec4>,
-        fill_rgbas: &WgpuBuffer<Vec4>,
-        stroke_rgbas: &WgpuBuffer<Vec4>,
-        stroke_widths: &WgpuBuffer<f32>,
+        points: &wgpu::Buffer,
+        fill_rgbas: &wgpu::Buffer,
+        stroke_rgbas: &wgpu::Buffer,
+        stroke_widths: &wgpu::Buffer,
     ) {
         self.0 = Self::new_bind_group(ctx, points, fill_rgbas, stroke_rgbas, stroke_widths);
     }

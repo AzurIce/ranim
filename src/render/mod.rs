@@ -2,7 +2,7 @@ pub mod pipelines;
 pub mod primitives;
 
 use bevy_color::Color;
-use glam::{Mat4, Vec2, Vec3};
+use glam::{vec2, Mat4, Vec2, Vec3};
 use primitives::Primitive;
 
 use crate::{
@@ -41,6 +41,12 @@ pub struct CameraUniformsBindGroup {
     pub bind_group: wgpu::BindGroup,
 }
 
+impl AsRef<wgpu::BindGroup> for CameraUniformsBindGroup {
+    fn as_ref(&self) -> &wgpu::BindGroup {
+        &self.bind_group
+    }
+}
+
 impl CameraUniformsBindGroup {
     pub(crate) fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
         ctx.device
@@ -71,6 +77,7 @@ impl CameraUniformsBindGroup {
 ///
 pub struct Renderer {
     size: (usize, usize),
+    camera: CameraFrame,
 
     clear_color: wgpu::Color,
     uniforms: CameraUniforms,
@@ -95,7 +102,7 @@ const ALIGNMENT: usize = 256;
 
 impl Renderer {
     pub(crate) fn new(ctx: &RanimContext, width: usize, height: usize) -> Self {
-        let frame = CameraFrame::new_with_size(width, height);
+        let camera = CameraFrame::new_with_size(width, height);
 
         let format = OUTPUT_TEXTURE_FORMAT;
         let ctx = &ctx.wgpu_ctx;
@@ -158,16 +165,17 @@ impl Renderer {
         });
 
         let uniforms = CameraUniforms {
-            proj_mat: frame.projection_matrix(),
-            view_mat: frame.view_matrix(),
+            proj_mat: camera.projection_matrix(),
+            view_mat: camera.view_matrix(),
             half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
             _padding: [0.0; 2],
         };
         // trace!("init renderer uniform: {:?}", uniforms);
         let uniforms_buffer = WgpuBuffer::new_init(
             ctx,
-            &[uniforms],
+            Some("Uniforms Buffer"),
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            uniforms,
         );
         let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
 
@@ -195,6 +203,7 @@ impl Renderer {
         };
 
         Self {
+            camera,
             size: (width, height),
             clear_color,
             // fps,
@@ -257,46 +266,27 @@ impl Renderer {
         self.output_texture_updated = false;
     }
 
-    fn render_entities<T: Entity>(
+    fn render_entities<T: Entity + 'static>(
         &mut self,
         ctx: &mut RanimContext,
         encoder: &mut wgpu::CommandEncoder,
         world: &mut World,
     ) {
-        if let Some(store) = world.entity_stores.get_store::<VItem>() {
-            {
-                let mut cpass = T::Primitive::start_compute_pass(
+        if let Some(store) = world.entity_stores.get_store_mut::<T>() {
+            for (_id, entity) in store.iter_mut() {
+                let Some(primitive) = &mut entity.primitive else {
+                    continue;
+                };
+
+                primitive.update_clip_info(&ctx.wgpu_ctx, &self.camera);
+                primitive.encode_render_command(
                     &ctx.wgpu_ctx,
                     &mut ctx.pipelines,
                     encoder,
                     &self.uniforms_bind_group.bind_group,
-                );
-
-                for (_id, entity) in store.iter() {
-                    if let Some(primitive) = &entity.primitive {
-                        primitive.compute_command(&mut cpass);
-                    }
-                    // trace!("[Scene] Rendering entity {:?}", id);
-                    // entity.render(ctx, self);
-                }
-            }
-            {
-                let mut rpass = T::Primitive::start_render_pass(
-                    &ctx.wgpu_ctx,
-                    &mut ctx.pipelines,
-                    encoder,
                     &self.multisample_view,
                     &self.render_view,
-                    &self.depth_stencil_view,
-                    &self.uniforms_bind_group.bind_group,
                 );
-                for (_id, entity) in store.iter() {
-                    if let Some(primitive) = &entity.primitive {
-                        primitive.render_command(&mut rpass);
-                    }
-                    // trace!("[Scene] Rendering entity {:?}", id);
-                    // entity.render(ctx, self);
-                }
             }
         }
     }
@@ -445,6 +435,12 @@ impl CameraFrame {
     pub fn view_matrix(&self) -> Mat4 {
         // Mat4::look_at_rh(vec3(0.0, 0.0, 1080.0), Vec3::NEG_Z, Vec3::Y)
         Mat4::look_at_rh(self.pos, self.pos + self.facing, self.up)
+    }
+    pub fn frame_size(&self) -> Vec2 {
+        vec2(self.size.0 as f32, self.size.1 as f32)
+    }
+    pub fn half_frame_size(&self) -> Vec2 {
+        self.frame_size() / 2.0
     }
 
     pub fn projection_matrix(&self) -> Mat4 {

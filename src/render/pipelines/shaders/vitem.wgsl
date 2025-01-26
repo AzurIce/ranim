@@ -211,7 +211,7 @@ fn render_control_points(pos: vec2<f32>) -> vec4<f32> {
 
 @fragment
 fn fs_main(@location(0) pos: vec2<f32>) -> @location(0) vec4<f32> {
-    var f_color: vec4<f32>;
+    var f_color: vec4<f32> = vec4(1.0, 0.0, 0.0, 1.0);
     f_color = render(pos);
     // f_color = blend_color(f_color, render_control_points(pos));
     return f_color;

@@ -32,6 +32,12 @@ impl<T, I: IntoIterator<Item = impl Into<T>>> From<I> for ComponentData<T> {
     }
 }
 
+impl<T> AsRef<[T]> for ComponentData<T> {
+    fn as_ref(&self) -> &[T] {
+        &self.0
+    }
+}
+
 impl<T> AsRef<Vec<T>> for ComponentData<T> {
     fn as_ref(&self) -> &Vec<T> {
         &self.0
@@ -145,7 +151,7 @@ impl<T: Transform3d> ComponentData<T> {
         let max = self
             .iter()
             .map(|p| p.position())
-            .reduce(|acc, e| acc.min(e))
+            .reduce(|acc, e| acc.max(e))
             .unwrap();
         let mid = (min + max) / 2.0;
         [min, mid, max]
@@ -256,5 +262,47 @@ impl<T: Transform3d> ComponentData<T> {
         self.shift(start - self.get_start_position().unwrap());
 
         self
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use glam::{ivec3, vec3};
+
+    use super::{vpoint::VPoint, ComponentData};
+
+    #[test]
+    fn test_bounding_box() {
+        let points: ComponentData<VPoint> = vec![
+            vec3(-100.0, -100.0, 0.0),
+            vec3(-100.0, 100.0, 0.0),
+            vec3(100.0, 100.0, 0.0),
+            vec3(100.0, -200.0, 0.0),
+        ]
+        .into();
+        assert_eq!(
+            points.get_bounding_box(),
+            [
+                vec3(-100.0, -200.0, 0.0),
+                vec3(0.0, -50.0, 0.0),
+                vec3(100.0, 100.0, 0.0)
+            ]
+        );
+        assert_eq!(
+            vec3(-100.0, -200.0, 0.0),
+            points.get_bounding_box_point(ivec3(-1, -1, 0))
+        );
+        assert_eq!(
+            vec3(-100.0, 100.0, 0.0),
+            points.get_bounding_box_point(ivec3(-1, 1, 0))
+        );
+        assert_eq!(
+            vec3(100.0, -200.0, 0.0),
+            points.get_bounding_box_point(ivec3(1, -1, 0))
+        );
+        assert_eq!(
+            vec3(100.0, 100.0, 0.0),
+            points.get_bounding_box_point(ivec3(1, 1, 0))
+        );
     }
 }
