@@ -56,6 +56,7 @@ impl<T: Entity> EntityCell<T> {
     pub fn prepare(&mut self, ctx: &RanimContext) {
         let wgpu_ctx = ctx.wgpu_ctx();
         let Some(extract_data) = self.extract_data.as_ref() else {
+            // self.primitive = None; // TODO: make this better
             return;
         };
         if let Some(primitive) = self.primitive.as_mut() {

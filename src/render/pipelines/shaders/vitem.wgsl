@@ -123,14 +123,15 @@ fn sign_line(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>) -> f32 {
 }
 
 fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
+    let points_len = arrayLength(&points);
+
     var attr: SubpathAttr;
-    attr.end_idx = start_idx;
+    attr.end_idx = points_len;
     attr.nearest_idx = 0u;
     attr.d = 3.40282346638528859812e38;
     attr.sgn = 1.0;
     attr.debug = vec4(1.0, 1.0, 1.0, 1.0);
 
-    let points_len = arrayLength(&points);
     let n = (points_len - 1) / 2 * 2;
     for (var i = start_idx; i < n; i += 2u) {
         let a = point(i);
@@ -213,6 +214,8 @@ fn render_control_points(pos: vec2<f32>) -> vec4<f32> {
 fn fs_main(@location(0) pos: vec2<f32>) -> @location(0) vec4<f32> {
     var f_color: vec4<f32> = vec4(1.0, 0.0, 0.0, 1.0);
     f_color = render(pos);
+    // let attr = get_subpath_attr(pos, 0u);
+    // f_color = vec4(f32(attr.sgn));
     // f_color = blend_color(f_color, render_control_points(pos));
     return f_color;
 }

@@ -518,7 +518,10 @@ mod test {
     use super::*;
     use crate::{
         context::RanimContext,
-        items::vitem::{Arc, Square, VItem},
+        items::{
+            vitem::{Arc, Polygon, Square, VItem},
+            Blueprint,
+        },
         // rabject::rabject3d::RabjectEntity3d,
         world::{Store, World},
     };
@@ -536,12 +539,22 @@ mod test {
         // }
         // .build()
         // .into();
-        let vitem = VItem::from_vpoints(vec![
-            vec3(0.0, 0.0, 0.0),
-            vec3(50.0, 100.0, 0.0),
-            vec3(100.0, 0.0, 0.0),
-        ]);
-        // let vitem: RabjectEntity3d<VItem> = VItem::square().into();
+        // let vitem = VItem::from_vpoints(vec![
+        //     vec3(0.0, 0.0, 0.0),
+        //     vec3(50.0, 100.0, 0.0),
+        //     vec3(100.0, 0.0, 0.0),
+        // ]);
+        let mut vitem = Square(100.0).build();
+        vitem.vpoints.shift(vec3(-200.0, 0.0, 0.0));
+        world.insert(vitem);
+        let vitem = Polygon(vec![
+            vec3(-100.0, -300.0, 0.0),
+            vec3(-100.0, 0.0, 0.0),
+            vec3(0.0, 300.0, 0.0),
+            vec3(200.0, 300.0, 0.0),
+            vec3(200.0, -300.0, 0.0),
+        ])
+        .build();
         let id = world.insert(vitem);
         world.extract();
         world.prepare(&ctx);
