@@ -1,9 +1,13 @@
+use bevy_color::{ColorToComponents, LinearRgba};
 use glam::{vec2, vec3, vec4, Vec3, Vec4};
 use itertools::Itertools;
 use log::trace;
 
 use crate::{
-    components::{rgba::Rgba, vpoint::VPoint, width::Width, ComponentData, TransformAnchor},
+    components::{
+        rgba::Rgba, vpoint::VPoint, width::Width, ComponentData, HasTransform3d, TransformAnchor,
+    },
+    prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::primitives::vitem::VItemPrimitive,
 };
 
@@ -15,6 +19,15 @@ pub struct VItem {
     pub stroke_widths: ComponentData<Width>,
     pub stroke_rgbas: ComponentData<Rgba>,
     pub fill_rgbas: ComponentData<Rgba>,
+}
+
+impl HasTransform3d<VPoint> for VItem {
+    fn get(&self) -> &ComponentData<VPoint> {
+        &self.vpoints
+    }
+    fn get_mut(&mut self) -> &mut ComponentData<VPoint> {
+        &mut self.vpoints
+    }
 }
 
 impl VItem {
@@ -55,6 +68,100 @@ impl Entity for VItem {
 
     fn extract(&self) -> Option<Self::ExtractData> {
         Some(self.clone())
+    }
+}
+
+// MARK: Anim traits impl
+
+impl Alignable for VItem {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.vpoints.is_aligned(&other.vpoints)
+            && self.stroke_widths.is_aligned(&other.stroke_widths)
+            && self.stroke_rgbas.is_aligned(&other.stroke_rgbas)
+            && self.fill_rgbas.is_aligned(&other.fill_rgbas)
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        self.vpoints.align_with(&mut other.vpoints);
+        self.stroke_rgbas.align_with(&mut other.stroke_rgbas);
+        self.stroke_widths.align_with(&mut other.stroke_widths);
+        self.fill_rgbas.align_with(&mut other.fill_rgbas);
+    }
+}
+
+impl Interpolatable for VItem {
+    fn lerp(&self, target: &Self, t: f32) -> Self {
+        let vpoints = self.vpoints.lerp(&target.vpoints, t);
+        let stroke_rgbas = self.stroke_rgbas.lerp(&target.stroke_rgbas, t);
+        let stroke_widths = self.stroke_widths.lerp(&target.stroke_widths, t);
+        let fill_rgbas = self.fill_rgbas.lerp(&target.fill_rgbas, t);
+        Self {
+            vpoints,
+            stroke_widths,
+            stroke_rgbas,
+            fill_rgbas,
+        }
+    }
+}
+
+impl Opacity for VItem {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.stroke_rgbas.set_opacity(opacity);
+        self.fill_rgbas.set_opacity(opacity);
+        self
+    }
+}
+
+impl Partial for VItem {
+    fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
+        let vpoints = self.vpoints.get_partial(range.clone());
+        let stroke_rgbas = self.stroke_rgbas.get_partial(range.clone());
+        let stroke_widths = self.stroke_widths.get_partial(range.clone());
+        let fill_rgbas = self.fill_rgbas.get_partial(range.clone());
+        Self {
+            vpoints,
+            stroke_widths,
+            stroke_rgbas,
+            fill_rgbas,
+        }
+    }
+}
+
+impl Empty for VItem {
+    fn empty() -> Self {
+        Self {
+            vpoints: Vec::<Vec3>::new().into(),
+            stroke_widths: Vec::<f32>::new().into(),
+            stroke_rgbas: Vec::<Vec4>::new().into(),
+            fill_rgbas: Vec::<Vec4>::new().into(),
+        }
+    }
+}
+
+impl Fill for VItem {
+    fn set_fill_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
+        let rgba = LinearRgba::from(color).to_vec4();
+        self.fill_rgbas.set_all(color);
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.fill_rgbas.set_opacity(opacity);
+        self
+    }
+}
+
+impl Stroke for VItem {
+    fn set_stroke_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
+        let rgba = LinearRgba::from(color).to_vec4();
+        self.stroke_rgbas.set_all(color);
+        self
+    }
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.stroke_rgbas.set_opacity(opacity);
+        self
+    }
+    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+        self.stroke_widths.set_all(width);
+        self
     }
 }
 
@@ -148,7 +255,6 @@ pub struct ArcBetweenPoints {
     pub start: Vec3,
     pub end: Vec3,
     pub angle: f32,
-    pub stroke_width: f32,
 }
 
 impl Blueprint<VItem> for ArcBetweenPoints {

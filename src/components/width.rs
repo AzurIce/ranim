@@ -1,3 +1,5 @@
+use crate::prelude::Interpolatable;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Width(pub f32);
@@ -22,6 +24,13 @@ impl From<f32> for Width {
         Self(value)
     }
 }
+
+impl Interpolatable for Width {
+    fn lerp(&self, target: &Self, t: f32) -> Self {
+        Self(self.0.lerp(&target.0, t))
+    }
+}
+
 
 // impl Deref for Width {
 //     type Target = f32;

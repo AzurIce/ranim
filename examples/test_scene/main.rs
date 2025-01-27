@@ -3,7 +3,7 @@ use std::time::Duration;
 use env_logger::Env;
 use glam::{vec2, vec3};
 use ranim::{
-    animation::{creation, transform::Transform},
+    animation::{creation, interpolate::Interpolate},
     items::vitem::{Square, VItem},
     prelude::*,
     rabject::rabject3d::RabjectEntity3d,

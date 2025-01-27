@@ -1,4 +1,3 @@
-use std::default;
 use std::time::{Duration, Instant};
 
 use bevy_color::{Alpha, Srgba};
@@ -6,7 +5,7 @@ use env_logger::Env;
 use glam::vec2;
 use log::info;
 use ranim::animation::fading;
-use ranim::items::vitem::{Arc, VItem};
+use ranim::items::vitem::Arc;
 // use ranim::rabject::rabject3d::RabjectEntity3d;
 use ranim::{prelude::*, Scene};
 
@@ -39,25 +38,24 @@ impl Scene for ArcScene {
                 let angle = std::f32::consts::PI * j as f32 / (ncol - 1) as f32 * 360.0 / 180.0;
                 let radius = step_y / 2.0;
                 let color = start_color.lerp(&end_color, i as f32 / (nrow - 1) as f32);
-                let offset = frame_start + vec2(
-                    j as f32 * step_x + step_x / 2.0 + j as f32 * gap + padding,
-                    i as f32 * step_y + step_y / 2.0 + i as f32 * gap + padding,
-                );
+                let offset = frame_start
+                    + vec2(
+                        j as f32 * step_x + step_x / 2.0 + j as f32 * gap + padding,
+                        i as f32 * step_y + step_y / 2.0 + i as f32 * gap + padding,
+                    );
                 let mut arc = Arc { angle, radius }.build();
                 arc.stroke_widths.set_all(10.0 * j as f32);
 
                 arc.stroke_rgbas.set_all(color);
                 arc.fill_rgbas.set_all(color.with_alpha(0.0));
                 arc.vpoints.shift(offset.extend(0.0));
-                let arc = app.insert(arc);
-                app.wait(Duration::from_secs_f32(0.02));
-                // let _arc = scene.play_in_canvas(
-                //     &canvas,
-                //     arc,
-                //     fading::fade_in().config(|config| {
-                //         config.set_run_time(Duration::from_secs_f32(0.02));
-                //     }),
-                // );
+                // let arc = app.insert(arc);
+                let _arc = app.play(
+                    arc,
+                    fading::fade_in().config(|config| {
+                        config.set_run_time(Duration::from_secs_f32(0.5));
+                    }),
+                );
             }
             info!("row [{i}/{nrow}] cost: {:?}", t.elapsed());
         }

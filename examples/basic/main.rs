@@ -9,7 +9,7 @@ use ranim::rabject::rabject2d::vmobject::{
     geometry::{Arc, Polygon},
     svg::Svg,
 };
-use ranim::{animation::transform::Transform, scene::SceneBuilder};
+use ranim::{animation::interpolate::Interpolate, scene::SceneBuilder};
 use ranim::{prelude::*, typst_svg};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -53,14 +53,14 @@ fn main() {
 
     // 0.5s wait -> fade in -> 0.5s wait
     scene.wait(Duration::from_secs_f32(0.5));
-    let polygon = scene.play_in_canvas(&canvas, ranim_text, Transform::new(polygon));
+    let polygon = scene.play_in_canvas(&canvas, ranim_text, Interpolate::new(polygon));
     scene.wait(Duration::from_secs_f32(0.5));
 
     let mut svg = Svg::from_svg(SVG).build();
     svg.shift(center);
 
     info!("polygon transform to svg");
-    let svg = scene.play_in_canvas(&canvas, polygon, Transform::new(svg.clone()));
+    let svg = scene.play_in_canvas(&canvas, polygon, Interpolate::new(svg.clone()));
     scene.wait(Duration::from_secs_f32(0.5));
 
     let mut arc = Arc::new(std::f32::consts::PI / 2.0)
@@ -70,7 +70,7 @@ fn main() {
     arc.set_color(Srgba::hex("58C4DDFF").unwrap()).shift(center);
 
     info!("svg transform to arc");
-    let arc = scene.play_in_canvas(&canvas, svg, Transform::new(arc.clone()));
+    let arc = scene.play_in_canvas(&canvas, svg, Interpolate::new(arc.clone()));
     scene.wait(Duration::from_secs_f32(0.5));
 
     info!("arc fade_out");
