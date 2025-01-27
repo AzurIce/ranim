@@ -517,13 +517,10 @@ mod test {
 
     use super::*;
     use crate::{
-        context::RanimContext,
-        items::{
+        context::RanimContext, items::{
             vitem::{Arc, Polygon, Square, VItem},
             Blueprint,
-        },
-        // rabject::rabject3d::RabjectEntity3d,
-        world::{Store, World},
+        }, prelude::{Partial, Stroke}, world::{Store, World}
     };
 
     #[test]
@@ -531,30 +528,25 @@ mod test {
         env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
         let mut ctx = RanimContext::new();
         let mut world = World::new();
-        // let vitem: RabjectEntity3d<VItem> = Square(100.0).build().into();
-        // let id = world.insert(vitem);
-        // let vitem: RabjectEntity3d<VItem> = Arc {
-        //     angle: std::f32::consts::PI / 4.0,
-        //     radius: 300.0,
-        // }
-        // .build()
-        // .into();
-        // let vitem = VItem::from_vpoints(vec![
-        //     vec3(0.0, 0.0, 0.0),
-        //     vec3(50.0, 100.0, 0.0),
-        //     vec3(100.0, 0.0, 0.0),
-        // ]);
-        let mut vitem = Square(100.0).build();
-        vitem.vpoints.shift(vec3(-200.0, 0.0, 0.0));
-        world.insert(vitem);
-        let vitem = Polygon(vec![
-            vec3(-100.0, -300.0, 0.0),
-            vec3(-100.0, 0.0, 0.0),
-            vec3(0.0, 300.0, 0.0),
-            vec3(200.0, 300.0, 0.0),
-            vec3(200.0, -300.0, 0.0),
-        ])
-        .build();
+        // let mut vitem = Square(100.0).build();
+        // vitem.vpoints.shift(vec3(-200.0, 0.0, 0.0));
+        // world.insert(vitem);
+        // let vitem = Polygon(vec![
+        //     vec3(-100.0, -300.0, 0.0),
+        //     vec3(-100.0, 0.0, 0.0),
+        //     vec3(0.0, 300.0, 0.0),
+        //     vec3(200.0, 300.0, 0.0),
+        //     vec3(200.0, -300.0, 0.0),
+        // ])
+        // .build();
+        let mut vitem = Arc {
+            angle: std::f32::consts::FRAC_PI_2,
+            radius: 200.0
+        }.build();
+        vitem.set_stroke_width(20.0);
+
+        // let vitem = vitem.get_partial(0.0..0.4);
+
         let id = world.insert(vitem);
         world.extract();
         world.prepare(&ctx);
