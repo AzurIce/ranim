@@ -67,7 +67,15 @@ impl Entity for VItem {
     type Primitive = VItemPrimitive;
 
     fn extract(&self) -> Option<Self::ExtractData> {
-        Some(self.clone())
+        if self.vpoints.len() < 3
+            || self.fill_rgbas.is_empty()
+            || self.stroke_rgbas.is_empty()
+            || self.stroke_widths.is_empty()
+        {
+            Some(Self::empty())
+        } else {
+            Some(self.clone())
+        }
     }
 }
 
@@ -129,10 +137,10 @@ impl Partial for VItem {
 impl Empty for VItem {
     fn empty() -> Self {
         Self {
-            vpoints: Vec::<Vec3>::new().into(),
-            stroke_widths: Vec::<f32>::new().into(),
-            stroke_rgbas: Vec::<Vec4>::new().into(),
-            fill_rgbas: Vec::<Vec4>::new().into(),
+            vpoints: vec![Vec3::ZERO; 3].into(),
+            stroke_widths: vec![0.0, 0.0].into(),
+            stroke_rgbas: vec![Vec4::ZERO; 2].into(),
+            fill_rgbas: vec![Vec4::ZERO; 2].into(),
         }
     }
 }

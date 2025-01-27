@@ -112,6 +112,7 @@ impl Primitive for VItemPrimitive {
         // trace!("update, data.fill_rgbas: {:?}", data.fill_rgbas);
         // trace!("points3d len: {}", self.points3d_buffer.len());
         // trace!("points2d len: {}", self.points3d_buffer.len());
+        self.vitem = data.clone();
         self.points3d_buffer
             .set(wgpu_ctx, &data.get_render_points());
         self.fill_rgbas.set(wgpu_ctx, &data.fill_rgbas);
@@ -136,7 +137,7 @@ impl Primitive for VItemPrimitive {
             .cartesian_product([-1, 1])
             .cartesian_product([-1, 1])
             .map(|((x, y), z)| {
-                trace!("{x} {y} {z}");
+                // trace!("{x} {y} {z}");
                 self.vitem.vpoints.get_bounding_box_point(ivec3(x, y, z))
             })
             .map(|p| {

@@ -184,7 +184,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
     }
 
     pub(crate) fn set(&mut self, ctx: &WgpuContext, data: &[T]) {
-        trace!("{} {}", self.inner.len(), data.len());
+        // trace!("{} {}", self.inner.len(), data.len());
         self.inner.resize(data.len(), T::default());
         self.inner.copy_from_slice(data);
 
