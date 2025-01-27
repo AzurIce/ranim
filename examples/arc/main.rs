@@ -59,14 +59,13 @@ impl Scene for ArcScene {
             }
             info!("row [{i}/{nrow}] cost: {:?}", t.elapsed());
         }
-        info!("total cost: {:?}", t.elapsed());
 
-        // info!(
-        //     "Rendered {} frames({}s) in {:?}",
-        //     scene.frame_count,
-        //     scene.time,
-        //     t.elapsed()
-        // );
+        info!(
+            "Rendered {} frames({}s) in {:?}",
+            app.frame_cnt(),
+            app.frame_time(),
+            t.elapsed()
+        );
     }
 }
 
