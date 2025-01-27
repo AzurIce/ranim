@@ -5,76 +5,95 @@ use std::{
 
 use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3};
 
-use crate::prelude::Alignable;
+use crate::prelude::{Alignable, Interpolatable, Partial};
 
 pub mod point;
 pub mod rgba;
 pub mod vpoint;
 pub mod width;
 
-pub struct ComponentData<T>(Vec<T>);
+#[derive(Default, Clone)]
+pub struct ComponentData<T: Default + Clone>(Vec<T>);
 
-impl<T: Debug> Debug for ComponentData<T> {
+impl<T: Default + Clone> Partial for ComponentData<T> {
+    fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
+        let start = (range.start * self.len() as f32).floor() as usize;
+        let end = (range.end * self.len() as f32).floor() as usize;
+        Self(self.get(start..end).unwrap().to_vec())
+    }
+}
+
+impl<T: Default + Clone> Alignable for ComponentData<T> {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.len() == other.len()
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        if self.len() == other.len() {
+            return;
+        }
+        if self.len() < other.len() {
+            self.resize_with_last(other.len());
+        } else {
+            other.resize_with_last(self.len());
+        }
+    }
+}
+
+impl<T: Default + Clone + Interpolatable> Interpolatable for ComponentData<T> {
+    fn lerp(&self, target: &Self, t: f32) -> Self {
+        Self(
+            self.iter()
+                .zip(target.iter())
+                .map(|(a, b)| a.lerp(b, t))
+                .collect::<Vec<_>>(),
+        )
+    }
+}
+
+impl<T: Default + Clone + Debug> Debug for ComponentData<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl<T: Clone> Clone for ComponentData<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl<T, I: IntoIterator<Item = impl Into<T>>> From<I> for ComponentData<T> {
+impl<T: Default + Clone, I: IntoIterator<Item = impl Into<T>>> From<I> for ComponentData<T> {
     fn from(v: I) -> Self {
         Self(v.into_iter().map(Into::into).collect())
     }
 }
 
-impl<T> AsRef<[T]> for ComponentData<T> {
+impl<T: Default + Clone> AsRef<[T]> for ComponentData<T> {
     fn as_ref(&self) -> &[T] {
         &self.0
     }
 }
 
-impl<T> AsRef<Vec<T>> for ComponentData<T> {
+impl<T: Default + Clone> AsRef<Vec<T>> for ComponentData<T> {
     fn as_ref(&self) -> &Vec<T> {
         &self.0
     }
 }
 
-impl<T> AsMut<Vec<T>> for ComponentData<T> {
+impl<T: Default + Clone> AsMut<Vec<T>> for ComponentData<T> {
     fn as_mut(&mut self) -> &mut Vec<T> {
         &mut self.0
     }
 }
 
-impl<T> Deref for ComponentData<T> {
+impl<T: Default + Clone> Deref for ComponentData<T> {
     type Target = Vec<T>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<T> DerefMut for ComponentData<T> {
+impl<T: Default + Clone> DerefMut for ComponentData<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T: Alignable> Alignable for ComponentData<T> {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().zip(other.iter()).all(|(a, b)| a.is_aligned(b))
-    }
-    fn align_with(&mut self, other: &mut Self) {
-        for (a, b) in self.iter_mut().zip(other.iter_mut()) {
-            a.align_with(b);
-        }
-    }
-}
-
-impl<T> ComponentData<T> {
+impl<T: Default + Clone> ComponentData<T> {
     pub fn extend_from_vec(&mut self, vec: Vec<T>) {
         self.0.extend(vec);
     }
@@ -126,12 +145,17 @@ impl TransformAnchor {
 }
 
 // MARK: Transform3d
+pub trait HasTransform3d<T: Transform3d + Default + Clone> {
+    fn get(&self) -> &ComponentData<T>;
+    fn get_mut(&mut self) -> &mut ComponentData<T>;
+}
+
 pub trait Transform3d {
     fn position(&self) -> Vec3;
     fn position_mut(&mut self) -> &mut Vec3;
 }
 
-impl<T: Transform3d> ComponentData<T> {
+impl<T: Transform3d + Default + Clone> ComponentData<T> {
     pub fn get_start_position(&self) -> Option<Vec3> {
         self.first().map(|p| p.position())
     }

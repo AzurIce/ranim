@@ -2,6 +2,9 @@ use std::ops::{Deref, DerefMut};
 
 use glam::Vec3;
 
+use crate::prelude::Alignable;
+use crate::prelude::Interpolatable;
+
 use super::Transform3d;
 
 use super::ComponentData;
@@ -45,6 +48,13 @@ impl Transform3d for VPoint {
         &mut self.0
     }
 }
+
+impl Interpolatable for VPoint {
+    fn lerp(&self, target: &Self, t: f32) -> Self {
+        Self(self.0.lerp(target.0, t))
+    }
+}
+
 
 impl ComponentData<VPoint> {
     pub fn get_closepath_flags(&self) -> Vec<bool> {

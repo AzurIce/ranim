@@ -96,7 +96,7 @@ pub mod prelude {
 
     pub use crate::animation::creation::{Empty, Fill, Partial, Stroke};
     pub use crate::animation::fading::Opacity;
-    pub use crate::animation::transform::Alignable;
+    pub use crate::animation::interpolate::Alignable;
 
     pub use crate::RenderScene;
     pub use crate::items::Blueprint;
@@ -147,6 +147,8 @@ impl<T: Scene> RenderScene for T {
 
 // MARK: RanimApp Trait
 pub trait RanimApp {
+    fn frame_cnt(&self) -> u32;
+    fn frame_time(&self) -> f32;
     /// Play an animation
     ///
     /// The different target_type is corresponding to different [`AnimateTarget`]:
@@ -182,23 +184,6 @@ pub trait RanimApp {
         animation: Animation<E>,
     );
 
-    // /// Play an animation in a canvas
-    // ///
-    // /// Same like [`Scene::play`], but the animation will be played in a canvas
-    // ///
-    // /// See [`Animation`] and [`crate::updater::Updater`].
-    // fn play_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static, T: Into<AnimateTarget<E>>>(
-    //     &mut self,
-    //     canvas_id: &EntityId<Canvas>,
-    //     target: T,
-    //     animation: Animation<E>,
-    // ) -> EntityId<E>;
-    // fn play_remove_in_canvas<E: Entity<Renderer = CanvasCamera> + 'static>(
-    //     &mut self,
-    //     canvas_id: &EntityId<Canvas>,
-    //     target_id: EntityId<E>,
-    //     animation: Animation<E>,
-    // );
     // fn center_canvas_in_frame(&mut self, canvas_id: &EntityId<Canvas>);
     fn wait(&mut self, duration: Duration);
     // fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas>;
@@ -359,6 +344,12 @@ impl RanimRenderApp {
 
 /// MARK: RanimRenderApp's RanimApp impl
 impl RanimApp for RanimRenderApp {
+    fn frame_cnt(&self) -> u32 {
+        self.frame_count
+    }
+    fn frame_time(&self) -> f32 {
+        self.tick_duration().as_secs_f32() * self.frame_count as f32
+    }
     fn get<T: Entity + 'static>(&self, id: &EntityId<T>) -> &EntityCell<T> {
         self.world.get(id)
     }

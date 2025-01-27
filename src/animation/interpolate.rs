@@ -5,9 +5,9 @@ use crate::items::Updatable;
 use super::{Animation, AnimationFunc};
 
 /// A transform animation func
-pub struct Transform<R: Alignable + Interpolatable> {
-    aligned_source: Option<R>,
-    aligned_target: R,
+pub struct Interpolate<T: Alignable + Interpolatable> {
+    aligned_source: Option<T>,
+    aligned_target: T,
 }
 
 /// A trait for aligning two rabjects
@@ -21,8 +21,8 @@ pub trait Alignable {
     fn align_with(&mut self, other: &mut Self);
 }
 
-impl<R: Alignable + Interpolatable + Clone + 'static> Transform<R> {
-    pub fn new(target: R) -> Animation<R> {
+impl<T: Alignable + Interpolatable + Clone + 'static> Interpolate<T> {
+    pub fn new(target: T) -> Animation<T> {
         let aligned_target = target.into();
 
         Animation::new(Self {
@@ -32,7 +32,7 @@ impl<R: Alignable + Interpolatable + Clone + 'static> Transform<R> {
     }
 }
 
-impl<T: Alignable + Interpolatable + Clone> AnimationFunc<T> for Transform<T> {
+impl<T: Alignable + Interpolatable + Clone> AnimationFunc<T> for Interpolate<T> {
     fn init(&mut self, entity: &mut T) {
         let mut aligned_source = entity.clone();
         if !aligned_source.is_aligned(&self.aligned_target) {

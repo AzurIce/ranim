@@ -190,6 +190,8 @@ impl<T: Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static> Anim
     }
 }
 
+// MARK: Traits
+
 pub trait Partial {
     fn get_partial(&self, range: Range<f32>) -> Self;
 }
@@ -208,3 +210,13 @@ pub trait Stroke {
     fn set_stroke_color(&mut self, color: Srgba) -> &mut Self;
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self;
 }
+
+pub trait Color: Fill + Stroke {
+    fn set_color(&mut self, color: Srgba) -> &mut Self {
+        self.set_fill_color(color);
+        self.set_stroke_color(color);
+        self
+    }
+}
+
+impl<T: Fill + Stroke> Color for T {}

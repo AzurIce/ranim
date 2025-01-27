@@ -2,9 +2,9 @@ use std::ops::{Deref, DerefMut};
 
 use glam::Vec3;
 
-use crate::prelude::Alignable;
+use crate::prelude::Interpolatable;
 
-use super::{ComponentData, Transform3d};
+use super::Transform3d;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point(Vec3);
@@ -35,6 +35,12 @@ impl DerefMut for Point {
     }
 }
 
+impl Interpolatable for Point {
+    fn lerp(&self, target: &Self, t: f32) -> Self {
+        Self(self.0.lerp(target.0, t))
+    }
+}
+
 impl Transform3d for Point {
     fn position(&self) -> Vec3 {
         self.0
@@ -45,22 +51,8 @@ impl Transform3d for Point {
     }
 }
 
-impl Alignable for ComponentData<Point> {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.len() == other.len()
-    }
-    fn align_with(&mut self, other: &mut Self) {
-        if self.len() < other.len() {
-            self.resize_with_last(other.len());
-        } else {
-            other.resize_with_last(self.len());
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     #[allow(unused)]
     use super::*;
-
 }
