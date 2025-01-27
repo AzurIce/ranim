@@ -62,9 +62,9 @@ impl Scene for MainScene {
 
         let mut arc = Arc {
             angle: std::f32::consts::PI / 2.0,
-            radius: 500.0,
+            radius: 300.0,
         }.build();
-        arc.set_color(Srgba::hex("58C4DDFF").unwrap()).set_stroke_width(20.0);
+        arc.set_color(Srgba::hex("58C4DDFF").unwrap()).set_stroke_width(40.0);
 
         info!("polygon transform to arc");
         let arc = app.play(polygon, Interpolate::new(arc.clone()));

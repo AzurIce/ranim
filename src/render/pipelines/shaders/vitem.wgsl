@@ -10,6 +10,8 @@ struct CameraUniforms {
 @group(1) @binding(2) var<storage> stroke_rgbas: array<vec4<f32>>;
 @group(1) @binding(3) var<storage> stroke_widths: array<f32>;
 
+const ANTI_ALIAS_WIDTH: f32 = 0.015;
+
 fn point(idx: u32) -> vec2<f32> {
     return points[idx].xy;
 }
@@ -61,6 +63,7 @@ fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
 
 fn distance_bezier(pos: vec2<f32>, A: vec2<f32>, _B: vec2<f32>, C: vec2<f32>) -> f32 {
     var B = mix(_B + vec2(1e-4), _B, abs(sign(_B * 2.0 - A - C)));
+    // var B = _B;
 
     let a = B - A;
     let b = A - B * 2.0 + C;
@@ -77,9 +80,9 @@ fn distance_bezier(pos: vec2<f32>, A: vec2<f32>, _B: vec2<f32>, C: vec2<f32>) ->
 
     var ppos = A + (c + b * t.x) * t.x;
     var dis = length(ppos - pos);
-    ppos = A + (c + b * t.y) + t.y;
+    ppos = A + (c + b * t.y) * t.y;
     dis = min(dis, length(ppos - pos));
-    ppos = A + (c + b * t.z) + t.z;
+    ppos = A + (c + b * t.z) * t.z;
     dis = min(dis, length(ppos - pos));
 
     return dis;
@@ -180,7 +183,7 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     }
 
     let sgn_d = sgn * d;
-    // return vec4(vec3(sgn_d), 1.0);
+    // return vec4(vec3(d), 1.0);
 
     let e = point(idx + 1u).xy - point(idx).xy;
     let w = pos.xy - point(idx).xy;
@@ -189,11 +192,11 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
 
     // TODO: Antialias and clip_box
     var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[anchor_index], fill_rgbas[anchor_index + 1], ratio), is_closed(idx));
-    fill_rgba.a *= smoothstep(1.0, -1.0, (sgn_d));
+    fill_rgba.a *= smoothstep(1.0, -1.0, (sgn_d) / ANTI_ALIAS_WIDTH);
 
     let stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
     var stroke_rgba: vec4<f32> = mix(stroke_rgbas[anchor_index], stroke_rgbas[anchor_index + 1], ratio);
-    stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width));
+    stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width) / ANTI_ALIAS_WIDTH);
 
     var f_color = blend_color(stroke_rgba, fill_rgba);
 
@@ -214,8 +217,8 @@ fn render_control_points(pos: vec2<f32>) -> vec4<f32> {
 fn fs_main(@location(0) pos: vec2<f32>) -> @location(0) vec4<f32> {
     var f_color: vec4<f32> = vec4(1.0, 0.0, 0.0, 1.0);
     f_color = render(pos);
-    // let attr = get_subpath_attr(pos, 0u);
-    // f_color = vec4(f32(attr.sgn));
+    // let attr = get_subpath_attr(pos, 14u);
+    // f_color = vec4(f32(attr.d));
     // f_color = blend_color(f_color, render_control_points(pos));
     return f_color;
 }
