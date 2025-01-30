@@ -517,10 +517,14 @@ mod test {
 
     use super::*;
     use crate::{
-        context::RanimContext, items::{
+        context::RanimContext,
+        items::{
             vitem::{Arc, Polygon, Square, VItem},
             Blueprint,
-        }, prelude::{Partial, Stroke}, world::{Store, World}
+        },
+        prelude::{Partial, Stroke},
+        utils::bezier::PathBuilder,
+        world::{Store, World},
     };
 
     #[test]
@@ -539,11 +543,30 @@ mod test {
         //     vec3(200.0, -300.0, 0.0),
         // ])
         // .build();
-        let mut vitem = Arc {
-            angle: std::f32::consts::FRAC_PI_2,
-            radius: 200.0
-        }.build();
-        vitem.set_stroke_width(20.0);
+        let mut builder = PathBuilder::new();
+        builder
+            .move_to(vec3(0.0, 0.0, 0.0))
+            .line_to(vec3(1.0, 1.0, 0.0))
+            .quad_to(vec3(1.0, 2.0, 0.0), vec3(0.0, 2.0, 0.0))
+            .cubic_to(
+                vec3(-2.0, 2.0, 0.0),
+                vec3(1.0, 4.0, 0.0),
+                vec3(0.0, 0.0, 0.0),
+            );
+        let vpoints = builder
+            .vpoints()
+            .to_vec()
+            .into_iter()
+            .map(|p| p * 50.0)
+            .collect::<Vec<_>>();
+        println!("{:?}", vpoints);
+        let mut vitem = VItem::from_vpoints(vpoints);
+        // let mut vitem = Arc {
+        //     angle: std::f32::consts::FRAC_PI_2,
+        //     radius: 200.0,
+        // }
+        // .build();
+        // vitem.set_stroke_width(20.0);
 
         // let vitem = vitem.get_partial(0.0..0.4);
 
