@@ -1,23 +1,92 @@
-use glam::Vec3;
+use glam::{Vec3, Vec3Swizzles};
 
-use crate::prelude::Interpolatable;
+use crate::{
+    prelude::Interpolatable,
+    utils::math::{cross2d, intersection},
+};
 
-pub fn point_on_cubic_bezier(points: &[Vec3; 4], t: f32) -> Vec3 {
-    let t = t.clamp(0.0, 1.0);
-    let p0 = points[0].lerp(points[1], t);
-    let p1 = points[1].lerp(points[2], t);
-    let p2 = points[2].lerp(points[3], t);
+/// A path builder based on quadratic beziers
+pub struct PathBuilder {
+    start_point: Option<Vec3>,
+    points: Vec<Vec3>,
+}
 
-    let p0 = p0.lerp(p1, t);
-    let p1 = p1.lerp(p2, t);
+impl PathBuilder {
+    pub fn new() -> Self {
+        Self {
+            start_point: None,
+            points: Vec::new(),
+        }
+    }
 
-    p0.lerp(p1, t)
+    /// Starts a new subpath and push the point as the start_point
+    pub fn move_to(&mut self, point: Vec3) -> &mut Self {
+        self.start_point = Some(point);
+        if let Some(end) = self.points.last() {
+            self.points.extend_from_slice(&[*end, point]);
+        } else {
+            self.points.push(point);
+        }
+        self
+    }
+
+    fn assert_started(&self) {
+        assert!(
+            self.start_point.is_some() || self.points.is_empty(),
+            "A path have to start with move_to"
+        );
+    }
+
+    /// Append a line
+    pub fn line_to(&mut self, p: Vec3) -> &mut Self {
+        self.assert_started();
+        let mid = (self.points.last().unwrap() + p) / 2.0;
+        self.points.extend_from_slice(&[mid, p]);
+        self
+    }
+
+    /// Append a quadratic bezier
+    pub fn quad_to(&mut self, h: Vec3, p: Vec3) -> &mut Self {
+        self.assert_started();
+        self.points.extend_from_slice(&[h, p]);
+        self
+    }
+
+    /// Append a cubic bezier
+    pub fn cubic_to(&mut self, h1: Vec3, h2: Vec3, p: Vec3) -> &mut Self {
+        self.assert_started();
+        let cur = self.points.last().unwrap();
+        if cur.distance_squared(h1) < f32::EPSILON || h1.distance_squared(h2) < f32::EPSILON {
+            return self.quad_to(h2, p);
+        }
+        if h2.distance_squared(p) < f32::EPSILON {
+            return self.quad_to(h1, p);
+        }
+
+        let quads = approx_cubic_with_quadratic([*cur, h1, h2, p]);
+        self.points
+            .extend(quads.into_iter().flat_map(|beziers| beziers[1..].to_vec()));
+
+        self
+    }
+
+    pub fn close_path(&mut self) -> &mut Self {
+        self.assert_started();
+        if let Some(start) = self.start_point {
+            self.line_to(start);
+        }
+        self
+    }
+
+    pub fn vpoints(&self) -> &[Vec3] {
+        &self.points
+    }
 }
 
 pub fn split_cubic_bezier(bezier: &[Vec3; 4], t: f32) -> ([Vec3; 4], [Vec3; 4]) {
     let [p0, h0, h1, p1] = bezier;
 
-    let split_point = &point_on_cubic_bezier(bezier, t);
+    let split_point = &cubic_bezier_eval(bezier, t);
 
     let h00 = p0.lerp(*h0, t);
     let h01 = p0.lerp(*h0, t).lerp(h0.lerp(*h1, t), t);
@@ -58,6 +127,96 @@ pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f32, b: f
     let end_prop = (b - a) / (1.0 - a);
     let h1 = h0.lerp(&h1_prime, end_prop);
     [h0, h1, h2]
+}
+
+pub fn cubic_bezier_eval(bezier: &[Vec3; 4], t: f32) -> Vec3 {
+    let t = t.clamp(0.0, 1.0);
+    let p0 = bezier[0].lerp(bezier[1], t);
+    let p1 = bezier[1].lerp(bezier[2], t);
+    let p2 = bezier[2].lerp(bezier[3], t);
+
+    let p0 = p0.lerp(p1, t);
+    let p1 = p1.lerp(p2, t);
+
+    p0.lerp(p1, t)
+}
+
+pub fn quad_bezier_eval(bezier: &[Vec3; 3], t: f32) -> Vec3 {
+    let t = t.clamp(0.0, 1.0);
+    let p0 = bezier[0].lerp(bezier[1], t);
+    let p1 = bezier[1].lerp(bezier[2], t);
+
+    p0.lerp(p1, t)
+}
+
+/// Approx a cubic bezier with quadratic bezier
+///
+/// [Vec3; 4] is [p1, h1, h2, p2]
+pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
+    let [p1, h1, h2, p2] = cubic;
+
+    let p = h1 - p1;
+    let q = h2 - 2. * h1 + p1;
+    let r = p2 - 3. * h2 + 3. * h1 - p1;
+
+    let a = cross2d(q.xy(), r.xy());
+    let b = cross2d(p.xy(), r.xy());
+    let c = cross2d(p.xy(), q.xy());
+    let disc = b * b - 4. * a * c;
+    let sqrt_disc = disc.sqrt();
+
+    println!("{} {} {}, disc: {}", a, b, c, disc);
+    let root = if a == 0.0 && b == 0.0 || a != 0.0 && disc < 0.0 {
+        0.5
+    } else if a == 0.0 {
+        -c / b
+    } else {
+        let mut root = (-b + sqrt_disc) / (2. * a);
+        if root <= 0.0 || root >= 1.0 {
+            root = (b + sqrt_disc) / (-2. * a);
+        }
+        if root <= 0.0 || root >= 1.0 {
+            root = 0.5
+        }
+        root
+    };
+    println!("{root}");
+
+    let cut_point = cubic_bezier_eval(&cubic, root);
+    let cut_tangent = quad_bezier_eval(&[h1 - p1, h2 - h1, p2 - h2], root);
+    let p1_tangent = h1 - p1;
+    let p2_tangent = p2 - h2;
+
+    let i1 = intersection(p1, p1_tangent, cut_point, cut_tangent);
+    let i2 = intersection(p2, p2_tangent, cut_point, cut_tangent);
+    // TODO: Make this better
+    // There is a possibility that cut_tangent equals to p1_tangent or p2_tangent
+    // Example:
+    // ```rust
+    // PathBuilder::new()
+    //     .move_to(vec3(0.0, 2.0, 0.0))
+    //     .cubic_to(
+    //         vec3(-2.0, 2.0, 0.0),
+    //         vec3(1.0, 4.0, 0.0),
+    //         vec3(0.0, 0.0, 0.0),
+    //     )
+    // ```
+    let (Some(i1), Some(i2)) = (i1, i2) else {
+        let root = if root > 0.5 {
+            root / 2.0
+        } else {
+            0.5 + (1.0 - root) / 2.0
+        };
+        let cut_point = cubic_bezier_eval(&cubic, root);
+        let cut_tangent = quad_bezier_eval(&[h1 - p1, h2 - h1, p2 - h2], root);
+        let p1_tangent = h1 - p1;
+        let p2_tangent = p2 - h2;
+        let i1 = intersection(p1, p1_tangent, cut_point, cut_tangent).unwrap();
+        let i2 = intersection(p2, p2_tangent, cut_point, cut_tangent).unwrap();
+        return vec![[p1, i1, cut_point], [cut_point, i2, p2]];
+    };
+
+    vec![[p1, i1, cut_point], [cut_point, i2, p2]]
 }
 
 // pub fn divide_segment_to_n_part(segment: PathSeg, n: usize) -> Vec<PathSeg> {

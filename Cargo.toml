@@ -22,7 +22,7 @@ itertools = "0.14"
 log = "0.4.25"
 pollster = "0.4.0"
 uuid = { version = "1.12.1", features = ["v4"] }
-wgpu = "24.0.0"
+wgpu = "24.0.1"
 anyhow = "1.0.95"
 bevy_color = "0.15.2"
 usvg = "0.44.0"

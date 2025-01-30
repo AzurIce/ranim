@@ -1,6 +1,7 @@
 use crate::render::primitives::Primitive;
 
 pub mod vitem;
+pub mod svg_item;
 
 pub trait Entity {
     type ExtractData;
