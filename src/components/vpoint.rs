@@ -2,7 +2,6 @@ use std::ops::{Deref, DerefMut};
 
 use glam::Vec3;
 
-use crate::prelude::Alignable;
 use crate::prelude::Interpolatable;
 
 use super::Transform3d;

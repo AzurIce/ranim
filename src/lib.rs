@@ -1,105 +1,29 @@
-//! Ranim is an animation engine written in rust, using [`wgpu`] and [`vello`].
-//!
-//! # Getting Started
-//!
-//! Every thing starts with a [`scene::Scene`], which handles the update
-//! and render of [`scene::Entity`]s.
-//!
-//! To create a scene, use [`scene::SceneBuilder`]:
-//!
-//! ```rust
-//! let mut scene = SceneBuilder::new("scene-hello").build();
-//! ```
-//!
-//! A scene implements [`std::ops::Deref`] to a [`scene::EntityStore`], which stores entities.
-//!
-//! You can treat it as a [`HashMap`](std::collections::HashMap) with [`scene::EntityId`] as the key,
-//! and the [`scene::Entity`] as the value, it has the following methods:
-//! - [`insert`](scene::EntityStore::insert):
-//!   Insert an [`Entity`](scene::Entity) into the store, and returns a new [`EntityId`](scene::EntityId)
-//! - [`remove`](scene::EntityStore::remove):
-//!   Consumes an [`EntityId`](scene::EntityId) and remove the corresponding [`Entity`](scene::Entity) from the store.
-//! - [`get`](scene::EntityStore::get) and [`get_mut`](scene::EntityStore::get_mut):
-//!   Get the reference of an [`Entity`](scene::Entity) by a reference of [`EntityId`](scene::EntityId).
-//!
-//! The [`scene::Scene`] in Ranim is 3d, it can only render 3d objects.
-//! However, there is a similar structure called [`scene::canvas::Canvas`], which is basically
-//! a 2d scene and can render 2d objects while itself can be rendered in 3d scene as a quad with texture.
-//!
-//! To create a canvas and add it into the scene, use [`scene::Scene::insert_new_canvas`]:
-//!
-//! ```rust
-//! // Create a canvas with viewport size 1920x1080
-//! let canvas = scene.insert_new_canvas(1920, 1080);
-//! ```
-//!
-//! The easiest way to create an entity is to use [`rabject::Blueprint`], its basically a builder of [`Entity`]:
-//!
-//! ```rust
-//! {
-//!     let canvas = scene.get_mut(canvas);
-//!
-//!     // Create a VMobject with a closed path formed by 5 points
-//!     let mut polygon = Polygon::new(vec![
-//!         vec2(0.0, 0.0),
-//!         vec2(-100.0, -300.0),
-//!         vec2(500.0, 0.0),
-//!         vec2(0.0, 700.0),
-//!         vec2(200.0, 300.0),
-//!     ])
-//!     .with_stroke_width(10.0)
-//!     .build();
-//!     // Set the properties of the rabject
-//!     polygon.set_color(Srgba::hex("FF8080FF").unwrap()).rotate(
-//!         std::f32::consts::PI / 4.0,
-//!         Vec3::Z,
-//!         TransformAnchor::origin(),
-//!     );
-//!
-//!     // Insert the VMobject and get its id
-//!     let polygon = canvas.insert(polygon);
-//! }
-//! ```
-//!
-//! Now the [`scene::Scene`] contains a [`scene::canvas::Canvas`], and in the canvas,
-//! there is a [`scene::Entity`] built by the [`crate::rabject::rabject2d::vmobject::geometry::Polygon`] blueprint.
-//!
-//! Finally, to render the scene, use [`scene::Scene::render_to_image`]:
-//!
-//! ```rust
-//! scene.render_to_image("hello.png");
-//! ```
-//!
-//! Then you will find `hello.png` in `output/scene-hello/hello.png`.
+//! Ranim is an animation engine written in rust based on [`wgpu`].
 
 use std::{
-    path::{Path, PathBuf},
-    time::{Duration, Instant},
+    cell::RefCell, fmt::Write, path::{Path, PathBuf}, rc::Rc, time::{Duration, Instant}
 };
 
-use animation::{AnimateTarget, Animation};
-use context::RanimContext;
+use animation::{Animation, AnimationClip};
+use context::{RanimContext, WgpuContext};
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
+use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::Entity;
 use log::trace;
 use render::{CameraFrame, Renderer};
-use world::{
-    EntityCell,
-    EntityId,
-    Store,
-    World,
-};
+use utils::Id;
+
 pub mod prelude {
     pub use crate::interpolate::Interpolatable;
 
-    pub use crate::animation::creation::{Empty, Fill, Partial, Stroke};
-    pub use crate::animation::fading::Opacity;
-    pub use crate::animation::interpolate::Alignable;
+    pub use crate::animation::entity::creation::{Empty, Fill, Partial, Stroke};
+    pub use crate::animation::entity::fading::Opacity;
+    pub use crate::animation::entity::interpolate::Alignable;
 
-    pub use crate::RenderScene;
     pub use crate::items::Blueprint;
+    pub use crate::RenderScene;
 }
 
 pub mod color;
@@ -113,15 +37,51 @@ pub mod context;
 pub mod items;
 pub mod render;
 pub mod utils;
-pub mod world;
+// pub mod world;
+
+/// An `Rabject` is a wrapper of an entity that can be rendered.
+pub struct Rabject<T: Entity> {
+    id: Id,
+    inner: T,
+    render_instance: Rc<RefCell<T::Primitive>>,
+}
+
+impl<T: Entity + Clone> Clone for Rabject<T> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            inner: self.inner.clone(),
+            render_instance: self.render_instance.clone(),
+        }
+    }
+}
+
+impl<T: Entity> Rabject<T> {
+    pub fn id(&self) -> Id {
+        self.id
+    }
+    pub fn new(ctx: &WgpuContext, inner: T) -> Self {
+        use crate::render::primitives::Primitive;
+
+        let id = Id::new();
+        let render_instance = T::Primitive::init(ctx, &inner);
+        let render_instance = Rc::new(RefCell::new(render_instance));
+
+        Self {
+            id,
+            inner,
+            render_instance,
+        }
+    }
+}
 
 pub struct SceneDesc {
     pub name: String,
 }
 
-pub trait Scene {
+pub trait AnimationClipConstructor {
     fn desc() -> SceneDesc;
-    fn construct<T: RanimApp>(&mut self, app: &mut T);
+    fn construct(&mut self, anim: &mut AnimationClip);
 }
 
 pub trait RenderScene {
@@ -130,80 +90,29 @@ pub trait RenderScene {
         Self: Sized;
 }
 
-impl<T: Scene> RenderScene for T {
+impl<T: AnimationClipConstructor> RenderScene for T {
     fn render(self)
     where
         Self: Sized,
     {
-        let mut scene = self;
+        let mut clip_contructor = self;
         let desc = T::desc();
         let mut app = RanimRenderApp::new(AppOptions {
-            output_path: PathBuf::from(format!("./output/{}/output.mp4", desc.name)),
+            output_dir: PathBuf::from(format!("./output/{}", desc.name)),
             ..Default::default()
         });
-        scene.construct(&mut app);
+        let mut clip = AnimationClip::new(app.ctx.wgpu_ctx());
+        clip_contructor.construct(&mut clip);
+        app.render_anim(clip);
     }
-}
-
-// MARK: RanimApp Trait
-pub trait RanimApp {
-    fn frame_cnt(&self) -> u32;
-    fn frame_time(&self) -> f32;
-    /// Play an animation
-    ///
-    /// The different target_type is corresponding to different [`AnimateTarget`]:
-    /// - [`Entity`] represents an entity that is not existed in the scene
-    ///
-    ///   It corresponds to [`AnimateTarget::Insert`], the entity will
-    ///   be inserted into the scene before animation plays
-    /// - [`EntityId`] represents an entity that is existed in the scene
-    ///   It corresponds to [`AnimateTarget::Existed`]
-    ///
-    /// Should note that this function takes the ownership of the entity or its id and returns the id.
-    ///
-    /// If you want to remove the entity after animation plays, you can use [`Scene::play_remove`].
-    ///
-    /// For playing animation in a canvas, see [`Scene::play_in_canvas`] and [`Scene::play_remove_in_canvas`].
-    ///
-    /// The actual "playing" part is equal to:
-    /// ```rust
-    /// let run_time = animation.config.run_time;
-    /// self.get_mut(&entity_id).insert_updater(animation);
-    /// self.advance(run_time);
-    /// ```
-    ///
-    /// See [`Animation`] and [`crate::updater::Updater`].
-    fn play<E: Entity + 'static, T: Into<AnimateTarget<E>>>(
-        &mut self,
-        target: T,
-        animation: Animation<E>,
-    ) -> EntityId<E>;
-    fn play_remove<E: Entity + 'static>(
-        &mut self,
-        target_id: EntityId<E>,
-        animation: Animation<E>,
-    );
-
-    // fn center_canvas_in_frame(&mut self, canvas_id: &EntityId<Canvas>);
-    fn wait(&mut self, duration: Duration);
-    // fn insert_new_canvas(&mut self, width: u32, height: u32) -> EntityId<Canvas>;
-
-    fn render_to_image(&mut self, filename: impl AsRef<str>);
-
-    fn camera(&self) -> &CameraFrame;
-    fn camera_mut(&mut self) -> &mut CameraFrame;
-
-    fn get<T: Entity + 'static>(&self, id: &EntityId<T>) -> &EntityCell<T>;
-    fn get_mut<T: Entity + 'static>(&mut self, id: &EntityId<T>) -> &mut EntityCell<T>;
-    fn insert<T: Entity + 'static>(&mut self, entity: T) -> EntityId<T>;
-    fn remove<T: Entity + 'static>(&mut self, id: EntityId<T>);
 }
 
 /// MARK: RanimRenderApp
 pub struct RanimRenderApp {
     ctx: RanimContext,
 
-    world: World,
+    // world: World,
+    // anim: Box<dyn Animation>,
     renderer: Renderer,
 
     camera_frame: CameraFrame,
@@ -218,13 +127,14 @@ pub struct RanimRenderApp {
     fps: u32,
 
     frame_count: u32,
+    output_dir: PathBuf,
 }
 
 pub struct AppOptions {
     pub frame_size: (u32, u32),
     pub frame_rate: u32,
     pub save_frames: bool,
-    pub output_path: PathBuf,
+    pub output_dir: PathBuf,
 }
 
 impl Default for AppOptions {
@@ -233,7 +143,7 @@ impl Default for AppOptions {
             frame_size: (1920, 1080),
             frame_rate: 60,
             save_frames: false,
-            output_path: PathBuf::from("./output.mp4"),
+            output_dir: PathBuf::from("./output"),
         }
     }
 }
@@ -252,7 +162,7 @@ impl RanimRenderApp {
         );
         renderer.update_uniforms(&ctx.wgpu_ctx, &camera_frame);
         Self {
-            world: World::new(),
+            // world: World::new(),
             renderer,
             camera_frame,
             video_writer: None,
@@ -260,46 +170,81 @@ impl RanimRenderApp {
                 FileWriterBuilder::default()
                     .with_fps(options.frame_rate)
                     .with_size(options.frame_size.0, options.frame_size.1)
-                    .with_file_path(options.output_path),
+                    .with_file_path(options.output_dir.join("output.mp4")),
             ),
             save_frames: options.save_frames,
             fps: options.frame_rate,
             frame_count: 0,
             ctx,
+            output_dir: options.output_dir,
         }
     }
     fn tick_duration(&self) -> Duration {
         Duration::from_secs_f32(1.0 / self.fps as f32)
     }
 
-    /// Advance the scene by a given duration
-    ///
-    /// this method writes frames through [`Self::update_frame`]
-    fn advance(&mut self, duration: Duration) {
-        let dt = self.tick_duration().as_secs_f32();
-        let frames = (duration.as_secs_f32() / dt).ceil() as usize;
+    pub fn render_anim<T: Animation>(&mut self, mut anim: T) {
+        let duration = anim.duration().as_secs_f32();
+        let frames = (duration * self.fps as f32).ceil() as usize;
+        let t = Instant::now();
+        let pb = ProgressBar::new(frames as u64);
+        pb.set_style(
+            ProgressStyle::with_template(
+                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] {human_pos}/{human_len} ({eta}) {msg}",
+            )
+            .unwrap()
+            .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
+                write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+            })
+            .progress_chars("#>-"),
+        );
+        (0..frames)
+            .map(|f| f as f32 / frames as f32)
+            .for_each(|alpha| {
+                trace!("rendering frame at alpha = {}", alpha);
+                anim.update_alpha(alpha);
+                self.renderer.render_anim(&mut self.ctx, &anim);
+                self.update_frame();
+                pb.inc(1);
+            });
 
-        for _ in 0..frames {
-            let start = Instant::now();
-            self.world.tick(dt);
-            trace!("[Scene/advance] tick cost: {:?}", start.elapsed());
-            let t = Instant::now();
-            self.update_frame(true);
-            trace!("[Scene/advance] update_frame cost: {:?}", t.elapsed());
-            trace!(
-                "[Scene/advance] one complete frame cost: {:?}",
-                start.elapsed()
-            );
-        }
+        let msg = format!(
+            "rendered {} frames({:?}) in {:?}",
+            frames,
+            anim.duration(),
+            t.elapsed()
+        );
+        pb.finish_with_message(msg);
     }
 
-    fn update_frame(&mut self, update: bool) {
+    // /// Advance the scene by a given duration
+    // ///
+    // /// this method writes frames through [`Self::update_frame`]
+    // fn advance(&mut self, duration: Duration) {
+    //     let dt = self.tick_duration().as_secs_f32();
+    //     let frames = (duration.as_secs_f32() / dt).ceil() as usize;
+
+    //     for _ in 0..frames {
+    //         let start = Instant::now();
+    //         self.world.tick(dt);
+    //         trace!("[Scene/advance] tick cost: {:?}", start.elapsed());
+    //         let t = Instant::now();
+    //         self.update_frame(true);
+    //         trace!("[Scene/advance] update_frame cost: {:?}", t.elapsed());
+    //         trace!(
+    //             "[Scene/advance] one complete frame cost: {:?}",
+    //             start.elapsed()
+    //         );
+    //     }
+    // }
+
+    fn update_frame(&mut self) {
         // TODO: solve the problem that the new inserted rabjects needs update
-        if update || true {
-            self.world.extract();
-            self.world.prepare(&self.ctx);
-        }
-        self.renderer.render(&mut self.ctx, &mut self.world);
+        // if update || true {
+        //     self.world.extract();
+        //     self.world.prepare(&self.ctx);
+        // }
+        // self.renderer.render(&mut self.ctx, &mut self.world);
 
         // `output_video` is true
         if let Some(video_writer) = self.video_writer.as_mut() {
@@ -312,19 +257,21 @@ impl RanimRenderApp {
 
         // `save_frames` is true
         if self.save_frames {
-            let path = format!("output/{}/frames/{:04}.png", "scene", self.frame_count);
+            let path = self
+                .output_dir
+                .join(format!("frames/{:04}.png", self.frame_count));
             self.save_frame_to_image(path);
         }
         self.frame_count += 1;
     }
 
-    // pub fn render_to_image(&mut self, world: &mut World, filename: impl AsRef<str>) {
-    //     let filename = filename.as_ref();
-    //     world.extract();
-    //     world.prepare(&self.ctx);
-    //     self.renderer.render(&mut self.ctx, &mut world.entities);
-    //     self.save_frame_to_image(PathBuf::from(format!("output/{}/{}", "world", filename)));
-    // }
+    // // pub fn render_to_image(&mut self, world: &mut World, filename: impl AsRef<str>) {
+    // //     let filename = filename.as_ref();
+    // //     world.extract();
+    // //     world.prepare(&self.ctx);
+    // //     self.renderer.render(&mut self.ctx, &mut world.entities);
+    // //     self.save_frame_to_image(PathBuf::from(format!("output/{}/{}", "world", filename)));
+    // // }
 
     pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
         let dir = path.as_ref().parent().unwrap();
@@ -340,87 +287,4 @@ impl RanimRenderApp {
         buffer.save(path).unwrap();
         // info!("[Scene]: SAVE FRAME TO IMAGE END, took {:?}", t.elapsed());
     }
-}
-
-/// MARK: RanimRenderApp's RanimApp impl
-impl RanimApp for RanimRenderApp {
-    fn frame_cnt(&self) -> u32 {
-        self.frame_count
-    }
-    fn frame_time(&self) -> f32 {
-        self.tick_duration().as_secs_f32() * self.frame_count as f32
-    }
-    fn get<T: Entity + 'static>(&self, id: &EntityId<T>) -> &EntityCell<T> {
-        self.world.get(id)
-    }
-    fn get_mut<T: Entity + 'static>(&mut self, id: &EntityId<T>) -> &mut EntityCell<T> {
-        self.world.get_mut(id)
-    }
-    fn insert<T: Entity + 'static>(&mut self, entity: T) -> EntityId<T> {
-        self.world.insert(entity)
-    }
-    fn remove<T: Entity + 'static>(&mut self, id: EntityId<T>) {
-        self.world.remove(id);
-    }
-
-    fn camera(&self) -> &CameraFrame {
-        &self.camera_frame
-    }
-    fn camera_mut(&mut self) -> &mut CameraFrame {
-        &mut self.camera_frame
-    }
-    fn play<E: Entity + 'static, T: Into<AnimateTarget<E>>>(
-        &mut self,
-        target: T,
-        animation: Animation<E>,
-    ) -> EntityId<E> {
-        let target = target.into();
-
-        let entity_id = match target {
-            AnimateTarget::Insert(entity) => self.insert(entity),
-            AnimateTarget::Existed(entity_id) => entity_id,
-        };
-
-        let run_time = animation.config.run_time;
-        self.get_mut(&entity_id).insert_updater(animation);
-        self.advance(run_time);
-        entity_id
-    }
-
-    fn play_remove<E: Entity + 'static>(
-        &mut self,
-        target_id: EntityId<E>,
-        animation: Animation<E>,
-    ) {
-        let target_id = self.play(target_id, animation);
-        self.remove(target_id);
-    }
-
-    fn render_to_image(&mut self, filename: impl AsRef<str>) {
-        let filename = filename.as_ref();
-        self.world.extract();
-        self.world.prepare(&self.ctx);
-        self.renderer.render(&mut self.ctx, &mut self.world);
-        self.save_frame_to_image(PathBuf::from(format!("output/{}/{}", "world", filename)));
-    }
-
-    fn wait(&mut self, duration: Duration) {
-        let dt = self.tick_duration().as_secs_f32();
-        let frames = (duration.as_secs_f32() / dt).ceil() as usize;
-
-        for _ in 0..frames {
-            let start = Instant::now();
-            self.update_frame(false);
-            trace!(
-                "[Scene/wait] one complete frame(update_frame) cost: {:?}",
-                start.elapsed()
-            );
-        }
-    }
-    // fn center_canvas_in_frame(&mut self, canvas_id: &EntityId<Canvas>) {
-    //     let canvas = self.world.get(canvas_id);
-    //     self.camera_frame.center_canvas_in_frame(canvas);
-    //     self.renderer
-    //         .update_uniforms(&self.ctx.wgpu_ctx, &self.camera_frame);
-    // }
 }

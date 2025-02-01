@@ -42,9 +42,9 @@ pub struct VItemPrimitive {
 }
 
 impl Primitive for VItemPrimitive {
-    type Data = VItem;
-    fn init(ctx: &WgpuContext, data: &Self::Data) -> Self {
-        // trace!("init");
+    type Entity = VItem;
+    fn init(ctx: &WgpuContext, data: &Self::Entity) -> Self {
+        trace!("init");
         let points3d_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Points 3d Buffer"),
@@ -107,18 +107,26 @@ impl Primitive for VItemPrimitive {
             render_bind_group,
         }
     }
-    fn update(&mut self, wgpu_ctx: &crate::context::WgpuContext, data: &Self::Data) {
-        // trace!("update, data.points: {:?}", data.points);
+    fn update(&mut self, wgpu_ctx: &crate::context::WgpuContext, data: &Self::Entity) {
+        // trace!("update, data.vpoints: {:?}", data.vpoints);
         // trace!("update, data.fill_rgbas: {:?}", data.fill_rgbas);
         // trace!("points3d len: {}", self.points3d_buffer.len());
         // trace!("points2d len: {}", self.points3d_buffer.len());
         self.vitem = data.clone();
+        if self.vitem.vpoints.is_empty() {
+            return;
+        }
         self.points3d_buffer
             .set(wgpu_ctx, &data.get_render_points());
+        // trace!("set fill_rgbas");
         self.fill_rgbas.set(wgpu_ctx, &data.fill_rgbas);
+        // trace!("set stroke_rgbas");
         self.stroke_rgbas.set(wgpu_ctx, &data.stroke_rgbas);
+        // trace!("set stroke_widths");
         self.stroke_widths.set(wgpu_ctx, &data.stroke_widths);
+        // trace!("resize points2d");
         if self.points2d_buffer.resize(wgpu_ctx, data.vpoints.len()) {
+            // trace!("resized points2d, updating bind groups");
             self.compute_bind_group
                 .update(&wgpu_ctx, &self.points3d_buffer, &self.points2d_buffer);
             self.render_bind_group.update(
@@ -173,6 +181,7 @@ impl Primitive for VItemPrimitive {
             vec2(max_x, min_y),
             vec2(max_x, max_y),
         ];
+        trace!("updated clip_box: {:?}", clip_box);
         self.clip_box_buffer.set(ctx, &clip_box);
     }
     fn encode_render_command(
@@ -184,6 +193,9 @@ impl Primitive for VItemPrimitive {
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
     ) {
+        if self.vitem.vpoints.is_empty() {
+            return;
+        }
         {
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("VItem Map Points Compute Pass"),

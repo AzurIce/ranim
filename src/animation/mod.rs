@@ -1,156 +1,171 @@
-pub mod creation;
-pub mod fading;
-pub mod interpolate;
+pub mod composition;
+pub mod entity;
+pub mod wait;
 
-use std::time;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use crate::{items::Entity, updater::Updater, utils::rate_functions::smooth, world::EntityId};
+use crate::{
+    context::WgpuContext,
+    items::Entity,
+    render::CameraFrame,
+    utils::{rate_functions::smooth, Id, RenderResourceStorage},
+    Rabject,
+};
 
+use composition::Chain;
+use entity::EntityAnimation;
 #[allow(unused)]
 use log::trace;
+use wait::Blank;
 
-pub struct Enter;
-
-pub struct AnimationConfig {
-    pub run_time: time::Duration,
-    pub rate_func: Box<dyn Fn(f32) -> f32>,
-    pub lag_ratio: Option<f32>,
+pub struct AnimationParams {
+    pub duration: Duration,
+    pub rate_func: fn(f32) -> f32,
 }
 
-impl Default for AnimationConfig {
-    /// Default animation config
-    /// - run_time: 1.0s
-    /// - rate_func: smooth
-    /// - remove: false
-    /// - end_rabject: None
+impl Default for AnimationParams {
     fn default() -> Self {
         Self {
-            run_time: time::Duration::from_secs_f32(1.0),
-            rate_func: Box::new(smooth),
-            lag_ratio: None,
-            // remove: false,
-            // end_rabject: None,
+            duration: Duration::from_secs_f32(1.0),
+            rate_func: smooth,
         }
     }
 }
 
-impl AnimationConfig {
-    pub fn set_run_time(&mut self, run_time: time::Duration) -> &mut Self {
-        self.run_time = run_time;
-        self
-    }
-    pub fn set_rate_func(&mut self, rate_func: Box<dyn Fn(f32) -> f32>) -> &mut Self {
-        self.rate_func = rate_func;
-        self
-    }
-    pub fn set_lag_ratio(&mut self, lag_ratio: Option<f32>) -> &mut Self {
-        self.lag_ratio = lag_ratio;
-        self
-    }
-
-    pub fn calc_frames(&self, fps: f32) -> usize {
-        (self.run_time.as_secs_f32() * fps).ceil() as usize
-    }
+pub trait AnimationFunc<T: Entity> {
+    fn eval_alpha(&mut self, target: &mut T, alpha: f32);
 }
 
-/// A trait representing an animation function
-///
-/// The main difference between [`AnimationFunc`] and [`Updater`] is that
-/// the [`Updater`]'s parameter is elapsed time `dt` but
-/// the [`AnimationFunc`]'s parameter is the animation progress `alpha`.
-///
-/// The `alpha` is calculated by the wrapper [`Animation`],
-/// and the [`Animation`] is actually just an [`Updater`].
-///
-/// See [`Animation`], [`Updater`]
-pub trait AnimationFunc<T> {
-    #[allow(unused)]
-    fn init(&mut self, entity: &mut T);
-
-    fn interpolate(&mut self, entity: &mut T, alpha: f32);
-
-    #[allow(unused)]
-    fn post_anim(&mut self, entity: &mut T) {}
+pub trait Animation {
+    fn duration(&self) -> Duration;
+    fn update_alpha(&mut self, alpha: f32);
+    fn update_clip_info(&self, ctx: &WgpuContext, camera: &CameraFrame);
+    fn render(
+        &self,
+        ctx: &WgpuContext,
+        pipelines: &mut RenderResourceStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        multisample_view: &wgpu::TextureView,
+        target_view: &wgpu::TextureView,
+    );
 }
 
-// /// An [`AnimationAction`] specifies what to do with the animatied entity
-// pub enum AnimationAction<T: Entity + 'static> {
-//     /// Insert the entity into the scene, and animate it
-//     InsertAndAnimate(T),
-//     /// Animate the entity, and remove it from the scene
-//     AnimateAndRemove(EntityId<T>),
-//     /// Just animate
-//     Animate(EntityId<T>),
-// }
-
-pub enum AnimateTarget<T: Entity> {
-    Insert(T),
-    Existed(EntityId<T>),
-    // Remove(EntityId<T>),
+/// AnimationClip is a timeline structure
+pub struct AnimationClip {
+    ctx: Arc<WgpuContext>,
+    entity_anims: HashMap<Id, Chain>,
+    cur_t: f32,
 }
 
-impl<T: Entity> From<T> for AnimateTarget<T> {
-    fn from(value: T) -> Self {
-        Self::Insert(value)
-    }
-}
-
-// impl<'a, T: Entity + 'static> From<&'a EntityId<T>> for AnimateTarget<'a, T> {
-//     fn from(value: &'a EntityId<T>) -> Self {
-//         Self::Existed(value)
-//     }
-// }
-impl<T: Entity> From<EntityId<T>> for AnimateTarget<T> {
-    fn from(value: EntityId<T>) -> Self {
-        Self::Existed(value)
-    }
-}
-
-/// A [`Updater`] wraps an [`AnimationFunc`]
-///
-/// See [`AnimationFunc`]
-pub struct Animation<T> {
-    acc_t: f32,
-
-    // action: AnimationAction<T>,
-    pub func: Box<dyn AnimationFunc<T>>,
-    pub(crate) config: AnimationConfig,
-}
-
-impl<T> Updater<T> for Animation<T> {
-    fn on_create(&mut self, entity: &mut T) {
-        self.func.init(entity);
-    }
-    fn on_update(&mut self, entity: &mut T, dt: f32) -> bool {
-        self.acc_t += dt;
-        let alpha = (self.acc_t / self.config.run_time.as_secs_f32()).clamp(0.0, 1.0);
-
-        let alpha = (self.config.rate_func)(alpha);
-
-        self.func.interpolate(entity, alpha);
-        self.acc_t <= self.config.run_time.as_secs_f32()
-    }
-    fn on_destroy(&mut self, entity: &mut T) {
-        self.func.post_anim(entity);
-    }
-}
-
-impl<T> Animation<T> {
-    pub fn new(func: impl AnimationFunc<T> + 'static) -> Self {
+impl AnimationClip {
+    pub fn new(ctx: Arc<WgpuContext>) -> Self {
         Self {
-            func: Box::new(func),
-            config: Default::default(),
-            acc_t: 0.0,
+            ctx,
+            entity_anims: HashMap::new(),
+            cur_t: 0.0,
         }
     }
+}
 
-    pub fn with_config(mut self, config: AnimationConfig) -> Self {
-        self.config = config;
-        self
+impl AnimationClip {
+    /// Create a rabject with an entity, this will allocate an Id and the render_instance for it
+    pub fn insert<T: Entity>(&mut self, entity: T) -> Rabject<T> {
+        let rabject = Rabject::new(&self.ctx, entity);
+        assert!(!self.entity_anims.contains_key(&rabject.id()));
+        // fill up the time before entity is inserted
+        self.entity_anims.insert(
+            rabject.id(),
+            Chain::new(vec![Box::new(Blank(Duration::from_secs_f32(self.cur_t)))]),
+        );
+        rabject
     }
+    pub fn show<T: Entity>(&mut self, rabject: &mut Rabject<T>) {}
+    pub fn hide<T: Entity>(&mut self, rabject: &mut Rabject<T>) {}
 
-    pub fn config(mut self, config: impl FnOnce(&mut AnimationConfig)) -> Self {
-        config(&mut self.config);
-        self
+    /// append an animation to the clip
+    pub fn play<T: Entity + 'static>(&mut self, mut anim: EntityAnimation<T>) -> Rabject<T> {
+        anim.update_alpha(1.0);
+        let result_rabject = anim.rabject().clone();
+        let duration = anim.duration();
+
+        self.entity_anims
+            .get_mut(&anim.rabject().id())
+            .unwrap()
+            .append(anim);
+        self.cur_t = self.cur_t + duration.as_secs_f32();
+
+        self.entity_anims
+            .iter_mut()
+            .filter(|(_, entity_anim)| entity_anim.duration().as_secs_f32() < self.cur_t)
+            .for_each(|(_, entity_anim)| {
+                entity_anim.append(Blank(duration));
+            });
+
+        result_rabject
+    }
+    pub fn play_stacked<T: Entity + 'static, const X: usize>(
+        &mut self,
+        mut anims: [EntityAnimation<T>; X],
+    ) -> [Rabject<T>; X] {
+        let result_rabjects = anims.each_mut().map(|anim| {
+            anim.update_alpha(1.0);
+            anim.rabject().clone()
+        });
+
+        let mut max_duration = Duration::from_secs_f32(0.0);
+        for anim in anims {
+            max_duration = max_duration.max(anim.duration());
+
+            self.entity_anims
+                .get_mut(&anim.rabject().id())
+                .unwrap()
+                .append(anim);
+        }
+        self.cur_t = self.cur_t + max_duration.as_secs_f32();
+        self.entity_anims
+            .iter_mut()
+            .filter(|(_, entity_anim)| entity_anim.duration().as_secs_f32() < self.cur_t)
+            .for_each(|(_, entity_anim)| {
+                entity_anim.append(Blank(max_duration));
+            });
+
+        result_rabjects
+    }
+}
+
+impl Animation for AnimationClip {
+    fn duration(&self) -> Duration {
+        Duration::from_secs_f32(self.cur_t)
+    }
+    fn render(
+        &self,
+        ctx: &WgpuContext,
+        pipelines: &mut RenderResourceStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        multisample_view: &wgpu::TextureView,
+        target_view: &wgpu::TextureView,
+    ) {
+        for (_, entity_anim) in self.entity_anims.iter() {
+            entity_anim.render(
+                ctx,
+                pipelines,
+                encoder,
+                uniforms_bind_group,
+                multisample_view,
+                target_view,
+            );
+        }
+    }
+    fn update_alpha(&mut self, alpha: f32) {
+        for (_, entity_anim) in self.entity_anims.iter_mut() {
+            entity_anim.update_alpha(alpha);
+        }
+    }
+    fn update_clip_info(&self, ctx: &WgpuContext, camera: &CameraFrame) {
+        for (_, entity_anim) in self.entity_anims.iter() {
+            entity_anim.update_clip_info(ctx, camera);
+        }
     }
 }

@@ -4,22 +4,24 @@ use bevy_color::{Alpha, Srgba};
 use env_logger::Env;
 use glam::vec2;
 use log::info;
-use ranim::animation::fading;
+use ranim::animation::entity::fading::fade_in;
+use ranim::animation::{Animation, AnimationClip};
 use ranim::items::vitem::Arc;
 // use ranim::rabject::rabject3d::RabjectEntity3d;
-use ranim::{prelude::*, Scene};
+use ranim::{prelude::*, AnimationClipConstructor};
 
 struct ArcScene;
 
-impl Scene for ArcScene {
+impl AnimationClipConstructor for ArcScene {
     fn desc() -> ranim::SceneDesc {
         ranim::SceneDesc {
             name: "arc".to_string(),
         }
     }
-    fn construct<T: ranim::RanimApp>(&mut self, app: &mut T) {
+    fn construct(&mut self, anim: &mut AnimationClip) {
         let t = Instant::now();
-        let frame_size = app.camera().size;
+        // let frame_size = app.camera().size;
+        let frame_size = (1920.0, 1080.0);
         let frame_start = vec2(frame_size.0 as f32 / -2.0, frame_size.1 as f32 / -2.0);
 
         let start_color = Srgba::hex("FF8080FF").unwrap();
@@ -49,23 +51,14 @@ impl Scene for ArcScene {
                 arc.stroke_rgbas.set_all(color);
                 arc.fill_rgbas.set_all(color.with_alpha(0.0));
                 arc.vpoints.shift(offset.extend(0.0));
-                // let arc = app.insert(arc);
-                let _arc = app.play(
-                    arc,
-                    fading::fade_in().config(|config| {
-                        config.set_run_time(Duration::from_secs_f32(0.5));
-                    }),
+
+                let arc = anim.insert(arc);
+                anim.play(
+                    fade_in(arc).with_duration(Duration::from_secs_f32(0.5))
                 );
             }
             info!("row [{i}/{nrow}] cost: {:?}", t.elapsed());
         }
-
-        info!(
-            "Rendered {} frames({}s) in {:?}",
-            app.frame_cnt(),
-            app.frame_time(),
-            t.elapsed()
-        );
     }
 }
 

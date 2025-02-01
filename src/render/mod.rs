@@ -6,10 +6,10 @@ use glam::{vec2, Mat4, Vec2, Vec3};
 use primitives::Primitive;
 
 use crate::{
+    animation::{entity::EntityAnimation, Animation},
     context::{RanimContext, WgpuContext},
     items::{vitem::VItem, Entity},
-    utils::wgpu::WgpuBuffer,
-    world::World,
+    utils::wgpu::WgpuBuffer, // world::World,
 };
 
 #[repr(C, align(16))]
@@ -266,45 +266,66 @@ impl Renderer {
         self.output_texture_updated = false;
     }
 
-    fn render_entities<T: Entity + 'static>(
-        &mut self,
-        ctx: &mut RanimContext,
-        encoder: &mut wgpu::CommandEncoder,
-        world: &mut World,
-    ) {
-        if let Some(store) = world.entity_stores.get_store_mut::<T>() {
-            for (_id, entity) in store.iter_mut() {
-                let Some(primitive) = &mut entity.primitive else {
-                    continue;
-                };
+    // fn render_entities<T: Entity + 'static>(
+    //     &mut self,
+    //     ctx: &mut RanimContext,
+    //     encoder: &mut wgpu::CommandEncoder,
+    //     world: &mut World,
+    // ) {
+    //     if let Some(store) = world.entity_stores.get_store_mut::<T>() {
+    //         for (_id, entity) in store.iter_mut() {
+    //             let Some(primitive) = &mut entity.primitive else {
+    //                 continue;
+    //             };
 
-                primitive.update_clip_info(&ctx.wgpu_ctx, &self.camera);
-                primitive.encode_render_command(
-                    &ctx.wgpu_ctx,
-                    &mut ctx.pipelines,
-                    encoder,
-                    &self.uniforms_bind_group.bind_group,
-                    &self.multisample_view,
-                    &self.render_view,
-                );
-            }
-        }
-    }
+    //             primitive.update_clip_info(&ctx.wgpu_ctx, &self.camera);
+    //             primitive.encode_render_command(
+    //                 &ctx.wgpu_ctx,
+    //                 &mut ctx.pipelines,
+    //                 encoder,
+    //                 &self.uniforms_bind_group.bind_group,
+    //                 &self.multisample_view,
+    //                 &self.render_view,
+    //             );
+    //         }
+    //     }
+    // }
 
-    pub fn render(&mut self, ctx: &mut RanimContext, world: &mut World) {
+    pub fn render_anim(&mut self, ctx: &mut RanimContext, anim: &impl Animation) {
         self.clear_screen(&ctx.wgpu_ctx);
-
         let mut encoder = ctx
             .wgpu_ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        self.render_entities::<VItem>(ctx, &mut encoder, world);
+        anim.update_clip_info(&ctx.wgpu_ctx, &self.camera);
+        anim.render(
+            &ctx.wgpu_ctx,
+            &mut ctx.pipelines,
+            &mut encoder,
+            &self.uniforms_bind_group.bind_group,
+            &self.multisample_view,
+            &self.render_view,
+        );
 
-        ctx.wgpu_ctx.queue.submit([encoder.finish()]);
-
+        ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
         self.output_texture_updated = false;
     }
+
+    // pub fn render(&mut self, ctx: &mut RanimContext, world: &mut World) {
+    //     self.clear_screen(&ctx.wgpu_ctx);
+
+    //     let mut encoder = ctx
+    //         .wgpu_ctx
+    //         .device
+    //         .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+    //     self.render_entities::<VItem>(ctx, &mut encoder, world);
+
+    //     ctx.wgpu_ctx.queue.submit([encoder.finish()]);
+
+    //     self.output_texture_updated = false;
+    // }
     fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
         let bytes_per_row =
             ((self.size.0 * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
@@ -513,25 +534,28 @@ pub trait RenderResource {
 mod test {
     use env_logger::Env;
     use glam::vec3;
-    use image::ImageBuffer;
 
     use super::*;
     use crate::{
-        context::RanimContext,
-        items::{
-            vitem::{Arc, Polygon, Square, VItem},
-            Blueprint,
+        animation::{
+            entity::{
+                creation::{create, uncreate, write},
+                fading::{fade_in, fade_out},
+            },
+            wait::wait,
+            AnimationClip,
         },
-        prelude::{Partial, Stroke},
+        items::vitem::{Arc, Polygon, Square, VItem},
         utils::bezier::PathBuilder,
-        world::{Store, World},
+        AppOptions,
+        RanimRenderApp, // world::{Store, World},
     };
 
     #[test]
     fn test_render_vitem() {
         env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
-        let mut ctx = RanimContext::new();
-        let mut world = World::new();
+        // let mut ctx = RanimContext::new();
+        // let mut world = World::new();
         // let mut vitem = Square(100.0).build();
         // vitem.vpoints.shift(vec3(-200.0, 0.0, 0.0));
         // world.insert(vitem);
@@ -552,7 +576,8 @@ mod test {
                 vec3(-2.0, 2.0, 0.0),
                 vec3(1.0, 4.0, 0.0),
                 vec3(0.0, 0.0, 0.0),
-            );
+            )
+            .close_path();
         let vpoints = builder
             .vpoints()
             .to_vec()
@@ -570,15 +595,32 @@ mod test {
 
         // let vitem = vitem.get_partial(0.0..0.4);
 
-        let id = world.insert(vitem);
-        world.extract();
-        world.prepare(&ctx);
-        world.prepare(&ctx);
+        // let id = world.insert(vitem);
+        // world.extract();
+        // world.prepare(&ctx);
+        // world.prepare(&ctx);
 
-        let mut renderer = Renderer::new(&ctx, 1920, 1080);
-        renderer.render(&mut ctx, &mut world);
-        let data = renderer.get_rendered_texture_data(&ctx.wgpu_ctx);
-        let image = ImageBuffer::<image::Rgba<u8>, _>::from_raw(1920, 1080, data.to_vec()).unwrap();
-        image.save("./output.png");
+        let mut app = RanimRenderApp::new(AppOptions::default());
+        // let rabject = Rabject::new(&app.ctx.wgpu_ctx, vitem);
+        // app.render_anim(wait(rabject));
+        let mut animation_clip = AnimationClip::new(app.ctx.wgpu_ctx());
+        let rabject = animation_clip.insert(vitem);
+        animation_clip.play(create(rabject.clone()));
+        animation_clip.play(wait(rabject.clone()));
+        animation_clip.play(uncreate(rabject.clone()));
+        app.render_anim(animation_clip);
+        // app.render_anim(
+        //     create(rabject.clone())
+        //         .chain(wait(rabject.clone()))
+        //         .chain(fade_out(rabject.clone()))
+        //         .chain(wait(rabject.clone()))
+        //         .chain(write(rabject)),
+        // );
+        // app.render_anim(wait(rabject));
+        // let mut renderer = Renderer::new(&ctx, 1920, 1080);
+        // // renderer.render(&mut ctx, &mut world);
+        // let data = renderer.get_rendered_texture_data(&ctx.wgpu_ctx);
+        // let image = ImageBuffer::<image::Rgba<u8>, _>::from_raw(1920, 1080, data.to_vec()).unwrap();
+        // image.save("./output.png");
     }
 }

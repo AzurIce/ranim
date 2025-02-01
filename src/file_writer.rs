@@ -75,7 +75,10 @@ impl FileWriterBuilder {
         //         .map(|s| s.to_string_lossy())
         //         .unwrap_or("mp4".into())
         // ));
-        std::fs::create_dir_all(self.file_path.parent().unwrap()).unwrap();
+        let parent = self.file_path.parent().unwrap();
+        if !parent.exists() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
 
         let mut command = Command::new("ffmpeg");
         #[rustfmt::skip]

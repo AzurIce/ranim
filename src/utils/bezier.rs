@@ -48,6 +48,10 @@ impl PathBuilder {
     /// Append a quadratic bezier
     pub fn quad_to(&mut self, h: Vec3, p: Vec3) -> &mut Self {
         self.assert_started();
+        let cur = self.points.last().unwrap();
+        if cur.distance_squared(h) < f32::EPSILON || h.distance_squared(p) < f32::EPSILON {
+            return self.line_to(p);
+        }
         self.points.extend_from_slice(&[h, p]);
         self
     }
@@ -64,14 +68,18 @@ impl PathBuilder {
         }
 
         let quads = approx_cubic_with_quadratic([*cur, h1, h2, p]);
-        self.points
-            .extend(quads.into_iter().flat_map(|beziers| beziers[1..].to_vec()));
+        for quad in quads {
+            self.quad_to(quad[1], quad[2]);
+        }
 
         self
     }
 
     pub fn close_path(&mut self) -> &mut Self {
         self.assert_started();
+        if self.points.last() == self.start_point.as_ref() {
+            return self;
+        }
         if let Some(start) = self.start_point {
             self.line_to(start);
         }
@@ -165,7 +173,7 @@ pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
     let disc = b * b - 4. * a * c;
     let sqrt_disc = disc.sqrt();
 
-    println!("{} {} {}, disc: {}", a, b, c, disc);
+    // println!("{} {} {}, disc: {}", a, b, c, disc);
     let root = if a == 0.0 && b == 0.0 || a != 0.0 && disc < 0.0 {
         0.5
     } else if a == 0.0 {
@@ -180,7 +188,7 @@ pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
         }
         root
     };
-    println!("{root}");
+    // println!("{root}");
 
     let cut_point = cubic_bezier_eval(&cubic, root);
     let cut_tangent = quad_bezier_eval(&[h1 - p1, h2 - h1, p2 - h2], root);

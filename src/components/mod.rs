@@ -171,12 +171,12 @@ impl<T: Transform3d + Default + Clone> ComponentData<T> {
             .iter()
             .map(|p| p.position())
             .reduce(|acc, e| acc.min(e))
-            .unwrap();
+            .unwrap_or(Vec3::ZERO);
         let max = self
             .iter()
             .map(|p| p.position())
             .reduce(|acc, e| acc.max(e))
-            .unwrap();
+            .unwrap_or(Vec3::ZERO);
         let mid = (min + max) / 2.0;
         [min, mid, max]
     }
