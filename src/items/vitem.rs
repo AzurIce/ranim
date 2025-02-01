@@ -121,10 +121,13 @@ impl Opacity for VItem {
 
 impl Partial for VItem {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
-        let vpoints = self.vpoints.get_partial(range.clone());
-        let stroke_rgbas = self.stroke_rgbas.get_partial(range.clone());
-        let stroke_widths = self.stroke_widths.get_partial(range.clone());
-        let fill_rgbas = self.fill_rgbas.get_partial(range.clone());
+        let anchor_len = (self.vpoints.len() + 1) / 2;
+        let start = (range.start * anchor_len as f32).ceil() as usize;
+        let end = (range.end * anchor_len as f32).floor() as usize;
+        let vpoints = self.vpoints.get(start*2..end*2).unwrap().to_vec().into();
+        let stroke_rgbas = self.stroke_rgbas.get(start..end).unwrap().to_vec().into();
+        let stroke_widths = self.stroke_widths.get(start..end).unwrap().to_vec().into();
+        let fill_rgbas = self.fill_rgbas.get(start..end).unwrap().to_vec().into();
         Self {
             vpoints,
             stroke_widths,

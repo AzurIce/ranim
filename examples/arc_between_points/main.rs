@@ -7,11 +7,11 @@ use log::info;
 use ranim::animation::creation::Color;
 use ranim::animation::fading;
 use ranim::items::vitem::ArcBetweenPoints;
-use ranim::{prelude::*, Scene, SceneDesc};
+use ranim::{prelude::*, AnimationClipConstructor, SceneDesc};
 
 pub struct ArcBetweenPointsScene;
 
-impl Scene for ArcBetweenPointsScene {
+impl AnimationClipConstructor for ArcBetweenPointsScene {
     fn desc() -> ranim::SceneDesc {
         SceneDesc {
             name: "arc_between_points".to_string(),

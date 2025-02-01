@@ -3,9 +3,9 @@ use crate::render::primitives::Primitive;
 pub mod vitem;
 pub mod svg_item;
 
-pub trait Entity {
+pub trait Entity: Clone {
     type ExtractData;
-    type Primitive: Primitive<Data = Self::ExtractData>;
+    type Primitive: Primitive<Entity = Self>;
 
     fn extract(&self) -> Option<Self::ExtractData>;
 }

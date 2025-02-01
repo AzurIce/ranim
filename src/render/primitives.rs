@@ -1,13 +1,13 @@
 pub mod vitem;
 
-use crate::{context::WgpuContext, utils::RenderResourceStorage};
+use crate::{context::WgpuContext, items::Entity, utils::RenderResourceStorage};
 
 use super::CameraFrame;
 
 pub trait Primitive {
-    type Data;
-    fn init(wgpu_ctx: &WgpuContext, data: &Self::Data) -> Self;
-    fn update(&mut self, wgpu_ctx: &WgpuContext, data: &Self::Data);
+    type Entity: Entity;
+    fn init(wgpu_ctx: &WgpuContext, data: &Self::Entity) -> Self;
+    fn update(&mut self, wgpu_ctx: &WgpuContext, data: &Self::Entity);
     #[allow(unused)]
     fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {}
     fn encode_render_command(

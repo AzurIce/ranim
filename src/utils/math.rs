@@ -5,7 +5,7 @@ pub fn cross2d(a: Vec2, b: Vec2) -> f32 {
 }
 
 pub fn intersection(p1: Vec3, v1: Vec3, p2: Vec3, v2: Vec3) -> Option<Vec3> {
-    println!("p1: {:?}, v1: {:?}, p2: {:?}, v2: {:?}", p1, v1, p2, v2);
+    // println!("p1: {:?}, v1: {:?}, p2: {:?}, v2: {:?}", p1, v1, p2, v2);
     let cross = v1.cross(v2);
     let denom = cross.length_squared();
     if denom < f32::EPSILON {

@@ -1,4 +1,3 @@
-// pub mod canvas;
 mod entity;
 mod store;
 
