@@ -162,6 +162,10 @@ impl Timeline {
     pub fn show<T: Entity>(&mut self, rabject: &mut Rabject<T>) {}
     pub fn hide<T: Entity>(&mut self, rabject: &mut Rabject<T>) {}
 
+    pub fn forward(&mut self, duration: Duration) {
+        self.cur_t += duration.as_secs_f32();
+    }
+
     /// append an animation to the clip
     pub fn play<T: Entity + 'static>(&mut self, mut anim: EntityAnimation<T>) -> Rabject<T> {
         let (entity_duration, timeline) = self.entity_timelines.get_mut(&anim.entity_id).unwrap();

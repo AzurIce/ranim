@@ -1,16 +1,14 @@
 use std::time::Duration;
 
 use env_logger::Env;
-use glam::{vec2, vec3};
 use ranim::{
-    animation::{creation, interpolate::Interpolate},
+    animation::{
+        entity::creation::{unwrite, write},
+        Timeline,
+    },
     items::vitem::{Square, VItem},
     prelude::*,
-    rabject::rabject3d::RabjectEntity3d,
-    render::Renderer,
-    typst_svg, typst_tree,
-    world::{EntityId, World},
-    AppOptions, RanimApp, RanimRenderApp, TimelineConstructor,
+    TimelineConstructor,
 };
 
 // fn create_and_uncreate<T: RanimApp>(scene: &mut T, canvas: &EntityId<Canvas>, vmobject: VMobject) {
@@ -86,11 +84,13 @@ impl TimelineConstructor for TestScene {
             name: "Test Scene".to_string(),
         }
     }
-    fn construct<T: ranim::RanimApp>(&mut self, app: &mut T) {
-        let square: RabjectEntity3d<VItem> = Square(100.0).build().into();
-        app.insert(square);
+    fn construct(&mut self, timeline: &mut Timeline) {
+        let square = Square(100.0).build();
+        let square = timeline.insert(square);
+        timeline.play(write(square.clone()));
+        timeline.forward(Duration::from_secs_f32(1.0));
+        timeline.play(unwrite(square.clone()));
         // app.render_to_image("test.png");
-        app.wait(Duration::from_secs_f32(1.0));
         // let path = VPathBuilder::start(vec3(0.0, 0.0, 0.0))
         //     .line_to(vec3(100.0, 200.0, 0.0))
         //     .line_to(vec3(-100.0, -100.0, 0.0))
@@ -106,9 +106,5 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace"))
         .init();
-
-    let mut scene = TestScene::default();
-    let mut app = RanimRenderApp::new(AppOptions::default());
-    // scene.construct(&mut app);
-    // scene
+    TestScene.render();
 }

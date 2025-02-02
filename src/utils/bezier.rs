@@ -1,4 +1,5 @@
 use glam::{Vec3, Vec3Swizzles};
+use log::trace;
 
 use crate::{
     prelude::Interpolatable,
@@ -102,6 +103,27 @@ pub fn split_cubic_bezier(bezier: &[Vec3; 4], t: f32) -> ([Vec3; 4], [Vec3; 4]) 
     let h11 = h1.lerp(*p1, t);
 
     ([*p0, h00, h01, *split_point], [*split_point, h10, h11, *p1])
+}
+
+pub fn split_quad_bezier(bezier: &[Vec3; 3], t: f32) -> ([Vec3; 3], [Vec3; 3]) {
+    let [p0, h, p1] = bezier;
+
+    let split_point = &quad_bezier_eval(bezier, t);
+
+    let h0 = p0.lerp(*h, t);
+    let h1 = h.lerp(*p1, t);
+
+    ([*p0, h0, *split_point], [*split_point, h1, *p1])
+}
+
+pub fn trim_quad_bezier(bezier: &[Vec3; 3], a: f32, b: f32) -> [Vec3; 3] {
+    // trace!("!!!trim_quad_bezier: {:?}, {:?}, {:?}", bezier, a, b);
+    let (a, b) = if a > b { (b, a) } else { (a, b) };
+    let end_on_b = split_quad_bezier(bezier, b).0;
+    let a = a / b;
+    let result = split_quad_bezier(&end_on_b, a).1;
+    // trace!("result: {:?}", result);
+    result
 }
 
 pub fn trim_cubic_bezier(bezier: &[Vec3; 4], a: f32, b: f32) -> [Vec3; 4] {

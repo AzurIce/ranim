@@ -4,8 +4,12 @@ use std::{
 };
 
 use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3};
+use log::trace;
 
-use crate::prelude::{Alignable, Interpolatable, Partial};
+use crate::{
+    prelude::{Alignable, Interpolatable, Partial},
+    utils::math::interpolate_usize,
+};
 
 pub mod point;
 pub mod rgba;
@@ -15,11 +19,46 @@ pub mod width;
 #[derive(Default, Clone)]
 pub struct ComponentData<T: Default + Clone>(Vec<T>);
 
-impl<T: Default + Clone> Partial for ComponentData<T> {
+// impl<T: Default + Clone> Partial for ComponentData<T> {
+//     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
+//         let start = (range.start * self.len() as f32).floor() as usize;
+//         let end = (range.end * self.len() as f32).floor() as usize;
+//         Self(self.get(start..end).unwrap().to_vec())
+//     }
+// }
+
+impl<T: Default + Clone + PointWise + Interpolatable + Debug> Partial for ComponentData<T> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
-        let start = (range.start * self.len() as f32).floor() as usize;
-        let end = (range.end * self.len() as f32).floor() as usize;
-        Self(self.get(start..end).unwrap().to_vec())
+        let max_idx = self.len() - 1;
+        let (start_index, start_residue) = interpolate_usize(0, max_idx, range.start);
+        let (end_index, end_residue) = interpolate_usize(0, max_idx, range.end);
+        // trace!("range: {:?}, start: {} {}, end: {} {}", range, start_index, start_residue, end_index, end_residue);
+        if start_index == end_index {
+            let start_v = self
+                .get(start_index)
+                .unwrap()
+                .lerp(self.get(start_index + 1).unwrap(), start_residue);
+            let end_v = self
+                .get(end_index)
+                .unwrap()
+                .lerp(self.get(end_index + 1).unwrap(), end_residue);
+            vec![start_v, end_v]
+        } else {
+            let start_v = self
+                .get(start_index)
+                .unwrap()
+                .lerp(self.get(start_index + 1).unwrap(), start_residue);
+            let end_v = self
+                .get(end_index)
+                .unwrap()
+                .lerp(self.get(end_index + 1).unwrap(), end_residue);
+
+            let mut partial = Vec::with_capacity(end_index - start_index + 1 + 2);
+            partial.push(start_v);
+            partial.extend_from_slice(self.get(start_index + 1..=end_index).unwrap());
+            partial.push(end_v);
+            partial
+        }.into()
     }
 }
 
@@ -114,6 +153,8 @@ impl<T: Default + Clone> ComponentData<T> {
         self.iter_mut().for_each(|x| *x = value.clone());
     }
 }
+
+pub trait PointWise {}
 
 // MARK: Transformable
 pub trait Transformable {

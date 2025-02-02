@@ -181,7 +181,7 @@ impl Primitive for VItemPrimitive {
             vec2(max_x, min_y),
             vec2(max_x, max_y),
         ];
-        trace!("updated clip_box: {:?}", clip_box);
+        // trace!("updated clip_box: {:?}", clip_box);
         self.clip_box_buffer.set(ctx, &clip_box);
     }
     fn encode_render_command(
