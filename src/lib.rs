@@ -210,7 +210,7 @@ impl RanimRenderApp {
         (0..frames)
             .map(|f| f as f32 / frames as f32)
             .for_each(|alpha| {
-                trace!("rendering frame at alpha = {}", alpha);
+                // trace!("rendering frame at alpha = {}", alpha);
                 anim.update_alpha(alpha);
                 self.renderer.render_anim(&mut self.ctx, &anim);
                 self.update_frame();
