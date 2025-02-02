@@ -20,7 +20,10 @@ use crate::{
     Rabject,
 };
 
-use super::{AnimationParams, Animator};
+use super::{
+    wait::{wait, Wait},
+    AnimationParams, Animator,
+};
 
 pub struct EntityTimeline<T: Entity> {
     pub(crate) rabject: Rabject<T>,
@@ -51,6 +54,7 @@ impl<T: Entity> EntityTimeline<T> {
 
 impl<T: Entity> Animator for EntityTimeline<T> {
     fn update_alpha(&mut self, alpha: f32) {
+        // TODO: handle no anim
         // println!("update_alpha: {alpha}, {}", self.total_sec);
         // println!("{:?}", self.end_sec);
         let sec = alpha * self.total_sec;

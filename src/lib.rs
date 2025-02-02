@@ -92,6 +92,9 @@ pub trait RenderScene {
     fn render(self)
     where
         Self: Sized;
+    fn render_frame_to_image(self, path: impl AsRef<Path>)
+    where
+        Self: Sized;
 }
 
 impl<T: TimelineConstructor> RenderScene for T {
@@ -107,12 +110,33 @@ impl<T: TimelineConstructor> RenderScene for T {
         });
         let mut timeline = Timeline::new(app.ctx.wgpu_ctx());
         clip_contructor.construct(&mut timeline);
+        if timeline.cur_t() == 0.0 {
+            timeline.forward(Duration::from_secs_f32(0.1));
+        }
         let duration = timeline.cur_t();
         app.render_anim(
             Animation::new(timeline)
                 .with_rate_func(linear)
                 .with_duration(Duration::from_secs_f32(duration)),
         );
+    }
+    fn render_frame_to_image(self, path: impl AsRef<Path>) {
+        let mut clip_contructor = self;
+        let desc = T::desc();
+        let mut app = RanimRenderApp::new(AppOptions {
+            output_dir: PathBuf::from(format!("./output/{}", desc.name)),
+            ..Default::default()
+        });
+        let mut timeline = Timeline::new(app.ctx.wgpu_ctx());
+        clip_contructor.construct(&mut timeline);
+        if timeline.cur_t() == 0.0 {
+            timeline.forward(Duration::from_secs_f32(0.1));
+        }
+        let duration = timeline.cur_t();
+        let mut anim = Animation::new(timeline)
+            .with_rate_func(linear)
+            .with_duration(Duration::from_secs_f32(duration));
+        app.render_anim_frame_to_image(&mut anim, path);
     }
 }
 
@@ -190,6 +214,18 @@ impl RanimRenderApp {
     }
     fn tick_duration(&self) -> Duration {
         Duration::from_secs_f32(1.0 / self.fps as f32)
+    }
+
+    pub fn render_anim_frame_to_image(
+        &mut self,
+        anim: &mut Animation,
+        filename: impl AsRef<Path>,
+    ) {
+        // let alpha = sec / anim.duration().as_secs_f32();
+        // anim.update_alpha(alpha);
+        self.renderer.render_anim(&mut self.ctx, anim);
+        let path = self.output_dir.join(filename);
+        self.save_frame_to_image(path);
     }
 
     pub fn render_anim(&mut self, mut anim: Animation) {

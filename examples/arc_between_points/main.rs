@@ -4,10 +4,11 @@ use bevy_color::Srgba;
 use env_logger::Env;
 use glam::{vec2, Mat2};
 use log::info;
-use ranim::animation::creation::Color;
-use ranim::animation::fading;
+use ranim::animation::entity::creation::Color;
+use ranim::animation::entity::fading::fade_in;
+use ranim::animation::Timeline;
 use ranim::items::vitem::ArcBetweenPoints;
-use ranim::{prelude::*, TimelineConstructor, SceneDesc};
+use ranim::{prelude::*, SceneDesc, TimelineConstructor};
 
 pub struct ArcBetweenPointsScene;
 
@@ -17,8 +18,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
             name: "arc_between_points".to_string(),
         }
     }
-    fn construct<T: ranim::RanimApp>(&mut self, app: &mut T) {
-        let (width, height) = (1920.0, 1080.0);
+    fn construct(&mut self, timeline: &mut Timeline) {
         let center = vec2(0.0, 0.0);
 
         let start_color = Srgba::hex("FF8080FF").unwrap();
@@ -30,7 +30,6 @@ impl TimelineConstructor for ArcBetweenPointsScene {
         let width_step = 50.0 / (nrad as f32).powi(2);
         let angle_step = std::f32::consts::PI * 7.0 / 4.0 / nrad as f32;
 
-        let t = Instant::now();
         for i in 0..nrad {
             let t = Instant::now();
             let rad = rad_step * (i + 1) as f32;
@@ -51,11 +50,9 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                     .set_fill_opacity(0.0)
                     .set_stroke_width(width);
 
-                let _arc = app.play(
-                    arc,
-                    fading::fade_in().config(|config| {
-                        config.set_run_time(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32));
-                    }),
+                let arc = timeline.insert(arc);
+                timeline.play(
+                    fade_in(arc).with_duration(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32)),
                 );
             }
             info!(
@@ -63,13 +60,6 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                 t.elapsed()
             );
         }
-
-        info!(
-            "Rendered {} frames({}s) in {:?}",
-            app.frame_cnt(),
-            app.frame_time(),
-            t.elapsed()
-        );
     }
 }
 

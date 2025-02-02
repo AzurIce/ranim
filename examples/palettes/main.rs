@@ -1,24 +1,22 @@
 use env_logger::Env;
-use glam::vec2;
+use glam::{vec2, vec3};
+use ranim::animation::entity::creation::Color;
 use ranim::color::palettes::manim::*;
-use ranim::prelude::*;
-use ranim::rabject::rabject2d::vmobject::geometry::Rect;
-use ranim::scene::SceneBuilder;
+use ranim::components::width;
+use ranim::items::vitem::Rectangle;
+use ranim::{prelude::*, TimelineConstructor};
 
-fn main() {
-    #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace")).init();
-    #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info")).init();
+struct Palettes;
 
-    let mut scene = SceneBuilder::new("palettes").build();
-    let (width, height) = scene.frame_size();
-    let canvas = scene.insert_new_canvas(width as u32, height as u32);
-    scene.center_canvas_in_frame(&canvas);
-
-    {
-        let canvas = scene.get_mut(&canvas);
-
+impl TimelineConstructor for Palettes {
+    fn desc() -> ranim::SceneDesc {
+        ranim::SceneDesc {
+            name: "palettes".to_string(),
+        }
+    }
+    fn construct(&mut self, timeline: &mut ranim::animation::Timeline) {
+        let (width, height) = (1920, 1080);
+        let (offset_x, offset_y) = (width as f32 / -2.0, height as f32 / -2.0);
         let colors = vec![
             vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],
             vec![TEAL_E, TEAL_D, TEAL_C, TEAL_B, TEAL_A],
@@ -44,15 +42,24 @@ fn main() {
             let w_step = (width - 2 * padding) / cols;
             for (j, color) in row.iter().enumerate() {
                 let x = padding + j * w_step;
-                let mut square = Rect::new(w_step as f32, h_step as f32).build();
-                square
-                    .shift(vec2(x as f32, y as f32))
-                    .set_color(*color)
-                    .set_stroke_width(0.0);
-                canvas.insert(square);
+                let mut square = Rectangle(w_step as f32, h_step as f32).build();
+                square.vpoints.shift(vec3(
+                    x as f32 + offset_x + w_step as f32 / 2.0,
+                    y as f32 + offset_y + h_step as f32 / 2.0,
+                    0.0,
+                ));
+                square.set_color(*color).set_stroke_width(0.0);
+                timeline.insert(square);
             }
         }
     }
-    // scene.wait(Duration::from_secs(1));
-    scene.render_to_image("./output.png");
+}
+
+fn main() {
+    #[cfg(debug_assertions)]
+    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace")).init();
+    #[cfg(not(debug_assertions))]
+    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info")).init();
+
+    Palettes.render_frame_to_image("output.png");
 }
