@@ -1,11 +1,14 @@
 use crate::Rabject;
 use crate::{interpolate::Interpolatable, items::Entity};
 
-use crate::animation::{AnimationFunc, entity::EntityAnimation};
+use crate::animation::entity::{EntityAnimation, EntityAnimator};
 
-pub fn interpolate<T: Entity + Alignable + Interpolatable + 'static>(src: Rabject<T>, dst: T) -> EntityAnimation<T> {
+pub fn interpolate<T: Entity + Alignable + Interpolatable + 'static>(
+    src: Rabject<T>,
+    dst: T,
+) -> EntityAnimation<T> {
     let inner = src.inner.clone();
-    EntityAnimation::new(src, Interpolate::new(inner, dst))
+    EntityAnimation::new(src.id(), Interpolate::new(inner, dst))
 }
 
 /// A transform animation func
@@ -43,14 +46,16 @@ impl<T: Entity + Alignable + Interpolatable> Interpolate<T> {
     }
 }
 
-impl<T: Entity + Alignable + Interpolatable> AnimationFunc<T> for Interpolate<T> {
-    fn eval_alpha(&mut self, target: &mut T, alpha: f32) {
+impl<T: Entity + Alignable + Interpolatable> EntityAnimator<T> for Interpolate<T> {
+    fn eval_alpha(&mut self, alpha: f32) -> T {
         if alpha == 0.0 {
-            *target = self.src.clone();
+            self.src.clone()
         } else if 0.0 < alpha && alpha < 1.0 {
-            *target = self.aligned_src.lerp(&self.aligned_dst, alpha);
+            self.aligned_src.lerp(&self.aligned_dst, alpha)
         } else if alpha == 1.0 {
-            *target = self.dst.clone();
+            self.dst.clone()
+        } else {
+            unreachable!()
         }
     }
 }

@@ -6,7 +6,7 @@ use glam::{vec2, Mat4, Vec2, Vec3};
 use primitives::Primitive;
 
 use crate::{
-    animation::{entity::EntityAnimation, Animation},
+    animation::{entity::EntityAnimation, Animator},
     context::{RanimContext, WgpuContext},
     items::{vitem::VItem, Entity},
     utils::wgpu::WgpuBuffer, // world::World,
@@ -291,7 +291,7 @@ impl Renderer {
     //     }
     // }
 
-    pub fn render_anim(&mut self, ctx: &mut RanimContext, anim: &impl Animation) {
+    pub fn render_anim(&mut self, ctx: &mut RanimContext, anim: &impl Animator) {
         self.clear_screen(&ctx.wgpu_ctx);
         let mut encoder = ctx
             .wgpu_ctx
@@ -543,10 +543,10 @@ mod test {
                 fading::{fade_in, fade_out},
             },
             wait::wait,
-            AnimationClip,
+            Animation, Timeline,
         },
         items::vitem::{Arc, Polygon, Square, VItem},
-        utils::bezier::PathBuilder,
+        utils::{bezier::PathBuilder, rate_functions::linear},
         AppOptions,
         RanimRenderApp, // world::{Store, World},
     };
@@ -603,12 +603,12 @@ mod test {
         let mut app = RanimRenderApp::new(AppOptions::default());
         // let rabject = Rabject::new(&app.ctx.wgpu_ctx, vitem);
         // app.render_anim(wait(rabject));
-        let mut animation_clip = AnimationClip::new(app.ctx.wgpu_ctx());
-        let rabject = animation_clip.insert(vitem);
-        animation_clip.play(create(rabject.clone()));
-        animation_clip.play(wait(rabject.clone()));
-        animation_clip.play(uncreate(rabject.clone()));
-        app.render_anim(animation_clip);
+        let mut timeline = Timeline::new(app.ctx.wgpu_ctx());
+        let rabject = timeline.insert(vitem);
+        timeline.play(create(rabject.clone()));
+        timeline.play(wait(rabject.clone()));
+        timeline.play(uncreate(rabject.clone()));
+        app.render_anim(Animation::new(timeline).with_rate_func(linear));
         // app.render_anim(
         //     create(rabject.clone())
         //         .chain(wait(rabject.clone()))

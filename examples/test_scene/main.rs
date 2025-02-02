@@ -10,7 +10,7 @@ use ranim::{
     render::Renderer,
     typst_svg, typst_tree,
     world::{EntityId, World},
-    AppOptions, RanimApp, RanimRenderApp, AnimationClipConstructor,
+    AppOptions, RanimApp, RanimRenderApp, TimelineConstructor,
 };
 
 // fn create_and_uncreate<T: RanimApp>(scene: &mut T, canvas: &EntityId<Canvas>, vmobject: VMobject) {
@@ -80,7 +80,7 @@ use ranim::{
 #[derive(Default)]
 struct TestScene;
 
-impl AnimationClipConstructor for TestScene {
+impl TimelineConstructor for TestScene {
     fn desc() -> ranim::SceneDesc {
         ranim::SceneDesc {
             name: "Test Scene".to_string(),

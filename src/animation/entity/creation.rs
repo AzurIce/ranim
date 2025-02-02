@@ -6,34 +6,34 @@ use crate::items::Entity;
 use crate::prelude::Interpolatable;
 use crate::Rabject;
 
-use crate::animation::{AnimationFunc, entity::EntityAnimation};
+use crate::animation::entity::{EntityAnimation, EntityAnimator};
 
 pub fn create<T: Entity + Partial + Empty + Interpolatable + 'static>(
     target: Rabject<T>,
 ) -> EntityAnimation<T> {
     let inner = target.inner.clone();
-    EntityAnimation::new(target, Create::new(inner))
+    EntityAnimation::new(target.id(), Create::new(inner))
 }
 
 pub fn uncreate<T: Entity + Partial + Empty + Interpolatable + 'static>(
     target: Rabject<T>,
 ) -> EntityAnimation<T> {
     let inner = target.inner.clone();
-    EntityAnimation::new(target, UnCreate::new(inner))
+    EntityAnimation::new(target.id(), UnCreate::new(inner))
 }
 
 pub fn write<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>(
     target: Rabject<T>,
 ) -> EntityAnimation<T> {
     let inner = target.inner.clone();
-    EntityAnimation::new(target, Write::new(inner))
+    EntityAnimation::new(target.id(), Write::new(inner))
 }
 
 pub fn unwrite<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>(
     target: Rabject<T>,
 ) -> EntityAnimation<T> {
     let inner = target.inner.clone();
-    EntityAnimation::new(target, Unwrite::new(inner))
+    EntityAnimation::new(target.id(), Unwrite::new(inner))
 }
 
 // ---------------------------------------------------- //
@@ -48,14 +48,16 @@ impl<T: Entity + Partial + Empty + Interpolatable> Create<T> {
     }
 }
 
-impl<T: Entity + Partial + Empty + Interpolatable> AnimationFunc<T> for Create<T> {
-    fn eval_alpha(&mut self, target: &mut T, alpha: f32) {
+impl<T: Entity + Partial + Empty + Interpolatable> EntityAnimator<T> for Create<T> {
+    fn eval_alpha(&mut self, alpha: f32) -> T {
         if alpha == 0.0 {
-            *target = T::empty();
+            T::empty()
         } else if 0.0 < alpha && alpha < 1.0 {
-            *target = self.original.get_partial(0.0..alpha);
+            self.original.get_partial(0.0..alpha)
         } else if alpha == 1.0 {
-            *target = self.original.clone();
+            self.original.clone()
+        } else {
+            unreachable!()
         }
     }
 }
@@ -70,14 +72,16 @@ impl<T: Entity + Partial + Empty + Interpolatable> UnCreate<T> {
     }
 }
 
-impl<T: Entity + Partial + Empty + Interpolatable> AnimationFunc<T> for UnCreate<T> {
-    fn eval_alpha(&mut self, target: &mut T, alpha: f32) {
+impl<T: Entity + Partial + Empty + Interpolatable> EntityAnimator<T> for UnCreate<T> {
+    fn eval_alpha(&mut self, alpha: f32) -> T {
         if alpha == 0.0 {
-            *target = self.original.clone();
+            self.original.clone()
         } else if 0.0 < alpha && alpha < 1.0 {
-            *target = self.original.get_partial(0.0..1.0 - alpha);
+            self.original.get_partial(0.0..1.0 - alpha)
         } else if alpha == 1.0 {
-            *target = T::empty();
+            T::empty()
+        } else {
+            unreachable!()
         }
     }
 }
@@ -107,16 +111,18 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Write<T> {
 }
 
 impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>
-    AnimationFunc<T> for Write<T>
+    EntityAnimator<T> for Write<T>
 {
-    fn eval_alpha(&mut self, target: &mut T, alpha: f32) {
+    fn eval_alpha(&mut self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
         if 0.0 <= alpha && alpha <= 1.0 {
-            self.create_anim.eval_alpha(target, alpha);
+            self.create_anim.eval_alpha(alpha)
         } else if 1.0 < alpha && alpha < 2.0 {
-            *target = self.outline.lerp(&self.original, alpha - 1.0);
+            self.outline.lerp(&self.original, alpha - 1.0)
         } else if alpha == 2.0 {
-            *target = self.original.clone();
+            self.original.clone()
+        } else {
+            unreachable!()
         }
     }
 }
@@ -145,17 +151,19 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Unwrite<T> {
     }
 }
 
-impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + 'static> AnimationFunc<T>
+impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + 'static> EntityAnimator<T>
     for Unwrite<T>
 {
-    fn eval_alpha(&mut self, target: &mut T, alpha: f32) {
+    fn eval_alpha(&mut self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
         if 0.0 < alpha && alpha < 1.0 {
-            *target = self.original.lerp(&self.outline, alpha);
+            self.original.lerp(&self.outline, alpha)
         } else if alpha == 1.0 {
-            *target = self.outline.clone();
+            self.outline.clone()
         } else if 1.0 < alpha && alpha <= 2.0 {
-            self.uncreate_anim.eval_alpha(target, alpha - 1.0);
+            self.uncreate_anim.eval_alpha(alpha - 1.0)
+        } else {
+            unreachable!()
         }
     }
 }
