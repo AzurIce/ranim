@@ -11,13 +11,13 @@ use ranim::glam::vec2;
 
 use ranim::animation::interpolate::Interpolate;
 use ranim::items::vitem::{Arc, Polygon};
-use ranim::{prelude::*, typst_svg, AnimationClipConstructor, SceneDesc};
+use ranim::{prelude::*, typst_svg, TimelineConstructor, SceneDesc};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 struct MainScene;
 
-impl AnimationClipConstructor for MainScene {
+impl TimelineConstructor for MainScene {
     fn desc() -> ranim::SceneDesc {
         SceneDesc {
             name: "basic".to_string(),

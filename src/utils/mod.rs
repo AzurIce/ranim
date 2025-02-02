@@ -15,7 +15,7 @@ use glam::{vec2, vec3, Mat3, Vec2, Vec3};
 
 use crate::{context::WgpuContext, render::RenderResource};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id(u128);
 
 impl Default for Id {

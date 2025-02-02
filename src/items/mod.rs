@@ -1,9 +1,9 @@
-use crate::render::primitives::Primitive;
+use crate::{prelude::Empty, render::primitives::Primitive};
 
 pub mod vitem;
 pub mod svg_item;
 
-pub trait Entity: Clone {
+pub trait Entity: Clone + Empty {
     type ExtractData;
     type Primitive: Primitive<Entity = Self>;
 

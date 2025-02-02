@@ -1,10 +1,14 @@
 //! Ranim is an animation engine written in rust based on [`wgpu`].
 
 use std::{
-    cell::RefCell, fmt::Write, path::{Path, PathBuf}, rc::Rc, time::{Duration, Instant}
+    cell::RefCell,
+    fmt::Write,
+    path::{Path, PathBuf},
+    rc::Rc,
+    time::{Duration, Instant},
 };
 
-use animation::{Animation, AnimationClip};
+use animation::{Animation, Animator, Timeline};
 use context::{RanimContext, WgpuContext};
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
@@ -13,7 +17,7 @@ use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::Entity;
 use log::trace;
 use render::{CameraFrame, Renderer};
-use utils::Id;
+use utils::{rate_functions::linear, Id};
 
 pub mod prelude {
     pub use crate::interpolate::Interpolatable;
@@ -79,9 +83,9 @@ pub struct SceneDesc {
     pub name: String,
 }
 
-pub trait AnimationClipConstructor {
+pub trait TimelineConstructor {
     fn desc() -> SceneDesc;
-    fn construct(&mut self, anim: &mut AnimationClip);
+    fn construct(&mut self, timeline: &mut Timeline);
 }
 
 pub trait RenderScene {
@@ -90,7 +94,7 @@ pub trait RenderScene {
         Self: Sized;
 }
 
-impl<T: AnimationClipConstructor> RenderScene for T {
+impl<T: TimelineConstructor> RenderScene for T {
     fn render(self)
     where
         Self: Sized,
@@ -101,9 +105,14 @@ impl<T: AnimationClipConstructor> RenderScene for T {
             output_dir: PathBuf::from(format!("./output/{}", desc.name)),
             ..Default::default()
         });
-        let mut clip = AnimationClip::new(app.ctx.wgpu_ctx());
-        clip_contructor.construct(&mut clip);
-        app.render_anim(clip);
+        let mut timeline = Timeline::new(app.ctx.wgpu_ctx());
+        clip_contructor.construct(&mut timeline);
+        let duration = timeline.cur_t();
+        app.render_anim(
+            Animation::new(timeline)
+                .with_rate_func(linear)
+                .with_duration(Duration::from_secs_f32(duration)),
+        );
     }
 }
 
@@ -183,7 +192,7 @@ impl RanimRenderApp {
         Duration::from_secs_f32(1.0 / self.fps as f32)
     }
 
-    pub fn render_anim<T: Animation>(&mut self, mut anim: T) {
+    pub fn render_anim(&mut self, mut anim: Animation) {
         let duration = anim.duration().as_secs_f32();
         let frames = (duration * self.fps as f32).ceil() as usize;
         let t = Instant::now();
