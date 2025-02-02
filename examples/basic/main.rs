@@ -4,14 +4,14 @@ use bevy_color::Srgba;
 use env_logger::Env;
 use glam::{vec3, Vec3};
 use log::info;
-use ranim::animation::creation::{self, Color};
-use ranim::animation::fading::{self, Fading};
+use ranim::animation::entity::creation::{uncreate, Color};
+use ranim::animation::entity::fading::fade_in;
+use ranim::animation::entity::interpolate::interpolate;
+use ranim::animation::Timeline;
 use ranim::components::TransformAnchor;
-use ranim::glam::vec2;
 
-use ranim::animation::interpolate::Interpolate;
 use ranim::items::vitem::{Arc, Polygon};
-use ranim::{prelude::*, typst_svg, TimelineConstructor, SceneDesc};
+use ranim::{prelude::*, typst_svg, SceneDesc, TimelineConstructor};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
@@ -23,7 +23,7 @@ impl TimelineConstructor for MainScene {
             name: "basic".to_string(),
         }
     }
-    fn construct<T: ranim::RanimApp>(&mut self, app: &mut T) {
+    fn construct(&mut self, timeline: &mut Timeline) {
         let t = Instant::now();
         info!("running...");
 
@@ -46,12 +46,16 @@ impl TimelineConstructor for MainScene {
         polygon
             .set_color(Srgba::hex("FF8080FF").unwrap())
             .set_opacity(0.5);
-        polygon.vpoints.rotate(std::f32::consts::FRAC_PI_4, Vec3::Z, TransformAnchor::origin());
-
+        polygon.vpoints.rotate(
+            std::f32::consts::FRAC_PI_4,
+            Vec3::Z,
+            TransformAnchor::origin(),
+        );
         // 0.5s wait -> fade in -> 0.5s wait
-        app.wait(Duration::from_secs_f32(0.5));
-        let polygon = app.play(polygon, fading::fade_in());
-        app.wait(Duration::from_secs_f32(0.5));
+        timeline.forward(Duration::from_secs_f32(0.5));
+        let polygon = timeline.insert(polygon);
+        let polygon = timeline.play(fade_in(polygon));
+        timeline.forward(Duration::from_secs_f32(0.5));
 
         // let mut svg = Svg::from_svg(SVG).build();
         // svg.shift(center);
@@ -63,23 +67,18 @@ impl TimelineConstructor for MainScene {
         let mut arc = Arc {
             angle: std::f32::consts::PI / 2.0,
             radius: 300.0,
-        }.build();
-        arc.set_color(Srgba::hex("58C4DDFF").unwrap()).set_stroke_width(40.0);
+        }
+        .build();
+        arc.set_color(Srgba::hex("58C4DDFF").unwrap())
+            .set_stroke_width(20.0);
 
         info!("polygon transform to arc");
-        let arc = app.play(polygon, Interpolate::new(arc.clone()));
-        app.wait(Duration::from_secs_f32(0.5));
+        let arc = timeline.play(interpolate(polygon, arc));
+        timeline.forward(Duration::from_secs_f32(0.5));
 
         info!("arc uncreate");
-        app.play_remove(arc, creation::uncreate());
-        app.wait(Duration::from_secs_f32(0.5));
-
-        info!(
-            "Rendered {} frames({}s) in {:?}",
-            app.frame_cnt(),
-            app.frame_time(),
-            t.elapsed()
-        );
+        timeline.play(uncreate(arc));
+        timeline.forward(Duration::from_secs_f32(0.5));
     }
 }
 

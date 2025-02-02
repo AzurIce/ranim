@@ -326,6 +326,7 @@ impl Renderer {
 
     //     self.output_texture_updated = false;
     // }
+
     fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
         let bytes_per_row =
             ((self.size.0 * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;

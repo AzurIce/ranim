@@ -5,9 +5,8 @@ use env_logger::Env;
 use glam::vec2;
 use log::info;
 use ranim::animation::entity::fading::fade_in;
-use ranim::animation::{Animator, Timeline};
+use ranim::animation::Timeline;
 use ranim::items::vitem::Arc;
-// use ranim::rabject::rabject3d::RabjectEntity3d;
 use ranim::{prelude::*, TimelineConstructor};
 
 struct ArcScene;
@@ -19,7 +18,6 @@ impl TimelineConstructor for ArcScene {
         }
     }
     fn construct(&mut self, timeline: &mut Timeline) {
-        let t = Instant::now();
         // let frame_size = app.camera().size;
         let frame_size = (1920.0, 1080.0);
         let frame_start = vec2(frame_size.0 as f32 / -2.0, frame_size.1 as f32 / -2.0);
