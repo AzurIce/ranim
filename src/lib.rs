@@ -123,7 +123,7 @@ pub trait TimelineConstructor {
 }
 
 pub trait RenderScene {
-    fn render(self)
+    fn render(self, options: &AppOptions)
     where
         Self: Sized;
     fn render_frame_to_image(self, path: impl AsRef<Path>)
@@ -132,20 +132,23 @@ pub trait RenderScene {
 }
 
 impl<T: TimelineConstructor> RenderScene for T {
-    fn render(self)
+    fn render(self, options: &AppOptions)
     where
         Self: Sized,
     {
-        let mut clip_contructor = self;
         let desc = T::desc();
-        let mut app = RanimRenderApp::new(AppOptions {
-            output_dir: PathBuf::from(format!("./output/{}", desc.name)),
-            ..Default::default()
-        });
+        let mut options = options.clone();
+        let default_options = AppOptions::default();
+        if options.output_dir == default_options.output_dir {
+            options.output_dir = PathBuf::from(format!("./output/{}", desc.name))
+        }
+
+        let mut clip_contructor = self;
+        let mut app = RanimRenderApp::new(&options);
         let mut timeline = Timeline::new();
         clip_contructor.construct(&mut timeline);
         if timeline.elapsed_secs() == 0.0 {
-            timeline.forward(Duration::from_secs_f32(0.1));
+            timeline.forward(0.1);
         }
         let duration_secs = timeline.elapsed_secs();
         app.render_anim(
@@ -157,14 +160,14 @@ impl<T: TimelineConstructor> RenderScene for T {
     fn render_frame_to_image(self, path: impl AsRef<Path>) {
         let mut clip_contructor = self;
         let desc = T::desc();
-        let mut app = RanimRenderApp::new(AppOptions {
+        let mut app = RanimRenderApp::new(&AppOptions {
             output_dir: PathBuf::from(format!("./output/{}", desc.name)),
             ..Default::default()
         });
         let mut timeline = Timeline::new();
         clip_contructor.construct(&mut timeline);
         if timeline.elapsed_secs() == 0.0 {
-            timeline.forward(Duration::from_secs_f32(0.1));
+            timeline.forward(0.1);
         }
         let duration_secs = timeline.elapsed_secs();
         let mut anim = Animation::new(timeline)
@@ -197,6 +200,7 @@ pub struct RanimRenderApp {
     output_dir: PathBuf,
 }
 
+#[derive(Debug, Clone)]
 pub struct AppOptions {
     pub frame_size: (u32, u32),
     pub frame_rate: u32,
@@ -216,7 +220,7 @@ impl Default for AppOptions {
 }
 
 impl RanimRenderApp {
-    pub fn new(options: AppOptions) -> Self {
+    pub fn new(options: &AppOptions) -> Self {
         let ctx = RanimContext::new();
         let camera_frame = CameraFrame::new_with_size(
             options.frame_size.0 as usize,
@@ -243,7 +247,7 @@ impl RanimRenderApp {
             fps: options.frame_rate,
             frame_count: 0,
             ctx,
-            output_dir: options.output_dir,
+            output_dir: options.output_dir.clone(),
         }
     }
     fn tick_duration(&self) -> Duration {

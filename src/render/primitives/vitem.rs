@@ -1,4 +1,5 @@
 use glam::{Vec2, Vec4};
+use log::trace;
 
 use crate::{
     components::{rgba::Rgba, width::Width},
@@ -84,6 +85,13 @@ impl VItemPrimitive {
         stroke_rgbas: &[Rgba],
         stroke_widths: &[Width],
     ) {
+        // trace!(
+        //     "VItemPrimitive update: {} {} {} {}",
+        //     render_points.len(),
+        //     fill_rgbas.len(),
+        //     stroke_rgbas.len(),
+        //     stroke_widths.len()
+        // );
         // // Fixed sized
         // self.clip_box_buffer.set(ctx, clip_box);
 
@@ -119,6 +127,7 @@ impl VItemPrimitive {
 
 impl Primitive for VItemPrimitive {
     fn update_clip_box(&mut self, ctx: &WgpuContext, clip_box: &[Vec2; 4]) {
+        // trace!("VItemPrimitive update_clip_box: {:?}", clip_box);
         self.clip_box_buffer.set(ctx, clip_box);
     }
     fn encode_render_command(

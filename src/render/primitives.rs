@@ -1,4 +1,5 @@
 pub mod vitem;
+pub mod svg_item;
 
 use glam::Vec2;
 

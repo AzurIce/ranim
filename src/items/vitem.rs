@@ -37,7 +37,7 @@ impl HasTransform3d for VItem {
 
 impl VItem {
     pub fn from_vpoints(vpoints: Vec<Vec3>) -> Self {
-        let stroke_widths = vec![1.0; vpoints.len()];
+        let stroke_widths = vec![1.0; (vpoints.len() + 1) / 2];
         let stroke_rgbas = vec![vec4(1.0, 0.0, 0.0, 1.0); (vpoints.len() + 1) / 2];
         let fill_rgbas = vec![vec4(0.0, 1.0, 0.0, 0.5); (vpoints.len() + 1) / 2];
         Self {

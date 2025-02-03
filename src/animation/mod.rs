@@ -1,7 +1,7 @@
 pub mod entity;
 pub mod wait;
 
-use std::{any::Any, collections::HashMap, sync::Arc, time::Duration};
+use std::{any::Any, collections::HashMap, time::Duration};
 
 use crate::{
     context::WgpuContext,
@@ -159,8 +159,8 @@ impl Timeline {
     // pub fn show<T: Entity>(&mut self, rabject: &mut Rabject<T>) {}
     // pub fn hide<T: Entity>(&mut self, rabject: &mut Rabject<T>) {}
 
-    pub fn forward(&mut self, duration: Duration) {
-        self.elapsed_secs += duration.as_secs_f32();
+    pub fn forward(&mut self, secs: f32) {
+        self.elapsed_secs += secs;
     }
 
     /// append an animation to the clip

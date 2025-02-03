@@ -7,7 +7,7 @@ use log::info;
 use ranim::animation::entity::fading::fade_in;
 use ranim::animation::Timeline;
 use ranim::items::vitem::Arc;
-use ranim::{prelude::*, TimelineConstructor};
+use ranim::{prelude::*, AppOptions, TimelineConstructor};
 
 struct ArcScene;
 
@@ -64,5 +64,5 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("arc=info")).init();
 
-    ArcScene.render();
+    ArcScene.render(&AppOptions::default());
 }

@@ -8,7 +8,7 @@ use ranim::animation::entity::creation::Color;
 use ranim::animation::entity::fading::fade_in;
 use ranim::animation::Timeline;
 use ranim::items::vitem::ArcBetweenPoints;
-use ranim::{prelude::*, SceneDesc, TimelineConstructor};
+use ranim::{prelude::*, AppOptions, SceneDesc, TimelineConstructor};
 
 pub struct ArcBetweenPointsScene;
 
@@ -71,5 +71,5 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=info"))
         .init();
 
-    ArcBetweenPointsScene.render();
+    ArcBetweenPointsScene.render(&AppOptions::default());
 }

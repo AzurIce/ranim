@@ -515,11 +515,7 @@ mod test {
             },
             wait::wait,
             Animation, Timeline,
-        },
-        items::vitem::{Arc, Polygon, Square, VItem},
-        utils::{bezier::PathBuilder, rate_functions::linear},
-        AppOptions,
-        RanimRenderApp, // world::{Store, World},
+        }, items::vitem::{Arc, Polygon, Square, VItem}, prelude::Fill, utils::{bezier::PathBuilder, rate_functions::linear}, AppOptions, RanimRenderApp // world::{Store, World},
     };
 
     #[test]
@@ -549,49 +545,50 @@ mod test {
                 vec3(0.0, 0.0, 0.0),
             )
             .close_path();
-        let vpoints = builder
+        let cw_vpoints = builder
             .vpoints()
             .to_vec()
             .into_iter()
             .map(|p| p * 50.0)
             .collect::<Vec<_>>();
-        println!("{:?}", vpoints);
-        let mut vitem = VItem::from_vpoints(vpoints);
-        // let mut vitem = Arc {
-        //     angle: std::f32::consts::FRAC_PI_2,
-        //     radius: 200.0,
-        // }
-        // .build();
-        // vitem.set_stroke_width(20.0);
+        println!("{:?}", cw_vpoints);
 
-        // let vitem = vitem.get_partial(0.0..0.4);
+        let mut builder = PathBuilder::new();
+        builder
+            .move_to(vec3(0.0, 0.0, 0.0))
+            .cubic_to(
+                vec3(1.0, 4.0, 0.0),
+                vec3(-2.0, 2.0, 0.0),
+                vec3(0.0, 2.0, 0.0),
+            )
+            .quad_to(vec3(1.0, 2.0, 0.0), vec3(1.0, 1.0, 0.0))
+            .line_to(vec3(0.0, 0.0, 0.0))
+            .close_path();
+        let ccw_vpoints = builder
+            .vpoints()
+            .to_vec()
+            .into_iter()
+            .map(|p| p * 80.0)
+            .collect::<Vec<_>>();
+        println!("{:?}", ccw_vpoints);
 
-        // let id = world.insert(vitem);
-        // world.extract();
-        // world.prepare(&ctx);
-        // world.prepare(&ctx);
 
-        let mut app = RanimRenderApp::new(AppOptions::default());
-        // let rabject = Rabject::new(&app.ctx.wgpu_ctx, vitem);
-        // app.render_anim(wait(rabject));
+        let mut app = RanimRenderApp::new(&AppOptions::default());
         let mut timeline = Timeline::new();
+        let mut vitem = VItem::from_vpoints(cw_vpoints);
         let rabject = timeline.insert(vitem);
         timeline.play(create(rabject.clone()));
         timeline.play(wait(rabject.clone()));
-        timeline.play(uncreate(rabject.clone()));
+        // timeline.play(uncreate(rabject.clone()));
+
+        let mut vitem = VItem::from_vpoints(ccw_vpoints);
+        vitem.set_fill_opacity(0.0);
+        let rabject = timeline.insert(vitem);
+        timeline.play(create(rabject.clone()));
+        timeline.play(wait(rabject.clone()));
+        // timeline.play(uncreate(rabject.clone()));
+
+
         app.render_anim(Animation::new(timeline).with_rate_func(linear));
-        // app.render_anim(
-        //     create(rabject.clone())
-        //         .chain(wait(rabject.clone()))
-        //         .chain(fade_out(rabject.clone()))
-        //         .chain(wait(rabject.clone()))
-        //         .chain(write(rabject)),
-        // );
-        // app.render_anim(wait(rabject));
-        // let mut renderer = Renderer::new(&ctx, 1920, 1080);
-        // // renderer.render(&mut ctx, &mut world);
-        // let data = renderer.get_rendered_texture_data(&ctx.wgpu_ctx);
-        // let image = ImageBuffer::<image::Rgba<u8>, _>::from_raw(1920, 1080, data.to_vec()).unwrap();
-        // image.save("./output.png");
     }
 }

@@ -3,12 +3,8 @@ use std::time::Duration;
 use env_logger::Env;
 use ranim::{
     animation::{
-        entity::creation::{unwrite, write},
-        Timeline,
-    },
-    items::vitem::{Square, VItem},
-    prelude::*,
-    TimelineConstructor,
+        entity::creation::{create, unwrite, write}, wait::wait, Timeline
+    }, items::{svg_item::SvgItem, vitem::{Square, VItem}}, prelude::*, AppOptions, TimelineConstructor
 };
 
 // fn create_and_uncreate<T: RanimApp>(scene: &mut T, canvas: &EntityId<Canvas>, vmobject: VMobject) {
@@ -75,6 +71,8 @@ use ranim::{
 //     }
 // }
 
+const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
+
 #[derive(Default)]
 struct TestScene;
 
@@ -85,11 +83,18 @@ impl TimelineConstructor for TestScene {
         }
     }
     fn construct(&mut self, timeline: &mut Timeline) {
-        let square = Square(100.0).build();
-        let square = timeline.insert(square);
-        timeline.play(write(square.clone()));
-        timeline.forward(Duration::from_secs_f32(1.0));
-        timeline.play(unwrite(square.clone()));
+        // let square = Square(100.0).build();
+        // let square = timeline.insert(square);
+        // timeline.play(write(square.clone()));
+        // timeline.forward(1.0);
+        // timeline.play(unwrite(square.clone()));
+
+        let svg = SvgItem::from_svg(SVG);
+        // println!("{:?}", svg);
+        let svg = timeline.insert(svg);
+        timeline.play(create(svg).with_duration(2.0));
+        // timeline.forward(1.0);
+
         // app.render_to_image("test.png");
         // let path = VPathBuilder::start(vec3(0.0, 0.0, 0.0))
         //     .line_to(vec3(100.0, 200.0, 0.0))
@@ -106,5 +111,8 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace"))
         .init();
-    TestScene.render();
+    TestScene.render(&AppOptions {
+        save_frames: true,
+        ..Default::default()
+    });
 }
