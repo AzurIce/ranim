@@ -237,6 +237,11 @@ impl<T: Transform3d + Default + Clone> ComponentData<T> {
             .unwrap()
     }
 
+    pub fn apply_affine(&mut self, affine: Mat3) {
+        self.iter_mut()
+            .for_each(|p| *p.position_mut() = affine * p.position());
+    }
+
     /// Apply a function to the points of the mobject about the point.
     pub fn apply_points_function(
         &mut self,

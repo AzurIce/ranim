@@ -11,7 +11,7 @@ use ranim::animation::Timeline;
 use ranim::components::TransformAnchor;
 
 use ranim::items::vitem::{Arc, Polygon};
-use ranim::{prelude::*, typst_svg, SceneDesc, TimelineConstructor};
+use ranim::{prelude::*, typst_svg, AppOptions, SceneDesc, TimelineConstructor};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
@@ -52,10 +52,10 @@ impl TimelineConstructor for MainScene {
             TransformAnchor::origin(),
         );
         // 0.5s wait -> fade in -> 0.5s wait
-        timeline.forward(Duration::from_secs_f32(0.5));
+        timeline.forward(0.5);
         let polygon = timeline.insert(polygon);
         let polygon = timeline.play(fade_in(polygon));
-        timeline.forward(Duration::from_secs_f32(0.5));
+        timeline.forward(0.5);
 
         // let mut svg = Svg::from_svg(SVG).build();
         // svg.shift(center);
@@ -74,11 +74,11 @@ impl TimelineConstructor for MainScene {
 
         info!("polygon transform to arc");
         let arc = timeline.play(interpolate(polygon, arc));
-        timeline.forward(Duration::from_secs_f32(0.5));
+        timeline.forward(0.5);
 
         info!("arc uncreate");
         timeline.play(uncreate(arc));
-        timeline.forward(Duration::from_secs_f32(0.5));
+        timeline.forward(0.5);
     }
 }
 
@@ -88,5 +88,5 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=info")).init();
 
-    MainScene.render();
+    MainScene.render(&AppOptions::default());
 }

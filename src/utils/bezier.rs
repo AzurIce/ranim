@@ -12,6 +12,9 @@ pub struct PathBuilder {
 }
 
 impl PathBuilder {
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
+    }
     pub fn new() -> Self {
         Self {
             start_point: None,
