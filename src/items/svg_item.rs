@@ -16,7 +16,7 @@ use super::{vitem::VItem, Entity};
 
 #[derive(Debug, Clone)]
 pub struct SvgItem {
-    pub(crate) vitems: Vec<VItem>,
+    pub vitems: Vec<VItem>,
 }
 
 impl SvgItem {
@@ -33,8 +33,13 @@ impl SvgItem {
         for (path, transform) in walk_svg_group(tree.root()) {
             // let transform = path.abs_transform();
 
+            // let mut cnt = 0;
             let mut builder = PathBuilder::new();
             for segment in path.data().segments() {
+                // cnt += 1;
+                // if vitems.len() == 79 {
+                //     println!("{} - {:?}", builder.len(), segment);
+                // }
                 match segment {
                     usvg::tiny_skia_path::PathSegment::MoveTo(p) => {
                         builder.move_to(vec3(p.x, p.y, 0.0))
@@ -53,6 +58,9 @@ impl SvgItem {
                     usvg::tiny_skia_path::PathSegment::Close => builder.close_path(),
                 };
             }
+            // if vitems.len() == 79 {
+            //     println!("{:?}", cnt);
+            // }
             if builder.is_empty() {
                 warn!("empty path");
                 continue;

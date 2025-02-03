@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use glam::Vec3;
+use itertools::Itertools;
 
 use crate::prelude::Interpolatable;
 use crate::prelude::Partial;
@@ -96,19 +97,31 @@ impl ComponentData<VPoint> {
             .flatten()
     }
     pub fn get_closepath_flags(&self) -> Vec<bool> {
-        let mut flags = vec![false; self.len()];
+        let len = self.len();
+        let mut flags = vec![false; len];
 
         // println!("{:?}", self.0);
         let mut i = 0;
-        for (j, chunk) in self.0[1..].chunks_exact(2).enumerate() {
-            // println!("{:?}", (j, chunk));
-            let cur_idx = 1 + j * 2;
-            let [a, b] = chunk else { unreachable!() };
-            if b == a || cur_idx == self.len() - 2 {
-                if b == self.get(i).unwrap() {
-                    flags[i..=cur_idx + 1].fill(true);
+        for mut chunk in &self.0.iter().enumerate().skip(2).chunks(2) {
+            let (a, b) = (chunk.next(), chunk.next());
+            if let Some((ia, a)) = match (a, b) {
+                (Some((ia, a)), Some((ib, b))) => {
+                    // println!("chunk[{ia}, {ib}] {:?}", [a, b]);
+                    if a == b {
+                        Some((ia, a))
+                    } else {
+                        None
+                    }
                 }
-                i = cur_idx + 2;
+                (Some((ia, a)), None) => Some((ia, a)),
+                _ => unreachable!(),
+            } {
+                // println!("### path end ###");
+                if (a.0 - self.get(i).unwrap().0).length_squared() <= 0.0001 {
+                    // println!("### path closed ###");
+                    flags[i..=ia].fill(true);
+                }
+                i = ia + 2;
             }
         }
 

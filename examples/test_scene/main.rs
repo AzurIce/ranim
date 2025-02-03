@@ -90,9 +90,15 @@ impl TimelineConstructor for TestScene {
         // timeline.play(unwrite(square.clone()));
 
         let svg = SvgItem::from_svg(SVG);
-        // println!("{:?}", svg);
+        // println!("{:?}", svg.vitems[79].vpoints);
+        // println!("{:?}", svg.vitems[79].vpoints.get_closepath_flags());
+        // let svg = svg.vitems[79].clone();
+        // println!("{:?}", svg.vpoints.len());
+        // let svg = svg.get_partial(0.55..0.6);
+
         let svg = timeline.insert(svg);
-        timeline.play(create(svg).with_duration(2.0));
+        timeline.play(wait(svg.clone()).with_duration(0.1));
+        timeline.play(create(svg).with_duration(1.0));
         // timeline.forward(1.0);
 
         // app.render_to_image("test.png");

@@ -21,6 +21,9 @@ impl PathBuilder {
             points: Vec::new(),
         }
     }
+    pub fn len(&self) -> usize {
+        self.points.len()
+    }
 
     /// Starts a new subpath and push the point as the start_point
     pub fn move_to(&mut self, point: Vec3) -> &mut Self {
@@ -83,9 +86,7 @@ impl PathBuilder {
         if self.points.last() == self.start_point.as_ref() {
             return self;
         }
-        if let Some(start) = self.start_point {
-            self.line_to(start);
-        }
+        self.line_to(self.start_point.unwrap());
         self
     }
 

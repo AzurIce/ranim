@@ -515,7 +515,15 @@ mod test {
             },
             wait::wait,
             Animation, Timeline,
-        }, items::vitem::{Arc, Polygon, Square, VItem}, prelude::Fill, utils::{bezier::PathBuilder, rate_functions::linear}, AppOptions, RanimRenderApp // world::{Store, World},
+        },
+        items::{
+            vitem::{Arc, Polygon, Square, VItem},
+            Blueprint,
+        },
+        prelude::Fill,
+        utils::{bezier::PathBuilder, rate_functions::linear},
+        AppOptions,
+        RanimRenderApp, // world::{Store, World},
     };
 
     #[test]
@@ -526,68 +534,66 @@ mod test {
         // let mut vitem = Square(100.0).build();
         // vitem.vpoints.shift(vec3(-200.0, 0.0, 0.0));
         // world.insert(vitem);
-        // let vitem = Polygon(vec![
-        //     vec3(-100.0, -300.0, 0.0),
-        //     vec3(-100.0, 0.0, 0.0),
-        //     vec3(0.0, 300.0, 0.0),
-        //     vec3(200.0, 300.0, 0.0),
-        //     vec3(200.0, -300.0, 0.0),
-        // ])
-        // .build();
-        let mut builder = PathBuilder::new();
-        builder
-            .move_to(vec3(0.0, 0.0, 0.0))
-            .line_to(vec3(1.0, 1.0, 0.0))
-            .quad_to(vec3(1.0, 2.0, 0.0), vec3(0.0, 2.0, 0.0))
-            .cubic_to(
-                vec3(-2.0, 2.0, 0.0),
-                vec3(1.0, 4.0, 0.0),
-                vec3(0.0, 0.0, 0.0),
-            )
-            .close_path();
-        let cw_vpoints = builder
-            .vpoints()
-            .to_vec()
-            .into_iter()
-            .map(|p| p * 50.0)
-            .collect::<Vec<_>>();
-        println!("{:?}", cw_vpoints);
+        let vitem = Polygon(vec![
+            vec3(-100.0, -300.0, 0.0),
+            vec3(-100.0, 0.0, 0.0),
+            vec3(0.0, 300.0, 0.0),
+            vec3(200.0, 300.0, 0.0),
+            vec3(200.0, -300.0, 0.0),
+        ])
+        .build();
+        // let mut builder = PathBuilder::new();
+        // builder
+        //     .move_to(vec3(0.0, 0.0, 0.0))
+        //     .line_to(vec3(1.0, 1.0, 0.0))
+        //     .quad_to(vec3(1.0, 2.0, 0.0), vec3(0.0, 2.0, 0.0))
+        //     .cubic_to(
+        //         vec3(-2.0, 2.0, 0.0),
+        //         vec3(1.0, 4.0, 0.0),
+        //         vec3(0.0, 0.0, 0.0),
+        //     )
+        //     .close_path();
+        // let cw_vpoints = builder
+        //     .vpoints()
+        //     .to_vec()
+        //     .into_iter()
+        //     .map(|p| p * 50.0)
+        //     .collect::<Vec<_>>();
+        // println!("{:?}", cw_vpoints);
 
-        let mut builder = PathBuilder::new();
-        builder
-            .move_to(vec3(0.0, 0.0, 0.0))
-            .cubic_to(
-                vec3(1.0, 4.0, 0.0),
-                vec3(-2.0, 2.0, 0.0),
-                vec3(0.0, 2.0, 0.0),
-            )
-            .quad_to(vec3(1.0, 2.0, 0.0), vec3(1.0, 1.0, 0.0))
-            .line_to(vec3(0.0, 0.0, 0.0))
-            .close_path();
-        let ccw_vpoints = builder
-            .vpoints()
-            .to_vec()
-            .into_iter()
-            .map(|p| p * 80.0)
-            .collect::<Vec<_>>();
-        println!("{:?}", ccw_vpoints);
-
+        // let mut builder = PathBuilder::new();
+        // builder
+        //     .move_to(vec3(0.0, 0.0, 0.0))
+        //     .cubic_to(
+        //         vec3(1.0, 4.0, 0.0),
+        //         vec3(-2.0, 2.0, 0.0),
+        //         vec3(0.0, 2.0, 0.0),
+        //     )
+        //     .quad_to(vec3(1.0, 2.0, 0.0), vec3(1.0, 1.0, 0.0))
+        //     .line_to(vec3(0.0, 0.0, 0.0))
+        //     .close_path();
+        // let ccw_vpoints = builder
+        //     .vpoints()
+        //     .to_vec()
+        //     .into_iter()
+        //     .map(|p| p * 80.0)
+        //     .collect::<Vec<_>>();
+        // println!("{:?}", ccw_vpoints);
 
         let mut app = RanimRenderApp::new(&AppOptions::default());
         let mut timeline = Timeline::new();
-        let mut vitem = VItem::from_vpoints(cw_vpoints);
+        // let mut vitem = VItem::from_vpoints(cw_vpoints);
+        // let rabject = timeline.insert(vitem);
+        // timeline.play(create(rabject.clone()));
+        // timeline.play(wait(rabject.clone()));
+        // timeline.play(uncreate(rabject.clone()));
+
+        // let mut vitem = VItem::from_vpoints(ccw_vpoints);
+        // vitem.set_fill_opacity(0.0);
         let rabject = timeline.insert(vitem);
         timeline.play(create(rabject.clone()));
         timeline.play(wait(rabject.clone()));
         // timeline.play(uncreate(rabject.clone()));
-
-        let mut vitem = VItem::from_vpoints(ccw_vpoints);
-        vitem.set_fill_opacity(0.0);
-        let rabject = timeline.insert(vitem);
-        timeline.play(create(rabject.clone()));
-        timeline.play(wait(rabject.clone()));
-        // timeline.play(uncreate(rabject.clone()));
-
 
         app.render_anim(Animation::new(timeline).with_rate_func(linear));
     }
