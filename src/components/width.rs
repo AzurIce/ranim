@@ -1,6 +1,6 @@
-use crate::prelude::{Interpolatable, Partial};
+use crate::prelude::Interpolatable;
 
-use super::{ComponentData, PointWise};
+use super::PointWise;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, bytemuck::Pod, bytemuck::Zeroable)]

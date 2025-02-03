@@ -6,7 +6,7 @@ pub fn wait<T: Entity + 'static>(rabject: Rabject<T>) -> EntityAnimation<T> {
     EntityAnimation::new(rabject.id(), Wait(rabject.inner.clone()))
 }
 
-pub fn blank<T: Entity + Empty>(rabject: Rabject<T>) -> EntityAnimation<T> {
+pub fn blank<T: Entity + Empty + 'static>(rabject: Rabject<T>) -> EntityAnimation<T> {
     EntityAnimation::new(rabject.id(), Blank)
 }
 

@@ -1,31 +1,22 @@
 //! The EntityAnimation is applied to an entity
 //!
+pub mod composition;
 pub mod creation;
 pub mod fading;
 pub mod interpolate;
 
-use std::{
-    any::Any,
-    ops::{Deref, DerefMut, RangeInclusive},
-    time::Duration,
-};
-
-use itertools::Itertools;
-
 use crate::{
     context::WgpuContext,
     items::Entity,
-    render::{primitives::Primitive, CameraFrame},
+    render::{CameraFrame, Renderable},
     utils::{Id, RenderResourceStorage},
     Rabject,
 };
 
-use super::{
-    wait::{wait, Wait},
-    AnimationParams, Animator,
-};
+use super::{AnimationParams, Animator};
 
 pub struct EntityTimeline<T: Entity> {
+    initial: Rabject<T>,
     pub(crate) rabject: Rabject<T>,
     anims: Vec<EntityAnimation<T>>,
     end_sec: Vec<f32>,
@@ -35,6 +26,7 @@ pub struct EntityTimeline<T: Entity> {
 impl<T: Entity> EntityTimeline<T> {
     pub fn new(rabject: Rabject<T>) -> Self {
         Self {
+            initial: rabject.clone(),
             rabject,
             anims: Vec::new(),
             end_sec: Vec::new(),
@@ -43,7 +35,7 @@ impl<T: Entity> EntityTimeline<T> {
     }
     /// Push an animation to the timeline
     pub fn push(&mut self, anim: EntityAnimation<T>) {
-        let duration = anim.params.duration.as_secs_f32();
+        let duration = anim.params.duration_secs;
         self.anims.push(anim);
 
         let end_sec = self.end_sec.last().copied().unwrap_or(0.0) + duration;
@@ -55,6 +47,9 @@ impl<T: Entity> EntityTimeline<T> {
 impl<T: Entity> Animator for EntityTimeline<T> {
     fn update_alpha(&mut self, alpha: f32) {
         // TODO: handle no anim
+        if self.anims.is_empty() {
+            return;
+        }
         // println!("update_alpha: {alpha}, {}", self.total_sec);
         // println!("{:?}", self.end_sec);
         let sec = alpha * self.total_sec;
@@ -64,18 +59,18 @@ impl<T: Entity> Animator for EntityTimeline<T> {
             .zip(self.end_sec.iter())
             .find(|(_, end_sec)| **end_sec >= sec)
             .unwrap();
-        let start_sec = end_sec - anim.params.duration.as_secs_f32();
+        let start_sec = end_sec - anim.params.duration_secs;
         let alpha = (sec - start_sec) / (end_sec - start_sec);
         self.rabject.inner = anim.eval_alpha(alpha);
     }
-    fn update_clip_info(&self, ctx: &WgpuContext, camera: &CameraFrame) {
-        self.rabject
-            .render_instance
-            .borrow_mut()
-            .update_clip_info(ctx, camera);
+}
+
+impl<T: Entity> Renderable for EntityTimeline<T> {
+    fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {
+        self.rabject.update_clip_info(ctx, camera);
     }
     fn render(
-        &self,
+        &mut self,
         ctx: &WgpuContext,
         pipelines: &mut RenderResourceStorage,
         encoder: &mut wgpu::CommandEncoder,
@@ -83,23 +78,36 @@ impl<T: Entity> Animator for EntityTimeline<T> {
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
     ) {
-        let mut render_instance = self.rabject.render_instance.borrow_mut();
-        render_instance.update(ctx, &self.rabject.inner);
-        render_instance.encode_render_command(
-            ctx,
-            pipelines,
-            encoder,
-            uniforms_bind_group,
-            multisample_view,
-            target_view,
-        );
+        if self.anims.is_empty() {
+            self.initial.render(
+                ctx,
+                pipelines,
+                encoder,
+                uniforms_bind_group,
+                multisample_view,
+                target_view,
+            );
+        } else {
+            self.rabject.render(
+                ctx,
+                pipelines,
+                encoder,
+                uniforms_bind_group,
+                multisample_view,
+                target_view,
+            );
+        }
     }
 }
 
+/// An animator that animates an entity
 pub trait EntityAnimator<T: Entity> {
     fn eval_alpha(&mut self, alpha: f32) -> T;
 }
 
+/// An animation that is applied to an entity
+///
+/// The `EntityAnimation` itself is also an [`EntityAnimator`]
 pub struct EntityAnimation<T: Entity> {
     pub(crate) entity_id: Id,
     animator: Box<dyn EntityAnimator<T>>,
@@ -114,8 +122,8 @@ impl<T: Entity> EntityAnimation<T> {
             params: AnimationParams::default(),
         }
     }
-    pub fn with_duration(mut self, duration: Duration) -> Self {
-        self.params.duration = duration;
+    pub fn with_duration(mut self, duration_secs: f32) -> Self {
+        self.params.duration_secs = duration_secs;
         self
     }
     pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
@@ -130,35 +138,3 @@ impl<T: Entity> EntityAnimator<T> for EntityAnimation<T> {
         self.animator.eval_alpha(alpha)
     }
 }
-
-// impl<T: Entity> Animator for EntityAnimation<T> {
-//     fn update_alpha(&mut self, alpha: f32) {
-//         self.animating_rabject.inner = self.animator.eval_alpha(alpha);
-//     }
-//     fn update_clip_info(&self, ctx: &WgpuContext, camera: &CameraFrame) {
-//         self.animating_rabject
-//             .render_instance
-//             .borrow_mut()
-//             .update_clip_info(ctx, camera);
-//     }
-//     fn render(
-//         &self,
-//         ctx: &WgpuContext,
-//         pipelines: &mut RenderResourceStorage,
-//         encoder: &mut wgpu::CommandEncoder,
-//         uniforms_bind_group: &wgpu::BindGroup,
-//         multisample_view: &wgpu::TextureView,
-//         target_view: &wgpu::TextureView,
-//     ) {
-//         let mut render_instance = self.animating_rabject.render_instance.borrow_mut();
-//         render_instance.update(ctx, &self.animating_rabject.inner);
-//         render_instance.encode_render_command(
-//             ctx,
-//             pipelines,
-//             encoder,
-//             uniforms_bind_group,
-//             multisample_view,
-//             target_view,
-//         );
-//     }
-// }

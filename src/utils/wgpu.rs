@@ -101,22 +101,26 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
 
 pub(crate) struct WgpuVecBuffer<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> {
     label: Option<&'static str>,
-    buffer: wgpu::Buffer,
+    pub(crate) buffer: Option<wgpu::Buffer>,
     usage: wgpu::BufferUsages,
     /// Keep match to the buffer size
     inner: Vec<T>,
 }
 
-impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> Deref for WgpuVecBuffer<T> {
-    type Target = wgpu::Buffer;
-
-    fn deref(&self) -> &Self::Target {
-        &self.buffer
-    }
-}
-
 impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
-    pub(crate) fn new(
+    pub(crate) fn new(label: Option<&'static str>, usage: wgpu::BufferUsages) -> Self {
+        assert!(
+            usage.contains(wgpu::BufferUsages::COPY_DST),
+            "Buffer {label:?} does not contains COPY_DST"
+        );
+        Self {
+            label,
+            buffer: None,
+            usage,
+            inner: vec![],
+        }
+    }
+    pub(crate) fn new_with_len(
         ctx: &WgpuContext,
         label: Option<&'static str>,
         usage: wgpu::BufferUsages,
@@ -128,12 +132,12 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         );
         Self {
             label,
-            buffer: ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            buffer: Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
                 label,
                 size: (std::mem::size_of::<T>() * len) as u64,
                 usage,
                 mapped_at_creation: false,
-            }),
+            })),
             usage,
             inner: vec![T::default(); len],
         }
@@ -152,13 +156,14 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         // trace!("[WgpuBuffer]: new_init, {} {:?}", data.len(), usage);
         Self {
             label,
-            buffer: ctx
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label,
-                    contents: bytemuck::cast_slice(&data),
-                    usage,
-                }),
+            buffer: Some(
+                ctx.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label,
+                        contents: bytemuck::cast_slice(&data),
+                        usage,
+                    }),
+            ),
             usage,
             inner: data.to_vec(),
         }
@@ -170,38 +175,48 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
 
     pub(crate) fn resize(&mut self, ctx: &WgpuContext, len: usize) -> bool {
         let size = (std::mem::size_of::<T>() * len) as u64;
-        let resize = self.buffer.size() != size;
-        if resize {
+        let realloc = self
+            .buffer
+            .as_ref()
+            .map(|b| b.size() != size)
+            .unwrap_or(true);
+        if realloc {
             self.inner.resize(len, T::default());
-            self.buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            self.buffer = Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
                 label: self.label,
                 size,
                 usage: self.usage,
                 mapped_at_creation: false,
-            })
+            }))
         }
-        resize
+        realloc
     }
 
-    pub(crate) fn set(&mut self, ctx: &WgpuContext, data: &[T]) {
+    pub(crate) fn set(&mut self, ctx: &WgpuContext, data: &[T]) -> bool {
         // trace!("{} {}", self.inner.len(), data.len());
         self.inner.resize(data.len(), T::default());
         self.inner.copy_from_slice(data);
+        let realloc = self
+            .buffer
+            .as_ref()
+            .map(|b| b.size() != (std::mem::size_of::<T>() * data.len()) as u64)
+            .unwrap_or(true);
 
-        if self.buffer.size() != (std::mem::size_of::<T>() * data.len()) as u64 {
-            self.buffer = ctx
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: self.label,
-                    contents: bytemuck::cast_slice(&data),
-                    usage: self.usage,
-                });
+        if realloc {
+            self.buffer = Some(
+                ctx.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: self.label,
+                        contents: bytemuck::cast_slice(&data),
+                        usage: self.usage,
+                    }),
+            );
         } else {
             {
                 let mut view = ctx
                     .queue
                     .write_buffer_with(
-                        self,
+                        self.buffer.as_ref().unwrap(),
                         0,
                         wgpu::BufferSize::new((std::mem::size_of::<T>() * data.len()) as u64)
                             .unwrap(),
@@ -211,6 +226,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             }
             ctx.queue.submit([]);
         }
+        realloc
     }
 }
 

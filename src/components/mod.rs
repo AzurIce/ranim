@@ -4,7 +4,7 @@ use std::{
 };
 
 use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3};
-use log::trace;
+use itertools::Itertools;
 
 use crate::{
     prelude::{Alignable, Interpolatable, Partial},
@@ -18,14 +18,6 @@ pub mod width;
 
 #[derive(Default, Clone)]
 pub struct ComponentData<T: Default + Clone>(Vec<T>);
-
-// impl<T: Default + Clone> Partial for ComponentData<T> {
-//     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
-//         let start = (range.start * self.len() as f32).floor() as usize;
-//         let end = (range.end * self.len() as f32).floor() as usize;
-//         Self(self.get(start..end).unwrap().to_vec())
-//     }
-// }
 
 impl<T: Default + Clone + PointWise + Interpolatable + Debug> Partial for ComponentData<T> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
@@ -58,7 +50,8 @@ impl<T: Default + Clone + PointWise + Interpolatable + Debug> Partial for Compon
             partial.extend_from_slice(self.get(start_index + 1..=end_index).unwrap());
             partial.push(end_v);
             partial
-        }.into()
+        }
+        .into()
     }
 }
 
@@ -186,9 +179,9 @@ impl TransformAnchor {
 }
 
 // MARK: Transform3d
-pub trait HasTransform3d<T: Transform3d + Default + Clone> {
-    fn get(&self) -> &ComponentData<T>;
-    fn get_mut(&mut self) -> &mut ComponentData<T>;
+pub trait HasTransform3d {
+    fn get(&self) -> &ComponentData<impl Transform3d + Default + Clone>;
+    fn get_mut(&mut self) -> &mut ComponentData<impl Transform3d + Default + Clone>;
 }
 
 pub trait Transform3d {
@@ -231,6 +224,17 @@ impl<T: Transform3d + Default + Clone> ComponentData<T> {
             bb[signum.y as usize].y,
             bb[signum.z as usize].z,
         )
+    }
+
+    pub fn get_bounding_box_corners(&self) -> [Vec3; 8] {
+        [-1, 1]
+            .into_iter()
+            .cartesian_product([-1, 1])
+            .cartesian_product([-1, 1])
+            .map(|((x, y), z)| self.get_bounding_box_point(ivec3(x, y, z)))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
     }
 
     /// Apply a function to the points of the mobject about the point.

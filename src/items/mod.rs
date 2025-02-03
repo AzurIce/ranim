@@ -1,13 +1,25 @@
-use crate::{prelude::Empty, render::primitives::Primitive};
+use glam::Vec2;
 
-pub mod vitem;
+use crate::{
+    prelude::Empty,
+    render::{primitives::Extract, CameraFrame},
+};
+
 pub mod svg_item;
+pub mod vitem;
 
 pub trait Entity: Clone + Empty {
-    type ExtractData;
-    type Primitive: Primitive<Entity = Self>;
+    type Primitive: Extract<Self> + Default;
 
-    fn extract(&self) -> Option<Self::ExtractData>;
+    #[allow(unused)]
+    fn clip_box(&self, camera: &CameraFrame) -> [Vec2; 4] {
+        [
+            Vec2::new(-1.0, -1.0),
+            Vec2::new(-1.0, 1.0),
+            Vec2::new(1.0, -1.0),
+            Vec2::new(1.0, 1.0),
+        ]
+    }
 }
 
 /// Blueprints are the data structures that are used to create [`Rabject`]s

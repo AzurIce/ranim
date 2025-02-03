@@ -1,15 +1,39 @@
 use std::path::Path;
 
 use bevy_color::Alpha;
-use glam::{vec3, vec4};
+use glam::vec3;
 
-use crate::{prelude::{Fill, Stroke}, utils::bezier::PathBuilder};
+use crate::{
+    prelude::{Empty, Fill, Stroke},
+    utils::bezier::PathBuilder,
+};
 
 use super::vitem::VItem;
 
+#[derive(Debug, Clone)]
 pub struct SvgItem {
-    vitems: Vec<VItem>,
+    pub(crate) vitems: Vec<VItem>,
 }
+
+impl Empty for SvgItem {
+    fn empty() -> Self {
+        Self { vitems: vec![] }
+    }
+}
+
+// impl Entity for SvgItem {
+//     fn to_rabject(self, ctx: &crate::context::WgpuContext) -> crate::Rabject<Self> {
+//         let render_instance = VItemPrimitive::init(ctx, &self);
+//         let render_instance = Rc::new(RefCell::new(
+//             Box::new(render_instance) as Box<dyn Primitive<Self>>
+//         ));
+//         Rabject {
+//             id: Id::new(),
+//             inner: self,
+//             render_instance,
+//         }
+//     }
+// }
 
 impl SvgItem {
     pub fn from_file(path: impl AsRef<Path>) -> Self {

@@ -1,7 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
 use glam::Vec3;
-use log::trace;
 
 use crate::prelude::Interpolatable;
 use crate::prelude::Partial;

@@ -1,5 +1,4 @@
 use glam::{Vec3, Vec3Swizzles};
-use log::trace;
 
 use crate::{
     prelude::Interpolatable,
