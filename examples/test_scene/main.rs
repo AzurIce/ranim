@@ -1,10 +1,20 @@
 use std::time::Duration;
 
 use env_logger::Env;
+use glam::Vec3;
 use ranim::{
     animation::{
-        entity::creation::{create, unwrite, write}, wait::wait, Timeline
-    }, items::{svg_item::SvgItem, vitem::{Square, VItem}}, prelude::*, AppOptions, TimelineConstructor
+        entity::creation::{create, unwrite, write},
+        wait::wait,
+        Timeline,
+    },
+    components::TransformAnchor,
+    items::{
+        svg_item::SvgItem,
+        vitem::{Square, VItem},
+    },
+    prelude::*,
+    AppOptions, TimelineConstructor,
 };
 
 // fn create_and_uncreate<T: RanimApp>(scene: &mut T, canvas: &EntityId<Canvas>, vmobject: VMobject) {
@@ -89,7 +99,13 @@ impl TimelineConstructor for TestScene {
         // timeline.forward(1.0);
         // timeline.play(unwrite(square.clone()));
 
-        let svg = SvgItem::from_svg(SVG);
+        let mut svg = SvgItem::from_svg(SVG);
+        svg.vitems.iter_mut().for_each(|vitem| {
+            vitem
+                .vpoints
+                .scale(Vec3::splat(2.0), TransformAnchor::origin());
+        });
+
         // println!("{:?}", svg.vitems[79].vpoints);
         // println!("{:?}", svg.vitems[79].vpoints.get_closepath_flags());
         // let svg = svg.vitems[79].clone();
