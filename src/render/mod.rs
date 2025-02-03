@@ -3,14 +3,24 @@ pub mod primitives;
 
 use bevy_color::Color;
 use glam::{vec2, Mat4, Vec2, Vec3};
-use primitives::Primitive;
 
 use crate::{
-    animation::{entity::EntityAnimation, Animator},
     context::{RanimContext, WgpuContext},
-    items::{vitem::VItem, Entity},
-    utils::wgpu::WgpuBuffer, // world::World,
+    utils::{wgpu::WgpuBuffer, RenderResourceStorage},
 };
+
+pub trait Renderable {
+    fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame);
+    fn render(
+        &mut self,
+        ctx: &WgpuContext,
+        pipelines: &mut RenderResourceStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        multisample_view: &wgpu::TextureView,
+        target_view: &wgpu::TextureView,
+    );
+}
 
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -266,40 +276,15 @@ impl Renderer {
         self.output_texture_updated = false;
     }
 
-    // fn render_entities<T: Entity + 'static>(
-    //     &mut self,
-    //     ctx: &mut RanimContext,
-    //     encoder: &mut wgpu::CommandEncoder,
-    //     world: &mut World,
-    // ) {
-    //     if let Some(store) = world.entity_stores.get_store_mut::<T>() {
-    //         for (_id, entity) in store.iter_mut() {
-    //             let Some(primitive) = &mut entity.primitive else {
-    //                 continue;
-    //             };
-
-    //             primitive.update_clip_info(&ctx.wgpu_ctx, &self.camera);
-    //             primitive.encode_render_command(
-    //                 &ctx.wgpu_ctx,
-    //                 &mut ctx.pipelines,
-    //                 encoder,
-    //                 &self.uniforms_bind_group.bind_group,
-    //                 &self.multisample_view,
-    //                 &self.render_view,
-    //             );
-    //         }
-    //     }
-    // }
-
-    pub fn render_anim(&mut self, ctx: &mut RanimContext, anim: &impl Animator) {
+    pub fn render(&mut self, ctx: &mut RanimContext, renderable: &mut impl Renderable) {
         self.clear_screen(&ctx.wgpu_ctx);
         let mut encoder = ctx
             .wgpu_ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        anim.update_clip_info(&ctx.wgpu_ctx, &self.camera);
-        anim.render(
+        renderable.update_clip_info(&ctx.wgpu_ctx, &self.camera);
+        renderable.render(
             &ctx.wgpu_ctx,
             &mut ctx.pipelines,
             &mut encoder,
@@ -311,21 +296,6 @@ impl Renderer {
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
         self.output_texture_updated = false;
     }
-
-    // pub fn render(&mut self, ctx: &mut RanimContext, world: &mut World) {
-    //     self.clear_screen(&ctx.wgpu_ctx);
-
-    //     let mut encoder = ctx
-    //         .wgpu_ctx
-    //         .device
-    //         .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
-    //     self.render_entities::<VItem>(ctx, &mut encoder, world);
-
-    //     ctx.wgpu_ctx.queue.submit([encoder.finish()]);
-
-    //     self.output_texture_updated = false;
-    // }
 
     fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
         let bytes_per_row =
@@ -604,7 +574,7 @@ mod test {
         let mut app = RanimRenderApp::new(AppOptions::default());
         // let rabject = Rabject::new(&app.ctx.wgpu_ctx, vitem);
         // app.render_anim(wait(rabject));
-        let mut timeline = Timeline::new(app.ctx.wgpu_ctx());
+        let mut timeline = Timeline::new();
         let rabject = timeline.insert(vitem);
         timeline.play(create(rabject.clone()));
         timeline.play(wait(rabject.clone()));

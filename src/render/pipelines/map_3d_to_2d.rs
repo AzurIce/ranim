@@ -9,14 +9,11 @@ pub struct Map3dTo2dPipeline {
     pipeline: wgpu::ComputePipeline,
 }
 
-pub struct ComputeBindGroup {
-    bind_group: wgpu::BindGroup,
-}
+pub struct ComputeBindGroup(wgpu::BindGroup);
 
-impl Deref for ComputeBindGroup {
-    type Target = wgpu::BindGroup;
-    fn deref(&self) -> &Self::Target {
-        &self.bind_group
+impl AsRef<wgpu::BindGroup> for ComputeBindGroup {
+    fn as_ref(&self) -> &wgpu::BindGroup {
+        &self.0
     }
 }
 
@@ -84,18 +81,7 @@ impl ComputeBindGroup {
         points3d_buffer: &wgpu::Buffer,
         points2d_buffer: &wgpu::Buffer,
     ) -> Self {
-        Self {
-            bind_group: Self::new_bind_group(ctx, points3d_buffer, points2d_buffer),
-        }
-    }
-
-    pub(crate) fn update(
-        &mut self,
-        ctx: &WgpuContext,
-        points3d_buffer: &wgpu::Buffer,
-        points2d_buffer: &wgpu::Buffer,
-    ) {
-        self.bind_group = Self::new_bind_group(ctx, points3d_buffer, points2d_buffer);
+        Self(Self::new_bind_group(ctx, points3d_buffer, points2d_buffer))
     }
 }
 

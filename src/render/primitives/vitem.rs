@@ -1,17 +1,10 @@
-use glam::{ivec3, vec2, Vec2, Vec4, Vec4Swizzles};
-use itertools::Itertools;
-use log::trace;
+use glam::{Vec2, Vec4};
 
 use crate::{
     components::{rgba::Rgba, width::Width},
     context::WgpuContext,
-    items::vitem::VItem,
-    render::{
-        pipelines::{
-            map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup, Map3dTo2dPipeline,
-            VItemPipeline,
-        },
-        CameraFrame,
+    render::pipelines::{
+        map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup, Map3dTo2dPipeline, VItemPipeline,
     },
     utils::{wgpu::WgpuVecBuffer, RenderResourceStorage},
 };
@@ -19,7 +12,6 @@ use crate::{
 use super::Primitive;
 
 pub struct VItemPrimitive {
-    vitem: VItem,
     /// COMPUTE INPUT: (x, y, z, is_closed)
     pub(crate) points3d_buffer: WgpuVecBuffer<Vec4>,
     /// COMPUTE OUTPUT, RENDER INPUT: (x, y, is_closed, 0)
@@ -35,67 +27,40 @@ pub struct VItemPrimitive {
     pub(crate) stroke_widths: WgpuVecBuffer<Width>,
 
     /// COMPUTE BIND GROUP 1: 0-points3d, 1-points2d
-    pub(crate) compute_bind_group: ComputeBindGroup,
+    pub(crate) compute_bind_group: Option<ComputeBindGroup>,
 
     /// RENDER BIND GROUP 1: 0-points, 1-fill_rgbas, 2-stroke_rgbas, 3-stroke_widths
-    pub(crate) render_bind_group: RenderBindGroup,
+    pub(crate) render_bind_group: Option<RenderBindGroup>,
 }
 
-impl Primitive for VItemPrimitive {
-    type Entity = VItem;
-    fn init(ctx: &WgpuContext, data: &Self::Entity) -> Self {
-        trace!("init");
-        let points3d_buffer = WgpuVecBuffer::new_init(
-            ctx,
+impl Default for VItemPrimitive {
+    fn default() -> Self {
+        let points3d_buffer = WgpuVecBuffer::new(
             Some("Points 3d Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            &data.get_render_points(),
         );
         let points2d_buffer = WgpuVecBuffer::new(
-            ctx,
             Some("Points 2d Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            data.vpoints.len(),
         );
-        let clip_box_buffer = WgpuVecBuffer::new_init(
-            ctx,
+        let clip_box_buffer = WgpuVecBuffer::new(
             Some("Clip Box Buffer"),
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            &[
-                Vec2::new(-1.0, -1.0),
-                Vec2::new(-1.0, 1.0),
-                Vec2::new(1.0, -1.0),
-                Vec2::new(1.0, 1.0),
-            ],
         );
-        let fill_rgbas = WgpuVecBuffer::new_init(
-            ctx,
+        let fill_rgbas = WgpuVecBuffer::new(
             Some("Fill Rgbas Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            &data.fill_rgbas,
         );
-        let stroke_rgbas = WgpuVecBuffer::new_init(
-            ctx,
+        let stroke_rgbas = WgpuVecBuffer::new(
             Some("Stroke Rgbas Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            &data.stroke_rgbas,
         );
-        let stroke_widths = WgpuVecBuffer::new_init(
-            ctx,
+        let stroke_widths = WgpuVecBuffer::new(
             Some("Stroke Widths Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            &data.stroke_widths,
         );
-        let compute_bind_group = ComputeBindGroup::new(ctx, &points3d_buffer, &points2d_buffer);
-        let render_bind_group = RenderBindGroup::new(
-            ctx,
-            &points2d_buffer,
-            &fill_rgbas,
-            &stroke_rgbas,
-            &stroke_widths,
-        );
+
         Self {
-            vitem: data.clone(),
             points3d_buffer,
             points2d_buffer,
             clip_box_buffer,
@@ -103,99 +68,68 @@ impl Primitive for VItemPrimitive {
             stroke_rgbas,
             stroke_widths,
 
-            compute_bind_group,
-            render_bind_group,
+            compute_bind_group: None,
+            render_bind_group: None,
         }
     }
-    fn update(&mut self, wgpu_ctx: &crate::context::WgpuContext, data: &Self::Entity) {
-        // trace!("update, data.vpoints: {:?}", data.vpoints);
-        // trace!("update, data.fill_rgbas: {:?}", data.fill_rgbas);
-        // trace!("points3d len: {}", self.points3d_buffer.len());
-        // trace!("points2d len: {}", self.points3d_buffer.len());
-        self.vitem = data.clone();
-        if self.vitem.vpoints.is_empty() {
-            return;
-        }
-        self.points3d_buffer
-            .set(wgpu_ctx, &data.get_render_points());
-        // trace!("set fill_rgbas");
-        self.fill_rgbas.set(wgpu_ctx, &data.fill_rgbas);
-        // trace!("set stroke_rgbas");
-        self.stroke_rgbas.set(wgpu_ctx, &data.stroke_rgbas);
-        // trace!("set stroke_widths");
-        self.stroke_widths.set(wgpu_ctx, &data.stroke_widths);
-        // trace!("resize points2d");
-        if self.points2d_buffer.resize(wgpu_ctx, data.vpoints.len()) {
-            // trace!("resized points2d, updating bind groups");
-            self.compute_bind_group
-                .update(&wgpu_ctx, &self.points3d_buffer, &self.points2d_buffer);
-            self.render_bind_group.update(
-                &wgpu_ctx,
-                &self.points2d_buffer,
-                &self.fill_rgbas,
-                &self.stroke_rgbas,
-                &self.stroke_widths,
-            );
+}
+
+impl VItemPrimitive {
+    pub fn update(
+        &mut self,
+        ctx: &WgpuContext,
+        // clip_box: &[Vec2; 4],
+        render_points: &[Vec4],
+        fill_rgbas: &[Rgba],
+        stroke_rgbas: &[Rgba],
+        stroke_widths: &[Width],
+    ) {
+        // // Fixed sized
+        // self.clip_box_buffer.set(ctx, clip_box);
+
+        // Dynamic sized
+        if [
+            self.points3d_buffer.set(ctx, render_points),
+            self.fill_rgbas.set(ctx, fill_rgbas),
+            self.stroke_rgbas.set(ctx, stroke_rgbas),
+            self.stroke_widths.set(ctx, stroke_widths),
+            self.points2d_buffer.resize(ctx, render_points.len()),
+            // This two should be all none or all some
+            self.compute_bind_group.is_none(),
+            // self.render_bind_group.is_none(),
+        ]
+        .iter()
+        .any(|x| *x)
+        {
+            self.compute_bind_group = Some(ComputeBindGroup::new(
+                ctx,
+                self.points3d_buffer.buffer.as_ref().unwrap(),
+                self.points2d_buffer.buffer.as_ref().unwrap(),
+            ));
+            self.render_bind_group = Some(RenderBindGroup::new(
+                ctx,
+                self.points2d_buffer.buffer.as_ref().unwrap(),
+                self.fill_rgbas.buffer.as_ref().unwrap(),
+                self.stroke_rgbas.buffer.as_ref().unwrap(),
+                self.stroke_widths.buffer.as_ref().unwrap(),
+            ));
         }
     }
+}
 
-    fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {
-        let corners = [-1, 1]
-            .into_iter()
-            .cartesian_product([-1, 1])
-            .cartesian_product([-1, 1])
-            .map(|((x, y), z)| {
-                // trace!("{x} {y} {z}");
-                self.vitem.vpoints.get_bounding_box_point(ivec3(x, y, z))
-            })
-            .map(|p| {
-                let mut p = camera.view_projection_matrix() * p.extend(1.0);
-                p /= p.w;
-                p.xy()
-            })
-            .collect::<Vec<Vec2>>();
-        let (mut min_x, mut max_x, mut min_y, mut max_y) = (1.0f32, -1.0f32, 1.0f32, -1.0f32);
-        for p in corners {
-            min_x = min_x.min(p.x);
-            max_x = max_x.max(p.x);
-            min_y = min_y.min(p.y);
-            max_y = max_y.max(p.y);
-        }
-        let max_width = self
-            .vitem
-            .stroke_widths
-            .iter()
-            .cloned()
-            .reduce(|acc, w| acc.max(w))
-            .map(|w| w.0)
-            .unwrap_or(0.0);
-        let radii = Vec2::splat(max_width) / camera.half_frame_size();
-        min_x -= radii.x;
-        min_y -= radii.y;
-        max_x += radii.x;
-        max_y += radii.y;
-
-        let clip_box = [
-            vec2(min_x, min_y),
-            vec2(min_x, max_y),
-            vec2(max_x, min_y),
-            vec2(max_x, max_y),
-        ];
-        // trace!("updated clip_box: {:?}", clip_box);
-        self.clip_box_buffer.set(ctx, &clip_box);
+impl Primitive for VItemPrimitive {
+    fn update_clip_box(&mut self, ctx: &WgpuContext, clip_box: &[Vec2; 4]) {
+        self.clip_box_buffer.set(ctx, clip_box);
     }
     fn encode_render_command(
         &mut self,
-        ctx: &crate::context::WgpuContext,
+        ctx: &WgpuContext,
         pipelines: &mut RenderResourceStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
     ) {
-        if self.vitem.vpoints.is_empty() {
-            return;
-        }
         {
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("VItem Map Points Compute Pass"),
@@ -204,7 +138,7 @@ impl Primitive for VItemPrimitive {
             cpass.set_pipeline(pipelines.get_or_init::<Map3dTo2dPipeline>(&ctx));
             cpass.set_bind_group(0, uniforms_bind_group, &[]);
 
-            cpass.set_bind_group(1, &*self.compute_bind_group, &[]);
+            cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
             cpass.dispatch_workgroups(
                 ((self.points3d_buffer.get().len() + 255) / 256) as u32,
                 1,
@@ -229,9 +163,82 @@ impl Primitive for VItemPrimitive {
             rpass.set_pipeline(pipelines.get_or_init::<VItemPipeline>(&ctx));
             rpass.set_bind_group(0, uniforms_bind_group, &[]);
 
-            rpass.set_bind_group(1, &*self.render_bind_group, &[]);
-            rpass.set_vertex_buffer(0, self.clip_box_buffer.slice(..));
+            rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
+            rpass.set_vertex_buffer(0, self.clip_box_buffer.buffer.as_ref().unwrap().slice(..));
             rpass.draw(0..self.clip_box_buffer.get().len() as u32, 0..1);
         }
     }
 }
+
+// impl Primitive<SvgItem> for VItemPrimitive {
+//     fn init(wgpu_ctx: &WgpuContext, data: &SvgItem) -> Self
+//     where
+//         Self: Sized,
+//     {
+//         data.vitems.iter().map(|vitem| {
+//             vitem.vpoints.get_bounding_box_corners()
+//             vitem.get_render_points()
+//         })
+//     }
+//     fn update(&mut self, wgpu_ctx: &WgpuContext, data: &SvgItem) {}
+// }
+
+// impl Renderable for Rabject<VItem> {
+// fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {
+//     let corners = self.inner.vpoints.get_bounding_box_corners().map(|p| {
+//         let mut p = camera.view_projection_matrix() * p.extend(1.0);
+//         p /= p.w;
+//         p.xy()
+//     });
+//     let (mut min_x, mut max_x, mut min_y, mut max_y) = (1.0f32, -1.0f32, 1.0f32, -1.0f32);
+//     for p in corners {
+//         min_x = min_x.min(p.x);
+//         max_x = max_x.max(p.x);
+//         min_y = min_y.min(p.y);
+//         max_y = max_y.max(p.y);
+//     }
+//     let max_width = self
+//         .inner
+//         .stroke_widths
+//         .iter()
+//         .cloned()
+//         .reduce(|acc, w| acc.max(w))
+//         .map(|w| w.0)
+//         .unwrap_or(0.0);
+//     let radii = Vec2::splat(max_width) / camera.half_frame_size();
+//     min_x -= radii.x;
+//     min_y -= radii.y;
+//     max_x += radii.x;
+//     max_y += radii.y;
+
+//     let clip_box = [
+//         vec2(min_x, min_y),
+//         vec2(min_x, max_y),
+//         vec2(max_x, min_y),
+//         vec2(max_x, max_y),
+//     ];
+//     // trace!("updated clip_box: {:?}", clip_box);
+//     self.render_instance.borrow_mut().update_clip_box(ctx, &clip_box);
+// }
+// fn render(
+//     &mut self,
+//     ctx: &WgpuContext,
+//     pipelines: &mut RenderResourceStorage,
+//     encoder: &mut wgpu::CommandEncoder,
+//     uniforms_bind_group: &wgpu::BindGroup,
+//     multisample_view: &wgpu::TextureView,
+//     target_view: &wgpu::TextureView,
+// ) {
+//     if self.inner.vpoints.is_empty() {
+//         return;
+//     }
+//     self.render_instance.borrow().encode_render_command(
+//         ctx,
+//         pipelines,
+//         encoder,
+//         uniforms_bind_group,
+//         multisample_view,
+//         target_view,
+//     );
+// }
+// }

@@ -9,9 +9,8 @@ use crate::{
 
 pub struct RenderBindGroup(wgpu::BindGroup);
 
-impl Deref for RenderBindGroup {
-    type Target = wgpu::BindGroup;
-    fn deref(&self) -> &Self::Target {
+impl AsRef<wgpu::BindGroup> for RenderBindGroup {
+    fn as_ref(&self) -> &wgpu::BindGroup {
         &self.0
     }
 }
@@ -114,17 +113,6 @@ impl RenderBindGroup {
             stroke_rgbas,
             stroke_widths,
         ))
-    }
-
-    pub(crate) fn update(
-        &mut self,
-        ctx: &WgpuContext,
-        points: &wgpu::Buffer,
-        fill_rgbas: &wgpu::Buffer,
-        stroke_rgbas: &wgpu::Buffer,
-        stroke_widths: &wgpu::Buffer,
-    ) {
-        self.0 = Self::new_bind_group(ctx, points, fill_rgbas, stroke_rgbas, stroke_widths);
     }
 }
 

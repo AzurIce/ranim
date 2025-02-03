@@ -9,15 +9,18 @@ use std::{
 };
 
 use animation::{Animation, Animator, Timeline};
+use components::{HasTransform3d, Transform3d};
 use context::{RanimContext, WgpuContext};
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::Entity;
-use log::trace;
-use render::{CameraFrame, Renderer};
-use utils::{rate_functions::linear, Id};
+use render::{
+    primitives::{Extract, Primitive},
+    CameraFrame, Renderable, Renderer,
+};
+use utils::{rate_functions::linear, Id, RenderResourceStorage};
 
 pub mod prelude {
     pub use crate::interpolate::Interpolatable;
@@ -44,10 +47,43 @@ pub mod utils;
 // pub mod world;
 
 /// An `Rabject` is a wrapper of an entity that can be rendered.
+///
+/// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
+///
+/// The cloned `Rabject` has same Id and shared render_instance, but with seperate data.
 pub struct Rabject<T: Entity> {
     id: Id,
     inner: T,
-    render_instance: Rc<RefCell<T::Primitive>>,
+    render_instance: Rc<RefCell<Box<dyn Extract<T>>>>,
+}
+
+impl<T: Entity> Renderable for Rabject<T> {
+    fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {
+        let clip_box = self.inner.clip_box(camera);
+        self.render_instance
+            .borrow_mut()
+            .update_clip_box(ctx, &clip_box);
+    }
+    fn render(
+        &mut self,
+        ctx: &WgpuContext,
+        pipelines: &mut RenderResourceStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        multisample_view: &wgpu::TextureView,
+        target_view: &wgpu::TextureView,
+    ) {
+        let mut render_instance = self.render_instance.borrow_mut();
+        render_instance.update(ctx, &self.inner);
+        render_instance.encode_render_command(
+            ctx,
+            pipelines,
+            encoder,
+            uniforms_bind_group,
+            multisample_view,
+            target_view,
+        );
+    }
 }
 
 impl<T: Entity + Clone> Clone for Rabject<T> {
@@ -60,20 +96,18 @@ impl<T: Entity + Clone> Clone for Rabject<T> {
     }
 }
 
-impl<T: Entity> Rabject<T> {
+impl<T: Entity + 'static> Rabject<T> {
     pub fn id(&self) -> Id {
         self.id
     }
-    pub fn new(ctx: &WgpuContext, inner: T) -> Self {
-        use crate::render::primitives::Primitive;
-
-        let id = Id::new();
-        let render_instance = T::Primitive::init(ctx, &inner);
-        let render_instance = Rc::new(RefCell::new(render_instance));
-
+    pub fn new(entity: T) -> Self {
+        let render_instance = T::Primitive::default();
+        let render_instance = Rc::new(RefCell::new(
+            Box::new(render_instance) as Box<dyn Extract<T>>
+        ));
         Self {
-            id,
-            inner,
+            id: Id::new(),
+            inner: entity,
             render_instance,
         }
     }
@@ -108,16 +142,16 @@ impl<T: TimelineConstructor> RenderScene for T {
             output_dir: PathBuf::from(format!("./output/{}", desc.name)),
             ..Default::default()
         });
-        let mut timeline = Timeline::new(app.ctx.wgpu_ctx());
+        let mut timeline = Timeline::new();
         clip_contructor.construct(&mut timeline);
-        if timeline.cur_t() == 0.0 {
+        if timeline.elapsed_secs() == 0.0 {
             timeline.forward(Duration::from_secs_f32(0.1));
         }
-        let duration = timeline.cur_t();
+        let duration_secs = timeline.elapsed_secs();
         app.render_anim(
             Animation::new(timeline)
                 .with_rate_func(linear)
-                .with_duration(Duration::from_secs_f32(duration)),
+                .with_duration(duration_secs),
         );
     }
     fn render_frame_to_image(self, path: impl AsRef<Path>) {
@@ -127,15 +161,15 @@ impl<T: TimelineConstructor> RenderScene for T {
             output_dir: PathBuf::from(format!("./output/{}", desc.name)),
             ..Default::default()
         });
-        let mut timeline = Timeline::new(app.ctx.wgpu_ctx());
+        let mut timeline = Timeline::new();
         clip_contructor.construct(&mut timeline);
-        if timeline.cur_t() == 0.0 {
+        if timeline.elapsed_secs() == 0.0 {
             timeline.forward(Duration::from_secs_f32(0.1));
         }
-        let duration = timeline.cur_t();
+        let duration_secs = timeline.elapsed_secs();
         let mut anim = Animation::new(timeline)
             .with_rate_func(linear)
-            .with_duration(Duration::from_secs_f32(duration));
+            .with_duration(duration_secs);
         app.render_anim_frame_to_image(&mut anim, path);
     }
 }
@@ -216,26 +250,21 @@ impl RanimRenderApp {
         Duration::from_secs_f32(1.0 / self.fps as f32)
     }
 
-    pub fn render_anim_frame_to_image(
-        &mut self,
-        anim: &mut Animation,
-        filename: impl AsRef<Path>,
-    ) {
+    pub fn render_anim_frame_to_image(&mut self, anim: &mut Animation, filename: impl AsRef<Path>) {
         // let alpha = sec / anim.duration().as_secs_f32();
         // anim.update_alpha(alpha);
-        self.renderer.render_anim(&mut self.ctx, anim);
+        self.renderer.render(&mut self.ctx, anim);
         let path = self.output_dir.join(filename);
         self.save_frame_to_image(path);
     }
 
     pub fn render_anim(&mut self, mut anim: Animation) {
-        let duration = anim.duration().as_secs_f32();
-        let frames = (duration * self.fps as f32).ceil() as usize;
+        let frames = (anim.duration_secs() * self.fps as f32).ceil() as usize;
         let t = Instant::now();
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
-                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] {human_pos}/{human_len} ({eta}) {msg}",
+                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} ({eta}) {msg}",
             )
             .unwrap()
             .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
@@ -248,49 +277,26 @@ impl RanimRenderApp {
             .for_each(|alpha| {
                 // trace!("rendering frame at alpha = {}", alpha);
                 anim.update_alpha(alpha);
-                self.renderer.render_anim(&mut self.ctx, &anim);
+                self.renderer.render(&mut self.ctx, &mut anim);
                 self.update_frame();
                 pb.inc(1);
+                pb.set_message(format!(
+                    "rendering {:?}/{:?}",
+                    Duration::from_secs_f32(alpha * anim.duration_secs()),
+                    Duration::from_secs_f32(anim.duration_secs())
+                ));
             });
 
         let msg = format!(
             "rendered {} frames({:?}) in {:?}",
             frames,
-            anim.duration(),
+            anim.duration_secs(),
             t.elapsed()
         );
         pb.finish_with_message(msg);
     }
 
-    // /// Advance the scene by a given duration
-    // ///
-    // /// this method writes frames through [`Self::update_frame`]
-    // fn advance(&mut self, duration: Duration) {
-    //     let dt = self.tick_duration().as_secs_f32();
-    //     let frames = (duration.as_secs_f32() / dt).ceil() as usize;
-
-    //     for _ in 0..frames {
-    //         let start = Instant::now();
-    //         self.world.tick(dt);
-    //         trace!("[Scene/advance] tick cost: {:?}", start.elapsed());
-    //         let t = Instant::now();
-    //         self.update_frame(true);
-    //         trace!("[Scene/advance] update_frame cost: {:?}", t.elapsed());
-    //         trace!(
-    //             "[Scene/advance] one complete frame cost: {:?}",
-    //             start.elapsed()
-    //         );
-    //     }
-    // }
-
     fn update_frame(&mut self) {
-        // TODO: solve the problem that the new inserted rabjects needs update
-        // if update || true {
-        //     self.world.extract();
-        //     self.world.prepare(&self.ctx);
-        // }
-        // self.renderer.render(&mut self.ctx, &mut self.world);
-
         // `output_video` is true
         if let Some(video_writer) = self.video_writer.as_mut() {
             video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));

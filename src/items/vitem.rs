@@ -1,5 +1,4 @@
-use bevy_color::{ColorToComponents, LinearRgba};
-use glam::{vec2, vec3, vec4, Vec3, Vec4};
+use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use itertools::Itertools;
 use log::trace;
 
@@ -7,8 +6,12 @@ use crate::{
     components::{
         rgba::Rgba, vpoint::VPoint, width::Width, ComponentData, HasTransform3d, TransformAnchor,
     },
+    context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::vitem::VItemPrimitive,
+    render::{
+        primitives::{vitem::VItemPrimitive, Extract},
+        CameraFrame,
+    },
 };
 
 use super::{Blueprint, Entity};
@@ -21,11 +24,13 @@ pub struct VItem {
     pub fill_rgbas: ComponentData<Rgba>,
 }
 
-impl HasTransform3d<VPoint> for VItem {
-    fn get(&self) -> &ComponentData<VPoint> {
+impl HasTransform3d for VItem {
+    fn get(&self) -> &ComponentData<impl crate::components::Transform3d + Default + Clone> {
         &self.vpoints
     }
-    fn get_mut(&mut self) -> &mut ComponentData<VPoint> {
+    fn get_mut(
+        &mut self,
+    ) -> &mut ComponentData<impl crate::components::Transform3d + Default + Clone> {
         &mut self.vpoints
     }
 }
@@ -62,25 +67,59 @@ impl VItem {
     }
 }
 
+// MARK: Entity impl
 impl Entity for VItem {
-    type ExtractData = VItem;
     type Primitive = VItemPrimitive;
 
-    fn extract(&self) -> Option<Self::ExtractData> {
-        if self.vpoints.len() < 3
-            || self.fill_rgbas.is_empty()
-            || self.stroke_rgbas.is_empty()
-            || self.stroke_widths.is_empty()
-        {
-            Some(Self::empty())
-        } else {
-            Some(self.clone())
+    fn clip_box(&self, camera: &CameraFrame) -> [Vec2; 4] {
+        let corners = self.vpoints.get_bounding_box_corners().map(|p| {
+            let mut p = camera.view_projection_matrix() * p.extend(1.0);
+            p /= p.w;
+            p.xy()
+        });
+        let (mut min_x, mut max_x, mut min_y, mut max_y) = (1.0f32, -1.0f32, 1.0f32, -1.0f32);
+        for p in corners {
+            min_x = min_x.min(p.x);
+            max_x = max_x.max(p.x);
+            min_y = min_y.min(p.y);
+            max_y = max_y.max(p.y);
         }
+        let max_width = self
+            .stroke_widths
+            .iter()
+            .cloned()
+            .reduce(|acc, w| acc.max(w))
+            .map(|w| w.0)
+            .unwrap_or(0.0);
+        let radii = Vec2::splat(max_width) / camera.half_frame_size();
+        min_x -= radii.x;
+        min_y -= radii.y;
+        max_x += radii.x;
+        max_y += radii.y;
+
+        [
+            vec2(min_x, min_y),
+            vec2(min_x, max_y),
+            vec2(max_x, min_y),
+            vec2(max_x, max_y),
+        ]
+    }
+}
+
+// MARK: Extract impl
+impl Extract<VItem> for VItemPrimitive {
+    fn update(&mut self, ctx: &WgpuContext, data: &VItem) {
+        self.update(
+            ctx,
+            &data.get_render_points(),
+            &data.fill_rgbas,
+            &data.stroke_rgbas,
+            &data.stroke_widths,
+        );
     }
 }
 
 // MARK: Anim traits impl
-
 impl Alignable for VItem {
     fn is_aligned(&self, other: &Self) -> bool {
         self.vpoints.is_aligned(&other.vpoints)
@@ -147,7 +186,6 @@ impl Empty for VItem {
 
 impl Fill for VItem {
     fn set_fill_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
-        let rgba = LinearRgba::from(color).to_vec4();
         self.fill_rgbas.set_all(color);
         self
     }
@@ -159,7 +197,6 @@ impl Fill for VItem {
 
 impl Stroke for VItem {
     fn set_stroke_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
-        let rgba = LinearRgba::from(color).to_vec4();
         self.stroke_rgbas.set_all(color);
         self
     }

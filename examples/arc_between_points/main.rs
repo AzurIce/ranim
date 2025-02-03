@@ -52,7 +52,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
 
                 let arc = timeline.insert(arc);
                 timeline.play(
-                    fade_in(arc).with_duration(Duration::from_secs_f32(3.0 / (nrad * ntan) as f32)),
+                    fade_in(arc).with_duration(3.0 / (nrad * ntan) as f32),
                 );
             }
             info!(

@@ -30,7 +30,6 @@ impl Id {
     }
 }
 
-
 #[derive(Default)]
 pub struct RenderResourceStorage {
     inner: HashMap<TypeId, Box<dyn Any>>,

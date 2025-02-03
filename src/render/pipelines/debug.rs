@@ -2,7 +2,10 @@ use std::ops::Deref;
 
 use glam::Vec4;
 
-use crate::{context::WgpuContext, render::{RenderResource, OUTPUT_TEXTURE_FORMAT}};
+use crate::{
+    context::WgpuContext,
+    render::{RenderResource, OUTPUT_TEXTURE_FORMAT},
+};
 
 pub struct DebugPipeline {
     pipeline: wgpu::RenderPipeline,

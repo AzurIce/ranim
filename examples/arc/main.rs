@@ -51,7 +51,7 @@ impl TimelineConstructor for ArcScene {
                 arc.vpoints.shift(offset.extend(0.0));
 
                 let arc = timeline.insert(arc);
-                timeline.play(fade_in(arc).with_duration(Duration::from_secs_f32(0.5)));
+                timeline.play(fade_in(arc).with_duration(0.5));
             }
             info!("row [{i}/{nrow}] cost: {:?}", t.elapsed());
         }

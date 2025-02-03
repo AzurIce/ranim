@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use bevy_color::{ColorToComponents, LinearRgba};
 use glam::{vec4, Vec4};
 
-use crate::prelude::{Interpolatable, Opacity, Partial};
+use crate::prelude::{Interpolatable, Opacity};
 
 use super::{ComponentData, PointWise};
 

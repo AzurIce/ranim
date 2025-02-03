@@ -1,4 +1,4 @@
-use glam::{vec2, IVec2, Vec2, Vec3, Vec3Swizzles};
+use glam::{vec2, IVec2, Vec2, Vec3};
 
 pub fn cross2d(a: Vec2, b: Vec2) -> f32 {
     a.x * b.y - b.x * a.y
