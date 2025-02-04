@@ -7,7 +7,7 @@ pub fn interpolate<T: Entity + Alignable + Interpolatable + 'static>(
     src: Rabject<T>,
     dst: T,
 ) -> EntityAnimation<T> {
-    let inner = src.inner.clone();
+    let inner = src.data.clone();
     EntityAnimation::new(src.id(), Interpolate::new(inner, dst))
 }
 

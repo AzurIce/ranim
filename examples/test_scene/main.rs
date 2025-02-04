@@ -89,7 +89,7 @@ struct TestScene;
 impl TimelineConstructor for TestScene {
     fn desc() -> ranim::SceneDesc {
         ranim::SceneDesc {
-            name: "Test Scene".to_string(),
+            name: "test_scene".to_string(),
         }
     }
     fn construct(&mut self, timeline: &mut Timeline) {
@@ -100,11 +100,7 @@ impl TimelineConstructor for TestScene {
         // timeline.play(unwrite(square.clone()));
 
         let mut svg = SvgItem::from_svg(SVG);
-        svg.vitems.iter_mut().for_each(|vitem| {
-            vitem
-                .vpoints
-                .scale(Vec3::splat(2.0), TransformAnchor::origin());
-        });
+        svg.scale(Vec3::splat(2.0));
 
         // println!("{:?}", svg.vitems[79].vpoints);
         // println!("{:?}", svg.vitems[79].vpoints.get_closepath_flags());

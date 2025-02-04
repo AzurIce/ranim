@@ -182,7 +182,7 @@ impl Timeline {
         self.elapsed_secs = self.elapsed_secs + anim.params.duration_secs;
         assert_eq!(*entity_duration, self.elapsed_secs);
 
-        timeline.rabject.inner = anim.eval_alpha(1.0);
+        timeline.rabject.data = anim.eval_alpha(1.0);
         timeline.push(anim);
         timeline.rabject.clone()
     }

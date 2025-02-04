@@ -1,9 +1,6 @@
-use std::time::{Duration, Instant};
-
 use bevy_color::{Alpha, Srgba};
 use env_logger::Env;
 use glam::vec2;
-use log::info;
 use ranim::animation::entity::fading::fade_in;
 use ranim::animation::Timeline;
 use ranim::items::vitem::Arc;
@@ -33,7 +30,6 @@ impl TimelineConstructor for ArcScene {
         let step_y = (frame_size.1 as f32 - padding * 2.0 - gap * (nrow - 1) as f32) / nrow as f32;
 
         for i in 0..nrow {
-            let t = Instant::now();
             for j in 0..ncol {
                 let angle = std::f32::consts::PI * j as f32 / (ncol - 1) as f32 * 360.0 / 180.0;
                 let radius = step_y / 2.0;
@@ -44,16 +40,14 @@ impl TimelineConstructor for ArcScene {
                         i as f32 * step_y + step_y / 2.0 + i as f32 * gap + padding,
                     );
                 let mut arc = Arc { angle, radius }.build();
-                arc.stroke_widths.set_all(10.0 * j as f32);
-
-                arc.stroke_rgbas.set_all(color);
-                arc.fill_rgbas.set_all(color.with_alpha(0.0));
-                arc.vpoints.shift(offset.extend(0.0));
+                arc.set_stroke_width(10.0 * j as f32)
+                    .set_stroke_color(color)
+                    .set_fill_color(color.with_alpha(0.0))
+                    .shift(offset.extend(0.0));
 
                 let arc = timeline.insert(arc);
                 timeline.play(fade_in(arc).with_duration(0.5));
             }
-            info!("row [{i}/{nrow}] cost: {:?}", t.elapsed());
         }
     }
 }

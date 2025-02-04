@@ -5,7 +5,7 @@ use glam::{vec4, Vec4};
 
 use crate::prelude::{Interpolatable, Opacity};
 
-use super::{ComponentData, PointWise};
+use super::{ComponentVec, PointWise};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
@@ -20,7 +20,7 @@ impl Opacity for Rgba {
     }
 }
 
-impl Opacity for ComponentData<Rgba> {
+impl Opacity for ComponentVec<Rgba> {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.iter_mut().for_each(|rgba| {
             rgba.set_opacity(opacity);

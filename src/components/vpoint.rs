@@ -8,21 +8,14 @@ use crate::prelude::Partial;
 use crate::utils::bezier::trim_quad_bezier;
 use crate::utils::math::interpolate_usize;
 
-use super::Transform3d;
-
-use super::ComponentData;
+use super::ComponentVec;
+use super::HasTransform3d;
 
 /// VPoints is used to represent a bunch of quad bezier paths.
 ///
 /// Every 3 elements in the inner vector is a quad bezier path
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct VPoint(pub Vec3);
-
-impl Default for VPoint {
-    fn default() -> Self {
-        Vec3::ZERO.into()
-    }
-}
 
 impl From<Vec3> for VPoint {
     fn from(value: Vec3) -> Self {
@@ -43,22 +36,13 @@ impl DerefMut for VPoint {
     }
 }
 
-impl Transform3d for VPoint {
-    fn position(&self) -> Vec3 {
-        self.0
-    }
-    fn position_mut(&mut self) -> &mut Vec3 {
-        &mut self.0
-    }
-}
-
 impl Interpolatable for VPoint {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         Self(self.0.lerp(target.0, t))
     }
 }
 
-impl Partial for ComponentData<VPoint> {
+impl Partial for ComponentVec<VPoint> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
         let max_anchor_idx = self.len() / 2;
 
@@ -90,7 +74,7 @@ impl Partial for ComponentData<VPoint> {
     }
 }
 
-impl ComponentData<VPoint> {
+impl ComponentVec<VPoint> {
     pub fn get_seg(&self, idx: usize) -> Option<&[VPoint; 3]> {
         self.get(idx * 2..idx * 2 + 3)
             .map(|seg| seg.try_into().ok())

@@ -2,13 +2,12 @@ use std::{f32, path::Path, slice::Iter, vec};
 
 use bevy_color::Alpha;
 use glam::{mat3, vec2, vec3, Vec3};
-use itertools::Itertools;
 use log::{info, trace, warn};
 
 use crate::{
-    components::{rgba::Rgba, width::Width, HasTransform3d, TransformAnchor},
-    prelude::{Empty, Fill, Interpolatable, Partial, Stroke},
-    render::primitives::{svg_item::SvgItemPrimitive, vitem::VItemPrimitive, Extract},
+    components::{vpoint::VPoint, TransformAnchor},
+    prelude::{Empty, Fill, Interpolatable, Partial, Stroke, Transformable},
+    render::primitives::{svg_item::SvgItemPrimitive, Extract},
     utils::bezier::PathBuilder,
 };
 
@@ -17,6 +16,42 @@ use super::{vitem::VItem, Entity};
 #[derive(Debug, Clone)]
 pub struct SvgItem {
     pub vitems: Vec<VItem>,
+}
+
+impl From<VItem> for SvgItem {
+    fn from(value: VItem) -> Self {
+        Self { vitems: vec![value] }
+    }
+}
+
+impl Transformable<VPoint> for SvgItem {
+    fn apply_affine(&mut self, affine: glam::Mat3) {
+        self.vitems.iter_mut().for_each(|x| x.apply_affine(affine));
+    }
+    fn apply_points_function(
+        &mut self,
+        f: impl Fn(&mut crate::components::ComponentVec<VPoint>) + Copy,
+        anchor: TransformAnchor,
+    ) {
+        self.vitems
+            .iter_mut()
+            .for_each(|x| x.apply_points_function(f, anchor));
+    }
+    fn get_bounding_box(&self) -> [Vec3; 3] {
+        let [min, max] = self.vitems
+            .iter()
+            .map(|x| x.get_bounding_box())
+            .map(|[min, _, max]| [min, max])
+            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
+            .unwrap();
+        [min, (min + max) / 2., max]
+    }
+    fn get_start_position(&self) -> Option<Vec3> {
+        self.vitems.first().and_then(|vitem| vitem.get_start_position())
+    }
+    fn get_end_position(&self) -> Option<Vec3> {
+        self.vitems.first().and_then(|vitem| vitem.get_start_position())
+    }
 }
 
 impl SvgItem {
@@ -67,14 +102,12 @@ impl SvgItem {
             }
 
             let mut vitem = VItem::from_vpoints(builder.vpoints().to_vec());
-            vitem.vpoints.apply_affine(mat3(
+            vitem.apply_affine(mat3(
                 vec3(transform.sx, transform.kx, transform.tx),
                 vec3(transform.ky, transform.sy, transform.ty),
                 vec3(0.0, 0.0, 1.0),
             ));
-            vitem
-                .vpoints
-                .rotate(f32::consts::PI, Vec3::X, TransformAnchor::origin());
+            vitem.rotate(f32::consts::PI, Vec3::X);
             if let Some(fill) = path.fill() {
                 let color = parse_paint(fill.paint()).with_alpha(fill.opacity().get());
                 vitem.set_fill_color(color);

@@ -9,7 +9,6 @@ use std::{
 };
 
 use animation::{Animation, Animator, Timeline};
-use components::{HasTransform3d, Transform3d};
 use context::{RanimContext, WgpuContext};
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
@@ -31,6 +30,8 @@ pub mod prelude {
 
     pub use crate::items::Blueprint;
     pub use crate::RenderScene;
+
+    pub use crate::components::Transformable;
 }
 
 pub mod color;
@@ -53,13 +54,13 @@ pub mod utils;
 /// The cloned `Rabject` has same Id and shared render_instance, but with seperate data.
 pub struct Rabject<T: Entity> {
     id: Id,
-    inner: T,
+    pub data: T,
     render_instance: Rc<RefCell<Box<dyn Extract<T>>>>,
 }
 
 impl<T: Entity> Renderable for Rabject<T> {
     fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {
-        let clip_box = self.inner.clip_box(camera);
+        let clip_box = self.data.clip_box(camera);
         self.render_instance
             .borrow_mut()
             .update_clip_box(ctx, &clip_box);
@@ -74,7 +75,7 @@ impl<T: Entity> Renderable for Rabject<T> {
         target_view: &wgpu::TextureView,
     ) {
         let mut render_instance = self.render_instance.borrow_mut();
-        render_instance.update(ctx, &self.inner);
+        render_instance.update(ctx, &self.data);
         render_instance.encode_render_command(
             ctx,
             pipelines,
@@ -90,7 +91,7 @@ impl<T: Entity + Clone> Clone for Rabject<T> {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
-            inner: self.inner.clone(),
+            data: self.data.clone(),
             render_instance: self.render_instance.clone(),
         }
     }
@@ -107,7 +108,7 @@ impl<T: Entity + 'static> Rabject<T> {
         ));
         Self {
             id: Id::new(),
-            inner: entity,
+            data: entity,
             render_instance,
         }
     }

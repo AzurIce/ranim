@@ -3,6 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use env_logger::Target;
 use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3};
 use itertools::Itertools;
 
@@ -16,10 +17,15 @@ pub mod rgba;
 pub mod vpoint;
 pub mod width;
 
-#[derive(Default, Clone)]
-pub struct ComponentData<T: Default + Clone>(Vec<T>);
+/// An component
+pub trait Component: Debug + Default + Clone + Copy {}
 
-impl<T: Default + Clone + PointWise + Interpolatable + Debug> Partial for ComponentData<T> {
+impl<T: Debug + Default + Clone + Copy> Component for T {}
+
+#[derive(Default, Debug, Clone)]
+pub struct ComponentVec<T: Component>(Vec<T>);
+
+impl<T: Component + PointWise + Interpolatable> Partial for ComponentVec<T> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
         let max_idx = self.len() - 1;
         let (start_index, start_residue) = interpolate_usize(0, max_idx, range.start);
@@ -55,7 +61,7 @@ impl<T: Default + Clone + PointWise + Interpolatable + Debug> Partial for Compon
     }
 }
 
-impl<T: Default + Clone> Alignable for ComponentData<T> {
+impl<T: Component> Alignable for ComponentVec<T> {
     fn is_aligned(&self, other: &Self) -> bool {
         self.len() == other.len()
     }
@@ -71,7 +77,7 @@ impl<T: Default + Clone> Alignable for ComponentData<T> {
     }
 }
 
-impl<T: Default + Clone + Interpolatable> Interpolatable for ComponentData<T> {
+impl<T: Component + Interpolatable> Interpolatable for ComponentVec<T> {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         Self(
             self.iter()
@@ -82,56 +88,48 @@ impl<T: Default + Clone + Interpolatable> Interpolatable for ComponentData<T> {
     }
 }
 
-impl<T: Default + Clone + Debug> Debug for ComponentData<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl<T: Default + Clone, I: IntoIterator<Item = impl Into<T>>> From<I> for ComponentData<T> {
+impl<T: Component, I: IntoIterator<Item = impl Into<T>>> From<I> for ComponentVec<T> {
     fn from(v: I) -> Self {
         Self(v.into_iter().map(Into::into).collect())
     }
 }
 
-impl<T: Default + Clone> AsRef<[T]> for ComponentData<T> {
-    fn as_ref(&self) -> &[T] {
-        &self.0
-    }
-}
+// impl<T: Component> AsRef<[T]> for ComponentVec<T> {
+//     fn as_ref(&self) -> &[T] {
+//         &self.0
+//     }
+// }
 
-impl<T: Default + Clone> AsRef<Vec<T>> for ComponentData<T> {
+impl<T: Component> AsRef<Vec<T>> for ComponentVec<T> {
     fn as_ref(&self) -> &Vec<T> {
         &self.0
     }
 }
 
-impl<T: Default + Clone> AsMut<Vec<T>> for ComponentData<T> {
+impl<T: Component> AsMut<Vec<T>> for ComponentVec<T> {
     fn as_mut(&mut self) -> &mut Vec<T> {
         &mut self.0
     }
 }
 
-impl<T: Default + Clone> Deref for ComponentData<T> {
+impl<T: Component> Deref for ComponentVec<T> {
     type Target = Vec<T>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<T: Default + Clone> DerefMut for ComponentData<T> {
+impl<T: Component> DerefMut for ComponentVec<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T: Default + Clone> ComponentData<T> {
+impl<T: Component> ComponentVec<T> {
     pub fn extend_from_vec(&mut self, vec: Vec<T>) {
         self.0.extend(vec);
     }
-}
 
-impl<T: Default + Clone> ComponentData<T> {
     pub fn resize_with_default(&mut self, new_len: usize) {
         self.resize(new_len, Default::default());
     }
@@ -150,13 +148,176 @@ impl<T: Default + Clone> ComponentData<T> {
 pub trait PointWise {}
 
 // MARK: Transformable
-pub trait Transformable {
-    fn shift(&mut self, offset: Vec3) -> &mut Self;
-    fn rotate(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self;
-    fn scale(&mut self, scale: Vec3) -> &mut Self;
+pub trait Transformable<T: Transform3dComponent> {
+    fn get_start_position(&self) -> Option<Vec3>;
+    fn get_end_position(&self) -> Option<Vec3>;
+    fn apply_points_function(&mut self, f: impl Fn(&mut ComponentVec<T>) + Copy, anchor: TransformAnchor);
+
+    /// Shift the mobject by a given vector.
+    fn shift(&mut self, shift: Vec3) -> &mut Self {
+        self.apply_points_function(
+            |points| {
+                points.iter_mut().for_each(|&mut mut p| {
+                    *p = *p + shift;
+                });
+            },
+            TransformAnchor::origin(),
+        );
+        self
+    }
+    /// Scale the mobject by a given vector.
+    fn scale(&mut self, scale: Vec3) -> &mut Self {
+        self.scale_by_anchor(scale, TransformAnchor::origin())
+    }
+    /// Scale the mobject by a given vector.
+    fn scale_by_anchor(&mut self, scale: Vec3, anchor: TransformAnchor) -> &mut Self {
+        self.apply_points_function(
+            |points| {
+                points.iter_mut().for_each(|&mut mut p| {
+                    *p = *p * scale;
+                });
+            },
+            anchor,
+        );
+        self
+    }
+    /// Rotate the mobject by a given angle about a given axis.
+    fn rotate(&mut self, angle: f32, axis: Vec3) -> &mut Self {
+        self.rotate_by_anchor(angle, axis, TransformAnchor::origin())
+    }
+    /// Rotate the mobject by a given angle about a given axis.
+    fn rotate_by_anchor(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self {
+        let axis = axis.normalize();
+        let rotation = Mat3::from_axis_angle(axis, angle);
+
+        self.apply_points_function(
+            |points| {
+                points.iter_mut().for_each(|&mut mut p| {
+                    *p = rotation * *p;
+                });
+            },
+            anchor,
+        );
+        self
+    }
+    fn apply_affine(&mut self, affine: Mat3) {
+        self.apply_points_function(
+            |points| {
+                points.iter_mut().for_each(|&mut mut p| {
+                    *p = affine * *p;
+                });
+            },
+            TransformAnchor::origin(),
+        )
+    }
+    /// Put the start and end points of the item on the given points.
+    fn put_start_and_end_on(&mut self, start: Vec3, end: Vec3) -> &mut Self {
+        let (cur_start, cur_end) = (
+            self.get_start_position().unwrap_or_default(),
+            self.get_end_position().unwrap_or_default(),
+        );
+        let cur_v = cur_end - cur_start;
+        if cur_v.length_squared() <= f32::EPSILON {
+            return self;
+        }
+
+        let v = end - start;
+        self.scale_by_anchor(
+            Vec3::splat(v.length() / cur_v.length()),
+            TransformAnchor::Point(cur_start),
+        );
+        let angle = cur_v.y.atan2(-cur_v.x) - v.y.atan2(-v.x) + std::f32::consts::PI / 2.0;
+        self.rotate(angle, Vec3::Z);
+        let cur_xy = vec2(cur_v.x, cur_v.y);
+        let cur_xy = cur_xy * cur_xy.abs().normalize();
+
+        let xy = vec2(v.x, v.y);
+        let xy = xy * xy.abs().normalize();
+        let angle = cur_v.z.atan2(-cur_xy.length()) - v.z.atan2(-xy.length());
+        self.rotate(angle, vec3(-v.y, v.x, 0.0));
+        self.shift(start - self.get_start_position().unwrap());
+
+        self
+    }
+
+    // Bounding box
+    fn get_bounding_box(&self) -> [Vec3; 3];
+    fn get_bounding_box_point(&self, edge: IVec3) -> Vec3 {
+        let bb = self.get_bounding_box();
+        let signum = (edge.signum() + IVec3::ONE).as_uvec3();
+
+        vec3(
+            bb[signum.x as usize].x,
+            bb[signum.y as usize].y,
+            bb[signum.z as usize].z,
+        )
+    }
+    fn get_bounding_box_corners(&self) -> [Vec3; 8] {
+        [-1, 1]
+            .into_iter()
+            .cartesian_product([-1, 1])
+            .cartesian_product([-1, 1])
+            .map(|((x, y), z)| self.get_bounding_box_point(ivec3(x, y, z)))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
+    }
+}
+
+impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
+    /// Apply a function to the points of the mobject about the point.
+    fn apply_points_function(&mut self, f: impl Fn(&mut ComponentVec<T>) + Copy, anchor: TransformAnchor) {
+        let anchor = match anchor {
+            TransformAnchor::Point(x) => x,
+            TransformAnchor::Edge(x) => self.get_bounding_box_point(x),
+        };
+        let component_vec = self.as_mut();
+
+        if anchor != Vec3::ZERO {
+            component_vec
+                .iter_mut()
+                .for_each(|&mut mut p| *p = *p + anchor);
+        }
+
+        f(component_vec);
+
+        if anchor != Vec3::ZERO {
+            component_vec
+                .iter_mut()
+                .for_each(|&mut mut p| *p = *p - anchor);
+        }
+    }
+
+    fn get_start_position(&self) -> Option<Vec3> {
+        self.as_ref().first().map(|&p| *p)
+    }
+
+    fn get_end_position(&self) -> Option<Vec3> {
+        self.as_ref().last().map(|&p| *p)
+    }
+
+    /// Get the bounding box of the mobject.
+    /// min, mid, max
+    fn get_bounding_box(&self) -> [Vec3; 3] {
+        let min = self
+            .as_ref()
+            .iter()
+            .map(|&p| *p)
+            .reduce(|acc, e| acc.min(e))
+            .unwrap_or(Vec3::ZERO);
+        let max = self
+            .as_ref()
+            .iter()
+            .map(|&p| *p)
+            .reduce(|acc, e| acc.max(e))
+            .unwrap_or(Vec3::ZERO);
+        let mid = (min + max) / 2.0;
+        [min, mid, max]
+    }
 }
 
 /// The anchor of the transformation.
+#[derive(Debug, Clone, Copy)]
 pub enum TransformAnchor {
     /// A point anchor
     Point(Vec3),
@@ -179,162 +340,27 @@ impl TransformAnchor {
 }
 
 // MARK: Transform3d
-pub trait HasTransform3d {
-    fn get(&self) -> &ComponentData<impl Transform3d + Default + Clone>;
-    fn get_mut(&mut self) -> &mut ComponentData<impl Transform3d + Default + Clone>;
+/// An `Transform3dComponent` should be a `Vec3` that can be transformed.
+pub trait Transform3dComponent: Component + DerefMut<Target = Vec3> {}
+impl<T: Component + DerefMut<Target = Vec3>> Transform3dComponent for T {}
+
+/// Something that can be treated as a ref/mut ref of `ComponentVec<Transform3dComponent>`.
+pub trait HasTransform3d<T: Transform3dComponent>:
+    AsRef<ComponentVec<T>> + AsMut<ComponentVec<T>>
+{
+}
+impl<T: Transform3dComponent, V: AsRef<ComponentVec<T>> + AsMut<ComponentVec<T>>> HasTransform3d<T>
+    for V
+{
 }
 
-pub trait Transform3d {
-    fn position(&self) -> Vec3;
-    fn position_mut(&mut self) -> &mut Vec3;
+impl<T: Component> AsRef<ComponentVec<T>> for ComponentVec<T> {
+    fn as_ref(&self) -> &ComponentVec<T> {
+        self
+    }
 }
-
-impl<T: Transform3d + Default + Clone> ComponentData<T> {
-    pub fn get_start_position(&self) -> Option<Vec3> {
-        self.first().map(|p| p.position())
-    }
-
-    pub fn get_end_position(&self) -> Option<Vec3> {
-        self.last().map(|p| p.position())
-    }
-
-    /// Get the bounding box of the mobject.
-    /// min, mid, max
-    pub fn get_bounding_box(&self) -> [Vec3; 3] {
-        let min = self
-            .iter()
-            .map(|p| p.position())
-            .reduce(|acc, e| acc.min(e))
-            .unwrap_or(Vec3::ZERO);
-        let max = self
-            .iter()
-            .map(|p| p.position())
-            .reduce(|acc, e| acc.max(e))
-            .unwrap_or(Vec3::ZERO);
-        let mid = (min + max) / 2.0;
-        [min, mid, max]
-    }
-
-    pub fn get_bounding_box_point(&self, edge: IVec3) -> Vec3 {
-        let bb = self.get_bounding_box();
-        let signum = (edge.signum() + IVec3::ONE).as_uvec3();
-
-        vec3(
-            bb[signum.x as usize].x,
-            bb[signum.y as usize].y,
-            bb[signum.z as usize].z,
-        )
-    }
-
-    pub fn get_bounding_box_corners(&self) -> [Vec3; 8] {
-        [-1, 1]
-            .into_iter()
-            .cartesian_product([-1, 1])
-            .cartesian_product([-1, 1])
-            .map(|((x, y), z)| self.get_bounding_box_point(ivec3(x, y, z)))
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap()
-    }
-
-    pub fn apply_affine(&mut self, affine: Mat3) {
-        self.iter_mut()
-            .for_each(|p| *p.position_mut() = affine * p.position());
-    }
-
-    /// Apply a function to the points of the mobject about the point.
-    pub fn apply_points_function(
-        &mut self,
-        f: impl Fn(&mut ComponentData<T>),
-        anchor: TransformAnchor,
-    ) {
-        let anchor = match anchor {
-            TransformAnchor::Point(x) => x,
-            TransformAnchor::Edge(x) => self.get_bounding_box_point(x),
-        };
-
-        if anchor != Vec3::ZERO {
-            self.iter_mut()
-                .for_each(|p| *p.position_mut() = p.position() + anchor);
-        }
-
-        f(self);
-
-        if anchor != Vec3::ZERO {
-            self.iter_mut()
-                .for_each(|p| *p.position_mut() = p.position() - anchor);
-        }
-    }
-
-    /// Shift the mobject by a given vector.
-    pub fn shift(&mut self, shift: Vec3) -> &mut Self {
-        self.apply_points_function(
-            |points| {
-                points.iter_mut().for_each(|p| {
-                    *p.position_mut() = p.position() + shift;
-                });
-            },
-            TransformAnchor::origin(),
-        );
-        self
-    }
-
-    /// Scale the mobject by a given vector.
-    pub fn scale(&mut self, scale: Vec3, anchor: TransformAnchor) -> &mut Self {
-        self.apply_points_function(
-            |points| {
-                points.iter_mut().for_each(|p| {
-                    *p.position_mut() = p.position() * scale;
-                });
-            },
-            anchor,
-        );
-        self
-    }
-
-    /// Rotate the mobject by a given angle about a given axis.
-    pub fn rotate(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self {
-        let axis = axis.normalize();
-        let rotation = Mat3::from_axis_angle(axis, angle);
-
-        self.apply_points_function(
-            |points| {
-                points.iter_mut().for_each(|p| {
-                    *p.position_mut() = rotation * p.position();
-                });
-            },
-            anchor,
-        );
-        self
-    }
-
-    /// Put the start and end points of the item on the given points.
-    pub fn put_start_and_end_on(&mut self, start: Vec3, end: Vec3) -> &mut Self {
-        let (cur_start, cur_end) = (
-            self.get_start_position().unwrap_or_default(),
-            self.get_end_position().unwrap_or_default(),
-        );
-        let cur_v = cur_end - cur_start;
-        if cur_v.length_squared() <= f32::EPSILON {
-            return self;
-        }
-
-        let v = end - start;
-        self.scale(
-            Vec3::splat(v.length() / cur_v.length()),
-            TransformAnchor::Point(cur_start),
-        );
-        let angle = cur_v.y.atan2(-cur_v.x) - v.y.atan2(-v.x) + std::f32::consts::PI / 2.0;
-        self.rotate(angle, Vec3::Z, TransformAnchor::origin());
-        let cur_xy = vec2(cur_v.x, cur_v.y);
-        let cur_xy = cur_xy * cur_xy.abs().normalize();
-
-        let xy = vec2(v.x, v.y);
-        let xy = xy * xy.abs().normalize();
-        let angle = cur_v.z.atan2(-cur_xy.length()) - v.z.atan2(-xy.length());
-        self.rotate(angle, vec3(-v.y, v.x, 0.0), TransformAnchor::origin());
-        self.shift(start - self.get_start_position().unwrap());
-
+impl<T: Component> AsMut<ComponentVec<T>> for ComponentVec<T> {
+    fn as_mut(&mut self) -> &mut ComponentVec<T> {
         self
     }
 }
@@ -343,11 +369,13 @@ impl<T: Transform3d + Default + Clone> ComponentData<T> {
 mod test {
     use glam::{ivec3, vec3};
 
-    use super::{vpoint::VPoint, ComponentData};
+    use crate::components::Transformable;
+
+    use super::{vpoint::VPoint, ComponentVec};
 
     #[test]
     fn test_bounding_box() {
-        let points: ComponentData<VPoint> = vec![
+        let points: ComponentVec<VPoint> = vec![
             vec3(-100.0, -100.0, 0.0),
             vec3(-100.0, 100.0, 0.0),
             vec3(100.0, 100.0, 0.0),

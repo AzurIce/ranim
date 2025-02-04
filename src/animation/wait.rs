@@ -3,7 +3,7 @@ use crate::{items::Entity, prelude::Empty, Rabject};
 use super::entity::{EntityAnimation, EntityAnimator};
 
 pub fn wait<T: Entity + 'static>(rabject: Rabject<T>) -> EntityAnimation<T> {
-    EntityAnimation::new(rabject.id(), Wait(rabject.inner.clone()))
+    EntityAnimation::new(rabject.id(), Wait(rabject.data.clone()))
 }
 
 pub fn blank<T: Entity + Empty + 'static>(rabject: Rabject<T>) -> EntityAnimation<T> {

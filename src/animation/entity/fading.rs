@@ -6,14 +6,14 @@ use crate::animation::entity::{EntityAnimation, EntityAnimator};
 pub fn fade_in<T: Opacity + Interpolatable + 'static + Entity>(
     rabject: Rabject<T>,
 ) -> EntityAnimation<T> {
-    let func = FadeIn::new(rabject.inner.clone());
+    let func = FadeIn::new(rabject.data.clone());
     EntityAnimation::new(rabject.id(), func)
 }
 
 pub fn fade_out<T: Opacity + Interpolatable + 'static + Entity>(
     rabject: Rabject<T>,
 ) -> EntityAnimation<T> {
-    let func = FadeOut::new(rabject.inner.clone());
+    let func = FadeOut::new(rabject.data.clone());
     EntityAnimation::new(rabject.id(), func)
 }
 

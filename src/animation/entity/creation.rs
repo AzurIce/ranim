@@ -11,28 +11,28 @@ use crate::animation::entity::{EntityAnimation, EntityAnimator};
 pub fn create<T: Entity + Partial + Empty + Interpolatable + 'static>(
     target: Rabject<T>,
 ) -> EntityAnimation<T> {
-    let inner = target.inner.clone();
+    let inner = target.data.clone();
     EntityAnimation::new(target.id(), Create::new(inner))
 }
 
 pub fn uncreate<T: Entity + Partial + Empty + Interpolatable + 'static>(
     target: Rabject<T>,
 ) -> EntityAnimation<T> {
-    let inner = target.inner.clone();
+    let inner = target.data.clone();
     EntityAnimation::new(target.id(), UnCreate::new(inner))
 }
 
 pub fn write<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>(
     target: Rabject<T>,
 ) -> EntityAnimation<T> {
-    let inner = target.inner.clone();
+    let inner = target.data.clone();
     EntityAnimation::new(target.id(), Write::new(inner))
 }
 
 pub fn unwrite<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>(
     target: Rabject<T>,
 ) -> EntityAnimation<T> {
-    let inner = target.inner.clone();
+    let inner = target.data.clone();
     EntityAnimation::new(target.id(), Unwrite::new(inner))
 }
 

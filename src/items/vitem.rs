@@ -4,7 +4,7 @@ use log::trace;
 
 use crate::{
     components::{
-        rgba::Rgba, vpoint::VPoint, width::Width, ComponentData, HasTransform3d, TransformAnchor,
+        rgba::Rgba, vpoint::VPoint, width::Width, ComponentVec, TransformAnchor, Transformable,
     },
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
@@ -18,19 +18,20 @@ use super::{Blueprint, Entity};
 
 #[derive(Debug, Clone)]
 pub struct VItem {
-    pub vpoints: ComponentData<VPoint>,
-    pub stroke_widths: ComponentData<Width>,
-    pub stroke_rgbas: ComponentData<Rgba>,
-    pub fill_rgbas: ComponentData<Rgba>,
+    pub vpoints: ComponentVec<VPoint>,
+    pub stroke_widths: ComponentVec<Width>,
+    pub stroke_rgbas: ComponentVec<Rgba>,
+    pub fill_rgbas: ComponentVec<Rgba>,
 }
 
-impl HasTransform3d for VItem {
-    fn get(&self) -> &ComponentData<impl crate::components::Transform3d + Default + Clone> {
+impl AsRef<ComponentVec<VPoint>> for VItem {
+    fn as_ref(&self) -> &ComponentVec<VPoint> {
         &self.vpoints
     }
-    fn get_mut(
-        &mut self,
-    ) -> &mut ComponentData<impl crate::components::Transform3d + Default + Clone> {
+}
+
+impl AsMut<ComponentVec<VPoint>> for VItem {
+    fn as_mut(&mut self) -> &mut ComponentVec<VPoint> {
         &mut self.vpoints
     }
 }
@@ -72,7 +73,7 @@ impl Entity for VItem {
     type Primitive = VItemPrimitive;
 
     fn clip_box(&self, camera: &CameraFrame) -> [Vec2; 4] {
-        let corners = self.vpoints.get_bounding_box_corners().map(|p| {
+        let corners = self.get_bounding_box_corners().map(|p| {
             let mut p = camera.view_projection_matrix() * p.extend(1.0);
             p /= p.w;
             p.xy()
@@ -351,7 +352,7 @@ impl Blueprint<VItem> for Ellipse {
         let mut mobject = Circle(1.0).build();
         mobject
             .vpoints
-            .scale(vec3(self.0, self.1, 1.0), TransformAnchor::origin());
+            .scale(vec3(self.0, self.1, 1.0));
         mobject
     }
 }
