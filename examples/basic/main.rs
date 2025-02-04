@@ -1,15 +1,16 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use bevy_color::Srgba;
 use env_logger::Env;
 use glam::{vec3, Vec3};
 use log::info;
 use ranim::animation::entity::creation::{uncreate, Color};
-use ranim::animation::entity::fading::fade_in;
+use ranim::animation::entity::fading::{fade_in, fade_out};
 use ranim::animation::entity::interpolate::interpolate;
 use ranim::animation::Timeline;
 use ranim::components::TransformAnchor;
 
+use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon};
 use ranim::{prelude::*, typst_svg, AppOptions, SceneDesc, TimelineConstructor};
 
@@ -45,22 +46,18 @@ impl TimelineConstructor for MainScene {
         .build();
         polygon
             .set_color(Srgba::hex("FF8080FF").unwrap())
-            .set_opacity(0.5);
-        polygon.vpoints.rotate(
-            std::f32::consts::FRAC_PI_4,
-            Vec3::Z,
-            TransformAnchor::origin(),
-        );
+            .set_opacity(0.5)
+            .rotate(std::f32::consts::FRAC_PI_4, Vec3::Z);
         // 0.5s wait -> fade in -> 0.5s wait
         timeline.forward(0.5);
         let polygon = timeline.insert(polygon);
         let polygon = timeline.play(fade_in(polygon));
         timeline.forward(0.5);
 
-        // let mut svg = Svg::from_svg(SVG).build();
-        // svg.shift(center);
+        // let mut svg = SvgItem::from_svg(SVG);
 
         // info!("polygon transform to svg");
+        // let svg = timeline.play(interpolate(polygon, svg));
         // let svg = app.play_in_canvas(&canvas, polygon, Interpolate::new(svg.clone()));
         // app.wait(Duration::from_secs_f32(0.5));
 

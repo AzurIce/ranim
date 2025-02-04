@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use bevy_color::Srgba;
 use env_logger::Env;
@@ -51,9 +51,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                     .set_stroke_width(width);
 
                 let arc = timeline.insert(arc);
-                timeline.play(
-                    fade_in(arc).with_duration(3.0 / (nrad * ntan) as f32),
-                );
+                timeline.play(fade_in(arc).with_duration(3.0 / (nrad * ntan) as f32));
             }
             info!(
                 "rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}",

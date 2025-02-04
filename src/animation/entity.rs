@@ -61,7 +61,7 @@ impl<T: Entity> Animator for EntityTimeline<T> {
             .unwrap();
         let start_sec = end_sec - anim.params.duration_secs;
         let alpha = (sec - start_sec) / (end_sec - start_sec);
-        self.rabject.inner = anim.eval_alpha(alpha);
+        self.rabject.data = anim.eval_alpha(alpha);
     }
 }
 

@@ -4,16 +4,12 @@ use glam::Vec3;
 
 use crate::prelude::Interpolatable;
 
-use super::Transform3d;
+// use super::Transform3d;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+// pub type Point = Vec3;
+
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct Point(Vec3);
-
-impl Default for Point {
-    fn default() -> Self {
-        Vec3::ZERO.into()
-    }
-}
 
 impl From<Vec3> for Point {
     fn from(value: Vec3) -> Self {
@@ -41,15 +37,18 @@ impl Interpolatable for Point {
     }
 }
 
-impl Transform3d for Point {
-    fn position(&self) -> Vec3 {
-        self.0
+// MARK: Transform3d
+impl AsRef<Vec3> for Point {
+    fn as_ref(&self) -> &Vec3 {
+        &self.0
     }
-
-    fn position_mut(&mut self) -> &mut Vec3 {
+}
+impl AsMut<Vec3> for Point {
+    fn as_mut(&mut self) -> &mut Vec3 {
         &mut self.0
     }
 }
+// impl Transform3d for Point {}
 
 #[cfg(test)]
 mod test {
