@@ -1,97 +1,346 @@
-//! Ranim is an animation engine written in rust, using [`wgpu`] and [`vello`].
-//!
-//! # Getting Started
-//!
-//! Every thing starts with a [`scene::Scene`], which handles the update
-//! and render of [`scene::Entity`]s.
-//!
-//! To create a scene, use [`scene::SceneBuilder`]:
-//!
-//! ```rust
-//! let mut scene = SceneBuilder::new("scene-hello").build();
-//! ```
-//!
-//! A scene implements [`std::ops::Deref`] to a [`scene::EntityStore`], which stores entities.
-//!
-//! You can treat it as a [`HashMap`](std::collections::HashMap) with [`scene::EntityId`] as the key,
-//! and the [`scene::Entity`] as the value, it has the following methods:
-//! - [`insert`](scene::EntityStore::insert):
-//!   Insert an [`Entity`](scene::Entity) into the store, and returns a new [`EntityId`](scene::EntityId)
-//! - [`remove`](scene::EntityStore::remove):
-//!   Consumes an [`EntityId`](scene::EntityId) and remove the corresponding [`Entity`](scene::Entity) from the store.
-//! - [`get`](scene::EntityStore::get) and [`get_mut`](scene::EntityStore::get_mut):
-//!   Get the reference of an [`Entity`](scene::Entity) by a reference of [`EntityId`](scene::EntityId).
-//!
-//! The [`scene::Scene`] in Ranim is 3d, it can only render 3d objects.
-//! However, there is a similar structure called [`scene::canvas::Canvas`], which is basically
-//! a 2d scene and can render 2d objects while itself can be rendered in 3d scene as a quad with texture.
-//!
-//! To create a canvas and add it into the scene, use [`scene::Scene::insert_new_canvas`]:
-//!
-//! ```rust
-//! // Create a canvas with viewport size 1920x1080
-//! let canvas = scene.insert_new_canvas(1920, 1080);
-//! ```
-//!
-//! The easiest way to create an entity is to use [`rabject::Blueprint`], its basically a builder of [`Entity`]:
-//!
-//! ```rust
-//! {
-//!     let canvas = scene.get_mut(canvas);
-//!
-//!     // Create a VMobject with a closed path formed by 5 points
-//!     let mut polygon = Polygon::new(vec![
-//!         vec2(0.0, 0.0),
-//!         vec2(-100.0, -300.0),
-//!         vec2(500.0, 0.0),
-//!         vec2(0.0, 700.0),
-//!         vec2(200.0, 300.0),
-//!     ])
-//!     .with_stroke_width(10.0)
-//!     .build();
-//!     // Set the properties of the rabject
-//!     polygon.set_color(Srgba::hex("FF8080FF").unwrap()).rotate(
-//!         std::f32::consts::PI / 4.0,
-//!         Vec3::Z,
-//!         TransformAnchor::origin(),
-//!     );
-//!
-//!     // Insert the VMobject and get its id
-//!     let polygon = canvas.insert(polygon);
-//! }
-//! ```
-//!
-//! Now the [`scene::Scene`] contains a [`scene::canvas::Canvas`], and in the canvas,
-//! there is a [`scene::Entity`] built by the [`crate::rabject::rabject2d::vmobject::geometry::Polygon`] blueprint.
-//!
-//! Finally, to render the scene, use [`scene::Scene::render_to_image`]:
-//!
-//! ```rust
-//! scene.render_to_image("hello.png");
-//! ```
-//!
-//! Then you will find `hello.png` in `output/scene-hello/hello.png`.
+//! Ranim is an animation engine written in rust based on [`wgpu`].
 
+use std::{
+    cell::RefCell,
+    fmt::Write,
+    path::{Path, PathBuf},
+    rc::Rc,
+    time::{Duration, Instant},
+};
+
+use animation::{Animation, Animator, Timeline};
+use context::{RanimContext, WgpuContext};
+use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
+use image::{ImageBuffer, Rgba};
+use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use items::Entity;
+use render::{
+    primitives::{Extract, Primitive},
+    CameraFrame, Renderable, Renderer,
+};
+use utils::{rate_functions::linear, Id, RenderResourceStorage};
+
 pub mod prelude {
     pub use crate::interpolate::Interpolatable;
 
-    pub use crate::animation::fading::Opacity;
-    pub use crate::animation::transform::Alignable;
-    pub use crate::animation::creation::{Partial, Empty, Fill, Stroke};
-    pub use crate::rabject::rabject2d::BoundingBox;
+    pub use crate::animation::entity::creation::{Empty, Fill, Partial, Stroke};
+    pub use crate::animation::entity::fading::Opacity;
+    pub use crate::animation::entity::interpolate::Alignable;
 
-    pub use crate::rabject::Blueprint;
+    pub use crate::items::Blueprint;
+    pub use crate::RenderScene;
+
+    pub use crate::components::Transformable;
 }
 
 pub mod color;
+mod file_writer;
 mod interpolate;
 pub mod updater;
 
 pub mod animation;
+pub mod components;
 pub mod context;
-/// Rabjects are the basic objects in ranim scene
-pub mod rabject;
-/// To arrange rabjects
-pub mod scene;
+pub mod items;
+pub mod render;
 pub mod utils;
+// pub mod world;
+
+/// An `Rabject` is a wrapper of an entity that can be rendered.
+///
+/// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
+///
+/// The cloned `Rabject` has same Id and shared render_instance, but with seperate data.
+pub struct Rabject<T: Entity> {
+    id: Id,
+    pub data: T,
+    render_instance: Rc<RefCell<Box<dyn Extract<T>>>>,
+}
+
+impl<T: Entity> Renderable for Rabject<T> {
+    fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {
+        let clip_box = self.data.clip_box(camera);
+        self.render_instance
+            .borrow_mut()
+            .update_clip_box(ctx, &clip_box);
+    }
+    fn render(
+        &mut self,
+        ctx: &WgpuContext,
+        pipelines: &mut RenderResourceStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        multisample_view: &wgpu::TextureView,
+        target_view: &wgpu::TextureView,
+    ) {
+        let mut render_instance = self.render_instance.borrow_mut();
+        render_instance.update(ctx, &self.data);
+        render_instance.encode_render_command(
+            ctx,
+            pipelines,
+            encoder,
+            uniforms_bind_group,
+            multisample_view,
+            target_view,
+        );
+    }
+}
+
+impl<T: Entity + Clone> Clone for Rabject<T> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            data: self.data.clone(),
+            render_instance: self.render_instance.clone(),
+        }
+    }
+}
+
+impl<T: Entity + 'static> Rabject<T> {
+    pub fn id(&self) -> Id {
+        self.id
+    }
+    pub fn new(entity: T) -> Self {
+        let render_instance = T::Primitive::default();
+        let render_instance = Rc::new(RefCell::new(
+            Box::new(render_instance) as Box<dyn Extract<T>>
+        ));
+        Self {
+            id: Id::new(),
+            data: entity,
+            render_instance,
+        }
+    }
+}
+
+pub struct SceneDesc {
+    pub name: String,
+}
+
+pub trait TimelineConstructor {
+    fn desc() -> SceneDesc;
+    fn construct(&mut self, timeline: &mut Timeline);
+}
+
+pub trait RenderScene {
+    fn render(self, options: &AppOptions)
+    where
+        Self: Sized;
+    fn render_frame_to_image(self, path: impl AsRef<Path>)
+    where
+        Self: Sized;
+}
+
+impl<T: TimelineConstructor> RenderScene for T {
+    fn render(self, options: &AppOptions)
+    where
+        Self: Sized,
+    {
+        let desc = T::desc();
+        let mut options = options.clone();
+        let default_options = AppOptions::default();
+        if options.output_dir == default_options.output_dir {
+            options.output_dir = PathBuf::from(format!("./output/{}", desc.name))
+        }
+
+        let mut clip_contructor = self;
+        let mut app = RanimRenderApp::new(&options);
+        let mut timeline = Timeline::new();
+        clip_contructor.construct(&mut timeline);
+        if timeline.elapsed_secs() == 0.0 {
+            timeline.forward(0.1);
+        }
+        let duration_secs = timeline.elapsed_secs();
+        app.render_anim(
+            Animation::new(timeline)
+                .with_rate_func(linear)
+                .with_duration(duration_secs),
+        );
+    }
+    fn render_frame_to_image(self, path: impl AsRef<Path>) {
+        let mut clip_contructor = self;
+        let desc = T::desc();
+        let mut app = RanimRenderApp::new(&AppOptions {
+            output_dir: PathBuf::from(format!("./output/{}", desc.name)),
+            ..Default::default()
+        });
+        let mut timeline = Timeline::new();
+        clip_contructor.construct(&mut timeline);
+        if timeline.elapsed_secs() == 0.0 {
+            timeline.forward(0.1);
+        }
+        let duration_secs = timeline.elapsed_secs();
+        let mut anim = Animation::new(timeline)
+            .with_rate_func(linear)
+            .with_duration(duration_secs);
+        app.render_anim_frame_to_image(&mut anim, path);
+    }
+}
+
+/// MARK: RanimRenderApp
+pub struct RanimRenderApp {
+    ctx: RanimContext,
+
+    // world: World,
+    // anim: Box<dyn Animation>,
+    renderer: Renderer,
+
+    camera_frame: CameraFrame,
+
+    /// The writer for the output.mp4 video
+    video_writer: Option<FileWriter>,
+    /// Whether to auto create a [`FileWriter`] to output the video
+    video_writer_builder: Option<FileWriterBuilder>,
+    /// Whether to save the frames
+    save_frames: bool,
+    /// fps
+    fps: u32,
+
+    frame_count: u32,
+    output_dir: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+pub struct AppOptions {
+    pub frame_size: (u32, u32),
+    pub frame_rate: u32,
+    pub save_frames: bool,
+    pub output_dir: PathBuf,
+}
+
+impl Default for AppOptions {
+    fn default() -> Self {
+        Self {
+            frame_size: (1920, 1080),
+            frame_rate: 60,
+            save_frames: false,
+            output_dir: PathBuf::from("./output"),
+        }
+    }
+}
+
+impl RanimRenderApp {
+    pub fn new(options: &AppOptions) -> Self {
+        let ctx = RanimContext::new();
+        let camera_frame = CameraFrame::new_with_size(
+            options.frame_size.0 as usize,
+            options.frame_size.1 as usize,
+        );
+        let mut renderer = Renderer::new(
+            &ctx,
+            options.frame_size.0 as usize,
+            options.frame_size.1 as usize,
+        );
+        renderer.update_uniforms(&ctx.wgpu_ctx, &camera_frame);
+        Self {
+            // world: World::new(),
+            renderer,
+            camera_frame,
+            video_writer: None,
+            video_writer_builder: Some(
+                FileWriterBuilder::default()
+                    .with_fps(options.frame_rate)
+                    .with_size(options.frame_size.0, options.frame_size.1)
+                    .with_file_path(options.output_dir.join("output.mp4")),
+            ),
+            save_frames: options.save_frames,
+            fps: options.frame_rate,
+            frame_count: 0,
+            ctx,
+            output_dir: options.output_dir.clone(),
+        }
+    }
+    fn tick_duration(&self) -> Duration {
+        Duration::from_secs_f32(1.0 / self.fps as f32)
+    }
+
+    pub fn render_anim_frame_to_image(&mut self, anim: &mut Animation, filename: impl AsRef<Path>) {
+        // let alpha = sec / anim.duration().as_secs_f32();
+        // anim.update_alpha(alpha);
+        self.renderer.render(&mut self.ctx, anim);
+        let path = self.output_dir.join(filename);
+        self.save_frame_to_image(path);
+    }
+
+    pub fn render_anim(&mut self, mut anim: Animation) {
+        let frames = (anim.duration_secs() * self.fps as f32).ceil() as usize;
+        let t = Instant::now();
+        let pb = ProgressBar::new(frames as u64);
+        pb.set_style(
+            ProgressStyle::with_template(
+                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} ({eta}) {msg}",
+            )
+            .unwrap()
+            .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
+                write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+            })
+            .progress_chars("#>-"),
+        );
+        (0..frames)
+            .map(|f| f as f32 / frames as f32)
+            .for_each(|alpha| {
+                // trace!("rendering frame at alpha = {}", alpha);
+                anim.update_alpha(alpha);
+                self.renderer.render(&mut self.ctx, &mut anim);
+                self.update_frame();
+                pb.inc(1);
+                pb.set_message(format!(
+                    "rendering {:?}/{:?}",
+                    Duration::from_secs_f32(alpha * anim.duration_secs()),
+                    Duration::from_secs_f32(anim.duration_secs())
+                ));
+            });
+
+        let msg = format!(
+            "rendered {} frames({:?}) in {:?}",
+            frames,
+            anim.duration_secs(),
+            t.elapsed()
+        );
+        pb.finish_with_message(msg);
+    }
+
+    fn update_frame(&mut self) {
+        // `output_video` is true
+        if let Some(video_writer) = self.video_writer.as_mut() {
+            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));
+        } else if let Some(builder) = self.video_writer_builder.as_ref() {
+            self.video_writer
+                .get_or_insert(builder.clone().build())
+                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));
+        }
+
+        // `save_frames` is true
+        if self.save_frames {
+            let path = self
+                .output_dir
+                .join(format!("frames/{:04}.png", self.frame_count));
+            self.save_frame_to_image(path);
+        }
+        self.frame_count += 1;
+    }
+
+    // // pub fn render_to_image(&mut self, world: &mut World, filename: impl AsRef<str>) {
+    // //     let filename = filename.as_ref();
+    // //     world.extract();
+    // //     world.prepare(&self.ctx);
+    // //     self.renderer.render(&mut self.ctx, &mut world.entities);
+    // //     self.save_frame_to_image(PathBuf::from(format!("output/{}/{}", "world", filename)));
+    // // }
+
+    pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
+        let dir = path.as_ref().parent().unwrap();
+        if !dir.exists() {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        // info!("[Scene]: SAVE FRAME TO IMAGE START");
+        // let t = Instant::now();
+        let size = self.camera_frame.size;
+        let texture_data = self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx);
+        let buffer: ImageBuffer<Rgba<u8>, &[u8]> =
+            ImageBuffer::from_raw(size.0 as u32, size.1 as u32, texture_data).unwrap();
+        buffer.save(path).unwrap();
+        // info!("[Scene]: SAVE FRAME TO IMAGE END, took {:?}", t.elapsed());
+    }
+}
