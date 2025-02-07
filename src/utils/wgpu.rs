@@ -4,6 +4,7 @@ use wgpu::util::DeviceExt;
 
 use crate::context::WgpuContext;
 
+#[allow(unused)]
 pub(crate) struct WgpuBuffer<T: bytemuck::Pod + bytemuck::Zeroable + Debug> {
     label: Option<&'static str>,
     buffer: wgpu::Buffer,
@@ -19,6 +20,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> Deref for WgpuBuffer<T> {
     }
 }
 
+#[allow(unused)]
 impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
     pub(crate) fn new(
         ctx: &WgpuContext,
@@ -119,55 +121,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             inner: vec![],
         }
     }
-    pub(crate) fn new_with_len(
-        ctx: &WgpuContext,
-        label: Option<&'static str>,
-        usage: wgpu::BufferUsages,
-        len: usize,
-    ) -> Self {
-        assert!(
-            usage.contains(wgpu::BufferUsages::COPY_DST),
-            "Buffer {label:?} does not contains COPY_DST"
-        );
-        Self {
-            label,
-            buffer: Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
-                label,
-                size: (std::mem::size_of::<T>() * len) as u64,
-                usage,
-                mapped_at_creation: false,
-            })),
-            usage,
-            inner: vec![T::default(); len],
-        }
-    }
-
-    pub(crate) fn new_init(
-        ctx: &WgpuContext,
-        label: Option<&'static str>,
-        usage: wgpu::BufferUsages,
-        data: &[T],
-    ) -> Self {
-        assert!(
-            usage.contains(wgpu::BufferUsages::COPY_DST),
-            "Buffer {label:?} does not contains COPY_DST"
-        );
-        // trace!("[WgpuBuffer]: new_init, {} {:?}", data.len(), usage);
-        Self {
-            label,
-            buffer: Some(
-                ctx.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label,
-                        contents: bytemuck::cast_slice(data),
-                        usage,
-                    }),
-            ),
-            usage,
-            inner: data.to_vec(),
-        }
-    }
-
+    
     pub(crate) fn get(&self) -> &[T] {
         self.inner.as_ref()
     }
