@@ -50,8 +50,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                     .set_fill_opacity(0.0)
                     .set_stroke_width(width);
 
-                let arc = timeline.show(arc);
-                timeline.play(fade_in(arc).with_duration(3.0 / (nrad * ntan) as f32));
+                timeline.play(fade_in(&arc).with_duration(3.0 / (nrad * ntan) as f32));
             }
             info!(
                 "rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}",

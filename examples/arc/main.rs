@@ -45,8 +45,7 @@ impl TimelineConstructor for ArcScene {
                     .set_fill_color(color.with_alpha(0.0))
                     .shift(offset.extend(0.0));
 
-                let arc = timeline.show(arc);
-                timeline.play(fade_in(arc).with_duration(0.5));
+                timeline.play(fade_in(&arc).with_duration(0.5));
             }
         }
     }
