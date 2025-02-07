@@ -18,44 +18,14 @@ use crate::{
     utils::PipelinesStorage,
 };
 
-use super::{AnimWithParams, Animator};
-
-impl Renderable for Rc<Box<dyn Renderable>> {
-    fn render(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-        pipelines: &mut PipelinesStorage,
-        encoder: &mut wgpu::CommandEncoder,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        camera: &CameraFrame,
-    ) {
-        self.as_ref().render(
-            ctx,
-            render_instances,
-            pipelines,
-            encoder,
-            uniforms_bind_group,
-            render_textures,
-            camera,
-        );
-    }
-}
-impl Animator for Rc<Box<dyn Renderable>> {
-    fn update_alpha(&mut self, _alpha: f32) {
-        // DO NOTHING
-    }
-}
-
-// In order to let `Timeline` use it simple, `EntityTimeline` should not contain generics
+use super::{Anim, AnimWithParams, Animator, StaticAnim};
 
 pub struct EntityTimeline {
     // pub(super) rabject_id: Id,
-    pub(super) cur_freeze_anim: Rc<Box<dyn Renderable>>,
+    pub(super) cur_freeze_anim: StaticAnim,
     pub(super) is_showing: bool,
     pub(super) cur_anim_idx: Option<usize>,
-    pub(super) anims: Vec<Box<dyn Animator>>,
+    pub(super) anims: Vec<Anim>,
     pub(super) end_secs: Vec<f32>,
     pub(super) elapsed_secs: f32,
 }
@@ -81,8 +51,8 @@ impl EntityTimeline {
         self.elapsed_secs += duration;
     }
 
-    /// Simply [`Self::append_freeze`] when [`Self::is_showing`] is true,
-    /// and [`Self::append_blank`] when [`Self::is_showing`] is false
+    /// Simply [`Self::append_freeze`] after used [`super::timeline::Timeline::show`],
+    /// and [`Self::append_blank`] after used [`super::timeline::Timeline::hide`].
     pub fn forward(&mut self, secs: f32) {
         if self.is_showing {
             self.append_freeze(secs);
@@ -186,8 +156,8 @@ impl<T: Entity> PureEvaluator<T> for Rabject<T> {
 }
 
 /// An animation that is applied to an entity
-///
-/// The `EntityAnimation` itself is also an [`EntityAnimator`]
+/// 
+/// This type implements [`Animator`] and [`Renderable`]
 #[derive(Clone)]
 pub struct EntityAnim<T: Entity> {
     rabject: Rabject<T>,

@@ -1,6 +1,8 @@
 pub mod entity;
 pub mod timeline;
 
+use std::rc::Rc;
+
 use crate::{
     context::WgpuContext,
     render::{primitives::RenderInstances, CameraFrame, RenderTextures, Renderable},
@@ -15,7 +17,43 @@ pub trait Animator: Renderable {
     fn update_alpha(&mut self, alpha: f32);
 }
 
-/// The param of an [`Animation`] or [`EntityAnimation`]
+/// An `Anim` is a box of [`Animator`]
+pub type Anim = Box<dyn Animator>;
+/// An `StaticAnim` is a box of [`Renderable`] inside a `Rc`
+/// 
+/// This implements [`Animator`] but does nothing on `update_alpha`
+pub type StaticAnim = Rc<Box<dyn Renderable>>;
+
+impl Renderable for StaticAnim {
+    fn render(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
+        pipelines: &mut PipelinesStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        camera: &CameraFrame,
+    ) {
+        self.as_ref().render(
+            ctx,
+            render_instances,
+            pipelines,
+            encoder,
+            uniforms_bind_group,
+            render_textures,
+            camera,
+        );
+    }
+}
+impl Animator for StaticAnim {
+    fn update_alpha(&mut self, _alpha: f32) {
+        // DO NOTHING
+    }
+}
+
+
+/// The param of an animation
 #[derive(Debug, Clone)]
 pub struct AnimParams {
     /// Default: 1.0
