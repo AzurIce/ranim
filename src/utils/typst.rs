@@ -59,17 +59,23 @@ macro_rules! typst_tree {
 mod test {
     #[test]
     fn test_typst() {
-        let svg = typst_svg!(r#"
+        let svg = typst_svg!(
+            r#"
             #text(20pt)[hello]
-        "#);
+        "#
+        );
         println!("{}", svg);
-        let svg = typst_svg!(r#"
+        let svg = typst_svg!(
+            r#"
             #text(20pt)[你好]
-        "#);
+        "#
+        );
         println!("{}", svg);
-        let svg = typst_svg!(r#"
+        let svg = typst_svg!(
+            r#"
             #text(60pt)[R]
-        "#);
+        "#
+        );
         println!("{}", svg);
     }
 }
