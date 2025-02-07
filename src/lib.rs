@@ -99,10 +99,12 @@ impl<T: TimelineConstructor> RenderScene for T {
         if timeline.elapsed_secs() == 0.0 {
             timeline.forward(0.1);
         }
+        info!("Rendering {:?}", timeline);
         let duration_secs = timeline.elapsed_secs();
         let mut anim = AnimWithParams::new(timeline)
-            .with_rate_func(linear)
-            .with_duration(duration_secs);
+            .with_duration(duration_secs)
+            .with_rate_func(linear);
+        anim.update_alpha(0.0);
         app.render_to_image(&mut anim, path);
     }
 }
