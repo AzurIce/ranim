@@ -1,13 +1,13 @@
 # Ranim
 
-https://github.com/user-attachments/assets/8249f9dd-bce7-439b-b2cc-31c6db2c6025
+https://github.com/user-attachments/assets/6cb333fd-2827-4c26-920c-d76d32e37976
 
 > [basic.mp4](./assets/basic.mp4)
 
-Ranim is an animation engine crate implemented in pure rust, inspired by [Manim](https://github.com/3b1b/manim/tree/master).
+Ranim is an animation engine crate implemented in pure rust, inspired heavily by [Manim](https://github.com/3b1b/manim/tree/master) and [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim).
 
 > [!WARNING]
-> Currently, the project is WIP. It only supports some basic *mobjects* and *animations*, the apis are unstable and may change frequently, the documentation is also not complete.
+> Ranim is now WIP. It only supports some basic *items* and *animations*, the apis are unstable and may change frequently, the documentation is also not complete.
 
 ## Dependencies
 
@@ -35,8 +35,7 @@ and you can use `--release` flag for faster rendering.
 
 Once the design is stablized, I may write about it.
 
-For now, you can check out the code and some PRs:
-- [PR#5: Refactor object management and logic/rendering phases](https://github.com/AzurIce/ranim/pull/5)
+For now, you can check out the code.
 
 ## Thanks
 
