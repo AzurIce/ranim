@@ -1,14 +1,18 @@
-use crate::Rabject;
 use crate::{interpolate::Interpolatable, items::Entity};
 
-use crate::animation::entity::{EntityAnimation, EntityAnimator};
+use crate::animation::entity::{EntityAnim, PureEvaluator, Rabject};
+
+use super::AnimWithParams;
 
 pub fn interpolate<T: Entity + Alignable + Interpolatable + 'static>(
-    src: Rabject<T>,
-    dst: T,
-) -> EntityAnimation<T> {
-    let inner = src.data.clone();
-    EntityAnimation::new(src.id(), Interpolate::new(inner, dst))
+    src: &Rabject<T>,
+    dst: &Rabject<T>,
+) -> AnimWithParams<EntityAnim<T>> {
+    let src_data = src.data.clone();
+    AnimWithParams::new(EntityAnim::new(
+        src.clone(),
+        Interpolate::new(src_data, dst.data.clone()),
+    ))
 }
 
 /// A transform animation func
@@ -46,8 +50,8 @@ impl<T: Entity + Alignable + Interpolatable> Interpolate<T> {
     }
 }
 
-impl<T: Entity + Alignable + Interpolatable> EntityAnimator<T> for Interpolate<T> {
-    fn eval_alpha(&mut self, alpha: f32) -> T {
+impl<T: Entity + Alignable + Interpolatable> PureEvaluator<T> for Interpolate<T> {
+    fn eval_alpha(&self, alpha: f32) -> T {
         if alpha == 0.0 {
             self.src.clone()
         } else if 0.0 < alpha && alpha < 1.0 {

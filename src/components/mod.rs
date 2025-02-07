@@ -3,7 +3,6 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use env_logger::Target;
 use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3};
 use itertools::Itertools;
 
@@ -151,7 +150,11 @@ pub trait PointWise {}
 pub trait Transformable<T: Transform3dComponent> {
     fn get_start_position(&self) -> Option<Vec3>;
     fn get_end_position(&self) -> Option<Vec3>;
-    fn apply_points_function(&mut self, f: impl Fn(&mut ComponentVec<T>) + Copy, anchor: TransformAnchor);
+    fn apply_points_function(
+        &mut self,
+        f: impl Fn(&mut ComponentVec<T>) + Copy,
+        anchor: TransformAnchor,
+    );
 
     /// Shift the mobject by a given vector.
     fn shift(&mut self, shift: Vec3) -> &mut Self {
@@ -266,7 +269,11 @@ pub trait Transformable<T: Transform3dComponent> {
 
 impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
     /// Apply a function to the points of the mobject about the point.
-    fn apply_points_function(&mut self, f: impl Fn(&mut ComponentVec<T>) + Copy, anchor: TransformAnchor) {
+    fn apply_points_function(
+        &mut self,
+        f: impl Fn(&mut ComponentVec<T>) + Copy,
+        anchor: TransformAnchor,
+    ) {
         let anchor = match anchor {
             TransformAnchor::Point(x) => x,
             TransformAnchor::Edge(x) => self.get_bounding_box_point(x),

@@ -1,50 +1,33 @@
 pub mod entity;
-pub mod wait;
 
-use std::{any::Any, collections::HashMap, time::Duration};
+use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use crate::{
     context::WgpuContext,
-    items::Entity,
-    render::{CameraFrame, Renderable},
+    items::{Entity, Rabject},
+    render::{primitives::RenderInstances, CameraFrame, Renderable},
     utils::{rate_functions::smooth, Id, RenderResourceStorage},
-    Rabject,
 };
 
-// use composition::Chain;
-use entity::{EntityAnimation, EntityAnimator, EntityTimeline};
+use entity::{AnimWithParams, EntityAnim, EntityTimeline};
 #[allow(unused)]
 use log::trace;
-use wait::{blank, wait};
 
 /// An `Animator` is basically an [`Renderable`] which can responds progress alpha change
 pub trait Animator: Renderable {
     fn update_alpha(&mut self, alpha: f32);
 }
 
-pub trait AnimatorAny: Animator + Any {
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
-
-impl<T: Animator + Any> AnimatorAny for T {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
-
 /// The param of an [`Animation`] or [`EntityAnimation`]
-pub struct AnimationParams {
+#[derive(Debug, Clone)]
+pub struct AnimParams {
     /// Default: 1.0
     pub duration_secs: f32,
     /// Default: smooth
     pub rate_func: fn(f32) -> f32,
 }
 
-impl Default for AnimationParams {
+impl Default for AnimParams {
     fn default() -> Self {
         Self {
             duration_secs: 1.0,
@@ -53,63 +36,14 @@ impl Default for AnimationParams {
     }
 }
 
-/// An `Animation` is a wrapper of an `Animator` with some params
-///
-/// The `Animation` itself is also an `Animator` which maps the
-/// input alpha with the rate function to inner `Animator`
-pub struct Animation {
-    animator: Box<dyn Animator>,
-    params: AnimationParams,
-}
-
-impl Animation {
-    pub fn new(animator: impl Animator + 'static) -> Self {
-        Self {
-            animator: Box::new(animator),
-            params: AnimationParams::default(),
-        }
-    }
+impl AnimParams {
     pub fn with_duration(mut self, duration_secs: f32) -> Self {
-        self.params.duration_secs = duration_secs;
+        self.duration_secs = duration_secs;
         self
     }
     pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
-        self.params.rate_func = rate_func;
+        self.rate_func = rate_func;
         self
-    }
-    pub fn duration_secs(&self) -> f32 {
-        self.params.duration_secs
-    }
-}
-
-impl Renderable for Animation {
-    fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {
-        self.animator.update_clip_info(ctx, camera);
-    }
-    fn render(
-        &mut self,
-        ctx: &WgpuContext,
-        pipelines: &mut RenderResourceStorage,
-        encoder: &mut wgpu::CommandEncoder,
-        uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
-    ) {
-        self.animator.render(
-            ctx,
-            pipelines,
-            encoder,
-            uniforms_bind_group,
-            multisample_view,
-            target_view,
-        );
-    }
-}
-
-impl Animator for Animation {
-    fn update_alpha(&mut self, alpha: f32) {
-        let alpha = (self.params.rate_func)(alpha);
-        self.animator.update_alpha(alpha);
     }
 }
 
@@ -119,9 +53,26 @@ impl Animator for Animation {
 /// - update all RabjectTimeline's alpha
 /// - render all RabjectTimeline
 pub struct Timeline {
-    /// Rabject's Id -> (RabjectTimeline's total_duration_secs, RabjectTimeline)
-    rabject_timelines: HashMap<Id, (f32, Box<dyn AnimatorAny>)>,
+    /// Rabject's Id -> EntityTimeline
+    rabject_timelines: HashMap<Id, EntityTimeline>,
     elapsed_secs: f32,
+}
+
+impl Debug for Timeline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "Timelin {:?}:\n",
+            Duration::from_secs_f32(self.elapsed_secs)
+        ))?;
+        for (id, timeline) in self.rabject_timelines.iter() {
+            f.write_fmt(format_args!(
+                "  EntityTimeline<{:?}>: {:?}\n",
+                id,
+                Duration::from_secs_f32(timeline.elapsed_secs)
+            ))?;
+        }
+        Ok(())
+    }
 }
 
 impl Timeline {
@@ -136,55 +87,79 @@ impl Timeline {
     }
 }
 
-impl Timeline {
-    /// Create a rabject with an entity, this will allocate an Id and the render_instance for it
-    pub fn insert<T: Entity + 'static>(&mut self, entity: T) -> Rabject<T> {
-        let rabject = Rabject::new(entity);
-        assert!(!self.rabject_timelines.contains_key(&rabject.id()));
-        let blank_anim = blank(rabject.clone()).with_duration(self.elapsed_secs);
+pub trait TimelineEntity<T: Entity> {
+    fn to_rabject(self) -> Rabject<T>;
+}
 
-        let (_, timeline) = self.rabject_timelines.entry(rabject.id()).or_insert((
-            self.elapsed_secs,
-            Box::new(EntityTimeline::new(rabject.clone())),
-        ));
-
-        // fill up the time before entity is inserted
-        let timeline = timeline
-            .as_any_mut()
-            .downcast_mut::<EntityTimeline<T>>()
-            .unwrap();
-        timeline.push(blank_anim);
-        rabject
+impl<T: Entity + 'static> TimelineEntity<T> for T {
+    fn to_rabject(self) -> Rabject<T> {
+        Rabject::new(self)
     }
-    // pub fn show<T: Entity>(&mut self, rabject: &mut Rabject<T>) {}
-    // pub fn hide<T: Entity>(&mut self, rabject: &mut Rabject<T>) {}
+}
+
+impl<T: Entity + 'static> TimelineEntity<T> for Rabject<T> {
+    fn to_rabject(self) -> Rabject<T> {
+        self
+    }
+}
+
+impl Timeline {
+    fn get_or_init_entity_timeline<T: Entity + 'static>(
+        &mut self,
+        rabject: &Rabject<T>,
+    ) -> &mut EntityTimeline {
+        self.rabject_timelines
+            .entry(rabject.id)
+            .or_insert(EntityTimeline::new(rabject))
+    }
+    pub fn show<T: Entity + 'static>(&mut self, rabject: &Rabject<T>) {
+        self.get_or_init_entity_timeline(rabject).is_showing = true;
+    }
+    pub fn hide<T: Entity + 'static>(&mut self, rabject: &Rabject<T>) {
+        self.get_or_init_entity_timeline(rabject).is_showing = false;
+    }
 
     pub fn forward(&mut self, secs: f32) {
+        self.rabject_timelines
+            .iter_mut()
+            .for_each(|(_id, timeline)| {
+                timeline.forward(secs);
+            });
         self.elapsed_secs += secs;
     }
 
     /// append an animation to the clip
-    pub fn play<T: Entity + 'static>(&mut self, mut anim: EntityAnimation<T>) -> Rabject<T> {
-        let (entity_duration, timeline) = self.rabject_timelines.get_mut(&anim.entity_id).unwrap();
-        let timeline = timeline
-            .as_any_mut()
-            .downcast_mut::<EntityTimeline<T>>()
-            .unwrap();
+    pub fn play<T: Entity + 'static>(&mut self, anim: AnimWithParams<EntityAnim<T>>) -> Rabject<T> {
+        let (duration, end_rabject) = {
+            // Fills the gap between the last animation and the current time
+            let rabject = anim.anim.rabject();
+            let timeline = if let Some(timeline) = self.rabject_timelines.get_mut(&rabject.id) {
+                let gapped_duration = self.elapsed_secs - timeline.elapsed_secs;
+                if gapped_duration > 0.0 {
+                    timeline.forward(gapped_duration);
+                }
+                timeline
+            } else {
+                let elapsed_secs = self.elapsed_secs;
+                let timeline = self.get_or_init_entity_timeline(rabject);
+                timeline.append_blank(elapsed_secs);
+                timeline
+            };
 
-        // Fill the gap with wait
-        let gapped_duration = self.elapsed_secs - *entity_duration;
-        if gapped_duration > 0.0 {
-            timeline.push(wait(timeline.rabject.clone()).with_duration(gapped_duration));
-            *entity_duration += gapped_duration;
+            // Append the animation
+            let duration = anim.params.duration_secs;
+            let rabject = timeline.append_anim(anim);
+            (duration, rabject)
+        };
+        self.elapsed_secs += duration;
+
+        // Forword other timelines
+        for (_id, timeline) in self.rabject_timelines.iter_mut() {
+            if timeline.elapsed_secs < self.elapsed_secs {
+                timeline.forward(self.elapsed_secs - timeline.elapsed_secs);
+            }
         }
-
-        *entity_duration += anim.params.duration_secs;
-        self.elapsed_secs = self.elapsed_secs + anim.params.duration_secs;
-        assert_eq!(*entity_duration, self.elapsed_secs);
-
-        timeline.rabject.data = anim.eval_alpha(1.0);
-        timeline.push(anim);
-        timeline.rabject.clone()
+        end_rabject
     }
     // pub fn play_stacked<T: Entity + 'static, const X: usize>(
     //     &mut self,
@@ -243,28 +218,27 @@ impl Timeline {
 }
 
 impl Renderable for Timeline {
-    fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {
-        for (_, (_, timeline)) in self.rabject_timelines.iter_mut() {
-            timeline.update_clip_info(ctx, camera);
-        }
-    }
     fn render(
-        &mut self,
+        &self,
         ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
         pipelines: &mut RenderResourceStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
+        camera: &CameraFrame,
     ) {
-        for (_, (_, timeline)) in self.rabject_timelines.iter_mut() {
+        for (_, timeline) in self.rabject_timelines.iter() {
             timeline.render(
                 ctx,
+                render_instances,
                 pipelines,
                 encoder,
                 uniforms_bind_group,
                 multisample_view,
                 target_view,
+                camera,
             );
         }
     }
@@ -272,9 +246,7 @@ impl Renderable for Timeline {
 
 impl Animator for Timeline {
     fn update_alpha(&mut self, alpha: f32) {
-        for (_, (entity_duration_secs, timeline)) in self.rabject_timelines.iter_mut() {
-            // println!("alpha: {alpha}, entity_duration: {}, cur_t: {}", entity_duration, self.cur_t);
-            let alpha = (alpha * self.elapsed_secs / *entity_duration_secs).clamp(0.0, 1.0);
+        for (_, timeline) in self.rabject_timelines.iter_mut() {
             timeline.update_alpha(alpha);
         }
     }

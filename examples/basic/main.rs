@@ -8,7 +8,6 @@ use ranim::animation::entity::creation::{uncreate, Color};
 use ranim::animation::entity::fading::{fade_in, fade_out};
 use ranim::animation::entity::interpolate::interpolate;
 use ranim::animation::Timeline;
-use ranim::components::TransformAnchor;
 
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon};
@@ -28,8 +27,8 @@ impl TimelineConstructor for MainScene {
         let t = Instant::now();
         info!("running...");
 
-        // let mut ranim_text = Svg::from_svg(&typst_svg!("#text(60pt)[Ranim]")).build();
-        // ranim_text.shift(-ranim_text.bounding_box().center());
+        let mut ranim_text = SvgItem::from_svg(&typst_svg!("#text(60pt)[Ranim]"));
+        ranim_text.shift(-ranim_text.get_bounding_box()[1]);
 
         // // 0.5s wait -> fade in -> 0.5s wait
         // app.wait(Duration::from_secs_f32(0.5));
@@ -46,36 +45,38 @@ impl TimelineConstructor for MainScene {
         .build();
         polygon
             .set_color(Srgba::hex("FF8080FF").unwrap())
-            .set_opacity(0.5)
+            .set_fill_opacity(0.5)
             .rotate(std::f32::consts::FRAC_PI_4, Vec3::Z);
         // 0.5s wait -> fade in -> 0.5s wait
         timeline.forward(0.5);
-        let polygon = timeline.insert(polygon);
+        let polygon = timeline.show(polygon);
         let polygon = timeline.play(fade_in(polygon));
         timeline.forward(0.5);
 
+        let polygon = timeline.play(fade_in(polygon));
+        // timeline.hide(&polygon);
         // let mut svg = SvgItem::from_svg(SVG);
+        // svg.scale(Vec3::splat(2.0));
+        // let polygon = SvgItem::from(polygon.data);
 
-        // info!("polygon transform to svg");
+        // let polygon = timeline.insert(polygon);
         // let svg = timeline.play(interpolate(polygon, svg));
-        // let svg = app.play_in_canvas(&canvas, polygon, Interpolate::new(svg.clone()));
-        // app.wait(Duration::from_secs_f32(0.5));
-
-        let mut arc = Arc {
-            angle: std::f32::consts::PI / 2.0,
-            radius: 300.0,
-        }
-        .build();
-        arc.set_color(Srgba::hex("58C4DDFF").unwrap())
-            .set_stroke_width(20.0);
-
-        info!("polygon transform to arc");
-        let arc = timeline.play(interpolate(polygon, arc));
         timeline.forward(0.5);
 
-        info!("arc uncreate");
-        timeline.play(uncreate(arc));
-        timeline.forward(0.5);
+        // let mut arc = Arc {
+        //     angle: std::f32::consts::PI / 2.0,
+        //     radius: 300.0,
+        // }
+        // .build();
+        // arc.set_color(Srgba::hex("58C4DDFF").unwrap())
+        //     .set_stroke_width(20.0);
+
+        // let arc = SvgItem::from(arc);
+        // let arc = timeline.play(interpolate(svg, arc));
+        // timeline.forward(0.5);
+
+        // timeline.play(uncreate(arc));
+        // timeline.forward(0.5);
     }
 }
 

@@ -2,38 +2,39 @@ use std::ops::Range;
 
 use bevy_color::Srgba;
 
-use crate::items::Entity;
+use crate::items::{Entity, Rabject};
 use crate::prelude::Interpolatable;
-use crate::Rabject;
 
-use crate::animation::entity::{EntityAnimation, EntityAnimator};
+use crate::animation::entity::{EntityAnim, PureEvaluator};
+
+use super::AnimWithParams;
 
 pub fn create<T: Entity + Partial + Empty + Interpolatable + 'static>(
-    target: Rabject<T>,
-) -> EntityAnimation<T> {
-    let inner = target.data.clone();
-    EntityAnimation::new(target.id(), Create::new(inner))
+    rabject: &Rabject<T>,
+) -> AnimWithParams<EntityAnim<T>> {
+    let func = Create::new(rabject.data.clone());
+    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
 }
 
 pub fn uncreate<T: Entity + Partial + Empty + Interpolatable + 'static>(
-    target: Rabject<T>,
-) -> EntityAnimation<T> {
-    let inner = target.data.clone();
-    EntityAnimation::new(target.id(), UnCreate::new(inner))
+    rabject: &Rabject<T>,
+) -> AnimWithParams<EntityAnim<T>> {
+    let func = UnCreate::new(rabject.data.clone());
+    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
 }
 
 pub fn write<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>(
-    target: Rabject<T>,
-) -> EntityAnimation<T> {
-    let inner = target.data.clone();
-    EntityAnimation::new(target.id(), Write::new(inner))
+    rabject: &Rabject<T>,
+) -> AnimWithParams<EntityAnim<T>> {
+    let func = Write::new(rabject.data.clone());
+    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
 }
 
 pub fn unwrite<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>(
-    target: Rabject<T>,
-) -> EntityAnimation<T> {
-    let inner = target.data.clone();
-    EntityAnimation::new(target.id(), Unwrite::new(inner))
+    rabject: &Rabject<T>,
+) -> AnimWithParams<EntityAnim<T>> {
+    let func = Unwrite::new(rabject.data.clone());
+    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
 }
 
 // ---------------------------------------------------- //
@@ -48,8 +49,8 @@ impl<T: Entity + Partial + Empty + Interpolatable> Create<T> {
     }
 }
 
-impl<T: Entity + Partial + Empty + Interpolatable> EntityAnimator<T> for Create<T> {
-    fn eval_alpha(&mut self, alpha: f32) -> T {
+impl<T: Entity + Partial + Empty + Interpolatable> PureEvaluator<T> for Create<T> {
+    fn eval_alpha(&self, alpha: f32) -> T {
         if alpha == 0.0 {
             T::empty()
         } else if 0.0 < alpha && alpha < 1.0 {
@@ -72,8 +73,9 @@ impl<T: Entity + Partial + Empty + Interpolatable> UnCreate<T> {
     }
 }
 
-impl<T: Entity + Partial + Empty + Interpolatable> EntityAnimator<T> for UnCreate<T> {
-    fn eval_alpha(&mut self, alpha: f32) -> T {
+impl<T: Entity + Partial + Empty + Interpolatable> PureEvaluator<T> for UnCreate<T> {
+    fn eval_alpha(&self, alpha: f32) -> T {
+        // trace!("{alpha}");
         if alpha == 0.0 {
             self.original.clone()
         } else if 0.0 < alpha && alpha < 1.0 {
@@ -111,9 +113,9 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Write<T> {
 }
 
 impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>
-    EntityAnimator<T> for Write<T>
+    PureEvaluator<T> for Write<T>
 {
-    fn eval_alpha(&mut self, alpha: f32) -> T {
+    fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
         if 0.0 <= alpha && alpha <= 1.0 {
             self.create_anim.eval_alpha(alpha)
@@ -151,10 +153,10 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Unwrite<T> {
     }
 }
 
-impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + 'static> EntityAnimator<T>
+impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + 'static> PureEvaluator<T>
     for Unwrite<T>
 {
-    fn eval_alpha(&mut self, alpha: f32) -> T {
+    fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
         if 0.0 < alpha && alpha < 1.0 {
             self.original.lerp(&self.outline, alpha)

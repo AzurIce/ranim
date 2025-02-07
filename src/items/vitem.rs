@@ -3,9 +3,7 @@ use itertools::Itertools;
 use log::trace;
 
 use crate::{
-    components::{
-        rgba::Rgba, vpoint::VPoint, width::Width, ComponentVec, TransformAnchor, Transformable,
-    },
+    components::{rgba::Rgba, vpoint::VPoint, width::Width, ComponentVec, Transformable},
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::{
@@ -14,7 +12,7 @@ use crate::{
     },
 };
 
-use super::{Blueprint, Entity};
+use super::{Blueprint, Entity, Rabject};
 
 #[derive(Debug, Clone)]
 pub struct VItem {
@@ -37,6 +35,7 @@ impl AsMut<ComponentVec<VPoint>> for VItem {
 }
 
 impl VItem {
+    // TODO: remove all constructor to blueprint impl
     pub fn from_vpoints(vpoints: Vec<Vec3>) -> Self {
         let stroke_widths = vec![1.0; (vpoints.len() + 1) / 2];
         let stroke_rgbas = vec![vec4(1.0, 0.0, 0.0, 1.0); (vpoints.len() + 1) / 2];
@@ -217,7 +216,7 @@ impl Stroke for VItem {
 pub struct Polygon(pub Vec<Vec3>);
 
 impl Blueprint<VItem> for Polygon {
-    fn build(mut self) -> VItem {
+    fn build(mut self) -> Rabject<VItem> {
         assert!(self.0.len() > 2);
 
         // Close the polygon
@@ -236,14 +235,14 @@ impl Blueprint<VItem> for Polygon {
             .interleave(handles.into_iter())
             .collect::<Vec<_>>();
         trace!("points: {:?}", points);
-        VItem::from_vpoints(points)
+        Rabject::new(VItem::from_vpoints(points))
     }
 }
 
 pub struct Rectangle(pub f32, pub f32);
 
 impl Blueprint<VItem> for Rectangle {
-    fn build(self) -> VItem {
+    fn build(self) -> Rabject<VItem> {
         let half_width = self.0 / 2.0;
         let half_height = self.1 / 2.0;
         Polygon(vec![
@@ -259,7 +258,7 @@ impl Blueprint<VItem> for Rectangle {
 pub struct Square(pub f32);
 
 impl Blueprint<VItem> for Square {
-    fn build(self) -> VItem {
+    fn build(self) -> Rabject<VItem> {
         Rectangle(self.0, self.0).build()
     }
 }
@@ -270,7 +269,7 @@ pub struct Arc {
 }
 
 impl Blueprint<VItem> for Arc {
-    fn build(self) -> VItem {
+    fn build(self) -> Rabject<VItem> {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
 
@@ -293,7 +292,7 @@ impl Blueprint<VItem> for Arc {
             *p /= (theta / 2.0).cos();
         });
         // trace!("start: {:?}, end: {:?}", points[0], points[len - 1]);
-        VItem::from_vpoints(points)
+        Rabject::new(VItem::from_vpoints(points))
     }
 }
 
@@ -304,7 +303,7 @@ pub struct ArcBetweenPoints {
 }
 
 impl Blueprint<VItem> for ArcBetweenPoints {
-    fn build(self) -> VItem {
+    fn build(self) -> Rabject<VItem> {
         let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
         let arc = Arc {
             angle: self.angle,
@@ -320,7 +319,7 @@ impl Blueprint<VItem> for ArcBetweenPoints {
 pub struct Circle(pub f32);
 
 impl Blueprint<VItem> for Circle {
-    fn build(self) -> VItem {
+    fn build(self) -> Rabject<VItem> {
         Arc {
             angle: std::f32::consts::TAU,
             radius: self.0,
@@ -335,7 +334,7 @@ pub enum Dot {
 }
 
 impl Blueprint<VItem> for Dot {
-    fn build(self) -> VItem {
+    fn build(self) -> Rabject<VItem> {
         Circle(match self {
             Dot::Small => 0.04,
             Dot::Normal => 0.08,
@@ -348,11 +347,9 @@ impl Blueprint<VItem> for Dot {
 pub struct Ellipse(pub f32, pub f32);
 
 impl Blueprint<VItem> for Ellipse {
-    fn build(self) -> VItem {
+    fn build(self) -> Rabject<VItem> {
         let mut mobject = Circle(1.0).build();
-        mobject
-            .vpoints
-            .scale(vec3(self.0, self.1, 1.0));
+        mobject.vpoints.scale(vec3(self.0, self.1, 1.0));
         mobject
     }
 }
