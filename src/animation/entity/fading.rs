@@ -1,20 +1,22 @@
+use crate::items::{Entity, Rabject};
 use crate::prelude::Interpolatable;
-use crate::{items::Entity, Rabject};
 
-use crate::animation::entity::{EntityAnimation, EntityAnimator};
+use crate::animation::entity::{EntityAnim, PureEvaluator};
+
+use super::AnimWithParams;
 
 pub fn fade_in<T: Opacity + Interpolatable + 'static + Entity>(
-    rabject: Rabject<T>,
-) -> EntityAnimation<T> {
+    rabject: &Rabject<T>,
+) -> AnimWithParams<EntityAnim<T>> {
     let func = FadeIn::new(rabject.data.clone());
-    EntityAnimation::new(rabject.id(), func)
+    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
 }
 
 pub fn fade_out<T: Opacity + Interpolatable + 'static + Entity>(
-    rabject: Rabject<T>,
-) -> EntityAnimation<T> {
+    rabject: &Rabject<T>,
+) -> AnimWithParams<EntityAnim<T>> {
     let func = FadeOut::new(rabject.data.clone());
-    EntityAnimation::new(rabject.id(), func)
+    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
 }
 
 // ---------------------------------------------------- //
@@ -33,8 +35,8 @@ impl<T: Entity + Interpolatable + Opacity + Clone> FadeIn<T> {
     }
 }
 
-impl<T: Entity + Interpolatable + Opacity> EntityAnimator<T> for FadeIn<T> {
-    fn eval_alpha(&mut self, alpha: f32) -> T {
+impl<T: Entity + Interpolatable + Opacity> PureEvaluator<T> for FadeIn<T> {
+    fn eval_alpha(&self, alpha: f32) -> T {
         self.src.lerp(&self.dst, alpha)
     }
 }
@@ -53,8 +55,8 @@ impl<T: Entity + Interpolatable + Opacity + Clone> FadeOut<T> {
     }
 }
 
-impl<T: Entity + Interpolatable + Opacity> EntityAnimator<T> for FadeOut<T> {
-    fn eval_alpha(&mut self, alpha: f32) -> T {
+impl<T: Entity + Interpolatable + Opacity> PureEvaluator<T> for FadeOut<T> {
+    fn eval_alpha(&self, alpha: f32) -> T {
         self.src.lerp(&self.dst, alpha)
     }
 }

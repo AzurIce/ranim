@@ -4,8 +4,10 @@ use env_logger::Env;
 use glam::Vec3;
 use ranim::{
     animation::{
-        entity::creation::{create, unwrite, write},
-        wait::wait,
+        entity::{
+            creation::{create, unwrite, write},
+            freeze::freeze,
+        },
         Timeline,
     },
     components::TransformAnchor,
@@ -108,8 +110,8 @@ impl TimelineConstructor for TestScene {
         // println!("{:?}", svg.vpoints.len());
         // let svg = svg.get_partial(0.55..0.6);
 
-        let svg = timeline.insert(svg);
-        timeline.play(wait(svg.clone()).with_duration(0.1));
+        let svg = timeline.show(svg);
+        timeline.play(freeze(svg.clone()).with_duration(0.1));
         timeline.play(create(svg).with_duration(1.0));
         // timeline.forward(1.0);
 

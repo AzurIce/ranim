@@ -49,7 +49,7 @@ impl TimelineConstructor for Palettes {
                     0.0,
                 ));
                 square.set_color(*color).set_stroke_width(0.0);
-                timeline.insert(square);
+                timeline.show(square);
             }
         }
     }

@@ -1,6 +1,3 @@
-use glam::{Vec2, Vec4};
-use log::trace;
-
 use crate::{
     components::{rgba::Rgba, width::Width},
     context::WgpuContext,
@@ -9,8 +6,9 @@ use crate::{
     },
     utils::{wgpu::WgpuVecBuffer, RenderResourceStorage},
 };
+use glam::{Vec2, Vec4};
 
-use super::Primitive;
+use super::RenderInstance;
 
 pub struct VItemPrimitive {
     /// COMPUTE INPUT: (x, y, z, is_closed)
@@ -125,7 +123,7 @@ impl VItemPrimitive {
     }
 }
 
-impl Primitive for VItemPrimitive {
+impl RenderInstance for VItemPrimitive {
     fn update_clip_box(&mut self, ctx: &WgpuContext, clip_box: &[Vec2; 4]) {
         // trace!("VItemPrimitive update_clip_box: {:?}", clip_box);
         self.clip_box_buffer.set(ctx, clip_box);

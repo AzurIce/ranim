@@ -2,11 +2,11 @@ use std::{f32, path::Path, slice::Iter, vec};
 
 use bevy_color::Alpha;
 use glam::{mat3, vec2, vec3, Vec3};
-use log::{info, trace, warn};
+use log::warn;
 
 use crate::{
     components::{vpoint::VPoint, TransformAnchor},
-    prelude::{Empty, Fill, Interpolatable, Partial, Stroke, Transformable},
+    prelude::{Alignable, Empty, Fill, Interpolatable, Partial, Stroke, Transformable},
     render::primitives::{svg_item::SvgItemPrimitive, Extract},
     utils::bezier::PathBuilder,
 };
@@ -20,7 +20,9 @@ pub struct SvgItem {
 
 impl From<VItem> for SvgItem {
     fn from(value: VItem) -> Self {
-        Self { vitems: vec![value] }
+        Self {
+            vitems: vec![value],
+        }
     }
 }
 
@@ -38,7 +40,8 @@ impl Transformable<VPoint> for SvgItem {
             .for_each(|x| x.apply_points_function(f, anchor));
     }
     fn get_bounding_box(&self) -> [Vec3; 3] {
-        let [min, max] = self.vitems
+        let [min, max] = self
+            .vitems
             .iter()
             .map(|x| x.get_bounding_box())
             .map(|[min, _, max]| [min, max])
@@ -47,10 +50,14 @@ impl Transformable<VPoint> for SvgItem {
         [min, (min + max) / 2., max]
     }
     fn get_start_position(&self) -> Option<Vec3> {
-        self.vitems.first().and_then(|vitem| vitem.get_start_position())
+        self.vitems
+            .first()
+            .and_then(|vitem| vitem.get_start_position())
     }
     fn get_end_position(&self) -> Option<Vec3> {
-        self.vitems.first().and_then(|vitem| vitem.get_start_position())
+        self.vitems
+            .first()
+            .and_then(|vitem| vitem.get_start_position())
     }
 }
 
@@ -238,6 +245,27 @@ impl Extract<SvgItem> for SvgItemPrimitive {
 }
 
 // MARK: Animation impl
+impl Alignable for SvgItem {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.vitems.len() == other.vitems.len()
+            && self
+                .vitems
+                .iter()
+                .zip(other.vitems.iter())
+                .all(|(a, b)| a.is_aligned(b))
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        if self.vitems.len() < other.vitems.len() {
+            self.vitems.resize_with(other.vitems.len(), VItem::empty);
+        } else if self.vitems.len() > other.vitems.len() {
+            other.vitems.resize_with(self.vitems.len(), VItem::empty);
+        }
+        self.vitems
+            .iter_mut()
+            .zip(other.vitems.iter_mut())
+            .for_each(|(a, b)| a.align_with(b));
+    }
+}
 
 impl Interpolatable for SvgItem {
     fn lerp(&self, target: &Self, t: f32) -> Self {
@@ -304,8 +332,8 @@ impl<'a> Iterator for SvgElementIterator<'a> {
                     usvg::Node::Path(path) => {
                         return Some((path, *transform));
                     }
-                    usvg::Node::Image(image) => {}
-                    usvg::Node::Text(text) => {}
+                    usvg::Node::Image(_image) => {}
+                    usvg::Node::Text(_text) => {}
                 },
                 None => {
                     self.stack.pop();

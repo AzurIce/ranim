@@ -9,7 +9,6 @@ use crate::utils::bezier::trim_quad_bezier;
 use crate::utils::math::interpolate_usize;
 
 use super::ComponentVec;
-use super::HasTransform3d;
 
 /// VPoints is used to represent a bunch of quad bezier paths.
 ///
@@ -44,6 +43,7 @@ impl Interpolatable for VPoint {
 
 impl Partial for ComponentVec<VPoint> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
+        // trace!("get_partial: {:?}", range);
         let max_anchor_idx = self.len() / 2;
 
         let (start_index, start_residue) = interpolate_usize(0, max_anchor_idx, range.start);
@@ -60,14 +60,17 @@ impl Partial for ComponentVec<VPoint> {
             let mut partial = Vec::with_capacity((end_index - start_index + 1 + 2) * 2 + 1);
             partial.extend_from_slice(&start_part);
             if start_index + 1 <= end_index - 1 {
-                partial.extend(
-                    self.get((start_index + 1) * 2 + 1..(end_index - 1) * 2 + 2)
-                        .unwrap()
-                        .iter()
-                        .map(|p| p.0),
-                );
+                let mid = self
+                    .get((start_index + 1) * 2 + 1..end_index * 2)
+                    .unwrap()
+                    .iter()
+                    .map(|p| p.0);
+                // trace!("mid: {}", mid.len());
+                partial.extend(mid);
+                partial.extend_from_slice(&end_part);
+            } else {
+                partial.extend_from_slice(&end_part[1..]);
             }
-            partial.extend_from_slice(&end_part);
             // trace!("vpoint: {:?}", partial.len());
             partial.into()
         }
@@ -89,7 +92,7 @@ impl ComponentVec<VPoint> {
         for mut chunk in &self.0.iter().enumerate().skip(2).chunks(2) {
             let (a, b) = (chunk.next(), chunk.next());
             if let Some((ia, a)) = match (a, b) {
-                (Some((ia, a)), Some((ib, b))) => {
+                (Some((ia, a)), Some((_ib, b))) => {
                     // println!("chunk[{ia}, {ib}] {:?}", [a, b]);
                     if a == b {
                         Some((ia, a))

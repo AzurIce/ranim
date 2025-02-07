@@ -3,6 +3,7 @@ pub mod primitives;
 
 use bevy_color::Color;
 use glam::{vec2, Mat4, Vec2, Vec3};
+use primitives::RenderInstances;
 
 use crate::{
     context::{RanimContext, WgpuContext},
@@ -10,15 +11,16 @@ use crate::{
 };
 
 pub trait Renderable {
-    fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame);
     fn render(
-        &mut self,
+        &self,
         ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
         pipelines: &mut RenderResourceStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
         multisample_view: &wgpu::TextureView,
         target_view: &wgpu::TextureView,
+        camera: &CameraFrame,
     );
 }
 
@@ -105,6 +107,8 @@ pub struct Renderer {
 
     uniforms_buffer: WgpuBuffer<CameraUniforms>,
     pub(crate) uniforms_bind_group: CameraUniformsBindGroup,
+
+    render_instances: RenderInstances,
 }
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -234,6 +238,7 @@ impl Renderer {
             // Uniforms
             uniforms_buffer,
             uniforms_bind_group,
+            render_instances: RenderInstances::default(),
         }
     }
 
@@ -283,14 +288,16 @@ impl Renderer {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        renderable.update_clip_info(&ctx.wgpu_ctx, &self.camera);
+        // renderable.update_clip_info(&ctx.wgpu_ctx, &self.camera);
         renderable.render(
             &ctx.wgpu_ctx,
+            &mut self.render_instances,
             &mut ctx.pipelines,
             &mut encoder,
             &self.uniforms_bind_group.bind_group,
             &self.multisample_view,
             &self.render_view,
+            &self.camera,
         );
 
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
@@ -360,9 +367,9 @@ impl Renderer {
         self.output_texture_updated = true;
     }
 
-    pub(crate) fn get_render_texture(&self) -> &wgpu::Texture {
-        &self.render_texture
-    }
+    // pub(crate) fn get_render_texture(&self) -> &wgpu::Texture {
+    //     &self.render_texture
+    // }
 
     pub(crate) fn get_rendered_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
         if !self.output_texture_updated {
@@ -506,34 +513,23 @@ mod test {
     use env_logger::Env;
     use glam::vec3;
 
-    use super::*;
     use crate::{
         animation::{
             entity::{
-                creation::{create, uncreate, write},
-                fading::{fade_in, fade_out},
+                creation::{create, uncreate},
+                AnimWithParams,
             },
-            wait::wait,
-            Animation, Timeline,
+            Timeline,
         },
-        items::{
-            vitem::{Arc, Polygon, Square, VItem},
-            Blueprint,
-        },
-        prelude::Fill,
-        utils::{bezier::PathBuilder, rate_functions::linear},
-        AppOptions,
-        RanimRenderApp, // world::{Store, World},
+        items::{vitem::Polygon, Blueprint},
+        utils::rate_functions::linear,
+        AppOptions, RanimRenderApp,
     };
 
     #[test]
     fn test_render_vitem() {
         env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
-        // let mut ctx = RanimContext::new();
-        // let mut world = World::new();
-        // let mut vitem = Square(100.0).build();
-        // vitem.vpoints.shift(vec3(-200.0, 0.0, 0.0));
-        // world.insert(vitem);
+
         let vitem = Polygon(vec![
             vec3(-100.0, -300.0, 0.0),
             vec3(-100.0, 0.0, 0.0),
@@ -542,59 +538,22 @@ mod test {
             vec3(200.0, -300.0, 0.0),
         ])
         .build();
-        // let mut builder = PathBuilder::new();
-        // builder
-        //     .move_to(vec3(0.0, 0.0, 0.0))
-        //     .line_to(vec3(1.0, 1.0, 0.0))
-        //     .quad_to(vec3(1.0, 2.0, 0.0), vec3(0.0, 2.0, 0.0))
-        //     .cubic_to(
-        //         vec3(-2.0, 2.0, 0.0),
-        //         vec3(1.0, 4.0, 0.0),
-        //         vec3(0.0, 0.0, 0.0),
-        //     )
-        //     .close_path();
-        // let cw_vpoints = builder
-        //     .vpoints()
-        //     .to_vec()
-        //     .into_iter()
-        //     .map(|p| p * 50.0)
-        //     .collect::<Vec<_>>();
-        // println!("{:?}", cw_vpoints);
-
-        // let mut builder = PathBuilder::new();
-        // builder
-        //     .move_to(vec3(0.0, 0.0, 0.0))
-        //     .cubic_to(
-        //         vec3(1.0, 4.0, 0.0),
-        //         vec3(-2.0, 2.0, 0.0),
-        //         vec3(0.0, 2.0, 0.0),
-        //     )
-        //     .quad_to(vec3(1.0, 2.0, 0.0), vec3(1.0, 1.0, 0.0))
-        //     .line_to(vec3(0.0, 0.0, 0.0))
-        //     .close_path();
-        // let ccw_vpoints = builder
-        //     .vpoints()
-        //     .to_vec()
-        //     .into_iter()
-        //     .map(|p| p * 80.0)
-        //     .collect::<Vec<_>>();
-        // println!("{:?}", ccw_vpoints);
 
         let mut app = RanimRenderApp::new(&AppOptions::default());
         let mut timeline = Timeline::new();
-        // let mut vitem = VItem::from_vpoints(cw_vpoints);
-        // let rabject = timeline.insert(vitem);
-        // timeline.play(create(rabject.clone()));
-        // timeline.play(wait(rabject.clone()));
-        // timeline.play(uncreate(rabject.clone()));
 
-        // let mut vitem = VItem::from_vpoints(ccw_vpoints);
-        // vitem.set_fill_opacity(0.0);
-        let rabject = timeline.insert(vitem);
-        timeline.play(create(rabject.clone()));
-        timeline.play(wait(rabject.clone()));
-        // timeline.play(uncreate(rabject.clone()));
+        timeline.forward(2.0);
+        timeline.play(create(&vitem));
+        timeline.hide(&vitem);
+        timeline.forward(1.0);
+        timeline.show(&vitem);
+        timeline.play(uncreate(&vitem));
 
-        app.render_anim(Animation::new(timeline).with_rate_func(linear));
+        let duration = timeline.elapsed_secs();
+        app.render_anim(
+            AnimWithParams::new(timeline)
+                .with_duration(duration)
+                .with_rate_func(linear),
+        );
     }
 }
