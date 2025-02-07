@@ -156,7 +156,7 @@ impl<T: Entity> PureEvaluator<T> for Rabject<T> {
 }
 
 /// An animation that is applied to an entity
-/// 
+///
 /// This type implements [`Animator`] and [`Renderable`]
 #[derive(Clone)]
 pub struct EntityAnim<T: Entity> {
