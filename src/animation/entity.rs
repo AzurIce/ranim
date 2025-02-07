@@ -14,22 +14,21 @@ use itertools::Itertools;
 use crate::{
     context::WgpuContext,
     items::{Entity, Rabject},
-    render::{primitives::RenderInstances, CameraFrame, Renderable},
-    utils::RenderResourceStorage,
+    render::{primitives::RenderInstances, CameraFrame, RenderTextures, Renderable},
+    utils::PipelinesStorage,
 };
 
-use super::{AnimParams, Animator};
+use super::{AnimWithParams, Animator};
 
 impl Renderable for Rc<Box<dyn Renderable>> {
     fn render(
         &self,
         ctx: &WgpuContext,
         render_instances: &mut RenderInstances,
-        pipelines: &mut RenderResourceStorage,
+        pipelines: &mut PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
+        render_textures: &RenderTextures,
         camera: &CameraFrame,
     ) {
         self.as_ref().render(
@@ -38,8 +37,7 @@ impl Renderable for Rc<Box<dyn Renderable>> {
             pipelines,
             encoder,
             uniforms_bind_group,
-            multisample_view,
-            target_view,
+            render_textures,
             camera,
         );
     }
@@ -151,11 +149,10 @@ impl Renderable for EntityTimeline {
         &self,
         ctx: &WgpuContext,
         render_instances: &mut RenderInstances,
-        pipelines: &mut RenderResourceStorage,
+        pipelines: &mut PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
+        render_textures: &RenderTextures,
         camera: &CameraFrame,
     ) {
         if let Some(idx) = self.cur_anim_idx {
@@ -165,8 +162,7 @@ impl Renderable for EntityTimeline {
                 pipelines,
                 encoder,
                 uniforms_bind_group,
-                multisample_view,
-                target_view,
+                render_textures,
                 camera,
             );
         }
@@ -209,11 +205,10 @@ impl<T: Entity + 'static> Renderable for EntityAnim<T> {
         &self,
         ctx: &WgpuContext,
         render_instances: &mut RenderInstances,
-        pipelines: &mut RenderResourceStorage,
+        pipelines: &mut PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
+        render_textures: &RenderTextures,
         camera: &CameraFrame,
     ) {
         self.rabject.render(
@@ -222,8 +217,7 @@ impl<T: Entity + 'static> Renderable for EntityAnim<T> {
             pipelines,
             encoder,
             uniforms_bind_group,
-            multisample_view,
-            target_view,
+            render_textures,
             camera,
         );
     }
@@ -238,61 +232,5 @@ impl<T: Entity> EntityAnim<T> {
     }
     pub fn rabject(&self) -> &Rabject<T> {
         &self.rabject
-    }
-}
-
-pub struct AnimWithParams<T: Animator> {
-    pub(crate) anim: T,
-    pub(crate) params: AnimParams,
-}
-
-impl<T: Animator> AnimWithParams<T> {
-    pub fn new(anim: T) -> Self {
-        Self {
-            anim,
-            params: AnimParams::default(),
-        }
-    }
-    pub fn with_duration(mut self, secs: f32) -> Self {
-        self.params.duration_secs = secs;
-        self
-    }
-    pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
-        self.params.rate_func = rate_func;
-        self
-    }
-}
-
-impl<T: Animator> Renderable for AnimWithParams<T> {
-    fn render(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-        pipelines: &mut RenderResourceStorage,
-        encoder: &mut wgpu::CommandEncoder,
-        uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
-        camera: &CameraFrame,
-    ) {
-        self.anim.render(
-            ctx,
-            render_instances,
-            pipelines,
-            encoder,
-            uniforms_bind_group,
-            multisample_view,
-            target_view,
-            camera,
-        );
-    }
-}
-
-impl<T: Animator> Animator for AnimWithParams<T> {
-    fn update_alpha(&mut self, alpha: f32) {
-        // trace!("alpha: {alpha}");
-        let alpha = (self.params.rate_func)(alpha);
-        // trace!("rate_func alpha: {alpha}");
-        self.anim.update_alpha(alpha);
     }
 }

@@ -31,11 +31,11 @@ impl Id {
 }
 
 #[derive(Default)]
-pub struct RenderResourceStorage {
+pub struct PipelinesStorage {
     inner: HashMap<TypeId, Box<dyn Any>>,
 }
 
-impl RenderResourceStorage {
+impl PipelinesStorage {
     pub fn get_or_init<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &P {
         let id = std::any::TypeId::of::<P>();
         self.inner

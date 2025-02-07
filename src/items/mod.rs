@@ -7,9 +7,9 @@ use crate::{
     prelude::Empty,
     render::{
         primitives::{Extract, RenderInstance, RenderInstances},
-        CameraFrame, Renderable,
+        CameraFrame, RenderTextures, Renderable,
     },
-    utils::{Id, RenderResourceStorage},
+    utils::{Id, PipelinesStorage},
 };
 
 pub mod svg_item;
@@ -43,11 +43,10 @@ impl<T: Entity + 'static> Renderable for Rabject<T> {
         &self,
         ctx: &WgpuContext,
         render_instances: &mut RenderInstances,
-        pipelines: &mut RenderResourceStorage,
+        pipelines: &mut PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
+        render_textures: &RenderTextures,
         camera: &CameraFrame,
     ) {
         let render_instance = render_instances.get_or_init::<T>(self.id);
@@ -58,8 +57,7 @@ impl<T: Entity + 'static> Renderable for Rabject<T> {
             pipelines,
             encoder,
             uniforms_bind_group,
-            multisample_view,
-            target_view,
+            render_textures,
         );
     }
 }

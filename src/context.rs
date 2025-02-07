@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use crate::utils::RenderResourceStorage;
+use crate::utils::PipelinesStorage;
 
 pub struct RanimContext {
     pub wgpu_ctx: Arc<WgpuContext>,
-    pub pipelines: RenderResourceStorage,
+    pub pipelines: PipelinesStorage,
 }
 
 impl Default for RanimContext {
@@ -16,7 +16,7 @@ impl Default for RanimContext {
 impl RanimContext {
     pub fn new() -> Self {
         let wgpu_ctx = Arc::new(pollster::block_on(WgpuContext::new()));
-        let pipelines = RenderResourceStorage::default();
+        let pipelines = PipelinesStorage::default();
 
         Self {
             wgpu_ctx,

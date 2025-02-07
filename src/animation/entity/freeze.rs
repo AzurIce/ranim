@@ -1,9 +1,11 @@
 use crate::{
     animation::Animator,
     items::{Entity, Rabject},
+    render::RenderTextures,
 };
 
-use super::{AnimWithParams, EntityAnim};
+use super::EntityAnim;
+use crate::animation::AnimWithParams;
 
 pub fn freeze<T: Entity + 'static>(rabject: &Rabject<T>) -> AnimWithParams<EntityAnim<T>> {
     let data = rabject.data.clone();
@@ -19,11 +21,10 @@ impl Renderable for Blank {
         &self,
         _ctx: &crate::context::WgpuContext,
         _render_instances: &mut crate::render::primitives::RenderInstances,
-        _pipelines: &mut crate::utils::RenderResourceStorage,
+        _pipelines: &mut crate::utils::PipelinesStorage,
         _encoder: &mut wgpu::CommandEncoder,
         _uniforms_bind_group: &wgpu::BindGroup,
-        _multisample_view: &wgpu::TextureView,
-        _target_view: &wgpu::TextureView,
+        _render_textures: &RenderTextures,
         _camera: &crate::render::CameraFrame,
     ) {
         // DO NOTHING

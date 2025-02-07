@@ -7,29 +7,19 @@ use primitives::RenderInstances;
 
 use crate::{
     context::{RanimContext, WgpuContext},
-    utils::{wgpu::WgpuBuffer, RenderResourceStorage},
+    utils::{wgpu::WgpuBuffer, PipelinesStorage},
 };
 
-// pub struct RenderContext<'a> {
-//     wgpu_ctx: &'a WgpuContext,
-//     pipelines: &'a mut RenderResourceStorage,
-//     render_instances: &'a mut RenderInstances,
-//     target_view: &'a wgpu::TextureView,
-//     multisample_view: &'a wgpu::TextureView,
-//     uniforms_bind_group: &'a wgpu::BindGroup,
-//     camera: &'a CameraFrame,
-// }
-
 pub trait Renderable {
+    #[allow(clippy::too_many_arguments)]
     fn render(
         &self,
         ctx: &WgpuContext,
         render_instances: &mut RenderInstances,
-        pipelines: &mut RenderResourceStorage,
+        pipelines: &mut PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
+        render_textures: &RenderTextures,
         camera: &CameraFrame,
     );
 }
@@ -84,39 +74,29 @@ impl CameraUniformsBindGroup {
             layout: &Self::bind_group_layout(ctx),
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer(uniforms_buffer.as_entire_buffer_binding()),
+                resource: wgpu::BindingResource::Buffer(
+                    uniforms_buffer.as_ref().as_entire_buffer_binding(),
+                ),
             }],
         });
         Self { bind_group }
     }
 }
 
-/// A Renderer to render the [`World`]
-///
-/// The [`Renderer`] is just responsible to render the current state
-/// of the [`World`] to the texture with the setted uniforms.
-///
-///
 pub struct Renderer {
     size: (usize, usize),
     camera: CameraFrame,
+    pub pipelines: PipelinesStorage,
 
     clear_color: wgpu::Color,
-    uniforms: CameraUniforms,
-    render_texture: wgpu::Texture,
-    // multisample_texture: wgpu::Texture,
-    // depth_stencil_texture: wgpu::Texture,
-    pub(crate) render_view: wgpu::TextureView,
-    pub(crate) multisample_view: wgpu::TextureView,
-    pub(crate) depth_stencil_view: wgpu::TextureView,
-
-    // output_view: wgpu::TextureView,
-    output_staging_buffer: wgpu::Buffer,
-    output_texture_data: Option<Vec<u8>>,
-    pub(crate) output_texture_updated: bool,
+    render_textures: RenderTextures,
 
     uniforms_buffer: WgpuBuffer<CameraUniforms>,
     pub(crate) uniforms_bind_group: CameraUniformsBindGroup,
+
+    output_staging_buffer: wgpu::Buffer,
+    output_texture_data: Option<Vec<u8>>,
+    pub(crate) output_texture_updated: bool,
 
     render_instances: RenderInstances,
 }
@@ -124,12 +104,18 @@ pub struct Renderer {
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const ALIGNMENT: usize = 256;
 
-impl Renderer {
-    pub(crate) fn new(ctx: &RanimContext, width: usize, height: usize) -> Self {
-        let camera = CameraFrame::new_with_size(width, height);
+pub struct RenderTextures {
+    render_texture: wgpu::Texture,
+    // multisample_texture: wgpu::Texture,
+    // depth_stencil_texture: wgpu::Texture,
+    pub(crate) render_view: wgpu::TextureView,
+    pub(crate) multisample_view: wgpu::TextureView,
+    pub(crate) depth_stencil_view: wgpu::TextureView,
+}
 
+impl RenderTextures {
+    pub fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
         let format = OUTPUT_TEXTURE_FORMAT;
-        let ctx = &ctx.wgpu_ctx;
         let render_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Target Texture"),
             size: wgpu::Extent3d {
@@ -180,6 +166,34 @@ impl Renderer {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
+        let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
+        let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
+        let depth_stencil_view =
+            depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        Self {
+            render_texture,
+            // multisample_texture,
+            // depth_stencil_texture,
+            render_view,
+            multisample_view,
+            depth_stencil_view,
+        }
+    }
+}
+
+impl Renderer {
+    pub(crate) fn new(ctx: &RanimContext, width: usize, height: usize) -> Self {
+        let camera = CameraFrame::new_with_size(width, height);
+
+        let ctx = &ctx.wgpu_ctx;
+        let render_textures = RenderTextures::new(ctx, width, height);
         let bytes_per_row = ((width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
         let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
@@ -203,22 +217,7 @@ impl Renderer {
         );
         let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
 
-        let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(format),
-            ..Default::default()
-        });
-        let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(format),
-            ..Default::default()
-        });
-        let depth_stencil_view =
-            depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        // let output_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
-        //     format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
-        //     ..Default::default()
-        // });
         let bg = Color::srgba_u8(0x33, 0x33, 0x33, 0xff).to_linear();
-        // let bg = Color::srgba_u8(41, 171, 202, 255).to_linear();
         let clear_color = wgpu::Color {
             r: bg.red as f64,
             g: bg.green as f64,
@@ -230,18 +229,9 @@ impl Renderer {
             camera,
             size: (width, height),
             clear_color,
-            // fps,
-            uniforms,
-            // Textures
-            render_texture,
-            // multisample_texture,
-            // depth_stencil_texture,
-            // Texture views
-            render_view,
-            multisample_view,
-            depth_stencil_view,
+            pipelines: PipelinesStorage::default(),
+            render_textures,
             // Outputs
-            // output_view,
             output_staging_buffer,
             output_texture_data: None,
             output_texture_updated: false,
@@ -262,18 +252,24 @@ impl Renderer {
 
         // Clear
         {
+            let RenderTextures {
+                render_view,
+                multisample_view,
+                depth_stencil_view,
+                ..
+            } = &self.render_textures;
             let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("VMobject Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.multisample_view,
-                    resolve_target: Some(&self.render_view),
+                    view: multisample_view,
+                    resolve_target: Some(render_view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(self.clear_color),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_stencil_view,
+                    view: depth_stencil_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -305,8 +301,7 @@ impl Renderer {
             &mut ctx.pipelines,
             &mut encoder,
             &self.uniforms_bind_group.bind_group,
-            &self.multisample_view,
-            &self.render_view,
+            &self.render_textures,
             &self.camera,
         );
 
@@ -328,10 +323,11 @@ impl Renderer {
                 label: Some("Render Encoder"),
             });
 
+        let RenderTextures { render_texture, .. } = &self.render_textures;
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
                 aspect: wgpu::TextureAspect::All,
-                texture: &self.render_texture,
+                texture: render_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
             },
@@ -343,7 +339,7 @@ impl Renderer {
                     rows_per_image: Some(self.size.1 as u32),
                 },
             },
-            self.render_texture.size(),
+            render_texture.size(),
         );
         ctx.queue.submit(Some(encoder.finish()));
 
@@ -390,19 +386,18 @@ impl Renderer {
     }
 
     pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext, camera_frame: &CameraFrame) {
-        self.uniforms.proj_mat = camera_frame.projection_matrix();
-        self.uniforms.view_mat = camera_frame.view_matrix();
-        self.uniforms.half_frame_size = Vec2::new(
-            camera_frame.size.0 as f32 / 2.0,
-            camera_frame.size.1 as f32 / 2.0,
-        );
+        let camera_uniforms = CameraUniforms {
+            proj_mat: camera_frame.projection_matrix(),
+            view_mat: camera_frame.view_matrix(),
+            half_frame_size: Vec2::new(
+                camera_frame.size.0 as f32 / 2.0,
+                camera_frame.size.1 as f32 / 2.0,
+            ),
+            _padding: [0.0; 2],
+        };
         // trace!("Uniforms: {:?}", self.uniforms);
         // trace!("[Camera] uploading camera uniforms to buffer...");
-        wgpu_ctx.queue.write_buffer(
-            &self.uniforms_buffer,
-            0,
-            bytemuck::cast_slice(&[self.uniforms]),
-        );
+        self.uniforms_buffer.set(wgpu_ctx, camera_uniforms);
     }
 }
 
@@ -525,11 +520,9 @@ mod test {
 
     use crate::{
         animation::{
-            entity::{
-                creation::{create, uncreate},
-                AnimWithParams,
-            },
-            Timeline,
+            entity::creation::{create, uncreate},
+            timeline::Timeline,
+            AnimWithParams,
         },
         items::{vitem::Polygon, Blueprint},
         utils::rate_functions::linear,

@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use animation::{entity::AnimWithParams, Animator, Timeline};
+use animation::{timeline::Timeline, AnimWithParams, Animator};
 use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;

@@ -1,6 +1,7 @@
 use env_logger::Env;
 use glam::vec3;
 use ranim::animation::entity::creation::Color;
+use ranim::animation::timeline::Timeline;
 use ranim::color::palettes::manim::*;
 use ranim::items::vitem::Rectangle;
 use ranim::{prelude::*, TimelineConstructor};
@@ -13,7 +14,7 @@ impl TimelineConstructor for Palettes {
             name: "palettes".to_string(),
         }
     }
-    fn construct(&mut self, timeline: &mut ranim::animation::Timeline) {
+    fn construct(&mut self, timeline: &mut Timeline) {
         let (width, height) = (1920, 1080);
         let (offset_x, offset_y) = (width as f32 / -2.0, height as f32 / -2.0);
         let colors = vec![

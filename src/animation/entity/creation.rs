@@ -2,12 +2,11 @@ use std::ops::Range;
 
 use bevy_color::Srgba;
 
+use crate::animation::AnimWithParams;
 use crate::items::{Entity, Rabject};
 use crate::prelude::Interpolatable;
 
 use crate::animation::entity::{EntityAnim, PureEvaluator};
-
-use super::AnimWithParams;
 
 pub fn create<T: Entity + Partial + Empty + Interpolatable + 'static>(
     rabject: &Rabject<T>,

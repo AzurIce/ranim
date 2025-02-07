@@ -1,10 +1,14 @@
 use crate::{
     components::{rgba::Rgba, width::Width},
     context::WgpuContext,
-    render::pipelines::{
-        map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup, Map3dTo2dPipeline, VItemPipeline,
+    render::{
+        pipelines::{
+            map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup, Map3dTo2dPipeline,
+            VItemPipeline,
+        },
+        RenderTextures,
     },
-    utils::{wgpu::WgpuVecBuffer, RenderResourceStorage},
+    utils::{wgpu::WgpuVecBuffer, PipelinesStorage},
 };
 use glam::{Vec2, Vec4};
 
@@ -131,11 +135,10 @@ impl RenderInstance for VItemPrimitive {
     fn encode_render_command(
         &mut self,
         ctx: &WgpuContext,
-        pipelines: &mut RenderResourceStorage,
+        pipelines: &mut PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
+        render_textures: &RenderTextures,
     ) {
         {
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -153,11 +156,16 @@ impl RenderInstance for VItemPrimitive {
             );
         }
         {
+            let RenderTextures {
+                multisample_view,
+                render_view,
+                ..
+            } = render_textures;
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("VItem Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: multisample_view,
-                    resolve_target: Some(target_view),
+                    resolve_target: Some(render_view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,

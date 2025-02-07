@@ -1,9 +1,10 @@
 use crate::items::ConvertIntoRabject;
 use crate::{interpolate::Interpolatable, items::Entity};
 
-use crate::animation::entity::{EntityAnim, PureEvaluator, Rabject};
-
-use super::AnimWithParams;
+use crate::animation::{
+    entity::{EntityAnim, PureEvaluator, Rabject},
+    AnimWithParams,
+};
 
 pub fn interpolate<D: Entity + Alignable + Interpolatable + 'static, S: ConvertIntoRabject<D>>(
     src: &S,
