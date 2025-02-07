@@ -40,10 +40,7 @@ impl WgpuContext {
     pub async fn new() -> Self {
         let instance = wgpu::Instance::default();
         let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                force_fallback_adapter: true,
-                ..Default::default()
-            })
+            .request_adapter(&wgpu::RequestAdapterOptions::default())
             .await
             .unwrap();
 
