@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use glam::Vec3;
 use itertools::Itertools;
+use log::trace;
 
 use crate::prelude::Interpolatable;
 use crate::prelude::Partial;
@@ -44,7 +45,8 @@ impl Interpolatable for VPoint {
 impl Partial for ComponentVec<VPoint> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
         // trace!("get_partial: {:?}", range);
-        let max_anchor_idx = self.len() / 2;
+        let max_anchor_idx = self.len() / 2 - 1;
+        // trace!("max_anchor_idx: {}", max_anchor_idx);
 
         let (start_index, start_residue) = interpolate_usize(0, max_anchor_idx, range.start);
         let (end_index, end_residue) = interpolate_usize(0, max_anchor_idx, range.end);

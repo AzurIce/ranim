@@ -3,8 +3,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use glam::{ivec3, vec2, vec3, IVec3, Mat3, Vec3};
+use glam::{ivec3, vec2, vec3, Affine2, IVec3, Mat3, Vec3, Vec3Swizzles};
 use itertools::Itertools;
+use log::trace;
 
 use crate::{
     prelude::{Alignable, Interpolatable, Partial},
@@ -17,19 +18,20 @@ pub mod vpoint;
 pub mod width;
 
 /// An component
-pub trait Component: Debug + Default + Clone + Copy {}
+pub trait Component: Debug + Default + Clone + Copy + PartialEq {}
 
-impl<T: Debug + Default + Clone + Copy> Component for T {}
+impl<T: Debug + Default + Clone + Copy + PartialEq> Component for T {}
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct ComponentVec<T: Component>(Vec<T>);
 
 impl<T: Component + PointWise + Interpolatable> Partial for ComponentVec<T> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
-        let max_idx = self.len() - 1;
+        let max_idx = self.len() - 2;
+
         let (start_index, start_residue) = interpolate_usize(0, max_idx, range.start);
         let (end_index, end_residue) = interpolate_usize(0, max_idx, range.end);
-        // trace!("range: {:?}, start: {} {}, end: {} {}", range, start_index, start_residue, end_index, end_residue);
+        // trace!("max_idx: {max_idx}, range: {:?}, start: {} {}, end: {} {}", range, start_index, start_residue, end_index, end_residue);
         if start_index == end_index {
             let start_v = self
                 .get(start_index)
@@ -156,12 +158,17 @@ pub trait Transformable<T: Transform3dComponent> {
         anchor: TransformAnchor,
     );
 
+    /// Put center at a given point.
+    fn put_center_on(&mut self, point: Vec3) -> &mut Self {
+        self.shift(point - self.get_bounding_box()[1]);
+        self
+    }
     /// Shift the mobject by a given vector.
     fn shift(&mut self, shift: Vec3) -> &mut Self {
         self.apply_points_function(
             |points| {
-                points.iter_mut().for_each(|&mut mut p| {
-                    *p = *p + shift;
+                points.iter_mut().for_each(|p| {
+                    **p = **p + shift;
                 });
             },
             TransformAnchor::origin(),
@@ -170,14 +177,14 @@ pub trait Transformable<T: Transform3dComponent> {
     }
     /// Scale the mobject by a given vector.
     fn scale(&mut self, scale: Vec3) -> &mut Self {
-        self.scale_by_anchor(scale, TransformAnchor::origin())
+        self.scale_by_anchor(scale, TransformAnchor::center())
     }
     /// Scale the mobject by a given vector.
     fn scale_by_anchor(&mut self, scale: Vec3, anchor: TransformAnchor) -> &mut Self {
         self.apply_points_function(
             |points| {
-                points.iter_mut().for_each(|&mut mut p| {
-                    *p = *p * scale;
+                points.iter_mut().for_each(|p| {
+                    **p = **p * scale;
                 });
             },
             anchor,
@@ -186,7 +193,7 @@ pub trait Transformable<T: Transform3dComponent> {
     }
     /// Rotate the mobject by a given angle about a given axis.
     fn rotate(&mut self, angle: f32, axis: Vec3) -> &mut Self {
-        self.rotate_by_anchor(angle, axis, TransformAnchor::origin())
+        self.rotate_by_anchor(angle, axis, TransformAnchor::center())
     }
     /// Rotate the mobject by a given angle about a given axis.
     fn rotate_by_anchor(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self {
@@ -195,19 +202,22 @@ pub trait Transformable<T: Transform3dComponent> {
 
         self.apply_points_function(
             |points| {
-                points.iter_mut().for_each(|&mut mut p| {
-                    *p = rotation * *p;
+                points.iter_mut().for_each(|p| {
+                    **p = rotation * **p;
                 });
             },
             anchor,
         );
         self
     }
-    fn apply_affine(&mut self, affine: Mat3) {
+    /// Simple multiplies the matrix to the points.
+    fn apply_affine(&mut self, affine: Affine2) {
         self.apply_points_function(
             |points| {
-                points.iter_mut().for_each(|&mut mut p| {
-                    *p = affine * *p;
+                points.iter_mut().for_each(|p| {
+                    let transformed = affine.transform_point2(p.xy());
+                    p.x = transformed.x;
+                    p.y = transformed.y;
                 });
             },
             TransformAnchor::origin(),
@@ -283,7 +293,7 @@ impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
         if anchor != Vec3::ZERO {
             component_vec
                 .iter_mut()
-                .for_each(|&mut mut p| *p = *p + anchor);
+                .for_each(|p| **p = **p - anchor);
         }
 
         f(component_vec);
@@ -291,7 +301,7 @@ impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
         if anchor != Vec3::ZERO {
             component_vec
                 .iter_mut()
-                .for_each(|&mut mut p| *p = *p - anchor);
+                .for_each(|p| **p = **p + anchor);
         }
     }
 
@@ -341,6 +351,10 @@ impl TransformAnchor {
         Self::Point(Vec3::ZERO)
     }
 
+    pub fn center() -> Self {
+        Self::Edge(IVec3::ZERO)
+    }
+
     pub fn edge(x: i32, y: i32, z: i32) -> Self {
         Self::Edge(ivec3(x, y, z))
     }
@@ -374,7 +388,7 @@ impl<T: Component> AsMut<ComponentVec<T>> for ComponentVec<T> {
 
 #[cfg(test)]
 mod test {
-    use glam::{ivec3, vec3};
+    use glam::{ivec3, vec3, Vec3};
 
     use crate::components::Transformable;
 
@@ -413,5 +427,16 @@ mod test {
             vec3(100.0, 100.0, 0.0),
             points.get_bounding_box_point(ivec3(1, 1, 0))
         );
+    }
+
+    #[test]
+    fn test_transform() {
+        let vpoints = vec![vec3(1.0, 1.0, 1.0), vec3(2.0, 2.0, 2.0)];
+        let mut component_data: ComponentVec<VPoint> = vpoints.into();
+        component_data.scale(Vec3::splat(3.0));
+
+        let ans: ComponentVec<VPoint> = vec![vec3(3.0, 3.0, 3.0), vec3(6.0, 6.0, 6.0)].into();
+        assert_eq!(component_data, ans)
+        
     }
 }

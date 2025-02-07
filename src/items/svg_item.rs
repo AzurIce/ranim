@@ -1,14 +1,14 @@
 use std::{f32, path::Path, slice::Iter, vec};
 
-use bevy_color::Alpha;
-use glam::{mat3, vec2, vec3, Vec3};
+use bevy_color::{Alpha, Srgba};
+use glam::{vec2, vec3, Affine2, Vec3};
 use log::warn;
 
 use crate::{
     components::{vpoint::VPoint, TransformAnchor},
-    prelude::{Alignable, Empty, Fill, Interpolatable, Partial, Stroke, Transformable},
+    prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
     render::primitives::{svg_item::SvgItemPrimitive, Extract},
-    utils::bezier::PathBuilder,
+    utils::{bezier::PathBuilder, math::interpolate_usize},
 };
 
 use super::{vitem::VItem, Entity};
@@ -26,18 +26,22 @@ impl From<VItem> for SvgItem {
     }
 }
 
+// MARK: Transformable
+
 impl Transformable<VPoint> for SvgItem {
-    fn apply_affine(&mut self, affine: glam::Mat3) {
-        self.vitems.iter_mut().for_each(|x| x.apply_affine(affine));
-    }
     fn apply_points_function(
         &mut self,
         f: impl Fn(&mut crate::components::ComponentVec<VPoint>) + Copy,
         anchor: TransformAnchor,
     ) {
+        let point = match anchor {
+            TransformAnchor::Edge(edge) => self.get_bounding_box_point(edge),
+            TransformAnchor::Point(point) => point,
+        };
+        // println!("{:?}, {:?}", anchor, point);
         self.vitems
             .iter_mut()
-            .for_each(|x| x.apply_points_function(f, anchor));
+            .for_each(|x| x.apply_points_function(f, TransformAnchor::Point(point)));
     }
     fn get_bounding_box(&self) -> [Vec3; 3] {
         let [min, max] = self
@@ -75,13 +79,8 @@ impl SvgItem {
         for (path, transform) in walk_svg_group(tree.root()) {
             // let transform = path.abs_transform();
 
-            // let mut cnt = 0;
             let mut builder = PathBuilder::new();
             for segment in path.data().segments() {
-                // cnt += 1;
-                // if vitems.len() == 79 {
-                //     println!("{} - {:?}", builder.len(), segment);
-                // }
                 match segment {
                     usvg::tiny_skia_path::PathSegment::MoveTo(p) => {
                         builder.move_to(vec3(p.x, p.y, 0.0))
@@ -100,21 +99,21 @@ impl SvgItem {
                     usvg::tiny_skia_path::PathSegment::Close => builder.close_path(),
                 };
             }
-            // if vitems.len() == 79 {
-            //     println!("{:?}", cnt);
-            // }
             if builder.is_empty() {
                 warn!("empty path");
                 continue;
             }
 
             let mut vitem = VItem::from_vpoints(builder.vpoints().to_vec());
-            vitem.apply_affine(mat3(
-                vec3(transform.sx, transform.kx, transform.tx),
-                vec3(transform.ky, transform.sy, transform.ty),
-                vec3(0.0, 0.0, 1.0),
-            ));
-            vitem.rotate(f32::consts::PI, Vec3::X);
+            let affine = Affine2::from_cols_array(&[
+                transform.sx as f32,
+                transform.kx as f32,
+                transform.kx as f32,
+                transform.sy as f32,
+                transform.tx as f32,
+                transform.ty as f32,
+            ]);
+            vitem.apply_affine(affine);
             if let Some(fill) = path.fill() {
                 let color = parse_paint(fill.paint()).with_alpha(fill.opacity().get());
                 vitem.set_fill_color(color);
@@ -141,8 +140,10 @@ impl SvgItem {
             vitems.push(vitem);
         }
         // vitems.reverse();
-
-        Self { vitems }
+        let mut svg_item = Self { vitems };
+        svg_item.put_center_on(Vec3::ZERO);
+        svg_item.rotate(f32::consts::PI, Vec3::X);
+        svg_item
     }
 }
 
@@ -245,6 +246,57 @@ impl Extract<SvgItem> for SvgItemPrimitive {
 }
 
 // MARK: Animation impl
+impl Stroke for SvgItem {
+    fn set_stroke_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
+        self.vitems.iter_mut().for_each(|vitem| {
+            vitem.set_stroke_color(color);
+        });
+        self
+    }
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.vitems.iter_mut().for_each(|vitem| {
+            vitem.set_stroke_opacity(opacity);
+        });
+        self
+    }
+    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+        self.vitems.iter_mut().for_each(|vitem| {
+            vitem.set_stroke_width(width);
+        });
+        self
+    }
+}
+
+impl Fill for SvgItem {
+    fn fill_color(&self) -> bevy_color::Srgba {
+        self.vitems
+            .first()
+            .map(|vitem| vitem.fill_color())
+            .unwrap_or(Srgba::WHITE)
+    }
+    fn set_fill_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
+        self.vitems.iter_mut().for_each(|vitem| {
+            vitem.set_fill_color(color);
+        });
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.vitems.iter_mut().for_each(|vitem| {
+            vitem.set_fill_opacity(opacity);
+        });
+        self
+    }
+}
+
+impl Opacity for SvgItem {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.vitems.iter_mut().for_each(|vitem| {
+            vitem.set_opacity(opacity);
+        });
+        self
+    }
+}
+
 impl Alignable for SvgItem {
     fn is_aligned(&self, other: &Self) -> bool {
         self.vitems.len() == other.vitems.len()
@@ -281,19 +333,43 @@ impl Interpolatable for SvgItem {
 
 impl Partial for SvgItem {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
-        let start = range.start * (self.vitems.len() - 1) as f32;
-        let end = range.end * (self.vitems.len() - 1) as f32;
-
-        let start_idx = start.floor();
-        let end_idx = end.ceil();
-
-        Self {
-            vitems: self
+        let max_vitem_idx = self.vitems.len() - 1;
+        let (start_index, start_residue) = interpolate_usize(0, max_vitem_idx, range.start);
+        let (end_index, end_residue) = interpolate_usize(0, max_vitem_idx, range.end);
+        // trace!("range: {:?}, start: {} {}, end: {} {}", range, start_index, start_residue, end_index, end_residue);
+        let vitems = if start_index == end_index {
+            let start_v = self
                 .vitems
-                .get(start_idx as usize..=end_idx as usize)
+                .get(start_index)
                 .unwrap()
-                .to_owned(),
-        }
+                .get_partial(start_residue..end_residue);
+            // .lerp(self.vitems.get(start_index + 1).unwrap(), start_residue);
+            vec![start_v]
+        } else {
+            let start_v = self
+                .vitems
+                .get(start_index)
+                .unwrap()
+                .get_partial(start_residue..1.0);
+            // .lerp(self.vitems.get(start_index + 1).unwrap(), start_residue);
+            let end_v = self
+                .vitems
+                .get(end_index)
+                .unwrap()
+                .get_partial(0.0..end_residue);
+            // .lerp(self.vitems.get(end_index + 1).unwrap(), end_residue);
+
+            let mut partial = Vec::with_capacity(end_index - start_index + 1 + 2);
+            partial.push(start_v);
+            if start_index + 1 <= end_index - 1 {
+                let mid = self.vitems.get(start_index + 1..end_index).unwrap();
+                partial.extend_from_slice(mid);
+            }
+            partial.push(end_v);
+            partial
+        };
+
+        Self { vitems }
     }
 }
 
@@ -326,6 +402,7 @@ impl<'a> Iterator for SvgElementIterator<'a> {
             match group.next() {
                 Some(node) => match node {
                     usvg::Node::Group(group) => {
+                        // trace!("group {:?}", group.abs_transform());
                         self.stack
                             .push((group.children().iter(), group.abs_transform()));
                     }

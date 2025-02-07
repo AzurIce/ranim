@@ -1,13 +1,15 @@
+use crate::items::ConvertIntoRabject;
 use crate::{interpolate::Interpolatable, items::Entity};
 
 use crate::animation::entity::{EntityAnim, PureEvaluator, Rabject};
 
 use super::AnimWithParams;
 
-pub fn interpolate<T: Entity + Alignable + Interpolatable + 'static>(
-    src: &Rabject<T>,
-    dst: &Rabject<T>,
-) -> AnimWithParams<EntityAnim<T>> {
+pub fn interpolate<D: Entity + Alignable + Interpolatable + 'static, S: ConvertIntoRabject<D>>(
+    src: &S,
+    dst: &Rabject<D>,
+) -> AnimWithParams<EntityAnim<D>> {
+    let src: Rabject<D> = src.clone().convert_into();
     let src_data = src.data.clone();
     AnimWithParams::new(EntityAnim::new(
         src.clone(),

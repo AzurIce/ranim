@@ -61,7 +61,7 @@ pub struct Timeline {
 impl Debug for Timeline {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "Timelin {:?}:\n",
+            "Timeline {:?}:\n",
             Duration::from_secs_f32(self.elapsed_secs)
         ))?;
         for (id, timeline) in self.rabject_timelines.iter() {

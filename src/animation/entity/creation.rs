@@ -103,6 +103,7 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Write<T> {
         outline
             .set_fill_opacity(0.0)
             .set_stroke_width(1.0)
+            .set_stroke_color(target.fill_color())
             .set_stroke_opacity(1.0);
         Self {
             original: target,
@@ -144,6 +145,7 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Unwrite<T> {
         outline
             .set_fill_opacity(0.0)
             .set_stroke_width(1.0)
+            .set_stroke_color(target.fill_color())
             .set_stroke_opacity(1.0);
         Self {
             original: target,
@@ -182,6 +184,7 @@ pub trait Empty {
 
 pub trait Fill {
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self;
+    fn fill_color(&self) -> Srgba;
     fn set_fill_color(&mut self, color: Srgba) -> &mut Self;
 }
 
