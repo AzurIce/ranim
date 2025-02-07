@@ -49,11 +49,10 @@ impl TimelineConstructor for MainScene {
             .rotate(std::f32::consts::FRAC_PI_4, Vec3::Z);
         // 0.5s wait -> fade in -> 0.5s wait
         timeline.forward(0.5);
-        let polygon = timeline.show(polygon);
-        let polygon = timeline.play(fade_in(polygon));
+        let polygon = timeline.play(fade_in(&polygon));
         timeline.forward(0.5);
 
-        let polygon = timeline.play(fade_in(polygon));
+        // let polygon = timeline.play(fade_in(&polygon));
         // timeline.hide(&polygon);
         // let mut svg = SvgItem::from_svg(SVG);
         // svg.scale(Vec3::splat(2.0));
