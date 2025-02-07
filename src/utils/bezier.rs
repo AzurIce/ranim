@@ -1,4 +1,5 @@
 use glam::{Vec3, Vec3Swizzles};
+use log::trace;
 
 use crate::{
     prelude::Interpolatable,
@@ -186,6 +187,7 @@ pub fn quad_bezier_eval(bezier: &[Vec3; 3], t: f32) -> Vec3 {
 ///
 /// [Vec3; 4] is [p1, h1, h2, p2]
 pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
+    // trace!("approx cubic {:?}", cubic);
     let [p1, h1, h2, p2] = cubic;
 
     let p = h1 - p1;
@@ -199,7 +201,7 @@ pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
     let sqrt_disc = disc.sqrt();
 
     // println!("{} {} {}, disc: {}", a, b, c, disc);
-    let root = if a == 0.0 && b == 0.0 || a != 0.0 && disc < 0.0 {
+    let mut root = if a == 0.0 && b == 0.0 || a != 0.0 && disc < 0.0 {
         0.5
     } else if a == 0.0 {
         -c / b
@@ -213,6 +215,9 @@ pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
         }
         root
     };
+    if root == 0.0 || root == 1.0 {
+        root = 0.5;
+    }
     // println!("{root}");
 
     let cut_point = cubic_bezier_eval(&cubic, root);

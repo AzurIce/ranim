@@ -1,8 +1,7 @@
 use env_logger::Env;
-use glam::{vec2, vec3};
+use glam::vec3;
 use ranim::animation::entity::creation::Color;
 use ranim::color::palettes::manim::*;
-use ranim::components::width;
 use ranim::items::vitem::Rectangle;
 use ranim::{prelude::*, TimelineConstructor};
 

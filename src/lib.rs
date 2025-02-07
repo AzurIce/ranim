@@ -198,7 +198,7 @@ impl RanimRenderApp {
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
-                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} ({eta}) {msg}",
+                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} (eta {eta}) {msg}",
             )
             .unwrap()
             .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
@@ -215,17 +215,16 @@ impl RanimRenderApp {
                 self.update_frame();
                 pb.inc(1);
                 pb.set_message(format!(
-                    "rendering {:?}/{:?}",
+                    "rendering {:.1?}/{:.1?}",
                     Duration::from_secs_f32(alpha * anim.params.duration_secs),
                     Duration::from_secs_f32(anim.params.duration_secs)
                 ));
             });
 
         let msg = format!(
-            "rendered {} frames({:?}) in {:?}",
+            "rendered {} frames({:?})",
             frames,
-            anim.params.duration_secs,
-            t.elapsed()
+            Duration::from_secs_f32(anim.params.duration_secs),
         );
         pb.finish_with_message(msg);
     }

@@ -82,6 +82,19 @@ impl<T: Entity + 'static> Rabject<T> {
     }
 }
 
+pub trait ConvertIntoRabject<D: Entity> : Clone {
+    fn convert_into(self) -> Rabject<D>;
+}
+
+impl<D: Entity, S: Entity + Into<D>> ConvertIntoRabject<D> for Rabject<S> {
+    fn convert_into(self) -> Rabject<D> {
+        Rabject {
+            id: self.id,
+            data: self.data.into(),
+        }
+    }
+}
+
 pub trait Entity: Clone + Empty {
     type Primitive: Extract<Self> + Default;
 
