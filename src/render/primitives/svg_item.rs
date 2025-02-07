@@ -19,7 +19,7 @@ impl SvgItemPrimitive {
 impl RenderInstance for SvgItemPrimitive {
     fn update_clip_box(&mut self, ctx: &crate::context::WgpuContext, clip_box: &[glam::Vec2; 4]) {
         // trace!("SvgItemPrimitive update_clip_box vitem_primitives: {}", self.vitem_primitives.len());
-        self.clip_box = clip_box.clone();
+        self.clip_box = *clip_box;
         self.vitem_primitives
             .iter_mut()
             .for_each(|vitem_primitive| {

@@ -142,7 +142,7 @@ impl RenderInstance for VItemPrimitive {
                 label: Some("VItem Map Points Compute Pass"),
                 timestamp_writes: None,
             });
-            cpass.set_pipeline(pipelines.get_or_init::<Map3dTo2dPipeline>(&ctx));
+            cpass.set_pipeline(pipelines.get_or_init::<Map3dTo2dPipeline>(ctx));
             cpass.set_bind_group(0, uniforms_bind_group, &[]);
 
             cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
@@ -167,7 +167,7 @@ impl RenderInstance for VItemPrimitive {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            rpass.set_pipeline(pipelines.get_or_init::<VItemPipeline>(&ctx));
+            rpass.set_pipeline(pipelines.get_or_init::<VItemPipeline>(ctx));
             rpass.set_bind_group(0, uniforms_bind_group, &[]);
 
             rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
@@ -176,76 +176,3 @@ impl RenderInstance for VItemPrimitive {
         }
     }
 }
-
-// impl Primitive<SvgItem> for VItemPrimitive {
-//     fn init(wgpu_ctx: &WgpuContext, data: &SvgItem) -> Self
-//     where
-//         Self: Sized,
-//     {
-//         data.vitems.iter().map(|vitem| {
-//             vitem.vpoints.get_bounding_box_corners()
-//             vitem.get_render_points()
-//         })
-//     }
-//     fn update(&mut self, wgpu_ctx: &WgpuContext, data: &SvgItem) {}
-// }
-
-// impl Renderable for Rabject<VItem> {
-// fn update_clip_info(&mut self, ctx: &WgpuContext, camera: &CameraFrame) {
-//     let corners = self.inner.vpoints.get_bounding_box_corners().map(|p| {
-//         let mut p = camera.view_projection_matrix() * p.extend(1.0);
-//         p /= p.w;
-//         p.xy()
-//     });
-//     let (mut min_x, mut max_x, mut min_y, mut max_y) = (1.0f32, -1.0f32, 1.0f32, -1.0f32);
-//     for p in corners {
-//         min_x = min_x.min(p.x);
-//         max_x = max_x.max(p.x);
-//         min_y = min_y.min(p.y);
-//         max_y = max_y.max(p.y);
-//     }
-//     let max_width = self
-//         .inner
-//         .stroke_widths
-//         .iter()
-//         .cloned()
-//         .reduce(|acc, w| acc.max(w))
-//         .map(|w| w.0)
-//         .unwrap_or(0.0);
-//     let radii = Vec2::splat(max_width) / camera.half_frame_size();
-//     min_x -= radii.x;
-//     min_y -= radii.y;
-//     max_x += radii.x;
-//     max_y += radii.y;
-
-//     let clip_box = [
-//         vec2(min_x, min_y),
-//         vec2(min_x, max_y),
-//         vec2(max_x, min_y),
-//         vec2(max_x, max_y),
-//     ];
-//     // trace!("updated clip_box: {:?}", clip_box);
-//     self.render_instance.borrow_mut().update_clip_box(ctx, &clip_box);
-// }
-// fn render(
-//     &mut self,
-//     ctx: &WgpuContext,
-//     pipelines: &mut RenderResourceStorage,
-//     encoder: &mut wgpu::CommandEncoder,
-//     uniforms_bind_group: &wgpu::BindGroup,
-//     multisample_view: &wgpu::TextureView,
-//     target_view: &wgpu::TextureView,
-// ) {
-//     if self.inner.vpoints.is_empty() {
-//         return;
-//     }
-//     self.render_instance.borrow().encode_render_command(
-//         ctx,
-//         pipelines,
-//         encoder,
-//         uniforms_bind_group,
-//         multisample_view,
-//         target_view,
-//     );
-// }
-// }

@@ -66,7 +66,7 @@ impl EntityTimeline {
     pub fn new<T: Entity + 'static>(rabject: &Rabject<T>) -> Self {
         Self {
             // rabject_id: rabject.id,
-            cur_freeze_anim: Rc::new(Box::new(freeze(&rabject))),
+            cur_freeze_anim: Rc::new(Box::new(freeze(rabject))),
             cur_anim_idx: None,
             is_showing: true,
             anims: Vec::new(),

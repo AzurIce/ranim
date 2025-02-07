@@ -1,5 +1,4 @@
 use glam::{Vec3, Vec3Swizzles};
-use log::trace;
 
 use crate::{
     prelude::Interpolatable,
@@ -7,6 +6,7 @@ use crate::{
 };
 
 /// A path builder based on quadratic beziers
+#[derive(Default)]
 pub struct PathBuilder {
     start_point: Option<Vec3>,
     points: Vec<Vec3>,
@@ -17,10 +17,7 @@ impl PathBuilder {
         self.points.is_empty()
     }
     pub fn new() -> Self {
-        Self {
-            start_point: None,
-            points: Vec::new(),
-        }
+        Self::default()
     }
     pub fn len(&self) -> usize {
         self.points.len()
@@ -125,9 +122,7 @@ pub fn trim_quad_bezier(bezier: &[Vec3; 3], a: f32, b: f32) -> [Vec3; 3] {
     let (a, b) = if a > b { (b, a) } else { (a, b) };
     let end_on_b = split_quad_bezier(bezier, b).0;
     let a = a / b;
-    let result = split_quad_bezier(&end_on_b, a).1;
-    // trace!("result: {:?}", result);
-    result
+    split_quad_bezier(&end_on_b, a).1
 }
 
 pub fn trim_cubic_bezier(bezier: &[Vec3; 4], a: f32, b: f32) -> [Vec3; 4] {
@@ -136,9 +131,7 @@ pub fn trim_cubic_bezier(bezier: &[Vec3; 4], a: f32, b: f32) -> [Vec3; 4] {
     let end_on_b = split_cubic_bezier(bezier, b).0;
     // trace!("end_on_b: {:?}", end_on_b);
     let a = a / b;
-    let result = split_cubic_bezier(&end_on_b, a).1;
-    // trace!("result: {:?}", result);
-    result
+    split_cubic_bezier(&end_on_b, a).1
 }
 
 /// Returns the point on a quadratic bezier curve at the given parameter.

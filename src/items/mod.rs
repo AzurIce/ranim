@@ -82,7 +82,7 @@ impl<T: Entity + 'static> Rabject<T> {
     }
 }
 
-pub trait ConvertIntoRabject<D: Entity> : Clone {
+pub trait ConvertIntoRabject<D: Entity>: Clone {
     fn convert_into(self) -> Rabject<D>;
 }
 

@@ -3,7 +3,7 @@
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use animation::{entity::AnimWithParams, Animator, Timeline};
@@ -194,7 +194,6 @@ impl RanimRenderApp {
 
     pub fn render_anim<T: Animator>(&mut self, mut anim: AnimWithParams<T>) {
         let frames = (anim.params.duration_secs * self.fps as f32).ceil() as usize;
-        let t = Instant::now();
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
@@ -209,7 +208,6 @@ impl RanimRenderApp {
         (0..frames)
             .map(|f| f as f32 / (frames - 1) as f32)
             .for_each(|alpha| {
-                // trace!("rendering frame at alpha = {}", alpha);
                 anim.update_alpha(alpha);
                 self.renderer.render(&mut self.ctx, &mut anim);
                 self.update_frame();

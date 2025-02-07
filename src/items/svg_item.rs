@@ -1,4 +1,4 @@
-use std::{f32, path::Path, slice::Iter, vec};
+use std::{cmp::Ordering, f32, path::Path, slice::Iter, vec};
 
 use bevy_color::{Alpha, Srgba};
 use glam::{vec2, vec3, Affine2, Vec3};
@@ -106,12 +106,12 @@ impl SvgItem {
 
             let mut vitem = VItem::from_vpoints(builder.vpoints().to_vec());
             let affine = Affine2::from_cols_array(&[
-                transform.sx as f32,
-                transform.kx as f32,
-                transform.kx as f32,
-                transform.sy as f32,
-                transform.tx as f32,
-                transform.ty as f32,
+                transform.sx,
+                transform.kx,
+                transform.kx,
+                transform.sy,
+                transform.tx,
+                transform.ty,
             ]);
             vitem.apply_affine(affine);
             if let Some(fill) = path.fill() {
@@ -307,10 +307,14 @@ impl Alignable for SvgItem {
                 .all(|(a, b)| a.is_aligned(b))
     }
     fn align_with(&mut self, other: &mut Self) {
-        if self.vitems.len() < other.vitems.len() {
-            self.vitems.resize_with(other.vitems.len(), VItem::empty);
-        } else if self.vitems.len() > other.vitems.len() {
-            other.vitems.resize_with(self.vitems.len(), VItem::empty);
+        match self.vitems.len().cmp(&other.vitems.len()) {
+            Ordering::Less => {
+                self.vitems.resize_with(other.vitems.len(), VItem::empty);
+            }
+            Ordering::Greater => {
+                other.vitems.resize_with(self.vitems.len(), VItem::empty);
+            }
+            _ => (),
         }
         self.vitems
             .iter_mut()
@@ -361,7 +365,7 @@ impl Partial for SvgItem {
 
             let mut partial = Vec::with_capacity(end_index - start_index + 1 + 2);
             partial.push(start_v);
-            if start_index + 1 <= end_index - 1 {
+            if start_index < end_index - 1 {
                 let mid = self.vitems.get(start_index + 1..end_index).unwrap();
                 partial.extend_from_slice(mid);
             }
@@ -397,6 +401,7 @@ struct SvgElementIterator<'a> {
 impl<'a> Iterator for SvgElementIterator<'a> {
     type Item = (&'a usvg::Path, usvg::Transform);
     fn next(&mut self) -> Option<Self::Item> {
+        #[allow(clippy::never_loop)]
         while !self.stack.is_empty() {
             let (group, transform) = self.stack.last_mut().unwrap();
             match group.next() {

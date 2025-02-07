@@ -52,6 +52,7 @@ impl AnimParams {
 /// The Timeline itself is also an [`Animator`] which:
 /// - update all RabjectTimeline's alpha
 /// - render all RabjectTimeline
+#[derive(Default)]
 pub struct Timeline {
     /// Rabject's Id -> EntityTimeline
     rabject_timelines: HashMap<Id, EntityTimeline>,
@@ -77,10 +78,7 @@ impl Debug for Timeline {
 
 impl Timeline {
     pub fn new() -> Self {
-        Self {
-            rabject_timelines: HashMap::new(),
-            elapsed_secs: 0.0,
-        }
+        Self::default()
     }
     pub fn elapsed_secs(&self) -> f32 {
         self.elapsed_secs

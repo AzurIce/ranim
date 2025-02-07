@@ -1,7 +1,6 @@
-use bevy_color::{ColorToComponents, Gray, Srgba};
+use bevy_color::{ColorToComponents, Srgba};
 use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use itertools::Itertools;
-use log::trace;
 
 use crate::{
     components::{rgba::Rgba, vpoint::VPoint, width::Width, ComponentVec, Transformable},
@@ -188,7 +187,7 @@ impl Empty for VItem {
 impl Fill for VItem {
     fn fill_color(&self) -> bevy_color::Srgba {
         self.fill_rgbas
-            .get(0)
+            .first()
             .map(|&rgba| Srgba::from_vec4(*rgba))
             .unwrap_or(Srgba::WHITE)
     }
@@ -237,10 +236,7 @@ impl Blueprint<VItem> for Polygon {
             .collect::<Vec<_>>();
 
         // Interleave anchors and handles
-        let points = anchors
-            .into_iter()
-            .interleave(handles.into_iter())
-            .collect::<Vec<_>>();
+        let points = anchors.into_iter().interleave(handles).collect::<Vec<_>>();
         // trace!("points: {:?}", points);
         Rabject::new(VItem::from_vpoints(points))
     }
