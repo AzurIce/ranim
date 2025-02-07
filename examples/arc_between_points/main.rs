@@ -6,7 +6,7 @@ use glam::{vec2, Mat2};
 use log::info;
 use ranim::animation::entity::creation::Color;
 use ranim::animation::entity::fading::fade_in;
-use ranim::animation::Timeline;
+use ranim::animation::timeline::Timeline;
 use ranim::items::vitem::ArcBetweenPoints;
 use ranim::{prelude::*, AppOptions, SceneDesc, TimelineConstructor};
 

@@ -6,7 +6,7 @@ use glam::{vec3, Vec3};
 use ranim::animation::entity::creation::{uncreate, unwrite, write, Color};
 use ranim::animation::entity::fading::{fade_in, fade_out};
 use ranim::animation::entity::interpolate::interpolate;
-use ranim::animation::Timeline;
+use ranim::animation::timeline::Timeline;
 
 use ranim::color::palettes::manim;
 use ranim::items::svg_item::SvgItem;

@@ -1,3 +1,5 @@
+use crate::render::RenderTextures;
+
 use super::{vitem::VItemPrimitive, RenderInstance};
 
 #[derive(Default)]
@@ -29,11 +31,10 @@ impl RenderInstance for SvgItemPrimitive {
     fn encode_render_command(
         &mut self,
         ctx: &crate::context::WgpuContext,
-        pipelines: &mut crate::render::RenderResourceStorage,
+        pipelines: &mut crate::render::PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
+        render_textures: &RenderTextures,
     ) {
         // trace!("SvgItemPrimitive encode_render_command vitem_primitives: {}", self.vitem_primitives.len());
         self.vitem_primitives
@@ -44,8 +45,7 @@ impl RenderInstance for SvgItemPrimitive {
                     pipelines,
                     encoder,
                     uniforms_bind_group,
-                    multisample_view,
-                    target_view,
+                    render_textures,
                 );
             });
     }

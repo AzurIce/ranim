@@ -10,17 +10,18 @@ use glam::Vec2;
 
 use crate::{context::WgpuContext, items::Entity, utils::Id};
 
+use super::RenderTextures;
+
 pub trait RenderInstance {
     #[allow(unused)]
     fn update_clip_box(&mut self, ctx: &WgpuContext, clip_box: &[Vec2; 4]) {}
     fn encode_render_command(
         &mut self,
         ctx: &WgpuContext,
-        pipelines: &mut super::RenderResourceStorage,
+        pipelines: &mut super::PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
-        multisample_view: &wgpu::TextureView,
-        target_view: &wgpu::TextureView,
+        render_textures: &RenderTextures,
     );
 }
 

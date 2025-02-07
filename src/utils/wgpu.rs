@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::Deref};
+use std::fmt::Debug;
 
 use wgpu::util::DeviceExt;
 
@@ -9,42 +9,17 @@ pub(crate) struct WgpuBuffer<T: bytemuck::Pod + bytemuck::Zeroable + Debug> {
     label: Option<&'static str>,
     buffer: wgpu::Buffer,
     usage: wgpu::BufferUsages,
-    inner: Option<T>,
+    inner: T,
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> Deref for WgpuBuffer<T> {
-    type Target = wgpu::Buffer;
-
-    fn deref(&self) -> &Self::Target {
+impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> AsRef<wgpu::Buffer> for WgpuBuffer<T> {
+    fn as_ref(&self) -> &wgpu::Buffer {
         &self.buffer
     }
 }
 
 #[allow(unused)]
 impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
-    pub(crate) fn new(
-        ctx: &WgpuContext,
-        label: Option<&'static str>,
-        usage: wgpu::BufferUsages,
-        size: u64,
-    ) -> Self {
-        assert!(
-            usage.contains(wgpu::BufferUsages::COPY_DST),
-            "Buffer {label:?} does not contains COPY_DST"
-        );
-        Self {
-            label,
-            buffer: ctx.device.create_buffer(&wgpu::BufferDescriptor {
-                label,
-                size,
-                usage,
-                mapped_at_creation: false,
-            }),
-            usage,
-            inner: None,
-        }
-    }
-
     pub(crate) fn new_init(
         ctx: &WgpuContext,
         label: Option<&'static str>,
@@ -66,37 +41,28 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
                     usage,
                 }),
             usage,
-            inner: Some(data),
+            inner: data,
         }
     }
 
-    pub(crate) fn get(&self) -> Option<&T> {
-        self.inner.as_ref()
+    pub(crate) fn get(&self) -> &T {
+        &self.inner
     }
 
     pub(crate) fn set(&mut self, ctx: &WgpuContext, data: T) {
-        if self.buffer.size() < std::mem::size_of_val::<T>(&data) as u64 {
-            self.buffer = ctx
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: self.label,
-                    contents: bytemuck::bytes_of(&data),
-                    usage: self.usage,
-                });
-        } else {
-            {
-                let mut view = ctx
-                    .queue
-                    .write_buffer_with(
-                        self,
-                        0,
-                        wgpu::BufferSize::new(std::mem::size_of_val(&data) as u64).unwrap(),
-                    )
-                    .unwrap();
-                view.copy_from_slice(bytemuck::bytes_of(&data));
-            }
-            ctx.queue.submit([]);
+        {
+            let mut view = ctx
+                .queue
+                .write_buffer_with(
+                    &self.buffer,
+                    0,
+                    wgpu::BufferSize::new(std::mem::size_of_val(&data) as u64).unwrap(),
+                )
+                .unwrap();
+            view.copy_from_slice(bytemuck::bytes_of(&data));
         }
+        ctx.queue.submit([]);
+        self.inner = data;
     }
 }
 
@@ -121,7 +87,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             inner: vec![],
         }
     }
-    
+
     pub(crate) fn get(&self) -> &[T] {
         self.inner.as_ref()
     }

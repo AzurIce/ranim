@@ -2,7 +2,7 @@ use bevy_color::{Alpha, Srgba};
 use env_logger::Env;
 use glam::vec2;
 use ranim::animation::entity::fading::fade_in;
-use ranim::animation::Timeline;
+use ranim::animation::timeline::Timeline;
 use ranim::items::vitem::Arc;
 use ranim::{prelude::*, AppOptions, TimelineConstructor};
 

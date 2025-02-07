@@ -8,7 +8,7 @@ use ranim::{
             creation::{create, unwrite, write},
             freeze::freeze,
         },
-        Timeline,
+        timeline::Timeline,
     },
     components::TransformAnchor,
     items::{
