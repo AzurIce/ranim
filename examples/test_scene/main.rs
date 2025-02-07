@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+#![allow(unused_imports)]
 use std::time::Duration;
 
 use env_logger::Env;
