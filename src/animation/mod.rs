@@ -20,7 +20,7 @@ pub trait Animator: Renderable {
 /// An `Anim` is a box of [`Animator`]
 pub type Anim = Box<dyn Animator>;
 /// An `StaticAnim` is a box of [`Renderable`] inside a `Rc`
-/// 
+///
 /// This implements [`Animator`] but does nothing on `update_alpha`
 pub type StaticAnim = Rc<Box<dyn Renderable>>;
 
@@ -51,7 +51,6 @@ impl Animator for StaticAnim {
         // DO NOTHING
     }
 }
-
 
 /// The param of an animation
 #[derive(Debug, Clone)]
