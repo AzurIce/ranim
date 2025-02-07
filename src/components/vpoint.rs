@@ -2,7 +2,6 @@ use std::ops::{Deref, DerefMut};
 
 use glam::Vec3;
 use itertools::Itertools;
-use log::trace;
 
 use crate::prelude::Interpolatable;
 use crate::prelude::Partial;
@@ -61,7 +60,7 @@ impl Partial for ComponentVec<VPoint> {
             let end_part = trim_quad_bezier(&seg, 0.0, end_residue);
             let mut partial = Vec::with_capacity((end_index - start_index + 1 + 2) * 2 + 1);
             partial.extend_from_slice(&start_part);
-            if start_index + 1 <= end_index - 1 {
+            if start_index < end_index - 1 {
                 let mid = self
                     .get((start_index + 1) * 2 + 1..end_index * 2)
                     .unwrap()
@@ -82,8 +81,7 @@ impl Partial for ComponentVec<VPoint> {
 impl ComponentVec<VPoint> {
     pub fn get_seg(&self, idx: usize) -> Option<&[VPoint; 3]> {
         self.get(idx * 2..idx * 2 + 3)
-            .map(|seg| seg.try_into().ok())
-            .flatten()
+            .and_then(|seg| seg.try_into().ok())
     }
     pub fn get_closepath_flags(&self) -> Vec<bool> {
         let len = self.len();

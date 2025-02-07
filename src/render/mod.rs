@@ -10,6 +10,16 @@ use crate::{
     utils::{wgpu::WgpuBuffer, RenderResourceStorage},
 };
 
+// pub struct RenderContext<'a> {
+//     wgpu_ctx: &'a WgpuContext,
+//     pipelines: &'a mut RenderResourceStorage,
+//     render_instances: &'a mut RenderInstances,
+//     target_view: &'a wgpu::TextureView,
+//     multisample_view: &'a wgpu::TextureView,
+//     uniforms_bind_group: &'a wgpu::BindGroup,
+//     camera: &'a CameraFrame,
+// }
+
 pub trait Renderable {
     fn render(
         &self,

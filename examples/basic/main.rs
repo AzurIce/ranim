@@ -1,6 +1,6 @@
 use std::f32;
 
-use bevy_color::{Gray, Srgba};
+use bevy_color::Srgba;
 use env_logger::Env;
 use glam::{vec3, Vec3};
 use ranim::animation::entity::creation::{uncreate, unwrite, write, Color};

@@ -5,7 +5,6 @@ use std::{
 
 use glam::{ivec3, vec2, vec3, Affine2, IVec3, Mat3, Vec3, Vec3Swizzles};
 use itertools::Itertools;
-use log::trace;
 
 use crate::{
     prelude::{Alignable, Interpolatable, Partial},
@@ -142,7 +141,7 @@ impl<T: Component> ComponentVec<T> {
 
     pub fn set_all(&mut self, value: impl Into<T>) {
         let value = value.into();
-        self.iter_mut().for_each(|x| *x = value.clone());
+        self.iter_mut().for_each(|x| *x = value);
     }
 }
 
@@ -168,7 +167,7 @@ pub trait Transformable<T: Transform3dComponent> {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
-                    **p = **p + shift;
+                    **p += shift;
                 });
             },
             TransformAnchor::origin(),
@@ -184,7 +183,7 @@ pub trait Transformable<T: Transform3dComponent> {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
-                    **p = **p * scale;
+                    **p *= scale;
                 });
             },
             anchor,
@@ -291,17 +290,13 @@ impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
         let component_vec = self.as_mut();
 
         if anchor != Vec3::ZERO {
-            component_vec
-                .iter_mut()
-                .for_each(|p| **p = **p - anchor);
+            component_vec.iter_mut().for_each(|p| **p -= anchor);
         }
 
         f(component_vec);
 
         if anchor != Vec3::ZERO {
-            component_vec
-                .iter_mut()
-                .for_each(|p| **p = **p + anchor);
+            component_vec.iter_mut().for_each(|p| **p += anchor);
         }
     }
 
@@ -437,6 +432,5 @@ mod test {
 
         let ans: ComponentVec<VPoint> = vec![vec3(3.0, 3.0, 3.0), vec3(6.0, 6.0, 6.0)].into();
         assert_eq!(component_data, ans)
-        
     }
 }

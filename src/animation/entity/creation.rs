@@ -118,9 +118,9 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'sta
 {
     fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
-        if 0.0 <= alpha && alpha <= 1.0 {
+        if (0.0..=1.0).contains(&alpha) {
             self.create_anim.eval_alpha(alpha)
-        } else if 1.0 < alpha && alpha < 2.0 {
+        } else if (1.0..2.0).contains(&alpha) {
             self.outline.lerp(&self.original, alpha - 1.0)
         } else if alpha == 2.0 {
             self.original.clone()

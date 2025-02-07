@@ -1,6 +1,5 @@
 use std::{fmt::Debug, ops::Deref};
 
-use log::trace;
 use wgpu::util::DeviceExt;
 
 use crate::context::WgpuContext;
@@ -160,7 +159,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                 ctx.device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label,
-                        contents: bytemuck::cast_slice(&data),
+                        contents: bytemuck::cast_slice(data),
                         usage,
                     }),
             ),
@@ -199,7 +198,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         let realloc = self
             .buffer
             .as_ref()
-            .map(|b| b.size() != (std::mem::size_of::<T>() * data.len()) as u64)
+            .map(|b| b.size() != (std::mem::size_of_val(data)) as u64)
             .unwrap_or(true);
 
         if realloc {
@@ -207,7 +206,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                 ctx.device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: self.label,
-                        contents: bytemuck::cast_slice(&data),
+                        contents: bytemuck::cast_slice(data),
                         usage: self.usage,
                     }),
             );
@@ -218,11 +217,10 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                     .write_buffer_with(
                         self.buffer.as_ref().unwrap(),
                         0,
-                        wgpu::BufferSize::new((std::mem::size_of::<T>() * data.len()) as u64)
-                            .unwrap(),
+                        wgpu::BufferSize::new((std::mem::size_of_val(data)) as u64).unwrap(),
                     )
                     .unwrap();
-                view.copy_from_slice(bytemuck::cast_slice(&data));
+                view.copy_from_slice(bytemuck::cast_slice(data));
             }
             ctx.queue.submit([]);
         }

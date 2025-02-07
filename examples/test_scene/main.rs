@@ -13,7 +13,8 @@ use ranim::{
     components::TransformAnchor,
     items::{
         svg_item::SvgItem,
-        vitem::{Square, VItem}, Rabject,
+        vitem::{Square, VItem},
+        Rabject,
     },
     prelude::*,
     AppOptions, TimelineConstructor,

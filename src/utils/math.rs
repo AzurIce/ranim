@@ -62,19 +62,17 @@ impl Rect {
         let center = self.center();
         let max = self.max;
 
-        let x = if edge.x < 0 {
-            min.x
-        } else if edge.x == 0 {
-            center.x
-        } else {
-            max.x
+        let x = match edge.x {
+            -1 => min.y,
+            0 => center.y,
+            1 => max.y,
+            _ => unreachable!(),
         };
-        let y = if edge.y < 0 {
-            min.y
-        } else if edge.y == 0 {
-            center.y
-        } else {
-            max.y
+        let y = match edge.y {
+            -1 => min.y,
+            0 => center.y,
+            1 => max.y,
+            _ => unreachable!(),
         };
 
         vec2(x, y)
@@ -86,7 +84,7 @@ impl Rect {
 /// return integer and the sub progress to the next integer
 pub fn interpolate_usize(a: usize, b: usize, t: f32) -> (usize, f32) {
     assert!(b >= a);
-    let t = t.clamp(0.0, 1.0) as f32;
+    let t = t.clamp(0.0, 1.0);
     let v = b - a;
 
     let p = v as f32 * t;

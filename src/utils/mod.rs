@@ -166,7 +166,7 @@ pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8>
     encoder.copy_texture_to_buffer(
         wgpu::TexelCopyTextureInfo {
             aspect: wgpu::TextureAspect::All,
-            texture: &texture,
+            texture: texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
         },
@@ -175,7 +175,7 @@ pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8>
             layout: wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(bytes_per_row as u32),
-                rows_per_image: Some(texture.size().height as u32),
+                rows_per_image: Some(texture.size().height),
             },
         },
         texture.size(),

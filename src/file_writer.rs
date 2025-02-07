@@ -31,6 +31,7 @@ impl Default for FileWriterBuilder {
     }
 }
 
+#[allow(unused)]
 impl FileWriterBuilder {
     pub fn with_file_path(mut self, file_path: PathBuf) -> Self {
         self.file_path = file_path;
@@ -123,9 +124,9 @@ impl Drop for FileWriter {
 }
 
 impl FileWriter {
-    pub fn builder() -> FileWriterBuilder {
-        FileWriterBuilder::default()
-    }
+    // pub fn builder() -> FileWriterBuilder {
+    //     FileWriterBuilder::default()
+    // }
 
     pub fn write_frame(&mut self, frame: &[u8]) {
         self.child_in
