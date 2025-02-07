@@ -383,7 +383,7 @@ impl<T: Component> AsMut<ComponentVec<T>> for ComponentVec<T> {
 
 #[cfg(test)]
 mod test {
-    use glam::{ivec3, vec3, Vec3};
+    use glam::{ivec3, vec3, IVec3, Vec3};
 
     use crate::components::Transformable;
 
@@ -407,6 +407,10 @@ mod test {
             ]
         );
         assert_eq!(
+            vec3(0.0, -50.0, 0.0),
+            points.get_bounding_box_point(ivec3(0, 0, 0))
+        );
+        assert_eq!(
             vec3(-100.0, -200.0, 0.0),
             points.get_bounding_box_point(ivec3(-1, -1, 0))
         );
@@ -426,11 +430,28 @@ mod test {
 
     #[test]
     fn test_transform() {
-        let vpoints = vec![vec3(1.0, 1.0, 1.0), vec3(2.0, 2.0, 2.0)];
-        let mut component_data: ComponentVec<VPoint> = vpoints.into();
-        component_data.scale(Vec3::splat(3.0));
+        let square = vec![
+            vec3(-1.0, -1.0, 0.0),
+            vec3(2.0, -2.0, 0.0),
+            vec3(0.5, 1.0, 0.0),
+            vec3(-3.0, 3.0, 0.0),
+            vec3(4.0, 4.0, 0.0),
+        ];
+        let mut scale_origin: ComponentVec<VPoint> = square.clone().into();
+        assert_eq!(
+            scale_origin.get_bounding_box_point(IVec3::ZERO),
+            vec3(0.5, 1.0, 0.0)
+        );
+        scale_origin.scale(Vec3::splat(3.0));
 
-        let ans: ComponentVec<VPoint> = vec![vec3(3.0, 3.0, 3.0), vec3(6.0, 6.0, 6.0)].into();
-        assert_eq!(component_data, ans)
+        let ans: ComponentVec<VPoint> = vec![
+            vec3(-4.0, -5.0, 0.0),
+            vec3(5.0, -8.0, 0.0),
+            vec3(0.5, 1.0, 0.0),
+            vec3(-10.0, 7.0, 0.0),
+            vec3(11.0, 10.0, 0.0),
+        ]
+        .into();
+        assert_eq!(scale_origin, ans);
     }
 }
