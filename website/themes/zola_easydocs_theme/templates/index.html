@@ -1,0 +1,169 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ get_url(path="main.css") | safe }}">
+    {% if config.extra.favicon -%}
+        {% set _favicon = config.extra.favicon -%}
+        {% if (_favicon is starting_with("http")) == false -%}
+            {% set _favicon = get_url(path=config.extra.favicon) -%}
+        {% endif -%}
+        <link rel="icon" href="{{ _favicon | safe }}">
+    {% endif -%}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+    <title>{% block title %}{{ config.title }}{% endblock title %}</title>
+</head>
+<body>
+
+{% if config.extra.release -%}
+    <script>
+        fetch('{{ config.extra.release | safe }}')
+            .then((response) => {
+                return response.json();
+            })
+            .then((data) => {
+                let release_name = data.name;
+                let html_url = data.html_url;
+                release.innerHTML = `<a href='${html_url}'>${release_name}</a>`;
+            });
+    </script>
+{% endif -%}
+<main>
+    {# Create variable to allow appending index.html at end of links if set in config #}
+    {% if not config.extra.easydocs_uglyurls or config.mode == "serve" or config.mode == "Serve" -%}
+        {% set _ugly_url = "" -%}
+    {% else %}
+        {% set _ugly_url = "index.html" -%}
+    {% endif -%}
+
+    {%- block nav -%}
+        <nav>
+            {% if config.extra.logo -%}
+                {% set _logo = config.extra.logo -%}
+                {% if (_logo is starting_with("http")) == false -%}
+                    {% set _logo = get_url(path=config.extra.logo) -%}
+                {% endif -%}
+                {% if current_path == "/" and not config.extra.easydocs_logo_always_clickable -%}
+                    <img src="{{ _logo | safe }}" alt="logo"/>
+                {% else -%}
+                    <a href="{{ config.base_url }}{{ _ugly_url }}">
+                        <img src="{{ _logo | safe }}" alt="logo"/>
+                    </a>
+                {% endif -%}
+
+            {% else -%}
+                <h1><a href="{{ config.base_url }}{{ _ugly_url }}">{{ config.title }}</a></h1>
+            {% endif -%}
+
+            {% if config.extra.release -%}
+                <div id="release"></div>
+            {% endif -%}
+
+            <a href="javascript:void(0);" onclick="burger()" id="mobile" class="ms-Icon--GlobalNavButton"></a>
+            <div id="trees">
+                {% set section_ = get_section(path="_index.md") -%}
+                {% for p in section_.subsections -%}
+                    {% set subsection = get_section(path=p) -%}
+
+
+                    <input class="tree-toggle" type="checkbox" id="{{ subsection.title | slugify }}"
+                           {% if current_path is starting_with(subsection.path) %}checked{% endif %}/>
+                    <label class="tree-toggle-label"
+                           for="{{ subsection.title | slugify }}">{{ subsection.title }}</label>
+
+                    <ul class="subtree">
+                        {% for page in subsection.pages -%}
+                            <li {% if current_path == page.path %}class="active"{% endif %}>
+                                <a href="{{ page.permalink | safe }}{{ _ugly_url }}">{{ page.title }}</a>
+                            </li>
+
+                            {% if page.toc -%}
+
+                                {% if current_path == page.path -%}
+
+                                    {# Count number of headers on page #}
+                                    {% set_global header_count = 0 -%}
+                                    {% for h2 in page.toc -%}
+                                        {% set_global header_count = header_count + 1 -%}
+                                        {% for h3 in h2.children -%}
+                                            {% set_global header_count = header_count + 1 -%}
+                                            {% for h4 in h3.children -%}
+                                                {% set_global header_count = header_count + 1 -%}
+                                            {% endfor -%}
+                                        {% endfor -%}
+                                    {% endfor -%}
+
+                                    {# Output headers if above threshold #}
+                                    {% if not config.extra.easydocs_heading_threshold -%}
+                                        {# Undefined or 0 unable to find a way to differentiate between 0 and undefined.
+                                            1 is already including any headings so 0 is not needed #}
+                                        {% set _threshold = 5 -%}
+                                    {% else %}
+                                        {% set _threshold = config.extra.easydocs_heading_threshold -%}
+                                    {% endif -%}
+
+                                    {% if header_count >= _threshold -%}
+                                        <ul id="toc">
+                                            {% for h2 in page.toc -%}
+                                                <li><a href="
+                                                        {{ h2.permalink | safe }}">{{ h2.title }}</a>
+                                                    {% if h2.children -%}
+                                                        <ul>
+                                                            {% for h3 in h2.children -%}
+                                                                <li>
+                                                                    <a href="{{ h3.permalink | safe }}">{{ h3.title }}</a>
+                                                                </li>
+                                                            {% endfor -%}
+                                                        </ul>
+                                                    {% endif -%}
+                                                </li>
+                                            {% endfor -%}
+                                        </ul>
+                                    {% endif -%}
+
+                                {% endif -%}
+                            {% endif -%}
+                        {% endfor -%}
+                    </ul>
+                {% endfor -%}
+            </div>
+        </nav>
+    {% endblock nav -%}
+
+    <article>
+
+        {% if config.build_search_index -%}
+            <div id="on_right">
+                <span id="search-ico" class="ms-Icon--Search"></span>
+            </div>
+            <div class="search-container">
+                <input id="search" type="search" placeholder="Search as you type...">
+                <div class="search-results">
+                    <div class="search-results__header"></div>
+                    <ul class="search-results__items"></ul>
+                </div>
+            </div>
+        {% endif -%}
+
+        <div id="wrap">
+            {% block content -%}
+                {%- if section.word_count -%}
+                    {{ section.content |safe }}
+                {%- else -%}
+                    {%- include "sec_toc_2_level.html" -%}
+                {% endif -%}
+            {% endblock content %}
+        </div>
+
+    </article>
+</main>
+
+{% if config.build_search_index %}
+    <script type="text/javascript" src="{{ get_url(path="elasticlunr.min.js") | safe }}" defer></script>
+    <script type="text/javascript" src="{{ get_url(path="search_index.en.js") | safe }}" defer></script>
+{% endif -%}
+
+    <script type="text/javascript" src="{{ get_url(path="js.js") | safe }}" defer></script>
+
+</body>
+</html>
