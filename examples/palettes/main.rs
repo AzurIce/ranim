@@ -59,7 +59,8 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info, ranim=info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info, ranim=info"))
+        .init();
 
     Palettes.render_frame_to_image("output.png");
 }
