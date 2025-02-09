@@ -1,0 +1,37 @@
+.outline {
+    padding: 1rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+
+    &__content {
+        overflow: hidden;
+
+        ul {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: .25rem;
+            list-style: none;
+        }
+    }
+
+    a {
+        box-sizing: border-box;
+        display: block;
+        padding: .375rem .5rem;
+        color: rgb(107, 114, 128);
+        text-decoration: none;
+        font-size: .875rem;
+        padding: .375rem .5rem;
+        border-radius: .25rem;
+        width: 100%;
+
+        &:hover {
+            background-color: rgba(157, 134, 148, 0.1);
+        }
+        &.active {
+            background-color: rgba(157, 134, 148, 0.2);
+        }
+    }
+}

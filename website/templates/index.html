@@ -1,11 +1,27 @@
 {% extends "layouts/base.html" %}
 
-{% block section %}
-
-{% endblock section %}
+{% block left_side %}
+	{% set section = get_section(path="_index.md") %}
+	<div class="outline">
+		<div class="outline__content">
+			<ul>
+				<li>
+					<a href="/" class="outline-item">
+						<span>介绍</span>
+					</a>
+				</li>
+				{% for page in section.pages %}
+					<li>
+						<a href="{{ page.permalink }}" class="outline-item">{{ page.title }}</a>
+					</li>
+				{% endfor %}
+			</ul>
+		</div>
+	</div>
+{% endblock left_side %}
 
 {% block content %}
-<article class="markdown-body">
-  {{ section.content | safe }}
-</article>
+	<article class="markdown-body">
+		{{ section.content | safe }}
+	</article>
 {% endblock content %}
