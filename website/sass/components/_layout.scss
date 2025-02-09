@@ -1,11 +1,11 @@
 .layout {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  // display: flex;
+  // flex-direction: column;
 
   &__header {
     position: sticky;
-    top: 0px;
+    top: 0;
     width: 100%;
     // height: 100%;
     // height: var(--header-height);
@@ -68,24 +68,26 @@
   }
 
   &__body {
-    width: 100%;
+    max-width: 90rem;
+    margin-left: auto;
+    margin-right: auto;
     display: flex;
-    justify-content: center;
     padding-bottom: 64px;
-    flex-grow: 1;
-    background-color: #ffffff;
 
     .side {
       position: sticky;
+      top: var(--header-height);
       width: 16rem;
-      flex-shrink: 0; // no shrink
-      display: flex;
-      flex-direction: column;
+      flex-shrink: 0;
       // min-width: 256px;
       // padding: 0 16px;
     }
 
     .content {
+      display: flex;
+      justify-content: center;
+
+      width: 100%;
       padding-top: 1rem;
       padding-left: 1.5rem;
       padding-right: 1.5rem;
@@ -107,6 +109,7 @@
     }
 
     .side.left {
+      align-self: flex-start; // need this for sticky to work
       display: none;
 
       @media (min-width: #{$md}) {
