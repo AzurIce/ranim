@@ -24,9 +24,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   {# TODO: og metas #}
 
-  <link rel="stylesheet" href="/index.css">
-  <link rel="stylesheet" href="/github-markdown.css">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=PT+Sans:400,400italic,700|Abril+Fatface">
+  <link rel="stylesheet" href="{{ get_url(path="index.css") }}">
+  <link rel="stylesheet" href="{{ get_url(path="github-markdown.css") }}">
 
   <!-- TODO: feed -->
   <!-- {% if config.generate_feed %}
@@ -43,7 +42,7 @@
   <header class="layout__header">
     <div class="back"></div>
     <nav class="nav">
-      <a href="/" class="home">
+      <a href="{{ get_url(path="/") }}" class="home">
         <span>Ranim</span>
       </a>
       {% for path in root_section.subsections %}
