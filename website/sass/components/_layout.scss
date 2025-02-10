@@ -1,0 +1,124 @@
+.layout {
+  min-height: 100vh;
+  // display: flex;
+  // flex-direction: column;
+
+  &__header {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    // height: 100%;
+    // height: var(--header-height);
+    background-color: rgba(0, 0, 0, 0);
+    z-index: 800;
+
+    .back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.8);
+      border-bottom: 1px solid rgb(229, 231, 235);
+      backdrop-filter: blur(12px);
+      z-index: -1;
+    }
+
+    .nav {
+      max-width: 90rem;
+      height: var(--header-height);
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0 1.5rem;
+
+      a {
+        text-decoration: none;
+        color: currentColor;
+        border-radius: 0.25rem;
+
+        &.home {
+          display: flex;
+          align-items: center;
+          margin-right: auto;
+
+          img {
+            display: initial !important;
+            max-width: 100%;
+            height: auto;
+            vertical-align: middle;
+          }
+
+          span {
+            width: 120px;
+            font-weight: 800;
+            margin: 0 0.5rem;
+          }
+        }
+
+        &.section-btn {
+          color: rgb(75, 85, 99);
+          font-size: .875rem;
+          padding: 0.5rem;
+        }
+
+        &.icon-btn {
+          padding: .5rem;
+        }
+      }
+    }
+  }
+
+  &__body {
+    max-width: 90rem;
+    margin-left: auto;
+    margin-right: auto;
+    display: flex;
+    padding-bottom: 64px;
+
+    .side {
+      position: sticky;
+      top: var(--header-height);
+      width: 16rem;
+      flex-shrink: 0;
+      // min-width: 256px;
+      // padding: 0 16px;
+    }
+
+    .content {
+      display: flex;
+      justify-content: center;
+
+      width: 100%;
+      padding-top: 1rem;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+
+      article {
+        width: 100%;
+      }
+
+      @media (min-width: #{$md}) {
+        padding-left: 3rem;
+        padding-right: 3rem;
+      }
+
+      padding-top: 1rem;
+    }
+
+    .side.right {
+      display: none;
+
+      @media (min-width: #{$xl}) {
+        display: block;
+      }
+    }
+
+    .side.left {
+      align-self: flex-start; // need this for sticky to work
+      display: none;
+
+      @media (min-width: #{$md}) {
+        display: block;
+      }
+    }
+  }
+}
