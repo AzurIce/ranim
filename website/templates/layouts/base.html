@@ -8,7 +8,13 @@
 {% set page_title = "Ranim" %}
 {% endif %}
 
-{% set root_section = get_section(path="_index.md") %}
+{% set_global root_section = get_section(path="_index.md") %}
+
+{# Shortcut to get the section/page. This variable will have a value except in some special pages like `404.html`. #}
+{% set_global section_or_page = false %}
+{% if section or page %}
+  {% set_global section_or_page = section | default(value=page) %}
+{% endif %}
 
 <!DOCTYPE html>
 <html lang="{{ lang }}">

@@ -1,6 +1,7 @@
-{% extends "layouts/base.html" %}
+{% extends "index.html" %}
 
 {% block left_side %}
+  {% set root_section = get_section(path="doc/_index.md") %}
 	<div class="outline">
 		<div class="outline__content">
 			<ul>
@@ -18,9 +19,3 @@
 		</div>
 	</div>
 {% endblock left_side %}
-
-{% block content %}
-	<article class="markdown-body">
-		{{ section_or_page.content | safe }}
-	</article>
-{% endblock content %}
