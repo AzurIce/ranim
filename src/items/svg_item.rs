@@ -1,10 +1,11 @@
 use std::{cmp::Ordering, f32, path::Path, slice::Iter, vec};
 
-use bevy_color::{Alpha, Srgba};
+use color::{palette::css, AlphaColor, Srgb};
 use glam::{vec2, vec3, Affine2, Vec3};
 use log::warn;
 
 use crate::{
+    color::{rgb8, rgba},
     components::{vpoint::VPoint, TransformAnchor},
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
     render::primitives::{svg_item::SvgItemPrimitive, Extract},
@@ -118,24 +119,14 @@ impl SvgItem {
                 let color = parse_paint(fill.paint()).with_alpha(fill.opacity().get());
                 vitem.set_fill_color(color);
             } else {
-                vitem.set_fill_color(bevy_color::Srgba {
-                    red: 0.0,
-                    green: 0.0,
-                    blue: 0.0,
-                    alpha: 0.0,
-                });
+                vitem.set_fill_color(rgba(0.0, 0.0, 0.0, 0.0));
             }
             if let Some(stroke) = path.stroke() {
                 let color = parse_paint(stroke.paint()).with_alpha(stroke.opacity().get());
                 vitem.set_stroke_color(color);
                 vitem.set_stroke_width(stroke.width().get());
             } else {
-                vitem.set_stroke_color(bevy_color::Srgba {
-                    red: 0.0,
-                    green: 0.0,
-                    blue: 0.0,
-                    alpha: 0.0,
-                });
+                vitem.set_stroke_color(rgba(0.0, 0.0, 0.0, 0.0));
             }
             vitems.push(vitem);
         }
@@ -247,7 +238,7 @@ impl Extract<SvgItem> for SvgItemPrimitive {
 
 // MARK: Animation impl
 impl Stroke for SvgItem {
-    fn set_stroke_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
+    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.vitems.iter_mut().for_each(|vitem| {
             vitem.set_stroke_color(color);
         });
@@ -268,13 +259,13 @@ impl Stroke for SvgItem {
 }
 
 impl Fill for SvgItem {
-    fn fill_color(&self) -> bevy_color::Srgba {
+    fn fill_color(&self) -> AlphaColor<Srgb> {
         self.vitems
             .first()
             .map(|vitem| vitem.fill_color())
-            .unwrap_or(Srgba::WHITE)
+            .unwrap_or(css::WHITE)
     }
-    fn set_fill_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
+    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.vitems.iter_mut().for_each(|vitem| {
             vitem.set_fill_color(color);
         });
@@ -378,17 +369,10 @@ impl Partial for SvgItem {
 }
 
 // MARK: misc
-fn parse_paint(paint: &usvg::Paint) -> bevy_color::Srgba {
+fn parse_paint(paint: &usvg::Paint) -> AlphaColor<Srgb> {
     match paint {
-        usvg::Paint::Color(color) => {
-            bevy_color::Color::srgb_u8(color.red, color.green, color.blue).to_srgba()
-        }
-        _ => bevy_color::Srgba {
-            red: 0.0,
-            green: 1.0,
-            blue: 0.0,
-            alpha: 1.0,
-        },
+        usvg::Paint::Color(color) => rgb8(color.red, color.green, color.blue),
+        _ => css::GREEN,
     }
 }
 

@@ -1,13 +1,13 @@
 use std::time::Instant;
 
-use bevy_color::Srgba;
 use env_logger::Env;
 use glam::{vec2, Mat2};
 use log::info;
-use ranim::animation::entity::creation::Color;
-use ranim::animation::entity::fading::fade_in;
-use ranim::animation::timeline::Timeline;
+use ranim::animation::creation::Color;
+use ranim::animation::fading::FadingAnim;
+use ranim::color::HueDirection;
 use ranim::items::vitem::ArcBetweenPoints;
+use ranim::timeline::Timeline;
 use ranim::{prelude::*, AppOptions, SceneDesc, TimelineConstructor};
 
 pub struct ArcBetweenPointsScene;
@@ -21,8 +21,8 @@ impl TimelineConstructor for ArcBetweenPointsScene {
     fn construct(&mut self, timeline: &mut Timeline) {
         let center = vec2(0.0, 0.0);
 
-        let start_color = Srgba::hex("FF8080FF").unwrap();
-        let end_color = Srgba::hex("58C4DDFF").unwrap();
+        let start_color = color!("#FF8080FF");
+        let end_color = color!("#58C4DDFF");
         let ntan = 16;
         let nrad = 5;
 
@@ -30,6 +30,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
         let width_step = 50.0 / (nrad as f32).powi(2);
         let angle_step = std::f32::consts::PI * 7.0 / 4.0 / nrad as f32;
 
+        let mut arcs = Vec::with_capacity(nrad * ntan);
         for i in 0..nrad {
             let t = Instant::now();
             let rad = rad_step * (i + 1) as f32;
@@ -37,7 +38,11 @@ impl TimelineConstructor for ArcBetweenPointsScene {
             let angle = angle_step * (i + 1) as f32;
 
             for j in 0..ntan {
-                let color = start_color.lerp(&end_color, j as f32 / (ntan - 1) as f32);
+                let color = start_color.lerp(
+                    end_color,
+                    j as f32 / (ntan - 1) as f32,
+                    HueDirection::Increasing,
+                );
                 let vec = Mat2::from_angle(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)
                     * vec2(rad, 0.0);
                 let mut arc = ArcBetweenPoints {
@@ -50,7 +55,9 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                     .set_fill_opacity(0.0)
                     .set_stroke_width(width);
 
-                timeline.play(fade_in(&arc).with_duration(3.0 / (nrad * ntan) as f32));
+                let mut arc = timeline.insert(arc);
+                timeline.play(arc.fade_in().with_duration(3.0 / (nrad * ntan) as f32));
+                arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`
             }
             info!(
                 "rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}",

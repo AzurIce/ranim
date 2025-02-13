@@ -1,0 +1,2 @@
+[alias]
+build-examples = "run --package xtask-build-examples"

@@ -1,21 +1,21 @@
-use crate::items::ConvertIntoRabject;
+use super::{AnimScheduler, EntityAnim, PureEvaluator, Rabject};
 use crate::{interpolate::Interpolatable, items::Entity};
 
-use crate::animation::{
-    entity::{EntityAnim, PureEvaluator, Rabject},
-    AnimWithParams,
-};
+pub trait InterpolateAnim<'r, 't, T: Entity + Alignable + Interpolatable + 'static> {
+    fn interpolate_from(&'r mut self, s: impl Into<T>) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
+}
 
-pub fn interpolate<D: Entity + Alignable + Interpolatable + 'static, S: ConvertIntoRabject<D>>(
-    src: &S,
-    dst: &Rabject<D>,
-) -> AnimWithParams<EntityAnim<D>> {
-    let src: Rabject<D> = src.clone().convert_into();
-    let src_data = src.data.clone();
-    AnimWithParams::new(EntityAnim::new(
-        src.clone(),
-        Interpolate::new(src_data, dst.data.clone()),
-    ))
+impl<'r, 't, T: Entity + Alignable + Interpolatable + 'static> InterpolateAnim<'r, 't, T>
+    for Rabject<'t, T>
+{
+    fn interpolate_from(
+        &'r mut self,
+        src: impl Into<T>,
+    ) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+        let src: T = src.into();
+        let func = Interpolate::new(src, self.data.clone());
+        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+    }
 }
 
 /// A transform animation func

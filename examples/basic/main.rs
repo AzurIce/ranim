@@ -1,17 +1,14 @@
 use std::f32;
 
-use bevy_color::Srgba;
 use env_logger::Env;
 use glam::{vec3, Vec3};
-use ranim::animation::entity::creation::{uncreate, unwrite, write, Color};
-use ranim::animation::entity::fading::{fade_in, fade_out};
-use ranim::animation::entity::interpolate::interpolate;
-use ranim::animation::timeline::Timeline;
-
+use ranim::animation::creation::{Color, CreationAnim, WritingAnim};
+use ranim::animation::fading::FadingAnim;
+use ranim::animation::interpolate::InterpolateAnim;
 use ranim::color::palettes::manim;
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon};
-use ranim::items::Rabject;
+use ranim::timeline::Timeline;
 use ranim::{prelude::*, typst_svg, AppOptions, SceneDesc, TimelineConstructor};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -25,7 +22,14 @@ impl TimelineConstructor for MainScene {
         }
     }
     fn construct(&mut self, timeline: &mut Timeline) {
-        let mut text = Rabject::new(SvgItem::from_svg(&typst_svg!(
+        timeline.forward(0.2);
+
+        let mut svg = SvgItem::from_svg(SVG);
+        svg.scale(Vec3::splat(2.0)).shift(vec3(0.0, 200.0, 0.0));
+        let mut svg = timeline.insert(svg);
+        timeline.play(svg.fade_in());
+
+        let mut text = SvgItem::from_svg(&typst_svg!(
             r#"
         #align(center)[
             #text(60pt)[Ranim]
@@ -33,23 +37,19 @@ impl TimelineConstructor for MainScene {
             #text(20pt)[Hello 你好]
         ]
         "#
-        )));
+        ));
         text.set_fill_opacity(0.8).shift(Vec3::NEG_Y * 200.0);
+        let mut text = timeline.insert(text);
 
-        let mut svg = Rabject::new(SvgItem::from_svg(SVG));
-        svg.scale(Vec3::splat(2.0)).shift(vec3(0.0, 200.0, 0.0));
+        timeline.play(text.write().with_duration(3.0));
 
-        timeline.forward(0.2);
-        timeline.play(fade_in(&svg));
+        let original_text = text.data.clone();
+        text.scale(Vec3::splat(2.0));
+        timeline.play(text.interpolate_from(original_text));
 
-        // [ranim_text] write -> 0.5s wait -> unwrite
-        let mut text_scaled = timeline.play(write(&text).with_duration(3.0));
-        text_scaled.scale(Vec3::splat(2.0));
-        let text = timeline.play(interpolate(&text, &text_scaled));
         timeline.forward(0.5);
-        timeline.play(unwrite(&text).with_duration(3.0));
-
-        timeline.play(fade_out(&svg));
+        timeline.play(text.unwrite().with_duration(3.0));
+        timeline.play(svg.fade_out());
 
         let mut polygon = Polygon(vec![
             vec3(0.0, 0.0, 0.0),
@@ -60,13 +60,14 @@ impl TimelineConstructor for MainScene {
         ])
         .build();
         polygon
-            .set_color(Srgba::hex("FF8080FF").unwrap())
+            .set_color(color!("#FF8080FF"))
             .set_fill_opacity(0.5)
             .rotate(std::f32::consts::FRAC_PI_2, Vec3::Z);
 
         // [polygon] 0.5s wait -> fade in -> 0.5s wait
         timeline.forward(0.5);
-        timeline.play(fade_in(&polygon));
+        let mut polygon = timeline.insert(polygon);
+        timeline.play(polygon.fade_in());
         timeline.forward(0.5);
 
         let mut arc = Arc {
@@ -75,12 +76,16 @@ impl TimelineConstructor for MainScene {
         }
         .build();
         arc.set_stroke_color(manim::BLUE_C);
+        let mut arc = timeline.insert(arc);
         // [polygon] interpolate [svg] -> 0.5s wait
-        let arc = timeline.play(interpolate(&polygon, &arc));
+
+        let polygon_data = polygon.data.clone();
+        drop(polygon);
+        timeline.play(arc.interpolate_from(polygon_data));
         timeline.forward(0.5);
 
         // [svg] fade_out -> 0.5s wait
-        timeline.play(uncreate(&arc));
+        timeline.play(arc.uncreate());
         timeline.forward(0.5);
     }
 }
@@ -89,8 +94,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=trace"))
-        .init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=info")).init();
 
     MainScene.render(&AppOptions::default());
 }

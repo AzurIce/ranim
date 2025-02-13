@@ -1,9 +1,9 @@
 use env_logger::Env;
 use glam::vec3;
-use ranim::animation::entity::creation::Color;
-use ranim::animation::timeline::Timeline;
+use ranim::animation::creation::Color;
 use ranim::color::palettes::manim::*;
 use ranim::items::vitem::Rectangle;
+use ranim::timeline::Timeline;
 use ranim::{prelude::*, TimelineConstructor};
 
 struct Palettes;
@@ -36,6 +36,7 @@ impl TimelineConstructor for Palettes {
         let rows = colors.len();
         let h_step = (height - 2 * padding) / rows;
 
+        let mut squares = Vec::with_capacity(colors.len() * 5);
         for (i, row) in colors.iter().enumerate() {
             let y = padding + i * h_step;
             let cols = row.len();
@@ -49,9 +50,11 @@ impl TimelineConstructor for Palettes {
                     0.0,
                 ));
                 square.set_color(*color).set_stroke_width(0.0);
-                timeline.show(&square);
+
+                squares.push(timeline.insert(square));
             }
         }
+        timeline.forward(0.01);
     }
 }
 
@@ -59,7 +62,7 @@ fn main() {
     #[cfg(debug_assertions)]
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info, ranim=info"))
+    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info, ranim=trace"))
         .init();
 
     Palettes.render_frame_to_image("output.png");
