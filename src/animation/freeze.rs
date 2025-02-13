@@ -1,18 +1,19 @@
+use super::{AnimScheduler, Animator, EntityAnim};
 use crate::{
-    animation::Animator,
     items::{Entity, Rabject},
-    render::RenderTextures,
+    render::{RenderTextures, Renderable},
 };
 
-use super::EntityAnim;
-use crate::animation::AnimWithParams;
-
-pub fn freeze<T: Entity + 'static>(rabject: &Rabject<T>) -> AnimWithParams<EntityAnim<T>> {
-    let data = rabject.data.clone();
-    AnimWithParams::new(EntityAnim::new(rabject.clone(), data))
+pub trait FreezeAnim<'r, 't, T: Entity + 'static> {
+    fn freeze(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
 }
 
-use crate::render::Renderable;
+impl<'r, 't, T: Entity + 'static> FreezeAnim<'r, 't, T> for Rabject<'t, T> {
+    fn freeze(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+        let data = self.data.clone();
+        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), data))
+    }
+}
 
 pub struct Blank;
 

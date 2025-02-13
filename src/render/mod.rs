@@ -1,11 +1,12 @@
 pub mod pipelines;
 pub mod primitives;
 
-use bevy_color::Color;
+use color::LinearSrgb;
 use glam::{vec2, Mat4, Vec2, Vec3};
 use primitives::RenderInstances;
 
 use crate::{
+    color::rgba8,
     context::{RanimContext, WgpuContext},
     utils::{wgpu::WgpuBuffer, PipelinesStorage},
 };
@@ -83,6 +84,7 @@ impl CameraUniformsBindGroup {
     }
 }
 
+/// A renderer for anything implementes [`Renderable`]
 pub struct Renderer {
     size: (usize, usize),
     camera: CameraFrame,
@@ -217,13 +219,9 @@ impl Renderer {
         );
         let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
 
-        let bg = Color::srgba_u8(0x33, 0x33, 0x33, 0xff).to_linear();
-        let clear_color = wgpu::Color {
-            r: bg.red as f64,
-            g: bg.green as f64,
-            b: bg.blue as f64,
-            a: bg.alpha as f64,
-        };
+        let bg = rgba8(0x33, 0x33, 0x33, 0xff).convert::<LinearSrgb>();
+        let [r, g, b, a] = bg.components.map(|x| x as f64);
+        let clear_color = wgpu::Color { r, g, b, a };
 
         Self {
             camera,
@@ -520,11 +518,11 @@ mod test {
 
     use crate::{
         animation::{
-            entity::creation::{create, uncreate},
-            timeline::Timeline,
+            creation::{CreationAnim, WritingAnim},
             AnimWithParams,
         },
         items::{vitem::Polygon, Blueprint},
+        timeline::Timeline,
         utils::rate_functions::linear,
         AppOptions, RanimRenderApp,
     };
@@ -543,14 +541,17 @@ mod test {
         .build();
 
         let mut app = RanimRenderApp::new(&AppOptions::default());
-        let mut timeline = Timeline::new();
+        let timeline = Timeline::new();
 
         timeline.forward(2.0);
-        timeline.play(create(&vitem));
-        timeline.hide(&vitem);
+        let mut vitem = timeline.insert(vitem);
+        // 创建动画并立即播放,确保vitem的生命周期足够长
+        timeline.play(vitem.write());
+        // timeline.hide(&vitem);
         timeline.forward(1.0);
-        timeline.show(&vitem);
-        timeline.play(uncreate(&vitem));
+        // timeline.show(&vitem);
+        timeline.play(vitem.uncreate());
+        drop(vitem);
 
         let duration = timeline.elapsed_secs();
         app.render_anim(

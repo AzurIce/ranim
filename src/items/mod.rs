@@ -9,6 +9,7 @@ use crate::{
         primitives::{Extract, RenderInstance, RenderInstances},
         CameraFrame, RenderTextures, Renderable,
     },
+    timeline::Timeline,
     utils::{Id, PipelinesStorage},
 };
 
@@ -20,25 +21,31 @@ pub mod vitem;
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
 ///
 /// The cloned `Rabject` has the same Id
-pub struct Rabject<T: Entity> {
+pub struct Rabject<'a, T: Entity> {
+    pub timeline: &'a Timeline,
     pub id: Id,
     pub data: T,
 }
 
-impl<T: Entity> Deref for Rabject<T> {
+pub struct FrozenRabject<T: Entity> {
+    pub id: Id,
+    pub data: T,
+}
+
+impl<T: Entity> Deref for Rabject<'_, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.data
     }
 }
 
-impl<T: Entity> DerefMut for Rabject<T> {
+impl<T: Entity> DerefMut for Rabject<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
     }
 }
 
-impl<T: Entity + 'static> Renderable for Rabject<T> {
+impl<T: Entity + 'static> Renderable for Rabject<'_, T> {
     fn render(
         &self,
         ctx: &WgpuContext,
@@ -62,7 +69,31 @@ impl<T: Entity + 'static> Renderable for Rabject<T> {
     }
 }
 
-impl<T: Entity + Clone> Clone for Rabject<T> {
+impl<T: Entity + 'static> Renderable for FrozenRabject<T> {
+    fn render(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
+        pipelines: &mut PipelinesStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        camera: &CameraFrame,
+    ) {
+        let render_instance = render_instances.get_or_init::<T>(self.id);
+        render_instance.update_clip_box(ctx, &self.data.clip_box(camera));
+        render_instance.update(ctx, &self.data);
+        render_instance.encode_render_command(
+            ctx,
+            pipelines,
+            encoder,
+            uniforms_bind_group,
+            render_textures,
+        );
+    }
+}
+
+impl<T: Entity + Clone> Clone for FrozenRabject<T> {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
@@ -71,29 +102,24 @@ impl<T: Entity + Clone> Clone for Rabject<T> {
     }
 }
 
-impl<T: Entity + 'static> Rabject<T> {
-    pub fn new(entity: T) -> Self {
+impl<'a, T: Entity + 'static> Rabject<'a, T> {
+    pub fn new(timeline: &'a Timeline, entity: T) -> Self {
         Self {
+            timeline,
             id: Id::new(),
             data: entity,
         }
     }
 }
 
-pub trait ConvertIntoRabject<D: Entity>: Clone {
-    fn convert_into(self) -> Rabject<D>;
-}
-
-impl<D: Entity, S: Entity + Into<D>> ConvertIntoRabject<D> for Rabject<S> {
-    fn convert_into(self) -> Rabject<D> {
-        Rabject {
-            id: self.id,
-            data: self.data.into(),
-        }
+impl<T: Entity> Drop for Rabject<'_, T> {
+    fn drop(&mut self) {
+        self.timeline.hide(self);
+        // TODO: remove it
     }
 }
 
-pub trait Entity: Clone + Empty {
+pub trait Entity: Clone + Empty + Send + Sync {
     type Primitive: Extract<Self> + Default;
 
     #[allow(unused)]
@@ -109,7 +135,7 @@ pub trait Entity: Clone + Empty {
 
 /// Blueprints are the data structures that are used to create [`Rabject`]s
 pub trait Blueprint<T: Entity> {
-    fn build(self) -> Rabject<T>;
+    fn build(self) -> T;
 }
 
 pub trait Updatable {

@@ -1,54 +1,63 @@
-use std::ops::Range;
-
-use bevy_color::Srgba;
-
-use crate::animation::AnimWithParams;
+use super::{AnimScheduler, EntityAnim, PureEvaluator};
 use crate::items::{Entity, Rabject};
 use crate::prelude::Interpolatable;
+use color::{AlphaColor, Srgb};
+use std::ops::Range;
 
-use crate::animation::entity::{EntityAnim, PureEvaluator};
+// MARK: Creation
 
-pub fn create<T: Entity + Partial + Empty + Interpolatable + 'static>(
-    rabject: &Rabject<T>,
-) -> AnimWithParams<EntityAnim<T>> {
-    let func = Create::new(rabject.data.clone());
-    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
+pub trait Creation: Entity + Partial + Empty + Interpolatable {}
+impl<T: Entity + Partial + Empty + Interpolatable> Creation for T {}
+
+pub trait CreationAnim<'r, 't, T: Creation + 'static> {
+    fn create(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
+    fn uncreate(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
 }
 
-pub fn uncreate<T: Entity + Partial + Empty + Interpolatable + 'static>(
-    rabject: &Rabject<T>,
-) -> AnimWithParams<EntityAnim<T>> {
-    let func = UnCreate::new(rabject.data.clone());
-    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
+impl<'r, 't, T: Creation + 'static> CreationAnim<'r, 't, T> for Rabject<'t, T> {
+    fn create(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+        let func = Create::new(self.data.clone());
+        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+    }
+    fn uncreate(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+        let func = UnCreate::new(self.data.clone());
+        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+    }
 }
 
-pub fn write<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>(
-    rabject: &Rabject<T>,
-) -> AnimWithParams<EntityAnim<T>> {
-    let func = Write::new(rabject.data.clone());
-    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
+// MARK: Writing
+pub trait Writing: Creation + Stroke + Fill {}
+impl<T: Creation + Stroke + Fill> Writing for T {}
+
+pub trait WritingAnim<'r, 't, T: Writing + 'static> {
+    fn write(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
+    fn unwrite(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
 }
 
-pub fn unwrite<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>(
-    rabject: &Rabject<T>,
-) -> AnimWithParams<EntityAnim<T>> {
-    let func = Unwrite::new(rabject.data.clone());
-    AnimWithParams::new(EntityAnim::new(rabject.clone(), func))
+impl<'r, 't, T: Writing + 'static> WritingAnim<'r, 't, T> for Rabject<'t, T> {
+    fn write(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+        let func = Write::new(self.data.clone());
+        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+    }
+    fn unwrite(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+        let func = Unwrite::new(self.data.clone());
+        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+    }
 }
 
 // ---------------------------------------------------- //
 
-pub struct Create<T: Entity + Partial + Empty + Interpolatable> {
+pub struct Create<T: Creation> {
     pub original: T,
 }
 
-impl<T: Entity + Partial + Empty + Interpolatable> Create<T> {
+impl<T: Creation> Create<T> {
     fn new(target: T) -> Self {
         Self { original: target }
     }
 }
 
-impl<T: Entity + Partial + Empty + Interpolatable> PureEvaluator<T> for Create<T> {
+impl<T: Creation> PureEvaluator<T> for Create<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         if alpha == 0.0 {
             T::empty()
@@ -62,17 +71,17 @@ impl<T: Entity + Partial + Empty + Interpolatable> PureEvaluator<T> for Create<T
     }
 }
 
-pub struct UnCreate<T: Entity + Partial + Empty + Interpolatable> {
+pub struct UnCreate<T: Creation> {
     pub original: T,
 }
 
-impl<T: Entity + Partial + Empty + Interpolatable> UnCreate<T> {
+impl<T: Creation> UnCreate<T> {
     fn new(target: T) -> Self {
         Self { original: target }
     }
 }
 
-impl<T: Entity + Partial + Empty + Interpolatable> PureEvaluator<T> for UnCreate<T> {
+impl<T: Creation> PureEvaluator<T> for UnCreate<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         // trace!("{alpha}");
         if alpha == 0.0 {
@@ -90,13 +99,13 @@ impl<T: Entity + Partial + Empty + Interpolatable> PureEvaluator<T> for UnCreate
 /// Write
 ///
 /// First update with partial from 0.0..0.0 to 0.0..1.0, then lerp fill_opacity to 1.0
-pub struct Write<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> {
+pub struct Write<T: Writing> {
     pub(crate) original: T,
     pub(crate) outline: T,
     create_anim: Create<T>,
 }
 
-impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Write<T> {
+impl<T: Writing> Write<T> {
     fn new(target: T) -> Self {
         let mut outline = target.clone();
         outline
@@ -112,9 +121,7 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Write<T> {
     }
 }
 
-impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'static>
-    PureEvaluator<T> for Write<T>
-{
+impl<T: Writing> PureEvaluator<T> for Write<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
         if (0.0..=1.0).contains(&alpha) {
@@ -132,13 +139,13 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + Clone + 'sta
 /// Unwrite
 ///
 /// First lerp fill_opacity to 0.0, then update with partial from 0.0..1.0 to 0.0..0.0
-pub struct Unwrite<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> {
+pub struct Unwrite<T: Writing> {
     pub(crate) original: T,
     pub(crate) outline: T,
     uncreate_anim: UnCreate<T>,
 }
 
-impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Unwrite<T> {
+impl<T: Writing> Unwrite<T> {
     fn new(target: T) -> Self {
         let mut outline = target.clone();
         outline
@@ -154,9 +161,7 @@ impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable> Unwrite<T> {
     }
 }
 
-impl<T: Entity + Partial + Empty + Stroke + Fill + Interpolatable + 'static> PureEvaluator<T>
-    for Unwrite<T>
-{
+impl<T: Writing> PureEvaluator<T> for Unwrite<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
         if 0.0 < alpha && alpha < 1.0 {
@@ -183,18 +188,18 @@ pub trait Empty {
 
 pub trait Fill {
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self;
-    fn fill_color(&self) -> Srgba;
-    fn set_fill_color(&mut self, color: Srgba) -> &mut Self;
+    fn fill_color(&self) -> AlphaColor<Srgb>;
+    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
 }
 
 pub trait Stroke {
     fn set_stroke_width(&mut self, width: f32) -> &mut Self;
-    fn set_stroke_color(&mut self, color: Srgba) -> &mut Self;
+    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self;
 }
 
 pub trait Color: Fill + Stroke {
-    fn set_color(&mut self, color: Srgba) -> &mut Self {
+    fn set_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.set_fill_color(color);
         self.set_stroke_color(color);
         self

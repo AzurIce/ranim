@@ -1,12 +1,19 @@
-pub mod entity;
-pub mod timeline;
+pub mod composition;
+pub mod creation;
+pub mod fading;
+pub mod freeze;
+pub mod interpolate;
 
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use crate::{
     context::WgpuContext,
-    render::{primitives::RenderInstances, CameraFrame, RenderTextures, Renderable},
-    utils::{rate_functions::smooth, PipelinesStorage},
+    items::{Entity, FrozenRabject, Rabject},
+    render::{
+        primitives::{Extract, RenderInstance, RenderInstances},
+        CameraFrame, RenderTextures, Renderable,
+    },
+    utils::{rate_functions::smooth, Id, PipelinesStorage},
 };
 
 #[allow(unused)]
@@ -18,7 +25,7 @@ pub trait Animator: Renderable {
 }
 
 /// An `Anim` is a box of [`Animator`]
-pub type Anim = Box<dyn Animator>;
+pub type Anim = Rc<RefCell<Box<dyn Animator>>>;
 /// An `StaticAnim` is a box of [`Renderable`] inside a `Rc`
 ///
 /// This implements [`Animator`] but does nothing on `update_alpha`
@@ -51,6 +58,143 @@ impl Animator for StaticAnim {
         // DO NOTHING
     }
 }
+
+/// An animator that animates an entity
+pub trait PureEvaluator<T: Entity>: Send + Sync {
+    fn eval_alpha(&self, alpha: f32) -> T;
+}
+
+impl<T: Entity> PureEvaluator<T> for T {
+    fn eval_alpha(&self, _alpha: f32) -> T {
+        self.clone()
+    }
+}
+impl<T: Entity> PureEvaluator<T> for FrozenRabject<T> {
+    fn eval_alpha(&self, _alpha: f32) -> T {
+        self.data.clone()
+    }
+}
+
+// MARK: AnimScheduler
+
+pub struct AnimScheduler<'r, 't, T: Entity, A: Animator> {
+    pub(crate) rabject: &'r mut Rabject<'t, T>,
+    pub(crate) anim: A,
+    pub(crate) params: AnimParams,
+}
+
+impl<T: Entity, A: Animator + 'static> From<AnimScheduler<'_, '_, T, A>> for Box<dyn Animator> {
+    fn from(value: AnimScheduler<'_, '_, T, A>) -> Self {
+        Box::new(AnimWithParams {
+            anim: value.anim,
+            params: value.params,
+        })
+    }
+}
+
+impl<T: Entity, A: Animator + 'static> From<AnimScheduler<'_, '_, T, A>> for Box<dyn Renderable> {
+    fn from(value: AnimScheduler<'_, '_, T, A>) -> Self {
+        Box::new(AnimWithParams {
+            anim: value.anim,
+            params: value.params,
+        })
+    }
+}
+
+impl<'r, 't, T: Entity + 'static, A: Animator> AnimScheduler<'r, 't, T, A> {
+    pub fn new(rabject: &'r mut Rabject<'t, T>, anim: A) -> Self {
+        Self {
+            rabject,
+            anim,
+            params: AnimParams::default(),
+        }
+    }
+    pub fn with_duration(mut self, duration_secs: f32) -> Self {
+        self.params.duration_secs = duration_secs;
+        self
+    }
+    pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
+        self.params.rate_func = rate_func;
+        self
+    }
+}
+
+impl<T: Entity + 'static> AnimScheduler<'_, '_, T, EntityAnim<T>> {
+    pub fn apply(&mut self) {
+        self.rabject.data = self.anim.evaluator.eval_alpha(1.0);
+    }
+    // pub fn play(self) {
+    //     self.rabject.timeline.play(self);
+    // }
+    // pub fn apply_and_play(mut self) {
+    //     self.apply();
+    //     self.rabject.timeline.play(self);
+    // }
+}
+
+// MARK: EntityAnim
+
+/// An animation that is applied to an entity
+///
+/// This type implements [`Animator`] and [`Renderable`]
+#[derive(Clone)]
+pub struct EntityAnim<T: Entity> {
+    id: Id,
+    data: T,
+    evaluator: Arc<Box<dyn PureEvaluator<T>>>,
+}
+
+impl<T: Entity + 'static> EntityAnim<T> {
+    pub fn get_end_freeze_anim(&self) -> EntityAnim<T> {
+        EntityAnim {
+            id: self.id,
+            data: self.data.clone(),
+            evaluator: Arc::new(Box::new(self.data.clone())),
+        }
+    }
+}
+
+impl<T: Entity + 'static> Animator for EntityAnim<T> {
+    fn update_alpha(&mut self, alpha: f32) {
+        self.data = self.evaluator.eval_alpha(alpha);
+    }
+}
+
+impl<T: Entity + 'static> Renderable for EntityAnim<T> {
+    fn render(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
+        pipelines: &mut PipelinesStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        camera: &CameraFrame,
+    ) {
+        let render_instance = render_instances.get_or_init::<T>(self.id);
+        render_instance.update_clip_box(ctx, &self.data.clip_box(camera));
+        render_instance.update(ctx, &self.data);
+        render_instance.encode_render_command(
+            ctx,
+            pipelines,
+            encoder,
+            uniforms_bind_group,
+            render_textures,
+        );
+    }
+}
+
+impl<T: Entity> EntityAnim<T> {
+    pub fn new(id: Id, data: T, func: impl PureEvaluator<T> + 'static) -> Self {
+        Self {
+            id,
+            data,
+            evaluator: Arc::new(Box::new(func)),
+        }
+    }
+}
+
+// MARK: AnimParams
 
 /// The param of an animation
 #[derive(Debug, Clone)]

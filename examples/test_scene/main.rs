@@ -5,13 +5,7 @@ use std::time::Duration;
 use env_logger::Env;
 use glam::Vec3;
 use ranim::{
-    animation::{
-        entity::{
-            creation::{create, unwrite, write},
-            freeze::freeze,
-        },
-        timeline::Timeline,
-    },
+    animation::{creation::CreationAnim, freeze::FreezeAnim},
     components::TransformAnchor,
     items::{
         svg_item::SvgItem,
@@ -19,6 +13,7 @@ use ranim::{
         Rabject,
     },
     prelude::*,
+    timeline::Timeline,
     AppOptions, TimelineConstructor,
 };
 
@@ -104,7 +99,7 @@ impl TimelineConstructor for TestScene {
         // timeline.forward(1.0);
         // timeline.play(unwrite(square.clone()));
 
-        let mut svg = Rabject::new(SvgItem::from_svg(SVG));
+        let mut svg = SvgItem::from_svg(SVG);
         svg.scale(Vec3::splat(2.0));
 
         // println!("{:?}", svg.vitems[79].vpoints);
@@ -113,8 +108,9 @@ impl TimelineConstructor for TestScene {
         // println!("{:?}", svg.vpoints.len());
         // let svg = svg.get_partial(0.55..0.6);
 
-        timeline.play(freeze(&svg).with_duration(0.1));
-        timeline.play(create(&svg).with_duration(1.0));
+        let mut svg = timeline.insert(svg);
+        timeline.play(svg.freeze().with_duration(0.1));
+        timeline.play(svg.create());
         // timeline.forward(1.0);
 
         // app.render_to_image("test.png");
