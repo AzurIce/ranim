@@ -6,7 +6,7 @@ pub mod fading;
 pub mod freeze;
 pub mod interpolate;
 
-use std::rc::Rc;
+use std::{rc::Rc, sync::{Arc, Mutex}};
 
 use freeze::{freeze, Blank};
 use itertools::Itertools;
@@ -20,6 +20,7 @@ use crate::{
 
 use super::{Anim, AnimWithParams, Animator, StaticAnim};
 
+#[derive(Clone)]
 pub struct EntityTimeline {
     // pub(super) rabject_id: Id,
     pub(super) cur_freeze_anim: StaticAnim,
@@ -34,7 +35,7 @@ impl EntityTimeline {
     pub fn new<T: Entity + 'static>(rabject: &Rabject<T>) -> Self {
         Self {
             // rabject_id: rabject.id,
-            cur_freeze_anim: Rc::new(Box::new(freeze(rabject))),
+            cur_freeze_anim: Arc::new(Box::new(freeze(rabject))),
             cur_anim_idx: None,
             is_showing: true,
             anims: Vec::new(),
@@ -44,7 +45,7 @@ impl EntityTimeline {
     }
     fn push<T: Animator + 'static>(&mut self, anim: AnimWithParams<T>) {
         let duration = anim.params.duration_secs;
-        self.anims.push(Box::new(anim));
+        self.anims.push(Arc::new(Mutex::new(Box::new(anim))));
 
         let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + duration;
         self.end_secs.push(end_sec);
@@ -80,7 +81,7 @@ impl EntityTimeline {
         anim.update_alpha(1.0);
         let end_rabject = anim.anim.rabject.clone();
 
-        self.cur_freeze_anim = Rc::new(Box::new(freeze(&end_rabject)));
+        self.cur_freeze_anim = Arc::new(Box::new(freeze(&end_rabject)));
         self.push(anim);
         end_rabject
     }
@@ -110,7 +111,7 @@ impl Animator for EntityTimeline {
         }
         .unwrap_or(0.0);
         let alpha = (cur_sec - start_sec) / (end_sec - start_sec);
-        anim.update_alpha(alpha);
+        anim.lock().unwrap().update_alpha(alpha);
     }
 }
 
@@ -126,7 +127,7 @@ impl Renderable for EntityTimeline {
         camera: &CameraFrame,
     ) {
         if let Some(idx) = self.cur_anim_idx {
-            self.anims[idx].render(
+            self.anims[idx].lock().unwrap().render(
                 ctx,
                 render_instances,
                 pipelines,
@@ -140,7 +141,7 @@ impl Renderable for EntityTimeline {
 }
 
 /// An animator that animates an entity
-pub trait PureEvaluator<T: Entity> {
+pub trait PureEvaluator<T: Entity>: Send + Sync {
     fn eval_alpha(&self, alpha: f32) -> T;
 }
 
@@ -161,7 +162,7 @@ impl<T: Entity> PureEvaluator<T> for Rabject<T> {
 #[derive(Clone)]
 pub struct EntityAnim<T: Entity> {
     rabject: Rabject<T>,
-    evaluator: Rc<Box<dyn PureEvaluator<T>>>,
+    evaluator: Arc<Box<dyn PureEvaluator<T>>>,
 }
 
 impl<T: Entity + 'static> Animator for EntityAnim<T> {
@@ -197,7 +198,7 @@ impl<T: Entity> EntityAnim<T> {
     pub fn new(rabject: Rabject<T>, func: impl PureEvaluator<T> + 'static) -> Self {
         Self {
             rabject,
-            evaluator: Rc::new(Box::new(func)),
+            evaluator: Arc::new(Box::new(func)),
         }
     }
     pub fn rabject(&self) -> &Rabject<T> {

@@ -1,8 +1,10 @@
 use std::ops::{Deref, DerefMut};
 
-use glam::Vec2;
+use glam::{vec3, Vec2, Vec3};
+use pyo3::{pyclass, pymethods};
 
 use crate::{
+    components::vpoint::VPoint,
     context::WgpuContext,
     prelude::Empty,
     render::{
@@ -14,6 +16,44 @@ use crate::{
 
 pub mod svg_item;
 pub mod vitem;
+
+// #[pyclass]
+// pub enum PyEntity {
+//     VItem(PyVItem),
+// }
+
+#[pyclass]
+#[pyo3(name="SvgItem")]
+pub struct PySvgItem {
+    pub(crate) inner: Rabject<svg_item::SvgItem>,
+}
+
+#[pymethods]
+impl PySvgItem {
+    #[new]
+    pub fn new(svg_str: &str) -> Self {
+        Self {
+            inner: Rabject::new(svg_item::SvgItem::from_svg(svg_str)),
+        }
+    }
+}
+
+#[pyclass]
+#[pyo3(name="VItem")]
+pub struct PyVItem {
+    pub(crate) inner: Rabject<vitem::VItem>,
+}
+
+#[pymethods]
+impl PyVItem {
+    #[new]
+    pub fn new(vpoints: Vec<[f32; 3]>) -> Self {
+        let vpoints = vpoints.iter().map(|v| vec3(v[0], v[1], v[2])).collect();
+        Self {
+            inner: Rabject::new(vitem::VItem::from_vpoints(vpoints)),
+        }
+    }
+}
 
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///
@@ -93,7 +133,7 @@ impl<D: Entity, S: Entity + Into<D>> ConvertIntoRabject<D> for Rabject<S> {
     }
 }
 
-pub trait Entity: Clone + Empty {
+pub trait Entity: Clone + Empty + Send + Sync {
     type Primitive: Extract<Self> + Default;
 
     #[allow(unused)]
@@ -120,4 +160,16 @@ impl<T: Clone> Updatable for T {
     fn update_from(&mut self, other: &Self) {
         *self = other.clone();
     }
+}
+
+// MARK: Py
+
+pub enum RabjectEnum {
+    VItem(Rabject<vitem::VItem>),
+    SvgItem(Rabject<svg_item::SvgItem>),
+}
+
+#[pyclass]
+pub struct PyRabject {
+    inner: RabjectEnum,
 }

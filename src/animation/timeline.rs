@@ -1,8 +1,10 @@
-use std::{collections::HashMap, fmt::Debug, time::Duration};
+use std::{collections::HashMap, fmt::Debug, sync::{Arc, Mutex}, time::Duration};
+
+use pyo3::{ffi::PyObject, pyclass, pymethods, types::PyAnyMethods, Bound, Py, PyAny};
 
 use crate::{
     context::WgpuContext,
-    items::{Entity, Rabject},
+    items::{vitem::VItem, Entity, PySvgItem, PyVItem, Rabject},
     render::{primitives::RenderInstances, CameraFrame, RenderTextures, Renderable},
     utils::{Id, PipelinesStorage},
 };
@@ -12,12 +14,44 @@ use super::{
     AnimWithParams, Animator,
 };
 
+#[pyclass]
+#[pyo3(name = "Timeline")]
+#[derive(Debug)]
+pub struct PyTimeline {
+    pub(crate) inner: Timeline,
+}
+
+#[pymethods]
+impl PyTimeline {
+    #[new]
+    pub fn new() -> Self {
+        Self {
+            inner: Timeline::new(),
+        }
+    }
+    pub fn show(&mut self, rabject: &Bound<'_, PyAny>) {
+        if let Ok(vitem) = rabject.downcast::<PyVItem>() {
+            self.inner.show(&vitem.borrow().inner);
+        } else if let Ok(svg_item) = rabject.downcast::<PySvgItem>() {
+            self.inner.show(&svg_item.borrow().inner);
+        }
+    }
+    pub fn forward(&mut self, secs: f32) {
+        self.inner.forward(secs);
+    }
+    pub fn elapsed_secs(&self) -> f32 {
+        self.inner.elapsed_secs()
+    }
+}
+
+// MARK: Timeline
+
 /// Timeline of all rabjects
 ///
 /// The Timeline itself is also an [`Animator`] which:
 /// - update all RabjectTimeline's alpha
 /// - render all RabjectTimeline
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Timeline {
     /// Rabject's Id -> EntityTimeline
     rabject_timelines: HashMap<Id, EntityTimeline>,
