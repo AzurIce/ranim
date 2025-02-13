@@ -6,13 +6,22 @@ use std::{
     time::Duration,
 };
 
-use animation::{timeline::Timeline, AnimWithParams, Animator};
+use animation::{
+    timeline::{PyTimeline, Timeline},
+    AnimWithParams, Animator,
+};
 use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use items::{PySvgItem, PyVItem};
 use log::info;
+use pyo3::{
+    pyfunction, pymodule,
+    types::{PyModule, PyModuleMethods},
+    wrap_pyfunction, Bound, PyResult,
+};
 use render::{CameraFrame, Renderable, Renderer};
 use utils::rate_functions::linear;
 
@@ -263,4 +272,34 @@ impl RanimRenderApp {
         buffer.save(path).unwrap();
         // info!("[Scene]: SAVE FRAME TO IMAGE END, took {:?}", t.elapsed());
     }
+}
+
+#[pyfunction]
+fn render_timeline(timeline: Bound<'_, PyTimeline>, output_dir: PathBuf) {
+    let options = AppOptions {
+        output_dir,
+        ..Default::default()
+    };
+
+    let mut app = RanimRenderApp::new(&options);
+    let mut timeline = timeline.borrow_mut();
+    if timeline.elapsed_secs() == 0.0 {
+        timeline.forward(0.1);
+    }
+    info!("Rendering {:?}", timeline);
+    let duration_secs = timeline.elapsed_secs();
+    app.render_anim(
+        AnimWithParams::new(timeline.inner.clone())
+            .with_duration(duration_secs)
+            .with_rate_func(linear),
+    );
+}
+
+#[pymodule]
+fn ranim(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyTimeline>()?;
+    m.add_class::<PyVItem>()?;
+    m.add_class::<PySvgItem>()?;
+    m.add_function(wrap_pyfunction!(render_timeline, m)?)?;
+    Ok(())
 }

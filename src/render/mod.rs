@@ -10,7 +10,7 @@ use crate::{
     utils::{wgpu::WgpuBuffer, PipelinesStorage},
 };
 
-pub trait Renderable {
+pub trait Renderable: Send + Sync {
     #[allow(clippy::too_many_arguments)]
     fn render(
         &self,

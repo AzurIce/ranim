@@ -1,7 +1,7 @@
 pub mod entity;
 pub mod timeline;
 
-use std::rc::Rc;
+use std::{rc::Rc, sync::{Arc, Mutex}};
 
 use crate::{
     context::WgpuContext,
@@ -18,11 +18,11 @@ pub trait Animator: Renderable {
 }
 
 /// An `Anim` is a box of [`Animator`]
-pub type Anim = Box<dyn Animator>;
+pub type Anim = Arc<Mutex<Box<dyn Animator>>>;
 /// An `StaticAnim` is a box of [`Renderable`] inside a `Rc`
 ///
 /// This implements [`Animator`] but does nothing on `update_alpha`
-pub type StaticAnim = Rc<Box<dyn Renderable>>;
+pub type StaticAnim = Arc<Box<dyn Renderable>>;
 
 impl Renderable for StaticAnim {
     fn render(
