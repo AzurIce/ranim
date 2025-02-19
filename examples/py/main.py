@@ -1,4 +1,4 @@
-import ranim
+import ranimpy
 
 """
 <module 'ranim' from 'H:\\_ranim\\ranim\\.venv\\Lib\\site-packages\\ranim\\__init__.py'>
@@ -9,14 +9,14 @@ import ranim
 # print(ranim.Timeline)
 # print(ranim.Timeline())
 
-timeline = ranim.Timeline()
+timeline = ranimpy.Timeline()
 
 with open("assets/Ghostscript_Tiger.svg") as f:
     svg = f.read()
 
-svg = ranim.SvgItem(svg)
+svg = ranimpy.SvgItem(svg)
 
 timeline.show(svg)
 timeline.forward(1.0)
 
-ranim.render_timeline(timeline, "./")
+ranimpy.render_timeline(timeline, "./")
