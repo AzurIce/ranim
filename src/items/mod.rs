@@ -1,7 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use glam::{vec3, Vec2};
-use pyo3::{pyclass, pymethods};
+use glam::Vec2;
 
 use crate::{
     context::WgpuContext,
@@ -15,44 +14,6 @@ use crate::{
 
 pub mod svg_item;
 pub mod vitem;
-
-// #[pyclass]
-// pub enum PyEntity {
-//     VItem(PyVItem),
-// }
-
-#[pyclass]
-#[pyo3(name = "SvgItem")]
-pub struct PySvgItem {
-    pub(crate) inner: Rabject<svg_item::SvgItem>,
-}
-
-#[pymethods]
-impl PySvgItem {
-    #[new]
-    pub fn new(svg_str: &str) -> Self {
-        Self {
-            inner: Rabject::new(svg_item::SvgItem::from_svg(svg_str)),
-        }
-    }
-}
-
-#[pyclass]
-#[pyo3(name = "VItem")]
-pub struct PyVItem {
-    pub(crate) inner: Rabject<vitem::VItem>,
-}
-
-#[pymethods]
-impl PyVItem {
-    #[new]
-    pub fn new(vpoints: Vec<[f32; 3]>) -> Self {
-        let vpoints = vpoints.iter().map(|v| vec3(v[0], v[1], v[2])).collect();
-        Self {
-            inner: Rabject::new(vitem::VItem::from_vpoints(vpoints)),
-        }
-    }
-}
 
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///

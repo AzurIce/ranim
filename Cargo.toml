@@ -9,10 +9,10 @@ license = "MIT"
 keywords = ["animation", "manim"]
 
 [workspace]
-members = ["xtasks/*"]
-[lib]
-name = "ranim"
-crate-type = ["cdylib", "rlib"]
+members = ["packages/*", "xtasks/*"]
+
+[workspace.dependencies]
+ranim = { path = "." }
 
 [dependencies]
 # ranim_derive.workspace = true
@@ -31,7 +31,6 @@ usvg = "0.44.0"
 regex = "1.11.1"
 wgpu-profiler = "0.21.0"
 indicatif = "0.17.11"
-pyo3 = { version = "0.23.4", features = ["extension-module"] }
 color = "0.2.3"
 
 # Enable a small amount of optimization in the dev profile.

@@ -1485,12 +1485,19 @@ dependencies = [
  "itertools 0.14.0",
  "log",
  "pollster",
- "pyo3",
  "regex",
  "usvg",
  "uuid",
  "wgpu",
  "wgpu-profiler",
+]
+
+[[package]]
+name = "ranimpy"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
+ "ranim",
 ]
 
 [[package]]
