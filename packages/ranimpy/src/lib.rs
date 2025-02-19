@@ -1,15 +1,17 @@
-pub mod timeline;
 pub mod items;
+pub mod timeline;
 
 use std::path::PathBuf;
 
+use ::ranim::{
+    animation::AnimWithParams, utils::rate_functions::linear, AppOptions, RanimRenderApp,
+};
 use items::{PySvgItem, PyVItem};
 use pyo3::{
     pyfunction, pymodule,
     types::{PyModule, PyModuleMethods},
     wrap_pyfunction, Bound, PyResult,
 };
-use ::ranim::{animation::AnimWithParams, utils::rate_functions::linear, AppOptions, RanimRenderApp};
 use timeline::PyTimeline;
 
 #[pyfunction]

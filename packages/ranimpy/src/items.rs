@@ -1,5 +1,8 @@
 use pyo3::{pyclass, pymethods};
-use ranim::{glam::vec3, items::{svg_item::SvgItem, vitem::VItem, Rabject}};
+use ranim::{
+    glam::vec3,
+    items::{svg_item::SvgItem, vitem::VItem, Rabject},
+};
 
 // MARK: SvgItem
 
@@ -37,4 +40,3 @@ impl PyVItem {
         }
     }
 }
-
