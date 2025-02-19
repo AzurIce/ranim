@@ -1,4 +1,4 @@
-use bevy_color::{ColorToComponents, Srgba};
+use color::{palette::css, AlphaColor, Srgb};
 use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use itertools::Itertools;
 
@@ -185,13 +185,13 @@ impl Empty for VItem {
 }
 
 impl Fill for VItem {
-    fn fill_color(&self) -> bevy_color::Srgba {
+    fn fill_color(&self) -> AlphaColor<Srgb> {
         self.fill_rgbas
             .first()
-            .map(|&rgba| Srgba::from_vec4(*rgba))
-            .unwrap_or(Srgba::WHITE)
+            .map(|&rgba| rgba.into())
+            .unwrap_or(css::WHITE)
     }
-    fn set_fill_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
+    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.fill_rgbas.set_all(color);
         self
     }
@@ -202,7 +202,7 @@ impl Fill for VItem {
 }
 
 impl Stroke for VItem {
-    fn set_stroke_color(&mut self, color: bevy_color::Srgba) -> &mut Self {
+    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.stroke_rgbas.set_all(color);
         self
     }

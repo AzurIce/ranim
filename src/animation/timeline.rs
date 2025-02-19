@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use pyo3::{pyclass, pymethods, types::PyAnyMethods, Bound, Py, PyAny};
+use pyo3::{pyclass, pymethods, types::PyAnyMethods, Bound, PyAny};
 
 use crate::{
     context::WgpuContext,

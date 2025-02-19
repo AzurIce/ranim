@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use bevy_color::Srgba;
+use color::{AlphaColor, Srgb};
 
 use crate::animation::AnimWithParams;
 use crate::items::{Entity, Rabject};
@@ -183,18 +183,18 @@ pub trait Empty {
 
 pub trait Fill {
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self;
-    fn fill_color(&self) -> Srgba;
-    fn set_fill_color(&mut self, color: Srgba) -> &mut Self;
+    fn fill_color(&self) -> AlphaColor<Srgb>;
+    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
 }
 
 pub trait Stroke {
     fn set_stroke_width(&mut self, width: f32) -> &mut Self;
-    fn set_stroke_color(&mut self, color: Srgba) -> &mut Self;
+    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self;
 }
 
 pub trait Color: Fill + Stroke {
-    fn set_color(&mut self, color: Srgba) -> &mut Self {
+    fn set_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.set_fill_color(color);
         self.set_stroke_color(color);
         self

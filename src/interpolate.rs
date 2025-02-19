@@ -1,4 +1,4 @@
-use bevy_color::{LinearRgba, Srgba};
+use color::{AlphaColor, ColorSpace};
 
 pub trait Interpolatable {
     fn lerp(&self, target: &Self, t: f32) -> Self;
@@ -10,24 +10,9 @@ impl Interpolatable for f32 {
     }
 }
 
-impl Interpolatable for LinearRgba {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
-        Self {
-            red: self.red.lerp(&target.red, t),
-            green: self.green.lerp(&target.green, t),
-            blue: self.blue.lerp(&target.blue, t),
-            alpha: self.alpha.lerp(&target.alpha, t),
-        }
-    }
-}
-
-impl Interpolatable for Srgba {
+impl<CS: ColorSpace> Interpolatable for AlphaColor<CS> {
     fn lerp(&self, other: &Self, t: f32) -> Self {
-        Self {
-            red: self.red.lerp(&other.red, t),
-            green: self.green.lerp(&other.green, t),
-            blue: self.blue.lerp(&other.blue, t),
-            alpha: self.alpha.lerp(&other.alpha, t),
-        }
+        // TODO: figure out to use `lerp_rect` or `lerp`
+        AlphaColor::lerp_rect(*self, *other, t)
     }
 }

@@ -26,6 +26,7 @@ use render::{CameraFrame, Renderable, Renderer};
 use utils::rate_functions::linear;
 
 pub mod prelude {
+    pub use crate::color::prelude::*;
     pub use crate::interpolate::Interpolatable;
 
     pub use crate::animation::entity::creation::{Empty, Fill, Partial, Stroke};

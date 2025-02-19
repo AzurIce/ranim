@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
-use bevy_color::{ColorToComponents, LinearRgba};
+// use bevy_color::{ColorToComponents, LinearRgba};
+use color::{AlphaColor, ColorSpace, LinearSrgb, Srgb};
 use glam::{vec4, Vec4};
 
 use crate::prelude::{Interpolatable, Opacity};
@@ -29,12 +30,26 @@ impl Opacity for ComponentVec<Rgba> {
     }
 }
 
-impl From<bevy_color::Srgba> for Rgba {
-    fn from(value: bevy_color::Srgba) -> Self {
-        let rgba = LinearRgba::from(value);
-        Self(rgba.to_vec4())
+impl<CS: ColorSpace> From<AlphaColor<CS>> for Rgba {
+    fn from(value: AlphaColor<CS>) -> Self {
+        let rgba = value.convert::<LinearSrgb>().components;
+        Self(Vec4::from_array(rgba))
     }
 }
+
+impl Into<AlphaColor<Srgb>> for Rgba {
+    fn into(self) -> AlphaColor<Srgb> {
+        let linear_rgba = self.0.to_array();
+        AlphaColor::<LinearSrgb>::new(linear_rgba).convert()
+    }
+}
+
+// impl From<bevy_color::Srgba> for Rgba {
+//     fn from(value: bevy_color::Srgba) -> Self {
+//         let rgba = LinearRgba::from(value);
+//         Self(rgba.to_vec4())
+//     }
+// }
 
 impl Default for Rgba {
     fn default() -> Self {
@@ -106,3 +121,23 @@ impl Interpolatable for Rgba {
 //         partial.into()
 //     }
 // }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_convertion() {
+        let approx = |a: f32, b: f32| (a - b).abs() < 0.001;
+        // The `rgb8` and `rgba8` should be in srgb
+        let color = AlphaColor::from_rgb8(85, 133, 217);
+        assert!(approx(color.components[0], 0.333));
+        assert!(approx(color.components[1], 0.522));
+        assert!(approx(color.components[2], 0.851));
+
+        let linear_rgba = Rgba::from(color);
+        assert!(approx(linear_rgba.x, 0.091));
+        assert!(approx(linear_rgba.y, 0.235));
+        assert!(approx(linear_rgba.z, 0.694));
+    }
+}

@@ -1,9 +1,9 @@
-use bevy_color::{Alpha, Srgba};
 use env_logger::Env;
 use glam::vec2;
 use ranim::animation::entity::fading::fade_in;
 use ranim::animation::timeline::Timeline;
 use ranim::items::vitem::Arc;
+use ranim::color::HueDirection;
 use ranim::{prelude::*, AppOptions, TimelineConstructor};
 
 struct ArcScene;
@@ -19,8 +19,8 @@ impl TimelineConstructor for ArcScene {
         let frame_size = (1920.0, 1080.0);
         let frame_start = vec2(frame_size.0 as f32 / -2.0, frame_size.1 as f32 / -2.0);
 
-        let start_color = Srgba::hex("FF8080FF").unwrap();
-        let end_color = Srgba::hex("58C4DDFF").unwrap();
+        let start_color = color!("#FF8080FF");
+        let end_color = color!("#58C4DDFF");
 
         let nrow = 10;
         let ncol = 10;
@@ -33,7 +33,11 @@ impl TimelineConstructor for ArcScene {
             for j in 0..ncol {
                 let angle = std::f32::consts::PI * j as f32 / (ncol - 1) as f32 * 360.0 / 180.0;
                 let radius = step_y / 2.0;
-                let color = start_color.lerp(&end_color, i as f32 / (nrow - 1) as f32);
+                let color = start_color.lerp(
+                    end_color,
+                    i as f32 / (nrow - 1) as f32,
+                    HueDirection::Increasing,
+                );
                 let offset = frame_start
                     + vec2(
                         j as f32 * step_x + step_x / 2.0 + j as f32 * gap + padding,

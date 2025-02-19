@@ -1,6 +1,5 @@
 use std::f32;
 
-use bevy_color::Srgba;
 use env_logger::Env;
 use glam::{vec3, Vec3};
 use ranim::animation::entity::creation::{uncreate, unwrite, write, Color};
@@ -60,7 +59,7 @@ impl TimelineConstructor for MainScene {
         ])
         .build();
         polygon
-            .set_color(Srgba::hex("FF8080FF").unwrap())
+            .set_color(color!("#FF8080FF"))
             .set_fill_opacity(0.5)
             .rotate(std::f32::consts::FRAC_PI_2, Vec3::Z);
 

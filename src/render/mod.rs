@@ -1,11 +1,12 @@
 pub mod pipelines;
 pub mod primitives;
 
-use bevy_color::Color;
+use color::LinearSrgb;
 use glam::{vec2, Mat4, Vec2, Vec3};
 use primitives::RenderInstances;
 
 use crate::{
+    color::rgba8,
     context::{RanimContext, WgpuContext},
     utils::{wgpu::WgpuBuffer, PipelinesStorage},
 };
@@ -217,13 +218,9 @@ impl Renderer {
         );
         let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
 
-        let bg = Color::srgba_u8(0x33, 0x33, 0x33, 0xff).to_linear();
-        let clear_color = wgpu::Color {
-            r: bg.red as f64,
-            g: bg.green as f64,
-            b: bg.blue as f64,
-            a: bg.alpha as f64,
-        };
+        let bg = rgba8(0x33, 0x33, 0x33, 0xff).convert::<LinearSrgb>();
+        let [r, g, b, a] = bg.components.map(|x| x as f64);
+        let clear_color = wgpu::Color { r, g, b, a };
 
         Self {
             camera,

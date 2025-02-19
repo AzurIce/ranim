@@ -8,8 +8,8 @@ readme = "README.md"
 license = "MIT"
 keywords = ["animation", "manim"]
 
-# [workspace]
-# members = ["packages/*"]
+[workspace]
+members = ["xtasks/*"]
 [lib]
 name = "ranim"
 crate-type = ["cdylib", "rlib"]
@@ -27,12 +27,12 @@ pollster = "0.4.0"
 uuid = { version = "1.12.1", features = ["v4"] }
 wgpu = "24.0.1"
 anyhow = "1.0.95"
-bevy_color = "0.15.3"
 usvg = "0.44.0"
 regex = "1.11.1"
 wgpu-profiler = "0.21.0"
 indicatif = "0.17.11"
 pyo3 = { version = "0.23.4", features = ["extension-module"] }
+color = "0.2.3"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
