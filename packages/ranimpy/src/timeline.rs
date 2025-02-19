@@ -7,7 +7,7 @@ use crate::items::{PySvgItem, PyVItem};
 #[pyo3(name = "Timeline")]
 #[derive(Debug)]
 pub struct PyTimeline {
-    pub(crate) inner: Timeline,
+    pub inner: Timeline,
 }
 
 #[pymethods]

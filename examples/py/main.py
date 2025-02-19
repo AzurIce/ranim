@@ -20,3 +20,7 @@ timeline.show(svg)
 timeline.forward(1.0)
 
 ranimpy.render_timeline(timeline, "./")
+print(timeline)
+print(type(timeline))
+
+# ranimpy.render_timeline(timeline, "./")

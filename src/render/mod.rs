@@ -84,6 +84,7 @@ impl CameraUniformsBindGroup {
     }
 }
 
+/// 
 pub struct Renderer {
     size: (usize, usize),
     camera: CameraFrame,
