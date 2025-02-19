@@ -36,6 +36,7 @@ jobs:
         with:
           path: ./website/public
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: build
     environment:
