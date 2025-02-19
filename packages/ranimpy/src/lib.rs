@@ -35,7 +35,7 @@ fn render_timeline(timeline: Bound<'_, PyTimeline>, output_dir: PathBuf) {
 }
 
 #[pymodule]
-fn ranimpy(m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn ranimpy(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTimeline>()?;
     m.add_class::<PyVItem>()?;
     m.add_class::<PySvgItem>()?;

@@ -13,6 +13,7 @@ members = ["packages/*", "xtasks/*"]
 
 [workspace.dependencies]
 ranim = { path = "." }
+ranimpy = { path = "packages/ranimpy" }
 
 [dependencies]
 # ranim_derive.workspace = true

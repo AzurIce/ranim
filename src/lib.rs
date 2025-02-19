@@ -115,8 +115,6 @@ impl<T: TimelineConstructor> RenderScene for T {
 pub struct RanimRenderApp {
     ctx: RanimContext,
 
-    // world: World,
-    // anim: Box<dyn Animation>,
     renderer: Renderer,
 
     camera_frame: CameraFrame,
