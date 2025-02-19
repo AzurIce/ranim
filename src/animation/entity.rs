@@ -6,9 +6,7 @@ pub mod fading;
 pub mod freeze;
 pub mod interpolate;
 
-use std::{
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use freeze::{freeze, Blank};
 use itertools::Itertools;

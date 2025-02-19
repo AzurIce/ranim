@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    time::Duration,
-};
+use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use pyo3::{pyclass, pymethods, types::PyAnyMethods, Bound, PyAny};
 

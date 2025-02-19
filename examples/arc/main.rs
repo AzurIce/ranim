@@ -2,8 +2,8 @@ use env_logger::Env;
 use glam::vec2;
 use ranim::animation::entity::fading::fade_in;
 use ranim::animation::timeline::Timeline;
-use ranim::items::vitem::Arc;
 use ranim::color::HueDirection;
+use ranim::items::vitem::Arc;
 use ranim::{prelude::*, AppOptions, TimelineConstructor};
 
 struct ArcScene;

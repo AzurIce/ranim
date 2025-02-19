@@ -37,9 +37,9 @@ impl<CS: ColorSpace> From<AlphaColor<CS>> for Rgba {
     }
 }
 
-impl Into<AlphaColor<Srgb>> for Rgba {
-    fn into(self) -> AlphaColor<Srgb> {
-        let linear_rgba = self.0.to_array();
+impl From<Rgba> for AlphaColor<Srgb> {
+    fn from(value: Rgba) -> AlphaColor<Srgb> {
+        let linear_rgba = value.0.to_array();
         AlphaColor::<LinearSrgb>::new(linear_rgba).convert()
     }
 }

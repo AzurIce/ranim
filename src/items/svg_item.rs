@@ -371,10 +371,9 @@ impl Partial for SvgItem {
 // MARK: misc
 fn parse_paint(paint: &usvg::Paint) -> AlphaColor<Srgb> {
     match paint {
-        usvg::Paint::Color(color) => rgb8(color.red, color.green, color.blue).into(),
+        usvg::Paint::Color(color) => rgb8(color.red, color.green, color.blue),
         _ => css::GREEN,
     }
-    .into()
 }
 
 struct SvgElementIterator<'a> {

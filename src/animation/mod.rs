@@ -1,9 +1,7 @@
 pub mod entity;
 pub mod timeline;
 
-use std::{
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use crate::{
     context::WgpuContext,
