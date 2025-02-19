@@ -1,10 +1,14 @@
-use std::{collections::HashMap, fmt::Debug, sync::{Arc, Mutex}, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    time::Duration,
+};
 
-use pyo3::{ffi::PyObject, pyclass, pymethods, types::PyAnyMethods, Bound, Py, PyAny};
+use pyo3::{pyclass, pymethods, types::PyAnyMethods, Bound, Py, PyAny};
 
 use crate::{
     context::WgpuContext,
-    items::{vitem::VItem, Entity, PySvgItem, PyVItem, Rabject},
+    items::{Entity, PySvgItem, PyVItem, Rabject},
     render::{primitives::RenderInstances, CameraFrame, RenderTextures, Renderable},
     utils::{Id, PipelinesStorage},
 };
@@ -24,6 +28,7 @@ pub struct PyTimeline {
 #[pymethods]
 impl PyTimeline {
     #[new]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             inner: Timeline::new(),

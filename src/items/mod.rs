@@ -1,10 +1,9 @@
 use std::ops::{Deref, DerefMut};
 
-use glam::{vec3, Vec2, Vec3};
+use glam::{vec3, Vec2};
 use pyo3::{pyclass, pymethods};
 
 use crate::{
-    components::vpoint::VPoint,
     context::WgpuContext,
     prelude::Empty,
     render::{
@@ -23,7 +22,7 @@ pub mod vitem;
 // }
 
 #[pyclass]
-#[pyo3(name="SvgItem")]
+#[pyo3(name = "SvgItem")]
 pub struct PySvgItem {
     pub(crate) inner: Rabject<svg_item::SvgItem>,
 }
@@ -39,7 +38,7 @@ impl PySvgItem {
 }
 
 #[pyclass]
-#[pyo3(name="VItem")]
+#[pyo3(name = "VItem")]
 pub struct PyVItem {
     pub(crate) inner: Rabject<vitem::VItem>,
 }
@@ -160,16 +159,4 @@ impl<T: Clone> Updatable for T {
     fn update_from(&mut self, other: &Self) {
         *self = other.clone();
     }
-}
-
-// MARK: Py
-
-pub enum RabjectEnum {
-    VItem(Rabject<vitem::VItem>),
-    SvgItem(Rabject<svg_item::SvgItem>),
-}
-
-#[pyclass]
-pub struct PyRabject {
-    inner: RabjectEnum,
 }
