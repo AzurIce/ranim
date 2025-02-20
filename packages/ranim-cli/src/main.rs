@@ -87,10 +87,8 @@ mod test {
 
     use super::*;
 
-    const TEST: &str = include_str!("../test/test.py");
-
     #[test]
-    fn test_main() -> PyResult<()> {
+    fn test_downcast() -> PyResult<()> {
         pyo3::append_to_inittab!(ranimpy_module);
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
@@ -109,22 +107,20 @@ mod test {
             println!("pyo3 sys.path: {}", path);
             println!("pyo3 sys.version: {}", version);
 
-            let content = CString::new(TEST).expect("failed to convert to CString");
             let module = PyModule::from_code(
                 py,
-                &content,
+                c_str!(r#"
+                    import ranimpy
+
+                    def build_timeline():
+                        return ranimpy.Timeline()
+                "#),
                 c_str!("scene.py"),
                 c_str!("scene"),
-                // &CString::new(filename).unwrap(),
-                // &CString::new(filename_without_ext).unwrap(),
             )?;
 
             let timeline = module.getattr("build_timeline")?.call0()?;
-
-            // let ranimpy = py.import("ranimpy")?;
-            // let timeline = py.eval(c_str!("ranimpy.Timeline()"), None, None)?;
-            println!("{:?}", timeline);
-            let timeline = timeline.downcast_into::<PyTimeline>()?;
+            assert!(timeline.downcast_into::<PyTimeline>().is_ok());
 
             Ok(())
         })
