@@ -84,7 +84,7 @@ impl CameraUniformsBindGroup {
     }
 }
 
-/// 
+/// A renderer for anything implementes [`Renderable`]
 pub struct Renderer {
     size: (usize, usize),
     camera: CameraFrame,
