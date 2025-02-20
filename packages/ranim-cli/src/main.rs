@@ -109,12 +109,14 @@ mod test {
 
             let module = PyModule::from_code(
                 py,
-                c_str!(r#"
+                c_str!(
+                    r#"
                     import ranimpy
 
                     def build_timeline():
                         return ranimpy.Timeline()
-                "#),
+                "#
+                ),
                 c_str!("scene.py"),
                 c_str!("scene"),
             )?;
