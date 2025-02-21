@@ -1,8 +1,4 @@
-use std::{
-    env::args,
-    ffi::CString,
-    path::{Path, PathBuf},
-};
+use std::{ffi::CString, path::PathBuf};
 
 use color_print::cprintln;
 use pyo3::{
@@ -65,20 +61,36 @@ fn get_timeline_funcs<'py>(
     Ok(result)
 }
 
+use clap::Parser;
+
+/// ranim CLI 参数
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+#[command(arg_required_else_help = true)]
+struct Args {
+    /// Python 源文件路径
+    #[arg(value_name = "INPUT_FILE")]
+    input_file: PathBuf,
+
+    /// 虚拟环境目录路径
+    #[arg(value_name = "VENV_DIR")]
+    venv_dir: Option<PathBuf>,
+}
+
 fn main() -> anyhow::Result<()> {
-    let args = args().skip(1).collect::<Vec<_>>();
-    if args.is_empty() || args.len() > 2 {
-        panic!("usage: ranim <input-file> [<venv_dir_path>]")
+    // let args = args_os()
+    //     .into_iter()
+    //     .skip_while(|arg| !arg.to_str().unwrap().contains("ranim"))
+    //     .collect::<Vec<_>>();
+    // println!("{:?}", args);
+    let args = Args::parse();
+
+    // 验证输入文件扩展名
+    if args.input_file.extension() != Some("py".as_ref()) {
+        anyhow::bail!("Input file must have .py extension");
     }
 
-    let input_file = &args[0];
-    let input_file = PathBuf::from(input_file);
-    assert!(input_file.extension() == Some("py".as_ref()));
-
-    // let filename = input_file.file_name().unwrap().to_str().unwrap();
-    // let filename_without_ext = input_file.file_stem().unwrap().to_str().unwrap();
-
-    let content = std::fs::read_to_string(&input_file).expect("failed to read from file");
+    let content = std::fs::read_to_string(&args.input_file).expect("failed to read from file");
     let content = CString::new(content).expect("failed to convert to CString");
 
     pyo3::append_to_inittab!(ranimpy_module);
@@ -92,24 +104,16 @@ fn main() -> anyhow::Result<()> {
         cprintln!("<b>pyo3</b> sys.version: <dim>{}</dim>", version);
 
         let path = sys.getattr("path")?;
-        if args.len() == 2 {
-            cprintln!("using venv {:?}", args[1]);
-            let venv_dir = Path::new(&args[1]);
+        if let Some(venv_dir) = args.venv_dir {
+            cprintln!("using venv {:?}", venv_dir);
             let site_packages_path =
                 dunce::canonicalize(venv_dir.join("Lib/site-packages")).unwrap();
             path.call_method1("append", (site_packages_path.to_str().unwrap(),))?;
         }
         cprintln!("<b>pyo3</b> sys.path: <dim>{}</dim>", path);
 
-        cprintln!("[ranim]: loading module {:?}...", input_file);
-        let module = PyModule::from_code(
-            py,
-            &content,
-            c_str!("scene.py"),
-            c_str!("scene"),
-            // &CString::new(filename).unwrap(),
-            // &CString::new(filename_without_ext).unwrap(),
-        )?;
+        cprintln!("[ranim]: loading module {:?}...", args.input_file);
+        let module = PyModule::from_code(py, &content, c_str!("scene.py"), c_str!("scene"))?;
 
         cprintln!("[ranim]: getting timeline funcs...");
         let timeline_funcs = get_timeline_funcs(&py, &module)?;

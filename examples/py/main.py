@@ -21,6 +21,6 @@ def timeline_test() -> ranimpy.Timeline:
     timeline.forward(1.0)
 
     return timeline
-    # ranimpy.render_timeline(timeline, "./")
-    # print(timeline)
-    # print(type(timeline))
+
+if __name__ == '__main__':
+    ranimpy.render_timeline(timeline_test(), "./")
