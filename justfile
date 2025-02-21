@@ -19,5 +19,5 @@ clean:
     -rm *.log
 
 lint:
-    cargo fmt --all --check
     cargo clippy --workspace --all-targets -- -D warnings
+    cargo fmt --all --check

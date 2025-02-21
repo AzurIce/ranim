@@ -9,18 +9,18 @@ import ranimpy
 # print(ranim.Timeline)
 # print(ranim.Timeline())
 
-timeline = ranimpy.Timeline()
+def timeline_test() -> ranimpy.Timeline:
+    timeline = ranimpy.Timeline()
 
-with open("assets/Ghostscript_Tiger.svg") as f:
-    svg = f.read()
+    with open("assets/Ghostscript_Tiger.svg") as f:
+        svg = f.read()
 
-svg = ranimpy.SvgItem(svg)
+    svg = ranimpy.SvgItem(svg)
 
-timeline.show(svg)
-timeline.forward(1.0)
+    timeline.show(svg)
+    timeline.forward(1.0)
 
-ranimpy.render_timeline(timeline, "./")
-print(timeline)
-print(type(timeline))
-
-# ranimpy.render_timeline(timeline, "./")
+    return timeline
+    # ranimpy.render_timeline(timeline, "./")
+    # print(timeline)
+    # print(type(timeline))

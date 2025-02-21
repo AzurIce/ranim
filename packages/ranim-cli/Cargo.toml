@@ -12,3 +12,5 @@ ranim.workspace = true
 ranimpy.workspace = true
 pyo3 = "0.23.4"
 dunce = "1.0.5"
+color-print = "0.3.7"
+anyhow = "1.0.96"
