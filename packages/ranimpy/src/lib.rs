@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use pyo3::{
     pyfunction, pymodule,
     types::{PyModule, PyModuleMethods},
-    wrap_pyfunction, wrap_pymodule, Bound, PyResult,
+    wrap_pyfunction, Bound, PyResult,
 };
 use ranim::{animation::AnimWithParams, utils::rate_functions::linear, AppOptions, RanimRenderApp};
 use timeline::PyTimeline;
@@ -35,7 +35,12 @@ fn render_timeline(timeline: Bound<'_, PyTimeline>, output_dir: PathBuf) {
 pub fn ranimpy(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(render_timeline, m)?)?;
     m.add_class::<PyTimeline>()?;
+    m.add_class::<items::PySvgItem>()?;
+    m.add_class::<items::PyVItem>()?;
 
-    m.add_wrapped(wrap_pymodule!(items::items))?;
+    // m.add_wrapped(wrap_pymodule!(items::items))?;
+    // let submodule = PyModule::new(py, "items")?;
+    // items::items(&submodule)?;
+    // m.add_submodule(&submodule)?;
     Ok(())
 }

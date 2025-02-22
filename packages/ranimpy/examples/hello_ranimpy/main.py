@@ -12,10 +12,11 @@ import ranimpy
 def timeline_test() -> ranimpy.Timeline:
     timeline = ranimpy.Timeline()
 
-    with open("assets/Ghostscript_Tiger.svg") as f:
+    with open("../../assets/Ghostscript_Tiger.svg") as f:
         svg = f.read()
 
     svg = ranimpy.SvgItem(svg)
+    svg.shift((100, 100, 0))
 
     timeline.show(svg)
     timeline.forward(1.0)
