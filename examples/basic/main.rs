@@ -1,17 +1,15 @@
 use std::f32;
 
-use bevy_color::Srgba;
 use env_logger::Env;
 use glam::{vec3, Vec3};
-use ranim::animation::entity::creation::{uncreate, unwrite, write, Color};
-use ranim::animation::entity::fading::{fade_in, fade_out};
-use ranim::animation::entity::interpolate::interpolate;
-use ranim::animation::timeline::Timeline;
-
+use ranim::animation::creation::{uncreate, unwrite, write, Color};
+use ranim::animation::fading::{fade_in, fade_out};
+use ranim::animation::interpolate::interpolate;
 use ranim::color::palettes::manim;
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon};
 use ranim::items::Rabject;
+use ranim::timeline::Timeline;
 use ranim::{prelude::*, typst_svg, AppOptions, SceneDesc, TimelineConstructor};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -60,7 +58,7 @@ impl TimelineConstructor for MainScene {
         ])
         .build();
         polygon
-            .set_color(Srgba::hex("FF8080FF").unwrap())
+            .set_color(color!("#FF8080FF"))
             .set_fill_opacity(0.5)
             .rotate(std::f32::consts::FRAC_PI_2, Vec3::Z);
 

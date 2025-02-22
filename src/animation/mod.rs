@@ -1,10 +1,14 @@
-pub mod entity;
-pub mod timeline;
+pub mod composition;
+pub mod creation;
+pub mod fading;
+pub mod freeze;
+pub mod interpolate;
 
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use crate::{
     context::WgpuContext,
+    items::{Entity, Rabject},
     render::{primitives::RenderInstances, CameraFrame, RenderTextures, Renderable},
     utils::{rate_functions::smooth, PipelinesStorage},
 };
@@ -18,11 +22,11 @@ pub trait Animator: Renderable {
 }
 
 /// An `Anim` is a box of [`Animator`]
-pub type Anim = Box<dyn Animator>;
+pub type Anim = Arc<Mutex<Box<dyn Animator>>>;
 /// An `StaticAnim` is a box of [`Renderable`] inside a `Rc`
 ///
 /// This implements [`Animator`] but does nothing on `update_alpha`
-pub type StaticAnim = Rc<Box<dyn Renderable>>;
+pub type StaticAnim = Arc<Box<dyn Renderable>>;
 
 impl Renderable for StaticAnim {
     fn render(
@@ -51,6 +55,76 @@ impl Animator for StaticAnim {
         // DO NOTHING
     }
 }
+
+/// An animator that animates an entity
+pub trait PureEvaluator<T: Entity>: Send + Sync {
+    fn eval_alpha(&self, alpha: f32) -> T;
+}
+
+impl<T: Entity> PureEvaluator<T> for T {
+    fn eval_alpha(&self, _alpha: f32) -> T {
+        self.clone()
+    }
+}
+impl<T: Entity> PureEvaluator<T> for Rabject<T> {
+    fn eval_alpha(&self, _alpha: f32) -> T {
+        self.data.clone()
+    }
+}
+
+// MARK: EntityAnim
+
+/// An animation that is applied to an entity
+///
+/// This type implements [`Animator`] and [`Renderable`]
+#[derive(Clone)]
+pub struct EntityAnim<T: Entity> {
+    pub(crate) rabject: Rabject<T>,
+    evaluator: Arc<Box<dyn PureEvaluator<T>>>,
+}
+
+impl<T: Entity + 'static> Animator for EntityAnim<T> {
+    fn update_alpha(&mut self, alpha: f32) {
+        self.rabject.data = self.evaluator.eval_alpha(alpha);
+    }
+}
+
+impl<T: Entity + 'static> Renderable for EntityAnim<T> {
+    fn render(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
+        pipelines: &mut PipelinesStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        camera: &CameraFrame,
+    ) {
+        self.rabject.render(
+            ctx,
+            render_instances,
+            pipelines,
+            encoder,
+            uniforms_bind_group,
+            render_textures,
+            camera,
+        );
+    }
+}
+
+impl<T: Entity> EntityAnim<T> {
+    pub fn new(rabject: Rabject<T>, func: impl PureEvaluator<T> + 'static) -> Self {
+        Self {
+            rabject,
+            evaluator: Arc::new(Box::new(func)),
+        }
+    }
+    pub fn rabject(&self) -> &Rabject<T> {
+        &self.rabject
+    }
+}
+
+// MARK: AnimParams
 
 /// The param of an animation
 #[derive(Debug, Clone)]

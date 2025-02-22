@@ -1,9 +1,9 @@
 use env_logger::Env;
 use glam::vec3;
-use ranim::animation::entity::creation::Color;
-use ranim::animation::timeline::Timeline;
+use ranim::animation::creation::Color;
 use ranim::color::palettes::manim::*;
 use ranim::items::vitem::Rectangle;
+use ranim::timeline::Timeline;
 use ranim::{prelude::*, TimelineConstructor};
 
 struct Palettes;

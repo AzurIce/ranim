@@ -1,0 +1,17 @@
+[package]
+name = "ranim-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ranimpy.workspace = true
+ranim.workspace = true
+dunce = "1.0.5"
+color-print = "0.3.7"
+anyhow = "1.0.96"
+pyo3 = { version = "0.23.4", features = ["extension-module"] }
+clap = { version = "4.5.30", features = ["derive"] }
+
+[[bin]]
+name = "ranim"
+path = "src/main.rs"

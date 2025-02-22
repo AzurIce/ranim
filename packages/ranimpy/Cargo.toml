@@ -1,0 +1,12 @@
+[package]
+name = "ranimpy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "ranimpy"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ranim.workspace = true
+pyo3 = { version = "0.23.4", features = ["extension-module", "multiple-pymethods"] }

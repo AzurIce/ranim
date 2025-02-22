@@ -93,7 +93,7 @@ impl<D: Entity, S: Entity + Into<D>> ConvertIntoRabject<D> for Rabject<S> {
     }
 }
 
-pub trait Entity: Clone + Empty {
+pub trait Entity: Clone + Empty + Send + Sync {
     type Primitive: Extract<Self> + Default;
 
     #[allow(unused)]

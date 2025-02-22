@@ -1,9 +1,7 @@
 use crate::items::{Entity, Rabject};
 use crate::prelude::Interpolatable;
 
-use crate::animation::entity::{EntityAnim, PureEvaluator};
-
-use crate::animation::AnimWithParams;
+use super::{AnimWithParams, EntityAnim, PureEvaluator};
 
 pub fn fade_in<T: Opacity + Interpolatable + 'static + Entity>(
     rabject: &Rabject<T>,
