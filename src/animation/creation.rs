@@ -1,12 +1,8 @@
-use std::ops::Range;
-
-use color::{AlphaColor, Srgb};
-
-use crate::animation::AnimWithParams;
+use super::{AnimWithParams, EntityAnim, PureEvaluator};
 use crate::items::{Entity, Rabject};
 use crate::prelude::Interpolatable;
-
-use crate::animation::entity::{EntityAnim, PureEvaluator};
+use color::{AlphaColor, Srgb};
+use std::ops::Range;
 
 pub fn create<T: Entity + Partial + Empty + Interpolatable + 'static>(
     rabject: &Rabject<T>,

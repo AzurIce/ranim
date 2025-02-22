@@ -1,8 +1,19 @@
-use pyo3::{pyclass, pymethods};
+use pyo3::{
+    pyclass, pymethods, pymodule,
+    types::{PyModule, PyModuleMethods},
+    Bound, PyResult,
+};
 use ranim::{
     glam::vec3,
     items::{svg_item::SvgItem, vitem::VItem, Rabject},
 };
+
+#[pymodule]
+pub fn items(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyVItem>()?;
+    m.add_class::<PySvgItem>()?;
+    Ok(())
+}
 
 // MARK: SvgItem
 

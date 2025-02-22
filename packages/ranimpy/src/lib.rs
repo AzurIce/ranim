@@ -3,15 +3,12 @@ pub mod timeline;
 
 use std::path::PathBuf;
 
-use ::ranim::{
-    animation::AnimWithParams, utils::rate_functions::linear, AppOptions, RanimRenderApp,
-};
-use items::{PySvgItem, PyVItem};
 use pyo3::{
     pyfunction, pymodule,
     types::{PyModule, PyModuleMethods},
-    wrap_pyfunction, Bound, PyResult,
+    wrap_pyfunction, wrap_pymodule, Bound, PyResult,
 };
+use ranim::{animation::AnimWithParams, utils::rate_functions::linear, AppOptions, RanimRenderApp};
 use timeline::PyTimeline;
 
 #[pyfunction]
@@ -36,9 +33,9 @@ fn render_timeline(timeline: Bound<'_, PyTimeline>, output_dir: PathBuf) {
 
 #[pymodule]
 pub fn ranimpy(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyTimeline>()?;
-    m.add_class::<PyVItem>()?;
-    m.add_class::<PySvgItem>()?;
     m.add_function(wrap_pyfunction!(render_timeline, m)?)?;
+    m.add_class::<PyTimeline>()?;
+
+    m.add_wrapped(wrap_pymodule!(items::items))?;
     Ok(())
 }

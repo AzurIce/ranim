@@ -18,6 +18,9 @@ examples:
 clean:
     -rm *.log
 
+fmt:
+    cargo fmt --all
+
 lint:
     cargo clippy --workspace --all-targets -- -D warnings
     cargo fmt --all --check

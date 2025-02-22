@@ -6,13 +6,14 @@ use std::{
     time::Duration,
 };
 
-use animation::{timeline::Timeline, AnimWithParams, Animator};
+use animation::{AnimWithParams, Animator};
 use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::info;
+use timeline::Timeline;
 
 use render::{CameraFrame, Renderable, Renderer};
 use utils::rate_functions::linear;
@@ -21,9 +22,9 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::interpolate::Interpolatable;
 
-    pub use crate::animation::entity::creation::{Empty, Fill, Partial, Stroke};
-    pub use crate::animation::entity::fading::Opacity;
-    pub use crate::animation::entity::interpolate::Alignable;
+    pub use crate::animation::creation::{Empty, Fill, Partial, Stroke};
+    pub use crate::animation::fading::Opacity;
+    pub use crate::animation::interpolate::Alignable;
 
     pub use crate::items::Blueprint;
     pub use crate::RenderScene;
@@ -34,6 +35,7 @@ pub mod prelude {
 pub mod color;
 mod file_writer;
 mod interpolate;
+pub mod timeline;
 pub mod updater;
 
 pub mod animation;

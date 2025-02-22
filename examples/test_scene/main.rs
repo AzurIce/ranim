@@ -6,11 +6,8 @@ use env_logger::Env;
 use glam::Vec3;
 use ranim::{
     animation::{
-        entity::{
-            creation::{create, unwrite, write},
-            freeze::freeze,
-        },
-        timeline::Timeline,
+        creation::{create, unwrite, write},
+        freeze::freeze,
     },
     components::TransformAnchor,
     items::{
@@ -19,6 +16,7 @@ use ranim::{
         Rabject,
     },
     prelude::*,
+    timeline::Timeline,
     AppOptions, TimelineConstructor,
 };
 

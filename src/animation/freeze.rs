@@ -1,18 +1,13 @@
+use super::{AnimWithParams, Animator, EntityAnim};
 use crate::{
-    animation::Animator,
     items::{Entity, Rabject},
-    render::RenderTextures,
+    render::{RenderTextures, Renderable},
 };
-
-use super::EntityAnim;
-use crate::animation::AnimWithParams;
 
 pub fn freeze<T: Entity + 'static>(rabject: &Rabject<T>) -> AnimWithParams<EntityAnim<T>> {
     let data = rabject.data.clone();
     AnimWithParams::new(EntityAnim::new(rabject.clone(), data))
 }
-
-use crate::render::Renderable;
 
 pub struct Blank;
 

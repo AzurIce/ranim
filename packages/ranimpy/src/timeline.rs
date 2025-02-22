@@ -1,5 +1,5 @@
 use pyo3::{pyclass, pymethods, types::PyAnyMethods, Bound, PyAny};
-use ranim::animation::timeline::Timeline;
+use ranim::timeline::Timeline;
 
 use crate::items::{PySvgItem, PyVItem};
 

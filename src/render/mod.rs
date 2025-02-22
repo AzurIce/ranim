@@ -518,11 +518,11 @@ mod test {
 
     use crate::{
         animation::{
-            entity::creation::{create, uncreate},
-            timeline::Timeline,
+            creation::{create, uncreate},
             AnimWithParams,
         },
         items::{vitem::Polygon, Blueprint},
+        timeline::Timeline,
         utils::rate_functions::linear,
         AppOptions, RanimRenderApp,
     };
