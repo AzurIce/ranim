@@ -11,6 +11,8 @@ use itertools::Itertools;
 use std::{cell::RefCell, rc::Rc};
 use std::{collections::HashMap, fmt::Debug, time::Duration};
 
+pub use ranim_macros::timeline;
+
 // MARK: Timeline
 
 /// Timeline of all rabjects
