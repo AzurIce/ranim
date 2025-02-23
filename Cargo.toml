@@ -12,10 +12,11 @@ keywords = ["animation", "manim"]
 members = ["packages/*", "xtasks/*"]
 
 [workspace.dependencies]
+ranim-macros = { path = "packages/ranim-macros" }
 ranim = { path = "." }
 
 [dependencies]
-# ranim_derive.workspace = true
+ranim-macros.workspace = true
 async-channel = "2.3.1"
 bytemuck = { version = "1.20.0", features = ["derive"] }
 env_logger = "0.11.6"
@@ -32,6 +33,7 @@ regex = "1.11.1"
 wgpu-profiler = "0.21.0"
 indicatif = "0.17.11"
 color = "0.2.3"
+linkme = "0.3.31"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

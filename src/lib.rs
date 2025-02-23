@@ -12,6 +12,7 @@ use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use linkme::distributed_slice;
 use log::{info, warn};
 use timeline::Timeline;
 
@@ -45,6 +46,35 @@ pub mod items;
 pub mod render;
 pub mod utils;
 // pub mod world;
+
+#[distributed_slice]
+pub static TIMELINES: [(&'static str, fn(&Timeline))];
+
+#[macro_export]
+macro_rules! render_timeline {
+    ($func:ident) => {
+        let (name, func) = ::ranim::TIMELINES
+            .iter()
+            .find(|(name, _)| *name == stringify!($func))
+            .unwrap();
+
+        let timeline = Timeline::new();
+        (func)(&timeline);
+        if timeline.elapsed_secs() == 0.0 {
+            // timeline.forward(0.1);
+        }
+        let duration_secs = timeline.elapsed_secs();
+        let mut app = ::ranim::RanimRenderApp::new(&::ranim::AppOptions {
+            output_dir: std::path::PathBuf::from(format!("./output/{}", name)),
+            ..Default::default()
+        });
+        app.render_anim(
+            ::ranim::animation::AnimWithParams::new(timeline)
+                .with_duration(duration_secs)
+                .with_rate_func(::ranim::utils::rate_functions::linear),
+        );
+    };
+}
 
 pub struct SceneDesc {
     pub name: String,
