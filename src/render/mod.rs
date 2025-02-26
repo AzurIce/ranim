@@ -29,7 +29,12 @@ pub trait Renderable {
 }
 
 pub trait DynamicRenderable: Renderable {
-    fn prepare_alpha(&mut self, alpha: f32, ctx: &WgpuContext, render_instances: &mut RenderInstances);
+    fn prepare_alpha(
+        &mut self,
+        alpha: f32,
+        ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
+    );
 }
 
 pub trait StaticRenderable: Renderable {

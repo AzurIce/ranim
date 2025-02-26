@@ -1,7 +1,7 @@
 use crate::{
     animation::{
-        freeze::Blank, AnimSchedule, AnimWithParams, Animation, EntityAnim,
-        Freezable, StaticEntityAnim,
+        freeze::Blank, AnimSchedule, AnimWithParams, Animation, EntityAnim, Freezable,
+        StaticEntityAnim,
     },
     context::WgpuContext,
     items::{Entity, Rabject},
@@ -234,10 +234,7 @@ impl EntityTimeline {
     }
 
     /// Append an animation to the timeline
-    pub fn append_anim<'r, 't, T: Entity + 'static>(
-        &mut self,
-        anim: AnimWithParams<EntityAnim<T>>,
-    ) {
+    pub fn append_anim<T: Entity + 'static>(&mut self, anim: AnimWithParams<EntityAnim<T>>) {
         self.cur_freeze_anim = Rc::new(Box::new(anim.inner.get_end_freeze_anim()));
         self.push(anim);
     }
