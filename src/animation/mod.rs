@@ -145,7 +145,7 @@ pub struct AnimSchedule<'r, 't, T: Entity, A> {
     pub(crate) anim: AnimWithParams<A>,
 }
 
-impl<'r, 't, T: Entity, A: Freezable<T>> Freezable<T> for AnimSchedule<'r, 't, T, A> {
+impl<T: Entity, A: Freezable<T>> Freezable<T> for AnimSchedule<'_, '_, T, A> {
     fn get_end_freeze_anim(&self) -> StaticEntityAnim<T> {
         self.anim.inner.get_end_freeze_anim()
     }

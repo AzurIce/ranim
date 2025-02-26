@@ -26,7 +26,7 @@ fn test_scene(timeline: &Timeline) {
     let mut svg = SvgItem::from_svg(SVG);
     svg.scale(Vec3::splat(3.0));
 
-    let mut svg = timeline.insert(svg);
+    let _svg = timeline.insert(svg);
 
     timeline.forward(10.0);
 }
