@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use animation::{AnimWithParams, Animator};
+use animation::AnimWithParams;
 use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
@@ -16,7 +16,7 @@ use linkme::distributed_slice;
 use log::{info, warn};
 use timeline::Timeline;
 
-use render::{CameraFrame, Renderable, Renderer};
+use render::{CameraFrame, DynamicRenderable, Renderable, Renderer};
 use utils::rate_functions::linear;
 
 pub mod prelude {
@@ -25,7 +25,7 @@ pub mod prelude {
 
     pub use crate::animation::creation::{Empty, Fill, Partial, Stroke};
     pub use crate::animation::fading::Opacity;
-    pub use crate::animation::interpolate::Alignable;
+    pub use crate::animation::transform::Alignable;
 
     pub use crate::items::Blueprint;
     pub use crate::RenderScene;
@@ -140,7 +140,7 @@ impl<T: TimelineConstructor> RenderScene for T {
         let mut anim = AnimWithParams::new(timeline)
             .with_duration(duration_secs)
             .with_rate_func(linear);
-        anim.update_alpha(0.0);
+        anim.prepare_alpha(0.0, &app.ctx.wgpu_ctx, &mut app.renderer.render_instances);
         app.render_to_image(&mut anim, path);
     }
 }
@@ -228,7 +228,7 @@ impl RanimRenderApp {
         self.save_frame_to_image(path);
     }
 
-    pub fn render_anim<T: Animator>(&mut self, mut anim: AnimWithParams<T>) {
+    pub fn render_anim<T: DynamicRenderable>(&mut self, mut anim: AnimWithParams<T>) {
         let frames = (anim.params.duration_secs * self.fps as f32).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
@@ -244,7 +244,11 @@ impl RanimRenderApp {
         (0..frames)
             .map(|f| f as f32 / (frames - 1) as f32)
             .for_each(|alpha| {
-                anim.update_alpha(alpha);
+                anim.prepare_alpha(
+                    alpha,
+                    &self.ctx.wgpu_ctx,
+                    &mut self.renderer.render_instances,
+                );
                 self.renderer.render(&mut self.ctx, &mut anim);
                 self.update_frame();
                 pb.inc(1);

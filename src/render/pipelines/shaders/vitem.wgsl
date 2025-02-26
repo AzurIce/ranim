@@ -9,6 +9,14 @@ struct CameraUniforms {
 @group(1) @binding(1) var<storage> fill_rgbas: array<vec4<f32>>;
 @group(1) @binding(2) var<storage> stroke_rgbas: array<vec4<f32>>;
 @group(1) @binding(3) var<storage> stroke_widths: array<f32>;
+struct ClipBox {
+    min_x: i32,
+    max_x: i32,
+    min_y: i32,
+    max_y: i32,
+    max_w:i32,
+}
+@group(1) @binding(4) var<storage> clip_box: ClipBox;
 
 const ANTI_ALIAS_WIDTH: f32 = 0.015;
 
@@ -229,10 +237,39 @@ struct VertexOutput {
 }
 
 @vertex
-fn vs_main(@builtin(vertex_index) vertex_index: u32, @location(0) clip_pos: vec2<f32>) -> VertexOutput {
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;
 
-    out.frag_pos = vec4(clip_pos, 0.0, 1.0);
-    out.pos = clip_pos * cam_uniforms.half_frame_size;
+    let x = vertex_index & 1u;
+    let min_x = f32(clip_box.min_x);
+    let max_x = f32(clip_box.max_x);
+    let min_y = f32(clip_box.min_y);
+    let max_y = f32(clip_box.max_y);
+    let max_w = f32(clip_box.max_w);
+
+    // let x_base = min_x - max_w;
+    // let x_offset = (max_x - min_x + max_w * 2.0) * f32((vertex_index >> 1u) & 1u);
+    
+    // let y_base = min_y - max_w;
+    // let y_offset = (max_y - min_y + max_w * 2.0) * f32(vertex_index & 1u);
+
+    // let clip_point = vec2(
+    //     x_base + x_offset,
+    //     y_base + y_offset
+    // );
+    var clip_point: vec2<f32>;
+    clip_point.x = select(
+        max_x + max_w,
+        min_x - max_w,
+        (vertex_index & 2u) == 0u
+    );
+    clip_point.y = select(
+        max_y + max_w,
+        min_y - max_w,
+        (vertex_index & 1u) == 0u
+    );
+
+    out.frag_pos = vec4(clip_point / cam_uniforms.half_frame_size, 0.0, 1.0);
+    out.pos = clip_point;
     return out;
 }

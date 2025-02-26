@@ -1,7 +1,5 @@
 use std::ops::Deref;
 
-use glam::Vec2;
-
 use crate::{
     context::WgpuContext,
     render::{CameraUniformsBindGroup, RenderResource, OUTPUT_TEXTURE_FORMAT},
@@ -61,6 +59,16 @@ impl RenderBindGroup {
                         },
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ],
             })
     }
@@ -71,6 +79,7 @@ impl RenderBindGroup {
         fill_rgbas: &wgpu::Buffer,
         stroke_rgbas: &wgpu::Buffer,
         stroke_widths: &wgpu::Buffer,
+        cc: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("VItem Render Bind Group"),
@@ -96,6 +105,10 @@ impl RenderBindGroup {
                         stroke_widths.as_entire_buffer_binding(),
                     ),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Buffer(cc.as_entire_buffer_binding()),
+                },
             ],
         })
     }
@@ -105,6 +118,7 @@ impl RenderBindGroup {
         fill_rgbas: &wgpu::Buffer,
         stroke_rgbas: &wgpu::Buffer,
         stroke_widths: &wgpu::Buffer,
+        cc: &wgpu::Buffer,
     ) -> Self {
         Self(Self::new_bind_group(
             ctx,
@@ -112,6 +126,7 @@ impl RenderBindGroup {
             fill_rgbas,
             stroke_rgbas,
             stroke_widths,
+            cc,
         ))
     }
 }
@@ -147,15 +162,7 @@ impl RenderResource for VItemPipeline {
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
-                buffers: &[wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Vec2>() as wgpu::BufferAddress,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x2,
-                        offset: 0,
-                        shader_location: 0,
-                    }],
-                }],
+                buffers: &[],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {

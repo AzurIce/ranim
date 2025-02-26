@@ -3,14 +3,10 @@ use std::ops::{Deref, DerefMut};
 use glam::Vec2;
 
 use crate::{
-    context::WgpuContext,
     prelude::Empty,
-    render::{
-        primitives::{Extract, RenderInstance, RenderInstances},
-        CameraFrame, RenderTextures, Renderable,
-    },
+    render::{primitives::ExtractFrom, CameraFrame},
     timeline::Timeline,
-    utils::{Id, PipelinesStorage},
+    utils::Id,
 };
 
 pub mod svg_item;
@@ -27,11 +23,6 @@ pub struct Rabject<'a, T: Entity> {
     pub data: T,
 }
 
-pub struct FrozenRabject<T: Entity> {
-    pub id: Id,
-    pub data: T,
-}
-
 impl<T: Entity> Deref for Rabject<'_, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
@@ -42,63 +33,6 @@ impl<T: Entity> Deref for Rabject<'_, T> {
 impl<T: Entity> DerefMut for Rabject<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
-    }
-}
-
-impl<T: Entity + 'static> Renderable for Rabject<'_, T> {
-    fn render(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-        pipelines: &mut PipelinesStorage,
-        encoder: &mut wgpu::CommandEncoder,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        camera: &CameraFrame,
-    ) {
-        let render_instance = render_instances.get_or_init::<T>(self.id);
-        render_instance.update_clip_box(ctx, &self.data.clip_box(camera));
-        render_instance.update(ctx, &self.data);
-        render_instance.encode_render_command(
-            ctx,
-            pipelines,
-            encoder,
-            uniforms_bind_group,
-            render_textures,
-        );
-    }
-}
-
-impl<T: Entity + 'static> Renderable for FrozenRabject<T> {
-    fn render(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-        pipelines: &mut PipelinesStorage,
-        encoder: &mut wgpu::CommandEncoder,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        camera: &CameraFrame,
-    ) {
-        let render_instance = render_instances.get_or_init::<T>(self.id);
-        render_instance.update_clip_box(ctx, &self.data.clip_box(camera));
-        render_instance.update(ctx, &self.data);
-        render_instance.encode_render_command(
-            ctx,
-            pipelines,
-            encoder,
-            uniforms_bind_group,
-            render_textures,
-        );
-    }
-}
-
-impl<T: Entity + Clone> Clone for FrozenRabject<T> {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            data: self.data.clone(),
-        }
     }
 }
 
@@ -120,7 +54,7 @@ impl<T: Entity> Drop for Rabject<'_, T> {
 }
 
 pub trait Entity: Clone + Empty + Send + Sync {
-    type Primitive: Extract<Self> + Default;
+    type Primitive: ExtractFrom<Self> + Default;
 
     #[allow(unused)]
     fn clip_box(&self, camera: &CameraFrame) -> [Vec2; 4] {

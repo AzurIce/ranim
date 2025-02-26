@@ -14,4 +14,6 @@ insert_anchor_links = "right"
 
 ## Getting Started
 
-// TODO
+```rust
+
+```

@@ -64,6 +64,37 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
         ctx.queue.submit([]);
         self.inner = data;
     }
+
+    #[allow(unused)]
+    pub(crate) fn read_buffer(&self, ctx: &WgpuContext) -> Vec<u8> {
+        let size = std::mem::size_of::<T>();
+        let staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Debug Staging Buffer"),
+            size: size as u64,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Debug Read Encoder"),
+            });
+
+        encoder.copy_buffer_to_buffer(&self.buffer, 0, &staging_buffer, 0, size as u64);
+        ctx.queue.submit(Some(encoder.finish()));
+
+        let buffer_slice = staging_buffer.slice(..);
+        let (tx, rx) = async_channel::bounded(1);
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send_blocking(result).unwrap()
+        });
+        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        rx.recv_blocking().unwrap().unwrap();
+
+        let x = buffer_slice.get_mapped_range().to_vec();
+        x
+    }
 }
 
 pub(crate) struct WgpuVecBuffer<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> {
@@ -145,6 +176,38 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             ctx.queue.submit([]);
         }
         realloc
+    }
+
+    #[allow(unused)]
+    pub(crate) fn read_buffer(&self, ctx: &WgpuContext) -> Option<Vec<u8>> {
+        let buffer = self.buffer.as_ref()?;
+        let size = std::mem::size_of::<T>() * self.inner.len();
+        let staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Debug Staging Buffer"),
+            size: size as u64,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Debug Read Encoder"),
+            });
+
+        encoder.copy_buffer_to_buffer(buffer, 0, &staging_buffer, 0, size as u64);
+        ctx.queue.submit(Some(encoder.finish()));
+
+        let buffer_slice = staging_buffer.slice(..);
+        let (tx, rx) = async_channel::bounded(1);
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send_blocking(result).unwrap()
+        });
+        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        rx.recv_blocking().unwrap().unwrap();
+
+        let x = buffer_slice.get_mapped_range().to_vec();
+        Some(x)
     }
 }
 
