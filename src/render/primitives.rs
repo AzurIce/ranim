@@ -6,15 +6,11 @@ use std::{
     collections::HashMap,
 };
 
-use glam::Vec2;
-
 use crate::{context::WgpuContext, items::Entity, utils::Id};
 
 use super::RenderTextures;
 
 pub trait RenderInstance {
-    #[allow(unused)]
-    fn update_clip_box(&mut self, ctx: &WgpuContext, clip_box: &[Vec2; 4]) {}
     fn encode_render_command(
         &mut self,
         ctx: &WgpuContext,
@@ -25,8 +21,8 @@ pub trait RenderInstance {
     );
 }
 
-pub trait Extract<T: Entity>: RenderInstance + Any {
-    fn update(&mut self, ctx: &WgpuContext, data: &T);
+pub trait ExtractFrom<T: Entity>: RenderInstance + Any {
+    fn update_from(&mut self, ctx: &WgpuContext, data: &T);
 }
 
 #[derive(Default)]
