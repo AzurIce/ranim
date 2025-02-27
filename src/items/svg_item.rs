@@ -8,7 +8,7 @@ use crate::{
     color::{rgb8, rgba},
     components::{vpoint::VPoint, TransformAnchor},
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
-    render::primitives::{svg_item::SvgItemPrimitive, Extract},
+    render::primitives::{svg_item::SvgItemPrimitive, ExtractFrom},
     utils::{bezier::PathBuilder, math::interpolate_usize},
 };
 
@@ -171,21 +171,20 @@ impl Entity for SvgItem {
 
 // MARK: Extract impl
 
-impl Extract<SvgItem> for SvgItemPrimitive {
-    fn update(&mut self, ctx: &crate::context::WgpuContext, data: &SvgItem) {
+impl ExtractFrom<SvgItem> for SvgItemPrimitive {
+    fn update_from(&mut self, ctx: &crate::context::WgpuContext, data: &SvgItem) {
         // trace!("SvgItemPrimitive update vitems: {}", data.vitems.len());
         if data.vitems.len() != self.vitem_primitives.len() {
             // trace!("resizing vitem_primitives from {} to {}...", self.vitem_primitives.len(), data.vitems.len());
             self.vitem_primitives
                 .resize_with(data.vitems.len(), Default::default);
-            self.refresh_clip_box(ctx);
         }
         // trace!("updating vitem_primitives...");
         self.vitem_primitives
             .iter_mut()
             .zip(data.vitems.iter())
             .for_each(|(vitem_primitive, vitem)| {
-                Extract::<VItem>::update(vitem_primitive, ctx, vitem)
+                ExtractFrom::<VItem>::update_from(vitem_primitive, ctx, vitem)
             });
         // let anchor_points_cnt = data
         //     .vitems

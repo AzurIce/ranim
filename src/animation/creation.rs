@@ -1,6 +1,7 @@
-use super::{AnimScheduler, EntityAnim, PureEvaluator};
+use super::{AnimSchedule, DynamicEntityAnim, EntityAnim, PureEvaluator};
 use crate::items::{Entity, Rabject};
 use crate::prelude::Interpolatable;
+use crate::utils::rate_functions::smooth;
 use color::{AlphaColor, Srgb};
 use std::ops::Range;
 
@@ -10,18 +11,18 @@ pub trait Creation: Entity + Partial + Empty + Interpolatable {}
 impl<T: Entity + Partial + Empty + Interpolatable> Creation for T {}
 
 pub trait CreationAnim<'r, 't, T: Creation + 'static> {
-    fn create(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
-    fn uncreate(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
+    fn create(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
+    fn uncreate(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
 }
 
 impl<'r, 't, T: Creation + 'static> CreationAnim<'r, 't, T> for Rabject<'t, T> {
-    fn create(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+    fn create(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
         let func = Create::new(self.data.clone());
-        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
     }
-    fn uncreate(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+    fn uncreate(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
         let func = UnCreate::new(self.data.clone());
-        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
     }
 }
 
@@ -30,18 +31,18 @@ pub trait Writing: Creation + Stroke + Fill {}
 impl<T: Creation + Stroke + Fill> Writing for T {}
 
 pub trait WritingAnim<'r, 't, T: Writing + 'static> {
-    fn write(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
-    fn unwrite(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
+    fn write(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
+    fn unwrite(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
 }
 
 impl<'r, 't, T: Writing + 'static> WritingAnim<'r, 't, T> for Rabject<'t, T> {
-    fn write(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+    fn write(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
         let func = Write::new(self.data.clone());
-        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
     }
-    fn unwrite(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+    fn unwrite(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
         let func = Unwrite::new(self.data.clone());
-        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
     }
 }
 

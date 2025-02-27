@@ -11,6 +11,10 @@ use crate::{
     utils::{wgpu::WgpuBuffer, PipelinesStorage},
 };
 
+pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+const ALIGNMENT: usize = 256;
+
+// MARK: Renderable
 pub trait Renderable {
     #[allow(clippy::too_many_arguments)]
     fn render(
@@ -21,9 +25,23 @@ pub trait Renderable {
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
         render_textures: &RenderTextures,
-        camera: &CameraFrame,
     );
 }
+
+pub trait DynamicRenderable: Renderable {
+    fn prepare_alpha(
+        &mut self,
+        alpha: f32,
+        ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
+    );
+}
+
+pub trait StaticRenderable: Renderable {
+    fn prepare(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances);
+}
+
+// MARK: CameraUniforms
 
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -84,10 +102,11 @@ impl CameraUniformsBindGroup {
     }
 }
 
+// MARK: Renderer
+
 /// A renderer for anything implementes [`Renderable`]
 pub struct Renderer {
     size: (usize, usize),
-    camera: CameraFrame,
     pub pipelines: PipelinesStorage,
 
     clear_color: wgpu::Color,
@@ -100,94 +119,7 @@ pub struct Renderer {
     output_texture_data: Option<Vec<u8>>,
     pub(crate) output_texture_updated: bool,
 
-    render_instances: RenderInstances,
-}
-
-pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
-const ALIGNMENT: usize = 256;
-
-pub struct RenderTextures {
-    render_texture: wgpu::Texture,
-    // multisample_texture: wgpu::Texture,
-    // depth_stencil_texture: wgpu::Texture,
-    pub(crate) render_view: wgpu::TextureView,
-    pub(crate) multisample_view: wgpu::TextureView,
-    pub(crate) depth_stencil_view: wgpu::TextureView,
-}
-
-impl RenderTextures {
-    pub fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
-        let format = OUTPUT_TEXTURE_FORMAT;
-        let render_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Target Texture"),
-            size: wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::COPY_SRC
-                | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[
-                wgpu::TextureFormat::Rgba8UnormSrgb,
-                wgpu::TextureFormat::Rgba8Unorm,
-            ],
-        });
-        let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Multisample Texture"),
-            size: wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 4,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[
-                wgpu::TextureFormat::Rgba8UnormSrgb,
-                wgpu::TextureFormat::Rgba8Unorm,
-            ],
-        });
-        let depth_stencil_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Depth Stencil Texture"),
-            size: wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 4,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth24PlusStencil8,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(format),
-            ..Default::default()
-        });
-        let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(format),
-            ..Default::default()
-        });
-        let depth_stencil_view =
-            depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        Self {
-            render_texture,
-            // multisample_texture,
-            // depth_stencil_texture,
-            render_view,
-            multisample_view,
-            depth_stencil_view,
-        }
-    }
+    pub(crate) render_instances: RenderInstances,
 }
 
 impl Renderer {
@@ -224,7 +156,6 @@ impl Renderer {
         let clear_color = wgpu::Color { r, g, b, a };
 
         Self {
-            camera,
             size: (width, height),
             clear_color,
             pipelines: PipelinesStorage::default(),
@@ -300,7 +231,6 @@ impl Renderer {
             &mut encoder,
             &self.uniforms_bind_group.bind_group,
             &self.render_textures,
-            &self.camera,
         );
 
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
@@ -398,6 +328,94 @@ impl Renderer {
         self.uniforms_buffer.set(wgpu_ctx, camera_uniforms);
     }
 }
+
+// MARK: RenderTextures
+
+pub struct RenderTextures {
+    render_texture: wgpu::Texture,
+    // multisample_texture: wgpu::Texture,
+    // depth_stencil_texture: wgpu::Texture,
+    pub(crate) render_view: wgpu::TextureView,
+    pub(crate) multisample_view: wgpu::TextureView,
+    pub(crate) depth_stencil_view: wgpu::TextureView,
+}
+
+impl RenderTextures {
+    pub fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
+        let format = OUTPUT_TEXTURE_FORMAT;
+        let render_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Target Texture"),
+            size: wgpu::Extent3d {
+                width: width as u32,
+                height: height as u32,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[
+                wgpu::TextureFormat::Rgba8UnormSrgb,
+                wgpu::TextureFormat::Rgba8Unorm,
+            ],
+        });
+        let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Multisample Texture"),
+            size: wgpu::Extent3d {
+                width: width as u32,
+                height: height as u32,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 4,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[
+                wgpu::TextureFormat::Rgba8UnormSrgb,
+                wgpu::TextureFormat::Rgba8Unorm,
+            ],
+        });
+        let depth_stencil_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depth Stencil Texture"),
+            size: wgpu::Extent3d {
+                width: width as u32,
+                height: height as u32,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 4,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth24PlusStencil8,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
+        let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
+        let depth_stencil_view =
+            depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        Self {
+            render_texture,
+            // multisample_texture,
+            // depth_stencil_texture,
+            render_view,
+            multisample_view,
+            depth_stencil_view,
+        }
+    }
+}
+
+// MARK: CameraFrame
 
 /// Default pos is at the origin, looking to the negative z-axis
 pub struct CameraFrame {

@@ -37,9 +37,31 @@ impl ComputeBindGroup {
                     },
                     count: None,
                 },
-                // (x, y, is_closed, 0)
+                // width
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // (x, y, is_closed, 0)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // min_x, min_y, max_x, max_y
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -55,7 +77,9 @@ impl ComputeBindGroup {
     fn new_bind_group(
         ctx: &WgpuContext,
         points3d_buffer: &wgpu::Buffer,
+        stroke_width_buffer: &wgpu::Buffer,
         points2d_buffer: &wgpu::Buffer,
+        clip_box_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Map 3D to 2D Compute Bind Group"),
@@ -70,7 +94,19 @@ impl ComputeBindGroup {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Buffer(
+                        stroke_width_buffer.as_entire_buffer_binding(),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Buffer(
                         points2d_buffer.as_entire_buffer_binding(),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Buffer(
+                        clip_box_buffer.as_entire_buffer_binding(),
                     ),
                 },
             ],
@@ -79,9 +115,17 @@ impl ComputeBindGroup {
     pub(crate) fn new(
         ctx: &WgpuContext,
         points3d_buffer: &wgpu::Buffer,
+        stroke_width_buffer: &wgpu::Buffer,
         points2d_buffer: &wgpu::Buffer,
+        clip_box_buffer: &wgpu::Buffer,
     ) -> Self {
-        Self(Self::new_bind_group(ctx, points3d_buffer, points2d_buffer))
+        Self(Self::new_bind_group(
+            ctx,
+            points3d_buffer,
+            stroke_width_buffer,
+            points2d_buffer,
+            clip_box_buffer,
+        ))
     }
 }
 

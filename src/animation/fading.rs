@@ -1,25 +1,26 @@
 use crate::items::{Entity, Rabject};
 use crate::prelude::Interpolatable;
+use crate::utils::rate_functions::smooth;
 
-use super::{AnimScheduler, EntityAnim, PureEvaluator};
+use super::{AnimSchedule, DynamicEntityAnim, EntityAnim, PureEvaluator};
 
 pub trait Fading: Opacity + Interpolatable + Entity {}
 impl<T: Opacity + Interpolatable + Entity> Fading for T {}
 
 pub trait FadingAnim<'r, 't, T: Fading + 'static> {
-    fn fade_in(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
-    fn fade_out(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>>;
+    fn fade_in(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
+    fn fade_out(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
 }
 
 impl<'r, 't, T: Fading + 'static> FadingAnim<'r, 't, T> for Rabject<'t, T> {
-    fn fade_in(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+    fn fade_in(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
         let func = FadeIn::new(self.data.clone());
-        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
     }
 
-    fn fade_out(&'r mut self) -> AnimScheduler<'r, 't, T, EntityAnim<T>> {
+    fn fade_out(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
         let func = FadeOut::new(self.data.clone());
-        AnimScheduler::new(self, EntityAnim::new(self.id, self.data.clone(), func))
+        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
     }
 }
 

@@ -4,7 +4,7 @@ use env_logger::Env;
 use glam::{vec3, Vec3};
 use ranim::animation::creation::{Color, CreationAnim, WritingAnim};
 use ranim::animation::fading::FadingAnim;
-use ranim::animation::interpolate::InterpolateAnim;
+use ranim::animation::transform::TransformAnim;
 use ranim::color::palettes::manim;
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon};
@@ -43,9 +43,12 @@ impl TimelineConstructor for MainScene {
 
         timeline.play(text.write().with_duration(3.0));
 
-        let original_text = text.data.clone();
-        text.scale(Vec3::splat(2.0));
-        timeline.play(text.interpolate_from(original_text));
+        timeline.play(
+            text.transform(|data| {
+                data.scale(Vec3::splat(2.0));
+            })
+            .apply(), // `apply` will apply the animation's effect to rabject's data
+        );
 
         timeline.forward(0.5);
         timeline.play(text.unwrite().with_duration(3.0));
@@ -81,7 +84,7 @@ impl TimelineConstructor for MainScene {
 
         let polygon_data = polygon.data.clone();
         drop(polygon);
-        timeline.play(arc.interpolate_from(polygon_data));
+        timeline.play(arc.transform_from(polygon_data));
         timeline.forward(0.5);
 
         // [svg] fade_out -> 0.5s wait

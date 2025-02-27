@@ -7,7 +7,7 @@ use crate::{
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::{
-        primitives::{vitem::VItemPrimitive, Extract},
+        primitives::{vitem::VItemPrimitive, ExtractFrom},
         CameraFrame,
     },
 };
@@ -107,8 +107,8 @@ impl Entity for VItem {
 }
 
 // MARK: Extract impl
-impl Extract<VItem> for VItemPrimitive {
-    fn update(&mut self, ctx: &WgpuContext, data: &VItem) {
+impl ExtractFrom<VItem> for VItemPrimitive {
+    fn update_from(&mut self, ctx: &WgpuContext, data: &VItem) {
         self.update(
             ctx,
             &data.get_render_points(),
