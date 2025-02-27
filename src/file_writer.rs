@@ -83,20 +83,22 @@ impl FileWriterBuilder {
 
         let mut command = Command::new("ffmpeg");
         #[rustfmt::skip]
-        command.args([
+        let command = command.args([
             "-y",
             "-f", "rawvideo",
             "-s", format!("{}x{}", self.width, self.height).as_str(),
             "-pix_fmt", "rgba",
             "-r", self.fps.to_string().as_str(),
             "-i", "-",
-            "-vf", self.vf_args.join(",").as_str(),
             "-an",
             "-loglevel", "error",
             "-vcodec", self.video_codec.as_str(),
             "-pix_fmt", self.pixel_format.as_str(),
             &self.file_path.to_string_lossy(),
         ]).stdin(Stdio::piped());
+        if !self.vf_args.is_empty() {
+            command.args(["-vf", self.vf_args.join(",").as_str()]);
+        }
 
         let mut child = command.spawn().expect("Failed to spawn ffmpeg");
         FileWriter {
