@@ -1,6 +1,6 @@
 use crate::{
     animation::{
-        freeze::Blank, AnimSchedule, AnimWithParams, Animation, EntityAnim, Freezable,
+        blank::Blank, AnimSchedule, AnimWithParams, Animation, EntityAnim, Freezable,
         StaticEntityAnim,
     },
     context::WgpuContext,
@@ -20,10 +20,6 @@ pub use ranim_macros::timeline;
 // MARK: Timeline
 
 /// Timeline of all rabjects
-///
-/// The Timeline itself is also an [`Animator`] which:
-/// - update all RabjectTimeline's alpha
-/// - render all RabjectTimeline
 ///
 /// Timeline has the interior mutability, and its [`Rabject`]s has the reference to it with the same lifetime.
 #[derive(Default, Clone)]
@@ -71,6 +67,11 @@ impl Timeline {
         }
         rabject
     }
+    pub fn update<T: Entity + 'static>(&self, rabject: &Rabject<T>) {
+        let mut timelines = self.rabject_timelines.borrow_mut();
+        let timeline = timelines.get_mut(&rabject.id).unwrap();
+        timeline.update(rabject);
+    }
 
     pub fn show<T: Entity>(&self, rabject: &Rabject<T>) {
         self.rabject_timelines
@@ -100,7 +101,7 @@ impl Timeline {
     /// Push an animation into the timeline
     ///
     /// Note that this won't apply the animation effect to rabject's data,
-    /// to apply the animation effect use [`AnimScheduler::apply`]
+    /// to apply the animation effect use [`AnimSchedule::apply`]
     pub fn play<'t, T: Entity + 'static>(
         &'t self,
         anim_schedule: AnimSchedule<'_, 't, T, EntityAnim<T>>,
@@ -181,6 +182,11 @@ pub struct EntityTimeline {
 }
 
 impl EntityTimeline {
+    pub fn update<T: Entity + 'static>(&mut self, rabject: &Rabject<T>) {
+        let freeze_anim: Box<dyn StaticRenderable> =
+            Box::new(StaticEntityAnim::new(rabject.id, rabject.data.clone()));
+        self.cur_freeze_anim = Rc::new(freeze_anim);
+    }
     pub fn new<'a, T: Entity + 'static>(rabject: &'a Rabject<'a, T>) -> Self {
         let freeze_anim: Box<dyn StaticRenderable> =
             Box::new(StaticEntityAnim::new(rabject.id, rabject.data.clone()));

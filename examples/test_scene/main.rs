@@ -5,7 +5,7 @@ use std::time::Duration;
 use env_logger::Env;
 use glam::Vec3;
 use ranim::{
-    animation::{creation::CreationAnim, freeze::FreezeAnim, transform::TransformAnim},
+    animation::{creation::CreationAnim, transform::TransformAnim},
     components::TransformAnchor,
     items::{
         svg_item::SvgItem,
@@ -23,10 +23,13 @@ const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[timeline]
 fn test_scene(timeline: &Timeline) {
-    let mut svg = SvgItem::from_svg(SVG);
-    svg.scale(Vec3::splat(3.0));
+    let svg = SvgItem::from_svg(SVG);
 
-    let _svg = timeline.insert(svg);
+    let mut svg = timeline.insert(svg);
+    svg.transform(|svg| {
+        svg.scale(Vec3::splat(3.0));
+    })
+    .apply();
 
     timeline.forward(10.0);
 }
