@@ -166,6 +166,8 @@ pub struct RanimRenderApp {
     output_dir: PathBuf,
 }
 
+// MARK: AppOptions
+
 #[derive(Debug, Clone)]
 pub struct AppOptions {
     pub frame_size: (u32, u32),

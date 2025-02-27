@@ -183,31 +183,34 @@ impl Renderer {
         {
             let RenderTextures {
                 render_view,
-                multisample_view,
-                depth_stencil_view,
+                // multisample_view,
+                // depth_stencil_view,
                 ..
             } = &self.render_textures;
             let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("VMobject Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: multisample_view,
-                    resolve_target: Some(render_view),
+                    // view: multisample_view,
+                    // resolve_target: Some(render_view),
+                    view: render_view,
+                    resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(self.clear_color),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: depth_stencil_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                }),
+                // depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                //     view: depth_stencil_view,
+                //     depth_ops: Some(wgpu::Operations {
+                //         load: wgpu::LoadOp::Clear(1.0),
+                //         store: wgpu::StoreOp::Store,
+                //     }),
+                //     stencil_ops: Some(wgpu::Operations {
+                //         load: wgpu::LoadOp::Clear(0),
+                //         store: wgpu::StoreOp::Store,
+                //     }),
+                // }),
+                depth_stencil_attachment: None,
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
@@ -336,8 +339,8 @@ pub struct RenderTextures {
     // multisample_texture: wgpu::Texture,
     // depth_stencil_texture: wgpu::Texture,
     pub(crate) render_view: wgpu::TextureView,
-    pub(crate) multisample_view: wgpu::TextureView,
-    pub(crate) depth_stencil_view: wgpu::TextureView,
+    // pub(crate) multisample_view: wgpu::TextureView,
+    // pub(crate) depth_stencil_view: wgpu::TextureView,
 }
 
 impl RenderTextures {
@@ -362,55 +365,55 @@ impl RenderTextures {
                 wgpu::TextureFormat::Rgba8Unorm,
             ],
         });
-        let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Multisample Texture"),
-            size: wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 4,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[
-                wgpu::TextureFormat::Rgba8UnormSrgb,
-                wgpu::TextureFormat::Rgba8Unorm,
-            ],
-        });
-        let depth_stencil_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Depth Stencil Texture"),
-            size: wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 4,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth24PlusStencil8,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
+        // let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+        //     label: Some("Multisample Texture"),
+        //     size: wgpu::Extent3d {
+        //         width: width as u32,
+        //         height: height as u32,
+        //         depth_or_array_layers: 1,
+        //     },
+        //     mip_level_count: 1,
+        //     sample_count: 4,
+        //     dimension: wgpu::TextureDimension::D2,
+        //     format,
+        //     usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        //     view_formats: &[
+        //         wgpu::TextureFormat::Rgba8UnormSrgb,
+        //         wgpu::TextureFormat::Rgba8Unorm,
+        //     ],
+        // });
+        // let depth_stencil_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+        //     label: Some("Depth Stencil Texture"),
+        //     size: wgpu::Extent3d {
+        //         width: width as u32,
+        //         height: height as u32,
+        //         depth_or_array_layers: 1,
+        //     },
+        //     mip_level_count: 1,
+        //     sample_count: 1,
+        //     dimension: wgpu::TextureDimension::D2,
+        //     format: wgpu::TextureFormat::Depth24PlusStencil8,
+        //     usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        //     view_formats: &[],
+        // });
         let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
             format: Some(format),
             ..Default::default()
         });
-        let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(format),
-            ..Default::default()
-        });
-        let depth_stencil_view =
-            depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        // let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
+        //     format: Some(format),
+        //     ..Default::default()
+        // });
+        // let depth_stencil_view =
+        //     depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         Self {
             render_texture,
             // multisample_texture,
             // depth_stencil_texture,
             render_view,
-            multisample_view,
-            depth_stencil_view,
+            // multisample_view,
+            // depth_stencil_view,
         }
     }
 }

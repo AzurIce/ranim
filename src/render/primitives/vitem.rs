@@ -149,15 +149,17 @@ impl RenderInstance for VItemPrimitive {
         }
         {
             let RenderTextures {
-                multisample_view,
+                // multisample_view,
                 render_view,
                 ..
             } = render_textures;
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("VItem Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: multisample_view,
-                    resolve_target: Some(render_view),
+                    // view: multisample_view,
+                    // resolve_target: Some(render_view),
+                    view: render_view,
+                    resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,

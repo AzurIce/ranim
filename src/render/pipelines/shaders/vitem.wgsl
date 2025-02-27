@@ -18,8 +18,6 @@ struct ClipBox {
 }
 @group(1) @binding(4) var<storage> clip_box: ClipBox;
 
-const ANTI_ALIAS_WIDTH: f32 = 0.015;
-
 fn point(idx: u32) -> vec2<f32> {
     return points[idx].xy;
 }
@@ -109,10 +107,7 @@ fn sign_bezier(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32>) -> f32 {
     let c: vec2<f32> = p - A;
 
     let denominator: f32 = a.x * b.y - b.x * a.y;
-    let bary: vec2<f32> = vec2<f32>(
-        c.x * b.y - b.x * c.y,
-        a.x * c.y - c.x * a.y
-    ) / denominator;
+    let bary: vec2<f32> = vec2<f32>(cross_2d(c, b), cross_2d(a, c)) / denominator;
 
     let d: vec2<f32> = vec2<f32>(bary.y * 0.5, 0.0) + 1.0 - bary.x - bary.y;
 
@@ -198,13 +193,13 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     let ratio = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
     let anchor_index = idx / 2;
 
-    // TODO: Antialias and clip_box
+    // TODO: Antialias
     var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[anchor_index], fill_rgbas[anchor_index + 1], ratio), is_closed(idx));
-    fill_rgba.a *= smoothstep(1.0, -1.0, (sgn_d) / ANTI_ALIAS_WIDTH);
+    fill_rgba.a *= smoothstep(1.0, -1.0, (sgn_d) );
 
     let stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
     var stroke_rgba: vec4<f32> = mix(stroke_rgbas[anchor_index], stroke_rgbas[anchor_index + 1], ratio);
-    stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width) / ANTI_ALIAS_WIDTH);
+    stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width));
 
     var f_color = blend_color(stroke_rgba, fill_rgba);
 

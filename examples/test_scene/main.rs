@@ -27,7 +27,7 @@ fn test_scene(timeline: &Timeline) {
 
     let mut svg = timeline.insert(svg);
     svg.transform(|svg| {
-        svg.scale(Vec3::splat(3.0));
+        svg.scale(Vec3::splat(3.272));
     })
     .apply();
 
