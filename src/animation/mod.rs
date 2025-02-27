@@ -1,7 +1,7 @@
+pub mod blank;
 pub mod composition;
 pub mod creation;
 pub mod fading;
-pub mod freeze;
 pub mod transform;
 
 use std::{cell::RefCell, rc::Rc};
@@ -172,6 +172,7 @@ impl<T: Entity + 'static> AnimSchedule<'_, '_, T, EntityAnim<T>> {
     pub fn apply(self) -> Self {
         if let EntityAnim::Dynamic(anim) = &self.anim.inner {
             self.rabject.data = anim.evaluator.eval_alpha(1.0);
+            self.rabject.timeline.update(self.rabject);
         }
         self
     }
@@ -369,9 +370,13 @@ impl AnimParams {
     }
 }
 
-/// An [`Animator`] with [`AnimParams`]
+/// A wrapper of an anim
 ///
-/// This is also an [`Animator`]
+/// For `A: DynamicRenderable`, `AnimWithParams<A>` is also `DynamicRenderable`, but the alpha is calculated with the params considered.
+/// For `A: StaticRenderable`, `AnimWithParams<A>` is also `StaticRenderable`, but the alpha is calculated with the params considered.
+/// For `A: Renderable`, `AnimWithParams<A>` is also `Renderable`
+///
+/// An `AnimWithParams<A>` can be convert into an Animation, if `A: Into<Animation>`.
 pub struct AnimWithParams<A> {
     pub(crate) inner: A,
     pub(crate) params: AnimParams,
