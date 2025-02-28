@@ -21,13 +21,13 @@ use ranim_macros::timeline;
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
-#[timeline]
+#[timeline(width = 3840, height = 2160, fps = 60)]
 fn test_scene(timeline: &Timeline) {
     let svg = SvgItem::from_svg(SVG);
 
     let mut svg = timeline.insert(svg);
     svg.transform(|svg| {
-        svg.scale(Vec3::splat(3.272));
+        svg.scale(Vec3::splat(3.272)).scale(Vec3::splat(2.0));
     })
     .apply();
 

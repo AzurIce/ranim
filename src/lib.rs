@@ -48,14 +48,14 @@ pub mod utils;
 // pub mod world;
 
 #[distributed_slice]
-pub static TIMELINES: [(&'static str, fn(&Timeline))];
+pub static TIMELINES: [(&'static str, fn(&Timeline), AppOptions<'static>)];
 
 #[macro_export]
 macro_rules! render_timeline {
     ($func:ident) => {
-        let (name, func) = ::ranim::TIMELINES
+        let (name, func, options) = ::ranim::TIMELINES
             .iter()
-            .find(|(name, _)| *name == stringify!($func))
+            .find(|(name, ..)| *name == stringify!($func))
             .unwrap();
 
         let timeline = Timeline::new();
@@ -64,10 +64,7 @@ macro_rules! render_timeline {
             // timeline.forward(0.1);
         }
         let duration_secs = timeline.elapsed_secs();
-        let mut app = ::ranim::RanimRenderApp::new(&::ranim::AppOptions {
-            output_dir: std::path::PathBuf::from(format!("./output/{}", name)),
-            ..Default::default()
-        });
+        let mut app = ::ranim::RanimRenderApp::new(&options);
         app.render_anim(
             ::ranim::animation::AnimWithParams::new(timeline)
                 .with_duration(duration_secs)
@@ -102,8 +99,9 @@ impl<T: TimelineConstructor> RenderScene for T {
         let desc = T::desc();
         let mut options = options.clone();
         let default_options = AppOptions::default();
+        let output_dir = format!("./output/{}", desc.name);
         if options.output_dir == default_options.output_dir {
-            options.output_dir = PathBuf::from(format!("./output/{}", desc.name))
+            options.output_dir = output_dir.as_str()
         }
 
         let mut clip_contructor = self;
@@ -126,7 +124,7 @@ impl<T: TimelineConstructor> RenderScene for T {
         let mut clip_contructor = self;
         let desc = T::desc();
         let mut app = RanimRenderApp::new(&AppOptions {
-            output_dir: PathBuf::from(format!("./output/{}", desc.name)),
+            output_dir: format!("./output/{}", desc.name).as_str(),
             ..Default::default()
         });
         let mut timeline = Timeline::new();
@@ -168,22 +166,24 @@ pub struct RanimRenderApp {
 
 // MARK: AppOptions
 
+pub static DEFAULT_APP_OPTIONS: AppOptions = AppOptions {
+    frame_size: (1920, 1080),
+    frame_rate: 60,
+    save_frames: false,
+    output_dir: "./output",
+};
+
 #[derive(Debug, Clone)]
-pub struct AppOptions {
+pub struct AppOptions<'a> {
     pub frame_size: (u32, u32),
     pub frame_rate: u32,
     pub save_frames: bool,
-    pub output_dir: PathBuf,
+    pub output_dir: &'a str,
 }
 
-impl Default for AppOptions {
+impl Default for AppOptions<'_> {
     fn default() -> Self {
-        Self {
-            frame_size: (1920, 1080),
-            frame_rate: 60,
-            save_frames: false,
-            output_dir: PathBuf::from("./output"),
-        }
+        DEFAULT_APP_OPTIONS.clone()
     }
 }
 
@@ -194,6 +194,7 @@ impl RanimRenderApp {
             options.frame_size.0 as usize,
             options.frame_size.1 as usize,
         );
+        let output_dir = PathBuf::from(options.output_dir);
         let mut renderer = Renderer::new(
             &ctx,
             options.frame_size.0 as usize,
@@ -209,13 +210,13 @@ impl RanimRenderApp {
                 FileWriterBuilder::default()
                     .with_fps(options.frame_rate)
                     .with_size(options.frame_size.0, options.frame_size.1)
-                    .with_file_path(options.output_dir.join("output.mp4")),
+                    .with_file_path(output_dir.join("output.mp4")),
             ),
             save_frames: options.save_frames,
             fps: options.frame_rate,
             frame_count: 0,
             ctx,
-            output_dir: options.output_dir.clone(),
+            output_dir,
         }
     }
     // fn tick_duration(&self) -> Duration {
