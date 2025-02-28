@@ -11,7 +11,7 @@ use crate::{
     items::{Entity, Rabject},
     render::{
         primitives::{ExtractFrom, RenderInstance, RenderInstances},
-        DynamicRenderable, RenderTextures, Renderable, StaticRenderable,
+        DynamicEval, DynamicRenderable, RenderTextures, Renderable, StaticEval, StaticRenderable,
     },
     utils::{rate_functions::linear, Id, PipelinesStorage},
 };
@@ -102,7 +102,7 @@ impl Renderable for Rc<Box<dyn StaticRenderable>> {
     }
 }
 
-impl DynamicRenderable for Rc<RefCell<Box<dyn DynamicRenderable>>> {
+impl DynamicEval for Rc<RefCell<Box<dyn DynamicRenderable>>> {
     fn prepare_alpha(
         &mut self,
         alpha: f32,
@@ -114,7 +114,7 @@ impl DynamicRenderable for Rc<RefCell<Box<dyn DynamicRenderable>>> {
     }
 }
 
-impl StaticRenderable for Rc<Box<dyn StaticRenderable>> {
+impl StaticEval for Rc<Box<dyn StaticRenderable>> {
     fn prepare(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances) {
         self.as_ref().prepare(ctx, render_instances);
     }
@@ -192,23 +192,23 @@ impl<T: Entity + 'static> From<AnimSchedule<'_, '_, T, DynamicEntityAnim<T>>> fo
 // MARK: StaticEntityAnim
 
 #[derive(Clone)]
-pub struct StaticEntityAnim<T: Entity> {
+pub struct StaticEntityAnim<T: Clone> {
     id: Id,
     data: T,
 }
 
-impl<T: Entity> StaticEntityAnim<T> {
+impl<T: Clone> StaticEntityAnim<T> {
     pub fn new(id: Id, data: T) -> Self {
         Self { id, data }
     }
 }
-impl<T: Entity> Freezable<T> for StaticEntityAnim<T> {
+impl<T: Clone> Freezable<T> for StaticEntityAnim<T> {
     fn get_end_freeze_anim(&self) -> StaticEntityAnim<T> {
         self.clone()
     }
 }
 
-impl<T: Entity + 'static> StaticRenderable for StaticEntityAnim<T> {
+impl<T: Entity + 'static> StaticEval for StaticEntityAnim<T> {
     fn prepare(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances) {
         let render_resource = render_instances.get_or_init::<T>(self.id);
         render_resource.update_from(ctx, &self.data);
@@ -238,7 +238,7 @@ impl<T: Entity + 'static> Renderable for StaticEntityAnim<T> {
 
 // MARK: Freeze
 
-pub trait Freezable<T: Entity> {
+pub trait Freezable<T: Clone> {
     fn get_end_freeze_anim(&self) -> StaticEntityAnim<T>;
 }
 
@@ -305,7 +305,7 @@ impl<T: Entity> Freezable<T> for DynamicEntityAnim<T> {
     }
 }
 
-impl<T: Entity + 'static> DynamicRenderable for DynamicEntityAnim<T> {
+impl<T: Entity + 'static> DynamicEval for DynamicEntityAnim<T> {
     fn prepare_alpha(
         &mut self,
         alpha: f32,
@@ -417,7 +417,7 @@ impl<A: Into<Animation>> From<AnimWithParams<A>> for Animation {
     }
 }
 
-impl<A: DynamicRenderable> DynamicRenderable for AnimWithParams<A> {
+impl<A: DynamicEval> DynamicEval for AnimWithParams<A> {
     fn prepare_alpha(
         &mut self,
         alpha: f32,
@@ -431,7 +431,7 @@ impl<A: DynamicRenderable> DynamicRenderable for AnimWithParams<A> {
     }
 }
 
-impl<A: StaticRenderable> StaticRenderable for AnimWithParams<A> {
+impl<A: StaticEval> StaticEval for AnimWithParams<A> {
     fn prepare(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances) {
         self.inner.prepare(ctx, render_instances);
     }

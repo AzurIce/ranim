@@ -1,4 +1,4 @@
-use crate::render::{RenderTextures, Renderable, StaticRenderable};
+use crate::render::{RenderTextures, Renderable, StaticEval};
 
 pub struct Blank;
 
@@ -16,7 +16,7 @@ impl Renderable for Blank {
     }
 }
 
-impl StaticRenderable for Blank {
+impl StaticEval for Blank {
     fn prepare(
         &self,
         _ctx: &crate::context::WgpuContext,

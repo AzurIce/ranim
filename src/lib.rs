@@ -16,7 +16,7 @@ use linkme::distributed_slice;
 use log::{info, warn};
 use timeline::Timeline;
 
-use render::{CameraFrame, DynamicRenderable, Renderable, Renderer};
+use render::{CameraFrame, DynamicEval, DynamicRenderable, Renderable, Renderer};
 use utils::rate_functions::linear;
 
 pub mod prelude {

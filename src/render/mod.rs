@@ -28,7 +28,7 @@ pub trait Renderable {
     );
 }
 
-pub trait DynamicRenderable: Renderable {
+pub trait DynamicEval {
     fn prepare_alpha(
         &mut self,
         alpha: f32,
@@ -37,9 +37,15 @@ pub trait DynamicRenderable: Renderable {
     );
 }
 
-pub trait StaticRenderable: Renderable {
+pub trait StaticEval {
     fn prepare(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances);
 }
+
+pub trait DynamicRenderable: DynamicEval + Renderable {}
+impl<T: DynamicEval + Renderable> DynamicRenderable for T {}
+
+pub trait StaticRenderable: StaticEval + Renderable {}
+impl<T: StaticEval + Renderable> StaticRenderable for T {}
 
 // MARK: CameraUniforms
 

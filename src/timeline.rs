@@ -6,8 +6,8 @@ use crate::{
     context::WgpuContext,
     items::{Entity, Rabject},
     render::{
-        primitives::RenderInstances, DynamicRenderable, RenderTextures, Renderable,
-        StaticRenderable,
+        primitives::RenderInstances, DynamicEval, RenderTextures, Renderable,
+        StaticEval, StaticRenderable,
     },
     utils::{Id, PipelinesStorage},
 };
@@ -16,6 +16,12 @@ use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use itertools::Itertools;
 pub use ranim_macros::timeline;
+
+// MARK: Eval
+
+pub trait Eval<T> {
+    fn eval(&self, a: f32) -> Option<T>;
+}
 
 // MARK: Timeline
 
@@ -131,7 +137,7 @@ impl Timeline {
     }
 }
 
-impl DynamicRenderable for Timeline {
+impl DynamicEval for Timeline {
     fn prepare_alpha(
         &mut self,
         alpha: f32,
@@ -167,6 +173,10 @@ impl Renderable for Timeline {
     }
 }
 
+pub struct CameraTimeline {
+
+}
+
 // MARK: EntityTimeline
 
 #[derive(Clone)]
@@ -174,11 +184,11 @@ pub struct EntityTimeline {
     // pub(super) rabject_id: Id,
     pub(super) cur_freeze_anim: Rc<Box<dyn StaticRenderable>>,
     pub(super) is_showing: bool,
+    pub(super) anims: Vec<Animation>,
+    pub(super) elapsed_secs: f32,
+    pub(super) end_secs: Vec<f32>,
     pub(super) last_anim_idx: Option<usize>,
     pub(super) cur_anim_idx: Option<usize>,
-    pub(super) anims: Vec<Animation>,
-    pub(super) end_secs: Vec<f32>,
-    pub(super) elapsed_secs: f32,
 }
 
 impl EntityTimeline {
@@ -246,7 +256,43 @@ impl EntityTimeline {
     }
 }
 
-impl DynamicRenderable for EntityTimeline {
+impl Eval<Box<dyn Renderable>> for EntityTimeline {
+    fn eval(&self, a: f32) -> Option<Box<dyn Renderable>> {
+        // TODO: handle no anim
+        if self.anims.is_empty() {
+            return None;
+        }
+        // trace!("update_alpha: {alpha}, {}", self.elapsed_secs);
+        let cur_sec = alpha * self.elapsed_secs;
+        let (idx, (anim, end_sec)) = self
+            .anims
+            .iter_mut()
+            .zip(self.end_secs.iter())
+            .find_position(|(_, end_sec)| **end_sec >= cur_sec)
+            .unwrap();
+        // trace!("{cur_sec[{idx}] {:?}", self.end_secs);
+        self.last_anim_idx = self.cur_anim_idx;
+        self.cur_anim_idx = Some(idx);
+        let start_sec = if idx > 0 {
+            self.end_secs.get(idx - 1).cloned()
+        } else {
+            None
+        }
+        .unwrap_or(0.0);
+        let alpha = (cur_sec - start_sec) / (end_sec - start_sec);
+        match anim {
+            Animation::Static(anim) => {
+                if self.last_anim_idx != self.cur_anim_idx {
+                    anim.prepare(ctx, render_instances);
+                }
+            }
+            Animation::Dynamic(anim) => {
+                anim.prepare_alpha(alpha, ctx, render_instances);
+            }
+    }
+}
+
+impl DynamicEval for EntityTimeline {
     fn prepare_alpha(
         &mut self,
         alpha: f32,
