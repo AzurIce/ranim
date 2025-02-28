@@ -73,6 +73,31 @@ macro_rules! render_timeline {
     };
 }
 
+#[macro_export]
+macro_rules! render_timeline_frame {
+    ($func:ident, $alpha:expr, $filepath:expr) => {
+        let (name, func, options) = ::ranim::TIMELINES
+            .iter()
+            .find(|(name, ..)| *name == stringify!($func))
+            .unwrap();
+
+        let timeline = Timeline::new();
+        (func)(&timeline);
+        if timeline.elapsed_secs() == 0.0 {
+            // timeline.forward(0.1);
+        }
+        let duration_secs = timeline.elapsed_secs();
+        let mut app = ::ranim::RanimRenderApp::new(&options);
+        app.render_anim_frame(
+            ::ranim::animation::AnimWithParams::new(timeline)
+                .with_duration(duration_secs)
+                .with_rate_func(::ranim::utils::rate_functions::linear),
+            $alpha,
+            $filepath,
+        );
+    };
+}
+
 pub struct SceneDesc {
     pub name: String,
 }
@@ -268,6 +293,20 @@ impl RanimRenderApp {
             Duration::from_secs_f32(anim.params.duration_secs),
         );
         pb.finish_with_message(msg);
+    }
+
+    pub fn render_anim_frame<T: DynamicRenderable>(
+        &mut self,
+        mut anim: AnimWithParams<T>,
+        alpha: f32,
+        filepath: impl AsRef<Path>,
+    ) {
+        anim.prepare_alpha(
+            alpha,
+            &self.ctx.wgpu_ctx,
+            &mut self.renderer.render_instances,
+        );
+        self.render_to_image(&mut anim, self.output_dir.join(filepath));
     }
 
     fn update_frame(&mut self) {
