@@ -20,10 +20,13 @@ use render::{CameraFrame, DynamicRenderable, Renderable, Renderer};
 use utils::rate_functions::linear;
 
 pub mod prelude {
+    pub use crate::timeline::{timeline, Timeline};
+    pub use crate::{render_timeline, render_timeline_frame};
+
     pub use crate::color::prelude::*;
     pub use crate::interpolate::Interpolatable;
 
-    pub use crate::animation::creation::{Empty, Fill, Partial, Stroke};
+    pub use crate::animation::creation::{Color, Empty, Fill, Partial, Stroke};
     pub use crate::animation::fading::Opacity;
     pub use crate::animation::transform::Alignable;
 

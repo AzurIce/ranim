@@ -218,7 +218,7 @@ impl Stroke for VItem {
 
 // MARK: Blueprints
 
-/// A polygon defined by a list of corner points (Clock wise).
+/// A polygon defined by a list of corner points (Counter Clock wise).
 pub struct Polygon(pub Vec<Vec3>);
 
 impl Blueprint<VItem> for Polygon {
@@ -250,9 +250,9 @@ impl Blueprint<VItem> for Rectangle {
         let half_height = self.1 / 2.0;
         Polygon(vec![
             vec3(-half_width, -half_height, 0.0),
-            vec3(-half_width, half_height, 0.0),
-            vec3(half_width, half_height, 0.0),
             vec3(half_width, -half_height, 0.0),
+            vec3(half_width, half_height, 0.0),
+            vec3(-half_width, half_height, 0.0),
         ])
         .build()
     }

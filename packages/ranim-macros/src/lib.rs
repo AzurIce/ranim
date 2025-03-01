@@ -1,4 +1,4 @@
-use darling::{ast::NestedMeta, FromMeta, Error};
+use darling::{ast::NestedMeta, Error, FromMeta};
 use proc_macro::TokenStream;
 
 #[derive(Debug, FromMeta)]

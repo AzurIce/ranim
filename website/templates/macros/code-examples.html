@@ -1,0 +1,35 @@
+{% macro code_example(example_name) %}
+  {% set example_data = load_data(path="/data/" ~ example_name ~ ".toml") %}
+  
+  {% if example_data.output_type == "video" %}
+    <video controls>
+      <source src="{{ example_data.output_path }}" type="video/mp4">
+      您的浏览器不支持视频标签。
+    </video>
+  {% elif example_data.output_type == "image" %}
+    <img src="{{ example_data.output_path }}" alt="{{ example_data.name }} 示例输出">
+  {% endif %}
+  
+  {{ example_data.code | markdown }}
+{% endmacro %}
+
+{% macro process_code_block(content) %}
+  {% set lines = content | split(pat="\n") %}
+  {% set result = [] %}
+  {% set i = 0 %}
+  {% set in_code_block = false %}
+  {% set code_block_content = [] %}
+  
+  {% for line in lines %}
+    {% if line is starting_with("<p>!example-") and not in_code_block %}
+      {% set parts = line | split(pat="!example-") %}
+      {% set example_info = parts[1] | split(pat="</p>") %}
+      {% set example_block = self::code_example(example_name=example_info[0]) %}
+      {% set_global result = result | concat(with=example_block) %}
+    {% else %}
+      {% set_global result = result | concat(with=line) %}
+    {% endif %}
+  {% endfor %}
+  
+  {{ result | join(sep="\n") | safe }}
+{% endmacro %}

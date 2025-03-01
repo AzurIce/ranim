@@ -2,6 +2,8 @@
   --container-padding: 8px;
 
   width: 100%;
+  // box-sizing: border-box;
+  // max-width: 100%;
   max-width: calc(#{$max-width} + var(--container-padding) * 2);
   margin: 0 auto;
   padding: 0 var(--container-padding);
