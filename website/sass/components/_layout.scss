@@ -85,15 +85,18 @@
 
     .content {
       display: flex;
+      flex: 1 1 auto;
+      max-width: 100%;
       justify-content: center;
+      overflow-x: hidden;
 
-      width: 100%;
       padding-top: 1rem;
       padding-left: 1.5rem;
       padding-right: 1.5rem;
 
       article {
         width: 100%;
+        max-width: 100%;
       }
 
       @media (min-width: #{$md}) {

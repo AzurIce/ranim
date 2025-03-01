@@ -1,0 +1,102 @@
+name = "basic"
+code = """
+```rust
+use std::f32;\r
+\r
+use env_logger::Env;\r
+use glam::{vec3, Vec3};\r
+use ranim::animation::creation::{Color, CreationAnim, WritingAnim};\r
+use ranim::animation::fading::FadingAnim;\r
+use ranim::animation::transform::TransformAnim;\r
+use ranim::color::palettes::manim;\r
+use ranim::items::svg_item::SvgItem;\r
+use ranim::items::vitem::{Arc, Polygon};\r
+use ranim::timeline::{timeline, Timeline};\r
+use ranim::{prelude::*, render_timeline, typst_svg};\r
+\r
+const SVG: &str = include_str!(\"../../assets/Ghostscript_Tiger.svg\");\r
+\r
+#[timeline]\r
+fn basic(timeline: &Timeline) {\r
+    timeline.forward(0.2);\r
+\r
+    let mut svg = SvgItem::from_svg(SVG);\r
+    svg.scale(Vec3::splat(2.0)).shift(vec3(0.0, 200.0, 0.0));\r
+    let mut svg = timeline.insert(svg);\r
+    timeline.play(svg.fade_in());\r
+\r
+    let mut text = SvgItem::from_svg(&typst_svg!(\r
+        r#\"\r
+        #align(center)[\r
+            #text(60pt)[Ranim]\r
+\r
+            #text(20pt)[Hello 你好]\r
+        ]\r
+        \"#\r
+    ));\r
+    text.set_fill_opacity(0.8).shift(Vec3::NEG_Y * 200.0);\r
+    let mut text = timeline.insert(text);\r
+\r
+    timeline.play(text.write().with_duration(3.0));\r
+\r
+    timeline.play(\r
+        text.transform(|data| {\r
+            data.scale(Vec3::splat(2.0));\r
+        })\r
+        .apply(), // `apply` will apply the animation's effect to rabject's data\r
+    );\r
+\r
+    timeline.forward(0.5);\r
+    timeline.play(text.unwrite().with_duration(3.0));\r
+    timeline.play(svg.fade_out());\r
+\r
+    let mut polygon = Polygon(vec![\r
+        vec3(0.0, 0.0, 0.0),\r
+        vec3(-100.0, -300.0, 0.0),\r
+        vec3(0.0, 700.0, 0.0),\r
+        vec3(200.0, 300.0, 0.0),\r
+        vec3(500.0, 0.0, 0.0),\r
+    ])\r
+    .build();\r
+    polygon\r
+        .set_color(color!(\"#FF8080FF\"))\r
+        .set_fill_opacity(0.5)\r
+        .rotate(std::f32::consts::FRAC_PI_2, Vec3::Z);\r
+\r
+    // [polygon] 0.5s wait -> fade in -> 0.5s wait\r
+    timeline.forward(0.5);\r
+    let mut polygon = timeline.insert(polygon);\r
+    timeline.play(polygon.fade_in());\r
+    timeline.forward(0.5);\r
+\r
+    let mut arc = Arc {\r
+        angle: f32::consts::PI / 3.0,\r
+        radius: 100.0,\r
+    }\r
+    .build();\r
+    arc.set_stroke_color(manim::BLUE_C);\r
+    let mut arc = timeline.insert(arc);\r
+    // [polygon] interpolate [svg] -> 0.5s wait\r
+\r
+    let polygon_data = polygon.data.clone();\r
+    drop(polygon);\r
+    timeline.play(arc.transform_from(polygon_data));\r
+    timeline.forward(0.5);\r
+\r
+    // [svg] fade_out -> 0.5s wait\r
+    timeline.play(arc.uncreate());\r
+    timeline.forward(0.5);\r
+}\r
+\r
+fn main() {\r
+    #[cfg(debug_assertions)]\r
+    env_logger::Builder::from_env(Env::default().default_filter_or(\"basic=trace\")).init();\r
+    #[cfg(not(debug_assertions))]\r
+    env_logger::Builder::from_env(Env::default().default_filter_or(\"basic=info,ranim=info\")).init();\r
+\r
+    render_timeline!(basic);\r
+}\r
+
+```"""
+output_type = "video"
+output_path = "/examples/basic/output.mp4"

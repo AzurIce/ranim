@@ -1,0 +1,67 @@
+name = "arc"
+code = """
+```rust
+use env_logger::Env;\r
+use glam::vec2;\r
+use ranim::animation::fading::FadingAnim;\r
+use ranim::color::HueDirection;\r
+use ranim::items::vitem::Arc;\r
+use ranim::timeline::{timeline, Timeline};\r
+use ranim::{prelude::*, render_timeline};\r
+\r
+#[timeline]\r
+fn arc(timeline: &Timeline) {\r
+    // let frame_size = app.camera().size;\r
+    let frame_size = (1920.0, 1080.0);\r
+    let frame_start = vec2(frame_size.0 as f32 / -2.0, frame_size.1 as f32 / -2.0);\r
+\r
+    let start_color = color!(\"#FF8080FF\");\r
+    let end_color = color!(\"#58C4DDFF\");\r
+\r
+    let nrow = 10;\r
+    let ncol = 10;\r
+    let gap = 10.0;\r
+    let padding = 30.0;\r
+    let step_x = (frame_size.0 as f32 - padding * 2.0 - gap * (ncol - 1) as f32) / ncol as f32;\r
+    let step_y = (frame_size.1 as f32 - padding * 2.0 - gap * (nrow - 1) as f32) / nrow as f32;\r
+\r
+    let mut arcs = Vec::with_capacity(nrow * ncol);\r
+    for i in 0..nrow {\r
+        for j in 0..ncol {\r
+            let angle = std::f32::consts::PI * j as f32 / (ncol - 1) as f32 * 360.0 / 180.0;\r
+            let radius = step_y / 2.0;\r
+            let color = start_color.lerp(\r
+                end_color,\r
+                i as f32 / (nrow - 1) as f32,\r
+                HueDirection::Increasing,\r
+            );\r
+            let offset = frame_start\r
+                + vec2(\r
+                    j as f32 * step_x + step_x / 2.0 + j as f32 * gap + padding,\r
+                    i as f32 * step_y + step_y / 2.0 + i as f32 * gap + padding,\r
+                );\r
+            let mut arc = Arc { angle, radius }.build();\r
+            arc.set_stroke_width(10.0 * j as f32)\r
+                .set_stroke_color(color)\r
+                .set_fill_color(color.with_alpha(0.0))\r
+                .shift(offset.extend(0.0));\r
+\r
+            let mut arc = timeline.insert(arc);\r
+            timeline.play(arc.fade_in().with_duration(0.05));\r
+            arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`\r
+        }\r
+    }\r
+}\r
+\r
+fn main() {\r
+    #[cfg(debug_assertions)]\r
+    env_logger::Builder::from_env(Env::default().default_filter_or(\"arc=trace\")).init();\r
+    #[cfg(not(debug_assertions))]\r
+    env_logger::Builder::from_env(Env::default().default_filter_or(\"arc=info\")).init();\r
+\r
+    render_timeline!(arc);\r
+}\r
+
+```"""
+output_type = "video"
+output_path = "/examples/arc/output.mp4"

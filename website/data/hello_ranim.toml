@@ -1,0 +1,35 @@
+name = "hello_ranim"
+code = """
+```rust
+use ranim::{\r
+    animation::{fading::FadingAnim, transform::TransformAnim},\r
+    color::palettes::manim,\r
+    items::vitem::{Circle, Square},\r
+    prelude::*,\r
+};\r
+\r
+#[timeline]\r
+fn hello_ranim(timeline: &Timeline) {\r
+    let mut square = Square(300.0).build();\r
+    square.set_color(manim::BLUE_C);\r
+    let mut square = timeline.insert(square);\r
+\r
+    let mut circle = Circle(300.0).build();\r
+    circle.set_color(manim::RED_C);\r
+\r
+    timeline.play(square.fade_in());\r
+\r
+    timeline.forward(1.0);\r
+    timeline.play(square.transform_to(circle).apply());\r
+    timeline.forward(1.0);\r
+\r
+    timeline.play(square.fade_out())\r
+}\r
+\r
+fn main() {\r
+    render_timeline!(hello_ranim);\r
+}\r
+
+```"""
+output_type = "video"
+output_path = "/examples/hello_ranim/output.mp4"
