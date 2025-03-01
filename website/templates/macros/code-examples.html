@@ -3,11 +3,11 @@
   
   {% if example_data.output_type == "video" %}
     <video controls>
-      <source src="{{ example_data.output_path }}" type="video/mp4">
+      <source src="{{ get_url(path=example_data.output_path) }}" type="video/mp4">
       您的浏览器不支持视频标签。
     </video>
   {% elif example_data.output_type == "image" %}
-    <img src="{{ example_data.output_path }}" alt="{{ example_data.name }} 示例输出">
+    <img src="{{ get_url(path=example_data.output_path) }}" alt="{{ example_data.name }} 示例输出">
   {% endif %}
   
   {{ example_data.code | markdown }}
