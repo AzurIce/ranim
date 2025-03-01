@@ -73,6 +73,6 @@ docs/_build/
 
 image*.png
 output/
-output*
+/output*
 
 .direnv/
