@@ -387,3 +387,53 @@ pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
 
 //     new_segments
 // }
+#[cfg(test)]
+mod test {
+    use super::*;
+    use glam::vec3;
+
+    #[test]
+    fn test_trim_quad_bezier() {
+        // 测试正常参数顺序 (a < b)
+        let bezier = [
+            vec3(0.0, 0.0, 0.0),
+            vec3(1.0, 2.0, 0.0),
+            vec3(2.0, 0.0, 0.0),
+        ];
+        let trimmed = trim_quad_bezier(&bezier, 0.25, 0.75);
+
+        // 验证结果点在曲线上
+        let start_point = quad_bezier_eval(&bezier, 0.25);
+        let end_point = quad_bezier_eval(&bezier, 0.75);
+        assert!((trimmed[0] - start_point).length() < f32::EPSILON);
+        assert!((trimmed[2] - end_point).length() < f32::EPSILON);
+
+        // 测试参数顺序颠倒 (a > b)
+        let trimmed_reversed = trim_quad_bezier(&bezier, 0.75, 0.25);
+        assert!((trimmed_reversed[0] - start_point).length() < f32::EPSILON);
+        assert!((trimmed_reversed[2] - end_point).length() < f32::EPSILON);
+
+        // 测试边界值
+        let full_curve = trim_quad_bezier(&bezier, 0.0, 1.0);
+        assert!((full_curve[0] - bezier[0]).length() < f32::EPSILON);
+        assert!((full_curve[2] - bezier[2]).length() < f32::EPSILON);
+
+        // 测试零长度曲线
+        let zero_length = trim_quad_bezier(&bezier, 0.5, 0.5);
+        let mid_point = quad_bezier_eval(&bezier, 0.5);
+        assert!((zero_length[0] - mid_point).length() < f32::EPSILON);
+        assert!((zero_length[2] - mid_point).length() < f32::EPSILON);
+
+        // 测试复杂曲线
+        let complex_bezier = [
+            vec3(-1.0, 0.0, 1.0),
+            vec3(1.0, 3.0, 0.0),
+            vec3(3.0, 0.0, -1.0),
+        ];
+        let trimmed_complex = trim_quad_bezier(&complex_bezier, 0.2, 0.8);
+        let complex_start = quad_bezier_eval(&complex_bezier, 0.2);
+        let complex_end = quad_bezier_eval(&complex_bezier, 0.8);
+        assert!((trimmed_complex[0] - complex_start).length() < f32::EPSILON);
+        assert!((trimmed_complex[2] - complex_end).length() < f32::EPSILON);
+    }
+}

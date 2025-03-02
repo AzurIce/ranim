@@ -5,25 +5,41 @@ use std::time::Duration;
 use env_logger::Env;
 use glam::Vec3;
 use ranim::{
-    animation::{creation::{CreationAnim, WritingAnim}, transform::TransformAnim}, components::TransformAnchor, items::{
+    animation::{
+        creation::{CreationAnim, WritingAnim},
+        transform::TransformAnim,
+    },
+    components::TransformAnchor,
+    items::{
         svg_item::SvgItem,
         vitem::{Square, VItem},
         Rabject,
-    }, prelude::*, render_timeline, timeline::Timeline, typst_svg, AppOptions, TimelineConstructor
+    },
+    prelude::*,
+    render_timeline,
+    timeline::Timeline,
+    typst_svg, AppOptions, TimelineConstructor,
 };
 use ranim_macros::timeline;
 
-const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
+// const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
-#[timeline(width = 3840, height = 2160, fps = 60)]
+#[timeline(fps = 60)]
 fn test_scene(timeline: &Timeline) {
     // let svg = SvgItem::from_svg(SVG);
 
     let svg = SvgItem::from_svg(typst_svg!("R"));
 
     let mut svg = timeline.insert(svg);
-    timeline.play(svg.unwrite().with_duration(2.0));
-    timeline.play(svg.write().with_duration(2.0));
+    let fill = svg.fill_color();
+    svg.scale(Vec3::splat(10.0))
+        .set_fill_opacity(0.0)
+        .set_stroke_width(1.0)
+        .set_stroke_color(fill)
+        .set_stroke_opacity(1.0);
+    // timeline.play(svg.unwrite().with_duration(2.0));
+    timeline.play(svg.uncreate().with_duration(2.0));
+    // timeline.play(svg.write().with_duration(2.0));
     // svg.transform(|svg| {
     //     svg.scale(Vec3::splat(3.272)).scale(Vec3::splat(2.0));
     // })
