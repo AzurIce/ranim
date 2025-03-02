@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
 
+const EXCLUDE_EXAMPLE: [&str; 1] = ["test_scene"];
+
 #[derive(Serialize, Deserialize)]
 struct ExampleMeta {
     name: String,
@@ -35,6 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
         .map(|entry| entry.path())
+        .filter(|p| !EXCLUDE_EXAMPLE.contains(&p.file_name().unwrap().to_str().unwrap()))
         .collect();
 
     // 如果提供了命令行参数，则只处理指定的示例
