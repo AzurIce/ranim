@@ -327,7 +327,7 @@ impl Interpolatable for SvgItem {
 
 impl Partial for SvgItem {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
-        let max_vitem_idx = self.vitems.len() - 1;
+        let max_vitem_idx = self.vitems.len();
         let (start_index, start_residue) = interpolate_usize(0, max_vitem_idx, range.start);
         let (end_index, end_residue) = interpolate_usize(0, max_vitem_idx, range.end);
         // trace!("range: {:?}, start: {} {}, end: {} {}", range, start_index, start_residue, end_index, end_residue);
@@ -340,26 +340,30 @@ impl Partial for SvgItem {
             // .lerp(self.vitems.get(start_index + 1).unwrap(), start_residue);
             vec![start_v]
         } else {
+            let mut partial = Vec::with_capacity(end_index - start_index + 1 + 2);
             let start_v = self
                 .vitems
                 .get(start_index)
                 .unwrap()
                 .get_partial(start_residue..1.0);
-            // .lerp(self.vitems.get(start_index + 1).unwrap(), start_residue);
-            let end_v = self
-                .vitems
-                .get(end_index)
-                .unwrap()
-                .get_partial(0.0..end_residue);
-            // .lerp(self.vitems.get(end_index + 1).unwrap(), end_residue);
-
-            let mut partial = Vec::with_capacity(end_index - start_index + 1 + 2);
             partial.push(start_v);
+
             if start_index < end_index - 1 {
                 let mid = self.vitems.get(start_index + 1..end_index).unwrap();
                 partial.extend_from_slice(mid);
             }
-            partial.push(end_v);
+
+            if end_residue != 0.0 {
+                // .lerp(self.vitems.get(start_index + 1).unwrap(), start_residue);
+                let end_v = self
+                    .vitems
+                    .get(end_index)
+                    .unwrap()
+                    .get_partial(0.0..end_residue);
+                // .lerp(self.vitems.get(end_index + 1).unwrap(), end_residue);
+
+                partial.push(end_v);
+            }
             partial
         };
 
@@ -418,7 +422,8 @@ fn walk_svg_group(group: &usvg::Group) -> impl Iterator<Item = (&usvg::Path, usv
 
 #[cfg(test)]
 mod test {
-    use super::walk_svg_group;
+    use super::*;
+    use crate::typst_svg;
 
     const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
     #[test]
@@ -426,5 +431,17 @@ mod test {
         let tree = usvg::Tree::from_str(SVG, &usvg::Options::default()).unwrap();
         let paths = walk_svg_group(tree.root()).collect::<Vec<_>>();
         println!("{} paths", paths.len());
+    }
+
+    #[test]
+    fn test_get_partial() {
+        let mut svg = SvgItem::from_svg(typst_svg!("R"));
+        svg.scale(Vec3::splat(10.0));
+
+        println!("{:?}", svg.vitems[0].vpoints);
+        let partial = svg.get_partial(0.0..0.5);
+        println!("{:?}", partial.vitems[0].vpoints);
+        let partial = svg.vitems[0].get_partial(0.0..0.5);
+        println!("{:?}", partial.vpoints);
     }
 }

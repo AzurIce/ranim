@@ -44,35 +44,48 @@ impl Interpolatable for VPoint {
 impl Partial for ComponentVec<VPoint> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
         // trace!("get_partial: {:?}", range);
-        let max_anchor_idx = self.len() / 2 - 1;
+        let max_anchor_idx = self.len() / 2;
         // trace!("max_anchor_idx: {}", max_anchor_idx);
 
         let (start_index, start_residue) = interpolate_usize(0, max_anchor_idx, range.start);
         let (end_index, end_residue) = interpolate_usize(0, max_anchor_idx, range.end);
-        if start_index == end_index {
+        // println!("{} {}", self.len(), max_anchor_idx);
+        // println!(
+        //     "{:?}, start: {} {}, end: {} {}",
+        //     range, start_index, start_residue, end_index, end_residue
+        // );
+        if end_index - start_index == 0 {
             let seg = self.get_seg(start_index).unwrap().map(|p| p.0);
             let quad = trim_quad_bezier(&seg, start_residue, end_residue);
             quad.into()
         } else {
+            let mut partial = Vec::with_capacity((end_index - start_index + 1 + 2) * 2 + 1);
+
             let seg = self.get_seg(start_index).unwrap().map(|p| p.0);
             let start_part = trim_quad_bezier(&seg, start_residue, 1.0);
-            let seg = self.get_seg(end_index).unwrap().map(|p| p.0);
-            let end_part = trim_quad_bezier(&seg, 0.0, end_residue);
-            let mut partial = Vec::with_capacity((end_index - start_index + 1 + 2) * 2 + 1);
             partial.extend_from_slice(&start_part);
-            if start_index < end_index - 1 {
+            // println!("start_seg: {:?}, start_part: {:?}", seg, start_part);
+
+            // If start_index < end_index - 1, we need to add the middle segment
+            //  start     mid    end
+            // [o - o] [- o - o] [- o]
+            if end_index - start_index > 1 {
                 let mid = self
-                    .get((start_index + 1) * 2 + 1..end_index * 2)
+                    .get((start_index + 1) * 2 + 1..=end_index * 2)
                     .unwrap()
                     .iter()
                     .map(|p| p.0);
                 // trace!("mid: {}", mid.len());
                 partial.extend(mid);
-                partial.extend_from_slice(&end_part);
-            } else {
+            }
+
+            if end_residue != 0.0 {
+                let seg = self.get_seg(end_index).unwrap().map(|p| p.0);
+                let end_part = trim_quad_bezier(&seg, 0.0, end_residue);
+                // println!("end_seg: {:?}, end_part: {:?}", seg, end_part);
                 partial.extend_from_slice(&end_part[1..]);
             }
-            // trace!("vpoint: {:?}", partial.len());
+
             partial.into()
         }
     }
@@ -115,5 +128,33 @@ impl ComponentVec<VPoint> {
         // println!("{:?}", flags);
 
         flags
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use glam::vec3;
+
+    use crate::{components::ComponentVec, prelude::Partial};
+
+    use super::VPoint;
+
+    #[test]
+    fn test_get_partial() {
+        let points: ComponentVec<VPoint> = vec![
+            vec3(0.0, 0.0, 0.0),
+            vec3(1.0, 1.0, 1.0),
+            vec3(2.0, 2.0, 2.0),
+            vec3(2.0, 2.0, 2.0),
+            vec3(3.0, 3.0, 3.0),
+            vec3(4.0, 4.0, 4.0),
+            vec3(5.0, 5.0, 5.0),
+        ]
+        .into();
+        let partial = points.get_partial(0.0..1.0);
+        assert_eq!(partial, points);
+
+        let partial = points.get_partial(0.0..0.5);
+        println!("{:?}", partial);
     }
 }
