@@ -165,14 +165,16 @@ impl<T: Writing> Unwrite<T> {
 impl<T: Writing> PureEvaluator<T> for Unwrite<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
-        if 0.0 < alpha && alpha < 1.0 {
+        if alpha == 0.0 {
+            self.original.clone()
+        } else if (0.0..1.0).contains(&alpha) {
             self.original.lerp(&self.outline, alpha)
         } else if alpha == 1.0 {
             self.outline.clone()
-        } else if 1.0 < alpha && alpha <= 2.0 {
+        } else if (1.0..=2.0).contains(&alpha) {
             self.uncreate_anim.eval_alpha(alpha - 1.0)
         } else {
-            unreachable!()
+            panic!("the alpha is out of range: {}", alpha);
         }
     }
 }
