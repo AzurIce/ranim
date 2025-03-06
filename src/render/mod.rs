@@ -3,7 +3,7 @@ pub mod primitives;
 
 use color::LinearSrgb;
 use glam::{vec2, Mat4, Vec2, Vec3};
-use primitives::RenderInstances;
+use primitives::{RenderInstance, RenderInstances};
 
 use crate::{
     color::rgba8,
@@ -28,18 +28,18 @@ pub trait Renderable {
     );
 }
 
-pub trait DynamicRenderable: Renderable {
-    fn prepare_alpha(
-        &mut self,
-        alpha: f32,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-    );
-}
+// pub trait DynamicRenderable: Renderable {
+//     fn prepare_alpha(
+//         &mut self,
+//         alpha: f32,
+//         ctx: &WgpuContext,
+//         render_instances: &mut RenderInstances,
+//     );
+// }
 
-pub trait StaticRenderable: Renderable {
-    fn prepare(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances);
-}
+// pub trait StaticRenderable: Renderable {
+//     fn prepare(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances);
+// }
 
 // MARK: CameraUniforms
 
@@ -119,7 +119,6 @@ pub struct Renderer {
     output_texture_data: Option<Vec<u8>>,
     pub(crate) output_texture_updated: bool,
 
-    pub(crate) render_instances: RenderInstances,
 }
 
 impl Renderer {
@@ -167,7 +166,6 @@ impl Renderer {
             // Uniforms
             uniforms_buffer,
             uniforms_bind_group,
-            render_instances: RenderInstances::default(),
         }
     }
 
@@ -219,7 +217,7 @@ impl Renderer {
         self.output_texture_updated = false;
     }
 
-    pub fn render(&mut self, ctx: &mut RanimContext, renderable: &mut impl Renderable) {
+    pub fn render(&mut self, ctx: &mut RanimContext, renderable: &impl RenderInstance) {
         self.clear_screen(&ctx.wgpu_ctx);
         let mut encoder = ctx
             .wgpu_ctx
@@ -227,9 +225,8 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
         // renderable.update_clip_info(&ctx.wgpu_ctx, &self.camera);
-        renderable.render(
+        renderable.encode_render_command(
             &ctx.wgpu_ctx,
-            &mut self.render_instances,
             &mut ctx.pipelines,
             &mut encoder,
             &self.uniforms_bind_group.bind_group,
@@ -534,51 +531,51 @@ pub trait RenderResource {
 
 #[cfg(test)]
 mod test {
-    use env_logger::Env;
-    use glam::vec3;
+    // use env_logger::Env;
+    // use glam::vec3;
 
-    use crate::{
-        animation::{
-            creation::{CreationAnim, WritingAnim},
-            AnimWithParams,
-        },
-        items::{vitem::Polygon, Blueprint},
-        timeline::Timeline,
-        utils::rate_functions::linear,
-        AppOptions, RanimRenderApp,
-    };
+    // use crate::{
+    //     animation::{
+    //         creation::{CreationAnim, WritingAnim},
+    //         AnimWithParams,
+    //     },
+    //     items::{vitem::Polygon, Blueprint},
+    //     timeline::Timeline,
+    //     utils::rate_functions::linear,
+    //     AppOptions, RanimRenderApp,
+    // };
 
-    #[test]
-    fn test_render_vitem() {
-        env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
+    // #[test]
+    // fn test_render_vitem() {
+    //     env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
 
-        let vitem = Polygon(vec![
-            vec3(-100.0, -300.0, 0.0),
-            vec3(-100.0, 0.0, 0.0),
-            vec3(0.0, 300.0, 0.0),
-            vec3(200.0, 300.0, 0.0),
-            vec3(200.0, -300.0, 0.0),
-        ])
-        .build();
+    //     let vitem = Polygon(vec![
+    //         vec3(-100.0, -300.0, 0.0),
+    //         vec3(-100.0, 0.0, 0.0),
+    //         vec3(0.0, 300.0, 0.0),
+    //         vec3(200.0, 300.0, 0.0),
+    //         vec3(200.0, -300.0, 0.0),
+    //     ])
+    //     .build();
 
-        let mut app = RanimRenderApp::new(&AppOptions::default());
-        let timeline = Timeline::new();
+    //     let mut app = RanimRenderApp::new(&AppOptions::default());
+    //     let timeline = Timeline::new();
 
-        timeline.forward(2.0);
-        let mut vitem = timeline.insert(vitem);
-        // 创建动画并立即播放,确保vitem的生命周期足够长
-        timeline.play(vitem.write());
-        // timeline.hide(&vitem);
-        timeline.forward(1.0);
-        // timeline.show(&vitem);
-        timeline.play(vitem.uncreate());
-        drop(vitem);
+    //     timeline.forward(2.0);
+    //     let mut vitem = timeline.insert(vitem);
+    //     // 创建动画并立即播放,确保vitem的生命周期足够长
+    //     timeline.play(vitem.write());
+    //     // timeline.hide(&vitem);
+    //     timeline.forward(1.0);
+    //     // timeline.show(&vitem);
+    //     timeline.play(vitem.uncreate());
+    //     drop(vitem);
 
-        let duration = timeline.elapsed_secs();
-        app.render_anim(
-            AnimWithParams::new(timeline)
-                .with_duration(duration)
-                .with_rate_func(linear),
-        );
-    }
+    //     let duration = timeline.elapsed_secs();
+    //     app.render_anim(
+    //         AnimWithParams::new(timeline)
+    //             .with_duration(duration)
+    //             .with_rate_func(linear),
+    //     );
+    // }
 }

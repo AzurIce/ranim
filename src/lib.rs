@@ -1,13 +1,15 @@
 //! Ranim is an animation engine written in rust based on [`wgpu`].
 
 use std::{
+    collections::HashMap,
     fmt::Write,
     path::{Path, PathBuf},
     time::Duration,
 };
 
-use animation::AnimWithParams;
+// use animation::AnimWithParams;
 use context::RanimContext;
+use eval::EvalResult;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
@@ -16,8 +18,10 @@ use linkme::distributed_slice;
 use log::{info, warn};
 use timeline::Timeline;
 
-use render::{CameraFrame, DynamicRenderable, Renderable, Renderer};
-use utils::rate_functions::linear;
+use render::{
+    primitives::{RenderInstance, RenderInstances},
+    CameraFrame, Renderer,
+};
 
 pub mod prelude {
     pub use crate::timeline::{timeline, Timeline};
@@ -45,10 +49,10 @@ pub mod updater;
 pub mod animation;
 pub mod components;
 pub mod context;
+pub mod eval;
 pub mod items;
 pub mod render;
 pub mod utils;
-// pub mod world;
 
 #[distributed_slice]
 pub static TIMELINES: [(&'static str, fn(&Timeline), AppOptions<'static>)];
@@ -61,18 +65,16 @@ macro_rules! render_timeline {
             .find(|(name, ..)| *name == stringify!($func))
             .unwrap();
 
+        println!("building timeline...");
         let timeline = Timeline::new();
         (func)(&timeline);
-        if timeline.elapsed_secs() == 0.0 {
+        println!("done");
+        if timeline.duration_secs() == 0.0 {
             // timeline.forward(0.1);
         }
-        let duration_secs = timeline.elapsed_secs();
+        let duration_secs = timeline.duration_secs();
         let mut app = ::ranim::RanimRenderApp::new(&options);
-        app.render_anim(
-            ::ranim::animation::AnimWithParams::new(timeline)
-                .with_duration(duration_secs)
-                .with_rate_func(::ranim::utils::rate_functions::linear),
-        );
+        app.render_timeline(timeline);
     };
 }
 
@@ -86,18 +88,18 @@ macro_rules! render_timeline_frame {
 
         let timeline = Timeline::new();
         (func)(&timeline);
-        if timeline.elapsed_secs() == 0.0 {
+        if timeline.duration_secs() == 0.0 {
             // timeline.forward(0.1);
         }
-        let duration_secs = timeline.elapsed_secs();
+        let duration_secs = timeline.duration_secs();
         let mut app = ::ranim::RanimRenderApp::new(&options);
-        app.render_anim_frame(
-            ::ranim::animation::AnimWithParams::new(timeline)
-                .with_duration(duration_secs)
-                .with_rate_func(::ranim::utils::rate_functions::linear),
-            $alpha,
-            $filepath,
-        );
+        // app.render_anim_frame(
+        //     ::ranim::animation::AnimWithParams::new(timeline)
+        //         .with_duration(duration_secs)
+        //         .with_rate_func(::ranim::utils::rate_functions::linear),
+        //     $alpha,
+        //     $filepath,
+        // );
     };
 }
 
@@ -136,17 +138,18 @@ impl<T: TimelineConstructor> RenderScene for T {
         let mut app = RanimRenderApp::new(&options);
         let mut timeline = Timeline::new();
         clip_contructor.construct(&mut timeline);
-        if timeline.elapsed_secs() == 0.0 {
+        if timeline.duration_secs() == 0.0 {
             warn!("Timeline's elapsed_secs is 0");
             // timeline.forward(0.1);
         }
         info!("Rendering {:?}", timeline);
-        let duration_secs = timeline.elapsed_secs();
-        app.render_anim(
-            AnimWithParams::new(timeline)
-                .with_duration(duration_secs)
-                .with_rate_func(linear),
-        );
+        let duration_secs = timeline.duration_secs();
+        app.render_timeline(timeline);
+        // app.render_anim(
+        //     AnimWithParams::new(timeline)
+        //         .with_duration(duration_secs)
+        //         .with_rate_func(linear),
+        // );
     }
     fn render_frame_to_image(self, path: impl AsRef<Path>) {
         let mut clip_contructor = self;
@@ -157,39 +160,18 @@ impl<T: TimelineConstructor> RenderScene for T {
         });
         let mut timeline = Timeline::new();
         clip_contructor.construct(&mut timeline);
-        if timeline.elapsed_secs() == 0.0 {
+        if timeline.duration_secs() == 0.0 {
             warn!("Timeline's elapsed_secs is 0")
             // timeline.forward(0.1);
         }
         info!("Rendering {:?}", timeline);
-        let duration_secs = timeline.elapsed_secs();
-        let mut anim = AnimWithParams::new(timeline)
-            .with_duration(duration_secs)
-            .with_rate_func(linear);
-        anim.prepare_alpha(0.0, &app.ctx.wgpu_ctx, &mut app.renderer.render_instances);
-        app.render_to_image(&mut anim, path);
+        let duration_secs = timeline.duration_secs();
+        // let mut anim = AnimWithParams::new(timeline)
+        //     .with_duration(duration_secs)
+        //     .with_rate_func(linear);
+        // anim.prepare_alpha(0.0, &app.ctx.wgpu_ctx, &mut app.renderer.render_instances);
+        // app.render_to_image(&mut anim, path);
     }
-}
-
-/// MARK: RanimRenderApp
-pub struct RanimRenderApp {
-    ctx: RanimContext,
-
-    renderer: Renderer,
-
-    camera_frame: CameraFrame,
-
-    /// The writer for the output.mp4 video
-    video_writer: Option<FileWriter>,
-    /// Whether to auto create a [`FileWriter`] to output the video
-    video_writer_builder: Option<FileWriterBuilder>,
-    /// Whether to save the frames
-    save_frames: bool,
-    /// fps
-    fps: u32,
-
-    frame_count: u32,
-    output_dir: PathBuf,
 }
 
 // MARK: AppOptions
@@ -213,6 +195,29 @@ impl Default for AppOptions<'_> {
     fn default() -> Self {
         DEFAULT_APP_OPTIONS.clone()
     }
+}
+
+/// MARK: RanimRenderApp
+pub struct RanimRenderApp {
+    ctx: RanimContext,
+
+    renderer: Renderer,
+
+    camera_frame: CameraFrame,
+
+    /// The writer for the output.mp4 video
+    video_writer: Option<FileWriter>,
+    /// Whether to auto create a [`FileWriter`] to output the video
+    video_writer_builder: Option<FileWriterBuilder>,
+    /// Whether to save the frames
+    save_frames: bool,
+    /// fps
+    fps: u32,
+
+    frame_count: u32,
+    output_dir: PathBuf,
+
+    pub(crate) render_instances: RenderInstances,
 }
 
 impl RanimRenderApp {
@@ -245,13 +250,14 @@ impl RanimRenderApp {
             frame_count: 0,
             ctx,
             output_dir,
+            render_instances: RenderInstances::default(),
         }
     }
     // fn tick_duration(&self) -> Duration {
     //     Duration::from_secs_f32(1.0 / self.fps as f32)
     // }
 
-    pub fn render_to_image<T: Renderable>(&mut self, anim: &mut T, filename: impl AsRef<Path>) {
+    pub fn render_to_image<T: RenderInstance>(&mut self, anim: &mut T, filename: impl AsRef<Path>) {
         // let alpha = sec / anim.duration().as_secs_f32();
         // anim.update_alpha(alpha);
         self.renderer.render(&mut self.ctx, anim);
@@ -259,8 +265,8 @@ impl RanimRenderApp {
         self.save_frame_to_image(path);
     }
 
-    pub fn render_anim<T: DynamicRenderable>(&mut self, mut anim: AnimWithParams<T>) {
-        let frames = (anim.params.duration_secs * self.fps as f32).ceil() as usize;
+    pub fn render_timeline(&mut self, timeline: Timeline) {
+        let frames = (timeline.duration_secs() * self.fps as f32).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
@@ -272,45 +278,76 @@ impl RanimRenderApp {
             })
             .progress_chars("#>-"),
         );
+        let mut last_idx = HashMap::new();
         (0..frames)
             .map(|f| f as f32 / (frames - 1) as f32)
             .for_each(|alpha| {
-                anim.prepare_alpha(
-                    alpha,
-                    &self.ctx.wgpu_ctx,
-                    &mut self.renderer.render_instances,
-                );
-                self.renderer.render(&mut self.ctx, &mut anim);
+                // TODO: eval camera_timeline -> Camera, eval every entity_timeline -> &[Entity]
+                // TODO: update camera render instance, update every entity render instance
+                let eval_results = timeline.eval_alpha(alpha);
+                eval_results.iter().for_each(|(id, res, idx)| {
+                    let last_idx = last_idx.entry(id.clone()).or_insert(-1);
+                    let prev_last_idx = *last_idx;
+                    *last_idx = *idx as i32;
+                    match res {
+                        EvalResult::Dynamic(res) => res.prepare_render_instance_for_entity(
+                            &self.ctx.wgpu_ctx,
+                            &mut self.render_instances,
+                            *id,
+                        ),
+                        EvalResult::Static(res) => {
+                            if prev_last_idx != *idx as i32 {
+                                res.prepare_render_instance_for_entity(
+                                    &self.ctx.wgpu_ctx,
+                                    &mut self.render_instances,
+                                    *id,
+                                )
+                            }
+                        }
+                    }
+                });
+                let render_primitives = eval_results
+                    .iter()
+                    .filter_map(|(id, res, _)| match res {
+                        EvalResult::Dynamic(res) => {
+                            res.get_render_instance_for_entity(&self.render_instances, *id)
+                        }
+                        EvalResult::Static(res) => {
+                            res.get_render_instance_for_entity(&self.render_instances, *id)
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                self.renderer.render(&mut self.ctx, &render_primitives);
                 self.update_frame();
                 pb.inc(1);
                 pb.set_message(format!(
                     "rendering {:.1?}/{:.1?}",
-                    Duration::from_secs_f32(alpha * anim.params.duration_secs),
-                    Duration::from_secs_f32(anim.params.duration_secs)
+                    Duration::from_secs_f32(alpha * timeline.duration_secs()),
+                    Duration::from_secs_f32(timeline.duration_secs())
                 ));
             });
 
         let msg = format!(
             "rendered {} frames({:?})",
             frames,
-            Duration::from_secs_f32(anim.params.duration_secs),
+            Duration::from_secs_f32(timeline.duration_secs()),
         );
         pb.finish_with_message(msg);
     }
 
-    pub fn render_anim_frame<T: DynamicRenderable>(
-        &mut self,
-        mut anim: AnimWithParams<T>,
-        alpha: f32,
-        filepath: impl AsRef<Path>,
-    ) {
-        anim.prepare_alpha(
-            alpha,
-            &self.ctx.wgpu_ctx,
-            &mut self.renderer.render_instances,
-        );
-        self.render_to_image(&mut anim, self.output_dir.join(filepath));
-    }
+    // pub fn render_anim_frame<T: DynamicRenderable>(
+    //     &mut self,
+    //     mut anim: AnimWithParams<T>,
+    //     alpha: f32,
+    //     filepath: impl AsRef<Path>,
+    // ) {
+    //     anim.prepare_alpha(
+    //         alpha,
+    //         &self.ctx.wgpu_ctx,
+    //         &mut self.renderer.render_instances,
+    //     );
+    //     self.render_to_image(&mut anim, self.output_dir.join(filepath));
+    // }
 
     fn update_frame(&mut self) {
         // `output_video` is true

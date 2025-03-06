@@ -125,7 +125,7 @@ impl VItemPrimitive {
 
 impl RenderInstance for VItemPrimitive {
     fn encode_render_command(
-        &mut self,
+        &self,
         ctx: &WgpuContext,
         pipelines: &mut PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,

@@ -1,12 +1,19 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    rc::Rc,
+};
 
 use glam::Vec2;
 
 use crate::{
+    context::WgpuContext,
     prelude::Empty,
-    render::{primitives::ExtractFrom, CameraFrame},
-    timeline::Timeline,
+    render::{
+        primitives::{ExtractFrom, RenderInstance, RenderInstances},
+        CameraFrame,
+    },
     utils::Id,
+    Timeline,
 };
 
 pub mod svg_item;
@@ -64,6 +71,61 @@ pub trait Entity: Clone + Empty + Send + Sync {
             Vec2::new(1.0, -1.0),
             Vec2::new(1.0, 1.0),
         ]
+    }
+}
+
+pub trait P {
+    fn get_render_instance_for_entity<'a>(
+        &self,
+        render_instances: &'a RenderInstances,
+        entity_id: Id,
+    ) -> Option<&'a dyn RenderInstance>;
+    fn prepare_render_instance_for_entity<'a>(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &'a mut RenderInstances,
+        entity_id: Id,
+    );
+}
+
+impl<T: Entity + 'static> P for T {
+    fn get_render_instance_for_entity<'a>(
+        &self,
+        render_instances: &'a RenderInstances,
+        entity_id: Id,
+    ) -> Option<&'a dyn RenderInstance> {
+        render_instances
+            .get_dynamic::<T>(entity_id)
+            .map(|x| x as &dyn RenderInstance)
+    }
+    fn prepare_render_instance_for_entity<'a>(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &'a mut RenderInstances,
+        entity_id: Id,
+    ) {
+        let render_instance = render_instances.get_dynamic_or_init::<T>(entity_id);
+        render_instance.update_from(ctx, self);
+    }
+}
+
+impl<T: Entity + 'static> P for Rc<T> {
+    fn get_render_instance_for_entity<'a>(
+        &self,
+        render_instances: &'a RenderInstances,
+        entity_id: Id,
+    ) -> Option<&'a dyn RenderInstance> {
+        self.as_ref()
+            .get_render_instance_for_entity(render_instances, entity_id)
+    }
+    fn prepare_render_instance_for_entity<'a>(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &'a mut RenderInstances,
+        entity_id: Id,
+    ) {
+        self.as_ref()
+            .prepare_render_instance_for_entity(ctx, render_instances, entity_id);
     }
 }
 
