@@ -1,35 +1,40 @@
-use super::{AnimSchedule, DynamicEntityAnim, EntityAnim, PureEvaluator, Rabject};
-use crate::{interpolate::Interpolatable, items::Entity, utils::rate_functions::smooth};
+use super::{AnimSchedule, Rabject};
+use crate::{
+    eval::{EvalDynamic, Evaluator},
+    interpolate::Interpolatable,
+    items::Entity,
+    utils::rate_functions::smooth,
+};
 
 pub trait TransformAnim<'r, 't, T: Entity + Alignable + Interpolatable + 'static> {
-    fn transform(&'r mut self, f: fn(&mut T)) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
-    fn transform_from(&'r mut self, s: impl Into<T>) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
-    fn transform_to(&'r mut self, d: impl Into<T>) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
+    fn transform(&'r mut self, f: fn(&mut T)) -> AnimSchedule<'r, 't, T>;
+    fn transform_from(&'r mut self, s: impl Into<T>) -> AnimSchedule<'r, 't, T>;
+    fn transform_to(&'r mut self, d: impl Into<T>) -> AnimSchedule<'r, 't, T>;
 }
 
 impl<'r, 't, T: Entity + Alignable + Interpolatable + 'static> TransformAnim<'r, 't, T>
     for Rabject<'t, T>
 {
     /// Play an animation interpolates from the given src to current rabject
-    fn transform_from(&'r mut self, src: impl Into<T>) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
+    fn transform_from(&'r mut self, src: impl Into<T>) -> AnimSchedule<'r, 't, T> {
         let src: T = src.into();
         let func = Transform::new(src, self.data.clone());
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
     }
 
     /// Play an animation interpolates current rabject with a given transform func
-    fn transform(&'r mut self, f: fn(&mut T)) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
+    fn transform(&'r mut self, f: fn(&mut T)) -> AnimSchedule<'r, 't, T> {
         let mut dst = self.data.clone();
         (f)(&mut dst);
         let func = Transform::new(self.data.clone(), dst);
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
     }
 
     /// Play an animation interpolates from the given src to current rabject
-    fn transform_to(&'r mut self, dst: impl Into<T>) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
+    fn transform_to(&'r mut self, dst: impl Into<T>) -> AnimSchedule<'r, 't, T> {
         let dst: T = dst.into();
         let func = Transform::new(self.data.clone(), dst);
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
     }
 }
 
@@ -68,7 +73,7 @@ impl<T: Entity + Alignable + Interpolatable> Transform<T> {
     }
 }
 
-impl<T: Entity + Alignable + Interpolatable> PureEvaluator<T> for Transform<T> {
+impl<T: Entity + Alignable + Interpolatable> EvalDynamic<T> for Transform<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         if alpha == 0.0 {
             self.src.clone()

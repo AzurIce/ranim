@@ -1,4 +1,5 @@
-use super::{AnimSchedule, DynamicEntityAnim, EntityAnim, PureEvaluator};
+use super::AnimSchedule;
+use crate::eval::{EvalDynamic, Evaluator};
 use crate::items::{Entity, Rabject};
 use crate::prelude::Interpolatable;
 use crate::utils::rate_functions::smooth;
@@ -11,18 +12,18 @@ pub trait Creation: Entity + Partial + Empty + Interpolatable {}
 impl<T: Entity + Partial + Empty + Interpolatable> Creation for T {}
 
 pub trait CreationAnim<'r, 't, T: Creation + 'static> {
-    fn create(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
-    fn uncreate(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
+    fn create(&'r mut self) -> AnimSchedule<'r, 't, T>;
+    fn uncreate(&'r mut self) -> AnimSchedule<'r, 't, T>;
 }
 
 impl<'r, 't, T: Creation + 'static> CreationAnim<'r, 't, T> for Rabject<'t, T> {
-    fn create(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
+    fn create(&'r mut self) -> AnimSchedule<'r, 't, T> {
         let func = Create::new(self.data.clone());
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
     }
-    fn uncreate(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
+    fn uncreate(&'r mut self) -> AnimSchedule<'r, 't, T> {
         let func = UnCreate::new(self.data.clone());
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
     }
 }
 
@@ -31,18 +32,18 @@ pub trait Writing: Creation + Stroke + Fill {}
 impl<T: Creation + Stroke + Fill> Writing for T {}
 
 pub trait WritingAnim<'r, 't, T: Writing + 'static> {
-    fn write(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
-    fn unwrite(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
+    fn write(&'r mut self) -> AnimSchedule<'r, 't, T>;
+    fn unwrite(&'r mut self) -> AnimSchedule<'r, 't, T>;
 }
 
 impl<'r, 't, T: Writing + 'static> WritingAnim<'r, 't, T> for Rabject<'t, T> {
-    fn write(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
+    fn write(&'r mut self) -> AnimSchedule<'r, 't, T> {
         let func = Write::new(self.data.clone());
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
     }
-    fn unwrite(&'r mut self) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
+    fn unwrite(&'r mut self) -> AnimSchedule<'r, 't, T> {
         let func = Unwrite::new(self.data.clone());
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
     }
 }
 
@@ -58,7 +59,7 @@ impl<T: Creation> Create<T> {
     }
 }
 
-impl<T: Creation> PureEvaluator<T> for Create<T> {
+impl<T: Creation> EvalDynamic<T> for Create<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         if alpha == 0.0 {
             T::empty()
@@ -82,7 +83,7 @@ impl<T: Creation> UnCreate<T> {
     }
 }
 
-impl<T: Creation> PureEvaluator<T> for UnCreate<T> {
+impl<T: Creation> EvalDynamic<T> for UnCreate<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         // trace!("{alpha}");
         if alpha == 0.0 {
@@ -122,7 +123,7 @@ impl<T: Writing> Write<T> {
     }
 }
 
-impl<T: Writing> PureEvaluator<T> for Write<T> {
+impl<T: Writing> EvalDynamic<T> for Write<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
         if (0.0..=1.0).contains(&alpha) {
@@ -162,17 +163,17 @@ impl<T: Writing> Unwrite<T> {
     }
 }
 
-impl<T: Writing> PureEvaluator<T> for Unwrite<T> {
+impl<T: Writing> EvalDynamic<T> for Unwrite<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
-        if alpha == 0.0 {
+        if (1.0..=2.0).contains(&alpha) {
+            self.uncreate_anim.eval_alpha(alpha - 1.0)
+        } else if alpha == 0.0 {
             self.original.clone()
         } else if (0.0..1.0).contains(&alpha) {
             self.original.lerp(&self.outline, alpha)
         } else if alpha == 1.0 {
             self.outline.clone()
-        } else if (1.0..=2.0).contains(&alpha) {
-            self.uncreate_anim.eval_alpha(alpha - 1.0)
         } else {
             panic!("the alpha is out of range: {}", alpha);
         }
