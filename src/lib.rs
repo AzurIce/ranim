@@ -14,13 +14,14 @@ use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use items::{camera_frame::CameraFrame, Rabject};
 use linkme::distributed_slice;
 use log::{info, warn};
 use timeline::Timeline;
 
 use render::{
     primitives::{RenderInstance, RenderInstances},
-    CameraFrame, Renderer,
+    Renderer,
 };
 
 pub mod prelude {
@@ -55,7 +56,11 @@ pub mod render;
 pub mod utils;
 
 #[distributed_slice]
-pub static TIMELINES: [(&'static str, fn(&Timeline), AppOptions<'static>)];
+pub static TIMELINES: [(
+    &'static str,
+    fn(&Timeline, Rabject<CameraFrame>),
+    AppOptions<'static>,
+)];
 
 #[macro_export]
 macro_rules! render_timeline {
@@ -67,7 +72,11 @@ macro_rules! render_timeline {
 
         println!("building timeline...");
         let timeline = Timeline::new();
-        (func)(&timeline);
+        let mut camera = timeline.insert(::ranim::items::camera_frame::CameraFrame::new_with_size(
+            options.frame_size.0 as usize,
+            options.frame_size.1 as usize,
+        ));
+        (func)(&timeline, camera);
         println!("done");
         if timeline.duration_secs() == 0.0 {
             // timeline.forward(0.1);
@@ -87,7 +96,11 @@ macro_rules! render_timeline_frame {
             .unwrap();
 
         let timeline = Timeline::new();
-        (func)(&timeline);
+        let mut camera = timeline.insert(::ranim::items::camera_frame::CameraFrame::new_with_size(
+            options.frame_size.0 as usize,
+            options.frame_size.1 as usize,
+        ));
+        (func)(&timeline, camera);
         if timeline.duration_secs() == 0.0 {
             // timeline.forward(0.1);
         }
@@ -200,10 +213,9 @@ impl Default for AppOptions<'_> {
 /// MARK: RanimRenderApp
 pub struct RanimRenderApp {
     ctx: RanimContext,
+    frame_size: (u32, u32),
 
     renderer: Renderer,
-
-    camera_frame: CameraFrame,
 
     /// The writer for the output.mp4 video
     video_writer: Option<FileWriter>,
@@ -223,21 +235,16 @@ pub struct RanimRenderApp {
 impl RanimRenderApp {
     pub fn new(options: &AppOptions) -> Self {
         let ctx = RanimContext::new();
-        let camera_frame = CameraFrame::new_with_size(
-            options.frame_size.0 as usize,
-            options.frame_size.1 as usize,
-        );
         let output_dir = PathBuf::from(options.output_dir);
         let mut renderer = Renderer::new(
             &ctx,
             options.frame_size.0 as usize,
             options.frame_size.1 as usize,
         );
-        renderer.update_uniforms(&ctx.wgpu_ctx, &camera_frame);
         Self {
             // world: World::new(),
             renderer,
-            camera_frame,
+            frame_size: options.frame_size,
             video_writer: None,
             video_writer_builder: Some(
                 FileWriterBuilder::default()
@@ -284,7 +291,8 @@ impl RanimRenderApp {
             .for_each(|alpha| {
                 // TODO: eval camera_timeline -> Camera, eval every entity_timeline -> &[Entity]
                 // TODO: update camera render instance, update every entity render instance
-                let eval_results = timeline.eval_alpha(alpha);
+                let (cam_eval_res, eval_results) = timeline.eval_alpha(alpha);
+                // println!("eval_results: {}", eval_results.len());
                 eval_results.iter().for_each(|(id, res, idx)| {
                     let last_idx = last_idx.entry(id.clone()).or_insert(-1);
                     let prev_last_idx = *last_idx;
@@ -317,6 +325,14 @@ impl RanimRenderApp {
                         }
                     })
                     .collect::<Vec<_>>();
+                let camera_frame = match &cam_eval_res.0 {
+                    EvalResult::Dynamic(res) => res,
+                    EvalResult::Static(res) => res,
+                };
+                // println!("{:?}", camera_frame);
+                // println!("{}", render_primitives.len());
+                self.renderer
+                    .update_uniforms(&self.ctx.wgpu_ctx, camera_frame);
                 self.renderer.render(&mut self.ctx, &render_primitives);
                 self.update_frame();
                 pb.inc(1);
@@ -376,10 +392,10 @@ impl RanimRenderApp {
         }
         // info!("[Scene]: SAVE FRAME TO IMAGE START");
         // let t = Instant::now();
-        let size = self.camera_frame.size;
+        let size = self.frame_size;
         let texture_data = self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx);
         let buffer: ImageBuffer<Rgba<u8>, &[u8]> =
-            ImageBuffer::from_raw(size.0 as u32, size.1 as u32, texture_data).unwrap();
+            ImageBuffer::from_raw(size.0, size.1, texture_data).unwrap();
         buffer.save(path).unwrap();
         // info!("[Scene]: SAVE FRAME TO IMAGE END, took {:?}", t.elapsed());
     }

@@ -6,10 +6,7 @@ use crate::{
     components::{rgba::Rgba, vpoint::VPoint, width::Width, ComponentVec, Transformable},
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::{
-        primitives::{vitem::VItemPrimitive, ExtractFrom},
-        CameraFrame,
-    },
+    render::primitives::{vitem::VItemPrimitive, ExtractFrom},
 };
 
 use super::{Blueprint, Entity};
@@ -70,40 +67,6 @@ impl VItem {
 // MARK: Entity impl
 impl Entity for VItem {
     type Primitive = VItemPrimitive;
-
-    fn clip_box(&self, camera: &CameraFrame) -> [Vec2; 4] {
-        let corners = self.get_bounding_box_corners().map(|p| {
-            let mut p = camera.view_projection_matrix() * p.extend(1.0);
-            p /= p.w;
-            p.xy()
-        });
-        let (mut min_x, mut max_x, mut min_y, mut max_y) = (1.0f32, -1.0f32, 1.0f32, -1.0f32);
-        for p in corners {
-            min_x = min_x.min(p.x);
-            max_x = max_x.max(p.x);
-            min_y = min_y.min(p.y);
-            max_y = max_y.max(p.y);
-        }
-        let max_width = self
-            .stroke_widths
-            .iter()
-            .cloned()
-            .reduce(|acc, w| acc.max(w))
-            .map(|w| w.0)
-            .unwrap_or(0.0);
-        let radii = Vec2::splat(max_width) / camera.half_frame_size();
-        min_x -= radii.x;
-        min_y -= radii.y;
-        max_x += radii.x;
-        max_y += radii.y;
-
-        [
-            vec2(min_x, min_y),
-            vec2(min_x, max_y),
-            vec2(max_x, min_y),
-            vec2(max_x, max_y),
-        ]
-    }
 }
 
 // MARK: Extract impl

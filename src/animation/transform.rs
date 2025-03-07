@@ -2,17 +2,16 @@ use super::{AnimSchedule, Rabject};
 use crate::{
     eval::{EvalDynamic, Evaluator},
     interpolate::Interpolatable,
-    items::Entity,
     utils::rate_functions::smooth,
 };
 
-pub trait TransformAnim<'r, 't, T: Entity + Alignable + Interpolatable + 'static> {
-    fn transform(&'r mut self, f: fn(&mut T)) -> AnimSchedule<'r, 't, T>;
+pub trait TransformAnim<'r, 't, T: Alignable + Interpolatable + Clone + 'static> {
+    fn transform<F: Fn(&mut T)>(&'r mut self, f: F) -> AnimSchedule<'r, 't, T>;
     fn transform_from(&'r mut self, s: impl Into<T>) -> AnimSchedule<'r, 't, T>;
     fn transform_to(&'r mut self, d: impl Into<T>) -> AnimSchedule<'r, 't, T>;
 }
 
-impl<'r, 't, T: Entity + Alignable + Interpolatable + 'static> TransformAnim<'r, 't, T>
+impl<'r, 't, T: Alignable + Interpolatable + Clone + 'static> TransformAnim<'r, 't, T>
     for Rabject<'t, T>
 {
     /// Play an animation interpolates from the given src to current rabject
@@ -23,7 +22,7 @@ impl<'r, 't, T: Entity + Alignable + Interpolatable + 'static> TransformAnim<'r,
     }
 
     /// Play an animation interpolates current rabject with a given transform func
-    fn transform(&'r mut self, f: fn(&mut T)) -> AnimSchedule<'r, 't, T> {
+    fn transform<F: Fn(&mut T)>(&'r mut self, f: F) -> AnimSchedule<'r, 't, T> {
         let mut dst = self.data.clone();
         (f)(&mut dst);
         let func = Transform::new(self.data.clone(), dst);
@@ -39,7 +38,7 @@ impl<'r, 't, T: Entity + Alignable + Interpolatable + 'static> TransformAnim<'r,
 }
 
 /// A transform animation func
-pub struct Transform<T: Entity + Alignable + Interpolatable> {
+pub struct Transform<T: Alignable + Interpolatable + Clone> {
     src: T,
     dst: T,
     aligned_src: T,
@@ -57,7 +56,7 @@ pub trait Alignable {
     fn align_with(&mut self, other: &mut Self);
 }
 
-impl<T: Entity + Alignable + Interpolatable> Transform<T> {
+impl<T: Alignable + Interpolatable + Clone> Transform<T> {
     pub fn new(src: T, dst: T) -> Self {
         let mut aligned_src = src.clone();
         let mut aligned_dst = dst.clone();
@@ -73,7 +72,7 @@ impl<T: Entity + Alignable + Interpolatable> Transform<T> {
     }
 }
 
-impl<T: Entity + Alignable + Interpolatable> EvalDynamic<T> for Transform<T> {
+impl<T: Alignable + Interpolatable + Clone> EvalDynamic<T> for Transform<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         if alpha == 0.0 {
             self.src.clone()
