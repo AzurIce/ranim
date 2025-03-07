@@ -1,26 +1,22 @@
-pub mod blank;
-// pub mod composition;
 pub mod creation;
 pub mod fading;
 pub mod transform;
 
 use crate::{
-    eval::Evaluator,
-    items::{Entity, Rabject},
-    utils::rate_functions::linear,
+    eval::Evaluator, items::{Entity, Rabject}, prelude::Timeline, timeline::EntityTimelineStaticState, utils::rate_functions::linear
 };
 
 #[allow(unused)]
 use log::trace;
 // MARK: AnimSchedule
 
-pub struct AnimSchedule<'r, 't, T: Entity> {
+pub struct AnimSchedule<'r, 't, T> {
     pub(crate) rabject: &'r mut Rabject<'t, T>,
     pub(crate) evaluator: Evaluator<T>,
     pub(crate) params: AnimParams,
 }
 
-impl<'r, 't, T: Entity + 'static> AnimSchedule<'r, 't, T> {
+impl<'r, 't, T: 'static> AnimSchedule<'r, 't, T> {
     pub fn new(rabject: &'r mut Rabject<'t, T>, evaluator: Evaluator<T>) -> Self {
         Self {
             rabject,
@@ -38,7 +34,7 @@ impl<'r, 't, T: Entity + 'static> AnimSchedule<'r, 't, T> {
     }
 }
 
-impl<T: Entity + 'static> AnimSchedule<'_, '_, T> {
+impl<T: EntityTimelineStaticState + Clone + 'static> AnimSchedule<'_, '_, T> {
     pub fn apply(self) -> Self {
         if let Evaluator::Dynamic(evaluator) = &self.evaluator {
             self.rabject.data = evaluator.eval_alpha(1.0);

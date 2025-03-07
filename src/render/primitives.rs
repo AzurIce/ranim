@@ -6,7 +6,7 @@ use std::{
     collections::HashMap,
 };
 
-use crate::{context::WgpuContext, items::Entity, utils::Id};
+use crate::{context::WgpuContext, items::Entity};
 
 use super::RenderTextures;
 
@@ -28,16 +28,16 @@ pub trait ExtractFrom<T: Entity>: RenderInstance + Any {
 #[derive(Default)]
 pub struct RenderInstances {
     // Entity Id, EntityTypeId -> Extract<T>
-    dynamic_items: HashMap<(Id, TypeId), Box<dyn Any>>,
+    dynamic_items: HashMap<(usize, TypeId), Box<dyn Any>>,
 }
 
 impl RenderInstances {
-    pub fn get_dynamic<T: Entity + 'static>(&self, id: Id) -> Option<&T::Primitive> {
+    pub fn get_dynamic<T: Entity + 'static>(&self, id: usize) -> Option<&T::Primitive> {
         self.dynamic_items
             .get(&(id, TypeId::of::<T>()))
             .map(|x| x.downcast_ref::<T::Primitive>().unwrap())
     }
-    pub fn get_dynamic_or_init<T: Entity + 'static>(&mut self, id: Id) -> &mut T::Primitive {
+    pub fn get_dynamic_or_init<T: Entity + 'static>(&mut self, id: usize) -> &mut T::Primitive {
         self.dynamic_items
             .entry((id, TypeId::of::<T>()))
             .or_insert_with(|| Box::new(T::Primitive::default()))
