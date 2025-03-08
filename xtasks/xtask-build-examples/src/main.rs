@@ -27,7 +27,7 @@ struct Args {
     lazy_run: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct ExampleMeta {
     name: String,
     code: String,
@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let hash = base16ct::lower::encode_string(&hash);
 
         // 创建元数据
-        let mut meta = ExampleMeta {
+        let new_meta = ExampleMeta {
             name: example_name.to_string(),
             code: format!("```rust,linenos\n{code}\n```"),
             hash: hash.clone(),
@@ -88,12 +88,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             output_path: None,
         };
 
+        let old_meta = read_to_string(website_data_dir.join(format!("{}.toml", example_name)))
+            .ok()
+            .and_then(|s| toml::from_str::<ExampleMeta>(&s).ok());
+        let mut new_meta = match old_meta.clone() {
+            Some(old_meta) => {
+                // Only need to update code and hash
+                ExampleMeta {
+                    code: new_meta.code,
+                    hash: new_meta.hash,
+                    ..old_meta
+                }
+            }
+            None => new_meta,
+        };
         // 如果非 Lazy 或无法读取 toml 或 toml 中无输出或 hash 有变化，则重新运行
         if !args.lazy_run
-            || read_to_string(website_data_dir.join(format!("{}.toml", example_name)))
-                .ok()
-                .and_then(|s| toml::from_str::<ExampleMeta>(&s).ok())
-                .map(|meta| meta.hash != hash || meta.output_path.and(meta.output_type).is_none())
+            || old_meta
+                .map(|meta| {
+                    meta.hash != new_meta.hash || meta.output_path.and(meta.output_type).is_none()
+                })
                 .unwrap_or(true)
         {
             // 运行示例
@@ -106,13 +120,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             // 确定输出类型并复制文件
             let (output_type, output_path) = copy_output_files(&output_dir, &example_output_dir)?;
-            meta.output_type = Some(output_type);
-            meta.output_path = Some(format!("/examples/{}/{}", example_name, output_path));
+            new_meta.output_type = Some(output_type);
+            new_meta.output_path = Some(format!("/examples/{}/{}", example_name, output_path));
         }
 
         // 写入元数据文件
         let meta_path = website_data_dir.join(format!("{}.toml", example_name));
-        let meta_toml = toml::to_string(&meta)?;
+        let meta_toml = toml::to_string(&new_meta)?;
         fs::write(meta_path, meta_toml)?;
 
         // 处理README.md并创建content/examples下的markdown文件
