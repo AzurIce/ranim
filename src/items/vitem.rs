@@ -1,12 +1,12 @@
 use color::{palette::css, AlphaColor, Srgb};
-use glam::{vec2, vec3, vec4, Vec2, Vec3, Vec4, Vec4Swizzles};
+use glam::{vec2, vec3, vec4, Vec3, Vec4};
 use itertools::Itertools;
 
 use crate::{
     components::{rgba::Rgba, vpoint::VPoint, width::Width, ComponentVec, Transformable},
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::{vitem::VItemPrimitive, ExtractFrom},
+    render::primitives::{vitem::VItemPrimitive, ExtractFrom, RenderInstance, RenderInstances},
 };
 
 use super::{Blueprint, Entity};
@@ -66,7 +66,24 @@ impl VItem {
 
 // MARK: Entity impl
 impl Entity for VItem {
-    type Primitive = VItemPrimitive;
+    fn get_render_instance_for_entity<'a>(
+        &self,
+        render_instances: &'a RenderInstances,
+        entity_id: usize,
+    ) -> Option<&'a dyn RenderInstance> {
+        render_instances
+            .get_dynamic::<VItemPrimitive>(entity_id)
+            .map(|x| x as &dyn RenderInstance)
+    }
+    fn prepare_render_instance_for_entity(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
+        entity_id: usize,
+    ) {
+        let render_instance = render_instances.get_dynamic_or_init::<VItemPrimitive>(entity_id);
+        render_instance.update_from(ctx, self);
+    }
 }
 
 // MARK: Extract impl

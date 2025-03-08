@@ -3,29 +3,30 @@
 use std::{
     collections::HashMap,
     fmt::Write,
-    ops::Deref,
     path::{Path, PathBuf},
     time::Duration,
 };
 
 // use animation::AnimWithParams;
-use context::RanimContext;
 use animation::EvalResult;
+use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{camera_frame::CameraFrame, Rabject};
 use linkme::distributed_slice;
-use log::{info, warn};
-use timeline::Timeline;
+use timeline::{Timeline, TimelineEvalResult};
 
 use render::{
     primitives::{RenderInstance, RenderInstances},
     Renderer,
 };
 
+// MARK: Prelude
 pub mod prelude {
+    pub use crate::Ranim;
+
     pub use crate::timeline::{timeline, Timeline};
     pub use crate::{render_timeline, render_timeline_frame};
 
@@ -37,7 +38,6 @@ pub mod prelude {
     pub use crate::animation::transform::Alignable;
 
     pub use crate::items::Blueprint;
-    pub use crate::RenderScene;
 
     pub use crate::components::Transformable;
 }
@@ -55,17 +55,19 @@ pub mod items;
 pub mod render;
 pub mod utils;
 
-#[distributed_slice]
-pub static TIMELINES: [(&'static str, fn(&Timeline, Rabject<CameraFrame>), AppOptions<'static>)];
+pub struct Ranim<'t>(pub &'t Timeline, pub Rabject<'t, CameraFrame>);
 
-pub fn build_timeline(func: &fn(&Timeline, Rabject<CameraFrame>), options: &AppOptions) -> Timeline {
+#[distributed_slice]
+pub static TIMELINES: [(&'static str, fn(Ranim), AppOptions<'static>)];
+
+pub fn build_timeline(func: &fn(Ranim), options: &AppOptions) -> Timeline {
     println!("building timeline...");
     let timeline = Timeline::new();
     let camera = timeline.insert(items::camera_frame::CameraFrame::new_with_size(
         options.frame_size.0 as usize,
         options.frame_size.1 as usize,
     ));
-    (func)(&timeline, camera);
+    (func)(Ranim(&timeline, camera));
     println!("done");
     timeline
 }
@@ -110,79 +112,6 @@ macro_rules! render_timeline_frame {
         //     $filepath,
         // );
     };
-}
-
-// MARK: RenderScene
-
-pub struct SceneDesc {
-    pub name: String,
-}
-
-pub trait TimelineConstructor {
-    fn desc() -> SceneDesc;
-    fn construct(&mut self, timeline: &mut Timeline);
-}
-
-pub trait RenderScene {
-    fn render(self, options: &AppOptions)
-    where
-        Self: Sized;
-    fn render_frame_to_image(self, path: impl AsRef<Path>)
-    where
-        Self: Sized;
-}
-
-impl<T: TimelineConstructor> RenderScene for T {
-    fn render(self, options: &AppOptions)
-    where
-        Self: Sized,
-    {
-        let desc = T::desc();
-        let mut options = options.clone();
-        let default_options = AppOptions::default();
-        let output_dir = format!("./output/{}", desc.name);
-        if options.output_dir == default_options.output_dir {
-            options.output_dir = output_dir.as_str()
-        }
-
-        let mut clip_contructor = self;
-        let mut app = RanimRenderApp::new(&options);
-        let mut timeline = Timeline::new();
-        clip_contructor.construct(&mut timeline);
-        if timeline.duration_secs() == 0.0 {
-            warn!("Timeline's elapsed_secs is 0");
-            // timeline.forward(0.1);
-        }
-        info!("Rendering {:?}", timeline);
-        let duration_secs = timeline.duration_secs();
-        app.render_timeline(timeline);
-        // app.render_anim(
-        //     AnimWithParams::new(timeline)
-        //         .with_duration(duration_secs)
-        //         .with_rate_func(linear),
-        // );
-    }
-    fn render_frame_to_image(self, path: impl AsRef<Path>) {
-        let mut clip_contructor = self;
-        let desc = T::desc();
-        let mut app = RanimRenderApp::new(&AppOptions {
-            output_dir: format!("./output/{}", desc.name).as_str(),
-            ..Default::default()
-        });
-        let mut timeline = Timeline::new();
-        clip_contructor.construct(&mut timeline);
-        if timeline.duration_secs() == 0.0 {
-            warn!("Timeline's elapsed_secs is 0")
-            // timeline.forward(0.1);
-        }
-        info!("Rendering {:?}", timeline);
-        let duration_secs = timeline.duration_secs();
-        // let mut anim = AnimWithParams::new(timeline)
-        //     .with_duration(duration_secs)
-        //     .with_rate_func(linear);
-        // anim.prepare_alpha(0.0, &app.ctx.wgpu_ctx, &mut app.renderer.render_instances);
-        // app.render_to_image(&mut anim, path);
-    }
 }
 
 // MARK: AppOptions
@@ -234,7 +163,7 @@ impl RanimRenderApp {
     pub fn new(options: &AppOptions) -> Self {
         let ctx = RanimContext::new();
         let output_dir = PathBuf::from(options.output_dir);
-        let mut renderer = Renderer::new(
+        let renderer = Renderer::new(
             &ctx,
             options.frame_size.0 as usize,
             options.frame_size.1 as usize,
@@ -289,10 +218,13 @@ impl RanimRenderApp {
             .for_each(|alpha| {
                 // TODO: eval camera_timeline -> Camera, eval every entity_timeline -> &[Entity]
                 // TODO: update camera render instance, update every entity render instance
-                let (cam_eval_res, eval_results) = timeline.eval_alpha(alpha);
+                let TimelineEvalResult {
+                    camera_frame,
+                    items,
+                } = timeline.eval_alpha(alpha);
                 // println!("eval_results: {}", eval_results.len());
-                eval_results.iter().for_each(|(id, res, idx)| {
-                    let last_idx = last_idx.entry(id.clone()).or_insert(-1);
+                items.iter().for_each(|(id, res, idx)| {
+                    let last_idx = last_idx.entry(*id).or_insert(-1);
                     let prev_last_idx = *last_idx;
                     *last_idx = *idx as i32;
                     match res {
@@ -312,7 +244,7 @@ impl RanimRenderApp {
                         }
                     }
                 });
-                let render_primitives = eval_results
+                let render_primitives = items
                     .iter()
                     .filter_map(|(id, res, _)| match res {
                         EvalResult::Dynamic(res) => {
@@ -323,7 +255,7 @@ impl RanimRenderApp {
                         }
                     })
                     .collect::<Vec<_>>();
-                let camera_frame = match &cam_eval_res.0 {
+                let camera_frame = match &camera_frame.0 {
                     EvalResult::Dynamic(res) => res,
                     EvalResult::Static(res) => res,
                 };

@@ -8,13 +8,14 @@ use ranim::animation::transform::TransformAnim;
 use ranim::color::palettes::manim;
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon};
-use ranim::timeline::{timeline, Timeline};
+use ranim::timeline::timeline;
 use ranim::{prelude::*, render_timeline, typst_svg};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[timeline]
-fn basic(timeline: &Timeline) {
+fn basic(ranim: Ranim) {
+    let Ranim(timeline, mut _camera) = ranim;
     timeline.forward(0.2);
 
     let mut svg = SvgItem::from_svg(SVG);

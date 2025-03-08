@@ -19,14 +19,15 @@ use ranim::{
     prelude::*,
     render_timeline,
     timeline::Timeline,
-    typst_svg, AppOptions, TimelineConstructor,
+    typst_svg, AppOptions,
 };
 use ranim_macros::timeline;
 
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[timeline(fps = 60)]
-fn test_scene<'t>(timeline: &'t Timeline, mut camera: Rabject<'t, CameraFrame>) {
+fn test_scene(ranim: Ranim) {
+    let Ranim(timeline, mut camera) = ranim;
     // let svg = SvgItem::from_svg(SVG);
 
     let svg = SvgItem::from_svg(typst_svg!("R"));

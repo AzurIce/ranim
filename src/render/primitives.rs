@@ -27,21 +27,21 @@ pub trait ExtractFrom<T: Entity>: RenderInstance + Any {
 
 #[derive(Default)]
 pub struct RenderInstances {
-    // Entity Id, EntityTypeId -> Extract<T>
+    // EntityId, TypeId -> Extract<T>
     dynamic_items: HashMap<(usize, TypeId), Box<dyn Any>>,
 }
 
 impl RenderInstances {
-    pub fn get_dynamic<T: Entity + 'static>(&self, id: usize) -> Option<&T::Primitive> {
+    pub fn get_dynamic<T: 'static>(&self, id: usize) -> Option<&T> {
         self.dynamic_items
             .get(&(id, TypeId::of::<T>()))
-            .map(|x| x.downcast_ref::<T::Primitive>().unwrap())
+            .map(|x| x.downcast_ref::<T>().unwrap())
     }
-    pub fn get_dynamic_or_init<T: Entity + 'static>(&mut self, id: usize) -> &mut T::Primitive {
+    pub fn get_dynamic_or_init<T: Default + 'static>(&mut self, id: usize) -> &mut T {
         self.dynamic_items
             .entry((id, TypeId::of::<T>()))
-            .or_insert_with(|| Box::new(T::Primitive::default()))
-            .downcast_mut::<T::Primitive>()
+            .or_insert_with(|| Box::new(T::default()))
+            .downcast_mut::<T>()
             .unwrap()
     }
 }

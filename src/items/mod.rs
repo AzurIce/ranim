@@ -5,8 +5,7 @@ use std::{
 
 use crate::{
     context::WgpuContext,
-    prelude::Empty,
-    render::primitives::{ExtractFrom, RenderInstance, RenderInstances},
+    render::primitives::{RenderInstance, RenderInstances},
     Timeline,
 };
 
@@ -43,46 +42,21 @@ impl<T> Drop for Rabject<'_, T> {
     }
 }
 
-pub trait Entity: Clone + Empty + Send + Sync {
-    type Primitive: ExtractFrom<Self> + Default;
-}
-
-pub trait ItemEntity {
+pub trait Entity {
     fn get_render_instance_for_entity<'a>(
         &self,
         render_instances: &'a RenderInstances,
         entity_id: usize,
     ) -> Option<&'a dyn RenderInstance>;
-    fn prepare_render_instance_for_entity<'a>(
+    fn prepare_render_instance_for_entity(
         &self,
         ctx: &WgpuContext,
-        render_instances: &'a mut RenderInstances,
+        render_instances: &mut RenderInstances,
         entity_id: usize,
     );
 }
 
-impl<T: Entity + 'static> ItemEntity for T {
-    fn get_render_instance_for_entity<'a>(
-        &self,
-        render_instances: &'a RenderInstances,
-        entity_id: usize,
-    ) -> Option<&'a dyn RenderInstance> {
-        render_instances
-            .get_dynamic::<T>(entity_id)
-            .map(|x| x as &dyn RenderInstance)
-    }
-    fn prepare_render_instance_for_entity<'a>(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &'a mut RenderInstances,
-        entity_id: usize,
-    ) {
-        let render_instance = render_instances.get_dynamic_or_init::<T>(entity_id);
-        render_instance.update_from(ctx, self);
-    }
-}
-
-impl<T: Entity + 'static> ItemEntity for Rc<T> {
+impl<T: Entity + 'static> Entity for Rc<T> {
     fn get_render_instance_for_entity<'a>(
         &self,
         render_instances: &'a RenderInstances,
@@ -91,10 +65,10 @@ impl<T: Entity + 'static> ItemEntity for Rc<T> {
         self.as_ref()
             .get_render_instance_for_entity(render_instances, entity_id)
     }
-    fn prepare_render_instance_for_entity<'a>(
+    fn prepare_render_instance_for_entity(
         &self,
         ctx: &WgpuContext,
-        render_instances: &'a mut RenderInstances,
+        render_instances: &mut RenderInstances,
         entity_id: usize,
     ) {
         self.as_ref()

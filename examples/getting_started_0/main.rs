@@ -1,7 +1,9 @@
 use ranim::{color::palettes::manim, items::vitem::Square, prelude::*};
 
 #[timeline]
-fn getting_started_0(timeline: &Timeline) {
+fn getting_started_0(ranim: Ranim) {
+    let Ranim(timeline, mut _camera) = ranim;
+
     let mut square = Square(300.0).build(); // An VItem of a square
     square.set_color(manim::BLUE_C);
 

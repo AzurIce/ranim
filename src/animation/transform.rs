@@ -10,9 +10,7 @@ pub trait TransformAnim<'r, 't, T: TransformRequirement + 'static> {
     fn transform_to(&'r mut self, d: impl Into<T>) -> AnimSchedule<'r, 't, T>;
 }
 
-impl<'r, 't, T: TransformRequirement + 'static> TransformAnim<'r, 't, T>
-    for Rabject<'t, T>
-{
+impl<'r, 't, T: TransformRequirement + 'static> TransformAnim<'r, 't, T> for Rabject<'t, T> {
     /// Play an animation interpolates from the given src to current rabject
     fn transform_from(&'r mut self, src: impl Into<T>) -> AnimSchedule<'r, 't, T> {
         Transform::new(src.into(), self.data.clone())

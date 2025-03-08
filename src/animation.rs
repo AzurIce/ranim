@@ -97,7 +97,7 @@ impl<'r, 't, T: 'static> AnimSchedule<'r, 't, T> {
     pub fn new(rabject: &'r mut Rabject<'t, T>, evaluator: Evaluator<T>) -> Self {
         Self {
             rabject,
-            evaluator: evaluator.into(),
+            evaluator,
             params: AnimParams::default(),
         }
     }

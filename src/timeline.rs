@@ -1,114 +1,15 @@
 use crate::{
-    // animation::{blank::Blank, AnimParams, AnimSchedule},
-    animation::{AnimParams, AnimSchedule},
+    animation::AnimSchedule,
     animation::{Eval, EvalResult, Evaluator},
-    items::{camera_frame::CameraFrame, Entity, ItemEntity, Rabject},
-    utils::rate_functions::linear, // ItemData,
+    items::{camera_frame::CameraFrame, Entity, Rabject},
+    utils::rate_functions::linear,
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
 
-use anyhow::anyhow;
 pub use ranim_macros::timeline;
 
-// MARK: Timeline
-
-pub type Item = Box<dyn ItemEntity>;
-
-pub struct Timelines<T>(Vec<EvalTimeline<T>>);
-
-impl<T: 'static> Timelines<T> {
-    pub fn insert(&mut self, data: T) -> usize {
-        self.0.push(EvalTimeline::new(data));
-        if let Some(duration_secs) = self.0.first().map(|timeline| timeline.duration_secs()) {
-            self.0.last_mut().unwrap().append_blank(duration_secs);
-        }
-        self.0.len() - 1
-    }
-    pub fn update_static_state(&mut self, id: usize, state: Option<Rc<T>>) -> anyhow::Result<()> {
-        let timeline = self
-            .0
-            .get_mut(id)
-            .ok_or(anyhow!("Timeline with id {} not exist", id))?;
-        timeline.update_static_state(state);
-        Ok(())
-    }
-    pub fn forward(&mut self, secs: f32) {
-        self.0.iter_mut().for_each(|timeline| {
-            timeline.forward(secs);
-        });
-    }
-    pub fn show(&mut self, id: usize) {
-        self.0.get_mut(id).map(|timeline| {
-            timeline.is_showing = true;
-        });
-    }
-    pub fn hide(&mut self, id: usize) {
-        self.0.get_mut(id).map(|timeline| {
-            timeline.is_showing = false;
-        });
-    }
-    pub fn play(
-        &mut self,
-        id: usize,
-        evaluator: Box<dyn Eval<T>>,
-        params: AnimParams,
-    ) -> anyhow::Result<()> {
-        let elapsed_time = self
-            .0
-            .first()
-            .map(|timeline| timeline.duration_secs())
-            .unwrap_or(0.0);
-
-        let timeline = self
-            .0
-            .get_mut(id)
-            .ok_or(anyhow!("Timeline with id {} not exist", id))?;
-        // Fills the gap between the last animation and the current time
-
-        // Fill the gap with its freeze
-        let gapped_duration = elapsed_time - timeline.duration_secs();
-        if gapped_duration > 0.0 {
-            timeline.append_freeze(gapped_duration);
-        }
-
-        // Append the animation
-        timeline.append_anim(Animation {
-            evaluator,
-            rate_func: params.rate_func,
-            duration_secs: params.duration_secs,
-        });
-
-        // Forword other timelines
-        self.0
-            .iter_mut()
-            .enumerate()
-            .filter(|(_id, _)| *_id != id)
-            .for_each(|(_, timeline)| {
-                timeline.forward(params.duration_secs);
-            });
-        Ok(())
-    }
-}
-
-impl<T> Timelines<T> {
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-    /// entity_id, res, anim_id
-    pub fn eval_alpha(&self, alpha: f32) -> Vec<(usize, EvalResult<T>, usize)> {
-        self.0
-            .iter()
-            .enumerate()
-            .filter_map(|(id, timeline)| {
-                timeline.eval_alpha(alpha).map(|(res, idx)| (id, res, idx))
-            })
-            .collect::<Vec<_>>()
-    }
-    pub fn timelines_cnt(&self) -> usize {
-        self.0.len()
-    }
-}
+pub type Item = Box<dyn Entity>;
 
 // MARK: EntityTimtlineState
 
@@ -148,22 +49,23 @@ impl EntityTimelineStaticState for CameraFrame {
 
 /// The main struct that offers the ranim's API, and encodes animations
 /// The rabjects insert to it will hold a reference to it, so it has interior mutability
+#[derive(Default)]
 pub struct Timeline {
     // Timeline<CameraFrame> or Timeline<Item>
     timelines: RefCell<Vec<Box<dyn AnyEvalTimelineTrait>>>,
     duration_secs: RefCell<f32>,
 }
 
-impl<'a> Timeline {
-    pub fn new() -> Self {
-        Self {
-            timelines: RefCell::new(Vec::new()),
-            duration_secs: RefCell::new(0.0),
-        }
-    }
+pub struct TimelineEvalResult {
+    pub camera_frame: (EvalResult<CameraFrame>, usize),
+    pub items: Vec<(usize, EvalResult<Item>, usize)>,
 }
 
 impl Timeline {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn duration_secs(&self) -> f32 {
         *self.duration_secs.borrow()
     }
@@ -178,7 +80,7 @@ impl Timeline {
         Rabject {
             id,
             data: static_state,
-            timeline: &self,
+            timeline: self,
         }
     }
     pub fn update<T: EntityTimelineStaticState + Clone + 'static>(&self, rabject: &Rabject<T>) {
@@ -247,13 +149,7 @@ impl Timeline {
                 timeline.forward(params.duration_secs);
             });
     }
-    pub fn eval_alpha(
-        &self,
-        alpha: f32,
-    ) -> (
-        (EvalResult<CameraFrame>, usize),
-        Vec<(usize, EvalResult<Item>, usize)>,
-    ) {
+    pub fn eval_alpha(&self, alpha: f32) -> TimelineEvalResult {
         let timelines = self.timelines.borrow_mut();
 
         let mut items = Vec::with_capacity(timelines.len());
@@ -266,13 +162,16 @@ impl Timeline {
             {
                 camera_frame = timeline.eval_alpha(alpha)
             } else if let Some(timeline) = timeline.as_any().downcast_ref::<EvalTimeline<Item>>() {
-                timeline
-                    .eval_alpha(alpha)
-                    .map(|(res, idx)| items.push((id, res, idx)));
+                if let Some((res, idx)) = timeline.eval_alpha(alpha) {
+                    items.push((id, res, idx));
+                }
             }
         });
 
-        (camera_frame.unwrap(), items)
+        TimelineEvalResult {
+            camera_frame: camera_frame.unwrap(),
+            items,
+        }
     }
 }
 

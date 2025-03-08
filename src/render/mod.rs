@@ -2,11 +2,14 @@ pub mod pipelines;
 pub mod primitives;
 
 use color::LinearSrgb;
-use glam::{vec2, Mat4, Vec2, Vec3};
-use primitives::{RenderInstance, RenderInstances};
+use glam::{Mat4, Vec2};
+use primitives::RenderInstance;
 
 use crate::{
-    color::rgba8, context::{RanimContext, WgpuContext}, items::{camera_frame::CameraFrame, Entity}, prelude::{Alignable, Interpolatable}, utils::{wgpu::WgpuBuffer, PipelinesStorage}
+    color::rgba8,
+    context::{RanimContext, WgpuContext},
+    items::camera_frame::CameraFrame,
+    utils::{wgpu::WgpuBuffer, PipelinesStorage},
 };
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -75,7 +78,6 @@ impl CameraUniformsBindGroup {
 
 // MARK: Renderer
 
-/// A renderer for anything implementes [`Renderable`]
 pub struct Renderer {
     size: (usize, usize),
     pub pipelines: PipelinesStorage,
@@ -89,7 +91,6 @@ pub struct Renderer {
     output_staging_buffer: wgpu::Buffer,
     output_texture_data: Option<Vec<u8>>,
     pub(crate) output_texture_updated: bool,
-
 }
 
 impl Renderer {
@@ -140,6 +141,7 @@ impl Renderer {
         }
     }
 
+    /// Clears the screen with `Renderer::clear_color`
     pub fn clear_screen(&mut self, wgpu_ctx: &WgpuContext) {
         // trace!("clear screen {:?}", self.clear_color);
         let mut encoder = wgpu_ctx
@@ -385,7 +387,6 @@ impl RenderTextures {
         }
     }
 }
-
 
 /// A render resource.
 pub trait RenderResource {

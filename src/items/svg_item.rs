@@ -7,8 +7,11 @@ use log::warn;
 use crate::{
     color::{rgb8, rgba},
     components::{vpoint::VPoint, TransformAnchor},
+    context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
-    render::primitives::{svg_item::SvgItemPrimitive, ExtractFrom},
+    render::primitives::{
+        svg_item::SvgItemPrimitive, ExtractFrom, RenderInstance, RenderInstances,
+    },
     utils::{bezier::PathBuilder, math::interpolate_usize},
 };
 
@@ -147,7 +150,24 @@ impl Empty for SvgItem {
 }
 
 impl Entity for SvgItem {
-    type Primitive = SvgItemPrimitive;
+    fn get_render_instance_for_entity<'a>(
+        &self,
+        render_instances: &'a RenderInstances,
+        entity_id: usize,
+    ) -> Option<&'a dyn RenderInstance> {
+        render_instances
+            .get_dynamic::<SvgItemPrimitive>(entity_id)
+            .map(|x| x as &dyn RenderInstance)
+    }
+    fn prepare_render_instance_for_entity(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
+        entity_id: usize,
+    ) {
+        let render_instance = render_instances.get_dynamic_or_init::<SvgItemPrimitive>(entity_id);
+        render_instance.update_from(ctx, self);
+    }
 }
 
 // MARK: Extract impl

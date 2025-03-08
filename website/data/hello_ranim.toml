@@ -9,7 +9,8 @@ use ranim::{\r
 };\r
 \r
 #[timeline]\r
-fn hello_ranim(timeline: &Timeline) {\r
+fn hello_ranim(ranim: Ranim) {\r
+    let Ranim(timeline, mut _camera) = ranim;\r
     let mut square = Square(300.0).build();\r
     square.set_color(manim::BLUE_C);\r
     let mut square = timeline.insert(square);\r
