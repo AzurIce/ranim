@@ -1,62 +1,62 @@
-use super::{AnimSchedule, Rabject};
-use crate::{
-    eval::{EvalDynamic, Evaluator},
-    interpolate::Interpolatable,
-    utils::rate_functions::smooth,
-};
+use super::{AnimSchedule, EvalDynamic, Rabject, Schedule};
+use crate::{interpolate::Interpolatable, utils::rate_functions::smooth};
 
-pub trait TransformAnim<'r, 't, T: Alignable + Interpolatable + Clone + 'static> {
+pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
+impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
+
+pub trait TransformAnim<'r, 't, T: TransformRequirement + 'static> {
     fn transform<F: Fn(&mut T)>(&'r mut self, f: F) -> AnimSchedule<'r, 't, T>;
     fn transform_from(&'r mut self, s: impl Into<T>) -> AnimSchedule<'r, 't, T>;
     fn transform_to(&'r mut self, d: impl Into<T>) -> AnimSchedule<'r, 't, T>;
 }
 
-impl<'r, 't, T: Alignable + Interpolatable + Clone + 'static> TransformAnim<'r, 't, T>
+impl<'r, 't, T: TransformRequirement + 'static> TransformAnim<'r, 't, T>
     for Rabject<'t, T>
 {
     /// Play an animation interpolates from the given src to current rabject
     fn transform_from(&'r mut self, src: impl Into<T>) -> AnimSchedule<'r, 't, T> {
-        let src: T = src.into();
-        let func = Transform::new(src, self.data.clone());
-        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
+        Transform::new(src.into(), self.data.clone())
+            .schedule(self)
+            .with_rate_func(smooth)
     }
 
     /// Play an animation interpolates current rabject with a given transform func
     fn transform<F: Fn(&mut T)>(&'r mut self, f: F) -> AnimSchedule<'r, 't, T> {
         let mut dst = self.data.clone();
         (f)(&mut dst);
-        let func = Transform::new(self.data.clone(), dst);
-        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
+        Transform::new(self.data.clone(), dst)
+            .schedule(self)
+            .with_rate_func(smooth)
     }
 
     /// Play an animation interpolates from the given src to current rabject
     fn transform_to(&'r mut self, dst: impl Into<T>) -> AnimSchedule<'r, 't, T> {
-        let dst: T = dst.into();
-        let func = Transform::new(self.data.clone(), dst);
-        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
+        Transform::new(self.data.clone(), dst.into())
+            .schedule(self)
+            .with_rate_func(smooth)
     }
 }
 
 /// A transform animation func
-pub struct Transform<T: Alignable + Interpolatable + Clone> {
+pub struct Transform<T: TransformRequirement> {
     src: T,
     dst: T,
     aligned_src: T,
     aligned_dst: T,
 }
 
-/// A trait for aligning two rabjects
+/// A trait for aligning two items
 ///
 /// Alignment is actually the meaning of preparation for interpolation.
 ///
-/// For example, if we want to interpolate two VMobjects, we need to
-/// align their inner data structure `Vec<VMobjectPoint>` to the same length.
+/// For example, if we want to interpolate two VItems, we need to
+/// align all their inner components like `ComponentVec<VPoint>` to the same length.
 pub trait Alignable {
     fn is_aligned(&self, other: &Self) -> bool;
     fn align_with(&mut self, other: &mut Self);
 }
 
-impl<T: Alignable + Interpolatable + Clone> Transform<T> {
+impl<T: TransformRequirement> Transform<T> {
     pub fn new(src: T, dst: T) -> Self {
         let mut aligned_src = src.clone();
         let mut aligned_dst = dst.clone();
@@ -72,7 +72,7 @@ impl<T: Alignable + Interpolatable + Clone> Transform<T> {
     }
 }
 
-impl<T: Alignable + Interpolatable + Clone> EvalDynamic<T> for Transform<T> {
+impl<T: TransformRequirement> EvalDynamic<T> for Transform<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         if alpha == 0.0 {
             self.src.clone()

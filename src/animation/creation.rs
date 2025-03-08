@@ -1,6 +1,5 @@
-use super::AnimSchedule;
-use crate::eval::{EvalDynamic, Evaluator};
-use crate::items::{Entity, Rabject};
+use super::{AnimSchedule, EvalDynamic, Schedule};
+use crate::items::Rabject;
 use crate::prelude::Interpolatable;
 use crate::utils::rate_functions::smooth;
 use color::{AlphaColor, Srgb};
@@ -8,58 +7,64 @@ use std::ops::Range;
 
 // MARK: Creation
 
-pub trait Creation: Entity + Partial + Empty + Interpolatable {}
-impl<T: Entity + Partial + Empty + Interpolatable> Creation for T {}
+pub trait CreationRequirement: Clone + Partial + Empty + Interpolatable {}
+impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 
-pub trait CreationAnim<'r, 't, T: Creation + 'static> {
+pub trait CreationAnim<'r, 't, T: CreationRequirement + 'static> {
     fn create(&'r mut self) -> AnimSchedule<'r, 't, T>;
     fn uncreate(&'r mut self) -> AnimSchedule<'r, 't, T>;
 }
 
-impl<'r, 't, T: Creation + 'static> CreationAnim<'r, 't, T> for Rabject<'t, T> {
+impl<'r, 't, T: CreationRequirement + 'static> CreationAnim<'r, 't, T> for Rabject<'t, T> {
     fn create(&'r mut self) -> AnimSchedule<'r, 't, T> {
-        let func = Create::new(self.data.clone());
-        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
+        Create::new(self.data.clone())
+            .schedule(self)
+            .with_rate_func(smooth)
     }
     fn uncreate(&'r mut self) -> AnimSchedule<'r, 't, T> {
-        let func = UnCreate::new(self.data.clone());
-        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
+        UnCreate::new(self.data.clone())
+            .schedule(self)
+            .with_rate_func(smooth)
     }
 }
 
 // MARK: Writing
-pub trait Writing: Creation + Stroke + Fill {}
-impl<T: Creation + Stroke + Fill> Writing for T {}
+pub trait WritingRequirement: CreationRequirement + Stroke + Fill {}
+impl<T: CreationRequirement + Stroke + Fill> WritingRequirement for T {}
 
-pub trait WritingAnim<'r, 't, T: Writing + 'static> {
+pub trait WritingAnim<'r, 't, T: WritingRequirement + 'static> {
     fn write(&'r mut self) -> AnimSchedule<'r, 't, T>;
     fn unwrite(&'r mut self) -> AnimSchedule<'r, 't, T>;
 }
 
-impl<'r, 't, T: Writing + 'static> WritingAnim<'r, 't, T> for Rabject<'t, T> {
+impl<'r, 't, T: WritingRequirement + 'static> WritingAnim<'r, 't, T> for Rabject<'t, T> {
     fn write(&'r mut self) -> AnimSchedule<'r, 't, T> {
-        let func = Write::new(self.data.clone());
-        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
+        Write::new(self.data.clone())
+            .schedule(self)
+            .with_rate_func(smooth)
     }
     fn unwrite(&'r mut self) -> AnimSchedule<'r, 't, T> {
-        let func = Unwrite::new(self.data.clone());
-        AnimSchedule::new(self, Evaluator::new_dynamic(func)).with_rate_func(smooth)
+        Unwrite::new(self.data.clone())
+            .schedule(self)
+            .with_rate_func(smooth)
     }
 }
 
 // ---------------------------------------------------- //
 
-pub struct Create<T: Creation> {
+// MARK: Impl
+
+pub struct Create<T: CreationRequirement> {
     pub original: T,
 }
 
-impl<T: Creation> Create<T> {
+impl<T: CreationRequirement> Create<T> {
     fn new(target: T) -> Self {
         Self { original: target }
     }
 }
 
-impl<T: Creation> EvalDynamic<T> for Create<T> {
+impl<T: CreationRequirement> EvalDynamic<T> for Create<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         if alpha == 0.0 {
             T::empty()
@@ -73,17 +78,17 @@ impl<T: Creation> EvalDynamic<T> for Create<T> {
     }
 }
 
-pub struct UnCreate<T: Creation> {
+pub struct UnCreate<T: CreationRequirement> {
     pub original: T,
 }
 
-impl<T: Creation> UnCreate<T> {
+impl<T: CreationRequirement> UnCreate<T> {
     fn new(target: T) -> Self {
         Self { original: target }
     }
 }
 
-impl<T: Creation> EvalDynamic<T> for UnCreate<T> {
+impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         // trace!("{alpha}");
         if alpha == 0.0 {
@@ -101,13 +106,13 @@ impl<T: Creation> EvalDynamic<T> for UnCreate<T> {
 /// Write
 ///
 /// First update with partial from 0.0..0.0 to 0.0..1.0, then lerp fill_opacity to 1.0
-pub struct Write<T: Writing> {
+pub struct Write<T: WritingRequirement> {
     pub(crate) original: T,
     pub(crate) outline: T,
     create_anim: Create<T>,
 }
 
-impl<T: Writing> Write<T> {
+impl<T: WritingRequirement> Write<T> {
     fn new(target: T) -> Self {
         let mut outline = target.clone();
         outline
@@ -123,7 +128,7 @@ impl<T: Writing> Write<T> {
     }
 }
 
-impl<T: Writing> EvalDynamic<T> for Write<T> {
+impl<T: WritingRequirement> EvalDynamic<T> for Write<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
         if (0.0..=1.0).contains(&alpha) {
@@ -141,13 +146,13 @@ impl<T: Writing> EvalDynamic<T> for Write<T> {
 /// Unwrite
 ///
 /// First lerp fill_opacity to 0.0, then update with partial from 0.0..1.0 to 0.0..0.0
-pub struct Unwrite<T: Writing> {
+pub struct Unwrite<T: WritingRequirement> {
     pub(crate) original: T,
     pub(crate) outline: T,
     uncreate_anim: UnCreate<T>,
 }
 
-impl<T: Writing> Unwrite<T> {
+impl<T: WritingRequirement> Unwrite<T> {
     fn new(target: T) -> Self {
         let mut outline = target.clone();
         outline
@@ -163,7 +168,7 @@ impl<T: Writing> Unwrite<T> {
     }
 }
 
-impl<T: Writing> EvalDynamic<T> for Unwrite<T> {
+impl<T: WritingRequirement> EvalDynamic<T> for Unwrite<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         let alpha = alpha * 2.0;
         if (1.0..=2.0).contains(&alpha) {
