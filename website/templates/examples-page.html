@@ -2,16 +2,11 @@
 {% extends "layouts/three-col.html" %}
 
 {% block left_side %}
+{% set examples_section = get_section(path="examples/_index.md") %}
 <div class="outline">
   <div class="outline__content">
     <ul>
-      <li>
-        <a href="{{ root_section.permalink }}"
-          class="outline-item {% if section_or_page and section_or_page.permalink == root_section.permalink %}active{% endif %}">
-          <span>{{ root_section.title }}</span>
-        </a>
-      </li>
-      {% for page in root_section.pages %}
+      {% for page in examples_section.pages %}
       <li>
         <a href="{{ page.permalink }}"
           class="outline-item {% if section_or_page and section_or_page.permalink == page.permalink %}active{% endif %}">{{

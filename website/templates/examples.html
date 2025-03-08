@@ -1,7 +1,26 @@
 {% extends "layouts/base.html" %}
 
-{% block content %}
-<article class="markdown-body">
+{% block main %}
+{# <article class="markdown-body">
   {{ section.content | safe }}
-</article>
-{% endblock content %}
+</article> #}
+<div class="container card-grid">
+  {% for page in section.pages %}
+  <a href="{{ page.permalink }}" class="card">
+    {% set example_data = load_data(path="/data/" ~ page.title ~ ".toml") %}
+    {% if example_data.output_type == "image" %}
+    <img src="{{ get_url(path=example_data.output_path) }}" alt="{{ example_data.name }} 示例输出">
+    {% else %}
+    <img>
+    {% endif %}
+
+    <div class="card__content">
+      <h2>{{ page.title }}</h2>
+      {% if page.description %}
+      <p>{{ page.description }}</p>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock main %}

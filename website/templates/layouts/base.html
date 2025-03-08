@@ -63,24 +63,8 @@
   </header>
 
   <main class="layout__body">
-    <aside class="side left">
-      {% block left_side %}
-      {% endblock left_side %}
-    </aside>
-
-    <div class="content container">
-      {% if section %}
-      {{ public_draft::warning(section=section) }}
-      {% elif page %}
-      {{ public_draft::warning(section=page) }}
-      {% endif %}
-      {% block content %}{% endblock content %}
-    </div>
-
-    <aside class="side right">
-      {% block right_side %}
-      {% endblock right_side %}
-    </aside>
+    {% block main %}
+    {% endblock main %}
   </main>
 </body>
 
