@@ -1,16 +1,11 @@
 use crate::{
     // animation::{blank::Blank, AnimParams, AnimSchedule},
     animation::{AnimParams, AnimSchedule},
-    eval::{Eval, EvalResult, Evaluator},
+    animation::{Eval, EvalResult, Evaluator},
     items::{camera_frame::CameraFrame, Entity, ItemEntity, Rabject},
     utils::rate_functions::linear, // ItemData,
 };
-use std::{
-    any::Any,
-    cell::RefCell,
-    ops::{Deref, DerefMut},
-    rc::Rc,
-};
+use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
 
 use anyhow::anyhow;
@@ -151,6 +146,8 @@ impl EntityTimelineStaticState for CameraFrame {
 
 // MARK: Timeline
 
+/// The main struct that offers the ranim's API, and encodes animations
+/// The rabjects insert to it will hold a reference to it, so it has interior mutability
 pub struct Timeline {
     // Timeline<CameraFrame> or Timeline<Item>
     timelines: RefCell<Vec<Box<dyn AnyEvalTimelineTrait>>>,

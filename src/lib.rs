@@ -3,13 +3,14 @@
 use std::{
     collections::HashMap,
     fmt::Write,
+    ops::Deref,
     path::{Path, PathBuf},
     time::Duration,
 };
 
 // use animation::AnimWithParams;
 use context::RanimContext;
-use eval::EvalResult;
+use animation::EvalResult;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
@@ -50,17 +51,24 @@ pub mod updater;
 pub mod animation;
 pub mod components;
 pub mod context;
-pub mod eval;
 pub mod items;
 pub mod render;
 pub mod utils;
 
 #[distributed_slice]
-pub static TIMELINES: [(
-    &'static str,
-    fn(&Timeline, Rabject<CameraFrame>),
-    AppOptions<'static>,
-)];
+pub static TIMELINES: [(&'static str, fn(&Timeline, Rabject<CameraFrame>), AppOptions<'static>)];
+
+pub fn build_timeline(func: &fn(&Timeline, Rabject<CameraFrame>), options: &AppOptions) -> Timeline {
+    println!("building timeline...");
+    let timeline = Timeline::new();
+    let camera = timeline.insert(items::camera_frame::CameraFrame::new_with_size(
+        options.frame_size.0 as usize,
+        options.frame_size.1 as usize,
+    ));
+    (func)(&timeline, camera);
+    println!("done");
+    timeline
+}
 
 #[macro_export]
 macro_rules! render_timeline {
@@ -70,14 +78,7 @@ macro_rules! render_timeline {
             .find(|(name, ..)| *name == stringify!($func))
             .unwrap();
 
-        println!("building timeline...");
-        let timeline = Timeline::new();
-        let mut camera = timeline.insert(::ranim::items::camera_frame::CameraFrame::new_with_size(
-            options.frame_size.0 as usize,
-            options.frame_size.1 as usize,
-        ));
-        (func)(&timeline, camera);
-        println!("done");
+        let timeline = ::ranim::build_timeline(func, options);
         if timeline.duration_secs() == 0.0 {
             // timeline.forward(0.1);
         }
@@ -95,12 +96,7 @@ macro_rules! render_timeline_frame {
             .find(|(name, ..)| *name == stringify!($func))
             .unwrap();
 
-        let timeline = Timeline::new();
-        let mut camera = timeline.insert(::ranim::items::camera_frame::CameraFrame::new_with_size(
-            options.frame_size.0 as usize,
-            options.frame_size.1 as usize,
-        ));
-        (func)(&timeline, camera);
+        let timeline = ::ranim::build_timeline(func, options);
         if timeline.duration_secs() == 0.0 {
             // timeline.forward(0.1);
         }
@@ -115,6 +111,8 @@ macro_rules! render_timeline_frame {
         // );
     };
 }
+
+// MARK: RenderScene
 
 pub struct SceneDesc {
     pub name: String,

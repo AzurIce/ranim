@@ -9,7 +9,7 @@ use ranim::timeline::{timeline, Timeline};
 use ranim::{prelude::*, render_timeline};
 
 #[timeline]
-fn arc(timeline: &Timeline, mut ramera: Rabject<CameraFrame>) {
+fn arc(timeline: &Timeline, _camera: Rabject<CameraFrame>) {
     // let frame_size = app.camera().size;
     let frame_size = (1920.0, 1080.0);
     let frame_start = vec2(frame_size.0 as f32 / -2.0, frame_size.1 as f32 / -2.0);

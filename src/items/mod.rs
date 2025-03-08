@@ -1,22 +1,18 @@
 use std::{
-    marker::PhantomData, ops::{Deref, DerefMut}, rc::Rc
+    ops::{Deref, DerefMut},
+    rc::Rc,
 };
-
-use glam::Vec2;
 
 use crate::{
     context::WgpuContext,
     prelude::Empty,
-    render::{
-        primitives::{ExtractFrom, RenderInstance, RenderInstances},
-    },
+    render::primitives::{ExtractFrom, RenderInstance, RenderInstances},
     Timeline,
 };
 
+pub mod camera_frame;
 pub mod svg_item;
 pub mod vitem;
-pub mod camera_frame;
-
 
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///
