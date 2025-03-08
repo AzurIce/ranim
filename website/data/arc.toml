@@ -1,6 +1,6 @@
 name = "arc"
 code = """
-```rust
+```rust,linenos
 use env_logger::Env;\r
 use glam::vec2;\r
 use ranim::animation::fading::FadingAnim;\r

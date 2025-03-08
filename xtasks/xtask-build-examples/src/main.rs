@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // 创建元数据
         let meta = ExampleMeta {
             name: example_name.to_string(),
-            code: format!("```rust\n{code}\n```"),
+            code: format!("```rust,linenos\n{code}\n```"),
             output_type,
             output_path: format!("/examples/{}/{}", example_name, output_path),
         };

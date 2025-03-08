@@ -1,6 +1,6 @@
 name = "arc_between_points"
 code = """
-```rust
+```rust,linenos
 use std::time::Instant;\r
 \r
 use env_logger::Env;\r

@@ -1,6 +1,6 @@
 name = "getting_started_0"
 code = """
-```rust
+```rust,linenos
 use ranim::{color::palettes::manim, items::vitem::Square, prelude::*};\r
 \r
 #[timeline]\r

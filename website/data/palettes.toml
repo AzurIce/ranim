@@ -1,6 +1,6 @@
 name = "palettes"
 code = """
-```rust
+```rust,linenos
 use env_logger::Env;\r
 use glam::vec3;\r
 use ranim::animation::creation::Color;\r
