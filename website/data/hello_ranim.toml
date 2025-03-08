@@ -1,6 +1,6 @@
 name = "hello_ranim"
 code = """
-```rust
+```rust,linenos
 use ranim::{\r
     animation::{fading::FadingAnim, transform::TransformAnim},\r
     color::palettes::manim,\r

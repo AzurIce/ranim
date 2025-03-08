@@ -1,6 +1,6 @@
 name = "basic"
 code = """
-```rust
+```rust,linenos
 use std::f32;\r
 \r
 use env_logger::Env;\r

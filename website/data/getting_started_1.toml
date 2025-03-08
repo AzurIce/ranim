@@ -1,6 +1,6 @@
 name = "getting_started_1"
 code = """
-```rust
+```rust,linenos
 use ranim::{\r
     animation::fading::FadingAnim, color::palettes::manim, items::vitem::Square, prelude::*,\r
 };\r
