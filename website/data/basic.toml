@@ -11,13 +11,14 @@ use ranim::animation::transform::TransformAnim;\r
 use ranim::color::palettes::manim;\r
 use ranim::items::svg_item::SvgItem;\r
 use ranim::items::vitem::{Arc, Polygon};\r
-use ranim::timeline::{timeline, Timeline};\r
+use ranim::timeline::timeline;\r
 use ranim::{prelude::*, render_timeline, typst_svg};\r
 \r
 const SVG: &str = include_str!(\"../../assets/Ghostscript_Tiger.svg\");\r
 \r
 #[timeline]\r
-fn basic(timeline: &Timeline) {\r
+fn basic(ranim: Ranim) {\r
+    let Ranim(timeline, mut _camera) = ranim;\r
     timeline.forward(0.2);\r
 \r
     let mut svg = SvgItem::from_svg(SVG);\r

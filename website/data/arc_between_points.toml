@@ -10,11 +10,12 @@ use ranim::animation::creation::Color;\r
 use ranim::animation::fading::FadingAnim;\r
 use ranim::color::HueDirection;\r
 use ranim::items::vitem::ArcBetweenPoints;\r
-use ranim::timeline::Timeline;\r
 use ranim::{prelude::*, render_timeline, timeline::timeline};\r
 \r
 #[timeline]\r
-fn arc_between_points(timeline: &Timeline) {\r
+fn arc_between_points(ranim: Ranim) {\r
+    let Ranim(timeline, mut _camera) = ranim;\r
+\r
     let center = vec2(0.0, 0.0);\r
 \r
     let start_color = color!(\"#FF8080FF\");\r

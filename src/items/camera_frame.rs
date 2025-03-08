@@ -1,4 +1,3 @@
-
 // MARK: CameraFrame
 
 use glam::{vec2, Mat4, Vec2, Vec3};
@@ -40,8 +39,7 @@ impl Alignable for CameraFrame {
     fn is_aligned(&self, _other: &Self) -> bool {
         true
     }
-    fn align_with(&mut self, _other: &mut Self) {
-    }
+    fn align_with(&mut self, _other: &mut Self) {}
 }
 
 impl CameraFrame {

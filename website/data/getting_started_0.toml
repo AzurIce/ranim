@@ -4,7 +4,9 @@ code = """
 use ranim::{color::palettes::manim, items::vitem::Square, prelude::*};\r
 \r
 #[timeline]\r
-fn getting_started_0(timeline: &Timeline) {\r
+fn getting_started_0(ranim: Ranim) {\r
+    let Ranim(timeline, mut _camera) = ranim;\r
+\r
     let mut square = Square(300.0).build(); // An VItem of a square\r
     square.set_color(manim::BLUE_C);\r
 \r

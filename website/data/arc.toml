@@ -6,11 +6,13 @@ use glam::vec2;\r
 use ranim::animation::fading::FadingAnim;\r
 use ranim::color::HueDirection;\r
 use ranim::items::vitem::Arc;\r
-use ranim::timeline::{timeline, Timeline};\r
+use ranim::timeline::timeline;\r
 use ranim::{prelude::*, render_timeline};\r
 \r
 #[timeline]\r
-fn arc(timeline: &Timeline) {\r
+fn arc(ranim: Ranim) {\r
+    let Ranim(timeline, mut _camera) = ranim;\r
+\r
     // let frame_size = app.camera().size;\r
     let frame_size = (1920.0, 1080.0);\r
     let frame_start = vec2(frame_size.0 as f32 / -2.0, frame_size.1 as f32 / -2.0);\r

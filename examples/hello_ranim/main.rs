@@ -6,7 +6,8 @@ use ranim::{
 };
 
 #[timeline]
-fn hello_ranim(timeline: &Timeline) {
+fn hello_ranim(ranim: Ranim) {
+    let Ranim(timeline, mut _camera) = ranim;
     let mut square = Square(300.0).build();
     square.set_color(manim::BLUE_C);
     let mut square = timeline.insert(square);

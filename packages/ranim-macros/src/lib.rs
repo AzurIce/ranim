@@ -46,7 +46,7 @@ pub fn timeline(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     quote::quote! {
         #[::linkme::distributed_slice(::ranim::TIMELINES)]
-        static #func_name_upper: (&str, fn(&::ranim::timeline::Timeline, ::ranim::items::Rabject<::ranim::items::camera_frame::CameraFrame>), ::ranim::AppOptions<'static>) =
+        static #func_name_upper: (&str, fn(::ranim::Ranim), ::ranim::AppOptions<'static>) =
             (stringify!(#func_name), #func_name, ::ranim::AppOptions::<'static> {
                 frame_size: (#width, #height),
                 frame_rate: #fps,
