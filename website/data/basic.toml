@@ -99,5 +99,6 @@ fn main() {\r
 }\r
 
 ```"""
+hash = "5cb7ce7db25b8c17d8509909f7a974f459434e1b"
 output_type = "video"
 output_path = "/examples/basic/output.mp4"

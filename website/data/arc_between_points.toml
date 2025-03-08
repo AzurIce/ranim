@@ -75,5 +75,6 @@ fn main() {\r
 }\r
 
 ```"""
+hash = "12a82e2ca49726c577da3a09b495b5da35432244"
 output_type = "video"
 output_path = "/examples/arc_between_points/output.mp4"

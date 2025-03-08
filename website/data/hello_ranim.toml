@@ -32,5 +32,6 @@ fn main() {\r
 }\r
 
 ```"""
+hash = "a4e6824873eda8cd9680fe8fdb0bdd770257bf3d"
 output_type = "video"
 output_path = "/examples/hello_ranim/output.mp4"

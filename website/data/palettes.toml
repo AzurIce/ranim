@@ -65,5 +65,6 @@ fn main() {\r
 }\r
 
 ```"""
+hash = "3d9c04d0bbe22d74756780e2f5041727a135fedb"
 output_type = "image"
 output_path = "/examples/palettes/output.png"

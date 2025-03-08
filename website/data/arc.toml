@@ -65,5 +65,6 @@ fn main() {\r
 }\r
 
 ```"""
+hash = "57374ff25ec9f6320195b7528119c0094d9d9249"
 output_type = "video"
 output_path = "/examples/arc/output.mp4"
