@@ -1,16 +1,17 @@
 name = "palettes"
 code = """
-```rust
+```rust,linenos
 use env_logger::Env;\r
 use glam::vec3;\r
 use ranim::animation::creation::Color;\r
 use ranim::color::palettes::manim::*;\r
 use ranim::items::vitem::Rectangle;\r
-use ranim::timeline::{timeline, Timeline};\r
+use ranim::timeline::timeline;\r
 use ranim::{prelude::*, render_timeline_frame};\r
 \r
 #[timeline]\r
-fn palettes(timeline: &Timeline) {\r
+fn palettes(ranim: Ranim) {\r
+    let Ranim(timeline, mut _camera) = ranim;\r
     let (width, height) = (1920, 1080);\r
     let (offset_x, offset_y) = (width as f32 / -2.0, height as f32 / -2.0);\r
     let colors = vec![\r
@@ -64,5 +65,6 @@ fn main() {\r
 }\r
 
 ```"""
+hash = "3d9c04d0bbe22d74756780e2f5041727a135fedb"
 output_type = "image"
 output_path = "/examples/palettes/output.png"

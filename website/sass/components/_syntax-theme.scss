@@ -1,0 +1,339 @@
+// From https://github.com/bevyengine/bevy-website/blob/608ff81301e0ef7a8ac7b18ac562f31f72550ac8/sass/components/_syntax-theme.scss
+.z-code {
+    color: #c0c5ce;
+    background-color: $syntax-theme-background;
+}
+
+div.incorrect {
+    $incorrect_block_background_color: #481e21;
+    position: relative;
+    background-color: $incorrect_block_background_color;
+    border-left: 10px solid darkred;
+    border-radius: 10px;
+    padding-right: 55px;
+
+    .z-code,
+    .z-code code {
+        background-color: $incorrect_block_background_color;
+    }
+}
+
+div.incorrect:hover {
+    border-color: red;
+
+    img {
+      /* SVG filter color for red */
+      filter: invert(10%) sepia(85%) saturate(7491%) hue-rotate(5deg) brightness(116%) contrast(114%);
+    }
+}
+
+div.incorrect-image {
+    position: absolute;
+    z-index: 99;
+    right: 20px;
+    top: 10px;
+
+    img {
+        width: 35px;
+        height: 35px;
+        /* SVG filter color for firebrick red */
+        filter: invert(11%) sepia(57%) saturate(5143%) hue-rotate(350deg) brightness(118%) contrast(87%);
+    }
+}
+
+// 基础语法颜色
+$syntax-default-text: #a3abb8;
+$syntax-comment: #8e9aa4;
+$syntax-keyword: #c594c5;
+$syntax-function: #6199d2;
+$syntax-class: #dfc479;
+$syntax-class-meta: #eff1f5;
+$syntax-method-special: #8fa1b3;
+$syntax-storage: #b48ead;
+$syntax-string: #9fc37f;
+$syntax-constant: #e79e6d;
+$syntax-tag: #e0858d;
+$syntax-attribute: #d08770;
+$syntax-entity-id: #8fa1b3;
+$syntax-selector: #b48ead;
+
+// Git相关颜色
+$git-deleted: #f92672;
+$git-inserted: #a6e22e;
+$git-changed: #967efb;
+$git-ignored: #565656;
+
+// 特殊语法颜色
+$syntax-regexp: #96b5b4;
+$syntax-escape: #96b5b4;
+$syntax-embedded: #ab7967;
+$syntax-illegal-bg: #bf616a;
+$syntax-illegal-text: #2b303b;
+$syntax-separator-bg: #4f5b66;
+
+.z-variable.z-parameter.z-function {
+    color: $syntax-default-text;
+}
+
+.z-comment,
+.z-punctuation.z-definition.z-comment {
+    color: $syntax-comment;
+}
+
+.z-punctuation.z-definition.z-string,
+.z-punctuation.z-definition.z-variable,
+.z-punctuation.z-definition.z-string,
+.z-punctuation.z-definition.z-parameters,
+.z-punctuation.z-definition.z-string,
+.z-punctuation.z-definition.z-array {
+    color: $syntax-default-text;
+}
+
+.z-none {
+    color: $syntax-default-text;
+}
+
+.z-keyword.z-operator {
+    color: $syntax-default-text;
+}
+
+.z-keyword {
+    color: $syntax-keyword;
+}
+
+.z-variable {
+    color: $syntax-default-text;
+}
+
+.z-entity.z-name.z-function,
+.z-meta.z-require,
+.z-support.z-function.z-any-method {
+    color: $syntax-function;
+}
+
+.z-support.z-class,
+.z-entity.z-name.z-class,
+.z-entity.z-name.z-type.z-class {
+    color: $syntax-class;
+}
+
+.z-meta.z-class {
+    color: $syntax-class-meta;
+}
+
+.z-keyword.z-other.z-special-method {
+    color: $syntax-method-special;
+}
+
+.z-storage {
+    color: $syntax-storage;
+}
+
+.z-support.z-function {
+    color: $syntax-function;
+}
+
+.z-string,
+.z-constant.z-other.z-symbol,
+.z-entity.z-other.z-inherited-class {
+    color: $syntax-string;
+}
+
+.z-none {
+    color: $syntax-constant;
+}
+
+.z-constant {
+    color: $syntax-constant;
+}
+
+.z-entity.z-name.z-tag {
+    color: $syntax-tag;
+}
+
+.z-entity.z-other.z-attribute-name {
+    color: $syntax-attribute;
+}
+
+.z-entity.z-other.z-attribute-name.z-id,
+.z-punctuation.z-definition.z-entity {
+    color: $syntax-entity-id;
+}
+
+.z-meta.z-selector {
+    color: $syntax-selector;
+}
+
+.z-markup.z-heading .z-punctuation.z-definition.z-heading,
+.z-entity.z-name.z-section {
+    color: $syntax-entity-id;
+}
+
+.z-keyword.z-other.z-unit {
+    color: $syntax-constant;
+}
+
+.z-markup.z-bold,
+.z-punctuation.z-definition.z-bold {
+    color: $syntax-class;
+    font-weight: bold;
+}
+
+.z-markup.z-italic,
+.z-punctuation.z-definition.z-italic {
+    color: $syntax-storage;
+    font-style: italic;
+}
+
+.z-markup.z-raw.z-inline {
+    color: $syntax-string;
+}
+
+.z-string.z-other.z-link {
+    color: $syntax-tag;
+}
+
+.z-meta.z-link {
+    color: $syntax-constant;
+}
+
+.z-markup.z-list {
+    color: $syntax-tag;
+}
+
+.z-markup.z-quote {
+    color: $syntax-constant;
+}
+
+.z-meta.z-separator {
+    color: $syntax-default-text;
+    background-color: $syntax-separator-bg;
+}
+
+.z-markup.z-inserted,
+.z-markup.z-inserted.z-git_gutter {
+    color: $syntax-string;
+}
+
+.z-markup.z-deleted,
+.z-markup.z-deleted.z-git_gutter {
+    color: $syntax-tag;
+}
+
+.z-markup.z-changed,
+.z-markup.z-changed.z-git_gutter {
+    color: $syntax-storage;
+}
+
+.z-markup.z-ignored,
+.z-markup.z-ignored.z-git_gutter {
+    color: $syntax-separator-bg;
+}
+
+.z-markup.z-untracked,
+.z-markup.z-untracked.z-git_gutter {
+    color: $syntax-separator-bg;
+}
+
+.z-constant.z-other.z-color {
+    color: $syntax-regexp;
+}
+
+.z-string.z-regexp {
+    color: $syntax-regexp;
+}
+
+.z-constant.z-character.z-escape {
+    color: $syntax-escape;
+}
+
+.z-punctuation.z-section.z-embedded,
+.z-variable.z-interpolation {
+    color: $syntax-embedded;
+}
+
+.z-invalid.z-illegal {
+    color: $syntax-illegal-text;
+    background-color: $syntax-illegal-bg;
+}
+
+.z-markup.z-deleted.z-git_gutter {
+    color: $git-deleted;
+}
+
+.z-markup.z-inserted.z-git_gutter {
+    color: $git-inserted;
+}
+
+.z-markup.z-changed.z-git_gutter {
+    color: $git-changed;
+}
+
+.z-markup.z-ignored.z-git_gutter {
+    color: $git-ignored;
+}
+
+.z-markup.z-untracked.z-git_gutter {
+    color: $git-ignored;
+}
+
+
+// RUST OVERRIDES
+
+.z-meta.z-generic.z-rust,
+.z-entity.z-name.z-struct.z-rust,
+.z-entity.z-name.z-enum.z-rust,
+.z-entity.z-name.z-impl.z-rust {
+    color: #dfc479;
+}
+
+.z-punctuation.z-definition.z-generic.z-rust {
+    color: #c0c5ce;
+}
+
+.z-storage.z-type.z-function,
+.z-keyword.z-operator.z-rust,
+.z-storage.z-type.z-struct.z-rust,
+.z-punctuation.z-accessor.z-rust,
+.z-storage.z-modifier.z-rust {
+    color: $syntax-keyword;
+}
+
+.z-support.z-macro.z-rust {
+    color: $syntax-function;
+}
+
+.z-punctuation.z-definition.z-string {
+    color: #9fc37f;
+}
+
+.z-entity.z-name.z-trait.z-rust {
+    color: #56b6c2;
+}
+
+.z-meta.z-annotation.z-rust,
+.z-variable.z-annotation.z-rust {
+    color: #d19a66;
+}
+
+.z-meta.z-annotation.z-parameters.z-rust,
+.z-variable.z-function.z-rust {
+
+    .z-begin,
+    .z-end,
+    .z-punctuation {
+        color: #d19a66;
+    }
+
+    color: #d1af8f;
+}
+
+// SHELL OVERRIDES
+.z-variable.z-function.z-shell,
+.z-support.z-function.z-shell {
+    color: $syntax-function;
+}
+
+.z-variable.z-parameter.z-option {
+    color: $syntax-keyword;
+}

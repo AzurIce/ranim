@@ -1,10 +1,12 @@
 name = "getting_started_0"
 code = """
-```rust
+```rust,linenos
 use ranim::{color::palettes::manim, items::vitem::Square, prelude::*};\r
 \r
 #[timeline]\r
-fn getting_started_0(timeline: &Timeline) {\r
+fn getting_started_0(ranim: Ranim) {\r
+    let Ranim(timeline, mut _camera) = ranim;\r
+\r
     let mut square = Square(300.0).build(); // An VItem of a square\r
     square.set_color(manim::BLUE_C);\r
 \r
@@ -18,5 +20,6 @@ fn main() {\r
 }\r
 
 ```"""
+hash = "e365c8ffc0e4e95f3fa54ea05f792c2f35ff25df"
 output_type = "video"
 output_path = "/examples/getting_started_0/output.mp4"

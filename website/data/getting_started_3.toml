@@ -1,6 +1,6 @@
 name = "getting_started_3"
 code = """
-```rust
+```rust,linenos
 use ranim::{\r
     animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},\r
     color::palettes::manim,\r
@@ -9,7 +9,8 @@ use ranim::{\r
 };\r
 \r
 #[timeline]\r
-fn getting_started_3(timeline: &Timeline) {\r
+fn getting_started_3(ranim: Ranim) {\r
+    let Ranim(timeline, mut _camera) = ranim;\r
     let mut square = Square(300.0).build();\r
     square.set_color(manim::BLUE_C);\r
 \r
@@ -28,5 +29,6 @@ fn main() {\r
 }\r
 
 ```"""
+hash = "3d2a15f4486cd299e3d41cd7126bcfa87c83e92b"
 output_type = "video"
 output_path = "/examples/getting_started_3/output.mp4"

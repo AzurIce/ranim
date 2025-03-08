@@ -1,14 +1,17 @@
 use std::{cmp::Ordering, f32, path::Path, slice::Iter, vec};
 
 use color::{palette::css, AlphaColor, Srgb};
-use glam::{vec2, vec3, Affine2, Vec3};
+use glam::{vec3, Affine2, Vec3};
 use log::warn;
 
 use crate::{
     color::{rgb8, rgba},
     components::{vpoint::VPoint, TransformAnchor},
+    context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
-    render::primitives::{svg_item::SvgItemPrimitive, ExtractFrom},
+    render::primitives::{
+        svg_item::SvgItemPrimitive, ExtractFrom, RenderInstance, RenderInstances,
+    },
     utils::{bezier::PathBuilder, math::interpolate_usize},
 };
 
@@ -147,25 +150,23 @@ impl Empty for SvgItem {
 }
 
 impl Entity for SvgItem {
-    type Primitive = SvgItemPrimitive;
-    fn clip_box(&self, camera: &crate::render::CameraFrame) -> [glam::Vec2; 4] {
-        self.vitems
-            .iter()
-            .map(|x| x.clip_box(camera))
-            .reduce(|acc, x| {
-                [
-                    vec2(acc[0].x.min(x[0].x), acc[0].y.min(x[0].y)),
-                    vec2(acc[1].x.min(x[1].x), acc[1].y.max(x[1].y)),
-                    vec2(acc[2].x.max(x[2].x), acc[2].y.min(x[2].y)),
-                    vec2(acc[3].x.max(x[3].x), acc[3].y.max(x[3].y)),
-                ]
-            })
-            .unwrap_or([
-                vec2(-1.0, -1.0),
-                vec2(-1.0, 1.0),
-                vec2(1.0, -1.0),
-                vec2(1.0, 1.0),
-            ])
+    fn get_render_instance_for_entity<'a>(
+        &self,
+        render_instances: &'a RenderInstances,
+        entity_id: usize,
+    ) -> Option<&'a dyn RenderInstance> {
+        render_instances
+            .get_dynamic::<SvgItemPrimitive>(entity_id)
+            .map(|x| x as &dyn RenderInstance)
+    }
+    fn prepare_render_instance_for_entity(
+        &self,
+        ctx: &WgpuContext,
+        render_instances: &mut RenderInstances,
+        entity_id: usize,
+    ) {
+        let render_instance = render_instances.get_dynamic_or_init::<SvgItemPrimitive>(entity_id);
+        render_instance.update_from(ctx, self);
     }
 }
 

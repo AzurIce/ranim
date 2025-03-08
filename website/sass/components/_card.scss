@@ -1,0 +1,46 @@
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 20px;
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    color: inherit;
+    text-decoration: inherit;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+    // 添加overflow:hidden确保图片被card的border-radius裁切
+    overflow: hidden;
+
+    img {
+      width: 100%;
+    }
+
+    &__content {
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+
+      h2 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 1.2em;
+        color: #333;
+      }
+
+      p {
+        color: #666;
+        margin-bottom: 15px;
+      }
+    }
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+  }
+}

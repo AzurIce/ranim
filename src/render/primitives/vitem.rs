@@ -125,7 +125,7 @@ impl VItemPrimitive {
 
 impl RenderInstance for VItemPrimitive {
     fn encode_render_command(
-        &mut self,
+        &self,
         ctx: &WgpuContext,
         pipelines: &mut PipelinesStorage,
         encoder: &mut wgpu::CommandEncoder,
@@ -184,10 +184,10 @@ mod test {
 
     use crate::{
         context::WgpuContext,
-        items::{vitem::Square, Blueprint},
+        items::{camera_frame::CameraFrame, vitem::Square, Blueprint},
         render::{
             primitives::{ExtractFrom, RenderInstance},
-            CameraFrame, CameraUniforms, CameraUniformsBindGroup, RenderTextures,
+            CameraUniforms, CameraUniformsBindGroup, RenderTextures,
         },
         utils::{wgpu::WgpuBuffer, PipelinesStorage},
     };
