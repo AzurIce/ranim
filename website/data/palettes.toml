@@ -6,7 +6,7 @@ use glam::vec3;\r
 use ranim::animation::creation::Color;\r
 use ranim::color::palettes::manim::*;\r
 use ranim::items::vitem::Rectangle;\r
-use ranim::timeline::timeline;\r
+use ranim::timeline::{timeline, TimeMark};\r
 use ranim::{prelude::*, render_timeline_frame};\r
 \r
 #[timeline]\r
@@ -61,10 +61,11 @@ fn main() {\r
     env_logger::Builder::from_env(Env::default().default_filter_or(\"palettes=info, ranim=trace\"))\r
         .init();\r
 \r
+    render_timeline_frame!(palettes, 0.0, \"preview.png\");\r
     render_timeline_frame!(palettes, 0.0, \"output.png\");\r
 }\r
 
 ```"""
-hash = "3d9c04d0bbe22d74756780e2f5041727a135fedb"
-output_type = "image"
-output_path = "/examples/palettes/output.png"
+hash = "b559ed0c9a7be849942bd3f6f5f1a109f3002cf9"
+preview_img = "/examples/palettes/preview.png"
+output_files = ["/examples/palettes/output.png"]

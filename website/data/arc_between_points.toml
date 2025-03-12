@@ -10,6 +10,7 @@ use ranim::animation::creation::Color;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::items::vitem::ArcBetweenPoints;
+use ranim::timeline::TimeMark;
 use ranim::{prelude::*, render_timeline, timeline::timeline};
 
 #[timeline]
@@ -63,6 +64,10 @@ fn arc_between_points(ranim: Ranim) {
             t.elapsed()
         );
     }
+    timeline.insert_time_mark(
+        timeline.duration_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
 }
 
 fn main() {
@@ -77,6 +82,6 @@ fn main() {
 }
 
 ```'''
-hash = "3d1028e07b22a4ef32291a00de560c83e4445f0a"
-output_type = "video"
-output_path = "/examples/arc_between_points/output.mp4"
+hash = "d80091b6a79f6c5e6d1c404c10a25a77a2f244eb"
+preview_img = "/examples/arc_between_points/preview.png"
+output_files = ["/examples/arc_between_points/output.mp4"]

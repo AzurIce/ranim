@@ -45,6 +45,11 @@ impl EntityTimelineStaticState for CameraFrame {
 
 // MARK: RanimTimeline
 
+#[derive(Debug, Clone)]
+pub enum TimeMark {
+    Capture(String),
+}
+
 /// The main struct that offers the ranim's API, and encodes animations
 /// The rabjects insert to it will hold a reference to it, so it has interior mutability
 #[derive(Default)]
@@ -52,6 +57,7 @@ pub struct RanimTimeline {
     // Timeline<CameraFrame> or Timeline<Item>
     timelines: RefCell<Vec<Box<dyn AnyTimelineTrait>>>,
     max_elapsed_secs: RefCell<f32>,
+    time_marks: RefCell<Vec<(f32, TimeMark)>>,
 }
 
 pub struct TimelineEvalResult {
@@ -154,6 +160,16 @@ impl RanimTimeline {
         self
     }
 
+    pub fn insert_time_mark(&self, sec: f32, time_mark: TimeMark) {
+        self.time_marks.borrow_mut().push((sec, time_mark));
+    }
+    pub fn time_marks(&self) -> Vec<(f32, TimeMark)> {
+        self.time_marks.borrow().clone()
+    }
+    pub fn eval_sec(&self, local_sec: f32) -> TimelineEvalResult {
+        self.eval_alpha(local_sec / *self.max_elapsed_secs.borrow())
+    }
+
     pub fn eval_alpha(&self, alpha: f32) -> TimelineEvalResult {
         let timelines = self.timelines.borrow_mut();
 
@@ -166,7 +182,8 @@ impl RanimTimeline {
                 .downcast_ref::<RabjectTimeline<CameraFrame>>()
             {
                 camera_frame = timeline.eval_alpha(alpha)
-            } else if let Some(timeline) = timeline.as_any().downcast_ref::<RabjectTimeline<Item>>() {
+            } else if let Some(timeline) = timeline.as_any().downcast_ref::<RabjectTimeline<Item>>()
+            {
                 if let Some((res, idx)) = timeline.eval_alpha(alpha) {
                     items.push((id, res, idx));
                 }

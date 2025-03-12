@@ -3,7 +3,7 @@ use glam::vec3;
 use ranim::animation::creation::Color;
 use ranim::color::palettes::manim::*;
 use ranim::items::vitem::Rectangle;
-use ranim::timeline::timeline;
+use ranim::timeline::{timeline, TimeMark};
 use ranim::{prelude::*, render_timeline_frame};
 
 #[timeline]
@@ -58,5 +58,6 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info, ranim=trace"))
         .init();
 
+    render_timeline_frame!(palettes, 0.0, "preview.png");
     render_timeline_frame!(palettes, 0.0, "output.png");
 }

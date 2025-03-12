@@ -16,7 +16,7 @@ use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{camera_frame::CameraFrame, Rabject};
 use linkme::distributed_slice;
-use timeline::{RanimTimeline, TimelineEvalResult};
+use timeline::{RanimTimeline, TimeMark, TimelineEvalResult};
 
 use render::{
     primitives::{RenderInstance, RenderInstances},
@@ -94,7 +94,7 @@ macro_rules! render_timeline {
 
 #[macro_export]
 macro_rules! render_timeline_frame {
-    ($func:ident, $alpha:expr, $filepath:expr) => {
+    ($func:ident, $sec:expr, $filepath:expr) => {
         let (name, func, options) = ::ranim::TIMELINES
             .iter()
             .find(|(name, ..)| *name == stringify!($func))
@@ -106,6 +106,7 @@ macro_rules! render_timeline_frame {
         }
         let duration_secs = timeline.duration_secs();
         let mut app = ::ranim::RanimRenderApp::new(&options);
+        app.render_timeline_frame(&timeline, $sec, $filepath)
         // app.render_anim_frame(
         //     ::ranim::animation::AnimWithParams::new(timeline)
         //         .with_duration(duration_secs)
@@ -281,6 +282,64 @@ impl RanimRenderApp {
             Duration::from_secs_f32(timeline.duration_secs()),
         );
         pb.finish_with_message(msg);
+
+        let timemarks = timeline
+            .time_marks()
+            .into_iter()
+            .filter(|mark| matches!(mark.1, TimeMark::Capture(_)))
+            .collect::<Vec<_>>();
+
+        let pb = ProgressBar::new(frames as u64).with_message("saving capture frames...");
+        for (sec, TimeMark::Capture(filename)) in timemarks {
+            self.render_timeline_frame(&timeline, sec, filename);
+            pb.inc(1);
+        }
+        pb.finish();
+    }
+
+    pub fn render_timeline_frame(
+        &mut self,
+        timeline: &RanimTimeline,
+        sec: f32,
+        filename: impl AsRef<Path>,
+    ) {
+        let TimelineEvalResult {
+            camera_frame,
+            items,
+        } = timeline.eval_sec(sec);
+        items.iter().for_each(|(id, res, _)| match res {
+            EvalResult::Dynamic(res) => res.prepare_render_instance_for_entity(
+                &self.ctx.wgpu_ctx,
+                &mut self.render_instances,
+                *id,
+            ),
+            EvalResult::Static(res) => res.prepare_render_instance_for_entity(
+                &self.ctx.wgpu_ctx,
+                &mut self.render_instances,
+                *id,
+            ),
+        });
+        let render_primitives = items
+            .iter()
+            .filter_map(|(id, res, _)| match res {
+                EvalResult::Dynamic(res) => {
+                    res.get_render_instance_for_entity(&self.render_instances, *id)
+                }
+                EvalResult::Static(res) => {
+                    res.get_render_instance_for_entity(&self.render_instances, *id)
+                }
+            })
+            .collect::<Vec<_>>();
+        let camera_frame = match &camera_frame.0 {
+            EvalResult::Dynamic(res) => res,
+            EvalResult::Static(res) => res,
+        };
+        // println!("{:?}", camera_frame);
+        // println!("{}", render_primitives.len());
+        self.renderer
+            .update_uniforms(&self.ctx.wgpu_ctx, camera_frame);
+        self.renderer.render(&mut self.ctx, &render_primitives);
+        self.save_frame_to_image(self.output_dir.join(filename));
     }
 
     // pub fn render_anim_frame<T: DynamicRenderable>(

@@ -5,7 +5,9 @@ pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 
 pub trait TransformAnim<T: TransformRequirement + 'static> {
-    fn transform_between(&self, dst: T) -> Animation<T>;
+    fn transform<F: Fn(&mut T)>(&self, f: F) -> Animation<T>;
+    fn transform_from(&self, s: impl Into<T>) -> Animation<T>;
+    fn transform_to(&self, d: impl Into<T>) -> Animation<T>;
 }
 
 pub trait TransformAnimSchedule<'r, 't, T: TransformRequirement + 'static> {
@@ -15,8 +17,18 @@ pub trait TransformAnimSchedule<'r, 't, T: TransformRequirement + 'static> {
 }
 
 impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
-    fn transform_between(&self, dst: T) -> Animation<T> {
+    fn transform<F: Fn(&mut T)>(&self, f: F) -> Animation<T> {
+        let mut dst = self.clone();
+        (f)(&mut dst);
         Animation::from_evaluator(Transform::new(self.clone(), dst).to_evaluator())
+            .with_rate_func(smooth)
+    }
+    fn transform_from(&self, s: impl Into<T>) -> Animation<T> {
+        Animation::from_evaluator(Transform::new(s.into(), self.clone()).to_evaluator())
+            .with_rate_func(smooth)
+    }
+    fn transform_to(&self, d: impl Into<T>) -> Animation<T> {
+        Animation::from_evaluator(Transform::new(self.clone(), d.into()).to_evaluator())
             .with_rate_func(smooth)
     }
 }
@@ -26,21 +38,17 @@ impl<'r, 't, T: TransformRequirement + 'static> TransformAnimSchedule<'r, 't, T>
 {
     /// Play an animation interpolates from the given src to current rabject
     fn transform_from(&'r mut self, src: impl Into<T>) -> AnimSchedule<'r, 't, T> {
-        let src = src.into();
-        AnimSchedule::new(self, src.transform_between(self.data.clone()))
+        AnimSchedule::new(self, self.data.transform_from(src))
     }
 
     /// Play an animation interpolates current rabject with a given transform func
     fn transform<F: Fn(&mut T)>(&'r mut self, f: F) -> AnimSchedule<'r, 't, T> {
-        let mut dst = self.data.clone();
-        (f)(&mut dst);
-        AnimSchedule::new(self, self.data.transform_between(dst))
+        AnimSchedule::new(self, self.data.transform(f))
     }
 
     /// Play an animation interpolates from the given src to current rabject
     fn transform_to(&'r mut self, dst: impl Into<T>) -> AnimSchedule<'r, 't, T> {
-        let dst = dst.into();
-        AnimSchedule::new(self, self.data.transform_between(dst))
+        AnimSchedule::new(self, self.data.transform_to(dst))
     }
 }
 
