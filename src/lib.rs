@@ -289,12 +289,26 @@ impl RanimRenderApp {
             .filter(|mark| matches!(mark.1, TimeMark::Capture(_)))
             .collect::<Vec<_>>();
 
-        let pb = ProgressBar::new(frames as u64).with_message("saving capture frames...");
-        for (sec, TimeMark::Capture(filename)) in timemarks {
-            self.render_timeline_frame(&timeline, sec, filename);
+        let pb = ProgressBar::new(timemarks.len() as u64)
+            .with_message("saving capture frames from time marks...");
+        pb.set_style(
+            ProgressStyle::with_template(
+                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] capture frame {human_pos}/{human_len} (eta {eta}) {msg}",
+            )
+            .unwrap()
+            .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
+                write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+            })
+            .progress_chars("#>-"),
+        );
+        for (sec, TimeMark::Capture(filename)) in &timemarks {
+            self.render_timeline_frame(&timeline, *sec, filename);
             pb.inc(1);
         }
-        pb.finish();
+        pb.finish_with_message(format!(
+            "saved {} capture frames from time marks",
+            timemarks.len()
+        ));
     }
 
     pub fn render_timeline_frame(
