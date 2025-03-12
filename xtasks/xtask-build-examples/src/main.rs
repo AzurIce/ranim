@@ -1,4 +1,6 @@
+use clap::Parser;
 use serde::{Deserialize, Serialize};
+use sha1::{Digest, Sha1};
 use std::env;
 use std::error::Error;
 use std::fs::{self, create_dir_all, read_to_string};
@@ -6,17 +8,38 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
 
-const EXCLUDE_EXAMPLE: [&str; 1] = ["test_scene"];
+const EXCLUDE_EXAMPLES: [&str; 1] = ["test_scene"];
+const HIDE_EXAMPLES: [&str; 4] = [
+    "getting_started_0",
+    "getting_started_1",
+    "getting_started_2",
+    "getting_started_3",
+];
 
-#[derive(Serialize, Deserialize)]
+#[derive(Parser)]
+#[command(author, version, about = "build ranim examples")]
+struct Args {
+    /// 指定要处理的示例名称，不指定则处理所有示例
+    #[arg(value_name = "EXAMPLES")]
+    examples: Vec<String>,
+
+    #[arg(long)]
+    lazy_run: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct ExampleMeta {
     name: String,
     code: String,
-    output_type: String, // "video" 或 "image"
-    output_path: String,
+    hash: String,
+    preview_img: Option<String>,
+    output_files: Vec<String>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // 解析命令行参数
+    let args = Args::parse();
+
     let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workspace_root = xtask_root.join("../../");
 
@@ -24,77 +47,168 @@ fn main() -> Result<(), Box<dyn Error>> {
     let website_root = workspace_root.join("website");
     let website_data_dir = website_root.join("data");
     let website_static_examples_dir = website_root.join("static").join("examples");
+    let website_content_examples_dir = website_root.join("content").join("examples");
 
     // 确保目标目录存在
     create_dir_all(&website_static_examples_dir)?;
     create_dir_all(&website_data_dir)?;
+    create_dir_all(&website_content_examples_dir)?;
 
-    // 获取命令行参数
-    let args: Vec<String> = env::args().skip(1).collect();
-
-    // 获取所有示例目录
-    let mut example_dirs: Vec<PathBuf> = fs::read_dir(&examples_dir)?
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
-        .map(|entry| entry.path())
-        .filter(|p| !EXCLUDE_EXAMPLE.contains(&p.file_name().unwrap().to_str().unwrap()))
-        .collect();
-
-    // 如果提供了命令行参数，则只处理指定的示例
-    if !args.is_empty() {
-        example_dirs.retain(|dir| {
-            if let Some(name) = dir.file_name().and_then(|n| n.to_str()) {
-                args.contains(&name.to_string())
-            } else {
-                false
-            }
-        });
-    }
-
-    println!("找到 {} 个示例", example_dirs.len());
+    let example_dirs = get_examples(examples_dir, &args.examples);
+    println!(
+        "找到 {} 个示例: {:?}",
+        example_dirs.len(),
+        example_dirs
+            .iter()
+            .map(|p| p.file_name().unwrap())
+            .collect::<Vec<_>>()
+    );
 
     // 处理每个示例
     for example_dir in example_dirs {
         let example_name = example_dir
             .file_name()
             .and_then(|name| name.to_str())
-            .ok_or("无法获取示例名称")?;
-
+            .unwrap();
         println!("处理示例: {}", example_name);
 
-        // 运行示例
-        run_example(example_name, &workspace_root)?;
-
-        // 复制输出文件
-        let output_dir = workspace_root.join("output").join(example_name);
-        let example_output_dir = website_static_examples_dir.join(example_name);
-        create_dir_all(&example_output_dir)?;
-
-        // 确定输出类型并复制文件
-        let (output_type, output_path) = copy_output_files(&output_dir, &example_output_dir)?;
-
         // 读取示例源代码
-        let main_rs_path = example_dir.join("main.rs");
-        let code = read_to_string(main_rs_path)?;
+        let code = read_to_string(example_dir.join("main.rs"))?;
+        let mut hasher = Sha1::new();
+        hasher.update(code.as_bytes());
+        let hash = hasher.finalize();
+        let hash = base16ct::lower::encode_string(&hash);
 
         // 创建元数据
-        let meta = ExampleMeta {
+        let new_meta = ExampleMeta {
             name: example_name.to_string(),
-            code: format!("```rust\n{code}\n```"),
-            output_type,
-            output_path: format!("/examples/{}/{}", example_name, output_path),
+            code: format!("```rust,linenos\n{code}\n```"),
+            hash: hash.clone(),
+            preview_img: None,
+            output_files: Vec::new(),
         };
+
+        let old_meta = read_to_string(website_data_dir.join(format!("{}.toml", example_name)))
+            .ok()
+            .and_then(|s| toml::from_str::<ExampleMeta>(&s).ok());
+        let mut new_meta = match old_meta.clone() {
+            Some(old_meta) => {
+                // Only need to update code and hash
+                ExampleMeta {
+                    code: new_meta.code,
+                    hash: new_meta.hash,
+                    ..old_meta
+                }
+            }
+            None => new_meta,
+        };
+        // 如果非 Lazy 或无法读取 toml 或 toml 中无输出或 hash 有变化，则重新运行
+        if !args.lazy_run
+            || old_meta
+                .map(|meta| meta.hash != new_meta.hash || meta.output_files.is_empty())
+                .unwrap_or(true)
+        {
+            // 运行示例
+            run_example(example_name, &workspace_root)?;
+
+            // 复制输出文件
+            let output_dir = workspace_root.join("output").join(example_name);
+            let example_output_dir = website_static_examples_dir.join(example_name);
+            create_dir_all(&example_output_dir)?;
+
+            // 复制文件并更新元数据
+            let (preview_img, output_files) = copy_output_files(&output_dir, &example_output_dir)?;
+            new_meta.preview_img =
+                preview_img.map(|path| format!("/examples/{}/{}", example_name, path));
+            new_meta.output_files = output_files
+                .into_iter()
+                .map(|path| format!("/examples/{}/{}", example_name, path))
+                .collect();
+        }
 
         // 写入元数据文件
         let meta_path = website_data_dir.join(format!("{}.toml", example_name));
-        let meta_toml = toml::to_string(&meta)?;
+        let meta_toml = toml::to_string(&new_meta)?;
         fs::write(meta_path, meta_toml)?;
+
+        // 处理README.md并创建content/examples下的markdown文件
+        if !HIDE_EXAMPLES.contains(&example_name) {
+            create_example_page(example_name, &example_dir, &website_content_examples_dir);
+        }
 
         println!("示例 {} 处理完成", example_name);
     }
 
     println!("所有示例处理完成");
     Ok(())
+}
+
+fn create_example_page(
+    example_name: impl AsRef<str>,
+    example_dir: impl AsRef<Path>,
+    website_content_examples_dir: impl AsRef<Path>,
+) {
+    let example_name = example_name.as_ref();
+    let example_dir = example_dir.as_ref();
+    let website_content_examples_dir = website_content_examples_dir.as_ref();
+
+    let readme_path = example_dir.join("README.md");
+    let content_md_path = website_content_examples_dir.join(format!("{}.md", example_name));
+
+    // 创建markdown内容
+    let mut md_content = format!(
+        r#"+++
+title = "{}"
+template = "examples-page.html"
++++
+
+"#,
+        example_name
+    );
+
+    // 如果README.md存在，则复制其内容
+    if readme_path.exists() {
+        let readme_content = read_to_string(readme_path).unwrap();
+        md_content.push_str(&readme_content);
+
+        // 确保README内容后有换行
+        if !readme_content.ends_with('\n') {
+            md_content.push('\n');
+        }
+
+        // 如果最后一行不是空行，添加一个空行
+        if !md_content.ends_with("\n\n") {
+            md_content.push('\n');
+        }
+    }
+
+    // 添加示例标记
+    md_content.push_str(&format!("!example-{}\n", example_name));
+
+    // 写入markdown文件
+    fs::write(content_md_path, md_content).unwrap();
+}
+
+fn get_examples(examples_dir: impl AsRef<Path>, example_filter: &[String]) -> Vec<PathBuf> {
+    // 获取所有示例目录
+    let mut example_dirs: Vec<PathBuf> = fs::read_dir(&examples_dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+        .map(|entry| entry.path())
+        .filter(|p| !EXCLUDE_EXAMPLES.contains(&p.file_name().unwrap().to_str().unwrap()))
+        .collect();
+
+    // 如果提供了示例名称参数，则只处理指定的示例
+    if !example_filter.is_empty() {
+        example_dirs.retain(|dir| {
+            dir.file_name()
+                .and_then(|n| n.to_str())
+                .map(|name| example_filter.contains(&name.to_string()))
+                .unwrap_or(false)
+        });
+    }
+    example_dirs
 }
 
 fn run_example(example_name: &str, workspace_root: &Path) -> Result<(), Box<dyn Error>> {
@@ -115,31 +229,33 @@ fn run_example(example_name: &str, workspace_root: &Path) -> Result<(), Box<dyn 
 fn copy_output_files(
     source_dir: &Path,
     target_dir: &Path,
-) -> Result<(String, String), Box<dyn Error>> {
-    // 查找输出文件
-    let mut output_type = String::new();
-    let mut output_path = String::new();
+) -> Result<(Option<String>, Vec<String>), Box<dyn Error>> {
+    let mut preview_img = None;
+    let mut output_files = Vec::new();
 
     for entry in WalkDir::new(source_dir).into_iter().filter_map(Result::ok) {
         let path = entry.path();
         if path.is_file() {
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if ext == "mp4" {
-                    output_type = "video".to_string();
-                    output_path = copy_file(path, target_dir)?;
-                } else if ext == "png" || ext == "jpg" || ext == "jpeg" {
-                    output_type = "image".to_string();
-                    output_path = copy_file(path, target_dir)?;
+            if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
+                if file_name == "preview.png" {
+                    preview_img = Some(copy_file(path, target_dir)?);
+                    continue;
+                }
+
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    if ["mp4", "png", "jpg"].contains(&ext) {
+                        output_files.push(copy_file(path, target_dir)?);
+                    }
                 }
             }
         }
     }
 
-    if output_type.is_empty() {
+    if output_files.is_empty() {
         return Err("未找到输出文件".into());
     }
 
-    Ok((output_type, output_path))
+    Ok((preview_img, output_files))
 }
 
 fn copy_file(source: &Path, target_dir: &Path) -> Result<String, Box<dyn Error>> {

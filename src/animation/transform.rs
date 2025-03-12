@@ -1,58 +1,77 @@
-use super::{AnimSchedule, DynamicEntityAnim, EntityAnim, PureEvaluator, Rabject};
-use crate::{interpolate::Interpolatable, items::Entity, utils::rate_functions::smooth};
+use super::{AnimSchedule, Animation, EvalDynamic, Rabject, ToEvaluator};
+use crate::{interpolate::Interpolatable, utils::rate_functions::smooth};
 
-pub trait TransformAnim<'r, 't, T: Entity + Alignable + Interpolatable + 'static> {
-    fn transform(&'r mut self, f: fn(&mut T)) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
-    fn transform_from(&'r mut self, s: impl Into<T>) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
-    fn transform_to(&'r mut self, d: impl Into<T>) -> AnimSchedule<'r, 't, T, EntityAnim<T>>;
+pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
+impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
+
+pub trait TransformAnim<T: TransformRequirement + 'static> {
+    fn transform<F: Fn(&mut T)>(&self, f: F) -> Animation<T>;
+    fn transform_from(&self, s: impl Into<T>) -> Animation<T>;
+    fn transform_to(&self, d: impl Into<T>) -> Animation<T>;
 }
 
-impl<'r, 't, T: Entity + Alignable + Interpolatable + 'static> TransformAnim<'r, 't, T>
+pub trait TransformAnimSchedule<'r, 't, T: TransformRequirement + 'static> {
+    fn transform<F: Fn(&mut T)>(&'r mut self, f: F) -> AnimSchedule<'r, 't, T>;
+    fn transform_from(&'r mut self, s: impl Into<T>) -> AnimSchedule<'r, 't, T>;
+    fn transform_to(&'r mut self, d: impl Into<T>) -> AnimSchedule<'r, 't, T>;
+}
+
+impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
+    fn transform<F: Fn(&mut T)>(&self, f: F) -> Animation<T> {
+        let mut dst = self.clone();
+        (f)(&mut dst);
+        Animation::from_evaluator(Transform::new(self.clone(), dst).to_evaluator())
+            .with_rate_func(smooth)
+    }
+    fn transform_from(&self, s: impl Into<T>) -> Animation<T> {
+        Animation::from_evaluator(Transform::new(s.into(), self.clone()).to_evaluator())
+            .with_rate_func(smooth)
+    }
+    fn transform_to(&self, d: impl Into<T>) -> Animation<T> {
+        Animation::from_evaluator(Transform::new(self.clone(), d.into()).to_evaluator())
+            .with_rate_func(smooth)
+    }
+}
+
+impl<'r, 't, T: TransformRequirement + 'static> TransformAnimSchedule<'r, 't, T>
     for Rabject<'t, T>
 {
     /// Play an animation interpolates from the given src to current rabject
-    fn transform_from(&'r mut self, src: impl Into<T>) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
-        let src: T = src.into();
-        let func = Transform::new(src, self.data.clone());
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+    fn transform_from(&'r mut self, src: impl Into<T>) -> AnimSchedule<'r, 't, T> {
+        AnimSchedule::new(self, self.data.transform_from(src))
     }
 
     /// Play an animation interpolates current rabject with a given transform func
-    fn transform(&'r mut self, f: fn(&mut T)) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
-        let mut dst = self.data.clone();
-        (f)(&mut dst);
-        let func = Transform::new(self.data.clone(), dst);
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+    fn transform<F: Fn(&mut T)>(&'r mut self, f: F) -> AnimSchedule<'r, 't, T> {
+        AnimSchedule::new(self, self.data.transform(f))
     }
 
     /// Play an animation interpolates from the given src to current rabject
-    fn transform_to(&'r mut self, dst: impl Into<T>) -> AnimSchedule<'r, 't, T, EntityAnim<T>> {
-        let dst: T = dst.into();
-        let func = Transform::new(self.data.clone(), dst);
-        AnimSchedule::new(self, DynamicEntityAnim::new(self.id, func)).with_rate_func(smooth)
+    fn transform_to(&'r mut self, dst: impl Into<T>) -> AnimSchedule<'r, 't, T> {
+        AnimSchedule::new(self, self.data.transform_to(dst))
     }
 }
 
 /// A transform animation func
-pub struct Transform<T: Entity + Alignable + Interpolatable> {
+pub struct Transform<T: TransformRequirement> {
     src: T,
     dst: T,
     aligned_src: T,
     aligned_dst: T,
 }
 
-/// A trait for aligning two rabjects
+/// A trait for aligning two items
 ///
 /// Alignment is actually the meaning of preparation for interpolation.
 ///
-/// For example, if we want to interpolate two VMobjects, we need to
-/// align their inner data structure `Vec<VMobjectPoint>` to the same length.
+/// For example, if we want to interpolate two VItems, we need to
+/// align all their inner components like `ComponentVec<VPoint>` to the same length.
 pub trait Alignable {
     fn is_aligned(&self, other: &Self) -> bool;
     fn align_with(&mut self, other: &mut Self);
 }
 
-impl<T: Entity + Alignable + Interpolatable> Transform<T> {
+impl<T: TransformRequirement> Transform<T> {
     pub fn new(src: T, dst: T) -> Self {
         let mut aligned_src = src.clone();
         let mut aligned_dst = dst.clone();
@@ -68,7 +87,7 @@ impl<T: Entity + Alignable + Interpolatable> Transform<T> {
     }
 }
 
-impl<T: Entity + Alignable + Interpolatable> PureEvaluator<T> for Transform<T> {
+impl<T: TransformRequirement> EvalDynamic<T> for Transform<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         if alpha == 0.0 {
             self.src.clone()

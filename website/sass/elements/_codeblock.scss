@@ -1,0 +1,73 @@
+pre {
+  padding: 1rem;
+  overflow: hidden !important;
+}
+
+pre code {
+  overflow: auto;
+}
+
+/* The line numbers already provide some kind of left/right padding */
+pre[data-linenos] {
+  padding: 1rem 0;
+}
+
+pre table td {
+  padding: 0;
+}
+
+/* The line number cells */
+pre table td:nth-of-type(1) {
+  text-align: center;
+  vertical-align: top;
+  user-select: none;
+  padding-right: 6px;
+  position: sticky;
+  left: 0;
+  background-color: rgb(246, 248, 250);
+  z-index: 1;
+  /* 添加一个微妙的右侧边框以区分行号和代码 */
+  // border-right: 1px solid rgba(127, 127, 127, 0.2);
+    /* 使用伪元素创建固定边框 */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    border-left: 1px solid rgba(127, 127, 127, 0.2);
+    // width: 1px;
+    // background-color: rgba(127, 127, 127, 0.2);
+    z-index: 2;
+  }
+}
+
+/* The line number cells */
+pre table td:nth-of-type(2) {
+  padding-left: 6px;
+}
+
+pre mark {
+  /* If you want your highlights to take the full width */
+  display: block;
+  /* The default background colour of a mark is bright yellow */
+  background-color: rgba(254, 252, 232, 0.9);
+}
+
+pre table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+pre code,
+.markdown-body pre tt {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+  overflow: auto;
+  line-height: inherit;
+  word-wrap: normal;
+  background-color: transparent;
+  border: 0;
+}

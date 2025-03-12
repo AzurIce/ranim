@@ -1,8 +1,8 @@
 name = "getting_started_2"
 code = """
-```rust
+```rust,linenos
 use ranim::{\r
-    animation::{fading::FadingAnim, transform::TransformAnim},\r
+    animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},\r
     color::palettes::manim,\r
     items::vitem::{Circle, Square},\r
     prelude::*,\r
@@ -10,7 +10,8 @@ use ranim::{\r
 };\r
 \r
 #[timeline]\r
-fn getting_started_2(timeline: &Timeline) {\r
+fn getting_started_2(ranim: Ranim) {\r
+    let Ranim(timeline, mut _camera) = ranim;\r
     let mut square = Square(300.0).build();\r
     square.set_color(manim::BLUE_C);\r
 \r
@@ -33,5 +34,5 @@ fn main() {\r
 }\r
 
 ```"""
-output_type = "video"
-output_path = "/examples/getting_started_2/output.mp4"
+hash = "daf7bdb00158ee9f03f5d55bf65b37514ddf68bf"
+output_files = ["/examples/getting_started_2/output.mp4"]

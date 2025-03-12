@@ -2,26 +2,25 @@ use std::f32;
 
 use env_logger::Env;
 use glam::{vec3, Vec3};
-use ranim::animation::creation::{Color, CreationAnim, WritingAnim};
-use ranim::animation::fading::FadingAnim;
-use ranim::animation::transform::TransformAnim;
+use ranim::animation::creation::{Color, CreationAnimSchedule, WritingAnimSchedule};
+use ranim::animation::fading::FadingAnimSchedule;
+use ranim::animation::transform::{TransformAnim, TransformAnimSchedule};
 use ranim::color::palettes::manim;
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon};
-use ranim::timeline::{timeline, Timeline};
+use ranim::timeline::{timeline, TimeMark};
 use ranim::{prelude::*, render_timeline, typst_svg};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[timeline]
-fn basic(timeline: &Timeline) {
+fn basic(ranim: Ranim) {
+    let Ranim(timeline, mut _camera) = ranim;
     timeline.forward(0.2);
 
     let mut svg = SvgItem::from_svg(SVG);
     svg.scale(Vec3::splat(2.0)).shift(vec3(0.0, 200.0, 0.0));
     let mut svg = timeline.insert(svg);
-    timeline.play(svg.fade_in());
-
     let mut text = SvgItem::from_svg(&typst_svg!(
         r#"
         #align(center)[
@@ -34,18 +33,27 @@ fn basic(timeline: &Timeline) {
     text.set_fill_opacity(0.8).shift(Vec3::NEG_Y * 200.0);
     let mut text = timeline.insert(text);
 
-    timeline.play(text.write().with_duration(3.0));
-
+    timeline.play(svg.fade_in().with_duration(3.0));
     timeline.play(
-        text.transform(|data| {
-            data.scale(Vec3::splat(2.0));
-        })
-        .apply(), // `apply` will apply the animation's effect to rabject's data
+        text.write()
+            .with_duration(3.0) // At the same time, the svg fade in
+            .chain(|data| {
+                data.transform(|data| {
+                    data.scale(Vec3::splat(2.0));
+                })
+            })
+            .apply(), // `apply` will apply the animation's effect to rabject's data
+    );
+    timeline.sync();
+    timeline.insert_time_mark(
+        timeline.duration_secs(),
+        TimeMark::Capture("preview.png".to_string()),
     );
 
     timeline.forward(0.5);
     timeline.play(text.unwrite().with_duration(3.0));
-    timeline.play(svg.fade_out());
+    timeline.play(svg.fade_out().with_duration(3.0));
+    timeline.sync();
 
     let mut polygon = Polygon(vec![
         vec3(0.0, 0.0, 0.0),
@@ -63,7 +71,7 @@ fn basic(timeline: &Timeline) {
     // [polygon] 0.5s wait -> fade in -> 0.5s wait
     timeline.forward(0.5);
     let mut polygon = timeline.insert(polygon);
-    timeline.play(polygon.fade_in());
+    timeline.play(polygon.fade_in()).sync();
     timeline.forward(0.5);
 
     let mut arc = Arc {
@@ -77,11 +85,11 @@ fn basic(timeline: &Timeline) {
 
     let polygon_data = polygon.data.clone();
     drop(polygon);
-    timeline.play(arc.transform_from(polygon_data));
+    timeline.play(arc.transform_from(polygon_data)).sync();
     timeline.forward(0.5);
 
     // [svg] fade_out -> 0.5s wait
-    timeline.play(arc.uncreate());
+    timeline.play(arc.uncreate()).sync();
     timeline.forward(0.5);
 }
 
