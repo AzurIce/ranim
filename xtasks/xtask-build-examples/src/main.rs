@@ -118,8 +118,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             // 复制文件并更新元数据
             let (preview_img, output_files) = copy_output_files(&output_dir, &example_output_dir)?;
-            new_meta.preview_img = preview_img.map(|path| format!("/examples/{}/{}", example_name, path));
-            new_meta.output_files = output_files.into_iter()
+            new_meta.preview_img =
+                preview_img.map(|path| format!("/examples/{}/{}", example_name, path));
+            new_meta.output_files = output_files
+                .into_iter()
                 .map(|path| format!("/examples/{}/{}", example_name, path))
                 .collect();
         }

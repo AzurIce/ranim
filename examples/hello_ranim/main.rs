@@ -2,7 +2,8 @@ use ranim::{
     animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},
     color::palettes::manim,
     items::vitem::{Circle, Square},
-    prelude::*, timeline::TimeMark,
+    prelude::*,
+    timeline::TimeMark,
 };
 
 #[timeline]

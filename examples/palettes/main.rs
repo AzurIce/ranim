@@ -3,7 +3,7 @@ use glam::vec3;
 use ranim::animation::creation::Color;
 use ranim::color::palettes::manim::*;
 use ranim::items::vitem::Rectangle;
-use ranim::timeline::{timeline, TimeMark};
+use ranim::timeline::timeline;
 use ranim::{prelude::*, render_timeline_frame};
 
 #[timeline]
