@@ -15,11 +15,11 @@ pub trait EntityTimelineStaticState {
     type StateType;
     fn into_state_type(self) -> Self::StateType;
     fn into_rc_state_type(self: Rc<Self>) -> Rc<Self::StateType>;
-    fn into_timeline(self) -> EvalTimeline<Self::StateType>
+    fn into_timeline(self) -> RabjectTimeline<Self::StateType>
     where
         Self: Sized + 'static,
     {
-        EvalTimeline::new(self.into_state_type())
+        RabjectTimeline::new(self.into_state_type())
     }
 }
 
@@ -43,14 +43,14 @@ impl EntityTimelineStaticState for CameraFrame {
     }
 }
 
-// MARK: Timeline
+// MARK: RanimTimeline
 
 /// The main struct that offers the ranim's API, and encodes animations
 /// The rabjects insert to it will hold a reference to it, so it has interior mutability
 #[derive(Default)]
-pub struct Timeline {
+pub struct RanimTimeline {
     // Timeline<CameraFrame> or Timeline<Item>
-    timelines: RefCell<Vec<Box<dyn AnyEvalTimelineTrait>>>,
+    timelines: RefCell<Vec<Box<dyn AnyTimelineTrait>>>,
     max_elapsed_secs: RefCell<f32>,
 }
 
@@ -59,7 +59,7 @@ pub struct TimelineEvalResult {
     pub items: Vec<(usize, EvalResult<Item>, usize)>,
 }
 
-impl Timeline {
+impl RanimTimeline {
     pub fn new() -> Self {
         Self::default()
     }
@@ -92,7 +92,7 @@ impl Timeline {
             .get_mut(rabject.id)
             .unwrap()
             .as_any_mut()
-            .downcast_mut::<EvalTimeline<T::StateType>>()
+            .downcast_mut::<RabjectTimeline<T::StateType>>()
             .unwrap();
         timeline.update_static_state(Some(Rc::new(rabject.data.clone().into_state_type())));
     }
@@ -145,7 +145,7 @@ impl Timeline {
             .get_mut(rabject.id)
             .unwrap()
             .as_any_mut()
-            .downcast_mut::<EvalTimeline<T::StateType>>()
+            .downcast_mut::<RabjectTimeline<T::StateType>>()
             .unwrap();
 
         timeline.append_anim(anim.into_state_type());
@@ -163,10 +163,10 @@ impl Timeline {
         timelines.iter().enumerate().for_each(|(id, timeline)| {
             if let Some(timeline) = timeline
                 .as_any()
-                .downcast_ref::<EvalTimeline<CameraFrame>>()
+                .downcast_ref::<RabjectTimeline<CameraFrame>>()
             {
                 camera_frame = timeline.eval_alpha(alpha)
-            } else if let Some(timeline) = timeline.as_any().downcast_ref::<EvalTimeline<Item>>() {
+            } else if let Some(timeline) = timeline.as_any().downcast_ref::<RabjectTimeline<Item>>() {
                 if let Some((res, idx)) = timeline.eval_alpha(alpha) {
                     items.push((id, res, idx));
                 }
@@ -180,7 +180,7 @@ impl Timeline {
     }
 }
 
-impl Debug for Timeline {
+impl Debug for RanimTimeline {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "Timeline {:?}: {} timelines\n",
@@ -191,9 +191,9 @@ impl Debug for Timeline {
     }
 }
 
-// MARK: EvalTimeline
+// MARK: RabjectTimeline
 /// A timeline struct that encodes the animation of the type `T`
-pub struct EvalTimeline<T> {
+pub struct RabjectTimeline<T> {
     forward_static_state: Option<Rc<T>>,
     animations: Vec<Option<Animation<T>>>,
     end_secs: Vec<f32>,
@@ -201,11 +201,11 @@ pub struct EvalTimeline<T> {
     is_showing: bool,
 }
 
-pub trait AnyEvalTimelineTrait: EvalTimelineTrait + Any {
+pub trait AnyTimelineTrait: TimelineTrait + Any {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
-impl<T: EvalTimelineTrait + Any> AnyEvalTimelineTrait for T {
+impl<T: TimelineTrait + Any> AnyTimelineTrait for T {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -213,7 +213,7 @@ impl<T: EvalTimelineTrait + Any> AnyEvalTimelineTrait for T {
         self
     }
 }
-pub trait EvalTimelineTrait {
+pub trait TimelineTrait {
     fn elapsed_secs(&self) -> f32;
     fn forward(&mut self, duration_secs: f32);
     fn append_blank(&mut self, duration_secs: f32);
@@ -222,7 +222,7 @@ pub trait EvalTimelineTrait {
     fn hide(&mut self);
 }
 
-impl<T: 'static> EvalTimelineTrait for EvalTimeline<T> {
+impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
     fn elapsed_secs(&self) -> f32 {
         self.end_secs.last().cloned().unwrap_or(0.0)
     }
@@ -256,7 +256,7 @@ impl<T: 'static> EvalTimelineTrait for EvalTimeline<T> {
     }
 }
 
-impl<T> EvalTimeline<T> {
+impl<T> RabjectTimeline<T> {
     fn update_static_state(&mut self, static_state: Option<Rc<T>>) {
         self.forward_static_state = static_state;
     }
@@ -273,13 +273,13 @@ impl<T> EvalTimeline<T> {
     }
 }
 
-impl<T> EvalTimeline<T> {
+impl<T> RabjectTimeline<T> {
     pub fn duration_secs(&self) -> f32 {
         self.end_secs.last().cloned().unwrap_or(0.0)
     }
 }
 
-impl<T: 'static> EvalTimeline<T> {
+impl<T: 'static> RabjectTimeline<T> {
     pub fn new(initial_static_state: T) -> Self {
         Self {
             forward_static_state: Some(Rc::new(initial_static_state)),
@@ -290,7 +290,7 @@ impl<T: 'static> EvalTimeline<T> {
     }
 }
 
-impl<T> EvalTimeline<T> {
+impl<T> RabjectTimeline<T> {
     pub fn eval_alpha(&self, alpha: f32) -> Option<(EvalResult<T>, usize)> {
         if self.animations.is_empty() {
             return None;

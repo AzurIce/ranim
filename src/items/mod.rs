@@ -4,7 +4,7 @@ use crate::{
     animation::{AnimSchedule, Animation},
     context::WgpuContext,
     render::primitives::{RenderInstance, RenderInstances},
-    Timeline,
+    RanimTimeline,
 };
 
 pub mod camera_frame;
@@ -15,7 +15,7 @@ pub mod vitem;
 ///
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
 pub struct Rabject<'a, T> {
-    pub timeline: &'a Timeline,
+    pub timeline: &'a RanimTimeline,
     pub id: usize,
     pub data: T,
 }

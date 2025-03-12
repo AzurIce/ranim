@@ -10,9 +10,17 @@ fn getting_started_0(ranim: Ranim) {\r
     let mut square = Square(300.0).build(); // An VItem of a square\r
     square.set_color(manim::BLUE_C);\r
 \r
-    timeline.forward(1.0);\r
-    let mut _square = timeline.insert(square); // Create a \"Rabject\" in the timeline\r
-    timeline.forward(1.0);\r
+    timeline.forward(0.5);\r
+    let square = timeline.insert(square); // Create a \"Rabject\" in the timeline\r
+    timeline.forward(0.5); // By default the rabject timeline is at \"show\" state\r
+    timeline.hide(&square);\r
+    timeline.forward(0.5); // After called \"hide\", the forward will encode blank into timeline\r
+\r
+    timeline.show(&square);\r
+    timeline.forward(0.5);\r
+\r
+    drop(square); // The drop is equal to `timeline.hide(&rabject)`\r
+    timeline.forward(0.5);\r
 }\r
 \r
 fn main() {\r
@@ -20,6 +28,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "e365c8ffc0e4e95f3fa54ea05f792c2f35ff25df"
+hash = "e19a148034dbd73a3204b11cafe3f64e9158fba4"
 output_type = "video"
 output_path = "/examples/getting_started_0/output.mp4"
