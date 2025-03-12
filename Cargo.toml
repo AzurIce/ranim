@@ -1,12 +1,13 @@
 [package]
 name = "ranim"
-description = "An animation engine inspired by Manim and Janim"
+description = "An animation engine inspired by manim and JAnim"
 repository = "https://github.com/AzurIce/ranim"
+homepage = "https://azurice.github.io/ranim"
 version = "0.0.0"
 edition = "2021"
 readme = "README.md"
 license = "MIT"
-keywords = ["animation", "manim"]
+keywords = ["animation", "manim", "wgpu"]
 
 [workspace]
 members = ["packages/*", "xtasks/*"]
