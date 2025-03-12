@@ -3,7 +3,7 @@ code = """
 ```rust,linenos
 use env_logger::Env;\r
 use glam::vec2;\r
-use ranim::animation::fading::FadingAnim;\r
+use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::color::HueDirection;\r
 use ranim::items::vitem::Arc;\r
 use ranim::timeline::timeline;\r
@@ -11,7 +11,7 @@ use ranim::{prelude::*, render_timeline};\r
 \r
 #[timeline]\r
 fn arc(ranim: Ranim) {\r
-    let Ranim(timeline, mut _camera) = ranim;\r
+    let Ranim(timeline, _camera) = ranim;\r
 \r
     // let frame_size = app.camera().size;\r
     let frame_size = (1920.0, 1080.0);\r
@@ -49,8 +49,8 @@ fn arc(ranim: Ranim) {\r
                 .shift(offset.extend(0.0));\r
 \r
             let mut arc = timeline.insert(arc);\r
-            timeline.play(arc.fade_in().with_duration(0.05));\r
-            arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`\r
+            timeline.play(arc.fade_in().with_duration(0.05)).sync();\r
+            arcs.push(arc); // To make sure it is not dropped until the end of the `construct`\r
         }\r
     }\r
 }\r
@@ -65,6 +65,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "57374ff25ec9f6320195b7528119c0094d9d9249"
+hash = "af0addf5d6eeb9c0941055c7d280548f1d0a1dc2"
 output_type = "video"
 output_path = "/examples/arc/output.mp4"

@@ -1,6 +1,6 @@
 use env_logger::Env;
 use glam::vec2;
-use ranim::animation::fading::FadingAnim;
+use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::items::vitem::Arc;
 use ranim::timeline::timeline;
@@ -8,7 +8,7 @@ use ranim::{prelude::*, render_timeline};
 
 #[timeline]
 fn arc(ranim: Ranim) {
-    let Ranim(timeline, mut _camera) = ranim;
+    let Ranim(timeline, _camera) = ranim;
 
     // let frame_size = app.camera().size;
     let frame_size = (1920.0, 1080.0);
@@ -46,8 +46,8 @@ fn arc(ranim: Ranim) {
                 .shift(offset.extend(0.0));
 
             let mut arc = timeline.insert(arc);
-            timeline.play(arc.fade_in().with_duration(0.05));
-            arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`
+            timeline.play(arc.fade_in().with_duration(0.05)).sync();
+            arcs.push(arc); // To make sure it is not dropped until the end of the `construct`
         }
     }
 }

@@ -2,7 +2,7 @@ name = "hello_ranim"
 code = """
 ```rust,linenos
 use ranim::{\r
-    animation::{fading::FadingAnim, transform::TransformAnim},\r
+    animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},\r
     color::palettes::manim,\r
     items::vitem::{Circle, Square},\r
     prelude::*,\r
@@ -24,7 +24,7 @@ fn hello_ranim(ranim: Ranim) {\r
     timeline.play(square.transform_to(circle).apply());\r
     timeline.forward(1.0);\r
 \r
-    timeline.play(square.fade_out())\r
+    timeline.play(square.fade_out());\r
 }\r
 \r
 fn main() {\r
@@ -32,6 +32,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "a4e6824873eda8cd9680fe8fdb0bdd770257bf3d"
+hash = "4d65b875d8e29eaec03b37cd8c4c30a2da88563c"
 output_type = "video"
 output_path = "/examples/hello_ranim/output.mp4"

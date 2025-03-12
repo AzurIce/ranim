@@ -1,9 +1,7 @@
-use std::{
-    ops::{Deref, DerefMut},
-    rc::Rc,
-};
+use std::rc::Rc;
 
 use crate::{
+    animation::{AnimSchedule, Animation},
     context::WgpuContext,
     render::primitives::{RenderInstance, RenderInstances},
     Timeline,
@@ -22,23 +20,20 @@ pub struct Rabject<'a, T> {
     pub data: T,
 }
 
-impl<T> Deref for Rabject<'_, T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl<T> DerefMut for Rabject<'_, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
-    }
-}
-
 impl<T> Drop for Rabject<'_, T> {
     fn drop(&mut self) {
         self.timeline.hide(self);
         // TODO: remove it
+    }
+}
+
+impl<'t, T: 'static> Rabject<'t, T> {
+    pub fn schedule<'r>(
+        &'r mut self,
+        anim_builder: impl FnOnce(&mut Self) -> Animation<T>,
+    ) -> AnimSchedule<'r, 't, T> {
+        let animation = (anim_builder)(self);
+        AnimSchedule::new(self, animation)
     }
 }
 

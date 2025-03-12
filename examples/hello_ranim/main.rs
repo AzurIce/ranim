@@ -1,5 +1,5 @@
 use ranim::{
-    animation::{fading::FadingAnim, transform::TransformAnim},
+    animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},
     color::palettes::manim,
     items::vitem::{Circle, Square},
     prelude::*,
@@ -21,7 +21,7 @@ fn hello_ranim(ranim: Ranim) {
     timeline.play(square.transform_to(circle).apply());
     timeline.forward(1.0);
 
-    timeline.play(square.fade_out())
+    timeline.play(square.fade_out());
 }
 
 fn main() {

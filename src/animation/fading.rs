@@ -1,4 +1,4 @@
-use super::{AnimSchedule, EvalDynamic, Schedule};
+use super::{AnimSchedule, Animation, EvalDynamic, ToEvaluator};
 use crate::items::Rabject;
 use crate::prelude::Interpolatable;
 use crate::utils::rate_functions::smooth;
@@ -8,22 +8,32 @@ pub trait FadingRequirement: Opacity + Interpolatable + Clone {}
 impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 
 // MARK: Anim Trait
-pub trait FadingAnim<'r, 't, T: FadingRequirement + 'static> {
+pub trait FadingAnim<T: FadingRequirement + 'static> {
+    fn fade_in(&self) -> Animation<T>;
+    fn fade_out(&self) -> Animation<T>;
+}
+
+pub trait FadingAnimSchedule<'r, 't, T: FadingRequirement + 'static> {
     fn fade_in(&'r mut self) -> AnimSchedule<'r, 't, T>;
     fn fade_out(&'r mut self) -> AnimSchedule<'r, 't, T>;
 }
 
-impl<'r, 't, T: FadingRequirement + 'static> FadingAnim<'r, 't, T> for Rabject<'t, T> {
+impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
+    fn fade_in(&self) -> Animation<T> {
+        Animation::from_evaluator(FadeIn::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+    }
+    fn fade_out(&self) -> Animation<T> {
+        Animation::from_evaluator(FadeOut::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+    }
+}
+
+impl<'r, 't, T: FadingRequirement + 'static> FadingAnimSchedule<'r, 't, T> for Rabject<'t, T> {
     fn fade_in(&'r mut self) -> AnimSchedule<'r, 't, T> {
-        FadeIn::new(self.data.clone())
-            .schedule(self)
-            .with_rate_func(smooth)
+        AnimSchedule::new(self, self.data.fade_in())
     }
 
     fn fade_out(&'r mut self) -> AnimSchedule<'r, 't, T> {
-        FadeOut::new(self.data.clone())
-            .schedule(self)
-            .with_rate_func(smooth)
+        AnimSchedule::new(self, self.data.fade_out())
     }
 }
 

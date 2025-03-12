@@ -55,7 +55,7 @@ pub mod items;
 pub mod render;
 pub mod utils;
 
-pub struct Ranim<'t>(pub &'t Timeline, pub Rabject<'t, CameraFrame>);
+pub struct Ranim<'t, 'r>(pub &'t Timeline, pub &'r mut Rabject<'t, CameraFrame>);
 
 #[distributed_slice]
 pub static TIMELINES: [(&'static str, fn(Ranim), AppOptions<'static>)];
@@ -63,11 +63,13 @@ pub static TIMELINES: [(&'static str, fn(Ranim), AppOptions<'static>)];
 pub fn build_timeline(func: &fn(Ranim), options: &AppOptions) -> Timeline {
     println!("building timeline...");
     let timeline = Timeline::new();
-    let camera = timeline.insert(items::camera_frame::CameraFrame::new_with_size(
+    let mut camera = timeline.insert(items::camera_frame::CameraFrame::new_with_size(
         options.frame_size.0 as usize,
         options.frame_size.1 as usize,
     ));
-    (func)(Ranim(&timeline, camera));
+    (func)(Ranim(&timeline, &mut camera));
+    timeline.sync();
+    drop(camera);
     println!("done");
     timeline
 }

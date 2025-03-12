@@ -2,9 +2,9 @@ use std::f32;
 
 use env_logger::Env;
 use glam::{vec3, Vec3};
-use ranim::animation::creation::{Color, CreationAnim, WritingAnim};
-use ranim::animation::fading::FadingAnim;
-use ranim::animation::transform::TransformAnim;
+use ranim::animation::creation::{Color, CreationAnimSchedule, WritingAnimSchedule};
+use ranim::animation::fading::FadingAnimSchedule;
+use ranim::animation::transform::TransformAnimSchedule;
 use ranim::color::palettes::manim;
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon};
@@ -21,7 +21,7 @@ fn basic(ranim: Ranim) {
     let mut svg = SvgItem::from_svg(SVG);
     svg.scale(Vec3::splat(2.0)).shift(vec3(0.0, 200.0, 0.0));
     let mut svg = timeline.insert(svg);
-    timeline.play(svg.fade_in());
+    timeline.play(svg.fade_in()).sync();
 
     let mut text = SvgItem::from_svg(&typst_svg!(
         r#"
@@ -47,6 +47,7 @@ fn basic(ranim: Ranim) {
     timeline.forward(0.5);
     timeline.play(text.unwrite().with_duration(3.0));
     timeline.play(svg.fade_out());
+    timeline.sync();
 
     let mut polygon = Polygon(vec![
         vec3(0.0, 0.0, 0.0),
