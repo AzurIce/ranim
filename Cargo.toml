@@ -1,12 +1,12 @@
 [package]
 name = "ranim"
 description = "An animation engine inspired by manim and JAnim"
-repository = "https://github.com/AzurIce/ranim"
-homepage = "https://azurice.github.io/ranim"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage = "https://azurice.github.io/ranim"
 readme = "README.md"
-license = "MIT"
 keywords = ["animation", "manim", "wgpu"]
 
 [workspace]
@@ -14,9 +14,12 @@ members = ["packages/*", "xtasks/*"]
 
 [workspace.package]
 version = "0.1.0-dev"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/AzurIce/ranim"
 
 [workspace.dependencies]
-ranim-macros = { path = "packages/ranim-macros", version = "0.1.0-dev" }
+ranim-macros = { path = "packages/ranim-macros" }
 
 [dependencies]
 ranim-macros.workspace = true
