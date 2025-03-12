@@ -1,5 +1,10 @@
 # Ranim
 
+![Licence](https://img.shields.io/github/license/AzurIce/ranim)
+![Check](https://github.com/AzurIce/ranim/actions/workflows/build.yml/badge.svg)
+![Website](https://github.com/AzurIce/ranim/actions/workflows/website.yml/badge.svg)
+
+
 https://github.com/user-attachments/assets/2176093e-758b-429b-89e0-2e3dd39b8a17
 
 > [hello_ranim.mp4](./assets/hello_ranim.mp4)
