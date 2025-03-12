@@ -7,6 +7,7 @@ use ranim::animation::creation::Color;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::items::vitem::ArcBetweenPoints;
+use ranim::timeline::TimeMark;
 use ranim::{prelude::*, render_timeline, timeline::timeline};
 
 #[timeline]
@@ -60,6 +61,10 @@ fn arc_between_points(ranim: Ranim) {
             t.elapsed()
         );
     }
+    timeline.insert_time_mark(
+        timeline.duration_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
 }
 
 fn main() {

@@ -32,8 +32,8 @@ struct ExampleMeta {
     name: String,
     code: String,
     hash: String,
-    output_type: Option<String>, // "video" 或 "image"
-    output_path: Option<String>,
+    preview_img: Option<String>,
+    output_files: Vec<String>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -84,8 +84,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             name: example_name.to_string(),
             code: format!("```rust,linenos\n{code}\n```"),
             hash: hash.clone(),
-            output_type: None,
-            output_path: None,
+            preview_img: None,
+            output_files: Vec::new(),
         };
 
         let old_meta = read_to_string(website_data_dir.join(format!("{}.toml", example_name)))
@@ -105,9 +105,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // 如果非 Lazy 或无法读取 toml 或 toml 中无输出或 hash 有变化，则重新运行
         if !args.lazy_run
             || old_meta
-                .map(|meta| {
-                    meta.hash != new_meta.hash || meta.output_path.and(meta.output_type).is_none()
-                })
+                .map(|meta| meta.hash != new_meta.hash || meta.output_files.is_empty())
                 .unwrap_or(true)
         {
             // 运行示例
@@ -118,10 +116,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let example_output_dir = website_static_examples_dir.join(example_name);
             create_dir_all(&example_output_dir)?;
 
-            // 确定输出类型并复制文件
-            let (output_type, output_path) = copy_output_files(&output_dir, &example_output_dir)?;
-            new_meta.output_type = Some(output_type);
-            new_meta.output_path = Some(format!("/examples/{}/{}", example_name, output_path));
+            // 复制文件并更新元数据
+            let (preview_img, output_files) = copy_output_files(&output_dir, &example_output_dir)?;
+            new_meta.preview_img = preview_img.map(|path| format!("/examples/{}/{}", example_name, path));
+            new_meta.output_files = output_files.into_iter()
+                .map(|path| format!("/examples/{}/{}", example_name, path))
+                .collect();
         }
 
         // 写入元数据文件
@@ -227,31 +227,33 @@ fn run_example(example_name: &str, workspace_root: &Path) -> Result<(), Box<dyn 
 fn copy_output_files(
     source_dir: &Path,
     target_dir: &Path,
-) -> Result<(String, String), Box<dyn Error>> {
-    // 查找输出文件
-    let mut output_type = String::new();
-    let mut output_path = String::new();
+) -> Result<(Option<String>, Vec<String>), Box<dyn Error>> {
+    let mut preview_img = None;
+    let mut output_files = Vec::new();
 
     for entry in WalkDir::new(source_dir).into_iter().filter_map(Result::ok) {
         let path = entry.path();
         if path.is_file() {
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if ext == "mp4" {
-                    output_type = "video".to_string();
-                    output_path = copy_file(path, target_dir)?;
-                } else if ext == "png" || ext == "jpg" || ext == "jpeg" {
-                    output_type = "image".to_string();
-                    output_path = copy_file(path, target_dir)?;
+            if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
+                if file_name == "preview.png" {
+                    preview_img = Some(copy_file(path, target_dir)?);
+                    continue;
+                }
+
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    if ["mp4", "png", "jpg"].contains(&ext) {
+                        output_files.push(copy_file(path, target_dir)?);
+                    }
                 }
             }
         }
     }
 
-    if output_type.is_empty() {
+    if output_files.is_empty() {
         return Err("未找到输出文件".into());
     }
 
-    Ok((output_type, output_path))
+    Ok((preview_img, output_files))
 }
 
 fn copy_file(source: &Path, target_dir: &Path) -> Result<String, Box<dyn Error>> {

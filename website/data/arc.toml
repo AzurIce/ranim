@@ -6,7 +6,7 @@ use glam::vec2;\r
 use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::color::HueDirection;\r
 use ranim::items::vitem::Arc;\r
-use ranim::timeline::timeline;\r
+use ranim::timeline::{timeline, TimeMark};\r
 use ranim::{prelude::*, render_timeline};\r
 \r
 #[timeline]\r
@@ -53,6 +53,10 @@ fn arc(ranim: Ranim) {\r
             arcs.push(arc); // To make sure it is not dropped until the end of the `construct`\r
         }\r
     }\r
+    timeline.insert_time_mark(\r
+        timeline.duration_secs(),\r
+        TimeMark::Capture(\"preview.png\".to_string()),\r
+    );\r
 }\r
 \r
 fn main() {\r
@@ -65,6 +69,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "af0addf5d6eeb9c0941055c7d280548f1d0a1dc2"
-output_type = "video"
-output_path = "/examples/arc/output.mp4"
+hash = "319d4ef0f756facbc9ca9b34cebc773c4e68b5ca"
+preview_img = "/examples/arc/preview.png"
+output_files = ["/examples/arc/output.mp4"]

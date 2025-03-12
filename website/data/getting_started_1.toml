@@ -25,5 +25,4 @@ fn main() {\r
 
 ```"""
 hash = "9d9809846e8b337f99132315bb006f5385617b2a"
-output_type = "video"
-output_path = "/examples/getting_started_1/output.mp4"
+output_files = ["/examples/getting_started_1/output.mp4"]

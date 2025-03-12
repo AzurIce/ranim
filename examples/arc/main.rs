@@ -3,7 +3,7 @@ use glam::vec2;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::items::vitem::Arc;
-use ranim::timeline::timeline;
+use ranim::timeline::{timeline, TimeMark};
 use ranim::{prelude::*, render_timeline};
 
 #[timeline]
@@ -50,6 +50,10 @@ fn arc(ranim: Ranim) {
             arcs.push(arc); // To make sure it is not dropped until the end of the `construct`
         }
     }
+    timeline.insert_time_mark(
+        timeline.duration_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
 }
 
 fn main() {
