@@ -11,11 +11,11 @@ use ranim::{prelude::*, render_timeline};\r
 \r
 #[timeline]\r
 fn arc(ranim: Ranim) {\r
-    let Ranim(timeline, _camera) = ranim;\r
+    let Ranim(timeline, camera) = ranim;\r
 \r
     // let frame_size = app.camera().size;\r
-    let frame_size = (1920.0, 1080.0);\r
-    let frame_start = vec2(frame_size.0 as f32 / -2.0, frame_size.1 as f32 / -2.0);\r
+    let frame_size = camera.data.frame_size();\r
+    let frame_start = vec2(frame_size.x / -2.0, frame_size.y / -2.0);\r
 \r
     let start_color = color!(\"#FF8080FF\");\r
     let end_color = color!(\"#58C4DDFF\");\r
@@ -24,8 +24,8 @@ fn arc(ranim: Ranim) {\r
     let ncol = 10;\r
     let gap = 10.0;\r
     let padding = 30.0;\r
-    let step_x = (frame_size.0 as f32 - padding * 2.0 - gap * (ncol - 1) as f32) / ncol as f32;\r
-    let step_y = (frame_size.1 as f32 - padding * 2.0 - gap * (nrow - 1) as f32) / nrow as f32;\r
+    let step_x = (frame_size.x - padding * 2.0 - gap * (ncol - 1) as f32) / ncol as f32;\r
+    let step_y = (frame_size.x - padding * 2.0 - gap * (nrow - 1) as f32) / nrow as f32;\r
 \r
     let mut arcs = Vec::with_capacity(nrow * ncol);\r
     for i in 0..nrow {\r
@@ -69,6 +69,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "319d4ef0f756facbc9ca9b34cebc773c4e68b5ca"
+hash = "00a37f6faf9915eb3cdc4a8d488f62ae8b9c745f"
 preview_img = "/examples/arc/preview.png"
 output_files = ["/examples/arc/output.mp4"]

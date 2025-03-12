@@ -5,7 +5,8 @@ use ranim::{\r
     animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},\r
     color::palettes::manim,\r
     items::vitem::{Circle, Square},\r
-    prelude::*, timeline::TimeMark,\r
+    prelude::*,\r
+    timeline::TimeMark,\r
 };\r
 \r
 #[timeline]\r
@@ -33,6 +34,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "8b1ca958d95af3a8859663e534d8ff502781234f"
+hash = "053b357db0e325c7af8514cd7b4f5c6e0359d865"
 preview_img = "/examples/hello_ranim/preview.png"
 output_files = ["/examples/hello_ranim/output.mp4"]

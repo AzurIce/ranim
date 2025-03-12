@@ -238,6 +238,14 @@ impl Blueprint<VItem> for Rectangle {
     }
 }
 
+pub struct Line(pub Vec3, pub Vec3);
+
+impl Blueprint<VItem> for Line {
+    fn build(self) -> VItem {
+        VItem::from_vpoints(vec![self.0, (self.0 + self.1) / 2.0, self.1])
+    }
+}
+
 pub struct Square(pub f32);
 
 impl Blueprint<VItem> for Square {

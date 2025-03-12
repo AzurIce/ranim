@@ -6,7 +6,7 @@ use glam::vec3;\r
 use ranim::animation::creation::Color;\r
 use ranim::color::palettes::manim::*;\r
 use ranim::items::vitem::Rectangle;\r
-use ranim::timeline::{timeline, TimeMark};\r
+use ranim::timeline::timeline;\r
 use ranim::{prelude::*, render_timeline_frame};\r
 \r
 #[timeline]\r
@@ -66,6 +66,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "b559ed0c9a7be849942bd3f6f5f1a109f3002cf9"
+hash = "63836f939a7f051eb07d5f7bab32010d5fbd77af"
 preview_img = "/examples/palettes/preview.png"
 output_files = ["/examples/palettes/output.png"]

@@ -8,11 +8,11 @@ use ranim::{prelude::*, render_timeline};
 
 #[timeline]
 fn arc(ranim: Ranim) {
-    let Ranim(timeline, _camera) = ranim;
+    let Ranim(timeline, camera) = ranim;
 
     // let frame_size = app.camera().size;
-    let frame_size = (1920.0, 1080.0);
-    let frame_start = vec2(frame_size.0 as f32 / -2.0, frame_size.1 as f32 / -2.0);
+    let frame_size = camera.data.frame_size();
+    let frame_start = vec2(frame_size.x / -2.0, frame_size.y / -2.0);
 
     let start_color = color!("#FF8080FF");
     let end_color = color!("#58C4DDFF");
@@ -21,8 +21,8 @@ fn arc(ranim: Ranim) {
     let ncol = 10;
     let gap = 10.0;
     let padding = 30.0;
-    let step_x = (frame_size.0 as f32 - padding * 2.0 - gap * (ncol - 1) as f32) / ncol as f32;
-    let step_y = (frame_size.1 as f32 - padding * 2.0 - gap * (nrow - 1) as f32) / nrow as f32;
+    let step_x = (frame_size.x - padding * 2.0 - gap * (ncol - 1) as f32) / ncol as f32;
+    let step_y = (frame_size.x - padding * 2.0 - gap * (nrow - 1) as f32) / nrow as f32;
 
     let mut arcs = Vec::with_capacity(nrow * ncol);
     for i in 0..nrow {
