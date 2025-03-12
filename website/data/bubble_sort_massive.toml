@@ -1,0 +1,135 @@
+name = "bubble_sort_massive"
+code = """
+```rust,linenos
+use glam::{ivec3, vec2, vec3, Vec3};\r
+use rand::{seq::SliceRandom, SeedableRng};\r
+use ranim::{\r
+    animation::transform::TransformAnimSchedule, color::palettes::manim, items::vitem::Rectangle,\r
+    prelude::*, timeline::TimeMark, utils::rate_functions::linear,\r
+};\r
+\r
+#[timeline]\r
+fn bubble_sort_massive(ranim: Ranim) {\r
+    let Ranim(timeline, _camera) = ranim;\r
+\r
+    let frame_size = _camera.data.frame_size();\r
+    let num = 100;\r
+    let anim_step_duration = 0.0015;\r
+    let padding = frame_size.x * 0.05;\r
+    let gap = 10.0;\r
+    let rect_width = (frame_size.x - 2.0 * padding - (num - 1) as f32 * gap) / num as f32;\r
+\r
+    let max_height = frame_size.y - 2.0 * padding;\r
+    let height_unit = max_height / num as f32;\r
+\r
+    let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);\r
+    let mut heights = (1..=num)\r
+        .map(|x| x as f32 * height_unit)\r
+        .collect::<Vec<f32>>();\r
+    heights.shuffle(&mut rng);\r
+\r
+    let frame_bl = vec2(frame_size.x / -2.0, frame_size.y / -2.0);\r
+    let mut rects = heights\r
+        .iter()\r
+        .enumerate()\r
+        .map(|(i, &height)| {\r
+            let mut rect = Rectangle(rect_width, height).build();\r
+            let bottom_left = rect.get_bounding_box_point(ivec3(-1, -1, 0));\r
+            let target_coord = frame_bl.extend(0.0)\r
+                + vec3(padding, padding, 0.0)\r
+                + Vec3::X * (rect_width + gap) * i as f32;\r
+            rect.shift(target_coord - bottom_left)\r
+                .set_color(manim::WHITE)\r
+                .set_fill_opacity(0.5);\r
+            timeline.insert(rect)\r
+        })\r
+        .collect::<Vec<_>>();\r
+\r
+    let shift_right = Vec3::X * (gap + rect_width);\r
+    for i in (1..num).rev() {\r
+        for j in 0..i {\r
+            timeline.play(\r
+                rects[j]\r
+                    .transform(|data| {\r
+                        data.set_color(manim::BLUE_C).set_fill_opacity(0.5);\r
+                    })\r
+                    .with_duration(anim_step_duration)\r
+                    .with_rate_func(linear)\r
+                    .apply(),\r
+            );\r
+            timeline.play(\r
+                rects[j + 1]\r
+                    .transform(|data| {\r
+                        data.set_color(manim::BLUE_C).set_fill_opacity(0.5);\r
+                    })\r
+                    .with_duration(anim_step_duration)\r
+                    .with_rate_func(linear)\r
+                    .apply(),\r
+            );\r
+            timeline.sync();\r
+\r
+            if heights[j] > heights[j + 1] {\r
+                timeline.play(\r
+                    rects[j]\r
+                        .transform(|data| {\r
+                            data.shift(shift_right)\r
+                                .set_color(manim::BLUE_C)\r
+                                .set_fill_opacity(0.5);\r
+                        })\r
+                        .with_duration(anim_step_duration)\r
+                        .with_rate_func(linear)\r
+                        .apply(),\r
+                );\r
+                timeline.play(\r
+                    rects[j + 1]\r
+                        .transform(|data| {\r
+                            data.shift(-shift_right)\r
+                                .set_color(manim::BLUE_C.with_alpha(0.5))\r
+                                .set_fill_opacity(0.5);\r
+                        })\r
+                        .with_duration(anim_step_duration)\r
+                        .with_rate_func(linear)\r
+                        .apply(),\r
+                );\r
+                timeline.sync();\r
+                heights.swap(j, j + 1);\r
+                rects.swap(j, j + 1);\r
+            }\r
+            timeline.play(\r
+                rects[j]\r
+                    .transform(|data| {\r
+                        data.set_color(manim::WHITE.with_alpha(0.5))\r
+                            .set_fill_opacity(0.5);\r
+                    })\r
+                    .with_duration(anim_step_duration)\r
+                    .with_rate_func(linear)\r
+                    .apply(),\r
+            );\r
+            timeline.play(\r
+                rects[j + 1]\r
+                    .transform(|data| {\r
+                        data.set_color(manim::WHITE.with_alpha(0.5))\r
+                            .set_fill_opacity(0.5);\r
+                    })\r
+                    .with_duration(anim_step_duration)\r
+                    .with_rate_func(linear)\r
+                    .apply(),\r
+            );\r
+            timeline.sync();\r
+        }\r
+    }\r
+\r
+    timeline.insert_time_mark(\r
+        timeline.duration_secs() / 2.0,\r
+        TimeMark::Capture(\"preview.png\".to_string()),\r
+    );\r
+}\r
+\r
+fn main() {\r
+    render_timeline!(bubble_sort_massive);\r
+}\r
+
+```"""
+hash = "5579e844eeee074a1495e6d72e429a10c0457998"
+preview_img = "/examples/bubble_sort_massive/preview.png"
+output_files = ["/examples/bubble_sort_massive/output.mp4"]
