@@ -1,6 +1,6 @@
 [package]
 name = "ranim"
-description = "An animation engine inspired by Manim"
+description = "An animation engine inspired by Manim and Janim"
 repository = "https://github.com/AzurIce/ranim"
 version = "0.0.0"
 edition = "2021"
@@ -28,12 +28,16 @@ pollster = "0.4.0"
 uuid = { version = "1.13.2", features = ["v4"] }
 wgpu = "24.0.1"
 anyhow = "1.0.95"
-usvg = "0.44.0"
+usvg = "0.45.0"
 regex = "1.11.1"
-wgpu-profiler = "0.21.0"
+wgpu-profiler = "0.22.0"
 indicatif = "0.17.11"
 color = "0.2.3"
 linkme = "0.3.31"
+
+[dev-dependencies]
+rand = "0.9.0"
+rand_chacha = "0.9.0"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
