@@ -5,7 +5,7 @@ use glam::{ivec3, vec2, vec3, Vec3};\r
 use rand::{seq::SliceRandom, SeedableRng};\r
 use ranim::{\r
     animation::transform::TransformAnimSchedule, color::palettes::manim, items::vitem::Rectangle,\r
-    prelude::*,\r
+    prelude::*, timeline::TimeMark, utils::rate_functions::linear,\r
 };\r
 \r
 #[timeline]\r
@@ -52,6 +52,7 @@ fn selective_sort(ranim: Ranim) {\r
                     data.set_fill_color(manim::RED_C.with_alpha(0.5));\r
                 })\r
                 .with_duration(0.15)\r
+                .with_rate_func(linear)\r
                 .apply(),\r
         );\r
         for j in i + 1..num {\r
@@ -61,6 +62,7 @@ fn selective_sort(ranim: Ranim) {\r
                         data.set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
                     })\r
                     .with_duration(0.15)\r
+                    .with_rate_func(linear)\r
                     .apply(),\r
             );\r
             timeline.sync();\r
@@ -73,6 +75,7 @@ fn selective_sort(ranim: Ranim) {\r
                                 .set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
                         })\r
                         .with_duration(0.15)\r
+                        .with_rate_func(linear)\r
                         .apply(),\r
                 );\r
                 timeline.play(\r
@@ -82,6 +85,7 @@ fn selective_sort(ranim: Ranim) {\r
                                 .set_fill_color(manim::RED_C.with_alpha(0.5));\r
                         })\r
                         .with_duration(0.15)\r
+                        .with_rate_func(linear)\r
                         .apply(),\r
                 );\r
                 timeline.sync();\r
@@ -94,6 +98,7 @@ fn selective_sort(ranim: Ranim) {\r
                         data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
                     })\r
                     .with_duration(0.15)\r
+                    .with_rate_func(linear)\r
                     .apply(),\r
             );\r
             timeline.sync();\r
@@ -104,12 +109,16 @@ fn selective_sort(ranim: Ranim) {\r
                     data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
                 })\r
                 .with_duration(0.15)\r
+                .with_rate_func(linear)\r
                 .apply(),\r
         );\r
         timeline.sync();\r
     }\r
 \r
-    timeline.forward(10.0);\r
+    timeline.insert_time_mark(\r
+        timeline.duration_secs() / 2.0,\r
+        TimeMark::Capture(\"preview.png\".to_string()),\r
+    );\r
 }\r
 \r
 fn main() {\r
@@ -117,5 +126,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "4cd8c65d5f7da9cff5070cf5076ddb3c2b89df07"
+hash = "9396322d60c308fa371e1033d60cec5e3bbbe790"
+preview_img = "/examples/selective_sort/preview.png"
 output_files = ["/examples/selective_sort/output.mp4"]

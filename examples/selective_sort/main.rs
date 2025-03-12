@@ -2,7 +2,7 @@ use glam::{ivec3, vec2, vec3, Vec3};
 use rand::{seq::SliceRandom, SeedableRng};
 use ranim::{
     animation::transform::TransformAnimSchedule, color::palettes::manim, items::vitem::Rectangle,
-    prelude::*,
+    prelude::*, timeline::TimeMark, utils::rate_functions::linear,
 };
 
 #[timeline]
@@ -49,6 +49,7 @@ fn selective_sort(ranim: Ranim) {
                     data.set_fill_color(manim::RED_C.with_alpha(0.5));
                 })
                 .with_duration(0.15)
+                .with_rate_func(linear)
                 .apply(),
         );
         for j in i + 1..num {
@@ -58,6 +59,7 @@ fn selective_sort(ranim: Ranim) {
                         data.set_fill_color(manim::BLUE_C.with_alpha(0.5));
                     })
                     .with_duration(0.15)
+                    .with_rate_func(linear)
                     .apply(),
             );
             timeline.sync();
@@ -70,6 +72,7 @@ fn selective_sort(ranim: Ranim) {
                                 .set_fill_color(manim::BLUE_C.with_alpha(0.5));
                         })
                         .with_duration(0.15)
+                        .with_rate_func(linear)
                         .apply(),
                 );
                 timeline.play(
@@ -79,6 +82,7 @@ fn selective_sort(ranim: Ranim) {
                                 .set_fill_color(manim::RED_C.with_alpha(0.5));
                         })
                         .with_duration(0.15)
+                        .with_rate_func(linear)
                         .apply(),
                 );
                 timeline.sync();
@@ -91,6 +95,7 @@ fn selective_sort(ranim: Ranim) {
                         data.set_fill_color(manim::WHITE.with_alpha(0.5));
                     })
                     .with_duration(0.15)
+                    .with_rate_func(linear)
                     .apply(),
             );
             timeline.sync();
@@ -101,12 +106,16 @@ fn selective_sort(ranim: Ranim) {
                     data.set_fill_color(manim::WHITE.with_alpha(0.5));
                 })
                 .with_duration(0.15)
+                .with_rate_func(linear)
                 .apply(),
         );
         timeline.sync();
     }
 
-    timeline.forward(10.0);
+    timeline.insert_time_mark(
+        timeline.duration_secs() / 2.0,
+        TimeMark::Capture("preview.png".to_string()),
+    );
 }
 
 fn main() {
