@@ -1,4 +1,4 @@
-name = "selective_sort"
+name = "selective_sort_massive"
 code = """
 ```rust,linenos
 use glam::{ivec3, vec2, vec3, Vec3};\r
@@ -9,14 +9,14 @@ use ranim::{\r
 };\r
 \r
 #[timeline]\r
-fn selective_sort(ranim: Ranim) {\r
+fn selective_sort_massive(ranim: Ranim) {\r
     let Ranim(timeline, _camera) = ranim;\r
 \r
     let frame_size = _camera.data.frame_size();\r
-    let num = 10;\r
-    let anim_step_duration = 0.15;\r
-    let padding = frame_size.x * 0.1;\r
-    let gap = 20.0;\r
+    let num = 100;\r
+    let anim_step_duration = 0.0015;\r
+    let padding = frame_size.x * 0.05;\r
+    let gap = 10.0;\r
     let rect_width = (frame_size.x - 2.0 * padding - (num - 1) as f32 * gap) / num as f32;\r
 \r
     let max_height = frame_size.y - 2.0 * padding;\r
@@ -50,7 +50,7 @@ fn selective_sort(ranim: Ranim) {\r
         timeline.play(\r
             rects[i]\r
                 .transform(|data| {\r
-                    data.set_fill_color(manim::RED_C.with_alpha(0.5));\r
+                    data.set_color(manim::RED_C).set_fill_opacity(0.5);\r
                 })\r
                 .with_duration(anim_step_duration)\r
                 .with_rate_func(linear)\r
@@ -60,7 +60,7 @@ fn selective_sort(ranim: Ranim) {\r
             timeline.play(\r
                 rects[j]\r
                     .transform(|data| {\r
-                        data.set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
+                        data.set_color(manim::BLUE_C).set_fill_opacity(0.5);\r
                     })\r
                     .with_duration(anim_step_duration)\r
                     .with_rate_func(linear)\r
@@ -73,7 +73,8 @@ fn selective_sort(ranim: Ranim) {\r
                     rects[i]\r
                         .transform(|data| {\r
                             data.shift(shift_right * (j - i) as f32)\r
-                                .set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
+                                .set_color(manim::BLUE_C)\r
+                                .set_fill_opacity(0.5);\r
                         })\r
                         .with_duration(anim_step_duration)\r
                         .with_rate_func(linear)\r
@@ -83,7 +84,8 @@ fn selective_sort(ranim: Ranim) {\r
                     rects[j]\r
                         .transform(|data| {\r
                             data.shift(-shift_right * (j - i) as f32)\r
-                                .set_fill_color(manim::RED_C.with_alpha(0.5));\r
+                                .set_color(manim::RED_C)\r
+                                .set_fill_opacity(0.5);\r
                         })\r
                         .with_duration(anim_step_duration)\r
                         .with_rate_func(linear)\r
@@ -96,7 +98,7 @@ fn selective_sort(ranim: Ranim) {\r
             timeline.play(\r
                 rects[j]\r
                     .transform(|data| {\r
-                        data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
+                        data.set_color(manim::WHITE).set_fill_opacity(0.5);\r
                     })\r
                     .with_duration(anim_step_duration)\r
                     .with_rate_func(linear)\r
@@ -107,7 +109,7 @@ fn selective_sort(ranim: Ranim) {\r
         timeline.play(\r
             rects[i]\r
                 .transform(|data| {\r
-                    data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
+                    data.set_color(manim::WHITE).set_fill_opacity(0.5);\r
                 })\r
                 .with_duration(anim_step_duration)\r
                 .with_rate_func(linear)\r
@@ -123,10 +125,10 @@ fn selective_sort(ranim: Ranim) {\r
 }\r
 \r
 fn main() {\r
-    render_timeline!(selective_sort);\r
+    render_timeline!(selective_sort_massive);\r
 }\r
 
 ```"""
-hash = "2ee2535346405e88db08d590be6f1769deb5a0ac"
-preview_img = "/examples/selective_sort/preview.png"
-output_files = ["/examples/selective_sort/output.mp4"]
+hash = "ea77943db484a5ff587f0f6ec105149d1b899940"
+preview_img = "/examples/selective_sort_massive/preview.png"
+output_files = ["/examples/selective_sort_massive/output.mp4"]
