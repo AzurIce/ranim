@@ -7,7 +7,7 @@ use glam::Vec3;
 use ranim::{
     animation::{
         creation::{CreationAnim, WritingAnim},
-        transform::TransformAnim,
+        transform::{TransformAnim, TransformAnimSchedule},
     },
     components::TransformAnchor,
     items::{
@@ -27,15 +27,15 @@ use ranim_macros::timeline;
 
 #[timeline(fps = 60)]
 fn test_scene(ranim: Ranim) {
-    let Ranim(timeline, mut camera) = ranim;
+    let Ranim(timeline, camera) = ranim;
     // let svg = SvgItem::from_svg(SVG);
 
     let svg = SvgItem::from_svg(typst_svg!("R"));
 
     let mut svg = timeline.insert(svg);
-    let fill = svg.fill_color();
-    svg.transform(|svg| {
-        svg.scale(Vec3::splat(10.0))
+    let fill = svg.data.fill_color();
+    svg.transform(|data| {
+        data.scale(Vec3::splat(10.0))
             .set_fill_opacity(0.0)
             .set_stroke_width(1.0)
             .set_stroke_color(fill)

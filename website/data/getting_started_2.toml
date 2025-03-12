@@ -2,7 +2,7 @@ name = "getting_started_2"
 code = """
 ```rust,linenos
 use ranim::{\r
-    animation::{fading::FadingAnim, transform::TransformAnim},\r
+    animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},\r
     color::palettes::manim,\r
     items::vitem::{Circle, Square},\r
     prelude::*,\r
@@ -34,6 +34,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "655af3699825919730f107d5f023a42314a01d7f"
+hash = "daf7bdb00158ee9f03f5d55bf65b37514ddf68bf"
 output_type = "video"
 output_path = "/examples/getting_started_2/output.mp4"

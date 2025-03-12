@@ -5,9 +5,9 @@ use std::f32;\r
 \r
 use env_logger::Env;\r
 use glam::{vec3, Vec3};\r
-use ranim::animation::creation::{Color, CreationAnim, WritingAnim};\r
-use ranim::animation::fading::FadingAnim;\r
-use ranim::animation::transform::TransformAnim;\r
+use ranim::animation::creation::{Color, CreationAnimSchedule, WritingAnimSchedule};\r
+use ranim::animation::fading::FadingAnimSchedule;\r
+use ranim::animation::transform::TransformAnimSchedule;\r
 use ranim::color::palettes::manim;\r
 use ranim::items::svg_item::SvgItem;\r
 use ranim::items::vitem::{Arc, Polygon};\r
@@ -24,7 +24,7 @@ fn basic(ranim: Ranim) {\r
     let mut svg = SvgItem::from_svg(SVG);\r
     svg.scale(Vec3::splat(2.0)).shift(vec3(0.0, 200.0, 0.0));\r
     let mut svg = timeline.insert(svg);\r
-    timeline.play(svg.fade_in());\r
+    timeline.play(svg.fade_in()).sync();\r
 \r
     let mut text = SvgItem::from_svg(&typst_svg!(\r
         r#\"\r
@@ -50,6 +50,7 @@ fn basic(ranim: Ranim) {\r
     timeline.forward(0.5);\r
     timeline.play(text.unwrite().with_duration(3.0));\r
     timeline.play(svg.fade_out());\r
+    timeline.sync();\r
 \r
     let mut polygon = Polygon(vec![\r
         vec3(0.0, 0.0, 0.0),\r
@@ -99,6 +100,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "5cb7ce7db25b8c17d8509909f7a974f459434e1b"
+hash = "f2224e9f23dda3b70940ee1f8bf9a61273614e68"
 output_type = "video"
 output_path = "/examples/basic/output.mp4"

@@ -1,8 +1,6 @@
 use crate::{
-    animation::AnimSchedule,
-    animation::{Eval, EvalResult, Evaluator},
+    animation::{AnimSchedule, Animation, EvalResult, Evaluator},
     items::{camera_frame::CameraFrame, Entity, Rabject},
-    utils::rate_functions::linear,
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
@@ -53,7 +51,7 @@ impl EntityTimelineStaticState for CameraFrame {
 pub struct Timeline {
     // Timeline<CameraFrame> or Timeline<Item>
     timelines: RefCell<Vec<Box<dyn AnyEvalTimelineTrait>>>,
-    duration_secs: RefCell<f32>,
+    max_elapsed_secs: RefCell<f32>,
 }
 
 pub struct TimelineEvalResult {
@@ -67,7 +65,7 @@ impl Timeline {
     }
 
     pub fn duration_secs(&self) -> f32 {
-        *self.duration_secs.borrow()
+        *self.max_elapsed_secs.borrow()
     }
     pub fn insert<T: EntityTimelineStaticState + Clone + 'static>(
         &self,
@@ -76,7 +74,12 @@ impl Timeline {
         let mut timelines = self.timelines.borrow_mut();
 
         let id = timelines.len();
-        timelines.push(Box::new(static_state.clone().into_timeline()));
+        let mut timeline = static_state.clone().into_timeline();
+        let max_elapsed_secs = *self.max_elapsed_secs.borrow();
+        if max_elapsed_secs != 0.0 {
+            timeline.append_blank(*self.max_elapsed_secs.borrow());
+        }
+        timelines.push(Box::new(timeline));
         Rabject {
             id,
             data: static_state,
@@ -97,7 +100,7 @@ impl Timeline {
         self.timelines.borrow_mut().iter_mut().for_each(|timeline| {
             timeline.forward(secs);
         });
-        *self.duration_secs.borrow_mut() += secs;
+        *self.max_elapsed_secs.borrow_mut() += secs;
     }
     pub fn show<T>(&self, rabject: &Rabject<T>) {
         self.timelines
@@ -113,42 +116,44 @@ impl Timeline {
             .unwrap()
             .hide();
     }
+
+    pub fn sync(&self) -> &Self {
+        // println!("### SYNC ###");
+        let mut timelines = self.timelines.borrow_mut();
+        let max_elapsed_secs = self.max_elapsed_secs.borrow();
+        timelines.iter_mut().for_each(|timeline| {
+            // println!("{}, {}", timeline.elapsed_secs(), *max_elapsed_secs);
+            if timeline.elapsed_secs() < *max_elapsed_secs {
+                timeline.forward(*max_elapsed_secs - timeline.elapsed_secs());
+            }
+        });
+        self
+    }
+
     /// Push an animation into the timeline
     ///
     /// Note that this won't apply the animation effect to rabject's data,
     /// to apply the animation effect use [`AnimSchedule::apply`]
-    pub fn play<'t, T: EntityTimelineStaticState + Clone + 'static>(
+    pub fn play<'r, 't: 'r, T: EntityTimelineStaticState + Clone + 'static>(
         &'t self,
-        anim_schedule: AnimSchedule<'_, 't, T>,
-    ) {
-        *self.duration_secs.borrow_mut() += anim_schedule.params.duration_secs;
-
-        let AnimSchedule {
-            rabject,
-            evaluator,
-            params,
-        } = anim_schedule;
-
+        anim_schedule: AnimSchedule<'r, 't, T>,
+    ) -> &'t Self {
         let mut timelines = self.timelines.borrow_mut();
-        timelines
+        let AnimSchedule { rabject, anim } = anim_schedule;
+
+        let timeline = timelines
             .get_mut(rabject.id)
             .unwrap()
             .as_any_mut()
             .downcast_mut::<EvalTimeline<T::StateType>>()
-            .unwrap()
-            .append_anim(Animation {
-                evaluator: Box::new(evaluator.to_state_type()),
-                rate_func: params.rate_func,
-                duration_secs: params.duration_secs,
-            });
-        timelines
-            .iter_mut()
-            .enumerate()
-            .filter(|(id, _)| *id != rabject.id)
-            .for_each(|(_, timeline)| {
-                timeline.forward(params.duration_secs);
-            });
+            .unwrap();
+
+        timeline.append_anim(anim.into_state_type());
+        let mut max_duration = self.max_elapsed_secs.borrow_mut();
+        *max_duration = max_duration.max(timeline.duration_secs());
+        self
     }
+
     pub fn eval_alpha(&self, alpha: f32) -> TimelineEvalResult {
         let timelines = self.timelines.borrow_mut();
 
@@ -186,20 +191,6 @@ impl Debug for Timeline {
     }
 }
 
-// MARK: Animation
-
-pub struct Animation<T> {
-    evaluator: Box<dyn Eval<T>>,
-    rate_func: fn(f32) -> f32,
-    duration_secs: f32,
-}
-
-impl<T> Eval<T> for Animation<T> {
-    fn eval_alpha(&self, alpha: f32) -> EvalResult<T> {
-        self.evaluator.eval_alpha((self.rate_func)(alpha))
-    }
-}
-
 // MARK: EvalTimeline
 /// A timeline struct that encodes the animation of the type `T`
 pub struct EvalTimeline<T> {
@@ -223,6 +214,7 @@ impl<T: EvalTimelineTrait + Any> AnyEvalTimelineTrait for T {
     }
 }
 pub trait EvalTimelineTrait {
+    fn elapsed_secs(&self) -> f32;
     fn forward(&mut self, duration_secs: f32);
     fn append_blank(&mut self, duration_secs: f32);
     fn append_freeze(&mut self, duration_secs: f32);
@@ -231,6 +223,9 @@ pub trait EvalTimelineTrait {
 }
 
 impl<T: 'static> EvalTimelineTrait for EvalTimeline<T> {
+    fn elapsed_secs(&self) -> f32 {
+        self.end_secs.last().cloned().unwrap_or(0.0)
+    }
     fn show(&mut self) {
         self.is_showing = true;
     }
@@ -252,12 +247,11 @@ impl<T: 'static> EvalTimelineTrait for EvalTimeline<T> {
     }
     fn append_freeze(&mut self, duration_secs: f32) {
         let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + duration_secs;
-        self.animations
-            .push(self.forward_static_state.as_ref().map(|state| Animation {
-                evaluator: Box::new(Evaluator::Static(state.clone())) as Box<dyn Eval<T>>,
-                rate_func: linear,
-                duration_secs,
-            }));
+        self.animations.push(
+            self.forward_static_state
+                .as_ref()
+                .map(|state| Animation::from_evaluator(Evaluator::Static(state.clone()))),
+        );
         self.end_secs.push(end_sec);
     }
 }
@@ -273,6 +267,7 @@ impl<T> EvalTimeline<T> {
         };
         self.update_static_state(Some(end_state));
         let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + anim.duration_secs;
+        // println!("{}", end_sec);
         self.animations.push(Some(anim));
         self.end_secs.push(end_sec);
     }

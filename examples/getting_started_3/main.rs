@@ -1,5 +1,7 @@
 use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    animation::{
+        creation::WritingAnimSchedule, fading::FadingAnimSchedule, transform::TransformAnimSchedule,
+    },
     color::palettes::manim,
     items::vitem::{Circle, Square},
     prelude::*,
