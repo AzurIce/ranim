@@ -7,3 +7,6 @@ edition = "2021"
 walkdir = "2.3"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8.20"
+clap = { version = "4.5", features = ["derive"] }
+sha1 = "0.10.6"
+base16ct = { version = "0.2.0", features = ["alloc"] }

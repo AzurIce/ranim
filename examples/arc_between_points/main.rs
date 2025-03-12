@@ -4,14 +4,16 @@ use env_logger::Env;
 use glam::{vec2, Mat2};
 use log::info;
 use ranim::animation::creation::Color;
-use ranim::animation::fading::FadingAnim;
+use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::items::vitem::ArcBetweenPoints;
-use ranim::timeline::Timeline;
+use ranim::timeline::TimeMark;
 use ranim::{prelude::*, render_timeline, timeline::timeline};
 
 #[timeline]
-fn arc_between_points(timeline: &Timeline) {
+fn arc_between_points(ranim: Ranim) {
+    let Ranim(timeline, _camera) = ranim;
+
     let center = vec2(0.0, 0.0);
 
     let start_color = color!("#FF8080FF");
@@ -49,7 +51,9 @@ fn arc_between_points(timeline: &Timeline) {
                 .set_stroke_width(width);
 
             let mut arc = timeline.insert(arc);
-            timeline.play(arc.fade_in().with_duration(3.0 / (nrad * ntan) as f32));
+            timeline
+                .play(arc.fade_in().with_duration(3.0 / (nrad * ntan) as f32))
+                .sync();
             arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`
         }
         info!(
@@ -57,6 +61,10 @@ fn arc_between_points(timeline: &Timeline) {
             t.elapsed()
         );
     }
+    timeline.insert_time_mark(
+        timeline.duration_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
 }
 
 fn main() {

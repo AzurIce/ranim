@@ -1,16 +1,18 @@
 name = "arc"
 code = """
-```rust
+```rust,linenos
 use env_logger::Env;\r
 use glam::vec2;\r
-use ranim::animation::fading::FadingAnim;\r
+use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::color::HueDirection;\r
 use ranim::items::vitem::Arc;\r
-use ranim::timeline::{timeline, Timeline};\r
+use ranim::timeline::{timeline, TimeMark};\r
 use ranim::{prelude::*, render_timeline};\r
 \r
 #[timeline]\r
-fn arc(timeline: &Timeline) {\r
+fn arc(ranim: Ranim) {\r
+    let Ranim(timeline, _camera) = ranim;\r
+\r
     // let frame_size = app.camera().size;\r
     let frame_size = (1920.0, 1080.0);\r
     let frame_start = vec2(frame_size.0 as f32 / -2.0, frame_size.1 as f32 / -2.0);\r
@@ -47,10 +49,14 @@ fn arc(timeline: &Timeline) {\r
                 .shift(offset.extend(0.0));\r
 \r
             let mut arc = timeline.insert(arc);\r
-            timeline.play(arc.fade_in().with_duration(0.05));\r
-            arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`\r
+            timeline.play(arc.fade_in().with_duration(0.05)).sync();\r
+            arcs.push(arc); // To make sure it is not dropped until the end of the `construct`\r
         }\r
     }\r
+    timeline.insert_time_mark(\r
+        timeline.duration_secs(),\r
+        TimeMark::Capture(\"preview.png\".to_string()),\r
+    );\r
 }\r
 \r
 fn main() {\r
@@ -63,5 +69,6 @@ fn main() {\r
 }\r
 
 ```"""
-output_type = "video"
-output_path = "/examples/arc/output.mp4"
+hash = "319d4ef0f756facbc9ca9b34cebc773c4e68b5ca"
+preview_img = "/examples/arc/preview.png"
+output_files = ["/examples/arc/output.mp4"]

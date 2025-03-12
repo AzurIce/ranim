@@ -3,11 +3,12 @@ use glam::vec3;
 use ranim::animation::creation::Color;
 use ranim::color::palettes::manim::*;
 use ranim::items::vitem::Rectangle;
-use ranim::timeline::{timeline, Timeline};
+use ranim::timeline::timeline;
 use ranim::{prelude::*, render_timeline_frame};
 
 #[timeline]
-fn palettes(timeline: &Timeline) {
+fn palettes(ranim: Ranim) {
+    let Ranim(timeline, mut _camera) = ranim;
     let (width, height) = (1920, 1080);
     let (offset_x, offset_y) = (width as f32 / -2.0, height as f32 / -2.0);
     let colors = vec![
@@ -57,5 +58,6 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info, ranim=trace"))
         .init();
 
+    render_timeline_frame!(palettes, 0.0, "preview.png");
     render_timeline_frame!(palettes, 0.0, "output.png");
 }
