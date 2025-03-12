@@ -2,7 +2,10 @@ name = "getting_started_1"
 code = """
 ```rust,linenos
 use ranim::{\r
-    animation::fading::FadingAnimSchedule, color::palettes::manim, items::vitem::Square, prelude::*,\r
+    animation::fading::{FadingAnim, FadingAnimSchedule},\r
+    color::palettes::manim,\r
+    items::vitem::Square,\r
+    prelude::*,\r
 };\r
 \r
 #[timeline]\r
@@ -12,10 +15,8 @@ fn getting_started_1(ranim: Ranim) {\r
     let mut square = Square(300.0).build();\r
     square.set_color(manim::BLUE_C);\r
 \r
-    timeline.forward(1.0);\r
     let mut square = timeline.insert(square);\r
-    timeline.play(square.fade_in()); // Create an `AnimSchedule` and play it\r
-    timeline.forward(1.0);\r
+    timeline.play(square.fade_in().chain(|data| data.fade_out()));\r
 }\r
 \r
 fn main() {\r
@@ -23,6 +24,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "82677031793125bcd85bfc9dce3263b4ea5bbfca"
+hash = "9d9809846e8b337f99132315bb006f5385617b2a"
 output_type = "video"
 output_path = "/examples/getting_started_1/output.mp4"

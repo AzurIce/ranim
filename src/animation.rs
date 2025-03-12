@@ -232,15 +232,15 @@ impl<T: Clone + 'static> AnimSchedule<'_, '_, T> {
             anim: chained_anim.into(),
         }
     }
-    pub fn chain_restored(self, anim_builder: impl FnOnce(T) -> Animation<T>) -> Self {
-        let AnimSchedule { rabject, anim } = self;
-        let next_anim = (anim_builder)(rabject.data.clone());
-        let chained_anim = ChainedAnimation::new(vec![anim, next_anim]);
-        Self {
-            rabject,
-            anim: chained_anim.into(),
-        }
-    }
+    // pub fn chain(self, anim_builder: impl FnOnce(T) -> Animation<T>) -> Self {
+    //     let AnimSchedule { rabject, anim } = self;
+    //     let next_anim = (anim_builder)(rabject.data.clone());
+    //     let chained_anim = ChainedAnimation::new(vec![anim, next_anim]);
+    //     Self {
+    //         rabject,
+    //         anim: chained_anim.into(),
+    //     }
+    // }
 }
 
 impl<T: EntityTimelineStaticState + Clone + 'static> AnimSchedule<'_, '_, T> {

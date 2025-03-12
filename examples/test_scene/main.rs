@@ -18,7 +18,7 @@ use ranim::{
     },
     prelude::*,
     render_timeline,
-    timeline::Timeline,
+    timeline::RanimTimeline,
     typst_svg, AppOptions,
 };
 use ranim_macros::timeline;

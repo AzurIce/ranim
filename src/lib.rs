@@ -16,7 +16,7 @@ use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{camera_frame::CameraFrame, Rabject};
 use linkme::distributed_slice;
-use timeline::{Timeline, TimelineEvalResult};
+use timeline::{RanimTimeline, TimelineEvalResult};
 
 use render::{
     primitives::{RenderInstance, RenderInstances},
@@ -27,7 +27,7 @@ use render::{
 pub mod prelude {
     pub use crate::Ranim;
 
-    pub use crate::timeline::{timeline, Timeline};
+    pub use crate::timeline::{timeline, RanimTimeline};
     pub use crate::{render_timeline, render_timeline_frame};
 
     pub use crate::color::prelude::*;
@@ -55,14 +55,14 @@ pub mod items;
 pub mod render;
 pub mod utils;
 
-pub struct Ranim<'t, 'r>(pub &'t Timeline, pub &'r mut Rabject<'t, CameraFrame>);
+pub struct Ranim<'t, 'r>(pub &'t RanimTimeline, pub &'r mut Rabject<'t, CameraFrame>);
 
 #[distributed_slice]
 pub static TIMELINES: [(&'static str, fn(Ranim), AppOptions<'static>)];
 
-pub fn build_timeline(func: &fn(Ranim), options: &AppOptions) -> Timeline {
+pub fn build_timeline(func: &fn(Ranim), options: &AppOptions) -> RanimTimeline {
     println!("building timeline...");
-    let timeline = Timeline::new();
+    let timeline = RanimTimeline::new();
     let mut camera = timeline.insert(items::camera_frame::CameraFrame::new_with_size(
         options.frame_size.0 as usize,
         options.frame_size.1 as usize,
@@ -201,7 +201,7 @@ impl RanimRenderApp {
         self.save_frame_to_image(path);
     }
 
-    pub fn render_timeline(&mut self, timeline: Timeline) {
+    pub fn render_timeline(&mut self, timeline: RanimTimeline) {
         let frames = (timeline.duration_secs() * self.fps as f32).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
