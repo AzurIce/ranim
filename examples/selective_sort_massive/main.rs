@@ -6,14 +6,14 @@ use ranim::{
 };
 
 #[timeline]
-fn selective_sort(ranim: Ranim) {
+fn selective_sort_massive(ranim: Ranim) {
     let Ranim(timeline, _camera) = ranim;
 
     let frame_size = _camera.data.frame_size();
-    let num = 10;
-    let anim_step_duration = 0.15;
-    let padding = frame_size.x * 0.1;
-    let gap = 20.0;
+    let num = 100;
+    let anim_step_duration = 0.0015;
+    let padding = frame_size.x * 0.05;
+    let gap = 10.0;
     let rect_width = (frame_size.x - 2.0 * padding - (num - 1) as f32 * gap) / num as f32;
 
     let max_height = frame_size.y - 2.0 * padding;
@@ -47,7 +47,7 @@ fn selective_sort(ranim: Ranim) {
         timeline.play(
             rects[i]
                 .transform(|data| {
-                    data.set_fill_color(manim::RED_C.with_alpha(0.5));
+                    data.set_color(manim::RED_C).set_fill_opacity(0.5);
                 })
                 .with_duration(anim_step_duration)
                 .with_rate_func(linear)
@@ -57,7 +57,7 @@ fn selective_sort(ranim: Ranim) {
             timeline.play(
                 rects[j]
                     .transform(|data| {
-                        data.set_fill_color(manim::BLUE_C.with_alpha(0.5));
+                        data.set_color(manim::BLUE_C).set_fill_opacity(0.5);
                     })
                     .with_duration(anim_step_duration)
                     .with_rate_func(linear)
@@ -70,7 +70,8 @@ fn selective_sort(ranim: Ranim) {
                     rects[i]
                         .transform(|data| {
                             data.shift(shift_right * (j - i) as f32)
-                                .set_fill_color(manim::BLUE_C.with_alpha(0.5));
+                                .set_color(manim::BLUE_C)
+                                .set_fill_opacity(0.5);
                         })
                         .with_duration(anim_step_duration)
                         .with_rate_func(linear)
@@ -80,7 +81,8 @@ fn selective_sort(ranim: Ranim) {
                     rects[j]
                         .transform(|data| {
                             data.shift(-shift_right * (j - i) as f32)
-                                .set_fill_color(manim::RED_C.with_alpha(0.5));
+                                .set_color(manim::RED_C)
+                                .set_fill_opacity(0.5);
                         })
                         .with_duration(anim_step_duration)
                         .with_rate_func(linear)
@@ -93,7 +95,7 @@ fn selective_sort(ranim: Ranim) {
             timeline.play(
                 rects[j]
                     .transform(|data| {
-                        data.set_fill_color(manim::WHITE.with_alpha(0.5));
+                        data.set_color(manim::WHITE).set_fill_opacity(0.5);
                     })
                     .with_duration(anim_step_duration)
                     .with_rate_func(linear)
@@ -104,7 +106,7 @@ fn selective_sort(ranim: Ranim) {
         timeline.play(
             rects[i]
                 .transform(|data| {
-                    data.set_fill_color(manim::WHITE.with_alpha(0.5));
+                    data.set_color(manim::WHITE).set_fill_opacity(0.5);
                 })
                 .with_duration(anim_step_duration)
                 .with_rate_func(linear)
@@ -120,5 +122,5 @@ fn selective_sort(ranim: Ranim) {
 }
 
 fn main() {
-    render_timeline!(selective_sort);
+    render_timeline!(selective_sort_massive);
 }
