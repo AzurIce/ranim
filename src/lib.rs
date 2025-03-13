@@ -1,4 +1,6 @@
-//! Ranim is an animation engine written in rust based on [`wgpu`].
+//! Ranim is an animation engine written in rust based on [`wgpu`], inspired by [3b1b/manim](https://github.com/3b1b/manim/) and [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim).
+//! 
+//! 
 
 use std::{
     collections::HashMap,
@@ -7,7 +9,6 @@ use std::{
     time::Duration,
 };
 
-// use animation::AnimWithParams;
 use animation::EvalResult;
 use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};

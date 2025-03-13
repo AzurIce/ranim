@@ -1,2 +1,0 @@
-tag = false
-pre-release-hook = ["git", "cliff", "--workdir", "../../", "-o", "../../CHANGELOG.md", "--tag", "{{version}}" ]
