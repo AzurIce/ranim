@@ -19,25 +19,40 @@ insert_anchor_links = "right"
 ```rust
 use ranim::prelude::*;
 
-#[timeline]
-fn timeline_name(ranim: Ranim) {
-    let Ranim(timeline, camera) = ranim;
+#[scene]
+struct HelloWorldScene;
 
-    // ...
+impl TimelineConstructor for HelloWorldScene {
+    fn construct<'t: 'r, 'r>(
+        self,
+        timeline: &'t RanimTimeline,
+        camera: &'r mut Rabject<'t, CameraFrame>,
+    ) {
+        // ...
+    }
 }
 
 fn main() {
-    render_timeline!(getting_started_0);
+    render_timeline(HelloWorldScene, &AppOptions::default());
 }
 ```
 
-参数为一个 `Ranim` 的函数可以被一个 `#[timeline]` attribute 标记为一段 Ranim 动画，使用 `render_timeline!` 宏可以对其进行渲染，渲染结果将被输出到 `output/<timeline_name>/` 目录下。
+**HelloWorldScene** 是一个 **Scene**，**Scene** 是 **SceneMetaTrait** 和 **TimelineConstructor** 两个 Trait 的组合（实现两个 Trait 自动实现）：
+- 前者实现了 `fn meta(&self) -> SceneMeta` 方法。
 
-`Ranim` 是一个简单 Wrapper（为了避免手写生命周期参数），其中是：
+  使用 `#[scene]` 会以结构体的 snake_case 命名（去掉 `Scene` 后缀）作为 **SceneMeta** 的 `name` 字段自动实现这个 Trait。
+
+  也可以通过 `#[scene(name = "<NAME>")]` 来手动命名。
+
+- 而后者则是定义了动画的构造过程。
+
+使用 `render_timeline` 可以使用一个 **Scene** 来构造一个 **RanimTimeline** 并对其进行渲染，渲染结果将被输出到 `<output_dir>/<scene_name>/` 目录下。
+
+`construct` 方法有两个关键的参数：
 - `timeline: &'t RanimTimeline`：Ranim API 的主要入口，几乎全部对动画的编码操作都发生在这个结构上
 - `camera: &'r Rabject<'t, CameraFrame>`：默认的相机 Rabject，也是 RanimTimeline 中被插入的第一个 Rabject
 
-`RanimTimeline` 和 `Rabject` 非常重要，将贯穿整个 Ranim 动画的编码。
+**RanimTimeline** 和 **Rabject** 这两个类型非常重要，将贯穿整个 Ranim 动画的编码。
 
 ### 1. RanimTimeline 和 Rabject
 

@@ -5,8 +5,6 @@ use crate::{
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
 
-pub use ranim_macros::timeline;
-
 pub type Item = Box<dyn Entity>;
 
 // MARK: EntityTimtlineState

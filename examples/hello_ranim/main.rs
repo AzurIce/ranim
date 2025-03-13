@@ -6,26 +6,33 @@ use ranim::{
     timeline::TimeMark,
 };
 
-#[timeline]
-fn hello_ranim(ranim: Ranim) {
-    let Ranim(timeline, mut _camera) = ranim;
-    let mut square = Square(300.0).build();
-    square.set_color(manim::BLUE_C);
-    let mut square = timeline.insert(square);
+#[scene]
+struct HelloRanimScene;
 
-    let mut circle = Circle(300.0).build();
-    circle.set_color(manim::RED_C);
+impl TimelineConstructor for HelloRanimScene {
+    fn construct<'t: 'r, 'r>(
+        self,
+        timeline: &'t RanimTimeline,
+        _camera: &'r mut Rabject<'t, CameraFrame>,
+    ) {
+        let mut square = Square(300.0).build();
+        square.set_color(manim::BLUE_C);
+        let mut square = timeline.insert(square);
 
-    timeline.insert_time_mark(0.5, TimeMark::Capture("preview.png".to_string()));
-    timeline.play(square.fade_in()).sync();
+        let mut circle = Circle(300.0).build();
+        circle.set_color(manim::RED_C);
 
-    timeline.forward(1.0);
-    timeline.play(square.transform_to(circle).apply()).sync();
-    timeline.forward(1.0);
+        timeline.insert_time_mark(0.5, TimeMark::Capture("preview.png".to_string()));
+        timeline.play(square.fade_in()).sync();
 
-    timeline.play(square.fade_out()).sync();
+        timeline.forward(1.0);
+        timeline.play(square.transform_to(circle).apply()).sync();
+        timeline.forward(1.0);
+
+        timeline.play(square.fade_out()).sync();
+    }
 }
 
 fn main() {
-    render_timeline!(hello_ranim);
+    render_timeline(HelloRanimScene, &AppOptions::default());
 }

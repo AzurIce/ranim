@@ -8,93 +8,109 @@ use ranim::{\r
     prelude::*, timeline::TimeMark, utils::rate_functions::linear,\r
 };\r
 \r
-#[timeline]\r
-fn selective_sort(ranim: Ranim) {\r
-    let Ranim(timeline, _camera) = ranim;\r
+#[scene]\r
+struct SelectiveSortScene;\r
 \r
-    let frame_size = _camera.data.frame_size();\r
-    let num = 10;\r
-    let anim_step_duration = 0.15;\r
-    let padding = frame_size.x * 0.1;\r
-    let gap = 20.0;\r
-    let rect_width = (frame_size.x - 2.0 * padding - (num - 1) as f32 * gap) / num as f32;\r
+impl TimelineConstructor for SelectiveSortScene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let frame_size = camera.data.frame_size();\r
+        let num = 10;\r
+        let anim_step_duration = 0.15;\r
+        let padding = frame_size.x * 0.1;\r
+        let gap = 20.0;\r
+        let rect_width = (frame_size.x - 2.0 * padding - (num - 1) as f32 * gap) / num as f32;\r
 \r
-    let max_height = frame_size.y - 2.0 * padding;\r
-    let height_unit = max_height / num as f32;\r
+        let max_height = frame_size.y - 2.0 * padding;\r
+        let height_unit = max_height / num as f32;\r
 \r
-    let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);\r
-    let mut heights = (1..=num)\r
-        .map(|x| x as f32 * height_unit)\r
-        .collect::<Vec<f32>>();\r
-    heights.shuffle(&mut rng);\r
+        let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);\r
+        let mut heights = (1..=num)\r
+            .map(|x| x as f32 * height_unit)\r
+            .collect::<Vec<f32>>();\r
+        heights.shuffle(&mut rng);\r
 \r
-    let frame_bl = vec2(frame_size.x / -2.0, frame_size.y / -2.0);\r
-    let mut rects = heights\r
-        .iter()\r
-        .enumerate()\r
-        .map(|(i, &height)| {\r
-            let mut rect = Rectangle(rect_width, height).build();\r
-            let bottom_left = rect.get_bounding_box_point(ivec3(-1, -1, 0));\r
-            let target_coord = frame_bl.extend(0.0)\r
-                + vec3(padding, padding, 0.0)\r
-                + Vec3::X * (rect_width + gap) * i as f32;\r
-            rect.shift(target_coord - bottom_left)\r
-                .set_color(manim::WHITE)\r
-                .set_fill_opacity(0.5);\r
-            timeline.insert(rect)\r
-        })\r
-        .collect::<Vec<_>>();\r
+        let frame_bl = vec2(frame_size.x / -2.0, frame_size.y / -2.0);\r
+        let mut rects = heights\r
+            .iter()\r
+            .enumerate()\r
+            .map(|(i, &height)| {\r
+                let mut rect = Rectangle(rect_width, height).build();\r
+                let bottom_left = rect.get_bounding_box_point(ivec3(-1, -1, 0));\r
+                let target_coord = frame_bl.extend(0.0)\r
+                    + vec3(padding, padding, 0.0)\r
+                    + Vec3::X * (rect_width + gap) * i as f32;\r
+                rect.shift(target_coord - bottom_left)\r
+                    .set_color(manim::WHITE)\r
+                    .set_fill_opacity(0.5);\r
+                timeline.insert(rect)\r
+            })\r
+            .collect::<Vec<_>>();\r
 \r
-    let shift_right = Vec3::X * (gap + rect_width);\r
-    for i in 0..num - 1 {\r
-        timeline.play(\r
-            rects[i]\r
-                .transform(|data| {\r
-                    data.set_fill_color(manim::RED_C.with_alpha(0.5));\r
-                })\r
-                .with_duration(anim_step_duration)\r
-                .with_rate_func(linear)\r
-                .apply(),\r
-        );\r
-        for j in i + 1..num {\r
+        let shift_right = Vec3::X * (gap + rect_width);\r
+        for i in 0..num - 1 {\r
             timeline.play(\r
-                rects[j]\r
+                rects[i]\r
                     .transform(|data| {\r
-                        data.set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
+                        data.set_fill_color(manim::RED_C.with_alpha(0.5));\r
                     })\r
                     .with_duration(anim_step_duration)\r
                     .with_rate_func(linear)\r
                     .apply(),\r
             );\r
-            timeline.sync();\r
-\r
-            if heights[i] > heights[j] {\r
-                timeline.play(\r
-                    rects[i]\r
-                        .transform(|data| {\r
-                            data.shift(shift_right * (j - i) as f32)\r
-                                .set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
-                        })\r
-                        .with_duration(anim_step_duration)\r
-                        .with_rate_func(linear)\r
-                        .apply(),\r
-                );\r
+            for j in i + 1..num {\r
                 timeline.play(\r
                     rects[j]\r
                         .transform(|data| {\r
-                            data.shift(-shift_right * (j - i) as f32)\r
-                                .set_fill_color(manim::RED_C.with_alpha(0.5));\r
+                            data.set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
                         })\r
                         .with_duration(anim_step_duration)\r
                         .with_rate_func(linear)\r
                         .apply(),\r
                 );\r
                 timeline.sync();\r
-                heights.swap(i, j);\r
-                rects.swap(i, j);\r
+\r
+                if heights[i] > heights[j] {\r
+                    timeline.play(\r
+                        rects[i]\r
+                            .transform(|data| {\r
+                                data.shift(shift_right * (j - i) as f32)\r
+                                    .set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
+                            })\r
+                            .with_duration(anim_step_duration)\r
+                            .with_rate_func(linear)\r
+                            .apply(),\r
+                    );\r
+                    timeline.play(\r
+                        rects[j]\r
+                            .transform(|data| {\r
+                                data.shift(-shift_right * (j - i) as f32)\r
+                                    .set_fill_color(manim::RED_C.with_alpha(0.5));\r
+                            })\r
+                            .with_duration(anim_step_duration)\r
+                            .with_rate_func(linear)\r
+                            .apply(),\r
+                    );\r
+                    timeline.sync();\r
+                    heights.swap(i, j);\r
+                    rects.swap(i, j);\r
+                }\r
+                timeline.play(\r
+                    rects[j]\r
+                        .transform(|data| {\r
+                            data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
+                        })\r
+                        .with_duration(anim_step_duration)\r
+                        .with_rate_func(linear)\r
+                        .apply(),\r
+                );\r
+                timeline.sync();\r
             }\r
             timeline.play(\r
-                rects[j]\r
+                rects[i]\r
                     .transform(|data| {\r
                         data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
                     })\r
@@ -104,29 +120,19 @@ fn selective_sort(ranim: Ranim) {\r
             );\r
             timeline.sync();\r
         }\r
-        timeline.play(\r
-            rects[i]\r
-                .transform(|data| {\r
-                    data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
-                })\r
-                .with_duration(anim_step_duration)\r
-                .with_rate_func(linear)\r
-                .apply(),\r
-        );\r
-        timeline.sync();\r
-    }\r
 \r
-    timeline.insert_time_mark(\r
-        timeline.duration_secs() / 2.0,\r
-        TimeMark::Capture(\"preview.png\".to_string()),\r
-    );\r
+        timeline.insert_time_mark(\r
+            timeline.duration_secs() / 2.0,\r
+            TimeMark::Capture(\"preview.png\".to_string()),\r
+        );\r
+    }\r
 }\r
 \r
 fn main() {\r
-    render_timeline!(selective_sort);\r
+    render_timeline(SelectiveSortScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "2ee2535346405e88db08d590be6f1769deb5a0ac"
+hash = "668a9187e0337d7256ebfc9489b91b7cb01cd089"
 preview_img = "/examples/selective_sort/preview.png"
 output_files = ["/examples/selective_sort/output.mp4"]

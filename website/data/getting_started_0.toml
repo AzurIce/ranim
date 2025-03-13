@@ -3,30 +3,36 @@ code = """
 ```rust,linenos
 use ranim::{color::palettes::manim, items::vitem::Square, prelude::*};\r
 \r
-#[timeline]\r
-fn getting_started_0(ranim: Ranim) {\r
-    let Ranim(timeline, mut _camera) = ranim;\r
+#[scene]\r
+struct GettingStarted0Scene;\r
 \r
-    let mut square = Square(300.0).build(); // An VItem of a square\r
-    square.set_color(manim::BLUE_C);\r
+impl TimelineConstructor for GettingStarted0Scene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let mut square = Square(300.0).build(); // An VItem of a square\r
+        square.set_color(manim::BLUE_C);\r
 \r
-    timeline.forward(0.5);\r
-    let square = timeline.insert(square); // Create a \"Rabject\" in the timeline\r
-    timeline.forward(0.5); // By default the rabject timeline is at \"show\" state\r
-    timeline.hide(&square);\r
-    timeline.forward(0.5); // After called \"hide\", the forward will encode blank into timeline\r
+        timeline.forward(0.5);\r
+        let square = timeline.insert(square); // Create a \"Rabject\" in the timeline\r
+        timeline.forward(0.5); // By default the rabject timeline is at \"show\" state\r
+        timeline.hide(&square);\r
+        timeline.forward(0.5); // After called \"hide\", the forward will encode blank into timeline\r
 \r
-    timeline.show(&square);\r
-    timeline.forward(0.5);\r
+        timeline.show(&square);\r
+        timeline.forward(0.5);\r
 \r
-    drop(square); // The drop is equal to `timeline.hide(&rabject)`\r
-    timeline.forward(0.5);\r
+        drop(square); // The drop is equal to `timeline.hide(&rabject)`\r
+        timeline.forward(0.5);\r
+    }\r
 }\r
 \r
 fn main() {\r
-    render_timeline!(getting_started_0);\r
+    render_timeline(GettingStarted0Scene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "e19a148034dbd73a3204b11cafe3f64e9158fba4"
+hash = "64653019b903e54980deecb7662f0841a3b46c23"
 output_files = ["/examples/getting_started_0/output.mp4"]
