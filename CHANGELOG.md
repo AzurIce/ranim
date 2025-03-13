@@ -2,7 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.2] - 2025-03-13
+
+### 🚜 Refactor
+
+- Use trait and struct approach to define a scene/timeline
+
+### ⚙️ Miscellaneous Tasks
+
+- Update cargo-release config
+
 ## [0.1.0-alpha.1] - 2025-03-13
+
+### ⚙️ Miscellaneous Tasks
+
+- Update cargo-release config
+- Release
+
+## [ranim-macros-v0.0.0] - 2025-03-12
 
 ### 🚀 Features
 
@@ -114,7 +131,6 @@ All notable changes to this project will be documented in this file.
 - *(ci)* Removed test job due to no gpu on runner
 - Added github pages workflow
 - Gh deploy only when push to main
-- Update cargo-release config
 
 ### WIP
 
