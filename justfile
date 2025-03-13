@@ -25,3 +25,6 @@ lint: fmt
     cargo clippy --workspace --all-targets -- -D warnings
     cargo fmt --all --check
     cargo doc --no-deps --workspace --document-private-items
+
+changelog:
+    git cliff -o CHANGELOG.md
