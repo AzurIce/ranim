@@ -8,89 +8,96 @@ use ranim::animation::transform::{TransformAnim, TransformAnimSchedule};
 use ranim::color::palettes::manim;
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon};
-use ranim::timeline::{timeline, TimeMark};
-use ranim::{prelude::*, render_timeline, typst_svg};
+use ranim::timeline::TimeMark;
+use ranim::{prelude::*, typst_svg};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
-#[timeline]
-fn basic(ranim: Ranim) {
-    let Ranim(timeline, mut _camera) = ranim;
-    timeline.forward(0.2);
+#[scene]
+struct BasicScene;
 
-    let mut svg = SvgItem::from_svg(SVG);
-    svg.scale(Vec3::splat(2.0)).shift(vec3(0.0, 200.0, 0.0));
-    let mut svg = timeline.insert(svg);
-    let mut text = SvgItem::from_svg(&typst_svg!(
-        r#"
-        #align(center)[
-            #text(60pt)[Ranim]
+impl TimelineConstructor for BasicScene {
+    fn construct<'t: 'r, 'r>(
+        self,
+        timeline: &'t RanimTimeline,
+        _camera: &'r mut Rabject<'t, CameraFrame>,
+    ) {
+        timeline.forward(0.2);
 
-            #text(20pt)[Hello 你好]
-        ]
-        "#
-    ));
-    text.set_fill_opacity(0.8).shift(Vec3::NEG_Y * 200.0);
-    let mut text = timeline.insert(text);
+        let mut svg = SvgItem::from_svg(SVG);
+        svg.scale(Vec3::splat(2.0)).shift(vec3(0.0, 200.0, 0.0));
+        let mut svg = timeline.insert(svg);
+        let mut text = SvgItem::from_svg(&typst_svg!(
+            r#"
+            #align(center)[
+                #text(60pt)[Ranim]
 
-    timeline.play(svg.fade_in().with_duration(3.0));
-    timeline.play(
-        text.write()
-            .with_duration(3.0) // At the same time, the svg fade in
-            .chain(|data| {
-                data.transform(|data| {
-                    data.scale(Vec3::splat(2.0));
+                #text(20pt)[Hello 你好]
+            ]
+            "#
+        ));
+        text.set_fill_opacity(0.8).shift(Vec3::NEG_Y * 200.0);
+        let mut text = timeline.insert(text);
+
+        timeline.play(svg.fade_in().with_duration(3.0));
+        timeline.play(
+            text.write()
+                .with_duration(3.0) // At the same time, the svg fade in
+                .chain(|data| {
+                    data.transform(|data| {
+                        data.scale(Vec3::splat(2.0));
+                    })
                 })
-            })
-            .apply(), // `apply` will apply the animation's effect to rabject's data
-    );
-    timeline.sync();
-    timeline.insert_time_mark(
-        timeline.duration_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+                .apply(), // `apply` will apply the animation's effect to rabject's data
+        );
+        timeline.sync();
+        timeline.insert_time_mark(
+            timeline.duration_secs(),
+            TimeMark::Capture("preview.png".to_string()),
+        );
 
-    timeline.forward(0.5);
-    timeline.play(text.unwrite().with_duration(3.0));
-    timeline.play(svg.fade_out().with_duration(3.0));
-    timeline.sync();
+        timeline.forward(0.5);
+        timeline.play(text.unwrite().with_duration(3.0));
+        timeline.play(svg.fade_out().with_duration(3.0));
+        timeline.sync();
 
-    let mut polygon = Polygon(vec![
-        vec3(0.0, 0.0, 0.0),
-        vec3(-100.0, -300.0, 0.0),
-        vec3(0.0, 700.0, 0.0),
-        vec3(200.0, 300.0, 0.0),
-        vec3(500.0, 0.0, 0.0),
-    ])
-    .build();
-    polygon
-        .set_color(color!("#FF8080FF"))
-        .set_fill_opacity(0.5)
-        .rotate(std::f32::consts::FRAC_PI_2, Vec3::Z);
+        let mut polygon = Polygon(vec![
+            vec3(0.0, 0.0, 0.0),
+            vec3(-100.0, -300.0, 0.0),
+            vec3(0.0, 700.0, 0.0),
+            vec3(200.0, 300.0, 0.0),
+            vec3(500.0, 0.0, 0.0),
+        ])
+        .build();
+        polygon
+            .set_color(color!("#FF8080FF"))
+            .set_fill_opacity(0.5)
+            .rotate(std::f32::consts::FRAC_PI_2, Vec3::Z);
 
-    // [polygon] 0.5s wait -> fade in -> 0.5s wait
-    timeline.forward(0.5);
-    let mut polygon = timeline.insert(polygon);
-    timeline.play(polygon.fade_in()).sync();
-    timeline.forward(0.5);
+        // [polygon] 0.5s wait -> fade in -> 0.5s wait
+        timeline.forward(0.5);
+        let mut polygon = timeline.insert(polygon);
+        timeline.play(polygon.fade_in()).sync();
+        timeline.forward(0.5);
 
-    let mut arc = Arc {
-        angle: f32::consts::PI / 3.0,
-        radius: 100.0,
+        let mut arc = Arc {
+            angle: f32::consts::PI / 3.0,
+            radius: 100.0,
+        }
+        .build();
+        arc.set_stroke_color(manim::BLUE_C);
+        let mut arc = timeline.insert(arc);
+        // [polygon] interpolate [svg] -> 0.5s wait
+
+        let polygon_data = polygon.data.clone();
+        drop(polygon);
+        timeline.play(arc.transform_from(polygon_data)).sync();
+        timeline.forward(0.5);
+
+        // [svg] fade_out -> 0.5s wait
+        timeline.play(arc.uncreate()).sync();
+        timeline.forward(0.5);
     }
-    .build();
-    arc.set_stroke_color(manim::BLUE_C);
-    let mut arc = timeline.insert(arc);
-    // [polygon] interpolate [svg] -> 0.5s wait
-
-    let polygon_data = polygon.data.clone();
-    drop(polygon);
-    timeline.play(arc.transform_from(polygon_data)).sync();
-    timeline.forward(0.5);
-
-    // [svg] fade_out -> 0.5s wait
-    timeline.play(arc.uncreate()).sync();
-    timeline.forward(0.5);
 }
 
 fn main() {
@@ -99,5 +106,5 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=info")).init();
 
-    render_timeline!(basic);
+    render_timeline(BasicScene, &AppOptions::default());
 }

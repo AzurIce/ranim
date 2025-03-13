@@ -9,31 +9,38 @@ use ranim::{\r
     timeline::TimeMark,\r
 };\r
 \r
-#[timeline]\r
-fn hello_ranim(ranim: Ranim) {\r
-    let Ranim(timeline, mut _camera) = ranim;\r
-    let mut square = Square(300.0).build();\r
-    square.set_color(manim::BLUE_C);\r
-    let mut square = timeline.insert(square);\r
+#[scene]\r
+struct HelloRanimScene;\r
 \r
-    let mut circle = Circle(300.0).build();\r
-    circle.set_color(manim::RED_C);\r
+impl TimelineConstructor for HelloRanimScene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let mut square = Square(300.0).build();\r
+        square.set_color(manim::BLUE_C);\r
+        let mut square = timeline.insert(square);\r
 \r
-    timeline.insert_time_mark(0.5, TimeMark::Capture(\"preview.png\".to_string()));\r
-    timeline.play(square.fade_in()).sync();\r
+        let mut circle = Circle(300.0).build();\r
+        circle.set_color(manim::RED_C);\r
 \r
-    timeline.forward(1.0);\r
-    timeline.play(square.transform_to(circle).apply()).sync();\r
-    timeline.forward(1.0);\r
+        timeline.insert_time_mark(0.5, TimeMark::Capture(\"preview.png\".to_string()));\r
+        timeline.play(square.fade_in()).sync();\r
 \r
-    timeline.play(square.fade_out()).sync();\r
+        timeline.forward(1.0);\r
+        timeline.play(square.transform_to(circle).apply()).sync();\r
+        timeline.forward(1.0);\r
+\r
+        timeline.play(square.fade_out()).sync();\r
+    }\r
 }\r
 \r
 fn main() {\r
-    render_timeline!(hello_ranim);\r
+    render_timeline(HelloRanimScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "053b357db0e325c7af8514cd7b4f5c6e0359d865"
+hash = "0d18da3833539884abd909086b26684201fc2e19"
 preview_img = "/examples/hello_ranim/preview.png"
 output_files = ["/examples/hello_ranim/output.mp4"]

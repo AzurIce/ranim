@@ -9,30 +9,37 @@ use ranim::{\r
     utils::rate_functions::linear,\r
 };\r
 \r
-#[timeline]\r
-fn getting_started_2(ranim: Ranim) {\r
-    let Ranim(timeline, mut _camera) = ranim;\r
-    let mut square = Square(300.0).build();\r
-    square.set_color(manim::BLUE_C);\r
+#[scene]\r
+struct GettingStarted2Scene;\r
 \r
-    let mut square = timeline.insert(square);\r
-    let mut circle = Circle(300.0).build();\r
-    circle.set_color(manim::RED_C);\r
+impl TimelineConstructor for GettingStarted2Scene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let mut square = Square(300.0).build();\r
+        square.set_color(manim::BLUE_C);\r
 \r
-    timeline.play(\r
-        square\r
-            .transform_to(circle)\r
-            .with_duration(2.0)\r
-            .with_rate_func(linear),\r
-    ); // Anim Schedule won't change the data in Rabject\r
-    timeline.forward(1.0);\r
-    timeline.play(square.fade_out()); // Anim is created based on the data in Rabject\r
+        let mut square = timeline.insert(square);\r
+        let mut circle = Circle(300.0).build();\r
+        circle.set_color(manim::RED_C);\r
+\r
+        timeline.play(\r
+            square\r
+                .transform_to(circle)\r
+                .with_duration(2.0)\r
+                .with_rate_func(linear),\r
+        ); // Anim Schedule won't change the data in Rabject\r
+        timeline.forward(1.0);\r
+        timeline.play(square.fade_out()); // Anim is created based on the data in Rabject\r
+    }\r
 }\r
 \r
 fn main() {\r
-    render_timeline!(getting_started_2);\r
+    render_timeline(GettingStarted2Scene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "daf7bdb00158ee9f03f5d55bf65b37514ddf68bf"
+hash = "987d44d779fa526adc4944629f858093e79937cd"
 output_files = ["/examples/getting_started_2/output.mp4"]

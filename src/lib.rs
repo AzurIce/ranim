@@ -1,6 +1,6 @@
 //! Ranim is an animation engine written in rust based on [`wgpu`], inspired by [3b1b/manim](https://github.com/3b1b/manim/) and [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim).
-//! 
-//! 
+//!
+//!
 
 use std::{
     collections::HashMap,
@@ -16,20 +16,20 @@ pub use glam;
 use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{camera_frame::CameraFrame, Rabject};
-use linkme::distributed_slice;
 use timeline::{RanimTimeline, TimeMark, TimelineEvalResult};
 
-use render::{
-    primitives::{RenderInstance, RenderInstances},
-    Renderer,
-};
+use render::{primitives::RenderInstances, Renderer};
 
 // MARK: Prelude
 pub mod prelude {
     pub use crate::Ranim;
 
-    pub use crate::timeline::{timeline, RanimTimeline};
-    pub use crate::{render_timeline, render_timeline_frame};
+    pub use crate::{render_timeline, render_timeline_at_sec, AppOptions};
+    pub use crate::{SceneMetaTrait, TimelineConstructor};
+    pub use ranim_macros::scene;
+
+    pub use crate::items::{camera_frame::CameraFrame, Rabject};
+    pub use crate::timeline::RanimTimeline;
 
     pub use crate::color::prelude::*;
     pub use crate::interpolate::Interpolatable;
@@ -47,7 +47,6 @@ pub mod color;
 mod file_writer;
 mod interpolate;
 pub mod timeline;
-pub mod updater;
 
 pub mod animation;
 pub mod components;
@@ -56,66 +55,109 @@ pub mod items;
 pub mod render;
 pub mod utils;
 
+/// A simple wrapper struct
+///
+/// This is used temporally for avoiding writing lifetime annotations like
+/// `fn foo<'t, 'r>(timeline: &'t RanimTimeline, camera: &'r mut Rabject<'t, CameraFrame>)`.
 pub struct Ranim<'t, 'r>(pub &'t RanimTimeline, pub &'r mut Rabject<'t, CameraFrame>);
 
-#[distributed_slice]
-pub static TIMELINES: [(&'static str, fn(Ranim), AppOptions<'static>)];
-
-pub fn build_timeline(func: &fn(Ranim), options: &AppOptions) -> RanimTimeline {
-    println!("building timeline...");
-    let timeline = RanimTimeline::new();
-    let mut camera = timeline.insert(items::camera_frame::CameraFrame::new_with_size(
-        options.frame_size.0 as usize,
-        options.frame_size.1 as usize,
-    ));
-    (func)(Ranim(&timeline, &mut camera));
-    timeline.sync();
-    drop(camera);
-    println!("done");
-    timeline
+/// The metadata of the Timeline
+pub struct SceneMeta {
+    pub name: String,
 }
 
-#[macro_export]
-macro_rules! render_timeline {
-    ($func:ident) => {
-        let (name, func, options) = ::ranim::TIMELINES
-            .iter()
-            .find(|(name, ..)| *name == stringify!($func))
-            .unwrap();
-
-        let timeline = ::ranim::build_timeline(func, options);
-        if timeline.duration_secs() == 0.0 {
-            // timeline.forward(0.1);
-        }
-        let duration_secs = timeline.duration_secs();
-        let mut app = ::ranim::RanimRenderApp::new(&options);
-        app.render_timeline(timeline);
-    };
+pub trait SceneMetaTrait {
+    fn meta(&self) -> SceneMeta;
 }
 
-#[macro_export]
-macro_rules! render_timeline_frame {
-    ($func:ident, $sec:expr, $filepath:expr) => {
-        let (name, func, options) = ::ranim::TIMELINES
-            .iter()
-            .find(|(name, ..)| *name == stringify!($func))
-            .unwrap();
+/// A [`Scene`] builds a [`RanimTimeline`]
+///
+/// This trait is automatically implemented for types that implements [`TimelineConstructor`] and [`SceneMetaTrait`].
+///
+/// A struct with [`ranim_macros::scene`] attribute implements [`SceneMetaTrait`], which is basically a type with [`SceneMeta`].
+/// - `#[scene]`: use the *snake_case* of the struct's name (Without the `Scene` suffix) as [`SceneMeta::name`].
+/// - `#[scene(name = "<NAME>"]): use the given name as [`SceneMeta::name`].`
+///
+/// [`render_timeline`] and [`render_timeline_at_sec`] will output to `<output_dir>/<NAME>/` directory.
+///
+/// # Examples
+/// ```rust
+/// use ranim::prelude::*;
+///
+/// #[scene]
+/// struct HelloWorld;
+///
+/// impl Scene for HelloWorld {
+///     fn construct(self, timeline: &RanimTimeline, camera: &Rabject<CameraFrame>) {
+///         // ...
+///     }
+/// }
+/// ```
+pub trait Scene: TimelineConstructor + SceneMetaTrait {}
+impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
 
-        let timeline = ::ranim::build_timeline(func, options);
-        if timeline.duration_secs() == 0.0 {
-            // timeline.forward(0.1);
+impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
+    fn construct<'t: 'r, 'r>(
+        self,
+        timeline: &'t RanimTimeline,
+        camera: &'r mut Rabject<'t, CameraFrame>,
+    ) {
+        self.0.construct(timeline, camera);
+    }
+}
+
+impl<C, M: SceneMetaTrait> SceneMetaTrait for (C, M) {
+    fn meta(&self) -> SceneMeta {
+        self.1.meta()
+    }
+}
+
+/// A constructor of a [`RanimTimeline`]
+pub trait TimelineConstructor {
+    /// Construct the timeline
+    ///
+    /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
+    fn construct<'t: 'r, 'r>(
+        self,
+        timeline: &'t RanimTimeline,
+        camera: &'r mut Rabject<'t, CameraFrame>,
+    );
+    fn build(self, options: &AppOptions) -> RanimTimeline
+    where
+        Self: Sized,
+    {
+        let timeline = RanimTimeline::new();
+        {
+            let mut camera = timeline.insert(items::camera_frame::CameraFrame::new_with_size(
+                options.frame_size.0 as usize,
+                options.frame_size.1 as usize,
+            ));
+            self.construct(&timeline, &mut camera);
+            timeline.sync();
         }
-        let duration_secs = timeline.duration_secs();
-        let mut app = ::ranim::RanimRenderApp::new(&options);
-        app.render_timeline_frame(&timeline, $sec, $filepath)
-        // app.render_anim_frame(
-        //     ::ranim::animation::AnimWithParams::new(timeline)
-        //         .with_duration(duration_secs)
-        //         .with_rate_func(::ranim::utils::rate_functions::linear),
-        //     $alpha,
-        //     $filepath,
-        // );
-    };
+        timeline
+    }
+}
+
+/// Build the timeline with the scene, and render it
+pub fn render_timeline(scene: impl Scene, options: &AppOptions) {
+    let meta = scene.meta();
+    let timeline = scene.build(options);
+    let mut app = RanimRenderApp::new(options, meta.name);
+    app.render_timeline(timeline);
+}
+
+/// Build the timeline with the scene, and render it at a given timestamp
+pub fn render_timeline_at_sec(
+    scene: impl Scene,
+    sec: f32,
+    output_file: impl AsRef<Path>,
+    options: &AppOptions,
+) {
+    let meta = scene.meta();
+    let timeline = scene.build(options);
+    let mut app = RanimRenderApp::new(options, meta.name);
+    app.render_timeline_frame(&timeline, sec, output_file);
 }
 
 // MARK: AppOptions
@@ -142,7 +184,7 @@ impl Default for AppOptions<'_> {
 }
 
 /// MARK: RanimRenderApp
-pub struct RanimRenderApp {
+struct RanimRenderApp {
     ctx: RanimContext,
     frame_size: (u32, u32),
 
@@ -159,12 +201,13 @@ pub struct RanimRenderApp {
 
     frame_count: u32,
     output_dir: PathBuf,
+    scene_name: String,
 
     pub(crate) render_instances: RenderInstances,
 }
 
 impl RanimRenderApp {
-    pub fn new(options: &AppOptions) -> Self {
+    fn new(options: &AppOptions, scene_name: String) -> Self {
         let ctx = RanimContext::new();
         let output_dir = PathBuf::from(options.output_dir);
         let renderer = Renderer::new(
@@ -181,29 +224,19 @@ impl RanimRenderApp {
                 FileWriterBuilder::default()
                     .with_fps(options.frame_rate)
                     .with_size(options.frame_size.0, options.frame_size.1)
-                    .with_file_path(output_dir.join("output.mp4")),
+                    .with_file_path(output_dir.join(&scene_name).join("output.mp4")),
             ),
             save_frames: options.save_frames,
             fps: options.frame_rate,
             frame_count: 0,
             ctx,
             output_dir,
+            scene_name,
             render_instances: RenderInstances::default(),
         }
     }
-    // fn tick_duration(&self) -> Duration {
-    //     Duration::from_secs_f32(1.0 / self.fps as f32)
-    // }
 
-    pub fn render_to_image<T: RenderInstance>(&mut self, anim: &mut T, filename: impl AsRef<Path>) {
-        // let alpha = sec / anim.duration().as_secs_f32();
-        // anim.update_alpha(alpha);
-        self.renderer.render(&mut self.ctx, anim);
-        let path = self.output_dir.join(filename);
-        self.save_frame_to_image(path);
-    }
-
-    pub fn render_timeline(&mut self, timeline: RanimTimeline) {
+    fn render_timeline(&mut self, timeline: RanimTimeline) {
         let frames = (timeline.duration_secs() * self.fps as f32).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
@@ -312,7 +345,7 @@ impl RanimRenderApp {
         ));
     }
 
-    pub fn render_timeline_frame(
+    fn render_timeline_frame(
         &mut self,
         timeline: &RanimTimeline,
         sec: f32,
@@ -354,22 +387,8 @@ impl RanimRenderApp {
         self.renderer
             .update_uniforms(&self.ctx.wgpu_ctx, camera_frame);
         self.renderer.render(&mut self.ctx, &render_primitives);
-        self.save_frame_to_image(self.output_dir.join(filename));
+        self.save_frame_to_image(self.output_dir.join(&self.scene_name).join(filename));
     }
-
-    // pub fn render_anim_frame<T: DynamicRenderable>(
-    //     &mut self,
-    //     mut anim: AnimWithParams<T>,
-    //     alpha: f32,
-    //     filepath: impl AsRef<Path>,
-    // ) {
-    //     anim.prepare_alpha(
-    //         alpha,
-    //         &self.ctx.wgpu_ctx,
-    //         &mut self.renderer.render_instances,
-    //     );
-    //     self.render_to_image(&mut anim, self.output_dir.join(filepath));
-    // }
 
     fn update_frame(&mut self) {
         // `output_video` is true

@@ -1,60 +1,47 @@
 use darling::{ast::NestedMeta, Error, FromMeta};
+use heck::AsSnekCase;
 use proc_macro::TokenStream;
 
-#[derive(Debug, FromMeta)]
+#[derive(Default, Debug, FromMeta)]
 #[darling(default)]
-struct TimelineArgs {
-    width: u32,
-    height: u32,
-    fps: u32,
-    save_frames: bool,
-}
-
-impl Default for TimelineArgs {
-    fn default() -> Self {
-        Self {
-            width: 1920,
-            height: 1080,
-            fps: 60,
-            save_frames: false,
-        }
-    }
+struct SceneMeta {
+    name: Option<String>,
 }
 
 #[proc_macro_attribute]
-pub fn timeline(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn scene(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args = match NestedMeta::parse_meta_list(attr.into()) {
         Ok(v) => v,
         Err(e) => return TokenStream::from(Error::from(e).write_errors()),
     };
 
-    let args = match TimelineArgs::from_list(&attr_args) {
+    let args = match SceneMeta::from_list(&attr_args) {
         Ok(v) => v,
         Err(e) => return TokenStream::from(e.write_errors()),
     };
-    let func = syn::parse_macro_input!(item as syn::ItemFn);
+    let input = syn::parse_macro_input!(item as syn::ItemStruct);
 
-    let func_name = &func.sig.ident;
-    let func_name_upper = syn::Ident::new(&func_name.to_string().to_uppercase(), func_name.span());
-
-    let TimelineArgs {
-        width,
-        height,
-        fps,
-        save_frames,
-    } = args;
+    let struct_name = &input.ident;
+    // 获取 struct_name 的字符串表示
+    let name = match args.name {
+        Some(ref name) => name.to_string(),
+        None => {
+            let name = stringify!(#struct_name);
+            let name = name.strip_suffix("Scene").unwrap_or(name);
+            AsSnekCase(name).to_string()
+        }
+    };
 
     quote::quote! {
-        #[::linkme::distributed_slice(::ranim::TIMELINES)]
-        static #func_name_upper: (&str, fn(::ranim::Ranim), ::ranim::AppOptions<'static>) =
-            (stringify!(#func_name), #func_name, ::ranim::AppOptions::<'static> {
-                frame_size: (#width, #height),
-                frame_rate: #fps,
-                save_frames: #save_frames,
-                output_dir: concat!("./output/", stringify!(#func_name)),
-            });
+        #input
 
-        #func
+        impl ::ranim::SceneMetaTrait for #struct_name {
+            fn meta(&self) -> ::ranim::SceneMeta {
+                ::ranim::SceneMeta {
+                    name: #name.to_string(),
+                }
+            }
+        }
     }
     .into()
 }

@@ -6,52 +6,58 @@ use glam::vec3;\r
 use ranim::animation::creation::Color;\r
 use ranim::color::palettes::manim::*;\r
 use ranim::items::vitem::Rectangle;\r
-use ranim::timeline::timeline;\r
-use ranim::{prelude::*, render_timeline_frame};\r
+use ranim::prelude::*;\r
 \r
-#[timeline]\r
-fn palettes(ranim: Ranim) {\r
-    let Ranim(timeline, mut _camera) = ranim;\r
-    let (width, height) = (1920, 1080);\r
-    let (offset_x, offset_y) = (width as f32 / -2.0, height as f32 / -2.0);\r
-    let colors = vec![\r
-        vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],\r
-        vec![TEAL_E, TEAL_D, TEAL_C, TEAL_B, TEAL_A],\r
-        vec![GREEN_E, GREEN_D, GREEN_C, GREEN_B, GREEN_A],\r
-        vec![YELLOW_E, YELLOW_D, YELLOW_C, YELLOW_B, YELLOW_A],\r
-        vec![GOLD_E, GOLD_D, GOLD_C, GOLD_B, GOLD_A],\r
-        vec![RED_E, RED_D, RED_C, RED_B, RED_A],\r
-        vec![MAROON_E, MAROON_D, MAROON_C, MAROON_B, MAROON_A],\r
-        vec![PURPLE_E, PURPLE_D, PURPLE_C, PURPLE_B, PURPLE_A],\r
-        vec![GREY_E, GREY_D, GREY_C, GREY_B, GREY_A],\r
-        vec![WHITE, BLACK, GREEN_SCREEN],\r
-        vec![GREY_BROWN, LIGHT_BROWN, PINK, LIGHT_PINK, ORANGE],\r
-    ];\r
+#[scene]\r
+struct PalettesScene;\r
 \r
-    let padding = 100;\r
+impl TimelineConstructor for PalettesScene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let (width, height) = (1920, 1080);\r
+        let (offset_x, offset_y) = (width as f32 / -2.0, height as f32 / -2.0);\r
+        let colors = vec![\r
+            vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],\r
+            vec![TEAL_E, TEAL_D, TEAL_C, TEAL_B, TEAL_A],\r
+            vec![GREEN_E, GREEN_D, GREEN_C, GREEN_B, GREEN_A],\r
+            vec![YELLOW_E, YELLOW_D, YELLOW_C, YELLOW_B, YELLOW_A],\r
+            vec![GOLD_E, GOLD_D, GOLD_C, GOLD_B, GOLD_A],\r
+            vec![RED_E, RED_D, RED_C, RED_B, RED_A],\r
+            vec![MAROON_E, MAROON_D, MAROON_C, MAROON_B, MAROON_A],\r
+            vec![PURPLE_E, PURPLE_D, PURPLE_C, PURPLE_B, PURPLE_A],\r
+            vec![GREY_E, GREY_D, GREY_C, GREY_B, GREY_A],\r
+            vec![WHITE, BLACK, GREEN_SCREEN],\r
+            vec![GREY_BROWN, LIGHT_BROWN, PINK, LIGHT_PINK, ORANGE],\r
+        ];\r
 \r
-    let rows = colors.len();\r
-    let h_step = (height - 2 * padding) / rows;\r
+        let padding = 100;\r
 \r
-    let mut squares = Vec::with_capacity(colors.len() * 5);\r
-    for (i, row) in colors.iter().enumerate() {\r
-        let y = padding + i * h_step;\r
-        let cols = row.len();\r
-        let w_step = (width - 2 * padding) / cols;\r
-        for (j, color) in row.iter().enumerate() {\r
-            let x = padding + j * w_step;\r
-            let mut square = Rectangle(w_step as f32, h_step as f32).build();\r
-            square.shift(vec3(\r
-                x as f32 + offset_x + w_step as f32 / 2.0,\r
-                y as f32 + offset_y + h_step as f32 / 2.0,\r
-                0.0,\r
-            ));\r
-            square.set_color(*color).set_stroke_width(0.0);\r
+        let rows = colors.len();\r
+        let h_step = (height - 2 * padding) / rows;\r
 \r
-            squares.push(timeline.insert(square));\r
+        let mut squares = Vec::with_capacity(colors.len() * 5);\r
+        for (i, row) in colors.iter().enumerate() {\r
+            let y = padding + i * h_step;\r
+            let cols = row.len();\r
+            let w_step = (width - 2 * padding) / cols;\r
+            for (j, color) in row.iter().enumerate() {\r
+                let x = padding + j * w_step;\r
+                let mut square = Rectangle(w_step as f32, h_step as f32).build();\r
+                square.shift(vec3(\r
+                    x as f32 + offset_x + w_step as f32 / 2.0,\r
+                    y as f32 + offset_y + h_step as f32 / 2.0,\r
+                    0.0,\r
+                ));\r
+                square.set_color(*color).set_stroke_width(0.0);\r
+\r
+                squares.push(timeline.insert(square));\r
+            }\r
         }\r
+        timeline.forward(0.01);\r
     }\r
-    timeline.forward(0.01);\r
 }\r
 \r
 fn main() {\r
@@ -61,11 +67,12 @@ fn main() {\r
     env_logger::Builder::from_env(Env::default().default_filter_or(\"palettes=info, ranim=trace\"))\r
         .init();\r
 \r
-    render_timeline_frame!(palettes, 0.0, \"preview.png\");\r
-    render_timeline_frame!(palettes, 0.0, \"output.png\");\r
+    let options = AppOptions::default();\r
+    render_timeline_at_sec(PalettesScene, 0.0, \"preview.png\", &options);\r
+    render_timeline_at_sec(PalettesScene, 0.0, \"output.png\", &options);\r
 }\r
 
 ```"""
-hash = "63836f939a7f051eb07d5f7bab32010d5fbd77af"
+hash = "5c6ef4ed8198605b19c8400ef640ea7d1149d1cd"
 preview_img = "/examples/palettes/preview.png"
 output_files = ["/examples/palettes/output.png"]

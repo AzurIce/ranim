@@ -10,64 +10,70 @@ use ranim::animation::creation::Color;\r
 use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::color::HueDirection;\r
 use ranim::items::vitem::ArcBetweenPoints;\r
+use ranim::prelude::*;\r
 use ranim::timeline::TimeMark;\r
-use ranim::{prelude::*, render_timeline, timeline::timeline};\r
 \r
-#[timeline]\r
-fn arc_between_points(ranim: Ranim) {\r
-    let Ranim(timeline, _camera) = ranim;\r
+#[scene]\r
+struct ArcBetweenPointsScene;\r
 \r
-    let center = vec2(0.0, 0.0);\r
+impl TimelineConstructor for ArcBetweenPointsScene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let center = vec2(0.0, 0.0);\r
 \r
-    let start_color = color!(\"#FF8080FF\");\r
-    let end_color = color!(\"#58C4DDFF\");\r
-    let ntan = 16;\r
-    let nrad = 5;\r
+        let start_color = color!(\"#FF8080FF\");\r
+        let end_color = color!(\"#58C4DDFF\");\r
+        let ntan = 16;\r
+        let nrad = 5;\r
 \r
-    let rad_step = 200.0 / nrad as f32;\r
-    let width_step = 50.0 / (nrad as f32).powi(2);\r
-    let angle_step = std::f32::consts::PI * 7.0 / 4.0 / nrad as f32;\r
+        let rad_step = 200.0 / nrad as f32;\r
+        let width_step = 50.0 / (nrad as f32).powi(2);\r
+        let angle_step = std::f32::consts::PI * 7.0 / 4.0 / nrad as f32;\r
 \r
-    let mut arcs = Vec::with_capacity(nrad * ntan);\r
-    for i in 0..nrad {\r
-        let t = Instant::now();\r
-        let rad = rad_step * (i + 1) as f32;\r
-        let width = width_step * ((nrad - i) as f32).powi(2);\r
-        let angle = angle_step * (i + 1) as f32;\r
+        let mut arcs = Vec::with_capacity(nrad * ntan);\r
+        for i in 0..nrad {\r
+            let t = Instant::now();\r
+            let rad = rad_step * (i + 1) as f32;\r
+            let width = width_step * ((nrad - i) as f32).powi(2);\r
+            let angle = angle_step * (i + 1) as f32;\r
 \r
-        for j in 0..ntan {\r
-            let color = start_color.lerp(\r
-                end_color,\r
-                j as f32 / (ntan - 1) as f32,\r
-                HueDirection::Increasing,\r
-            );\r
-            let vec = Mat2::from_angle(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)\r
-                * vec2(rad, 0.0);\r
-            let mut arc = ArcBetweenPoints {\r
-                start: center.extend(0.0),\r
-                end: (center + vec).extend(0.0),\r
-                angle,\r
+            for j in 0..ntan {\r
+                let color = start_color.lerp(\r
+                    end_color,\r
+                    j as f32 / (ntan - 1) as f32,\r
+                    HueDirection::Increasing,\r
+                );\r
+                let vec = Mat2::from_angle(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)\r
+                    * vec2(rad, 0.0);\r
+                let mut arc = ArcBetweenPoints {\r
+                    start: center.extend(0.0),\r
+                    end: (center + vec).extend(0.0),\r
+                    angle,\r
+                }\r
+                .build();\r
+                arc.set_color(color)\r
+                    .set_fill_opacity(0.0)\r
+                    .set_stroke_width(width);\r
+\r
+                let mut arc = timeline.insert(arc);\r
+                timeline\r
+                    .play(arc.fade_in().with_duration(3.0 / (nrad * ntan) as f32))\r
+                    .sync();\r
+                arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`\r
             }\r
-            .build();\r
-            arc.set_color(color)\r
-                .set_fill_opacity(0.0)\r
-                .set_stroke_width(width);\r
-\r
-            let mut arc = timeline.insert(arc);\r
-            timeline\r
-                .play(arc.fade_in().with_duration(3.0 / (nrad * ntan) as f32))\r
-                .sync();\r
-            arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`\r
+            info!(\r
+                \"rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}\",\r
+                t.elapsed()\r
+            );\r
         }\r
-        info!(\r
-            \"rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}\",\r
-            t.elapsed()\r
+        timeline.insert_time_mark(\r
+            timeline.duration_secs(),\r
+            TimeMark::Capture(\"preview.png\".to_string()),\r
         );\r
     }\r
-    timeline.insert_time_mark(\r
-        timeline.duration_secs(),\r
-        TimeMark::Capture(\"preview.png\".to_string()),\r
-    );\r
 }\r
 \r
 fn main() {\r
@@ -78,10 +84,10 @@ fn main() {\r
     env_logger::Builder::from_env(Env::default().default_filter_or(\"arc_between_points=info\"))\r
         .init();\r
 \r
-    render_timeline!(arc_between_points);\r
+    render_timeline(ArcBetweenPointsScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "0c4e4f5365bcec377cbb976cba7f4c77ff759d49"
+hash = "d2733aa74a5f4f28419792300b8c839a5232c71f"
 preview_img = "/examples/arc_between_points/preview.png"
 output_files = ["/examples/arc_between_points/output.mp4"]

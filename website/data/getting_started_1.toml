@@ -6,23 +6,30 @@ use ranim::{\r
     color::palettes::manim,\r
     items::vitem::Square,\r
     prelude::*,\r
+    render_timeline, AppOptions,\r
 };\r
 \r
-#[timeline]\r
-fn getting_started_1(ranim: Ranim) {\r
-    let Ranim(timeline, mut _camera) = ranim;\r
+#[scene]\r
+struct GettingStarted1Scene;\r
 \r
-    let mut square = Square(300.0).build();\r
-    square.set_color(manim::BLUE_C);\r
+impl TimelineConstructor for GettingStarted1Scene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let mut square = Square(300.0).build();\r
+        square.set_color(manim::BLUE_C);\r
 \r
-    let mut square = timeline.insert(square);\r
-    timeline.play(square.fade_in().chain(|data| data.fade_out()));\r
+        let mut square = timeline.insert(square);\r
+        timeline.play(square.fade_in().chain(|data| data.fade_out()));\r
+    }\r
 }\r
 \r
 fn main() {\r
-    render_timeline!(getting_started_1);\r
+    render_timeline(GettingStarted1Scene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "9d9809846e8b337f99132315bb006f5385617b2a"
+hash = "f3f20590493efc56636e14f2e1a740220803dddb"
 output_files = ["/examples/getting_started_1/output.mp4"]

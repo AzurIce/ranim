@@ -10,26 +10,33 @@ use ranim::{\r
     prelude::*,\r
 };\r
 \r
-#[timeline]\r
-fn getting_started_3(ranim: Ranim) {\r
-    let Ranim(timeline, mut _camera) = ranim;\r
-    let mut square = Square(300.0).build();\r
-    square.set_color(manim::BLUE_C);\r
+#[scene]\r
+struct GettingStarted3Scene;\r
 \r
-    let mut square = timeline.insert(square);\r
-    let mut circle = Circle(300.0).build();\r
-    circle.set_color(manim::RED_C);\r
+impl TimelineConstructor for GettingStarted3Scene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let mut square = Square(300.0).build();\r
+        square.set_color(manim::BLUE_C);\r
 \r
-    timeline.play(square.transform_to(circle).apply()); // Use `apply` on an anim schedule to update rabject data\r
-    timeline.play(square.unwrite()); // Do not use `apply` to keep the data in Rabject not changed\r
-    timeline.play(square.write());\r
-    timeline.play(square.fade_out());\r
+        let mut square = timeline.insert(square);\r
+        let mut circle = Circle(300.0).build();\r
+        circle.set_color(manim::RED_C);\r
+\r
+        timeline.play(square.transform_to(circle).apply()); // Use `apply` on an anim schedule to update rabject data\r
+        timeline.play(square.unwrite()); // Do not use `apply` to keep the data in Rabject not changed\r
+        timeline.play(square.write());\r
+        timeline.play(square.fade_out());\r
+    }\r
 }\r
 \r
 fn main() {\r
-    render_timeline!(getting_started_3);\r
+    render_timeline(GettingStarted3Scene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "6e3e5e1cb69d07290c95aefb89dac74561b50760"
+hash = "b777a4c065157d2ef47186c1387f1e35aaaeb508"
 output_files = ["/examples/getting_started_3/output.mp4"]
