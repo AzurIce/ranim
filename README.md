@@ -1,9 +1,9 @@
 # Ranim
 
 ![Licence](https://img.shields.io/github/license/AzurIce/ranim)
+![crates.io](https://img.shields.io/crates/v/ranim.svg)
 ![Check](https://github.com/AzurIce/ranim/actions/workflows/build.yml/badge.svg)
 ![Website](https://github.com/AzurIce/ranim/actions/workflows/website.yml/badge.svg)
-
 
 https://github.com/user-attachments/assets/2176093e-758b-429b-89e0-2e3dd39b8a17
 
@@ -17,14 +17,22 @@ Ranim is an animation engine crate implemented in pure rust, inspired heavily by
 ## Dependencies
 
 Runtime dependencies:
-- typst: for fonts and maths rendering
-- ffmpeg: ranim spawns a ffmpeg process to encode videos
+- typst: fonts and maths rendering
+- ffmpeg: encode videos
 
 ## Installation
 
-Currently, it is not published to crates.io, but you can add it to your `Cargo.toml`'s `[dependencies]` section with git url:
+Currently, it is experimental on crates.io:
 
 ```toml
+[dependencies]
+ranim = "0.1.0-alpha.1"
+```
+
+You can also use from git for the latest updates:
+
+```toml
+[dependencies]
 ranim = { git = "https://github.com/azurice/ranim" }
 ```
 
@@ -42,7 +50,7 @@ Once the design is stablized, I may write about it.
 
 For now, you can check out the code.
 
-## Thanks
+## Aknowledgements
 
 - [3b1b/manim](https://github.com/3b1b/manim)
 - [ManimCommunity/manim](https://github.com/ManimCommunity/manim/)
