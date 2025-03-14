@@ -37,6 +37,26 @@ impl<'t, T: 'static> Rabject<'t, T> {
     }
 }
 
+/// A renderable entity in ranim
+///
+/// You can implement your own entity by implementing this trait.
+///
+/// In Ranim, every item `T` is just plain data. After [`RanimTimeline::insert`]ed to [`RanimTimeline`],
+/// the item will have an id and its corresponding [`crate::timeline::RabjectTimeline`].
+///
+/// The resources (buffer, texture, etc) rendering an item needs are called **RenderInstance**,
+/// and all of them are managed by ranim outside of timeline in a struct [`RenderInstances`].
+///
+/// The [`RenderInstances`] is basically a store of [`RenderInstance`]s based on [`std::collections::HashMap`].
+/// - The key is the combination of [`Rabject::id`] and [`RenderInstance`]'s [`std::any::TypeId`]
+/// - The value is the [`RenderInstance`]
+///
+/// For now, there are two types of [`RenderInstance`]:
+/// - [`crate::render::primitives::vitem::VItemPrimitive`]: The core primitive to render vectorized items.
+/// - [`crate::render::primitives::svg_item::SvgItemPrimitive`]
+///
+/// You can check the builtin implementations of [`Entity`] for mor details.
+///
 pub trait Entity {
     fn get_render_instance_for_entity<'a>(
         &self,
