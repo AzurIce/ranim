@@ -91,8 +91,8 @@ impl<T: Entity + 'static> Entity for Rc<T> {
     }
 }
 
-/// Blueprints are the data structures that are used to create [`Rabject`]s
-pub trait Blueprint<T: Entity> {
+/// Blueprints are the data structures that are used to create an Item
+pub trait Blueprint<T> {
     fn build(self) -> T;
 }
 
