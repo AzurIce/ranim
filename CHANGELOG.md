@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### Misc
+
+- Added logo
+
 ## [0.1.0-alpha.3] - 2025-03-14
 
 ### 🚀 Features
@@ -15,6 +21,10 @@ All notable changes to this project will be documented in this file.
 ### 📚 Documentation
 
 - Added doc for Entity
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.1.0-alpha.2] - 2025-03-13
 
