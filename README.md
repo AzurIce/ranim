@@ -1,17 +1,24 @@
 <div align="center">
-    <img alt="Ranim Logo" src="./assets/ranim.png" width="256" height="256" />
-</div>
+<img alt="Ranim Logo" src="./assets/ranim.png" width="200" height="200" />
 
 # Ranim
+<div>
+    <img alt="license" src="https://img.shields.io/github/license/AzurIce/ranim" />
+    <img alt="crates.io" src="https://img.shields.io/crates/v/ranim.svg" />
+    <img alt="commit" src="https://img.shields.io/github/commit-activity/m/AzurIce/ranim?color=%23ff69b4">
+</div>
+<div>
+    <img alt="build check" src="https://github.com/AzurIce/ranim/actions/workflows/build.yml/badge.svg" />
+    <img alg="website check" src="https://github.com/AzurIce/ranim/actions/workflows/website.yml/badge.svg" />
+</div>
+<div>
+    <img alt="stars" src="https://img.shields.io/github/stars/AzurIce/ranim?style=social">
+</div>
+</div>
 
-![Licence](https://img.shields.io/github/license/AzurIce/ranim)
-![crates.io](https://img.shields.io/crates/v/ranim.svg)
-![Check](https://github.com/AzurIce/ranim/actions/workflows/build.yml/badge.svg)
-![Website](https://github.com/AzurIce/ranim/actions/workflows/website.yml/badge.svg)
+https://github.com/user-attachments/assets/285e4c0f-c794-46d0-b38f-434e5e6d9c8b
 
-https://github.com/user-attachments/assets/2176093e-758b-429b-89e0-2e3dd39b8a17
-
-> [hello_ranim.mp4](./assets/hello_ranim.mp4)
+> [examples/getting_started3](./examples/getting_started3)
 
 Ranim is an animation engine crate implemented in pure rust, inspired heavily by [Manim](https://github.com/3b1b/manim/tree/master) and [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim).
 
