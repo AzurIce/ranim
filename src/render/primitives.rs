@@ -27,7 +27,7 @@ pub trait ExtractFrom<T: Entity>: RenderInstance + Any {
 
 #[derive(Default)]
 pub struct RenderInstances {
-    // EntityId, TypeId -> Extract<T>
+    // Rabject's id, RenderInstance's TypeId -> RenderInstance
     dynamic_items: HashMap<(usize, TypeId), Box<dyn Any>>,
 }
 
