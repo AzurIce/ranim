@@ -3,6 +3,7 @@ use crate::items::Rabject;
 use crate::prelude::Interpolatable;
 use crate::utils::rate_functions::smooth;
 use color::{AlphaColor, Srgb};
+use log::warn;
 use std::ops::Range;
 
 // MARK: Creation
@@ -109,7 +110,14 @@ impl<T: CreationRequirement> UnCreate<T> {
 }
 
 impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
-    fn eval_alpha(&self, alpha: f32) -> T {
+    fn eval_alpha(&self, mut alpha: f32) -> T {
+        if !(0.0..=1.0).contains(&alpha) {
+            warn!(
+                "the alpha is out of range: {}, clampped to 0.0..=1.0",
+                alpha
+            );
+            alpha = alpha.clamp(0.0, 1.0)
+        }
         // trace!("{alpha}");
         if alpha == 0.0 {
             self.original.clone()
@@ -118,7 +126,7 @@ impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
         } else if alpha == 1.0 {
             T::empty()
         } else {
-            unreachable!()
+            panic!("the alpha is out of range: {}", alpha);
         }
     }
 }

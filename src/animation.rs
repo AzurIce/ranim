@@ -101,7 +101,7 @@ impl<T> ChainedAnimation<T> {
         let mut sum = 0.0;
         anims
             .iter()
-            .map(|anim| anim.duration_secs)
+            .map(|anim| anim.span_len())
             .for_each(|duration| {
                 sum += duration;
                 end_secs.push(sum);
@@ -121,7 +121,7 @@ impl<T> Eval<T> for ChainedAnimation<T> {
             .zip(self.end_secs.iter())
             .find(|&(_, end_sec)| *end_sec >= inner_global_sec)
             .unwrap();
-        anim.eval_sec(inner_global_sec - end_sec + anim.duration_secs)
+        anim.eval_sec(inner_global_sec - end_sec + anim.span_len())
     }
 }
 
@@ -168,6 +168,9 @@ impl<T: 'static> Animation<T> {
 }
 
 impl<T> Animation<T> {
+    pub fn span_len(&self) -> f32 {
+        self.duration_secs + self.padding.0 + self.padding.1
+    }
     pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
         self.rate_func = rate_func;
         self
@@ -189,7 +192,7 @@ impl<T> Animation<T> {
         self
     }
     pub fn eval_alpha(&self, alpha: f32) -> EvalResult<T> {
-        self.eval_sec(alpha * self.duration_secs)
+        self.eval_sec(alpha * self.span_len())
     }
     pub fn eval_sec(&self, local_sec: f32) -> EvalResult<T> {
         self.evaluator.eval_alpha((self.rate_func)(

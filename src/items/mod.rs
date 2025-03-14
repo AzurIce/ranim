@@ -11,11 +11,46 @@ pub mod camera_frame;
 pub mod svg_item;
 pub mod vitem;
 
+pub struct Group<T> {
+    pub items: Vec<T>,
+}
+
+pub struct RabjectGroup<'t, T> {
+    pub rabjects: Vec<Rabject<'t, T>>,
+}
+
+impl<'r, 't: 'r, T> RabjectGroup<'t, T> {
+    pub fn lagged_anim(
+        &'r mut self,
+        lag_ratio: f32,
+        anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
+    ) -> Vec<AnimSchedule<'r, 't, T>> {
+        let n = self.rabjects.len();
+
+        let mut anim_schedules = self
+            .rabjects
+            .iter_mut()
+            .map(|rabject| (anim_builder.clone())(rabject))
+            .collect::<Vec<_>>();
+
+        let duration = anim_schedules[0].anim.duration_secs;
+        let lag_time = duration * lag_ratio;
+        anim_schedules
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, schedule)| {
+                schedule.anim.padding = (i as f32 * lag_time, (n - i - 1) as f32 * lag_time);
+                // println!("{} {:?} {}", schedule.anim.span_len(), schedule.anim.padding, schedule.anim.duration_secs);
+            });
+        anim_schedules
+    }
+}
+
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
-pub struct Rabject<'a, T> {
-    pub timeline: &'a RanimTimeline,
+pub struct Rabject<'t, T> {
+    pub timeline: &'t RanimTimeline,
     pub id: usize,
     pub data: T,
 }
