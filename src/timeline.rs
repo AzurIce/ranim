@@ -1,6 +1,6 @@
 use crate::{
     animation::{AnimSchedule, Animation, EvalResult, Evaluator},
-    items::{camera_frame::CameraFrame, Entity, Rabject},
+    items::{camera_frame::CameraFrame, Entity, Group, Rabject, RabjectGroup},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
@@ -70,6 +70,27 @@ impl RanimTimeline {
 
     pub fn duration_secs(&self) -> f32 {
         *self.max_elapsed_secs.borrow()
+    }
+    pub fn insert_group<T: EntityTimelineStaticState + Clone + 'static>(
+        &self,
+        static_state_group: Group<T>,
+    ) -> RabjectGroup<T> {
+        RabjectGroup {
+            rabjects: static_state_group
+                .items
+                .into_iter()
+                .map(|item| self.insert(item))
+                .collect::<Vec<_>>(),
+        }
+    }
+    pub fn play_group<'r, 't: 'r, T: EntityTimelineStaticState + Clone + 'static>(
+        &'t self,
+        anim_schedules: Vec<AnimSchedule<'r, 't, T>>,
+    ) -> &'t Self {
+        anim_schedules.into_iter().for_each(|anim_schedule| {
+            self.play(anim_schedule);
+        });
+        self
     }
     pub fn insert<T: EntityTimelineStaticState + Clone + 'static>(
         &self,
@@ -152,8 +173,18 @@ impl RanimTimeline {
             .downcast_mut::<RabjectTimeline<T::StateType>>()
             .unwrap();
 
-        timeline.append_anim(anim.into_state_type());
         let mut max_duration = self.max_elapsed_secs.borrow_mut();
+        // println!(
+        //     "{} play {:?}({}, {}, {}) on {}",
+        //     max_duration,
+        //     anim.span_len(),
+        //     anim.padding.0,
+        //     anim.duration_secs,
+        //     anim.padding.1,
+        //     timeline.duration_secs()
+        // );
+
+        timeline.append_anim(anim.into_state_type());
         *max_duration = max_duration.max(timeline.duration_secs());
         self
     }
@@ -281,7 +312,7 @@ impl<T> RabjectTimeline<T> {
             EvalResult::Static(res) => res,
         };
         self.update_static_state(Some(end_state));
-        let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + anim.duration_secs;
+        let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + anim.span_len();
         // println!("{}", end_sec);
         self.animations.push(Some(anim));
         self.end_secs.push(end_sec);
@@ -322,8 +353,8 @@ impl<T> RabjectTimeline<T> {
             .unwrap();
 
         elem.as_ref().map(|elem| {
-            let start_sec = end_sec - elem.duration_secs;
-            let alpha = (target_sec - start_sec) / elem.duration_secs;
+            let start_sec = end_sec - elem.span_len();
+            let alpha = (target_sec - start_sec) / elem.span_len();
             (elem.eval_alpha(alpha), idx)
         })
     }

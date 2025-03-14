@@ -54,3 +54,6 @@ opt-level = 3
 
 [package.metadata.release]
 pre-release-hook = ["git", "cliff", "-o", "CHANGELOG.md", "--tag", "{{version}}" ]
+pre-release-replacements = [
+  {file="README.md", search="ranim = .*", replace="{{crate_name}} = \"{{version}}\""},
+]
