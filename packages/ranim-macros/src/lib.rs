@@ -26,8 +26,8 @@ pub fn scene(attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = match args.name {
         Some(ref name) => name.to_string(),
         None => {
-            let name = stringify!(#struct_name);
-            let name = name.strip_suffix("Scene").unwrap_or(name);
+            let name = struct_name.to_string();
+            let name = name.strip_suffix("Scene").unwrap_or(&name);
             AsSnekCase(name).to_string()
         }
     };
