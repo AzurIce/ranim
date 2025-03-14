@@ -1,3 +1,7 @@
+<div align="center">
+    <img alt="Ranim Logo" src="./assets/ranim.png" width="256" height="256" />
+</div>
+
 # Ranim
 
 ![Licence](https://img.shields.io/github/license/AzurIce/ranim)
