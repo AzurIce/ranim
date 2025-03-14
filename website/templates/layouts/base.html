@@ -13,7 +13,7 @@
 {# Shortcut to get the section/page. This variable will have a value except in some special pages like `404.html`. #}
 {% set_global section_or_page = false %}
 {% if section or page %}
-  {% set_global section_or_page = section | default(value=page) %}
+{% set_global section_or_page = section | default(value=page) %}
 {% endif %}
 
 <!DOCTYPE html>
@@ -24,8 +24,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   {# TODO: og metas #}
 
-  <link rel="stylesheet" href="{{ get_url(path="index.css") }}">
-  <link rel="stylesheet" href="{{ get_url(path="github-markdown.css") }}">
+  <link rel="stylesheet" href="{{ get_url(path='index.css') }}">
+  <link rel="stylesheet" href="{{ get_url(path='github-markdown.css') }}">
+
+  <!-- Favicon -->
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ get_url(path='apple-touch-icon.png') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ get_url(path='favicon-32x32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ get_url(path='favicon-16x16.png') }}">
+  <link rel="manifest" href="{{ get_url(path='site.webmanifest') }}">
 
   <!-- TODO: feed -->
   <!-- {% if config.generate_feed %}
@@ -42,16 +48,17 @@
   <header class="layout__header">
     <div class="back"></div>
     <nav class="nav">
-      <a href="{{ get_url(path="/") }}" class="home">
+      <a href="{{ get_url(path='/') }}" class="home nav-btn">
+        <img src="{{ get_url(path='ranim.png') }}" alt="Ranim Icon"/>
         <span>Ranim</span>
       </a>
       {% for path in root_section.subsections %}
       {% set subsection = get_section(path=path) %}
-      <a href="{{subsection.permalink}}" class="section-btn">
+      <a href="{{subsection.permalink}}" class="section-btn nav-btn">
         {{ subsection.title }}
       </a>
       {% endfor %}
-      <a href="https://github.com/AzurIce/ranim" target="_blank" rel="noreferrer" class="icon-btn">
+      <a href="https://github.com/AzurIce/ranim" target="_blank" rel="noreferrer" class="icon-btn nav-btn">
         <svg width="24" height="24" fill="currentColor" viewBox="3 3 18 18">
           <title>GitHub</title>
           <path

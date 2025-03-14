@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_图层_1" data-name="图层 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170.08 170.08">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: #83c167;
+      }
+
+      .cls-3, .cls-4 {
+        fill: #58c4dd;
+      }
+
+      .cls-5, .cls-2, .cls-4 {
+        opacity: .5;
+      }
+
+      .cls-5, .cls-6 {
+        fill: #fc6255;
+      }
+    </style>
+  </defs>
+  <rect class="cls-2" x="87.87" y="0" width="82.2" height="82.2" transform="translate(170.08 -87.87) rotate(90)"/>
+  <polygon class="cls-1" points="170.08 82.2 170.08 0 87.87 0 170.08 82.2"/>
+  <rect class="cls-5" x="0" y="0" width="82.2" height="170.08"/>
+  <rect class="cls-6" x="0" y="0" width="41.1" height="170.08"/>
+  <polygon class="cls-3" points="170.08 170.08 87.87 87.87 87.87 170.08 170.08 170.08"/>
+  <polygon class="cls-4" points="87.87 87.87 170.08 170.08 170.08 87.87 87.87 87.87"/>
+</svg>
