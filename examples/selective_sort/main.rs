@@ -6,7 +6,7 @@ use ranim::{
 };
 
 #[scene]
-struct SelectiveSortScene;
+struct SelectiveSortScene(pub usize);
 
 impl TimelineConstructor for SelectiveSortScene {
     fn construct<'t: 'r, 'r>(
@@ -14,11 +14,12 @@ impl TimelineConstructor for SelectiveSortScene {
         timeline: &'t RanimTimeline,
         camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
+        let num = self.0;
+
         let frame_size = camera.data.frame_size();
-        let num = 10;
-        let anim_step_duration = 0.15;
-        let padding = frame_size.x * 0.1;
-        let gap = 20.0;
+        let anim_step_duration = 15.0 / num.pow(2) as f32;
+        let padding = frame_size.x * 0.05;
+        let gap = 20.0 / (num as f32).log10();
         let rect_width = (frame_size.x - 2.0 * padding - (num - 1) as f32 * gap) / num as f32;
 
         let max_height = frame_size.y - 2.0 * padding;
@@ -120,11 +121,24 @@ impl TimelineConstructor for SelectiveSortScene {
 
         timeline.insert_time_mark(
             timeline.duration_secs() / 2.0,
-            TimeMark::Capture("preview.png".to_string()),
+            TimeMark::Capture(format!("preview-{num}.png")),
         );
     }
 }
 
 fn main() {
-    render_timeline(SelectiveSortScene, &AppOptions::default());
+    render_timeline(
+        SelectiveSortScene(10),
+        &AppOptions {
+            output_filename: "output-10.mp4",
+            ..Default::default()
+        },
+    );
+    render_timeline(
+        SelectiveSortScene(100),
+        &AppOptions {
+            output_filename: "output-100.mp4",
+            ..Default::default()
+        },
+    );
 }

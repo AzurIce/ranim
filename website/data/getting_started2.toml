@@ -1,4 +1,4 @@
-name = "getting_started_2"
+name = "getting_started2"
 code = """
 ```rust,linenos
 use ranim::{\r
@@ -42,4 +42,5 @@ fn main() {\r
 
 ```"""
 hash = "987d44d779fa526adc4944629f858093e79937cd"
-output_files = ["/examples/getting_started_2/output.mp4"]
+preview_imgs = []
+output_files = ["/examples/getting_started2/output.mp4"]

@@ -42,5 +42,5 @@ fn main() {\r
 
 ```"""
 hash = "0d18da3833539884abd909086b26684201fc2e19"
-preview_img = "/examples/hello_ranim/preview.png"
+preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]

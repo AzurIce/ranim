@@ -1,4 +1,4 @@
-name = "getting_started_0"
+name = "getting_started0"
 code = """
 ```rust,linenos
 use ranim::{color::palettes::manim, items::vitem::Square, prelude::*};\r
@@ -35,4 +35,5 @@ fn main() {\r
 
 ```"""
 hash = "64653019b903e54980deecb7662f0841a3b46c23"
-output_files = ["/examples/getting_started_0/output.mp4"]
+preview_imgs = []
+output_files = ["/examples/getting_started0/output.mp4"]

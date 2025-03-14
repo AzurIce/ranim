@@ -9,7 +9,7 @@ use ranim::{\r
 };\r
 \r
 #[scene]\r
-struct BubbleSortScene;\r
+struct BubbleSortScene(pub usize);\r
 \r
 impl TimelineConstructor for BubbleSortScene {\r
     fn construct<'t: 'r, 'r>(\r
@@ -17,11 +17,12 @@ impl TimelineConstructor for BubbleSortScene {\r
         timeline: &'t RanimTimeline,\r
         camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
+        let num = self.0;\r
+\r
         let frame_size = camera.data.frame_size();\r
-        let num = 10;\r
-        let anim_step_duration = 0.15;\r
-        let padding = frame_size.x * 0.1;\r
-        let gap = 20.0;\r
+        let anim_step_duration = 15.0 / num.pow(2) as f32;\r
+        let padding = frame_size.x * 0.05;\r
+        let gap = 20.0 / (num as f32).log10();\r
         let rect_width = (frame_size.x - 2.0 * padding - (num - 1) as f32 * gap) / num as f32;\r
 \r
         let max_height = frame_size.y - 2.0 * padding;\r
@@ -56,7 +57,7 @@ impl TimelineConstructor for BubbleSortScene {\r
                 timeline.play(\r
                     rects[j]\r
                         .transform(|data| {\r
-                            data.set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
+                            data.set_color(manim::BLUE_C).set_fill_opacity(0.5);\r
                         })\r
                         .with_duration(anim_step_duration)\r
                         .with_rate_func(linear)\r
@@ -65,7 +66,7 @@ impl TimelineConstructor for BubbleSortScene {\r
                 timeline.play(\r
                     rects[j + 1]\r
                         .transform(|data| {\r
-                            data.set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
+                            data.set_color(manim::BLUE_C).set_fill_opacity(0.5);\r
                         })\r
                         .with_duration(anim_step_duration)\r
                         .with_rate_func(linear)\r
@@ -78,7 +79,8 @@ impl TimelineConstructor for BubbleSortScene {\r
                         rects[j]\r
                             .transform(|data| {\r
                                 data.shift(shift_right)\r
-                                    .set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
+                                    .set_color(manim::BLUE_C)\r
+                                    .set_fill_opacity(0.5);\r
                             })\r
                             .with_duration(anim_step_duration)\r
                             .with_rate_func(linear)\r
@@ -88,7 +90,8 @@ impl TimelineConstructor for BubbleSortScene {\r
                         rects[j + 1]\r
                             .transform(|data| {\r
                                 data.shift(-shift_right)\r
-                                    .set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
+                                    .set_color(manim::BLUE_C)\r
+                                    .set_fill_opacity(0.5);\r
                             })\r
                             .with_duration(anim_step_duration)\r
                             .with_rate_func(linear)\r
@@ -101,7 +104,7 @@ impl TimelineConstructor for BubbleSortScene {\r
                 timeline.play(\r
                     rects[j]\r
                         .transform(|data| {\r
-                            data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
+                            data.set_color(manim::WHITE).set_fill_opacity(0.5);\r
                         })\r
                         .with_duration(anim_step_duration)\r
                         .with_rate_func(linear)\r
@@ -110,7 +113,7 @@ impl TimelineConstructor for BubbleSortScene {\r
                 timeline.play(\r
                     rects[j + 1]\r
                         .transform(|data| {\r
-                            data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
+                            data.set_color(manim::WHITE).set_fill_opacity(0.5);\r
                         })\r
                         .with_duration(anim_step_duration)\r
                         .with_rate_func(linear)\r
@@ -122,16 +125,29 @@ impl TimelineConstructor for BubbleSortScene {\r
 \r
         timeline.insert_time_mark(\r
             timeline.duration_secs() / 2.0,\r
-            TimeMark::Capture(\"preview.png\".to_string()),\r
+            TimeMark::Capture(format!(\"preview-{num}.png\")),\r
         );\r
     }\r
 }\r
 \r
 fn main() {\r
-    render_timeline(BubbleSortScene, &AppOptions::default());\r
+    render_timeline(\r
+        BubbleSortScene(10),\r
+        &AppOptions {\r
+            output_filename: \"output-10.mp4\",\r
+            ..Default::default()\r
+        },\r
+    );\r
+    render_timeline(\r
+        BubbleSortScene(100),\r
+        &AppOptions {\r
+            output_filename: \"output-100.mp4\",\r
+            ..Default::default()\r
+        },\r
+    );\r
 }\r
 
 ```"""
-hash = "95e28b4204b46976fa1e211e308c3f81183d3055"
-preview_img = "/examples/bubble_sort/preview.png"
-output_files = ["/examples/bubble_sort/output.mp4"]
+hash = "bddb6f0a52d7b77c9e2169cc30ffa97630b29f09"
+preview_imgs = ["/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
+output_files = ["/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/output-100.mp4"]

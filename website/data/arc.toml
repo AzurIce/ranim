@@ -76,5 +76,5 @@ fn main() {\r
 
 ```"""
 hash = "1018db9be2adf558ea95abde70bca0b071d0c56f"
-preview_img = "/examples/arc/preview.png"
+preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/output.mp4"]

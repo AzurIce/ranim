@@ -89,5 +89,5 @@ fn main() {\r
 
 ```"""
 hash = "d2733aa74a5f4f28419792300b8c839a5232c71f"
-preview_img = "/examples/arc_between_points/preview.png"
+preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/output.mp4"]
