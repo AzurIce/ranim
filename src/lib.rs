@@ -62,6 +62,7 @@ pub mod utils;
 pub struct Ranim<'t, 'r>(pub &'t RanimTimeline, pub &'r mut Rabject<'t, CameraFrame>);
 
 /// The metadata of the Timeline
+#[derive(Debug, Clone)]
 pub struct SceneMeta {
     pub name: String,
 }
@@ -167,6 +168,7 @@ pub static DEFAULT_APP_OPTIONS: AppOptions = AppOptions {
     frame_rate: 60,
     save_frames: false,
     output_dir: "./output",
+    output_filename: "output.mp4",
 };
 
 #[derive(Debug, Clone)]
@@ -175,6 +177,7 @@ pub struct AppOptions<'a> {
     pub frame_rate: u32,
     pub save_frames: bool,
     pub output_dir: &'a str,
+    pub output_filename: &'a str,
 }
 
 impl Default for AppOptions<'_> {
@@ -224,7 +227,7 @@ impl RanimRenderApp {
                 FileWriterBuilder::default()
                     .with_fps(options.frame_rate)
                     .with_size(options.frame_size.0, options.frame_size.1)
-                    .with_file_path(output_dir.join(&scene_name).join("output.mp4")),
+                    .with_file_path(output_dir.join(&scene_name).join(options.output_filename)),
             ),
             save_frames: options.save_frames,
             fps: options.frame_rate,
