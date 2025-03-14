@@ -24,6 +24,8 @@ impl<T: Debug + Default + Clone + Copy + PartialEq> Component for T {}
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct ComponentVec<T: Component>(Vec<T>);
 
+// MARK: Trait impls
+
 impl<T: Component + PointWise + Interpolatable> Partial for ComponentVec<T> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
         let max_idx = self.len() - 2;
