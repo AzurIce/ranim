@@ -1,5 +1,5 @@
 <div align="center">
-<img alt="Ranim Logo" src="./assets/ranim.png" width="256" height="256" />
+<img alt="Ranim Logo" src="./assets/ranim.png" width="200" height="200" />
 
 # Ranim
 <div>
