@@ -10,10 +10,10 @@ use walkdir::WalkDir;
 
 const EXCLUDE_EXAMPLES: [&str; 1] = ["test_scene"];
 const HIDE_EXAMPLES: [&str; 4] = [
-    "getting_started_0",
-    "getting_started_1",
-    "getting_started_2",
-    "getting_started_3",
+    "getting_started0",
+    "getting_started1",
+    "getting_started2",
+    "getting_started3",
 ];
 
 #[derive(Parser)]
@@ -32,7 +32,7 @@ struct ExampleMeta {
     name: String,
     code: String,
     hash: String,
-    preview_img: Option<String>,
+    preview_imgs: Vec<String>,
     output_files: Vec<String>,
 }
 
@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             name: example_name.to_string(),
             code: format!("```rust,linenos\n{code}\n```"),
             hash: hash.clone(),
-            preview_img: None,
+            preview_imgs: Vec::new(),
             output_files: Vec::new(),
         };
 
@@ -117,9 +117,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             create_dir_all(&example_output_dir)?;
 
             // 复制文件并更新元数据
-            let (preview_img, output_files) = copy_output_files(&output_dir, &example_output_dir)?;
-            new_meta.preview_img =
-                preview_img.map(|path| format!("/examples/{}/{}", example_name, path));
+            let (preview_imgs, output_files) = copy_output_files(&output_dir, &example_output_dir)?;
+            new_meta.preview_imgs = preview_imgs
+                .into_iter()
+                .map(|path| format!("/examples/{}/{}", example_name, path))
+                .collect();
             new_meta.output_files = output_files
                 .into_iter()
                 .map(|path| format!("/examples/{}/{}", example_name, path))
@@ -229,24 +231,31 @@ fn run_example(example_name: &str, workspace_root: &Path) -> Result<(), Box<dyn 
 fn copy_output_files(
     source_dir: &Path,
     target_dir: &Path,
-) -> Result<(Option<String>, Vec<String>), Box<dyn Error>> {
-    let mut preview_img = None;
+) -> Result<(Vec<String>, Vec<String>), Box<dyn Error>> {
+    let mut preview_imgs = Vec::new();
     let mut output_files = Vec::new();
 
     for entry in WalkDir::new(source_dir).into_iter().filter_map(Result::ok) {
         let path = entry.path();
         if path.is_file() {
             if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
-                if file_name == "preview.png" {
-                    preview_img = Some(copy_file(path, target_dir)?);
-                    continue;
-                }
-
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                print!("Found {:?}", file_name);
+                if file_name.starts_with("preview") {
+                    print!(", preview file");
+                    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                        if ["png", "jpg"].contains(&ext) {
+                            println!(", copying...");
+                            preview_imgs.push(copy_file(path, target_dir)?);
+                        }
+                    }
+                } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    print!(", output file");
                     if ["mp4", "png", "jpg"].contains(&ext) {
+                        print!(", copying...");
                         output_files.push(copy_file(path, target_dir)?);
                     }
                 }
+                println!()
             }
         }
     }
@@ -255,7 +264,7 @@ fn copy_output_files(
         return Err("未找到输出文件".into());
     }
 
-    Ok((preview_img, output_files))
+    Ok((preview_imgs, output_files))
 }
 
 fn copy_file(source: &Path, target_dir: &Path) -> Result<String, Box<dyn Error>> {

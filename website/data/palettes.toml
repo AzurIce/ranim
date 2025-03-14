@@ -74,5 +74,5 @@ fn main() {\r
 
 ```"""
 hash = "5c6ef4ed8198605b19c8400ef640ea7d1149d1cd"
-preview_img = "/examples/palettes/preview.png"
+preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/output.png"]

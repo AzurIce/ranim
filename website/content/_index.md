@@ -86,7 +86,7 @@ impl<T> Drop for Rabject<'_, T> {
 
 下面的例子使用一个 `VItem` 物件和 `timeline.insert` 在时间线中创建了一个 `Rabject<VItem>` 并展示了 `show`、`hide` 以及 `drop` 对其影响：
 
-!example-getting_started_0
+!example-getting_started0
 
 ### 2. 播放动画
 
@@ -112,7 +112,7 @@ timeline.play(square.fade_in().chain(|data| data.fade_out()));
 
 而 `T` 与 `&'r mut Rabject<'t, T>` 相同，也有创建动画的方法，不过返回的是 `Animation<T>`。
 
-!example-getting_started_1
+!example-getting_started1
 
 ### 3. 动画参数
 
@@ -124,7 +124,7 @@ timeline.play(square.fade_in().chain(|data| data.fade_out()));
 
 这并不是一个 Bug，而是一种刻意的设计，请继续向下阅读 4. 向 Rabject 应用动画变更，了解更多。
 
-!example-getting_started_2
+!example-getting_started2
 
 ### 4. 向 Rabject 应用动画变更（AnimSchedule 与 apply）
 
@@ -133,7 +133,7 @@ timeline.play(square.fade_in().chain(|data| data.fade_out()));
 
 这样的好处是对于一些对数据有 **损坏性变更** 的动画（比如 unwrite 等），我们不需要提前对数据进行备份。
 
-!example-getting_started_3
+!example-getting_started3
 
 不过 `chain` 是会以第一个动画的结束状态为基础创建下一个动画的，但是要注意此时的 `AnimSchedule` 是整个被拼接后的动画，如果不调用 `apply` 是不会更新 `Rabject` 内部的数据的，而调用 `apply` 会应用整个被拼接后的动画的变更：
 

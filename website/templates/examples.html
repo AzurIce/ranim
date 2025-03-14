@@ -8,8 +8,12 @@
   {% for page in section.pages %}
   <a href="{{ page.permalink }}" class="card">
     {% set example_data = load_data(path="/data/" ~ page.title ~ ".toml") %}
-    {% if example_data.preview_img %}
-    <img src="{{ get_url(path=example_data.preview_img) }}" alt="{{ example_data.name }} 示例输出">
+    {% if example_data.preview_imgs and example_data.preview_imgs | length > 0 %}
+    <div class="preview-grid">
+      {% for preview_img in example_data.preview_imgs %}
+      <img src="{{ get_url(path=preview_img) }}" alt="{{ example_data.name }} 示例输出 {{ loop.index }}">
+      {% endfor %}
+    </div>
     {% else %}
     <img>
     {% endif %}

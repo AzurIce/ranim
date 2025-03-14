@@ -114,5 +114,5 @@ fn main() {\r
 
 ```"""
 hash = "3b561e5efe90d76937020eb6af9792b23b000cdf"
-preview_img = "/examples/basic/preview.png"
+preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/output.mp4"]
