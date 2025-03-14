@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.0-alpha.4] - 2025-03-14
 
+### ⚙️ Miscellaneous Tasks
+
+- Release
+
 ### WIP
 
 - Support for RabjectGroup
