@@ -161,7 +161,7 @@ pub trait Transformable<T: Transform3dComponent> {
 
     /// Put anchor at a given point.
     ///
-    /// See [`TransformAnchor`] for more details.
+    /// See [`Anchor`] for more details.
     fn put_anchor_on(&mut self, anchor: Anchor, point: Vec3) -> &mut Self {
         let anchor = match anchor {
             Anchor::Edge(edge) => self.get_bounding_box_point(edge),
