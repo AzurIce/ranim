@@ -156,13 +156,23 @@ pub trait Transformable<T: Transform3dComponent> {
     fn apply_points_function(
         &mut self,
         f: impl Fn(&mut ComponentVec<T>) + Copy,
-        anchor: TransformAnchor,
-    );
+        anchor: Anchor,
+    ) -> &mut Self;
 
+    /// Put anchor at a given point.
+    ///
+    /// See [`TransformAnchor`] for more details.
+    fn put_anchor_on(&mut self, anchor: Anchor, point: Vec3) -> &mut Self {
+        let anchor = match anchor {
+            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
+            Anchor::Point(point) => point,
+        };
+        self.shift(point - anchor);
+        self
+    }
     /// Put center at a given point.
     fn put_center_on(&mut self, point: Vec3) -> &mut Self {
-        self.shift(point - self.get_bounding_box()[1]);
-        self
+        self.put_anchor_on(Anchor::center(), point)
     }
     /// Shift the mobject by a given vector.
     fn shift(&mut self, shift: Vec3) -> &mut Self {
@@ -172,16 +182,16 @@ pub trait Transformable<T: Transform3dComponent> {
                     **p += shift;
                 });
             },
-            TransformAnchor::origin(),
+            Anchor::origin(),
         );
         self
     }
     /// Scale the mobject by a given vector.
     fn scale(&mut self, scale: Vec3) -> &mut Self {
-        self.scale_by_anchor(scale, TransformAnchor::center())
+        self.scale_by_anchor(scale, Anchor::center())
     }
     /// Scale the mobject by a given vector.
-    fn scale_by_anchor(&mut self, scale: Vec3, anchor: TransformAnchor) -> &mut Self {
+    fn scale_by_anchor(&mut self, scale: Vec3, anchor: Anchor) -> &mut Self {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
@@ -194,10 +204,10 @@ pub trait Transformable<T: Transform3dComponent> {
     }
     /// Rotate the mobject by a given angle about a given axis.
     fn rotate(&mut self, angle: f32, axis: Vec3) -> &mut Self {
-        self.rotate_by_anchor(angle, axis, TransformAnchor::center())
+        self.rotate_by_anchor(angle, axis, Anchor::center())
     }
     /// Rotate the mobject by a given angle about a given axis.
-    fn rotate_by_anchor(&mut self, angle: f32, axis: Vec3, anchor: TransformAnchor) -> &mut Self {
+    fn rotate_by_anchor(&mut self, angle: f32, axis: Vec3, anchor: Anchor) -> &mut Self {
         let axis = axis.normalize();
         let rotation = Mat3::from_axis_angle(axis, angle);
 
@@ -212,7 +222,7 @@ pub trait Transformable<T: Transform3dComponent> {
         self
     }
     /// Simple multiplies the matrix to the points.
-    fn apply_affine(&mut self, affine: Affine2) {
+    fn apply_affine(&mut self, affine: Affine2) -> &mut Self {
         self.apply_points_function(
             |points| {
                 points.iter_mut().for_each(|p| {
@@ -221,7 +231,7 @@ pub trait Transformable<T: Transform3dComponent> {
                     p.y = transformed.y;
                 });
             },
-            TransformAnchor::origin(),
+            Anchor::origin(),
         )
     }
     /// Put the start and end points of the item on the given points.
@@ -238,7 +248,7 @@ pub trait Transformable<T: Transform3dComponent> {
         let v = end - start;
         self.scale_by_anchor(
             Vec3::splat(v.length() / cur_v.length()),
-            TransformAnchor::Point(cur_start),
+            Anchor::Point(cur_start),
         );
         let angle = cur_v.y.atan2(-cur_v.x) - v.y.atan2(-v.x) + std::f32::consts::PI / 2.0;
         self.rotate(angle, Vec3::Z);
@@ -283,11 +293,11 @@ impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
     fn apply_points_function(
         &mut self,
         f: impl Fn(&mut ComponentVec<T>) + Copy,
-        anchor: TransformAnchor,
-    ) {
+        anchor: Anchor,
+    ) -> &mut Self {
         let anchor = match anchor {
-            TransformAnchor::Point(x) => x,
-            TransformAnchor::Edge(x) => self.get_bounding_box_point(x),
+            Anchor::Point(x) => x,
+            Anchor::Edge(x) => self.get_bounding_box_point(x),
         };
         let component_vec = self.as_mut();
 
@@ -300,6 +310,7 @@ impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
         if anchor != Vec3::ZERO {
             component_vec.iter_mut().for_each(|p| **p += anchor);
         }
+        self
     }
 
     fn get_start_position(&self) -> Option<Vec3> {
@@ -332,14 +343,14 @@ impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
 
 /// The anchor of the transformation.
 #[derive(Debug, Clone, Copy)]
-pub enum TransformAnchor {
-    /// A point anchor
+pub enum Anchor {
+    /// A point anchor, which is an absolute coordinate
     Point(Vec3),
     /// An edge anchor, use -1, 0, 1 to specify the edge on each axis
     Edge(IVec3),
 }
 
-impl TransformAnchor {
+impl Anchor {
     pub fn point(x: f32, y: f32, z: f32) -> Self {
         Self::Point(vec3(x, y, z))
     }
