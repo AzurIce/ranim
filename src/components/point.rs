@@ -4,10 +4,6 @@ use glam::Vec3;
 
 use crate::prelude::Interpolatable;
 
-// use super::Transform3d;
-
-// pub type Point = Vec3;
-
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct Point(Vec3);
 
@@ -47,11 +43,4 @@ impl AsMut<Vec3> for Point {
     fn as_mut(&mut self) -> &mut Vec3 {
         &mut self.0
     }
-}
-// impl Transform3d for Point {}
-
-#[cfg(test)]
-mod test {
-    #[allow(unused)]
-    use super::*;
 }

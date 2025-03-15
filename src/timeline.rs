@@ -1,6 +1,6 @@
 use crate::{
     animation::{AnimSchedule, Animation, EvalResult, Evaluator},
-    items::{Entity, Group, Rabject, RabjectGroup, camera_frame::CameraFrame},
+    items::{Entity, Rabject, camera_frame::CameraFrame},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
@@ -70,18 +70,6 @@ impl RanimTimeline {
 
     pub fn duration_secs(&self) -> f32 {
         *self.max_elapsed_secs.borrow()
-    }
-    pub fn insert_group<T: EntityTimelineStaticState + Clone + 'static>(
-        &self,
-        static_state_group: Group<T>,
-    ) -> RabjectGroup<T> {
-        RabjectGroup {
-            rabjects: static_state_group
-                .items
-                .into_iter()
-                .map(|item| self.insert(item))
-                .collect::<Vec<_>>(),
-        }
     }
     pub fn play_group<'r, 't: 'r, T: EntityTimelineStaticState + Clone + 'static>(
         &'t self,

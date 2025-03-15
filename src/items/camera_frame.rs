@@ -15,13 +15,6 @@ pub struct CameraFrame {
     // pub rotation: Mat4,
 }
 
-// impl Entity for CameraFrame {
-//     type Primitive = ();
-//     fn clip_box(&self, camera: &CameraFrame) -> [Vec2; 4] {
-//         [Vec2::splat(0.0); 4]
-//     }
-// }
-
 impl Interpolatable for CameraFrame {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         assert_eq!(self.size, target.size);

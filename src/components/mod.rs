@@ -7,8 +7,7 @@ use glam::{Affine2, IVec3, Mat3, Vec3, Vec3Swizzles, ivec3, vec2, vec3};
 use itertools::Itertools;
 
 use crate::{
-    prelude::{Alignable, Interpolatable, Partial},
-    utils::math::interpolate_usize,
+    items::group::Group, prelude::{Alignable, Interpolatable, Partial}, utils::math::interpolate_usize
 };
 
 pub mod point;
@@ -287,6 +286,40 @@ pub trait Transformable<T: Transform3dComponent> {
             .unwrap()
     }
 }
+
+impl<T: Transformable<C>, C: Transform3dComponent> Transformable<C> for Group<T> {
+    fn get_start_position(&self) -> Option<Vec3> {
+        self.as_ref().first().and_then(|x| x.get_start_position())
+    }
+    fn get_end_position(&self) -> Option<Vec3> {
+        self.as_ref().last().and_then(|x| x.get_end_position())
+    }
+    fn apply_points_function(
+        &mut self,
+        f: impl Fn(&mut ComponentVec<C>) + Copy,
+        anchor: Anchor,
+    ) -> &mut Self {
+        let point = match anchor {
+            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
+            Anchor::Point(point) => point,
+        };
+        // println!("{:?}, {:?}", anchor, point);
+        self.iter_mut().for_each(|x| {
+            x.apply_points_function(f, Anchor::Point(point));
+        });
+        self
+    }
+    fn get_bounding_box(&self) -> [Vec3; 3] {
+        let [min, max] = self
+            .iter()
+            .map(|x| x.get_bounding_box())
+            .map(|[min, _, max]| [min, max])
+            .reduce(|a, b| [a[0].min(b[0]), a[1].max(b[1])])
+            .unwrap_or([Vec3::ZERO; 2]);
+        [min, (min + max) / 2.0, max]
+    }
+}
+
 
 impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
     /// Apply a function to the points of the mobject about the point.
