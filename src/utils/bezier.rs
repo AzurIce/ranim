@@ -242,8 +242,18 @@ pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
         let cut_tangent = quad_bezier_eval(&[h1 - p1, h2 - h1, p2 - h2], root);
         let p1_tangent = h1 - p1;
         let p2_tangent = p2 - h2;
-        let i1 = intersection(p1, p1_tangent, cut_point, cut_tangent).unwrap();
-        let i2 = intersection(p2, p2_tangent, cut_point, cut_tangent).unwrap();
+        let i1 = intersection(p1, p1_tangent, cut_point, cut_tangent).unwrap_or((p1 + cut_point) / 2.0);
+        let i2 = intersection(p2, p2_tangent, cut_point, cut_tangent).unwrap_or((cut_point + p2) / 2.0);
+        // if i1.is_none() || i2.is_none() {
+        //     panic!(
+        //         r"Can't find intersection for{:?}:
+        //     p1({:?}), p1_tangent({:?}),
+        //     cut_point({:?}), cut_tangent({:?}),
+        //     p2({:?}), p2_tangent({:?})
+        //     ",
+        //         cubic, p1, p1_tangent, cut_point, cut_tangent, p2, p2_tangent
+        //     );
+        // }
         return vec![[p1, i1, cut_point], [cut_point, i2, p2]];
     };
 
