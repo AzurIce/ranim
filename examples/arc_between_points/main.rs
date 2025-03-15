@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use env_logger::Env;
-use glam::{vec2, Mat2};
+use glam::{Mat2, vec2};
 use log::info;
 use ranim::animation::creation::Color;
 use ranim::animation::fading::FadingAnimSchedule;

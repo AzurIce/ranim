@@ -2,13 +2,13 @@ use crate::{
     components::{rgba::Rgba, width::Width},
     context::WgpuContext,
     render::{
-        pipelines::{
-            map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup, Map3dTo2dPipeline,
-            VItemPipeline,
-        },
         RenderTextures,
+        pipelines::{
+            Map3dTo2dPipeline, VItemPipeline, map_3d_to_2d::ComputeBindGroup,
+            vitem::RenderBindGroup,
+        },
     },
-    utils::{wgpu::WgpuVecBuffer, PipelinesStorage},
+    utils::{PipelinesStorage, wgpu::WgpuVecBuffer},
 };
 use glam::Vec4;
 
@@ -184,12 +184,12 @@ mod test {
 
     use crate::{
         context::WgpuContext,
-        items::{camera_frame::CameraFrame, vitem::Square, Blueprint},
+        items::{Blueprint, camera_frame::CameraFrame, vitem::Square},
         render::{
-            primitives::{ExtractFrom, RenderInstance},
             CameraUniforms, CameraUniformsBindGroup, RenderTextures,
+            primitives::{ExtractFrom, RenderInstance},
         },
-        utils::{wgpu::WgpuBuffer, PipelinesStorage},
+        utils::{PipelinesStorage, wgpu::WgpuBuffer},
     };
 
     use super::VItemPrimitive;

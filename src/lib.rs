@@ -15,20 +15,20 @@ use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use items::{camera_frame::CameraFrame, Rabject};
+use items::{Rabject, camera_frame::CameraFrame};
 use timeline::{RanimTimeline, TimeMark, TimelineEvalResult};
 
-use render::{primitives::RenderInstances, Renderer};
+use render::{Renderer, primitives::RenderInstances};
 
 // MARK: Prelude
 pub mod prelude {
     pub use crate::Ranim;
 
-    pub use crate::{render_timeline, render_timeline_at_sec, AppOptions};
+    pub use crate::{AppOptions, render_timeline, render_timeline_at_sec};
     pub use crate::{SceneMetaTrait, TimelineConstructor};
     pub use ranim_macros::scene;
 
-    pub use crate::items::{camera_frame::CameraFrame, Rabject};
+    pub use crate::items::{Rabject, camera_frame::CameraFrame};
     pub use crate::timeline::RanimTimeline;
 
     pub use crate::color::prelude::*;

@@ -1,6 +1,6 @@
 use crate::{
     animation::{AnimSchedule, Animation, EvalResult, Evaluator},
-    items::{camera_frame::CameraFrame, Entity, Group, Rabject, RabjectGroup},
+    items::{Entity, Group, Rabject, RabjectGroup, camera_frame::CameraFrame},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
@@ -349,7 +349,7 @@ impl<T> RabjectTimeline<T> {
             .iter()
             .zip(self.end_secs.iter())
             .enumerate()
-            .find(|(_, (_, &end_sec))| end_sec >= target_sec)
+            .find(|&(_, (_, &end_sec))| end_sec >= target_sec)
             .unwrap();
 
         elem.as_ref().map(|elem| {

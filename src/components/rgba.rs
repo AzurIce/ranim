@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 // use bevy_color::{ColorToComponents, LinearRgba};
 use color::{AlphaColor, ColorSpace, LinearSrgb, Srgb};
-use glam::{vec4, Vec4};
+use glam::{Vec4, vec4};
 
 use crate::prelude::{Interpolatable, Opacity};
 

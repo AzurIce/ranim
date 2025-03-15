@@ -1,4 +1,4 @@
-use darling::{ast::NestedMeta, Error, FromMeta};
+use darling::{Error, FromMeta, ast::NestedMeta};
 use heck::AsSnekCase;
 use proc_macro::TokenStream;
 

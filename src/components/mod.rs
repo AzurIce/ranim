@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use glam::{ivec3, vec2, vec3, Affine2, IVec3, Mat3, Vec3, Vec3Swizzles};
+use glam::{Affine2, IVec3, Mat3, Vec3, Vec3Swizzles, ivec3, vec2, vec3};
 use itertools::Itertools;
 
 use crate::{
@@ -385,11 +385,11 @@ impl<T: Component> AsMut<ComponentVec<T>> for ComponentVec<T> {
 
 #[cfg(test)]
 mod test {
-    use glam::{ivec3, vec3, IVec3, Vec3};
+    use glam::{IVec3, Vec3, ivec3, vec3};
 
     use crate::components::Transformable;
 
-    use super::{vpoint::VPoint, ComponentVec};
+    use super::{ComponentVec, vpoint::VPoint};
 
     #[test]
     fn test_bounding_box() {

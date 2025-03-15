@@ -107,11 +107,7 @@ impl ComponentVec<VPoint> {
             if let Some((ia, a)) = match (a, b) {
                 (Some((ia, a)), Some((_ib, b))) => {
                     // println!("chunk[{ia}, {ib}] {:?}", [a, b]);
-                    if a == b {
-                        Some((ia, a))
-                    } else {
-                        None
-                    }
+                    if a == b { Some((ia, a)) } else { None }
                 }
                 (Some((ia, a)), None) => Some((ia, a)),
                 _ => unreachable!(),
