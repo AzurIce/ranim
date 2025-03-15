@@ -1,5 +1,5 @@
-use glam::{ivec3, vec2, vec3, Vec3};
-use rand::{seq::SliceRandom, SeedableRng};
+use glam::{Vec3, ivec3, vec2, vec3};
+use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     animation::transform::TransformAnimSchedule, color::palettes::manim, items::vitem::Rectangle,
     prelude::*, timeline::TimeMark, utils::rate_functions::linear,

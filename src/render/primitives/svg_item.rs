@@ -1,6 +1,6 @@
 use crate::render::RenderTextures;
 
-use super::{vitem::VItemPrimitive, RenderInstance};
+use super::{RenderInstance, vitem::VItemPrimitive};
 
 #[derive(Default)]
 pub struct SvgItemPrimitive {

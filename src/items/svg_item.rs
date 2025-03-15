@@ -1,21 +1,21 @@
 use std::{cmp::Ordering, f32, path::Path, slice::Iter, vec};
 
-use color::{palette::css, AlphaColor, Srgb};
-use glam::{vec3, Affine2, Vec3};
+use color::{AlphaColor, Srgb, palette::css};
+use glam::{Affine2, Vec3, vec3};
 use log::warn;
 
 use crate::{
     color::{rgb8, rgba},
-    components::{vpoint::VPoint, TransformAnchor},
+    components::{TransformAnchor, vpoint::VPoint},
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
     render::primitives::{
-        svg_item::SvgItemPrimitive, ExtractFrom, RenderInstance, RenderInstances,
+        ExtractFrom, RenderInstance, RenderInstances, svg_item::SvgItemPrimitive,
     },
     utils::{bezier::PathBuilder, math::interpolate_usize},
 };
 
-use super::{vitem::VItem, Entity, Group};
+use super::{Entity, Group, vitem::VItem};
 
 #[derive(Debug, Clone)]
 pub struct SvgItem {

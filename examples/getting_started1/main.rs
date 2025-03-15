@@ -1,9 +1,10 @@
 use ranim::{
+    AppOptions,
     animation::fading::{FadingAnim, FadingAnimSchedule},
     color::palettes::manim,
     items::vitem::Square,
     prelude::*,
-    render_timeline, AppOptions,
+    render_timeline,
 };
 
 #[scene]

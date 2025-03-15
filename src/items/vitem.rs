@@ -1,12 +1,12 @@
-use color::{palette::css, AlphaColor, Srgb};
-use glam::{vec2, vec3, vec4, Vec3, Vec4};
+use color::{AlphaColor, Srgb, palette::css};
+use glam::{Vec3, Vec4, vec2, vec3, vec4};
 use itertools::Itertools;
 
 use crate::{
-    components::{rgba::Rgba, vpoint::VPoint, width::Width, ComponentVec, Transformable},
+    components::{ComponentVec, Transformable, rgba::Rgba, vpoint::VPoint, width::Width},
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::{vitem::VItemPrimitive, ExtractFrom, RenderInstance, RenderInstances},
+    render::primitives::{ExtractFrom, RenderInstance, RenderInstances, vitem::VItemPrimitive},
 };
 
 use super::{Blueprint, Entity};

@@ -1,6 +1,6 @@
 // MARK: CameraFrame
 
-use glam::{vec2, Mat4, Vec2, Vec3};
+use glam::{Mat4, Vec2, Vec3, vec2};
 
 use crate::prelude::{Alignable, Interpolatable};
 

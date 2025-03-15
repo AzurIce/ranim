@@ -11,7 +11,7 @@ use std::{
     fmt::Debug,
 };
 
-use glam::{vec2, vec3, Mat3, Vec2, Vec3};
+use glam::{Mat3, Vec2, Vec3, vec2, vec3};
 
 use crate::{context::WgpuContext, render::RenderResource};
 

@@ -9,7 +9,7 @@ use crate::{
     color::rgba8,
     context::{RanimContext, WgpuContext},
     items::camera_frame::CameraFrame,
-    utils::{wgpu::WgpuBuffer, PipelinesStorage},
+    utils::{PipelinesStorage, wgpu::WgpuBuffer},
 };
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;

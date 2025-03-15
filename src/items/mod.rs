@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
 use crate::{
+    RanimTimeline,
     animation::{AnimSchedule, Animation},
     context::WgpuContext,
     render::primitives::{RenderInstance, RenderInstances},
-    RanimTimeline,
 };
 
 pub mod camera_frame;

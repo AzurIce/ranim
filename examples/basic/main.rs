@@ -1,14 +1,14 @@
 use std::f32;
 
 use env_logger::Env;
-use glam::{vec3, Vec3};
+use glam::{Vec3, vec3};
 use ranim::animation::creation::{Color, CreationAnimSchedule, WritingAnimSchedule};
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::animation::transform::TransformAnimSchedule;
 use ranim::color::palettes::manim;
+use ranim::items::Group;
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon, VItem};
-use ranim::items::Group;
 use ranim::timeline::TimeMark;
 use ranim::utils::rate_functions::linear;
 use ranim::{prelude::*, typst_svg};

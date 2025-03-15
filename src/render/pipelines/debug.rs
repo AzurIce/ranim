@@ -4,7 +4,7 @@ use glam::Vec4;
 
 use crate::{
     context::WgpuContext,
-    render::{RenderResource, OUTPUT_TEXTURE_FORMAT},
+    render::{OUTPUT_TEXTURE_FORMAT, RenderResource},
 };
 
 pub struct DebugPipeline {
