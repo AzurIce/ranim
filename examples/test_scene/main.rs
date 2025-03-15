@@ -9,7 +9,7 @@ use ranim::{
         creation::{CreationAnim, WritingAnim},
         transform::{TransformAnim, TransformAnimSchedule},
     },
-    components::TransformAnchor,
+    components::Anchor,
     items::{
         camera_frame::CameraFrame,
         svg_item::SvgItem,

@@ -6,7 +6,7 @@ use log::warn;
 
 use crate::{
     color::{rgb8, rgba},
-    components::{TransformAnchor, vpoint::VPoint},
+    components::{Anchor, vpoint::VPoint},
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
     render::primitives::{
@@ -36,16 +36,17 @@ impl Transformable<VPoint> for SvgItem {
     fn apply_points_function(
         &mut self,
         f: impl Fn(&mut crate::components::ComponentVec<VPoint>) + Copy,
-        anchor: TransformAnchor,
-    ) {
+        anchor: Anchor,
+    ) -> &mut Self {
         let point = match anchor {
-            TransformAnchor::Edge(edge) => self.get_bounding_box_point(edge),
-            TransformAnchor::Point(point) => point,
+            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
+            Anchor::Point(point) => point,
         };
         // println!("{:?}, {:?}", anchor, point);
-        self.vitems
-            .iter_mut()
-            .for_each(|x| x.apply_points_function(f, TransformAnchor::Point(point)));
+        self.vitems.iter_mut().for_each(|x| {
+            x.apply_points_function(f, Anchor::Point(point));
+        });
+        self
     }
     fn get_bounding_box(&self) -> [Vec3; 3] {
         let [min, max] = self
@@ -344,16 +345,17 @@ impl Transformable<VPoint> for Group<VItem> {
     fn apply_points_function(
         &mut self,
         f: impl Fn(&mut crate::components::ComponentVec<VPoint>) + Copy,
-        anchor: TransformAnchor,
-    ) {
+        anchor: Anchor,
+    ) -> &mut Self {
         let point = match anchor {
-            TransformAnchor::Edge(edge) => self.get_bounding_box_point(edge),
-            TransformAnchor::Point(point) => point,
+            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
+            Anchor::Point(point) => point,
         };
         // println!("{:?}, {:?}", anchor, point);
-        self.items
-            .iter_mut()
-            .for_each(|x| x.apply_points_function(f, TransformAnchor::Point(point)));
+        self.items.iter_mut().for_each(|x| {
+            x.apply_points_function(f, Anchor::Point(point));
+        });
+        self
     }
     fn get_bounding_box(&self) -> [Vec3; 3] {
         let [min, max] = self
