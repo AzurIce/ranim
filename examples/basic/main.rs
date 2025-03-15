@@ -6,7 +6,7 @@ use ranim::animation::creation::{Color, CreationAnimSchedule, WritingAnimSchedul
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::animation::transform::TransformAnimSchedule;
 use ranim::color::palettes::manim;
-use ranim::items::Group;
+use ranim::items::group::Group;
 use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::{Arc, Polygon, VItem};
 use ranim::timeline::TimeMark;
@@ -38,11 +38,14 @@ impl TimelineConstructor for BasicScene {
             ]
             "#
         ));
-        text.items.iter_mut().for_each(|item| {
+        text.iter_mut().for_each(|item| {
             item.set_fill_opacity(0.8).shift(Vec3::NEG_Y * 200.0);
         });
-        let mut text = timeline.insert_group(text);
-        let len = text.rabjects.len() as f32;
+        let mut text = text
+            .into_iter()
+            .map(|item| timeline.insert(item))
+            .collect::<Group<_>>();
+        let len = text.len() as f32;
         let dur = 3.0 / (1.0 + (len - 1.0) * 0.2);
         // println!("{len}, {dur}");
 

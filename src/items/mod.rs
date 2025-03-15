@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use group::Group;
+
 use crate::{
     RanimTimeline,
     animation::{AnimSchedule, Animation},
@@ -8,27 +10,20 @@ use crate::{
 };
 
 pub mod camera_frame;
+pub mod group;
 pub mod svg_item;
 pub mod vitem;
 
-pub struct Group<T> {
-    pub items: Vec<T>,
-}
-
-pub struct RabjectGroup<'t, T> {
-    pub rabjects: Vec<Rabject<'t, T>>,
-}
-
-impl<'r, 't: 'r, T> RabjectGroup<'t, T> {
+impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
     pub fn lagged_anim(
         &'r mut self,
         lag_ratio: f32,
         anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
     ) -> Vec<AnimSchedule<'r, 't, T>> {
-        let n = self.rabjects.len();
+        let n = self.as_ref().len();
 
         let mut anim_schedules = self
-            .rabjects
+            .as_mut()
             .iter_mut()
             .map(|rabject| (anim_builder.clone())(rabject))
             .collect::<Vec<_>>();

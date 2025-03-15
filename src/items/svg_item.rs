@@ -15,7 +15,7 @@ use crate::{
     utils::{bezier::PathBuilder, math::interpolate_usize},
 };
 
-use super::{Entity, Group, vitem::VItem};
+use super::{group::Group, vitem::VItem, Entity};
 
 #[derive(Debug, Clone)]
 pub struct SvgItem {
@@ -326,46 +326,10 @@ impl Group<VItem> {
         let svg = svg.as_ref();
         let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();
 
-        let mut vitem_group = Self {
-            items: vitems_from_tree(&tree),
-        };
+        let mut vitem_group = Self(vitems_from_tree(&tree));
         vitem_group.put_center_on(Vec3::ZERO);
         vitem_group.rotate(f32::consts::PI, Vec3::X);
         vitem_group
-    }
-}
-
-impl Transformable<VPoint> for Group<VItem> {
-    fn get_start_position(&self) -> Option<Vec3> {
-        self.items.first().and_then(|x| x.get_start_position())
-    }
-    fn get_end_position(&self) -> Option<Vec3> {
-        self.items.last().and_then(|x| x.get_end_position())
-    }
-    fn apply_points_function(
-        &mut self,
-        f: impl Fn(&mut crate::components::ComponentVec<VPoint>) + Copy,
-        anchor: Anchor,
-    ) -> &mut Self {
-        let point = match anchor {
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-            Anchor::Point(point) => point,
-        };
-        // println!("{:?}, {:?}", anchor, point);
-        self.items.iter_mut().for_each(|x| {
-            x.apply_points_function(f, Anchor::Point(point));
-        });
-        self
-    }
-    fn get_bounding_box(&self) -> [Vec3; 3] {
-        let [min, max] = self
-            .items
-            .iter()
-            .map(|x| x.get_bounding_box())
-            .map(|[min, _, max]| [min, max])
-            .reduce(|a, b| [a[0].min(b[0]), a[1].max(b[1])])
-            .unwrap_or([Vec3::ZERO; 2]);
-        [min, (min + max) / 2.0, max]
     }
 }
 

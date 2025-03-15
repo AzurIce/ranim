@@ -43,17 +43,11 @@ impl Interpolatable for VPoint {
 
 impl Partial for ComponentVec<VPoint> {
     fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
-        // trace!("get_partial: {:?}", range);
         let max_anchor_idx = self.len() / 2;
-        // trace!("max_anchor_idx: {}", max_anchor_idx);
 
         let (start_index, start_residue) = interpolate_usize(0, max_anchor_idx, range.start);
         let (end_index, end_residue) = interpolate_usize(0, max_anchor_idx, range.end);
-        // println!("{} {}", self.len(), max_anchor_idx);
-        // println!(
-        //     "{:?}, start: {} {}, end: {} {}",
-        //     range, start_index, start_residue, end_index, end_residue
-        // );
+
         if end_index - start_index == 0 {
             let seg = self.get_seg(start_index).unwrap().map(|p| p.0);
             let quad = trim_quad_bezier(&seg, start_residue, end_residue);
@@ -64,7 +58,6 @@ impl Partial for ComponentVec<VPoint> {
             let seg = self.get_seg(start_index).unwrap().map(|p| p.0);
             let start_part = trim_quad_bezier(&seg, start_residue, 1.0);
             partial.extend_from_slice(&start_part);
-            // println!("start_seg: {:?}, start_part: {:?}", seg, start_part);
 
             // If start_index < end_index - 1, we need to add the middle segment
             //  start     mid    end
@@ -75,14 +68,12 @@ impl Partial for ComponentVec<VPoint> {
                     .unwrap()
                     .iter()
                     .map(|p| p.0);
-                // trace!("mid: {}", mid.len());
                 partial.extend(mid);
             }
 
             if end_residue != 0.0 {
                 let seg = self.get_seg(end_index).unwrap().map(|p| p.0);
                 let end_part = trim_quad_bezier(&seg, 0.0, end_residue);
-                // println!("end_seg: {:?}, end_part: {:?}", seg, end_part);
                 partial.extend_from_slice(&end_part[1..]);
             }
 
