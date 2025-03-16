@@ -3,11 +3,15 @@ pub mod creation;
 pub mod fading;
 pub mod transform;
 
-use crate::{items::Rabject, timeline::EntityTimelineStaticState, utils::rate_functions::linear};
+use crate::{
+    items::{Rabject, group::Group},
+    timeline::EntityTimelineStaticState,
+    utils::rate_functions::linear,
+};
 
 #[allow(unused)]
 use log::trace;
-use std::rc::Rc;
+use std::{iter::Once, rc::Rc};
 
 // MARK: Eval
 
@@ -207,6 +211,13 @@ pub struct AnimSchedule<'r, 't, T> {
     pub(crate) rabject: &'r mut Rabject<'t, T>,
     pub(crate) anim: Animation<T>,
 }
+
+impl<'r, 't, T: 'static> AnimSchedule<'r, 't, T> {
+    pub fn new(rabject: &'r mut Rabject<'t, T>, anim: Animation<T>) -> Self {
+        Self { rabject, anim }
+    }
+}
+
 impl<T> AnimSchedule<'_, '_, T> {
     pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
         self.anim.rate_func = rate_func;
@@ -218,9 +229,26 @@ impl<T> AnimSchedule<'_, '_, T> {
     }
 }
 
-impl<'r, 't, T: 'static> AnimSchedule<'r, 't, T> {
-    pub fn new(rabject: &'r mut Rabject<'t, T>, anim: Animation<T>) -> Self {
-        Self { rabject, anim }
+impl<T: 'static> IntoIterator for AnimSchedule<'_, '_, T> {
+    type IntoIter = Once<Self>;
+    type Item = Self;
+    fn into_iter(self) -> Self::IntoIter {
+        std::iter::once(self)
+    }
+}
+
+impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
+    pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
+        self.iter_mut().for_each(|schedule| {
+            schedule.anim.rate_func = rate_func;
+        });
+        self
+    }
+    pub fn with_duration(mut self, secs: f32) -> Self {
+        self.iter_mut().for_each(|schedule| {
+            schedule.anim.duration_secs = secs;
+        });
+        self
     }
 }
 
@@ -235,15 +263,6 @@ impl<T: Clone + 'static> AnimSchedule<'_, '_, T> {
             anim: chained_anim.into(),
         }
     }
-    // pub fn chain(self, anim_builder: impl FnOnce(T) -> Animation<T>) -> Self {
-    //     let AnimSchedule { rabject, anim } = self;
-    //     let next_anim = (anim_builder)(rabject.data.clone());
-    //     let chained_anim = ChainedAnimation::new(vec![anim, next_anim]);
-    //     Self {
-    //         rabject,
-    //         anim: chained_anim.into(),
-    //     }
-    // }
 }
 
 impl<T: EntityTimelineStaticState + Clone + 'static> AnimSchedule<'_, '_, T> {
@@ -259,21 +278,14 @@ impl<T: EntityTimelineStaticState + Clone + 'static> AnimSchedule<'_, '_, T> {
     }
 }
 
-impl<'r, 't, T> IntoIterator for AnimSchedule<'r, 't, T> {
-    type Item = AnimSchedule<'r, 't, T>;
-    type IntoIter = SingleAnimIter<'r, 't, T>;
-    fn into_iter(self) -> Self::IntoIter {
-        SingleAnimIter { inner: Some(self) }
-    }
-}
-
-pub struct SingleAnimIter<'r, 't, T> {
-    inner: Option<AnimSchedule<'r, 't, T>>,
-}
-
-impl<'r, 't, T> Iterator for SingleAnimIter<'r, 't, T> {
-    type Item = AnimSchedule<'r, 't, T>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.take()
+impl<T: EntityTimelineStaticState + Clone + 'static> Group<AnimSchedule<'_, '_, T>> {
+    pub fn apply(mut self) -> Self {
+        self.iter_mut().for_each(|schedule| {
+            if let EvalResult::Dynamic(res) = schedule.anim.eval_alpha(1.0) {
+                schedule.rabject.data = res;
+            }
+            schedule.rabject.timeline.update(schedule.rabject);
+        });
+        self
     }
 }

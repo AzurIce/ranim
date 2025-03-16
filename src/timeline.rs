@@ -71,12 +71,19 @@ impl RanimTimeline {
     pub fn duration_secs(&self) -> f32 {
         *self.max_elapsed_secs.borrow()
     }
-    pub fn play_group<'r, 't: 'r, T: EntityTimelineStaticState + Clone + 'static>(
-        &'t self,
-        anim_schedules: Vec<AnimSchedule<'r, 't, T>>,
-    ) -> &'t Self {
+
+    /// Push an animation into the timeline
+    ///
+    /// Note that this won't apply the animation effect to rabject's data,
+    /// to apply the animation effect use [`AnimSchedule::apply`]
+    pub fn play<'r, 't, T, I>(&'t self, anim_schedules: I) -> &'t Self
+    where
+        't: 'r,
+        T: EntityTimelineStaticState + Clone + 'static,
+        I: IntoIterator<Item = AnimSchedule<'r, 't, T>>,
+    {
         anim_schedules.into_iter().for_each(|anim_schedule| {
-            self.play(anim_schedule);
+            self._play(anim_schedule);
         });
         self
     }
@@ -143,11 +150,7 @@ impl RanimTimeline {
         self
     }
 
-    /// Push an animation into the timeline
-    ///
-    /// Note that this won't apply the animation effect to rabject's data,
-    /// to apply the animation effect use [`AnimSchedule::apply`]
-    pub fn play<'r, 't: 'r, T: EntityTimelineStaticState + Clone + 'static>(
+    fn _play<'r, 't: 'r, T: EntityTimelineStaticState + Clone + 'static>(
         &'t self,
         anim_schedule: AnimSchedule<'r, 't, T>,
     ) -> &'t Self {

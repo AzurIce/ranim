@@ -15,7 +15,7 @@ use crate::{
     utils::{bezier::PathBuilder, math::interpolate_usize},
 };
 
-use super::{group::Group, vitem::VItem, Entity};
+use super::{Entity, group::Group, vitem::VItem};
 
 #[derive(Debug, Clone)]
 pub struct SvgItem {

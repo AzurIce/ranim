@@ -7,7 +7,9 @@ use glam::{Affine2, IVec3, Mat3, Vec3, Vec3Swizzles, ivec3, vec2, vec3};
 use itertools::Itertools;
 
 use crate::{
-    items::group::Group, prelude::{Alignable, Interpolatable, Partial}, utils::math::interpolate_usize
+    items::group::Group,
+    prelude::{Alignable, Interpolatable, Partial},
+    utils::math::interpolate_usize,
 };
 
 pub mod point;
@@ -319,7 +321,6 @@ impl<T: Transformable<C>, C: Transform3dComponent> Transformable<C> for Group<T>
         [min, (min + max) / 2.0, max]
     }
 }
-
 
 impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
     /// Apply a function to the points of the mobject about the point.

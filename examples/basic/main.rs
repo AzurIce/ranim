@@ -49,7 +49,7 @@ impl TimelineConstructor for BasicScene {
         let dur = 3.0 / (1.0 + (len - 1.0) * 0.2);
         // println!("{len}, {dur}");
 
-        timeline.play_group(text.lagged_anim(0.2, |item| {
+        timeline.play(text.lagged_anim(0.2, |item| {
             item.write().with_duration(dur).with_rate_func(linear)
         }));
         timeline.play(svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
@@ -60,7 +60,7 @@ impl TimelineConstructor for BasicScene {
         );
 
         timeline.forward(0.5);
-        timeline.play_group(text.lagged_anim(0.2, |item| {
+        timeline.play(text.lagged_anim(0.2, |item| {
             item.unwrite().with_duration(dur).with_rate_func(linear)
         }));
         timeline.play(svg.fade_out().with_duration(3.0));

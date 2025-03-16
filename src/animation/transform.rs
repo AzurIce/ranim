@@ -15,62 +15,62 @@ impl<T: TransformRequirement + 'static> GroupTransformAnim<T> for Group<T> {
         let mut dsts = self.clone();
         (f)(&mut dsts);
         self.iter()
-            .zip(dsts.into_iter())
+            .zip(dsts)
             .map(|(x, dst)| x.transform_to(dst))
             .collect()
     }
     fn transform_from<E: Into<T>>(&self, s: Group<E>) -> Group<Animation<T>> {
         let ss: Group<T> = s.into_iter().map(|x| x.into()).collect();
         self.iter()
-            .zip(ss.into_iter())
+            .zip(ss)
             .map(|(x, s)| x.transform_from(s))
             .collect()
     }
     fn transform_to<E: Into<T>>(&self, d: Group<E>) -> Group<Animation<T>> {
         let dd: Group<T> = d.into_iter().map(|x| x.into()).collect();
         self.iter()
-            .zip(dd.into_iter())
+            .zip(dd)
             .map(|(x, d)| x.transform_to(d))
             .collect()
     }
 }
 
 pub trait GroupTransformAnimSchedule<'r, 't, T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut Group<T>)>(&'r mut self, f: F) -> Vec<AnimSchedule<'r, 't, T>>;
-    fn transform_from<E: Into<T>>(&'r mut self, s: Group<E>) -> Vec<AnimSchedule<'r, 't, T>>;
-    fn transform_to<E: Into<T>>(&'r mut self, d: Group<E>) -> Vec<AnimSchedule<'r, 't, T>>;
+    fn transform<F: Fn(&mut Group<T>)>(&'r mut self, f: F) -> Group<AnimSchedule<'r, 't, T>>;
+    fn transform_from<E: Into<T>>(&'r mut self, s: Group<E>) -> Group<AnimSchedule<'r, 't, T>>;
+    fn transform_to<E: Into<T>>(&'r mut self, d: Group<E>) -> Group<AnimSchedule<'r, 't, T>>;
 }
 
 impl<'r, 't, T: TransformRequirement + 'static> GroupTransformAnimSchedule<'r, 't, T>
     for [Rabject<'t, T>]
 {
-    fn transform<F: Fn(&mut Group<T>)>(&'r mut self, f: F) -> Vec<AnimSchedule<'r, 't, T>> {
+    fn transform<F: Fn(&mut Group<T>)>(&'r mut self, f: F) -> Group<AnimSchedule<'r, 't, T>> {
         let data = self
             .iter()
             .map(|rabject| rabject.data.clone())
             .collect::<Group<T>>();
         self.iter_mut()
-            .zip(data.transform(f).into_iter())
+            .zip(data.transform(f))
             .map(|(rabject, anim)| AnimSchedule::new(rabject, anim))
             .collect()
     }
-    fn transform_from<E: Into<T>>(&'r mut self, s: Group<E>) -> Vec<AnimSchedule<'r, 't, T>> {
+    fn transform_from<E: Into<T>>(&'r mut self, s: Group<E>) -> Group<AnimSchedule<'r, 't, T>> {
         let data = self
             .iter()
             .map(|rabject| rabject.data.clone())
             .collect::<Group<T>>();
         self.iter_mut()
-            .zip(data.transform_from(s).into_iter())
+            .zip(data.transform_from(s))
             .map(|(rabject, anim)| AnimSchedule::new(rabject, anim))
             .collect()
     }
-    fn transform_to<E: Into<T>>(&'r mut self, d: Group<E>) -> Vec<AnimSchedule<'r, 't, T>> {
+    fn transform_to<E: Into<T>>(&'r mut self, d: Group<E>) -> Group<AnimSchedule<'r, 't, T>> {
         let data = self
             .iter()
             .map(|rabject| rabject.data.clone())
             .collect::<Group<T>>();
         self.iter_mut()
-            .zip(data.transform_to(d).into_iter())
+            .zip(data.transform_to(d))
             .map(|(rabject, anim)| AnimSchedule::new(rabject, anim))
             .collect()
     }
