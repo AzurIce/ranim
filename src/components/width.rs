@@ -34,4 +34,3 @@ impl Interpolatable for Width {
         Self(self.0.lerp(&target.0, t))
     }
 }
-
