@@ -2,10 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🚀 Features
+
+- Added put_anchor_or method, renamed TransformAnchor to Anchor
+- First step of supporting group rabjects
+- Unified play method for AnimSchedule and Group<AnimSchedule>
+
+### 🐛 Bug Fixes
+
+- Use mid point when failed to get intersection in approx_cubic_with_quad
+
+### 📚 Documentation
+
+- Fix doc link for `Anchor`
+
 ## [0.1.0-alpha.4] - 2025-03-14
 
 ### ⚙️ Miscellaneous Tasks
 
+- Release
 - Release
 
 ### WIP
