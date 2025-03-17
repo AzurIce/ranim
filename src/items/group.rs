@@ -19,13 +19,13 @@ use std::ops::{Deref, DerefMut};
 ///     item.write()
 /// }).with_duration(5.0).apply());
 /// ```
-/// 
+///
 /// For some animation (like [`crate::animation::transform::Transform`]), it may support
 /// creating directly for item's slice. This often happens when some operation on the group
 /// is not equivalent to applying the same operation on each item (like [`crate::components::Transformable::scale`]).
-/// 
+///
 /// For example, if logo is a `Group<VItem>` with six elements:
-/// 
+///
 /// ```rust
 /// let scale = [
 ///     vec3(scale, 1.0, 1.0),

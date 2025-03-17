@@ -259,18 +259,18 @@ impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
         self
     }
     /// Scales the entire group's total duration to a new duration
-    /// 
+    ///
     /// For example, use `[x, y, z]`` to represent an anim with duration `y` and padding `(x, z)`,
     /// calling `with_duration(5)` on an group of:
-    /// 
+    ///
     /// ```
     ///               [2    , 2    , 2    ]
     ///      [2    , 1, 2    ]
     /// [ 1,  1,  1]
     /// ```
-    /// 
+    ///
     /// will scale the group to:
-    /// 
+    ///
     /// ```
     ///                [1    , 1    , 1   ]
     ///      [1   , .5, 1    ]
