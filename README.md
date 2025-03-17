@@ -16,8 +16,10 @@
 </div>
 </div>
 
-![getting_started3](./assets/getting_started3.gif)
-![ranim_logo](./assets/ranim_logo.gif)
+<div style="display: flex;">
+    <img alt="getting_started3" src="./assets/getting_started3.gif" width="48%" />
+    <img alt="ranim_logo" src="./assets/ranim_logo.gif" width="48%" />
+</div>
 
 > [examples/getting_started3](./examples/getting_started3)
 > 
