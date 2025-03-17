@@ -19,14 +19,14 @@ impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
         &'r mut self,
         lag_ratio: f32,
         anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
-    ) -> Vec<AnimSchedule<'r, 't, T>> {
+    ) -> Group<AnimSchedule<'r, 't, T>> {
         let n = self.as_ref().len();
 
         let mut anim_schedules = self
             .as_mut()
             .iter_mut()
             .map(|rabject| (anim_builder.clone())(rabject))
-            .collect::<Vec<_>>();
+            .collect::<Group<_>>();
 
         let duration = anim_schedules[0].anim.duration_secs;
         let lag_time = duration * lag_ratio;

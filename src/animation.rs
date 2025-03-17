@@ -219,6 +219,10 @@ impl<'r, 't, T: 'static> AnimSchedule<'r, 't, T> {
 }
 
 impl<T> AnimSchedule<'_, '_, T> {
+    pub fn with_padding(mut self, start_sec: f32, end_sec: f32) -> Self {
+        self.anim.padding = (start_sec, end_sec);
+        self
+    }
     pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
         self.anim.rate_func = rate_func;
         self
@@ -237,22 +241,61 @@ impl<T: 'static> IntoIterator for AnimSchedule<'_, '_, T> {
     }
 }
 
+// MARK: Group
+
 impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
+    /// Sets the rate function for each animation in the group
     pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
         self.iter_mut().for_each(|schedule| {
             schedule.anim.rate_func = rate_func;
         });
         self
     }
+    /// Sets the duration for each animation in the group
     pub fn with_duration(mut self, secs: f32) -> Self {
         self.iter_mut().for_each(|schedule| {
             schedule.anim.duration_secs = secs;
         });
         self
     }
+    /// Scales the entire group's total duration to a new duration
+    /// 
+    /// For example, use `[x, y, z]`` to represent an anim with duration `y` and padding `(x, z)`,
+    /// calling `with_duration(5)` on an group of:
+    /// 
+    /// ```
+    ///               [2    , 2    , 2    ]
+    ///      [2    , 1, 2    ]
+    /// [ 1,  1,  1]
+    /// ```
+    /// 
+    /// will scale the group to:
+    /// 
+    /// ```
+    ///                [1    , 1    , 1   ]
+    ///      [1   , .5, 1    ]
+    /// [.5, .5, .5]
+    /// ```
+    pub fn with_total_duration(mut self, secs: f32) -> Self {
+        let total_secs = self
+            .iter()
+            .map(|schedule| schedule.anim.span_len())
+            .reduce(|acc, e| acc.max(e))
+            .unwrap_or(secs);
+        let ratio = secs / total_secs;
+        self.iter_mut().for_each(|schedule| {
+            let (duration, (padding_start, padding_end)) =
+                (&mut schedule.anim.duration_secs, &mut schedule.anim.padding);
+            *duration *= ratio;
+            *padding_start *= ratio;
+            *padding_end *= ratio;
+        });
+        self
+    }
 }
 
 impl<T: Clone + 'static> AnimSchedule<'_, '_, T> {
+    #[deprecated]
     pub fn chain(self, anim_builder: impl FnOnce(T) -> Animation<T>) -> Self {
         let AnimSchedule { rabject, anim } = self;
         let data = anim.eval_alpha(1.0).into_owned();
