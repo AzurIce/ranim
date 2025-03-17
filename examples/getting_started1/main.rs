@@ -20,6 +20,7 @@ impl TimelineConstructor for GettingStarted1Scene {
         square.set_color(manim::BLUE_C);
 
         let mut square = timeline.insert(square);
+        #[allow(deprecated)]
         timeline.play(square.fade_in().chain(|data| data.fade_out()));
     }
 }
