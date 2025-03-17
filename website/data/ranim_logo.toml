@@ -1,0 +1,155 @@
+name = "ranim_logo"
+code = """
+```rust,linenos
+use std::f32::consts::PI;\r
+\r
+use glam::{Vec3, vec3};\r
+use ranim::{\r
+    animation::{creation::WritingAnimSchedule, transform::GroupTransformAnimSchedule},\r
+    color::palettes::manim,\r
+    components::Anchor,\r
+    items::{\r
+        group::Group,\r
+        vitem::{Polygon, Rectangle, Square, VItem},\r
+    },\r
+    prelude::*,\r
+    timeline::TimeMark,\r
+    typst_svg,\r
+    utils::rate_functions::{linear, smooth},\r
+};\r
+\r
+fn build_logo(logo_width: f32) -> [VItem; 6] {\r
+    let mut red_bg_rect = Rectangle(logo_width / 2.0, logo_width).build();\r
+    red_bg_rect\r
+        .set_color(manim::RED_C.with_alpha(0.5))\r
+        .put_center_on(vec3(-logo_width / 4.0, 0.0, 0.0));\r
+    let mut red_rect = Rectangle(logo_width / 4.0, logo_width).build();\r
+    red_rect\r
+        .set_color(manim::RED_C)\r
+        .put_anchor_on(Anchor::edge(1, 0, 0), vec3(-logo_width / 4.0, 0.0, 0.0));\r
+\r
+    let mut green_bg_sq = Square(logo_width / 2.0).build();\r
+    green_bg_sq\r
+        .set_color(manim::GREEN_C.with_alpha(0.5))\r
+        .put_center_on(vec3(logo_width / 4.0, logo_width / 4.0, 0.0));\r
+    let mut green_triangle = Polygon(vec![\r
+        vec3(0.0, logo_width / 2.0, 0.0),\r
+        vec3(logo_width / 2.0, logo_width / 2.0, 0.0),\r
+        vec3(logo_width / 2.0, 0.0, 0.0),\r
+    ])\r
+    .build(); // ◥\r
+    green_triangle.set_color(manim::GREEN_C);\r
+\r
+    let mut blue_bg_sq = Square(logo_width / 2.0).build();\r
+    blue_bg_sq\r
+        .set_color(manim::BLUE_C.with_alpha(0.5))\r
+        .put_center_on(vec3(logo_width / 4.0, -logo_width / 4.0, 0.0));\r
+    let mut blue_triangle = green_triangle.clone();\r
+    blue_triangle\r
+        .set_color(manim::BLUE_C)\r
+        .rotate(PI, Vec3::Z)\r
+        .shift(Vec3::NEG_Y * logo_width / 2.0); // ◣\r
+\r
+    [\r
+        red_bg_rect,\r
+        red_rect,\r
+        green_bg_sq,\r
+        green_triangle,\r
+        blue_bg_sq,\r
+        blue_triangle,\r
+    ]\r
+}\r
+#[scene]\r
+struct RanimLogoScene;\r
+\r
+impl TimelineConstructor for RanimLogoScene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let frame_size = camera.data.frame_size();\r
+        let logo_width = frame_size.y * 0.618;\r
+\r
+        let mut logo = build_logo(logo_width)\r
+            .map(|item| timeline.insert(item))\r
+            .into_iter()\r
+            .collect::<Group<_>>();\r
+\r
+        timeline\r
+            .play(logo.lagged_anim(0.0, |item| {\r
+                item.write().with_duration(3.0).with_rate_func(smooth)\r
+            }))\r
+            .sync();\r
+\r
+        let gap_ratio = 1.0 / 60.0;\r
+        let gap = logo_width * gap_ratio;\r
+        let scale = (logo_width - gap * 2.0) / logo_width;\r
+        let scale = [\r
+            vec3(scale, 1.0, 1.0),\r
+            vec3(scale, scale, 1.0),\r
+            vec3(scale, scale, 1.0),\r
+        ];\r
+        let anchor = [\r
+            Anchor::edge(-1, 0, 0),\r
+            Anchor::edge(1, 1, 0),\r
+            Anchor::edge(1, -1, 0),\r
+        ];\r
+        logo.chunks_mut(2)\r
+            .zip(scale.into_iter().zip(anchor))\r
+            .for_each(|(chunk, (scale, anchor))| {\r
+                timeline.play(\r
+                    chunk\r
+                        .transform(|data| {\r
+                            data.scale_by_anchor(scale, anchor)\r
+                                .scale_by_anchor(vec3(0.9, 0.9, 1.0), Anchor::origin())\r
+                                .shift(vec3(0.0, frame_size.y / 9.0, 0.0));\r
+                        })\r
+                        .with_rate_func(smooth)\r
+                        .apply(),\r
+                );\r
+            });\r
+\r
+        let mut ranim_text = Group::<VItem>::from_svg(typst_svg!(\r
+            r#\"\r
+#align(center)[\r
+    #text(60pt, font: \"LXGW Bright\")[Ranim]\r
+]\"#\r
+        ));\r
+        ranim_text.shift(vec3(0.0, -frame_size.y * 2.5 / 8.0, 0.0));\r
+        let mut ranim_text = ranim_text\r
+            .into_iter()\r
+            .map(|item| timeline.insert(item))\r
+            .collect::<Group<_>>();\r
+        timeline.play(\r
+            ranim_text\r
+                .lagged_anim(0.2, |item| item.write())\r
+                .with_duration(2.0)\r
+                .with_rate_func(linear),\r
+        );\r
+        timeline.sync();\r
+\r
+        timeline.insert_time_mark(\r
+            timeline.duration_secs(),\r
+            TimeMark::Capture(\"preview.png\".to_string()),\r
+        );\r
+        timeline.forward(1.0);\r
+\r
+        let mut all = logo\r
+            .into_iter()\r
+            .chain(ranim_text.into_iter())\r
+            .collect::<Group<_>>();\r
+        timeline.play(all.lagged_anim(0.0, |item| {\r
+            item.unwrite().with_duration(3.0).with_rate_func(smooth)\r
+        }));\r
+    }\r
+}\r
+\r
+fn main() {\r
+    render_timeline(RanimLogoScene, &AppOptions::default());\r
+}\r
+
+```"""
+hash = "f0c7be1fabe59142d491278d2054f913fdcadf74"
+preview_imgs = ["/examples/ranim_logo/preview.png"]
+output_files = ["/examples/ranim_logo/output.mp4"]
