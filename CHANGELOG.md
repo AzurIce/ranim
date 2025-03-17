@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.6] - 2025-03-17
+
+### 🚀 Features
+
+- Group animation scaling
+- *(example)* Added ranim_logo example
+- Implemented Transformable for slice
+
+### 🎨 Styling
+
+- Lint
+- Fix clippy lint
+
 ## [0.1.0-alpha.5] - 2025-03-16
 
 ### 🚀 Features
@@ -17,6 +30,10 @@ All notable changes to this project will be documented in this file.
 ### 📚 Documentation
 
 - Fix doc link for `Anchor`
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.1.0-alpha.4] - 2025-03-14
 
