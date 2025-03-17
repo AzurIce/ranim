@@ -16,9 +16,12 @@
 </div>
 </div>
 
-https://github.com/user-attachments/assets/285e4c0f-c794-46d0-b38f-434e5e6d9c8b
+![getting_started3](./assets/getting_started3.gif)
+![ranim_logo](./assets/ranim_logo.gif)
 
 > [examples/getting_started3](./examples/getting_started3)
+> 
+> [examples/ranim_logo](./examples/ranim_logo)
 
 Ranim is an animation engine crate implemented in pure rust, inspired heavily by [Manim](https://github.com/3b1b/manim/tree/master) and [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim).
 
