@@ -322,6 +322,39 @@ impl<T: Transformable<C>, C: Transform3dComponent> Transformable<C> for Group<T>
     }
 }
 
+impl<T: Transformable<C>, C: Transform3dComponent> Transformable<C> for [T] {
+    fn get_start_position(&self) -> Option<Vec3> {
+        self.first().and_then(|x| x.get_start_position())
+    }
+    fn get_end_position(&self) -> Option<Vec3> {
+        self.last().and_then(|x| x.get_end_position())
+    }
+    fn apply_points_function(
+        &mut self,
+        f: impl Fn(&mut ComponentVec<C>) + Copy,
+        anchor: Anchor,
+    ) -> &mut Self {
+        let point = match anchor {
+            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
+            Anchor::Point(point) => point,
+        };
+        // println!("{:?}, {:?}", anchor, point);
+        self.iter_mut().for_each(|x| {
+            x.apply_points_function(f, Anchor::Point(point));
+        });
+        self
+    }
+    fn get_bounding_box(&self) -> [Vec3; 3] {
+        let [min, max] = self
+            .iter()
+            .map(|x| x.get_bounding_box())
+            .map(|[min, _, max]| [min, max])
+            .reduce(|a, b| [a[0].min(b[0]), a[1].max(b[1])])
+            .unwrap_or([Vec3::ZERO; 2]);
+        [min, (min + max) / 2.0, max]
+    }
+}
+
 impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
     /// Apply a function to the points of the mobject about the point.
     fn apply_points_function(
