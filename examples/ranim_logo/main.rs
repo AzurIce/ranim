@@ -132,10 +132,7 @@ impl TimelineConstructor for RanimLogoScene {
         );
         timeline.forward(1.0);
 
-        let mut all = logo
-            .into_iter()
-            .chain(ranim_text.into_iter())
-            .collect::<Group<_>>();
+        let mut all = logo.into_iter().chain(ranim_text).collect::<Group<_>>();
         timeline.play(all.lagged_anim(0.0, |item| {
             item.unwrite().with_duration(3.0).with_rate_func(smooth)
         }));
