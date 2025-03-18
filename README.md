@@ -71,3 +71,7 @@ For now, you can check out the code.
 - [3b1b/manim](https://github.com/3b1b/manim)
 - [ManimCommunity/manim](https://github.com/ManimCommunity/manim/)
 - [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=AzurIce/ranim&type=Date)](https://www.star-history.com/#AzurIce/ranim&Date)
