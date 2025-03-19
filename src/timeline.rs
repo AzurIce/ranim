@@ -62,7 +62,7 @@ pub struct RanimTimeline {
 
 pub struct TimelineEvalResult {
     pub camera_frame: (EvalResult<CameraFrame>, usize),
-    /// (id, EvalResult<Item>, animation idx in the corresponding timeline)
+    /// (`id`, `EvalResult<Item>`, `animation idx` in the corresponding timeline)
     pub items: Vec<(usize, EvalResult<Item>, usize)>,
 }
 
@@ -157,7 +157,7 @@ impl RanimTimeline {
             .show();
     }
     /// Hide a rabject
-    /// 
+    ///
     /// [`RanimTimeline::forward`] after this will encode blank into the timeline
     pub fn hide<T>(&self, rabject: &Rabject<T>) {
         self.timelines

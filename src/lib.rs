@@ -78,7 +78,7 @@ pub trait SceneMetaTrait {
 /// - `#[scene]`: use the *snake_case* of the struct's name (Without the `Scene` suffix) as [`SceneMeta::name`].
 /// - `#[scene(name = "<NAME>"]): use the given name as [`SceneMeta::name`].`
 ///
-/// [`render_timeline`] and [`render_timeline_at_sec`] will output to `<output_dir>/<NAME>/` directory.
+/// [`build_and_render_timeline`] and [`build_and_render_timeline_at_sec`] will output to `<output_dir>/<NAME>/` directory.
 ///
 /// # Examples
 /// ```rust

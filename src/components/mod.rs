@@ -148,7 +148,7 @@ impl<T: Component> ComponentVec<T> {
 }
 
 /// A marker trait for components that has each element as a point data.
-/// 
+///
 /// For example [`vpoint::VPoint`] is not point wise.
 pub trait PointWise {}
 
