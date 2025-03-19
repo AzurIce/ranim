@@ -1,18 +1,27 @@
 // MARK: CameraFrame
 
-use glam::{Mat4, Vec2, Vec3, vec2};
+use glam::{Mat4, Vec3};
 
 use crate::prelude::{Alignable, Interpolatable};
 
-/// Default pos is at the origin, looking to the negative z-axis
+/// The data of a camera
+///
+/// The [`CameraFrame`] has a [`CameraFrame::perspective_blend`] property (default is `0.0`),
+/// which is used to blend between orthographic and perspective projection.
+///
+/// When an CameraFrame is created using [`CameraFrame::new_with_size`],
+/// it is first located at the origin and looking to the negative z-axis.
+///
+/// Then, the [`CameraFrame::center_canvas_in_frame`] method is used to
+/// correct the position of the camera, this makes the canvas with the given size
+/// located at origin fit in the frame when [`CameraFrame::perspective_blend`] is `1.0`.
+///
 #[derive(Clone, Debug)]
 pub struct CameraFrame {
     pub fovy: f32,
-    // pub size: (usize, usize),
     pub pos: Vec3,
     pub up: Vec3,
     pub facing: Vec3,
-    // pub rotation: Mat4,
     // far > near
     pub near: f32,
     pub far: f32,
@@ -28,7 +37,10 @@ impl Interpolatable for CameraFrame {
             facing: self.facing.lerp(target.facing, t),
             near: self.near.lerp(&target.near, t),
             far: self.far.lerp(&target.far, t),
-            perspective_blend: self.perspective_blend.lerp(&target.perspective_blend, t).clamp(0.0, 1.0),
+            perspective_blend: self
+                .perspective_blend
+                .lerp(&target.perspective_blend, t)
+                .clamp(0.0, 1.0),
         }
     }
 }
@@ -41,6 +53,8 @@ impl Alignable for CameraFrame {
 }
 
 impl CameraFrame {
+    /// Create a new CameraFrame, and call [`CameraFrame::center_canvas_in_frame`]
+    /// with `(Vec3::ZERO, width, height, Vec3::Y, Vec3::Z, width / height)`
     pub fn new_with_size(width: usize, height: usize) -> Self {
         let mut camera_frame = Self {
             fovy: std::f32::consts::PI / 2.0,
@@ -102,16 +116,7 @@ impl CameraFrame {
 }
 
 impl CameraFrame {
-    pub fn set_fovy(&mut self, fovy: f32) -> &mut Self {
-        self.fovy = fovy;
-        self
-    }
-
-    pub fn move_to(&mut self, pos: Vec3) -> &mut Self {
-        self.pos = pos;
-        self
-    }
-
+    /// Center the canvas in the frame when [`CameraFrame::perspective_blend`] is `1.0`
     pub fn center_canvas_in_frame(
         &mut self,
         center: Vec3,
@@ -119,7 +124,7 @@ impl CameraFrame {
         height: f32,
         up: Vec3,
         normal: Vec3,
-        aspect_ratio: f32
+        aspect_ratio: f32,
     ) -> &mut Self {
         let canvas_ratio = height / width;
         let up = up.normalize();
