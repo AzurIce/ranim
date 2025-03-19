@@ -1,3 +1,5 @@
+use log::trace;
+
 use crate::{
     animation::{AnimSchedule, Animation, EvalResult, Evaluator},
     items::{Entity, Rabject, camera_frame::CameraFrame},
@@ -154,6 +156,7 @@ impl RanimTimeline {
         &'t self,
         anim_schedule: AnimSchedule<'r, 't, T>,
     ) -> &'t Self {
+        trace!("play {:?}", anim_schedule);
         let mut timelines = self.timelines.borrow_mut();
         let AnimSchedule { rabject, anim } = anim_schedule;
 
@@ -277,7 +280,6 @@ impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
         }
     }
     fn append_blank(&mut self, duration_secs: f32) {
-        // self.update_static_state(None);
         let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + duration_secs;
         self.animations.push(None);
         self.end_secs.push(end_sec);

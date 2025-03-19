@@ -256,13 +256,12 @@ impl RanimRenderApp {
         (0..frames)
             .map(|f| f as f32 / (frames - 1) as f32)
             .for_each(|alpha| {
-                // TODO: eval camera_timeline -> Camera, eval every entity_timeline -> &[Entity]
-                // TODO: update camera render instance, update every entity render instance
                 let TimelineEvalResult {
+                    // EvalResult<CameraFrame>, idx
                     camera_frame,
+                    // Vec<(rabject_id, EvalResult<Item>, idx)>
                     items,
                 } = timeline.eval_alpha(alpha);
-                // println!("eval_results: {}", eval_results.len());
                 items.iter().for_each(|(id, res, idx)| {
                     let last_idx = last_idx.entry(*id).or_insert(-1);
                     let prev_last_idx = *last_idx;

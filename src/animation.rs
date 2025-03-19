@@ -11,7 +11,7 @@ use crate::{
 
 #[allow(unused)]
 use log::trace;
-use std::{iter::Once, rc::Rc};
+use std::{fmt::Debug, iter::Once, rc::Rc};
 
 // MARK: Eval
 
@@ -51,6 +51,7 @@ impl<T> Evaluator<T> {
     }
 }
 
+#[derive(Debug)]
 pub enum EvalResult<T> {
     Dynamic(T),
     Static(Rc<T>),
@@ -147,6 +148,16 @@ pub struct Animation<T> {
     pub(crate) padding: (f32, f32),
 }
 
+impl<T> Debug for Animation<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Animation {{ duration_secs: {}, padding: {:?}, rate_func: {:?} }}",
+            self.duration_secs, self.padding, self.rate_func
+        )
+    }
+}
+
 impl<T: EntityTimelineStaticState + Clone + 'static> Animation<T> {
     pub fn into_state_type(self) -> Animation<T::StateType> {
         Animation {
@@ -210,6 +221,16 @@ impl<T> Animation<T> {
 pub struct AnimSchedule<'r, 't, T> {
     pub(crate) rabject: &'r mut Rabject<'t, T>,
     pub(crate) anim: Animation<T>,
+}
+
+impl<'r, 't, T> Debug for AnimSchedule<'r, 't, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "AnimSchedule {{ rabject: {:?}, anim: {:?} }}",
+            self.rabject.id, self.anim
+        )
+    }
 }
 
 impl<'r, 't, T: 'static> AnimSchedule<'r, 't, T> {
