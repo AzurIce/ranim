@@ -12,6 +12,8 @@ insert_anchor_links = "right"
 - 矢量图形基于二阶贝塞尔曲线表示，使用 SDF 渲染
 - 使用 wgpu，兼容多种后端图形 API
 
+**注：目前 ranim 的接口仍并不稳定，而本页面的说明文字可能更新的不是特别勤（但是带视频的部分即 example 是会同步更新的）**
+
 ## Getting Started
 
 在 Ranim 中，定义并渲染一段动画的方式基本长成下面这个样子：
