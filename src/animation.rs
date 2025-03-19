@@ -218,6 +218,10 @@ impl<T> Animation<T> {
 
 // MARK: AnimSchedule
 
+/// A schedule for an animation
+///
+/// When you create an anim, you actually creates an [`AnimSchedule`] which contains the anim.
+/// The rabject's data won't change unless you call [`AnimSchedule::apply`].
 pub struct AnimSchedule<'r, 't, T> {
     pub(crate) rabject: &'r mut Rabject<'t, T>,
     pub(crate) anim: Animation<T>,
