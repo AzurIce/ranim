@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.7] - 2025-03-19
+
+### 🚀 Features
+
+- Implemented Debug for EvalResult, Animation and AnimSchedule
+- Added perspective_blend, closes: #43
+
+### 🚜 Refactor
+
+- Seperate scale and fovy for camera_frame's ortho and persp projection
+- Refactor timeline build and render func
+- Rewrite all examples with new coord-system and group apis
+
+### 📚 Documentation
+
+- Added doc for CameraFrame
+
+### ⚙️ Miscellaneous Tasks
+
+- *(xtask/build-examples)* Added clean arg to clean non-exist examples
+
 ## [0.1.0-alpha.6] - 2025-03-17
 
 ### 🚀 Features
@@ -14,6 +35,10 @@ All notable changes to this project will be documented in this file.
 
 - Lint
 - Fix clippy lint
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.1.0-alpha.5] - 2025-03-16
 
