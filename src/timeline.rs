@@ -138,11 +138,12 @@ impl RanimTimeline {
         timeline.update_static_state(Some(Rc::new(rabject.data.clone().into_state_type())));
     }
     /// Forward all rabjects' timeline by the given seconds
-    pub fn forward(&self, secs: f32) {
+    pub fn forward(&self, secs: f32) -> &Self {
         self.timelines.borrow_mut().iter_mut().for_each(|timeline| {
             timeline.forward(secs);
         });
         *self.max_elapsed_secs.borrow_mut() += secs;
+        self
     }
 
     /// Show a rabject

@@ -13,7 +13,6 @@ use animation::EvalResult;
 use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
-use image::{ImageBuffer, Rgba};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{Rabject, camera_frame::CameraFrame};
 use timeline::{RanimTimeline, TimeMark, TimelineEvalResult};
@@ -24,7 +23,7 @@ use render::{Renderer, primitives::RenderInstances};
 pub mod prelude {
     pub use crate::Ranim;
 
-    pub use crate::{AppOptions, render_timeline, render_timeline_at_sec};
+    pub use crate::{AppOptions, build_and_render_timeline, build_and_render_timeline_at_sec};
     pub use crate::{SceneMetaTrait, TimelineConstructor};
     pub use ranim_macros::scene;
 
@@ -123,38 +122,35 @@ pub trait TimelineConstructor {
         timeline: &'t RanimTimeline,
         camera: &'r mut Rabject<'t, CameraFrame>,
     );
-    fn build(self, options: &AppOptions) -> RanimTimeline
-    where
-        Self: Sized,
+}
+
+pub fn build_timeline(constructor: impl TimelineConstructor) -> RanimTimeline {
+    let timeline = RanimTimeline::new();
     {
-        let timeline = RanimTimeline::new();
-        {
-            let mut camera = timeline.insert(items::camera_frame::CameraFrame::new(
-            ));
-            self.construct(&timeline, &mut camera);
-            timeline.sync();
-        }
-        timeline
+        let mut camera = timeline.insert(items::camera_frame::CameraFrame::new());
+        constructor.construct(&timeline, &mut camera);
+        timeline.sync();
     }
+    timeline
 }
 
 /// Build the timeline with the scene, and render it
-pub fn render_timeline(scene: impl Scene, options: &AppOptions) {
+pub fn build_and_render_timeline(scene: impl Scene, options: &AppOptions) {
     let meta = scene.meta();
-    let timeline = scene.build(options);
+    let timeline = build_timeline(scene);
     let mut app = RanimRenderApp::new(options, meta.name);
     app.render_timeline(timeline);
 }
 
 /// Build the timeline with the scene, and render it at a given timestamp
-pub fn render_timeline_at_sec(
+pub fn build_and_render_timeline_at_sec(
     scene: impl Scene,
     sec: f32,
     output_file: impl AsRef<Path>,
     options: &AppOptions,
 ) {
     let meta = scene.meta();
-    let timeline = scene.build(options);
+    let timeline = build_timeline(scene);
     let mut app = RanimRenderApp::new(options, meta.name);
     app.render_timeline_frame(&timeline, sec, output_file);
 }
@@ -417,7 +413,9 @@ impl RanimRenderApp {
         if !dir.exists() {
             std::fs::create_dir_all(dir).unwrap();
         }
-        let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx.wgpu_ctx);
+        let buffer = self
+            .renderer
+            .get_rendered_texture_img_buffer(&self.ctx.wgpu_ctx);
         buffer.save(path).unwrap();
     }
 }
