@@ -4,15 +4,24 @@ use std::ops::{Deref, DerefMut};
 ///
 /// The inner of a group is a [`Vec`], it has the ownership of the elements.
 ///
-/// [`Group<T>`] implements [`FromIterator`], [`IntoIterator<Item = T>`], so it can be
-/// collected from an iterator, and also can be used for `impl IntoIterator<Item = T>`:
+/// You can construct a group directly from an [`Vec`]:
+///
+/// ```rust
+/// let group = Group(vec![1, 2, 3, 4]);
+/// ```
+///
+/// For convinience, [`Group<T>`] also implements [`FromIterator`] and
+/// [`IntoIterator<Item = T>`], so it can be collected from an iterator,
+/// and also can be used for `impl IntoIterator<Item = T>`:
 ///
 /// ```rust
 /// let group = (0..9).map(|i| Square(100.0 * i as f32).build()).collect::<Group<_>>();
 /// let group = group.into_iter().map(|item| timeline.insert(item)).collect::<Group<_>>();
 /// ```
 ///
-/// For a group of items, you can use [`Group::lagged_anim`] to create animation on every item:
+/// # Group of [`crate::items::Item`]s
+///
+/// You can use [`Group::lagged_anim`] to create animation on every item:
 ///
 /// ```rust
 /// timeline.play(group.lagged_anim(0.2, |item| {
@@ -20,8 +29,8 @@ use std::ops::{Deref, DerefMut};
 /// }).with_duration(5.0).apply());
 /// ```
 ///
-/// For some animation (like [`crate::animation::transform::Transform`]), it may support
-/// creating directly for item's slice. This often happens when some operation on the group
+/// For some animations (like [`crate::animation::transform::Transform`]), it may support
+/// creating directly from item's slice. This often happens when some operation on the group
 /// is not equivalent to applying the same operation on each item (like [`crate::components::Transformable::scale`]).
 ///
 /// For example, if logo is a `Group<VItem>` with six elements:

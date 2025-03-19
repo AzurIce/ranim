@@ -8,8 +8,6 @@ use crate::prelude::{Alignable, Interpolatable};
 ///
 /// The [`CameraFrame`] has a [`CameraFrame::perspective_blend`] property (default is `0.0`),
 /// which is used to blend between orthographic and perspective projection.
-///
-/// See [`CameraFrame::DEFAULT`] for the default value.
 #[derive(Clone, Debug)]
 pub struct CameraFrame {
     pub pos: Vec3,
@@ -52,33 +50,30 @@ impl Alignable for CameraFrame {
 
 impl Default for CameraFrame {
     fn default() -> Self {
-        Self::DEFAULT
+        Self {
+            pos: Vec3::ZERO,
+            up: Vec3::Y,
+            facing: Vec3::NEG_Z,
+
+            scale: 1.0,
+            fovy: std::f32::consts::PI / 2.0,
+
+            near: -1000.0,
+            far: 1000.0,
+            perspective_blend: 0.0,
+        }
     }
 }
 
 impl CameraFrame {
-    /// The default value of [`CameraFrame`]
-    pub const DEFAULT: Self = Self {
-        pos: Vec3::ZERO,
-        up: Vec3::Y,
-        facing: Vec3::NEG_Z,
-
-        scale: 1.0,
-        fovy: std::f32::consts::PI / 2.0,
-
-        near: -1000.0,
-        far: 1000.0,
-        perspective_blend: 0.0,
-    };
-    /// Create a new CameraFrame at the origin facing to the negative z-axis and use Y as up vector.
-    ///
-    /// See [`CameraFrame::DEFAULT`] for the default projection settings.
+    /// Create a new CameraFrame at the origin facing to the negative z-axis and use Y as up vector with default projection settings.
     pub fn new() -> Self {
         Self::default()
     }
 }
 
 impl CameraFrame {
+    /// The view matrix of the camera
     pub fn view_matrix(&self) -> Mat4 {
         Mat4::look_at_rh(self.pos, self.pos + self.facing, self.up)
     }

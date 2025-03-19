@@ -11,6 +11,25 @@ use crate::{
 
 use super::{Blueprint, Entity};
 
+/// A vectorized item.
+///
+/// It is built from four components:
+/// - [`VItem::vpoints`]: the vpoints of the item, see [`VPoint`].
+/// - [`VItem::stroke_widths`]: the stroke widths of the item, see [`Width`].
+/// - [`VItem::stroke_rgbas`]: the stroke colors of the item, see [`Rgba`].
+/// - [`VItem::fill_rgbas`]: the fill colors of the item, see [`Rgba`].
+///
+/// You can construct a [`VItem`] from a list of [`VPoint`]s:
+///
+/// ```rust
+/// let vitem = VItem::from_vpoints(vec![
+///     vec3(0.0, 0.0, 0.0),
+///     vec3(1.0, 0.0, 0.0),
+///     vec3(0.5, 1.0, 0.0),
+/// ]);
+/// ```
+///
+///
 #[derive(Debug, Clone, PartialEq)]
 pub struct VItem {
     pub vpoints: ComponentVec<VPoint>,

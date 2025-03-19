@@ -2,12 +2,10 @@ use log::trace;
 
 use crate::{
     animation::{AnimSchedule, Animation, EvalResult, Evaluator},
-    items::{Entity, Rabject, camera_frame::CameraFrame, group::Group},
+    items::{Entity, Item, Rabject, camera_frame::CameraFrame, group::Group},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
-
-pub type Item = Box<dyn Entity>;
 
 // MARK: EntityTimtlineState
 

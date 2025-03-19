@@ -157,28 +157,35 @@ pub fn build_and_render_timeline_at_sec(
 
 // MARK: AppOptions
 
-pub static DEFAULT_APP_OPTIONS: AppOptions = AppOptions {
-    frame_height: 8.0,
-    pixel_size: (1920, 1080),
-    frame_rate: 60,
-    save_frames: false,
-    output_dir: "./output",
-    output_filename: "output.mp4",
-};
-
+/// The options of ranim's rendering app
 #[derive(Debug, Clone)]
 pub struct AppOptions<'a> {
+    /// The height of the frame
+    ///
+    /// This will be the coordinate in the scene. The width is calculated by the aspect ratio from [`AppOptions::pixel_size`].
     pub frame_height: f32,
+    /// The size of the output texture in pixels.
     pub pixel_size: (u32, u32),
+    /// The frame rate of the output video.
     pub frame_rate: u32,
+    /// Whether to save the frames.
     pub save_frames: bool,
+    /// The directory to save the output.
     pub output_dir: &'a str,
+    /// The filename of the output video.
     pub output_filename: &'a str,
 }
 
 impl Default for AppOptions<'_> {
     fn default() -> Self {
-        DEFAULT_APP_OPTIONS.clone()
+        AppOptions {
+            frame_height: 8.0,
+            pixel_size: (1920, 1080),
+            frame_rate: 60,
+            save_frames: false,
+            output_dir: "./output",
+            output_filename: "output.mp4",
+        }
     }
 }
 

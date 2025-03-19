@@ -14,6 +14,8 @@ pub mod group;
 pub mod svg_item;
 pub mod vitem;
 
+pub type Item = Box<dyn Entity>;
+
 impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
     pub fn lagged_anim(
         &'r mut self,
@@ -66,6 +68,8 @@ impl<'t, T: 'static> Rabject<'t, T> {
         AnimSchedule::new(self, animation)
     }
 }
+
+// MARK: Entity
 
 /// A renderable entity in ranim
 ///
