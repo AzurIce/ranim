@@ -223,7 +223,7 @@ pub struct AnimSchedule<'r, 't, T> {
     pub(crate) anim: Animation<T>,
 }
 
-impl<'r, 't, T> Debug for AnimSchedule<'r, 't, T> {
+impl<T> Debug for AnimSchedule<'_, '_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

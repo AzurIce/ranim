@@ -30,8 +30,7 @@ impl TimelineConstructor for TestScene {
         timeline: &'t RanimTimeline,
         camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
-
-        let item = Square(500.0).build();
+        let _item = Square(500.0).build();
         timeline.forward(1.0);
         timeline.sync();
         timeline.play(camera.transform(|camera| camera.fovy = PI / 4.0));
