@@ -1,11 +1,10 @@
-use std::time::Instant;
-
 use env_logger::Env;
-use glam::{Mat2, vec2};
-use log::info;
+use itertools::Itertools;
 use ranim::animation::creation::Color;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
+use ranim::glam::{Mat2, vec2};
+use ranim::items::group::Group;
 use ranim::items::vitem::ArcBetweenPoints;
 use ranim::prelude::*;
 use ranim::timeline::TimeMark;
@@ -26,18 +25,15 @@ impl TimelineConstructor for ArcBetweenPointsScene {
         let ntan = 16;
         let nrad = 5;
 
-        let rad_step = 200.0 / nrad as f32;
-        let width_step = 50.0 / (nrad as f32).powi(2);
-        let angle_step = std::f32::consts::PI * 7.0 / 4.0 / nrad as f32;
-
-        let mut arcs = Vec::with_capacity(nrad * ntan);
-        for i in 0..nrad {
-            let t = Instant::now();
-            let rad = rad_step * (i + 1) as f32;
-            let width = width_step * ((nrad - i) as f32).powi(2);
-            let angle = angle_step * (i + 1) as f32;
-
-            for j in 0..ntan {
+        let arcs = (0..nrad)
+            .map(|i| {
+                let radius = 6.0 * (i + 1) as f32 / nrad as f32;
+                let width = 6.0 * ((nrad - i) as f32 / nrad as f32).powi(2);
+                let angle = std::f32::consts::PI * 7.0 / 4.0 * (i + 1) as f32 / nrad as f32;
+                (radius, width, angle)
+            })
+            .cartesian_product(0..ntan)
+            .map(|((rad, width, angle), j)| {
                 let color = start_color.lerp(
                     end_color,
                     j as f32 / (ntan - 1) as f32,
@@ -54,18 +50,13 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                 arc.set_color(color)
                     .set_fill_opacity(0.0)
                     .set_stroke_width(width);
+                arc
+            })
+            .collect::<Group<_>>();
+        let mut arcs = timeline.insert_group(arcs);
 
-                let mut arc = timeline.insert(arc);
-                timeline
-                    .play(arc.fade_in().with_duration(3.0 / (nrad * ntan) as f32))
-                    .sync();
-                arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`
-            }
-            info!(
-                "rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}",
-                t.elapsed()
-            );
-        }
+        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());
+        timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();
         timeline.insert_time_mark(
             timeline.duration_secs(),
             TimeMark::Capture("preview.png".to_string()),
@@ -81,5 +72,5 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=info"))
         .init();
 
-    render_timeline(ArcBetweenPointsScene, &AppOptions::default());
+    build_and_render_timeline(ArcBetweenPointsScene, &AppOptions::default());
 }

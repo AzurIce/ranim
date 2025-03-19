@@ -15,11 +15,11 @@ impl TimelineConstructor for GettingStarted2Scene {
         timeline: &'t RanimTimeline,
         _camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
-        let mut square = Square(300.0).build();
+        let mut square = Square(2.0).build();
         square.set_color(manim::BLUE_C);
 
         let mut square = timeline.insert(square);
-        let mut circle = Circle(300.0).build();
+        let mut circle = Circle(2.0).build();
         circle.set_color(manim::RED_C);
 
         timeline.play(
@@ -34,5 +34,5 @@ impl TimelineConstructor for GettingStarted2Scene {
 }
 
 fn main() {
-    render_timeline(GettingStarted2Scene, &AppOptions::default());
+    build_and_render_timeline(GettingStarted2Scene, &AppOptions::default());
 }

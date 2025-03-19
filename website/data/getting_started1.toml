@@ -2,11 +2,12 @@ name = "getting_started1"
 code = """
 ```rust,linenos
 use ranim::{\r
+    AppOptions,\r
     animation::fading::{FadingAnim, FadingAnimSchedule},\r
     color::palettes::manim,\r
     items::vitem::Square,\r
     prelude::*,\r
-    render_timeline, AppOptions,\r
+    build_and_render_timeline,\r
 };\r
 \r
 #[scene]\r
@@ -18,19 +19,20 @@ impl TimelineConstructor for GettingStarted1Scene {\r
         timeline: &'t RanimTimeline,\r
         _camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
-        let mut square = Square(300.0).build();\r
+        let mut square = Square(2.0).build();\r
         square.set_color(manim::BLUE_C);\r
 \r
         let mut square = timeline.insert(square);\r
+        #[allow(deprecated)]\r
         timeline.play(square.fade_in().chain(|data| data.fade_out()));\r
     }\r
 }\r
 \r
 fn main() {\r
-    render_timeline(GettingStarted1Scene, &AppOptions::default());\r
+    build_and_render_timeline(GettingStarted1Scene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "f3f20590493efc56636e14f2e1a740220803dddb"
+hash = "9eb6cc4b46c190af1113b39d0e1dadd1ce00c292"
 preview_imgs = []
 output_files = ["/examples/getting_started1/output.mp4"]
