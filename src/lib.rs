@@ -129,9 +129,7 @@ pub trait TimelineConstructor {
     {
         let timeline = RanimTimeline::new();
         {
-            let mut camera = timeline.insert(items::camera_frame::CameraFrame::new_with_size(
-                options.frame_size.0 as usize,
-                options.frame_size.1 as usize,
+            let mut camera = timeline.insert(items::camera_frame::CameraFrame::new(
             ));
             self.construct(&timeline, &mut camera);
             timeline.sync();
@@ -164,7 +162,8 @@ pub fn render_timeline_at_sec(
 // MARK: AppOptions
 
 pub static DEFAULT_APP_OPTIONS: AppOptions = AppOptions {
-    frame_size: (1920, 1080),
+    frame_height: 8.0,
+    pixel_size: (1920, 1080),
     frame_rate: 60,
     save_frames: false,
     output_dir: "./output",
@@ -173,7 +172,8 @@ pub static DEFAULT_APP_OPTIONS: AppOptions = AppOptions {
 
 #[derive(Debug, Clone)]
 pub struct AppOptions<'a> {
-    pub frame_size: (u32, u32),
+    pub frame_height: f32,
+    pub pixel_size: (u32, u32),
     pub frame_rate: u32,
     pub save_frames: bool,
     pub output_dir: &'a str,
@@ -189,8 +189,7 @@ impl Default for AppOptions<'_> {
 /// MARK: RanimRenderApp
 struct RanimRenderApp {
     ctx: RanimContext,
-    frame_size: (u32, u32),
-
+    // frame_size: (u32, u32),
     renderer: Renderer,
 
     /// The writer for the output.mp4 video
@@ -215,18 +214,19 @@ impl RanimRenderApp {
         let output_dir = PathBuf::from(options.output_dir);
         let renderer = Renderer::new(
             &ctx,
-            options.frame_size.0 as usize,
-            options.frame_size.1 as usize,
+            options.frame_height,
+            options.pixel_size.0 as usize,
+            options.pixel_size.1 as usize,
         );
         Self {
             // world: World::new(),
             renderer,
-            frame_size: options.frame_size,
+            // frame_size: options.frame_size,
             video_writer: None,
             video_writer_builder: Some(
                 FileWriterBuilder::default()
                     .with_fps(options.frame_rate)
-                    .with_size(options.frame_size.0, options.frame_size.1)
+                    .with_size(options.pixel_size.0, options.pixel_size.1)
                     .with_file_path(output_dir.join(&scene_name).join(options.output_filename)),
             ),
             save_frames: options.save_frames,
@@ -417,13 +417,7 @@ impl RanimRenderApp {
         if !dir.exists() {
             std::fs::create_dir_all(dir).unwrap();
         }
-        // info!("[Scene]: SAVE FRAME TO IMAGE START");
-        // let t = Instant::now();
-        let size = self.frame_size;
-        let texture_data = self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx);
-        let buffer: ImageBuffer<Rgba<u8>, &[u8]> =
-            ImageBuffer::from_raw(size.0, size.1, texture_data).unwrap();
+        let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx.wgpu_ctx);
         buffer.save(path).unwrap();
-        // info!("[Scene]: SAVE FRAME TO IMAGE END, took {:?}", t.elapsed());
     }
 }
