@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
 
-const EXCLUDE_EXAMPLES: [&str; 1] = ["test_scene"];
+const EXCLUDE_EXAMPLES: [&str; 1] = ["test"];
 const HIDE_EXAMPLES: [&str; 4] = [
     "getting_started0",
     "getting_started1",

@@ -22,7 +22,7 @@ fn point(idx: u32) -> vec2<f32> {
     return points[idx].xy;
 }
 fn is_closed(idx: u32) -> bool {
-    return bool(points[idx].z);
+    return bool(points[idx].w);
 }
 
 struct SubpathAttr {
@@ -202,6 +202,7 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width));
 
     var f_color = blend_color(stroke_rgba, fill_rgba);
+    // TODO: handle depth
 
     return f_color;
 }

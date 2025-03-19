@@ -108,7 +108,7 @@ impl Renderer {
         });
 
         let uniforms = CameraUniforms {
-            proj_mat: camera.projection_matrix(),
+            proj_mat: camera.projection_matrix(width as f32, height as f32),
             view_mat: camera.view_matrix(),
             half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
             _padding: [0.0; 2],
@@ -288,11 +288,11 @@ impl Renderer {
 
     pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext, camera_frame: &CameraFrame) {
         let camera_uniforms = CameraUniforms {
-            proj_mat: camera_frame.projection_matrix(),
+            proj_mat: camera_frame.projection_matrix(self.size.0 as f32, self.size.1 as f32),
             view_mat: camera_frame.view_matrix(),
             half_frame_size: Vec2::new(
-                camera_frame.size.0 as f32 / 2.0,
-                camera_frame.size.1 as f32 / 2.0,
+                self.size.0 as f32 / 2.0,
+                self.size.1 as f32 / 2.0,
             ),
             _padding: [0.0; 2],
         };
