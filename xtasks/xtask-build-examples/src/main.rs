@@ -25,6 +25,10 @@ struct Args {
 
     #[arg(long)]
     lazy_run: bool,
+
+    /// 清除不存在的示例对应的输出文件
+    #[arg(long)]
+    clean: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -48,6 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let website_data_dir = website_root.join("data");
     let website_static_examples_dir = website_root.join("static").join("examples");
     let website_content_examples_dir = website_root.join("content").join("examples");
+    let output_dir = workspace_root.join("output");
 
     // 确保目标目录存在
     create_dir_all(&website_static_examples_dir)?;
@@ -63,6 +68,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map(|p| p.file_name().unwrap())
             .collect::<Vec<_>>()
     );
+
+    // 如果指定了clean选项，清理不存在的示例输出
+    if args.clean {
+        clean_nonexistent_examples(
+            &example_dirs,
+            &output_dir,
+            &website_data_dir,
+            &website_static_examples_dir,
+            &website_content_examples_dir,
+        )?;
+    }
 
     // 处理每个示例
     for example_dir in example_dirs {
@@ -278,4 +294,94 @@ fn copy_file(source: &Path, target_dir: &Path) -> Result<String, Box<dyn Error>>
     fs::copy(source, &target_path)?;
 
     Ok(file_name)
+}
+
+/// 清理不存在的示例对应的输出文件
+fn clean_nonexistent_examples(
+    example_dirs: &[PathBuf],
+    output_dir: &Path,
+    website_data_dir: &Path,
+    website_static_examples_dir: &Path,
+    website_content_examples_dir: &Path,
+) -> Result<(), Box<dyn Error>> {
+    println!("开始清理不存在的示例输出...");
+
+    // 获取所有现存示例的名称
+    let existing_examples: Vec<String> = example_dirs
+        .iter()
+        .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(String::from))
+        .collect();
+
+    // 清理output目录
+    if output_dir.exists() {
+        for entry in fs::read_dir(output_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                if let Some(dir_name) = entry.file_name().to_str() {
+                    if !existing_examples.contains(&dir_name.to_string())
+                        && !EXCLUDE_EXAMPLES.contains(&dir_name)
+                    {
+                        println!("删除output目录中的: {}", dir_name);
+                        fs::remove_dir_all(entry.path())?;
+                    }
+                }
+            }
+        }
+    }
+
+    // 清理website/data目录
+    if website_data_dir.exists() {
+        for entry in fs::read_dir(website_data_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_file() {
+                if let Some(file_name) = entry.file_name().to_str() {
+                    if file_name.ends_with(".toml") {
+                        let example_name = file_name.trim_end_matches(".toml");
+                        if !existing_examples.contains(&example_name.to_string()) {
+                            println!("删除website/data中的: {}", file_name);
+                            fs::remove_file(entry.path())?;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 清理website/static/examples目录
+    if website_static_examples_dir.exists() {
+        for entry in fs::read_dir(website_static_examples_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                if let Some(dir_name) = entry.file_name().to_str() {
+                    if !existing_examples.contains(&dir_name.to_string()) {
+                        println!("删除website/static/examples中的: {}", dir_name);
+                        fs::remove_dir_all(entry.path())?;
+                    }
+                }
+            }
+        }
+    }
+
+    // 清理website/content/examples目录
+    if website_content_examples_dir.exists() {
+        for entry in fs::read_dir(website_content_examples_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_file() {
+                if let Some(file_name) = entry.file_name().to_str() {
+                    if file_name.ends_with(".md") {
+                        let example_name = file_name.trim_end_matches(".md");
+                        if !existing_examples.contains(&example_name.to_string())
+                            && example_name != "_index"
+                        {
+                            println!("删除website/content/examples中的: {}", file_name);
+                            fs::remove_file(entry.path())?;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    println!("清理完成");
+    Ok(())
 }
