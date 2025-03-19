@@ -7,7 +7,6 @@ use glam::{Affine2, IVec3, Mat3, Vec3, Vec3Swizzles, ivec3, vec2, vec3};
 use itertools::Itertools;
 
 use crate::{
-    items::group::Group,
     prelude::{Alignable, Interpolatable, Partial},
     utils::math::interpolate_usize,
 };
@@ -148,6 +147,9 @@ impl<T: Component> ComponentVec<T> {
     }
 }
 
+/// A marker trait for components that has each element as a point data.
+///
+/// For example [`vpoint::VPoint`] is not point wise.
 pub trait PointWise {}
 
 // MARK: Transformable
@@ -286,39 +288,6 @@ pub trait Transformable<T: Transform3dComponent> {
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
-    }
-}
-
-impl<T: Transformable<C>, C: Transform3dComponent> Transformable<C> for Group<T> {
-    fn get_start_position(&self) -> Option<Vec3> {
-        self.as_ref().first().and_then(|x| x.get_start_position())
-    }
-    fn get_end_position(&self) -> Option<Vec3> {
-        self.as_ref().last().and_then(|x| x.get_end_position())
-    }
-    fn apply_points_function(
-        &mut self,
-        f: impl Fn(&mut ComponentVec<C>) + Copy,
-        anchor: Anchor,
-    ) -> &mut Self {
-        let point = match anchor {
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-            Anchor::Point(point) => point,
-        };
-        // println!("{:?}, {:?}", anchor, point);
-        self.iter_mut().for_each(|x| {
-            x.apply_points_function(f, Anchor::Point(point));
-        });
-        self
-    }
-    fn get_bounding_box(&self) -> [Vec3; 3] {
-        let [min, max] = self
-            .iter()
-            .map(|x| x.get_bounding_box())
-            .map(|[min, _, max]| [min, max])
-            .reduce(|a, b| [a[0].min(b[0]), a[1].max(b[1])])
-            .unwrap_or([Vec3::ZERO; 2]);
-        [min, (min + max) / 2.0, max]
     }
 }
 
@@ -461,13 +430,18 @@ impl<T: Component> AsMut<ComponentVec<T>> for ComponentVec<T> {
     }
 }
 
+// MARK: Test
+
 #[cfg(test)]
 mod test {
     use glam::{IVec3, Vec3, ivec3, vec3};
 
-    use crate::components::Transformable;
+    use crate::{
+        components::Transformable,
+        items::{Blueprint, group::Group, vitem::Square},
+    };
 
-    use super::{ComponentVec, vpoint::VPoint};
+    use super::{Anchor, ComponentVec, vpoint::VPoint};
 
     #[test]
     fn test_bounding_box() {
@@ -533,5 +507,53 @@ mod test {
         ]
         .into();
         assert_eq!(scale_origin, ans);
+    }
+
+    #[test]
+    fn test_group_transform() {
+        // 20 40 ... 100
+        let mut group = (1..=5)
+            .map(|i| {
+                let mut sq = Square(i as f32 * 20.0).build();
+                let x = (0..i).map(|i| i as f32 * 20.0).sum();
+                sq.put_anchor_on(Anchor::edge(-1, 0, 0), vec3(x, 0.0, 0.0));
+                sq
+            })
+            .collect::<Group<_>>();
+        assert_eq!(
+            group.get_bounding_box(),
+            [
+                vec3(0.0, -50.0, 0.0),
+                vec3(150.0, 0.0, 0.0),
+                vec3(300.0, 50.0, 0.0)
+            ]
+        );
+        group.scale(Vec3::splat(2.0));
+        assert_eq!(
+            group.get_bounding_box(),
+            [
+                vec3(-150.0, -100.0, 0.0),
+                vec3(150.0, 0.0, 0.0),
+                vec3(450.0, 100.0, 0.0)
+            ]
+        );
+
+        assert_eq!(
+            group.get(1..).unwrap().get_bounding_box(),
+            [
+                vec3(-110.0, -100.0, 0.0),
+                vec3(170.0, 0.0, 0.0),
+                vec3(450.0, 100.0, 0.0)
+            ]
+        );
+        group.get_mut(1..).unwrap().scale(Vec3::splat(0.25));
+        assert_eq!(
+            group.get(1..).unwrap().get_bounding_box(),
+            [
+                vec3(100.0, -25.0, 0.0),
+                vec3(170.0, 0.0, 0.0),
+                vec3(240.0, 25.0, 0.0)
+            ]
+        )
     }
 }

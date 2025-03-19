@@ -334,11 +334,7 @@ impl<T: EntityTimelineStaticState + Clone + 'static> AnimSchedule<'_, '_, T> {
         if let EvalResult::Dynamic(res) = self.anim.eval_alpha(1.0) {
             self.rabject.data = res;
         }
-        self.rabject.timeline.update(self.rabject);
         self
-    }
-    pub fn play(self) {
-        self.rabject.timeline.play(self);
     }
 }
 

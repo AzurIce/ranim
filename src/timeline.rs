@@ -2,7 +2,7 @@ use log::trace;
 
 use crate::{
     animation::{AnimSchedule, Animation, EvalResult, Evaluator},
-    items::{Entity, Rabject, camera_frame::CameraFrame},
+    items::{Entity, Rabject, camera_frame::CameraFrame, group::Group},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
@@ -62,6 +62,7 @@ pub struct RanimTimeline {
 
 pub struct TimelineEvalResult {
     pub camera_frame: (EvalResult<CameraFrame>, usize),
+    /// (`id`, `EvalResult<Item>`, `animation idx` in the corresponding timeline)
     pub items: Vec<(usize, EvalResult<Item>, usize)>,
 }
 
@@ -89,14 +90,30 @@ impl RanimTimeline {
         });
         self
     }
-    pub fn insert<T: EntityTimelineStaticState + Clone + 'static>(
-        &self,
-        static_state: T,
-    ) -> Rabject<T> {
+    /// Insert an iterator of items into the timeline, and return a group of rabjects
+    ///
+    /// This is equivalent to
+    /// ```rust
+    /// items
+    ///     .into_iter()
+    ///     .map(|item| self.insert(item))
+    ///     .collect::<Group<_>>()
+    /// ```
+    pub fn insert_group<'r, 't, T, I>(&'t self, items: I) -> Group<Rabject<'t, T>>
+    where
+        't: 'r,
+        T: EntityTimelineStaticState + Clone + 'static,
+        I: IntoIterator<Item = T>,
+    {
+        items.into_iter().map(|item| self.insert(item)).collect()
+    }
+
+    /// Insert an item into the timeline, and return a rabject
+    pub fn insert<T: EntityTimelineStaticState + Clone + 'static>(&self, item: T) -> Rabject<T> {
         let mut timelines = self.timelines.borrow_mut();
 
         let id = timelines.len();
-        let mut timeline = static_state.clone().into_timeline();
+        let mut timeline = item.clone().into_timeline();
         let max_elapsed_secs = *self.max_elapsed_secs.borrow();
         if max_elapsed_secs != 0.0 {
             timeline.append_blank(*self.max_elapsed_secs.borrow());
@@ -104,10 +121,12 @@ impl RanimTimeline {
         timelines.push(Box::new(timeline));
         Rabject {
             id,
-            data: static_state,
+            data: item,
             timeline: self,
         }
     }
+
+    /// Update the static state of a rabject's timeline
     pub fn update<T: EntityTimelineStaticState + Clone + 'static>(&self, rabject: &Rabject<T>) {
         let mut timelines = self.timelines.borrow_mut();
         let timeline = timelines
@@ -118,12 +137,18 @@ impl RanimTimeline {
             .unwrap();
         timeline.update_static_state(Some(Rc::new(rabject.data.clone().into_state_type())));
     }
-    pub fn forward(&self, secs: f32) {
+    /// Forward all rabjects' timeline by the given seconds
+    pub fn forward(&self, secs: f32) -> &Self {
         self.timelines.borrow_mut().iter_mut().for_each(|timeline| {
             timeline.forward(secs);
         });
         *self.max_elapsed_secs.borrow_mut() += secs;
+        self
     }
+
+    /// Show a rabject
+    ///
+    /// [`RanimTimeline::forward`] after this will encode timeline's static rabject state into the timeline
     pub fn show<T>(&self, rabject: &Rabject<T>) {
         self.timelines
             .borrow_mut()
@@ -131,6 +156,9 @@ impl RanimTimeline {
             .unwrap()
             .show();
     }
+    /// Hide a rabject
+    ///
+    /// [`RanimTimeline::forward`] after this will encode blank into the timeline
     pub fn hide<T>(&self, rabject: &Rabject<T>) {
         self.timelines
             .borrow_mut()
@@ -139,8 +167,8 @@ impl RanimTimeline {
             .hide();
     }
 
+    /// Sync all rabjects' timeline to the max elapsed seconds
     pub fn sync(&self) -> &Self {
-        // println!("### SYNC ###");
         let mut timelines = self.timelines.borrow_mut();
         let max_elapsed_secs = self.max_elapsed_secs.borrow();
         timelines.iter_mut().for_each(|timeline| {
@@ -168,16 +196,6 @@ impl RanimTimeline {
             .unwrap();
 
         let mut max_duration = self.max_elapsed_secs.borrow_mut();
-        // println!(
-        //     "{} play {:?}({}, {}, {}) on {}",
-        //     max_duration,
-        //     anim.span_len(),
-        //     anim.padding.0,
-        //     anim.duration_secs,
-        //     anim.padding.1,
-        //     timeline.duration_secs()
-        // );
-
         timeline.append_anim(anim.into_state_type());
         *max_duration = max_duration.max(timeline.duration_secs());
         self
@@ -232,12 +250,13 @@ impl Debug for RanimTimeline {
 }
 
 // MARK: RabjectTimeline
+
 /// A timeline struct that encodes the animation of the type `T`
 pub struct RabjectTimeline<T> {
     forward_static_state: Option<Rc<T>>,
     animations: Vec<Option<Animation<T>>>,
     end_secs: Vec<f32>,
-    // Encoding state
+    // Encoding states
     is_showing: bool,
 }
 

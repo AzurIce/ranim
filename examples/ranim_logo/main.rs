@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use glam::{Vec3, vec3};
+use glam::{Vec3, vec2, vec3};
 use ranim::{
     animation::{creation::WritingAnimSchedule, transform::GroupTransformAnimSchedule},
     color::palettes::manim,
@@ -63,9 +63,9 @@ impl TimelineConstructor for RanimLogoScene {
     fn construct<'t: 'r, 'r>(
         self,
         timeline: &'t RanimTimeline,
-        camera: &'r mut Rabject<'t, CameraFrame>,
+        _camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
-        let frame_size = camera.data.frame_size();
+        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);
         let logo_width = frame_size.y * 0.618;
 
         let mut logo = build_logo(logo_width)
@@ -100,7 +100,7 @@ impl TimelineConstructor for RanimLogoScene {
                         .transform(|data| {
                             data.scale_by_anchor(scale, anchor)
                                 .scale_by_anchor(vec3(0.9, 0.9, 1.0), Anchor::origin())
-                                .shift(vec3(0.0, frame_size.y / 9.0, 0.0));
+                                .shift(vec3(0.0, 1.3, 0.0));
                         })
                         .with_rate_func(smooth)
                         .apply(),
@@ -110,10 +110,15 @@ impl TimelineConstructor for RanimLogoScene {
         let mut ranim_text = Group::<VItem>::from_svg(typst_svg!(
             r#"
 #align(center)[
-    #text(60pt, font: "LXGW Bright")[Ranim]
+    #text(10pt, font: "LXGW Bright")[Ranim]
 ]"#
         ));
-        ranim_text.shift(vec3(0.0, -frame_size.y * 2.5 / 8.0, 0.0));
+        {
+            let bb = ranim_text.get_bounding_box();
+            ranim_text
+                .scale(Vec3::splat(1.0 / (bb[2].y - bb[0].y)))
+                .put_center_on(Vec3::NEG_Y * 2.5);
+        }
         let mut ranim_text = ranim_text
             .into_iter()
             .map(|item| timeline.insert(item))
@@ -140,5 +145,5 @@ impl TimelineConstructor for RanimLogoScene {
 }
 
 fn main() {
-    render_timeline(RanimLogoScene, &AppOptions::default());
+    build_and_render_timeline(RanimLogoScene, &AppOptions::default());
 }

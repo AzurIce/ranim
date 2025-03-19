@@ -12,7 +12,7 @@ impl TimelineConstructor for GettingStarted0Scene {\r
         timeline: &'t RanimTimeline,\r
         _camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
-        let mut square = Square(300.0).build(); // An VItem of a square\r
+        let mut square = Square(2.0).build(); // An VItem of a square\r
         square.set_color(manim::BLUE_C);\r
 \r
         timeline.forward(0.5);\r
@@ -30,10 +30,10 @@ impl TimelineConstructor for GettingStarted0Scene {\r
 }\r
 \r
 fn main() {\r
-    render_timeline(GettingStarted0Scene, &AppOptions::default());\r
+    build_and_render_timeline(GettingStarted0Scene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "64653019b903e54980deecb7662f0841a3b46c23"
+hash = "a7e45a8ab4016ffc571785e6f2627823632ee513"
 preview_imgs = []
 output_files = ["/examples/getting_started0/output.mp4"]
