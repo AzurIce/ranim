@@ -1,6 +1,6 @@
 // MARK: CameraFrame
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, vec2};
 
 use crate::prelude::{Alignable, Interpolatable};
 
@@ -18,10 +18,13 @@ use crate::prelude::{Alignable, Interpolatable};
 ///
 #[derive(Clone, Debug)]
 pub struct CameraFrame {
-    pub fovy: f32,
     pub pos: Vec3,
     pub up: Vec3,
     pub facing: Vec3,
+    /// Used in orthographic projection
+    pub scale: f32,
+    /// Used in perspective projection
+    pub fovy: f32,
     // far > near
     pub near: f32,
     pub far: f32,
@@ -31,10 +34,11 @@ pub struct CameraFrame {
 impl Interpolatable for CameraFrame {
     fn lerp(&self, target: &Self, t: f32) -> Self {
         Self {
-            fovy: self.fovy.lerp(&target.fovy, t),
             pos: self.pos.lerp(target.pos, t),
             up: self.up.lerp(target.up, t),
             facing: self.facing.lerp(target.facing, t),
+            scale: self.scale.lerp(&target.scale, t),
+            fovy: self.fovy.lerp(&target.fovy, t),
             near: self.near.lerp(&target.near, t),
             far: self.far.lerp(&target.far, t),
             perspective_blend: self
@@ -53,44 +57,43 @@ impl Alignable for CameraFrame {
 }
 
 impl CameraFrame {
-    /// Create a new CameraFrame, and call [`CameraFrame::center_canvas_in_frame`]
-    /// with `(Vec3::ZERO, width, height, Vec3::Y, Vec3::Z, width / height)`
-    pub fn new_with_size(width: usize, height: usize) -> Self {
-        let mut camera_frame = Self {
-            fovy: std::f32::consts::PI / 2.0,
+    /// Create a new CameraFrame at the origin facing to the negative z-axis and use Y as up vector.
+    ///
+    /// The default projection settings are:
+    /// - orthographic projection with a scale of `1.0`
+    /// - perspective projection with a field of view of `90.0` degrees
+    /// - near plane at `-1000.0` and far plane at `1000.0`(note that perspective projection clamps near plane to `min=0.1`)
+    /// - perspective blend is `0.0`
+    pub fn new() -> Self {
+        Self {
             pos: Vec3::ZERO,
             up: Vec3::Y,
             facing: Vec3::NEG_Z,
-            // rotation: Mat4::IDENTITY,
+
+            scale: 1.0,
+            fovy: std::f32::consts::PI / 2.0,
+
             near: -1000.0,
             far: 1000.0,
             perspective_blend: 0.0,
-        };
-        camera_frame.center_canvas_in_frame(
-            Vec3::ZERO,
-            width as f32,
-            height as f32,
-            Vec3::Y,
-            Vec3::Z,
-            width as f32 / height as f32,
-        );
-        camera_frame
+        }
     }
 }
 
 impl CameraFrame {
     pub fn view_matrix(&self) -> Mat4 {
-        // Mat4::look_at_rh(vec3(0.0, 0.0, 1080.0), Vec3::NEG_Z, Vec3::Y)
         Mat4::look_at_rh(self.pos, self.pos + self.facing, self.up)
     }
 
     /// Use the given frame size as `left`, `right`, `bottom`, `top` to construct an orthographic matrix
-    pub fn orthographic_mat(&self, frame_width: f32, frame_height: f32) -> Mat4 {
+    pub fn orthographic_mat(&self, frame_height: f32, aspect_ratio: f32) -> Mat4 {
+        let frame_size = vec2(frame_height * aspect_ratio, frame_height);
+        let frame_size = frame_size * self.scale;
         Mat4::orthographic_rh(
-            -frame_width / 2.0,
-            frame_width / 2.0,
-            -frame_height / 2.0,
-            frame_height / 2.0,
+            -frame_size.x / 2.0,
+            frame_size.x / 2.0,
+            -frame_size.y / 2.0,
+            frame_size.y / 2.0,
             self.near,
             self.far,
         )
@@ -104,14 +107,14 @@ impl CameraFrame {
     }
 
     /// Use the given frame size to construct projection matrix
-    pub fn projection_matrix(&self, frame_width: f32, frame_height: f32) -> Mat4 {
-        let aspect_ratio = frame_width / frame_height;
-        self.orthographic_mat(frame_width, frame_height)
+    pub fn projection_matrix(&self, frame_height: f32, aspect_ratio: f32) -> Mat4 {
+        self.orthographic_mat(frame_height, aspect_ratio)
             .lerp(&self.perspective_mat(aspect_ratio), self.perspective_blend)
     }
 
-    pub fn view_projection_matrix(&self, frame_width: f32, frame_height: f32) -> Mat4 {
-        self.projection_matrix(frame_width, frame_height) * self.view_matrix()
+    /// Use the given frame size to construct view projection matrix
+    pub fn view_projection_matrix(&self, frame_height: f32, aspect_ratio: f32) -> Mat4 {
+        self.projection_matrix(frame_height, aspect_ratio) * self.view_matrix()
     }
 }
 

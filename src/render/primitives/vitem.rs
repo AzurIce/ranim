@@ -201,7 +201,7 @@ mod test {
         let mut vitem_primitive = VItemPrimitive::default();
         let mut pipelines = PipelinesStorage::default();
         let (width, height) = (1920, 1080);
-        let camera = CameraFrame::new_with_size(width, height);
+        let camera = CameraFrame::new();
         let uniforms = CameraUniforms {
             proj_mat: camera.perspective_mat(width as f32 / height as f32),
             view_mat: camera.view_matrix(),

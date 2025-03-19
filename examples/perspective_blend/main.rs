@@ -55,15 +55,14 @@ impl TimelineConstructor for PerspectiveBlendScene {
             .rotate(std::f32::consts::PI / 2.0, Vec3::X);
 
         let mut cube = Group(vec![front, back, right, left, top, bottom]);
-        cube.scale(Vec3::splat(10.0));
 
         cube.rotate(std::f32::consts::PI / 6.0, Vec3::Y);
         cube.rotate(std::f32::consts::PI / 6.0, Vec3::X);
         // Position cube and camera
-        let mut cubes = timeline.insert_group(cube);
+        let mut _cubes = timeline.insert_group(cube);
 
         // Move camera to show the cube
-        camera.data.move_to(vec3(0.0, 0.0, 5.0));
+        camera.data.pos = vec3(0.0, 0.0, 5.0);
         timeline.update(&camera);
 
         timeline.forward(1.0);
@@ -77,7 +76,7 @@ impl TimelineConstructor for PerspectiveBlendScene {
 
 fn main() {
     let options = AppOptions {
-        frame_size: (1280, 720),
+        pixel_size: (1280, 720),
         frame_rate: 60,
         ..Default::default()
     };
