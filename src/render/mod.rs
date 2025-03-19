@@ -3,6 +3,7 @@ pub mod primitives;
 
 use color::LinearSrgb;
 use glam::{Mat4, Vec2};
+use image::{ImageBuffer, Rgba};
 use primitives::RenderInstance;
 
 use crate::{
@@ -79,6 +80,7 @@ impl CameraUniformsBindGroup {
 // MARK: Renderer
 
 pub struct Renderer {
+    frame_height: f32,
     size: (usize, usize),
     pub pipelines: PipelinesStorage,
 
@@ -94,8 +96,8 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub(crate) fn new(ctx: &RanimContext, width: usize, height: usize) -> Self {
-        let camera = CameraFrame::new_with_size(width, height);
+    pub(crate) fn new(ctx: &RanimContext, frame_height: f32, width: usize, height: usize) -> Self {
+        let camera = CameraFrame::new();
 
         let ctx = &ctx.wgpu_ctx;
         let render_textures = RenderTextures::new(ctx, width, height);
@@ -108,7 +110,7 @@ impl Renderer {
         });
 
         let uniforms = CameraUniforms {
-            proj_mat: camera.projection_matrix(),
+            proj_mat: camera.projection_matrix(width as f32, height as f32),
             view_mat: camera.view_matrix(),
             half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
             _padding: [0.0; 2],
@@ -127,6 +129,7 @@ impl Renderer {
         let clear_color = wgpu::Color { r, g, b, a };
 
         Self {
+            frame_height,
             size: (width, height),
             clear_color,
             pipelines: PipelinesStorage::default(),
@@ -285,15 +288,21 @@ impl Renderer {
         }
         self.output_texture_data.as_ref().unwrap()
     }
+    pub fn get_rendered_texture_img_buffer(
+        &mut self,
+        ctx: &WgpuContext,
+    ) -> ImageBuffer<Rgba<u8>, &[u8]> {
+        let size = self.size;
+        let data = self.get_rendered_texture_data(ctx);
+        ImageBuffer::from_raw(size.0 as u32, size.1 as u32, data).unwrap()
+    }
 
     pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext, camera_frame: &CameraFrame) {
         let camera_uniforms = CameraUniforms {
-            proj_mat: camera_frame.projection_matrix(),
+            proj_mat: camera_frame
+                .projection_matrix(self.frame_height, self.size.0 as f32 / self.size.1 as f32),
             view_mat: camera_frame.view_matrix(),
-            half_frame_size: Vec2::new(
-                camera_frame.size.0 as f32 / 2.0,
-                camera_frame.size.1 as f32 / 2.0,
-            ),
+            half_frame_size: Vec2::new(self.size.0 as f32 / 2.0, self.size.1 as f32 / 2.0),
             _padding: [0.0; 2],
         };
         // trace!("Uniforms: {:?}", self.uniforms);

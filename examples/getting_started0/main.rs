@@ -9,7 +9,7 @@ impl TimelineConstructor for GettingStarted0Scene {
         timeline: &'t RanimTimeline,
         _camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
-        let mut square = Square(300.0).build(); // An VItem of a square
+        let mut square = Square(2.0).build(); // An VItem of a square
         square.set_color(manim::BLUE_C);
 
         timeline.forward(0.5);
@@ -27,5 +27,5 @@ impl TimelineConstructor for GettingStarted0Scene {
 }
 
 fn main() {
-    render_timeline(GettingStarted0Scene, &AppOptions::default());
+    build_and_render_timeline(GettingStarted0Scene, &AppOptions::default());
 }

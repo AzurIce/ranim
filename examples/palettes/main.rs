@@ -1,7 +1,9 @@
 use env_logger::Env;
-use glam::vec3;
 use ranim::animation::creation::Color;
 use ranim::color::palettes::manim::*;
+use ranim::components::Anchor;
+use ranim::glam::{vec2, vec3};
+use ranim::items::group::Group;
 use ranim::items::vitem::Rectangle;
 use ranim::prelude::*;
 
@@ -14,8 +16,9 @@ impl TimelineConstructor for PalettesScene {
         timeline: &'t RanimTimeline,
         _camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
-        let (width, height) = (1920, 1080);
-        let (offset_x, offset_y) = (width as f32 / -2.0, height as f32 / -2.0);
+        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);
+        let padded_frame_size = frame_size * 0.9;
+
         let colors = vec![
             vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],
             vec![TEAL_E, TEAL_D, TEAL_C, TEAL_B, TEAL_A],
@@ -30,29 +33,30 @@ impl TimelineConstructor for PalettesScene {
             vec![GREY_BROWN, LIGHT_BROWN, PINK, LIGHT_PINK, ORANGE],
         ];
 
-        let padding = 100;
+        let padded_frame_start = vec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
+        let h_step = padded_frame_size.y / colors.len() as f32;
 
-        let rows = colors.len();
-        let h_step = (height - 2 * padding) / rows;
-
-        let mut squares = Vec::with_capacity(colors.len() * 5);
-        for (i, row) in colors.iter().enumerate() {
-            let y = padding + i * h_step;
-            let cols = row.len();
-            let w_step = (width - 2 * padding) / cols;
-            for (j, color) in row.iter().enumerate() {
-                let x = padding + j * w_step;
-                let mut square = Rectangle(w_step as f32, h_step as f32).build();
-                square.shift(vec3(
-                    x as f32 + offset_x + w_step as f32 / 2.0,
-                    y as f32 + offset_y + h_step as f32 / 2.0,
-                    0.0,
-                ));
-                square.set_color(*color).set_stroke_width(0.0);
-
-                squares.push(timeline.insert(square));
-            }
-        }
+        let squares = colors
+            .iter()
+            .enumerate()
+            .flat_map(|(i, row)| {
+                let y = i as f32 * h_step;
+                let w_step = padded_frame_size.x / row.len() as f32;
+                row.iter().enumerate().map(move |(j, color)| {
+                    let x = j as f32 * w_step;
+                    let mut square = Rectangle(w_step as f32, h_step as f32).build();
+                    square
+                        .put_anchor_on(
+                            Anchor::edge(-1, -1, 0),
+                            padded_frame_start.extend(0.0) + vec3(x, y, 0.0),
+                        )
+                        .set_color(*color)
+                        .set_stroke_width(0.0);
+                    square
+                })
+            })
+            .collect::<Group<_>>();
+        let _squares = timeline.insert_group(squares);
         timeline.forward(0.01);
     }
 }
@@ -65,6 +69,6 @@ fn main() {
         .init();
 
     let options = AppOptions::default();
-    render_timeline_at_sec(PalettesScene, 0.0, "preview.png", &options);
-    render_timeline_at_sec(PalettesScene, 0.0, "output.png", &options);
+    build_and_render_timeline_at_sec(PalettesScene, 0.0, "preview.png", &options);
+    build_and_render_timeline_at_sec(PalettesScene, 0.0, "output.png", &options);
 }

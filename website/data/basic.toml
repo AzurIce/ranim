@@ -1,17 +1,13 @@
 name = "basic"
 code = """
 ```rust,linenos
-use std::f32;\r
-\r
 use env_logger::Env;\r
-use glam::{vec3, Vec3};\r
-use ranim::animation::creation::{Color, CreationAnimSchedule, WritingAnimSchedule};\r
+use glam::Vec3;\r
+use ranim::animation::creation::WritingAnimSchedule;\r
 use ranim::animation::fading::FadingAnimSchedule;\r
-use ranim::animation::transform::TransformAnimSchedule;\r
-use ranim::color::palettes::manim;\r
+use ranim::items::group::Group;\r
 use ranim::items::svg_item::SvgItem;\r
-use ranim::items::vitem::{Arc, Polygon, VItem};\r
-use ranim::items::Group;\r
+use ranim::items::vitem::VItem;\r
 use ranim::timeline::TimeMark;\r
 use ranim::utils::rate_functions::linear;\r
 use ranim::{prelude::*, typst_svg};\r
@@ -30,28 +26,38 @@ impl TimelineConstructor for BasicScene {\r
         timeline.forward(0.2);\r
 \r
         let mut svg = SvgItem::from_svg(SVG);\r
-        svg.scale(Vec3::splat(2.0)).shift(vec3(0.0, 200.0, 0.0));\r
+        {\r
+            let bb = svg.get_bounding_box();\r
+            svg.scale(Vec3::splat(3.0 / (bb[2].y - bb[0].y)))\r
+                .put_center_on(Vec3::Y * 2.0);\r
+        }\r
         let mut svg = timeline.insert(svg);\r
+\r
         let mut text = Group::<VItem>::from_svg(&typst_svg!(\r
             r#\"\r
             #align(center)[\r
-                #text(60pt)[Ranim]\r
+                #text(18pt)[Ranim]\r
 \r
-                #text(20pt)[Hello 你好]\r
+                #text(6pt)[Hello 你好]\r
             ]\r
             \"#\r
         ));\r
-        text.items.iter_mut().for_each(|item| {\r
-            item.set_fill_opacity(0.8).shift(Vec3::NEG_Y * 200.0);\r
+        {\r
+            let bb = text.get_bounding_box();\r
+            text.scale(Vec3::splat(2.0 / (bb[2].y - bb[0].y)))\r
+                .put_center_on(Vec3::NEG_Y * 2.0);\r
+        }\r
+\r
+        text.iter_mut().for_each(|item| {\r
+            item.set_fill_opacity(0.8);\r
         });\r
         let mut text = timeline.insert_group(text);\r
-        let len = text.rabjects.len() as f32;\r
-        let dur = 3.0 / (1.0 + (len - 1.0) * 0.2);\r
-        // println!(\"{len}, {dur}\");\r
 \r
-        timeline.play_group(text.lagged_anim(0.2, |item| {\r
-            item.write().with_duration(dur).with_rate_func(linear)\r
-        }));\r
+        timeline.play(\r
+            text.lagged_anim(0.2, |item| item.write())\r
+                .with_total_duration(3.0)\r
+                .with_rate_func(linear),\r
+        );\r
         timeline.play(svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in\r
         timeline.sync();\r
         timeline.insert_time_mark(\r
@@ -60,48 +66,13 @@ impl TimelineConstructor for BasicScene {\r
         );\r
 \r
         timeline.forward(0.5);\r
-        timeline.play_group(text.lagged_anim(0.2, |item| {\r
-            item.unwrite().with_duration(dur).with_rate_func(linear)\r
-        }));\r
+        timeline.play(\r
+            text.lagged_anim(0.2, |item| item.unwrite())\r
+                .with_total_duration(3.0)\r
+                .with_rate_func(linear),\r
+        );\r
         timeline.play(svg.fade_out().with_duration(3.0));\r
         timeline.sync();\r
-\r
-        let mut polygon = Polygon(vec![\r
-            vec3(0.0, 0.0, 0.0),\r
-            vec3(-100.0, -300.0, 0.0),\r
-            vec3(0.0, 700.0, 0.0),\r
-            vec3(200.0, 300.0, 0.0),\r
-            vec3(500.0, 0.0, 0.0),\r
-        ])\r
-        .build();\r
-        polygon\r
-            .set_color(color!(\"#FF8080FF\"))\r
-            .set_fill_opacity(0.5)\r
-            .rotate(std::f32::consts::FRAC_PI_2, Vec3::Z);\r
-\r
-        // [polygon] 0.5s wait -> fade in -> 0.5s wait\r
-        timeline.forward(0.5);\r
-        let mut polygon = timeline.insert(polygon);\r
-        timeline.play(polygon.fade_in()).sync();\r
-        timeline.forward(0.5);\r
-\r
-        let mut arc = Arc {\r
-            angle: f32::consts::PI / 3.0,\r
-            radius: 100.0,\r
-        }\r
-        .build();\r
-        arc.set_stroke_color(manim::BLUE_C);\r
-        let mut arc = timeline.insert(arc);\r
-        // [polygon] interpolate [svg] -> 0.5s wait\r
-\r
-        let polygon_data = polygon.data.clone();\r
-        drop(polygon);\r
-        timeline.play(arc.transform_from(polygon_data)).sync();\r
-        timeline.forward(0.5);\r
-\r
-        // [svg] fade_out -> 0.5s wait\r
-        timeline.play(arc.uncreate()).sync();\r
-        timeline.forward(0.5);\r
     }\r
 }\r
 \r
@@ -111,10 +82,10 @@ fn main() {\r
     #[cfg(not(debug_assertions))]\r
     env_logger::Builder::from_env(Env::default().default_filter_or(\"basic=info,ranim=info\")).init();\r
 \r
-    render_timeline(BasicScene, &AppOptions::default());\r
+    build_and_render_timeline(BasicScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "dd6b12b4519c0edd2d42ccf2e79537791e2bda96"
+hash = "04587ed65e99f3a722aa403491ca9e1a05370625"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/output.mp4"]

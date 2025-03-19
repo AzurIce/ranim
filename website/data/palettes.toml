@@ -2,9 +2,11 @@ name = "palettes"
 code = """
 ```rust,linenos
 use env_logger::Env;\r
-use glam::vec3;\r
 use ranim::animation::creation::Color;\r
 use ranim::color::palettes::manim::*;\r
+use ranim::components::Anchor;\r
+use ranim::glam::{vec2, vec3};\r
+use ranim::items::group::Group;\r
 use ranim::items::vitem::Rectangle;\r
 use ranim::prelude::*;\r
 \r
@@ -17,8 +19,9 @@ impl TimelineConstructor for PalettesScene {\r
         timeline: &'t RanimTimeline,\r
         _camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
-        let (width, height) = (1920, 1080);\r
-        let (offset_x, offset_y) = (width as f32 / -2.0, height as f32 / -2.0);\r
+        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);\r
+        let padded_frame_size = frame_size * 0.9;\r
+\r
         let colors = vec![\r
             vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],\r
             vec![TEAL_E, TEAL_D, TEAL_C, TEAL_B, TEAL_A],\r
@@ -33,29 +36,30 @@ impl TimelineConstructor for PalettesScene {\r
             vec![GREY_BROWN, LIGHT_BROWN, PINK, LIGHT_PINK, ORANGE],\r
         ];\r
 \r
-        let padding = 100;\r
+        let padded_frame_start = vec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
+        let h_step = padded_frame_size.y / colors.len() as f32;\r
 \r
-        let rows = colors.len();\r
-        let h_step = (height - 2 * padding) / rows;\r
-\r
-        let mut squares = Vec::with_capacity(colors.len() * 5);\r
-        for (i, row) in colors.iter().enumerate() {\r
-            let y = padding + i * h_step;\r
-            let cols = row.len();\r
-            let w_step = (width - 2 * padding) / cols;\r
-            for (j, color) in row.iter().enumerate() {\r
-                let x = padding + j * w_step;\r
-                let mut square = Rectangle(w_step as f32, h_step as f32).build();\r
-                square.shift(vec3(\r
-                    x as f32 + offset_x + w_step as f32 / 2.0,\r
-                    y as f32 + offset_y + h_step as f32 / 2.0,\r
-                    0.0,\r
-                ));\r
-                square.set_color(*color).set_stroke_width(0.0);\r
-\r
-                squares.push(timeline.insert(square));\r
-            }\r
-        }\r
+        let squares = colors\r
+            .iter()\r
+            .enumerate()\r
+            .flat_map(|(i, row)| {\r
+                let y = i as f32 * h_step;\r
+                let w_step = padded_frame_size.x / row.len() as f32;\r
+                row.iter().enumerate().map(move |(j, color)| {\r
+                    let x = j as f32 * w_step;\r
+                    let mut square = Rectangle(w_step as f32, h_step as f32).build();\r
+                    square\r
+                        .put_anchor_on(\r
+                            Anchor::edge(-1, -1, 0),\r
+                            padded_frame_start.extend(0.0) + vec3(x, y, 0.0),\r
+                        )\r
+                        .set_color(*color)\r
+                        .set_stroke_width(0.0);\r
+                    square\r
+                })\r
+            })\r
+            .collect::<Group<_>>();\r
+        let _squares = timeline.insert_group(squares);\r
         timeline.forward(0.01);\r
     }\r
 }\r
@@ -68,11 +72,11 @@ fn main() {\r
         .init();\r
 \r
     let options = AppOptions::default();\r
-    render_timeline_at_sec(PalettesScene, 0.0, \"preview.png\", &options);\r
-    render_timeline_at_sec(PalettesScene, 0.0, \"output.png\", &options);\r
+    build_and_render_timeline_at_sec(PalettesScene, 0.0, \"preview.png\", &options);\r
+    build_and_render_timeline_at_sec(PalettesScene, 0.0, \"output.png\", &options);\r
 }\r
 
 ```"""
-hash = "5c6ef4ed8198605b19c8400ef640ea7d1149d1cd"
+hash = "48d8c0a7c2b0761602807016067dae533502beb7"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/output.png"]
