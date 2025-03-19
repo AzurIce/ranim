@@ -35,9 +35,10 @@ impl TimelineConstructor for HelloRanimScene {\r
 \r
 fn main() {\r
     build_and_render_timeline(HelloRanimScene, &AppOptions::default());\r
+    build_and_render_timeline_at_sec(HelloRanimScene, 0.0, \"preview.png\", &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "91761e9e586efe067ce863b4b0e738255c3d09f5"
+hash = "14277bc77a919f5e72fc7500e49a80566095dcfd"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]

@@ -18,7 +18,7 @@ impl TimelineConstructor for PerspectiveBlendScene {
         camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
         camera.data.pos = Vec3::Z * 5.0;
-        timeline.update(&camera);
+        timeline.update(camera);
 
         // Create a cube
         let side_length = 2.0;
@@ -87,17 +87,16 @@ impl TimelineConstructor for PerspectiveBlendScene {
                 data.rotate(std::f32::consts::PI / 6.0, Vec3::Y)
                     .rotate(std::f32::consts::PI / 6.0, Vec3::X);
             })
-            .with_duration(3.0),
+            .with_duration(4.0),
         );
-
-        timeline.forward(1.0);
 
         timeline.play(
             camera
                 .transform(|data| {
                     data.perspective_blend = 1.0;
                 })
-                .with_duration(2.0),
+                .with_duration(2.0)
+                .with_padding(2.0, 0.0),
         );
         timeline.sync();
         timeline.insert_time_mark(

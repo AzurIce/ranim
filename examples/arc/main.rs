@@ -37,11 +37,8 @@ impl TimelineConstructor for ArcScene {
 
                 let angle = std::f32::consts::PI * (j + 1.0) / ncol as f32 * 360.0 / 180.0;
                 let radius = step_y / 2.0 * 0.8;
-                let color = start_color.lerp(
-                    end_color,
-                    i as f32 / (nrow - 1) as f32,
-                    HueDirection::Increasing,
-                );
+                let color =
+                    start_color.lerp(end_color, i / (nrow - 1) as f32, HueDirection::Increasing);
                 let offset =
                     frame_start + vec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
                 let mut arc = Arc { angle, radius }.build();

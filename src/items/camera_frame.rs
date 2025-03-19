@@ -9,13 +9,7 @@ use crate::prelude::{Alignable, Interpolatable};
 /// The [`CameraFrame`] has a [`CameraFrame::perspective_blend`] property (default is `0.0`),
 /// which is used to blend between orthographic and perspective projection.
 ///
-/// When an CameraFrame is created using [`CameraFrame::new_with_size`],
-/// it is first located at the origin and looking to the negative z-axis.
-///
-/// Then, the [`CameraFrame::center_canvas_in_frame`] method is used to
-/// correct the position of the camera, this makes the canvas with the given size
-/// located at origin fit in the frame when [`CameraFrame::perspective_blend`] is `1.0`.
-///
+/// See [`CameraFrame::DEFAULT`] for the default value.
 #[derive(Clone, Debug)]
 pub struct CameraFrame {
     pub pos: Vec3,
@@ -56,27 +50,31 @@ impl Alignable for CameraFrame {
     fn align_with(&mut self, _other: &mut Self) {}
 }
 
+impl Default for CameraFrame {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 impl CameraFrame {
+    /// The default value of [`CameraFrame`]
+    pub const DEFAULT: Self = Self {
+        pos: Vec3::ZERO,
+        up: Vec3::Y,
+        facing: Vec3::NEG_Z,
+
+        scale: 1.0,
+        fovy: std::f32::consts::PI / 2.0,
+
+        near: -1000.0,
+        far: 1000.0,
+        perspective_blend: 0.0,
+    };
     /// Create a new CameraFrame at the origin facing to the negative z-axis and use Y as up vector.
     ///
-    /// The default projection settings are:
-    /// - orthographic projection with a scale of `1.0`
-    /// - perspective projection with a field of view of `90.0` degrees
-    /// - near plane at `-1000.0` and far plane at `1000.0`(note that perspective projection clamps near plane to `min=0.1`)
-    /// - perspective blend is `0.0`
+    /// See [`CameraFrame::DEFAULT`] for the default projection settings.
     pub fn new() -> Self {
-        Self {
-            pos: Vec3::ZERO,
-            up: Vec3::Y,
-            facing: Vec3::NEG_Z,
-
-            scale: 1.0,
-            fovy: std::f32::consts::PI / 2.0,
-
-            near: -1000.0,
-            far: 1000.0,
-            perspective_blend: 0.0,
-        }
+        Self::default()
     }
 }
 
