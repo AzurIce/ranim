@@ -1,14 +1,13 @@
 name = "arc_between_points"
 code = """
 ```rust,linenos
-use std::time::Instant;\r
-\r
 use env_logger::Env;\r
-use glam::{vec2, Mat2};\r
-use log::info;\r
+use itertools::Itertools;\r
 use ranim::animation::creation::Color;\r
 use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::color::HueDirection;\r
+use ranim::glam::{Mat2, vec2};\r
+use ranim::items::group::Group;\r
 use ranim::items::vitem::ArcBetweenPoints;\r
 use ranim::prelude::*;\r
 use ranim::timeline::TimeMark;\r
@@ -29,18 +28,15 @@ impl TimelineConstructor for ArcBetweenPointsScene {\r
         let ntan = 16;\r
         let nrad = 5;\r
 \r
-        let rad_step = 200.0 / nrad as f32;\r
-        let width_step = 50.0 / (nrad as f32).powi(2);\r
-        let angle_step = std::f32::consts::PI * 7.0 / 4.0 / nrad as f32;\r
-\r
-        let mut arcs = Vec::with_capacity(nrad * ntan);\r
-        for i in 0..nrad {\r
-            let t = Instant::now();\r
-            let rad = rad_step * (i + 1) as f32;\r
-            let width = width_step * ((nrad - i) as f32).powi(2);\r
-            let angle = angle_step * (i + 1) as f32;\r
-\r
-            for j in 0..ntan {\r
+        let arcs = (0..nrad)\r
+            .map(|i| {\r
+                let radius = 6.0 * (i + 1) as f32 / nrad as f32;\r
+                let width = 6.0 * ((nrad - i) as f32 / nrad as f32).powi(2);\r
+                let angle = std::f32::consts::PI * 7.0 / 4.0 * (i + 1) as f32 / nrad as f32;\r
+                (radius, width, angle)\r
+            })\r
+            .cartesian_product(0..ntan)\r
+            .map(|((rad, width, angle), j)| {\r
                 let color = start_color.lerp(\r
                     end_color,\r
                     j as f32 / (ntan - 1) as f32,\r
@@ -57,18 +53,13 @@ impl TimelineConstructor for ArcBetweenPointsScene {\r
                 arc.set_color(color)\r
                     .set_fill_opacity(0.0)\r
                     .set_stroke_width(width);\r
+                arc\r
+            })\r
+            .collect::<Group<_>>();\r
+        let mut arcs = timeline.insert_group(arcs);\r
 \r
-                let mut arc = timeline.insert(arc);\r
-                timeline\r
-                    .play(arc.fade_in().with_duration(3.0 / (nrad * ntan) as f32))\r
-                    .sync();\r
-                arcs.push(arc); // Used to make sure it is not dropped until the end of the `construct`\r
-            }\r
-            info!(\r
-                \"rad [{i}/{nrad}] angle: {angle} width: {width} rad: {rad} cost: {:?}\",\r
-                t.elapsed()\r
-            );\r
-        }\r
+        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());\r
+        timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();\r
         timeline.insert_time_mark(\r
             timeline.duration_secs(),\r
             TimeMark::Capture(\"preview.png\".to_string()),\r
@@ -84,10 +75,10 @@ fn main() {\r
     env_logger::Builder::from_env(Env::default().default_filter_or(\"arc_between_points=info\"))\r
         .init();\r
 \r
-    render_timeline(ArcBetweenPointsScene, &AppOptions::default());\r
+    build_and_render_timeline(ArcBetweenPointsScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "d2733aa74a5f4f28419792300b8c839a5232c71f"
+hash = "1ed983d0275e0d328003d516e20d5ec422ba8165"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/output.mp4"]

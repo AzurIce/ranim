@@ -133,7 +133,7 @@ timeline.play(square.fade_in().chain(|data| data.fade_out()));
 
 这样的好处是对于一些对数据有 **损坏性变更** 的动画（比如 unwrite 等），我们不需要提前对数据进行备份。
 
-!example-getting_started3
+!example-hello_ranim
 
 不过 `chain` 是会以第一个动画的结束状态为基础创建下一个动画的，但是要注意此时的 `AnimSchedule` 是整个被拼接后的动画，如果不调用 `apply` 是不会更新 `Rabject` 内部的数据的，而调用 `apply` 会应用整个被拼接后的动画的变更：
 

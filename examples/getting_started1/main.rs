@@ -4,7 +4,7 @@ use ranim::{
     color::palettes::manim,
     items::vitem::Square,
     prelude::*,
-    render_timeline,
+    build_and_render_timeline,
 };
 
 #[scene]
@@ -16,7 +16,7 @@ impl TimelineConstructor for GettingStarted1Scene {
         timeline: &'t RanimTimeline,
         _camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
-        let mut square = Square(300.0).build();
+        let mut square = Square(2.0).build();
         square.set_color(manim::BLUE_C);
 
         let mut square = timeline.insert(square);
@@ -26,5 +26,5 @@ impl TimelineConstructor for GettingStarted1Scene {
 }
 
 fn main() {
-    render_timeline(GettingStarted1Scene, &AppOptions::default());
+    build_and_render_timeline(GettingStarted1Scene, &AppOptions::default());
 }

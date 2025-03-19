@@ -3,7 +3,7 @@ code = """
 ```rust,linenos
 use std::f32::consts::PI;\r
 \r
-use glam::{Vec3, vec3};\r
+use glam::{Vec3, vec2, vec3};\r
 use ranim::{\r
     animation::{creation::WritingAnimSchedule, transform::GroupTransformAnimSchedule},\r
     color::palettes::manim,\r
@@ -66,9 +66,9 @@ impl TimelineConstructor for RanimLogoScene {\r
     fn construct<'t: 'r, 'r>(\r
         self,\r
         timeline: &'t RanimTimeline,\r
-        camera: &'r mut Rabject<'t, CameraFrame>,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
-        let frame_size = camera.data.frame_size();\r
+        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);\r
         let logo_width = frame_size.y * 0.618;\r
 \r
         let mut logo = build_logo(logo_width)\r
@@ -103,7 +103,7 @@ impl TimelineConstructor for RanimLogoScene {\r
                         .transform(|data| {\r
                             data.scale_by_anchor(scale, anchor)\r
                                 .scale_by_anchor(vec3(0.9, 0.9, 1.0), Anchor::origin())\r
-                                .shift(vec3(0.0, frame_size.y / 9.0, 0.0));\r
+                                .shift(vec3(0.0, 1.3, 0.0));\r
                         })\r
                         .with_rate_func(smooth)\r
                         .apply(),\r
@@ -113,10 +113,15 @@ impl TimelineConstructor for RanimLogoScene {\r
         let mut ranim_text = Group::<VItem>::from_svg(typst_svg!(\r
             r#\"\r
 #align(center)[\r
-    #text(60pt, font: \"LXGW Bright\")[Ranim]\r
+    #text(10pt, font: \"LXGW Bright\")[Ranim]\r
 ]\"#\r
         ));\r
-        ranim_text.shift(vec3(0.0, -frame_size.y * 2.5 / 8.0, 0.0));\r
+        {\r
+            let bb = ranim_text.get_bounding_box();\r
+            ranim_text\r
+                .scale(Vec3::splat(1.0 / (bb[2].y - bb[0].y)))\r
+                .put_center_on(Vec3::NEG_Y * 2.5);\r
+        }\r
         let mut ranim_text = ranim_text\r
             .into_iter()\r
             .map(|item| timeline.insert(item))\r
@@ -135,10 +140,7 @@ impl TimelineConstructor for RanimLogoScene {\r
         );\r
         timeline.forward(1.0);\r
 \r
-        let mut all = logo\r
-            .into_iter()\r
-            .chain(ranim_text.into_iter())\r
-            .collect::<Group<_>>();\r
+        let mut all = logo.into_iter().chain(ranim_text).collect::<Group<_>>();\r
         timeline.play(all.lagged_anim(0.0, |item| {\r
             item.unwrite().with_duration(3.0).with_rate_func(smooth)\r
         }));\r
@@ -146,10 +148,10 @@ impl TimelineConstructor for RanimLogoScene {\r
 }\r
 \r
 fn main() {\r
-    render_timeline(RanimLogoScene, &AppOptions::default());\r
+    build_and_render_timeline(RanimLogoScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "f0c7be1fabe59142d491278d2054f913fdcadf74"
+hash = "54155807364440c33799c7429912057521a1c6f9"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/output.mp4"]

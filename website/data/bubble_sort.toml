@@ -1,11 +1,11 @@
 name = "bubble_sort"
 code = """
 ```rust,linenos
-use glam::{ivec3, vec2, vec3, Vec3};\r
-use rand::{seq::SliceRandom, SeedableRng};\r
+use glam::{Vec3, vec2};\r
+use rand::{SeedableRng, seq::SliceRandom};\r
 use ranim::{\r
-    animation::transform::TransformAnimSchedule, color::palettes::manim, items::vitem::Rectangle,\r
-    prelude::*, timeline::TimeMark, utils::rate_functions::linear,\r
+    animation::transform::TransformAnimSchedule, color::palettes::manim, components::Anchor,\r
+    items::vitem::Rectangle, prelude::*, timeline::TimeMark, utils::rate_functions::linear,\r
 };\r
 \r
 #[scene]\r
@@ -15,18 +15,17 @@ impl TimelineConstructor for BubbleSortScene {\r
     fn construct<'t: 'r, 'r>(\r
         self,\r
         timeline: &'t RanimTimeline,\r
-        camera: &'r mut Rabject<'t, CameraFrame>,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
         let num = self.0;\r
 \r
-        let frame_size = camera.data.frame_size();\r
-        let anim_step_duration = 15.0 / num.pow(2) as f32;\r
-        let padding = frame_size.x * 0.05;\r
-        let gap = 20.0 / (num as f32).log10();\r
-        let rect_width = (frame_size.x - 2.0 * padding - (num - 1) as f32 * gap) / num as f32;\r
+        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);\r
+        let padded_frame_size = frame_size * 0.9;\r
 \r
-        let max_height = frame_size.y - 2.0 * padding;\r
-        let height_unit = max_height / num as f32;\r
+        let anim_step_duration = 15.0 / num.pow(2) as f32;\r
+\r
+        let width_unit = padded_frame_size.x / num as f32;\r
+        let height_unit = padded_frame_size.y / num as f32;\r
 \r
         let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);\r
         let mut heights = (1..=num)\r
@@ -34,24 +33,23 @@ impl TimelineConstructor for BubbleSortScene {\r
             .collect::<Vec<f32>>();\r
         heights.shuffle(&mut rng);\r
 \r
-        let frame_bl = vec2(frame_size.x / -2.0, frame_size.y / -2.0);\r
+        let padded_frame_bl = vec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
         let mut rects = heights\r
             .iter()\r
             .enumerate()\r
             .map(|(i, &height)| {\r
-                let mut rect = Rectangle(rect_width, height).build();\r
-                let bottom_left = rect.get_bounding_box_point(ivec3(-1, -1, 0));\r
-                let target_coord = frame_bl.extend(0.0)\r
-                    + vec3(padding, padding, 0.0)\r
-                    + Vec3::X * (rect_width + gap) * i as f32;\r
-                rect.shift(target_coord - bottom_left)\r
+                let mut rect = Rectangle(width_unit, height).build();\r
+                let target_bc_coord = padded_frame_bl.extend(0.0)\r
+                    + Vec3::X * (width_unit * i as f32 + width_unit / 2.0);\r
+                rect.scale(Vec3::splat(0.8))\r
+                    .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord)\r
                     .set_color(manim::WHITE)\r
                     .set_fill_opacity(0.5);\r
                 timeline.insert(rect)\r
             })\r
             .collect::<Vec<_>>();\r
 \r
-        let shift_right = Vec3::X * (gap + rect_width);\r
+        let shift_right = Vec3::X * width_unit;\r
         for i in (1..num).rev() {\r
             for j in 0..i {\r
                 timeline.play(\r
@@ -131,14 +129,14 @@ impl TimelineConstructor for BubbleSortScene {\r
 }\r
 \r
 fn main() {\r
-    render_timeline(\r
+    build_and_render_timeline(\r
         BubbleSortScene(10),\r
         &AppOptions {\r
             output_filename: \"output-10.mp4\",\r
             ..Default::default()\r
         },\r
     );\r
-    render_timeline(\r
+    build_and_render_timeline(\r
         BubbleSortScene(100),\r
         &AppOptions {\r
             output_filename: \"output-100.mp4\",\r
@@ -148,6 +146,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "bddb6f0a52d7b77c9e2169cc30ffa97630b29f09"
+hash = "c672dc3e7d5163e1f518f9e5333d06c5a25f2f0e"
 preview_imgs = ["/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
 output_files = ["/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/output-100.mp4"]
