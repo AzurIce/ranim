@@ -3,7 +3,7 @@
 use std::{f32::consts::PI, time::Duration};
 
 use env_logger::Env;
-use glam::Vec3;
+use glam::{Vec3, vec3};
 use ranim::{
     animation::{
         creation::{CreationAnim, WritingAnim},
@@ -12,6 +12,7 @@ use ranim::{
     components::Anchor,
     items::{
         camera_frame::CameraFrame,
+        group::Group,
         svg_item::SvgItem,
         vitem::{Square, VItem},
     },
@@ -41,10 +42,9 @@ impl TimelineConstructor for TestScene {
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=trace")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("test=trace")).init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test_scene=info,ranim=trace"))
-        .init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("test=info,ranim=trace")).init();
     // println!("main");
     render_timeline(
         TestScene,

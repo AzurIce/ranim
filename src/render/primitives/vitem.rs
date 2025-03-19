@@ -203,7 +203,7 @@ mod test {
         let (width, height) = (1920, 1080);
         let camera = CameraFrame::new_with_size(width, height);
         let uniforms = CameraUniforms {
-            proj_mat: camera.projection_matrix(),
+            proj_mat: camera.perspective_mat(width as f32 / height as f32),
             view_mat: camera.view_matrix(),
             half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
             _padding: [0.0; 2],
