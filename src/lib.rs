@@ -31,11 +31,7 @@ pub mod prelude {
     pub use crate::timeline::RanimTimeline;
 
     pub use crate::color::prelude::*;
-    pub use crate::interpolate::Interpolatable;
-
-    pub use crate::animation::creation::{Color, Empty, Fill, Partial, Stroke};
-    pub use crate::animation::fading::Opacity;
-    pub use crate::animation::transform::Alignable;
+    pub use crate::traits::*;
 
     pub use crate::items::Blueprint;
 
@@ -44,8 +40,8 @@ pub mod prelude {
 
 pub mod color;
 mod file_writer;
-mod interpolate;
 pub mod timeline;
+pub mod traits;
 
 pub mod animation;
 pub mod components;

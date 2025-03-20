@@ -70,10 +70,10 @@ fn main() {\r
     #[cfg(not(debug_assertions))]\r
     env_logger::Builder::from_env(Env::default().default_filter_or(\"arc=info\")).init();\r
 \r
-    build_and_render_timeline(ArcScene, &AppOptions::default());\r
+    render_scene(ArcScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "e21199a8bf037ed0bf976ea6200b8ca7ae473114"
+hash = "444a06a6ec364b2674a20df967d43b8f80f06abf"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/output.mp4"]

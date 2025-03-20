@@ -116,10 +116,10 @@ fn main() {\r
         ..Default::default()\r
     };\r
 \r
-    build_and_render_timeline(PerspectiveBlendScene, &options);\r
+    render_scene(PerspectiveBlendScene, &options);\r
 }\r
 
 ```"""
-hash = "8502fe0533d88f4499ef795d911a49431e3ce9c3"
+hash = "1ed553df2ba4c93d2c66b233ff9c1390db0a7e93"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/output.mp4"]

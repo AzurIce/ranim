@@ -4,10 +4,10 @@ code = """
 use ranim::{
     AppOptions,
     animation::fading::{FadingAnim, FadingAnimSchedule},
-    build_and_render_timeline,
     color::palettes::manim,
     items::vitem::Square,
     prelude::*,
+    render_scene,
 };
 
 #[scene]
@@ -29,10 +29,10 @@ impl TimelineConstructor for GettingStarted1Scene {
 }
 
 fn main() {
-    build_and_render_timeline(GettingStarted1Scene, &AppOptions::default());
+    render_scene(GettingStarted1Scene, &AppOptions::default());
 }
 
 ```"""
-hash = "b870db34a820626c463dd5124f1d31339e1d1b8f"
+hash = "89619598c84cbd6307305984fc42bf1875f5afec"
 preview_imgs = []
 output_files = ["/examples/getting_started1/output.mp4"]

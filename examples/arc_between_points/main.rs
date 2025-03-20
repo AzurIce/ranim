@@ -1,6 +1,5 @@
 use env_logger::Env;
 use itertools::Itertools;
-use ranim::animation::creation::Color;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::glam::{Mat2, vec2};

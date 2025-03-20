@@ -1,10 +1,8 @@
 use super::{AnimSchedule, Animation, EvalDynamic, ToEvaluator};
 use crate::items::Rabject;
-use crate::prelude::Interpolatable;
+use crate::traits::{Empty, Fill, Interpolatable, Partial, Stroke};
 use crate::utils::rate_functions::smooth;
-use color::{AlphaColor, Srgb};
 use log::warn;
-use std::ops::Range;
 
 // MARK: Creation
 
@@ -212,35 +210,3 @@ impl<T: WritingRequirement> EvalDynamic<T> for Unwrite<T> {
         }
     }
 }
-
-// MARK: Traits
-
-pub trait Partial {
-    fn get_partial(&self, range: Range<f32>) -> Self;
-}
-
-pub trait Empty {
-    fn empty() -> Self;
-}
-
-pub trait Fill {
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self;
-    fn fill_color(&self) -> AlphaColor<Srgb>;
-    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
-}
-
-pub trait Stroke {
-    fn set_stroke_width(&mut self, width: f32) -> &mut Self;
-    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
-    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self;
-}
-
-pub trait Color: Fill + Stroke {
-    fn set_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.set_fill_color(color);
-        self.set_stroke_color(color);
-        self
-    }
-}
-
-impl<T: Fill + Stroke> Color for T {}

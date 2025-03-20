@@ -129,14 +129,14 @@ impl TimelineConstructor for BubbleSortScene {\r
 }\r
 \r
 fn main() {\r
-    build_and_render_timeline(\r
+    render_scene(\r
         BubbleSortScene(10),\r
         &AppOptions {\r
             output_filename: \"output-10.mp4\",\r
             ..Default::default()\r
         },\r
     );\r
-    build_and_render_timeline(\r
+    render_scene(\r
         BubbleSortScene(100),\r
         &AppOptions {\r
             output_filename: \"output-100.mp4\",\r
@@ -146,6 +146,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "c672dc3e7d5163e1f518f9e5333d06c5a25f2f0e"
+hash = "6c1f0a8113d467b7be8b6258f26b85542626ed2e"
 preview_imgs = ["/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
 output_files = ["/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/output-100.mp4"]

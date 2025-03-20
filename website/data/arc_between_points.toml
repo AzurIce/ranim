@@ -3,7 +3,6 @@ code = """
 ```rust,linenos
 use env_logger::Env;\r
 use itertools::Itertools;\r
-use ranim::animation::creation::Color;\r
 use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::color::HueDirection;\r
 use ranim::glam::{Mat2, vec2};\r
@@ -75,10 +74,10 @@ fn main() {\r
     env_logger::Builder::from_env(Env::default().default_filter_or(\"arc_between_points=info\"))\r
         .init();\r
 \r
-    build_and_render_timeline(ArcBetweenPointsScene, &AppOptions::default());\r
+    render_scene(ArcBetweenPointsScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "1ed983d0275e0d328003d516e20d5ec422ba8165"
+hash = "430a5d45d85e01390e89485f1a1bae968c4f8ad4"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/output.mp4"]
