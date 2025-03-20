@@ -195,6 +195,21 @@ pub trait Transformable<T: Transform3dComponent> {
         );
         self
     }
+    /// Scale the mobject to a given hint.
+    ///
+    /// See [`ScaleHint`] for more details.
+    fn scale_to(&mut self, hint: ScaleHint) -> &mut Self {
+        let bb = self.get_bounding_box();
+        let scale = match hint {
+            ScaleHint::Height(h) => vec3(1.0, h / (bb[2].y - bb[0].y), 1.0),
+            ScaleHint::Width(w) => vec3(w / (bb[2].x - bb[0].x), 1.0, 1.0),
+            ScaleHint::Size(w, h) => vec3(w / (bb[2].x - bb[0].x), h / (bb[2].y - bb[0].y), 1.0),
+            ScaleHint::PorportionalHeight(h) => Vec3::splat(h / (bb[2].y - bb[0].y)),
+            ScaleHint::PorportionalWidth(w) => Vec3::splat(w / (bb[2].x - bb[0].x)),
+        };
+        self.scale(scale);
+        self
+    }
     /// Scale the mobject from its center by a given scale vector.
     ///
     /// This is equivalent to [`Transformable::scale_by_anchor`] with [`Anchor::center`].
@@ -395,6 +410,7 @@ impl<T: HasTransform3d<C>, C: Transform3dComponent> Transformable<C> for T {
     }
 }
 
+// MARK: Anchor
 /// The anchor of the transformation.
 #[derive(Debug, Clone, Copy)]
 pub enum Anchor {
@@ -420,6 +436,21 @@ impl Anchor {
     pub fn edge(x: i32, y: i32, z: i32) -> Self {
         Self::Edge(ivec3(x, y, z))
     }
+}
+
+// MARK: ScaleTo
+/// A hint for scaling the mobject.
+pub enum ScaleHint {
+    /// Scale the mobject to a given height, the width will remain unchanged.
+    Height(f32),
+    /// Scale the mobject to a given width, the height will remain unchanged.
+    Width(f32),
+    /// Scale the mobject to a given size.
+    Size(f32, f32),
+    /// Scale the mobject proportionally to a given height, the width will also be scaled accordingly.
+    PorportionalHeight(f32),
+    /// Scale the mobject proportionally to a given width, the height will also be scaled accordingly.
+    PorportionalWidth(f32),
 }
 
 // MARK: Transform3d

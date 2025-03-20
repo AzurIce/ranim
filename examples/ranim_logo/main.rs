@@ -4,7 +4,7 @@ use glam::{Vec3, vec2, vec3};
 use ranim::{
     animation::{creation::WritingAnimSchedule, transform::GroupTransformAnimSchedule},
     color::palettes::manim,
-    components::Anchor,
+    components::{Anchor, ScaleHint},
     items::{
         group::Group,
         vitem::{Polygon, Rectangle, Square, VItem},
@@ -113,12 +113,9 @@ impl TimelineConstructor for RanimLogoScene {
     #text(10pt, font: "LXGW Bright")[Ranim]
 ]"#
         ));
-        {
-            let bb = ranim_text.get_bounding_box();
-            ranim_text
-                .scale(Vec3::splat(1.0 / (bb[2].y - bb[0].y)))
-                .put_center_on(Vec3::NEG_Y * 2.5);
-        }
+        ranim_text
+            .scale_to(ScaleHint::PorportionalHeight(1.0))
+            .put_center_on(Vec3::NEG_Y * 2.5);
         let mut ranim_text = ranim_text
             .into_iter()
             .map(|item| timeline.insert(item))

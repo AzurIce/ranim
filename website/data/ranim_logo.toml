@@ -7,7 +7,7 @@ use glam::{Vec3, vec2, vec3};\r
 use ranim::{\r
     animation::{creation::WritingAnimSchedule, transform::GroupTransformAnimSchedule},\r
     color::palettes::manim,\r
-    components::Anchor,\r
+    components::{Anchor, ScaleHint},\r
     items::{\r
         group::Group,\r
         vitem::{Polygon, Rectangle, Square, VItem},\r
@@ -116,12 +116,9 @@ impl TimelineConstructor for RanimLogoScene {\r
     #text(10pt, font: \"LXGW Bright\")[Ranim]\r
 ]\"#\r
         ));\r
-        {\r
-            let bb = ranim_text.get_bounding_box();\r
-            ranim_text\r
-                .scale(Vec3::splat(1.0 / (bb[2].y - bb[0].y)))\r
-                .put_center_on(Vec3::NEG_Y * 2.5);\r
-        }\r
+        ranim_text\r
+            .scale_to(ScaleHint::PorportionalHeight(1.0))\r
+            .put_center_on(Vec3::NEG_Y * 2.5);\r
         let mut ranim_text = ranim_text\r
             .into_iter()\r
             .map(|item| timeline.insert(item))\r
@@ -152,6 +149,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "ebaa08d283854b7706a7fae67eed34c6d96e2998"
+hash = "d47f8d33169d596ad993771c28e392f9b74b28b7"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/output.mp4"]
