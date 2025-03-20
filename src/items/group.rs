@@ -10,16 +10,37 @@ use std::ops::{Deref, DerefMut};
 /// let group = Group(vec![1, 2, 3, 4]);
 /// ```
 ///
+/// # Group of [`crate::items::Item`]s
+///
 /// For convinience, [`Group<T>`] also implements [`FromIterator`] and
 /// [`IntoIterator<Item = T>`], so it can be collected from an iterator,
-/// and also can be used for `impl IntoIterator<Item = T>`:
+/// and also can be used for `impl IntoIterator<Item = T>`.
 ///
 /// ```rust
-/// let group = (0..9).map(|i| Square(100.0 * i as f32).build()).collect::<Group<_>>();
-/// let group = group.into_iter().map(|item| timeline.insert(item)).collect::<Group<_>>();
+/// let mut group = (0..9).map(|i| Square(100.0 * i as f32).build()).collect::<Group<_>>();
 /// ```
 ///
-/// # Group of [`crate::items::Item`]s
+/// Note that some operations like [`crate::components::Transformable`] for a group of items
+/// should have different implementation for a single item and a group of items.
+/// (For example, scaling the whole group is not equivalent to scaling each item).
+///
+/// In this case, `[T]` normally has the different implementation. And [`Group<T>`]
+/// implements [`Deref`], [`DerefMut`], [`AsRef`], [`AsMut`] to `[T]`.
+/// So a group of items (or its slice) will have the implementation:
+///
+/// ```rust
+/// group[0..3].scale_by_anchor(vec3(0.5, 0.5, 1.0), Anchor::origin());
+/// ```
+///
+/// A group of items can be inserted into the timeline with
+/// [`crate::timeline::RanimTimeline::insert_group`] to get
+/// a group of [`crate::items::Rabject`]s:
+///
+/// ```rust
+/// let group = timeline.insert_group(group);
+/// ```
+///
+/// # Group of [`crate::items::Rabject`]s
 ///
 /// You can use [`Group::lagged_anim`] to create animation on every item:
 ///
@@ -30,8 +51,8 @@ use std::ops::{Deref, DerefMut};
 /// ```
 ///
 /// For some animations (like [`crate::animation::transform::Transform`]), it may support
-/// creating directly from item's slice. This often happens when some operation on the group
-/// is not equivalent to applying the same operation on each item (like [`crate::components::Transformable::scale`]).
+/// creating directly from item's slice. Since it may involves some group operations which
+/// is not equivalent to applying the same operation on each item (like [`crate::components::Transformable`]).
 ///
 /// For example, if logo is a `Group<VItem>` with six elements:
 ///
@@ -61,9 +82,6 @@ use std::ops::{Deref, DerefMut};
 ///         );
 ///     });
 /// ```
-///
-/// [`AsRef<[T]>`](AsRef) and [`AsMut<[T]>`](AsMut) are implemented for `Group<T>`.
-///
 ///
 #[derive(Clone)]
 pub struct Group<T>(pub Vec<T>);
