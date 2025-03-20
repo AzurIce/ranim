@@ -153,6 +153,12 @@ impl<T: Component> ComponentVec<T> {
 pub trait PointWise {}
 
 // MARK: Transformable
+/// A trait about transforming the mobject in 3d space.
+///
+/// This trait is automatically implemented for `T` that implements [`HasTransform3d`].
+/// And for `T` that implements this trait, `[T]` will also implement this trait.
+///
+/// But should note that, `[T]`'s implementation is not equivalent to doing the same operation on each item, The [`Anchor`] point will be calculated from the bounding box of the whole slice.
 pub trait Transformable<T: Transform3dComponent> {
     fn get_start_position(&self) -> Option<Vec3>;
     fn get_end_position(&self) -> Option<Vec3>;
@@ -189,7 +195,9 @@ pub trait Transformable<T: Transform3dComponent> {
         );
         self
     }
-    /// Scale the mobject by a given vector.
+    /// Scale the mobject from its center by a given scale vector.
+    ///
+    /// This is equivalent to [`Transformable::scale_by_anchor`] with [`Anchor::center`].
     fn scale(&mut self, scale: Vec3) -> &mut Self {
         self.scale_by_anchor(scale, Anchor::center())
     }
@@ -268,7 +276,11 @@ pub trait Transformable<T: Transform3dComponent> {
     }
 
     // Bounding box
+    /// Get the bounding box of the mobject in [min, mid, max] order.
     fn get_bounding_box(&self) -> [Vec3; 3];
+    /// Get the bounding box point of the mobject at an edge Anchor.
+    ///
+    /// See [`Anchor`].
     fn get_bounding_box_point(&self, edge: IVec3) -> Vec3 {
         let bb = self.get_bounding_box();
         let signum = (edge.signum() + IVec3::ONE).as_uvec3();
@@ -279,6 +291,10 @@ pub trait Transformable<T: Transform3dComponent> {
             bb[signum.z as usize].z,
         )
     }
+    /// Get the bounding box corners of the mobject.
+    ///
+    /// The order is the cartesian product of [-1, 1] on x, y, z axis.
+    /// Which is `(-1, -1, -1)`, `(-1, -1, 1)`, `(-1, 1, -1)`, `(-1, 1, 1)`, ...
     fn get_bounding_box_corners(&self) -> [Vec3; 8] {
         [-1, 1]
             .into_iter()
@@ -291,6 +307,7 @@ pub trait Transformable<T: Transform3dComponent> {
     }
 }
 
+// MARK: [T]
 impl<T: Transformable<C>, C: Transform3dComponent> Transformable<C> for [T] {
     fn get_start_position(&self) -> Option<Vec3> {
         self.first().and_then(|x| x.get_start_position())
@@ -324,11 +341,12 @@ impl<T: Transformable<C>, C: Transform3dComponent> Transformable<C> for [T] {
     }
 }
 
-impl<T: Transform3dComponent, V: HasTransform3d<T>> Transformable<T> for V {
+// MARK: T
+impl<T: HasTransform3d<C>, C: Transform3dComponent> Transformable<C> for T {
     /// Apply a function to the points of the mobject about the point.
     fn apply_points_function(
         &mut self,
-        f: impl Fn(&mut ComponentVec<T>) + Copy,
+        f: impl Fn(&mut ComponentVec<C>) + Copy,
         anchor: Anchor,
     ) -> &mut Self {
         let anchor = match anchor {
