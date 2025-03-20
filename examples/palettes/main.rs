@@ -1,5 +1,4 @@
 use env_logger::Env;
-use ranim::animation::creation::Color;
 use ranim::color::palettes::manim::*;
 use ranim::components::Anchor;
 use ranim::glam::{vec2, vec3};

@@ -1,5 +1,9 @@
 use super::{AnimSchedule, Animation, EvalDynamic, Rabject, ToEvaluator};
-use crate::{interpolate::Interpolatable, items::group::Group, utils::rate_functions::smooth};
+use crate::{
+    items::group::Group,
+    traits::{Alignable, Interpolatable},
+    utils::rate_functions::smooth,
+};
 
 pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
@@ -130,17 +134,6 @@ pub struct Transform<T: TransformRequirement> {
     dst: T,
     aligned_src: T,
     aligned_dst: T,
-}
-
-/// A trait for aligning two items
-///
-/// Alignment is actually the meaning of preparation for interpolation.
-///
-/// For example, if we want to interpolate two VItems, we need to
-/// align all their inner components like `ComponentVec<VPoint>` to the same length.
-pub trait Alignable {
-    fn is_aligned(&self, other: &Self) -> bool;
-    fn align_with(&mut self, other: &mut Self);
 }
 
 impl<T: TransformRequirement> Transform<T> {

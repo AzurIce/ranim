@@ -1,6 +1,6 @@
 use super::{AnimSchedule, Animation, EvalDynamic, ToEvaluator};
 use crate::items::Rabject;
-use crate::prelude::Interpolatable;
+use crate::traits::{Interpolatable, Opacity};
 use crate::utils::rate_functions::smooth;
 
 // MARK: Require Trait
@@ -77,8 +77,4 @@ impl<T: FadingRequirement> EvalDynamic<T> for FadeOut<T> {
     fn eval_alpha(&self, alpha: f32) -> T {
         self.src.lerp(&self.dst, alpha)
     }
-}
-
-pub trait Opacity {
-    fn set_opacity(&mut self, opacity: f32) -> &mut Self;
 }

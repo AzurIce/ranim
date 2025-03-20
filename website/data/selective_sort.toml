@@ -130,14 +130,14 @@ impl TimelineConstructor for SelectiveSortScene {\r
 }\r
 \r
 fn main() {\r
-    build_and_render_timeline(\r
+    render_scene(\r
         SelectiveSortScene(10),\r
         &AppOptions {\r
             output_filename: \"output-10.mp4\",\r
             ..Default::default()\r
         },\r
     );\r
-    build_and_render_timeline(\r
+    render_scene(\r
         SelectiveSortScene(100),\r
         &AppOptions {\r
             output_filename: \"output-100.mp4\",\r
@@ -147,6 +147,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "e3e8ae9aaf7d2db963ec9c0084798dae79884a43"
+hash = "12b05a0f6ec96bcd756b56de4fb4443c86455029"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/output-10.mp4", "/examples/selective_sort/output-100.mp4"]

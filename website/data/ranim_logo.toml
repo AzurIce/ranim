@@ -148,10 +148,10 @@ impl TimelineConstructor for RanimLogoScene {\r
 }\r
 \r
 fn main() {\r
-    build_and_render_timeline(RanimLogoScene, &AppOptions::default());\r
+    render_scene(RanimLogoScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "54155807364440c33799c7429912057521a1c6f9"
+hash = "ebaa08d283854b7706a7fae67eed34c6d96e2998"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/output.mp4"]

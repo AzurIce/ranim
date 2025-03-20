@@ -82,10 +82,10 @@ fn main() {\r
     #[cfg(not(debug_assertions))]\r
     env_logger::Builder::from_env(Env::default().default_filter_or(\"basic=info,ranim=info\")).init();\r
 \r
-    build_and_render_timeline(BasicScene, &AppOptions::default());\r
+    render_scene(BasicScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "04587ed65e99f3a722aa403491ca9e1a05370625"
+hash = "042ab7a106b784e3d6645b45c77df7819f74a55c"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/output.mp4"]

@@ -2,7 +2,6 @@ name = "palettes"
 code = """
 ```rust,linenos
 use env_logger::Env;\r
-use ranim::animation::creation::Color;\r
 use ranim::color::palettes::manim::*;\r
 use ranim::components::Anchor;\r
 use ranim::glam::{vec2, vec3};\r
@@ -72,11 +71,11 @@ fn main() {\r
         .init();\r
 \r
     let options = AppOptions::default();\r
-    build_and_render_timeline_at_sec(PalettesScene, 0.0, \"preview.png\", &options);\r
-    build_and_render_timeline_at_sec(PalettesScene, 0.0, \"output.png\", &options);\r
+    render_scene_at_sec(PalettesScene, 0.0, \"preview.png\", &options);\r
+    render_scene_at_sec(PalettesScene, 0.0, \"output.png\", &options);\r
 }\r
 
 ```"""
-hash = "48d8c0a7c2b0761602807016067dae533502beb7"
+hash = "b7f0a6c400515abf997efd973b4dbf0070a68a0f"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/output.png"]
