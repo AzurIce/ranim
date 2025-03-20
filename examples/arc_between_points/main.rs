@@ -72,5 +72,5 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=info"))
         .init();
 
-    build_and_render_timeline(ArcBetweenPointsScene, &AppOptions::default());
+    render_scene(ArcBetweenPointsScene, &AppOptions::default());
 }

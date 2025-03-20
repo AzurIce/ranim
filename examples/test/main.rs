@@ -46,7 +46,7 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("test=info,ranim=trace")).init();
     // println!("main");
-    build_and_render_timeline(
+    render_scene(
         TestScene,
         &AppOptions {
             frame_rate: 60,

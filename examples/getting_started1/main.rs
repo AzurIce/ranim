@@ -1,10 +1,10 @@
 use ranim::{
     AppOptions,
     animation::fading::{FadingAnim, FadingAnimSchedule},
-    build_and_render_timeline,
     color::palettes::manim,
     items::vitem::Square,
     prelude::*,
+    render_scene,
 };
 
 #[scene]
@@ -26,5 +26,5 @@ impl TimelineConstructor for GettingStarted1Scene {
 }
 
 fn main() {
-    build_and_render_timeline(GettingStarted1Scene, &AppOptions::default());
+    render_scene(GettingStarted1Scene, &AppOptions::default());
 }

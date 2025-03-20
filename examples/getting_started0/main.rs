@@ -27,5 +27,5 @@ impl TimelineConstructor for GettingStarted0Scene {
 }
 
 fn main() {
-    build_and_render_timeline(GettingStarted0Scene, &AppOptions::default());
+    render_scene(GettingStarted0Scene, &AppOptions::default());
 }

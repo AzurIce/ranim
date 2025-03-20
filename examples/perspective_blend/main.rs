@@ -113,5 +113,5 @@ fn main() {
         ..Default::default()
     };
 
-    build_and_render_timeline(PerspectiveBlendScene, &options);
+    render_scene(PerspectiveBlendScene, &options);
 }

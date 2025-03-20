@@ -23,7 +23,7 @@ use render::{Renderer, primitives::RenderInstances};
 pub mod prelude {
     pub use crate::Ranim;
 
-    pub use crate::{AppOptions, build_and_render_timeline, build_and_render_timeline_at_sec};
+    pub use crate::{AppOptions, render_scene, render_scene_at_sec};
     pub use crate::{SceneMetaTrait, TimelineConstructor};
     pub use ranim_macros::scene;
 
@@ -76,9 +76,9 @@ pub trait SceneMetaTrait {
 ///
 /// A struct with [`ranim_macros::scene`] attribute implements [`SceneMetaTrait`], which is basically a type with [`SceneMeta`].
 /// - `#[scene]`: use the *snake_case* of the struct's name (Without the `Scene` suffix) as [`SceneMeta::name`].
-/// - `#[scene(name = "<NAME>"]): use the given name as [`SceneMeta::name`].`
+/// - `#[scene(name = "<NAME>"])`: use the given name as [`SceneMeta::name`].
 ///
-/// [`build_and_render_timeline`] and [`build_and_render_timeline_at_sec`] will output to `<output_dir>/<NAME>/` directory.
+/// [`render_scene`] and [`render_scene_at_sec`] will output to `<output_dir>/<NAME>/` directory.
 ///
 /// # Examples
 /// ```rust
@@ -135,7 +135,7 @@ pub fn build_timeline(constructor: impl TimelineConstructor) -> RanimTimeline {
 }
 
 /// Build the timeline with the scene, and render it
-pub fn build_and_render_timeline(scene: impl Scene, options: &AppOptions) {
+pub fn render_scene(scene: impl Scene, options: &AppOptions) {
     let meta = scene.meta();
     let timeline = build_timeline(scene);
     let mut app = RanimRenderApp::new(options, meta.name);
@@ -143,7 +143,7 @@ pub fn build_and_render_timeline(scene: impl Scene, options: &AppOptions) {
 }
 
 /// Build the timeline with the scene, and render it at a given timestamp
-pub fn build_and_render_timeline_at_sec(
+pub fn render_scene_at_sec(
     scene: impl Scene,
     sec: f32,
     output_file: impl AsRef<Path>,

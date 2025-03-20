@@ -67,5 +67,5 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("arc=info")).init();
 
-    build_and_render_timeline(ArcScene, &AppOptions::default());
+    render_scene(ArcScene, &AppOptions::default());
 }
