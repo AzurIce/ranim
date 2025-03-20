@@ -145,5 +145,5 @@ impl TimelineConstructor for RanimLogoScene {
 }
 
 fn main() {
-    build_and_render_timeline(RanimLogoScene, &AppOptions::default());
+    render_scene(RanimLogoScene, &AppOptions::default());
 }

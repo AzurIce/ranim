@@ -69,6 +69,6 @@ fn main() {
         .init();
 
     let options = AppOptions::default();
-    build_and_render_timeline_at_sec(PalettesScene, 0.0, "preview.png", &options);
-    build_and_render_timeline_at_sec(PalettesScene, 0.0, "output.png", &options);
+    render_scene_at_sec(PalettesScene, 0.0, "preview.png", &options);
+    render_scene_at_sec(PalettesScene, 0.0, "output.png", &options);
 }

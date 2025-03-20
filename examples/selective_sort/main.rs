@@ -127,14 +127,14 @@ impl TimelineConstructor for SelectiveSortScene {
 }
 
 fn main() {
-    build_and_render_timeline(
+    render_scene(
         SelectiveSortScene(10),
         &AppOptions {
             output_filename: "output-10.mp4",
             ..Default::default()
         },
     );
-    build_and_render_timeline(
+    render_scene(
         SelectiveSortScene(100),
         &AppOptions {
             output_filename: "output-100.mp4",

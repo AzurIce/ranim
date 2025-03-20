@@ -31,6 +31,6 @@ impl TimelineConstructor for HelloRanimScene {
 }
 
 fn main() {
-    build_and_render_timeline(HelloRanimScene, &AppOptions::default());
-    build_and_render_timeline_at_sec(HelloRanimScene, 0.0, "preview.png", &AppOptions::default());
+    render_scene(HelloRanimScene, &AppOptions::default());
+    render_scene_at_sec(HelloRanimScene, 0.0, "preview.png", &AppOptions::default());
 }

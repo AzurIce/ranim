@@ -79,5 +79,5 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=info")).init();
 
-    build_and_render_timeline(BasicScene, &AppOptions::default());
+    render_scene(BasicScene, &AppOptions::default());
 }
