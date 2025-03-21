@@ -55,16 +55,34 @@ fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
     let d = q * q + 4.0 * p3 / 27.0;
     let offset = -a / 3.0;
 
+    // single_root
     if (d >= 0.0) {
         let z = sqrt(d);
         let x = (vec2(z, -z) - q) / 2.0;
         let uv = sign(x) * pow(abs(x), vec2(1.0 / 3.0));
-        return vec3(offset + uv.x + uv.y);
+
+        var r = offset + uv.x + uv.y;
+
+        let f = ((r + a) * r + b) * r + c;
+        let f_prime = (3.0 * r + 2.0 * a) * r + b;
+
+        r -= f / f_prime;
+
+        return vec3(r);
     }
+    let u = sqrt(-p / 3.0);
     let v = acos(-sqrt(-27.0 / p3) * q / 2.0) / 3.0;
     let m = cos(v);
     let n = sin(v) * 1.732050808;
-    return vec3(m + m, -n - m, n - m) * sqrt(-p / 3.0) + offset;
+
+    var r = vec3(m + m, -n - m, n - m) * u + offset;
+
+    let f = ((r + a) * r + b) * r + c;
+    let f_prime = (3.0 * r + 2.0 * a) * r + b;
+
+    r -= f / f_prime;
+
+    return r;
 }
 
 fn distance_bezier(pos: vec2<f32>, A: vec2<f32>, _B: vec2<f32>, C: vec2<f32>) -> f32 {
