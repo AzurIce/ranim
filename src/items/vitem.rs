@@ -3,10 +3,10 @@ use glam::{Vec3, Vec4, vec2, vec3, vec4};
 use itertools::Itertools;
 
 use crate::{
-    components::{ComponentVec, Transformable, rgba::Rgba, vpoint::VPoint, width::Width},
+    components::{rgba::Rgba, vpoint::{VPoint, VPointSliceMethods}, width::Width, ComponentVec, Transformable},
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::{ExtractFrom, RenderInstance, RenderInstances, vitem::VItemPrimitive},
+    render::primitives::{vitem::VItemPrimitive, ExtractFrom, RenderInstance, RenderInstances},
 };
 
 use super::{Blueprint, Entity};

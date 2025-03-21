@@ -391,20 +391,29 @@ fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
         for segment in path.data().segments() {
             match segment {
                 usvg::tiny_skia_path::PathSegment::MoveTo(p) => {
+                    // println!("MoveTo: {:?}", vec3(p.x, p.y, 0.0));
                     builder.move_to(vec3(p.x, p.y, 0.0))
                 }
                 usvg::tiny_skia_path::PathSegment::LineTo(p) => {
+                    // println!("LineTo: {:?}", vec3(p.x, p.y, 0.0));
                     builder.line_to(vec3(p.x, p.y, 0.0))
                 }
                 usvg::tiny_skia_path::PathSegment::QuadTo(p1, p2) => {
+                    // println!("QuadTo: {:?}, {:?}", vec3(p1.x, p1.y, 0.0), vec3(p2.x, p2.y, 0.0));
                     builder.quad_to(vec3(p1.x, p1.y, 0.0), vec3(p2.x, p2.y, 0.0))
                 }
-                usvg::tiny_skia_path::PathSegment::CubicTo(p1, p2, p3) => builder.cubic_to(
-                    vec3(p1.x, p1.y, 0.0),
-                    vec3(p2.x, p2.y, 0.0),
-                    vec3(p3.x, p3.y, 0.0),
-                ),
-                usvg::tiny_skia_path::PathSegment::Close => builder.close_path(),
+                usvg::tiny_skia_path::PathSegment::CubicTo(p1, p2, p3) => {
+                    // println!("CubicTo: {:?}, {:?}, {:?}", vec3(p1.x, p1.y, 0.0), vec3(p2.x, p2.y, 0.0), vec3(p3.x, p3.y, 0.0));
+                    builder.cubic_to(
+                        vec3(p1.x, p1.y, 0.0),
+                        vec3(p2.x, p2.y, 0.0),
+                        vec3(p3.x, p3.y, 0.0),
+                    )
+                }
+                usvg::tiny_skia_path::PathSegment::Close => {
+                    // println!("Close");
+                    builder.close_path()
+                }
             };
         }
         if builder.is_empty() {

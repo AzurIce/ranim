@@ -9,12 +9,9 @@ use ranim::{
         creation::{CreationAnim, WritingAnim},
         transform::{TransformAnim, TransformAnimSchedule},
     },
-    components::Anchor,
+    components::{vpoint::VPointSliceMethods, Anchor, ScaleHint},
     items::{
-        camera_frame::CameraFrame,
-        group::Group,
-        svg_item::SvgItem,
-        vitem::{Square, VItem},
+        camera_frame::CameraFrame, group::Group, nvitem::NVItem, svg_item::SvgItem, vitem::{Square, VItem}
     },
     prelude::*,
     typst_svg,
@@ -31,11 +28,59 @@ impl TimelineConstructor for TestScene {
         timeline: &'t RanimTimeline,
         camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
-        let _item = Square(500.0).build();
-        timeline.forward(1.0);
-        timeline.sync();
-        timeline.play(camera.transform(|camera| camera.fovy = PI / 4.0));
+        // let mut text = Group::<VItem>::from_svg(typst_svg!(r#"#text(font: "LXGW Bright")[意软]"#));
+        // let mut text = Group::<VItem>::from_svg(typst_svg!(r#"#text(font: "LXGW Bright")[有意思]"#));
+        // let mut text = Group::<VItem>::from_svg(typst_svg!(r#"#align(center)[
+        //     #text(font: "LXGW Bright")[有意思]
 
+        //     #text(font: "LXGW Bright")[真的是人用的]
+
+        //     #text(font: "LXGW Bright")[『我』的『软件』]
+        // ]"#));
+        // println!("{}", text.len());
+        // let vpoints = text[0].vpoints.get(0..94).unwrap();
+        // println!("{:?}", vpoints);
+        // println!("{:?}", vpoints.get_closepath_flags());
+        // text.scale_to(ScaleHint::PorportionalHeight(1.5));
+        // let text = text[14].clone();
+        // let vpoints = text.vpoints.get(0..).unwrap();
+        // println!("{:?}", vpoints);
+        // println!("{:?}", vpoints.get_closepath_flags());
+        let item = NVItem::from_nvpoints(vec![
+            [
+                vec3(0.0, 0.0, 0.0),
+                vec3(0.0, 0.0, 0.0),
+                vec3(0.0, 2.0, 0.0),
+            ],
+            [
+                vec3(2.0, 0.0, 0.0),
+                vec3(2.0, 2.0, 0.0),
+                vec3(2.0, 4.0, 0.0),
+            ],
+            // [
+            //     vec3(-2.0, 4.0, 0.0),
+            //     vec3(-2.0, 2.0, 0.0),
+            //     vec3(-2.0, 2.0, 0.0),
+            // ],
+            [
+                vec3(-2.0, 4.0, 0.0),
+                vec3(-2.0, 2.0, 0.0),
+                vec3(-2.0, 0.0, 0.0),
+            ],
+            [
+                vec3(-2.0, 0.0, 0.0),
+                vec3(0.0, 0.0, 0.0),
+                vec3(0.0, 0.0, 0.0),
+            ],
+        ]);
+        // let item = Square(4.0).build();
+
+        let _item = timeline.insert(item);
+
+        // let mut _text = timeline.insert_group(text);
+        // let mut _text = timeline.insert(text);
+
+        timeline.forward(1.0);
         timeline.sync();
     }
 }

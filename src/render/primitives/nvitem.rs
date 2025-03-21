@@ -4,8 +4,8 @@ use crate::{
     render::{
         RenderTextures,
         pipelines::{
-            Map3dTo2dPipeline, VItemPipeline, map_3d_to_2d::ComputeBindGroup,
-            vitem::RenderBindGroup,
+            NVItemMapPointsPipeline, NVItemPipeline, nvitem::RenderBindGroup,
+            nvitem_map_points::ComputeBindGroup,
         },
     },
     utils::{PipelinesStorage, wgpu::WgpuVecBuffer},
@@ -14,11 +14,21 @@ use glam::Vec4;
 
 use super::RenderInstance;
 
-pub struct VItemPrimitive {
-    /// COMPUTE INPUT: (x, y, z, is_closed)
-    pub(crate) points3d_buffer: WgpuVecBuffer<Vec4>,
-    /// COMPUTE OUTPUT, RENDER INPUT: (x, y, is_closed, 0)
-    pub(crate) points2d_buffer: WgpuVecBuffer<Vec4>, // Use vec4 for alignment
+#[repr(C, align(16))]
+#[derive(Debug, Clone, Copy, Default, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct NVPoint {
+    pub prev_handle: Vec4,
+    pub anchor: Vec4,
+    pub next_handle: Vec4,
+    pub closepath: f32,
+    pub _padding: [f32; 3],
+}
+
+pub struct NVItemPrimitive {
+    /// COMPUTE STORAGE: NVPoint
+    pub(crate) points3d_buffer: WgpuVecBuffer<NVPoint>,
+    /// COMPUTE INPUT AND OUTPUT, RENDER INPUT: NVPoint
+    pub(crate) points2d_buffer: WgpuVecBuffer<NVPoint>,
     /// COMPUTE OUTPUT, RENDER INPUT: (min_x, max_x, min_y, max_y, max_w)
     pub(crate) clip_info_buffer: WgpuVecBuffer<i32>,
 
@@ -36,15 +46,15 @@ pub struct VItemPrimitive {
     pub(crate) render_bind_group: Option<RenderBindGroup>,
 }
 
-impl Default for VItemPrimitive {
+impl Default for NVItemPrimitive {
     fn default() -> Self {
         let points3d_buffer = WgpuVecBuffer::new(
             Some("Points 3d Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
         );
         let points2d_buffer = WgpuVecBuffer::new(
             Some("Points 2d Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
         );
         let clip_info_buffer = WgpuVecBuffer::new(
             Some("Clip Info Buffer"),
@@ -79,15 +89,19 @@ impl Default for VItemPrimitive {
     }
 }
 
-impl VItemPrimitive {
+impl NVItemPrimitive {
     pub fn update(
         &mut self,
         ctx: &WgpuContext,
-        render_points: &[Vec4],
+        render_points: &[NVPoint],
         fill_rgbas: &[Rgba],
         stroke_rgbas: &[Rgba],
         stroke_widths: &[Width],
     ) {
+        println!("render_points: {:?}", render_points);
+        println!("fill_rgbas: {:?}", fill_rgbas);
+        println!("stroke_rgbas: {:?}", stroke_rgbas);
+        println!("stroke_widths: {:?}", stroke_widths);
         // Dynamic sized
         if [
             self.points3d_buffer.set(ctx, render_points),
@@ -123,7 +137,7 @@ impl VItemPrimitive {
     }
 }
 
-impl RenderInstance for VItemPrimitive {
+impl RenderInstance for NVItemPrimitive {
     fn encode_render_command(
         &self,
         ctx: &WgpuContext,
@@ -134,10 +148,10 @@ impl RenderInstance for VItemPrimitive {
     ) {
         {
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("VItem Map Points Compute Pass"),
+                label: Some("NVItem Map Points Compute Pass"),
                 timestamp_writes: None,
             });
-            cpass.set_pipeline(pipelines.get_or_init::<Map3dTo2dPipeline>(ctx));
+            cpass.set_pipeline(pipelines.get_or_init::<NVItemMapPointsPipeline>(ctx));
             cpass.set_bind_group(0, uniforms_bind_group, &[]);
 
             cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
@@ -154,7 +168,7 @@ impl RenderInstance for VItemPrimitive {
                 ..
             } = render_textures;
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("VItem Render Pass"),
+                label: Some("NVItem Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     // view: multisample_view,
                     // resolve_target: Some(render_view),
@@ -169,7 +183,7 @@ impl RenderInstance for VItemPrimitive {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            rpass.set_pipeline(pipelines.get_or_init::<VItemPipeline>(ctx));
+            rpass.set_pipeline(pipelines.get_or_init::<NVItemPipeline>(ctx));
             rpass.set_bind_group(0, uniforms_bind_group, &[]);
 
             rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
@@ -180,36 +194,52 @@ impl RenderInstance for VItemPrimitive {
 
 #[cfg(test)]
 mod test {
-    use glam::{Vec2, vec2};
+    use glam::{vec2, vec3, Vec2};
     use image::Rgba;
 
     use crate::{
         context::WgpuContext,
-        items::{Blueprint, camera_frame::CameraFrame, vitem::Square},
+        items::{camera_frame::CameraFrame, nvitem::NVItem},
         render::{
-            CameraUniforms, CameraUniformsBindGroup, RenderTextures,
-            primitives::{ExtractFrom, RenderInstance, RenderInstances},
+            primitives::{nvitem::NVPoint, ExtractFrom, RenderInstance}, CameraUniforms, CameraUniformsBindGroup, RenderTextures
         },
-        utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
+        utils::{get_texture_data, wgpu::WgpuBuffer, PipelinesStorage},
     };
 
-    use super::VItemPrimitive;
+    use super::NVItemPrimitive;
 
     #[test]
     fn test() {
         let ctx = pollster::block_on(WgpuContext::new());
-        let vitem = Square(8.0).build();
-
+        let nvitem = NVItem::from_nvpoints(vec![
+            [
+                vec3(0.0, 0.0, 0.0),
+                vec3(0.0, 0.0, 0.0),
+                vec3(0.0, 1.0, 0.0),
+            ],
+            [
+                vec3(0.0, 1.0, 0.0),
+                vec3(0.0, 2.0, 0.0),
+                vec3(1.0, 2.0, 0.0),
+            ],
+            [
+                vec3(1.0, 2.0, 0.0),
+                vec3(2.0, 2.0, 0.0),
+                vec3(1.0, 1.0, 0.0),
+            ],
+            [
+                vec3(1.0, 1.0, 0.0),
+                vec3(0.0, 0.0, 0.0),
+                vec3(0.0, 0.0, 0.0),
+            ],
+        ]);
+        let mut nvitem_primitive = NVItemPrimitive::default();
         let mut pipelines = PipelinesStorage::default();
-        let mut render_instance = VItemPrimitive::default();
-        render_instance.update_from(&ctx, &vitem);
-
         let (width, height) = (1920, 1080);
-        let frame_size = vec2(8.0 * width as f32 / height as f32, 8.0);
-
+        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);
         let camera = CameraFrame::new();
         let uniforms = CameraUniforms {
-            proj_mat: camera.projection_matrix(frame_size.y, width as f32 / height as f32),
+            proj_mat: camera.projection_matrix(frame_size.y, 16.0 / 9.0),
             view_mat: camera.view_matrix(),
             half_frame_size: frame_size / 2.0,
             _padding: [0.0; 2],
@@ -223,54 +253,11 @@ mod test {
         let camera_bind_group = CameraUniformsBindGroup::new(&ctx, &uniforms_buffer);
         let render_textures = RenderTextures::new(&ctx, width, height);
 
-        let mut encoder = ctx
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Encoder"),
-            });
-
-        // Clear
-        {
-            let RenderTextures {
-                render_view,
-                // multisample_view,
-                // depth_stencil_view,
-                ..
-            } = &render_textures;
-            let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("VMobject Clear Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    // view: multisample_view,
-                    // resolve_target: Some(render_view),
-                    view: render_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                // depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                //     view: depth_stencil_view,
-                //     depth_ops: Some(wgpu::Operations {
-                //         load: wgpu::LoadOp::Clear(1.0),
-                //         store: wgpu::StoreOp::Store,
-                //     }),
-                //     stencil_ops: Some(wgpu::Operations {
-                //         load: wgpu::LoadOp::Clear(0),
-                //         store: wgpu::StoreOp::Store,
-                //     }),
-                // }),
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-        }
-        ctx.queue.submit(Some(encoder.finish()));
-
+        nvitem_primitive.update_from(&ctx, &nvitem);
         let mut encoder = ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        render_instance.encode_render_command(
+        nvitem_primitive.encode_render_command(
             &ctx,
             &mut pipelines,
             &mut encoder,
@@ -278,17 +265,27 @@ mod test {
             &render_textures,
         );
         ctx.queue.submit(Some(encoder.finish()));
-        let res = render_instance.clip_info_buffer.read_buffer(&ctx).unwrap();
-        let res: &[i32] = bytemuck::cast_slice(&res);
-        println!("{:?}", res);
 
-        let texture_data = get_texture_data(&ctx, &render_textures.render_texture);
-        let img_buffer = image::ImageBuffer::<Rgba<u8>, &[u8]>::from_raw(
-            width as u32,
-            height as u32,
-            &texture_data,
-        )
-        .unwrap();
-        img_buffer.save("test.png").unwrap();
+        // let texture_data = get_texture_data(&ctx, &render_textures.render_texture);
+        // let texture_data: &[u8] = bytemuck::cast_slice(&texture_data);
+        // let img_buffer = image::ImageBuffer::<Rgba<u8>, &[u8]>::from_raw(
+        //     width as u32,
+        //     height as u32,
+        //     texture_data,
+        // )
+        // .unwrap();
+        // img_buffer.save("test.png").unwrap();
+
+        let res = nvitem_primitive.points3d_buffer.read_buffer(&ctx).unwrap();
+        let res: &[NVPoint] = bytemuck::cast_slice(&res);
+        println!("points3d: {:?}", res);
+
+        let res = nvitem_primitive.points2d_buffer.read_buffer(&ctx).unwrap();
+        let res: &[NVPoint] = bytemuck::cast_slice(&res);
+        println!("points2d: {:?}", res);
+        // ctx.queue.submit(Some(encoder.finish()));
+        let res = nvitem_primitive.clip_info_buffer.read_buffer(&ctx).unwrap();
+        let res: &[i32] = bytemuck::cast_slice(&res);
+        println!("clip_info: {:?}", res);
     }
 }

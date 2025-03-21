@@ -1,5 +1,6 @@
 pub mod svg_item;
 pub mod vitem;
+pub mod nvitem;
 
 use std::{
     any::{Any, TypeId},

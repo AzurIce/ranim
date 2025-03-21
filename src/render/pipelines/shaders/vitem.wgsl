@@ -204,6 +204,7 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     }
 
     let sgn_d = sgn * d;
+    // return vec4(1.0);
     // return vec4(vec3(d), 1.0);
 
     let e = point(idx + 1u).xy - point(idx).xy;

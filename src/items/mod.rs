@@ -13,6 +13,7 @@ pub mod camera_frame;
 pub mod group;
 pub mod svg_item;
 pub mod vitem;
+pub mod nvitem;
 
 pub type Item = Box<dyn Entity>;
 
