@@ -14,6 +14,7 @@ use crate::{
 pub mod point;
 pub mod rgba;
 pub mod vpoint;
+pub mod nvpoint;
 pub mod width;
 
 /// An component
@@ -23,6 +24,19 @@ impl<T: Debug + Default + Clone + Copy + PartialEq> Component for T {}
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct ComponentVec<T: Component>(Vec<T>);
+
+impl<T: Component> Deref for ComponentVec<T> {
+    type Target = [T];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: Component> DerefMut for ComponentVec<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 // MARK: Trait impls
 
@@ -114,31 +128,18 @@ impl<T: Component> AsMut<Vec<T>> for ComponentVec<T> {
     }
 }
 
-impl<T: Component> Deref for ComponentVec<T> {
-    type Target = Vec<T>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T: Component> DerefMut for ComponentVec<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 impl<T: Component> ComponentVec<T> {
     pub fn extend_from_vec(&mut self, vec: Vec<T>) {
         self.0.extend(vec);
     }
 
     pub fn resize_with_default(&mut self, new_len: usize) {
-        self.resize(new_len, Default::default());
+        self.0.resize(new_len, Default::default());
     }
 
     pub fn resize_with_last(&mut self, new_len: usize) {
         let last = self.last().cloned().unwrap_or_default();
-        self.resize(new_len, last);
+        self.0.resize(new_len, last);
     }
 
     pub fn set_all(&mut self, value: impl Into<T>) {

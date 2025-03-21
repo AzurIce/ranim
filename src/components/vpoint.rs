@@ -82,22 +82,28 @@ impl Partial for ComponentVec<VPoint> {
     }
 }
 
-impl ComponentVec<VPoint> {
-    pub fn get_seg(&self, idx: usize) -> Option<&[VPoint; 3]> {
+pub trait VPointSliceMethods {
+    fn get_seg(&self, idx: usize) -> Option<&[VPoint; 3]>;
+    fn get_closepath_flags(&self) -> Vec<bool>;
+}
+
+impl VPointSliceMethods for [VPoint] {
+    fn get_seg(&self, idx: usize) -> Option<&[VPoint; 3]> {
         self.get(idx * 2..idx * 2 + 3)
             .and_then(|seg| seg.try_into().ok())
     }
-    pub fn get_closepath_flags(&self) -> Vec<bool> {
+    fn get_closepath_flags(&self) -> Vec<bool> {
         let len = self.len();
         let mut flags = vec![false; len];
 
-        // println!("{:?}", self.0);
+        // println!("{:?}", self);
+        // println!("start: {:?}", self.get(0).unwrap());
         let mut i = 0;
-        for mut chunk in &self.0.iter().enumerate().skip(2).chunks(2) {
+        for mut chunk in &self.iter().enumerate().skip(2).chunks(2) {
             let (a, b) = (chunk.next(), chunk.next());
             if let Some((ia, a)) = match (a, b) {
                 (Some((ia, a)), Some((_ib, b))) => {
-                    // println!("chunk[{ia}, {ib}] {:?}", [a, b]);
+                    // println!("chunk[{ia}, {_ib}] {:?}", [a, b]);
                     if a == b { Some((ia, a)) } else { None }
                 }
                 (Some((ia, a)), None) => Some((ia, a)),
@@ -109,6 +115,7 @@ impl ComponentVec<VPoint> {
                     flags[i..=ia].fill(true);
                 }
                 i = ia + 2;
+                // println!("start: {:?}", self.get(i));
             }
         }
 

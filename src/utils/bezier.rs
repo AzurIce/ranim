@@ -72,6 +72,7 @@ impl PathBuilder {
         }
 
         let quads = approx_cubic_with_quadratic([*cur, h1, h2, p]);
+        // println!("quads: {:?}", quads);
         for quad in quads {
             self.quad_to(quad[1], quad[2]);
         }
@@ -203,11 +204,8 @@ pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
         if root <= 0.0 || root >= 1.0 {
             root = (b + sqrt_disc) / (-2. * a);
         }
-        if root <= 0.0 || root >= 1.0 {
-            root = 0.5
-        }
         root
-    };
+    }.clamp(0.0, 1.0);
     if root == 0.0 || root == 1.0 {
         root = 0.5;
     }
@@ -447,5 +445,18 @@ mod test {
         let complex_end = quad_bezier_eval(&complex_bezier, 0.8);
         assert!((trimmed_complex[0] - complex_start).length() < f32::EPSILON);
         assert!((trimmed_complex[2] - complex_end).length() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_approx_cubic_with_quadratic() {
+        let cubic = [
+            vec3(7.15, 8.679, 0.0),
+            vec3(7.04, 8.712, 0.0),
+            vec3(6.941, 8.734, 0.0),
+            vec3(6.864, 8.734, 0.0),
+        ];
+        println!("cubic: {:?}", cubic);
+        let quads = approx_cubic_with_quadratic(cubic);
+        println!("quads: {:?}", quads);
     }
 }
