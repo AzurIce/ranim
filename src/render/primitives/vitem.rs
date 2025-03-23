@@ -131,8 +131,14 @@ impl RenderInstance for VItemPrimitive {
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
         render_textures: &RenderTextures,
+        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
     ) {
+        #[cfg(feature = "profiling")]
+        let mut scope = profiler.scope("vitem rendering", encoder);
         {
+            #[cfg(feature = "profiling")]
+            let mut cpass = scope.scoped_compute_pass("VItem Map Points Compute Pass");
+            #[cfg(not(feature = "profiling"))]
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("VItem Map Points Compute Pass"),
                 timestamp_writes: None,
@@ -153,7 +159,7 @@ impl RenderInstance for VItemPrimitive {
                 render_view,
                 ..
             } = render_textures;
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let rpass_desc = wgpu::RenderPassDescriptor {
                 label: Some("VItem Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     // view: multisample_view,
@@ -168,7 +174,11 @@ impl RenderInstance for VItemPrimitive {
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
-            });
+            };
+            #[cfg(feature = "profiling")]
+            let mut rpass = scope.scoped_render_pass("VItem Render Pass", rpass_desc);
+            #[cfg(not(feature = "profiling"))]
+            let mut rpass = encoder.begin_render_pass(&rpass_desc);
             rpass.set_pipeline(pipelines.get_or_init::<VItemPipeline>(ctx));
             rpass.set_bind_group(0, uniforms_bind_group, &[]);
 

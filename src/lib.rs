@@ -50,6 +50,14 @@ pub mod items;
 pub mod render;
 pub mod utils;
 
+#[cfg(feature = "profiling")]
+// Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
+// the singleton returned by `puffin::GlobalProfiler::lock`. Instead, we need our own `puffin::GlobalProfiler` that we
+// can be several frames behind puffin's main global profiler singleton.
+pub(crate) static PUFFIN_GPU_PROFILER: std::sync::LazyLock<
+    std::sync::Mutex<puffin::GlobalProfiler>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
+
 /// A simple wrapper struct
 ///
 /// This is used temporally for avoiding writing lifetime annotations like
@@ -239,6 +247,22 @@ impl RanimRenderApp {
     }
 
     fn render_timeline(&mut self, timeline: RanimTimeline) {
+        #[cfg(feature = "profiling")]
+        let (_cpu_server, _gpu_server) = {
+            puffin::set_scopes_on(true);
+            // default global profiler
+            let cpu_server =
+                puffin_http::Server::new(&format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT))
+                    .unwrap();
+            // custom gpu profiler in `PUFFIN_GPU_PROFILER`
+            let gpu_server = puffin_http::Server::new_custom(
+                &format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT + 1),
+                |sink| PUFFIN_GPU_PROFILER.lock().unwrap().add_sink(sink),
+                |id| _ = PUFFIN_GPU_PROFILER.lock().unwrap().remove_sink(id),
+            ).unwrap();
+            (cpu_server, gpu_server)
+        };
+
         let frames = (timeline.duration_secs() * self.fps as f32).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
@@ -255,33 +279,47 @@ impl RanimRenderApp {
         (0..frames)
             .map(|f| f as f32 / (frames - 1) as f32)
             .for_each(|alpha| {
+                #[cfg(feature = "profiling")]
+                profiling::scope!("frame");
+
                 let TimelineEvalResult {
                     // EvalResult<CameraFrame>, idx
                     camera_frame,
                     // Vec<(rabject_id, EvalResult<Item>, idx)>
                     items,
-                } = timeline.eval_alpha(alpha);
-                items.iter().for_each(|(id, res, idx)| {
-                    let last_idx = last_idx.entry(*id).or_insert(-1);
-                    let prev_last_idx = *last_idx;
-                    *last_idx = *idx as i32;
-                    match res {
-                        EvalResult::Dynamic(res) => res.prepare_render_instance_for_entity(
-                            &self.ctx.wgpu_ctx,
-                            &mut self.render_instances,
-                            *id,
-                        ),
-                        EvalResult::Static(res) => {
-                            if prev_last_idx != *idx as i32 {
-                                res.prepare_render_instance_for_entity(
-                                    &self.ctx.wgpu_ctx,
-                                    &mut self.render_instances,
-                                    *id,
-                                )
+                } = {
+                    #[cfg(feature = "profiling")]
+                    profiling::scope!("eval");
+
+                    timeline.eval_alpha(alpha)
+                };
+
+                {
+                    #[cfg(feature = "profiling")]
+                    profiling::scope!("prepare");
+                    items.iter().for_each(|(id, res, idx)| {
+                        let last_idx = last_idx.entry(*id).or_insert(-1);
+                        let prev_last_idx = *last_idx;
+                        *last_idx = *idx as i32;
+                        match res {
+                            EvalResult::Dynamic(res) => res.prepare_render_instance_for_entity(
+                                &self.ctx.wgpu_ctx,
+                                &mut self.render_instances,
+                                *id,
+                            ),
+                            EvalResult::Static(res) => {
+                                if prev_last_idx != *idx as i32 {
+                                    res.prepare_render_instance_for_entity(
+                                        &self.ctx.wgpu_ctx,
+                                        &mut self.render_instances,
+                                        *id,
+                                    )
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
+
                 let render_primitives = items
                     .iter()
                     .filter_map(|(id, res, _)| match res {
@@ -301,8 +339,19 @@ impl RanimRenderApp {
                 // println!("{}", render_primitives.len());
                 self.renderer
                     .update_uniforms(&self.ctx.wgpu_ctx, camera_frame);
-                self.renderer.render(&mut self.ctx, &render_primitives);
+
+                {
+                    #[cfg(feature = "profiling")]
+                    profiling::scope!("render");
+
+                    self.renderer.render(&mut self.ctx, &render_primitives);
+                }
+
                 self.update_frame();
+
+                #[cfg(feature = "profiling")]
+                profiling::finish_frame!();
+
                 pb.inc(1);
                 pb.set_message(format!(
                     "rendering {:.1?}/{:.1?}",
