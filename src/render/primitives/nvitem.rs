@@ -50,11 +50,15 @@ impl Default for NVItemPrimitive {
     fn default() -> Self {
         let points3d_buffer = WgpuVecBuffer::new(
             Some("Points 3d Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
         );
         let points2d_buffer = WgpuVecBuffer::new(
             Some("Points 2d Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
         );
         let clip_info_buffer = WgpuVecBuffer::new(
             Some("Clip Info Buffer"),
@@ -145,8 +149,14 @@ impl RenderInstance for NVItemPrimitive {
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
         render_textures: &RenderTextures,
+        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
     ) {
+        #[cfg(feature = "profiling")]
+        let mut scope = profiler.scope("nvitem rendering", encoder);
         {
+            #[cfg(feature = "profiling")]
+            let mut cpass = scope.scoped_compute_pass("NVItem Map Points Compute Pass");
+            #[cfg(not(feature = "profiling"))]
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("NVItem Map Points Compute Pass"),
                 timestamp_writes: None,
@@ -167,7 +177,7 @@ impl RenderInstance for NVItemPrimitive {
                 render_view,
                 ..
             } = render_textures;
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let rpass_desc = wgpu::RenderPassDescriptor {
                 label: Some("NVItem Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     // view: multisample_view,
@@ -182,7 +192,11 @@ impl RenderInstance for NVItemPrimitive {
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
-            });
+            };
+            #[cfg(feature = "profiling")]
+            let mut rpass = scope.scoped_render_pass("NVItem Render Pass", rpass_desc);
+            #[cfg(not(feature = "profiling"))]
+            let mut rpass = encoder.begin_render_pass(&rpass_desc);
             rpass.set_pipeline(pipelines.get_or_init::<NVItemPipeline>(ctx));
             rpass.set_bind_group(0, uniforms_bind_group, &[]);
 
@@ -194,16 +208,17 @@ impl RenderInstance for NVItemPrimitive {
 
 #[cfg(test)]
 mod test {
-    use glam::{vec2, vec3, Vec2};
+    use glam::{Vec2, vec2, vec3};
     use image::Rgba;
 
     use crate::{
         context::WgpuContext,
         items::{camera_frame::CameraFrame, nvitem::NVItem},
         render::{
-            primitives::{nvitem::NVPoint, ExtractFrom, RenderInstance}, CameraUniforms, CameraUniformsBindGroup, RenderTextures
+            CameraUniforms, CameraUniformsBindGroup, RenderTextures,
+            primitives::{ExtractFrom, RenderInstance, nvitem::NVPoint},
         },
-        utils::{get_texture_data, wgpu::WgpuBuffer, PipelinesStorage},
+        utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
     };
 
     use super::NVItemPrimitive;
