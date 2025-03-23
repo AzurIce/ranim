@@ -6,16 +6,21 @@ use log::warn;
 
 use crate::{
     color::{rgb8, rgba},
-    components::{Anchor, vpoint::VPoint},
+    components::{Anchor, HasTransform3dComponent},
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
     render::primitives::{
         ExtractFrom, RenderInstance, RenderInstances, svg_item::SvgItemPrimitive,
     },
-    utils::{bezier::PathBuilder, math::interpolate_usize},
+    utils::math::interpolate_usize,
 };
 
-use super::{Entity, group::Group, vitem::VItem};
+use super::{
+    Blueprint, Entity,
+    group::Group,
+    nvitem::{NVItem, NVItemBuilder},
+    vitem::{VItem, VItemBuilder},
+};
 
 #[derive(Debug, Clone)]
 pub struct SvgItem {
@@ -32,10 +37,21 @@ impl From<VItem> for SvgItem {
 
 // MARK: Transformable
 
-impl Transformable<VPoint> for SvgItem {
+impl Transformable for SvgItem {
+    fn iter_points(&self) -> impl Iterator<Item = &Vec3> {
+        self.vitems
+            .iter()
+            .flat_map(|x| x.transform_3d().iter_points())
+    }
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut Vec3> {
+        self.vitems
+            .iter_mut()
+            .flat_map(|x| x.transform_3d_mut().iter_points_mut())
+    }
+
     fn apply_points_function(
         &mut self,
-        f: impl Fn(&mut crate::components::ComponentVec<VPoint>) + Copy,
+        f: impl Fn(Vec<&mut Vec3>) + Copy,
         anchor: Anchor,
     ) -> &mut Self {
         let point = match anchor {
@@ -333,6 +349,18 @@ impl Group<VItem> {
     }
 }
 
+impl Group<NVItem> {
+    pub fn from_svg(svg: impl AsRef<str>) -> Self {
+        let svg = svg.as_ref();
+        let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();
+
+        let mut nvitem_group = Self(nvitems_from_tree(&tree));
+        nvitem_group.put_center_on(Vec3::ZERO);
+        nvitem_group.rotate(f32::consts::PI, Vec3::X);
+        nvitem_group
+    }
+}
+
 // MARK: misc
 fn parse_paint(paint: &usvg::Paint) -> AlphaColor<Srgb> {
     match paint {
@@ -382,12 +410,79 @@ fn walk_svg_group(group: &usvg::Group) -> impl Iterator<Item = (&usvg::Path, usv
     }
 }
 
+fn nvitems_from_tree(tree: &usvg::Tree) -> Vec<NVItem> {
+    let mut nvitems = vec![];
+    for (path, transform) in walk_svg_group(tree.root()) {
+        // let transform = path.abs_transform();
+
+        let mut builder = NVItemBuilder::new();
+        for segment in path.data().segments() {
+            match segment {
+                usvg::tiny_skia_path::PathSegment::MoveTo(p) => {
+                    // println!("MoveTo: {:?}", vec3(p.x, p.y, 0.0));
+                    builder.move_to(vec3(p.x, p.y, 0.0))
+                }
+                usvg::tiny_skia_path::PathSegment::LineTo(p) => {
+                    // println!("LineTo: {:?}", vec3(p.x, p.y, 0.0));
+                    builder.line_to(vec3(p.x, p.y, 0.0))
+                }
+                usvg::tiny_skia_path::PathSegment::QuadTo(p1, p2) => {
+                    // println!("QuadTo: {:?}, {:?}", vec3(p1.x, p1.y, 0.0), vec3(p2.x, p2.y, 0.0));
+                    builder.quad_to(vec3(p1.x, p1.y, 0.0), vec3(p2.x, p2.y, 0.0))
+                }
+                usvg::tiny_skia_path::PathSegment::CubicTo(p1, p2, p3) => {
+                    // println!("CubicTo: {:?}, {:?}, {:?}", vec3(p1.x, p1.y, 0.0), vec3(p2.x, p2.y, 0.0), vec3(p3.x, p3.y, 0.0));
+                    builder.cubic_to(
+                        vec3(p1.x, p1.y, 0.0),
+                        vec3(p2.x, p2.y, 0.0),
+                        vec3(p3.x, p3.y, 0.0),
+                    )
+                }
+                usvg::tiny_skia_path::PathSegment::Close => {
+                    // println!("Close");
+                    builder.close_path()
+                }
+            };
+        }
+        if builder.is_empty() {
+            warn!("empty path");
+            continue;
+        }
+
+        let mut nvitem = builder.build();
+        let affine = Affine2::from_cols_array(&[
+            transform.sx,
+            transform.kx,
+            transform.kx,
+            transform.sy,
+            transform.tx,
+            transform.ty,
+        ]);
+        nvitem.apply_affine(affine);
+        if let Some(fill) = path.fill() {
+            let color = parse_paint(fill.paint()).with_alpha(fill.opacity().get());
+            nvitem.set_fill_color(color);
+        } else {
+            nvitem.set_fill_color(rgba(0.0, 0.0, 0.0, 0.0));
+        }
+        if let Some(stroke) = path.stroke() {
+            let color = parse_paint(stroke.paint()).with_alpha(stroke.opacity().get());
+            nvitem.set_stroke_color(color);
+            nvitem.set_stroke_width(stroke.width().get());
+        } else {
+            nvitem.set_stroke_color(rgba(0.0, 0.0, 0.0, 0.0));
+        }
+        nvitems.push(nvitem);
+    }
+    nvitems
+}
+
 fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
     let mut vitems = vec![];
     for (path, transform) in walk_svg_group(tree.root()) {
         // let transform = path.abs_transform();
 
-        let mut builder = PathBuilder::new();
+        let mut builder = VItemBuilder::new();
         for segment in path.data().segments() {
             match segment {
                 usvg::tiny_skia_path::PathSegment::MoveTo(p) => {

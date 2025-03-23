@@ -3,10 +3,19 @@ use glam::{Vec3, Vec4, vec2, vec3, vec4};
 use itertools::Itertools;
 
 use crate::{
-    components::{nvpoint::{NVPoint, NVPointSliceMethods}, rgba::Rgba, vpoint::{VPoint, VPointSliceMethods}, width::Width, ComponentVec, Transformable},
+    components::{
+        ComponentVec, HasTransform3dComponent, Transformable,
+        nvpoint::{NVPoint, NVPointSliceMethods},
+        rgba::Rgba,
+        vpoint::{VPoint, VPointSliceMethods},
+        width::Width,
+    },
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::{nvitem::NVItemPrimitive, vitem::VItemPrimitive, ExtractFrom, RenderInstance, RenderInstances},
+    render::primitives::{
+        ExtractFrom, RenderInstance, RenderInstances, nvitem::NVItemPrimitive,
+        vitem::VItemPrimitive,
+    },
 };
 
 use super::{Blueprint, Entity};
@@ -38,14 +47,13 @@ pub struct NVItem {
     pub fill_rgbas: ComponentVec<Rgba>,
 }
 
-impl AsRef<ComponentVec<NVPoint>> for NVItem {
-    fn as_ref(&self) -> &ComponentVec<NVPoint> {
+impl HasTransform3dComponent for NVItem {
+    type Component = NVPoint;
+    fn transform_3d(&self) -> &ComponentVec<Self::Component> {
         &self.nvpoints
     }
-}
 
-impl AsMut<ComponentVec<NVPoint>> for NVItem {
-    fn as_mut(&mut self) -> &mut ComponentVec<NVPoint> {
+    fn transform_3d_mut(&mut self) -> &mut ComponentVec<Self::Component> {
         &mut self.nvpoints
     }
 }
@@ -74,7 +82,7 @@ impl NVItem {
         self.stroke_widths.resize_with_last((len + 1) / 2);
     }
 
-    pub(crate) fn get_render_points(&self) -> Vec<crate::render::primitives::nvitem::NVPoint > {
+    pub(crate) fn get_render_points(&self) -> Vec<crate::render::primitives::nvitem::NVPoint> {
         self.nvpoints
             .iter()
             .zip(self.nvpoints.get_closepath_flags().iter())
@@ -223,152 +231,256 @@ impl Stroke for NVItem {
 
 // MARK: Blueprints
 
-// /// A polygon defined by a list of corner points (Counter Clock wise).
-// pub struct Polygon(pub Vec<Vec3>);
+#[derive(Default)]
+pub struct NVItemBuilder {
+    start_point: Option<Vec3>,
+    nvpoints: Vec<[Vec3; 3]>,
+}
 
-// impl Blueprint<NVItem> for Polygon {
-//     fn build(mut self) -> NVItem {
-//         assert!(self.0.len() > 2);
+impl NVItemBuilder {
+    pub fn is_empty(&self) -> bool {
+        self.nvpoints.is_empty()
+    }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn len(&self) -> usize {
+        self.nvpoints.len()
+    }
 
-//         // Close the polygon
-//         self.0.push(self.0[0]);
+    /// Starts a new subpath and push the point as the start_point
+    pub fn move_to(&mut self, point: Vec3) -> &mut Self {
+        self.start_point = Some(point);
+        // Close the previous path
+        if let Some(end) = self.nvpoints.last_mut() {
+            end[2] = end[1];
+        }
+        self.nvpoints.push([point; 3]);
+        self
+    }
 
-//         let anchors = self.0;
-//         let handles = anchors
-//             .iter()
-//             .tuple_windows()
-//             .map(|(&a, &b)| 0.5 * (a + b))
-//             .collect::<Vec<_>>();
+    fn assert_started(&self) {
+        assert!(
+            self.start_point.is_some() || self.nvpoints.is_empty(),
+            "A path have to start with move_to"
+        );
+    }
 
-//         // Interleave anchors and handles
-//         let points = anchors.into_iter().interleave(handles).collect::<Vec<_>>();
-//         // trace!("points: {:?}", points);
-//         NVItem::from_vpoints(points)
-//     }
-// }
+    /// Append a line
+    pub fn line_to(&mut self, p: Vec3) -> &mut Self {
+        self.assert_started();
+        let last = self.nvpoints.last_mut().unwrap();
+        let mid = (last[1] + p) / 2.0;
+        last[2] = mid;
+        self.nvpoints.push([mid, p, p]);
+        self
+    }
 
-// pub struct Rectangle(pub f32, pub f32);
+    /// Append a quadratic bezier
+    pub fn quad_to(&mut self, h: Vec3, p: Vec3) -> &mut Self {
+        self.assert_started();
+        let last = self.nvpoints.last_mut().unwrap();
+        if last[1].distance_squared(h) < f32::EPSILON || h.distance_squared(p) < f32::EPSILON {
+            return self.line_to(p);
+        }
+        let prev_h = (last[1] + h * 2.0) / 3.0;
+        let next_h = (2.0 * h + p) / 3.0;
+        last[2] = prev_h;
+        self.nvpoints.push([next_h, p, p]);
+        self
+    }
 
-// impl Blueprint<NVItem> for Rectangle {
-//     fn build(self) -> NVItem {
-//         let half_width = self.0 / 2.0;
-//         let half_height = self.1 / 2.0;
-//         Polygon(vec![
-//             vec3(-half_width, -half_height, 0.0),
-//             vec3(half_width, -half_height, 0.0),
-//             vec3(half_width, half_height, 0.0),
-//             vec3(-half_width, half_height, 0.0),
-//         ])
-//         .build()
-//     }
-// }
+    /// Append a cubic bezier
+    pub fn cubic_to(&mut self, h1: Vec3, h2: Vec3, p: Vec3) -> &mut Self {
+        self.assert_started();
+        let last = self.nvpoints.last_mut().unwrap();
+        if last[1].distance_squared(h1) < f32::EPSILON || h1.distance_squared(h2) < f32::EPSILON {
+            return self.quad_to(h2, p);
+        }
+        if h2.distance_squared(p) < f32::EPSILON {
+            return self.quad_to(h1, p);
+        }
 
-// pub struct Line(pub Vec3, pub Vec3);
+        last[2] = h1;
+        self.nvpoints.push([h2, p, p]);
 
-// impl Blueprint<NVItem> for Line {
-//     fn build(self) -> NVItem {
-//         NVItem::from_vpoints(vec![self.0, (self.0 + self.1) / 2.0, self.1])
-//     }
-// }
+        self
+    }
 
-// pub struct Square(pub f32);
+    pub fn close_path(&mut self) -> &mut Self {
+        self.assert_started();
+        if self.nvpoints.last().unwrap()[1] == self.start_point.unwrap() {
+            return self;
+        }
+        self.line_to(self.start_point.unwrap());
+        self
+    }
 
-// impl Blueprint<NVItem> for Square {
-//     fn build(self) -> NVItem {
-//         Rectangle(self.0, self.0).build()
-//     }
-// }
+    pub fn nvpoints(&self) -> &[[Vec3; 3]] {
+        &self.nvpoints
+    }
+}
 
-// pub struct Arc {
-//     pub angle: f32,
-//     pub radius: f32,
-// }
+impl Blueprint<NVItem> for NVItemBuilder {
+    fn build(self) -> NVItem {
+        NVItem::from_nvpoints(self.nvpoints().to_vec())
+    }
+}
 
-// impl Blueprint<NVItem> for Arc {
-//     fn build(self) -> NVItem {
-//         const NUM_SEGMENTS: usize = 8;
-//         let len = 2 * NUM_SEGMENTS + 1;
+/// A polygon defined by a list of corner points (Counter Clock wise).
+pub struct Polygon(pub Vec<Vec3>);
 
-//         let mut points = (0..len)
-//             .map(|i| {
-//                 let angle = self.angle * i as f32 / (len - 1) as f32;
-//                 let (mut x, mut y) = (angle.cos(), angle.sin());
-//                 if x.abs() < 1.8e-7 {
-//                     x = 0.0;
-//                 }
-//                 if y.abs() < 1.8e-7 {
-//                     y = 0.0;
-//                 }
-//                 vec2(x, y).extend(0.0) * self.radius
-//             })
-//             .collect::<Vec<_>>();
+impl Blueprint<NVItem> for Polygon {
+    fn build(mut self) -> NVItem {
+        assert!(self.0.len() > 2);
 
-//         let theta = self.angle / NUM_SEGMENTS as f32;
-//         points.iter_mut().skip(1).step_by(2).for_each(|p| {
-//             *p /= (theta / 2.0).cos();
-//         });
-//         // trace!("start: {:?}, end: {:?}", points[0], points[len - 1]);
-//         NVItem::from_vpoints(points)
-//     }
-// }
+        // Close the polygon
+        self.0.push(self.0[0]);
 
-// pub struct ArcBetweenPoints {
-//     pub start: Vec3,
-//     pub end: Vec3,
-//     pub angle: f32,
-// }
+        let anchors = self.0;
 
-// impl Blueprint<NVItem> for ArcBetweenPoints {
-//     fn build(self) -> NVItem {
-//         let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
-//         let arc = Arc {
-//             angle: self.angle,
-//             radius,
-//         };
-//         let mut item = arc.build();
-//         item.nvpoints.put_start_and_end_on(self.start, self.end);
-//         item
-//     }
-// }
+        let mut builder = NVItemBuilder::new();
+        builder.move_to(anchors[0]);
+        anchors.iter().skip(1).for_each(|p| {
+            builder.line_to(*p);
+        });
+        builder.close_path();
+        builder.build()
+    }
+}
 
-// /// A circle
-// pub struct Circle(pub f32);
+pub struct Rectangle(pub f32, pub f32);
 
-// impl Blueprint<NVItem> for Circle {
-//     fn build(self) -> NVItem {
-//         Arc {
-//             angle: std::f32::consts::TAU,
-//             radius: self.0,
-//         }
-//         .build()
-//     }
-// }
+impl Blueprint<NVItem> for Rectangle {
+    fn build(self) -> NVItem {
+        let half_width = self.0 / 2.0;
+        let half_height = self.1 / 2.0;
+        Polygon(vec![
+            vec3(-half_width, -half_height, 0.0),
+            vec3(half_width, -half_height, 0.0),
+            vec3(half_width, half_height, 0.0),
+            vec3(-half_width, half_height, 0.0),
+        ])
+        .build()
+    }
+}
 
-// pub enum Dot {
-//     Small,
-//     Normal,
-// }
+pub struct Line(pub Vec3, pub Vec3);
 
-// impl Blueprint<NVItem> for Dot {
-//     fn build(self) -> NVItem {
-//         Circle(match self {
-//             Dot::Small => 0.04,
-//             Dot::Normal => 0.08,
-//         })
-//         .build()
-//     }
-// }
+impl Blueprint<NVItem> for Line {
+    fn build(self) -> NVItem {
+        let mid = (self.0 + self.1) / 2.0;
+        NVItem::from_nvpoints(vec![[self.0, self.0, mid], [mid, self.1, self.1]])
+    }
+}
 
-// // width, height
-// pub struct Ellipse(pub f32, pub f32);
+pub struct Square(pub f32);
 
-// impl Blueprint<NVItem> for Ellipse {
-//     fn build(self) -> NVItem {
-//         let mut mobject = Circle(1.0).build();
-//         mobject.nvpoints.scale(vec3(self.0, self.1, 1.0));
-//         mobject
-//     }
-// }
+impl Blueprint<NVItem> for Square {
+    fn build(self) -> NVItem {
+        Rectangle(self.0, self.0).build()
+    }
+}
+
+pub struct Arc {
+    pub angle: f32,
+    pub radius: f32,
+}
+
+impl Blueprint<NVItem> for Arc {
+    fn build(self) -> NVItem {
+        const NUM_SEGMENTS: usize = 8;
+        let len = 2 * NUM_SEGMENTS + 1;
+
+        let mut points = (0..len)
+            .map(|i| {
+                let angle = self.angle * i as f32 / (len - 1) as f32;
+                let (mut x, mut y) = (angle.cos(), angle.sin());
+                if x.abs() < 1.8e-7 {
+                    x = 0.0;
+                }
+                if y.abs() < 1.8e-7 {
+                    y = 0.0;
+                }
+                vec2(x, y).extend(0.0) * self.radius
+            })
+            .collect::<Vec<_>>();
+        let theta = self.angle / NUM_SEGMENTS as f32;
+        points.iter_mut().skip(1).step_by(2).for_each(|p| {
+            *p /= (theta / 2.0).cos();
+        });
+
+        let mut builder = NVItemBuilder::new();
+        builder.move_to(points[0]);
+        points
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .zip(points.iter().skip(2).step_by(2))
+            .for_each(|(h, p)| {
+                builder.quad_to(*h, *p);
+            });
+        builder.build()
+    }
+}
+
+pub struct ArcBetweenPoints {
+    pub start: Vec3,
+    pub end: Vec3,
+    pub angle: f32,
+}
+
+impl Blueprint<NVItem> for ArcBetweenPoints {
+    fn build(self) -> NVItem {
+        let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
+        let arc = Arc {
+            angle: self.angle,
+            radius,
+        };
+        let mut item = arc.build();
+        item.nvpoints.put_start_and_end_on(self.start, self.end);
+        item
+    }
+}
+
+/// A circle
+pub struct Circle(pub f32);
+
+impl Blueprint<NVItem> for Circle {
+    fn build(self) -> NVItem {
+        Arc {
+            angle: std::f32::consts::TAU,
+            radius: self.0,
+        }
+        .build()
+    }
+}
+
+pub enum Dot {
+    Small,
+    Normal,
+}
+
+impl Blueprint<NVItem> for Dot {
+    fn build(self) -> NVItem {
+        Circle(match self {
+            Dot::Small => 0.04,
+            Dot::Normal => 0.08,
+        })
+        .build()
+    }
+}
+
+// width, height
+pub struct Ellipse(pub f32, pub f32);
+
+impl Blueprint<NVItem> for Ellipse {
+    fn build(self) -> NVItem {
+        let mut mobject = Circle(1.0).build();
+        mobject.nvpoints.scale(vec3(self.0, self.1, 1.0));
+        mobject
+    }
+}
 
 #[cfg(test)]
 mod test {

@@ -1,6 +1,8 @@
+use std::ops::{Deref, DerefMut};
+
 use glam::Vec3;
 
-use super::PointWise;
+use super::{ComponentVec, PointWise, Transform3dComponent, Transformable};
 use crate::traits::Interpolatable;
 
 /// VPoints is used to represent a bunch of quad bezier paths.
@@ -44,7 +46,7 @@ impl NVPointSliceMethods for [NVPoint] {
         // println!("{:?}", self);
         // println!("start: {:?}", self.get(0).unwrap());
         let mut i = 0;
-        for (idx, NVPoint([h_prev, p, h_next])) in self.iter().enumerate() {
+        for (idx, NVPoint([_h_prev, p, h_next])) in self.iter().enumerate() {
             // println!("[{}] h_prev: {:?}, p: {:?}, h_next: {:?}", idx, h_prev, p, h_next);
             if p == h_next || idx == len - 1 {
                 // println!("### path end ###");
@@ -60,6 +62,20 @@ impl NVPointSliceMethods for [NVPoint] {
         // println!("{:?}", flags);
 
         flags
+    }
+}
+
+impl Transform3dComponent for NVPoint {
+    fn pos(&self) -> Vec3 {
+        self.0[1]
+    }
+    
+    fn iter_points(&self) -> impl Iterator<Item = &Vec3> {
+        self.0.iter()
+    }
+
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut Vec3> {
+        self.0.iter_mut()
     }
 }
 

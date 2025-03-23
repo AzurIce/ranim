@@ -3,10 +3,16 @@ use glam::{Vec3, Vec4, vec2, vec3, vec4};
 use itertools::Itertools;
 
 use crate::{
-    components::{rgba::Rgba, vpoint::{VPoint, VPointSliceMethods}, width::Width, ComponentVec, Transformable},
+    components::{
+        ComponentVec, HasTransform3dComponent, Transformable,
+        rgba::Rgba,
+        vpoint::{VPoint, VPointSliceMethods},
+        width::Width,
+    },
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::{vitem::VItemPrimitive, ExtractFrom, RenderInstance, RenderInstances},
+    render::primitives::{ExtractFrom, RenderInstance, RenderInstances, vitem::VItemPrimitive},
+    utils::bezier::approx_cubic_with_quadratic,
 };
 
 use super::{Blueprint, Entity};
@@ -38,14 +44,13 @@ pub struct VItem {
     pub fill_rgbas: ComponentVec<Rgba>,
 }
 
-impl AsRef<ComponentVec<VPoint>> for VItem {
-    fn as_ref(&self) -> &ComponentVec<VPoint> {
+impl HasTransform3dComponent for VItem {
+    type Component = VPoint;
+    fn transform_3d(&self) -> &ComponentVec<Self::Component> {
         &self.vpoints
     }
-}
 
-impl AsMut<ComponentVec<VPoint>> for VItem {
-    fn as_mut(&mut self) -> &mut ComponentVec<VPoint> {
+    fn transform_3d_mut(&mut self) -> &mut ComponentVec<Self::Component> {
         &mut self.vpoints
     }
 }
@@ -216,6 +221,101 @@ impl Stroke for VItem {
 }
 
 // MARK: Blueprints
+
+/// A path builder based on quadratic beziers
+#[derive(Default)]
+pub struct VItemBuilder {
+    start_point: Option<Vec3>,
+    points: Vec<Vec3>,
+}
+
+impl VItemBuilder {
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
+    }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn len(&self) -> usize {
+        self.points.len()
+    }
+
+    /// Starts a new subpath and push the point as the start_point
+    pub fn move_to(&mut self, point: Vec3) -> &mut Self {
+        self.start_point = Some(point);
+        if let Some(end) = self.points.last() {
+            self.points.extend_from_slice(&[*end, point]);
+        } else {
+            self.points.push(point);
+        }
+        self
+    }
+
+    fn assert_started(&self) {
+        assert!(
+            self.start_point.is_some() || self.points.is_empty(),
+            "A path have to start with move_to"
+        );
+    }
+
+    /// Append a line
+    pub fn line_to(&mut self, p: Vec3) -> &mut Self {
+        self.assert_started();
+        let mid = (self.points.last().unwrap() + p) / 2.0;
+        self.points.extend_from_slice(&[mid, p]);
+        self
+    }
+
+    /// Append a quadratic bezier
+    pub fn quad_to(&mut self, h: Vec3, p: Vec3) -> &mut Self {
+        self.assert_started();
+        let cur = self.points.last().unwrap();
+        if cur.distance_squared(h) < f32::EPSILON || h.distance_squared(p) < f32::EPSILON {
+            return self.line_to(p);
+        }
+        self.points.extend_from_slice(&[h, p]);
+        self
+    }
+
+    /// Append a cubic bezier
+    pub fn cubic_to(&mut self, h1: Vec3, h2: Vec3, p: Vec3) -> &mut Self {
+        self.assert_started();
+        let cur = self.points.last().unwrap();
+        if cur.distance_squared(h1) < f32::EPSILON || h1.distance_squared(h2) < f32::EPSILON {
+            return self.quad_to(h2, p);
+        }
+        if h2.distance_squared(p) < f32::EPSILON {
+            return self.quad_to(h1, p);
+        }
+
+        let quads = approx_cubic_with_quadratic([*cur, h1, h2, p]);
+        // println!("quads: {:?}", quads);
+        for quad in quads {
+            self.quad_to(quad[1], quad[2]);
+        }
+
+        self
+    }
+
+    pub fn close_path(&mut self) -> &mut Self {
+        self.assert_started();
+        if self.points.last() == self.start_point.as_ref() {
+            return self;
+        }
+        self.line_to(self.start_point.unwrap());
+        self
+    }
+
+    pub fn vpoints(&self) -> &[Vec3] {
+        &self.points
+    }
+}
+
+impl Blueprint<VItem> for VItemBuilder {
+    fn build(self) -> VItem {
+        VItem::from_vpoints(self.vpoints().to_vec())
+    }
+}
 
 /// A polygon defined by a list of corner points (Counter Clock wise).
 pub struct Polygon(pub Vec<Vec3>);

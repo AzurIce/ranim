@@ -5,7 +5,7 @@ use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::components::Anchor;
 use ranim::items::group::Group;
-use ranim::items::vitem::Arc;
+use ranim::items::nvitem::Arc;
 use ranim::prelude::*;
 use ranim::timeline::TimeMark;
 

@@ -102,10 +102,10 @@ impl NVItemPrimitive {
         stroke_rgbas: &[Rgba],
         stroke_widths: &[Width],
     ) {
-        println!("render_points: {:?}", render_points);
-        println!("fill_rgbas: {:?}", fill_rgbas);
-        println!("stroke_rgbas: {:?}", stroke_rgbas);
-        println!("stroke_widths: {:?}", stroke_widths);
+        // println!("render_points: {:?}", render_points);
+        // println!("fill_rgbas: {:?}", fill_rgbas);
+        // println!("stroke_rgbas: {:?}", stroke_rgbas);
+        // println!("stroke_widths: {:?}", stroke_widths);
         // Dynamic sized
         if [
             self.points3d_buffer.set(ctx, render_points),

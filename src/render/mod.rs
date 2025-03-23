@@ -9,17 +9,19 @@ use image::{ImageBuffer, Rgba};
 use primitives::RenderInstance;
 
 use crate::{
-    PUFFIN_GPU_PROFILER,
     color::rgba8,
     context::{RanimContext, WgpuContext},
     items::camera_frame::CameraFrame,
-    utils::{PipelinesStorage, wgpu::WgpuBuffer},
+    utils::{wgpu::WgpuBuffer, PipelinesStorage},
 };
+#[cfg(feature = "profiling")]
+use crate::PUFFIN_GPU_PROFILER;
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const ALIGNMENT: usize = 256;
 
 #[cfg(feature = "profiling")]
+#[allow(unused)]
 mod profiling_utils {
     use wgpu_profiler::GpuTimerQueryResult;
 

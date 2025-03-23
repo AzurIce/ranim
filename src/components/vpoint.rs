@@ -9,12 +9,28 @@ use crate::utils::bezier::trim_quad_bezier;
 use crate::utils::math::interpolate_usize;
 
 use super::ComponentVec;
+use super::Transform3dComponent;
 
 /// VPoints is used to represent a bunch of quad bezier paths.
 ///
 /// Every 3 elements in the inner vector is a quad bezier path
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct VPoint(pub Vec3);
+
+impl Transform3dComponent for VPoint {
+    fn pos(&self) -> Vec3 {
+        self.0
+    }
+    
+    fn iter_points(&self) -> impl Iterator<Item = &Vec3> {
+        std::iter::once(&self.0)
+    }
+
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut Vec3> {
+        std::iter::once(&mut self.0)
+    }
+}
+
 
 impl From<Vec3> for VPoint {
     fn from(value: Vec3) -> Self {

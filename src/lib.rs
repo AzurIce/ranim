@@ -15,6 +15,7 @@ use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{Rabject, camera_frame::CameraFrame};
+use log::info;
 use timeline::{RanimTimeline, TimeMark, TimelineEvalResult};
 
 use render::{Renderer, primitives::RenderInstances};
@@ -248,18 +249,23 @@ impl RanimRenderApp {
 
     fn render_timeline(&mut self, timeline: RanimTimeline) {
         #[cfg(feature = "profiling")]
+        info!("profiling enabled, starting puffin servers...");
+        #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {
             puffin::set_scopes_on(true);
             // default global profiler
-            let cpu_server =
-                puffin_http::Server::new(&format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT))
-                    .unwrap();
+            let cpu_url = format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT);
+            let cpu_server = puffin_http::Server::new(&cpu_url).unwrap();
             // custom gpu profiler in `PUFFIN_GPU_PROFILER`
+            let gpu_url = format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT + 1);
             let gpu_server = puffin_http::Server::new_custom(
-                &format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT + 1),
+                &gpu_url,
                 |sink| PUFFIN_GPU_PROFILER.lock().unwrap().add_sink(sink),
                 |id| _ = PUFFIN_GPU_PROFILER.lock().unwrap().remove_sink(id),
-            ).unwrap();
+            )
+            .unwrap();
+            info!("puffin cpu server: {}", cpu_url);
+            info!("puffin gpu server: {}", gpu_url);
             (cpu_server, gpu_server)
         };
 

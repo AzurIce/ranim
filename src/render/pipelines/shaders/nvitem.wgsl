@@ -83,10 +83,10 @@ fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
 
         var r = offset + uv.x + uv.y;
 
-        let f = ((r + a) * r + b) * r + c;
-        let f_prime = (3.0 * r + 2.0 * a) * r + b;
+        // let f = ((r + a) * r + b) * r + c;
+        // let f_prime = (3.0 * r + 2.0 * a) * r + b;
 
-        r -= f / f_prime;
+        // r -= f / f_prime;
 
         return vec3(r, r, r);
     }
@@ -97,10 +97,10 @@ fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
 
     var r = vec3(m + m, - n - m, n - m) * u + offset;
 
-    let f = ((r + a) * r + b) * r + c;
-    let f_prime = (3.0 * r + 2.0 * a) * r + b;
+    // let f = ((r + a) * r + b) * r + c;
+    // let f_prime = (3.0 * r + 2.0 * a) * r + b;
 
-    r -= f / f_prime;
+    // r -= f / f_prime;
 
     return r;
 }
@@ -160,7 +160,7 @@ fn tan_bezier(t: f32, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: vec2<f32>
 }
 
 fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: vec2<f32>) -> f32 {
-    // coeffecient of the equation `cubic bezier.y = pos.y`
+    // Coeffecient of the equation `cubic bezier.y = pos.y`
     let cu = (- p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y);
     let qu = (3.0 * p0.y - 6.0 * p1.y + 3.0 * p2.y);
     let li = (- 3.0 * p0.y + 3.0 * p1.y);
@@ -175,20 +175,21 @@ fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: 
     //  + anchor1    + anchor2
     // The equation degenerate to a quadratic equation
     if cu == 0.0 {
-        let d = li * li - 4.0 * qu * co;
-        if d > 0.0 {
-            let root1 = (- li - sqrt(d)) / (2.0 * qu);
-            sgn *= sign_root(root1, pos, p0, p1, p2, p3);
-            let root2 = (- li + sqrt(d)) / (2.0 * qu);
-            sgn *= sign_root(root2, pos, p0, p1, p2, p3);
-        }
-        else if d == 0.0 {
-            let root = - li / (2.0 * qu);
-            // This is a workaround to fix the case where the tangent on the root is horizontal
-            if tan_bezier(root, p0, p1, p2, p3).y != 0.0 {
-                sgn *= sign_root(root, pos, p0, p1, p2, p3);
-            }
-        }
+        // sgn = -1.0;
+        // let d = li * li - 4.0 * qu * co;
+        // if d > 0.0 {
+        //     let root1 = (- li - sqrt(d)) / (2.0 * qu);
+        //     sgn *= sign_root(root1, pos, p0, p1, p2, p3);
+        //     let root2 = (- li + sqrt(d)) / (2.0 * qu);
+        //     sgn *= sign_root(root2, pos, p0, p1, p2, p3);
+        // }
+        // else if d == 0.0 {
+        //     let root = - li / (2.0 * qu);
+        //     // This is a workaround to fix the case where the tangent on the root is horizontal
+        //     if tan_bezier(root, p0, p1, p2, p3).y != 0.0 {
+        //         sgn *= sign_root(root, pos, p0, p1, p2, p3);
+        //     }
+        // }
     }
     else {
         let root = solve_cubic(qu / cu, li / cu, co / cu);
@@ -221,7 +222,7 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
     attr.debug = vec4(1.0, 1.0, 1.0, 1.0);
 
     let n = points_len;
-    for (var i = start_idx; i < points_len; i++) {
+    for (var i = start_idx; i < n; i++) {
         let p1 = point(i);
         let h1 = next_handle(i);
         let h2 = prev_handle(i + 1u);
@@ -237,9 +238,9 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
             attr.d = dist;
             attr.nearest_idx = i;
         }
-        if is_closed(i) {
+        // if is_closed(i) {
             attr.sgn *= sign_bezier(pos, p1, h1, h2, p2);
-        }
+        // }
     }
 
     return attr;
@@ -266,24 +267,24 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     let sgn_d = sgn * d;
     // return vec4(1.0);
     // return vec4(vec3(d), 1.0);
-    // return vec4(vec3(sgn_d), 1.0);
+    return vec4(vec3(sgn_d), 1.0);
 
-    let e = point(idx + 1u).xy - point(idx).xy;
-    let w = pos.xy - point(idx).xy;
-    let ratio = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
-    let anchor_index = idx / 2;
+    // let e = point(idx + 1u).xy - point(idx).xy;
+    // let w = pos.xy - point(idx).xy;
+    // let ratio = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
+    // let anchor_index = idx / 2;
 
-    // TODO: Antialias
-    var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[anchor_index], fill_rgbas[anchor_index + 1], ratio), is_closed(idx));
-    fill_rgba.a *= smoothstep(1.0, - 1.0, (sgn_d));
+    // // TODO: Antialias
+    // var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[anchor_index], fill_rgbas[anchor_index + 1], ratio), is_closed(idx));
+    // fill_rgba.a *= smoothstep(1.0, - 1.0, (sgn_d));
 
-    let stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
-    var stroke_rgba: vec4<f32> = mix(stroke_rgbas[anchor_index], stroke_rgbas[anchor_index + 1], ratio);
-    stroke_rgba.a *= smoothstep(1.0, - 1.0, (d - stroke_width));
+    // let stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
+    // var stroke_rgba: vec4<f32> = mix(stroke_rgbas[anchor_index], stroke_rgbas[anchor_index + 1], ratio);
+    // stroke_rgba.a *= smoothstep(1.0, - 1.0, (d - stroke_width));
 
-    var f_color = blend_color(stroke_rgba, fill_rgba);
+    // var f_color = blend_color(stroke_rgba, fill_rgba);
 
-    return f_color;
+    // return f_color;
 }
 
 fn render_control_points(pos: vec2<f32>) -> vec4<f32> {

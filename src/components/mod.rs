@@ -11,10 +11,10 @@ use crate::{
     utils::math::interpolate_usize,
 };
 
+pub mod nvpoint;
 pub mod point;
 pub mod rgba;
 pub mod vpoint;
-pub mod nvpoint;
 pub mod width;
 
 /// An component
@@ -34,6 +34,18 @@ impl<T: Component> Deref for ComponentVec<T> {
 
 impl<T: Component> DerefMut for ComponentVec<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<T: Component> AsRef<[T]> for ComponentVec<T> {
+    fn as_ref(&self) -> &[T] {
+        &self.0
+    }
+}
+
+impl<T: Component> AsMut<[T]> for ComponentVec<T> {
+    fn as_mut(&mut self) -> &mut [T] {
         &mut self.0
     }
 }
@@ -160,14 +172,16 @@ pub trait PointWise {}
 /// And for `T` that implements this trait, `[T]` will also implement this trait.
 ///
 /// But should note that, `[T]`'s implementation is not equivalent to doing the same operation on each item, The [`Anchor`] point will be calculated from the bounding box of the whole slice.
-pub trait Transformable<T: Transform3dComponent> {
+pub trait Transformable {
     fn get_start_position(&self) -> Option<Vec3>;
     fn get_end_position(&self) -> Option<Vec3>;
     fn apply_points_function(
         &mut self,
-        f: impl Fn(&mut ComponentVec<T>) + Copy,
+        f: impl Fn(Vec<&mut Vec3>) + Copy, // TODO: make this Vec better?
         anchor: Anchor,
     ) -> &mut Self;
+    fn iter_points(&self) -> impl Iterator<Item = &Vec3>;
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut Vec3>;
 
     /// Put anchor at a given point.
     ///
@@ -188,8 +202,8 @@ pub trait Transformable<T: Transform3dComponent> {
     fn shift(&mut self, shift: Vec3) -> &mut Self {
         self.apply_points_function(
             |points| {
-                points.iter_mut().for_each(|p| {
-                    **p += shift;
+                points.into_iter().for_each(|p| {
+                    *p += shift;
                 });
             },
             Anchor::origin(),
@@ -221,8 +235,8 @@ pub trait Transformable<T: Transform3dComponent> {
     fn scale_by_anchor(&mut self, scale: Vec3, anchor: Anchor) -> &mut Self {
         self.apply_points_function(
             |points| {
-                points.iter_mut().for_each(|p| {
-                    **p *= scale;
+                points.into_iter().for_each(|p| {
+                    *p *= scale;
                 });
             },
             anchor,
@@ -240,8 +254,8 @@ pub trait Transformable<T: Transform3dComponent> {
 
         self.apply_points_function(
             |points| {
-                points.iter_mut().for_each(|p| {
-                    **p = rotation * **p;
+                points.into_iter().for_each(|p| {
+                    *p = rotation * *p;
                 });
             },
             anchor,
@@ -252,7 +266,7 @@ pub trait Transformable<T: Transform3dComponent> {
     fn apply_affine(&mut self, affine: Affine2) -> &mut Self {
         self.apply_points_function(
             |points| {
-                points.iter_mut().for_each(|p| {
+                points.into_iter().for_each(|p| {
                     let transformed = affine.transform_point2(p.xy());
                     p.x = transformed.x;
                     p.y = transformed.y;
@@ -324,86 +338,49 @@ pub trait Transformable<T: Transform3dComponent> {
 }
 
 // MARK: [T]
-impl<T: Transformable<C>, C: Transform3dComponent> Transformable<C> for [T] {
+impl<T: Transform3dComponent + Component> Transformable for ComponentVec<T> {
+    fn iter_points(&self) -> impl Iterator<Item = &Vec3> {
+        self.iter().map(|x| x.iter_points()).flatten()
+    }
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut Vec3> {
+        self.iter_mut().map(|x| x.iter_points_mut()).flatten()
+    }
     fn get_start_position(&self) -> Option<Vec3> {
-        self.first().and_then(|x| x.get_start_position())
+        self.first().map(|x| x.pos())
     }
     fn get_end_position(&self) -> Option<Vec3> {
-        self.last().and_then(|x| x.get_end_position())
+        self.last().map(|x| x.pos())
     }
     fn apply_points_function(
         &mut self,
-        f: impl Fn(&mut ComponentVec<C>) + Copy,
+        f: impl Fn(Vec<&mut Vec3>) + Copy,
         anchor: Anchor,
     ) -> &mut Self {
-        let point = match anchor {
+        let anchor = match anchor {
             Anchor::Edge(edge) => self.get_bounding_box_point(edge),
             Anchor::Point(point) => point,
         };
         // println!("{:?}, {:?}", anchor, point);
-        self.iter_mut().for_each(|x| {
-            x.apply_points_function(f, Anchor::Point(point));
-        });
-        self
-    }
-    fn get_bounding_box(&self) -> [Vec3; 3] {
-        let [min, max] = self
-            .iter()
-            .map(|x| x.get_bounding_box())
-            .map(|[min, _, max]| [min, max])
-            .reduce(|a, b| [a[0].min(b[0]), a[1].max(b[1])])
-            .unwrap_or([Vec3::ZERO; 2]);
-        [min, (min + max) / 2.0, max]
-    }
-}
-
-// MARK: T
-impl<T: HasTransform3d<C>, C: Transform3dComponent> Transformable<C> for T {
-    /// Apply a function to the points of the mobject about the point.
-    fn apply_points_function(
-        &mut self,
-        f: impl Fn(&mut ComponentVec<C>) + Copy,
-        anchor: Anchor,
-    ) -> &mut Self {
-        let anchor = match anchor {
-            Anchor::Point(x) => x,
-            Anchor::Edge(x) => self.get_bounding_box_point(x),
-        };
-        let component_vec = self.as_mut();
-
         if anchor != Vec3::ZERO {
-            component_vec.iter_mut().for_each(|p| **p -= anchor);
+            self.iter_points_mut().for_each(|p| *p -= anchor);
         }
 
-        f(component_vec);
+        f(self.iter_points_mut().collect());
 
         if anchor != Vec3::ZERO {
-            component_vec.iter_mut().for_each(|p| **p += anchor);
+            self.iter_points_mut().for_each(|p| *p += anchor);
         }
         self
     }
-
-    fn get_start_position(&self) -> Option<Vec3> {
-        self.as_ref().first().map(|&p| *p)
-    }
-
-    fn get_end_position(&self) -> Option<Vec3> {
-        self.as_ref().last().map(|&p| *p)
-    }
-
-    /// Get the bounding box of the mobject.
-    /// min, mid, max
     fn get_bounding_box(&self) -> [Vec3; 3] {
         let min = self
-            .as_ref()
-            .iter()
-            .map(|&p| *p)
+            .iter_points()
+            .cloned()
             .reduce(|acc, e| acc.min(e))
             .unwrap_or(Vec3::ZERO);
         let max = self
-            .as_ref()
-            .iter()
-            .map(|&p| *p)
+            .iter_points()
+            .cloned()
             .reduce(|acc, e| acc.max(e))
             .unwrap_or(Vec3::ZERO);
         let mid = (min + max) / 2.0;
@@ -454,33 +431,95 @@ pub enum ScaleHint {
     PorportionalWidth(f32),
 }
 
-// MARK: Transform3d
-/// An `Transform3dComponent` should be a `Vec3` that can be transformed.
-pub trait Transform3dComponent: Component + DerefMut<Target = Vec3> {}
-impl<T: Component + DerefMut<Target = Vec3>> Transform3dComponent for T {}
-
-/// Something that can be treated as a ref/mut ref of `ComponentVec<Transform3dComponent>`.
-pub trait HasTransform3d<T: Transform3dComponent>:
-    AsRef<ComponentVec<T>> + AsMut<ComponentVec<T>>
-{
-}
-impl<T: Transform3dComponent, V: AsRef<ComponentVec<T>> + AsMut<ComponentVec<T>>> HasTransform3d<T>
-    for V
-{
-}
-
-impl<T: Component> AsRef<ComponentVec<T>> for ComponentVec<T> {
-    fn as_ref(&self) -> &ComponentVec<T> {
-        self
-    }
-}
-impl<T: Component> AsMut<ComponentVec<T>> for ComponentVec<T> {
-    fn as_mut(&mut self) -> &mut ComponentVec<T> {
-        self
-    }
+pub trait Transform3dComponent {
+    fn pos(&self) -> Vec3;
+    fn iter_points(&self) -> impl Iterator<Item = &Vec3>;
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut Vec3>;
 }
 
 // MARK: Test
+
+pub trait HasTransform3dComponent {
+    type Component: Transform3dComponent + Component;
+    fn transform_3d(&self) -> &ComponentVec<Self::Component>;
+    fn transform_3d_mut(&mut self) -> &mut ComponentVec<Self::Component>;
+}
+
+impl<T: HasTransform3dComponent> Transformable for T {
+    fn get_start_position(&self) -> Option<Vec3> {
+        self.transform_3d().get_start_position()
+    }
+
+    fn get_end_position(&self) -> Option<Vec3> {
+        self.transform_3d().get_end_position()
+    }
+
+    fn apply_points_function(
+        &mut self,
+        f: impl Fn(Vec<&mut Vec3>) + Copy, // TODO: make this Vec better?
+        anchor: Anchor,
+    ) -> &mut Self {
+        self.transform_3d_mut().apply_points_function(f, anchor);
+        self
+    }
+
+    fn iter_points(&self) -> impl Iterator<Item = &Vec3> {
+        self.transform_3d().iter_points()
+    }
+
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut Vec3> {
+        self.transform_3d_mut().iter_points_mut()
+    }
+
+    fn get_bounding_box(&self) -> [Vec3; 3] {
+        self.transform_3d().get_bounding_box()
+    }
+}
+
+impl<T: HasTransform3dComponent> Transformable for [T] {
+    fn get_start_position(&self) -> Option<Vec3> {
+        self.first().and_then(|x| x.get_start_position())
+    }
+
+    fn get_end_position(&self) -> Option<Vec3> {
+        self.last().and_then(|x| x.get_end_position())
+    }
+
+    fn apply_points_function(
+        &mut self,
+        f: impl Fn(Vec<&mut Vec3>) + Copy, // TODO: make this Vec better?
+        anchor: Anchor,
+    ) -> &mut Self {
+        let anchor = match anchor {
+            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
+            Anchor::Point(point) => point,
+        };
+        self.iter_mut().for_each(|x| {
+            x.apply_points_function(f, Anchor::Point(anchor));
+        });
+        self
+    }
+
+    fn iter_points(&self) -> impl Iterator<Item = &Vec3> {
+        self.iter().flat_map(|x| x.iter_points())
+    }
+
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut Vec3> {
+        self.iter_mut().flat_map(|x| x.iter_points_mut())
+    }
+
+    fn get_bounding_box(&self) -> [Vec3; 3] {
+        let [min, max] = self
+            .iter()
+            .map(|x| {
+                let [min, _, max] = x.get_bounding_box();
+                [min, max]
+            })
+            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
+            .unwrap_or([Vec3::ZERO, Vec3::ZERO]);
+        [min, (min + max) / 2.0, max]
+    }
+}
 
 #[cfg(test)]
 mod test {

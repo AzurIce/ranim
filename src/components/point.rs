@@ -4,8 +4,24 @@ use glam::Vec3;
 
 use crate::prelude::Interpolatable;
 
+use super::Transform3dComponent;
+
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct Point(Vec3);
+
+impl Transform3dComponent for Point {
+    fn pos(&self) -> Vec3 {
+        self.0
+    }
+
+    fn iter_points(&self) -> impl Iterator<Item = &Vec3> {
+        std::iter::once(&self.0)
+    }
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut Vec3> {
+        std::iter::once(&mut self.0)
+    }
+}
+
 
 impl From<Vec3> for Point {
     fn from(value: Vec3) -> Self {

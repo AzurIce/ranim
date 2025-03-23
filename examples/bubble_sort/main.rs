@@ -2,7 +2,7 @@ use glam::{Vec3, vec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     animation::transform::TransformAnimSchedule, color::palettes::manim, components::Anchor,
-    items::vitem::Rectangle, prelude::*, timeline::TimeMark, utils::rate_functions::linear,
+    items::nvitem::Rectangle, prelude::*, timeline::TimeMark, utils::rate_functions::linear,
 };
 
 #[scene]

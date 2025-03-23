@@ -9,9 +9,13 @@ use ranim::{
         creation::{CreationAnim, WritingAnim},
         transform::{TransformAnim, TransformAnimSchedule},
     },
-    components::{vpoint::VPointSliceMethods, Anchor, ScaleHint},
+    components::{Anchor, ScaleHint, vpoint::VPointSliceMethods},
     items::{
-        camera_frame::CameraFrame, group::Group, nvitem::NVItem, svg_item::SvgItem, vitem::{Square, VItem}
+        camera_frame::CameraFrame,
+        group::Group,
+        nvitem::{NVItem, NVItemBuilder},
+        svg_item::SvgItem,
+        vitem::{Square, VItem},
     },
     prelude::*,
     typst_svg,
@@ -30,13 +34,43 @@ impl TimelineConstructor for TestScene {
     ) {
         // let mut text = Group::<VItem>::from_svg(typst_svg!(r#"#text(font: "LXGW Bright")[意软]"#));
         // let mut text = Group::<VItem>::from_svg(typst_svg!(r#"#text(font: "LXGW Bright")[有意思]"#));
-        // let mut text = Group::<VItem>::from_svg(typst_svg!(r#"#align(center)[
+        // let mut vitem = Group::<VItem>::from_svg(typst_svg!(
+        //     r#"#align(center)[
         //     #text(font: "LXGW Bright")[有意思]
 
         //     #text(font: "LXGW Bright")[真的是人用的]
 
         //     #text(font: "LXGW Bright")[『我』的『软件』]
-        // ]"#));
+        // ]"#
+        // ));
+        // vitem
+        //     .scale_to(ScaleHint::PorportionalWidth(3.8))
+        //     .put_center_on(Vec3::NEG_X * 2.0);
+        let mut nvitem = Group::<NVItem>::from_svg(typst_svg!(
+            r#"#align(center)[
+            #text(font: "LXGW Bright")[软]
+        ]"#
+        ));
+        // let mut nvitem = NVItemBuilder::new();
+        // nvitem.move_to(vec3(-3.4890716, 2.2969427, 0.0));
+        // nvitem.cubic_to(
+        //     vec3(-3.5152762, 2.2969427, 0.0),
+        //     vec3(-3.5327399, 2.2794755, 0.0),
+        //     vec3(-3.5327399, 2.2445414, 0.0),
+        // );
+        // nvitem.close_path();
+        // let nvitem = nvitem.build();
+
+        nvitem.scale_to(ScaleHint::PorportionalHeight(8.0));
+        // let nvitem = nvitem[0].get_partial(0.0..0.15);
+        // dbg!(nvitem.nvpoints.len());
+        // println!("{:?}", nvitem.nvpoints);
+        // nvitem
+        //     .scale_to(ScaleHint::PorportionalWidth(3.8))
+        //     .put_center_on(Vec3::X * 2.0);
+
+        // let _vitem = timeline.insert_group(vitem);
+        let _nvitem = timeline.insert_group(nvitem);
         // println!("{}", text.len());
         // let vpoints = text[0].vpoints.get(0..94).unwrap();
         // println!("{:?}", vpoints);
@@ -46,37 +80,27 @@ impl TimelineConstructor for TestScene {
         // let vpoints = text.vpoints.get(0..).unwrap();
         // println!("{:?}", vpoints);
         // println!("{:?}", vpoints.get_closepath_flags());
-        let item = NVItem::from_nvpoints(vec![
-            [
-                vec3(0.0, 0.0, 0.0),
-                vec3(0.0, 0.0, 0.0),
-                vec3(0.0, 2.0, 0.0),
-            ],
-            [
-                vec3(2.0, 0.0, 0.0),
-                vec3(2.0, 2.0, 0.0),
-                vec3(2.0, 4.0, 0.0),
-            ],
-            // [
-            //     vec3(-2.0, 4.0, 0.0),
-            //     vec3(-2.0, 2.0, 0.0),
-            //     vec3(-2.0, 2.0, 0.0),
-            // ],
-            [
-                vec3(-2.0, 4.0, 0.0),
-                vec3(-2.0, 2.0, 0.0),
-                vec3(-2.0, 0.0, 0.0),
-            ],
-            [
-                vec3(-2.0, 0.0, 0.0),
-                vec3(0.0, 0.0, 0.0),
-                vec3(0.0, 0.0, 0.0),
-            ],
-        ]);
+        // let vitem = VItem::from_vpoints(vec![
+        //     vec3(0.0, 0.0, 0.0),
+        //     vec3(0.0, 2.0, 0.0),
+        //     vec3(2.0, 2.0, 0.0),
+        // ]);
+        // let nvitem = NVItem::from_nvpoints(vec![
+        //     [
+        //         vec3(0.0, 0.0, 0.0),
+        //         vec3(0.0, 0.0, 0.0),
+        //         vec3(0.0, 2.0, 0.0),
+        //     ],
+        //     [
+        //         vec3(0.0, 2.0, 0.0),
+        //         vec3(2.0, 2.0, 0.0),
+        //         vec3(2.0, 2.0, 0.0),
+        //     ],
+        // ]);
         // let item = Square(4.0).build();
 
-        let _item = timeline.insert(item);
-
+        // let _vitem = timeline.insert(vitem);
+        // let _nvitem = timeline.insert(nvitem);
         // let mut _text = timeline.insert_group(text);
         // let mut _text = timeline.insert(text);
 
@@ -91,8 +115,10 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("test=info,ranim=trace")).init();
     // println!("main");
-    render_scene(
+    render_scene_at_sec(
         TestScene,
+        0.0,
+        "test.png",
         &AppOptions {
             frame_rate: 60,
             ..AppOptions::default()
