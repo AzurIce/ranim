@@ -1,12 +1,15 @@
 pub mod pipelines;
 pub mod primitives;
 
+use std::thread;
+
 use color::LinearSrgb;
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Rgba};
 use primitives::RenderInstance;
 
 use crate::{
+    PUFFIN_GPU_PROFILER,
     color::rgba8,
     context::{RanimContext, WgpuContext},
     items::camera_frame::CameraFrame,
@@ -15,6 +18,53 @@ use crate::{
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const ALIGNMENT: usize = 256;
+
+#[cfg(feature = "profiling")]
+mod profiling_utils {
+    use wgpu_profiler::GpuTimerQueryResult;
+
+    pub fn scopes_to_console_recursive(results: &[GpuTimerQueryResult], indentation: u32) {
+        for scope in results {
+            if indentation > 0 {
+                print!("{:<width$}", "|", width = 4);
+            }
+
+            if let Some(time) = &scope.time {
+                println!(
+                    "{:.3}μs - {}",
+                    (time.end - time.start) * 1000.0 * 1000.0,
+                    scope.label
+                );
+            } else {
+                println!("n/a - {}", scope.label);
+            }
+
+            if !scope.nested_queries.is_empty() {
+                scopes_to_console_recursive(&scope.nested_queries, indentation + 1);
+            }
+        }
+    }
+
+    pub fn console_output(
+        results: &Option<Vec<GpuTimerQueryResult>>,
+        enabled_features: wgpu::Features,
+    ) {
+        puffin::profile_scope!("console_output");
+        print!("\x1B[2J\x1B[1;1H"); // Clear terminal and put cursor to first row first column
+        println!("Welcome to wgpu_profiler demo!");
+        println!();
+        println!(
+            "Press space to write out a trace file that can be viewed in chrome's chrome://tracing"
+        );
+        println!();
+        match results {
+            Some(results) => {
+                scopes_to_console_recursive(results, 0);
+            }
+            None => println!("No profiling results available yet!"),
+        }
+    }
+}
 
 // MARK: CameraUniforms
 
@@ -93,6 +143,9 @@ pub struct Renderer {
     output_staging_buffer: wgpu::Buffer,
     output_texture_data: Option<Vec<u8>>,
     pub(crate) output_texture_updated: bool,
+
+    #[cfg(feature = "profiling")]
+    pub(crate) profiler: wgpu_profiler::GpuProfiler,
 }
 
 impl Renderer {
@@ -128,6 +181,13 @@ impl Renderer {
         let [r, g, b, a] = bg.components.map(|x| x as f64);
         let clear_color = wgpu::Color { r, g, b, a };
 
+        #[cfg(feature = "profiling")]
+        let profiler = wgpu_profiler::GpuProfiler::new(
+            &ctx.device,
+            wgpu_profiler::GpuProfilerSettings::default(),
+        )
+        .unwrap();
+
         Self {
             frame_height,
             size: (width, height),
@@ -141,11 +201,16 @@ impl Renderer {
             // Uniforms
             uniforms_buffer,
             uniforms_bind_group,
+            // Profiler
+            #[cfg(feature = "profiling")]
+            profiler,
         }
     }
 
     /// Clears the screen with `Renderer::clear_color`
     pub fn clear_screen(&mut self, wgpu_ctx: &WgpuContext) {
+        #[cfg(feature = "profiling")]
+        profiling::scope!("clear_screen");
         // trace!("clear screen {:?}", self.clear_color);
         let mut encoder = wgpu_ctx
             .device
@@ -207,9 +272,38 @@ impl Renderer {
             &mut encoder,
             &self.uniforms_bind_group.bind_group,
             &self.render_textures,
+            #[cfg(feature = "profiling")]
+            &mut self.profiler,
         );
 
+        #[cfg(not(feature = "profiling"))]
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+
+        #[cfg(feature = "profiling")]
+        {
+            self.profiler.resolve_queries(&mut encoder);
+            {
+                profiling::scope!("submit");
+                ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+            }
+
+            // Signal to the profiler that the frame is finished.
+            self.profiler.end_frame().unwrap();
+
+            // Query for oldest finished frame (this is almost certainly not the one we just submitted!) and display results in the command line.
+            ctx.wgpu_ctx.device.poll(wgpu::Maintain::Wait);
+            let latest_profiler_results = self
+                .profiler
+                .process_finished_frame(ctx.wgpu_ctx.queue.get_timestamp_period());
+            // profiling_utils::console_output(&latest_profiler_results, ctx.wgpu_ctx.device.features());
+            let mut gpu_profiler = PUFFIN_GPU_PROFILER.lock().unwrap();
+            wgpu_profiler::puffin::output_frame_to_puffin(
+                &mut gpu_profiler,
+                &latest_profiler_results.unwrap(),
+            );
+            gpu_profiler.new_frame();
+        }
+
         self.output_texture_updated = false;
     }
 
