@@ -2,13 +2,11 @@ use crate::{
     components::{rgba::Rgba, width::Width},
     context::WgpuContext,
     render::{
-        RenderTextures,
         pipelines::{
-            NVItemMapPointsPipeline, NVItemPipeline, nvitem::RenderBindGroup,
-            nvitem_map_points::ComputeBindGroup,
-        },
+            nvitem::RenderBindGroup, nvitem_map_points::ComputeBindGroup, NVItemMapPointsPipeline, NVItemPipeline
+        }, RenderTextures
     },
-    utils::{PipelinesStorage, wgpu::WgpuVecBuffer},
+    utils::{wgpu::{WgpuBuffer, WgpuVecBuffer}, PipelinesStorage},
 };
 use glam::Vec4;
 
@@ -29,6 +27,8 @@ pub struct NVItemPrimitive {
     pub(crate) points3d_buffer: WgpuVecBuffer<NVPoint>,
     /// COMPUTE INPUT AND OUTPUT, RENDER INPUT: NVPoint
     pub(crate) points2d_buffer: WgpuVecBuffer<NVPoint>,
+    /// COMPUTE INPUT
+    pub(crate) points_len: Option<WgpuBuffer<u32>>,
     /// COMPUTE OUTPUT, RENDER INPUT: (min_x, max_x, min_y, max_y, max_w)
     pub(crate) clip_info_buffer: WgpuVecBuffer<i32>,
 
@@ -82,6 +82,7 @@ impl Default for NVItemPrimitive {
         Self {
             points3d_buffer,
             points2d_buffer,
+            points_len: None,
             clip_info_buffer,
             fill_rgbas,
             stroke_rgbas,
@@ -102,6 +103,17 @@ impl NVItemPrimitive {
         stroke_rgbas: &[Rgba],
         stroke_widths: &[Width],
     ) {
+        let len = render_points.len();
+        if self.points_len.is_none() {
+            self.points_len = Some(WgpuBuffer::new_init(
+                ctx,
+                Some("Points Len Buffer"),
+                wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                len as u32,
+            ));
+        } else {
+            self.points_len.as_mut().unwrap().set(ctx, len as u32);
+        }
         // println!("render_points: {:?}", render_points);
         // println!("fill_rgbas: {:?}", fill_rgbas);
         // println!("stroke_rgbas: {:?}", stroke_rgbas);
@@ -127,6 +139,7 @@ impl NVItemPrimitive {
                 self.points3d_buffer.buffer.as_ref().unwrap(),
                 self.stroke_widths.buffer.as_ref().unwrap(),
                 self.points2d_buffer.buffer.as_ref().unwrap(),
+                self.points_len.as_ref().unwrap().as_ref(),
                 self.clip_info_buffer.buffer.as_ref().unwrap(),
             ));
             self.render_bind_group = Some(RenderBindGroup::new(
@@ -171,6 +184,7 @@ impl RenderInstance for NVItemPrimitive {
                 1,
             );
         }
+
         {
             let RenderTextures {
                 // multisample_view,
@@ -204,21 +218,24 @@ impl RenderInstance for NVItemPrimitive {
             rpass.draw(0..4, 0..1);
         }
     }
+    fn debug(&self, ctx: &WgpuContext) {
+        let res = self.points2d_buffer.read_buffer(ctx).unwrap();
+        let res: &[NVPoint] = bytemuck::cast_slice(&res);
+        println!("points2d: {:?}", res);
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use glam::{Vec2, vec2, vec3};
+    use glam::{vec2, vec3, Vec2, Vec3};
     use image::Rgba;
 
     use crate::{
-        context::WgpuContext,
-        items::{camera_frame::CameraFrame, nvitem::NVItem},
-        render::{
-            CameraUniforms, CameraUniformsBindGroup, RenderTextures,
-            primitives::{ExtractFrom, RenderInstance, nvitem::NVPoint},
-        },
-        utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
+        components::ScaleHint, context::WgpuContext, items::{
+            camera_frame::CameraFrame, nvitem::{NVItem, NVItemBuilder}, Blueprint
+        }, prelude::Transformable, render::{
+            primitives::{nvitem::NVPoint, ExtractFrom, RenderInstance}, CameraUniforms, CameraUniformsBindGroup, RenderTextures
+        }, utils::{get_texture_data, wgpu::WgpuBuffer, PipelinesStorage}
     };
 
     use super::NVItemPrimitive;
@@ -226,28 +243,19 @@ mod test {
     #[test]
     fn test() {
         let ctx = pollster::block_on(WgpuContext::new());
-        let nvitem = NVItem::from_nvpoints(vec![
-            [
-                vec3(0.0, 0.0, 0.0),
-                vec3(0.0, 0.0, 0.0),
-                vec3(0.0, 1.0, 0.0),
-            ],
-            [
-                vec3(0.0, 1.0, 0.0),
-                vec3(0.0, 2.0, 0.0),
-                vec3(1.0, 2.0, 0.0),
-            ],
-            [
-                vec3(1.0, 2.0, 0.0),
-                vec3(2.0, 2.0, 0.0),
-                vec3(1.0, 1.0, 0.0),
-            ],
-            [
-                vec3(1.0, 1.0, 0.0),
-                vec3(0.0, 0.0, 0.0),
-                vec3(0.0, 0.0, 0.0),
-            ],
-        ]);
+        let mut nvitem = NVItemBuilder::new();
+        nvitem.move_to(vec3(-3.4890716, 2.2969427, 0.0));
+        nvitem.cubic_to(
+            vec3(-3.5152762, 2.2969427, 0.0),
+            vec3(-3.5327399, 2.2794755, 0.0),
+            vec3(-3.5327399, 2.2445414, 0.0),
+        );
+        // nvitem.close_path();
+        let mut nvitem = nvitem.build();
+
+        nvitem
+            .scale_to(ScaleHint::PorportionalHeight(8.0))
+            .put_center_on(Vec3::ZERO);
         let mut nvitem_primitive = NVItemPrimitive::default();
         let mut pipelines = PipelinesStorage::default();
         let (width, height) = (1920, 1080);
@@ -256,7 +264,7 @@ mod test {
         let uniforms = CameraUniforms {
             proj_mat: camera.projection_matrix(frame_size.y, 16.0 / 9.0),
             view_mat: camera.view_matrix(),
-            half_frame_size: frame_size / 2.0,
+            half_frame_size: vec2(width as f32 / 2.0, height as f32 / 2.0),
             _padding: [0.0; 2],
         };
         let uniforms_buffer = WgpuBuffer::new_init(
@@ -268,6 +276,12 @@ mod test {
         let camera_bind_group = CameraUniformsBindGroup::new(&ctx, &uniforms_buffer);
         let render_textures = RenderTextures::new(&ctx, width, height);
 
+        let mut wgpu_profiler = wgpu_profiler::GpuProfiler::new(
+            &ctx.device,
+            wgpu_profiler::GpuProfilerSettings::default(),
+        )
+        .unwrap();
+
         nvitem_primitive.update_from(&ctx, &nvitem);
         let mut encoder = ctx
             .device
@@ -278,6 +292,7 @@ mod test {
             &mut encoder,
             &camera_bind_group.bind_group,
             &render_textures,
+            &mut wgpu_profiler
         );
         ctx.queue.submit(Some(encoder.finish()));
 

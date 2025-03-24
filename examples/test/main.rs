@@ -46,22 +46,24 @@ impl TimelineConstructor for TestScene {
         // vitem
         //     .scale_to(ScaleHint::PorportionalWidth(3.8))
         //     .put_center_on(Vec3::NEG_X * 2.0);
-        let mut nvitem = Group::<NVItem>::from_svg(typst_svg!(
-            r#"#align(center)[
-            #text(font: "LXGW Bright")[软]
-        ]"#
-        ));
-        // let mut nvitem = NVItemBuilder::new();
-        // nvitem.move_to(vec3(-3.4890716, 2.2969427, 0.0));
-        // nvitem.cubic_to(
-        //     vec3(-3.5152762, 2.2969427, 0.0),
-        //     vec3(-3.5327399, 2.2794755, 0.0),
-        //     vec3(-3.5327399, 2.2445414, 0.0),
-        // );
+        // let mut nvitem = Group::<NVItem>::from_svg(typst_svg!(
+        //     r#"#align(center)[
+        //     #text(font: "LXGW Bright")[软]
+        // ]"#
+        // ));
+        let mut nvitem = NVItemBuilder::new();
+        nvitem.move_to(vec3(-3.4890716, 2.2969427, 0.0));
+        nvitem.cubic_to(
+            vec3(-3.5152762, 2.2969427, 0.0),
+            vec3(-3.5327399, 2.2794755, 0.0),
+            vec3(-3.5327399, 2.2445414, 0.0),
+        );
         // nvitem.close_path();
-        // let nvitem = nvitem.build();
+        let mut nvitem = nvitem.build();
 
-        nvitem.scale_to(ScaleHint::PorportionalHeight(8.0));
+        nvitem
+            .scale_to(ScaleHint::PorportionalHeight(8.0))
+            .put_center_on(Vec3::ZERO);
         // let nvitem = nvitem[0].get_partial(0.0..0.15);
         // dbg!(nvitem.nvpoints.len());
         // println!("{:?}", nvitem.nvpoints);
@@ -70,7 +72,7 @@ impl TimelineConstructor for TestScene {
         //     .put_center_on(Vec3::X * 2.0);
 
         // let _vitem = timeline.insert_group(vitem);
-        let _nvitem = timeline.insert_group(nvitem);
+        // let _nvitem = timeline.insert_group(nvitem);
         // println!("{}", text.len());
         // let vpoints = text[0].vpoints.get(0..94).unwrap();
         // println!("{:?}", vpoints);
@@ -100,7 +102,7 @@ impl TimelineConstructor for TestScene {
         // let item = Square(4.0).build();
 
         // let _vitem = timeline.insert(vitem);
-        // let _nvitem = timeline.insert(nvitem);
+        let _nvitem = timeline.insert(nvitem);
         // let mut _text = timeline.insert_group(text);
         // let mut _text = timeline.insert(text);
 

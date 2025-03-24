@@ -288,6 +288,7 @@ impl Renderer {
                 profiling::scope!("submit");
                 ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
             }
+            renderable.debug(&ctx.wgpu_ctx);
 
             // Signal to the profiler that the frame is finished.
             self.profiler.end_frame().unwrap();

@@ -208,6 +208,12 @@ mod test {
     #[test]
     fn test() {
         let ctx = pollster::block_on(WgpuContext::new());
+
+        let mut wgpu_profiler = wgpu_profiler::GpuProfiler::new(
+            &ctx.device,
+            wgpu_profiler::GpuProfilerSettings::default(),
+        )
+        .unwrap();
         let vitem = Square(8.0).build();
 
         let mut pipelines = PipelinesStorage::default();
@@ -286,6 +292,7 @@ mod test {
             &mut encoder,
             &camera_bind_group.bind_group,
             &render_textures,
+            &mut wgpu_profiler,
         );
         ctx.queue.submit(Some(encoder.finish()));
         let res = render_instance.clip_info_buffer.read_buffer(&ctx).unwrap();

@@ -59,9 +59,20 @@ impl ComputeBindGroup {
                     },
                     count: None,
                 },
-                // min_x, min_y, max_x, max_y
+                // points_len
                 wgpu::BindGroupLayoutEntry {
                     binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // min_x, min_y, max_x, max_y
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -79,6 +90,7 @@ impl ComputeBindGroup {
         input_nvpoints_buffer: &wgpu::Buffer,
         stroke_width_buffer: &wgpu::Buffer,
         output_nvpoints_buffer: &wgpu::Buffer,
+        points_len_buffer: &wgpu::Buffer,
         clip_box_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -106,6 +118,12 @@ impl ComputeBindGroup {
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::Buffer(
+                        points_len_buffer.as_entire_buffer_binding(),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Buffer(
                         clip_box_buffer.as_entire_buffer_binding(),
                     ),
                 },
@@ -117,6 +135,7 @@ impl ComputeBindGroup {
         input_nvpoints_buffer: &wgpu::Buffer,
         stroke_width_buffer: &wgpu::Buffer,
         output_nvpoints_buffer: &wgpu::Buffer,
+        points_len_buffer: &wgpu::Buffer,
         clip_box_buffer: &wgpu::Buffer,
     ) -> Self {
         Self(Self::new_bind_group(
@@ -124,6 +143,7 @@ impl ComputeBindGroup {
             input_nvpoints_buffer,
             stroke_width_buffer,
             output_nvpoints_buffer,
+            points_len_buffer,
             clip_box_buffer,
         ))
     }

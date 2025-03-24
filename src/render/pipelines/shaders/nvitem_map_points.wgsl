@@ -31,11 +31,18 @@ struct ClipBox {
 }
 
 @group(1) @binding(3)
+var<storage, read_write> points_len: u32;
+
+@group(1) @binding(4)
 var<storage, read_write> clip_points: ClipBox;
 
 @compute @workgroup_size(256)
 fn cs_main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>, @builtin(num_workgroups) num_workgroups: vec3<u32>) {
     let index = global_invocation_id.x;
+
+    if index >= points_len {
+        return;
+    }
 
     for (var i = 0; i < 3; i++) {
         let p = cam_uniforms.proj_mat * cam_uniforms.view_mat * vec4(input_data[index].points[i].xyz, 1.0);

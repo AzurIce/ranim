@@ -174,7 +174,7 @@ fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: 
     //
     //  + anchor1    + anchor2
     // The equation degenerate to a quadratic equation
-    if cu == 0.0 {
+    if abs(cu - 0.0) < 1e-6 {
         // sgn = -1.0;
         // let d = li * li - 4.0 * qu * co;
         // if d > 0.0 {
@@ -193,9 +193,18 @@ fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: 
     }
     else {
         let root = solve_cubic(qu / cu, li / cu, co / cu);
-        sgn *= sign_root(root.x, pos, p0, p1, p2, p3);
-        sgn *= sign_root(root.y, pos, p0, p1, p2, p3);
-        sgn *= sign_root(root.z, pos, p0, p1, p2, p3);
+        // sgn *= sign_root(root.x, pos, p0, p1, p2, p3);
+        // sgn *= sign_root(root.y, pos, p0, p1, p2, p3);
+        // sgn *= sign_root(root.z, pos, p0, p1, p2, p3);
+
+        // if root.z != root.z {
+        //     sgn = -1.0;
+        // }
+        // if root.z == root.z {
+        //     sgn = -1.0;
+        // }
+
+        sgn=-1.0;
     }
 
     // let tan1 = p0.xy - p1.xy;
@@ -222,7 +231,7 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
     attr.debug = vec4(1.0, 1.0, 1.0, 1.0);
 
     let n = points_len;
-    for (var i = start_idx; i < n; i++) {
+    for (var i = start_idx; i < points_len; i++) {
         let p1 = point(i);
         let h1 = next_handle(i);
         let h2 = prev_handle(i + 1u);
@@ -239,8 +248,13 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
             attr.nearest_idx = i;
         }
         // if is_closed(i) {
-            attr.sgn *= sign_bezier(pos, p1, h1, h2, p2);
+        attr.sgn = sign_bezier(pos, p1, h1, h2, p2);
         // }
+        // let cu = (- p1.y + 3.0 * h1.y - 3.0 * h2.y + p2.y);
+        // let qu = (3.0 * p1.y - 6.0 * h1.y + 3.0 * h2.y);
+        // let li = (- 3.0 * p1.y + 3.0 * h1.y);
+        // let co = p1.y - pos.y;
+        // attr.debug = vec4(solve_cubic(qu / cu, li / cu, co / cu), 1.0);
     }
 
     return attr;
@@ -253,6 +267,7 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     var d = 3.40282346638528859812e38;
     var sgn = 1.0;
 
+    // var debug: vec4<f32> = vec4(1.0, 1.0, 1.0, 1.0);
     var start_idx = 0u;
     while start_idx < points_len {
         let attr = get_subpath_attr(pos, start_idx);
@@ -262,12 +277,16 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
         }
         sgn *= attr.sgn;
         start_idx = attr.end_idx + 1;
+        // debug = attr.debug;
     }
 
     let sgn_d = sgn * d;
     // return vec4(1.0);
     // return vec4(vec3(d), 1.0);
-    return vec4(vec3(sgn_d), 1.0);
+    return vec4(vec3(sgn), 1.0);
+    // return vec4(vec3(sgn_d), 1.0);
+    // return debug;
+    // return vec4(1.0);
 
     // let e = point(idx + 1u).xy - point(idx).xy;
     // let w = pos.xy - point(idx).xy;

@@ -22,6 +22,7 @@ pub trait RenderInstance {
         #[cfg(feature = "profiling")]
         profiler: &mut wgpu_profiler::GpuProfiler,
     );
+    fn debug(&self, ctx: &WgpuContext) {}
 }
 
 pub trait ExtractFrom<T: Entity>: RenderInstance + Any {
@@ -70,6 +71,11 @@ impl RenderInstance for Vec<&dyn RenderInstance> {
                 #[cfg(feature = "profiling")]
                 profiler,
             );
+        }
+    }
+    fn debug(&self, ctx: &WgpuContext) {
+        for render_instance in self {
+            render_instance.debug(ctx);
         }
     }
 }
