@@ -67,13 +67,22 @@ fn blend_color(f: vec4<f32>, b: vec4<f32>) -> vec4<f32> {
     return vec4(f.r * f.a + b.r * b.a * (1.0 - f.a) / a, f.g * f.a + b.g * b.a * (1.0 - f.a) / a, f.b * f.a + b.b * b.a * (1.0 - f.a) / a, a);
 }
 
-fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
+struct SolveCubicRes {
+    n: u32,
+    root: array<f32, 3>,
+}
+
+fn solve_cubic(a: f32, b: f32, c: f32) -> SolveCubicRes {
     let p = b - a * a / 3.0;
+    // let sqrt_neg_p = sqrt(-p);
+    // let sqrt_neg_p3 = sqrt_neg_p * sqrt_neg_p * sqrt_neg_p;
     let p3 = p * p * p;
 
     let q = a * (2.0 * a * a - 9.0 * b) / 27.0 + c;
     let d = q * q + 4.0 * p3 / 27.0;
     let offset = - a / 3.0;
+
+    var res: SolveCubicRes;
 
     // single_root
     if (d >= 0.0) {
@@ -83,12 +92,13 @@ fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
 
         var r = offset + uv.x + uv.y;
 
-        // let f = ((r + a) * r + b) * r + c;
-        // let f_prime = (3.0 * r + 2.0 * a) * r + b;
+        let f = ((r + a) * r + b) * r + c;
+        let f_prime = (3.0 * r + 2.0 * a) * r + b;
 
-        // r -= f / f_prime;
-
-        return vec3(r, r, r);
+        r -= f / f_prime;
+        res.n = 1u;
+        res.root[0] = r;
+        return res;
     }
     let u = sqrt(- p / 3.0);
     let v = acos(- sqrt(- 27.0 / p3) * q / 2.0) / 3.0;
@@ -102,7 +112,11 @@ fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
 
     // r -= f / f_prime;
 
-    return r;
+    res.n = 3u;
+    res.root[0] = r.x;
+    res.root[1] = r.y;
+    res.root[2] = r.z;
+    return res;
 }
 
 // Implemented from https://www.shadertoy.com/view/3lsSzS
@@ -166,7 +180,115 @@ fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: 
     let li = (- 3.0 * p0.y + 3.0 * p1.y);
     let co = p0.y - pos.y;
 
+    // if distance(p0, vec2(450.0053, 540.0)) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if abs(p0.x - 450.0053) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if abs(p0.y - 540.0) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if distance(p1, vec2(-90.075745, 540.0)) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if abs(p1.x - -90.075745) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if abs(p1.y - 540.0) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if distance(p2, vec2(-450.00528, 179.99673)) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if abs(p2.x - -450.00528) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if abs(p2.y - 179.99673) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if distance(p3, vec2(-450.00528, -539.99994)) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if abs(p3.x - -450.00528) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if abs(p3.y - -539.99994) < 1e-6 {
+    //     return -1.0;
+    // }
+    
+    
+
+    //! ? only 1e-4 is ok
+    // if abs(cu - 0.00987) < 1e-4 {
+    //     return -1.0;
+    // }
+    // if abs(qu + 1080.00981) < 1e-6 {
+    //     return -1.0;
+    // }
+    // if abs(li) < 1e-6 {
+    //     return -1.0;
+    // }
+
+
     var sgn = 1.0;
+
+    // if abs(cu - 0.0) < 1e-6 {
+    //     sgn = -1.0;
+    // } else {
+        let res = solve_cubic(qu / cu, li / cu, co / cu);
+        // if res.n == 3u {
+        //     return -1.0;
+        // }
+        // if 0.0 <= res.root[1] && res.root[1] <= 1.0 {
+        //     return -1.0;
+        // }
+        let root = res.root[2];
+        let root2 = root * root;
+        let root3 = root2 * root;
+        let A = - p0.x + 3.0 * p1.x - 3.0 * p2.x + p3.x;
+        let B = 3.0 * p0.x - 6.0 * p1.x + 3.0 * p2.x;
+        let C = - 3.0 * p0.x + 3.0 * p1.x;
+        let D = p0.x;
+        //! ? only 1e-4 is ok
+        // if abs(A - 179.778025) < 1e-4 {
+        //     return -1.0;
+        // }
+        //! ? only 1e-4 is ok
+        // if abs(B - 540.45453) < 1e-4 {
+        //     return -1.0;
+        // }
+        // if abs(C + 1620.243135) < 1e-6 {
+        //     return -1.0;
+        // }
+        // if abs(D - 450.0053) < 1e-6 {
+        //     return -1.0;
+        // }
+        
+        // condition is true ???
+        // if abs(root - 0.0) < 1e-6 && res.n == 3u {
+        //     return -1.0;
+        // }
+
+        // 寄
+        let x_pos = A * root3 + B * root2 + C * root + D;
+        if x_pos < pos.x {
+            return -1.0;
+        }
+        // if abs(x_pos - 450.0053) < 1e-6 {
+        //     return -1.0;
+        // }
+        // if 0.0 <= res.root[2] && res.root[2] <= 1.0 {
+        //     return -1.0;
+        // }
+
+        // return res.root[0];
+        // for (var i = 0u; i < res.n; i++) {
+        //     let root = res.root[i];
+        //     sgn *= sign_root(root, pos, p0, p1, p2, p3);
+        // }
+    // }
+
     // quadratic
     // For example, when:
     //
@@ -174,41 +296,50 @@ fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: 
     //
     //  + anchor1    + anchor2
     // The equation degenerate to a quadratic equation
-    if abs(cu - 0.0) < 1e-6 {
-        // sgn = -1.0;
-        // let d = li * li - 4.0 * qu * co;
-        // if d > 0.0 {
-        //     let root1 = (- li - sqrt(d)) / (2.0 * qu);
-        //     sgn *= sign_root(root1, pos, p0, p1, p2, p3);
-        //     let root2 = (- li + sqrt(d)) / (2.0 * qu);
-        //     sgn *= sign_root(root2, pos, p0, p1, p2, p3);
-        // }
-        // else if d == 0.0 {
-        //     let root = - li / (2.0 * qu);
-        //     // This is a workaround to fix the case where the tangent on the root is horizontal
-        //     if tan_bezier(root, p0, p1, p2, p3).y != 0.0 {
-        //         sgn *= sign_root(root, pos, p0, p1, p2, p3);
-        //     }
-        // }
-    }
-    else {
-        let root = solve_cubic(qu / cu, li / cu, co / cu);
-        // sgn *= sign_root(root.x, pos, p0, p1, p2, p3);
-        // sgn *= sign_root(root.y, pos, p0, p1, p2, p3);
-        // sgn *= sign_root(root.z, pos, p0, p1, p2, p3);
+    // if abs(cu - 0.0) < 1e-6 {
+    //     sgn = -1.0;
+    //     let d = li * li - 4.0 * qu * co;
+    //     if d > 0.0 {
+    //         let root1 = (- li - sqrt(d)) / (2.0 * qu);
+    //         sgn *= sign_root(root1, pos, p0, p1, p2, p3);
+    //         let root2 = (- li + sqrt(d)) / (2.0 * qu);
+    //         sgn *= sign_root(root2, pos, p0, p1, p2, p3);
+    //     }
+    //     else if d == 0.0 {
+    //         let root = - li / (2.0 * qu);
+    //         // This is a workaround to fix the case where the tangent on the root is horizontal
+    //         if tan_bezier(root, p0, p1, p2, p3).y != 0.0 {
+    //             sgn *= sign_root(root, pos, p0, p1, p2, p3);
+    //         }
+    //     }
+    // }
+    // else {
+    //     let root = solve_cubic(qu / cu, li / cu, co / cu);
+    //     // sgn *= sign_root(root.x, pos, p0, p1, p2, p3);
+    //     // sgn *= sign_root(root.y, pos, p0, p1, p2, p3);
+    //     // sgn *= sign_root(root.z, pos, p0, p1, p2, p3);
 
-        // if root.z != root.z {
-        //     sgn = -1.0;
-        // }
-        // if root.z == root.z {
-        //     sgn = -1.0;
-        // }
+    //     // if root.x > 100000 {
+    //     //     sgn = -1.0;
+    //     // }
+    //     // if root.z >= 0.0 && root.z <= 1.0 {
+    //         sgn = root.z;
+    //     // }
+    //     // if abs(root.y + root.z) < 0.01 {
+    //     //     sgn = -1.0;
+    //     // }
+    //     // if root.z != root.z {
+    //     //     sgn = -1.0;
+    //     // }
+    //     // if root.z == root.z {
+    //     //     sgn = -1.0;
+    //     // }
 
-        sgn=-1.0;
-    }
+    //     // sgn=-1.0;
+    // }
 
-    // let tan1 = p0.xy - p1.xy;
-    // let tan2 = p2.xy - p3.xy;
+    // let tan1 = p0 - p1;
+    // let tan2 = p2 - p3;
     // let nor1 = vec2(tan1.y, - tan1.x);
     // let nor2 = vec2(tan2.y, - tan2.x);
 
@@ -231,7 +362,8 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
     attr.debug = vec4(1.0, 1.0, 1.0, 1.0);
 
     let n = points_len;
-    for (var i = start_idx; i < points_len; i++) {
+    // ! i < 1 just for test, the input only has 1 subpath
+    for (var i = start_idx; i < 1; i++) {
         let p1 = point(i);
         let h1 = next_handle(i);
         let h2 = prev_handle(i + 1u);
@@ -250,11 +382,6 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
         // if is_closed(i) {
         attr.sgn = sign_bezier(pos, p1, h1, h2, p2);
         // }
-        // let cu = (- p1.y + 3.0 * h1.y - 3.0 * h2.y + p2.y);
-        // let qu = (3.0 * p1.y - 6.0 * h1.y + 3.0 * h2.y);
-        // let li = (- 3.0 * p1.y + 3.0 * h1.y);
-        // let co = p1.y - pos.y;
-        // attr.debug = vec4(solve_cubic(qu / cu, li / cu, co / cu), 1.0);
     }
 
     return attr;
@@ -280,11 +407,12 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
         // debug = attr.debug;
     }
 
+    // return vec4(vec3(sign_bezier(pos, point(idx), next_handle(idx), prev_handle(idx + 1u), point(idx + 1u))), 1.0);
     let sgn_d = sgn * d;
     // return vec4(1.0);
     // return vec4(vec3(d), 1.0);
-    return vec4(vec3(sgn), 1.0);
-    // return vec4(vec3(sgn_d), 1.0);
+    // return vec4(vec3(sgn), 1.0);
+    return vec4(vec3(sgn_d), 1.0);
     // return debug;
     // return vec4(1.0);
 

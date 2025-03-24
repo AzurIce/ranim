@@ -209,6 +209,7 @@ mod test {
     fn test() {
         let ctx = pollster::block_on(WgpuContext::new());
 
+        #[cfg(feature = "profiling")]
         let mut wgpu_profiler = wgpu_profiler::GpuProfiler::new(
             &ctx.device,
             wgpu_profiler::GpuProfilerSettings::default(),
@@ -292,6 +293,7 @@ mod test {
             &mut encoder,
             &camera_bind_group.bind_group,
             &render_textures,
+            #[cfg(feature = "profiling")]
             &mut wgpu_profiler,
         );
         ctx.queue.submit(Some(encoder.finish()));
