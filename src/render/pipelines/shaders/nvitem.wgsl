@@ -271,10 +271,10 @@ fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: 
         // }
 
         // 寄
-        let x_pos = A * root3 + B * root2 + C * root + D;
-        if x_pos < pos.x {
-            return -1.0;
-        }
+        // let x_pos = A * root3 + B * root2 + C * root + D;
+        // if x_pos < pos.x {
+        //     return -1.0;
+        // }
         // if abs(x_pos - 450.0053) < 1e-6 {
         //     return -1.0;
         // }

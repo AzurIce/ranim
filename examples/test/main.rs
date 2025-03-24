@@ -117,19 +117,79 @@ fn main() {
     #[cfg(not(debug_assertions))]
     env_logger::Builder::from_env(Env::default().default_filter_or("test=info,ranim=trace")).init();
     // println!("main");
-    render_scene_at_sec(
-        TestScene,
-        0.0,
-        "test.png",
-        &AppOptions {
-            frame_rate: 60,
-            ..AppOptions::default()
-        },
-    );
+    render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions {
+        frame_rate: 60,
+        ..AppOptions::default()
+    });
     // TestScene.render(&AppOptions {
     //     frame_rate: 60,
     //     frame_size: (3840, 2160),
     //     save_frames: true,
     //     ..Default::default()
     // });
+}
+
+#[cfg(test)]
+mod test {
+    use glam::{DVec2, Vec2, vec2, dvec2, vec3, dvec3};
+
+    const P: [Vec2; 4] = [
+        vec2(450.0053, 540.0),
+        vec2(-90.075745, 540.0),
+        vec2(-450.00528, 179.99673),
+        vec2(-450.00528, -539.99994),
+    ];
+
+
+    #[derive(Debug)]
+    struct SolveCubicRes {
+        n: u32,
+        root: [f32; 3],
+    }
+
+    fn solve_cubic(a: f32, b: f32, c: f32) -> SolveCubicRes {
+        dbg!(a, b, c);
+        let p = b - a * a / 3.0;
+        let p3 = p * p * p;
+        dbg!(p);
+        dbg!(p3);
+
+        let q = a * (2.0 * a * a - 9.0 * b) / 27.0 + c;
+        let _d = q * q + 4.0 * p3 / 27.0;
+        let offset = -a / 3.0;
+
+        let u = (-p / 3.0).sqrt();
+        let v = (-(-27.0 / p3).sqrt() * q / 2.0).clamp(-1.0, 1.0).acos() / 3.0;
+        dbg!((-27.0 / p3).sqrt());
+        dbg!(-(-27.0 / p3).sqrt() * q / 2.0);
+        dbg!((-(-27.0 / p3).sqrt() * q / 2.0).acos());
+        dbg!(v);
+        let m = v.cos();
+        let n = v.sin() * 1.732050808;
+
+        let r = vec3(m + m, -n - m, n - m) * u + offset;
+
+        // let f = ((r + a) * r + b) * r + c;
+        // let f_prime = (3.0 * r + 2.0 * a) * r + b;
+
+        // r -= f / f_prime;
+
+        SolveCubicRes {
+            n: 3,
+            root: [r.x, r.y, r.z],
+        }
+    }
+
+    #[test]
+    fn foo() {
+        let pos = vec2(0.0, 0.0);
+        let cu = -P[0].y + 3.0 * P[1].y - 3.0 * P[2].y + P[3].y;
+        let qu = 3.0 * P[0].y - 6.0 * P[1].y + 3.0 * P[2].y;
+        let li = -3.0 * P[0].y + 3.0 * P[1].y;
+        let co = P[0].y - pos.y;
+        dbg!(cu, qu, li, co);
+
+        let res = solve_cubic(qu / cu, li / cu, co / cu);
+        println!("{:?}", res);
+    }
 }
