@@ -1,4 +1,4 @@
-use glam::{Vec3, Vec3Swizzles};
+use glam::{DVec3, Vec3Swizzles};
 
 use crate::{
     prelude::Interpolatable,
@@ -8,8 +8,8 @@ use crate::{
 /// A path builder based on quadratic beziers
 #[derive(Default)]
 pub struct PathBuilder {
-    start_point: Option<Vec3>,
-    points: Vec<Vec3>,
+    start_point: Option<DVec3>,
+    points: Vec<DVec3>,
 }
 
 impl PathBuilder {
@@ -24,7 +24,7 @@ impl PathBuilder {
     }
 
     /// Starts a new subpath and push the point as the start_point
-    pub fn move_to(&mut self, point: Vec3) -> &mut Self {
+    pub fn move_to(&mut self, point: DVec3) -> &mut Self {
         self.start_point = Some(point);
         if let Some(end) = self.points.last() {
             self.points.extend_from_slice(&[*end, point]);
@@ -42,7 +42,7 @@ impl PathBuilder {
     }
 
     /// Append a line
-    pub fn line_to(&mut self, p: Vec3) -> &mut Self {
+    pub fn line_to(&mut self, p: DVec3) -> &mut Self {
         self.assert_started();
         let mid = (self.points.last().unwrap() + p) / 2.0;
         self.points.extend_from_slice(&[mid, p]);
@@ -50,10 +50,10 @@ impl PathBuilder {
     }
 
     /// Append a quadratic bezier
-    pub fn quad_to(&mut self, h: Vec3, p: Vec3) -> &mut Self {
+    pub fn quad_to(&mut self, h: DVec3, p: DVec3) -> &mut Self {
         self.assert_started();
         let cur = self.points.last().unwrap();
-        if cur.distance_squared(h) < f32::EPSILON || h.distance_squared(p) < f32::EPSILON {
+        if cur.distance_squared(h) < f64::EPSILON || h.distance_squared(p) < f64::EPSILON {
             return self.line_to(p);
         }
         self.points.extend_from_slice(&[h, p]);
@@ -61,13 +61,13 @@ impl PathBuilder {
     }
 
     /// Append a cubic bezier
-    pub fn cubic_to(&mut self, h1: Vec3, h2: Vec3, p: Vec3) -> &mut Self {
+    pub fn cubic_to(&mut self, h1: DVec3, h2: DVec3, p: DVec3) -> &mut Self {
         self.assert_started();
         let cur = self.points.last().unwrap();
-        if cur.distance_squared(h1) < f32::EPSILON || h1.distance_squared(h2) < f32::EPSILON {
+        if cur.distance_squared(h1) < f64::EPSILON || h1.distance_squared(h2) < f64::EPSILON {
             return self.quad_to(h2, p);
         }
-        if h2.distance_squared(p) < f32::EPSILON {
+        if h2.distance_squared(p) < f64::EPSILON {
             return self.quad_to(h1, p);
         }
 
@@ -88,12 +88,12 @@ impl PathBuilder {
         self
     }
 
-    pub fn vpoints(&self) -> &[Vec3] {
+    pub fn vpoints(&self) -> &[DVec3] {
         &self.points
     }
 }
 
-pub fn split_cubic_bezier(bezier: &[Vec3; 4], t: f32) -> ([Vec3; 4], [Vec3; 4]) {
+pub fn split_cubic_bezier(bezier: &[DVec3; 4], t: f64) -> ([DVec3; 4], [DVec3; 4]) {
     let [p0, h0, h1, p1] = bezier;
 
     let split_point = &cubic_bezier_eval(bezier, t);
@@ -106,7 +106,7 @@ pub fn split_cubic_bezier(bezier: &[Vec3; 4], t: f32) -> ([Vec3; 4], [Vec3; 4]) 
     ([*p0, h00, h01, *split_point], [*split_point, h10, h11, *p1])
 }
 
-pub fn split_quad_bezier(bezier: &[Vec3; 3], t: f32) -> ([Vec3; 3], [Vec3; 3]) {
+pub fn split_quad_bezier(bezier: &[DVec3; 3], t: f64) -> ([DVec3; 3], [DVec3; 3]) {
     let [p0, h, p1] = bezier;
 
     let split_point = &quad_bezier_eval(bezier, t);
@@ -117,7 +117,7 @@ pub fn split_quad_bezier(bezier: &[Vec3; 3], t: f32) -> ([Vec3; 3], [Vec3; 3]) {
     ([*p0, h0, *split_point], [*split_point, h1, *p1])
 }
 
-pub fn trim_quad_bezier(bezier: &[Vec3; 3], a: f32, b: f32) -> [Vec3; 3] {
+pub fn trim_quad_bezier(bezier: &[DVec3; 3], a: f64, b: f64) -> [DVec3; 3] {
     // trace!("!!!trim_quad_bezier: {:?}, {:?}, {:?}", bezier, a, b);
     let (a, b) = if a > b { (b, a) } else { (a, b) };
     let end_on_b = split_quad_bezier(bezier, b).0;
@@ -125,7 +125,7 @@ pub fn trim_quad_bezier(bezier: &[Vec3; 3], a: f32, b: f32) -> [Vec3; 3] {
     split_quad_bezier(&end_on_b, a).1
 }
 
-pub fn trim_cubic_bezier(bezier: &[Vec3; 4], a: f32, b: f32) -> [Vec3; 4] {
+pub fn trim_cubic_bezier(bezier: &[DVec3; 4], a: f64, b: f64) -> [DVec3; 4] {
     // trace!("trim_cubic_bezier: {:?}, {:?}, {:?}", bezier, a, b);
     let (a, b) = if a > b { (b, a) } else { (a, b) };
     let end_on_b = split_cubic_bezier(bezier, b).0;
@@ -135,7 +135,7 @@ pub fn trim_cubic_bezier(bezier: &[Vec3; 4], a: f32, b: f32) -> [Vec3; 4] {
 }
 
 /// Returns the point on a quadratic bezier curve at the given parameter.
-pub fn point_on_quadratic_bezier<T: Interpolatable>(points: &[T; 3], t: f32) -> T {
+pub fn point_on_quadratic_bezier<T: Interpolatable>(points: &[T; 3], t: f64) -> T {
     let t = t.clamp(0.0, 1.0);
     let p1 = points[0].lerp(&points[1], t);
     let p2 = points[1].lerp(&points[2], t);
@@ -143,7 +143,7 @@ pub fn point_on_quadratic_bezier<T: Interpolatable>(points: &[T; 3], t: f32) -> 
 }
 
 /// Returns the control points of the given part of a quadratic bezier curve.
-pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f32, b: f32) -> [T; 3] {
+pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f64, b: f64) -> [T; 3] {
     let a = a.clamp(0.0, 1.0);
     let b = b.clamp(0.0, 1.0);
 
@@ -156,7 +156,7 @@ pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f32, b: f
     [h0, h1, h2]
 }
 
-pub fn cubic_bezier_eval(bezier: &[Vec3; 4], t: f32) -> Vec3 {
+pub fn cubic_bezier_eval(bezier: &[DVec3; 4], t: f64) -> DVec3 {
     let t = t.clamp(0.0, 1.0);
     let p0 = bezier[0].lerp(bezier[1], t);
     let p1 = bezier[1].lerp(bezier[2], t);
@@ -168,7 +168,7 @@ pub fn cubic_bezier_eval(bezier: &[Vec3; 4], t: f32) -> Vec3 {
     p0.lerp(p1, t)
 }
 
-pub fn quad_bezier_eval(bezier: &[Vec3; 3], t: f32) -> Vec3 {
+pub fn quad_bezier_eval(bezier: &[DVec3; 3], t: f64) -> DVec3 {
     let t = t.clamp(0.0, 1.0);
     let p0 = bezier[0].lerp(bezier[1], t);
     let p1 = bezier[1].lerp(bezier[2], t);
@@ -179,7 +179,7 @@ pub fn quad_bezier_eval(bezier: &[Vec3; 3], t: f32) -> Vec3 {
 /// Approx a cubic bezier with quadratic bezier
 ///
 /// [Vec3; 4] is [p1, h1, h2, p2]
-pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
+pub fn approx_cubic_with_quadratic(cubic: [DVec3; 4]) -> Vec<[DVec3; 3]> {
     // trace!("approx cubic {:?}", cubic);
     let [p1, h1, h2, p2] = cubic;
 
@@ -197,7 +197,7 @@ pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
     let mut root = if a == 0.0 && b == 0.0 || a != 0.0 && disc < 0.0 {
         0.5
     } else if a == 0.0 {
-        -c / b
+        (-c / b).clamp(0.0, 1.0)
     } else {
         let mut root = (-b + sqrt_disc) / (2. * a);
         if root <= 0.0 || root >= 1.0 {
@@ -402,50 +402,50 @@ pub fn approx_cubic_with_quadratic(cubic: [Vec3; 4]) -> Vec<[Vec3; 3]> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use glam::vec3;
+    use glam::dvec3;
 
     #[test]
     fn test_trim_quad_bezier() {
         // 测试正常参数顺序 (a < b)
         let bezier = [
-            vec3(0.0, 0.0, 0.0),
-            vec3(1.0, 2.0, 0.0),
-            vec3(2.0, 0.0, 0.0),
+            dvec3(0.0, 0.0, 0.0),
+            dvec3(1.0, 2.0, 0.0),
+            dvec3(2.0, 0.0, 0.0),
         ];
         let trimmed = trim_quad_bezier(&bezier, 0.25, 0.75);
 
         // 验证结果点在曲线上
         let start_point = quad_bezier_eval(&bezier, 0.25);
         let end_point = quad_bezier_eval(&bezier, 0.75);
-        assert!((trimmed[0] - start_point).length() < f32::EPSILON);
-        assert!((trimmed[2] - end_point).length() < f32::EPSILON);
+        assert!((trimmed[0] - start_point).length() < f64::EPSILON);
+        assert!((trimmed[2] - end_point).length() < f64::EPSILON);
 
         // 测试参数顺序颠倒 (a > b)
         let trimmed_reversed = trim_quad_bezier(&bezier, 0.75, 0.25);
-        assert!((trimmed_reversed[0] - start_point).length() < f32::EPSILON);
-        assert!((trimmed_reversed[2] - end_point).length() < f32::EPSILON);
+        assert!((trimmed_reversed[0] - start_point).length() < f64::EPSILON);
+        assert!((trimmed_reversed[2] - end_point).length() < f64::EPSILON);
 
         // 测试边界值
         let full_curve = trim_quad_bezier(&bezier, 0.0, 1.0);
-        assert!((full_curve[0] - bezier[0]).length() < f32::EPSILON);
-        assert!((full_curve[2] - bezier[2]).length() < f32::EPSILON);
+        assert!((full_curve[0] - bezier[0]).length() < f64::EPSILON);
+        assert!((full_curve[2] - bezier[2]).length() < f64::EPSILON);
 
         // 测试零长度曲线
         let zero_length = trim_quad_bezier(&bezier, 0.5, 0.5);
         let mid_point = quad_bezier_eval(&bezier, 0.5);
-        assert!((zero_length[0] - mid_point).length() < f32::EPSILON);
-        assert!((zero_length[2] - mid_point).length() < f32::EPSILON);
+        assert!((zero_length[0] - mid_point).length() < f64::EPSILON);
+        assert!((zero_length[2] - mid_point).length() < f64::EPSILON);
 
         // 测试复杂曲线
         let complex_bezier = [
-            vec3(-1.0, 0.0, 1.0),
-            vec3(1.0, 3.0, 0.0),
-            vec3(3.0, 0.0, -1.0),
+            dvec3(-1.0, 0.0, 1.0),
+            dvec3(1.0, 3.0, 0.0),
+            dvec3(3.0, 0.0, -1.0),
         ];
         let trimmed_complex = trim_quad_bezier(&complex_bezier, 0.2, 0.8);
         let complex_start = quad_bezier_eval(&complex_bezier, 0.2);
         let complex_end = quad_bezier_eval(&complex_bezier, 0.8);
-        assert!((trimmed_complex[0] - complex_start).length() < f32::EPSILON);
-        assert!((trimmed_complex[2] - complex_end).length() < f32::EPSILON);
+        assert!((trimmed_complex[0] - complex_start).length() < f64::EPSILON);
+        assert!((trimmed_complex[2] - complex_end).length() < f64::EPSILON);
     }
 }

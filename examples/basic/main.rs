@@ -1,5 +1,5 @@
 use env_logger::Env;
-use glam::Vec3;
+use glam::DVec3;
 use ranim::animation::creation::WritingAnimSchedule;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::components::ScaleHint;
@@ -25,7 +25,7 @@ impl TimelineConstructor for BasicScene {
 
         let mut svg = SvgItem::from_svg(SVG);
         svg.scale_to(ScaleHint::PorportionalHeight(3.0))
-            .put_center_on(Vec3::Y * 2.0);
+            .put_center_on(DVec3::Y * 2.0);
         let mut svg = timeline.insert(svg);
 
         let mut text = Group::<VItem>::from_svg(&typst_svg!(
@@ -38,7 +38,7 @@ impl TimelineConstructor for BasicScene {
             "#
         ));
         text.scale_to(ScaleHint::PorportionalHeight(2.0))
-            .put_center_on(Vec3::NEG_Y * 2.0);
+            .put_center_on(DVec3::NEG_Y * 2.0);
 
         text.iter_mut().for_each(|item| {
             item.set_fill_opacity(0.8);

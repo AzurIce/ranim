@@ -1,14 +1,14 @@
-use glam::{IVec2, Vec2, Vec3, vec2};
+use glam::{IVec2, DVec2, DVec3, dvec2};
 
-pub fn cross2d(a: Vec2, b: Vec2) -> f32 {
+pub fn cross2d(a: DVec2, b: DVec2) -> f64 {
     a.x * b.y - b.x * a.y
 }
 
-pub fn intersection(p1: Vec3, v1: Vec3, p2: Vec3, v2: Vec3) -> Option<Vec3> {
+pub fn intersection(p1: DVec3, v1: DVec3, p2: DVec3, v2: DVec3) -> Option<DVec3> {
     // println!("p1: {:?}, v1: {:?}, p2: {:?}, v2: {:?}", p1, v1, p2, v2);
     let cross = v1.cross(v2);
     let denom = cross.length_squared();
-    if denom < f32::EPSILON {
+    if denom < f64::EPSILON {
         return None;
     }
 
@@ -19,7 +19,7 @@ pub fn intersection(p1: Vec3, v1: Vec3, p2: Vec3, v2: Vec3) -> Option<Vec3> {
     let point1 = p1 + v1 * t;
     let point2 = p2 + v2 * s;
 
-    if (point1 - point2).length_squared() < f32::EPSILON {
+    if (point1 - point2).length_squared() < f64::EPSILON {
         Some(point1)
     } else {
         None
@@ -29,8 +29,8 @@ pub fn intersection(p1: Vec3, v1: Vec3, p2: Vec3, v2: Vec3) -> Option<Vec3> {
 /// A rectangle in 2D space
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {
-    min: Vec2,
-    max: Vec2,
+    min: DVec2,
+    max: DVec2,
 }
 
 impl Rect {
@@ -45,7 +45,7 @@ impl Rect {
         Self { min, max }
     }
 
-    pub fn center(&self) -> Vec2 {
+    pub fn center(&self) -> DVec2 {
         (self.min + self.max) / 2.0
     }
 
@@ -57,7 +57,7 @@ impl Rect {
     ///    |          |          |
     /// (-1, 1)-----(0, 1)-----(1, 1)
     /// ```
-    pub fn point(&self, edge: IVec2) -> Vec2 {
+    pub fn point(&self, edge: IVec2) -> DVec2 {
         let min = self.min;
         let center = self.center();
         let max = self.max;
@@ -75,34 +75,34 @@ impl Rect {
             _ => unreachable!(),
         };
 
-        vec2(x, y)
+        dvec2(x, y)
     }
 }
 
 /// Interpolate between two integers
 ///
 /// return integer and the sub progress to the next integer
-pub fn interpolate_usize(a: usize, b: usize, t: f32) -> (usize, f32) {
+pub fn interpolate_usize(a: usize, b: usize, t: f64) -> (usize, f64) {
     assert!(b >= a);
     let t = t.clamp(0.0, 1.0);
     let v = b - a;
 
-    let p = v as f32 * t;
+    let p = v as f64 * t;
 
     (a + p.floor() as usize, p.fract())
 }
 
 #[cfg(test)]
 mod test {
-    use core::f32;
+    use core::f64;
 
     use super::*;
 
     #[test]
     fn test_interpolate_usize() {
-        let test = |(x, t): (usize, f32), (expected_x, expected_t): (usize, f32)| {
+        let test = |(x, t): (usize, f64), (expected_x, expected_t): (usize, f64)| {
             assert_eq!(x, expected_x);
-            assert!((t - expected_t).abs() < f32::EPSILON);
+            assert!((t - expected_t).abs() < f64::EPSILON);
         };
 
         test(interpolate_usize(0, 10, 0.0), (0, 0.0));
@@ -123,41 +123,41 @@ mod test {
 
     #[test]
     fn test_intersection() {
-        use glam::vec3;
+        use glam::dvec3;
 
         // 1. 垂直相交
-        let p1 = vec3(0.0, 0.0, 0.0);
-        let v1 = vec3(1.0, 0.0, 0.0);
-        let p2 = vec3(0.0, 1.0, 0.0);
-        let v2 = vec3(0.0, -1.0, 0.0);
-        assert_eq!(intersection(p1, v1, p2, v2), Some(vec3(0.0, 0.0, 0.0)));
+        let p1 = dvec3(0.0, 0.0, 0.0);
+        let v1 = dvec3(1.0, 0.0, 0.0);
+        let p2 = dvec3(0.0, 1.0, 0.0);
+        let v2 = dvec3(0.0, -1.0, 0.0);
+        assert_eq!(intersection(p1, v1, p2, v2), Some(dvec3(0.0, 0.0, 0.0)));
 
         // 2. 斜交
-        let p1 = vec3(1.0, 1.0, 0.0);
-        let v1 = vec3(1.0, 2.0, 0.0);
-        let p2 = vec3(3.0, 1.0, 0.0);
-        let v2 = vec3(-1.0, 2.0, 0.0);
-        assert_eq!(intersection(p1, v1, p2, v2), Some(vec3(2.0, 3.0, 0.0)));
+        let p1 = dvec3(1.0, 1.0, 0.0);
+        let v1 = dvec3(1.0, 2.0, 0.0);
+        let p2 = dvec3(3.0, 1.0, 0.0);
+        let v2 = dvec3(-1.0, 2.0, 0.0);
+        assert_eq!(intersection(p1, v1, p2, v2), Some(dvec3(2.0, 3.0, 0.0)));
 
         // 3. 重合直线（应返回 None）
-        let p1 = vec3(0.0, 0.0, 0.0);
-        let v1 = vec3(1.0, 1.0, 1.0);
-        let p2 = vec3(1.0, 1.0, 1.0);
-        let v2 = vec3(2.0, 2.0, 2.0);
+        let p1 = dvec3(0.0, 0.0, 0.0);
+        let v1 = dvec3(1.0, 1.0, 1.0);
+        let p2 = dvec3(1.0, 1.0, 1.0);
+        let v2 = dvec3(2.0, 2.0, 2.0);
         assert!(intersection(p1, v1, p2, v2).is_none());
 
         // 4. 平行直线（应返回 None）
-        let p1 = vec3(0.0, 0.0, 0.0);
-        let v1 = vec3(1.0, 1.0, 0.0);
-        let p2 = vec3(1.0, 0.0, 0.0);
-        let v2 = vec3(1.0, 1.0, 0.0);
+        let p1 = dvec3(0.0, 0.0, 0.0);
+        let v1 = dvec3(1.0, 1.0, 0.0);
+        let p2 = dvec3(1.0, 0.0, 0.0);
+        let v2 = dvec3(1.0, 1.0, 0.0);
         assert!(intersection(p1, v1, p2, v2).is_none());
 
         // 5. 异面直线（应返回 None）
-        let p1 = vec3(0.0, 0.0, 0.0);
-        let v1 = vec3(1.0, 0.0, 1.0);
-        let p2 = vec3(0.0, 1.0, 0.0);
-        let v2 = vec3(1.0, 0.0, -1.0);
+        let p1 = dvec3(0.0, 0.0, 0.0);
+        let v1 = dvec3(1.0, 0.0, 1.0);
+        let p2 = dvec3(0.0, 1.0, 0.0);
+        let v2 = dvec3(1.0, 0.0, -1.0);
         assert!(intersection(p1, v1, p2, v2).is_none());
     }
 }

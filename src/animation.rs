@@ -16,7 +16,7 @@ use std::{fmt::Debug, iter::Once, rc::Rc};
 // MARK: Eval
 
 pub trait EvalDynamic<T> {
-    fn eval_alpha(&self, alpha: f32) -> T;
+    fn eval_alpha(&self, alpha: f64) -> T;
 }
 
 pub trait ToEvaluator<T> {
@@ -67,11 +67,11 @@ impl<T: Clone> EvalResult<T> {
 }
 
 pub trait Eval<T> {
-    fn eval_alpha(&self, alpha: f32) -> EvalResult<T>;
+    fn eval_alpha(&self, alpha: f64) -> EvalResult<T>;
 }
 
 impl<T> Eval<T> for Evaluator<T> {
-    fn eval_alpha(&self, alpha: f32) -> EvalResult<T> {
+    fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
         match self {
             Self::Dynamic(e) => EvalResult::Dynamic(e.eval_alpha(alpha)),
             Self::Static(e) => EvalResult::Static(e.clone()),
@@ -84,7 +84,7 @@ pub struct EvalAdapter<T> {
 }
 
 impl<T: EntityTimelineStaticState + Clone + 'static> Eval<T::StateType> for EvalAdapter<T> {
-    fn eval_alpha(&self, alpha: f32) -> EvalResult<T::StateType> {
+    fn eval_alpha(&self, alpha: f64) -> EvalResult<T::StateType> {
         match self.inner.eval_alpha(alpha) {
             EvalResult::Dynamic(res) => EvalResult::Dynamic(res.into_state_type()),
             EvalResult::Static(res) => EvalResult::Static(res.into_rc_state_type()),
@@ -96,7 +96,7 @@ impl<T: EntityTimelineStaticState + Clone + 'static> Eval<T::StateType> for Eval
 
 pub struct ChainedAnimation<T> {
     anims: Vec<Animation<T>>,
-    end_secs: Vec<f32>,
+    end_secs: Vec<f64>,
 }
 
 impl<T> ChainedAnimation<T> {
@@ -117,7 +117,7 @@ impl<T> ChainedAnimation<T> {
 }
 
 impl<T> Eval<T> for ChainedAnimation<T> {
-    fn eval_alpha(&self, alpha: f32) -> EvalResult<T> {
+    fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
         let inner_global_sec = self.end_secs.last().unwrap() * alpha;
 
         let (anim, end_sec) = self
@@ -143,9 +143,9 @@ impl<T: 'static> From<ChainedAnimation<T>> for Animation<T> {
 
 pub struct Animation<T> {
     evaluator: Box<dyn Eval<T>>,
-    pub(crate) rate_func: fn(f32) -> f32,
-    pub(crate) duration_secs: f32,
-    pub(crate) padding: (f32, f32),
+    pub(crate) rate_func: fn(f64) -> f64,
+    pub(crate) duration_secs: f64,
+    pub(crate) padding: (f64, f64),
 }
 
 impl<T> Debug for Animation<T> {
@@ -183,33 +183,33 @@ impl<T: 'static> Animation<T> {
 }
 
 impl<T> Animation<T> {
-    pub fn span_len(&self) -> f32 {
+    pub fn span_len(&self) -> f64 {
         self.duration_secs + self.padding.0 + self.padding.1
     }
-    pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
+    pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.rate_func = rate_func;
         self
     }
-    pub fn with_duration(mut self, secs: f32) -> Self {
+    pub fn with_duration(mut self, secs: f64) -> Self {
         self.duration_secs = secs;
         self
     }
-    pub fn padding(mut self, start_sec: f32, end_sec: f32) -> Self {
+    pub fn padding(mut self, start_sec: f64, end_sec: f64) -> Self {
         self.padding = (start_sec, end_sec);
         self
     }
-    pub fn padding_start(mut self, sec: f32) -> Self {
+    pub fn padding_start(mut self, sec: f64) -> Self {
         self.padding.0 = sec;
         self
     }
-    pub fn padding_end(mut self, sec: f32) -> Self {
+    pub fn padding_end(mut self, sec: f64) -> Self {
         self.padding.1 = sec;
         self
     }
-    pub fn eval_alpha(&self, alpha: f32) -> EvalResult<T> {
+    pub fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
         self.eval_sec(alpha * self.span_len())
     }
-    pub fn eval_sec(&self, local_sec: f32) -> EvalResult<T> {
+    pub fn eval_sec(&self, local_sec: f64) -> EvalResult<T> {
         self.evaluator.eval_alpha((self.rate_func)(
             ((local_sec - self.padding.0) / self.duration_secs).clamp(0.0, 1.0),
         ))
@@ -244,15 +244,15 @@ impl<'r, 't, T: 'static> AnimSchedule<'r, 't, T> {
 }
 
 impl<T> AnimSchedule<'_, '_, T> {
-    pub fn with_padding(mut self, start_sec: f32, end_sec: f32) -> Self {
+    pub fn with_padding(mut self, start_sec: f64, end_sec: f64) -> Self {
         self.anim.padding = (start_sec, end_sec);
         self
     }
-    pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
+    pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.anim.rate_func = rate_func;
         self
     }
-    pub fn with_duration(mut self, secs: f32) -> Self {
+    pub fn with_duration(mut self, secs: f64) -> Self {
         self.anim.duration_secs = secs;
         self
     }
@@ -270,14 +270,14 @@ impl<T: 'static> IntoIterator for AnimSchedule<'_, '_, T> {
 
 impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
     /// Sets the rate function for each animation in the group
-    pub fn with_rate_func(mut self, rate_func: fn(f32) -> f32) -> Self {
+    pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.iter_mut().for_each(|schedule| {
             schedule.anim.rate_func = rate_func;
         });
         self
     }
     /// Sets the duration for each animation in the group
-    pub fn with_duration(mut self, secs: f32) -> Self {
+    pub fn with_duration(mut self, secs: f64) -> Self {
         self.iter_mut().for_each(|schedule| {
             schedule.anim.duration_secs = secs;
         });
@@ -301,7 +301,7 @@ impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
     ///      [1   , .5, 1    ]
     /// [.5, .5, .5]
     /// ```
-    pub fn with_total_duration(mut self, secs: f32) -> Self {
+    pub fn with_total_duration(mut self, secs: f64) -> Self {
         let total_secs = self
             .iter()
             .map(|schedule| schedule.anim.span_len())

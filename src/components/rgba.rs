@@ -77,8 +77,8 @@ impl DerefMut for Rgba {
 }
 
 impl Interpolatable for Rgba {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
-        Self(self.0.lerp(target.0, t))
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        Self(self.0.lerp(target.0, t as f32))
     }
 }
 

@@ -54,7 +54,7 @@ impl<T: FadingRequirement> FadeIn<T> {
 }
 
 impl<T: FadingRequirement> EvalDynamic<T> for FadeIn<T> {
-    fn eval_alpha(&self, alpha: f32) -> T {
+    fn eval_alpha(&self, alpha: f64) -> T {
         self.src.lerp(&self.dst, alpha)
     }
 }
@@ -74,7 +74,7 @@ impl<T: FadingRequirement> FadeOut<T> {
 }
 
 impl<T: FadingRequirement> EvalDynamic<T> for FadeOut<T> {
-    fn eval_alpha(&self, alpha: f32) -> T {
+    fn eval_alpha(&self, alpha: f64) -> T {
         self.src.lerp(&self.dst, alpha)
     }
 }

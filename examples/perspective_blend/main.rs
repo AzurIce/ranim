@@ -1,4 +1,4 @@
-use glam::Vec3;
+use glam::DVec3;
 use ranim::{
     animation::transform::{GroupTransformAnimSchedule, TransformAnimSchedule},
     color::palettes::manim,
@@ -17,7 +17,7 @@ impl TimelineConstructor for PerspectiveBlendScene {
         timeline: &'t RanimTimeline,
         camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
-        camera.data.pos = Vec3::Z * 5.0;
+        camera.data.pos = DVec3::Z * 5.0;
         timeline.update(camera);
 
         // Create a cube
@@ -30,8 +30,8 @@ impl TimelineConstructor for PerspectiveBlendScene {
         bottom.set_color(manim::TEAL_C).set_fill_opacity(0.5);
         let mut bottom = timeline.insert(bottom);
         anims.push(bottom.transform(|data| {
-            data.shift(Vec3::NEG_Y * side_length / 2.0)
-                .rotate(std::f32::consts::PI / 2.0, Vec3::X);
+            data.shift(DVec3::NEG_Y * side_length / 2.0)
+                .rotate(std::f64::consts::PI / 2.0, DVec3::X);
         }));
 
         // Right face
@@ -39,8 +39,8 @@ impl TimelineConstructor for PerspectiveBlendScene {
         right.set_color(manim::GREEN_C).set_fill_opacity(0.5);
         let mut right = timeline.insert(right);
         anims.push(right.transform(|data| {
-            data.shift(Vec3::X * side_length / 2.0)
-                .rotate(std::f32::consts::PI / 2.0, Vec3::Y);
+            data.shift(DVec3::X * side_length / 2.0)
+                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
         }));
 
         // Back face
@@ -48,7 +48,7 @@ impl TimelineConstructor for PerspectiveBlendScene {
         back.set_color(manim::BLUE_C).set_fill_opacity(0.5);
         let mut back = timeline.insert(back);
         anims.push(back.transform(|data| {
-            data.shift(Vec3::NEG_Z * side_length / 2.0);
+            data.shift(DVec3::NEG_Z * side_length / 2.0);
         }));
 
         // Top face
@@ -56,8 +56,8 @@ impl TimelineConstructor for PerspectiveBlendScene {
         top.set_color(manim::PURPLE_C).set_fill_opacity(0.5);
         let mut top = timeline.insert(top);
         anims.push(top.transform(|data| {
-            data.shift(Vec3::Y * side_length / 2.0)
-                .rotate(-std::f32::consts::PI / 2.0, Vec3::X);
+            data.shift(DVec3::Y * side_length / 2.0)
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
         }));
 
         // Front face (facing camera)
@@ -66,7 +66,7 @@ impl TimelineConstructor for PerspectiveBlendScene {
         let mut front = timeline.insert(front);
 
         anims.push(front.transform(|data| {
-            data.shift(Vec3::Z * side_length / 2.0);
+            data.shift(DVec3::Z * side_length / 2.0);
         }));
 
         // Left face
@@ -74,8 +74,8 @@ impl TimelineConstructor for PerspectiveBlendScene {
         left.set_color(manim::YELLOW_C).set_fill_opacity(0.5);
         let mut left = timeline.insert(left);
         anims.push(left.transform(|data| {
-            data.shift(Vec3::NEG_X * side_length / 2.0)
-                .rotate(-std::f32::consts::PI / 2.0, Vec3::Y);
+            data.shift(DVec3::NEG_X * side_length / 2.0)
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
         }));
 
         timeline.play(Group(anims).apply()).sync();
@@ -84,8 +84,8 @@ impl TimelineConstructor for PerspectiveBlendScene {
 
         timeline.play(
             cube.transform(|data| {
-                data.rotate(std::f32::consts::PI / 6.0, Vec3::Y)
-                    .rotate(std::f32::consts::PI / 6.0, Vec3::X);
+                data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
+                    .rotate(std::f64::consts::PI / 6.0, DVec3::X);
             })
             .with_duration(4.0),
         );

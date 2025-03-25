@@ -1,12 +1,12 @@
 use std::{cmp::Ordering, f32, path::Path, slice::Iter, vec};
 
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{Affine2, Vec3, vec3};
+use glam::{dvec3, DAffine2, DVec3};
 use log::warn;
 
 use crate::{
     color::{rgb8, rgba},
-    components::{Anchor, vpoint::VPoint},
+    components::Anchor,
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
     render::primitives::{
@@ -32,10 +32,16 @@ impl From<VItem> for SvgItem {
 
 // MARK: Transformable
 
-impl Transformable<VPoint> for SvgItem {
+impl Transformable for SvgItem {
+    fn iter_points(&self) -> impl Iterator<Item = &DVec3> {
+        self.vitems.iter().flat_map(|x| x.iter_points())
+    }
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut DVec3> {
+        self.vitems.iter_mut().flat_map(|x| x.iter_points_mut())
+    }
     fn apply_points_function(
         &mut self,
-        f: impl Fn(&mut crate::components::ComponentVec<VPoint>) + Copy,
+        f: impl Fn(Vec<&mut glam::DVec3>) + Copy,
         anchor: Anchor,
     ) -> &mut Self {
         let point = match anchor {
@@ -48,7 +54,7 @@ impl Transformable<VPoint> for SvgItem {
         });
         self
     }
-    fn get_bounding_box(&self) -> [Vec3; 3] {
+    fn get_bounding_box(&self) -> [DVec3; 3] {
         let [min, max] = self
             .vitems
             .iter()
@@ -58,12 +64,12 @@ impl Transformable<VPoint> for SvgItem {
             .unwrap();
         [min, (min + max) / 2., max]
     }
-    fn get_start_position(&self) -> Option<Vec3> {
+    fn get_start_position(&self) -> Option<DVec3> {
         self.vitems
             .first()
             .and_then(|vitem| vitem.get_start_position())
     }
-    fn get_end_position(&self) -> Option<Vec3> {
+    fn get_end_position(&self) -> Option<DVec3> {
         self.vitems
             .first()
             .and_then(|vitem| vitem.get_start_position())
@@ -82,8 +88,8 @@ impl SvgItem {
 
         let vitems = vitems_from_tree(&tree);
         let mut svg_item = Self { vitems };
-        svg_item.put_center_on(Vec3::ZERO);
-        svg_item.rotate(f32::consts::PI, Vec3::X);
+        svg_item.put_center_on(DVec3::ZERO);
+        svg_item.rotate(std::f64::consts::PI, DVec3::X);
         svg_item
     }
 }
@@ -262,7 +268,7 @@ impl Alignable for SvgItem {
 }
 
 impl Interpolatable for SvgItem {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
         let vitems = self
             .vitems
             .iter()
@@ -274,7 +280,7 @@ impl Interpolatable for SvgItem {
 }
 
 impl Partial for SvgItem {
-    fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
+    fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
         let max_vitem_idx = self.vitems.len();
         let (start_index, start_residue) = interpolate_usize(0, max_vitem_idx, range.start);
         let (end_index, end_residue) = interpolate_usize(0, max_vitem_idx, range.end);
@@ -327,8 +333,8 @@ impl Group<VItem> {
         let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();
 
         let mut vitem_group = Self(vitems_from_tree(&tree));
-        vitem_group.put_center_on(Vec3::ZERO);
-        vitem_group.rotate(f32::consts::PI, Vec3::X);
+        vitem_group.put_center_on(DVec3::ZERO);
+        vitem_group.rotate(std::f64::consts::PI, DVec3::X);
         vitem_group
     }
 }
@@ -391,18 +397,19 @@ fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
         for segment in path.data().segments() {
             match segment {
                 usvg::tiny_skia_path::PathSegment::MoveTo(p) => {
-                    builder.move_to(vec3(p.x, p.y, 0.0))
+                    builder.move_to(dvec3(p.x as f64, p.y as f64, 0.0))
                 }
                 usvg::tiny_skia_path::PathSegment::LineTo(p) => {
-                    builder.line_to(vec3(p.x, p.y, 0.0))
+                    builder.line_to(dvec3(p.x as f64, p.y as f64, 0.0))
                 }
-                usvg::tiny_skia_path::PathSegment::QuadTo(p1, p2) => {
-                    builder.quad_to(vec3(p1.x, p1.y, 0.0), vec3(p2.x, p2.y, 0.0))
-                }
+                usvg::tiny_skia_path::PathSegment::QuadTo(p1, p2) => builder.quad_to(
+                    dvec3(p1.x as f64, p1.y as f64, 0.0),
+                    dvec3(p2.x as f64, p2.y as f64, 0.0),
+                ),
                 usvg::tiny_skia_path::PathSegment::CubicTo(p1, p2, p3) => builder.cubic_to(
-                    vec3(p1.x, p1.y, 0.0),
-                    vec3(p2.x, p2.y, 0.0),
-                    vec3(p3.x, p3.y, 0.0),
+                    dvec3(p1.x as f64, p1.y as f64, 0.0),
+                    dvec3(p2.x as f64, p2.y as f64, 0.0),
+                    dvec3(p3.x as f64, p3.y as f64, 0.0),
                 ),
                 usvg::tiny_skia_path::PathSegment::Close => builder.close_path(),
             };
@@ -413,13 +420,13 @@ fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
         }
 
         let mut vitem = VItem::from_vpoints(builder.vpoints().to_vec());
-        let affine = Affine2::from_cols_array(&[
-            transform.sx,
-            transform.kx,
-            transform.kx,
-            transform.sy,
-            transform.tx,
-            transform.ty,
+        let affine = DAffine2::from_cols_array(&[
+            transform.sx as f64,
+            transform.kx as f64,
+            transform.kx as f64,
+            transform.sy as f64,
+            transform.tx as f64,
+            transform.ty as f64,
         ]);
         vitem.apply_affine(affine);
         if let Some(fill) = path.fill() {
@@ -456,7 +463,7 @@ mod test {
     #[test]
     fn test_get_partial() {
         let mut svg = SvgItem::from_svg(typst_svg!("R"));
-        svg.scale(Vec3::splat(10.0));
+        svg.scale(DVec3::splat(10.0));
 
         println!("{:?}", svg.vitems[0].vpoints);
         let partial = svg.get_partial(0.0..0.5);

@@ -2,7 +2,7 @@ name = "basic"
 code = """
 ```rust,linenos
 use env_logger::Env;\r
-use glam::Vec3;\r
+use glam::DVec3;\r
 use ranim::animation::creation::WritingAnimSchedule;\r
 use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::components::ScaleHint;\r
@@ -28,7 +28,7 @@ impl TimelineConstructor for BasicScene {\r
 \r
         let mut svg = SvgItem::from_svg(SVG);\r
         svg.scale_to(ScaleHint::PorportionalHeight(3.0))\r
-            .put_center_on(Vec3::Y * 2.0);\r
+            .put_center_on(DVec3::Y * 2.0);\r
         let mut svg = timeline.insert(svg);\r
 \r
         let mut text = Group::<VItem>::from_svg(&typst_svg!(\r
@@ -41,7 +41,7 @@ impl TimelineConstructor for BasicScene {\r
             \"#\r
         ));\r
         text.scale_to(ScaleHint::PorportionalHeight(2.0))\r
-            .put_center_on(Vec3::NEG_Y * 2.0);\r
+            .put_center_on(DVec3::NEG_Y * 2.0);\r
 \r
         text.iter_mut().for_each(|item| {\r
             item.set_fill_opacity(0.8);\r
@@ -81,6 +81,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "c4965ace09638aeff643caf7e182507b7b691dd1"
+hash = "06654c58827a321490c984d03418aa7bee0ef52d"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/output.mp4"]

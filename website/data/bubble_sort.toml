@@ -1,7 +1,7 @@
 name = "bubble_sort"
 code = """
 ```rust,linenos
-use glam::{Vec3, vec2};\r
+use glam::{DVec3, dvec2};\r
 use rand::{SeedableRng, seq::SliceRandom};\r
 use ranim::{\r
     animation::transform::TransformAnimSchedule, color::palettes::manim, components::Anchor,\r
@@ -19,29 +19,29 @@ impl TimelineConstructor for BubbleSortScene {\r
     ) {\r
         let num = self.0;\r
 \r
-        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);\r
+        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
         let padded_frame_size = frame_size * 0.9;\r
 \r
-        let anim_step_duration = 15.0 / num.pow(2) as f32;\r
+        let anim_step_duration = 15.0 / num.pow(2) as f64;\r
 \r
-        let width_unit = padded_frame_size.x / num as f32;\r
-        let height_unit = padded_frame_size.y / num as f32;\r
+        let width_unit = padded_frame_size.x / num as f64;\r
+        let height_unit = padded_frame_size.y / num as f64;\r
 \r
         let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);\r
         let mut heights = (1..=num)\r
-            .map(|x| x as f32 * height_unit)\r
-            .collect::<Vec<f32>>();\r
+            .map(|x| x as f64 * height_unit)\r
+            .collect::<Vec<f64>>();\r
         heights.shuffle(&mut rng);\r
 \r
-        let padded_frame_bl = vec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
+        let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
         let mut rects = heights\r
             .iter()\r
             .enumerate()\r
             .map(|(i, &height)| {\r
                 let mut rect = Rectangle(width_unit, height).build();\r
                 let target_bc_coord = padded_frame_bl.extend(0.0)\r
-                    + Vec3::X * (width_unit * i as f32 + width_unit / 2.0);\r
-                rect.scale(Vec3::splat(0.8))\r
+                    + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);\r
+                rect.scale(DVec3::splat(0.8))\r
                     .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord)\r
                     .set_color(manim::WHITE)\r
                     .set_fill_opacity(0.5);\r
@@ -49,7 +49,7 @@ impl TimelineConstructor for BubbleSortScene {\r
             })\r
             .collect::<Vec<_>>();\r
 \r
-        let shift_right = Vec3::X * width_unit;\r
+        let shift_right = DVec3::X * width_unit;\r
         for i in (1..num).rev() {\r
             for j in 0..i {\r
                 timeline.play(\r
@@ -146,6 +146,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "6c1f0a8113d467b7be8b6258f26b85542626ed2e"
+hash = "a5d36b613b7f130036761681ca5ce5a4c6ce07b8"
 preview_imgs = ["/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
 output_files = ["/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/output-100.mp4"]

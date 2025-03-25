@@ -1,29 +1,35 @@
 use std::ops::Range;
 
 use color::{AlphaColor, ColorSpace, Srgb};
-use glam::Mat4;
+use glam::DMat4;
 
 // MARK: Interpolatable
 pub trait Interpolatable {
-    fn lerp(&self, target: &Self, t: f32) -> Self;
+    fn lerp(&self, target: &Self, t: f64) -> Self;
 }
 
 impl Interpolatable for f32 {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        self + (target - self) * t as f32
+    }
+}
+
+impl Interpolatable for f64 {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
         self + (target - self) * t
     }
 }
 
 impl<CS: ColorSpace> Interpolatable for AlphaColor<CS> {
-    fn lerp(&self, other: &Self, t: f32) -> Self {
+    fn lerp(&self, other: &Self, t: f64) -> Self {
         // TODO: figure out to use `lerp_rect` or `lerp`
-        AlphaColor::lerp_rect(*self, *other, t)
+        AlphaColor::lerp_rect(*self, *other, t as f32)
     }
 }
 
-impl Interpolatable for Mat4 {
-    fn lerp(&self, other: &Self, t: f32) -> Self {
-        let mut result = Mat4::ZERO;
+impl Interpolatable for DMat4 {
+    fn lerp(&self, other: &Self, t: f64) -> Self {
+        let mut result = DMat4::ZERO;
         for i in 0..4 {
             for j in 0..4 {
                 result.col_mut(i)[j] = self.col(i)[j].lerp(&other.col(i)[j], t);
@@ -52,7 +58,7 @@ pub trait Opacity {
 
 // MARK: Partial
 pub trait Partial {
-    fn get_partial(&self, range: Range<f32>) -> Self;
+    fn get_partial(&self, range: Range<f64>) -> Self;
 }
 
 // MARK: Empty

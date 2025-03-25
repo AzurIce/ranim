@@ -4,7 +4,7 @@ code = """
 use env_logger::Env;\r
 use ranim::color::palettes::manim::*;\r
 use ranim::components::Anchor;\r
-use ranim::glam::{vec2, vec3};\r
+use ranim::glam::{dvec2, dvec3};\r
 use ranim::items::group::Group;\r
 use ranim::items::vitem::Rectangle;\r
 use ranim::prelude::*;\r
@@ -18,7 +18,7 @@ impl TimelineConstructor for PalettesScene {\r
         timeline: &'t RanimTimeline,\r
         _camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
-        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);\r
+        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
         let padded_frame_size = frame_size * 0.9;\r
 \r
         let colors = vec![\r
@@ -35,22 +35,22 @@ impl TimelineConstructor for PalettesScene {\r
             vec![GREY_BROWN, LIGHT_BROWN, PINK, LIGHT_PINK, ORANGE],\r
         ];\r
 \r
-        let padded_frame_start = vec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
-        let h_step = padded_frame_size.y / colors.len() as f32;\r
+        let padded_frame_start = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
+        let h_step = padded_frame_size.y / colors.len() as f64;\r
 \r
         let squares = colors\r
             .iter()\r
             .enumerate()\r
             .flat_map(|(i, row)| {\r
-                let y = i as f32 * h_step;\r
-                let w_step = padded_frame_size.x / row.len() as f32;\r
+                let y = i as f64 * h_step;\r
+                let w_step = padded_frame_size.x / row.len() as f64;\r
                 row.iter().enumerate().map(move |(j, color)| {\r
-                    let x = j as f32 * w_step;\r
-                    let mut square = Rectangle(w_step as f32, h_step as f32).build();\r
+                    let x = j as f64 * w_step;\r
+                    let mut square = Rectangle(w_step as f64, h_step as f64).build();\r
                     square\r
                         .put_anchor_on(\r
                             Anchor::edge(-1, -1, 0),\r
-                            padded_frame_start.extend(0.0) + vec3(x, y, 0.0),\r
+                            padded_frame_start.extend(0.0) + dvec3(x, y, 0.0),\r
                         )\r
                         .set_color(*color)\r
                         .set_stroke_width(0.0);\r
@@ -76,6 +76,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "b7f0a6c400515abf997efd973b4dbf0070a68a0f"
+hash = "c0c4625bb81eb4e4b59707c5c4445df7e955d8bb"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/output.png"]

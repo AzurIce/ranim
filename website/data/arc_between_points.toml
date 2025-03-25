@@ -5,7 +5,7 @@ use env_logger::Env;\r
 use itertools::Itertools;\r
 use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::color::HueDirection;\r
-use ranim::glam::{Mat2, vec2};\r
+use ranim::glam::{DMat2, dvec2};\r
 use ranim::items::group::Group;\r
 use ranim::items::vitem::ArcBetweenPoints;\r
 use ranim::prelude::*;\r
@@ -20,7 +20,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {\r
         timeline: &'t RanimTimeline,\r
         _camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
-        let center = vec2(0.0, 0.0);\r
+        let center = dvec2(0.0, 0.0);\r
 \r
         let start_color = color!(\"#FF8080FF\");\r
         let end_color = color!(\"#58C4DDFF\");\r
@@ -29,9 +29,9 @@ impl TimelineConstructor for ArcBetweenPointsScene {\r
 \r
         let arcs = (0..nrad)\r
             .map(|i| {\r
-                let radius = 6.0 * (i + 1) as f32 / nrad as f32;\r
-                let width = 6.0 * ((nrad - i) as f32 / nrad as f32).powi(2);\r
-                let angle = std::f32::consts::PI * 7.0 / 4.0 * (i + 1) as f32 / nrad as f32;\r
+                let radius = 6.0 * (i + 1) as f64 / nrad as f64;\r
+                let width = 6.0 * ((nrad - i) as f64 / nrad as f64).powi(2);\r
+                let angle = std::f64::consts::PI * 7.0 / 4.0 * (i + 1) as f64 / nrad as f64;\r
                 (radius, width, angle)\r
             })\r
             .cartesian_product(0..ntan)\r
@@ -41,8 +41,8 @@ impl TimelineConstructor for ArcBetweenPointsScene {\r
                     j as f32 / (ntan - 1) as f32,\r
                     HueDirection::Increasing,\r
                 );\r
-                let vec = Mat2::from_angle(std::f32::consts::PI * 2.0 / ntan as f32 * j as f32)\r
-                    * vec2(rad, 0.0);\r
+                let vec = DMat2::from_angle(std::f64::consts::PI * 2.0 / ntan as f64 * j as f64)\r
+                    * dvec2(rad, 0.0);\r
                 let mut arc = ArcBetweenPoints {\r
                     start: center.extend(0.0),\r
                     end: (center + vec).extend(0.0),\r
@@ -51,7 +51,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {\r
                 .build();\r
                 arc.set_color(color)\r
                     .set_fill_opacity(0.0)\r
-                    .set_stroke_width(width);\r
+                    .set_stroke_width(width as f32);\r
                 arc\r
             })\r
             .collect::<Group<_>>();\r
@@ -78,6 +78,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "430a5d45d85e01390e89485f1a1bae968c4f8ad4"
+hash = "f8e84d6a5e67dee428a0a8224647fedd3f415468"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/output.mp4"]

@@ -1,6 +1,6 @@
 // MARK: CameraFrame
 
-use glam::{Mat4, Vec3, vec2};
+use glam::{dvec2, DMat4, DVec3};
 
 use crate::prelude::{Alignable, Interpolatable};
 
@@ -10,21 +10,21 @@ use crate::prelude::{Alignable, Interpolatable};
 /// which is used to blend between orthographic and perspective projection.
 #[derive(Clone, Debug)]
 pub struct CameraFrame {
-    pub pos: Vec3,
-    pub up: Vec3,
-    pub facing: Vec3,
+    pub pos: DVec3,
+    pub up: DVec3,
+    pub facing: DVec3,
     /// Used in orthographic projection
-    pub scale: f32,
+    pub scale: f64,
     /// Used in perspective projection
-    pub fovy: f32,
+    pub fovy: f64,
     // far > near
-    pub near: f32,
-    pub far: f32,
-    pub perspective_blend: f32,
+    pub near: f64,
+    pub far: f64,
+    pub perspective_blend: f64,
 }
 
 impl Interpolatable for CameraFrame {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
         Self {
             pos: self.pos.lerp(target.pos, t),
             up: self.up.lerp(target.up, t),
@@ -51,12 +51,12 @@ impl Alignable for CameraFrame {
 impl Default for CameraFrame {
     fn default() -> Self {
         Self {
-            pos: Vec3::ZERO,
-            up: Vec3::Y,
-            facing: Vec3::NEG_Z,
+            pos: DVec3::ZERO,
+            up: DVec3::Y,
+            facing: DVec3::NEG_Z,
 
             scale: 1.0,
-            fovy: std::f32::consts::PI / 2.0,
+            fovy: std::f64::consts::PI / 2.0,
 
             near: -1000.0,
             far: 1000.0,
@@ -74,15 +74,15 @@ impl CameraFrame {
 
 impl CameraFrame {
     /// The view matrix of the camera
-    pub fn view_matrix(&self) -> Mat4 {
-        Mat4::look_at_rh(self.pos, self.pos + self.facing, self.up)
+    pub fn view_matrix(&self) -> DMat4 {
+        DMat4::look_at_rh(self.pos, self.pos + self.facing, self.up)
     }
 
     /// Use the given frame size as `left`, `right`, `bottom`, `top` to construct an orthographic matrix
-    pub fn orthographic_mat(&self, frame_height: f32, aspect_ratio: f32) -> Mat4 {
-        let frame_size = vec2(frame_height * aspect_ratio, frame_height);
+    pub fn orthographic_mat(&self, frame_height: f64, aspect_ratio: f64) -> DMat4 {
+        let frame_size = dvec2(frame_height * aspect_ratio, frame_height);
         let frame_size = frame_size * self.scale;
-        Mat4::orthographic_rh(
+        DMat4::orthographic_rh(
             -frame_size.x / 2.0,
             frame_size.x / 2.0,
             -frame_size.y / 2.0,
@@ -93,20 +93,22 @@ impl CameraFrame {
     }
 
     /// Use the given frame aspect ratio to construct a perspective matrix
-    pub fn perspective_mat(&self, aspect_ratio: f32) -> Mat4 {
+    pub fn perspective_mat(&self, aspect_ratio: f64) -> DMat4 {
         let near = self.near.max(0.1);
         let far = self.far.max(near);
-        Mat4::perspective_rh(self.fovy, aspect_ratio, near, far)
+        DMat4::perspective_rh(self.fovy, aspect_ratio, near, far)
     }
 
     /// Use the given frame size to construct projection matrix
-    pub fn projection_matrix(&self, frame_height: f32, aspect_ratio: f32) -> Mat4 {
-        self.orthographic_mat(frame_height, aspect_ratio)
-            .lerp(&self.perspective_mat(aspect_ratio), self.perspective_blend)
+    pub fn projection_matrix(&self, frame_height: f64, aspect_ratio: f64) -> DMat4 {
+        self.orthographic_mat(frame_height, aspect_ratio).lerp(
+            &self.perspective_mat(aspect_ratio),
+            self.perspective_blend as f64,
+        )
     }
 
     /// Use the given frame size to construct view projection matrix
-    pub fn view_projection_matrix(&self, frame_height: f32, aspect_ratio: f32) -> Mat4 {
+    pub fn view_projection_matrix(&self, frame_height: f64, aspect_ratio: f64) -> DMat4 {
         self.projection_matrix(frame_height, aspect_ratio) * self.view_matrix()
     }
 }
@@ -115,12 +117,12 @@ impl CameraFrame {
     /// Center the canvas in the frame when [`CameraFrame::perspective_blend`] is `1.0`
     pub fn center_canvas_in_frame(
         &mut self,
-        center: Vec3,
-        width: f32,
-        height: f32,
-        up: Vec3,
-        normal: Vec3,
-        aspect_ratio: f32,
+        center: DVec3,
+        width: f64,
+        height: f64,
+        up: DVec3,
+        normal: DVec3,
+        aspect_ratio: f64,
     ) -> &mut Self {
         let canvas_ratio = height / width;
         let up = up.normalize();

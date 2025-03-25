@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use glam::Vec3;
+use glam::DVec3;
 use itertools::Itertools;
 
 use crate::prelude::Interpolatable;
@@ -9,21 +9,36 @@ use crate::utils::bezier::trim_quad_bezier;
 use crate::utils::math::interpolate_usize;
 
 use super::ComponentVec;
+use super::Transform3dComponent;
 
 /// VPoints is used to represent a bunch of quad bezier paths.
 ///
 /// Every 3 elements in the inner vector is a quad bezier path
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub struct VPoint(pub Vec3);
+pub struct VPoint(pub DVec3);
 
-impl From<Vec3> for VPoint {
-    fn from(value: Vec3) -> Self {
+impl Transform3dComponent for VPoint {
+    fn pos(&self) -> DVec3 {
+        self.0
+    }
+    
+    fn iter_points(&self) -> impl Iterator<Item = &DVec3> {
+        std::iter::once(&self.0)
+    }
+
+    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut DVec3> {
+        std::iter::once(&mut self.0)
+    }
+}
+
+impl From<DVec3> for VPoint {
+    fn from(value: DVec3) -> Self {
         Self(value)
     }
 }
 
 impl Deref for VPoint {
-    type Target = Vec3;
+    type Target = DVec3;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -36,13 +51,13 @@ impl DerefMut for VPoint {
 }
 
 impl Interpolatable for VPoint {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
         Self(self.0.lerp(target.0, t))
     }
 }
 
 impl Partial for ComponentVec<VPoint> {
-    fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
+    fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
         let max_anchor_idx = self.len() / 2;
 
         let (start_index, start_residue) = interpolate_usize(0, max_anchor_idx, range.start);
@@ -97,7 +112,7 @@ impl ComponentVec<VPoint> {
             let (a, b) = (chunk.next(), chunk.next());
             if let Some((ia, a)) = match (a, b) {
                 (Some((ia, a)), Some((_ib, b))) => {
-                    // println!("chunk[{ia}, {ib}] {:?}", [a, b]);
+                    // println!("chunk[{ia}, {_ib}] {:?}", [a, b]);
                     if a == b { Some((ia, a)) } else { None }
                 }
                 (Some((ia, a)), None) => Some((ia, a)),
@@ -120,7 +135,7 @@ impl ComponentVec<VPoint> {
 
 #[cfg(test)]
 mod test {
-    use glam::vec3;
+    use glam::dvec3;
 
     use crate::{components::ComponentVec, prelude::Partial};
 
@@ -129,13 +144,13 @@ mod test {
     #[test]
     fn test_get_partial() {
         let points: ComponentVec<VPoint> = vec![
-            vec3(0.0, 0.0, 0.0),
-            vec3(1.0, 1.0, 1.0),
-            vec3(2.0, 2.0, 2.0),
-            vec3(2.0, 2.0, 2.0),
-            vec3(3.0, 3.0, 3.0),
-            vec3(4.0, 4.0, 4.0),
-            vec3(5.0, 5.0, 5.0),
+            dvec3(0.0, 0.0, 0.0),
+            dvec3(1.0, 1.0, 1.0),
+            dvec3(2.0, 2.0, 2.0),
+            dvec3(2.0, 2.0, 2.0),
+            dvec3(3.0, 3.0, 3.0),
+            dvec3(4.0, 4.0, 4.0),
+            dvec3(5.0, 5.0, 5.0),
         ]
         .into();
         let partial = points.get_partial(0.0..1.0);
