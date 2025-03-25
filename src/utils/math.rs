@@ -1,4 +1,4 @@
-use glam::{IVec2, DVec2, DVec3, dvec2};
+use glam::{DVec2, DVec3, IVec2, dvec2};
 
 pub fn cross2d(a: DVec2, b: DVec2) -> f64 {
     a.x * b.y - b.x * a.y

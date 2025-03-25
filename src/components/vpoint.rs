@@ -21,7 +21,7 @@ impl Transform3dComponent for VPoint {
     fn pos(&self) -> DVec3 {
         self.0
     }
-    
+
     fn iter_points(&self) -> impl Iterator<Item = &DVec3> {
         std::iter::once(&self.0)
     }

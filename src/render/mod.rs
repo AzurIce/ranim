@@ -164,7 +164,9 @@ impl Renderer {
         });
 
         let uniforms = CameraUniforms {
-            proj_mat: camera.projection_matrix(width as f64, height as f64).as_mat4(),
+            proj_mat: camera
+                .projection_matrix(width as f64, height as f64)
+                .as_mat4(),
             view_mat: camera.view_matrix().as_mat4(),
             half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
             _padding: [0.0; 2],
@@ -398,7 +400,7 @@ impl Renderer {
         let uniforms = CameraUniforms {
             view_mat: camera_frame.view_matrix().as_mat4(),
             proj_mat: camera_frame
-                .projection_matrix(self.frame_height as f64, self.size.0 as f64 / self.size.1 as f64)
+                .projection_matrix(self.frame_height, self.size.0 as f64 / self.size.1 as f64)
                 .as_mat4(),
             // center of the screen
             half_frame_size: Vec2::new(self.size.0 as f32 / 2.0, self.size.1 as f32 / 2.0),

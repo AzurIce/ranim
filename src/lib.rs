@@ -259,7 +259,8 @@ impl RanimRenderApp {
                 &format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT + 1),
                 |sink| PUFFIN_GPU_PROFILER.lock().unwrap().add_sink(sink),
                 |id| _ = PUFFIN_GPU_PROFILER.lock().unwrap().remove_sink(id),
-            ).unwrap();
+            )
+            .unwrap();
             (cpu_server, gpu_server)
         };
 

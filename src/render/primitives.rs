@@ -18,8 +18,7 @@ pub trait RenderInstance {
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
         render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")]
-        profiler: &mut wgpu_profiler::GpuProfiler,
+        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
     );
     fn debug(&self, _ctx: &WgpuContext) {}
 }
@@ -57,8 +56,7 @@ impl RenderInstance for Vec<&dyn RenderInstance> {
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
         render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")]
-        profiler: &mut wgpu_profiler::GpuProfiler,
+        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
     ) {
         for render_instance in self {
             render_instance.encode_render_command(

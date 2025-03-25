@@ -161,7 +161,7 @@ pub trait PointWise {}
 // MARK: Transformable
 /// A trait about transforming the mobject in 3d space.
 ///
-/// This trait is automatically implemented for `T` that implements [`HasTransform3d`].
+/// This trait is automatically implemented for `T` that implements [`HasTransform3dComponent`].
 /// And for `T` that implements this trait, `[T]` will also implement this trait.
 ///
 /// But should note that, `[T]`'s implementation is not equivalent to doing the same operation on each item, The [`Anchor`] point will be calculated from the bounding box of the whole slice.
@@ -333,10 +333,10 @@ pub trait Transformable {
 // MARK: [T]
 impl<T: Transform3dComponent + Component> Transformable for ComponentVec<T> {
     fn iter_points(&self) -> impl Iterator<Item = &DVec3> {
-        self.iter().map(|x| x.iter_points()).flatten()
+        self.iter().flat_map(|x| x.iter_points())
     }
     fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut DVec3> {
-        self.iter_mut().map(|x| x.iter_points_mut()).flatten()
+        self.iter_mut().flat_map(|x| x.iter_points_mut())
     }
     fn get_start_position(&self) -> Option<DVec3> {
         self.first().map(|x| x.pos())

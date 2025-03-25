@@ -15,8 +15,7 @@ impl RenderInstance for SvgItemPrimitive {
         encoder: &mut wgpu::CommandEncoder,
         uniforms_bind_group: &wgpu::BindGroup,
         render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")]
-        profiler: &mut wgpu_profiler::GpuProfiler,
+        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
     ) {
         // trace!("SvgItemPrimitive encode_render_command vitem_primitives: {}", self.vitem_primitives.len());
         self.vitem_primitives.iter().for_each(|vimte_primitive| {
