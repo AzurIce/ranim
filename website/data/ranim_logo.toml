@@ -1,9 +1,9 @@
 name = "ranim_logo"
 code = """
 ```rust,linenos
-use std::f32::consts::PI;\r
+use std::f64::consts::PI;\r
 \r
-use glam::{Vec3, vec2, vec3};\r
+use glam::{DVec3, dvec2, dvec3};\r
 use ranim::{\r
     animation::{creation::WritingAnimSchedule, transform::GroupTransformAnimSchedule},\r
     color::palettes::manim,\r
@@ -18,24 +18,24 @@ use ranim::{\r
     utils::rate_functions::{linear, smooth},\r
 };\r
 \r
-fn build_logo(logo_width: f32) -> [VItem; 6] {\r
+fn build_logo(logo_width: f64) -> [VItem; 6] {\r
     let mut red_bg_rect = Rectangle(logo_width / 2.0, logo_width).build();\r
     red_bg_rect\r
         .set_color(manim::RED_C.with_alpha(0.5))\r
-        .put_center_on(vec3(-logo_width / 4.0, 0.0, 0.0));\r
+        .put_center_on(dvec3(-logo_width / 4.0, 0.0, 0.0));\r
     let mut red_rect = Rectangle(logo_width / 4.0, logo_width).build();\r
     red_rect\r
         .set_color(manim::RED_C)\r
-        .put_anchor_on(Anchor::edge(1, 0, 0), vec3(-logo_width / 4.0, 0.0, 0.0));\r
+        .put_anchor_on(Anchor::edge(1, 0, 0), dvec3(-logo_width / 4.0, 0.0, 0.0));\r
 \r
     let mut green_bg_sq = Square(logo_width / 2.0).build();\r
     green_bg_sq\r
         .set_color(manim::GREEN_C.with_alpha(0.5))\r
-        .put_center_on(vec3(logo_width / 4.0, logo_width / 4.0, 0.0));\r
+        .put_center_on(dvec3(logo_width / 4.0, logo_width / 4.0, 0.0));\r
     let mut green_triangle = Polygon(vec![\r
-        vec3(0.0, logo_width / 2.0, 0.0),\r
-        vec3(logo_width / 2.0, logo_width / 2.0, 0.0),\r
-        vec3(logo_width / 2.0, 0.0, 0.0),\r
+        dvec3(0.0, logo_width / 2.0, 0.0),\r
+        dvec3(logo_width / 2.0, logo_width / 2.0, 0.0),\r
+        dvec3(logo_width / 2.0, 0.0, 0.0),\r
     ])\r
     .build(); // ◥\r
     green_triangle.set_color(manim::GREEN_C);\r
@@ -43,12 +43,12 @@ fn build_logo(logo_width: f32) -> [VItem; 6] {\r
     let mut blue_bg_sq = Square(logo_width / 2.0).build();\r
     blue_bg_sq\r
         .set_color(manim::BLUE_C.with_alpha(0.5))\r
-        .put_center_on(vec3(logo_width / 4.0, -logo_width / 4.0, 0.0));\r
+        .put_center_on(dvec3(logo_width / 4.0, -logo_width / 4.0, 0.0));\r
     let mut blue_triangle = green_triangle.clone();\r
     blue_triangle\r
         .set_color(manim::BLUE_C)\r
-        .rotate(PI, Vec3::Z)\r
-        .shift(Vec3::NEG_Y * logo_width / 2.0); // ◣\r
+        .rotate(PI, DVec3::Z)\r
+        .shift(DVec3::NEG_Y * logo_width / 2.0); // ◣\r
 \r
     [\r
         red_bg_rect,\r
@@ -68,7 +68,7 @@ impl TimelineConstructor for RanimLogoScene {\r
         timeline: &'t RanimTimeline,\r
         _camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
-        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);\r
+        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
         let logo_width = frame_size.y * 0.618;\r
 \r
         let mut logo = build_logo(logo_width)\r
@@ -86,9 +86,9 @@ impl TimelineConstructor for RanimLogoScene {\r
         let gap = logo_width * gap_ratio;\r
         let scale = (logo_width - gap * 2.0) / logo_width;\r
         let scale = [\r
-            vec3(scale, 1.0, 1.0),\r
-            vec3(scale, scale, 1.0),\r
-            vec3(scale, scale, 1.0),\r
+            dvec3(scale, 1.0, 1.0),\r
+            dvec3(scale, scale, 1.0),\r
+            dvec3(scale, scale, 1.0),\r
         ];\r
         let anchor = [\r
             Anchor::edge(-1, 0, 0),\r
@@ -102,8 +102,8 @@ impl TimelineConstructor for RanimLogoScene {\r
                     chunk\r
                         .transform(|data| {\r
                             data.scale_by_anchor(scale, anchor)\r
-                                .scale_by_anchor(vec3(0.9, 0.9, 1.0), Anchor::origin())\r
-                                .shift(vec3(0.0, 1.3, 0.0));\r
+                                .scale_by_anchor(dvec3(0.9, 0.9, 1.0), Anchor::origin())\r
+                                .shift(dvec3(0.0, 1.3, 0.0));\r
                         })\r
                         .with_rate_func(smooth)\r
                         .apply(),\r
@@ -118,7 +118,7 @@ impl TimelineConstructor for RanimLogoScene {\r
         ));\r
         ranim_text\r
             .scale_to(ScaleHint::PorportionalHeight(1.0))\r
-            .put_center_on(Vec3::NEG_Y * 2.5);\r
+            .put_center_on(DVec3::NEG_Y * 2.5);\r
         let mut ranim_text = ranim_text\r
             .into_iter()\r
             .map(|item| timeline.insert(item))\r
@@ -149,6 +149,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "d47f8d33169d596ad993771c28e392f9b74b28b7"
+hash = "910c0336ee428f8fc2aa36abd5ec24f8cb41e58c"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/output.mp4"]

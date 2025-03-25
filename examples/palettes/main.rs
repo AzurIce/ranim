@@ -1,7 +1,7 @@
 use env_logger::Env;
 use ranim::color::palettes::manim::*;
 use ranim::components::Anchor;
-use ranim::glam::{vec2, vec3};
+use ranim::glam::{dvec2, dvec3};
 use ranim::items::group::Group;
 use ranim::items::vitem::Rectangle;
 use ranim::prelude::*;
@@ -15,7 +15,7 @@ impl TimelineConstructor for PalettesScene {
         timeline: &'t RanimTimeline,
         _camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
-        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);
+        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let padded_frame_size = frame_size * 0.9;
 
         let colors = vec![
@@ -32,22 +32,22 @@ impl TimelineConstructor for PalettesScene {
             vec![GREY_BROWN, LIGHT_BROWN, PINK, LIGHT_PINK, ORANGE],
         ];
 
-        let padded_frame_start = vec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
-        let h_step = padded_frame_size.y / colors.len() as f32;
+        let padded_frame_start = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
+        let h_step = padded_frame_size.y / colors.len() as f64;
 
         let squares = colors
             .iter()
             .enumerate()
             .flat_map(|(i, row)| {
-                let y = i as f32 * h_step;
-                let w_step = padded_frame_size.x / row.len() as f32;
+                let y = i as f64 * h_step;
+                let w_step = padded_frame_size.x / row.len() as f64;
                 row.iter().enumerate().map(move |(j, color)| {
-                    let x = j as f32 * w_step;
-                    let mut square = Rectangle(w_step as f32, h_step as f32).build();
+                    let x = j as f64 * w_step;
+                    let mut square = Rectangle(w_step as f64, h_step as f64).build();
                     square
                         .put_anchor_on(
                             Anchor::edge(-1, -1, 0),
-                            padded_frame_start.extend(0.0) + vec3(x, y, 0.0),
+                            padded_frame_start.extend(0.0) + dvec3(x, y, 0.0),
                         )
                         .set_color(*color)
                         .set_stroke_width(0.0);

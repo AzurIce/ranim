@@ -7,7 +7,6 @@ use image::{ImageBuffer, Rgba};
 use primitives::RenderInstance;
 
 use crate::{
-    PUFFIN_GPU_PROFILER,
     color::rgba8,
     context::{RanimContext, WgpuContext},
     items::camera_frame::CameraFrame,
@@ -16,6 +15,9 @@ use crate::{
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const ALIGNMENT: usize = 256;
+
+#[cfg(feature = "profiling")]
+use crate::PUFFIN_GPU_PROFILER;
 
 #[allow(unused)]
 #[cfg(feature = "profiling")]
@@ -129,7 +131,7 @@ impl CameraUniformsBindGroup {
 // MARK: Renderer
 
 pub struct Renderer {
-    frame_height: f32,
+    frame_height: f64,
     size: (usize, usize),
     pub pipelines: PipelinesStorage,
 
@@ -148,7 +150,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub(crate) fn new(ctx: &RanimContext, frame_height: f32, width: usize, height: usize) -> Self {
+    pub(crate) fn new(ctx: &RanimContext, frame_height: f64, width: usize, height: usize) -> Self {
         let camera = CameraFrame::new();
 
         let ctx = &ctx.wgpu_ctx;
@@ -162,8 +164,8 @@ impl Renderer {
         });
 
         let uniforms = CameraUniforms {
-            proj_mat: camera.projection_matrix(width as f32, height as f32),
-            view_mat: camera.view_matrix(),
+            proj_mat: camera.projection_matrix(width as f64, height as f64).as_mat4(),
+            view_mat: camera.view_matrix().as_mat4(),
             half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
             _padding: [0.0; 2],
         };
@@ -286,6 +288,8 @@ impl Renderer {
                 ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
             }
 
+            renderable.debug(&ctx.wgpu_ctx);
+
             // Signal to the profiler that the frame is finished.
             self.profiler.end_frame().unwrap();
 
@@ -308,7 +312,7 @@ impl Renderer {
 
     fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
         let bytes_per_row =
-            ((self.size.0 * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
+            ((self.size.0 * 4) as f64 / ALIGNMENT as f64).ceil() as usize * ALIGNMENT;
         let mut texture_data =
             self.output_texture_data
                 .take()
@@ -391,16 +395,18 @@ impl Renderer {
     }
 
     pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext, camera_frame: &CameraFrame) {
-        let camera_uniforms = CameraUniforms {
+        let uniforms = CameraUniforms {
+            view_mat: camera_frame.view_matrix().as_mat4(),
             proj_mat: camera_frame
-                .projection_matrix(self.frame_height, self.size.0 as f32 / self.size.1 as f32),
-            view_mat: camera_frame.view_matrix(),
+                .projection_matrix(self.frame_height as f64, self.size.0 as f64 / self.size.1 as f64)
+                .as_mat4(),
+            // center of the screen
             half_frame_size: Vec2::new(self.size.0 as f32 / 2.0, self.size.1 as f32 / 2.0),
             _padding: [0.0; 2],
         };
         // trace!("Uniforms: {:?}", self.uniforms);
         // trace!("[Camera] uploading camera uniforms to buffer...");
-        self.uniforms_buffer.set(wgpu_ctx, camera_uniforms);
+        self.uniforms_buffer.set(wgpu_ctx, uniforms);
     }
 }
 

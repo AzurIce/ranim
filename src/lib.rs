@@ -149,7 +149,7 @@ pub fn render_scene(scene: impl Scene, options: &AppOptions) {
 /// Build the timeline with the scene, and render it at a given timestamp
 pub fn render_scene_at_sec(
     scene: impl Scene,
-    sec: f32,
+    sec: f64,
     output_file: impl AsRef<Path>,
     options: &AppOptions,
 ) {
@@ -167,7 +167,7 @@ pub struct AppOptions<'a> {
     /// The height of the frame
     ///
     /// This will be the coordinate in the scene. The width is calculated by the aspect ratio from [`AppOptions::pixel_size`].
-    pub frame_height: f32,
+    pub frame_height: f64,
     /// The size of the output texture in pixels.
     pub pixel_size: (u32, u32),
     /// The frame rate of the output video.
@@ -263,7 +263,7 @@ impl RanimRenderApp {
             (cpu_server, gpu_server)
         };
 
-        let frames = (timeline.duration_secs() * self.fps as f32).ceil() as usize;
+        let frames = (timeline.duration_secs() * self.fps as f64).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
@@ -277,7 +277,7 @@ impl RanimRenderApp {
         );
         let mut last_idx = HashMap::new();
         (0..frames)
-            .map(|f| f as f32 / (frames - 1) as f32)
+            .map(|f| f as f64 / (frames - 1) as f64)
             .for_each(|alpha| {
                 #[cfg(feature = "profiling")]
                 profiling::scope!("frame");
@@ -355,15 +355,15 @@ impl RanimRenderApp {
                 pb.inc(1);
                 pb.set_message(format!(
                     "rendering {:.1?}/{:.1?}",
-                    Duration::from_secs_f32(alpha * timeline.duration_secs()),
-                    Duration::from_secs_f32(timeline.duration_secs())
+                    Duration::from_secs_f64(alpha * timeline.duration_secs()),
+                    Duration::from_secs_f64(timeline.duration_secs())
                 ));
             });
 
         let msg = format!(
             "rendered {} frames({:?})",
             frames,
-            Duration::from_secs_f32(timeline.duration_secs()),
+            Duration::from_secs_f64(timeline.duration_secs()),
         );
         pb.finish_with_message(msg);
 
@@ -398,7 +398,7 @@ impl RanimRenderApp {
     fn render_timeline_frame(
         &mut self,
         timeline: &RanimTimeline,
-        sec: f32,
+        sec: f64,
         filename: impl AsRef<Path>,
     ) {
         let TimelineEvalResult {

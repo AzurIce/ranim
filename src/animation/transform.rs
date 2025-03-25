@@ -153,7 +153,7 @@ impl<T: TransformRequirement> Transform<T> {
 }
 
 impl<T: TransformRequirement> EvalDynamic<T> for Transform<T> {
-    fn eval_alpha(&self, alpha: f32) -> T {
+    fn eval_alpha(&self, alpha: f64) -> T {
         if alpha == 0.0 {
             self.src.clone()
         } else if 0.0 < alpha && alpha < 1.0 {

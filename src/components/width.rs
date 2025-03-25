@@ -30,7 +30,7 @@ impl From<f32> for Width {
 }
 
 impl Interpolatable for Width {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
         Self(self.0.lerp(&target.0, t))
     }
 }

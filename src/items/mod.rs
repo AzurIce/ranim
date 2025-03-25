@@ -19,7 +19,7 @@ pub type Item = Box<dyn Entity>;
 impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
     pub fn lagged_anim(
         &'r mut self,
-        lag_ratio: f32,
+        lag_ratio: f64,
         anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
     ) -> Group<AnimSchedule<'r, 't, T>> {
         let n = self.as_ref().len();
@@ -36,7 +36,7 @@ impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
             .iter_mut()
             .enumerate()
             .for_each(|(i, schedule)| {
-                schedule.anim.padding = (i as f32 * lag_time, (n - i - 1) as f32 * lag_time);
+                schedule.anim.padding = (i as f64 * lag_time, (n - i - 1) as f64 * lag_time);
                 // println!("{} {:?} {}", schedule.anim.span_len(), schedule.anim.padding, schedule.anim.duration_secs);
             });
         anim_schedules

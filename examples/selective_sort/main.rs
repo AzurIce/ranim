@@ -1,4 +1,4 @@
-use glam::{Vec3, vec2};
+use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     animation::transform::TransformAnimSchedule, color::palettes::manim, components::Anchor,
@@ -16,29 +16,29 @@ impl TimelineConstructor for SelectiveSortScene {
     ) {
         let num = self.0;
 
-        let frame_size = vec2(8.0 * 16.0 / 9.0, 8.0);
+        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let padded_frame_size = frame_size * 0.9;
 
-        let anim_step_duration = 15.0 / num.pow(2) as f32;
+        let anim_step_duration = 15.0 / num.pow(2) as f64;
 
-        let width_unit = padded_frame_size.x / num as f32;
-        let height_unit = padded_frame_size.y / num as f32;
+        let width_unit = padded_frame_size.x / num as f64;
+        let height_unit = padded_frame_size.y / num as f64;
 
         let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);
         let mut heights = (1..=num)
-            .map(|x| x as f32 * height_unit)
-            .collect::<Vec<f32>>();
+            .map(|x| x as f64 * height_unit)
+            .collect::<Vec<f64>>();
         heights.shuffle(&mut rng);
 
-        let padded_frame_bl = vec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
+        let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
         let mut rects = heights
             .iter()
             .enumerate()
             .map(|(i, &height)| {
                 let mut rect = Rectangle(width_unit, height).build();
                 let target_bc_coord = padded_frame_bl.extend(0.0)
-                    + Vec3::X * (width_unit * i as f32 + width_unit / 2.0);
-                rect.scale(Vec3::splat(0.8))
+                    + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);
+                rect.scale(DVec3::splat(0.8))
                     .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord)
                     .set_color(manim::WHITE)
                     .set_fill_opacity(0.5);
@@ -46,7 +46,7 @@ impl TimelineConstructor for SelectiveSortScene {
             })
             .collect::<Vec<_>>();
 
-        let shift_right = Vec3::X * width_unit;
+        let shift_right = DVec3::X * width_unit;
         for i in 0..num - 1 {
             timeline.play(
                 rects[i]
@@ -73,7 +73,7 @@ impl TimelineConstructor for SelectiveSortScene {
                     timeline.play(
                         rects[i]
                             .transform(|data| {
-                                data.shift(shift_right * (j - i) as f32)
+                                data.shift(shift_right * (j - i) as f64)
                                     .set_color(manim::BLUE_C)
                                     .set_fill_opacity(0.5);
                             })
@@ -84,7 +84,7 @@ impl TimelineConstructor for SelectiveSortScene {
                     timeline.play(
                         rects[j]
                             .transform(|data| {
-                                data.shift(-shift_right * (j - i) as f32)
+                                data.shift(-shift_right * (j - i) as f64)
                                     .set_color(manim::RED_C)
                                     .set_fill_opacity(0.5);
                             })

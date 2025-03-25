@@ -84,7 +84,7 @@ impl<T: CreationRequirement> Create<T> {
 }
 
 impl<T: CreationRequirement> EvalDynamic<T> for Create<T> {
-    fn eval_alpha(&self, alpha: f32) -> T {
+    fn eval_alpha(&self, alpha: f64) -> T {
         if alpha == 0.0 {
             T::empty()
         } else if 0.0 < alpha && alpha < 1.0 {
@@ -108,7 +108,7 @@ impl<T: CreationRequirement> UnCreate<T> {
 }
 
 impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
-    fn eval_alpha(&self, mut alpha: f32) -> T {
+    fn eval_alpha(&self, mut alpha: f64) -> T {
         if !(0.0..=1.0).contains(&alpha) {
             warn!(
                 "the alpha is out of range: {}, clampped to 0.0..=1.0",
@@ -155,7 +155,7 @@ impl<T: WritingRequirement> Write<T> {
 }
 
 impl<T: WritingRequirement> EvalDynamic<T> for Write<T> {
-    fn eval_alpha(&self, alpha: f32) -> T {
+    fn eval_alpha(&self, alpha: f64) -> T {
         let alpha = alpha * 2.0;
         if (0.0..=1.0).contains(&alpha) {
             self.create_anim.eval_alpha(alpha)
@@ -195,7 +195,7 @@ impl<T: WritingRequirement> Unwrite<T> {
 }
 
 impl<T: WritingRequirement> EvalDynamic<T> for Unwrite<T> {
-    fn eval_alpha(&self, alpha: f32) -> T {
+    fn eval_alpha(&self, alpha: f64) -> T {
         let alpha = alpha * 2.0;
         if (1.0..=2.0).contains(&alpha) {
             self.uncreate_anim.eval_alpha(alpha - 1.0)

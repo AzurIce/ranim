@@ -1,7 +1,7 @@
 name = "perspective_blend"
 code = """
 ```rust,linenos
-use glam::Vec3;\r
+use glam::DVec3;\r
 use ranim::{\r
     animation::transform::{GroupTransformAnimSchedule, TransformAnimSchedule},\r
     color::palettes::manim,\r
@@ -20,7 +20,7 @@ impl TimelineConstructor for PerspectiveBlendScene {\r
         timeline: &'t RanimTimeline,\r
         camera: &'r mut Rabject<'t, CameraFrame>,\r
     ) {\r
-        camera.data.pos = Vec3::Z * 5.0;\r
+        camera.data.pos = DVec3::Z * 5.0;\r
         timeline.update(camera);\r
 \r
         // Create a cube\r
@@ -33,8 +33,8 @@ impl TimelineConstructor for PerspectiveBlendScene {\r
         bottom.set_color(manim::TEAL_C).set_fill_opacity(0.5);\r
         let mut bottom = timeline.insert(bottom);\r
         anims.push(bottom.transform(|data| {\r
-            data.shift(Vec3::NEG_Y * side_length / 2.0)\r
-                .rotate(std::f32::consts::PI / 2.0, Vec3::X);\r
+            data.shift(DVec3::NEG_Y * side_length / 2.0)\r
+                .rotate(std::f64::consts::PI / 2.0, DVec3::X);\r
         }));\r
 \r
         // Right face\r
@@ -42,8 +42,8 @@ impl TimelineConstructor for PerspectiveBlendScene {\r
         right.set_color(manim::GREEN_C).set_fill_opacity(0.5);\r
         let mut right = timeline.insert(right);\r
         anims.push(right.transform(|data| {\r
-            data.shift(Vec3::X * side_length / 2.0)\r
-                .rotate(std::f32::consts::PI / 2.0, Vec3::Y);\r
+            data.shift(DVec3::X * side_length / 2.0)\r
+                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);\r
         }));\r
 \r
         // Back face\r
@@ -51,7 +51,7 @@ impl TimelineConstructor for PerspectiveBlendScene {\r
         back.set_color(manim::BLUE_C).set_fill_opacity(0.5);\r
         let mut back = timeline.insert(back);\r
         anims.push(back.transform(|data| {\r
-            data.shift(Vec3::NEG_Z * side_length / 2.0);\r
+            data.shift(DVec3::NEG_Z * side_length / 2.0);\r
         }));\r
 \r
         // Top face\r
@@ -59,8 +59,8 @@ impl TimelineConstructor for PerspectiveBlendScene {\r
         top.set_color(manim::PURPLE_C).set_fill_opacity(0.5);\r
         let mut top = timeline.insert(top);\r
         anims.push(top.transform(|data| {\r
-            data.shift(Vec3::Y * side_length / 2.0)\r
-                .rotate(-std::f32::consts::PI / 2.0, Vec3::X);\r
+            data.shift(DVec3::Y * side_length / 2.0)\r
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);\r
         }));\r
 \r
         // Front face (facing camera)\r
@@ -69,7 +69,7 @@ impl TimelineConstructor for PerspectiveBlendScene {\r
         let mut front = timeline.insert(front);\r
 \r
         anims.push(front.transform(|data| {\r
-            data.shift(Vec3::Z * side_length / 2.0);\r
+            data.shift(DVec3::Z * side_length / 2.0);\r
         }));\r
 \r
         // Left face\r
@@ -77,8 +77,8 @@ impl TimelineConstructor for PerspectiveBlendScene {\r
         left.set_color(manim::YELLOW_C).set_fill_opacity(0.5);\r
         let mut left = timeline.insert(left);\r
         anims.push(left.transform(|data| {\r
-            data.shift(Vec3::NEG_X * side_length / 2.0)\r
-                .rotate(-std::f32::consts::PI / 2.0, Vec3::Y);\r
+            data.shift(DVec3::NEG_X * side_length / 2.0)\r
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);\r
         }));\r
 \r
         timeline.play(Group(anims).apply()).sync();\r
@@ -87,8 +87,8 @@ impl TimelineConstructor for PerspectiveBlendScene {\r
 \r
         timeline.play(\r
             cube.transform(|data| {\r
-                data.rotate(std::f32::consts::PI / 6.0, Vec3::Y)\r
-                    .rotate(std::f32::consts::PI / 6.0, Vec3::X);\r
+                data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)\r
+                    .rotate(std::f64::consts::PI / 6.0, DVec3::X);\r
             })\r
             .with_duration(4.0),\r
         );\r
@@ -120,6 +120,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "1ed553df2ba4c93d2c66b233ff9c1390db0a7e93"
+hash = "d3bfee3d2291f62abd2af1b04f47be78cde1e8a7"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/output.mp4"]

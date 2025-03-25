@@ -1,9 +1,12 @@
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{Vec3, Vec4, vec2, vec3, vec4};
+use glam::{DVec3, Vec4, dvec2, dvec3, vec4};
 use itertools::Itertools;
 
 use crate::{
-    components::{ComponentVec, Transformable, rgba::Rgba, vpoint::VPoint, width::Width},
+    components::{
+        ComponentVec, HasTransform3dComponent, Transformable, rgba::Rgba, vpoint::VPoint,
+        width::Width,
+    },
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::primitives::{ExtractFrom, RenderInstance, RenderInstances, vitem::VItemPrimitive},
@@ -23,9 +26,9 @@ use super::{Blueprint, Entity};
 ///
 /// ```rust
 /// let vitem = VItem::from_vpoints(vec![
-///     vec3(0.0, 0.0, 0.0),
-///     vec3(1.0, 0.0, 0.0),
-///     vec3(0.5, 1.0, 0.0),
+///     dvec3(0.0, 0.0, 0.0),
+///     dvec3(1.0, 0.0, 0.0),
+///     dvec3(0.5, 1.0, 0.0),
 /// ]);
 /// ```
 ///
@@ -36,6 +39,17 @@ pub struct VItem {
     pub stroke_widths: ComponentVec<Width>,
     pub stroke_rgbas: ComponentVec<Rgba>,
     pub fill_rgbas: ComponentVec<Rgba>,
+}
+
+impl HasTransform3dComponent for VItem {
+    type Component = VPoint;
+    fn transform_3d(&self) -> &ComponentVec<Self::Component> {
+        &self.vpoints
+    }
+
+    fn transform_3d_mut(&mut self) -> &mut ComponentVec<Self::Component> {
+        &mut self.vpoints
+    }
 }
 
 impl AsRef<ComponentVec<VPoint>> for VItem {
@@ -52,7 +66,7 @@ impl AsMut<ComponentVec<VPoint>> for VItem {
 
 impl VItem {
     // TODO: remove all constructor to blueprint impl
-    pub fn from_vpoints(vpoints: Vec<Vec3>) -> Self {
+    pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
         let stroke_widths = vec![1.0; (vpoints.len() + 1) / 2];
         let stroke_rgbas = vec![vec4(1.0, 0.0, 0.0, 1.0); (vpoints.len() + 1) / 2];
         let fill_rgbas = vec![vec4(0.0, 1.0, 0.0, 0.5); (vpoints.len() + 1) / 2];
@@ -64,7 +78,7 @@ impl VItem {
         }
     }
 
-    pub fn extend_vpoints(&mut self, vpoints: &[Vec3]) {
+    pub fn extend_vpoints(&mut self, vpoints: &[DVec3]) {
         self.vpoints
             .extend_from_vec(vpoints.iter().cloned().map(Into::into).collect());
 
@@ -78,7 +92,14 @@ impl VItem {
         self.vpoints
             .iter()
             .zip(self.vpoints.get_closepath_flags().iter())
-            .map(|(p, f)| vec4(p.x, p.y, p.z, if *f { 1.0 } else { 0.0 }))
+            .map(|(p, f)| {
+                vec4(
+                    p.x as f32,
+                    p.y as f32,
+                    p.z as f32,
+                    if *f { 1.0 } else { 0.0 },
+                )
+            })
             .collect()
     }
 }
@@ -135,7 +156,7 @@ impl Alignable for VItem {
 }
 
 impl Interpolatable for VItem {
-    fn lerp(&self, target: &Self, t: f32) -> Self {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
         let vpoints = self.vpoints.lerp(&target.vpoints, t);
         let stroke_rgbas = self.stroke_rgbas.lerp(&target.stroke_rgbas, t);
         let stroke_widths = self.stroke_widths.lerp(&target.stroke_widths, t);
@@ -158,7 +179,7 @@ impl Opacity for VItem {
 }
 
 impl Partial for VItem {
-    fn get_partial(&self, range: std::ops::Range<f32>) -> Self {
+    fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
         let vpoints = self.vpoints.get_partial(range.clone());
         let stroke_rgbas = self.stroke_rgbas.get_partial(range.clone());
         let stroke_widths = self.stroke_widths.get_partial(range.clone());
@@ -175,7 +196,7 @@ impl Partial for VItem {
 impl Empty for VItem {
     fn empty() -> Self {
         Self {
-            vpoints: vec![Vec3::ZERO; 3].into(),
+            vpoints: vec![DVec3::ZERO; 3].into(),
             stroke_widths: vec![0.0, 0.0].into(),
             stroke_rgbas: vec![Vec4::ZERO; 2].into(),
             fill_rgbas: vec![Vec4::ZERO; 2].into(),
@@ -218,7 +239,7 @@ impl Stroke for VItem {
 // MARK: Blueprints
 
 /// A polygon defined by a list of corner points (Counter Clock wise).
-pub struct Polygon(pub Vec<Vec3>);
+pub struct Polygon(pub Vec<DVec3>);
 
 impl Blueprint<VItem> for Polygon {
     fn build(mut self) -> VItem {
@@ -241,23 +262,23 @@ impl Blueprint<VItem> for Polygon {
     }
 }
 
-pub struct Rectangle(pub f32, pub f32);
+pub struct Rectangle(pub f64, pub f64);
 
 impl Blueprint<VItem> for Rectangle {
     fn build(self) -> VItem {
         let half_width = self.0 / 2.0;
         let half_height = self.1 / 2.0;
         Polygon(vec![
-            vec3(-half_width, -half_height, 0.0),
-            vec3(half_width, -half_height, 0.0),
-            vec3(half_width, half_height, 0.0),
-            vec3(-half_width, half_height, 0.0),
+            dvec3(-half_width, -half_height, 0.0),
+            dvec3(half_width, -half_height, 0.0),
+            dvec3(half_width, half_height, 0.0),
+            dvec3(-half_width, half_height, 0.0),
         ])
         .build()
     }
 }
 
-pub struct Line(pub Vec3, pub Vec3);
+pub struct Line(pub DVec3, pub DVec3);
 
 impl Blueprint<VItem> for Line {
     fn build(self) -> VItem {
@@ -265,7 +286,7 @@ impl Blueprint<VItem> for Line {
     }
 }
 
-pub struct Square(pub f32);
+pub struct Square(pub f64);
 
 impl Blueprint<VItem> for Square {
     fn build(self) -> VItem {
@@ -274,8 +295,8 @@ impl Blueprint<VItem> for Square {
 }
 
 pub struct Arc {
-    pub angle: f32,
-    pub radius: f32,
+    pub angle: f64,
+    pub radius: f64,
 }
 
 impl Blueprint<VItem> for Arc {
@@ -285,7 +306,7 @@ impl Blueprint<VItem> for Arc {
 
         let mut points = (0..len)
             .map(|i| {
-                let angle = self.angle * i as f32 / (len - 1) as f32;
+                let angle = self.angle * i as f64 / (len - 1) as f64;
                 let (mut x, mut y) = (angle.cos(), angle.sin());
                 if x.abs() < 1.8e-7 {
                     x = 0.0;
@@ -293,11 +314,11 @@ impl Blueprint<VItem> for Arc {
                 if y.abs() < 1.8e-7 {
                     y = 0.0;
                 }
-                vec2(x, y).extend(0.0) * self.radius
+                dvec2(x, y).extend(0.0) * self.radius
             })
             .collect::<Vec<_>>();
 
-        let theta = self.angle / NUM_SEGMENTS as f32;
+        let theta = self.angle / NUM_SEGMENTS as f64;
         points.iter_mut().skip(1).step_by(2).for_each(|p| {
             *p /= (theta / 2.0).cos();
         });
@@ -307,9 +328,9 @@ impl Blueprint<VItem> for Arc {
 }
 
 pub struct ArcBetweenPoints {
-    pub start: Vec3,
-    pub end: Vec3,
-    pub angle: f32,
+    pub start: DVec3,
+    pub end: DVec3,
+    pub angle: f64,
 }
 
 impl Blueprint<VItem> for ArcBetweenPoints {
@@ -326,12 +347,12 @@ impl Blueprint<VItem> for ArcBetweenPoints {
 }
 
 /// A circle
-pub struct Circle(pub f32);
+pub struct Circle(pub f64);
 
 impl Blueprint<VItem> for Circle {
     fn build(self) -> VItem {
         Arc {
-            angle: std::f32::consts::TAU,
+            angle: std::f64::consts::TAU,
             radius: self.0,
         }
         .build()
@@ -354,12 +375,12 @@ impl Blueprint<VItem> for Dot {
 }
 
 // width, height
-pub struct Ellipse(pub f32, pub f32);
+pub struct Ellipse(pub f64, pub f64);
 
 impl Blueprint<VItem> for Ellipse {
     fn build(self) -> VItem {
         let mut mobject = Circle(1.0).build();
-        mobject.vpoints.scale(vec3(self.0, self.1, 1.0));
+        mobject.vpoints.scale(dvec3(self.0, self.1, 1.0));
         mobject
     }
 }
@@ -371,7 +392,7 @@ mod test {
     #[test]
     fn test_arc() {
         let arc = Arc {
-            angle: std::f32::consts::PI / 2.0,
+            angle: std::f64::consts::PI / 2.0,
             radius: 1.0,
         }
         .build();
