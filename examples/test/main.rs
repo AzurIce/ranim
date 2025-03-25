@@ -55,7 +55,7 @@ impl TimelineConstructor for TestScene {
         //     #text(font: "LXGW Bright")[『我』的『软件』]
         // ]"#
         // ));
-        let mut nvitem = Group::<NVItem>::from_svg(typst_svg!(r#"#text(font: "LXGW Bright")[软]"#));
+        let mut nvitem = Group::<NVItem>::from_svg(typst_svg!(r#"#text(font: "LXGW Bright")[寄]"#));
         // let mut nvitem = NVItemBuilder::new();
         // nvitem.move_to(vec3(-3.4890716, 2.2969427, 0.0));
         // nvitem.cubic_to(
