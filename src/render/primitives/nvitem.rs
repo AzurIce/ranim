@@ -219,9 +219,9 @@ impl RenderInstance for NVItemPrimitive {
         }
     }
     fn debug(&self, ctx: &WgpuContext) {
-        let res = self.points2d_buffer.read_buffer(ctx).unwrap();
-        let res: &[NVPoint] = bytemuck::cast_slice(&res);
-        println!("points2d: {:?}", res);
+        // let res = self.points2d_buffer.read_buffer(ctx).unwrap();
+        // let res: &[NVPoint] = bytemuck::cast_slice(&res);
+        // println!("points2d: {:?}", res);
     }
 }
 

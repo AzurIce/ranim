@@ -31,9 +31,12 @@ fn cs_main(
 
     var point: vec4<f32>;
     point = cam_uniforms.proj_mat * cam_uniforms.view_mat * vec4(points3d[index].xyz, 1.0);
-    let x = point.x / point.w * cam_uniforms.half_frame_size.x;
-    let y = point.y / point.w * cam_uniforms.half_frame_size.y;
-    let z = point.z / point.w;
+    var x = point.x / point.w * cam_uniforms.half_frame_size.x;
+    var y = point.y / point.w * cam_uniforms.half_frame_size.y;
+    var z = point.z / point.w;
+    x = round(x * 10.0) / 10.0;
+    y = round(y * 10.0) / 10.0;
+    z = round(z * 10.0) / 10.0;
 
     points2d[index].x = x;
     points2d[index].y = y;

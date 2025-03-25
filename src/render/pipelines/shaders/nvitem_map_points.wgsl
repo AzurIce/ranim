@@ -47,9 +47,12 @@ fn cs_main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>, @buil
     for (var i = 0; i < 3; i++) {
         let p = cam_uniforms.proj_mat * cam_uniforms.view_mat * vec4(input_data[index].points[i].xyz, 1.0);
 
-        let x = p.x / p.w * cam_uniforms.half_frame_size.x;
-        let y = p.y / p.w * cam_uniforms.half_frame_size.y;
-        let z = p.z / p.w;
+        var x = p.x / p.w * cam_uniforms.half_frame_size.x;
+        var y = p.y / p.w * cam_uniforms.half_frame_size.y;
+        var z = p.z / p.w;
+        x = round(x * 100.0) / 100.0;
+        y = round(y * 100.0) / 100.0;
+        z = round(z * 100.0) / 100.0;
 
         output_data[index].points[i].x = x;
         output_data[index].points[i].y = y;
