@@ -67,13 +67,23 @@ fn blend_color(f: vec4<f32>, b: vec4<f32>) -> vec4<f32> {
     return vec4(f.r * f.a + b.r * b.a * (1.0 - f.a) / a, f.g * f.a + b.g * b.a * (1.0 - f.a) / a, f.b * f.a + b.b * b.a * (1.0 - f.a) / a, a);
 }
 
-fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
-    let p = b - a * a / 3.0;
+struct SolveCubicRes {
+    root: array<f32, 3>,
+    debug: vec4<f32>,
+}
+
+fn solve_cubic(a_3: f32, b_3: f32, c: f32) -> SolveCubicRes {
+    let a = a_3 * 3.0;
+    let b = b_3 * 3.0;
+
+    let p = b - a * a_3;
     let p3 = p * p * p;
 
-    let q = a * (2.0 * a * a - 9.0 * b) / 27.0 + c;
-    let d = q * q + 4.0 * p3 / 27.0;
-    let offset = - a / 3.0;
+    let q = a * (a * a / 13.5 - b_3) + c;
+    let d = q * q + p3 / 6.75;
+    let offset = - a_3;
+
+    var res: SolveCubicRes;
 
     // single_root
     if (d >= 0.0) {
@@ -87,7 +97,9 @@ fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
         let f_prime = (3.0 * r + 2.0 * a) * r + b;
 
         r -= f / f_prime;
-        return vec3(r, r, r);
+        res.root = array(r, r, r);
+        res.debug = vec4(0.0, 0.0, 1.0, 1.0); // Blue for single root
+        return res;
     }
     let u = sqrt(- p / 3.0);
     let v = acos(clamp(- sqrt(- 27.0 / p3) * q / 2.0, - 1.0, 1.0)) / 3.0;
@@ -95,15 +107,29 @@ fn solve_cubic(a: f32, b: f32, c: f32) -> vec3<f32> {
     let n = sin(v) * 1.732050808;
 
     var r = vec3(m + m, - n - m, n - m) * u + offset;
+    var r_array = array(r.x, r.y, r.z);
 
-    var f = ((r + a) * r + b) * r + c;
-    var f_prime = (3.0 * r + 2.0 * a) * r + b;
+    for (var i = 0u; i < 3u; i++) {
+        for (var j = 0u; j < 6u; j++) {
+            let f = ((r_array[i] + a) * r_array[i] + b) * r_array[i] + c;
+            let f_prime = (3.0 * r_array[i] + 2.0 * a) * r_array[i] + b;
 
-    r -= f / f_prime;
+            if abs(f_prime) < 1e-6 {
+                break;
+            }
 
-    f = ((r + a) * r + b) * r + c;
-    f_prime = (3.0 * r + 2.0 * a) * r + b;
-    return r;
+            let delta = f / f_prime;
+            r_array[i] -= delta;
+
+            if length(delta) < 1e-6 {
+                break;
+            }
+        }
+    }
+
+    res.root = r_array;
+    res.debug = vec4(0.0, 1.0, 0.0, 1.0); // Green for three roots
+    return res;
 }
 
 // Implemented from https://www.shadertoy.com/view/3lsSzS
@@ -165,14 +191,21 @@ fn tan_bezier(t: f32, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: vec2<f32>
     return term1 + term2 + term3;
 }
 
-fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: vec2<f32>) -> f32 {
+struct SignBezierRes {
+    sgn: f32,
+    debug_color: vec4<f32>,
+};
+
+fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: vec2<f32>) -> SignBezierRes {
     // Coeffecient of the equation `cubic bezier.y = pos.y`
-    let cu = (- p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y);
-    let qu = (3.0 * p0.y - 6.0 * p1.y + 3.0 * p2.y);
-    let li = (- 3.0 * p0.y + 3.0 * p1.y);
+    let cu = (p3.y + p1.y * 3.0) - (p2.y * 3.0 + p0.y);
+    let qu_3 = p0.y - 2.0 * p1.y + p2.y;
+    let li_3 = - p0.y + p1.y;
     let co = p0.y - pos.y;
 
-    var sgn = 1.0;
+    var res: SignBezierRes;
+    res.sgn = 1.0;
+    res.debug_color = vec4(0.0, 0.0, 0.0, 1.0);
     // quadratic
     // For example, when:
     //
@@ -181,25 +214,28 @@ fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: 
     //  + anchor1    + anchor2
     // The equation degenerate to a quadratic equation
     if abs(cu) < 1e-6 {
-        let d = li * li - 4.0 * qu * co;
+        res.debug_color = vec4(1.0, 0.0, 0.0, 1.0); // Red for quadratic
+
+        let d = 9.0 * li_3 * li_3 - 12.0 * qu_3 * co;
         if abs(d) < 1e-6 {
-            let root = - li / (2.0 * qu);
+            let root = - li_3 / (2.0 * qu_3);
             // This is a workaround to fix the case where the tangent on the root is horizontal
             if tan_bezier(root, p0, p1, p2, p3).y != 0.0 {
-                sgn *= sign_root(root, pos, p0, p1, p2, p3);
+                res.sgn *= sign_root(root, pos, p0, p1, p2, p3);
             }
         } else if d > 0.0 {
-            let root1 = (- li - sqrt(d)) / (2.0 * qu);
-            sgn *= sign_root(root1, pos, p0, p1, p2, p3);
-            let root2 = (- li + sqrt(d)) / (2.0 * qu);
-            sgn *= sign_root(root2, pos, p0, p1, p2, p3);
+            let root1 = (- li_3 - sqrt(d) / 3.0) / (2.0 * qu_3);
+            res.sgn *= sign_root(root1, pos, p0, p1, p2, p3);
+            let root2 = (- li_3 + sqrt(d) / 3.0) / (2.0 * qu_3);
+            res.sgn *= sign_root(root2, pos, p0, p1, p2, p3);
         }
     }
     else {
-        let root = solve_cubic(qu / cu, li / cu, co / cu);
-        sgn *= sign_root(root.x, pos, p0, p1, p2, p3);
-        sgn *= sign_root(root.y, pos, p0, p1, p2, p3);
-        sgn *= sign_root(root.z, pos, p0, p1, p2, p3);
+        let res_cubic = solve_cubic(qu_3 / cu, li_3 / cu, co / cu);
+        for (var i = 0u; i < 3u; i++) {
+            res.sgn *= sign_root(res_cubic.root[i], pos, p0, p1, p2, p3);
+        }
+        res.debug_color = res_cubic.debug;
     }
 
     // // let tan1 = p0.xy - p1.xy;
@@ -212,7 +248,7 @@ fn sign_bezier(pos: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>, p3: 
 
     // // let cond2: vec3<bool> = vec3(p2.y < p3.y, pos.y> p3.y, dot(pos - p3.xy, nor2) < 0.0);
     // // sgn *= select(1.0, - 1.0, all(cond2) || !any(cond2));
-    return sgn;
+    return res;
 }
 
 fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
@@ -243,7 +279,9 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
             attr.nearest_idx = i;
         }
         // if is_closed(i) {
-            attr.sgn *= sign_bezier(pos, p1, h1, h2, p2);
+            let res = sign_bezier(pos, p1, h1, h2, p2);
+            attr.sgn *= res.sgn;
+            attr.debug = res.debug_color;
         // }
     }
 
@@ -256,6 +294,7 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     var idx = 0u;
     var d = 3.40282346638528859812e38;
     var sgn = 1.0;
+    var debug_color = vec4(0.0, 0.0, 0.0, 1.0);
 
     var start_idx = 0u;
     while start_idx < points_len {
@@ -263,6 +302,7 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
         if attr.d < d {
             idx = attr.nearest_idx;
             d = attr.d;
+            debug_color = attr.debug;
         }
         sgn *= attr.sgn;
         start_idx = attr.end_idx + 1;
@@ -271,24 +311,24 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     let sgn_d = sgn * d;
     // return vec4(1.0);
     // return vec4(vec3(d), 1.0);
-    return vec4(vec3(sgn_d), 1.0);
+    // return vec4(vec3(sgn_d), 1.0);
 
-    // let e = point(idx + 1u).xy - point(idx).xy;
-    // let w = pos.xy - point(idx).xy;
-    // let ratio = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
-    // let anchor_index = idx / 2;
+    let e = point(idx + 1u).xy - point(idx).xy;
+    let w = pos.xy - point(idx).xy;
+    let ratio = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
 
-    // // TODO: Antialias
-    // var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[anchor_index], fill_rgbas[anchor_index + 1], ratio), is_closed(idx));
-    // fill_rgba.a *= smoothstep(1.0, - 1.0, (sgn_d));
+    // TODO: Antialias
+    var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[idx], fill_rgbas[idx + 1], ratio), is_closed(idx));
+    fill_rgba.a *= smoothstep(1.0, - 1.0, (sgn_d));
 
-    // let stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
-    // var stroke_rgba: vec4<f32> = mix(stroke_rgbas[anchor_index], stroke_rgbas[anchor_index + 1], ratio);
-    // stroke_rgba.a *= smoothstep(1.0, - 1.0, (d - stroke_width));
+    let stroke_width = mix(stroke_widths[idx], stroke_widths[idx + 1], ratio);
+    // var stroke_rgba: vec4<f32> = mix(stroke_rgbas[idx], stroke_rgbas[idx + 1], ratio);
+    var stroke_rgba: vec4<f32> = debug_color;
+    stroke_rgba.a *= smoothstep(1.0, - 1.0, (d - stroke_width));
 
-    // var f_color = blend_color(stroke_rgba, fill_rgba);
+    var f_color = blend_color(stroke_rgba, fill_rgba);
 
-    // return f_color;
+    return f_color;
 }
 
 fn render_control_points(pos: vec2<f32>) -> vec4<f32> {

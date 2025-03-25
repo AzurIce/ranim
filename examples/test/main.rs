@@ -245,9 +245,9 @@ mod test {
     }
 
     #[test]
-    fn foo() {
+    fn test_precision() {
         let pos = vec2(0.0, 0.0);
-        let cu = 3.0 * (-P[0].y / 3.0 + P[1].y - P[2].y + P[3].y / 3.0);
+        let cu = (P[3].y + P[1].y * 3.0) - (P[2].y * 3.0 + P[0].y);
         // let cu = 0.00987;
         let qu = 3.0 * P[0].y - 6.0 * P[1].y + 3.0 * P[2].y;
         let li = -3.0 * P[0].y + 3.0 * P[1].y;
@@ -256,6 +256,7 @@ mod test {
 
         let res = solve_cubic(qu / cu, li / cu, co / cu);
         println!("{:?}", res);
+        println!("##########");
 
         let pos = dvec2(0.0, 0.0);
         let cu = -P_DOUBLE[0].y + 3.0 * P_DOUBLE[1].y - 3.0 * P_DOUBLE[2].y + P_DOUBLE[3].y;
@@ -266,5 +267,71 @@ mod test {
 
         let res_double = solve_cubic_double(qu / cu, li / cu, co / cu);
         println!("{:?}", res_double);
+    }
+
+    
+    #[test]
+    fn foo() {
+        // 仅使用f32计算，并应用浮点误差减少技术
+        let pos = vec2(0.0, 0.0);
+
+        // 1. 更精确的计算顺序
+        // 将大小相近的值分组，避免大数吞噬小数
+        let cu = (P[3].y - P[2].y * 3.0) + (P[1].y * 3.0 - P[0].y);
+        
+        // 2. 使用Horner方法重写多项式系数计算
+        let qu = 3.0 * (P[0].y + P[2].y - 2.0 * P[1].y);
+        let li = 3.0 * (P[1].y - P[0].y);
+        let co = P[0].y - pos.y;
+        
+        // 3. 归一化系数，提高数值稳定性
+        let max_coeff = cu.abs().max(qu.abs()).max(li.abs()).max(co.abs());
+        let (norm_cu, norm_qu, norm_li, norm_co) = if max_coeff > 0.0 && false {
+            (cu / max_coeff, qu / max_coeff, li / max_coeff, co / max_coeff)
+        } else {
+            (cu, qu, li, co)
+        };
+        
+        // 6. 解方程
+        let a = norm_qu / norm_cu;
+        let b = norm_li / norm_cu;
+        let c = norm_co / norm_cu;
+        let res = solve_cubic(a, b, c);
+        
+        // 7. 牛顿迭代优化根的精度
+        let mut improved_roots = [0.0; 3];
+        for i in 0..3 {
+            let mut x = res.root[i];
+            // 应用2-3次牛顿迭代来提高根的精度
+            for _ in 0..6 {
+                // f(x) = x³ + ax² + bx + c
+                let f = ((x + a) * x + b) * x + c;
+                // f'(x) = 3x² + 2ax + b
+                let f_prime = (3.0 * x + 2.0 * a) * x + b;
+                
+                if f_prime.abs() < 1e-10 {
+                    break; // 避免除以接近零的数
+                }
+                
+                let delta = f / f_prime;
+                x -= delta;
+                
+                if delta.abs() < 1e-8 {
+                    break; // 收敛，可以提前停止
+                }
+            }
+            improved_roots[i] = x;
+        }
+        
+        // 输出和对比结果
+        println!("原始解算结果: {:?}", res);
+        println!("优化后的根: {:?}", improved_roots);
+        println!("直接计算的cu: {}", cu);
+        
+        // 检验根的准确性
+        for (i, &root) in improved_roots.iter().enumerate() {
+            let original = ((root + a) * root + b) * root + c;
+            println!("根 {} 的方程验证值: {}", i, original);
+        }
     }
 }
