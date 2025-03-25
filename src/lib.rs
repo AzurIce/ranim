@@ -319,6 +319,7 @@ impl RanimRenderApp {
                             }
                         }
                     });
+                    self.ctx.wgpu_ctx.queue.submit([]);
                 }
 
                 let render_primitives = items

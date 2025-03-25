@@ -61,7 +61,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
                 .unwrap();
             view.copy_from_slice(bytemuck::bytes_of(&data));
         }
-        ctx.queue.submit([]);
+        // ctx.queue.submit([]);
         self.inner = data;
     }
 
@@ -173,7 +173,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                     .unwrap();
                 view.copy_from_slice(bytemuck::cast_slice(data));
             }
-            ctx.queue.submit([]);
+            // ctx.queue.submit([]);
         }
         realloc
     }
