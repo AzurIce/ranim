@@ -1,8 +1,6 @@
 pub mod pipelines;
 pub mod primitives;
 
-use std::thread;
-
 use color::LinearSrgb;
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Rgba};
@@ -19,6 +17,7 @@ use crate::{
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const ALIGNMENT: usize = 256;
 
+#[allow(unused)]
 #[cfg(feature = "profiling")]
 mod profiling_utils {
     use wgpu_profiler::GpuTimerQueryResult;
@@ -496,55 +495,4 @@ pub trait RenderResource {
     fn new(ctx: &WgpuContext) -> Self
     where
         Self: Sized;
-}
-
-#[cfg(test)]
-mod test {
-    // use env_logger::Env;
-    // use glam::vec3;
-
-    // use crate::{
-    //     animation::{
-    //         creation::{CreationAnim, WritingAnim},
-    //         AnimWithParams,
-    //     },
-    //     items::{vitem::Polygon, Blueprint},
-    //     timeline::Timeline,
-    //     utils::rate_functions::linear,
-    //     AppOptions, RanimRenderApp,
-    // };
-
-    // #[test]
-    // fn test_render_vitem() {
-    //     env_logger::Builder::from_env(Env::default().default_filter_or("ranim=trace")).init();
-
-    //     let vitem = Polygon(vec![
-    //         vec3(-100.0, -300.0, 0.0),
-    //         vec3(-100.0, 0.0, 0.0),
-    //         vec3(0.0, 300.0, 0.0),
-    //         vec3(200.0, 300.0, 0.0),
-    //         vec3(200.0, -300.0, 0.0),
-    //     ])
-    //     .build();
-
-    //     let mut app = RanimRenderApp::new(&AppOptions::default());
-    //     let timeline = Timeline::new();
-
-    //     timeline.forward(2.0);
-    //     let mut vitem = timeline.insert(vitem);
-    //     // 创建动画并立即播放,确保vitem的生命周期足够长
-    //     timeline.play(vitem.write());
-    //     // timeline.hide(&vitem);
-    //     timeline.forward(1.0);
-    //     // timeline.show(&vitem);
-    //     timeline.play(vitem.uncreate());
-    //     drop(vitem);
-
-    //     let duration = timeline.elapsed_secs();
-    //     app.render_anim(
-    //         AnimWithParams::new(timeline)
-    //             .with_duration(duration)
-    //             .with_rate_func(linear),
-    //     );
-    // }
 }
