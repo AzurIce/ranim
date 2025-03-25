@@ -1,5 +1,5 @@
-use std::ops::{Deref, DerefMut};
 use glam::DVec3;
+use std::ops::{Deref, DerefMut};
 
 use crate::prelude::Interpolatable;
 

@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, f32, path::Path, slice::Iter, vec};
 
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{dvec3, DAffine2, DVec3};
+use glam::{DAffine2, DVec3, dvec3};
 use log::warn;
 
 use crate::{

@@ -49,7 +49,8 @@ impl WgpuContext {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    required_features: adapter.features() & wgpu_profiler::GpuProfiler::ALL_WGPU_TIMER_FEATURES,
+                    required_features: adapter.features()
+                        & wgpu_profiler::GpuProfiler::ALL_WGPU_TIMER_FEATURES,
                     required_limits: wgpu::Limits::default(),
                     memory_hints: wgpu::MemoryHints::default(),
                 },

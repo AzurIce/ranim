@@ -257,7 +257,9 @@ mod test {
 
         let camera = CameraFrame::new();
         let uniforms = CameraUniforms {
-            proj_mat: camera.projection_matrix(frame_size.y, width as f64 / height as f64).as_mat4(),
+            proj_mat: camera
+                .projection_matrix(frame_size.y, width as f64 / height as f64)
+                .as_mat4(),
             view_mat: camera.view_matrix().as_mat4(),
             half_frame_size: (frame_size / 2.0).as_vec2(),
             _padding: [0.0; 2],

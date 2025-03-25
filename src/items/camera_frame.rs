@@ -1,6 +1,6 @@
 // MARK: CameraFrame
 
-use glam::{dvec2, DMat4, DVec3};
+use glam::{DMat4, DVec3, dvec2};
 
 use crate::prelude::{Alignable, Interpolatable};
 
@@ -101,10 +101,8 @@ impl CameraFrame {
 
     /// Use the given frame size to construct projection matrix
     pub fn projection_matrix(&self, frame_height: f64, aspect_ratio: f64) -> DMat4 {
-        self.orthographic_mat(frame_height, aspect_ratio).lerp(
-            &self.perspective_mat(aspect_ratio),
-            self.perspective_blend as f64,
-        )
+        self.orthographic_mat(frame_height, aspect_ratio)
+            .lerp(&self.perspective_mat(aspect_ratio), self.perspective_blend)
     }
 
     /// Use the given frame size to construct view projection matrix
