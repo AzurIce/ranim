@@ -2,13 +2,11 @@ use crate::{
     components::{rgba::Rgba, width::Width},
     context::WgpuContext,
     render::{
-        RenderTextures,
         pipelines::{
-            Map3dTo2dPipeline, VItemPipeline, map_3d_to_2d::ComputeBindGroup,
-            vitem::RenderBindGroup,
-        },
+            map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup, Map3dTo2dPipeline, VItemPipeline
+        }, RenderTextures
     },
-    utils::{PipelinesStorage, wgpu::WgpuVecBuffer},
+    utils::{wgpu::{WgpuBuffer, WgpuVecBuffer}, PipelinesStorage},
 };
 use glam::Vec4;
 
@@ -21,6 +19,8 @@ pub struct VItemPrimitive {
     pub(crate) points2d_buffer: WgpuVecBuffer<Vec4>, // Use vec4 for alignment
     /// COMPUTE OUTPUT, RENDER INPUT: (min_x, max_x, min_y, max_y, max_w)
     pub(crate) clip_info_buffer: WgpuVecBuffer<i32>,
+    /// COMPUTE INPUT: point_cnt
+    pub(crate) point_cnt_buffer: Option<WgpuBuffer<u32>>,
 
     /// RENDER INPUT
     pub(crate) fill_rgbas: WgpuVecBuffer<Rgba>,
@@ -69,6 +69,7 @@ impl Default for VItemPrimitive {
             points3d_buffer,
             points2d_buffer,
             clip_info_buffer,
+            point_cnt_buffer: None,
             fill_rgbas,
             stroke_rgbas,
             stroke_widths,
@@ -88,6 +89,16 @@ impl VItemPrimitive {
         stroke_rgbas: &[Rgba],
         stroke_widths: &[Width],
     ) {
+        if self.point_cnt_buffer.is_none() {
+            self.point_cnt_buffer = Some(WgpuBuffer::new_init(
+                ctx,
+                Some("Point Cnt Buffer"),
+                wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                render_points.len() as u32,
+            ));
+        } else {
+            self.point_cnt_buffer.as_mut().unwrap().set(ctx, render_points.len() as u32);
+        }
         // Dynamic sized
         if [
             self.points3d_buffer.set(ctx, render_points),
@@ -110,6 +121,7 @@ impl VItemPrimitive {
                 self.stroke_widths.buffer.as_ref().unwrap(),
                 self.points2d_buffer.buffer.as_ref().unwrap(),
                 self.clip_info_buffer.buffer.as_ref().unwrap(),
+                self.point_cnt_buffer.as_ref().unwrap().as_ref(),
             ));
             self.render_bind_group = Some(RenderBindGroup::new(
                 ctx,
@@ -185,62 +197,5 @@ impl RenderInstance for VItemPrimitive {
             rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
             rpass.draw(0..4, 0..1);
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use glam::Vec2;
-
-    use crate::{
-        context::WgpuContext,
-        items::{Blueprint, camera_frame::CameraFrame, vitem::Square},
-        render::{
-            CameraUniforms, CameraUniformsBindGroup, RenderTextures,
-            primitives::{ExtractFrom, RenderInstance},
-        },
-        utils::{PipelinesStorage, wgpu::WgpuBuffer},
-    };
-
-    use super::VItemPrimitive;
-
-    #[test]
-    fn test() {
-        let ctx = pollster::block_on(WgpuContext::new());
-        let vitem = Square(10.0).build();
-        let mut vitem_primitive = VItemPrimitive::default();
-        let mut pipelines = PipelinesStorage::default();
-        let (width, height) = (1920, 1080);
-        let camera = CameraFrame::new();
-        let uniforms = CameraUniforms {
-            proj_mat: camera.perspective_mat(width as f32 / height as f32),
-            view_mat: camera.view_matrix(),
-            half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
-            _padding: [0.0; 2],
-        };
-        let uniforms_buffer = WgpuBuffer::new_init(
-            &ctx,
-            Some("Uniforms Buffer"),
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            uniforms,
-        );
-        let camera_bind_group = CameraUniformsBindGroup::new(&ctx, &uniforms_buffer);
-        let render_textures = RenderTextures::new(&ctx, width, height);
-
-        vitem_primitive.update_from(&ctx, &vitem);
-        let mut encoder = ctx
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        vitem_primitive.encode_render_command(
-            &ctx,
-            &mut pipelines,
-            &mut encoder,
-            &camera_bind_group.bind_group,
-            &render_textures,
-        );
-        ctx.queue.submit(Some(encoder.finish()));
-        let res = vitem_primitive.clip_info_buffer.read_buffer(&ctx).unwrap();
-        let res: &[i32] = bytemuck::cast_slice(&res);
-        println!("{:?}", res);
     }
 }

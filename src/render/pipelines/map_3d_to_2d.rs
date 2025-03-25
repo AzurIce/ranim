@@ -70,6 +70,17 @@ impl ComputeBindGroup {
                     },
                     count: None,
                 },
+                // point_cnt
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         }
     }
@@ -80,6 +91,7 @@ impl ComputeBindGroup {
         stroke_width_buffer: &wgpu::Buffer,
         points2d_buffer: &wgpu::Buffer,
         clip_box_buffer: &wgpu::Buffer,
+        point_cnt_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Map 3D to 2D Compute Bind Group"),
@@ -109,6 +121,12 @@ impl ComputeBindGroup {
                         clip_box_buffer.as_entire_buffer_binding(),
                     ),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Buffer(
+                        point_cnt_buffer.as_entire_buffer_binding(),
+                    ),
+                },
             ],
         })
     }
@@ -118,6 +136,7 @@ impl ComputeBindGroup {
         stroke_width_buffer: &wgpu::Buffer,
         points2d_buffer: &wgpu::Buffer,
         clip_box_buffer: &wgpu::Buffer,
+        point_cnt_buffer: &wgpu::Buffer,
     ) -> Self {
         Self(Self::new_bind_group(
             ctx,
@@ -125,6 +144,7 @@ impl ComputeBindGroup {
             stroke_width_buffer,
             points2d_buffer,
             clip_box_buffer,
+            point_cnt_buffer,
         ))
     }
 }
