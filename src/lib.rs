@@ -46,13 +46,13 @@ pub mod timeline;
 pub mod traits;
 
 pub mod animation;
+#[cfg(feature = "app")]
+pub mod app;
 pub mod components;
 pub mod context;
 pub mod items;
 pub mod render;
 pub mod utils;
-#[cfg(feature = "app")]
-pub mod app;
 
 #[cfg(feature = "profiling")]
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to

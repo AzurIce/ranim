@@ -150,7 +150,10 @@ pub fn paint_timeline(
 
     let current_line_x = info.point_from_ms(state, current_ms);
     shapes.push(egui::Shape::line_segment(
-        [pos2(current_line_x, rect.min.y), pos2(current_line_x, rect.max.y)],
+        [
+            pos2(current_line_x, rect.min.y),
+            pos2(current_line_x, rect.max.y),
+        ],
         Stroke::new(1.0, Rgba::from_white_alpha(alpha_multiplier)),
     ));
     loop {

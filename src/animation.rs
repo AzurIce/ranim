@@ -90,9 +90,10 @@ pub trait Eval<T> {
 impl<T> Eval<T> for Evaluator<T> {
     fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
         match self {
-            Self::Dynamic { inner, type_name: _ } => {
-                EvalResult::Dynamic(inner.eval_alpha(alpha))
-            }
+            Self::Dynamic {
+                inner,
+                type_name: _,
+            } => EvalResult::Dynamic(inner.eval_alpha(alpha)),
             Self::Static(e) => EvalResult::Static(e.clone()),
         }
     }

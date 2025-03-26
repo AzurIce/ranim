@@ -21,10 +21,12 @@ pub trait CreationAnimSchedule<'r, 't, T: CreationRequirement + 'static> {
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
     fn create(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Create::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(Create::new(self.clone()).to_evaluator())
+            .with_rate_func(smooth)
     }
     fn uncreate(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(UnCreate::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(UnCreate::new(self.clone()).to_evaluator())
+            .with_rate_func(smooth)
     }
 }
 
@@ -53,10 +55,12 @@ pub trait WritingAnimSchedule<'r, 't, T: WritingRequirement + 'static> {
 
 impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
     fn write(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Write::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(Write::new(self.clone()).to_evaluator())
+            .with_rate_func(smooth)
     }
     fn unwrite(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Unwrite::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(Unwrite::new(self.clone()).to_evaluator())
+            .with_rate_func(smooth)
     }
 }
 
