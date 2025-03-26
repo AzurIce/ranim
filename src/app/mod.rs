@@ -3,7 +3,7 @@ mod egui_tools;
 use std::sync::Arc;
 
 use egui_wgpu::ScreenDescriptor;
-use wgpu::{SurfaceError, include_wgsl};
+use wgpu::SurfaceError;
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
@@ -13,7 +13,7 @@ use winit::{
 };
 
 use crate::{
-    AppOptions, Scene, SceneMeta,
+    Scene, SceneMeta,
     animation::EvalResult,
     build_timeline,
     context::{RanimContext, WgpuContext},
@@ -111,8 +111,8 @@ struct AppState {
     // timeline: RanimTimeline,
     renderer: Renderer,
 
-    // last_sec: f64,
-    // current_sec: f64,
+    last_sec: f64,
+    current_sec: f64,
     render_instances: RenderInstances,
 }
 
@@ -120,6 +120,11 @@ impl AppState {
     pub fn prepare(&mut self, ctx: &mut RanimContext) {
         #[cfg(feature = "profiling")]
         profiling::scope!("frame");
+
+        if self.last_sec == self.current_sec {
+            return;
+        }
+        self.last_sec = self.current_sec;
 
         let TimelineEvalResult {
             // EvalResult<CameraFrame>, idx
@@ -130,13 +135,13 @@ impl AppState {
             #[cfg(feature = "profiling")]
             profiling::scope!("eval");
 
-            self.timeline.eval_alpha(0.5)
+            self.timeline.eval_sec(self.current_sec)
         };
 
         {
             #[cfg(feature = "profiling")]
             profiling::scope!("prepare");
-            items.iter().for_each(|(id, res, idx)| {
+            items.iter().for_each(|(id, res, _idx)| {
                 // let last_idx = last_idx.entry(*id).or_insert(-1);
                 // let prev_last_idx = *last_idx;
                 // *last_idx = *idx as i32;
@@ -188,6 +193,13 @@ impl AppState {
     }
 
     pub fn ui(&mut self, state: &mut RenderState) {
+        egui::TopBottomPanel::bottom("bottom_panel").show(state.egui_renderer.context(), |ui| {
+            ui.label("Bottom Panel");
+            ui.add(
+                egui::Slider::new(&mut self.current_sec, 0.0..=self.timeline.duration_secs())
+                    .text("sec"),
+            );
+        });
         egui::Window::new(format!("{}", self.meta.name))
             .resizable(true)
             .vscroll(true)
@@ -223,6 +235,8 @@ impl AppState {
             meta,
             timeline,
             renderer,
+            current_sec: 0.0,
+            last_sec: -1.0,
             render_instances: RenderInstances::default(),
         }
     }
