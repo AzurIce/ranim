@@ -23,6 +23,8 @@ use render::{Renderer, primitives::RenderInstances};
 pub mod prelude {
     pub use crate::Ranim;
 
+    #[cfg(feature = "app")]
+    pub use crate::app::run_scene_app;
     pub use crate::{AppOptions, render_scene, render_scene_at_sec};
     pub use crate::{SceneMetaTrait, TimelineConstructor};
     pub use ranim_macros::scene;
@@ -49,6 +51,8 @@ pub mod context;
 pub mod items;
 pub mod render;
 pub mod utils;
+#[cfg(feature = "app")]
+pub mod app;
 
 #[cfg(feature = "profiling")]
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
