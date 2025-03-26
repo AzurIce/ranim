@@ -322,7 +322,9 @@ impl AppState {
             .resizable(true)
             .max_height(600.0)
             .show(state.egui_renderer.context(), |ui| {
-                ui.label("Bottom Panel");
+                ui.label("Timeline");
+
+                ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
                 ui.add(
                     egui::Slider::new(&mut self.current_sec, 0.0..=self.timeline.duration_secs())
                         .text("sec"),
@@ -356,7 +358,12 @@ impl AppState {
 
                         let timeline_shape_id = info.painter.add(Shape::Noop);
 
-                        let max_y = ui_canvas(&mut self.timeline_state, &info, &timeline_infos, (min_ms, max_ms));
+                        let max_y = ui_canvas(
+                            &mut self.timeline_state,
+                            &info,
+                            &timeline_infos,
+                            (min_ms, max_ms),
+                        );
                         let mut used_rect = canvas;
                         used_rect.max.y = max_y.max(used_rect.min.y + available_height);
 
@@ -367,6 +374,7 @@ impl AppState {
                                 used_rect,
                                 &self.timeline_state,
                                 min_ms,
+                                (self.current_sec * 1000.0) as i64,
                             )),
                         );
 
@@ -381,29 +389,29 @@ impl AppState {
 
         // dbg!(state.viewport);
 
-        egui::Window::new(format!("{}", self.meta.name))
-            .resizable(true)
-            .vscroll(true)
-            .default_open(false)
-            .show(state.egui_renderer.context(), |ui| {
-                ui.label("Label!");
+        // egui::Window::new(format!("{}", self.meta.name))
+        //     .resizable(true)
+        //     .vscroll(true)
+        //     .default_open(false)
+        //     .show(state.egui_renderer.context(), |ui| {
+        //         ui.label("Label!");
 
-                if ui.button("Button!").clicked() {}
+        //         if ui.button("Button!").clicked() {}
 
-                ui.separator();
-                ui.horizontal(|ui| {
-                    ui.label(format!(
-                        "Pixels per point: {}",
-                        state.egui_renderer.context().pixels_per_point()
-                    ));
-                    if ui.button("-").clicked() {
-                        state.scale_factor = (state.scale_factor - 0.1).max(0.3);
-                    }
-                    if ui.button("+").clicked() {
-                        state.scale_factor = (state.scale_factor + 0.1).min(3.0);
-                    }
-                });
-            });
+        //         ui.separator();
+        //         ui.horizontal(|ui| {
+        //             ui.label(format!(
+        //                 "Pixels per point: {}",
+        //                 state.egui_renderer.context().pixels_per_point()
+        //             ));
+        //             if ui.button("-").clicked() {
+        //                 state.scale_factor = (state.scale_factor - 0.1).max(0.3);
+        //             }
+        //             if ui.button("+").clicked() {
+        //                 state.scale_factor = (state.scale_factor + 0.1).min(3.0);
+        //             }
+        //         });
+        //     });
         occupied_screen_space
     }
 }
@@ -592,7 +600,10 @@ impl WinitApp {
 impl ApplicationHandler for WinitApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = event_loop
-            .create_window(Window::default_attributes())
+            .create_window(
+                Window::default_attributes()
+                    .with_title(format!("Ranim {}", self.app_state.meta.name)),
+            )
             .unwrap();
         pollster::block_on(self.set_window(window));
     }
