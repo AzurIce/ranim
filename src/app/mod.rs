@@ -40,7 +40,6 @@ struct RenderState {
     pub scale_factor: f32,
     pub egui_renderer: egui_tools::EguiRenderer,
     pub app_pipeline: AppPipeline,
-    pub occupied_screen_space: OccupiedScreenSpace,
 
     pub viewport: Viewport,
 }
@@ -101,7 +100,6 @@ impl RenderState {
             egui_renderer,
             app_pipeline,
             scale_factor,
-            occupied_screen_space: OccupiedScreenSpace::default(),
             viewport: Viewport {
                 width: 1.0,
                 height: 1.0,
@@ -115,6 +113,62 @@ impl RenderState {
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(&ctx.device, &self.surface_config);
+    }
+
+    fn update_viewport(&mut self, occupied_screen_space: OccupiedScreenSpace, render_aspect: f32) {
+        // Calculate viewport
+        let screen_width = self.surface_config.width as f32;
+        let screen_height = self.surface_config.height as f32;
+        // dbg!(screen_width, screen_height);
+
+        let OccupiedScreenSpace {
+            top,
+            bottom,
+            left,
+            right,
+        } = occupied_screen_space;
+        // dbg!(state.occupied_screen_space);
+
+        // Calculate available space
+        let available_width = screen_width - left - right;
+        let available_height = screen_height - top - bottom;
+        // dbg!(available_width, available_height);
+
+        // Calculate aspect ratio of the render texture
+        let viewport_aspect = available_width / available_height;
+
+        let (viewport_width, viewport_height, viewport_x, viewport_y) =
+            if render_aspect > viewport_aspect {
+                // Render is wider than viewport
+                let width = available_width;
+                let height = width / render_aspect;
+                let x = left - right;
+                let y = bottom - top;
+                (
+                    width / screen_width,
+                    height / screen_height,
+                    x / screen_width,
+                    y / screen_height,
+                )
+            } else {
+                // Render is taller than viewport
+                let height = available_height;
+                let width = height * render_aspect;
+                let x = left - right;
+                let y = bottom - top;
+                (
+                    width / screen_width,
+                    height / screen_height,
+                    x / screen_width,
+                    y / screen_height,
+                )
+            };
+        self.viewport = Viewport {
+            width: viewport_width,
+            height: viewport_height,
+            x: viewport_x,
+            y: viewport_y,
+        };
     }
 }
 
@@ -143,10 +197,10 @@ impl AppState {
         #[cfg(feature = "profiling")]
         profiling::scope!("frame");
 
-        state.app_pipeline.bind_group.update_viewport(
-            &ctx.wgpu_ctx.queue,
-            state.viewport,
-        );
+        state
+            .app_pipeline
+            .bind_group
+            .update_viewport(&ctx.wgpu_ctx.queue, state.viewport);
 
         if self.last_sec == self.current_sec {
             return;
@@ -219,61 +273,23 @@ impl AppState {
         }
     }
 
-    pub fn ui(&mut self, state: &mut RenderState) {
-        let bottom = egui::TopBottomPanel::bottom("bottom_panel").show(state.egui_renderer.context(), |ui| {
-            ui.label("Bottom Panel");
-            ui.add(
-                egui::Slider::new(&mut self.current_sec, 0.0..=self.timeline.duration_secs())
-                    .text("sec"),
-            );
-        }).response.rect.height();
+    pub fn ui(&mut self, state: &mut RenderState) -> OccupiedScreenSpace {
+        let scale_factor = state.scale_factor;
+        let mut occupied_screen_space = OccupiedScreenSpace::default();
 
-        state.occupied_screen_space.bottom = bottom * state.scale_factor;
+        occupied_screen_space.bottom = egui::TopBottomPanel::bottom("bottom_panel")
+            .show(state.egui_renderer.context(), |ui| {
+                ui.label("Bottom Panel");
+                ui.add(
+                    egui::Slider::new(&mut self.current_sec, 0.0..=self.timeline.duration_secs())
+                        .text("sec"),
+                );
+            })
+            .response
+            .rect
+            .height()
+            * scale_factor;
 
-        // Calculate viewport
-        let screen_width = state.surface_config.width as f32;
-        let screen_height = state.surface_config.height as f32;
-        // dbg!(screen_width, screen_height);
-
-        let OccupiedScreenSpace {
-            top,
-            bottom,
-            left,
-            right,
-        } = state.occupied_screen_space;
-        // dbg!(state.occupied_screen_space);
-
-        // Calculate available space
-        let available_width = screen_width - left - right;
-        let available_height = screen_height - top - bottom;
-        // dbg!(available_width, available_height);
-
-        // Calculate aspect ratio of the render texture
-        let render_aspect = 16.0 / 9.0; // TODO: get from renderer
-        let viewport_aspect = available_width / available_height;
-
-        let (viewport_width, viewport_height, viewport_x, viewport_y) =
-            if render_aspect > viewport_aspect {
-                // Render is wider than viewport
-                let width = available_width;
-                let height = width / render_aspect;
-                let x = left - right;
-                let y = bottom - top;
-                (width / screen_width, height / screen_height, x / screen_width, y / screen_height)
-            } else {
-                // Render is taller than viewport
-                let height = available_height;
-                let width = height * render_aspect;
-                let x = left - right;
-                let y = bottom - top;
-                (width / screen_width, height / screen_height, x / screen_width, y / screen_height)
-            };
-        state.viewport = Viewport {
-            width: viewport_width,
-            height: viewport_height,
-            x: viewport_x,
-            y: viewport_y,
-        };
         // dbg!(state.viewport);
 
         egui::Window::new(format!("{}", self.meta.name))
@@ -299,6 +315,7 @@ impl AppState {
                     }
                 });
             });
+        occupied_screen_space
     }
 }
 
@@ -369,6 +386,9 @@ impl WinitApp {
     }
 
     fn handle_redraw(&mut self) {
+        #[cfg(feature = "profiling")]
+        profiling::scope!("redraw");
+
         // Attempt to handle minimizing window
         if let Some(window) = self.window.as_ref() {
             if let Some(min) = window.is_minimized() {
@@ -418,6 +438,9 @@ impl WinitApp {
 
         // MARK: app render
         {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("app render");
+
             self.app_state.prepare(&mut self.ctx, state);
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
@@ -441,8 +464,13 @@ impl WinitApp {
 
         // MARK: egui render
         {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("egui render");
+
             state.egui_renderer.begin_frame(window);
-            self.app_state.ui(state);
+            let occupied_screen_space = self.app_state.ui(state);
+            state.update_viewport(occupied_screen_space, 16.0 / 9.0); // TODO: get from renderer
+
             state.egui_renderer.end_frame_and_draw(
                 &self.ctx.wgpu_ctx.device,
                 &self.ctx.wgpu_ctx.queue,
@@ -453,8 +481,21 @@ impl WinitApp {
             );
         }
 
-        self.ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
-        surface_texture.present();
+        {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("submit");
+
+            self.ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+        }
+        {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("present");
+
+            surface_texture.present();
+        }
+
+        #[cfg(feature = "profiling")]
+        profiling::finish_frame!();
     }
 }
 
@@ -493,7 +534,26 @@ impl ApplicationHandler for WinitApp {
     }
 }
 
+#[cfg(feature = "profiling")]
+use crate::PUFFIN_GPU_PROFILER;
+
 pub fn run_scene_app(scene: impl Scene) {
+    #[cfg(feature = "profiling")]
+    let (_cpu_server, _gpu_server) = {
+        puffin::set_scopes_on(true);
+        // default global profiler
+        let cpu_server =
+            puffin_http::Server::new(&format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT)).unwrap();
+        // custom gpu profiler in `PUFFIN_GPU_PROFILER`
+        let gpu_server = puffin_http::Server::new_custom(
+            &format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT + 1),
+            |sink| PUFFIN_GPU_PROFILER.lock().unwrap().add_sink(sink),
+            |id| _ = PUFFIN_GPU_PROFILER.lock().unwrap().remove_sink(id),
+        )
+        .unwrap();
+        (cpu_server, gpu_server)
+    };
+
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
