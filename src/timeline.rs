@@ -1,7 +1,7 @@
 use log::trace;
 
 use crate::{
-    animation::{AnimSchedule, Animation, EvalResult, Evaluator},
+    animation::{AnimSchedule, AnimationSpan, EvalResult, Evaluator},
     items::{Entity, Item, Rabject, camera_frame::CameraFrame, group::Group},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
@@ -9,16 +9,20 @@ use std::{fmt::Debug, time::Duration};
 
 // MARK: EntityTimtlineState
 
+/// The static state of a timeline
+///
+/// A type `T` can be inserted into the timeline only if it implements this trait.
+///
+/// An [`EntityTimelineStaticState`] will be converted into [`EntityTimelineStaticState::StateType`]
+/// when inserted into the timeline.
+///
+/// Now, the timeline only supports two types of state type:
+/// - [`Item`]: The state of an item
+/// - [`CameraFrame`]: The state of the camera
 pub trait EntityTimelineStaticState {
     type StateType;
     fn into_state_type(self) -> Self::StateType;
     fn into_rc_state_type(self: Rc<Self>) -> Rc<Self::StateType>;
-    fn into_timeline(self) -> RabjectTimeline<Self::StateType>
-    where
-        Self: Sized + 'static,
-    {
-        RabjectTimeline::new(self.into_state_type())
-    }
 }
 
 impl<T: Entity + 'static> EntityTimelineStaticState for T {
@@ -111,7 +115,7 @@ impl RanimTimeline {
         let mut timelines = self.timelines.borrow_mut();
 
         let id = timelines.len();
-        let mut timeline = item.clone().into_timeline();
+        let mut timeline = RabjectTimeline::new(item.clone());
         let max_elapsed_secs = *self.max_elapsed_secs.borrow();
         if max_elapsed_secs != 0.0 {
             timeline.append_blank(*self.max_elapsed_secs.borrow());
@@ -234,6 +238,26 @@ impl RanimTimeline {
             items,
         }
     }
+    pub fn get_timeline_infos(&self) -> Vec<RabjectTimelineInfo> {
+        const MAX_TIMELINE_CNT: usize = 100;
+        self.timelines
+            .borrow()
+            .iter()
+            .enumerate()
+            .take(MAX_TIMELINE_CNT)
+            .map(|(id, timeline)| RabjectTimelineInfo {
+                id,
+                type_name: timeline.type_name().to_string(),
+                animation_infos: timeline.get_animation_infos(),
+            })
+            .collect()
+    }
+}
+
+pub struct RabjectTimelineInfo {
+    pub id: usize,
+    pub type_name: String,
+    pub animation_infos: Vec<AnimationInfo>,
 }
 
 impl Debug for RanimTimeline {
@@ -251,8 +275,9 @@ impl Debug for RanimTimeline {
 
 /// A timeline struct that encodes the animation of the type `T`
 pub struct RabjectTimeline<T> {
+    type_name: String,
     forward_static_state: Option<Rc<T>>,
-    animations: Vec<Option<Animation<T>>>,
+    animations: Vec<Option<AnimationSpan<T>>>,
     end_secs: Vec<f64>,
     // Encoding states
     is_showing: bool,
@@ -270,6 +295,13 @@ impl<T: TimelineTrait + Any> AnyTimelineTrait for T {
         self
     }
 }
+
+pub struct AnimationInfo {
+    pub anim_name: String,
+    pub start_sec: f64,
+    pub end_sec: f64,
+}
+
 pub trait TimelineTrait {
     fn elapsed_secs(&self) -> f64;
     fn forward(&mut self, duration_secs: f64);
@@ -277,6 +309,8 @@ pub trait TimelineTrait {
     fn append_freeze(&mut self, duration_secs: f64);
     fn show(&mut self);
     fn hide(&mut self);
+    fn get_animation_infos(&self) -> Vec<AnimationInfo>;
+    fn type_name(&self) -> &str;
 }
 
 impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
@@ -306,9 +340,39 @@ impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
         self.animations.push(
             self.forward_static_state
                 .as_ref()
-                .map(|state| Animation::from_evaluator(Evaluator::Static(state.clone()))),
+                .map(|state| AnimationSpan::from_evaluator(Evaluator::Static(state.clone()))),
         );
         self.end_secs.push(end_sec);
+    }
+    fn get_animation_infos(&self) -> Vec<AnimationInfo> {
+        const MAX_INFO_CNT: usize = 100;
+        self.animations
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, anim)| {
+                anim.as_ref().map(|anim| AnimationInfo {
+                    anim_name: anim.type_name.clone(),
+                    start_sec: self.end_secs.get(idx - 1).cloned().unwrap_or(0.0) + anim.padding.0,
+                    end_sec: self.end_secs[idx] - anim.padding.1,
+                })
+            })
+            .take(MAX_INFO_CNT)
+            .collect()
+    }
+    fn type_name(&self) -> &str {
+        &self.type_name
+    }
+}
+
+impl<T: 'static> RabjectTimeline<T> {
+    pub fn new<S: EntityTimelineStaticState<StateType = T>>(initial_static_state: S) -> Self {
+        Self {
+            type_name: std::any::type_name::<S>().to_string(),
+            forward_static_state: Some(Rc::new(initial_static_state.into_state_type())),
+            animations: Vec::new(),
+            end_secs: Vec::new(),
+            is_showing: true,
+        }
     }
 }
 
@@ -316,7 +380,7 @@ impl<T> RabjectTimeline<T> {
     fn update_static_state(&mut self, static_state: Option<Rc<T>>) {
         self.forward_static_state = static_state;
     }
-    fn append_anim(&mut self, anim: Animation<T>) {
+    fn append_anim(&mut self, anim: AnimationSpan<T>) {
         let end_state = match anim.eval_alpha(1.0) {
             EvalResult::Dynamic(res) => Rc::new(res),
             EvalResult::Static(res) => res,
@@ -327,26 +391,9 @@ impl<T> RabjectTimeline<T> {
         self.animations.push(Some(anim));
         self.end_secs.push(end_sec);
     }
-}
-
-impl<T> RabjectTimeline<T> {
     pub fn duration_secs(&self) -> f64 {
         self.end_secs.last().cloned().unwrap_or(0.0)
     }
-}
-
-impl<T: 'static> RabjectTimeline<T> {
-    pub fn new(initial_static_state: T) -> Self {
-        Self {
-            forward_static_state: Some(Rc::new(initial_static_state)),
-            animations: Vec::new(),
-            end_secs: Vec::new(),
-            is_showing: true,
-        }
-    }
-}
-
-impl<T> RabjectTimeline<T> {
     pub fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<T>, usize)> {
         if self.animations.is_empty() {
             return None;
