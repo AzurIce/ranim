@@ -49,6 +49,13 @@ impl TimelineConstructor for TestScene {
         // println!("vpoints: {:?}", vitem.vpoints);
         // println!("close_path: {:?}", vitem.vpoints.get_closepath_flags());
         let _vitem = timeline.insert_group(vitem);
+
+        let mut border = Square(1.0).build();
+        border
+            .scale_to(ScaleHint::Size(8.0, 8.0))
+            .put_center_on(DVec3::ZERO);
+        let _border = timeline.insert(border);
+
         // let _vitem = timeline.insert(vitem);
         timeline.forward(1.0);
         timeline.sync();
@@ -71,7 +78,10 @@ fn main() {
     //         ..AppOptions::default()
     //     },
     // );
-    render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
+    // render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
+
+    // reuires "app" feature
+    run_scene_app(TestScene);
     // TestScene.render(&AppOptions {
     //     frame_rate: 60,
     //     frame_size: (3840, 2160),
