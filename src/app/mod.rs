@@ -18,9 +18,21 @@ use crate::{
     build_timeline,
     context::{RanimContext, WgpuContext},
     prelude::RanimTimeline,
-    render::{Renderer, pipelines::app::AppPipeline, primitives::RenderInstances},
+    render::{
+        Renderer,
+        pipelines::app::{AppPipeline, Viewport},
+        primitives::RenderInstances,
+    },
     timeline::TimelineEvalResult,
 };
+
+#[derive(Default, Debug, Clone, Copy)]
+struct OccupiedScreenSpace {
+    top: f32,
+    bottom: f32,
+    left: f32,
+    right: f32,
+}
 
 struct RenderState {
     pub surface_config: wgpu::SurfaceConfiguration,
@@ -28,6 +40,9 @@ struct RenderState {
     pub scale_factor: f32,
     pub egui_renderer: egui_tools::EguiRenderer,
     pub app_pipeline: AppPipeline,
+    pub occupied_screen_space: OccupiedScreenSpace,
+
+    pub viewport: Viewport,
 }
 
 impl RenderState {
@@ -86,6 +101,13 @@ impl RenderState {
             egui_renderer,
             app_pipeline,
             scale_factor,
+            occupied_screen_space: OccupiedScreenSpace::default(),
+            viewport: Viewport {
+                width: 1.0,
+                height: 1.0,
+                x: 0.0,
+                y: 0.0,
+            },
         }
     }
 
@@ -96,7 +118,7 @@ impl RenderState {
     }
 }
 
-struct RanimApp {
+struct WinitApp {
     state: Option<RenderState>,
     window: Option<Arc<Window>>,
 
@@ -117,9 +139,14 @@ struct AppState {
 }
 
 impl AppState {
-    pub fn prepare(&mut self, ctx: &mut RanimContext) {
+    pub fn prepare(&mut self, ctx: &mut RanimContext, state: &mut RenderState) {
         #[cfg(feature = "profiling")]
         profiling::scope!("frame");
+
+        state.app_pipeline.bind_group.update_viewport(
+            &ctx.wgpu_ctx.queue,
+            state.viewport,
+        );
 
         if self.last_sec == self.current_sec {
             return;
@@ -193,13 +220,62 @@ impl AppState {
     }
 
     pub fn ui(&mut self, state: &mut RenderState) {
-        egui::TopBottomPanel::bottom("bottom_panel").show(state.egui_renderer.context(), |ui| {
+        let bottom = egui::TopBottomPanel::bottom("bottom_panel").show(state.egui_renderer.context(), |ui| {
             ui.label("Bottom Panel");
             ui.add(
                 egui::Slider::new(&mut self.current_sec, 0.0..=self.timeline.duration_secs())
                     .text("sec"),
             );
-        });
+        }).response.rect.height();
+
+        state.occupied_screen_space.bottom = bottom * state.scale_factor;
+
+        // Calculate viewport
+        let screen_width = state.surface_config.width as f32;
+        let screen_height = state.surface_config.height as f32;
+        // dbg!(screen_width, screen_height);
+
+        let OccupiedScreenSpace {
+            top,
+            bottom,
+            left,
+            right,
+        } = state.occupied_screen_space;
+        // dbg!(state.occupied_screen_space);
+
+        // Calculate available space
+        let available_width = screen_width - left - right;
+        let available_height = screen_height - top - bottom;
+        // dbg!(available_width, available_height);
+
+        // Calculate aspect ratio of the render texture
+        let render_aspect = 16.0 / 9.0; // TODO: get from renderer
+        let viewport_aspect = available_width / available_height;
+
+        let (viewport_width, viewport_height, viewport_x, viewport_y) =
+            if render_aspect > viewport_aspect {
+                // Render is wider than viewport
+                let width = available_width;
+                let height = width / render_aspect;
+                let x = left - right;
+                let y = bottom - top;
+                (width / screen_width, height / screen_height, x / screen_width, y / screen_height)
+            } else {
+                // Render is taller than viewport
+                let height = available_height;
+                let width = height * render_aspect;
+                let x = left - right;
+                let y = bottom - top;
+                (width / screen_width, height / screen_height, x / screen_width, y / screen_height)
+            };
+        state.viewport = Viewport {
+            width: viewport_width,
+            height: viewport_height,
+            x: viewport_x,
+            y: viewport_y,
+        };
+        // dbg!(state.viewport);
+
         egui::Window::new(format!("{}", self.meta.name))
             .resizable(true)
             .vscroll(true)
@@ -242,7 +318,7 @@ impl AppState {
     }
 }
 
-impl RanimApp {
+impl WinitApp {
     fn new(scene: impl Scene) -> Self {
         let ctx = RanimContext::new();
         let app_state = AppState::new(&ctx, scene);
@@ -342,7 +418,7 @@ impl RanimApp {
 
         // MARK: app render
         {
-            self.app_state.prepare(&mut self.ctx);
+            self.app_state.prepare(&mut self.ctx, state);
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -382,7 +458,7 @@ impl RanimApp {
     }
 }
 
-impl ApplicationHandler for RanimApp {
+impl ApplicationHandler for WinitApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = event_loop
             .create_window(Window::default_attributes())
@@ -393,7 +469,7 @@ impl ApplicationHandler for RanimApp {
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
-        window_id: WindowId,
+        _window_id: WindowId,
         event: WindowEvent,
     ) {
         self.state
@@ -421,7 +497,7 @@ pub fn run_scene_app(scene: impl Scene) {
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
-    let mut app = RanimApp::new(scene);
+    let mut app = WinitApp::new(scene);
 
     event_loop.run_app(&mut app).expect("Failed to run app");
 }
