@@ -2,11 +2,23 @@ use std::ops::Deref;
 
 use crate::context::WgpuContext;
 
-pub struct AppBindGroup(wgpu::BindGroup);
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct Viewport {
+    pub width: f32,
+    pub height: f32,
+    pub x: f32,
+    pub y: f32,
+}
+
+pub struct AppBindGroup {
+    bind_group: wgpu::BindGroup,
+    viewport_buffer: wgpu::Buffer,
+}
 
 impl AsRef<wgpu::BindGroup> for AppBindGroup {
     fn as_ref(&self) -> &wgpu::BindGroup {
-        &self.0
+        &self.bind_group
     }
 }
 
@@ -32,14 +44,32 @@ impl AppBindGroup {
                         count: None,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::all(),
+                        count: None,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                    },
                 ],
             })
     }
+
     pub fn new_bind_group(
         ctx: &WgpuContext,
         texture_view: &wgpu::TextureView,
         sampler: &wgpu::Sampler,
     ) -> Self {
+        let viewport_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Viewport Buffer"),
+            size: std::mem::size_of::<Viewport>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("App Bind Group"),
             layout: &AppBindGroup::bind_group_layout(ctx),
@@ -52,9 +82,21 @@ impl AppBindGroup {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(sampler),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: viewport_buffer.as_entire_binding(),
+                },
             ],
         });
-        Self(bind_group)
+
+        Self {
+            bind_group,
+            viewport_buffer,
+        }
+    }
+
+    pub fn update_viewport(&self, queue: &wgpu::Queue, viewport: Viewport) {
+        queue.write_buffer(&self.viewport_buffer, 0, bytemuck::cast_slice(&[viewport]));
     }
 }
 
