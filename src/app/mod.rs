@@ -316,6 +316,8 @@ impl AppState {
         let scale_factor = state.scale_factor;
         let mut occupied_screen_space = OccupiedScreenSpace::default();
 
+        let timeline_infos = self.timeline.get_timeline_infos();
+
         occupied_screen_space.bottom = egui::TopBottomPanel::bottom("bottom_panel")
             .resizable(true)
             .max_height(600.0)
@@ -354,7 +356,7 @@ impl AppState {
 
                         let timeline_shape_id = info.painter.add(Shape::Noop);
 
-                        let max_y = ui_canvas(&mut self.timeline_state, &info, (min_ms, max_ms));
+                        let max_y = ui_canvas(&mut self.timeline_state, &info, &timeline_infos, (min_ms, max_ms));
                         let mut used_rect = canvas;
                         used_rect.max.y = max_y.max(used_rect.min.y + available_height);
 

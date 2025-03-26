@@ -1,4 +1,4 @@
-use super::{AnimSchedule, Animation, EvalDynamic, ToEvaluator};
+use super::{AnimSchedule, AnimationSpan, EvalDynamic, ToEvaluator};
 use crate::items::Rabject;
 use crate::traits::{Empty, Fill, Interpolatable, Partial, Stroke};
 use crate::utils::rate_functions::smooth;
@@ -10,8 +10,8 @@ pub trait CreationRequirement: Clone + Partial + Empty + Interpolatable {}
 impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 
 pub trait CreationAnim<T: CreationRequirement + 'static> {
-    fn create(&self) -> Animation<T>;
-    fn uncreate(&self) -> Animation<T>;
+    fn create(&self) -> AnimationSpan<T>;
+    fn uncreate(&self) -> AnimationSpan<T>;
 }
 
 pub trait CreationAnimSchedule<'r, 't, T: CreationRequirement + 'static> {
@@ -20,11 +20,11 @@ pub trait CreationAnimSchedule<'r, 't, T: CreationRequirement + 'static> {
 }
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
-    fn create(&self) -> Animation<T> {
-        Animation::from_evaluator(Create::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+    fn create(&self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Create::new(self.clone()).to_evaluator()).with_rate_func(smooth)
     }
-    fn uncreate(&self) -> Animation<T> {
-        Animation::from_evaluator(UnCreate::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+    fn uncreate(&self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(UnCreate::new(self.clone()).to_evaluator()).with_rate_func(smooth)
     }
 }
 
@@ -42,8 +42,8 @@ pub trait WritingRequirement: CreationRequirement + Stroke + Fill {}
 impl<T: CreationRequirement + Stroke + Fill> WritingRequirement for T {}
 
 pub trait WritingAnim<T: WritingRequirement + 'static> {
-    fn write(&self) -> Animation<T>;
-    fn unwrite(&self) -> Animation<T>;
+    fn write(&self) -> AnimationSpan<T>;
+    fn unwrite(&self) -> AnimationSpan<T>;
 }
 
 pub trait WritingAnimSchedule<'r, 't, T: WritingRequirement + 'static> {
@@ -52,11 +52,11 @@ pub trait WritingAnimSchedule<'r, 't, T: WritingRequirement + 'static> {
 }
 
 impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
-    fn write(&self) -> Animation<T> {
-        Animation::from_evaluator(Write::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+    fn write(&self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Write::new(self.clone()).to_evaluator()).with_rate_func(smooth)
     }
-    fn unwrite(&self) -> Animation<T> {
-        Animation::from_evaluator(Unwrite::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+    fn unwrite(&self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Unwrite::new(self.clone()).to_evaluator()).with_rate_func(smooth)
     }
 }
 

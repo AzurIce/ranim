@@ -1,10 +1,13 @@
-use egui::{Align2, PointerButton, Rgba, Stroke, pos2, remap_clamp};
+use egui::{Align2, Color32, PointerButton, Rect, Rgba, Stroke, pos2, remap_clamp};
+
+use crate::{color::palettes::manim, timeline::RabjectTimelineInfo};
 
 use super::{TimelineInfo, TimelineState};
 
 pub fn ui_canvas(
     state: &mut TimelineState,
     info: &TimelineInfo,
+    timeline_infos: &[RabjectTimelineInfo],
     (min_ms, max_ms): (i64, i64),
 ) -> f32 {
     if state.canvas_width_ms <= 0.0 {
@@ -12,6 +15,66 @@ pub fn ui_canvas(
     }
     let mut cursor_y = info.canvas.top();
     cursor_y += info.text_height; // Time labels
+
+    // const MAX_ANIM_CNT: usize = 1000;
+    // let mut cnt = 0;
+    for timeline_info in timeline_infos {
+        // if cnt > MAX_ANIM_CNT {
+        //     break;
+        // }
+        let top_y = cursor_y;
+        for animation_info in &timeline_info.animation_infos {
+            if animation_info.anim_name.as_str() == "Static" {
+                continue;
+            }
+            let start_x = info.point_from_ms(state, (animation_info.start_sec * 1000.0) as i64);
+            let end_x = info.point_from_ms(state, (animation_info.end_sec * 1000.0) as i64);
+
+            if info.canvas.max.x < start_x || end_x < info.canvas.min.x {
+                continue;
+            }
+
+            // cnt += 1;
+            let bottom_y = top_y + 16.0;
+
+            let rect = Rect::from_min_max(pos2(start_x, top_y), pos2(end_x, bottom_y));
+            let rect_color = manim::BLUE_C.to_rgba8();
+
+            info.painter.rect_filled(
+                rect,
+                4.0,
+                egui::Rgba::from_srgba_unmultiplied(
+                    rect_color.r,
+                    rect_color.g,
+                    rect_color.b,
+                    (0.9 * 255.0) as u8,
+                ),
+            );
+
+            let wide_enough_for_text = end_x - start_x > 32.0;
+            if wide_enough_for_text {
+                let text = format!(
+                    "{} {:6.3} s",
+                    animation_info.anim_name,
+                    animation_info.end_sec - animation_info.start_sec
+                );
+
+                let painter = info.painter.with_clip_rect(rect.intersect(info.canvas));
+
+                let pos = pos2(start_x + 4.0, top_y + 0.5 * (16.0 - info.text_height));
+                let pos = painter.round_pos_to_pixels(pos);
+                const TEXT_COLOR: Color32 = Color32::BLACK;
+                painter.text(
+                    pos,
+                    Align2::LEFT_TOP,
+                    text,
+                    info.font_id.clone(),
+                    TEXT_COLOR,
+                );
+            }
+        }
+        cursor_y += 16.0 + 4.0;
+    }
 
     cursor_y
 }
