@@ -20,10 +20,12 @@ pub trait FadingAnimSchedule<'r, 't, T: FadingRequirement + 'static> {
 
 impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
     fn fade_in(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(FadeIn::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(FadeIn::new(self.clone()).to_evaluator())
+            .with_rate_func(smooth)
     }
     fn fade_out(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(FadeOut::new(self.clone()).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(FadeOut::new(self.clone()).to_evaluator())
+            .with_rate_func(smooth)
     }
 }
 

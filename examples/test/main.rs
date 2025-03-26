@@ -78,9 +78,11 @@ fn main() {
     //         ..AppOptions::default()
     //     },
     // );
-    // render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
+    #[cfg(not(feature = "app"))]
+    render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
 
     // reuires "app" feature
+    #[cfg(feature = "app")]
     run_scene_app(TestScene);
     // TestScene.render(&AppOptions {
     //     frame_rate: 60,

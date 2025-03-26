@@ -1,10 +1,6 @@
 use ranim::{
-    AppOptions,
-    animation::fading::{FadingAnim, FadingAnimSchedule},
-    color::palettes::manim,
-    items::vitem::Square,
-    prelude::*,
-    render_scene,
+    AppOptions, animation::fading::FadingAnimSchedule, color::palettes::manim,
+    items::vitem::Square, prelude::*, render_scene,
 };
 
 #[scene]
@@ -21,7 +17,8 @@ impl TimelineConstructor for GettingStarted1Scene {
 
         let mut square = timeline.insert(square);
         #[allow(deprecated)]
-        timeline.play(square.fade_in().chain(|data| data.fade_out()));
+        timeline.play(square.fade_in());
+        timeline.play(square.fade_out());
     }
 }
 
