@@ -1,4 +1,4 @@
-use egui::{Align2, Color32, PointerButton, Rect, Rgba, Stroke, pos2, remap_clamp};
+use egui::{emath::GuiRounding, pos2, remap_clamp, Align2, Color32, PointerButton, Rect, Rgba, Stroke};
 
 use crate::{color::palettes::manim, timeline::RabjectTimelineInfo};
 
@@ -10,19 +10,22 @@ pub fn ui_canvas(
     timeline_infos: &[RabjectTimelineInfo],
     (min_ms, max_ms): (i64, i64),
 ) -> f32 {
+    let line_height = 16.0;
+    let gap = 4.0;
+
     if state.canvas_width_ms <= 0.0 {
         state.canvas_width_ms = (max_ms - min_ms) as f32;
     }
-    let mut cursor_y = info.canvas.top();
-    cursor_y += info.text_height; // Time labels
+    let mut start_y = info.canvas.top();
+    start_y += info.text_height; // Time labels
+    let end_y = start_y + timeline_infos.len() as f32 * (line_height + gap);
 
-    // const MAX_ANIM_CNT: usize = 1000;
-    // let mut cnt = 0;
-    for timeline_info in timeline_infos {
-        // if cnt > MAX_ANIM_CNT {
-        //     break;
-        // }
-        let top_y = cursor_y;
+    for (idx, timeline_info) in timeline_infos.iter().enumerate() {
+        let local_y = idx as f32 * (line_height + gap);
+
+        let top_y = start_y + local_y;
+        let bottom_y = top_y + line_height;
+
         for animation_info in &timeline_info.animation_infos {
             if animation_info.anim_name.as_str() == "Static" {
                 continue;
@@ -33,9 +36,6 @@ pub fn ui_canvas(
             if info.canvas.max.x < start_x || end_x < info.canvas.min.x {
                 continue;
             }
-
-            // cnt += 1;
-            let bottom_y = top_y + 16.0;
 
             let rect = Rect::from_min_max(pos2(start_x, top_y), pos2(end_x, bottom_y));
             let rect_color = manim::BLUE_C.to_rgba8();
@@ -62,7 +62,7 @@ pub fn ui_canvas(
                 let painter = info.painter.with_clip_rect(rect.intersect(info.canvas));
 
                 let pos = pos2(start_x + 4.0, top_y + 0.5 * (16.0 - info.text_height));
-                let pos = painter.round_pos_to_pixels(pos);
+                let pos = pos.round_to_pixels(painter.pixels_per_point());
                 const TEXT_COLOR: Color32 = Color32::BLACK;
                 painter.text(
                     pos,
@@ -73,10 +73,9 @@ pub fn ui_canvas(
                 );
             }
         }
-        cursor_y += 16.0 + 4.0;
     }
 
-    cursor_y
+    end_y
 }
 
 pub fn interact_with_canvas(state: &mut TimelineState, info: &TimelineInfo) {

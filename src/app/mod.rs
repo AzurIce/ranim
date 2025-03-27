@@ -16,17 +16,9 @@ use winit::{
 };
 
 use crate::{
-    Scene, SceneMeta,
-    animation::EvalResult,
-    build_timeline,
-    context::{RanimContext, WgpuContext},
-    prelude::RanimTimeline,
-    render::{
-        Renderer,
-        pipelines::app::{AppPipeline, Viewport},
-        primitives::RenderInstances,
-    },
-    timeline::TimelineEvalResult,
+    animation::EvalResult, build_timeline, context::{RanimContext, WgpuContext}, prelude::RanimTimeline, render::{
+        pipelines::app::{AppPipeline, Viewport}, primitives::RenderInstances, Renderer
+    }, timeline::{RabjectTimelineInfo, TimelineEvalResult}, Scene, SceneMeta
 };
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -186,6 +178,7 @@ struct WinitApp {
 struct AppState {
     meta: SceneMeta,
     timeline: RanimTimeline,
+    timeline_infos: Vec<RabjectTimelineInfo>,
     // app_options: AppOptions<'a>,
     // timeline: RanimTimeline,
     renderer: Renderer,
@@ -199,7 +192,6 @@ struct AppState {
 struct TimelineState {
     canvas_width_ms: f32,
     sideways_pan_in_points: f32,
-    grid_spacing_ms: f32,
 }
 
 impl Default for TimelineState {
@@ -207,7 +199,6 @@ impl Default for TimelineState {
         Self {
             canvas_width_ms: 0.0,
             sideways_pan_in_points: 0.0,
-            grid_spacing_ms: 1.0,
         }
     }
 }
@@ -215,6 +206,7 @@ impl Default for TimelineState {
 struct TimelineInfo {
     ctx: egui::Context,
     canvas: egui::Rect,
+    available_height: f32,
     response: egui::Response,
     painter: egui::Painter,
     text_height: f32,
@@ -316,8 +308,6 @@ impl AppState {
         let scale_factor = state.scale_factor;
         let mut occupied_screen_space = OccupiedScreenSpace::default();
 
-        let timeline_infos = self.timeline.get_timeline_infos();
-
         occupied_screen_space.bottom = egui::TopBottomPanel::bottom("bottom_panel")
             .resizable(true)
             .max_height(600.0)
@@ -346,6 +336,7 @@ impl AppState {
                         let info = TimelineInfo {
                             ctx: ui.ctx().clone(),
                             canvas,
+                            available_height,
                             response,
                             painter: ui.painter_at(canvas),
                             start_ms: min_ms,
@@ -361,7 +352,7 @@ impl AppState {
                         let max_y = ui_canvas(
                             &mut self.timeline_state,
                             &info,
-                            &timeline_infos,
+                            &self.timeline_infos,
                             (min_ms, max_ms),
                         );
                         let mut used_rect = canvas;
@@ -420,10 +411,12 @@ impl AppState {
     fn new(ctx: &RanimContext, scene: impl Scene) -> Self {
         let meta = scene.meta();
         let timeline = build_timeline(scene);
+        let timeline_infos = timeline.get_timeline_infos();
         let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
         Self {
             meta,
             timeline,
+            timeline_infos,
             renderer,
             current_sec: 0.0,
             last_sec: -1.0,
