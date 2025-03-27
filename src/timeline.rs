@@ -239,12 +239,12 @@ impl RanimTimeline {
         }
     }
     pub fn get_timeline_infos(&self) -> Vec<RabjectTimelineInfo> {
-        const MAX_TIMELINE_CNT: usize = 100;
+        // const MAX_TIMELINE_CNT: usize = 100;
         self.timelines
             .borrow()
             .iter()
             .enumerate()
-            .take(MAX_TIMELINE_CNT)
+            // .take(MAX_TIMELINE_CNT)
             .map(|(id, timeline)| RabjectTimelineInfo {
                 id,
                 type_name: timeline.type_name().to_string(),
@@ -345,7 +345,7 @@ impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
         self.end_secs.push(end_sec);
     }
     fn get_animation_infos(&self) -> Vec<AnimationInfo> {
-        const MAX_INFO_CNT: usize = 100;
+        // const MAX_INFO_CNT: usize = 100;
         self.animations
             .iter()
             .enumerate()
@@ -356,7 +356,7 @@ impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
                     end_sec: self.end_secs[idx] - anim.padding.1,
                 })
             })
-            .take(MAX_INFO_CNT)
+            // .take(MAX_INFO_CNT)
             .collect()
     }
     fn type_name(&self) -> &str {
