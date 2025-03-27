@@ -1,4 +1,6 @@
-use egui::{emath::GuiRounding, pos2, remap_clamp, Align2, Color32, PointerButton, Rect, Rgba, Stroke};
+use egui::{
+    Align2, Color32, PointerButton, Rect, Rgba, Stroke, emath::GuiRounding, pos2, remap_clamp,
+};
 
 use crate::{color::palettes::manim, timeline::RabjectTimelineInfo};
 

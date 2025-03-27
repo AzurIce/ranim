@@ -16,9 +16,17 @@ use winit::{
 };
 
 use crate::{
-    animation::EvalResult, build_timeline, context::{RanimContext, WgpuContext}, prelude::RanimTimeline, render::{
-        pipelines::app::{AppPipeline, Viewport}, primitives::RenderInstances, Renderer
-    }, timeline::{RabjectTimelineInfo, TimelineEvalResult}, Scene, SceneMeta
+    Scene, SceneMeta,
+    animation::EvalResult,
+    build_timeline,
+    context::{RanimContext, WgpuContext},
+    prelude::RanimTimeline,
+    render::{
+        Renderer,
+        pipelines::app::{AppPipeline, Viewport},
+        primitives::RenderInstances,
+    },
+    timeline::{RabjectTimelineInfo, TimelineEvalResult},
 };
 
 #[derive(Default, Debug, Clone, Copy)]
