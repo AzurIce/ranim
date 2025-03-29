@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.9] - 2025-03-29
+
+### 🚀 Features
+
+- Clamp the timeline zoom to 100ms~total_sec
+
 ## [0.1.0-alpha.8] - 2025-03-29
 
 ### 🚀 Features
@@ -38,6 +44,10 @@ All notable changes to this project will be documented in this file.
 - Fix lint
 - Fix lint
 - Lint
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.1.0-alpha.7] - 2025-03-19
 
