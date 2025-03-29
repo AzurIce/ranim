@@ -5,19 +5,14 @@ pub mod manim {
 
     use crate::color::rgb;
 
-    /// #1C758A
     /// <div style="background-color: #1C758A; width: 10px; padding: 10px; border: 1px solid;"></div>
     pub const BLUE_E: AlphaColor<Srgb> = rgb(0.11, 0.46, 0.54);
-    /// #29ABCA
     /// <div style="background-color: #29ABCA; width: 10px; padding: 10px; border: 1px solid;"></div>
     pub const BLUE_D: AlphaColor<Srgb> = rgb(0.16, 0.67, 0.79);
-    /// #58C4DD
     /// <div style="background-color: #58C4DD; width: 10px; padding: 10px; border: 1px solid;"></div>
     pub const BLUE_C: AlphaColor<Srgb> = rgb(0.35, 0.77, 0.87);
-    /// #9CDCEB
     /// <div style="background-color: #9CDCEB; width: 10px; padding: 10px; border: 1px solid;"></div>
     pub const BLUE_B: AlphaColor<Srgb> = rgb(0.61, 0.86, 0.92);
-    /// #C7E9F1
     /// <div style="background-color: #C7E9F1; width: 10px; padding: 10px; border: 1px solid;"></div>
     pub const BLUE_A: AlphaColor<Srgb> = rgb(0.78, 0.91, 0.95);
 
