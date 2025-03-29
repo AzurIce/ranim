@@ -23,6 +23,7 @@ ranim-macros = { path = "packages/ranim-macros", version = "0.1.0-alpha.7" }
 
 [features]
 profiling = ["dep:wgpu-profiler", "dep:puffin", "dep:puffin_http", "dep:profiling"]
+app = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:winit"]
 
 [dependencies]
 ranim-macros.workspace = true
@@ -46,6 +47,11 @@ puffin = { version = "0.19.1", optional = true }
 puffin_http = { version = "0.16.1", optional = true }
 wgpu-profiler = { version = "0.22.0", optional = true, features = ["puffin"] }
 profiling = { version = "1.0.16", optional = true, features = ["profile-with-puffin"] }
+
+egui = { version = "0.31.1", optional = true }
+egui-wgpu = { version = "0.31.1", features = ["winit"], optional = true }
+egui-winit = { version = "0.31.1", optional = true }
+winit = { version = "0.30.9", optional = true }
 
 [dev-dependencies]
 rand = "0.9.0"

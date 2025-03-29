@@ -11,13 +11,19 @@ use crate::{
 
 #[allow(unused)]
 use log::trace;
-use std::{fmt::Debug, iter::Once, rc::Rc};
+use std::{any::Any, fmt::Debug, iter::Once, rc::Rc};
 
 // MARK: Eval
 
 pub trait EvalDynamic<T> {
     fn eval_alpha(&self, alpha: f64) -> T;
 }
+
+// impl<T: EntityTimelineStaticState + EvalDynamic<T>> EvalDynamic<T::StateType> for T {
+//     fn eval_alpha(&self, alpha: f64) -> T::StateType {
+//         EvalDynamic::<T>::eval_alpha(self, alpha).into_state_type()
+//     }
+// }
 
 pub trait ToEvaluator<T> {
     fn to_evaluator(self) -> Evaluator<T>
@@ -35,20 +41,31 @@ impl<T: EvalDynamic<E>, E: 'static> ToEvaluator<E> for T {
 }
 
 pub enum Evaluator<T> {
-    Dynamic(Box<dyn EvalDynamic<T>>),
+    Dynamic {
+        type_name: String,
+        inner: Box<dyn EvalDynamic<T>>,
+    },
     Static(Rc<T>),
 }
 
-impl<T> From<Box<dyn EvalDynamic<T>>> for Evaluator<T> {
-    fn from(value: Box<dyn EvalDynamic<T>>) -> Self {
-        Self::Dynamic(value)
-    }
-}
-
 impl<T> Evaluator<T> {
-    pub fn new_dynamic<F: EvalDynamic<T> + 'static>(func: F) -> Self {
-        Self::Dynamic(Box::new(func))
+    // Any is for type name
+    pub fn new_dynamic<F: EvalDynamic<T> + Any + 'static>(func: F) -> Self {
+        let type_name = std::any::type_name::<F>().to_string();
+        Self::Dynamic {
+            type_name,
+            inner: Box::new(func),
+        }
     }
+
+    // // Any is for type name
+    // pub fn from_eval_dynamic<F: EvalDynamic<T> + Any + 'static>(func: F) -> Self {
+    //     let type_name = std::any::type_name::<F>().to_string();
+    //     Self::Dynamic {
+    //         type_name,
+    //         inner: Box::new(func),
+    //     }
+    // }
 }
 
 #[derive(Debug)]
@@ -73,7 +90,10 @@ pub trait Eval<T> {
 impl<T> Eval<T> for Evaluator<T> {
     fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
         match self {
-            Self::Dynamic(e) => EvalResult::Dynamic(e.eval_alpha(alpha)),
+            Self::Dynamic {
+                inner,
+                type_name: _,
+            } => EvalResult::Dynamic(inner.eval_alpha(alpha)),
             Self::Static(e) => EvalResult::Static(e.clone()),
         }
     }
@@ -93,62 +113,15 @@ impl<T: EntityTimelineStaticState + Clone + 'static> Eval<T::StateType> for Eval
 }
 
 // MARK: Animation
-
-pub struct ChainedAnimation<T> {
-    anims: Vec<Animation<T>>,
-    end_secs: Vec<f64>,
-}
-
-impl<T> ChainedAnimation<T> {
-    /// len >= 1
-    pub fn new(anims: Vec<Animation<T>>) -> Self {
-        let mut end_secs = Vec::with_capacity(anims.len());
-        let mut sum = 0.0;
-        anims
-            .iter()
-            .map(|anim| anim.span_len())
-            .for_each(|duration| {
-                sum += duration;
-                end_secs.push(sum);
-            });
-
-        Self { anims, end_secs }
-    }
-}
-
-impl<T> Eval<T> for ChainedAnimation<T> {
-    fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
-        let inner_global_sec = self.end_secs.last().unwrap() * alpha;
-
-        let (anim, end_sec) = self
-            .anims
-            .iter()
-            .zip(self.end_secs.iter())
-            .find(|&(_, end_sec)| *end_sec >= inner_global_sec)
-            .unwrap();
-        anim.eval_sec(inner_global_sec - end_sec + anim.span_len())
-    }
-}
-
-impl<T: 'static> From<ChainedAnimation<T>> for Animation<T> {
-    fn from(value: ChainedAnimation<T>) -> Self {
-        Self {
-            duration_secs: value.end_secs.last().cloned().unwrap(),
-            evaluator: Box::new(value),
-            padding: (0.0, 0.0),
-            rate_func: linear,
-        }
-    }
-}
-
-pub struct Animation<T> {
-    evaluator: Box<dyn Eval<T>>,
+pub struct AnimationSpan<T> {
+    pub(crate) type_name: String,
+    pub(crate) evaluator: Box<dyn Eval<T>>,
     pub(crate) rate_func: fn(f64) -> f64,
     pub(crate) duration_secs: f64,
     pub(crate) padding: (f64, f64),
 }
 
-impl<T> Debug for Animation<T> {
+impl<T> Debug for AnimationSpan<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -158,9 +131,10 @@ impl<T> Debug for Animation<T> {
     }
 }
 
-impl<T: EntityTimelineStaticState + Clone + 'static> Animation<T> {
-    pub fn into_state_type(self) -> Animation<T::StateType> {
-        Animation {
+impl<T: EntityTimelineStaticState + Clone + 'static> AnimationSpan<T> {
+    pub fn into_state_type(self) -> AnimationSpan<T::StateType> {
+        AnimationSpan {
+            type_name: self.type_name,
             evaluator: Box::new(EvalAdapter {
                 inner: self.evaluator,
             }),
@@ -171,9 +145,13 @@ impl<T: EntityTimelineStaticState + Clone + 'static> Animation<T> {
     }
 }
 
-impl<T: 'static> Animation<T> {
+impl<T: 'static> AnimationSpan<T> {
     pub fn from_evaluator(evaluator: Evaluator<T>) -> Self {
         Self {
+            type_name: match &evaluator {
+                Evaluator::Dynamic { type_name, .. } => type_name.clone(),
+                Evaluator::Static(_) => "Static".to_string(),
+            },
             evaluator: Box::new(evaluator),
             rate_func: linear,
             duration_secs: 1.0,
@@ -182,7 +160,7 @@ impl<T: 'static> Animation<T> {
     }
 }
 
-impl<T> Animation<T> {
+impl<T> AnimationSpan<T> {
     pub fn span_len(&self) -> f64 {
         self.duration_secs + self.padding.0 + self.padding.1
     }
@@ -224,7 +202,7 @@ impl<T> Animation<T> {
 /// The rabject's data won't change unless you call [`AnimSchedule::apply`].
 pub struct AnimSchedule<'r, 't, T> {
     pub(crate) rabject: &'r mut Rabject<'t, T>,
-    pub(crate) anim: Animation<T>,
+    pub(crate) anim: AnimationSpan<T>,
 }
 
 impl<T> Debug for AnimSchedule<'_, '_, T> {
@@ -238,7 +216,7 @@ impl<T> Debug for AnimSchedule<'_, '_, T> {
 }
 
 impl<'r, 't, T: 'static> AnimSchedule<'r, 't, T> {
-    pub fn new(rabject: &'r mut Rabject<'t, T>, anim: Animation<T>) -> Self {
+    pub fn new(rabject: &'r mut Rabject<'t, T>, anim: AnimationSpan<T>) -> Self {
         Self { rabject, anim }
     }
 }
@@ -316,20 +294,6 @@ impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
             *padding_end *= ratio;
         });
         self
-    }
-}
-
-impl<T: Clone + 'static> AnimSchedule<'_, '_, T> {
-    #[deprecated]
-    pub fn chain(self, anim_builder: impl FnOnce(T) -> Animation<T>) -> Self {
-        let AnimSchedule { rabject, anim } = self;
-        let data = anim.eval_alpha(1.0).into_owned();
-        let next_anim = (anim_builder)(data);
-        let chained_anim = ChainedAnimation::new(vec![anim, next_anim]);
-        Self {
-            rabject,
-            anim: chained_anim.into(),
-        }
     }
 }
 

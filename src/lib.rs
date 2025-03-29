@@ -23,6 +23,8 @@ use render::{Renderer, primitives::RenderInstances};
 pub mod prelude {
     pub use crate::Ranim;
 
+    #[cfg(feature = "app")]
+    pub use crate::app::run_scene_app;
     pub use crate::{AppOptions, render_scene, render_scene_at_sec};
     pub use crate::{SceneMetaTrait, TimelineConstructor};
     pub use ranim_macros::scene;
@@ -44,6 +46,8 @@ pub mod timeline;
 pub mod traits;
 
 pub mod animation;
+#[cfg(feature = "app")]
+pub mod app;
 pub mod components;
 pub mod context;
 pub mod items;
