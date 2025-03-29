@@ -60,6 +60,20 @@ cargo run --example <example-name>
 
 and you can use `--release` flag for faster rendering.
 
+## Feature Flags
+
+- `app`: enable the preview app api
+  
+  use `run_scene_app` API to launch an preview app on a scene
+  
+  https://github.com/user-attachments/assets/5bf287e2-b06f-42f8-83b6-76f3775e298e
+- `profiling`: enable profiling with https://github.com/EmbarkStudios/puffin
+
+  CPU uses `127.0.0.1:8585` and GPU uses `127.0.0.1:8586`
+  
+  ![image](https://github.com/user-attachments/assets/36bf841c-e30f-45cc-adbc-bd4bfff9bc4c)
+   
+
 ## Design
 
 Once the design is stablized, I may write about it.
