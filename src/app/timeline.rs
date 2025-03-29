@@ -25,6 +25,69 @@ impl TimelineState {
             timeline_infos,
         }
     }
+    pub fn ui_preview_timeline(&mut self, ui: &mut egui::Ui) {
+        const PREVIEW_HEIGHT: f32 = 30.0;
+
+        Frame::canvas(ui.style()).show(ui, |ui| {
+            let mut rect = ui.available_rect_before_wrap();
+            // rect.set_bottom(ui.min_rect().bottom());
+            rect.set_height(PREVIEW_HEIGHT);
+
+            let font_id = TextStyle::Body.resolve(ui.style());
+            let painter = ui.painter_at(rect);
+            let shape_id = painter.add(Shape::Noop);
+            painter.set(
+                shape_id,
+                Shape::Vec(paint_time_grid(
+                    rect,
+                    &painter,
+                    font_id,
+                    (self.total_sec * 1000.0) as i64,
+                    (self.current_sec * 1000.0) as i64,
+                )),
+            );
+
+            ui.allocate_rect(rect, egui::Sense::hover());
+        });
+    }
+
+    pub fn interact_preview_timeline(&mut self, info: &TimelineInfo) {
+        let response = &info.response;
+
+        if response.clicked() {
+            if let Some(mouse_pos) = response.hover_pos() {}
+        }
+
+        // if response.drag_delta().x != 0.0 {
+        //     self.offset_points += response.drag_delta().x;
+        // }
+
+        // if response.hovered() {
+        //     let mut zoom_factor = info.ctx.input(|i| i.zoom_delta_2d().x);
+
+        //     if response.dragged_by(PointerButton::Secondary) {
+        //         let delta = (response.drag_delta().y * 0.01).exp();
+        //         // dbg!(delta);
+        //         zoom_factor *= delta;
+        //     }
+
+        //     // dbg!(state.canvas_width_ms);
+        //     if zoom_factor != 1.0 {
+        //         self.width_sec /= zoom_factor as f64;
+        //         if let Some(mouse_pos) = response.hover_pos() {
+        //             let zoom_center = mouse_pos.x - info.canvas.min.x;
+        //             self.offset_points =
+        //                 (self.offset_points - zoom_center) * zoom_factor + zoom_center;
+        //         }
+        //     }
+        // }
+
+        // // Reset view
+        // if response.double_clicked() {
+        //     // TODO
+        // }
+    }
+
     pub fn ui_main_timeline(&mut self, ui: &mut egui::Ui) {
         Frame::canvas(ui.style()).show(ui, |ui| {
             let available_height = ui.max_rect().bottom() - ui.min_rect().bottom();
@@ -40,7 +103,6 @@ impl TimelineState {
                 let info = TimelineInfo {
                     ctx: ui.ctx().clone(),
                     canvas,
-                    available_height,
                     response,
                     painter: ui.painter_at(canvas),
                     text_height: 15.0,
@@ -88,7 +150,10 @@ impl TimelineState {
 
             // dbg!(state.canvas_width_ms);
             if zoom_factor != 1.0 {
+                let old_width_sec = self.width_sec;
                 self.width_sec /= zoom_factor as f64;
+                self.width_sec = self.width_sec.clamp(100.0 / 1000.0, self.total_sec);
+                zoom_factor = (old_width_sec / self.width_sec) as f32;
                 if let Some(mouse_pos) = response.hover_pos() {
                     let zoom_center = mouse_pos.x - info.canvas.min.x;
                     self.offset_points =
@@ -168,6 +233,110 @@ pub fn ui_canvas(state: &mut TimelineState, info: &TimelineInfo) -> f32 {
     }
 
     end_y
+}
+
+pub fn paint_time_grid(
+    rect: egui::Rect,
+    painter: &egui::Painter,
+    font_id: egui::FontId,
+    width_ms: i64,
+    current_ms: i64,
+) -> Vec<egui::Shape> {
+    if width_ms <= 0 {
+        return vec![];
+    }
+
+    let mut shapes = vec![];
+
+    let alpha_multiplier = 0.3;
+
+    // The maximum number of lines, 4 pixels gap
+    let max_lines = (rect.width() / 4.0).floor() as i64;
+    // The minimum grid spacing, 1 ms
+    let mut grid_spacing_ms = 1;
+    // Increase the grid spacing until it's less than the maximum number of lines
+    while width_ms / grid_spacing_ms > max_lines as i64 {
+        grid_spacing_ms *= 10;
+    }
+
+    let num_tiny_lines = width_ms / grid_spacing_ms;
+    let zoom_factor = remap_clamp(
+        num_tiny_lines as f32,
+        (0.1 * max_lines as f32)..=max_lines as f32,
+        1.0..=0.0,
+    );
+    let zoom_factor = zoom_factor * zoom_factor;
+    let big_alpha = remap_clamp(zoom_factor, 0.0..=1.0, 0.5..=1.0);
+    let medium_alpha = remap_clamp(zoom_factor, 0.0..=1.0, 0.1..=0.5);
+    let tiny_alpha = remap_clamp(zoom_factor, 0.0..=1.0, 0.0..=0.1);
+
+    let ppms = rect.width() / width_ms as f32;
+    (0..num_tiny_lines).for_each(|i| {
+        let ms = grid_spacing_ms * i;
+        let line_x = rect.min.x + ms as f32 * ppms;
+
+        let big_line = ms % (grid_spacing_ms * 100) == 0;
+        let medium_line = ms % (grid_spacing_ms * 10) == 0;
+
+        let line_alpha = if big_line {
+            big_alpha
+        } else if medium_line {
+            medium_alpha
+        } else {
+            tiny_alpha
+        };
+
+        shapes.push(egui::Shape::line_segment(
+            [pos2(line_x, rect.min.y), pos2(line_x, rect.max.y)],
+            Stroke::new(1.0, Rgba::from_white_alpha(line_alpha * alpha_multiplier)),
+        ));
+
+        let text_alpha = if big_line {
+            medium_alpha
+        } else if medium_line {
+            tiny_alpha
+        } else {
+            0.0
+        };
+
+        if text_alpha > 0.0 {
+            let text = grid_text(ms);
+            let text_x = line_x + 4.0;
+            let text_color = Rgba::from_white_alpha((text_alpha * 2.0).min(1.0)).into();
+            // Timestamp on top
+            painter.fonts(|f| {
+                shapes.push(egui::Shape::text(
+                    f,
+                    pos2(text_x, rect.min.y),
+                    Align2::LEFT_TOP,
+                    &text,
+                    font_id.clone(),
+                    text_color,
+                ));
+            });
+            // Timestamp on bottom
+            painter.fonts(|f| {
+                shapes.push(egui::Shape::text(
+                    f,
+                    pos2(text_x, rect.max.y - 12.0),
+                    Align2::LEFT_TOP,
+                    &text,
+                    font_id.clone(),
+                    text_color,
+                ));
+            });
+        }
+    });
+
+    let current_line_x = current_ms as f32 * ppms;
+    shapes.push(egui::Shape::line_segment(
+        [
+            pos2(current_line_x, rect.min.y),
+            pos2(current_line_x, rect.max.y),
+        ],
+        Stroke::new(1.0, Rgba::from_white_alpha(alpha_multiplier)),
+    ));
+    shapes
 }
 
 pub fn paint_timeline(
