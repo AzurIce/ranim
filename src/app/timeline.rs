@@ -1,28 +1,118 @@
 use egui::{
-    Align2, Color32, PointerButton, Rect, Rgba, Stroke, emath::GuiRounding, pos2, remap_clamp,
+    Align2, Color32, Frame, PointerButton, Rect, Rgba, ScrollArea, Shape, Stroke, TextStyle,
+    emath::GuiRounding, pos2, remap_clamp,
 };
 
 use crate::{color::palettes::manim, timeline::RabjectTimelineInfo};
 
-use super::{TimelineInfo, TimelineState};
+use super::TimelineInfo;
 
-pub fn ui_canvas(
-    state: &mut TimelineState,
-    info: &TimelineInfo,
-    timeline_infos: &[RabjectTimelineInfo],
-    (min_ms, max_ms): (i64, i64),
-) -> f32 {
+pub(super) struct TimelineState {
+    pub(super) total_sec: f64,
+    pub(super) current_sec: f64,
+    pub(super) width_sec: f64,
+    pub(super) offset_points: f32,
+    pub(super) timeline_infos: Vec<RabjectTimelineInfo>,
+}
+
+impl TimelineState {
+    pub fn new(total_sec: f64, timeline_infos: Vec<RabjectTimelineInfo>) -> Self {
+        Self {
+            total_sec,
+            current_sec: 0.0,
+            width_sec: total_sec,
+            offset_points: 0.0,
+            timeline_infos,
+        }
+    }
+    pub fn ui_main_timeline(&mut self, ui: &mut egui::Ui) {
+        Frame::canvas(ui.style()).show(ui, |ui| {
+            let available_height = ui.max_rect().bottom() - ui.min_rect().bottom();
+            ScrollArea::vertical().show(ui, |ui| {
+                let mut canvas = ui.available_rect_before_wrap();
+                canvas.max.y = f32::INFINITY;
+
+                let response = ui.interact(
+                    canvas,
+                    ui.id().with("canvas"),
+                    egui::Sense::click_and_drag(),
+                );
+                let info = TimelineInfo {
+                    ctx: ui.ctx().clone(),
+                    canvas,
+                    available_height,
+                    response,
+                    painter: ui.painter_at(canvas),
+                    text_height: 15.0,
+                    font_id: TextStyle::Body.resolve(ui.style()),
+                };
+
+                self.interact_main_timeline(&info);
+
+                let timeline_shape_id = info.painter.add(Shape::Noop);
+
+                let max_y = ui_canvas(self, &info);
+                let mut used_rect = canvas;
+                used_rect.max.y = max_y.max(used_rect.min.y + available_height);
+
+                info.painter.set(
+                    timeline_shape_id,
+                    Shape::Vec(paint_timeline(
+                        &info,
+                        used_rect,
+                        &self,
+                        (self.current_sec * 1000.0) as i64,
+                    )),
+                );
+
+                ui.allocate_rect(used_rect, egui::Sense::hover());
+            });
+        });
+    }
+
+    pub fn interact_main_timeline(&mut self, info: &TimelineInfo) {
+        let response = &info.response;
+
+        if response.drag_delta().x != 0.0 {
+            self.offset_points += response.drag_delta().x;
+        }
+
+        if response.hovered() {
+            let mut zoom_factor = info.ctx.input(|i| i.zoom_delta_2d().x);
+
+            if response.dragged_by(PointerButton::Secondary) {
+                let delta = (response.drag_delta().y * 0.01).exp();
+                // dbg!(delta);
+                zoom_factor *= delta;
+            }
+
+            // dbg!(state.canvas_width_ms);
+            if zoom_factor != 1.0 {
+                self.width_sec /= zoom_factor as f64;
+                if let Some(mouse_pos) = response.hover_pos() {
+                    let zoom_center = mouse_pos.x - info.canvas.min.x;
+                    self.offset_points =
+                        (self.offset_points - zoom_center) * zoom_factor + zoom_center;
+                }
+            }
+        }
+
+        // Reset view
+        if response.double_clicked() {
+            // TODO
+        }
+    }
+}
+
+pub fn ui_canvas(state: &mut TimelineState, info: &TimelineInfo) -> f32 {
     let line_height = 16.0;
     let gap = 4.0;
 
-    if state.canvas_width_ms <= 0.0 {
-        state.canvas_width_ms = (max_ms - min_ms) as f32;
-    }
     let mut start_y = info.canvas.top();
     start_y += info.text_height; // Time labels
-    let end_y = start_y + timeline_infos.len() as f32 * (line_height + gap);
+    let end_y = start_y + state.timeline_infos.len() as f32 * (line_height + gap);
 
-    for (idx, timeline_info) in timeline_infos.iter().enumerate() {
+    for (idx, timeline_info) in state.timeline_infos.iter().enumerate() {
         let local_y = idx as f32 * (line_height + gap);
 
         let top_y = start_y + local_y;
@@ -80,67 +170,34 @@ pub fn ui_canvas(
     end_y
 }
 
-pub fn interact_with_canvas(state: &mut TimelineState, info: &TimelineInfo) {
-    let response = &info.response;
-
-    if response.drag_delta().x != 0.0 {
-        state.sideways_pan_in_points += response.drag_delta().x;
-    }
-
-    if response.hovered() {
-        let mut zoom_factor = info.ctx.input(|i| i.zoom_delta_2d().x);
-
-        if response.dragged_by(PointerButton::Secondary) {
-            let delta = (response.drag_delta().y * 0.01).exp();
-            // dbg!(delta);
-            zoom_factor *= delta;
-        }
-
-        // dbg!(state.canvas_width_ms);
-        if zoom_factor != 1.0 {
-            state.canvas_width_ms /= zoom_factor;
-            if let Some(mouse_pos) = response.hover_pos() {
-                let zoom_center = mouse_pos.x - info.canvas.min.x;
-                state.sideways_pan_in_points =
-                    (state.sideways_pan_in_points - zoom_center) * zoom_factor + zoom_center;
-            }
-        }
-    }
-
-    // Reset view
-    if response.double_clicked() {
-        // TODO
-    }
-}
-
 pub fn paint_timeline(
     info: &TimelineInfo,
     rect: egui::Rect,
     state: &TimelineState,
-    start_ms: i64,
     current_ms: i64,
 ) -> Vec<egui::Shape> {
     let mut shapes = vec![];
 
-    if state.canvas_width_ms <= 0.0 {
+    if state.width_sec <= 0.0 {
         return shapes;
     }
 
     let alpha_multiplier = 0.3;
 
+    let start_ms = 0;
     // The maximum number of lines, 4 pixels gap
     let max_lines = rect.width() / 4.0;
     // The minimum grid spacing, 1 ms
     let mut grid_spacing_ms = 1;
     // Increase the grid spacing until it's less than the maximum number of lines
-    while state.canvas_width_ms / (grid_spacing_ms as f32) > max_lines {
+    while state.width_sec as f32 * 1000.0 / grid_spacing_ms as f32 > max_lines {
         grid_spacing_ms *= 10;
     }
     // dbg!(state.sideways_pan_in_points);
     // dbg!(state.canvas_width_ms);
     // dbg!(grid_spacing_ms);
 
-    let num_tiny_lines = state.canvas_width_ms / grid_spacing_ms as f32;
+    let num_tiny_lines = state.width_sec as f32 * 1000.0 / grid_spacing_ms as f32;
     let zoom_factor = remap_clamp(num_tiny_lines, (0.1 * max_lines)..=max_lines, 1.0..=0.0);
     let zoom_factor = zoom_factor * zoom_factor;
     let big_alpha = remap_clamp(zoom_factor, 0.0..=1.0, 0.5..=1.0);
