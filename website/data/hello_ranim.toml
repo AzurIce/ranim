@@ -34,11 +34,16 @@ impl TimelineConstructor for HelloRanimScene {\r
 }\r
 \r
 fn main() {\r
-    render_scene(HelloRanimScene, &AppOptions::default());\r
-    render_scene_at_sec(HelloRanimScene, 0.0, \"preview.png\", &AppOptions::default());\r
+    #[cfg(feature = \"app\")]\r
+    run_scene_app(HelloRanimScene);\r
+    #[cfg(not(feature = \"app\"))]\r
+    {\r
+        render_scene(HelloRanimScene, &AppOptions::default());\r
+        render_scene_at_sec(HelloRanimScene, 0.0, \"preview.png\", &AppOptions::default());\r
+    }\r
 }\r
 
 ```"""
-hash = "dacb17855d87fcf7bf0fe68b3969731f883b6d1f"
+hash = "17291d991387513e36b520cee0f4c287391f9d46"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]

@@ -83,16 +83,28 @@ use std::ops::{Deref, DerefMut};
 ///     });
 /// ```
 ///
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Group<T>(pub Vec<T>);
 
 impl<T> Group<T> {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, T> {
         self.0.iter()
     }
 
     pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
         self.0.iter_mut()
+    }
+
+    pub fn pop(&mut self) -> Option<T> {
+        self.0.pop()
+    }
+
+    pub fn push(&mut self, item: T) {
+        self.0.push(item);
     }
 }
 
