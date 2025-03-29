@@ -13,13 +13,13 @@ keywords = ["animation", "manim", "wgpu"]
 members = ["packages/*", "xtasks/*"]
 
 [workspace.package]
-version = "0.1.0-alpha.7"
+version = "0.1.0-alpha.8"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/AzurIce/ranim"
 
 [workspace.dependencies]
-ranim-macros = { path = "packages/ranim-macros", version = "0.1.0-alpha.7" }
+ranim-macros = { path = "packages/ranim-macros", version = "0.1.0-alpha.8" }
 
 [features]
 profiling = ["dep:wgpu-profiler", "dep:puffin", "dep:puffin_http", "dep:profiling"]

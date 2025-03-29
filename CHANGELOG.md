@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.8] - 2025-03-29
+
+### 🚀 Features
+
+- Added scale_to and ScaleHint
+- Added profiling based on puffin and wgpu_profiler
+- Basic app
+- Basic progress seeking
+- Viewport fit in scaling
+- Added profiling for preview app
+- Timeline grid painting
+- Max 100 timeline * 100 anims info drawing
+- Current time indicator line, window title
+
+### 🐛 Bug Fixes
+
+- #50
+
+### 🚜 Refactor
+
+- Rename build_and_render_timeline to render_scene
+- Moved basic traits to a separate module
+- Use f64 instead of f32, closes: #38
+- *(app)* Refactor TimelineState
+
+### 📚 Documentation
+
+- Update docs
+- Update doc for group
+- Update doc for Transformable
+
+### 🎨 Styling
+
+- Fix lint
+- Fix lint
+- Lint
+
 ## [0.1.0-alpha.7] - 2025-03-19
 
 ### 🚀 Features
@@ -22,6 +59,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - *(xtask/build-examples)* Added clean arg to clean non-exist examples
+- Release
 
 ## [0.1.0-alpha.6] - 2025-03-17
 
