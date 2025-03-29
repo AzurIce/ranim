@@ -3,9 +3,8 @@ mod timeline;
 
 use std::sync::Arc;
 
-use egui::{Frame, ScrollArea, Shape, TextStyle};
 use egui_wgpu::ScreenDescriptor;
-use timeline::{interact_with_canvas, paint_timeline, ui_canvas};
+use timeline::TimelineState;
 use wgpu::SurfaceError;
 use winit::{
     application::ApplicationHandler,
@@ -26,7 +25,7 @@ use crate::{
         pipelines::app::{AppPipeline, Viewport},
         primitives::RenderInstances,
     },
-    timeline::{RabjectTimelineInfo, TimelineEvalResult},
+    timeline::TimelineEvalResult,
 };
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -183,34 +182,6 @@ struct WinitApp {
     app_state: AppState,
 }
 
-struct AppState {
-    meta: SceneMeta,
-    timeline: RanimTimeline,
-    timeline_infos: Vec<RabjectTimelineInfo>,
-    // app_options: AppOptions<'a>,
-    // timeline: RanimTimeline,
-    renderer: Renderer,
-
-    last_sec: f64,
-    current_sec: f64,
-    render_instances: RenderInstances,
-    timeline_state: TimelineState,
-}
-
-struct TimelineState {
-    canvas_width_ms: f32,
-    sideways_pan_in_points: f32,
-}
-
-impl Default for TimelineState {
-    fn default() -> Self {
-        Self {
-            canvas_width_ms: 0.0,
-            sideways_pan_in_points: 0.0,
-        }
-    }
-}
-
 struct TimelineInfo {
     ctx: egui::Context,
     canvas: egui::Rect,
@@ -218,20 +189,44 @@ struct TimelineInfo {
     response: egui::Response,
     painter: egui::Painter,
     text_height: f32,
-    start_ms: i64,
-    stop_ms: i64,
     font_id: egui::FontId,
 }
 
 impl TimelineInfo {
     fn point_from_ms(&self, state: &TimelineState, ms: i64) -> f32 {
         self.canvas.min.x
-            + state.sideways_pan_in_points
-            + self.canvas.width() * ((ms - self.start_ms) as f32) / state.canvas_width_ms
+            + state.offset_points
+            + self.canvas.width() * ms as f32 / (state.width_sec * 1000.0) as f32
     }
 }
 
+struct AppState {
+    meta: SceneMeta,
+    timeline: RanimTimeline,
+    // app_options: AppOptions<'a>,
+    // timeline: RanimTimeline,
+    renderer: Renderer,
+
+    last_sec: f64,
+    render_instances: RenderInstances,
+    timeline_state: TimelineState,
+}
+
 impl AppState {
+    fn new(ctx: &RanimContext, scene: impl Scene) -> Self {
+        let meta = scene.meta();
+        let timeline = build_timeline(scene);
+        let timeline_infos = timeline.get_timeline_infos();
+        let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
+        Self {
+            meta,
+            renderer,
+            last_sec: -1.0,
+            render_instances: RenderInstances::default(),
+            timeline_state: TimelineState::new(timeline.duration_secs(), timeline_infos),
+            timeline,
+        }
+    }
     pub fn prepare(&mut self, ctx: &mut RanimContext, state: &mut RenderState) {
         #[cfg(feature = "profiling")]
         profiling::scope!("frame");
@@ -241,10 +236,10 @@ impl AppState {
             .bind_group
             .update_viewport(&ctx.wgpu_ctx.queue, state.viewport);
 
-        if self.last_sec == self.current_sec {
+        if self.last_sec == self.timeline_state.current_sec {
             return;
         }
-        self.last_sec = self.current_sec;
+        self.last_sec = self.timeline_state.current_sec;
 
         let TimelineEvalResult {
             // EvalResult<CameraFrame>, idx
@@ -255,7 +250,7 @@ impl AppState {
             #[cfg(feature = "profiling")]
             profiling::scope!("eval");
 
-            self.timeline.eval_sec(self.current_sec)
+            self.timeline.eval_sec(self.timeline_state.current_sec)
         };
 
         {
@@ -324,62 +319,14 @@ impl AppState {
 
                 ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
                 ui.add(
-                    egui::Slider::new(&mut self.current_sec, 0.0..=self.timeline.duration_secs())
-                        .text("sec"),
+                    egui::Slider::new(
+                        &mut self.timeline_state.current_sec,
+                        0.0..=self.timeline_state.total_sec,
+                    )
+                    .text("sec"),
                 );
-                Frame::canvas(ui.style()).show(ui, |ui| {
-                    let available_height = ui.max_rect().bottom() - ui.min_rect().bottom();
-                    ScrollArea::vertical().show(ui, |ui| {
-                        let mut canvas = ui.available_rect_before_wrap();
-                        canvas.max.y = f32::INFINITY;
 
-                        let min_ms = 0;
-                        let max_ms = self.timeline.duration_secs() as i64 * 1000;
-
-                        let response = ui.interact(
-                            canvas,
-                            ui.id().with("canvas"),
-                            egui::Sense::click_and_drag(),
-                        );
-                        let info = TimelineInfo {
-                            ctx: ui.ctx().clone(),
-                            canvas,
-                            available_height,
-                            response,
-                            painter: ui.painter_at(canvas),
-                            start_ms: min_ms,
-                            stop_ms: max_ms,
-                            text_height: 15.0,
-                            font_id: TextStyle::Body.resolve(ui.style()),
-                        };
-
-                        interact_with_canvas(&mut self.timeline_state, &info);
-
-                        let timeline_shape_id = info.painter.add(Shape::Noop);
-
-                        let max_y = ui_canvas(
-                            &mut self.timeline_state,
-                            &info,
-                            &self.timeline_infos,
-                            (min_ms, max_ms),
-                        );
-                        let mut used_rect = canvas;
-                        used_rect.max.y = max_y.max(used_rect.min.y + available_height);
-
-                        info.painter.set(
-                            timeline_shape_id,
-                            Shape::Vec(paint_timeline(
-                                &info,
-                                used_rect,
-                                &self.timeline_state,
-                                min_ms,
-                                (self.current_sec * 1000.0) as i64,
-                            )),
-                        );
-
-                        ui.allocate_rect(used_rect, egui::Sense::hover());
-                    });
-                });
+                self.timeline_state.ui_main_timeline(ui);
             })
             .response
             .rect
@@ -412,25 +359,6 @@ impl AppState {
         //         });
         //     });
         occupied_screen_space
-    }
-}
-
-impl AppState {
-    fn new(ctx: &RanimContext, scene: impl Scene) -> Self {
-        let meta = scene.meta();
-        let timeline = build_timeline(scene);
-        let timeline_infos = timeline.get_timeline_infos();
-        let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
-        Self {
-            meta,
-            timeline,
-            timeline_infos,
-            renderer,
-            current_sec: 0.0,
-            last_sec: -1.0,
-            render_instances: RenderInstances::default(),
-            timeline_state: TimelineState::default(),
-        }
     }
 }
 
