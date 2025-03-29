@@ -185,7 +185,6 @@ struct WinitApp {
 struct TimelineInfo {
     ctx: egui::Context,
     canvas: egui::Rect,
-    available_height: f32,
     response: egui::Response,
     painter: egui::Painter,
     text_height: f32,
@@ -326,6 +325,7 @@ impl AppState {
                     .text("sec"),
                 );
 
+                // self.timeline_state.ui_preview_timeline(ui);
                 self.timeline_state.ui_main_timeline(ui);
             })
             .response
