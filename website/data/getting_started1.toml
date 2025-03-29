@@ -1,38 +1,35 @@
 name = "getting_started1"
 code = """
 ```rust,linenos
-use ranim::{
-    AppOptions,
-    animation::fading::{FadingAnim, FadingAnimSchedule},
-    color::palettes::manim,
-    items::vitem::Square,
-    prelude::*,
-    render_scene,
-};
-
-#[scene]
-struct GettingStarted1Scene;
-
-impl TimelineConstructor for GettingStarted1Scene {
-    fn construct<'t: 'r, 'r>(
-        self,
-        timeline: &'t RanimTimeline,
-        _camera: &'r mut Rabject<'t, CameraFrame>,
-    ) {
-        let mut square = Square(2.0).build();
-        square.set_color(manim::BLUE_C);
-
-        let mut square = timeline.insert(square);
-        #[allow(deprecated)]
-        timeline.play(square.fade_in().chain(|data| data.fade_out()));
-    }
-}
-
-fn main() {
-    render_scene(GettingStarted1Scene, &AppOptions::default());
-}
+use ranim::{\r
+    AppOptions, animation::fading::FadingAnimSchedule, color::palettes::manim,\r
+    items::vitem::Square, prelude::*, render_scene,\r
+};\r
+\r
+#[scene]\r
+struct GettingStarted1Scene;\r
+\r
+impl TimelineConstructor for GettingStarted1Scene {\r
+    fn construct<'t: 'r, 'r>(\r
+        self,\r
+        timeline: &'t RanimTimeline,\r
+        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+    ) {\r
+        let mut square = Square(2.0).build();\r
+        square.set_color(manim::BLUE_C);\r
+\r
+        let mut square = timeline.insert(square);\r
+        #[allow(deprecated)]\r
+        timeline.play(square.fade_in());\r
+        timeline.play(square.fade_out());\r
+    }\r
+}\r
+\r
+fn main() {\r
+    render_scene(GettingStarted1Scene, &AppOptions::default());\r
+}\r
 
 ```"""
-hash = "89619598c84cbd6307305984fc42bf1875f5afec"
+hash = "24355287c63da93ae82cd3fde9d05e5fbe460904"
 preview_imgs = []
 output_files = ["/examples/getting_started1/output.mp4"]

@@ -73,10 +73,13 @@ fn main() {\r
     #[cfg(not(debug_assertions))]\r
     env_logger::Builder::from_env(Env::default().default_filter_or(\"arc=info\")).init();\r
 \r
+    #[cfg(feature = \"app\")]\r
+    run_scene_app(ArcScene);\r
+    #[cfg(not(feature = \"app\"))]\r
     render_scene(ArcScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "e39dfd99249792048cc7e726c585616ba43bc2ec"
+hash = "7949c4cbc115637b2038ac1886686a82ddd1c335"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/output.mp4"]

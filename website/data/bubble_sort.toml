@@ -129,23 +129,28 @@ impl TimelineConstructor for BubbleSortScene {\r
 }\r
 \r
 fn main() {\r
-    render_scene(\r
-        BubbleSortScene(10),\r
-        &AppOptions {\r
-            output_filename: \"output-10.mp4\",\r
-            ..Default::default()\r
-        },\r
-    );\r
-    render_scene(\r
-        BubbleSortScene(100),\r
-        &AppOptions {\r
-            output_filename: \"output-100.mp4\",\r
-            ..Default::default()\r
-        },\r
-    );\r
+    #[cfg(feature = \"app\")]\r
+    run_scene_app(BubbleSortScene(100));\r
+    #[cfg(not(feature = \"app\"))]\r
+    {\r
+        render_scene(\r
+            BubbleSortScene(10),\r
+            &AppOptions {\r
+                output_filename: \"output-10.mp4\",\r
+                ..Default::default()\r
+            },\r
+        );\r
+        render_scene(\r
+            BubbleSortScene(100),\r
+            &AppOptions {\r
+                output_filename: \"output-100.mp4\",\r
+                ..Default::default()\r
+            },\r
+        );\r
+    }\r
 }\r
 
 ```"""
-hash = "a5d36b613b7f130036761681ca5ce5a4c6ce07b8"
+hash = "a7d30f16921c7f7c96a037c99dcb3b93cab87fd8"
 preview_imgs = ["/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
 output_files = ["/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/output-100.mp4"]
