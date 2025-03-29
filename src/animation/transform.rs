@@ -1,4 +1,4 @@
-use super::{AnimSchedule, Animation, EvalDynamic, Rabject, ToEvaluator};
+use super::{AnimSchedule, AnimationSpan, EvalDynamic, Rabject, ToEvaluator};
 use crate::{
     items::group::Group,
     traits::{Alignable, Interpolatable},
@@ -9,13 +9,13 @@ pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 
 pub trait GroupTransformAnim<T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut Group<T>)>(&self, f: F) -> Group<Animation<T>>;
-    fn transform_from<E: Into<T>>(&self, s: Group<E>) -> Group<Animation<T>>;
-    fn transform_to<E: Into<T>>(&self, d: Group<E>) -> Group<Animation<T>>;
+    fn transform<F: Fn(&mut Group<T>)>(&self, f: F) -> Group<AnimationSpan<T>>;
+    fn transform_from<E: Into<T>>(&self, s: Group<E>) -> Group<AnimationSpan<T>>;
+    fn transform_to<E: Into<T>>(&self, d: Group<E>) -> Group<AnimationSpan<T>>;
 }
 
 impl<T: TransformRequirement + 'static> GroupTransformAnim<T> for Group<T> {
-    fn transform<F: Fn(&mut Group<T>)>(&self, f: F) -> Group<Animation<T>> {
+    fn transform<F: Fn(&mut Group<T>)>(&self, f: F) -> Group<AnimationSpan<T>> {
         let mut dsts = self.clone();
         (f)(&mut dsts);
         self.iter()
@@ -23,14 +23,14 @@ impl<T: TransformRequirement + 'static> GroupTransformAnim<T> for Group<T> {
             .map(|(x, dst)| x.transform_to(dst))
             .collect()
     }
-    fn transform_from<E: Into<T>>(&self, s: Group<E>) -> Group<Animation<T>> {
+    fn transform_from<E: Into<T>>(&self, s: Group<E>) -> Group<AnimationSpan<T>> {
         let ss: Group<T> = s.into_iter().map(|x| x.into()).collect();
         self.iter()
             .zip(ss)
             .map(|(x, s)| x.transform_from(s))
             .collect()
     }
-    fn transform_to<E: Into<T>>(&self, d: Group<E>) -> Group<Animation<T>> {
+    fn transform_to<E: Into<T>>(&self, d: Group<E>) -> Group<AnimationSpan<T>> {
         let dd: Group<T> = d.into_iter().map(|x| x.into()).collect();
         self.iter()
             .zip(dd)
@@ -81,9 +81,9 @@ impl<'r, 't, T: TransformRequirement + 'static> GroupTransformAnimSchedule<'r, '
 }
 
 pub trait TransformAnim<T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut T)>(&self, f: F) -> Animation<T>;
-    fn transform_from(&self, s: impl Into<T>) -> Animation<T>;
-    fn transform_to(&self, d: impl Into<T>) -> Animation<T>;
+    fn transform<F: Fn(&mut T)>(&self, f: F) -> AnimationSpan<T>;
+    fn transform_from(&self, s: impl Into<T>) -> AnimationSpan<T>;
+    fn transform_to(&self, d: impl Into<T>) -> AnimationSpan<T>;
 }
 
 pub trait TransformAnimSchedule<'r, 't, T: TransformRequirement + 'static> {
@@ -93,18 +93,18 @@ pub trait TransformAnimSchedule<'r, 't, T: TransformRequirement + 'static> {
 }
 
 impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
-    fn transform<F: Fn(&mut T)>(&self, f: F) -> Animation<T> {
+    fn transform<F: Fn(&mut T)>(&self, f: F) -> AnimationSpan<T> {
         let mut dst = self.clone();
         (f)(&mut dst);
-        Animation::from_evaluator(Transform::new(self.clone(), dst).to_evaluator())
+        AnimationSpan::from_evaluator(Transform::new(self.clone(), dst).to_evaluator())
             .with_rate_func(smooth)
     }
-    fn transform_from(&self, s: impl Into<T>) -> Animation<T> {
-        Animation::from_evaluator(Transform::new(s.into(), self.clone()).to_evaluator())
+    fn transform_from(&self, s: impl Into<T>) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Transform::new(s.into(), self.clone()).to_evaluator())
             .with_rate_func(smooth)
     }
-    fn transform_to(&self, d: impl Into<T>) -> Animation<T> {
-        Animation::from_evaluator(Transform::new(self.clone(), d.into()).to_evaluator())
+    fn transform_to(&self, d: impl Into<T>) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Transform::new(self.clone(), d.into()).to_evaluator())
             .with_rate_func(smooth)
     }
 }

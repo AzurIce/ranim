@@ -30,8 +30,8 @@ impl RanimContext {
 }
 
 pub struct WgpuContext {
-    // pub instance: wgpu::Instance,
-    // pub adapter: wgpu::Adapter,
+    pub instance: wgpu::Instance,
+    pub adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
 }
@@ -65,8 +65,8 @@ impl WgpuContext {
             .unwrap();
 
         Self {
-            // instance,
-            // adapter,
+            instance,
+            adapter,
             device,
             queue,
         }

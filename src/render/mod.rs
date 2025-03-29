@@ -136,7 +136,7 @@ pub struct Renderer {
     pub pipelines: PipelinesStorage,
 
     clear_color: wgpu::Color,
-    render_textures: RenderTextures,
+    pub(crate) render_textures: RenderTextures,
 
     uniforms_buffer: WgpuBuffer<CameraUniforms>,
     pub(crate) uniforms_bind_group: CameraUniformsBindGroup,
@@ -415,7 +415,7 @@ impl Renderer {
 // MARK: RenderTextures
 
 pub struct RenderTextures {
-    render_texture: wgpu::Texture,
+    pub(crate) render_texture: wgpu::Texture,
     // multisample_texture: wgpu::Texture,
     // depth_stencil_texture: wgpu::Texture,
     pub(crate) render_view: wgpu::TextureView,
@@ -439,7 +439,8 @@ impl RenderTextures {
             format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::COPY_SRC
-                | wgpu::TextureUsages::COPY_DST,
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[
                 wgpu::TextureFormat::Rgba8UnormSrgb,
                 wgpu::TextureFormat::Rgba8Unorm,

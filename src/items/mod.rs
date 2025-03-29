@@ -4,7 +4,7 @@ use group::Group;
 
 use crate::{
     RanimTimeline,
-    animation::{AnimSchedule, Animation},
+    animation::{AnimSchedule, AnimationSpan},
     context::WgpuContext,
     render::primitives::{RenderInstance, RenderInstances},
 };
@@ -62,7 +62,7 @@ impl<T> Drop for Rabject<'_, T> {
 impl<'t, T: 'static> Rabject<'t, T> {
     pub fn schedule<'r>(
         &'r mut self,
-        anim_builder: impl FnOnce(&mut Self) -> Animation<T>,
+        anim_builder: impl FnOnce(&mut Self) -> AnimationSpan<T>,
     ) -> AnimSchedule<'r, 't, T> {
         let animation = (anim_builder)(self);
         AnimSchedule::new(self, animation)

@@ -126,18 +126,23 @@ impl TimelineConstructor for BubbleSortScene {
 }
 
 fn main() {
-    render_scene(
-        BubbleSortScene(10),
-        &AppOptions {
-            output_filename: "output-10.mp4",
-            ..Default::default()
-        },
-    );
-    render_scene(
-        BubbleSortScene(100),
-        &AppOptions {
-            output_filename: "output-100.mp4",
-            ..Default::default()
-        },
-    );
+    #[cfg(feature = "app")]
+    run_scene_app(BubbleSortScene(100));
+    #[cfg(not(feature = "app"))]
+    {
+        render_scene(
+            BubbleSortScene(10),
+            &AppOptions {
+                output_filename: "output-10.mp4",
+                ..Default::default()
+            },
+        );
+        render_scene(
+            BubbleSortScene(100),
+            &AppOptions {
+                output_filename: "output-100.mp4",
+                ..Default::default()
+            },
+        );
+    }
 }
