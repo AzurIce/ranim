@@ -39,7 +39,7 @@ impl TimelineConstructor for HanoiScene {
         let rod_height = 5.0;
         let rod_section_width = 4.0;
 
-        let _rods = timeline.insert_group([-1, 0, 1].into_iter().map(|i| {
+        let _rods = timeline.insert([-1, 0, 1].into_iter().map(|i| {
             let mut rod = Rectangle(rod_width, rod_height).build();
             rod.set_color(manim::GREY_C).put_anchor_on(
                 Anchor::edge(0, -1, 0),
@@ -51,7 +51,7 @@ impl TimelineConstructor for HanoiScene {
         let min_disk_width = rod_width * 1.7;
         let max_disk_width = rod_section_width * 0.8;
         let disk_height = (rod_height * 0.8) / n as f64;
-        let _disks = timeline.insert_group((0..n).map(|i| {
+        let _disks = timeline.insert((0..n).map(|i| {
             let factor = i as f64 / (n - 1) as f64;
             let disk_width = min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);
             let mut disk = Rectangle(disk_width, disk_height).build();

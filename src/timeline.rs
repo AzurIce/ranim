@@ -68,6 +68,45 @@ pub struct TimelineEvalResult {
     pub items: Vec<(usize, EvalResult<Item>, usize)>,
 }
 
+// MARK: TimelineInsert
+/// For type `T` that implements [`EntityTimelineStaticState`],
+///
+/// `T` and `impl IntoIterator<Item = T>` can be inserted into the timeline.
+/// This is accomplished by two implementations of this trait, with different `Mark` type:
+/// - [`ItemMark`]: Insert a `T`, returns [`Rabject<T>`]
+/// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group<Rabject<T>>`]
+pub trait TimelineItem<'t, Mark> {
+    type Inserted;
+    fn insert(self, timeline: &'t RanimTimeline) -> Self::Inserted;
+}
+
+// MARK: TimelineItem
+pub struct ItemMark;
+pub struct GroupMark;
+
+impl<'t, T> TimelineItem<'t, ItemMark> for T
+where
+    T: EntityTimelineStaticState + Clone + 'static,
+{
+    type Inserted = Rabject<'t, T>;
+    fn insert(self, timeline: &'t RanimTimeline) -> Self::Inserted {
+        timeline.insert_item(self)
+    }
+}
+
+impl<'t, E, T> TimelineItem<'t, GroupMark> for T
+where
+    E: EntityTimelineStaticState + Clone + 'static,
+    T: IntoIterator<Item = E>,
+{
+    type Inserted = Group<Rabject<'t, E>>;
+    fn insert(self, timeline: &'t RanimTimeline) -> Self::Inserted {
+        self.into_iter()
+            .map(|item| timeline.insert_item(item))
+            .collect()
+    }
+}
+
 impl RanimTimeline {
     pub fn new() -> Self {
         Self::default()
@@ -92,6 +131,11 @@ impl RanimTimeline {
         });
         self
     }
+
+    pub fn insert<'t, Mark, T: TimelineItem<'t, Mark>>(&'t self, item: T) -> T::Inserted {
+        item.insert(self)
+    }
+
     /// Insert an iterator of items into the timeline, and return a group of rabjects
     ///
     /// This is equivalent to
@@ -107,11 +151,17 @@ impl RanimTimeline {
         T: EntityTimelineStaticState + Clone + 'static,
         I: IntoIterator<Item = T>,
     {
-        items.into_iter().map(|item| self.insert(item)).collect()
+        items
+            .into_iter()
+            .map(|item| self.insert_item(item))
+            .collect()
     }
 
     /// Insert an item into the timeline, and return a rabject
-    pub fn insert<T: EntityTimelineStaticState + Clone + 'static>(&self, item: T) -> Rabject<T> {
+    pub fn insert_item<T: EntityTimelineStaticState + Clone + 'static>(
+        &self,
+        item: T,
+    ) -> Rabject<T> {
         let mut timelines = self.timelines.borrow_mut();
 
         let id = timelines.len();

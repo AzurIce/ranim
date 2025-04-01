@@ -48,7 +48,7 @@ impl TimelineConstructor for TestScene {
         // let vitem = vitem[0].clone().get_partial(0.0..0.4);
         // println!("vpoints: {:?}", vitem.vpoints);
         // println!("close_path: {:?}", vitem.vpoints.get_closepath_flags());
-        let _vitem = timeline.insert_group(vitem);
+        let _vitem = timeline.insert(vitem);
 
         let mut border = Square(1.0).build();
         border

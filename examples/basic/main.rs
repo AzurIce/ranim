@@ -43,7 +43,7 @@ impl TimelineConstructor for BasicScene {
         text.iter_mut().for_each(|item| {
             item.set_fill_opacity(0.8);
         });
-        let mut text = timeline.insert_group(text);
+        let mut text = timeline.insert(text);
 
         timeline.play(
             text.lagged_anim(0.2, |item| item.write())
