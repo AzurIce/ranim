@@ -2,11 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.10] - 2025-04-01
+
+### 🚀 Features
+
+- Added ease-in-out rate functions
+
+### 🐛 Bug Fixes
+
+- #56, fixed subtract with overflow
+
+### 🚜 Refactor
+
+- Added TimelineItem trait to unify Group<T> and T insertion
+
+### 📚 Documentation
+
+- Fix palettes blue doc
+
+### Examples
+
+- Added hanoi example, closes: #47
+
 ## [0.1.0-alpha.9] - 2025-03-29
 
 ### 🚀 Features
 
 - Clamp the timeline zoom to 100ms~total_sec
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.1.0-alpha.8] - 2025-03-29
 
