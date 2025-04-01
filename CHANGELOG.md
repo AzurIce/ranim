@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0-alpha.10] - 2025-04-01
+## [0.1.0-alpha.11] - 2025-04-01
 
 ### 🚀 Features
 
@@ -19,6 +19,11 @@ All notable changes to this project will be documented in this file.
 ### 📚 Documentation
 
 - Fix palettes blue doc
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
+- Update cargo exclude
 
 ### Examples
 
