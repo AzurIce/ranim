@@ -35,20 +35,20 @@ impl TimelineConstructor for HelloWorldScene {
 }
 
 fn main() {
-    render_timeline(HelloWorldScene, &AppOptions::default());
+    render_scene(HelloWorldScene, &AppOptions::default());
 }
 ```
 
-**HelloWorldScene** 是一个 **Scene**，**Scene** 是 **SceneMetaTrait** 和 **TimelineConstructor** 两个 Trait 的组合（实现两个 Trait 自动实现）：
-- 前者实现了 `fn meta(&self) -> SceneMeta` 方法。
+**HelloWorldScene** 是一个 **Scene**，即下面两个 Trait 的组合：
+- `SceneMetaTrait` 实现了 `fn meta(&self) -> SceneMeta` 方法。
 
   使用 `#[scene]` 会以结构体的 snake_case 命名（去掉 `Scene` 后缀）作为 **SceneMeta** 的 `name` 字段自动实现这个 Trait。
 
   也可以通过 `#[scene(name = "<NAME>")]` 来手动命名。
 
-- 而后者则是定义了动画的构造过程。
+- `SceneConstructor` 则是定义了动画的构造过程。
 
-使用 `render_timeline` 可以使用一个 **Scene** 来构造一个 **RanimTimeline** 并对其进行渲染，渲染结果将被输出到 `<output_dir>/<scene_name>/` 目录下。
+使用 `render_scene` 可以用一个 **Scene** 来构造一个 **RanimTimeline** 并对其进行渲染，渲染结果将被输出到 `<output_dir>/<scene_name>/` 目录下。
 
 `construct` 方法有两个关键的参数：
 - `timeline: &'t RanimTimeline`：Ranim API 的主要入口，几乎全部对动画的编码操作都发生在这个结构上
