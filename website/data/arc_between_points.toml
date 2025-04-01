@@ -55,7 +55,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {\r
                 arc\r
             })\r
             .collect::<Group<_>>();\r
-        let mut arcs = timeline.insert_group(arcs);\r
+        let mut arcs = timeline.insert(arcs);\r
 \r
         let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());\r
         timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();\r
@@ -78,6 +78,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "f8e84d6a5e67dee428a0a8224647fedd3f415468"
+hash = "07d05169ffcc0b83527e87d2bd23e9246926220b"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/output.mp4"]

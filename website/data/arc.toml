@@ -56,7 +56,7 @@ impl TimelineConstructor for ArcScene {\r
             })\r
             .collect::<Group<_>>();\r
 \r
-        let mut arcs = timeline.insert_group(arcs);\r
+        let mut arcs = timeline.insert(arcs);\r
         let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());\r
         timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();\r
 \r
@@ -80,6 +80,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "7949c4cbc115637b2038ac1886686a82ddd1c335"
+hash = "811d0e784fe345f1840c1abbf3d52b1bb9630f25"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/output.mp4"]
