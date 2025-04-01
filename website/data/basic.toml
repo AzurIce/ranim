@@ -46,7 +46,7 @@ impl TimelineConstructor for BasicScene {\r
         text.iter_mut().for_each(|item| {\r
             item.set_fill_opacity(0.8);\r
         });\r
-        let mut text = timeline.insert_group(text);\r
+        let mut text = timeline.insert(text);\r
 \r
         timeline.play(\r
             text.lagged_anim(0.2, |item| item.write())\r
@@ -81,6 +81,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "06654c58827a321490c984d03418aa7bee0ef52d"
+hash = "ddb32e881ee0568649c7510a57b811148017abc2"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/output.mp4"]

@@ -58,7 +58,7 @@ impl TimelineConstructor for PalettesScene {\r
                 })\r
             })\r
             .collect::<Group<_>>();\r
-        let _squares = timeline.insert_group(squares);\r
+        let _squares = timeline.insert(squares);\r
         timeline.forward(0.01);\r
     }\r
 }\r
@@ -76,6 +76,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "c0c4625bb81eb4e4b59707c5c4445df7e955d8bb"
+hash = "d3eb3b397540b8f7c470cb0ed6b6648a75c88bdd"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/output.png"]
