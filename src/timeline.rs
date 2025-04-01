@@ -402,7 +402,11 @@ impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
             .filter_map(|(idx, anim)| {
                 anim.as_ref().map(|anim| AnimationInfo {
                     anim_name: anim.type_name.clone(),
-                    start_sec: self.end_secs.get(idx - 1).cloned().unwrap_or(0.0) + anim.padding.0,
+                    start_sec: if idx == 0 {
+                        0.0
+                    } else {
+                        self.end_secs.get(idx - 1).cloned().unwrap()
+                    } + anim.padding.0,
                     end_sec: self.end_secs[idx] - anim.padding.1,
                 })
             })
