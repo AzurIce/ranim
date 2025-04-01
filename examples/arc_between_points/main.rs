@@ -52,7 +52,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                 arc
             })
             .collect::<Group<_>>();
-        let mut arcs = timeline.insert_group(arcs);
+        let mut arcs = timeline.insert(arcs);
 
         let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());
         timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();

@@ -55,7 +55,7 @@ impl TimelineConstructor for PalettesScene {
                 })
             })
             .collect::<Group<_>>();
-        let _squares = timeline.insert_group(squares);
+        let _squares = timeline.insert(squares);
         timeline.forward(0.01);
     }
 }
