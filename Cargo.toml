@@ -8,6 +8,10 @@ repository.workspace = true
 homepage = "https://azurice.github.io/ranim"
 readme = "README.md"
 keywords = ["animation", "manim", "wgpu"]
+exclude = [
+  "website",
+  "assets"
+]
 
 [workspace]
 members = ["packages/*", "xtasks/*"]
