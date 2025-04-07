@@ -260,14 +260,14 @@ impl AppState {
                 // let prev_last_idx = *last_idx;
                 // *last_idx = *idx as i32;
                 match res {
-                    EvalResult::Dynamic(res) => res.prepare_render_instance_for_entity(
+                    EvalResult::Dynamic(res) => res.prepare_for_id(
                         &ctx.wgpu_ctx,
                         &mut self.render_instances,
                         *id,
                     ),
                     EvalResult::Static(res) => {
                         // if prev_last_idx != *idx as i32 {
-                        res.prepare_render_instance_for_entity(
+                        res.prepare_for_id(
                             &ctx.wgpu_ctx,
                             &mut self.render_instances,
                             *id,
@@ -283,10 +283,10 @@ impl AppState {
             .iter()
             .filter_map(|(id, res, _)| match res {
                 EvalResult::Dynamic(res) => {
-                    res.get_render_instance_for_entity(&self.render_instances, *id)
+                    res.renderable_of_id(&self.render_instances, *id)
                 }
                 EvalResult::Static(res) => {
-                    res.get_render_instance_for_entity(&self.render_instances, *id)
+                    res.renderable_of_id(&self.render_instances, *id)
                 }
             })
             .collect::<Vec<_>>();

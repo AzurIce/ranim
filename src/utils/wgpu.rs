@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
 use wgpu::util::DeviceExt;
 
@@ -102,7 +102,9 @@ pub(crate) struct WgpuVecBuffer<T: Default + bytemuck::Pod + bytemuck::Zeroable 
     pub(crate) buffer: Option<wgpu::Buffer>,
     usage: wgpu::BufferUsages,
     /// Keep match to the buffer size
-    inner: Vec<T>,
+    len: usize,
+    _phantom: PhantomData<T>,
+    // inner: Vec<T>,
 }
 
 impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
@@ -115,13 +117,24 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             label,
             buffer: None,
             usage,
-            inner: vec![],
+            len: 0,
+            _phantom: PhantomData,
+            // inner: vec![],
         }
     }
 
-    pub(crate) fn get(&self) -> &[T] {
-        self.inner.as_ref()
+    pub(crate) fn new_init(ctx: &WgpuContext, label: Option<&'static str>, usage: wgpu::BufferUsages, data: &[T]) -> Self {
+        let mut buffer = Self::new(label, usage);
+        buffer.set(ctx, data);
+        buffer
     }
+
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
+    // pub(crate) fn get(&self) -> &[T] {
+    //     self.inner.as_ref()
+    // }
 
     pub(crate) fn resize(&mut self, ctx: &WgpuContext, len: usize) -> bool {
         let size = (std::mem::size_of::<T>() * len) as u64;
@@ -131,7 +144,8 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             .map(|b| b.size() != size)
             .unwrap_or(true);
         if realloc {
-            self.inner.resize(len, T::default());
+            self.len = len;
+            // self.inner.resize(len, T::default());
             self.buffer = Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
                 label: self.label,
                 size,
@@ -144,8 +158,9 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
 
     pub(crate) fn set(&mut self, ctx: &WgpuContext, data: &[T]) -> bool {
         // trace!("{} {}", self.inner.len(), data.len());
-        self.inner.resize(data.len(), T::default());
-        self.inner.copy_from_slice(data);
+        // self.inner.resize(data.len(), T::default());
+        // self.inner.copy_from_slice(data);
+        self.len = data.len();
         let realloc = self
             .buffer
             .as_ref()
@@ -181,7 +196,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
     #[allow(unused)]
     pub(crate) fn read_buffer(&self, ctx: &WgpuContext) -> Option<Vec<u8>> {
         let buffer = self.buffer.as_ref()?;
-        let size = std::mem::size_of::<T>() * self.inner.len();
+        let size = std::mem::size_of::<T>() * self.len;
         let staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Debug Staging Buffer"),
             size: size as u64,

@@ -15,7 +15,7 @@ use crate::{
 };
 use glam::Vec4;
 
-use super::RenderInstance;
+use super::{Primitive, Renderable};
 
 pub struct VItemPrimitive {
     /// COMPUTE INPUT: (x, y, z, is_closed)
@@ -39,6 +39,140 @@ pub struct VItemPrimitive {
 
     /// RENDER BIND GROUP 1: 0-points, 1-fill_rgbas, 2-stroke_rgbas, 3-stroke_widths
     pub(crate) render_bind_group: Option<RenderBindGroup>,
+}
+
+pub struct VItemPrimitiveData {
+    pub(crate) points2d: Vec<Vec4>,
+    pub(crate) fill_rgbas: Vec<Rgba>,
+    pub(crate) stroke_rgbas: Vec<Rgba>,
+    pub(crate) stroke_widths: Vec<Width>,
+}
+
+impl Primitive for VItemPrimitive {
+    type Data = VItemPrimitiveData;
+
+    fn init(ctx: &WgpuContext, data: &Self::Data) -> Self {
+        let points3d_buffer = WgpuVecBuffer::new_init(
+            ctx,
+            Some("Points 3d Buffer"),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            &data.points2d,
+        );
+        let points2d_buffer = WgpuVecBuffer::new_init(
+            ctx,
+            Some("Points 2d Buffer"),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            &data.points2d,
+        );
+        let clip_info_buffer = WgpuVecBuffer::new_init(
+            ctx,
+            Some("Clip Info Buffer"),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            &[i32::MAX, i32::MIN, i32::MAX, i32::MIN, 0],
+        );
+        let point_cnt_buffer = WgpuBuffer::new_init(
+            ctx,
+            Some("Point Cnt Buffer"),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            data.points2d.len() as u32,
+        );
+        let fill_rgbas = WgpuVecBuffer::new_init(
+            ctx,
+            Some("Fill Rgbas Buffer"),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            &data.fill_rgbas,
+        );
+        let stroke_rgbas = WgpuVecBuffer::new_init(
+            ctx,
+            Some("Stroke Rgbas Buffer"),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            &data.stroke_rgbas,
+        );
+        let stroke_widths = WgpuVecBuffer::new_init(
+            ctx,
+            Some("Stroke Widths Buffer"),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            &data.stroke_widths,
+        );
+
+        let compute_bind_group = ComputeBindGroup::new(
+            ctx,
+            points3d_buffer.buffer.as_ref().unwrap(),
+            stroke_widths.buffer.as_ref().unwrap(),
+            points2d_buffer.buffer.as_ref().unwrap(),
+            clip_info_buffer.buffer.as_ref().unwrap(),
+            point_cnt_buffer.as_ref(),
+        );
+
+        let render_bind_group = RenderBindGroup::new(
+            ctx,
+            points2d_buffer.buffer.as_ref().unwrap(),
+            fill_rgbas.buffer.as_ref().unwrap(),
+            stroke_rgbas.buffer.as_ref().unwrap(),
+            stroke_widths.buffer.as_ref().unwrap(),
+            clip_info_buffer.buffer.as_ref().unwrap(),
+        );
+
+        Self {
+            points3d_buffer,
+            points2d_buffer,
+            clip_info_buffer,
+            point_cnt_buffer: Some(point_cnt_buffer),
+            fill_rgbas,
+            stroke_rgbas,
+            stroke_widths,
+            compute_bind_group: Some(compute_bind_group),
+            render_bind_group: Some(render_bind_group),
+        }
+    }
+    fn update(&mut self, ctx: &WgpuContext, data: &Self::Data) {
+        if self.point_cnt_buffer.is_none() {
+            self.point_cnt_buffer = Some(WgpuBuffer::new_init(
+                ctx,
+                Some("Point Cnt Buffer"),
+                wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                data.points2d.len() as u32,
+            ));
+        } else {
+            self.point_cnt_buffer
+                .as_mut()
+                .unwrap()
+                .set(ctx, data.points2d.len() as u32);
+        }
+        // Dynamic sized
+        if [
+            self.points3d_buffer.set(ctx, &data.points2d),
+            self.fill_rgbas.set(ctx, &data.fill_rgbas),
+            self.stroke_rgbas.set(ctx, &data.stroke_rgbas),
+            self.stroke_widths.set(ctx, &data.stroke_widths),
+            self.points2d_buffer.resize(ctx, data.points2d.len()),
+            self.clip_info_buffer
+                .set(ctx, &[i32::MAX, i32::MIN, i32::MAX, i32::MIN, 0]),
+            // This two should be all none or all some
+            self.compute_bind_group.is_none(),
+            // self.render_bind_group.is_none(),
+        ]
+        .iter()
+        .any(|x| *x)
+        {
+            self.compute_bind_group = Some(ComputeBindGroup::new(
+                ctx,
+                self.points3d_buffer.buffer.as_ref().unwrap(),
+                self.stroke_widths.buffer.as_ref().unwrap(),
+                self.points2d_buffer.buffer.as_ref().unwrap(),
+                self.clip_info_buffer.buffer.as_ref().unwrap(),
+                self.point_cnt_buffer.as_ref().unwrap().as_ref(),
+            ));
+            self.render_bind_group = Some(RenderBindGroup::new(
+                ctx,
+                self.points2d_buffer.buffer.as_ref().unwrap(),
+                self.fill_rgbas.buffer.as_ref().unwrap(),
+                self.stroke_rgbas.buffer.as_ref().unwrap(),
+                self.stroke_widths.buffer.as_ref().unwrap(),
+                self.clip_info_buffer.buffer.as_ref().unwrap(),
+            ));
+        }
+    }
 }
 
 impl Default for VItemPrimitive {
@@ -89,67 +223,67 @@ impl Default for VItemPrimitive {
     }
 }
 
-impl VItemPrimitive {
-    pub fn update(
-        &mut self,
-        ctx: &WgpuContext,
-        render_points: &[Vec4],
-        fill_rgbas: &[Rgba],
-        stroke_rgbas: &[Rgba],
-        stroke_widths: &[Width],
-    ) {
-        // println!("update vitem primitive");
-        // println!("render_points: {:?}", render_points);
-        if self.point_cnt_buffer.is_none() {
-            self.point_cnt_buffer = Some(WgpuBuffer::new_init(
-                ctx,
-                Some("Point Cnt Buffer"),
-                wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                render_points.len() as u32,
-            ));
-        } else {
-            self.point_cnt_buffer
-                .as_mut()
-                .unwrap()
-                .set(ctx, render_points.len() as u32);
-        }
-        // Dynamic sized
-        if [
-            self.points3d_buffer.set(ctx, render_points),
-            self.fill_rgbas.set(ctx, fill_rgbas),
-            self.stroke_rgbas.set(ctx, stroke_rgbas),
-            self.stroke_widths.set(ctx, stroke_widths),
-            self.points2d_buffer.resize(ctx, render_points.len()),
-            self.clip_info_buffer
-                .set(ctx, &[i32::MAX, i32::MIN, i32::MAX, i32::MIN, 0]),
-            // This two should be all none or all some
-            self.compute_bind_group.is_none(),
-            // self.render_bind_group.is_none(),
-        ]
-        .iter()
-        .any(|x| *x)
-        {
-            self.compute_bind_group = Some(ComputeBindGroup::new(
-                ctx,
-                self.points3d_buffer.buffer.as_ref().unwrap(),
-                self.stroke_widths.buffer.as_ref().unwrap(),
-                self.points2d_buffer.buffer.as_ref().unwrap(),
-                self.clip_info_buffer.buffer.as_ref().unwrap(),
-                self.point_cnt_buffer.as_ref().unwrap().as_ref(),
-            ));
-            self.render_bind_group = Some(RenderBindGroup::new(
-                ctx,
-                self.points2d_buffer.buffer.as_ref().unwrap(),
-                self.fill_rgbas.buffer.as_ref().unwrap(),
-                self.stroke_rgbas.buffer.as_ref().unwrap(),
-                self.stroke_widths.buffer.as_ref().unwrap(),
-                self.clip_info_buffer.buffer.as_ref().unwrap(),
-            ));
-        }
-    }
-}
+// impl VItemPrimitive {
+//     pub fn update(
+//         &mut self,
+//         ctx: &WgpuContext,
+//         render_points: &[Vec4],
+//         fill_rgbas: &[Rgba],
+//         stroke_rgbas: &[Rgba],
+//         stroke_widths: &[Width],
+//     ) {
+//         // println!("update vitem primitive");
+//         // println!("render_points: {:?}", render_points);
+//         if self.point_cnt_buffer.is_none() {
+//             self.point_cnt_buffer = Some(WgpuBuffer::new_init(
+//                 ctx,
+//                 Some("Point Cnt Buffer"),
+//                 wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+//                 render_points.len() as u32,
+//             ));
+//         } else {
+//             self.point_cnt_buffer
+//                 .as_mut()
+//                 .unwrap()
+//                 .set(ctx, render_points.len() as u32);
+//         }
+//         // Dynamic sized
+//         if [
+//             self.points3d_buffer.set(ctx, render_points),
+//             self.fill_rgbas.set(ctx, fill_rgbas),
+//             self.stroke_rgbas.set(ctx, stroke_rgbas),
+//             self.stroke_widths.set(ctx, stroke_widths),
+//             self.points2d_buffer.resize(ctx, render_points.len()),
+//             self.clip_info_buffer
+//                 .set(ctx, &[i32::MAX, i32::MIN, i32::MAX, i32::MIN, 0]),
+//             // This two should be all none or all some
+//             self.compute_bind_group.is_none(),
+//             // self.render_bind_group.is_none(),
+//         ]
+//         .iter()
+//         .any(|x| *x)
+//         {
+//             self.compute_bind_group = Some(ComputeBindGroup::new(
+//                 ctx,
+//                 self.points3d_buffer.buffer.as_ref().unwrap(),
+//                 self.stroke_widths.buffer.as_ref().unwrap(),
+//                 self.points2d_buffer.buffer.as_ref().unwrap(),
+//                 self.clip_info_buffer.buffer.as_ref().unwrap(),
+//                 self.point_cnt_buffer.as_ref().unwrap().as_ref(),
+//             ));
+//             self.render_bind_group = Some(RenderBindGroup::new(
+//                 ctx,
+//                 self.points2d_buffer.buffer.as_ref().unwrap(),
+//                 self.fill_rgbas.buffer.as_ref().unwrap(),
+//                 self.stroke_rgbas.buffer.as_ref().unwrap(),
+//                 self.stroke_widths.buffer.as_ref().unwrap(),
+//                 self.clip_info_buffer.buffer.as_ref().unwrap(),
+//             ));
+//         }
+//     }
+// }
 
-impl RenderInstance for VItemPrimitive {
+impl Renderable for VItemPrimitive {
     fn encode_render_command(
         &self,
         ctx: &WgpuContext,
@@ -173,11 +307,7 @@ impl RenderInstance for VItemPrimitive {
             cpass.set_bind_group(0, uniforms_bind_group, &[]);
 
             cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
-            cpass.dispatch_workgroups(
-                ((self.points3d_buffer.get().len() + 255) / 256) as u32,
-                1,
-                1,
-            );
+            cpass.dispatch_workgroups(((self.points3d_buffer.len() + 255) / 256) as u32, 1, 1);
         }
         {
             let RenderTextures {
@@ -226,12 +356,11 @@ mod test {
 
     use crate::{
         context::WgpuContext,
-        items::{Blueprint, camera_frame::CameraFrame, vitem::Square},
+        items::{camera_frame::CameraFrame, vitem::Square, Blueprint},
         render::{
-            CameraUniforms, CameraUniformsBindGroup, RenderTextures,
-            primitives::{ExtractFrom, RenderInstance},
+            primitives::{Extract, Primitive, Renderable}, CameraUniforms, CameraUniformsBindGroup, RenderTextures
         },
-        utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
+        utils::{get_texture_data, wgpu::WgpuBuffer, PipelinesStorage},
     };
 
     use super::VItemPrimitive;
@@ -249,8 +378,7 @@ mod test {
         let vitem = Square(8.0).build();
 
         let mut pipelines = PipelinesStorage::default();
-        let mut render_instance = VItemPrimitive::default();
-        render_instance.update_from(&ctx, &vitem);
+        let vitem_primitive = VItemPrimitive::init(&ctx, &vitem.extract());
 
         let (width, height) = (1920, 1080);
         let frame_size = dvec2(8.0 * width as f64 / height as f64, 8.0);
@@ -325,7 +453,7 @@ mod test {
         let mut encoder = ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        render_instance.encode_render_command(
+        vitem_primitive.encode_render_command(
             &ctx,
             &mut pipelines,
             &mut encoder,
@@ -335,14 +463,14 @@ mod test {
             &mut wgpu_profiler,
         );
         ctx.queue.submit(Some(encoder.finish()));
-        let points3d = render_instance.points3d_buffer.read_buffer(&ctx).unwrap();
+        let points3d = vitem_primitive.points3d_buffer.read_buffer(&ctx).unwrap();
         let points3d = bytemuck::cast_slice::<_, Vec4>(&points3d);
         println!("points3d: {:?}", points3d);
-        let points2d = render_instance.points2d_buffer.read_buffer(&ctx).unwrap();
+        let points2d = vitem_primitive.points2d_buffer.read_buffer(&ctx).unwrap();
         let points2d = bytemuck::cast_slice::<_, Vec4>(&points2d);
         println!("points2d: {:?}", points2d);
 
-        let res = render_instance.clip_info_buffer.read_buffer(&ctx).unwrap();
+        let res = vitem_primitive.clip_info_buffer.read_buffer(&ctx).unwrap();
         let res: &[i32] = bytemuck::cast_slice(&res);
         println!("{:?}", res);
 
