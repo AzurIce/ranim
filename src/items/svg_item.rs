@@ -7,15 +7,15 @@ use log::warn;
 use crate::{
     color::{rgb8, rgba},
     components::Anchor,
-    context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
     render::primitives::{
-        ExtractFrom, RenderInstance, RenderInstances, svg_item::SvgItemPrimitive,
+        Extract,
+        svg_item::{SvgItemPrimitive, SvgItemPrimitiveData},
     },
     utils::{bezier::PathBuilder, math::interpolate_usize},
 };
 
-use super::{Entity, group::Group, vitem::VItem};
+use super::{group::Group, vitem::VItem};
 
 #[derive(Debug, Clone)]
 pub struct SvgItem {
@@ -102,90 +102,13 @@ impl Empty for SvgItem {
     }
 }
 
-impl Entity for SvgItem {
-    fn get_render_instance_for_entity<'a>(
-        &self,
-        render_instances: &'a RenderInstances,
-        entity_id: usize,
-    ) -> Option<&'a dyn RenderInstance> {
-        render_instances
-            .get_dynamic::<SvgItemPrimitive>(entity_id)
-            .map(|x| x as &dyn RenderInstance)
-    }
-    fn prepare_render_instance_for_entity(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-        entity_id: usize,
-    ) {
-        let render_instance = render_instances.get_dynamic_or_init::<SvgItemPrimitive>(entity_id);
-        render_instance.update_from(ctx, self);
-    }
-}
-
-// MARK: Extract impl
-
-impl ExtractFrom<SvgItem> for SvgItemPrimitive {
-    fn update_from(&mut self, ctx: &crate::context::WgpuContext, data: &SvgItem) {
-        // trace!("SvgItemPrimitive update vitems: {}", data.vitems.len());
-        if data.vitems.len() != self.vitem_primitives.len() {
-            // trace!("resizing vitem_primitives from {} to {}...", self.vitem_primitives.len(), data.vitems.len());
-            self.vitem_primitives
-                .resize_with(data.vitems.len(), Default::default);
+// MARK: Extract
+impl Extract for SvgItem {
+    type Primitive = SvgItemPrimitive;
+    fn extract(&self) -> <Self::Primitive as crate::render::primitives::Primitive>::Data {
+        SvgItemPrimitiveData {
+            vitem_datas: self.vitems.iter().map(|x| x.extract()).collect(),
         }
-        // trace!("updating vitem_primitives...");
-        self.vitem_primitives
-            .iter_mut()
-            .zip(data.vitems.iter())
-            .for_each(|(vitem_primitive, vitem)| {
-                ExtractFrom::<VItem>::update_from(vitem_primitive, ctx, vitem)
-            });
-        // let anchor_points_cnt = data
-        //     .vitems
-        //     .iter()
-        //     .map(|x| (x.vpoints.len() + 1) / 2)
-        //     .sum::<usize>();
-        // let mut render_points = Vec::with_capacity(anchor_points_cnt * 2 - 1);
-        // let mut fill_rgbas = Vec::with_capacity(anchor_points_cnt);
-        // let mut stroke_rgbas = Vec::with_capacity(anchor_points_cnt);
-        // let mut stroke_widths = Vec::with_capacity(anchor_points_cnt);
-
-        // for vitem in &data.vitems {
-        //     if vitem.vpoints.is_empty() {
-        //         continue;
-        //     }
-        //     let data = vitem.get_render_points();
-        //     render_points.extend_from_slice(&data);
-        //     render_points.push(data.last().cloned().unwrap());
-
-        //     let data = AsRef::<[Rgba]>::as_ref(&vitem.fill_rgbas);
-        //     fill_rgbas.extend_from_slice(data);
-        //     fill_rgbas.push(data.last().cloned().unwrap());
-
-        //     let data = AsRef::<[Rgba]>::as_ref(&vitem.stroke_rgbas);
-        //     stroke_rgbas.extend_from_slice(data);
-        //     stroke_rgbas.push(data.last().cloned().unwrap());
-
-        //     let data = AsRef::<[Width]>::as_ref(&vitem.stroke_widths);
-        //     stroke_widths.extend_from_slice(data);
-        //     stroke_widths.push(data.last().cloned().unwrap());
-        // }
-
-        // info!(
-        //     "SvgItem({} vitems) Extract len: {} {} {} {}",
-        //     data.vitems.len(),
-        //     render_points.len(),
-        //     fill_rgbas.len(),
-        //     stroke_rgbas.len(),
-        //     stroke_widths.len()
-        // );
-        // self.update(
-        //     ctx,
-        //     &render_points,
-        //     &fill_rgbas,
-        //     &stroke_rgbas,
-        //     &stroke_widths,
-        // );
     }
 }
 

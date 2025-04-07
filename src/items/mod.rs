@@ -1,20 +1,14 @@
-use std::rc::Rc;
-
 use group::Group;
 
 use crate::{
     RanimTimeline,
     animation::{AnimSchedule, AnimationSpan},
-    context::WgpuContext,
-    render::primitives::{RenderInstance, RenderInstances},
 };
 
 pub mod camera_frame;
 pub mod group;
 pub mod svg_item;
 pub mod vitem;
-
-pub type Item = Box<dyn Entity>;
 
 impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
     pub fn lagged_anim(
@@ -71,60 +65,26 @@ impl<'t, T: 'static> Rabject<'t, T> {
 
 // MARK: Entity
 
-/// A renderable entity in ranim
-///
-/// You can implement your own entity by implementing this trait.
-///
-/// In Ranim, every item `T` is just plain data. After [`RanimTimeline::insert`]ed to [`RanimTimeline`],
-/// the item will have an id and its corresponding [`crate::timeline::RabjectTimeline`].
-///
-/// The resources (buffer, texture, etc) rendering an item needs are called **RenderInstance**,
-/// and all of them are managed by ranim outside of timeline in a struct [`RenderInstances`].
-///
-/// The [`RenderInstances`] is basically a store of [`RenderInstance`]s based on [`std::collections::HashMap`].
-/// - The key is the combination of [`Rabject::id`] and [`RenderInstance`]'s [`std::any::TypeId`]
-/// - The value is the [`RenderInstance`]
-///
-/// For now, there are two types of [`RenderInstance`]:
-/// - [`crate::render::primitives::vitem::VItemPrimitive`]: The core primitive to render vectorized items.
-/// - [`crate::render::primitives::svg_item::SvgItemPrimitive`]
-///
-/// You can check the builtin implementations of [`Entity`] for mor details.
-///
-pub trait Entity {
-    fn get_render_instance_for_entity<'a>(
-        &self,
-        render_instances: &'a RenderInstances,
-        entity_id: usize,
-    ) -> Option<&'a dyn RenderInstance>;
-    fn prepare_render_instance_for_entity(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-        entity_id: usize,
-    );
-}
-
-impl<T: Entity + 'static> Entity for Rc<T> {
-    fn get_render_instance_for_entity<'a>(
-        &self,
-        render_instances: &'a RenderInstances,
-        entity_id: usize,
-    ) -> Option<&'a dyn RenderInstance> {
-        self.as_ref()
-            .get_render_instance_for_entity(render_instances, entity_id)
-    }
-    fn prepare_render_instance_for_entity(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-        entity_id: usize,
-    ) {
-        self.as_ref()
-            .prepare_render_instance_for_entity(ctx, render_instances, entity_id);
-    }
-}
-
+// /// A renderable entity in ranim
+// ///
+// /// You can implement your own entity by implementing this trait.
+// ///
+// /// In Ranim, every item `T` is just plain data. After [`RanimTimeline::insert`]ed to [`RanimTimeline`],
+// /// the item will have an id and its corresponding [`crate::timeline::RabjectTimeline`].
+// ///
+// /// The resources (buffer, texture, etc) rendering an item needs are called **RenderInstance**,
+// /// and all of them are managed by ranim outside of timeline in a struct [`RenderInstances`].
+// ///
+// /// The [`RenderInstances`] is basically a store of [`RenderInstance`]s based on [`std::collections::HashMap`].
+// /// - The key is the combination of [`Rabject::id`] and [`RenderInstance`]'s [`std::any::TypeId`]
+// /// - The value is the [`RenderInstance`]
+// ///
+// /// For now, there are two types of [`RenderInstance`]:
+// /// - [`crate::render::primitives::vitem::VItemPrimitive`]: The core primitive to render vectorized items.
+// /// - [`crate::render::primitives::svg_item::SvgItemPrimitive`]
+// ///
+// /// You can check the builtin implementations of [`Entity`] for mor details.
+// ///
 /// Blueprints are the data structures that are used to create an Item
 pub trait Blueprint<T> {
     fn build(self) -> T;

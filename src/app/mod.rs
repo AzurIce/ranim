@@ -260,18 +260,12 @@ impl AppState {
                 // let prev_last_idx = *last_idx;
                 // *last_idx = *idx as i32;
                 match res {
-                    EvalResult::Dynamic(res) => res.prepare_render_instance_for_entity(
-                        &ctx.wgpu_ctx,
-                        &mut self.render_instances,
-                        *id,
-                    ),
+                    EvalResult::Dynamic(res) => {
+                        res.prepare_for_id(&ctx.wgpu_ctx, &mut self.render_instances, *id)
+                    }
                     EvalResult::Static(res) => {
                         // if prev_last_idx != *idx as i32 {
-                        res.prepare_render_instance_for_entity(
-                            &ctx.wgpu_ctx,
-                            &mut self.render_instances,
-                            *id,
-                        )
+                        res.prepare_for_id(&ctx.wgpu_ctx, &mut self.render_instances, *id)
                         // }
                     }
                 }
@@ -282,12 +276,8 @@ impl AppState {
         let render_primitives = items
             .iter()
             .filter_map(|(id, res, _)| match res {
-                EvalResult::Dynamic(res) => {
-                    res.get_render_instance_for_entity(&self.render_instances, *id)
-                }
-                EvalResult::Static(res) => {
-                    res.get_render_instance_for_entity(&self.render_instances, *id)
-                }
+                EvalResult::Dynamic(res) => res.renderable_of_id(&self.render_instances, *id),
+                EvalResult::Static(res) => res.renderable_of_id(&self.render_instances, *id),
             })
             .collect::<Vec<_>>();
         let camera_frame = match &camera_frame.0 {

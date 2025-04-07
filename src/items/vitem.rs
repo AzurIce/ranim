@@ -7,12 +7,14 @@ use crate::{
         ComponentVec, HasTransform3dComponent, Transformable, rgba::Rgba, vpoint::VPoint,
         width::Width,
     },
-    context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::{ExtractFrom, RenderInstance, RenderInstances, vitem::VItemPrimitive},
+    render::primitives::{
+        Extract,
+        vitem::{VItemPrimitive, VItemPrimitiveData},
+    },
 };
 
-use super::{Blueprint, Entity};
+use super::Blueprint;
 
 /// A vectorized item.
 ///
@@ -67,9 +69,9 @@ impl AsMut<ComponentVec<VPoint>> for VItem {
 impl VItem {
     // TODO: remove all constructor to blueprint impl
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
-        let stroke_widths = vec![1.0; (vpoints.len() + 1) / 2];
-        let stroke_rgbas = vec![vec4(1.0, 0.0, 0.0, 1.0); (vpoints.len() + 1) / 2];
-        let fill_rgbas = vec![vec4(0.0, 1.0, 0.0, 0.5); (vpoints.len() + 1) / 2];
+        let stroke_widths = vec![1.0; vpoints.len().div_ceil(2)];
+        let stroke_rgbas = vec![vec4(1.0, 0.0, 0.0, 1.0); vpoints.len().div_ceil(2)];
+        let fill_rgbas = vec![vec4(0.0, 1.0, 0.0, 0.5); vpoints.len().div_ceil(2)];
         Self {
             vpoints: vpoints.into(),
             stroke_rgbas: stroke_rgbas.into(),
@@ -83,9 +85,9 @@ impl VItem {
             .extend_from_vec(vpoints.iter().cloned().map(Into::into).collect());
 
         let len = self.vpoints.len();
-        self.fill_rgbas.resize_with_last((len + 1) / 2);
-        self.stroke_rgbas.resize_with_last((len + 1) / 2);
-        self.stroke_widths.resize_with_last((len + 1) / 2);
+        self.fill_rgbas.resize_with_last(len.div_ceil(2));
+        self.stroke_rgbas.resize_with_last(len.div_ceil(2));
+        self.stroke_widths.resize_with_last(len.div_ceil(2));
     }
 
     pub(crate) fn get_render_points(&self) -> Vec<Vec4> {
@@ -104,38 +106,16 @@ impl VItem {
     }
 }
 
-// MARK: Entity impl
-impl Entity for VItem {
-    fn get_render_instance_for_entity<'a>(
-        &self,
-        render_instances: &'a RenderInstances,
-        entity_id: usize,
-    ) -> Option<&'a dyn RenderInstance> {
-        render_instances
-            .get_dynamic::<VItemPrimitive>(entity_id)
-            .map(|x| x as &dyn RenderInstance)
-    }
-    fn prepare_render_instance_for_entity(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-        entity_id: usize,
-    ) {
-        let render_instance = render_instances.get_dynamic_or_init::<VItemPrimitive>(entity_id);
-        render_instance.update_from(ctx, self);
-    }
-}
-
-// MARK: Extract impl
-impl ExtractFrom<VItem> for VItemPrimitive {
-    fn update_from(&mut self, ctx: &WgpuContext, data: &VItem) {
-        self.update(
-            ctx,
-            &data.get_render_points(),
-            &data.fill_rgbas,
-            &data.stroke_rgbas,
-            &data.stroke_widths,
-        );
+// MARK: Extract
+impl Extract for VItem {
+    type Primitive = VItemPrimitive;
+    fn extract(&self) -> <Self::Primitive as crate::render::primitives::Primitive>::Data {
+        VItemPrimitiveData {
+            points2d: self.get_render_points(),
+            fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
+            stroke_rgbas: self.stroke_rgbas.iter().cloned().collect(),
+            stroke_widths: self.stroke_widths.iter().cloned().collect(),
+        }
     }
 }
 
