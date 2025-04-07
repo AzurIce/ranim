@@ -4,15 +4,14 @@ use itertools::Itertools;
 
 use crate::{
     components::{
-        ComponentVec, HasTransform3dComponent, Transformable, rgba::Rgba, vpoint::VPoint,
-        width::Width,
+        rgba::Rgba, vpoint::VPoint, width::Width, ComponentVec, HasTransform3dComponent, Transformable
     },
     context::WgpuContext,
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::{ExtractFrom, RenderInstance, RenderInstances, vitem::VItemPrimitive},
+    render::primitives::{vitem::{VItemPrimitive, VItemPrimitiveData}, Extract,  RenderInstances, Renderable},
 };
 
-use super::{Blueprint, Entity};
+use super::{Blueprint};
 
 /// A vectorized item.
 ///
@@ -105,39 +104,50 @@ impl VItem {
 }
 
 // MARK: Entity impl
-impl Entity for VItem {
-    fn get_render_instance_for_entity<'a>(
-        &self,
-        render_instances: &'a RenderInstances,
-        entity_id: usize,
-    ) -> Option<&'a dyn RenderInstance> {
-        render_instances
-            .get_dynamic::<VItemPrimitive>(entity_id)
-            .map(|x| x as &dyn RenderInstance)
-    }
-    fn prepare_render_instance_for_entity(
-        &self,
-        ctx: &WgpuContext,
-        render_instances: &mut RenderInstances,
-        entity_id: usize,
-    ) {
-        let render_instance = render_instances.get_dynamic_or_init::<VItemPrimitive>(entity_id);
-        render_instance.update_from(ctx, self);
+impl Extract for VItem {
+    type Primitive = VItemPrimitive;
+    fn extract(&self) -> <Self::Primitive as crate::render::primitives::Primitive>::Data {
+        VItemPrimitiveData {
+            points2d: self.get_render_points(),
+            fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
+            stroke_rgbas: self.stroke_rgbas.iter().cloned().collect(),
+            stroke_widths: self.stroke_widths.iter().cloned().collect(),
+        }
     }
 }
+// impl Entity for VItem {
+//     fn get_render_instance_for_entity<'a>(
+//         &self,
+//         render_instances: &'a RenderInstances,
+//         entity_id: usize,
+//     ) -> Option<&'a dyn Renderable> {
+//         render_instances
+//             .get_dynamic::<VItemPrimitive>(entity_id)
+//             .map(|x| x as &dyn Renderable)
+//     }
+//     fn prepare_render_instance_for_entity(
+//         &self,
+//         ctx: &WgpuContext,
+//         render_instances: &mut RenderInstances,
+//         entity_id: usize,
+//     ) {
+//         let render_instance = render_instances.get_dynamic_or_init::<VItemPrimitive>(entity_id);
+//         render_instance.update_from(ctx, self);
+//     }
+// }
 
-// MARK: Extract impl
-impl ExtractFrom<VItem> for VItemPrimitive {
-    fn update_from(&mut self, ctx: &WgpuContext, data: &VItem) {
-        self.update(
-            ctx,
-            &data.get_render_points(),
-            &data.fill_rgbas,
-            &data.stroke_rgbas,
-            &data.stroke_widths,
-        );
-    }
-}
+// // MARK: Extract impl
+// impl ExtractFrom<VItem> for VItemPrimitive {
+//     fn update_from(&mut self, ctx: &WgpuContext, data: &VItem) {
+//         self.update(
+//             ctx,
+//             &data.get_render_points(),
+//             &data.fill_rgbas,
+//             &data.stroke_rgbas,
+//             &data.stroke_widths,
+//         );
+//     }
+// }
 
 // MARK: Anim traits impl
 impl Alignable for VItem {

@@ -4,7 +4,7 @@ pub mod primitives;
 use color::LinearSrgb;
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Rgba};
-use primitives::RenderInstance;
+use primitives::Renderable;
 
 use crate::{
     color::rgba8,
@@ -261,7 +261,7 @@ impl Renderer {
         self.output_texture_updated = false;
     }
 
-    pub fn render(&mut self, ctx: &mut RanimContext, renderable: &impl RenderInstance) {
+    pub fn render(&mut self, ctx: &mut RanimContext, renderable: &impl Renderable) {
         self.clear_screen(&ctx.wgpu_ctx);
         let mut encoder = ctx
             .wgpu_ctx
