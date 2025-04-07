@@ -1,13 +1,41 @@
 use crate::render::RenderTextures;
 
-use super::{RenderInstance, vitem::VItemPrimitive};
+use super::{
+    Primitive, Renderable,
+    vitem::{VItemPrimitive, VItemPrimitiveData},
+};
 
 #[derive(Default)]
 pub struct SvgItemPrimitive {
     pub(crate) vitem_primitives: Vec<VItemPrimitive>,
 }
 
-impl RenderInstance for SvgItemPrimitive {
+pub struct SvgItemPrimitiveData {
+    pub vitem_datas: Vec<VItemPrimitiveData>,
+}
+
+impl Primitive for SvgItemPrimitive {
+    type Data = SvgItemPrimitiveData;
+
+    fn init(ctx: &crate::context::WgpuContext, data: &Self::Data) -> Self {
+        let vitem_primitives = data
+            .vitem_datas
+            .iter()
+            .map(|vitem_primitive| VItemPrimitive::init(ctx, vitem_primitive))
+            .collect();
+        Self { vitem_primitives }
+    }
+    fn update(&mut self, ctx: &crate::context::WgpuContext, data: &Self::Data) {
+        self.vitem_primitives
+            .iter_mut()
+            .zip(data.vitem_datas.iter())
+            .for_each(|(vitem_primitive, vitem_data)| {
+                vitem_primitive.update(ctx, vitem_data);
+            });
+    }
+}
+
+impl Renderable for SvgItemPrimitive {
     fn encode_render_command(
         &self,
         ctx: &crate::context::WgpuContext,

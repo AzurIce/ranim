@@ -5,7 +5,7 @@ pub mod transform;
 
 use crate::{
     items::{Rabject, group::Group},
-    timeline::EntityTimelineStaticState,
+    timeline::RanimItem,
     utils::rate_functions::linear,
 };
 
@@ -18,12 +18,6 @@ use std::{any::Any, fmt::Debug, iter::Once, rc::Rc};
 pub trait EvalDynamic<T> {
     fn eval_alpha(&self, alpha: f64) -> T;
 }
-
-// impl<T: EntityTimelineStaticState + EvalDynamic<T>> EvalDynamic<T::StateType> for T {
-//     fn eval_alpha(&self, alpha: f64) -> T::StateType {
-//         EvalDynamic::<T>::eval_alpha(self, alpha).into_state_type()
-//     }
-// }
 
 pub trait ToEvaluator<T> {
     fn to_evaluator(self) -> Evaluator<T>
@@ -75,6 +69,15 @@ pub enum EvalResult<T> {
 }
 
 impl<T: Clone> EvalResult<T> {
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> EvalResult<U> {
+        match self {
+            Self::Dynamic(t) => EvalResult::Dynamic(f(t)),
+            Self::Static(rc) => EvalResult::Static(Rc::new(f((*rc).clone()))),
+        }
+    }
+}
+
+impl<T: Clone> EvalResult<T> {
     pub fn into_owned(self) -> T {
         match self {
             Self::Dynamic(t) => t,
@@ -103,15 +106,6 @@ pub struct EvalAdapter<T> {
     pub inner: Box<dyn Eval<T>>,
 }
 
-impl<T: EntityTimelineStaticState + Clone + 'static> Eval<T::StateType> for EvalAdapter<T> {
-    fn eval_alpha(&self, alpha: f64) -> EvalResult<T::StateType> {
-        match self.inner.eval_alpha(alpha) {
-            EvalResult::Dynamic(res) => EvalResult::Dynamic(res.into_state_type()),
-            EvalResult::Static(res) => EvalResult::Static(res.into_rc_state_type()),
-        }
-    }
-}
-
 // MARK: Animation
 pub struct AnimationSpan<T> {
     pub(crate) type_name: String,
@@ -128,20 +122,6 @@ impl<T> Debug for AnimationSpan<T> {
             "Animation {{ duration_secs: {}, padding: {:?}, rate_func: {:?} }}",
             self.duration_secs, self.padding, self.rate_func
         )
-    }
-}
-
-impl<T: EntityTimelineStaticState + Clone + 'static> AnimationSpan<T> {
-    pub fn into_state_type(self) -> AnimationSpan<T::StateType> {
-        AnimationSpan {
-            type_name: self.type_name,
-            evaluator: Box::new(EvalAdapter {
-                inner: self.evaluator,
-            }),
-            rate_func: self.rate_func,
-            duration_secs: self.duration_secs,
-            padding: self.padding,
-        }
     }
 }
 
@@ -297,7 +277,7 @@ impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
     }
 }
 
-impl<T: EntityTimelineStaticState + Clone + 'static> AnimSchedule<'_, '_, T> {
+impl<T: RanimItem + Clone + 'static> AnimSchedule<'_, '_, T> {
     pub fn apply(self) -> Self {
         if let EvalResult::Dynamic(res) = self.anim.eval_alpha(1.0) {
             self.rabject.data = res;
@@ -306,7 +286,7 @@ impl<T: EntityTimelineStaticState + Clone + 'static> AnimSchedule<'_, '_, T> {
     }
 }
 
-impl<T: EntityTimelineStaticState + Clone + 'static> Group<AnimSchedule<'_, '_, T>> {
+impl<T: RanimItem + Clone + 'static> Group<AnimSchedule<'_, '_, T>> {
     pub fn apply(mut self) -> Self {
         self.iter_mut().for_each(|schedule| {
             if let EvalResult::Dynamic(res) = schedule.anim.eval_alpha(1.0) {
