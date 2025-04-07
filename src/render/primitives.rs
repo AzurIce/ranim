@@ -6,7 +6,7 @@ use std::{
     collections::HashMap,
 };
 
-use crate::{context::WgpuContext};
+use crate::context::WgpuContext;
 
 use super::RenderTextures;
 
@@ -30,12 +30,19 @@ pub trait Renderable {
     fn debug(&self, _ctx: &WgpuContext) {}
 }
 
+/// Extract is the process of getting [`Primitive::Data`] from an item.
+///
+/// If [`Primitive::Data`] is [`Renderable`], then [`RenderableItem`] will be automatically implemented.
 pub trait Extract {
     type Primitive: Primitive;
     fn extract(&self) -> <Self::Primitive as Primitive>::Data;
 }
 
 /// RenderableItem is what can [`Extract`] to a [`Renderable`] [`Primitive`].
+/// This is automatically implemented for all types that implement [`Extract<Primitive = P>`]
+/// where `P` implements [`Renderable`] and [`Primitive`].
+///
+/// If you want to implement your own [`RenderableItem`], all you need to do is implement [`Extract`].
 pub trait RenderableItem {
     fn prepare_for_id(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances, id: usize);
     fn renderable_of_id<'a>(

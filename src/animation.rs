@@ -4,7 +4,9 @@ pub mod fading;
 pub mod transform;
 
 use crate::{
-    items::{group::Group, Rabject}, timeline::RanimItem, utils::rate_functions::linear
+    items::{Rabject, group::Group},
+    timeline::RanimItem,
+    utils::rate_functions::linear,
 };
 
 #[allow(unused)]

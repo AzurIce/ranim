@@ -10,7 +10,7 @@ use std::ops::{Deref, DerefMut};
 /// let group = Group(vec![1, 2, 3, 4]);
 /// ```
 ///
-/// # Group of [`crate::items::Item`]s
+/// # Group of items
 ///
 /// For convinience, [`Group<T>`] also implements [`FromIterator`] and
 /// [`IntoIterator<Item = T>`], so it can be collected from an iterator,
@@ -33,11 +33,11 @@ use std::ops::{Deref, DerefMut};
 /// ```
 ///
 /// A group of items can be inserted into the timeline with
-/// [`crate::timeline::RanimTimeline::insert_group`] to get
+/// [`crate::timeline::RanimTimeline::insert`] to get
 /// a group of [`crate::items::Rabject`]s:
 ///
 /// ```rust
-/// let group = timeline.insert_group(group);
+/// let group = timeline.insert(group); // returns `Group<Rabject<T>>`
 /// ```
 ///
 /// # Group of [`crate::items::Rabject`]s

@@ -1,21 +1,14 @@
-use std::rc::Rc;
-
 use group::Group;
 
 use crate::{
     RanimTimeline,
     animation::{AnimSchedule, AnimationSpan},
-    context::WgpuContext,
-    render::primitives::{Renderable, RenderInstances},
 };
 
 pub mod camera_frame;
 pub mod group;
 pub mod svg_item;
 pub mod vitem;
-
-
-// pub type Item = Box<dyn Entity>;
 
 impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
     pub fn lagged_anim(
@@ -92,40 +85,6 @@ impl<'t, T: 'static> Rabject<'t, T> {
 // ///
 // /// You can check the builtin implementations of [`Entity`] for mor details.
 // ///
-// pub trait Entity {
-//     fn get_render_instance_for_entity<'a>(
-//         &self,
-//         render_instances: &'a RenderInstances,
-//         entity_id: usize,
-//     ) -> Option<&'a dyn Renderable>;
-//     fn prepare_render_instance_for_entity(
-//         &self,
-//         ctx: &WgpuContext,
-//         render_instances: &mut RenderInstances,
-//         entity_id: usize,
-//     );
-// }
-
-// impl<T: Entity + 'static> Entity for Rc<T> {
-//     fn get_render_instance_for_entity<'a>(
-//         &self,
-//         render_instances: &'a RenderInstances,
-//         entity_id: usize,
-//     ) -> Option<&'a dyn Renderable> {
-//         self.as_ref()
-//             .get_render_instance_for_entity(render_instances, entity_id)
-//     }
-//     fn prepare_render_instance_for_entity(
-//         &self,
-//         ctx: &WgpuContext,
-//         render_instances: &mut RenderInstances,
-//         entity_id: usize,
-//     ) {
-//         self.as_ref()
-//             .prepare_render_instance_for_entity(ctx, render_instances, entity_id);
-//     }
-// }
-
 /// Blueprints are the data structures that are used to create an Item
 pub trait Blueprint<T> {
     fn build(self) -> T;
