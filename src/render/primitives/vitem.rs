@@ -307,7 +307,7 @@ impl Renderable for VItemPrimitive {
             cpass.set_bind_group(0, uniforms_bind_group, &[]);
 
             cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
-            cpass.dispatch_workgroups(((self.points3d_buffer.len() + 255) / 256) as u32, 1, 1);
+            cpass.dispatch_workgroups(self.points3d_buffer.len().div_ceil(256) as u32, 1, 1);
         }
         {
             let RenderTextures {
@@ -356,11 +356,12 @@ mod test {
 
     use crate::{
         context::WgpuContext,
-        items::{camera_frame::CameraFrame, vitem::Square, Blueprint},
+        items::{Blueprint, camera_frame::CameraFrame, vitem::Square},
         render::{
-            primitives::{Extract, Primitive, Renderable}, CameraUniforms, CameraUniformsBindGroup, RenderTextures
+            CameraUniforms, CameraUniformsBindGroup, RenderTextures,
+            primitives::{Extract, Primitive, Renderable},
         },
-        utils::{get_texture_data, wgpu::WgpuBuffer, PipelinesStorage},
+        utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
     };
 
     use super::VItemPrimitive;

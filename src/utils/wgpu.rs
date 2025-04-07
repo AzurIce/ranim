@@ -123,7 +123,12 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         }
     }
 
-    pub(crate) fn new_init(ctx: &WgpuContext, label: Option<&'static str>, usage: wgpu::BufferUsages, data: &[T]) -> Self {
+    pub(crate) fn new_init(
+        ctx: &WgpuContext,
+        label: Option<&'static str>,
+        usage: wgpu::BufferUsages,
+        data: &[T],
+    ) -> Self {
         let mut buffer = Self::new(label, usage);
         buffer.set(ctx, data);
         buffer

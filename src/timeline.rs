@@ -13,6 +13,7 @@ pub enum TimeMark {
     Capture(String),
 }
 
+#[allow(clippy::type_complexity)]
 pub struct TimelineEvalResult {
     pub camera_frame: (EvalResult<CameraFrame>, usize),
     /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `animation idx` in the corresponding timeline)
@@ -20,7 +21,7 @@ pub struct TimelineEvalResult {
 }
 
 // MARK: TimelineInsert
-/// For type `T` that implements [`EntityTimelineStaticState`],
+/// For type `T` that implements [`RanimItem`],
 ///
 /// `T` and `impl IntoIterator<Item = T>` can be inserted into the timeline.
 /// This is accomplished by two implementations of this trait, with different `Mark` type:
@@ -58,6 +59,16 @@ where
     }
 }
 
+/// An item that can be inserted into ranim's timeline
+///
+/// The item `T` will be inserted into a [`RabjectTimeline<T>`],
+/// and the [`RabjectTimeline<T>`] will be inserted into a [`RanimTimeline`] with type erased.
+///
+/// For now, there are two fixed types of [`RanimItem`], and they will be erased to different types:
+/// - [`CameraFrame`]: A camera frame.
+///   It will be erased to [`Timeline::CameraFrame`], which has a boxed [`AnyTimelineTrait`] in it.
+/// - [`RenderableItem`]: A renderable item
+///   It will be erased to [`Timeline::RenderableItem`], which has a boxed [`RenderableTimelineTrait`] in it.
 pub trait RanimItem {
     fn insert_into_timeline(self, timeline: &RanimTimeline) -> Rabject<Self>
     where
@@ -394,9 +405,7 @@ pub trait RenderableTimelineTrait: TimelineTrait {
 
 impl<T: Clone + RenderableItem + 'static> RenderableTimelineTrait for RabjectTimeline<T> {
     fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<Box<dyn RenderableItem>>, usize)> {
-        let Some((item, idx)) = self.eval_alpha(alpha) else {
-            return None;
-        };
+        let (item, idx) = self.eval_alpha(alpha)?;
         let item = item.map(|item| Box::new(item) as Box<dyn RenderableItem>);
         Some((item, idx))
     }
