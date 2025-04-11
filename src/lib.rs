@@ -36,6 +36,7 @@ pub mod prelude {
     pub use crate::traits::*;
 
     pub use crate::items::Blueprint;
+    pub use crate::items::LaggedAnim;
 
     pub use crate::components::Transformable;
 }
@@ -268,7 +269,8 @@ impl RanimRenderApp {
             (cpu_server, gpu_server)
         };
 
-        let frames = (timeline.duration_secs() * self.fps as f64).ceil() as usize;
+        let frames = timeline.duration_secs() * self.fps as f64;
+        let frames = frames.ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(

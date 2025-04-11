@@ -1,6 +1,5 @@
 use darling::{Error, FromMeta, ast::NestedMeta};
 use heck::AsSnekCase;
-use paste::paste;
 use proc_macro::TokenStream;
 
 #[derive(Default, Debug, FromMeta)]

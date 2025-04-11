@@ -7,7 +7,6 @@ use crate::{
     RanimTimeline,
     animation::{AnimSchedule, AnimationSpan},
     timeline::{ItemMark, TimelineItem},
-    traits::Empty,
 };
 
 pub mod camera_frame;
@@ -15,17 +14,28 @@ pub mod group;
 pub mod svg_item;
 pub mod vitem;
 
-impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
-    pub fn lagged_anim(
+pub trait LaggedAnim<'r, 't, T> {
+    fn lagged_anim(
+        &'r mut self,
+        lag_ratio: f64,
+        anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
+    ) -> Group<AnimSchedule<'r, 't, T>>;
+}
+
+impl<'r, 't: 'r, T: 'r, R> LaggedAnim<'r, 't, T> for R
+where
+    R: ItemRabject<'t, 'r, T> + ?Sized,
+{
+    fn lagged_anim(
         &'r mut self,
         lag_ratio: f64,
         anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
     ) -> Group<AnimSchedule<'r, 't, T>> {
-        let n = self.as_ref().len();
+        let iter = self.iter_mut();
 
-        let mut anim_schedules = self
-            .as_mut()
-            .iter_mut()
+        let n = iter.len();
+
+        let mut anim_schedules = iter
             .map(|rabject| (anim_builder.clone())(rabject))
             .collect::<Group<_>>();
 
@@ -42,10 +52,43 @@ impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
     }
 }
 
-// #[item]
+// impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
+//     pub fn lagged_anim(
+//         &'r mut self,
+//         lag_ratio: f64,
+//         anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
+//     ) -> Group<AnimSchedule<'r, 't, T>> {
+//         let n = self.as_ref().len();
+
+//         let mut anim_schedules = self
+//             .as_mut()
+//             .iter_mut()
+//             .map(|rabject| (anim_builder.clone())(rabject))
+//             .collect::<Group<_>>();
+
+//         let duration = anim_schedules[0].anim.duration_secs;
+//         let lag_time = duration * lag_ratio;
+//         anim_schedules
+//             .iter_mut()
+//             .enumerate()
+//             .for_each(|(i, schedule)| {
+//                 schedule.anim.padding = (i as f64 * lag_time, (n - i - 1) as f64 * lag_time);
+//                 // println!("{} {:?} {}", schedule.anim.span_len(), schedule.anim.padding, schedule.anim.duration_secs);
+//             });
+//         anim_schedules
+//     }
+// }
+
+#[item]
 pub struct Arrow {
     tip: VItem,
     line: VItem,
+}
+
+impl Default for Arrow {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Arrow {
@@ -67,10 +110,42 @@ impl<'t> TimelineItem<'t, ItemMark> for Arrow {
     }
 }
 
-impl<'t> ArrowRabject<'t> {
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Rabject<'t, VItem>> {
-        let mut_parts = self.mut_parts();
-        [mut_parts.tip, mut_parts.line].into_iter()
+impl<'t: 'r, 'r> IntoIterator for &'r mut ArrowRabject<'t> {
+    type Item = &'r mut Rabject<'t, VItem>;
+    type IntoIter = std::array::IntoIter<&'r mut Rabject<'t, VItem>, 2>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        [&mut self.tip, &mut self.line].into_iter()
+    }
+}
+
+pub trait ItemRabject<'t: 'r, 'r, T> {
+    fn iter_mut<'a, 'b>(&'a mut self) -> impl ExactSizeIterator<Item = &'b mut Rabject<'t, T>>
+    where
+        'a: 'b,
+        't: 'b,
+        T: 'b;
+}
+
+impl<'t: 'r, 'r, T> ItemRabject<'t, 'r, T> for [Rabject<'t, T>] {
+    fn iter_mut<'a, 'b>(&'a mut self) -> impl ExactSizeIterator<Item = &'b mut Rabject<'t, T>>
+    where
+        'a: 'b,
+        't: 'b,
+        T: 'b,
+    {
+        self.iter_mut()
+    }
+}
+
+impl<'t: 'r, 'r> ItemRabject<'t, 'r, VItem> for ArrowRabject<'t> {
+    fn iter_mut<'a, 'b>(&'a mut self) -> impl ExactSizeIterator<Item = &'b mut Rabject<'t, VItem>>
+    where
+        'a: 'b,
+        't: 'b,
+        VItem: 'b,
+    {
+        [&mut self.tip, &mut self.line].into_iter()
     }
 }
 
@@ -96,32 +171,32 @@ impl<'a, T: MutParts<'a, Mut = ArrowMutParts<'a>>> ArrowMethods<'a> for T {
     }
 }
 
-// Example usage:
-fn foo() {
-    let timeline = RanimTimeline::new();
+// // Example usage:
+// fn foo() {
+//     let timeline = RanimTimeline::new();
 
-    let mut arrow = Arrow {
-        tip: VItem::empty(),
-        line: VItem::empty(),
-    };
+//     let mut arrow = Arrow {
+//         tip: VItem::empty(),
+//         line: VItem::empty(),
+//     };
 
-    arrow.set_tip(VItem::empty());
+//     arrow.set_tip(VItem::empty());
 
-    let mut arrow_rabject = ArrowRabject {
-        tip: Rabject {
-            timeline: &timeline,
-            id: 0,
-            data: arrow.tip,
-        },
-        line: Rabject {
-            timeline: &timeline,
-            id: 1,
-            data: arrow.line,
-        },
-    };
+//     let mut arrow_rabject = ArrowRabject {
+//         tip: Rabject {
+//             timeline: &timeline,
+//             id: 0,
+//             data: arrow.tip,
+//         },
+//         line: Rabject {
+//             timeline: &timeline,
+//             id: 1,
+//             data: arrow.line,
+//         },
+//     };
 
-    arrow_rabject.set_tip(VItem::empty());
-}
+//     arrow_rabject.set_tip(VItem::empty());
+// }
 
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///

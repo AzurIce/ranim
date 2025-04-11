@@ -8,7 +8,8 @@ use glam::{DVec3, dvec3};
 use ranim::{
     animation::{
         creation::{CreationAnim, WritingAnim},
-        transform::{TransformAnim, TransformAnimSchedule},
+        fading::FadingAnimSchedule,
+        transform::{GroupTransformAnimSchedule, TransformAnim, TransformAnimSchedule},
     },
     components::{Anchor, ScaleHint},
     items::{
@@ -31,11 +32,14 @@ impl TimelineConstructor for TestScene {
     fn construct<'t: 'r, 'r>(
         self,
         timeline: &'t RanimTimeline,
-        camera: &'r mut Rabject<'t, CameraFrame>,
+        _camera: &'r mut Rabject<'t, CameraFrame>,
     ) {
         let arrow = Arrow::new();
         let mut arrow = timeline.insert(arrow);
-        timeline.play(arrow.iter_mut().lagged_anim(0.2, |part| part.fade_in()));
+        timeline.play(arrow.lagged_anim(0.2, |part| part.fade_in()));
+        timeline.play(arrow.transform(|data| {
+            data.rotate(PI / 2.0, DVec3::Y);
+        }));
         timeline.forward(1.0);
         // let _item = Square(500.0).build();
         // let mut vitem = Group::<VItem>::from_svg(typst_svg!(
@@ -84,7 +88,8 @@ fn main() {
     //     },
     // );
     #[cfg(not(feature = "app"))]
-    render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
+    render_scene(TestScene, &AppOptions::default());
+    // render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
 
     // reuires "app" feature
     #[cfg(feature = "app")]

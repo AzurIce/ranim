@@ -1,6 +1,6 @@
 use super::{AnimSchedule, AnimationSpan, EvalDynamic, Rabject, ToEvaluator};
 use crate::{
-    items::group::Group,
+    items::{ItemRabject, group::Group},
     traits::{Alignable, Interpolatable},
     utils::rate_functions::smooth,
 };
@@ -45,12 +45,14 @@ pub trait GroupTransformAnimSchedule<'r, 't, T: TransformRequirement + 'static> 
     fn transform_to<E: Into<T>>(&'r mut self, d: Group<E>) -> Group<AnimSchedule<'r, 't, T>>;
 }
 
-impl<'r, 't, T: TransformRequirement + 'static> GroupTransformAnimSchedule<'r, 't, T>
-    for [Rabject<'t, T>]
+impl<'t: 'r, 'r, T, R> GroupTransformAnimSchedule<'r, 't, T> for R
+where
+    T: TransformRequirement + 'static,
+    R: ItemRabject<'t, 'r, T> + ?Sized,
 {
     fn transform<F: Fn(&mut Group<T>)>(&'r mut self, f: F) -> Group<AnimSchedule<'r, 't, T>> {
         let data = self
-            .iter()
+            .iter_mut()
             .map(|rabject| rabject.data.clone())
             .collect::<Group<T>>();
         self.iter_mut()
@@ -60,7 +62,7 @@ impl<'r, 't, T: TransformRequirement + 'static> GroupTransformAnimSchedule<'r, '
     }
     fn transform_from<E: Into<T>>(&'r mut self, s: Group<E>) -> Group<AnimSchedule<'r, 't, T>> {
         let data = self
-            .iter()
+            .iter_mut()
             .map(|rabject| rabject.data.clone())
             .collect::<Group<T>>();
         self.iter_mut()
@@ -70,7 +72,7 @@ impl<'r, 't, T: TransformRequirement + 'static> GroupTransformAnimSchedule<'r, '
     }
     fn transform_to<E: Into<T>>(&'r mut self, d: Group<E>) -> Group<AnimSchedule<'r, 't, T>> {
         let data = self
-            .iter()
+            .iter_mut()
             .map(|rabject| rabject.data.clone())
             .collect::<Group<T>>();
         self.iter_mut()
