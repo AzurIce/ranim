@@ -273,10 +273,10 @@ impl RanimTimeline {
         self.time_marks.borrow().clone()
     }
     pub fn eval_sec(&self, local_sec: f64) -> TimelineEvalResult {
-        self.eval_alpha_new(local_sec / *self.max_elapsed_secs.borrow())
+        self.eval_alpha(local_sec / *self.max_elapsed_secs.borrow())
     }
 
-    pub fn eval_alpha_new(&self, alpha: f64) -> TimelineEvalResult {
+    pub fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
         let timelines = self.timelines.borrow_mut();
 
         let mut items = Vec::with_capacity(timelines.len());

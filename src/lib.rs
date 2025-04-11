@@ -296,7 +296,7 @@ impl RanimRenderApp {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("eval");
 
-                    timeline.eval_alpha_new(alpha)
+                    timeline.eval_alpha(alpha)
                 };
 
                 {

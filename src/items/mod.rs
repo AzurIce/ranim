@@ -1,8 +1,9 @@
 use group::Group;
+use ranim_macros::item;
+use vitem::VItem;
 
 use crate::{
-    RanimTimeline,
-    animation::{AnimSchedule, AnimationSpan},
+    animation::{AnimSchedule, AnimationSpan}, traits::Empty, RanimTimeline
 };
 
 pub mod camera_frame;
@@ -35,6 +36,61 @@ impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
             });
         anim_schedules
     }
+}
+
+#[item]
+pub struct Arrow {
+    tip: VItem,
+    line: VItem,
+}
+
+pub trait MutParts<'a> {
+    type Owned;
+    type Mut: 'a;
+    fn mut_parts(&'a mut self) -> Self::Mut;
+    fn owned(&'a self) -> Self::Owned;
+}
+
+pub trait ArrowMethods<'a>: MutParts<'a, Mut = ArrowMutParts<'a>> {
+    fn set_tip(&'a mut self, tip: VItem);
+    fn set_line(&'a mut self, line: VItem);
+}
+
+impl<'a, T: MutParts<'a, Mut = ArrowMutParts<'a>>> ArrowMethods<'a> for T {
+    fn set_tip(&'a mut self, tip: VItem) {
+        *self.mut_parts().tip = tip;
+    }
+
+    fn set_line(&'a mut self, line: VItem) {
+        *self.mut_parts().line = line;
+    }
+}
+
+// Example usage:
+fn foo() {
+    let timeline = RanimTimeline::new();
+
+    let mut arrow = Arrow {
+        tip: VItem::empty(),
+        line: VItem::empty(),
+    };
+
+    arrow.set_tip(VItem::empty());
+
+    let mut arrow_rabject = ArrowRabject {
+        tip: Rabject {
+            timeline: &timeline,
+            id: 0,
+            data: arrow.tip,
+        },
+        line: Rabject {
+            timeline: &timeline,
+            id: 1,
+            data: arrow.line,
+        },
+    };
+
+    arrow_rabject.set_tip(VItem::empty());
 }
 
 /// An `Rabject` is a wrapper of an entity that can be rendered.
