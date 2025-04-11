@@ -1,9 +1,13 @@
+use glam::DVec3;
 use group::Group;
 use ranim_macros::item;
-use vitem::VItem;
+use vitem::{Circle, Line, VItem};
 
 use crate::{
-    animation::{AnimSchedule, AnimationSpan}, traits::Empty, RanimTimeline
+    RanimTimeline,
+    animation::{AnimSchedule, AnimationSpan},
+    timeline::{ItemMark, TimelineItem},
+    traits::Empty,
 };
 
 pub mod camera_frame;
@@ -38,10 +42,36 @@ impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
     }
 }
 
-#[item]
+// #[item]
 pub struct Arrow {
     tip: VItem,
     line: VItem,
+}
+
+impl Arrow {
+    pub fn new() -> Self {
+        Self {
+            tip: Circle(1.0).build(),
+            line: Line(0.2 * DVec3::NEG_Y, 0.2 * DVec3::Y).build(),
+        }
+    }
+}
+
+impl<'t> TimelineItem<'t, ItemMark> for Arrow {
+    type Inserted = ArrowRabject<'t>;
+    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
+        ArrowRabject {
+            tip: RanimTimeline::insert(timeline, self.tip),
+            line: RanimTimeline::insert(timeline, self.line),
+        }
+    }
+}
+
+impl<'t> ArrowRabject<'t> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Rabject<'t, VItem>> {
+        let mut_parts = self.mut_parts();
+        [mut_parts.tip, mut_parts.line].into_iter()
+    }
 }
 
 pub trait MutParts<'a> {
