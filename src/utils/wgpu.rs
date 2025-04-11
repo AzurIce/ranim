@@ -89,7 +89,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             tx.send_blocking(result).unwrap()
         });
-        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        ctx.device.poll(wgpu::PollType::Wait).unwrap();
         rx.recv_blocking().unwrap().unwrap();
 
         let x = buffer_slice.get_mapped_range().to_vec();
@@ -223,7 +223,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             tx.send_blocking(result).unwrap()
         });
-        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        ctx.device.poll(wgpu::PollType::Wait).unwrap();
         rx.recv_blocking().unwrap().unwrap();
 
         let x = buffer_slice.get_mapped_range().to_vec();

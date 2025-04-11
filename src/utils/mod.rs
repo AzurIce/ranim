@@ -190,7 +190,7 @@ pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8>
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             tx.send_blocking(result).unwrap()
         });
-        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        ctx.device.poll(wgpu::PollType::Wait).unwrap();
         rx.recv().await.unwrap().unwrap();
 
         {
