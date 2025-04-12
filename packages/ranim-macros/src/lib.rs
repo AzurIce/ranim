@@ -104,13 +104,13 @@ pub fn item(_attr: TokenStream, item: TokenStream) -> TokenStream {
     quote::quote! {
         #input
 
-        pub struct #mut_parts_name<'r> {
-            #(#mut_parts_fields)*
-        }
+        // pub struct #mut_parts_name<'r> {
+        //     #(#mut_parts_fields)*
+        // }
 
-        pub struct #rabject_name<'t> {
-            #(#rabject_fields)*
-        }
+        // pub struct #rabject_name<'t> {
+        //     #(#rabject_fields)*
+        // }
 
         impl<'r> crate::items::MutParts<'r> for #struct_name {
             type Owned = #struct_name;
@@ -141,6 +141,17 @@ pub fn item(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
         }
+    }
+    .into()
+}
+
+#[proc_macro_derive(BaseMutParts)]
+pub fn base_mut_parts_derive(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    let name = &input.ident;
+
+    quote::quote! {
+        impl crate::items::BaseMutParts for #name {}
     }
     .into()
 }

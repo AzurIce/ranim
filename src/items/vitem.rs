@@ -1,6 +1,7 @@
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, dvec2, dvec3, vec4};
 use itertools::Itertools;
+use ranim_macros::BaseMutParts;
 
 use crate::{
     components::{
@@ -35,7 +36,7 @@ use super::Blueprint;
 /// ```
 ///
 ///
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, BaseMutParts)]
 pub struct VItem {
     pub vpoints: ComponentVec<VPoint>,
     pub stroke_widths: ComponentVec<Width>,

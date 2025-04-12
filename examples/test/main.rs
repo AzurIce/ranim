@@ -36,10 +36,38 @@ impl TimelineConstructor for TestScene {
     ) {
         let arrow = Arrow::new();
         let mut arrow = timeline.insert(arrow);
+        timeline.play(
+            arrow
+                .transform(|data| {
+                    data.shift(DVec3::NEG_Y * 2.0);
+                })
+                .apply(),
+        );
         timeline.play(arrow.lagged_anim(0.2, |part| part.fade_in()));
-        timeline.play(arrow.transform(|data| {
-            data.rotate(PI / 2.0, DVec3::Y);
-        }));
+        timeline.play(
+            arrow
+                .transform(|data| {
+                    data.shift(DVec3::Y * 2.0);
+                })
+                .apply(),
+        );
+        timeline.play(
+            arrow
+                .tip
+                .transform(|data| {
+                    data.shift(DVec3::X * 2.0);
+                })
+                .apply(),
+        );
+        timeline.play(
+            arrow
+                .line
+                .transform(|data| {
+                    data.shift(DVec3::NEG_X * 2.0);
+                })
+                .apply(),
+        );
+        timeline.sync();
         timeline.forward(1.0);
         // let _item = Square(500.0).build();
         // let mut vitem = Group::<VItem>::from_svg(typst_svg!(

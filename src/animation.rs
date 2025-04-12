@@ -4,8 +4,7 @@ pub mod fading;
 pub mod transform;
 
 use crate::{
-    items::{Rabject, group::Group},
-    timeline::RanimItem,
+    items::{group::Group, Item, Rabject},
     utils::rate_functions::linear,
 };
 
@@ -277,7 +276,7 @@ impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
     }
 }
 
-impl<T: RanimItem + Clone + 'static> AnimSchedule<'_, '_, T> {
+impl<T: Item + Clone + 'static> AnimSchedule<'_, '_, T> {
     pub fn apply(self) -> Self {
         if let EvalResult::Dynamic(res) = self.anim.eval_alpha(1.0) {
             self.rabject.data = res;
@@ -286,7 +285,7 @@ impl<T: RanimItem + Clone + 'static> AnimSchedule<'_, '_, T> {
     }
 }
 
-impl<T: RanimItem + Clone + 'static> Group<AnimSchedule<'_, '_, T>> {
+impl<T: Item + Clone + 'static> Group<AnimSchedule<'_, '_, T>> {
     pub fn apply(mut self) -> Self {
         self.iter_mut().for_each(|schedule| {
             if let EvalResult::Dynamic(res) = schedule.anim.eval_alpha(1.0) {

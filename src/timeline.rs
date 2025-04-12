@@ -2,7 +2,7 @@ use log::trace;
 
 use crate::{
     animation::{AnimSchedule, AnimationSpan, EvalResult, Evaluator},
-    items::{Rabject, camera_frame::CameraFrame, group::Group},
+    items::{Item, Rabject, camera_frame::CameraFrame, group::Group},
     render::primitives::RenderableItem,
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
@@ -36,68 +36,75 @@ pub trait TimelineItem<'t, Mark> {
 pub struct ItemMark;
 pub struct GroupMark;
 
-impl<'t, T> TimelineItem<'t, ItemMark> for T
-where
-    T: RanimItem + 'static,
-{
-    type Inserted = Rabject<'t, T>;
+// impl<'t, T> TimelineItem<'t, ItemMark> for T
+// where
+//     T: RanimItem + 'static,
+// {
+//     type Inserted = Rabject<'t, T>;
+//     fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
+//         RanimItem::insert_into_timeline(self, timeline)
+//     }
+// }
+
+impl<'t, T: Item + 'static> TimelineItem<'t, ItemMark> for T {
+    type Inserted = T::Rabject<'t>;
     fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
-        RanimItem::insert_into_timeline(self, timeline)
+        Item::insert_into_timeline(self, timeline)
     }
 }
 
 impl<'t, E, T> TimelineItem<'t, GroupMark> for T
 where
-    E: RanimItem + 'static,
+    E: Item + 'static,
     T: IntoIterator<Item = E>,
 {
-    type Inserted = Group<Rabject<'t, E>>;
+    type Inserted = Group<E::Rabject<'t>>;
     fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
         self.into_iter()
-            .map(|item| RanimItem::insert_into_timeline(item, timeline))
+            .map(|item| item.insert_into_timeline(timeline))
             .collect()
     }
 }
 
-/// An item that can be inserted into ranim's timeline
-///
-/// The item `T` will be inserted into a [`RabjectTimeline<T>`],
-/// and the [`RabjectTimeline<T>`] will be inserted into a [`RanimTimeline`] with type erased.
-///
-/// For now, there are two fixed types of [`RanimItem`], and they will be erased to different types:
-/// - [`CameraFrame`]: A camera frame.
-///   It will be erased to [`Timeline::CameraFrame`], which has a boxed [`AnyTimelineTrait`] in it.
-/// - [`RenderableItem`]: A renderable item
-///   It will be erased to [`Timeline::RenderableItem`], which has a boxed [`RenderableTimelineTrait`] in it.
-pub trait RanimItem {
-    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Rabject<Self>
-    where
-        Self: Sized;
-}
+// /// An item that can be inserted into ranim's timeline
+// ///
+// /// The item `T` will be inserted into a [`RabjectTimeline<T>`],
+// /// and the [`RabjectTimeline<T>`] will be inserted into a [`RanimTimeline`] with type erased.
+// ///
+// /// For now, there are two fixed types of [`RanimItem`], and they will be erased to different types:
+// /// - [`CameraFrame`]: A camera frame.
+// ///   It will be erased to [`Timeline::CameraFrame`], which has a boxed [`AnyTimelineTrait`] in it.
+// /// - [`RenderableItem`]: A renderable item
+// ///   It will be erased to [`Timeline::RenderableItem`], which has a boxed [`RenderableTimelineTrait`] in it.
+// pub trait RanimItem {
+//     fn insert_into_timeline(self, timeline: &RanimTimeline) -> Rabject<Self>
+//     where
+//         Self: Sized;
+// }
 
-impl<T: RenderableItem + Clone + 'static> RanimItem for T {
-    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
-        let timeline = RabjectTimeline::new(self.clone());
-        let timeline = Timeline::RenderableItem(Box::new(timeline));
-        Rabject {
-            id: ranim_timeline.insert_timeline(timeline),
-            data: self,
-            timeline: ranim_timeline,
-        }
-    }
-}
+// impl<T: RenderableItem + Clone + 'static> RanimItem for T {
+//     fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
+//         let timeline = RabjectTimeline::new(self.clone());
+//         let timeline = Timeline::RenderableItem(Box::new(timeline));
+//         Rabject {
+//             id: ranim_timeline.insert_timeline(timeline),
+//             data: self,
+//             timeline: ranim_timeline,
+//         }
+//     }
+// }
 
-impl RanimItem for CameraFrame {
-    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
-        let timeline = RabjectTimeline::new(self.clone());
-        let timeline = Timeline::CameraFrame(Box::new(timeline));
-        Rabject {
-            id: ranim_timeline.insert_timeline(timeline),
-            data: self,
-            timeline: ranim_timeline,
-        }
-    }
-}
+// impl RanimItem for CameraFrame {
+//     fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
+//         let timeline = RabjectTimeline::new(self.clone());
+//         let timeline = Timeline::CameraFrame(Box::new(timeline));
+//         Rabject {
+//             id: ranim_timeline.insert_timeline(timeline),
+//             data: self,
+//             timeline: ranim_timeline,
+//         }
+//     }
+// }
 
 pub enum Timeline {
     CameraFrame(Box<dyn AnyTimelineTrait>),
@@ -158,7 +165,7 @@ impl RanimTimeline {
     pub fn play<'r, 't, T, I>(&'t self, anim_schedules: I) -> &'t Self
     where
         't: 'r,
-        T: RanimItem + Clone + 'static,
+        T: Item + Clone + 'static,
         I: IntoIterator<Item = AnimSchedule<'r, 't, T>>,
     {
         anim_schedules.into_iter().for_each(|anim_schedule| {
@@ -171,7 +178,7 @@ impl RanimTimeline {
         item.insert_into_timeline(self)
     }
 
-    fn insert_timeline(&self, mut timeline: Timeline) -> usize {
+    pub(crate) fn insert_timeline(&self, mut timeline: Timeline) -> usize {
         let mut timelines = self.timelines.borrow_mut();
 
         let id = timelines.len();
@@ -187,7 +194,7 @@ impl RanimTimeline {
     }
 
     /// Update the static state of a rabject's timeline
-    pub fn update<T: RanimItem + Clone + 'static>(&self, rabject: &Rabject<T>) {
+    pub fn update<T: Item + Clone + 'static>(&self, rabject: &Rabject<T>) {
         let mut timelines = self.timelines.borrow_mut();
         let timeline = timelines
             .get_mut(rabject.id)
@@ -245,7 +252,7 @@ impl RanimTimeline {
         self
     }
 
-    fn _play<'r, 't: 'r, T: RanimItem + Clone + 'static>(
+    fn _play<'r, 't: 'r, T: Item + Clone + 'static>(
         &'t self,
         anim_schedule: AnimSchedule<'r, 't, T>,
     ) -> &'t Self {
