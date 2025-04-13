@@ -13,11 +13,10 @@ use ranim::{
     },
     components::{Anchor, ScaleHint},
     items::{
-        Arrow,
         camera_frame::CameraFrame,
         group::Group,
         svg_item::SvgItem,
-        vitem::{Square, VItem},
+        vitem::{Square, VItem, arrow::Arrow},
     },
     prelude::*,
     typst_svg,

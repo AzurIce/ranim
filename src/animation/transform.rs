@@ -1,6 +1,6 @@
 use super::{AnimSchedule, AnimationSpan, EvalDynamic, Rabject, ToEvaluator};
 use crate::{
-    items::{group::Group, IterMutRabjects},
+    items::{IterMutRabjects, group::Group},
     traits::{Alignable, Interpolatable},
     utils::rate_functions::smooth,
 };

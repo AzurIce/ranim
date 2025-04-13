@@ -4,7 +4,7 @@ pub mod fading;
 pub mod transform;
 
 use crate::{
-    items::{group::Group, Item, Rabject},
+    items::{Item, Rabject, group::Group},
     utils::rate_functions::linear,
 };
 

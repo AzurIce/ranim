@@ -1,16 +1,12 @@
-use std::vec::IntoIter;
-
 use camera_frame::CameraFrame;
-use glam::DVec3;
 use group::Group;
-use ranim_macros::item;
-use vitem::{Circle, Line, VItem};
+use ranim_macros::Item;
 
 use crate::{
     RanimTimeline,
     animation::{AnimSchedule, AnimationSpan},
     render::primitives::{Extract, Primitive, Renderable},
-    timeline::{ItemMark, RabjectTimeline, Timeline, TimelineItem},
+    timeline::{RabjectTimeline, Timeline},
 };
 
 pub mod camera_frame;
@@ -54,33 +50,6 @@ where
         anim_schedules
     }
 }
-
-// impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
-//     pub fn lagged_anim(
-//         &'r mut self,
-//         lag_ratio: f64,
-//         anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
-//     ) -> Group<AnimSchedule<'r, 't, T>> {
-//         let n = self.as_ref().len();
-
-//         let mut anim_schedules = self
-//             .as_mut()
-//             .iter_mut()
-//             .map(|rabject| (anim_builder.clone())(rabject))
-//             .collect::<Group<_>>();
-
-//         let duration = anim_schedules[0].anim.duration_secs;
-//         let lag_time = duration * lag_ratio;
-//         anim_schedules
-//             .iter_mut()
-//             .enumerate()
-//             .for_each(|(i, schedule)| {
-//                 schedule.anim.padding = (i as f64 * lag_time, (n - i - 1) as f64 * lag_time);
-//                 // println!("{} {:?} {}", schedule.anim.span_len(), schedule.anim.padding, schedule.anim.duration_secs);
-//             });
-//         anim_schedules
-//     }
-// }
 
 /// A marker trait for auto implementation of [`MutParts`]
 pub trait BaseMutParts: Clone {}
@@ -168,150 +137,6 @@ impl Item for CameraFrame {
     }
 }
 
-#[derive(Clone)]
-pub struct Tip(VItem);
-
-impl Tip {
-    pub fn new() -> Self {
-        Self(Circle(1.0).build())
-    }
-}
-
-impl Item for Tip {
-    type BaseItem = VItem;
-    type Rabject<'t> = TipRabject<'t>;
-    fn insert_into_timeline<'t>(self, ranim_timeline: &'t RanimTimeline) -> Self::Rabject<'t> {
-        TipRabject(Item::insert_into_timeline(self.0, ranim_timeline))
-    }
-}
-
-pub struct TipRabject<'t>(pub Rabject<'t, VItem>);
-
-pub struct TipMutParts<'a>(&'a mut VItem);
-
-impl<'a> MutParts<'a> for Tip {
-    type Owned = Tip;
-    type Mut = TipMutParts<'a>;
-    fn mut_parts(&'a mut self) -> Self::Mut {
-        TipMutParts(self.0.mut_parts())
-    }
-    fn owned(&'a self) -> Self::Owned {
-        Tip(self.0.owned())
-    }
-}
-
-impl<'a, 't> MutParts<'a> for TipRabject<'t> {
-    type Owned = Tip;
-    type Mut = TipMutParts<'a>;
-    fn mut_parts(&'a mut self) -> Self::Mut {
-        TipMutParts(self.0.mut_parts())
-    }
-    fn owned(&'a self) -> Self::Owned {
-        Tip(self.0.owned())
-    }
-}
-
-impl<'t: 'r, 'r> IterMutRabjects<'t, 'r, VItem> for TipRabject<'t> {
-    fn iter_mut<'a, 'b>(&'a mut self) -> impl Iterator<Item = &'b mut Rabject<'t, VItem>>
-    where
-        'a: 'b,
-        't: 'b,
-        VItem: 'b,
-    {
-        self.0.iter_mut()
-    }
-}
-
-// #[item]
-#[derive(Clone)]
-pub struct Arrow {
-    tip: Tip,
-    line: VItem,
-}
-
-impl Default for Arrow {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub struct ArrowMutParts<'a> {
-    pub tip: TipMutParts<'a>,
-    pub line: &'a mut VItem,
-}
-
-pub struct ArrowRabject<'t> {
-    pub tip: TipRabject<'t>,
-    pub line: Rabject<'t, VItem>,
-}
-
-impl Item for Arrow {
-    type BaseItem = VItem;
-    type Rabject<'t> = ArrowRabject<'t>;
-    fn insert_into_timeline<'t>(self, ranim_timeline: &'t RanimTimeline) -> Self::Rabject<'t> {
-        ArrowRabject {
-            tip: Item::insert_into_timeline(self.tip, ranim_timeline),
-            line: Item::insert_into_timeline(self.line, ranim_timeline),
-        }
-    }
-}
-
-impl<'a> MutParts<'a> for Arrow {
-    type Owned = Arrow;
-    type Mut = ArrowMutParts<'a>;
-    fn mut_parts(&'a mut self) -> Self::Mut {
-        ArrowMutParts {
-            tip: self.tip.mut_parts(),
-            line: self.line.mut_parts(),
-        }
-    }
-    fn owned(&'a self) -> Self::Owned {
-        Self::Owned {
-            tip: self.tip.owned(),
-            line: self.line.owned(),
-        }
-    }
-}
-
-impl<'a, 't> MutParts<'a> for ArrowRabject<'t> {
-    type Owned = Arrow;
-    type Mut = ArrowMutParts<'a>;
-    fn mut_parts(&'a mut self) -> Self::Mut {
-        ArrowMutParts {
-            tip: self.tip.mut_parts(),
-            line: self.line.mut_parts(),
-        }
-    }
-    fn owned(&'a self) -> Self::Owned {
-        Arrow {
-            tip: self.tip.owned(),
-            line: self.line.owned(),
-        }
-    }
-}
-
-impl Arrow {
-    pub fn new() -> Self {
-        Self {
-            tip: Tip::new(),
-            line: Line(0.2 * DVec3::NEG_Y, 0.2 * DVec3::Y).build(),
-        }
-    }
-}
-
-impl<'t: 'r, 'r> IterMutRabjects<'t, 'r, VItem> for ArrowRabject<'t> {
-    fn iter_mut<'a, 'b>(&'a mut self) -> impl Iterator<Item = &'b mut Rabject<'t, VItem>>
-    where
-        'a: 'b,
-        't: 'b,
-        VItem: 'b,
-    {
-        self.tip
-            .iter_mut()
-            .chain(self.line.iter_mut())
-    }
-}
-
 pub trait IterMutRabjects<'t: 'r, 'r, T> {
     fn iter_mut<'a, 'b>(&'a mut self) -> impl Iterator<Item = &'b mut Rabject<'t, T>>
     where
@@ -319,8 +144,6 @@ pub trait IterMutRabjects<'t: 'r, 'r, T> {
         't: 'b,
         T: 'b;
 }
-
-
 
 impl<'t: 'r, 'r, T> IterMutRabjects<'t, 'r, T> for [Rabject<'t, T>] {
     fn iter_mut<'a, 'b>(&'a mut self) -> impl Iterator<Item = &'b mut Rabject<'t, T>>
@@ -332,49 +155,6 @@ impl<'t: 'r, 'r, T> IterMutRabjects<'t, 'r, T> for [Rabject<'t, T>] {
         self.iter_mut()
     }
 }
-
-pub trait ArrowMethods<'a>: MutParts<'a, Mut = ArrowMutParts<'a>> {
-    fn set_tip(&'a mut self, tip: VItem);
-    fn set_line(&'a mut self, line: VItem);
-}
-
-impl<'a, T: MutParts<'a, Mut = ArrowMutParts<'a>>> ArrowMethods<'a> for T {
-    fn set_tip(&'a mut self, tip: VItem) {
-        *self.mut_parts().tip.0 = tip;
-    }
-
-    fn set_line(&'a mut self, line: VItem) {
-        *self.mut_parts().line = line;
-    }
-}
-
-// // Example usage:
-// fn foo() {
-//     let timeline = RanimTimeline::new();
-
-//     let mut arrow = Arrow {
-//         tip: VItem::empty(),
-//         line: VItem::empty(),
-//     };
-
-//     arrow.set_tip(VItem::empty());
-
-//     let mut arrow_rabject = ArrowRabject {
-//         tip: Rabject {
-//             timeline: &timeline,
-//             id: 0,
-//             data: arrow.tip,
-//         },
-//         line: Rabject {
-//             timeline: &timeline,
-//             id: 1,
-//             data: arrow.line,
-//         },
-//     };
-
-//     arrow_rabject.set_tip(VItem::empty());
-// }
-
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
