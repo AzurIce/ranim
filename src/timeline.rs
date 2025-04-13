@@ -21,12 +21,12 @@ pub struct TimelineEvalResult {
 }
 
 // MARK: TimelineInsert
-/// For type `T` that implements [`RanimItem`],
+/// For type `T` that implements [`Item`],
 ///
 /// `T` and `impl IntoIterator<Item = T>` can be inserted into the timeline.
 /// This is accomplished by two implementations of this trait, with different `Mark` type:
-/// - [`ItemMark`]: Insert a `T`, returns [`Rabject<T>`]
-/// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group<Rabject<T>>`]
+/// - [`ItemMark`]: Insert a `T`, returns [`Item::Rabject<'t>`]
+/// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group`] of [`Item::Rabject<'t>`]
 pub trait TimelineItem<'t, Mark> {
     type Inserted;
     fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted;

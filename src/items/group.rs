@@ -42,7 +42,7 @@ use std::ops::{Deref, DerefMut};
 ///
 /// # Group of [`crate::items::Rabject`]s
 ///
-/// You can use [`Group::lagged_anim`] to create animation on every item:
+/// You can use [`crate::items::LaggedAnim::lagged_anim`] to create animation on every item:
 ///
 /// ```rust
 /// timeline.play(group.lagged_anim(0.2, |item| {

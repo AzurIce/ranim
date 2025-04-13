@@ -1,6 +1,5 @@
 use camera_frame::CameraFrame;
 use group::Group;
-use ranim_macros::Item;
 
 use crate::{
     RanimTimeline,
@@ -65,7 +64,7 @@ impl<'a, T: BaseMutParts + 'a> MutParts<'a> for T {
     }
 }
 
-impl<'a, 't, T: BaseMutParts + 'a> MutParts<'a> for Rabject<'t, T> {
+impl<'a, T: BaseMutParts + 'a> MutParts<'a> for Rabject<'_, T> {
     type Owned = T;
     type Mut = &'a mut T;
     fn mut_parts(&'a mut self) -> Self::Mut {
@@ -100,7 +99,7 @@ pub trait MutParts<'a> {
 pub trait Item {
     type BaseItem;
     type Rabject<'t>;
-    fn insert_into_timeline<'t>(self, ranim_timeline: &'t RanimTimeline) -> Self::Rabject<'t>;
+    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Self::Rabject<'_>;
 }
 
 // impl for RenderableItems
@@ -111,7 +110,7 @@ where
 {
     type BaseItem = T;
     type Rabject<'t> = Rabject<'t, T>;
-    fn insert_into_timeline<'t>(self, ranim_timeline: &'t RanimTimeline) -> Self::Rabject<'t> {
+    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Self::Rabject<'_> {
         let timeline = RabjectTimeline::new(self.clone());
         let timeline = Timeline::RenderableItem(Box::new(timeline));
         Rabject {
@@ -126,7 +125,7 @@ where
 impl Item for CameraFrame {
     type BaseItem = CameraFrame;
     type Rabject<'t> = Rabject<'t, CameraFrame>;
-    fn insert_into_timeline<'t>(self, ranim_timeline: &'t RanimTimeline) -> Self::Rabject<'t> {
+    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Self::Rabject<'_> {
         let timeline = RabjectTimeline::new(self.clone());
         let timeline = Timeline::CameraFrame(Box::new(timeline));
         Rabject {
@@ -181,7 +180,7 @@ impl<'t, T: 'static> Rabject<'t, T> {
     }
 }
 
-impl<'t: 'r, 'r, T> Rabject<'t, T> {
+impl<'t, T> Rabject<'t, T> {
     fn iter_mut<'a, 'b>(&'a mut self) -> impl Iterator<Item = &'b mut Rabject<'t, T>>
     where
         'a: 'b,

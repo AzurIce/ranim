@@ -1,10 +1,7 @@
 use glam::DVec3;
+use ranim_macros::Item;
 
-// use ranim_macros::Item;
-use crate::items::{Item, IterMutRabjects, MutParts, Rabject};
-
-use crate::items::Blueprint;
-use crate::prelude::RanimTimeline;
+use crate::items::{Blueprint, MutParts};
 
 use super::{Circle, Line, VItem};
 
@@ -16,6 +13,12 @@ pub struct Tip(VItem);
 impl Tip {
     pub fn new() -> Self {
         Self(Circle(1.0).build())
+    }
+}
+
+impl Default for Tip {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

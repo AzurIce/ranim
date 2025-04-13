@@ -121,33 +121,45 @@ pub fn derive_item(input: TokenStream) -> TokenStream {
                 })
                 .collect();
 
-            let mut_parts_impl: Vec<_> = field_names.iter().map(|name| {
-                quote::quote! {
-                    #name: self.#name.mut_parts(),
-                }
-            }).collect();
+            let mut_parts_impl: Vec<_> = field_names
+                .iter()
+                .map(|name| {
+                    quote::quote! {
+                        #name: self.#name.mut_parts(),
+                    }
+                })
+                .collect();
 
-            let owned_impl: Vec<_> = field_names.iter().map(|name| {
-                quote::quote! {
-                    #name: self.#name.owned(),
-                }
-            }).collect();
+            let owned_impl: Vec<_> = field_names
+                .iter()
+                .map(|name| {
+                    quote::quote! {
+                        #name: self.#name.owned(),
+                    }
+                })
+                .collect();
 
-            let insert_into_timeline_impl: Vec<_> = field_names.iter().map(|name| {
-                quote::quote! {
-                    #name: crate::items::Item::insert_into_timeline(self.#name, ranim_timeline),
-                }
-            }).collect();
+            let insert_into_timeline_impl: Vec<_> = field_names
+                .iter()
+                .map(|name| {
+                    quote::quote! {
+                        #name: crate::items::Item::insert_into_timeline(self.#name, ranim_timeline),
+                    }
+                })
+                .collect();
 
-            let iter_mut_impl = field_names.iter().map(|name| {
-                quote::quote! {
-                    self.#name.iter_mut()
-                }
-            }).collect::<Vec<_>>();
+            let iter_mut_impl = field_names
+                .iter()
+                .map(|name| {
+                    quote::quote! {
+                        self.#name.iter_mut()
+                    }
+                })
+                .collect::<Vec<_>>();
 
             let chain_iter_mut = iter_mut_impl.iter().fold(
                 quote::quote! { std::iter::empty() },
-                |acc, iter| quote::quote! { #acc.chain(#iter) }
+                |acc, iter| quote::quote! { #acc.chain(#iter) },
             );
 
             quote::quote! {
@@ -220,45 +232,63 @@ pub fn derive_item(input: TokenStream) -> TokenStream {
                 .map(|(idx, f)| (syn::Index::from(idx), &f.ty))
                 .unzip::<_, _, Vec<_>, Vec<_>>();
 
-            let mut_parts_fields: Vec<_> = field_types.iter().map(|ty| {
-                quote::quote! {
-                    pub <#ty as crate::items::MutParts<'a>>::Mut
-                }
-            }).collect();
+            let mut_parts_fields: Vec<_> = field_types
+                .iter()
+                .map(|ty| {
+                    quote::quote! {
+                        pub <#ty as crate::items::MutParts<'a>>::Mut
+                    }
+                })
+                .collect();
 
-            let rabject_fields: Vec<_> = field_types.iter().map(|ty| {
-                quote::quote! {
-                    pub <#ty as crate::items::Item>::Rabject<'t>
-                }
-            }).collect();
+            let rabject_fields: Vec<_> = field_types
+                .iter()
+                .map(|ty| {
+                    quote::quote! {
+                        pub <#ty as crate::items::Item>::Rabject<'t>
+                    }
+                })
+                .collect();
 
-            let mut_parts_impl: Vec<_> = idx.iter().map(|idx| {
-                quote::quote! {
-                    self.#idx.mut_parts()
-                }
-            }).collect();
+            let mut_parts_impl: Vec<_> = idx
+                .iter()
+                .map(|idx| {
+                    quote::quote! {
+                        self.#idx.mut_parts()
+                    }
+                })
+                .collect();
 
-            let owned_impl: Vec<_> = idx.iter().map(|idx| {
-                quote::quote! {
-                    self.#idx.owned()
-                }
-            }).collect();
+            let owned_impl: Vec<_> = idx
+                .iter()
+                .map(|idx| {
+                    quote::quote! {
+                        self.#idx.owned()
+                    }
+                })
+                .collect();
 
-            let insert_into_timeline_impl: Vec<_> = idx.iter().map(|idx| {
-                quote::quote! {
-                    crate::items::Item::insert_into_timeline(self.#idx, ranim_timeline),
-                }
-            }).collect();
+            let insert_into_timeline_impl: Vec<_> = idx
+                .iter()
+                .map(|idx| {
+                    quote::quote! {
+                        crate::items::Item::insert_into_timeline(self.#idx, ranim_timeline),
+                    }
+                })
+                .collect();
 
-            let iter_mut_impl = idx.iter().map(|idx| {
-                quote::quote! {
-                    self.#idx.iter_mut()
-                }
-            }).collect::<Vec<_>>();
+            let iter_mut_impl = idx
+                .iter()
+                .map(|idx| {
+                    quote::quote! {
+                        self.#idx.iter_mut()
+                    }
+                })
+                .collect::<Vec<_>>();
 
             let chain_iter_mut = iter_mut_impl.iter().fold(
                 quote::quote! { std::iter::empty() },
-                |acc, iter| quote::quote! { #acc.chain(#iter) }
+                |acc, iter| quote::quote! { #acc.chain(#iter) },
             );
 
             quote::quote! {
@@ -325,7 +355,7 @@ pub fn derive_item(input: TokenStream) -> TokenStream {
         syn::Fields::Unit => panic!("Item can not be used on unit structs"),
     };
 
-    dbg!(res.to_string());
+    // dbg!(res.to_string());
 
     res.into()
 }
