@@ -13,23 +13,23 @@ pub mod group;
 pub mod svg_item;
 pub mod vitem;
 
-pub trait LaggedAnim<'r, 't, T> {
+pub trait LaggedAnim<'t, T> {
     fn lagged_anim(
-        &'r mut self,
+        &mut self,
         lag_ratio: f64,
-        anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
-    ) -> Group<AnimSchedule<'r, 't, T>>;
+        anim_builder: impl for<'r> FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
+    ) -> Group<AnimSchedule<'_, 't, T>>;
 }
 
-impl<'r, 't: 'r, T: 'r, R> LaggedAnim<'r, 't, T> for R
+impl<'t, T, R> LaggedAnim<'t, T> for R
 where
-    R: IterMutRabjects<'t, 'r, T> + ?Sized,
+    R: IterMutRabjects<'t, T> + ?Sized,
 {
     fn lagged_anim(
-        &'r mut self,
+        &mut self,
         lag_ratio: f64,
-        anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
-    ) -> Group<AnimSchedule<'r, 't, T>> {
+        anim_builder: impl for<'r> FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
+    ) -> Group<AnimSchedule<'_, 't, T>> {
         let iter = self.iter_mut();
 
         let mut anim_schedules = iter
@@ -136,7 +136,7 @@ impl Item for CameraFrame {
     }
 }
 
-pub trait IterMutRabjects<'t: 'r, 'r, T> {
+pub trait IterMutRabjects<'t, T> {
     fn iter_mut<'a, 'b>(&'a mut self) -> impl Iterator<Item = &'b mut Rabject<'t, T>>
     where
         'a: 'b,
@@ -144,7 +144,7 @@ pub trait IterMutRabjects<'t: 'r, 'r, T> {
         T: 'b;
 }
 
-impl<'t: 'r, 'r, T> IterMutRabjects<'t, 'r, T> for [Rabject<'t, T>] {
+impl<'t, T> IterMutRabjects<'t, T> for [Rabject<'t, T>] {
     fn iter_mut<'a, 'b>(&'a mut self) -> impl Iterator<Item = &'b mut Rabject<'t, T>>
     where
         'a: 'b,
@@ -192,27 +192,6 @@ impl<'t, T> Rabject<'t, T> {
 }
 
 // MARK: Entity
-
-// /// A renderable entity in ranim
-// ///
-// /// You can implement your own entity by implementing this trait.
-// ///
-// /// In Ranim, every item `T` is just plain data. After [`RanimTimeline::insert`]ed to [`RanimTimeline`],
-// /// the item will have an id and its corresponding [`crate::timeline::RabjectTimeline`].
-// ///
-// /// The resources (buffer, texture, etc) rendering an item needs are called **RenderInstance**,
-// /// and all of them are managed by ranim outside of timeline in a struct [`RenderInstances`].
-// ///
-// /// The [`RenderInstances`] is basically a store of [`RenderInstance`]s based on [`std::collections::HashMap`].
-// /// - The key is the combination of [`Rabject::id`] and [`RenderInstance`]'s [`std::any::TypeId`]
-// /// - The value is the [`RenderInstance`]
-// ///
-// /// For now, there are two types of [`RenderInstance`]:
-// /// - [`crate::render::primitives::vitem::VItemPrimitive`]: The core primitive to render vectorized items.
-// /// - [`crate::render::primitives::svg_item::SvgItemPrimitive`]
-// ///
-// /// You can check the builtin implementations of [`Entity`] for mor details.
-// ///
 /// Blueprints are the data structures that are used to create an Item
 pub trait Blueprint<T> {
     fn build(self) -> T;

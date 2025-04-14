@@ -1,3 +1,15 @@
+//! animation timeline
+//!
+//! This module contains the core data structure of ranim to encode animations, **Timeline**.
+//!
+//! [`RanimTimeline`] offers the main ranim API, it has interior mutability,
+//! and offered to [`super::TimelineConstructor::construct`] as an immutable reference.
+//!
+//! [`RanimTimeline`] contains a list of [`Timeline`], it uses [`RabjectTimeline`] as internal to encode animations.
+//! Currently there are two types of [`Timeline`]:
+//! - [`Timeline::CameraFrame`]: A [`RabjectTimeline<CameraFrame>`] erased to [`AnyTimelineTrait`]
+//! - [`Timeline::RenderableItem`]: A [`Group<RabjectTimeline<RenderableItem>>`] erased to [`AnyRenderableTimelineTrait`]
+//!
 use log::trace;
 
 use crate::{
@@ -8,142 +20,11 @@ use crate::{
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
 
-#[derive(Debug, Clone)]
-pub enum TimeMark {
-    Capture(String),
-}
-
-#[allow(clippy::type_complexity)]
-pub struct TimelineEvalResult {
-    pub camera_frame: (EvalResult<CameraFrame>, usize),
-    /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `animation idx` in the corresponding timeline)
-    pub items: Vec<(usize, EvalResult<Box<dyn RenderableItem>>, usize)>,
-}
-
-// MARK: TimelineInsert
-/// For type `T` that implements [`Item`],
-///
-/// `T` and `impl IntoIterator<Item = T>` can be inserted into the timeline.
-/// This is accomplished by two implementations of this trait, with different `Mark` type:
-/// - [`ItemMark`]: Insert a `T`, returns [`Item::Rabject<'t>`]
-/// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group`] of [`Item::Rabject<'t>`]
-pub trait TimelineItem<'t, Mark> {
-    type Inserted;
-    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted;
-}
-
-// MARK: TimelineItem
-pub struct ItemMark;
-pub struct GroupMark;
-
-// impl<'t, T> TimelineItem<'t, ItemMark> for T
-// where
-//     T: RanimItem + 'static,
-// {
-//     type Inserted = Rabject<'t, T>;
-//     fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
-//         RanimItem::insert_into_timeline(self, timeline)
-//     }
-// }
-
-impl<'t, T: Item + 'static> TimelineItem<'t, ItemMark> for T {
-    type Inserted = T::Rabject<'t>;
-    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
-        Item::insert_into_timeline(self, timeline)
-    }
-}
-
-impl<'t, E, T> TimelineItem<'t, GroupMark> for T
-where
-    E: Item + 'static,
-    T: IntoIterator<Item = E>,
-{
-    type Inserted = Group<E::Rabject<'t>>;
-    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
-        self.into_iter()
-            .map(|item| item.insert_into_timeline(timeline))
-            .collect()
-    }
-}
-
-// /// An item that can be inserted into ranim's timeline
-// ///
-// /// The item `T` will be inserted into a [`RabjectTimeline<T>`],
-// /// and the [`RabjectTimeline<T>`] will be inserted into a [`RanimTimeline`] with type erased.
-// ///
-// /// For now, there are two fixed types of [`RanimItem`], and they will be erased to different types:
-// /// - [`CameraFrame`]: A camera frame.
-// ///   It will be erased to [`Timeline::CameraFrame`], which has a boxed [`AnyTimelineTrait`] in it.
-// /// - [`RenderableItem`]: A renderable item
-// ///   It will be erased to [`Timeline::RenderableItem`], which has a boxed [`RenderableTimelineTrait`] in it.
-// pub trait RanimItem {
-//     fn insert_into_timeline(self, timeline: &RanimTimeline) -> Rabject<Self>
-//     where
-//         Self: Sized;
-// }
-
-// impl<T: RenderableItem + Clone + 'static> RanimItem for T {
-//     fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
-//         let timeline = RabjectTimeline::new(self.clone());
-//         let timeline = Timeline::RenderableItem(Box::new(timeline));
-//         Rabject {
-//             id: ranim_timeline.insert_timeline(timeline),
-//             data: self,
-//             timeline: ranim_timeline,
-//         }
-//     }
-// }
-
-// impl RanimItem for CameraFrame {
-//     fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
-//         let timeline = RabjectTimeline::new(self.clone());
-//         let timeline = Timeline::CameraFrame(Box::new(timeline));
-//         Rabject {
-//             id: ranim_timeline.insert_timeline(timeline),
-//             data: self,
-//             timeline: ranim_timeline,
-//         }
-//     }
-// }
-
-pub enum Timeline {
-    CameraFrame(Box<dyn AnyTimelineTrait>),
-    RenderableItem(Box<dyn AnyRenderableTimelineTrait>),
-}
-
-impl Timeline {
-    pub fn as_timeline(&self) -> &dyn TimelineTrait {
-        match self {
-            Timeline::CameraFrame(timeline) => timeline.as_timeline(),
-            Timeline::RenderableItem(timeline) => timeline.as_timeline(),
-        }
-    }
-    pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait {
-        match self {
-            Timeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
-            Timeline::RenderableItem(timeline) => timeline.as_timeline_mut(),
-        }
-    }
-    pub fn as_any(&self) -> &dyn Any {
-        match self {
-            Timeline::CameraFrame(timeline) => timeline.as_any(),
-            Timeline::RenderableItem(timeline) => timeline.as_any(),
-        }
-    }
-    pub fn as_any_mut(&mut self) -> &mut dyn Any {
-        match self {
-            Timeline::CameraFrame(timeline) => timeline.as_any_mut(),
-            Timeline::RenderableItem(timeline) => timeline.as_any_mut(),
-        }
-    }
-}
-
 // MARK: RanimTimeline
 /// The main struct that offers the ranim's API, and encodes animations
 /// The rabjects insert to it will hold a reference to it, so it has interior mutability
 #[derive(Default)]
 pub struct RanimTimeline {
-    // Timeline<CameraFrame> or Timeline<Item>
     timelines: RefCell<Vec<Timeline>>,
     max_elapsed_secs: RefCell<f64>,
     time_marks: RefCell<Vec<(f64, TimeMark)>>,
@@ -326,6 +207,94 @@ impl RanimTimeline {
                 animation_infos: timeline.as_timeline().get_animation_infos(),
             })
             .collect()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TimeMark {
+    Capture(String),
+}
+
+#[allow(clippy::type_complexity)]
+pub struct TimelineEvalResult {
+    pub camera_frame: (EvalResult<CameraFrame>, usize),
+    /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `animation idx` in the corresponding timeline)
+    pub items: Vec<(usize, EvalResult<Box<dyn RenderableItem>>, usize)>,
+}
+
+// MARK: TimelineInsert
+/// For type `T` that implements [`Item`],
+///
+/// `T` and `impl IntoIterator<Item = T>` can be inserted into the timeline.
+/// This is accomplished by two implementations of this trait, with different `Mark` type:
+/// - [`ItemMark`]: Insert a `T`, returns [`Item::Rabject<'t>`]
+/// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group`] of [`Item::Rabject<'t>`]
+pub trait TimelineItem<'t, Mark> {
+    type Inserted;
+    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted;
+}
+
+// MARK: TimelineItem
+pub struct ItemMark;
+pub struct GroupMark;
+
+impl<'t, T: Item + 'static> TimelineItem<'t, ItemMark> for T {
+    type Inserted = T::Rabject<'t>;
+    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
+        Item::insert_into_timeline(self, timeline)
+    }
+}
+
+impl<'t, E, T> TimelineItem<'t, GroupMark> for T
+where
+    E: Item + 'static,
+    T: IntoIterator<Item = E>,
+{
+    type Inserted = Group<E::Rabject<'t>>;
+    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
+        self.into_iter()
+            .map(|item| item.insert_into_timeline(timeline))
+            .collect()
+    }
+}
+
+/// Type erased [`RabjectTimeline`]
+///
+/// Currently, there are two types of [`Timeline`]:
+/// - [`Timeline::CameraFrame`]: A [`RabjectTimeline<CameraFrame>`] erased to [`AnyTimelineTrait`]
+/// - [`Timeline::RenderableItem`]: A [`Group<RabjectTimeline<RenderableItem>>`] erased to [`AnyRenderableTimelineTrait`]
+///
+/// It has [`Timeline::as_timeline`] and [`Timeline::as_timeline_mut`] to use it as a [`TimelineTrait`],
+/// and [`Timeline::as_any`] and [`Timeline::as_any_mut`] to use it as an [`Any`].
+pub enum Timeline {
+    CameraFrame(Box<dyn AnyTimelineTrait>),
+    RenderableItem(Box<dyn AnyRenderableTimelineTrait>),
+}
+
+impl Timeline {
+    pub fn as_timeline(&self) -> &dyn TimelineTrait {
+        match self {
+            Timeline::CameraFrame(timeline) => timeline.as_timeline(),
+            Timeline::RenderableItem(timeline) => timeline.as_timeline(),
+        }
+    }
+    pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait {
+        match self {
+            Timeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
+            Timeline::RenderableItem(timeline) => timeline.as_timeline_mut(),
+        }
+    }
+    pub fn as_any(&self) -> &dyn Any {
+        match self {
+            Timeline::CameraFrame(timeline) => timeline.as_any(),
+            Timeline::RenderableItem(timeline) => timeline.as_any(),
+        }
+    }
+    pub fn as_any_mut(&mut self) -> &mut dyn Any {
+        match self {
+            Timeline::CameraFrame(timeline) => timeline.as_any_mut(),
+            Timeline::RenderableItem(timeline) => timeline.as_any_mut(),
+        }
     }
 }
 

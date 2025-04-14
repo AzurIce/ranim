@@ -48,7 +48,7 @@ pub trait GroupTransformAnimSchedule<'r, 't, T: TransformRequirement + 'static> 
 impl<'t: 'r, 'r, T, R> GroupTransformAnimSchedule<'r, 't, T> for R
 where
     T: TransformRequirement + 'static,
-    R: IterMutRabjects<'t, 'r, T> + ?Sized,
+    R: IterMutRabjects<'t, T> + ?Sized,
 {
     fn transform<F: Fn(&mut Group<T>)>(&'r mut self, f: F) -> Group<AnimSchedule<'r, 't, T>> {
         let data = self

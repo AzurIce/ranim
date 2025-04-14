@@ -211,7 +211,7 @@ pub fn derive_item(input: TokenStream) -> TokenStream {
                     }
                 }
 
-                impl<'t: 'r, 'r> crate::items::IterMutRabjects<'t, 'r, #base_item> for #rabject_name<'t> {
+                impl<'t> crate::items::IterMutRabjects<'t, #base_item> for #rabject_name<'t> {
                     fn iter_mut<'a, 'b>(&'a mut self) -> impl Iterator<Item = &'b mut crate::items::Rabject<'t, #base_item>>
                     where
                         'a: 'b,
@@ -340,7 +340,7 @@ pub fn derive_item(input: TokenStream) -> TokenStream {
                     }
                 }
 
-                impl<'t: 'r, 'r> crate::items::IterMutRabjects<'t, 'r, #base_item> for #rabject_name<'t> {
+                impl<'t> crate::items::IterMutRabjects<'t, #base_item> for #rabject_name<'t> {
                     fn iter_mut<'a, 'b>(&'a mut self) -> impl Iterator<Item = &'b mut crate::items::Rabject<'t, #base_item>>
                     where
                         'a: 'b,
