@@ -2,7 +2,9 @@
 
 use glam::{DMat4, DVec3, dvec2};
 
-use crate::prelude::{Alignable, Interpolatable};
+use crate::{prelude::{Alignable, Interpolatable}, timeline::{RabjectTimeline, Timeline}};
+
+use super::BaseItem;
 
 /// The data of a camera
 ///
@@ -21,6 +23,12 @@ pub struct CameraFrame {
     pub near: f64,
     pub far: f64,
     pub perspective_blend: f64,
+}
+
+impl BaseItem for CameraFrame {
+    fn create_timeline(&self) -> Timeline {
+        Timeline::CameraFrame(Box::new(RabjectTimeline::new(self.clone())))
+    }
 }
 
 impl Interpolatable for CameraFrame {

@@ -75,7 +75,7 @@ impl RanimTimeline {
     }
 
     /// Update the static state of a rabject's timeline
-    pub fn update<T: Item + Clone + 'static>(&self, rabject: &Rabject<T>) {
+    pub fn update_basic_rabject<T: Item + Clone + 'static>(&self, rabject: &Rabject<T>) {
         let mut timelines = self.timelines.borrow_mut();
         let timeline = timelines
             .get_mut(rabject.id)
@@ -436,7 +436,7 @@ impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
             .enumerate()
             .filter_map(|(idx, anim)| {
                 anim.as_ref().map(|anim| AnimationInfo {
-                    anim_name: anim.type_name.clone(),
+                    anim_name: anim.type_name().to_string(),
                     start_sec: if idx == 0 {
                         0.0
                     } else {

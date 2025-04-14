@@ -1,11 +1,9 @@
-use camera_frame::CameraFrame;
 use group::Group;
 
 use crate::{
     RanimTimeline,
     animation::{AnimSchedule, AnimationSpan},
-    render::primitives::{Extract, Primitive, Renderable},
-    timeline::{RabjectTimeline, Timeline},
+    timeline::Timeline,
 };
 
 pub mod camera_frame;
@@ -102,32 +100,16 @@ pub trait Item {
     fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Self::Rabject<'_>;
 }
 
-// impl for RenderableItems
-impl<T, P> Item for T
-where
-    T: Extract<Primitive = P> + Clone + 'static,
-    P: Renderable + Primitive + 'static,
-{
-    type BaseItem = T;
-    type Rabject<'t> = Rabject<'t, T>;
-    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Self::Rabject<'_> {
-        let timeline = RabjectTimeline::new(self.clone());
-        let timeline = Timeline::RenderableItem(Box::new(timeline));
-        Rabject {
-            id: ranim_timeline.insert_timeline(timeline),
-            data: self,
-            timeline: ranim_timeline,
-        }
-    }
+// MARK: BaseItem
+pub trait BaseItem: Clone {
+    fn create_timeline(&self) -> Timeline;
 }
 
-// imple for CameraFrame
-impl Item for CameraFrame {
-    type BaseItem = CameraFrame;
-    type Rabject<'t> = Rabject<'t, CameraFrame>;
+impl<T: BaseItem> Item for T {
+    type BaseItem = Self;
+    type Rabject<'t> = Rabject<'t, Self>;
     fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Self::Rabject<'_> {
-        let timeline = RabjectTimeline::new(self.clone());
-        let timeline = Timeline::CameraFrame(Box::new(timeline));
+        let timeline = self.create_timeline();
         Rabject {
             id: ranim_timeline.insert_timeline(timeline),
             data: self,

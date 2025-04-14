@@ -7,17 +7,15 @@ use ranim_macros::BaseMutParts;
 
 use crate::{
     components::{
-        ComponentVec, HasTransform3dComponent, Transformable, rgba::Rgba, vpoint::VPoint,
-        width::Width,
+        rgba::Rgba, vpoint::VPoint, width::Width, ComponentVec, HasTransform3dComponent, Transformable
     },
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::primitives::{
-        Extract,
-        vitem::{VItemPrimitive, VItemPrimitiveData},
-    },
+        vitem::{VItemPrimitive, VItemPrimitiveData}, Extract
+    }, timeline::{RabjectTimeline, Timeline},
 };
 
-use super::Blueprint;
+use super::{BaseItem, Blueprint};
 
 /// A vectorized item.
 ///
@@ -44,6 +42,12 @@ pub struct VItem {
     pub stroke_widths: ComponentVec<Width>,
     pub stroke_rgbas: ComponentVec<Rgba>,
     pub fill_rgbas: ComponentVec<Rgba>,
+}
+
+impl BaseItem for VItem {
+    fn create_timeline(&self) -> Timeline {
+        Timeline::RenderableItem(Box::new(RabjectTimeline::new(self.clone())))
+    }
 }
 
 impl HasTransform3dComponent for VItem {

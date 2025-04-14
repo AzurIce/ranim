@@ -50,15 +50,6 @@ impl<T> Evaluator<T> {
             inner: Box::new(func),
         }
     }
-
-    // // Any is for type name
-    // pub fn from_eval_dynamic<F: EvalDynamic<T> + Any + 'static>(func: F) -> Self {
-    //     let type_name = std::any::type_name::<F>().to_string();
-    //     Self::Dynamic {
-    //         type_name,
-    //         inner: Box::new(func),
-    //     }
-    // }
 }
 
 #[derive(Debug)]
@@ -101,14 +92,10 @@ impl<T> Eval<T> for Evaluator<T> {
     }
 }
 
-pub struct EvalAdapter<T> {
-    pub inner: Box<dyn Eval<T>>,
-}
 
 // MARK: Animation
 pub struct AnimationSpan<T> {
-    pub(crate) type_name: String,
-    pub(crate) evaluator: Box<dyn Eval<T>>,
+    pub(crate) evaluator: Evaluator<T>,
     pub(crate) rate_func: fn(f64) -> f64,
     pub(crate) duration_secs: f64,
     pub(crate) padding: (f64, f64),
@@ -127,11 +114,7 @@ impl<T> Debug for AnimationSpan<T> {
 impl<T: 'static> AnimationSpan<T> {
     pub fn from_evaluator(evaluator: Evaluator<T>) -> Self {
         Self {
-            type_name: match &evaluator {
-                Evaluator::Dynamic { type_name, .. } => type_name.clone(),
-                Evaluator::Static(_) => "Static".to_string(),
-            },
-            evaluator: Box::new(evaluator),
+            evaluator,
             rate_func: linear,
             duration_secs: 1.0,
             padding: (0.0, 0.0),
@@ -140,6 +123,12 @@ impl<T: 'static> AnimationSpan<T> {
 }
 
 impl<T> AnimationSpan<T> {
+    pub fn type_name(&self) -> &str {
+        match &self.evaluator {
+            Evaluator::Dynamic { type_name, .. } => type_name,
+            Evaluator::Static(_) => "Static",
+        }
+    }
     pub fn span_len(&self) -> f64 {
         self.duration_secs + self.padding.0 + self.padding.1
     }
@@ -291,7 +280,7 @@ impl<T: Item + Clone + 'static> Group<AnimSchedule<'_, '_, T>> {
             if let EvalResult::Dynamic(res) = schedule.anim.eval_alpha(1.0) {
                 schedule.rabject.data = res;
             }
-            schedule.rabject.timeline.update(schedule.rabject);
+            // schedule.rabject.timeline.update(schedule.rabject);
         });
         self
     }
