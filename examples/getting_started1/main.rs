@@ -7,10 +7,10 @@ use ranim::{
 struct GettingStarted1Scene;
 
 impl TimelineConstructor for GettingStarted1Scene {
-    fn construct<'t: 'r, 'r>(
+    fn construct(
         self,
-        timeline: &'t RanimTimeline,
-        _camera: &'r mut Rabject<'t, CameraFrame>,
+        timeline: &RanimTimeline,
+        _camera: &mut Rabject<CameraFrame>,
     ) {
         let mut square = Square(2.0).build();
         square.set_color(manim::BLUE_C);

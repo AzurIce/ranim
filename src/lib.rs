@@ -21,8 +21,6 @@ use render::{Renderer, primitives::RenderInstances};
 
 // MARK: Prelude
 pub mod prelude {
-    pub use crate::Ranim;
-
     #[cfg(feature = "app")]
     pub use crate::app::run_scene_app;
     pub use crate::{AppOptions, render_scene, render_scene_at_sec};
@@ -62,12 +60,6 @@ pub(crate) static PUFFIN_GPU_PROFILER: std::sync::LazyLock<
     std::sync::Mutex<puffin::GlobalProfiler>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
 
-/// A simple wrapper struct
-///
-/// This is used temporally for avoiding writing lifetime annotations like
-/// `fn foo<'t, 'r>(timeline: &'t RanimTimeline, camera: &'r mut Rabject<'t, CameraFrame>)`.
-pub struct Ranim<'t, 'r>(pub &'t RanimTimeline, pub &'r mut Rabject<'t, CameraFrame>);
-
 /// The metadata of the Timeline
 #[derive(Debug, Clone)]
 pub struct SceneMeta {
@@ -105,10 +97,10 @@ pub trait Scene: TimelineConstructor + SceneMetaTrait {}
 impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
 
 impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
-    fn construct<'t: 'r, 'r>(
+    fn construct<'r>(
         self,
-        timeline: &'t RanimTimeline,
-        camera: &'r mut Rabject<'t, CameraFrame>,
+        timeline: &RanimTimeline,
+        camera: &'r mut Rabject<CameraFrame>,
     ) {
         self.0.construct(timeline, camera);
     }
@@ -125,10 +117,10 @@ pub trait TimelineConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct<'t: 'r, 'r>(
+    fn construct(
         self,
-        timeline: &'t RanimTimeline,
-        camera: &'r mut Rabject<'t, CameraFrame>,
+        timeline: &RanimTimeline,
+        camera: &mut Rabject<CameraFrame>,
     );
 }
 

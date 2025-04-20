@@ -27,10 +27,10 @@ use ranim::{
 struct TestScene;
 
 impl TimelineConstructor for TestScene {
-    fn construct<'t: 'r, 'r>(
+    fn construct(
         self,
-        timeline: &'t RanimTimeline,
-        camera: &'r mut Rabject<'t, CameraFrame>,
+        timeline: &RanimTimeline,
+        camera: &mut Rabject<CameraFrame>,
     ) {
         let _item = Square(500.0).build();
         let mut vitem = Group::<VItem>::from_svg(typst_svg!(

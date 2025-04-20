@@ -15,10 +15,10 @@ use ranim::{\r
 struct PerspectiveBlendScene;\r
 \r
 impl TimelineConstructor for PerspectiveBlendScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         camera.data.pos = DVec3::Z * 5.0;\r
         timeline.update(camera);\r
@@ -120,6 +120,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "d3bfee3d2291f62abd2af1b04f47be78cde1e8a7"
+hash = "6ddf98c3ace71f3b81bf52022dbdffa3823ca6fe"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/output.mp4"]

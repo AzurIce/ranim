@@ -4,10 +4,10 @@ use ranim::{color::palettes::manim, items::vitem::Square, prelude::*};
 struct GettingStarted0Scene;
 
 impl TimelineConstructor for GettingStarted0Scene {
-    fn construct<'t: 'r, 'r>(
+    fn construct(
         self,
-        timeline: &'t RanimTimeline,
-        _camera: &'r mut Rabject<'t, CameraFrame>,
+        timeline: &RanimTimeline,
+        _camera: &mut Rabject<CameraFrame>,
     ) {
         let mut square = Square(2.0).build(); // An VItem of a square
         square.set_color(manim::BLUE_C);
@@ -21,7 +21,7 @@ impl TimelineConstructor for GettingStarted0Scene {
         timeline.show(&square);
         timeline.forward(0.5);
 
-        drop(square); // The drop is equal to `timeline.hide(&rabject)`
+        timeline.remove(square); // Currently is equal to `timeline.hide(&rabject)`, but takes the owner ship
         timeline.forward(0.5);
     }
 }

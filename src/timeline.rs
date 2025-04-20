@@ -27,32 +27,32 @@ pub struct TimelineEvalResult {
 /// This is accomplished by two implementations of this trait, with different `Mark` type:
 /// - [`ItemMark`]: Insert a `T`, returns [`Rabject<T>`]
 /// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group<Rabject<T>>`]
-pub trait TimelineItem<'t, Mark> {
+pub trait TimelineItem<Mark> {
     type Inserted;
-    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted;
+    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Self::Inserted;
 }
 
 // MARK: TimelineItem
 pub struct ItemMark;
 pub struct GroupMark;
 
-impl<'t, T> TimelineItem<'t, ItemMark> for T
+impl<T> TimelineItem<ItemMark> for T
 where
     T: RanimItem + 'static,
 {
-    type Inserted = Rabject<'t, T>;
-    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
+    type Inserted = Rabject<T>;
+    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Self::Inserted {
         RanimItem::insert_into_timeline(self, timeline)
     }
 }
 
-impl<'t, E, T> TimelineItem<'t, GroupMark> for T
+impl<E, T> TimelineItem<GroupMark> for T
 where
     E: RanimItem + 'static,
     T: IntoIterator<Item = E>,
 {
-    type Inserted = Group<Rabject<'t, E>>;
-    fn insert_into_timeline(self, timeline: &'t RanimTimeline) -> Self::Inserted {
+    type Inserted = Group<Rabject<E>>;
+    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Self::Inserted {
         self.into_iter()
             .map(|item| RanimItem::insert_into_timeline(item, timeline))
             .collect()
@@ -82,7 +82,6 @@ impl<T: RenderableItem + Clone + 'static> RanimItem for T {
         Rabject {
             id: ranim_timeline.insert_timeline(timeline),
             data: self,
-            timeline: ranim_timeline,
         }
     }
 }
@@ -94,7 +93,6 @@ impl RanimItem for CameraFrame {
         Rabject {
             id: ranim_timeline.insert_timeline(timeline),
             data: self,
-            timeline: ranim_timeline,
         }
     }
 }
@@ -155,11 +153,10 @@ impl RanimTimeline {
     ///
     /// Note that this won't apply the animation effect to rabject's data,
     /// to apply the animation effect use [`AnimSchedule::apply`]
-    pub fn play<'r, 't, T, I>(&'t self, anim_schedules: I) -> &'t Self
+    pub fn play<'r, T, I>(&self, anim_schedules: I) -> &Self
     where
-        't: 'r,
         T: RanimItem + Clone + 'static,
-        I: IntoIterator<Item = AnimSchedule<'r, 't, T>>,
+        I: IntoIterator<Item = AnimSchedule<'r, T>>,
     {
         anim_schedules.into_iter().for_each(|anim_schedule| {
             self._play(anim_schedule);
@@ -167,7 +164,7 @@ impl RanimTimeline {
         self
     }
 
-    pub fn insert<'t, Mark, T: TimelineItem<'t, Mark>>(&'t self, item: T) -> T::Inserted {
+    pub fn insert<Mark, T: TimelineItem<Mark>>(&self, item: T) -> T::Inserted {
         item.insert_into_timeline(self)
     }
 
@@ -229,6 +226,19 @@ impl RanimTimeline {
             .hide();
     }
 
+    // TODO: make this better
+    /// Remove a rabject
+    ///
+    /// [`RanimTimeline::forward`] after this will encode blank into the timeline
+    pub fn remove<T>(&self, rabject: Rabject<T>) {
+        self.timelines
+            .borrow_mut()
+            .get_mut(rabject.id)
+            .unwrap()
+            .as_timeline_mut()
+            .hide();
+    }
+
     /// Sync all rabjects' timeline to the max elapsed seconds
     pub fn sync(&self) -> &Self {
         let mut timelines = self.timelines.borrow_mut();
@@ -245,10 +255,10 @@ impl RanimTimeline {
         self
     }
 
-    fn _play<'r, 't: 'r, T: RanimItem + Clone + 'static>(
-        &'t self,
-        anim_schedule: AnimSchedule<'r, 't, T>,
-    ) -> &'t Self {
+    fn _play<'r, T: RanimItem + Clone + 'static>(
+        &self,
+        anim_schedule: AnimSchedule<'r, T>,
+    ) -> &Self {
         trace!("play {:?}", anim_schedule);
         let mut timelines = self.timelines.borrow_mut();
         let AnimSchedule { rabject, anim } = anim_schedule;

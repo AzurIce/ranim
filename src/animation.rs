@@ -180,12 +180,12 @@ impl<T> AnimationSpan<T> {
 ///
 /// When you create an anim, you actually creates an [`AnimSchedule`] which contains the anim.
 /// The rabject's data won't change unless you call [`AnimSchedule::apply`].
-pub struct AnimSchedule<'r, 't, T> {
-    pub(crate) rabject: &'r mut Rabject<'t, T>,
+pub struct AnimSchedule<'r, T> {
+    pub(crate) rabject: &'r mut Rabject<T>,
     pub(crate) anim: AnimationSpan<T>,
 }
 
-impl<T> Debug for AnimSchedule<'_, '_, T> {
+impl<T> Debug for AnimSchedule<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -195,13 +195,13 @@ impl<T> Debug for AnimSchedule<'_, '_, T> {
     }
 }
 
-impl<'r, 't, T: 'static> AnimSchedule<'r, 't, T> {
-    pub fn new(rabject: &'r mut Rabject<'t, T>, anim: AnimationSpan<T>) -> Self {
+impl<'r, T: 'static> AnimSchedule<'r, T> {
+    pub fn new(rabject: &'r mut Rabject<T>, anim: AnimationSpan<T>) -> Self {
         Self { rabject, anim }
     }
 }
 
-impl<T> AnimSchedule<'_, '_, T> {
+impl<T> AnimSchedule<'_, T> {
     pub fn with_padding(mut self, start_sec: f64, end_sec: f64) -> Self {
         self.anim.padding = (start_sec, end_sec);
         self
@@ -216,7 +216,7 @@ impl<T> AnimSchedule<'_, '_, T> {
     }
 }
 
-impl<T: 'static> IntoIterator for AnimSchedule<'_, '_, T> {
+impl<T: 'static> IntoIterator for AnimSchedule<'_, T> {
     type IntoIter = Once<Self>;
     type Item = Self;
     fn into_iter(self) -> Self::IntoIter {
@@ -226,7 +226,7 @@ impl<T: 'static> IntoIterator for AnimSchedule<'_, '_, T> {
 
 // MARK: Group
 
-impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
+impl<T: 'static> Group<AnimSchedule<'_, T>> {
     /// Sets the rate function for each animation in the group
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.iter_mut().for_each(|schedule| {
@@ -277,7 +277,7 @@ impl<T: 'static> Group<AnimSchedule<'_, '_, T>> {
     }
 }
 
-impl<T: RanimItem + Clone + 'static> AnimSchedule<'_, '_, T> {
+impl<T: RanimItem + Clone + 'static> AnimSchedule<'_, T> {
     pub fn apply(self) -> Self {
         if let EvalResult::Dynamic(res) = self.anim.eval_alpha(1.0) {
             self.rabject.data = res;
@@ -286,13 +286,12 @@ impl<T: RanimItem + Clone + 'static> AnimSchedule<'_, '_, T> {
     }
 }
 
-impl<T: RanimItem + Clone + 'static> Group<AnimSchedule<'_, '_, T>> {
+impl<T: RanimItem + Clone + 'static> Group<AnimSchedule<'_, T>> {
     pub fn apply(mut self) -> Self {
         self.iter_mut().for_each(|schedule| {
             if let EvalResult::Dynamic(res) = schedule.anim.eval_alpha(1.0) {
                 schedule.rabject.data = res;
             }
-            schedule.rabject.timeline.update(schedule.rabject);
         });
         self
     }

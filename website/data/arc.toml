@@ -16,10 +16,10 @@ use ranim::timeline::TimeMark;\r
 struct ArcScene;\r
 \r
 impl TimelineConstructor for ArcScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         // let frame_size = app.camera().size;\r
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
@@ -80,6 +80,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "811d0e784fe345f1840c1abbf3d52b1bb9630f25"
+hash = "0592d900c07d0707a17f102738f0d83833306946"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/output.mp4"]

@@ -15,10 +15,10 @@ use ranim::timeline::TimeMark;\r
 struct ArcBetweenPointsScene;\r
 \r
 impl TimelineConstructor for ArcBetweenPointsScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         let center = dvec2(0.0, 0.0);\r
 \r
@@ -78,6 +78,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "07d05169ffcc0b83527e87d2bd23e9246926220b"
+hash = "a55d919dc37c95e5099e9b1314c3885a49e1ab40"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/output.mp4"]
