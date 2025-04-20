@@ -10,11 +10,7 @@ use ranim::prelude::*;
 struct PalettesScene;
 
 impl TimelineConstructor for PalettesScene {
-    fn construct(
-        self,
-        timeline: &RanimTimeline,
-        _camera: &mut Rabject<CameraFrame>,
-    ) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let padded_frame_size = frame_size * 0.9;
 

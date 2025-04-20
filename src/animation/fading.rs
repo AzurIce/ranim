@@ -13,9 +13,9 @@ pub trait FadingAnim<T: FadingRequirement + 'static> {
     fn fade_out(&self) -> AnimationSpan<T>;
 }
 
-pub trait FadingAnimSchedule<'r, T: FadingRequirement + 'static> {
-    fn fade_in(&'r mut self) -> AnimSchedule<'r, T>;
-    fn fade_out(&'r mut self) -> AnimSchedule<'r, T>;
+pub trait FadingAnimSchedule<T: FadingRequirement + 'static> {
+    fn fade_in(&mut self) -> AnimSchedule<T>;
+    fn fade_out(&mut self) -> AnimSchedule<T>;
 }
 
 impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
@@ -29,12 +29,12 @@ impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
     }
 }
 
-impl<'r, T: FadingRequirement + 'static> FadingAnimSchedule<'r, T> for Rabject<T> {
-    fn fade_in(&'r mut self) -> AnimSchedule<'r, T> {
+impl<T: FadingRequirement + 'static> FadingAnimSchedule<T> for Rabject<T> {
+    fn fade_in(&mut self) -> AnimSchedule<T> {
         AnimSchedule::new(self, self.data.fade_in())
     }
 
-    fn fade_out(&'r mut self) -> AnimSchedule<'r, T> {
+    fn fade_out(&mut self) -> AnimSchedule<T> {
         AnimSchedule::new(self, self.data.fade_out())
     }
 }

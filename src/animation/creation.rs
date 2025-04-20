@@ -14,9 +14,9 @@ pub trait CreationAnim<T: CreationRequirement + 'static> {
     fn uncreate(&self) -> AnimationSpan<T>;
 }
 
-pub trait CreationAnimSchedule<'r, T: CreationRequirement + 'static> {
-    fn create(&'r mut self) -> AnimSchedule<'r, T>;
-    fn uncreate(&'r mut self) -> AnimSchedule<'r, T>;
+pub trait CreationAnimSchedule<T: CreationRequirement + 'static> {
+    fn create(&mut self) -> AnimSchedule<T>;
+    fn uncreate(&mut self) -> AnimSchedule<T>;
 }
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
@@ -30,11 +30,11 @@ impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
     }
 }
 
-impl<'r, 't, T: CreationRequirement + 'static> CreationAnimSchedule<'r, T> for Rabject<T> {
-    fn create(&'r mut self) -> AnimSchedule<'r, T> {
+impl<T: CreationRequirement + 'static> CreationAnimSchedule<T> for Rabject<T> {
+    fn create(&mut self) -> AnimSchedule<T> {
         AnimSchedule::new(self, self.data.create())
     }
-    fn uncreate(&'r mut self) -> AnimSchedule<'r, T> {
+    fn uncreate(&mut self) -> AnimSchedule<T> {
         AnimSchedule::new(self, self.data.uncreate())
     }
 }
@@ -48,9 +48,9 @@ pub trait WritingAnim<T: WritingRequirement + 'static> {
     fn unwrite(&self) -> AnimationSpan<T>;
 }
 
-pub trait WritingAnimSchedule<'r, T: WritingRequirement + 'static> {
-    fn write(&'r mut self) -> AnimSchedule<'r, T>;
-    fn unwrite(&'r mut self) -> AnimSchedule<'r, T>;
+pub trait WritingAnimSchedule<T: WritingRequirement + 'static> {
+    fn write(&mut self) -> AnimSchedule<T>;
+    fn unwrite(&mut self) -> AnimSchedule<T>;
 }
 
 impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
@@ -64,11 +64,11 @@ impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
     }
 }
 
-impl<'r, T: WritingRequirement + 'static> WritingAnimSchedule<'r, T> for Rabject<T> {
-    fn write(&'r mut self) -> AnimSchedule<'r, T> {
+impl<T: WritingRequirement + 'static> WritingAnimSchedule<T> for Rabject<T> {
+    fn write(&mut self) -> AnimSchedule<T> {
         AnimSchedule::new(self, self.data.write())
     }
-    fn unwrite(&'r mut self) -> AnimSchedule<'r, T> {
+    fn unwrite(&mut self) -> AnimSchedule<T> {
         AnimSchedule::new(self, self.data.unwrite())
     }
 }

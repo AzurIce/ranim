@@ -255,10 +255,7 @@ impl RanimTimeline {
         self
     }
 
-    fn _play<'r, T: RanimItem + Clone + 'static>(
-        &self,
-        anim_schedule: AnimSchedule<'r, T>,
-    ) -> &Self {
+    fn _play<T: RanimItem + Clone + 'static>(&self, anim_schedule: AnimSchedule<T>) -> &Self {
         trace!("play {:?}", anim_schedule);
         let mut timelines = self.timelines.borrow_mut();
         let AnimSchedule { rabject, anim } = anim_schedule;

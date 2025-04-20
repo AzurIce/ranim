@@ -45,9 +45,7 @@ pub trait GroupTransformAnimSchedule<'r, T: TransformRequirement + 'static> {
     fn transform_to<E: Into<T>>(&'r mut self, d: Group<E>) -> Group<AnimSchedule<'r, T>>;
 }
 
-impl<'r, T: TransformRequirement + 'static> GroupTransformAnimSchedule<'r, T>
-    for [Rabject<T>]
-{
+impl<'r, T: TransformRequirement + 'static> GroupTransformAnimSchedule<'r, T> for [Rabject<T>] {
     fn transform<F: Fn(&mut Group<T>)>(&'r mut self, f: F) -> Group<AnimSchedule<'r, T>> {
         let data = self
             .iter()
@@ -86,10 +84,10 @@ pub trait TransformAnim<T: TransformRequirement + 'static> {
     fn transform_to(&self, d: impl Into<T>) -> AnimationSpan<T>;
 }
 
-pub trait TransformAnimSchedule<'r, T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut T)>(&'r mut self, f: F) -> AnimSchedule<'r, T>;
-    fn transform_from(&'r mut self, s: impl Into<T>) -> AnimSchedule<'r, T>;
-    fn transform_to(&'r mut self, d: impl Into<T>) -> AnimSchedule<'r, T>;
+pub trait TransformAnimSchedule<T: TransformRequirement + 'static> {
+    fn transform<F: Fn(&mut T)>(&mut self, f: F) -> AnimSchedule<T>;
+    fn transform_from(&mut self, s: impl Into<T>) -> AnimSchedule<T>;
+    fn transform_to(&mut self, d: impl Into<T>) -> AnimSchedule<T>;
 }
 
 impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
@@ -109,21 +107,19 @@ impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
     }
 }
 
-impl<'r, T: TransformRequirement + 'static> TransformAnimSchedule<'r, T>
-    for Rabject<T>
-{
+impl<T: TransformRequirement + 'static> TransformAnimSchedule<T> for Rabject<T> {
     /// Play an animation interpolates from the given src to current rabject
-    fn transform_from(&'r mut self, src: impl Into<T>) -> AnimSchedule<'r, T> {
+    fn transform_from(&mut self, src: impl Into<T>) -> AnimSchedule<T> {
         AnimSchedule::new(self, self.data.transform_from(src))
     }
 
     /// Play an animation interpolates current rabject with a given transform func
-    fn transform<F: Fn(&mut T)>(&'r mut self, f: F) -> AnimSchedule<'r, T> {
+    fn transform<F: Fn(&mut T)>(&mut self, f: F) -> AnimSchedule<T> {
         AnimSchedule::new(self, self.data.transform(f))
     }
 
     /// Play an animation interpolates from the given src to current rabject
-    fn transform_to(&'r mut self, dst: impl Into<T>) -> AnimSchedule<'r, T> {
+    fn transform_to(&mut self, dst: impl Into<T>) -> AnimSchedule<T> {
         AnimSchedule::new(self, self.data.transform_to(dst))
     }
 }

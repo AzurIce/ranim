@@ -97,11 +97,7 @@ pub trait Scene: TimelineConstructor + SceneMetaTrait {}
 impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
 
 impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
-    fn construct<'r>(
-        self,
-        timeline: &RanimTimeline,
-        camera: &'r mut Rabject<CameraFrame>,
-    ) {
+    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
         self.0.construct(timeline, camera);
     }
 }
@@ -117,11 +113,7 @@ pub trait TimelineConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct(
-        self,
-        timeline: &RanimTimeline,
-        camera: &mut Rabject<CameraFrame>,
-    );
+    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>);
 }
 
 pub fn build_timeline(constructor: impl TimelineConstructor) -> RanimTimeline {
