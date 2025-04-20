@@ -43,10 +43,10 @@ pub struct Rabject<T> {
 }
 
 impl<T: 'static> Rabject<T> {
-    pub fn schedule<'r>(
-        &'r mut self,
+    pub fn schedule(
+        &mut self,
         anim_builder: impl FnOnce(&mut Self) -> AnimationSpan<T>,
-    ) -> AnimSchedule<'r, T> {
+    ) -> AnimSchedule<T> {
         let animation = (anim_builder)(self);
         AnimSchedule::new(self, animation)
     }

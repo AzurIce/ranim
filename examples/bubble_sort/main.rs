@@ -9,11 +9,7 @@ use ranim::{
 struct BubbleSortScene(pub usize);
 
 impl TimelineConstructor for BubbleSortScene {
-    fn construct(
-        self,
-        timeline: &RanimTimeline,
-        _camera: &mut Rabject<CameraFrame>,
-    ) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
         let num = self.0;
 
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);

@@ -13,11 +13,7 @@ use ranim::timeline::TimeMark;
 struct ArcScene;
 
 impl TimelineConstructor for ArcScene {
-    fn construct(
-        self,
-        timeline: &RanimTimeline,
-        _camera: &mut Rabject<CameraFrame>,
-    ) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
         // let frame_size = app.camera().size;
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);

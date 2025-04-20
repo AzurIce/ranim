@@ -12,11 +12,7 @@ use ranim::timeline::TimeMark;
 struct ArcBetweenPointsScene;
 
 impl TimelineConstructor for ArcBetweenPointsScene {
-    fn construct(
-        self,
-        timeline: &RanimTimeline,
-        _camera: &mut Rabject<CameraFrame>,
-    ) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
         let center = dvec2(0.0, 0.0);
 
         let start_color = color!("#FF8080FF");

@@ -4,11 +4,7 @@ use ranim::{color::palettes::manim, items::vitem::Square, prelude::*};
 struct GettingStarted0Scene;
 
 impl TimelineConstructor for GettingStarted0Scene {
-    fn construct(
-        self,
-        timeline: &RanimTimeline,
-        _camera: &mut Rabject<CameraFrame>,
-    ) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
         let mut square = Square(2.0).build(); // An VItem of a square
         square.set_color(manim::BLUE_C);
 

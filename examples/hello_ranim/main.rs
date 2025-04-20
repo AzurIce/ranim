@@ -11,11 +11,7 @@ use ranim::{
 struct HelloRanimScene;
 
 impl TimelineConstructor for HelloRanimScene {
-    fn construct(
-        self,
-        timeline: &RanimTimeline,
-        _camera: &mut Rabject<CameraFrame>,
-    ) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
         let mut square = Square(2.0).build();
         square.set_color(manim::BLUE_C);
 

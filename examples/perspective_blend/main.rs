@@ -12,11 +12,7 @@ use ranim::{
 struct PerspectiveBlendScene;
 
 impl TimelineConstructor for PerspectiveBlendScene {
-    fn construct(
-        self,
-        timeline: &RanimTimeline,
-        camera: &mut Rabject<CameraFrame>,
-    ) {
+    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
         camera.data.pos = DVec3::Z * 5.0;
         timeline.update(camera);
 
