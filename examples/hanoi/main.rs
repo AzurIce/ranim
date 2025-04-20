@@ -28,10 +28,10 @@ fn solve_hanoi(
 struct HanoiScene(pub usize);
 
 impl TimelineConstructor for HanoiScene {
-    fn construct<'t: 'r, 'r>(
+    fn construct(
         self,
-        timeline: &'t RanimTimeline,
-        _camera: &'r mut Rabject<'t, CameraFrame>,
+        timeline: &RanimTimeline,
+        _camera: &mut Rabject<CameraFrame>,
     ) {
         let n = self.0;
         let total_sec = 10.0;

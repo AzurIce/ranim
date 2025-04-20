@@ -13,10 +13,10 @@ use ranim::prelude::*;\r
 struct PalettesScene;\r
 \r
 impl TimelineConstructor for PalettesScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
         let padded_frame_size = frame_size * 0.9;\r
@@ -76,6 +76,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "d3eb3b397540b8f7c470cb0ed6b6648a75c88bdd"
+hash = "2d186a5dc91216d73a2a95c821b3edf13ccd5067"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/output.png"]

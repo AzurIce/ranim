@@ -16,10 +16,10 @@ const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 struct BasicScene;
 
 impl TimelineConstructor for BasicScene {
-    fn construct<'t: 'r, 'r>(
+    fn construct(
         self,
-        timeline: &'t RanimTimeline,
-        _camera: &'r mut Rabject<'t, CameraFrame>,
+        timeline: &RanimTimeline,
+        _camera: &mut Rabject<CameraFrame>,
     ) {
         timeline.forward(0.2);
 

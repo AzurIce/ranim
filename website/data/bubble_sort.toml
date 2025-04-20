@@ -12,10 +12,10 @@ use ranim::{\r
 struct BubbleSortScene(pub usize);\r
 \r
 impl TimelineConstructor for BubbleSortScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         let num = self.0;\r
 \r
@@ -151,6 +151,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "a7d30f16921c7f7c96a037c99dcb3b93cab87fd8"
+hash = "c08b5e6db0b18aff9d05c9384457c7fdfdce632d"
 preview_imgs = ["/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
 output_files = ["/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/output-100.mp4"]

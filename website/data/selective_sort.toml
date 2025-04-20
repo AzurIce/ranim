@@ -12,10 +12,10 @@ use ranim::{\r
 struct SelectiveSortScene(pub usize);\r
 \r
 impl TimelineConstructor for SelectiveSortScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         let num = self.0;\r
 \r
@@ -147,6 +147,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "cac5363d02a31270ffd44e2c824602eb09cd81ae"
+hash = "5905c5429e65cb8c2596dc49eaae029352066ae8"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/output-10.mp4", "/examples/selective_sort/output-100.mp4"]

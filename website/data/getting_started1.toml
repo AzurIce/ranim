@@ -10,10 +10,10 @@ use ranim::{\r
 struct GettingStarted1Scene;\r
 \r
 impl TimelineConstructor for GettingStarted1Scene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         let mut square = Square(2.0).build();\r
         square.set_color(manim::BLUE_C);\r
@@ -30,6 +30,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "24355287c63da93ae82cd3fde9d05e5fbe460904"
+hash = "c97c77d1d2471d7abedad605fc4bdf44866bbacc"
 preview_imgs = []
 output_files = ["/examples/getting_started1/output.mp4"]

@@ -63,10 +63,10 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {\r
 struct RanimLogoScene;\r
 \r
 impl TimelineConstructor for RanimLogoScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
         let logo_width = frame_size.y * 0.618;\r
@@ -149,6 +149,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "910c0336ee428f8fc2aa36abd5ec24f8cb41e58c"
+hash = "f1b826e7eed5eb20b3230a5f00c3ba6e3222fe57"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/output.mp4"]

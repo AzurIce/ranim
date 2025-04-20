@@ -31,10 +31,10 @@ fn solve_hanoi(\r
 struct HanoiScene(pub usize);\r
 \r
 impl TimelineConstructor for HanoiScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         let n = self.0;\r
         let total_sec = 10.0;\r
@@ -141,6 +141,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "c22a1a9bc10041068d7c8564b86cd15e0ab543d8"
+hash = "633c5616ab96fb876dc4d04013484b7e17b5fc4e"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/output-10.mp4", "/examples/hanoi/output-5.mp4"]

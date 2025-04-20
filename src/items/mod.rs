@@ -1,21 +1,18 @@
 use group::Group;
 
-use crate::{
-    RanimTimeline,
-    animation::{AnimSchedule, AnimationSpan},
-};
+use crate::animation::{AnimSchedule, AnimationSpan};
 
 pub mod camera_frame;
 pub mod group;
 pub mod svg_item;
 pub mod vitem;
 
-impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
+impl<'r, T> Group<Rabject<T>> {
     pub fn lagged_anim(
         &'r mut self,
         lag_ratio: f64,
-        anim_builder: impl FnOnce(&'r mut Rabject<'t, T>) -> AnimSchedule<'r, 't, T> + Clone,
-    ) -> Group<AnimSchedule<'r, 't, T>> {
+        anim_builder: impl FnOnce(&'r mut Rabject<T>) -> AnimSchedule<'r, T> + Clone,
+    ) -> Group<AnimSchedule<'r, T>> {
         let n = self.as_ref().len();
 
         let mut anim_schedules = self
@@ -40,24 +37,16 @@ impl<'r, 't: 'r, T> Group<Rabject<'t, T>> {
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
-pub struct Rabject<'t, T> {
-    pub timeline: &'t RanimTimeline,
+pub struct Rabject<T> {
     pub id: usize,
     pub data: T,
 }
 
-impl<T> Drop for Rabject<'_, T> {
-    fn drop(&mut self) {
-        self.timeline.hide(self);
-        // TODO: remove it
-    }
-}
-
-impl<'t, T: 'static> Rabject<'t, T> {
+impl<T: 'static> Rabject<T> {
     pub fn schedule<'r>(
         &'r mut self,
         anim_builder: impl FnOnce(&mut Self) -> AnimationSpan<T>,
-    ) -> AnimSchedule<'r, 't, T> {
+    ) -> AnimSchedule<'r, T> {
         let animation = (anim_builder)(self);
         AnimSchedule::new(self, animation)
     }

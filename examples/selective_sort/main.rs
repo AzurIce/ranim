@@ -9,10 +9,10 @@ use ranim::{
 struct SelectiveSortScene(pub usize);
 
 impl TimelineConstructor for SelectiveSortScene {
-    fn construct<'t: 'r, 'r>(
+    fn construct(
         self,
-        timeline: &'t RanimTimeline,
-        _camera: &'r mut Rabject<'t, CameraFrame>,
+        timeline: &RanimTimeline,
+        _camera: &mut Rabject<CameraFrame>,
     ) {
         let num = self.0;
 

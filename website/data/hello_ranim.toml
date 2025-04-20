@@ -14,10 +14,10 @@ use ranim::{\r
 struct HelloRanimScene;\r
 \r
 impl TimelineConstructor for HelloRanimScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         let mut square = Square(2.0).build();\r
         square.set_color(manim::BLUE_C);\r
@@ -44,6 +44,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "17291d991387513e36b520cee0f4c287391f9d46"
+hash = "fc76af7b8736725b2cfe556f0c78d13c62687441"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]

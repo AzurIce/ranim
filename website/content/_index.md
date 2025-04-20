@@ -25,10 +25,10 @@ use ranim::prelude::*;
 struct HelloWorldScene;
 
 impl TimelineConstructor for HelloWorldScene {
-    fn construct<'t: 'r, 'r>(
+    fn construct(
         self,
-        timeline: &'t RanimTimeline,
-        camera: &'r mut Rabject<'t, CameraFrame>,
+        timeline: &RanimTimeline,
+        camera: &mut Rabject<CameraFrame>,
     ) {
         // ...
     }
@@ -66,7 +66,6 @@ Ranim 使用一个 `RanimTimeline` 结构来编码动画，首先介绍两个最
 
 ```rust
 pub struct Rabject<'a, T> {
-    pub timeline: &'a RanimTimeline,
     pub id: usize,
     pub data: T,
 }
@@ -76,17 +75,9 @@ pub struct Rabject<'a, T> {
 
 使用 `timeline.show(&rabject)` 和 `timeline.hide(&rabject)` 可以控制接下来 `forward` 时的表现。
 
-当一个 `Rabject` 被 `drop` 时，它会被 `hide` 掉：
+此外 `hide` 有一个获取 Rabject 所有权的变体：`timeline.remove(rabject)`，与 `hide` 效果相同。
 
-```rust
-impl<T> Drop for Rabject<'_, T> {
-    fn drop(&mut self) {
-        self.timeline.hide(self);
-    }
-}
-```
-
-下面的例子使用一个 `VItem` 物件和 `timeline.insert` 在时间线中创建了一个 `Rabject<VItem>` 并展示了 `show`、`hide` 以及 `drop` 对其影响：
+下面的例子使用一个 `VItem` 物件和 `timeline.insert` 在时间线中创建了一个 `Rabject<VItem>` 并展示了 `show`、`hide` 以及 `remove` 对其影响：
 
 !example-getting_started0
 

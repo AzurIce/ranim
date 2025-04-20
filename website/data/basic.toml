@@ -19,10 +19,10 @@ const SVG: &str = include_str!(\"../../assets/Ghostscript_Tiger.svg\");\r
 struct BasicScene;\r
 \r
 impl TimelineConstructor for BasicScene {\r
-    fn construct<'t: 'r, 'r>(\r
+    fn construct(\r
         self,\r
-        timeline: &'t RanimTimeline,\r
-        _camera: &'r mut Rabject<'t, CameraFrame>,\r
+        timeline: &RanimTimeline,\r
+        _camera: &mut Rabject<CameraFrame>,\r
     ) {\r
         timeline.forward(0.2);\r
 \r
@@ -81,6 +81,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "ddb32e881ee0568649c7510a57b811148017abc2"
+hash = "90bead11bd3052b898de01e8c67f67480a848f97"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/output.mp4"]
