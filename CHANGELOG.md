@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.12] - 2025-04-20
+
+### 🚜 Refactor
+
+- Refactor timeline and item
+- Removed 't timeline reference from Rabject
+
+### 🎨 Styling
+
+- Lint and some docs
+- Lint
+
 ## [0.1.0-alpha.11] - 2025-04-01
 
 ### 🚀 Features
@@ -24,6 +36,7 @@ All notable changes to this project will be documented in this file.
 
 - Release
 - Update cargo exclude
+- Release
 
 ### Examples
 

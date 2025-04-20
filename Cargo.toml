@@ -17,13 +17,13 @@ exclude = [
 members = ["packages/*", "xtasks/*"]
 
 [workspace.package]
-version = "0.1.0-alpha.11"
+version = "0.1.0-alpha.12"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/AzurIce/ranim"
 
 [workspace.dependencies]
-ranim-macros = { path = "packages/ranim-macros", version = "0.1.0-alpha.11" }
+ranim-macros = { path = "packages/ranim-macros", version = "0.1.0-alpha.12" }
 
 [features]
 profiling = ["dep:wgpu-profiler", "dep:puffin", "dep:puffin_http", "dep:profiling"]
