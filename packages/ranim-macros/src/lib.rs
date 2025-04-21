@@ -81,7 +81,9 @@ pub fn derive_fill(input: TokenStream) -> TokenStream {
             )
         }
         Fields::Unnamed(fields) => {
-            let field_indices = (0..fields.unnamed.len()).map(syn::Index::from).collect::<Vec<_>>();
+            let field_indices = (0..fields.unnamed.len())
+                .map(syn::Index::from)
+                .collect::<Vec<_>>();
             (
                 quote! {
                     #(
@@ -154,7 +156,9 @@ pub fn derive_stroke(input: TokenStream) -> TokenStream {
             )
         }
         Fields::Unnamed(fields) => {
-            let field_indices = (0..fields.unnamed.len()).map(syn::Index::from).collect::<Vec<_>>();
+            let field_indices = (0..fields.unnamed.len())
+                .map(syn::Index::from)
+                .collect::<Vec<_>>();
             (
                 quote! {
                     #(

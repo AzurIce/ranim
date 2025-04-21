@@ -14,6 +14,12 @@ pub struct Arrow {
     pub line: VItem,
 }
 
+impl Default for Arrow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Arrow {
     pub fn new() -> Self {
         Self {
