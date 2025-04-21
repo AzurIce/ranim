@@ -109,5 +109,10 @@ fn main() {
         ..Default::default()
     };
 
+    #[cfg(not(feature = "app"))]
     render_scene(PerspectiveBlendScene, &options);
+
+    // reuires "app" feature
+    #[cfg(feature = "app")]
+    run_scene_app(PerspectiveBlendScene);
 }
