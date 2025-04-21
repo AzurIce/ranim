@@ -1,3 +1,5 @@
+pub mod arrow;
+
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, dvec2, dvec3, vec4};
 use itertools::Itertools;

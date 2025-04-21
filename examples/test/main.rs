@@ -15,7 +15,7 @@ use ranim::{
         camera_frame::CameraFrame,
         group::Group,
         svg_item::SvgItem,
-        vitem::{Square, VItem},
+        vitem::{Square, VItem, arrow::Arrow},
     },
     prelude::*,
     typst_svg,
@@ -28,23 +28,26 @@ struct TestScene;
 
 impl TimelineConstructor for TestScene {
     fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
-        let _item = Square(500.0).build();
-        let mut vitem = Group::<VItem>::from_svg(typst_svg!(
-            r#"#align(center)[
-            #text(font: "LXGW Bright")[有意思]
+        // let _item = Square(500.0).build();
+        // let mut vitem = Group::<VItem>::from_svg(typst_svg!(
+        //     r#"#align(center)[
+        //     #text(font: "LXGW Bright")[有意思]
 
-            #text(font: "LXGW Bright")[真的是人用的]
+        //     #text(font: "LXGW Bright")[真的是人用的]
 
-            #text(font: "LXGW Bright")[『我』的『软件』]
-        ]"#
-        ));
-        vitem
-            .scale_to(ScaleHint::PorportionalHeight(8.0))
-            .put_center_on(DVec3::ZERO);
+        //     #text(font: "LXGW Bright")[『我』的『软件』]
+        // ]"#
+        // ));
+        // vitem
+        //     .scale_to(ScaleHint::PorportionalHeight(8.0))
+        //     .put_center_on(DVec3::ZERO);
         // let vitem = vitem[0].clone().get_partial(0.0..0.4);
         // println!("vpoints: {:?}", vitem.vpoints);
         // println!("close_path: {:?}", vitem.vpoints.get_closepath_flags());
-        let _vitem = timeline.insert(vitem);
+        // let _vitem = timeline.insert(vitem);
+
+        let arrow = Arrow::new();
+        let mut arrow = timeline.insert(arrow);
 
         let mut border = Square(1.0).build();
         border
@@ -55,7 +58,10 @@ impl TimelineConstructor for TestScene {
         // let _vitem = timeline.insert(vitem);
         timeline.forward(1.0);
         timeline.sync();
-        timeline.play(camera.transform(|camera| camera.fovy = PI / 4.0));
+        timeline.play(camera.transform(|camera| {
+            camera.perspective_blend = 1.0;
+            camera.fovy = PI / 4.0;
+        }));
 
         timeline.sync();
     }

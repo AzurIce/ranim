@@ -1,10 +1,7 @@
 pub mod svg_item;
 pub mod vitem;
 
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-};
+use std::{any::Any, collections::HashMap};
 
 use crate::context::WgpuContext;
 
@@ -28,6 +25,66 @@ pub trait Renderable {
         #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
     );
     fn debug(&self, _ctx: &WgpuContext) {}
+}
+
+impl<T0: Renderable> Renderable for (T0,) {
+    fn encode_render_command(
+        &self,
+        ctx: &WgpuContext,
+        pipelines: &mut super::PipelinesStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
+    ) {
+        self.0.encode_render_command(
+            ctx,
+            pipelines,
+            encoder,
+            uniforms_bind_group,
+            render_textures,
+            #[cfg(feature = "profiling")]
+            profiler,
+        );
+    }
+    fn debug(&self, ctx: &WgpuContext) {
+        self.0.debug(ctx);
+    }
+}
+
+impl<T0: Renderable, T1: Renderable> Renderable for (T0, T1) {
+    fn encode_render_command(
+        &self,
+        ctx: &WgpuContext,
+        pipelines: &mut super::PipelinesStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
+    ) {
+        self.0.encode_render_command(
+            ctx,
+            pipelines,
+            encoder,
+            uniforms_bind_group,
+            render_textures,
+            #[cfg(feature = "profiling")]
+            profiler,
+        );
+        self.1.encode_render_command(
+            ctx,
+            pipelines,
+            encoder,
+            uniforms_bind_group,
+            render_textures,
+            #[cfg(feature = "profiling")]
+            profiler,
+        );
+    }
+    fn debug(&self, ctx: &WgpuContext) {
+        self.0.debug(ctx);
+        self.1.debug(ctx);
+    }
 }
 
 /// Extract is the process of getting [`Primitive::Data`] from an item.
@@ -69,32 +126,37 @@ where
     }
 }
 
-pub fn prepare_render_primitive<T: Extract<Primitive = P>, P: Renderable + Primitive + 'static>(
-    ctx: &WgpuContext,
-    render_instances: &mut RenderInstances,
-    id: usize,
-    data: T,
-) {
-    let primitive_data = data.extract();
-    let primitive = P::init(ctx, &primitive_data);
-    render_instances
-        .items
-        .insert((id, TypeId::of::<P>()), Box::new(primitive));
-}
-
 // pub trait ExtractFrom<T: Entity>: Renderable + Any {
 //     fn update_from(&mut self, ctx: &WgpuContext, data: &T);
 // }
 
 #[derive(Default)]
 pub struct RenderInstances {
-    // Rabject's id, RenderInstance's TypeId -> RenderInstance
-    dynamic_items: HashMap<(usize, TypeId), Box<dyn Any>>,
-    //
-    items: HashMap<(usize, TypeId), Box<dyn Any>>,
+    // Rabject's id -> RenderInstance
+    items: HashMap<usize, Box<dyn Any>>,
 }
 
 impl RenderInstances {
+    pub(crate) fn insert_render_instance<T: Renderable + 'static>(
+        &mut self,
+        id: usize,
+        instance: T,
+    ) {
+        self.items.insert(id, Box::new(instance));
+    }
+    pub(crate) fn get_render_instance<T: Renderable + 'static>(&self, id: usize) -> Option<&T> {
+        self.items
+            .get(&id)
+            .and_then(|x| x.as_ref().downcast_ref::<T>())
+    }
+    pub(crate) fn get_render_instance_mut<T: Renderable + 'static>(
+        &mut self,
+        id: usize,
+    ) -> Option<&mut T> {
+        self.items
+            .get_mut(&id)
+            .and_then(|x| x.as_mut().downcast_mut::<T>())
+    }
     pub fn prepare<T: Extract<Primitive = P>, P: Renderable + Primitive + 'static>(
         &mut self,
         ctx: &WgpuContext,
@@ -102,29 +164,19 @@ impl RenderInstances {
         item: &T,
     ) {
         let primitive_data = item.extract();
-        let primitive = P::init(ctx, &primitive_data);
-        self.items
-            .insert((id, TypeId::of::<P>()), Box::new(primitive));
+        if let Some(render_instance) = self.get_render_instance_mut::<P>(id) {
+            render_instance.update(ctx, &primitive_data);
+        } else {
+            self.insert_render_instance(id, P::init(ctx, &primitive_data));
+        }
     }
     pub fn get_renderable<T: Extract<Primitive = P>, P: Renderable + Primitive + 'static>(
         &self,
         id: usize,
     ) -> Option<&dyn Renderable> {
         self.items
-            .get(&(id, TypeId::of::<P>()))
+            .get(&id)
             .map(|x| x.downcast_ref::<P>().unwrap() as &dyn Renderable)
-    }
-    pub fn get_dynamic<T: 'static>(&self, id: usize) -> Option<&T> {
-        self.dynamic_items
-            .get(&(id, TypeId::of::<T>()))
-            .map(|x| x.downcast_ref::<T>().unwrap())
-    }
-    pub fn get_dynamic_or_init<T: Default + 'static>(&mut self, id: usize) -> &mut T {
-        self.dynamic_items
-            .entry((id, TypeId::of::<T>()))
-            .or_insert_with(|| Box::new(T::default()))
-            .downcast_mut::<T>()
-            .unwrap()
     }
 }
 
