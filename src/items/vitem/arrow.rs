@@ -1,4 +1,5 @@
 use glam::dvec3;
+use ranim_macros::{Alignable, Empty, Fill, Interpolatable, Opacity, Stroke};
 
 use crate::{
     items::Blueprint,
@@ -7,7 +8,7 @@ use crate::{
 
 use super::{Circle, Line, VItem};
 
-#[derive(Clone)]
+#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill)]
 pub struct Arrow {
     pub tip: VItem,
     pub line: VItem,
