@@ -3,6 +3,8 @@ pub mod vitem;
 
 use std::{any::Any, collections::HashMap};
 
+use variadics_please::all_tuples;
+
 use crate::context::WgpuContext;
 
 use super::RenderTextures;
@@ -27,32 +29,42 @@ pub trait Renderable {
     fn debug(&self, _ctx: &WgpuContext) {}
 }
 
-impl<T0: Renderable> Renderable for (T0,) {
-    fn encode_render_command(
-        &self,
-        ctx: &WgpuContext,
-        pipelines: &mut super::PipelinesStorage,
-        encoder: &mut wgpu::CommandEncoder,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
-    ) {
-        self.0.encode_render_command(
-            ctx,
-            pipelines,
-            encoder,
-            uniforms_bind_group,
-            render_textures,
-            #[cfg(feature = "profiling")]
-            profiler,
-        );
-    }
-    fn debug(&self, ctx: &WgpuContext) {
-        self.0.debug(ctx);
-    }
+macro_rules! impl_tuple_renderable {
+    ($($T:ident),*) => {
+        impl<$($T: Renderable),*> Renderable for ($($T,)*) {
+            fn encode_render_command(
+                &self,
+                ctx: &WgpuContext,
+                pipelines: &mut super::PipelinesStorage,
+                encoder: &mut wgpu::CommandEncoder,
+                uniforms_bind_group: &wgpu::BindGroup,
+                render_textures: &RenderTextures,
+                #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
+            ) {
+                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
+                let ($($T,)*) = self;
+                $($T.encode_render_command(
+                    ctx,
+                    pipelines,
+                    encoder,
+                    uniforms_bind_group,
+                    render_textures,
+                    #[cfg(feature = "profiling")]
+                    profiler,
+                );)*
+            }
+            fn debug(&self, ctx: &WgpuContext) {
+                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
+                let ($($T,)*) = self;
+                $($T.debug(ctx);)*
+            }
+        }
+    };
 }
 
-impl<T0: Renderable, T1: Renderable> Renderable for (T0, T1) {
+all_tuples!(impl_tuple_renderable, 1, 16, T);
+
+impl<T: Renderable, const N: usize> Renderable for [T; N] {
     fn encode_render_command(
         &self,
         ctx: &WgpuContext,
@@ -62,28 +74,20 @@ impl<T0: Renderable, T1: Renderable> Renderable for (T0, T1) {
         render_textures: &RenderTextures,
         #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
     ) {
-        self.0.encode_render_command(
-            ctx,
-            pipelines,
-            encoder,
-            uniforms_bind_group,
-            render_textures,
-            #[cfg(feature = "profiling")]
-            profiler,
-        );
-        self.1.encode_render_command(
-            ctx,
-            pipelines,
-            encoder,
-            uniforms_bind_group,
-            render_textures,
-            #[cfg(feature = "profiling")]
-            profiler,
-        );
+        self.iter().for_each(|x| {
+            x.encode_render_command(
+                ctx,
+                pipelines,
+                encoder,
+                uniforms_bind_group,
+                render_textures,
+                #[cfg(feature = "profiling")]
+                profiler,
+            )
+        });
     }
-    fn debug(&self, ctx: &WgpuContext) {
-        self.0.debug(ctx);
-        self.1.debug(ctx);
+    fn debug(&self, _ctx: &WgpuContext) {
+        self.iter().for_each(|x| x.debug(_ctx));
     }
 }
 
@@ -122,7 +126,9 @@ where
         render_instances: &'a RenderInstances,
         id: usize,
     ) -> Option<&'a dyn Renderable> {
-        render_instances.get_renderable::<T, P>(id)
+        render_instances
+            .get_render_instance::<P>(id)
+            .map(|instance| instance as &dyn Renderable)
     }
 }
 
