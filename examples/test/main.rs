@@ -7,14 +7,16 @@ use env_logger::Env;
 use glam::{DVec3, dvec3};
 use ranim::{
     animation::{
-        creation::{CreationAnim, WritingAnim}, fading::FadingAnimSchedule, transform::{TransformAnim, TransformAnimSchedule}
+        creation::{CreationAnim, WritingAnim},
+        fading::FadingAnimSchedule,
+        transform::{TransformAnim, TransformAnimSchedule},
     },
     components::{Anchor, ScaleHint},
     items::{
         camera_frame::CameraFrame,
         group::Group,
         svg_item::SvgItem,
-        vitem::{arrow::Arrow, Square, VItem},
+        vitem::{Square, VItem, arrow::Arrow},
     },
     prelude::*,
     typst_svg,
