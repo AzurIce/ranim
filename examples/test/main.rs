@@ -7,15 +7,14 @@ use env_logger::Env;
 use glam::{DVec3, dvec3};
 use ranim::{
     animation::{
-        creation::{CreationAnim, WritingAnim},
-        transform::{TransformAnim, TransformAnimSchedule},
+        creation::{CreationAnim, WritingAnim}, fading::FadingAnimSchedule, transform::{TransformAnim, TransformAnimSchedule}
     },
     components::{Anchor, ScaleHint},
     items::{
         camera_frame::CameraFrame,
         group::Group,
         svg_item::SvgItem,
-        vitem::{Square, VItem, arrow::Arrow},
+        vitem::{arrow::Arrow, Square, VItem},
     },
     prelude::*,
     typst_svg,
@@ -48,6 +47,7 @@ impl TimelineConstructor for TestScene {
 
         let arrow = Arrow::new();
         let mut arrow = timeline.insert(arrow);
+        timeline.play(arrow.fade_in()).sync();
 
         let mut border = Square(1.0).build();
         border
