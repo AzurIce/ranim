@@ -79,29 +79,6 @@ impl Position for VItem {
     }
 }
 
-// impl HasTransform3dComponent for VItem {
-//     type Component = VPoint;
-//     fn transform_3d(&self) -> &ComponentVec<Self::Component> {
-//         &self.vpoints
-//     }
-
-//     fn transform_3d_mut(&mut self) -> &mut ComponentVec<Self::Component> {
-//         &mut self.vpoints
-//     }
-// }
-
-// impl AsRef<ComponentVec<VPoint>> for VItem {
-//     fn as_ref(&self) -> &ComponentVec<VPoint> {
-//         &self.vpoints
-//     }
-// }
-
-// impl AsMut<ComponentVec<VPoint>> for VItem {
-//     fn as_mut(&mut self) -> &mut ComponentVec<VPoint> {
-//         &mut self.vpoints
-//     }
-// }
-
 impl VItem {
     // TODO: remove all constructor to blueprint impl
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
@@ -138,6 +115,10 @@ impl VItem {
                 )
             })
             .collect()
+    }
+    pub fn put_start_and_end_on(&mut self, start: DVec3, end: DVec3) -> &mut Self {
+        self.vpoints.put_start_and_end_on(start, end);
+        self
     }
 }
 

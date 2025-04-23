@@ -1,8 +1,26 @@
 use darling::{Error, FromMeta, ast::NestedMeta};
 use heck::AsSnekCase;
 use proc_macro::TokenStream;
+use proc_macro_crate::{FoundCrate, crate_name};
+use proc_macro2::Span;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields, parse_macro_input};
+use syn::{Data, DeriveInput, Fields, Ident, parse_macro_input};
+
+const RANIM_CRATE_NAME: &str = "ranim";
+
+fn ranim_path() -> proc_macro2::TokenStream {
+    match (
+        crate_name(RANIM_CRATE_NAME),
+        std::env::var("CARGO_CRATE_NAME").as_deref(),
+    ) {
+        (Ok(FoundCrate::Itself), Ok(RANIM_CRATE_NAME)) => quote!(crate),
+        (Ok(FoundCrate::Name(name)), _) => {
+            let ident = Ident::new(&name, Span::call_site());
+            quote!(::#ident)
+        }
+        _ => quote!(::ranim),
+    }
+}
 
 #[derive(Default, Debug, FromMeta)]
 #[darling(default)]
@@ -12,6 +30,7 @@ struct SceneMeta {
 
 #[proc_macro_attribute]
 pub fn scene(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let ranim = ranim_path();
     let attr_args = match NestedMeta::parse_meta_list(attr.into()) {
         Ok(v) => v,
         Err(e) => return TokenStream::from(Error::from(e).write_errors()),
@@ -37,9 +56,9 @@ pub fn scene(attr: TokenStream, item: TokenStream) -> TokenStream {
     quote::quote! {
         #input
 
-        impl ::ranim::SceneMetaTrait for #struct_name {
-            fn meta(&self) -> ::ranim::SceneMeta {
-                ::ranim::SceneMeta {
+        impl #ranim::SceneMetaTrait for #struct_name {
+            fn meta(&self) -> #ranim::SceneMeta {
+                #ranim::SceneMeta {
                     name: #name.to_string(),
                 }
             }
@@ -48,203 +67,68 @@ pub fn scene(attr: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
+// MARK: derive Traits
+
 #[proc_macro_derive(Fill)]
 pub fn derive_fill(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    let generics = &input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let fields = match &input.data {
-        Data::Struct(data) => &data.fields,
-        _ => panic!("Fill can only be derived for structs"),
-    };
-
-    let (set_fill_opacity_impls, fill_color_impl, set_fill_color_impls) = match fields {
-        Fields::Named(fields) => {
-            let field_names = fields.named.iter().map(|f| &f.ident).collect::<Vec<_>>();
-            let first_field = field_names.first().unwrap();
-            (
-                quote! {
+    impl_derive(
+        input,
+        |ranim| quote! {#ranim::traits::Fill},
+        |ranim, field_positions| {
+            quote! {
+                fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
                     #(
-                        self.#field_names.set_fill_opacity(opacity);
+                        self.#field_positions.set_fill_opacity(opacity);
                     )*
-                },
-                quote! {
-                    self.#first_field.fill_color()
-                },
-                quote! {
+                    self
+                }
+                fn fill_color(&self) -> #ranim::color::AlphaColor<#ranim::color::Srgb> {
+                    [#(self.#field_positions.fill_color(), )*].first().cloned().unwrap()
+                }
+                fn set_fill_color(&mut self, color:  #ranim::color::AlphaColor<#ranim::color::Srgb>) -> &mut Self {
                     #(
-                        self.#field_names.set_fill_color(color);
+                        self.#field_positions.set_fill_color(color);
                     )*
-                },
-            )
-        }
-        Fields::Unnamed(fields) => {
-            let field_indices = (0..fields.unnamed.len())
-                .map(syn::Index::from)
-                .collect::<Vec<_>>();
-            (
-                quote! {
-                    #(
-                        self.#field_indices.set_fill_opacity(opacity);
-                    )*
-                },
-                quote! {
-                    self.0.fill_color()
-                },
-                quote! {
-                    #(
-                        self.#field_indices.set_fill_color(color);
-                    )*
-                },
-            )
-        }
-        Fields::Unit => panic!("Cannot be derived for unit structs"),
-    };
-
-    let expanded = quote! {
-        impl #impl_generics crate::traits::Fill for #name #ty_generics #where_clause {
-            fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-                #set_fill_opacity_impls
-                self
+                    self
+                }
             }
-            fn fill_color(&self) -> crate::color::AlphaColor<crate::color::Srgb> {
-                #fill_color_impl
-            }
-            fn set_fill_color(&mut self, color:  crate::color::AlphaColor<crate::color::Srgb>) -> &mut Self {
-                #set_fill_color_impls
-                self
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
+        },
+    )
 }
 
 #[proc_macro_derive(Stroke)]
 pub fn derive_stroke(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    let generics = &input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let fields = match &input.data {
-        Data::Struct(data) => &data.fields,
-        _ => panic!("Stroke can only be derived for structs"),
-    };
-
-    let (set_stroke_width_impls, set_stroke_color_impls, set_stroke_opacity_impls) = match fields {
-        Fields::Named(fields) => {
-            let field_names = fields.named.iter().map(|f| &f.ident).collect::<Vec<_>>();
-            (
-                quote! {
+    impl_derive(
+        input,
+        |ranim| quote! {#ranim::traits::Stroke},
+        |ranim, field_positions| {
+            quote! {
+                fn set_stroke_width(&mut self, width: f32) -> &mut Self {
                     #(
-                        self.#field_names.set_stroke_width(width);
+                        self.#field_positions.set_stroke_width(width);
                     )*
-                },
-                quote! {
+                    self
+                }
+                fn set_stroke_color(&mut self, color: #ranim::color::AlphaColor<#ranim::color::Srgb>) -> &mut Self {
                     #(
-                        self.#field_names.set_stroke_color(color);
+                        self.#field_positions.set_stroke_color(color);
                     )*
-                },
-                quote! {
+                    self
+                }
+                fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
                     #(
-                        self.#field_names.set_stroke_opacity(opacity);
+                        self.#field_positions.set_stroke_opacity(opacity);
                     )*
-                },
-            )
-        }
-        Fields::Unnamed(fields) => {
-            let field_indices = (0..fields.unnamed.len())
-                .map(syn::Index::from)
-                .collect::<Vec<_>>();
-            (
-                quote! {
-                    #(
-                        self.#field_indices.set_stroke_width(width);
-                    )*
-                },
-                quote! {
-                    #(
-                        self.#field_indices.set_stroke_color(color);
-                    )*
-                },
-                quote! {
-                    #(
-                        self.#field_indices.set_stroke_opacity(opacity);
-                    )*
-                },
-            )
-        }
-        Fields::Unit => panic!("Cannot be derived for unit structs"),
-    };
-
-    let expanded = quote! {
-        impl #impl_generics crate::traits::Stroke for #name #ty_generics #where_clause {
-            fn set_stroke_width(&mut self, width: f32) -> &mut Self {
-                #set_stroke_width_impls
-                self
+                    self
+                }
             }
-            fn set_stroke_color(&mut self, color: crate::color::AlphaColor<crate::color::Srgb>) -> &mut Self {
-                #set_stroke_color_impls
-                self
-            }
-            fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-                #set_stroke_opacity_impls
-                self
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
+        },
+    )
 }
-
-// #[proc_macro_derive(Color)]
-// pub fn derive_color(input: TokenStream) -> TokenStream {
-//     let input = parse_macro_input!(input as DeriveInput);
-//     let name = &input.ident;
-//     let generics = &input.generics;
-//     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-//     let fields = match &input.data {
-//         Data::Struct(data) => &data.fields,
-//         _ => panic!("Color can only be derived for structs"),
-//     };
-
-//     let field_impls = match fields {
-//         Fields::Named(fields) => {
-//             let field_names = fields.named.iter().map(|f| &f.ident);
-//             quote! {
-//                 #(
-//                     self.#field_names.color(ctx, color);
-//                 )*
-//             }
-//         }
-//         Fields::Unnamed(fields) => {
-//             let field_indices = (0..fields.unnamed.len()).map(syn::Index::from);
-//             quote! {
-//                 #(
-//                     self.#field_indices.color(ctx, color);
-//                 )*
-//             }
-//         }
-//         Fields::Unit => quote! {},
-//     };
-
-//     let expanded = quote! {
-//         impl #impl_generics crate::traits::Color for #name #ty_generics #where_clause {
-//             fn color(&mut self, ctx: &crate::context::WgpuContext, color: &crate::items::Color) {
-//                 #field_impls
-//             }
-//         }
-//     };
-
-//     TokenStream::from(expanded)
-// }
 
 #[proc_macro_derive(Empty)]
 pub fn derive_empty(input: TokenStream) -> TokenStream {
+    let ranim = ranim_path();
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let generics = &input.generics;
@@ -282,7 +166,7 @@ pub fn derive_empty(input: TokenStream) -> TokenStream {
     };
 
     let expanded = quote! {
-        impl #impl_generics crate::traits::Empty for #name #ty_generics #where_clause {
+        impl #impl_generics #ranim::traits::Empty for #name #ty_generics #where_clause {
             fn empty() -> Self {
                 #field_impls
             }
@@ -294,159 +178,66 @@ pub fn derive_empty(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Opacity)]
 pub fn derive_opacity(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    let generics = &input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let fields = match &input.data {
-        Data::Struct(data) => &data.fields,
-        _ => panic!("Opacity can only be derived for structs"),
-    };
-
-    let field_impls = match fields {
-        Fields::Named(fields) => {
-            let field_names = fields.named.iter().map(|f| &f.ident);
+    impl_derive(
+        input,
+        |ranim| quote! {#ranim::traits::Opacity},
+        |_ranim, field_positions| {
             quote! {
-                #(
-                    self.#field_names.set_opacity(opacity);
-                )*
+                fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+                    #(
+                        self.#field_positions.set_opacity(opacity);
+                    )*
+                    self
+                }
             }
-        }
-        Fields::Unnamed(fields) => {
-            let field_indices = (0..fields.unnamed.len()).map(syn::Index::from);
-            quote! {
-                #(
-                    self.#field_indices.set_opacity(opacity);
-                )*
-            }
-        }
-        Fields::Unit => panic!("Cannot be derived for unit structs"),
-    };
-
-    let expanded = quote! {
-        impl #impl_generics crate::traits::Opacity for #name #ty_generics #where_clause {
-            fn set_opacity(&mut self, opacity: f32) -> &mut Self {
-                #field_impls
-                self
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
+        },
+    )
 }
 
 #[proc_macro_derive(Alignable)]
 pub fn derive_alignable(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    let generics = &input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let fields = match &input.data {
-        Data::Struct(data) => &data.fields,
-        _ => panic!("Alignable can only be derived for structs"),
-    };
-
-    let (is_aligned_impls, align_with_impls) = match fields {
-        Fields::Named(fields) => {
-            let field_names = fields.named.iter().map(|f| &f.ident).collect::<Vec<_>>();
-            (
-                quote! {
+    impl_derive(
+        input,
+        |ranim| quote! {#ranim::traits::Alignable},
+        |_ranim, field_positions| {
+            quote! {
+                fn is_aligned(&self, other: &Self) -> bool {
                     #(
-                        self.#field_names.is_aligned(&other.#field_names) &&
+                        self.#field_positions.is_aligned(&other.#field_positions) &&
                     )* true
-                },
-                quote! {
+                }
+                fn align_with(&mut self, other: &mut Self) {
                     #(
-                        self.#field_names.align_with(&mut other.#field_names);
+                        self.#field_positions.align_with(&mut other.#field_positions);
                     )*
-                },
-            )
-        }
-        Fields::Unnamed(fields) => {
-            let field_indices = (0..fields.unnamed.len())
-                .map(syn::Index::from)
-                .collect::<Vec<_>>();
-            (
-                quote! {
-                    #(
-                        self.#field_indices.is_aligned(&other.#field_indices) &&
-                    )* true
-                },
-                quote! {
-                    #(
-                        self.#field_indices.align_with(&mut other.#field_indices);
-                    )*
-                },
-            )
-        }
-        Fields::Unit => panic!("Cannot be derived for unit structs"),
-    };
-
-    let expanded = quote! {
-        impl #impl_generics crate::traits::Alignable for #name #ty_generics #where_clause {
-            fn is_aligned(&self, other: &Self) -> bool {
-                #is_aligned_impls
+                }
             }
-            fn align_with(&mut self, other: &mut Self) {
-                #align_with_impls
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
+        },
+    )
 }
 
 #[proc_macro_derive(Interpolatable)]
 pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    let generics = &input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let fields = match &input.data {
-        Data::Struct(data) => &data.fields,
-        _ => panic!("Can only be derived for structs"),
-    };
-
-    let field_impls = match fields {
-        Fields::Named(fields) => {
-            let field_names = fields.named.iter().map(|f| &f.ident);
+    impl_derive(
+        input,
+        |ranim| quote! {#ranim::traits::Interpolatable},
+        |_ranim, field_positions| {
             quote! {
-                Self {
-                    #(
-                        #field_names: self.#field_names.lerp(&other.#field_names, t),
-                    )*
+                fn lerp(&self, other: &Self, t: f64) -> Self {
+                    Self {
+                        #(
+                            #field_positions: self.#field_positions.lerp(&other.#field_positions, t),
+                        )*
+                    }
                 }
             }
-        }
-        Fields::Unnamed(fields) => {
-            let field_indices = (0..fields.unnamed.len()).map(syn::Index::from);
-            quote! {
-                Self(
-                    #(
-                        self.#field_indices.lerp(&other.#field_indices, t),
-                    )*
-                )
-            }
-        }
-        Fields::Unit => panic!("Cannot be derived for unit structs"),
-    };
-
-    let expanded = quote! {
-        impl #impl_generics crate::traits::Interpolatable for #name #ty_generics #where_clause {
-            fn lerp(&self, other: &Self, t: f64) -> Self {
-                #field_impls
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
+        },
+    )
 }
 
 #[proc_macro_derive(BoundingBox)]
 pub fn derive_bounding_box(input: TokenStream) -> TokenStream {
+    let ranim = ranim_path();
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let generics = &input.generics;
@@ -457,36 +248,19 @@ pub fn derive_bounding_box(input: TokenStream) -> TokenStream {
         _ => panic!("Can only be derived for structs"),
     };
 
-    let field_impls = match fields {
-        Fields::Named(fields) => {
-            let field_names = fields.named.iter().map(|f| &f.ident);
-            quote! {
-                let [min, max] = [#(self.#field_names.get_bounding_box(), )*]
-                    .into_iter()
-                    .map(|[min, _, max]| [min, max])
-                    .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
-                    .unwrap();
-                [min, (min + max) / 2.0, max]
-            }
-        }
-        Fields::Unnamed(fields) => {
-            let field_indices = (0..fields.unnamed.len()).map(syn::Index::from);
-            quote! {
-                let [min, max] = [#(self.#field_indices.get_bounding_box(), )*]
-                    .into_iter()
-                    .map(|[min, _, max]| [min, max])
-                    .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
-                    .unwrap();
-                [min, (min + max) / 2.0, max]
-            }
-        }
-        Fields::Unit => panic!("Cannot be derived for unit structs"),
-    };
+    let field_positions = get_field_positions(fields)
+        .ok_or("cannot get field from unit struct")
+        .unwrap();
 
     let expanded = quote! {
-        impl #impl_generics crate::traits::BoundingBox for #name #ty_generics #where_clause {
+        impl #impl_generics #ranim::traits::BoundingBox for #name #ty_generics #where_clause {
             fn get_bounding_box(&self) -> [DVec3; 3] {
-                #field_impls
+                let [min, max] = [#(self.#field_positions.get_bounding_box(), )*]
+                    .into_iter()
+                    .map(|[min, _, max]| [min, max])
+                    .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
+                    .unwrap();
+                [min, (min + max) / 2.0, max]
             }
         }
     };
@@ -494,8 +268,61 @@ pub fn derive_bounding_box(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-#[proc_macro_derive(Transformable)]
-pub fn derive_transformable(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Position)]
+pub fn derive_position(input: TokenStream) -> TokenStream {
+    impl_derive(
+        input,
+        |ranim| {
+            quote! {#ranim::traits::Position}
+        },
+        |ranim, field_positions| {
+            quote! {
+                fn shift(&mut self, shift: DVec3) -> &mut Self {
+                    #(self.#field_positions.shift(shift);)*
+                    self
+                }
+
+                fn rotate_by_anchor(&mut self, angle: f64, axis: #ranim::glam::DVec3, anchor: #ranim::components::Anchor) -> &mut Self {
+                    #(self.#field_positions.rotate_by_anchor(angle, axis, anchor);)*
+                    self
+                }
+
+                fn scale_by_anchor(&mut self, scale: #ranim::glam::DVec3, anchor: #ranim::components::Anchor) -> &mut Self {
+                    #(self.#field_positions.scale_by_anchor(scale, anchor);)*
+                    self
+                }
+            }
+        },
+    )
+}
+
+#[proc_macro_derive(PointsFunc)]
+pub fn derive_point_func(input: TokenStream) -> TokenStream {
+    impl_derive(
+        input,
+        |ranim| {
+            quote! {#ranim::traits::PointsFunc}
+        },
+        |_ranim, field_positions| {
+            quote! {
+                fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self {
+                    #(self.#field_positions.apply_points_func(f);)*
+                    self
+                }
+            }
+        },
+    )
+}
+
+fn impl_derive(
+    input: TokenStream,
+    trait_path: impl Fn(&proc_macro2::TokenStream) -> proc_macro2::TokenStream,
+    impl_token: impl Fn(
+        &proc_macro2::TokenStream,
+        Vec<proc_macro2::TokenStream>,
+    ) -> proc_macro2::TokenStream,
+) -> TokenStream {
+    let ranim = ranim_path();
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let generics = &input.generics;
@@ -503,106 +330,44 @@ pub fn derive_transformable(input: TokenStream) -> TokenStream {
 
     let fields = match &input.data {
         Data::Struct(data) => &data.fields,
-        _ => panic!("Transformable can only be derived for structs"),
+        _ => panic!("Can only be derived for structs"),
     };
 
-    let (
-        get_start_position_impl,
-        get_end_position_impl,
-        apply_points_function_impl,
-        iter_points_impl,
-        iter_points_mut_impl,
-        get_bounding_box_impl,
-    ) = match fields {
-        Fields::Named(fields) => {
-            let field_names = fields.named.iter().map(|f| &f.ident).collect::<Vec<_>>();
-            let first_field = field_names.first().unwrap();
-            (
-                quote! {
-                    self.#first_field.get_start_position()
-                },
-                quote! {
-                    self.#first_field.get_end_position()
-                },
-                quote! {
-                    #(
-                        self.#field_names.apply_points_function(f, anchor);
-                    )*
-                    self
-                },
-                quote! {
-                    self.#first_field.iter_points()
-                },
-                quote! {
-                    self.#first_field.iter_points_mut()
-                },
-                quote! {
-                    self.#first_field.get_bounding_box()
-                },
-            )
-        }
-        Fields::Unnamed(fields) => {
-            let field_indices = (0..fields.unnamed.len())
-                .map(syn::Index::from)
-                .collect::<Vec<_>>();
-            (
-                quote! {
-                    self.0.get_start_position()
-                },
-                quote! {
-                    self.0.get_end_position()
-                },
-                quote! {
-                    #(
-                        self.#field_indices.apply_points_function(f, anchor);
-                    )*
-                    self
-                },
-                quote! {
-                    self.0.iter_points()
-                },
-                quote! {
-                    self.0.iter_points_mut()
-                },
-                quote! {
-                    self.0.get_bounding_box()
-                },
-            )
-        }
-        Fields::Unit => panic!("Cannot be derived for unit structs"),
-    };
+    let field_positions = get_field_positions(fields)
+        .ok_or("cannot get field from unit struct")
+        .unwrap();
 
+    let trait_path = trait_path(&ranim);
+    let impl_token = impl_token(&ranim, field_positions);
     let expanded = quote! {
-        impl #impl_generics crate::prelude::Transformable for #name #ty_generics #where_clause {
-            fn get_start_position(&self) -> Option<glam::DVec3> {
-                #get_start_position_impl
-            }
-
-            fn get_end_position(&self) -> Option<glam::DVec3> {
-                #get_end_position_impl
-            }
-
-            fn apply_points_function(
-                &mut self,
-                f: impl Fn(Vec<&mut glam::DVec3>) + Copy,
-                anchor: crate::components::Anchor,
-            ) -> &mut Self {
-                #apply_points_function_impl
-            }
-
-            fn iter_points(&self) -> impl Iterator<Item = &glam::DVec3> {
-                #iter_points_impl
-            }
-
-            fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut glam::DVec3> {
-                #iter_points_mut_impl
-            }
-
-            fn get_bounding_box(&self) -> [glam::DVec3; 3] {
-                #get_bounding_box_impl
-            }
+        impl #impl_generics #trait_path for #name #ty_generics #where_clause {
+            #impl_token
         }
     };
 
     TokenStream::from(expanded)
+}
+
+fn get_field_positions(fields: &Fields) -> Option<Vec<proc_macro2::TokenStream>> {
+    match fields {
+        Fields::Named(fields) => Some(
+            fields
+                .named
+                .iter()
+                .map(|f| {
+                    let pos = &f.ident;
+                    quote! { #pos }
+                })
+                .collect::<Vec<_>>(),
+        ),
+        Fields::Unnamed(fields) => Some(
+            (0..fields.unnamed.len())
+                .map(syn::Index::from)
+                .map(|i| {
+                    quote! { #i }
+                })
+                .collect::<Vec<_>>(),
+        ),
+        Fields::Unit => None,
+    }
 }

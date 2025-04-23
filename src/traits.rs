@@ -133,6 +133,7 @@ pub trait BoundingBox {
     }
 }
 
+// MARK: PointsFunc
 pub trait PointsFunc {
     fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self;
     fn apply_affine(&mut self, affine: DAffine2) -> &mut Self {

@@ -1,11 +1,11 @@
 use glam::DVec3;
-use ranim_macros::{Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Stroke};
+use ranim_macros::{
+    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Position, Stroke,
+};
 
 use crate::{
-    components::Anchor,
     items::Blueprint,
     render::primitives::{Extract, Primitive, Renderable, RenderableItem, vitem::VItemPrimitive},
-    traits::Position,
 };
 
 use super::{Line, Polygon, VItem};
@@ -20,25 +20,8 @@ use super::{Line, Polygon, VItem};
 ///           /   \
 /// 0.1 * -X +-----+ 0.1 * X
 /// ```
-#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox)]
+#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position)]
 pub struct ArrowTip(pub VItem);
-
-impl Position for ArrowTip {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.0.shift(shift);
-        self
-    }
-
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        self.0.rotate_by_anchor(angle, axis, anchor);
-        self
-    }
-
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
-        self.0.scale_by_anchor(scale, anchor);
-        self
-    }
-}
 
 impl Default for ArrowTip {
     fn default() -> Self {
