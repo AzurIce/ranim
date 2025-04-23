@@ -1,5 +1,13 @@
 use std::ops::{Deref, DerefMut};
 
+use glam::DVec3;
+use log::warn;
+
+use crate::{
+    components::Anchor,
+    traits::{BoundingBox, Position},
+};
+
 /// A group of things.
 ///
 /// The inner of a group is a [`Vec`], it has the ownership of the elements.
@@ -20,7 +28,7 @@ use std::ops::{Deref, DerefMut};
 /// let mut group = (0..9).map(|i| Square(100.0 * i as f32).build()).collect::<Group<_>>();
 /// ```
 ///
-/// Note that some operations like [`crate::components::Transformable`] for a group of items
+/// Note that some operations like [`Position`] for a group of items
 /// should have different implementation for a single item and a group of items.
 /// (For example, scaling the whole group is not equivalent to scaling each item).
 ///
@@ -52,7 +60,7 @@ use std::ops::{Deref, DerefMut};
 ///
 /// For some animations (like [`crate::animation::transform::Transform`]), it may support
 /// creating directly from item's slice. Since it may involves some group operations which
-/// is not equivalent to applying the same operation on each item (like [`crate::components::Transformable`]).
+/// is not equivalent to applying the same operation on each item (like [`Position`]).
 ///
 /// For example, if logo is a `Group<VItem>` with six elements:
 ///
@@ -146,5 +154,49 @@ impl<T> IntoIterator for Group<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+
+impl<T: BoundingBox> BoundingBox for [T] {
+    fn get_bounding_box(&self) -> [DVec3; 3] {
+        let [min, max] = self
+            .iter()
+            .map(|x| x.get_bounding_box())
+            .map(|[min, _, max]| [min, max])
+            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
+            .unwrap_or([DVec3::ZERO, DVec3::ZERO]);
+        if min == max {
+            warn!("Empty bounding box, is the slice empty?")
+        }
+        [min, (min + max) / 2.0, max]
+    }
+}
+
+impl<T: Position> Position for [T] {
+    fn shift(&mut self, shift: DVec3) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.shift(shift);
+        });
+        self
+    }
+    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
+        let anchor = match anchor {
+            Anchor::Point(p) => p,
+            Anchor::Edge(e) => self.get_bounding_box_point(e),
+        };
+        self.iter_mut().for_each(|x| {
+            x.rotate_by_anchor(angle, axis, Anchor::Point(anchor));
+        });
+        self
+    }
+    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
+        let anchor = match anchor {
+            Anchor::Point(p) => p,
+            Anchor::Edge(e) => self.get_bounding_box_point(e),
+        };
+        self.iter_mut().for_each(|x| {
+            x.scale_by_anchor(scale, Anchor::Point(anchor));
+        });
+        self
     }
 }

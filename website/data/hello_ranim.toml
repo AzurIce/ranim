@@ -1,49 +1,45 @@
 name = "hello_ranim"
-code = """
+code = '''
 ```rust,linenos
-use ranim::{\r
-    animation::{\r
-        creation::WritingAnimSchedule, fading::FadingAnimSchedule, transform::TransformAnimSchedule,\r
-    },\r
-    color::palettes::manim,\r
-    items::vitem::{Circle, Square},\r
-    prelude::*,\r
-};\r
-\r
-#[scene]\r
-struct HelloRanimScene;\r
-\r
-impl TimelineConstructor for HelloRanimScene {\r
-    fn construct(\r
-        self,\r
-        timeline: &RanimTimeline,\r
-        _camera: &mut Rabject<CameraFrame>,\r
-    ) {\r
-        let mut square = Square(2.0).build();\r
-        square.set_color(manim::BLUE_C);\r
-\r
-        let mut square = timeline.insert(square);\r
-        let mut circle = Circle(2.0).build();\r
-        circle.set_color(manim::RED_C);\r
-\r
-        timeline.play(square.transform_to(circle).apply()); // Use `apply` on an anim schedule to update rabject data\r
-        timeline.play(square.unwrite()); // Do not use `apply` to keep the data in Rabject not changed\r
-        timeline.play(square.write());\r
-        timeline.play(square.fade_out());\r
-    }\r
-}\r
-\r
-fn main() {\r
-    #[cfg(feature = \"app\")]\r
-    run_scene_app(HelloRanimScene);\r
-    #[cfg(not(feature = \"app\"))]\r
-    {\r
-        render_scene(HelloRanimScene, &AppOptions::default());\r
-        render_scene_at_sec(HelloRanimScene, 0.0, \"preview.png\", &AppOptions::default());\r
-    }\r
-}\r
+use ranim::{
+    animation::{
+        creation::WritingAnimSchedule, fading::FadingAnimSchedule, transform::TransformAnimSchedule,
+    },
+    color::palettes::manim,
+    items::vitem::{Circle, Square},
+    prelude::*,
+};
 
-```"""
-hash = "fc76af7b8736725b2cfe556f0c78d13c62687441"
+#[scene]
+struct HelloRanimScene;
+
+impl TimelineConstructor for HelloRanimScene {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+        let mut square = Square(2.0).build();
+        square.set_color(manim::BLUE_C);
+
+        let mut square = timeline.insert(square);
+        let mut circle = Circle(2.0).build();
+        circle.set_color(manim::RED_C);
+
+        timeline.play(square.transform_to(circle).apply()); // Use `apply` on an anim schedule to update rabject data
+        timeline.play(square.unwrite()); // Do not use `apply` to keep the data in Rabject not changed
+        timeline.play(square.write());
+        timeline.play(square.fade_out());
+    }
+}
+
+fn main() {
+    #[cfg(feature = "app")]
+    run_scene_app(HelloRanimScene);
+    #[cfg(not(feature = "app"))]
+    {
+        render_scene(HelloRanimScene, &AppOptions::default());
+        render_scene_at_sec(HelloRanimScene, 0.0, "preview.png", &AppOptions::default());
+    }
+}
+
+```'''
+hash = "5997de75b5be7a52015f867ee9ddd6444b2a0c97"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]

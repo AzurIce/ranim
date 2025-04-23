@@ -4,7 +4,6 @@ use ranim::animation::creation::WritingAnimSchedule;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::components::ScaleHint;
 use ranim::items::group::Group;
-use ranim::items::svg_item::SvgItem;
 use ranim::items::vitem::VItem;
 use ranim::timeline::TimeMark;
 use ranim::utils::rate_functions::linear;
@@ -19,7 +18,7 @@ impl TimelineConstructor for BasicScene {
     fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
         timeline.forward(0.2);
 
-        let mut svg = SvgItem::from_svg(SVG);
+        let mut svg = Group::<VItem>::from_svg(SVG);
         svg.scale_to(ScaleHint::PorportionalHeight(3.0))
             .put_center_on(DVec3::Y * 2.0);
         let mut svg = timeline.insert(svg);
@@ -46,7 +45,7 @@ impl TimelineConstructor for BasicScene {
                 .with_total_duration(3.0)
                 .with_rate_func(linear),
         );
-        timeline.play(svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
+        timeline.play(svg.lagged_anim(0.0, |item| item.fade_in().with_duration(3.0))); // At the same time, the svg fade in
         timeline.sync();
         timeline.insert_time_mark(
             timeline.duration_secs(),
@@ -59,7 +58,7 @@ impl TimelineConstructor for BasicScene {
                 .with_total_duration(3.0)
                 .with_rate_func(linear),
         );
-        timeline.play(svg.fade_out().with_duration(3.0));
+        timeline.play(svg.lagged_anim(0.0, |item| item.fade_out().with_duration(3.0))); // At the same time, the svg fade in
         timeline.sync();
     }
 }

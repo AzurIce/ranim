@@ -1,46 +1,42 @@
 name = "getting_started2"
 code = """
 ```rust,linenos
-use ranim::{\r
-    animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},\r
-    color::palettes::manim,\r
-    items::vitem::{Circle, Square},\r
-    prelude::*,\r
-    utils::rate_functions::linear,\r
-};\r
-\r
-#[scene]\r
-struct GettingStarted2Scene;\r
-\r
-impl TimelineConstructor for GettingStarted2Scene {\r
-    fn construct(\r
-        self,\r
-        timeline: &RanimTimeline,\r
-        _camera: &mut Rabject<CameraFrame>,\r
-    ) {\r
-        let mut square = Square(2.0).build();\r
-        square.set_color(manim::BLUE_C);\r
-\r
-        let mut square = timeline.insert(square);\r
-        let mut circle = Circle(2.0).build();\r
-        circle.set_color(manim::RED_C);\r
-\r
-        timeline.play(\r
-            square\r
-                .transform_to(circle)\r
-                .with_duration(2.0)\r
-                .with_rate_func(linear),\r
-        ); // Anim Schedule won't change the data in Rabject\r
-        timeline.forward(1.0);\r
-        timeline.play(square.fade_out()); // Anim is created based on the data in Rabject\r
-    }\r
-}\r
-\r
-fn main() {\r
-    render_scene(GettingStarted2Scene, &AppOptions::default());\r
-}\r
+use ranim::{
+    animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},
+    color::palettes::manim,
+    items::vitem::{Circle, Square},
+    prelude::*,
+    utils::rate_functions::linear,
+};
+
+#[scene]
+struct GettingStarted2Scene;
+
+impl TimelineConstructor for GettingStarted2Scene {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+        let mut square = Square(2.0).build();
+        square.set_color(manim::BLUE_C);
+
+        let mut square = timeline.insert(square);
+        let mut circle = Circle(2.0).build();
+        circle.set_color(manim::RED_C);
+
+        timeline.play(
+            square
+                .transform_to(circle)
+                .with_duration(2.0)
+                .with_rate_func(linear),
+        ); // Anim Schedule won't change the data in Rabject
+        timeline.forward(1.0);
+        timeline.play(square.fade_out()); // Anim is created based on the data in Rabject
+    }
+}
+
+fn main() {
+    render_scene(GettingStarted2Scene, &AppOptions::default());
+}
 
 ```"""
-hash = "2a3db6a335a9ac67f6567c227e238a134e56f402"
+hash = "75fa8d31c7ea814ef9737b41c9f4d1f847b9215d"
 preview_imgs = []
 output_files = ["/examples/getting_started2/output.mp4"]

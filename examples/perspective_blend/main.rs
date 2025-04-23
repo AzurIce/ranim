@@ -2,7 +2,6 @@ use glam::DVec3;
 use ranim::{
     animation::transform::{GroupTransformAnimSchedule, TransformAnimSchedule},
     color::palettes::manim,
-    components::Transformable,
     items::{group::Group, vitem::Square},
     prelude::*,
     timeline::TimeMark,

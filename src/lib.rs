@@ -34,8 +34,6 @@ pub mod prelude {
     pub use crate::traits::*;
 
     pub use crate::items::Blueprint;
-
-    pub use crate::components::Transformable;
 }
 
 pub mod color;

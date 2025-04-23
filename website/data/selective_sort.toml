@@ -1,152 +1,148 @@
 name = "selective_sort"
-code = """
+code = '''
 ```rust,linenos
-use glam::{DVec3, dvec2};\r
-use rand::{SeedableRng, seq::SliceRandom};\r
-use ranim::{\r
-    animation::transform::TransformAnimSchedule, color::palettes::manim, components::Anchor,\r
-    items::vitem::Rectangle, prelude::*, timeline::TimeMark, utils::rate_functions::linear,\r
-};\r
-\r
-#[scene]\r
-struct SelectiveSortScene(pub usize);\r
-\r
-impl TimelineConstructor for SelectiveSortScene {\r
-    fn construct(\r
-        self,\r
-        timeline: &RanimTimeline,\r
-        _camera: &mut Rabject<CameraFrame>,\r
-    ) {\r
-        let num = self.0;\r
-\r
-        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
-        let padded_frame_size = frame_size * 0.9;\r
-\r
-        let anim_step_duration = 15.0 / num.pow(2) as f64;\r
-\r
-        let width_unit = padded_frame_size.x / num as f64;\r
-        let height_unit = padded_frame_size.y / num as f64;\r
-\r
-        let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);\r
-        let mut heights = (1..=num)\r
-            .map(|x| x as f64 * height_unit)\r
-            .collect::<Vec<f64>>();\r
-        heights.shuffle(&mut rng);\r
-\r
-        let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
-        let mut rects = heights\r
-            .iter()\r
-            .enumerate()\r
-            .map(|(i, &height)| {\r
-                let mut rect = Rectangle(width_unit, height).build();\r
-                let target_bc_coord = padded_frame_bl.extend(0.0)\r
-                    + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);\r
-                rect.scale(DVec3::splat(0.8))\r
-                    .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord)\r
-                    .set_color(manim::WHITE)\r
-                    .set_fill_opacity(0.5);\r
-                timeline.insert(rect)\r
-            })\r
-            .collect::<Vec<_>>();\r
-\r
-        let shift_right = DVec3::X * width_unit;\r
-        for i in 0..num - 1 {\r
-            timeline.play(\r
-                rects[i]\r
-                    .transform(|data| {\r
-                        data.set_color(manim::RED_C).set_fill_opacity(0.5);\r
-                    })\r
-                    .with_duration(anim_step_duration)\r
-                    .with_rate_func(linear)\r
-                    .apply(),\r
-            );\r
-            for j in i + 1..num {\r
-                timeline.play(\r
-                    rects[j]\r
-                        .transform(|data| {\r
-                            data.set_color(manim::BLUE_C).set_fill_opacity(0.5);\r
-                        })\r
-                        .with_duration(anim_step_duration)\r
-                        .with_rate_func(linear)\r
-                        .apply(),\r
-                );\r
-                timeline.sync();\r
-\r
-                if heights[i] > heights[j] {\r
-                    timeline.play(\r
-                        rects[i]\r
-                            .transform(|data| {\r
-                                data.shift(shift_right * (j - i) as f64)\r
-                                    .set_color(manim::BLUE_C)\r
-                                    .set_fill_opacity(0.5);\r
-                            })\r
-                            .with_duration(anim_step_duration)\r
-                            .with_rate_func(linear)\r
-                            .apply(),\r
-                    );\r
-                    timeline.play(\r
-                        rects[j]\r
-                            .transform(|data| {\r
-                                data.shift(-shift_right * (j - i) as f64)\r
-                                    .set_color(manim::RED_C)\r
-                                    .set_fill_opacity(0.5);\r
-                            })\r
-                            .with_duration(anim_step_duration)\r
-                            .with_rate_func(linear)\r
-                            .apply(),\r
-                    );\r
-                    timeline.sync();\r
-                    heights.swap(i, j);\r
-                    rects.swap(i, j);\r
-                }\r
-                timeline.play(\r
-                    rects[j]\r
-                        .transform(|data| {\r
-                            data.set_color(manim::WHITE).set_fill_opacity(0.5);\r
-                        })\r
-                        .with_duration(anim_step_duration)\r
-                        .with_rate_func(linear)\r
-                        .apply(),\r
-                );\r
-                timeline.sync();\r
-            }\r
-            timeline.play(\r
-                rects[i]\r
-                    .transform(|data| {\r
-                        data.set_color(manim::WHITE).set_fill_opacity(0.5);\r
-                    })\r
-                    .with_duration(anim_step_duration)\r
-                    .with_rate_func(linear)\r
-                    .apply(),\r
-            );\r
-            timeline.sync();\r
-        }\r
-\r
-        timeline.insert_time_mark(\r
-            timeline.duration_secs() / 2.0,\r
-            TimeMark::Capture(format!(\"preview-{num}.png\")),\r
-        );\r
-    }\r
-}\r
-\r
-fn main() {\r
-    render_scene(\r
-        SelectiveSortScene(10),\r
-        &AppOptions {\r
-            output_filename: \"output-10.mp4\",\r
-            ..Default::default()\r
-        },\r
-    );\r
-    render_scene(\r
-        SelectiveSortScene(100),\r
-        &AppOptions {\r
-            output_filename: \"output-100.mp4\",\r
-            ..Default::default()\r
-        },\r
-    );\r
-}\r
+use glam::{DVec3, dvec2};
+use rand::{SeedableRng, seq::SliceRandom};
+use ranim::{
+    animation::transform::TransformAnimSchedule, color::palettes::manim, components::Anchor,
+    items::vitem::Rectangle, prelude::*, timeline::TimeMark, utils::rate_functions::linear,
+};
 
-```"""
-hash = "5905c5429e65cb8c2596dc49eaae029352066ae8"
+#[scene]
+struct SelectiveSortScene(pub usize);
+
+impl TimelineConstructor for SelectiveSortScene {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+        let num = self.0;
+
+        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
+        let padded_frame_size = frame_size * 0.9;
+
+        let anim_step_duration = 15.0 / num.pow(2) as f64;
+
+        let width_unit = padded_frame_size.x / num as f64;
+        let height_unit = padded_frame_size.y / num as f64;
+
+        let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);
+        let mut heights = (1..=num)
+            .map(|x| x as f64 * height_unit)
+            .collect::<Vec<f64>>();
+        heights.shuffle(&mut rng);
+
+        let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
+        let mut rects = heights
+            .iter()
+            .enumerate()
+            .map(|(i, &height)| {
+                let mut rect = Rectangle(width_unit, height).build();
+                let target_bc_coord = padded_frame_bl.extend(0.0)
+                    + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);
+                rect.scale(DVec3::splat(0.8))
+                    .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord)
+                    .set_color(manim::WHITE)
+                    .set_fill_opacity(0.5);
+                timeline.insert(rect)
+            })
+            .collect::<Vec<_>>();
+
+        let shift_right = DVec3::X * width_unit;
+        for i in 0..num - 1 {
+            timeline.play(
+                rects[i]
+                    .transform(|data| {
+                        data.set_color(manim::RED_C).set_fill_opacity(0.5);
+                    })
+                    .with_duration(anim_step_duration)
+                    .with_rate_func(linear)
+                    .apply(),
+            );
+            for j in i + 1..num {
+                timeline.play(
+                    rects[j]
+                        .transform(|data| {
+                            data.set_color(manim::BLUE_C).set_fill_opacity(0.5);
+                        })
+                        .with_duration(anim_step_duration)
+                        .with_rate_func(linear)
+                        .apply(),
+                );
+                timeline.sync();
+
+                if heights[i] > heights[j] {
+                    timeline.play(
+                        rects[i]
+                            .transform(|data| {
+                                data.shift(shift_right * (j - i) as f64)
+                                    .set_color(manim::BLUE_C)
+                                    .set_fill_opacity(0.5);
+                            })
+                            .with_duration(anim_step_duration)
+                            .with_rate_func(linear)
+                            .apply(),
+                    );
+                    timeline.play(
+                        rects[j]
+                            .transform(|data| {
+                                data.shift(-shift_right * (j - i) as f64)
+                                    .set_color(manim::RED_C)
+                                    .set_fill_opacity(0.5);
+                            })
+                            .with_duration(anim_step_duration)
+                            .with_rate_func(linear)
+                            .apply(),
+                    );
+                    timeline.sync();
+                    heights.swap(i, j);
+                    rects.swap(i, j);
+                }
+                timeline.play(
+                    rects[j]
+                        .transform(|data| {
+                            data.set_color(manim::WHITE).set_fill_opacity(0.5);
+                        })
+                        .with_duration(anim_step_duration)
+                        .with_rate_func(linear)
+                        .apply(),
+                );
+                timeline.sync();
+            }
+            timeline.play(
+                rects[i]
+                    .transform(|data| {
+                        data.set_color(manim::WHITE).set_fill_opacity(0.5);
+                    })
+                    .with_duration(anim_step_duration)
+                    .with_rate_func(linear)
+                    .apply(),
+            );
+            timeline.sync();
+        }
+
+        timeline.insert_time_mark(
+            timeline.duration_secs() / 2.0,
+            TimeMark::Capture(format!("preview-{num}.png")),
+        );
+    }
+}
+
+fn main() {
+    render_scene(
+        SelectiveSortScene(10),
+        &AppOptions {
+            output_filename: "output-10.mp4",
+            ..Default::default()
+        },
+    );
+    render_scene(
+        SelectiveSortScene(100),
+        &AppOptions {
+            output_filename: "output-100.mp4",
+            ..Default::default()
+        },
+    );
+}
+
+```'''
+hash = "b409faabc606bf8f3f8ba7f1d72f98e5d95defce"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/output-10.mp4", "/examples/selective_sort/output-100.mp4"]

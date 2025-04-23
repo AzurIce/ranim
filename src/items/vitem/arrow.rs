@@ -1,16 +1,69 @@
-use glam::dvec3;
-use ranim_macros::{Alignable, Empty, Fill, Interpolatable, Opacity, Stroke};
+use glam::DVec3;
+use ranim_macros::{Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Stroke};
 
 use crate::{
+    components::Anchor,
     items::Blueprint,
     render::primitives::{Extract, Primitive, Renderable, RenderableItem, vitem::VItemPrimitive},
+    traits::Position,
 };
 
-use super::{Circle, Line, VItem};
+use super::{Line, Polygon, VItem};
+
+/// An arrow tip
+///
+/// the default tip is like:
+///
+/// ```text
+///             + 0.2 * Y
+///            / \
+///           /   \
+/// 0.1 * -X +-----+ 0.1 * X
+/// ```
+#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox)]
+pub struct ArrowTip(pub VItem);
+
+impl Position for ArrowTip {
+    fn shift(&mut self, shift: DVec3) -> &mut Self {
+        self.0.shift(shift);
+        self
+    }
+
+    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
+        self.0.rotate_by_anchor(angle, axis, anchor);
+        self
+    }
+
+    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
+        self.0.scale_by_anchor(scale, anchor);
+        self
+    }
+}
+
+impl Default for ArrowTip {
+    fn default() -> Self {
+        Self(
+            Polygon(vec![
+                0.2 * DVec3::Y,
+                0.1 * DVec3::X,
+                0.2 * DVec3::Y,
+                0.1 * DVec3::NEG_X,
+            ])
+            .build(),
+        )
+    }
+}
+
+impl Extract for ArrowTip {
+    type Primitive = VItemPrimitive;
+    fn extract(&self) -> <Self::Primitive as Primitive>::Data {
+        self.0.extract()
+    }
+}
 
 #[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill)]
 pub struct Arrow {
-    pub tip: VItem,
+    pub tip: ArrowTip,
     pub line: VItem,
 }
 
@@ -23,8 +76,8 @@ impl Default for Arrow {
 impl Arrow {
     pub fn new() -> Self {
         Self {
-            tip: Circle(1.0).build(),
-            line: Line(dvec3(0.0, 0.0, 0.0), dvec3(1.0, 0.0, 0.0)).build(),
+            tip: ArrowTip::default(),
+            line: Line(0.2 * DVec3::NEG_Y, 0.2 * DVec3::Y).build(),
         }
     }
 }

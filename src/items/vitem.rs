@@ -1,19 +1,18 @@
 pub mod arrow;
+pub mod line;
 
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, dvec2, dvec3, vec4};
 use itertools::Itertools;
 
 use crate::{
-    components::{
-        ComponentVec, HasTransform3dComponent, Transformable, rgba::Rgba, vpoint::VPoint,
-        width::Width,
-    },
+    components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::primitives::{
         Extract,
         vitem::{VItemPrimitive, VItemPrimitiveData},
     },
+    traits::{BoundingBox, PointsFunc, Position},
 };
 
 use super::Blueprint;
@@ -21,12 +20,12 @@ use super::Blueprint;
 /// A vectorized item.
 ///
 /// It is built from four components:
-/// - [`VItem::vpoints`]: the vpoints of the item, see [`VPoint`].
+/// - [`VItem::vpoints`]: the vpoints of the item, see [`VPointComponentVec`].
 /// - [`VItem::stroke_widths`]: the stroke widths of the item, see [`Width`].
 /// - [`VItem::stroke_rgbas`]: the stroke colors of the item, see [`Rgba`].
 /// - [`VItem::fill_rgbas`]: the fill colors of the item, see [`Rgba`].
 ///
-/// You can construct a [`VItem`] from a list of [`VPoint`]s:
+/// You can construct a [`VItem`] from a list of VPoints, see [`VPointComponentVec`]:
 ///
 /// ```rust
 /// let vitem = VItem::from_vpoints(vec![
@@ -39,34 +38,69 @@ use super::Blueprint;
 ///
 #[derive(Debug, Clone, PartialEq)]
 pub struct VItem {
-    pub vpoints: ComponentVec<VPoint>,
+    pub vpoints: VPointComponentVec,
     pub stroke_widths: ComponentVec<Width>,
     pub stroke_rgbas: ComponentVec<Rgba>,
     pub fill_rgbas: ComponentVec<Rgba>,
 }
 
-impl HasTransform3dComponent for VItem {
-    type Component = VPoint;
-    fn transform_3d(&self) -> &ComponentVec<Self::Component> {
-        &self.vpoints
-    }
-
-    fn transform_3d_mut(&mut self) -> &mut ComponentVec<Self::Component> {
-        &mut self.vpoints
+impl PointsFunc for VItem {
+    fn apply_points_func(&mut self, f: impl Fn(&mut [DVec3])) -> &mut Self {
+        self.vpoints.apply_points_func(f);
+        self
     }
 }
 
-impl AsRef<ComponentVec<VPoint>> for VItem {
-    fn as_ref(&self) -> &ComponentVec<VPoint> {
-        &self.vpoints
+impl BoundingBox for VItem {
+    fn get_bounding_box(&self) -> [DVec3; 3] {
+        self.vpoints.get_bounding_box()
     }
 }
 
-impl AsMut<ComponentVec<VPoint>> for VItem {
-    fn as_mut(&mut self) -> &mut ComponentVec<VPoint> {
-        &mut self.vpoints
+impl Position for VItem {
+    fn shift(&mut self, shift: DVec3) -> &mut Self {
+        self.vpoints.shift(shift);
+        self
+    }
+
+    fn rotate_by_anchor(
+        &mut self,
+        angle: f64,
+        axis: DVec3,
+        anchor: crate::components::Anchor,
+    ) -> &mut Self {
+        self.vpoints.rotate_by_anchor(angle, axis, anchor);
+        self
+    }
+
+    fn scale_by_anchor(&mut self, scale: DVec3, anchor: crate::components::Anchor) -> &mut Self {
+        self.vpoints.scale_by_anchor(scale, anchor);
+        self
     }
 }
+
+// impl HasTransform3dComponent for VItem {
+//     type Component = VPoint;
+//     fn transform_3d(&self) -> &ComponentVec<Self::Component> {
+//         &self.vpoints
+//     }
+
+//     fn transform_3d_mut(&mut self) -> &mut ComponentVec<Self::Component> {
+//         &mut self.vpoints
+//     }
+// }
+
+// impl AsRef<ComponentVec<VPoint>> for VItem {
+//     fn as_ref(&self) -> &ComponentVec<VPoint> {
+//         &self.vpoints
+//     }
+// }
+
+// impl AsMut<ComponentVec<VPoint>> for VItem {
+//     fn as_mut(&mut self) -> &mut ComponentVec<VPoint> {
+//         &mut self.vpoints
+//     }
+// }
 
 impl VItem {
     // TODO: remove all constructor to blueprint impl
@@ -75,7 +109,7 @@ impl VItem {
         let stroke_rgbas = vec![vec4(1.0, 0.0, 0.0, 1.0); vpoints.len().div_ceil(2)];
         let fill_rgbas = vec![vec4(0.0, 1.0, 0.0, 0.5); vpoints.len().div_ceil(2)];
         Self {
-            vpoints: vpoints.into(),
+            vpoints: VPointComponentVec(vpoints.into()),
             stroke_rgbas: stroke_rgbas.into(),
             stroke_widths: stroke_widths.into(),
             fill_rgbas: fill_rgbas.into(),
@@ -83,8 +117,7 @@ impl VItem {
     }
 
     pub fn extend_vpoints(&mut self, vpoints: &[DVec3]) {
-        self.vpoints
-            .extend_from_vec(vpoints.iter().cloned().map(Into::into).collect());
+        self.vpoints.extend_from_vec(vpoints.to_vec());
 
         let len = self.vpoints.len();
         self.fill_rgbas.resize_with_last(len.div_ceil(2));
@@ -178,7 +211,7 @@ impl Partial for VItem {
 impl Empty for VItem {
     fn empty() -> Self {
         Self {
-            vpoints: vec![DVec3::ZERO; 3].into(),
+            vpoints: VPointComponentVec(vec![DVec3::ZERO; 3].into()),
             stroke_widths: vec![0.0, 0.0].into(),
             stroke_rgbas: vec![Vec4::ZERO; 2].into(),
             fill_rgbas: vec![Vec4::ZERO; 2].into(),

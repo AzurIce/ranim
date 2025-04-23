@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, f32, path::Path, slice::Iter, vec};
+use std::{slice::Iter, vec};
 
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DAffine2, DVec3, dvec3};
@@ -6,247 +6,12 @@ use log::warn;
 
 use crate::{
     color::{rgb8, rgba},
-    components::Anchor,
-    prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke, Transformable},
-    render::primitives::{
-        Extract,
-        svg_item::{SvgItemPrimitive, SvgItemPrimitiveData},
-    },
-    utils::{bezier::PathBuilder, math::interpolate_usize},
+    prelude::{Fill, Stroke},
+    traits::{PointsFunc, Position},
+    utils::bezier::PathBuilder,
 };
 
 use super::{group::Group, vitem::VItem};
-
-#[derive(Debug, Clone)]
-pub struct SvgItem {
-    pub vitems: Vec<VItem>,
-}
-
-impl From<VItem> for SvgItem {
-    fn from(value: VItem) -> Self {
-        Self {
-            vitems: vec![value],
-        }
-    }
-}
-
-// MARK: Transformable
-
-impl Transformable for SvgItem {
-    fn iter_points(&self) -> impl Iterator<Item = &DVec3> {
-        self.vitems.iter().flat_map(|x| x.iter_points())
-    }
-    fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut DVec3> {
-        self.vitems.iter_mut().flat_map(|x| x.iter_points_mut())
-    }
-    fn apply_points_function(
-        &mut self,
-        f: impl Fn(Vec<&mut glam::DVec3>) + Copy,
-        anchor: Anchor,
-    ) -> &mut Self {
-        let point = match anchor {
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-            Anchor::Point(point) => point,
-        };
-        // println!("{:?}, {:?}", anchor, point);
-        self.vitems.iter_mut().for_each(|x| {
-            x.apply_points_function(f, Anchor::Point(point));
-        });
-        self
-    }
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        let [min, max] = self
-            .vitems
-            .iter()
-            .map(|x| x.get_bounding_box())
-            .map(|[min, _, max]| [min, max])
-            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
-            .unwrap();
-        [min, (min + max) / 2., max]
-    }
-    fn get_start_position(&self) -> Option<DVec3> {
-        self.vitems
-            .first()
-            .and_then(|vitem| vitem.get_start_position())
-    }
-    fn get_end_position(&self) -> Option<DVec3> {
-        self.vitems
-            .first()
-            .and_then(|vitem| vitem.get_start_position())
-    }
-}
-
-impl SvgItem {
-    pub fn from_file(path: impl AsRef<Path>) -> Self {
-        let path = path.as_ref();
-        let content = std::fs::read_to_string(path).unwrap();
-        Self::from_svg(&content)
-    }
-    pub fn from_svg(svg: impl AsRef<str>) -> Self {
-        let svg = svg.as_ref();
-        let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();
-
-        let vitems = vitems_from_tree(&tree);
-        let mut svg_item = Self { vitems };
-        svg_item.put_center_on(DVec3::ZERO);
-        svg_item.rotate(std::f64::consts::PI, DVec3::X);
-        svg_item
-    }
-}
-
-impl Empty for SvgItem {
-    fn empty() -> Self {
-        Self {
-            vitems: vec![VItem::empty()],
-        }
-    }
-}
-
-// MARK: Extract
-impl Extract for SvgItem {
-    type Primitive = SvgItemPrimitive;
-    fn extract(&self) -> <Self::Primitive as crate::render::primitives::Primitive>::Data {
-        SvgItemPrimitiveData {
-            vitem_datas: self.vitems.iter().map(|x| x.extract()).collect(),
-        }
-    }
-}
-
-// MARK: Animation impl
-impl Stroke for SvgItem {
-    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.vitems.iter_mut().for_each(|vitem| {
-            vitem.set_stroke_color(color);
-        });
-        self
-    }
-    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.vitems.iter_mut().for_each(|vitem| {
-            vitem.set_stroke_opacity(opacity);
-        });
-        self
-    }
-    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
-        self.vitems.iter_mut().for_each(|vitem| {
-            vitem.set_stroke_width(width);
-        });
-        self
-    }
-}
-
-impl Fill for SvgItem {
-    fn fill_color(&self) -> AlphaColor<Srgb> {
-        self.vitems
-            .first()
-            .map(|vitem| vitem.fill_color())
-            .unwrap_or(css::WHITE)
-    }
-    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.vitems.iter_mut().for_each(|vitem| {
-            vitem.set_fill_color(color);
-        });
-        self
-    }
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.vitems.iter_mut().for_each(|vitem| {
-            vitem.set_fill_opacity(opacity);
-        });
-        self
-    }
-}
-
-impl Opacity for SvgItem {
-    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.vitems.iter_mut().for_each(|vitem| {
-            vitem.set_opacity(opacity);
-        });
-        self
-    }
-}
-
-impl Alignable for SvgItem {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.vitems.len() == other.vitems.len()
-            && self
-                .vitems
-                .iter()
-                .zip(other.vitems.iter())
-                .all(|(a, b)| a.is_aligned(b))
-    }
-    fn align_with(&mut self, other: &mut Self) {
-        match self.vitems.len().cmp(&other.vitems.len()) {
-            Ordering::Less => {
-                self.vitems.resize_with(other.vitems.len(), VItem::empty);
-            }
-            Ordering::Greater => {
-                other.vitems.resize_with(self.vitems.len(), VItem::empty);
-            }
-            _ => (),
-        }
-        self.vitems
-            .iter_mut()
-            .zip(other.vitems.iter_mut())
-            .for_each(|(a, b)| a.align_with(b));
-    }
-}
-
-impl Interpolatable for SvgItem {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        let vitems = self
-            .vitems
-            .iter()
-            .zip(target.vitems.iter())
-            .map(|(a, b)| a.lerp(b, t))
-            .collect();
-        Self { vitems }
-    }
-}
-
-impl Partial for SvgItem {
-    fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
-        let max_vitem_idx = self.vitems.len();
-        let (start_index, start_residue) = interpolate_usize(0, max_vitem_idx, range.start);
-        let (end_index, end_residue) = interpolate_usize(0, max_vitem_idx, range.end);
-        // trace!("range: {:?}, start: {} {}, end: {} {}", range, start_index, start_residue, end_index, end_residue);
-        let vitems = if start_index == end_index {
-            let start_v = self
-                .vitems
-                .get(start_index)
-                .unwrap()
-                .get_partial(start_residue..end_residue);
-            // .lerp(self.vitems.get(start_index + 1).unwrap(), start_residue);
-            vec![start_v]
-        } else {
-            let mut partial = Vec::with_capacity(end_index - start_index + 1 + 2);
-            let start_v = self
-                .vitems
-                .get(start_index)
-                .unwrap()
-                .get_partial(start_residue..1.0);
-            partial.push(start_v);
-
-            if start_index < end_index - 1 {
-                let mid = self.vitems.get(start_index + 1..end_index).unwrap();
-                partial.extend_from_slice(mid);
-            }
-
-            if end_residue != 0.0 {
-                // .lerp(self.vitems.get(start_index + 1).unwrap(), start_residue);
-                let end_v = self
-                    .vitems
-                    .get(end_index)
-                    .unwrap()
-                    .get_partial(0.0..end_residue);
-                // .lerp(self.vitems.get(end_index + 1).unwrap(), end_residue);
-
-                partial.push(end_v);
-            }
-            partial
-        };
-
-        Self { vitems }
-    }
-}
 
 // MARK: Another aproach
 
@@ -373,7 +138,6 @@ fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::typst_svg;
 
     const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
     #[test]
@@ -383,15 +147,15 @@ mod test {
         println!("{} paths", paths.len());
     }
 
-    #[test]
-    fn test_get_partial() {
-        let mut svg = SvgItem::from_svg(typst_svg!("R"));
-        svg.scale(DVec3::splat(10.0));
+    // #[test]
+    // fn test_get_partial() {
+    //     let mut svg = SvgItem::from_svg(typst_svg!("R"));
+    //     svg.scale(DVec3::splat(10.0));
 
-        println!("{:?}", svg.vitems[0].vpoints);
-        let partial = svg.get_partial(0.0..0.5);
-        println!("{:?}", partial.vitems[0].vpoints);
-        let partial = svg.vitems[0].get_partial(0.0..0.5);
-        println!("{:?}", partial.vpoints);
-    }
+    //     println!("{:?}", svg.vitems[0].vpoints);
+    //     let partial = svg.get_partial(0.0..0.5);
+    //     println!("{:?}", partial.vitems[0].vpoints);
+    //     let partial = svg.vitems[0].get_partial(0.0..0.5);
+    //     println!("{:?}", partial.vpoints);
+    // }
 }
