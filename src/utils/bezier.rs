@@ -98,10 +98,10 @@ pub fn split_cubic_bezier(bezier: &[DVec3; 4], t: f64) -> ([DVec3; 4], [DVec3; 4
 
     let split_point = &cubic_bezier_eval(bezier, t);
 
-    let h00 = p0.lerp(*h0, t);
-    let h01 = p0.lerp(*h0, t).lerp(h0.lerp(*h1, t), t);
-    let h10 = h0.lerp(*h1, t).lerp(h1.lerp(*p1, t), t);
-    let h11 = h1.lerp(*p1, t);
+    let h00 = p0.lerp(h0, t);
+    let h01 = p0.lerp(h0, t).lerp(h0.lerp(h1, t), t);
+    let h10 = h0.lerp(h1, t).lerp(h1.lerp(p1, t), t);
+    let h11 = h1.lerp(p1, t);
 
     ([*p0, h00, h01, *split_point], [*split_point, h10, h11, *p1])
 }
@@ -111,8 +111,8 @@ pub fn split_quad_bezier(bezier: &[DVec3; 3], t: f64) -> ([DVec3; 3], [DVec3; 3]
 
     let split_point = &quad_bezier_eval(bezier, t);
 
-    let h0 = p0.lerp(*h, t);
-    let h1 = h.lerp(*p1, t);
+    let h0 = p0.lerp(h, t);
+    let h1 = h.lerp(p1, t);
 
     ([*p0, h0, *split_point], [*split_point, h1, *p1])
 }

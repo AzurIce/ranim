@@ -15,7 +15,6 @@ use ranim::{
     items::{
         camera_frame::CameraFrame,
         group::Group,
-        svg_item::SvgItem,
         vitem::{Square, VItem, arrow::Arrow},
     },
     prelude::*,

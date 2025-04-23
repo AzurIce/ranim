@@ -407,7 +407,7 @@ pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
 
     let fields = match &input.data {
         Data::Struct(data) => &data.fields,
-        _ => panic!("Interpolatable can only be derived for structs"),
+        _ => panic!("Can only be derived for structs"),
     };
 
     let field_impls = match fields {
@@ -424,11 +424,11 @@ pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
         Fields::Unnamed(fields) => {
             let field_indices = (0..fields.unnamed.len()).map(syn::Index::from);
             quote! {
-                Self {
+                Self(
                     #(
-                        self.#field_indices.lerp(&other.#field_indices, t);
+                        self.#field_indices.lerp(&other.#field_indices, t),
                     )*
-                }
+                )
             }
         }
         Fields::Unit => panic!("Cannot be derived for unit structs"),
@@ -438,6 +438,168 @@ pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
         impl #impl_generics crate::traits::Interpolatable for #name #ty_generics #where_clause {
             fn lerp(&self, other: &Self, t: f64) -> Self {
                 #field_impls
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(BoundingBox)]
+pub fn derive_bounding_box(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let fields = match &input.data {
+        Data::Struct(data) => &data.fields,
+        _ => panic!("Can only be derived for structs"),
+    };
+
+    let field_impls = match fields {
+        Fields::Named(fields) => {
+            let field_names = fields.named.iter().map(|f| &f.ident);
+            quote! {
+                let [min, max] = [#(self.#field_names.get_bounding_box(), )*]
+                    .into_iter()
+                    .map(|[min, _, max]| [min, max])
+                    .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
+                    .unwrap();
+                [min, (min + max) / 2.0, max]
+            }
+        }
+        Fields::Unnamed(fields) => {
+            let field_indices = (0..fields.unnamed.len()).map(syn::Index::from);
+            quote! {
+                let [min, max] = [#(self.#field_indices.get_bounding_box(), )*]
+                    .into_iter()
+                    .map(|[min, _, max]| [min, max])
+                    .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
+                    .unwrap();
+                [min, (min + max) / 2.0, max]
+            }
+        }
+        Fields::Unit => panic!("Cannot be derived for unit structs"),
+    };
+
+    let expanded = quote! {
+        impl #impl_generics crate::traits::BoundingBox for #name #ty_generics #where_clause {
+            fn get_bounding_box(&self) -> [DVec3; 3] {
+                #field_impls
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(Transformable)]
+pub fn derive_transformable(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let fields = match &input.data {
+        Data::Struct(data) => &data.fields,
+        _ => panic!("Transformable can only be derived for structs"),
+    };
+
+    let (
+        get_start_position_impl,
+        get_end_position_impl,
+        apply_points_function_impl,
+        iter_points_impl,
+        iter_points_mut_impl,
+        get_bounding_box_impl,
+    ) = match fields {
+        Fields::Named(fields) => {
+            let field_names = fields.named.iter().map(|f| &f.ident).collect::<Vec<_>>();
+            let first_field = field_names.first().unwrap();
+            (
+                quote! {
+                    self.#first_field.get_start_position()
+                },
+                quote! {
+                    self.#first_field.get_end_position()
+                },
+                quote! {
+                    #(
+                        self.#field_names.apply_points_function(f, anchor);
+                    )*
+                    self
+                },
+                quote! {
+                    self.#first_field.iter_points()
+                },
+                quote! {
+                    self.#first_field.iter_points_mut()
+                },
+                quote! {
+                    self.#first_field.get_bounding_box()
+                },
+            )
+        }
+        Fields::Unnamed(fields) => {
+            let field_indices = (0..fields.unnamed.len())
+                .map(syn::Index::from)
+                .collect::<Vec<_>>();
+            (
+                quote! {
+                    self.0.get_start_position()
+                },
+                quote! {
+                    self.0.get_end_position()
+                },
+                quote! {
+                    #(
+                        self.#field_indices.apply_points_function(f, anchor);
+                    )*
+                    self
+                },
+                quote! {
+                    self.0.iter_points()
+                },
+                quote! {
+                    self.0.iter_points_mut()
+                },
+                quote! {
+                    self.0.get_bounding_box()
+                },
+            )
+        }
+        Fields::Unit => panic!("Cannot be derived for unit structs"),
+    };
+
+    let expanded = quote! {
+        impl #impl_generics crate::prelude::Transformable for #name #ty_generics #where_clause {
+            fn get_start_position(&self) -> Option<glam::DVec3> {
+                #get_start_position_impl
+            }
+
+            fn get_end_position(&self) -> Option<glam::DVec3> {
+                #get_end_position_impl
+            }
+
+            fn apply_points_function(
+                &mut self,
+                f: impl Fn(Vec<&mut glam::DVec3>) + Copy,
+                anchor: crate::components::Anchor,
+            ) -> &mut Self {
+                #apply_points_function_impl
+            }
+
+            fn iter_points(&self) -> impl Iterator<Item = &glam::DVec3> {
+                #iter_points_impl
+            }
+
+            fn iter_points_mut(&mut self) -> impl Iterator<Item = &mut glam::DVec3> {
+                #iter_points_mut_impl
+            }
+
+            fn get_bounding_box(&self) -> [glam::DVec3; 3] {
+                #get_bounding_box_impl
             }
         }
     };
