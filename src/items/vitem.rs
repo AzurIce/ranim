@@ -82,9 +82,9 @@ impl Position for VItem {
 impl VItem {
     // TODO: remove all constructor to blueprint impl
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
-        let stroke_widths = vec![1.0; vpoints.len().div_ceil(2)];
-        let stroke_rgbas = vec![vec4(1.0, 0.0, 0.0, 1.0); vpoints.len().div_ceil(2)];
-        let fill_rgbas = vec![vec4(0.0, 1.0, 0.0, 0.5); vpoints.len().div_ceil(2)];
+        let stroke_widths = vec![0.02; vpoints.len().div_ceil(2)];
+        let stroke_rgbas = vec![vec4(1.0, 1.0, 1.0, 1.0); vpoints.len().div_ceil(2)];
+        let fill_rgbas = vec![vec4(0.0, 0.0, 0.0, 0.0); vpoints.len().div_ceil(2)];
         Self {
             vpoints: VPointComponentVec(vpoints.into()),
             stroke_rgbas: stroke_rgbas.into(),

@@ -195,11 +195,11 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
 
     // TODO: Antialias
     var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[anchor_index], fill_rgbas[anchor_index + 1], ratio), is_closed(idx));
-    fill_rgba.a *= smoothstep(1.0, -1.0, (sgn_d) );
+    fill_rgba.a *= smoothstep(1.0, -1.0, (sgn_d));
 
     let stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
     var stroke_rgba: vec4<f32> = mix(stroke_rgbas[anchor_index], stroke_rgbas[anchor_index + 1], ratio);
-    stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width));
+    stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width) / 0.015);
 
     var f_color = blend_color(stroke_rgba, fill_rgba);
     // TODO: handle depth
