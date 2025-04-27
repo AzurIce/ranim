@@ -434,6 +434,7 @@ impl RanimRenderApp {
         if self.save_frames {
             let path = self
                 .output_dir
+                .join(&self.scene_name)
                 .join(format!("frames/{:04}.png", self.frame_count));
             self.save_frame_to_image(path);
         }

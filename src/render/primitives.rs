@@ -159,6 +159,7 @@ impl RenderInstances {
         &mut self,
         id: usize,
     ) -> Option<&mut T> {
+        // println!("get_render_instance_mut");
         self.items
             .get_mut(&id)
             .and_then(|x| x.as_mut().downcast_mut::<T>())
