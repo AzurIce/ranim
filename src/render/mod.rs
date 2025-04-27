@@ -4,6 +4,7 @@ pub mod primitives;
 use color::LinearSrgb;
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Rgba};
+use pipelines::{Map3dTo2dPipeline, VItemPipeline};
 use primitives::Renderable;
 
 use crate::{
@@ -269,15 +270,82 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
         // renderable.update_clip_info(&ctx.wgpu_ctx, &self.camera);
-        renderable.encode_render_command(
-            &ctx.wgpu_ctx,
-            &mut ctx.pipelines,
-            &mut encoder,
-            &self.uniforms_bind_group.bind_group,
-            &self.render_textures,
+        {
             #[cfg(feature = "profiling")]
-            &mut self.profiler,
-        );
+            let mut scope = self.profiler.scope("compute pass", &mut encoder);
+            #[cfg(feature = "profiling")]
+            let mut cpass = scope.scoped_compute_pass("VItem Map Points Compute Pass");
+            #[cfg(not(feature = "profiling"))]
+            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("VItem Map Points Compute Pass"),
+                timestamp_writes: None,
+            });
+            cpass.set_pipeline(
+                ctx.pipelines
+                    .get_or_init::<Map3dTo2dPipeline>(&ctx.wgpu_ctx),
+            );
+            cpass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
+
+            renderable.encode_compute_pass_command(
+                &ctx.wgpu_ctx,
+                &mut ctx.pipelines,
+                &mut cpass,
+                &self.uniforms_bind_group.bind_group,
+                &self.render_textures,
+                #[cfg(feature = "profiling")]
+                &self.profiler,
+            );
+        }
+        {
+            #[cfg(feature = "profiling")]
+            let mut scope = self.profiler.scope("render pass", &mut encoder);
+            let RenderTextures {
+                // multisample_view,
+                render_view,
+                ..
+            } = &mut self.render_textures;
+            let rpass_desc = wgpu::RenderPassDescriptor {
+                label: Some("VItem Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    // view: multisample_view,
+                    // resolve_target: Some(render_view),
+                    view: render_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            };
+            #[cfg(feature = "profiling")]
+            let mut rpass = scope.scoped_render_pass("VItem Render Pass", rpass_desc);
+            #[cfg(not(feature = "profiling"))]
+            let mut rpass = encoder.begin_render_pass(&rpass_desc);
+            rpass.set_pipeline(ctx.pipelines.get_or_init::<VItemPipeline>(&ctx.wgpu_ctx));
+            rpass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
+
+            renderable.encode_render_pass_command(
+                &ctx.wgpu_ctx,
+                &mut ctx.pipelines,
+                &mut rpass,
+                &self.uniforms_bind_group.bind_group,
+                &self.render_textures,
+                #[cfg(feature = "profiling")]
+                &self.profiler,
+            );
+        }
+        // renderable.encode_render_command(
+        //     &ctx.wgpu_ctx,
+        //     &mut ctx.pipelines,
+        //     &mut encoder,
+        //     &self.uniforms_bind_group.bind_group,
+        //     &self.render_textures,
+        //     #[cfg(feature = "profiling")]
+        //     &mut self.profiler,
+        // );
 
         #[cfg(not(feature = "profiling"))]
         ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
