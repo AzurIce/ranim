@@ -284,6 +284,30 @@ impl Default for VItemPrimitive {
 // }
 
 impl Renderable for VItemPrimitive {
+    fn encode_compute_pass_command<'a>(
+        &self,
+        ctx: &WgpuContext,
+        pipelines: &mut crate::render::PipelinesStorage,
+        cpass: &mut wgpu::ComputePass<'a>,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
+    ) {
+        cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
+        cpass.dispatch_workgroups(self.points3d_buffer.len().div_ceil(256) as u32, 1, 1);
+    }
+    fn encode_render_pass_command<'a>(
+        &self,
+        ctx: &WgpuContext,
+        pipelines: &mut crate::render::PipelinesStorage,
+        rpass: &mut wgpu::RenderPass<'a>,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
+    ) {
+        rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
+        rpass.draw(0..4, 0..1);
+    }
     fn encode_render_command(
         &self,
         ctx: &WgpuContext,

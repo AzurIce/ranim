@@ -36,6 +36,48 @@ impl Primitive for SvgItemPrimitive {
 }
 
 impl Renderable for SvgItemPrimitive {
+    fn encode_render_pass_command<'a>(
+            &self,
+            ctx: &crate::context::WgpuContext,
+            pipelines: &mut crate::render::PipelinesStorage,
+            rpass: &mut wgpu::RenderPass<'a>,
+            uniforms_bind_group: &wgpu::BindGroup,
+            render_textures: &RenderTextures,
+            #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
+        ) {
+        self.vitem_primitives.iter().for_each(|vimte_primitive| {
+            vimte_primitive.encode_render_pass_command(
+                ctx,
+                pipelines,
+                rpass,
+                uniforms_bind_group,
+                render_textures,
+                #[cfg(feature = "profiling")]
+                profiler,
+            );
+        })
+    }
+    fn encode_compute_pass_command<'a>(
+            &self,
+            ctx: &crate::context::WgpuContext,
+            pipelines: &mut crate::render::PipelinesStorage,
+            cpass: &mut wgpu::ComputePass<'a>,
+            uniforms_bind_group: &wgpu::BindGroup,
+            render_textures: &RenderTextures,
+            #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
+        ) {
+        self.vitem_primitives.iter().for_each(|vimte_primitive| {
+            vimte_primitive.encode_compute_pass_command(
+                ctx,
+                pipelines,
+                cpass,
+                uniforms_bind_group,
+                render_textures,
+                #[cfg(feature = "profiling")]
+                profiler,
+            );
+        })
+    }
     fn encode_render_command(
         &self,
         ctx: &crate::context::WgpuContext,
