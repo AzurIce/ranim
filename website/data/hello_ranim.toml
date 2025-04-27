@@ -1,6 +1,9 @@
 name = "hello_ranim"
 code = '''
 ```rust,linenos
+use std::f64::consts::PI;
+
+use glam::DVec3;
 use ranim::{
     animation::{
         creation::WritingAnimSchedule, fading::FadingAnimSchedule, transform::TransformAnimSchedule,
@@ -20,6 +23,7 @@ impl TimelineConstructor for HelloRanimScene {
 
         let mut square = timeline.insert(square);
         let mut circle = Circle(2.0).build();
+        circle.rotate(PI / 4.0 + PI, DVec3::Z);
         circle.set_color(manim::RED_C);
 
         timeline.play(square.transform_to(circle).apply()); // Use `apply` on an anim schedule to update rabject data
@@ -40,6 +44,6 @@ fn main() {
 }
 
 ```'''
-hash = "5997de75b5be7a52015f867ee9ddd6444b2a0c97"
+hash = "dcc9a480c4d76305155bf2a89b4ed6c848bec2a8"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]

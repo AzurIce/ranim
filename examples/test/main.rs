@@ -11,11 +11,12 @@ use ranim::{
         fading::FadingAnimSchedule,
         transform::{TransformAnim, TransformAnimSchedule},
     },
+    color::palettes::manim,
     components::{Anchor, ScaleHint},
     items::{
         camera_frame::CameraFrame,
         group::Group,
-        vitem::{Square, VItem, arrow::Arrow},
+        vitem::{arrow::Arrow, Circle, Polygon, Square, VItem},
     },
     prelude::*,
     typst_svg,
@@ -28,42 +29,29 @@ struct TestScene;
 
 impl TimelineConstructor for TestScene {
     fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
-        // let _item = Square(500.0).build();
-        // let mut vitem = Group::<VItem>::from_svg(typst_svg!(
-        //     r#"#align(center)[
-        //     #text(font: "LXGW Bright")[有意思]
+        let mut pentagon = Polygon(
+            (0..=5)
+                .map(|i| {
+                    let angle = i as f64 / 5.0 * 2.0 * PI;
+                    dvec3(angle.cos(), angle.sin(), 0.0) * 2.0
+                })
+                .collect(),
+        )
+        .build();
+        pentagon
+            .set_color(manim::RED_C)
+            // .rotate(PI / 2.0, DVec3::Z)
+            .set_stroke_width(2.0);
+        let mut pentagon = timeline.insert(pentagon);
 
-        //     #text(font: "LXGW Bright")[真的是人用的]
+        let mut circle = Circle(2.0).build();
+        circle.set_color(manim::BLUE_C).set_stroke_width(2.0);
 
-        //     #text(font: "LXGW Bright")[『我』的『软件』]
-        // ]"#
-        // ));
-        // vitem
-        //     .scale_to(ScaleHint::PorportionalHeight(8.0))
-        //     .put_center_on(DVec3::ZERO);
-        // let vitem = vitem[0].clone().get_partial(0.0..0.4);
-        // println!("vpoints: {:?}", vitem.vpoints);
-        // println!("close_path: {:?}", vitem.vpoints.get_closepath_flags());
-        // let _vitem = timeline.insert(vitem);
+        println!("{:?}", pentagon.data.vpoints);
+        pentagon.data.align_with(&mut circle);
+        println!("{:?}", pentagon.data.vpoints);
 
-        let arrow = Arrow::new();
-        let mut arrow = timeline.insert(arrow);
-        timeline.play(arrow.fade_in()).sync();
-
-        let mut border = Square(1.0).build();
-        border
-            .scale_to(ScaleHint::Size(8.0, 8.0))
-            .put_center_on(DVec3::ZERO);
-        let _border = timeline.insert(border);
-
-        // let _vitem = timeline.insert(vitem);
-        timeline.forward(1.0);
-        timeline.sync();
-        timeline.play(camera.transform(|camera| {
-            camera.perspective_blend = 1.0;
-            camera.fovy = PI / 4.0;
-        }));
-
+        timeline.play(pentagon.transform_to(circle));
         timeline.sync();
     }
 }
@@ -81,8 +69,9 @@ fn main() {
     //         ..AppOptions::default()
     //     },
     // );
-    #[cfg(not(feature = "app"))]
-    render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
+    // #[cfg(not(feature = "app"))]
+    // render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
+    render_scene(TestScene, &AppOptions::default());
 
     // reuires "app" feature
     #[cfg(feature = "app")]

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::ops::{Deref, DerefMut};
 
 use glam::DMat3;
@@ -8,10 +9,11 @@ use itertools::Itertools;
 use ranim_macros::Interpolatable;
 
 use crate::prelude::Partial;
+use crate::traits::Alignable;
 use crate::traits::BoundingBox;
 use crate::traits::PointsFunc;
 use crate::traits::Position;
-use crate::utils::bezier::trim_quad_bezier;
+use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
 
 use super::Anchor;
@@ -46,7 +48,154 @@ impl DerefMut for VPointComponentVec {
     }
 }
 
+impl Alignable for VPointComponentVec {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.len() == other.len()
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        if self.is_empty() {
+            self.0 = vec![DVec3::ZERO; 3].into();
+        }
+        if self.len() > other.len() {
+            other.align_with(self);
+        }
+
+        let into_closed_subpaths = |subpaths: Vec<Vec<DVec3>>| -> Vec<Vec<DVec3>> {
+            subpaths
+                .into_iter()
+                .map(|sp| {
+                    // should have no zero-length subpath
+                    if !get_subpath_closed_flag(&sp).unwrap().1 {
+                        let sp_len = sp.len();
+                        let sp_iter = sp.into_iter();
+                        sp_iter
+                            .clone()
+                            .take(sp_len - 1)
+                            .chain(sp_iter.rev())
+                            .collect::<Vec<_>>()
+                    } else {
+                        sp
+                    }
+                })
+                .collect::<Vec<_>>()
+        };
+        let sps_self = into_closed_subpaths(self.get_subpaths());
+        let sps_other = into_closed_subpaths(other.get_subpaths());
+
+        let sps_to_points = |mut sps: Vec<Vec<DVec3>>| -> Vec<DVec3> {
+            let sps_cnt = sps.len();
+            let last_sp = sps.split_off(sps_cnt - 1);
+            sps.into_iter()
+                .flat_map(|sp| sp.into_iter())
+                .chain(last_sp[0].iter().cloned())
+                .collect()
+        };
+
+        let points_self = sps_to_points(sps_self);
+        let points_other = sps_to_points(sps_other);
+
+        let points_to_bez_tuples = |points: &Vec<DVec3>| -> Vec<[DVec3; 3]> {
+            let it0 = points.iter().step_by(2).cloned();
+            let it1 = points.iter().skip(1).step_by(2).cloned();
+            let it2 = points.iter().skip(2).step_by(2).cloned();
+            it0.zip(it1).zip(it2).map(|((a, b), c)| [a, b, c]).collect()
+        };
+        let align_points = |points: Vec<DVec3>, len: usize| -> Vec<DVec3> {
+            let bez_tuples = points_to_bez_tuples(&points);
+
+            let diff_len = (len - points.len()) / 2;
+            // println!("{:?}", bez_tuples);
+            let mut lens = bez_tuples
+                .iter()
+                .map(|[a, b, c]| {
+                    if (a - b).length_squared() < f64::EPSILON {
+                        0.0
+                    } else {
+                        (c - a).length()
+                    }
+                })
+                .collect::<Vec<_>>();
+            let mut ipc = Vec::with_capacity(bez_tuples.len());
+            ipc.resize(bez_tuples.len(), 0);
+
+            for _ in 0..diff_len {
+                // println!("{:?}", lens);
+                let idx = lens
+                    .iter()
+                    .position_max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+                    .unwrap();
+                ipc[idx] += 1;
+                lens[idx] *= ipc[idx] as f64 / (ipc[idx] + 1) as f64;
+            }
+            // println!("BEZ: {:?}", bez_tuples);
+            // println!("IPC: {:?}", ipc);
+            let new_segs = bez_tuples
+                .into_iter()
+                .zip(ipc.into_iter())
+                .map(|(bez, ipc)| {
+                    // curve cnt is ipc + 1, anchor cnt is ipc + 2
+                    let alphas = (0..ipc + 2)
+                        .map(|i| i as f64 / (ipc + 1) as f64)
+                        .collect::<Vec<_>>();
+                    let mut new_points = Vec::with_capacity((ipc + 1) * 2 + 1);
+                    new_points.push(bez[0]);
+                    // println!("###bez: {:?}, ipc: {}", bez, ipc);
+                    alphas.iter().tuple_windows().for_each(|(a1, a2)| {
+                        let partial = trim_quad_bezier(&bez, *a1, *a2);
+                        // println!("{} {}: {:?}", a1, a2, partial);
+                        new_points.extend(partial[1..].into_iter())
+                    });
+                    // println!("{:?}", new_points);
+                    new_points
+                })
+                .collect::<Vec<_>>();
+            let mut new_points = Vec::with_capacity(other.len());
+            new_points.extend_from_slice(&new_segs[0]);
+            for seg in new_segs.into_iter().skip(1) {
+                new_points.extend(&seg[1..]);
+            }
+            new_points
+        };
+
+        if points_self.len() < points_other.len() {
+            self.0 = align_points(points_self, points_other.len()).into();
+            other.0 = points_other.into();
+        } else {
+            other.0 = align_points(points_other, points_self.len()).into();
+            self.0 = points_self.into();
+        }
+    }
+}
+
+// fn extend_subpath_with_n(mut subpath: Vec<DVec3>, n: usize) -> Vec<DVec3> {
+//     let beziers = subpath.iter().zip(other)
+// }
+
 impl VPointComponentVec {
+    pub fn get_subpaths(&self) -> Vec<Vec<DVec3>> {
+        let mut subpaths = Vec::new();
+
+        let mut subpath = Vec::new();
+        for mut chunk in self.iter().chunks(2).into_iter() {
+            let (a, b) = (chunk.next(), chunk.next());
+            match (a, b) {
+                (Some(a), Some(b)) => {
+                    subpath.push(*a);
+                    subpath.push(*b);
+                    if a == b {
+                        subpaths.push(subpath.drain(..).collect())
+                    }
+                }
+                (Some(a), None) => {
+                    subpath.push(*a);
+                    subpaths.push(subpath.drain(..).collect())
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        subpaths
+    }
     pub fn get_seg(&self, idx: usize) -> Option<&[DVec3; 3]> {
         self.get(idx * 2..idx * 2 + 3)
             .and_then(|seg| seg.try_into().ok())
@@ -58,25 +207,15 @@ impl VPointComponentVec {
 
         // println!("{:?}", self.0);
         let mut i = 0;
-        for mut chunk in &self.0.iter().enumerate().skip(2).chunks(2) {
-            let (a, b) = (chunk.next(), chunk.next());
-            if let Some((ia, a)) = match (a, b) {
-                (Some((ia, a)), Some((_ib, b))) => {
-                    // println!("chunk[{ia}, {_ib}] {:?}", [a, b]);
-                    if a == b { Some((ia, a)) } else { None }
-                }
-                (Some((ia, a)), None) => Some((ia, a)),
-                _ => unreachable!(),
-            } {
-                // println!("### path end ###");
-                if (a - self.get(i).unwrap()).length_squared() <= 0.0001 {
-                    // println!("### path closed ###");
-                    flags[i..=ia].fill(true);
-                }
-                i = ia + 2;
-            }
+        while let Some((end_idx, is_closed)) = self
+            .get(i..)
+            .and_then(|slice| get_subpath_closed_flag(slice))
+        {
+            // println!("{i} {end_idx} {len}");
+            let end_idx = i + end_idx + 2;
+            flags[i..=end_idx.clamp(i, len - 1)].fill(is_closed);
+            i = end_idx;
         }
-
         // println!("{:?}", flags);
 
         flags
@@ -216,7 +355,24 @@ impl PointsFunc for [DVec3] {
 mod test {
     use glam::dvec3;
 
-    use crate::{components::vpoint::VPointComponentVec, prelude::Partial};
+    use crate::{
+        components::vpoint::VPointComponentVec,
+        items::{
+            Blueprint,
+            vitem::{Circle, Square},
+        },
+        prelude::Partial,
+        traits::Alignable,
+    };
+
+    #[test]
+    fn test_align() {
+        let mut circle = Circle(1.0).build();
+        let mut square = Square(1.0).build();
+        println!("{:?}", square.vpoints);
+        square.align_with(&mut circle);
+        println!("{:?}", square.vpoints);
+    }
 
     #[test]
     fn test_get_partial() {
