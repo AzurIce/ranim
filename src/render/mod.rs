@@ -465,13 +465,14 @@ impl Renderer {
     }
 
     pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext, camera_frame: &CameraFrame) {
+        let ratio = self.size.0 as f64 / self.size.1 as f64;
         let uniforms = CameraUniforms {
             view_mat: camera_frame.view_matrix().as_mat4(),
             proj_mat: camera_frame
-                .projection_matrix(self.frame_height, self.size.0 as f64 / self.size.1 as f64)
+                .projection_matrix(self.frame_height, ratio)
                 .as_mat4(),
             // center of the screen
-            half_frame_size: Vec2::new(self.size.0 as f32 / 2.0, self.size.1 as f32 / 2.0),
+            half_frame_size: Vec2::new((self.frame_height * ratio) as f32 / 2.0, self.frame_height as f32 / 2.0),
             _padding: [0.0; 2],
         };
         // trace!("Uniforms: {:?}", self.uniforms);
