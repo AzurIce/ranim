@@ -37,6 +37,7 @@ impl TimelineConstructor for SelectiveSortScene {
                 rect.scale(DVec3::splat(0.8))
                     .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord)
                     .set_color(manim::WHITE)
+                    .set_stroke_width(0.0)
                     .set_fill_opacity(0.5);
                 timeline.insert(rect)
             })

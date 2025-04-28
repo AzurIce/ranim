@@ -52,7 +52,7 @@ impl TimelineConstructor for HanoiScene {
             let disk_width = min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);
             let mut disk = Rectangle(disk_width, disk_height).build();
             let color = manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
-            disk.set_color(color).put_anchor_on(
+            disk.set_color(color).set_stroke_width(0.0).put_anchor_on(
                 Anchor::edge(0, -1, 0),
                 dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.0),
             );

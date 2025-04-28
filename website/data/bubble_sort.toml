@@ -40,6 +40,7 @@ impl TimelineConstructor for BubbleSortScene {
                 rect.scale(DVec3::splat(0.8))
                     .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord)
                     .set_color(manim::WHITE)
+                    .set_stroke_width(0.0)
                     .set_fill_opacity(0.5);
                 timeline.insert(rect)
             })
@@ -147,6 +148,6 @@ fn main() {
 }
 
 ```'''
-hash = "d39c3043045416d6fe861b3eecfb8eb6c7ef8df5"
+hash = "9d74136e463179ed817c1a85344f1fd17ba82fb9"
 preview_imgs = ["/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
 output_files = ["/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/output-100.mp4"]

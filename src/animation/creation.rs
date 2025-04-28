@@ -1,4 +1,5 @@
 use super::{AnimSchedule, AnimationSpan, EvalDynamic, ToEvaluator};
+use crate::items::vitem::DEFAULT_STROKE_WIDTH;
 use crate::items::Rabject;
 use crate::traits::{Empty, Fill, Interpolatable, Partial, Stroke};
 use crate::utils::rate_functions::smooth;
@@ -147,7 +148,7 @@ impl<T: WritingRequirement> Write<T> {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)
-            .set_stroke_width(1.0)
+            .set_stroke_width(DEFAULT_STROKE_WIDTH)
             .set_stroke_color(target.fill_color())
             .set_stroke_opacity(1.0);
         Self {
@@ -187,7 +188,7 @@ impl<T: WritingRequirement> Unwrite<T> {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)
-            .set_stroke_width(1.0)
+            .set_stroke_width(DEFAULT_STROKE_WIDTH)
             .set_stroke_color(target.fill_color())
             .set_stroke_opacity(1.0);
         Self {

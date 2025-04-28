@@ -55,7 +55,7 @@ impl TimelineConstructor for HanoiScene {
             let disk_width = min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);
             let mut disk = Rectangle(disk_width, disk_height).build();
             let color = manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
-            disk.set_color(color).put_anchor_on(
+            disk.set_color(color).set_stroke_width(0.0).put_anchor_on(
                 Anchor::edge(0, -1, 0),
                 dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.0),
             );
@@ -137,6 +137,6 @@ fn main() {
 }
 
 ```'''
-hash = "50ba5cf892c5f7f7d767455e895be5d0602021ab"
+hash = "d3a2e5f1b2684fa32ccfda6898e6564fc5f4b9c3"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/output-10.mp4", "/examples/hanoi/output-5.mp4"]

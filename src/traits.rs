@@ -1,10 +1,10 @@
-use std::ops::Range;
+use std::{cmp::Ordering, ops::Range};
 
 use color::{AlphaColor, ColorSpace, Srgb};
 use glam::{DAffine2, DMat4, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
 use itertools::Itertools;
 
-use crate::components::{Anchor, ScaleHint};
+use crate::components::{width::Width, Anchor, ScaleHint};
 
 // MARK: Interpolatable
 pub trait Interpolatable {
@@ -85,7 +85,10 @@ pub trait Fill {
 
 // MARK: Stroke
 pub trait Stroke {
-    fn set_stroke_width(&mut self, width: f32) -> &mut Self;
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self;
+    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+        self.apply_stroke_func(|widths| widths.fill(width.into()))
+    }
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self;
 }
@@ -191,19 +194,21 @@ pub trait Position: BoundingBox {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.scale_by_anchor(scale, Anchor::center())
     }
-    /// Scale the item to a given hint.
-    ///
-    /// See [`ScaleHint`] for more details.
-    fn scale_to(&mut self, hint: ScaleHint) -> &mut Self {
+    fn calc_scale_ratio(&self, hint: ScaleHint) -> DVec3 {
         let bb = self.get_bounding_box();
-        let scale = match hint {
+        match hint {
             ScaleHint::Height(h) => dvec3(1.0, h / (bb[2].y - bb[0].y), 1.0),
             ScaleHint::Width(w) => dvec3(w / (bb[2].x - bb[0].x), 1.0, 1.0),
             ScaleHint::Size(w, h) => dvec3(w / (bb[2].x - bb[0].x), h / (bb[2].y - bb[0].y), 1.0),
             ScaleHint::PorportionalHeight(h) => DVec3::splat(h / (bb[2].y - bb[0].y)),
             ScaleHint::PorportionalWidth(w) => DVec3::splat(w / (bb[2].x - bb[0].x)),
-        };
-        self.scale(scale);
+        }
+    }
+    /// Scale the item to a given hint.
+    ///
+    /// See [`ScaleHint`] for more details.
+    fn scale_to(&mut self, hint: ScaleHint) -> &mut Self {
+        self.scale(self.calc_scale_ratio(hint));
         self
     }
 
@@ -212,3 +217,31 @@ pub trait Position: BoundingBox {
         self.get_bounding_box()[1]
     }
 }
+
+pub trait PositionStrokeExt: Position + Stroke {
+    fn scale_with_stroke_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
+        self.scale_by_anchor(scale, anchor);
+
+        let scales = [scale.x, scale.y, scale.z];
+        let idx = scales
+            .iter()
+            .map(|x: &f64| if *x > 1.0 { *x } else { 1.0 / *x })
+            .position_max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+            .unwrap_or(0);
+        let scale = scales[idx];
+        self.apply_stroke_func(|widths| widths.iter_mut().for_each(|w| w.0 *= scale as f32));
+        self
+    }
+    fn scale_with_stroke(&mut self, scale: DVec3) -> &mut Self {
+        self.scale_with_stroke_by_anchor(scale, Anchor::center())
+    }
+    /// Scale the item to a given hint.
+    ///
+    /// See [`ScaleHint`] for more details.
+    fn scale_to_with_stroke(&mut self, hint: ScaleHint) -> &mut Self {
+        let scale = self.calc_scale_ratio(hint);
+        self.scale_with_stroke(scale)
+    }
+}
+
+impl<T: Position + Stroke + ?Sized> PositionStrokeExt for T {}

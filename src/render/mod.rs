@@ -286,15 +286,7 @@ impl Renderer {
             );
             cpass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
 
-            renderable.encode_compute_pass_command(
-                &ctx.wgpu_ctx,
-                &mut ctx.pipelines,
-                &mut cpass,
-                &self.uniforms_bind_group.bind_group,
-                &self.render_textures,
-                #[cfg(feature = "profiling")]
-                &self.profiler,
-            );
+            renderable.encode_compute_pass_command(&mut cpass);
         }
         {
             #[cfg(feature = "profiling")]
@@ -327,15 +319,7 @@ impl Renderer {
             rpass.set_pipeline(ctx.pipelines.get_or_init::<VItemPipeline>(&ctx.wgpu_ctx));
             rpass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
 
-            renderable.encode_render_pass_command(
-                &ctx.wgpu_ctx,
-                &mut ctx.pipelines,
-                &mut rpass,
-                &self.uniforms_bind_group.bind_group,
-                &self.render_textures,
-                #[cfg(feature = "profiling")]
-                &self.profiler,
-            );
+            renderable.encode_render_pass_command(&mut rpass);
         }
         // renderable.encode_render_command(
         //     &ctx.wgpu_ctx,
@@ -472,7 +456,10 @@ impl Renderer {
                 .projection_matrix(self.frame_height, ratio)
                 .as_mat4(),
             // center of the screen
-            half_frame_size: Vec2::new((self.frame_height * ratio) as f32 / 2.0, self.frame_height as f32 / 2.0),
+            half_frame_size: Vec2::new(
+                (self.frame_height * ratio) as f32 / 2.0,
+                self.frame_height as f32 / 2.0,
+            ),
             _padding: [0.0; 2],
         };
         // trace!("Uniforms: {:?}", self.uniforms);

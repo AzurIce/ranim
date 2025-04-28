@@ -17,24 +17,8 @@ pub trait Primitive {
 }
 
 pub trait Renderable {
-    fn encode_compute_pass_command<'a>(
-        &self,
-        ctx: &WgpuContext,
-        pipelines: &mut super::PipelinesStorage,
-        cpass: &mut wgpu::ComputePass<'a>,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
-    );
-    fn encode_render_pass_command<'a>(
-        &self,
-        ctx: &WgpuContext,
-        pipelines: &mut super::PipelinesStorage,
-        rpass: &mut wgpu::RenderPass<'a>,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
-    );
+    fn encode_compute_pass_command<'a>(&self, cpass: &mut wgpu::ComputePass<'a>);
+    fn encode_render_pass_command<'a>(&self, rpass: &mut wgpu::RenderPass<'a>);
     fn encode_render_command(
         &self,
         ctx: &WgpuContext,
@@ -52,44 +36,22 @@ macro_rules! impl_tuple_renderable {
         impl<$($T: Renderable),*> Renderable for ($($T,)*) {
             fn encode_compute_pass_command<'a>(
                 &self,
-                ctx: &WgpuContext,
-                pipelines: &mut super::PipelinesStorage,
                 cpass: &mut wgpu::ComputePass<'a>,
-                uniforms_bind_group: &wgpu::BindGroup,
-                render_textures: &RenderTextures,
-                #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
             ) {
                 #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
                 let ($($T,)*) = self;
                 $($T.encode_compute_pass_command(
-                    ctx,
-                    pipelines,
                     cpass,
-                    uniforms_bind_group,
-                    render_textures,
-                    #[cfg(feature = "profiling")]
-                    profiler,
                 );)*
             }
             fn encode_render_pass_command<'a>(
                 &self,
-                ctx: &WgpuContext,
-                pipelines: &mut super::PipelinesStorage,
                 rpass: &mut wgpu::RenderPass<'a>,
-                uniforms_bind_group: &wgpu::BindGroup,
-                render_textures: &RenderTextures,
-                #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
             ) {
                 #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
                 let ($($T,)*) = self;
                 $($T.encode_render_pass_command(
-                    ctx,
-                    pipelines,
                     rpass,
-                    uniforms_bind_group,
-                    render_textures,
-                    #[cfg(feature = "profiling")]
-                    profiler
                 );)*
             }
             fn encode_render_command(
@@ -125,47 +87,13 @@ macro_rules! impl_tuple_renderable {
 all_tuples!(impl_tuple_renderable, 1, 16, T);
 
 impl<T: Renderable, const N: usize> Renderable for [T; N] {
-    fn encode_compute_pass_command<'a>(
-        &self,
-        ctx: &WgpuContext,
-        pipelines: &mut super::PipelinesStorage,
-        cpass: &mut wgpu::ComputePass<'a>,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
-    ) {
-        self.iter().for_each(|x| {
-            x.encode_compute_pass_command(
-                ctx,
-                pipelines,
-                cpass,
-                uniforms_bind_group,
-                render_textures,
-                #[cfg(feature = "profiling")]
-                profiler,
-            )
-        })
+    fn encode_compute_pass_command<'a>(&self, cpass: &mut wgpu::ComputePass<'a>) {
+        self.iter()
+            .for_each(|x| x.encode_compute_pass_command(cpass))
     }
-    fn encode_render_pass_command<'a>(
-        &self,
-        ctx: &WgpuContext,
-        pipelines: &mut super::PipelinesStorage,
-        rpass: &mut wgpu::RenderPass<'a>,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
-    ) {
-        self.iter().for_each(|x| {
-            x.encode_render_pass_command(
-                ctx,
-                pipelines,
-                rpass,
-                uniforms_bind_group,
-                render_textures,
-                #[cfg(feature = "profiling")]
-                profiler,
-            )
-        })
+    fn encode_render_pass_command<'a>(&self, rpass: &mut wgpu::RenderPass<'a>) {
+        self.iter()
+            .for_each(|x| x.encode_render_pass_command(rpass))
     }
     fn encode_render_command(
         &self,
@@ -290,46 +218,14 @@ impl RenderInstances {
 }
 
 impl Renderable for Vec<&dyn Renderable> {
-    fn encode_compute_pass_command<'a>(
-        &self,
-        ctx: &WgpuContext,
-        pipelines: &mut super::PipelinesStorage,
-        encoder: &mut wgpu::ComputePass<'a>,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
-    ) {
+    fn encode_compute_pass_command<'a>(&self, cpass: &mut wgpu::ComputePass<'a>) {
         for render_instance in self {
-            render_instance.encode_compute_pass_command(
-                ctx,
-                pipelines,
-                encoder,
-                uniforms_bind_group,
-                render_textures,
-                #[cfg(feature = "profiling")]
-                profiler,
-            );
+            render_instance.encode_compute_pass_command(cpass);
         }
     }
-    fn encode_render_pass_command<'a>(
-        &self,
-        ctx: &WgpuContext,
-        pipelines: &mut super::PipelinesStorage,
-        rpass: &mut wgpu::RenderPass<'a>,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")] profiler: &wgpu_profiler::GpuProfiler,
-    ) {
+    fn encode_render_pass_command<'a>(&self, rpass: &mut wgpu::RenderPass<'a>) {
         for render_instance in self {
-            render_instance.encode_render_pass_command(
-                ctx,
-                pipelines,
-                rpass,
-                uniforms_bind_group,
-                render_textures,
-                #[cfg(feature = "profiling")]
-                profiler,
-            );
+            render_instance.encode_render_pass_command(rpass);
         }
     }
 

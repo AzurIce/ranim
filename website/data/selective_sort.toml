@@ -40,6 +40,7 @@ impl TimelineConstructor for SelectiveSortScene {
                 rect.scale(DVec3::splat(0.8))
                     .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord)
                     .set_color(manim::WHITE)
+                    .set_stroke_width(0.0)
                     .set_fill_opacity(0.5);
                 timeline.insert(rect)
             })
@@ -143,6 +144,6 @@ fn main() {
 }
 
 ```'''
-hash = "b409faabc606bf8f3f8ba7f1d72f98e5d95defce"
+hash = "2ee1437d4d85e78955f6c1af36840bcec43e5728"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/output-10.mp4", "/examples/selective_sort/output-100.mp4"]

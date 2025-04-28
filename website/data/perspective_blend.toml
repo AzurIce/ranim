@@ -1,125 +1,125 @@
 name = "perspective_blend"
-code = '''
+code = """
 ```rust,linenos
-use glam::DVec3;
-use ranim::{
-    animation::transform::{GroupTransformAnimSchedule, TransformAnimSchedule},
-    color::palettes::manim,
-    items::{group::Group, vitem::Square},
-    prelude::*,
-    timeline::TimeMark,
-};
+use glam::DVec3;\r
+use ranim::{\r
+    animation::transform::{GroupTransformAnimSchedule, TransformAnimSchedule},\r
+    color::palettes::manim,\r
+    items::{group::Group, vitem::Square},\r
+    prelude::*,\r
+    timeline::TimeMark,\r
+};\r
+\r
+#[scene]\r
+struct PerspectiveBlendScene;\r
+\r
+impl TimelineConstructor for PerspectiveBlendScene {\r
+    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {\r
+        camera.data.pos = DVec3::Z * 5.0;\r
+        timeline.update(camera);\r
+\r
+        // Create a cube\r
+        let side_length = 2.0;\r
+\r
+        let mut anims = Vec::new();\r
+\r
+        // Bottom face\r
+        let mut bottom = Square(side_length).build();\r
+        bottom.set_color(manim::TEAL_C).set_fill_opacity(0.5);\r
+        let mut bottom = timeline.insert(bottom);\r
+        anims.push(bottom.transform(|data| {\r
+            data.shift(DVec3::NEG_Y * side_length / 2.0)\r
+                .rotate(std::f64::consts::PI / 2.0, DVec3::X);\r
+        }));\r
+\r
+        // Right face\r
+        let mut right = Square(side_length).build();\r
+        right.set_color(manim::GREEN_C).set_fill_opacity(0.5);\r
+        let mut right = timeline.insert(right);\r
+        anims.push(right.transform(|data| {\r
+            data.shift(DVec3::X * side_length / 2.0)\r
+                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);\r
+        }));\r
+\r
+        // Back face\r
+        let mut back = Square(side_length).build();\r
+        back.set_color(manim::BLUE_C).set_fill_opacity(0.5);\r
+        let mut back = timeline.insert(back);\r
+        anims.push(back.transform(|data| {\r
+            data.shift(DVec3::NEG_Z * side_length / 2.0);\r
+        }));\r
+\r
+        // Top face\r
+        let mut top = Square(side_length).build();\r
+        top.set_color(manim::PURPLE_C).set_fill_opacity(0.5);\r
+        let mut top = timeline.insert(top);\r
+        anims.push(top.transform(|data| {\r
+            data.shift(DVec3::Y * side_length / 2.0)\r
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);\r
+        }));\r
+\r
+        // Front face (facing camera)\r
+        let mut front = Square(side_length).build();\r
+        front.set_color(manim::RED_C).set_fill_opacity(0.5);\r
+        let mut front = timeline.insert(front);\r
+\r
+        anims.push(front.transform(|data| {\r
+            data.shift(DVec3::Z * side_length / 2.0);\r
+        }));\r
+\r
+        // Left face\r
+        let mut left = Square(side_length).build();\r
+        left.set_color(manim::YELLOW_C).set_fill_opacity(0.5);\r
+        let mut left = timeline.insert(left);\r
+        anims.push(left.transform(|data| {\r
+            data.shift(DVec3::NEG_X * side_length / 2.0)\r
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);\r
+        }));\r
+\r
+        timeline.play(Group(anims).apply()).sync();\r
+\r
+        let mut cube = Group(vec![front, back, right, left, top, bottom]);\r
+\r
+        timeline.play(\r
+            cube.transform(|data| {\r
+                data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)\r
+                    .rotate(std::f64::consts::PI / 6.0, DVec3::X);\r
+            })\r
+            .with_duration(4.0),\r
+        );\r
+\r
+        timeline.play(\r
+            camera\r
+                .transform(|data| {\r
+                    data.perspective_blend = 1.0;\r
+                })\r
+                .with_duration(2.0)\r
+                .with_padding(2.0, 0.0),\r
+        );\r
+        timeline.sync();\r
+        timeline.insert_time_mark(\r
+            timeline.duration_secs(),\r
+            TimeMark::Capture(\"preview.png\".to_string()),\r
+        );\r
+    }\r
+}\r
+\r
+fn main() {\r
+    let options = AppOptions {\r
+        pixel_size: (1280, 720),\r
+        frame_rate: 60,\r
+        ..Default::default()\r
+    };\r
+\r
+    #[cfg(not(feature = \"app\"))]\r
+    render_scene(PerspectiveBlendScene, &options);\r
+\r
+    // reuires \"app\" feature\r
+    #[cfg(feature = \"app\")]\r
+    run_scene_app(PerspectiveBlendScene);\r
+}\r
 
-#[scene]
-struct PerspectiveBlendScene;
-
-impl TimelineConstructor for PerspectiveBlendScene {
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
-        camera.data.pos = DVec3::Z * 5.0;
-        timeline.update(camera);
-
-        // Create a cube
-        let side_length = 2.0;
-
-        let mut anims = Vec::new();
-
-        // Bottom face
-        let mut bottom = Square(side_length).build();
-        bottom.set_color(manim::TEAL_C).set_fill_opacity(0.5);
-        let mut bottom = timeline.insert(bottom);
-        anims.push(bottom.transform(|data| {
-            data.shift(DVec3::NEG_Y * side_length / 2.0)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::X);
-        }));
-
-        // Right face
-        let mut right = Square(side_length).build();
-        right.set_color(manim::GREEN_C).set_fill_opacity(0.5);
-        let mut right = timeline.insert(right);
-        anims.push(right.transform(|data| {
-            data.shift(DVec3::X * side_length / 2.0)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
-        }));
-
-        // Back face
-        let mut back = Square(side_length).build();
-        back.set_color(manim::BLUE_C).set_fill_opacity(0.5);
-        let mut back = timeline.insert(back);
-        anims.push(back.transform(|data| {
-            data.shift(DVec3::NEG_Z * side_length / 2.0);
-        }));
-
-        // Top face
-        let mut top = Square(side_length).build();
-        top.set_color(manim::PURPLE_C).set_fill_opacity(0.5);
-        let mut top = timeline.insert(top);
-        anims.push(top.transform(|data| {
-            data.shift(DVec3::Y * side_length / 2.0)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
-        }));
-
-        // Front face (facing camera)
-        let mut front = Square(side_length).build();
-        front.set_color(manim::RED_C).set_fill_opacity(0.5);
-        let mut front = timeline.insert(front);
-
-        anims.push(front.transform(|data| {
-            data.shift(DVec3::Z * side_length / 2.0);
-        }));
-
-        // Left face
-        let mut left = Square(side_length).build();
-        left.set_color(manim::YELLOW_C).set_fill_opacity(0.5);
-        let mut left = timeline.insert(left);
-        anims.push(left.transform(|data| {
-            data.shift(DVec3::NEG_X * side_length / 2.0)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
-        }));
-
-        timeline.play(Group(anims).apply()).sync();
-
-        let mut cube = Group(vec![front, back, right, left, top, bottom]);
-
-        timeline.play(
-            cube.transform(|data| {
-                data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
-                    .rotate(std::f64::consts::PI / 6.0, DVec3::X);
-            })
-            .with_duration(4.0),
-        );
-
-        timeline.play(
-            camera
-                .transform(|data| {
-                    data.perspective_blend = 1.0;
-                })
-                .with_duration(2.0)
-                .with_padding(2.0, 0.0),
-        );
-        timeline.sync();
-        timeline.insert_time_mark(
-            timeline.duration_secs(),
-            TimeMark::Capture("preview.png".to_string()),
-        );
-    }
-}
-
-fn main() {
-    let options = AppOptions {
-        pixel_size: (1280, 720),
-        frame_rate: 60,
-        ..Default::default()
-    };
-
-    #[cfg(not(feature = "app"))]
-    render_scene(PerspectiveBlendScene, &options);
-
-    // reuires "app" feature
-    #[cfg(feature = "app")]
-    run_scene_app(PerspectiveBlendScene);
-}
-
-```'''
-hash = "0e0a4a0d37cf40ac14547830cecb45a2ede3a9cd"
+```"""
+hash = "d530a24c897808b41509435d5e1d7311f6f80fa4"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/output.mp4"]
