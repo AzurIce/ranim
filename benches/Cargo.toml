@@ -1,0 +1,16 @@
+[package]
+name = "benches"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+itertools.workspace = true
+criterion = { version = "0.5.1", features = ["html_reports"] }
+ranim = { path = "../" }
+
+[[bench]]
+name = "bench1"
+harness = false

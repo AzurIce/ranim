@@ -24,10 +24,7 @@ fn pentagon() -> VItem {
             .collect(),
     )
     .build();
-    pentagon
-        .set_color(manim::RED_C)
-        .rotate(PI / 2.0, DVec3::Z)
-        .set_stroke_width(2.0);
+    pentagon.set_color(manim::RED_C).rotate(PI / 2.0, DVec3::Z);
     pentagon
 }
 
@@ -92,12 +89,12 @@ struct TransformScene;
 impl TimelineConstructor for TransformScene {
     fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
         let mut src = timeline.insert(Square(2.0).build());
-        src.data.set_color(manim::RED_C).set_stroke_width(2.0);
+        src.data.set_color(manim::RED_C);
         src.data.put_center_on(dvec3(0.0, 2.0, 0.0));
         timeline.update(&src);
         let mut dst = Circle(1.5).build();
-        dst.rotate(PI / 4.0 + PI, DVec3::Z); // rotate to match src
-        dst.set_color(manim::BLUE_C).set_stroke_width(2.0);
+        // dst.rotate(PI / 4.0 + PI, DVec3::Z); // rotate to match src
+        dst.set_color(manim::BLUE_C);
         dst.put_center_on(dvec3(0.0, -2.0, 0.0));
         timeline.play(src.transform_to(dst).with_rate_func(linear));
         timeline.sync();
