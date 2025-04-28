@@ -103,9 +103,9 @@ pub fn derive_stroke(input: TokenStream) -> TokenStream {
         |ranim| quote! {#ranim::traits::Stroke},
         |ranim, field_positions| {
             quote! {
-                fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+                fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [#ranim::components::width::Width])) -> &mut Self {
                     #(
-                        self.#field_positions.set_stroke_width(width);
+                        self.#field_positions.apply_stroke_func(&f);
                     )*
                     self
                 }

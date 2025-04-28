@@ -1,12 +1,14 @@
 pub mod arrow;
 pub mod line;
 
+use std::cmp::Ordering;
+
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{DVec3, Vec4, dvec2, dvec3, vec4};
+use glam::{DVec3, Vec3Swizzles, Vec4, dvec2, dvec3, vec4};
 use itertools::Itertools;
 
 use crate::{
-    components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
+    components::{ComponentVec, ScaleHint, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::primitives::{
         Extract,
@@ -79,10 +81,12 @@ impl Position for VItem {
     }
 }
 
+pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
+
 impl VItem {
     // TODO: remove all constructor to blueprint impl
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
-        let stroke_widths = vec![0.02; vpoints.len().div_ceil(2)];
+        let stroke_widths = vec![DEFAULT_STROKE_WIDTH; vpoints.len().div_ceil(2)];
         let stroke_rgbas = vec![vec4(1.0, 1.0, 1.0, 1.0); vpoints.len().div_ceil(2)];
         let fill_rgbas = vec![vec4(0.0, 0.0, 0.0, 0.0); vpoints.len().div_ceil(2)];
         Self {
@@ -218,16 +222,16 @@ impl Fill for VItem {
 }
 
 impl Stroke for VItem {
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
+        f(self.stroke_widths.as_mut());
+        self
+    }
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.stroke_rgbas.set_all(color);
         self
     }
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
         self.stroke_rgbas.set_opacity(opacity);
-        self
-    }
-    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
-        self.stroke_widths.set_all(width);
         self
     }
 }

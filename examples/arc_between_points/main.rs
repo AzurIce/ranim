@@ -23,7 +23,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
         let arcs = (0..nrad)
             .map(|i| {
                 let radius = 6.0 * (i + 1) as f64 / nrad as f64;
-                let width = 6.0 * ((nrad - i) as f64 / nrad as f64).powi(2);
+                let width = 0.12 * ((nrad - i) as f64 / nrad as f64).powi(2);
                 let angle = std::f64::consts::PI * 7.0 / 4.0 * (i + 1) as f64 / nrad as f64;
                 (radius, width, angle)
             })

@@ -5,7 +5,7 @@ use log::warn;
 
 use crate::{
     components::Anchor,
-    traits::{BoundingBox, Position},
+    traits::{BoundingBox, Fill, Position, Stroke},
 };
 
 /// A group of things.
@@ -196,6 +196,45 @@ impl<T: Position> Position for [T] {
         };
         self.iter_mut().for_each(|x| {
             x.scale_by_anchor(scale, Anchor::Point(anchor));
+        });
+        self
+    }
+}
+
+impl<T: Stroke> Stroke for [T] {
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [crate::components::width::Width])) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.apply_stroke_func(&f);
+        });
+        self
+    }
+    fn set_stroke_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.set_stroke_color(color);
+        });
+        self
+    }
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.set_stroke_opacity(opacity);
+        });
+        self
+    }
+}
+
+impl<T: Fill> Fill for [T] {
+    fn fill_color(&self) -> color::AlphaColor<color::Srgb> {
+        self[0].fill_color()
+    }
+    fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.set_fill_color(color);
+        });
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.set_fill_opacity(opacity);
         });
         self
     }
