@@ -16,7 +16,7 @@ use ranim::{
     items::{
         camera_frame::CameraFrame,
         group::Group,
-        vitem::{arrow::Arrow, Circle, Polygon, Square, VItem},
+        vitem::{Circle, Polygon, Square, VItem, arrow::Arrow},
     },
     prelude::*,
     typst_svg,
@@ -28,7 +28,7 @@ use ranim::{
 struct TestScene;
 
 impl TimelineConstructor for TestScene {
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
         let mut pentagon = Polygon(
             (0..=5)
                 .map(|i| {

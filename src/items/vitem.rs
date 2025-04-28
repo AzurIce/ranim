@@ -1,14 +1,12 @@
 pub mod arrow;
 pub mod line;
 
-use std::cmp::Ordering;
-
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{DVec3, Vec3Swizzles, Vec4, dvec2, dvec3, vec4};
+use glam::{DVec3, Vec4, dvec2, dvec3, vec4};
 use itertools::Itertools;
 
 use crate::{
-    components::{ComponentVec, ScaleHint, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
+    components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::primitives::{
         Extract,

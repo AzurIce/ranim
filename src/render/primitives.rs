@@ -17,8 +17,8 @@ pub trait Primitive {
 }
 
 pub trait Renderable {
-    fn encode_compute_pass_command<'a>(&self, cpass: &mut wgpu::ComputePass<'a>);
-    fn encode_render_pass_command<'a>(&self, rpass: &mut wgpu::RenderPass<'a>);
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass);
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass);
     fn encode_render_command(
         &self,
         ctx: &WgpuContext,
@@ -34,9 +34,9 @@ pub trait Renderable {
 macro_rules! impl_tuple_renderable {
     ($($T:ident),*) => {
         impl<$($T: Renderable),*> Renderable for ($($T,)*) {
-            fn encode_compute_pass_command<'a>(
+            fn encode_compute_pass_command(
                 &self,
-                cpass: &mut wgpu::ComputePass<'a>,
+                cpass: &mut wgpu::ComputePass,
             ) {
                 #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
                 let ($($T,)*) = self;
@@ -44,9 +44,9 @@ macro_rules! impl_tuple_renderable {
                     cpass,
                 );)*
             }
-            fn encode_render_pass_command<'a>(
+            fn encode_render_pass_command(
                 &self,
-                rpass: &mut wgpu::RenderPass<'a>,
+                rpass: &mut wgpu::RenderPass,
             ) {
                 #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
                 let ($($T,)*) = self;
@@ -87,11 +87,11 @@ macro_rules! impl_tuple_renderable {
 all_tuples!(impl_tuple_renderable, 1, 16, T);
 
 impl<T: Renderable, const N: usize> Renderable for [T; N] {
-    fn encode_compute_pass_command<'a>(&self, cpass: &mut wgpu::ComputePass<'a>) {
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         self.iter()
             .for_each(|x| x.encode_compute_pass_command(cpass))
     }
-    fn encode_render_pass_command<'a>(&self, rpass: &mut wgpu::RenderPass<'a>) {
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         self.iter()
             .for_each(|x| x.encode_render_pass_command(rpass))
     }
@@ -218,12 +218,12 @@ impl RenderInstances {
 }
 
 impl Renderable for Vec<&dyn Renderable> {
-    fn encode_compute_pass_command<'a>(&self, cpass: &mut wgpu::ComputePass<'a>) {
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         for render_instance in self {
             render_instance.encode_compute_pass_command(cpass);
         }
     }
-    fn encode_render_pass_command<'a>(&self, rpass: &mut wgpu::RenderPass<'a>) {
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         for render_instance in self {
             render_instance.encode_render_pass_command(rpass);
         }

@@ -1,6 +1,6 @@
 use super::{AnimSchedule, AnimationSpan, EvalDynamic, ToEvaluator};
-use crate::items::vitem::DEFAULT_STROKE_WIDTH;
 use crate::items::Rabject;
+use crate::items::vitem::DEFAULT_STROKE_WIDTH;
 use crate::traits::{Empty, Fill, Interpolatable, Partial, Stroke};
 use crate::utils::rate_functions::smooth;
 use log::warn;
