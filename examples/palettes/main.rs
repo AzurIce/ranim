@@ -1,4 +1,4 @@
-use env_logger::Env;
+use log::LevelFilter;
 use ranim::color::palettes::manim::*;
 use ranim::components::Anchor;
 use ranim::glam::{dvec2, dvec3};
@@ -58,9 +58,12 @@ impl TimelineConstructor for PalettesScene {
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=trace")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
+        .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("palettes=info, ranim=trace"))
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Info)
         .init();
 
     let options = AppOptions::default();

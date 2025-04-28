@@ -1,5 +1,5 @@
-use env_logger::Env;
 use glam::DVec3;
+use log::LevelFilter;
 use ranim::animation::creation::WritingAnimSchedule;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::components::ScaleHint;
@@ -65,9 +65,12 @@ impl TimelineConstructor for BasicScene {
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=trace")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
+        .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("basic=info,ranim=info")).init();
-
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Info)
+        .init();
     render_scene(BasicScene, &AppOptions::default());
 }

@@ -3,8 +3,8 @@
 use std::{f64::consts::PI, time::Duration};
 
 use ::color::palette::css;
-use env_logger::Env;
 use glam::{DVec3, dvec3};
+use log::LevelFilter;
 use ranim::{
     animation::{
         creation::{CreationAnim, WritingAnim},
@@ -58,9 +58,13 @@ impl TimelineConstructor for TestScene {
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test=trace")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
+        .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test=info,ranim=trace")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Info)
+        .init();
     // println!("main");
     // render_scene(
     //     TestScene,

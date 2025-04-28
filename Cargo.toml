@@ -33,7 +33,7 @@ app = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:winit"]
 ranim-macros.workspace = true
 async-channel = "2.3.1"
 bytemuck = { version = "1.20.0", features = ["derive"] }
-env_logger = "0.11.6"
+pretty_env_logger = "0.5.0"
 glam = { version = "0.30.0", features = ["bytemuck"] }
 image = "0.25.5"
 itertools = "0.14"

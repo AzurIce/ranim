@@ -1,6 +1,6 @@
-use env_logger::Env;
 use glam::dvec2;
 use itertools::Itertools;
+use log::LevelFilter;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::components::Anchor;
@@ -62,9 +62,13 @@ impl TimelineConstructor for ArcScene {
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("arc=trace")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
+        .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("arc=info")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Info)
+        .init();
 
     #[cfg(feature = "app")]
     run_scene_app(ArcScene);
