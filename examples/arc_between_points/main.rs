@@ -1,5 +1,5 @@
-use env_logger::Env;
 use itertools::Itertools;
+use log::LevelFilter;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::glam::{DMat2, dvec2};
@@ -61,10 +61,12 @@ impl TimelineConstructor for ArcBetweenPointsScene {
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=trace"))
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
         .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=info"))
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Info)
         .init();
 
     render_scene(ArcBetweenPointsScene, &AppOptions::default());

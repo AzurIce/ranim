@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use log::info;
+
 use crate::utils::PipelinesStorage;
 
 pub struct RanimContext {
@@ -43,6 +45,7 @@ impl WgpuContext {
             .request_adapter(&wgpu::RequestAdapterOptions::default())
             .await
             .unwrap();
+        info!("{:?}", adapter.get_info());
 
         #[cfg(feature = "profiling")]
         let (device, queue) = adapter
