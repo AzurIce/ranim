@@ -153,9 +153,9 @@ pub fn get_subpath_closed_flag(path: &[DVec3]) -> Option<(usize, bool)> {
         } {
             // println!("### path end ###");
             if (a - path[0]).length_squared() <= 0.0001 {
-                return Some((ia, true))
+                return Some((ia, true));
             } else {
-                return Some((ia, false))
+                return Some((ia, false));
             }
         }
     }

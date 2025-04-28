@@ -2,13 +2,18 @@ use std::f64::consts::PI;
 
 use glam::{DVec3, dvec3};
 use ranim::{
-    animation::{creation::{CreationAnimSchedule, WritingAnimSchedule}, fading::FadingAnimSchedule, transform::TransformAnimSchedule},
+    animation::{
+        creation::{CreationAnimSchedule, WritingAnimSchedule},
+        fading::FadingAnimSchedule,
+        transform::TransformAnimSchedule,
+    },
     color::palettes::manim,
     items::vitem::{Circle, Polygon, Square, VItem},
     prelude::*,
     utils::rate_functions::linear,
 };
 
+#[allow(unused)]
 fn pentagon() -> VItem {
     let mut pentagon = Polygon(
         (0..=5)
@@ -19,10 +24,14 @@ fn pentagon() -> VItem {
             .collect(),
     )
     .build();
-    pentagon.set_color(manim::RED_C).rotate(PI / 2.0, DVec3::Z).set_stroke_width(2.0);
+    pentagon
+        .set_color(manim::RED_C)
+        .rotate(PI / 2.0, DVec3::Z)
+        .set_stroke_width(2.0);
     pentagon
 }
 
+#[allow(unused)]
 #[scene]
 struct FadingScene;
 
@@ -40,6 +49,7 @@ impl TimelineConstructor for FadingScene {
     }
 }
 
+#[allow(unused)]
 #[scene]
 struct CreationScene;
 
@@ -57,6 +67,7 @@ impl TimelineConstructor for CreationScene {
     }
 }
 
+#[allow(unused)]
 #[scene]
 struct WritingScene;
 
@@ -74,6 +85,7 @@ impl TimelineConstructor for WritingScene {
     }
 }
 
+#[allow(unused)]
 #[scene]
 struct TransformScene;
 

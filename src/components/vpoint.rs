@@ -115,8 +115,7 @@ impl Alignable for VPointComponentVec {
                     }
                 })
                 .collect::<Vec<_>>();
-            let mut ipc = Vec::with_capacity(bez_tuples.len());
-            ipc.resize(bez_tuples.len(), 0);
+            let mut ipc = vec![0; bez_tuples.len()];
 
             for _ in 0..diff_len {
                 // println!("{:?}", lens);
@@ -131,7 +130,7 @@ impl Alignable for VPointComponentVec {
             // println!("IPC: {:?}", ipc);
             let new_segs = bez_tuples
                 .into_iter()
-                .zip(ipc.into_iter())
+                .zip(ipc)
                 .map(|(bez, ipc)| {
                     // curve cnt is ipc + 1, anchor cnt is ipc + 2
                     let alphas = (0..ipc + 2)
@@ -143,7 +142,7 @@ impl Alignable for VPointComponentVec {
                     alphas.iter().tuple_windows().for_each(|(a1, a2)| {
                         let partial = trim_quad_bezier(&bez, *a1, *a2);
                         // println!("{} {}: {:?}", a1, a2, partial);
-                        new_points.extend(partial[1..].into_iter())
+                        new_points.extend(partial[1..].iter())
                     });
                     // println!("{:?}", new_points);
                     new_points
@@ -183,12 +182,12 @@ impl VPointComponentVec {
                     subpath.push(*a);
                     subpath.push(*b);
                     if a == b {
-                        subpaths.push(subpath.drain(..).collect())
+                        subpaths.push(std::mem::take(&mut subpath));
                     }
                 }
                 (Some(a), None) => {
                     subpath.push(*a);
-                    subpaths.push(subpath.drain(..).collect())
+                    subpaths.push(std::mem::take(&mut subpath))
                 }
                 _ => unreachable!(),
             }
@@ -207,10 +206,7 @@ impl VPointComponentVec {
 
         // println!("{:?}", self.0);
         let mut i = 0;
-        while let Some((end_idx, is_closed)) = self
-            .get(i..)
-            .and_then(|slice| get_subpath_closed_flag(slice))
-        {
+        while let Some((end_idx, is_closed)) = self.get(i..).and_then(get_subpath_closed_flag) {
             // println!("{i} {end_idx} {len}");
             let end_idx = i + end_idx + 2;
             flags[i..=end_idx.clamp(i, len - 1)].fill(is_closed);

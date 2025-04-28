@@ -4,7 +4,7 @@ use color::{AlphaColor, ColorSpace, Srgb};
 use glam::{DAffine2, DMat4, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
 use itertools::Itertools;
 
-use crate::components::{width::Width, Anchor, ScaleHint};
+use crate::components::{Anchor, ScaleHint, width::Width};
 
 // MARK: Interpolatable
 pub trait Interpolatable {

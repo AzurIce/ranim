@@ -202,7 +202,10 @@ impl<T: Position> Position for [T] {
 }
 
 impl<T: Stroke> Stroke for [T] {
-    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [crate::components::width::Width])) -> &mut Self {
+    fn apply_stroke_func(
+        &mut self,
+        f: impl for<'a> Fn(&'a mut [crate::components::width::Width]),
+    ) -> &mut Self {
         self.iter_mut().for_each(|x| {
             x.apply_stroke_func(&f);
         });

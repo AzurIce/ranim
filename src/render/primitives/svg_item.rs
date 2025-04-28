@@ -36,12 +36,12 @@ impl Primitive for SvgItemPrimitive {
 }
 
 impl Renderable for SvgItemPrimitive {
-    fn encode_render_pass_command<'a>(&self, rpass: &mut wgpu::RenderPass<'a>) {
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         self.vitem_primitives.iter().for_each(|vimte_primitive| {
             vimte_primitive.encode_render_pass_command(rpass);
         })
     }
-    fn encode_compute_pass_command<'a>(&self, cpass: &mut wgpu::ComputePass<'a>) {
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         self.vitem_primitives.iter().for_each(|vimte_primitive| {
             vimte_primitive.encode_compute_pass_command(cpass);
         })
