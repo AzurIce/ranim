@@ -267,10 +267,10 @@ impl Blueprint<VItem> for Rectangle {
         let half_width = self.0 / 2.0;
         let half_height = self.1 / 2.0;
         Polygon(vec![
-            dvec3(-half_width, -half_height, 0.0),
-            dvec3(half_width, -half_height, 0.0),
             dvec3(half_width, half_height, 0.0),
             dvec3(-half_width, half_height, 0.0),
+            dvec3(-half_width, -half_height, 0.0),
+            dvec3(half_width, -half_height, 0.0),
         ])
         .build()
     }

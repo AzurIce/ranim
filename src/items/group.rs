@@ -1,13 +1,5 @@
 use std::ops::{Deref, DerefMut};
 
-use glam::DVec3;
-use log::warn;
-
-use crate::{
-    components::Anchor,
-    traits::{BoundingBox, Fill, Position, Stroke},
-};
-
 /// A group of things.
 ///
 /// The inner of a group is a [`Vec`], it has the ownership of the elements.
@@ -154,91 +146,5 @@ impl<T> IntoIterator for Group<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
-    }
-}
-
-impl<T: BoundingBox> BoundingBox for [T] {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        let [min, max] = self
-            .iter()
-            .map(|x| x.get_bounding_box())
-            .map(|[min, _, max]| [min, max])
-            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
-            .unwrap_or([DVec3::ZERO, DVec3::ZERO]);
-        if min == max {
-            warn!("Empty bounding box, is the slice empty?")
-        }
-        [min, (min + max) / 2.0, max]
-    }
-}
-
-impl<T: Position> Position for [T] {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.shift(shift);
-        });
-        self
-    }
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = match anchor {
-            Anchor::Point(p) => p,
-            Anchor::Edge(e) => self.get_bounding_box_point(e),
-        };
-        self.iter_mut().for_each(|x| {
-            x.rotate_by_anchor(angle, axis, Anchor::Point(anchor));
-        });
-        self
-    }
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = match anchor {
-            Anchor::Point(p) => p,
-            Anchor::Edge(e) => self.get_bounding_box_point(e),
-        };
-        self.iter_mut().for_each(|x| {
-            x.scale_by_anchor(scale, Anchor::Point(anchor));
-        });
-        self
-    }
-}
-
-impl<T: Stroke> Stroke for [T] {
-    fn apply_stroke_func(
-        &mut self,
-        f: impl for<'a> Fn(&'a mut [crate::components::width::Width]),
-    ) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.apply_stroke_func(&f);
-        });
-        self
-    }
-    fn set_stroke_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_stroke_color(color);
-        });
-        self
-    }
-    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_stroke_opacity(opacity);
-        });
-        self
-    }
-}
-
-impl<T: Fill> Fill for [T] {
-    fn fill_color(&self) -> color::AlphaColor<color::Srgb> {
-        self[0].fill_color()
-    }
-    fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_fill_color(color);
-        });
-        self
-    }
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_fill_opacity(opacity);
-        });
-        self
     }
 }
