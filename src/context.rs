@@ -42,7 +42,10 @@ impl WgpuContext {
     pub async fn new() -> Self {
         let instance = wgpu::Instance::default();
         let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions::default())
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                ..Default::default()
+            })
             .await
             .unwrap();
         info!("{:?}", adapter.get_info());
