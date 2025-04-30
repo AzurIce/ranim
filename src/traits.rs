@@ -245,8 +245,6 @@ impl<T: Position> PositionGroupExt for [T] {
     }
 }
 
-fn foo() {}
-
 pub trait PositionStrokeExt: Position + Stroke {
     fn scale_with_stroke_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
         self.scale_by_anchor(scale, anchor);
