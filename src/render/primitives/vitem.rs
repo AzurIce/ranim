@@ -55,19 +55,25 @@ impl Primitive for VItemPrimitive {
         let points3d_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Points 3d Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
             &data.points2d,
         );
         let points2d_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Points 2d Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
             &data.points2d,
         );
         let clip_info_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Clip Info Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
             &[i32::MAX, i32::MIN, i32::MAX, i32::MIN, 0],
         );
         let point_cnt_buffer = WgpuBuffer::new_init(
@@ -481,7 +487,7 @@ mod test {
 
         let res = vitem_primitive.clip_info_buffer.read_buffer(&ctx).unwrap();
         let res: &[i32] = bytemuck::cast_slice(&res);
-        println!("{:?}", res);
+        println!("Clip Info: {:?}", res);
 
         let texture_data = get_texture_data(&ctx, &render_textures.render_texture);
         let img_buffer = image::ImageBuffer::<Rgba<u8>, &[u8]>::from_raw(
