@@ -82,6 +82,12 @@ impl Position for VItem {
 pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
 
 impl VItem {
+    pub fn set_points(&mut self, points: Vec<DVec3>) {
+        self.vpoints.0 = points.into();
+    }
+    pub fn get_anchor(&self, idx: usize) -> Option<&DVec3> {
+        self.vpoints.get(idx * 2)
+    }
     // TODO: remove all constructor to blueprint impl
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
         let stroke_widths = vec![DEFAULT_STROKE_WIDTH; vpoints.len().div_ceil(2)];
