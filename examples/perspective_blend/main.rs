@@ -2,7 +2,6 @@ use glam::DVec3;
 use ranim::{
     animation::transform::{GroupTransformAnimSchedule, TransformAnimSchedule},
     color::palettes::manim,
-    components::Transformable,
     items::{group::Group, vitem::Square},
     prelude::*,
     timeline::TimeMark,
@@ -109,5 +108,10 @@ fn main() {
         ..Default::default()
     };
 
+    #[cfg(not(feature = "app"))]
     render_scene(PerspectiveBlendScene, &options);
+
+    // reuires "app" feature
+    #[cfg(feature = "app")]
+    run_scene_app(PerspectiveBlendScene);
 }

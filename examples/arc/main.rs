@@ -1,6 +1,6 @@
-use env_logger::Env;
 use glam::dvec2;
 use itertools::Itertools;
+use log::LevelFilter;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::components::Anchor;
@@ -41,7 +41,7 @@ impl TimelineConstructor for ArcScene {
                 let offset =
                     frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
                 let mut arc = Arc { angle, radius }.build();
-                arc.set_stroke_width(6.0 * (j as f32 + 1.0) / ncol as f32)
+                arc.set_stroke_width(0.12 * (j as f32 + 0.02) / ncol as f32)
                     .set_stroke_color(color)
                     .set_fill_color(color.with_alpha(0.0))
                     .put_anchor_on(Anchor::center(), offset.extend(0.0));
@@ -62,9 +62,13 @@ impl TimelineConstructor for ArcScene {
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("arc=trace")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
+        .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("arc=info")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Info)
+        .init();
 
     #[cfg(feature = "app")]
     run_scene_app(ArcScene);

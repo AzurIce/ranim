@@ -20,7 +20,7 @@ use std::ops::{Deref, DerefMut};
 /// let mut group = (0..9).map(|i| Square(100.0 * i as f32).build()).collect::<Group<_>>();
 /// ```
 ///
-/// Note that some operations like [`crate::components::Transformable`] for a group of items
+/// Note that some operations like [`crate::traits::Position`] for a group of items
 /// should have different implementation for a single item and a group of items.
 /// (For example, scaling the whole group is not equivalent to scaling each item).
 ///
@@ -52,7 +52,7 @@ use std::ops::{Deref, DerefMut};
 ///
 /// For some animations (like [`crate::animation::transform::Transform`]), it may support
 /// creating directly from item's slice. Since it may involves some group operations which
-/// is not equivalent to applying the same operation on each item (like [`crate::components::Transformable`]).
+/// is not equivalent to applying the same operation on each item (like [`crate::traits::Position`]).
 ///
 /// For example, if logo is a `Group<VItem>` with six elements:
 ///

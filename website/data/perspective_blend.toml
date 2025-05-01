@@ -5,7 +5,6 @@ use glam::DVec3;\r
 use ranim::{\r
     animation::transform::{GroupTransformAnimSchedule, TransformAnimSchedule},\r
     color::palettes::manim,\r
-    components::Transformable,\r
     items::{group::Group, vitem::Square},\r
     prelude::*,\r
     timeline::TimeMark,\r
@@ -15,11 +14,7 @@ use ranim::{\r
 struct PerspectiveBlendScene;\r
 \r
 impl TimelineConstructor for PerspectiveBlendScene {\r
-    fn construct(\r
-        self,\r
-        timeline: &RanimTimeline,\r
-        camera: &mut Rabject<CameraFrame>,\r
-    ) {\r
+    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {\r
         camera.data.pos = DVec3::Z * 5.0;\r
         timeline.update(camera);\r
 \r
@@ -116,10 +111,15 @@ fn main() {\r
         ..Default::default()\r
     };\r
 \r
+    #[cfg(not(feature = \"app\"))]\r
     render_scene(PerspectiveBlendScene, &options);\r
+\r
+    // reuires \"app\" feature\r
+    #[cfg(feature = \"app\")]\r
+    run_scene_app(PerspectiveBlendScene);\r
 }\r
 
 ```"""
-hash = "6ddf98c3ace71f3b81bf52022dbdffa3823ca6fe"
+hash = "d530a24c897808b41509435d5e1d7311f6f80fa4"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/output.mp4"]

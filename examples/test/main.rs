@@ -3,19 +3,20 @@
 use std::{f64::consts::PI, time::Duration};
 
 use ::color::palette::css;
-use env_logger::Env;
 use glam::{DVec3, dvec3};
+use log::LevelFilter;
 use ranim::{
     animation::{
         creation::{CreationAnim, WritingAnim},
+        fading::FadingAnimSchedule,
         transform::{TransformAnim, TransformAnimSchedule},
     },
+    color::palettes::manim::{self, RED_C},
     components::{Anchor, ScaleHint},
     items::{
         camera_frame::CameraFrame,
         group::Group,
-        svg_item::SvgItem,
-        vitem::{Square, VItem},
+        vitem::{Circle, Polygon, Square, VItem, arrow::Arrow},
     },
     prelude::*,
     typst_svg,
@@ -27,45 +28,27 @@ use ranim::{
 struct TestScene;
 
 impl TimelineConstructor for TestScene {
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
-        let _item = Square(500.0).build();
-        let mut vitem = Group::<VItem>::from_svg(typst_svg!(
-            r#"#align(center)[
-            #text(font: "LXGW Bright")[有意思]
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+        let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
+        let mut arrow = timeline.insert(arrow);
 
-            #text(font: "LXGW Bright")[真的是人用的]
-
-            #text(font: "LXGW Bright")[『我』的『软件』]
-        ]"#
-        ));
-        vitem
-            .scale_to(ScaleHint::PorportionalHeight(8.0))
-            .put_center_on(DVec3::ZERO);
-        // let vitem = vitem[0].clone().get_partial(0.0..0.4);
-        // println!("vpoints: {:?}", vitem.vpoints);
-        // println!("close_path: {:?}", vitem.vpoints.get_closepath_flags());
-        let _vitem = timeline.insert(vitem);
-
-        let mut border = Square(1.0).build();
-        border
-            .scale_to(ScaleHint::Size(8.0, 8.0))
-            .put_center_on(DVec3::ZERO);
-        let _border = timeline.insert(border);
-
-        // let _vitem = timeline.insert(vitem);
-        timeline.forward(1.0);
-        timeline.sync();
-        timeline.play(camera.transform(|camera| camera.fovy = PI / 4.0));
-
+        timeline.play(arrow.transform(|data| {
+            data.set_color(RED_C);
+            data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
+        }));
         timeline.sync();
     }
 }
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test=trace")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
+        .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("test=info,ranim=trace")).init();
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Info)
+        .init();
     // println!("main");
     // render_scene(
     //     TestScene,
@@ -74,8 +57,9 @@ fn main() {
     //         ..AppOptions::default()
     //     },
     // );
-    #[cfg(not(feature = "app"))]
-    render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
+    // #[cfg(not(feature = "app"))]
+    // render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
+    render_scene(TestScene, &AppOptions::default());
 
     // reuires "app" feature
     #[cfg(feature = "app")]

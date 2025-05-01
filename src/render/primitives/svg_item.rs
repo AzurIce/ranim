@@ -36,6 +36,16 @@ impl Primitive for SvgItemPrimitive {
 }
 
 impl Renderable for SvgItemPrimitive {
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
+        self.vitem_primitives.iter().for_each(|vimte_primitive| {
+            vimte_primitive.encode_render_pass_command(rpass);
+        })
+    }
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
+        self.vitem_primitives.iter().for_each(|vimte_primitive| {
+            vimte_primitive.encode_compute_pass_command(cpass);
+        })
+    }
     fn encode_render_command(
         &self,
         ctx: &crate::context::WgpuContext,

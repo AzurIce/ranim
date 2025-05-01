@@ -1,85 +1,81 @@
 name = "arc"
-code = """
+code = '''
 ```rust,linenos
-use env_logger::Env;\r
-use glam::dvec2;\r
-use itertools::Itertools;\r
-use ranim::animation::fading::FadingAnimSchedule;\r
-use ranim::color::HueDirection;\r
-use ranim::components::Anchor;\r
-use ranim::items::group::Group;\r
-use ranim::items::vitem::Arc;\r
-use ranim::prelude::*;\r
-use ranim::timeline::TimeMark;\r
-\r
-#[scene]\r
-struct ArcScene;\r
-\r
-impl TimelineConstructor for ArcScene {\r
-    fn construct(\r
-        self,\r
-        timeline: &RanimTimeline,\r
-        _camera: &mut Rabject<CameraFrame>,\r
-    ) {\r
-        // let frame_size = app.camera().size;\r
-        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
-        let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);\r
-\r
-        let start_color = color!(\"#FF8080FF\");\r
-        let end_color = color!(\"#58C4DDFF\");\r
-\r
-        let nrow = 10;\r
-        let ncol = 10;\r
-        let step_x = frame_size.x / ncol as f64;\r
-        let step_y = frame_size.y / nrow as f64;\r
-\r
-        let arcs = (0..nrow)\r
-            .cartesian_product(0..ncol)\r
-            .map(|(i, j)| {\r
-                let (i, j) = (i as f64, j as f64);\r
-\r
-                let angle = std::f64::consts::PI * (j + 1.0) / ncol as f64 * 360.0 / 180.0;\r
-                let radius = step_y / 2.0 * 0.8;\r
-                let color = start_color.lerp(\r
-                    end_color,\r
-                    i as f32 / (nrow - 1) as f32,\r
-                    HueDirection::Increasing,\r
-                );\r
-                let offset =\r
-                    frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);\r
-                let mut arc = Arc { angle, radius }.build();\r
-                arc.set_stroke_width(6.0 * (j as f32 + 1.0) / ncol as f32)\r
-                    .set_stroke_color(color)\r
-                    .set_fill_color(color.with_alpha(0.0))\r
-                    .put_anchor_on(Anchor::center(), offset.extend(0.0));\r
-                arc\r
-            })\r
-            .collect::<Group<_>>();\r
-\r
-        let mut arcs = timeline.insert(arcs);\r
-        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());\r
-        timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();\r
-\r
-        timeline.insert_time_mark(\r
-            timeline.duration_secs(),\r
-            TimeMark::Capture(\"preview.png\".to_string()),\r
-        );\r
-    }\r
-}\r
-\r
-fn main() {\r
-    #[cfg(debug_assertions)]\r
-    env_logger::Builder::from_env(Env::default().default_filter_or(\"arc=trace\")).init();\r
-    #[cfg(not(debug_assertions))]\r
-    env_logger::Builder::from_env(Env::default().default_filter_or(\"arc=info\")).init();\r
-\r
-    #[cfg(feature = \"app\")]\r
-    run_scene_app(ArcScene);\r
-    #[cfg(not(feature = \"app\"))]\r
-    render_scene(ArcScene, &AppOptions::default());\r
-}\r
+use env_logger::Env;
+use glam::dvec2;
+use itertools::Itertools;
+use ranim::animation::fading::FadingAnimSchedule;
+use ranim::color::HueDirection;
+use ranim::components::Anchor;
+use ranim::items::group::Group;
+use ranim::items::vitem::Arc;
+use ranim::prelude::*;
+use ranim::timeline::TimeMark;
 
-```"""
-hash = "0592d900c07d0707a17f102738f0d83833306946"
+#[scene]
+struct ArcScene;
+
+impl TimelineConstructor for ArcScene {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+        // let frame_size = app.camera().size;
+        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
+        let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
+
+        let start_color = color!("#FF8080FF");
+        let end_color = color!("#58C4DDFF");
+
+        let nrow = 10;
+        let ncol = 10;
+        let step_x = frame_size.x / ncol as f64;
+        let step_y = frame_size.y / nrow as f64;
+
+        let arcs = (0..nrow)
+            .cartesian_product(0..ncol)
+            .map(|(i, j)| {
+                let (i, j) = (i as f64, j as f64);
+
+                let angle = std::f64::consts::PI * (j + 1.0) / ncol as f64 * 360.0 / 180.0;
+                let radius = step_y / 2.0 * 0.8;
+                let color = start_color.lerp(
+                    end_color,
+                    i as f32 / (nrow - 1) as f32,
+                    HueDirection::Increasing,
+                );
+                let offset =
+                    frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
+                let mut arc = Arc { angle, radius }.build();
+                arc.set_stroke_width(0.12 * (j as f32 + 0.02) / ncol as f32)
+                    .set_stroke_color(color)
+                    .set_fill_color(color.with_alpha(0.0))
+                    .put_anchor_on(Anchor::center(), offset.extend(0.0));
+                arc
+            })
+            .collect::<Group<_>>();
+
+        let mut arcs = timeline.insert(arcs);
+        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());
+        timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();
+
+        timeline.insert_time_mark(
+            timeline.duration_secs(),
+            TimeMark::Capture("preview.png".to_string()),
+        );
+    }
+}
+
+fn main() {
+    #[cfg(debug_assertions)]
+    env_logger::Builder::from_env(Env::default().default_filter_or("arc=trace")).init();
+    #[cfg(not(debug_assertions))]
+    env_logger::Builder::from_env(Env::default().default_filter_or("arc=info")).init();
+
+    #[cfg(feature = "app")]
+    run_scene_app(ArcScene);
+    #[cfg(not(feature = "app"))]
+    render_scene(ArcScene, &AppOptions::default());
+}
+
+```'''
+hash = "dd735ffb5a37702dd184b2db79ee654fe2a6df1a"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/output.mp4"]
