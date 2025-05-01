@@ -3,8 +3,6 @@ use std::ops::{Deref, DerefMut};
 
 use glam::DMat3;
 use glam::DVec3;
-use glam::dvec2;
-use glam::dvec3;
 use itertools::Itertools;
 use ranim_macros::Interpolatable;
 
@@ -352,7 +350,6 @@ mod test {
             Blueprint,
             vitem::{Circle, Square},
         },
-        prelude::Partial,
         traits::Alignable,
     };
 

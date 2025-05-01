@@ -6,7 +6,7 @@ use std::{
 use glam::{DVec3, IVec3, dvec3, ivec3};
 
 use crate::{
-    prelude::{Alignable, Interpolatable, Partial},
+    prelude::{Alignable, Interpolatable},
     utils::math::interpolate_usize,
 };
 
