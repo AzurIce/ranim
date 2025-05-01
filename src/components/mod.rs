@@ -50,8 +50,8 @@ impl<T: Component> AsMut<[T]> for ComponentVec<T> {
 
 // MARK: Trait impls
 
-impl<T: Component + PointWise + Interpolatable> Partial for ComponentVec<T> {
-    fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
+impl<T: Component + PointWise + Interpolatable> ComponentVec<T> {
+    pub fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
         let max_idx = self.len() - 2;
 
         let (start_index, start_residue) = interpolate_usize(0, max_idx, range.start);

@@ -1,14 +1,13 @@
 use glam::DVec3;
 use ranim_macros::{
-    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Position, Stroke,
+    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, Position, Stroke,
 };
 
 use crate::{
-    items::Blueprint,
-    render::primitives::{Extract, Primitive, Renderable, RenderableItem, vitem::VItemPrimitive},
+    components::Anchor, items::Blueprint, render::primitives::{vitem::VItemPrimitive, Extract, Primitive, Renderable, RenderableItem}, traits::Position
 };
 
-use super::{line::Line, Polygon, VItem};
+use super::{Polygon, VItem, line::Line};
 
 /// An arrow tip
 ///
@@ -20,24 +19,49 @@ use super::{line::Line, Polygon, VItem};
 ///           /   \
 /// 0.1 * -X +-----+ 0.1 * X
 /// ```
-#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position)]
+#[derive(
+    Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position, Partial,
+)]
 pub struct ArrowTip(pub VItem);
 
 impl Default for ArrowTip {
     fn default() -> Self {
-        Self(
-            Polygon(vec![
-                0.2 * DVec3::Y,
-                0.1 * DVec3::X,
-                0.1 * DVec3::NEG_X,
-                0.2 * DVec3::Y,
-            ])
-            .build(),
-        )
+        let vitem = Polygon(vec![
+            0.2 * DVec3::Y,
+            0.1 * DVec3::X,
+            0.1 * DVec3::NEG_X,
+            0.2 * DVec3::Y,
+        ])
+        .build();
+        Self(vitem)
     }
 }
 
 impl ArrowTip {
+    pub fn set_direction(&mut self, dir: DVec3) -> &mut Self {
+        let current_dir = self.direction().normalize();
+        let new_dir = dir.normalize();
+        let rotation_angle = current_dir.angle_between(new_dir);
+        let mut rotation_axis = current_dir.cross(new_dir).normalize();
+        if rotation_axis.length() < f64::EPSILON {
+            rotation_axis = DVec3::Z;
+        }
+        
+        if rotation_angle.abs() > f64::EPSILON {
+            self.0.rotate(rotation_angle, rotation_axis);
+        }
+        self
+    }
+    pub fn put_tip_on(&mut self, pos: DVec3) -> &mut Self {
+        let tip_point= self.tip_point();
+        self.0.put_anchor_on(Anchor::Point(tip_point), pos);
+        self
+    }
+    pub fn put_bottom_center_on(&mut self, pos: DVec3) -> &mut Self {
+        let tip_point= self.tip_point();
+        self.0.put_anchor_on(Anchor::Point(tip_point), pos);
+        self
+    }
     /// The point on the tip
     pub fn tip_point(&self) -> DVec3 {
         *self.0.get_anchor(0).unwrap()
@@ -59,7 +83,7 @@ impl Extract for ArrowTip {
     }
 }
 
-#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill)]
+#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, Partial)]
 pub struct Arrow {
     pub tip: ArrowTip,
     pub line: Line,
@@ -67,16 +91,40 @@ pub struct Arrow {
 
 impl Default for Arrow {
     fn default() -> Self {
-        Self::new()
+        Self::new(-0.2 * DVec3::Y, DVec3::Y)
     }
 }
 
 impl Arrow {
-    pub fn new() -> Self {
+    pub fn new(start: DVec3, end: DVec3) -> Self {
+        let mut tip = ArrowTip::default();
+        tip.set_direction(end - start);
+        tip.put_tip_on(end);
         Self {
-            tip: ArrowTip::default(),
-            line: Line::new(0.2 * DVec3::NEG_Y, 0.2 * DVec3::Y),
+            line: Line::new(
+                start,
+                tip.bottom_center_point(),
+            ),
+            tip,
         }
+    }
+    pub fn start(&self) -> DVec3 {
+        self.line.start()
+    }
+    pub fn end(&self) -> DVec3 {
+        self.tip.tip_point()
+    }
+    pub fn put_end_on(&mut self, pos: DVec3) -> &mut Self {
+        self.put_start_and_end_on(self.start(), pos)
+    }
+    pub fn put_start_on(&mut self, pos: DVec3) -> &mut Self {
+        self.put_start_and_end_on(pos, self.end())
+    }
+    pub fn put_start_and_end_on(&mut self, start: DVec3, end: DVec3) -> &mut Self {
+        self.tip.set_direction(end - start);
+        self.tip.put_tip_on(end);
+        self.line.put_start_and_end_on(start, self.tip.bottom_center_point());
+        self
     }
 }
 

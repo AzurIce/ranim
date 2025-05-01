@@ -126,6 +126,32 @@ pub fn derive_stroke(input: TokenStream) -> TokenStream {
     )
 }
 
+#[proc_macro_derive(Partial)]
+pub fn derive_partial(input: TokenStream) -> TokenStream {
+    impl_derive(
+        input,
+        |ranim| quote! {#ranim::traits::Partial},
+        |_ranim, field_positions| {
+            quote! {
+                fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
+                    Self {
+                        #(
+                            #field_positions: self.#field_positions.get_partial(range.clone()),
+                        )*
+                    }
+                }
+                fn get_partial_closed(&self, range: std::ops::Range<f64>) -> Self {
+                    Self {
+                        #(
+                            #field_positions: self.#field_positions.get_partial(range.clone()),
+                        )*
+                    }
+                }
+            }
+        },
+    )
+}
+
 #[proc_macro_derive(Empty)]
 pub fn derive_empty(input: TokenStream) -> TokenStream {
     let ranim = ranim_path();

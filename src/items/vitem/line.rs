@@ -1,13 +1,13 @@
 use glam::DVec3;
 use ranim_macros::{
-    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Position, Stroke,
+    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, Position, Stroke
 };
 
 use crate::render::primitives::{vitem::VItemPrimitive, Extract, Primitive};
 
 use super::VItem;
 
-#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position)]
+#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position, Partial)]
 pub struct Line(pub VItem);
 
 impl Line {
@@ -22,7 +22,21 @@ impl Line {
         (p1 + p2) / 2.0
     }
     pub fn new(p1: DVec3, p2: DVec3) -> Self {
-        Self(VItem::from_vpoints(vec![p1, (p1 + p2) / 2.0, p1]))
+        Self(VItem::from_vpoints(vec![p1, (p1 + p2) / 2.0, p2]))
+    }
+    pub fn start(&self) -> DVec3 {
+        self.points()[0]
+    }
+    pub fn end(&self) -> DVec3 {
+        self.points()[1]
+    }
+    pub fn put_start_on(&mut self, pos: DVec3) -> &mut Self {
+        let start = self.points()[0];
+        self.put_start_and_end_on(start, pos)
+    }
+    pub fn put_end_on(&mut self, pos: DVec3) -> &mut Self {
+        let end = self.points()[1];
+        self.put_start_and_end_on(pos, end)
     }
     pub fn put_start_and_end_on(&mut self, start: DVec3, end: DVec3) -> &mut Self {
         self.0.put_start_and_end_on(start, end);

@@ -69,6 +69,7 @@ pub trait Opacity {
 // MARK: Partial
 pub trait Partial {
     fn get_partial(&self, range: Range<f64>) -> Self;
+    fn get_partial_closed(&self, range: Range<f64>) -> Self;
 }
 
 // MARK: Empty
