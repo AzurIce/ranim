@@ -11,6 +11,10 @@ use std::{
 
 use animation::EvalResult;
 use context::RanimContext;
+#[cfg(feature = "video-rs")]
+use file_writer::VideoRsFileWriter;
+use file_writer::VideoWriter;
+#[cfg(not(feature = "video-rs"))]
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
@@ -185,17 +189,15 @@ struct RanimRenderApp {
     // frame_size: (u32, u32),
     renderer: Renderer,
 
-    /// The writer for the output.mp4 video
-    video_writer: Option<FileWriter>,
-    /// Whether to auto create a [`FileWriter`] to output the video
-    video_writer_builder: Option<FileWriterBuilder>,
-    /// Whether to save the frames
-    save_frames: bool,
+    pixel_size: (u32, u32),
     /// fps
     fps: u32,
+    /// Whether to save the frames
+    save_frames: bool,
+    output_dir: PathBuf,
+    output_filename: String,
 
     frame_count: u32,
-    output_dir: PathBuf,
     scene_name: String,
 
     pub(crate) render_instances: RenderInstances,
@@ -215,21 +217,22 @@ impl RanimRenderApp {
             // world: World::new(),
             renderer,
             // frame_size: options.frame_size,
-            video_writer: None,
-            video_writer_builder: Some(
-                FileWriterBuilder::default()
-                    .with_fps(options.frame_rate)
-                    .with_size(options.pixel_size.0, options.pixel_size.1)
-                    .with_file_path(output_dir.join(&scene_name).join(options.output_filename)),
-            ),
+            pixel_size: options.pixel_size,
             save_frames: options.save_frames,
             fps: options.frame_rate,
             frame_count: 0,
             ctx,
             output_dir,
+            output_filename: options.output_filename.to_string(),
             scene_name,
             render_instances: RenderInstances::default(),
         }
+    }
+
+    fn output_file_path(&self) -> PathBuf {
+        self.output_dir
+            .join(&self.scene_name)
+            .join(&self.output_filename)
     }
 
     fn render_timeline(&mut self, timeline: RanimTimeline) {
@@ -249,6 +252,20 @@ impl RanimRenderApp {
             .unwrap();
             (cpu_server, gpu_server)
         };
+
+        #[cfg(not(feature = "video-rs"))]
+        let mut video_writer = FileWriterBuilder::default()
+            .with_fps(self.fps)
+            .with_size(self.pixel_size.0, self.pixel_size.1)
+            .with_file_path(self.output_file_path())
+            .build();
+        #[cfg(feature = "video-rs")]
+        let mut video_writer = VideoRsFileWriter::new(
+            self.pixel_size.0,
+            self.pixel_size.1,
+            self.fps,
+            self.output_file_path(),
+        );
 
         let frames = (timeline.duration_secs() * self.fps as f64).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
@@ -335,7 +352,7 @@ impl RanimRenderApp {
                     self.renderer.render(&mut self.ctx, &render_primitives);
                 }
 
-                self.update_frame();
+                self.update_frame(&mut video_writer);
 
                 #[cfg(feature = "profiling")]
                 profiling::finish_frame!();
@@ -420,15 +437,9 @@ impl RanimRenderApp {
         self.save_frame_to_image(self.output_dir.join(&self.scene_name).join(filename));
     }
 
-    fn update_frame(&mut self) {
+    fn update_frame(&mut self, video_writer: &mut impl VideoWriter) {
         // `output_video` is true
-        if let Some(video_writer) = self.video_writer.as_mut() {
-            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));
-        } else if let Some(builder) = self.video_writer_builder.as_ref() {
-            self.video_writer
-                .get_or_insert(builder.clone().build())
-                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));
-        }
+        video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));
 
         // `save_frames` is true
         if self.save_frames {

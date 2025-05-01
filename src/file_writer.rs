@@ -4,6 +4,77 @@ use std::{
     process::{Child, ChildStdin, Command, Stdio},
 };
 
+#[cfg(feature = "video-rs")]
+use ndarray;
+#[cfg(feature = "video-rs")]
+use ndarray::Array3;
+use ndarray::{Array4, s};
+#[cfg(feature = "video-rs")]
+use video_rs::Encoder;
+#[cfg(feature = "video-rs")]
+use video_rs::{Time, encode::Settings};
+
+pub trait VideoWriter {
+    fn write_frame(&mut self, frame: &[u8]);
+}
+
+#[cfg(feature = "video-rs")]
+pub struct VideoRsFileWriter {
+    width: u32,
+    height: u32,
+    encoder: Encoder,
+    position: Time,
+    duration: Time,
+}
+
+#[cfg(feature = "video-rs")]
+impl VideoRsFileWriter {
+    pub fn new(width: u32, height: u32, fps: u32, path: PathBuf) -> Self {
+        let settings = Settings::preset_h264_yuv420p(width as usize, height as usize, true);
+        let encoder = Encoder::new(path, settings).expect("failed to create encoder");
+        Self {
+            width,
+            height,
+            encoder,
+            position: Time::zero(),
+            duration: Time::from_nth_of_a_second(fps as usize),
+        }
+    }
+}
+
+#[cfg(feature = "video-rs")]
+impl VideoWriter for VideoRsFileWriter {
+    fn write_frame(&mut self, frame_bytes: &[u8]) {
+        let mut frame = Array3::<u8>::zeros((self.height as usize, self.width as usize, 3));
+
+        frame_bytes
+            .chunks_exact(4)
+            .zip(frame.exact_chunks_mut((1, 1, 3)))
+            .for_each(|(src, mut dst)| {
+                dst.as_slice_mut().unwrap().copy_from_slice(&src[..3]);
+            });
+        // let rgba_array = Array3::<u8>::from_shape_vec(
+        //     (self.height as usize, self.width as usize, 4),
+        //     frame.to_vec(),
+        // );
+        // let mut rgb_array = Array3::<u8>::zeros((self.height as usize, self.width as usize, 3));
+        // // 复制前3个通道
+        // rgb_array.assign(&rgba_array.slice(s![.., .., 0..3]));
+        self.encoder
+            .encode(&frame, self.position)
+            .expect("failed to encode frame");
+
+        self.position = self.position.aligned_with(self.duration).add();
+    }
+}
+
+#[cfg(feature = "video-rs")]
+impl Drop for VideoRsFileWriter {
+    fn drop(&mut self) {
+        self.encoder.finish().expect("failed to finish encoder");
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FileWriterBuilder {
     pub file_path: PathBuf,
@@ -125,12 +196,8 @@ impl Drop for FileWriter {
     }
 }
 
-impl FileWriter {
-    // pub fn builder() -> FileWriterBuilder {
-    //     FileWriterBuilder::default()
-    // }
-
-    pub fn write_frame(&mut self, frame: &[u8]) {
+impl VideoWriter for FileWriter {
+    fn write_frame(&mut self, frame: &[u8]) {
         self.child_in
             .as_mut()
             .unwrap()

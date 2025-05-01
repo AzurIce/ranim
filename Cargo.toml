@@ -31,6 +31,7 @@ profiling = [
   "dep:profiling",
 ]
 app = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:winit"]
+video-rs = ["dep:video-rs", "dep:ndarray"]
 
 [dependencies]
 ranim-macros.workspace = true
@@ -48,8 +49,10 @@ anyhow = "1.0.95"
 usvg = "0.45.0"
 regex = "1.11.1"
 indicatif = "0.17.11"
-color = "0.2.3"
+color = "0.3.0"
 
+ndarray = { version = "0.16.1", optional = true }
+video-rs = { version = "0.10.3", optional = true, features = ["ndarray"] }
 puffin = { version = "0.19.1", optional = true }
 puffin_http = { version = "0.16.1", optional = true }
 wgpu-profiler = { version = "0.22.0", optional = true, features = ["puffin"] }
