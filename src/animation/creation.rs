@@ -200,7 +200,7 @@ impl<T: WritingRequirement> Unwrite<T> {
 impl<T: WritingRequirement> EvalDynamic<T> for Unwrite<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         let alpha = alpha * 2.0;
-         if (0.0..1.0).contains(&alpha) {
+        if (0.0..1.0).contains(&alpha) {
             self.original.lerp(&self.outline, alpha)
         } else if alpha == 1.0 {
             self.outline.clone()
@@ -210,7 +210,7 @@ impl<T: WritingRequirement> EvalDynamic<T> for Unwrite<T> {
             T::empty()
         } else if alpha == 0.0 {
             self.original.clone()
-        } else{
+        } else {
             panic!("the alpha is out of range: {}", alpha);
         }
     }

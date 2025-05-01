@@ -1,13 +1,15 @@
 use glam::DVec3;
 use ranim_macros::{
-    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, Position, Stroke
+    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, Position, Stroke,
 };
 
-use crate::render::primitives::{vitem::VItemPrimitive, Extract, Primitive};
+use crate::render::primitives::{Extract, Primitive, vitem::VItemPrimitive};
 
 use super::VItem;
 
-#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position, Partial)]
+#[derive(
+    Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position, Partial,
+)]
 pub struct Line(pub VItem);
 
 impl Line {

@@ -16,7 +16,7 @@ use ranim::{
     items::{
         camera_frame::CameraFrame,
         group::Group,
-        vitem::{arrow::Arrow, Circle, Polygon, Square, VItem},
+        vitem::{Circle, Polygon, Square, VItem, arrow::Arrow},
     },
     prelude::*,
     typst_svg,

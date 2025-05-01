@@ -83,7 +83,7 @@ pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
 
 impl VItem {
     pub fn close(&mut self) -> &mut Self {
-        if self.vpoints.last() != self.vpoints.first() && ! self.vpoints.is_empty() {
+        if self.vpoints.last() != self.vpoints.first() && !self.vpoints.is_empty() {
             let start = self.vpoints[0];
             let end = self.vpoints[self.vpoints.len() - 1];
             self.extend_vpoints(&[(start + end) / 2.0, start]);

@@ -4,7 +4,10 @@ use ranim_macros::{
 };
 
 use crate::{
-    components::Anchor, items::Blueprint, render::primitives::{vitem::VItemPrimitive, Extract, Primitive, Renderable, RenderableItem}, traits::Position
+    components::Anchor,
+    items::Blueprint,
+    render::primitives::{Extract, Primitive, Renderable, RenderableItem, vitem::VItemPrimitive},
+    traits::Position,
 };
 
 use super::{Polygon, VItem, line::Line};
@@ -46,19 +49,19 @@ impl ArrowTip {
         if rotation_axis.length() < f64::EPSILON {
             rotation_axis = DVec3::Z;
         }
-        
+
         if rotation_angle.abs() > f64::EPSILON {
             self.0.rotate(rotation_angle, rotation_axis);
         }
         self
     }
     pub fn put_tip_on(&mut self, pos: DVec3) -> &mut Self {
-        let tip_point= self.tip_point();
+        let tip_point = self.tip_point();
         self.0.put_anchor_on(Anchor::Point(tip_point), pos);
         self
     }
     pub fn put_bottom_center_on(&mut self, pos: DVec3) -> &mut Self {
-        let tip_point= self.tip_point();
+        let tip_point = self.tip_point();
         self.0.put_anchor_on(Anchor::Point(tip_point), pos);
         self
     }
@@ -101,10 +104,7 @@ impl Arrow {
         tip.set_direction(end - start);
         tip.put_tip_on(end);
         Self {
-            line: Line::new(
-                start,
-                tip.bottom_center_point(),
-            ),
+            line: Line::new(start, tip.bottom_center_point()),
             tip,
         }
     }
@@ -123,7 +123,8 @@ impl Arrow {
     pub fn put_start_and_end_on(&mut self, start: DVec3, end: DVec3) -> &mut Self {
         self.tip.set_direction(end - start);
         self.tip.put_tip_on(end);
-        self.line.put_start_and_end_on(start, self.tip.bottom_center_point());
+        self.line
+            .put_start_and_end_on(start, self.tip.bottom_center_point());
         self
     }
 }
