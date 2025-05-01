@@ -17,11 +17,11 @@
 </div>
 
 <div style="display: flex;">
-    <img alt="getting_started3" src="./assets/getting_started3.gif" width="48%" />
+    <img alt="hello_ranim" src="./assets/hello_ranim.gif" width="48%" />
     <img alt="ranim_logo" src="./assets/ranim_logo.gif" width="48%" />
 </div>
 
-> [examples/getting_started3](./examples/getting_started3)
+> [examples/hello_ranim](./examples/hello_ranim)
 > 
 > [examples/ranim_logo](./examples/ranim_logo)
 
