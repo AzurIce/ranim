@@ -1,142 +1,142 @@
 name = "hanoi"
-code = '''
+code = """
 ```rust,linenos
-use glam::dvec3;
-use ranim::{
-    animation::transform::TransformAnimSchedule,
-    color::{HueDirection, palettes::manim},
-    components::Anchor,
-    items::{group::Group, vitem::Rectangle},
-    prelude::*,
-    utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
-};
+use glam::dvec3;\r
+use ranim::{\r
+    animation::transform::TransformAnimSchedule,\r
+    color::{HueDirection, palettes::manim},\r
+    components::Anchor,\r
+    items::{group::Group, vitem::Rectangle},\r
+    prelude::*,\r
+    utils::rate_functions::{ease_in_quad, ease_out_quad, linear},\r
+};\r
+\r
+fn solve_hanoi(\r
+    n: usize,\r
+    idx_src: usize,\r
+    idx_dst: usize,\r
+    idx_tmp: usize,\r
+    move_disk: &mut impl FnMut(usize, usize),\r
+) {\r
+    if n == 1 {\r
+        move_disk(idx_src, idx_dst);\r
+    } else {\r
+        solve_hanoi(n - 1, idx_src, idx_tmp, idx_dst, move_disk);\r
+        move_disk(idx_src, idx_dst);\r
+        solve_hanoi(n - 1, idx_tmp, idx_dst, idx_src, move_disk);\r
+    }\r
+}\r
+\r
+#[scene]\r
+struct HanoiScene(pub usize);\r
+\r
+impl TimelineConstructor for HanoiScene {\r
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {\r
+        let n = self.0;\r
+        let total_sec = 10.0;\r
+        let rod_width = 0.4;\r
+        let rod_height = 5.0;\r
+        let rod_section_width = 4.0;\r
+\r
+        let _rods = timeline.insert([-1, 0, 1].into_iter().map(|i| {\r
+            let mut rod = Rectangle(rod_width, rod_height).build();\r
+            rod.set_color(manim::GREY_C).put_anchor_on(\r
+                Anchor::edge(0, -1, 0),\r
+                dvec3(i as f64 * rod_section_width, -4.0, 0.0),\r
+            );\r
+            rod\r
+        }));\r
+\r
+        let min_disk_width = rod_width * 1.7;\r
+        let max_disk_width = rod_section_width * 0.8;\r
+        let disk_height = (rod_height * 0.8) / n as f64;\r
+        let _disks = timeline.insert((0..n).map(|i| {\r
+            let factor = i as f64 / (n - 1) as f64;\r
+            let disk_width = min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);\r
+            let mut disk = Rectangle(disk_width, disk_height).build();\r
+            let color = manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);\r
+            disk.set_color(color).set_stroke_width(0.0).put_anchor_on(\r
+                Anchor::edge(0, -1, 0),\r
+                dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.0),\r
+            );\r
+            disk\r
+        }));\r
+\r
+        let mut disks = [_disks, Group::new(), Group::new()];\r
+\r
+        let anim_duration = total_sec / (2.0f64.powi(n as i32) - 1.0) / 3.0;\r
+        let mut move_disk = |idx_src: usize, idx_dst: usize| {\r
+            let top_disk_y = |idx: usize| disks[idx].len() as f64 * disk_height - 4.0;\r
+            let top_src = top_disk_y(idx_src) - disk_height;\r
+            let top_dst = top_disk_y(idx_dst);\r
+            let mut disk = disks[idx_src].pop().unwrap();\r
+\r
+            timeline.play(\r
+                disk.transform(|data| {\r
+                    data.shift(dvec3(0.0, 3.0 - top_src, 0.0));\r
+                })\r
+                .with_duration(anim_duration)\r
+                .with_rate_func(ease_in_quad)\r
+                .apply(),\r
+            );\r
+            timeline.play(\r
+                disk.transform(|data| {\r
+                    data.shift(dvec3(\r
+                        (idx_dst as f64 - idx_src as f64) * rod_section_width,\r
+                        0.0,\r
+                        0.0,\r
+                    ));\r
+                })\r
+                .with_duration(anim_duration)\r
+                .with_rate_func(linear)\r
+                .apply(),\r
+            );\r
+            timeline.play(\r
+                disk.transform(|data| {\r
+                    data.shift(dvec3(0.0, top_dst - 3.0, 0.0));\r
+                })\r
+                .with_duration(anim_duration)\r
+                .with_rate_func(ease_out_quad)\r
+                .apply(),\r
+            );\r
+            timeline.sync();\r
+            disks[idx_dst].push(disk);\r
+        };\r
+\r
+        solve_hanoi(n, 0, 1, 2, &mut move_disk);\r
+    }\r
+}\r
+\r
+fn main() {\r
+    #[cfg(feature = \"app\")]\r
+    run_scene_app(HanoiScene(10));\r
+    #[cfg(not(feature = \"app\"))]\r
+    {\r
+        render_scene(\r
+            HanoiScene(5),\r
+            &AppOptions {\r
+                output_filename: \"output-5.mp4\",\r
+                ..Default::default()\r
+            },\r
+        );\r
+        render_scene_at_sec(HanoiScene(5), 0.0, \"preview-5.png\", &AppOptions::default());\r
+        render_scene(\r
+            HanoiScene(10),\r
+            &AppOptions {\r
+                output_filename: \"output-10.mp4\",\r
+                ..Default::default()\r
+            },\r
+        );\r
+        render_scene_at_sec(\r
+            HanoiScene(10),\r
+            0.0,\r
+            \"preview-10.png\",\r
+            &AppOptions::default(),\r
+        );\r
+    }\r
+}\r
 
-fn solve_hanoi(
-    n: usize,
-    idx_src: usize,
-    idx_dst: usize,
-    idx_tmp: usize,
-    move_disk: &mut impl FnMut(usize, usize),
-) {
-    if n == 1 {
-        move_disk(idx_src, idx_dst);
-    } else {
-        solve_hanoi(n - 1, idx_src, idx_tmp, idx_dst, move_disk);
-        move_disk(idx_src, idx_dst);
-        solve_hanoi(n - 1, idx_tmp, idx_dst, idx_src, move_disk);
-    }
-}
-
-#[scene]
-struct HanoiScene(pub usize);
-
-impl TimelineConstructor for HanoiScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
-        let n = self.0;
-        let total_sec = 10.0;
-        let rod_width = 0.4;
-        let rod_height = 5.0;
-        let rod_section_width = 4.0;
-
-        let _rods = timeline.insert([-1, 0, 1].into_iter().map(|i| {
-            let mut rod = Rectangle(rod_width, rod_height).build();
-            rod.set_color(manim::GREY_C).put_anchor_on(
-                Anchor::edge(0, -1, 0),
-                dvec3(i as f64 * rod_section_width, -4.0, 0.0),
-            );
-            rod
-        }));
-
-        let min_disk_width = rod_width * 1.7;
-        let max_disk_width = rod_section_width * 0.8;
-        let disk_height = (rod_height * 0.8) / n as f64;
-        let _disks = timeline.insert((0..n).map(|i| {
-            let factor = i as f64 / (n - 1) as f64;
-            let disk_width = min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);
-            let mut disk = Rectangle(disk_width, disk_height).build();
-            let color = manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
-            disk.set_color(color).set_stroke_width(0.0).put_anchor_on(
-                Anchor::edge(0, -1, 0),
-                dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.0),
-            );
-            disk
-        }));
-
-        let mut disks = [_disks, Group::new(), Group::new()];
-
-        let anim_duration = total_sec / (2.0f64.powi(n as i32) - 1.0) / 3.0;
-        let mut move_disk = |idx_src: usize, idx_dst: usize| {
-            let top_disk_y = |idx: usize| disks[idx].len() as f64 * disk_height - 4.0;
-            let top_src = top_disk_y(idx_src) - disk_height;
-            let top_dst = top_disk_y(idx_dst);
-            let mut disk = disks[idx_src].pop().unwrap();
-
-            timeline.play(
-                disk.transform(|data| {
-                    data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
-                })
-                .with_duration(anim_duration)
-                .with_rate_func(ease_in_quad)
-                .apply(),
-            );
-            timeline.play(
-                disk.transform(|data| {
-                    data.shift(dvec3(
-                        (idx_dst as f64 - idx_src as f64) * rod_section_width,
-                        0.0,
-                        0.0,
-                    ));
-                })
-                .with_duration(anim_duration)
-                .with_rate_func(linear)
-                .apply(),
-            );
-            timeline.play(
-                disk.transform(|data| {
-                    data.shift(dvec3(0.0, top_dst - 3.0, 0.0));
-                })
-                .with_duration(anim_duration)
-                .with_rate_func(ease_out_quad)
-                .apply(),
-            );
-            timeline.sync();
-            disks[idx_dst].push(disk);
-        };
-
-        solve_hanoi(n, 0, 1, 2, &mut move_disk);
-    }
-}
-
-fn main() {
-    #[cfg(feature = "app")]
-    run_scene_app(HanoiScene(10));
-    #[cfg(not(feature = "app"))]
-    {
-        render_scene(
-            HanoiScene(5),
-            &AppOptions {
-                output_filename: "output-5.mp4",
-                ..Default::default()
-            },
-        );
-        render_scene_at_sec(HanoiScene(5), 0.0, "preview-5.png", &AppOptions::default());
-        render_scene(
-            HanoiScene(10),
-            &AppOptions {
-                output_filename: "output-10.mp4",
-                ..Default::default()
-            },
-        );
-        render_scene_at_sec(
-            HanoiScene(10),
-            0.0,
-            "preview-10.png",
-            &AppOptions::default(),
-        );
-    }
-}
-
-```'''
-hash = "d3a2e5f1b2684fa32ccfda6898e6564fc5f4b9c3"
+```"""
+hash = "8b0fff8ecf492ef0fb8a90a8d5fce66f6f567ee0"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/output-10.mp4", "/examples/hanoi/output-5.mp4"]

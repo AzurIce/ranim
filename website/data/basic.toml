@@ -1,8 +1,8 @@
 name = "basic"
 code = """
 ```rust,linenos
-use env_logger::Env;\r
 use glam::DVec3;\r
+use log::LevelFilter;\r
 use ranim::animation::creation::WritingAnimSchedule;\r
 use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::components::ScaleHint;\r
@@ -68,14 +68,17 @@ impl TimelineConstructor for BasicScene {\r
 \r
 fn main() {\r
     #[cfg(debug_assertions)]\r
-    env_logger::Builder::from_env(Env::default().default_filter_or(\"basic=trace\")).init();\r
+    pretty_env_logger::formatted_timed_builder()\r
+        .filter(Some(\"ranim\"), LevelFilter::Trace)\r
+        .init();\r
     #[cfg(not(debug_assertions))]\r
-    env_logger::Builder::from_env(Env::default().default_filter_or(\"basic=info,ranim=info\")).init();\r
-\r
+    pretty_env_logger::formatted_timed_builder()\r
+        .filter(Some(\"ranim\"), LevelFilter::Info)\r
+        .init();\r
     render_scene(BasicScene, &AppOptions::default());\r
 }\r
 
 ```"""
-hash = "0ae49c344a4f790bedd543d79308d65175d1c432"
+hash = "d94a370c836dbaa810ccde557f3c3d5b1bf11c34"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/output.mp4"]
