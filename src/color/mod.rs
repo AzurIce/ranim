@@ -1,4 +1,4 @@
-use color::{AlphaColor, OpaqueColor, Srgb};
+pub use color::{AlphaColor, OpaqueColor, Srgb};
 
 pub mod palettes;
 pub use ::color::HueDirection;

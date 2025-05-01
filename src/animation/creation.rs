@@ -1,5 +1,6 @@
 use super::{AnimSchedule, AnimationSpan, EvalDynamic, ToEvaluator};
 use crate::items::Rabject;
+use crate::items::vitem::DEFAULT_STROKE_WIDTH;
 use crate::traits::{Empty, Fill, Interpolatable, Partial, Stroke};
 use crate::utils::rate_functions::smooth;
 use log::warn;
@@ -92,7 +93,7 @@ impl<T: CreationRequirement> EvalDynamic<T> for Create<T> {
         if alpha == 0.0 {
             T::empty()
         } else if 0.0 < alpha && alpha < 1.0 {
-            self.original.get_partial(0.0..alpha)
+            self.original.get_partial_closed(0.0..alpha)
         } else if alpha == 1.0 {
             self.original.clone()
         } else {
@@ -124,7 +125,7 @@ impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
         if alpha == 0.0 {
             self.original.clone()
         } else if 0.0 < alpha && alpha < 1.0 {
-            self.original.get_partial(0.0..1.0 - alpha)
+            self.original.get_partial_closed(0.0..1.0 - alpha)
         } else if alpha == 1.0 {
             T::empty()
         } else {
@@ -139,7 +140,6 @@ impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
 pub struct Write<T: WritingRequirement> {
     pub(crate) original: T,
     pub(crate) outline: T,
-    create_anim: Create<T>,
 }
 
 impl<T: WritingRequirement> Write<T> {
@@ -147,12 +147,11 @@ impl<T: WritingRequirement> Write<T> {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)
-            .set_stroke_width(1.0)
+            .set_stroke_width(DEFAULT_STROKE_WIDTH)
             .set_stroke_color(target.fill_color())
             .set_stroke_opacity(1.0);
         Self {
             original: target,
-            create_anim: Create::new(outline.clone()),
             outline,
         }
     }
@@ -161,8 +160,10 @@ impl<T: WritingRequirement> Write<T> {
 impl<T: WritingRequirement> EvalDynamic<T> for Write<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         let alpha = alpha * 2.0;
-        if (0.0..=1.0).contains(&alpha) {
-            self.create_anim.eval_alpha(alpha)
+        if (0.0..1.0).contains(&alpha) {
+            self.outline.get_partial(0.0..alpha)
+        } else if alpha == 1.0 {
+            self.outline.clone()
         } else if (1.0..2.0).contains(&alpha) {
             self.outline.lerp(&self.original, alpha - 1.0)
         } else if alpha == 2.0 {
@@ -179,7 +180,6 @@ impl<T: WritingRequirement> EvalDynamic<T> for Write<T> {
 pub struct Unwrite<T: WritingRequirement> {
     pub(crate) original: T,
     pub(crate) outline: T,
-    uncreate_anim: UnCreate<T>,
 }
 
 impl<T: WritingRequirement> Unwrite<T> {
@@ -187,12 +187,11 @@ impl<T: WritingRequirement> Unwrite<T> {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)
-            .set_stroke_width(1.0)
+            .set_stroke_width(DEFAULT_STROKE_WIDTH)
             .set_stroke_color(target.fill_color())
             .set_stroke_opacity(1.0);
         Self {
             original: target,
-            uncreate_anim: UnCreate::new(outline.clone()),
             outline,
         }
     }
@@ -201,14 +200,16 @@ impl<T: WritingRequirement> Unwrite<T> {
 impl<T: WritingRequirement> EvalDynamic<T> for Unwrite<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         let alpha = alpha * 2.0;
-        if (1.0..=2.0).contains(&alpha) {
-            self.uncreate_anim.eval_alpha(alpha - 1.0)
-        } else if alpha == 0.0 {
-            self.original.clone()
-        } else if (0.0..1.0).contains(&alpha) {
+        if (0.0..1.0).contains(&alpha) {
             self.original.lerp(&self.outline, alpha)
         } else if alpha == 1.0 {
             self.outline.clone()
+        } else if (1.0..2.0).contains(&alpha) {
+            self.outline.get_partial(0.0..2.0 - alpha)
+        } else if alpha == 2.0 {
+            T::empty()
+        } else if alpha == 0.0 {
+            self.original.clone()
         } else {
             panic!("the alpha is out of range: {}", alpha);
         }

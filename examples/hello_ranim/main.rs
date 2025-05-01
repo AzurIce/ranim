@@ -1,3 +1,6 @@
+use std::f64::consts::PI;
+
+use glam::DVec3;
 use ranim::{
     animation::{
         creation::WritingAnimSchedule, fading::FadingAnimSchedule, transform::TransformAnimSchedule,
@@ -17,6 +20,7 @@ impl TimelineConstructor for HelloRanimScene {
 
         let mut square = timeline.insert(square);
         let mut circle = Circle(2.0).build();
+        circle.rotate(PI / 4.0 + PI, DVec3::Z);
         circle.set_color(manim::RED_C);
 
         timeline.play(square.transform_to(circle).apply()); // Use `apply` on an anim schedule to update rabject data

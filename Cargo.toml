@@ -8,13 +8,10 @@ repository.workspace = true
 homepage = "https://azurice.github.io/ranim"
 readme = "README.md"
 keywords = ["animation", "manim", "wgpu"]
-exclude = [
-  "website",
-  "assets"
-]
+exclude = ["website", "assets"]
 
 [workspace]
-members = ["packages/*", "xtasks/*"]
+members = ["benches", "packages/*", "xtasks/*"]
 
 [workspace.package]
 version = "0.1.0-alpha.12"
@@ -24,19 +21,25 @@ repository = "https://github.com/AzurIce/ranim"
 
 [workspace.dependencies]
 ranim-macros = { path = "packages/ranim-macros", version = "0.1.0-alpha.12" }
+itertools = "0.14"
 
 [features]
-profiling = ["dep:wgpu-profiler", "dep:puffin", "dep:puffin_http", "dep:profiling"]
+profiling = [
+  "dep:wgpu-profiler",
+  "dep:puffin",
+  "dep:puffin_http",
+  "dep:profiling",
+]
 app = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:winit"]
 
 [dependencies]
 ranim-macros.workspace = true
+itertools.workspace = true
 async-channel = "2.3.1"
 bytemuck = { version = "1.20.0", features = ["derive"] }
-env_logger = "0.11.6"
+pretty_env_logger = "0.5.0"
 glam = { version = "0.30.0", features = ["bytemuck"] }
 image = "0.25.5"
-itertools = "0.14"
 log = "0.4.25"
 pollster = "0.4.0"
 uuid = { version = "1.13.2", features = ["v4"] }
@@ -50,12 +53,15 @@ color = "0.2.3"
 puffin = { version = "0.19.1", optional = true }
 puffin_http = { version = "0.16.1", optional = true }
 wgpu-profiler = { version = "0.22.0", optional = true, features = ["puffin"] }
-profiling = { version = "1.0.16", optional = true, features = ["profile-with-puffin"] }
+profiling = { version = "1.0.16", optional = true, features = [
+  "profile-with-puffin",
+] }
 
 egui = { version = "0.31.1", optional = true }
 egui-wgpu = { version = "0.31.1", features = ["winit"], optional = true }
 egui-winit = { version = "0.31.1", optional = true }
 winit = { version = "0.30.9", optional = true }
+variadics_please = "1.1.0"
 
 [dev-dependencies]
 rand = "0.9.0"
@@ -70,7 +76,14 @@ opt-level = 1
 opt-level = 3
 
 [package.metadata.release]
-pre-release-hook = ["git", "cliff", "-o", "CHANGELOG.md", "--tag", "{{version}}" ]
+pre-release-hook = [
+  "git",
+  "cliff",
+  "-o",
+  "CHANGELOG.md",
+  "--tag",
+  "{{version}}",
+]
 pre-release-replacements = [
-  {file="README.md", search="ranim = .*", replace="{{crate_name}} = \"{{version}}\""},
+  { file = "README.md", search = "ranim = .*", replace = "{{crate_name}} = \"{{version}}\"" },
 ]

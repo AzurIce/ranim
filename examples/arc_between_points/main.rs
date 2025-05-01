@@ -1,5 +1,5 @@
-use env_logger::Env;
 use itertools::Itertools;
+use log::LevelFilter;
 use ranim::animation::fading::FadingAnimSchedule;
 use ranim::color::HueDirection;
 use ranim::glam::{DMat2, dvec2};
@@ -23,7 +23,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
         let arcs = (0..nrad)
             .map(|i| {
                 let radius = 6.0 * (i + 1) as f64 / nrad as f64;
-                let width = 6.0 * ((nrad - i) as f64 / nrad as f64).powi(2);
+                let width = 0.12 * ((nrad - i) as f64 / nrad as f64).powi(2);
                 let angle = std::f64::consts::PI * 7.0 / 4.0 * (i + 1) as f64 / nrad as f64;
                 (radius, width, angle)
             })
@@ -61,10 +61,12 @@ impl TimelineConstructor for ArcBetweenPointsScene {
 
 fn main() {
     #[cfg(debug_assertions)]
-    env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=trace"))
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
         .init();
     #[cfg(not(debug_assertions))]
-    env_logger::Builder::from_env(Env::default().default_filter_or("arc_between_points=info"))
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Info)
         .init();
 
     render_scene(ArcBetweenPointsScene, &AppOptions::default());

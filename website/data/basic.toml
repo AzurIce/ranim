@@ -7,7 +7,6 @@ use ranim::animation::creation::WritingAnimSchedule;\r
 use ranim::animation::fading::FadingAnimSchedule;\r
 use ranim::components::ScaleHint;\r
 use ranim::items::group::Group;\r
-use ranim::items::svg_item::SvgItem;\r
 use ranim::items::vitem::VItem;\r
 use ranim::timeline::TimeMark;\r
 use ranim::utils::rate_functions::linear;\r
@@ -19,15 +18,11 @@ const SVG: &str = include_str!(\"../../assets/Ghostscript_Tiger.svg\");\r
 struct BasicScene;\r
 \r
 impl TimelineConstructor for BasicScene {\r
-    fn construct(\r
-        self,\r
-        timeline: &RanimTimeline,\r
-        _camera: &mut Rabject<CameraFrame>,\r
-    ) {\r
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {\r
         timeline.forward(0.2);\r
 \r
-        let mut svg = SvgItem::from_svg(SVG);\r
-        svg.scale_to(ScaleHint::PorportionalHeight(3.0))\r
+        let mut svg = Group::<VItem>::from_svg(SVG);\r
+        svg.scale_to_with_stroke(ScaleHint::PorportionalHeight(3.0))\r
             .put_center_on(DVec3::Y * 2.0);\r
         let mut svg = timeline.insert(svg);\r
 \r
@@ -40,7 +35,7 @@ impl TimelineConstructor for BasicScene {\r
             ]\r
             \"#\r
         ));\r
-        text.scale_to(ScaleHint::PorportionalHeight(2.0))\r
+        text.scale_to_with_stroke(ScaleHint::PorportionalHeight(2.0))\r
             .put_center_on(DVec3::NEG_Y * 2.0);\r
 \r
         text.iter_mut().for_each(|item| {\r
@@ -53,7 +48,7 @@ impl TimelineConstructor for BasicScene {\r
                 .with_total_duration(3.0)\r
                 .with_rate_func(linear),\r
         );\r
-        timeline.play(svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in\r
+        timeline.play(svg.lagged_anim(0.0, |item| item.fade_in().with_duration(3.0))); // At the same time, the svg fade in\r
         timeline.sync();\r
         timeline.insert_time_mark(\r
             timeline.duration_secs(),\r
@@ -66,7 +61,7 @@ impl TimelineConstructor for BasicScene {\r
                 .with_total_duration(3.0)\r
                 .with_rate_func(linear),\r
         );\r
-        timeline.play(svg.fade_out().with_duration(3.0));\r
+        timeline.play(svg.lagged_anim(0.0, |item| item.fade_out().with_duration(3.0))); // At the same time, the svg fade in\r
         timeline.sync();\r
     }\r
 }\r
@@ -81,6 +76,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "90bead11bd3052b898de01e8c67f67480a848f97"
+hash = "0ae49c344a4f790bedd543d79308d65175d1c432"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/output.mp4"]

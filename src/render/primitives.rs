@@ -1,10 +1,9 @@
 pub mod svg_item;
 pub mod vitem;
 
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-};
+use std::{any::Any, collections::HashMap};
+
+use variadics_please::all_tuples;
 
 use crate::context::WgpuContext;
 
@@ -18,6 +17,8 @@ pub trait Primitive {
 }
 
 pub trait Renderable {
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass);
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass);
     fn encode_render_command(
         &self,
         ctx: &WgpuContext,
@@ -28,6 +29,96 @@ pub trait Renderable {
         #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
     );
     fn debug(&self, _ctx: &WgpuContext) {}
+}
+
+macro_rules! impl_tuple_renderable {
+    ($($T:ident),*) => {
+        impl<$($T: Renderable),*> Renderable for ($($T,)*) {
+            fn encode_compute_pass_command(
+                &self,
+                cpass: &mut wgpu::ComputePass,
+            ) {
+                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
+                let ($($T,)*) = self;
+                $($T.encode_compute_pass_command(
+                    cpass,
+                );)*
+            }
+            fn encode_render_pass_command(
+                &self,
+                rpass: &mut wgpu::RenderPass,
+            ) {
+                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
+                let ($($T,)*) = self;
+                $($T.encode_render_pass_command(
+                    rpass,
+                );)*
+            }
+            fn encode_render_command(
+                &self,
+                ctx: &WgpuContext,
+                pipelines: &mut super::PipelinesStorage,
+                encoder: &mut wgpu::CommandEncoder,
+                uniforms_bind_group: &wgpu::BindGroup,
+                render_textures: &RenderTextures,
+                #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
+            ) {
+                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
+                let ($($T,)*) = self;
+                $($T.encode_render_command(
+                    ctx,
+                    pipelines,
+                    encoder,
+                    uniforms_bind_group,
+                    render_textures,
+                    #[cfg(feature = "profiling")]
+                    profiler,
+                );)*
+            }
+            fn debug(&self, ctx: &WgpuContext) {
+                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
+                let ($($T,)*) = self;
+                $($T.debug(ctx);)*
+            }
+        }
+    };
+}
+
+all_tuples!(impl_tuple_renderable, 1, 16, T);
+
+impl<T: Renderable, const N: usize> Renderable for [T; N] {
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
+        self.iter()
+            .for_each(|x| x.encode_compute_pass_command(cpass))
+    }
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
+        self.iter()
+            .for_each(|x| x.encode_render_pass_command(rpass))
+    }
+    fn encode_render_command(
+        &self,
+        ctx: &WgpuContext,
+        pipelines: &mut super::PipelinesStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
+    ) {
+        self.iter().for_each(|x| {
+            x.encode_render_command(
+                ctx,
+                pipelines,
+                encoder,
+                uniforms_bind_group,
+                render_textures,
+                #[cfg(feature = "profiling")]
+                profiler,
+            )
+        });
+    }
+    fn debug(&self, _ctx: &WgpuContext) {
+        self.iter().for_each(|x| x.debug(_ctx));
+    }
 }
 
 /// Extract is the process of getting [`Primitive::Data`] from an item.
@@ -65,21 +156,10 @@ where
         render_instances: &'a RenderInstances,
         id: usize,
     ) -> Option<&'a dyn Renderable> {
-        render_instances.get_renderable::<T, P>(id)
+        render_instances
+            .get_render_instance::<P>(id)
+            .map(|instance| instance as &dyn Renderable)
     }
-}
-
-pub fn prepare_render_primitive<T: Extract<Primitive = P>, P: Renderable + Primitive + 'static>(
-    ctx: &WgpuContext,
-    render_instances: &mut RenderInstances,
-    id: usize,
-    data: T,
-) {
-    let primitive_data = data.extract();
-    let primitive = P::init(ctx, &primitive_data);
-    render_instances
-        .items
-        .insert((id, TypeId::of::<P>()), Box::new(primitive));
 }
 
 // pub trait ExtractFrom<T: Entity>: Renderable + Any {
@@ -88,13 +168,32 @@ pub fn prepare_render_primitive<T: Extract<Primitive = P>, P: Renderable + Primi
 
 #[derive(Default)]
 pub struct RenderInstances {
-    // Rabject's id, RenderInstance's TypeId -> RenderInstance
-    dynamic_items: HashMap<(usize, TypeId), Box<dyn Any>>,
-    //
-    items: HashMap<(usize, TypeId), Box<dyn Any>>,
+    // Rabject's id -> RenderInstance
+    items: HashMap<usize, Box<dyn Any>>,
 }
 
 impl RenderInstances {
+    pub(crate) fn insert_render_instance<T: Renderable + 'static>(
+        &mut self,
+        id: usize,
+        instance: T,
+    ) {
+        self.items.insert(id, Box::new(instance));
+    }
+    pub(crate) fn get_render_instance<T: Renderable + 'static>(&self, id: usize) -> Option<&T> {
+        self.items
+            .get(&id)
+            .and_then(|x| x.as_ref().downcast_ref::<T>())
+    }
+    pub(crate) fn get_render_instance_mut<T: Renderable + 'static>(
+        &mut self,
+        id: usize,
+    ) -> Option<&mut T> {
+        // println!("get_render_instance_mut");
+        self.items
+            .get_mut(&id)
+            .and_then(|x| x.as_mut().downcast_mut::<T>())
+    }
     pub fn prepare<T: Extract<Primitive = P>, P: Renderable + Primitive + 'static>(
         &mut self,
         ctx: &WgpuContext,
@@ -102,33 +201,34 @@ impl RenderInstances {
         item: &T,
     ) {
         let primitive_data = item.extract();
-        let primitive = P::init(ctx, &primitive_data);
-        self.items
-            .insert((id, TypeId::of::<P>()), Box::new(primitive));
+        if let Some(render_instance) = self.get_render_instance_mut::<P>(id) {
+            render_instance.update(ctx, &primitive_data);
+        } else {
+            self.insert_render_instance(id, P::init(ctx, &primitive_data));
+        }
     }
     pub fn get_renderable<T: Extract<Primitive = P>, P: Renderable + Primitive + 'static>(
         &self,
         id: usize,
     ) -> Option<&dyn Renderable> {
         self.items
-            .get(&(id, TypeId::of::<P>()))
+            .get(&id)
             .map(|x| x.downcast_ref::<P>().unwrap() as &dyn Renderable)
-    }
-    pub fn get_dynamic<T: 'static>(&self, id: usize) -> Option<&T> {
-        self.dynamic_items
-            .get(&(id, TypeId::of::<T>()))
-            .map(|x| x.downcast_ref::<T>().unwrap())
-    }
-    pub fn get_dynamic_or_init<T: Default + 'static>(&mut self, id: usize) -> &mut T {
-        self.dynamic_items
-            .entry((id, TypeId::of::<T>()))
-            .or_insert_with(|| Box::new(T::default()))
-            .downcast_mut::<T>()
-            .unwrap()
     }
 }
 
 impl Renderable for Vec<&dyn Renderable> {
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
+        for render_instance in self {
+            render_instance.encode_compute_pass_command(cpass);
+        }
+    }
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
+        for render_instance in self {
+            render_instance.encode_render_pass_command(rpass);
+        }
+    }
+
     fn encode_render_command(
         &self,
         ctx: &WgpuContext,

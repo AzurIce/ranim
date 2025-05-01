@@ -34,8 +34,6 @@ pub mod prelude {
     pub use crate::traits::*;
 
     pub use crate::items::Blueprint;
-
-    pub use crate::components::Transformable;
 }
 
 pub mod color;
@@ -436,6 +434,7 @@ impl RanimRenderApp {
         if self.save_frames {
             let path = self
                 .output_dir
+                .join(&self.scene_name)
                 .join(format!("frames/{:04}.png", self.frame_count));
             self.save_frame_to_image(path);
         }
