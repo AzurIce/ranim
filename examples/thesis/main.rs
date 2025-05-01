@@ -109,8 +109,8 @@ fn main() {
         output_dir: "output-thesis",
         ..Default::default()
     };
-    // render_scene(FadingScene, &options);
-    // render_scene(CreationScene, &options);
-    // render_scene(WritingScene, &options);
+    render_scene(FadingScene, &options);
+    render_scene(CreationScene, &options);
+    render_scene(WritingScene, &options);
     render_scene(TransformScene, &options);
 }

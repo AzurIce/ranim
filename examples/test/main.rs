@@ -11,12 +11,12 @@ use ranim::{
         fading::FadingAnimSchedule,
         transform::{TransformAnim, TransformAnimSchedule},
     },
-    color::palettes::manim,
+    color::palettes::manim::{self, RED_C},
     components::{Anchor, ScaleHint},
     items::{
         camera_frame::CameraFrame,
         group::Group,
-        vitem::{Circle, Polygon, Square, VItem, arrow::Arrow},
+        vitem::{arrow::Arrow, Circle, Polygon, Square, VItem},
     },
     prelude::*,
     typst_svg,
@@ -29,29 +29,13 @@ struct TestScene;
 
 impl TimelineConstructor for TestScene {
     fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
-        let mut pentagon = Polygon(
-            (0..=5)
-                .map(|i| {
-                    let angle = i as f64 / 5.0 * 2.0 * PI;
-                    dvec3(angle.cos(), angle.sin(), 0.0) * 2.0
-                })
-                .collect(),
-        )
-        .build();
-        pentagon
-            .set_color(manim::RED_C)
-            // .rotate(PI / 2.0, DVec3::Z)
-            .set_stroke_width(2.0);
-        let mut pentagon = timeline.insert(pentagon);
+        let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
+        let mut arrow = timeline.insert(arrow);
 
-        let mut circle = Circle(2.0).build();
-        circle.set_color(manim::BLUE_C).set_stroke_width(2.0);
-
-        println!("{:?}", pentagon.data.vpoints);
-        pentagon.data.align_with(&mut circle);
-        println!("{:?}", pentagon.data.vpoints);
-
-        timeline.play(pentagon.transform_to(circle));
+        timeline.play(arrow.transform(|data| {
+            data.set_color(RED_C);
+            data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
+        }));
         timeline.sync();
     }
 }

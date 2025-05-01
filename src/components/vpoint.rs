@@ -8,7 +8,6 @@ use glam::dvec3;
 use itertools::Itertools;
 use ranim_macros::Interpolatable;
 
-use crate::prelude::Partial;
 use crate::traits::Alignable;
 use crate::traits::BoundingBox;
 use crate::traits::PointsFunc;
@@ -233,24 +232,20 @@ impl VPointComponentVec {
             DVec3::splat(v.length() / cur_v.length()),
             Anchor::Point(cur_start),
         );
-        let angle = cur_v.y.atan2(-cur_v.x) - v.y.atan2(-v.x) + std::f64::consts::PI / 2.0;
-        self.rotate(angle, DVec3::Z);
-        let cur_xy = dvec2(cur_v.x, cur_v.y);
-        let cur_xy = cur_xy * cur_xy.abs().normalize();
-
-        let xy = dvec2(v.x, v.y);
-        let xy = xy * xy.abs().normalize();
-        let angle = cur_v.z.atan2(-cur_xy.length()) - v.z.atan2(-xy.length());
-        self.rotate(angle, dvec3(-v.y, v.x, 0.0));
-        let cur_start = self.first().cloned().unwrap();
+        let rotate_angle = cur_v.angle_between(v);
+        let mut rotate_axis = cur_v.cross(v).normalize();
+        if rotate_axis.length_squared() <= f64::EPSILON {
+            rotate_axis = DVec3::Z;
+        }
+        self.rotate_by_anchor(rotate_angle, rotate_axis, Anchor::Point(cur_start));
         self.shift(start - cur_start);
 
         self
     }
 }
 
-impl Partial for VPointComponentVec {
-    fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
+impl VPointComponentVec {
+    pub fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
         let max_anchor_idx = self.len() / 2;
 
         let (start_index, start_residue) = interpolate_usize(0, max_anchor_idx, range.start);

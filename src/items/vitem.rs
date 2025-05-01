@@ -82,6 +82,14 @@ impl Position for VItem {
 pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
 
 impl VItem {
+    pub fn close(&mut self) -> &mut Self {
+        if self.vpoints.last() != self.vpoints.first() && ! self.vpoints.is_empty() {
+            let start = self.vpoints[0];
+            let end = self.vpoints[self.vpoints.len() - 1];
+            self.extend_vpoints(&[(start + end) / 2.0, start]);
+        }
+        self
+    }
     pub fn set_points(&mut self, points: Vec<DVec3>) {
         self.vpoints.0 = points.into();
     }
@@ -194,6 +202,11 @@ impl Partial for VItem {
             stroke_rgbas,
             fill_rgbas,
         }
+    }
+    fn get_partial_closed(&self, range: std::ops::Range<f64>) -> Self {
+        let mut partial = self.get_partial(range);
+        partial.close();
+        partial
     }
 }
 
