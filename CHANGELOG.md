@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.13] - 2025-05-01
+
+### 🚀 Features
+
+- Implemented Renderable for tuples and arrays
+- Derive macros for anim traits
+- Align vitem points according to ratio, closes: #33
+- An attempt to share pass between items
+- Scale with stroke
+
+### 🚜 Refactor
+
+- Refactor Transformable Trait to Position and BoundingBox
+- Rework on derive macros
+
+### ⚙️ Miscellaneous Tasks
+
+- Use pretty_env_logger instead of env_logger
+- Added puffin_viewer to flake shell
+
+### WIP
+
+- More items
+
 ## [0.1.0-alpha.12] - 2025-04-20
 
 ### 🚜 Refactor
@@ -13,6 +37,10 @@ All notable changes to this project will be documented in this file.
 
 - Lint and some docs
 - Lint
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.1.0-alpha.11] - 2025-04-01
 
