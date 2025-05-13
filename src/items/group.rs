@@ -1,5 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 /// A group of things.
 ///
 /// The inner of a group is a [`Vec`], it has the ownership of the elements.
@@ -83,6 +86,7 @@ use std::ops::{Deref, DerefMut};
 ///     });
 /// ```
 ///
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Default)]
 pub struct Group<T>(pub Vec<T>);
 

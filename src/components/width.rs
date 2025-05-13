@@ -1,9 +1,14 @@
+use derive_more::From;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use crate::prelude::Interpolatable;
 
 use super::PointWise;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, bytemuck::Pod, bytemuck::Zeroable, From)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Width(pub f32);
 
 impl PointWise for Width {}
@@ -20,12 +25,6 @@ impl Width {
 impl Default for Width {
     fn default() -> Self {
         1.0.into()
-    }
-}
-
-impl From<f32> for Width {
-    fn from(value: f32) -> Self {
-        Self(value)
     }
 }
 
