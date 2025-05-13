@@ -127,7 +127,7 @@ impl AppPipeline {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("App Pipeline Layout"),
-                bind_group_layouts: &[&AppBindGroup::bind_group_layout(&ctx)],
+                bind_group_layouts: &[&AppBindGroup::bind_group_layout(ctx)],
                 push_constant_ranges: &[],
             });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

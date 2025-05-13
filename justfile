@@ -19,12 +19,20 @@ clean:
     -rm *.log
 
 fmt:
-    cargo fmt --all
-
-lint: fmt
-    cargo clippy --workspace --all-targets -- -D warnings
     cargo fmt --all --check
+
+lint: lint-no-features
+    just lint-features app
+    just lint-features serde
+    just lint-features profiling
+
+lint-no-features: fmt
+    cargo clippy --workspace --all-targets -- -D warnings
     cargo doc --no-deps --workspace --document-private-items
+
+lint-features *FEATURES: fmt
+    cargo clippy --workspace --all-targets --features {{FEATURES}} -- -D warnings
+    cargo doc --no-deps --workspace --document-private-items --features {{FEATURES}}
 
 changelog:
     git cliff -o CHANGELOG.md

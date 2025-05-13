@@ -102,14 +102,15 @@ impl TimelineConstructor for PerspectiveBlendScene {
 }
 
 fn main() {
-    let options = AppOptions {
-        pixel_size: (1280, 720),
-        frame_rate: 60,
-        ..Default::default()
-    };
-
     #[cfg(not(feature = "app"))]
-    render_scene(PerspectiveBlendScene, &options);
+    {
+        let options = AppOptions {
+            pixel_size: (1280, 720),
+            frame_rate: 60,
+            ..Default::default()
+        };
+        render_scene(PerspectiveBlendScene, &options);
+    }
 
     // reuires "app" feature
     #[cfg(feature = "app")]

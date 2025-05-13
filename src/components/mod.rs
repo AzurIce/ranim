@@ -1,9 +1,9 @@
-use std::{
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-};
+use std::fmt::Debug;
 
+use derive_more::{AsMut, AsRef, Deref, DerefMut};
 use glam::{DVec3, IVec3, dvec3, ivec3};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 use crate::{
     prelude::{Alignable, Interpolatable},
@@ -20,33 +20,11 @@ pub trait Component: Debug + Default + Clone + Copy + PartialEq {}
 
 impl<T: Debug + Default + Clone + Copy + PartialEq> Component for T {}
 
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Deref, DerefMut, AsMut, AsRef)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[as_ref(forward)]
+#[as_mut(forward)]
 pub struct ComponentVec<T: Component>(Vec<T>);
-
-impl<T: Component> Deref for ComponentVec<T> {
-    type Target = [T];
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T: Component> DerefMut for ComponentVec<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<T: Component> AsRef<[T]> for ComponentVec<T> {
-    fn as_ref(&self) -> &[T] {
-        &self.0
-    }
-}
-
-impl<T: Component> AsMut<[T]> for ComponentVec<T> {
-    fn as_mut(&mut self) -> &mut [T] {
-        &mut self.0
-    }
-}
 
 // MARK: Trait impls
 
@@ -120,18 +98,6 @@ impl<T: Component, I: IntoIterator<Item = impl Into<T>>> From<I> for ComponentVe
     }
 }
 
-impl<T: Component> AsRef<Vec<T>> for ComponentVec<T> {
-    fn as_ref(&self) -> &Vec<T> {
-        &self.0
-    }
-}
-
-impl<T: Component> AsMut<Vec<T>> for ComponentVec<T> {
-    fn as_mut(&mut self) -> &mut Vec<T> {
-        &mut self.0
-    }
-}
-
 impl<T: Component> ComponentVec<T> {
     pub fn extend_from_vec(&mut self, vec: Vec<T>) {
         self.0.extend(vec);
@@ -158,10 +124,19 @@ pub trait PointWise {}
 // MARK: Anchor
 /// The anchor of the transformation.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Anchor {
     /// A point anchor, which is an absolute coordinate
     Point(DVec3),
-    /// An edge anchor, use -1, 0, 1 to specify the edge on each axis
+    /// An edge anchor, use -1, 0, 1 to specify the edge on each axis, (0, 0, 0) is the center point.
+    /// ```text
+    ///      +Y
+    ///      |
+    ///      |
+    ///      +----- +X
+    ///    /
+    /// +Z
+    /// ```
     Edge(IVec3),
 }
 
@@ -185,6 +160,8 @@ impl Anchor {
 
 // MARK: ScaleTo
 /// A hint for scaling the mobject.
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ScaleHint {
     /// Scale the mobject to a given height, the width will remain unchanged.
     Height(f64),
