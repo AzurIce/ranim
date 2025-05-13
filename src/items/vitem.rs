@@ -1,10 +1,12 @@
 pub mod arrow;
 pub mod line;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, dvec2, dvec3, vec4};
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},

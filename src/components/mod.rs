@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use derive_more::{AsMut, AsRef, Deref, DerefMut, IsVariant};
 use glam::{DVec3, IVec3, dvec3, ivec3};
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{

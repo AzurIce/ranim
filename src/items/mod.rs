@@ -1,4 +1,5 @@
 use group::Group;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::animation::{AnimSchedule, AnimationSpan};

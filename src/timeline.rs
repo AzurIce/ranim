@@ -1,4 +1,5 @@
 use log::trace;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{

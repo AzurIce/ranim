@@ -1,5 +1,6 @@
 use derive_more::{AsMut, AsRef, Deref, DerefMut, From};
 use glam::DVec3;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::prelude::Interpolatable;

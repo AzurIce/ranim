@@ -1,5 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// A group of things.

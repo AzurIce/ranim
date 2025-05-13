@@ -1,4 +1,5 @@
 use derive_more::From;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::prelude::Interpolatable;

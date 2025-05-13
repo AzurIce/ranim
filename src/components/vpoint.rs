@@ -5,6 +5,7 @@ use glam::DMat3;
 use glam::DVec3;
 use itertools::Itertools;
 use ranim_macros::Interpolatable;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::traits::Alignable;
