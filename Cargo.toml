@@ -31,6 +31,7 @@ profiling = [
   "dep:profiling",
 ]
 app = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:winit"]
+serde = ["dep:serde", "glam/serde", "color/serde"]
 
 [dependencies]
 ranim-macros.workspace = true
@@ -49,6 +50,8 @@ usvg = "0.45.0"
 regex = "1.11.1"
 indicatif = "0.17.11"
 color = "0.2.3"
+variadics_please = "1.1.0"
+derive_more = { version = "2.0.1", features = ["deref_mut", "deref", "index", "index_mut", "is_variant", "as_ref", "from", "into_iterator"] }
 
 puffin = { version = "0.19.1", optional = true }
 puffin_http = { version = "0.16.1", optional = true }
@@ -61,7 +64,8 @@ egui = { version = "0.31.1", optional = true }
 egui-wgpu = { version = "0.31.1", features = ["winit"], optional = true }
 egui-winit = { version = "0.31.1", optional = true }
 winit = { version = "0.30.9", optional = true }
-variadics_please = "1.1.0"
+
+serde = { version = "1", features = ["derive"], optional = true}
 
 [dev-dependencies]
 rand = "0.9.0"

@@ -1,5 +1,7 @@
 use group::Group;
 // use variadics_please::all_tuples;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 use crate::{
     animation::{AnimSchedule, AnimationSpan},
@@ -41,6 +43,7 @@ impl<'r, T> Group<Rabject<T>> {
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rabject<T> {
     pub id: usize,
     pub data: T,

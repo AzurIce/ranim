@@ -3,6 +3,8 @@ use std::ops::{Deref, DerefMut};
 // use bevy_color::{ColorToComponents, LinearRgba};
 use color::{AlphaColor, ColorSpace, LinearSrgb, Srgb};
 use glam::{Vec4, vec4};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 use crate::prelude::{Interpolatable, Opacity};
 
@@ -10,6 +12,7 @@ use super::{ComponentVec, PointWise};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rgba(pub Vec4);
 
 impl PointWise for Rgba {}
