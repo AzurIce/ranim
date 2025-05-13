@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use derive_more::{AsMut, AsRef, Deref, DerefMut, IsVariant};
+use derive_more::{AsMut, AsRef, Deref, DerefMut};
 use glam::{DVec3, IVec3, dvec3, ivec3};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,8 @@ impl<T: Debug + Default + Clone + Copy + PartialEq> Component for T {}
 
 #[derive(Default, Debug, Clone, PartialEq, Deref, DerefMut, AsMut, AsRef)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[as_ref(forward)]
+#[as_mut(forward)]
 pub struct ComponentVec<T: Component>(Vec<T>);
 
 // MARK: Trait impls
@@ -121,7 +123,7 @@ pub trait PointWise {}
 
 // MARK: Anchor
 /// The anchor of the transformation.
-#[derive(Debug, Clone, Copy, IsVariant)]
+#[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Anchor {
     /// A point anchor, which is an absolute coordinate
@@ -156,7 +158,7 @@ impl Anchor {
 
 // MARK: ScaleTo
 /// A hint for scaling the mobject.
-#[derive(Debug, IsVariant)]
+#[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ScaleHint {
     /// Scale the mobject to a given height, the width will remain unchanged.
