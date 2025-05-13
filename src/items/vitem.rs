@@ -8,10 +8,7 @@ use itertools::Itertools;
 use crate::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::{
-        Extract,
-        vitem::{VItemPrimitive, VItemPrimitiveData},
-    },
+    render::primitives::{Extract, vitem::VItemPrimitive},
     traits::{BoundingBox, PointsFunc, Position},
 };
 
@@ -138,11 +135,11 @@ impl VItem {
     }
 }
 
-// MARK: Extract
+/// See [`VItemPrimitive`].
 impl Extract for VItem {
-    type Primitive = VItemPrimitive;
-    fn extract(&self) -> <Self::Primitive as crate::render::primitives::Primitive>::Data {
-        VItemPrimitiveData {
+    type Target = VItemPrimitive;
+    fn extract(&self) -> Self::Target {
+        VItemPrimitive {
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect(),

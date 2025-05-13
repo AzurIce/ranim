@@ -138,5 +138,8 @@ impl TimelineConstructor for RanimLogoScene {
 }
 
 fn main() {
+    #[cfg(feature = "app")]
+    run_scene_app(RanimLogoScene);
+    #[cfg(not(feature = "app"))]
     render_scene(RanimLogoScene, &AppOptions::default());
 }

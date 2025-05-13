@@ -1,6 +1,10 @@
 use group::Group;
+// use variadics_please::all_tuples;
 
-use crate::animation::{AnimSchedule, AnimationSpan};
+use crate::{
+    animation::{AnimSchedule, AnimationSpan},
+    render::primitives::{Extract, Renderable},
+};
 
 pub mod camera_frame;
 pub mod group;
@@ -52,28 +56,6 @@ impl<T: 'static> Rabject<T> {
     }
 }
 
-// MARK: Entity
-
-// /// A renderable entity in ranim
-// ///
-// /// You can implement your own entity by implementing this trait.
-// ///
-// /// In Ranim, every item `T` is just plain data. After [`RanimTimeline::insert`]ed to [`RanimTimeline`],
-// /// the item will have an id and its corresponding [`crate::timeline::RabjectTimeline`].
-// ///
-// /// The resources (buffer, texture, etc) rendering an item needs are called **RenderInstance**,
-// /// and all of them are managed by ranim outside of timeline in a struct [`RenderInstances`].
-// ///
-// /// The [`RenderInstances`] is basically a store of [`RenderInstance`]s based on [`std::collections::HashMap`].
-// /// - The key is the combination of [`Rabject::id`] and [`RenderInstance`]'s [`std::any::TypeId`]
-// /// - The value is the [`RenderInstance`]
-// ///
-// /// For now, there are two types of [`RenderInstance`]:
-// /// - [`crate::render::primitives::vitem::VItemPrimitive`]: The core primitive to render vectorized items.
-// /// - [`crate::render::primitives::svg_item::SvgItemPrimitive`]
-// ///
-// /// You can check the builtin implementations of [`Entity`] for mor details.
-// ///
 /// Blueprints are the data structures that are used to create an Item
 pub trait Blueprint<T> {
     fn build(self) -> T;
@@ -88,3 +70,55 @@ impl<T: Clone> Updatable for T {
         *self = other.clone();
     }
 }
+
+impl<T: Extract<Target = Target>, Target: Renderable + 'static> VisualItem for T {
+    fn extract_renderable(&self) -> Box<dyn Renderable> {
+        Box::new(Extract::extract(self))
+    }
+}
+
+/// The item which can be extracted into a [`Renderable`]
+///
+/// VisualItem is one kind of [`crate::timeline::RanimItem`].
+/// This is automatically implemented for the types that [`Extract`] to a [`Renderable`].
+pub trait VisualItem {
+    fn extract_renderable(&self) -> Box<dyn Renderable>;
+}
+
+// TODO: This causes some clone
+// The render is also based on the decomposed result?
+// pub trait Item {
+//     type Target;
+//     fn decompose(&self) -> Self::Target;
+// }
+
+// macro_rules! impl_into_group {
+//     ($($T:ident),*) => {
+//         impl<$($T: Into<I>),*,I: BaseItem> From<($($T,)*)> for Group<I> {
+//             fn from(value: ($($T,)*)) -> Self {
+//                 #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
+//                 let ($($T,)*) = value;
+//                 Self(vec![$($T.into()),*])
+//             }
+//         }
+//     };
+// }
+
+// all_tuples!(impl_into_group, 1, 16, T);
+
+// impl<T: Into<E>, E: RenderableItem> RenderableItem for T {
+//     fn prepare_for_id(
+//         &self,
+//         ctx: &crate::context::WgpuContext,
+//         render_instances: &mut crate::render::primitives::RenderInstances,
+//         id: usize,
+//     ) {
+
+//     }
+//     fn renderable_of_id<'a>(
+//         &'a self,
+//         render_instances: &'a crate::render::primitives::RenderInstances,
+//         id: usize,
+//     ) -> Option<&'a dyn crate::render::primitives::Renderable> {
+//     }
+// }
