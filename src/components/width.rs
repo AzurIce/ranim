@@ -6,8 +6,8 @@ use crate::prelude::Interpolatable;
 use super::PointWise;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, bytemuck::Pod, bytemuck::Zeroable, From )]
-#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, bytemuck::Pod, bytemuck::Zeroable, From)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Width(pub f32);
 
 impl PointWise for Width {}

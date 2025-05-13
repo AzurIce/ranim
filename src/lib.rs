@@ -35,7 +35,6 @@ pub mod prelude {
 
     pub use crate::items::Blueprint;
 }
-pub mod theory;
 
 pub mod color;
 mod file_writer;
