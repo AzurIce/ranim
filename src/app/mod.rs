@@ -4,6 +4,7 @@ mod timeline;
 use std::sync::Arc;
 
 use egui_wgpu::ScreenDescriptor;
+use serde::{Deserialize, Serialize};
 use timeline::TimelineState;
 use wgpu::SurfaceError;
 use winit::{
@@ -29,6 +30,7 @@ use crate::{
 };
 
 #[derive(Default, Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
 struct OccupiedScreenSpace {
     top: f32,
     bottom: f32,
@@ -365,7 +367,7 @@ impl WinitApp {
         }
     }
 
-    async fn set_window(&mut self, window: Window) {
+    async fn init_window(&mut self, window: Window) {
         let window = Arc::new(window);
         let initial_width = 1360;
         let initial_height = 768;
@@ -524,7 +526,7 @@ impl ApplicationHandler for WinitApp {
                     .with_title(format!("Ranim {}", self.app_state.meta.name)),
             )
             .unwrap();
-        pollster::block_on(self.set_window(window));
+        pollster::block_on(self.init_window(window));
     }
 
     fn window_event(
