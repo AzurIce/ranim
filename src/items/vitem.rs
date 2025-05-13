@@ -1,6 +1,9 @@
 pub mod arrow;
 pub mod line;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, dvec2, dvec3, vec4};
 use itertools::Itertools;
@@ -36,6 +39,7 @@ use super::Blueprint;
 /// ```
 ///
 ///
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct VItem {
     pub vpoints: VPointComponentVec,
