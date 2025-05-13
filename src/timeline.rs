@@ -1,4 +1,5 @@
 use log::trace;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     animation::{AnimSchedule, AnimationSpan, EvalResult, Evaluator},
@@ -329,6 +330,7 @@ impl RanimTimeline {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
 pub struct RabjectTimelineInfo {
     pub id: usize,
     pub type_name: String,
@@ -400,6 +402,7 @@ impl<T: RenderableTimelineTrait + Any> AnyRenderableTimelineTrait for T {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
 pub struct AnimationInfo {
     pub anim_name: String,
     pub start_sec: f64,

@@ -9,6 +9,7 @@ use crate::{
     utils::rate_functions::linear,
 };
 
+use derive_more::{IntoIterator, IsVariant};
 #[allow(unused)]
 use log::trace;
 use std::{any::Any, fmt::Debug, iter::Once, rc::Rc};

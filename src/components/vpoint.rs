@@ -1,10 +1,12 @@
 use std::cmp::Ordering;
 use std::ops::{Deref, DerefMut};
 
+use derive_more::{Deref, DerefMut};
 use glam::DMat3;
 use glam::DVec3;
 use itertools::Itertools;
 use ranim_macros::Interpolatable;
+use serde::{Deserialize, Serialize};
 
 use crate::traits::Alignable;
 use crate::traits::BoundingBox;
@@ -29,21 +31,9 @@ use super::ComponentVec;
 /// | 0(Anchor) | 1(Handle) | 2(Anchor) | 3(Handle) | 4(Anchor) | 5(Handle) | 6(Anchor) |
 /// |-----------|-----------|-----------|-----------|-----------|-----------|-----------|
 /// | a | b | c | c(subpath0) | d | e | f (subpath1) |
-#[derive(Debug, Clone, PartialEq, Interpolatable)]
+#[derive(Debug, Clone, PartialEq, Interpolatable, Deref, DerefMut)]
+#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
 pub struct VPointComponentVec(pub ComponentVec<DVec3>);
-
-impl Deref for VPointComponentVec {
-    type Target = ComponentVec<DVec3>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for VPointComponentVec {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 impl Alignable for VPointComponentVec {
     fn is_aligned(&self, other: &Self) -> bool {
