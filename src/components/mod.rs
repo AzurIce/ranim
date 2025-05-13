@@ -128,13 +128,15 @@ pub trait PointWise {}
 pub enum Anchor {
     /// A point anchor, which is an absolute coordinate
     Point(DVec3),
-    /// An edge anchor, use -1, 0, 1 to specify the edge on each axis
-    /// Edge anchor for 2d object
-    ///  --(0,1)--
-    /// |         |
-    /// (-1,0)    (1,0)
-    /// |         |
-    ///  --(0,-1)--
+    /// An edge anchor, use -1, 0, 1 to specify the edge on each axis, (0, 0, 0) is the center point.
+    /// ```text
+    ///      +Y
+    ///      |
+    ///      |
+    ///      +----- +X
+    ///    /
+    /// +Z
+    /// ```
     Edge(IVec3),
 }
 
