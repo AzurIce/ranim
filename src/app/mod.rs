@@ -4,6 +4,7 @@ mod timeline;
 use std::sync::Arc;
 
 use egui_wgpu::ScreenDescriptor;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use timeline::TimelineState;
 use wgpu::SurfaceError;
