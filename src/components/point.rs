@@ -1,12 +1,11 @@
 use derive_more::{AsMut, AsRef, Deref, DerefMut, From};
 use glam::DVec3;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 
 use crate::prelude::Interpolatable;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Deref, DerefMut, From, AsRef, AsMut)]
-#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Point(DVec3);
 
 impl Interpolatable for Point {

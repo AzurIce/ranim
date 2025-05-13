@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::ops::{Deref, DerefMut};
 
 use derive_more::{Deref, DerefMut};
 use glam::DMat3;
@@ -32,7 +31,7 @@ use super::ComponentVec;
 /// |-----------|-----------|-----------|-----------|-----------|-----------|-----------|
 /// | a | b | c | c(subpath0) | d | e | f (subpath1) |
 #[derive(Debug, Clone, PartialEq, Interpolatable, Deref, DerefMut)]
-#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct VPointComponentVec(pub ComponentVec<DVec3>);
 
 impl Alignable for VPointComponentVec {

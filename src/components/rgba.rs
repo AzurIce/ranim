@@ -11,7 +11,7 @@ use super::{ComponentVec, PointWise};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rgba(pub Vec4);
 
 impl PointWise for Rgba {}

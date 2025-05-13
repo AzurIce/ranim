@@ -30,7 +30,7 @@ use crate::{
 };
 
 #[derive(Default, Debug, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct OccupiedScreenSpace {
     top: f32,
     bottom: f32,
@@ -92,7 +92,7 @@ impl RenderState {
             ..Default::default()
         });
         let app_pipeline = AppPipeline::new(
-            &ctx,
+            ctx,
             render_view,
             &sampler,
             swapchain_capabilities.formats[0].into(),
@@ -298,6 +298,7 @@ impl AppState {
         }
     }
 
+    #[allow(clippy::field_reassign_with_default)]
     pub fn ui(&mut self, state: &mut RenderState) -> OccupiedScreenSpace {
         let scale_factor = state.scale_factor;
         let mut occupied_screen_space = OccupiedScreenSpace::default();

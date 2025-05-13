@@ -8,7 +8,7 @@ use crate::{color::palettes::manim, timeline::RabjectTimelineInfo};
 
 use super::TimelineInfo;
 
-#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(super) struct TimelineState {
     pub(super) total_sec: f64,
     pub(super) current_sec: f64,
@@ -17,6 +17,7 @@ pub(super) struct TimelineState {
     pub(super) timeline_infos: Vec<RabjectTimelineInfo>,
 }
 
+#[allow(unused)]
 impl TimelineState {
     pub fn new(total_sec: f64, timeline_infos: Vec<RabjectTimelineInfo>) -> Self {
         Self {
@@ -124,7 +125,7 @@ impl TimelineState {
                     Shape::Vec(paint_timeline(
                         &info,
                         used_rect,
-                        &self,
+                        self,
                         (self.current_sec * 1000.0) as i64,
                     )),
                 );
@@ -257,7 +258,7 @@ pub fn paint_time_grid(
     // The minimum grid spacing, 1 ms
     let mut grid_spacing_ms = 1;
     // Increase the grid spacing until it's less than the maximum number of lines
-    while width_ms / grid_spacing_ms > max_lines as i64 {
+    while width_ms / grid_spacing_ms > max_lines {
         grid_spacing_ms *= 10;
     }
 
@@ -456,9 +457,9 @@ fn grid_text(grid_ms: i64) -> String {
     let sec = grid_ms as f64 / 1000.0;
     if grid_ms % 1_000 == 0 {
         format!("{sec:.0} s")
-    } else if grid_ms % 1000 == 0 {
+    } else if grid_ms % 100 == 0 {
         format!("{sec:.1} s")
-    } else if grid_ms % 10_000 == 0 {
+    } else if grid_ms % 10 == 0 {
         format!("{sec:.2} s")
     } else {
         format!("{sec:.3} s")

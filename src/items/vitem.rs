@@ -37,7 +37,7 @@ use super::Blueprint;
 /// ```
 ///
 ///
-#[cfg_attr(feature = "serde", derive(Serialize,Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct VItem {
     pub vpoints: VPointComponentVec,
