@@ -5,7 +5,7 @@ use color::LinearSrgb;
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Rgba};
 use pipelines::{Map3dTo2dPipeline, VItemPipeline};
-use primitives::Renderable;
+use primitives::RenderCommand;
 
 use crate::{
     color::rgba8,
@@ -262,7 +262,7 @@ impl Renderer {
         self.output_texture_updated = false;
     }
 
-    pub fn render(&mut self, ctx: &mut RanimContext, renderable: &impl Renderable) {
+    pub fn render(&mut self, ctx: &mut RanimContext, renderable: &impl RenderCommand) {
         self.clear_screen(&ctx.wgpu_ctx);
         let mut encoder = ctx
             .wgpu_ctx

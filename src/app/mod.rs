@@ -244,7 +244,7 @@ impl AppState {
             // EvalResult<CameraFrame>, idx
             camera_frame,
             // Vec<(rabject_id, EvalResult<Item>, idx)>
-            items,
+            visual_items,
         } = {
             #[cfg(feature = "profiling")]
             profiling::scope!("eval");
@@ -252,33 +252,33 @@ impl AppState {
             self.timeline.eval_sec(self.timeline_state.current_sec)
         };
 
+        let extracted = {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("extract");
+            visual_items
+                .iter()
+                .map(|(id, res, _)| {
+                    let renderable = match res {
+                        EvalResult::Dynamic(res) => res.extract_renderable(),
+                        EvalResult::Static(res) => res.extract_renderable(),
+                    };
+                    (*id, renderable)
+                })
+                .collect::<Vec<_>>()
+        };
+
         {
             #[cfg(feature = "profiling")]
             profiling::scope!("prepare");
-            items.iter().for_each(|(id, res, _idx)| {
-                // let last_idx = last_idx.entry(*id).or_insert(-1);
-                // let prev_last_idx = *last_idx;
-                // *last_idx = *idx as i32;
-                match res {
-                    EvalResult::Dynamic(res) => {
-                        res.prepare_for_id(&ctx.wgpu_ctx, &mut self.render_instances, *id)
-                    }
-                    EvalResult::Static(res) => {
-                        // if prev_last_idx != *idx as i32 {
-                        res.prepare_for_id(&ctx.wgpu_ctx, &mut self.render_instances, *id)
-                        // }
-                    }
-                }
+            extracted.iter().for_each(|(id, renderable)| {
+                renderable.prepare_for_id(&ctx.wgpu_ctx, &mut self.render_instances, *id);
             });
             ctx.wgpu_ctx.queue.submit([]);
         }
 
-        let render_primitives = items
+        let render_primitives = visual_items
             .iter()
-            .filter_map(|(id, res, _)| match res {
-                EvalResult::Dynamic(res) => res.renderable_of_id(&self.render_instances, *id),
-                EvalResult::Static(res) => res.renderable_of_id(&self.render_instances, *id),
-            })
+            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
             .collect::<Vec<_>>();
         let camera_frame = match &camera_frame.0 {
             EvalResult::Dynamic(res) => res,

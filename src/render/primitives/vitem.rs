@@ -15,9 +15,22 @@ use crate::{
 };
 use glam::Vec4;
 
-use super::{Primitive, Renderable};
+use super::{Primitive, RenderCommand, RenderResource};
 
+/// A primitive for rendering a vitem.
 pub struct VItemPrimitive {
+    pub(crate) points2d: Vec<Vec4>,
+    pub(crate) fill_rgbas: Vec<Rgba>,
+    pub(crate) stroke_rgbas: Vec<Rgba>,
+    pub(crate) stroke_widths: Vec<Width>,
+}
+
+impl Primitive for VItemPrimitive {
+    type RenderInstance = VItemRenderInstance;
+}
+
+/// [`VItemPrimitive`]'s render instance.
+pub struct VItemRenderInstance {
     /// COMPUTE INPUT: (x, y, z, is_closed)
     pub(crate) points3d_buffer: WgpuVecBuffer<Vec4>,
     /// COMPUTE OUTPUT, RENDER INPUT: (x, y, is_closed, 0)
@@ -41,15 +54,8 @@ pub struct VItemPrimitive {
     pub(crate) render_bind_group: Option<RenderBindGroup>,
 }
 
-pub struct VItemPrimitiveData {
-    pub(crate) points2d: Vec<Vec4>,
-    pub(crate) fill_rgbas: Vec<Rgba>,
-    pub(crate) stroke_rgbas: Vec<Rgba>,
-    pub(crate) stroke_widths: Vec<Width>,
-}
-
-impl Primitive for VItemPrimitive {
-    type Data = VItemPrimitiveData;
+impl RenderResource for VItemRenderInstance {
+    type Data = VItemPrimitive;
 
     fn init(ctx: &WgpuContext, data: &Self::Data) -> Self {
         let points3d_buffer = WgpuVecBuffer::new_init(
@@ -181,115 +187,7 @@ impl Primitive for VItemPrimitive {
     }
 }
 
-impl Default for VItemPrimitive {
-    fn default() -> Self {
-        let points3d_buffer = WgpuVecBuffer::new(
-            Some("Points 3d Buffer"),
-            wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
-        );
-        let points2d_buffer = WgpuVecBuffer::new(
-            Some("Points 2d Buffer"),
-            wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
-        );
-        let clip_info_buffer = WgpuVecBuffer::new(
-            Some("Clip Info Buffer"),
-            wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
-        );
-        let fill_rgbas = WgpuVecBuffer::new(
-            Some("Fill Rgbas Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        );
-        let stroke_rgbas = WgpuVecBuffer::new(
-            Some("Stroke Rgbas Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        );
-        let stroke_widths = WgpuVecBuffer::new(
-            Some("Stroke Widths Buffer"),
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        );
-
-        Self {
-            points3d_buffer,
-            points2d_buffer,
-            clip_info_buffer,
-            point_cnt_buffer: None,
-            fill_rgbas,
-            stroke_rgbas,
-            stroke_widths,
-
-            compute_bind_group: None,
-            render_bind_group: None,
-        }
-    }
-}
-
-// impl VItemPrimitive {
-//     pub fn update(
-//         &mut self,
-//         ctx: &WgpuContext,
-//         render_points: &[Vec4],
-//         fill_rgbas: &[Rgba],
-//         stroke_rgbas: &[Rgba],
-//         stroke_widths: &[Width],
-//     ) {
-//         // println!("update vitem primitive");
-//         // println!("render_points: {:?}", render_points);
-//         if self.point_cnt_buffer.is_none() {
-//             self.point_cnt_buffer = Some(WgpuBuffer::new_init(
-//                 ctx,
-//                 Some("Point Cnt Buffer"),
-//                 wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-//                 render_points.len() as u32,
-//             ));
-//         } else {
-//             self.point_cnt_buffer
-//                 .as_mut()
-//                 .unwrap()
-//                 .set(ctx, render_points.len() as u32);
-//         }
-//         // Dynamic sized
-//         if [
-//             self.points3d_buffer.set(ctx, render_points),
-//             self.fill_rgbas.set(ctx, fill_rgbas),
-//             self.stroke_rgbas.set(ctx, stroke_rgbas),
-//             self.stroke_widths.set(ctx, stroke_widths),
-//             self.points2d_buffer.resize(ctx, render_points.len()),
-//             self.clip_info_buffer
-//                 .set(ctx, &[i32::MAX, i32::MIN, i32::MAX, i32::MIN, 0]),
-//             // This two should be all none or all some
-//             self.compute_bind_group.is_none(),
-//             // self.render_bind_group.is_none(),
-//         ]
-//         .iter()
-//         .any(|x| *x)
-//         {
-//             self.compute_bind_group = Some(ComputeBindGroup::new(
-//                 ctx,
-//                 self.points3d_buffer.buffer.as_ref().unwrap(),
-//                 self.stroke_widths.buffer.as_ref().unwrap(),
-//                 self.points2d_buffer.buffer.as_ref().unwrap(),
-//                 self.clip_info_buffer.buffer.as_ref().unwrap(),
-//                 self.point_cnt_buffer.as_ref().unwrap().as_ref(),
-//             ));
-//             self.render_bind_group = Some(RenderBindGroup::new(
-//                 ctx,
-//                 self.points2d_buffer.buffer.as_ref().unwrap(),
-//                 self.fill_rgbas.buffer.as_ref().unwrap(),
-//                 self.stroke_rgbas.buffer.as_ref().unwrap(),
-//                 self.stroke_widths.buffer.as_ref().unwrap(),
-//                 self.clip_info_buffer.buffer.as_ref().unwrap(),
-//             ));
-//         }
-//     }
-// }
-
-impl Renderable for VItemPrimitive {
+impl RenderCommand for VItemRenderInstance {
     fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
         cpass.dispatch_workgroups(self.points3d_buffer.len().div_ceil(256) as u32, 1, 1);
@@ -373,12 +271,12 @@ mod test {
         items::{Blueprint, camera_frame::CameraFrame, vitem::Square},
         render::{
             CameraUniforms, CameraUniformsBindGroup, RenderTextures,
-            primitives::{Extract, Primitive, Renderable},
+            primitives::{Extract, RenderCommand, RenderResource},
         },
         utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
     };
 
-    use super::VItemPrimitive;
+    use super::VItemRenderInstance;
 
     #[test]
     fn test() {
@@ -392,8 +290,9 @@ mod test {
         .unwrap();
         let vitem = Square(8.0).build();
 
+        let renderable = vitem.extract();
         let mut pipelines = PipelinesStorage::default();
-        let vitem_primitive = VItemPrimitive::init(&ctx, &vitem.extract());
+        let vitem_primitive = VItemRenderInstance::init(&ctx, &renderable);
 
         let (width, height) = (1920, 1080);
         let frame_size = dvec2(8.0 * width as f64 / height as f64, 8.0);

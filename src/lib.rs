@@ -273,51 +273,50 @@ impl RanimRenderApp {
                     // EvalResult<CameraFrame>, idx
                     camera_frame,
                     // Vec<(rabject_id, EvalResult<Item>, idx)>
-                    items,
+                    visual_items,
                 } = {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("eval");
 
-                    timeline.eval_alpha_new(alpha)
+                    timeline.eval_alpha(alpha)
+                };
+
+                let extracted_updates = {
+                    #[cfg(feature = "profiling")]
+                    profiling::scope!("extract");
+                    visual_items
+                        .iter()
+                        .filter_map(|(id, res, idx)| {
+                            let last_idx = last_idx.entry(*id).or_insert(-1);
+                            let prev_last_idx = *last_idx;
+                            *last_idx = *idx as i32;
+                            let renderable = match res {
+                                EvalResult::Dynamic(res) => Some(res.extract_renderable()),
+                                EvalResult::Static(res) => {
+                                    if prev_last_idx != *idx as i32 {
+                                        Some(res.extract_renderable())
+                                    } else {
+                                        None
+                                    }
+                                }
+                            };
+                            renderable.map(|renderable| (*id, renderable))
+                        })
+                        .collect::<Vec<_>>()
                 };
 
                 {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("prepare");
-                    items.iter().for_each(|(id, res, idx)| {
-                        let last_idx = last_idx.entry(*id).or_insert(-1);
-                        let prev_last_idx = *last_idx;
-                        *last_idx = *idx as i32;
-                        match res {
-                            EvalResult::Dynamic(res) => res.prepare_for_id(
-                                &self.ctx.wgpu_ctx,
-                                &mut self.render_instances,
-                                *id,
-                            ),
-                            EvalResult::Static(res) => {
-                                if prev_last_idx != *idx as i32 {
-                                    res.prepare_for_id(
-                                        &self.ctx.wgpu_ctx,
-                                        &mut self.render_instances,
-                                        *id,
-                                    )
-                                }
-                            }
-                        }
+                    extracted_updates.iter().for_each(|(id, res)| {
+                        res.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id);
                     });
                     self.ctx.wgpu_ctx.queue.submit([]);
                 }
 
-                let render_primitives = items
+                let render_primitives = visual_items
                     .iter()
-                    .filter_map(|(id, res, _)| match res {
-                        EvalResult::Dynamic(res) => {
-                            res.renderable_of_id(&self.render_instances, *id)
-                        }
-                        EvalResult::Static(res) => {
-                            res.renderable_of_id(&self.render_instances, *id)
-                        }
-                    })
+                    .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
                     .collect::<Vec<_>>();
                 let camera_frame = match &camera_frame.0 {
                     EvalResult::Dynamic(res) => res,
@@ -391,22 +390,26 @@ impl RanimRenderApp {
     ) {
         let TimelineEvalResult {
             camera_frame,
-            items,
+            visual_items,
         } = timeline.eval_sec(sec);
-        items.iter().for_each(|(id, res, _)| match res {
-            EvalResult::Dynamic(res) => {
-                res.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id)
-            }
-            EvalResult::Static(res) => {
-                res.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id)
-            }
-        });
-        let render_primitives = items
+
+        let extracted = visual_items
             .iter()
-            .filter_map(|(id, res, _)| match res {
-                EvalResult::Dynamic(res) => res.renderable_of_id(&self.render_instances, *id),
-                EvalResult::Static(res) => res.renderable_of_id(&self.render_instances, *id),
+            .map(|(id, res, _)| {
+                let renderable = match res {
+                    EvalResult::Dynamic(res) => res.extract_renderable(),
+                    EvalResult::Static(res) => res.extract_renderable(),
+                };
+                (*id, renderable)
             })
+            .collect::<Vec<_>>();
+
+        extracted.iter().for_each(|(id, renderable)| {
+            renderable.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id)
+        });
+        let render_primitives = visual_items
+            .iter()
+            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
             .collect::<Vec<_>>();
         let camera_frame = match &camera_frame.0 {
             EvalResult::Dynamic(res) => res,

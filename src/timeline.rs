@@ -2,8 +2,7 @@ use log::trace;
 
 use crate::{
     animation::{AnimSchedule, AnimationSpan, EvalResult, Evaluator},
-    items::{Rabject, camera_frame::CameraFrame, group::Group},
-    render::primitives::RenderableItem,
+    items::{Rabject, VisualItem, camera_frame::CameraFrame, group::Group},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
@@ -17,7 +16,7 @@ pub enum TimeMark {
 pub struct TimelineEvalResult {
     pub camera_frame: (EvalResult<CameraFrame>, usize),
     /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `animation idx` in the corresponding timeline)
-    pub items: Vec<(usize, EvalResult<Box<dyn RenderableItem>>, usize)>,
+    pub visual_items: Vec<(usize, EvalResult<Box<dyn VisualItem>>, usize)>,
 }
 
 // MARK: TimelineInsert
@@ -67,18 +66,18 @@ where
 /// For now, there are two fixed types of [`RanimItem`], and they will be erased to different types:
 /// - [`CameraFrame`]: A camera frame.
 ///   It will be erased to [`Timeline::CameraFrame`], which has a boxed [`AnyTimelineTrait`] in it.
-/// - [`RenderableItem`]: A renderable item
-///   It will be erased to [`Timeline::RenderableItem`], which has a boxed [`RenderableTimelineTrait`] in it.
+/// - [`VisualItem`]: A renderable item
+///   It will be erased to [`Timeline::VisualItem`], which has a boxed [`VisualItemTimelineTrait`] in it.
 pub trait RanimItem {
     fn insert_into_timeline(self, timeline: &RanimTimeline) -> Rabject<Self>
     where
         Self: Sized;
 }
 
-impl<T: RenderableItem + Clone + 'static> RanimItem for T {
+impl<T: VisualItem + Clone + 'static> RanimItem for T {
     fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
         let timeline = RabjectTimeline::new(self.clone());
-        let timeline = Timeline::RenderableItem(Box::new(timeline));
+        let timeline = Timeline::VisualItem(Box::new(timeline));
         Rabject {
             id: ranim_timeline.insert_timeline(timeline),
             data: self,
@@ -99,32 +98,32 @@ impl RanimItem for CameraFrame {
 
 pub enum Timeline {
     CameraFrame(Box<dyn AnyTimelineTrait>),
-    RenderableItem(Box<dyn AnyRenderableTimelineTrait>),
+    VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
 }
 
 impl Timeline {
     pub fn as_timeline(&self) -> &dyn TimelineTrait {
         match self {
             Timeline::CameraFrame(timeline) => timeline.as_timeline(),
-            Timeline::RenderableItem(timeline) => timeline.as_timeline(),
+            Timeline::VisualItem(timeline) => timeline.as_timeline(),
         }
     }
     pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait {
         match self {
             Timeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
-            Timeline::RenderableItem(timeline) => timeline.as_timeline_mut(),
+            Timeline::VisualItem(timeline) => timeline.as_timeline_mut(),
         }
     }
     pub fn as_any(&self) -> &dyn Any {
         match self {
             Timeline::CameraFrame(timeline) => timeline.as_any(),
-            Timeline::RenderableItem(timeline) => timeline.as_any(),
+            Timeline::VisualItem(timeline) => timeline.as_any(),
         }
     }
     pub fn as_any_mut(&mut self) -> &mut dyn Any {
         match self {
             Timeline::CameraFrame(timeline) => timeline.as_any_mut(),
-            Timeline::RenderableItem(timeline) => timeline.as_any_mut(),
+            Timeline::VisualItem(timeline) => timeline.as_any_mut(),
         }
     }
 }
@@ -280,10 +279,10 @@ impl RanimTimeline {
         self.time_marks.borrow().clone()
     }
     pub fn eval_sec(&self, local_sec: f64) -> TimelineEvalResult {
-        self.eval_alpha_new(local_sec / *self.max_elapsed_secs.borrow())
+        self.eval_alpha(local_sec / *self.max_elapsed_secs.borrow())
     }
 
-    pub fn eval_alpha_new(&self, alpha: f64) -> TimelineEvalResult {
+    pub fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
         let timelines = self.timelines.borrow_mut();
 
         let mut items = Vec::with_capacity(timelines.len());
@@ -300,7 +299,7 @@ impl RanimTimeline {
                         .unwrap();
                     camera_frame = timeline.eval_alpha(alpha)
                 }
-                Timeline::RenderableItem(timeline) => {
+                Timeline::VisualItem(timeline) => {
                     if let Some((res, idx)) = timeline.eval_alpha(alpha) {
                         items.push((id, res, idx));
                     }
@@ -309,7 +308,7 @@ impl RanimTimeline {
 
         TimelineEvalResult {
             camera_frame: camera_frame.unwrap(),
-            items,
+            visual_items: items,
         }
     }
 
@@ -379,13 +378,13 @@ impl<T: TimelineTrait + Any> AnyTimelineTrait for T {
     }
 }
 
-pub trait AnyRenderableTimelineTrait: RenderableTimelineTrait + Any {
+pub trait AnyVisualItemTimelineTrait: VisualItemTimelineTrait + Any {
     fn as_timeline(&self) -> &dyn TimelineTrait;
     fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait;
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
-impl<T: RenderableTimelineTrait + Any> AnyRenderableTimelineTrait for T {
+impl<T: VisualItemTimelineTrait + Any> AnyVisualItemTimelineTrait for T {
     fn as_timeline(&self) -> &dyn TimelineTrait {
         self
     }
@@ -406,14 +405,14 @@ pub struct AnimationInfo {
     pub end_sec: f64,
 }
 
-pub trait RenderableTimelineTrait: TimelineTrait {
-    fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<Box<dyn RenderableItem>>, usize)>;
+pub trait VisualItemTimelineTrait: TimelineTrait {
+    fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)>;
 }
 
-impl<T: Clone + RenderableItem + 'static> RenderableTimelineTrait for RabjectTimeline<T> {
-    fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<Box<dyn RenderableItem>>, usize)> {
+impl<T: Clone + VisualItem + 'static> VisualItemTimelineTrait for RabjectTimeline<T> {
+    fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)> {
         let (item, idx) = self.eval_alpha(alpha)?;
-        let item = item.map(|item| Box::new(item) as Box<dyn RenderableItem>);
+        let item = item.map(|item| Box::new(item) as Box<dyn VisualItem>);
         Some((item, idx))
     }
 }
