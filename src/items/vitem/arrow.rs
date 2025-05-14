@@ -7,7 +7,6 @@ use crate::{
     components::Anchor,
     items::Blueprint,
     render::primitives::{Extract, vitem::VItemPrimitive},
-    traits::Position,
 };
 
 use super::{Polygon, VItem, line::Line};

@@ -19,7 +19,7 @@ clean:
     -rm *.log
 
 fmt:
-    cargo fmt --all --check
+    cargo fmt --all
 
 lint: lint-no-features
     just lint-features app

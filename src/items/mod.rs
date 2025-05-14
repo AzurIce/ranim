@@ -10,7 +10,6 @@ use crate::{
 
 pub mod camera_frame;
 pub mod group;
-pub mod svg_item;
 pub mod vitem;
 
 impl<'r, T> Group<Rabject<T>> {
@@ -60,6 +59,10 @@ impl<T: 'static> Rabject<T> {
 }
 
 /// Blueprints are the data structures that are used to create an Item
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub trait Blueprint<T> {
     fn build(self) -> T;
 }

@@ -1,5 +1,6 @@
-pub mod arrow;
-pub mod line;
+// pub mod arrow;
+pub mod geometry;
+// pub mod line;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -12,10 +13,11 @@ use crate::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::primitives::{Extract, vitem::VItemPrimitive},
-    traits::{BoundingBox, PointsFunc, Position},
+    traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift},
+    utils::svg::vitems_from_tree,
 };
 
-use super::Blueprint;
+use super::{Blueprint, group::Group};
 
 /// A vectorized item.
 ///
@@ -58,12 +60,14 @@ impl BoundingBox for VItem {
     }
 }
 
-impl Position for VItem {
+impl Shift for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
         self
     }
+}
 
+impl Rotate for VItem {
     fn rotate_by_anchor(
         &mut self,
         angle: f64,
@@ -73,7 +77,9 @@ impl Position for VItem {
         self.vpoints.rotate_by_anchor(angle, axis, anchor);
         self
     }
+}
 
+impl Scale for VItem {
     fn scale_by_anchor(&mut self, scale: DVec3, anchor: crate::components::Anchor) -> &mut Self {
         self.vpoints.scale_by_anchor(scale, anchor);
         self
@@ -83,6 +89,10 @@ impl Position for VItem {
 pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
 
 impl VItem {
+    pub fn with(mut self, f: impl Fn(&mut Self)) -> Self {
+        f(&mut self);
+        self
+    }
     pub fn close(&mut self) -> &mut Self {
         if self.vpoints.last() != self.vpoints.first() && !self.vpoints.is_empty() {
             let start = self.vpoints[0];
@@ -240,6 +250,12 @@ impl Fill for VItem {
 }
 
 impl Stroke for VItem {
+    fn stroke_color(&self) -> AlphaColor<Srgb> {
+        self.stroke_rgbas
+            .first()
+            .map(|&rgba| rgba.into())
+            .unwrap_or(css::WHITE)
+    }
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         f(self.stroke_widths.as_mut());
         self
@@ -254,9 +270,26 @@ impl Stroke for VItem {
     }
 }
 
+// MARK: Group
+impl Group<VItem> {
+    pub fn from_svg(svg: impl AsRef<str>) -> Self {
+        let svg = svg.as_ref();
+        let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();
+
+        let mut vitem_group = Self(vitems_from_tree(&tree));
+        vitem_group.put_center_on(DVec3::ZERO);
+        vitem_group.rotate(std::f64::consts::PI, DVec3::X);
+        vitem_group
+    }
+}
+
 // MARK: Blueprints
 
 /// A polygon defined by a list of corner points (Counter Clock wise).
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub struct Polygon(pub Vec<DVec3>);
 
 impl Blueprint<VItem> for Polygon {
@@ -280,6 +313,10 @@ impl Blueprint<VItem> for Polygon {
     }
 }
 
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub struct Rectangle(pub f64, pub f64);
 
 impl Blueprint<VItem> for Rectangle {
@@ -296,6 +333,10 @@ impl Blueprint<VItem> for Rectangle {
     }
 }
 
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub struct Line(pub DVec3, pub DVec3);
 
 impl Blueprint<VItem> for Line {
@@ -304,6 +345,10 @@ impl Blueprint<VItem> for Line {
     }
 }
 
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub struct Square(pub f64);
 
 impl Blueprint<VItem> for Square {
@@ -312,6 +357,10 @@ impl Blueprint<VItem> for Square {
     }
 }
 
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub struct Arc {
     pub angle: f64,
     pub radius: f64,
@@ -345,6 +394,10 @@ impl Blueprint<VItem> for Arc {
     }
 }
 
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub struct ArcBetweenPoints {
     pub start: DVec3,
     pub end: DVec3,
@@ -365,6 +418,10 @@ impl Blueprint<VItem> for ArcBetweenPoints {
 }
 
 /// A circle
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub struct Circle(pub f64);
 
 impl Blueprint<VItem> for Circle {
@@ -377,6 +434,10 @@ impl Blueprint<VItem> for Circle {
     }
 }
 
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub enum Dot {
     Small,
     Normal,
@@ -393,6 +454,10 @@ impl Blueprint<VItem> for Dot {
 }
 
 // width, height
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub struct Ellipse(pub f64, pub f64);
 
 impl Blueprint<VItem> for Ellipse {

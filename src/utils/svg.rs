@@ -1,31 +1,16 @@
 use std::{slice::Iter, vec};
 
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{DAffine2, DVec3, dvec3};
+use glam::{DAffine2, dvec3};
 use log::warn;
 
 use crate::{
     color::{rgb8, rgba},
+    items::vitem::VItem,
     prelude::{Fill, Stroke},
-    traits::{PointsFunc, Position},
+    traits::PointsFunc,
     utils::bezier::PathBuilder,
 };
-
-use super::{group::Group, vitem::VItem};
-
-// MARK: Another aproach
-
-impl Group<VItem> {
-    pub fn from_svg(svg: impl AsRef<str>) -> Self {
-        let svg = svg.as_ref();
-        let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();
-
-        let mut vitem_group = Self(vitems_from_tree(&tree));
-        vitem_group.put_center_on(DVec3::ZERO);
-        vitem_group.rotate(std::f64::consts::PI, DVec3::X);
-        vitem_group
-    }
-}
 
 // MARK: misc
 fn parse_paint(paint: &usvg::Paint) -> AlphaColor<Srgb> {
@@ -76,7 +61,7 @@ fn walk_svg_group(group: &usvg::Group) -> impl Iterator<Item = (&usvg::Path, usv
     }
 }
 
-fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
+pub fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
     let mut vitems = vec![];
     for (path, transform) in walk_svg_group(tree.root()) {
         // let transform = path.abs_transform();
