@@ -9,99 +9,102 @@ pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 
 pub trait GroupTransformAnim<T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut Group<T>)>(&self, f: F) -> Group<AnimationSpan<T>>;
-    fn transform_from<E: Into<T>>(&self, s: Group<E>) -> Group<AnimationSpan<T>>;
-    fn transform_to<E: Into<T>>(&self, d: Group<E>) -> Group<AnimationSpan<T>>;
+    fn transform<F: Fn(&mut Group<T>)>(self, f: F) -> Group<AnimationSpan<T>>;
+    fn transform_from<E: Into<T>>(self, s: Group<E>) -> Group<AnimationSpan<T>>;
+    fn transform_to<E: Into<T>>(self, d: Group<E>) -> Group<AnimationSpan<T>>;
 }
 
 impl<T: TransformRequirement + 'static> GroupTransformAnim<T> for Group<T> {
-    fn transform<F: Fn(&mut Group<T>)>(&self, f: F) -> Group<AnimationSpan<T>> {
+    fn transform<F: Fn(&mut Group<T>)>(self, f: F) -> Group<AnimationSpan<T>> {
         let mut dsts = self.clone();
         (f)(&mut dsts);
-        self.iter()
+        self.into_iter()
             .zip(dsts)
             .map(|(x, dst)| x.transform_to(dst))
             .collect()
     }
-    fn transform_from<E: Into<T>>(&self, s: Group<E>) -> Group<AnimationSpan<T>> {
+    fn transform_from<E: Into<T>>(self, s: Group<E>) -> Group<AnimationSpan<T>> {
         let ss: Group<T> = s.into_iter().map(|x| x.into()).collect();
-        self.iter()
+        self.into_iter()
             .zip(ss)
             .map(|(x, s)| x.transform_from(s))
             .collect()
     }
-    fn transform_to<E: Into<T>>(&self, d: Group<E>) -> Group<AnimationSpan<T>> {
+    fn transform_to<E: Into<T>>(self, d: Group<E>) -> Group<AnimationSpan<T>> {
         let dd: Group<T> = d.into_iter().map(|x| x.into()).collect();
-        self.iter()
+        self.into_iter()
             .zip(dd)
             .map(|(x, d)| x.transform_to(d))
             .collect()
     }
 }
 
-pub trait GroupTransformAnimSchedule<'r, T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut Group<T>)>(&'r mut self, f: F) -> Group<AnimSchedule<'r, T>>;
-    fn transform_from<E: Into<T>>(&'r mut self, s: Group<E>) -> Group<AnimSchedule<'r, T>>;
-    fn transform_to<E: Into<T>>(&'r mut self, d: Group<E>) -> Group<AnimSchedule<'r, T>>;
+pub trait GroupTransformAnimSchedule<T: TransformRequirement + 'static> {
+    fn transform<F: Fn(&mut Group<T>)>(self, f: F) -> Group<AnimSchedule<T>>;
+    fn transform_from<E: Into<T>>(self, s: Group<E>) -> Group<AnimSchedule<T>>;
+    fn transform_to<E: Into<T>>(self, d: Group<E>) -> Group<AnimSchedule<T>>;
 }
 
-impl<'r, T: TransformRequirement + 'static> GroupTransformAnimSchedule<'r, T> for [Rabject<T>] {
-    fn transform<F: Fn(&mut Group<T>)>(&'r mut self, f: F) -> Group<AnimSchedule<'r, T>> {
-        let data = self
-            .iter()
-            .map(|rabject| rabject.data.clone())
-            .collect::<Group<T>>();
-        self.iter_mut()
-            .zip(data.transform(f))
-            .map(|(rabject, anim)| AnimSchedule::new(rabject, anim))
+impl<T: TransformRequirement + 'static> GroupTransformAnimSchedule<T> for Group<Rabject<T>> {
+    fn transform<F: Fn(&mut Group<T>)>(self, f: F) -> Group<AnimSchedule<T>> {
+        let (ids, datas): (Vec<_>, Vec<_>) = self
+            .into_iter()
+            .map(|rabject| (rabject.id, rabject.data))
+            .unzip();
+
+        ids.into_iter()
+            .zip(Group(datas).transform(f))
+            .map(|(id, anim)| AnimSchedule::new(id, anim))
             .collect()
     }
-    fn transform_from<E: Into<T>>(&'r mut self, s: Group<E>) -> Group<AnimSchedule<'r, T>> {
-        let data = self
-            .iter()
-            .map(|rabject| rabject.data.clone())
-            .collect::<Group<T>>();
-        self.iter_mut()
-            .zip(data.transform_from(s))
-            .map(|(rabject, anim)| AnimSchedule::new(rabject, anim))
+    fn transform_from<E: Into<T>>(self, src: Group<E>) -> Group<AnimSchedule<T>> {
+        let (ids, datas): (Vec<_>, Vec<_>) = self
+            .into_iter()
+            .map(|rabject| (rabject.id, rabject.data))
+            .unzip();
+
+        ids.into_iter()
+            .zip(Group(datas).transform_from(src))
+            .map(|(id, anim)| AnimSchedule::new(id, anim))
             .collect()
     }
-    fn transform_to<E: Into<T>>(&'r mut self, d: Group<E>) -> Group<AnimSchedule<'r, T>> {
-        let data = self
-            .iter()
-            .map(|rabject| rabject.data.clone())
-            .collect::<Group<T>>();
-        self.iter_mut()
-            .zip(data.transform_to(d))
-            .map(|(rabject, anim)| AnimSchedule::new(rabject, anim))
+    fn transform_to<E: Into<T>>(self, dst: Group<E>) -> Group<AnimSchedule<T>> {
+        let (ids, datas): (Vec<_>, Vec<_>) = self
+            .into_iter()
+            .map(|rabject| (rabject.id, rabject.data))
+            .unzip();
+
+        ids.into_iter()
+            .zip(Group(datas).transform_to(dst))
+            .map(|(id, anim)| AnimSchedule::new(id, anim))
             .collect()
     }
 }
 
 pub trait TransformAnim<T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut T)>(&self, f: F) -> AnimationSpan<T>;
-    fn transform_from(&self, s: impl Into<T>) -> AnimationSpan<T>;
-    fn transform_to(&self, d: impl Into<T>) -> AnimationSpan<T>;
+    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationSpan<T>;
+    fn transform_from(self, src: impl Into<T>) -> AnimationSpan<T>;
+    fn transform_to(self, dst: impl Into<T>) -> AnimationSpan<T>;
 }
 
 pub trait TransformAnimSchedule<T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut T)>(&mut self, f: F) -> AnimSchedule<T>;
-    fn transform_from(&mut self, s: impl Into<T>) -> AnimSchedule<T>;
-    fn transform_to(&mut self, d: impl Into<T>) -> AnimSchedule<T>;
+    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimSchedule<T>;
+    fn transform_from(self, s: impl Into<T>) -> AnimSchedule<T>;
+    fn transform_to(self, d: impl Into<T>) -> AnimSchedule<T>;
 }
 
 impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
-    fn transform<F: Fn(&mut T)>(&self, f: F) -> AnimationSpan<T> {
+    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationSpan<T> {
         let mut dst = self.clone();
         (f)(&mut dst);
         AnimationSpan::from_evaluator(Transform::new(self.clone(), dst).to_evaluator())
             .with_rate_func(smooth)
     }
-    fn transform_from(&self, s: impl Into<T>) -> AnimationSpan<T> {
+    fn transform_from(self, s: impl Into<T>) -> AnimationSpan<T> {
         AnimationSpan::from_evaluator(Transform::new(s.into(), self.clone()).to_evaluator())
             .with_rate_func(smooth)
     }
-    fn transform_to(&self, d: impl Into<T>) -> AnimationSpan<T> {
+    fn transform_to(self, d: impl Into<T>) -> AnimationSpan<T> {
         AnimationSpan::from_evaluator(Transform::new(self.clone(), d.into()).to_evaluator())
             .with_rate_func(smooth)
     }
@@ -109,18 +112,18 @@ impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
 
 impl<T: TransformRequirement + 'static> TransformAnimSchedule<T> for Rabject<T> {
     /// Play an animation interpolates from the given src to current rabject
-    fn transform_from(&mut self, src: impl Into<T>) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.transform_from(src))
+    fn transform_from(self, src: impl Into<T>) -> AnimSchedule<T> {
+        AnimSchedule::new(self.id, TransformAnim::transform_from(self.data, src))
     }
 
     /// Play an animation interpolates current rabject with a given transform func
-    fn transform<F: Fn(&mut T)>(&mut self, f: F) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.transform(f))
+    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimSchedule<T> {
+        AnimSchedule::new(self.id, TransformAnim::transform(self.data, f))
     }
 
     /// Play an animation interpolates from the given src to current rabject
-    fn transform_to(&mut self, dst: impl Into<T>) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.transform_to(dst))
+    fn transform_to(self, dst: impl Into<T>) -> AnimSchedule<T> {
+        AnimSchedule::new(self.id, TransformAnim::transform_to(self.data, dst))
     }
 }
 

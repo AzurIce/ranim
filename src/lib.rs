@@ -117,8 +117,9 @@ pub trait TimelineConstructor {
 pub fn build_timeline(constructor: impl TimelineConstructor) -> RanimTimeline {
     let timeline = RanimTimeline::new();
     {
-        let mut camera = timeline.insert(items::camera_frame::CameraFrame::new());
-        constructor.construct(&timeline, &mut camera);
+        let mut camera_frame = Rabject::new(items::camera_frame::CameraFrame::new());
+        timeline.insert(&camera_frame);
+        constructor.construct(&timeline, &mut camera_frame);
         timeline.sync();
     }
     timeline
