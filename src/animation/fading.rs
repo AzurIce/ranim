@@ -9,33 +9,33 @@ impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 
 // MARK: Anim Trait
 pub trait FadingAnim<T: FadingRequirement + 'static> {
-    fn fade_in(&self) -> AnimationSpan<T>;
-    fn fade_out(&self) -> AnimationSpan<T>;
+    fn fade_in(self) -> AnimationSpan<T>;
+    fn fade_out(self) -> AnimationSpan<T>;
 }
 
 pub trait FadingAnimSchedule<T: FadingRequirement + 'static> {
-    fn fade_in(&mut self) -> AnimSchedule<T>;
-    fn fade_out(&mut self) -> AnimSchedule<T>;
+    fn fade_in(self) -> AnimSchedule<T>;
+    fn fade_out(self) -> AnimSchedule<T>;
 }
 
 impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
-    fn fade_in(&self) -> AnimationSpan<T> {
+    fn fade_in(self) -> AnimationSpan<T> {
         AnimationSpan::from_evaluator(FadeIn::new(self.clone()).to_evaluator())
             .with_rate_func(smooth)
     }
-    fn fade_out(&self) -> AnimationSpan<T> {
+    fn fade_out(self) -> AnimationSpan<T> {
         AnimationSpan::from_evaluator(FadeOut::new(self.clone()).to_evaluator())
             .with_rate_func(smooth)
     }
 }
 
 impl<T: FadingRequirement + 'static> FadingAnimSchedule<T> for Rabject<T> {
-    fn fade_in(&mut self) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.fade_in())
+    fn fade_in(self) -> AnimSchedule<T> {
+        AnimSchedule::new(self.id, FadingAnim::fade_in(self.data))
     }
 
-    fn fade_out(&mut self) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.fade_out())
+    fn fade_out(self) -> AnimSchedule<T> {
+        AnimSchedule::new(self.id, FadingAnim::fade_out(self.data))
     }
 }
 

@@ -21,6 +21,10 @@ pub struct TimelineEvalResult {
     pub visual_items: Vec<(usize, EvalResult<Box<dyn VisualItem>>, usize)>,
 }
 
+// MARK: TimelineItem
+pub struct ItemMark;
+pub struct GroupMark;
+
 // MARK: TimelineInsert
 /// For type `T` that implements [`RanimItem`],
 ///
@@ -29,78 +33,77 @@ pub struct TimelineEvalResult {
 /// - [`ItemMark`]: Insert a `T`, returns [`Rabject<T>`]
 /// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group<Rabject<T>>`]
 pub trait TimelineItem<Mark> {
-    type Inserted;
-    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Self::Inserted;
+    fn insert_into_timeline(self, timeline: &RanimTimeline);
 }
 
-// MARK: TimelineItem
-pub struct ItemMark;
-pub struct GroupMark;
-
-impl<T> TimelineItem<ItemMark> for T
+impl<T> TimelineItem<ItemMark> for &Rabject<T>
 where
-    T: RanimItem + 'static,
+    T: Into<Timeline> + Clone,
 {
-    type Inserted = Rabject<T>;
-    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Self::Inserted {
-        RanimItem::insert_into_timeline(self, timeline)
+    fn insert_into_timeline(self, timeline: &RanimTimeline) {
+        timeline._insert_timeline(self.id, self.data.clone().into());
     }
 }
 
-impl<E, T> TimelineItem<GroupMark> for T
+impl<'a, E, T> TimelineItem<GroupMark> for &'a T
 where
-    E: RanimItem + 'static,
-    T: IntoIterator<Item = E>,
+    E: Into<Timeline> + Clone + 'a,
+    &'a T: IntoIterator<Item = &'a Rabject<E>>,
 {
-    type Inserted = Group<Rabject<E>>;
-    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Self::Inserted {
+    fn insert_into_timeline(self, timeline: &RanimTimeline) {
         self.into_iter()
-            .map(|item| RanimItem::insert_into_timeline(item, timeline))
+            .map(|rabject| rabject.insert_into_timeline(timeline))
             .collect()
     }
 }
 
-/// An item that can be inserted into ranim's timeline
-///
-/// The item `T` will be inserted into a [`RabjectTimeline<T>`],
-/// and the [`RabjectTimeline<T>`] will be inserted into a [`RanimTimeline`] with type erased.
-///
-/// For now, there are two fixed types of [`RanimItem`], and they will be erased to different types:
-/// - [`CameraFrame`]: A camera frame.
-///   It will be erased to [`Timeline::CameraFrame`], which has a boxed [`AnyTimelineTrait`] in it.
-/// - [`VisualItem`]: A renderable item
-///   It will be erased to [`Timeline::VisualItem`], which has a boxed [`VisualItemTimelineTrait`] in it.
-pub trait RanimItem {
-    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Rabject<Self>
-    where
-        Self: Sized;
+pub trait TimelineAnim<Mark> {
+    type Output;
+    fn play(self, timeline: &RanimTimeline) -> Self::Output;
 }
 
-impl<T: VisualItem + Clone + 'static> RanimItem for T {
-    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
-        let timeline = RabjectTimeline::new(self.clone());
-        let timeline = Timeline::VisualItem(Box::new(timeline));
-        Rabject {
-            id: ranim_timeline.insert_timeline(timeline),
-            data: self,
-        }
+impl<T: Into<Timeline> + Clone + 'static> TimelineAnim<ItemMark> for AnimSchedule<T> {
+    type Output = T;
+    fn play(self, timeline: &RanimTimeline) -> Self::Output {
+        let res = self.anim.eval_alpha(1.0).into_owned();
+        timeline._play(self.id, self.anim);
+        res
     }
 }
 
-impl RanimItem for CameraFrame {
-    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
-        let timeline = RabjectTimeline::new(self.clone());
-        let timeline = Timeline::CameraFrame(Box::new(timeline));
-        Rabject {
-            id: ranim_timeline.insert_timeline(timeline),
-            data: self,
-        }
+impl<T: TimelineAnim<ItemMark>, I> TimelineAnim<GroupMark> for I
+where
+    I: IntoIterator<Item = T>,
+{
+    type Output = Group<T::Output>;
+    fn play(self, timeline: &RanimTimeline) -> Self::Output {
+        self.into_iter()
+            .map(|item| item.play(timeline))
+            .collect()
     }
 }
-
+/// Timeline is a type erased [`RabjectTimeline<T>`]
+///
+/// Currently There are two types of Timeline:
+/// - [`Timeline::VisualItem`]: Can be created from [`VisualItem`], has a boxed [`AnyVisualItemTimelineTrait`] in it.
+/// - [`Timeline::CameraFrame`]: Can be created from [`CameraFrame`], has a boxed [`AnyTimelineTrait`] in it.
 pub enum Timeline {
     CameraFrame(Box<dyn AnyTimelineTrait>),
     VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
+}
+
+impl From<CameraFrame> for Timeline {
+    fn from(value: CameraFrame) -> Self {
+        let timeline = RabjectTimeline::new(value);
+        Timeline::CameraFrame(Box::new(timeline))
+    }
+}
+
+impl<T: VisualItem + Clone + 'static> From<T> for Timeline {
+    fn from(value: T) -> Self {
+        let timeline = RabjectTimeline::new(value);
+        Timeline::VisualItem(Box::new(timeline))
+    }
 }
 
 impl Timeline {
@@ -136,7 +139,7 @@ impl Timeline {
 #[derive(Default)]
 pub struct RanimTimeline {
     // Timeline<CameraFrame> or Timeline<Item>
-    timelines: RefCell<Vec<Timeline>>,
+    timelines: RefCell<Vec<(usize, Timeline)>>,
     max_elapsed_secs: RefCell<f64>,
     time_marks: RefCell<Vec<(f64, TimeMark)>>,
 }
@@ -150,54 +153,22 @@ impl RanimTimeline {
         *self.max_elapsed_secs.borrow()
     }
 
-    /// Push an animation into the timeline
-    ///
-    /// Note that this won't apply the animation effect to rabject's data,
-    /// to apply the animation effect use [`AnimSchedule::apply`]
-    pub fn play<'r, T, I>(&self, anim_schedules: I) -> &Self
-    where
-        T: RanimItem + Clone + 'static,
-        I: IntoIterator<Item = AnimSchedule<'r, T>>,
-    {
-        anim_schedules
-            .into_iter()
-            .for_each(|AnimSchedule { rabject, anim }| {
-                self._play(rabject, anim);
-            });
-        self
+    pub fn insert<Mark, T: TimelineItem<Mark>>(&self, item: T) {
+        item.insert_into_timeline(self);
     }
 
-    pub fn play_and_hide<'r, T, I>(&self, anim_schedules: I) -> &Self
-    where
-        T: RanimItem + Clone + 'static,
-        I: IntoIterator<Item = AnimSchedule<'r, T>>,
-    {
-        anim_schedules
-            .into_iter()
-            .for_each(|AnimSchedule { rabject, anim }| {
-                self._play(rabject, anim);
-                self.hide(rabject);
-            });
-        self
-    }
+    // pub fn insert_and<Mark, T: TimelineItem<Mark>, F>(&self, item: T, f: F)
+    // where
+    //     F: FnOnce(&Self, &mut T::Inserted),
+    // {
+    //     let mut inserted = item.insert_into_timeline(self);
+    //     f(self, &mut inserted);
+    //     inserted
+    // }
 
-    pub fn insert<Mark, T: TimelineItem<Mark>>(&self, item: T) -> T::Inserted {
-        item.insert_into_timeline(self)
-    }
-
-    pub fn insert_and<Mark, T: TimelineItem<Mark>, F>(&self, item: T, f: F) -> T::Inserted
-    where
-        F: FnOnce(&Self, &mut T::Inserted),
-    {
-        let mut inserted = item.insert_into_timeline(self);
-        f(self, &mut inserted);
-        inserted
-    }
-
-    fn insert_timeline(&self, mut timeline: Timeline) -> usize {
+    fn _insert_timeline(&self, id: usize, mut timeline: Timeline) {
         let mut timelines = self.timelines.borrow_mut();
 
-        let id = timelines.len();
         let max_elapsed_secs = *self.max_elapsed_secs.borrow();
         {
             let timeline = timeline.as_timeline_mut();
@@ -205,26 +176,33 @@ impl RanimTimeline {
                 timeline.append_blank(*self.max_elapsed_secs.borrow());
             }
         }
-        timelines.push(timeline);
-        id
+        timelines.push((id, timeline));
     }
 
     /// Update the static state of a rabject's timeline
-    pub fn update<T: RanimItem + Clone + 'static>(&self, rabject: &Rabject<T>) {
+    pub fn update<T: Into<Timeline> + Clone + 'static>(&self, rabject: &Rabject<T>) {
+        self._update(rabject.id, rabject.data.clone());
+    }
+    pub fn _update<T: Into<Timeline> + Clone + 'static>(&self, id: usize, data: T) {
         let mut timelines = self.timelines.borrow_mut();
         let timeline = timelines
-            .get_mut(rabject.id)
+            .iter_mut()
+            .find(|(_id, _)| *_id == id)
             .unwrap()
+            .1
             .as_any_mut()
             .downcast_mut::<RabjectTimeline<T>>()
             .unwrap();
-        timeline.update_static_state(Some(Rc::new(rabject.data.clone())));
+        timeline.update_static_state(Some(Rc::new(data)));
     }
     /// Forward all rabjects' timeline by the given seconds
     pub fn forward(&self, secs: f64) -> &Self {
-        self.timelines.borrow_mut().iter_mut().for_each(|timeline| {
-            timeline.as_timeline_mut().forward(secs);
-        });
+        self.timelines
+            .borrow_mut()
+            .iter_mut()
+            .for_each(|(_, timeline)| {
+                timeline.as_timeline_mut().forward(secs);
+            });
         *self.max_elapsed_secs.borrow_mut() += secs;
         self
     }
@@ -233,23 +211,17 @@ impl RanimTimeline {
     ///
     /// [`RanimTimeline::forward`] after this will encode timeline's static rabject state into the timeline
     pub fn show<T>(&self, rabject: &Rabject<T>) {
+        self._show(rabject.id);
+    }
+    fn _show(&self, id: usize) {
         self.timelines
             .borrow_mut()
-            .get_mut(rabject.id)
+            .iter_mut()
+            .find(|(_id, _)| *_id == id)
             .unwrap()
+            .1
             .as_timeline_mut()
             .show();
-    }
-    /// Hide a rabject
-    ///
-    /// [`RanimTimeline::forward`] after this will encode blank into the timeline
-    pub fn hide<T>(&self, rabject: &Rabject<T>) {
-        self.timelines
-            .borrow_mut()
-            .get_mut(rabject.id)
-            .unwrap()
-            .as_timeline_mut()
-            .hide();
     }
 
     // TODO: make this better
@@ -257,10 +229,21 @@ impl RanimTimeline {
     ///
     /// [`RanimTimeline::forward`] after this will encode blank into the timeline
     pub fn remove<T>(&self, rabject: Rabject<T>) {
+        self._hide(rabject.id);
+    }
+    /// Hide a rabject
+    ///
+    /// [`RanimTimeline::forward`] after this will encode blank into the timeline
+    pub fn hide<T>(&self, rabject: &Rabject<T>) {
+        self._hide(rabject.id);
+    }
+    fn _hide(&self, id: usize) {
         self.timelines
             .borrow_mut()
-            .get_mut(rabject.id)
+            .iter_mut()
+            .find(|(_id, _)| *_id == id)
             .unwrap()
+            .1
             .as_timeline_mut()
             .hide();
     }
@@ -269,7 +252,7 @@ impl RanimTimeline {
     pub fn sync(&self) -> &Self {
         let mut timelines = self.timelines.borrow_mut();
         let max_elapsed_secs = self.max_elapsed_secs.borrow();
-        timelines.iter_mut().for_each(|timeline| {
+        timelines.iter_mut().for_each(|(id, timeline)| {
             // println!("{}, {}", timeline.elapsed_secs(), *max_elapsed_secs);
             let elapsed_secs = timeline.as_timeline().elapsed_secs();
             if elapsed_secs < *max_elapsed_secs {
@@ -281,17 +264,40 @@ impl RanimTimeline {
         self
     }
 
-    fn _play<T: RanimItem + Clone + 'static>(
+    /// Push an animation into the timeline
+    ///
+    /// Note that this won't apply the animation effect to rabject's data,
+    /// to apply the animation effect use [`AnimSchedule::apply`]
+    pub fn play<Mark, T: TimelineAnim<Mark>>(&self, anim: T) -> T::Output
+    {
+        anim.play(self)
+    }
+    // pub fn play_and_hide<'r, T, I>(&self, anim_schedules: I) -> &Self
+    // where
+    //     T: Into<Timeline> + Clone + 'static,
+    //     I: IntoIterator<Item = AnimSchedule<T>>,
+    // {
+    //     anim_schedules
+    //         .into_iter()
+    //         .for_each(|AnimSchedule { id, anim }| {
+    //             self._play(id, anim);
+    //             self._hide(id);
+    //         });
+    //     self
+    // }
+    fn _play<T: Into<Timeline> + Clone + 'static>(
         &self,
-        rabject: &mut Rabject<T>,
+        id: usize,
         anim: AnimationSpan<T>,
     ) -> &Self {
-        trace!("play {:?} on {:?}", anim, rabject.id);
+        trace!("play {:?} on {:?}", anim, id);
         let mut timelines = self.timelines.borrow_mut();
 
         let timeline = timelines
-            .get_mut(rabject.id)
+            .iter_mut()
+            .find(|(_id, _)| *_id == id)
             .unwrap()
+            .1
             .as_any_mut()
             .downcast_mut::<RabjectTimeline<T>>()
             .unwrap();
@@ -318,23 +324,20 @@ impl RanimTimeline {
         let mut items = Vec::with_capacity(timelines.len());
 
         let mut camera_frame = None::<(EvalResult<CameraFrame>, usize)>;
-        timelines
-            .iter()
-            .enumerate()
-            .for_each(|(id, timeline)| match timeline {
-                Timeline::CameraFrame(timeline) => {
-                    let timeline = timeline
-                        .as_any()
-                        .downcast_ref::<RabjectTimeline<CameraFrame>>()
-                        .unwrap();
-                    camera_frame = timeline.eval_alpha(alpha)
+        timelines.iter().for_each(|(id, timeline)| match timeline {
+            Timeline::CameraFrame(timeline) => {
+                let timeline = timeline
+                    .as_any()
+                    .downcast_ref::<RabjectTimeline<CameraFrame>>()
+                    .unwrap();
+                camera_frame = timeline.eval_alpha(alpha)
+            }
+            Timeline::VisualItem(timeline) => {
+                if let Some((res, idx)) = timeline.eval_alpha(alpha) {
+                    items.push((*id, res, idx));
                 }
-                Timeline::VisualItem(timeline) => {
-                    if let Some((res, idx)) = timeline.eval_alpha(alpha) {
-                        items.push((id, res, idx));
-                    }
-                }
-            });
+            }
+        });
 
         TimelineEvalResult {
             camera_frame: camera_frame.unwrap(),
@@ -347,10 +350,9 @@ impl RanimTimeline {
         self.timelines
             .borrow()
             .iter()
-            .enumerate()
             // .take(MAX_TIMELINE_CNT)
             .map(|(id, timeline)| RabjectTimelineInfo {
-                id,
+                id: *id,
                 type_name: timeline.as_timeline().type_name().to_string(),
                 animation_infos: timeline.as_timeline().get_animation_infos(),
             })

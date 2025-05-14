@@ -1,3 +1,6 @@
+use std::sync::atomic::AtomicUsize;
+
+use derive_more::{Deref, DerefMut};
 use group::Group;
 // use variadics_please::all_tuples;
 #[cfg(feature = "serde")]
@@ -16,8 +19,8 @@ impl<'r, T> Group<Rabject<T>> {
     pub fn lagged_anim(
         &'r mut self,
         lag_ratio: f64,
-        anim_builder: impl FnOnce(&'r mut Rabject<T>) -> AnimSchedule<'r, T> + Clone,
-    ) -> Group<AnimSchedule<'r, T>> {
+        anim_builder: impl FnOnce(&'r mut Rabject<T>) -> AnimSchedule<T> + Clone,
+    ) -> Group<AnimSchedule<T>> {
         let n = self.as_ref().len();
 
         let mut anim_schedules = self
@@ -39,24 +42,47 @@ impl<'r, T> Group<Rabject<T>> {
     }
 }
 
+static RABJECT_CNT: AtomicUsize = AtomicUsize::new(0);
+
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Deref, DerefMut)]
 pub struct Rabject<T> {
     pub id: usize,
+    #[deref]
+    #[deref_mut]
     pub data: T,
 }
 
-impl<T: 'static> Rabject<T> {
-    pub fn schedule(
-        &mut self,
-        anim_builder: impl FnOnce(&mut Self) -> AnimationSpan<T>,
-    ) -> AnimSchedule<T> {
-        let animation = (anim_builder)(self);
-        AnimSchedule::new(self, animation)
+impl<T: Clone> Clone for Rabject<T> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            data: self.data.clone()
+        }
     }
 }
+
+impl<T> Rabject<T> {
+    pub fn new(data: T) -> Self {
+        Self {
+            id: RABJECT_CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            data,
+        }
+    }
+}
+
+// impl<T: 'static> Rabject<T> {
+//     pub fn schedule(
+//         &mut self,
+//         anim_builder: impl FnOnce(&mut Self) -> AnimationSpan<T>,
+//     ) -> AnimSchedule<T> {
+//         let animation = (anim_builder)(self);
+//         AnimSchedule::new(self, animation)
+//     }
+// }
 
 /// Blueprints are the data structures that are used to create an Item
 #[deprecated(
@@ -128,3 +154,36 @@ pub trait VisualItem {
 //     ) -> Option<&'a dyn crate::render::primitives::Renderable> {
 //     }
 // }
+
+#[cfg(test)]
+mod test {
+    fn id<T>(x: &T) -> usize {
+        x as *const T as usize
+    }
+
+    fn foo_move<T>(x: T) {
+        println!("x: {}", id(&x));
+    }
+
+    #[test]
+    fn foo() {
+        let mut a = 12;
+        println!("a: {}", id(&a));
+        // a = 13;
+        // println!("assigned a: {}", id(&a));
+        // let b = a;
+        // println!("b: {}", id(&b));
+        foo_move(a);
+
+        let mut a = String::from("hello");
+        println!("a: {}", id(&a));
+        // a = String::from("world");
+        // println!("assigned a: {}", id(&a));
+        // a.clear();
+        // println!("update a: {}", id(&a));
+        // let b = a;
+        // println!("b: {}", id(&b));
+        foo_move(a);
+
+    }
+}

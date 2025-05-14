@@ -31,7 +31,7 @@ use ranim::{
 struct TestScene;
 
 impl TimelineConstructor for TestScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut CameraFrame) {
         // let mut text = Group::<VItem>::from_svg(typst_svg!(
         //     r#"#align(center)[
         //     #text(10pt, font: "LXGW Bright")[R]

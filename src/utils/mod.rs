@@ -16,6 +16,10 @@ use glam::{Mat3, Vec2, Vec3, vec2, vec3};
 
 use crate::{context::WgpuContext, render::RenderResource};
 
+pub fn id<T>(x: &T) -> usize {
+    x as *const T as usize
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id(u128);
 
