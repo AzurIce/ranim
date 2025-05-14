@@ -110,7 +110,7 @@ impl TimelineConstructor for RanimLogoScene {
 ]"#
         ));
         ranim_text
-            .scale_to(ScaleHint::PorportionalHeight(1.0))
+            .scale_to(ScaleHint::PorportionalY(1.0))
             .put_center_on(DVec3::NEG_Y * 2.5);
         let mut ranim_text = ranim_text
             .into_iter()

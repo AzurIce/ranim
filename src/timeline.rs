@@ -159,14 +159,39 @@ impl RanimTimeline {
         T: RanimItem + Clone + 'static,
         I: IntoIterator<Item = AnimSchedule<'r, T>>,
     {
-        anim_schedules.into_iter().for_each(|anim_schedule| {
-            self._play(anim_schedule);
-        });
+        anim_schedules
+            .into_iter()
+            .for_each(|AnimSchedule { rabject, anim }| {
+                self._play(rabject, anim);
+            });
+        self
+    }
+
+    pub fn play_and_hide<'r, T, I>(&self, anim_schedules: I) -> &Self
+    where
+        T: RanimItem + Clone + 'static,
+        I: IntoIterator<Item = AnimSchedule<'r, T>>,
+    {
+        anim_schedules
+            .into_iter()
+            .for_each(|AnimSchedule { rabject, anim }| {
+                self._play(rabject, anim);
+                self.hide(rabject);
+            });
         self
     }
 
     pub fn insert<Mark, T: TimelineItem<Mark>>(&self, item: T) -> T::Inserted {
         item.insert_into_timeline(self)
+    }
+
+    pub fn insert_and<Mark, T: TimelineItem<Mark>, F>(&self, item: T, f: F) -> T::Inserted
+    where
+        F: FnOnce(&Self, &mut T::Inserted),
+    {
+        let mut inserted = item.insert_into_timeline(self);
+        f(self, &mut inserted);
+        inserted
     }
 
     fn insert_timeline(&self, mut timeline: Timeline) -> usize {
@@ -256,10 +281,13 @@ impl RanimTimeline {
         self
     }
 
-    fn _play<T: RanimItem + Clone + 'static>(&self, anim_schedule: AnimSchedule<T>) -> &Self {
-        trace!("play {:?}", anim_schedule);
+    fn _play<T: RanimItem + Clone + 'static>(
+        &self,
+        rabject: &mut Rabject<T>,
+        anim: AnimationSpan<T>,
+    ) -> &Self {
+        trace!("play {:?} on {:?}", anim, rabject.id);
         let mut timelines = self.timelines.borrow_mut();
-        let AnimSchedule { rabject, anim } = anim_schedule;
 
         let timeline = timelines
             .get_mut(rabject.id)

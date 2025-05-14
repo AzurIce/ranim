@@ -19,7 +19,7 @@ impl TimelineConstructor for BasicScene {
         timeline.forward(0.2);
 
         let mut svg = Group::<VItem>::from_svg(SVG);
-        svg.scale_to_with_stroke(ScaleHint::PorportionalHeight(3.0))
+        svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
             .put_center_on(DVec3::Y * 2.0);
         let mut svg = timeline.insert(svg);
 
@@ -32,7 +32,7 @@ impl TimelineConstructor for BasicScene {
             ]
             "#
         ));
-        text.scale_to_with_stroke(ScaleHint::PorportionalHeight(2.0))
+        text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
             .put_center_on(DVec3::NEG_Y * 2.0);
 
         text.iter_mut().for_each(|item| {

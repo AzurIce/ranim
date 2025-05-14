@@ -103,6 +103,9 @@ pub fn derive_stroke(input: TokenStream) -> TokenStream {
         |ranim| quote! {#ranim::traits::Stroke},
         |ranim, field_positions| {
             quote! {
+                fn stroke_color(&self) -> #ranim::color::AlphaColor<#ranim::color::Srgb> {
+                    [#(self.#field_positions.stroke_color(), )*].first().cloned().unwrap()
+                }
                 fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [#ranim::components::width::Width])) -> &mut Self {
                     #(
                         self.#field_positions.apply_stroke_func(&f);
@@ -247,12 +250,12 @@ pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
     impl_derive(
         input,
         |ranim| quote! {#ranim::traits::Interpolatable},
-        |_ranim, field_positions| {
+        |ranim, field_positions| {
             quote! {
                 fn lerp(&self, other: &Self, t: f64) -> Self {
                     Self {
                         #(
-                            #field_positions: self.#field_positions.lerp(&other.#field_positions, t),
+                            #field_positions: #ranim::traits::Interpolatable::lerp(&self.#field_positions, &other.#field_positions, t),
                         )*
                     }
                 }

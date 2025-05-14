@@ -52,6 +52,7 @@ indicatif = "0.17.11"
 color = "0.2.3"
 variadics_please = "1.1.0"
 derive_more = { version = "2.0.1", features = ["deref_mut", "deref", "index", "index_mut", "is_variant", "as_ref", "from", "into_iterator"] }
+# ambassador = "0.4.1"
 
 puffin = { version = "0.19.1", optional = true }
 puffin_http = { version = "0.16.1", optional = true }
