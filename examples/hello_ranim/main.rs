@@ -5,7 +5,7 @@ use log::LevelFilter;
 use ranim::{
     animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
-    items::vitem::{geometry::Square, Circle, VItem},
+    items::vitem::{Circle, VItem, geometry::Square},
     prelude::*,
 };
 

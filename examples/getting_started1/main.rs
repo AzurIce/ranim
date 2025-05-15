@@ -14,7 +14,7 @@ use ranim::{
 struct GettingStarted1Scene;
 
 impl TimelineConstructor for GettingStarted1Scene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         // A Square with size 2.0 and color blue
         let square = Square::new(2.0).with(|square| {
             square.fill_rgba = manim::BLUE_C;

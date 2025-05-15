@@ -50,10 +50,10 @@ impl TimelineConstructor for ArcScene {
             })
             .collect::<Group<_>>();
 
-        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in()).with_total_duration(3.0);
-        let (arcs, end_time) = timeline.schedule(arcs_fade_in);
-        timeline.pin(arcs);
-        timeline.forward_to(end_time);
+        let arcs_fade_in = arcs
+            .lagged_anim(0.2, |item| item.fade_in())
+            .with_total_duration(3.0);
+        timeline.play(arcs_fade_in);
 
         timeline.insert_time_mark(
             timeline.cur_sec(),

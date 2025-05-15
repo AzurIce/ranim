@@ -1,7 +1,13 @@
 use ranim::{
-    animation::{creation::{CreationAnim, WritingAnim}, transform::{TransformAnim, TransformAnimSchedule}},
+    animation::{
+        creation::{CreationAnim, WritingAnim},
+        transform::TransformAnim,
+    },
     color::palettes::manim,
-    items::vitem::{geometry::{Rectangle, Square}, Circle, VItem},
+    items::vitem::{
+        Circle, VItem,
+        geometry::{Rectangle, Square},
+    },
     prelude::*,
     utils::rate_functions::linear,
 };
@@ -10,7 +16,7 @@ use ranim::{
 struct GettingStarted2Scene;
 
 impl TimelineConstructor for GettingStarted2Scene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
             rect.stroke_rgba = manim::GREEN_C;
         });

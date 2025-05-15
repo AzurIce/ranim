@@ -154,7 +154,6 @@ impl<T: WritingRequirement> Unwrite<T> {
         outline
             .set_fill_opacity(0.0)
             .set_stroke_width(DEFAULT_STROKE_WIDTH)
-            .set_stroke_color(target.fill_color())
             .set_stroke_opacity(1.0);
         Self {
             original: target,

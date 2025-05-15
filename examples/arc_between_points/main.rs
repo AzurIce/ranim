@@ -54,9 +54,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
             .lagged_anim(0.2, |item| item.fade_in())
             .with_total_duration(3.0);
         println!("{:?}", arcs_fade_in);
-        let (arcs, end_time) = timeline.schedule(arcs_fade_in);
-        timeline.pin(arcs);
-        timeline.forward_to(end_time);
+        timeline.play(arcs_fade_in);
 
         timeline.insert_time_mark(
             timeline.cur_sec(),

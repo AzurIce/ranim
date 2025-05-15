@@ -30,13 +30,10 @@ impl<T> Group<T> {
 
         let duration = anim_schedules[0].duration_secs;
         let lag_time = duration * lag_ratio;
-        anim_schedules
-            .iter_mut()
-            .enumerate()
-            .for_each(|(i, anim)| {
-                anim.padding = (i as f64 * lag_time, (n - i - 1) as f64 * lag_time);
-                // println!("{} {:?} {}", schedule.anim.span_len(), schedule.anim.padding, schedule.anim.duration_secs);
-            });
+        anim_schedules.iter_mut().enumerate().for_each(|(i, anim)| {
+            anim.padding = (i as f64 * lag_time, (n - i - 1) as f64 * lag_time);
+            // println!("{} {:?} {}", schedule.anim.span_len(), schedule.anim.padding, schedule.anim.duration_secs);
+        });
         anim_schedules
     }
 }
@@ -147,36 +144,3 @@ pub trait VisualItem {
 //     ) -> Option<&'a dyn crate::render::primitives::Renderable> {
 //     }
 // }
-
-#[cfg(test)]
-mod test {
-    fn id<T>(x: &T) -> usize {
-        x as *const T as usize
-    }
-
-    fn foo_move<T>(x: T) {
-        println!("x: {}", id(&x));
-    }
-
-    #[test]
-    fn foo() {
-        let mut a = 12;
-        println!("a: {}", id(&a));
-        // a = 13;
-        // println!("assigned a: {}", id(&a));
-        // let b = a;
-        // println!("b: {}", id(&b));
-        foo_move(a);
-
-        let mut a = String::from("hello");
-        println!("a: {}", id(&a));
-        // a = String::from("world");
-        // println!("assigned a: {}", id(&a));
-        // a.clear();
-        // println!("update a: {}", id(&a));
-        // let b = a;
-        // println!("b: {}", id(&b));
-        foo_move(a);
-
-    }
-}

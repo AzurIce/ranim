@@ -1,10 +1,8 @@
-use itertools::Itertools;
-use log::{info, trace};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    animation::{AnimSchedule, AnimationSpan, EvalResult, Evaluator},
+    animation::{AnimationSpan, EvalResult, Evaluator},
     items::{PinnedItem, VisualItem, camera_frame::CameraFrame, group::Group},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
@@ -648,14 +646,13 @@ impl<T> RabjectTimeline<T> {
         self.show_secs
             .chunks(2)
             .enumerate()
-            .find(|(idx, show_secs)| {
+            .any(|(idx, show_secs)| {
                 let start = show_secs.first().cloned().unwrap();
                 let end = show_secs.get(1).cloned().unwrap_or(self.cur_sec());
                 start <= self.cur_sec
                     && (self.cur_sec < end
-                        || self.cur_sec == end && *idx == self.animations.len() - 1)
+                        || self.cur_sec == end && idx == self.animations.len() - 1)
             })
-            .is_some()
     }
     fn schedule(&mut self, anim: AnimationSpan<T>) {
         // trace!(
