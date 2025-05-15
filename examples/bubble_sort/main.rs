@@ -116,7 +116,7 @@ impl TimelineConstructor for BubbleSortScene {
         }
 
         timeline.insert_time_mark(
-            timeline.duration_secs() / 2.0,
+            timeline.cur_sec() / 2.0,
             TimeMark::Capture(format!("preview-{num}.png")),
         );
     }

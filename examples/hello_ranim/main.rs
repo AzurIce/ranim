@@ -13,14 +13,13 @@ use ranim::{
 struct HelloRanimScene;
 
 impl TimelineConstructor for HelloRanimScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let mut square = Square::new(2.0).with(|square| {
             square.fill_rgba = manim::BLUE_C;
             square.stroke_rgba = manim::BLUE_C;
         });
 
         timeline.play(square.clone().fade_in());
-        timeline.sync();
         let mut circle = Circle(2.0).build().with(|circle| {
             circle
                 .rotate(PI / 4.0 + PI, DVec3::Z)

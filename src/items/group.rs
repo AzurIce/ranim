@@ -87,7 +87,7 @@ use serde::{Deserialize, Serialize};
 /// ```
 ///
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Group<T>(pub Vec<T>);
 
 impl<T> Group<T> {

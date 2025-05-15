@@ -125,7 +125,7 @@ impl TimelineConstructor for RanimLogoScene {
         timeline.sync();
 
         timeline.insert_time_mark(
-            timeline.duration_secs(),
+            timeline.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),
         );
         timeline.forward(1.0);

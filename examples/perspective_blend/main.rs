@@ -95,7 +95,7 @@ impl TimelineConstructor for PerspectiveBlendScene {
         );
         timeline.sync();
         timeline.insert_time_mark(
-            timeline.duration_secs(),
+            timeline.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),
         );
     }

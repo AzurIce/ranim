@@ -225,7 +225,7 @@ impl AppState {
             renderer,
             last_sec: -1.0,
             render_instances: RenderInstances::default(),
-            timeline_state: TimelineState::new(timeline.duration_secs(), timeline_infos),
+            timeline_state: TimelineState::new(timeline.cur_sec(), timeline_infos),
             timeline,
         }
     }

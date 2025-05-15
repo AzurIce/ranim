@@ -95,7 +95,7 @@ pub trait Scene: TimelineConstructor + SceneMetaTrait {}
 impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
 
 impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
-    fn construct(self, timeline: &RanimTimeline, camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, camera: PinnedItem<CameraFrame>) {
         self.0.construct(timeline, camera);
     }
 }
@@ -111,16 +111,17 @@ pub trait TimelineConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct(self, timeline: &RanimTimeline, camera: &mut PinnedItem<CameraFrame>);
+    fn construct(self, timeline: &RanimTimeline, camera: PinnedItem<CameraFrame>);
 }
 
 pub fn build_timeline(constructor: impl TimelineConstructor) -> RanimTimeline {
     let timeline = RanimTimeline::new();
     {
         let camera_frame = items::camera_frame::CameraFrame::new();
-        let mut camera_frame = timeline.pin(camera_frame);
-        constructor.construct(&timeline, &mut camera_frame);
+        let camera_frame = timeline.pin(camera_frame);
+        constructor.construct(&timeline, camera_frame);
         timeline.sync();
+        timeline.seal();
     }
     timeline
 }
@@ -251,7 +252,7 @@ impl RanimRenderApp {
             (cpu_server, gpu_server)
         };
 
-        let frames = (timeline.duration_secs() * self.fps as f64).ceil() as usize;
+        let frames = (timeline.cur_sec() * self.fps as f64).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
@@ -343,15 +344,15 @@ impl RanimRenderApp {
                 pb.inc(1);
                 pb.set_message(format!(
                     "rendering {:.1?}/{:.1?}",
-                    Duration::from_secs_f64(alpha * timeline.duration_secs()),
-                    Duration::from_secs_f64(timeline.duration_secs())
+                    Duration::from_secs_f64(alpha * timeline.cur_sec()),
+                    Duration::from_secs_f64(timeline.cur_sec())
                 ));
             });
 
         let msg = format!(
             "rendered {} frames({:?})",
             frames,
-            Duration::from_secs_f64(timeline.duration_secs()),
+            Duration::from_secs_f64(timeline.cur_sec()),
         );
         pb.finish_with_message(msg);
 

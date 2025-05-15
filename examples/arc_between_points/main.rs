@@ -12,7 +12,7 @@ use ranim::timeline::TimeMark;
 struct ArcBetweenPointsScene;
 
 impl TimelineConstructor for ArcBetweenPointsScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let center = dvec2(0.0, 0.0);
 
         let start_color = color!("#FF8080FF");
@@ -53,12 +53,13 @@ impl TimelineConstructor for ArcBetweenPointsScene {
         let arcs_fade_in = arcs
             .lagged_anim(0.2, |item| item.fade_in())
             .with_total_duration(3.0);
+        println!("{:?}", arcs_fade_in);
         let (arcs, end_time) = timeline.schedule(arcs_fade_in);
         timeline.pin(arcs);
         timeline.forward_to(end_time);
 
         timeline.insert_time_mark(
-            timeline.duration_secs(),
+            timeline.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),
         );
     }
