@@ -49,6 +49,17 @@ impl Interpolatable for DMat4 {
     }
 }
 
+// MARK: With
+pub trait With {
+    fn with(mut self, f: impl Fn(&mut Self)) -> Self
+    where
+        Self: Sized,
+    {
+        f(&mut self);
+        self
+    }
+}
+
 // MARK: Alignable
 /// A trait for aligning two items
 ///

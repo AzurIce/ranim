@@ -1,24 +1,24 @@
-use ranim::{color::palettes::manim, items::vitem::Square, prelude::*};
+use ranim::{animation::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*};
 
 #[scene]
 struct GettingStarted0Scene;
 
 impl TimelineConstructor for GettingStarted0Scene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
-        let mut square = Square(2.0).build(); // An VItem of a square
-        square.set_color(manim::BLUE_C);
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+        // A Square with size 2.0 and color blue
+        let square = Square::new(2.0).with(|square| {
+            square.fill_rgba = manim::BLUE_C;
+            square.stroke_rgba = manim::BLUE_C;
+        });
 
-        timeline.forward(0.5);
-        let square = timeline.insert(square); // Create a "Rabject" in the timeline
-        timeline.forward(0.5); // By default the rabject timeline is at "show" state
-        timeline.hide(&square);
-        timeline.forward(0.5); // After called "hide", the forward will encode blank into timeline
+        // Plays the animation
+        timeline.play(square.clone().fade_in()); 
+        timeline.play(square.fade_out());
 
-        timeline.show(&square);
-        timeline.forward(0.5);
-
-        timeline.remove(square); // Currently is equal to `timeline.hide(&rabject)`, but takes the owner ship
-        timeline.forward(0.5);
+        // The play method returns the result of the animation,
+        // so it can also be written like this:
+        // let square = timeline.play(square.fade_in());
+        // timeline.play(square.fade_out());
     }
 }
 

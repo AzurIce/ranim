@@ -41,20 +41,20 @@ impl TimelineConstructor for TestScene {
         let square_a = Square::new(1.0);
         let rectangle_a = Rectangle::new(1.0, 2.0);
         {
-            let mut square = timeline.insert(VItem::from(square_a.clone()));
-            let mut rectangle = timeline.insert(VItem::from(rectangle_a.clone()));
+            let mut square = timeline.pin(VItem::from(square_a.clone()));
+            let mut rectangle = timeline.pin(VItem::from(rectangle_a.clone()));
             timeline.play_and_hide(square.write());
             timeline.play_and_hide(rectangle.write());
             timeline.sync();
         }
 
-        let mut rectangle_b = timeline.insert(Rectangle::from(square_a));
+        let mut rectangle_b = timeline.pin(Rectangle::from(square_a));
         let square_b = Square::new(2.0);
         {
-            let mut square = timeline.insert(Rectangle::from(square_b.clone()));
+            let mut square = timeline.pin(Rectangle::from(square_b.clone()));
             timeline.play_and_hide(square.transform_from(rectangle_a.clone()));
         }
-        let mut square_b = timeline.insert(square_b);
+        let mut square_b = timeline.pin(square_b);
 
         timeline.forward(1.0);
 

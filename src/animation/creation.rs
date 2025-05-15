@@ -1,5 +1,4 @@
-use super::{AnimSchedule, AnimationSpan, EvalDynamic, ToEvaluator};
-use crate::items::Rabject;
+use super::{AnimationSpan, EvalDynamic, ToEvaluator};
 use crate::items::vitem::DEFAULT_STROKE_WIDTH;
 use crate::traits::{Empty, Fill, Interpolatable, Partial, Stroke};
 use crate::utils::rate_functions::smooth;
@@ -10,14 +9,9 @@ use log::warn;
 pub trait CreationRequirement: Clone + Partial + Empty + Interpolatable {}
 impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 
-trait CreationAnim<T: CreationRequirement + 'static> {
+pub trait CreationAnim<T: CreationRequirement + 'static> {
     fn create(self) -> AnimationSpan<T>;
     fn uncreate(self) -> AnimationSpan<T>;
-}
-
-pub trait CreationAnimSchedule<T: CreationRequirement + 'static> {
-    fn create(self) -> AnimSchedule<T>;
-    fn uncreate(self) -> AnimSchedule<T>;
 }
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
@@ -29,27 +23,13 @@ impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
     }
 }
 
-impl<T: CreationRequirement + 'static> CreationAnimSchedule<T> for Rabject<T> {
-    fn create(self) -> AnimSchedule<T> {
-        AnimSchedule::new(self.id, CreationAnim::create(self.data))
-    }
-    fn uncreate(self) -> AnimSchedule<T> {
-        AnimSchedule::new(self.id, CreationAnim::uncreate(self.data))
-    }
-}
-
 // MARK: Writing
 pub trait WritingRequirement: CreationRequirement + Stroke + Fill {}
 impl<T: CreationRequirement + Stroke + Fill> WritingRequirement for T {}
 
-trait WritingAnim<T: WritingRequirement + 'static> {
+pub trait WritingAnim<T: WritingRequirement + 'static> {
     fn write(self) -> AnimationSpan<T>;
     fn unwrite(self) -> AnimationSpan<T>;
-}
-
-pub trait WritingAnimSchedule<T: WritingRequirement + 'static> {
-    fn write(self) -> AnimSchedule<T>;
-    fn unwrite(self) -> AnimSchedule<T>;
 }
 
 impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
@@ -58,15 +38,6 @@ impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
     }
     fn unwrite(self) -> AnimationSpan<T> {
         AnimationSpan::from_evaluator(Unwrite::new(self).to_evaluator()).with_rate_func(smooth)
-    }
-}
-
-impl<T: WritingRequirement + 'static> WritingAnimSchedule<T> for Rabject<T> {
-    fn write(self) -> AnimSchedule<T> {
-        AnimSchedule::new(self.id, WritingAnim::write(self.data))
-    }
-    fn unwrite(self) -> AnimSchedule<T> {
-        AnimSchedule::new(self.id, WritingAnim::unwrite(self.data))
     }
 }
 

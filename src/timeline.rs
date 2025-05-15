@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     animation::{AnimSchedule, AnimationSpan, EvalResult, Evaluator},
-    items::{Rabject, VisualItem, camera_frame::CameraFrame, group::Group},
+    items::{PinnedItem, VisualItem, camera_frame::CameraFrame, group::Group},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
@@ -32,42 +32,84 @@ pub struct GroupMark;
 /// This is accomplished by two implementations of this trait, with different `Mark` type:
 /// - [`ItemMark`]: Insert a `T`, returns [`Rabject<T>`]
 /// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group<Rabject<T>>`]
-pub trait TimelineItem<Mark> {
-    fn insert_into_timeline(self, timeline: &RanimTimeline);
+pub trait TimelinePin<Mark> {
+    type Output;
+    fn pin(self, timeline: &RanimTimeline) -> Self::Output;
 }
 
-impl<T> TimelineItem<ItemMark> for &Rabject<T>
+impl<T> TimelinePin<ItemMark> for T
 where
     T: Into<Timeline> + Clone,
 {
-    fn insert_into_timeline(self, timeline: &RanimTimeline) {
-        timeline._insert_timeline(self.id, self.data.clone().into());
+    type Output = PinnedItem<T>;
+    fn pin(self, timeline: &RanimTimeline) -> Self::Output {
+        let pinned_item = PinnedItem::new(self);
+        timeline._insert_timeline(pinned_item.id(), pinned_item.data.clone().into());
+        pinned_item
     }
 }
 
-impl<'a, E, T> TimelineItem<GroupMark> for &'a T
+impl<E, T> TimelinePin<GroupMark> for T
 where
-    E: Into<Timeline> + Clone + 'a,
-    &'a T: IntoIterator<Item = &'a Rabject<E>>,
+    E: TimelinePin<ItemMark>,
+    T: IntoIterator<Item = E>,
 {
-    fn insert_into_timeline(self, timeline: &RanimTimeline) {
+    type Output = Group<E::Output>;
+    fn pin(self, timeline: &RanimTimeline) -> Self::Output {
         self.into_iter()
-            .map(|rabject| rabject.insert_into_timeline(timeline))
+            .map(|rabject| rabject.pin(timeline))
+            .collect()
+    }
+}
+
+pub trait TimelineUnpin<Mark> {
+    type Output;
+    fn unpin(self, timeline: &RanimTimeline) -> Self::Output;
+}
+
+impl<T> TimelineUnpin<ItemMark> for PinnedItem<T>
+where
+    T: Into<Timeline> + Clone,
+{
+    type Output = T;
+    fn unpin(self, timeline: &RanimTimeline) -> Self::Output {
+        timeline._hide(self.id());
+        self.data
+    }
+}
+
+impl<E, T> TimelineUnpin<GroupMark> for T
+where
+    E: TimelineUnpin<ItemMark>,
+    T: IntoIterator<Item = E>,
+{
+    type Output = Group<E::Output>;
+    fn unpin(self, timeline: &RanimTimeline) -> Self::Output {
+        self.into_iter()
+            .map(|rabject| rabject.unpin(timeline))
             .collect()
     }
 }
 
 pub trait TimelineAnim<Mark> {
     type Output;
-    fn play(self, timeline: &RanimTimeline) -> Self::Output;
+    fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64);
 }
 
-impl<T: Into<Timeline> + Clone + 'static> TimelineAnim<ItemMark> for AnimSchedule<T> {
+// For AnimationSpan, we first insert it, then play and hide the anim
+impl<T: Into<Timeline> + Clone + 'static> TimelineAnim<ItemMark> for AnimationSpan<T> {
     type Output = T;
-    fn play(self, timeline: &RanimTimeline) -> Self::Output {
-        let res = self.anim.eval_alpha(1.0).into_owned();
-        timeline._play(self.id, self.anim);
-        res
+    fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64) {
+        let cur_time = timeline.duration_secs();
+        let duration = self.span_len();
+
+        let item = self.eval_alpha(0.0).into_owned();
+        let rabject = timeline.pin(item);
+
+        let res = self.eval_alpha(1.0).into_owned();
+        timeline._play(rabject.id(), self);
+        timeline.hide(&rabject);
+        (res, cur_time + duration)
     }
 }
 
@@ -76,10 +118,16 @@ where
     I: IntoIterator<Item = T>,
 {
     type Output = Group<T::Output>;
-    fn play(self, timeline: &RanimTimeline) -> Self::Output {
-        self.into_iter()
-            .map(|item| item.play(timeline))
-            .collect()
+    fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64) {
+        let (results, end_times): (Vec<_>, Vec<_>) =
+            self.into_iter().map(|item| item.schedule(timeline)).unzip();
+        (
+            Group(results),
+            end_times
+                .into_iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap(),
+        )
     }
 }
 /// Timeline is a type erased [`RabjectTimeline<T>`]
@@ -153,8 +201,13 @@ impl RanimTimeline {
         *self.max_elapsed_secs.borrow()
     }
 
-    pub fn insert<Mark, T: TimelineItem<Mark>>(&self, item: T) {
-        item.insert_into_timeline(self);
+    /// Use pin to pin anitem into the timeline
+    pub fn pin<Mark, T: TimelinePin<Mark>>(&self, item: T) -> T::Output {
+        item.pin(self)
+    }
+
+    pub fn unpin<Mark, T: TimelineUnpin<Mark>>(&self, item: T) -> T::Output {
+        item.unpin(self)
     }
 
     // pub fn insert_and<Mark, T: TimelineItem<Mark>, F>(&self, item: T, f: F)
@@ -180,8 +233,8 @@ impl RanimTimeline {
     }
 
     /// Update the static state of a rabject's timeline
-    pub fn update<T: Into<Timeline> + Clone + 'static>(&self, rabject: &Rabject<T>) {
-        self._update(rabject.id, rabject.data.clone());
+    pub fn update<T: Into<Timeline> + Clone + 'static>(&self, rabject: &PinnedItem<T>) {
+        self._update(rabject.id(), rabject.data.clone());
     }
     pub fn _update<T: Into<Timeline> + Clone + 'static>(&self, id: usize, data: T) {
         let mut timelines = self.timelines.borrow_mut();
@@ -206,12 +259,19 @@ impl RanimTimeline {
         *self.max_elapsed_secs.borrow_mut() += secs;
         self
     }
+    pub fn forward_to(&self, target_sec: f64) -> &Self {
+        let duration = target_sec - self.duration_secs();
+        if duration > 0.0 {
+            self.forward(duration);
+        }
+        self
+    }
 
     /// Show a rabject
     ///
     /// [`RanimTimeline::forward`] after this will encode timeline's static rabject state into the timeline
-    pub fn show<T>(&self, rabject: &Rabject<T>) {
-        self._show(rabject.id);
+    pub fn show<T>(&self, rabject: &PinnedItem<T>) {
+        self._show(rabject.id());
     }
     fn _show(&self, id: usize) {
         self.timelines
@@ -228,14 +288,14 @@ impl RanimTimeline {
     /// Remove a rabject
     ///
     /// [`RanimTimeline::forward`] after this will encode blank into the timeline
-    pub fn remove<T>(&self, rabject: Rabject<T>) {
-        self._hide(rabject.id);
+    pub fn remove<T>(&self, rabject: PinnedItem<T>) {
+        self._hide(rabject.id());
     }
     /// Hide a rabject
     ///
     /// [`RanimTimeline::forward`] after this will encode blank into the timeline
-    pub fn hide<T>(&self, rabject: &Rabject<T>) {
-        self._hide(rabject.id);
+    pub fn hide<T>(&self, rabject: &PinnedItem<T>) {
+        self._hide(rabject.id());
     }
     fn _hide(&self, id: usize) {
         self.timelines
@@ -268,10 +328,27 @@ impl RanimTimeline {
     ///
     /// Note that this won't apply the animation effect to rabject's data,
     /// to apply the animation effect use [`AnimSchedule::apply`]
-    pub fn play<Mark, T: TimelineAnim<Mark>>(&self, anim: T) -> T::Output
-    {
-        anim.play(self)
+    pub fn play<Mark, T: TimelineAnim<Mark>>(&self, anim: T) -> T::Output {
+        let (res, end_sec) = anim.schedule(self);
+        self.forward_to(end_sec);
+        res
     }
+
+    // pub fn play_and<Mark, T: TimelineAnim<Mark>, F, O>(&self, anim: T, and: F) -> O
+    // where F: FnOnce(&RanimTimeline, T::Output) -> O {
+    //     let (res, end_sec) = anim.schedule(self);
+    //     self.forward_to(end_sec);
+    //     res
+    // }
+
+    /// Push an animation into the timeline while not forwarding the timeline
+    ///
+    /// It will return the animation result and the end time of the animation
+    pub fn schedule<Mark, T: TimelineAnim<Mark>>(&self, anim: T) -> (T::Output, f64) {
+        let res = anim.schedule(self);
+        res
+    }
+
     // pub fn play_and_hide<'r, T, I>(&self, anim_schedules: I) -> &Self
     // where
     //     T: Into<Timeline> + Clone + 'static,

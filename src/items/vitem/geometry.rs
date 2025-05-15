@@ -5,8 +5,8 @@ use ranim_macros::Interpolatable;
 
 use crate::{
     components::Anchor,
-    render::primitives::{Extract, vitem::VItemPrimitive},
-    traits::{Alignable, BoundingBox, Fill, Interpolatable, Opacity, Rotate, Scale, Shift, Stroke},
+    render::primitives::{vitem::VItemPrimitive, Extract},
+    traits::{Alignable, BoundingBox, Color, Fill, Interpolatable, Opacity, Rotate, Scale, Shift, Stroke, With},
 };
 
 use super::{DEFAULT_STROKE_WIDTH, VItem};
@@ -22,6 +22,8 @@ pub struct Square {
     pub stroke_width: f32,
     pub fill_rgba: AlphaColor<Srgb>,
 }
+
+impl With for Square {}
 
 impl Square {
     pub fn new(size: f64) -> Self {
@@ -142,6 +144,8 @@ pub struct Rectangle {
     pub stroke_width: f32,
     pub fill_rgba: AlphaColor<Srgb>,
 }
+
+impl With for Rectangle {}
 
 impl Rectangle {
     pub fn new(width: f64, height: f64) -> Self {
