@@ -1,20 +1,37 @@
 use ranim::{
-    AppOptions, animation::fading::FadingAnimSchedule, color::palettes::manim,
-    items::vitem::Square, prelude::*, render_scene,
+    AppOptions,
+    animation::{
+        creation::{CreationAnim, WritingAnim},
+        transform::TransformAnim,
+    },
+    color::palettes::manim,
+    items::vitem::{Circle, VItem, geometry::Square},
+    prelude::*,
+    render_scene,
 };
 
 #[scene]
 struct GettingStarted1Scene;
 
 impl TimelineConstructor for GettingStarted1Scene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
-        let mut square = Square(2.0).build();
-        square.set_color(manim::BLUE_C);
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+        // A Square with size 2.0 and color blue
+        let square = Square::new(2.0).with(|square| {
+            square.fill_rgba = manim::BLUE_C;
+            square.stroke_rgba = manim::BLUE_C;
+        });
 
-        let mut square = timeline.insert(square);
-        #[allow(deprecated)]
-        timeline.play(square.fade_in());
-        timeline.play(square.fade_out());
+        let circle = Circle(2.0).build().with(|circle| {
+            circle.set_color(manim::RED_C);
+        });
+
+        // In order to do more low-level opeerations,
+        // sometimes we need to convert the item to a low-level item.
+        {
+            let square = timeline.play(VItem::from(square).create());
+            timeline.play(square.transform_to(circle.clone()));
+        }
+        timeline.play(circle.unwrite());
     }
 }
 

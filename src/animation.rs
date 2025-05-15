@@ -4,12 +4,13 @@ pub mod fading;
 pub mod transform;
 
 use crate::{
-    items::{group::Group, Rabject}, timeline::Timeline, utils::{id, rate_functions::linear}
+    items::{PinnedItem, group::Group},
+    utils::rate_functions::linear,
 };
 
 #[allow(unused)]
 use log::trace;
-use std::{any::Any, fmt::Debug, iter::Once, rc::Rc};
+use std::{any::Any, fmt::Debug, rc::Rc};
 
 // MARK: Eval
 
@@ -178,6 +179,10 @@ impl<T> AnimationSpan<T> {
 ///
 /// When you create an anim, you actually creates an [`AnimSchedule`] which contains the anim.
 /// The rabject's data won't change unless you call [`AnimSchedule::apply`].
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "use refactored anim-timeline system instead"
+)]
 pub struct AnimSchedule<T> {
     pub(crate) id: usize,
     pub(crate) anim: AnimationSpan<T>,
@@ -224,18 +229,18 @@ impl<T> AnimSchedule<T> {
 
 // MARK: Group
 
-impl<T: 'static> Group<AnimSchedule<T>> {
+impl<T: 'static> Group<AnimationSpan<T>> {
     /// Sets the rate function for each animation in the group
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.iter_mut().for_each(|schedule| {
-            schedule.anim.rate_func = rate_func;
+            schedule.rate_func = rate_func;
         });
         self
     }
     /// Sets the duration for each animation in the group
     pub fn with_duration(mut self, secs: f64) -> Self {
         self.iter_mut().for_each(|schedule| {
-            schedule.anim.duration_secs = secs;
+            schedule.duration_secs = secs;
         });
         self
     }
@@ -260,13 +265,13 @@ impl<T: 'static> Group<AnimSchedule<T>> {
     pub fn with_total_duration(mut self, secs: f64) -> Self {
         let total_secs = self
             .iter()
-            .map(|schedule| schedule.anim.span_len())
+            .map(|schedule| schedule.span_len())
             .reduce(|acc, e| acc.max(e))
             .unwrap_or(secs);
         let ratio = secs / total_secs;
         self.iter_mut().for_each(|schedule| {
             let (duration, (padding_start, padding_end)) =
-                (&mut schedule.anim.duration_secs, &mut schedule.anim.padding);
+                (&mut schedule.duration_secs, &mut schedule.padding);
             *duration *= ratio;
             *padding_start *= ratio;
             *padding_end *= ratio;

@@ -13,7 +13,7 @@ use crate::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
     prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
     render::primitives::{Extract, vitem::VItemPrimitive},
-    traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift},
+    traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, With},
     utils::svg::vitems_from_tree,
 };
 
@@ -46,6 +46,8 @@ pub struct VItem {
     pub stroke_rgbas: ComponentVec<Rgba>,
     pub fill_rgbas: ComponentVec<Rgba>,
 }
+
+impl With for VItem {}
 
 impl PointsFunc for VItem {
     fn apply_points_func(&mut self, f: impl Fn(&mut [DVec3])) -> &mut Self {
@@ -89,10 +91,6 @@ impl Scale for VItem {
 pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
 
 impl VItem {
-    pub fn with(mut self, f: impl Fn(&mut Self)) -> Self {
-        f(&mut self);
-        self
-    }
     pub fn close(&mut self) -> &mut Self {
         if self.vpoints.last() != self.vpoints.first() && !self.vpoints.is_empty() {
             let start = self.vpoints[0];

@@ -15,27 +15,26 @@ pub mod camera_frame;
 pub mod group;
 pub mod vitem;
 
-impl<'r, T> Group<Rabject<T>> {
+impl<T> Group<T> {
     pub fn lagged_anim(
-        &'r mut self,
+        self,
         lag_ratio: f64,
-        anim_builder: impl FnOnce(&'r mut Rabject<T>) -> AnimSchedule<T> + Clone,
-    ) -> Group<AnimSchedule<T>> {
+        anim_builder: impl FnOnce(T) -> AnimationSpan<T> + Clone,
+    ) -> Group<AnimationSpan<T>> {
         let n = self.as_ref().len();
 
         let mut anim_schedules = self
-            .as_mut()
-            .iter_mut()
+            .into_iter()
             .map(|rabject| (anim_builder.clone())(rabject))
             .collect::<Group<_>>();
 
-        let duration = anim_schedules[0].anim.duration_secs;
+        let duration = anim_schedules[0].duration_secs;
         let lag_time = duration * lag_ratio;
         anim_schedules
             .iter_mut()
             .enumerate()
-            .for_each(|(i, schedule)| {
-                schedule.anim.padding = (i as f64 * lag_time, (n - i - 1) as f64 * lag_time);
+            .for_each(|(i, anim)| {
+                anim.padding = (i as f64 * lag_time, (n - i - 1) as f64 * lag_time);
                 // println!("{} {:?} {}", schedule.anim.span_len(), schedule.anim.padding, schedule.anim.duration_secs);
             });
         anim_schedules
@@ -49,24 +48,18 @@ static RABJECT_CNT: AtomicUsize = AtomicUsize::new(0);
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Deref, DerefMut)]
-pub struct Rabject<T> {
-    pub id: usize,
+pub struct PinnedItem<T> {
+    id: usize,
     #[deref]
     #[deref_mut]
     pub data: T,
 }
 
-impl<T: Clone> Clone for Rabject<T> {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            data: self.data.clone()
-        }
+impl<T> PinnedItem<T> {
+    pub fn id(&self) -> usize {
+        self.id
     }
-}
-
-impl<T> Rabject<T> {
-    pub fn new(data: T) -> Self {
+    pub(crate) fn new(data: T) -> Self {
         Self {
             id: RABJECT_CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             data,

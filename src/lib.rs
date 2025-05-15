@@ -14,7 +14,7 @@ use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use items::{Rabject, camera_frame::CameraFrame};
+use items::{PinnedItem, camera_frame::CameraFrame};
 use timeline::{RanimTimeline, TimeMark, TimelineEvalResult};
 
 use render::{Renderer, primitives::RenderInstances};
@@ -27,7 +27,7 @@ pub mod prelude {
     pub use crate::{SceneMetaTrait, TimelineConstructor};
     pub use ranim_macros::scene;
 
-    pub use crate::items::{Rabject, camera_frame::CameraFrame};
+    pub use crate::items::{PinnedItem, camera_frame::CameraFrame};
     pub use crate::timeline::RanimTimeline;
 
     pub use crate::color::prelude::*;
@@ -95,7 +95,7 @@ pub trait Scene: TimelineConstructor + SceneMetaTrait {}
 impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
 
 impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, camera: &mut PinnedItem<CameraFrame>) {
         self.0.construct(timeline, camera);
     }
 }
@@ -111,14 +111,14 @@ pub trait TimelineConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>);
+    fn construct(self, timeline: &RanimTimeline, camera: &mut PinnedItem<CameraFrame>);
 }
 
 pub fn build_timeline(constructor: impl TimelineConstructor) -> RanimTimeline {
     let timeline = RanimTimeline::new();
     {
-        let mut camera_frame = Rabject::new(items::camera_frame::CameraFrame::new());
-        timeline.insert(&camera_frame);
+        let camera_frame = items::camera_frame::CameraFrame::new();
+        let mut camera_frame = timeline.pin(camera_frame);
         constructor.construct(&timeline, &mut camera_frame);
         timeline.sync();
     }

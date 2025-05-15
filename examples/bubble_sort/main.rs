@@ -9,7 +9,7 @@ use ranim::{
 struct BubbleSortScene(pub usize);
 
 impl TimelineConstructor for BubbleSortScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
         let num = self.0;
 
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
@@ -39,7 +39,7 @@ impl TimelineConstructor for BubbleSortScene {
                     .set_color(manim::WHITE)
                     .set_stroke_width(0.0)
                     .set_fill_opacity(0.5);
-                timeline.insert(rect)
+                timeline.pin(rect)
             })
             .collect::<Vec<_>>();
 

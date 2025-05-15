@@ -1,19 +1,20 @@
 use glam::dvec2;
 use itertools::Itertools;
 use log::LevelFilter;
-use ranim::animation::fading::FadingAnimSchedule;
-use ranim::color::HueDirection;
-use ranim::components::Anchor;
-use ranim::items::group::Group;
-use ranim::items::vitem::Arc;
-use ranim::prelude::*;
-use ranim::timeline::TimeMark;
+use ranim::{
+    animation::fading::FadingAnim,
+    color::HueDirection,
+    components::Anchor,
+    items::{group::Group, vitem::Arc},
+    prelude::*,
+    timeline::TimeMark,
+};
 
 #[scene]
 struct ArcScene;
 
 impl TimelineConstructor for ArcScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
         // let frame_size = app.camera().size;
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
@@ -40,18 +41,19 @@ impl TimelineConstructor for ArcScene {
                 );
                 let offset =
                     frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
-                let mut arc = Arc { angle, radius }.build();
-                arc.set_stroke_width(0.12 * (j as f32 + 0.02) / ncol as f32)
-                    .set_stroke_color(color)
-                    .set_fill_color(color.with_alpha(0.0))
-                    .put_anchor_on(Anchor::center(), offset.extend(0.0));
-                arc
+                Arc { angle, radius }.build().with(|arc| {
+                    arc.set_stroke_width(0.12 * (j as f32 + 0.02) / ncol as f32)
+                        .set_stroke_color(color)
+                        .set_fill_color(color.with_alpha(0.0))
+                        .put_anchor_on(Anchor::center(), offset.extend(0.0));
+                })
             })
             .collect::<Group<_>>();
 
-        let mut arcs = timeline.insert(arcs);
-        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());
-        timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();
+        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in()).with_total_duration(3.0);
+        let (arcs, end_time) = timeline.schedule(arcs_fade_in);
+        timeline.pin(arcs);
+        timeline.forward_to(end_time);
 
         timeline.insert_time_mark(
             timeline.duration_secs(),

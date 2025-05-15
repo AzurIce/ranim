@@ -10,7 +10,7 @@ use ranim::prelude::*;
 struct PalettesScene;
 
 impl TimelineConstructor for PalettesScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let padded_frame_size = frame_size * 0.9;
 
@@ -51,7 +51,7 @@ impl TimelineConstructor for PalettesScene {
                 })
             })
             .collect::<Group<_>>();
-        let _squares = timeline.insert(squares);
+        let _squares = timeline.pin(squares);
         timeline.forward(0.01);
     }
 }

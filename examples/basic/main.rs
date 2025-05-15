@@ -15,13 +15,13 @@ const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 struct BasicScene;
 
 impl TimelineConstructor for BasicScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
         timeline.forward(0.2);
 
         let mut svg = Group::<VItem>::from_svg(SVG);
         svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
             .put_center_on(DVec3::Y * 2.0);
-        let mut svg = timeline.insert(svg);
+        let mut svg = timeline.pin(svg);
 
         let mut text = Group::<VItem>::from_svg(&typst_svg!(
             r#"
@@ -38,7 +38,7 @@ impl TimelineConstructor for BasicScene {
         text.iter_mut().for_each(|item| {
             item.set_fill_opacity(0.8);
         });
-        let mut text = timeline.insert(text);
+        let mut text = timeline.pin(text);
 
         timeline.play(
             text.lagged_anim(0.2, |item| item.write())
