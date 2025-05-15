@@ -5,8 +5,10 @@ use ranim_macros::Interpolatable;
 
 use crate::{
     components::Anchor,
-    render::primitives::{vitem::VItemPrimitive, Extract},
-    traits::{Alignable, BoundingBox, Color, Fill, Interpolatable, Opacity, Rotate, Scale, Shift, Stroke, With},
+    render::primitives::{Extract, vitem::VItemPrimitive},
+    traits::{
+        Alignable, BoundingBox, Fill, Interpolatable, Opacity, Rotate, Scale, Shift, Stroke, With,
+    },
 };
 
 use super::{DEFAULT_STROKE_WIDTH, VItem};
@@ -330,7 +332,7 @@ impl Alignable for Polygon {
         }
         // TODO: find a better algo to minimize the distance
         self.points
-            .resize(other.points.len(), self.points.last().unwrap().clone());
+            .resize(other.points.len(), self.points.last().cloned().unwrap());
     }
 }
 

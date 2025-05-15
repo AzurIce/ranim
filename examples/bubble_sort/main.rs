@@ -9,7 +9,7 @@ use ranim::{
 struct BubbleSortScene(pub usize);
 
 impl TimelineConstructor for BubbleSortScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let num = self.0;
 
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
@@ -26,6 +26,11 @@ impl TimelineConstructor for BubbleSortScene {
             .collect::<Vec<f64>>();
         heights.shuffle(&mut rng);
 
+        enum Item<T> {
+            Pinned(PinnedItem<T>),
+            Unpinned(T),
+        }
+
         let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
         let mut rects = heights
             .iter()
@@ -39,7 +44,7 @@ impl TimelineConstructor for BubbleSortScene {
                     .set_color(manim::WHITE)
                     .set_stroke_width(0.0)
                     .set_fill_opacity(0.5);
-                timeline.pin(rect)
+                Item::Pinned(timeline.pin(rect))
             })
             .collect::<Vec<_>>();
 
@@ -47,7 +52,8 @@ impl TimelineConstructor for BubbleSortScene {
         for i in (1..num).rev() {
             for j in 0..i {
                 timeline.play(
-                    rects[j]
+                    timeline
+                        .unpin(rects[j])
                         .transform(|data| {
                             data.set_color(manim::BLUE_C).set_fill_opacity(0.5);
                         })
