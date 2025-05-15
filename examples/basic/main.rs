@@ -48,7 +48,7 @@ impl TimelineConstructor for BasicScene {
         timeline.play(svg.lagged_anim(0.0, |item| item.fade_in().with_duration(3.0))); // At the same time, the svg fade in
         timeline.sync();
         timeline.insert_time_mark(
-            timeline.duration_secs(),
+            timeline.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),
         );
 

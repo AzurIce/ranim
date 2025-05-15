@@ -14,7 +14,7 @@ use ranim::{
 struct ArcScene;
 
 impl TimelineConstructor for ArcScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         // let frame_size = app.camera().size;
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
@@ -56,7 +56,7 @@ impl TimelineConstructor for ArcScene {
         timeline.forward_to(end_time);
 
         timeline.insert_time_mark(
-            timeline.duration_secs(),
+            timeline.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),
         );
     }
