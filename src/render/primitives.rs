@@ -3,20 +3,20 @@ pub mod vitem;
 
 use std::{any::Any, collections::HashMap};
 
-use variadics_please::all_tuples;
+use variadics_please::{all_tuples, all_tuples_enumerated};
 
 use crate::context::WgpuContext;
 
 use super::RenderTextures;
 
 /// A Primitive is a structure that encapsules the wgpu resources
-pub trait Primitive {
+pub trait RenderResource {
     type Data;
     fn init(ctx: &WgpuContext, data: &Self::Data) -> Self;
     fn update(&mut self, ctx: &WgpuContext, data: &Self::Data);
 }
 
-pub trait Renderable {
+pub trait RenderCommand {
     fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass);
     fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass);
     fn encode_render_command(
@@ -31,9 +31,9 @@ pub trait Renderable {
     fn debug(&self, _ctx: &WgpuContext) {}
 }
 
-macro_rules! impl_tuple_renderable {
+macro_rules! impl_tuple_render_command {
     ($($T:ident),*) => {
-        impl<$($T: Renderable),*> Renderable for ($($T,)*) {
+        impl<$($T: RenderCommand,)*> RenderCommand for ($($T,)*) {
             fn encode_compute_pass_command(
                 &self,
                 cpass: &mut wgpu::ComputePass,
@@ -84,9 +84,9 @@ macro_rules! impl_tuple_renderable {
     };
 }
 
-all_tuples!(impl_tuple_renderable, 1, 16, T);
+all_tuples!(impl_tuple_render_command, 1, 16, T);
 
-impl<T: Renderable, const N: usize> Renderable for [T; N] {
+impl<T: RenderCommand, const N: usize> RenderCommand for [T; N] {
     fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         self.iter()
             .for_each(|x| x.encode_compute_pass_command(cpass))
@@ -121,103 +121,97 @@ impl<T: Renderable, const N: usize> Renderable for [T; N] {
     }
 }
 
-/// Extract is the process of getting [`Primitive::Data`] from an item.
-///
-/// If [`Primitive::Data`] is [`Renderable`], then [`RenderableItem`] will be automatically implemented.
 pub trait Extract {
-    type Primitive: Primitive;
-    fn extract(&self) -> <Self::Primitive as Primitive>::Data;
+    type Target;
+    fn extract(&self) -> Self::Target;
 }
 
-/// RenderableItem is what can [`Extract`] to a [`Renderable`] [`Primitive`].
-/// This is automatically implemented for all types that implement [`Extract<Primitive = P>`]
-/// where `P` implements [`Renderable`] and [`Primitive`].
+/// The Primitive is the basic renderable object in Ranim.
 ///
-/// If you want to implement your own [`RenderableItem`], all you need to do is implement [`Extract`].
-pub trait RenderableItem {
+/// The Primitive itself is simply the data of the object.
+/// A Primitive has a corresponding [`Primitive::RenderInstance`],
+/// which implements [`RenderResource`] and [`RenderCommand`]:
+/// - [`RenderResource`]: A trait about init or update itself with [`RenderResource::Data`].
+/// - [`RenderCommand`]: A trait about encoding GPU commands.
+///
+pub trait Primitive {
+    type RenderInstance: RenderResource<Data = Self> + RenderCommand;
+}
+
+/// A trait for type erasing
+pub trait Renderable {
     fn prepare_for_id(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances, id: usize);
-    fn renderable_of_id<'a>(
-        &'a self,
-        render_instances: &'a RenderInstances,
-        id: usize,
-    ) -> Option<&'a dyn Renderable>;
 }
-
-impl<T, P> RenderableItem for T
-where
-    T: Extract<Primitive = P>,
-    P: Renderable + Primitive + 'static,
-{
+impl<T: Primitive + 'static> Renderable for T {
     fn prepare_for_id(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances, id: usize) {
-        render_instances.prepare(ctx, id, self);
-    }
-    fn renderable_of_id<'a>(
-        &'a self,
-        render_instances: &'a RenderInstances,
-        id: usize,
-    ) -> Option<&'a dyn Renderable> {
-        render_instances
-            .get_render_instance::<P>(id)
-            .map(|instance| instance as &dyn Renderable)
+        if let Some(instance) = render_instances.get_render_instance_mut::<T::RenderInstance>(id) {
+            instance.update(ctx, self);
+        } else {
+            render_instances.insert_render_instance(id, T::RenderInstance::init(ctx, self));
+        }
     }
 }
 
-// pub trait ExtractFrom<T: Entity>: Renderable + Any {
-//     fn update_from(&mut self, ctx: &WgpuContext, data: &T);
-// }
+macro_rules! impl_tuple_renderable {
+    ($(($n:tt, $T:ident)),*) => {
+        impl<$($T: Primitive + 'static),*> Renderable for ($($T,)*) {
+            fn prepare_for_id(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances, id: usize) {
+                if let Some(instance) =
+                    render_instances.get_render_instance_mut::<($($T::RenderInstance,)*)>(id)
+                {
+                    $(instance.$n.update(ctx, &self.$n);)*
+                } else {
+                    let instance = (
+                        $($T::RenderInstance::init(ctx, &self.$n),)*
+                    );
+                    render_instances.insert_render_instance(id, instance);
+                }
+            }
+        }
+    };
+}
+
+all_tuples_enumerated!(impl_tuple_renderable, 1, 16, T);
+
+pub trait AnyRenderCommand: Any + RenderCommand {}
+impl<T: RenderCommand + Any> AnyRenderCommand for T {}
 
 #[derive(Default)]
 pub struct RenderInstances {
     // Rabject's id -> RenderInstance
-    items: HashMap<usize, Box<dyn Any>>,
+    items: HashMap<usize, Box<dyn AnyRenderCommand>>,
 }
 
 impl RenderInstances {
-    pub(crate) fn insert_render_instance<T: Renderable + 'static>(
-        &mut self,
-        id: usize,
-        instance: T,
-    ) {
-        self.items.insert(id, Box::new(instance));
-    }
-    pub(crate) fn get_render_instance<T: Renderable + 'static>(&self, id: usize) -> Option<&T> {
+    // pub(crate) fn get_render_instance<T: RenderCommand + 'static>(&self, id: usize) -> Option<&T> {
+    //     self.items
+    //         .get(&id)
+    //         .and_then(|x| (x.as_ref() as &dyn Any).downcast_ref::<T>())
+    // }
+    pub(crate) fn get_render_instance_dyn(&self, id: usize) -> Option<&dyn RenderCommand> {
         self.items
             .get(&id)
-            .and_then(|x| x.as_ref().downcast_ref::<T>())
+            .map(|x| x.as_ref() as &dyn RenderCommand)
     }
-    pub(crate) fn get_render_instance_mut<T: Renderable + 'static>(
+    pub(crate) fn get_render_instance_mut<T: RenderCommand + 'static>(
         &mut self,
         id: usize,
     ) -> Option<&mut T> {
         // println!("get_render_instance_mut");
         self.items
             .get_mut(&id)
-            .and_then(|x| x.as_mut().downcast_mut::<T>())
+            .and_then(|x| (x.as_mut() as &mut dyn Any).downcast_mut::<T>())
     }
-    pub fn prepare<T: Extract<Primitive = P>, P: Renderable + Primitive + 'static>(
+    pub(crate) fn insert_render_instance<T: RenderCommand + 'static>(
         &mut self,
-        ctx: &WgpuContext,
         id: usize,
-        item: &T,
+        instance: T,
     ) {
-        let primitive_data = item.extract();
-        if let Some(render_instance) = self.get_render_instance_mut::<P>(id) {
-            render_instance.update(ctx, &primitive_data);
-        } else {
-            self.insert_render_instance(id, P::init(ctx, &primitive_data));
-        }
-    }
-    pub fn get_renderable<T: Extract<Primitive = P>, P: Renderable + Primitive + 'static>(
-        &self,
-        id: usize,
-    ) -> Option<&dyn Renderable> {
-        self.items
-            .get(&id)
-            .map(|x| x.downcast_ref::<P>().unwrap() as &dyn Renderable)
+        self.items.insert(id, Box::new(instance));
     }
 }
 
-impl Renderable for Vec<&dyn Renderable> {
+impl RenderCommand for Vec<&dyn RenderCommand> {
     fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         for render_instance in self {
             render_instance.encode_compute_pass_command(cpass);

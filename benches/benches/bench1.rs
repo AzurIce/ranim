@@ -12,7 +12,7 @@ use ranim::{
 struct StaticSquareScene(pub usize);
 
 impl TimelineConstructor for StaticSquareScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64;
 
@@ -27,7 +27,7 @@ impl TimelineConstructor for StaticSquareScene {
                 square
             })
             .collect::<Group<_>>();
-        let _squares = timeline.insert(squares);
+        let _squares = timeline.pin(squares);
         timeline.forward(1.0);
     }
 }
@@ -36,7 +36,7 @@ impl TimelineConstructor for StaticSquareScene {
 struct TransformSquareScene(pub usize);
 
 impl TimelineConstructor for TransformSquareScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64 - buff;
 
@@ -50,7 +50,7 @@ impl TimelineConstructor for TransformSquareScene {
                 item
             })
             .collect::<Group<_>>();
-        let mut squares = timeline.insert(squares);
+        let mut squares = timeline.pin(squares);
         let circles = (0..self.0)
             .cartesian_product(0..self.0)
             .map(|(i, j)| {

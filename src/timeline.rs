@@ -1,11 +1,9 @@
-use log::trace;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    animation::{AnimSchedule, AnimationSpan, EvalResult, Evaluator},
-    items::{Rabject, camera_frame::CameraFrame, group::Group},
-    render::primitives::RenderableItem,
+    animation::{AnimationSpan, EvalResult, Evaluator},
+    items::{PinnedItem, VisualItem, camera_frame::CameraFrame, group::Group},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
@@ -19,8 +17,12 @@ pub enum TimeMark {
 pub struct TimelineEvalResult {
     pub camera_frame: (EvalResult<CameraFrame>, usize),
     /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `animation idx` in the corresponding timeline)
-    pub items: Vec<(usize, EvalResult<Box<dyn RenderableItem>>, usize)>,
+    pub visual_items: Vec<(usize, EvalResult<Box<dyn VisualItem>>, usize)>,
 }
+
+// MARK: TimelineItem
+pub struct ItemMark;
+pub struct GroupMark;
 
 // MARK: TimelineInsert
 /// For type `T` that implements [`RanimItem`],
@@ -29,104 +31,171 @@ pub struct TimelineEvalResult {
 /// This is accomplished by two implementations of this trait, with different `Mark` type:
 /// - [`ItemMark`]: Insert a `T`, returns [`Rabject<T>`]
 /// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group<Rabject<T>>`]
-pub trait TimelineItem<Mark> {
-    type Inserted;
-    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Self::Inserted;
+pub trait TimelinePin<Mark> {
+    type Output;
+    fn pin(self, timeline: &RanimTimeline) -> Self::Output;
 }
 
-// MARK: TimelineItem
-pub struct ItemMark;
-pub struct GroupMark;
-
-impl<T> TimelineItem<ItemMark> for T
+impl<T> TimelinePin<ItemMark> for T
 where
-    T: RanimItem + 'static,
+    T: Into<Timeline> + Clone,
 {
-    type Inserted = Rabject<T>;
-    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Self::Inserted {
-        RanimItem::insert_into_timeline(self, timeline)
+    type Output = PinnedItem<T>;
+    fn pin(self, timeline: &RanimTimeline) -> Self::Output {
+        let pinned_item = PinnedItem::new(self);
+        // trace!("pin item: {}", pinned_item.id());
+        timeline._insert_timeline(pinned_item.id(), pinned_item.data.clone().into());
+        pinned_item
     }
 }
 
-impl<E, T> TimelineItem<GroupMark> for T
+impl<E, T> TimelinePin<GroupMark> for T
 where
-    E: RanimItem + 'static,
+    E: TimelinePin<ItemMark>,
     T: IntoIterator<Item = E>,
 {
-    type Inserted = Group<Rabject<E>>;
-    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Self::Inserted {
+    type Output = Group<E::Output>;
+    fn pin(self, timeline: &RanimTimeline) -> Self::Output {
         self.into_iter()
-            .map(|item| RanimItem::insert_into_timeline(item, timeline))
+            .map(|rabject| rabject.pin(timeline))
             .collect()
     }
 }
 
-/// An item that can be inserted into ranim's timeline
-///
-/// The item `T` will be inserted into a [`RabjectTimeline<T>`],
-/// and the [`RabjectTimeline<T>`] will be inserted into a [`RanimTimeline`] with type erased.
-///
-/// For now, there are two fixed types of [`RanimItem`], and they will be erased to different types:
-/// - [`CameraFrame`]: A camera frame.
-///   It will be erased to [`Timeline::CameraFrame`], which has a boxed [`AnyTimelineTrait`] in it.
-/// - [`RenderableItem`]: A renderable item
-///   It will be erased to [`Timeline::RenderableItem`], which has a boxed [`RenderableTimelineTrait`] in it.
-pub trait RanimItem {
-    fn insert_into_timeline(self, timeline: &RanimTimeline) -> Rabject<Self>
-    where
-        Self: Sized;
+pub trait TimelineUnpin<Mark> {
+    type Output;
+    fn unpin(self, timeline: &RanimTimeline) -> Self::Output;
 }
 
-impl<T: RenderableItem + Clone + 'static> RanimItem for T {
-    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
-        let timeline = RabjectTimeline::new(self.clone());
-        let timeline = Timeline::RenderableItem(Box::new(timeline));
-        Rabject {
-            id: ranim_timeline.insert_timeline(timeline),
-            data: self,
-        }
+impl<T> TimelineUnpin<ItemMark> for PinnedItem<T>
+where
+    T: Into<Timeline> + Clone,
+{
+    type Output = T;
+    fn unpin(self, timeline: &RanimTimeline) -> Self::Output {
+        timeline._hide(self.id());
+        self.data
     }
 }
 
-impl RanimItem for CameraFrame {
-    fn insert_into_timeline(self, ranim_timeline: &RanimTimeline) -> Rabject<Self> {
-        let timeline = RabjectTimeline::new(self.clone());
-        let timeline = Timeline::CameraFrame(Box::new(timeline));
-        Rabject {
-            id: ranim_timeline.insert_timeline(timeline),
-            data: self,
-        }
+impl<E, T> TimelineUnpin<GroupMark> for T
+where
+    E: TimelineUnpin<ItemMark>,
+    T: IntoIterator<Item = E>,
+{
+    type Output = Group<E::Output>;
+    fn unpin(self, timeline: &RanimTimeline) -> Self::Output {
+        self.into_iter()
+            .map(|rabject| rabject.unpin(timeline))
+            .collect()
     }
 }
 
+pub trait TimelineAnim<Mark> {
+    type Output;
+    fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64);
+}
+
+// For AnimationSpan, we first insert it, then play and hide the anim
+impl<T: Into<Timeline> + Clone + 'static> TimelineAnim<ItemMark> for AnimationSpan<T> {
+    type Output = T;
+    fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64) {
+        let cur_time = timeline.cur_sec();
+        let duration = self.span_len();
+        // trace!(
+        //     "[TimelineAnim::schedule] cur: {}, duration: {}",
+        //     cur_time, duration
+        // );
+
+        let item = self.eval_alpha(0.0).into_owned();
+        let rabject = timeline.pin(item);
+
+        let res = self.eval_alpha(1.0).into_owned();
+        timeline._schedule(rabject.id(), self);
+        (res, cur_time + duration)
+    }
+}
+
+impl<T: TimelineAnim<ItemMark>> TimelineAnim<GroupMark> for Group<T> {
+    type Output = Group<T::Output>;
+    fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64) {
+        let (results, end_times): (Vec<_>, Vec<_>) =
+            self.into_iter().map(|item| item.schedule(timeline)).unzip();
+        (
+            Group(results),
+            end_times
+                .into_iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap(),
+        )
+    }
+}
+
+impl<T: TimelineAnim<ItemMark>, const N: usize> TimelineAnim<GroupMark> for [T; N] {
+    type Output = [T::Output; N];
+    fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64) {
+        let (results, end_times): (Vec<_>, Vec<_>) =
+            self.into_iter().map(|item| item.schedule(timeline)).unzip();
+        (
+            results
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("failed to convert vec to array"))
+                .unwrap(),
+            end_times
+                .into_iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap(),
+        )
+    }
+}
+
+/// Timeline is a type erased [`RabjectTimeline<T>`]
+///
+/// Currently There are two types of Timeline:
+/// - [`Timeline::VisualItem`]: Can be created from [`VisualItem`], has a boxed [`AnyVisualItemTimelineTrait`] in it.
+/// - [`Timeline::CameraFrame`]: Can be created from [`CameraFrame`], has a boxed [`AnyTimelineTrait`] in it.
 pub enum Timeline {
     CameraFrame(Box<dyn AnyTimelineTrait>),
-    RenderableItem(Box<dyn AnyRenderableTimelineTrait>),
+    VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
+}
+
+impl From<CameraFrame> for Timeline {
+    fn from(value: CameraFrame) -> Self {
+        let timeline = RabjectTimeline::new(value);
+        Timeline::CameraFrame(Box::new(timeline))
+    }
+}
+
+impl<T: VisualItem + Clone + 'static> From<T> for Timeline {
+    fn from(value: T) -> Self {
+        let timeline = RabjectTimeline::new(value);
+        Timeline::VisualItem(Box::new(timeline))
+    }
 }
 
 impl Timeline {
     pub fn as_timeline(&self) -> &dyn TimelineTrait {
         match self {
             Timeline::CameraFrame(timeline) => timeline.as_timeline(),
-            Timeline::RenderableItem(timeline) => timeline.as_timeline(),
+            Timeline::VisualItem(timeline) => timeline.as_timeline(),
         }
     }
     pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait {
         match self {
             Timeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
-            Timeline::RenderableItem(timeline) => timeline.as_timeline_mut(),
+            Timeline::VisualItem(timeline) => timeline.as_timeline_mut(),
         }
     }
     pub fn as_any(&self) -> &dyn Any {
         match self {
             Timeline::CameraFrame(timeline) => timeline.as_any(),
-            Timeline::RenderableItem(timeline) => timeline.as_any(),
+            Timeline::VisualItem(timeline) => timeline.as_any(),
         }
     }
     pub fn as_any_mut(&mut self) -> &mut dyn Any {
         match self {
             Timeline::CameraFrame(timeline) => timeline.as_any_mut(),
-            Timeline::RenderableItem(timeline) => timeline.as_any_mut(),
+            Timeline::VisualItem(timeline) => timeline.as_any_mut(),
         }
     }
 }
@@ -137,141 +206,200 @@ impl Timeline {
 #[derive(Default)]
 pub struct RanimTimeline {
     // Timeline<CameraFrame> or Timeline<Item>
-    timelines: RefCell<Vec<Timeline>>,
-    max_elapsed_secs: RefCell<f64>,
+    timelines: RefCell<Vec<(usize, Timeline)>>,
+    cur_secs: RefCell<f64>,
     time_marks: RefCell<Vec<(f64, TimeMark)>>,
 }
 
 impl RanimTimeline {
+    pub(crate) fn seal(&self) {
+        self.timelines
+            .borrow_mut()
+            .iter_mut()
+            .for_each(|(_, timeline)| {
+                timeline.as_timeline_mut().hide();
+            });
+        // info!("Timeline sealed");
+        // info!("{}", self.cur_sec());
+        // info!("{}", self.max_elapsed_secs());
+    }
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn duration_secs(&self) -> f64 {
-        *self.max_elapsed_secs.borrow()
+    pub fn cur_sec(&self) -> f64 {
+        *self.cur_secs.borrow()
     }
 
-    /// Push an animation into the timeline
-    ///
-    /// Note that this won't apply the animation effect to rabject's data,
-    /// to apply the animation effect use [`AnimSchedule::apply`]
-    pub fn play<'r, T, I>(&self, anim_schedules: I) -> &Self
-    where
-        T: RanimItem + Clone + 'static,
-        I: IntoIterator<Item = AnimSchedule<'r, T>>,
-    {
-        anim_schedules.into_iter().for_each(|anim_schedule| {
-            self._play(anim_schedule);
-        });
-        self
+    pub fn max_elapsed_secs(&self) -> f64 {
+        self.timelines
+            .borrow()
+            .iter()
+            .map(|(_, timeline)| timeline.as_timeline().elapsed_secs())
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap()
     }
 
-    pub fn insert<Mark, T: TimelineItem<Mark>>(&self, item: T) -> T::Inserted {
-        item.insert_into_timeline(self)
+    /// Use pin to pin anitem into the timeline
+    pub fn pin<Mark, T: TimelinePin<Mark>>(&self, item: T) -> T::Output {
+        item.pin(self)
     }
 
-    fn insert_timeline(&self, mut timeline: Timeline) -> usize {
+    pub fn unpin<Mark, T: TimelineUnpin<Mark>>(&self, item: T) -> T::Output {
+        item.unpin(self)
+    }
+
+    fn _insert_timeline(&self, id: usize, mut timeline: Timeline) {
         let mut timelines = self.timelines.borrow_mut();
 
-        let id = timelines.len();
-        let max_elapsed_secs = *self.max_elapsed_secs.borrow();
         {
             let timeline = timeline.as_timeline_mut();
-            if max_elapsed_secs != 0.0 && timeline.elapsed_secs() < max_elapsed_secs {
-                timeline.append_blank(*self.max_elapsed_secs.borrow());
-            }
+            timeline.set_start_sec(self.cur_sec());
+            // if max_elapsed_secs != 0.0 && timeline.elapsed_secs() < max_elapsed_secs {
+            //     timeline.append_blank(*self.max_elapsed_secs.borrow());
+            // }
+            // trace!(
+            //     "insert timeline, id: {}, cur_sec: {}, show_secs: {:?}",
+            //     id,
+            //     timeline.cur_sec(),
+            //     timeline.show_secs()
+            // );
         }
-        timelines.push(timeline);
-        id
+        timelines.push((id, timeline));
     }
 
-    /// Update the static state of a rabject's timeline
-    pub fn update<T: RanimItem + Clone + 'static>(&self, rabject: &Rabject<T>) {
-        let mut timelines = self.timelines.borrow_mut();
-        let timeline = timelines
-            .get_mut(rabject.id)
-            .unwrap()
-            .as_any_mut()
-            .downcast_mut::<RabjectTimeline<T>>()
-            .unwrap();
-        timeline.update_static_state(Some(Rc::new(rabject.data.clone())));
-    }
     /// Forward all rabjects' timeline by the given seconds
     pub fn forward(&self, secs: f64) -> &Self {
-        self.timelines.borrow_mut().iter_mut().for_each(|timeline| {
-            timeline.as_timeline_mut().forward(secs);
-        });
-        *self.max_elapsed_secs.borrow_mut() += secs;
+        // println!("forward, sec: {}", secs);
+        self.timelines
+            .borrow_mut()
+            .iter_mut()
+            .for_each(|(_, timeline)| {
+                timeline.as_timeline_mut().forward(secs);
+            });
+        *self.cur_secs.borrow_mut() += secs;
+        self
+    }
+    pub fn forward_to(&self, target_sec: f64) -> &Self {
+        // println!("forward_to, target_sec: {}", target_sec);
+        self.timelines
+            .borrow_mut()
+            .iter_mut()
+            .for_each(|(_, timeline)| {
+                timeline.as_timeline_mut().forward_to(target_sec);
+            });
+        *self.cur_secs.borrow_mut() = target_sec;
         self
     }
 
     /// Show a rabject
     ///
     /// [`RanimTimeline::forward`] after this will encode timeline's static rabject state into the timeline
-    pub fn show<T>(&self, rabject: &Rabject<T>) {
+    pub fn show<T>(&self, rabject: &PinnedItem<T>) {
+        self._show(rabject.id());
+    }
+    fn _show(&self, id: usize) {
         self.timelines
             .borrow_mut()
-            .get_mut(rabject.id)
+            .iter_mut()
+            .find(|(_id, _)| *_id == id)
             .unwrap()
+            .1
             .as_timeline_mut()
             .show();
-    }
-    /// Hide a rabject
-    ///
-    /// [`RanimTimeline::forward`] after this will encode blank into the timeline
-    pub fn hide<T>(&self, rabject: &Rabject<T>) {
-        self.timelines
-            .borrow_mut()
-            .get_mut(rabject.id)
-            .unwrap()
-            .as_timeline_mut()
-            .hide();
     }
 
     // TODO: make this better
     /// Remove a rabject
     ///
     /// [`RanimTimeline::forward`] after this will encode blank into the timeline
-    pub fn remove<T>(&self, rabject: Rabject<T>) {
+    pub fn remove<T>(&self, rabject: PinnedItem<T>) {
+        self._hide(rabject.id());
+    }
+    /// Hide a rabject
+    ///
+    /// [`RanimTimeline::forward`] after this will encode blank into the timeline
+    pub fn hide<T>(&self, rabject: &PinnedItem<T>) {
+        self._hide(rabject.id());
+    }
+    fn _hide(&self, id: usize) {
         self.timelines
             .borrow_mut()
-            .get_mut(rabject.id)
+            .iter_mut()
+            .find(|(_id, _)| *_id == id)
             .unwrap()
+            .1
             .as_timeline_mut()
             .hide();
     }
 
     /// Sync all rabjects' timeline to the max elapsed seconds
     pub fn sync(&self) -> &Self {
+        let max_elapsed_secs = self.max_elapsed_secs();
+
         let mut timelines = self.timelines.borrow_mut();
-        let max_elapsed_secs = self.max_elapsed_secs.borrow();
-        timelines.iter_mut().for_each(|timeline| {
-            // println!("{}, {}", timeline.elapsed_secs(), *max_elapsed_secs);
-            let elapsed_secs = timeline.as_timeline().elapsed_secs();
-            if elapsed_secs < *max_elapsed_secs {
-                timeline
-                    .as_timeline_mut()
-                    .forward(*max_elapsed_secs - elapsed_secs);
-            }
+        timelines.iter_mut().for_each(|(_, timeline)| {
+            timeline.as_timeline_mut().forward_to(max_elapsed_secs);
         });
         self
     }
 
-    fn _play<T: RanimItem + Clone + 'static>(&self, anim_schedule: AnimSchedule<T>) -> &Self {
-        trace!("play {:?}", anim_schedule);
+    /// Push an animation into the timeline
+    ///
+    /// Note that this won't apply the animation effect to rabject's data,
+    /// to apply the animation effect use [`AnimSchedule::apply`]
+    pub fn play<Mark, T: TimelineAnim<Mark>>(&self, anim: T) -> T::Output {
+        let (res, end_sec) = self.schedule(anim);
+        // trace!("play, end_sec: {}", end_sec);
+        self.forward_to(end_sec);
+        res
+    }
+
+    // pub fn play_and<Mark, T: TimelineAnim<Mark>, F, O>(&self, anim: T, and: F) -> O
+    // where F: FnOnce(&RanimTimeline, T::Output) -> O {
+    //     let (res, end_sec) = anim.schedule(self);
+    //     self.forward_to(end_sec);
+    //     res
+    // }
+
+    /// Push an animation into the timeline while not forwarding the timeline
+    ///
+    /// It will return the animation result and the end time of the animation
+    pub fn schedule<Mark, T: TimelineAnim<Mark>>(&self, anim: T) -> (T::Output, f64) {
+        anim.schedule(self)
+    }
+
+    // pub fn play_and_hide<'r, T, I>(&self, anim_schedules: I) -> &Self
+    // where
+    //     T: Into<Timeline> + Clone + 'static,
+    //     I: IntoIterator<Item = AnimSchedule<T>>,
+    // {
+    //     anim_schedules
+    //         .into_iter()
+    //         .for_each(|AnimSchedule { id, anim }| {
+    //             self._play(id, anim);
+    //             self._hide(id);
+    //         });
+    //     self
+    // }
+    fn _schedule<T: Into<Timeline> + Clone + 'static>(
+        &self,
+        id: usize,
+        anim: AnimationSpan<T>,
+    ) -> &Self {
+        // trace!("[RanimTimeline::_schedule] schedule {:?} on {:?}", anim, id);
         let mut timelines = self.timelines.borrow_mut();
-        let AnimSchedule { rabject, anim } = anim_schedule;
 
         let timeline = timelines
-            .get_mut(rabject.id)
+            .iter_mut()
+            .find(|(_id, _)| *_id == id)
             .unwrap()
+            .1
             .as_any_mut()
             .downcast_mut::<RabjectTimeline<T>>()
             .unwrap();
 
-        let mut max_duration = self.max_elapsed_secs.borrow_mut();
-        timeline.append_anim(anim);
-        *max_duration = max_duration.max(timeline.duration_secs());
+        timeline.schedule(anim);
         self
     }
 
@@ -282,36 +410,34 @@ impl RanimTimeline {
         self.time_marks.borrow().clone()
     }
     pub fn eval_sec(&self, local_sec: f64) -> TimelineEvalResult {
-        self.eval_alpha_new(local_sec / *self.max_elapsed_secs.borrow())
+        self.eval_alpha(local_sec / self.cur_sec())
     }
 
-    pub fn eval_alpha_new(&self, alpha: f64) -> TimelineEvalResult {
+    pub fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
         let timelines = self.timelines.borrow_mut();
 
         let mut items = Vec::with_capacity(timelines.len());
 
         let mut camera_frame = None::<(EvalResult<CameraFrame>, usize)>;
-        timelines
-            .iter()
-            .enumerate()
-            .for_each(|(id, timeline)| match timeline {
-                Timeline::CameraFrame(timeline) => {
-                    let timeline = timeline
-                        .as_any()
-                        .downcast_ref::<RabjectTimeline<CameraFrame>>()
-                        .unwrap();
-                    camera_frame = timeline.eval_alpha(alpha)
+        timelines.iter().for_each(|(id, timeline)| match timeline {
+            Timeline::CameraFrame(timeline) => {
+                let timeline = timeline
+                    .as_any()
+                    .downcast_ref::<RabjectTimeline<CameraFrame>>()
+                    .unwrap();
+                camera_frame = timeline.eval_alpha(alpha)
+            }
+            Timeline::VisualItem(timeline) => {
+                if let Some((res, idx)) = timeline.eval_alpha(alpha) {
+                    items.push((*id, res, idx));
                 }
-                Timeline::RenderableItem(timeline) => {
-                    if let Some((res, idx)) = timeline.eval_alpha(alpha) {
-                        items.push((id, res, idx));
-                    }
-                }
-            });
+            }
+        });
+        // println!("alpha: {}, items: {}", alpha, items.len());
 
         TimelineEvalResult {
             camera_frame: camera_frame.unwrap(),
-            items,
+            visual_items: items,
         }
     }
 
@@ -320,10 +446,9 @@ impl RanimTimeline {
         self.timelines
             .borrow()
             .iter()
-            .enumerate()
             // .take(MAX_TIMELINE_CNT)
             .map(|(id, timeline)| RabjectTimelineInfo {
-                id,
+                id: *id,
                 type_name: timeline.as_timeline().type_name().to_string(),
                 animation_infos: timeline.as_timeline().get_animation_infos(),
             })
@@ -342,25 +467,14 @@ impl Debug for RanimTimeline {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "Timeline {:?}: {} timelines\n",
-            Duration::from_secs_f64(self.duration_secs()),
+            Duration::from_secs_f64(self.cur_sec()),
             self.timelines.borrow().len()
         ))?;
         Ok(())
     }
 }
 
-// MARK: RabjectTimeline
-
-/// A timeline struct that encodes the animation of the type `T`
-pub struct RabjectTimeline<T> {
-    type_name: String,
-    forward_static_state: Option<Rc<T>>,
-    animations: Vec<Option<AnimationSpan<T>>>,
-    end_secs: Vec<f64>,
-    // Encoding states
-    is_showing: bool,
-}
-
+// MARK: TimelineTrait
 pub trait AnyTimelineTrait: TimelineTrait + Any {
     fn as_timeline(&self) -> &dyn TimelineTrait;
     fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait;
@@ -382,13 +496,13 @@ impl<T: TimelineTrait + Any> AnyTimelineTrait for T {
     }
 }
 
-pub trait AnyRenderableTimelineTrait: RenderableTimelineTrait + Any {
+pub trait AnyVisualItemTimelineTrait: VisualItemTimelineTrait + Any {
     fn as_timeline(&self) -> &dyn TimelineTrait;
     fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait;
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
-impl<T: RenderableTimelineTrait + Any> AnyRenderableTimelineTrait for T {
+impl<T: VisualItemTimelineTrait + Any> AnyVisualItemTimelineTrait for T {
     fn as_timeline(&self) -> &dyn TimelineTrait {
         self
     }
@@ -403,6 +517,18 @@ impl<T: RenderableTimelineTrait + Any> AnyRenderableTimelineTrait for T {
     }
 }
 
+pub trait VisualItemTimelineTrait: TimelineTrait {
+    fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)>;
+}
+
+impl<T: Clone + VisualItem + 'static> VisualItemTimelineTrait for RabjectTimeline<T> {
+    fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)> {
+        let (item, idx) = self.eval_alpha(alpha)?;
+        let item = item.map(|item| Box::new(item) as Box<dyn VisualItem>);
+        Some((item, idx))
+    }
+}
+
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AnimationInfo {
     pub anim_name: String,
@@ -410,75 +536,98 @@ pub struct AnimationInfo {
     pub end_sec: f64,
 }
 
-pub trait RenderableTimelineTrait: TimelineTrait {
-    fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<Box<dyn RenderableItem>>, usize)>;
-}
-
-impl<T: Clone + RenderableItem + 'static> RenderableTimelineTrait for RabjectTimeline<T> {
-    fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<Box<dyn RenderableItem>>, usize)> {
-        let (item, idx) = self.eval_alpha(alpha)?;
-        let item = item.map(|item| Box::new(item) as Box<dyn RenderableItem>);
-        Some((item, idx))
-    }
-}
-
 pub trait TimelineTrait {
+    fn cur_sec(&self) -> f64;
     fn elapsed_secs(&self) -> f64;
     fn forward(&mut self, duration_secs: f64);
-    fn append_blank(&mut self, duration_secs: f64);
-    fn append_freeze(&mut self, duration_secs: f64);
+    fn forward_to(&mut self, target_sec: f64) {
+        let duration = target_sec - self.cur_sec();
+        if duration > 0.0 {
+            self.forward(duration);
+        }
+    }
+    // fn append_blank(&mut self, duration_secs: f64);
+    // fn append_freeze(&mut self, duration_secs: f64);
     fn show(&mut self);
     fn hide(&mut self);
     fn get_animation_infos(&self) -> Vec<AnimationInfo>;
     fn type_name(&self) -> &str;
+    fn set_start_sec(&mut self, start_sec: f64);
+    fn show_secs(&self) -> &Vec<f64>;
 }
 
-impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
+// MARK: RabjectTimeline
+/// A timeline struct that encodes the animation of the type `T`
+pub struct RabjectTimeline<T> {
+    type_name: String,
+    cur_sec: f64,
+    animations: Vec<AnimationSpan<T>>,
+    show_secs: Vec<f64>,
+}
+
+impl<T> TimelineTrait for RabjectTimeline<T> {
     fn elapsed_secs(&self) -> f64 {
-        self.end_secs.last().cloned().unwrap_or(0.0)
+        self.show_secs.last().copied().unwrap_or(0.0)
+    }
+    fn cur_sec(&self) -> f64 {
+        self.cur_sec
+    }
+    fn show_secs(&self) -> &Vec<f64> {
+        &self.show_secs
     }
     fn show(&mut self) {
-        self.is_showing = true;
-    }
-    fn hide(&mut self) {
-        self.is_showing = false;
-    }
-    fn forward(&mut self, duration_secs: f64) {
-        if self.is_showing {
-            self.append_freeze(duration_secs);
-        } else {
-            self.append_blank(duration_secs);
+        if self.show_secs.len() % 2 == 0 {
+            // trace!("!!! push {}", self.cur_sec());
+            self.show_secs.push(self.cur_sec());
         }
     }
-    fn append_blank(&mut self, duration_secs: f64) {
-        let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + duration_secs;
-        self.animations.push(None);
-        self.end_secs.push(end_sec);
+    fn hide(&mut self) {
+        if self.show_secs.len() % 2 != 0 {
+            // trace!("!!! push {}", self.cur_sec());
+            self.show_secs.push(self.cur_sec());
+        }
     }
-    fn append_freeze(&mut self, duration_secs: f64) {
-        let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + duration_secs;
-        self.animations.push(
-            self.forward_static_state
-                .as_ref()
-                .map(|state| AnimationSpan::from_evaluator(Evaluator::Static(state.clone()))),
-        );
-        self.end_secs.push(end_sec);
+    fn forward(&mut self, duration_secs: f64) {
+        // trace!(
+        //     "[{}] cur: {}, forward {} secs",
+        //     self.type_name,
+        //     self.cur_sec(),
+        //     duration_secs
+        // );
+        self.cur_sec += duration_secs;
+        // if self.is_showing() {
+        //     self.append_freeze(duration_secs);
+        // } else {
+        //     self.append_blank(duration_secs);
+        // }
     }
+    // fn append_blank(&mut self, duration_secs: f64) {
+    //     let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + duration_secs;
+    //     self.animations.push(None);
+    //     self.end_secs.push(end_sec);
+    // }
+    // fn append_freeze(&mut self, duration_secs: f64) {
+    //     let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + duration_secs;
+    //     self.animations.push(
+    //         self.forward_static_state
+    //             .as_ref()
+    //             .map(|state| AnimationSpan::from_evaluator(Evaluator::Static(state.clone()))),
+    //     );
+    //     self.end_secs.push(end_sec);
+    // }
     fn get_animation_infos(&self) -> Vec<AnimationInfo> {
         // const MAX_INFO_CNT: usize = 100;
         self.animations
             .iter()
-            .enumerate()
-            .filter_map(|(idx, anim)| {
-                anim.as_ref().map(|anim| AnimationInfo {
+            .zip(self.show_secs.chunks(2))
+            .map(|(anim, show_sec)| {
+                let start = show_sec.first().unwrap();
+                let end = show_sec.last().unwrap();
+                AnimationInfo {
                     anim_name: anim.type_name.clone(),
-                    start_sec: if idx == 0 {
-                        0.0
-                    } else {
-                        self.end_secs.get(idx - 1).cloned().unwrap()
-                    } + anim.padding.0,
-                    end_sec: self.end_secs[idx] - anim.padding.1,
-                })
+                    start_sec: *start + anim.padding.0,
+                    end_sec: *end - anim.padding.1,
+                }
             })
             // .take(MAX_INFO_CNT)
             .collect()
@@ -486,37 +635,58 @@ impl<T: 'static> TimelineTrait for RabjectTimeline<T> {
     fn type_name(&self) -> &str {
         &self.type_name
     }
+    fn set_start_sec(&mut self, start_sec: f64) {
+        assert_eq!(self.show_secs.len(), 1);
+        self.cur_sec = start_sec;
+        self.show_secs[0] = start_sec;
+    }
 }
 
 impl<T: 'static> RabjectTimeline<T> {
+    /// Create a new timeline with the initial state
     pub fn new(initial_state: T) -> Self {
         Self {
             type_name: std::any::type_name::<T>().to_string(),
-            forward_static_state: Some(Rc::new(initial_state)),
-            animations: Vec::new(),
-            end_secs: Vec::new(),
-            is_showing: true,
+            animations: vec![AnimationSpan::from_evaluator(Evaluator::Static(Rc::new(
+                initial_state,
+            )))],
+            cur_sec: 0.0,
+            show_secs: vec![0.0],
         }
     }
 }
 
 impl<T> RabjectTimeline<T> {
-    fn update_static_state(&mut self, static_state: Option<Rc<T>>) {
-        self.forward_static_state = static_state;
+    fn is_showing(&self) -> bool {
+        self.show_secs
+            .chunks(2)
+            .enumerate()
+            .any(|(idx, show_secs)| {
+                let start = show_secs.first().cloned().unwrap();
+                let end = show_secs.get(1).cloned().unwrap_or(self.cur_sec());
+                start <= self.cur_sec
+                    && (self.cur_sec < end
+                        || self.cur_sec == end && idx == self.animations.len() - 1)
+            })
     }
-    fn append_anim(&mut self, anim: AnimationSpan<T>) {
-        let end_state = match anim.eval_alpha(1.0) {
-            EvalResult::Dynamic(res) => Rc::new(res),
-            EvalResult::Static(res) => res,
-        };
-        self.update_static_state(Some(end_state));
-        let end_sec = self.end_secs.last().copied().unwrap_or(0.0) + anim.span_len();
-        // println!("{}", end_sec);
-        self.animations.push(Some(anim));
-        self.end_secs.push(end_sec);
-    }
-    pub fn duration_secs(&self) -> f64 {
-        self.end_secs.last().cloned().unwrap_or(0.0)
+    fn schedule(&mut self, anim: AnimationSpan<T>) {
+        // trace!(
+        //     "[RabjectTimeline::schedule] schedule {:?}, cur: {}, show_secs: {:?}",
+        //     anim,
+        //     self.cur_sec(),
+        //     self.show_secs
+        // );
+        if self.is_showing() {
+            self.show_secs.push(self.cur_sec);
+        }
+        self.show_secs.push(self.cur_sec);
+        self.show_secs.push(self.cur_sec + anim.span_len());
+        self.animations.push(anim);
+        // trace!(
+        //     "[RabjectTimeline::schedule] schedule, cur: {}, show_secs: {:?}",
+        //     self.cur_sec(),
+        //     self.show_secs
+        // );
     }
     pub fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<T>, usize)> {
         if self.animations.is_empty() {
@@ -524,19 +694,30 @@ impl<T> RabjectTimeline<T> {
         }
 
         let alpha = alpha.clamp(0.0, 1.0);
-        let target_sec = alpha * self.end_secs.last().unwrap();
-        let (idx, (elem, end_sec)) = self
-            .animations
+        let target_sec = alpha * self.cur_sec();
+        // trace!(
+        //     "[RabjectTimeline::eval_alpha alpha: {}, target_sec: {}",
+        //     alpha, target_sec
+        // );
+        // trace!("cur: {}, show_secs {:?}", self.cur_sec(), self.show_secs);
+        self.animations
             .iter()
-            .zip(self.end_secs.iter())
+            .zip(self.show_secs.chunks(2))
             .enumerate()
-            .find(|&(_, (_, &end_sec))| end_sec >= target_sec)
-            .unwrap();
-
-        elem.as_ref().map(|elem| {
-            let start_sec = end_sec - elem.span_len();
-            let alpha = (target_sec - start_sec) / elem.span_len();
-            (elem.eval_alpha(alpha), idx)
-        })
+            .find_map(|(idx, (anim, show_secs))| {
+                let start = show_secs.first().cloned().unwrap();
+                let end = show_secs.get(1).cloned().unwrap_or(self.cur_sec());
+                if start <= target_sec
+                    && (target_sec < end || target_sec == end && idx == self.animations.len() - 1)
+                {
+                    Some((idx, anim, (start, end)))
+                } else {
+                    None
+                }
+            })
+            .map(|(idx, anim, (start, end))| {
+                let alpha = (target_sec - start) / (end - start);
+                (anim.eval_alpha(alpha), idx)
+            })
     }
 }

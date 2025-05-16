@@ -60,12 +60,12 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
 struct RanimLogoScene;
 
 impl TimelineConstructor for RanimLogoScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let logo_width = frame_size.y * 0.618;
 
         let mut logo = build_logo(logo_width)
-            .map(|item| timeline.insert(item))
+            .map(|item| timeline.pin(item))
             .into_iter()
             .collect::<Group<_>>();
 
@@ -110,11 +110,11 @@ impl TimelineConstructor for RanimLogoScene {
 ]"#
         ));
         ranim_text
-            .scale_to(ScaleHint::PorportionalHeight(1.0))
+            .scale_to(ScaleHint::PorportionalY(1.0))
             .put_center_on(DVec3::NEG_Y * 2.5);
         let mut ranim_text = ranim_text
             .into_iter()
-            .map(|item| timeline.insert(item))
+            .map(|item| timeline.pin(item))
             .collect::<Group<_>>();
         timeline.play(
             ranim_text
@@ -125,7 +125,7 @@ impl TimelineConstructor for RanimLogoScene {
         timeline.sync();
 
         timeline.insert_time_mark(
-            timeline.duration_secs(),
+            timeline.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),
         );
         timeline.forward(1.0);
@@ -138,5 +138,8 @@ impl TimelineConstructor for RanimLogoScene {
 }
 
 fn main() {
+    #[cfg(feature = "app")]
+    run_scene_app(RanimLogoScene);
+    #[cfg(not(feature = "app"))]
     render_scene(RanimLogoScene, &AppOptions::default());
 }

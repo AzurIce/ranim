@@ -14,7 +14,7 @@ use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use items::{Rabject, camera_frame::CameraFrame};
+use items::{PinnedItem, camera_frame::CameraFrame};
 use timeline::{RanimTimeline, TimeMark, TimelineEvalResult};
 
 use render::{Renderer, primitives::RenderInstances};
@@ -27,7 +27,7 @@ pub mod prelude {
     pub use crate::{SceneMetaTrait, TimelineConstructor};
     pub use ranim_macros::scene;
 
-    pub use crate::items::{Rabject, camera_frame::CameraFrame};
+    pub use crate::items::{PinnedItem, camera_frame::CameraFrame};
     pub use crate::timeline::RanimTimeline;
 
     pub use crate::color::prelude::*;
@@ -95,7 +95,7 @@ pub trait Scene: TimelineConstructor + SceneMetaTrait {}
 impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
 
 impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, camera: PinnedItem<CameraFrame>) {
         self.0.construct(timeline, camera);
     }
 }
@@ -111,15 +111,17 @@ pub trait TimelineConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>);
+    fn construct(self, timeline: &RanimTimeline, camera: PinnedItem<CameraFrame>);
 }
 
 pub fn build_timeline(constructor: impl TimelineConstructor) -> RanimTimeline {
     let timeline = RanimTimeline::new();
     {
-        let mut camera = timeline.insert(items::camera_frame::CameraFrame::new());
-        constructor.construct(&timeline, &mut camera);
+        let camera_frame = items::camera_frame::CameraFrame::new();
+        let camera_frame = timeline.pin(camera_frame);
+        constructor.construct(&timeline, camera_frame);
         timeline.sync();
+        timeline.seal();
     }
     timeline
 }
@@ -250,7 +252,7 @@ impl RanimRenderApp {
             (cpu_server, gpu_server)
         };
 
-        let frames = (timeline.duration_secs() * self.fps as f64).ceil() as usize;
+        let frames = (timeline.cur_sec() * self.fps as f64).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
@@ -273,51 +275,50 @@ impl RanimRenderApp {
                     // EvalResult<CameraFrame>, idx
                     camera_frame,
                     // Vec<(rabject_id, EvalResult<Item>, idx)>
-                    items,
+                    visual_items,
                 } = {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("eval");
 
-                    timeline.eval_alpha_new(alpha)
+                    timeline.eval_alpha(alpha)
+                };
+
+                let extracted_updates = {
+                    #[cfg(feature = "profiling")]
+                    profiling::scope!("extract");
+                    visual_items
+                        .iter()
+                        .filter_map(|(id, res, idx)| {
+                            let last_idx = last_idx.entry(*id).or_insert(-1);
+                            let prev_last_idx = *last_idx;
+                            *last_idx = *idx as i32;
+                            let renderable = match res {
+                                EvalResult::Dynamic(res) => Some(res.extract_renderable()),
+                                EvalResult::Static(res) => {
+                                    if prev_last_idx != *idx as i32 {
+                                        Some(res.extract_renderable())
+                                    } else {
+                                        None
+                                    }
+                                }
+                            };
+                            renderable.map(|renderable| (*id, renderable))
+                        })
+                        .collect::<Vec<_>>()
                 };
 
                 {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("prepare");
-                    items.iter().for_each(|(id, res, idx)| {
-                        let last_idx = last_idx.entry(*id).or_insert(-1);
-                        let prev_last_idx = *last_idx;
-                        *last_idx = *idx as i32;
-                        match res {
-                            EvalResult::Dynamic(res) => res.prepare_for_id(
-                                &self.ctx.wgpu_ctx,
-                                &mut self.render_instances,
-                                *id,
-                            ),
-                            EvalResult::Static(res) => {
-                                if prev_last_idx != *idx as i32 {
-                                    res.prepare_for_id(
-                                        &self.ctx.wgpu_ctx,
-                                        &mut self.render_instances,
-                                        *id,
-                                    )
-                                }
-                            }
-                        }
+                    extracted_updates.iter().for_each(|(id, res)| {
+                        res.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id);
                     });
                     self.ctx.wgpu_ctx.queue.submit([]);
                 }
 
-                let render_primitives = items
+                let render_primitives = visual_items
                     .iter()
-                    .filter_map(|(id, res, _)| match res {
-                        EvalResult::Dynamic(res) => {
-                            res.renderable_of_id(&self.render_instances, *id)
-                        }
-                        EvalResult::Static(res) => {
-                            res.renderable_of_id(&self.render_instances, *id)
-                        }
-                    })
+                    .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
                     .collect::<Vec<_>>();
                 let camera_frame = match &camera_frame.0 {
                     EvalResult::Dynamic(res) => res,
@@ -343,15 +344,15 @@ impl RanimRenderApp {
                 pb.inc(1);
                 pb.set_message(format!(
                     "rendering {:.1?}/{:.1?}",
-                    Duration::from_secs_f64(alpha * timeline.duration_secs()),
-                    Duration::from_secs_f64(timeline.duration_secs())
+                    Duration::from_secs_f64(alpha * timeline.cur_sec()),
+                    Duration::from_secs_f64(timeline.cur_sec())
                 ));
             });
 
         let msg = format!(
             "rendered {} frames({:?})",
             frames,
-            Duration::from_secs_f64(timeline.duration_secs()),
+            Duration::from_secs_f64(timeline.cur_sec()),
         );
         pb.finish_with_message(msg);
 
@@ -391,22 +392,26 @@ impl RanimRenderApp {
     ) {
         let TimelineEvalResult {
             camera_frame,
-            items,
+            visual_items,
         } = timeline.eval_sec(sec);
-        items.iter().for_each(|(id, res, _)| match res {
-            EvalResult::Dynamic(res) => {
-                res.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id)
-            }
-            EvalResult::Static(res) => {
-                res.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id)
-            }
-        });
-        let render_primitives = items
+
+        let extracted = visual_items
             .iter()
-            .filter_map(|(id, res, _)| match res {
-                EvalResult::Dynamic(res) => res.renderable_of_id(&self.render_instances, *id),
-                EvalResult::Static(res) => res.renderable_of_id(&self.render_instances, *id),
+            .map(|(id, res, _)| {
+                let renderable = match res {
+                    EvalResult::Dynamic(res) => res.extract_renderable(),
+                    EvalResult::Static(res) => res.extract_renderable(),
+                };
+                (*id, renderable)
             })
+            .collect::<Vec<_>>();
+
+        extracted.iter().for_each(|(id, renderable)| {
+            renderable.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id)
+        });
+        let render_primitives = visual_items
+            .iter()
+            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
             .collect::<Vec<_>>();
         let camera_frame = match &camera_frame.0 {
             EvalResult::Dynamic(res) => res,

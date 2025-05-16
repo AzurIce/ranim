@@ -1,11 +1,11 @@
 use std::{cmp::Ordering, ops::Range};
 
 use color::{AlphaColor, ColorSpace, Srgb};
-use glam::{DAffine2, DMat4, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
+use glam::{DAffine2, DMat3, DMat4, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
 use itertools::Itertools;
 use log::warn;
 
-use crate::components::{Anchor, ScaleHint, width::Width};
+use crate::components::{Anchor, ScaleHint, vpoint::wrap_point_func_with_anchor, width::Width};
 
 // MARK: Interpolatable
 pub trait Interpolatable {
@@ -49,6 +49,19 @@ impl Interpolatable for DMat4 {
     }
 }
 
+// MARK: With
+pub trait With {
+    fn with(mut self, f: impl Fn(&mut Self)) -> Self
+    where
+        Self: Sized,
+    {
+        f(&mut self);
+        self
+    }
+}
+
+impl<T> With for T {}
+
 // MARK: Alignable
 /// A trait for aligning two items
 ///
@@ -59,6 +72,13 @@ impl Interpolatable for DMat4 {
 pub trait Alignable {
     fn is_aligned(&self, other: &Self) -> bool;
     fn align_with(&mut self, other: &mut Self);
+}
+
+impl Alignable for DVec3 {
+    fn align_with(&mut self, _other: &mut Self) {}
+    fn is_aligned(&self, _other: &Self) -> bool {
+        true
+    }
 }
 
 // MARK: Opacity
@@ -87,6 +107,7 @@ pub trait Fill {
 
 // MARK: Stroke
 pub trait Stroke {
+    fn stroke_color(&self) -> AlphaColor<Srgb>;
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self;
     fn set_stroke_width(&mut self, width: f32) -> &mut Self {
         self.apply_stroke_func(|widths| widths.fill(width.into()))
@@ -153,7 +174,7 @@ pub trait PointsFunc {
     }
 }
 
-pub trait Position: BoundingBox {
+pub trait Shift: BoundingBox {
     // MARK: Shift
     /// Shift the item by a given vector.
     fn shift(&mut self, shift: DVec3) -> &mut Self;
@@ -172,7 +193,9 @@ pub trait Position: BoundingBox {
     fn put_center_on(&mut self, point: DVec3) -> &mut Self {
         self.put_anchor_on(Anchor::center(), point)
     }
+}
 
+pub trait Rotate {
     // MARK: Rotate
     /// Rotate the item by a given angle about a given axis at anchor.
     ///
@@ -184,7 +207,9 @@ pub trait Position: BoundingBox {
     fn rotate(&mut self, angle: f64, axis: DVec3) -> &mut Self {
         self.rotate_by_anchor(angle, axis, Anchor::center())
     }
+}
 
+pub trait Scale: BoundingBox {
     // MARK: Scale
     /// Scale the item by a given scale at anchor.
     ///
@@ -199,11 +224,12 @@ pub trait Position: BoundingBox {
     fn calc_scale_ratio(&self, hint: ScaleHint) -> DVec3 {
         let bb = self.get_bounding_box();
         match hint {
-            ScaleHint::Height(h) => dvec3(1.0, h / (bb[2].y - bb[0].y), 1.0),
-            ScaleHint::Width(w) => dvec3(w / (bb[2].x - bb[0].x), 1.0, 1.0),
-            ScaleHint::Size(w, h) => dvec3(w / (bb[2].x - bb[0].x), h / (bb[2].y - bb[0].y), 1.0),
-            ScaleHint::PorportionalHeight(h) => DVec3::splat(h / (bb[2].y - bb[0].y)),
-            ScaleHint::PorportionalWidth(w) => DVec3::splat(w / (bb[2].x - bb[0].x)),
+            ScaleHint::X(v) => dvec3(v / (bb[2].x - bb[0].x), 1.0, 1.0),
+            ScaleHint::Y(v) => dvec3(1.0, v / (bb[2].y - bb[0].y), 1.0),
+            ScaleHint::Z(v) => dvec3(1.0, 1.0, v / (bb[2].z - bb[0].z)),
+            ScaleHint::PorportionalX(v) => DVec3::splat(v / (bb[2].x - bb[0].x)),
+            ScaleHint::PorportionalY(v) => DVec3::splat(v / (bb[2].y - bb[0].y)),
+            ScaleHint::PorportionalZ(v) => DVec3::splat(v / (bb[2].z - bb[0].z)),
         }
     }
     /// Scale the item to a given hint.
@@ -213,20 +239,58 @@ pub trait Position: BoundingBox {
         self.scale(self.calc_scale_ratio(hint));
         self
     }
+}
 
-    /// Get the position of the item at the center
-    fn pos(&self) -> DVec3 {
-        self.get_bounding_box()[1]
+// pub trait Position: BoundingBox {
+//     /// Get the position of the item at the center
+//     fn pos(&self) -> DVec3 {
+//         self.get_bounding_box()[1]
+//     }
+// }
+
+impl BoundingBox for DVec3 {
+    fn get_bounding_box(&self) -> [DVec3; 3] {
+        [*self, *self, *self]
     }
 }
 
-pub trait PositionGroupExt: Position {
+impl Shift for DVec3 {
+    fn shift(&mut self, shift: DVec3) -> &mut Self {
+        *self += shift;
+        self
+    }
+}
+
+impl Rotate for DVec3 {
+    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
+        let rotation = DMat3::from_axis_angle(axis, angle);
+        let p = match anchor {
+            Anchor::Point(point) => point,
+            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
+        };
+        wrap_point_func_with_anchor(|p| *p = rotation * *p, p)(self);
+        self
+    }
+}
+
+impl Scale for DVec3 {
+    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
+        let p = match anchor {
+            Anchor::Point(point) => point,
+            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
+        };
+        wrap_point_func_with_anchor(|p| *p *= scale, p)(self);
+        self
+    }
+}
+
+pub trait Arrange: Shift {
     fn arrange(&mut self, pos_func: impl Fn(usize) -> DVec3);
     fn arrange_cols(&mut self, ncols: usize, pos_func: impl Fn(usize, usize) -> DVec3);
     fn arrange_rows(&mut self, nrows: usize, pos_func: impl Fn(usize, usize) -> DVec3);
 }
 
-impl<T: Position> PositionGroupExt for [T] {
+impl<T: Shift> Arrange for [T] {
     fn arrange(&mut self, pos_func: impl Fn(usize) -> DVec3) {
         self.iter_mut().enumerate().for_each(|(i, item)| {
             item.put_center_on(pos_func(i));
@@ -246,7 +310,7 @@ impl<T: Position> PositionGroupExt for [T] {
     }
 }
 
-pub trait PositionStrokeExt: Position + Stroke {
+pub trait ScaleStrokeExt: Scale + Stroke {
     fn scale_with_stroke_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
         self.scale_by_anchor(scale, anchor);
 
@@ -272,7 +336,7 @@ pub trait PositionStrokeExt: Position + Stroke {
     }
 }
 
-impl<T: Position + Stroke + ?Sized> PositionStrokeExt for T {}
+impl<T: Scale + Stroke + ?Sized> ScaleStrokeExt for T {}
 
 // MARK: impls for [T]
 impl<T: BoundingBox> BoundingBox for [T] {
@@ -290,13 +354,7 @@ impl<T: BoundingBox> BoundingBox for [T] {
     }
 }
 
-impl<T: Position> Position for [T] {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.shift(shift);
-        });
-        self
-    }
+impl<T: Rotate + BoundingBox> Rotate for [T] {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         let anchor = match anchor {
             Anchor::Point(p) => p,
@@ -307,6 +365,9 @@ impl<T: Position> Position for [T] {
         });
         self
     }
+}
+
+impl<T: Scale> Scale for [T] {
     fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
         let anchor = match anchor {
             Anchor::Point(p) => p,
@@ -319,7 +380,19 @@ impl<T: Position> Position for [T] {
     }
 }
 
+impl<T: Shift> Shift for [T] {
+    fn shift(&mut self, shift: DVec3) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.shift(shift);
+        });
+        self
+    }
+}
+
 impl<T: Stroke> Stroke for [T] {
+    fn stroke_color(&self) -> AlphaColor<Srgb> {
+        self[0].stroke_color()
+    }
     fn apply_stroke_func(
         &mut self,
         f: impl for<'a> Fn(&'a mut [crate::components::width::Width]),

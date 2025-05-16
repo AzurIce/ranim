@@ -163,16 +163,18 @@ impl Anchor {
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ScaleHint {
-    /// Scale the mobject to a given height, the width will remain unchanged.
-    Height(f64),
-    /// Scale the mobject to a given width, the height will remain unchanged.
-    Width(f64),
-    /// Scale the mobject to a given size.
-    Size(f64, f64),
-    /// Scale the mobject proportionally to a given height, the width will also be scaled accordingly.
-    PorportionalHeight(f64),
-    /// Scale the mobject proportionally to a given width, the height will also be scaled accordingly.
-    PorportionalWidth(f64),
+    /// Scale the mobject's X axe, while keep other axes unchanged.
+    X(f64),
+    /// Scale the mobject's Y axe, while keep other axes unchanged.
+    Y(f64),
+    /// Scale the mobject's Z axe, while keep other axes unchanged.
+    Z(f64),
+    /// Scale the mobject's X axe, while other axes are scaled accordingly.
+    PorportionalX(f64),
+    /// Scale the mobject's Y axe, while other axes are scaled accordingly.
+    PorportionalY(f64),
+    /// Scale the mobject's Z axe, while other axes are scaled accordingly.
+    PorportionalZ(f64),
 }
 
 // MARK: Test
@@ -182,8 +184,8 @@ mod test {
 
     use crate::{
         components::vpoint::VPointComponentVec,
-        items::{Blueprint, group::Group, vitem::Square},
-        traits::{BoundingBox, Position},
+        items::{group::Group, vitem::{geometry::Square, VItem}, Blueprint},
+        traits::{BoundingBox, Scale, Shift},
     };
 
     use super::Anchor;
@@ -263,7 +265,7 @@ mod test {
         // 20 40 ... 100
         let mut group = (1..=5)
             .map(|i| {
-                let mut sq = Square(i as f64 * 20.0).build();
+                let mut sq = VItem::from(Square::new(i as f64 * 20.0));
                 let x = (0..i).map(|i| i as f64 * 20.0).sum();
                 sq.put_anchor_on(Anchor::edge(-1, 0, 0), dvec3(x, 0.0, 0.0));
                 sq
