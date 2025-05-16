@@ -297,16 +297,15 @@ mod test {
     use crate::{
         components::vpoint::VPointComponentVec,
         items::{
-            Blueprint,
-            vitem::{Circle, Square},
+            vitem::{geometry::{Circle, Square}, VItem},
         },
         traits::Alignable,
     };
 
     #[test]
     fn test_align() {
-        let mut circle = Circle(1.0).build();
-        let mut square = Square(1.0).build();
+        let mut circle = VItem::from(Circle::new(1.0));
+        let mut square = VItem::from(Square::new(1.0));
         println!("{:?}", square.vpoints);
         square.align_with(&mut circle);
         println!("{:?}", square.vpoints);

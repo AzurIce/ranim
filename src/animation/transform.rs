@@ -9,13 +9,13 @@ pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 
 pub trait GroupTransformAnim<T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut Group<T>)>(self, f: F) -> Group<AnimationSpan<T>>;
+    fn transform<F: Fn(&mut Self)>(self, f: F) -> Group<AnimationSpan<T>>;
     fn transform_from<E: Into<T>>(self, s: Group<E>) -> Group<AnimationSpan<T>>;
     fn transform_to<E: Into<T>>(self, d: Group<E>) -> Group<AnimationSpan<T>>;
 }
 
 impl<T: TransformRequirement + 'static> GroupTransformAnim<T> for Group<T> {
-    fn transform<F: Fn(&mut Group<T>)>(self, f: F) -> Group<AnimationSpan<T>> {
+    fn transform<F: Fn(&mut Self)>(self, f: F) -> Group<AnimationSpan<T>> {
         let mut dsts = self.clone();
         (f)(&mut dsts);
         self.into_iter()

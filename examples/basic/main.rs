@@ -19,12 +19,12 @@ impl TimelineConstructor for BasicScene {
     fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         timeline.forward(0.2);
 
-        let mut svg = Group::<VItem>::from_svg(SVG).with(|svg| {
+        let svg = Group::<VItem>::from_svg(SVG).with(|svg| {
             svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
                 .put_center_on(DVec3::Y * 2.0);
         });
 
-        let mut text = Group::<VItem>::from_svg(&typst_svg!(
+        let text = Group::<VItem>::from_svg(&typst_svg!(
             r#"
             #align(center)[
                 #text(18pt)[Ranim]
@@ -35,10 +35,8 @@ impl TimelineConstructor for BasicScene {
         ))
         .with(|text| {
             text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
-                .put_center_on(DVec3::NEG_Y * 2.0);
-            text.iter_mut().for_each(|item| {
-                item.set_fill_opacity(0.8);
-            });
+                .put_center_on(DVec3::NEG_Y * 2.0)
+                .set_fill_opacity(0.8);
         });
 
         timeline.play(

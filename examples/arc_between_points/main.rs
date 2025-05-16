@@ -1,12 +1,13 @@
 use itertools::Itertools;
 use log::LevelFilter;
-use ranim::animation::fading::FadingAnim;
-use ranim::color::HueDirection;
-use ranim::glam::{DMat2, dvec2};
-use ranim::items::group::Group;
-use ranim::items::vitem::ArcBetweenPoints;
-use ranim::prelude::*;
-use ranim::timeline::TimeMark;
+use ranim::{
+    animation::fading::FadingAnim,
+    color::HueDirection,
+    glam::{DMat2, dvec2},
+    items::{group::Group, vitem::geometry::ArcBetweenPoints},
+    prelude::*,
+    timeline::TimeMark,
+};
 
 #[scene]
 struct ArcBetweenPointsScene;
@@ -36,17 +37,12 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                 );
                 let vec = DMat2::from_angle(std::f64::consts::PI * 2.0 / ntan as f64 * j as f64)
                     * dvec2(rad, 0.0);
-                ArcBetweenPoints {
-                    start: center.extend(0.0),
-                    end: (center + vec).extend(0.0),
-                    angle,
-                }
-                .build()
-                .with(|arc| {
-                    arc.set_color(color)
-                        .set_fill_opacity(0.0)
-                        .set_stroke_width(width as f32);
-                })
+                ArcBetweenPoints::new(center.extend(0.0), (center + vec).extend(0.0), angle).with(
+                    |arc| {
+                        arc.stroke_rgba = color;
+                        arc.stroke_width = width as f32;
+                    },
+                )
             })
             .collect::<Group<_>>();
 

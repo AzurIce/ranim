@@ -7,8 +7,8 @@ use glam::{DVec3, dvec3};
 use log::LevelFilter;
 use ranim::{
     animation::{
-        creation::{CreationAnim, WritingAnim, WritingAnimSchedule},
-        fading::{FadingAnim, FadingAnimSchedule},
+        creation::{CreationAnim, WritingAnim},
+        fading::FadingAnim,
         transform::{TransformAnim, TransformAnimSchedule},
     },
     color::palettes::manim::{self, BLUE_C, RED_C},
@@ -18,7 +18,7 @@ use ranim::{
         group::Group,
         vitem::{
             self, VItem,
-            geometry::{Polygon, Rectangle, Square},
+            geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
         },
     },
     prelude::*,
@@ -31,44 +31,15 @@ use ranim::{
 struct TestScene;
 
 impl TimelineConstructor for TestScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut CameraFrame) {
-        // let mut text = Group::<VItem>::from_svg(typst_svg!(
-        //     r#"#align(center)[
-        //     #text(10pt, font: "LXGW Bright")[R]
-        // ]"#
-        // ));
-
-        let square_a = Square::new(1.0);
-        let rectangle_a = Rectangle::new(1.0, 2.0);
-        {
-            let mut square = timeline.pin(VItem::from(square_a.clone()));
-            let mut rectangle = timeline.pin(VItem::from(rectangle_a.clone()));
-            timeline.play_and_hide(square.write());
-            timeline.play_and_hide(rectangle.write());
-            timeline.sync();
-        }
-
-        let mut rectangle_b = timeline.pin(Rectangle::from(square_a));
-        let square_b = Square::new(2.0);
-        {
-            let mut square = timeline.pin(Rectangle::from(square_b.clone()));
-            timeline.play_and_hide(square.transform_from(rectangle_a.clone()));
-        }
-        let mut square_b = timeline.pin(square_b);
-
-        timeline.forward(1.0);
-
-        timeline.play(
-            rectangle_b
-                .transform(|rectangle| {
-                    rectangle.scale_to(ScaleHint::X(2.0));
-                })
-                .apply(),
-        );
-        timeline.sync();
-
-        timeline.play(square_b.fade_out());
-        timeline.play(rectangle_b.fade_out());
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+        let n = 8;
+        let arcs = (0..n)
+            .map(|i| {
+                let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
+                ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
+            })
+            .collect::<Group<_>>();
+        let arcs = timeline.pin(arcs);
 
         // text.set_stroke_color(manim::RED_C)
         //     .set_stroke_width(0.05)
@@ -84,7 +55,6 @@ impl TimelineConstructor for TestScene {
         //     data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
         // }));
         timeline.forward(1.0);
-        timeline.sync();
     }
 }
 

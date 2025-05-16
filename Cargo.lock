@@ -218,6 +218,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert_float_eq"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10d2119f741b79fe9907f5396d19bffcb46568cfcc315e78677d731972ac7085"
+
+[[package]]
 name = "async-channel"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2694,6 +2700,7 @@ name = "ranim"
 version = "0.1.0-alpha.13"
 dependencies = [
  "anyhow",
+ "assert_float_eq",
  "async-channel",
  "bytemuck",
  "color",
