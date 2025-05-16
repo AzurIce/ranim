@@ -60,6 +60,8 @@ pub trait With {
     }
 }
 
+impl<T> With for T {}
+
 // MARK: Alignable
 /// A trait for aligning two items
 ///

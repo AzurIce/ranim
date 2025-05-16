@@ -5,8 +5,7 @@ use ranim::{
     },
     color::palettes::manim,
     items::vitem::{
-        Circle, VItem,
-        geometry::{Rectangle, Square},
+        geometry::{Circle, Rectangle, Square}, VItem
     },
     prelude::*,
     utils::rate_functions::linear,
@@ -30,14 +29,15 @@ impl TimelineConstructor for GettingStarted2Scene {
             square.stroke_rgba = manim::BLUE_C;
         });
 
-        let circle = Circle(2.0).build().with(|circle| {
-            circle.set_color(manim::RED_C);
+        let circle = Circle::new(2.0).with(|circle| {
+            circle.fill_rgba = manim::RED_C;
+            circle.stroke_rgba = manim::RED_C;
         });
         {
             let square = timeline.play(VItem::from(square).create());
             timeline.play(square.transform_to(circle.clone()));
         }
-        timeline.play(circle.unwrite());
+        timeline.play(VItem::from(circle).unwrite());
 
         // Use unpin to remove the static showed item and turn it back to normal
         let rect = timeline.unpin(rect);

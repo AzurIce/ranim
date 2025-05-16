@@ -268,12 +268,11 @@ mod test {
 
     use crate::{
         context::WgpuContext,
-        items::{Blueprint, camera_frame::CameraFrame, vitem::Square},
+        items::{camera_frame::CameraFrame, vitem::{geometry::Square, VItem}, Blueprint},
         render::{
-            CameraUniforms, CameraUniformsBindGroup, RenderTextures,
-            primitives::{Extract, RenderCommand, RenderResource},
+            primitives::{Extract, RenderCommand, RenderResource}, CameraUniforms, CameraUniformsBindGroup, RenderTextures
         },
-        utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
+        utils::{get_texture_data, wgpu::WgpuBuffer, PipelinesStorage},
     };
 
     use super::VItemRenderInstance;
@@ -288,7 +287,7 @@ mod test {
             wgpu_profiler::GpuProfilerSettings::default(),
         )
         .unwrap();
-        let vitem = Square(8.0).build();
+        let vitem = VItem::from(Square::new(8.0));
 
         let renderable = vitem.extract();
         let mut pipelines = PipelinesStorage::default();

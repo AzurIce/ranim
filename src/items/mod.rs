@@ -7,7 +7,7 @@ use group::Group;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    animation::{AnimSchedule, AnimationSpan},
+    animation::{AnimationSpan},
     render::primitives::{Extract, Renderable},
 };
 
@@ -44,7 +44,7 @@ static RABJECT_CNT: AtomicUsize = AtomicUsize::new(0);
 ///
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Deref, DerefMut)]
+#[derive(Debug, Deref, DerefMut)]
 pub struct PinnedItem<T> {
     id: usize,
     #[deref]

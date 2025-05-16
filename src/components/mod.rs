@@ -184,7 +184,7 @@ mod test {
 
     use crate::{
         components::vpoint::VPointComponentVec,
-        items::{Blueprint, group::Group, vitem::Square},
+        items::{group::Group, vitem::{geometry::Square, VItem}, Blueprint},
         traits::{BoundingBox, Scale, Shift},
     };
 
@@ -265,7 +265,7 @@ mod test {
         // 20 40 ... 100
         let mut group = (1..=5)
             .map(|i| {
-                let mut sq = Square(i as f64 * 20.0).build();
+                let mut sq = VItem::from(Square::new(i as f64 * 20.0));
                 let x = (0..i).map(|i| i as f64 * 20.0).sum();
                 sq.put_anchor_on(Anchor::edge(-1, 0, 0), dvec3(x, 0.0, 0.0));
                 sq

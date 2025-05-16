@@ -3,8 +3,6 @@ use std::ops::{Deref, DerefMut};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::traits::With;
-
 /// A group of things.
 ///
 /// The inner of a group is a [`Vec`], it has the ownership of the elements.
@@ -91,8 +89,6 @@ use crate::traits::With;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Default, Debug)]
 pub struct Group<T>(pub Vec<T>);
-
-impl<T> With for Group<T> {}
 
 impl<T> Group<T> {
     pub fn new() -> Self {

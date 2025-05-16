@@ -116,16 +116,31 @@ impl<T: Into<Timeline> + Clone + 'static> TimelineAnim<ItemMark> for AnimationSp
     }
 }
 
-impl<T: TimelineAnim<ItemMark>, I> TimelineAnim<GroupMark> for I
-where
-    I: IntoIterator<Item = T>,
-{
+impl<T: TimelineAnim<ItemMark>> TimelineAnim<GroupMark> for Group<T> {
     type Output = Group<T::Output>;
     fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64) {
         let (results, end_times): (Vec<_>, Vec<_>) =
             self.into_iter().map(|item| item.schedule(timeline)).unzip();
         (
             Group(results),
+            end_times
+                .into_iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap(),
+        )
+    }
+}
+
+impl<T: TimelineAnim<ItemMark>, const N: usize> TimelineAnim<GroupMark> for [T; N] {
+    type Output = [T::Output; N];
+    fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64) {
+        let (results, end_times): (Vec<_>, Vec<_>) =
+            self.into_iter().map(|item| item.schedule(timeline)).unzip();
+        (
+            results
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("failed to convert vec to array"))
+                .unwrap(),
             end_times
                 .into_iter()
                 .max_by(|a, b| a.partial_cmp(b).unwrap())

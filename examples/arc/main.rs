@@ -4,8 +4,7 @@ use log::LevelFilter;
 use ranim::{
     animation::fading::FadingAnim,
     color::HueDirection,
-    components::Anchor,
-    items::{group::Group, vitem::Arc},
+    items::{group::Group, vitem::geometry::Arc},
     prelude::*,
     timeline::TimeMark,
 };
@@ -41,11 +40,10 @@ impl TimelineConstructor for ArcScene {
                 );
                 let offset =
                     frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
-                Arc { angle, radius }.build().with(|arc| {
-                    arc.set_stroke_width(0.12 * (j as f32 + 0.02) / ncol as f32)
-                        .set_stroke_color(color)
-                        .set_fill_color(color.with_alpha(0.0))
-                        .put_anchor_on(Anchor::center(), offset.extend(0.0));
+                Arc::new(angle, radius).with(|arc| {
+                    arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
+                    arc.stroke_rgba = color;
+                    arc.put_center_on(offset.extend(0.0));
                 })
             })
             .collect::<Group<_>>();
