@@ -35,7 +35,7 @@ impl TimelineConstructor for GettingStarted2Scene {
         });
         {
             let square = timeline.play(VItem::from(square).create());
-            timeline.play(square.transform_to(circle.clone()));
+            timeline.play(square.transform_to(circle.clone()).with_rate_func(linear));
         }
         timeline.play(VItem::from(circle).unwrite());
 

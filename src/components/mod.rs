@@ -6,8 +6,7 @@ use glam::{DVec3, IVec3, dvec3, ivec3};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    prelude::{Alignable, Interpolatable},
-    utils::math::interpolate_usize,
+    prelude::{Alignable, Interpolatable}, traits::BoundingBox, utils::math::interpolate_usize
 };
 
 pub mod point;
@@ -123,6 +122,9 @@ pub trait PointWise {}
 
 // MARK: Anchor
 /// The anchor of the transformation.
+/// 
+/// - [`DVec3`] implements [`Into`] [`Anchor::Point`]
+/// - [`IVec3`] implements [`Into`] [`Anchor::Edge`]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Anchor {
@@ -141,20 +143,22 @@ pub enum Anchor {
 }
 
 impl Anchor {
+    pub const ORIGIN: Self = Self::Point(DVec3::ZERO);
+    pub const CENTER: Self = Self::Edge(IVec3::ZERO);
+
     pub fn point(x: f64, y: f64, z: f64) -> Self {
         Self::Point(dvec3(x, y, z))
     }
 
-    pub fn origin() -> Self {
-        Self::Point(DVec3::ZERO)
-    }
-
-    pub fn center() -> Self {
-        Self::Edge(IVec3::ZERO)
-    }
-
     pub fn edge(x: i32, y: i32, z: i32) -> Self {
-        Self::Edge(ivec3(x, y, z))
+        Self::Edge(ivec3(x, y, z).clamp(IVec3::NEG_ONE, IVec3::ONE))
+    }
+
+    pub fn get_pos<T: BoundingBox + ?Sized>(self, bbox: &T) -> DVec3 {
+        match self {
+            Self::Point(x) => x,
+            Self::Edge(x) => bbox.get_bounding_box_point(x)
+        }
     }
 }
 

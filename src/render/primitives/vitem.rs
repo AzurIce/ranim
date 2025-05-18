@@ -268,11 +268,15 @@ mod test {
 
     use crate::{
         context::WgpuContext,
-        items::{camera_frame::CameraFrame, vitem::{geometry::Square, VItem}, Blueprint},
-        render::{
-            primitives::{Extract, RenderCommand, RenderResource}, CameraUniforms, CameraUniformsBindGroup, RenderTextures
+        items::{
+            camera_frame::CameraFrame,
+            vitem::{VItem, geometry::Square},
         },
-        utils::{get_texture_data, wgpu::WgpuBuffer, PipelinesStorage},
+        render::{
+            CameraUniforms, CameraUniformsBindGroup, RenderTextures,
+            primitives::{Extract, RenderCommand, RenderResource},
+        },
+        utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
     };
 
     use super::VItemRenderInstance;

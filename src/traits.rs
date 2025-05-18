@@ -182,16 +182,12 @@ pub trait Shift: BoundingBox {
     ///
     /// See [`Anchor`] for more details.
     fn put_anchor_on(&mut self, anchor: Anchor, point: DVec3) -> &mut Self {
-        let anchor = match anchor {
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-            Anchor::Point(point) => point,
-        };
-        self.shift(point - anchor);
+        self.shift(point - anchor.get_pos(self));
         self
     }
     /// Put center at a given point.
     fn put_center_on(&mut self, point: DVec3) -> &mut Self {
-        self.put_anchor_on(Anchor::center(), point)
+        self.put_anchor_on(Anchor::CENTER, point)
     }
 }
 
@@ -205,7 +201,7 @@ pub trait Rotate {
     ///
     /// This is equivalent to [`Position::rotate_by_anchor`] with [`Anchor::center`].
     fn rotate(&mut self, angle: f64, axis: DVec3) -> &mut Self {
-        self.rotate_by_anchor(angle, axis, Anchor::center())
+        self.rotate_by_anchor(angle, axis, Anchor::CENTER)
     }
 }
 
@@ -219,7 +215,7 @@ pub trait Scale: BoundingBox {
     ///
     /// This is equivalent to [`Position::scale_by_anchor`] with [`Anchor::center`].
     fn scale(&mut self, scale: DVec3) -> &mut Self {
-        self.scale_by_anchor(scale, Anchor::center())
+        self.scale_by_anchor(scale, Anchor::CENTER)
     }
     fn calc_scale_ratio(&self, hint: ScaleHint) -> DVec3 {
         let bb = self.get_bounding_box();
@@ -325,7 +321,7 @@ pub trait ScaleStrokeExt: Scale + Stroke {
         self
     }
     fn scale_with_stroke(&mut self, scale: DVec3) -> &mut Self {
-        self.scale_with_stroke_by_anchor(scale, Anchor::center())
+        self.scale_with_stroke_by_anchor(scale, Anchor::CENTER)
     }
     /// Scale the item to a given hint.
     ///

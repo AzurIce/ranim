@@ -1,4 +1,3 @@
-pub mod svg_item;
 pub mod vitem;
 
 use std::{any::Any, collections::HashMap};

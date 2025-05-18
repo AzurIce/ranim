@@ -19,6 +19,7 @@ pub struct Square {
     pub size: f64,
     pub up: DVec3,
     pub normal: DVec3,
+
     pub stroke_rgba: AlphaColor<Srgb>,
     pub stroke_width: f32,
     pub fill_rgba: AlphaColor<Srgb>,
@@ -31,6 +32,7 @@ impl Square {
             size,
             up: dvec3(0.0, 1.0, 0.0),
             normal: dvec3(0.0, 0.0, 1.0),
+
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
             fill_rgba: AlphaColor::TRANSPARENT,
@@ -41,7 +43,7 @@ impl Square {
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the square a square.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, Anchor::center())
+        self.scale_by_anchor(scale, Anchor::CENTER)
     }
     /// Scale the square by the given scale, with the given anchor as the center.
     ///
@@ -198,12 +200,9 @@ impl Rotate for Rectangle {
         &mut self,
         angle: f64,
         axis: DVec3,
-        anchor: crate::components::Anchor,
+        anchor: Anchor,
     ) -> &mut Self {
-        let anchor = Anchor::Point(match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        });
+        let anchor = Anchor::Point(anchor.get_pos(self));
         self.p1.rotate_by_anchor(angle, axis, anchor);
         self.p2.rotate_by_anchor(angle, axis, anchor);
         self.up.rotate_by_anchor(angle, axis, anchor);
@@ -213,11 +212,8 @@ impl Rotate for Rectangle {
 }
 
 impl Scale for Rectangle {
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: crate::components::Anchor) -> &mut Self {
-        let anchor = Anchor::Point(match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        });
+    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
+        let anchor = Anchor::Point(anchor.get_pos(self));
         self.p1.scale_by_anchor(scale, anchor);
         self.p2.scale_by_anchor(scale, anchor);
         self

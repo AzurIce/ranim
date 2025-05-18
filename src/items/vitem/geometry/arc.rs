@@ -41,17 +41,14 @@ impl Arc {
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, Anchor::center())
+        self.scale_by_anchor(scale, Anchor::CENTER)
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale_by_anchor(&mut self, scale: f64, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        });
+        let anchor = Anchor::Point(anchor.get_pos(self));
         self.radius *= scale;
         self.center.scale_by_anchor(DVec3::splat(scale), anchor);
         self
@@ -190,7 +187,7 @@ impl ArcBetweenPoints {
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, Anchor::center())
+        self.scale_by_anchor(scale, Anchor::CENTER)
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
@@ -332,7 +329,7 @@ impl Circle {
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, Anchor::center())
+        self.scale_by_anchor(scale, Anchor::CENTER)
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
@@ -370,10 +367,7 @@ impl Shift for Circle {
 
 impl Rotate for Circle {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        });
+        let anchor = Anchor::Point(anchor.get_pos(self));
         self.center.rotate_by_anchor(angle, axis, anchor);
         self.up.rotate_by_anchor(angle, axis, anchor);
         self.normal.rotate_by_anchor(angle, axis, anchor);
