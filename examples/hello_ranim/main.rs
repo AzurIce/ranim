@@ -5,7 +5,10 @@ use log::LevelFilter;
 use ranim::{
     animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
-    items::vitem::{Circle, VItem, geometry::Square},
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Square},
+    },
     prelude::*,
 };
 
@@ -20,10 +23,10 @@ impl TimelineConstructor for HelloRanimScene {
         });
 
         timeline.play(square.clone().fade_in());
-        let mut circle = Circle(2.0).build().with(|circle| {
-            circle
-                .rotate(PI / 4.0 + PI, DVec3::Z)
-                .set_color(manim::RED_C);
+        let mut circle = Circle::new(2.0).with(|circle| {
+            circle.fill_rgba = manim::RED_C;
+            circle.stroke_rgba = manim::RED_C;
+            circle.rotate(PI / 4.0 + PI, DVec3::Z);
         });
 
         timeline.play(VItem::from(square).transform_to(circle.clone()));
@@ -32,8 +35,8 @@ impl TimelineConstructor for HelloRanimScene {
         let circle = timeline.pin(circle);
         timeline.forward(1.0);
         let circle = timeline.unpin(circle);
-        timeline.play(circle.clone().unwrite());
-        timeline.play(circle.clone().write());
+        timeline.play(VItem::from(circle.clone()).unwrite());
+        timeline.play(VItem::from(circle.clone()).write());
         timeline.play(circle.fade_out());
     }
 }
