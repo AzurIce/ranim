@@ -1,11 +1,10 @@
 use ranim::{
     animation::{
-        GroupAnimFunction,
-        transform::{GroupTransformAnim, TransformAnim},
+        transform::{GroupTransformAnim, TransformAnim}, GroupAnimFunction
     },
     color::palettes::manim,
     glam::DVec3,
-    items::vitem::geometry::Square,
+    items::vitem::{geometry::Square, VItem},
     prelude::*,
     timeline::TimeMark,
     utils::rate_functions::linear,
@@ -24,10 +23,10 @@ impl TimelineConstructor for PerspectiveBlendScene {
         let side_length = 2.0;
 
         let square_with_color = |color: color::AlphaColor<color::Srgb>| {
-            Square::new(side_length).with(|square| {
+            VItem::from(Square::new(side_length).with(|square| {
                 square.fill_rgba = color.with_alpha(0.5);
                 square.stroke_rgba = color;
-            })
+            }))
         };
 
         let bottom = square_with_color(manim::TEAL_C);
@@ -62,7 +61,7 @@ impl TimelineConstructor for PerspectiveBlendScene {
 
         let faces = timeline.play([bottom, right, back, top, front, left].with_rate_func(linear));
 
-        let (faces, _) = timeline.schedule(
+        timeline.schedule(
             faces
                 .transform(|data| {
                     data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
@@ -72,17 +71,15 @@ impl TimelineConstructor for PerspectiveBlendScene {
         );
 
         timeline.forward(2.0);
-        timeline.pin(faces);
 
         let camera = timeline.unpin(camera);
-        let camera = timeline.play(
+        timeline.play(
             camera
                 .transform(|data| {
                     data.perspective_blend = 1.0;
                 })
                 .with_duration(2.0),
         );
-        timeline.pin(camera);
         timeline.insert_time_mark(
             timeline.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),
