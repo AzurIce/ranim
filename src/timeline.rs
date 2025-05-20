@@ -116,13 +116,16 @@ impl<T: Into<Timeline> + Clone + 'static> TimelineAnim<ItemMark> for AnimationSp
     }
 }
 
-impl<T: TimelineAnim<ItemMark>> TimelineAnim<GroupMark> for Group<T> {
-    type Output = Group<T::Output>;
+impl<E> TimelineAnim<GroupMark> for Vec<E>
+where
+    E: TimelineAnim<ItemMark>,
+{
+    type Output = Vec<E::Output>;
     fn schedule(self, timeline: &RanimTimeline) -> (Self::Output, f64) {
         let (results, end_times): (Vec<_>, Vec<_>) =
             self.into_iter().map(|item| item.schedule(timeline)).unzip();
         (
-            Group(results),
+            results,
             end_times
                 .into_iter()
                 .max_by(|a, b| a.partial_cmp(b).unwrap())
@@ -425,7 +428,9 @@ impl RanimTimeline {
                     .as_any()
                     .downcast_ref::<RabjectTimeline<CameraFrame>>()
                     .unwrap();
-                camera_frame = timeline.eval_alpha(alpha)
+                if let Some(res) = timeline.eval_alpha(alpha) {
+                    camera_frame = Some(res)
+                }
             }
             Timeline::VisualItem(timeline) => {
                 if let Some((res, idx)) = timeline.eval_alpha(alpha) {
@@ -433,6 +438,7 @@ impl RanimTimeline {
                 }
             }
         });
+        // println!("alpha: {}, items: {}", alpha, items.len());
         // println!("alpha: {}, items: {}", alpha, items.len());
 
         TimelineEvalResult {

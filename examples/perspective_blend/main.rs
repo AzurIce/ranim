@@ -1,99 +1,88 @@
-use glam::DVec3;
 use ranim::{
-    animation::transform::{GroupTransformAnimSchedule, TransformAnimSchedule},
+    animation::{
+        GroupAnimFunction,
+        transform::{GroupTransformAnim, TransformAnim},
+    },
     color::palettes::manim,
-    items::{group::Group, vitem::Square},
+    glam::DVec3,
+    items::vitem::geometry::Square,
     prelude::*,
     timeline::TimeMark,
+    utils::rate_functions::linear,
 };
 
 #[scene]
 struct PerspectiveBlendScene;
 
 impl TimelineConstructor for PerspectiveBlendScene {
-    fn construct(self, timeline: &RanimTimeline, camera: &mut PinnedItem<CameraFrame>) {
-        camera.data.pos = DVec3::Z * 5.0;
-        timeline.update(camera);
+    fn construct(self, timeline: &RanimTimeline, camera: PinnedItem<CameraFrame>) {
+        let mut camera = timeline.unpin(camera);
+        camera.pos = DVec3::Z * 5.0;
+        let camera = timeline.pin(camera);
 
         // Create a cube
         let side_length = 2.0;
 
-        let mut anims = Vec::new();
+        let square_with_color = |color: color::AlphaColor<color::Srgb>| {
+            Square::new(side_length).with(|square| {
+                square.fill_rgba = color.with_alpha(0.5);
+                square.stroke_rgba = color;
+            })
+        };
 
-        // Bottom face
-        let mut bottom = Square(side_length).build();
-        bottom.set_color(manim::TEAL_C).set_fill_opacity(0.5);
-        let mut bottom = timeline.pin(bottom);
-        anims.push(bottom.transform(|data| {
+        let bottom = square_with_color(manim::TEAL_C);
+        let right = square_with_color(manim::GREEN_C);
+        let back = square_with_color(manim::BLUE_C);
+        let top = square_with_color(manim::PURPLE_C);
+        let front = square_with_color(manim::RED_C);
+        let left = square_with_color(manim::YELLOW_C);
+
+        let bottom = bottom.transform(|data| {
             data.shift(DVec3::NEG_Y * side_length / 2.0)
                 .rotate(std::f64::consts::PI / 2.0, DVec3::X);
-        }));
-
-        // Right face
-        let mut right = Square(side_length).build();
-        right.set_color(manim::GREEN_C).set_fill_opacity(0.5);
-        let mut right = timeline.pin(right);
-        anims.push(right.transform(|data| {
+        });
+        let right = right.transform(|data| {
             data.shift(DVec3::X * side_length / 2.0)
                 .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
-        }));
-
-        // Back face
-        let mut back = Square(side_length).build();
-        back.set_color(manim::BLUE_C).set_fill_opacity(0.5);
-        let mut back = timeline.pin(back);
-        anims.push(back.transform(|data| {
+        });
+        let back = back.transform(|data| {
             data.shift(DVec3::NEG_Z * side_length / 2.0);
-        }));
-
-        // Top face
-        let mut top = Square(side_length).build();
-        top.set_color(manim::PURPLE_C).set_fill_opacity(0.5);
-        let mut top = timeline.pin(top);
-        anims.push(top.transform(|data| {
+        });
+        let top = top.transform(|data| {
             data.shift(DVec3::Y * side_length / 2.0)
                 .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
-        }));
-
-        // Front face (facing camera)
-        let mut front = Square(side_length).build();
-        front.set_color(manim::RED_C).set_fill_opacity(0.5);
-        let mut front = timeline.pin(front);
-
-        anims.push(front.transform(|data| {
+        });
+        let front = front.transform(|data| {
             data.shift(DVec3::Z * side_length / 2.0);
-        }));
-
-        // Left face
-        let mut left = Square(side_length).build();
-        left.set_color(manim::YELLOW_C).set_fill_opacity(0.5);
-        let mut left = timeline.pin(left);
-        anims.push(left.transform(|data| {
+        });
+        let left = left.transform(|data| {
             data.shift(DVec3::NEG_X * side_length / 2.0)
                 .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
-        }));
+        });
 
-        timeline.play(Group(anims).apply()).sync();
+        let faces = timeline.play([bottom, right, back, top, front, left].with_rate_func(linear));
 
-        let mut cube = Group(vec![front, back, right, left, top, bottom]);
-
-        timeline.play(
-            cube.transform(|data| {
-                data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
-                    .rotate(std::f64::consts::PI / 6.0, DVec3::X);
-            })
-            .with_duration(4.0),
+        let (faces, _) = timeline.schedule(
+            faces
+                .transform(|data| {
+                    data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
+                        .rotate(std::f64::consts::PI / 6.0, DVec3::X);
+                })
+                .with_duration(4.0),
         );
 
-        timeline.play(
+        timeline.forward(2.0);
+        timeline.pin(faces);
+
+        let camera = timeline.unpin(camera);
+        let camera = timeline.play(
             camera
                 .transform(|data| {
                     data.perspective_blend = 1.0;
                 })
-                .with_duration(2.0)
-                .with_padding(2.0, 0.0),
+                .with_duration(2.0),
         );
-        timeline.sync();
+        timeline.pin(camera);
         timeline.insert_time_mark(
             timeline.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),

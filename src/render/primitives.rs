@@ -85,6 +85,40 @@ macro_rules! impl_tuple_render_command {
 
 all_tuples!(impl_tuple_render_command, 1, 16, T);
 
+impl<T: RenderCommand> RenderCommand for Vec<T> {
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
+        self.iter()
+            .for_each(|x| x.encode_compute_pass_command(cpass))
+    }
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
+        self.iter()
+            .for_each(|x| x.encode_render_pass_command(rpass))
+    }
+    fn encode_render_command(
+        &self,
+        ctx: &WgpuContext,
+        pipelines: &mut super::PipelinesStorage,
+        encoder: &mut wgpu::CommandEncoder,
+        uniforms_bind_group: &wgpu::BindGroup,
+        render_textures: &RenderTextures,
+        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
+    ) {
+        self.iter().for_each(|x| {
+            x.encode_render_command(
+                ctx,
+                pipelines,
+                encoder,
+                uniforms_bind_group,
+                render_textures,
+                #[cfg(feature = "profiling")]
+                profiler,
+            )
+        });
+    }
+    fn debug(&self, _ctx: &WgpuContext) {
+        self.iter().for_each(|x| x.debug(_ctx));
+    }
+}
 impl<T: RenderCommand, const N: usize> RenderCommand for [T; N] {
     fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         self.iter()
@@ -147,6 +181,33 @@ impl<T: Primitive + 'static> Renderable for T {
             instance.update(ctx, self);
         } else {
             render_instances.insert_render_instance(id, T::RenderInstance::init(ctx, self));
+        }
+    }
+}
+impl<T: Primitive + 'static> Renderable for Vec<T> {
+    fn prepare_for_id(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances, id: usize) {
+        if self.is_empty() {
+            return;
+        }
+        if let Some(instance) =
+            render_instances.get_render_instance_mut::<Vec<T::RenderInstance>>(id)
+        {
+            if instance.len() < self.len() {
+                instance.resize_with(self.len(), || T::RenderInstance::init(ctx, &self[0]));
+            }
+            instance
+                .iter_mut()
+                .zip(self.iter())
+                .for_each(|(instance, data)| {
+                    instance.update(ctx, data);
+                });
+        } else {
+            render_instances.insert_render_instance(
+                id,
+                self.iter()
+                    .map(|data| T::RenderInstance::init(ctx, data))
+                    .collect::<Vec<_>>(),
+            );
         }
     }
 }

@@ -3,17 +3,13 @@ pub mod creation;
 pub mod fading;
 pub mod transform;
 
-use crate::{
-    items::{PinnedItem, group::Group},
-    utils::rate_functions::linear,
-};
+use crate::utils::rate_functions::linear;
 
 #[allow(unused)]
 use log::trace;
 use std::{any::Any, fmt::Debug, rc::Rc};
 
 // MARK: Eval
-
 pub trait EvalDynamic<T> {
     fn eval_alpha(&self, alpha: f64) -> T;
 }
@@ -50,15 +46,6 @@ impl<T> Evaluator<T> {
             inner: Box::new(func),
         }
     }
-
-    // // Any is for type name
-    // pub fn from_eval_dynamic<F: EvalDynamic<T> + Any + 'static>(func: F) -> Self {
-    //     let type_name = std::any::type_name::<F>().to_string();
-    //     Self::Dynamic {
-    //         type_name,
-    //         inner: Box::new(func),
-    //     }
-    // }
 }
 
 #[derive(Debug)]
@@ -173,77 +160,12 @@ impl<T> AnimationSpan<T> {
     }
 }
 
-// MARK: AnimSchedule
-
-/// A schedule for an animation
-///
-/// When you create an anim, you actually creates an [`AnimSchedule`] which contains the anim.
-/// The rabject's data won't change unless you call [`AnimSchedule::apply`].
-#[deprecated(
-    since = "0.1.0-alpha.14",
-    note = "use refactored anim-timeline system instead"
-)]
-pub struct AnimSchedule<T> {
-    pub(crate) id: usize,
-    pub(crate) anim: AnimationSpan<T>,
-}
-
-impl<T> Debug for AnimSchedule<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "AnimSchedule {{ rabject: {:?}, anim: {:?} }}",
-            self.id, self.anim
-        )
-    }
-}
-
-impl<T> AnimSchedule<T> {
-    pub fn new(id: usize, anim: AnimationSpan<T>) -> Self {
-        Self { id, anim }
-    }
-}
-
-impl<T> AnimSchedule<T> {
-    pub fn with_padding(mut self, start_sec: f64, end_sec: f64) -> Self {
-        self.anim.padding = (start_sec, end_sec);
-        self
-    }
-    pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
-        self.anim.rate_func = rate_func;
-        self
-    }
-    pub fn with_duration(mut self, secs: f64) -> Self {
-        self.anim.duration_secs = secs;
-        self
-    }
-}
-
-// impl<T: 'static> IntoIterator for AnimSchedule<T> {
-//     type IntoIter = Once<Self>;
-//     type Item = Self;
-//     fn into_iter(self) -> Self::IntoIter {
-//         std::iter::once(self)
-//     }
-// }
-
 // MARK: Group
-
-impl<T: 'static> Group<AnimationSpan<T>> {
+pub trait GroupAnimFunction<T> {
     /// Sets the rate function for each animation in the group
-    pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
-        self.iter_mut().for_each(|schedule| {
-            schedule.rate_func = rate_func;
-        });
-        self
-    }
+    fn with_rate_func(self, rate_func: fn(f64) -> f64) -> Self;
     /// Sets the duration for each animation in the group
-    pub fn with_duration(mut self, secs: f64) -> Self {
-        self.iter_mut().for_each(|schedule| {
-            schedule.duration_secs = secs;
-        });
-        self
-    }
+    fn with_duration(self, secs: f64) -> Self;
     /// Scales the entire group's total duration to a new duration
     ///
     /// For example, use `[x, y, z]`` to represent an anim with duration `y` and padding `(x, z)`,
@@ -262,14 +184,34 @@ impl<T: 'static> Group<AnimationSpan<T>> {
     ///      [1   , .5, 1    ]
     /// [.5, .5, .5]
     /// ```
-    pub fn with_total_duration(mut self, secs: f64) -> Self {
-        let total_secs = self
-            .iter()
+    fn with_total_duration(self, secs: f64) -> Self;
+}
+
+impl<E: 'static, T> GroupAnimFunction<E> for T
+where
+    for<'a> &'a mut T: IntoIterator<Item = &'a mut AnimationSpan<E>>,
+    for<'a> &'a T: IntoIterator<Item = &'a AnimationSpan<E>>,
+{
+    fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
+        (&mut self).into_iter().for_each(|schedule| {
+            schedule.rate_func = rate_func;
+        });
+        self
+    }
+    fn with_duration(mut self, secs: f64) -> Self {
+        (&mut self).into_iter().for_each(|schedule| {
+            schedule.duration_secs = secs;
+        });
+        self
+    }
+    fn with_total_duration(mut self, secs: f64) -> Self {
+        let total_secs = (&self)
+            .into_iter()
             .map(|schedule| schedule.span_len())
             .reduce(|acc, e| acc.max(e))
             .unwrap_or(secs);
         let ratio = secs / total_secs;
-        self.iter_mut().for_each(|schedule| {
+        (&mut self).into_iter().for_each(|schedule| {
             let (duration, (padding_start, padding_end)) =
                 (&mut schedule.duration_secs, &mut schedule.padding);
             *duration *= ratio;
@@ -278,18 +220,5 @@ impl<T: 'static> Group<AnimationSpan<T>> {
         });
         self
     }
-}
 
-impl<T: Clone + 'static> AnimSchedule<T> {
-    pub fn apply(self) -> T {
-        self.anim.eval_alpha(1.0).into_owned()
-    }
-}
-
-impl<T: Clone + 'static> Group<AnimSchedule<T>> {
-    pub fn apply(self) -> Group<T> {
-        self.into_iter()
-            .map(|schedule| schedule.anim.eval_alpha(1.0).into_owned())
-            .collect()
-    }
 }

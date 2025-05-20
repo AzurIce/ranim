@@ -86,10 +86,17 @@ impl Rotate for Square {
             Anchor::Edge(edge) => self.get_bounding_box_point(edge),
         });
         self.center.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, anchor);
-        self.normal.rotate_by_anchor(angle, axis, anchor);
+        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
         self
     }
+}
+
+impl Alignable for Square {
+    fn is_aligned(&self, _other: &Self) -> bool {
+        true
+    }
+    fn align_with(&mut self, _other: &mut Self) {}
 }
 
 impl Opacity for Square {
@@ -119,7 +126,7 @@ impl From<Square> for Rectangle {
             stroke_width,
             fill_rgba,
         } = value;
-        let right = -normal.cross(up).normalize();
+        let right = up.cross(normal).normalize();
         let p1 = center - width / 2.0 * right + width / 2.0 * up;
         let p2 = center + width / 2.0 * right - width / 2.0 * up;
         Rectangle {
@@ -173,10 +180,11 @@ impl Rectangle {
         }
     }
     pub fn width(&self) -> f64 {
-        (self.p2.x - self.p1.x).abs()
+        let right = self.up.cross(self.normal).normalize();
+        (self.p2 - self.p1).dot(right).abs()
     }
     pub fn height(&self) -> f64 {
-        (self.p2.y - self.p1.y).abs()
+        (self.p2 - self.p1).dot(self.up).abs()
     }
 }
 
@@ -196,17 +204,12 @@ impl Shift for Rectangle {
 }
 
 impl Rotate for Rectangle {
-    fn rotate_by_anchor(
-        &mut self,
-        angle: f64,
-        axis: DVec3,
-        anchor: Anchor,
-    ) -> &mut Self {
+    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         let anchor = Anchor::Point(anchor.get_pos(self));
         self.p1.rotate_by_anchor(angle, axis, anchor);
         self.p2.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, anchor);
-        self.normal.rotate_by_anchor(angle, axis, anchor);
+        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
         self
     }
 }
@@ -414,5 +417,55 @@ impl Extract for Polygon {
         // }
         // cache.as_ref().unwrap().extract()
         VItem::from(self.clone()).extract()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use assert_float_eq::assert_float_absolute_eq;
+
+    use super::*;
+    #[test]
+    fn test_square() {
+        let square = Square::new(2.0).with(|data| {
+            data.shift(DVec3::NEG_Y)
+                .rotate(std::f64::consts::PI / 2.0, DVec3::X);
+        });
+        assert_float_absolute_eq!(square.center.distance_squared(DVec3::NEG_Y), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Z), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::NEG_Y), 0.0, 1e-10);
+        let square = Square::new(2.0).with(|data| {
+            data.shift(DVec3::X)
+                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
+        });
+        assert_float_absolute_eq!(square.center.distance_squared(DVec3::X), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Y), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::X), 0.0, 1e-10);
+        let square = Square::new(2.0).with(|data| {
+            data.shift(DVec3::NEG_Z);
+        });
+        assert_float_absolute_eq!(square.center.distance_squared(DVec3::NEG_Z), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Y), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::Z), 0.0, 1e-10);
+        let square = Square::new(2.0).with(|data| {
+            data.shift(DVec3::Y)
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
+        });
+        assert_float_absolute_eq!(square.center.distance_squared(DVec3::Y), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.up.distance_squared(DVec3::NEG_Z), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::Y), 0.0, 1e-10);
+        let square = Square::new(2.0).with(|data| {
+            data.shift(DVec3::Z);
+        });
+        assert_float_absolute_eq!(square.center.distance_squared(DVec3::Z), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Y), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::Z), 0.0, 1e-10);
+        let square = Square::new(2.0).with(|data| {
+            data.shift(DVec3::NEG_X)
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
+        });
+        assert_float_absolute_eq!(square.center.distance_squared(DVec3::NEG_X), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Y), 0.0, 1e-10);
+        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::NEG_X), 0.0, 1e-10);
     }
 }

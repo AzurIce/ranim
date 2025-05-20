@@ -1,9 +1,13 @@
-use glam::{DVec3, dvec2};
 use itertools::Itertools;
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
-    animation::transform::TransformAnim, color::palettes::manim, components::Anchor,
-    items::vitem::geometry::Rectangle, prelude::*, timeline::TimeMark,
+    animation::transform::TransformAnim,
+    color::palettes::manim,
+    components::Anchor,
+    glam::{DVec3, dvec2},
+    items::vitem::geometry::Rectangle,
+    prelude::*,
+    timeline::TimeMark,
     utils::rate_functions::linear,
 };
 

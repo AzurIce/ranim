@@ -1,16 +1,17 @@
 use log::LevelFilter;
-use ranim::color::palettes::manim::*;
-use ranim::components::Anchor;
-use ranim::glam::{dvec2, dvec3};
-use ranim::items::group::Group;
-use ranim::items::vitem::Rectangle;
-use ranim::prelude::*;
+use ranim::{
+    color::palettes::manim::*,
+    components::Anchor,
+    glam::{dvec2, dvec3},
+    items::{group::Group, vitem::geometry::Rectangle},
+    prelude::*,
+};
 
 #[scene]
 struct PalettesScene;
 
 impl TimelineConstructor for PalettesScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let padded_frame_size = frame_size * 0.9;
 
@@ -39,15 +40,16 @@ impl TimelineConstructor for PalettesScene {
                 let w_step = padded_frame_size.x / row.len() as f64;
                 row.iter().enumerate().map(move |(j, color)| {
                     let x = j as f64 * w_step;
-                    let mut square = Rectangle(w_step as f64, h_step as f64).build();
-                    square
-                        .put_anchor_on(
+                    Rectangle::new(w_step as f64, h_step as f64).with(|rect| {
+                        rect.stroke_rgba = *color;
+                        rect.fill_rgba = *color;
+                        rect.stroke_width = 0.0;
+
+                        rect.put_anchor_on(
                             Anchor::edge(-1, -1, 0),
                             padded_frame_start.extend(0.0) + dvec3(x, y, 0.0),
-                        )
-                        .set_color(*color)
-                        .set_stroke_width(0.0);
-                    square
+                        );
+                    })
                 })
             })
             .collect::<Group<_>>();

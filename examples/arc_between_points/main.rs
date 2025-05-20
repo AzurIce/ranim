@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use log::LevelFilter;
 use ranim::{
-    animation::fading::FadingAnim,
+    animation::{fading::FadingAnim, GroupAnimFunction},
     color::HueDirection,
-    glam::{DMat2, dvec2},
-    items::{group::Group, vitem::geometry::ArcBetweenPoints},
+    glam::{dvec2, DMat2},
+    items::{group::Group, vitem::geometry::ArcBetweenPoints, GroupLaggedAnim},
     prelude::*,
     timeline::TimeMark,
 };

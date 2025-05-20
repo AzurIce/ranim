@@ -1,10 +1,10 @@
-use glam::dvec2;
 use itertools::Itertools;
 use log::LevelFilter;
 use ranim::{
-    animation::fading::FadingAnim,
+    animation::{GroupAnimFunction, fading::FadingAnim},
     color::HueDirection,
-    items::{group::Group, vitem::geometry::Arc},
+    glam::dvec2,
+    items::{GroupLaggedAnim, vitem::geometry::Arc},
     prelude::*,
     timeline::TimeMark,
 };
@@ -46,7 +46,7 @@ impl TimelineConstructor for ArcScene {
                     arc.put_center_on(offset.extend(0.0));
                 })
             })
-            .collect::<Group<_>>();
+            .collect::<Vec<_>>();
 
         let arcs_fade_in = arcs
             .lagged_anim(0.2, |item| item.fade_in())

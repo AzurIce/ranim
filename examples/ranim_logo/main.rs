@@ -60,7 +60,7 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
 struct RanimLogoScene;
 
 impl TimelineConstructor for RanimLogoScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let logo_width = frame_size.y * 0.618;
 

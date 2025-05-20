@@ -6,7 +6,9 @@ use glam::{DVec3, IVec3, dvec3, ivec3};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    prelude::{Alignable, Interpolatable}, traits::BoundingBox, utils::math::interpolate_usize
+    prelude::{Alignable, Interpolatable},
+    traits::BoundingBox,
+    utils::math::interpolate_usize,
 };
 
 pub mod point;
@@ -122,7 +124,7 @@ pub trait PointWise {}
 
 // MARK: Anchor
 /// The anchor of the transformation.
-/// 
+///
 /// - [`DVec3`] implements [`Into`] [`Anchor::Point`]
 /// - [`IVec3`] implements [`Into`] [`Anchor::Edge`]
 #[derive(Debug, Clone, Copy)]
@@ -157,7 +159,7 @@ impl Anchor {
     pub fn get_pos<T: BoundingBox + ?Sized>(self, bbox: &T) -> DVec3 {
         match self {
             Self::Point(x) => x,
-            Self::Edge(x) => bbox.get_bounding_box_point(x)
+            Self::Edge(x) => bbox.get_bounding_box_point(x),
         }
     }
 }
@@ -188,7 +190,10 @@ mod test {
 
     use crate::{
         components::vpoint::VPointComponentVec,
-        items::{group::Group, vitem::{geometry::Square, VItem}, Blueprint},
+        items::{
+            group::Group,
+            vitem::{VItem, geometry::Square},
+        },
         traits::{BoundingBox, Scale, Shift},
     };
 
