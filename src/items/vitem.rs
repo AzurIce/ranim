@@ -1,5 +1,6 @@
 // pub mod arrow;
 pub mod geometry;
+pub mod typst;
 // pub mod line;
 
 use geometry::Circle;

@@ -67,6 +67,10 @@ egui-winit = { version = "0.31.1", optional = true }
 winit = { version = "0.30.10", optional = true }
 
 serde = { version = "1", features = ["derive"], optional = true}
+typst = "0.13.1"
+typst-kit = "0.13.1"
+time = "0.3.41"
+typst-svg = "0.13.1"
 
 [dev-dependencies]
 assert_float_eq = "1.1.4"

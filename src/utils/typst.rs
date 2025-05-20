@@ -2,6 +2,15 @@ use std::io::Write;
 
 use regex::bytes::Regex;
 
+pub fn get_typst_element(svg: &str) -> String {
+    let re = Regex::new(r"<path[^>]*(?:>.*?<\/path>|\/>)").unwrap();
+    let removed_bg = re.replace(svg.as_bytes(), b"");
+
+    // println!("{}", String::from_utf8_lossy(&output));
+    // println!("{}", String::from_utf8_lossy(&removed_bg));
+    String::from_utf8_lossy(&removed_bg).to_string()
+}
+
 pub fn compile_typst_code(typst_code: &str) -> String {
     let mut child = std::process::Command::new("typst")
         .arg("compile")
@@ -20,13 +29,9 @@ pub fn compile_typst_code(typst_code: &str) -> String {
     }
 
     let output = child.wait_with_output().unwrap().stdout;
+    let output = String::from_utf8_lossy(&output);
 
-    let re = Regex::new(r"<path[^>]*(?:>.*?<\/path>|\/>)").unwrap();
-    let removed_bg = re.replace(&output, b"");
-
-    // println!("{}", String::from_utf8_lossy(&output));
-    // println!("{}", String::from_utf8_lossy(&removed_bg));
-    String::from_utf8_lossy(&removed_bg).to_string()
+    get_typst_element(&output)
 }
 
 #[macro_export]

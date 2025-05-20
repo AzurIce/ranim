@@ -1,10 +1,10 @@
 use std::f64::consts::PI;
 
-use glam::DVec3;
 use log::LevelFilter;
 use ranim::{
     animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
+    glam::DVec3,
     items::vitem::{
         VItem,
         geometry::{Circle, Square},
@@ -17,13 +17,13 @@ struct HelloRanimScene;
 
 impl TimelineConstructor for HelloRanimScene {
     fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
-        let mut square = Square::new(2.0).with(|square| {
+        let square = Square::new(2.0).with(|square| {
             square.fill_rgba = manim::BLUE_C;
             square.stroke_rgba = manim::BLUE_C;
         });
 
         timeline.play(square.clone().fade_in());
-        let mut circle = Circle::new(2.0).with(|circle| {
+        let circle = Circle::new(2.0).with(|circle| {
             circle.fill_rgba = manim::RED_C;
             circle.stroke_rgba = manim::RED_C;
             circle.rotate(PI / 4.0 + PI, DVec3::Z);

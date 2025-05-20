@@ -1,4 +1,6 @@
-use super::{AnimSchedule, AnimationSpan, EvalDynamic, PinnedItem, ToEvaluator};
+use itertools::Itertools;
+
+use super::{AnimationSpan, EvalDynamic, ToEvaluator};
 use crate::{
     items::group::Group,
     traits::{Alignable, Interpolatable},
@@ -9,33 +11,60 @@ pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 
 pub trait GroupTransformAnim<T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut Self)>(self, f: F) -> Group<AnimationSpan<T>>;
-    fn transform_from<E: Into<T>>(self, s: Group<E>) -> Group<AnimationSpan<T>>;
-    fn transform_to<E: Into<T>>(self, d: Group<E>) -> Group<AnimationSpan<T>>;
+    type Output;
+    fn transform<F: Fn(&mut Self)>(self, func: F) -> Self::Output;
+    fn transform_from<I: IntoIterator<Item = T>>(self, srcs: I) -> Self::Output;
+    fn transform_to<I: IntoIterator<Item = T>>(self, dsts: I) -> Self::Output;
 }
 
 impl<T: TransformRequirement + 'static> GroupTransformAnim<T> for Group<T> {
-    fn transform<F: Fn(&mut Self)>(self, f: F) -> Group<AnimationSpan<T>> {
+    type Output = Group<AnimationSpan<T>>;
+    fn transform<F: Fn(&mut Self)>(self, func: F) -> Group<AnimationSpan<T>> {
         let mut dsts = self.clone();
-        (f)(&mut dsts);
+        (func)(&mut dsts);
         self.into_iter()
             .zip(dsts)
             .map(|(x, dst)| x.transform_to(dst))
             .collect()
     }
-    fn transform_from<E: Into<T>>(self, s: Group<E>) -> Group<AnimationSpan<T>> {
-        let ss: Group<T> = s.into_iter().map(|x| x.into()).collect();
+    fn transform_from<I: IntoIterator<Item = T>>(self, srcs: I) -> Group<AnimationSpan<T>> {
         self.into_iter()
-            .zip(ss)
-            .map(|(x, s)| x.transform_from(s))
+            .zip(srcs)
+            .map(|(x, src)| x.transform_from(src))
             .collect()
     }
-    fn transform_to<E: Into<T>>(self, d: Group<E>) -> Group<AnimationSpan<T>> {
-        let dd: Group<T> = d.into_iter().map(|x| x.into()).collect();
+    fn transform_to<I: IntoIterator<Item = T>>(self, dsts: I) -> Group<AnimationSpan<T>> {
         self.into_iter()
-            .zip(dd)
-            .map(|(x, d)| x.transform_to(d))
+            .zip(dsts)
+            .map(|(x, dst)| x.transform_to(dst))
             .collect()
+    }
+}
+
+impl<T: TransformRequirement + 'static, const N: usize> GroupTransformAnim<T> for [T; N] {
+    type Output = [AnimationSpan<T>; N];
+    fn transform<F: Fn(&mut Self)>(self, func: F) -> Self::Output {
+        let mut dsts = self.clone();
+        (func)(&mut dsts);
+        self.into_iter()
+            .zip(dsts)
+            .map(|(x, dst)| x.transform_to(dst))
+            .collect_array()
+            .unwrap()
+    }
+    fn transform_from<I: IntoIterator<Item = T>>(self, srcs: I) -> Self::Output {
+        self.into_iter()
+            .zip(srcs)
+            .map(|(x, src)| x.transform_from(src))
+            .collect_array()
+            .unwrap()
+    }
+    fn transform_to<I: IntoIterator<Item = T>>(self, dsts: I) -> Self::Output {
+        self.into_iter()
+            .zip(dsts)
+            .map(|(x, dst)| x.transform_to(dst))
+            .collect_array()
+            .unwrap()
     }
 }
 
@@ -43,12 +72,6 @@ pub trait TransformAnim<T: TransformRequirement + 'static> {
     fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationSpan<T>;
     fn transform_from(self, src: impl Into<T>) -> AnimationSpan<T>;
     fn transform_to(self, dst: impl Into<T>) -> AnimationSpan<T>;
-}
-
-pub trait TransformAnimSchedule<T: TransformRequirement + 'static> {
-    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimSchedule<T>;
-    fn transform_from(self, s: impl Into<T>) -> AnimSchedule<T>;
-    fn transform_to(self, d: impl Into<T>) -> AnimSchedule<T>;
 }
 
 impl<T: TransformRequirement + 'static> TransformAnim<T> for T {

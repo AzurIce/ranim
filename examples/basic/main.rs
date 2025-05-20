@@ -1,9 +1,9 @@
 use glam::DVec3;
 use log::LevelFilter;
 use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim},
+    animation::{creation::WritingAnim, fading::FadingAnim, GroupAnimFunction},
     components::ScaleHint,
-    items::{group::Group, vitem::VItem},
+    items::{group::Group, vitem::VItem, GroupLaggedAnim},
     prelude::*,
     timeline::TimeMark,
     typst_svg,

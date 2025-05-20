@@ -7,7 +7,7 @@ use group::Group;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    animation::{AnimationSpan},
+    animation::AnimationSpan,
     render::primitives::{Extract, Renderable},
 };
 
@@ -15,18 +15,30 @@ pub mod camera_frame;
 pub mod group;
 pub mod vitem;
 
-impl<T> Group<T> {
-    pub fn lagged_anim(
+pub trait GroupLaggedAnim<T> {
+    type Output;
+    fn lagged_anim(
         self,
         lag_ratio: f64,
         anim_builder: impl FnOnce(T) -> AnimationSpan<T> + Clone,
-    ) -> Group<AnimationSpan<T>> {
-        let n = self.as_ref().len();
+    ) -> Vec<AnimationSpan<T>>;
+}
 
+impl<E, T> GroupLaggedAnim<E> for T
+where
+    T: IntoIterator<Item = E>,
+{
+    type Output = Vec<AnimationSpan<E>>;
+    fn lagged_anim(
+        self,
+        lag_ratio: f64,
+        anim_builder: impl FnOnce(E) -> AnimationSpan<E> + Clone,
+    ) -> Self::Output {
         let mut anim_schedules = self
             .into_iter()
             .map(|rabject| (anim_builder.clone())(rabject))
-            .collect::<Group<_>>();
+            .collect::<Vec<_>>();
+        let n = anim_schedules.len();
 
         let duration = anim_schedules[0].duration_secs;
         let lag_time = duration * lag_ratio;
@@ -37,6 +49,8 @@ impl<T> Group<T> {
         anim_schedules
     }
 }
+
+impl<T> Group<T> {}
 
 static RABJECT_CNT: AtomicUsize = AtomicUsize::new(0);
 

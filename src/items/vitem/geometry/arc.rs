@@ -92,8 +92,8 @@ impl Rotate for Arc {
             Anchor::Edge(edge) => self.get_bounding_box_point(edge),
         });
         self.center.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, anchor);
-        self.normal.rotate_by_anchor(angle, axis, anchor);
+        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
         self
     }
 }
@@ -229,8 +229,8 @@ impl Rotate for ArcBetweenPoints {
         });
         self.start.rotate_by_anchor(angle, axis, anchor);
         self.end.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, anchor);
-        self.normal.rotate_by_anchor(angle, axis, anchor);
+        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
         self
     }
 }
@@ -369,8 +369,16 @@ impl Rotate for Circle {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         let anchor = Anchor::Point(anchor.get_pos(self));
         self.center.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, anchor);
-        self.normal.rotate_by_anchor(angle, axis, anchor);
+        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self
+    }
+}
+
+impl Opacity for Circle {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
+        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
         self
     }
 }

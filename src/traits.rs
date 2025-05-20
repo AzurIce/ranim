@@ -265,6 +265,15 @@ impl Rotate for DVec3 {
             Anchor::Edge(edge) => self.get_bounding_box_point(edge),
         };
         wrap_point_func_with_anchor(|p| *p = rotation * *p, p)(self);
+        if self.x.abs() < 1e-10 {
+            self.x = 0.0;
+        }
+        if self.y.abs() < 1e-10 {
+            self.y = 0.0;
+        }
+        if self.z.abs() < 1e-10 {
+            self.z = 0.0;
+        }
         self
     }
 }
@@ -352,12 +361,9 @@ impl<T: BoundingBox> BoundingBox for [T] {
 
 impl<T: Rotate + BoundingBox> Rotate for [T] {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = match anchor {
-            Anchor::Point(p) => p,
-            Anchor::Edge(e) => self.get_bounding_box_point(e),
-        };
+        let anchor = Anchor::Point(anchor.get_pos(self));
         self.iter_mut().for_each(|x| {
-            x.rotate_by_anchor(angle, axis, Anchor::Point(anchor));
+            x.rotate_by_anchor(angle, axis, anchor);
         });
         self
     }
