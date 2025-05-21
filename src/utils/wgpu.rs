@@ -92,8 +92,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
         ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
         rx.recv_blocking().unwrap().unwrap();
 
-        let x = buffer_slice.get_mapped_range().to_vec();
-        x
+        buffer_slice.get_mapped_range().to_vec()
     }
 }
 
