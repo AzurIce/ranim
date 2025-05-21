@@ -6,9 +6,9 @@ use ranim_macros::Interpolatable;
 
 use crate::{
     components::Anchor,
-    items::vitem::{DEFAULT_STROKE_WIDTH, VItem},
-    render::primitives::{Extract, vitem::VItemPrimitive},
-    traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, With},
+    items::vitem::{VItem, DEFAULT_STROKE_WIDTH},
+    render::primitives::{vitem::VItemPrimitive, Extract},
+    traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor},
 };
 
 use super::Arc;

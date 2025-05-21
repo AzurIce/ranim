@@ -45,8 +45,6 @@ pub mod prelude {
 
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
-
-    pub use crate::items::Blueprint;
 }
 
 pub mod color;

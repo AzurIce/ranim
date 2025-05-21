@@ -3,12 +3,11 @@ pub mod geometry;
 pub mod typst;
 // pub mod line;
 
-use geometry::Circle;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{DVec3, Vec4, dvec3, vec4};
+use glam::{DVec3, Vec4, vec4};
 
 use crate::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
@@ -18,7 +17,7 @@ use crate::{
     utils::svg::vitems_from_tree,
 };
 
-use super::{Blueprint, group::Group};
+use super::group::Group;
 
 /// A vectorized item.
 ///
@@ -284,16 +283,16 @@ impl Group<VItem> {
 }
 
 // MARK: Blueprints
-#[deprecated(
-    since = "0.1.0-alpha.14",
-    note = "Use the refactored item system instead"
-)]
-pub struct Ellipse(pub f64, pub f64);
+// #[deprecated(
+//     since = "0.1.0-alpha.14",
+//     note = "Use the refactored item system instead"
+// )]
+// pub struct Ellipse(pub f64, pub f64);
 
-impl Blueprint<VItem> for Ellipse {
-    fn build(self) -> VItem {
-        let mut mobject = VItem::from(Circle::new(1.0));
-        mobject.vpoints.scale(dvec3(self.0, self.1, 1.0));
-        mobject
-    }
-}
+// impl Blueprint<VItem> for Ellipse {
+//     fn build(self) -> VItem {
+//         let mut mobject = VItem::from(Circle::new(1.0));
+//         mobject.vpoints.scale(dvec3(self.0, self.1, 1.0));
+//         mobject
+//     }
+// }
