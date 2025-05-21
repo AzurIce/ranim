@@ -2,7 +2,6 @@ use itertools::Itertools;
 
 use super::{AnimationSpan, EvalDynamic, ToEvaluator};
 use crate::{
-    items::group::Group,
     traits::{Alignable, Interpolatable},
     utils::rate_functions::smooth,
 };
@@ -17,9 +16,9 @@ pub trait GroupTransformAnim<T: TransformRequirement + 'static> {
     fn transform_to<I: IntoIterator<Item = T>>(self, dsts: I) -> Self::Output;
 }
 
-impl<T: TransformRequirement + 'static> GroupTransformAnim<T> for Group<T> {
-    type Output = Group<AnimationSpan<T>>;
-    fn transform<F: Fn(&mut Self)>(self, func: F) -> Group<AnimationSpan<T>> {
+impl<T: TransformRequirement + 'static> GroupTransformAnim<T> for Vec<T> {
+    type Output = Vec<AnimationSpan<T>>;
+    fn transform<F: Fn(&mut Self)>(self, func: F) -> Vec<AnimationSpan<T>> {
         let mut dsts = self.clone();
         (func)(&mut dsts);
         self.into_iter()
@@ -27,13 +26,13 @@ impl<T: TransformRequirement + 'static> GroupTransformAnim<T> for Group<T> {
             .map(|(x, dst)| x.transform_to(dst))
             .collect()
     }
-    fn transform_from<I: IntoIterator<Item = T>>(self, srcs: I) -> Group<AnimationSpan<T>> {
+    fn transform_from<I: IntoIterator<Item = T>>(self, srcs: I) -> Vec<AnimationSpan<T>> {
         self.into_iter()
             .zip(srcs)
             .map(|(x, src)| x.transform_from(src))
             .collect()
     }
-    fn transform_to<I: IntoIterator<Item = T>>(self, dsts: I) -> Group<AnimationSpan<T>> {
+    fn transform_to<I: IntoIterator<Item = T>>(self, dsts: I) -> Vec<AnimationSpan<T>> {
         self.into_iter()
             .zip(dsts)
             .map(|(x, dst)| x.transform_to(dst))

@@ -198,8 +198,7 @@ where
     for<'a> &'a T: IntoIterator<Item = &'a AnimationSpan<E>>,
 {
     fn duration(&self) -> f64 {
-        (&self)
-            .into_iter()
+        self.into_iter()
             .map(|anim| anim.span_len())
             .reduce(|acc, e| acc.max(e))
             .unwrap()

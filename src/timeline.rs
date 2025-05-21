@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     animation::{AnimationSpan, EvalResult, Evaluator},
-    items::{PinnedItem, VisualItem, camera_frame::CameraFrame, group::Group},
+    items::{PinnedItem, VisualItem, camera_frame::CameraFrame},
 };
 use std::{any::Any, cell::RefCell, rc::Rc};
 use std::{fmt::Debug, time::Duration};
@@ -25,12 +25,12 @@ pub struct ItemMark;
 pub struct GroupMark;
 
 // MARK: TimelineInsert
-/// For type `T` that implements [`RanimItem`],
+/// For type `T` that implements [`Into<Timeline>`],
 ///
 /// `T` and `impl IntoIterator<Item = T>` can be inserted into the timeline.
 /// This is accomplished by two implementations of this trait, with different `Mark` type:
-/// - [`ItemMark`]: Insert a `T`, returns [`Rabject<T>`]
-/// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group<Rabject<T>>`]
+/// - [`ItemMark`]: Pins a `T`, returns [`PinnedItem<T>`]
+/// - [`GroupMark`]: Pins an [`IntoIterator<Item = T>`], returns [`Vec<PinnedItem<T>>`]
 pub trait TimelinePin<Mark> {
     type Output;
     fn pin_at(self, timeline: &RanimTimeline, time: f64) -> Self::Output;
@@ -62,7 +62,7 @@ where
     E: TimelinePin<ItemMark>,
     T: IntoIterator<Item = E>,
 {
-    type Output = Group<E::Output>;
+    type Output = Vec<E::Output>;
     fn pin_at(self, timeline: &RanimTimeline, time: f64) -> Self::Output {
         self.into_iter()
             .map(|rabject| rabject.pin_at(timeline, time))
@@ -91,7 +91,7 @@ where
     E: TimelineUnpin<ItemMark>,
     T: IntoIterator<Item = E>,
 {
-    type Output = Group<E::Output>;
+    type Output = Vec<E::Output>;
     fn unpin(self, timeline: &RanimTimeline) -> Self::Output {
         self.into_iter()
             .map(|rabject| rabject.unpin(timeline))
@@ -345,9 +345,6 @@ impl RanimTimeline {
     }
 
     /// Push an animation into the timeline
-    ///
-    /// Note that this won't apply the animation effect to rabject's data,
-    /// to apply the animation effect use [`AnimSchedule::apply`]
     pub fn play<Mark, T: TimelineAnim<Mark>>(&self, anim: T) -> T::Output {
         let (res, end_sec) = self.schedule(anim);
         // trace!("play, end_sec: {}", end_sec);

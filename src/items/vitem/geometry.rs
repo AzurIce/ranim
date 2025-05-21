@@ -1,7 +1,7 @@
-mod circle;
 mod arc;
+mod circle;
 mod polygon;
 
 pub use arc::*;
-pub use polygon::*;
 pub use circle::*;
+pub use polygon::*;

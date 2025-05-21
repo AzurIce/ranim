@@ -6,9 +6,7 @@ use crate::{
     components::Anchor,
     items::vitem::{DEFAULT_STROKE_WIDTH, VItem},
     render::primitives::{Extract, vitem::VItemPrimitive},
-    traits::{
-        BoundingBox, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With,
-    },
+    traits::{BoundingBox, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With},
 };
 
 // MARK: ### Arc ###

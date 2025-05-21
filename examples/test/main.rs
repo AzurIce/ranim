@@ -9,13 +9,12 @@ use ranim::{
     animation::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
-        transform::{TransformAnim, TransformAnimSchedule},
+        transform::TransformAnim,
     },
     color::palettes::manim::{self, BLUE_C, RED_C},
     components::{Anchor, ScaleHint},
     items::{
         camera_frame::CameraFrame,
-        group::Group,
         vitem::{
             self, VItem,
             geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
@@ -38,7 +37,7 @@ impl TimelineConstructor for TestScene {
                 let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
                 ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
             })
-            .collect::<Group<_>>();
+            .collect::<Vec<_>>();
         let arcs = timeline.pin(arcs);
 
         // text.set_stroke_color(manim::RED_C)

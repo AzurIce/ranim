@@ -1,5 +1,6 @@
 // pub mod arrow;
 pub mod geometry;
+pub mod svg;
 pub mod typst;
 // pub mod line;
 
@@ -14,10 +15,7 @@ use crate::{
     prelude::{Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, StrokeWidth},
     render::primitives::{Extract, vitem::VItemPrimitive},
     traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
-    utils::svg::vitems_from_tree,
 };
-
-use super::group::Group;
 
 /// A vectorized item.
 ///
@@ -266,19 +264,6 @@ impl StrokeWidth for VItem {
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         f(self.stroke_widths.as_mut());
         self
-    }
-}
-
-// MARK: Group
-impl Group<VItem> {
-    pub fn from_svg(svg: impl AsRef<str>) -> Self {
-        let svg = svg.as_ref();
-        let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();
-
-        let mut vitem_group = Self(vitems_from_tree(&tree));
-        vitem_group.put_center_on(DVec3::ZERO);
-        vitem_group.rotate(std::f64::consts::PI, DVec3::X);
-        vitem_group
     }
 }
 

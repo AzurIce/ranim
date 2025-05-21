@@ -4,7 +4,7 @@ use ranim::{
     animation::{AnimGroupFunction, fading::FadingAnim},
     color::HueDirection,
     glam::{DMat2, dvec2},
-    items::{group::Group, vitem::geometry::ArcBetweenPoints},
+    items::vitem::geometry::ArcBetweenPoints,
     prelude::*,
     timeline::TimeMark,
 };
@@ -44,7 +44,7 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                     },
                 )
             })
-            .collect::<Group<_>>();
+            .collect::<Vec<_>>();
 
         let arcs_fade_in = arcs
             .into_iter()
