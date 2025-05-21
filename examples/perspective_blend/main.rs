@@ -1,6 +1,6 @@
 use ranim::{
     animation::{
-        GroupAnimFunction,
+        AnimGroupFunction,
         transform::{GroupTransformAnim, TransformAnim},
     },
     color::palettes::manim,

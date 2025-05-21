@@ -1,7 +1,7 @@
 use glam::DVec3;
 use log::LevelFilter;
 use ranim::{
-    animation::{GroupAnimFunction, creation::WritingAnim, fading::FadingAnim},
+    animation::{AnimGroupFunction, creation::WritingAnim, fading::FadingAnim},
     components::ScaleHint,
     items::{group::Group, vitem::VItem},
     prelude::*,

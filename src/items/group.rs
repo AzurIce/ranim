@@ -88,6 +88,7 @@ use serde::{Deserialize, Serialize};
 ///
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Default, Debug)]
+#[deprecated(since = "0.1.0-alpha.14")]
 pub struct Group<T>(pub Vec<T>);
 
 impl<T> Group<T> {

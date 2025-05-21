@@ -5,7 +5,6 @@ pub mod transform;
 
 use crate::utils::rate_functions::linear;
 
-use itertools::Itertools;
 #[allow(unused)]
 use log::trace;
 use std::{any::Any, fmt::Debug, rc::Rc};
@@ -89,10 +88,6 @@ impl<T> Eval<T> for Evaluator<T> {
     }
 }
 
-pub struct EvalAdapter<T> {
-    pub inner: Box<dyn Eval<T>>,
-}
-
 // MARK: Animation
 pub struct AnimationSpan<T> {
     pub(crate) type_name: String,
@@ -162,7 +157,10 @@ impl<T> AnimationSpan<T> {
 }
 
 // MARK: Group
-pub trait GroupAnimFunction<T> {
+/// A group of animations is basically a type has `iter` and `iter_mut` to iterate
+/// over the animations. This trait is automatically implemented.
+pub trait AnimGroupFunction<T> {
+    /// Get the total duration of the anim group
     fn duration(&self) -> f64;
     /// Sets the rate function for each animation in the group
     fn with_rate_func(self, rate_func: fn(f64) -> f64) -> Self;
@@ -187,11 +185,14 @@ pub trait GroupAnimFunction<T> {
     /// [.5, .5, .5]
     /// ```
     fn with_total_duration(self, secs: f64) -> Self;
+    /// Sets the offset of each animation by lagging it
+    /// by a given ratio of the previous animation's duration
     fn with_lagged_offset(self, ratio: f64) -> Self;
+    /// Sets the epilogue of each animation to the end of the group
     fn with_epilogue_to_end(self) -> Self;
 }
 
-impl<E: 'static, T> GroupAnimFunction<E> for T
+impl<E: 'static, T> AnimGroupFunction<E> for T
 where
     for<'a> &'a mut T: IntoIterator<Item = &'a mut AnimationSpan<E>>,
     for<'a> &'a T: IntoIterator<Item = &'a AnimationSpan<E>>,
