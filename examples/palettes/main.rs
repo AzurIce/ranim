@@ -41,11 +41,9 @@ impl TimelineConstructor for PalettesScene {
                 row.iter().enumerate().map(move |(j, color)| {
                     let x = j as f64 * w_step;
                     Rectangle::new(w_step as f64, h_step as f64).with(|rect| {
-                        rect.stroke_rgba = *color;
-                        rect.fill_rgba = *color;
                         rect.stroke_width = 0.0;
 
-                        rect.put_anchor_on(
+                        rect.set_color(*color).put_anchor_on(
                             Anchor::edge(-1, -1, 0),
                             padded_frame_start.extend(0.0) + dvec3(x, y, 0.0),
                         );

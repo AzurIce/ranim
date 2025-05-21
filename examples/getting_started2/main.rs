@@ -5,7 +5,8 @@ use ranim::{
     },
     color::palettes::manim,
     items::vitem::{
-        geometry::{Circle, Rectangle, Square}, VItem
+        VItem,
+        geometry::{Circle, Rectangle, Square},
     },
     prelude::*,
     utils::rate_functions::linear,
@@ -17,7 +18,7 @@ struct GettingStarted2Scene;
 impl TimelineConstructor for GettingStarted2Scene {
     fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
-            rect.stroke_rgba = manim::GREEN_C;
+            rect.set_stroke_color(manim::GREEN_C);
         });
 
         // Use pin to keep the item static showed
@@ -25,13 +26,11 @@ impl TimelineConstructor for GettingStarted2Scene {
         timeline.forward(1.0);
 
         let square = Square::new(2.0).with(|square| {
-            square.fill_rgba = manim::BLUE_C;
-            square.stroke_rgba = manim::BLUE_C;
+            square.set_color(manim::BLUE_C);
         });
 
         let circle = Circle::new(2.0).with(|circle| {
-            circle.fill_rgba = manim::RED_C;
-            circle.stroke_rgba = manim::RED_C;
+            circle.set_color(manim::RED_C);
         });
         {
             let square = timeline.play(VItem::from(square).create());

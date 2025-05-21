@@ -7,8 +7,8 @@ use log::warn;
 use crate::{
     color::{rgb8, rgba},
     items::vitem::VItem,
-    prelude::{Fill, Stroke},
-    traits::PointsFunc,
+    prelude::{FillColor, StrokeWidth},
+    traits::{PointsFunc, StrokeColor},
     utils::bezier::PathBuilder,
 };
 

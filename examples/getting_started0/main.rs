@@ -10,8 +10,7 @@ impl TimelineConstructor for GettingStarted0Scene {
     fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         // A Square with size 2.0 and color blue
         let square = Square::new(2.0).with(|square| {
-            square.fill_rgba = manim::BLUE_C;
-            square.stroke_rgba = manim::BLUE_C;
+            square.set_color(manim::BLUE_C);
         });
 
         // Plays the animation

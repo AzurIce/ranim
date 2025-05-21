@@ -33,7 +33,13 @@ pub struct GroupMark;
 /// - [`GroupMark`]: Insert an [`IntoIterator<Item = T>`], returns [`Group<Rabject<T>>`]
 pub trait TimelinePin<Mark> {
     type Output;
-    fn pin(self, timeline: &RanimTimeline) -> Self::Output;
+    fn pin_at(self, timeline: &RanimTimeline, time: f64) -> Self::Output;
+    fn pin(self, timeline: &RanimTimeline) -> Self::Output
+    where
+        Self: Sized,
+    {
+        self.pin_at(timeline, timeline.cur_sec())
+    }
 }
 
 impl<T> TimelinePin<ItemMark> for T
@@ -41,10 +47,12 @@ where
     T: Into<Timeline> + Clone,
 {
     type Output = PinnedItem<T>;
-    fn pin(self, timeline: &RanimTimeline) -> Self::Output {
+    fn pin_at(self, timeline: &RanimTimeline, time: f64) -> Self::Output {
         let pinned_item = PinnedItem::new(self);
         // trace!("pin item: {}", pinned_item.id());
-        timeline._insert_timeline(pinned_item.id(), pinned_item.data.clone().into());
+        let mut item_timeline: Timeline = pinned_item.data.clone().into();
+        item_timeline.as_timeline_mut().set_start_sec(time);
+        timeline._insert_timeline(pinned_item.id(), item_timeline);
         pinned_item
     }
 }
@@ -55,9 +63,9 @@ where
     T: IntoIterator<Item = E>,
 {
     type Output = Group<E::Output>;
-    fn pin(self, timeline: &RanimTimeline) -> Self::Output {
+    fn pin_at(self, timeline: &RanimTimeline, time: f64) -> Self::Output {
         self.into_iter()
-            .map(|rabject| rabject.pin(timeline))
+            .map(|rabject| rabject.pin_at(timeline, time))
             .collect()
     }
 }
@@ -244,6 +252,9 @@ impl RanimTimeline {
     }
 
     /// Use pin to pin anitem into the timeline
+    pub fn pin_at<Mark, T: TimelinePin<Mark>>(&self, item: T, sec: f64) -> T::Output {
+        item.pin_at(self, sec)
+    }
     pub fn pin<Mark, T: TimelinePin<Mark>>(&self, item: T) -> T::Output {
         item.pin(self)
     }
@@ -252,22 +263,8 @@ impl RanimTimeline {
         item.unpin(self)
     }
 
-    fn _insert_timeline(&self, id: usize, mut timeline: Timeline) {
+    fn _insert_timeline(&self, id: usize, timeline: Timeline) {
         let mut timelines = self.timelines.borrow_mut();
-
-        {
-            let timeline = timeline.as_timeline_mut();
-            timeline.set_start_sec(self.cur_sec());
-            // if max_elapsed_secs != 0.0 && timeline.elapsed_secs() < max_elapsed_secs {
-            //     timeline.append_blank(*self.max_elapsed_secs.borrow());
-            // }
-            // trace!(
-            //     "insert timeline, id: {}, cur_sec: {}, show_secs: {:?}",
-            //     id,
-            //     timeline.cur_sec(),
-            //     timeline.show_secs()
-            // );
-        }
         timelines.push((id, timeline));
     }
 
@@ -370,6 +367,16 @@ impl RanimTimeline {
     /// It will return the animation result and the end time of the animation
     pub fn schedule<Mark, T: TimelineAnim<Mark>>(&self, anim: T) -> (T::Output, f64) {
         anim.schedule(self)
+    }
+    pub fn schedule_and_pin<Mark1, Mark2, T: TimelineAnim<Mark1>>(
+        &self,
+        anim: T,
+    ) -> (<T::Output as TimelinePin<Mark2>>::Output, f64)
+    where
+        T::Output: TimelinePin<Mark2>,
+    {
+        let (item, end_time) = anim.schedule(self);
+        (self.pin_at(item, end_time), end_time)
     }
 
     // pub fn play_and_hide<'r, T, I>(&self, anim_schedules: I) -> &Self

@@ -98,26 +98,79 @@ pub trait Empty {
     fn empty() -> Self;
 }
 
-// MARK: Fill
-pub trait Fill {
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self;
+// MARK: FillColor
+pub trait FillColor {
     fn fill_color(&self) -> AlphaColor<Srgb>;
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self;
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
 }
 
-// MARK: Stroke
-pub trait Stroke {
-    fn stroke_color(&self) -> AlphaColor<Srgb>;
-    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self;
-    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
-        self.apply_stroke_func(|widths| widths.fill(width.into()))
+impl<T: FillColor> FillColor for [T] {
+    fn fill_color(&self) -> color::AlphaColor<color::Srgb> {
+        self[0].fill_color()
     }
+    fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.set_fill_color(color);
+        });
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.set_fill_opacity(opacity);
+        });
+        self
+    }
+}
+
+// MARK: StrokeColor
+pub trait StrokeColor {
+    fn stroke_color(&self) -> AlphaColor<Srgb>;
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self;
 }
 
+impl<T: StrokeColor> StrokeColor for [T] {
+    fn stroke_color(&self) -> AlphaColor<Srgb> {
+        self[0].stroke_color()
+    }
+    fn set_stroke_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.set_stroke_color(color);
+        });
+        self
+    }
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.set_stroke_opacity(opacity);
+        });
+        self
+    }
+}
+
+// MARK: StrokeWidth
+pub trait StrokeWidth {
+    // TODO: Make this better
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self;
+    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+        self.apply_stroke_func(|widths| widths.fill(width.into()))
+    }
+}
+
+impl<T: StrokeWidth> StrokeWidth for [T] {
+    fn apply_stroke_func(
+        &mut self,
+        f: impl for<'a> Fn(&'a mut [crate::components::width::Width]),
+    ) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.apply_stroke_func(&f);
+        });
+        self
+    }
+}
+
 // MARK: Color
-pub trait Color: Fill + Stroke {
+pub trait Color: FillColor + StrokeColor {
     fn set_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.set_fill_color(color);
         self.set_stroke_color(color);
@@ -125,8 +178,9 @@ pub trait Color: Fill + Stroke {
     }
 }
 
-impl<T: Fill + Stroke> Color for T {}
+impl<T: FillColor + StrokeColor + ?Sized> Color for T {}
 
+// MARK: BoundingBox
 pub trait BoundingBox {
     /// Get the bounding box of the mobject in [min, mid, max] order.
     fn get_bounding_box(&self) -> [DVec3; 3];
@@ -159,6 +213,27 @@ pub trait BoundingBox {
     }
 }
 
+impl BoundingBox for DVec3 {
+    fn get_bounding_box(&self) -> [DVec3; 3] {
+        [*self, *self, *self]
+    }
+}
+
+impl<T: BoundingBox> BoundingBox for [T] {
+    fn get_bounding_box(&self) -> [DVec3; 3] {
+        let [min, max] = self
+            .iter()
+            .map(|x| x.get_bounding_box())
+            .map(|[min, _, max]| [min, max])
+            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
+            .unwrap_or([DVec3::ZERO, DVec3::ZERO]);
+        if min == max {
+            warn!("Empty bounding box, is the slice empty?")
+        }
+        [min, (min + max) / 2.0, max]
+    }
+}
+
 // MARK: PointsFunc
 pub trait PointsFunc {
     fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self;
@@ -174,8 +249,8 @@ pub trait PointsFunc {
     }
 }
 
+// MARK: Shift
 pub trait Shift: BoundingBox {
-    // MARK: Shift
     /// Shift the item by a given vector.
     fn shift(&mut self, shift: DVec3) -> &mut Self;
     /// Put anchor at a given point.
@@ -191,8 +266,17 @@ pub trait Shift: BoundingBox {
     }
 }
 
+impl<T: Shift> Shift for [T] {
+    fn shift(&mut self, shift: DVec3) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.shift(shift);
+        });
+        self
+    }
+}
+
+// MARK: Rotate
 pub trait Rotate {
-    // MARK: Rotate
     /// Rotate the item by a given angle about a given axis at anchor.
     ///
     /// See [`Anchor`]
@@ -205,8 +289,18 @@ pub trait Rotate {
     }
 }
 
+impl<T: Rotate + BoundingBox> Rotate for [T] {
+    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
+        let anchor = Anchor::Point(anchor.get_pos(self));
+        self.iter_mut().for_each(|x| {
+            x.rotate_by_anchor(angle, axis, anchor);
+        });
+        self
+    }
+}
+
+// MARK: Scale
 pub trait Scale: BoundingBox {
-    // MARK: Scale
     /// Scale the item by a given scale at anchor.
     ///
     /// See [`Anchor`]
@@ -237,16 +331,16 @@ pub trait Scale: BoundingBox {
     }
 }
 
-// pub trait Position: BoundingBox {
-//     /// Get the position of the item at the center
-//     fn pos(&self) -> DVec3 {
-//         self.get_bounding_box()[1]
-//     }
-// }
-
-impl BoundingBox for DVec3 {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        [*self, *self, *self]
+impl<T: Scale> Scale for [T] {
+    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
+        let anchor = match anchor {
+            Anchor::Point(p) => p,
+            Anchor::Edge(e) => self.get_bounding_box_point(e),
+        };
+        self.iter_mut().for_each(|x| {
+            x.scale_by_anchor(scale, Anchor::Point(anchor));
+        });
+        self
     }
 }
 
@@ -315,7 +409,7 @@ impl<T: Shift> Arrange for [T] {
     }
 }
 
-pub trait ScaleStrokeExt: Scale + Stroke {
+pub trait ScaleStrokeExt: Scale + StrokeWidth {
     fn scale_with_stroke_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
         self.scale_by_anchor(scale, anchor);
 
@@ -341,97 +435,4 @@ pub trait ScaleStrokeExt: Scale + Stroke {
     }
 }
 
-impl<T: Scale + Stroke + ?Sized> ScaleStrokeExt for T {}
-
-// MARK: impls for [T]
-impl<T: BoundingBox> BoundingBox for [T] {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        let [min, max] = self
-            .iter()
-            .map(|x| x.get_bounding_box())
-            .map(|[min, _, max]| [min, max])
-            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
-            .unwrap_or([DVec3::ZERO, DVec3::ZERO]);
-        if min == max {
-            warn!("Empty bounding box, is the slice empty?")
-        }
-        [min, (min + max) / 2.0, max]
-    }
-}
-
-impl<T: Rotate + BoundingBox> Rotate for [T] {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(anchor.get_pos(self));
-        self.iter_mut().for_each(|x| {
-            x.rotate_by_anchor(angle, axis, anchor);
-        });
-        self
-    }
-}
-
-impl<T: Scale> Scale for [T] {
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = match anchor {
-            Anchor::Point(p) => p,
-            Anchor::Edge(e) => self.get_bounding_box_point(e),
-        };
-        self.iter_mut().for_each(|x| {
-            x.scale_by_anchor(scale, Anchor::Point(anchor));
-        });
-        self
-    }
-}
-
-impl<T: Shift> Shift for [T] {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.shift(shift);
-        });
-        self
-    }
-}
-
-impl<T: Stroke> Stroke for [T] {
-    fn stroke_color(&self) -> AlphaColor<Srgb> {
-        self[0].stroke_color()
-    }
-    fn apply_stroke_func(
-        &mut self,
-        f: impl for<'a> Fn(&'a mut [crate::components::width::Width]),
-    ) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.apply_stroke_func(&f);
-        });
-        self
-    }
-    fn set_stroke_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_stroke_color(color);
-        });
-        self
-    }
-    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_stroke_opacity(opacity);
-        });
-        self
-    }
-}
-
-impl<T: Fill> Fill for [T] {
-    fn fill_color(&self) -> color::AlphaColor<color::Srgb> {
-        self[0].fill_color()
-    }
-    fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_fill_color(color);
-        });
-        self
-    }
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_fill_opacity(opacity);
-        });
-        self
-    }
-}
+impl<T: Scale + StrokeWidth + ?Sized> ScaleStrokeExt for T {}

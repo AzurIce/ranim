@@ -37,9 +37,7 @@ impl TimelineConstructor for HanoiScene {
 
         let _rods = timeline.pin([-1, 0, 1].into_iter().map(|i| {
             Rectangle::new(rod_width, rod_height).with(|rect| {
-                rect.fill_rgba = manim::GREY_C;
-                rect.stroke_rgba = manim::GREY_C;
-                rect.put_anchor_on(
+                rect.set_color(manim::GREY_C).put_anchor_on(
                     Anchor::edge(0, -1, 0),
                     dvec3(i as f64 * rod_section_width, -4.0, 0.0),
                 );
@@ -57,10 +55,8 @@ impl TimelineConstructor for HanoiScene {
                 timeline.pin(Rectangle::new(disk_width, disk_height).with(|rect| {
                     let color =
                         manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
-                    rect.fill_rgba = color;
-                    rect.stroke_rgba = color;
                     rect.stroke_width = 0.0;
-                    rect.put_anchor_on(
+                    rect.set_color(color).put_anchor_on(
                         Anchor::edge(0, -1, 0),
                         dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.0),
                     );

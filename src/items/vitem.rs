@@ -8,13 +8,13 @@ use geometry::Circle;
 use serde::{Deserialize, Serialize};
 
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{dvec3, vec4, DVec3, Vec4};
+use glam::{DVec3, Vec4, dvec3, vec4};
 
 use crate::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
-    prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
+    prelude::{Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, StrokeWidth},
     render::primitives::{Extract, vitem::VItemPrimitive},
-    traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift},
+    traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
     utils::svg::vitems_from_tree,
 };
 
@@ -229,7 +229,7 @@ impl Empty for VItem {
     }
 }
 
-impl Fill for VItem {
+impl FillColor for VItem {
     fn fill_color(&self) -> AlphaColor<Srgb> {
         self.fill_rgbas
             .first()
@@ -246,16 +246,12 @@ impl Fill for VItem {
     }
 }
 
-impl Stroke for VItem {
+impl StrokeColor for VItem {
     fn stroke_color(&self) -> AlphaColor<Srgb> {
         self.stroke_rgbas
             .first()
             .map(|&rgba| rgba.into())
             .unwrap_or(css::WHITE)
-    }
-    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
-        f(self.stroke_widths.as_mut());
-        self
     }
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.stroke_rgbas.set_all(color);
@@ -263,6 +259,13 @@ impl Stroke for VItem {
     }
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
         self.stroke_rgbas.set_opacity(opacity);
+        self
+    }
+}
+
+impl StrokeWidth for VItem {
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
+        f(self.stroke_widths.as_mut());
         self
     }
 }
@@ -281,38 +284,6 @@ impl Group<VItem> {
 }
 
 // MARK: Blueprints
-
-#[deprecated(
-    since = "0.1.0-alpha.14",
-    note = "Use the refactored item system instead"
-)]
-pub struct Line(pub DVec3, pub DVec3);
-
-impl Blueprint<VItem> for Line {
-    fn build(self) -> VItem {
-        VItem::from_vpoints(vec![self.0, (self.0 + self.1) / 2.0, self.1])
-    }
-}
-
-#[deprecated(
-    since = "0.1.0-alpha.14",
-    note = "Use the refactored item system instead"
-)]
-pub enum Dot {
-    Small,
-    Normal,
-}
-
-impl Blueprint<VItem> for Dot {
-    fn build(self) -> VItem {
-        Circle::new(match self {
-            Dot::Small => 0.04,
-            Dot::Normal => 0.08,
-        }).into()
-    }
-}
-
-// width, height
 #[deprecated(
     since = "0.1.0-alpha.14",
     note = "Use the refactored item system instead"

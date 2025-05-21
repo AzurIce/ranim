@@ -296,8 +296,9 @@ mod test {
 
     use crate::{
         components::vpoint::VPointComponentVec,
-        items::{
-            vitem::{geometry::{Circle, Square}, VItem},
+        items::vitem::{
+            VItem,
+            geometry::{Circle, Square},
         },
         traits::Alignable,
     };

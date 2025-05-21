@@ -1,11 +1,18 @@
 use crate::{
-    components::{rgba::Rgba, width::Width}, context::WgpuContext, render::{
+    components::{rgba::Rgba, width::Width},
+    context::WgpuContext,
+    render::{
+        RenderTextures,
         pipelines::{
-            map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup, Map3dTo2dPipeline, VItemPipeline
-        }, RenderTextures
-    }, traits::Fill, utils::{
-        wgpu::{WgpuBuffer, WgpuVecBuffer}, PipelinesStorage
-    }
+            Map3dTo2dPipeline, VItemPipeline, map_3d_to_2d::ComputeBindGroup,
+            vitem::RenderBindGroup,
+        },
+    },
+    traits::FillColor,
+    utils::{
+        PipelinesStorage,
+        wgpu::{WgpuBuffer, WgpuVecBuffer},
+    },
 };
 use color::AlphaColor;
 use glam::Vec4;
@@ -25,7 +32,7 @@ impl Primitive for VItemPrimitive {
     type RenderInstance = VItemRenderInstance;
 }
 
-impl Fill for VItemPrimitive {
+impl FillColor for VItemPrimitive {
     fn fill_color(&self) -> color::AlphaColor<color::Srgb> {
         let Rgba(rgba) = self.fill_rgbas[0];
         AlphaColor::new([rgba.x, rgba.y, rgba.z, rgba.w])
@@ -35,7 +42,9 @@ impl Fill for VItemPrimitive {
         self
     }
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rgbas.iter_mut().for_each(|rgba| rgba.0.w = opacity);
+        self.fill_rgbas
+            .iter_mut()
+            .for_each(|rgba| rgba.0.w = opacity);
         self
     }
 }

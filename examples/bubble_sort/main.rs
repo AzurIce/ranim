@@ -40,9 +40,9 @@ impl TimelineConstructor for BubbleSortScene {
                 let target_bc_coord = padded_frame_bl.extend(0.0)
                     + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);
                 let rect = Rectangle::new(width_unit, height).with(|rect| {
-                    rect.fill_rgba = manim::WHITE.with_alpha(0.5);
                     rect.stroke_width = 0.0;
-                    rect.scale(DVec3::splat(0.8))
+                    rect.set_fill_color(manim::WHITE.with_alpha(0.5))
+                        .scale(DVec3::splat(0.8))
                         .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
                 });
                 Some(timeline.pin(rect))
@@ -51,14 +51,14 @@ impl TimelineConstructor for BubbleSortScene {
 
         let anim_highlight = |rect: Rectangle| {
             rect.transform(|data| {
-                data.fill_rgba = manim::BLUE_C.with_alpha(0.5);
+                data.set_fill_color(manim::BLUE_C.with_alpha(0.5));
             })
             .with_duration(anim_step_duration)
             .with_rate_func(linear)
         };
         let anim_unhighlight = |rect: Rectangle| {
             rect.transform(|data| {
-                data.fill_rgba = manim::WHITE.with_alpha(0.5);
+                data.set_fill_color(manim::WHITE.with_alpha(0.5));
             })
             .with_duration(anim_step_duration)
             .with_rate_func(linear)

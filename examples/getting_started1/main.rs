@@ -1,8 +1,16 @@
 use ranim::{
+    AppOptions,
     animation::{
         creation::{CreationAnim, WritingAnim},
         transform::TransformAnim,
-    }, color::palettes::manim, items::vitem::{geometry::{Circle, Square}, VItem}, prelude::*, render_scene, AppOptions
+    },
+    color::palettes::manim,
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Square},
+    },
+    prelude::*,
+    render_scene,
 };
 
 #[scene]
@@ -12,13 +20,11 @@ impl TimelineConstructor for GettingStarted1Scene {
     fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         // A Square with size 2.0 and color blue
         let square = Square::new(2.0).with(|square| {
-            square.fill_rgba = manim::BLUE_C;
-            square.stroke_rgba = manim::BLUE_C;
+            square.set_color(manim::BLUE_C);
         });
 
         let circle = Circle::new(2.0).with(|circle| {
-            circle.fill_rgba = manim::RED_C;
-            circle.stroke_rgba = manim::RED_C;
+            circle.set_color(manim::RED_C);
         });
 
         // In order to do more low-level opeerations,

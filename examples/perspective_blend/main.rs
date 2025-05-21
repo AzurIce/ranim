@@ -1,10 +1,11 @@
 use ranim::{
     animation::{
-        transform::{GroupTransformAnim, TransformAnim}, GroupAnimFunction
+        GroupAnimFunction,
+        transform::{GroupTransformAnim, TransformAnim},
     },
     color::palettes::manim,
     glam::DVec3,
-    items::vitem::{geometry::Square, VItem},
+    items::vitem::{VItem, geometry::Square},
     prelude::*,
     timeline::TimeMark,
     utils::rate_functions::linear,
@@ -24,8 +25,7 @@ impl TimelineConstructor for PerspectiveBlendScene {
 
         let square_with_color = |color: color::AlphaColor<color::Srgb>| {
             VItem::from(Square::new(side_length).with(|square| {
-                square.fill_rgba = color.with_alpha(0.5);
-                square.stroke_rgba = color;
+                square.set_color(color).set_fill_opacity(0.5);
             }))
         };
 
