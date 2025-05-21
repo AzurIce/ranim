@@ -3,7 +3,7 @@ use log::LevelFilter;
 use ranim::{
     animation::{AnimGroupFunction, creation::WritingAnim, fading::FadingAnim},
     components::ScaleHint,
-    items::{group::Group, vitem::VItem},
+    items::vitem::{VItem, svg::SvgItem},
     prelude::*,
     timeline::TimeMark,
     typst_svg,
@@ -19,25 +19,27 @@ impl TimelineConstructor for BasicScene {
     fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         timeline.forward(0.2);
 
-        let svg = Group::<VItem>::from_svg(SVG).with(|svg| {
+        let svg = Vec::<VItem>::from(SvgItem::new(SVG).with(|svg| {
             svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
                 .put_center_on(DVec3::Y * 2.0);
-        });
+        }));
 
-        let text = Group::<VItem>::from_svg(&typst_svg!(
-            r#"
+        let text = Vec::<VItem>::from(
+            SvgItem::new(&typst_svg!(
+                r#"
             #align(center)[
                 #text(18pt)[Ranim]
 
                 #text(6pt)[Hello 你好]
             ]
             "#
-        ))
-        .with(|text| {
-            text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
-                .put_center_on(DVec3::NEG_Y * 2.0)
-                .set_fill_opacity(0.8);
-        });
+            ))
+            .with(|text| {
+                text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
+                    .put_center_on(DVec3::NEG_Y * 2.0)
+                    .set_fill_opacity(0.8);
+            }),
+        );
 
         timeline.play(
             text.clone()

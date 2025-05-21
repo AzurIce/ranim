@@ -3,7 +3,7 @@ use ranim::{
     color::palettes::manim::*,
     components::Anchor,
     glam::{dvec2, dvec3},
-    items::{group::Group, vitem::geometry::Rectangle},
+    items::vitem::geometry::Rectangle,
     prelude::*,
 };
 
@@ -50,7 +50,7 @@ impl TimelineConstructor for PalettesScene {
                     })
                 })
             })
-            .collect::<Group<_>>();
+            .collect::<Vec<_>>();
         let _squares = timeline.pin(squares);
         timeline.forward(0.01);
     }

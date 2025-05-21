@@ -6,12 +6,10 @@ use ranim::{
     animation::{AnimGroupFunction, creation::WritingAnim, transform::GroupTransformAnim},
     color::palettes::manim,
     components::{Anchor, ScaleHint},
-    items::{
-        group::Group,
-        vitem::{
-            VItem,
-            geometry::{Polygon, Rectangle, Square},
-        },
+    items::vitem::{
+        VItem,
+        geometry::{Polygon, Rectangle, Square},
+        svg::SvgItem,
     },
     prelude::*,
     timeline::TimeMark,
@@ -104,17 +102,19 @@ impl TimelineConstructor for RanimLogoScene {
             .collect_array::<6>()
             .unwrap();
 
-        let ranim_text = Group::<VItem>::from_svg(typst_svg!(
-            r#"
+        let ranim_text = Vec::<VItem>::from(
+            SvgItem::new(typst_svg!(
+                r#"
 #align(center)[
     #text(10pt, font: "LXGW Bright")[Ranim]
 ]"#
-        ))
-        .with(|text| {
-            text.set_color(manim::WHITE)
-                .scale_to(ScaleHint::PorportionalY(1.0))
-                .put_center_on(DVec3::NEG_Y * 2.5);
-        });
+            ))
+            .with(|text| {
+                text.set_color(manim::WHITE)
+                    .scale_to(ScaleHint::PorportionalY(1.0))
+                    .put_center_on(DVec3::NEG_Y * 2.5);
+            }),
+        );
         let (logo, end_time_logo) = timeline.schedule(logo_transform_anim);
         let (ranim_text, end_time_text) = timeline.schedule(
             ranim_text

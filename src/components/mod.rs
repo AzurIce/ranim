@@ -190,10 +190,7 @@ mod test {
 
     use crate::{
         components::vpoint::VPointComponentVec,
-        items::{
-            group::Group,
-            vitem::{VItem, geometry::Square},
-        },
+        items::vitem::{VItem, geometry::Square},
         traits::{BoundingBox, Scale, Shift},
     };
 
@@ -279,7 +276,7 @@ mod test {
                 sq.put_anchor_on(Anchor::edge(-1, 0, 0), dvec3(x, 0.0, 0.0));
                 sq
             })
-            .collect::<Group<_>>();
+            .collect::<Vec<_>>();
         assert_eq!(
             group.get_bounding_box(),
             [

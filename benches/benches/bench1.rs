@@ -1,10 +1,12 @@
 use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
 use itertools::Itertools;
-use ranim::animation::transform::GroupTransformAnimSchedule;
-use ranim::glam::{DVec3, dvec3};
-use ranim::items::vitem::Circle;
 use ranim::{
-    items::{group::Group, vitem::Square},
+    animation::transform::TransformAnim,
+    glam::{DVec3, dvec3},
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Square},
+    },
     prelude::*,
 };
 
@@ -12,7 +14,7 @@ use ranim::{
 struct StaticSquareScene(pub usize);
 
 impl TimelineConstructor for StaticSquareScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64;
 
@@ -21,12 +23,13 @@ impl TimelineConstructor for StaticSquareScene {
         let squares = (0..self.0)
             .cartesian_product(0..self.0)
             .map(|(i, j)| {
-                let mut square = Square(size).build();
-                square
-                    .put_center_on(start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64);
-                square
+                Square::new(size).with(|square| {
+                    square.put_center_on(
+                        start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64,
+                    );
+                })
             })
-            .collect::<Group<_>>();
+            .collect::<Vec<_>>();
         let _squares = timeline.pin(squares);
         timeline.forward(1.0);
     }
@@ -36,7 +39,7 @@ impl TimelineConstructor for StaticSquareScene {
 struct TransformSquareScene(pub usize);
 
 impl TimelineConstructor for TransformSquareScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64 - buff;
 
@@ -45,21 +48,30 @@ impl TimelineConstructor for TransformSquareScene {
         let squares = (0..self.0)
             .cartesian_product(0..self.0)
             .map(|(i, j)| {
-                let mut item = Square(size).build();
-                item.put_center_on(start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64);
-                item
+                VItem::from(Square::new(size).with(|square| {
+                    square.put_center_on(
+                        start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64,
+                    );
+                }))
             })
-            .collect::<Group<_>>();
-        let mut squares = timeline.pin(squares);
+            .collect::<Vec<_>>();
         let circles = (0..self.0)
             .cartesian_product(0..self.0)
             .map(|(i, j)| {
-                let mut item = Circle(size / 2.0).build();
-                item.put_center_on(start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64);
-                item
+                VItem::from(Circle::new(size / 2.0).with(|circle| {
+                    circle.put_center_on(
+                        start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64,
+                    );
+                }))
             })
-            .collect::<Group<_>>();
-        timeline.play(squares.transform_to(circles));
+            .collect::<Vec<_>>();
+        timeline.play(
+            squares
+                .into_iter()
+                .zip(circles)
+                .map(|(square, circle)| square.transform_to(circle))
+                .collect::<Vec<_>>(),
+        );
     }
 }
 

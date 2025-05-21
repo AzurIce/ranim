@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use crate::render::primitives::{Extract, Renderable};
 
 pub mod camera_frame;
-pub mod group;
 pub mod vitem;
 
 static RABJECT_CNT: AtomicUsize = AtomicUsize::new(0);
@@ -37,16 +36,6 @@ impl<T> PinnedItem<T> {
     }
 }
 
-// impl<T: 'static> Rabject<T> {
-//     pub fn schedule(
-//         &mut self,
-//         anim_builder: impl FnOnce(&mut Self) -> AnimationSpan<T>,
-//     ) -> AnimSchedule<T> {
-//         let animation = (anim_builder)(self);
-//         AnimSchedule::new(self, animation)
-//     }
-// }
-
 /// Blueprints are the data structures that are used to create an Item
 #[deprecated(
     since = "0.1.0-alpha.14",
@@ -74,7 +63,6 @@ impl<T: Extract<Target = Target>, Target: Renderable + 'static> VisualItem for T
 
 /// The item which can be extracted into a [`Renderable`]
 ///
-/// VisualItem is one kind of [`crate::timeline::RanimItem`].
 /// This is automatically implemented for the types that [`Extract`] to a [`Renderable`].
 pub trait VisualItem {
     fn extract_renderable(&self) -> Box<dyn Renderable>;

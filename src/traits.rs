@@ -283,7 +283,7 @@ pub trait Rotate {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self;
     /// Rotate the mobject by a given angle about a given axis at center.
     ///
-    /// This is equivalent to [`Position::rotate_by_anchor`] with [`Anchor::center`].
+    /// This is equivalent to [`Rotate::rotate_by_anchor`] with [`Anchor::CENTER`].
     fn rotate(&mut self, angle: f64, axis: DVec3) -> &mut Self {
         self.rotate_by_anchor(angle, axis, Anchor::CENTER)
     }
@@ -307,7 +307,7 @@ pub trait Scale: BoundingBox {
     fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self;
     /// Scale the item by a given scale at center.
     ///
-    /// This is equivalent to [`Position::scale_by_anchor`] with [`Anchor::center`].
+    /// This is equivalent to [`Scale::scale_by_anchor`] with [`Anchor::CENTER`].
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.scale_by_anchor(scale, Anchor::CENTER)
     }
