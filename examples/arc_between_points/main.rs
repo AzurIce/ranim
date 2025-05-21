@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use log::LevelFilter;
 use ranim::{
-    animation::{fading::FadingAnim, GroupAnimFunction},
+    animation::{GroupAnimFunction, fading::FadingAnim},
     color::HueDirection,
-    glam::{dvec2, DMat2},
-    items::{group::Group, vitem::geometry::ArcBetweenPoints, GroupLaggedAnim},
+    glam::{DMat2, dvec2},
+    items::{group::Group, vitem::geometry::ArcBetweenPoints},
     prelude::*,
     timeline::TimeMark,
 };
@@ -39,17 +39,20 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                     * dvec2(rad, 0.0);
                 ArcBetweenPoints::new(center.extend(0.0), (center + vec).extend(0.0), angle).with(
                     |arc| {
-                        arc.stroke_rgba = color;
                         arc.stroke_width = width as f32;
+                        arc.set_stroke_color(color);
                     },
                 )
             })
             .collect::<Group<_>>();
 
         let arcs_fade_in = arcs
-            .lagged_anim(0.2, |item| item.fade_in())
+            .into_iter()
+            .map(|arc| arc.fade_in())
+            .collect::<Vec<_>>()
+            .with_lagged_offset(0.2)
+            .with_epilogue_to_end()
             .with_total_duration(3.0);
-        println!("{:?}", arcs_fade_in);
         timeline.play(arcs_fade_in);
 
         timeline.insert_time_mark(

@@ -5,6 +5,7 @@ pub mod transform;
 
 use crate::utils::rate_functions::linear;
 
+use itertools::Itertools;
 #[allow(unused)]
 use log::trace;
 use std::{any::Any, fmt::Debug, rc::Rc};
@@ -96,9 +97,9 @@ pub struct EvalAdapter<T> {
 pub struct AnimationSpan<T> {
     pub(crate) type_name: String,
     pub(crate) evaluator: Box<dyn Eval<T>>,
-    pub(crate) rate_func: fn(f64) -> f64,
-    pub(crate) duration_secs: f64,
-    pub(crate) padding: (f64, f64),
+    pub rate_func: fn(f64) -> f64,
+    pub duration_secs: f64,
+    pub padding: (f64, f64),
 }
 
 impl<T> Debug for AnimationSpan<T> {
@@ -162,6 +163,7 @@ impl<T> AnimationSpan<T> {
 
 // MARK: Group
 pub trait GroupAnimFunction<T> {
+    fn duration(&self) -> f64;
     /// Sets the rate function for each animation in the group
     fn with_rate_func(self, rate_func: fn(f64) -> f64) -> Self;
     /// Sets the duration for each animation in the group
@@ -185,6 +187,8 @@ pub trait GroupAnimFunction<T> {
     /// [.5, .5, .5]
     /// ```
     fn with_total_duration(self, secs: f64) -> Self;
+    fn with_lagged_offset(self, ratio: f64) -> Self;
+    fn with_epilogue_to_end(self) -> Self;
 }
 
 impl<E: 'static, T> GroupAnimFunction<E> for T
@@ -192,6 +196,13 @@ where
     for<'a> &'a mut T: IntoIterator<Item = &'a mut AnimationSpan<E>>,
     for<'a> &'a T: IntoIterator<Item = &'a AnimationSpan<E>>,
 {
+    fn duration(&self) -> f64 {
+        (&self)
+            .into_iter()
+            .map(|anim| anim.span_len())
+            .reduce(|acc, e| acc.max(e))
+            .unwrap()
+    }
     fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         (&mut self).into_iter().for_each(|schedule| {
             schedule.rate_func = rate_func;
@@ -220,5 +231,33 @@ where
         });
         self
     }
+    fn with_lagged_offset(mut self, ratio: f64) -> Self {
+        let iter = (&self)
+            .into_iter()
+            .map(|item: &AnimationSpan<E>| item.span_len() * ratio)
+            .scan(0.0, |state, x| {
+                *state += x;
+                Some(*state)
+            })
+            .collect::<Vec<_>>();
 
+        (&mut self)
+            .into_iter()
+            .zip([0.0].into_iter().chain(iter))
+            .for_each(|(anim, lag_time)| {
+                anim.padding.0 = lag_time;
+            });
+
+        self
+    }
+    fn with_epilogue_to_end(mut self) -> Self {
+        let duration = self.duration();
+        (&mut self).into_iter().for_each(|anim| {
+            let span = anim.span_len();
+            if span < duration {
+                anim.padding.1 = duration - span;
+            }
+        });
+        self
+    }
 }

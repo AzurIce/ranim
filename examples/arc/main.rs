@@ -4,7 +4,7 @@ use ranim::{
     animation::{GroupAnimFunction, fading::FadingAnim},
     color::HueDirection,
     glam::dvec2,
-    items::{GroupLaggedAnim, vitem::geometry::Arc},
+    items::vitem::geometry::Arc,
     prelude::*,
     timeline::TimeMark,
 };
@@ -42,14 +42,18 @@ impl TimelineConstructor for ArcScene {
                     frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
                 Arc::new(angle, radius).with(|arc| {
                     arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
-                    arc.stroke_rgba = color;
-                    arc.put_center_on(offset.extend(0.0));
+                    arc.set_stroke_color(color)
+                        .put_center_on(offset.extend(0.0));
                 })
             })
             .collect::<Vec<_>>();
 
         let arcs_fade_in = arcs
-            .lagged_anim(0.2, |item| item.fade_in())
+            .into_iter()
+            .map(|arc| arc.fade_in())
+            .collect::<Vec<_>>()
+            .with_lagged_offset(0.2)
+            .with_epilogue_to_end()
             .with_total_duration(3.0);
         timeline.play(arcs_fade_in);
 

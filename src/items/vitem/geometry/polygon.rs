@@ -8,7 +8,8 @@ use crate::{
     items::vitem::{DEFAULT_STROKE_WIDTH, VItem},
     render::primitives::{Extract, vitem::VItemPrimitive},
     traits::{
-        Alignable, BoundingBox, Fill, Interpolatable, Opacity, Rotate, Scale, Shift, Stroke, With,
+        Alignable, BoundingBox, FillColor, Interpolatable, Opacity, Rotate, Scale, Shift,
+        StrokeColor, StrokeWidth, With,
     },
 };
 
@@ -102,6 +103,34 @@ impl Alignable for Square {
 impl Opacity for Square {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
+        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
+        self
+    }
+}
+
+impl StrokeColor for Square {
+    fn stroke_color(&self) -> AlphaColor<Srgb> {
+        self.stroke_rgba
+    }
+    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
+        self.stroke_rgba = color;
+        self
+    }
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
+        self
+    }
+}
+
+impl FillColor for Square {
+    fn fill_color(&self) -> AlphaColor<Srgb> {
+        self.fill_rgba
+    }
+    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
+        self.fill_rgba = color;
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
         self.fill_rgba = self.fill_rgba.with_alpha(opacity);
         self
     }
@@ -238,6 +267,34 @@ impl Alignable for Rectangle {
     }
 }
 
+impl StrokeColor for Rectangle {
+    fn stroke_color(&self) -> AlphaColor<Srgb> {
+        self.stroke_rgba
+    }
+    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
+        self.stroke_rgba = color;
+        self
+    }
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
+        self
+    }
+}
+
+impl FillColor for Rectangle {
+    fn fill_color(&self) -> AlphaColor<Srgb> {
+        self.fill_rgba
+    }
+    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
+        self.fill_rgba = color;
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
+        self
+    }
+}
+
 // MARK: Conversions
 impl From<Rectangle> for Polygon {
     fn from(value: Rectangle) -> Self {
@@ -367,6 +424,34 @@ impl Opacity for Polygon {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.fill_rgba = self.fill_rgba.with_alpha(opacity);
         self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
+        self
+    }
+}
+
+impl StrokeColor for Polygon {
+    fn stroke_color(&self) -> AlphaColor<Srgb> {
+        self.stroke_rgba
+    }
+    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
+        self.stroke_rgba = color;
+        self
+    }
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
+        self
+    }
+}
+
+impl FillColor for Polygon {
+    fn fill_color(&self) -> AlphaColor<Srgb> {
+        self.fill_rgba
+    }
+    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
+        self.fill_rgba = color;
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
         self
     }
 }

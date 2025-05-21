@@ -1,9 +1,9 @@
 use glam::DVec3;
 use log::LevelFilter;
 use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim, GroupAnimFunction},
+    animation::{GroupAnimFunction, creation::WritingAnim, fading::FadingAnim},
     components::ScaleHint,
-    items::{group::Group, vitem::VItem, GroupLaggedAnim},
+    items::{group::Group, vitem::VItem},
     prelude::*,
     timeline::TimeMark,
     typst_svg,
@@ -41,14 +41,19 @@ impl TimelineConstructor for BasicScene {
 
         timeline.play(
             text.clone()
-                .lagged_anim(0.2, |item| item.write())
-                .with_total_duration(3.0)
+                .into_iter()
+                .map(|item| item.write())
+                .collect::<Vec<_>>()
+                .with_lagged_offset(0.2)
+                .with_epilogue_to_end()
                 .with_rate_func(linear),
         );
         let text = timeline.pin(text);
         timeline.play(
             svg.clone()
-                .lagged_anim(0.0, |item| item.fade_in().with_duration(3.0)),
+                .into_iter()
+                .map(|item| item.fade_in().with_duration(3.0))
+                .collect::<Vec<_>>(),
         ); // At the same time, the svg fade in
         let svg = timeline.pin(svg);
         timeline.insert_time_mark(
@@ -60,14 +65,20 @@ impl TimelineConstructor for BasicScene {
         timeline.play(
             timeline
                 .unpin(text)
-                .lagged_anim(0.2, |item| item.unwrite())
+                .into_iter()
+                .map(|item| item.unwrite())
+                .collect::<Vec<_>>()
+                .with_lagged_offset(0.2)
+                .with_epilogue_to_end()
                 .with_total_duration(3.0)
                 .with_rate_func(linear),
         );
         timeline.play(
             timeline
                 .unpin(svg)
-                .lagged_anim(0.0, |item| item.fade_out().with_duration(3.0)),
+                .into_iter()
+                .map(|item| item.fade_out().with_duration(3.0))
+                .collect::<Vec<_>>(),
         ); // At the same time, the svg fade in
         timeline.sync();
     }

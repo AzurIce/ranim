@@ -2,9 +2,9 @@
 //!
 //!
 //! ## Coordinate System
-//! 
+//!
 //! Ranim's coordinate system is right-handed coordinate:
-//! 
+//!
 //! ```text
 //!      +Y
 //!      |
@@ -13,7 +13,7 @@
 //!    /
 //! +Z
 //! ```
-//! 
+//!
 
 use std::{
     collections::HashMap,

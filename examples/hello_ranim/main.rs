@@ -18,15 +18,14 @@ struct HelloRanimScene;
 impl TimelineConstructor for HelloRanimScene {
     fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let square = Square::new(2.0).with(|square| {
-            square.fill_rgba = manim::BLUE_C;
-            square.stroke_rgba = manim::BLUE_C;
+            square.set_color(manim::BLUE_C);
         });
 
         timeline.play(square.clone().fade_in());
         let circle = Circle::new(2.0).with(|circle| {
-            circle.fill_rgba = manim::RED_C;
-            circle.stroke_rgba = manim::RED_C;
-            circle.rotate(PI / 4.0 + PI, DVec3::Z);
+            circle
+                .set_color(manim::RED_C)
+                .rotate(PI / 4.0 + PI, DVec3::Z);
         });
 
         timeline.play(VItem::from(square).transform_to(circle.clone()));

@@ -1,56 +1,15 @@
 use std::sync::atomic::AtomicUsize;
 
 use derive_more::{Deref, DerefMut};
-use group::Group;
 // use variadics_please::all_tuples;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    animation::AnimationSpan,
-    render::primitives::{Extract, Renderable},
-};
+use crate::render::primitives::{Extract, Renderable};
 
 pub mod camera_frame;
 pub mod group;
 pub mod vitem;
-
-pub trait GroupLaggedAnim<T> {
-    type Output;
-    fn lagged_anim(
-        self,
-        lag_ratio: f64,
-        anim_builder: impl FnOnce(T) -> AnimationSpan<T> + Clone,
-    ) -> Vec<AnimationSpan<T>>;
-}
-
-impl<E, T> GroupLaggedAnim<E> for T
-where
-    T: IntoIterator<Item = E>,
-{
-    type Output = Vec<AnimationSpan<E>>;
-    fn lagged_anim(
-        self,
-        lag_ratio: f64,
-        anim_builder: impl FnOnce(E) -> AnimationSpan<E> + Clone,
-    ) -> Self::Output {
-        let mut anim_schedules = self
-            .into_iter()
-            .map(|rabject| (anim_builder.clone())(rabject))
-            .collect::<Vec<_>>();
-        let n = anim_schedules.len();
-
-        let duration = anim_schedules[0].duration_secs;
-        let lag_time = duration * lag_ratio;
-        anim_schedules.iter_mut().enumerate().for_each(|(i, anim)| {
-            anim.padding = (i as f64 * lag_time, (n - i - 1) as f64 * lag_time);
-            // println!("{} {:?} {}", schedule.anim.span_len(), schedule.anim.padding, schedule.anim.duration_secs);
-        });
-        anim_schedules
-    }
-}
-
-impl<T> Group<T> {}
 
 static RABJECT_CNT: AtomicUsize = AtomicUsize::new(0);
 

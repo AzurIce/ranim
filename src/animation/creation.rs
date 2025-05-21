@@ -1,6 +1,6 @@
 use super::{AnimationSpan, EvalDynamic, ToEvaluator};
 use crate::items::vitem::DEFAULT_STROKE_WIDTH;
-use crate::traits::{Empty, Fill, Interpolatable, Partial, Stroke};
+use crate::traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth};
 use crate::utils::rate_functions::smooth;
 use log::warn;
 
@@ -24,8 +24,8 @@ impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
 }
 
 // MARK: Writing
-pub trait WritingRequirement: CreationRequirement + Stroke + Fill {}
-impl<T: CreationRequirement + Stroke + Fill> WritingRequirement for T {}
+pub trait WritingRequirement: CreationRequirement + StrokeWidth + StrokeColor + FillColor {}
+impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequirement for T {}
 
 pub trait WritingAnim<T: WritingRequirement + 'static> {
     fn write(self) -> AnimationSpan<T>;

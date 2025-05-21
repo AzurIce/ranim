@@ -1,13 +1,17 @@
 use std::f64::consts::PI;
 
 use glam::{DVec3, dvec2, dvec3};
+use itertools::Itertools;
 use ranim::{
-    animation::{creation::WritingAnimSchedule, transform::GroupTransformAnimSchedule},
+    animation::{GroupAnimFunction, creation::WritingAnim, transform::GroupTransformAnim},
     color::palettes::manim,
     components::{Anchor, ScaleHint},
     items::{
         group::Group,
-        vitem::{Polygon, Rectangle, Square, VItem},
+        vitem::{
+            VItem,
+            geometry::{Polygon, Rectangle, Square},
+        },
     },
     prelude::*,
     timeline::TimeMark,
@@ -16,44 +20,45 @@ use ranim::{
 };
 
 fn build_logo(logo_width: f64) -> [VItem; 6] {
-    let mut red_bg_rect = Rectangle(logo_width / 2.0, logo_width).build();
-    red_bg_rect
-        .set_color(manim::RED_C.with_alpha(0.5))
-        .put_center_on(dvec3(-logo_width / 4.0, 0.0, 0.0));
-    let mut red_rect = Rectangle(logo_width / 4.0, logo_width).build();
-    red_rect
-        .set_color(manim::RED_C)
-        .put_anchor_on(Anchor::edge(1, 0, 0), dvec3(-logo_width / 4.0, 0.0, 0.0));
+    let red_bg_rect = Rectangle::new(logo_width / 2.0, logo_width).with(|rect| {
+        rect.set_color(manim::RED_C.with_alpha(0.5))
+            .put_center_on(dvec3(-logo_width / 4.0, 0.0, 0.0));
+    });
+    let red_rect = Rectangle::new(logo_width / 4.0, logo_width).with(|rect| {
+        rect.set_color(manim::RED_C)
+            .put_anchor_on(Anchor::edge(1, 0, 0), dvec3(-logo_width / 4.0, 0.0, 0.0));
+    });
 
-    let mut green_bg_sq = Square(logo_width / 2.0).build();
-    green_bg_sq
-        .set_color(manim::GREEN_C.with_alpha(0.5))
-        .put_center_on(dvec3(logo_width / 4.0, logo_width / 4.0, 0.0));
-    let mut green_triangle = Polygon(vec![
+    let green_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
+        sq.set_color(manim::GREEN_C.with_alpha(0.5))
+            .put_center_on(dvec3(logo_width / 4.0, logo_width / 4.0, 0.0));
+    });
+    let green_triangle = Polygon::new(vec![
         dvec3(0.0, logo_width / 2.0, 0.0),
         dvec3(logo_width / 2.0, logo_width / 2.0, 0.0),
         dvec3(logo_width / 2.0, 0.0, 0.0),
     ])
-    .build(); // ◥
-    green_triangle.set_color(manim::GREEN_C);
+    .with(|tri| {
+        tri.set_color(manim::GREEN_C);
+    }); // ◥
 
-    let mut blue_bg_sq = Square(logo_width / 2.0).build();
-    blue_bg_sq
-        .set_color(manim::BLUE_C.with_alpha(0.5))
-        .put_center_on(dvec3(logo_width / 4.0, -logo_width / 4.0, 0.0));
-    let mut blue_triangle = green_triangle.clone();
-    blue_triangle
-        .set_color(manim::BLUE_C)
-        .rotate(PI, DVec3::Z)
-        .shift(DVec3::NEG_Y * logo_width / 2.0); // ◣
+    let blue_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
+        sq.set_color(manim::BLUE_C.with_alpha(0.5))
+            .put_center_on(dvec3(logo_width / 4.0, -logo_width / 4.0, 0.0));
+    });
+    let blue_triangle = green_triangle.clone().with(|tri| {
+        tri.set_color(manim::BLUE_C)
+            .rotate(PI, DVec3::Z)
+            .shift(DVec3::NEG_Y * logo_width / 2.0);
+    }); // ◣
 
     [
-        red_bg_rect,
-        red_rect,
-        green_bg_sq,
-        green_triangle,
-        blue_bg_sq,
-        blue_triangle,
+        VItem::from(red_bg_rect),
+        VItem::from(red_rect),
+        VItem::from(green_bg_sq),
+        VItem::from(green_triangle),
+        VItem::from(blue_bg_sq),
+        VItem::from(blue_triangle),
     ]
 }
 #[scene]
@@ -64,16 +69,9 @@ impl TimelineConstructor for RanimLogoScene {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let logo_width = frame_size.y * 0.618;
 
-        let mut logo = build_logo(logo_width)
-            .map(|item| timeline.pin(item))
-            .into_iter()
-            .collect::<Group<_>>();
-
-        timeline
-            .play(logo.lagged_anim(0.0, |item| {
-                item.write().with_duration(3.0).with_rate_func(smooth)
-            }))
-            .sync();
+        let logo = build_logo(logo_width);
+        let logo =
+            timeline.play(logo.map(|item| item.write().with_duration(3.0).with_rate_func(smooth)));
 
         let gap_ratio = 1.0 / 60.0;
         let gap = logo_width * gap_ratio;
@@ -88,41 +86,48 @@ impl TimelineConstructor for RanimLogoScene {
             Anchor::edge(1, 1, 0),
             Anchor::edge(1, -1, 0),
         ];
-        logo.chunks_mut(2)
+        let logo_transform_anim = logo
+            .into_iter()
+            .chunks(2)
+            .into_iter()
             .zip(scale.into_iter().zip(anchor))
-            .for_each(|(chunk, (scale, anchor))| {
-                timeline.play(
-                    chunk
-                        .transform(|data| {
-                            data.scale_by_anchor(scale, anchor)
-                                .scale_by_anchor(dvec3(0.9, 0.9, 1.0), Anchor::origin())
-                                .shift(dvec3(0.0, 1.3, 0.0));
-                        })
-                        .with_rate_func(smooth)
-                        .apply(),
-                );
-            });
+            .flat_map(|(chunk, (scale, anchor))| {
+                let chunk = chunk.collect_array::<2>().unwrap();
+                chunk
+                    .transform(|data| {
+                        data.scale_by_anchor(scale, anchor)
+                            .scale_by_anchor(dvec3(0.9, 0.9, 1.0), Anchor::ORIGIN)
+                            .shift(dvec3(0.0, 1.3, 0.0));
+                    })
+                    .with_rate_func(smooth)
+            })
+            .collect_array::<6>()
+            .unwrap();
 
-        let mut ranim_text = Group::<VItem>::from_svg(typst_svg!(
+        let ranim_text = Group::<VItem>::from_svg(typst_svg!(
             r#"
 #align(center)[
     #text(10pt, font: "LXGW Bright")[Ranim]
 ]"#
-        ));
-        ranim_text
-            .scale_to(ScaleHint::PorportionalY(1.0))
-            .put_center_on(DVec3::NEG_Y * 2.5);
-        let mut ranim_text = ranim_text
-            .into_iter()
-            .map(|item| timeline.pin(item))
-            .collect::<Group<_>>();
-        timeline.play(
+        ))
+        .with(|text| {
+            text.set_color(manim::WHITE)
+                .scale_to(ScaleHint::PorportionalY(1.0))
+                .put_center_on(DVec3::NEG_Y * 2.5);
+        });
+        let (logo, end_time_logo) = timeline.schedule(logo_transform_anim);
+        let (ranim_text, end_time_text) = timeline.schedule(
             ranim_text
-                .lagged_anim(0.2, |item| item.write())
-                .with_duration(2.0)
-                .with_rate_func(linear),
+                .into_iter()
+                .map(|item| item.write().with_duration(2.0).with_rate_func(linear))
+                .collect::<Vec<_>>()
+                .with_lagged_offset(0.2)
+                .with_epilogue_to_end(),
         );
-        timeline.sync();
+        timeline.forward_to(end_time_logo);
+        let logo = timeline.pin(logo);
+        timeline.forward_to(end_time_text);
+        let ranim_text = timeline.pin(ranim_text);
 
         timeline.insert_time_mark(
             timeline.cur_sec(),
@@ -130,10 +135,14 @@ impl TimelineConstructor for RanimLogoScene {
         );
         timeline.forward(1.0);
 
-        let mut all = logo.into_iter().chain(ranim_text).collect::<Group<_>>();
-        timeline.play(all.lagged_anim(0.0, |item| {
-            item.unwrite().with_duration(3.0).with_rate_func(smooth)
-        }));
+        timeline.play(
+            timeline
+                .unpin(logo)
+                .into_iter()
+                .chain(timeline.unpin(ranim_text))
+                .map(|item| item.unwrite().with_duration(3.0).with_rate_func(smooth))
+                .collect::<Vec<_>>(),
+        );
     }
 }
 
