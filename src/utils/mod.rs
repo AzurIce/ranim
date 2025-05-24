@@ -1,7 +1,7 @@
 pub mod bezier;
 pub mod math;
 pub mod rate_functions;
-pub mod refresh;
+pub mod svg;
 pub mod typst;
 pub mod wgpu;
 

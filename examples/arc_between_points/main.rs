@@ -1,18 +1,19 @@
 use itertools::Itertools;
 use log::LevelFilter;
-use ranim::animation::fading::FadingAnimSchedule;
-use ranim::color::HueDirection;
-use ranim::glam::{DMat2, dvec2};
-use ranim::items::group::Group;
-use ranim::items::vitem::ArcBetweenPoints;
-use ranim::prelude::*;
-use ranim::timeline::TimeMark;
+use ranim::{
+    animation::{AnimGroupFunction, fading::FadingAnim},
+    color::HueDirection,
+    glam::{DMat2, dvec2},
+    items::vitem::geometry::ArcBetweenPoints,
+    prelude::*,
+    timeline::TimeMark,
+};
 
 #[scene]
 struct ArcBetweenPointsScene;
 
 impl TimelineConstructor for ArcBetweenPointsScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
         let center = dvec2(0.0, 0.0);
 
         let start_color = color!("#FF8080FF");
@@ -36,24 +37,26 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                 );
                 let vec = DMat2::from_angle(std::f64::consts::PI * 2.0 / ntan as f64 * j as f64)
                     * dvec2(rad, 0.0);
-                let mut arc = ArcBetweenPoints {
-                    start: center.extend(0.0),
-                    end: (center + vec).extend(0.0),
-                    angle,
-                }
-                .build();
-                arc.set_color(color)
-                    .set_fill_opacity(0.0)
-                    .set_stroke_width(width as f32);
-                arc
+                ArcBetweenPoints::new(center.extend(0.0), (center + vec).extend(0.0), angle).with(
+                    |arc| {
+                        arc.stroke_width = width as f32;
+                        arc.set_stroke_color(color);
+                    },
+                )
             })
-            .collect::<Group<_>>();
-        let mut arcs = timeline.insert(arcs);
+            .collect::<Vec<_>>();
 
-        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());
-        timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();
+        let arcs_fade_in = arcs
+            .into_iter()
+            .map(|arc| arc.fade_in())
+            .collect::<Vec<_>>()
+            .with_lagged_offset(0.2)
+            .with_epilogue_to_end()
+            .with_total_duration(3.0);
+        timeline.play(arcs_fade_in);
+
         timeline.insert_time_mark(
-            timeline.duration_secs(),
+            timeline.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),
         );
     }

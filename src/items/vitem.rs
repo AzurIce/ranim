@@ -1,24 +1,21 @@
-pub mod arrow;
-pub mod line;
+// pub mod arrow;
+pub mod geometry;
+pub mod svg;
+pub mod typst;
+// pub mod line;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{DVec3, Vec4, dvec2, dvec3, vec4};
-use itertools::Itertools;
+use glam::{DVec3, Vec4, vec4};
 
 use crate::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
-    prelude::{Alignable, Empty, Fill, Interpolatable, Opacity, Partial, Stroke},
-    render::primitives::{
-        Extract,
-        vitem::{VItemPrimitive, VItemPrimitiveData},
-    },
-    traits::{BoundingBox, PointsFunc, Position},
+    prelude::{Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, StrokeWidth},
+    render::primitives::{Extract, vitem::VItemPrimitive},
+    traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
-
-use super::Blueprint;
 
 /// A vectorized item.
 ///
@@ -61,12 +58,14 @@ impl BoundingBox for VItem {
     }
 }
 
-impl Position for VItem {
+impl Shift for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
         self
     }
+}
 
+impl Rotate for VItem {
     fn rotate_by_anchor(
         &mut self,
         angle: f64,
@@ -76,7 +75,9 @@ impl Position for VItem {
         self.vpoints.rotate_by_anchor(angle, axis, anchor);
         self
     }
+}
 
+impl Scale for VItem {
     fn scale_by_anchor(&mut self, scale: DVec3, anchor: crate::components::Anchor) -> &mut Self {
         self.vpoints.scale_by_anchor(scale, anchor);
         self
@@ -142,11 +143,11 @@ impl VItem {
     }
 }
 
-// MARK: Extract
+/// See [`VItemPrimitive`].
 impl Extract for VItem {
-    type Primitive = VItemPrimitive;
-    fn extract(&self) -> <Self::Primitive as crate::render::primitives::Primitive>::Data {
-        VItemPrimitiveData {
+    type Target = VItemPrimitive;
+    fn extract(&self) -> Self::Target {
+        VItemPrimitive {
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect(),
@@ -225,7 +226,7 @@ impl Empty for VItem {
     }
 }
 
-impl Fill for VItem {
+impl FillColor for VItem {
     fn fill_color(&self) -> AlphaColor<Srgb> {
         self.fill_rgbas
             .first()
@@ -242,10 +243,12 @@ impl Fill for VItem {
     }
 }
 
-impl Stroke for VItem {
-    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
-        f(self.stroke_widths.as_mut());
-        self
+impl StrokeColor for VItem {
+    fn stroke_color(&self) -> AlphaColor<Srgb> {
+        self.stroke_rgbas
+            .first()
+            .map(|&rgba| rgba.into())
+            .unwrap_or(css::WHITE)
     }
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.stroke_rgbas.set_all(color);
@@ -257,166 +260,24 @@ impl Stroke for VItem {
     }
 }
 
+impl StrokeWidth for VItem {
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
+        f(self.stroke_widths.as_mut());
+        self
+    }
+}
+
 // MARK: Blueprints
+// #[deprecated(
+//     since = "0.1.0-alpha.14",
+//     note = "Use the refactored item system instead"
+// )]
+// pub struct Ellipse(pub f64, pub f64);
 
-/// A polygon defined by a list of corner points (Counter Clock wise).
-pub struct Polygon(pub Vec<DVec3>);
-
-impl Blueprint<VItem> for Polygon {
-    fn build(mut self) -> VItem {
-        assert!(self.0.len() > 2);
-
-        // Close the polygon
-        self.0.push(self.0[0]);
-
-        let anchors = self.0;
-        let handles = anchors
-            .iter()
-            .tuple_windows()
-            .map(|(&a, &b)| 0.5 * (a + b))
-            .collect::<Vec<_>>();
-
-        // Interleave anchors and handles
-        let points = anchors.into_iter().interleave(handles).collect::<Vec<_>>();
-        // trace!("points: {:?}", points);
-        VItem::from_vpoints(points)
-    }
-}
-
-pub struct Rectangle(pub f64, pub f64);
-
-impl Blueprint<VItem> for Rectangle {
-    fn build(self) -> VItem {
-        let half_width = self.0 / 2.0;
-        let half_height = self.1 / 2.0;
-        Polygon(vec![
-            dvec3(half_width, half_height, 0.0),
-            dvec3(-half_width, half_height, 0.0),
-            dvec3(-half_width, -half_height, 0.0),
-            dvec3(half_width, -half_height, 0.0),
-        ])
-        .build()
-    }
-}
-
-pub struct Line(pub DVec3, pub DVec3);
-
-impl Blueprint<VItem> for Line {
-    fn build(self) -> VItem {
-        VItem::from_vpoints(vec![self.0, (self.0 + self.1) / 2.0, self.1])
-    }
-}
-
-pub struct Square(pub f64);
-
-impl Blueprint<VItem> for Square {
-    fn build(self) -> VItem {
-        Rectangle(self.0, self.0).build()
-    }
-}
-
-pub struct Arc {
-    pub angle: f64,
-    pub radius: f64,
-}
-
-impl Blueprint<VItem> for Arc {
-    fn build(self) -> VItem {
-        const NUM_SEGMENTS: usize = 8;
-        let len = 2 * NUM_SEGMENTS + 1;
-
-        let mut points = (0..len)
-            .map(|i| {
-                let angle = self.angle * i as f64 / (len - 1) as f64;
-                let (mut x, mut y) = (angle.cos(), angle.sin());
-                if x.abs() < 1.8e-7 {
-                    x = 0.0;
-                }
-                if y.abs() < 1.8e-7 {
-                    y = 0.0;
-                }
-                dvec2(x, y).extend(0.0) * self.radius
-            })
-            .collect::<Vec<_>>();
-
-        let theta = self.angle / NUM_SEGMENTS as f64;
-        points.iter_mut().skip(1).step_by(2).for_each(|p| {
-            *p /= (theta / 2.0).cos();
-        });
-        // trace!("start: {:?}, end: {:?}", points[0], points[len - 1]);
-        VItem::from_vpoints(points)
-    }
-}
-
-pub struct ArcBetweenPoints {
-    pub start: DVec3,
-    pub end: DVec3,
-    pub angle: f64,
-}
-
-impl Blueprint<VItem> for ArcBetweenPoints {
-    fn build(self) -> VItem {
-        let radius = (self.start.distance(self.end) / 2.0) / self.angle.sin();
-        let arc = Arc {
-            angle: self.angle,
-            radius,
-        };
-        let mut item = arc.build();
-        item.vpoints.put_start_and_end_on(self.start, self.end);
-        item
-    }
-}
-
-/// A circle
-pub struct Circle(pub f64);
-
-impl Blueprint<VItem> for Circle {
-    fn build(self) -> VItem {
-        Arc {
-            angle: std::f64::consts::TAU,
-            radius: self.0,
-        }
-        .build()
-    }
-}
-
-pub enum Dot {
-    Small,
-    Normal,
-}
-
-impl Blueprint<VItem> for Dot {
-    fn build(self) -> VItem {
-        Circle(match self {
-            Dot::Small => 0.04,
-            Dot::Normal => 0.08,
-        })
-        .build()
-    }
-}
-
-// width, height
-pub struct Ellipse(pub f64, pub f64);
-
-impl Blueprint<VItem> for Ellipse {
-    fn build(self) -> VItem {
-        let mut mobject = Circle(1.0).build();
-        mobject.vpoints.scale(dvec3(self.0, self.1, 1.0));
-        mobject
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_arc() {
-        let arc = Arc {
-            angle: std::f64::consts::PI / 2.0,
-            radius: 1.0,
-        }
-        .build();
-        println!("{:?}", arc.vpoints);
-    }
-}
+// impl Blueprint<VItem> for Ellipse {
+//     fn build(self) -> VItem {
+//         let mut mobject = VItem::from(Circle::new(1.0));
+//         mobject.vpoints.scale(dvec3(self.0, self.1, 1.0));
+//         mobject
+//     }
+// }

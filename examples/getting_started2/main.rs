@@ -1,7 +1,13 @@
 use ranim::{
-    animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},
+    animation::{
+        creation::{CreationAnim, WritingAnim},
+        transform::TransformAnim,
+    },
     color::palettes::manim,
-    items::vitem::{Circle, Square},
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Rectangle, Square},
+    },
     prelude::*,
     utils::rate_functions::linear,
 };
@@ -10,22 +16,31 @@ use ranim::{
 struct GettingStarted2Scene;
 
 impl TimelineConstructor for GettingStarted2Scene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
-        let mut square = Square(2.0).build();
-        square.set_color(manim::BLUE_C);
+    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+        let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
+            rect.set_stroke_color(manim::GREEN_C);
+        });
 
-        let mut square = timeline.insert(square);
-        let mut circle = Circle(2.0).build();
-        circle.set_color(manim::RED_C);
-
-        timeline.play(
-            square
-                .transform_to(circle)
-                .with_duration(2.0)
-                .with_rate_func(linear),
-        ); // Anim Schedule won't change the data in Rabject
+        // Use pin to keep the item static showed
+        let rect = timeline.pin(rect);
         timeline.forward(1.0);
-        timeline.play(square.fade_out()); // Anim is created based on the data in Rabject
+
+        let square = Square::new(2.0).with(|square| {
+            square.set_color(manim::BLUE_C);
+        });
+
+        let circle = Circle::new(2.0).with(|circle| {
+            circle.set_color(manim::RED_C);
+        });
+        {
+            let square = timeline.play(VItem::from(square).create());
+            timeline.play(square.transform_to(circle.clone()).with_rate_func(linear));
+        }
+        timeline.play(VItem::from(circle).unwrite());
+
+        // Use unpin to remove the static showed item and turn it back to normal
+        let rect = timeline.unpin(rect);
+        timeline.play(VItem::from(rect).uncreate());
     }
 }
 
