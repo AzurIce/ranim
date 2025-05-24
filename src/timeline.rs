@@ -170,6 +170,18 @@ pub enum Timeline {
     VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
 }
 
+impl From<RabjectTimeline<CameraFrame>> for Timeline {
+    fn from(value: RabjectTimeline<CameraFrame>) -> Self {
+        Timeline::CameraFrame(Box::new(value))
+    }
+}
+
+impl<T: VisualItem + Clone + 'static> From<RabjectTimeline<T>> for Timeline {
+    fn from(value: RabjectTimeline<T>) -> Self {
+        Timeline::VisualItem(Box::new(value))
+    }
+}
+
 impl From<CameraFrame> for Timeline {
     fn from(value: CameraFrame) -> Self {
         let timeline = RabjectTimeline::new(value);
@@ -221,6 +233,28 @@ pub struct RanimTimeline {
     cur_secs: RefCell<f64>,
     time_marks: RefCell<Vec<(f64, TimeMark)>>,
 }
+
+// MARK: NEW
+pub struct TimelineEncoder<'a, T> where RabjectTimeline<T>: Into<Timeline> {
+    timeline: &'a RanimTimeline,
+    inner: Option<RabjectTimeline<T>>,
+}
+
+impl<T> Drop for TimelineEncoder<'_, T> where RabjectTimeline<T>: Into<Timeline> {
+    fn drop(&mut self) {
+        if let Some(inner) = self.inner.take() {
+            let cnt = self.timeline.timelines.borrow().len();
+            self.timeline._insert_timeline(cnt, inner.into());
+        }
+    }
+}
+
+impl RanimTimeline {
+    pub fn new_timeline(&self) -> Timeline {
+
+    }
+}
+
 
 impl RanimTimeline {
     pub(crate) fn seal(&self) {
