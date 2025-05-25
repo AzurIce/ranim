@@ -90,7 +90,7 @@ impl TimelineConstructor for BubbleSortScene {
                 let mut rect_ab = timeline.play(rect_ab.map(anim_highlight));
                 if heights[j] > heights[j + 1] {
                     rect_ab = timeline.play(anim_swap(rect_ab));
-                    timeline.sync();
+                    timeline.seal();
                     heights.swap(j, j + 1);
                     rect_ab.swap(0, 1);
                 }

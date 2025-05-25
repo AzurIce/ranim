@@ -6,14 +6,14 @@ use ranim::{
     glam::{DMat2, dvec2},
     items::vitem::geometry::ArcBetweenPoints,
     prelude::*,
-    timeline::TimeMark,
+    timeline::{TimeMark, TimelineEncoder},
 };
 
 #[scene]
 struct ArcBetweenPointsScene;
 
 impl TimelineConstructor for ArcBetweenPointsScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut TimelineEncoder<CameraFrame>) {
         let center = dvec2(0.0, 0.0);
 
         let start_color = color!("#FF8080FF");
@@ -46,17 +46,21 @@ impl TimelineConstructor for ArcBetweenPointsScene {
             })
             .collect::<Vec<_>>();
 
-        let arcs_fade_in = arcs
+        arcs
             .into_iter()
             .map(|arc| arc.fade_in())
             .collect::<Vec<_>>()
             .with_lagged_offset(0.2)
             .with_epilogue_to_end()
-            .with_total_duration(3.0);
-        timeline.play(arcs_fade_in);
+            .with_total_duration(3.0)
+            .into_iter()
+            .for_each(|anim| {
+                let mut timeline = timeline.begin_timeline_encoder();
+                timeline.play(anim);
+            });
 
         timeline.insert_time_mark(
-            timeline.cur_sec(),
+            timeline.max_elapsed_secs(),
             TimeMark::Capture("preview.png".to_string()),
         );
     }

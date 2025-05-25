@@ -29,7 +29,7 @@ impl TimelineConstructor for HelloRanimScene {
         });
 
         timeline.play(VItem::from(square).transform_to(circle.clone()));
-        timeline.sync();
+        timeline.seal();
 
         let circle = timeline.pin(circle);
         timeline.forward(1.0);

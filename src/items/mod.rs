@@ -15,6 +15,7 @@ static RABJECT_CNT: AtomicUsize = AtomicUsize::new(0);
 /// An `Rabject` is a wrapper of an entity that can be rendered.
 ///
 /// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
+#[deprecated(since = "0.1.0-alpha.14", note = "Use the refactored item system instead")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Deref, DerefMut)]
 pub struct PinnedItem<T> {

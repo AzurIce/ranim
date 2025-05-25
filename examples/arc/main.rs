@@ -1,19 +1,19 @@
 use itertools::Itertools;
 use log::LevelFilter;
 use ranim::{
-    animation::{AnimGroupFunction, fading::FadingAnim},
+    animation::{fading::FadingAnim, AnimGroupFunction},
     color::HueDirection,
     glam::dvec2,
     items::vitem::geometry::Arc,
     prelude::*,
-    timeline::TimeMark,
+    timeline::{TimeMark, TimelineEncoder},
 };
 
 #[scene]
 struct ArcScene;
 
 impl TimelineConstructor for ArcScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &RanimTimeline, _camera: &mut TimelineEncoder<CameraFrame>) {
         // let frame_size = app.camera().size;
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
@@ -48,17 +48,20 @@ impl TimelineConstructor for ArcScene {
             })
             .collect::<Vec<_>>();
 
-        let arcs_fade_in = arcs
+        arcs
             .into_iter()
             .map(|arc| arc.fade_in())
             .collect::<Vec<_>>()
             .with_lagged_offset(0.2)
             .with_epilogue_to_end()
-            .with_total_duration(3.0);
-        timeline.play(arcs_fade_in);
+            .with_total_duration(3.0).into_iter().for_each(|anim| {
+                let mut timeline = timeline.begin_timeline_encoder();
+                timeline.play(anim);
+            });
+        // timeline.play(arcs_fade_in);
 
         timeline.insert_time_mark(
-            timeline.cur_sec(),
+            timeline.max_elapsed_secs(),
             TimeMark::Capture("preview.png".to_string()),
         );
     }
