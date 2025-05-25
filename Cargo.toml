@@ -43,13 +43,13 @@ glam = { version = "0.30.3", features = ["bytemuck"] }
 image = "0.25.6"
 log = "0.4.27"
 pollster = "0.4.0"
-uuid = { version = "1.16.0", features = ["v4"] }
-wgpu = "24.0.3"
+uuid = { version = "1.17.0", features = ["v4"] }
+wgpu = "24.0.5"
 anyhow = "1.0.98"
 usvg = "0.45.1"
 regex = "1.11.1"
 indicatif = "0.17.11"
-color = "0.3.0"
+color = "0.3.1"
 variadics_please = "1.1.0"
 derive_more = { version = "2.0.1", features = ["deref_mut", "deref", "index", "index_mut", "is_variant", "as_ref", "from", "into_iterator"] }
 # ambassador = "0.4.1"
@@ -64,7 +64,7 @@ profiling = { version = "1.0.16", optional = true, features = [
 egui = { version = "0.31.1", optional = true }
 egui-wgpu = { version = "0.31.1", features = ["winit"], optional = true }
 egui-winit = { version = "0.31.1", optional = true }
-winit = { version = "0.30.10", optional = true }
+winit = { version = "0.30.11", optional = true }
 
 serde = { version = "1", features = ["derive"], optional = true}
 typst = "0.13.1"

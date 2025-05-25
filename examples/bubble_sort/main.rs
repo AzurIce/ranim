@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     animation::transform::TransformAnim,
@@ -7,7 +6,7 @@ use ranim::{
     glam::{DVec3, dvec2},
     items::vitem::geometry::Rectangle,
     prelude::*,
-    timeline::TimeMark,
+    timeline::{TimeMark, TimelinesFunc},
     utils::rate_functions::linear,
 };
 
@@ -15,7 +14,7 @@ use ranim::{
 struct BubbleSortScene(pub usize);
 
 impl TimelineConstructor for BubbleSortScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let num = self.0;
 
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
@@ -33,7 +32,7 @@ impl TimelineConstructor for BubbleSortScene {
         heights.shuffle(&mut rng);
 
         let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
-        let mut rects = heights
+        let mut r_rects = heights
             .iter()
             .enumerate()
             .map(|(i, &height)| {
@@ -45,7 +44,7 @@ impl TimelineConstructor for BubbleSortScene {
                         .scale(DVec3::splat(0.8))
                         .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
                 });
-                Some(timeline.pin(rect))
+                r.init_timeline(rect)
             })
             .collect::<Vec<_>>();
 
@@ -65,44 +64,46 @@ impl TimelineConstructor for BubbleSortScene {
         };
         let shift_right = DVec3::X * width_unit;
         let swap_shift = [shift_right, -shift_right];
-        let anim_swap = |rects: [Rectangle; 2]| {
-            rects
+        let anim_swap = |timeline: &mut RanimScene, r_rectab: &[&TimelineId<Rectangle>; 2]| {
+            let timelines = timeline.timeline_mut(r_rectab);
+            timelines
                 .into_iter()
                 .zip(swap_shift.iter())
-                .map(|(rect, shift)| {
-                    rect.transform(|data| {
-                        data.shift(*shift);
-                    })
-                    .with_duration(anim_step_duration)
-                    .with_rate_func(linear)
-                })
-                .collect_array()
-                .unwrap()
+                .for_each(|(timeline, shift)| {
+                    timeline.play_with(|rect| {
+                        rect.transform(|data| {
+                            data.shift(*shift);
+                        })
+                        .with_duration(anim_step_duration)
+                        .with_rate_func(linear)
+                    });
+                });
         };
 
         for i in (1..num).rev() {
             for j in 0..i {
-                let rect_ab = [
-                    timeline.unpin(rects[j].take().unwrap()),
-                    timeline.unpin(rects[j + 1].take().unwrap()),
-                ];
-
-                let mut rect_ab = timeline.play(rect_ab.map(anim_highlight));
+                r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])
+                    .into_iter()
+                    .for_each(|timeline| {
+                        timeline.play_with(anim_highlight);
+                    });
                 if heights[j] > heights[j + 1] {
-                    rect_ab = timeline.play(anim_swap(rect_ab));
-                    timeline.sync();
+                    anim_swap(r, &[&r_rects[j], &r_rects[j + 1]]);
+                    r.timelines_mut().sync();
                     heights.swap(j, j + 1);
-                    rect_ab.swap(0, 1);
+                    r_rects.swap(j, j + 1);
                 }
-                let [rect_a, rect_b] = timeline.play(rect_ab.map(anim_unhighlight));
-
-                rects[j] = Some(timeline.pin(rect_a));
-                rects[j + 1] = Some(timeline.pin(rect_b));
+                r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])
+                    .into_iter()
+                    .for_each(|timeline| {
+                        timeline.play_with(anim_unhighlight);
+                    });
+                r.timelines_mut().sync();
             }
         }
 
-        timeline.insert_time_mark(
-            timeline.cur_sec() / 2.0,
+        r.insert_time_mark(
+            r.cur_sec() / 2.0,
             TimeMark::Capture(format!("preview-{num}.png")),
         );
     }

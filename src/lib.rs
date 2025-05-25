@@ -27,8 +27,8 @@ use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use items::{PinnedItem, camera_frame::CameraFrame};
-use timeline::{RanimTimeline, TimeMark, TimelineEvalResult};
+use items::{TimelineId, camera_frame::CameraFrame};
+use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult, TimelineTrait};
 
 use render::{Renderer, primitives::RenderInstances};
 
@@ -38,10 +38,11 @@ pub mod prelude {
     pub use crate::app::run_scene_app;
     pub use crate::{AppOptions, render_scene, render_scene_at_sec};
     pub use crate::{SceneMetaTrait, TimelineConstructor};
+    pub use crate::timeline::TimelinesFunc;
     pub use ranim_macros::scene;
 
-    pub use crate::items::{PinnedItem, camera_frame::CameraFrame};
-    pub use crate::timeline::RanimTimeline;
+    pub use crate::items::{TimelineId, camera_frame::CameraFrame};
+    pub use crate::timeline::RanimScene;
 
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
@@ -106,7 +107,7 @@ pub trait Scene: TimelineConstructor + SceneMetaTrait {}
 impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
 
 impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
-    fn construct(self, timeline: &RanimTimeline, camera: PinnedItem<CameraFrame>) {
+    fn construct(self, timeline: &mut RanimScene, camera: TimelineId<CameraFrame>) {
         self.0.construct(timeline, camera);
     }
 }
@@ -122,19 +123,18 @@ pub trait TimelineConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct(self, timeline: &RanimTimeline, camera: PinnedItem<CameraFrame>);
+    fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>);
 }
 
-pub fn build_timeline(constructor: impl TimelineConstructor) -> RanimTimeline {
-    let timeline = RanimTimeline::new();
+pub fn build_timeline(constructor: impl TimelineConstructor) -> SealedRanimScene {
+    let mut timeline = RanimScene::new();
     {
-        let camera_frame = items::camera_frame::CameraFrame::new();
-        let camera_frame = timeline.pin(camera_frame);
-        constructor.construct(&timeline, camera_frame);
-        timeline.sync();
-        timeline.seal();
+        let cam= items::camera_frame::CameraFrame::new();
+        let r_cam = timeline.init_timeline(cam);
+        timeline.timeline_mut(&r_cam).show();
+        constructor.construct(&mut timeline, r_cam);
     }
-    timeline
+    timeline.seal()
 }
 
 /// Build the timeline with the scene, and render it
@@ -245,7 +245,7 @@ impl RanimRenderApp {
         }
     }
 
-    fn render_timeline(&mut self, timeline: RanimTimeline) {
+    fn render_timeline(&mut self, timeline: SealedRanimScene) {
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {
             puffin::set_scopes_on(true);
@@ -263,7 +263,7 @@ impl RanimRenderApp {
             (cpu_server, gpu_server)
         };
 
-        let frames = (timeline.cur_sec() * self.fps as f64).ceil() as usize;
+        let frames = (timeline.total_secs() * self.fps as f64).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
@@ -355,15 +355,15 @@ impl RanimRenderApp {
                 pb.inc(1);
                 pb.set_message(format!(
                     "rendering {:.1?}/{:.1?}",
-                    Duration::from_secs_f64(alpha * timeline.cur_sec()),
-                    Duration::from_secs_f64(timeline.cur_sec())
+                    Duration::from_secs_f64(alpha * timeline.total_secs()),
+                    Duration::from_secs_f64(timeline.total_secs())
                 ));
             });
 
         let msg = format!(
             "rendered {} frames({:?})",
             frames,
-            Duration::from_secs_f64(timeline.cur_sec()),
+            Duration::from_secs_f64(timeline.total_secs()),
         );
         pb.finish_with_message(msg);
 
@@ -397,7 +397,7 @@ impl RanimRenderApp {
 
     fn render_timeline_frame(
         &mut self,
-        timeline: &RanimTimeline,
+        timeline: &SealedRanimScene,
         sec: f64,
         filename: impl AsRef<Path>,
     ) {

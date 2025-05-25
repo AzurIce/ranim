@@ -1,13 +1,13 @@
 use ranim::{
-    animation::{
-        AnimGroupFunction,
-        transform::{GroupTransformAnim, TransformAnim},
-    },
+    animation::transform::TransformAnim,
     color::palettes::manim,
     glam::DVec3,
-    items::vitem::{VItem, geometry::Square},
+    items::{
+        Group,
+        vitem::{VItem, geometry::Square},
+    },
     prelude::*,
-    timeline::TimeMark,
+    timeline::{TimeMark, TimelineTrait, TimelinesFunc},
     utils::rate_functions::linear,
 };
 
@@ -15,10 +15,11 @@ use ranim::{
 struct PerspectiveBlendScene;
 
 impl TimelineConstructor for PerspectiveBlendScene {
-    fn construct(self, timeline: &RanimTimeline, camera: PinnedItem<CameraFrame>) {
-        let mut camera = timeline.unpin(camera);
-        camera.pos = DVec3::Z * 5.0;
-        let camera = timeline.pin(camera);
+    fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
+        let cam = r.timeline(&r_cam).state().clone().with(|cam| {
+            cam.pos = DVec3::Z * 5.0;
+        });
+        r.timeline_mut(&r_cam).update(cam);
 
         // Create a cube
         let side_length = 2.0;
@@ -29,61 +30,83 @@ impl TimelineConstructor for PerspectiveBlendScene {
             }))
         };
 
-        let bottom = square_with_color(manim::TEAL_C);
-        let right = square_with_color(manim::GREEN_C);
-        let back = square_with_color(manim::BLUE_C);
-        let top = square_with_color(manim::PURPLE_C);
-        let front = square_with_color(manim::RED_C);
-        let left = square_with_color(manim::YELLOW_C);
+        let r_bottom = r.init_timeline(square_with_color(manim::TEAL_C));
+        let r_right = r.init_timeline(square_with_color(manim::GREEN_C));
+        let r_back = r.init_timeline(square_with_color(manim::BLUE_C));
+        let r_top = r.init_timeline(square_with_color(manim::PURPLE_C));
+        let r_front = r.init_timeline(square_with_color(manim::RED_C));
+        let r_left = r.init_timeline(square_with_color(manim::YELLOW_C));
 
-        let bottom = bottom.transform(|data| {
-            data.shift(DVec3::NEG_Y * side_length / 2.0)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::X);
+        let bottom = r.timeline_mut(&r_bottom).play_with(|bottom| {
+            bottom
+                .transform(|data| {
+                    data.shift(DVec3::NEG_Y * side_length / 2.0)
+                        .rotate(std::f64::consts::PI / 2.0, DVec3::X);
+                })
+                .with_rate_func(linear)
         });
-        let right = right.transform(|data| {
-            data.shift(DVec3::X * side_length / 2.0)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
+        let right = r.timeline_mut(&r_right).play_with(|right| {
+            right
+                .transform(|data| {
+                    data.shift(DVec3::X * side_length / 2.0)
+                        .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
+                })
+                .with_rate_func(linear)
         });
-        let back = back.transform(|data| {
-            data.shift(DVec3::NEG_Z * side_length / 2.0);
+        let back = r.timeline_mut(&r_back).play_with(|back| {
+            back.transform(|data| {
+                data.shift(DVec3::NEG_Z * side_length / 2.0);
+            })
+            .with_rate_func(linear)
         });
-        let top = top.transform(|data| {
-            data.shift(DVec3::Y * side_length / 2.0)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
+        let top = r.timeline_mut(&r_top).play_with(|top| {
+            top.transform(|data| {
+                data.shift(DVec3::Y * side_length / 2.0)
+                    .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
+            })
+            .with_rate_func(linear)
         });
-        let front = front.transform(|data| {
-            data.shift(DVec3::Z * side_length / 2.0);
+        let front = r.timeline_mut(&r_front).play_with(|front| {
+            front
+                .transform(|data| {
+                    data.shift(DVec3::Z * side_length / 2.0);
+                })
+                .with_rate_func(linear)
         });
-        let left = left.transform(|data| {
-            data.shift(DVec3::NEG_X * side_length / 2.0)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
+        let left = r.timeline_mut(&r_left).play_with(|left| {
+            left.transform(|data| {
+                data.shift(DVec3::NEG_X * side_length / 2.0)
+                    .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
+            })
+            .with_rate_func(linear)
         });
+        r.timeline_mut(&r_bottom).hide();
+        r.timeline_mut(&r_right).hide();
+        r.timeline_mut(&r_back).hide();
+        r.timeline_mut(&r_top).hide();
+        r.timeline_mut(&r_front).hide();
+        r.timeline_mut(&r_left).hide();
 
-        let faces = timeline.play([bottom, right, back, top, front, left].with_rate_func(linear));
-
-        timeline.schedule(
+        let faces = Group(vec![bottom, right, back, top, front, left]);
+        let r_faces = r.init_timeline(faces);
+        r.timelines_mut().sync(); // TODO: make this better
+        r.timeline_mut(&r_faces).play_with(|faces| {
             faces
                 .transform(|data| {
                     data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
                         .rotate(std::f64::consts::PI / 6.0, DVec3::X);
                 })
-                .with_duration(4.0),
-        );
+                .with_duration(4.0)
+        });
 
-        timeline.forward(2.0);
-
-        let camera = timeline.unpin(camera);
-        timeline.play(
-            camera
-                .transform(|data| {
-                    data.perspective_blend = 1.0;
-                })
-                .with_duration(2.0),
-        );
-        timeline.insert_time_mark(
-            timeline.cur_sec(),
-            TimeMark::Capture("preview.png".to_string()),
-        );
+        r.timeline_mut(&r_cam).forward(2.0);
+        r.timeline_mut(&r_cam).play_with(|cam| {
+            cam.transform(|data| {
+                data.perspective_blend = 1.0;
+            })
+            .with_duration(2.0)
+        });
+        r.insert_time_mark(r.cur_sec(), TimeMark::Capture("preview.png".to_string()));
     }
 }
 

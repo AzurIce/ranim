@@ -1,81 +1,76 @@
 name = "arc_between_points"
-code = """
+code = '''
 ```rust,linenos
-use itertools::Itertools;\r
-use log::LevelFilter;\r
-use ranim::animation::fading::FadingAnimSchedule;\r
-use ranim::color::HueDirection;\r
-use ranim::glam::{DMat2, dvec2};\r
-use ranim::items::group::Group;\r
-use ranim::items::vitem::ArcBetweenPoints;\r
-use ranim::prelude::*;\r
-use ranim::timeline::TimeMark;\r
-\r
-#[scene]\r
-struct ArcBetweenPointsScene;\r
-\r
-impl TimelineConstructor for ArcBetweenPointsScene {\r
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {\r
-        let center = dvec2(0.0, 0.0);\r
-\r
-        let start_color = color!(\"#FF8080FF\");\r
-        let end_color = color!(\"#58C4DDFF\");\r
-        let ntan = 16;\r
-        let nrad = 5;\r
-\r
-        let arcs = (0..nrad)\r
-            .map(|i| {\r
-                let radius = 6.0 * (i + 1) as f64 / nrad as f64;\r
-                let width = 0.12 * ((nrad - i) as f64 / nrad as f64).powi(2);\r
-                let angle = std::f64::consts::PI * 7.0 / 4.0 * (i + 1) as f64 / nrad as f64;\r
-                (radius, width, angle)\r
-            })\r
-            .cartesian_product(0..ntan)\r
-            .map(|((rad, width, angle), j)| {\r
-                let color = start_color.lerp(\r
-                    end_color,\r
-                    j as f32 / (ntan - 1) as f32,\r
-                    HueDirection::Increasing,\r
-                );\r
-                let vec = DMat2::from_angle(std::f64::consts::PI * 2.0 / ntan as f64 * j as f64)\r
-                    * dvec2(rad, 0.0);\r
-                let mut arc = ArcBetweenPoints {\r
-                    start: center.extend(0.0),\r
-                    end: (center + vec).extend(0.0),\r
-                    angle,\r
-                }\r
-                .build();\r
-                arc.set_color(color)\r
-                    .set_fill_opacity(0.0)\r
-                    .set_stroke_width(width as f32);\r
-                arc\r
-            })\r
-            .collect::<Group<_>>();\r
-        let mut arcs = timeline.insert(arcs);\r
-\r
-        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());\r
-        timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();\r
-        timeline.insert_time_mark(\r
-            timeline.duration_secs(),\r
-            TimeMark::Capture(\"preview.png\".to_string()),\r
-        );\r
-    }\r
-}\r
-\r
-fn main() {\r
-    #[cfg(debug_assertions)]\r
-    pretty_env_logger::formatted_timed_builder()\r
-        .filter(Some(\"ranim\"), LevelFilter::Trace)\r
-        .init();\r
-    #[cfg(not(debug_assertions))]\r
-    pretty_env_logger::formatted_timed_builder()\r
-        .filter(Some(\"ranim\"), LevelFilter::Info)\r
-        .init();\r
-\r
-    render_scene(ArcBetweenPointsScene, &AppOptions::default());\r
-}\r
+use itertools::Itertools;
+use log::LevelFilter;
+use ranim::{
+    animation::{LaggedAnim, fading::FadingAnim},
+    color::HueDirection,
+    glam::{DMat2, dvec2},
+    items::{Group, vitem::geometry::ArcBetweenPoints},
+    prelude::*,
+    timeline::TimeMark,
+};
 
-```"""
-hash = "54e4dad06450ff78165e6f4b3b08719aefc93c20"
+#[scene]
+struct ArcBetweenPointsScene;
+
+impl TimelineConstructor for ArcBetweenPointsScene {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+        let center = dvec2(0.0, 0.0);
+
+        let start_color = color!("#FF8080FF");
+        let end_color = color!("#58C4DDFF");
+        let ntan = 16;
+        let nrad = 5;
+
+        let arcs = (0..nrad)
+            .map(|i| {
+                let radius = 6.0 * (i + 1) as f64 / nrad as f64;
+                let width = 0.12 * ((nrad - i) as f64 / nrad as f64).powi(2);
+                let angle = std::f64::consts::PI * 7.0 / 4.0 * (i + 1) as f64 / nrad as f64;
+                (radius, width, angle)
+            })
+            .cartesian_product(0..ntan)
+            .map(|((rad, width, angle), j)| {
+                let color = start_color.lerp(
+                    end_color,
+                    j as f32 / (ntan - 1) as f32,
+                    HueDirection::Increasing,
+                );
+                let vec = DMat2::from_angle(std::f64::consts::PI * 2.0 / ntan as f64 * j as f64)
+                    * dvec2(rad, 0.0);
+                ArcBetweenPoints::new(center.extend(0.0), (center + vec).extend(0.0), angle).with(
+                    |arc| {
+                        arc.stroke_width = width as f32;
+                        arc.set_stroke_color(color);
+                    },
+                )
+            })
+            .collect::<Group<_>>();
+        let r_arcs = r.init_timeline(arcs);
+
+        r.timeline_mut(&r_arcs)
+            .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+
+        r.insert_time_mark(r.cur_sec(), TimeMark::Capture("preview.png".to_string()));
+    }
+}
+
+fn main() {
+    #[cfg(debug_assertions)]
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
+        .init();
+    #[cfg(not(debug_assertions))]
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Info)
+        .init();
+
+    render_scene(ArcBetweenPointsScene, &AppOptions::default());
+}
+
+```'''
+hash = "96c1710edf23d36e9a21eace550f1d09624fb528"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/output.mp4"]

@@ -1,42 +1,68 @@
 name = "getting_started2"
 code = """
 ```rust,linenos
-use ranim::{\r
-    animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},\r
-    color::palettes::manim,\r
-    items::vitem::{Circle, Square},\r
-    prelude::*,\r
-    utils::rate_functions::linear,\r
-};\r
-\r
-#[scene]\r
-struct GettingStarted2Scene;\r
-\r
-impl TimelineConstructor for GettingStarted2Scene {\r
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {\r
-        let mut square = Square(2.0).build();\r
-        square.set_color(manim::BLUE_C);\r
-\r
-        let mut square = timeline.insert(square);\r
-        let mut circle = Circle(2.0).build();\r
-        circle.set_color(manim::RED_C);\r
-\r
-        timeline.play(\r
-            square\r
-                .transform_to(circle)\r
-                .with_duration(2.0)\r
-                .with_rate_func(linear),\r
-        ); // Anim Schedule won't change the data in Rabject\r
-        timeline.forward(1.0);\r
-        timeline.play(square.fade_out()); // Anim is created based on the data in Rabject\r
-    }\r
-}\r
-\r
-fn main() {\r
-    render_scene(GettingStarted2Scene, &AppOptions::default());\r
-}\r
+use ranim::{
+    animation::{
+        creation::{CreationAnim, WritingAnim},
+        transform::TransformAnim,
+    },
+    color::palettes::manim,
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Rectangle, Square},
+    },
+    prelude::*,
+    timeline::{TimelineTrait, TimelinesFunc},
+    utils::rate_functions::linear,
+};
+
+#[scene]
+struct GettingStarted2Scene;
+
+impl TimelineConstructor for GettingStarted2Scene {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+        let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
+            rect.set_stroke_color(manim::GREEN_C);
+        });
+
+        // The new initialized timeline is hidden by default, use show to start encoding a static anim and make it show
+        let r_rect = r.init_timeline(rect.clone());
+        r.timeline_mut(&r_rect).show();
+
+        r.timelines_mut().forward(1.0);
+
+        let square = Square::new(2.0).with(|square| {
+            square.set_color(manim::BLUE_C);
+        });
+        let circle = Circle::new(2.0).with(|circle| {
+            circle.set_color(manim::RED_C);
+        });
+        let r_vitem = r.init_timeline(VItem::from(square.clone()));
+        {
+            let timeline = r.timeline_mut(&r_vitem);
+            timeline.forward(1.0);
+            timeline.play_with(|vitem| vitem.create());
+            timeline.play_with(|vitem| {
+                vitem
+                    .transform_to(VItem::from(circle.clone()))
+                    .with_rate_func(linear)
+            });
+            timeline.play_with(|vitem| vitem.unwrite());
+        }
+
+        r.timelines_mut().sync();
+
+        // Use hide to stop showing an item
+        r.timeline_mut(&r_rect).hide();
+        r.timeline_mut(&r_vitem).play(VItem::from(rect).uncreate());
+    }
+}
+
+fn main() {
+    render_scene(GettingStarted2Scene, &AppOptions::default());
+}
 
 ```"""
-hash = "62034f9446f1d05a9829aee1ad3c8911b6d9ad8d"
+hash = "3cb050f36fe65cbb0f1bc99e49f7abbf45f4bbcf"
 preview_imgs = []
 output_files = ["/examples/getting_started2/output.mp4"]
