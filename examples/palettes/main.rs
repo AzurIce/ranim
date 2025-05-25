@@ -3,15 +3,15 @@ use ranim::{
     color::palettes::manim::*,
     components::Anchor,
     glam::{dvec2, dvec3},
-    items::vitem::geometry::Rectangle,
-    prelude::*,
+    items::{vitem::geometry::Rectangle, Group},
+    prelude::*, timeline::{TimelineTrait, TimelinesFunc},
 };
 
 #[scene]
 struct PalettesScene;
 
 impl TimelineConstructor for PalettesScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let padded_frame_size = frame_size * 0.9;
 
@@ -50,9 +50,10 @@ impl TimelineConstructor for PalettesScene {
                     })
                 })
             })
-            .collect::<Vec<_>>();
-        let _squares = timeline.pin(squares);
-        timeline.forward(0.01);
+            .collect::<Group<_>>();
+        let squares = r.init_timeline(squares);
+        r.timeline_mut(&squares).show();
+        r.timelines_mut().forward(0.01);
     }
 }
 

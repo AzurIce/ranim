@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use log::LevelFilter;
 use ranim::{
-    animation::{AnimGroupFunction, fading::FadingAnim},
+    animation::{fading::FadingAnim, LaggedAnim},
     color::HueDirection,
     glam::dvec2,
-    items::vitem::geometry::Arc,
+    items::{vitem::geometry::Arc, Group},
     prelude::*,
     timeline::TimeMark,
 };
@@ -13,7 +13,7 @@ use ranim::{
 struct ArcScene;
 
 impl TimelineConstructor for ArcScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         // let frame_size = app.camera().size;
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
@@ -46,19 +46,15 @@ impl TimelineConstructor for ArcScene {
                         .put_center_on(offset.extend(0.0));
                 })
             })
-            .collect::<Vec<_>>();
+            .collect::<Group<_>>();
+        let r_arcs = r.init_timeline(arcs);
 
-        let arcs_fade_in = arcs
-            .into_iter()
-            .map(|arc| arc.fade_in())
-            .collect::<Vec<_>>()
-            .with_lagged_offset(0.2)
-            .with_epilogue_to_end()
-            .with_total_duration(3.0);
-        timeline.play(arcs_fade_in);
+        r.timeline_mut(&r_arcs).play_with(|arcs| {
+            arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0)
+        });
 
-        timeline.insert_time_mark(
-            timeline.cur_sec(),
+        r.insert_time_mark(
+            r.cur_sec(),
             TimeMark::Capture("preview.png".to_string()),
         );
     }

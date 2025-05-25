@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use log::LevelFilter;
 use ranim::{
-    animation::{AnimGroupFunction, fading::FadingAnim},
+    animation::{LaggedAnim, fading::FadingAnim},
     color::HueDirection,
     glam::{DMat2, dvec2},
-    items::vitem::geometry::ArcBetweenPoints,
+    items::{Group, vitem::geometry::ArcBetweenPoints},
     prelude::*,
     timeline::TimeMark,
 };
@@ -13,7 +13,7 @@ use ranim::{
 struct ArcBetweenPointsScene;
 
 impl TimelineConstructor for ArcBetweenPointsScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let center = dvec2(0.0, 0.0);
 
         let start_color = color!("#FF8080FF");
@@ -44,21 +44,13 @@ impl TimelineConstructor for ArcBetweenPointsScene {
                     },
                 )
             })
-            .collect::<Vec<_>>();
+            .collect::<Group<_>>();
+        let r_arcs = r.init_timeline(arcs);
 
-        let arcs_fade_in = arcs
-            .into_iter()
-            .map(|arc| arc.fade_in())
-            .collect::<Vec<_>>()
-            .with_lagged_offset(0.2)
-            .with_epilogue_to_end()
-            .with_total_duration(3.0);
-        timeline.play(arcs_fade_in);
+        r.timeline_mut(&r_arcs)
+            .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
 
-        timeline.insert_time_mark(
-            timeline.cur_sec(),
-            TimeMark::Capture("preview.png".to_string()),
-        );
+        r.insert_time_mark(r.cur_sec(), TimeMark::Capture("preview.png".to_string()));
     }
 }
 

@@ -300,9 +300,9 @@ impl From<Rectangle> for Polygon {
     fn from(value: Rectangle) -> Self {
         let points = vec![
             value.p1,
-            value.p2 + value.up * value.height(),
-            value.p2,
             value.p1 - value.up * value.height(),
+            value.p2,
+            value.p2 + value.up * value.height(),
         ];
         Polygon {
             points,

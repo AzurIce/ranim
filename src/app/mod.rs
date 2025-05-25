@@ -21,13 +21,12 @@ use crate::{
     animation::EvalResult,
     build_timeline,
     context::{RanimContext, WgpuContext},
-    prelude::RanimTimeline,
     render::{
         Renderer,
         pipelines::app::{AppPipeline, Viewport},
         primitives::RenderInstances,
     },
-    timeline::TimelineEvalResult,
+    timeline::{SealedRanimScene, TimelineEvalResult},
 };
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -204,7 +203,7 @@ impl TimelineInfo {
 
 struct AppState {
     meta: SceneMeta,
-    timeline: RanimTimeline,
+    timeline: SealedRanimScene,
     // app_options: AppOptions<'a>,
     // timeline: RanimTimeline,
     renderer: Renderer,
@@ -225,7 +224,7 @@ impl AppState {
             renderer,
             last_sec: -1.0,
             render_instances: RenderInstances::default(),
-            timeline_state: TimelineState::new(timeline.cur_sec(), timeline_infos),
+            timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
             timeline,
         }
     }

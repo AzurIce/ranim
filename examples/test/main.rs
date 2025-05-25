@@ -10,18 +10,12 @@ use ranim::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
         transform::TransformAnim,
-    },
-    color::palettes::manim::{self, BLUE_C, RED_C},
-    components::{Anchor, ScaleHint},
-    items::{
+    }, color::palettes::manim::{self, BLUE_C, RED_C}, components::{Anchor, ScaleHint}, items::{
         camera_frame::CameraFrame,
         vitem::{
-            self, VItem,
-            geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
-        },
-    },
-    prelude::*,
-    typst_svg,
+            self, geometry::{ArcBetweenPoints, Polygon, Rectangle, Square}, VItem
+        }, Group,
+    }, prelude::*, timeline::{TimelineTrait, TimelinesFunc}, typst_svg
 };
 
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -30,15 +24,16 @@ use ranim::{
 struct TestScene;
 
 impl TimelineConstructor for TestScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let n = 8;
         let arcs = (0..n)
             .map(|i| {
                 let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
                 ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
             })
-            .collect::<Vec<_>>();
-        let arcs = timeline.pin(arcs);
+            .collect::<Group<_>>();
+        let r_arcs = r.init_timeline(arcs);
+        r.timeline_mut(&r_arcs).show();
 
         // text.set_stroke_color(manim::RED_C)
         //     .set_stroke_width(0.05)
@@ -53,7 +48,7 @@ impl TimelineConstructor for TestScene {
         //     data.set_color(RED_C);
         //     data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
         // }));
-        timeline.forward(1.0);
+        r.timelines_mut().forward(1.0);
     }
 }
 

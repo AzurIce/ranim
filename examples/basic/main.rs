@@ -1,13 +1,15 @@
 use glam::DVec3;
 use log::LevelFilter;
 use ranim::{
-    animation::{AnimGroupFunction, creation::WritingAnim, fading::FadingAnim},
+    animation::{creation::GroupWritingAnim, fading::FadingAnim},
     components::ScaleHint,
-    items::vitem::{VItem, svg::SvgItem},
+    items::{
+        Group,
+        vitem::{VItem, svg::SvgItem},
+    },
     prelude::*,
-    timeline::TimeMark,
+    timeline::{TimeMark, TimelinesFunc},
     typst_svg,
-    utils::rate_functions::linear,
 };
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -16,15 +18,15 @@ const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 struct BasicScene;
 
 impl TimelineConstructor for BasicScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
-        timeline.forward(0.2);
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+        r.timelines_mut().forward(0.2);
 
-        let svg = Vec::<VItem>::from(SvgItem::new(SVG).with(|svg| {
+        let svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {
             svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
                 .put_center_on(DVec3::Y * 2.0);
         }));
-
-        let text = Vec::<VItem>::from(
+        let r_svg = r.init_timeline(svg);
+        let text = Group::<VItem>::from(
             SvgItem::new(&typst_svg!(
                 r#"
             #align(center)[
@@ -40,49 +42,22 @@ impl TimelineConstructor for BasicScene {
                     .set_fill_opacity(0.8);
             }),
         );
+        let r_text = r.init_timeline(text);
 
-        timeline.play(
-            text.clone()
-                .into_iter()
-                .map(|item| item.write())
-                .collect::<Vec<_>>()
-                .with_lagged_offset(0.2)
-                .with_epilogue_to_end()
-                .with_rate_func(linear),
-        );
-        let text = timeline.pin(text);
-        timeline.play(
-            svg.clone()
-                .into_iter()
-                .map(|item| item.fade_in().with_duration(3.0))
-                .collect::<Vec<_>>(),
-        ); // At the same time, the svg fade in
-        let svg = timeline.pin(svg);
-        timeline.insert_time_mark(
-            timeline.cur_sec(),
-            TimeMark::Capture("preview.png".to_string()),
-        );
+        r.timeline_mut(&r_text)
+            .play_with(|text| text.group_write(0.2).with_duration(3.0));
+        r.timeline_mut(&r_svg)
+            .play_with(|svg| svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
+        r.timelines_mut().sync();
 
-        timeline.forward(0.5);
-        timeline.play(
-            timeline
-                .unpin(text)
-                .into_iter()
-                .map(|item| item.unwrite())
-                .collect::<Vec<_>>()
-                .with_lagged_offset(0.2)
-                .with_epilogue_to_end()
-                .with_total_duration(3.0)
-                .with_rate_func(linear),
-        );
-        timeline.play(
-            timeline
-                .unpin(svg)
-                .into_iter()
-                .map(|item| item.fade_out().with_duration(3.0))
-                .collect::<Vec<_>>(),
-        ); // At the same time, the svg fade in
-        timeline.sync();
+        r.insert_time_mark(r.cur_sec(), TimeMark::Capture("preview.png".to_string()));
+
+        r.timelines_mut().forward(0.5);
+        r.timeline_mut(&r_text)
+            .play_with(|text| text.group_unwrite(0.2).with_duration(3.0));
+        r.timeline_mut(&r_svg)
+            .play_with(|svg| svg.fade_out().with_duration(3.0)); // At the same time, the svg fade out
+        r.timelines_mut().sync();
     }
 }
 

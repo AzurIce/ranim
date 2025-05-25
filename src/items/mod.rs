@@ -1,4 +1,4 @@
-use std::sync::atomic::AtomicUsize;
+use std::{sync::atomic::AtomicUsize, vec};
 
 use derive_more::{Deref, DerefMut};
 // use variadics_please::all_tuples;
@@ -10,28 +10,23 @@ use crate::render::primitives::{Extract, Renderable};
 pub mod camera_frame;
 pub mod vitem;
 
-static RABJECT_CNT: AtomicUsize = AtomicUsize::new(0);
+static TIMELINE_CNT: AtomicUsize = AtomicUsize::new(0);
 
-/// An `Rabject` is a wrapper of an entity that can be rendered.
-///
-/// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Deref, DerefMut)]
-pub struct PinnedItem<T> {
+#[derive(Debug)]
+pub struct TimelineId<T> {
     id: usize,
-    #[deref]
-    #[deref_mut]
-    pub data: T,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T> PinnedItem<T> {
+impl<T> TimelineId<T> {
     pub fn id(&self) -> usize {
         self.id
     }
-    pub(crate) fn new(data: T) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            id: RABJECT_CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-            data,
+            id: TIMELINE_CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            _phantom: std::marker::PhantomData,
         }
     }
 }
@@ -43,16 +38,6 @@ impl<T> PinnedItem<T> {
 )]
 pub trait Blueprint<T> {
     fn build(self) -> T;
-}
-
-pub trait Updatable {
-    fn update_from(&mut self, other: &Self);
-}
-
-impl<T: Clone> Updatable for T {
-    fn update_from(&mut self, other: &Self) {
-        *self = other.clone();
-    }
 }
 
 impl<T: Extract<Target = Target>, Target: Renderable + 'static> VisualItem for T {
@@ -105,3 +90,36 @@ pub trait VisualItem {
 //     ) -> Option<&'a dyn crate::render::primitives::Renderable> {
 //     }
 // }
+
+#[derive(Debug, Default, Clone, Deref, DerefMut)]
+pub struct Group<T>(pub Vec<T>);
+
+impl<T> IntoIterator for Group<T> {
+    type IntoIter = vec::IntoIter<T>;
+    type Item = T;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a Group<T> {
+    type IntoIter = std::slice::Iter<'a, T>;
+    type Item = &'a T;
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Group<T> {
+    type IntoIter = std::slice::IterMut<'a, T>;
+    type Item = &'a mut T;
+    fn into_iter(self) -> Self::IntoIter {
+        (&mut self.0).into_iter()
+    }
+}
+
+impl<T> FromIterator<T> for Group<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(Vec::from_iter(iter))
+    }
+}

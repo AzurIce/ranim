@@ -3,16 +3,16 @@ use std::f64::consts::PI;
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
 use ranim::{
-    animation::{AnimGroupFunction, creation::WritingAnim, transform::GroupTransformAnim},
+    animation::{creation::WritingAnim, transform::TransformAnim, LaggedAnim},
     color::palettes::manim,
     components::{Anchor, ScaleHint},
-    items::vitem::{
-        VItem,
-        geometry::{Polygon, Rectangle, Square},
-        svg::SvgItem,
+    items::{
+        vitem::{
+            geometry::{Polygon, Rectangle, Square}, svg::SvgItem, VItem
+        }, Group
     },
     prelude::*,
-    timeline::TimeMark,
+    timeline::{TimeMark, TimelineTrait, TimelinesFunc},
     typst_svg,
     utils::rate_functions::{linear, smooth},
 };
@@ -63,13 +63,33 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
 struct RanimLogoScene;
 
 impl TimelineConstructor for RanimLogoScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let logo_width = frame_size.y * 0.618;
 
         let logo = build_logo(logo_width);
-        let logo =
-            timeline.play(logo.map(|item| item.write().with_duration(3.0).with_rate_func(smooth)));
+        let logo = logo.map(|item| r.init_timeline(item));
+
+        let ranim_text = Group::<VItem>::from(
+            SvgItem::new(typst_svg!(
+                r#"
+#align(center)[
+    #text(10pt, font: "LXGW Bright")[Ranim]
+]"#
+            ))
+            .with(|text| {
+                text.set_color(manim::WHITE)
+                    .scale_to(ScaleHint::PorportionalY(1.0))
+                    .put_center_on(DVec3::NEG_Y * 2.5);
+            }),
+        );
+        let r_ranim_text = r.init_timeline(ranim_text);
+
+        logo.iter().for_each(|item| {
+            r.timeline_mut(item)
+                .play_with(|item| item.write().with_duration(3.0).with_rate_func(smooth));
+        });
+        r.timelines_mut().sync();
 
         let gap_ratio = 1.0 / 60.0;
         let gap = logo_width * gap_ratio;
@@ -84,65 +104,44 @@ impl TimelineConstructor for RanimLogoScene {
             Anchor::edge(1, 1, 0),
             Anchor::edge(1, -1, 0),
         ];
-        let logo_transform_anim = logo
-            .into_iter()
+        logo.iter()
             .chunks(2)
             .into_iter()
             .zip(scale.into_iter().zip(anchor))
-            .flat_map(|(chunk, (scale, anchor))| {
+            .for_each(|(chunk, (scale, anchor))| {
                 let chunk = chunk.collect_array::<2>().unwrap();
-                chunk
-                    .transform(|data| {
-                        data.scale_by_anchor(scale, anchor)
-                            .scale_by_anchor(dvec3(0.9, 0.9, 1.0), Anchor::ORIGIN)
-                            .shift(dvec3(0.0, 1.3, 0.0));
-                    })
-                    .with_rate_func(smooth)
+                r.timeline_mut(&chunk).iter_mut().for_each(|timeline| {
+                    timeline.play_with(|item| {
+                        item.transform(|data| {
+                            data.scale_by_anchor(scale, anchor)
+                                .scale_by_anchor(dvec3(0.9, 0.9, 1.0), Anchor::ORIGIN)
+                                .shift(dvec3(0.0, 1.3, 0.0));
+                        })
+                        .with_rate_func(smooth)
+                    });
+                });
+            });
+        r.timeline_mut(&r_ranim_text).forward(0.5);
+        r.timeline_mut(&r_ranim_text).play_with(|text| {
+            text.lagged(0.2, |item| {
+                item.write().with_duration(2.0).with_rate_func(linear)
             })
-            .collect_array::<6>()
-            .unwrap();
+            .with_duration(2.0)
+        });
+        r.timelines_mut().sync();
 
-        let ranim_text = Vec::<VItem>::from(
-            SvgItem::new(typst_svg!(
-                r#"
-#align(center)[
-    #text(10pt, font: "LXGW Bright")[Ranim]
-]"#
-            ))
-            .with(|text| {
-                text.set_color(manim::WHITE)
-                    .scale_to(ScaleHint::PorportionalY(1.0))
-                    .put_center_on(DVec3::NEG_Y * 2.5);
-            }),
-        );
-        let (logo, end_time_logo) = timeline.schedule(logo_transform_anim);
-        let (ranim_text, end_time_text) = timeline.schedule(
-            ranim_text
-                .into_iter()
-                .map(|item| item.write().with_duration(2.0).with_rate_func(linear))
-                .collect::<Vec<_>>()
-                .with_lagged_offset(0.2)
-                .with_epilogue_to_end(),
-        );
-        timeline.forward_to(end_time_logo);
-        let logo = timeline.pin(logo);
-        timeline.forward_to(end_time_text);
-        let ranim_text = timeline.pin(ranim_text);
+        r.insert_time_mark(r.cur_sec(), TimeMark::Capture("preview.png".to_string()));
+        r.timelines_mut().forward(1.0);
 
-        timeline.insert_time_mark(
-            timeline.cur_sec(),
-            TimeMark::Capture("preview.png".to_string()),
-        );
-        timeline.forward(1.0);
-
-        timeline.play(
-            timeline
-                .unpin(logo)
-                .into_iter()
-                .chain(timeline.unpin(ranim_text))
-                .map(|item| item.unwrite().with_duration(3.0).with_rate_func(smooth))
-                .collect::<Vec<_>>(),
-        );
+        logo.iter().for_each(|r_logo| {
+            r.timeline_mut(r_logo)
+                .play_with(|item| item.unwrite().with_duration(3.0).with_rate_func(smooth));
+        });
+        r.timeline_mut(&r_ranim_text).play_with(|text| {
+            text.lagged(0.0, |item| {
+                item.unwrite().with_duration(3.0).with_rate_func(linear)
+            })
+        });
     }
 }
 

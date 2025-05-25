@@ -3,7 +3,7 @@ pub mod creation;
 pub mod fading;
 pub mod transform;
 
-use crate::utils::rate_functions::linear;
+use crate::{items::{Group, TimelineId}, utils::rate_functions::linear};
 
 #[allow(unused)]
 use log::trace;
@@ -194,8 +194,8 @@ pub trait AnimGroupFunction<T> {
 
 impl<E: 'static, T> AnimGroupFunction<E> for T
 where
-    for<'a> &'a mut T: IntoIterator<Item = &'a mut AnimationSpan<E>>,
-    for<'a> &'a T: IntoIterator<Item = &'a AnimationSpan<E>>,
+    for<'a, 'r> &'a mut T: IntoIterator<Item = &'a mut AnimationSchedule<E>>,
+    for<'a> &'a T: IntoIterator<Item = &'a AnimationSchedule<E>>,
 {
     fn duration(&self) -> f64 {
         self.into_iter()
@@ -205,13 +205,13 @@ where
     }
     fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         (&mut self).into_iter().for_each(|schedule| {
-            schedule.rate_func = rate_func;
+            schedule.inner.rate_func = rate_func;
         });
         self
     }
     fn with_duration(mut self, secs: f64) -> Self {
         (&mut self).into_iter().for_each(|schedule| {
-            schedule.duration_secs = secs;
+            schedule.inner.duration_secs = secs;
         });
         self
     }
@@ -223,18 +223,16 @@ where
             .unwrap_or(secs);
         let ratio = secs / total_secs;
         (&mut self).into_iter().for_each(|schedule| {
-            let (duration, (padding_start, padding_end)) =
-                (&mut schedule.duration_secs, &mut schedule.padding);
-            *duration *= ratio;
-            *padding_start *= ratio;
-            *padding_end *= ratio;
+            schedule.inner.duration_secs *= ratio;
+            schedule.inner.padding.0 *= ratio;
+            schedule.inner.padding.1 *= ratio;
         });
         self
     }
     fn with_lagged_offset(mut self, ratio: f64) -> Self {
         let iter = (&self)
             .into_iter()
-            .map(|item: &AnimationSpan<E>| item.span_len() * ratio)
+            .map(|item: &AnimationSchedule<E>| item.span_len() * ratio)
             .scan(0.0, |state, x| {
                 *state += x;
                 Some(*state)
@@ -245,7 +243,7 @@ where
             .into_iter()
             .zip([0.0].into_iter().chain(iter))
             .for_each(|(anim, lag_time)| {
-                anim.padding.0 = lag_time;
+                anim.inner.padding.0 = lag_time;
             });
 
         self
@@ -255,9 +253,93 @@ where
         (&mut self).into_iter().for_each(|anim| {
             let span = anim.span_len();
             if span < duration {
-                anim.padding.1 = duration - span;
+                anim.inner.padding.1 = duration - span;
             }
         });
         self
+    }
+}
+
+pub struct AnimationSchedule<T> {
+    pub(crate) rabject_id: usize,
+    pub(crate) inner: AnimationSpan<T>,
+}
+
+impl<T> AnimationSchedule<T> {
+    pub fn span_len(&self) -> f64 {
+        self.inner.span_len()
+    }
+    pub fn with_duration(mut self, secs: f64) -> Self {
+        self.inner.duration_secs = secs;
+        self
+    }
+    pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
+        self.inner.rate_func = rate_func;
+        self
+    }
+    pub fn with_padding(mut self, start_sec: f64, end_sec: f64) -> Self {
+        self.inner.padding = (start_sec, end_sec);
+        self
+    }
+}
+
+// impl<T: Clone> RabjectId<T> {
+//     pub fn anim(&self, f: impl FnOnce(T) -> AnimationSpan<T>) -> AnimationSchedule<T> {
+//         let inner = f(self.data.clone());
+//         AnimationSchedule {
+//             rabject_id: self.id(),
+//             inner,
+//         }
+//     }
+// }
+
+// MARK: LaggedAnim
+pub trait LaggedAnim<T> {
+    fn lagged(self, lag_ratio: f64, anim_func: impl FnMut(T) -> AnimationSpan<T>) -> AnimationSpan<Group<T>>;
+}
+
+impl<T: Clone + 'static> LaggedAnim<T> for Group<T> {
+    fn lagged(self, lag_ratio: f64, anim_func: impl FnMut(T) -> AnimationSpan<T>) -> AnimationSpan<Group<T>> {
+        AnimationSpan::from_evaluator(Lagged::new(self, lag_ratio, anim_func).to_evaluator())
+    }
+}
+
+pub struct Lagged<T> {
+    anims: Vec<AnimationSpan<T>>,
+    lag_ratio: f64,
+}
+
+impl<T> Lagged<T> {
+    fn new<I>(target: I, lag_ratio: f64, anim_func: impl FnMut(T) -> AnimationSpan<T>) -> Self
+    where
+        I: IntoIterator<Item = T>,
+    {
+        Self {
+            anims: target.into_iter().map(anim_func).collect(),
+            lag_ratio,
+        }
+    }
+}
+
+impl<T: Clone> EvalDynamic<Group<T>> for Lagged<T> {
+    fn eval_alpha(&self, alpha: f64) -> Group<T> {
+        // -|--
+        //  -|--
+        //   -|--
+        // total_time - unit_time * (1.0 - lag_ratio)  = unit_time * lag_ratio * n
+        // total_time = unit_time * (1.0 + (n - 1) lag_ratio)
+        let unit_time = 1.0 / (1.0 + (self.anims.len() - 1) as f64 * self.lag_ratio);
+        let unit_lagged_time = unit_time * self.lag_ratio;
+        self.anims
+            .iter()
+            .enumerate()
+            .map(|(i, anim)| {
+                let start = unit_lagged_time * i as f64;
+
+                let alpha = (alpha - start) / unit_time;
+                let alpha = alpha.clamp(0.0, 1.0);
+                anim.eval_alpha(alpha).into_owned()
+            })
+            .collect()
     }
 }

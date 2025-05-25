@@ -1,9 +1,7 @@
 use glam::DVec3;
 
 use crate::{
-    render::primitives::{Extract, vitem::VItemPrimitive},
-    traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth},
-    utils::svg::vitems_from_tree,
+    items::Group, render::primitives::{vitem::VItemPrimitive, Extract}, traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth}, utils::svg::vitems_from_tree
 };
 
 use super::VItem;
@@ -114,9 +112,9 @@ impl StrokeWidth for SvgItem {
 }
 
 // MARK: Conversions
-impl From<SvgItem> for Vec<VItem> {
+impl From<SvgItem> for Group<VItem> {
     fn from(value: SvgItem) -> Self {
-        value.0
+        Self(value.0)
     }
 }
 

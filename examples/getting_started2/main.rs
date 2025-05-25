@@ -9,6 +9,7 @@ use ranim::{
         geometry::{Circle, Rectangle, Square},
     },
     prelude::*,
+    timeline::{TimelineTrait, TimelinesFunc},
     utils::rate_functions::linear,
 };
 
@@ -16,31 +17,41 @@ use ranim::{
 struct GettingStarted2Scene;
 
 impl TimelineConstructor for GettingStarted2Scene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
             rect.set_stroke_color(manim::GREEN_C);
         });
 
-        // Use pin to keep the item static showed
-        let rect = timeline.pin(rect);
-        timeline.forward(1.0);
+        // The new initialized timeline is hidden by default, use show to start encoding a static anim and make it show
+        let r_rect = r.init_timeline(rect.clone());
+        r.timeline_mut(&r_rect).show();
+
+        r.timelines_mut().forward(1.0);
 
         let square = Square::new(2.0).with(|square| {
             square.set_color(manim::BLUE_C);
         });
-
         let circle = Circle::new(2.0).with(|circle| {
             circle.set_color(manim::RED_C);
         });
+        let r_vitem = r.init_timeline(VItem::from(square.clone()));
         {
-            let square = timeline.play(VItem::from(square).create());
-            timeline.play(square.transform_to(circle.clone()).with_rate_func(linear));
+            let timeline = r.timeline_mut(&r_vitem);
+            timeline.forward(1.0);
+            timeline.play_with(|vitem| vitem.create());
+            timeline.play_with(|vitem| {
+                vitem
+                    .transform_to(VItem::from(circle.clone()))
+                    .with_rate_func(linear)
+            });
+            timeline.play_with(|vitem| vitem.unwrite());
         }
-        timeline.play(VItem::from(circle).unwrite());
 
-        // Use unpin to remove the static showed item and turn it back to normal
-        let rect = timeline.unpin(rect);
-        timeline.play(VItem::from(rect).uncreate());
+        r.timelines_mut().sync();
+
+        // Use hide to stop showing an item
+        r.timeline_mut(&r_rect).hide();
+        r.timeline_mut(&r_vitem).play(VItem::from(rect).uncreate());
     }
 }
 

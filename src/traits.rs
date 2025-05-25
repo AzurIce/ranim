@@ -5,11 +5,23 @@ use glam::{DAffine2, DMat3, DMat4, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
 use itertools::Itertools;
 use log::warn;
 
-use crate::components::{Anchor, ScaleHint, vpoint::wrap_point_func_with_anchor, width::Width};
+use crate::{
+    components::{Anchor, ScaleHint, vpoint::wrap_point_func_with_anchor, width::Width},
+    items::Group,
+};
 
 // MARK: Interpolatable
 pub trait Interpolatable {
     fn lerp(&self, target: &Self, t: f64) -> Self;
+}
+
+impl<T: Interpolatable> Interpolatable for Group<T> {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        self.into_iter()
+            .zip(target)
+            .map(|(a, b)| a.lerp(b, t))
+            .collect()
+    }
 }
 
 impl Interpolatable for f32 {
@@ -81,9 +93,31 @@ impl Alignable for DVec3 {
     }
 }
 
+// TODO: make this better
+impl<T> Alignable for Group<T> {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.len() == other.len()
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        
+    }
+}
+
 // MARK: Opacity
 pub trait Opacity {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self;
+}
+
+impl<T: Opacity, I> Opacity for I
+where
+    for<'a> &'a mut I: IntoIterator<Item = &'a mut T>,
+{
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.into_iter().for_each(|x| {
+            x.set_opacity(opacity);
+        });
+        self
+    }
 }
 
 // MARK: Partial

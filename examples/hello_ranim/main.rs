@@ -10,33 +10,44 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
+    timeline::{TimelineTrait, TimelinesFunc},
 };
 
 #[scene]
 struct HelloRanimScene;
 
 impl TimelineConstructor for HelloRanimScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: PinnedItem<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let square = Square::new(2.0).with(|square| {
             square.set_color(manim::BLUE_C);
         });
+        let r_square = r.init_timeline(square);
 
-        timeline.play(square.clone().fade_in());
         let circle = Circle::new(2.0).with(|circle| {
             circle
                 .set_color(manim::RED_C)
                 .rotate(PI / 4.0 + PI, DVec3::Z);
         });
+        let r_vitem_circle = r.init_timeline(VItem::from(circle.clone()));
 
-        timeline.play(VItem::from(square).transform_to(circle.clone()));
-        timeline.sync();
+        let square = {
+            let timeline = r.timeline_mut(&r_square);
+            let square = timeline.play_with(|square| square.fade_in());
+            timeline.hide();
+            square
+        };
 
-        let circle = timeline.pin(circle);
-        timeline.forward(1.0);
-        let circle = timeline.unpin(circle);
-        timeline.play(VItem::from(circle.clone()).unwrite());
-        timeline.play(VItem::from(circle.clone()).write());
-        timeline.play(circle.fade_out());
+        r.timelines_mut().sync();
+        {
+            let timeline = r.timeline_mut(&r_vitem_circle);
+            timeline.play_with(|circle| VItem::from(square).transform_to(circle));
+            timeline.forward(1.0);
+            let circle = timeline.state().clone();
+            timeline.play_with(|circle| circle.unwrite());
+            timeline.play(circle.write());
+            timeline.play_with(|circle| circle.fade_out());
+        }
+        r.timelines_mut().sync();
     }
 }
 

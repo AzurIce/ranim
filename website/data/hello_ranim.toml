@@ -1,49 +1,74 @@
 name = "hello_ranim"
-code = """
+code = '''
 ```rust,linenos
-use std::f64::consts::PI;\r
-\r
-use glam::DVec3;\r
-use ranim::{\r
-    animation::{\r
-        creation::WritingAnimSchedule, fading::FadingAnimSchedule, transform::TransformAnimSchedule,\r
-    },\r
-    color::palettes::manim,\r
-    items::vitem::{Circle, Square},\r
-    prelude::*,\r
-};\r
-\r
-#[scene]\r
-struct HelloRanimScene;\r
-\r
-impl TimelineConstructor for HelloRanimScene {\r
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {\r
-        let mut square = Square(2.0).build();\r
-        square.set_color(manim::BLUE_C);\r
-\r
-        let mut square = timeline.insert(square);\r
-        let mut circle = Circle(2.0).build();\r
-        circle.rotate(PI / 4.0 + PI, DVec3::Z);\r
-        circle.set_color(manim::RED_C);\r
-\r
-        timeline.play(square.transform_to(circle).apply()); // Use `apply` on an anim schedule to update rabject data\r
-        timeline.play(square.unwrite()); // Do not use `apply` to keep the data in Rabject not changed\r
-        timeline.play(square.write());\r
-        timeline.play(square.fade_out());\r
-    }\r
-}\r
-\r
-fn main() {\r
-    #[cfg(feature = \"app\")]\r
-    run_scene_app(HelloRanimScene);\r
-    #[cfg(not(feature = \"app\"))]\r
-    {\r
-        render_scene(HelloRanimScene, &AppOptions::default());\r
-        render_scene_at_sec(HelloRanimScene, 0.0, \"preview.png\", &AppOptions::default());\r
-    }\r
-}\r
+use std::f64::consts::PI;
 
-```"""
-hash = "3502f56e64f3d87332db9639ec3382ffec1c9c77"
+use log::LevelFilter;
+use ranim::{
+    animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    color::palettes::manim,
+    glam::DVec3,
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Square},
+    },
+    prelude::*,
+    timeline::{TimelineTrait, TimelinesFunc},
+};
+
+#[scene]
+struct HelloRanimScene;
+
+impl TimelineConstructor for HelloRanimScene {
+    fn construct(self, timeline: &mut RanimScene, _camera: TimelineId<CameraFrame>) {
+        let square = Square::new(2.0).with(|square| {
+            square.set_color(manim::BLUE_C);
+        });
+        let r_square = timeline.init_timeline(square);
+
+        let square = {
+            let timeline = timeline.timeline_mut(&r_square);
+            let square = timeline.play_with(|square| square.fade_in());
+            timeline.hide();
+            square
+        };
+        timeline.timelines_mut().sync();
+
+        let circle = Circle::new(2.0).with(|circle| {
+            circle
+                .set_color(manim::RED_C)
+                .rotate(PI / 4.0 + PI, DVec3::Z);
+        });
+        let r_vitem_circle = timeline.init_timeline(VItem::from(circle.clone()));
+
+        {
+            let timeline = timeline.timeline_mut(&r_vitem_circle);
+            timeline.play_with(|circle| VItem::from(square).transform_to(circle));
+            timeline.forward(1.0);
+            let circle = timeline.state().clone();
+            timeline.play_with(|circle| circle.unwrite());
+            timeline.play(circle.write());
+            timeline.play_with(|circle| circle.fade_out());
+        }
+        timeline.timelines_mut().sync();
+    }
+}
+
+fn main() {
+    #[cfg(debug_assertions)]
+    pretty_env_logger::formatted_timed_builder()
+        .filter(Some("ranim"), LevelFilter::Trace)
+        .init();
+    #[cfg(feature = "app")]
+    run_scene_app(HelloRanimScene);
+    #[cfg(not(feature = "app"))]
+    {
+        render_scene(HelloRanimScene, &AppOptions::default());
+        render_scene_at_sec(HelloRanimScene, 0.0, "preview.png", &AppOptions::default());
+    }
+}
+
+```'''
+hash = "3d97c435232b3d5169a7835ed48bc009e90fd5df"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]

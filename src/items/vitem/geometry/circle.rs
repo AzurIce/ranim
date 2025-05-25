@@ -6,9 +6,9 @@ use ranim_macros::Interpolatable;
 
 use crate::{
     components::Anchor,
-    items::vitem::{DEFAULT_STROKE_WIDTH, VItem},
-    render::primitives::{Extract, vitem::VItemPrimitive},
-    traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor},
+    items::vitem::{VItem, DEFAULT_STROKE_WIDTH},
+    render::primitives::{vitem::VItemPrimitive, Extract},
+    traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, With},
 };
 
 use super::Arc;
@@ -152,7 +152,10 @@ impl From<Circle> for Arc {
 
 impl From<Circle> for VItem {
     fn from(value: Circle) -> Self {
-        Arc::from(value).into()
+        let fill_rgba = value.fill_rgba;
+        VItem::from(Arc::from(value)).with(|item| {
+            item.set_fill_color(fill_rgba);
+        })
     }
 }
 
