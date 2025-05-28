@@ -57,7 +57,7 @@ impl WgpuContext {
                     label: None,
                     required_features: adapter.features()
                         & wgpu_profiler::GpuProfiler::ALL_WGPU_TIMER_FEATURES,
-                    required_limits: wgpu::Limits::default(),
+                    required_limits: wgpu::Limits::downlevel_defaults(),
                     memory_hints: wgpu::MemoryHints::default(),
                 },
                 None,
@@ -66,7 +66,13 @@ impl WgpuContext {
             .unwrap();
         #[cfg(not(feature = "profiling"))]
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor::default(), None)
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    required_limits: wgpu::Limits::downlevel_defaults(),
+                    ..Default::default()
+                },
+                None,
+            )
             .await
             .unwrap();
 
