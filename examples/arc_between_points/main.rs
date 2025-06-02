@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use log::LevelFilter;
 use ranim::{
-    animation::{LaggedAnim, fading::FadingAnim},
+    animation::{fading::FadingAnim, lagged::LaggedAnim},
     color::HueDirection,
     glam::{DMat2, dvec2},
     items::{Group, vitem::geometry::ArcBetweenPoints},

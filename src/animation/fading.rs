@@ -1,4 +1,5 @@
-use super::{AnimationSpan, EvalDynamic, ToEvaluator};
+use super::{AnimationSpan, EvalDynamic};
+use crate::animation::Evaluator;
 use crate::traits::{Interpolatable, Opacity};
 use crate::utils::rate_functions::smooth;
 
@@ -14,11 +15,11 @@ pub trait FadingAnim<T: FadingRequirement + 'static> {
 
 impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
     fn fade_in(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(FadeIn::new(self.clone()).to_evaluator())
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(FadeIn::new(self.clone())))
             .with_rate_func(smooth)
     }
     fn fade_out(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(FadeOut::new(self.clone()).to_evaluator())
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(FadeOut::new(self.clone())))
             .with_rate_func(smooth)
     }
 }

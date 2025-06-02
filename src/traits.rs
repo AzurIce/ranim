@@ -98,9 +98,7 @@ impl<T> Alignable for Group<T> {
     fn is_aligned(&self, other: &Self) -> bool {
         self.len() == other.len()
     }
-    fn align_with(&mut self, other: &mut Self) {
-        
-    }
+    fn align_with(&mut self, _other: &mut Self) {}
 }
 
 // MARK: Opacity

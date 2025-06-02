@@ -36,9 +36,9 @@ use render::{Renderer, primitives::RenderInstances};
 pub mod prelude {
     #[cfg(feature = "app")]
     pub use crate::app::run_scene_app;
+    pub use crate::timeline::TimelinesFunc;
     pub use crate::{AppOptions, render_scene, render_scene_at_sec};
     pub use crate::{SceneMetaTrait, TimelineConstructor};
-    pub use crate::timeline::TimelinesFunc;
     pub use ranim_macros::scene;
 
     pub use crate::items::{TimelineId, camera_frame::CameraFrame};
@@ -80,7 +80,7 @@ pub trait SceneMetaTrait {
     fn meta(&self) -> SceneMeta;
 }
 
-/// A [`Scene`] builds a [`RanimTimeline`]
+/// A [`Scene`] builds a [`RanimScene`]
 ///
 /// This trait is automatically implemented for types that implements [`TimelineConstructor`] and [`SceneMetaTrait`].
 ///
@@ -97,8 +97,8 @@ pub trait SceneMetaTrait {
 /// #[scene]
 /// struct HelloWorld;
 ///
-/// impl Scene for HelloWorld {
-///     fn construct(self, timeline: &RanimTimeline, camera: &Rabject<CameraFrame>) {
+/// impl TimelineConstructor for HelloWorld {
+///     fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
 ///         // ...
 ///     }
 /// }
@@ -107,8 +107,8 @@ pub trait Scene: TimelineConstructor + SceneMetaTrait {}
 impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
 
 impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
-    fn construct(self, timeline: &mut RanimScene, camera: TimelineId<CameraFrame>) {
-        self.0.construct(timeline, camera);
+    fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
+        self.0.construct(r, r_cam);
     }
 }
 
@@ -118,7 +118,7 @@ impl<C, M: SceneMetaTrait> SceneMetaTrait for (C, M) {
     }
 }
 
-/// A constructor of a [`RanimTimeline`]
+/// A constructor of a [`RanimScene`]
 pub trait TimelineConstructor {
     /// Construct the timeline
     ///
@@ -129,7 +129,7 @@ pub trait TimelineConstructor {
 pub fn build_timeline(constructor: impl TimelineConstructor) -> SealedRanimScene {
     let mut timeline = RanimScene::new();
     {
-        let cam= items::camera_frame::CameraFrame::new();
+        let cam = items::camera_frame::CameraFrame::new();
         let r_cam = timeline.init_timeline(cam);
         timeline.timeline_mut(&r_cam).show();
         constructor.construct(&mut timeline, r_cam);
@@ -369,7 +369,7 @@ impl RanimRenderApp {
 
         let timemarks = timeline
             .time_marks()
-            .into_iter()
+            .iter()
             .filter(|mark| matches!(mark.1, TimeMark::Capture(_)))
             .collect::<Vec<_>>();
 

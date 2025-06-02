@@ -10,12 +10,20 @@ use ranim::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
         transform::TransformAnim,
-    }, color::palettes::manim::{self, BLUE_C, RED_C}, components::{Anchor, ScaleHint}, items::{
+    },
+    color::palettes::manim::{self, BLUE_C, RED_C},
+    components::{Anchor, ScaleHint},
+    items::{
+        Group,
         camera_frame::CameraFrame,
         vitem::{
-            self, geometry::{ArcBetweenPoints, Polygon, Rectangle, Square}, VItem
-        }, Group,
-    }, prelude::*, timeline::{TimelineTrait, TimelinesFunc}, typst_svg
+            self, VItem,
+            geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
+        },
+    },
+    prelude::*,
+    timeline::{TimelineTrait, TimelinesFunc},
+    typst_svg,
 };
 
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
