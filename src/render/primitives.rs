@@ -159,7 +159,7 @@ pub trait Extract {
     fn extract(&self) -> Self::Target;
 }
 
-impl <E: Extract> Extract for Group<E> {
+impl<E: Extract> Extract for Group<E> {
     type Target = Vec<E::Target>;
     fn extract(&self) -> Self::Target {
         self.iter().map(|x| x.extract()).collect()

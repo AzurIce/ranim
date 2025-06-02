@@ -3,8 +3,9 @@ use ranim::{
     color::palettes::manim::*,
     components::Anchor,
     glam::{dvec2, dvec3},
-    items::{vitem::geometry::Rectangle, Group},
-    prelude::*, timeline::{TimelineTrait, TimelinesFunc},
+    items::{Group, vitem::geometry::Rectangle},
+    prelude::*,
+    timeline::{TimelineTrait, TimelinesFunc},
 };
 
 #[scene]

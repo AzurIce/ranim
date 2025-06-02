@@ -1,7 +1,10 @@
 use glam::DVec3;
 
 use crate::{
-    items::Group, render::primitives::{vitem::VItemPrimitive, Extract}, traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth}, utils::svg::vitems_from_tree
+    items::Group,
+    render::primitives::{Extract, vitem::VItemPrimitive},
+    traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth},
+    utils::svg::vitems_from_tree,
 };
 
 use super::VItem;

@@ -1,9 +1,6 @@
 use ranim::{
     AppOptions,
-    animation::{
-        creation::{WritingAnim},
-        transform::TransformAnim,
-    },
+    animation::{creation::WritingAnim, transform::TransformAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,

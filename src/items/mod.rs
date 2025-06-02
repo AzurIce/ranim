@@ -106,7 +106,7 @@ impl<'a, T> IntoIterator for &'a Group<T> {
     type IntoIter = std::slice::Iter<'a, T>;
     type Item = &'a T;
     fn into_iter(self) -> Self::IntoIter {
-        (&self.0).into_iter()
+        self.0.iter()
     }
 }
 
@@ -114,7 +114,7 @@ impl<'a, T> IntoIterator for &'a mut Group<T> {
     type IntoIter = std::slice::IterMut<'a, T>;
     type Item = &'a mut T;
     fn into_iter(self) -> Self::IntoIter {
-        (&mut self.0).into_iter()
+        self.0.iter_mut()
     }
 }
 

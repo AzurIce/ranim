@@ -1,4 +1,5 @@
-use super::{AnimationSpan, EvalDynamic, ToEvaluator};
+use super::{AnimationSpan, EvalDynamic};
+use crate::animation::Evaluator;
 use crate::items::Group;
 use crate::items::vitem::DEFAULT_STROKE_WIDTH;
 use crate::traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth};
@@ -17,10 +18,12 @@ pub trait CreationAnim<T: CreationRequirement + 'static> {
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
     fn create(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Create::new(self).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Create::new(self)))
+            .with_rate_func(smooth)
     }
     fn uncreate(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(UnCreate::new(self).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(UnCreate::new(self)))
+            .with_rate_func(smooth)
     }
 }
 
@@ -35,10 +38,12 @@ pub trait WritingAnim<T: WritingRequirement + 'static> {
 
 impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
     fn write(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Write::new(self).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Write::new(self)))
+            .with_rate_func(smooth)
     }
     fn unwrite(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Unwrite::new(self).to_evaluator()).with_rate_func(smooth)
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Unwrite::new(self)))
+            .with_rate_func(smooth)
     }
 }
 
@@ -52,11 +57,11 @@ where
     I: IntoIterator<Item = T>,
 {
     fn group_write(self, lag_ratio: f64) -> AnimationSpan<Group<T>> {
-        AnimationSpan::from_evaluator(GroupWrite::new(self, lag_ratio).to_evaluator())
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(GroupWrite::new(self, lag_ratio)))
             .with_rate_func(smooth)
     }
     fn group_unwrite(self, lag_ratio: f64) -> AnimationSpan<Group<T>> {
-        AnimationSpan::from_evaluator(GroupWrite::new(self, lag_ratio).to_evaluator())
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(GroupWrite::new(self, lag_ratio)))
             .with_rate_func(smooth)
     }
 }

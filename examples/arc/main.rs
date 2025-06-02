@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use log::LevelFilter;
 use ranim::{
-    animation::{fading::FadingAnim, LaggedAnim},
+    animation::{fading::FadingAnim, lagged::LaggedAnim},
     color::HueDirection,
     glam::dvec2,
-    items::{vitem::geometry::Arc, Group},
+    items::{Group, vitem::geometry::Arc},
     prelude::*,
     timeline::TimeMark,
 };
@@ -49,14 +49,10 @@ impl TimelineConstructor for ArcScene {
             .collect::<Group<_>>();
         let r_arcs = r.init_timeline(arcs);
 
-        r.timeline_mut(&r_arcs).play_with(|arcs| {
-            arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0)
-        });
+        r.timeline_mut(&r_arcs)
+            .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
 
-        r.insert_time_mark(
-            r.cur_sec(),
-            TimeMark::Capture("preview.png".to_string()),
-        );
+        r.insert_time_mark(r.cur_sec(), TimeMark::Capture("preview.png".to_string()));
     }
 }
 

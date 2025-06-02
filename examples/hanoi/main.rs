@@ -1,5 +1,12 @@
 use ranim::{
-    animation::transform::TransformAnim, color::{palettes::manim, HueDirection}, components::Anchor, glam::dvec3, items::vitem::geometry::Rectangle, prelude::*, timeline::{TimelineTrait, TimelinesFunc}, utils::rate_functions::{ease_in_quad, ease_out_quad, linear}
+    animation::transform::TransformAnim,
+    color::{HueDirection, palettes::manim},
+    components::Anchor,
+    glam::dvec3,
+    items::vitem::geometry::Rectangle,
+    prelude::*,
+    timeline::{TimelineTrait, TimelinesFunc},
+    utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
 
 fn solve_hanoi(
@@ -61,7 +68,9 @@ impl TimelineConstructor for HanoiScene {
                 }))
             })
             .collect::<Vec<_>>();
-        r.timelines_mut().iter_mut().for_each(|timeline| timeline.show());
+        r.timelines_mut()
+            .iter_mut()
+            .for_each(|timeline| timeline.show());
 
         let mut disks = [_disks, Vec::new(), Vec::new()];
 
