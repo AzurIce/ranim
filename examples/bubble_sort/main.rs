@@ -13,7 +13,7 @@ use ranim::{
 #[scene]
 struct BubbleSortScene(pub usize);
 
-impl TimelineConstructor for BubbleSortScene {
+impl SceneConstructor for BubbleSortScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let num = self.0;
 
@@ -44,7 +44,7 @@ impl TimelineConstructor for BubbleSortScene {
                         .scale(DVec3::splat(0.8))
                         .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
                 });
-                r.init_timeline(rect)
+                r.init_timeline(rect).id()
             })
             .collect::<Vec<_>>();
 
@@ -103,7 +103,7 @@ impl TimelineConstructor for BubbleSortScene {
         }
 
         r.insert_time_mark(
-            r.cur_sec() / 2.0,
+            r.timelines().max_total_secs(),
             TimeMark::Capture(format!("preview-{num}.png")),
         );
     }

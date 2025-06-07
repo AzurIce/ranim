@@ -27,8 +27,8 @@ struct HelloWorldScene;
 impl TimelineConstructor for HelloWorldScene {
     fn construct(
         self,
-        timeline: &RanimTimeline,
-        camera: &mut Rabject<CameraFrame>,
+        r: &mut RanimScene,
+        r_cam: TimelineId<CameraFrame>,
     ) {
         // ...
     }
@@ -48,15 +48,21 @@ fn main() {
 
 - `SceneConstructor` 则是定义了动画的构造过程。
 
-使用 `render_scene` 可以用一个 **Scene** 来构造一个 **RanimTimeline** 并对其进行渲染，渲染结果将被输出到 `<output_dir>/<scene_name>/` 目录下。
+使用 `render_scene` 可以用一个 **Scene** 来构造一个 **RanimScene** 并对其进行渲染，渲染结果将被输出到 `<output_dir>/<scene_name>/` 目录下。
 
 `construct` 方法有两个关键的参数：
-- `timeline: &'t RanimTimeline`：Ranim API 的主要入口，几乎全部对动画的编码操作都发生在这个结构上
-- `camera: &'r Rabject<'t, CameraFrame>`：默认的相机 Rabject，也是 RanimTimeline 中被插入的第一个 Rabject
+- `timeline: &mut RanimScene`：Ranim API 的主要入口，几乎全部对动画的编码操作都发生在这个结构上
+- `camera: TimelineId<CameraFrame>`：默认的相机时间线的 Id，也是 RanimScene 中被创建的第一个 Timeline
 
 **RanimTimeline** 和 **Rabject** 这两个类型非常重要，将贯穿整个 Ranim 动画的编码。
 
-### 1. RanimTimeline 和 Rabject
+### 1. Timeline 和 TimelineId
+
+`RanimScene` 中有若干个 `Timeline`，每个 `Timeline` 中包含一系列的动画列表。
+
+通过 `r.init_timeline(state)` 可以创建一个 `Timeline`，而通过 `r.timeline(id)`, `r.timeline_mut(id)`, `r.timelines()`, `r.timelines_mut()` 可以获取对应 Id 的 `Timeline`。
+
+
 
 Ranim 使用一个 `RanimTimeline` 结构来编码动画，首先介绍两个最基本的操作：
 - 使用 `timeline.forward(duration_secs)` 来使时间线推进一段时间

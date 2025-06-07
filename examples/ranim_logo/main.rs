@@ -15,7 +15,7 @@ use ranim::{
         },
     },
     prelude::*,
-    timeline::{TimeMark, TimelineTrait, TimelinesFunc},
+    timeline::{TimeMark, TimelineFunc, TimelinesFunc},
     typst_svg,
     utils::rate_functions::{linear, smooth},
 };
@@ -65,13 +65,13 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
 #[scene]
 struct RanimLogoScene;
 
-impl TimelineConstructor for RanimLogoScene {
+impl SceneConstructor for RanimLogoScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let logo_width = frame_size.y * 0.618;
 
         let logo = build_logo(logo_width);
-        let logo = logo.map(|item| r.init_timeline(item));
+        let logo = logo.map(|item| r.init_timeline(item).id());
 
         let ranim_text = Group::<VItem>::from(
             SvgItem::new(typst_svg!(
@@ -86,7 +86,7 @@ impl TimelineConstructor for RanimLogoScene {
                     .put_center_on(DVec3::NEG_Y * 2.5);
             }),
         );
-        let r_ranim_text = r.init_timeline(ranim_text);
+        let r_ranim_text = r.init_timeline(ranim_text).id();
 
         logo.iter().for_each(|item| {
             r.timeline_mut(item)
@@ -133,7 +133,10 @@ impl TimelineConstructor for RanimLogoScene {
         });
         r.timelines_mut().sync();
 
-        r.insert_time_mark(r.cur_sec(), TimeMark::Capture("preview.png".to_string()));
+        r.insert_time_mark(
+            r.timelines().max_total_secs(),
+            TimeMark::Capture("preview.png".to_string()),
+        );
         r.timelines_mut().forward(1.0);
 
         logo.iter().for_each(|r_logo| {

@@ -17,7 +17,7 @@ const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 #[scene]
 struct BasicScene;
 
-impl TimelineConstructor for BasicScene {
+impl SceneConstructor for BasicScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         r.timelines_mut().forward(0.2);
 
@@ -25,7 +25,6 @@ impl TimelineConstructor for BasicScene {
             svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
                 .put_center_on(DVec3::Y * 2.0);
         }));
-        let r_svg = r.init_timeline(svg);
         let text = Group::<VItem>::from(
             SvgItem::new(&typst_svg!(
                 r#"
@@ -42,7 +41,8 @@ impl TimelineConstructor for BasicScene {
                     .set_fill_opacity(0.8);
             }),
         );
-        let r_text = r.init_timeline(text);
+        let r_svg = r.init_timeline(svg).id();
+        let r_text = r.init_timeline(text).id();
 
         r.timeline_mut(&r_text)
             .play_with(|text| text.group_write(0.2).with_duration(3.0));
@@ -50,7 +50,10 @@ impl TimelineConstructor for BasicScene {
             .play_with(|svg| svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
         r.timelines_mut().sync();
 
-        r.insert_time_mark(r.cur_sec(), TimeMark::Capture("preview.png".to_string()));
+        r.insert_time_mark(
+            r.timelines().max_total_secs(),
+            TimeMark::Capture("preview.png".to_string()),
+        );
 
         r.timelines_mut().forward(0.5);
         r.timeline_mut(&r_text)

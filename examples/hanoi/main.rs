@@ -5,7 +5,7 @@ use ranim::{
     glam::dvec3,
     items::vitem::geometry::Rectangle,
     prelude::*,
-    timeline::{TimelineTrait, TimelinesFunc},
+    timeline::{TimelineFunc, TimelinesFunc},
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
 
@@ -28,7 +28,7 @@ fn solve_hanoi(
 #[scene]
 struct HanoiScene(pub usize);
 
-impl TimelineConstructor for HanoiScene {
+impl SceneConstructor for HanoiScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let n = self.0;
         let total_sec = 10.0;
@@ -46,7 +46,7 @@ impl TimelineConstructor for HanoiScene {
                     );
                 })
             })
-            .map(|rect| r.init_timeline(rect))
+            .map(|rect| r.init_timeline(rect).with(|timeline| timeline.show()).id())
             .collect::<Vec<_>>();
 
         let min_disk_width = rod_width * 1.7;
@@ -66,11 +66,10 @@ impl TimelineConstructor for HanoiScene {
                         dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.0),
                     );
                 }))
+                .with(|timeline| timeline.show())
+                .id()
             })
             .collect::<Vec<_>>();
-        r.timelines_mut()
-            .iter_mut()
-            .for_each(|timeline| timeline.show());
 
         let mut disks = [_disks, Vec::new(), Vec::new()];
 

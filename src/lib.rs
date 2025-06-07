@@ -28,7 +28,7 @@ use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{TimelineId, camera_frame::CameraFrame};
-use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult, TimelineTrait};
+use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult, TimelineFunc};
 
 use render::{Renderer, primitives::RenderInstances};
 
@@ -38,7 +38,7 @@ pub mod prelude {
     pub use crate::app::run_scene_app;
     pub use crate::timeline::TimelinesFunc;
     pub use crate::{AppOptions, render_scene, render_scene_at_sec};
-    pub use crate::{SceneMetaTrait, TimelineConstructor};
+    pub use crate::{SceneConstructor, SceneMetaTrait};
     pub use ranim_macros::scene;
 
     pub use crate::items::{TimelineId, camera_frame::CameraFrame};
@@ -82,7 +82,7 @@ pub trait SceneMetaTrait {
 
 /// A [`Scene`] builds a [`RanimScene`]
 ///
-/// This trait is automatically implemented for types that implements [`TimelineConstructor`] and [`SceneMetaTrait`].
+/// This trait is automatically implemented for types that implements [`SceneConstructor`] and [`SceneMetaTrait`].
 ///
 /// A struct with [`ranim_macros::scene`] attribute implements [`SceneMetaTrait`], which is basically a type with [`SceneMeta`].
 /// - `#[scene]`: use the *snake_case* of the struct's name (Without the `Scene` suffix) as [`SceneMeta::name`].
@@ -97,16 +97,16 @@ pub trait SceneMetaTrait {
 /// #[scene]
 /// struct HelloWorld;
 ///
-/// impl TimelineConstructor for HelloWorld {
+/// impl SceneConstructor for HelloWorld {
 ///     fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
 ///         // ...
 ///     }
 /// }
 /// ```
-pub trait Scene: TimelineConstructor + SceneMetaTrait {}
-impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
+pub trait Scene: SceneConstructor + SceneMetaTrait {}
+impl<T: SceneConstructor + SceneMetaTrait> Scene for T {}
 
-impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
+impl<C: SceneConstructor, M> SceneConstructor for (C, M) {
     fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
         self.0.construct(r, r_cam);
     }
@@ -119,18 +119,18 @@ impl<C, M: SceneMetaTrait> SceneMetaTrait for (C, M) {
 }
 
 /// A constructor of a [`RanimScene`]
-pub trait TimelineConstructor {
+pub trait SceneConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
     fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>);
 }
 
-pub fn build_timeline(constructor: impl TimelineConstructor) -> SealedRanimScene {
+pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
     let mut timeline = RanimScene::new();
     {
         let cam = items::camera_frame::CameraFrame::new();
-        let r_cam = timeline.init_timeline(cam);
+        let r_cam = timeline.init_timeline(cam).id();
         timeline.timeline_mut(&r_cam).show();
         constructor.construct(&mut timeline, r_cam);
     }

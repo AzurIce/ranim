@@ -7,8 +7,8 @@ use crate::{
     animation::{AnimationSpan, EvalResult, Evaluator},
     items::{TimelineId, VisualItem, camera_frame::CameraFrame},
 };
+use std::fmt::Debug;
 use std::{any::Any, sync::Arc};
-use std::{fmt::Debug, time::Duration};
 
 #[derive(Debug, Clone)]
 pub enum TimeMark {
@@ -36,7 +36,7 @@ impl Timeline {
     }
 }
 
-impl TimelineTrait for Timeline {
+impl TimelineFunc for Timeline {
     fn cur_sec(&self) -> f64 {
         self.inner.as_timeline().cur_sec()
     }
@@ -92,13 +92,13 @@ impl<T: VisualItem + Clone + 'static> From<RabjectTimeline<T>> for InnerTimeline
 }
 
 impl InnerTimeline {
-    pub fn as_timeline(&self) -> &dyn TimelineTrait {
+    pub fn as_timeline(&self) -> &dyn TimelineFunc {
         match self {
             InnerTimeline::CameraFrame(timeline) => timeline.as_timeline(),
             InnerTimeline::VisualItem(timeline) => timeline.as_timeline(),
         }
     }
-    pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait {
+    pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc {
         match self {
             InnerTimeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
             InnerTimeline::VisualItem(timeline) => timeline.as_timeline_mut(),
@@ -118,15 +118,82 @@ impl InnerTimeline {
     }
 }
 
-// MARK: Ranim
+// MARK: RanimScene
 /// The main struct that offers the ranim's API, and encodes animations
 /// The rabjects insert to it will hold a reference to it, so it has interior mutability
 #[derive(Default)]
 pub struct RanimScene {
     // Timeline<CameraFrame> or Timeline<Item>
     timelines: Vec<Timeline>,
-    cur_secs: f64,
     time_marks: Vec<(f64, TimeMark)>,
+}
+
+impl RanimScene {
+    pub fn seal(mut self) -> SealedRanimScene {
+        let total_secs = self.timelines.max_total_secs();
+        self.timelines.forward_to(total_secs);
+        self.timelines.seal();
+        SealedRanimScene {
+            total_secs,
+            timelines: self.timelines,
+            time_marks: self.time_marks,
+        }
+    }
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn init_timeline<T: Clone + 'static>(&mut self, state: T) -> &mut RabjectTimeline<T>
+    where
+        RabjectTimeline<T>: Into<InnerTimeline>,
+    {
+        let rabject = TimelineId::alloc();
+        self._make_sure_timeline_initialized::<T>(rabject.id(), state);
+        self.timeline_mut(&rabject)
+    }
+    pub fn timelines(&self) -> &Vec<Timeline> {
+        &self.timelines
+    }
+    pub fn timelines_mut(&mut self) -> &mut Vec<Timeline> {
+        &mut self.timelines
+    }
+    pub fn timeline<'a, T: TimelineIndex<'a>>(&'a self, index: &T) -> T::RefOutput {
+        index.timeline(self)
+    }
+    pub fn timeline_mut<'a, T: TimelineIndex<'a>>(&'a mut self, index: &T) -> T::MutOutput {
+        index.timeline_mut(self)
+    }
+
+    fn _make_sure_timeline_initialized<T: Clone + 'static>(&mut self, id: usize, state: T)
+    where
+        RabjectTimeline<T>: Into<InnerTimeline>,
+    {
+        if self.timeline(&id).is_none() {
+            let rabject_timeline = RabjectTimeline::<T>::new(TimelineId::new(id), state);
+            self.timelines.push(Timeline {
+                id,
+                inner: rabject_timeline.into(),
+            });
+        }
+    }
+
+    pub fn insert_time_mark(&mut self, sec: f64, time_mark: TimeMark) {
+        self.time_marks.push((sec, time_mark));
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct RabjectTimelineInfo {
+    pub id: usize,
+    pub type_name: String,
+    pub animation_infos: Vec<AnimationInfo>,
+}
+
+impl Debug for RanimScene {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("Timeline: {} timelines", self.timelines.len()))?;
+        Ok(())
+    }
 }
 
 pub struct SealedRanimScene {
@@ -284,6 +351,7 @@ impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for [&TimelineId<T>; N] {
     }
 }
 
+// MARK: TimelinesFunc
 pub trait TimelinesFunc {
     fn seal(&mut self);
     fn max_total_secs(&self) -> f64;
@@ -292,7 +360,7 @@ pub trait TimelinesFunc {
     fn forward_to(&mut self, target_sec: f64);
 }
 
-impl<I: ?Sized, T: TimelineTrait> TimelinesFunc for I
+impl<I: ?Sized, T: TimelineFunc> TimelinesFunc for I
 where
     for<'a> &'a mut I: IntoIterator<Item = &'a mut T>,
     for<'a> &'a I: IntoIterator<Item = &'a T>,
@@ -325,111 +393,34 @@ where
     }
 }
 
-impl RanimScene {
-    pub fn seal(mut self) -> SealedRanimScene {
-        let total_secs = self.timelines.max_total_secs();
-        self.timelines.forward_to(total_secs);
-        self.timelines.seal();
-        SealedRanimScene {
-            total_secs,
-            timelines: self.timelines,
-            time_marks: self.time_marks,
-        }
-    }
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn init_timeline<T: Clone + 'static>(&mut self, state: T) -> TimelineId<T>
-    where
-        RabjectTimeline<T>: Into<InnerTimeline>,
-    {
-        let rabject = TimelineId::new();
-        self._make_sure_timeline_initialized::<T>(rabject.id(), state);
-        rabject
-    }
-    pub fn timelines(&self) -> &Vec<Timeline> {
-        &self.timelines
-    }
-    pub fn timelines_mut(&mut self) -> &mut Vec<Timeline> {
-        &mut self.timelines
-    }
-    pub fn timeline<'a, T: TimelineIndex<'a>>(&'a self, index: &T) -> T::RefOutput {
-        index.timeline(self)
-    }
-    pub fn timeline_mut<'a, T: TimelineIndex<'a>>(&'a mut self, index: &T) -> T::MutOutput {
-        index.timeline_mut(self)
-    }
-
-    pub fn cur_sec(&self) -> f64 {
-        self.cur_secs
-    }
-
-    fn _make_sure_timeline_initialized<T: Clone + 'static>(&mut self, id: usize, state: T)
-    where
-        RabjectTimeline<T>: Into<InnerTimeline>,
-    {
-        if self.timeline(&id).is_none() {
-            let mut rabject_timeline = RabjectTimeline::<T>::new(state);
-            rabject_timeline.forward_to(self.cur_secs);
-            self.timelines.push(Timeline {
-                id,
-                inner: rabject_timeline.into(),
-            });
-        }
-    }
-
-    pub fn insert_time_mark(&mut self, sec: f64, time_mark: TimeMark) {
-        self.time_marks.push((sec, time_mark));
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct RabjectTimelineInfo {
-    pub id: usize,
-    pub type_name: String,
-    pub animation_infos: Vec<AnimationInfo>,
-}
-
-impl Debug for RanimScene {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "Timeline {:?}: {} timelines\n",
-            Duration::from_secs_f64(self.cur_sec()),
-            self.timelines.len()
-        ))?;
-        Ok(())
-    }
-}
-
 // MARK: TimelineTrait
-pub trait AnyTimelineTrait: TimelineTrait + Any {
-    fn as_timeline(&self) -> &dyn TimelineTrait;
-    fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait;
+pub trait AnyTimelineTrait: TimelineFunc + Any {
+    fn as_timeline(&self) -> &dyn TimelineFunc;
+    fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc;
 }
-impl<T: TimelineTrait + Any> AnyTimelineTrait for T {
-    fn as_timeline(&self) -> &dyn TimelineTrait {
+impl<T: TimelineFunc + Any> AnyTimelineTrait for T {
+    fn as_timeline(&self) -> &dyn TimelineFunc {
         self
     }
-    fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait {
+    fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc {
         self
     }
 }
 
 pub trait AnyVisualItemTimelineTrait: VisualItemTimelineTrait + Any {
-    fn as_timeline(&self) -> &dyn TimelineTrait;
-    fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait;
+    fn as_timeline(&self) -> &dyn TimelineFunc;
+    fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc;
 }
 impl<T: VisualItemTimelineTrait + Any> AnyVisualItemTimelineTrait for T {
-    fn as_timeline(&self) -> &dyn TimelineTrait {
+    fn as_timeline(&self) -> &dyn TimelineFunc {
         self
     }
-    fn as_timeline_mut(&mut self) -> &mut dyn TimelineTrait {
+    fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc {
         self
     }
 }
 
-pub trait VisualItemTimelineTrait: TimelineTrait {
+pub trait VisualItemTimelineTrait: TimelineFunc {
     fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)>;
 }
 
@@ -448,7 +439,8 @@ pub struct AnimationInfo {
     pub end_sec: f64,
 }
 
-pub trait TimelineTrait {
+// MARK: TimelineFunc
+pub trait TimelineFunc {
     fn seal(&mut self);
     fn cur_sec(&self) -> f64;
     fn elapsed_secs(&self) -> f64;
@@ -471,6 +463,7 @@ pub trait TimelineTrait {
 // MARK: RabjectTimeline
 /// A timeline struct that encodes the animation of the type `T`
 pub struct RabjectTimeline<T> {
+    id: TimelineId<T>,
     type_name: String,
     cur_sec: f64,
     /// The state used for static anim.
@@ -487,7 +480,7 @@ pub struct RabjectTimeline<T> {
     show_secs: Vec<f64>,
 }
 
-impl<T: Clone + 'static> TimelineTrait for RabjectTimeline<T> {
+impl<T: Clone + 'static> TimelineFunc for RabjectTimeline<T> {
     fn seal(&mut self) {
         // println!("seal");
         self._submit_planning_static_anim();
@@ -543,8 +536,9 @@ impl<T: 'static> RabjectTimeline<T> {
     /// The timeline is hidden by default, because we don't know when the first anim starts.
     /// And this allow us to use [`RabjectTimeline::forward`] and [`RabjectTimeline::forward_to`]
     /// to adjust the start time of the first anim.
-    pub fn new(state: T) -> Self {
+    pub(crate) fn new(id: TimelineId<T>, state: T) -> Self {
         Self {
+            id,
             state,
             type_name: std::any::type_name::<T>().to_string(),
             animations: vec![],
@@ -556,6 +550,9 @@ impl<T: 'static> RabjectTimeline<T> {
 }
 
 impl<T: Clone + 'static> RabjectTimeline<T> {
+    pub fn id(&self) -> TimelineId<T> {
+        self.id
+    }
     pub fn cur_sec(&self) -> f64 {
         self.cur_sec
     }

@@ -1,22 +1,23 @@
 use ranim::{
     animation::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square,
-    prelude::*,
+    prelude::*, timeline::TimelineFunc,
 };
 
 #[scene]
 struct GettingStarted0Scene;
 
-impl TimelineConstructor for GettingStarted0Scene {
+impl SceneConstructor for GettingStarted0Scene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         // A Square with size 2.0 and color blue
         let square = Square::new(2.0).with(|square| {
             square.set_color(manim::BLUE_C);
         });
-        let r_square = r.init_timeline(square);
+        let r_square = r.init_timeline(square).id();
 
         {
             let timeline = r.timeline_mut(&r_square);
             timeline.play_with(|square| square.fade_in());
+            timeline.forward(1.0);
             timeline.play_with(|square| square.fade_out());
         }
 

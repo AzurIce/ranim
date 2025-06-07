@@ -5,13 +5,13 @@ use ranim::{
     glam::{dvec2, dvec3},
     items::{Group, vitem::geometry::Rectangle},
     prelude::*,
-    timeline::{TimelineTrait, TimelinesFunc},
+    timeline::{TimelineFunc, TimelinesFunc},
 };
 
 #[scene]
 struct PalettesScene;
 
-impl TimelineConstructor for PalettesScene {
+impl SceneConstructor for PalettesScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let padded_frame_size = frame_size * 0.9;
@@ -52,7 +52,7 @@ impl TimelineConstructor for PalettesScene {
                 })
             })
             .collect::<Group<_>>();
-        let squares = r.init_timeline(squares);
+        let squares = r.init_timeline(squares).id();
         r.timeline_mut(&squares).show();
         r.timelines_mut().forward(0.01);
     }

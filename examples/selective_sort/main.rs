@@ -6,14 +6,14 @@ use ranim::{
     components::Anchor,
     items::vitem::geometry::Rectangle,
     prelude::*,
-    timeline::{TimeMark, TimelineTrait, TimelinesFunc},
+    timeline::{TimeMark, TimelineFunc, TimelinesFunc},
     utils::rate_functions::linear,
 };
 
 #[scene]
 struct SelectiveSortScene(pub usize);
 
-impl TimelineConstructor for SelectiveSortScene {
+impl SceneConstructor for SelectiveSortScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let num = self.0;
 
@@ -43,12 +43,9 @@ impl TimelineConstructor for SelectiveSortScene {
                     rect.scale(DVec3::splat(0.8))
                         .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
                 });
-                r.init_timeline(rect)
+                r.init_timeline(rect).with(|timeline| timeline.show()).id()
             })
             .collect::<Vec<_>>();
-        r.timelines_mut()
-            .iter_mut()
-            .for_each(|timeline| timeline.show());
 
         let highlight = |rect: Rectangle| {
             rect.transform(|data| {
@@ -100,7 +97,7 @@ impl TimelineConstructor for SelectiveSortScene {
         }
 
         r.insert_time_mark(
-            r.cur_sec() / 2.0,
+            r.timelines().max_total_secs() / 2.0,
             TimeMark::Capture(format!("preview-{num}.png")),
         );
     }
