@@ -1,31 +1,48 @@
 name = "getting_started1"
 code = """
 ```rust,linenos
-use ranim::{\r
-    AppOptions, animation::fading::FadingAnimSchedule, color::palettes::manim,\r
-    items::vitem::Square, prelude::*, render_scene,\r
-};\r
-\r
-#[scene]\r
-struct GettingStarted1Scene;\r
-\r
-impl TimelineConstructor for GettingStarted1Scene {\r
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {\r
-        let mut square = Square(2.0).build();\r
-        square.set_color(manim::BLUE_C);\r
-\r
-        let mut square = timeline.insert(square);\r
-        #[allow(deprecated)]\r
-        timeline.play(square.fade_in());\r
-        timeline.play(square.fade_out());\r
-    }\r
-}\r
-\r
-fn main() {\r
-    render_scene(GettingStarted1Scene, &AppOptions::default());\r
-}\r
+use ranim::{
+    AppOptions,
+    animation::{creation::WritingAnim, transform::TransformAnim},
+    color::palettes::manim,
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Square},
+    },
+    prelude::*,
+    render_scene,
+};
+
+#[scene]
+struct GettingStarted1Scene;
+
+impl SceneConstructor for GettingStarted1Scene {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+        // A Square with size 2.0 and color blue
+        let square = Square::new(2.0).with(|square| {
+            square.set_color(manim::BLUE_C);
+        });
+
+        let circle = Circle::new(2.0).with(|circle| {
+            circle.set_color(manim::RED_C);
+        });
+
+        // In order to do more low-level opeerations,
+        // sometimes we need to convert the item to a low-level item.
+        let r_vitem = r.init_timeline(VItem::from(square)).id();
+        {
+            let timeline = r.timeline_mut(&r_vitem);
+            timeline.play_with(|vitem| vitem.transform_to(VItem::from(circle.clone())));
+            timeline.play_with(|vitem| vitem.unwrite());
+        }
+    }
+}
+
+fn main() {
+    render_scene(GettingStarted1Scene, &AppOptions::default());
+}
 
 ```"""
-hash = "4b11745b1ccc9e8b76b6bc236576c6825a70fe32"
+hash = "ddbbc02de60a27a13b97f321122198a5395e230b"
 preview_imgs = []
 output_files = ["/examples/getting_started1/output.mp4"]
