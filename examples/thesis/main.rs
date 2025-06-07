@@ -36,7 +36,7 @@ fn pentagon() -> VItem {
 #[scene]
 struct FadingScene;
 
-impl TimelineConstructor for FadingScene {
+impl SceneConstructor for FadingScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let pentagon_in = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, 2.0, 0.0));
@@ -44,8 +44,8 @@ impl TimelineConstructor for FadingScene {
         let pentagon_out = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, -2.0, 0.0));
         });
-        let r_in = r.init_timeline(pentagon_in);
-        let r_out = r.init_timeline(pentagon_out);
+        let r_in = r.init_timeline(pentagon_in).id();
+        let r_out = r.init_timeline(pentagon_out).id();
         r.timeline_mut(&r_in).play_with(|item| item.fade_in());
         r.timeline_mut(&r_out).play_with(|item| item.fade_out());
     }
@@ -55,7 +55,7 @@ impl TimelineConstructor for FadingScene {
 #[scene]
 struct CreationScene;
 
-impl TimelineConstructor for CreationScene {
+impl SceneConstructor for CreationScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let pentagon_in = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, 2.0, 0.0));
@@ -63,8 +63,8 @@ impl TimelineConstructor for CreationScene {
         let pentagon_out = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, -2.0, 0.0));
         });
-        let r_in = r.init_timeline(pentagon_in);
-        let r_out = r.init_timeline(pentagon_out);
+        let r_in = r.init_timeline(pentagon_in).id();
+        let r_out = r.init_timeline(pentagon_out).id();
         r.timeline_mut(&r_in).play_with(|item| item.create());
         r.timeline_mut(&r_out).play_with(|item| item.uncreate());
     }
@@ -74,7 +74,7 @@ impl TimelineConstructor for CreationScene {
 #[scene]
 struct WritingScene;
 
-impl TimelineConstructor for WritingScene {
+impl SceneConstructor for WritingScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let pentagon_in = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, 2.0, 0.0));
@@ -82,8 +82,8 @@ impl TimelineConstructor for WritingScene {
         let pentagon_out = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, -2.0, 0.0));
         });
-        let r_in = r.init_timeline(pentagon_in);
-        let r_out = r.init_timeline(pentagon_out);
+        let r_in = r.init_timeline(pentagon_in).id();
+        let r_out = r.init_timeline(pentagon_out).id();
         r.timeline_mut(&r_in).play_with(|item| item.write());
         r.timeline_mut(&r_out).play_with(|item| item.unwrite());
     }
@@ -93,7 +93,7 @@ impl TimelineConstructor for WritingScene {
 #[scene]
 struct TransformScene;
 
-impl TimelineConstructor for TransformScene {
+impl SceneConstructor for TransformScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let src = Square::new(2.0).with(|x| {
             x.set_color(manim::RED_C)
@@ -104,7 +104,7 @@ impl TimelineConstructor for TransformScene {
                 .put_center_on(dvec3(0.0, -2.0, 0.0));
         });
         // dst.rotate(PI / 4.0 + PI, DVec3::Z); // rotate to match src
-        let r_item = r.init_timeline(VItem::from(src));
+        let r_item = r.init_timeline(VItem::from(src)).id();
         r.timeline_mut(&r_item)
             .play_with(|item| item.transform_to(VItem::from(dst)).with_rate_func(linear));
     }

@@ -22,7 +22,7 @@ use ranim::{
         },
     },
     prelude::*,
-    timeline::{TimelineTrait, TimelinesFunc},
+    timeline::{TimelineFunc, TimelinesFunc},
     typst_svg,
 };
 
@@ -31,7 +31,7 @@ use ranim::{
 #[scene]
 struct TestScene;
 
-impl TimelineConstructor for TestScene {
+impl SceneConstructor for TestScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let n = 8;
         let arcs = (0..n)
@@ -40,7 +40,7 @@ impl TimelineConstructor for TestScene {
                 ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
             })
             .collect::<Group<_>>();
-        let r_arcs = r.init_timeline(arcs);
+        let r_arcs = r.init_timeline(arcs).id();
         r.timeline_mut(&r_arcs).show();
 
         // text.set_stroke_color(manim::RED_C)

@@ -13,7 +13,7 @@ use ranim::{
 #[scene]
 struct GettingStarted1Scene;
 
-impl TimelineConstructor for GettingStarted1Scene {
+impl SceneConstructor for GettingStarted1Scene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         // A Square with size 2.0 and color blue
         let square = Square::new(2.0).with(|square| {
@@ -26,7 +26,7 @@ impl TimelineConstructor for GettingStarted1Scene {
 
         // In order to do more low-level opeerations,
         // sometimes we need to convert the item to a low-level item.
-        let r_vitem = r.init_timeline(VItem::from(square));
+        let r_vitem = r.init_timeline(VItem::from(square)).id();
         {
             let timeline = r.timeline_mut(&r_vitem);
             timeline.play_with(|vitem| vitem.transform_to(VItem::from(circle.clone())));

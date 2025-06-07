@@ -8,20 +8,20 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
-    timeline::TimelineTrait,
+    timeline::TimelineFunc,
 };
 
 #[scene]
 struct StaticSquareScene(pub usize);
 
-impl TimelineConstructor for StaticSquareScene {
+impl SceneConstructor for StaticSquareScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64;
 
         let unit = size + buff;
         let start = dvec3(-4.0, -4.0, 0.0);
-        let squares = (0..self.0)
+        let _squares = (0..self.0)
             .cartesian_product(0..self.0)
             .map(|(i, j)| {
                 Square::new(size).with(|square| {
@@ -30,11 +30,8 @@ impl TimelineConstructor for StaticSquareScene {
                     );
                 })
             })
-            .map(|item| r.init_timeline(item))
+            .map(|item| r.init_timeline(item).with(|timeline| timeline.show()).id())
             .collect::<Vec<_>>();
-        for square in &squares {
-            r.timeline_mut(square).show();
-        }
         r.timelines_mut().forward(1.0);
     }
 }
@@ -42,7 +39,7 @@ impl TimelineConstructor for StaticSquareScene {
 #[scene]
 struct TransformSquareScene(pub usize);
 
-impl TimelineConstructor for TransformSquareScene {
+impl SceneConstructor for TransformSquareScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64 - buff;
@@ -58,7 +55,7 @@ impl TimelineConstructor for TransformSquareScene {
                     );
                 }))
             })
-            .map(|item| r.init_timeline(item))
+            .map(|item| r.init_timeline(item).id())
             .collect::<Vec<_>>();
         let circles = (0..self.0)
             .cartesian_product(0..self.0)

@@ -7,14 +7,14 @@ use ranim::{
         vitem::{VItem, geometry::Square},
     },
     prelude::*,
-    timeline::{TimeMark, TimelineTrait, TimelinesFunc},
+    timeline::{TimeMark, TimelineFunc, TimelinesFunc},
     utils::rate_functions::linear,
 };
 
 #[scene]
 struct PerspectiveBlendScene;
 
-impl TimelineConstructor for PerspectiveBlendScene {
+impl SceneConstructor for PerspectiveBlendScene {
     fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
         let cam = r.timeline(&r_cam).state().clone().with(|cam| {
             cam.pos = DVec3::Z * 5.0;
@@ -30,12 +30,12 @@ impl TimelineConstructor for PerspectiveBlendScene {
             }))
         };
 
-        let r_bottom = r.init_timeline(square_with_color(manim::TEAL_C));
-        let r_right = r.init_timeline(square_with_color(manim::GREEN_C));
-        let r_back = r.init_timeline(square_with_color(manim::BLUE_C));
-        let r_top = r.init_timeline(square_with_color(manim::PURPLE_C));
-        let r_front = r.init_timeline(square_with_color(manim::RED_C));
-        let r_left = r.init_timeline(square_with_color(manim::YELLOW_C));
+        let r_bottom = r.init_timeline(square_with_color(manim::TEAL_C)).id();
+        let r_right = r.init_timeline(square_with_color(manim::GREEN_C)).id();
+        let r_back = r.init_timeline(square_with_color(manim::BLUE_C)).id();
+        let r_top = r.init_timeline(square_with_color(manim::PURPLE_C)).id();
+        let r_front = r.init_timeline(square_with_color(manim::RED_C)).id();
+        let r_left = r.init_timeline(square_with_color(manim::YELLOW_C)).id();
 
         let bottom = r.timeline_mut(&r_bottom).play_with(|bottom| {
             bottom
@@ -88,7 +88,7 @@ impl TimelineConstructor for PerspectiveBlendScene {
         r.timeline_mut(&r_left).hide();
 
         let faces = Group(vec![bottom, right, back, top, front, left]);
-        let r_faces = r.init_timeline(faces);
+        let r_faces = r.init_timeline(faces).id();
         r.timelines_mut().sync(); // TODO: make this better
         r.timeline_mut(&r_faces).play_with(|faces| {
             faces
@@ -106,7 +106,10 @@ impl TimelineConstructor for PerspectiveBlendScene {
             })
             .with_duration(2.0)
         });
-        r.insert_time_mark(r.cur_sec(), TimeMark::Capture("preview.png".to_string()));
+        r.insert_time_mark(
+            r.timelines().max_total_secs(),
+            TimeMark::Capture("preview.png".to_string()),
+        );
     }
 }
 

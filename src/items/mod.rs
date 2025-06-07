@@ -19,15 +19,26 @@ pub struct TimelineId<T> {
     _phantom: std::marker::PhantomData<T>,
 }
 
+impl<T> Clone for TimelineId<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for TimelineId<T> {}
+
 impl<T> TimelineId<T> {
     pub fn id(&self) -> usize {
         self.id
     }
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(id: usize) -> Self {
         Self {
-            id: TIMELINE_CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            id,
             _phantom: std::marker::PhantomData,
         }
+    }
+    pub(crate) fn alloc() -> Self {
+        Self::new(TIMELINE_CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
     }
 }
 

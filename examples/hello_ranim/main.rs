@@ -10,25 +10,25 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
-    timeline::{TimelineTrait, TimelinesFunc},
+    timeline::{TimelineFunc, TimelinesFunc},
 };
 
 #[scene]
 struct HelloRanimScene;
 
-impl TimelineConstructor for HelloRanimScene {
+impl SceneConstructor for HelloRanimScene {
     fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let square = Square::new(2.0).with(|square| {
             square.set_color(manim::BLUE_C);
         });
-        let r_square = r.init_timeline(square);
+        let r_square = r.init_timeline(square).id();
 
         let circle = Circle::new(2.0).with(|circle| {
             circle
                 .set_color(manim::RED_C)
                 .rotate(PI / 4.0 + PI, DVec3::Z);
         });
-        let r_vitem_circle = r.init_timeline(VItem::from(circle.clone()));
+        let r_vitem_circle = r.init_timeline(VItem::from(circle.clone())).id();
 
         let square = {
             let timeline = r.timeline_mut(&r_square);
