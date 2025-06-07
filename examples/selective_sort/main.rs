@@ -32,7 +32,7 @@ impl SceneConstructor for SelectiveSortScene {
         heights.shuffle(&mut rng);
 
         let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
-        let mut rects = heights
+        let mut r_rects = heights
             .iter()
             .enumerate()
             .map(|(i, &height)| {
@@ -64,15 +64,15 @@ impl SceneConstructor for SelectiveSortScene {
 
         let shift_right = DVec3::X * width_unit;
         for i in 0..num - 1 {
-            r.timeline_mut(&rects[i]).play_with(highlight);
+            r.timeline_mut(r_rects[i]).play_with(highlight);
             for j in i + 1..num {
-                r.timeline_mut(&rects[j]).play_with(highlight);
+                r.timeline_mut(r_rects[j]).play_with(highlight);
                 r.timelines_mut().sync();
 
                 if heights[i] > heights[j] {
                     let dir = [shift_right, -shift_right];
                     let color = [manim::BLUE_C, manim::RED_C];
-                    r.timeline_mut(&[&rects[i], &rects[j]])
+                    r.timeline_mut(&[r_rects[i], r_rects[j]])
                         .iter_mut()
                         .zip(dir)
                         .zip(color)
@@ -88,12 +88,12 @@ impl SceneConstructor for SelectiveSortScene {
                             });
                         });
                     heights.swap(i, j);
-                    rects.swap(i, j);
+                    r_rects.swap(i, j);
                 }
-                r.timeline_mut(&rects[j]).play_with(unhighlight);
+                r.timeline_mut(r_rects[j]).play_with(unhighlight);
                 r.timelines_mut().sync();
             }
-            r.timeline_mut(&rects[i]).play_with(unhighlight);
+            r.timeline_mut(r_rects[i]).play_with(unhighlight);
         }
 
         r.insert_time_mark(

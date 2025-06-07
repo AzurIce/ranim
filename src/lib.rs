@@ -131,7 +131,7 @@ pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
     {
         let cam = items::camera_frame::CameraFrame::new();
         let r_cam = timeline.init_timeline(cam).id();
-        timeline.timeline_mut(&r_cam).show();
+        timeline.timeline_mut(r_cam).show();
         constructor.construct(&mut timeline, r_cam);
     }
     timeline.seal()

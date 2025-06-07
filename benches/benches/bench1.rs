@@ -67,10 +67,14 @@ impl SceneConstructor for TransformSquareScene {
                 }))
             })
             .collect::<Vec<_>>();
-        squares.iter().zip(circles).for_each(|(r_square, circle)| {
-            r.timeline_mut(r_square)
-                .play_with(|item| item.transform_to(circle));
-        });
+        squares
+            .iter()
+            .cloned()
+            .zip(circles)
+            .for_each(|(r_square, circle)| {
+                r.timeline_mut(r_square)
+                    .play_with(|item| item.transform_to(circle));
+            });
     }
 }
 

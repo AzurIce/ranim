@@ -41,7 +41,7 @@ impl SceneConstructor for TestScene {
             })
             .collect::<Group<_>>();
         let r_arcs = r.init_timeline(arcs).id();
-        r.timeline_mut(&r_arcs).show();
+        r.timeline_mut(r_arcs).show();
 
         // text.set_stroke_color(manim::RED_C)
         //     .set_stroke_width(0.05)

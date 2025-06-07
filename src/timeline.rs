@@ -147,9 +147,9 @@ impl RanimScene {
     where
         RabjectTimeline<T>: Into<InnerTimeline>,
     {
-        let rabject = TimelineId::alloc();
-        self._make_sure_timeline_initialized::<T>(rabject.id(), state);
-        self.timeline_mut(&rabject)
+        let id = TimelineId::alloc();
+        self._make_sure_timeline_initialized::<T>(id.id(), state);
+        self.timeline_mut(id)
     }
     pub fn timelines(&self) -> &Vec<Timeline> {
         &self.timelines
@@ -157,10 +157,10 @@ impl RanimScene {
     pub fn timelines_mut(&mut self) -> &mut Vec<Timeline> {
         &mut self.timelines
     }
-    pub fn timeline<'a, T: TimelineIndex<'a>>(&'a self, index: &T) -> T::RefOutput {
+    pub fn timeline<'a, T: TimelineIndex<'a>>(&'a self, index: T) -> T::RefOutput {
         index.timeline(self)
     }
-    pub fn timeline_mut<'a, T: TimelineIndex<'a>>(&'a mut self, index: &T) -> T::MutOutput {
+    pub fn timeline_mut<'a, T: TimelineIndex<'a>>(&'a mut self, index: T) -> T::MutOutput {
         index.timeline_mut(self)
     }
 
@@ -168,7 +168,7 @@ impl RanimScene {
     where
         RabjectTimeline<T>: Into<InnerTimeline>,
     {
-        if self.timeline(&id).is_none() {
+        if self.timeline(id).is_none() {
             let rabject_timeline = RabjectTimeline::<T>::new(TimelineId::new(id), state);
             self.timelines.push(Timeline {
                 id,
@@ -257,34 +257,35 @@ impl SealedRanimScene {
     }
 }
 
+// MARK: TimelineIndex
 pub trait TimelineIndex<'a> {
     type RefOutput;
     type MutOutput;
-    fn timeline(&self, timeline: &'a RanimScene) -> Self::RefOutput;
-    fn timeline_mut(&self, timeline: &'a mut RanimScene) -> Self::MutOutput;
+    fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput;
+    fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput;
 }
 
 impl<'a> TimelineIndex<'a> for usize {
     type RefOutput = Option<&'a Timeline>;
     type MutOutput = Option<&'a mut Timeline>;
-    fn timeline(&self, timeline: &'a RanimScene) -> Self::RefOutput {
+    fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput {
         timeline
             .timelines()
             .iter()
-            .find(|timeline| *self == timeline.id)
+            .find(|timeline| self == timeline.id)
     }
-    fn timeline_mut(&self, timeline: &'a mut RanimScene) -> Self::MutOutput {
+    fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput {
         timeline
             .timelines_mut()
             .iter_mut()
-            .find(|timeline| *self == timeline.id)
+            .find(|timeline| self == timeline.id)
     }
 }
 
 impl<'a, T: 'static> TimelineIndex<'a> for TimelineId<T> {
     type RefOutput = &'a RabjectTimeline<T>;
     type MutOutput = &'a mut RabjectTimeline<T>;
-    fn timeline(&self, timeline: &'a RanimScene) -> Self::RefOutput {
+    fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput {
         timeline
             .timelines()
             .iter()
@@ -297,7 +298,7 @@ impl<'a, T: 'static> TimelineIndex<'a> for TimelineId<T> {
             })
             .unwrap()
     }
-    fn timeline_mut(&self, timeline: &'a mut RanimScene) -> Self::MutOutput {
+    fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput {
         timeline
             .timelines_mut()
             .iter_mut()
@@ -312,10 +313,10 @@ impl<'a, T: 'static> TimelineIndex<'a> for TimelineId<T> {
     }
 }
 
-impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for [&TimelineId<T>; N] {
+impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for &[TimelineId<T>; N] {
     type RefOutput = [&'a RabjectTimeline<T>; N];
     type MutOutput = [&'a mut RabjectTimeline<T>; N];
-    fn timeline(&self, timeline: &'a RanimScene) -> Self::RefOutput {
+    fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput {
         // TODO: the order is not stable
         let mut timelines = timeline
             .timelines()
@@ -332,7 +333,7 @@ impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for [&TimelineId<T>; N] {
                 .unwrap()
         })
     }
-    fn timeline_mut(&self, timeline: &'a mut RanimScene) -> Self::MutOutput {
+    fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput {
         // TODO: the order is not stable
         let mut timelines = timeline
             .timelines_mut()
