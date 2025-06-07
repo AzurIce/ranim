@@ -4,15 +4,20 @@ code = """
 use glam::{DVec3, dvec2};\r
 use rand::{SeedableRng, seq::SliceRandom};\r
 use ranim::{\r
-    animation::transform::TransformAnimSchedule, color::palettes::manim, components::Anchor,\r
-    items::vitem::Rectangle, prelude::*, timeline::TimeMark, utils::rate_functions::linear,\r
+    animation::transform::TransformAnim,\r
+    color::palettes::manim,\r
+    components::Anchor,\r
+    items::vitem::geometry::Rectangle,\r
+    prelude::*,\r
+    timeline::{TimeMark, TimelineFunc, TimelinesFunc},\r
+    utils::rate_functions::linear,\r
 };\r
 \r
 #[scene]\r
 struct SelectiveSortScene(pub usize);\r
 \r
-impl TimelineConstructor for SelectiveSortScene {\r
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {\r
+impl SceneConstructor for SelectiveSortScene {\r
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {\r
         let num = self.0;\r
 \r
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
@@ -34,93 +39,68 @@ impl TimelineConstructor for SelectiveSortScene {\r
             .iter()\r
             .enumerate()\r
             .map(|(i, &height)| {\r
-                let mut rect = Rectangle(width_unit, height).build();\r
                 let target_bc_coord = padded_frame_bl.extend(0.0)\r
                     + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);\r
-                rect.scale(DVec3::splat(0.8))\r
-                    .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord)\r
-                    .set_color(manim::WHITE)\r
-                    .set_stroke_width(0.0)\r
-                    .set_fill_opacity(0.5);\r
-                timeline.insert(rect)\r
+                let rect = Rectangle::new(width_unit, height).with(|rect| {\r
+                    rect.fill_rgba = manim::WHITE.with_alpha(0.5);\r
+                    rect.scale(DVec3::splat(0.8))\r
+                        .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);\r
+                });\r
+                r.init_timeline(rect).with(|timeline| timeline.show()).id()\r
             })\r
             .collect::<Vec<_>>();\r
 \r
+        let highlight = |rect: Rectangle| {\r
+            rect.transform(|data| {\r
+                data.set_color(manim::RED_C).set_fill_opacity(0.5);\r
+            })\r
+            .with_duration(anim_step_duration)\r
+            .with_rate_func(linear)\r
+        };\r
+        let unhighlight = |rect: Rectangle| {\r
+            rect.transform(|data| {\r
+                data.set_color(manim::WHITE).set_fill_opacity(0.5);\r
+            })\r
+            .with_duration(anim_step_duration)\r
+            .with_rate_func(linear)\r
+        };\r
+\r
         let shift_right = DVec3::X * width_unit;\r
         for i in 0..num - 1 {\r
-            timeline.play(\r
-                rects[i]\r
-                    .transform(|data| {\r
-                        data.set_color(manim::RED_C).set_fill_opacity(0.5);\r
-                    })\r
-                    .with_duration(anim_step_duration)\r
-                    .with_rate_func(linear)\r
-                    .apply(),\r
-            );\r
+            r.timeline_mut(&rects[i]).play_with(highlight);\r
             for j in i + 1..num {\r
-                timeline.play(\r
-                    rects[j]\r
-                        .transform(|data| {\r
-                            data.set_color(manim::BLUE_C).set_fill_opacity(0.5);\r
-                        })\r
-                        .with_duration(anim_step_duration)\r
-                        .with_rate_func(linear)\r
-                        .apply(),\r
-                );\r
-                timeline.sync();\r
+                r.timeline_mut(&rects[j]).play_with(highlight);\r
+                r.timelines_mut().sync();\r
 \r
                 if heights[i] > heights[j] {\r
-                    timeline.play(\r
-                        rects[i]\r
-                            .transform(|data| {\r
-                                data.shift(shift_right * (j - i) as f64)\r
-                                    .set_color(manim::BLUE_C)\r
-                                    .set_fill_opacity(0.5);\r
-                            })\r
-                            .with_duration(anim_step_duration)\r
-                            .with_rate_func(linear)\r
-                            .apply(),\r
-                    );\r
-                    timeline.play(\r
-                        rects[j]\r
-                            .transform(|data| {\r
-                                data.shift(-shift_right * (j - i) as f64)\r
-                                    .set_color(manim::RED_C)\r
-                                    .set_fill_opacity(0.5);\r
-                            })\r
-                            .with_duration(anim_step_duration)\r
-                            .with_rate_func(linear)\r
-                            .apply(),\r
-                    );\r
-                    timeline.sync();\r
+                    let dir = [shift_right, -shift_right];\r
+                    let color = [manim::BLUE_C, manim::RED_C];\r
+                    r.timeline_mut(&[&rects[i], &rects[j]])\r
+                        .iter_mut()\r
+                        .zip(dir)\r
+                        .zip(color)\r
+                        .for_each(|((timeline, dir), color)| {\r
+                            timeline.play_with(|rect| {\r
+                                rect.transform(|rect| {\r
+                                    rect.shift(dir * (j - i) as f64)\r
+                                        .set_color(color)\r
+                                        .set_fill_opacity(0.5);\r
+                                })\r
+                                .with_duration(anim_step_duration)\r
+                                .with_rate_func(linear)\r
+                            });\r
+                        });\r
                     heights.swap(i, j);\r
                     rects.swap(i, j);\r
                 }\r
-                timeline.play(\r
-                    rects[j]\r
-                        .transform(|data| {\r
-                            data.set_color(manim::WHITE).set_fill_opacity(0.5);\r
-                        })\r
-                        .with_duration(anim_step_duration)\r
-                        .with_rate_func(linear)\r
-                        .apply(),\r
-                );\r
-                timeline.sync();\r
+                r.timeline_mut(&rects[j]).play_with(unhighlight);\r
+                r.timelines_mut().sync();\r
             }\r
-            timeline.play(\r
-                rects[i]\r
-                    .transform(|data| {\r
-                        data.set_color(manim::WHITE).set_fill_opacity(0.5);\r
-                    })\r
-                    .with_duration(anim_step_duration)\r
-                    .with_rate_func(linear)\r
-                    .apply(),\r
-            );\r
-            timeline.sync();\r
+            r.timeline_mut(&rects[i]).play_with(unhighlight);\r
         }\r
 \r
-        timeline.insert_time_mark(\r
-            timeline.duration_secs() / 2.0,\r
+        r.insert_time_mark(\r
+            r.timelines().max_total_secs() / 2.0,\r
             TimeMark::Capture(format!(\"preview-{num}.png\")),\r
         );\r
     }\r
@@ -144,6 +124,6 @@ fn main() {\r
 }\r
 
 ```"""
-hash = "97ed3112a5ddc20f805962094f5607e7942002ea"
+hash = "12207f563c6dc2008298dc9005e9105783fbfd36"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/output-10.mp4", "/examples/selective_sort/output-100.mp4"]
