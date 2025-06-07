@@ -16,10 +16,10 @@ struct PerspectiveBlendScene;
 
 impl SceneConstructor for PerspectiveBlendScene {
     fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
-        let cam = r.timeline(&r_cam).state().clone().with(|cam| {
+        let cam = r.timeline(r_cam).state().clone().with(|cam| {
             cam.pos = DVec3::Z * 5.0;
         });
-        r.timeline_mut(&r_cam).update(cam);
+        r.timeline_mut(r_cam).update(cam);
 
         // Create a cube
         let side_length = 2.0;
@@ -37,7 +37,7 @@ impl SceneConstructor for PerspectiveBlendScene {
         let r_front = r.init_timeline(square_with_color(manim::RED_C)).id();
         let r_left = r.init_timeline(square_with_color(manim::YELLOW_C)).id();
 
-        let bottom = r.timeline_mut(&r_bottom).play_with(|bottom| {
+        let bottom = r.timeline_mut(r_bottom).play_with(|bottom| {
             bottom
                 .transform(|data| {
                     data.shift(DVec3::NEG_Y * side_length / 2.0)
@@ -45,7 +45,7 @@ impl SceneConstructor for PerspectiveBlendScene {
                 })
                 .with_rate_func(linear)
         });
-        let right = r.timeline_mut(&r_right).play_with(|right| {
+        let right = r.timeline_mut(r_right).play_with(|right| {
             right
                 .transform(|data| {
                     data.shift(DVec3::X * side_length / 2.0)
@@ -53,44 +53,44 @@ impl SceneConstructor for PerspectiveBlendScene {
                 })
                 .with_rate_func(linear)
         });
-        let back = r.timeline_mut(&r_back).play_with(|back| {
+        let back = r.timeline_mut(r_back).play_with(|back| {
             back.transform(|data| {
                 data.shift(DVec3::NEG_Z * side_length / 2.0);
             })
             .with_rate_func(linear)
         });
-        let top = r.timeline_mut(&r_top).play_with(|top| {
+        let top = r.timeline_mut(r_top).play_with(|top| {
             top.transform(|data| {
                 data.shift(DVec3::Y * side_length / 2.0)
                     .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
             })
             .with_rate_func(linear)
         });
-        let front = r.timeline_mut(&r_front).play_with(|front| {
+        let front = r.timeline_mut(r_front).play_with(|front| {
             front
                 .transform(|data| {
                     data.shift(DVec3::Z * side_length / 2.0);
                 })
                 .with_rate_func(linear)
         });
-        let left = r.timeline_mut(&r_left).play_with(|left| {
+        let left = r.timeline_mut(r_left).play_with(|left| {
             left.transform(|data| {
                 data.shift(DVec3::NEG_X * side_length / 2.0)
                     .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
             })
             .with_rate_func(linear)
         });
-        r.timeline_mut(&r_bottom).hide();
-        r.timeline_mut(&r_right).hide();
-        r.timeline_mut(&r_back).hide();
-        r.timeline_mut(&r_top).hide();
-        r.timeline_mut(&r_front).hide();
-        r.timeline_mut(&r_left).hide();
+        r.timeline_mut(r_bottom).hide();
+        r.timeline_mut(r_right).hide();
+        r.timeline_mut(r_back).hide();
+        r.timeline_mut(r_top).hide();
+        r.timeline_mut(r_front).hide();
+        r.timeline_mut(r_left).hide();
 
         let faces = Group(vec![bottom, right, back, top, front, left]);
         let r_faces = r.init_timeline(faces).id();
         r.timelines_mut().sync(); // TODO: make this better
-        r.timeline_mut(&r_faces).play_with(|faces| {
+        r.timeline_mut(r_faces).play_with(|faces| {
             faces
                 .transform(|data| {
                     data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
@@ -99,8 +99,8 @@ impl SceneConstructor for PerspectiveBlendScene {
                 .with_duration(4.0)
         });
 
-        r.timeline_mut(&r_cam).forward(2.0);
-        r.timeline_mut(&r_cam).play_with(|cam| {
+        r.timeline_mut(r_cam).forward(2.0);
+        r.timeline_mut(r_cam).play_with(|cam| {
             cam.transform(|data| {
                 data.perspective_blend = 1.0;
             })

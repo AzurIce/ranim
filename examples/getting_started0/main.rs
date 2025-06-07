@@ -15,7 +15,7 @@ impl SceneConstructor for GettingStarted0Scene {
         let r_square = r.init_timeline(square).id();
 
         {
-            let timeline = r.timeline_mut(&r_square);
+            let timeline = r.timeline_mut(r_square);
             timeline.play_with(|square| square.fade_in());
             timeline.forward(1.0);
             timeline.play_with(|square| square.fade_out());

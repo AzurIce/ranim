@@ -49,7 +49,7 @@ impl SceneConstructor for ArcScene {
             .collect::<Group<_>>();
         let r_arcs = r.init_timeline(arcs).id();
 
-        r.timeline_mut(&r_arcs)
+        r.timeline_mut(r_arcs)
             .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
 
         r.insert_time_mark(

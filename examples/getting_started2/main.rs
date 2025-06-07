@@ -29,7 +29,7 @@ impl SceneConstructor for GettingStarted2Scene {
                 timeline.show();
             })
             .id();
-        r.timeline_mut(&r_rect).show();
+        r.timeline_mut(r_rect).show();
 
         r.timelines_mut().forward(1.0);
 
@@ -41,7 +41,7 @@ impl SceneConstructor for GettingStarted2Scene {
         });
         let r_vitem = r.init_timeline(VItem::from(square.clone())).id();
         {
-            let timeline = r.timeline_mut(&r_vitem);
+            let timeline = r.timeline_mut(r_vitem);
             timeline.forward(1.0);
             timeline.play_with(|vitem| vitem.create());
             timeline.play_with(|vitem| {
@@ -55,8 +55,8 @@ impl SceneConstructor for GettingStarted2Scene {
         r.timelines_mut().sync();
 
         // Use hide to stop showing an item
-        r.timeline_mut(&r_rect).hide();
-        r.timeline_mut(&r_vitem).play(VItem::from(rect).uncreate());
+        r.timeline_mut(r_rect).hide();
+        r.timeline_mut(r_vitem).play(VItem::from(rect).uncreate());
     }
 }
 

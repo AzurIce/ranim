@@ -31,7 +31,7 @@ impl SceneConstructor for HelloRanimScene {
         let r_vitem_circle = r.init_timeline(VItem::from(circle.clone())).id();
 
         let square = {
-            let timeline = r.timeline_mut(&r_square);
+            let timeline = r.timeline_mut(r_square);
             let square = timeline.play_with(|square| square.fade_in());
             timeline.hide();
             square
@@ -39,7 +39,7 @@ impl SceneConstructor for HelloRanimScene {
 
         r.timelines_mut().sync();
         {
-            let timeline = r.timeline_mut(&r_vitem_circle);
+            let timeline = r.timeline_mut(r_vitem_circle);
             timeline.play_with(|circle| VItem::from(square).transform_to(circle));
             timeline.forward(1.0);
             let circle = timeline.state().clone();

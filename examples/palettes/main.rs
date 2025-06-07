@@ -52,8 +52,8 @@ impl SceneConstructor for PalettesScene {
                 })
             })
             .collect::<Group<_>>();
-        let squares = r.init_timeline(squares).id();
-        r.timeline_mut(&squares).show();
+        let r_squares = r.init_timeline(squares).id();
+        r.timeline_mut(r_squares).show();
         r.timelines_mut().forward(0.01);
     }
 }

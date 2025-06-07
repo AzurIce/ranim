@@ -46,8 +46,8 @@ impl SceneConstructor for FadingScene {
         });
         let r_in = r.init_timeline(pentagon_in).id();
         let r_out = r.init_timeline(pentagon_out).id();
-        r.timeline_mut(&r_in).play_with(|item| item.fade_in());
-        r.timeline_mut(&r_out).play_with(|item| item.fade_out());
+        r.timeline_mut(r_in).play_with(|item| item.fade_in());
+        r.timeline_mut(r_out).play_with(|item| item.fade_out());
     }
 }
 
@@ -65,8 +65,8 @@ impl SceneConstructor for CreationScene {
         });
         let r_in = r.init_timeline(pentagon_in).id();
         let r_out = r.init_timeline(pentagon_out).id();
-        r.timeline_mut(&r_in).play_with(|item| item.create());
-        r.timeline_mut(&r_out).play_with(|item| item.uncreate());
+        r.timeline_mut(r_in).play_with(|item| item.create());
+        r.timeline_mut(r_out).play_with(|item| item.uncreate());
     }
 }
 
@@ -84,8 +84,8 @@ impl SceneConstructor for WritingScene {
         });
         let r_in = r.init_timeline(pentagon_in).id();
         let r_out = r.init_timeline(pentagon_out).id();
-        r.timeline_mut(&r_in).play_with(|item| item.write());
-        r.timeline_mut(&r_out).play_with(|item| item.unwrite());
+        r.timeline_mut(r_in).play_with(|item| item.write());
+        r.timeline_mut(r_out).play_with(|item| item.unwrite());
     }
 }
 
@@ -105,7 +105,7 @@ impl SceneConstructor for TransformScene {
         });
         // dst.rotate(PI / 4.0 + PI, DVec3::Z); // rotate to match src
         let r_item = r.init_timeline(VItem::from(src)).id();
-        r.timeline_mut(&r_item)
+        r.timeline_mut(r_item)
             .play_with(|item| item.transform_to(VItem::from(dst)).with_rate_func(linear));
     }
 }

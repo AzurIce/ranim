@@ -28,7 +28,7 @@ impl SceneConstructor for GettingStarted1Scene {
         // sometimes we need to convert the item to a low-level item.
         let r_vitem = r.init_timeline(VItem::from(square)).id();
         {
-            let timeline = r.timeline_mut(&r_vitem);
+            let timeline = r.timeline_mut(r_vitem);
             timeline.play_with(|vitem| vitem.transform_to(VItem::from(circle.clone())));
             timeline.play_with(|vitem| vitem.unwrite());
         }

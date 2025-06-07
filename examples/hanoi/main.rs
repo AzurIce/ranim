@@ -71,17 +71,17 @@ impl SceneConstructor for HanoiScene {
             })
             .collect::<Vec<_>>();
 
-        let mut disks = [_disks, Vec::new(), Vec::new()];
+        let mut r_disks = [_disks, Vec::new(), Vec::new()];
 
         let anim_duration = total_sec / (2.0f64.powi(n as i32) - 1.0) / 3.0;
         let mut move_disk = |idx_src: usize, idx_dst: usize| {
-            let top_disk_y = |idx: usize| disks[idx].len() as f64 * disk_height - 4.0;
+            let top_disk_y = |idx: usize| r_disks[idx].len() as f64 * disk_height - 4.0;
             let top_src = top_disk_y(idx_src) - disk_height;
             let top_dst = top_disk_y(idx_dst);
-            let disk = disks[idx_src].pop().unwrap();
+            let r_disk = r_disks[idx_src].pop().unwrap();
 
             {
-                let timeline = r.timeline_mut(&disk);
+                let timeline = r.timeline_mut(r_disk);
                 timeline.play_with(|disk| {
                     disk.transform(|data| {
                         data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
@@ -109,7 +109,7 @@ impl SceneConstructor for HanoiScene {
                 });
             }
             r.timelines_mut().sync();
-            disks[idx_dst].push(disk);
+            r_disks[idx_dst].push(r_disk);
         };
 
         solve_hanoi(n, 0, 1, 2, &mut move_disk);

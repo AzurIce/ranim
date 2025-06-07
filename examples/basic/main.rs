@@ -44,9 +44,9 @@ impl SceneConstructor for BasicScene {
         let r_svg = r.init_timeline(svg).id();
         let r_text = r.init_timeline(text).id();
 
-        r.timeline_mut(&r_text)
+        r.timeline_mut(r_text)
             .play_with(|text| text.group_write(0.2).with_duration(3.0));
-        r.timeline_mut(&r_svg)
+        r.timeline_mut(r_svg)
             .play_with(|svg| svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
         r.timelines_mut().sync();
 
@@ -56,9 +56,9 @@ impl SceneConstructor for BasicScene {
         );
 
         r.timelines_mut().forward(0.5);
-        r.timeline_mut(&r_text)
+        r.timeline_mut(r_text)
             .play_with(|text| text.group_unwrite(0.2).with_duration(3.0));
-        r.timeline_mut(&r_svg)
+        r.timeline_mut(r_svg)
             .play_with(|svg| svg.fade_out().with_duration(3.0)); // At the same time, the svg fade out
         r.timelines_mut().sync();
     }
