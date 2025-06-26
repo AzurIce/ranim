@@ -1,35 +1,4 @@
-use std::sync::Arc;
-
 use log::info;
-
-use crate::utils::PipelinesStorage;
-
-pub struct RanimContext {
-    pub wgpu_ctx: Arc<WgpuContext>,
-    pub pipelines: PipelinesStorage,
-}
-
-impl Default for RanimContext {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl RanimContext {
-    pub fn new() -> Self {
-        let wgpu_ctx = Arc::new(pollster::block_on(WgpuContext::new()));
-        let pipelines = PipelinesStorage::default();
-
-        Self {
-            wgpu_ctx,
-            pipelines,
-        }
-    }
-
-    pub fn wgpu_ctx(&self) -> Arc<WgpuContext> {
-        self.wgpu_ctx.clone()
-    }
-}
 
 pub struct WgpuContext {
     pub instance: wgpu::Instance,

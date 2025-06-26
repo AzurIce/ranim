@@ -23,7 +23,6 @@ use std::{
 };
 
 use animation::EvalResult;
-use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
@@ -31,6 +30,8 @@ use items::{TimelineId, camera_frame::CameraFrame};
 use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult, TimelineFunc};
 
 use render::{Renderer, primitives::RenderInstances};
+
+use crate::context::WgpuContext;
 
 // MARK: Prelude
 pub mod prelude {
@@ -194,7 +195,7 @@ impl Default for AppOptions<'_> {
 
 /// MARK: RanimRenderApp
 struct RanimRenderApp {
-    ctx: RanimContext,
+    ctx: WgpuContext,
     // frame_size: (u32, u32),
     renderer: Renderer,
 
@@ -216,7 +217,7 @@ struct RanimRenderApp {
 
 impl RanimRenderApp {
     fn new(options: &AppOptions, scene_name: String) -> Self {
-        let ctx = RanimContext::new();
+        let ctx = pollster::block_on(WgpuContext::new());
         let output_dir = PathBuf::from(options.output_dir);
         let renderer = Renderer::new(
             &ctx,
@@ -322,9 +323,9 @@ impl RanimRenderApp {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("prepare");
                     extracted_updates.iter().for_each(|(id, res)| {
-                        res.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id);
+                        res.prepare_for_id(&self.ctx, &mut self.render_instances, *id);
                     });
-                    self.ctx.wgpu_ctx.queue.submit([]);
+                    self.ctx.queue.submit([]);
                 }
 
                 let render_primitives = visual_items
@@ -337,14 +338,13 @@ impl RanimRenderApp {
                 };
                 // println!("{:?}", camera_frame);
                 // println!("{}", render_primitives.len());
-                self.renderer
-                    .update_uniforms(&self.ctx.wgpu_ctx, camera_frame);
+                self.renderer.update_uniforms(&self.ctx, camera_frame);
 
                 {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("render");
 
-                    self.renderer.render(&mut self.ctx, &render_primitives);
+                    self.renderer.render(&self.ctx, &render_primitives);
                 }
 
                 self.update_frame();
@@ -418,7 +418,7 @@ impl RanimRenderApp {
             .collect::<Vec<_>>();
 
         extracted.iter().for_each(|(id, renderable)| {
-            renderable.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id)
+            renderable.prepare_for_id(&self.ctx, &mut self.render_instances, *id)
         });
         let render_primitives = visual_items
             .iter()
@@ -430,20 +430,19 @@ impl RanimRenderApp {
         };
         // println!("{:?}", camera_frame);
         // println!("{}", render_primitives.len());
-        self.renderer
-            .update_uniforms(&self.ctx.wgpu_ctx, camera_frame);
-        self.renderer.render(&mut self.ctx, &render_primitives);
+        self.renderer.update_uniforms(&self.ctx, camera_frame);
+        self.renderer.render(&self.ctx, &render_primitives);
         self.save_frame_to_image(self.output_dir.join(&self.scene_name).join(filename));
     }
 
     fn update_frame(&mut self) {
         // `output_video` is true
         if let Some(video_writer) = self.video_writer.as_mut() {
-            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));
+            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
         } else if let Some(builder) = self.video_writer_builder.as_ref() {
             self.video_writer
                 .get_or_insert(builder.clone().build())
-                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));
+                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
         }
 
         // `save_frames` is true
@@ -462,9 +461,7 @@ impl RanimRenderApp {
         if !dir.exists() {
             std::fs::create_dir_all(dir).unwrap();
         }
-        let buffer = self
-            .renderer
-            .get_rendered_texture_img_buffer(&self.ctx.wgpu_ctx);
+        let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx);
         buffer.save(path).unwrap();
     }
 }

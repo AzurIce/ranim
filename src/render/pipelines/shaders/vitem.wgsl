@@ -121,9 +121,9 @@ fn sign_bezier(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32>) -> f32 {
 // right -> 1.0
 fn sign_line(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>) -> f32 {
     let cond: vec3<bool> = vec3(
-        p.y >= A.y,
-        p.y < B.y,
-        cross_2d(B - A, p - A) > 0.0
+        (p.y >= A.y),
+        (p.y < B.y),
+        (cross_2d(B - A, p - A) > 0.0)
     );
     return select(1.0, -1.0, all(cond) || !any(cond));
 }

@@ -1,7 +1,7 @@
 use egui::Context;
 use egui_wgpu::wgpu::{CommandEncoder, Device, Queue, StoreOp, TextureFormat, TextureView};
 use egui_wgpu::{Renderer, ScreenDescriptor, wgpu};
-use egui_winit::State;
+use egui_winit::{EventResponse, State};
 use winit::event::WindowEvent;
 use winit::window::Window;
 
@@ -48,8 +48,8 @@ impl EguiRenderer {
         }
     }
 
-    pub fn handle_input(&mut self, window: &Window, event: &WindowEvent) {
-        let _ = self.state.on_window_event(window, event);
+    pub fn handle_input(&mut self, window: &Window, event: &WindowEvent) -> EventResponse {
+        self.state.on_window_event(window, event)
     }
 
     pub fn ppp(&mut self, v: f32) {
@@ -75,7 +75,10 @@ impl EguiRenderer {
             panic!("begin_frame must be called before end_frame_and_draw can be called!");
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         self.ppp(screen_descriptor.pixels_per_point);
+        #[cfg(target_arch = "wasm32")]
+        self.ppp(screen_descriptor.pixels_per_point * screen_descriptor.pixels_per_point);
 
         let full_output = self.state.egui_ctx().end_pass();
 

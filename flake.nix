@@ -10,31 +10,27 @@
   #   ];
   # };
 
-
   inputs = {
-    nixpkgs.url      = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
-    flake-utils.url  = "github:numtide/flake-utils";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs = { nixpkgs, rust-overlay, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
+        pkgs = import nixpkgs { inherit system overlays; };
         rust-tools = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" ];
+          targets = [ "wasm32-unknown-unknown" ];
         };
         puffin_viewer = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
           pname = "puffin_viewer";
           version = "0.22.0";
 
           cargoBuildFlags = [ "-p puffin_viewer" ];
-          cargoPatches = [
-            ./puffin-Cargo.lock.patch
-          ];
+          cargoPatches = [ ./puffin-Cargo.lock.patch ];
 
           src = pkgs.fetchFromGitHub {
             owner = "EmbarkStudios";
@@ -45,8 +41,7 @@
 
           cargoHash = "sha256-zhijQ+9vVB4IL/t1+IGLAnvJka0AB1yJRWo/qEyUfx0=";
         });
-      in
-      {
+      in {
         devShells.default = pkgs.mkShell {
           # prioritize system clang, see https://github.com/zed-industries/zed/issues/7036
           # https://github.com/gfx-rs/gfx/issues/2309
@@ -55,25 +50,25 @@
             export PATH=/usr/bin:$PATH
           '';
 
-          buildInputs = with pkgs; [
-            clang
-            llvmPackages_17.bintools
-            libusb1
-            openssl
-            pkg-config
-          ] ++ [
-            rust-tools
-          ] ++ (with pkgs.darwin.apple_sdk.frameworks; pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            System
-            IOKit
-            Security
-            CoreFoundation
-            AppKit
+          buildInputs = with pkgs;
+            [ clang llvmPackages_17.bintools libusb1 openssl pkg-config ]
+            ++ [ rust-tools ] ++ (with pkgs.darwin.apple_sdk.frameworks;
+              pkgs.lib.optionals pkgs.stdenv.isDarwin [
+                System
+                IOKit
+                Security
+                CoreFoundation
+                AppKit
+              ]);
+          packages = [ puffin_viewer ] ++ (with pkgs; [
+            miniserve
+            trunk
+            zola
+            mdbook
+            wasm-pack
+            wasm-bindgen-cli
+            mdbook-i18n-helpers
           ]);
-          packages = [
-            puffin_viewer
-          ];
         };
-      }
-    );
+      });
 }
