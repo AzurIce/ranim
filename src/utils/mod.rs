@@ -15,20 +15,20 @@ use glam::{Mat3, Vec2, Vec3, vec2, vec3};
 
 use crate::{context::WgpuContext, render::RenderResource};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Id(u128);
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// pub struct Id(u128);
 
-impl Default for Id {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// impl Default for Id {
+//     fn default() -> Self {
+//         Self::new()
+//     }
+// }
 
-impl Id {
-    pub fn new() -> Self {
-        Self(uuid::Uuid::new_v4().as_u128())
-    }
-}
+// impl Id {
+//     pub fn new() -> Self {
+//         Self(uuid::Uuid::new_v4().as_u128())
+//     }
+// }
 
 #[derive(Default)]
 pub struct PipelinesStorage {
@@ -188,7 +188,7 @@ pub fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8>
         // the future. Otherwise the application will freeze.
         let (tx, rx) = async_channel::bounded(1);
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            tx.send_blocking(result).unwrap()
+            pollster::block_on(tx.send(result)).unwrap()
         });
         ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
         rx.recv().await.unwrap().unwrap();

@@ -9,7 +9,7 @@ use primitives::RenderCommand;
 
 use crate::{
     color::rgba8,
-    context::{RanimContext, WgpuContext},
+    context::WgpuContext,
     items::camera_frame::CameraFrame,
     utils::{PipelinesStorage, wgpu::WgpuBuffer},
 };
@@ -151,10 +151,9 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub(crate) fn new(ctx: &RanimContext, frame_height: f64, width: usize, height: usize) -> Self {
+    pub(crate) fn new(ctx: &WgpuContext, frame_height: f64, width: usize, height: usize) -> Self {
         let camera = CameraFrame::new();
 
-        let ctx = &ctx.wgpu_ctx;
         let render_textures = RenderTextures::new(ctx, width, height);
         let bytes_per_row = ((width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
         let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
@@ -212,11 +211,11 @@ impl Renderer {
     }
 
     /// Clears the screen with `Renderer::clear_color`
-    pub fn clear_screen(&mut self, wgpu_ctx: &WgpuContext) {
+    pub fn clear_screen(&mut self, ctx: &WgpuContext) {
         #[cfg(feature = "profiling")]
         profiling::scope!("clear_screen");
         // trace!("clear screen {:?}", self.clear_color);
-        let mut encoder = wgpu_ctx
+        let mut encoder = ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Encoder"),
@@ -258,14 +257,13 @@ impl Renderer {
                 timestamp_writes: None,
             });
         }
-        wgpu_ctx.queue.submit(Some(encoder.finish()));
+        ctx.queue.submit(Some(encoder.finish()));
         self.output_texture_updated = false;
     }
 
-    pub fn render(&mut self, ctx: &mut RanimContext, renderable: &impl RenderCommand) {
-        self.clear_screen(&ctx.wgpu_ctx);
+    pub fn render(&mut self, ctx: &WgpuContext, renderable: &impl RenderCommand) {
+        self.clear_screen(ctx);
         let mut encoder = ctx
-            .wgpu_ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
@@ -280,10 +278,7 @@ impl Renderer {
                 label: Some("VItem Map Points Compute Pass"),
                 timestamp_writes: None,
             });
-            cpass.set_pipeline(
-                ctx.pipelines
-                    .get_or_init::<Map3dTo2dPipeline>(&ctx.wgpu_ctx),
-            );
+            cpass.set_pipeline(self.pipelines.get_or_init::<Map3dTo2dPipeline>(ctx));
             cpass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
 
             renderable.encode_compute_pass_command(&mut cpass);
@@ -316,7 +311,7 @@ impl Renderer {
             let mut rpass = scope.scoped_render_pass("VItem Render Pass", rpass_desc);
             #[cfg(not(feature = "profiling"))]
             let mut rpass = encoder.begin_render_pass(&rpass_desc);
-            rpass.set_pipeline(ctx.pipelines.get_or_init::<VItemPipeline>(&ctx.wgpu_ctx));
+            rpass.set_pipeline(self.pipelines.get_or_init::<VItemPipeline>(ctx));
             rpass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
 
             renderable.encode_render_pass_command(&mut rpass);
@@ -332,26 +327,26 @@ impl Renderer {
         // );
 
         #[cfg(not(feature = "profiling"))]
-        ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+        ctx.queue.submit(Some(encoder.finish()));
 
         #[cfg(feature = "profiling")]
         {
             self.profiler.resolve_queries(&mut encoder);
             {
                 profiling::scope!("submit");
-                ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
+                ctx.queue.submit(Some(encoder.finish()));
             }
 
-            renderable.debug(&ctx.wgpu_ctx);
+            renderable.debug(ctx);
 
             // Signal to the profiler that the frame is finished.
             self.profiler.end_frame().unwrap();
 
             // Query for oldest finished frame (this is almost certainly not the one we just submitted!) and display results in the command line.
-            ctx.wgpu_ctx.device.poll(wgpu::Maintain::Wait);
+            ctx.device.poll(wgpu::Maintain::Wait);
             let latest_profiler_results = self
                 .profiler
-                .process_finished_frame(ctx.wgpu_ctx.queue.get_timestamp_period());
+                .process_finished_frame(ctx.queue.get_timestamp_period());
             // profiling_utils::console_output(&latest_profiler_results, ctx.wgpu_ctx.device.features());
             let mut gpu_profiler = PUFFIN_GPU_PROFILER.lock().unwrap();
             wgpu_profiler::puffin::output_frame_to_puffin(
@@ -405,7 +400,7 @@ impl Renderer {
             // the future. Otherwise the application will freeze.
             let (tx, rx) = async_channel::bounded(1);
             buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-                tx.send_blocking(result).unwrap()
+                pollster::block_on(tx.send(result)).unwrap()
             });
             ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
             rx.recv().await.unwrap().unwrap();
@@ -475,6 +470,7 @@ pub struct RenderTextures {
     // multisample_texture: wgpu::Texture,
     // depth_stencil_texture: wgpu::Texture,
     pub(crate) render_view: wgpu::TextureView,
+    pub(crate) linear_render_view: wgpu::TextureView,
     // pub(crate) multisample_view: wgpu::TextureView,
     // pub(crate) depth_stencil_view: wgpu::TextureView,
 }
@@ -537,6 +533,10 @@ impl RenderTextures {
             format: Some(format),
             ..Default::default()
         });
+        let linear_render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            ..Default::default()
+        });
         // let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
         //     format: Some(format),
         //     ..Default::default()
@@ -549,6 +549,7 @@ impl RenderTextures {
             // multisample_texture,
             // depth_stencil_texture,
             render_view,
+            linear_render_view,
             // multisample_view,
             // depth_stencil_view,
         }
