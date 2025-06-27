@@ -1,16 +1,44 @@
 {% macro code_example(example_name) %}
-{% set example_data = load_data(path="/data/" ~ example_name ~ ".toml") %}
+{% set example_data = load_data(path="data/" ~ example_name ~ ".toml") %}
 
-{% for output_file in example_data.output_files %}
-{% if output_file is ending_with(".mp4") %}
-<video controls>
-  <source src="{{ get_url(path=output_file) }}" type="video/mp4">
-  您的浏览器不支持视频标签。
-</video>
-{% else %}
-<img src="{{ get_url(path=output_file) }}" alt="{{ example_data.name }} 示例输出">
-{% endif %}
-{% endfor %}
+<!-- {% if example_data.wasm %}
+<script type="module">
+  import init from '{{ get_url(path="examples/" ~ example_name ~ "/pkg/" ~ example_name ~ ".js") }}';
+  init();
+</script>
+<canvas id="app" width="1280" height="720" style="width: 100%; min-height: 400;"></canvas>
+{% endif %} -->
+
+<sl-tab-group>
+  <sl-tab slot="nav" panel="preview">Preview</sl-tab>
+  {% if example_data.wasm %}
+  <sl-tab slot="nav" panel="app">App</sl-tab>
+  {% endif %}
+
+  <sl-tab-panel name="preview">
+    {% for output_file in example_data.output_files %}
+    {% if output_file is ending_with(".mp4") %}
+    <video controls>
+      <source src="{{ get_url(path=output_file) }}" type="video/mp4">
+      您的浏览器不支持视频标签。
+    </video>
+    {% else %}
+    <img src="{{ get_url(path=output_file) }}" alt="{{ example_data.name }} 示例输出">
+    {% endif %}
+    {% endfor %}
+  </sl-tab-panel>
+  {% if example_data.wasm %}
+  <sl-tab-panel name="app">
+    <script type="module">
+      import init from '{{ get_url(path="examples/" ~ example_name ~ "/pkg/" ~ example_name ~ ".js") }}';
+      init();
+    </script>
+    <canvas id="app-{{ example_name }}" width="1280" height="1020" style="width: 100%; aspect-ratio: 16 / 12;"></canvas>
+
+  </sl-tab-panel>
+  {% endif %}
+</sl-tab-group>
+
 
 {{ example_data.code | markdown }}
 {% endmacro %}

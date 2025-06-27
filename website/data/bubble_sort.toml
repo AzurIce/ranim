@@ -1,6 +1,6 @@
 name = "bubble_sort"
 code = """
-```rust,linenos
+```rust
 use rand::{SeedableRng, seq::SliceRandom};\r
 use ranim::{\r
     animation::transform::TransformAnim,\r
@@ -12,6 +12,7 @@ use ranim::{\r
     timeline::{TimeMark, TimelinesFunc},\r
     utils::rate_functions::linear,\r
 };\r
+use log::LevelFilter;\r
 \r
 #[scene]\r
 struct BubbleSortScene(pub usize);\r
@@ -67,7 +68,7 @@ impl SceneConstructor for BubbleSortScene {\r
         };\r
         let shift_right = DVec3::X * width_unit;\r
         let swap_shift = [shift_right, -shift_right];\r
-        let anim_swap = |timeline: &mut RanimScene, r_rectab: &[&TimelineId<Rectangle>; 2]| {\r
+        let anim_swap = |timeline: &mut RanimScene, r_rectab: &[TimelineId<Rectangle>; 2]| {\r
             let timelines = timeline.timeline_mut(r_rectab);\r
             timelines\r
                 .into_iter()\r
@@ -85,18 +86,18 @@ impl SceneConstructor for BubbleSortScene {\r
 \r
         for i in (1..num).rev() {\r
             for j in 0..i {\r
-                r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])\r
+                r.timeline_mut(&[r_rects[j], r_rects[j + 1]])\r
                     .into_iter()\r
                     .for_each(|timeline| {\r
                         timeline.play_with(anim_highlight);\r
                     });\r
                 if heights[j] > heights[j + 1] {\r
-                    anim_swap(r, &[&r_rects[j], &r_rects[j + 1]]);\r
+                    anim_swap(r, &[r_rects[j], r_rects[j + 1]]);\r
                     r.timelines_mut().sync();\r
                     heights.swap(j, j + 1);\r
                     r_rects.swap(j, j + 1);\r
                 }\r
-                r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])\r
+                r.timeline_mut(&[r_rects[j], r_rects[j + 1]])\r
                     .into_iter()\r
                     .for_each(|timeline| {\r
                         timeline.play_with(anim_unhighlight);\r
@@ -107,34 +108,46 @@ impl SceneConstructor for BubbleSortScene {\r
 \r
         r.insert_time_mark(\r
             r.timelines().max_total_secs(),\r
-            TimeMark::Capture(format!(\"preview-{num}.png\")),\r
+            TimeMark::Capture(format!("preview-{num}.png")),\r
         );\r
     }\r
 }\r
 \r
 fn main() {\r
-    #[cfg(feature = \"app\")]\r
+    #[cfg(not(target_arch = "wasm32"))]\r
+    {\r
+        #[cfg(debug_assertions)]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Trace)\r
+            .init();\r
+        #[cfg(not(debug_assertions))]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Info)\r
+            .init();\r
+    }\r
+\r
+    #[cfg(feature = "app")]\r
     run_scene_app(BubbleSortScene(100));\r
-    #[cfg(not(feature = \"app\"))]\r
+    #[cfg(not(feature = "app"))]\r
     {\r
         render_scene(\r
             BubbleSortScene(10),\r
             &AppOptions {\r
-                output_filename: \"output-10.mp4\",\r
+                output_filename: "output-10.mp4",\r
                 ..Default::default()\r
             },\r
         );\r
         render_scene(\r
             BubbleSortScene(100),\r
             &AppOptions {\r
-                output_filename: \"output-100.mp4\",\r
+                output_filename: "output-100.mp4",\r
                 ..Default::default()\r
             },\r
         );\r
     }\r
 }\r
-
 ```"""
-hash = "d789e88826a16d1f51e03148c09bd03fef73bebe"
+hash = "5d756fa1389f0d653fe7867c9d079a7a602e628f"
 preview_imgs = ["/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
 output_files = ["/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/output-100.mp4"]
+wasm = true

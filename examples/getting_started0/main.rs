@@ -1,3 +1,4 @@
+use log::LevelFilter;
 use ranim::{
     animation::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square,
     prelude::*, timeline::TimelineFunc,
@@ -29,5 +30,20 @@ impl SceneConstructor for GettingStarted0Scene {
 }
 
 fn main() {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
+
+    #[cfg(feature = "app")]
+    run_scene_app(GettingStarted0Scene);
+    #[cfg(not(feature = "app"))]
     render_scene(GettingStarted0Scene, &AppOptions::default());
 }

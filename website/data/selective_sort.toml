@@ -1,6 +1,6 @@
 name = "selective_sort"
 code = """
-```rust,linenos
+```rust
 use glam::{DVec3, dvec2};\r
 use rand::{SeedableRng, seq::SliceRandom};\r
 use ranim::{\r
@@ -12,6 +12,8 @@ use ranim::{\r
     timeline::{TimeMark, TimelineFunc, TimelinesFunc},\r
     utils::rate_functions::linear,\r
 };\r
+use log::LevelFilter;\r
+\r
 \r
 #[scene]\r
 struct SelectiveSortScene(pub usize);\r
@@ -35,7 +37,7 @@ impl SceneConstructor for SelectiveSortScene {\r
         heights.shuffle(&mut rng);\r
 \r
         let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
-        let mut rects = heights\r
+        let mut r_rects = heights\r
             .iter()\r
             .enumerate()\r
             .map(|(i, &height)| {\r
@@ -67,15 +69,15 @@ impl SceneConstructor for SelectiveSortScene {\r
 \r
         let shift_right = DVec3::X * width_unit;\r
         for i in 0..num - 1 {\r
-            r.timeline_mut(&rects[i]).play_with(highlight);\r
+            r.timeline_mut(r_rects[i]).play_with(highlight);\r
             for j in i + 1..num {\r
-                r.timeline_mut(&rects[j]).play_with(highlight);\r
+                r.timeline_mut(r_rects[j]).play_with(highlight);\r
                 r.timelines_mut().sync();\r
 \r
                 if heights[i] > heights[j] {\r
                     let dir = [shift_right, -shift_right];\r
                     let color = [manim::BLUE_C, manim::RED_C];\r
-                    r.timeline_mut(&[&rects[i], &rects[j]])\r
+                    r.timeline_mut(&[r_rects[i], r_rects[j]])\r
                         .iter_mut()\r
                         .zip(dir)\r
                         .zip(color)\r
@@ -91,39 +93,56 @@ impl SceneConstructor for SelectiveSortScene {\r
                             });\r
                         });\r
                     heights.swap(i, j);\r
-                    rects.swap(i, j);\r
+                    r_rects.swap(i, j);\r
                 }\r
-                r.timeline_mut(&rects[j]).play_with(unhighlight);\r
+                r.timeline_mut(r_rects[j]).play_with(unhighlight);\r
                 r.timelines_mut().sync();\r
             }\r
-            r.timeline_mut(&rects[i]).play_with(unhighlight);\r
+            r.timeline_mut(r_rects[i]).play_with(unhighlight);\r
         }\r
 \r
         r.insert_time_mark(\r
             r.timelines().max_total_secs() / 2.0,\r
-            TimeMark::Capture(format!(\"preview-{num}.png\")),\r
+            TimeMark::Capture(format!("preview-{num}.png")),\r
         );\r
     }\r
 }\r
 \r
 fn main() {\r
-    render_scene(\r
-        SelectiveSortScene(10),\r
-        &AppOptions {\r
-            output_filename: \"output-10.mp4\",\r
-            ..Default::default()\r
-        },\r
-    );\r
-    render_scene(\r
-        SelectiveSortScene(100),\r
-        &AppOptions {\r
-            output_filename: \"output-100.mp4\",\r
-            ..Default::default()\r
-        },\r
-    );\r
+    #[cfg(not(target_arch = "wasm32"))]\r
+    {\r
+        #[cfg(debug_assertions)]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Trace)\r
+            .init();\r
+        #[cfg(not(debug_assertions))]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Info)\r
+            .init();\r
+    }\r
+\r
+    #[cfg(feature = "app")]\r
+    run_scene_app(SelectiveSortScene(100));\r
+    #[cfg(not(feature = "app"))]\r
+    {\r
+        render_scene(\r
+            SelectiveSortScene(10),\r
+            &AppOptions {\r
+                output_filename: "output-10.mp4",\r
+                ..Default::default()\r
+            },\r
+        );\r
+        render_scene(\r
+            SelectiveSortScene(100),\r
+            &AppOptions {\r
+                output_filename: "output-100.mp4",\r
+                ..Default::default()\r
+            },\r
+        );\r
+    }\r
 }\r
-
 ```"""
-hash = "12207f563c6dc2008298dc9005e9105783fbfd36"
+hash = "901727b73a148b384ca6a4a664f7792a971ecb4d"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/output-10.mp4", "/examples/selective_sort/output-100.mp4"]
+wasm = true

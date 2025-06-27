@@ -1,6 +1,6 @@
 name = "getting_started2"
 code = """
-```rust,linenos
+```rust
 use ranim::{\r
     animation::{\r
         creation::{CreationAnim, WritingAnim},\r
@@ -15,6 +15,7 @@ use ranim::{\r
     timeline::{TimelineFunc, TimelinesFunc},\r
     utils::rate_functions::linear,\r
 };\r
+use log::LevelFilter;\r
 \r
 #[scene]\r
 struct GettingStarted2Scene;\r
@@ -32,7 +33,7 @@ impl SceneConstructor for GettingStarted2Scene {\r
                 timeline.show();\r
             })\r
             .id();\r
-        r.timeline_mut(&r_rect).show();\r
+        r.timeline_mut(r_rect).show();\r
 \r
         r.timelines_mut().forward(1.0);\r
 \r
@@ -44,7 +45,7 @@ impl SceneConstructor for GettingStarted2Scene {\r
         });\r
         let r_vitem = r.init_timeline(VItem::from(square.clone())).id();\r
         {\r
-            let timeline = r.timeline_mut(&r_vitem);\r
+            let timeline = r.timeline_mut(r_vitem);\r
             timeline.forward(1.0);\r
             timeline.play_with(|vitem| vitem.create());\r
             timeline.play_with(|vitem| {\r
@@ -58,16 +59,31 @@ impl SceneConstructor for GettingStarted2Scene {\r
         r.timelines_mut().sync();\r
 \r
         // Use hide to stop showing an item\r
-        r.timeline_mut(&r_rect).hide();\r
-        r.timeline_mut(&r_vitem).play(VItem::from(rect).uncreate());\r
+        r.timeline_mut(r_rect).hide();\r
+        r.timeline_mut(r_vitem).play(VItem::from(rect).uncreate());\r
     }\r
 }\r
 \r
 fn main() {\r
+    #[cfg(not(target_arch = "wasm32"))]\r
+    {\r
+        #[cfg(debug_assertions)]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Trace)\r
+            .init();\r
+        #[cfg(not(debug_assertions))]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Info)\r
+            .init();\r
+    }\r
+\r
+    #[cfg(feature = "app")]\r
+    run_scene_app(GettingStarted2Scene);\r
+    #[cfg(not(feature = "app"))]\r
     render_scene(GettingStarted2Scene, &AppOptions::default());\r
 }\r
-
 ```"""
-hash = "09669fa81b04f149e12908b321626e4a0f26e459"
+hash = "504bc0bfe1b1cd622080d7ac2ef38826d1c829b9"
 preview_imgs = []
 output_files = ["/examples/getting_started2/output.mp4"]
+wasm = true

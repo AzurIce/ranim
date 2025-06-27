@@ -188,9 +188,9 @@ pub fn ui_canvas(state: &mut TimelineState, info: &TimelineInfo) -> f32 {
         let bottom_y = top_y + line_height;
 
         for animation_info in &timeline_info.animation_infos {
-            if animation_info.anim_name.as_str() == "Static" {
-                continue;
-            }
+            // if animation_info.anim_name.as_str() == "Static" {
+            //     continue;
+            // }
             let start_x = info.point_from_ms(state, (animation_info.start_sec * 1000.0) as i64);
             let end_x = info.point_from_ms(state, (animation_info.end_sec * 1000.0) as i64);
 
@@ -199,7 +199,11 @@ pub fn ui_canvas(state: &mut TimelineState, info: &TimelineInfo) -> f32 {
             }
 
             let rect = Rect::from_min_max(pos2(start_x, top_y), pos2(end_x, bottom_y));
-            let rect_color = manim::BLUE_C.to_rgba8();
+            let rect_color = if animation_info.anim_name.as_str() == "Static" {
+                manim::YELLOW_C.to_rgba8()
+            } else {
+                manim::BLUE_C.to_rgba8()
+            };
 
             info.painter.rect_filled(
                 rect,

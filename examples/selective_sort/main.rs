@@ -1,4 +1,5 @@
 use glam::{DVec3, dvec2};
+use log::LevelFilter;
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     animation::transform::TransformAnim,
@@ -104,18 +105,35 @@ impl SceneConstructor for SelectiveSortScene {
 }
 
 fn main() {
-    render_scene(
-        SelectiveSortScene(10),
-        &AppOptions {
-            output_filename: "output-10.mp4",
-            ..Default::default()
-        },
-    );
-    render_scene(
-        SelectiveSortScene(100),
-        &AppOptions {
-            output_filename: "output-100.mp4",
-            ..Default::default()
-        },
-    );
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
+
+    #[cfg(feature = "app")]
+    run_scene_app(SelectiveSortScene(100));
+    #[cfg(not(feature = "app"))]
+    {
+        render_scene(
+            SelectiveSortScene(10),
+            &AppOptions {
+                output_filename: "output-10.mp4",
+                ..Default::default()
+            },
+        );
+        render_scene(
+            SelectiveSortScene(100),
+            &AppOptions {
+                output_filename: "output-100.mp4",
+                ..Default::default()
+            },
+        );
+    }
 }
