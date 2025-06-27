@@ -98,12 +98,15 @@ web-sys = { version = "0.3.77" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 egui-winit = { version = "0.31.1", default-features = false, optional = true }
+getrandom = { version = "0.3.3", features = ["wasm_js"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+pretty_env_logger = "0.5.0"
 
 [dev-dependencies]
 assert_float_eq = "1.1.4"
 rand = "0.9.1"
 rand_chacha = "0.9.0"
-pretty_env_logger = "0.5.0"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
@@ -125,3 +128,95 @@ pre-release-hook = [
 pre-release-replacements = [
   { file = "README.md", search = "ranim = .*", replace = "{{crate_name}} = \"{{version}}\"" },
 ]
+
+# MARK: Examples
+[[example]]
+name = "arc"
+path = "examples/arc/main.rs"
+
+[package.metadata.example.arc]
+wasm = true
+
+[[example]]
+name = "arc_between_points"
+path = "examples/arc_between_points/main.rs"
+
+[package.metadata.example.arc_between_points]
+wasm = true
+
+[[example]]
+name = "basic"
+path = "examples/basic/main.rs"
+
+[package.metadata.example.basic]
+wasm = true
+
+[[example]]
+name = "bubble_sort"
+path = "examples/bubble_sort/main.rs"
+
+[package.metadata.example.bubble_sort]
+wasm = true
+
+[[example]]
+name = "getting_started0"
+path = "examples/getting_started0/main.rs"
+
+[package.metadata.example.getting_started0]
+wasm = true
+hide = true
+
+[[example]]
+name = "getting_started1"
+path = "examples/getting_started1/main.rs"
+
+[package.metadata.example.getting_started1]
+wasm = true
+hide = true
+
+[[example]]
+name = "getting_started2"
+path = "examples/getting_started2/main.rs"
+
+[package.metadata.example.getting_started2]
+wasm = true
+hide = true
+
+[[example]]
+name = "hanoi"
+path = "examples/hanoi/main.rs"
+
+[package.metadata.example.hanoi]
+wasm = true
+
+[[example]]
+name = "hello_ranim"
+path = "examples/hello_ranim/main.rs"
+
+[package.metadata.example.hello_ranim]
+wasm = true
+
+[[example]]
+name = "palettes"
+path = "examples/palettes/main.rs"
+
+[[example]]
+name = "perspective_blend"
+path = "examples/perspective_blend/main.rs"
+
+[package.metadata.example.perspective_blend]
+wasm = true
+
+[[example]]
+name = "ranim_logo"
+path = "examples/ranim_logo/main.rs"
+
+[package.metadata.example.ranim_logo]
+wasm = true
+
+[[example]]
+name = "selective_sort"
+path = "examples/selective_sort/main.rs"
+
+[package.metadata.example.selective_sort]
+wasm = true

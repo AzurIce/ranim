@@ -1,6 +1,6 @@
 name = "hello_ranim"
 code = """
-```rust,linenos
+```rust
 use std::f64::consts::PI;\r
 \r
 use log::LevelFilter;\r
@@ -34,7 +34,7 @@ impl SceneConstructor for HelloRanimScene {\r
         let r_vitem_circle = r.init_timeline(VItem::from(circle.clone())).id();\r
 \r
         let square = {\r
-            let timeline = r.timeline_mut(&r_square);\r
+            let timeline = r.timeline_mut(r_square);\r
             let square = timeline.play_with(|square| square.fade_in());\r
             timeline.hide();\r
             square\r
@@ -42,7 +42,7 @@ impl SceneConstructor for HelloRanimScene {\r
 \r
         r.timelines_mut().sync();\r
         {\r
-            let timeline = r.timeline_mut(&r_vitem_circle);\r
+            let timeline = r.timeline_mut(r_vitem_circle);\r
             timeline.play_with(|circle| VItem::from(square).transform_to(circle));\r
             timeline.forward(1.0);\r
             let circle = timeline.state().clone();\r
@@ -55,20 +55,28 @@ impl SceneConstructor for HelloRanimScene {\r
 }\r
 \r
 fn main() {\r
-    #[cfg(debug_assertions)]\r
-    pretty_env_logger::formatted_timed_builder()\r
-        .filter(Some(\"ranim\"), LevelFilter::Trace)\r
-        .init();\r
-    #[cfg(feature = \"app\")]\r
+    #[cfg(not(target_arch = "wasm32"))]\r
+    {\r
+        #[cfg(debug_assertions)]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Trace)\r
+            .init();\r
+        #[cfg(not(debug_assertions))]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Info)\r
+            .init();\r
+    }\r
+\r
+    #[cfg(feature = "app")]\r
     run_scene_app(HelloRanimScene);\r
-    #[cfg(not(feature = \"app\"))]\r
+    #[cfg(not(feature = "app"))]\r
     {\r
         render_scene(HelloRanimScene, &AppOptions::default());\r
-        render_scene_at_sec(HelloRanimScene, 0.0, \"preview.png\", &AppOptions::default());\r
+        render_scene_at_sec(HelloRanimScene, 0.0, "preview.png", &AppOptions::default());\r
     }\r
 }\r
-
 ```"""
-hash = "e9d9650b9c82739f444e3839bb225d461ff3b48c"
+hash = "6332dc5f06b7d545721f173768f8dfe416d3e059"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]
+wasm = true

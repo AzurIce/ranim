@@ -2,6 +2,7 @@ use std::f64::consts::PI;
 
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
+use log::LevelFilter;
 use ranim::{
     animation::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
     color::palettes::manim,
@@ -12,11 +13,11 @@ use ranim::{
             VItem,
             geometry::{Polygon, Rectangle, Square},
             svg::SvgItem,
+            typst::typst_svg,
         },
     },
     prelude::*,
     timeline::{TimeMark, TimelineFunc, TimelinesFunc},
-    typst_svg,
     utils::rate_functions::{linear, smooth},
 };
 
@@ -74,11 +75,11 @@ impl SceneConstructor for RanimLogoScene {
         let r_logo = logo.map(|item| r.init_timeline(item).id());
 
         let ranim_text = Group::<VItem>::from(
-            SvgItem::new(typst_svg!(
+            SvgItem::new(typst_svg(
                 r#"
 #align(center)[
     #text(10pt, font: "LXGW Bright")[Ranim]
-]"#
+]"#,
             ))
             .with(|text| {
                 text.set_color(manim::WHITE)
@@ -154,6 +155,18 @@ impl SceneConstructor for RanimLogoScene {
 }
 
 fn main() {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
+
     #[cfg(feature = "app")]
     run_scene_app(RanimLogoScene);
     #[cfg(not(feature = "app"))]

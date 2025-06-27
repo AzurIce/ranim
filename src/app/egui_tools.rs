@@ -75,10 +75,7 @@ impl EguiRenderer {
             panic!("begin_frame must be called before end_frame_and_draw can be called!");
         }
 
-        #[cfg(not(target_arch = "wasm32"))]
         self.ppp(screen_descriptor.pixels_per_point);
-        #[cfg(target_arch = "wasm32")]
-        self.ppp(screen_descriptor.pixels_per_point * screen_descriptor.pixels_per_point);
 
         let full_output = self.state.egui_ctx().end_pass();
 

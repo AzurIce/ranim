@@ -1,6 +1,6 @@
 name = "palettes"
-code = '''
-```rust,linenos
+code = """
+```rust
 use log::LevelFilter;
 use ranim::{
     color::palettes::manim::*,
@@ -55,28 +55,31 @@ impl SceneConstructor for PalettesScene {
                 })
             })
             .collect::<Group<_>>();
-        let squares = r.init_timeline(squares).id();
-        r.timeline_mut(&squares).show();
+        let r_squares = r.init_timeline(squares).id();
+        r.timeline_mut(r_squares).show();
         r.timelines_mut().forward(0.01);
     }
 }
 
 fn main() {
-    #[cfg(debug_assertions)]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Trace)
-        .init();
-    #[cfg(not(debug_assertions))]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Info)
-        .init();
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
 
     let options = AppOptions::default();
     render_scene_at_sec(PalettesScene, 0.0, "preview.png", &options);
     render_scene_at_sec(PalettesScene, 0.0, "output.png", &options);
 }
-
-```'''
-hash = "7d6f919b15d0a6a26875bee0ad9d73909022823d"
+```"""
+hash = "b3302454b644da9e8595905a246dd695c5d46b1f"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/output.png"]
+wasm = false

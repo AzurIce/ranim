@@ -1,6 +1,6 @@
 name = "hanoi"
-code = '''
-```rust,linenos
+code = """
+```rust
 use ranim::{
     animation::transform::TransformAnim,
     color::{HueDirection, palettes::manim},
@@ -11,6 +11,7 @@ use ranim::{
     timeline::{TimelineFunc, TimelinesFunc},
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
+use log::LevelFilter;
 
 fn solve_hanoi(
     n: usize,
@@ -74,17 +75,17 @@ impl SceneConstructor for HanoiScene {
             })
             .collect::<Vec<_>>();
 
-        let mut disks = [_disks, Vec::new(), Vec::new()];
+        let mut r_disks = [_disks, Vec::new(), Vec::new()];
 
         let anim_duration = total_sec / (2.0f64.powi(n as i32) - 1.0) / 3.0;
         let mut move_disk = |idx_src: usize, idx_dst: usize| {
-            let top_disk_y = |idx: usize| disks[idx].len() as f64 * disk_height - 4.0;
+            let top_disk_y = |idx: usize| r_disks[idx].len() as f64 * disk_height - 4.0;
             let top_src = top_disk_y(idx_src) - disk_height;
             let top_dst = top_disk_y(idx_dst);
-            let disk = disks[idx_src].pop().unwrap();
+            let r_disk = r_disks[idx_src].pop().unwrap();
 
             {
-                let timeline = r.timeline_mut(&disk);
+                let timeline = r.timeline_mut(r_disk);
                 timeline.play_with(|disk| {
                     disk.transform(|data| {
                         data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
@@ -112,7 +113,7 @@ impl SceneConstructor for HanoiScene {
                 });
             }
             r.timelines_mut().sync();
-            disks[idx_dst].push(disk);
+            r_disks[idx_dst].push(r_disk);
         };
 
         solve_hanoi(n, 0, 1, 2, &mut move_disk);
@@ -120,6 +121,18 @@ impl SceneConstructor for HanoiScene {
 }
 
 fn main() {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
+
     #[cfg(feature = "app")]
     run_scene_app(HanoiScene(10));
     #[cfg(not(feature = "app"))]
@@ -147,8 +160,8 @@ fn main() {
         );
     }
 }
-
-```'''
-hash = "6bf18556fe3b49858e1a5fde6d7e9eaa831ebb3f"
+```"""
+hash = "d590e954878b069471be77d5e8d207552282536e"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/output-10.mp4", "/examples/hanoi/output-5.mp4"]
+wasm = true

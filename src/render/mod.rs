@@ -465,6 +465,7 @@ impl Renderer {
 
 // MARK: RenderTextures
 
+#[allow(unused)]
 pub struct RenderTextures {
     pub(crate) render_texture: wgpu::Texture,
     // multisample_texture: wgpu::Texture,

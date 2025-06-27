@@ -25,7 +25,7 @@ impl<T: Debug + Default + Clone + Copy + PartialEq> Component for T {}
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[as_ref(forward)]
 #[as_mut(forward)]
-pub struct ComponentVec<T: Component>(Vec<T>);
+pub struct ComponentVec<T: Component>(pub(crate) Vec<T>);
 
 // MARK: Trait impls
 

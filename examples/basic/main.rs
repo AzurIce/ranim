@@ -5,11 +5,11 @@ use ranim::{
     components::ScaleHint,
     items::{
         Group,
+        vitem::typst::typst_svg,
         vitem::{VItem, svg::SvgItem},
     },
     prelude::*,
     timeline::{TimeMark, TimelinesFunc},
-    typst_svg,
 };
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -26,14 +26,14 @@ impl SceneConstructor for BasicScene {
                 .put_center_on(DVec3::Y * 2.0);
         }));
         let text = Group::<VItem>::from(
-            SvgItem::new(&typst_svg!(
+            SvgItem::new(typst_svg(
                 r#"
             #align(center)[
                 #text(18pt)[Ranim]
 
                 #text(6pt)[Hello 你好]
             ]
-            "#
+            "#,
             ))
             .with(|text| {
                 text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
@@ -65,13 +65,20 @@ impl SceneConstructor for BasicScene {
 }
 
 fn main() {
-    #[cfg(debug_assertions)]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Trace)
-        .init();
-    #[cfg(not(debug_assertions))]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Info)
-        .init();
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
+
+    #[cfg(feature = "app")]
+    run_scene_app(BasicScene);
+    #[cfg(not(feature = "app"))]
     render_scene(BasicScene, &AppOptions::default());
 }

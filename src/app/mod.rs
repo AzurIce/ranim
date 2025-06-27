@@ -10,6 +10,7 @@ use timeline::TimelineState;
 use wgpu::SurfaceError;
 use winit::{
     application::ApplicationHandler,
+    dpi::PhysicalSize,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
     window::{Window, WindowId},
@@ -181,33 +182,9 @@ impl AppState {
             })
             .response
             .rect
-            .height();
+            .height()
+            * app_renderer.egui_renderer.context().pixels_per_point();
 
-        // dbg!(state.viewport);
-
-        // egui::Window::new(format!("{}", self.meta.name))
-        //     .resizable(true)
-        //     .vscroll(true)
-        //     .default_open(false)
-        //     .show(state.egui_renderer.context(), |ui| {
-        //         ui.label("Label!");
-
-        //         if ui.button("Button!").clicked() {}
-
-        //         ui.separator();
-        //         ui.horizontal(|ui| {
-        //             ui.label(format!(
-        //                 "Pixels per point: {}",
-        //                 state.egui_renderer.context().pixels_per_point()
-        //             ));
-        //             if ui.button("-").clicked() {
-        //                 state.scale_factor = (state.scale_factor - 0.1).max(0.3);
-        //             }
-        //             if ui.button("+").clicked() {
-        //                 state.scale_factor = (state.scale_factor + 0.1).min(3.0);
-        //             }
-        //         });
-        //     });
         occupied_screen_space
     }
 }
@@ -238,6 +215,7 @@ impl WinitApp {
     }
 }
 
+// MARK: Redraw
 fn redraw(
     wgpu_ctx: &WgpuContext,
     app_state: &mut AppState,
@@ -319,8 +297,12 @@ fn redraw(
         profiling::scope!("egui render");
 
         app_renderer.egui_renderer.begin_frame(window);
-        let _occupied_screen_space = app_state.ui(app_renderer);
-        // app_renderer.update_viewport(occupied_screen_space, 16.0 / 9.0); // TODO: get from renderer
+        let occupied_screen_space = app_state.ui(app_renderer);
+        let viewport = app_renderer.calc_viewport(occupied_screen_space, 16.0 / 9.0); // TODO: get from renderer
+        app_renderer
+            .app_pipeline
+            .bind_group
+            .update_viewport(&wgpu_ctx.queue, viewport);
 
         app_renderer.egui_renderer.end_frame_and_draw(
             &wgpu_ctx.device,
@@ -349,6 +331,22 @@ fn redraw(
     profiling::finish_frame!();
 }
 
+// MARK: Resize
+fn resize(ctx: &WgpuContext, app_renderer: &mut AppRenderer, size: PhysicalSize<u32>) {
+    if size.width == 0 || size.height == 0 {
+        log::warn!("[resize]: ignored resize to value <= 0: {:?}", size);
+        return;
+    }
+    log::info!("[resize]: {:?}", size);
+    {
+        app_renderer.surface_config.width = size.width;
+        app_renderer.surface_config.height = size.height;
+        app_renderer
+            .surface
+            .configure(&ctx.device, &app_renderer.surface_config);
+    }
+}
+
 impl ApplicationHandler<WgpuContext> for WinitApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         #[allow(unused)]
@@ -363,12 +361,15 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
 
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
-            let canvas = document.get_element_by_id("app").unwrap();
+            let canvas = document
+                .get_element_by_id(&format!("app-{}", self.app_state.meta.name))
+                .unwrap();
             let canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().ok();
 
             log::info!("found canvas: {}", canvas.is_some());
             if let Some(canvas) = canvas.as_ref() {
                 self.size = (canvas.width(), canvas.height());
+                log::info!("canvas size: {:?}", self.size);
             }
             window_attrs = window_attrs.with_canvas(canvas);
 
@@ -382,6 +383,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
             log::error!("failed to create window");
             return;
         };
+        log::info!("window size: {:?}", window.inner_size());
         #[cfg(not(target_arch = "wasm32"))]
         {
             let size = window.inner_size();
@@ -438,28 +440,20 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
         }
 
         match event {
-            // MARK: Redraw
-            WindowEvent::RedrawRequested => {
-                redraw(wgpu_ctx, app_state, window, app_renderer);
-            }
-            // MARK: Resized
-            WindowEvent::Resized(size) => {
-                log::info!("[resize]: {:?}", size);
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    app_renderer.surface_config.width = size.width;
-                    app_renderer.surface_config.height = size.height;
-                    app_renderer
-                        .surface
-                        .configure(&wgpu_ctx.device, &app_renderer.surface_config);
-                }
-            }
+            WindowEvent::RedrawRequested => redraw(wgpu_ctx, app_state, window, app_renderer),
+            WindowEvent::Resized(size) => resize(wgpu_ctx, app_renderer, size),
             _ => (),
         }
         self.window.as_ref().unwrap().request_redraw();
     }
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, wgpu_ctx: WgpuContext) {
-        let app_renderer = AppRenderer::new(&wgpu_ctx, self.window.clone().unwrap(), self.size);
+        let mut app_renderer = AppRenderer::new(&wgpu_ctx, self.window.clone().unwrap(), self.size);
+        log::info!("app_renderer initialized");
+        if let Some(window) = self.window.as_ref() {
+            let size = window.inner_size();
+            log::info!("window size: {:?}", size);
+            resize(&wgpu_ctx, &mut app_renderer, size)
+        }
         self.app_renderer.replace(app_renderer);
         self.wgpu_ctx.replace(wgpu_ctx);
     }
@@ -518,6 +512,7 @@ pub struct AppRenderer {
     ranim_renderer: Renderer,
     sampler: wgpu::Sampler,
     app_pipeline: AppPipeline,
+    // viewport: Viewport,
 }
 
 impl AppRenderer {
@@ -562,7 +557,10 @@ impl AppRenderer {
         });
         let app_pipeline = AppPipeline::new(
             ctx,
+            #[cfg(target_arch = "wasm32")]
             &ranim_renderer.render_textures.linear_render_view,
+            #[cfg(not(target_arch = "wasm32"))]
+            &ranim_renderer.render_textures.render_view,
             &sampler,
             surface_config.format.into(),
         );
@@ -573,6 +571,71 @@ impl AppRenderer {
             ranim_renderer,
             sampler,
             app_pipeline,
+            // viewport: Viewport {
+            //     width: 1.0,
+            //     height: 1.0,
+            //     x: 0.0,
+            //     y: 0.0
+            // }
+        }
+    }
+    fn calc_viewport(
+        &self,
+        occupied_screen_space: OccupiedScreenSpace,
+        render_aspect: f32,
+    ) -> Viewport {
+        // Calculate viewport
+        let screen_width = self.surface_config.width as f32;
+        let screen_height = self.surface_config.height as f32;
+        // dbg!(screen_width, screen_height);
+
+        let OccupiedScreenSpace {
+            top,
+            bottom,
+            left,
+            right,
+        } = occupied_screen_space;
+        // dbg!(state.occupied_screen_space);
+
+        // Calculate available space
+        let available_width = screen_width - left - right;
+        let available_height = screen_height - top - bottom;
+        // dbg!(available_width, available_height);
+
+        // Calculate aspect ratio of the render texture
+        let viewport_aspect = available_width / available_height;
+
+        let (viewport_width, viewport_height, viewport_x, viewport_y) =
+            if render_aspect > viewport_aspect {
+                // Render is wider than viewport
+                let width = available_width;
+                let height = width / render_aspect;
+                let x = left - right;
+                let y = bottom - top;
+                (
+                    width / screen_width,
+                    height / screen_height,
+                    x / screen_width,
+                    y / screen_height,
+                )
+            } else {
+                // Render is taller than viewport
+                let height = available_height;
+                let width = height * render_aspect;
+                let x = left - right;
+                let y = bottom - top;
+                (
+                    width / screen_width,
+                    height / screen_height,
+                    x / screen_width,
+                    y / screen_height,
+                )
+            };
+        Viewport {
+            width: viewport_width,
+            height: viewport_height,
+            x: viewport_x,
+            y: viewport_y,
         }
     }
 }

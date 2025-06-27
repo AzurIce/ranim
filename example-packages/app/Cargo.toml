@@ -10,5 +10,3 @@ console_error_panic_hook = "0.1.7"
 log = "0.4.27"
 pretty_env_logger = "0.5.0"
 ranim = { workspace = true, features = ["app"] }
-# wasm-bindgen = "0.2.100"
-web-sys = { version = "0.3.77", features = ["Window", "Document", "HtmlElement", "Text"] }

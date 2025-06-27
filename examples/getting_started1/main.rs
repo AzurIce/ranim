@@ -1,5 +1,5 @@
+use log::LevelFilter;
 use ranim::{
-    AppOptions,
     animation::{creation::WritingAnim, transform::TransformAnim},
     color::palettes::manim,
     items::vitem::{
@@ -7,7 +7,6 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
-    render_scene,
 };
 
 #[scene]
@@ -36,5 +35,20 @@ impl SceneConstructor for GettingStarted1Scene {
 }
 
 fn main() {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
+
+    #[cfg(feature = "app")]
+    run_scene_app(GettingStarted1Scene);
+    #[cfg(not(feature = "app"))]
     render_scene(GettingStarted1Scene, &AppOptions::default());
 }

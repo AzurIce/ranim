@@ -59,14 +59,17 @@ impl SceneConstructor for PalettesScene {
 }
 
 fn main() {
-    #[cfg(debug_assertions)]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Trace)
-        .init();
-    #[cfg(not(debug_assertions))]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Info)
-        .init();
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
 
     let options = AppOptions::default();
     render_scene_at_sec(PalettesScene, 0.0, "preview.png", &options);

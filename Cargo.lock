@@ -161,7 +161,6 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "ranim",
- "web-sys",
 ]
 
 [[package]]
@@ -195,7 +194,7 @@ dependencies = [
  "objc2-foundation 0.3.1",
  "parking_lot",
  "percent-encoding",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
  "x11rb",
 ]
 
@@ -1513,9 +1512,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26145e563e54f2cadc477553f1ec5ee650b00862f0a58bcd12cbdc5f0ea2d2f4"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "r-efi",
  "wasi 0.14.2+wasi-0.2.4",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -3380,6 +3381,7 @@ dependencies = [
  "egui",
  "egui-wgpu",
  "egui-winit",
+ "getrandom 0.3.3",
  "glam",
  "image",
  "indicatif",
@@ -5729,6 +5731,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 name = "xtask-build-examples"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "base16ct",
  "clap",
  "serde",

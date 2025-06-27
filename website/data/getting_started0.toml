@@ -1,10 +1,11 @@
 name = "getting_started0"
 code = """
-```rust,linenos
+```rust
 use ranim::{\r
     animation::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square,\r
     prelude::*, timeline::TimelineFunc,\r
 };\r
+use log::LevelFilter;\r
 \r
 #[scene]\r
 struct GettingStarted0Scene;\r
@@ -18,7 +19,7 @@ impl SceneConstructor for GettingStarted0Scene {\r
         let r_square = r.init_timeline(square).id();\r
 \r
         {\r
-            let timeline = r.timeline_mut(&r_square);\r
+            let timeline = r.timeline_mut(r_square);\r
             timeline.play_with(|square| square.fade_in());\r
             timeline.forward(1.0);\r
             timeline.play_with(|square| square.fade_out());\r
@@ -32,10 +33,25 @@ impl SceneConstructor for GettingStarted0Scene {\r
 }\r
 \r
 fn main() {\r
+    #[cfg(not(target_arch = "wasm32"))]\r
+    {\r
+        #[cfg(debug_assertions)]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Trace)\r
+            .init();\r
+        #[cfg(not(debug_assertions))]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Info)\r
+            .init();\r
+    }\r
+\r
+    #[cfg(feature = "app")]\r
+    run_scene_app(GettingStarted0Scene);\r
+    #[cfg(not(feature = "app"))]\r
     render_scene(GettingStarted0Scene, &AppOptions::default());\r
 }\r
-
 ```"""
-hash = "2b0eccac43c233ba1a8b77e9b42164d6ba3a75ea"
+hash = "414fbf27ebd14f00a730649ce3f789b57f5165aa"
 preview_imgs = []
 output_files = ["/examples/getting_started0/output.mp4"]
+wasm = true
