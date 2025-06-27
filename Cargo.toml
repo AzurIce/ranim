@@ -85,8 +85,9 @@ typst = "0.13.1"
 typst-kit = { version = "0.13.1", default-features = false, features = [
   "fonts",
 ] }
-time = "0.3.41"
+# time = "0.3.41"
 typst-svg = "0.13.1"
+chrono = "0.4.41"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 egui-winit = { version = "0.31.1", optional = true }
