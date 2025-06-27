@@ -1,6 +1,7 @@
 name = "hanoi"
 code = """
 ```rust
+use log::LevelFilter;
 use ranim::{
     animation::transform::TransformAnim,
     color::{HueDirection, palettes::manim},
@@ -11,7 +12,6 @@ use ranim::{
     timeline::{TimelineFunc, TimelinesFunc},
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
-use log::LevelFilter;
 
 fn solve_hanoi(
     n: usize,
@@ -161,7 +161,7 @@ fn main() {
     }
 }
 ```"""
-hash = "d590e954878b069471be77d5e8d207552282536e"
+hash = "9db765894610329acc80be9a751bd5a99f59e024"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/output-10.mp4", "/examples/hanoi/output-5.mp4"]
 wasm = true

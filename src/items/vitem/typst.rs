@@ -1,5 +1,6 @@
 use std::sync::OnceLock;
 
+use chrono::{DateTime, Datelike, Local};
 use typst::{
     Library, World,
     diag::{FileError, FileResult},
@@ -33,7 +34,7 @@ pub struct SingleFileTypstWorld {
 
     library: LazyHash<Library>,
     book: LazyHash<FontBook>,
-    time: time::OffsetDateTime,
+    now: OnceLock<DateTime<Local>>,
 }
 
 impl SingleFileTypstWorld {
@@ -45,7 +46,7 @@ impl SingleFileTypstWorld {
             library: LazyHash::new(Library::default()),
             book: LazyHash::new(fonts.book.clone()),
             source: Source::detached(source),
-            time: time::OffsetDateTime::now_utc(),
+            now: OnceLock::new(),
         }
     }
 }
@@ -79,11 +80,20 @@ impl World for SingleFileTypstWorld {
         fonts().fonts[index].get()
     }
 
+    // TODO: fix this
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        let offset = offset.unwrap_or(0);
-        let offset = time::UtcOffset::from_hms(offset.try_into().ok()?, 0, 0).ok()?;
-        let time = self.time.checked_to_offset(offset)?;
-        Some(Datetime::Date(time.date()))
+        let now = self.now.get_or_init(chrono::Local::now);
+
+        let naive = match offset {
+            None => now.naive_local(),
+            Some(o) => now.naive_utc() + chrono::Duration::hours(o),
+        };
+
+        Datetime::from_ymd(
+            naive.year(),
+            naive.month().try_into().ok()?,
+            naive.day().try_into().ok()?,
+        )
     }
 }
 
