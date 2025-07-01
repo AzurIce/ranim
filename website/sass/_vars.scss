@@ -6,9 +6,89 @@ $xl: 1280px;
 $syntax-theme-background: #2b2c2f;
 // $syntax-theme-background-hover: #414247;
 
-:root {
-    --header-height: 4rem;
+// Animation
+$duration-fast: 100ms;
+$duration: 250ms;
 
-    --font-family-sans: "Fira Sans", sans-serif;
-    --font-family-mono: "Fira Mono", monospace;
+// Colors
+// Original comments from bevy-website:
+// If you're reading this in late 2025 (or later), check PR #1953 because these
+// changes probably can be reverted.
+//
+// These colors are *temporarily* defined as SASS variables. They should be
+// replaced with CSS variables once CSS Relative Colors support is *widely
+// available*. We define these as SASS variables so that they can be used with
+// the `sass:color` package to derive new colors. If a color is not going to be
+// used to derive a new color, then CSS vars should be used instead.
+//
+// See PR: https://github.com/bevyengine/bevy-website/pull/1953
+// See Relative Colors support: https://caniuse.com/css-relative-colors
+$color-neutral-17: #2c2c2d;
+$color-neutral-93: #ececec;
+$color-black: #000;
+$color-white: #fff;
+
+:root {
+  --header-height: 4rem;
+
+  --font-family-sans: "Fira Sans", sans-serif;
+  --font-family-mono: "Fira Mono", monospace;
+
+  // Neutrals by lightness
+  --color-neutral-11: #1b1b1b;
+  --color-neutral-13: #1e1e22;
+  --color-neutral-14: #232326;
+  --color-neutral-17: #{$color-neutral-17};
+  --color-neutral-18: #2b2c2f;
+  --color-neutral-19: #2f3033;
+  --color-neutral-22: #383838;
+  --color-neutral-27: #414247;
+  --color-neutral-33: #555;
+  --color-neutral-33b: #535353;
+  --color-neutral-36: #59595e;
+  --color-neutral-40: #666;
+  --color-neutral-42: #6b6b6b;
+  --color-neutral-45: #737373;
+  --color-neutral-50: #808080;
+  --color-neutral-53: #868686;
+  --color-neutral-55: #8c8c8c;
+  --color-neutral-59: #969696;
+  --color-neutral-60: #95959d;
+  --color-neutral-60b: #999;
+  --color-neutral-60c: #8e9aa4;
+  --color-neutral-61: #9b9b9d;
+  --color-neutral-67: #aaa;
+  --color-neutral-69: #b1b1b1;
+  --color-neutral-72: #b8b8b8;
+  --color-neutral-73: #b9b9b9;
+  --color-neutral-75: #bfbfbf;
+  --color-neutral-78: #c8c8c8;
+  --color-neutral-82: #d2d2d2;
+  --color-neutral-88: #e1e1e1;
+  --color-neutral-93: #{$color-neutral-93};
+  --color-neutral-96: #f0effb;
+  --color-neutral-97: #f7f7f7;
+
+  --color-black: #{$color-black};
+  --color-white: #{$color-white};
+
+  --tree-menu-active-color: var(--color-neutral-93);
+  --tree-menu-chevron-filter: brightness(70%);
+  --tree-menu-label-active-bg-color: #{rgba($color-neutral-93, 0.1)};
+  --tree-menu-label-active-color: var(--color-neutral-93);
+  --tree-menu-label-color: var(--color-neutral-61);
+  --tree-menu-toc-bg-color: #{rgba($color-black, 0.25)};
+  --tree-menu-toggle-hover-color: #{rgba($color-neutral-93, 0.1)};
+}
+
+.light-mode {
+  @media (prefers-color-scheme: light) {
+    --tree-menu-active-color: var(--color-black);
+    --tree-menu-chevron-filter: invert(65%);
+    --tree-menu-label-active-bg-color: var(--color-neutral-88);
+    --tree-menu-label-active-color: var(--color-black);
+    --tree-menu-label-color: var(--color-neutral-33);
+    --tree-menu-toc-bg-color: var(--color-neutral-93);
+    --tree-menu-toggle-hover-color: var(--color-neutral-75);
+  }
 }

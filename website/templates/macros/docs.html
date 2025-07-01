@@ -1,0 +1,52 @@
+{% macro section_item(section) %}
+  {% set subsections = [] %}
+  {% for section in section.subsections %}
+    {% set_global subsections = subsections | concat(with=get_section(path=section)) %}
+  {% endfor %}
+  {% set subitems = section.pages | concat(with=subsections) | sort(attribute="extra.weight") %}
+
+  {% if subitems %}
+    {% for p in subitems %}
+      {% set id = p.path | slugify %}
+      {% set is_in_branch = p.path in current_path %}
+      {% set is_active = current_path == p.path %}
+      {% set class = "tree-menu__item" %}
+      {% set label_class = "tree-menu__label" %}
+      {% if is_active %}
+        {% set class = class ~ " tree-menu__item--active" %}
+      {% endif %}
+      {% set is_section = subsections is containing(p) %}
+      {% if is_section %}
+        {% set label_class = label_class ~ " tree-menu__label--with-chevron" %}
+        <input id="{{ id }}" type="checkbox" class="tree-menu__state"
+          {% if is_in_branch %}checked{% endif %}>
+      {% endif %}
+
+      <li class="{{ class }}">
+        <div class="{{ label_class }}">
+          <a class="tree-menu__link" href="{{ p.path }}">{{ p.title }}</a>
+          {% if is_section %}
+            <label class="tree-menu__toggle" for="{{ id }}">
+              <img class="tree-menu__chevron"
+                    src="/assets/icon-chevron-down.svg"
+                    alt="A chevron, or V-shaped symbol"
+                    width="15"
+                    height="24">
+            </label>
+          {% endif %}
+        </div>
+        {% if is_section %}
+          <ul class="tree-menu">
+            {{ docs::section_item(section=p) }}
+          </ul>
+        {% endif %}
+      </li>
+    {% endfor %}
+  {% endif %}
+{% endmacro %}
+
+{% macro menu(root) %}
+  <ul class="tree-menu">
+    {{ docs::section_item(section=root) }}
+  </ul>
+{% endmacro %}

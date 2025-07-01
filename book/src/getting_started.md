@@ -1,7 +1,4 @@
-+++
-title = "Getting Started"
-+++
-## Getting Started
+# Getting Started
 
 在 Ranim 中，定义并渲染一段动画的方式基本长成下面这个样子：
 
@@ -43,7 +40,7 @@ fn main() {
 
 **RanimTimeline** 和 **Rabject** 这两个类型非常重要，将贯穿整个 Ranim 动画的编码。
 
-### 1. Timeline 和 TimelineId
+## 1. Timeline 和 TimelineId
 
 `RanimScene` 中有若干个 `Timeline`，每个 `Timeline` 中包含一系列的动画列表。
 
@@ -74,7 +71,7 @@ pub struct Rabject<'a, T> {
 
 !example-getting_started0
 
-### 2. 播放动画
+## 2. 播放动画
 
 Ranim 中的每一个动画都会为实现了对应 Trait 的物件添加对应的创建方法。
 
@@ -100,7 +97,7 @@ timeline.play(square.fade_in().chain(|data| data.fade_out()));
 
 !example-getting_started1
 
-### 3. 动画参数
+## 3. 动画参数
 
 `AnimSchedule<T>` 和 `Animation<T>` 都具有一些控制动画属性的参数，可以通过链式调用的方式来设置：
 - `with_duration(duration_secs)`：设置动画持续时间
@@ -112,7 +109,7 @@ timeline.play(square.fade_in().chain(|data| data.fade_out()));
 
 !example-getting_started2
 
-### 4. 向 Rabject 应用动画变更（AnimSchedule 与 apply）
+## 4. 向 Rabject 应用动画变更（AnimSchedule 与 apply）
 
 使用 Rabject 创建动画时是基于 Rabject 当前的内部数据来创建的，创建与播放动画并不会修改其内部数据。
 如果想要一个动画的效果实际应用到 Rabject 中，那么需要对 `AnimSchedule` 使用 `apply` 方法。

@@ -1,0 +1,11 @@
+[book]
+authors = ["AzurIce"]
+language = "zh"
+src = "src"
+title = "Ranim Book"
+
+[build]
+build-dir = "../website/static/book/"
+
+[output.html]
+site-url = "/book/"
