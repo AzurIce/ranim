@@ -33,7 +33,6 @@ Ranim is an animation engine crate implemented in pure rust, inspired heavily by
 ## Dependencies
 
 Runtime dependencies:
-- typst: fonts and maths rendering
 - ffmpeg: encode videos
 
 ## Installation
@@ -42,7 +41,7 @@ Currently, it is experimental on crates.io:
 
 ```toml
 [dependencies]
-ranim = "0.1.0-alpha.11"
+ranim = "0.1.0-alpha.14"
 ```
 
 You can also use from git for the latest updates:
