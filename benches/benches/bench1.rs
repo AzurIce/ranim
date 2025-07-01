@@ -1,42 +1,46 @@
 use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
 use itertools::Itertools;
-use ranim::animation::transform::GroupTransformAnimSchedule;
-use ranim::glam::{DVec3, dvec3};
-use ranim::items::vitem::Circle;
 use ranim::{
-    items::{group::Group, vitem::Square},
+    animation::transform::TransformAnim,
+    glam::{DVec3, dvec3},
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Square},
+    },
     prelude::*,
+    timeline::TimelineFunc,
 };
 
 #[scene]
 struct StaticSquareScene(pub usize);
 
-impl TimelineConstructor for StaticSquareScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+impl SceneConstructor for StaticSquareScene {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64;
 
         let unit = size + buff;
         let start = dvec3(-4.0, -4.0, 0.0);
-        let squares = (0..self.0)
+        let _squares = (0..self.0)
             .cartesian_product(0..self.0)
             .map(|(i, j)| {
-                let mut square = Square(size).build();
-                square
-                    .put_center_on(start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64);
-                square
+                Square::new(size).with(|square| {
+                    square.put_center_on(
+                        start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64,
+                    );
+                })
             })
-            .collect::<Group<_>>();
-        let _squares = timeline.insert(squares);
-        timeline.forward(1.0);
+            .map(|item| r.init_timeline(item).with(|timeline| timeline.show()).id())
+            .collect::<Vec<_>>();
+        r.timelines_mut().forward(1.0);
     }
 }
 
 #[scene]
 struct TransformSquareScene(pub usize);
 
-impl TimelineConstructor for TransformSquareScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+impl SceneConstructor for TransformSquareScene {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64 - buff;
 
@@ -45,21 +49,32 @@ impl TimelineConstructor for TransformSquareScene {
         let squares = (0..self.0)
             .cartesian_product(0..self.0)
             .map(|(i, j)| {
-                let mut item = Square(size).build();
-                item.put_center_on(start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64);
-                item
+                VItem::from(Square::new(size).with(|square| {
+                    square.put_center_on(
+                        start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64,
+                    );
+                }))
             })
-            .collect::<Group<_>>();
-        let mut squares = timeline.insert(squares);
+            .map(|item| r.init_timeline(item).id())
+            .collect::<Vec<_>>();
         let circles = (0..self.0)
             .cartesian_product(0..self.0)
             .map(|(i, j)| {
-                let mut item = Circle(size / 2.0).build();
-                item.put_center_on(start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64);
-                item
+                VItem::from(Circle::new(size / 2.0).with(|circle| {
+                    circle.put_center_on(
+                        start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64,
+                    );
+                }))
             })
-            .collect::<Group<_>>();
-        timeline.play(squares.transform_to(circles));
+            .collect::<Vec<_>>();
+        squares
+            .iter()
+            .cloned()
+            .zip(circles)
+            .for_each(|(r_square, circle)| {
+                r.timeline_mut(r_square)
+                    .play_with(|item| item.transform_to(circle));
+            });
     }
 }
 
@@ -76,7 +91,7 @@ fn render_benchmark(c: &mut Criterion) {
                 render_scene(
                     StaticSquareScene(*n),
                     &AppOptions {
-                        output_dir: format!("./output-bench/static_squares/{}", n).as_str(),
+                        output_dir: format!("./output-bench/static_squares/{n}").as_str(),
                         ..Default::default()
                     },
                 );
@@ -88,7 +103,7 @@ fn render_benchmark(c: &mut Criterion) {
                 render_scene(
                     TransformSquareScene(*n),
                     &AppOptions {
-                        output_dir: format!("./output-bench/transform_squares/{}", n).as_str(),
+                        output_dir: format!("./output-bench/transform_squares/{n}").as_str(),
                         ..Default::default()
                     },
                 );

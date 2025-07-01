@@ -1,0 +1,12 @@
+[package]
+name = "app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+console_error_panic_hook = "0.1.7"
+log = "0.4.27"
+pretty_env_logger = "0.5.0"
+ranim = { workspace = true, features = ["app"] }

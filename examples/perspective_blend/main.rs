@@ -1,107 +1,132 @@
-use glam::DVec3;
+use log::LevelFilter;
 use ranim::{
-    animation::transform::{GroupTransformAnimSchedule, TransformAnimSchedule},
+    animation::transform::TransformAnim,
     color::palettes::manim,
-    items::{group::Group, vitem::Square},
+    glam::DVec3,
+    items::{
+        Group,
+        vitem::{VItem, geometry::Square},
+    },
     prelude::*,
-    timeline::TimeMark,
+    timeline::{TimeMark, TimelineFunc, TimelinesFunc},
+    utils::rate_functions::linear,
 };
 
 #[scene]
 struct PerspectiveBlendScene;
 
-impl TimelineConstructor for PerspectiveBlendScene {
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
-        camera.data.pos = DVec3::Z * 5.0;
-        timeline.update(camera);
+impl SceneConstructor for PerspectiveBlendScene {
+    fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
+        let cam = r.timeline(r_cam).state().clone().with(|cam| {
+            cam.pos = DVec3::Z * 5.0;
+        });
+        r.timeline_mut(r_cam).update(cam);
 
         // Create a cube
         let side_length = 2.0;
 
-        let mut anims = Vec::new();
+        let square_with_color = |color: color::AlphaColor<color::Srgb>| {
+            VItem::from(Square::new(side_length).with(|square| {
+                square.set_color(color).set_fill_opacity(0.5);
+            }))
+        };
 
-        // Bottom face
-        let mut bottom = Square(side_length).build();
-        bottom.set_color(manim::TEAL_C).set_fill_opacity(0.5);
-        let mut bottom = timeline.insert(bottom);
-        anims.push(bottom.transform(|data| {
-            data.shift(DVec3::NEG_Y * side_length / 2.0)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::X);
-        }));
+        let r_bottom = r.init_timeline(square_with_color(manim::TEAL_C)).id();
+        let r_right = r.init_timeline(square_with_color(manim::GREEN_C)).id();
+        let r_back = r.init_timeline(square_with_color(manim::BLUE_C)).id();
+        let r_top = r.init_timeline(square_with_color(manim::PURPLE_C)).id();
+        let r_front = r.init_timeline(square_with_color(manim::RED_C)).id();
+        let r_left = r.init_timeline(square_with_color(manim::YELLOW_C)).id();
 
-        // Right face
-        let mut right = Square(side_length).build();
-        right.set_color(manim::GREEN_C).set_fill_opacity(0.5);
-        let mut right = timeline.insert(right);
-        anims.push(right.transform(|data| {
-            data.shift(DVec3::X * side_length / 2.0)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
-        }));
-
-        // Back face
-        let mut back = Square(side_length).build();
-        back.set_color(manim::BLUE_C).set_fill_opacity(0.5);
-        let mut back = timeline.insert(back);
-        anims.push(back.transform(|data| {
-            data.shift(DVec3::NEG_Z * side_length / 2.0);
-        }));
-
-        // Top face
-        let mut top = Square(side_length).build();
-        top.set_color(manim::PURPLE_C).set_fill_opacity(0.5);
-        let mut top = timeline.insert(top);
-        anims.push(top.transform(|data| {
-            data.shift(DVec3::Y * side_length / 2.0)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
-        }));
-
-        // Front face (facing camera)
-        let mut front = Square(side_length).build();
-        front.set_color(manim::RED_C).set_fill_opacity(0.5);
-        let mut front = timeline.insert(front);
-
-        anims.push(front.transform(|data| {
-            data.shift(DVec3::Z * side_length / 2.0);
-        }));
-
-        // Left face
-        let mut left = Square(side_length).build();
-        left.set_color(manim::YELLOW_C).set_fill_opacity(0.5);
-        let mut left = timeline.insert(left);
-        anims.push(left.transform(|data| {
-            data.shift(DVec3::NEG_X * side_length / 2.0)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
-        }));
-
-        timeline.play(Group(anims).apply()).sync();
-
-        let mut cube = Group(vec![front, back, right, left, top, bottom]);
-
-        timeline.play(
-            cube.transform(|data| {
-                data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
-                    .rotate(std::f64::consts::PI / 6.0, DVec3::X);
-            })
-            .with_duration(4.0),
-        );
-
-        timeline.play(
-            camera
+        let bottom = r.timeline_mut(r_bottom).play_with(|bottom| {
+            bottom
                 .transform(|data| {
-                    data.perspective_blend = 1.0;
+                    data.shift(DVec3::NEG_Y * side_length / 2.0)
+                        .rotate(std::f64::consts::PI / 2.0, DVec3::X);
                 })
-                .with_duration(2.0)
-                .with_padding(2.0, 0.0),
-        );
-        timeline.sync();
-        timeline.insert_time_mark(
-            timeline.duration_secs(),
+                .with_rate_func(linear)
+        });
+        let right = r.timeline_mut(r_right).play_with(|right| {
+            right
+                .transform(|data| {
+                    data.shift(DVec3::X * side_length / 2.0)
+                        .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
+                })
+                .with_rate_func(linear)
+        });
+        let back = r.timeline_mut(r_back).play_with(|back| {
+            back.transform(|data| {
+                data.shift(DVec3::NEG_Z * side_length / 2.0);
+            })
+            .with_rate_func(linear)
+        });
+        let top = r.timeline_mut(r_top).play_with(|top| {
+            top.transform(|data| {
+                data.shift(DVec3::Y * side_length / 2.0)
+                    .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
+            })
+            .with_rate_func(linear)
+        });
+        let front = r.timeline_mut(r_front).play_with(|front| {
+            front
+                .transform(|data| {
+                    data.shift(DVec3::Z * side_length / 2.0);
+                })
+                .with_rate_func(linear)
+        });
+        let left = r.timeline_mut(r_left).play_with(|left| {
+            left.transform(|data| {
+                data.shift(DVec3::NEG_X * side_length / 2.0)
+                    .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
+            })
+            .with_rate_func(linear)
+        });
+        r.timeline_mut(r_bottom).hide();
+        r.timeline_mut(r_right).hide();
+        r.timeline_mut(r_back).hide();
+        r.timeline_mut(r_top).hide();
+        r.timeline_mut(r_front).hide();
+        r.timeline_mut(r_left).hide();
+
+        let faces = Group(vec![bottom, right, back, top, front, left]);
+        let r_faces = r.init_timeline(faces).id();
+        r.timelines_mut().sync(); // TODO: make this better
+        r.timeline_mut(r_faces).play_with(|faces| {
+            faces
+                .transform(|data| {
+                    data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
+                        .rotate(std::f64::consts::PI / 6.0, DVec3::X);
+                })
+                .with_duration(4.0)
+        });
+
+        r.timeline_mut(r_cam).forward(2.0);
+        r.timeline_mut(r_cam).play_with(|cam| {
+            cam.transform(|data| {
+                data.perspective_blend = 1.0;
+            })
+            .with_duration(2.0)
+        });
+        r.insert_time_mark(
+            r.timelines().max_total_secs(),
             TimeMark::Capture("preview.png".to_string()),
         );
     }
 }
 
 fn main() {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
+
     #[cfg(not(feature = "app"))]
     {
         let options = AppOptions {

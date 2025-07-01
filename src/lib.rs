@@ -1,6 +1,19 @@
 //! Ranim is an animation engine written in rust based on [`wgpu`], inspired by [3b1b/manim](https://github.com/3b1b/manim/) and [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim).
 //!
 //!
+//! ## Coordinate System
+//!
+//! Ranim's coordinate system is right-handed coordinate:
+//!
+//! ```text
+//!      +Y
+//!      |
+//!      |
+//!      +----- +X
+//!    /
+//! +Z
+//! ```
+//!
 
 use std::{
     collections::HashMap,
@@ -10,30 +23,29 @@ use std::{
 };
 
 use animation::EvalResult;
-use context::RanimContext;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use items::{Rabject, camera_frame::CameraFrame};
-use timeline::{RanimTimeline, TimeMark, TimelineEvalResult};
+use items::{TimelineId, camera_frame::CameraFrame};
+use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult, TimelineFunc};
 
 use render::{Renderer, primitives::RenderInstances};
+
+use crate::context::WgpuContext;
 
 // MARK: Prelude
 pub mod prelude {
     #[cfg(feature = "app")]
     pub use crate::app::run_scene_app;
     pub use crate::{AppOptions, render_scene, render_scene_at_sec};
-    pub use crate::{SceneMetaTrait, TimelineConstructor};
+    pub use crate::{SceneConstructor, SceneMetaTrait};
     pub use ranim_macros::scene;
 
-    pub use crate::items::{Rabject, camera_frame::CameraFrame};
-    pub use crate::timeline::RanimTimeline;
+    pub use crate::items::{TimelineId, camera_frame::CameraFrame};
+    pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};
 
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
-
-    pub use crate::items::Blueprint;
 }
 
 pub mod color;
@@ -68,9 +80,9 @@ pub trait SceneMetaTrait {
     fn meta(&self) -> SceneMeta;
 }
 
-/// A [`Scene`] builds a [`RanimTimeline`]
+/// A [`Scene`] builds a [`RanimScene`]
 ///
-/// This trait is automatically implemented for types that implements [`TimelineConstructor`] and [`SceneMetaTrait`].
+/// This trait is automatically implemented for types that implements [`SceneConstructor`] and [`SceneMetaTrait`].
 ///
 /// A struct with [`ranim_macros::scene`] attribute implements [`SceneMetaTrait`], which is basically a type with [`SceneMeta`].
 /// - `#[scene]`: use the *snake_case* of the struct's name (Without the `Scene` suffix) as [`SceneMeta::name`].
@@ -85,18 +97,18 @@ pub trait SceneMetaTrait {
 /// #[scene]
 /// struct HelloWorld;
 ///
-/// impl Scene for HelloWorld {
-///     fn construct(self, timeline: &RanimTimeline, camera: &Rabject<CameraFrame>) {
+/// impl SceneConstructor for HelloWorld {
+///     fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
 ///         // ...
 ///     }
 /// }
 /// ```
-pub trait Scene: TimelineConstructor + SceneMetaTrait {}
-impl<T: TimelineConstructor + SceneMetaTrait> Scene for T {}
+pub trait Scene: SceneConstructor + SceneMetaTrait {}
+impl<T: SceneConstructor + SceneMetaTrait> Scene for T {}
 
-impl<C: TimelineConstructor, M> TimelineConstructor for (C, M) {
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>) {
-        self.0.construct(timeline, camera);
+impl<C: SceneConstructor, M> SceneConstructor for (C, M) {
+    fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
+        self.0.construct(r, r_cam);
     }
 }
 
@@ -106,22 +118,23 @@ impl<C, M: SceneMetaTrait> SceneMetaTrait for (C, M) {
     }
 }
 
-/// A constructor of a [`RanimTimeline`]
-pub trait TimelineConstructor {
+/// A constructor of a [`RanimScene`]
+pub trait SceneConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct(self, timeline: &RanimTimeline, camera: &mut Rabject<CameraFrame>);
+    fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>);
 }
 
-pub fn build_timeline(constructor: impl TimelineConstructor) -> RanimTimeline {
-    let timeline = RanimTimeline::new();
+pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
+    let mut timeline = RanimScene::new();
     {
-        let mut camera = timeline.insert(items::camera_frame::CameraFrame::new());
-        constructor.construct(&timeline, &mut camera);
-        timeline.sync();
+        let cam = items::camera_frame::CameraFrame::new();
+        let r_cam = timeline.init_timeline(cam).id();
+        timeline.timeline_mut(r_cam).show();
+        constructor.construct(&mut timeline, r_cam);
     }
-    timeline
+    timeline.seal()
 }
 
 /// Build the timeline with the scene, and render it
@@ -181,7 +194,7 @@ impl Default for AppOptions<'_> {
 
 /// MARK: RanimRenderApp
 struct RanimRenderApp {
-    ctx: RanimContext,
+    ctx: WgpuContext,
     // frame_size: (u32, u32),
     renderer: Renderer,
 
@@ -203,7 +216,7 @@ struct RanimRenderApp {
 
 impl RanimRenderApp {
     fn new(options: &AppOptions, scene_name: String) -> Self {
-        let ctx = RanimContext::new();
+        let ctx = pollster::block_on(WgpuContext::new());
         let output_dir = PathBuf::from(options.output_dir);
         let renderer = Renderer::new(
             &ctx,
@@ -232,7 +245,7 @@ impl RanimRenderApp {
         }
     }
 
-    fn render_timeline(&mut self, timeline: RanimTimeline) {
+    fn render_timeline(&mut self, timeline: SealedRanimScene) {
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {
             puffin::set_scopes_on(true);
@@ -250,7 +263,7 @@ impl RanimRenderApp {
             (cpu_server, gpu_server)
         };
 
-        let frames = (timeline.duration_secs() * self.fps as f64).ceil() as usize;
+        let frames = (timeline.total_secs() * self.fps as f64).ceil() as usize;
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
@@ -273,51 +286,50 @@ impl RanimRenderApp {
                     // EvalResult<CameraFrame>, idx
                     camera_frame,
                     // Vec<(rabject_id, EvalResult<Item>, idx)>
-                    items,
+                    visual_items,
                 } = {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("eval");
 
-                    timeline.eval_alpha_new(alpha)
+                    timeline.eval_alpha(alpha)
+                };
+
+                let extracted_updates = {
+                    #[cfg(feature = "profiling")]
+                    profiling::scope!("extract");
+                    visual_items
+                        .iter()
+                        .filter_map(|(id, res, idx)| {
+                            let last_idx = last_idx.entry(*id).or_insert(-1);
+                            let prev_last_idx = *last_idx;
+                            *last_idx = *idx as i32;
+                            let renderable = match res {
+                                EvalResult::Dynamic(res) => Some(res.extract_renderable()),
+                                EvalResult::Static(res) => {
+                                    if prev_last_idx != *idx as i32 {
+                                        Some(res.extract_renderable())
+                                    } else {
+                                        None
+                                    }
+                                }
+                            };
+                            renderable.map(|renderable| (*id, renderable))
+                        })
+                        .collect::<Vec<_>>()
                 };
 
                 {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("prepare");
-                    items.iter().for_each(|(id, res, idx)| {
-                        let last_idx = last_idx.entry(*id).or_insert(-1);
-                        let prev_last_idx = *last_idx;
-                        *last_idx = *idx as i32;
-                        match res {
-                            EvalResult::Dynamic(res) => res.prepare_for_id(
-                                &self.ctx.wgpu_ctx,
-                                &mut self.render_instances,
-                                *id,
-                            ),
-                            EvalResult::Static(res) => {
-                                if prev_last_idx != *idx as i32 {
-                                    res.prepare_for_id(
-                                        &self.ctx.wgpu_ctx,
-                                        &mut self.render_instances,
-                                        *id,
-                                    )
-                                }
-                            }
-                        }
+                    extracted_updates.iter().for_each(|(id, res)| {
+                        res.prepare_for_id(&self.ctx, &mut self.render_instances, *id);
                     });
-                    self.ctx.wgpu_ctx.queue.submit([]);
+                    self.ctx.queue.submit([]);
                 }
 
-                let render_primitives = items
+                let render_primitives = visual_items
                     .iter()
-                    .filter_map(|(id, res, _)| match res {
-                        EvalResult::Dynamic(res) => {
-                            res.renderable_of_id(&self.render_instances, *id)
-                        }
-                        EvalResult::Static(res) => {
-                            res.renderable_of_id(&self.render_instances, *id)
-                        }
-                    })
+                    .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
                     .collect::<Vec<_>>();
                 let camera_frame = match &camera_frame.0 {
                     EvalResult::Dynamic(res) => res,
@@ -325,14 +337,13 @@ impl RanimRenderApp {
                 };
                 // println!("{:?}", camera_frame);
                 // println!("{}", render_primitives.len());
-                self.renderer
-                    .update_uniforms(&self.ctx.wgpu_ctx, camera_frame);
+                self.renderer.update_uniforms(&self.ctx, camera_frame);
 
                 {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("render");
 
-                    self.renderer.render(&mut self.ctx, &render_primitives);
+                    self.renderer.render(&self.ctx, &render_primitives);
                 }
 
                 self.update_frame();
@@ -343,21 +354,21 @@ impl RanimRenderApp {
                 pb.inc(1);
                 pb.set_message(format!(
                     "rendering {:.1?}/{:.1?}",
-                    Duration::from_secs_f64(alpha * timeline.duration_secs()),
-                    Duration::from_secs_f64(timeline.duration_secs())
+                    Duration::from_secs_f64(alpha * timeline.total_secs()),
+                    Duration::from_secs_f64(timeline.total_secs())
                 ));
             });
 
         let msg = format!(
             "rendered {} frames({:?})",
             frames,
-            Duration::from_secs_f64(timeline.duration_secs()),
+            Duration::from_secs_f64(timeline.total_secs()),
         );
         pb.finish_with_message(msg);
 
         let timemarks = timeline
             .time_marks()
-            .into_iter()
+            .iter()
             .filter(|mark| matches!(mark.1, TimeMark::Capture(_)))
             .collect::<Vec<_>>();
 
@@ -385,28 +396,32 @@ impl RanimRenderApp {
 
     fn render_timeline_frame(
         &mut self,
-        timeline: &RanimTimeline,
+        timeline: &SealedRanimScene,
         sec: f64,
         filename: impl AsRef<Path>,
     ) {
         let TimelineEvalResult {
             camera_frame,
-            items,
+            visual_items,
         } = timeline.eval_sec(sec);
-        items.iter().for_each(|(id, res, _)| match res {
-            EvalResult::Dynamic(res) => {
-                res.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id)
-            }
-            EvalResult::Static(res) => {
-                res.prepare_for_id(&self.ctx.wgpu_ctx, &mut self.render_instances, *id)
-            }
-        });
-        let render_primitives = items
+
+        let extracted = visual_items
             .iter()
-            .filter_map(|(id, res, _)| match res {
-                EvalResult::Dynamic(res) => res.renderable_of_id(&self.render_instances, *id),
-                EvalResult::Static(res) => res.renderable_of_id(&self.render_instances, *id),
+            .map(|(id, res, _)| {
+                let renderable = match res {
+                    EvalResult::Dynamic(res) => res.extract_renderable(),
+                    EvalResult::Static(res) => res.extract_renderable(),
+                };
+                (*id, renderable)
             })
+            .collect::<Vec<_>>();
+
+        extracted.iter().for_each(|(id, renderable)| {
+            renderable.prepare_for_id(&self.ctx, &mut self.render_instances, *id)
+        });
+        let render_primitives = visual_items
+            .iter()
+            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
             .collect::<Vec<_>>();
         let camera_frame = match &camera_frame.0 {
             EvalResult::Dynamic(res) => res,
@@ -414,20 +429,19 @@ impl RanimRenderApp {
         };
         // println!("{:?}", camera_frame);
         // println!("{}", render_primitives.len());
-        self.renderer
-            .update_uniforms(&self.ctx.wgpu_ctx, camera_frame);
-        self.renderer.render(&mut self.ctx, &render_primitives);
+        self.renderer.update_uniforms(&self.ctx, camera_frame);
+        self.renderer.render(&self.ctx, &render_primitives);
         self.save_frame_to_image(self.output_dir.join(&self.scene_name).join(filename));
     }
 
     fn update_frame(&mut self) {
         // `output_video` is true
         if let Some(video_writer) = self.video_writer.as_mut() {
-            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));
+            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
         } else if let Some(builder) = self.video_writer_builder.as_ref() {
             self.video_writer
                 .get_or_insert(builder.clone().build())
-                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx.wgpu_ctx));
+                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
         }
 
         // `save_frames` is true
@@ -446,9 +460,7 @@ impl RanimRenderApp {
         if !dir.exists() {
             std::fs::create_dir_all(dir).unwrap();
         }
-        let buffer = self
-            .renderer
-            .get_rendered_texture_img_buffer(&self.ctx.wgpu_ctx);
+        let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx);
         buffer.save(path).unwrap();
     }
 }

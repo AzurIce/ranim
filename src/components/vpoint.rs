@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
 use derive_more::{Deref, DerefMut};
-use glam::DMat3;
 use glam::DVec3;
 use itertools::Itertools;
 use ranim_macros::Interpolatable;
@@ -9,9 +8,10 @@ use ranim_macros::Interpolatable;
 use serde::{Deserialize, Serialize};
 
 use crate::traits::Alignable;
-use crate::traits::BoundingBox;
 use crate::traits::PointsFunc;
-use crate::traits::Position;
+use crate::traits::Rotate;
+use crate::traits::Scale;
+use crate::traits::Shift;
 use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
 
@@ -272,18 +272,6 @@ impl VPointComponentVec {
     }
 }
 
-impl BoundingBox for [DVec3] {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        let [min, max] = self
-            .iter()
-            .cloned()
-            .map(|x| [x, x])
-            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
-            .unwrap_or([DVec3::ZERO, DVec3::ZERO]);
-        [min, (min + max) / 2.0, max]
-    }
-}
-
 pub fn wrap_point_func_with_anchor(
     f: impl Fn(&mut DVec3) + Copy,
     anchor: DVec3,
@@ -292,34 +280,6 @@ pub fn wrap_point_func_with_anchor(
         *points -= anchor;
         f(points);
         *points += anchor;
-    }
-}
-
-impl Position for [DVec3] {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.iter_mut().for_each(|p| *p += shift);
-        self
-    }
-
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: super::Anchor) -> &mut Self {
-        let rotation = DMat3::from_axis_angle(axis, angle);
-        let p = match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        };
-        self.iter_mut()
-            .for_each(wrap_point_func_with_anchor(|p| *p = rotation * *p, p));
-        self
-    }
-
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: super::Anchor) -> &mut Self {
-        let p = match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        };
-        self.iter_mut()
-            .for_each(wrap_point_func_with_anchor(|p| *p *= scale, p));
-        self
     }
 }
 
@@ -336,17 +296,17 @@ mod test {
 
     use crate::{
         components::vpoint::VPointComponentVec,
-        items::{
-            Blueprint,
-            vitem::{Circle, Square},
+        items::vitem::{
+            VItem,
+            geometry::{Circle, Square},
         },
         traits::Alignable,
     };
 
     #[test]
     fn test_align() {
-        let mut circle = Circle(1.0).build();
-        let mut square = Square(1.0).build();
+        let mut circle = VItem::from(Circle::new(1.0));
+        let mut square = VItem::from(Square::new(1.0));
         println!("{:?}", square.vpoints);
         square.align_with(&mut circle);
         println!("{:?}", square.vpoints);
@@ -370,7 +330,7 @@ mod test {
         assert_eq!(partial, points);
 
         let partial = points.get_partial(0.0..0.5);
-        println!("{:?}", partial);
+        println!("{partial:?}");
     }
 
     #[test]

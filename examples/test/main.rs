@@ -1,5 +1,5 @@
 #![allow(clippy::all)]
-#![allow(unused_imports)]
+#![allow(unused)]
 use std::{f64::consts::PI, time::Duration};
 
 use ::color::palette::css;
@@ -8,17 +8,21 @@ use log::LevelFilter;
 use ranim::{
     animation::{
         creation::{CreationAnim, WritingAnim},
-        fading::FadingAnimSchedule,
-        transform::{TransformAnim, TransformAnimSchedule},
+        fading::FadingAnim,
+        transform::TransformAnim,
     },
-    color::palettes::manim::{self, RED_C},
+    color::palettes::manim::{self, BLUE_C, RED_C},
     components::{Anchor, ScaleHint},
     items::{
+        Group,
         camera_frame::CameraFrame,
-        group::Group,
-        vitem::{Circle, Polygon, Square, VItem, arrow::Arrow},
+        vitem::{
+            self, VItem,
+            geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
+        },
     },
     prelude::*,
+    timeline::{TimelineFunc, TimelinesFunc},
     typst_svg,
 };
 
@@ -27,16 +31,32 @@ use ranim::{
 #[scene]
 struct TestScene;
 
-impl TimelineConstructor for TestScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
-        let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
-        let mut arrow = timeline.insert(arrow);
+impl SceneConstructor for TestScene {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+        let n = 8;
+        let arcs = (0..n)
+            .map(|i| {
+                let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
+                ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
+            })
+            .collect::<Group<_>>();
+        let r_arcs = r.init_timeline(arcs).id();
+        r.timeline_mut(r_arcs).show();
 
-        timeline.play(arrow.transform(|data| {
-            data.set_color(RED_C);
-            data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
-        }));
-        timeline.sync();
+        // text.set_stroke_color(manim::RED_C)
+        //     .set_stroke_width(0.05)
+        //     .set_fill_color(BLUE_C)
+        //     .set_fill_opacity(0.5);
+        // text.scale_to(ScaleHint::PorportionalHeight(8.0 * 0.8));
+        // let mut text = timeline.insert(text);
+        // let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
+        // let mut arrow = timeline.insert(arrow);
+
+        // timeline.play(arrow.transform(|data| {
+        //     data.set_color(RED_C);
+        //     data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
+        // }));
+        r.timelines_mut().forward(1.0);
     }
 }
 
@@ -58,7 +78,15 @@ fn main() {
     //     },
     // );
     // #[cfg(not(feature = "app"))]
-    // render_scene_at_sec(TestScene, 0.0, "test.png", &AppOptions::default());
+    // render_scene_at_sec(
+    //     TestScene,
+    //     0.0,
+    //     "test.png",
+    //     &AppOptions {
+    //         pixel_size: (1080, 1080),
+    //         ..Default::default()
+    //     },
+    // );
     render_scene(TestScene, &AppOptions::default());
 
     // reuires "app" feature

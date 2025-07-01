@@ -1,5 +1,5 @@
-use super::{AnimSchedule, AnimationSpan, EvalDynamic, ToEvaluator};
-use crate::items::Rabject;
+use super::{AnimationSpan, EvalDynamic};
+use crate::animation::Evaluator;
 use crate::traits::{Interpolatable, Opacity};
 use crate::utils::rate_functions::smooth;
 
@@ -9,33 +9,18 @@ impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 
 // MARK: Anim Trait
 pub trait FadingAnim<T: FadingRequirement + 'static> {
-    fn fade_in(&self) -> AnimationSpan<T>;
-    fn fade_out(&self) -> AnimationSpan<T>;
-}
-
-pub trait FadingAnimSchedule<T: FadingRequirement + 'static> {
-    fn fade_in(&mut self) -> AnimSchedule<T>;
-    fn fade_out(&mut self) -> AnimSchedule<T>;
+    fn fade_in(self) -> AnimationSpan<T>;
+    fn fade_out(self) -> AnimationSpan<T>;
 }
 
 impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
-    fn fade_in(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(FadeIn::new(self.clone()).to_evaluator())
+    fn fade_in(self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(FadeIn::new(self.clone())))
             .with_rate_func(smooth)
     }
-    fn fade_out(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(FadeOut::new(self.clone()).to_evaluator())
+    fn fade_out(self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(FadeOut::new(self.clone())))
             .with_rate_func(smooth)
-    }
-}
-
-impl<T: FadingRequirement + 'static> FadingAnimSchedule<T> for Rabject<T> {
-    fn fade_in(&mut self) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.fade_in())
-    }
-
-    fn fade_out(&mut self) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.fade_out())
     }
 }
 
@@ -47,7 +32,7 @@ pub struct FadeIn<T: FadingRequirement> {
 }
 
 impl<T: FadingRequirement> FadeIn<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         let mut src = target.clone();
         let dst = target.clone();
         src.set_opacity(0.0);
@@ -67,7 +52,7 @@ pub struct FadeOut<T: FadingRequirement> {
 }
 
 impl<T: FadingRequirement> FadeOut<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         let src = target.clone();
         let mut dst = target.clone();
         dst.set_opacity(0.0);
