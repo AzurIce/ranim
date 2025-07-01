@@ -75,7 +75,7 @@ pub struct Create<T: CreationRequirement> {
 }
 
 impl<T: CreationRequirement> Create<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         Self { original: target }
     }
 }
@@ -99,7 +99,7 @@ pub struct UnCreate<T: CreationRequirement> {
 }
 
 impl<T: CreationRequirement> UnCreate<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         Self { original: target }
     }
 }
@@ -132,7 +132,7 @@ pub struct Write<T: WritingRequirement> {
 }
 
 impl<T: WritingRequirement> Write<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)
@@ -168,7 +168,7 @@ pub struct GroupWrite<T: WritingRequirement> {
 }
 
 impl<T: WritingRequirement> GroupWrite<T> {
-    fn new<I>(target: I, lag_ratio: f64) -> Self
+    pub fn new<I>(target: I, lag_ratio: f64) -> Self
     where
         I: IntoIterator<Item = T>,
     {
@@ -211,7 +211,7 @@ pub struct Unwrite<T: WritingRequirement> {
 }
 
 impl<T: WritingRequirement> Unwrite<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)

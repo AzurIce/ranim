@@ -32,7 +32,7 @@ pub struct FadeIn<T: FadingRequirement> {
 }
 
 impl<T: FadingRequirement> FadeIn<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         let mut src = target.clone();
         let dst = target.clone();
         src.set_opacity(0.0);
@@ -52,7 +52,7 @@ pub struct FadeOut<T: FadingRequirement> {
 }
 
 impl<T: FadingRequirement> FadeOut<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         let src = target.clone();
         let mut dst = target.clone();
         dst.set_opacity(0.0);
