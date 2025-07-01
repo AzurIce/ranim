@@ -13,19 +13,15 @@ impl SceneConstructor for GettingStarted0Scene {
         let square = Square::new(2.0).with(|square| {
             square.set_color(manim::BLUE_C);
         });
-        let r_square = r.init_timeline(square).id();
 
-        {
-            let timeline = r.timeline_mut(r_square);
-            timeline.play_with(|square| square.fade_in());
-            timeline.forward(1.0);
-            timeline.play_with(|square| square.fade_out());
-        }
-
-        // The play method returns the result of the animation,
-        // so it can also be written like this:
-        // let square = timeline.play(square.fade_in());
-        // timeline.play(square.fade_out());
+        let timeline = r.init_timeline(square);
+        timeline.play_with(|square| square.fade_in());
+        timeline.forward(1.0);
+        timeline.hide();
+        timeline.forward(1.0);
+        timeline.show();
+        timeline.forward(1.0);
+        timeline.play_with(|square| square.fade_out());
     }
 }
 
