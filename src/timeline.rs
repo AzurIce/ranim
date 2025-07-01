@@ -69,7 +69,7 @@ impl TimelineFunc for Timeline {
     }
 }
 
-/// Timeline is a type erased [`RabjectTimeline<T>`]
+/// Timeline is a type erased [`ItemTimeline<T>`]
 ///
 /// Currently There are two types of Timeline:
 /// - [`InnerTimeline::VisualItem`]: Can be created from [`VisualItem`], has a boxed [`AnyVisualItemTimelineTrait`] in it.
@@ -79,14 +79,14 @@ pub enum InnerTimeline {
     VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
 }
 
-impl From<RabjectTimeline<CameraFrame>> for InnerTimeline {
-    fn from(value: RabjectTimeline<CameraFrame>) -> Self {
+impl From<ItemTimeline<CameraFrame>> for InnerTimeline {
+    fn from(value: ItemTimeline<CameraFrame>) -> Self {
         InnerTimeline::CameraFrame(Box::new(value))
     }
 }
 
-impl<T: VisualItem + Clone + 'static> From<RabjectTimeline<T>> for InnerTimeline {
-    fn from(value: RabjectTimeline<T>) -> Self {
+impl<T: VisualItem + Clone + 'static> From<ItemTimeline<T>> for InnerTimeline {
+    fn from(value: ItemTimeline<T>) -> Self {
         InnerTimeline::VisualItem(Box::new(value))
     }
 }
@@ -143,9 +143,9 @@ impl RanimScene {
         Self::default()
     }
 
-    pub fn init_timeline<T: Clone + 'static>(&mut self, state: T) -> &mut RabjectTimeline<T>
+    pub fn init_timeline<T: Clone + 'static>(&mut self, state: T) -> &mut ItemTimeline<T>
     where
-        RabjectTimeline<T>: Into<InnerTimeline>,
+        ItemTimeline<T>: Into<InnerTimeline>,
     {
         let id = TimelineId::alloc();
         self._make_sure_timeline_initialized::<T>(id.id(), state);
@@ -166,10 +166,10 @@ impl RanimScene {
 
     fn _make_sure_timeline_initialized<T: Clone + 'static>(&mut self, id: usize, state: T)
     where
-        RabjectTimeline<T>: Into<InnerTimeline>,
+        ItemTimeline<T>: Into<InnerTimeline>,
     {
         if self.timeline(id).is_none() {
-            let rabject_timeline = RabjectTimeline::<T>::new(TimelineId::new(id), state);
+            let rabject_timeline = ItemTimeline::<T>::new(TimelineId::new(id), state);
             self.timelines.push(Timeline {
                 id,
                 inner: rabject_timeline.into(),
@@ -217,7 +217,7 @@ impl SealedRanimScene {
         let eval_timeline = |timeline: &Timeline| match &timeline.inner {
             InnerTimeline::CameraFrame(inner) => {
                 let timeline = (inner.as_ref() as &dyn Any)
-                    .downcast_ref::<RabjectTimeline<CameraFrame>>()
+                    .downcast_ref::<ItemTimeline<CameraFrame>>()
                     .unwrap();
                 if let Some(res) = timeline.eval_sec(target_sec) {
                     camera_frame = Some(res)
@@ -283,8 +283,8 @@ impl<'a> TimelineIndex<'a> for usize {
 }
 
 impl<'a, T: 'static> TimelineIndex<'a> for TimelineId<T> {
-    type RefOutput = &'a RabjectTimeline<T>;
-    type MutOutput = &'a mut RabjectTimeline<T>;
+    type RefOutput = &'a ItemTimeline<T>;
+    type MutOutput = &'a mut ItemTimeline<T>;
     fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput {
         timeline
             .timelines()
@@ -293,7 +293,7 @@ impl<'a, T: 'static> TimelineIndex<'a> for TimelineId<T> {
             .map(|timeline| {
                 timeline
                     .as_any()
-                    .downcast_ref::<RabjectTimeline<T>>()
+                    .downcast_ref::<ItemTimeline<T>>()
                     .unwrap()
             })
             .unwrap()
@@ -306,7 +306,7 @@ impl<'a, T: 'static> TimelineIndex<'a> for TimelineId<T> {
             .map(|timeline| {
                 timeline
                     .as_any_mut()
-                    .downcast_mut::<RabjectTimeline<T>>()
+                    .downcast_mut::<ItemTimeline<T>>()
                     .unwrap()
             })
             .unwrap()
@@ -314,8 +314,8 @@ impl<'a, T: 'static> TimelineIndex<'a> for TimelineId<T> {
 }
 
 impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for &[TimelineId<T>; N] {
-    type RefOutput = [&'a RabjectTimeline<T>; N];
-    type MutOutput = [&'a mut RabjectTimeline<T>; N];
+    type RefOutput = [&'a ItemTimeline<T>; N];
+    type MutOutput = [&'a mut ItemTimeline<T>; N];
     fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput {
         // TODO: the order is not stable
         let mut timelines = timeline
@@ -329,7 +329,7 @@ impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for &[TimelineId<T>; N] {
         timelines.map(|timeline| {
             timeline
                 .as_any()
-                .downcast_ref::<RabjectTimeline<T>>()
+                .downcast_ref::<ItemTimeline<T>>()
                 .unwrap()
         })
     }
@@ -346,7 +346,7 @@ impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for &[TimelineId<T>; N] {
         timelines.map(|timeline| {
             timeline
                 .as_any_mut()
-                .downcast_mut::<RabjectTimeline<T>>()
+                .downcast_mut::<ItemTimeline<T>>()
                 .unwrap()
         })
     }
@@ -425,7 +425,7 @@ pub trait VisualItemTimelineTrait: TimelineFunc {
     fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)>;
 }
 
-impl<T: Clone + VisualItem + 'static> VisualItemTimelineTrait for RabjectTimeline<T> {
+impl<T: Clone + VisualItem + 'static> VisualItemTimelineTrait for ItemTimeline<T> {
     fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)> {
         let (item, idx) = self.eval_sec(target_sec)?;
         let item = item.map(|item| Box::new(item) as Box<dyn VisualItem>);
@@ -461,17 +461,17 @@ pub trait TimelineFunc {
     fn show_secs(&self) -> &Vec<f64>;
 }
 
-// MARK: RabjectTimeline
+// MARK: ItemTimeline
 /// A timeline struct that encodes the animation of the type `T`
-pub struct RabjectTimeline<T> {
+pub struct ItemTimeline<T> {
     id: TimelineId<T>,
     type_name: String,
     cur_sec: f64,
     /// The state used for static anim.
     ///
-    /// It will be `Some` after the first [`RabjectTimeline::update`] or [`RabjectTimeline::update_with`]
+    /// It will be `Some` after the first [`ItemTimeline::update`] or [`ItemTimeline::update_with`]
     ///
-    /// The [`RabjectTimeline::show`] only works when it is `Some`.
+    /// The [`ItemTimeline::show`] only works when it is `Some`.
     state: T,
     /// The start time of the planning static anim.
     /// When it is true, it means that it is showing.
@@ -481,7 +481,7 @@ pub struct RabjectTimeline<T> {
     show_secs: Vec<f64>,
 }
 
-impl<T: Clone + 'static> TimelineFunc for RabjectTimeline<T> {
+impl<T: Clone + 'static> TimelineFunc for ItemTimeline<T> {
     fn seal(&mut self) {
         // println!("seal");
         self._submit_planning_static_anim();
@@ -495,7 +495,7 @@ impl<T: Clone + 'static> TimelineFunc for RabjectTimeline<T> {
     fn show_secs(&self) -> &Vec<f64> {
         &self.show_secs
     }
-    /// The [`RabjectTimeline::state`] should be `Some`
+    /// The [`ItemTimeline::state`] should be `Some`
     fn show(&mut self) {
         // println!("show");
         if self.planning_static_start_sec.is_none() {
@@ -531,11 +531,11 @@ impl<T: Clone + 'static> TimelineFunc for RabjectTimeline<T> {
     }
 }
 
-impl<T: 'static> RabjectTimeline<T> {
+impl<T: 'static> ItemTimeline<T> {
     /// Create a new timeline with the initial state
     ///
     /// The timeline is hidden by default, because we don't know when the first anim starts.
-    /// And this allow us to use [`RabjectTimeline::forward`] and [`RabjectTimeline::forward_to`]
+    /// And this allow us to use [`ItemTimeline::forward`] and [`ItemTimeline::forward_to`]
     /// to adjust the start time of the first anim.
     pub(crate) fn new(id: TimelineId<T>, state: T) -> Self {
         Self {
@@ -550,7 +550,7 @@ impl<T: 'static> RabjectTimeline<T> {
     }
 }
 
-impl<T: Clone + 'static> RabjectTimeline<T> {
+impl<T: Clone + 'static> ItemTimeline<T> {
     pub fn id(&self) -> TimelineId<T> {
         self.id
     }
