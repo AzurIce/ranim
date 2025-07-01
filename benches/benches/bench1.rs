@@ -91,7 +91,7 @@ fn render_benchmark(c: &mut Criterion) {
                 render_scene(
                     StaticSquareScene(*n),
                     &AppOptions {
-                        output_dir: format!("./output-bench/static_squares/{}", n).as_str(),
+                        output_dir: format!("./output-bench/static_squares/{n}").as_str(),
                         ..Default::default()
                     },
                 );
@@ -103,7 +103,7 @@ fn render_benchmark(c: &mut Criterion) {
                 render_scene(
                     TransformSquareScene(*n),
                     &AppOptions {
-                        output_dir: format!("./output-bench/transform_squares/{}", n).as_str(),
+                        output_dir: format!("./output-bench/transform_squares/{n}").as_str(),
                         ..Default::default()
                     },
                 );

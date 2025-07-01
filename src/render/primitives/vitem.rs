@@ -339,7 +339,7 @@ mod test {
         );
         let uniforms = uniforms_buffer.read_buffer(&ctx);
         let uniforms: &[CameraUniforms] = bytemuck::cast_slice(&uniforms);
-        println!("uniforms: {:?}", uniforms);
+        println!("uniforms: {uniforms:?}");
         let camera_bind_group = CameraUniformsBindGroup::new(&ctx, &uniforms_buffer);
         let render_textures = RenderTextures::new(&ctx, width, height);
 
@@ -402,14 +402,14 @@ mod test {
         ctx.queue.submit(Some(encoder.finish()));
         let points3d = vitem_primitive.points3d_buffer.read_buffer(&ctx).unwrap();
         let points3d = bytemuck::cast_slice::<_, Vec4>(&points3d);
-        println!("points3d: {:?}", points3d);
+        println!("points3d: {points3d:?}");
         let points2d = vitem_primitive.points2d_buffer.read_buffer(&ctx).unwrap();
         let points2d = bytemuck::cast_slice::<_, Vec4>(&points2d);
-        println!("points2d: {:?}", points2d);
+        println!("points2d: {points2d:?}");
 
         let res = vitem_primitive.clip_info_buffer.read_buffer(&ctx).unwrap();
         let res: &[i32] = bytemuck::cast_slice(&res);
-        println!("Clip Info: {:?}", res);
+        println!("Clip Info: {res:?}");
 
         let texture_data = get_texture_data(&ctx, &render_textures.render_texture);
         let img_buffer = image::ImageBuffer::<Rgba<u8>, &[u8]>::from_raw(

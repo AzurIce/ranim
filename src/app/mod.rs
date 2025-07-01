@@ -334,10 +334,10 @@ fn redraw(
 // MARK: Resize
 fn resize(ctx: &WgpuContext, app_renderer: &mut AppRenderer, size: PhysicalSize<u32>) {
     if size.width == 0 || size.height == 0 {
-        log::warn!("[resize]: ignored resize to value <= 0: {:?}", size);
+        log::warn!("[resize]: ignored resize to value <= 0: {size:?}");
         return;
     }
-    log::info!("[resize]: {:?}", size);
+    log::info!("[resize]: {size:?}");
     {
         app_renderer.surface_config.width = size.width;
         app_renderer.surface_config.height = size.height;
@@ -451,7 +451,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
         log::info!("app_renderer initialized");
         if let Some(window) = self.window.as_ref() {
             let size = window.inner_size();
-            log::info!("window size: {:?}", size);
+            log::info!("window size: {size:?}");
             resize(&wgpu_ctx, &mut app_renderer, size)
         }
         self.app_renderer.replace(app_renderer);

@@ -330,7 +330,7 @@ mod test {
         assert_eq!(partial, points);
 
         let partial = points.get_partial(0.0..0.5);
-        println!("{:?}", partial);
+        println!("{partial:?}");
     }
 
     #[test]
