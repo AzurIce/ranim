@@ -1,9 +1,8 @@
 [package]
 name = "app"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
+version = "0.1.0"
+edition = "2024"
+publish = false
 
 [dependencies]
 console_error_panic_hook = "0.1.7"
