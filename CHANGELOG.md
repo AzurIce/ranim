@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.14] - 2025-07-01
+
+### 🚀 Features
+
+- Make preview app supports wasm web, closes: #67
+- Added wasm app into website examples
+
+### 🐛 Bug Fixes
+
+- Use chrono instead of time for typst world
+
+### 🚜 Refactor
+
+- Added extract stage
+- Traits and geometry(WIP)
+- Added PinnedItem, rework on timeline and anim APIs(WIP)
+- Refactor timeline with show_secs
+- Migrated some items and examples to the new item and timeline system
+- Rework timeline
+- Rename RabjectTimeline to ItemTimeline
+- Removed padding from AnimationSpan
+- Change type_name field of AnimationSpan to a method
+- Refactor book structure
+
+### 📚 Documentation
+
+- Update doc for Anchor::Edge
+
+### ⚙️ Miscellaneous Tasks
+
+- Update deps
+
+### WIP
+
+- Refactor rabject and timeline
+
+### Website
+
+- Moved getting started to guide based on mdbook, added doc
+- Update book and examples
+
 ## [0.1.0-alpha.13] - 2025-05-01
 
 ### 🚀 Features
@@ -21,6 +62,7 @@ All notable changes to this project will be documented in this file.
 
 - Use pretty_env_logger instead of env_logger
 - Added puffin_viewer to flake shell
+- Release
 
 ### WIP
 
@@ -74,16 +116,6 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- Clamp the timeline zoom to 100ms~total_sec
-
-### ⚙️ Miscellaneous Tasks
-
-- Release
-
-## [0.1.0-alpha.8] - 2025-03-29
-
-### 🚀 Features
-
 - Added scale_to and ScaleHint
 - Added profiling based on puffin and wgpu_profiler
 - Basic app
@@ -93,6 +125,7 @@ All notable changes to this project will be documented in this file.
 - Timeline grid painting
 - Max 100 timeline * 100 anims info drawing
 - Current time indicator line, window title
+- Clamp the timeline zoom to 100ms~total_sec
 
 ### 🐛 Bug Fixes
 
@@ -119,6 +152,7 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
+- Release
 - Release
 
 ## [0.1.0-alpha.7] - 2025-03-19
