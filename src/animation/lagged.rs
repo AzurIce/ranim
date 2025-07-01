@@ -40,7 +40,7 @@ pub struct Lagged<T> {
 }
 
 impl<T> Lagged<T> {
-    fn new<I>(target: I, lag_ratio: f64, anim_func: impl FnMut(T) -> AnimationSpan<T>) -> Self
+    pub fn new<I>(target: I, lag_ratio: f64, anim_func: impl FnMut(T) -> AnimationSpan<T>) -> Self
     where
         I: IntoIterator<Item = T>,
     {

@@ -26,7 +26,7 @@ pub struct Func<T: FuncRequirement> {
 }
 
 impl<T: FuncRequirement> Func<T> {
-    fn new(target: T, f: impl Fn(&T, f64) -> T + 'static) -> Self {
+    pub fn new(target: T, f: impl Fn(&T, f64) -> T + 'static) -> Self {
         Self {
             src: target,
             f: Box::new(f),
