@@ -290,12 +290,7 @@ impl<'a, T: 'static> TimelineIndex<'a> for TimelineId<T> {
             .timelines()
             .iter()
             .find(|timeline| self.id() == timeline.id)
-            .map(|timeline| {
-                timeline
-                    .as_any()
-                    .downcast_ref::<ItemTimeline<T>>()
-                    .unwrap()
-            })
+            .map(|timeline| timeline.as_any().downcast_ref::<ItemTimeline<T>>().unwrap())
             .unwrap()
     }
     fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput {
@@ -326,12 +321,7 @@ impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for &[TimelineId<T>; N] {
             .unwrap();
         timelines
             .sort_by_key(|timeline| self.iter().position(|id| id.id() == timeline.id).unwrap());
-        timelines.map(|timeline| {
-            timeline
-                .as_any()
-                .downcast_ref::<ItemTimeline<T>>()
-                .unwrap()
-        })
+        timelines.map(|timeline| timeline.as_any().downcast_ref::<ItemTimeline<T>>().unwrap())
     }
     fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput {
         // TODO: the order is not stable
@@ -519,8 +509,8 @@ impl<T: Clone + 'static> TimelineFunc for ItemTimeline<T> {
                 let end = show_sec.last().unwrap();
                 AnimationInfo {
                     anim_name: anim.type_name.clone(),
-                    start_sec: *start + anim.padding.0,
-                    end_sec: *end - anim.padding.1,
+                    start_sec: *start,
+                    end_sec: *end,
                 }
             })
             // .take(MAX_INFO_CNT)
