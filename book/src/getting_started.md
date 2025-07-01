@@ -1,6 +1,14 @@
 # Getting Started
 
-在 Ranim 中，定义并渲染一段动画的方式基本长成下面这个样子：
+<div class="warning">
+
+注意：
+
+当前本章内容非常不完善，结构不清晰、内容不完整，目前建议结合 Example 和源码来了解。
+
+</div>
+
+在 Ranim 中，定义并渲染一段动画的代码基本长成下面这个样子：
 
 ```rust
 use ranim::prelude::*;
@@ -40,106 +48,77 @@ fn main() {
 
 **RanimTimeline** 和 **Rabject** 这两个类型非常重要，将贯穿整个 Ranim 动画的编码。
 
-## 1. Timeline 和 TimelineId
+## 1. Timeline 基础
 
 `RanimScene` 中有若干个 `Timeline`，每个 `Timeline` 中包含一系列的动画列表。
 
-通过 `r.init_timeline(state)` 可以创建一个 `Timeline`，而通过 `r.timeline(id)`, `r.timeline_mut(id)`, `r.timelines()`, `r.timelines_mut()` 可以获取对应 Id 的 `Timeline`。
+通过 `r.init_timeline(state)` 可以创建一个 `Timeline`：
 
-
-
-Ranim 使用一个 `RanimTimeline` 结构来编码动画，首先介绍两个最基本的操作：
-- 使用 `timeline.forward(duration_secs)` 来使时间线推进一段时间
-- 使用 `timeline.insert(item)` 来将一个 `item: T` 插入时间线，返回一个 `Rabject<T>`
-
-`Rabject<T>` 的结构很简单，如下：
-
-```rust
-pub struct Rabject<'a, T> {
-    pub id: usize,
-    pub data: T,
-}
+```rust,ignore
+let square: Square = Square::new(2.0).with(|square| {
+    square.set_color(manim::BLUE_C);
+});
+let r_square: TimelineId<Square> = r.init_timeline(square).id();
 ```
 
-当某个物件 `T` 被插入 `RanimTimeline` 中时，会被赋予一个 Id，以 `Rabject<T>` 的形式返回，同时在 `RanimTimeline` 内部会以 `T` 的值为初始状态创建一条 `RabjectTimeline`。
+`RanimScene` 中有关 `Timeline` 的方法如下：
 
-使用 `timeline.show(&rabject)` 和 `timeline.hide(&rabject)` 可以控制接下来 `forward` 时的表现。
+|方法|描述|
+|---|---|
+|`r.init_timeline(state)`|创建一个 `Timeline`|
+|`r.timeline(id)`|获取对应 `id` 的 `Timeline` 的不可变引用|
+|`r.timeline_mut(id)`|获取对应 `id` 的 `Timeline` 的可变引用|
+|`r.timelines()`|获取类型擦除后的全部时间线的不可变引用|
+|`r.timelines_mut()`|获取类型擦除后的全部时间线的可变引用|
 
-此外 `hide` 有一个获取 Rabject 所有权的变体：`timeline.remove(rabject)`，与 `hide` 效果相同。
+时间线是用于编码动画的结构，首先介绍几个最基本的操作：
+- 使用 `timeline.forward(duration_secs)` 来使时间线推进一段时间
+- 使用 `timeline.play(anim)` 来向时间线中插入一段动画
+- 使用 `timeline.show()` 和 `timeline.hide()` 可以控制物体接下来 `forward` 时显示与否。
 
-下面的例子使用一个 `VItem` 物件和 `timeline.insert` 在时间线中创建了一个 `Rabject<VItem>` 并展示了 `show`、`hide` 以及 `remove` 对其影响：
+下面的例子使用一个 `Square` 初始化了一个时间线，然后编码了淡入1秒、显示0.5秒、消失0.5秒、显示0.5秒、淡出1秒的动画：
 
-!example-getting_started0
+```rust,ignore
+// A Square with size 2.0 and color blue
+let square = Square::new(2.0).with(|square| {
+    square.set_color(manim::BLUE_C);
+});
 
-## 2. 播放动画
-
-Ranim 中的每一个动画都会为实现了对应 Trait 的物件添加对应的创建方法。
-
-比如对于 `FadingAnim`，凡是实现了 `Opacity + Interpolatable` Trait 的物件都会拥有 `fade_in` 和 `fade_out` 方法。
-
-对一个 `Rabject<T>` 调用创建动画的方法会返回一个 `AnimSchedule<T>`，将它传入 `timeline.play(anim_schedule)` 即可将这段动画编码在 `RanimTimeline` 中。
-
-```rust
-let mut square = timeline.insert(square);
-timeline.play(square.fade_in());
+let timeline = r.init_timeline(square.clone());
+timeline.play(square.clone().fade_in());
+timeline.forward(1.0);
+timeline.hide();
+timeline.forward(1.0);
+timeline.show();
+timeline.forward(1.0);
 timeline.play(square.fade_out());
 ```
 
-上面的动画也可以这样写：
-```rust
-let mut square = timeline.insert(square);
-timeline.play(square.fade_in().chain(|data| data.fade_out()));
+时间线内部维护了一个物件的状态值，在 `forward` 时会使用它来编码静态的动画，通过 `timeline.state()` 可以获取时间线内部的物件状态值。于是上面的代码也可以写作：
+
+```rust,ignore
+let timeline: &mut ItemTimeline<Square> = r.init_timeline(square);
+timeline.play(timeline.state().clone().fade_in());
+// ...
+timeline.play(timeline.state().clone().fade_out());
 ```
 
-`AnimSchedule<T>` 的 `chain` 方法，接受一个 `impl FnOnce(T) -> Animation<T>`，会将两个动画拼接在一起。
+同时为了便捷，还有一个 `timeline.play_with(builder)` 方法来编码动画：
 
-而 `T` 与 `&'r mut Rabject<'t, T>` 相同，也有创建动画的方法，不过返回的是 `Animation<T>`。
-
-!example-getting_started1
-
-## 3. 动画参数
-
-`AnimSchedule<T>` 和 `Animation<T>` 都具有一些控制动画属性的参数，可以通过链式调用的方式来设置：
-- `with_duration(duration_secs)`：设置动画持续时间
-- `with_rate_func(rate_func)`：设置动画速率函数
-
-此外在这个例子中你会发现，在播放了 `transform_to(circle)` 之后，再播放 `fade_out` 时，播放的并不是圆形的淡出，而是方形。
-
-这并不是一个 Bug，而是一种刻意的设计，请继续向下阅读 4. 向 Rabject 应用动画变更，了解更多。
-
-!example-getting_started2
-
-## 4. 向 Rabject 应用动画变更（AnimSchedule 与 apply）
-
-使用 Rabject 创建动画时是基于 Rabject 当前的内部数据来创建的，创建与播放动画并不会修改其内部数据。
-如果想要一个动画的效果实际应用到 Rabject 中，那么需要对 `AnimSchedule` 使用 `apply` 方法。
-
-这样的好处是对于一些对数据有 **损坏性变更** 的动画（比如 unwrite 等），我们不需要提前对数据进行备份。
-
-!example-hello_ranim
-
-不过 `chain` 是会以第一个动画的结束状态为基础创建下一个动画的，但是要注意此时的 `AnimSchedule` 是整个被拼接后的动画，如果不调用 `apply` 是不会更新 `Rabject` 内部的数据的，而调用 `apply` 会应用整个被拼接后的动画的变更：
-
-```rust
-// <-- Rabject's data is a square
-timeline.play(
-    square
-        .transform_to(circle)
-        .chain(|data| data.unwrite())
-);
-// <-- Rabject's data is still a square
-timeline.play(square.write()); // This plays a square's unwrite, but not circle's
+```rust,ignore
+impl<T: Clone + 'static> ItemTimeline<T> {
+    // ...
+    pub fn play_with(&mut self, anim_func: impl FnOnce(T) -> AnimationSpan<T>) -> T {
+        self.play(anim_func(self.state.clone()))
+    }
+}
 ```
 
-```rust
-// <-- Rabject's data is a square
-timeline.play(
-    square
-        .transform_to(circle)
-        .chain(|data| data.unwrite())
-        .apply(), // <-- Rabject's data is an unwrote circle now
-);
-timeline.play(square.write()); // This plays nothing, because after the apply, the data is empty（unwrote circle）
-```
+于是之前的代码也可以写作：
 
-简单来说 `AnimSchedule` 的作用就是将具有紧密关系的动画组合在一起，通过 `apply` 会应用整个动画（类似 Transaction 的感觉）。
+```rust,ignore
+let timeline: &mut ItemTimeline<Square> = r.init_timeline(square);
+timeline.play_with(|square| square.fade_in());
+// ...
+timeline.play_with(|square| square.fade_out());
+```

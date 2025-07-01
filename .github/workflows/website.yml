@@ -27,7 +27,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: just, mdbook, zola
+          tool: just, mdbook, zola, mdbook-katex
 
       - run: just website
 
