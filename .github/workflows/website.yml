@@ -27,9 +27,9 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: zola@0.19.2
+          tool: just, mdbook, zola, mdbook-katex
 
-      - run: cd website && zola build
+      - run: just website
 
       - name: ⏫ Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v1.0.7

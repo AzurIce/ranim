@@ -22,7 +22,9 @@ fn vs_main(@builtin(vertex_index)index: u32) -> VertexOutput {
     var x = viewport.x;
     var y = viewport.y;
 
+    // 1.0, 1.0, -1.0, -1.0
     let coord_x = select(1.0, -1.0, (index & 2u) == 0u);
+    // 1.0, -1.0, 1.0, -1.0
     let coord_y = select(1.0, -1.0, (index & 1u) == 0u);
     x += coord_x * width;
     y += coord_y * height;

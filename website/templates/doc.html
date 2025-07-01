@@ -1,0 +1,38 @@
+{% import "macros/code-examples.html" as code_examples %}
+{% import "macros/docs.html" as docs %}
+{% extends "layouts/three-col.html" %}
+
+{% block theme %}light-mode{% endblock %}
+
+{% block left_side %}
+{% set doc_section = get_section(path="doc/_index.md") %}
+<div class="outline">
+  {{ docs::menu(root=doc_section) }}
+</div>
+<!-- <div class="outline">
+  <div class="outline__content">
+    <ul>
+      <li>
+        <a href="{{ doc_section.permalink }}"
+          class="outline-item {% if section_or_page and section_or_page.permalink == doc_section.permalink %}active{% endif %}">
+          <span>{{ doc_section.title }}</span>
+        </a>
+      </li>
+      {% for page in doc_section.pages %}
+      <li>
+        <a href="{{ page.permalink }}"
+          class="outline-item {% if section_or_page and section_or_page.permalink == page.permalink %}active{% endif %}">{{
+          page.title }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div> -->
+{% endblock left_side %}
+
+{% block content %}
+<article class="markdown-body">
+  {{ code_examples::process_code_block(content=section_or_page.content) | safe }}
+  <!-- {{ section_or_page.content | safe }} -->
+</article>
+{% endblock content %}

@@ -12,24 +12,26 @@ use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
     event::WindowEvent,
-    event_loop::ActiveEventLoop,
+    event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
     window::{Window, WindowId},
 };
 
+#[allow(unused)]
 use crate::{
     Scene, SceneMeta,
     animation::EvalResult,
+    app::egui_tools::EguiRenderer,
     build_timeline,
-    context::{RanimContext, WgpuContext},
-    prelude::RanimTimeline,
+    context::WgpuContext,
     render::{
         Renderer,
         pipelines::app::{AppPipeline, Viewport},
         primitives::RenderInstances,
     },
-    timeline::TimelineEvalResult,
+    timeline::{SealedRanimScene, TimelineEvalResult},
 };
 
+#[allow(unused)]
 #[derive(Default, Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct OccupiedScreenSpace {
@@ -39,50 +41,511 @@ struct OccupiedScreenSpace {
     right: f32,
 }
 
-struct RenderState {
-    pub surface_config: wgpu::SurfaceConfiguration,
-    pub surface: wgpu::Surface<'static>,
-    pub scale_factor: f32,
-    pub egui_renderer: egui_tools::EguiRenderer,
-    pub app_pipeline: AppPipeline,
-
-    pub viewport: Viewport,
+struct TimelineInfo {
+    ctx: egui::Context,
+    canvas: egui::Rect,
+    response: egui::Response,
+    painter: egui::Painter,
+    text_height: f32,
+    font_id: egui::FontId,
 }
 
-impl RenderState {
-    async fn new(
-        ctx: &WgpuContext,
-        surface: wgpu::Surface<'static>,
-        window: &Window,
-        width: u32,
-        height: u32,
-        render_view: &wgpu::TextureView,
-    ) -> Self {
-        let swapchain_capabilities = surface.get_capabilities(&ctx.adapter);
-        let selected_format = wgpu::TextureFormat::Bgra8UnormSrgb;
-        let swapchain_format = swapchain_capabilities
-            .formats
-            .iter()
-            .find(|d| **d == selected_format)
-            .expect("failed to select proper surface texture format!");
+impl TimelineInfo {
+    fn point_from_ms(&self, state: &TimelineState, ms: i64) -> f32 {
+        self.canvas.min.x
+            + state.offset_points
+            + self.canvas.width() * ms as f32 / (state.width_sec * 1000.0) as f32
+    }
+}
 
-        let surface_config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: *swapchain_format,
-            width,
-            height,
-            present_mode: wgpu::PresentMode::AutoVsync,
-            desired_maximum_frame_latency: 0,
-            alpha_mode: swapchain_capabilities.alpha_modes[0],
-            view_formats: vec![],
+#[allow(unused)]
+struct AppState {
+    meta: SceneMeta,
+    timeline: SealedRanimScene,
+    // app_options: AppOptions<'a>,
+    // timeline: RanimTimeline,
+    // renderer: Renderer,
+    last_sec: f64,
+    render_instances: RenderInstances,
+    timeline_state: TimelineState,
+}
+
+impl AppState {
+    fn new(scene: impl Scene) -> Self {
+        let meta = scene.meta();
+        let timeline = build_timeline(scene);
+        let timeline_infos = timeline.get_timeline_infos();
+        // let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
+        Self {
+            meta,
+            // renderer,
+            last_sec: -1.0,
+            render_instances: RenderInstances::default(),
+            timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
+            timeline,
+        }
+    }
+    pub fn prepare(&mut self, ctx: &WgpuContext, app_renderer: &mut AppRenderer) {
+        #[cfg(feature = "profiling")]
+        profiling::scope!("frame");
+
+        // app_renderer
+        //     .app_pipeline
+        //     .bind_group
+        //     .update_viewport(&ctx.queue, app_renderer.viewport);
+
+        if self.last_sec == self.timeline_state.current_sec {
+            return;
+        }
+        self.last_sec = self.timeline_state.current_sec;
+
+        let TimelineEvalResult {
+            // EvalResult<CameraFrame>, idx
+            camera_frame,
+            // Vec<(rabject_id, EvalResult<Item>, idx)>
+            visual_items,
+        } = {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("eval");
+
+            self.timeline.eval_sec(self.timeline_state.current_sec)
         };
+
+        let extracted = {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("extract");
+            visual_items
+                .iter()
+                .map(|(id, res, _)| {
+                    let renderable = match res {
+                        EvalResult::Dynamic(res) => res.extract_renderable(),
+                        EvalResult::Static(res) => res.extract_renderable(),
+                    };
+                    (*id, renderable)
+                })
+                .collect::<Vec<_>>()
+        };
+
+        {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("prepare");
+            extracted.iter().for_each(|(id, renderable)| {
+                renderable.prepare_for_id(ctx, &mut self.render_instances, *id);
+            });
+            ctx.queue.submit([]);
+        }
+
+        let render_primitives = visual_items
+            .iter()
+            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
+            .collect::<Vec<_>>();
+        let camera_frame = match &camera_frame.0 {
+            EvalResult::Dynamic(res) => res,
+            EvalResult::Static(res) => res,
+        };
+        // println!("{:?}", camera_frame);
+        // println!("{}", render_primitives.len());
+        app_renderer
+            .ranim_renderer
+            .update_uniforms(ctx, camera_frame);
+
+        {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("render");
+
+            app_renderer.ranim_renderer.render(ctx, &render_primitives);
+        }
+    }
+
+    #[allow(clippy::field_reassign_with_default)]
+    pub fn ui(&mut self, app_renderer: &mut AppRenderer) -> OccupiedScreenSpace {
+        // let scale_factor = app_renderer.scale_factor;
+        let mut occupied_screen_space = OccupiedScreenSpace::default();
+
+        occupied_screen_space.bottom = egui::TopBottomPanel::bottom("bottom_panel")
+            .resizable(true)
+            .max_height(600.0)
+            .show(app_renderer.egui_renderer.context(), |ui| {
+                ui.label("Timeline");
+
+                ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
+                ui.add(
+                    egui::Slider::new(
+                        &mut self.timeline_state.current_sec,
+                        0.0..=self.timeline_state.total_sec,
+                    )
+                    .text("sec"),
+                );
+
+                // self.timeline_state.ui_preview_timeline(ui);
+                self.timeline_state.ui_main_timeline(ui);
+            })
+            .response
+            .rect
+            .height()
+            * app_renderer.egui_renderer.context().pixels_per_point();
+
+        occupied_screen_space
+    }
+}
+
+// in resume: create the window, and launch the async task to init WgpuContext
+// the WgpuContext will be sent through event loop proxy as user event
+struct WinitApp {
+    event_loop_proxy: Option<EventLoopProxy<WgpuContext>>,
+    app_state: AppState,
+
+    size: (u32, u32),
+    window: Option<Arc<Window>>,
+    app_renderer: Option<AppRenderer>,
+    wgpu_ctx: Option<WgpuContext>,
+}
+
+impl WinitApp {
+    fn new(scene: impl Scene, event_loop: &EventLoop<WgpuContext>) -> Self {
+        Self {
+            event_loop_proxy: Some(event_loop.create_proxy()),
+            app_state: AppState::new(scene),
+
+            size: (0, 0),
+            window: None,
+            app_renderer: None,
+            wgpu_ctx: None,
+        }
+    }
+}
+
+// MARK: Redraw
+fn redraw(
+    wgpu_ctx: &WgpuContext,
+    app_state: &mut AppState,
+    window: &Window,
+    app_renderer: &mut AppRenderer,
+) {
+    #[cfg(feature = "profiling")]
+    profiling::scope!("redraw");
+
+    // Attempt to handle minimizing window
+    if let Some(min) = window.is_minimized() {
+        if min {
+            println!("Window is minimized");
+            return;
+        }
+    }
+
+    let screen_descriptor = ScreenDescriptor {
+        size_in_pixels: [
+            app_renderer.surface_config.width,
+            app_renderer.surface_config.height,
+        ],
+        pixels_per_point: window.scale_factor() as f32,
+    };
+
+    let surface_texture = app_renderer.surface.get_current_texture();
+
+    match surface_texture {
+        Err(SurfaceError::Outdated) => {
+            // Ignoring outdated to allow resizing and minimization
+            println!("wgpu surface outdated");
+            return;
+        }
+        Err(_) => {
+            surface_texture.expect("Failed to acquire next swap chain texture");
+            return;
+        }
+        Ok(_) => {}
+    };
+    let surface_texture = surface_texture.unwrap();
+
+    let surface_view = surface_texture
+        .texture
+        .create_view(&wgpu::TextureViewDescriptor::default());
+
+    let mut encoder = wgpu_ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+    // MARK: app render
+    {
+        #[cfg(feature = "profiling")]
+        profiling::scope!("app render");
+
+        app_state.prepare(wgpu_ctx, app_renderer);
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &surface_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            occlusion_query_set: None,
+            timestamp_writes: None,
+        });
+
+        render_pass.set_pipeline(&app_renderer.app_pipeline);
+        render_pass.set_bind_group(0, app_renderer.app_pipeline.bind_group.as_ref(), &[]);
+        render_pass.draw(0..4, 0..1);
+    }
+
+    // MARK: egui render
+    {
+        #[cfg(feature = "profiling")]
+        profiling::scope!("egui render");
+
+        app_renderer.egui_renderer.begin_frame(window);
+        let occupied_screen_space = app_state.ui(app_renderer);
+        let viewport = app_renderer.calc_viewport(occupied_screen_space, 16.0 / 9.0); // TODO: get from renderer
+        app_renderer
+            .app_pipeline
+            .bind_group
+            .update_viewport(&wgpu_ctx.queue, viewport);
+
+        app_renderer.egui_renderer.end_frame_and_draw(
+            &wgpu_ctx.device,
+            &wgpu_ctx.queue,
+            &mut encoder,
+            window,
+            &surface_view,
+            screen_descriptor,
+        );
+    }
+
+    {
+        #[cfg(feature = "profiling")]
+        profiling::scope!("submit");
+
+        wgpu_ctx.queue.submit(Some(encoder.finish()));
+    }
+    {
+        #[cfg(feature = "profiling")]
+        profiling::scope!("present");
+
+        surface_texture.present();
+    }
+
+    #[cfg(feature = "profiling")]
+    profiling::finish_frame!();
+}
+
+// MARK: Resize
+fn resize(ctx: &WgpuContext, app_renderer: &mut AppRenderer, size: PhysicalSize<u32>) {
+    if size.width == 0 || size.height == 0 {
+        log::warn!("[resize]: ignored resize to value <= 0: {size:?}");
+        return;
+    }
+    log::info!("[resize]: {size:?}");
+    {
+        app_renderer.surface_config.width = size.width;
+        app_renderer.surface_config.height = size.height;
+        app_renderer
+            .surface
+            .configure(&ctx.device, &app_renderer.surface_config);
+    }
+}
+
+impl ApplicationHandler<WgpuContext> for WinitApp {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        #[allow(unused)]
+        let mut window_attrs = Window::default_attributes();
+        #[allow(unused)]
+        let (mut width, mut height) = (0, 0);
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            use wasm_bindgen::JsCast;
+            use winit::platform::web::WindowAttributesExtWebSys;
+
+            let window = web_sys::window().unwrap();
+            let document = window.document().unwrap();
+            let canvas = document
+                .get_element_by_id(&format!("app-{}", self.app_state.meta.name))
+                .unwrap();
+            let canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().ok();
+
+            log::info!("found canvas: {}", canvas.is_some());
+            if let Some(canvas) = canvas.as_ref() {
+                self.size = (canvas.width(), canvas.height());
+                log::info!("canvas size: {:?}", self.size);
+            }
+            window_attrs = window_attrs.with_canvas(canvas);
+
+            // window_attrs =
+            //     window_attrs.with_prevent_default(window.prevent_default_event_handling);
+            // window_attrs = winit_window_attrs.with_append(true);
+        }
+
+        log::info!("creating window...");
+        let Ok(window) = event_loop.create_window(window_attrs) else {
+            log::error!("failed to create window");
+            return;
+        };
+        log::info!("window size: {:?}", window.inner_size());
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let size = window.inner_size();
+            self.size = (size.width, size.height);
+        }
+        let window = Arc::new(window);
+        self.window.replace(window.clone());
+
+        // Init context
+        let Some(event_loop_proxy) = self.event_loop_proxy.take() else {
+            return;
+        };
+        log::info!("initializing wgpu ctx...");
+        let init_wgpu_ctx = async move {
+            let renderer = WgpuContext::new().await;
+            assert!(event_loop_proxy.send_event(renderer).is_ok());
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            pollster::block_on(init_wgpu_ctx);
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            wasm_bindgen_futures::spawn_local(init_wgpu_ctx);
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        if let WindowEvent::CloseRequested = event {
+            event_loop.exit();
+            return;
+        }
+
+        let (Some(window), Some(wgpu_ctx), Some(app_renderer)) = (
+            self.window.as_ref(),
+            self.wgpu_ctx.as_ref(),
+            self.app_renderer.as_mut(),
+        ) else {
+            return;
+        };
+        let app_state = &mut self.app_state;
+
+        if app_renderer
+            .egui_renderer
+            .handle_input(window, &event)
+            .consumed
+        {
+            return;
+        }
+
+        match event {
+            WindowEvent::RedrawRequested => redraw(wgpu_ctx, app_state, window, app_renderer),
+            WindowEvent::Resized(size) => resize(wgpu_ctx, app_renderer, size),
+            _ => (),
+        }
+        self.window.as_ref().unwrap().request_redraw();
+    }
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, wgpu_ctx: WgpuContext) {
+        let mut app_renderer = AppRenderer::new(&wgpu_ctx, self.window.clone().unwrap(), self.size);
+        log::info!("app_renderer initialized");
+        if let Some(window) = self.window.as_ref() {
+            let size = window.inner_size();
+            log::info!("window size: {size:?}");
+            resize(&wgpu_ctx, &mut app_renderer, size)
+        }
+        self.app_renderer.replace(app_renderer);
+        self.wgpu_ctx.replace(wgpu_ctx);
+    }
+}
+
+#[cfg(feature = "profiling")]
+use crate::PUFFIN_GPU_PROFILER;
+
+pub fn run_scene_app(scene: impl Scene) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init().expect("Failed to initialize console_log");
+    }
+
+    #[cfg(feature = "profiling")]
+    let (_cpu_server, _gpu_server) = {
+        puffin::set_scopes_on(true);
+        // default global profiler
+        let cpu_server =
+            puffin_http::Server::new(&format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT)).unwrap();
+        // custom gpu profiler in `PUFFIN_GPU_PROFILER`
+        let gpu_server = puffin_http::Server::new_custom(
+            &format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT + 1),
+            |sink| PUFFIN_GPU_PROFILER.lock().unwrap().add_sink(sink),
+            |id| _ = PUFFIN_GPU_PROFILER.lock().unwrap().remove_sink(id),
+        )
+        .unwrap();
+        (cpu_server, gpu_server)
+    };
+
+    let event_loop = winit::event_loop::EventLoop::<WgpuContext>::with_user_event()
+        .build()
+        .unwrap();
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+
+    #[allow(unused_mut)]
+    let mut app = WinitApp::new(scene, &event_loop);
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        use winit::platform::web::EventLoopExtWebSys;
+        event_loop.spawn_app(app);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        event_loop.run_app(&mut app).unwrap();
+    }
+}
+
+#[allow(unused)]
+pub struct AppRenderer {
+    surface: wgpu::Surface<'static>,
+    surface_config: wgpu::SurfaceConfiguration,
+    egui_renderer: EguiRenderer,
+    ranim_renderer: Renderer,
+    sampler: wgpu::Sampler,
+    app_pipeline: AppPipeline,
+    // viewport: Viewport,
+}
+
+impl AppRenderer {
+    pub fn new(ctx: &WgpuContext, window: Arc<Window>, size: (u32, u32)) -> Self {
+        let surface = ctx.instance.create_surface(window.clone()).unwrap();
+
+        // let swapchain_capabilities = surface.get_capabilities(&ctx.adapter);
+        // let selected_format = wgpu::TextureFormat::Bgra8UnormSrgb;
+        // let swapchain_format = swapchain_capabilities
+        //     .formats
+        //     .iter()
+        //     .find(|d| **d == selected_format)
+        //     .expect("failed to select proper surface texture format!");
+
+        let surface_config = surface
+            .get_default_config(&ctx.adapter, size.0, size.1)
+            .expect("failed to get surface config");
+        // let surface_config = wgpu::SurfaceConfiguration {
+        //     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        //     format: *swapchain_format,
+        //     width: size.0,
+        //     height: size.1,
+        //     present_mode: wgpu::PresentMode::AutoVsync,
+        //     desired_maximum_frame_latency: 0,
+        //     alpha_mode: swapchain_capabilities.alpha_modes[0],
+        //     view_formats: vec![],
+        // };
 
         surface.configure(&ctx.device, &surface_config);
 
         let egui_renderer =
-            egui_tools::EguiRenderer::new(&ctx.device, surface_config.format, None, 1, window);
-
-        let scale_factor = 1.0;
+            egui_tools::EguiRenderer::new(&ctx.device, surface_config.format, None, 1, &window);
+        let ranim_renderer = Renderer::new(ctx, 8.0, 1280, 720);
 
         let sampler = ctx.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -94,33 +557,33 @@ impl RenderState {
         });
         let app_pipeline = AppPipeline::new(
             ctx,
-            render_view,
+            #[cfg(target_arch = "wasm32")]
+            &ranim_renderer.render_textures.linear_render_view,
+            #[cfg(not(target_arch = "wasm32"))]
+            &ranim_renderer.render_textures.render_view,
             &sampler,
-            swapchain_capabilities.formats[0].into(),
+            surface_config.format.into(),
         );
-
         Self {
             surface,
             surface_config,
             egui_renderer,
+            ranim_renderer,
+            sampler,
             app_pipeline,
-            scale_factor,
-            viewport: Viewport {
-                width: 1.0,
-                height: 1.0,
-                x: 0.0,
-                y: 0.0,
-            },
+            // viewport: Viewport {
+            //     width: 1.0,
+            //     height: 1.0,
+            //     x: 0.0,
+            //     y: 0.0
+            // }
         }
     }
-
-    fn resize_surface(&mut self, ctx: &WgpuContext, width: u32, height: u32) {
-        self.surface_config.width = width;
-        self.surface_config.height = height;
-        self.surface.configure(&ctx.device, &self.surface_config);
-    }
-
-    fn update_viewport(&mut self, occupied_screen_space: OccupiedScreenSpace, render_aspect: f32) {
+    fn calc_viewport(
+        &self,
+        occupied_screen_space: OccupiedScreenSpace,
+        render_aspect: f32,
+    ) -> Viewport {
         // Calculate viewport
         let screen_width = self.surface_config.width as f32;
         let screen_height = self.surface_config.height as f32;
@@ -168,420 +631,11 @@ impl RenderState {
                     y / screen_height,
                 )
             };
-        self.viewport = Viewport {
+        Viewport {
             width: viewport_width,
             height: viewport_height,
             x: viewport_x,
             y: viewport_y,
-        };
-    }
-}
-
-struct WinitApp {
-    state: Option<RenderState>,
-    window: Option<Arc<Window>>,
-
-    ctx: RanimContext,
-    app_state: AppState,
-}
-
-struct TimelineInfo {
-    ctx: egui::Context,
-    canvas: egui::Rect,
-    response: egui::Response,
-    painter: egui::Painter,
-    text_height: f32,
-    font_id: egui::FontId,
-}
-
-impl TimelineInfo {
-    fn point_from_ms(&self, state: &TimelineState, ms: i64) -> f32 {
-        self.canvas.min.x
-            + state.offset_points
-            + self.canvas.width() * ms as f32 / (state.width_sec * 1000.0) as f32
-    }
-}
-
-struct AppState {
-    meta: SceneMeta,
-    timeline: RanimTimeline,
-    // app_options: AppOptions<'a>,
-    // timeline: RanimTimeline,
-    renderer: Renderer,
-
-    last_sec: f64,
-    render_instances: RenderInstances,
-    timeline_state: TimelineState,
-}
-
-impl AppState {
-    fn new(ctx: &RanimContext, scene: impl Scene) -> Self {
-        let meta = scene.meta();
-        let timeline = build_timeline(scene);
-        let timeline_infos = timeline.get_timeline_infos();
-        let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
-        Self {
-            meta,
-            renderer,
-            last_sec: -1.0,
-            render_instances: RenderInstances::default(),
-            timeline_state: TimelineState::new(timeline.duration_secs(), timeline_infos),
-            timeline,
         }
     }
-    pub fn prepare(&mut self, ctx: &mut RanimContext, state: &mut RenderState) {
-        #[cfg(feature = "profiling")]
-        profiling::scope!("frame");
-
-        state
-            .app_pipeline
-            .bind_group
-            .update_viewport(&ctx.wgpu_ctx.queue, state.viewport);
-
-        if self.last_sec == self.timeline_state.current_sec {
-            return;
-        }
-        self.last_sec = self.timeline_state.current_sec;
-
-        let TimelineEvalResult {
-            // EvalResult<CameraFrame>, idx
-            camera_frame,
-            // Vec<(rabject_id, EvalResult<Item>, idx)>
-            items,
-        } = {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("eval");
-
-            self.timeline.eval_sec(self.timeline_state.current_sec)
-        };
-
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("prepare");
-            items.iter().for_each(|(id, res, _idx)| {
-                // let last_idx = last_idx.entry(*id).or_insert(-1);
-                // let prev_last_idx = *last_idx;
-                // *last_idx = *idx as i32;
-                match res {
-                    EvalResult::Dynamic(res) => {
-                        res.prepare_for_id(&ctx.wgpu_ctx, &mut self.render_instances, *id)
-                    }
-                    EvalResult::Static(res) => {
-                        // if prev_last_idx != *idx as i32 {
-                        res.prepare_for_id(&ctx.wgpu_ctx, &mut self.render_instances, *id)
-                        // }
-                    }
-                }
-            });
-            ctx.wgpu_ctx.queue.submit([]);
-        }
-
-        let render_primitives = items
-            .iter()
-            .filter_map(|(id, res, _)| match res {
-                EvalResult::Dynamic(res) => res.renderable_of_id(&self.render_instances, *id),
-                EvalResult::Static(res) => res.renderable_of_id(&self.render_instances, *id),
-            })
-            .collect::<Vec<_>>();
-        let camera_frame = match &camera_frame.0 {
-            EvalResult::Dynamic(res) => res,
-            EvalResult::Static(res) => res,
-        };
-        // println!("{:?}", camera_frame);
-        // println!("{}", render_primitives.len());
-        self.renderer.update_uniforms(&ctx.wgpu_ctx, camera_frame);
-
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("render");
-
-            self.renderer.render(ctx, &render_primitives);
-        }
-    }
-
-    #[allow(clippy::field_reassign_with_default)]
-    pub fn ui(&mut self, state: &mut RenderState) -> OccupiedScreenSpace {
-        let scale_factor = state.scale_factor;
-        let mut occupied_screen_space = OccupiedScreenSpace::default();
-
-        occupied_screen_space.bottom = egui::TopBottomPanel::bottom("bottom_panel")
-            .resizable(true)
-            .max_height(600.0)
-            .show(state.egui_renderer.context(), |ui| {
-                ui.label("Timeline");
-
-                ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
-                ui.add(
-                    egui::Slider::new(
-                        &mut self.timeline_state.current_sec,
-                        0.0..=self.timeline_state.total_sec,
-                    )
-                    .text("sec"),
-                );
-
-                // self.timeline_state.ui_preview_timeline(ui);
-                self.timeline_state.ui_main_timeline(ui);
-            })
-            .response
-            .rect
-            .height()
-            * scale_factor;
-
-        // dbg!(state.viewport);
-
-        // egui::Window::new(format!("{}", self.meta.name))
-        //     .resizable(true)
-        //     .vscroll(true)
-        //     .default_open(false)
-        //     .show(state.egui_renderer.context(), |ui| {
-        //         ui.label("Label!");
-
-        //         if ui.button("Button!").clicked() {}
-
-        //         ui.separator();
-        //         ui.horizontal(|ui| {
-        //             ui.label(format!(
-        //                 "Pixels per point: {}",
-        //                 state.egui_renderer.context().pixels_per_point()
-        //             ));
-        //             if ui.button("-").clicked() {
-        //                 state.scale_factor = (state.scale_factor - 0.1).max(0.3);
-        //             }
-        //             if ui.button("+").clicked() {
-        //                 state.scale_factor = (state.scale_factor + 0.1).min(3.0);
-        //             }
-        //         });
-        //     });
-        occupied_screen_space
-    }
-}
-
-impl WinitApp {
-    fn new(scene: impl Scene) -> Self {
-        let ctx = RanimContext::new();
-        let app_state = AppState::new(&ctx, scene);
-
-        Self {
-            ctx,
-            state: None,
-            window: None,
-            app_state,
-        }
-    }
-
-    async fn init_window(&mut self, window: Window) {
-        let window = Arc::new(window);
-        let initial_width = 1360;
-        let initial_height = 768;
-
-        let _ = window.request_inner_size(PhysicalSize::new(initial_width, initial_height));
-
-        let surface = self
-            .ctx
-            .wgpu_ctx
-            .instance
-            .create_surface(window.clone())
-            .expect("Failed to create surface!");
-
-        let state = RenderState::new(
-            &self.ctx.wgpu_ctx,
-            surface,
-            &window,
-            initial_width,
-            initial_width,
-            &self.app_state.renderer.render_textures.render_view,
-        )
-        .await;
-
-        self.window.get_or_insert(window);
-        self.state.get_or_insert(state);
-    }
-
-    fn handle_resized(&mut self, width: u32, height: u32) {
-        if width > 0 && height > 0 {
-            self.state
-                .as_mut()
-                .unwrap()
-                .resize_surface(&self.ctx.wgpu_ctx, width, height);
-        }
-    }
-
-    fn handle_redraw(&mut self) {
-        #[cfg(feature = "profiling")]
-        profiling::scope!("redraw");
-
-        // Attempt to handle minimizing window
-        if let Some(window) = self.window.as_ref() {
-            if let Some(min) = window.is_minimized() {
-                if min {
-                    println!("Window is minimized");
-                    return;
-                }
-            }
-        }
-
-        let state = self.state.as_mut().unwrap();
-
-        let screen_descriptor = ScreenDescriptor {
-            size_in_pixels: [state.surface_config.width, state.surface_config.height],
-            pixels_per_point: self.window.as_ref().unwrap().scale_factor() as f32
-                * state.scale_factor,
-        };
-
-        let surface_texture = state.surface.get_current_texture();
-
-        match surface_texture {
-            Err(SurfaceError::Outdated) => {
-                // Ignoring outdated to allow resizing and minimization
-                println!("wgpu surface outdated");
-                return;
-            }
-            Err(_) => {
-                surface_texture.expect("Failed to acquire next swap chain texture");
-                return;
-            }
-            Ok(_) => {}
-        };
-
-        let surface_texture = surface_texture.unwrap();
-
-        let surface_view = surface_texture
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder = self
-            .ctx
-            .wgpu_ctx
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-        let window = self.window.as_ref().unwrap();
-
-        // MARK: app render
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("app render");
-
-            self.app_state.prepare(&mut self.ctx, state);
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &surface_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-
-            render_pass.set_pipeline(&state.app_pipeline);
-            render_pass.set_bind_group(0, state.app_pipeline.bind_group.as_ref(), &[]);
-            render_pass.draw(0..4, 0..1);
-        }
-
-        // MARK: egui render
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("egui render");
-
-            state.egui_renderer.begin_frame(window);
-            let occupied_screen_space = self.app_state.ui(state);
-            state.update_viewport(occupied_screen_space, 16.0 / 9.0); // TODO: get from renderer
-
-            state.egui_renderer.end_frame_and_draw(
-                &self.ctx.wgpu_ctx.device,
-                &self.ctx.wgpu_ctx.queue,
-                &mut encoder,
-                window,
-                &surface_view,
-                screen_descriptor,
-            );
-        }
-
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("submit");
-
-            self.ctx.wgpu_ctx.queue.submit(Some(encoder.finish()));
-        }
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("present");
-
-            surface_texture.present();
-        }
-
-        #[cfg(feature = "profiling")]
-        profiling::finish_frame!();
-    }
-}
-
-impl ApplicationHandler for WinitApp {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window = event_loop
-            .create_window(
-                Window::default_attributes()
-                    .with_title(format!("Ranim {}", self.app_state.meta.name)),
-            )
-            .unwrap();
-        pollster::block_on(self.init_window(window));
-    }
-
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        _window_id: WindowId,
-        event: WindowEvent,
-    ) {
-        self.state
-            .as_mut()
-            .unwrap()
-            .egui_renderer
-            .handle_input(self.window.as_ref().unwrap(), &event);
-        match event {
-            WindowEvent::CloseRequested => {
-                event_loop.exit();
-            }
-            WindowEvent::RedrawRequested => {
-                self.handle_redraw();
-                self.window.as_ref().unwrap().request_redraw();
-            }
-            WindowEvent::Resized(new_size) => {
-                self.handle_resized(new_size.width, new_size.height);
-            }
-            _ => (),
-        }
-    }
-}
-
-#[cfg(feature = "profiling")]
-use crate::PUFFIN_GPU_PROFILER;
-
-pub fn run_scene_app(scene: impl Scene) {
-    #[cfg(feature = "profiling")]
-    let (_cpu_server, _gpu_server) = {
-        puffin::set_scopes_on(true);
-        // default global profiler
-        let cpu_server =
-            puffin_http::Server::new(&format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT)).unwrap();
-        // custom gpu profiler in `PUFFIN_GPU_PROFILER`
-        let gpu_server = puffin_http::Server::new_custom(
-            &format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT + 1),
-            |sink| PUFFIN_GPU_PROFILER.lock().unwrap().add_sink(sink),
-            |id| _ = PUFFIN_GPU_PROFILER.lock().unwrap().remove_sink(id),
-        )
-        .unwrap();
-        (cpu_server, gpu_server)
-    };
-
-    let event_loop = winit::event_loop::EventLoop::new().unwrap();
-    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-
-    let mut app = WinitApp::new(scene);
-
-    event_loop.run_app(&mut app).expect("Failed to run app");
 }

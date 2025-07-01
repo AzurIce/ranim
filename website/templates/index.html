@@ -1,7 +1,7 @@
 {% import "macros/code-examples.html" as code_examples %}
-{% extends "layouts/three-col.html" %}
+{% extends "layouts/base.html" %}
 
-{% block left_side %}
+<!-- {% block left_side %}
 <div class="outline">
   <div class="outline__content">
     <ul>
@@ -21,11 +21,16 @@
     </ul>
   </div>
 </div>
-{% endblock left_side %}
+{% endblock left_side %} -->
 
-{% block content %}
-<article class="markdown-body">
-  {{ code_examples::process_code_block(content=section_or_page.content) | safe }}
-  <!-- {{ section_or_page.content | safe }} -->
-</article>
-{% endblock content %}
+{% block main %}
+<div class="container content">
+  <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; margin: 2rem auto">
+    <img src="ranim.svg" width="200" alt="Ranim logo" />
+    <article class="markdown-body">
+      {{ code_examples::process_code_block(content=section_or_page.content) | safe }}
+      <!-- {{ section_or_page.content | safe }} -->
+    </article>
+  </div>
+</div>
+{% endblock main %}

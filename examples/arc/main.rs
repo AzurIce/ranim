@@ -1,19 +1,19 @@
-use glam::dvec2;
 use itertools::Itertools;
 use log::LevelFilter;
-use ranim::animation::fading::FadingAnimSchedule;
-use ranim::color::HueDirection;
-use ranim::components::Anchor;
-use ranim::items::group::Group;
-use ranim::items::vitem::Arc;
-use ranim::prelude::*;
-use ranim::timeline::TimeMark;
+use ranim::{
+    animation::{fading::FadingAnim, lagged::LaggedAnim},
+    color::HueDirection,
+    glam::dvec2,
+    items::{Group, vitem::geometry::Arc},
+    prelude::*,
+    timeline::TimeMark,
+};
 
 #[scene]
 struct ArcScene;
 
-impl TimelineConstructor for ArcScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
+impl SceneConstructor for ArcScene {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
         // let frame_size = app.camera().size;
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
@@ -40,35 +40,37 @@ impl TimelineConstructor for ArcScene {
                 );
                 let offset =
                     frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
-                let mut arc = Arc { angle, radius }.build();
-                arc.set_stroke_width(0.12 * (j as f32 + 0.02) / ncol as f32)
-                    .set_stroke_color(color)
-                    .set_fill_color(color.with_alpha(0.0))
-                    .put_anchor_on(Anchor::center(), offset.extend(0.0));
-                arc
+                Arc::new(angle, radius).with(|arc| {
+                    arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
+                    arc.set_stroke_color(color)
+                        .put_center_on(offset.extend(0.0));
+                })
             })
             .collect::<Group<_>>();
+        let r_arcs = r.init_timeline(arcs).id();
 
-        let mut arcs = timeline.insert(arcs);
-        let arcs_fade_in = arcs.lagged_anim(0.2, |item| item.fade_in());
-        timeline.play(arcs_fade_in.with_total_duration(3.0)).sync();
+        r.timeline_mut(r_arcs)
+            .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
 
-        timeline.insert_time_mark(
-            timeline.duration_secs(),
+        r.insert_time_mark(
+            r.timelines().max_total_secs(),
             TimeMark::Capture("preview.png".to_string()),
         );
     }
 }
 
 fn main() {
-    #[cfg(debug_assertions)]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Trace)
-        .init();
-    #[cfg(not(debug_assertions))]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Info)
-        .init();
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
 
     #[cfg(feature = "app")]
     run_scene_app(ArcScene);

@@ -1,76 +1,84 @@
 use glam::DVec3;
 use log::LevelFilter;
-use ranim::animation::creation::WritingAnimSchedule;
-use ranim::animation::fading::FadingAnimSchedule;
-use ranim::components::ScaleHint;
-use ranim::items::group::Group;
-use ranim::items::vitem::VItem;
-use ranim::timeline::TimeMark;
-use ranim::utils::rate_functions::linear;
-use ranim::{prelude::*, typst_svg};
+use ranim::{
+    animation::{creation::GroupWritingAnim, fading::FadingAnim},
+    components::ScaleHint,
+    items::{
+        Group,
+        vitem::typst::typst_svg,
+        vitem::{VItem, svg::SvgItem},
+    },
+    prelude::*,
+    timeline::{TimeMark, TimelinesFunc},
+};
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
 struct BasicScene;
 
-impl TimelineConstructor for BasicScene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
-        timeline.forward(0.2);
+impl SceneConstructor for BasicScene {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+        r.timelines_mut().forward(0.2);
 
-        let mut svg = Group::<VItem>::from_svg(SVG);
-        svg.scale_to_with_stroke(ScaleHint::PorportionalHeight(3.0))
-            .put_center_on(DVec3::Y * 2.0);
-        let mut svg = timeline.insert(svg);
-
-        let mut text = Group::<VItem>::from_svg(&typst_svg!(
-            r#"
+        let svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {
+            svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
+                .put_center_on(DVec3::Y * 2.0);
+        }));
+        let text = Group::<VItem>::from(
+            SvgItem::new(typst_svg(
+                r#"
             #align(center)[
                 #text(18pt)[Ranim]
 
                 #text(6pt)[Hello 你好]
             ]
-            "#
-        ));
-        text.scale_to_with_stroke(ScaleHint::PorportionalHeight(2.0))
-            .put_center_on(DVec3::NEG_Y * 2.0);
-
-        text.iter_mut().for_each(|item| {
-            item.set_fill_opacity(0.8);
-        });
-        let mut text = timeline.insert(text);
-
-        timeline.play(
-            text.lagged_anim(0.2, |item| item.write())
-                .with_total_duration(3.0)
-                .with_rate_func(linear),
+            "#,
+            ))
+            .with(|text| {
+                text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
+                    .put_center_on(DVec3::NEG_Y * 2.0)
+                    .set_fill_opacity(0.8);
+            }),
         );
-        timeline.play(svg.lagged_anim(0.0, |item| item.fade_in().with_duration(3.0))); // At the same time, the svg fade in
-        timeline.sync();
-        timeline.insert_time_mark(
-            timeline.duration_secs(),
+        let r_svg = r.init_timeline(svg).id();
+        let r_text = r.init_timeline(text).id();
+
+        r.timeline_mut(r_text)
+            .play_with(|text| text.group_write(0.2).with_duration(3.0));
+        r.timeline_mut(r_svg)
+            .play_with(|svg| svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
+        r.timelines_mut().sync();
+
+        r.insert_time_mark(
+            r.timelines().max_total_secs(),
             TimeMark::Capture("preview.png".to_string()),
         );
 
-        timeline.forward(0.5);
-        timeline.play(
-            text.lagged_anim(0.2, |item| item.unwrite())
-                .with_total_duration(3.0)
-                .with_rate_func(linear),
-        );
-        timeline.play(svg.lagged_anim(0.0, |item| item.fade_out().with_duration(3.0))); // At the same time, the svg fade in
-        timeline.sync();
+        r.timelines_mut().forward(0.5);
+        r.timeline_mut(r_text)
+            .play_with(|text| text.group_unwrite(0.2).with_duration(3.0));
+        r.timeline_mut(r_svg)
+            .play_with(|svg| svg.fade_out().with_duration(3.0)); // At the same time, the svg fade out
+        r.timelines_mut().sync();
     }
 }
 
 fn main() {
-    #[cfg(debug_assertions)]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Trace)
-        .init();
-    #[cfg(not(debug_assertions))]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Info)
-        .init();
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
+
+    #[cfg(feature = "app")]
+    run_scene_app(BasicScene);
+    #[cfg(not(feature = "app"))]
     render_scene(BasicScene, &AppOptions::default());
 }

@@ -1,0 +1,116 @@
+// from [bevy-website](https://github.com/bevyengine/bevy-website)
+.tree-menu {
+    $item-height: 32px;
+    $border-radius: 4px;
+    $h-padding: 12px;
+
+    margin: 0;
+    padding: 0;
+    position: relative;
+
+    &__state {
+        display: none;
+    }
+
+    &__item {
+        list-style: none;
+
+        > .tree-menu {
+            display: none;
+            padding-left: $h-padding;
+        }
+    }
+
+    &__label {
+        display: grid;
+        grid-template-columns: 1fr min-content;
+        border-radius: $border-radius;
+        overflow: hidden; // prevent the radii from getting messed up
+        margin-bottom: 2px;
+        color: var(--tree-menu-label-color);
+
+        &:hover {
+            background-color: var(--tree-menu-label-active-bg-color);
+
+            .tree-menu__link {
+                color: var(--tree-menu-label-active-color);
+            }
+        }
+
+        &--with-chevron {
+            .tree-menu__link {
+                padding-right: 4px;
+            }
+        }
+    }
+
+    &__link {
+        display: flex;
+        align-items: center;
+        flex-grow: 1;
+        padding: 4px $h-padding;
+        min-height: $item-height;
+        text-decoration: none;
+        line-height: 1.35;
+        font-size: 1rem;
+        text-wrap: balance;
+
+        &, &:focus, &:active, &:hover, &:link, &:visited {
+            color: var(--tree-menu-label-color);
+        }
+
+        &[data-highlight-intrapage-link-active=true] {
+          color: var(--tree-menu-active-color);
+        }
+    }
+
+    &__toggle {
+        @include flex-center;
+
+        flex-shrink: 0;
+        width: 44px;
+        cursor: pointer;
+        user-select: none;
+        color: var(--tree-menu-label-color);
+
+        &:hover {
+            background-color: var(--tree-menu-toggle-hover-color);
+        }
+    }
+
+    &__chevron {
+        transition: transform $duration;
+        transform: rotate(-90deg);
+        filter: var(--tree-menu-chevron-filter);
+    }
+
+    &__item--active {
+        // Target just the first label, ignore subsection labels
+        > .tree-menu__label {
+            background-color: var(--tree-menu-label-active-bg-color);
+
+            &,
+            .tree-menu__toggle,
+            .tree-menu__link {
+                color: var(--tree-menu-label-active-color);
+            }
+        }
+    }
+
+    // Sub-menu open state
+    &__state:checked + .tree-menu__item {
+        > .tree-menu__label .tree-menu__chevron {
+            transform: rotate(0deg);
+        }
+
+        > .tree-menu {
+            display: block;
+        }
+    }
+
+    &__toc {
+      grid-row: 2;
+      grid-column: 1 / span 2;
+      background-color: var(--tree-menu-toc-bg-color);
+    }
+}

@@ -1,42 +1,89 @@
 name = "getting_started2"
 code = """
-```rust,linenos
+```rust
+use log::LevelFilter;
 use ranim::{
-    animation::{fading::FadingAnimSchedule, transform::TransformAnimSchedule},
+    animation::{
+        creation::{CreationAnim, WritingAnim},
+        transform::TransformAnim,
+    },
     color::palettes::manim,
-    items::vitem::{Circle, Square},
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Rectangle, Square},
+    },
     prelude::*,
+    timeline::{TimelineFunc, TimelinesFunc},
     utils::rate_functions::linear,
 };
 
 #[scene]
 struct GettingStarted2Scene;
 
-impl TimelineConstructor for GettingStarted2Scene {
-    fn construct(self, timeline: &RanimTimeline, _camera: &mut Rabject<CameraFrame>) {
-        let mut square = Square(2.0).build();
-        square.set_color(manim::BLUE_C);
+impl SceneConstructor for GettingStarted2Scene {
+    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+        let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
+            rect.set_stroke_color(manim::GREEN_C);
+        });
 
-        let mut square = timeline.insert(square);
-        let mut circle = Circle(2.0).build();
-        circle.set_color(manim::RED_C);
+        // The new initialized timeline is hidden by default, use show to start encoding a static anim and make it show
+        let r_rect = r
+            .init_timeline(rect.clone())
+            .with(|timeline| {
+                timeline.show();
+            })
+            .id();
+        r.timeline_mut(r_rect).show();
 
-        timeline.play(
-            square
-                .transform_to(circle)
-                .with_duration(2.0)
-                .with_rate_func(linear),
-        ); // Anim Schedule won't change the data in Rabject
-        timeline.forward(1.0);
-        timeline.play(square.fade_out()); // Anim is created based on the data in Rabject
+        r.timelines_mut().forward(1.0);
+
+        let square = Square::new(2.0).with(|square| {
+            square.set_color(manim::BLUE_C);
+        });
+        let circle = Circle::new(2.0).with(|circle| {
+            circle.set_color(manim::RED_C);
+        });
+        let r_vitem = r.init_timeline(VItem::from(square.clone())).id();
+        {
+            let timeline = r.timeline_mut(r_vitem);
+            timeline.forward(1.0);
+            timeline.play_with(|vitem| vitem.create());
+            timeline.play_with(|vitem| {
+                vitem
+                    .transform_to(VItem::from(circle.clone()))
+                    .with_rate_func(linear)
+            });
+            timeline.play_with(|vitem| vitem.unwrite());
+        }
+
+        r.timelines_mut().sync();
+
+        // Use hide to stop showing an item
+        r.timeline_mut(r_rect).hide();
+        r.timeline_mut(r_vitem).play(VItem::from(rect).uncreate());
     }
 }
 
 fn main() {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        #[cfg(debug_assertions)]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Trace)
+            .init();
+        #[cfg(not(debug_assertions))]
+        pretty_env_logger::formatted_timed_builder()
+            .filter(Some("ranim"), LevelFilter::Info)
+            .init();
+    }
+
+    #[cfg(feature = "app")]
+    run_scene_app(GettingStarted2Scene);
+    #[cfg(not(feature = "app"))]
     render_scene(GettingStarted2Scene, &AppOptions::default());
 }
-
 ```"""
-hash = "75fa8d31c7ea814ef9737b41c9f4d1f847b9215d"
+hash = "d50a4a66aea08b0a2f0d153441b11d577b15c915"
 preview_imgs = []
 output_files = ["/examples/getting_started2/output.mp4"]
+wasm = true

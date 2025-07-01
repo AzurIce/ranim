@@ -1,0 +1,16 @@
+[book]
+authors = ["AzurIce"]
+language = "zh"
+src = "src"
+title = "Ranim Book"
+
+[build]
+build-dir = "../website/static/book/"
+
+[preprocessor.katex]
+after = ["links"]
+
+[output.html]
+site-url = "/book/"
+additional-css = ["theme/pagetoc.css"]
+additional-js  = ["theme/pagetoc.js"]

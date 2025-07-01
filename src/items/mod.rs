@@ -1,93 +1,136 @@
-use group::Group;
+use std::{sync::atomic::AtomicUsize, vec};
+
+use derive_more::{Deref, DerefMut};
+// use variadics_please::all_tuples;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::animation::{AnimSchedule, AnimationSpan};
+use crate::render::primitives::{Extract, Renderable};
 
 pub mod camera_frame;
-pub mod group;
-pub mod svg_item;
 pub mod vitem;
 
-impl<'r, T> Group<Rabject<T>> {
-    pub fn lagged_anim(
-        &'r mut self,
-        lag_ratio: f64,
-        anim_builder: impl FnOnce(&'r mut Rabject<T>) -> AnimSchedule<'r, T> + Clone,
-    ) -> Group<AnimSchedule<'r, T>> {
-        let n = self.as_ref().len();
+static TIMELINE_CNT: AtomicUsize = AtomicUsize::new(0);
 
-        let mut anim_schedules = self
-            .as_mut()
-            .iter_mut()
-            .map(|rabject| (anim_builder.clone())(rabject))
-            .collect::<Group<_>>();
-
-        let duration = anim_schedules[0].anim.duration_secs;
-        let lag_time = duration * lag_ratio;
-        anim_schedules
-            .iter_mut()
-            .enumerate()
-            .for_each(|(i, schedule)| {
-                schedule.anim.padding = (i as f64 * lag_time, (n - i - 1) as f64 * lag_time);
-                // println!("{} {:?} {}", schedule.anim.span_len(), schedule.anim.padding, schedule.anim.duration_secs);
-            });
-        anim_schedules
-    }
-}
-
-/// An `Rabject` is a wrapper of an entity that can be rendered.
-///
-/// The `Rabject`s with same `Id` will use the same `EntityTimeline` to animate.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Rabject<T> {
-    pub id: usize,
-    pub data: T,
+#[derive(Debug)]
+pub struct TimelineId<T> {
+    id: usize,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: 'static> Rabject<T> {
-    pub fn schedule(
-        &mut self,
-        anim_builder: impl FnOnce(&mut Self) -> AnimationSpan<T>,
-    ) -> AnimSchedule<T> {
-        let animation = (anim_builder)(self);
-        AnimSchedule::new(self, animation)
+impl<T> Clone for TimelineId<T> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
 
-// MARK: Entity
+impl<T> Copy for TimelineId<T> {}
 
-// /// A renderable entity in ranim
-// ///
-// /// You can implement your own entity by implementing this trait.
-// ///
-// /// In Ranim, every item `T` is just plain data. After [`RanimTimeline::insert`]ed to [`RanimTimeline`],
-// /// the item will have an id and its corresponding [`crate::timeline::RabjectTimeline`].
-// ///
-// /// The resources (buffer, texture, etc) rendering an item needs are called **RenderInstance**,
-// /// and all of them are managed by ranim outside of timeline in a struct [`RenderInstances`].
-// ///
-// /// The [`RenderInstances`] is basically a store of [`RenderInstance`]s based on [`std::collections::HashMap`].
-// /// - The key is the combination of [`Rabject::id`] and [`RenderInstance`]'s [`std::any::TypeId`]
-// /// - The value is the [`RenderInstance`]
-// ///
-// /// For now, there are two types of [`RenderInstance`]:
-// /// - [`crate::render::primitives::vitem::VItemPrimitive`]: The core primitive to render vectorized items.
-// /// - [`crate::render::primitives::svg_item::SvgItemPrimitive`]
-// ///
-// /// You can check the builtin implementations of [`Entity`] for mor details.
-// ///
+impl<T> TimelineId<T> {
+    pub fn id(&self) -> usize {
+        self.id
+    }
+    pub(crate) fn new(id: usize) -> Self {
+        Self {
+            id,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+    pub(crate) fn alloc() -> Self {
+        Self::new(TIMELINE_CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+    }
+}
+
 /// Blueprints are the data structures that are used to create an Item
+#[deprecated(
+    since = "0.1.0-alpha.14",
+    note = "Use the refactored item system instead"
+)]
 pub trait Blueprint<T> {
     fn build(self) -> T;
 }
 
-pub trait Updatable {
-    fn update_from(&mut self, other: &Self);
+impl<T: Extract<Target = Target>, Target: Renderable + 'static> VisualItem for T {
+    fn extract_renderable(&self) -> Box<dyn Renderable> {
+        Box::new(Extract::extract(self))
+    }
 }
 
-impl<T: Clone> Updatable for T {
-    fn update_from(&mut self, other: &Self) {
-        *self = other.clone();
+/// The item which can be extracted into a [`Renderable`]
+///
+/// This is automatically implemented for the types that [`Extract`] to a [`Renderable`].
+pub trait VisualItem {
+    fn extract_renderable(&self) -> Box<dyn Renderable>;
+}
+
+// TODO: This causes some clone
+// The render is also based on the decomposed result?
+// pub trait Item {
+//     type Target;
+//     fn decompose(&self) -> Self::Target;
+// }
+
+// macro_rules! impl_into_group {
+//     ($($T:ident),*) => {
+//         impl<$($T: Into<I>),*,I: BaseItem> From<($($T,)*)> for Group<I> {
+//             fn from(value: ($($T,)*)) -> Self {
+//                 #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
+//                 let ($($T,)*) = value;
+//                 Self(vec![$($T.into()),*])
+//             }
+//         }
+//     };
+// }
+
+// all_tuples!(impl_into_group, 1, 16, T);
+
+// impl<T: Into<E>, E: RenderableItem> RenderableItem for T {
+//     fn prepare_for_id(
+//         &self,
+//         ctx: &crate::context::WgpuContext,
+//         render_instances: &mut crate::render::primitives::RenderInstances,
+//         id: usize,
+//     ) {
+
+//     }
+//     fn renderable_of_id<'a>(
+//         &'a self,
+//         render_instances: &'a crate::render::primitives::RenderInstances,
+//         id: usize,
+//     ) -> Option<&'a dyn crate::render::primitives::Renderable> {
+//     }
+// }
+
+#[derive(Debug, Default, Clone, Deref, DerefMut)]
+pub struct Group<T>(pub Vec<T>);
+
+impl<T> IntoIterator for Group<T> {
+    type IntoIter = vec::IntoIter<T>;
+    type Item = T;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a Group<T> {
+    type IntoIter = std::slice::Iter<'a, T>;
+    type Item = &'a T;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Group<T> {
+    type IntoIter = std::slice::IterMut<'a, T>;
+    type Item = &'a mut T;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
+
+impl<T> FromIterator<T> for Group<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(Vec::from_iter(iter))
     }
 }

@@ -3,14 +3,25 @@ use ranim_macros::{
     Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, Position, Stroke,
 };
 
-use crate::render::primitives::{Extract, Primitive, vitem::VItemPrimitive};
+use crate::render::primitives::{Extract, vitem::VItemPrimitive};
 
-use super::VItem;
+use super::{VItem, arrow::Arrow};
+
+#[derive(Clone)]
+pub struct NumberLine {
+    pub arrow: Arrow,
+}
 
 #[derive(
     Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position, Partial,
 )]
 pub struct Line(pub VItem);
+
+impl From<Line> for VItem {
+    fn from(value: Line) -> Self {
+        value.0
+    }
+}
 
 impl Line {
     pub fn points(&self) -> [DVec3; 2] {
@@ -47,8 +58,8 @@ impl Line {
 }
 
 impl Extract for Line {
-    type Primitive = VItemPrimitive;
-    fn extract(&self) -> <VItemPrimitive as Primitive>::Data {
+    type Target = VItemPrimitive;
+    fn extract(&self) -> Self::Target {
         self.0.extract()
     }
 }

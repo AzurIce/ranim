@@ -1,7 +1,8 @@
-use super::{AnimSchedule, AnimationSpan, EvalDynamic, ToEvaluator};
-use crate::items::Rabject;
+use super::{AnimationSpan, EvalDynamic};
+use crate::animation::Evaluator;
+use crate::items::Group;
 use crate::items::vitem::DEFAULT_STROKE_WIDTH;
-use crate::traits::{Empty, Fill, Interpolatable, Partial, Stroke};
+use crate::traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth};
 use crate::utils::rate_functions::smooth;
 use log::warn;
 
@@ -11,66 +12,57 @@ pub trait CreationRequirement: Clone + Partial + Empty + Interpolatable {}
 impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 
 pub trait CreationAnim<T: CreationRequirement + 'static> {
-    fn create(&self) -> AnimationSpan<T>;
-    fn uncreate(&self) -> AnimationSpan<T>;
-}
-
-pub trait CreationAnimSchedule<T: CreationRequirement + 'static> {
-    fn create(&mut self) -> AnimSchedule<T>;
-    fn uncreate(&mut self) -> AnimSchedule<T>;
+    fn create(self) -> AnimationSpan<T>;
+    fn uncreate(self) -> AnimationSpan<T>;
 }
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
-    fn create(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Create::new(self.clone()).to_evaluator())
+    fn create(self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Create::new(self)))
             .with_rate_func(smooth)
     }
-    fn uncreate(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(UnCreate::new(self.clone()).to_evaluator())
+    fn uncreate(self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(UnCreate::new(self)))
             .with_rate_func(smooth)
-    }
-}
-
-impl<T: CreationRequirement + 'static> CreationAnimSchedule<T> for Rabject<T> {
-    fn create(&mut self) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.create())
-    }
-    fn uncreate(&mut self) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.uncreate())
     }
 }
 
 // MARK: Writing
-pub trait WritingRequirement: CreationRequirement + Stroke + Fill {}
-impl<T: CreationRequirement + Stroke + Fill> WritingRequirement for T {}
+pub trait WritingRequirement: CreationRequirement + StrokeWidth + StrokeColor + FillColor {}
+impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequirement for T {}
 
 pub trait WritingAnim<T: WritingRequirement + 'static> {
-    fn write(&self) -> AnimationSpan<T>;
-    fn unwrite(&self) -> AnimationSpan<T>;
-}
-
-pub trait WritingAnimSchedule<T: WritingRequirement + 'static> {
-    fn write(&mut self) -> AnimSchedule<T>;
-    fn unwrite(&mut self) -> AnimSchedule<T>;
+    fn write(self) -> AnimationSpan<T>;
+    fn unwrite(self) -> AnimationSpan<T>;
 }
 
 impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
-    fn write(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Write::new(self.clone()).to_evaluator())
+    fn write(self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Write::new(self)))
             .with_rate_func(smooth)
     }
-    fn unwrite(&self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Unwrite::new(self.clone()).to_evaluator())
+    fn unwrite(self) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Unwrite::new(self)))
             .with_rate_func(smooth)
     }
 }
 
-impl<T: WritingRequirement + 'static> WritingAnimSchedule<T> for Rabject<T> {
-    fn write(&mut self) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.write())
+pub trait GroupWritingAnim<T: WritingRequirement + 'static> {
+    fn group_write(self, lag_ratio: f64) -> AnimationSpan<Group<T>>;
+    fn group_unwrite(self, lag_ratio: f64) -> AnimationSpan<Group<T>>;
+}
+
+impl<T: WritingRequirement + 'static, I> GroupWritingAnim<T> for I
+where
+    I: IntoIterator<Item = T>,
+{
+    fn group_write(self, lag_ratio: f64) -> AnimationSpan<Group<T>> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(GroupWrite::new(self, lag_ratio)))
+            .with_rate_func(smooth)
     }
-    fn unwrite(&mut self) -> AnimSchedule<T> {
-        AnimSchedule::new(self, self.data.unwrite())
+    fn group_unwrite(self, lag_ratio: f64) -> AnimationSpan<Group<T>> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(GroupWrite::new(self, lag_ratio)))
+            .with_rate_func(smooth)
     }
 }
 
@@ -83,7 +75,7 @@ pub struct Create<T: CreationRequirement> {
 }
 
 impl<T: CreationRequirement> Create<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         Self { original: target }
     }
 }
@@ -107,7 +99,7 @@ pub struct UnCreate<T: CreationRequirement> {
 }
 
 impl<T: CreationRequirement> UnCreate<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         Self { original: target }
     }
 }
@@ -115,10 +107,7 @@ impl<T: CreationRequirement> UnCreate<T> {
 impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
     fn eval_alpha(&self, mut alpha: f64) -> T {
         if !(0.0..=1.0).contains(&alpha) {
-            warn!(
-                "the alpha is out of range: {}, clampped to 0.0..=1.0",
-                alpha
-            );
+            warn!("the alpha is out of range: {alpha}, clampped to 0.0..=1.0");
             alpha = alpha.clamp(0.0, 1.0)
         }
         // trace!("{alpha}");
@@ -129,7 +118,7 @@ impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
         } else if alpha == 1.0 {
             T::empty()
         } else {
-            panic!("the alpha is out of range: {}", alpha);
+            panic!("the alpha is out of range: {alpha}");
         }
     }
 }
@@ -143,12 +132,11 @@ pub struct Write<T: WritingRequirement> {
 }
 
 impl<T: WritingRequirement> Write<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)
             .set_stroke_width(DEFAULT_STROKE_WIDTH)
-            .set_stroke_color(target.fill_color())
             .set_stroke_opacity(1.0);
         Self {
             original: target,
@@ -174,6 +162,46 @@ impl<T: WritingRequirement> EvalDynamic<T> for Write<T> {
     }
 }
 
+pub struct GroupWrite<T: WritingRequirement> {
+    anims: Vec<Write<T>>,
+    lag_ratio: f64,
+}
+
+impl<T: WritingRequirement> GroupWrite<T> {
+    pub fn new<I>(target: I, lag_ratio: f64) -> Self
+    where
+        I: IntoIterator<Item = T>,
+    {
+        Self {
+            anims: target.into_iter().map(Write::new).collect(),
+            lag_ratio,
+        }
+    }
+}
+
+impl<T: WritingRequirement> EvalDynamic<Group<T>> for GroupWrite<T> {
+    fn eval_alpha(&self, alpha: f64) -> Group<T> {
+        // -|--
+        //  -|--
+        //   -|--
+        // total_time - unit_time * (1.0 - lag_ratio)  = unit_time * lag_ratio * n
+        // total_time = unit_time * (1.0 + (n - 1) lag_ratio)
+        let unit_time = 1.0 / (1.0 + (self.anims.len() - 1) as f64 * self.lag_ratio);
+        let unit_lagged_time = unit_time * self.lag_ratio;
+        self.anims
+            .iter()
+            .enumerate()
+            .map(|(i, anim)| {
+                let start = unit_lagged_time * i as f64;
+
+                let alpha = (alpha - start) / unit_time;
+                let alpha = alpha.clamp(0.0, 1.0);
+                anim.eval_alpha(alpha)
+            })
+            .collect()
+    }
+}
+
 /// Unwrite
 ///
 /// First lerp fill_opacity to 0.0, then update with partial from 0.0..1.0 to 0.0..0.0
@@ -183,12 +211,11 @@ pub struct Unwrite<T: WritingRequirement> {
 }
 
 impl<T: WritingRequirement> Unwrite<T> {
-    fn new(target: T) -> Self {
+    pub fn new(target: T) -> Self {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)
             .set_stroke_width(DEFAULT_STROKE_WIDTH)
-            .set_stroke_color(target.fill_color())
             .set_stroke_opacity(1.0);
         Self {
             original: target,
@@ -211,7 +238,7 @@ impl<T: WritingRequirement> EvalDynamic<T> for Unwrite<T> {
         } else if alpha == 0.0 {
             self.original.clone()
         } else {
-            panic!("the alpha is out of range: {}", alpha);
+            panic!("the alpha is out of range: {alpha}");
         }
     }
 }

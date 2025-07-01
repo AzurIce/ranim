@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     prelude::{Alignable, Interpolatable},
+    traits::BoundingBox,
     utils::math::interpolate_usize,
 };
 
@@ -24,7 +25,7 @@ impl<T: Debug + Default + Clone + Copy + PartialEq> Component for T {}
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[as_ref(forward)]
 #[as_mut(forward)]
-pub struct ComponentVec<T: Component>(Vec<T>);
+pub struct ComponentVec<T: Component>(pub(crate) Vec<T>);
 
 // MARK: Trait impls
 
@@ -123,6 +124,9 @@ pub trait PointWise {}
 
 // MARK: Anchor
 /// The anchor of the transformation.
+///
+/// - [`DVec3`] implements [`Into`] [`Anchor::Point`]
+/// - [`IVec3`] implements [`Into`] [`Anchor::Edge`]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Anchor {
@@ -141,20 +145,22 @@ pub enum Anchor {
 }
 
 impl Anchor {
+    pub const ORIGIN: Self = Self::Point(DVec3::ZERO);
+    pub const CENTER: Self = Self::Edge(IVec3::ZERO);
+
     pub fn point(x: f64, y: f64, z: f64) -> Self {
         Self::Point(dvec3(x, y, z))
     }
 
-    pub fn origin() -> Self {
-        Self::Point(DVec3::ZERO)
-    }
-
-    pub fn center() -> Self {
-        Self::Edge(IVec3::ZERO)
-    }
-
     pub fn edge(x: i32, y: i32, z: i32) -> Self {
-        Self::Edge(ivec3(x, y, z))
+        Self::Edge(ivec3(x, y, z).clamp(IVec3::NEG_ONE, IVec3::ONE))
+    }
+
+    pub fn get_pos<T: BoundingBox + ?Sized>(self, bbox: &T) -> DVec3 {
+        match self {
+            Self::Point(x) => x,
+            Self::Edge(x) => bbox.get_bounding_box_point(x),
+        }
     }
 }
 
@@ -163,16 +169,18 @@ impl Anchor {
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ScaleHint {
-    /// Scale the mobject to a given height, the width will remain unchanged.
-    Height(f64),
-    /// Scale the mobject to a given width, the height will remain unchanged.
-    Width(f64),
-    /// Scale the mobject to a given size.
-    Size(f64, f64),
-    /// Scale the mobject proportionally to a given height, the width will also be scaled accordingly.
-    PorportionalHeight(f64),
-    /// Scale the mobject proportionally to a given width, the height will also be scaled accordingly.
-    PorportionalWidth(f64),
+    /// Scale the mobject's X axe, while keep other axes unchanged.
+    X(f64),
+    /// Scale the mobject's Y axe, while keep other axes unchanged.
+    Y(f64),
+    /// Scale the mobject's Z axe, while keep other axes unchanged.
+    Z(f64),
+    /// Scale the mobject's X axe, while other axes are scaled accordingly.
+    PorportionalX(f64),
+    /// Scale the mobject's Y axe, while other axes are scaled accordingly.
+    PorportionalY(f64),
+    /// Scale the mobject's Z axe, while other axes are scaled accordingly.
+    PorportionalZ(f64),
 }
 
 // MARK: Test
@@ -182,8 +190,8 @@ mod test {
 
     use crate::{
         components::vpoint::VPointComponentVec,
-        items::{Blueprint, group::Group, vitem::Square},
-        traits::{BoundingBox, Position},
+        items::vitem::{VItem, geometry::Square},
+        traits::{BoundingBox, Scale, Shift},
     };
 
     use super::Anchor;
@@ -263,12 +271,12 @@ mod test {
         // 20 40 ... 100
         let mut group = (1..=5)
             .map(|i| {
-                let mut sq = Square(i as f64 * 20.0).build();
+                let mut sq = VItem::from(Square::new(i as f64 * 20.0));
                 let x = (0..i).map(|i| i as f64 * 20.0).sum();
                 sq.put_anchor_on(Anchor::edge(-1, 0, 0), dvec3(x, 0.0, 0.0));
                 sq
             })
-            .collect::<Group<_>>();
+            .collect::<Vec<_>>();
         assert_eq!(
             group.get_bounding_box(),
             [
