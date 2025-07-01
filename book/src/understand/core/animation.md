@@ -15,7 +15,7 @@ $$
 在由 Rust 实现的 Ranim 中也就是 `EvalDynamic<T>` Trait 和实现了它的类型 `T`：
 
 ```rust,ignore
-{{#include ../../../src/animation.rs:EvalDynamic}}
+{{#include ../../../../src/animation.rs:EvalDynamic}}
 ```
 
 它接受自身的不可变引用和一个进度值作为输入，经过计算，输出一个自身类型的结果。
@@ -23,9 +23,9 @@ $$
 以 `Transform` 动画为例，其内部包含了物件初始状态和目标状态，以及用于插值的对齐后的初始和目标状态，在 `EvalDynamic<T>` 的实现中使用内部的数据进行计算求值得到结果：
 
 ```rust,ignore
-{{#include ../../../src/animation/transform.rs:Transform}}
+{{#include ../../../../src/animation/transform.rs:Transform}}
 
-{{#include ../../../src/animation/transform.rs:Transform-EvalDynamic}}
+{{#include ../../../../src/animation/transform.rs:Transform-EvalDynamic}}
 ```
 
 ## AnimationSpan
@@ -39,9 +39,9 @@ $$
 在 Ranim 中，这对应着 `AnimationSpan` 结构：
 
 ```rust,ignore
-{{#include ../../../src/animation.rs:AnimationSpan}}
+{{#include ../../../../src/animation.rs:AnimationSpan}}
 
-{{#include ../../../src/animation.rs:AnimationSpan-eval}}
+{{#include ../../../../src/animation.rs:AnimationSpan-eval}}
 ```
 
 其中的 `evaluator: Evaluator<T>` 其实就是对 `Box<dyn EvalDynamic<T>>` 的封装。
