@@ -5,8 +5,10 @@ use crate::{
     utils::rate_functions::smooth,
 };
 
+// ANCHOR: TransformRequirement
 pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
+// ANCHOR_END: TransformRequirement
 
 pub trait TransformAnim<T: TransformRequirement + 'static> {
     fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationSpan<T>;
@@ -37,13 +39,15 @@ impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
     }
 }
 
-/// A transform animation func
+// ANCHOR: Transform
+/// Transform Anim
 pub struct Transform<T: TransformRequirement> {
     src: T,
     dst: T,
     aligned_src: T,
     aligned_dst: T,
 }
+// ANCHOR_END: Transform
 
 impl<T: TransformRequirement> Transform<T> {
     pub fn new(src: T, dst: T) -> Self {
@@ -61,6 +65,7 @@ impl<T: TransformRequirement> Transform<T> {
     }
 }
 
+// ANCHOR: Transform-EvalDynamic
 impl<T: TransformRequirement> EvalDynamic<T> for Transform<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         if alpha == 0.0 {
@@ -74,3 +79,4 @@ impl<T: TransformRequirement> EvalDynamic<T> for Transform<T> {
         }
     }
 }
+// ANCHOR_END: Transform-EvalDynamic
