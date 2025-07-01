@@ -107,10 +107,7 @@ impl<T: CreationRequirement> UnCreate<T> {
 impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
     fn eval_alpha(&self, mut alpha: f64) -> T {
         if !(0.0..=1.0).contains(&alpha) {
-            warn!(
-                "the alpha is out of range: {}, clampped to 0.0..=1.0",
-                alpha
-            );
+            warn!("the alpha is out of range: {alpha}, clampped to 0.0..=1.0");
             alpha = alpha.clamp(0.0, 1.0)
         }
         // trace!("{alpha}");
@@ -121,7 +118,7 @@ impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
         } else if alpha == 1.0 {
             T::empty()
         } else {
-            panic!("the alpha is out of range: {}", alpha);
+            panic!("the alpha is out of range: {alpha}");
         }
     }
 }
@@ -241,7 +238,7 @@ impl<T: WritingRequirement> EvalDynamic<T> for Unwrite<T> {
         } else if alpha == 0.0 {
             self.original.clone()
         } else {
-            panic!("the alpha is out of range: {}", alpha);
+            panic!("the alpha is out of range: {alpha}");
         }
     }
 }

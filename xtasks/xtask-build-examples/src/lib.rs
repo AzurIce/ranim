@@ -93,7 +93,7 @@ impl Example {
             let path = entry.path();
             if path.is_file() {
                 if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
-                    print!("Found {:?}", file_name);
+                    print!("Found {file_name:?}");
                     if file_name.starts_with("preview") {
                         print!(", preview file");
                         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {

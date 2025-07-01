@@ -212,7 +212,7 @@ mod tests {
         });
         let arc = VItem::from(arc);
         let points = arc.vpoints.0.clone().0;
-        println!("{:?}", points);
+        println!("{points:?}");
 
         print_typst_vitem(points);
     }

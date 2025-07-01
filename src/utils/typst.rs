@@ -69,18 +69,18 @@ mod test {
             #text(20pt)[hello]
         "#
         );
-        println!("{}", svg);
+        println!("{svg}");
         let svg = typst_svg!(
             r#"
             #text(20pt)[你好]
         "#
         );
-        println!("{}", svg);
+        println!("{svg}");
         let svg = typst_svg!(
             r#"
             #text(60pt)[R]
         "#
         );
-        println!("{}", svg);
+        println!("{svg}");
     }
 }
