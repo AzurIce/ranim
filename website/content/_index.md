@@ -13,6 +13,4 @@ insert_anchor_links = "right"
 - 使用 wgpu，兼容多种后端图形 API
 - 可编译到 wasm 支持 Web 平台
 
-**注：目前 ranim 的接口仍并不稳定，而本页面的说明文字可能更新的不是特别勤（但是带视频的部分即 example 是会同步更新的）**
-
-!example-ranim_logo
+!example-hello_ranim

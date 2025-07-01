@@ -36,3 +36,15 @@ lint-features *FEATURES: fmt
 
 changelog:
     git cliff -o CHANGELOG.md
+
+website:
+    just doc
+    just book
+    zola --root website build
+
+doc:
+    cargo doc --no-deps -p ranim --document-private-items --all-features
+    cp -r target/doc/ website/static/doc/
+
+book:
+    mdbook build book
