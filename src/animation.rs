@@ -18,6 +18,7 @@ pub trait EvalDynamic<T> {
 }
 // ANCHOR_END: EvalDynamic
 
+// ANCHOR: Evaluator
 pub enum Evaluator<T> {
     Dynamic {
         type_name: String,
@@ -25,6 +26,7 @@ pub enum Evaluator<T> {
     },
     Static(Arc<T>),
 }
+// ANCHOR_END: Evaluator
 
 impl<T> Evaluator<T> {
     // Any is for type name
@@ -74,7 +76,6 @@ impl<T: Clone> EvalResult<T> {
 // MARK: Animation
 // ANCHOR: AnimationSpan
 pub struct AnimationSpan<T> {
-    pub(crate) type_name: String,
     pub(crate) evaluator: Evaluator<T>,
     pub rate_func: fn(f64) -> f64,
     pub duration_secs: f64,
@@ -94,10 +95,6 @@ impl<T> Debug for AnimationSpan<T> {
 impl<T: 'static> AnimationSpan<T> {
     pub fn from_evaluator(evaluator: Evaluator<T>) -> Self {
         Self {
-            type_name: match &evaluator {
-                Evaluator::Dynamic { type_name, .. } => type_name.clone(),
-                Evaluator::Static(_) => "Static".to_string(),
-            },
             evaluator,
             rate_func: linear,
             duration_secs: 1.0,
@@ -106,8 +103,11 @@ impl<T: 'static> AnimationSpan<T> {
 }
 
 impl<T> AnimationSpan<T> {
-    pub fn span_len(&self) -> f64 {
-        self.duration_secs
+    pub fn type_name(&self) -> &str {
+        match &self.evaluator {
+            Evaluator::Dynamic { type_name, .. } => type_name,
+            Evaluator::Static(_) => "Static",
+        }
     }
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.rate_func = rate_func;
@@ -117,8 +117,12 @@ impl<T> AnimationSpan<T> {
         self.duration_secs = secs;
         self
     }
+}
+
+// ANCHOR: AnimationSpan-eval
+impl<T> AnimationSpan<T> {
     pub fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
-        self.eval_sec(alpha * self.span_len())
+        self.eval_sec(alpha * self.duration_secs)
     }
     pub fn eval_sec(&self, local_sec: f64) -> EvalResult<T> {
         self.evaluator.eval_alpha((self.rate_func)(
@@ -126,3 +130,4 @@ impl<T> AnimationSpan<T> {
         ))
     }
 }
+// ANCHOR_END: AnimationSpan-eval

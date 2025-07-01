@@ -37,13 +37,12 @@ use crate::context::WgpuContext;
 pub mod prelude {
     #[cfg(feature = "app")]
     pub use crate::app::run_scene_app;
-    pub use crate::timeline::TimelinesFunc;
     pub use crate::{AppOptions, render_scene, render_scene_at_sec};
     pub use crate::{SceneConstructor, SceneMetaTrait};
     pub use ranim_macros::scene;
 
     pub use crate::items::{TimelineId, camera_frame::CameraFrame};
-    pub use crate::timeline::RanimScene;
+    pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};
 
     pub use crate::color::prelude::*;
     pub use crate::traits::*;

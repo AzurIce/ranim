@@ -508,7 +508,7 @@ impl<T: Clone + 'static> TimelineFunc for ItemTimeline<T> {
                 let start = show_sec.first().unwrap();
                 let end = show_sec.last().unwrap();
                 AnimationInfo {
-                    anim_name: anim.type_name.clone(),
+                    anim_name: anim.type_name().to_string(),
                     start_sec: *start,
                     end_sec: *end,
                 }
@@ -587,7 +587,7 @@ impl<T: Clone + 'static> ItemTimeline<T> {
     pub fn play(&mut self, anim: AnimationSpan<T>) -> T {
         self._submit_planning_static_anim();
         let res = anim.eval_alpha(1.0).into_owned();
-        let duration = anim.span_len();
+        let duration = anim.duration_secs;
         let end = self.cur_sec + duration;
         self.push_anim(anim, self.cur_sec, end);
         self.cur_sec = end;
