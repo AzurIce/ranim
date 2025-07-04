@@ -13,44 +13,39 @@ use ranim::{\r
         geometry::{Circle, Square},\r
     },\r
     prelude::*,\r
-    timeline::{TimelineFunc, TimelinesFunc},\r
 };\r
 \r
 #[scene]\r
 struct HelloRanimScene;\r
 \r
 impl SceneConstructor for HelloRanimScene {\r
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {\r
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
         let square = Square::new(2.0).with(|square| {\r
             square.set_color(manim::BLUE_C);\r
         });\r
-        let r_square = r.init_timeline(square).id();\r
+\r
+        let r_square = r.insert(square);\r
+        {\r
+            let timeline = r.timeline_mut(&r_square);\r
+            timeline.play_with(|square| square.fade_in());\r
+        };\r
 \r
         let circle = Circle::new(2.0).with(|circle| {\r
             circle\r
                 .set_color(manim::RED_C)\r
                 .rotate(PI / 4.0 + PI, DVec3::Z);\r
         });\r
-        let r_vitem_circle = r.init_timeline(VItem::from(circle.clone())).id();\r
 \r
-        let square = {\r
-            let timeline = r.timeline_mut(r_square);\r
-            let square = timeline.play_with(|square| square.fade_in());\r
-            timeline.hide();\r
-            square\r
-        };\r
-\r
-        r.timelines_mut().sync();\r
+        let r_vitem = r.map(r_square, VItem::from);\r
         {\r
-            let timeline = r.timeline_mut(r_vitem_circle);\r
-            timeline.play_with(|circle| VItem::from(square).transform_to(circle));\r
+            let timeline = r.timeline_mut(&r_vitem);\r
+            timeline.play_with(|state| state.transform_to(circle));\r
             timeline.forward(1.0);\r
             let circle = timeline.state().clone();\r
             timeline.play_with(|circle| circle.unwrite());\r
             timeline.play(circle.write());\r
             timeline.play_with(|circle| circle.fade_out());\r
-        }\r
-        r.timelines_mut().sync();\r
+        };\r
     }\r
 }\r
 \r
@@ -76,7 +71,7 @@ fn main() {\r
     }\r
 }\r
 ```"""
-hash = "6332dc5f06b7d545721f173768f8dfe416d3e059"
+hash = "0cf649f3322c7aff09b7a012f768e476c38b612a"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]
 wasm = true

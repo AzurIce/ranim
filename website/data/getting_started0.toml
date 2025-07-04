@@ -1,57 +1,57 @@
 name = "getting_started0"
 code = """
 ```rust
-use log::LevelFilter;
-use ranim::{
-    animation::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square,
-    prelude::*, timeline::TimelineFunc,
-};
-
-#[scene]
-struct GettingStarted0Scene;
-
-impl SceneConstructor for GettingStarted0Scene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
-        // A Square with size 2.0 and color blue
-        let square = Square::new(2.0).with(|square| {
-            square.set_color(manim::BLUE_C);
-        });
-        let r_square = r.init_timeline(square).id();
-
-        {
-            let timeline = r.timeline_mut(r_square);
-            timeline.play_with(|square| square.fade_in());
-            timeline.forward(1.0);
-            timeline.play_with(|square| square.fade_out());
-        }
-
-        // The play method returns the result of the animation,
-        // so it can also be written like this:
-        // let square = timeline.play(square.fade_in());
-        // timeline.play(square.fade_out());
-    }
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    run_scene_app(GettingStarted0Scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(GettingStarted0Scene, &AppOptions::default());
-}
+use log::LevelFilter;\r
+use ranim::{\r
+    animation::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square,\r
+    prelude::*,\r
+};\r
+\r
+#[scene]\r
+struct GettingStarted0Scene;\r
+\r
+impl SceneConstructor for GettingStarted0Scene {\r
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+        // A Square with size 2.0 and color blue\r
+        let square = Square::new(2.0).with(|square| {\r
+            square.set_color(manim::BLUE_C);\r
+        });\r
+\r
+        let r_square = r.insert(square);\r
+        {\r
+            let timeline = r.timeline_mut(&r_square);\r
+            timeline\r
+                .play_with(|square| square.fade_in())\r
+                .forward(1.0)\r
+                .hide()\r
+                .forward(1.0)\r
+                .show()\r
+                .forward(1.0)\r
+                .play_with(|square| square.fade_out());\r
+        }\r
+    }\r
+}\r
+\r
+fn main() {\r
+    #[cfg(not(target_arch = "wasm32"))]\r
+    {\r
+        #[cfg(debug_assertions)]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Trace)\r
+            .init();\r
+        #[cfg(not(debug_assertions))]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Info)\r
+            .init();\r
+    }\r
+\r
+    #[cfg(feature = "app")]\r
+    run_scene_app(GettingStarted0Scene);\r
+    #[cfg(not(feature = "app"))]\r
+    render_scene(GettingStarted0Scene, &AppOptions::default());\r
+}\r
 ```"""
-hash = "db6c26c96efba2c061e4756d61ec863f087df8d1"
+hash = "d8a3bfb081da42e0998e50074040fb541cebe78f"
 preview_imgs = []
 output_files = ["/examples/getting_started0/output.mp4"]
 wasm = true
