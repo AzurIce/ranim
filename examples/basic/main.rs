@@ -18,7 +18,7 @@ const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 struct BasicScene;
 
 impl SceneConstructor for BasicScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         r.timelines_mut().forward(0.2);
 
         let svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {

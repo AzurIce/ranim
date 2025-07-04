@@ -191,8 +191,8 @@ pub fn ui_canvas(state: &mut TimelineState, info: &TimelineInfo) -> f32 {
             // if animation_info.anim_name.as_str() == "Static" {
             //     continue;
             // }
-            let start_x = info.point_from_ms(state, (animation_info.start_sec * 1000.0) as i64);
-            let end_x = info.point_from_ms(state, (animation_info.end_sec * 1000.0) as i64);
+            let start_x = info.point_from_ms(state, (animation_info.range.start * 1000.0) as i64);
+            let end_x = info.point_from_ms(state, (animation_info.range.end * 1000.0) as i64);
 
             if info.canvas.max.x < start_x || end_x < info.canvas.min.x {
                 continue;
@@ -221,7 +221,7 @@ pub fn ui_canvas(state: &mut TimelineState, info: &TimelineInfo) -> f32 {
                 let text = format!(
                     "{} {:6.3} s",
                     animation_info.anim_name,
-                    animation_info.end_sec - animation_info.start_sec
+                    animation_info.range.end - animation_info.range.start
                 );
 
                 let painter = info.painter.with_clip_rect(rect.intersect(info.canvas));

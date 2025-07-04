@@ -154,6 +154,11 @@ impl<T: RenderCommand, const N: usize> RenderCommand for [T; N] {
     }
 }
 
+// pub trait Extractor<T> {
+//     type Target;
+//     fn extract(data: &T) -> Self::Target;
+// }
+
 pub trait Extract {
     type Target;
     fn extract(&self) -> Self::Target;

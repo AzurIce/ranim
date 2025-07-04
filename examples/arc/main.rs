@@ -13,7 +13,7 @@ use ranim::{
 struct ArcScene;
 
 impl SceneConstructor for ArcScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         // let frame_size = app.camera().size;
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
@@ -47,7 +47,7 @@ impl SceneConstructor for ArcScene {
                 })
             })
             .collect::<Group<_>>();
-        let r_arcs = r.init_timeline(arcs).id();
+        let r_arcs = r.insert(arcs);
 
         r.timeline_mut(r_arcs)
             .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));

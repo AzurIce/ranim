@@ -37,7 +37,7 @@ fn pentagon() -> VItem {
 struct FadingScene;
 
 impl SceneConstructor for FadingScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let pentagon_in = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, 2.0, 0.0));
         });
@@ -56,7 +56,7 @@ impl SceneConstructor for FadingScene {
 struct CreationScene;
 
 impl SceneConstructor for CreationScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let pentagon_in = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, 2.0, 0.0));
         });
@@ -75,7 +75,7 @@ impl SceneConstructor for CreationScene {
 struct WritingScene;
 
 impl SceneConstructor for WritingScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let pentagon_in = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, 2.0, 0.0));
         });
@@ -94,7 +94,7 @@ impl SceneConstructor for WritingScene {
 struct TransformScene;
 
 impl SceneConstructor for TransformScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let src = Square::new(2.0).with(|x| {
             x.set_color(manim::RED_C)
                 .put_center_on(dvec3(0.0, 2.0, 0.0));

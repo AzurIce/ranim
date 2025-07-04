@@ -15,7 +15,7 @@ use ranim::{
 struct BubbleSortScene(pub usize);
 
 impl SceneConstructor for BubbleSortScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let num = self.0;
 
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
@@ -65,7 +65,7 @@ impl SceneConstructor for BubbleSortScene {
         };
         let shift_right = DVec3::X * width_unit;
         let swap_shift = [shift_right, -shift_right];
-        let anim_swap = |timeline: &mut RanimScene, r_rectab: &[TimelineId<Rectangle>; 2]| {
+        let anim_swap = |timeline: &mut RanimScene, r_rectab: &[ItemId<Rectangle>; 2]| {
             let timelines = timeline.timeline_mut(r_rectab);
             timelines
                 .into_iter()

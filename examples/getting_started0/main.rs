@@ -8,7 +8,7 @@ use ranim::{
 struct GettingStarted0Scene;
 
 impl SceneConstructor for GettingStarted0Scene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         // A Square with size 2.0 and color blue
         let square = Square::new(2.0).with(|square| {
             square.set_color(manim::BLUE_C);
