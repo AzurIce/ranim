@@ -17,7 +17,7 @@ use ranim::{
         },
     },
     prelude::*,
-    timeline::{TimeMark, TimelineFunc, TimelinesFunc},
+    timeline::TimeMark,
     utils::rate_functions::{linear, smooth},
 };
 
@@ -72,7 +72,7 @@ impl SceneConstructor for RanimLogoScene {
         let logo_width = frame_size.y * 0.618;
 
         let logo = build_logo(logo_width);
-        let r_logo = logo.map(|item| r.init_timeline(item).id());
+        let r_logo = logo.map(|item| r.insert(item));
 
         let ranim_text = Group::<VItem>::from(
             SvgItem::new(typst_svg(
@@ -87,10 +87,10 @@ impl SceneConstructor for RanimLogoScene {
                     .put_center_on(DVec3::NEG_Y * 2.5);
             }),
         );
-        let r_ranim_text = r.init_timeline(ranim_text).id();
+        let r_ranim_text = r.insert(ranim_text);
 
         r_logo.iter().for_each(|item| {
-            r.timeline_mut(*item)
+            r.timeline_mut(item)
                 .play_with(|item| item.write().with_duration(3.0).with_rate_func(smooth));
         });
         r.timelines_mut().sync();
@@ -110,7 +110,6 @@ impl SceneConstructor for RanimLogoScene {
         ];
         r_logo
             .iter()
-            .cloned()
             .chunks(2)
             .into_iter()
             .zip(scale.into_iter().zip(anchor))
@@ -127,13 +126,14 @@ impl SceneConstructor for RanimLogoScene {
                     });
                 });
             });
-        r.timeline_mut(r_ranim_text).forward(0.5);
-        r.timeline_mut(r_ranim_text).play_with(|text| {
-            text.lagged(0.2, |item| {
-                item.write().with_duration(2.0).with_rate_func(linear)
-            })
-            .with_duration(2.0)
-        });
+        r.timeline_mut(&r_ranim_text)
+            .forward(0.5)
+            .play_with(|text| {
+                text.lagged(0.2, |item| {
+                    item.write().with_duration(2.0).with_rate_func(linear)
+                })
+                .with_duration(2.0)
+            });
         r.timelines_mut().sync();
 
         r.insert_time_mark(
@@ -142,11 +142,11 @@ impl SceneConstructor for RanimLogoScene {
         );
         r.timelines_mut().forward(1.0);
 
-        r_logo.iter().cloned().for_each(|r_logo_part| {
+        r_logo.iter().for_each(|r_logo_part| {
             r.timeline_mut(r_logo_part)
                 .play_with(|item| item.unwrite().with_duration(3.0).with_rate_func(smooth));
         });
-        r.timeline_mut(r_ranim_text).play_with(|text| {
+        r.timeline_mut(&r_ranim_text).play_with(|text| {
             text.lagged(0.0, |item| {
                 item.unwrite().with_duration(3.0).with_rate_func(linear)
             })

@@ -6,7 +6,6 @@ use ranim::{
     glam::dvec3,
     items::vitem::geometry::Rectangle,
     prelude::*,
-    timeline::{TimelineFunc, TimelinesFunc},
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
 
@@ -47,7 +46,7 @@ impl SceneConstructor for HanoiScene {
                     );
                 })
             })
-            .map(|rect| r.init_timeline(rect).with(|timeline| timeline.show()).id())
+            .map(|rect| r.insert_and_show(rect))
             .collect::<Vec<_>>();
 
         let min_disk_width = rod_width * 1.7;
@@ -58,7 +57,7 @@ impl SceneConstructor for HanoiScene {
                 let factor = i as f64 / (n - 1) as f64;
                 let disk_width =
                     min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);
-                r.init_timeline(Rectangle::new(disk_width, disk_height).with(|rect| {
+                r.insert_and_show(Rectangle::new(disk_width, disk_height).with(|rect| {
                     let color =
                         manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
                     rect.stroke_width = 0.0;
@@ -67,8 +66,6 @@ impl SceneConstructor for HanoiScene {
                         dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.0),
                     );
                 }))
-                .with(|timeline| timeline.show())
-                .id()
             })
             .collect::<Vec<_>>();
 
@@ -82,7 +79,7 @@ impl SceneConstructor for HanoiScene {
             let r_disk = r_disks[idx_src].pop().unwrap();
 
             {
-                let timeline = r.timeline_mut(r_disk);
+                let timeline = r.timeline_mut(&r_disk);
                 timeline.play_with(|disk| {
                     disk.transform(|data| {
                         data.shift(dvec3(0.0, 3.0 - top_src, 0.0));

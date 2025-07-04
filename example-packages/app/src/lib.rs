@@ -9,7 +9,6 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
-    timeline::{TimelineFunc, TimelinesFunc},
 };
 
 #[scene]
@@ -20,32 +19,28 @@ impl SceneConstructor for HelloRanimScene {
         let square = Square::new(2.0).with(|square| {
             square.set_color(manim::BLUE_C);
         });
-        let r_square = r.init_timeline(square).id();
+
+        let r_square = r.insert(square);
+        {
+            let timeline = r.timeline_mut(&r_square);
+            timeline.play_with(|square| square.fade_in());
+        };
 
         let circle = Circle::new(2.0).with(|circle| {
             circle
                 .set_color(manim::RED_C)
                 .rotate(PI / 4.0 + PI, DVec3::Z);
         });
-        let r_vitem_circle = r.init_timeline(VItem::from(circle.clone())).id();
 
-        let square = {
-            let timeline = r.timeline_mut(r_square);
-            let square = timeline.play_with(|square| square.fade_in());
-            timeline.hide();
-            square
-        };
-
-        r.timelines_mut().sync();
+        let r_vitem = r.map(r_square, VItem::from);
         {
-            let timeline = r.timeline_mut(r_vitem_circle);
-            timeline.play_with(|circle| VItem::from(square).transform_to(circle));
+            let timeline = r.timeline_mut(&r_vitem);
+            timeline.play_with(|state| state.transform_to(circle));
             timeline.forward(1.0);
             let circle = timeline.state().clone();
             timeline.play_with(|circle| circle.unwrite());
             timeline.play(circle.write());
             timeline.play_with(|circle| circle.fade_out());
-        }
-        r.timelines_mut().sync();
+        };
     }
 }

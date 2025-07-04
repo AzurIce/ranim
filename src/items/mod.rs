@@ -29,14 +29,6 @@ pub struct ItemId<T> {
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T> Clone for ItemId<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for ItemId<T> {}
-
 impl<T> Deref for ItemId<T> {
     type Target = usize;
     fn deref(&self) -> &Self::Target {
@@ -45,6 +37,9 @@ impl<T> Deref for ItemId<T> {
 }
 
 impl<T> ItemId<T> {
+    pub fn inner(&self) -> Id {
+        self.id
+    }
     pub(crate) fn new(id: Id) -> Self {
         Self {
             id,

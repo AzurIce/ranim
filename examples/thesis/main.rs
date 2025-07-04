@@ -44,10 +44,10 @@ impl SceneConstructor for FadingScene {
         let pentagon_out = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, -2.0, 0.0));
         });
-        let r_in = r.init_timeline(pentagon_in).id();
-        let r_out = r.init_timeline(pentagon_out).id();
-        r.timeline_mut(r_in).play_with(|item| item.fade_in());
-        r.timeline_mut(r_out).play_with(|item| item.fade_out());
+        let r_in = r.insert(pentagon_in);
+        let r_out = r.insert(pentagon_out);
+        r.timeline_mut(&r_in).play_with(|item| item.fade_in());
+        r.timeline_mut(&r_out).play_with(|item| item.fade_out());
     }
 }
 
@@ -63,10 +63,10 @@ impl SceneConstructor for CreationScene {
         let pentagon_out = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, -2.0, 0.0));
         });
-        let r_in = r.init_timeline(pentagon_in).id();
-        let r_out = r.init_timeline(pentagon_out).id();
-        r.timeline_mut(r_in).play_with(|item| item.create());
-        r.timeline_mut(r_out).play_with(|item| item.uncreate());
+        let r_in = r.insert(pentagon_in);
+        let r_out = r.insert(pentagon_out);
+        r.timeline_mut(&r_in).play_with(|item| item.create());
+        r.timeline_mut(&r_out).play_with(|item| item.uncreate());
     }
 }
 
@@ -82,10 +82,10 @@ impl SceneConstructor for WritingScene {
         let pentagon_out = pentagon().with(|x| {
             x.put_center_on(dvec3(0.0, -2.0, 0.0));
         });
-        let r_in = r.init_timeline(pentagon_in).id();
-        let r_out = r.init_timeline(pentagon_out).id();
-        r.timeline_mut(r_in).play_with(|item| item.write());
-        r.timeline_mut(r_out).play_with(|item| item.unwrite());
+        let r_in = r.insert(pentagon_in);
+        let r_out = r.insert(pentagon_out);
+        r.timeline_mut(&r_in).play_with(|item| item.write());
+        r.timeline_mut(&r_out).play_with(|item| item.unwrite());
     }
 }
 
@@ -104,8 +104,8 @@ impl SceneConstructor for TransformScene {
                 .put_center_on(dvec3(0.0, -2.0, 0.0));
         });
         // dst.rotate(PI / 4.0 + PI, DVec3::Z); // rotate to match src
-        let r_item = r.init_timeline(VItem::from(src)).id();
-        r.timeline_mut(r_item)
+        let r_item = r.insert(VItem::from(src));
+        r.timeline_mut(&r_item)
             .play_with(|item| item.transform_to(VItem::from(dst)).with_rate_func(linear));
     }
 }
