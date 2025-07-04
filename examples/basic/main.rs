@@ -9,7 +9,7 @@ use ranim::{
         vitem::{VItem, svg::SvgItem},
     },
     prelude::*,
-    timeline::{TimeMark, TimelinesFunc},
+    timeline::TimeMark,
 };
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -41,12 +41,12 @@ impl SceneConstructor for BasicScene {
                     .set_fill_opacity(0.8);
             }),
         );
-        let r_svg = r.init_timeline(svg).id();
-        let r_text = r.init_timeline(text).id();
+        let r_svg = r.insert(svg);
+        let r_text = r.insert(text);
 
-        r.timeline_mut(r_text)
+        r.timeline_mut(&r_text)
             .play_with(|text| text.group_write(0.2).with_duration(3.0));
-        r.timeline_mut(r_svg)
+        r.timeline_mut(&r_svg)
             .play_with(|svg| svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
         r.timelines_mut().sync();
 
@@ -56,9 +56,9 @@ impl SceneConstructor for BasicScene {
         );
 
         r.timelines_mut().forward(0.5);
-        r.timeline_mut(r_text)
+        r.timeline_mut(&r_text)
             .play_with(|text| text.group_unwrite(0.2).with_duration(3.0));
-        r.timeline_mut(r_svg)
+        r.timeline_mut(&r_svg)
             .play_with(|svg| svg.fade_out().with_duration(3.0)); // At the same time, the svg fade out
         r.timelines_mut().sync();
     }

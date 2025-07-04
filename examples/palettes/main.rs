@@ -5,7 +5,6 @@ use ranim::{
     glam::{dvec2, dvec3},
     items::{Group, vitem::geometry::Rectangle},
     prelude::*,
-    timeline::{TimelineFunc, TimelinesFunc},
 };
 
 #[scene]
@@ -52,8 +51,7 @@ impl SceneConstructor for PalettesScene {
                 })
             })
             .collect::<Group<_>>();
-        let r_squares = r.init_timeline(squares).id();
-        r.timeline_mut(r_squares).show();
+        r.insert_and_show(squares);
         r.timelines_mut().forward(0.01);
     }
 }

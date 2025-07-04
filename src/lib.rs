@@ -27,7 +27,7 @@ use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{ItemId, camera_frame::CameraFrame};
-use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult, TimelineFunc};
+use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult};
 
 use render::{Renderer, primitives::RenderInstances};
 
@@ -131,7 +131,7 @@ pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
     {
         let cam = items::camera_frame::CameraFrame::new();
         let r_cam = timeline.insert(cam);
-        timeline.timeline_mut(r_cam).show();
+        timeline.timeline_mut(&r_cam).show();
         constructor.construct(&mut timeline, r_cam);
     }
     timeline.seal()
