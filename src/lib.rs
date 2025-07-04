@@ -26,8 +26,8 @@ use animation::EvalResult;
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use items::{TimelineId, camera_frame::CameraFrame};
-use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult, TimelineFunc};
+use items::{ItemId, camera_frame::CameraFrame};
+use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult};
 
 use render::{Renderer, primitives::RenderInstances};
 
@@ -41,7 +41,7 @@ pub mod prelude {
     pub use crate::{SceneConstructor, SceneMetaTrait};
     pub use ranim_macros::scene;
 
-    pub use crate::items::{TimelineId, camera_frame::CameraFrame};
+    pub use crate::items::{ItemId, camera_frame::CameraFrame};
     pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};
 
     pub use crate::color::prelude::*;
@@ -107,7 +107,7 @@ pub trait Scene: SceneConstructor + SceneMetaTrait {}
 impl<T: SceneConstructor + SceneMetaTrait> Scene for T {}
 
 impl<C: SceneConstructor, M> SceneConstructor for (C, M) {
-    fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {
         self.0.construct(r, r_cam);
     }
 }
@@ -123,15 +123,15 @@ pub trait SceneConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>);
+    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>);
 }
 
 pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
     let mut timeline = RanimScene::new();
     {
         let cam = items::camera_frame::CameraFrame::new();
-        let r_cam = timeline.init_timeline(cam).id();
-        timeline.timeline_mut(r_cam).show();
+        let r_cam = timeline.insert(cam);
+        timeline.timeline_mut(&r_cam).show();
         constructor.construct(&mut timeline, r_cam);
     }
     timeline.seal()
@@ -299,14 +299,15 @@ impl RanimRenderApp {
                     profiling::scope!("extract");
                     visual_items
                         .iter()
-                        .filter_map(|(id, res, idx)| {
-                            let last_idx = last_idx.entry(*id).or_insert(-1);
+                        .filter_map(|(id, res, timeline_idx, idx)| {
+                            let idx = (*timeline_idx as i32, *idx as i32);
+                            let last_idx = last_idx.entry(*id).or_insert((-1, -1));
                             let prev_last_idx = *last_idx;
-                            *last_idx = *idx as i32;
+                            *last_idx = idx;
                             let renderable = match res {
                                 EvalResult::Dynamic(res) => Some(res.extract_renderable()),
                                 EvalResult::Static(res) => {
-                                    if prev_last_idx != *idx as i32 {
+                                    if prev_last_idx != idx {
                                         Some(res.extract_renderable())
                                     } else {
                                         None
@@ -329,7 +330,7 @@ impl RanimRenderApp {
 
                 let render_primitives = visual_items
                     .iter()
-                    .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
+                    .filter_map(|(id, _, _, _)| self.render_instances.get_render_instance_dyn(*id))
                     .collect::<Vec<_>>();
                 let camera_frame = match &camera_frame.0 {
                     EvalResult::Dynamic(res) => res,
@@ -407,7 +408,7 @@ impl RanimRenderApp {
 
         let extracted = visual_items
             .iter()
-            .map(|(id, res, _)| {
+            .map(|(id, res, _, _)| {
                 let renderable = match res {
                     EvalResult::Dynamic(res) => res.extract_renderable(),
                     EvalResult::Static(res) => res.extract_renderable(),
@@ -421,7 +422,7 @@ impl RanimRenderApp {
         });
         let render_primitives = visual_items
             .iter()
-            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
+            .filter_map(|(id, _, _, _)| self.render_instances.get_render_instance_dyn(*id))
             .collect::<Vec<_>>();
         let camera_frame = match &camera_frame.0 {
             EvalResult::Dynamic(res) => res,

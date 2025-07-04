@@ -2,12 +2,8 @@ use glam::{DVec3, dvec2};
 use log::LevelFilter;
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
-    animation::transform::TransformAnim,
-    color::palettes::manim,
-    components::Anchor,
-    items::vitem::geometry::Rectangle,
-    prelude::*,
-    timeline::{TimeMark, TimelineFunc, TimelinesFunc},
+    animation::transform::TransformAnim, color::palettes::manim, components::Anchor,
+    items::vitem::geometry::Rectangle, prelude::*, timeline::TimeMark,
     utils::rate_functions::linear,
 };
 
@@ -15,7 +11,7 @@ use ranim::{
 struct SelectiveSortScene(pub usize);
 
 impl SceneConstructor for SelectiveSortScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let num = self.0;
 
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
@@ -44,7 +40,7 @@ impl SceneConstructor for SelectiveSortScene {
                     rect.scale(DVec3::splat(0.8))
                         .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
                 });
-                r.init_timeline(rect).with(|timeline| timeline.show()).id()
+                r.insert_and_show(rect)
             })
             .collect::<Vec<_>>();
 
@@ -65,15 +61,15 @@ impl SceneConstructor for SelectiveSortScene {
 
         let shift_right = DVec3::X * width_unit;
         for i in 0..num - 1 {
-            r.timeline_mut(r_rects[i]).play_with(highlight);
+            r.timeline_mut(&r_rects[i]).play_with(highlight);
             for j in i + 1..num {
-                r.timeline_mut(r_rects[j]).play_with(highlight);
+                r.timeline_mut(&r_rects[j]).play_with(highlight);
                 r.timelines_mut().sync();
 
                 if heights[i] > heights[j] {
                     let dir = [shift_right, -shift_right];
                     let color = [manim::BLUE_C, manim::RED_C];
-                    r.timeline_mut(&[r_rects[i], r_rects[j]])
+                    r.timeline_mut(&[&r_rects[i], &r_rects[j]])
                         .iter_mut()
                         .zip(dir)
                         .zip(color)
@@ -91,10 +87,10 @@ impl SceneConstructor for SelectiveSortScene {
                     heights.swap(i, j);
                     r_rects.swap(i, j);
                 }
-                r.timeline_mut(r_rects[j]).play_with(unhighlight);
+                r.timeline_mut(&r_rects[j]).play_with(unhighlight);
                 r.timelines_mut().sync();
             }
-            r.timeline_mut(r_rects[i]).play_with(unhighlight);
+            r.timeline_mut(&r_rects[i]).play_with(unhighlight);
         }
 
         r.insert_time_mark(

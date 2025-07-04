@@ -1,11 +1,10 @@
-use derive_more::{Deref, DerefMut};
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{
     animation::{AnimationSpan, EvalResult, Evaluator},
-    items::{TimelineId, VisualItem, camera_frame::CameraFrame},
+    items::{ItemId, VisualItem, camera_frame::CameraFrame},
 };
 use std::fmt::Debug;
 use std::{any::Any, sync::Arc};
@@ -17,103 +16,98 @@ pub enum TimeMark {
 
 #[allow(clippy::type_complexity)]
 pub struct TimelineEvalResult {
-    pub camera_frame: (EvalResult<CameraFrame>, usize),
-    /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `animation idx` in the corresponding timeline)
-    pub visual_items: Vec<(usize, EvalResult<Box<dyn VisualItem>>, usize)>,
-}
-
-#[derive(Deref, DerefMut)]
-pub struct Timeline {
-    id: usize,
-    #[deref]
-    #[deref_mut]
-    inner: InnerTimeline,
-}
-
-impl Timeline {
-    pub fn id(&self) -> usize {
-        self.id
-    }
-}
-
-impl TimelineFunc for Timeline {
-    fn cur_sec(&self) -> f64 {
-        self.inner.as_timeline().cur_sec()
-    }
-    fn elapsed_secs(&self) -> f64 {
-        self.inner.as_timeline().elapsed_secs()
-    }
-    fn forward(&mut self, duration_secs: f64) {
-        self.inner.as_timeline_mut().forward(duration_secs);
-    }
-    fn forward_to(&mut self, target_sec: f64) {
-        self.inner.as_timeline_mut().forward_to(target_sec);
-    }
-    fn get_animation_infos(&self) -> Vec<AnimationInfo> {
-        self.inner.as_timeline().get_animation_infos()
-    }
-    fn hide(&mut self) {
-        self.inner.as_timeline_mut().hide();
-    }
-    fn seal(&mut self) {
-        self.inner.as_timeline_mut().seal();
-    }
-    fn show(&mut self) {
-        self.inner.as_timeline_mut().show();
-    }
-    fn show_secs(&self) -> &Vec<f64> {
-        self.inner.as_timeline().show_secs()
-    }
-    fn type_name(&self) -> &str {
-        self.inner.as_timeline().type_name()
-    }
+    pub camera_frame: (EvalResult<CameraFrame>, usize, usize),
+    /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `timeline idx` `animation idx`)
+    pub visual_items: Vec<(usize, EvalResult<Box<dyn VisualItem>>, usize, usize)>,
 }
 
 /// Timeline is a type erased [`ItemTimeline<T>`]
 ///
 /// Currently There are two types of Timeline:
-/// - [`InnerTimeline::VisualItem`]: Can be created from [`VisualItem`], has a boxed [`AnyVisualItemTimelineTrait`] in it.
-/// - [`InnerTimeline::CameraFrame`]: Can be created from [`CameraFrame`], has a boxed [`AnyTimelineTrait`] in it.
-pub enum InnerTimeline {
+/// - [`DynTimeline::VisualItem`]: Can be created from [`VisualItem`], has a boxed [`AnyVisualItemTimelineTrait`] in it.
+/// - [`DynTimeline::CameraFrame`]: Can be created from [`CameraFrame`], has a boxed [`AnyTimelineTrait`] in it.
+pub enum DynTimeline {
     CameraFrame(Box<dyn AnyTimelineTrait>),
     VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
 }
 
-impl From<ItemTimeline<CameraFrame>> for InnerTimeline {
+impl TimelineFunc for DynTimeline {
+    fn start_sec(&self) -> Option<f64> {
+        self.as_timeline().start_sec()
+    }
+
+    fn end_sec(&self) -> Option<f64> {
+        self.as_timeline().end_sec()
+    }
+
+    fn seal(&mut self) {
+        self.as_timeline_mut().seal();
+    }
+
+    fn cur_sec(&self) -> f64 {
+        self.as_timeline().cur_sec()
+    }
+
+    fn elapsed_secs(&self) -> f64 {
+        self.as_timeline().elapsed_secs()
+    }
+
+    fn forward(&mut self, duration_secs: f64) {
+        self.as_timeline_mut().forward(duration_secs);
+    }
+
+    fn show(&mut self) {
+        self.as_timeline_mut().show();
+    }
+
+    fn hide(&mut self) {
+        self.as_timeline_mut().hide();
+    }
+
+    fn get_animation_infos(&self) -> Vec<AnimationInfo> {
+        self.as_timeline().get_animation_infos()
+    }
+
+    fn type_name(&self) -> &str {
+        self.as_timeline().type_name()
+    }
+}
+
+impl From<ItemTimeline<CameraFrame>> for DynTimeline {
     fn from(value: ItemTimeline<CameraFrame>) -> Self {
-        InnerTimeline::CameraFrame(Box::new(value))
+        DynTimeline::CameraFrame(Box::new(value))
     }
 }
 
-impl<T: VisualItem + Clone + 'static> From<ItemTimeline<T>> for InnerTimeline {
+impl<T: VisualItem + Clone + 'static> From<ItemTimeline<T>> for DynTimeline {
     fn from(value: ItemTimeline<T>) -> Self {
-        InnerTimeline::VisualItem(Box::new(value))
+        DynTimeline::VisualItem(Box::new(value))
     }
 }
 
-impl InnerTimeline {
+impl DynTimeline {
     pub fn as_timeline(&self) -> &dyn TimelineFunc {
         match self {
-            InnerTimeline::CameraFrame(timeline) => timeline.as_timeline(),
-            InnerTimeline::VisualItem(timeline) => timeline.as_timeline(),
+            DynTimeline::CameraFrame(timeline) => timeline.as_timeline(),
+            DynTimeline::VisualItem(timeline) => timeline.as_timeline(),
         }
     }
     pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc {
         match self {
-            InnerTimeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
-            InnerTimeline::VisualItem(timeline) => timeline.as_timeline_mut(),
+            DynTimeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
+            DynTimeline::VisualItem(timeline) => timeline.as_timeline_mut(),
         }
     }
     pub fn as_any(&self) -> &dyn Any {
         match self {
-            InnerTimeline::CameraFrame(timeline) => timeline.as_ref() as &dyn Any,
-            InnerTimeline::VisualItem(timeline) => timeline.as_ref() as &dyn Any,
+            DynTimeline::CameraFrame(timeline) => timeline.as_ref() as &dyn Any,
+            DynTimeline::VisualItem(timeline) => timeline.as_ref() as &dyn Any,
         }
     }
     pub fn as_any_mut(&mut self) -> &mut dyn Any {
         match self {
-            InnerTimeline::CameraFrame(timeline) => timeline.as_mut() as &mut dyn Any,
-            InnerTimeline::VisualItem(timeline) => timeline.as_mut() as &mut dyn Any,
+            DynTimeline::CameraFrame(timeline) => timeline.as_mut() as &mut dyn Any,
+            DynTimeline::VisualItem(timeline) => timeline.as_mut() as &mut dyn Any,
         }
     }
 }
@@ -124,7 +118,7 @@ impl InnerTimeline {
 #[derive(Default)]
 pub struct RanimScene {
     // Timeline<CameraFrame> or Timeline<Item>
-    timelines: Vec<Timeline>,
+    timelines: Vec<ItemDynTimelines>,
     time_marks: Vec<(f64, TimeMark)>,
 }
 
@@ -143,38 +137,65 @@ impl RanimScene {
         Self::default()
     }
 
-    pub fn init_timeline<T: Clone + 'static>(&mut self, state: T) -> &mut ItemTimeline<T>
+    pub fn insert<T: Clone + 'static>(&mut self, state: T) -> ItemId<T>
     where
-        ItemTimeline<T>: Into<InnerTimeline>,
+        ItemTimeline<T>: Into<DynTimeline>,
     {
-        let id = TimelineId::alloc();
-        self._make_sure_timeline_initialized::<T>(id.id(), state);
-        self.timeline_mut(id)
+        self.insert_and(state, |_| {})
     }
-    pub fn timelines(&self) -> &Vec<Timeline> {
-        &self.timelines
+    pub fn insert_and_show<T: Clone + 'static>(&mut self, state: T) -> ItemId<T>
+    where
+        ItemTimeline<T>: Into<DynTimeline>,
+    {
+        self.insert_and(state, |timeline| {
+            timeline.show();
+        })
     }
-    pub fn timelines_mut(&mut self) -> &mut Vec<Timeline> {
-        &mut self.timelines
+    pub fn insert_and<T: Clone + 'static>(
+        &mut self,
+        state: T,
+        f: impl FnOnce(&mut ItemTimeline<T>),
+    ) -> ItemId<T>
+    where
+        ItemTimeline<T>: Into<DynTimeline>,
+    {
+        let id = ItemId::alloc();
+        let mut item_timeline = ItemTimeline::<T>::new(state);
+        f(&mut item_timeline);
+        self.timelines.push(ItemDynTimelines {
+            id: *id,
+            timelines: vec![item_timeline.into()],
+        });
+        id
     }
-    pub fn timeline<'a, T: TimelineIndex<'a>>(&'a self, index: T) -> T::RefOutput {
-        index.timeline(self)
-    }
-    pub fn timeline_mut<'a, T: TimelineIndex<'a>>(&'a mut self, index: T) -> T::MutOutput {
-        index.timeline_mut(self)
+    pub fn map<T: Clone + 'static, E: Clone + 'static>(
+        &mut self,
+        item_id: ItemId<T>,
+        map_fn: impl FnOnce(T) -> E,
+    ) -> ItemId<E>
+    where
+        ItemTimeline<E>: Into<DynTimeline>,
+    {
+        let item_dyn_timeline = self
+            .timelines
+            .iter_mut()
+            .find(|timeline| timeline.id == *item_id)
+            .unwrap();
+        item_dyn_timeline.apply_map(map_fn);
+        ItemId::new(item_id.inner())
     }
 
-    fn _make_sure_timeline_initialized<T: Clone + 'static>(&mut self, id: usize, state: T)
-    where
-        ItemTimeline<T>: Into<InnerTimeline>,
-    {
-        if self.timeline(id).is_none() {
-            let rabject_timeline = ItemTimeline::<T>::new(TimelineId::new(id), state);
-            self.timelines.push(Timeline {
-                id,
-                inner: rabject_timeline.into(),
-            });
-        }
+    pub fn timelines(&self) -> &Vec<ItemDynTimelines> {
+        &self.timelines
+    }
+    pub fn timelines_mut(&mut self) -> &mut Vec<ItemDynTimelines> {
+        &mut self.timelines
+    }
+    pub fn timeline<'a, T: TimelineIndex<'a>>(&'a self, index: &T) -> T::RefOutput {
+        index.timeline(self)
+    }
+    pub fn timeline_mut<'a, T: TimelineIndex<'a>>(&'a mut self, index: &T) -> T::MutOutput {
+        index.timeline_mut(self)
     }
 
     pub fn insert_time_mark(&mut self, sec: f64, time_mark: TimeMark) {
@@ -198,7 +219,7 @@ impl Debug for RanimScene {
 
 pub struct SealedRanimScene {
     total_secs: f64,
-    timelines: Vec<Timeline>,
+    timelines: Vec<ItemDynTimelines>,
     time_marks: Vec<(f64, TimeMark)>,
 }
 
@@ -212,24 +233,21 @@ impl SealedRanimScene {
     pub fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
         let mut items = Vec::with_capacity(self.timelines.len());
 
-        let mut camera_frame = None::<(EvalResult<CameraFrame>, usize)>;
+        let mut camera_frame = None::<(EvalResult<CameraFrame>, usize, usize)>;
 
-        let eval_timeline = |timeline: &Timeline| match &timeline.inner {
-            InnerTimeline::CameraFrame(inner) => {
-                let timeline = (inner.as_ref() as &dyn Any)
-                    .downcast_ref::<ItemTimeline<CameraFrame>>()
-                    .unwrap();
-                if let Some(res) = timeline.eval_sec(target_sec) {
-                    camera_frame = Some(res)
+        for timeline in &self.timelines {
+            let Some((timeline_idx, res)) = timeline.eval_sec(target_sec) else {
+                continue;
+            };
+            match res {
+                DynTimelineEvalResult::CameraFrame((res, idx)) => {
+                    camera_frame = Some((res, timeline_idx, idx))
+                }
+                DynTimelineEvalResult::VisualItem((res, idx)) => {
+                    items.push((timeline.id, res, timeline_idx, idx));
                 }
             }
-            InnerTimeline::VisualItem(inner) => {
-                if let Some((res, idx)) = inner.eval_sec(target_sec) {
-                    items.push((timeline.id, res, idx));
-                }
-            }
-        };
-        self.timelines.iter().for_each(eval_timeline);
+        }
         // println!("alpha: {}, items: {}", alpha, items.len());
         // println!("alpha: {}, items: {}", alpha, items.len());
 
@@ -261,84 +279,72 @@ impl SealedRanimScene {
 pub trait TimelineIndex<'a> {
     type RefOutput;
     type MutOutput;
-    fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput;
-    fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput;
+    fn timeline(&self, timeline: &'a RanimScene) -> Self::RefOutput;
+    fn timeline_mut(&self, timeline: &'a mut RanimScene) -> Self::MutOutput;
 }
 
 impl<'a> TimelineIndex<'a> for usize {
-    type RefOutput = Option<&'a Timeline>;
-    type MutOutput = Option<&'a mut Timeline>;
-    fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput {
+    type RefOutput = Option<&'a ItemDynTimelines>;
+    type MutOutput = Option<&'a mut ItemDynTimelines>;
+    fn timeline(&self, timeline: &'a RanimScene) -> Self::RefOutput {
         timeline
             .timelines()
             .iter()
-            .find(|timeline| self == timeline.id)
+            .find(|timeline| *self == timeline.id)
     }
-    fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput {
+    fn timeline_mut(&self, timeline: &'a mut RanimScene) -> Self::MutOutput {
         timeline
             .timelines_mut()
             .iter_mut()
-            .find(|timeline| self == timeline.id)
+            .find(|timeline| *self == timeline.id)
     }
 }
 
-impl<'a, T: 'static> TimelineIndex<'a> for TimelineId<T> {
+impl<'a, T: 'static> TimelineIndex<'a> for ItemId<T> {
     type RefOutput = &'a ItemTimeline<T>;
     type MutOutput = &'a mut ItemTimeline<T>;
-    fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput {
+    fn timeline(&self, timeline: &'a RanimScene) -> Self::RefOutput {
         timeline
             .timelines()
             .iter()
-            .find(|timeline| self.id() == timeline.id)
-            .map(|timeline| timeline.as_any().downcast_ref::<ItemTimeline<T>>().unwrap())
+            .find(|timeline| **self == timeline.id)
+            .map(|timeline| timeline.get())
             .unwrap()
     }
-    fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput {
+    fn timeline_mut(&self, timeline: &'a mut RanimScene) -> Self::MutOutput {
         timeline
             .timelines_mut()
             .iter_mut()
-            .find(|timeline| self.id() == timeline.id)
-            .map(|timeline| {
-                timeline
-                    .as_any_mut()
-                    .downcast_mut::<ItemTimeline<T>>()
-                    .unwrap()
-            })
+            .find(|timeline| **self == timeline.id)
+            .map(|timeline| timeline.get_mut())
             .unwrap()
     }
 }
 
-impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for &[TimelineId<T>; N] {
+impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for [&ItemId<T>; N] {
     type RefOutput = [&'a ItemTimeline<T>; N];
     type MutOutput = [&'a mut ItemTimeline<T>; N];
-    fn timeline(self, timeline: &'a RanimScene) -> Self::RefOutput {
+    fn timeline(&self, timeline: &'a RanimScene) -> Self::RefOutput {
         // TODO: the order is not stable
         let mut timelines = timeline
             .timelines()
             .iter()
-            .filter(|timeline| self.iter().any(|rabject| rabject.id() == timeline.id))
+            .filter(|timeline| self.iter().any(|id| ***id == timeline.id))
             .collect_array::<N>()
             .unwrap();
-        timelines
-            .sort_by_key(|timeline| self.iter().position(|id| id.id() == timeline.id).unwrap());
-        timelines.map(|timeline| timeline.as_any().downcast_ref::<ItemTimeline<T>>().unwrap())
+        timelines.sort_by_key(|timeline| self.iter().position(|id| ***id == timeline.id).unwrap());
+        timelines.map(|timeline| timeline.get())
     }
-    fn timeline_mut(self, timeline: &'a mut RanimScene) -> Self::MutOutput {
+    fn timeline_mut(&self, timeline: &'a mut RanimScene) -> Self::MutOutput {
         // TODO: the order is not stable
         let mut timelines = timeline
             .timelines_mut()
             .iter_mut()
-            .filter(|timeline| self.iter().any(|rabject| rabject.id() == timeline.id))
+            .filter(|timeline| self.iter().any(|id| ***id == timeline.id))
             .collect_array::<N>()
             .unwrap();
-        timelines
-            .sort_by_key(|timeline| self.iter().position(|id| id.id() == timeline.id).unwrap());
-        timelines.map(|timeline| {
-            timeline
-                .as_any_mut()
-                .downcast_mut::<ItemTimeline<T>>()
-                .unwrap()
-        })
+        timelines.sort_by_key(|timeline| self.iter().position(|id| ***id == timeline.id).unwrap());
+        timelines.map(|timeline| timeline.get_mut())
     }
 }
 
@@ -426,12 +432,19 @@ impl<T: Clone + VisualItem + 'static> VisualItemTimelineTrait for ItemTimeline<T
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AnimationInfo {
     pub anim_name: String,
-    pub start_sec: f64,
-    pub end_sec: f64,
+    pub range: std::ops::Range<f64>,
 }
 
 // MARK: TimelineFunc
 pub trait TimelineFunc {
+    fn start_sec(&self) -> Option<f64>;
+    fn end_sec(&self) -> Option<f64>;
+    fn range_sec(&self) -> Option<std::ops::Range<f64>> {
+        let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
+            return None;
+        };
+        Some(start..end)
+    }
     fn seal(&mut self);
     fn cur_sec(&self) -> f64;
     fn elapsed_secs(&self) -> f64;
@@ -448,70 +461,212 @@ pub trait TimelineFunc {
     fn hide(&mut self);
     fn get_animation_infos(&self) -> Vec<AnimationInfo>;
     fn type_name(&self) -> &str;
-    fn show_secs(&self) -> &Vec<f64>;
+    // fn show_secs(&self) -> &Vec<f64>;
+}
+
+pub struct ItemDynTimelines {
+    id: usize,
+    timelines: Vec<DynTimeline>,
+}
+
+pub enum DynTimelineEvalResult {
+    CameraFrame((EvalResult<CameraFrame>, usize)),
+    VisualItem((EvalResult<Box<dyn VisualItem>>, usize)),
+}
+
+impl ItemDynTimelines {
+    pub fn eval_alpha(&self, alpha: f64) -> Option<(usize, DynTimelineEvalResult)> {
+        let target_sec = self.timelines.max_total_secs() * alpha;
+        self.eval_sec(target_sec)
+    }
+    pub fn eval_sec(&self, target_sec: f64) -> Option<(usize, DynTimelineEvalResult)> {
+        let (timeline_idx, timeline) =
+            self.timelines.iter().enumerate().find(|(idx, timeline)| {
+                // TODO: make this unwrap better
+                let range = timeline.as_timeline().range_sec().unwrap();
+                range.contains(&target_sec)
+                    || *idx == self.timelines.len() - 1 && range.end == target_sec
+            })?;
+
+        match timeline {
+            DynTimeline::CameraFrame(inner) => {
+                let timeline = (inner.as_ref() as &dyn Any)
+                    .downcast_ref::<ItemTimeline<CameraFrame>>()
+                    .unwrap();
+                timeline
+                    .eval_sec(target_sec)
+                    .map(|res| (timeline_idx, DynTimelineEvalResult::CameraFrame(res)))
+            }
+            DynTimeline::VisualItem(inner) => inner
+                .eval_sec(target_sec)
+                .map(|res| (timeline_idx, DynTimelineEvalResult::VisualItem(res))),
+        }
+    }
+}
+
+impl ItemDynTimelines {
+    pub fn get_dyn(&self) -> &dyn TimelineFunc {
+        // TODO: make this unwrap better
+        self.timelines.last().unwrap().as_timeline()
+    }
+    pub fn get_dyn_mut(&mut self) -> &mut dyn TimelineFunc {
+        // TODO: make this unwrap better
+        self.timelines.last_mut().unwrap().as_timeline_mut()
+    }
+    pub fn get<T: 'static>(&self) -> &ItemTimeline<T> {
+        // TODO: make this unwrap better
+        self.timelines
+            .last()
+            .unwrap()
+            .as_any()
+            .downcast_ref()
+            .unwrap()
+    }
+    pub fn get_mut<T: 'static>(&mut self) -> &mut ItemTimeline<T> {
+        // TODO: make this unwrap better
+        self.timelines
+            .last_mut()
+            .unwrap()
+            .as_any_mut()
+            .downcast_mut()
+            .unwrap()
+    }
+    pub fn apply_map<T: Clone + 'static, E: Clone + 'static>(&mut self, map_fn: impl FnOnce(T) -> E)
+    where
+        ItemTimeline<E>: Into<DynTimeline>,
+    {
+        let (state, end_sec, is_showing) = {
+            let timeline = self.get_mut::<T>();
+            let is_showing = timeline.planning_static_start_sec.is_some();
+            timeline.seal();
+            (
+                timeline.state().clone(),
+                timeline.elapsed_secs(),
+                is_showing,
+            )
+        };
+        let new_state = map_fn(state);
+        let mut new_timeline = ItemTimeline::new(new_state);
+        new_timeline.forward_to(end_sec);
+        if is_showing {
+            new_timeline.show();
+        }
+        self.timelines.push(new_timeline.into());
+    }
+}
+
+impl TimelineFunc for ItemDynTimelines {
+    fn start_sec(&self) -> Option<f64> {
+        self.get_dyn().start_sec()
+    }
+    fn end_sec(&self) -> Option<f64> {
+        self.get_dyn().end_sec()
+    }
+    fn seal(&mut self) {
+        self.get_dyn_mut().seal();
+    }
+
+    fn cur_sec(&self) -> f64 {
+        self.get_dyn().cur_sec()
+    }
+
+    fn elapsed_secs(&self) -> f64 {
+        self.get_dyn().elapsed_secs()
+    }
+
+    fn forward(&mut self, duration_secs: f64) {
+        self.get_dyn_mut().forward(duration_secs);
+    }
+
+    fn show(&mut self) {
+        self.get_dyn_mut().show();
+    }
+
+    fn hide(&mut self) {
+        self.get_dyn_mut().hide();
+    }
+
+    fn get_animation_infos(&self) -> Vec<AnimationInfo> {
+        self.timelines
+            .iter()
+            .flat_map(|timeline| timeline.as_timeline().get_animation_infos())
+            .collect()
+    }
+
+    fn type_name(&self) -> &str {
+        self.get_dyn().type_name()
+    }
 }
 
 // MARK: ItemTimeline
-/// A timeline struct that encodes the animation of the type `T`
+/// `ItemTimeline<T>` is used to encode animations for a single type `T`,
+/// it contains a list of [`AnimationSpan<T>`] and the corresponding metadata for each span.
 pub struct ItemTimeline<T> {
-    id: TimelineId<T>,
     type_name: String,
+    anims: Vec<(AnimationSpan<T>, std::ops::Range<f64>)>,
+    // extractor: Option<E>,
+
+    // State for building the clip
     cur_sec: f64,
     /// The state used for static anim.
-    ///
-    /// It will be `Some` after the first [`ItemTimeline::update`] or [`ItemTimeline::update_with`]
-    ///
-    /// The [`ItemTimeline::show`] only works when it is `Some`.
     state: T,
     /// The start time of the planning static anim.
     /// When it is true, it means that it is showing.
     planning_static_start_sec: Option<f64>,
+}
 
-    animations: Vec<AnimationSpan<T>>,
-    show_secs: Vec<f64>,
+impl<T: 'static> ItemTimeline<T> {
+    /// Create a new timeline with the initial state
+    ///
+    /// The timeline is hidden by default, because we don't know when the first anim starts.
+    /// And this allow us to use [`ItemTimeline::forward`] and [`ItemTimeline::forward_to`]
+    /// to adjust the start time of the first anim.
+    pub(crate) fn new(state: T) -> Self {
+        Self {
+            type_name: std::any::type_name::<T>().to_string(),
+            anims: vec![],
+            // extractor: None,
+            cur_sec: 0.0,
+            state,
+            planning_static_start_sec: None,
+        }
+    }
 }
 
 impl<T: Clone + 'static> TimelineFunc for ItemTimeline<T> {
+    fn start_sec(&self) -> Option<f64> {
+        self.anims.first().map(|(_, range)| range.start)
+    }
+    fn end_sec(&self) -> Option<f64> {
+        self.anims.last().map(|(_, range)| range.end)
+    }
     fn seal(&mut self) {
         // println!("seal");
         self._submit_planning_static_anim();
     }
     fn elapsed_secs(&self) -> f64 {
-        self.show_secs.last().copied().unwrap_or(0.0)
+        self.end_sec().unwrap_or(0.0)
     }
     fn cur_sec(&self) -> f64 {
         self.cur_sec
     }
-    fn show_secs(&self) -> &Vec<f64> {
-        &self.show_secs
-    }
     /// The [`ItemTimeline::state`] should be `Some`
     fn show(&mut self) {
-        // println!("show");
-        if self.planning_static_start_sec.is_none() {
-            self.planning_static_start_sec = Some(self.cur_sec)
-        }
+        self.show();
     }
     fn hide(&mut self) {
-        // println!("hide");
-        self._submit_planning_static_anim();
+        self.hide();
     }
     fn forward(&mut self, duration_secs: f64) {
-        self.cur_sec += duration_secs;
+        self.forward(duration_secs);
     }
     fn get_animation_infos(&self) -> Vec<AnimationInfo> {
         // const MAX_INFO_CNT: usize = 100;
-        self.animations
+        self.anims
             .iter()
-            .zip(self.show_secs.chunks(2))
-            .map(|(anim, show_sec)| {
-                let start = show_sec.first().unwrap();
-                let end = show_sec.last().unwrap();
-                AnimationInfo {
-                    anim_name: anim.type_name().to_string(),
-                    start_sec: *start,
-                    end_sec: *end,
-                }
+            .map(|(anim, range)| AnimationInfo {
+                anim_name: anim.type_name().to_string(),
+                range: range.clone(),
             })
             // .take(MAX_INFO_CNT)
             .collect()
@@ -521,53 +676,53 @@ impl<T: Clone + 'static> TimelineFunc for ItemTimeline<T> {
     }
 }
 
-impl<T: 'static> ItemTimeline<T> {
-    /// Create a new timeline with the initial state
-    ///
-    /// The timeline is hidden by default, because we don't know when the first anim starts.
-    /// And this allow us to use [`ItemTimeline::forward`] and [`ItemTimeline::forward_to`]
-    /// to adjust the start time of the first anim.
-    pub(crate) fn new(id: TimelineId<T>, state: T) -> Self {
-        Self {
-            id,
-            state,
-            type_name: std::any::type_name::<T>().to_string(),
-            animations: vec![],
-            planning_static_start_sec: None,
-            cur_sec: 0.0,
-            show_secs: vec![],
-        }
-    }
-}
-
 impl<T: Clone + 'static> ItemTimeline<T> {
-    pub fn id(&self) -> TimelineId<T> {
-        self.id
-    }
     pub fn cur_sec(&self) -> f64 {
         self.cur_sec
     }
     pub fn state(&self) -> &T {
         &self.state
     }
-    pub fn update_with(&mut self, update_func: impl FnOnce(&mut T)) {
+    pub fn update_with(&mut self, update_func: impl FnOnce(&mut T)) -> &mut Self {
         let showing = self._submit_planning_static_anim();
         update_func(&mut self.state);
         if showing {
             self.show();
         }
+        self
     }
-    pub fn update(&mut self, state: T) {
+    pub fn update(&mut self, state: T) -> &mut Self {
         let showing = self._submit_planning_static_anim();
         self.state = state;
         if showing {
             self.show();
         }
+        self
+    }
+    /// The [`ItemTimeline::state`] should be `Some`
+    pub fn show(&mut self) -> &mut Self {
+        if self.planning_static_start_sec.is_none() {
+            self.planning_static_start_sec = Some(self.cur_sec)
+        }
+        self
+    }
+    pub fn hide(&mut self) -> &mut Self {
+        // println!("hide");
+        self._submit_planning_static_anim();
+        self
+    }
+    pub fn forward(&mut self, duration_secs: f64) -> &mut Self {
+        self.cur_sec += duration_secs;
+        self
+    }
+    pub fn forward_to(&mut self, target_sec: f64) -> &mut Self {
+        if target_sec > self.cur_sec {
+            self.forward(target_sec - self.cur_sec);
+        }
+        self
     }
     fn push_anim(&mut self, anim: AnimationSpan<T>, start: f64, end: f64) {
-        // println!("push_anim: {:?} ({}, {})", anim, start, end);
-        self.animations.push(anim);
-        self.show_secs.extend_from_slice(&[start, end]);
+        self.anims.push((anim, start..end));
     }
     fn _submit_planning_static_anim(&mut self) -> bool {
         // println!("{:?}", self.planning_static_start_sec);
@@ -581,52 +736,49 @@ impl<T: Clone + 'static> ItemTimeline<T> {
         }
         false
     }
-    pub fn play_with(&mut self, anim_func: impl FnOnce(T) -> AnimationSpan<T>) -> T {
+    pub fn play_with(&mut self, anim_func: impl FnOnce(T) -> AnimationSpan<T>) -> &mut Self {
         self.play(anim_func(self.state.clone()))
     }
-    pub fn play(&mut self, anim: AnimationSpan<T>) -> T {
+    pub fn play(&mut self, anim: AnimationSpan<T>) -> &mut Self {
         self._submit_planning_static_anim();
         let res = anim.eval_alpha(1.0).into_owned();
         let duration = anim.duration_secs;
         let end = self.cur_sec + duration;
         self.push_anim(anim, self.cur_sec, end);
         self.cur_sec = end;
-        self.update(res.clone());
+        self.update(res);
         self.show();
-        res
+        self
     }
     pub fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<T>, usize)> {
-        let start = *self.show_secs.first().unwrap();
-        let end = *self.show_secs.last().unwrap();
+        let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
+            return None;
+        };
         self.eval_sec(alpha * (end - start) + start)
     }
     pub fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<T>, usize)> {
-        if self.animations.is_empty() {
+        let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
+            return None;
+        };
+
+        if !(start..=end).contains(&target_sec) {
             return None;
         }
 
-        if target_sec < *self.show_secs.first().unwrap()
-            || target_sec > *self.show_secs.last().unwrap()
-        {
-            return None;
-        }
-        self.animations
+        self.anims
             .iter()
-            .zip(self.show_secs.chunks(2))
             .enumerate()
-            .find_map(|(idx, (anim, show_secs))| {
-                let start = show_secs.first().cloned().unwrap();
-                let end = show_secs.get(1).cloned().unwrap_or(self.cur_sec());
-                if start <= target_sec
-                    && (target_sec < end || target_sec == end && idx == self.animations.len() - 1)
+            .find_map(|(idx, (anim, range))| {
+                if range.contains(&target_sec)
+                    || (idx == self.anims.len() - 1 && target_sec == range.end)
                 {
-                    Some((idx, anim, (start, end)))
+                    Some((idx, anim, range))
                 } else {
                     None
                 }
             })
-            .map(|(idx, anim, (start, end))| {
-                let alpha = (target_sec - start) / (end - start);
+            .map(|(idx, anim, range)| {
+                let alpha = (target_sec - range.start) / (range.end - range.start);
                 (anim.eval_alpha(alpha), idx)
             })
     }

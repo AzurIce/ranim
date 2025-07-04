@@ -8,14 +8,13 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
-    timeline::TimelineFunc,
 };
 
 #[scene]
 struct StaticSquareScene(pub usize);
 
 impl SceneConstructor for StaticSquareScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64;
 
@@ -30,7 +29,7 @@ impl SceneConstructor for StaticSquareScene {
                     );
                 })
             })
-            .map(|item| r.init_timeline(item).with(|timeline| timeline.show()).id())
+            .map(|item| r.insert_and_show(item))
             .collect::<Vec<_>>();
         r.timelines_mut().forward(1.0);
     }
@@ -40,7 +39,7 @@ impl SceneConstructor for StaticSquareScene {
 struct TransformSquareScene(pub usize);
 
 impl SceneConstructor for TransformSquareScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64 - buff;
 
@@ -55,7 +54,7 @@ impl SceneConstructor for TransformSquareScene {
                     );
                 }))
             })
-            .map(|item| r.init_timeline(item).id())
+            .map(|item| r.insert(item))
             .collect::<Vec<_>>();
         let circles = (0..self.0)
             .cartesian_product(0..self.0)
@@ -67,14 +66,10 @@ impl SceneConstructor for TransformSquareScene {
                 }))
             })
             .collect::<Vec<_>>();
-        squares
-            .iter()
-            .cloned()
-            .zip(circles)
-            .for_each(|(r_square, circle)| {
-                r.timeline_mut(r_square)
-                    .play_with(|item| item.transform_to(circle));
-            });
+        squares.iter().zip(circles).for_each(|(r_square, circle)| {
+            r.timeline_mut(r_square)
+                .play_with(|item| item.transform_to(circle));
+        });
     }
 }
 
