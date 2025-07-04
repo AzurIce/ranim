@@ -739,13 +739,13 @@ impl<T: Clone + 'static> ItemTimeline<T> {
                 if range.contains(&target_sec)
                     || (idx == self.anims.len() - 1 && target_sec == range.end)
                 {
-                    Some((idx, anim, (start, end)))
+                    Some((idx, anim, range))
                 } else {
                     None
                 }
             })
-            .map(|(idx, anim, (start, end))| {
-                let alpha = (target_sec - start) / (end - start);
+            .map(|(idx, anim, range)| {
+                let alpha = (target_sec - range.start) / (range.end - range.start);
                 (anim.eval_alpha(alpha), idx)
             })
     }
