@@ -1,85 +1,83 @@
 name = "palettes"
 code = """
 ```rust
-use log::LevelFilter;
-use ranim::{
-    color::palettes::manim::*,
-    components::Anchor,
-    glam::{dvec2, dvec3},
-    items::{Group, vitem::geometry::Rectangle},
-    prelude::*,
-    timeline::{TimelineFunc, TimelinesFunc},
-};
-
-#[scene]
-struct PalettesScene;
-
-impl SceneConstructor for PalettesScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
-        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
-        let padded_frame_size = frame_size * 0.9;
-
-        let colors = vec![
-            vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],
-            vec![TEAL_E, TEAL_D, TEAL_C, TEAL_B, TEAL_A],
-            vec![GREEN_E, GREEN_D, GREEN_C, GREEN_B, GREEN_A],
-            vec![YELLOW_E, YELLOW_D, YELLOW_C, YELLOW_B, YELLOW_A],
-            vec![GOLD_E, GOLD_D, GOLD_C, GOLD_B, GOLD_A],
-            vec![RED_E, RED_D, RED_C, RED_B, RED_A],
-            vec![MAROON_E, MAROON_D, MAROON_C, MAROON_B, MAROON_A],
-            vec![PURPLE_E, PURPLE_D, PURPLE_C, PURPLE_B, PURPLE_A],
-            vec![GREY_E, GREY_D, GREY_C, GREY_B, GREY_A],
-            vec![WHITE, BLACK, GREEN_SCREEN],
-            vec![GREY_BROWN, LIGHT_BROWN, PINK, LIGHT_PINK, ORANGE],
-        ];
-
-        let padded_frame_start = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
-        let h_step = padded_frame_size.y / colors.len() as f64;
-
-        let squares = colors
-            .iter()
-            .enumerate()
-            .flat_map(|(i, row)| {
-                let y = i as f64 * h_step;
-                let w_step = padded_frame_size.x / row.len() as f64;
-                row.iter().enumerate().map(move |(j, color)| {
-                    let x = j as f64 * w_step;
-                    Rectangle::new(w_step as f64, h_step as f64).with(|rect| {
-                        rect.stroke_width = 0.0;
-
-                        rect.set_color(*color).put_anchor_on(
-                            Anchor::edge(-1, -1, 0),
-                            padded_frame_start.extend(0.0) + dvec3(x, y, 0.0),
-                        );
-                    })
-                })
-            })
-            .collect::<Group<_>>();
-        let r_squares = r.init_timeline(squares).id();
-        r.timeline_mut(r_squares).show();
-        r.timelines_mut().forward(0.01);
-    }
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    let options = AppOptions::default();
-    render_scene_at_sec(PalettesScene, 0.0, "preview.png", &options);
-    render_scene_at_sec(PalettesScene, 0.0, "output.png", &options);
-}
+use log::LevelFilter;\r
+use ranim::{\r
+    color::palettes::manim::*,\r
+    components::Anchor,\r
+    glam::{dvec2, dvec3},\r
+    items::{Group, vitem::geometry::Rectangle},\r
+    prelude::*,\r
+};\r
+\r
+#[scene]\r
+struct PalettesScene;\r
+\r
+impl SceneConstructor for PalettesScene {\r
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
+        let padded_frame_size = frame_size * 0.9;\r
+\r
+        let colors = vec![\r
+            vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],\r
+            vec![TEAL_E, TEAL_D, TEAL_C, TEAL_B, TEAL_A],\r
+            vec![GREEN_E, GREEN_D, GREEN_C, GREEN_B, GREEN_A],\r
+            vec![YELLOW_E, YELLOW_D, YELLOW_C, YELLOW_B, YELLOW_A],\r
+            vec![GOLD_E, GOLD_D, GOLD_C, GOLD_B, GOLD_A],\r
+            vec![RED_E, RED_D, RED_C, RED_B, RED_A],\r
+            vec![MAROON_E, MAROON_D, MAROON_C, MAROON_B, MAROON_A],\r
+            vec![PURPLE_E, PURPLE_D, PURPLE_C, PURPLE_B, PURPLE_A],\r
+            vec![GREY_E, GREY_D, GREY_C, GREY_B, GREY_A],\r
+            vec![WHITE, BLACK, GREEN_SCREEN],\r
+            vec![GREY_BROWN, LIGHT_BROWN, PINK, LIGHT_PINK, ORANGE],\r
+        ];\r
+\r
+        let padded_frame_start = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
+        let h_step = padded_frame_size.y / colors.len() as f64;\r
+\r
+        let squares = colors\r
+            .iter()\r
+            .enumerate()\r
+            .flat_map(|(i, row)| {\r
+                let y = i as f64 * h_step;\r
+                let w_step = padded_frame_size.x / row.len() as f64;\r
+                row.iter().enumerate().map(move |(j, color)| {\r
+                    let x = j as f64 * w_step;\r
+                    Rectangle::new(w_step as f64, h_step as f64).with(|rect| {\r
+                        rect.stroke_width = 0.0;\r
+\r
+                        rect.set_color(*color).put_anchor_on(\r
+                            Anchor::edge(-1, -1, 0),\r
+                            padded_frame_start.extend(0.0) + dvec3(x, y, 0.0),\r
+                        );\r
+                    })\r
+                })\r
+            })\r
+            .collect::<Group<_>>();\r
+        r.insert_and_show(squares);\r
+        r.timelines_mut().forward(0.01);\r
+    }\r
+}\r
+\r
+fn main() {\r
+    #[cfg(not(target_arch = "wasm32"))]\r
+    {\r
+        #[cfg(debug_assertions)]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Trace)\r
+            .init();\r
+        #[cfg(not(debug_assertions))]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Info)\r
+            .init();\r
+    }\r
+\r
+    let options = AppOptions::default();\r
+    render_scene_at_sec(PalettesScene, 0.0, "preview.png", &options);\r
+    render_scene_at_sec(PalettesScene, 0.0, "output.png", &options);\r
+}\r
 ```"""
-hash = "b3302454b644da9e8595905a246dd695c5d46b1f"
+hash = "1013dced04e4daa1b8714e890877f5aa772bf8ce"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/output.png"]
 wasm = false

@@ -50,15 +50,15 @@ fn main() {
 
 ## 1. Timeline 基础
 
-`RanimScene` 中有若干个 `Timeline`，每个 `Timeline` 中包含一系列的动画列表。
+`RanimScene` 中有若干个「物件时间线」，每个物件时间线中包含一个动画列表。
 
-通过 `r.init_timeline(state)` 可以创建一个 `Timeline`：
+通过 `r.insert(state)` 可以创建一个 `Timeline`：
 
 ```rust,ignore
 let square: Square = Square::new(2.0).with(|square| {
     square.set_color(manim::BLUE_C);
 });
-let r_square: TimelineId<Square> = r.init_timeline(square).id();
+let r_square: TimelineId<Square> = r.insert(square);
 ```
 
 `RanimScene` 中有关 `Timeline` 的方法如下：
