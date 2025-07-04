@@ -7,7 +7,7 @@ use ranim::{
     glam::{DVec3, dvec2},
     items::vitem::geometry::Rectangle,
     prelude::*,
-    timeline::{TimeMark, TimelinesFunc},
+    timeline::TimeMark,
     utils::rate_functions::linear,
 };
 
@@ -15,7 +15,7 @@ use ranim::{
 struct BubbleSortScene(pub usize);
 
 impl SceneConstructor for BubbleSortScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let num = self.0;
 
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
@@ -45,7 +45,7 @@ impl SceneConstructor for BubbleSortScene {
                         .scale(DVec3::splat(0.8))
                         .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
                 });
-                r.init_timeline(rect).id()
+                r.insert(rect)
             })
             .collect::<Vec<_>>();
 
@@ -65,7 +65,7 @@ impl SceneConstructor for BubbleSortScene {
         };
         let shift_right = DVec3::X * width_unit;
         let swap_shift = [shift_right, -shift_right];
-        let anim_swap = |timeline: &mut RanimScene, r_rectab: &[TimelineId<Rectangle>; 2]| {
+        let anim_swap = |timeline: &mut RanimScene, r_rectab: &[&ItemId<Rectangle>; 2]| {
             let timelines = timeline.timeline_mut(r_rectab);
             timelines
                 .into_iter()
@@ -83,18 +83,18 @@ impl SceneConstructor for BubbleSortScene {
 
         for i in (1..num).rev() {
             for j in 0..i {
-                r.timeline_mut(&[r_rects[j], r_rects[j + 1]])
+                r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])
                     .into_iter()
                     .for_each(|timeline| {
                         timeline.play_with(anim_highlight);
                     });
                 if heights[j] > heights[j + 1] {
-                    anim_swap(r, &[r_rects[j], r_rects[j + 1]]);
+                    anim_swap(r, &[&r_rects[j], &r_rects[j + 1]]);
                     r.timelines_mut().sync();
                     heights.swap(j, j + 1);
                     r_rects.swap(j, j + 1);
                 }
-                r.timeline_mut(&[r_rects[j], r_rects[j + 1]])
+                r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])
                     .into_iter()
                     .for_each(|timeline| {
                         timeline.play_with(anim_unhighlight);

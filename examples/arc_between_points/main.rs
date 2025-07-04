@@ -13,7 +13,7 @@ use ranim::{
 struct ArcBetweenPointsScene;
 
 impl SceneConstructor for ArcBetweenPointsScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let center = dvec2(0.0, 0.0);
 
         let start_color = color!("#FF8080FF");
@@ -45,9 +45,9 @@ impl SceneConstructor for ArcBetweenPointsScene {
                 )
             })
             .collect::<Group<_>>();
-        let r_arcs = r.init_timeline(arcs).id();
+        let r_arcs = r.insert(arcs);
 
-        r.timeline_mut(r_arcs)
+        r.timeline_mut(&r_arcs)
             .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
 
         r.insert_time_mark(

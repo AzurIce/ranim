@@ -32,7 +32,7 @@ use ranim::{
 struct TestScene;
 
 impl SceneConstructor for TestScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let n = 8;
         let arcs = (0..n)
             .map(|i| {
@@ -40,8 +40,7 @@ impl SceneConstructor for TestScene {
                 ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
             })
             .collect::<Group<_>>();
-        let r_arcs = r.init_timeline(arcs).id();
-        r.timeline_mut(r_arcs).show();
+        let r_arcs = r.insert_and_show(arcs);
 
         // text.set_stroke_color(manim::RED_C)
         //     .set_stroke_width(0.05)
