@@ -116,7 +116,7 @@ impl AppState {
             profiling::scope!("extract");
             visual_items
                 .iter()
-                .map(|(id, res, _)| {
+                .map(|(id, res, _, _)| {
                     let renderable = match res {
                         EvalResult::Dynamic(res) => res.extract_renderable(),
                         EvalResult::Static(res) => res.extract_renderable(),
@@ -137,7 +137,7 @@ impl AppState {
 
         let render_primitives = visual_items
             .iter()
-            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
+            .filter_map(|(id, _, _, _)| self.render_instances.get_render_instance_dyn(*id))
             .collect::<Vec<_>>();
         let camera_frame = match &camera_frame.0 {
             EvalResult::Dynamic(res) => res,

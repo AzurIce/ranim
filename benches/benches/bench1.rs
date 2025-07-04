@@ -15,7 +15,7 @@ use ranim::{
 struct StaticSquareScene(pub usize);
 
 impl SceneConstructor for StaticSquareScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64;
 
@@ -40,7 +40,7 @@ impl SceneConstructor for StaticSquareScene {
 struct TransformSquareScene(pub usize);
 
 impl SceneConstructor for TransformSquareScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64 - buff;
 

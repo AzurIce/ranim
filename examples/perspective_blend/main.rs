@@ -16,7 +16,7 @@ use ranim::{
 struct PerspectiveBlendScene;
 
 impl SceneConstructor for PerspectiveBlendScene {
-    fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {
         let cam = r.timeline(r_cam).state().clone().with(|cam| {
             cam.pos = DVec3::Z * 5.0;
         });

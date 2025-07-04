@@ -15,7 +15,7 @@ use ranim::{
 struct SelectiveSortScene(pub usize);
 
 impl SceneConstructor for SelectiveSortScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: TimelineId<CameraFrame>) {
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let num = self.0;
 
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
