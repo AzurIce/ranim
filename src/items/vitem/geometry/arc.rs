@@ -298,10 +298,11 @@ impl From<ArcBetweenPoints> for Arc {
             let v2 = end - start;
 
             let rot_angle = v1.angle_between(v2);
-            let mut rot_axis = v1.cross(v2).normalize();
+            let mut rot_axis = v1.cross(v2);
             if rot_axis.length_squared() <= f64::EPSILON {
                 rot_axis = DVec3::NEG_Z;
             }
+            rot_axis = rot_axis.normalize();
             arc.shift(start - cur_start).rotate_by_anchor(
                 rot_angle,
                 rot_axis,
