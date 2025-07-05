@@ -415,6 +415,7 @@ impl Scale for DVec3 {
     }
 }
 
+// MARK: Arrange
 pub trait Arrange: Shift {
     fn arrange(&mut self, pos_func: impl Fn(usize) -> DVec3);
     fn arrange_cols(&mut self, ncols: usize, pos_func: impl Fn(usize, usize) -> DVec3);
@@ -441,6 +442,7 @@ impl<T: Shift> Arrange for [T] {
     }
 }
 
+// MARK: ScaleStrokeExt
 pub trait ScaleStrokeExt: Scale + StrokeWidth {
     fn scale_with_stroke_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
         self.scale_by_anchor(scale, anchor);
