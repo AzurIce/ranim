@@ -296,12 +296,13 @@ mod test {
     use std::f64::consts::PI;
 
     use assert_float_eq::assert_float_absolute_eq;
-    use glam::{dvec3, DVec3};
+    use glam::{DVec3, dvec3};
 
     use crate::{
-        components::{vpoint::VPointComponentVec, Anchor},
+        components::{Anchor, vpoint::VPointComponentVec},
         items::vitem::{
-            geometry::{Circle, Square}, VItem
+            VItem,
+            geometry::{Circle, Square},
         },
         traits::{Alignable, Rotate},
     };
@@ -356,11 +357,7 @@ mod test {
                 dvec3(-2.0, -2.0, 0.0),
             ])
             .for_each(|(res, truth)| {
-                assert_float_absolute_eq!(
-                    res.distance_squared(truth),
-                    0.0,
-                    1e-10
-                );
+                assert_float_absolute_eq!(res.distance_squared(truth), 0.0, 1e-10);
             });
     }
 
@@ -384,11 +381,7 @@ mod test {
                 dvec3(4.0, 4.0, 0.0),
             ])
             .for_each(|(res, truth)| {
-                assert_float_absolute_eq!(
-                    res.distance_squared(truth),
-                    0.0,
-                    1e-10
-                );
+                assert_float_absolute_eq!(res.distance_squared(truth), 0.0, 1e-10);
             });
 
         points.put_start_and_end_on(dvec3(0.0, 0.0, 0.0), dvec3(-2.0, -2.0, 0.0));
@@ -401,11 +394,7 @@ mod test {
                 dvec3(-2.0, -2.0, 0.0),
             ])
             .for_each(|(res, truth)| {
-                assert_float_absolute_eq!(
-                    res.distance_squared(truth),
-                    0.0,
-                    1e-10
-                );
+                assert_float_absolute_eq!(res.distance_squared(truth), 0.0, 1e-10);
             });
     }
 }
