@@ -104,7 +104,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_single_file_typst_world() {
+    fn test_single_file_typst_world_foo() {
         let source = "R";
 
         println!("{}", typst_svg(source));

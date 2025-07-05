@@ -221,10 +221,11 @@ impl VPointComponentVec {
             Anchor::Point(cur_start),
         );
         let rotate_angle = cur_v.angle_between(v);
-        let mut rotate_axis = cur_v.cross(v).normalize();
+        let mut rotate_axis = cur_v.cross(v);
         if rotate_axis.length_squared() <= f64::EPSILON {
             rotate_axis = DVec3::Z;
         }
+        rotate_axis = rotate_axis.normalize();
         self.rotate_by_anchor(rotate_angle, rotate_axis, Anchor::Point(cur_start));
         self.shift(start - cur_start);
 
@@ -292,15 +293,18 @@ impl PointsFunc for [DVec3] {
 
 #[cfg(test)]
 mod test {
-    use glam::dvec3;
+    use std::f64::consts::PI;
+
+    use assert_float_eq::assert_float_absolute_eq;
+    use glam::{DVec3, dvec3};
 
     use crate::{
-        components::vpoint::VPointComponentVec,
+        components::{Anchor, vpoint::VPointComponentVec},
         items::vitem::{
             VItem,
             geometry::{Circle, Square},
         },
-        traits::Alignable,
+        traits::{Alignable, Rotate},
     };
 
     #[test]
@@ -334,6 +338,30 @@ mod test {
     }
 
     #[test]
+    fn test_rotate() {
+        let mut points = VPointComponentVec(
+            vec![
+                dvec3(0.0, 0.0, 0.0),
+                dvec3(1.0, 0.0, 0.0),
+                dvec3(2.0, 2.0, 0.0),
+            ]
+            .into(),
+        );
+        points.rotate_by_anchor(PI, DVec3::Z, Anchor::Point(DVec3::ZERO));
+        points
+            .0
+            .iter()
+            .zip([
+                dvec3(0.0, 0.0, 0.0),
+                dvec3(-1.0, 0.0, 0.0),
+                dvec3(-2.0, -2.0, 0.0),
+            ])
+            .for_each(|(res, truth)| {
+                assert_float_absolute_eq!(res.distance_squared(truth), 0.0, 1e-10);
+            });
+    }
+
+    #[test]
     fn test_put_start_and_end_on() {
         let mut points = VPointComponentVec(
             vec![
@@ -344,24 +372,29 @@ mod test {
             .into(),
         );
         points.put_start_and_end_on(dvec3(0.0, 0.0, 0.0), dvec3(4.0, 4.0, 0.0));
-        assert_eq!(
-            points.0,
-            vec![
+        points
+            .0
+            .iter()
+            .zip([
                 dvec3(0.0, 0.0, 0.0),
                 dvec3(2.0, 0.0, 0.0),
                 dvec3(4.0, 4.0, 0.0),
-            ]
-            .into()
-        );
+            ])
+            .for_each(|(res, truth)| {
+                assert_float_absolute_eq!(res.distance_squared(truth), 0.0, 1e-10);
+            });
+
         points.put_start_and_end_on(dvec3(0.0, 0.0, 0.0), dvec3(-2.0, -2.0, 0.0));
-        assert_eq!(
-            points.0,
-            vec![
+        points
+            .0
+            .iter()
+            .zip([
                 dvec3(0.0, 0.0, 0.0),
-                dvec3(0.0, 1.0, 0.0),
+                dvec3(-1.0, 0.0, 0.0),
                 dvec3(-2.0, -2.0, 0.0),
-            ]
-            .into()
-        );
+            ])
+            .for_each(|(res, truth)| {
+                assert_float_absolute_eq!(res.distance_squared(truth), 0.0, 1e-10);
+            });
     }
 }
