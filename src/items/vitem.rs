@@ -1,6 +1,9 @@
 // pub mod arrow;
+/// Geometry items
 pub mod geometry;
+/// Svg item
 pub mod svg;
+/// Typst (use Svg with `typst_svg` for now)
 pub mod typst;
 // pub mod line;
 
@@ -39,9 +42,13 @@ use crate::{
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct VItem {
+    /// vpoints data
     pub vpoints: VPointComponentVec,
+    /// stroke widths
     pub stroke_widths: ComponentVec<Width>,
+    /// stroke rgbas
     pub stroke_rgbas: ComponentVec<Rgba>,
+    /// fill rgbas
     pub fill_rgbas: ComponentVec<Rgba>,
 }
 
@@ -84,9 +91,11 @@ impl Scale for VItem {
     }
 }
 
+/// Default stroke width
 pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
 
 impl VItem {
+    /// Close the VItem
     pub fn close(&mut self) -> &mut Self {
         if self.vpoints.last() != self.vpoints.first() && !self.vpoints.is_empty() {
             let start = self.vpoints[0];
@@ -95,13 +104,15 @@ impl VItem {
         }
         self
     }
-    pub fn set_points(&mut self, points: Vec<DVec3>) {
-        self.vpoints.0 = points.into();
+    /// Set the vpoints of the VItem
+    pub fn set_points(&mut self, vpoints: Vec<DVec3>) {
+        self.vpoints.0 = vpoints.into();
     }
+    /// Get anchor points
     pub fn get_anchor(&self, idx: usize) -> Option<&DVec3> {
         self.vpoints.get(idx * 2)
     }
-    // TODO: remove all constructor to blueprint impl
+    /// Construct a [`VItem`] form vpoints
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
         let stroke_widths = vec![DEFAULT_STROKE_WIDTH; vpoints.len().div_ceil(2)];
         let stroke_rgbas = vec![vec4(1.0, 1.0, 1.0, 1.0); vpoints.len().div_ceil(2)];
@@ -113,7 +124,7 @@ impl VItem {
             fill_rgbas: fill_rgbas.into(),
         }
     }
-
+    /// Extend vpoints of the VItem
     pub fn extend_vpoints(&mut self, vpoints: &[DVec3]) {
         self.vpoints.extend_from_vec(vpoints.to_vec());
 
@@ -137,6 +148,7 @@ impl VItem {
             })
             .collect()
     }
+    /// Put start and end on
     pub fn put_start_and_end_on(&mut self, start: DVec3, end: DVec3) -> &mut Self {
         self.vpoints.put_start_and_end_on(start, end);
         self

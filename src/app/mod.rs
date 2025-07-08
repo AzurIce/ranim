@@ -16,22 +16,20 @@ use winit::{
     window::{Window, WindowId},
 };
 
-#[allow(unused)]
 use crate::{
     Scene, SceneMeta,
     animation::EvalResult,
     app::egui_tools::EguiRenderer,
     build_timeline,
-    context::WgpuContext,
     render::{
         Renderer,
         pipelines::app::{AppPipeline, Viewport},
         primitives::RenderInstances,
     },
     timeline::{SealedRanimScene, TimelineEvalResult},
+    utils::wgpu::WgpuContext,
 };
 
-#[allow(unused)]
 #[derive(Default, Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct OccupiedScreenSpace {
@@ -462,6 +460,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
 #[cfg(feature = "profiling")]
 use crate::PUFFIN_GPU_PROFILER;
 
+/// Runs a scene preview app on `scene`
 pub fn run_scene_app(scene: impl Scene) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -505,7 +504,7 @@ pub fn run_scene_app(scene: impl Scene) {
 }
 
 #[allow(unused)]
-pub struct AppRenderer {
+pub(crate) struct AppRenderer {
     surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
     egui_renderer: EguiRenderer,
@@ -516,7 +515,7 @@ pub struct AppRenderer {
 }
 
 impl AppRenderer {
-    pub fn new(ctx: &WgpuContext, window: Arc<Window>, size: (u32, u32)) -> Self {
+    fn new(ctx: &WgpuContext, window: Arc<Window>, size: (u32, u32)) -> Self {
         let surface = ctx.instance.create_surface(window.clone()).unwrap();
 
         // let swapchain_capabilities = surface.get_capabilities(&ctx.adapter);

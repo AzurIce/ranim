@@ -4,7 +4,9 @@ use crate::{
 };
 
 // MARK: LaggedAnim
+/// The methods to create animations for `Group<T>`
 pub trait LaggedAnim<T> {
+    /// Create a [`Lagged`] anim.
     fn lagged(
         self,
         lag_ratio: f64,
@@ -24,22 +26,27 @@ impl<T: Clone + 'static> LaggedAnim<T> for Group<T> {
     }
 }
 
-pub fn lagged<T, I>(
-    lag_ratio: f64,
-    mut anim_func: impl FnMut(T) -> AnimationSpan<T>,
-) -> impl FnMut(I) -> Lagged<T>
-where
-    I: IntoIterator<Item = T>,
-{
-    move |target| Lagged::new(target, lag_ratio, &mut anim_func)
-}
+// pub fn lagged<T, I>(
+//     lag_ratio: f64,
+//     mut anim_func: impl FnMut(T) -> AnimationSpan<T>,
+// ) -> impl FnMut(I) -> Lagged<T>
+// where
+//     I: IntoIterator<Item = T>,
+// {
+//     move |target| Lagged::new(target, lag_ratio, &mut anim_func)
+// }
 
+/// The lagged anim.
+///
+/// This is only applyable to [`Group<T>`], and this will apply
+/// the anims in the order of the elements with the lag ratio.
 pub struct Lagged<T> {
     anims: Vec<AnimationSpan<T>>,
     lag_ratio: f64,
 }
 
 impl<T> Lagged<T> {
+    /// Constructor
     pub fn new<I>(target: I, lag_ratio: f64, anim_func: impl FnMut(T) -> AnimationSpan<T>) -> Self
     where
         I: IntoIterator<Item = T>,

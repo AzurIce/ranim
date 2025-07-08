@@ -2,6 +2,7 @@ use std::io::Write;
 
 use regex::bytes::Regex;
 
+/// remove `r"<path[^>]*(?:>.*?<\/path>|\/>)"`
 pub fn get_typst_element(svg: &str) -> String {
     let re = Regex::new(r"<path[^>]*(?:>.*?<\/path>|\/>)").unwrap();
     let removed_bg = re.replace(svg.as_bytes(), b"");
@@ -11,6 +12,7 @@ pub fn get_typst_element(svg: &str) -> String {
     String::from_utf8_lossy(&removed_bg).to_string()
 }
 
+/// Compiles typst code to SVG string by spawning a typst process
 pub fn compile_typst_code(typst_code: &str) -> String {
     let mut child = std::process::Command::new("typst")
         .arg("compile")
@@ -34,53 +36,28 @@ pub fn compile_typst_code(typst_code: &str) -> String {
     get_typst_element(&output)
 }
 
-#[macro_export]
-macro_rules! typst_svg {
-    ($typst_code:expr) => {{
-        use $crate::utils::typst::compile_typst_code;
+// #[macro_export]
+// macro_rules! typst_svg {
+//     ($typst_code:expr) => {{
+//         use $crate::utils::typst::compile_typst_code;
 
-        let mut typst_code = r##"
-            #set page(margin: 0cm)
-            #set text(fill: rgb("#ffffff"))
-        "##
-        .to_string();
-        typst_code.push_str($typst_code);
-        // println!("{}", typst_code);
-        let svg = compile_typst_code(typst_code.as_str());
-        svg
-    }};
-}
+//         let mut typst_code = r##"
+//             #set page(margin: 0cm)
+//             #set text(fill: rgb("#ffffff"))
+//         "##
+//         .to_string();
+//         typst_code.push_str($typst_code);
+//         // println!("{}", typst_code);
+//         let svg = compile_typst_code(typst_code.as_str());
+//         svg
+//     }};
+// }
 
-#[macro_export]
-macro_rules! typst_tree {
-    ($typst_code:expr) => {{
-        use $crate::typst_svg;
-        usvg::Tree::from_str(&typst_svg!($typst_code), &usvg::Options::default())
-            .expect("failed to parse svg")
-    }};
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_typst() {
-        let svg = typst_svg!(
-            r#"
-            #text(20pt)[hello]
-        "#
-        );
-        println!("{svg}");
-        let svg = typst_svg!(
-            r#"
-            #text(20pt)[你好]
-        "#
-        );
-        println!("{svg}");
-        let svg = typst_svg!(
-            r#"
-            #text(60pt)[R]
-        "#
-        );
-        println!("{svg}");
-    }
-}
+// #[macro_export]
+// macro_rules! typst_tree {
+//     ($typst_code:expr) => {{
+//         use $crate::typst_svg;
+//         usvg::Tree::from_str(&typst_svg!($typst_code), &usvg::Options::default())
+//             .expect("failed to parse svg")
+//     }};
+// }

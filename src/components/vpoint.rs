@@ -158,6 +158,7 @@ impl Alignable for VPointComponentVec {
 // }
 
 impl VPointComponentVec {
+    /// Get Subpaths
     pub fn get_subpaths(&self) -> Vec<Vec<DVec3>> {
         let mut subpaths = Vec::new();
 
@@ -182,11 +183,12 @@ impl VPointComponentVec {
 
         subpaths
     }
+    /// Get the segment
     pub fn get_seg(&self, idx: usize) -> Option<&[DVec3; 3]> {
         self.get(idx * 2..idx * 2 + 3)
             .and_then(|seg| seg.try_into().ok())
     }
-
+    /// Get closed path flags
     pub fn get_closepath_flags(&self) -> Vec<bool> {
         let len = self.len();
         let mut flags = vec![false; len];
@@ -234,6 +236,9 @@ impl VPointComponentVec {
 }
 
 impl VPointComponentVec {
+    /// Get partial of the vpoint.
+    ///
+    /// This will trim the bezier.
     pub fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
         let max_anchor_idx = self.len() / 2;
 
@@ -273,6 +278,8 @@ impl VPointComponentVec {
     }
 }
 
+/// Apply the function by first transform the points to origin based on anchor,
+/// then apply the function, then transform the points back.
 pub fn wrap_point_func_with_anchor(
     f: impl Fn(&mut DVec3) + Copy,
     anchor: DVec3,

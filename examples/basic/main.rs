@@ -1,12 +1,11 @@
 use glam::DVec3;
 use log::LevelFilter;
 use ranim::{
-    animation::{creation::GroupWritingAnim, fading::FadingAnim},
+    animation::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     components::ScaleHint,
     items::{
         Group,
-        vitem::typst::typst_svg,
-        vitem::{VItem, svg::SvgItem},
+        vitem::{VItem, svg::SvgItem, typst::typst_svg},
     },
     prelude::*,
     timeline::TimeMark,
@@ -45,7 +44,7 @@ impl SceneConstructor for BasicScene {
         let r_text = r.insert(text);
 
         r.timeline_mut(&r_text)
-            .play_with(|text| text.group_write(0.2).with_duration(3.0));
+            .play_with(|text| text.lagged(0.2, |e| e.write()).with_duration(3.0));
         r.timeline_mut(&r_svg)
             .play_with(|svg| svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
         r.timelines_mut().sync();
@@ -57,7 +56,7 @@ impl SceneConstructor for BasicScene {
 
         r.timelines_mut().forward(0.5);
         r.timeline_mut(&r_text)
-            .play_with(|text| text.group_unwrite(0.2).with_duration(3.0));
+            .play_with(|text| text.lagged(0.2, |e| e.write()).with_duration(3.0));
         r.timeline_mut(&r_svg)
             .play_with(|svg| svg.fade_out().with_duration(3.0)); // At the same time, the svg fade out
         r.timelines_mut().sync();

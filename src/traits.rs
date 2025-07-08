@@ -11,7 +11,11 @@ use crate::{
 };
 
 // MARK: Interpolatable
+/// A trait for interpolating to values
+///
+/// It uses the reference of two values and produce an owned interpolated value.
 pub trait Interpolatable {
+    /// Lerping between values
     fn lerp(&self, target: &Self, t: f64) -> Self;
 }
 
@@ -62,7 +66,20 @@ impl Interpolatable for DMat4 {
 }
 
 // MARK: With
+/// A trait for mutating a value in place.
+///
+/// This trait is automatically implemented for `T`.
+///
+/// # Example
+/// ```
+/// use ranim::prelude::*;
+///
+/// let mut a = 1;
+/// a = a.with(|x| *x = 2);
+/// assert_eq!(a, 2);
+/// ```
 pub trait With {
+    /// Mutating a value inplace
     fn with(mut self, f: impl Fn(&mut Self)) -> Self
     where
         Self: Sized,
@@ -82,7 +99,9 @@ impl<T> With for T {}
 /// For example, if we want to interpolate two VItems, we need to
 /// align all their inner components like `ComponentVec<VPoint>` to the same length.
 pub trait Alignable {
+    /// Checking if two items are aligned
     fn is_aligned(&self, other: &Self) -> bool;
+    /// Aligning two items
     fn align_with(&mut self, other: &mut Self);
 }
 
@@ -102,7 +121,9 @@ impl<T> Alignable for Group<T> {
 }
 
 // MARK: Opacity
+/// A trait for items with opacity
 pub trait Opacity {
+    /// Setting opacity of an item
     fn set_opacity(&mut self, opacity: f32) -> &mut Self;
 }
 
@@ -119,21 +140,29 @@ where
 }
 
 // MARK: Partial
+/// A trait for items that can be displayed partially
 pub trait Partial {
+    /// Getting a partial item
     fn get_partial(&self, range: Range<f64>) -> Self;
+    /// Getting a partial item closed
     fn get_partial_closed(&self, range: Range<f64>) -> Self;
 }
 
 // MARK: Empty
-
+/// A trait for items that can be empty
 pub trait Empty {
+    /// Getting an empty item
     fn empty() -> Self;
 }
 
 // MARK: FillColor
+/// A trait for items that have fill color
 pub trait FillColor {
+    /// Getting fill color of an item
     fn fill_color(&self) -> AlphaColor<Srgb>;
+    /// Setting fill opacity of an item
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self;
+    /// Setting fill color(rgba) of an item
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
 }
 
@@ -156,10 +185,14 @@ impl<T: FillColor> FillColor for [T] {
 }
 
 // MARK: StrokeColor
+/// A trait for items that have stroke color
 pub trait StrokeColor {
+    /// Getting stroke color of an item
     fn stroke_color(&self) -> AlphaColor<Srgb>;
-    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
+    /// Setting stroke opacity of an item
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self;
+    /// Setting stroke color(rgba) of an item
+    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self;
 }
 
 impl<T: StrokeColor> StrokeColor for [T] {
@@ -181,9 +214,12 @@ impl<T: StrokeColor> StrokeColor for [T] {
 }
 
 // MARK: StrokeWidth
+/// A trait for items have stroke width
 pub trait StrokeWidth {
     // TODO: Make this better
+    /// Applying stroke width function to an item
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self;
+    /// Setting stroke width of an item
     fn set_stroke_width(&mut self, width: f32) -> &mut Self {
         self.apply_stroke_func(|widths| widths.fill(width.into()))
     }
@@ -202,7 +238,11 @@ impl<T: StrokeWidth> StrokeWidth for [T] {
 }
 
 // MARK: Color
+/// A trait for items that have both fill color and stroke color
+///
+/// This trait is auto implemented for items that implement [`FillColor`] and [`StrokeColor`].
 pub trait Color: FillColor + StrokeColor {
+    /// Setting color(rgba) of an item
     fn set_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.set_fill_color(color);
         self.set_stroke_color(color);
@@ -213,6 +253,7 @@ pub trait Color: FillColor + StrokeColor {
 impl<T: FillColor + StrokeColor + ?Sized> Color for T {}
 
 // MARK: BoundingBox
+/// A trait for items that have a bounding box
 pub trait BoundingBox {
     /// Get the bounding box of the mobject in [min, mid, max] order.
     fn get_bounding_box(&self) -> [DVec3; 3];
@@ -267,8 +308,11 @@ impl<T: BoundingBox> BoundingBox for [T] {
 }
 
 // MARK: PointsFunc
+/// A trait for items that can apply points function.
 pub trait PointsFunc {
+    /// Applying points function to an item
     fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self;
+    /// Applying affine transform to an item
     fn apply_affine(&mut self, affine: DAffine2) -> &mut Self {
         self.apply_points_func(|points| {
             points.iter_mut().for_each(|p| {
@@ -282,6 +326,7 @@ pub trait PointsFunc {
 }
 
 // MARK: Shift
+/// A trait for shifting operations.
 pub trait Shift: BoundingBox {
     /// Shift the item by a given vector.
     fn shift(&mut self, shift: DVec3) -> &mut Self;
@@ -308,6 +353,7 @@ impl<T: Shift> Shift for [T] {
 }
 
 // MARK: Rotate
+/// A trait for rotating operations
 pub trait Rotate {
     /// Rotate the item by a given angle about a given axis at anchor.
     ///
@@ -332,6 +378,7 @@ impl<T: Rotate + BoundingBox> Rotate for [T] {
 }
 
 // MARK: Scale
+/// A trait for scaling operations
 pub trait Scale: BoundingBox {
     /// Scale the item by a given scale at anchor.
     ///
@@ -343,6 +390,9 @@ pub trait Scale: BoundingBox {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.scale_by_anchor(scale, Anchor::CENTER)
     }
+    /// Calculate the scale ratio for a given hint.
+    ///
+    /// See [`ScaleHint`] for more details.
     fn calc_scale_ratio(&self, hint: ScaleHint) -> DVec3 {
         let bb = self.get_bounding_box();
         match hint {
@@ -416,9 +466,19 @@ impl Scale for DVec3 {
 }
 
 // MARK: Arrange
+/// A trait for arranging operations.
 pub trait Arrange: Shift {
+    /// Arrange the items by a given function.
+    ///
+    /// The `pos_func` takes index as input and output the center position.
     fn arrange(&mut self, pos_func: impl Fn(usize) -> DVec3);
+    /// Arrange the items in a grid with given number of columns.
+    ///
+    /// The `pos_func` takes row and column index as input and output the center position.
     fn arrange_cols(&mut self, ncols: usize, pos_func: impl Fn(usize, usize) -> DVec3);
+    /// Arrange the items in a grid with given number of rows.
+    ///
+    /// The `pos_func` takes row and column index as input and output the center position.
     fn arrange_rows(&mut self, nrows: usize, pos_func: impl Fn(usize, usize) -> DVec3);
 }
 
@@ -443,7 +503,9 @@ impl<T: Shift> Arrange for [T] {
 }
 
 // MARK: ScaleStrokeExt
+/// A trait for scaling operations with stroke width.
 pub trait ScaleStrokeExt: Scale + StrokeWidth {
+    /// Scale the item by a given scale at anchor with stroke width.
     fn scale_with_stroke_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
         self.scale_by_anchor(scale, anchor);
 
@@ -457,6 +519,7 @@ pub trait ScaleStrokeExt: Scale + StrokeWidth {
         self.apply_stroke_func(|widths| widths.iter_mut().for_each(|w| w.0 *= scale as f32));
         self
     }
+    /// Scale the item by a given scale with stroke width.
     fn scale_with_stroke(&mut self, scale: DVec3) -> &mut Self {
         self.scale_with_stroke_by_anchor(scale, Anchor::CENTER)
     }

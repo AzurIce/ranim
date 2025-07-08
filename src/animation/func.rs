@@ -4,10 +4,13 @@ use crate::{
 };
 
 // MARK: Require Trait
+/// The requirement for [`Func`]
 pub trait FuncRequirement: Clone {}
 
 // MARK: Anim Trait
+/// The methods to create animations for `T` that satisfies [`FuncRequirement`]
 pub trait FuncAnim<T: FuncRequirement + 'static> {
+    /// Create a [`Func`] anim.
     fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationSpan<T>;
 }
 
@@ -19,6 +22,9 @@ impl<T: FuncRequirement + 'static> FuncAnim<T> for T {
 }
 
 // MARK: Impl
+/// An func anim.
+///
+/// This simply use the given func to eval the animation state.
 pub struct Func<T: FuncRequirement> {
     src: T,
     #[allow(clippy::type_complexity)]
@@ -26,6 +32,7 @@ pub struct Func<T: FuncRequirement> {
 }
 
 impl<T: FuncRequirement> Func<T> {
+    /// Constructor
     pub fn new(target: T, f: impl Fn(&T, f64) -> T + 'static) -> Self {
         Self {
             src: target,

@@ -1,5 +1,6 @@
 pub use color::palette::css;
 
+/// Color palettes from [3b1b/manim: Animation engine for explanatory math videos](https://github.com/3b1b/manim)
 pub mod manim {
     use color::{AlphaColor, Srgb};
 

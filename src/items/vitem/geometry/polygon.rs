@@ -14,19 +14,28 @@ use crate::{
 };
 
 // MARK: ### Square ###
+/// A Square
 #[derive(Clone, Debug, Interpolatable)]
 pub struct Square {
+    /// Center
     pub center: DVec3,
+    /// Size
     pub size: f64,
+    /// Up vec
     pub up: DVec3,
+    /// Normal vec
     pub normal: DVec3,
 
+    /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
+    /// Stroke width
     pub stroke_width: f32,
+    /// Fill rgba
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
 impl Square {
+    /// Constructor
     pub fn new(size: f64) -> Self {
         Self {
             center: dvec3(0.0, 0.0, 0.0),
@@ -183,18 +192,27 @@ impl From<Square> for VItem {
 }
 
 // MARK: ### Rectangle ###
+/// Rectangle
 #[derive(Clone, Debug, Interpolatable)]
 pub struct Rectangle {
+    /// Corner 1
     pub p1: DVec3,
+    /// Corner 2
     pub p2: DVec3,
     up: DVec3,
+    /// Normal vec
     pub normal: DVec3,
+
+    /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
+    /// Stroke width
     pub stroke_width: f32,
+    /// Fill rgba
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
 impl Rectangle {
+    /// Constructor
     pub fn new(width: f64, height: f64) -> Self {
         let half_width = width / 2.0;
         let half_height = height / 2.0;
@@ -208,10 +226,12 @@ impl Rectangle {
             fill_rgba: AlphaColor::TRANSPARENT,
         }
     }
+    /// Width
     pub fn width(&self) -> f64 {
         let right = self.up.cross(self.normal).normalize();
         (self.p2 - self.p1).dot(right).abs()
     }
+    /// Height
     pub fn height(&self) -> f64 {
         (self.p2 - self.p1).dot(self.up).abs()
     }
@@ -327,18 +347,23 @@ impl Extract for Rectangle {
 }
 
 // MARK: ### Polygon ###
-#[derive(Clone, Debug)]
 /// A Polygon with uniform stroke and fill
+#[derive(Clone, Debug)]
 pub struct Polygon {
+    /// Corner points
     pub points: Vec<DVec3>,
+    /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
+    /// Stroke width
     pub stroke_width: f32,
+    /// Fill rgba
     pub fill_rgba: AlphaColor<Srgb>,
     // _need_update: RefCell<bool>,
     // _extract_cache: RefCell<Option<VItem>>,
 }
 
 impl Polygon {
+    /// Constructor
     pub fn new(points: Vec<DVec3>) -> Self {
         Self {
             points,
@@ -348,10 +373,6 @@ impl Polygon {
             // _need_update: RefCell::new(true),
             // _extract_cache: RefCell::new(None),
         }
-    }
-    pub fn with<O>(mut self, f: impl FnOnce(&mut Self) -> O) -> Self {
-        f(&mut self);
-        self
     }
 }
 

@@ -1,9 +1,11 @@
 use glam::{DVec2, DVec3, IVec2, dvec2};
 
+/// Cross product of 2d points
 pub fn cross2d(a: DVec2, b: DVec2) -> f64 {
     a.x * b.y - b.x * a.y
 }
 
+/// Get the intersection point of two ray
 pub fn intersection(p1: DVec3, v1: DVec3, p2: DVec3, v2: DVec3) -> Option<DVec3> {
     // println!("p1: {:?}, v1: {:?}, p2: {:?}, v2: {:?}", p1, v1, p2, v2);
     let cross = v1.cross(v2);
@@ -34,17 +36,19 @@ pub struct Rect {
 }
 
 impl Rect {
+    /// Get the union of two rectangle
     pub fn union(&self, other: &Self) -> Self {
         let min = self.min.min(other.min);
         let max = self.max.max(other.max);
         Self { min, max }
     }
+    /// Get the intersection of two rectangle
     pub fn intersection(&self, other: &Self) -> Self {
         let min = self.min.max(other.min);
         let max = self.max.min(other.max);
         Self { min, max }
     }
-
+    /// Get the center of the rectangle
     pub fn center(&self) -> DVec2 {
         (self.min + self.max) / 2.0
     }

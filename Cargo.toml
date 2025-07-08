@@ -10,6 +10,10 @@ readme = "README.md"
 keywords = ["animation", "manim", "wgpu"]
 exclude = ["website", "assets", "book"]
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [workspace]
 members = [
   "benches",

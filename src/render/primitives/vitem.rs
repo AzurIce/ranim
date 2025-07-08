@@ -1,6 +1,5 @@
 use crate::{
     components::{rgba::Rgba, width::Width},
-    context::WgpuContext,
     render::{
         RenderTextures,
         pipelines::{
@@ -11,7 +10,7 @@ use crate::{
     traits::FillColor,
     utils::{
         PipelinesStorage,
-        wgpu::{WgpuBuffer, WgpuVecBuffer},
+        wgpu::{WgpuBuffer, WgpuContext, WgpuVecBuffer},
     },
 };
 use color::AlphaColor;
@@ -287,7 +286,6 @@ mod test {
     use image::Rgba;
 
     use crate::{
-        context::WgpuContext,
         items::{
             camera_frame::CameraFrame,
             vitem::{VItem, geometry::Square},
@@ -299,7 +297,7 @@ mod test {
         utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
     };
 
-    use super::VItemRenderInstance;
+    use super::*;
 
     #[test]
     fn test() {

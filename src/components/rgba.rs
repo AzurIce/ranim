@@ -10,6 +10,7 @@ use crate::prelude::{Interpolatable, Opacity};
 
 use super::{ComponentVec, PointWise};
 
+/// Rgba
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

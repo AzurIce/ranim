@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::context::WgpuContext;
+use crate::utils::wgpu::WgpuContext;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]

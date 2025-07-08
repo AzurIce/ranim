@@ -14,19 +14,27 @@ use crate::{
 use super::Arc;
 
 // MARK: ### Circle ###
+/// An circle
 #[derive(Clone, Debug, Interpolatable)]
 pub struct Circle {
+    /// Center
     pub center: DVec3,
+    /// Radius
     pub radius: f64,
     up: DVec3,
+    /// Normal vec of the circle plane
     pub normal: DVec3,
 
+    /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
+    /// Stroke width
     pub stroke_width: f32,
+    /// Fill rgba
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
 impl Circle {
+    /// Constructor
     pub fn new(radius: f64) -> Self {
         Self {
             center: DVec3::ZERO,
