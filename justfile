@@ -44,12 +44,12 @@ website:
 
 doc-nightly:
     RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --no-deps -p ranim --document-private-items --all-features
-    rm -r website/static/doc/
+    -rm -r website/static/doc/
     cp -r target/doc/ website/static/doc/
 
 doc:
     cargo doc --no-deps -p ranim --document-private-items --all-features
-    rm -r website/static/doc/
+    -rm -r website/static/doc/
     cp -r target/doc/ website/static/doc/
 
 book:
