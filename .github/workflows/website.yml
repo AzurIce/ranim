@@ -25,6 +25,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
       - uses: taiki-e/install-action@v2
         with:
           tool: just, mdbook, zola, mdbook-katex
