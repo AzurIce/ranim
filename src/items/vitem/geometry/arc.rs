@@ -10,19 +10,27 @@ use crate::{
 };
 
 // MARK: ### Arc ###
+/// An arc
 #[derive(Clone, Debug, Interpolatable)]
 pub struct Arc {
+    /// Center
     pub center: DVec3,
+    /// Radius
     pub radius: f64,
+    /// Angle
     pub angle: f64,
     pub(super) up: DVec3,
+    /// The normal vec of the arc plane
     pub normal: DVec3,
 
+    /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
+    /// Stroke width
     pub stroke_width: f32,
 }
 
 impl Arc {
+    /// Constructor
     pub fn new(angle: f64, radius: f64) -> Self {
         Self {
             center: DVec3::ZERO,
@@ -51,10 +59,12 @@ impl Arc {
         self.center.scale_by_anchor(DVec3::splat(scale), anchor);
         self
     }
+    /// The start point
     pub fn start(&self) -> DVec3 {
         let right = self.up.cross(self.normal).normalize();
         self.center + self.radius * right
     }
+    /// The end point
     pub fn end(&self) -> DVec3 {
         let right = self.up.cross(self.normal).normalize();
         self.center
@@ -170,18 +180,26 @@ impl Extract for Arc {
 }
 
 // MARK: ### ArcBetweenPoints ###
+/// An arc between points
 #[derive(Clone, Debug, Interpolatable)]
 pub struct ArcBetweenPoints {
+    /// Start point
     pub start: DVec3,
+    /// End point
     pub end: DVec3,
+    /// Arc angle
     pub angle: f64,
     up: DVec3,
+    /// Arc plane normal vec
     pub normal: DVec3,
 
+    /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
+    /// Stroke width
     pub stroke_width: f32,
 }
 impl ArcBetweenPoints {
+    /// Constructor
     pub fn new(start: DVec3, end: DVec3, angle: f64) -> Self {
         Self {
             start,

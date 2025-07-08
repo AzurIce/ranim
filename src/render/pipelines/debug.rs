@@ -3,8 +3,8 @@ use std::ops::Deref;
 use glam::Vec4;
 
 use crate::{
-    context::WgpuContext,
     render::{OUTPUT_TEXTURE_FORMAT, RenderResource},
+    utils::wgpu::WgpuContext,
 };
 
 pub struct DebugPipeline {

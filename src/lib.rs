@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 //! Ranim is an animation engine written in rust based on [`wgpu`], inspired by [3b1b/manim](https://github.com/3b1b/manim/) and [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim).
 //!
 //!
@@ -14,6 +16,10 @@
 //! +Z
 //! ```
 //!
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
+    html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
+)]
 
 use std::{
     collections::HashMap,
@@ -31,9 +37,10 @@ use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult};
 
 use render::{Renderer, primitives::RenderInstances};
 
-use crate::context::WgpuContext;
+use crate::utils::wgpu::WgpuContext;
 
 // MARK: Prelude
+/// The preludes
 pub mod prelude {
     #[cfg(feature = "app")]
     pub use crate::app::run_scene_app;
@@ -48,18 +55,25 @@ pub mod prelude {
     pub use crate::traits::*;
 }
 
+/// Colors and Palettes
 pub mod color;
 mod file_writer;
+/// The core structure to encode animations
 pub mod timeline;
+/// The basic traits for items
 pub mod traits;
 
 pub mod animation;
+/// The preview app
 #[cfg(feature = "app")]
 pub mod app;
+/// Basic data representation
 pub mod components;
-pub mod context;
+/// Builtin items
 pub mod items;
-pub mod render;
+/// Rendering stuff
+mod render;
+/// Utils
 pub mod utils;
 
 #[cfg(feature = "profiling")]
@@ -70,28 +84,35 @@ pub(crate) static PUFFIN_GPU_PROFILER: std::sync::LazyLock<
     std::sync::Mutex<puffin::GlobalProfiler>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
 
+// ANCHOR: SceneMeta
 /// The metadata of the Timeline
 #[derive(Debug, Clone)]
 pub struct SceneMeta {
+    /// The name of the Scene, it is used for output path `<output_dir>/<name>/`
     pub name: String,
 }
+// ANCHOR_END: SceneMeta
 
+// ANCHOR: SceneMetaTrait
+/// A trait for getting [`SceneMeta`]
 pub trait SceneMetaTrait {
+    /// Get [`SceneMeta`]
     fn meta(&self) -> SceneMeta;
 }
+// ANCHOR_END: SceneMetaTrait
 
-/// A [`Scene`] builds a [`RanimScene`]
+/// The scene passed to [`render_scene`], simply [`SceneMetaTrait`] + [`SceneConstructor`].
 ///
 /// This trait is automatically implemented for types that implements [`SceneConstructor`] and [`SceneMetaTrait`].
 ///
 /// A struct with [`ranim_macros::scene`] attribute implements [`SceneMetaTrait`], which is basically a type with [`SceneMeta`].
 /// - `#[scene]`: use the *snake_case* of the struct's name (Without the `Scene` suffix) as [`SceneMeta::name`].
-/// - `#[scene(name = "<NAME>"])`: use the given name as [`SceneMeta::name`].
+/// - `#[scene(name = "<name>"])`: use the given name as [`SceneMeta::name`].
 ///
-/// [`render_scene`] and [`render_scene_at_sec`] will output to `<output_dir>/<NAME>/` directory.
+/// [`render_scene`] and [`render_scene_at_sec`] will output to `<output_dir>/<name>/` directory.
 ///
 /// # Examples
-/// ```rust
+/// ```rust,no_run
 /// use ranim::prelude::*;
 ///
 /// #[scene]
@@ -118,6 +139,7 @@ impl<C, M: SceneMetaTrait> SceneMetaTrait for (C, M) {
     }
 }
 
+// ANCHOR: SceneConstructor
 /// A constructor of a [`RanimScene`]
 pub trait SceneConstructor {
     /// Construct the timeline
@@ -125,7 +147,9 @@ pub trait SceneConstructor {
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
     fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>);
 }
+// ANCHOR_END: SceneConstructor
 
+/// A helper function to build a [`SealedRanimScene`] from a [`SceneConstructor`]
 pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
     let mut timeline = RanimScene::new();
     {

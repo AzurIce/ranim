@@ -5,7 +5,7 @@ use egui::{
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{color::palettes::manim, timeline::RabjectTimelineInfo};
+use crate::{color::palettes::manim, timeline::ItemDynTimelinesInfo};
 
 use super::TimelineInfo;
 
@@ -15,12 +15,12 @@ pub(super) struct TimelineState {
     pub(super) current_sec: f64,
     pub(super) width_sec: f64,
     pub(super) offset_points: f32,
-    pub(super) timeline_infos: Vec<RabjectTimelineInfo>,
+    pub(super) timeline_infos: Vec<ItemDynTimelinesInfo>,
 }
 
 #[allow(unused)]
 impl TimelineState {
-    pub fn new(total_sec: f64, timeline_infos: Vec<RabjectTimelineInfo>) -> Self {
+    pub fn new(total_sec: f64, timeline_infos: Vec<ItemDynTimelinesInfo>) -> Self {
         Self {
             total_sec,
             current_sec: 0.0,

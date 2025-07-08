@@ -7,11 +7,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::render::primitives::{Extract, Renderable};
 
+/// The camera frame.
 pub mod camera_frame;
+/// The vectorized item.
 pub mod vitem;
 
 static ITEM_CNT: AtomicUsize = AtomicUsize::new(0);
 
+/// An id.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Deref)]
 pub struct Id(pub usize);
@@ -22,6 +25,9 @@ impl Id {
     }
 }
 
+/// An item id.
+///
+/// This is basically an [`Id`] with type info.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct ItemId<T> {
@@ -37,6 +43,7 @@ impl<T> Deref for ItemId<T> {
 }
 
 impl<T> ItemId<T> {
+    /// Get the inner [`Id`].
     pub fn inner(&self) -> Id {
         self.id
     }
@@ -61,9 +68,13 @@ impl<T: Extract<Target = Target>, Target: Renderable + 'static> VisualItem for T
 ///
 /// This is automatically implemented for the types that [`Extract`] to a [`Renderable`].
 pub trait VisualItem {
+    /// Extracts the [`Renderable`] from the item.
     fn extract_renderable(&self) -> Box<dyn Renderable>;
 }
 
+/// A Group of type `T`.
+///
+/// Just like a [`Vec`]
 #[derive(Debug, Default, Clone, Deref, DerefMut)]
 pub struct Group<T>(pub Vec<T>);
 

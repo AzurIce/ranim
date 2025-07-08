@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::prelude::Interpolatable;
 
+/// Point
 #[derive(Default, Debug, Clone, Copy, PartialEq, Deref, DerefMut, From, AsRef, AsMut)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Point(DVec3);

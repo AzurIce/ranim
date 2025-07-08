@@ -6,14 +6,19 @@ use crate::{
 };
 
 // ANCHOR: TransformRequirement
+/// The requirement of [`Transform`]
 pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 // ANCHOR_END: TransformRequirement
 
+/// The methods to create animations for `T` that satisfies [`TransformRequirement`]
 pub trait TransformAnim<T: TransformRequirement + 'static> {
+    /// Create a [`Transform`] anim with a func.
     fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationSpan<T>;
-    fn transform_from(self, src: impl Into<T>) -> AnimationSpan<T>;
-    fn transform_to(self, dst: impl Into<T>) -> AnimationSpan<T>;
+    /// Create a [`Transform`] anim from src.
+    fn transform_from(self, src: T) -> AnimationSpan<T>;
+    /// Create a [`Transform`] anim to dst.
+    fn transform_to(self, dst: T) -> AnimationSpan<T>;
 }
 
 impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
@@ -23,19 +28,13 @@ impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
         AnimationSpan::from_evaluator(Evaluator::new_dynamic(Transform::new(self.clone(), dst)))
             .with_rate_func(smooth)
     }
-    fn transform_from(self, s: impl Into<T>) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Transform::new(
-            s.into(),
-            self.clone(),
-        )))
-        .with_rate_func(smooth)
+    fn transform_from(self, s: T) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Transform::new(s, self.clone())))
+            .with_rate_func(smooth)
     }
-    fn transform_to(self, d: impl Into<T>) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Transform::new(
-            self.clone(),
-            d.into(),
-        )))
-        .with_rate_func(smooth)
+    fn transform_to(self, d: T) -> AnimationSpan<T> {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Transform::new(self.clone(), d)))
+            .with_rate_func(smooth)
     }
 }
 
@@ -50,6 +49,7 @@ pub struct Transform<T: TransformRequirement> {
 // ANCHOR_END: Transform
 
 impl<T: TransformRequirement> Transform<T> {
+    /// Constructor
     pub fn new(src: T, dst: T) -> Self {
         let mut aligned_src = src.clone();
         let mut aligned_dst = dst.clone();

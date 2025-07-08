@@ -9,9 +9,8 @@ use primitives::RenderCommand;
 
 use crate::{
     color::rgba8,
-    context::WgpuContext,
     items::camera_frame::CameraFrame,
-    utils::{PipelinesStorage, wgpu::WgpuBuffer},
+    utils::{PipelinesStorage, wgpu::WgpuBuffer, wgpu::WgpuContext},
 };
 
 pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;

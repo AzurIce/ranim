@@ -10,16 +10,22 @@ use crate::prelude::{Alignable, Interpolatable};
 /// which is used to blend between orthographic and perspective projection.
 #[derive(Clone, Debug)]
 pub struct CameraFrame {
+    /// The position
     pub pos: DVec3,
+    /// The up unit vec
     pub up: DVec3,
+    /// The facing unit vec
     pub facing: DVec3,
-    /// Used in orthographic projection
+    /// The scaling factor, used in orthographic projection
     pub scale: f64,
-    /// Used in perspective projection
+    /// The field of view angle, used in perspective projection
     pub fovy: f64,
     // far > near
+    /// The near pane
     pub near: f64,
+    /// The far pane
     pub far: f64,
+    /// The perspective blend value in [0.0, 1.0]
     pub perspective_blend: f64,
 }
 

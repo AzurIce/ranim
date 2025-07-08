@@ -6,6 +6,7 @@ use crate::prelude::Interpolatable;
 
 use super::PointWise;
 
+/// Width
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, bytemuck::Pod, bytemuck::Zeroable, From)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -14,9 +15,11 @@ pub struct Width(pub f32);
 impl PointWise for Width {}
 
 impl Width {
+    /// Max
     pub fn max(self, other: Self) -> Self {
         Self(self.0.max(other.0))
     }
+    /// Min
     pub fn min(self, other: Self) -> Self {
         Self(self.0.min(other.0))
     }

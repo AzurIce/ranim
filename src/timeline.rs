@@ -9,107 +9,22 @@ use crate::{
 use std::fmt::Debug;
 use std::{any::Any, sync::Arc};
 
+/// TimeMark
 #[derive(Debug, Clone)]
 pub enum TimeMark {
+    /// Capture a picture with a name
     Capture(String),
 }
 
+/// The evaluation result
+///
+/// This is produced from [`SealedRanimScene::eval_alpha`] or [`SealedRanimScene::eval_sec`]
 #[allow(clippy::type_complexity)]
 pub struct TimelineEvalResult {
+    /// (`EvalResult<CameraFrame>`, `timeline idx` `animation idx`)
     pub camera_frame: (EvalResult<CameraFrame>, usize, usize),
     /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `timeline idx` `animation idx`)
     pub visual_items: Vec<(usize, EvalResult<Box<dyn VisualItem>>, usize, usize)>,
-}
-
-/// Timeline is a type erased [`ItemTimeline<T>`]
-///
-/// Currently There are two types of Timeline:
-/// - [`DynTimeline::VisualItem`]: Can be created from [`VisualItem`], has a boxed [`AnyVisualItemTimelineTrait`] in it.
-/// - [`DynTimeline::CameraFrame`]: Can be created from [`CameraFrame`], has a boxed [`AnyTimelineTrait`] in it.
-pub enum DynTimeline {
-    CameraFrame(Box<dyn AnyTimelineTrait>),
-    VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
-}
-
-impl TimelineFunc for DynTimeline {
-    fn start_sec(&self) -> Option<f64> {
-        self.as_timeline().start_sec()
-    }
-
-    fn end_sec(&self) -> Option<f64> {
-        self.as_timeline().end_sec()
-    }
-
-    fn seal(&mut self) {
-        self.as_timeline_mut().seal();
-    }
-
-    fn cur_sec(&self) -> f64 {
-        self.as_timeline().cur_sec()
-    }
-
-    fn elapsed_secs(&self) -> f64 {
-        self.as_timeline().elapsed_secs()
-    }
-
-    fn forward(&mut self, duration_secs: f64) {
-        self.as_timeline_mut().forward(duration_secs);
-    }
-
-    fn show(&mut self) {
-        self.as_timeline_mut().show();
-    }
-
-    fn hide(&mut self) {
-        self.as_timeline_mut().hide();
-    }
-
-    fn get_animation_infos(&self) -> Vec<AnimationInfo> {
-        self.as_timeline().get_animation_infos()
-    }
-
-    fn type_name(&self) -> &str {
-        self.as_timeline().type_name()
-    }
-}
-
-impl From<ItemTimeline<CameraFrame>> for DynTimeline {
-    fn from(value: ItemTimeline<CameraFrame>) -> Self {
-        DynTimeline::CameraFrame(Box::new(value))
-    }
-}
-
-impl<T: VisualItem + Clone + 'static> From<ItemTimeline<T>> for DynTimeline {
-    fn from(value: ItemTimeline<T>) -> Self {
-        DynTimeline::VisualItem(Box::new(value))
-    }
-}
-
-impl DynTimeline {
-    pub fn as_timeline(&self) -> &dyn TimelineFunc {
-        match self {
-            DynTimeline::CameraFrame(timeline) => timeline.as_timeline(),
-            DynTimeline::VisualItem(timeline) => timeline.as_timeline(),
-        }
-    }
-    pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc {
-        match self {
-            DynTimeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
-            DynTimeline::VisualItem(timeline) => timeline.as_timeline_mut(),
-        }
-    }
-    pub fn as_any(&self) -> &dyn Any {
-        match self {
-            DynTimeline::CameraFrame(timeline) => timeline.as_ref() as &dyn Any,
-            DynTimeline::VisualItem(timeline) => timeline.as_ref() as &dyn Any,
-        }
-    }
-    pub fn as_any_mut(&mut self) -> &mut dyn Any {
-        match self {
-            DynTimeline::CameraFrame(timeline) => timeline.as_mut() as &mut dyn Any,
-            DynTimeline::VisualItem(timeline) => timeline.as_mut() as &mut dyn Any,
-        }
-    }
 }
 
 // MARK: RanimScene
@@ -123,6 +38,7 @@ pub struct RanimScene {
 }
 
 impl RanimScene {
+    /// Seals the scene to [`SealedRanimScene`].
     pub fn seal(mut self) -> SealedRanimScene {
         let total_secs = self.timelines.max_total_secs();
         self.timelines.forward_to(total_secs);
@@ -133,16 +49,23 @@ impl RanimScene {
             time_marks: self.time_marks,
         }
     }
+    /// Create a new [`RanimScene`]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Use the item state to create a new [`ItemDynTimelines`] and returns the [`ItemId`].
+    ///
+    /// Note that, the new timeline is hidden by default, use [`ItemTimeline::forward`] and
+    /// [`ItemTimeline::forward_to`] to modify the start time of the first anim, and use
+    /// [`ItemTimeline::show`] to start encoding and static anim.
     pub fn insert<T: Clone + 'static>(&mut self, state: T) -> ItemId<T>
     where
         ItemTimeline<T>: Into<DynTimeline>,
     {
         self.insert_and(state, |_| {})
     }
+    /// Use the item state to create a new [`ItemDynTimelines`], and call [`ItemTimeline::show`] on it.
     pub fn insert_and_show<T: Clone + 'static>(&mut self, state: T) -> ItemId<T>
     where
         ItemTimeline<T>: Into<DynTimeline>,
@@ -151,6 +74,7 @@ impl RanimScene {
             timeline.show();
         })
     }
+    /// Use the item state to create a new [`ItemDynTimelines`], and call `f` on it.
     pub fn insert_and<T: Clone + 'static>(
         &mut self,
         state: T,
@@ -168,6 +92,9 @@ impl RanimScene {
         });
         id
     }
+    /// Consumes an [`ItemId<T>`], and convert it into [`ItemId<E>`].
+    ///
+    /// This insert inserts an [`ItemTimeline<E>`] into the corresponding [`ItemDynTimelines`]
     pub fn map<T: Clone + 'static, E: Clone + 'static>(
         &mut self,
         item_id: ItemId<T>,
@@ -185,28 +112,34 @@ impl RanimScene {
         ItemId::new(item_id.inner())
     }
 
+    /// Get reference of all timelines in the type erased [`ItemDynTimelines`] type.
     pub fn timelines(&self) -> &Vec<ItemDynTimelines> {
         &self.timelines
     }
+    /// Get mutable reference of all timelines in the type erased [`ItemDynTimelines`] type.
     pub fn timelines_mut(&mut self) -> &mut Vec<ItemDynTimelines> {
         &mut self.timelines
     }
+    /// Get the reference of timeline(s) by the [`TimelineIndex`].
     pub fn timeline<'a, T: TimelineIndex<'a>>(&'a self, index: &T) -> T::RefOutput {
         index.timeline(self)
     }
+    /// Get the mutable reference of timeline(s) by the [`TimelineIndex`].
     pub fn timeline_mut<'a, T: TimelineIndex<'a>>(&'a mut self, index: &T) -> T::MutOutput {
         index.timeline_mut(self)
     }
-
+    /// Inserts an [`TimeMark`]
     pub fn insert_time_mark(&mut self, sec: f64, time_mark: TimeMark) {
         self.time_marks.push((sec, time_mark));
     }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct RabjectTimelineInfo {
+/// The information of an [`ItemDynTimelines`].
+pub struct ItemDynTimelinesInfo {
+    /// The inner id value of the [`ItemId`]
     pub id: usize,
-    pub type_name: String,
+    /// The animation infos.
     pub animation_infos: Vec<AnimationInfo>,
 }
 
@@ -217,6 +150,10 @@ impl Debug for RanimScene {
     }
 }
 
+/// The sealed [`RanimScene`].
+///
+/// the timelines and time marks cannot be modified after sealed. And
+/// once the [`RanimScene`] is sealed, it can be used for evaluating.
 pub struct SealedRanimScene {
     total_secs: f64,
     timelines: Vec<ItemDynTimelines>,
@@ -224,12 +161,15 @@ pub struct SealedRanimScene {
 }
 
 impl SealedRanimScene {
+    /// Get the total seconds of the [`SealedRanimScene`].
     pub fn total_secs(&self) -> f64 {
         self.total_secs
     }
+    /// Get time marks
     pub fn time_marks(&self) -> &Vec<(f64, TimeMark)> {
         &self.time_marks
     }
+    /// Evaluate the state of timelines at `target_sec`
     pub fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
         let mut items = Vec::with_capacity(self.timelines.len());
 
@@ -248,27 +188,25 @@ impl SealedRanimScene {
                 }
             }
         }
-        // println!("alpha: {}, items: {}", alpha, items.len());
-        // println!("alpha: {}, items: {}", alpha, items.len());
 
         TimelineEvalResult {
             camera_frame: camera_frame.unwrap(),
             visual_items: items,
         }
     }
-
+    /// Evaluate the state of timelines at `alpha`
     pub fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
         self.eval_sec(alpha * self.total_secs)
     }
 
-    pub fn get_timeline_infos(&self) -> Vec<RabjectTimelineInfo> {
+    /// Get timeline infos.
+    pub fn get_timeline_infos(&self) -> Vec<ItemDynTimelinesInfo> {
         // const MAX_TIMELINE_CNT: usize = 100;
         self.timelines
             .iter()
             // .take(MAX_TIMELINE_CNT)
-            .map(|timeline| RabjectTimelineInfo {
+            .map(|timeline| ItemDynTimelinesInfo {
                 id: timeline.id,
-                type_name: timeline.as_timeline().type_name().to_string(),
                 animation_infos: timeline.as_timeline().get_animation_infos(),
             })
             .collect()
@@ -276,10 +214,24 @@ impl SealedRanimScene {
 }
 
 // MARK: TimelineIndex
+/// A trait for indexing timeline(s)
+///
+/// [`RanimScene::timeline`] and [`RanimScene::timeline_mut`] uses the
+/// reference of [`TimelineIndex`] to index the timeline(s).
+///
+/// | Index Type | Output Type |
+/// |------------|-------------|
+/// |   `usize`    | `&ItemDynTimelines` and `&mut ItemDynTimelines` |
+/// |   `ItemId<T>`    | `&ItemTimeline<T>` & and `&mut ItemTimeline<T>` |
+/// |   `[&ItemId<T>; N]`    | `[&ItemTimeline<T>; N]` and `[&mut ItemTimeline<T>; N]` |
 pub trait TimelineIndex<'a> {
+    /// Output of [`TimelineIndex::timeline`]
     type RefOutput;
+    /// Output of [`TimelineIndex::timeline_mut`]
     type MutOutput;
+    /// Get the reference of timeline(s) from [`RanimScene`] by the [`TimelineIndex`].
     fn timeline(&self, timeline: &'a RanimScene) -> Self::RefOutput;
+    /// Get the mutable reference of timeline(s) from [`RanimScene`] by the [`TimelineIndex`].
     fn timeline_mut(&self, timeline: &'a mut RanimScene) -> Self::MutOutput;
 }
 
@@ -349,11 +301,17 @@ impl<'a, T: 'static, const N: usize> TimelineIndex<'a> for [&ItemId<T>; N] {
 }
 
 // MARK: TimelinesFunc
+/// Functions for timelines
 pub trait TimelinesFunc {
+    /// Seal timelines
     fn seal(&mut self);
+    /// Get the max end_sec of the timelines
     fn max_total_secs(&self) -> f64;
+    /// Sync the timelines
     fn sync(&mut self);
+    /// Forward all timelines by `sec`
     fn forward(&mut self, secs: f64);
+    /// Forward all timelines to `target_sec`
     fn forward_to(&mut self, target_sec: f64);
 }
 
@@ -391,8 +349,11 @@ where
 }
 
 // MARK: TimelineTrait
+/// Any + TimelineFunc
 pub trait AnyTimelineTrait: TimelineFunc + Any {
+    /// As a reference of [`TimelineFunc`]
     fn as_timeline(&self) -> &dyn TimelineFunc;
+    /// As a mutable reference of [`TimelineFunc`]
     fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc;
 }
 impl<T: TimelineFunc + Any> AnyTimelineTrait for T {
@@ -404,8 +365,11 @@ impl<T: TimelineFunc + Any> AnyTimelineTrait for T {
     }
 }
 
+/// Any + VisualItemTimelineTrait
 pub trait AnyVisualItemTimelineTrait: VisualItemTimelineTrait + Any {
+    /// As a reference of [`TimelineFunc`]
     fn as_timeline(&self) -> &dyn TimelineFunc;
+    /// As a mutable reference of [`TimelineFunc`]
     fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc;
 }
 impl<T: VisualItemTimelineTrait + Any> AnyVisualItemTimelineTrait for T {
@@ -417,7 +381,11 @@ impl<T: VisualItemTimelineTrait + Any> AnyVisualItemTimelineTrait for T {
     }
 }
 
+/// A visual item timeline, which can eval to `EvalResult<Box<dyn VisualItem>>`.
+///
+/// This is auto implemented for `ItemTimeline<T>` where `T: Clone + VisualItem + 'static`
 pub trait VisualItemTimelineTrait: TimelineFunc {
+    /// Evaluate the timeline at `target_sec`
     fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)>;
 }
 
@@ -429,56 +397,74 @@ impl<T: Clone + VisualItem + 'static> VisualItemTimelineTrait for ItemTimeline<T
     }
 }
 
+/// Info of an animation
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AnimationInfo {
+    /// The name of the animation
     pub anim_name: String,
+    /// The time range of the animation
     pub range: std::ops::Range<f64>,
 }
 
 // MARK: TimelineFunc
+/// Functions for a timeline
 pub trait TimelineFunc {
+    /// The start sec of the timeline(the start sec of the first animation.)
     fn start_sec(&self) -> Option<f64>;
+    /// The end sec of the timeline(the end sec of the last animation.)
     fn end_sec(&self) -> Option<f64>;
+    /// The range of the timeline.
     fn range_sec(&self) -> Option<std::ops::Range<f64>> {
         let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
             return None;
         };
         Some(start..end)
     }
+    /// Seal the timeline func(submit the planning static anim)
     fn seal(&mut self);
+    /// The current sec of the timeline.
     fn cur_sec(&self) -> f64;
-    fn elapsed_secs(&self) -> f64;
-    fn forward(&mut self, duration_secs: f64);
+    /// Forward the timeline by `secs`
+    fn forward(&mut self, secs: f64);
+    /// Forward the timeline to `target_sec`
     fn forward_to(&mut self, target_sec: f64) {
         let duration = target_sec - self.cur_sec();
         if duration > 0.0 {
             self.forward(duration);
         }
     }
-    // fn append_blank(&mut self, duration_secs: f64);
-    // fn append_freeze(&mut self, duration_secs: f64);
+    /// Show the item
     fn show(&mut self);
+    /// Hide the item
     fn hide(&mut self);
+    /// Get the animation infos
     fn get_animation_infos(&self) -> Vec<AnimationInfo>;
+    /// The type name of the timeline
     fn type_name(&self) -> &str;
-    // fn show_secs(&self) -> &Vec<f64>;
 }
 
+/// A item timeline which contains multiple [`DynTimeline`], so
+/// that it can contains multiple [`ItemTimeline<T>`] in different type of `T`.
 pub struct ItemDynTimelines {
     id: usize,
     timelines: Vec<DynTimeline>,
 }
 
+/// The eval result of [`ItemDynTimelines`]
 pub enum DynTimelineEvalResult {
+    /// The eval result of [`ItemTimeline<CameraFrame>`]
     CameraFrame((EvalResult<CameraFrame>, usize)),
+    /// The eval result of [`ItemTimeline<T>`] where `T` is a [`VisualItem`]
     VisualItem((EvalResult<Box<dyn VisualItem>>, usize)),
 }
 
 impl ItemDynTimelines {
+    /// Evaluate the timeline at `alpha`
     pub fn eval_alpha(&self, alpha: f64) -> Option<(usize, DynTimelineEvalResult)> {
         let target_sec = self.timelines.max_total_secs() * alpha;
         self.eval_sec(target_sec)
     }
+    /// Evaluate the timeline at `target_sec`
     pub fn eval_sec(&self, target_sec: f64) -> Option<(usize, DynTimelineEvalResult)> {
         let (timeline_idx, timeline) =
             self.timelines.iter().enumerate().find(|(idx, timeline)| {
@@ -505,14 +491,19 @@ impl ItemDynTimelines {
 }
 
 impl ItemDynTimelines {
+    /// As a reference of [`TimelineFunc`]
     pub fn get_dyn(&self) -> &dyn TimelineFunc {
         // TODO: make this unwrap better
         self.timelines.last().unwrap().as_timeline()
     }
+    /// As a mutable reference of [`TimelineFunc`]
     pub fn get_dyn_mut(&mut self) -> &mut dyn TimelineFunc {
         // TODO: make this unwrap better
         self.timelines.last_mut().unwrap().as_timeline_mut()
     }
+    /// As a reference of [`ItemTimeline<T>`]
+    ///
+    /// Should make sure that the last timeline in it is of type `T`
     pub fn get<T: 'static>(&self) -> &ItemTimeline<T> {
         // TODO: make this unwrap better
         self.timelines
@@ -522,6 +513,9 @@ impl ItemDynTimelines {
             .downcast_ref()
             .unwrap()
     }
+    /// As a mutable reference of [`ItemTimeline<T>`]
+    ///
+    /// Should make sure that the last timeline in it is of type `T`
     pub fn get_mut<T: 'static>(&mut self) -> &mut ItemTimeline<T> {
         // TODO: make this unwrap better
         self.timelines
@@ -531,6 +525,15 @@ impl ItemDynTimelines {
             .downcast_mut()
             .unwrap()
     }
+    /// Apply a map function.
+    ///
+    /// This will use the last timeline's state, which is of type `T` to
+    /// construct a mapped state of type `E`, then use this mapped state to
+    /// create a new [`ItemTimeline<E>`] and push to the end of the timleines.
+    ///
+    /// If there is a planning static anim, it will get submitted and the new
+    /// timeline will start planning a static anim immediately just like the
+    /// static anim goes "cross" two timeline of different type.
     pub fn apply_map<T: Clone + 'static, E: Clone + 'static>(&mut self, map_fn: impl FnOnce(T) -> E)
     where
         ItemTimeline<E>: Into<DynTimeline>,
@@ -541,7 +544,7 @@ impl ItemDynTimelines {
             timeline.seal();
             (
                 timeline.state().clone(),
-                timeline.elapsed_secs(),
+                timeline.end_sec().unwrap_or(0.0),
                 is_showing,
             )
         };
@@ -565,34 +568,24 @@ impl TimelineFunc for ItemDynTimelines {
     fn seal(&mut self) {
         self.get_dyn_mut().seal();
     }
-
     fn cur_sec(&self) -> f64 {
         self.get_dyn().cur_sec()
     }
-
-    fn elapsed_secs(&self) -> f64 {
-        self.get_dyn().elapsed_secs()
-    }
-
     fn forward(&mut self, duration_secs: f64) {
         self.get_dyn_mut().forward(duration_secs);
     }
-
     fn show(&mut self) {
         self.get_dyn_mut().show();
     }
-
     fn hide(&mut self) {
         self.get_dyn_mut().hide();
     }
-
     fn get_animation_infos(&self) -> Vec<AnimationInfo> {
         self.timelines
             .iter()
             .flat_map(|timeline| timeline.as_timeline().get_animation_infos())
             .collect()
     }
-
     fn type_name(&self) -> &str {
         self.get_dyn().type_name()
     }
@@ -644,9 +637,6 @@ impl<T: Clone + 'static> TimelineFunc for ItemTimeline<T> {
         // println!("seal");
         self._submit_planning_static_anim();
     }
-    fn elapsed_secs(&self) -> f64 {
-        self.end_sec().unwrap_or(0.0)
-    }
     fn cur_sec(&self) -> f64 {
         self.cur_sec
     }
@@ -677,12 +667,19 @@ impl<T: Clone + 'static> TimelineFunc for ItemTimeline<T> {
 }
 
 impl<T: Clone + 'static> ItemTimeline<T> {
+    /// Get the current second
     pub fn cur_sec(&self) -> f64 {
         self.cur_sec
     }
+    /// Get the current item state
     pub fn state(&self) -> &T {
         &self.state
     }
+    /// Update the state
+    pub fn update(&mut self, state: T) -> &mut Self {
+        self.update_with(|s| *s = state)
+    }
+    /// Update the state with `update_func`
     pub fn update_with(&mut self, update_func: impl FnOnce(&mut T)) -> &mut Self {
         let showing = self._submit_planning_static_anim();
         update_func(&mut self.state);
@@ -691,71 +688,70 @@ impl<T: Clone + 'static> ItemTimeline<T> {
         }
         self
     }
-    pub fn update(&mut self, state: T) -> &mut Self {
-        let showing = self._submit_planning_static_anim();
-        self.state = state;
-        if showing {
-            self.show();
-        }
-        self
-    }
-    /// The [`ItemTimeline::state`] should be `Some`
+    /// Show the item.
+    ///
+    /// This will start planning an static anim if there isn't an planning static anim.
     pub fn show(&mut self) -> &mut Self {
         if self.planning_static_start_sec.is_none() {
             self.planning_static_start_sec = Some(self.cur_sec)
         }
         self
     }
+    /// Hide the item.
+    ///
+    /// This will submit a static anim if there is an planning static anim.
     pub fn hide(&mut self) -> &mut Self {
         // println!("hide");
         self._submit_planning_static_anim();
         self
     }
-    pub fn forward(&mut self, duration_secs: f64) -> &mut Self {
-        self.cur_sec += duration_secs;
+    /// Forward the timeline by `secs`
+    pub fn forward(&mut self, secs: f64) -> &mut Self {
+        self.cur_sec += secs;
         self
     }
+    /// Forward the timeline to `target_sec` if the current sec is smaller than it.
     pub fn forward_to(&mut self, target_sec: f64) -> &mut Self {
         if target_sec > self.cur_sec {
             self.forward(target_sec - self.cur_sec);
         }
         self
     }
-    fn push_anim(&mut self, anim: AnimationSpan<T>, start: f64, end: f64) {
-        self.anims.push((anim, start..end));
-    }
     fn _submit_planning_static_anim(&mut self) -> bool {
         // println!("{:?}", self.planning_static_start_sec);
         if let Some(start) = self.planning_static_start_sec.take() {
-            self.push_anim(
+            self.anims.push((
                 AnimationSpan::from_evaluator(Evaluator::Static(Arc::new(self.state.clone()))),
-                start,
-                self.cur_sec,
-            );
+                start..self.cur_sec,
+            ));
             return true;
         }
         false
     }
+    /// Plays an anim with `anim_func`.
     pub fn play_with(&mut self, anim_func: impl FnOnce(T) -> AnimationSpan<T>) -> &mut Self {
         self.play(anim_func(self.state.clone()))
     }
+    /// Plays an anim.
     pub fn play(&mut self, anim: AnimationSpan<T>) -> &mut Self {
         self._submit_planning_static_anim();
         let res = anim.eval_alpha(1.0).into_owned();
         let duration = anim.duration_secs;
         let end = self.cur_sec + duration;
-        self.push_anim(anim, self.cur_sec, end);
+        self.anims.push((anim, self.cur_sec..end));
         self.cur_sec = end;
         self.update(res);
         self.show();
         self
     }
+    /// Evaluate the state at `alpha`
     pub fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<T>, usize)> {
         let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
             return None;
         };
         self.eval_sec(alpha * (end - start) + start)
     }
+    /// Evaluate the state at `target_sec`
     pub fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<T>, usize)> {
         let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
             return None;
@@ -781,5 +777,90 @@ impl<T: Clone + 'static> ItemTimeline<T> {
                 let alpha = (target_sec - range.start) / (range.end - range.start);
                 (anim.eval_alpha(alpha), idx)
             })
+    }
+}
+
+/// A type erased [`ItemTimeline<T>`]
+///
+/// Currently There are two types of Timeline:
+/// - [`DynTimeline::CameraFrame`]: Can be created from [`CameraFrame`], has a boxed [`AnyTimelineTrait`] in it.
+/// - [`DynTimeline::VisualItem`]: Can be created from [`VisualItem`], has a boxed [`AnyVisualItemTimelineTrait`] in it.
+pub enum DynTimeline {
+    /// A type erased timeline for [`CameraFrame`], its inner is a boxed [`AnyTimelineTrait`].
+    CameraFrame(Box<dyn AnyTimelineTrait>),
+    /// A type erased timeline for [`VisualItem`], its inner is a boxed [`AnyVisualItemTimelineTrait`].
+    VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
+}
+
+impl TimelineFunc for DynTimeline {
+    fn start_sec(&self) -> Option<f64> {
+        self.as_timeline().start_sec()
+    }
+    fn end_sec(&self) -> Option<f64> {
+        self.as_timeline().end_sec()
+    }
+    fn seal(&mut self) {
+        self.as_timeline_mut().seal();
+    }
+    fn cur_sec(&self) -> f64 {
+        self.as_timeline().cur_sec()
+    }
+    fn forward(&mut self, duration_secs: f64) {
+        self.as_timeline_mut().forward(duration_secs);
+    }
+    fn show(&mut self) {
+        self.as_timeline_mut().show();
+    }
+    fn hide(&mut self) {
+        self.as_timeline_mut().hide();
+    }
+    fn get_animation_infos(&self) -> Vec<AnimationInfo> {
+        self.as_timeline().get_animation_infos()
+    }
+    fn type_name(&self) -> &str {
+        self.as_timeline().type_name()
+    }
+}
+
+impl From<ItemTimeline<CameraFrame>> for DynTimeline {
+    fn from(value: ItemTimeline<CameraFrame>) -> Self {
+        DynTimeline::CameraFrame(Box::new(value))
+    }
+}
+
+impl<T: VisualItem + Clone + 'static> From<ItemTimeline<T>> for DynTimeline {
+    fn from(value: ItemTimeline<T>) -> Self {
+        DynTimeline::VisualItem(Box::new(value))
+    }
+}
+
+impl DynTimeline {
+    /// As a ref of [`TimelineFunc`]
+    pub fn as_timeline(&self) -> &dyn TimelineFunc {
+        match self {
+            DynTimeline::CameraFrame(timeline) => timeline.as_timeline(),
+            DynTimeline::VisualItem(timeline) => timeline.as_timeline(),
+        }
+    }
+    /// As a mut ref of [`TimelineFunc`]
+    pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc {
+        match self {
+            DynTimeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
+            DynTimeline::VisualItem(timeline) => timeline.as_timeline_mut(),
+        }
+    }
+    /// As a ref of [`Any`]
+    pub fn as_any(&self) -> &dyn Any {
+        match self {
+            DynTimeline::CameraFrame(timeline) => timeline.as_ref() as &dyn Any,
+            DynTimeline::VisualItem(timeline) => timeline.as_ref() as &dyn Any,
+        }
+    }
+    /// As a mut ref of [`Any`]
+    pub fn as_any_mut(&mut self) -> &mut dyn Any {
+        match self {
+            DynTimeline::CameraFrame(timeline) => timeline.as_mut() as &mut dyn Any,
+            DynTimeline::VisualItem(timeline) => timeline.as_mut() as &mut dyn Any,
+        }
     }
 }

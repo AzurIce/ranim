@@ -61,6 +61,7 @@ fn walk_svg_group(group: &usvg::Group) -> impl Iterator<Item = (&usvg::Path, usv
     }
 }
 
+/// Construct a `Vec<VItem>` from `&usvg::Tree`
 pub fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
     let mut vitems = vec![];
     for (path, transform) in walk_svg_group(tree.root()) {

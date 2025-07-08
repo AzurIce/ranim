@@ -23,7 +23,6 @@ use ranim::{
     },
     prelude::*,
     timeline::{TimelineFunc, TimelinesFunc},
-    typst_svg,
 };
 
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");

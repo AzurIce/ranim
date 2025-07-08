@@ -10,10 +10,14 @@ use crate::{
 use super::VItem;
 
 // MARK: ### SvgItem ###
+/// An Svg Item
+///
+/// Its inner is a `Vec<VItem>`
 #[derive(Clone)]
 pub struct SvgItem(Vec<VItem>);
 
 impl SvgItem {
+    /// Creates a new SvgItem from a SVG string
     pub fn new(svg: impl AsRef<str>) -> Self {
         let svg = svg.as_ref();
         let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();

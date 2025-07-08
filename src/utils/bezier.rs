@@ -14,12 +14,15 @@ pub struct PathBuilder {
 }
 
 impl PathBuilder {
+    /// Is the path empty or not
     pub fn is_empty(&self) -> bool {
         self.points.is_empty()
     }
+    /// Construct a new path
     pub fn new() -> Self {
         Self::default()
     }
+    /// Get the number of points
     pub fn len(&self) -> usize {
         self.points.len()
     }
@@ -79,7 +82,11 @@ impl PathBuilder {
 
         self
     }
-
+    /// Close the path.
+    ///
+    /// The path is considered closed if the start point is equal to the last point.
+    ///
+    /// If the path is not closed, a line is appended to the end to close it.
     pub fn close_path(&mut self) -> &mut Self {
         self.assert_started();
         if self.points.last() == self.start_point.as_ref() {
@@ -88,12 +95,13 @@ impl PathBuilder {
         self.line_to(self.start_point.unwrap());
         self
     }
-
+    /// Get the points
     pub fn vpoints(&self) -> &[DVec3] {
         &self.points
     }
 }
 
+/// Split a cubic bezier at progress value `t` in [0.0, 1.0]
 pub fn split_cubic_bezier(bezier: &[DVec3; 4], t: f64) -> ([DVec3; 4], [DVec3; 4]) {
     let [p0, h0, h1, p1] = bezier;
 
@@ -107,6 +115,7 @@ pub fn split_cubic_bezier(bezier: &[DVec3; 4], t: f64) -> ([DVec3; 4], [DVec3; 4
     ([*p0, h00, h01, *split_point], [*split_point, h10, h11, *p1])
 }
 
+/// Split a quad bezier at progress value `t` in [0.0, 1.0]
 pub fn split_quad_bezier(bezier: &[DVec3; 3], t: f64) -> ([DVec3; 3], [DVec3; 3]) {
     let [p0, h, p1] = bezier;
 
@@ -118,6 +127,7 @@ pub fn split_quad_bezier(bezier: &[DVec3; 3], t: f64) -> ([DVec3; 3], [DVec3; 3]
     ([*p0, h0, *split_point], [*split_point, h1, *p1])
 }
 
+/// Get [a, b] of a quad bezier
 pub fn trim_quad_bezier(bezier: &[DVec3; 3], a: f64, b: f64) -> [DVec3; 3] {
     // trace!("!!!trim_quad_bezier: {:?}, {:?}, {:?}", bezier, a, b);
     let (a, b) = if a > b { (b, a) } else { (a, b) };
@@ -126,6 +136,7 @@ pub fn trim_quad_bezier(bezier: &[DVec3; 3], a: f64, b: f64) -> [DVec3; 3] {
     split_quad_bezier(&end_on_b, a).1
 }
 
+/// Get [a, b] of a cubic bezier
 pub fn trim_cubic_bezier(bezier: &[DVec3; 4], a: f64, b: f64) -> [DVec3; 4] {
     // trace!("trim_cubic_bezier: {:?}, {:?}, {:?}", bezier, a, b);
     let (a, b) = if a > b { (b, a) } else { (a, b) };
@@ -184,6 +195,9 @@ pub fn partial_quadratic_bezier<T: Interpolatable>(points: &[T; 3], a: f64, b: f
     [h0, h1, h2]
 }
 
+/// Evaluate a cubic bezier at `t` in [0.0, 1.0]
+///
+/// `t` will be clamped into [0.0, 1.0]
 pub fn cubic_bezier_eval(bezier: &[DVec3; 4], t: f64) -> DVec3 {
     let t = t.clamp(0.0, 1.0);
     let p0 = bezier[0].lerp(bezier[1], t);
@@ -196,6 +210,9 @@ pub fn cubic_bezier_eval(bezier: &[DVec3; 4], t: f64) -> DVec3 {
     p0.lerp(p1, t)
 }
 
+/// Evaluate a quad bezier at `t` in [0.0, 1.0]
+///
+/// `t` will be clamped into [0.0, 1.0]
 pub fn quad_bezier_eval(bezier: &[DVec3; 3], t: f64) -> DVec3 {
     let t = t.clamp(0.0, 1.0);
     let p0 = bezier[0].lerp(bezier[1], t);

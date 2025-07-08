@@ -11,9 +11,13 @@ use crate::{
     utils::math::interpolate_usize,
 };
 
+/// Point
 pub mod point;
+/// Rgba
 pub mod rgba;
+/// Vpoint
 pub mod vpoint;
+/// Width
 pub mod width;
 
 /// An component
@@ -21,6 +25,7 @@ pub trait Component: Debug + Default + Clone + Copy + PartialEq {}
 
 impl<T: Debug + Default + Clone + Copy + PartialEq> Component for T {}
 
+/// A component vec
 #[derive(Default, Debug, Clone, PartialEq, Deref, DerefMut, AsMut, AsRef)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[as_ref(forward)]
@@ -30,6 +35,9 @@ pub struct ComponentVec<T: Component>(pub(crate) Vec<T>);
 // MARK: Trait impls
 
 impl<T: Component + PointWise + Interpolatable> ComponentVec<T> {
+    /// Get partial of data
+    ///
+    /// This will interpolate between point wise data
     pub fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
         let max_idx = self.len() - 2;
 
@@ -100,19 +108,20 @@ impl<T: Component, I: IntoIterator<Item = impl Into<T>>> From<I> for ComponentVe
 }
 
 impl<T: Component> ComponentVec<T> {
+    /// Extend from a vec
     pub fn extend_from_vec(&mut self, vec: Vec<T>) {
         self.0.extend(vec);
     }
-
+    /// Resize with default value
     pub fn resize_with_default(&mut self, new_len: usize) {
         self.0.resize(new_len, Default::default());
     }
-
+    /// Resize with last element
     pub fn resize_with_last(&mut self, new_len: usize) {
         let last = self.last().cloned().unwrap_or_default();
         self.0.resize(new_len, last);
     }
-
+    /// Set all element to a value
     pub fn set_all(&mut self, value: impl Into<T>) {
         let value = value.into();
         self.iter_mut().for_each(|x| *x = value);
@@ -145,17 +154,21 @@ pub enum Anchor {
 }
 
 impl Anchor {
+    /// The origin point: `Anchor::Point(DVec3::ZERO)`
     pub const ORIGIN: Self = Self::Point(DVec3::ZERO);
+    /// The center edge: `Anchor::Edge(IVec3::ZERO)`
     pub const CENTER: Self = Self::Edge(IVec3::ZERO);
 
+    /// Construct a [`Anchor::Point`]
     pub fn point(x: f64, y: f64, z: f64) -> Self {
         Self::Point(dvec3(x, y, z))
     }
-
+    /// Construct a [`Anchor::Edge`]
     pub fn edge(x: i32, y: i32, z: i32) -> Self {
         Self::Edge(ivec3(x, y, z).clamp(IVec3::NEG_ONE, IVec3::ONE))
     }
 
+    /// Get the position of the anchor based on a [`BoundingBox`]
     pub fn get_pos<T: BoundingBox + ?Sized>(self, bbox: &T) -> DVec3 {
         match self {
             Self::Point(x) => x,

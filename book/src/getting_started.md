@@ -13,42 +13,49 @@
 ```rust
 use ranim::prelude::*;
 
-#[scene]
-struct HelloWorldScene;
-
-impl TimelineConstructor for HelloWorldScene {
-    fn construct(
-        self,
-        r: &mut RanimScene,
-        r_cam: TimelineId<CameraFrame>,
-    ) {
+{{#include ../../examples/hello_ranim/main.rs:15:19}}
         // ...
     }
 }
 
 fn main() {
-    render_scene(HelloWorldScene, &AppOptions::default());
+    render_scene(HelloRanimScene, &AppOptions::default());
 }
 ```
 
-**HelloWorldScene** 是一个 **Scene**，即下面两个 Trait 的组合：
-- `SceneMetaTrait` 实现了 `fn meta(&self) -> SceneMeta` 方法。
+`render_scene` 函数接收一个 `impl Scene` 并对其进行构造、求值、渲染，并将渲染结果编码为视频被输出到 `<output_dir>/<scene_name>/` 目录下。
 
-  使用 `#[scene]` 会以结构体的 snake_case 命名（去掉 `Scene` 后缀）作为 **SceneMeta** 的 `name` 字段自动实现这个 Trait。
+其中 `<output_dir>` 可以通过 `AppOptions` 设置，而 `<scene_name>` 则由场景的 `SceneMetaTrait` 的实现决定（见 [`Scene` Trait](#scene-trait)）。
 
-  也可以通过 `#[scene(name = "<NAME>")]` 来手动命名。
+## 1. 场景的构造
 
-- `SceneConstructor` 则是定义了动画的构造过程。
+`Scene` 由两个 Trait 组合而成：
 
-使用 `render_scene` 可以用一个 **Scene** 来构造一个 **RanimScene** 并对其进行渲染，渲染结果将被输出到 `<output_dir>/<scene_name>/` 目录下。
+- `SceneMetaTrait`：包含场景元信息的定义。
+- `SceneConstructor`：包含场景动画构造过程的定义。
 
-`construct` 方法有两个关键的参数：
-- `timeline: &mut RanimScene`：Ranim API 的主要入口，几乎全部对动画的编码操作都发生在这个结构上
-- `camera: TimelineId<CameraFrame>`：默认的相机时间线的 Id，也是 RanimScene 中被创建的第一个 Timeline
+```rust,ignore
+{{#include ../../src/lib.rs:SceneMeta}}
 
-**RanimTimeline** 和 **Rabject** 这两个类型非常重要，将贯穿整个 Ranim 动画的编码。
+{{#include ../../src/lib.rs:SceneMetaTrait}}
 
-## 1. Timeline 基础
+{{#include ../../src/lib.rs:SceneConstructor}}
+```
+
+当这两个 Trait 均被实现时，`Scene` Trait 会被自动实现。
+
+Ranim 提供了一个 `#[scene]` 宏来便于 `SceneMetaTrait` 的实现：
+- 使用 `#[scene]` 会以结构体的 snake_case 命名（去掉 `Scene` 后缀）作为 `SceneMeta` 的 `name` 字段自动实现这个 Trait
+- 也可以通过 `#[scene(name = "<NAME>")]` 来手动设置场景名称。
+
+而 `SceneConstructor` 的 `construct` 方法则是编码了整个场景动画过程的核心部分，它有两个参数：
+
+- `&mut RanimScene`：Ranim 场景，动画编码 API 的入口。
+- `ItemId<CameraFrame>`：相机物件的 Id。
+
+`RanimScene` 和 `ItemId` 这两个类型十分关键，是整个动画编码过程的核心。
+
+## 2. 向时间线中插入物件
 
 `RanimScene` 中有若干个「物件时间线」，每个物件时间线中包含一个动画列表。
 

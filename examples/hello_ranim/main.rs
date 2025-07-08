@@ -36,7 +36,7 @@ impl SceneConstructor for HelloRanimScene {
         let r_vitem = r.map(r_square, VItem::from);
         {
             let timeline = r.timeline_mut(&r_vitem);
-            timeline.play_with(|state| state.transform_to(circle));
+            timeline.play_with(|state| state.transform_to(circle.into()));
             timeline.forward(1.0);
             let circle = timeline.state().clone();
             timeline.play_with(|circle| circle.unwrite());

@@ -19,6 +19,7 @@ fn fonts() -> &'static Fonts {
     FONTS.get_or_init(|| FontSearcher::new().include_system_fonts(true).search())
 }
 
+/// Compiles typst string to SVG string
 pub fn typst_svg(source: &str) -> String {
     let world = SingleFileTypstWorld::new(source);
     let document = typst::compile(&world)
@@ -29,7 +30,7 @@ pub fn typst_svg(source: &str) -> String {
     get_typst_element(&svg)
 }
 
-pub struct SingleFileTypstWorld {
+pub(crate) struct SingleFileTypstWorld {
     source: Source,
 
     library: LazyHash<Library>,
@@ -99,8 +100,6 @@ impl World for SingleFileTypstWorld {
 
 #[cfg(test)]
 mod tests {
-    use crate::typst_svg;
-
     use super::*;
 
     #[test]
@@ -108,6 +107,6 @@ mod tests {
         let source = "R";
 
         println!("{}", typst_svg(source));
-        println!("{}", typst_svg!(source))
+        // println!("{}", typst_svg!(source))
     }
 }
