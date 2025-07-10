@@ -1,4 +1,6 @@
-pub mod pipelines;
+//! This module
+pub(crate) mod pipelines;
+/// The basic renderable structs
 pub mod primitives;
 
 use color::LinearSrgb;
@@ -13,7 +15,7 @@ use crate::{
     utils::{PipelinesStorage, wgpu::WgpuBuffer, wgpu::WgpuContext},
 };
 
-pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const ALIGNMENT: usize = 256;
 
 #[cfg(feature = "profiling")]
@@ -80,7 +82,7 @@ pub struct CameraUniforms {
 }
 
 impl CameraUniforms {
-    pub fn as_bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    pub(crate) fn as_bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
             binding,
             visibility: wgpu::ShaderStages::all(),
@@ -94,8 +96,8 @@ impl CameraUniforms {
     }
 }
 
-pub struct CameraUniformsBindGroup {
-    pub bind_group: wgpu::BindGroup,
+pub(crate) struct CameraUniformsBindGroup {
+    pub(crate) bind_group: wgpu::BindGroup,
 }
 
 impl AsRef<wgpu::BindGroup> for CameraUniformsBindGroup {
@@ -130,10 +132,10 @@ impl CameraUniformsBindGroup {
 
 // MARK: Renderer
 
-pub struct Renderer {
+pub(crate) struct Renderer {
     frame_height: f64,
     size: (usize, usize),
-    pub pipelines: PipelinesStorage,
+    pub(crate) pipelines: PipelinesStorage,
 
     clear_color: wgpu::Color,
     pub(crate) render_textures: RenderTextures,
@@ -464,6 +466,7 @@ impl Renderer {
 
 // MARK: RenderTextures
 
+/// Texture resources used for rendering
 #[allow(unused)]
 pub struct RenderTextures {
     pub(crate) render_texture: wgpu::Texture,
@@ -476,7 +479,7 @@ pub struct RenderTextures {
 }
 
 impl RenderTextures {
-    pub fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
+    pub(crate) fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
         let format = OUTPUT_TEXTURE_FORMAT;
         let render_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Target Texture"),
@@ -557,7 +560,7 @@ impl RenderTextures {
 }
 
 /// A render resource.
-pub trait RenderResource {
+pub(crate) trait RenderResource {
     fn new(ctx: &WgpuContext) -> Self
     where
         Self: Sized;

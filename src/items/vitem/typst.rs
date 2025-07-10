@@ -1,6 +1,11 @@
-use std::sync::OnceLock;
+use std::{
+    num::NonZeroUsize,
+    sync::{Arc, Mutex, OnceLock},
+};
 
 use chrono::{DateTime, Datelike, Local};
+use lru::LruCache;
+use sha1::{Digest, Sha1};
 use typst::{
     Library, World,
     diag::{FileError, FileResult},
@@ -14,6 +19,48 @@ use typst_kit::fonts::{FontSearcher, Fonts};
 
 use crate::utils::typst::get_typst_element;
 
+struct TypstLruCache {
+    inner: LruCache<[u8; 20], String>,
+}
+
+impl TypstLruCache {
+    fn new(cap: NonZeroUsize) -> Self {
+        Self {
+            inner: LruCache::new(cap),
+        }
+    }
+    // fn get(&mut self, typst_str: &str) -> Option<&String> {
+    //     let mut sha1 = Sha1::new();
+    //     sha1.update(typst_str.as_bytes());
+    //     let sha1 = sha1.finalize();
+    //     self.inner.get::<[u8; 20]>(sha1.as_ref())
+    // }
+    fn get_or_insert(&mut self, typst_str: &str) -> &String {
+        let mut sha1 = Sha1::new();
+        sha1.update(typst_str.as_bytes());
+        let sha1 = sha1.finalize();
+        self.inner
+            .get_or_insert_ref(AsRef::<[u8; 20]>::as_ref(&sha1), || {
+                let world = SingleFileTypstWorld::new(typst_str);
+                let document = typst::compile(&world)
+                    .output
+                    .expect("failed to compile typst source");
+
+                let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
+                get_typst_element(&svg)
+            })
+    }
+}
+
+fn typst_lru() -> &'static Arc<Mutex<TypstLruCache>> {
+    static LRU: OnceLock<Arc<Mutex<TypstLruCache>>> = OnceLock::new();
+    LRU.get_or_init(|| {
+        Arc::new(Mutex::new(TypstLruCache::new(
+            NonZeroUsize::new(256).unwrap(),
+        )))
+    })
+}
+
 fn fonts() -> &'static Fonts {
     static FONTS: OnceLock<Fonts> = OnceLock::new();
     FONTS.get_or_init(|| FontSearcher::new().include_system_fonts(true).search())
@@ -21,13 +68,14 @@ fn fonts() -> &'static Fonts {
 
 /// Compiles typst string to SVG string
 pub fn typst_svg(source: &str) -> String {
-    let world = SingleFileTypstWorld::new(source);
-    let document = typst::compile(&world)
-        .output
-        .expect("failed to compile typst source");
+    typst_lru().lock().unwrap().get_or_insert(source).clone()
+    // let world = SingleFileTypstWorld::new(source);
+    // let document = typst::compile(&world)
+    //     .output
+    //     .expect("failed to compile typst source");
 
-    let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
-    get_typst_element(&svg)
+    // let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
+    // get_typst_element(&svg)
 }
 
 pub(crate) struct SingleFileTypstWorld {

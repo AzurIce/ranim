@@ -34,8 +34,9 @@ use crate::{render::RenderResource, utils::wgpu::WgpuContext};
 //     }
 // }
 
+/// A storage for pipelines
 #[derive(Default)]
-pub(crate) struct PipelinesStorage {
+pub struct PipelinesStorage {
     inner: HashMap<TypeId, Box<dyn Any>>,
 }
 

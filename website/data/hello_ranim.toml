@@ -39,7 +39,7 @@ impl SceneConstructor for HelloRanimScene {\r
         let r_vitem = r.map(r_square, VItem::from);\r
         {\r
             let timeline = r.timeline_mut(&r_vitem);\r
-            timeline.play_with(|state| state.transform_to(circle));\r
+            timeline.play_with(|state| state.transform_to(circle.into()));\r
             timeline.forward(1.0);\r
             let circle = timeline.state().clone();\r
             timeline.play_with(|circle| circle.unwrite());\r
@@ -71,7 +71,7 @@ fn main() {\r
     }\r
 }\r
 ```"""
-hash = "0cf649f3322c7aff09b7a012f768e476c38b612a"
+hash = "25a793414768b0fa37959d91c21437f2e715fdf3"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]
 wasm = true

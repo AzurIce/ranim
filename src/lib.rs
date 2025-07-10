@@ -73,7 +73,7 @@ pub mod components;
 /// Builtin items
 pub mod items;
 /// Rendering stuff
-mod render;
+pub mod render;
 /// Utils
 pub mod utils;
 
