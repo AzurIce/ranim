@@ -48,6 +48,8 @@ serde = ["dep:serde", "glam/serde", "color/serde"]
 [dependencies]
 ranim-macros.workspace = true
 itertools.workspace = true
+sha1 = "0.10.6"
+lru = "0.16.0"
 async-channel = "2.3.1"
 bytemuck = { version = "1.23.0", features = ["derive"] }
 glam = { version = "0.30.3", features = ["bytemuck"] }

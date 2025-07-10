@@ -1,3 +1,4 @@
+/// Primitive for vitem
 pub mod vitem;
 
 use std::{any::Any, collections::HashMap};
@@ -8,16 +9,25 @@ use crate::{items::Group, utils::wgpu::WgpuContext};
 
 use super::RenderTextures;
 
-/// A Primitive is a structure that encapsules the wgpu resources
+/// The RenderResource encapsules the wgpu resources.
+///
+/// It has a `Data` type that is used to initialize/update the resource.
 pub trait RenderResource {
+    /// The type used for [`RenderResource::init`] and [`RenderResource::update`].
     type Data;
+    /// Initialize a RenderResource using [`RenderResource::Data`]
     fn init(ctx: &WgpuContext, data: &Self::Data) -> Self;
+    /// update a RenderResource using [`RenderResource::Data`]
     fn update(&mut self, ctx: &WgpuContext, data: &Self::Data);
 }
 
+/// The RenderCommand encodes the commands.
 pub trait RenderCommand {
+    /// Encode the compute pass command
     fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass);
+    /// Encode the render pass command
     fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass);
+    /// Encode the render command
     fn encode_render_command(
         &self,
         ctx: &WgpuContext,
@@ -27,6 +37,7 @@ pub trait RenderCommand {
         render_textures: &RenderTextures,
         #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
     );
+    /// Debug
     fn debug(&self, _ctx: &WgpuContext) {}
 }
 
@@ -159,8 +170,11 @@ impl<T: RenderCommand, const N: usize> RenderCommand for [T; N] {
 //     fn extract(data: &T) -> Self::Target;
 // }
 
+/// Extract a [`Extract::Target`] from reference.
 pub trait Extract {
+    /// The extraction result
     type Target;
+    /// Extract a [`Extract::Target`] from reference.
     fn extract(&self) -> Self::Target;
 }
 
@@ -178,13 +192,14 @@ impl<E: Extract> Extract for Group<E> {
 /// which implements [`RenderResource`] and [`RenderCommand`]:
 /// - [`RenderResource`]: A trait about init or update itself with [`RenderResource::Data`].
 /// - [`RenderCommand`]: A trait about encoding GPU commands.
-///
 pub trait Primitive {
+    /// The RenderInstance
     type RenderInstance: RenderResource<Data = Self> + RenderCommand;
 }
 
 /// A trait for type erasing
 pub trait Renderable {
+    /// Prepare render instance for id
     fn prepare_for_id(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances, id: usize);
 }
 impl<T: Primitive + 'static> Renderable for T {
@@ -245,9 +260,11 @@ macro_rules! impl_tuple_renderable {
 
 all_tuples_enumerated!(impl_tuple_renderable, 1, 16, T);
 
+/// Type erased [`RenderCommand`]
 pub trait AnyRenderCommand: Any + RenderCommand {}
 impl<T: RenderCommand + Any> AnyRenderCommand for T {}
 
+/// Storage for [`RenderCommand`]s
 #[derive(Default)]
 pub struct RenderInstances {
     // Rabject's id -> RenderInstance
