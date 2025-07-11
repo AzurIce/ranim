@@ -1,5 +1,5 @@
 [alias]
-build-examples = "run --package xtask-build-examples"
+examples = "run --package xtask-examples"
 
 [target.wasm32-unknown-unknown]
 rustflags = ['--cfg', 'getrandom_backend="wasm_js"']

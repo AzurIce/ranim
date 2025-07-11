@@ -1,5 +1,5 @@
 [package]
-name = "xtask-build-examples"
+name = "xtask-examples"
 version = "0.1.0"
 edition.workspace = true
 publish = false
@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 walkdir = "2.3"
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.8.20"
+toml = "0.9.1"
 # toml_edit = { version = "0.22.7", default-features = false, features = [
 #   "parse",
 # ] }

@@ -1,8 +1,8 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::env;
 use std::error::Error;
 use std::path::Path;
-use xtask_build_examples::get_examples;
+use xtask_examples::get_examples;
 
 #[derive(Parser)]
 #[command(author, version, about = "build ranim examples")]
@@ -11,12 +11,21 @@ struct Args {
     #[arg(value_name = "EXAMPLES")]
     examples: Vec<String>,
 
-    #[arg(long)]
-    lazy_run: bool,
-
     /// 清除不存在的示例对应的输出文件
     #[arg(long)]
     clean: bool,
+
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Build,
+    Run {
+        #[arg(long)]
+        lazy_run: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -37,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         examples.retain(|example| args.examples.contains(&example.name));
     }
     println!(
-        "building {}/{} examples: {:?}...",
+        "processing {}/{} examples: {:?}...",
         examples.len(),
         total_cnt,
         examples.iter().map(|e| e.name.clone()).collect::<Vec<_>>()
@@ -47,8 +56,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         // TODO: clean
     }
     for example in examples {
-        example.clean(&workspace_root);
-        example.build(&workspace_root, args.lazy_run);
+        match args.command {
+            Commands::Build => {
+                example.build_wasm(&workspace_root);
+            }
+            Commands::Run { lazy_run } => {
+                example.run(&workspace_root, lazy_run);
+            }
+        }
         println!("示例 {} 处理完成", example.name);
     }
 
