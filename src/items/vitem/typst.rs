@@ -1,6 +1,5 @@
 use std::{
-    num::NonZeroUsize,
-    sync::{Arc, Mutex, OnceLock},
+    num::NonZeroUsize, ops::Deref, sync::{Arc, Mutex, OnceLock}
 };
 
 use chrono::{DateTime, Datelike, Local};
@@ -41,8 +40,10 @@ impl TypstLruCache {
         let sha1 = sha1.finalize();
         self.inner
             .get_or_insert_ref(AsRef::<[u8; 20]>::as_ref(&sha1), || {
-                let world = SingleFileTypstWorld::new(typst_str);
-                let document = typst::compile(&world)
+                // let world = SingleFileTypstWorld::new(typst_str);
+                let mut world = typst_world().lock().unwrap();
+                world.set_source(typst_str);
+                let document = typst::compile(world.deref())
                     .output
                     .expect("failed to compile typst source");
 
@@ -64,6 +65,11 @@ fn typst_lru() -> &'static Arc<Mutex<TypstLruCache>> {
 fn fonts() -> &'static Fonts {
     static FONTS: OnceLock<Fonts> = OnceLock::new();
     FONTS.get_or_init(|| FontSearcher::new().include_system_fonts(true).search())
+}
+
+fn typst_world() -> &'static Arc<Mutex<SingleFileTypstWorld>> {
+    static WORLD: OnceLock<Arc<Mutex<SingleFileTypstWorld>>> = OnceLock::new();
+    WORLD.get_or_init(|| Arc::new(Mutex::new(SingleFileTypstWorld::new(""))))
 }
 
 /// Compiles typst string to SVG string
@@ -97,6 +103,9 @@ impl SingleFileTypstWorld {
             source: Source::detached(source),
             now: OnceLock::new(),
         }
+    }
+    pub fn set_source(&mut self, source: impl AsRef<str>) {
+        self.source = Source::detached(source.as_ref().to_string());
     }
 }
 
@@ -148,13 +157,38 @@ impl World for SingleFileTypstWorld {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use super::*;
 
     #[test]
     fn test_single_file_typst_world_foo() {
         let source = "R";
 
-        println!("{}", typst_svg(source));
+        let start = Instant::now();
+        let mut world = SingleFileTypstWorld::new(source);
+        println!("world construct: {:?}", start.elapsed());
+
+        let start = Instant::now();
+        world.set_source("r");
+        println!("set source: {:?}", start.elapsed());
+
+
+        let start = Instant::now();
+        let document = typst::compile(&world)
+            .output
+            .expect("failed to compile typst source");
+        println!("document compile: {:?}", start.elapsed());
+
+        let start = Instant::now();
+        let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
+        println!("svg output: {:?}", start.elapsed());
+
+        let start = Instant::now();
+        let res = get_typst_element(&svg);
+        println!("get element: {:?}", start.elapsed());
+
+        println!("{}", res);
         // println!("{}", typst_svg!(source))
     }
 }
