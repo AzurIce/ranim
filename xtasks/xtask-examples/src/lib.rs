@@ -35,16 +35,45 @@ pub struct Example {
 }
 
 impl Example {
-    pub fn clean(&self, root_dir: impl AsRef<Path>) {
+    pub fn clean_wasm(&self, root_dir: impl AsRef<Path>) {
         let root_dir = root_dir.as_ref();
 
         let website_root = root_dir.join("website");
-        let output_dir = website_root.join("static/examples").join(&self.name);
+        let output_dir = website_root
+            .join("static/examples")
+            .join(&self.name)
+            .join("pkg");
         if std::fs::exists(&output_dir).unwrap() {
             std::fs::remove_dir_all(&output_dir).expect("failed to clean example");
         }
     }
-    pub fn build(&self, root_dir: impl AsRef<Path>, lazy: bool) {
+
+    pub fn clean_output(&self, root_dir: impl AsRef<Path>) {
+        let root_dir = root_dir.as_ref();
+
+        let website_root = root_dir.join("website");
+        let output_dir = website_root.join("static/examples").join(&self.name);
+        for entry in std::fs::read_dir(output_dir).unwrap() {
+            let Ok(entry) = entry else {
+                continue;
+            };
+            let Ok(t) = entry.file_type() else {
+                continue;
+            };
+
+            if t.is_dir() {
+                if entry.file_name().to_string_lossy() == "pkg" {
+                    continue;
+                }
+                std::fs::remove_dir_all(entry.path()).expect("failed to clean example");
+            } else {
+                std::fs::remove_file(entry.path()).expect("failed to clean example");
+            }
+        }
+    }
+
+    /// Output to `website/staic/examples/<example-name>/`
+    pub fn run(&self, root_dir: impl AsRef<Path>, lazy: bool) {
         #[derive(Serialize, Deserialize)]
         struct OutputData {
             name: String,
@@ -74,9 +103,10 @@ impl Example {
             }
         }
 
+        self.clean_output(root_dir);
+
         let mut preview_imgs = vec![];
         let mut output_files = vec![];
-        // Run example (build video and image)
         let status = Command::new("cargo")
             .current_dir(root_dir)
             .args(["run", "--example", &self.name, "--release"])
@@ -119,7 +149,41 @@ impl Example {
             }
         }
 
-        // Build wasm
+        let output_data = OutputData {
+            name: self.name.clone(),
+            code: self.code.clone(),
+            hash: self.hash.clone(),
+
+            preview_imgs: preview_imgs
+                .into_iter()
+                .map(|f| format!("/examples/{}/{}", self.name, f))
+                .collect(),
+            output_files: output_files
+                .into_iter()
+                .map(|f| format!("/examples/{}/{}", self.name, f))
+                .collect(),
+            wasm: self.meta.wasm,
+        };
+        let output_data = toml::to_string(&output_data).unwrap();
+
+        std::fs::write(&data_path, output_data).expect("failed to write data.toml");
+        if !self.meta.hide {
+            self.create_example_page(root_dir);
+        }
+    }
+
+    /// Build wasm to `website/staic/examples/<example-name>/pkg/`
+    pub fn build_wasm(&self, root_dir: impl AsRef<Path>) {
+        let root_dir = root_dir.as_ref();
+        let website_root = root_dir.join("website");
+        let output_dir = website_root
+            .join("static")
+            .join("examples")
+            .join(&self.name);
+        std::fs::create_dir_all(&output_dir).expect("failed to create dir");
+
+        self.clean_wasm(root_dir);
+
         if self.meta.wasm {
             let status = Command::new("cargo")
                 .current_dir(root_dir)
@@ -157,28 +221,6 @@ impl Example {
             if !status.success() {
                 panic!("failed to run wasm-bindgen")
             }
-        }
-
-        let output_data = OutputData {
-            name: self.name.clone(),
-            code: self.code.clone(),
-            hash: self.hash.clone(),
-
-            preview_imgs: preview_imgs
-                .into_iter()
-                .map(|f| format!("/examples/{}/{}", self.name, f))
-                .collect(),
-            output_files: output_files
-                .into_iter()
-                .map(|f| format!("/examples/{}/{}", self.name, f))
-                .collect(),
-            wasm: self.meta.wasm,
-        };
-        let output_data = toml::to_string(&output_data).unwrap();
-
-        std::fs::write(&data_path, output_data).expect("failed to write data.toml");
-        if !self.meta.hide {
-            self.create_example_page(root_dir);
         }
     }
 
@@ -293,19 +335,35 @@ mod test {
     }
 
     #[test]
-    fn test_build_example() {
+    fn test_example_build_wasm() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir);
         println!("{:?}", examples[0].name);
-        examples[0].build(&root_dir, false);
+        examples[0].build_wasm(&root_dir);
     }
     #[test]
-    fn test_clean_example() {
+    fn test_example_run() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir);
         println!("{:?}", examples[0].name);
-        examples[0].clean(&root_dir);
+        examples[0].run(&root_dir, false);
+    }
+    #[test]
+    fn test_example_clean_output() {
+        let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let root_dir = xtask_root.join("../../");
+        let examples = get_examples(&root_dir);
+        println!("{:?}", examples[0].name);
+        examples[0].clean_output(&root_dir);
+    }
+    #[test]
+    fn test_example_clean_wasm() {
+        let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let root_dir = xtask_root.join("../../");
+        let examples = get_examples(&root_dir);
+        println!("{:?}", examples[0].name);
+        examples[0].clean_wasm(&root_dir);
     }
 }

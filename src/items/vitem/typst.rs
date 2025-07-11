@@ -1,5 +1,7 @@
 use std::{
-    num::NonZeroUsize, ops::Deref, sync::{Arc, Mutex, OnceLock}
+    num::NonZeroUsize,
+    ops::Deref,
+    sync::{Arc, Mutex, OnceLock},
 };
 
 use chrono::{DateTime, Datelike, Local};
@@ -173,7 +175,6 @@ mod tests {
         world.set_source("r");
         println!("set source: {:?}", start.elapsed());
 
-
         let start = Instant::now();
         let document = typst::compile(&world)
             .output
@@ -188,7 +189,7 @@ mod tests {
         let res = get_typst_element(&svg);
         println!("get element: {:?}", start.elapsed());
 
-        println!("{}", res);
+        println!("{res}");
         // println!("{}", typst_svg!(source))
     }
 }
