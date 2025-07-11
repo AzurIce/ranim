@@ -1,3 +1,4 @@
 public/
 static/book/
 static/doc/
+static/examples/**/pkg/
