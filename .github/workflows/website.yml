@@ -27,10 +27,19 @@ jobs:
 
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: wasm32-unknown-unknown
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: just, mdbook, zola, mdbook-katex
+          tool: just, mdbook, zola, mdbook-katex, wasm-bindgen
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "build"
+
+      - name: Build wasm examples
+        run: cargo examples build
 
       - run: just website
 
