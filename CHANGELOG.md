@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0-alpha.16] - 2025-07-11
+## [0.1.0-alpha.17] - 2025-07-11
 
 ### 🚀 Features
 
@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file.
 - Build wasm in action
 - Update flake
 - Added git-cliff to flake's shell packages
+- Release
 
 ## [0.1.0-alpha.14] - 2025-07-01
 
