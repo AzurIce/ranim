@@ -50,17 +50,9 @@
             export PATH=/usr/bin:$PATH
           '';
 
-          buildInputs = with pkgs;
-            [ clang llvmPackages_17.bintools libusb1 openssl pkg-config ]
-            ++ [ rust-tools ] ++ (with pkgs.darwin.apple_sdk.frameworks;
-              pkgs.lib.optionals pkgs.stdenv.isDarwin [
-                System
-                IOKit
-                Security
-                CoreFoundation
-                AppKit
-              ]);
+          buildInputs = with pkgs; [ clang libiconv ] ++ [ rust-tools ];
           packages = [ puffin_viewer ] ++ (with pkgs; [
+            cargo-release
             miniserve
             trunk
             zola
