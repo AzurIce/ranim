@@ -3429,7 +3429,7 @@ checksum = "c3d6831663a5098ea164f89cff59c6284e95f4e3c76ce9848d4529f5ccca9bde"
 
 [[package]]
 name = "ranim"
-version = "0.1.0-alpha.15"
+version = "0.1.0-alpha.16"
 dependencies = [
  "anyhow",
  "assert_float_eq",
@@ -3476,7 +3476,7 @@ dependencies = [
 
 [[package]]
 name = "ranim-macros"
-version = "0.1.0-alpha.15"
+version = "0.1.0-alpha.16"
 dependencies = [
  "darling",
  "heck",
