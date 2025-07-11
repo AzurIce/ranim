@@ -52,6 +52,7 @@
 
           buildInputs = with pkgs; [ clang libiconv ] ++ [ rust-tools ];
           packages = [ puffin_viewer ] ++ (with pkgs; [
+            git-cliff
             cargo-release
             miniserve
             trunk
