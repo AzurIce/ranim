@@ -113,11 +113,11 @@ impl RanimScene {
     }
 
     /// Get reference of all timelines in the type erased [`ItemDynTimelines`] type.
-    pub fn timelines(&self) -> &Vec<ItemDynTimelines> {
+    pub fn timelines(&self) -> &[ItemDynTimelines] {
         &self.timelines
     }
     /// Get mutable reference of all timelines in the type erased [`ItemDynTimelines`] type.
-    pub fn timelines_mut(&mut self) -> &mut Vec<ItemDynTimelines> {
+    pub fn timelines_mut(&mut self) -> &mut [ItemDynTimelines] {
         &mut self.timelines
     }
     /// Get the reference of timeline(s) by the [`TimelineIndex`].
