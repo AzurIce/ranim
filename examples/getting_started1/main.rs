@@ -9,6 +9,7 @@ use ranim::{
     prelude::*,
 };
 
+// ANCHOR: construct
 #[scene]
 struct GettingStarted1Scene;
 
@@ -33,6 +34,7 @@ impl SceneConstructor for GettingStarted1Scene {
         }
     }
 }
+// ANCHOR_END: construct
 
 fn main() {
     #[cfg(not(target_arch = "wasm32"))]
