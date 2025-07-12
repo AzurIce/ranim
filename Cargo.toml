@@ -57,11 +57,11 @@ image = "0.25.6"
 log = "0.4.27"
 pollster = "0.4.0"
 # uuid = { version = "1.17.0", features = ["v4"] }
-wgpu = "24.0.5"
+wgpu = "25.0.2"
 anyhow = "1.0.98"
 usvg = "0.45.1"
 regex = "1.11.1"
-indicatif = "0.17.11"
+indicatif = "0.18.0"
 color = "0.3.1"
 variadics_please = "1.1.0"
 derive_more = { version = "2.0.1", features = [
@@ -77,14 +77,14 @@ derive_more = { version = "2.0.1", features = [
 
 puffin = { version = "0.19.1", optional = true }
 puffin_http = { version = "0.16.1", optional = true }
-wgpu-profiler = { version = "0.22.0", optional = true, features = ["puffin"] }
+wgpu-profiler = { version = "0.23.0", optional = true, features = ["puffin"] }
 profiling = { version = "1.0.17", optional = true, features = [
   "profile-with-puffin",
 ] }
 
-egui = { version = "0.31.1", optional = true }
+egui = { version = "0.32.0", optional = true }
 winit = { version = "0.30.11", optional = true }
-egui-wgpu = { version = "0.31.1", optional = true }
+egui-wgpu = { version = "0.32.0", optional = true }
 
 serde = { version = "1", features = ["derive"], optional = true }
 typst = "0.13.1"
@@ -96,7 +96,7 @@ typst-svg = "0.13.1"
 chrono = "0.4.41"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-egui-winit = { version = "0.31.1", optional = true }
+egui-winit = { version = "0.32.0", optional = true }
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2.100"
@@ -104,7 +104,7 @@ wasm-bindgen-futures = { version = "0.4.50" }
 web-sys = { version = "0.3.77" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
-egui-winit = { version = "0.31.1", default-features = false, optional = true }
+egui-winit = { version = "0.32.0", default-features = false, optional = true }
 getrandom = { version = "0.3.3", features = ["wasm_js"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
