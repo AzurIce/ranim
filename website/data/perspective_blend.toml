@@ -1,140 +1,140 @@
 name = "perspective_blend"
 code = """
 ```rust
-use log::LevelFilter;
-use ranim::{
-    animation::transform::TransformAnim,
-    color::palettes::manim,
-    glam::DVec3,
-    items::{
-        Group,
-        vitem::{VItem, geometry::Square},
-    },
-    prelude::*,
-    timeline::TimeMark,
-    utils::rate_functions::linear,
-};
-
-#[scene]
-struct PerspectiveBlendScene;
-
-impl SceneConstructor for PerspectiveBlendScene {
-    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {
-        r.timeline_mut(&r_cam).update_with(|cam| {
-            cam.pos = DVec3::Z * 5.0;
-        });
-
-        // Create a cube
-        let side_length = 2.0;
-
-        let square_with_color = |color: color::AlphaColor<color::Srgb>| {
-            VItem::from(Square::new(side_length).with(|square| {
-                square.set_color(color).set_fill_opacity(0.5);
-            }))
-        };
-
-        // bottom, right, back, top, front, left
-        let square_faces = [
-            manim::TEAL_C,
-            manim::GREEN_C,
-            manim::BLUE_C,
-            manim::PURPLE_C,
-            manim::RED_C,
-            manim::YELLOW_C,
-        ]
-        .map(|color| r.insert(square_with_color(color)));
-
-        let transform_fns: [&dyn Fn(&mut VItem); 6] = [
-            &(|data| {
-                data.shift(DVec3::NEG_Y * side_length / 2.0)
-                    .rotate(std::f64::consts::PI / 2.0, DVec3::X);
-            }),
-            &(|data| {
-                data.shift(DVec3::X * side_length / 2.0)
-                    .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
-            }),
-            &(|data| {
-                data.shift(DVec3::NEG_Z * side_length / 2.0);
-            }),
-            &(|data| {
-                data.shift(DVec3::Y * side_length / 2.0)
-                    .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
-            }),
-            &(|data| {
-                data.shift(DVec3::Z * side_length / 2.0);
-            }),
-            &(|data| {
-                data.shift(DVec3::NEG_X * side_length / 2.0)
-                    .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
-            }),
-        ];
-
-        let square_faces = square_faces
-            .iter()
-            .zip(transform_fns)
-            .map(|(r_face, transform_fn)| {
-                r.timeline_mut(r_face)
-                    .play_with(|face| face.transform(transform_fn).with_rate_func(linear))
-                    .hide()
-                    .state()
-                    .clone()
-            })
-            .collect::<Vec<_>>();
-
-        let faces = Group(square_faces);
-        let r_faces = r.insert(faces);
-        r.timelines_mut().sync(); // TODO: make this better
-        r.timeline_mut(&r_faces).play_with(|faces| {
-            faces
-                .transform(|data| {
-                    data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
-                        .rotate(std::f64::consts::PI / 6.0, DVec3::X);
-                })
-                .with_duration(4.0)
-        });
-
-        r.timeline_mut(&r_cam).forward(2.0).play_with(|cam| {
-            cam.transform(|data| {
-                data.perspective_blend = 1.0;
-            })
-            .with_duration(2.0)
-        });
-        r.insert_time_mark(
-            r.timelines().max_total_secs(),
-            TimeMark::Capture("preview.png".to_string()),
-        );
-    }
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(not(feature = "app"))]
-    {
-        let options = AppOptions {
-            pixel_size: (1280, 720),
-            frame_rate: 60,
-            ..Default::default()
-        };
-        render_scene(PerspectiveBlendScene, &options);
-    }
-
-    // reuires "app" feature
-    #[cfg(feature = "app")]
-    run_scene_app(PerspectiveBlendScene);
-}
+use log::LevelFilter;\r
+use ranim::{\r
+    animation::transform::TransformAnim,\r
+    color::palettes::manim,\r
+    glam::DVec3,\r
+    items::{\r
+        Group,\r
+        vitem::{VItem, geometry::Square},\r
+    },\r
+    prelude::*,\r
+    timeline::TimeMark,\r
+    utils::rate_functions::linear,\r
+};\r
+\r
+#[scene]\r
+struct PerspectiveBlendScene;\r
+\r
+impl SceneConstructor for PerspectiveBlendScene {\r
+    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {\r
+        r.timeline_mut(&r_cam).update_with(|cam| {\r
+            cam.pos = DVec3::Z * 5.0;\r
+        });\r
+\r
+        // Create a cube\r
+        let side_length = 2.0;\r
+\r
+        let square_with_color = |color: color::AlphaColor<color::Srgb>| {\r
+            VItem::from(Square::new(side_length).with(|square| {\r
+                square.set_color(color).set_fill_opacity(0.5);\r
+            }))\r
+        };\r
+\r
+        // bottom, right, back, top, front, left\r
+        let square_faces = [\r
+            manim::TEAL_C,\r
+            manim::GREEN_C,\r
+            manim::BLUE_C,\r
+            manim::PURPLE_C,\r
+            manim::RED_C,\r
+            manim::YELLOW_C,\r
+        ]\r
+        .map(|color| r.insert(square_with_color(color)));\r
+\r
+        let transform_fns: [&dyn Fn(&mut VItem); 6] = [\r
+            &(|data| {\r
+                data.shift(DVec3::NEG_Y * side_length / 2.0)\r
+                    .rotate(std::f64::consts::PI / 2.0, DVec3::X);\r
+            }),\r
+            &(|data| {\r
+                data.shift(DVec3::X * side_length / 2.0)\r
+                    .rotate(std::f64::consts::PI / 2.0, DVec3::Y);\r
+            }),\r
+            &(|data| {\r
+                data.shift(DVec3::NEG_Z * side_length / 2.0);\r
+            }),\r
+            &(|data| {\r
+                data.shift(DVec3::Y * side_length / 2.0)\r
+                    .rotate(-std::f64::consts::PI / 2.0, DVec3::X);\r
+            }),\r
+            &(|data| {\r
+                data.shift(DVec3::Z * side_length / 2.0);\r
+            }),\r
+            &(|data| {\r
+                data.shift(DVec3::NEG_X * side_length / 2.0)\r
+                    .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);\r
+            }),\r
+        ];\r
+\r
+        let square_faces = square_faces\r
+            .iter()\r
+            .zip(transform_fns)\r
+            .map(|(r_face, transform_fn)| {\r
+                r.timeline_mut(r_face)\r
+                    .play_with(|face| face.transform(transform_fn).with_rate_func(linear))\r
+                    .hide()\r
+                    .state()\r
+                    .clone()\r
+            })\r
+            .collect::<Vec<_>>();\r
+\r
+        let faces = Group(square_faces);\r
+        let r_faces = r.insert(faces);\r
+        r.timelines_mut().sync(); // TODO: make this better\r
+        r.timeline_mut(&r_faces).play_with(|faces| {\r
+            faces\r
+                .transform(|data| {\r
+                    data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)\r
+                        .rotate(std::f64::consts::PI / 6.0, DVec3::X);\r
+                })\r
+                .with_duration(4.0)\r
+        });\r
+\r
+        r.timeline_mut(&r_cam).forward(2.0).play_with(|cam| {\r
+            cam.transform(|data| {\r
+                data.perspective_blend = 1.0;\r
+            })\r
+            .with_duration(2.0)\r
+        });\r
+        r.insert_time_mark(\r
+            r.timelines().max_total_secs(),\r
+            TimeMark::Capture("preview.png".to_string()),\r
+        );\r
+    }\r
+}\r
+\r
+fn main() {\r
+    #[cfg(not(target_arch = "wasm32"))]\r
+    {\r
+        #[cfg(debug_assertions)]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Trace)\r
+            .init();\r
+        #[cfg(not(debug_assertions))]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Info)\r
+            .init();\r
+    }\r
+\r
+    #[cfg(not(feature = "app"))]\r
+    {\r
+        let options = AppOptions {\r
+            pixel_size: (1280, 720),\r
+            frame_rate: 60,\r
+            ..Default::default()\r
+        };\r
+        render_scene(PerspectiveBlendScene, &options);\r
+    }\r
+\r
+    // reuires "app" feature\r
+    #[cfg(feature = "app")]\r
+    run_scene_app(PerspectiveBlendScene);\r
+}\r
 ```"""
-hash = "584483c5fa659bf229a1c1ade5994598c1bab8ab"
+hash = "0dc777c6bfe98424b620af997f630b10df8a202d"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/output.mp4"]
 wasm = true
