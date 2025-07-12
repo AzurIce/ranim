@@ -207,7 +207,7 @@ pub(crate) fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> 
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             pollster::block_on(tx.send(result)).unwrap()
         });
-        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        ctx.device.poll(wgpu::PollType::Wait).unwrap();
         rx.recv().await.unwrap().unwrap();
 
         {

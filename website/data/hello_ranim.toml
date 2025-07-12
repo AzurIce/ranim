@@ -1,77 +1,77 @@
 name = "hello_ranim"
 code = """
 ```rust
-use std::f64::consts::PI;
-
-use log::LevelFilter;
-use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
-    color::palettes::manim,
-    glam::DVec3,
-    items::vitem::{
-        VItem,
-        geometry::{Circle, Square},
-    },
-    prelude::*,
-};
-
-#[scene]
-struct HelloRanimScene;
-
-impl SceneConstructor for HelloRanimScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
-        let square = Square::new(2.0).with(|square| {
-            square.set_color(manim::BLUE_C);
-        });
-
-        let r_square = r.insert(square);
-        {
-            let timeline = r.timeline_mut(&r_square);
-            timeline.play_with(|square| square.fade_in());
-        };
-
-        let circle = Circle::new(2.0).with(|circle| {
-            circle
-                .set_color(manim::RED_C)
-                .rotate(PI / 4.0 + PI, DVec3::Z);
-        });
-
-        let r_vitem = r.map(r_square, VItem::from);
-        {
-            let timeline = r.timeline_mut(&r_vitem);
-            timeline.play_with(|state| state.transform_to(circle.into()));
-            timeline.forward(1.0);
-            let circle = timeline.state().clone();
-            timeline.play_with(|circle| circle.unwrite());
-            timeline.play(circle.write());
-            timeline.play_with(|circle| circle.fade_out());
-        };
-    }
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    run_scene_app(HelloRanimScene);
-    #[cfg(not(feature = "app"))]
-    {
-        render_scene(HelloRanimScene, &AppOptions::default());
-        render_scene_at_sec(HelloRanimScene, 0.0, "preview.png", &AppOptions::default());
-    }
-}
+use std::f64::consts::PI;\r
+\r
+use log::LevelFilter;\r
+use ranim::{\r
+    animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},\r
+    color::palettes::manim,\r
+    glam::DVec3,\r
+    items::vitem::{\r
+        VItem,\r
+        geometry::{Circle, Square},\r
+    },\r
+    prelude::*,\r
+};\r
+\r
+#[scene]\r
+struct HelloRanimScene;\r
+\r
+impl SceneConstructor for HelloRanimScene {\r
+    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+        let square = Square::new(2.0).with(|square| {\r
+            square.set_color(manim::BLUE_C);\r
+        });\r
+\r
+        let r_square = r.insert(square);\r
+        {\r
+            let timeline = r.timeline_mut(&r_square);\r
+            timeline.play_with(|square| square.fade_in());\r
+        };\r
+\r
+        let circle = Circle::new(2.0).with(|circle| {\r
+            circle\r
+                .set_color(manim::RED_C)\r
+                .rotate(PI / 4.0 + PI, DVec3::Z);\r
+        });\r
+\r
+        let r_vitem = r.map(r_square, VItem::from);\r
+        {\r
+            let timeline = r.timeline_mut(&r_vitem);\r
+            timeline.play_with(|state| state.transform_to(circle.into()));\r
+            timeline.forward(1.0);\r
+            let circle = timeline.state().clone();\r
+            timeline.play_with(|circle| circle.unwrite());\r
+            timeline.play(circle.write());\r
+            timeline.play_with(|circle| circle.fade_out());\r
+        };\r
+    }\r
+}\r
+\r
+fn main() {\r
+    #[cfg(not(target_arch = "wasm32"))]\r
+    {\r
+        #[cfg(debug_assertions)]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Trace)\r
+            .init();\r
+        #[cfg(not(debug_assertions))]\r
+        pretty_env_logger::formatted_timed_builder()\r
+            .filter(Some("ranim"), LevelFilter::Info)\r
+            .init();\r
+    }\r
+\r
+    #[cfg(feature = "app")]\r
+    run_scene_app(HelloRanimScene);\r
+    #[cfg(not(feature = "app"))]\r
+    {\r
+        render_scene(HelloRanimScene, &AppOptions::default());\r
+        render_scene_at_sec(HelloRanimScene, 0.0, "preview.png", &AppOptions::default());\r
+    }\r
+}\r
 ```"""
-hash = "156f0d4c5ab7afeab4bc8cc541caf290adfc9cda"
+hash = "25a793414768b0fa37959d91c21437f2e715fdf3"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/output.mp4"]
 wasm = true

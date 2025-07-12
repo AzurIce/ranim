@@ -24,21 +24,19 @@ impl WgpuContext {
 
         #[cfg(feature = "profiling")]
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: adapter.features()
-                        & wgpu_profiler::GpuProfiler::ALL_WGPU_TIMER_FEATURES,
-                    required_limits: wgpu::Limits::default(),
-                    memory_hints: wgpu::MemoryHints::default(),
-                },
-                None,
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: adapter.features()
+                    & wgpu_profiler::GpuProfiler::ALL_WGPU_TIMER_FEATURES,
+                required_limits: wgpu::Limits::default(),
+                memory_hints: wgpu::MemoryHints::default(),
+                trace: None,
+            })
             .await
             .unwrap();
         #[cfg(not(feature = "profiling"))]
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor::default(), None)
+            .request_device(&wgpu::DeviceDescriptor::default())
             .await
             .unwrap();
 
@@ -136,7 +134,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             pollster::block_on(tx.send(result)).unwrap()
         });
-        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        ctx.device.poll(wgpu::PollType::Wait).unwrap();
         pollster::block_on(rx.recv()).unwrap().unwrap();
 
         buffer_slice.get_mapped_range().to_vec()
@@ -269,7 +267,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             pollster::block_on(tx.send(result)).unwrap()
         });
-        ctx.device.poll(wgpu::Maintain::Wait).panic_on_timeout();
+        ctx.device.poll(wgpu::PollType::Wait).unwrap();
         pollster::block_on(rx.recv()).unwrap().unwrap();
 
         let x = buffer_slice.get_mapped_range().to_vec();
