@@ -4,14 +4,9 @@ code = """
 use glam::DVec3;\r
 use log::LevelFilter;\r
 use ranim::{\r
-    animation::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},\r
-    components::ScaleHint,\r
-    items::{\r
-        Group,\r
-        vitem::{VItem, svg::SvgItem, typst::typst_svg},\r
-    },\r
-    prelude::*,\r
-    timeline::TimeMark,\r
+    animation::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim}, color::palettes::manim, components::ScaleHint, items::{\r
+        vitem::{svg::SvgItem, typst::typst_svg, VItem}, Group\r
+    }, prelude::*, timeline::TimeMark\r
 };\r
 \r
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");\r
@@ -40,6 +35,7 @@ impl SceneConstructor for BasicScene {\r
             .with(|text| {\r
                 text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))\r
                     .put_center_on(DVec3::NEG_Y * 2.0)\r
+                    .set_color(manim::WHITE)\r
                     .set_fill_opacity(0.8);\r
             }),\r
         );\r
@@ -85,7 +81,7 @@ fn main() {\r
     render_scene(BasicScene, &AppOptions::default());\r
 }\r
 ```"""
-hash = "e712dc588d10bc55038691d7f4022401e0411e77"
+hash = "bc290cb1420fc26825d9a880c2646573b6048946"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/output.mp4"]
 wasm = true
