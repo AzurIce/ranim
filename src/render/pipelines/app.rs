@@ -30,7 +30,7 @@ impl AppBindGroup {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::all(),
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                         count: None,
                         ty: wgpu::BindingType::Texture {
                             sample_type: wgpu::TextureSampleType::Float { filterable: true },
@@ -40,13 +40,13 @@ impl AppBindGroup {
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
-                        visibility: wgpu::ShaderStages::all(),
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                         count: None,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 2,
-                        visibility: wgpu::ShaderStages::all(),
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                         count: None,
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,

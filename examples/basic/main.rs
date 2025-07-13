@@ -2,6 +2,7 @@ use glam::DVec3;
 use log::LevelFilter;
 use ranim::{
     animation::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
+    color::palettes::manim,
     components::ScaleHint,
     items::{
         Group,
@@ -37,6 +38,7 @@ impl SceneConstructor for BasicScene {
             .with(|text| {
                 text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
                     .put_center_on(DVec3::NEG_Y * 2.0)
+                    .set_color(manim::WHITE)
                     .set_fill_opacity(0.8);
             }),
         );
