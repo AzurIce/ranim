@@ -34,6 +34,7 @@ Ranim is an animation engine crate implemented in pure rust, inspired heavily by
 
 Runtime dependencies:
 - ffmpeg: encode videos
+  Ranim will try to use ffmpeg from system's path environment variable first, if no ffmpeg is found, ranim will automatic download ffmpeg to the current working dir.
 
 ## Installation
 
@@ -41,7 +42,7 @@ Currently, it is experimental on crates.io:
 
 ```toml
 [dependencies]
-ranim = "0.1.0-alpha.14"
+ranim = "0.1.0-alpha.17"
 ```
 
 You can also use from git for the latest updates:

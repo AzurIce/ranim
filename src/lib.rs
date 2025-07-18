@@ -24,16 +24,17 @@
 
 use std::{
     collections::HashMap,
-    fmt::Write,
     path::{Path, PathBuf},
     time::Duration,
 };
 
 use animation::EvalResult;
+#[cfg(not(target_arch = "wasm32"))]
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{ItemId, camera_frame::CameraFrame};
+use log::info;
 use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult};
 
 use render::{Renderer, primitives::RenderInstances};
@@ -43,10 +44,12 @@ use crate::utils::wgpu::WgpuContext;
 // MARK: Prelude
 /// The preludes
 pub mod prelude {
+    pub use crate::AppOptions;
     #[cfg(feature = "app")]
     pub use crate::app::run_scene_app;
-    pub use crate::{AppOptions, render_scene, render_scene_at_sec};
     pub use crate::{SceneConstructor, SceneMetaTrait};
+    #[cfg(not(target_arch = "wasm32"))]
+    pub use crate::{render_scene, render_scene_at_sec};
     pub use ranim_macros::scene;
 
     pub use crate::items::{ItemId, camera_frame::CameraFrame};
@@ -58,6 +61,7 @@ pub mod prelude {
 
 /// Colors and Palettes
 pub mod color;
+#[cfg(not(target_arch = "wasm32"))]
 mod file_writer;
 /// The core structure to encode animations
 pub mod timeline;
@@ -163,6 +167,7 @@ pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
 }
 
 /// Build the timeline with the scene, and render it
+#[cfg(not(target_arch = "wasm32"))]
 pub fn render_scene(scene: impl Scene, options: &AppOptions) {
     let meta = scene.meta();
     let timeline = build_timeline(scene);
@@ -171,6 +176,7 @@ pub fn render_scene(scene: impl Scene, options: &AppOptions) {
 }
 
 /// Build the timeline with the scene, and render it at a given timestamp
+#[cfg(not(target_arch = "wasm32"))]
 pub fn render_scene_at_sec(
     scene: impl Scene,
     sec: f64,
@@ -218,6 +224,7 @@ impl Default for AppOptions<'_> {
 }
 
 /// MARK: RanimRenderApp
+#[cfg(not(target_arch = "wasm32"))]
 struct RanimRenderApp {
     ctx: WgpuContext,
     // frame_size: (u32, u32),
@@ -239,8 +246,27 @@ struct RanimRenderApp {
     pub(crate) render_instances: RenderInstances,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl RanimRenderApp {
     fn new(options: &AppOptions, scene_name: String) -> Self {
+        info!("Checking ffmpeg...");
+        if let Ok(ffmpeg_path) = which::which("ffmpeg") {
+            info!("ffmpeg found at {ffmpeg_path:?}");
+        } else {
+            use crate::utils::download_ffmpeg;
+            info!(
+                "ffmpeg not found from path env, searching in {:?}...",
+                Path::new("./").canonicalize().unwrap()
+            );
+            if Path::new("./ffmpeg").exists() {
+                info!("ffmpeg found at current working directory")
+            } else {
+                info!("ffmpeg not found at current working directory, downloading...");
+                download_ffmpeg("./").expect("failed to download ffmpeg");
+            }
+        }
+
+        info!("Creating wgpu context...");
         let ctx = pollster::block_on(WgpuContext::new());
         let output_dir = PathBuf::from(options.output_dir);
         let renderer = Renderer::new(
@@ -295,7 +321,7 @@ impl RanimRenderApp {
                 "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} (eta {eta}) {msg}",
             )
             .unwrap()
-            .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
+            .with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| {
                 write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
             })
             .progress_chars("#>-"),
@@ -405,7 +431,7 @@ impl RanimRenderApp {
                 "[{elapsed_precise}] [{wide_bar:.cyan/blue}] capture frame {human_pos}/{human_len} (eta {eta}) {msg}",
             )
             .unwrap()
-            .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
+            .with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| {
                 write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
             })
             .progress_chars("#>-"),
