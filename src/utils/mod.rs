@@ -14,6 +14,12 @@ use std::{
     any::{Any, TypeId},
     collections::HashMap,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use std::{
+    env::current_exe,
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
+};
 
 use glam::{Mat3, Vec2, Vec3, vec2, vec3};
 
@@ -226,4 +232,62 @@ pub(crate) fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> 
     });
     output_staging_buffer.unmap();
     texture_data
+}
+
+const FFMPEG_RELEASE_URL: &str = "https://github.com/eugeneware/ffmpeg-static/releases/latest";
+
+#[allow(unused)]
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn exe_dir() -> PathBuf {
+    current_exe().unwrap().parent().unwrap().to_path_buf()
+}
+
+/// Download latest release of ffmpeg from <https://github.com/eugeneware/ffmpeg-static/releases/latest> to <target_dir>/ffmpeg
+#[cfg(not(target_arch = "wasm32"))]
+pub fn download_ffmpeg(target_dir: impl AsRef<Path>) -> Result<PathBuf, anyhow::Error> {
+    use anyhow::Context;
+    use std::io::Cursor;
+
+    use itertools::Itertools;
+    use log::info;
+
+    let target_dir = target_dir.as_ref();
+
+    let res = reqwest::blocking::get(FFMPEG_RELEASE_URL).context("failed to get release url")?;
+    let url = res.url().to_string();
+    let url = url.split("tag").collect_array::<2>().unwrap();
+    let url = format!("{}/download/{}", url[0], url[1]);
+    info!("ffmpeg release url: {url:?}");
+
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+    let url = format!("{url}/ffmpeg-win32-x64.gz");
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    let url = format!("{url}/ffmpeg-linux-x64.gz");
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    let url = format!("{url}/ffmpeg-linux-arm64.gz");
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    let url = format!("{url}/ffmpeg-darwin-x64.gz");
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    let url = format!("{url}/ffmpeg-darwin-arm64.gz");
+
+    info!("downloading ffmpeg from {url:?}...");
+
+    let res = reqwest::blocking::get(&url).context("get err")?;
+    let mut decoder =
+        flate2::bufread::GzDecoder::new(BufReader::new(Cursor::new(res.bytes().unwrap())));
+    let mut bytes = Vec::new();
+    decoder
+        .read_to_end(&mut bytes)
+        .context("GzDecoder decode err")?;
+    let ffmpeg_path = target_dir.join("ffmpeg");
+    std::fs::write(&ffmpeg_path, bytes).unwrap();
+
+    #[cfg(target_family = "unix")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        std::fs::set_permissions(&ffmpeg_path, std::fs::Permissions::from_mode(0o755))?;
+    }
+    info!("ffmpeg downloaded to {target_dir:?}");
+    Ok(ffmpeg_path)
 }

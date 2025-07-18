@@ -4,6 +4,8 @@ use std::{
     process::{Child, ChildStdin, Command, Stdio},
 };
 
+use log::info;
+
 #[derive(Debug, Clone)]
 pub struct FileWriterBuilder {
     pub file_path: PathBuf,
@@ -81,7 +83,13 @@ impl FileWriterBuilder {
             std::fs::create_dir_all(parent).unwrap();
         }
 
-        let mut command = Command::new("ffmpeg");
+        let mut command = if let Ok(ffmpeg_path) = which::which("ffmpeg") {
+            info!("using ffmpeg found from path env");
+            Command::new("ffmpeg")
+        } else {
+            info!("using ffmpeg from current working dir");
+            Command::new("./ffmpeg")
+        };
         #[rustfmt::skip]
         let command = command.args([
             "-y",
