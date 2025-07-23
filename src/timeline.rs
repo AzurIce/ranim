@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use rayon::prelude::*;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +25,12 @@ pub struct TimelineEvalResult {
     /// (`EvalResult<CameraFrame>`, `timeline idx` `animation idx`)
     pub camera_frame: (EvalResult<CameraFrame>, usize, usize),
     /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `timeline idx` `animation idx`)
-    pub visual_items: Vec<(usize, EvalResult<Box<dyn VisualItem>>, usize, usize)>,
+    pub visual_items: Vec<(
+        usize,
+        EvalResult<Box<dyn VisualItem + Send + Sync>>,
+        usize,
+        usize,
+    )>,
 }
 
 // MARK: RanimScene
@@ -92,10 +98,25 @@ impl RanimScene {
         });
         id
     }
+
     /// Consumes an [`ItemId<T>`], and convert it into [`ItemId<E>`].
     ///
     /// This insert inserts an [`ItemTimeline<E>`] into the corresponding [`ItemDynTimelines`]
     pub fn map<T: Clone + 'static, E: Clone + 'static>(
+        &mut self,
+        item_id: ItemId<T>,
+        map_value: E,
+    ) -> ItemId<E>
+    where
+        ItemTimeline<E>: Into<DynTimeline>,
+    {
+        self.map_with(item_id, move |_| map_value)
+    }
+
+    /// Consumes an [`ItemId<T>`], and convert it into [`ItemId<E>`].
+    ///
+    /// This insert inserts an [`ItemTimeline<E>`] into the corresponding [`ItemDynTimelines`]
+    pub fn map_with<T: Clone + 'static, E: Clone + 'static>(
         &mut self,
         item_id: ItemId<T>,
         map_fn: impl FnOnce(T) -> E,
@@ -171,27 +192,47 @@ impl SealedRanimScene {
     }
     /// Evaluate the state of timelines at `target_sec`
     pub fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
-        let mut items = Vec::with_capacity(self.timelines.len());
+        // let mut items = Vec::with_capacity(self.timelines.len());
 
-        let mut camera_frame = None::<(EvalResult<CameraFrame>, usize, usize)>;
+        // let mut camera_frame = None::<(EvalResult<CameraFrame>, usize, usize)>;
 
-        for timeline in &self.timelines {
-            let Some((timeline_idx, res)) = timeline.eval_sec(target_sec) else {
-                continue;
-            };
-            match res {
-                DynTimelineEvalResult::CameraFrame((res, idx)) => {
-                    camera_frame = Some((res, timeline_idx, idx))
-                }
-                DynTimelineEvalResult::VisualItem((res, idx)) => {
-                    items.push((timeline.id, res, timeline_idx, idx));
-                }
-            }
-        }
+        let (cameras, items): (Vec<_>, Vec<_>) = self
+            .timelines
+            .par_iter()
+            .filter_map(|timeline| {
+                timeline
+                    .eval_sec(target_sec)
+                    .map(|(timeline_idx, res)| match res {
+                        DynTimelineEvalResult::CameraFrame((res, idx)) => {
+                            (Some((res, timeline_idx, idx)), None)
+                        }
+                        DynTimelineEvalResult::VisualItem((res, idx)) => {
+                            (None, Some((timeline.id, res, timeline_idx, idx)))
+                        }
+                    })
+            })
+            .unzip();
+
+        let camera_frame = cameras.into_iter().flatten().next().unwrap();
+        let visual_items = items.into_iter().flatten().collect();
+
+        // for timeline in &self.timelines {
+        //     let Some((timeline_idx, res)) = timeline.eval_sec(target_sec) else {
+        //         continue;
+        //     };
+        //     match res {
+        //         DynTimelineEvalResult::CameraFrame((res, idx)) => {
+        //             camera_frame = Some((res, timeline_idx, idx))
+        //         }
+        //         DynTimelineEvalResult::VisualItem((res, idx)) => {
+        //             items.push((timeline.id, res, timeline_idx, idx));
+        //         }
+        //     }
+        // }
 
         TimelineEvalResult {
-            camera_frame: camera_frame.unwrap(),
-            visual_items: items,
+            camera_frame,
+            visual_items,
         }
     }
     /// Evaluate the state of timelines at `alpha`
@@ -386,13 +427,19 @@ impl<T: VisualItemTimelineTrait + Any> AnyVisualItemTimelineTrait for T {
 /// This is auto implemented for `ItemTimeline<T>` where `T: Clone + VisualItem + 'static`
 pub trait VisualItemTimelineTrait: TimelineFunc {
     /// Evaluate the timeline at `target_sec`
-    fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)>;
+    fn eval_sec(
+        &self,
+        target_sec: f64,
+    ) -> Option<(EvalResult<Box<dyn VisualItem + Send + Sync>>, usize)>;
 }
 
-impl<T: Clone + VisualItem + 'static> VisualItemTimelineTrait for ItemTimeline<T> {
-    fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)> {
+impl<T: Clone + VisualItem + Send + Sync + 'static> VisualItemTimelineTrait for ItemTimeline<T> {
+    fn eval_sec(
+        &self,
+        target_sec: f64,
+    ) -> Option<(EvalResult<Box<dyn VisualItem + Send + Sync>>, usize)> {
         let (item, idx) = self.eval_sec(target_sec)?;
-        let item = item.map(|item| Box::new(item) as Box<dyn VisualItem>);
+        let item = item.map(|item| Box::new(item) as Box<dyn VisualItem + Send + Sync>);
         Some((item, idx))
     }
 }
@@ -455,7 +502,7 @@ pub enum DynTimelineEvalResult {
     /// The eval result of [`ItemTimeline<CameraFrame>`]
     CameraFrame((EvalResult<CameraFrame>, usize)),
     /// The eval result of [`ItemTimeline<T>`] where `T` is a [`VisualItem`]
-    VisualItem((EvalResult<Box<dyn VisualItem>>, usize)),
+    VisualItem((EvalResult<Box<dyn VisualItem + Send + Sync>>, usize)),
 }
 
 impl ItemDynTimelines {
@@ -592,6 +639,7 @@ impl TimelineFunc for ItemDynTimelines {
 }
 
 // MARK: ItemTimeline
+// ANCHOR: ItemTimeline
 /// `ItemTimeline<T>` is used to encode animations for a single type `T`,
 /// it contains a list of [`AnimationSpan<T>`] and the corresponding metadata for each span.
 pub struct ItemTimeline<T> {
@@ -607,6 +655,7 @@ pub struct ItemTimeline<T> {
     /// When it is true, it means that it is showing.
     planning_static_start_sec: Option<f64>,
 }
+// ANCHOR_END: ItemTimeline
 
 impl<T: 'static> ItemTimeline<T> {
     /// Create a new timeline with the initial state
@@ -688,6 +737,24 @@ impl<T: Clone + 'static> ItemTimeline<T> {
         }
         self
     }
+    /// Recover to current state after [`Self::scope`]
+    ///
+    /// Equivalent to:
+    /// ```rust
+    /// let state = timeline.state().clone();
+    /// timeline.scope(scope_fn);
+    /// timeline.update(state)
+    /// ```
+    pub fn recover_scope<R, F: FnOnce(&mut Self) -> R>(&mut self, scope_fn: F) -> &mut Self {
+        let state = self.state().clone();
+        scope_fn(self);
+        self.update(state)
+    }
+    /// Scope the timeline with `scope_fn`
+    pub fn scope<R, F: FnOnce(&mut Self) -> R>(&mut self, scope_fn: F) -> &mut Self {
+        scope_fn(self);
+        self
+    }
     /// Show the item.
     ///
     /// This will start planning an static anim if there isn't an planning static anim.
@@ -727,6 +794,21 @@ impl<T: Clone + 'static> ItemTimeline<T> {
             return true;
         }
         false
+    }
+    /// Recover to current state after [`Self::play_with`]
+    pub fn recover_play_with(
+        &mut self,
+        anim_func: impl FnOnce(T) -> AnimationSpan<T>,
+    ) -> &mut Self {
+        self.recover_scope(|timeline| {
+            timeline.play_with(anim_func);
+        })
+    }
+    /// Recover to current state after [`Self::play`]
+    pub fn recover_play(&mut self, anim: AnimationSpan<T>) -> &mut Self {
+        self.recover_scope(|timeline| {
+            timeline.play(anim);
+        })
     }
     /// Plays an anim with `anim_func`.
     pub fn play_with(&mut self, anim_func: impl FnOnce(T) -> AnimationSpan<T>) -> &mut Self {
@@ -780,6 +862,7 @@ impl<T: Clone + 'static> ItemTimeline<T> {
     }
 }
 
+// ANCHOR: DynTimeline
 /// A type erased [`ItemTimeline<T>`]
 ///
 /// Currently There are two types of Timeline:
@@ -787,10 +870,11 @@ impl<T: Clone + 'static> ItemTimeline<T> {
 /// - [`DynTimeline::VisualItem`]: Can be created from [`VisualItem`], has a boxed [`AnyVisualItemTimelineTrait`] in it.
 pub enum DynTimeline {
     /// A type erased timeline for [`CameraFrame`], its inner is a boxed [`AnyTimelineTrait`].
-    CameraFrame(Box<dyn AnyTimelineTrait>),
+    CameraFrame(Box<dyn AnyTimelineTrait + Send + Sync>),
     /// A type erased timeline for [`VisualItem`], its inner is a boxed [`AnyVisualItemTimelineTrait`].
-    VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
+    VisualItem(Box<dyn AnyVisualItemTimelineTrait + Send + Sync>),
 }
+// ANCHOR_END: DynTimeline
 
 impl TimelineFunc for DynTimeline {
     fn start_sec(&self) -> Option<f64> {
@@ -828,7 +912,7 @@ impl From<ItemTimeline<CameraFrame>> for DynTimeline {
     }
 }
 
-impl<T: VisualItem + Clone + 'static> From<ItemTimeline<T>> for DynTimeline {
+impl<T: VisualItem + Clone + Send + Sync + 'static> From<ItemTimeline<T>> for DynTimeline {
     fn from(value: ItemTimeline<T>) -> Self {
         DynTimeline::VisualItem(Box::new(value))
     }

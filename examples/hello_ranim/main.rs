@@ -22,10 +22,8 @@ impl SceneConstructor for HelloRanimScene {
         });
 
         let r_square = r.insert(square);
-        {
-            let timeline = r.timeline_mut(&r_square);
-            timeline.play_with(|square| square.fade_in());
-        };
+        r.timeline_mut(&r_square)
+            .play_with(|square| square.fade_in());
 
         let circle = Circle::new(2.0).with(|circle| {
             circle
@@ -33,15 +31,16 @@ impl SceneConstructor for HelloRanimScene {
                 .rotate(PI / 4.0 + PI, DVec3::Z);
         });
 
-        let r_vitem = r.map(r_square, VItem::from);
+        let r_vitem = r.map_with(r_square, VItem::from);
         {
             let timeline = r.timeline_mut(&r_vitem);
             timeline.play_with(|state| state.transform_to(circle.into()));
             timeline.forward(1.0);
             let circle = timeline.state().clone();
-            timeline.play_with(|circle| circle.unwrite());
-            timeline.play(circle.write());
-            timeline.play_with(|circle| circle.fade_out());
+            timeline
+                .recover_play_with(|vitem| vitem.unwrite())
+                .play(circle.write())
+                .play_with(|vitem| vitem.fade_out());
         };
     }
 }

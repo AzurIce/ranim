@@ -78,16 +78,15 @@ impl SceneConstructor for HanoiScene {
             let top_dst = top_disk_y(idx_dst);
             let r_disk = r_disks[idx_src].pop().unwrap();
 
-            {
-                let timeline = r.timeline_mut(&r_disk);
-                timeline.play_with(|disk| {
+            r.timeline_mut(&r_disk)
+                .play_with(|disk| {
                     disk.transform(|data| {
                         data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
                     })
                     .with_duration(anim_duration)
                     .with_rate_func(ease_in_quad)
-                });
-                timeline.play_with(|disk| {
+                })
+                .play_with(|disk| {
                     disk.transform(|data| {
                         data.shift(dvec3(
                             (idx_dst as f64 - idx_src as f64) * rod_section_width,
@@ -97,15 +96,14 @@ impl SceneConstructor for HanoiScene {
                     })
                     .with_duration(anim_duration)
                     .with_rate_func(linear)
-                });
-                timeline.play_with(|disk| {
+                })
+                .play_with(|disk| {
                     disk.transform(|data| {
                         data.shift(dvec3(0.0, top_dst - 3.0, 0.0));
                     })
                     .with_duration(anim_duration)
                     .with_rate_func(ease_out_quad)
                 });
-            }
             r.timelines_mut().sync();
             r_disks[idx_dst].push(r_disk);
         };

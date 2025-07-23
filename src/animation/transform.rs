@@ -1,14 +1,14 @@
 use super::{AnimationSpan, EvalDynamic};
 use crate::{
-    animation::Evaluator,
+    animation::{BasicRequirement, Evaluator},
     traits::{Alignable, Interpolatable},
     utils::rate_functions::smooth,
 };
 
 // ANCHOR: TransformRequirement
 /// The requirement of [`Transform`]
-pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
-impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
+pub trait TransformRequirement: BasicRequirement + Alignable + Interpolatable {}
+impl<T: BasicRequirement + Alignable + Interpolatable> TransformRequirement for T {}
 // ANCHOR_END: TransformRequirement
 
 /// The methods to create animations for `T` that satisfies [`TransformRequirement`]

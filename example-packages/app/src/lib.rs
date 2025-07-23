@@ -32,7 +32,7 @@ impl SceneConstructor for HelloRanimScene {
                 .rotate(PI / 4.0 + PI, DVec3::Z);
         });
 
-        let r_vitem = r.map(r_square, VItem::from);
+        let r_vitem = r.map_with(r_square, VItem::from);
         {
             let timeline = r.timeline_mut(&r_vitem);
             timeline.play_with(|state| state.transform_to(circle.into()));

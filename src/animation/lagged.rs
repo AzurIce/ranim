@@ -1,11 +1,11 @@
 use crate::{
-    animation::{AnimationSpan, EvalDynamic, Evaluator},
+    animation::{AnimationSpan, BasicRequirement, EvalDynamic, Evaluator},
     items::Group,
 };
 
 // MARK: LaggedAnim
 /// The methods to create animations for `Group<T>`
-pub trait LaggedAnim<T> {
+pub trait LaggedAnim<T: BasicRequirement> {
     /// Create a [`Lagged`] anim.
     fn lagged(
         self,
@@ -14,7 +14,7 @@ pub trait LaggedAnim<T> {
     ) -> AnimationSpan<Group<T>>;
 }
 
-impl<T: Clone + 'static> LaggedAnim<T> for Group<T> {
+impl<T: BasicRequirement + 'static> LaggedAnim<T> for Group<T> {
     fn lagged(
         self,
         lag_ratio: f64,

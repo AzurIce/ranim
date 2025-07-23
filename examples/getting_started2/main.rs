@@ -38,20 +38,13 @@ impl SceneConstructor for GettingStarted2Scene {
             circle.set_color(manim::RED_C);
         });
         let r_vitem = r.insert(VItem::from(square));
-        {
-            let timeline = r.timeline_mut(&r_vitem);
-            timeline
-                .forward(1.0)
-                .play_with(|vitem| vitem.create())
-                .play_with(|vitem| {
-                    vitem
-                        .transform_to(VItem::from(circle.clone()))
-                        .with_rate_func(linear)
-                })
-                .play_with(|vitem| vitem.unwrite());
-        }
+        r.timeline_mut(&r_vitem)
+            .forward(1.0)
+            .play_with(|vitem| vitem.create())
+            .play_with(|vitem| vitem.transform_to(circle.into()).with_rate_func(linear))
+            .play_with(|vitem| vitem.unwrite());
 
-        let r_rect: ItemId<VItem> = r.map(r_rect, VItem::from);
+        let r_rect: ItemId<VItem> = r.map_with(r_rect, VItem::from);
         r.timeline_mut(&r_rect).play_with(|rect| rect.uncreate());
     }
 }

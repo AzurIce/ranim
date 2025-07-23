@@ -1,5 +1,5 @@
 use super::{AnimationSpan, EvalDynamic};
-use crate::animation::Evaluator;
+use crate::animation::{BasicRequirement, Evaluator};
 use crate::items::vitem::DEFAULT_STROKE_WIDTH;
 use crate::traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth};
 use crate::utils::rate_functions::smooth;
@@ -8,8 +8,8 @@ use log::warn;
 // MARK: Creation
 
 /// The requirement of [`Create`] and [`UnCreate`]
-pub trait CreationRequirement: Clone + Partial + Empty + Interpolatable {}
-impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
+pub trait CreationRequirement: BasicRequirement + Partial + Empty + Interpolatable {}
+impl<T: BasicRequirement + Partial + Empty + Interpolatable> CreationRequirement for T {}
 
 /// The methods to create animations for `T` that satisfies [`CreationRequirement`]
 pub trait CreationAnim<T: CreationRequirement + 'static> {

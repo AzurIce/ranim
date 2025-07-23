@@ -16,6 +16,10 @@ use crate::utils::rate_functions::linear;
 use log::trace;
 use std::{any::Any, fmt::Debug, sync::Arc};
 
+/// The basic requirement for animated item
+pub trait BasicRequirement: Any + Clone + Send + Sync {}
+impl<T: Any + Clone + Send + Sync> BasicRequirement for T {}
+
 // MARK: Eval
 // ANCHOR: EvalDynamic
 /// This is the core of any animation, an animation is basically a function on time.
@@ -38,7 +42,7 @@ pub enum Evaluator<T> {
         /// The type name of the evaluator
         type_name: String,
         /// The inner dynamic evaluator
-        inner: Box<dyn EvalDynamic<T>>,
+        inner: Box<dyn EvalDynamic<T> + Send + Sync>,
     },
     /// A static evaluator
     Static(Arc<T>),
@@ -49,7 +53,7 @@ impl<T> Evaluator<T> {
     // Any is for type name
     // TODO: should I include Send here directly?
     /// Creates a dynamic evaluator
-    pub fn new_dynamic<F: EvalDynamic<T> + Any + 'static>(func: F) -> Self {
+    pub fn new_dynamic<F: EvalDynamic<T> + Any + Send + Sync + 'static>(func: F) -> Self {
         let type_name = std::any::type_name::<F>().to_string();
         Self::Dynamic {
             type_name,

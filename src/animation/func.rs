@@ -1,21 +1,17 @@
 use crate::{
-    animation::{AnimationSpan, EvalDynamic, Evaluator},
+    animation::{AnimationSpan, BasicRequirement, EvalDynamic, Evaluator},
     utils::rate_functions::smooth,
 };
 
-// MARK: Require Trait
-/// The requirement for [`Func`]
-pub trait FuncRequirement: Clone {}
-
 // MARK: Anim Trait
 /// The methods to create animations for `T` that satisfies [`FuncRequirement`]
-pub trait FuncAnim<T: FuncRequirement + 'static> {
+pub trait FuncAnim<T: BasicRequirement + 'static> {
     /// Create a [`Func`] anim.
-    fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationSpan<T>;
+    fn func(self, f: impl Fn(&T, f64) -> T + Send + Sync + 'static) -> AnimationSpan<T>;
 }
 
-impl<T: FuncRequirement + 'static> FuncAnim<T> for T {
-    fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationSpan<T> {
+impl<T: BasicRequirement + 'static> FuncAnim<T> for T {
+    fn func(self, f: impl Fn(&T, f64) -> T + Send + Sync + 'static) -> AnimationSpan<T> {
         AnimationSpan::from_evaluator(Evaluator::new_dynamic(Func::new(self.clone(), f)))
             .with_rate_func(smooth)
     }
@@ -25,15 +21,15 @@ impl<T: FuncRequirement + 'static> FuncAnim<T> for T {
 /// An func anim.
 ///
 /// This simply use the given func to eval the animation state.
-pub struct Func<T: FuncRequirement> {
+pub struct Func<T: BasicRequirement> {
     src: T,
     #[allow(clippy::type_complexity)]
-    f: Box<dyn Fn(&T, f64) -> T>,
+    f: Box<dyn Fn(&T, f64) -> T + Send + Sync>,
 }
 
-impl<T: FuncRequirement> Func<T> {
+impl<T: BasicRequirement> Func<T> {
     /// Constructor
-    pub fn new(target: T, f: impl Fn(&T, f64) -> T + 'static) -> Self {
+    pub fn new(target: T, f: impl Fn(&T, f64) -> T + Send + Sync + 'static) -> Self {
         Self {
             src: target,
             f: Box::new(f),
@@ -41,7 +37,7 @@ impl<T: FuncRequirement> Func<T> {
     }
 }
 
-impl<T: FuncRequirement> EvalDynamic<T> for Func<T> {
+impl<T: BasicRequirement> EvalDynamic<T> for Func<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         (self.f)(&self.src, alpha)
     }

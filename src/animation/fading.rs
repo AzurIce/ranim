@@ -1,12 +1,12 @@
 use super::{AnimationSpan, EvalDynamic};
-use crate::animation::Evaluator;
+use crate::animation::{BasicRequirement, Evaluator};
 use crate::traits::{Interpolatable, Opacity};
 use crate::utils::rate_functions::smooth;
 
 // MARK: Require Trait
 /// The requirement of [`FadeIn`] and [`FadeOut`]
-pub trait FadingRequirement: Opacity + Interpolatable + Clone {}
-impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
+pub trait FadingRequirement: BasicRequirement + Opacity + Interpolatable {}
+impl<T: BasicRequirement + Opacity + Interpolatable> FadingRequirement for T {}
 
 // MARK: Anim Trait
 /// The methods to create animations for `T` that satisfies [`FadingRequirement`]

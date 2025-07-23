@@ -1,6 +1,6 @@
 use log::LevelFilter;
 use ranim::{
-    animation::{creation::WritingAnim, transform::TransformAnim},
+    animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -20,18 +20,19 @@ impl SceneConstructor for GettingStarted1Scene {
             square.set_color(manim::BLUE_C);
         });
 
+        let r_square = r.insert(square);
+        r.timeline_mut(&r_square).play_with(|s| s.fade_in());
+
         let circle = Circle::new(2.0).with(|circle| {
             circle.set_color(manim::RED_C);
         });
 
         // In order to do more low-level opeerations,
         // sometimes we need to convert the item to a low-level item.
-        let r_vitem = r.insert(VItem::from(square));
-        {
-            let timeline = r.timeline_mut(&r_vitem);
-            timeline.play_with(|vitem| vitem.transform_to(VItem::from(circle.clone())));
-            timeline.play_with(|vitem| vitem.unwrite());
-        }
+        let r_vitem = r.map_with(r_square, VItem::from);
+        r.timeline_mut(&r_vitem)
+            .play_with(|vitem| vitem.transform_to(circle.into()))
+            .play_with(|vitem| vitem.unwrite());
     }
 }
 // ANCHOR_END: construct
