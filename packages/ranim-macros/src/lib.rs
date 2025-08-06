@@ -4,7 +4,34 @@ use proc_macro::TokenStream;
 use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::Span;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields, Ident, parse_macro_input};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, Ident, ItemFn};
+
+/// 标记函数的宏，将函数信息收集到 linkme 分布式切片中
+#[proc_macro_attribute]
+pub fn preview(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let ranim = ranim_path();
+    let input_fn = parse_macro_input!(item as ItemFn);
+    let fn_name = &input_fn.sig.ident;
+    let fn_name_str = fn_name.to_string();
+    
+    // 生成唯一的静态变量名
+    let static_name = syn::Ident::new(
+        &format!("__PREVIEW_FUNC_{}", fn_name.to_string().to_uppercase()),
+        fn_name.span()
+    );
+    
+    let expanded = quote! {
+        #input_fn
+        
+        #[#ranim::linkme::distributed_slice(#ranim::PREVIEW_FUNCS)]
+        static #static_name: #ranim::PreviewFunc = #ranim::PreviewFunc {
+            name: #fn_name_str,
+            fn_ptr: #fn_name,
+        };
+    };
+    
+    TokenStream::from(expanded)
+}
 
 const RANIM_CRATE_NAME: &str = "ranim";
 

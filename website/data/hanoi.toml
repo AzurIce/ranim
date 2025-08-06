@@ -32,7 +32,7 @@ fn solve_hanoi(\r
 struct HanoiScene(pub usize);\r
 \r
 impl SceneConstructor for HanoiScene {\r
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
         let n = self.0;\r
         let total_sec = 10.0;\r
         let rod_width = 0.4;\r

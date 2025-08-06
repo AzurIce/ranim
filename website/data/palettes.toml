@@ -14,7 +14,7 @@ use ranim::{\r
 struct PalettesScene;\r
 \r
 impl SceneConstructor for PalettesScene {\r
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
         let padded_frame_size = frame_size * 0.9;\r
 \r

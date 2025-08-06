@@ -17,7 +17,7 @@ use ranim::{\r
 struct GettingStarted1Scene;\r
 \r
 impl SceneConstructor for GettingStarted1Scene {\r
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
         // A Square with size 2.0 and color blue\r
         let square = Square::new(2.0).with(|square| {\r
             square.set_color(manim::BLUE_C);\r

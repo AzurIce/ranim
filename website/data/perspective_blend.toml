@@ -19,7 +19,7 @@ use ranim::{\r
 struct PerspectiveBlendScene;\r
 \r
 impl SceneConstructor for PerspectiveBlendScene {\r
-    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {\r
+    fn construct(&self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {\r
         r.timeline_mut(&r_cam).update_with(|cam| {\r
             cam.pos = DVec3::Z * 5.0;\r
         });\r

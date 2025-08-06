@@ -17,7 +17,7 @@ use winit::{
 };
 
 use crate::{
-    Scene, SceneMeta,
+    Scene, SceneConstructor,
     animation::EvalResult,
     app::egui_tools::EguiRenderer,
     build_timeline,
@@ -58,7 +58,7 @@ impl TimelineInfo {
 
 #[allow(unused)]
 struct AppState {
-    meta: SceneMeta,
+    title: String,
     timeline: SealedRanimScene,
     // app_options: AppOptions<'a>,
     // timeline: RanimTimeline,
@@ -69,13 +69,12 @@ struct AppState {
 }
 
 impl AppState {
-    fn new(scene: impl Scene) -> Self {
-        let meta = scene.meta();
-        let timeline = build_timeline(scene);
+    fn new_with_title(scene_constructor: &dyn SceneConstructor, title: String) -> Self {
+        let timeline = build_timeline(scene_constructor);
         let timeline_infos = timeline.get_timeline_infos();
         // let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
         Self {
-            meta,
+            title,
             // renderer,
             last_sec: -1.0,
             render_instances: RenderInstances::default(),
@@ -83,6 +82,9 @@ impl AppState {
             timeline,
         }
     }
+    // fn new(scene_constructor: &dyn SceneConstructor) -> Self {
+    //     Self::new_with_title(scene_constructor, "preview_app".to_string())
+    // }
     pub fn prepare(&mut self, ctx: &WgpuContext, app_renderer: &mut AppRenderer) {
         #[cfg(feature = "profiling")]
         profiling::scope!("frame");
@@ -200,10 +202,10 @@ struct WinitApp {
 }
 
 impl WinitApp {
-    fn new(scene: impl Scene, event_loop: &EventLoop<WgpuContext>) -> Self {
+    fn new(app_state: AppState, event_loop: &EventLoop<WgpuContext>) -> Self {
         Self {
             event_loop_proxy: Some(event_loop.create_proxy()),
-            app_state: AppState::new(scene),
+            app_state,
 
             size: (0, 0),
             window: None,
@@ -490,7 +492,10 @@ pub fn run_scene_app(scene: impl Scene) {
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
     #[allow(unused_mut)]
-    let mut app = WinitApp::new(scene, &event_loop);
+    let mut app = WinitApp::new(
+        AppState::new_with_title(&scene, scene.meta().name.clone()),
+        &event_loop,
+    );
 
     #[cfg(target_arch = "wasm32")]
     {

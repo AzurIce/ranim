@@ -16,7 +16,7 @@ use ranim::{\r
 struct ArcBetweenPointsScene;\r
 \r
 impl SceneConstructor for ArcBetweenPointsScene {\r
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
         let center = dvec2(0.0, 0.0);\r
 \r
         let start_color = color!("#FF8080FF");\r

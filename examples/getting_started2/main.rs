@@ -17,7 +17,7 @@ use ranim::{
 struct GettingStarted2Scene;
 
 impl SceneConstructor for GettingStarted2Scene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
             rect.set_stroke_color(manim::GREEN_C);
         });
