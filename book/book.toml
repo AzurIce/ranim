@@ -10,7 +10,10 @@ build-dir = "../website/static/book/"
 [preprocessor.katex]
 after = ["links"]
 
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
 [output.html]
 site-url = "/book/"
 additional-css = ["theme/pagetoc.css"]
-additional-js  = ["theme/pagetoc.js"]
+additional-js  = ["theme/pagetoc.js", "mermaid.min.js", "mermaid-init.js"]

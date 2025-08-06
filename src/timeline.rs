@@ -207,7 +207,7 @@ impl SealedRanimScene {
             // .take(MAX_TIMELINE_CNT)
             .map(|timeline| ItemDynTimelinesInfo {
                 id: timeline.id,
-                animation_infos: timeline.as_timeline().get_animation_infos(),
+                animation_infos: (timeline as &dyn TimelineFunc).get_animation_infos(),
             })
             .collect()
     }
@@ -350,37 +350,14 @@ where
 
 // MARK: TimelineTrait
 /// Any + TimelineFunc
-pub trait AnyTimelineTrait: TimelineFunc + Any {
-    /// As a reference of [`TimelineFunc`]
-    fn as_timeline(&self) -> &dyn TimelineFunc;
-    /// As a mutable reference of [`TimelineFunc`]
-    fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc;
-}
-impl<T: TimelineFunc + Any> AnyTimelineTrait for T {
-    fn as_timeline(&self) -> &dyn TimelineFunc {
-        self
-    }
-    fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc {
-        self
-    }
-}
+pub trait AnyTimelineFunc: TimelineFunc + Any {}
+impl<T: TimelineFunc + Any> AnyTimelineFunc for T {}
 
 /// Any + VisualItemTimelineTrait
-pub trait AnyVisualItemTimelineTrait: VisualItemTimelineTrait + Any {
-    /// As a reference of [`TimelineFunc`]
-    fn as_timeline(&self) -> &dyn TimelineFunc;
-    /// As a mutable reference of [`TimelineFunc`]
-    fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc;
-}
-impl<T: VisualItemTimelineTrait + Any> AnyVisualItemTimelineTrait for T {
-    fn as_timeline(&self) -> &dyn TimelineFunc {
-        self
-    }
-    fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc {
-        self
-    }
-}
+pub trait AnyVisualItemTimelineTrait: VisualItemTimelineTrait + Any {}
+impl<T: VisualItemTimelineTrait + Any> AnyVisualItemTimelineTrait for T {}
 
+// ANCHOR: VisualItemTimelineTrait
 /// A visual item timeline, which can eval to `EvalResult<Box<dyn VisualItem>>`.
 ///
 /// This is auto implemented for `ItemTimeline<T>` where `T: Clone + VisualItem + 'static`
@@ -388,6 +365,7 @@ pub trait VisualItemTimelineTrait: TimelineFunc {
     /// Evaluate the timeline at `target_sec`
     fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)>;
 }
+// ANCHOR_END: VisualItemTimelineTrait
 
 impl<T: Clone + VisualItem + 'static> VisualItemTimelineTrait for ItemTimeline<T> {
     fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<Box<dyn VisualItem>>, usize)> {
@@ -443,13 +421,16 @@ pub trait TimelineFunc {
     fn type_name(&self) -> &str;
 }
 
+// ANCHOR: ItemDynTimelines
 /// A item timeline which contains multiple [`DynTimeline`], so
 /// that it can contains multiple [`ItemTimeline<T>`] in different type of `T`.
 pub struct ItemDynTimelines {
     id: usize,
     timelines: Vec<DynTimeline>,
 }
+// ANCHOR_END: ItemDynTimelines
 
+// MARK: DynTimelineEvalResult
 /// The eval result of [`ItemDynTimelines`]
 pub enum DynTimelineEvalResult {
     /// The eval result of [`ItemTimeline<CameraFrame>`]
@@ -592,14 +573,14 @@ impl TimelineFunc for ItemDynTimelines {
 }
 
 // MARK: ItemTimeline
+// ANCHOR: ItemTimeline
 /// `ItemTimeline<T>` is used to encode animations for a single type `T`,
 /// it contains a list of [`AnimationSpan<T>`] and the corresponding metadata for each span.
 pub struct ItemTimeline<T> {
     type_name: String,
     anims: Vec<(AnimationSpan<T>, std::ops::Range<f64>)>,
-    // extractor: Option<E>,
 
-    // State for building the clip
+    // Followings are states use while constructing
     cur_sec: f64,
     /// The state used for static anim.
     state: T,
@@ -607,6 +588,7 @@ pub struct ItemTimeline<T> {
     /// When it is true, it means that it is showing.
     planning_static_start_sec: Option<f64>,
 }
+// ANCHOR_END: ItemTimeline
 
 impl<T: 'static> ItemTimeline<T> {
     /// Create a new timeline with the initial state
@@ -780,17 +762,20 @@ impl<T: Clone + 'static> ItemTimeline<T> {
     }
 }
 
+// MARK: DynTimeline
+// ANCHOR: DynTimeline
 /// A type erased [`ItemTimeline<T>`]
 ///
 /// Currently There are two types of Timeline:
-/// - [`DynTimeline::CameraFrame`]: Can be created from [`CameraFrame`], has a boxed [`AnyTimelineTrait`] in it.
+/// - [`DynTimeline::CameraFrame`]: Can be created from [`CameraFrame`], has a boxed [`AnyTimelineFunc`] in it.
 /// - [`DynTimeline::VisualItem`]: Can be created from [`VisualItem`], has a boxed [`AnyVisualItemTimelineTrait`] in it.
 pub enum DynTimeline {
-    /// A type erased timeline for [`CameraFrame`], its inner is a boxed [`AnyTimelineTrait`].
-    CameraFrame(Box<dyn AnyTimelineTrait>),
+    /// A type erased timeline for [`CameraFrame`], its inner is a boxed [`AnyTimelineFunc`].
+    CameraFrame(Box<dyn AnyTimelineFunc>),
     /// A type erased timeline for [`VisualItem`], its inner is a boxed [`AnyVisualItemTimelineTrait`].
     VisualItem(Box<dyn AnyVisualItemTimelineTrait>),
 }
+// ANCHOR_END: DynTimeline
 
 impl TimelineFunc for DynTimeline {
     fn start_sec(&self) -> Option<f64> {
@@ -838,15 +823,16 @@ impl DynTimeline {
     /// As a ref of [`TimelineFunc`]
     pub fn as_timeline(&self) -> &dyn TimelineFunc {
         match self {
-            DynTimeline::CameraFrame(timeline) => timeline.as_timeline(),
-            DynTimeline::VisualItem(timeline) => timeline.as_timeline(),
+            DynTimeline::CameraFrame(timeline) => timeline.as_ref() as &dyn TimelineFunc,
+            DynTimeline::VisualItem(timeline) => timeline.as_ref() as &dyn TimelineFunc,
         }
     }
     /// As a mut ref of [`TimelineFunc`]
     pub fn as_timeline_mut(&mut self) -> &mut dyn TimelineFunc {
         match self {
-            DynTimeline::CameraFrame(timeline) => timeline.as_timeline_mut(),
-            DynTimeline::VisualItem(timeline) => timeline.as_timeline_mut(),
+            DynTimeline::CameraFrame(timeline) => timeline.as_mut() as &mut dyn TimelineFunc,
+
+            DynTimeline::VisualItem(timeline) => timeline.as_mut() as &mut dyn TimelineFunc,
         }
     }
     /// As a ref of [`Any`]
