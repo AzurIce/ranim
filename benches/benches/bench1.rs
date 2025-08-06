@@ -15,7 +15,7 @@ use ranim::{
 struct StaticSquareScene(pub usize);
 
 impl SceneConstructor for StaticSquareScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64;
 
@@ -40,7 +40,7 @@ impl SceneConstructor for StaticSquareScene {
 struct TransformSquareScene(pub usize);
 
 impl SceneConstructor for TransformSquareScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let buff = 0.1;
         let size = 8.0 / self.0 as f64 - buff;
 
@@ -118,13 +118,13 @@ fn eval_benchmark(c: &mut Criterion) {
     // 测试不同规模的场景
     for n in [10, 100, 1000, 10000].iter() {
         group.bench_with_input(BenchmarkId::new("eval_static_squares", n), n, |b, n| {
-            let timeline = build_timeline(StaticSquareScene(*n));
+            let timeline = build_timeline(&StaticSquareScene(*n));
             b.iter(|| {
                 timeline.eval_alpha(0.5);
             });
         });
         group.bench_with_input(BenchmarkId::new("eval_transform_squares", n), n, |b, n| {
-            let timeline = build_timeline(TransformSquareScene(*n));
+            let timeline = build_timeline(&TransformSquareScene(*n));
             b.iter(|| {
                 timeline.eval_alpha(0.5);
             });

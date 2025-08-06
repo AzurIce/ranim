@@ -28,18 +28,20 @@ use std::{
     time::Duration,
 };
 
+pub use linkme;
 use animation::EvalResult;
 #[cfg(not(target_arch = "wasm32"))]
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{ItemId, camera_frame::CameraFrame};
+use linkme::distributed_slice;
 use log::info;
 use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult};
 
 use render::{Renderer, primitives::RenderInstances};
 
-use crate::utils::wgpu::WgpuContext;
+use crate::{app::run_scene_app, utils::wgpu::WgpuContext};
 
 // MARK: Prelude
 /// The preludes
@@ -50,7 +52,7 @@ pub mod prelude {
     pub use crate::{SceneConstructor, SceneMetaTrait};
     #[cfg(not(target_arch = "wasm32"))]
     pub use crate::{render_scene, render_scene_at_sec};
-    pub use ranim_macros::scene;
+    pub use ranim_macros::{scene, preview};
 
     pub use crate::items::{ItemId, camera_frame::CameraFrame};
     pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};
@@ -80,6 +82,41 @@ pub mod items;
 pub mod render;
 /// Utils
 pub mod utils;
+
+/// 函数信息结构体
+#[derive(Debug, Clone, Copy)]
+pub struct PreviewFunc {
+    pub name: &'static str,
+    pub fn_ptr: fn() -> Box<dyn SceneConstructor>,
+}
+
+/// 用于收集标记函数的分布式切片
+#[distributed_slice]
+pub static PREVIEW_FUNCS: [PreviewFunc] = [..];
+
+pub fn get_funcs() {
+    println!("收集到的函数列表:");
+    for (index, func_info) in PREVIEW_FUNCS.iter().enumerate() {
+        let ptr = func_info.fn_ptr;
+        println!(
+            "  {}. 函数名: {}, 地址: {:p}",
+            index + 1,
+            func_info.name,
+            ptr
+        );
+    }
+    println!("总共收集到 {} 个函数", PREVIEW_FUNCS.len());
+}
+
+pub fn run_preview() {
+    get_funcs();
+    let func = PREVIEW_FUNCS[0];
+    let scene = (func.fn_ptr)();
+    run_scene_app((scene, SceneMeta {
+        name: func.name.to_string(),
+    }));
+}
+
 
 #[cfg(feature = "profiling")]
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
@@ -124,7 +161,7 @@ pub trait SceneMetaTrait {
 /// struct HelloWorld;
 ///
 /// impl SceneConstructor for HelloWorld {
-///     fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
+///     fn construct(&self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
 ///         // ...
 ///     }
 /// }
@@ -133,8 +170,14 @@ pub trait Scene: SceneConstructor + SceneMetaTrait {}
 impl<T: SceneConstructor + SceneMetaTrait> Scene for T {}
 
 impl<C: SceneConstructor, M> SceneConstructor for (C, M) {
-    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {
+    fn construct(&self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {
         self.0.construct(r, r_cam);
+    }
+}
+
+impl SceneConstructor for Box<dyn SceneConstructor> {
+    fn construct(&self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {
+        self.as_ref().construct(r, r_cam);
     }
 }
 
@@ -144,18 +187,24 @@ impl<C, M: SceneMetaTrait> SceneMetaTrait for (C, M) {
     }
 }
 
+impl SceneMetaTrait for SceneMeta {
+    fn meta(&self) -> SceneMeta {
+        self.clone()
+    }
+}
+
 // ANCHOR: SceneConstructor
 /// A constructor of a [`RanimScene`]
 pub trait SceneConstructor {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>);
+    fn construct(&self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>);
 }
 // ANCHOR_END: SceneConstructor
 
 /// A helper function to build a [`SealedRanimScene`] from a [`SceneConstructor`]
-pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
+pub fn build_timeline(constructor: &dyn SceneConstructor) -> SealedRanimScene {
     let mut timeline = RanimScene::new();
     {
         let cam = items::camera_frame::CameraFrame::new();
@@ -170,7 +219,7 @@ pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
 #[cfg(not(target_arch = "wasm32"))]
 pub fn render_scene(scene: impl Scene, options: &AppOptions) {
     let meta = scene.meta();
-    let timeline = build_timeline(scene);
+    let timeline = build_timeline(&scene);
     let mut app = RanimRenderApp::new(options, meta.name);
     app.render_timeline(timeline);
 }
@@ -184,7 +233,7 @@ pub fn render_scene_at_sec(
     options: &AppOptions,
 ) {
     let meta = scene.meta();
-    let timeline = build_timeline(scene);
+    let timeline = build_timeline(&scene);
     let mut app = RanimRenderApp::new(options, meta.name);
     app.render_timeline_frame(&timeline, sec, output_file);
 }

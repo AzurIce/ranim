@@ -90,6 +90,8 @@ typst-kit = { version = "0.13.1", default-features = false, features = [
 typst-svg = "0.13.1"
 chrono = "0.4.41"
 reqwest = "0.12.22"
+slotmap = "1.0.7"
+linkme = "0.3.33"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 egui-winit = { version = "0.32.0", optional = true }

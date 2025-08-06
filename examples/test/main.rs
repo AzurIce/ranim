@@ -31,7 +31,7 @@ use ranim::{
 struct TestScene;
 
 impl SceneConstructor for TestScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let n = 8;
         let arcs = (0..n)
             .map(|i| {

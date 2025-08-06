@@ -13,7 +13,7 @@ use ranim::{
 struct ArcScene;
 
 impl SceneConstructor for ArcScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         // let frame_size = app.camera().size;
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
         let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
@@ -59,6 +59,11 @@ impl SceneConstructor for ArcScene {
     }
 }
 
+#[preview]
+fn preview_arc() -> Box<dyn SceneConstructor> {
+    Box::new(ArcScene)
+}
+
 fn main() {
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -73,7 +78,9 @@ fn main() {
     }
 
     #[cfg(feature = "app")]
-    run_scene_app(ArcScene);
-    #[cfg(not(feature = "app"))]
-    render_scene(ArcScene, &AppOptions::default());
+    ranim::run_preview();
+    // #[cfg(feature = "app")]
+    // run_scene_app(ArcScene);
+    // #[cfg(not(feature = "app"))]
+    // render_scene(ArcScene, &AppOptions::default());
 }

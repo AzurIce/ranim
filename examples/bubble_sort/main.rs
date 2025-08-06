@@ -15,7 +15,7 @@ use ranim::{
 struct BubbleSortScene(pub usize);
 
 impl SceneConstructor for BubbleSortScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
+    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
         let num = self.0;
 
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
