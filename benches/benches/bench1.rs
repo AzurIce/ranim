@@ -2,6 +2,7 @@ use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion
 use itertools::Itertools;
 use ranim::{
     animation::transform::TransformAnim,
+    build_timeline,
     glam::{DVec3, dvec3},
     items::vitem::{
         VItem,
@@ -109,5 +110,29 @@ fn render_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, render_benchmark);
+fn eval_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Evaluating");
+    group.sampling_mode(SamplingMode::Linear).sample_size(10);
+    // rayon::ThreadPoolBuilder::new().build_global().unwrap();
+
+    // 测试不同规模的场景
+    for n in [10, 100, 1000, 10000].iter() {
+        group.bench_with_input(BenchmarkId::new("eval_static_squares", n), n, |b, n| {
+            let timeline = build_timeline(StaticSquareScene(*n));
+            b.iter(|| {
+                timeline.eval_alpha(0.5);
+            });
+        });
+        group.bench_with_input(BenchmarkId::new("eval_transform_squares", n), n, |b, n| {
+            let timeline = build_timeline(TransformSquareScene(*n));
+            b.iter(|| {
+                timeline.eval_alpha(0.5);
+            });
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, render_benchmark, eval_benchmark);
 criterion_main!(benches);
