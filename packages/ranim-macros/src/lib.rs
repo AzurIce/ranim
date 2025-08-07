@@ -24,6 +24,7 @@ pub fn preview(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #input_fn
         
         #[#ranim::linkme::distributed_slice(#ranim::PREVIEW_FUNCS)]
+        #[linkme(crate = #ranim::linkme)]
         static #static_name: #ranim::PreviewFunc = #ranim::PreviewFunc {
             name: #fn_name_str,
             fn_ptr: #fn_name,
