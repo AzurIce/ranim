@@ -28,20 +28,20 @@ use std::{
     time::Duration,
 };
 
-pub use linkme;
 use animation::EvalResult;
 #[cfg(not(target_arch = "wasm32"))]
 use file_writer::{FileWriter, FileWriterBuilder};
 pub use glam;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use items::{ItemId, camera_frame::CameraFrame};
+pub use linkme;
 use linkme::distributed_slice;
 use log::info;
 use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult};
 
 use render::{Renderer, primitives::RenderInstances};
 
-use crate::{app::run_scene_app, utils::wgpu::WgpuContext};
+use crate::utils::wgpu::WgpuContext;
 
 // MARK: Prelude
 /// The preludes
@@ -52,7 +52,7 @@ pub mod prelude {
     pub use crate::{SceneConstructor, SceneMetaTrait};
     #[cfg(not(target_arch = "wasm32"))]
     pub use crate::{render_scene, render_scene_at_sec};
-    pub use ranim_macros::{scene, preview};
+    pub use ranim_macros::{preview, scene};
 
     pub use crate::items::{ItemId, camera_frame::CameraFrame};
     pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};
@@ -83,7 +83,6 @@ pub mod render;
 /// Utils
 pub mod utils;
 
-/// 函数信息结构体
 #[derive(Debug, Clone, Copy)]
 pub struct PreviewFunc {
     pub name: &'static str,
@@ -93,6 +92,18 @@ pub struct PreviewFunc {
 /// 用于收集标记函数的分布式切片
 #[distributed_slice]
 pub static PREVIEW_FUNCS: [PreviewFunc] = [..];
+
+/// C ABI 导出函数，用于动态库加载
+#[unsafe(no_mangle)]
+pub extern "C" fn get_func_i(i: usize) -> *const PreviewFunc {
+    &PREVIEW_FUNCS[i]
+}
+
+/// 获取函数数量的 C ABI 函数
+#[unsafe(no_mangle)]
+pub extern "C" fn get_func_count() -> usize {
+    PREVIEW_FUNCS.len()
+}
 
 pub fn get_funcs() {
     println!("收集到的函数列表:");
@@ -108,15 +119,18 @@ pub fn get_funcs() {
     println!("总共收集到 {} 个函数", PREVIEW_FUNCS.len());
 }
 
+#[cfg(feature = "app")]
 pub fn run_preview() {
     get_funcs();
     let func = PREVIEW_FUNCS[0];
     let scene = (func.fn_ptr)();
-    run_scene_app((scene, SceneMeta {
-        name: func.name.to_string(),
-    }));
+    app::run_scene_app((
+        scene,
+        SceneMeta {
+            name: func.name.to_string(),
+        },
+    ));
 }
-
 
 #[cfg(feature = "profiling")]
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
@@ -169,7 +183,7 @@ pub trait SceneMetaTrait {
 pub trait Scene: SceneConstructor + SceneMetaTrait {}
 impl<T: SceneConstructor + SceneMetaTrait> Scene for T {}
 
-impl<C: SceneConstructor, M> SceneConstructor for (C, M) {
+impl<C: SceneConstructor, M: Send + Sync> SceneConstructor for (C, M) {
     fn construct(&self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {
         self.0.construct(r, r_cam);
     }
@@ -195,7 +209,7 @@ impl SceneMetaTrait for SceneMeta {
 
 // ANCHOR: SceneConstructor
 /// A constructor of a [`RanimScene`]
-pub trait SceneConstructor {
+pub trait SceneConstructor: Send + Sync {
     /// Construct the timeline
     ///
     /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
