@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use log::trace;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -6,7 +7,7 @@ use crate::{
     animation::{AnimationSpan, EvalResult, Evaluator},
     items::{ItemId, VisualItem, camera_frame::CameraFrame},
 };
-use std::fmt::Debug;
+use std::{any::TypeId, fmt::Debug};
 use std::{any::Any, sync::Arc};
 
 /// TimeMark
@@ -83,7 +84,8 @@ impl RanimScene {
     where
         ItemTimeline<T>: Into<DynTimeline>,
     {
-        let id = ItemId::alloc();
+        let id = ItemId::new(self.timelines.len());
+        trace!("insert_and type of {:?}, id: {id:?}", TypeId::of::<T>());
         let mut item_timeline = ItemTimeline::<T>::new(state);
         f(&mut item_timeline);
         self.timelines.push(ItemDynTimelines {
@@ -103,6 +105,7 @@ impl RanimScene {
     where
         ItemTimeline<E>: Into<DynTimeline>,
     {
+        trace!("map {:?}", item_id);
         let item_dyn_timeline = self
             .timelines
             .iter_mut()
@@ -114,10 +117,12 @@ impl RanimScene {
 
     /// Get reference of all timelines in the type erased [`ItemDynTimelines`] type.
     pub fn timelines(&self) -> &[ItemDynTimelines] {
+        trace!("timelines");
         &self.timelines
     }
     /// Get mutable reference of all timelines in the type erased [`ItemDynTimelines`] type.
     pub fn timelines_mut(&mut self) -> &mut [ItemDynTimelines] {
+        trace!("timelines_mut");
         &mut self.timelines
     }
     /// Get the reference of timeline(s) by the [`TimelineIndex`].
