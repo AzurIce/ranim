@@ -1,31 +1,26 @@
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    sync::{Arc, Mutex},
     thread::{self, JoinHandle},
     time::Duration,
 };
 
 use anyhow::Result;
 use krates::Kid;
-use libloading::Library;
 use notify_debouncer_full::{DebouncedEvent, Debouncer};
 use ranim::{
-    PreviewFunc, SceneConstructor,
     app::{AppCmd, AppState},
 };
-use smol::channel::{Sender, bounded};
 
+use async_channel::{Receiver, Sender, bounded, unbounded};
 use notify::RecursiveMode;
-use smol::channel::{Receiver, unbounded};
 use tracing::{error, info, trace};
 
-use crate::{cli::Args, workspace::Workspace};
+use crate::{cli::Args, workspace::Workspace, RanimUserLibrary};
 
 fn watch_krate(
     workspace: &Workspace,
     kid: &Kid,
-    // args: &Args,
 ) -> (
     Debouncer<notify::ReadDirectoryChangesWatcher, notify_debouncer_full::FileIdMap>,
     Receiver<Vec<DebouncedEvent>>,
@@ -122,61 +117,6 @@ fn watch_krate(
     (debouncer, rx)
 }
 
-pub struct RanimUserLibrary {
-    inner: Option<Library>,
-    temp_path: PathBuf,
-}
-
-impl RanimUserLibrary {
-    pub fn load(dylib_path: impl AsRef<Path>) -> Self {
-        let dylib_path = dylib_path.as_ref();
-
-        let temp_dir = std::env::temp_dir();
-        let file_name = dylib_path.file_name().unwrap();
-
-        // 使用时间戳和随机数确保每次都有唯一的临时文件名
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let temp_path = temp_dir.join(format!(
-            "ranim_{}_{}_{}",
-            std::process::id(),
-            timestamp,
-            file_name.to_string_lossy()
-        ));
-
-        std::fs::copy(dylib_path, &temp_path).unwrap();
-
-        let lib = unsafe { Library::new(&temp_path).unwrap() };
-        Self {
-            inner: Some(lib),
-            temp_path,
-        }
-    }
-
-    pub fn get_preview_func(&self) -> &PreviewFunc {
-        unsafe {
-            use libloading::Symbol;
-
-            let get_func_i: Symbol<unsafe extern "C" fn(usize) -> *const ranim::PreviewFunc> =
-                self.inner.as_ref().unwrap().get(b"get_func_i").unwrap();
-            let get_func_count: Symbol<unsafe extern "C" fn() -> usize> =
-                self.inner.as_ref().unwrap().get(b"get_func_count").unwrap();
-
-            assert!(get_func_count() > 0);
-            &*get_func_i(0)
-        }
-    }
-}
-
-impl Drop for RanimUserLibrary {
-    fn drop(&mut self) {
-        drop(self.inner.take());
-        std::fs::remove_file(&self.temp_path).unwrap();
-    }
-}
-
 pub fn preview_command(args: Args) {
     info!("Loading workspace...");
     let workspace = Workspace::current().unwrap();
@@ -242,9 +182,9 @@ pub fn preview_command(args: Args) {
         .unwrap()
         .expect("Failed on initial build");
 
-    let preview_func = lib.get_preview_func();
-    let scene = (preview_func.fn_ptr)();
-    let app = AppState::new_with_title(&scene, preview_func.name.to_string());
+    let scene = lib.get_preview_func();
+    // let scene = (preview_func.constructor)()();
+    let app = AppState::new_with_title(scene.constructor, scene.name.to_string());
     let cmd_tx = app.cmd_tx.clone();
 
     let daemon = thread::spawn(move || {
@@ -264,11 +204,13 @@ pub fn preview_command(args: Args) {
             }
             if let Ok(new_lib) = res_rx.try_recv() {
                 if let Ok(new_lib) = new_lib {
-                    let preview_func = new_lib.get_preview_func();
-                    let scene = (preview_func.fn_ptr)();
+                    let scene = new_lib.get_preview_func();
+                    // let scene = (preview_func.fn_ptr)();
 
                     let (tx, rx) = bounded(1);
-                    cmd_tx.send_blocking(AppCmd::ReloadScene(scene, tx)).unwrap();
+                    cmd_tx
+                        .send_blocking(AppCmd::ReloadScene(scene.constructor, tx))
+                        .unwrap();
                     rx.recv_blocking().unwrap();
                     lib.replace(new_lib);
                 }

@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser, Clone, Default)]
 pub struct Args {
-    #[arg(short, long, help_heading = "Cargo Options")]
+    #[arg(global = true, short, long, help_heading = "Cargo Options")]
     package: Option<String>,
 
     // #[arg(long, global = true, help_heading = "Cargo Options")]

@@ -13,11 +13,11 @@ proc-macro = true
 [dependencies]
 quote = "1.0.38"
 syn = "2.0.98"
-darling = "0.20.10"
-heck = "0.5.0"
+# darling = "0.20.10"
+# heck = "0.5.0"
 proc-macro-crate = "3.3.0"
 proc-macro2 = "1.0.95"
-paste = "1.0.15"
+# paste = "1.0.15"
 
 [package.metadata.release]
 tag = false
