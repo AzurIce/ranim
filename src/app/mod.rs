@@ -60,7 +60,7 @@ impl TimelineInfo {
 
 pub enum AppCmd {
     /// Reload the scene, will send a `()` after reloaded
-    ReloadScene(Box<dyn SceneConstructor>, Sender<()>),
+    ReloadScene(SceneConstructor, Sender<()>),
 }
 
 #[allow(unused)]
@@ -80,7 +80,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new_with_title(scene_constructor: &dyn SceneConstructor, title: String) -> Self {
+    pub fn new_with_title(scene_constructor: SceneConstructor, title: String) -> Self {
         let timeline = build_timeline(scene_constructor);
         let timeline_infos = timeline.get_timeline_infos();
         // let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
@@ -98,7 +98,7 @@ impl AppState {
             timeline,
         }
     }
-    fn new(scene_constructor: &dyn SceneConstructor) -> Self {
+    fn new(scene_constructor: SceneConstructor) -> Self {
         Self::new_with_title(scene_constructor, "preview_app".to_string())
     }
     pub fn prepare(&mut self, ctx: &WgpuContext, app_renderer: &mut AppRenderer) {
@@ -178,7 +178,7 @@ impl AppState {
         if let Ok(cmd) = self.cmd_rx.try_recv() {
             match cmd {
                 AppCmd::ReloadScene(scene_constructor, tx) => {
-                    let timeline = build_timeline(&scene_constructor);
+                    let timeline = build_timeline(scene_constructor);
                     let timeline_infos = timeline.get_timeline_infos();
                     self.timeline_state = TimelineState::new(timeline.total_secs(), timeline_infos);
                     self.timeline = timeline;
@@ -479,6 +479,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
         match event {
             WindowEvent::RedrawRequested => redraw(wgpu_ctx, app_state, window, app_renderer),
             WindowEvent::Resized(size) => resize(wgpu_ctx, app_renderer, size),
+            WindowEvent::CloseRequested => event_loop.exit(),
             _ => (),
         }
         self.window.as_ref().unwrap().request_redraw();
@@ -541,9 +542,9 @@ pub fn run_app(app: AppState) {
     }
 }
 
-/// Runs a scene preview app on `scene`
-pub fn run_scene_app(scene: impl Scene) {
-    let app_state = AppState::new_with_title(&scene, scene.meta().name.clone());
+/// Runs a scene preview app on a scene constructor
+pub fn run_scene_app(constructor: SceneConstructor, name: String) {
+    let app_state = AppState::new_with_title(constructor, name);
     run_app(app_state);
 }
 

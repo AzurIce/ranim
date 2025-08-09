@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use ignore::gitignore::Gitignore;
-use krates::{Kid, KrateDetails, Krates, NodeId};
-use log::info;
+use krates::{Kid, KrateDetails, Krates};
 use tracing::{debug, error};
 
 pub struct Workspace {
@@ -20,7 +19,8 @@ impl Workspace {
             builder.workspace(true);
 
             builder.build(cmd, |_| {})
-        }.context("Failed to build crate graph")?;
+        }
+        .context("Failed to build crate graph")?;
 
         let workspace_root = krates.workspace_root().as_std_path().to_path_buf();
         let workspace_root = &workspace_root;
