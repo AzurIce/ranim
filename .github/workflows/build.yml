@@ -9,7 +9,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
-    if: github.repository == 'AzurIce/ranim'
+    if: github.repository == 'AzurIce/ranim' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -55,11 +55,10 @@ jobs:
   #     # - name: Run cargo integration-test
   #     #   run: cargo integration-test
 
-
   lints:
     name: Lints
     runs-on: ubuntu-latest
-    if: github.repository == 'AzurIce/ranim'
+    if: github.repository == 'AzurIce/ranim' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
