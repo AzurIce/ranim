@@ -187,6 +187,7 @@ pub fn preview_command(args: Args) {
     let app = AppState::new_with_title(scene.constructor, scene.name.to_string());
     let cmd_tx = app.cmd_tx.clone();
 
+    let (shutdown_tx, shutdown_rx) = bounded(1);
     let daemon = thread::spawn(move || {
         let mut lib = Some(lib);
         loop {
@@ -215,10 +216,14 @@ pub fn preview_command(args: Args) {
                     lib.replace(new_lib);
                 }
             }
+            if let Ok(_) = shutdown_rx.try_recv() {
+                break;
+            }
             std::thread::sleep(Duration::from_millis(200));
         }
     });
     ranim::app::run_app(app);
+    shutdown_tx.send_blocking(());
     daemon.join().unwrap();
 }
 

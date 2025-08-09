@@ -87,6 +87,12 @@ pub struct SceneConfig {
     pub frame_height: f64,
 }
 
+impl Default for SceneConfig {
+    fn default() -> Self {
+        Self { frame_height: 8.0 }
+    }
+}
+
 /// The output of a scene
 #[derive(Debug, Clone)]
 pub struct Output {
@@ -137,6 +143,8 @@ pub extern "C" fn scenes() -> &'static [Scene] {
 pub mod prelude {
     #[cfg(feature = "app")]
     pub use crate::app::run_scene_app;
+
+    pub use crate::{render_scene, render_scene_output};
     pub use ranim_macros::{output, preview, scene};
 
     pub use crate::items::{ItemId, camera_frame::CameraFrame};
