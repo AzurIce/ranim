@@ -452,6 +452,8 @@ impl ItemDynTimelines {
     }
     /// Evaluate the timeline at `target_sec`
     pub fn eval_sec(&self, target_sec: f64) -> Option<(usize, DynTimelineEvalResult)> {
+        // println!("len: {}", self.timelines.len());
+
         let (timeline_idx, timeline) =
             self.timelines.iter().enumerate().find(|(idx, timeline)| {
                 // TODO: make this unwrap better
@@ -462,9 +464,16 @@ impl ItemDynTimelines {
 
         match timeline {
             DynTimeline::CameraFrame(inner) => {
-                let timeline = (inner.as_ref() as &dyn Any)
-                    .downcast_ref::<ItemTimeline<CameraFrame>>()
-                    .unwrap();
+                // println!("{:?}", inner.type_id());
+                // println!("{:?}", (inner.as_ref() as &dyn Any).type_id());
+                // println!("{:?}", std::any::TypeId::of::<&ItemTimeline<CameraFrame>>());
+                // println!("{:?}", std::any::TypeId::of::<ItemTimeline<CameraFrame>>());
+                // println!("{:?}", std::any::TypeId::of::<CameraFrame>());
+
+                let timeline = unsafe {
+                    (inner.as_ref() as &dyn Any)
+                        .downcast_ref_unchecked::<ItemTimeline<CameraFrame>>()
+                };
                 timeline
                     .eval_sec(target_sec)
                     .map(|res| (timeline_idx, DynTimelineEvalResult::CameraFrame(res)))
