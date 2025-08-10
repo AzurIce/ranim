@@ -3,13 +3,7 @@ code = """
 ```rust
 use log::LevelFilter;\r
 use ranim::{\r
-    animation::transform::TransformAnim,\r
-    color::{HueDirection, palettes::manim},\r
-    components::Anchor,\r
-    glam::dvec3,\r
-    items::vitem::geometry::Rectangle,\r
-    prelude::*,\r
-    utils::rate_functions::{ease_in_quad, ease_out_quad, linear},\r
+    animation::transform::TransformAnim, color::{palettes::manim, HueDirection}, components::Anchor, glam::dvec3, items::vitem::geometry::Rectangle, prelude::*, timeline::TimeMark, utils::rate_functions::{ease_in_quad, ease_out_quad, linear}\r
 };\r
 \r
 fn solve_hanoi(\r
@@ -109,6 +103,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {\r
     };\r
 \r
     solve_hanoi(n, 0, 1, 2, &mut move_disk);\r
+    r.insert_time_mark(0.0, TimeMark::Capture(format!("preview-{n}.png")));\r
 }\r
 \r
 #[scene]\r
@@ -139,15 +134,15 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    preview(hanoi_5);\r
+    preview(hanoi_5_scene);\r
     #[cfg(not(feature = "app"))]\r
     {\r
-        render(hanoi_5);\r
-        render(hanoi_10);\r
+        render_scene(hanoi_5_scene);\r
+        render_scene(hanoi_10_scene);\r
     }\r
 }\r
 ```"""
-hash = "f844164b340243ff3619e782daa307979ea22750"
-preview_imgs = []
+hash = "dec5c2192c438d80f95c28e2378b1e2cb03a3f04"
+preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/hanoi_10_1920x1080_60.mp4", "/examples/hanoi/hanoi_5_1920x1080_60.mp4"]
 wasm = true

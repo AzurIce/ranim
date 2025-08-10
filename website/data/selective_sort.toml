@@ -126,15 +126,15 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    preview(selective_sort_10);\r
+    preview(selective_sort_10_scene);\r
     #[cfg(not(feature = "app"))]\r
     {\r
-        render(selective_sort_10);\r
-        render(selective_sort_100);\r
+        render_scene(selective_sort_10_scene);\r
+        render_scene(selective_sort_100_scene);\r
     }\r
 }\r
 ```"""
-hash = "437a35c65ea0b37da52e84cce27201f98d47c535"
+hash = "0d3d5d41235341a7ef00d8a2406d5ed03ea6fd65"
 preview_imgs = ["/examples/selective_sort/preview-100.png", "/examples/selective_sort/preview-10.png"]
 output_files = ["/examples/selective_sort/selective_sort_100_1920x1080_60.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
 wasm = true

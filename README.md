@@ -60,11 +60,41 @@ cargo run --example <example-name>
 
 and you can use `--release` flag for faster rendering.
 
+### Ranim Cli
+
+Ranim cli is a command line tool to help you build the animation. It enables animation previewing with hot reload through dylib.
+
+Please notice that you can use ranim without ranim-cli, the previewing and rendering process can be achieved by simply invoking apis provided by *ranim*, but it may enhance your experience.
+
+You can install it with:
+
+```bash
+cargo install ranim-cli
+```
+
+Or install from git:
+
+```bash
+cargo install --git https://github.com/azurice/ranim
+```
+
+Basic Usage:
+- `ranim preview`: Launch a preview app and invoke cargo to build your library automatically when the source code is changed, then reload it through *libloading* and show it in the preview app.
+- `ranim render[ <scene-name>]`: Render scene's output, when no scene name is specified, render all scenes.
+
+You can specify the package with `--package` (just like cargo), and other aditional arguments you want to pass to `cargo build` can be passed after `--`.
+
+For example:
+
+```bash
+ranim render -p xxx scene_a scene_b -- --release
+```
+
 ## Feature Flags
 
 - `app`: enable the preview app api
   
-  use `run_scene_app` API to launch an preview app on a scene
+  use `preview` or `run_scene_app` API to launch an preview app on a scene
   
   https://github.com/user-attachments/assets/5bf287e2-b06f-42f8-83b6-76f3775e298e
 - `profiling`: enable profiling with https://github.com/EmbarkStudios/puffin

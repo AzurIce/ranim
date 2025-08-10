@@ -1,12 +1,6 @@
 use log::LevelFilter;
 use ranim::{
-    animation::transform::TransformAnim,
-    color::{HueDirection, palettes::manim},
-    components::Anchor,
-    glam::dvec3,
-    items::vitem::geometry::Rectangle,
-    prelude::*,
-    utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
+    animation::transform::TransformAnim, color::{palettes::manim, HueDirection}, components::Anchor, glam::dvec3, items::vitem::geometry::Rectangle, prelude::*, timeline::TimeMark, utils::rate_functions::{ease_in_quad, ease_out_quad, linear}
 };
 
 fn solve_hanoi(
@@ -106,6 +100,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
     };
 
     solve_hanoi(n, 0, 1, 2, &mut move_disk);
+    r.insert_time_mark(0.0, TimeMark::Capture(format!("preview-{n}.png")));
 }
 
 #[scene]

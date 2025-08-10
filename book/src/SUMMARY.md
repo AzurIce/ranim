@@ -1,6 +1,7 @@
 # Summary
 
 - [Getting Started](./getting_started.md)
+- [Ranim Cli](./cli.md)
 
 # 理解 Ranim
 - [核心概念](./understand/core/README.md)

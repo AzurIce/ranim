@@ -403,6 +403,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
             let canvas = document
                 .get_element_by_id(&format!("app-{}", self.app_state.title))
                 .unwrap();
+            log::info!("searching for app-{}", self.app_state.title);
             let canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().ok();
 
             log::info!("found canvas: {}", canvas.is_some());

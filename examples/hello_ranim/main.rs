@@ -6,10 +6,9 @@ use ranim::{
     color::palettes::manim,
     glam::DVec3,
     items::vitem::{
-        VItem,
-        geometry::{Circle, Square},
+        geometry::{Circle, Square}, VItem
     },
-    prelude::*,
+    prelude::*, timeline::TimeMark,
 };
 
 #[scene]
@@ -43,6 +42,8 @@ fn hello_ranim(r: &mut RanimScene) {
         timeline.play(circle.write());
         timeline.play_with(|circle| circle.fade_out());
     };
+
+    r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
 }
 
 fn main() {

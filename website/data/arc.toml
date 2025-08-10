@@ -75,12 +75,12 @@ fn main() {
     }
 
     #[cfg(feature = "app")]
-    preview(arc);
+    preview(arc_scene);
     #[cfg(not(feature = "app"))]
-    render(arc)
+    render_scene(arc_scene)
 }
 ```"""
-hash = "a54e6bd25a94a622e69e93c525612f0cb793c7c4"
+hash = "f9561ba08203fea605f237badee6cc70d1936082"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true
