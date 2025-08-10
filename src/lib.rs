@@ -21,36 +21,161 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
+#![feature(downcast_unchecked)]
 
+#[cfg(not(target_arch = "wasm32"))]
+use crate::utils::wgpu::WgpuContext;
+use animation::EvalResult;
+#[cfg(not(target_arch = "wasm32"))]
+use file_writer::{FileWriter, FileWriterBuilder};
+#[cfg(not(target_arch = "wasm32"))]
+use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+#[cfg(not(target_arch = "wasm32"))]
+use log::info;
+#[cfg(not(target_arch = "wasm32"))]
+use render::{Renderer, primitives::RenderInstances};
+#[cfg(not(target_arch = "wasm32"))]
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     time::Duration,
 };
-
-use animation::EvalResult;
+use timeline::{RanimScene, SealedRanimScene};
 #[cfg(not(target_arch = "wasm32"))]
-use file_writer::{FileWriter, FileWriterBuilder};
+use timeline::{TimeMark, TimelineEvalResult};
+
 pub use glam;
-use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use items::{ItemId, camera_frame::CameraFrame};
-use log::info;
-use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult};
 
-use render::{Renderer, primitives::RenderInstances};
+pub mod animation;
+/// The preview app
+#[cfg(feature = "app")]
+pub mod app;
+/// Colors and Palettes
+pub mod color;
+/// Basic data representation
+pub mod components;
+#[cfg(not(target_arch = "wasm32"))]
+mod file_writer;
+/// Builtin items
+pub mod items;
+/// Rendering stuff
+pub mod render;
+/// The core structure to encode animations
+pub mod timeline;
+/// The basic traits for items
+pub mod traits;
+/// Utils
+pub mod utils;
 
-use crate::utils::wgpu::WgpuContext;
+// ANCHOR: SceneConstructor
+/// A scene constructor
+///
+/// It can be a simple fn pointer of `fn(&mut RanimScene)`,
+/// or any type implements `Fn(&mut RanimScene) + Send + Sync`.
+pub trait SceneConstructor: Send + Sync {
+    /// The construct logic
+    fn construct(&self, r: &mut RanimScene);
+
+    /// Use the constructor to build a [`SealedRanimScene`]
+    fn build_scene(&self) -> SealedRanimScene {
+        let mut scene = RanimScene::new();
+        self.construct(&mut scene);
+        scene.seal()
+    }
+}
+// ANCHOR_END: SceneConstructor
+
+impl<F: Fn(&mut RanimScene) + Send + Sync> SceneConstructor for F {
+    fn construct(&self, r: &mut RanimScene) {
+        self(r);
+    }
+}
+
+// MARK: Dylib part
+#[cfg(not(target_family = "wasm"))]
+pub use linkme;
+
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct Scene {
+    pub name: &'static str,
+    pub constructor: fn(&mut RanimScene),
+    pub config: SceneConfig,
+    pub outputs: &'static [Output],
+    pub preview: bool,
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[doc(hidden)]
+#[linkme::distributed_slice]
+pub static SCENES: [Scene];
+
+/// Scene config
+#[derive(Debug, Clone)]
+pub struct SceneConfig {
+    /// The height of the frame
+    ///
+    /// This will be the coordinate in the scene. The width is calculated by the aspect ratio from [`Output::width`] and [`Output::height`].
+    pub frame_height: f64,
+}
+
+impl Default for SceneConfig {
+    fn default() -> Self {
+        Self { frame_height: 8.0 }
+    }
+}
+
+/// The output of a scene
+#[derive(Debug, Clone)]
+pub struct Output {
+    /// The width of the output texture in pixels.
+    pub width: u32,
+    /// The height of the output texture in pixels.
+    pub height: u32,
+    /// The frame rate of the output video.
+    pub fps: u32,
+    /// Whether to save the frames.
+    pub save_frames: bool,
+    /// The directory to save the output
+    ///
+    /// Related to the `output` folder, Or absolute.
+    pub dir: &'static str,
+}
+
+impl Default for Output {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl Output {
+    /// 1920x1080 60fps save_frames=false dir="./"
+    pub const DEFAULT: Self = Self {
+        width: 1920,
+        height: 1080,
+        fps: 60,
+        save_frames: false,
+        dir: "./",
+    };
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[doc(hidden)]
+#[unsafe(no_mangle)]
+#[allow(improper_ctypes_definitions)] // Because currently we only use it in rust
+pub extern "C" fn scenes() -> &'static [Scene] {
+    &SCENES
+}
 
 // MARK: Prelude
 /// The preludes
 pub mod prelude {
-    pub use crate::AppOptions;
     #[cfg(feature = "app")]
-    pub use crate::app::run_scene_app;
-    pub use crate::{SceneConstructor, SceneMetaTrait};
+    pub use crate::app::{preview, run_app, run_scene_app};
     #[cfg(not(target_arch = "wasm32"))]
-    pub use crate::{render_scene, render_scene_at_sec};
-    pub use ranim_macros::scene;
+    pub use crate::{render, render_scene, render_scene_output};
+
+    pub use ranim_macros::{output, preview, scene};
 
     pub use crate::items::{ItemId, camera_frame::CameraFrame};
     pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};
@@ -58,28 +183,6 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 }
-
-/// Colors and Palettes
-pub mod color;
-#[cfg(not(target_arch = "wasm32"))]
-mod file_writer;
-/// The core structure to encode animations
-pub mod timeline;
-/// The basic traits for items
-pub mod traits;
-
-pub mod animation;
-/// The preview app
-#[cfg(feature = "app")]
-pub mod app;
-/// Basic data representation
-pub mod components;
-/// Builtin items
-pub mod items;
-/// Rendering stuff
-pub mod render;
-/// Utils
-pub mod utils;
 
 #[cfg(feature = "profiling")]
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
@@ -89,138 +192,30 @@ pub(crate) static PUFFIN_GPU_PROFILER: std::sync::LazyLock<
     std::sync::Mutex<puffin::GlobalProfiler>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
 
-// ANCHOR: SceneMeta
-/// The metadata of the Timeline
-#[derive(Debug, Clone)]
-pub struct SceneMeta {
-    /// The name of the Scene, it is used for output path `<output_dir>/<name>/`
-    pub name: String,
-}
-// ANCHOR_END: SceneMeta
-
-// ANCHOR: SceneMetaTrait
-/// A trait for getting [`SceneMeta`]
-pub trait SceneMetaTrait {
-    /// Get [`SceneMeta`]
-    fn meta(&self) -> SceneMeta;
-}
-// ANCHOR_END: SceneMetaTrait
-
-/// The scene passed to [`render_scene`], simply [`SceneMetaTrait`] + [`SceneConstructor`].
-///
-/// This trait is automatically implemented for types that implements [`SceneConstructor`] and [`SceneMetaTrait`].
-///
-/// A struct with [`ranim_macros::scene`] attribute implements [`SceneMetaTrait`], which is basically a type with [`SceneMeta`].
-/// - `#[scene]`: use the *snake_case* of the struct's name (Without the `Scene` suffix) as [`SceneMeta::name`].
-/// - `#[scene(name = "<name>"])`: use the given name as [`SceneMeta::name`].
-///
-/// [`render_scene`] and [`render_scene_at_sec`] will output to `<output_dir>/<name>/` directory.
-///
-/// # Examples
-/// ```rust,no_run
-/// use ranim::prelude::*;
-///
-/// #[scene]
-/// struct HelloWorld;
-///
-/// impl SceneConstructor for HelloWorld {
-///     fn construct(self, r: &mut RanimScene, r_cam: TimelineId<CameraFrame>) {
-///         // ...
-///     }
-/// }
-/// ```
-pub trait Scene: SceneConstructor + SceneMetaTrait {}
-impl<T: SceneConstructor + SceneMetaTrait> Scene for T {}
-
-impl<C: SceneConstructor, M> SceneConstructor for (C, M) {
-    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {
-        self.0.construct(r, r_cam);
-    }
-}
-
-impl<C, M: SceneMetaTrait> SceneMetaTrait for (C, M) {
-    fn meta(&self) -> SceneMeta {
-        self.1.meta()
-    }
-}
-
-// ANCHOR: SceneConstructor
-/// A constructor of a [`RanimScene`]
-pub trait SceneConstructor {
-    /// Construct the timeline
-    ///
-    /// The `camera` is always the first `Rabject` inserted to the `timeline`, and keeps alive until the end of the timeline.
-    fn construct(self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>);
-}
-// ANCHOR_END: SceneConstructor
-
-/// A helper function to build a [`SealedRanimScene`] from a [`SceneConstructor`]
-pub fn build_timeline(constructor: impl SceneConstructor) -> SealedRanimScene {
-    let mut timeline = RanimScene::new();
-    {
-        let cam = items::camera_frame::CameraFrame::new();
-        let r_cam = timeline.insert(cam);
-        timeline.timeline_mut(&r_cam).show();
-        constructor.construct(&mut timeline, r_cam);
-    }
-    timeline.seal()
-}
-
-/// Build the timeline with the scene, and render it
+/// Render a scene
 #[cfg(not(target_arch = "wasm32"))]
-pub fn render_scene(scene: impl Scene, options: &AppOptions) {
-    let meta = scene.meta();
-    let timeline = build_timeline(scene);
-    let mut app = RanimRenderApp::new(options, meta.name);
-    app.render_timeline(timeline);
+pub fn render_scene(scene: &Scene) {
+    for output in scene.outputs {
+        render_scene_output(
+            scene.constructor,
+            scene.name.to_string(),
+            &scene.config,
+            output,
+        );
+    }
 }
 
-/// Build the timeline with the scene, and render it at a given timestamp
+/// Render a scene output
 #[cfg(not(target_arch = "wasm32"))]
-pub fn render_scene_at_sec(
-    scene: impl Scene,
-    sec: f64,
-    output_file: impl AsRef<Path>,
-    options: &AppOptions,
+pub fn render_scene_output(
+    constructor: impl SceneConstructor,
+    name: String,
+    scene_config: &SceneConfig,
+    output: &Output,
 ) {
-    let meta = scene.meta();
-    let timeline = build_timeline(scene);
-    let mut app = RanimRenderApp::new(options, meta.name);
-    app.render_timeline_frame(&timeline, sec, output_file);
-}
-
-// MARK: AppOptions
-
-/// The options of ranim's rendering app
-#[derive(Debug, Clone)]
-pub struct AppOptions<'a> {
-    /// The height of the frame
-    ///
-    /// This will be the coordinate in the scene. The width is calculated by the aspect ratio from [`AppOptions::pixel_size`].
-    pub frame_height: f64,
-    /// The size of the output texture in pixels.
-    pub pixel_size: (u32, u32),
-    /// The frame rate of the output video.
-    pub frame_rate: u32,
-    /// Whether to save the frames.
-    pub save_frames: bool,
-    /// The directory to save the output.
-    pub output_dir: &'a str,
-    /// The filename of the output video.
-    pub output_filename: &'a str,
-}
-
-impl Default for AppOptions<'_> {
-    fn default() -> Self {
-        AppOptions {
-            frame_height: 8.0,
-            pixel_size: (1920, 1080),
-            frame_rate: 60,
-            save_frames: false,
-            output_dir: "./output",
-            output_filename: "output.mp4",
-        }
-    }
+    let scene = constructor.build_scene();
+    let mut app = RanimRenderApp::new(name, scene_config, output);
+    app.render_timeline(scene);
 }
 
 /// MARK: RanimRenderApp
@@ -235,20 +230,21 @@ struct RanimRenderApp {
     /// Whether to auto create a [`FileWriter`] to output the video
     video_writer_builder: Option<FileWriterBuilder>,
     /// Whether to save the frames
-    save_frames: bool,
-    /// fps
-    fps: u32,
-
     frame_count: u32,
-    output_dir: PathBuf,
     scene_name: String,
+
+    width: u32,
+    height: u32,
+    fps: u32,
+    save_frames: bool,
+    output_dir: PathBuf,
 
     pub(crate) render_instances: RenderInstances,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl RanimRenderApp {
-    fn new(options: &AppOptions, scene_name: String) -> Self {
+    fn new(scene_name: String, scene_config: &SceneConfig, output: &Output) -> Self {
         info!("Checking ffmpeg...");
         if let Ok(ffmpeg_path) = which::which("ffmpeg") {
             info!("ffmpeg found at {ffmpeg_path:?}");
@@ -268,12 +264,18 @@ impl RanimRenderApp {
 
         info!("Creating wgpu context...");
         let ctx = pollster::block_on(WgpuContext::new());
-        let output_dir = PathBuf::from(options.output_dir);
+        let mut output_dir = PathBuf::from(output.dir);
+        if !output_dir.is_absolute() {
+            output_dir = std::env::current_dir()
+                .unwrap()
+                .join("./output")
+                .join(output_dir);
+        }
         let renderer = Renderer::new(
             &ctx,
-            options.frame_height,
-            options.pixel_size.0 as usize,
-            options.pixel_size.1 as usize,
+            scene_config.frame_height,
+            output.width as usize,
+            output.height as usize,
         );
         Self {
             // world: World::new(),
@@ -282,14 +284,19 @@ impl RanimRenderApp {
             video_writer: None,
             video_writer_builder: Some(
                 FileWriterBuilder::default()
-                    .with_fps(options.frame_rate)
-                    .with_size(options.pixel_size.0, options.pixel_size.1)
-                    .with_file_path(output_dir.join(&scene_name).join(options.output_filename)),
+                    .with_fps(output.fps)
+                    .with_size(output.width, output.height)
+                    .with_file_path(output_dir.join(format!(
+                        "{scene_name}_{}x{}_{}.mp4",
+                        output.width, output.height, output.fps
+                    ))),
             ),
-            save_frames: options.save_frames,
-            fps: options.frame_rate,
             frame_count: 0,
             ctx,
+            width: output.width,
+            height: output.height,
+            fps: output.fps,
+            save_frames: output.save_frames,
             output_dir,
             scene_name,
             render_instances: RenderInstances::default(),
@@ -315,6 +322,7 @@ impl RanimRenderApp {
         };
 
         let frames = (timeline.total_secs() * self.fps as f64).ceil() as usize;
+        let frames = frames.max(2);
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(
@@ -483,7 +491,14 @@ impl RanimRenderApp {
         // println!("{}", render_primitives.len());
         self.renderer.update_uniforms(&self.ctx, camera_frame);
         self.renderer.render(&self.ctx, &render_primitives);
-        self.save_frame_to_image(self.output_dir.join(&self.scene_name).join(filename));
+        self.save_frame_to_image(
+            self.output_dir
+                .join(format!(
+                    "{}_{}x{}_{}",
+                    self.scene_name, self.width, self.height, self.fps
+                ))
+                .join(filename),
+        );
     }
 
     fn update_frame(&mut self) {
@@ -500,8 +515,11 @@ impl RanimRenderApp {
         if self.save_frames {
             let path = self
                 .output_dir
-                .join(&self.scene_name)
-                .join(format!("frames/{:04}.png", self.frame_count));
+                .join(format!(
+                    "{}_{}x{}_{}-frames",
+                    self.scene_name, self.width, self.height, self.fps
+                ))
+                .join(format!("{:04}.png", self.frame_count));
             self.save_frame_to_image(path);
         }
         self.frame_count += 1;
@@ -509,7 +527,7 @@ impl RanimRenderApp {
 
     pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
         let dir = path.as_ref().parent().unwrap();
-        if !dir.exists() {
+        if !dir.exists() || !dir.is_dir() {
             std::fs::create_dir_all(dir).unwrap();
         }
         let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx);

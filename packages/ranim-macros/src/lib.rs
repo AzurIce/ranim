@@ -1,10 +1,13 @@
-use darling::{Error, FromMeta, ast::NestedMeta};
-use heck::AsSnekCase;
+mod scene;
+mod utils;
+
 use proc_macro::TokenStream;
 use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::Span;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields, Ident, parse_macro_input};
+use syn::{Data, DeriveInput, Fields, Ident, ItemFn, parse_macro_input};
+
+use crate::scene::parse_scene_attrs;
 
 const RANIM_CRATE_NAME: &str = "ranim";
 
@@ -22,49 +25,121 @@ fn ranim_path() -> proc_macro2::TokenStream {
     }
 }
 
-#[derive(Default, Debug, FromMeta)]
-#[darling(default)]
-struct SceneMeta {
-    name: Option<String>,
+/// 解析单个属性（#[scene(...)] / #[preview] / #[output(...)]）
+#[derive(Default)]
+struct SceneAttrs {
+    name: Option<String>,      // #[scene(name = "...")]
+    frame_height: Option<f64>, // #[scene(frame_height = 8.0)]
+    preview: bool,             // #[preview]
+    outputs: Vec<OutputDef>,   // #[output(...)]
+}
+
+/// 一个 #[output(...)] 里的字段
+#[derive(Default)]
+struct OutputDef {
+    width: u32,
+    height: u32,
+    fps: u32,
+    save_frames: bool,
+    dir: String,
+}
+
+// ---------- 入口 ----------
+#[proc_macro_attribute]
+pub fn scene(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let ranim = ranim_path();
+    let input_fn = parse_macro_input!(input as ItemFn);
+    let attrs = parse_scene_attrs(&input_fn.attrs).unwrap_or_default();
+
+    let fn_name = &input_fn.sig.ident;
+    let vis = &input_fn.vis;
+    let fn_body = &input_fn.block;
+
+    // 场景名称
+    let scene_name = attrs.name.unwrap_or_else(|| fn_name.to_string());
+
+    // SceneConfig
+    let frame_height = attrs.frame_height.unwrap_or(8.0);
+    let scene_config = quote! {
+        #ranim::SceneConfig {
+            frame_height: #frame_height,
+        }
+    };
+
+    // Output 列表
+    let mut outputs = Vec::new();
+    for OutputDef {
+        width,
+        height,
+        fps,
+        save_frames,
+        dir,
+    } in attrs.outputs
+    {
+        outputs.push(quote! {
+            #ranim::Output {
+                width: #width,
+                height: #height,
+                fps: #fps,
+                save_frames: #save_frames,
+                dir: #dir,
+            }
+        });
+    }
+    if outputs.is_empty() {
+        outputs.push(quote! {
+            #ranim::Output::DEFAULT
+        });
+    }
+
+    let preview = attrs.preview;
+
+    let static_output_name = syn::Ident::new(
+        &format!("__SCENE_{}_OUTPUTS", fn_name.to_string().to_uppercase()),
+        fn_name.span(),
+    );
+    let static_name = syn::Ident::new(
+        &format!("__SCENE_{}", fn_name.to_string().to_uppercase()),
+        fn_name.span(),
+    );
+    let static_scene_name = syn::Ident::new(&format!("{fn_name}_scene"), fn_name.span());
+
+    let output_cnt = outputs.len();
+
+    let scene = quote! {
+        #ranim::Scene {
+            name: #scene_name,
+            constructor: #fn_name,
+            config: #scene_config,
+            outputs: &#static_output_name,
+            preview: #preview,
+        }
+    };
+
+    // 构造 Scene 并塞进分布式切片
+    let expanded = quote! {
+        #vis fn #fn_name(r: &mut #ranim::timeline::RanimScene) #fn_body
+
+        static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
+        #[cfg_attr(not(target_family = "wasm"), #ranim::linkme::distributed_slice(#ranim::SCENES))]
+        #[cfg_attr(not(target_family = "wasm"), linkme(crate = #ranim::linkme))]
+        static #static_name: #ranim::Scene = #scene;
+
+        #[allow(non_upper_case_globals)]
+        #vis static #static_scene_name: &'static #ranim::Scene = &#static_name;
+    };
+
+    TokenStream::from(expanded)
 }
 
 #[proc_macro_attribute]
-pub fn scene(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let ranim = ranim_path();
-    let attr_args = match NestedMeta::parse_meta_list(attr.into()) {
-        Ok(v) => v,
-        Err(e) => return TokenStream::from(Error::from(e).write_errors()),
-    };
+pub fn output(_: TokenStream, _: TokenStream) -> TokenStream {
+    TokenStream::new()
+}
 
-    let args = match SceneMeta::from_list(&attr_args) {
-        Ok(v) => v,
-        Err(e) => return TokenStream::from(e.write_errors()),
-    };
-    let input = syn::parse_macro_input!(item as syn::ItemStruct);
-
-    let struct_name = &input.ident;
-    // 获取 struct_name 的字符串表示
-    let name = match args.name {
-        Some(ref name) => name.to_string(),
-        None => {
-            let name = struct_name.to_string();
-            let name = name.strip_suffix("Scene").unwrap_or(&name);
-            AsSnekCase(name).to_string()
-        }
-    };
-
-    quote::quote! {
-        #input
-
-        impl #ranim::SceneMetaTrait for #struct_name {
-            fn meta(&self) -> #ranim::SceneMeta {
-                #ranim::SceneMeta {
-                    name: #name.to_string(),
-                }
-            }
-        }
-    }
-    .into()
+#[proc_macro_attribute]
+pub fn preview(_: TokenStream, _: TokenStream) -> TokenStream {
+    TokenStream::new()
 }
 
 // MARK: derive Traits

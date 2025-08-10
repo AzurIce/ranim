@@ -20,6 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    if: github.repository == 'AzurIce/ranim'
     steps:
       - uses: actions/checkout@v4
         with:
