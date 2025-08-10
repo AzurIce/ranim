@@ -18,14 +18,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 members = ["benches", "example-packages/*", "packages/*", "xtasks/*"]
 
 [workspace.package]
-version = "0.1.0-alpha.17"
+version = "0.1.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/AzurIce/ranim"
 
 [workspace.dependencies]
-ranim = { path = ".", version = "0.1.0-alpha.17" }
-ranim-macros = { path = "packages/ranim-macros", version = "0.1.0-alpha.17" }
+ranim = { path = ".", version = "0.1.0" }
+ranim-macros = { path = "packages/ranim-macros", version = "0.1.0" }
 itertools = "0.14"
 
 [features]

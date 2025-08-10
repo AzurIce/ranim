@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0] - 2025-08-10
+
+### 🚀 Features
+
+- Ffmpeg auto download, closes: #75
+- Basic live previewing based on dylib
+- Implemented scene, preview, output macros, rework on render config and the main entry apis
+- Implemented `ranim render`
+
+### 🐛 Bug Fixes
+
+- Could not find `linkme` in the list of imported crates
+- Use `downcast_ref_unchecked` for CameraFrame
+- Ranim preview freezes when clicked on windows close button
+
+### 📚 Documentation
+
+- Update website and book
+
+### ⚙️ Miscellaneous Tasks
+
+- Don't run on drafted PR
+- Update workflow
+- Use nightly
+
 ## [0.1.0-alpha.17] - 2025-07-11
 
 ### 🚀 Features
@@ -16,11 +41,6 @@ All notable changes to this project will be documented in this file.
 - ItemTimeline eval range incorrect
 - Zero-length vec normalization error, correct test usecases, closes: #70
 
-### 💼 Other
-
-- Fix include
-- Fix book and doc link
-
 ### 📚 Documentation
 
 - Added `#![warn(missing_docs)]`, first step to enhance documents
@@ -31,6 +51,15 @@ All notable changes to this project will be documented in this file.
 - Update flake
 - Added git-cliff to flake's shell packages
 - Release
+- Release
+
+### Book
+
+- Fix include
+
+### Website
+
+- Fix book and doc link
 
 ## [0.1.0-alpha.14] - 2025-07-01
 
@@ -42,12 +71,6 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Use chrono instead of time for typst world
-
-### 💼 Other
-
-- Refactor rabject and timeline
-- Moved getting started to guide based on mdbook, added doc
-- Update book and examples
 
 ### 🚜 Refactor
 
@@ -71,6 +94,15 @@ All notable changes to this project will be documented in this file.
 - Update deps
 - Release
 
+### WIP
+
+- Refactor rabject and timeline
+
+### Website
+
+- Moved getting started to guide based on mdbook, added doc
+- Update book and examples
+
 ## [0.1.0-alpha.13] - 2025-05-01
 
 ### 🚀 Features
@@ -80,10 +112,6 @@ All notable changes to this project will be documented in this file.
 - Align vitem points according to ratio, closes: #33
 - An attempt to share pass between items
 - Scale with stroke
-
-### 💼 Other
-
-- More items
 
 ### 🚜 Refactor
 
@@ -95,6 +123,10 @@ All notable changes to this project will be documented in this file.
 - Use pretty_env_logger instead of env_logger
 - Added puffin_viewer to flake shell
 - Release
+
+### WIP
+
+- More items
 
 ## [0.1.0-alpha.12] - 2025-04-20
 
@@ -122,10 +154,6 @@ All notable changes to this project will be documented in this file.
 
 - #56, fixed subtract with overflow
 
-### 💼 Other
-
-- Added hanoi example, closes: #47
-
 ### 🚜 Refactor
 
 - Added TimelineItem trait to unify Group<T> and T insertion
@@ -139,6 +167,10 @@ All notable changes to this project will be documented in this file.
 - Release
 - Update cargo exclude
 - Release
+
+### Examples
+
+- Added hanoi example, closes: #47
 
 ## [0.1.0-alpha.9] - 2025-03-29
 
@@ -244,15 +276,18 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.0-alpha.4] - 2025-03-14
 
-### 💼 Other
-
-- Added logo
-- Support for RabjectGroup
-
 ### ⚙️ Miscellaneous Tasks
 
 - Release
 - Release
+
+### WIP
+
+- Support for RabjectGroup
+
+### Misc
+
+- Added logo
 
 ## [0.1.0-alpha.3] - 2025-03-14
 
@@ -342,22 +377,6 @@ All notable changes to this project will be documented in this file.
 - *(website)* Fix toml output
 - #29
 
-### 💼 Other
-
-- Refactoring bezier for filling
-- Fixing arc between points put start_and_end modifies the width
-- Refactor to correct vectorized objects
-- Finishing the refactor
-- Finished refactor but with stroke and fill not finished
-- Refactor project structure
-- Fixing aligning for animation
-- Rewrite camera
-- Refactor to support hierarchy
-- Refactor object management and scene render architecture, but with animation not compatible
-- Introduce vello
-- New codeblock style with linenos, update examples
-- Examples page
-
 ### 🚜 Refactor
 
 - Moved wgpu related field and functions of Mobject to ExtractedMobject, added ToMobject trait, added width for Arc and Polygon, added radius for Arc
@@ -418,5 +437,24 @@ All notable changes to this project will be documented in this file.
 - *(ci)* Removed test job due to no gpu on runner
 - Added github pages workflow
 - Gh deploy only when push to main
+
+### WIP
+
+- Refactoring bezier for filling
+- Fixing arc between points put start_and_end modifies the width
+- Refactor to correct vectorized objects
+- Finishing the refactor
+- Finished refactor but with stroke and fill not finished
+- Refactor project structure
+- Fixing aligning for animation
+- Rewrite camera
+- Refactor to support hierarchy
+- Refactor object management and scene render architecture, but with animation not compatible
+- Introduce vello
+
+### Website
+
+- New codeblock style with linenos, update examples
+- Examples page
 
 <!-- generated by git-cliff -->
