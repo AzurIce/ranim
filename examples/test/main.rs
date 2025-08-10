@@ -28,34 +28,33 @@ use ranim::{
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
-struct TestScene;
+#[preview]
+#[output]
+fn test(r: &mut RanimScene) {
+    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let n = 8;
+    let arcs = (0..n)
+        .map(|i| {
+            let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
+            ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
+        })
+        .collect::<Group<_>>();
+    let r_arcs = r.insert_and_show(arcs);
 
-impl SceneConstructor for TestScene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
-        let n = 8;
-        let arcs = (0..n)
-            .map(|i| {
-                let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
-                ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
-            })
-            .collect::<Group<_>>();
-        let r_arcs = r.insert_and_show(arcs);
+    // text.set_stroke_color(manim::RED_C)
+    //     .set_stroke_width(0.05)
+    //     .set_fill_color(BLUE_C)
+    //     .set_fill_opacity(0.5);
+    // text.scale_to(ScaleHint::PorportionalHeight(8.0 * 0.8));
+    // let mut text = timeline.insert(text);
+    // let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
+    // let mut arrow = timeline.insert(arrow);
 
-        // text.set_stroke_color(manim::RED_C)
-        //     .set_stroke_width(0.05)
-        //     .set_fill_color(BLUE_C)
-        //     .set_fill_opacity(0.5);
-        // text.scale_to(ScaleHint::PorportionalHeight(8.0 * 0.8));
-        // let mut text = timeline.insert(text);
-        // let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
-        // let mut arrow = timeline.insert(arrow);
-
-        // timeline.play(arrow.transform(|data| {
-        //     data.set_color(RED_C);
-        //     data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
-        // }));
-        r.timelines_mut().forward(1.0);
-    }
+    // timeline.play(arrow.transform(|data| {
+    //     data.set_color(RED_C);
+    //     data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
+    // }));
+    r.timelines_mut().forward(1.0);
 }
 
 fn main() {
@@ -85,11 +84,12 @@ fn main() {
     //         ..Default::default()
     //     },
     // );
-    render_scene(TestScene, &AppOptions::default());
+    #[cfg(not(feature = "app"))]
+    render_scene(test_scene);
 
-    // reuires "app" feature
+    // requires "app" feature
     #[cfg(feature = "app")]
-    run_scene_app(TestScene);
+    preview(test_scene);
     // TestScene.render(&AppOptions {
     //     frame_rate: 60,
     //     frame_size: (3840, 2160),

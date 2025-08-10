@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::atomic::AtomicUsize, vec};
+use std::{fmt::Debug, ops::Deref, vec};
 
 use derive_more::{Deref, DerefMut};
 // use variadics_please::all_tuples;
@@ -12,49 +12,39 @@ pub mod camera_frame;
 /// The vectorized item.
 pub mod vitem;
 
-static ITEM_CNT: AtomicUsize = AtomicUsize::new(0);
-
-/// An id.
+/// An item id.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Copy, Deref)]
-pub struct Id(pub usize);
-
-impl Id {
-    pub(crate) fn alloc() -> Self {
-        Self(ITEM_CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
-    }
+pub struct ItemId<T> {
+    id: usize,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-/// An item id.
-///
-/// This is basically an [`Id`] with type info.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
-pub struct ItemId<T> {
-    id: Id,
-    _phantom: std::marker::PhantomData<T>,
+impl<T> Debug for ItemId<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ItemId")
+            .field("id", &self.id)
+            .field("type", &std::any::type_name::<T>())
+            .finish()
+    }
 }
 
 impl<T> Deref for ItemId<T> {
     type Target = usize;
     fn deref(&self) -> &Self::Target {
-        self.id.deref()
+        &self.id
     }
 }
 
 impl<T> ItemId<T> {
-    /// Get the inner [`Id`].
-    pub fn inner(&self) -> Id {
+    /// Get the inner id.
+    pub fn inner(&self) -> usize {
         self.id
     }
-    pub(crate) fn new(id: Id) -> Self {
+    pub(crate) fn new(id: usize) -> Self {
         Self {
             id,
             _phantom: std::marker::PhantomData,
         }
-    }
-    pub(crate) fn alloc() -> Self {
-        Self::new(Id::alloc())
     }
 }
 

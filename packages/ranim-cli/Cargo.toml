@@ -1,0 +1,28 @@
+[package]
+name = "ranim-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "ranim"
+path = "src/main.rs"
+
+[dependencies]
+ranim = { workspace = true, features = ["app"] }
+anyhow = "1.0.98"
+cargo_toml = "0.22.3"
+clap = { version = "4.5.42", features = ["derive"] }
+ignore = "0.4.23"
+krates = "0.20.0"
+libloading = "0.8.8"
+log = "0.4.27"
+notify = "8.2.0"
+notify-debouncer-full = "0.6.0"
+async-channel = "2.5.0"
+toml = "0.9.5"
+pretty_env_logger = "0.5.0"
+
+[package.metadata.release]
+tag = false

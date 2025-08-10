@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use log::{trace, warn};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -6,8 +7,8 @@ use crate::{
     animation::{AnimationSpan, EvalResult, Evaluator},
     items::{ItemId, VisualItem, camera_frame::CameraFrame},
 };
-use std::fmt::Debug;
 use std::{any::Any, sync::Arc};
+use std::{any::TypeId, fmt::Debug};
 
 /// TimeMark
 #[derive(Debug, Clone)]
@@ -83,7 +84,8 @@ impl RanimScene {
     where
         ItemTimeline<T>: Into<DynTimeline>,
     {
-        let id = ItemId::alloc();
+        let id = ItemId::new(self.timelines.len());
+        trace!("insert_and type of {:?}, id: {id:?}", TypeId::of::<T>());
         let mut item_timeline = ItemTimeline::<T>::new(state);
         f(&mut item_timeline);
         self.timelines.push(ItemDynTimelines {
@@ -103,6 +105,11 @@ impl RanimScene {
     where
         ItemTimeline<E>: Into<DynTimeline>,
     {
+        trace!(
+            "map {item_id:?} {:?} -> {:?}",
+            TypeId::of::<T>(),
+            TypeId::of::<E>()
+        );
         let item_dyn_timeline = self
             .timelines
             .iter_mut()
@@ -114,10 +121,12 @@ impl RanimScene {
 
     /// Get reference of all timelines in the type erased [`ItemDynTimelines`] type.
     pub fn timelines(&self) -> &[ItemDynTimelines] {
+        trace!("timelines");
         &self.timelines
     }
     /// Get mutable reference of all timelines in the type erased [`ItemDynTimelines`] type.
     pub fn timelines_mut(&mut self) -> &mut [ItemDynTimelines] {
+        trace!("timelines_mut");
         &mut self.timelines
     }
     /// Get the reference of timeline(s) by the [`TimelineIndex`].
@@ -187,6 +196,10 @@ impl SealedRanimScene {
                     items.push((timeline.id, res, timeline_idx, idx));
                 }
             }
+        }
+
+        if camera_frame.is_none() {
+            warn!("No camera frame found at sec {target_sec}");
         }
 
         TimelineEvalResult {
@@ -447,6 +460,8 @@ impl ItemDynTimelines {
     }
     /// Evaluate the timeline at `target_sec`
     pub fn eval_sec(&self, target_sec: f64) -> Option<(usize, DynTimelineEvalResult)> {
+        // println!("len: {}", self.timelines.len());
+
         let (timeline_idx, timeline) =
             self.timelines.iter().enumerate().find(|(idx, timeline)| {
                 // TODO: make this unwrap better
@@ -457,9 +472,16 @@ impl ItemDynTimelines {
 
         match timeline {
             DynTimeline::CameraFrame(inner) => {
-                let timeline = (inner.as_ref() as &dyn Any)
-                    .downcast_ref::<ItemTimeline<CameraFrame>>()
-                    .unwrap();
+                // println!("{:?}", inner.type_id());
+                // println!("{:?}", (inner.as_ref() as &dyn Any).type_id());
+                // println!("{:?}", std::any::TypeId::of::<&ItemTimeline<CameraFrame>>());
+                // println!("{:?}", std::any::TypeId::of::<ItemTimeline<CameraFrame>>());
+                // println!("{:?}", std::any::TypeId::of::<CameraFrame>());
+
+                let timeline = unsafe {
+                    (inner.as_ref() as &dyn Any)
+                        .downcast_ref_unchecked::<ItemTimeline<CameraFrame>>()
+                };
                 timeline
                     .eval_sec(target_sec)
                     .map(|res| (timeline_idx, DynTimelineEvalResult::CameraFrame(res)))

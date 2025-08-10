@@ -5,28 +5,26 @@ use ranim::{
 };
 
 #[scene]
-struct GettingStarted0Scene;
+#[preview]
+#[output(dir = "getting_started0")]
+fn getting_started0(r: &mut RanimScene) {
+    let _r_cam = r.insert_and_show(CameraFrame::default());
+    // A Square with size 2.0 and color blue
+    let square = Square::new(2.0).with(|square| {
+        square.set_color(manim::BLUE_C);
+    });
 
-// ANCHOR: construct
-impl SceneConstructor for GettingStarted0Scene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
-        // A Square with size 2.0 and color blue
-        let square = Square::new(2.0).with(|square| {
-            square.set_color(manim::BLUE_C);
-        });
-
-        let r_square = r.insert(square);
-        {
-            let timeline = r.timeline_mut(&r_square);
-            timeline
-                .play_with(|square| square.fade_in())
-                .forward(1.0)
-                .hide()
-                .forward(1.0)
-                .show()
-                .forward(1.0)
-                .play_with(|square| square.fade_out());
-        }
+    let r_square = r.insert(square);
+    {
+        let timeline = r.timeline_mut(&r_square);
+        timeline
+            .play_with(|square| square.fade_in())
+            .forward(1.0)
+            .hide()
+            .forward(1.0)
+            .show()
+            .forward(1.0)
+            .play_with(|square| square.fade_out());
     }
 }
 // ANCHOR_END: construct
@@ -45,7 +43,7 @@ fn main() {
     }
 
     #[cfg(feature = "app")]
-    run_scene_app(GettingStarted0Scene);
+    preview(getting_started0_scene);
     #[cfg(not(feature = "app"))]
-    render_scene(GettingStarted0Scene, &AppOptions::default());
+    render_scene(getting_started0_scene);
 }

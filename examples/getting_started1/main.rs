@@ -11,27 +11,26 @@ use ranim::{
 
 // ANCHOR: construct
 #[scene]
-struct GettingStarted1Scene;
+#[preview]
+#[output(dir = "getting_started1")]
+fn getting_started1(r: &mut RanimScene) {
+    let _r_cam = r.insert_and_show(CameraFrame::default());
+    // A Square with size 2.0 and color blue
+    let square = Square::new(2.0).with(|square| {
+        square.set_color(manim::BLUE_C);
+    });
 
-impl SceneConstructor for GettingStarted1Scene {
-    fn construct(self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {
-        // A Square with size 2.0 and color blue
-        let square = Square::new(2.0).with(|square| {
-            square.set_color(manim::BLUE_C);
-        });
+    let circle = Circle::new(2.0).with(|circle| {
+        circle.set_color(manim::RED_C);
+    });
 
-        let circle = Circle::new(2.0).with(|circle| {
-            circle.set_color(manim::RED_C);
-        });
-
-        // In order to do more low-level opeerations,
-        // sometimes we need to convert the item to a low-level item.
-        let r_vitem = r.insert(VItem::from(square));
-        {
-            let timeline = r.timeline_mut(&r_vitem);
-            timeline.play_with(|vitem| vitem.transform_to(VItem::from(circle.clone())));
-            timeline.play_with(|vitem| vitem.unwrite());
-        }
+    // In order to do more low-level opeerations,
+    // sometimes we need to convert the item to a low-level item.
+    let r_vitem = r.insert(VItem::from(square));
+    {
+        let timeline = r.timeline_mut(&r_vitem);
+        timeline.play_with(|vitem| vitem.transform_to(VItem::from(circle.clone())));
+        timeline.play_with(|vitem| vitem.unwrite());
     }
 }
 // ANCHOR_END: construct
@@ -50,7 +49,7 @@ fn main() {
     }
 
     #[cfg(feature = "app")]
-    run_scene_app(GettingStarted1Scene);
+    preview(getting_started1_scene);
     #[cfg(not(feature = "app"))]
-    render_scene(GettingStarted1Scene, &AppOptions::default());
+    render_scene(getting_started1_scene);
 }

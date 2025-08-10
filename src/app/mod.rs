@@ -3,6 +3,7 @@ mod timeline;
 
 use std::sync::Arc;
 
+use async_channel::{Receiver, Sender, unbounded};
 use egui_wgpu::ScreenDescriptor;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -17,10 +18,9 @@ use winit::{
 };
 
 use crate::{
-    Scene, SceneMeta,
+    Scene, SceneConstructor,
     animation::EvalResult,
     app::egui_tools::EguiRenderer,
-    build_timeline,
     render::{
         Renderer,
         pipelines::app::{AppPipeline, Viewport},
@@ -56,10 +56,22 @@ impl TimelineInfo {
     }
 }
 
+/// App command
+pub enum AppCmd {
+    /// Reload the scene, will send a `()` after reloaded
+    ReloadScene(Box<dyn SceneConstructor>, Sender<()>),
+}
+
+/// App's state
 #[allow(unused)]
-struct AppState {
-    meta: SceneMeta,
+pub struct AppState {
+    cmd_rx: Receiver<AppCmd>,
+    /// The channel for [`AppCmd`]
+    pub cmd_tx: Sender<AppCmd>,
+
+    title: String,
     timeline: SealedRanimScene,
+    need_eval: bool,
     // app_options: AppOptions<'a>,
     // timeline: RanimTimeline,
     // renderer: Renderer,
@@ -69,13 +81,18 @@ struct AppState {
 }
 
 impl AppState {
-    fn new(scene: impl Scene) -> Self {
-        let meta = scene.meta();
-        let timeline = build_timeline(scene);
+    /// Create a new app state with a scene constructor and a title
+    pub fn new_with_title(scene_constructor: impl SceneConstructor, title: String) -> Self {
+        let timeline = scene_constructor.build_scene();
         let timeline_infos = timeline.get_timeline_infos();
         // let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
+        let (cmd_tx, cmd_rx) = unbounded();
+
         Self {
-            meta,
+            cmd_tx,
+            cmd_rx,
+            title,
+            need_eval: false,
             // renderer,
             last_sec: -1.0,
             render_instances: RenderInstances::default(),
@@ -83,7 +100,10 @@ impl AppState {
             timeline,
         }
     }
-    pub fn prepare(&mut self, ctx: &WgpuContext, app_renderer: &mut AppRenderer) {
+    // fn new(scene_constructor: SceneConstructor) -> Self {
+    //     Self::new_with_title(scene_constructor, "preview_app".to_string())
+    // }
+    fn prepare(&mut self, ctx: &WgpuContext, app_renderer: &mut AppRenderer) {
         #[cfg(feature = "profiling")]
         profiling::scope!("frame");
 
@@ -92,9 +112,10 @@ impl AppState {
         //     .bind_group
         //     .update_viewport(&ctx.queue, app_renderer.viewport);
 
-        if self.last_sec == self.timeline_state.current_sec {
+        if self.last_sec == self.timeline_state.current_sec && !self.need_eval {
             return;
         }
+        self.need_eval = false;
         self.last_sec = self.timeline_state.current_sec;
 
         let TimelineEvalResult {
@@ -155,8 +176,28 @@ impl AppState {
         }
     }
 
+    fn handle_events(&mut self) {
+        if let Ok(cmd) = self.cmd_rx.try_recv() {
+            match cmd {
+                AppCmd::ReloadScene(constructor, tx) => {
+                    let timeline = constructor.build_scene();
+                    let timeline_infos = timeline.get_timeline_infos();
+                    self.timeline_state = TimelineState::new(timeline.total_secs(), timeline_infos);
+                    self.timeline = timeline;
+                    self.render_instances = RenderInstances::default();
+                    self.need_eval = true;
+
+                    if let Err(err) = tx.try_send(()) {
+                        log::error!("Failed to send reloaded signal: {err:?}");
+                    }
+                }
+            }
+        }
+    }
+
     #[allow(clippy::field_reassign_with_default)]
-    pub fn ui(&mut self, app_renderer: &mut AppRenderer) -> OccupiedScreenSpace {
+    fn ui(&mut self, app_renderer: &mut AppRenderer) -> OccupiedScreenSpace {
+        self.handle_events();
         // let scale_factor = app_renderer.scale_factor;
         let mut occupied_screen_space = OccupiedScreenSpace::default();
 
@@ -200,10 +241,10 @@ struct WinitApp {
 }
 
 impl WinitApp {
-    fn new(scene: impl Scene, event_loop: &EventLoop<WgpuContext>) -> Self {
+    fn new(app_state: AppState, event_loop: &EventLoop<WgpuContext>) -> Self {
         Self {
             event_loop_proxy: Some(event_loop.create_proxy()),
-            app_state: AppState::new(scene),
+            app_state,
 
             size: (0, 0),
             window: None,
@@ -224,11 +265,11 @@ fn redraw(
     profiling::scope!("redraw");
 
     // Attempt to handle minimizing window
-    if let Some(min) = window.is_minimized() {
-        if min {
-            println!("Window is minimized");
-            return;
-        }
+    if let Some(min) = window.is_minimized()
+        && min
+    {
+        println!("Window is minimized");
+        return;
     }
 
     let screen_descriptor = ScreenDescriptor {
@@ -360,8 +401,9 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
             let canvas = document
-                .get_element_by_id(&format!("app-{}", self.app_state.meta.name))
+                .get_element_by_id(&format!("app-{}", self.app_state.title))
                 .unwrap();
+            log::info!("searching for app-{}", self.app_state.title);
             let canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().ok();
 
             log::info!("found canvas: {}", canvas.is_some());
@@ -440,6 +482,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
         match event {
             WindowEvent::RedrawRequested => redraw(wgpu_ctx, app_state, window, app_renderer),
             WindowEvent::Resized(size) => resize(wgpu_ctx, app_renderer, size),
+            WindowEvent::CloseRequested => event_loop.exit(),
             _ => (),
         }
         self.window.as_ref().unwrap().request_redraw();
@@ -460,8 +503,8 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
 #[cfg(feature = "profiling")]
 use crate::PUFFIN_GPU_PROFILER;
 
-/// Runs a scene preview app on `scene`
-pub fn run_scene_app(scene: impl Scene) {
+/// Runs an app with the given app state
+pub fn run_app(app: AppState) {
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -490,7 +533,7 @@ pub fn run_scene_app(scene: impl Scene) {
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
     #[allow(unused_mut)]
-    let mut app = WinitApp::new(scene, &event_loop);
+    let mut app = WinitApp::new(app, &event_loop);
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -501,6 +544,17 @@ pub fn run_scene_app(scene: impl Scene) {
     {
         event_loop.run_app(&mut app).unwrap();
     }
+}
+
+/// Runs a scene preview app on a scene constructor
+pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
+    let app_state = AppState::new_with_title(constructor, name);
+    run_app(app_state);
+}
+
+/// Preview a scene
+pub fn preview(s: &Scene) {
+    run_scene_app(s.constructor, s.name.to_string());
 }
 
 #[allow(unused)]
