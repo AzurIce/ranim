@@ -76,5 +76,10 @@ fn main() {
     #[cfg(feature = "app")]
     run_scene_app(arc, "arc".to_string());
     #[cfg(not(feature = "app"))]
-    render_scene_output(arc, "arc".to_string(), &SceneConfig::default(), &Output::default());
+    render_scene_output(
+        arc,
+        "arc".to_string(),
+        &SceneConfig::default(),
+        &Output::default(),
+    );
 }
