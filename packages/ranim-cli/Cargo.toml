@@ -1,5 +1,6 @@
 [package]
 name = "ranim-cli"
+description = "Command line tool for working with ranim"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,6 +9,7 @@ repository.workspace = true
 [[bin]]
 name = "ranim"
 path = "src/main.rs"
+doc = false
 
 [dependencies]
 ranim = { workspace = true, features = ["app"] }
