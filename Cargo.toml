@@ -134,7 +134,7 @@ pre-release-hook = [
   "{{version}}",
 ]
 pre-release-replacements = [
-  { file = "README.md", search = "ranim = .*", replace = "{{crate_name}} = \"{{version}}\"" },
+  { file = "README.md", search = "ranim = \"[^\"]+\"", replace = "{{crate_name}} = \"{{version}}\"" },
 ]
 
 # MARK: Examples
