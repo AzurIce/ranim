@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "ranim"
+path = "src/main.rs"
+
 [dependencies]
 ranim = { workspace = true, features = ["app"] }
 anyhow = "1.0.98"

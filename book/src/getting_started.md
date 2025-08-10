@@ -13,60 +13,60 @@
 ```rust
 use ranim::prelude::*;
 
-{{#include ../../examples/hello_ranim/main.rs:15:19}}
+{{#include ../../examples/hello_ranim/main.rs:18:19}}
         // ...
     }
 }
 
 fn main() {
-    render_scene(HelloRanimScene, &AppOptions::default());
+    render_scene_output(
+        hello_ranim,
+        "hello_ranim".to_string(),
+        &SceneConfig::default(),
+        &Output::default()
+    );
 }
 ```
 
-`render_scene` 函数接收一个 `impl Scene` 并对其进行构造、求值、渲染，并将渲染结果编码为视频被输出到 `<output_dir>/<scene_name>/` 目录下。
+`render_scene` 函数接收一个 `impl SceneConstructor` 并使用它对动画进行构造、求值、渲染，并将渲染结果按照传入的 `Output` 定义输出为视频。
 
-其中 `<output_dir>` 可以通过 `AppOptions` 设置，而 `<scene_name>` 则由场景的 `SceneMetaTrait` 的实现决定（见 [`Scene` Trait](#scene-trait)）。
+默认的输出路径为 `./output/<scene_name>_<width>x<height>_<fps>.mp4`。
+
+此外，当启用了 `app` feature 时，可以使用 `run_scene_app` 来启动一个能够可视化时间线并拖动进度条预览画面的应用：
+
+```rust,ignore
+run_scene_app(hello_ranim, "hello_ranim".to_string());
+```
 
 ## 1. 场景的构造
 
-`Scene` 由两个 Trait 组合而成：
-
-- `SceneMetaTrait`：包含场景元信息的定义。
-- `SceneConstructor`：包含场景动画构造过程的定义。
+任何实现了 `SceneConstructor` Trait 的类型都可以被用于构造场景：
 
 ```rust,ignore
-{{#include ../../src/lib.rs:SceneMeta}}
-
-{{#include ../../src/lib.rs:SceneMetaTrait}}
-
 {{#include ../../src/lib.rs:SceneConstructor}}
 ```
 
-当这两个 Trait 均被实现时，`Scene` Trait 会被自动实现。
+*ranim* 自动为 `F:  Fn(&mut RanimScene) + Send + Sync` 实现了该 Trait。
 
-Ranim 提供了一个 `#[scene]` 宏来便于 `SceneMetaTrait` 的实现：
-- 使用 `#[scene]` 会以结构体的 snake_case 命名（去掉 `Scene` 后缀）作为 `SceneMeta` 的 `name` 字段自动实现这个 Trait
-- 也可以通过 `#[scene(name = "<NAME>")]` 来手动设置场景名称。
+也就是说，对于要求 `impl SceneConstructor` 的参数：
+- 既可以传入函数指针 `fn(&mut RanimScene)`
+- 也可以传入一个闭包 `|r: &mut RanimScene| { /*...*/ }`。
 
-而 `SceneConstructor` 的 `construct` 方法则是编码了整个场景动画过程的核心部分，它有两个参数：
-
-- `&mut RanimScene`：Ranim 场景，动画编码 API 的入口。
-- `ItemId<CameraFrame>`：相机物件的 Id。
-
-`RanimScene` 和 `ItemId` 这两个类型十分关键，是整个动画编码过程的核心。
+整个构造过程围绕着 `&mut RanimScene`，它是 ranim 中编码动画 api 的主入口。
 
 ## 2. 时间线
 
-每一个 `ItemId` 都唯一对应一条时间线，时间线是一种用于编码物件动画的结构，
-它的内部有一个存储了动画以及展示时间的列表，以及用于编码静态动画的物件状态。
+每一个被插入时间线的物件都有一个唯一的 `ItemId`，同时也有一条对应的时间线。
+
+时间线是一种用于编码物件动画的结构，它的内部有一个存储了动画以及展示时间的列表，以及用于编码静态动画的物件状态。
 
 编码动画的过程本质上是在向时间线中插入动态或静态的动画：
 
 ![Timeline](timeline.png)
 
-### 2.1 创建时间线
+### 2.1 插入物件（创建时间线）
 
-通过 `r.insert(state)` 可以创建一条时间线：
+通过 `r.insert(state)` 可以插入一个物件并为其创建一条时间线：
 
 ```rust,ignore
 let square = Square::new(2.0).with(|x| {
@@ -108,23 +108,25 @@ let [sq1_timeline_ref, sq2_timeline_ref] = r.timeline_ref(&[&r_square1, &r_squar
 ```rust,ignore
 // 类型为 &[ItemDynTimelines]
 let timelines = r.timelines();
+// 类型为 &mut [ItemDynTimelines]
+let timelines = r.timelines_mut();
 ```
 
 ### 2.2 操作时间线
 
 `ItemTimeline<T>` 和 `ItemDynTimelines` 都具有一些用于编码动画的操作方法：
 
-|方法|`ItemTimeline<T>`|`ItemDynTimelines`|描述|
-|---|---|---|---|
-|`show` / `hide`|✅|✅|显示/隐藏时间线中的物体|
-|`forward` / `forward_to`|✅|✅|推进时间线|
-|`play` / `play_with`|✅|❌|向时间线中插入动画|
-|`update` / `update_with`|✅|❌|更新时间线中物体状态|
-|`state`|✅|❌|获取时间线中物体状态|
+| 方法                     | `ItemTimeline<T>` | `ItemDynTimelines` | 描述                    |
+| ------------------------ | ----------------- | ------------------ | ----------------------- |
+| `show` / `hide`          | ✅                | ✅                 | 显示/隐藏时间线中的物体 |
+| `forward` / `forward_to` | ✅                | ✅                 | 推进时间线              |
+| `play` / `play_with`     | ✅                | ❌                 | 向时间线中插入动画      |
+| `update` / `update_with` | ✅                | ❌                 | 更新时间线中物体状态    |
+| `state`                  | ✅                | ❌                 | 获取时间线中物体状态    |
 
 有关方法的具体详细定义可以参考 API 文档。
 
-下面的例子使用一个 `Square` 物件创建了一个时间线，然后编码了淡入1秒、显示0.5秒、消失0.5秒、显示0.5秒、淡出1秒的动画：
+下面的例子使用一个 `Square` 物件创建了一个时间线，然后编码了淡入 1 秒、显示 0.5 秒、消失 0.5 秒、显示 0.5 秒、淡出 1 秒的动画：
 
 ```rust,ignore
 {{#rustdoc_include ../../examples/getting_started0/main.rs:construct}}

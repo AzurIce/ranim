@@ -136,15 +136,15 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    preview(bubble_sort_10);\r
+    preview(bubble_sort_10_scene);\r
     #[cfg(not(feature = "app"))]\r
     {\r
-        render(bubble_sort_10);\r
-        render(bubble_sort_100);\r
+        render_scene(bubble_sort_10_scene);\r
+        render_scene(bubble_sort_100_scene);\r
     }\r
 }\r
 ```"""
-hash = "4e7c60158427cbec3781b6643e1ec491e313f620"
+hash = "7dbee0bb6d6eaf92155f5619f9fb4f6638da9b6d"
 preview_imgs = ["/examples/bubble_sort/preview-100.png", "/examples/bubble_sort/preview-10.png"]
 output_files = ["/examples/bubble_sort/bubble_sort_100_1920x1080_60.mp4", "/examples/bubble_sort/bubble_sort_10_1920x1080_60.mp4"]
 wasm = true

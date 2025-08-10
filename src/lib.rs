@@ -60,6 +60,7 @@ pub mod traits;
 /// Utils
 pub mod utils;
 
+// ANCHOR: SceneConstructor
 /// A scene constructor
 ///
 /// It can be a simple fn pointer of `fn(&mut RanimScene)`,
@@ -75,6 +76,7 @@ pub trait SceneConstructor: Send + Sync {
         scene.seal()
     }
 }
+// ANCHOR_END: SceneConstructor
 
 impl<F: Fn(&mut RanimScene) + Send + Sync> SceneConstructor for F {
     fn construct(&self, r: &mut RanimScene) {
