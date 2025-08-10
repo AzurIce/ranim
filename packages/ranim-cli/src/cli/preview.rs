@@ -43,7 +43,7 @@ fn watch_krate(
     watch_krates.extend(
         workspace
             .krates
-            .get_deps(workspace.krates.nid_for_kid(&kid).unwrap())
+            .get_deps(workspace.krates.nid_for_kid(kid).unwrap())
             .filter_map(|(dep, _)| {
                 let krate = match dep {
                     krates::Node::Krate { krate, .. } => krate,
@@ -77,7 +77,7 @@ fn watch_krate(
 
     let mut watch_paths = vec![];
     for krate_root in &watch_krate_roots {
-        trace!("Adding watched dir for krate root {:?}", krate_root);
+        trace!("Adding watched dir for krate root {krate_root:?}");
         let ignore_builder = ignore::gitignore::GitignoreBuilder::new(krate_root);
         let ignore = ignore_builder.build().unwrap();
 
@@ -105,7 +105,7 @@ fn watch_krate(
     watch_paths.dedup();
 
     for path in &watch_paths {
-        trace!("Watching path {:?}", path);
+        trace!("Watching path {path:?}");
         debouncer
             .watch(path, RecursiveMode::Recursive)
             .expect("Failed to watch path");
@@ -123,7 +123,7 @@ pub fn preview_command(args: &Args) {
     // Get the target package
     info!("Getting target package...");
     let (kid, package_name) = get_target_package(&workspace, args);
-    info!("Target package name: {}", package_name);
+    info!("Target package name: {package_name}");
 
     info!("Watching package...");
     let (_watcher, rx) = watch_krate(&workspace, &kid);
@@ -159,19 +159,19 @@ pub fn preview_command(args: &Args) {
                 }
                 builder.start_build();
             }
-            if let Ok(new_lib) = res_rx.try_recv() {
-                if let Ok(new_lib) = new_lib {
-                    let scene = new_lib.get_preview_func();
+            if let Ok(new_lib) = res_rx.try_recv()
+                && let Ok(new_lib) = new_lib
+            {
+                let scene = new_lib.get_preview_func();
 
-                    let (tx, rx) = bounded(1);
-                    cmd_tx
-                        .send_blocking(AppCmd::ReloadScene(scene.constructor, tx))
-                        .unwrap();
-                    rx.recv_blocking().unwrap();
-                    lib.replace(new_lib);
-                }
+                let (tx, rx) = bounded(1);
+                cmd_tx
+                    .send_blocking(AppCmd::ReloadScene(Box::new(scene.constructor), tx))
+                    .unwrap();
+                rx.recv_blocking().unwrap();
+                lib.replace(new_lib);
             }
-            if let Ok(_) = shutdown_rx.try_recv() {
+            if shutdown_rx.try_recv().is_ok() {
                 info!("exiting event loop...");
                 break;
             }

@@ -14,10 +14,10 @@ use ranim::{\r
 \r
 // ANCHOR: construct\r
 #[scene]\r
-struct GettingStarted1Scene;\r
-\r
-impl SceneConstructor for GettingStarted1Scene {\r
-    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+#[preview]\r
+#[output(dir = "getting_started1")]\r
+fn getting_started1(r: &mut RanimScene) {\r
+    let _r_cam = r.insert_and_show(CameraFrame::default());\r
         // A Square with size 2.0 and color blue\r
         let square = Square::new(2.0).with(|square| {\r
             square.set_color(manim::BLUE_C);\r
@@ -35,7 +35,6 @@ impl SceneConstructor for GettingStarted1Scene {\r
             timeline.play_with(|vitem| vitem.transform_to(VItem::from(circle.clone())));\r
             timeline.play_with(|vitem| vitem.unwrite());\r
         }\r
-    }\r
 }\r
 // ANCHOR_END: construct\r
 \r
@@ -53,12 +52,12 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    run_scene_app(GettingStarted1Scene);\r
+    preview(getting_started1);\r
     #[cfg(not(feature = "app"))]\r
-    render_scene(GettingStarted1Scene, &AppOptions::default());\r
+    render(getting_started1);\r
 }\r
 ```"""
-hash = "abaf7e9a89e66817c64cf2db21ddfe3c7991c465"
+hash = "32b2bfe45bbd85f6ad5d2838eeda9896299c9948"
 preview_imgs = []
-output_files = ["/examples/getting_started1/output.mp4"]
+output_files = ["/examples/getting_started1/getting_started1_1920x1080_60.mp4"]
 wasm = true

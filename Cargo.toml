@@ -43,10 +43,11 @@ serde = ["dep:serde", "glam/serde", "color/serde"]
 [dependencies]
 ranim-macros.workspace = true
 itertools.workspace = true
+inventory = "0.3.20"
 sha1 = "0.10.6"
 lru = "0.16.0"
 async-channel = "2.3.1"
-bytemuck = { version = "1.23.0", features = ["derive"] }
+bytemuck = { version = "1.23.2", features = ["derive"] }
 glam = { version = "0.30.3", features = ["bytemuck"] }
 image = "0.25.6"
 log = "0.4.27"
@@ -91,7 +92,6 @@ typst-svg = "0.13.1"
 chrono = "0.4.41"
 reqwest = "0.12.22"
 slotmap = "1.0.7"
-linkme = "0.3.33"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 egui-winit = { version = "0.32.0", optional = true }

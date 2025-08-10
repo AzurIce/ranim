@@ -16,10 +16,10 @@ use ranim::{\r
 };\r
 \r
 #[scene]\r
-struct HelloRanimScene;\r
-\r
-impl SceneConstructor for HelloRanimScene {\r
-    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+#[preview]\r
+#[output(dir = "hello_ranim")]\r
+fn hello_ranim(r: &mut RanimScene) {\r
+    let _r_cam = r.insert_and_show(CameraFrame::default());\r
         let square = Square::new(2.0).with(|square| {\r
             square.set_color(manim::BLUE_C);\r
         });\r
@@ -46,7 +46,6 @@ impl SceneConstructor for HelloRanimScene {\r
             timeline.play(circle.write());\r
             timeline.play_with(|circle| circle.fade_out());\r
         };\r
-    }\r
 }\r
 \r
 fn main() {\r
@@ -63,15 +62,12 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    run_scene_app(HelloRanimScene);\r
+    preview(hello_ranim);\r
     #[cfg(not(feature = "app"))]\r
-    {\r
-        render_scene(HelloRanimScene, &AppOptions::default());\r
-        render_scene_at_sec(HelloRanimScene, 0.0, "preview.png", &AppOptions::default());\r
-    }\r
+    render(hello_ranim)\r
 }\r
 ```"""
-hash = "25a793414768b0fa37959d91c21437f2e715fdf3"
-preview_imgs = ["/examples/hello_ranim/preview.png"]
-output_files = ["/examples/hello_ranim/output.mp4"]
+hash = "05c7f968353fe990b89c0fecc3f912ed22f9e3cc"
+preview_imgs = []
+output_files = ["/examples/hello_ranim/hello_ranim_1920x1080_60.mp4"]
 wasm = true

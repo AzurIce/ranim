@@ -17,10 +17,10 @@ use ranim::{\r
 };\r
 \r
 #[scene]\r
-struct GettingStarted2Scene;\r
-\r
-impl SceneConstructor for GettingStarted2Scene {\r
-    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+#[preview]\r
+#[output(dir = "getting_started2")]\r
+fn getting_started2(r: &mut RanimScene) {\r
+    let _r_cam = r.insert_and_show(CameraFrame::default());\r
         let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {\r
             rect.set_stroke_color(manim::GREEN_C);\r
         });\r
@@ -56,7 +56,6 @@ impl SceneConstructor for GettingStarted2Scene {\r
 \r
         let r_rect: ItemId<VItem> = r.map(r_rect, VItem::from);\r
         r.timeline_mut(&r_rect).play_with(|rect| rect.uncreate());\r
-    }\r
 }\r
 \r
 fn main() {\r
@@ -73,12 +72,12 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    run_scene_app(GettingStarted2Scene);\r
+    preview(getting_started2);\r
     #[cfg(not(feature = "app"))]\r
-    render_scene(GettingStarted2Scene, &AppOptions::default());\r
+    render(getting_started2);\r
 }\r
 ```"""
-hash = "3fd8510c02989a3b36b2ea18ec6647861b4e2e24"
+hash = "a6815190e8ee060e8f5387ac9d2c2a80f7464467"
 preview_imgs = []
-output_files = ["/examples/getting_started2/output.mp4"]
+output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
 wasm = true
