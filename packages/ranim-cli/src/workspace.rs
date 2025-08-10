@@ -3,7 +3,9 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use ignore::gitignore::Gitignore;
 use krates::{Kid, KrateDetails, Krates};
-use tracing::{debug, error};
+use log::{debug, error};
+
+use crate::cli::Args;
 
 pub struct Workspace {
     pub krates: Krates,
@@ -116,4 +118,25 @@ impl Workspace {
 
         Ok(kid.clone())
     }
+}
+
+/// Get the target package.
+/// 
+/// This combines the info from args and workspace:
+/// - If `--package` is specified, use that.
+/// - Otherwise, use workspace's main package.
+pub fn get_target_package(workspace: &Workspace, args: &Args) -> (Kid, String) {
+    let kid = if let Some(package) = args.package.as_ref() {
+        workspace.get_package(&package)
+    } else {
+        workspace.main_package()
+    }
+    .expect("no package");
+    let package_name =
+        if let krates::Node::Krate { krate, .. } = workspace.krates.node_for_kid(&kid).unwrap() {
+            krate.name.to_string()
+        } else {
+            unreachable!()
+        };
+    (kid, package_name)
 }

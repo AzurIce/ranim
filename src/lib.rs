@@ -213,13 +213,14 @@ struct RanimRenderApp {
     /// Whether to auto create a [`FileWriter`] to output the video
     video_writer_builder: Option<FileWriterBuilder>,
     /// Whether to save the frames
-    save_frames: bool,
-    /// fps
-    fps: u32,
-
     frame_count: u32,
-    output_dir: PathBuf,
     scene_name: String,
+
+    width: u32,
+    height: u32,
+    fps: u32,
+    save_frames: bool,
+    output_dir: PathBuf,
 
     pub(crate) render_instances: RenderInstances,
 }
@@ -268,16 +269,17 @@ impl RanimRenderApp {
                 FileWriterBuilder::default()
                     .with_fps(output.fps)
                     .with_size(output.width, output.height)
-                    .with_file_path(
-                        output_dir
-                            .join(&scene_name)
-                            .join(format!("{scene_name}.mp4")),
-                    ),
+                    .with_file_path(output_dir.join(format!(
+                        "{scene_name}_{}x{}_{}.mp4",
+                        output.width, output.height, output.fps
+                    ))),
             ),
-            save_frames: output.save_frames,
-            fps: output.fps,
             frame_count: 0,
             ctx,
+            width: output.width,
+            height: output.height,
+            fps: output.fps,
+            save_frames: output.save_frames,
             output_dir,
             scene_name,
             render_instances: RenderInstances::default(),
@@ -471,7 +473,14 @@ impl RanimRenderApp {
         // println!("{}", render_primitives.len());
         self.renderer.update_uniforms(&self.ctx, camera_frame);
         self.renderer.render(&self.ctx, &render_primitives);
-        self.save_frame_to_image(self.output_dir.join(&self.scene_name).join(filename));
+        self.save_frame_to_image(
+            self.output_dir
+                .join(format!(
+                    "{}_{}x{}_{}",
+                    self.scene_name, self.width, self.height, self.fps
+                ))
+                .join(filename),
+        );
     }
 
     fn update_frame(&mut self) {
@@ -488,8 +497,11 @@ impl RanimRenderApp {
         if self.save_frames {
             let path = self
                 .output_dir
-                .join(&self.scene_name)
-                .join(format!("frames/{:04}.png", self.frame_count));
+                .join(format!(
+                    "{}_{}x{}_{}-frames",
+                    self.scene_name, self.width, self.height, self.fps
+                ))
+                .join(format!("{:04}.png", self.frame_count));
             self.save_frame_to_image(path);
         }
         self.frame_count += 1;
@@ -497,7 +509,7 @@ impl RanimRenderApp {
 
     pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
         let dir = path.as_ref().parent().unwrap();
-        if !dir.exists() {
+        if !dir.exists() || !dir.is_dir() {
             std::fs::create_dir_all(dir).unwrap();
         }
         let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx);
