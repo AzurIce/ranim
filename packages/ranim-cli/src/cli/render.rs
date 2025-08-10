@@ -31,13 +31,14 @@ pub fn render_command(args: &Args, scenes: &[String]) {
         .unwrap()
         .expect("Failed on initial build");
 
-    let all_scenes = lib.scenes();
-    let scenes_to_render: Vec<&Scene> = if scenes.is_empty() {
-        all_scenes.iter().collect()
+    let all_scenes: Vec<&'static Scene> = lib.scenes().into_iter().collect::<Vec<_>>();
+    let scenes_to_render: Vec<&'static Scene> = if scenes.is_empty() {
+        all_scenes.clone()
     } else {
         all_scenes
             .iter()
             .filter(|scene| scenes.iter().any(|s| s == scene.name))
+            .cloned()
             .collect()
     };
 

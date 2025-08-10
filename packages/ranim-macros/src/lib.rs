@@ -98,25 +98,35 @@ pub fn scene(_args: TokenStream, input: TokenStream) -> TokenStream {
         &format!("__SCENE_{}_OUTPUTS", fn_name.to_string().to_uppercase()),
         fn_name.span(),
     );
+    let static_name = syn::Ident::new(
+        &format!("__SCENE_{}", fn_name.to_string().to_uppercase()),
+        fn_name.span(),
+    );
     let static_scene_name = syn::Ident::new(&format!("{fn_name}_scene"), fn_name.span());
 
     let output_cnt = outputs.len();
+
+    let scene = quote! {
+        #ranim::Scene {
+            name: #scene_name,
+            constructor: #fn_name,
+            config: #scene_config,
+            outputs: &#static_output_name,
+            preview: #preview,
+        }
+    };
 
     // 构造 Scene 并塞进分布式切片
     let expanded = quote! {
         #vis fn #fn_name(r: &mut #ranim::timeline::RanimScene) #fn_body
 
         static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
-        #[allow(non_upper_case_globals)]
-        #vis static #static_scene_name: &'static #ranim::Scene = &#ranim::Scene {
-            name: #scene_name,
-            constructor: #fn_name,
-            config: #scene_config,
-            outputs: &#static_output_name,
-            preview: #preview,
-        };
+        #[cfg_attr(not(target_family = "wasm"), #ranim::linkme::distributed_slice(#ranim::SCENES))]
+        #[cfg_attr(not(target_family = "wasm"), linkme(crate = #ranim::linkme))]
+        static #static_name: #ranim::Scene = #scene;
 
-        #ranim::inventory::submit!{ #static_scene_name }
+        #[allow(non_upper_case_globals)]
+        #vis static #static_scene_name: &'static #ranim::Scene = &#static_name;
     };
 
     TokenStream::from(expanded)

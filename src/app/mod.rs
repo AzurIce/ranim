@@ -548,22 +548,12 @@ pub fn run_app(app: AppState) {
 
 /// Runs a scene preview app on a scene constructor
 pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
-    #[cfg(target_family = "wasm")]
-    unsafe {
-        super::__wasm_call_ctors();
-    }
-
     let app_state = AppState::new_with_title(constructor, name);
     run_app(app_state);
 }
 
 /// Preview a scene
 pub fn preview(s: &Scene) {
-    #[cfg(target_family = "wasm")]
-    unsafe {
-        super::__wasm_call_ctors();
-    }
-
     run_scene_app(s.constructor, s.name.to_string());
 }
 
