@@ -60,9 +60,9 @@ pub fn parse_output_list(list: &MetaList) -> syn::Result<OutputDef> {
     let mut def = OutputDef {
         width: 1920,
         height: 1080,
-        fps: 30,
-        save_frames: true,
-        dir: "output".into(),
+        fps: 60,
+        save_frames: false,
+        dir: "./".into(),
     };
 
     let parser = Punctuated::<MetaNameValue, Comma>::parse_terminated;

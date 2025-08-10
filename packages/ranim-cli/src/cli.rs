@@ -6,12 +6,10 @@ use clap::{Parser, Subcommand};
 #[derive(Parser, Clone, Default)]
 pub struct Args {
     #[arg(global = true, short, long, help_heading = "Cargo Options")]
-    package: Option<String>,
+    pub package: Option<String>,
 
-    // #[arg(long, global = true, help_heading = "Cargo Options")]
-    // pub locked: bool,
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-    args: Vec<String>,
+    pub args: Vec<String>,
 }
 
 #[derive(Parser)]
@@ -32,10 +30,10 @@ impl Cli {
 
         match self.command {
             Commands::Preview => {
-                preview::preview_command(args);
+                preview::preview_command(&args);
             }
-            Commands::Render => {
-                render::render_command(args);
+            Commands::Render { scenes } => {
+                render::render_command(&args, &scenes);
             }
         }
     }
@@ -46,5 +44,9 @@ pub enum Commands {
     /// Launch a preview app, watch the lib crate and rebuild it to dylib when it is changed
     Preview,
     /// Build the lib crate and load it, then render it to video
-    Render,
+    Render {
+        /// Optional scene names to render (if not provided, render all scenes)
+        #[arg(num_args = 0..)]
+        scenes: Vec<String>,
+    },
 }

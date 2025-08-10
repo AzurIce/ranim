@@ -18,9 +18,7 @@ notify = "8.2.0"
 notify-debouncer-full = "0.6.0"
 async-channel = "2.5.0"
 toml = "0.9.5"
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["fmt", "env-filter"] }
-tracing-log = "0.2.0"
+pretty_env_logger = "0.5.0"
 
 [package.metadata.release]
 tag = false
