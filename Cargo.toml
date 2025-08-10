@@ -228,3 +228,10 @@ path = "examples/selective_sort/main.rs"
 
 [package.metadata.example.selective_sort]
 wasm = true
+
+[[example]]
+name = "extract_vitem_visualize"
+path = "examples/extract_vitem_visualize/main.rs"
+
+[package.metadata.example.extract_vitem_visualize]
+wasm = true
