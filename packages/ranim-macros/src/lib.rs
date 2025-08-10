@@ -46,10 +46,10 @@ struct OutputDef {
 
 // ---------- 入口 ----------
 #[proc_macro_attribute]
-pub fn scene(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let ranim = ranim_path();
     let input_fn = parse_macro_input!(input as ItemFn);
-    let attrs = parse_scene_attrs(&input_fn.attrs).unwrap_or_default();
+    let attrs = parse_scene_attrs(args, input_fn.attrs.as_slice()).unwrap();
 
     let fn_name = &input_fn.sig.ident;
     let vis = &input_fn.vis;

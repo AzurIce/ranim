@@ -4,10 +4,38 @@ use crate::{OutputDef, SceneAttrs};
 use quote::ToTokens;
 use syn::{Expr, ExprLit, Lit, Meta, MetaList, MetaNameValue, token::Comma};
 
-pub fn parse_scene_attrs(attrs: &[syn::Attribute]) -> syn::Result<SceneAttrs> {
+/// 解析 #[scene(...)] 中的参数
+pub fn parse_scene_attrs(
+    args: proc_macro::TokenStream,
+    attrs: &[syn::Attribute],
+) -> syn::Result<SceneAttrs> {
     use syn::{parse::Parser, punctuated::Punctuated};
 
     let mut res = SceneAttrs::default();
+
+    if args.is_empty() {
+        return Ok(res);
+    }
+
+    let args = proc_macro2::TokenStream::from(args);
+    let parser = Punctuated::<MetaNameValue, Comma>::parse_terminated;
+    let kvs = parser.parse2(args)?;
+
+    for nv in kvs {
+        if nv.path.is_ident("name")
+            && let Expr::Lit(ExprLit {
+                lit: Lit::Str(s), ..
+            }) = nv.value
+        {
+            res.name = Some(s.value());
+        } else if nv.path.is_ident("frame_height")
+            && let Expr::Lit(ExprLit {
+                lit: Lit::Float(f), ..
+            }) = nv.value
+        {
+            res.frame_height = Some(f.base10_parse()?);
+        }
+    }
 
     for attr in attrs {
         if attr.path().is_ident("preview") {
@@ -15,36 +43,13 @@ pub fn parse_scene_attrs(attrs: &[syn::Attribute]) -> syn::Result<SceneAttrs> {
             continue;
         }
 
-        // 统一拿 meta
-        let meta = &attr.meta;
-
-        if let Meta::List(list) = meta {
-            if list.path.is_ident("scene") {
-                // 解析 #[scene(key = value, ...)]
-                let parser = Punctuated::<MetaNameValue, Comma>::parse_terminated;
-                let kvs = parser.parse2(list.tokens.clone())?;
-                for nv in kvs {
-                    if nv.path.is_ident("name")
-                        && let Expr::Lit(ExprLit {
-                            lit: Lit::Str(s), ..
-                        }) = nv.value
-                    {
-                        res.name = Some(s.value());
-                    } else if nv.path.is_ident("frame_height")
-                        && let Expr::Lit(ExprLit {
-                            lit: Lit::Float(f), ..
-                        }) = nv.value
-                    {
-                        res.frame_height = Some(f.base10_parse()?);
-                    }
-                }
-            }
-
-            if list.path.is_ident("output") {
-                res.outputs.push(parse_output_list(list)?);
-            }
+        if let Meta::List(list) = &attr.meta
+            && list.path.is_ident("output")
+        {
+            res.outputs.push(parse_output_list(list)?);
         }
     }
+
     Ok(res)
 }
 
