@@ -46,7 +46,7 @@ fn hello_ranim(r: &mut RanimScene) {
         timeline.play_with(|circle| circle.fade_out());
     };
 
-    r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
+    r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
 }
 
 fn main() {
@@ -68,7 +68,7 @@ fn main() {
     render_scene(hello_ranim_scene)
 }
 ```"""
-hash = "e1a0b7d8cef861d7556f67ca2ae6163c5be66a82"
+hash = "63ce4c9ecc1c90b3a656f765ff3756815e222f38"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/hello_ranim_1920x1080_60.mp4"]
 wasm = true

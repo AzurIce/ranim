@@ -23,19 +23,26 @@
 )]
 #![feature(downcast_unchecked)]
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::utils::wgpu::WgpuContext;
 use animation::EvalResult;
 #[cfg(not(target_arch = "wasm32"))]
 use file_writer::{FileWriter, FileWriterBuilder};
+#[cfg(not(target_arch = "wasm32"))]
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+#[cfg(not(target_arch = "wasm32"))]
 use log::info;
+#[cfg(not(target_arch = "wasm32"))]
 use render::{Renderer, primitives::RenderInstances};
+#[cfg(not(target_arch = "wasm32"))]
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     time::Duration,
 };
-use timeline::{RanimScene, SealedRanimScene, TimeMark, TimelineEvalResult};
+use timeline::{RanimScene, SealedRanimScene};
+#[cfg(not(target_arch = "wasm32"))]
+use timeline::{TimeMark, TimelineEvalResult};
 
 pub use glam;
 
@@ -85,7 +92,8 @@ impl<F: Fn(&mut RanimScene) + Send + Sync> SceneConstructor for F {
 }
 
 // MARK: Dylib part
-pub use inventory;
+#[cfg(not(target_family = "wasm"))]
+pub use linkme;
 
 #[doc(hidden)]
 #[derive(Clone)]
@@ -97,7 +105,10 @@ pub struct Scene {
     pub preview: bool,
 }
 
-inventory::collect!(&'static Scene);
+#[cfg(not(target_family = "wasm"))]
+#[doc(hidden)]
+#[linkme::distributed_slice]
+pub static SCENES: [Scene];
 
 /// Scene config
 #[derive(Debug, Clone)]
@@ -148,19 +159,12 @@ impl Output {
     };
 }
 
+#[cfg(not(target_family = "wasm"))]
 #[doc(hidden)]
 #[unsafe(no_mangle)]
 #[allow(improper_ctypes_definitions)] // Because currently we only use it in rust
-pub extern "C" fn scenes() -> inventory::iter<Scene> {
-    inventory::iter::<Scene>
-}
-
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-
-#[cfg(target_arch = "wasm32")]
-unsafe extern "C" {
-    pub(crate) fn __wasm_call_ctors();
+pub extern "C" fn scenes() -> &'static [Scene] {
+    &SCENES
 }
 
 // MARK: Prelude

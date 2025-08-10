@@ -86,21 +86,22 @@ impl RanimUserLibraryBuilder {
 
     /// This will cancel the previous build
     pub fn start_build(&mut self) {
+        info!("Start build");
         self.cancel_previous_build();
         let builder = self.build_process.clone();
-        self.building_handle = Some(thread::spawn(move || {
-            info!("Building...");
-            builder.build();
-        }));
+        self.building_handle = Some(thread::spawn(move || builder.build()));
     }
 
     pub fn cancel_previous_build(&mut self) {
-        if let Some(building_handle) = self.building_handle.take() {
+        if let Some(building_handle) = self.building_handle.take()
+            && !building_handle.is_finished()
+        {
             info!("Canceling previous build...");
-            self.cancel_tx
-                .send_blocking(())
-                .map_err(|e| anyhow::anyhow!("Failed to cancel build: {:?}", e))
-                .unwrap();
+            if let Err(err) = self.cancel_tx.try_send(()) {
+                if err.is_closed() {
+                    panic!("Failed to cancel build: {:?}", err);
+                }
+            }
             building_handle.join().unwrap();
         }
     }
@@ -146,13 +147,13 @@ impl RanimUserLibrary {
     }
 
     /// Safety: dylib has a `scenes`` fn with the correct signature
-    pub fn scenes(&self) -> &[Scene] {
+    pub fn scenes(&self) -> &'static [Scene] {
         let scenes: Symbol<extern "C" fn() -> &'static [Scene]> =
             unsafe { self.inner.as_ref().unwrap().get(b"scenes").unwrap() };
         scenes()
     }
 
-    pub fn get_preview_func(&self) -> &Scene {
+    pub fn get_preview_func(&self) -> &'static Scene {
         self.scenes()
             .iter()
             .find(|s| s.preview)

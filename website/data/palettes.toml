@@ -80,6 +80,6 @@ fn main() {
 }
 ```"""
 hash = "63e3b66c2d875501f32ca9a98757493d5ece401c"
-preview_imgs = ["/examples/palettes/preview.jpg", "/examples/palettes/preview.png"]
+preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/palettes_1920x1080_60.mp4"]
 wasm = false

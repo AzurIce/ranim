@@ -43,7 +43,7 @@ fn hello_ranim(r: &mut RanimScene) {
         timeline.play_with(|circle| circle.fade_out());
     };
 
-    r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
+    r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
 }
 
 fn main() {
