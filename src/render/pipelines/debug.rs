@@ -7,6 +7,7 @@ use crate::{
     utils::wgpu::WgpuContext,
 };
 
+#[allow(unused)]
 pub struct DebugPipeline {
     pipeline: wgpu::RenderPipeline,
 }

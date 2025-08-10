@@ -142,9 +142,9 @@ pub extern "C" fn scenes() -> &'static [Scene] {
 /// The preludes
 pub mod prelude {
     #[cfg(feature = "app")]
-    pub use crate::app::run_scene_app;
-
+    pub use crate::app::{run_app, run_scene_app};
     pub use crate::{render_scene, render_scene_output};
+
     pub use ranim_macros::{output, preview, scene};
 
     pub use crate::items::{ItemId, camera_frame::CameraFrame};

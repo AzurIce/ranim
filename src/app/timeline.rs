@@ -58,9 +58,9 @@ impl TimelineState {
     pub fn interact_preview_timeline(&mut self, info: &TimelineInfo) {
         let response = &info.response;
 
-        if response.clicked() {
-            if let Some(mouse_pos) = response.hover_pos() {}
-        }
+        if response.clicked()
+            && let Some(mouse_pos) = response.hover_pos()
+        {}
 
         // if response.drag_delta().x != 0.0 {
         //     self.offset_points += response.drag_delta().x;

@@ -121,31 +121,30 @@ impl Example {
             .filter_map(Result::ok)
         {
             let path = entry.path();
-            if path.is_file() {
-                if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
-                    print!("Found {file_name:?}");
-                    if file_name.starts_with("preview") {
-                        print!(", preview file");
-                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                            if ["png", "jpg"].contains(&ext) {
-                                println!(", copying...");
-                                preview_imgs.push(
-                                    copy_file(path, &output_dir)
-                                        .expect("failed to copy preview img"),
-                                );
-                            }
-                        }
-                    } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                        print!(", output file");
-                        if ["mp4", "png", "jpg"].contains(&ext) {
-                            print!(", copying...");
-                            output_files.push(
-                                copy_file(path, &output_dir).expect("failed to copy output file"),
-                            );
-                        }
+            if path.is_file()
+                && let Some(file_name) = path.file_name().and_then(|name| name.to_str())
+            {
+                print!("Found {file_name:?}");
+                if file_name.starts_with("preview") {
+                    print!(", preview file");
+                    if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                        && ["png", "jpg"].contains(&ext)
+                    {
+                        println!(", copying...");
+                        preview_imgs.push(
+                            copy_file(path, &output_dir).expect("failed to copy preview img"),
+                        );
                     }
-                    println!()
+                } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    print!(", output file");
+                    if ["mp4", "png", "jpg"].contains(&ext) {
+                        print!(", copying...");
+                        output_files.push(
+                            copy_file(path, &output_dir).expect("failed to copy output file"),
+                        );
+                    }
                 }
+                println!()
             }
         }
 

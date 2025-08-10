@@ -121,7 +121,7 @@ impl Workspace {
 }
 
 /// Get the target package.
-/// 
+///
 /// This combines the info from args and workspace:
 /// - If `--package` is specified, use that.
 /// - Otherwise, use workspace's main package.

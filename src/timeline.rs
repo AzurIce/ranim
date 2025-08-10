@@ -7,8 +7,8 @@ use crate::{
     animation::{AnimationSpan, EvalResult, Evaluator},
     items::{ItemId, VisualItem, camera_frame::CameraFrame},
 };
-use std::{any::TypeId, fmt::Debug};
 use std::{any::Any, sync::Arc};
+use std::{any::TypeId, fmt::Debug};
 
 /// TimeMark
 #[derive(Debug, Clone)]
@@ -105,7 +105,11 @@ impl RanimScene {
     where
         ItemTimeline<E>: Into<DynTimeline>,
     {
-        trace!("map {:?}", item_id);
+        trace!(
+            "map {item_id:?} {:?} -> {:?}",
+            TypeId::of::<T>(),
+            TypeId::of::<E>()
+        );
         let item_dyn_timeline = self
             .timelines
             .iter_mut()
