@@ -1,6 +1,13 @@
 use log::LevelFilter;
 use ranim::{
-    animation::transform::TransformAnim, color::{palettes::manim, HueDirection}, components::Anchor, glam::dvec3, items::vitem::geometry::Rectangle, prelude::*, timeline::TimeMark, utils::rate_functions::{ease_in_quad, ease_out_quad, linear}
+    animation::transform::TransformAnim,
+    color::{HueDirection, palettes::manim},
+    components::Anchor,
+    glam::dvec3,
+    items::vitem::geometry::Rectangle,
+    prelude::*,
+    timeline::TimeMark,
+    utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
 
 fn solve_hanoi(

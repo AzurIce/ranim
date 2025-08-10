@@ -21,7 +21,7 @@ fn watch_krate(
     workspace: &Workspace,
     kid: &Kid,
 ) -> (
-    Debouncer<notify::RecommendedWatcher, notify_debouncer_full::FileIdMap>,
+    Debouncer<notify::RecommendedWatcher, notify_debouncer_full::RecommendedCache>,
     Receiver<Vec<DebouncedEvent>>,
 ) {
     let (tx, rx) = unbounded();

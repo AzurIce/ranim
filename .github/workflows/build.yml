@@ -16,6 +16,8 @@ jobs:
 
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -23,6 +25,9 @@ jobs:
 
       - name: Run cargo check
         run: cargo check
+
+      - name: Run cargo check
+        run: cargo check --target wasm32-unknown-unknown
 
   # test:
   #   name: Test Suite

@@ -6,9 +6,11 @@ use ranim::{
     color::palettes::manim,
     glam::DVec3,
     items::vitem::{
-        geometry::{Circle, Square}, VItem
+        VItem,
+        geometry::{Circle, Square},
     },
-    prelude::*, timeline::TimeMark,
+    prelude::*,
+    timeline::TimeMark,
 };
 
 #[scene]
