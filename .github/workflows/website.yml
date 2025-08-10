@@ -4,6 +4,7 @@ on:
   push:
     branches: ["main"]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
@@ -20,7 +21,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    if: github.repository == 'AzurIce/ranim' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    if: github.repository == 'AzurIce/ranim'
     steps:
       - uses: actions/checkout@v4
         with:
