@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2025-08-10
+
+### 🐛 Bug Fixes
+
+- Scene macro's attrs not working
+
+### Example
+
+- Added extract_vitem_visualize
+
 ## [0.1.0] - 2025-08-10
 
 ### 🚀 Features
@@ -26,6 +36,7 @@ All notable changes to this project will be documented in this file.
 - Don't run on drafted PR
 - Update workflow
 - Use nightly
+- Release
 
 ## [0.1.0-alpha.17] - 2025-07-11
 
