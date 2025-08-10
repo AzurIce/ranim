@@ -28,7 +28,6 @@ use animation::EvalResult;
 #[cfg(not(target_arch = "wasm32"))]
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use linkme::distributed_slice;
 use log::info;
 use render::{Renderer, primitives::RenderInstances};
 use std::{
@@ -61,22 +60,42 @@ pub mod traits;
 /// Utils
 pub mod utils;
 
-/// A scene constructor type alias
-pub type SceneConstructor = fn(&mut RanimScene);
+/// A scene constructor
+///
+/// It can be a simple fn pointer of `fn(&mut RanimScene)`,
+/// or any type implements `Fn(&mut RanimScene) + Send + Sync`.
+pub trait SceneConstructor: Send + Sync {
+    /// The construct logic
+    fn construct(&self, r: &mut RanimScene);
+
+    /// Use the constructor to build a [`SealedRanimScene`]
+    fn build_scene(&self) -> SealedRanimScene {
+        let mut scene = RanimScene::new();
+        self.construct(&mut scene);
+        scene.seal()
+    }
+}
+
+impl<F: Fn(&mut RanimScene) + Send + Sync> SceneConstructor for F {
+    fn construct(&self, r: &mut RanimScene) {
+        self(r);
+    }
+}
 
 // MARK: Dylib part
-#[doc(hidden)]
-pub use linkme;
+pub use inventory;
 
 #[doc(hidden)]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Scene {
     pub name: &'static str,
-    pub constructor: SceneConstructor,
+    pub constructor: fn(&mut RanimScene),
     pub config: SceneConfig,
     pub outputs: &'static [Output],
     pub preview: bool,
 }
+
+inventory::collect!(&'static Scene);
 
 /// Scene config
 #[derive(Debug, Clone)]
@@ -128,22 +147,27 @@ impl Output {
 }
 
 #[doc(hidden)]
-#[distributed_slice]
-pub static SCENES: [Scene] = [..];
-
-#[doc(hidden)]
 #[unsafe(no_mangle)]
 #[allow(improper_ctypes_definitions)] // Because currently we only use it in rust
-pub extern "C" fn scenes() -> &'static [Scene] {
-    &SCENES
+pub extern "C" fn scenes() -> inventory::iter<Scene> {
+    inventory::iter::<Scene>
+}
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+unsafe extern "C" {
+    pub(crate) fn __wasm_call_ctors();
 }
 
 // MARK: Prelude
 /// The preludes
 pub mod prelude {
     #[cfg(feature = "app")]
-    pub use crate::app::{run_app, run_scene_app};
-    pub use crate::{render_scene, render_scene_output};
+    pub use crate::app::{preview, run_app, run_scene_app};
+    #[cfg(not(target_arch = "wasm32"))]
+    pub use crate::{render, render_scene, render_scene_output};
 
     pub use ranim_macros::{output, preview, scene};
 
@@ -162,21 +186,8 @@ pub(crate) static PUFFIN_GPU_PROFILER: std::sync::LazyLock<
     std::sync::Mutex<puffin::GlobalProfiler>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
 
-/// A helper function to build a [`SealedRanimScene`] from a [`SceneConstructor`]
-pub fn build_timeline(constructor: SceneConstructor) -> SealedRanimScene {
-    let mut timeline = RanimScene::new();
-    {
-        // let cam = items::camera_frame::CameraFrame::new();
-        // let r_cam = timeline.insert(cam);
-        // timeline.timeline_mut(&r_cam).show();
-        // constructor.construct(&mut timeline, r_cam);
-    }
-    constructor(&mut timeline);
-    timeline.seal()
-}
-
-#[cfg(not(target_arch = "wasm32"))]
 /// Render a scene
+#[cfg(not(target_arch = "wasm32"))]
 pub fn render_scene(scene: &Scene) {
     for output in scene.outputs {
         render_scene_output(
@@ -188,17 +199,17 @@ pub fn render_scene(scene: &Scene) {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 /// Render a scene output
+#[cfg(not(target_arch = "wasm32"))]
 pub fn render_scene_output(
-    constructor: SceneConstructor,
+    constructor: impl SceneConstructor,
     name: String,
     scene_config: &SceneConfig,
     output: &Output,
 ) {
-    let timeline = build_timeline(constructor);
+    let scene = constructor.build_scene();
     let mut app = RanimRenderApp::new(name, scene_config, output);
-    app.render_timeline(timeline);
+    app.render_timeline(scene);
 }
 
 /// MARK: RanimRenderApp
@@ -305,6 +316,7 @@ impl RanimRenderApp {
         };
 
         let frames = (timeline.total_secs() * self.fps as f64).ceil() as usize;
+        let frames = frames.max(2);
         let pb = ProgressBar::new(frames as u64);
         pb.set_style(
             ProgressStyle::with_template(

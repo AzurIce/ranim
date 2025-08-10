@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use log::trace;
+use log::{trace, warn};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -196,6 +196,10 @@ impl SealedRanimScene {
                     items.push((timeline.id, res, timeline_idx, idx));
                 }
             }
+        }
+
+        if camera_frame.is_none() {
+            warn!("No camera frame found at sec {target_sec}");
         }
 
         TimelineEvalResult {

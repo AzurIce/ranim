@@ -16,10 +16,10 @@ use ranim::{\r
 };\r
 \r
 #[scene]\r
-struct PerspectiveBlendScene;\r
-\r
-impl SceneConstructor for PerspectiveBlendScene {\r
-    fn construct(&self, r: &mut RanimScene, r_cam: ItemId<CameraFrame>) {\r
+#[preview]\r
+#[output(dir = "perspective_blend")]\r
+fn perspective_blend(r: &mut RanimScene) {\r
+    let r_cam = r.insert_and_show(CameraFrame::default());\r
         r.timeline_mut(&r_cam).update_with(|cam| {\r
             cam.pos = DVec3::Z * 5.0;\r
         });\r
@@ -103,7 +103,6 @@ impl SceneConstructor for PerspectiveBlendScene {\r
             r.timelines().max_total_secs(),\r
             TimeMark::Capture("preview.png".to_string()),\r
         );\r
-    }\r
 }\r
 \r
 fn main() {\r
@@ -120,21 +119,13 @@ fn main() {\r
     }\r
 \r
     #[cfg(not(feature = "app"))]\r
-    {\r
-        let options = AppOptions {\r
-            pixel_size: (1280, 720),\r
-            frame_rate: 60,\r
-            ..Default::default()\r
-        };\r
-        render_scene(PerspectiveBlendScene, &options);\r
-    }\r
+    render(perspective_blend);\r
 \r
-    // reuires "app" feature\r
     #[cfg(feature = "app")]\r
-    run_scene_app(PerspectiveBlendScene);\r
+    preview(perspective_blend);\r
 }\r
 ```"""
-hash = "0dc777c6bfe98424b620af997f630b10df8a202d"
+hash = "08607cf5c95d250d2ca111da2690ec20533ae2d5"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
-output_files = ["/examples/perspective_blend/output.mp4"]
+output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

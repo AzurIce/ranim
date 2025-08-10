@@ -67,10 +67,10 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {\r
     ]\r
 }\r
 #[scene]\r
-struct RanimLogoScene;\r
-\r
-impl SceneConstructor for RanimLogoScene {\r
-    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+#[preview]\r
+#[output(dir = "ranim_logo")]\r
+fn ranim_logo(r: &mut RanimScene) {\r
+    let _r_cam = r.insert_and_show(CameraFrame::default());\r
         let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
         let logo_width = frame_size.y * 0.618;\r
 \r
@@ -154,7 +154,6 @@ impl SceneConstructor for RanimLogoScene {\r
                 item.unwrite().with_duration(3.0).with_rate_func(linear)\r
             })\r
         });\r
-    }\r
 }\r
 \r
 fn main() {\r
@@ -171,12 +170,12 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    run_scene_app(RanimLogoScene);\r
+    preview(ranim_logo);\r
     #[cfg(not(feature = "app"))]\r
-    render_scene(RanimLogoScene, &AppOptions::default());\r
+    render(ranim_logo);\r
 }\r
 ```"""
-hash = "0ccfe35f71c17bc83272d0b2b9bb1285cf4a7e88"
+hash = "b33532dc9ff6cf38ebe5b74d2062f024e54d421c"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
-output_files = ["/examples/ranim_logo/output.mp4"]
+output_files = ["/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
 wasm = true

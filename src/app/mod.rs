@@ -18,10 +18,9 @@ use winit::{
 };
 
 use crate::{
-    SceneConstructor,
+    Scene, SceneConstructor,
     animation::EvalResult,
     app::egui_tools::EguiRenderer,
-    build_timeline,
     render::{
         Renderer,
         pipelines::app::{AppPipeline, Viewport},
@@ -60,7 +59,7 @@ impl TimelineInfo {
 /// App command
 pub enum AppCmd {
     /// Reload the scene, will send a `()` after reloaded
-    ReloadScene(SceneConstructor, Sender<()>),
+    ReloadScene(Box<dyn SceneConstructor>, Sender<()>),
 }
 
 /// App's state
@@ -83,8 +82,8 @@ pub struct AppState {
 
 impl AppState {
     /// Create a new app state with a scene constructor and a title
-    pub fn new_with_title(scene_constructor: SceneConstructor, title: String) -> Self {
-        let timeline = build_timeline(scene_constructor);
+    pub fn new_with_title(scene_constructor: impl SceneConstructor, title: String) -> Self {
+        let timeline = scene_constructor.build_scene();
         let timeline_infos = timeline.get_timeline_infos();
         // let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
         let (cmd_tx, cmd_rx) = unbounded();
@@ -180,8 +179,8 @@ impl AppState {
     fn handle_events(&mut self) {
         if let Ok(cmd) = self.cmd_rx.try_recv() {
             match cmd {
-                AppCmd::ReloadScene(scene_constructor, tx) => {
-                    let timeline = build_timeline(scene_constructor);
+                AppCmd::ReloadScene(constructor, tx) => {
+                    let timeline = constructor.build_scene();
                     let timeline_infos = timeline.get_timeline_infos();
                     self.timeline_state = TimelineState::new(timeline.total_secs(), timeline_infos);
                     self.timeline = timeline;
@@ -402,7 +401,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
             let canvas = document
-                .get_element_by_id(&format!("app-{}", self.app_state.meta.name))
+                .get_element_by_id(&format!("app-{}", self.app_state.title))
                 .unwrap();
             let canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().ok();
 
@@ -547,9 +546,24 @@ pub fn run_app(app: AppState) {
 }
 
 /// Runs a scene preview app on a scene constructor
-pub fn run_scene_app(constructor: SceneConstructor, name: String) {
+pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
+    #[cfg(target_family = "wasm")]
+    unsafe {
+        super::__wasm_call_ctors();
+    }
+
     let app_state = AppState::new_with_title(constructor, name);
     run_app(app_state);
+}
+
+/// Preview a scene
+pub fn preview(s: &Scene) {
+    #[cfg(target_family = "wasm")]
+    unsafe {
+        super::__wasm_call_ctors();
+    }
+
+    run_scene_app(s.constructor, s.name.to_string());
 }
 
 #[allow(unused)]

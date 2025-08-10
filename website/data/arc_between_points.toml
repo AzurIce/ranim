@@ -13,10 +13,10 @@ use ranim::{\r
 };\r
 \r
 #[scene]\r
-struct ArcBetweenPointsScene;\r
-\r
-impl SceneConstructor for ArcBetweenPointsScene {\r
-    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+#[preview]\r
+#[output(dir = "arc_between_points")]\r
+fn arc_between_points(r: &mut RanimScene) {\r
+    let _r_cam = r.insert_and_show(CameraFrame::default());\r
         let center = dvec2(0.0, 0.0);\r
 \r
         let start_color = color!("#FF8080FF");\r
@@ -57,7 +57,6 @@ impl SceneConstructor for ArcBetweenPointsScene {\r
             r.timelines().max_total_secs(),\r
             TimeMark::Capture("preview.png".to_string()),\r
         );\r
-    }\r
 }\r
 \r
 fn main() {\r
@@ -74,12 +73,12 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    run_scene_app(ArcBetweenPointsScene);\r
+    preview(arc_between_points);\r
     #[cfg(not(feature = "app"))]\r
-    render_scene(ArcBetweenPointsScene, &AppOptions::default());\r
+    render(arc_between_points)\r
 }\r
 ```"""
-hash = "fa05d32596220686125b9ba87fd2bf376528efc8"
+hash = "84c65765602cda7e018ff4829a29e75235e59399"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
-output_files = ["/examples/arc_between_points/output.mp4"]
+output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
 wasm = true

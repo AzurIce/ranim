@@ -14,103 +14,112 @@ use ranim::{\r
     utils::rate_functions::linear,\r
 };\r
 \r
-#[scene]\r
-struct BubbleSortScene(pub usize);\r
+fn bubble_sort(r: &mut RanimScene, num: usize) {\r
+    let _r_cam = r.insert_and_show(CameraFrame::default());\r
 \r
-impl SceneConstructor for BubbleSortScene {\r
-    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
-        let num = self.0;\r
+    let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
+    let padded_frame_size = frame_size * 0.9;\r
 \r
-        let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
-        let padded_frame_size = frame_size * 0.9;\r
+    let anim_step_duration = 15.0 / num.pow(2) as f64;\r
 \r
-        let anim_step_duration = 15.0 / num.pow(2) as f64;\r
+    let width_unit = padded_frame_size.x / num as f64;\r
+    let height_unit = padded_frame_size.y / num as f64;\r
 \r
-        let width_unit = padded_frame_size.x / num as f64;\r
-        let height_unit = padded_frame_size.y / num as f64;\r
+    let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);\r
+    let mut heights = (1..=num)\r
+        .map(|x| x as f64 * height_unit)\r
+        .collect::<Vec<f64>>();\r
+    heights.shuffle(&mut rng);\r
 \r
-        let mut rng = rand_chacha::ChaChaRng::seed_from_u64(114514);\r
-        let mut heights = (1..=num)\r
-            .map(|x| x as f64 * height_unit)\r
-            .collect::<Vec<f64>>();\r
-        heights.shuffle(&mut rng);\r
+    let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
+    let mut r_rects = heights\r
+        .iter()\r
+        .enumerate()\r
+        .map(|(i, &height)| {\r
+            let target_bc_coord =\r
+                padded_frame_bl.extend(0.0) + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);\r
+            let rect = Rectangle::new(width_unit, height).with(|rect| {\r
+                rect.stroke_width = 0.0;\r
+                rect.set_fill_color(manim::WHITE.with_alpha(0.5))\r
+                    .scale(DVec3::splat(0.8))\r
+                    .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);\r
+            });\r
+            r.insert(rect)\r
+        })\r
+        .collect::<Vec<_>>();\r
 \r
-        let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);\r
-        let mut r_rects = heights\r
-            .iter()\r
-            .enumerate()\r
-            .map(|(i, &height)| {\r
-                let target_bc_coord = padded_frame_bl.extend(0.0)\r
-                    + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);\r
-                let rect = Rectangle::new(width_unit, height).with(|rect| {\r
-                    rect.stroke_width = 0.0;\r
-                    rect.set_fill_color(manim::WHITE.with_alpha(0.5))\r
-                        .scale(DVec3::splat(0.8))\r
-                        .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);\r
+    let anim_highlight = |rect: Rectangle| {\r
+        rect.transform(|data| {\r
+            data.set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
+        })\r
+        .with_duration(anim_step_duration)\r
+        .with_rate_func(linear)\r
+    };\r
+    let anim_unhighlight = |rect: Rectangle| {\r
+        rect.transform(|data| {\r
+            data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
+        })\r
+        .with_duration(anim_step_duration)\r
+        .with_rate_func(linear)\r
+    };\r
+    let shift_right = DVec3::X * width_unit;\r
+    let swap_shift = [shift_right, -shift_right];\r
+    let anim_swap = |timeline: &mut RanimScene, r_rectab: &[&ItemId<Rectangle>; 2]| {\r
+        let timelines = timeline.timeline_mut(r_rectab);\r
+        timelines\r
+            .into_iter()\r
+            .zip(swap_shift.iter())\r
+            .for_each(|(timeline, shift)| {\r
+                timeline.play_with(|rect| {\r
+                    rect.transform(|data| {\r
+                        data.shift(*shift);\r
+                    })\r
+                    .with_duration(anim_step_duration)\r
+                    .with_rate_func(linear)\r
                 });\r
-                r.insert(rect)\r
-            })\r
-            .collect::<Vec<_>>();\r
+            });\r
+    };\r
 \r
-        let anim_highlight = |rect: Rectangle| {\r
-            rect.transform(|data| {\r
-                data.set_fill_color(manim::BLUE_C.with_alpha(0.5));\r
-            })\r
-            .with_duration(anim_step_duration)\r
-            .with_rate_func(linear)\r
-        };\r
-        let anim_unhighlight = |rect: Rectangle| {\r
-            rect.transform(|data| {\r
-                data.set_fill_color(manim::WHITE.with_alpha(0.5));\r
-            })\r
-            .with_duration(anim_step_duration)\r
-            .with_rate_func(linear)\r
-        };\r
-        let shift_right = DVec3::X * width_unit;\r
-        let swap_shift = [shift_right, -shift_right];\r
-        let anim_swap = |timeline: &mut RanimScene, r_rectab: &[&ItemId<Rectangle>; 2]| {\r
-            let timelines = timeline.timeline_mut(r_rectab);\r
-            timelines\r
+    for i in (1..num).rev() {\r
+        for j in 0..i {\r
+            r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])\r
                 .into_iter()\r
-                .zip(swap_shift.iter())\r
-                .for_each(|(timeline, shift)| {\r
-                    timeline.play_with(|rect| {\r
-                        rect.transform(|data| {\r
-                            data.shift(*shift);\r
-                        })\r
-                        .with_duration(anim_step_duration)\r
-                        .with_rate_func(linear)\r
-                    });\r
+                .for_each(|timeline| {\r
+                    timeline.play_with(anim_highlight);\r
                 });\r
-        };\r
-\r
-        for i in (1..num).rev() {\r
-            for j in 0..i {\r
-                r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])\r
-                    .into_iter()\r
-                    .for_each(|timeline| {\r
-                        timeline.play_with(anim_highlight);\r
-                    });\r
-                if heights[j] > heights[j + 1] {\r
-                    anim_swap(r, &[&r_rects[j], &r_rects[j + 1]]);\r
-                    r.timelines_mut().sync();\r
-                    heights.swap(j, j + 1);\r
-                    r_rects.swap(j, j + 1);\r
-                }\r
-                r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])\r
-                    .into_iter()\r
-                    .for_each(|timeline| {\r
-                        timeline.play_with(anim_unhighlight);\r
-                    });\r
+            if heights[j] > heights[j + 1] {\r
+                anim_swap(r, &[&r_rects[j], &r_rects[j + 1]]);\r
                 r.timelines_mut().sync();\r
+                heights.swap(j, j + 1);\r
+                r_rects.swap(j, j + 1);\r
             }\r
+            r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])\r
+                .into_iter()\r
+                .for_each(|timeline| {\r
+                    timeline.play_with(anim_unhighlight);\r
+                });\r
+            r.timelines_mut().sync();\r
         }\r
-\r
-        r.insert_time_mark(\r
-            r.timelines().max_total_secs(),\r
-            TimeMark::Capture(format!("preview-{num}.png")),\r
-        );\r
     }\r
+\r
+    r.insert_time_mark(\r
+        r.timelines().max_total_secs(),\r
+        TimeMark::Capture(format!("preview-{num}.png")),\r
+    );\r
+}\r
+\r
+#[scene]\r
+#[preview]\r
+#[output(dir = "bubble_sort")]\r
+fn bubble_sort_10(r: &mut RanimScene) {\r
+    bubble_sort(r, 10);\r
+}\r
+\r
+#[scene]\r
+#[preview]\r
+#[output(dir = "bubble_sort")]\r
+fn bubble_sort_100(r: &mut RanimScene) {\r
+    bubble_sort(r, 100);\r
 }\r
 \r
 fn main() {\r
@@ -127,27 +136,15 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    run_scene_app(BubbleSortScene(100));\r
+    preview(bubble_sort_10);\r
     #[cfg(not(feature = "app"))]\r
     {\r
-        render_scene(\r
-            BubbleSortScene(10),\r
-            &AppOptions {\r
-                output_filename: "output-10.mp4",\r
-                ..Default::default()\r
-            },\r
-        );\r
-        render_scene(\r
-            BubbleSortScene(100),\r
-            &AppOptions {\r
-                output_filename: "output-100.mp4",\r
-                ..Default::default()\r
-            },\r
-        );\r
+        render(bubble_sort_10);\r
+        render(bubble_sort_100);\r
     }\r
 }\r
 ```"""
-hash = "7cb4cedf4cfc7a3f8aead07c570559619ccea6f9"
-preview_imgs = ["/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
-output_files = ["/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/output-100.mp4"]
+hash = "4e7c60158427cbec3781b6643e1ec491e313f620"
+preview_imgs = ["/examples/bubble_sort/preview-100.png", "/examples/bubble_sort/preview-10.png"]
+output_files = ["/examples/bubble_sort/bubble_sort_100_1920x1080_60.mp4", "/examples/bubble_sort/bubble_sort_10_1920x1080_60.mp4"]
 wasm = true

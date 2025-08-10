@@ -14,7 +14,7 @@ pub fn render_command(args: &Args, scenes: &[String]) {
     // Get the target package
     info!("Getting target package...");
     let (_, package_name) = get_target_package(&workspace, args);
-    info!("Target package name: {}", package_name);
+    info!("Target package name: {package_name}");
 
     let current_dir = std::env::current_dir().expect("Failed to get current directory");
     let mut builder = RanimUserLibraryBuilder::new(
@@ -45,10 +45,10 @@ pub fn render_command(args: &Args, scenes: &[String]) {
         if scenes.is_empty() {
             info!("No scenes found to render");
         } else {
-            error!("No matching scenes found for: {:?}", scenes);
+            error!("No matching scenes found for: {scenes:?}");
             error!(
                 "Available scenes: {:?}",
-                all_scenes.iter().map(|s| s.name).collect::<Vec<_>>()
+                all_scenes.iter().map(|s| &s.name).collect::<Vec<_>>()
             );
         }
         return;

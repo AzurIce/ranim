@@ -4,18 +4,24 @@ code = """
 use glam::DVec3;\r
 use log::LevelFilter;\r
 use ranim::{\r
-    animation::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim}, color::palettes::manim, components::ScaleHint, items::{\r
-        vitem::{svg::SvgItem, typst::typst_svg, VItem}, Group\r
-    }, prelude::*, timeline::TimeMark\r
+    animation::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},\r
+    color::palettes::manim,\r
+    components::ScaleHint,\r
+    items::{\r
+        Group,\r
+        vitem::{VItem, svg::SvgItem, typst::typst_svg},\r
+    },\r
+    prelude::*,\r
+    timeline::TimeMark,\r
 };\r
 \r
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");\r
 \r
 #[scene]\r
-struct BasicScene;\r
-\r
-impl SceneConstructor for BasicScene {\r
-    fn construct(&self, r: &mut RanimScene, _r_cam: ItemId<CameraFrame>) {\r
+#[preview]\r
+#[output(dir = "basic")]\r
+fn basic(r: &mut RanimScene) {\r
+    let _r_cam = r.insert_and_show(CameraFrame::default());\r
         r.timelines_mut().forward(0.2);\r
 \r
         let svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {\r
@@ -52,14 +58,6 @@ impl SceneConstructor for BasicScene {\r
             r.timelines().max_total_secs(),\r
             TimeMark::Capture("preview.png".to_string()),\r
         );\r
-\r
-        r.timelines_mut().forward(0.5);\r
-        r.timeline_mut(&r_text)\r
-            .play_with(|text| text.lagged(0.2, |e| e.write()).with_duration(3.0));\r
-        r.timeline_mut(&r_svg)\r
-            .play_with(|svg| svg.fade_out().with_duration(3.0)); // At the same time, the svg fade out\r
-        r.timelines_mut().sync();\r
-    }\r
 }\r
 \r
 fn main() {\r
@@ -76,12 +74,12 @@ fn main() {\r
     }\r
 \r
     #[cfg(feature = "app")]\r
-    run_scene_app(BasicScene);\r
+    preview(basic);\r
     #[cfg(not(feature = "app"))]\r
-    render_scene(BasicScene, &AppOptions::default());\r
+    render(basic)\r
 }\r
 ```"""
-hash = "bc290cb1420fc26825d9a880c2646573b6048946"
+hash = "738f7fb7a264852d782d7b2b119aa5473a73d5cb"
 preview_imgs = ["/examples/basic/preview.png"]
-output_files = ["/examples/basic/output.mp4"]
+output_files = ["/examples/basic/basic_1920x1080_60.mp4"]
 wasm = true

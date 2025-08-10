@@ -94,14 +94,11 @@ pub fn scene(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let preview = attrs.preview;
 
-    let static_name = syn::Ident::new(
-        &format!("__SCENE_{}", fn_name.to_string().to_uppercase()),
-        fn_name.span(),
-    );
     let static_output_name = syn::Ident::new(
         &format!("__SCENE_{}_OUTPUTS", fn_name.to_string().to_uppercase()),
         fn_name.span(),
     );
+    let static_scene_name = syn::Ident::new(&format!("{fn_name}_scene"), fn_name.span());
 
     let output_cnt = outputs.len();
 
@@ -110,15 +107,16 @@ pub fn scene(_args: TokenStream, input: TokenStream) -> TokenStream {
         #vis fn #fn_name(r: &mut #ranim::timeline::RanimScene) #fn_body
 
         static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
-        #[#ranim::linkme::distributed_slice(#ranim::SCENES)]
-        #[linkme(crate = #ranim::linkme)]
-        static #static_name: #ranim::Scene = #ranim::Scene {
+        #[allow(non_upper_case_globals)]
+        #vis static #static_scene_name: &'static #ranim::Scene = &#ranim::Scene {
             name: #scene_name,
             constructor: #fn_name,
             config: #scene_config,
             outputs: &#static_output_name,
             preview: #preview,
         };
+
+        #ranim::inventory::submit!{ #static_scene_name }
     };
 
     TokenStream::from(expanded)

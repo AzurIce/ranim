@@ -12,11 +12,7 @@ pub mod camera_frame;
 /// The vectorized item.
 pub mod vitem;
 
-// static ITEM_CNT: AtomicUsize = AtomicUsize::new(0);
-
 /// An item id.
-///
-/// This is basically an [`Id`] with type info.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ItemId<T> {
     id: usize,
@@ -40,7 +36,7 @@ impl<T> Deref for ItemId<T> {
 }
 
 impl<T> ItemId<T> {
-    /// Get the inner [`Id`].
+    /// Get the inner id.
     pub fn inner(&self) -> usize {
         self.id
     }
@@ -50,9 +46,6 @@ impl<T> ItemId<T> {
             _phantom: std::marker::PhantomData,
         }
     }
-    // pub(crate) fn alloc() -> Self {
-    //     Self::new(Id::alloc())
-    // }
 }
 
 impl<T: Extract<Target = Target>, Target: Renderable + 'static> VisualItem for T {

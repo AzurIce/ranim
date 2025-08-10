@@ -1,7 +1,5 @@
 use itertools::Itertools;
 use log::LevelFilter;
-#[cfg(not(feature = "app"))]
-use ranim::{Output, SceneConfig};
 use ranim::{
     animation::{fading::FadingAnim, lagged::LaggedAnim},
     color::HueDirection,
@@ -13,7 +11,7 @@ use ranim::{
 
 #[scene]
 #[preview]
-#[output]
+#[output(dir = "arc")]
 fn arc(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
 
@@ -74,12 +72,7 @@ fn main() {
     }
 
     #[cfg(feature = "app")]
-    run_scene_app(arc, "arc".to_string());
+    preview(arc_scene);
     #[cfg(not(feature = "app"))]
-    render_scene_output(
-        arc,
-        "arc".to_string(),
-        &SceneConfig::default(),
-        &Output::default(),
-    );
+    render_scene(arc_scene)
 }

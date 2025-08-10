@@ -34,14 +34,14 @@ impl BuildProcess {
             &self.args,
             Some(self.cancel_rx),
         ) {
-            error!("Failed to build package: {:?}", err);
+            error!("Failed to build package: {err:?}");
             self.res_tx
-                .send_blocking(Err(anyhow::anyhow!("Failed to build package: {:?}", err)))
+                .send_blocking(Err(anyhow::anyhow!("Failed to build package: {err:?}")))
                 .unwrap();
         } else {
             let dylib_path = get_dylib_path(&self.workspace, &self.package_name, &self.args.args);
             // let tmp_dir = std::env::temp_dir();
-            info!("loading {:?}...", dylib_path);
+            info!("loading {dylib_path:?}...");
 
             let lib = RanimUserLibrary::load(dylib_path);
             self.res_tx.send_blocking(Ok(lib)).unwrap();
@@ -171,7 +171,7 @@ impl Drop for RanimUserLibrary {
 
 fn cargo_build(
     path: impl AsRef<Path>,
-    package: &String,
+    package: &str,
     args: &Args,
     cancel_rx: Option<Receiver<()>>,
 ) -> Result<()> {
@@ -180,7 +180,7 @@ fn cargo_build(
     cmd.args([
         "build",
         "-p",
-        package.as_str(),
+        package,
         "--lib",
         "--color=always",
         // "--message-format=json-render-diagnostics",

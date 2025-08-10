@@ -43,7 +43,7 @@ impl Workspace {
         };
         let workspace = Arc::new(workspace);
 
-        debug!("loaded workspace at {:?}", workspace_root);
+        debug!("loaded workspace at {workspace_root:?}");
 
         Ok(workspace)
     }
@@ -91,10 +91,10 @@ impl Workspace {
     pub fn get_package(&self, package_name: &str) -> Result<Kid> {
         let mut workspace_members = self.krates.workspace_members();
         let kid = workspace_members.find_map(|node| {
-            if let krates::Node::Krate { id, krate, .. } = node {
-                if krate.name == package_name {
-                    return Some(id);
-                }
+            if let krates::Node::Krate { id, krate, .. } = node
+                && krate.name == package_name
+            {
+                return Some(id);
             }
             None
         });
@@ -127,7 +127,7 @@ impl Workspace {
 /// - Otherwise, use workspace's main package.
 pub fn get_target_package(workspace: &Workspace, args: &Args) -> (Kid, String) {
     let kid = if let Some(package) = args.package.as_ref() {
-        workspace.get_package(&package)
+        workspace.get_package(package)
     } else {
         workspace.main_package()
     }
