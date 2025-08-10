@@ -1,6 +1,7 @@
 name: Build
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main
@@ -9,7 +10,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
-    if: github.repository == 'AzurIce/ranim' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    if: github.repository == 'AzurIce/ranim'
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -58,7 +59,7 @@ jobs:
   lints:
     name: Lints
     runs-on: ubuntu-latest
-    if: github.repository == 'AzurIce/ranim' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    if: github.repository == 'AzurIce/ranim'
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
