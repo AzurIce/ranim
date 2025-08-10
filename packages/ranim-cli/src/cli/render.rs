@@ -31,7 +31,7 @@ pub fn render_command(args: &Args, scenes: &[String]) {
         .unwrap()
         .expect("Failed on initial build");
 
-    let all_scenes: Vec<&'static Scene> = lib.scenes().into_iter().collect::<Vec<_>>();
+    let all_scenes: Vec<&'static Scene> = lib.scenes().iter().collect::<Vec<_>>();
     let scenes_to_render: Vec<&'static Scene> = if scenes.is_empty() {
         all_scenes.clone()
     } else {

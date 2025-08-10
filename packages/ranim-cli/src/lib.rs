@@ -97,10 +97,10 @@ impl RanimUserLibraryBuilder {
             && !building_handle.is_finished()
         {
             info!("Canceling previous build...");
-            if let Err(err) = self.cancel_tx.try_send(()) {
-                if err.is_closed() {
-                    panic!("Failed to cancel build: {:?}", err);
-                }
+            if let Err(err) = self.cancel_tx.try_send(())
+                && err.is_closed()
+            {
+                panic!("Failed to cancel build: {err:?}");
             }
             building_handle.join().unwrap();
         }
