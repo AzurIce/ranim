@@ -175,7 +175,7 @@ impl SealedRanimScene {
         self.total_secs
     }
     /// Get time marks
-    pub fn time_marks(&self) -> &Vec<(f64, TimeMark)> {
+    pub fn time_marks(&self) -> &[(f64, TimeMark)] {
         &self.time_marks
     }
     /// Evaluate the state of timelines at `target_sec`
