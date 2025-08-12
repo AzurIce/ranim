@@ -23,28 +23,23 @@
 )]
 #![feature(downcast_unchecked)]
 
-#[cfg(not(target_arch = "wasm32"))]
-use crate::utils::wgpu::WgpuContext;
 use animation::EvalResult;
+use log::{info, trace};
+use timeline::{RanimScene, SealedRanimScene};
+
 #[cfg(not(target_arch = "wasm32"))]
 use file_writer::{FileWriter, FileWriterBuilder};
 #[cfg(not(target_arch = "wasm32"))]
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 #[cfg(not(target_arch = "wasm32"))]
-use log::info;
-#[cfg(not(target_arch = "wasm32"))]
 use render::{Renderer, primitives::RenderInstances};
-#[cfg(not(target_arch = "wasm32"))]
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    time::Duration,
+    time::{Duration, Instant},
 };
-use timeline::{RanimScene, SealedRanimScene};
 #[cfg(not(target_arch = "wasm32"))]
-use timeline::{TimeMark, TimelineEvalResult};
-
-pub use glam;
+use utils::wgpu::WgpuContext;
 
 pub mod animation;
 /// The preview app
@@ -66,6 +61,8 @@ pub mod timeline;
 pub mod traits;
 /// Utils
 pub mod utils;
+
+pub use glam;
 
 // ANCHOR: SceneConstructor
 /// A scene constructor
@@ -213,9 +210,15 @@ pub fn render_scene_output(
     scene_config: &SceneConfig,
     output: &Output,
 ) {
+    let t = Instant::now();
     let scene = constructor.build_scene();
+    trace!("Build timeline cost: {:?}", t.elapsed());
+
     let mut app = RanimRenderApp::new(name, scene_config, output);
-    app.render_timeline(scene);
+    app.render_timeline(&scene);
+    if !scene.time_marks().is_empty() {
+        app.render_capture_marks(&scene);
+    }
 }
 
 /// MARK: RanimRenderApp
@@ -245,7 +248,10 @@ struct RanimRenderApp {
 #[cfg(not(target_arch = "wasm32"))]
 impl RanimRenderApp {
     fn new(scene_name: String, scene_config: &SceneConfig, output: &Output) -> Self {
+        use std::time::Instant;
+
         info!("Checking ffmpeg...");
+        let t = Instant::now();
         if let Ok(ffmpeg_path) = which::which("ffmpeg") {
             info!("ffmpeg found at {ffmpeg_path:?}");
         } else {
@@ -261,9 +267,13 @@ impl RanimRenderApp {
                 download_ffmpeg("./").expect("failed to download ffmpeg");
             }
         }
+        trace!("Check ffmmpeg cost: {:?}", t.elapsed());
 
+        let t = Instant::now();
         info!("Creating wgpu context...");
         let ctx = pollster::block_on(WgpuContext::new());
+        trace!("Create wgpu context cost: {:?}", t.elapsed());
+
         let mut output_dir = PathBuf::from(output.dir);
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir()
@@ -303,7 +313,8 @@ impl RanimRenderApp {
         }
     }
 
-    fn render_timeline(&mut self, timeline: SealedRanimScene) {
+    fn render_timeline(&mut self, timeline: &SealedRanimScene) {
+        let start = Instant::now();
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {
             puffin::set_scopes_on(true);
@@ -338,6 +349,8 @@ impl RanimRenderApp {
         (0..frames)
             .map(|f| f as f64 / (frames - 1) as f64)
             .for_each(|alpha| {
+                use crate::timeline::TimelineEvalResult;
+
                 #[cfg(feature = "profiling")]
                 profiling::scope!("frame");
 
@@ -425,7 +438,13 @@ impl RanimRenderApp {
             Duration::from_secs_f64(timeline.total_secs()),
         );
         pb.finish_with_message(msg);
+        trace!("render timeline cost: {:?}", start.elapsed());
+    }
 
+    fn render_capture_marks(&mut self, timeline: &SealedRanimScene) {
+        use crate::timeline::TimeMark;
+
+        let start = Instant::now();
         let timemarks = timeline
             .time_marks()
             .iter()
@@ -452,6 +471,7 @@ impl RanimRenderApp {
             "saved {} capture frames from time marks",
             timemarks.len()
         ));
+        trace!("save capture frames cost: {:?}", start.elapsed());
     }
 
     fn render_timeline_frame(
@@ -460,6 +480,8 @@ impl RanimRenderApp {
         sec: f64,
         filename: impl AsRef<Path>,
     ) {
+        use crate::timeline::TimelineEvalResult;
+
         let TimelineEvalResult {
             camera_frame,
             visual_items,
