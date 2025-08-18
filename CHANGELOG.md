@@ -2,11 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2025-08-18
+
+### 🐛 Bug Fixes
+
+- Group's alignable impl doesn't correctly align items
+
 ## [0.1.1] - 2025-08-10
 
 ### 🐛 Bug Fixes
 
 - Scene macro's attrs not working
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ### Example
 
