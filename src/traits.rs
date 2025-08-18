@@ -113,11 +113,15 @@ impl Alignable for DVec3 {
 }
 
 // TODO: make this better
-impl<T> Alignable for Group<T> {
+impl<T: Alignable> Alignable for Group<T> {
     fn is_aligned(&self, other: &Self) -> bool {
-        self.len() == other.len()
+        self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
     }
-    fn align_with(&mut self, _other: &mut Self) {}
+    fn align_with(&mut self, other: &mut Self) {
+        self.iter_mut().zip(other).for_each(|(a, b)| {
+            a.align_with(b);
+        });
+    }
 }
 
 // MARK: Opacity
