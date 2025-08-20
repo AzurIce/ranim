@@ -82,6 +82,7 @@ impl PathBuilder {
 
         self
     }
+
     /// Close the path.
     ///
     /// The path is considered closed if the start point is equal to the last point.
