@@ -159,9 +159,15 @@ impl Output {
 #[cfg(not(target_family = "wasm"))]
 #[doc(hidden)]
 #[unsafe(no_mangle)]
-#[allow(improper_ctypes_definitions)] // Because currently we only use it in rust
-pub extern "C" fn scenes() -> &'static [Scene] {
-    &SCENES
+pub extern "C" fn scenes() -> *const Scene {
+    SCENES.as_ptr()
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[doc(hidden)]
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_cnt() -> usize {
+    SCENES.len()
 }
 
 // MARK: Prelude
@@ -464,7 +470,7 @@ impl RanimRenderApp {
             .progress_chars("#>-"),
         );
         for (sec, TimeMark::Capture(filename)) in &timemarks {
-            self.render_timeline_frame(&timeline, *sec, filename);
+            self.render_timeline_frame(timeline, *sec, filename);
             pb.inc(1);
         }
         pb.finish_with_message(format!(

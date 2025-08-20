@@ -31,7 +31,7 @@ fn hello_ranim(r: &mut RanimScene) {
     let circle = Circle::new(2.0).with(|circle| {
         circle
             .set_color(manim::RED_C)
-            .rotate(PI / 4.0 + PI, DVec3::Z);
+            .rotate(-PI / 4.0 + PI, DVec3::Z);
     });
 
     let r_vitem = r.map(r_square, VItem::from);

@@ -1,7 +1,7 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_channel::{Receiver, Sender, bounded};
 use libloading::{Library, Symbol};
-use log::{error, info};
+use log::{debug, error, info};
 use ranim::Scene;
 use std::{
     path::{Path, PathBuf},
@@ -146,18 +146,26 @@ impl RanimUserLibrary {
         }
     }
 
-    /// Safety: dylib has a `scenes`` fn with the correct signature
-    pub fn scenes(&self) -> &'static [Scene] {
-        let scenes: Symbol<extern "C" fn() -> &'static [Scene]> =
+    /// Safety: dylib has a `scenes` and a `scene_cnt` fn with the correct signature and safe implementation
+    pub fn scenes(&self) -> &[Scene] {
+        let scene_cnt: Symbol<extern "C" fn() -> usize> =
+            unsafe { self.inner.as_ref().unwrap().get(b"scene_cnt").unwrap() };
+
+        let scenes: Symbol<extern "C" fn() -> *const Scene> =
             unsafe { self.inner.as_ref().unwrap().get(b"scenes").unwrap() };
-        scenes()
+
+        let scene_cnt = scene_cnt();
+        debug!("scene_cnt: {scene_cnt}");
+        let scenes = scenes();
+
+        unsafe { std::slice::from_raw_parts(scenes, scene_cnt) }
     }
 
-    pub fn get_preview_func(&self) -> &'static Scene {
+    pub fn get_preview_func(&self) -> Result<&Scene> {
         self.scenes()
             .iter()
             .find(|s| s.preview)
-            .expect("no scene marked with `#[preview]` found")
+            .context("no scene marked with `#[preview]` found")
     }
 }
 
