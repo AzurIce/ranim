@@ -8,7 +8,7 @@ use notify_debouncer_full::{DebouncedEvent, Debouncer};
 use ranim::app::{AppCmd, AppState};
 
 use async_channel::{Receiver, bounded, unbounded};
-use log::{info, trace};
+use log::{error, info, trace};
 use notify::RecursiveMode;
 
 use crate::{
@@ -144,7 +144,13 @@ pub fn preview_command(args: &Args) {
         .unwrap()
         .expect("Failed on initial build");
 
-    let scene = lib.get_preview_func();
+    let Ok(scene) = lib.get_preview_func() else {
+        error!("Failed to get preview scene, available scenes:");
+        for scene in lib.scenes() {
+            info!("Scene: {:?} preview: {:?}", scene.name, scene.preview);
+        }
+        panic!("Failed to get preview scene");
+    };
     let app = AppState::new_with_title(scene.constructor, scene.name.to_string());
     let cmd_tx = app.cmd_tx.clone();
 
@@ -162,7 +168,13 @@ pub fn preview_command(args: &Args) {
             if let Ok(new_lib) = res_rx.try_recv()
                 && let Ok(new_lib) = new_lib
             {
-                let scene = new_lib.get_preview_func();
+                let Ok(scene) = new_lib.get_preview_func() else {
+                    error!("Failed to get preview scene, available scenes:");
+                    for scene in new_lib.scenes() {
+                        info!("Scene: {:?} preview: {:?}", scene.name, scene.preview);
+                    }
+                    continue;
+                };
 
                 let (tx, rx) = bounded(1);
                 cmd_tx

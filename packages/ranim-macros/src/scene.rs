@@ -13,27 +13,25 @@ pub fn parse_scene_attrs(
 
     let mut res = SceneAttrs::default();
 
-    if args.is_empty() {
-        return Ok(res);
-    }
+    if !args.is_empty() {
+        let args = proc_macro2::TokenStream::from(args);
+        let parser = Punctuated::<MetaNameValue, Comma>::parse_terminated;
+        let kvs = parser.parse2(args)?;
 
-    let args = proc_macro2::TokenStream::from(args);
-    let parser = Punctuated::<MetaNameValue, Comma>::parse_terminated;
-    let kvs = parser.parse2(args)?;
-
-    for nv in kvs {
-        if nv.path.is_ident("name")
-            && let Expr::Lit(ExprLit {
-                lit: Lit::Str(s), ..
-            }) = nv.value
-        {
-            res.name = Some(s.value());
-        } else if nv.path.is_ident("frame_height")
-            && let Expr::Lit(ExprLit {
-                lit: Lit::Float(f), ..
-            }) = nv.value
-        {
-            res.frame_height = Some(f.base10_parse()?);
+        for nv in kvs {
+            if nv.path.is_ident("name")
+                && let Expr::Lit(ExprLit {
+                    lit: Lit::Str(s), ..
+                }) = nv.value
+            {
+                res.name = Some(s.value());
+            } else if nv.path.is_ident("frame_height")
+                && let Expr::Lit(ExprLit {
+                    lit: Lit::Float(f), ..
+                }) = nv.value
+            {
+                res.frame_height = Some(f.base10_parse()?);
+            }
         }
     }
 
