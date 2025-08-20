@@ -14,3 +14,7 @@ ranim = { path = "../" }
 [[bench]]
 name = "bench1"
 harness = false
+
+[[bench]]
+name = "items"
+harness = false
