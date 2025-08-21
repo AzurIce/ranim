@@ -21,7 +21,7 @@
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
-        rust-tools = pkgs.rust-bin.stable.latest.default.override {
+        rust-tools = pkgs.rust-bin.nightly.latest.default.override {
           extensions = [ "rust-src" ];
           targets = [ "wasm32-unknown-unknown" ];
         };
