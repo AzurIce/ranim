@@ -30,6 +30,16 @@ doc-nightly:
     -rm -r website/static/doc/
     cp -r target/doc/ website/static/doc/
 
+doc-examples:
+    RUSTDOCFLAGS="--cfg docsrs --cfg docrs_dep --html-in-header ./packages/ranim-examples/docs-rs/header.html" \
+    RUSTFLAGS="--cfg docsrs_dep" \
+        cargo doc --no-deps -p ranim-examples --document-private-items --all-features \
+        --target-dir ./packages/ranim-examples/target/
+    
+    cargo build -p ranim-examples --release --target wasm32-unknown-unknown
+    wasm-bindgen --target web ./target/wasm32-unknown-unknown/release/ranim_examples.wasm \
+        --out-dir ./packages/ranim-examples/target/doc/ranim_examples/pkg
+
 doc:
     cargo doc --no-deps -p ranim --document-private-items --all-features
     -rm -r website/static/doc/

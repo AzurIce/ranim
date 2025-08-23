@@ -41,7 +41,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
                     .scale(DVec3::splat(0.8))
                     .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
             });
-            r.insert(rect)
+            r.insert_and_show(rect)
         })
         .collect::<Vec<_>>();
 

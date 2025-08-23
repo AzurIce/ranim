@@ -54,6 +54,11 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_name = &input_fn.sig.ident;
     let vis = &input_fn.vis;
     let fn_body = &input_fn.block;
+    let doc_attrs: Vec<_> = input_fn
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .collect();
 
     // 场景名称
     let scene_name = attrs.name.unwrap_or_else(|| fn_name.to_string());
@@ -118,11 +123,14 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // 构造 Scene 并塞进分布式切片
     let expanded = quote! {
+        #(#doc_attrs)*
         #vis fn #fn_name(r: &mut #ranim::timeline::RanimScene) #fn_body
 
+        #[doc(hidden)]
         static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
         #[cfg_attr(not(target_family = "wasm"), #ranim::linkme::distributed_slice(#ranim::SCENES))]
         #[cfg_attr(not(target_family = "wasm"), linkme(crate = #ranim::linkme))]
+        #[doc(hidden)]
         static #static_name: #ranim::Scene = #scene;
 
         #[allow(non_upper_case_globals)]
