@@ -213,12 +213,14 @@ impl<T: Primitive + 'static> Renderable for T {
 }
 impl<T: Primitive + 'static> Renderable for Vec<T> {
     fn prepare_for_id(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances, id: usize) {
+        // info!("prepare for vec");
         if self.is_empty() {
             return;
         }
         if let Some(instance) =
             render_instances.get_render_instance_mut::<Vec<T::RenderInstance>>(id)
         {
+            // info!("update");
             if instance.len() != self.len() {
                 instance.resize_with(self.len(), || T::RenderInstance::init(ctx, &self[0]));
             }
@@ -228,13 +230,16 @@ impl<T: Primitive + 'static> Renderable for Vec<T> {
                 .for_each(|(instance, data)| {
                     instance.update(ctx, data);
                 });
+            // info!("update done");
         } else {
-            render_instances.insert_render_instance(
-                id,
-                self.iter()
-                    .map(|data| T::RenderInstance::init(ctx, data))
-                    .collect::<Vec<_>>(),
-            );
+            // info!("insert");
+            let instances = self
+                .iter()
+                .map(|data| T::RenderInstance::init(ctx, data))
+                .collect::<Vec<_>>();
+            // info!("insert");
+            render_instances.insert_render_instance(id, instances);
+            // info!("insert done");
         }
     }
 }

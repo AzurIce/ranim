@@ -117,7 +117,7 @@ fn hanoi_5(r: &mut RanimScene) {
     hanoi(r, 5);
 }
 
-#[scene]
+#[scene(name = "hanoi")]
 #[preview]
 #[output(dir = "hanoi")]
 fn hanoi_10(r: &mut RanimScene) {
@@ -138,7 +138,7 @@ fn main() {
     }
 
     #[cfg(feature = "app")]
-    preview(hanoi_5_scene);
+    preview(hanoi_10_scene);
     #[cfg(not(feature = "app"))]
     {
         render_scene(hanoi_5_scene);
