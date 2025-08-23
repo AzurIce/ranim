@@ -1,7 +1,7 @@
 mod egui_tools;
 mod timeline;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use async_channel::{Receiver, Sender, unbounded};
 use egui_wgpu::ScreenDescriptor;
@@ -78,6 +78,7 @@ pub struct AppState {
     last_sec: f64,
     render_instances: RenderInstances,
     timeline_state: TimelineState,
+    play_prev_t: Option<Instant>,
 }
 
 impl AppState {
@@ -89,6 +90,7 @@ impl AppState {
         let (cmd_tx, cmd_rx) = unbounded();
 
         Self {
+            play_prev_t: None,
             cmd_tx,
             cmd_rx,
             title,
@@ -201,20 +203,48 @@ impl AppState {
         // let scale_factor = app_renderer.scale_factor;
         let mut occupied_screen_space = OccupiedScreenSpace::default();
 
+        if let Some(play_prev_t) = self.play_prev_t {
+            let elapsed = play_prev_t.elapsed().as_secs_f64();
+            self.timeline_state.current_sec =
+                (self.timeline_state.current_sec + elapsed).min(self.timeline_state.total_sec);
+            if self.timeline_state.current_sec == self.timeline_state.total_sec {
+                self.play_prev_t = None;
+            } else {
+                self.play_prev_t = Some(Instant::now());
+            }
+        }
+
         occupied_screen_space.bottom = egui::TopBottomPanel::bottom("bottom_panel")
             .resizable(true)
             .max_height(600.0)
             .show(app_renderer.egui_renderer.context(), |ui| {
                 ui.label("Timeline");
 
-                ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
-                ui.add(
-                    egui::Slider::new(
-                        &mut self.timeline_state.current_sec,
-                        0.0..=self.timeline_state.total_sec,
-                    )
-                    .text("sec"),
-                );
+                ui.horizontal(|ui| {
+                    if ui.button("<<").clicked() {
+                        self.timeline_state.current_sec = 0.0;
+                    }
+                    if self.play_prev_t.is_none() {
+                        if ui.button("play").clicked() {
+                            self.play_prev_t = Some(Instant::now());
+                        }
+                    } else {
+                        if ui.button("pause").clicked() {
+                            self.play_prev_t = None;
+                        }
+                    }
+                    if ui.button(">>").clicked() {
+                        self.timeline_state.current_sec = self.timeline_state.total_sec;
+                    }
+                    ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
+                    ui.add(
+                        egui::Slider::new(
+                            &mut self.timeline_state.current_sec,
+                            0.0..=self.timeline_state.total_sec,
+                        )
+                        .text("sec"),
+                    );
+                });
 
                 // self.timeline_state.ui_preview_timeline(ui);
                 self.timeline_state.ui_main_timeline(ui);
