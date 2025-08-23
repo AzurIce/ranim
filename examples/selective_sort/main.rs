@@ -102,7 +102,7 @@ fn selective_sort_10(r: &mut RanimScene) {
     selective_sort(r, 10);
 }
 
-#[scene]
+#[scene(name = "selective_sort")]
 #[preview]
 #[output(dir = "selective_sort")]
 fn selective_sort_100(r: &mut RanimScene) {
@@ -123,7 +123,7 @@ fn main() {
     }
 
     #[cfg(feature = "app")]
-    preview(selective_sort_10_scene);
+    preview(selective_sort_100_scene);
     #[cfg(not(feature = "app"))]
     {
         render_scene(selective_sort_10_scene);
