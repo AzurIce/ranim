@@ -112,7 +112,7 @@ fn bubble_sort_10(r: &mut RanimScene) {
     bubble_sort(r, 10);
 }
 
-#[scene]
+#[scene(name = "bubble_sort")]
 #[preview]
 #[output(dir = "bubble_sort")]
 fn bubble_sort_100(r: &mut RanimScene) {
@@ -133,7 +133,7 @@ fn main() {
     }
 
     #[cfg(feature = "app")]
-    preview(bubble_sort_10_scene);
+    preview(bubble_sort_100_scene);
     #[cfg(not(feature = "app"))]
     {
         render_scene(bubble_sort_10_scene);
