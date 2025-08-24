@@ -5,9 +5,11 @@ use std::sync::Arc;
 
 use async_channel::{Receiver, Sender, unbounded};
 use egui_wgpu::ScreenDescriptor;
+use log::{info, warn};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use timeline::TimelineState;
+use web_time::Instant;
 use wgpu::SurfaceError;
 use winit::{
     application::ApplicationHandler,
@@ -78,17 +80,25 @@ pub struct AppState {
     last_sec: f64,
     render_instances: RenderInstances,
     timeline_state: TimelineState,
+    play_prev_t: Option<Instant>,
 }
 
 impl AppState {
     /// Create a new app state with a scene constructor and a title
     pub fn new_with_title(scene_constructor: impl SceneConstructor, title: String) -> Self {
+        let t = Instant::now();
+        info!("building scene...");
         let timeline = scene_constructor.build_scene();
+        info!("Scene built, cost: {:?}", t.elapsed());
+
+        info!("Getting timelines info...");
         let timeline_infos = timeline.get_timeline_infos();
+        info!("Total {} timelines", timeline_infos.len());
         // let renderer = Renderer::new(ctx, 8.0, 1920, 1080);
         let (cmd_tx, cmd_rx) = unbounded();
 
         Self {
+            play_prev_t: None,
             cmd_tx,
             cmd_rx,
             title,
@@ -201,20 +211,49 @@ impl AppState {
         // let scale_factor = app_renderer.scale_factor;
         let mut occupied_screen_space = OccupiedScreenSpace::default();
 
+        if let Some(play_prev_t) = self.play_prev_t {
+            let elapsed = play_prev_t.elapsed().as_secs_f64();
+            self.timeline_state.current_sec =
+                (self.timeline_state.current_sec + elapsed).min(self.timeline_state.total_sec);
+            if self.timeline_state.current_sec == self.timeline_state.total_sec {
+                self.play_prev_t = None;
+            } else {
+                self.play_prev_t = Some(Instant::now());
+            }
+        }
+
         occupied_screen_space.bottom = egui::TopBottomPanel::bottom("bottom_panel")
             .resizable(true)
             .max_height(600.0)
             .show(app_renderer.egui_renderer.context(), |ui| {
                 ui.label("Timeline");
 
-                ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
-                ui.add(
-                    egui::Slider::new(
-                        &mut self.timeline_state.current_sec,
-                        0.0..=self.timeline_state.total_sec,
-                    )
-                    .text("sec"),
-                );
+                ui.horizontal(|ui| {
+                    if ui.button("<<").clicked() {
+                        self.timeline_state.current_sec = 0.0;
+                    }
+                    #[allow(clippy::collapsible_else_if)]
+                    if self.play_prev_t.is_none() {
+                        if ui.button("play").clicked() {
+                            self.play_prev_t = Some(Instant::now());
+                        }
+                    } else {
+                        if ui.button("pause").clicked() {
+                            self.play_prev_t = None;
+                        }
+                    }
+                    if ui.button(">>").clicked() {
+                        self.timeline_state.current_sec = self.timeline_state.total_sec;
+                    }
+                    ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
+                    ui.add(
+                        egui::Slider::new(
+                            &mut self.timeline_state.current_sec,
+                            0.0..=self.timeline_state.total_sec,
+                        )
+                        .text("sec"),
+                    );
+                });
 
                 // self.timeline_state.ui_preview_timeline(ui);
                 self.timeline_state.ui_main_timeline(ui);
@@ -284,7 +323,7 @@ fn redraw(
     if let Some(min) = window.is_minimized()
         && min
     {
-        println!("Window is minimized");
+        info!("Window is minimized");
         return;
     }
 
@@ -301,10 +340,11 @@ fn redraw(
     match surface_texture {
         Err(SurfaceError::Outdated) => {
             // Ignoring outdated to allow resizing and minimization
-            println!("wgpu surface outdated");
+            warn!("wgpu surface outdated");
             return;
         }
         Err(_) => {
+            warn!("surface texture err");
             surface_texture.expect("Failed to acquire next swap chain texture");
             return;
         }
@@ -392,7 +432,6 @@ fn resize(ctx: &WgpuContext, app_renderer: &mut AppRenderer, size: PhysicalSize<
         log::warn!("[resize]: ignored resize to value <= 0: {size:?}");
         return;
     }
-    log::info!("[resize]: {size:?}");
     {
         app_renderer.surface_config.width = size.width;
         app_renderer.surface_config.height = size.height;
@@ -416,6 +455,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
 
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
+
             log::info!("searching for {}", self.container_id);
             let canvas = document
                 .get_element_by_id(&self.container_id)
@@ -457,12 +497,12 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
             // window_attrs = winit_window_attrs.with_append(true);
         }
 
-        log::info!("creating window...");
+        log::info!("[resume]: creating window...");
         let Ok(window) = event_loop.create_window(window_attrs) else {
-            log::error!("failed to create window");
+            log::error!("[resume]: failed to create window");
             return;
         };
-        log::info!("window size: {:?}", window.inner_size());
+        log::info!("[resume]: window size: {:?}", window.inner_size());
         #[cfg(not(target_arch = "wasm32"))]
         {
             let size = window.inner_size();
@@ -475,10 +515,10 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
         let Some(event_loop_proxy) = self.event_loop_proxy.take() else {
             return;
         };
-        log::info!("initializing wgpu ctx...");
+        log::info!("[resume]: initializing wgpu ctx...");
         let init_wgpu_ctx = async move {
-            let renderer = WgpuContext::new().await;
-            assert!(event_loop_proxy.send_event(renderer).is_ok());
+            let wgpu_ctx = WgpuContext::new().await;
+            assert!(event_loop_proxy.send_event(wgpu_ctx).is_ok());
         };
         #[cfg(not(target_arch = "wasm32"))]
         {
@@ -490,22 +530,46 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
         }
     }
 
+    // fn device_event(
+    //     &mut self,
+    //     event_loop: &ActiveEventLoop,
+    //     device_id: winit::event::DeviceId,
+    //     event: winit::event::DeviceEvent,
+    // ) {
+    //     log::info!("[device_event]: device_id: {device_id:?}, event: {event:?}");
+    // }
+
+    // fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: winit::event::StartCause) {
+    //     log::info!("[new_events]: cause: {cause:?}");
+    // }
+
+    // fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+    //     log::info!("[suspended]");
+    // }
+
+    // fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+    //     log::info!("[about_to_wait]");
+    // }
+
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
         _window_id: WindowId,
         event: WindowEvent,
     ) {
+        // info!("[window_event]");
         if let WindowEvent::CloseRequested = event {
             event_loop.exit();
             return;
         }
 
+        // info!("[window_event]: event: {:?}", event);
         let (Some(window), Some(wgpu_ctx), Some(app_renderer)) = (
             self.window.as_ref(),
             self.wgpu_ctx.as_ref(),
             self.app_renderer.as_mut(),
         ) else {
+            // info!("[window_event]: not ready");
             return;
         };
         let app_state = &mut self.app_state;
@@ -524,18 +588,21 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => (),
         }
-        self.window.as_ref().unwrap().request_redraw();
+        window.request_redraw();
     }
+
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, wgpu_ctx: WgpuContext) {
+        // info!("[user_event]");
         let mut app_renderer = AppRenderer::new(&wgpu_ctx, self.window.clone().unwrap(), self.size);
-        log::info!("app_renderer initialized");
+        // log::info!("[user_event]: app_renderer initialized");
         if let Some(window) = self.window.as_ref() {
             let size = window.inner_size();
-            log::info!("window size: {size:?}");
+            // log::info!("[user_event]: window size: {size:?}");
             resize(&wgpu_ctx, &mut app_renderer, size)
         }
         self.app_renderer.replace(app_renderer);
         self.wgpu_ctx.replace(wgpu_ctx);
+        self.window.as_ref().unwrap().request_redraw();
     }
 }
 
@@ -543,13 +610,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
 use crate::PUFFIN_GPU_PROFILER;
 
 /// Runs an app with the given app state
-pub fn run_app(app: AppState, #[cfg(target_arch = "wasm32")] container_id: String) {
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init().expect("Failed to initialize console_log");
-    }
-
+pub fn run_app(app: AppState) {
     #[cfg(feature = "profiling")]
     let (_cpu_server, _gpu_server) = {
         puffin::set_scopes_on(true);
@@ -586,12 +647,14 @@ pub fn run_app(app: AppState, #[cfg(target_arch = "wasm32")] container_id: Strin
 
 /// Runs a scene preview app on a scene constructor
 pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
-    let app_state = AppState::new_with_title(constructor, name.clone());
-    run_app(
-        app_state,
-        #[cfg(target_arch = "wasm32")]
-        format!("ranim-app-{name}"),
-    );
+    #[cfg(target_arch = "wasm32")]
+    {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init().expect("Failed to initialize console_log");
+    }
+
+    let app_state = AppState::new_with_title(constructor, name);
+    run_app(app_state);
 }
 
 /// Preview a scene

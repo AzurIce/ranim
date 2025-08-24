@@ -77,6 +77,8 @@ impl RenderResource for VItemRenderInstance {
     type Data = VItemPrimitive;
 
     fn init(ctx: &WgpuContext, data: &Self::Data) -> Self {
+        // info!("init");
+        // info!("3d: {}", data.points2d.len());
         let points3d_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Points 3d Buffer"),
@@ -85,6 +87,7 @@ impl RenderResource for VItemRenderInstance {
                 | wgpu::BufferUsages::COPY_SRC,
             &data.points2d,
         );
+        // info!("2d: {}", data.points2d.len());
         let points2d_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Points 2d Buffer"),
@@ -93,6 +96,7 @@ impl RenderResource for VItemRenderInstance {
                 | wgpu::BufferUsages::COPY_SRC,
             &data.points2d,
         );
+        // info!("clip");
         let clip_info_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Clip Info Buffer"),
@@ -101,24 +105,28 @@ impl RenderResource for VItemRenderInstance {
                 | wgpu::BufferUsages::COPY_SRC,
             &[i32::MAX, i32::MIN, i32::MAX, i32::MIN, 0],
         );
+        // info!("point_cnt");
         let point_cnt_buffer = WgpuBuffer::new_init(
             ctx,
             Some("Point Cnt Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             data.points2d.len() as u32,
         );
+        // info!("fill: {}",data.fill_rgbas.len());
         let fill_rgbas = WgpuVecBuffer::new_init(
             ctx,
             Some("Fill Rgbas Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             &data.fill_rgbas,
         );
+        // info!("stroke: {}",data.stroke_rgbas.len());
         let stroke_rgbas = WgpuVecBuffer::new_init(
             ctx,
             Some("Stroke Rgbas Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             &data.stroke_rgbas,
         );
+        // info!("stroke_widths: {}",data.stroke_widths.len());
         let stroke_widths = WgpuVecBuffer::new_init(
             ctx,
             Some("Stroke Widths Buffer"),
@@ -126,6 +134,7 @@ impl RenderResource for VItemRenderInstance {
             &data.stroke_widths,
         );
 
+        // info!("compute_bind_group");
         let compute_bind_group = ComputeBindGroup::new(
             ctx,
             points3d_buffer.buffer.as_ref().unwrap(),
@@ -135,6 +144,7 @@ impl RenderResource for VItemRenderInstance {
             point_cnt_buffer.as_ref(),
         );
 
+        // info!("render_bind_group");
         let render_bind_group = RenderBindGroup::new(
             ctx,
             points2d_buffer.buffer.as_ref().unwrap(),
@@ -143,6 +153,7 @@ impl RenderResource for VItemRenderInstance {
             stroke_widths.buffer.as_ref().unwrap(),
             clip_info_buffer.buffer.as_ref().unwrap(),
         );
+        // info!("init done");
 
         Self {
             points3d_buffer,

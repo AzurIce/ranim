@@ -217,15 +217,20 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             .unwrap_or(true);
 
         if realloc {
-            self.buffer = Some(
-                ctx.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: self.label,
-                        contents: bytemuck::cast_slice(data),
-                        usage: self.usage,
-                    }),
-            );
+            // info!("realloc");
+            // NOTE: create_buffer_init sometimes causes freezing in wasm
+            let buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+                label: self.label,
+                size: (std::mem::size_of_val(data)) as u64,
+                usage: self.usage,
+                mapped_at_creation: false,
+            });
+            ctx.queue
+                .write_buffer(&buffer, 0, bytemuck::cast_slice(data));
+            // info!("new");
+            self.buffer = Some(buffer);
         } else {
+            // info!("queue copy");
             {
                 let mut view = ctx
                     .queue
@@ -239,6 +244,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             }
             // ctx.queue.submit([]);
         }
+        // info!("done");
         realloc
     }
 
