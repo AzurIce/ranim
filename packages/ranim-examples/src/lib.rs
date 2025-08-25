@@ -27,8 +27,8 @@ pub mod sort;
 ///
 /// <canvas id="ranim-app-hello_ranim" width="1280" height="720" style="width: 100%;"></canvas>
 /// <script type="module">
-///   const { run_hello_ranim } = await ranim_examples;
-///   run_hello_ranim();
+///   const { find_scene } = await ranim_examples;
+///   find_scene("hello_ranim").run_app();
 /// </script>
 pub fn hello_ranim(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -58,12 +58,4 @@ pub fn hello_ranim(r: &mut RanimScene) {
         timeline.play(circle.write());
         timeline.play_with(|circle| circle.fade_out());
     };
-}
-
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn run_hello_ranim() {
-    run_scene_app(
-        hello_ranim_scene.constructor,
-        hello_ranim_scene.name.to_string(),
-    );
 }

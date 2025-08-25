@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use async_channel::{Receiver, Sender, bounded};
 use libloading::{Library, Symbol};
-use log::{debug, error, info};
+use log::{error, info};
 use ranim::Scene;
 use std::{
     path::{Path, PathBuf},
@@ -118,6 +118,21 @@ pub struct RanimUserLibrary {
     temp_path: PathBuf,
 }
 
+pub struct RanimUserLibrarySceneIter<'a> {
+    lib: &'a RanimUserLibrary,
+    idx: usize,
+}
+
+impl<'a> Iterator for RanimUserLibrarySceneIter<'a> {
+    type Item = &'a Scene;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.lib.get_scene(self.idx);
+        self.idx += 1;
+        res
+    }
+}
+
 impl RanimUserLibrary {
     pub fn load(dylib_path: impl AsRef<Path>) -> Self {
         let dylib_path = dylib_path.as_ref();
@@ -146,24 +161,28 @@ impl RanimUserLibrary {
         }
     }
 
-    /// Safety: dylib has a `scenes` and a `scene_cnt` fn with the correct signature and safe implementation
-    pub fn scenes(&self) -> &[Scene] {
+    pub fn scene_cnt(&self) -> usize {
         let scene_cnt: Symbol<extern "C" fn() -> usize> =
             unsafe { self.inner.as_ref().unwrap().get(b"scene_cnt").unwrap() };
+        scene_cnt()
+    }
 
-        let scenes: Symbol<extern "C" fn() -> *const Scene> =
-            unsafe { self.inner.as_ref().unwrap().get(b"scenes").unwrap() };
+    pub fn get_scene(&self, idx: usize) -> Option<&Scene> {
+        let get_scene: Symbol<extern "C" fn(usize) -> *const Scene> =
+            unsafe { self.inner.as_ref().unwrap().get(b"get_scene").unwrap() };
+        if self.scene_cnt() <= idx {
+            None
+        } else {
+            Some(unsafe { &*get_scene(idx) })
+        }
+    }
 
-        let scene_cnt = scene_cnt();
-        debug!("scene_cnt: {scene_cnt}");
-        let scenes = scenes();
-
-        unsafe { std::slice::from_raw_parts(scenes, scene_cnt) }
+    pub fn scenes(&self) -> impl Iterator<Item = &Scene> {
+        RanimUserLibrarySceneIter { lib: self, idx: 0 }
     }
 
     pub fn get_preview_func(&self) -> Result<&Scene> {
         self.scenes()
-            .iter()
             .find(|s| s.preview)
             .context("no scene marked with `#[preview]` found")
     }

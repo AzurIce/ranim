@@ -128,10 +128,11 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 
         #[doc(hidden)]
         static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
-        #[cfg_attr(not(target_family = "wasm"), #ranim::linkme::distributed_slice(#ranim::SCENES))]
-        #[cfg_attr(not(target_family = "wasm"), linkme(crate = #ranim::linkme))]
         #[doc(hidden)]
         static #static_name: #ranim::Scene = #scene;
+        #ranim::inventory::submit!{
+            #scene
+        }
 
         #[allow(non_upper_case_globals)]
         #vis static #static_scene_name: &'static #ranim::Scene = &#static_name;
