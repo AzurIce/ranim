@@ -1,10 +1,10 @@
-use log::LevelFilter;
 use std::f64::consts::PI;
 
 use ranim::{
     animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
     components::ScaleHint,
+    glam::DVec3,
     items::{
         Group,
         vitem::{
@@ -19,9 +19,9 @@ use ranim::{
     timeline::TimeMark,
 };
 
-use glam::DVec3;
-
 #[derive(Clone)]
+/// A custom item that extract to a vec of [`VItemPrimitive`] that visualizes
+/// the underlying points of a vitem
 pub struct VisualVItem(VItem);
 
 impl Interpolatable for VisualVItem {
@@ -173,9 +173,10 @@ impl Empty for VisualVItem {
 
 // MARK: ranim_text
 #[scene]
+#[wasm_demo_doc]
 #[preview]
-#[output(dir = "extract_vitem_visualize")]
-fn ranim_text(r: &mut RanimScene) {
+#[output(dir = "ranim_text_extract_vitem_visualize")]
+fn ranim_text_extract_vitem_visualize(r: &mut RanimScene) {
     let r_cam = r.insert_and_show(CameraFrame::default());
 
     let text = SvgItem::new(typst_svg("Ranim")).with(|item| {
@@ -210,13 +211,15 @@ fn ranim_text(r: &mut RanimScene) {
         .play_with(|cam| cam.transform_to(default_cam));
 
     // r.timelines_mut().forward(1.0);
-    r.insert_time_mark(5.0, TimeMark::Capture("preview-ranim_text.png".to_string()));
+    r.insert_time_mark(5.0, TimeMark::Capture("preview.png".to_string()));
 }
 
-#[scene(name = "extract_vitem_visualize")]
+#[scene]
+#[wasm_demo_doc]
 #[preview]
-#[output(dir = "extract_vitem_visualize")]
-pub fn hello_ranim(r: &mut RanimScene) {
+#[output(dir = "hello_ranim_extract_vitem_visualize")]
+/// [`crate::hello_ranim`] with [`VisualVItem`]
+pub fn hello_ranim_extract_vitem_visualize(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
 
     let square = VisualVItem(VItem::from(Square::new(2.0).with(|square| {
@@ -243,30 +246,5 @@ pub fn hello_ranim(r: &mut RanimScene) {
     }
 
     r.timelines_mut().sync();
-    r.insert_time_mark(
-        3.2,
-        TimeMark::Capture("preview-hello_ranim.png".to_string()),
-    );
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(hello_ranim_scene);
-    #[cfg(not(feature = "app"))]
-    {
-        render_scene(hello_ranim_scene);
-        render_scene(ranim_text_scene);
-    }
+    r.insert_time_mark(3.2, TimeMark::Capture("preview.png".to_string()));
 }

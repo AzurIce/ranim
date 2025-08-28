@@ -1,4 +1,3 @@
-use log::LevelFilter;
 use ranim::{
     animation::transform::TransformAnim,
     color::palettes::manim,
@@ -13,8 +12,10 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[preview]
 #[output(dir = "perspective_blend")]
+/// An example of perspective blend.
 fn perspective_blend(r: &mut RanimScene) {
     let r_cam = r.insert_and_show(CameraFrame::default());
     r.timeline_mut(&r_cam).update_with(|cam| {
@@ -100,24 +101,4 @@ fn perspective_blend(r: &mut RanimScene) {
         r.timelines().max_total_secs(),
         TimeMark::Capture("preview.png".to_string()),
     );
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(not(feature = "app"))]
-    render_scene(perspective_blend_scene);
-
-    #[cfg(feature = "app")]
-    preview(perspective_blend_scene);
 }

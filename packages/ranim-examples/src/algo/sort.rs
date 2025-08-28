@@ -103,6 +103,7 @@ pub fn bubble_sort(r: &mut RanimScene, num: usize) {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[preview]
 #[output(dir = "bubble_sort")]
 /// A bubble sort ranim example with input of 10.
@@ -117,24 +118,6 @@ pub fn bubble_sort_10(r: &mut RanimScene) {
 /// A bubble sort ranim example with input of 100.
 pub fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
-}
-
-#[cfg(any(feature = "app", target_arch = "wasm32"))]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn run_bubble_sort_10() {
-    run_scene_app(
-        bubble_sort_10_scene.constructor,
-        bubble_sort_10_scene.name.to_string(),
-    );
-}
-
-#[cfg(any(feature = "app", target_arch = "wasm32"))]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn run_bubble_sort_100() {
-    run_scene_app(
-        bubble_sort_100_scene.constructor,
-        bubble_sort_100_scene.name.to_string(),
-    );
 }
 
 // MARK: selective_sort
@@ -239,4 +222,3 @@ pub fn selective_sort_10(r: &mut RanimScene) {
 pub fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
-

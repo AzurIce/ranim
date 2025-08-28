@@ -203,7 +203,7 @@ pub mod prelude {
     #[cfg(not(target_arch = "wasm32"))]
     pub use crate::{render, render_scene, render_scene_output};
 
-    pub use ranim_macros::{output, preview, wasm_demo_doc, scene};
+    pub use ranim_macros::{output, preview, scene, wasm_demo_doc};
 
     pub use crate::items::{ItemId, camera_frame::CameraFrame};
     pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};

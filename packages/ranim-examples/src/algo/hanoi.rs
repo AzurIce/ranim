@@ -1,4 +1,3 @@
-use log::LevelFilter;
 use ranim::{
     animation::transform::TransformAnim,
     color::{HueDirection, palettes::manim},
@@ -10,7 +9,7 @@ use ranim::{
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
 
-fn solve_hanoi(
+pub fn solve_hanoi(
     n: usize,
     idx_src: usize,
     idx_dst: usize,
@@ -26,7 +25,7 @@ fn solve_hanoi(
     }
 }
 
-fn hanoi(r: &mut RanimScene, n: usize) {
+pub fn hanoi(r: &mut RanimScene, n: usize) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     let total_sec = 10.0;
     let rod_width = 0.4;
@@ -34,7 +33,6 @@ fn hanoi(r: &mut RanimScene, n: usize) {
     let rod_section_width = 4.0;
 
     let _rods = [-1, 0, 1]
-        .into_iter()
         .map(|i| {
             Rectangle::new(rod_width, rod_height).with(|rect| {
                 rect.set_color(manim::GREY_C).put_anchor_on(
@@ -43,8 +41,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 );
             })
         })
-        .map(|rect| r.insert_and_show(rect))
-        .collect::<Vec<_>>();
+        .map(|rect| r.insert_and_show(rect));
 
     let min_disk_width = rod_width * 1.7;
     let max_disk_width = rod_section_width * 0.8;
@@ -111,37 +108,19 @@ fn hanoi(r: &mut RanimScene, n: usize) {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[preview]
 #[output(dir = "hanoi")]
-fn hanoi_5(r: &mut RanimScene) {
+/// An example of solving the Tower of Hanoi problem with 5 disks.
+pub fn hanoi_5(r: &mut RanimScene) {
     hanoi(r, 5);
 }
 
-#[scene(name = "hanoi")]
+#[scene]
+#[wasm_demo_doc]
 #[preview]
 #[output(dir = "hanoi")]
-fn hanoi_10(r: &mut RanimScene) {
+/// An example of solving the Tower of Hanoi problem with 10 disks.
+pub fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(hanoi_10_scene);
-    #[cfg(not(feature = "app"))]
-    {
-        render_scene(hanoi_5_scene);
-        render_scene(hanoi_10_scene);
-    }
 }

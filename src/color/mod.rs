@@ -1,8 +1,7 @@
-pub use color::{AlphaColor, OpaqueColor, Srgb};
+pub use ::color::*;
 
 /// palettes
 pub mod palettes;
-pub use ::color::HueDirection;
 
 /// Color preludes
 pub mod prelude {
@@ -36,7 +35,7 @@ pub const fn rgba(r: f32, g: f32, b: f32, a: f32) -> AlphaColor<Srgb> {
 #[macro_export]
 macro_rules! color {
     ($color_str:expr) => {{
-        use ::color::{Srgb, parse_color};
+        use ::ranim::color::{Srgb, parse_color};
         parse_color($color_str)
             .expect("Invalid color string")
             .to_alpha_color::<Srgb>()

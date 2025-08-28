@@ -1,0 +1,112 @@
+use itertools::Itertools;
+use ranim::{
+    animation::{fading::FadingAnim, lagged::LaggedAnim},
+    color::HueDirection,
+    glam::{DMat2, dvec2},
+    items::{
+        Group,
+        vitem::geometry::{Arc, ArcBetweenPoints},
+    },
+    prelude::*,
+    timeline::TimeMark,
+};
+
+#[scene]
+#[wasm_demo_doc]
+#[preview]
+#[output(dir = "arc")]
+/// A scene that shows how to use [`Arc`] item.
+pub fn arc(r: &mut RanimScene) {
+    let _r_cam = r.insert_and_show(CameraFrame::default());
+
+    // let frame_size = app.camera().size;
+    let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
+    let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
+
+    let start_color = color!("#FF8080FF");
+    let end_color = color!("#58C4DDFF");
+
+    let nrow = 10;
+    let ncol = 10;
+    let step_x = frame_size.x / ncol as f64;
+    let step_y = frame_size.y / nrow as f64;
+
+    let arcs = (0..nrow)
+        .cartesian_product(0..ncol)
+        .map(|(i, j)| {
+            let (i, j) = (i as f64, j as f64);
+
+            let angle = std::f64::consts::PI * (j + 1.0) / ncol as f64 * 360.0 / 180.0;
+            let radius = step_y / 2.0 * 0.8;
+            let color = start_color.lerp(
+                end_color,
+                i as f32 / (nrow - 1) as f32,
+                HueDirection::Increasing,
+            );
+            let offset = frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
+            Arc::new(angle, radius).with(|arc| {
+                arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
+                arc.set_stroke_color(color)
+                    .put_center_on(offset.extend(0.0));
+            })
+        })
+        .collect::<Group<_>>();
+    let r_arcs = r.insert(arcs);
+
+    r.timeline_mut(&r_arcs)
+        .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+
+    r.insert_time_mark(
+        r.timelines().max_total_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
+}
+
+#[scene]
+#[wasm_demo_doc]
+#[preview]
+#[output(dir = "arc_between_points")]
+/// A scene that shows how to use [`ArcBetweenPoints`] item.
+pub fn arc_between_points(r: &mut RanimScene) {
+    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let center = dvec2(0.0, 0.0);
+
+    let start_color = color!("#FF8080FF");
+    let end_color = color!("#58C4DDFF");
+    let ntan = 16;
+    let nrad = 5;
+
+    let arcs = (0..nrad)
+        .map(|i| {
+            let radius = 6.0 * (i + 1) as f64 / nrad as f64;
+            let width = 0.12 * ((nrad - i) as f64 / nrad as f64).powi(2);
+            let angle = std::f64::consts::PI * 7.0 / 4.0 * (i + 1) as f64 / nrad as f64;
+            (radius, width, angle)
+        })
+        .cartesian_product(0..ntan)
+        .map(|((rad, width, angle), j)| {
+            let color = start_color.lerp(
+                end_color,
+                j as f32 / (ntan - 1) as f32,
+                HueDirection::Increasing,
+            );
+            let vec = DMat2::from_angle(std::f64::consts::PI * 2.0 / ntan as f64 * j as f64)
+                * dvec2(rad, 0.0);
+            ArcBetweenPoints::new(center.extend(0.0), (center + vec).extend(0.0), angle).with(
+                |arc| {
+                    arc.stroke_width = width as f32;
+                    arc.set_stroke_color(color);
+                },
+            )
+        })
+        .collect::<Group<_>>();
+    let r_arcs = r.insert(arcs);
+
+    r.timeline_mut(&r_arcs)
+        .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+
+    r.insert_time_mark(
+        r.timelines().max_total_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
+}

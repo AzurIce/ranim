@@ -19,7 +19,7 @@ use wasm_bindgen::prelude::*;
 #[scene]
 #[wasm_demo_doc]
 #[preview]
-#[output]
+#[output(dir = "getting_started0")]
 /// This example shows the basic api of [`RanimScene`].
 pub fn getting_started0(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -45,7 +45,7 @@ pub fn getting_started0(r: &mut RanimScene) {
 #[scene]
 #[wasm_demo_doc]
 #[preview]
-#[output]
+#[output(dir = "getting_started1")]
 /// This example shows the basic api of [`RanimScene`].
 pub fn getting_started1(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -71,7 +71,7 @@ pub fn getting_started1(r: &mut RanimScene) {
 #[scene]
 #[wasm_demo_doc]
 #[preview]
-#[output]
+#[output(dir = "getting_started2")]
 /// This example shows the basic api of [`RanimScene`].
 fn getting_started2(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
