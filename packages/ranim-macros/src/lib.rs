@@ -31,6 +31,7 @@ struct SceneAttrs {
     name: Option<String>,      // #[scene(name = "...")]
     frame_height: Option<f64>, // #[scene(frame_height = 8.0)]
     preview: bool,             // #[preview]
+    wasm_demo_doc: bool,       // #[wasm_demo_doc]
     outputs: Vec<OutputDef>,   // #[output(...)]
 }
 
@@ -44,7 +45,7 @@ struct OutputDef {
     dir: String,
 }
 
-// ---------- 入口 ----------
+// MARK: scene
 #[proc_macro_attribute]
 pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let ranim = ranim_path();
@@ -54,6 +55,11 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_name = &input_fn.sig.ident;
     let vis = &input_fn.vis;
     let fn_body = &input_fn.block;
+    let doc_attrs: Vec<_> = input_fn
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .collect();
 
     // 场景名称
     let scene_name = attrs.name.unwrap_or_else(|| fn_name.to_string());
@@ -93,6 +99,17 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let preview = attrs.preview;
+    let doc = if attrs.wasm_demo_doc {
+        quote! {
+            #[doc = concat!("<canvas id=\"ranim-app-", stringify!(#fn_name), "\" width=\"1280\" height=\"720\" style=\"width: 100%;\"></canvas>")]
+            #[doc = concat!("<script type=\"module\">")]
+            #[doc = concat!("  const { find_scene } = await ranim_examples;")]
+            #[doc = concat!("  find_scene(\"", stringify!(#fn_name), "\").run_app();")]
+            #[doc = "</script>"]
+        }
+    } else {
+        quote! {}
+    };
 
     let static_output_name = syn::Ident::new(
         &format!("__SCENE_{}_OUTPUTS", fn_name.to_string().to_uppercase()),
@@ -118,6 +135,8 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // 构造 Scene 并塞进分布式切片
     let expanded = quote! {
+        #doc
+        #(#doc_attrs)*
         #vis fn #fn_name(r: &mut #ranim::timeline::RanimScene) #fn_body
 
         static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
@@ -141,6 +160,11 @@ pub fn output(_: TokenStream, _: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn preview(_: TokenStream, _: TokenStream) -> TokenStream {
+    TokenStream::new()
+}
+
+#[proc_macro_attribute]
+pub fn wasm_demo_doc(_attr: TokenStream, _: TokenStream) -> TokenStream {
     TokenStream::new()
 }
 

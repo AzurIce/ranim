@@ -41,6 +41,11 @@ pub fn parse_scene_attrs(
             continue;
         }
 
+        if attr.path().is_ident("wasm_demo_doc") {
+            res.wasm_demo_doc = true;
+            continue;
+        }
+
         if let Meta::List(list) = &attr.meta
             && list.path.is_ident("output")
         {
