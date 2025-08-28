@@ -104,28 +104,17 @@ pub fn bubble_sort(r: &mut RanimScene, num: usize) {
 
 #[scene]
 #[preview]
-#[output]
+#[output(dir = "bubble_sort")]
 /// A bubble sort ranim example with input of 10.
-///
-/// <canvas id="ranim-app-bubble_sort_10" width="1280" height="720" style="width: 100%;"></canvas>
-/// <script type="module">
-///   const { run_bubble_sort_10 } = await ranim_examples;
-///   run_bubble_sort_10();
-/// </script>
 pub fn bubble_sort_10(r: &mut RanimScene) {
     bubble_sort(r, 10);
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[preview]
-#[output]
+#[output(dir = "bubble_sort")]
 /// A bubble sort ranim example with input of 100.
-///
-/// <canvas id="ranim-app-bubble_sort_100" width="1280" height="720" style="width: 100%;"></canvas>
-/// <script type="module">
-///   const { run_bubble_sort_100 } = await ranim_examples;
-///   run_bubble_sort_100();
-/// </script>
 pub fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
 }
@@ -234,47 +223,20 @@ pub fn selective_sort(r: &mut RanimScene, num: usize) {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[preview]
 #[output]
 /// A selective sort ranim example with input of 10.
-///
-/// <canvas id="ranim-app-selective_sort_10" width="1280" height="720" style="width: 100%;"></canvas>
-/// <script type="module">
-///   const { run_selective_sort_10 } = await ranim_examples;
-///   run_selective_sort_10();
-/// </script>
 pub fn selective_sort_10(r: &mut RanimScene) {
     selective_sort(r, 10);
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[preview]
 #[output]
 /// A selective sort ranim example with input of 100.
-///
-/// <canvas id="ranim-app-selective_sort_100" width="1280" height="720" style="width: 100%;"></canvas>
-/// <script type="module">
-///   const { run_selective_sort_100 } = await ranim_examples;
-///   run_selective_sort_100();
-/// </script>
 pub fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
 
-#[cfg(any(feature = "app", target_arch = "wasm32"))]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn run_selective_sort_10() {
-    run_scene_app(
-        selective_sort_10_scene.constructor,
-        selective_sort_10_scene.name.to_string(),
-    );
-}
-
-#[cfg(any(feature = "app", target_arch = "wasm32"))]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn run_selective_sort_100() {
-    run_scene_app(
-        selective_sort_100_scene.constructor,
-        selective_sort_100_scene.name.to_string(),
-    );
-}

@@ -17,15 +17,10 @@ use ranim::{
 use wasm_bindgen::prelude::*;
 
 #[scene]
+#[wasm_demo_doc]
 #[preview]
 #[output]
 /// This example shows the basic api of [`RanimScene`].
-///
-/// <canvas id="ranim-app-getting_started0" width="1280" height="720" style="width: 100%;"></canvas>
-/// <script type="module">
-///   const { find_scene } = await ranim_examples;
-///   find_scene("getting_started0").run_app();
-/// </script>
 pub fn getting_started0(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     // A Square with size 2.0 and color blue
@@ -48,15 +43,10 @@ pub fn getting_started0(r: &mut RanimScene) {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[preview]
 #[output]
 /// This example shows the basic api of [`RanimScene`].
-///
-/// <canvas id="ranim-app-getting_started1" width="1280" height="720" style="width: 100%;"></canvas>
-/// <script type="module">
-///   const { find_scene } = await ranim_examples;
-///   find_scene("getting_started1").run_app();
-/// </script>
 pub fn getting_started1(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     // A Square with size 2.0 and color blue
@@ -79,15 +69,10 @@ pub fn getting_started1(r: &mut RanimScene) {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[preview]
 #[output]
 /// This example shows the basic api of [`RanimScene`].
-///
-/// <canvas id="ranim-app-getting_started2" width="1280" height="720" style="width: 100%;"></canvas>
-/// <script type="module">
-///   const { find_scene } = await ranim_examples;
-///   find_scene("getting_started2").run_app();
-/// </script>
 fn getting_started2(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {

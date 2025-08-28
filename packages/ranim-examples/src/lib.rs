@@ -22,14 +22,9 @@ pub mod sort;
 
 #[scene]
 #[preview]
-#[output]
+#[wasm_demo_doc]
+#[output(dir = "hello_ranim")]
 /// Hello Ranim!
-///
-/// <canvas id="ranim-app-hello_ranim" width="1280" height="720" style="width: 100%;"></canvas>
-/// <script type="module">
-///   const { find_scene } = await ranim_examples;
-///   find_scene("hello_ranim").run_app();
-/// </script>
 pub fn hello_ranim(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     let square = Square::new(2.0).with(|square| {
