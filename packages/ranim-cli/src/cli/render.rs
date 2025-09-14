@@ -2,12 +2,10 @@ use log::{error, info};
 use ranim::{Scene, render_scene};
 
 use crate::{
-    RanimUserLibraryBuilder,
-    cli::Args,
-    workspace::{Workspace, get_target_package},
+    RanimUserLibraryBuilder, Target, cli::CliArgs, workspace::{Workspace, get_target_package}
 };
 
-pub fn render_command(args: &Args, scenes: &[String]) {
+pub fn render_command(args: &CliArgs, scenes: &[String]) {
     info!("Loading workspace...");
     let workspace = Workspace::current().unwrap();
 
@@ -16,10 +14,15 @@ pub fn render_command(args: &Args, scenes: &[String]) {
     let (_, package_name) = get_target_package(&workspace, args);
     info!("Target package name: {package_name}");
 
+    // let target = args.target.clone().map(Target::from).unwrap_or_default();
+    let target = Target::from(args.target.clone());
+    info!("Target: {target:?}");
+
     let current_dir = std::env::current_dir().expect("Failed to get current directory");
     let mut builder = RanimUserLibraryBuilder::new(
         workspace.clone(),
         package_name.clone(),
+        target,
         args.clone(),
         current_dir.clone(),
     );
