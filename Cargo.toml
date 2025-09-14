@@ -94,13 +94,14 @@ typst-svg = "0.13.1"
 chrono = "0.4.41"
 reqwest = "0.12.23"
 slotmap = "1.0.7"
+inventory = "0.3.21"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 egui-winit = { version = "0.32.1", optional = true }
 which = "8.0.0"
 flate2 = "1.1.2"
 reqwest = { version = "0.12.22", features = ["blocking"] }
-linkme = "0.3.33"
+# linkme = "0.3.33"
 
 # web:
 [target.'cfg(target_family = "wasm")'.dependencies]
@@ -165,37 +166,6 @@ path = "examples/basic/main.rs"
 wasm = true
 
 [[example]]
-name = "bubble_sort"
-path = "examples/bubble_sort/main.rs"
-
-[package.metadata.example.bubble_sort]
-wasm = true
-
-[[example]]
-name = "getting_started0"
-path = "examples/getting_started0/main.rs"
-
-[package.metadata.example.getting_started0]
-wasm = true
-hide = true
-
-[[example]]
-name = "getting_started1"
-path = "examples/getting_started1/main.rs"
-
-[package.metadata.example.getting_started1]
-wasm = true
-hide = true
-
-[[example]]
-name = "getting_started2"
-path = "examples/getting_started2/main.rs"
-
-[package.metadata.example.getting_started2]
-wasm = true
-hide = true
-
-[[example]]
 name = "hanoi"
 path = "examples/hanoi/main.rs"
 
@@ -225,13 +195,6 @@ name = "ranim_logo"
 path = "examples/ranim_logo/main.rs"
 
 [package.metadata.example.ranim_logo]
-wasm = true
-
-[[example]]
-name = "selective_sort"
-path = "examples/selective_sort/main.rs"
-
-[package.metadata.example.selective_sort]
 wasm = true
 
 [[example]]
