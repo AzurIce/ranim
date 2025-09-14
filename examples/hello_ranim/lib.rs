@@ -1,6 +1,5 @@
 use std::f64::consts::PI;
 
-use log::LevelFilter;
 use ranim::{
     animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
@@ -46,23 +45,4 @@ fn hello_ranim(r: &mut RanimScene) {
     };
 
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(hello_ranim_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(hello_ranim_scene)
 }

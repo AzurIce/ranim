@@ -1,4 +1,3 @@
-use log::LevelFilter;
 use ranim::{
     animation::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square,
     prelude::*,
@@ -28,22 +27,3 @@ fn getting_started0(r: &mut RanimScene) {
     }
 }
 // ANCHOR_END: construct
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(getting_started0_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(getting_started0_scene);
-}

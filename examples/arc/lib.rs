@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use log::LevelFilter;
 use ranim::{
     animation::{fading::FadingAnim, lagged::LaggedAnim},
     color::HueDirection,
