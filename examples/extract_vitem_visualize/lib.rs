@@ -1,4 +1,3 @@
-use log::LevelFilter;
 use std::f64::consts::PI;
 
 use ranim::{
@@ -247,26 +246,4 @@ pub fn hello_ranim(r: &mut RanimScene) {
         3.2,
         TimeMark::Capture("preview-hello_ranim.png".to_string()),
     );
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(hello_ranim_scene);
-    #[cfg(not(feature = "app"))]
-    {
-        render_scene(hello_ranim_scene);
-        render_scene(ranim_text_scene);
-    }
 }

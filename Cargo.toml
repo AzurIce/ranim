@@ -146,60 +146,76 @@ pre-release-replacements = [
 [[example]]
 name = "arc"
 path = "examples/arc/lib.rs"
-crate-type = ["dylib"]
+crate-type = ["cdylib"]
 
 [package.metadata.example.arc]
 wasm = true
 
 [[example]]
 name = "arc_between_points"
-path = "examples/arc_between_points/main.rs"
+path = "examples/arc_between_points/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.arc_between_points]
 wasm = true
 
 [[example]]
 name = "basic"
-path = "examples/basic/main.rs"
+path = "examples/basic/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.basic]
 wasm = true
 
 [[example]]
 name = "hanoi"
-path = "examples/hanoi/main.rs"
+path = "examples/hanoi/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.hanoi]
 wasm = true
 
 [[example]]
 name = "hello_ranim"
-path = "examples/hello_ranim/main.rs"
+path = "examples/hello_ranim/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.hello_ranim]
 wasm = true
 
 [[example]]
 name = "palettes"
-path = "examples/palettes/main.rs"
+path = "examples/palettes/lib.rs"
+crate-type = ["cdylib"]
 
 [[example]]
 name = "perspective_blend"
-path = "examples/perspective_blend/main.rs"
+path = "examples/perspective_blend/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.perspective_blend]
 wasm = true
 
 [[example]]
 name = "ranim_logo"
-path = "examples/ranim_logo/main.rs"
+path = "examples/ranim_logo/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.ranim_logo]
 wasm = true
 
 [[example]]
 name = "extract_vitem_visualize"
-path = "examples/extract_vitem_visualize/main.rs"
+path = "examples/extract_vitem_visualize/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.extract_vitem_visualize]
 wasm = true
+
+[[example]]
+name = "test"
+path = "examples/test/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.test]
+wasm = false

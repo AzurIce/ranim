@@ -1,4 +1,3 @@
-use log::LevelFilter;
 use ranim::{
     animation::transform::TransformAnim,
     color::palettes::manim,
@@ -102,22 +101,3 @@ fn perspective_blend(r: &mut RanimScene) {
     );
 }
 
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(not(feature = "app"))]
-    render_scene(perspective_blend_scene);
-
-    #[cfg(feature = "app")]
-    preview(perspective_blend_scene);
-}
