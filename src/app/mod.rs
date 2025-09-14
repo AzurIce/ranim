@@ -280,9 +280,12 @@ struct WinitApp {
     window: Option<Arc<Window>>,
     app_renderer: Option<AppRenderer>,
     wgpu_ctx: Option<WgpuContext>,
+    #[cfg(target_arch = "wasm32")]
+    container_id: String,
 }
 
 impl WinitApp {
+    #[cfg(not(target_arch = "wasm32"))]
     fn new(app_state: AppState, event_loop: &EventLoop<WgpuContext>) -> Self {
         Self {
             event_loop_proxy: Some(event_loop.create_proxy()),
@@ -292,6 +295,19 @@ impl WinitApp {
             window: None,
             app_renderer: None,
             wgpu_ctx: None,
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    fn new(app_state: AppState, event_loop: &EventLoop<WgpuContext>, container_id: String) -> Self {
+        Self {
+            event_loop_proxy: Some(event_loop.create_proxy()),
+            app_state,
+
+            size: (0, 0),
+            window: None,
+            app_renderer: None,
+            wgpu_ctx: None,
+            container_id,
         }
     }
 }
@@ -442,18 +458,42 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
 
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
-            log::info!("searching for app-{}", self.app_state.title);
-            let canvas = document
-                .get_element_by_id(&format!("app-{}", self.app_state.title))
-                .unwrap();
-            let canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().ok();
 
-            log::info!("found canvas: {}", canvas.is_some());
-            if let Some(canvas) = canvas.as_ref() {
-                self.size = (canvas.width(), canvas.height());
-                log::info!("canvas size: {:?}", self.size);
-            }
-            window_attrs = window_attrs.with_canvas(canvas);
+            log::info!("searching for {}", self.container_id);
+            let canvas = document
+                .get_element_by_id(&self.container_id)
+                .and_then(|canvas| canvas.dyn_into::<web_sys::HtmlCanvasElement>().ok());
+
+            let canvas = match canvas {
+                Some(canvas) => {
+                    log::info!("found canvas");
+                    self.size = (canvas.width(), canvas.height());
+                    log::info!("canvas size: {:?}", self.size);
+                    canvas
+                }
+                None => {
+                    log::info!("canvas not found, creating a new one");
+                    let canvas = document
+                        .create_element("canvas")
+                        .unwrap()
+                        .dyn_into::<web_sys::HtmlCanvasElement>()
+                        .unwrap();
+
+                    // 设置 canvas 的 id 和尺寸
+                    canvas.set_id(&self.container_id);
+                    canvas.set_width(800); // 默认宽度
+                    canvas.set_height(600); // 默认高度
+
+                    // 将 canvas 添加到文档中
+                    document.body().unwrap().append_child(&canvas).unwrap();
+
+                    self.size = (canvas.width(), canvas.height());
+                    log::info!("created canvas with size: {:?}", self.size);
+                    canvas
+                }
+            };
+
+            window_attrs = window_attrs.with_canvas(Some(canvas));
 
             // window_attrs =
             //     window_attrs.with_prevent_default(window.prevent_default_event_handling);
@@ -595,16 +635,15 @@ pub fn run_app(app: AppState, #[cfg(target_arch = "wasm32")] container_id: Strin
         .unwrap();
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
-    #[allow(unused_mut)]
-    let mut app = WinitApp::new(app, &event_loop);
-
     #[cfg(target_arch = "wasm32")]
     {
+        let mut app = WinitApp::new(app, &event_loop, container_id);
         use winit::platform::web::EventLoopExtWebSys;
         event_loop.spawn_app(app);
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
+        let mut app = WinitApp::new(app, &event_loop);
         event_loop.run_app(&mut app).unwrap();
     }
 }

@@ -59,9 +59,11 @@
             zola
             mdbook
             wasm-pack
-            wasm-bindgen-cli
+            # wasm-bindgen-cli
             mdbook-i18n-helpers
-          ]);
+          ]) ++ [
+            (pkgs.callPackage ./wasm-bindgen-cli.nix {})
+          ];
         };
       });
 }
