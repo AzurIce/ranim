@@ -10,6 +10,9 @@ readme = "README.md"
 keywords = ["animation", "manim", "wgpu"]
 exclude = ["website", "assets", "book"]
 
+[lib]
+crate-type = ["rlib", "dylib"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
@@ -45,19 +48,19 @@ ranim-macros.workspace = true
 itertools.workspace = true
 web-time = "1.1.0"
 sha1 = "0.10.6"
-lru = "0.16.0"
+lru = "0.16.1"
 async-channel = "2.3.1"
 bytemuck = { version = "1.23.2", features = ["derive"] }
 glam = { version = "0.30.3", features = ["bytemuck"] }
-image = "0.25.6"
-log = "0.4.27"
+image = "0.25.8"
+log = "0.4.28"
 pollster = "0.4.0"
 wgpu = "25.0.2"
 anyhow = "1.0.99"
 usvg = "0.45.1"
-regex = "1.11.1"
+regex = "1.11.2"
 indicatif = "0.18.0"
-color = "0.3.1"
+color = "0.3.2"
 variadics_please = "1.1.0"
 derive_more = { version = "2.0.1", features = [
   "deref_mut",
@@ -141,7 +144,8 @@ pre-release-replacements = [
 # MARK: Examples
 [[example]]
 name = "arc"
-path = "examples/arc/main.rs"
+path = "examples/arc/lib.rs"
+crate-type = ["dylib"]
 
 [package.metadata.example.arc]
 wasm = true
