@@ -10,6 +10,10 @@ readme = "README.md"
 keywords = ["animation", "manim", "wgpu"]
 exclude = ["website", "assets", "book"]
 
+# Use RUSTFLAGS="-C prefer-dynamic" reduces link time from 500ms to 100ms
+[lib]
+crate-type = ["rlib", "dylib"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
