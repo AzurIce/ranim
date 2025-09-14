@@ -61,6 +61,7 @@
             wasm-pack
             wasm-bindgen-cli
             mdbook-i18n-helpers
+            measureme
           ]);
         };
       });
