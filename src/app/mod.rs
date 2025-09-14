@@ -32,6 +32,9 @@ use crate::{
     utils::wgpu::WgpuContext,
 };
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
 #[derive(Default, Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct OccupiedScreenSpace {
@@ -570,7 +573,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
 use crate::PUFFIN_GPU_PROFILER;
 
 /// Runs an app with the given app state
-pub fn run_app(app: AppState) {
+pub fn run_app(app: AppState, #[cfg(target_arch = "wasm32")] container_id: String) {
     #[cfg(feature = "profiling")]
     let (_cpu_server, _gpu_server) = {
         puffin::set_scopes_on(true);
@@ -606,16 +609,24 @@ pub fn run_app(app: AppState) {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl Scene {
+    pub fn run_app(&self) {
+        run_scene_app(self.constructor, self.name.to_string());
+    }
+    pub fn run_app_with_name(&self, name: String) {
+        run_scene_app(self.constructor, name);
+    }
+}
+
 /// Runs a scene preview app on a scene constructor
 pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init().expect("Failed to initialize console_log");
-    }
-
-    let app_state = AppState::new_with_title(constructor, name);
-    run_app(app_state);
+    let app_state = AppState::new_with_title(constructor, name.clone());
+    run_app(
+        app_state,
+        #[cfg(target_arch = "wasm32")]
+        format!("ranim-app-{name}"),
+    );
 }
 
 /// Preview a scene
