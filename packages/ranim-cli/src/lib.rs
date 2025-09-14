@@ -41,7 +41,12 @@ impl BuildProcess {
                 .send_blocking(Err(anyhow::anyhow!("Failed to build package: {err:?}")))
                 .unwrap();
         } else {
-            let dylib_path = get_dylib_path(&self.workspace, &self.package_name, &self.target, &self.args.args);
+            let dylib_path = get_dylib_path(
+                &self.workspace,
+                &self.package_name,
+                &self.target,
+                &self.args.args,
+            );
             // let tmp_dir = std::env::temp_dir();
             info!("loading {dylib_path:?}...");
 
@@ -279,7 +284,12 @@ pub fn cargo_build(
     }
 }
 
-fn get_dylib_path(workspace: &Workspace, package_name: &str, target: &Target, args: &[String]) -> PathBuf {
+fn get_dylib_path(
+    workspace: &Workspace,
+    package_name: &str,
+    target: &Target,
+    args: &[String],
+) -> PathBuf {
     // Construct the dylib path
     let mut target_dir = workspace
         .krates
@@ -294,7 +304,7 @@ fn get_dylib_path(workspace: &Workspace, package_name: &str, target: &Target, ar
     if let Target::Example(_) = target {
         target_dir = target_dir.join("examples");
     }
-    
+
     let artifact_name = match target {
         Target::Lib => package_name,
         Target::Example(example) => example,

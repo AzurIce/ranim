@@ -2,7 +2,9 @@ use log::{error, info};
 use ranim::{Scene, render_scene};
 
 use crate::{
-    RanimUserLibraryBuilder, Target, cli::CliArgs, workspace::{Workspace, get_target_package}
+    RanimUserLibraryBuilder, Target,
+    cli::CliArgs,
+    workspace::{Workspace, get_target_package},
 };
 
 pub fn render_command(args: &CliArgs, scenes: &[String]) {
