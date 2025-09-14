@@ -92,22 +92,26 @@ mod test {
         };
         assert!(scenes.is_empty());
         assert_eq!(cli.args.package, Some("package".to_string()));
-        // assert!(cli.args.target.lib);
+        assert!(!cli.args.target.lib);
+        assert!(cli.args.target.example.is_none());
 
         let cli = parse_args(&["ranim", "preview", "--lib"]).unwrap();
-        // assert!(matches!(cli.command, Commands::Preview));
-        // assert!(cli.args.package.is_none());
-        // let TargetArg { lib, example } = cli.args.target.clone();
-        // assert!(lib);
-        // assert!(example.is_none());
-        // assert_eq!(Target::from(cli.args.target.clone()), Target::Lib);
+        assert!(matches!(cli.command, Commands::Preview));
+        assert!(cli.args.package.is_none());
+        let TargetArg { lib, example } = cli.args.target.clone();
+        assert!(lib);
+        assert!(example.is_none());
+        assert_eq!(Target::from(cli.args.target.clone()), Target::Lib);
 
         let cli = parse_args(&["ranim", "preview", "--example", "example"]).unwrap();
-        // assert!(matches!(cli.command, Commands::Preview));
-        // assert!(cli.args.package.is_none());
-        // let TargetArg { lib, example } = cli.args.target.clone();
-        // assert!(!lib);
-        // assert_eq!(example, Some("example".to_string()));
-        // assert_eq!(Target::from(cli.args.target.clone()), Target::Example("example".to_string()));
+        assert!(matches!(cli.command, Commands::Preview));
+        assert!(cli.args.package.is_none());
+        let TargetArg { lib, example } = cli.args.target.clone();
+        assert!(!lib);
+        assert_eq!(example, Some("example".to_string()));
+        assert_eq!(
+            Target::from(cli.args.target.clone()),
+            Target::Example("example".to_string())
+        );
     }
 }

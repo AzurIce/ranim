@@ -100,4 +100,3 @@ fn perspective_blend(r: &mut RanimScene) {
         TimeMark::Capture("preview.png".to_string()),
     );
 }
-

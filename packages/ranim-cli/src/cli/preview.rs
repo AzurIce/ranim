@@ -12,7 +12,9 @@ use log::{error, info, trace};
 use notify::RecursiveMode;
 
 use crate::{
-    RanimUserLibraryBuilder, Target, cli::CliArgs, workspace::{Workspace, get_target_package}
+    RanimUserLibraryBuilder, Target,
+    cli::CliArgs,
+    workspace::{Workspace, get_target_package},
 };
 
 fn watch_krate(
