@@ -31,6 +31,7 @@ struct SceneAttrs {
     name: Option<String>,      // #[scene(name = "...")]
     frame_height: Option<f64>, // #[scene(frame_height = 8.0)]
     preview: bool,             // #[preview]
+    wasm_demo_doc: bool,       // #[wasm_demo_doc]
     outputs: Vec<OutputDef>,   // #[output(...)]
 }
 
@@ -44,7 +45,7 @@ struct OutputDef {
     dir: String,
 }
 
-// ---------- 入口 ----------
+// MARK: scene
 #[proc_macro_attribute]
 pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let ranim = ranim_path();
@@ -54,6 +55,18 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_name = &input_fn.sig.ident;
     let vis = &input_fn.vis;
     let fn_body = &input_fn.block;
+    let doc_attrs: Vec<_> = input_fn
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .collect();
+
+    let doc_head = doc_attrs.first();
+    let doc_attrs = if doc_attrs.len() > 1 {
+        &doc_attrs[1..]
+    } else {
+        &[]
+    };
 
     // 场景名称
     let scene_name = attrs.name.unwrap_or_else(|| fn_name.to_string());
@@ -93,6 +106,27 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let preview = attrs.preview;
+    let mut doc = quote! {
+        #(#doc_attrs)*
+    };
+    if attrs.wasm_demo_doc {
+        doc = quote! {
+            #[doc = concat!(r#"<div>"#)]
+            #[doc = concat!(r#"  <canvas id="ranim-app-"#, stringify!(#fn_name), r#"" width="1280" height="720" style="width: 100%; height: 100%;"></canvas>"#)]
+            #[doc = concat!(r#"  <script type="module">"#)]
+            #[doc = concat!(r#"    const { find_scene } = await ranim_examples;"#)]
+            #[doc = concat!(r#"    find_scene(""#, stringify!(#fn_name), r#"").run_app();"#)]
+            #[doc = concat!(r#"  </script>"#)]
+            #[doc = concat!(r#"</div>"#)]
+            #doc
+        };
+    }
+    if let Some(doc_head) = doc_head {
+        doc = quote! {
+            #doc_head
+            #doc
+        };
+    }
 
     let static_output_name = syn::Ident::new(
         &format!("__SCENE_{}_OUTPUTS", fn_name.to_string().to_uppercase()),
@@ -118,12 +152,16 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // 构造 Scene 并塞进分布式切片
     let expanded = quote! {
+        #doc
         #vis fn #fn_name(r: &mut #ranim::timeline::RanimScene) #fn_body
 
+        #[doc(hidden)]
         static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
-        #[cfg_attr(not(target_family = "wasm"), #ranim::linkme::distributed_slice(#ranim::SCENES))]
-        #[cfg_attr(not(target_family = "wasm"), linkme(crate = #ranim::linkme))]
+        #[doc(hidden)]
         static #static_name: #ranim::Scene = #scene;
+        #ranim::inventory::submit!{
+            #scene
+        }
 
         #[allow(non_upper_case_globals)]
         #vis static #static_scene_name: &'static #ranim::Scene = &#static_name;
@@ -139,6 +177,11 @@ pub fn output(_: TokenStream, _: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn preview(_: TokenStream, _: TokenStream) -> TokenStream {
+    TokenStream::new()
+}
+
+#[proc_macro_attribute]
+pub fn wasm_demo_doc(_attr: TokenStream, _: TokenStream) -> TokenStream {
     TokenStream::new()
 }
 

@@ -27,6 +27,9 @@ use animation::EvalResult;
 use log::{info, trace};
 use timeline::{RanimScene, SealedRanimScene};
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
 #[cfg(not(target_arch = "wasm32"))]
 use file_writer::{FileWriter, FileWriterBuilder};
 #[cfg(not(target_arch = "wasm32"))]
@@ -89,23 +92,57 @@ impl<F: Fn(&mut RanimScene) + Send + Sync> SceneConstructor for F {
 }
 
 // MARK: Dylib part
-#[cfg(not(target_family = "wasm"))]
-pub use linkme;
-
 #[doc(hidden)]
 #[derive(Clone)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct Scene {
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub name: &'static str,
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub constructor: fn(&mut RanimScene),
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub config: SceneConfig,
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub outputs: &'static [Output],
     pub preview: bool,
 }
 
-#[cfg(not(target_family = "wasm"))]
+pub use inventory;
+
+inventory::collect!(Scene);
+
 #[doc(hidden)]
-#[linkme::distributed_slice]
-pub static SCENES: [Scene];
+#[unsafe(no_mangle)]
+pub extern "C" fn get_scene(idx: usize) -> *const Scene {
+    inventory::iter::<Scene>().skip(idx).take(1).next().unwrap()
+}
+
+#[doc(hidden)]
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_cnt() -> usize {
+    inventory::iter::<Scene>().count()
+}
+
+#[cfg(target_arch = "wasm32")]
+unsafe extern "C" {
+    fn __wasm_call_ctors();
+}
+
+/// Return a scene with matched name
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn find_scene(name: &str) -> Option<Scene> {
+    inventory::iter::<Scene>().find(|s| s.name == name).cloned()
+}
+
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
+fn wasm_start() {
+    unsafe {
+        __wasm_call_ctors();
+    }
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    console_log::init().expect("Failed to initialize console_log");
+}
 
 /// Scene config
 #[derive(Debug, Clone)]
@@ -124,6 +161,7 @@ impl Default for SceneConfig {
 
 /// The output of a scene
 #[derive(Debug, Clone)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct Output {
     /// The width of the output texture in pixels.
     pub width: u32,
@@ -136,6 +174,7 @@ pub struct Output {
     /// The directory to save the output
     ///
     /// Related to the `output` folder, Or absolute.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub dir: &'static str,
 }
 
@@ -156,20 +195,6 @@ impl Output {
     };
 }
 
-#[cfg(not(target_family = "wasm"))]
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-pub extern "C" fn scenes() -> *const Scene {
-    SCENES.as_ptr()
-}
-
-#[cfg(not(target_family = "wasm"))]
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-pub extern "C" fn scene_cnt() -> usize {
-    SCENES.len()
-}
-
 // MARK: Prelude
 /// The preludes
 pub mod prelude {
@@ -178,7 +203,7 @@ pub mod prelude {
     #[cfg(not(target_arch = "wasm32"))]
     pub use crate::{render, render_scene, render_scene_output};
 
-    pub use ranim_macros::{output, preview, scene};
+    pub use ranim_macros::{output, preview, scene, wasm_demo_doc};
 
     pub use crate::items::{ItemId, camera_frame::CameraFrame};
     pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};
