@@ -12,9 +12,7 @@ use log::{error, info, trace};
 use notify::RecursiveMode;
 
 use crate::{
-    RanimUserLibraryBuilder,
-    cli::Args,
-    workspace::{Workspace, get_target_package},
+    RanimUserLibraryBuilder, Target, cli::CliArgs, workspace::{Workspace, get_target_package}
 };
 
 fn watch_krate(
@@ -116,7 +114,7 @@ fn watch_krate(
     (debouncer, rx)
 }
 
-pub fn preview_command(args: &Args) {
+pub fn preview_command(args: &CliArgs) {
     info!("Loading workspace...");
     let workspace = Workspace::current().unwrap();
 
@@ -125,6 +123,10 @@ pub fn preview_command(args: &Args) {
     let (kid, package_name) = get_target_package(&workspace, args);
     info!("Target package name: {package_name}");
 
+    // let target = args.target.clone().map(Target::from).unwrap_or_default();
+    let target = Target::from(args.target.clone());
+    info!("Target: {target:?}");
+
     info!("Watching package...");
     let (_watcher, rx) = watch_krate(&workspace, &kid);
 
@@ -132,6 +134,7 @@ pub fn preview_command(args: &Args) {
     let mut builder = RanimUserLibraryBuilder::new(
         workspace.clone(),
         package_name.clone(),
+        target,
         args.clone(),
         current_dir.clone(),
     );

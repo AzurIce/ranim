@@ -10,7 +10,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::{cli::Args, workspace::Workspace};
+use crate::{cli::CliArgs, workspace::Workspace};
 
 pub mod cli;
 pub mod workspace;
@@ -19,7 +19,8 @@ pub mod workspace;
 pub struct BuildProcess {
     workspace: Arc<Workspace>,
     package_name: String,
-    args: Args,
+    target: Target,
+    args: CliArgs,
     current_dir: PathBuf,
 
     res_tx: Sender<Result<RanimUserLibrary>>,
@@ -31,6 +32,7 @@ impl BuildProcess {
         if let Err(err) = cargo_build(
             &self.current_dir,
             &self.package_name,
+            &self.target,
             &self.args,
             Some(self.cancel_rx),
         ) {
@@ -39,7 +41,7 @@ impl BuildProcess {
                 .send_blocking(Err(anyhow::anyhow!("Failed to build package: {err:?}")))
                 .unwrap();
         } else {
-            let dylib_path = get_dylib_path(&self.workspace, &self.package_name, &self.args.args);
+            let dylib_path = get_dylib_path(&self.workspace, &self.package_name, &self.target, &self.args.args);
             // let tmp_dir = std::env::temp_dir();
             info!("loading {dylib_path:?}...");
 
@@ -61,7 +63,8 @@ impl RanimUserLibraryBuilder {
     pub fn new(
         workspace: Arc<Workspace>,
         package_name: String,
-        args: Args,
+        target: Target,
+        args: CliArgs,
         current_dir: PathBuf,
     ) -> Self {
         let (res_tx, res_rx) = bounded(1);
@@ -70,6 +73,7 @@ impl RanimUserLibraryBuilder {
         let build_process = BuildProcess {
             workspace,
             package_name,
+            target,
             args,
             current_dir,
             res_tx,
@@ -197,23 +201,45 @@ impl Drop for RanimUserLibrary {
     }
 }
 
-fn cargo_build(
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum Target {
+    #[default]
+    Lib,
+    Example(String),
+}
+
+impl From<cli::TargetArg> for Target {
+    fn from(arg: cli::TargetArg) -> Self {
+        if arg.lib {
+            Target::Lib
+        } else if let Some(example) = arg.example {
+            Target::Example(example)
+        } else {
+            Self::default()
+        }
+    }
+}
+
+pub fn cargo_build(
     path: impl AsRef<Path>,
     package: &str,
-    args: &Args,
+    target: &Target,
+    args: &CliArgs,
     cancel_rx: Option<Receiver<()>>,
 ) -> Result<()> {
     let path = path.as_ref();
     let mut cmd = Command::new("cargo");
-    cmd.args([
-        "build",
-        "-p",
-        package,
-        "--lib",
-        "--color=always",
-        // "--message-format=json-render-diagnostics",
-    ])
-    .current_dir(path);
+    cmd.args(["build", "-p", package, "--color=always"])
+        // .env("RUSTFLAGS", "-C prefer_dynamic")
+        .current_dir(path);
+    match target {
+        Target::Lib => {
+            cmd.arg("--lib");
+        }
+        Target::Example(x) => {
+            cmd.args(["--example", x]);
+        }
+    }
     cmd.args(&args.args);
 
     // Start an async task to wait for completion
@@ -253,9 +279,9 @@ fn cargo_build(
     }
 }
 
-fn get_dylib_path(workspace: &Workspace, package_name: &str, args: &[String]) -> PathBuf {
+fn get_dylib_path(workspace: &Workspace, package_name: &str, target: &Target, args: &[String]) -> PathBuf {
     // Construct the dylib path
-    let target_dir = workspace
+    let mut target_dir = workspace
         .krates
         .workspace_root()
         .as_std_path()
@@ -265,15 +291,23 @@ fn get_dylib_path(workspace: &Workspace, package_name: &str, args: &[String]) ->
         } else {
             "debug"
         });
+    if let Target::Example(_) = target {
+        target_dir = target_dir.join("examples");
+    }
+    
+    let artifact_name = match target {
+        Target::Lib => package_name,
+        Target::Example(example) => example,
+    };
 
     #[cfg(target_os = "windows")]
-    let dylib_name = format!("{}.dll", package_name.replace("-", "_"));
+    let dylib_name = format!("{}.dll", artifact_name.replace("-", "_"));
 
     #[cfg(target_os = "macos")]
-    let dylib_name = format!("lib{}.dylib", package_name.replace("-", "_"));
+    let dylib_name = format!("lib{}.dylib", artifact_name.replace("-", "_"));
 
     #[cfg(target_os = "linux")]
-    let dylib_name = format!("lib{}.so", package_name.replace("-", "_"));
+    let dylib_name = format!("lib{}.so", artifact_name.replace("-", "_"));
 
     target_dir.join(dylib_name)
 }
