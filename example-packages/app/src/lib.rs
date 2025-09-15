@@ -37,7 +37,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
         let timeline = r.timeline_mut(&r_vitem);
         timeline.play_with(|state| state.transform_to(circle.into()));
         timeline.forward(1.0);
-        let circle = timeline.state().clone();
+        let circle = timeline.snapshot().clone();
         timeline.play_with(|circle| circle.unwrite());
         timeline.play(circle.write());
         timeline.play_with(|circle| circle.fade_out());

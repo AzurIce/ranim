@@ -71,7 +71,7 @@ fn perspective_blend(r: &mut RanimScene) {
             r.timeline_mut(r_face)
                 .play_with(|face| face.transform(transform_fn).with_rate_func(linear))
                 .hide()
-                .state()
+                .snapshot()
                 .clone()
         })
         .collect::<Vec<_>>();

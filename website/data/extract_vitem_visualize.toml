@@ -40,7 +40,7 @@ fn ranim_text(r: &mut RanimScene) {
         .map(VisualVItem)
         .map(|item| r.insert_and_show(item))
         .collect::<Vec<_>>();
-    let default_cam = r.timeline(&r_cam).state().clone();
+    let default_cam = r.timeline(&r_cam).snapshot().clone();
     r.timelines_mut().forward(1.0);
     r.timeline_mut(&r_cam).play_with(|cam| {
         cam.transform(|cam| {
@@ -85,7 +85,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
         timeline
             .play_with(|item| item.transform_to(circle))
             .forward(1.0);
-        let circle = timeline.state().clone();
+        let circle = timeline.snapshot().clone();
         timeline
             .play_with(|circle| circle.unwrite().with_duration(2.0))
             .play(circle.write().with_duration(2.0))
@@ -249,7 +249,7 @@ impl Empty for VisualVItem {
     }
 }
 ```"""
-hash = "90c404c3e4fa3fb4c728dd92768c9e117d41f7fd"
+hash = "97ffffed29c6fe633d3166df74190853a006f130"
 preview_imgs = ["/examples/extract_vitem_visualize/preview-ranim_text.png", "/examples/extract_vitem_visualize/preview-hello_ranim.png"]
 output_files = ["/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4", "/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4"]
 wasm = true
