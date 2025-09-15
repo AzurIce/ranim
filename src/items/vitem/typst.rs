@@ -1,6 +1,6 @@
 use std::{
+    collections::HashMap,
     num::NonZeroUsize,
-    ops::Deref,
     sync::{Arc, Mutex, OnceLock},
 };
 
@@ -43,9 +43,10 @@ impl TypstLruCache {
         self.inner
             .get_or_insert_ref(AsRef::<[u8; 20]>::as_ref(&sha1), || {
                 // let world = SingleFileTypstWorld::new(typst_str);
-                let mut world = typst_world().lock().unwrap();
-                world.set_source(typst_str);
-                let document = typst::compile(world.deref())
+                let world = typst_world().lock().unwrap();
+                let world = world.with_source_str(typst_str);
+                // world.set_source(typst_str);
+                let document = typst::compile(&world)
                     .output
                     .expect("failed to compile typst source");
 
@@ -69,9 +70,9 @@ fn fonts() -> &'static Fonts {
     FONTS.get_or_init(|| FontSearcher::new().include_system_fonts(true).search())
 }
 
-fn typst_world() -> &'static Arc<Mutex<SingleFileTypstWorld>> {
-    static WORLD: OnceLock<Arc<Mutex<SingleFileTypstWorld>>> = OnceLock::new();
-    WORLD.get_or_init(|| Arc::new(Mutex::new(SingleFileTypstWorld::new(""))))
+fn typst_world() -> &'static Arc<Mutex<TypstWorld>> {
+    static WORLD: OnceLock<Arc<Mutex<TypstWorld>>> = OnceLock::new();
+    WORLD.get_or_init(|| Arc::new(Mutex::new(TypstWorld::new())))
 }
 
 /// Compiles typst string to SVG string
@@ -86,38 +87,97 @@ pub fn typst_svg(source: &str) -> String {
     // get_typst_element(&svg)
 }
 
-pub(crate) struct SingleFileTypstWorld {
-    source: Source,
-
-    library: LazyHash<Library>,
-    book: LazyHash<FontBook>,
-    now: OnceLock<DateTime<Local>>,
+struct FileEntry {
+    bytes: Bytes,
+    /// This field is filled on demand.
+    source: Option<Source>,
 }
 
-impl SingleFileTypstWorld {
-    pub fn new(source: impl AsRef<str>) -> Self {
-        let source = source.as_ref().to_string();
-        let fonts = fonts();
+impl FileEntry {
+    fn source(&mut self, id: FileId) -> FileResult<Source> {
+        // Fallible `get_or_insert`.
+        let source = if let Some(source) = &self.source {
+            source
+        } else {
+            let contents = std::str::from_utf8(&self.bytes).map_err(|_| FileError::InvalidUtf8)?;
+            // Defuse the BOM!
+            let contents = contents.trim_start_matches('\u{feff}');
+            let source = Source::new(id, contents.into());
+            self.source.insert(source)
+        };
+        Ok(source.clone())
+    }
+}
 
+pub(crate) struct TypstWorld {
+    library: LazyHash<Library>,
+    book: LazyHash<FontBook>,
+    files: Mutex<HashMap<FileId, FileEntry>>,
+}
+
+impl TypstWorld {
+    pub(crate) fn new() -> Self {
+        let fonts = fonts();
         Self {
             library: LazyHash::new(Library::default()),
             book: LazyHash::new(fonts.book.clone()),
-            source: Source::detached(source),
+            files: Mutex::new(HashMap::new()),
+        }
+    }
+    pub(crate) fn with_source_str(&self, source: &str) -> TypstWorldWithSource<'_> {
+        self.with_source(Source::detached(source))
+    }
+    pub(crate) fn with_source(&self, source: Source) -> TypstWorldWithSource<'_> {
+        TypstWorldWithSource {
+            world: self,
+            source,
             now: OnceLock::new(),
         }
     }
-    pub fn set_source(&mut self, source: impl AsRef<str>) {
-        self.source = Source::detached(source.as_ref().to_string());
+
+    // from https://github.com/mattfbacon/typst-bot
+    // TODO: package things
+    // Weird pattern because mapping a MutexGuard is not stable yet.
+    fn file<T>(&self, id: FileId, map: impl FnOnce(&mut FileEntry) -> T) -> FileResult<T> {
+        let mut files = self.files.lock().unwrap();
+        if let Some(entry) = files.get_mut(&id) {
+            return Ok(map(entry));
+        }
+        // `files` must stay locked here so we don't download the same package multiple times.
+        // TODO proper multithreading, maybe with typst-kit.
+
+        // 'x: {
+        // 	if let Some(package) = id.package() {
+        // 		let package_dir = self.ensure_package(package)?;
+        // 		let Some(path) = id.vpath().resolve(&package_dir) else {
+        // 			break 'x;
+        // 		};
+        // 		let contents = std::fs::read(&path).map_err(|error| FileError::from_io(error, &path))?;
+        // 		let entry = files.entry(id).or_insert(FileEntry {
+        // 			bytes: Bytes::new(contents),
+        // 			source: None,
+        // 		});
+        // 		return Ok(map(entry));
+        // 	}
+        // }
+
+        Err(FileError::NotFound(id.vpath().as_rootless_path().into()))
     }
 }
 
-impl World for SingleFileTypstWorld {
+pub(crate) struct TypstWorldWithSource<'a> {
+    world: &'a TypstWorld,
+    source: Source,
+    now: OnceLock<DateTime<Local>>,
+}
+
+impl World for TypstWorldWithSource<'_> {
     fn library(&self) -> &LazyHash<Library> {
-        &self.library
+        &self.world.library
     }
 
     fn book(&self) -> &LazyHash<FontBook> {
-        &self.book
+        &self.world.book
     }
 
     fn main(&self) -> FileId {
@@ -125,22 +185,21 @@ impl World for SingleFileTypstWorld {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
-        if id == self.main() {
+        if id == self.source.id() {
             Ok(self.source.clone())
         } else {
-            Err(FileError::AccessDenied)
+            self.world.file(id, |entry| entry.source(id))?
         }
     }
 
-    fn file(&self, _id: FileId) -> FileResult<Bytes> {
-        Err(FileError::AccessDenied)
+    fn file(&self, id: FileId) -> FileResult<Bytes> {
+        self.world.file(id, |file| file.bytes.clone())
     }
 
     fn font(&self, index: usize) -> Option<Font> {
         fonts().fonts[index].get()
     }
 
-    // TODO: fix this
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         let now = self.now.get_or_init(chrono::Local::now);
 
@@ -163,16 +222,28 @@ mod tests {
 
     use super::*;
 
+    /*
+    fonts search: 322.844709ms
+    world construct: 1.901541ms
+    set source: 958ns
+    file: 736
+    file: 818
+    document compile: 89.835583ms
+    svg output: 185.458µs
+    get element: 730.792µs
+     */
     #[test]
     fn test_single_file_typst_world_foo() {
-        let source = "R";
+        let start = Instant::now();
+        fonts();
+        println!("fonts search: {:?}", start.elapsed());
 
         let start = Instant::now();
-        let mut world = SingleFileTypstWorld::new(source);
+        let world = TypstWorld::new();
         println!("world construct: {:?}", start.elapsed());
 
         let start = Instant::now();
-        world.set_source("r");
+        let world = world.with_source_str("r");
         println!("set source: {:?}", start.elapsed());
 
         let start = Instant::now();
