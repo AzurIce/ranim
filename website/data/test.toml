@@ -60,5 +60,5 @@ fn test(r: &mut RanimScene) {
 ```"""
 hash = "acfdc524331371002e46b8fb6108a529956404b8"
 preview_imgs = []
-output_files = ["/examples/test/test.png"]
+output_files = []
 wasm = false

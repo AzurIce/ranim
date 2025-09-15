@@ -58,5 +58,5 @@ fn getting_started2(r: &mut RanimScene) {
 ```"""
 hash = "95225fe1fa6fe68cb1bd11f058ed77f64c036524"
 preview_imgs = []
-output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4", "/examples/getting_started2/output.mp4"]
+output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
 wasm = true

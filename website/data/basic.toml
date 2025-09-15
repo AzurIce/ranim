@@ -59,6 +59,6 @@ fn basic(r: &mut RanimScene) {
 }
 ```"""
 hash = "403f5d60454c83de778393bfbdcb76c7f1c4b9d0"
-preview_imgs = ["/examples/basic/preview.png", "/examples/basic/preview.png"]
-output_files = ["/examples/basic/basic_1920x1080_60.mp4", "/examples/basic/output.mp4"]
+preview_imgs = ["/examples/basic/preview.png"]
+output_files = ["/examples/basic/basic_1920x1080_60.mp4"]
 wasm = true

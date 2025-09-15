@@ -60,6 +60,6 @@ pub fn arc(r: &mut RanimScene) {
 }
 ```"""
 hash = "dc18d016814001956ff917be890bfdaa19fc5f1e"
-preview_imgs = ["/examples/arc/preview.png", "/examples/arc/preview.png"]
-output_files = ["/examples/arc/output.mp4", "/examples/arc/arc_1920x1080_60.mp4"]
+preview_imgs = ["/examples/arc/preview.png"]
+output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true
