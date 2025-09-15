@@ -3,8 +3,8 @@ use ranim::{
     prelude::*,
 };
 
+// ANCHOR: construct
 #[scene]
-#[preview]
 #[output(dir = "getting_started0")]
 fn getting_started0(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());

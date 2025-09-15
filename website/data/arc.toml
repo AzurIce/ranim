@@ -2,7 +2,6 @@ name = "arc"
 code = """
 ```rust
 use itertools::Itertools;
-use log::LevelFilter;
 use ranim::{
     animation::{fading::FadingAnim, lagged::LaggedAnim},
     color::HueDirection,
@@ -13,9 +12,8 @@ use ranim::{
 };
 
 #[scene]
-#[preview]
 #[output(dir = "arc")]
-fn arc(r: &mut RanimScene) {
+pub fn arc(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
 
     // let frame_size = app.camera().size;
@@ -60,27 +58,8 @@ fn arc(r: &mut RanimScene) {
         TimeMark::Capture("preview.png".to_string()),
     );
 }
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(arc_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(arc_scene)
-}
 ```"""
-hash = "f9561ba08203fea605f237badee6cc70d1936082"
-preview_imgs = ["/examples/arc/preview.png"]
-output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
+hash = "dc18d016814001956ff917be890bfdaa19fc5f1e"
+preview_imgs = ["/examples/arc/preview.png", "/examples/arc/preview.png"]
+output_files = ["/examples/arc/output.mp4", "/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

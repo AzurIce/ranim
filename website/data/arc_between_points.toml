@@ -2,7 +2,6 @@ name = "arc_between_points"
 code = """
 ```rust
 use itertools::Itertools;
-use log::LevelFilter;
 use ranim::{
     animation::{fading::FadingAnim, lagged::LaggedAnim},
     color::HueDirection,
@@ -13,7 +12,6 @@ use ranim::{
 };
 
 #[scene]
-#[preview]
 #[output(dir = "arc_between_points")]
 fn arc_between_points(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -58,27 +56,8 @@ fn arc_between_points(r: &mut RanimScene) {
         TimeMark::Capture("preview.png".to_string()),
     );
 }
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(arc_between_points_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(arc_between_points_scene)
-}
 ```"""
-hash = "e5cebf8fd17f99362081cdb166d59a0a7ca2621d"
-preview_imgs = ["/examples/arc_between_points/preview.png"]
-output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
+hash = "f116a79d0af1979367bcdcf1db12e7b19d88e4ca"
+preview_imgs = ["/examples/arc_between_points/preview.png", "/examples/arc_between_points/preview.png"]
+output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4", "/examples/arc_between_points/output.mp4"]
 wasm = true

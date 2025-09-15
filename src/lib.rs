@@ -104,7 +104,6 @@ pub struct Scene {
     pub config: SceneConfig,
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub outputs: &'static [Output],
-    pub preview: bool,
 }
 
 pub use inventory;
@@ -199,11 +198,11 @@ impl Output {
 /// The preludes
 pub mod prelude {
     #[cfg(feature = "app")]
-    pub use crate::app::{preview, run_app, run_scene_app};
+    pub use crate::app::{preview_scene, run_app, run_scene_app};
     #[cfg(not(target_arch = "wasm32"))]
-    pub use crate::{render, render_scene, render_scene_output};
+    pub use crate::{render_scene, render_scene_output};
 
-    pub use ranim_macros::{output, preview, scene, wasm_demo_doc};
+    pub use ranim_macros::{output, scene, wasm_demo_doc};
 
     pub use crate::items::{ItemId, camera_frame::CameraFrame};
     pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};

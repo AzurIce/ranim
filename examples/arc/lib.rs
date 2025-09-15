@@ -9,7 +9,6 @@ use ranim::{
 };
 
 #[scene]
-#[preview]
 #[output(dir = "arc")]
 pub fn arc(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());

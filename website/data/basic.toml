@@ -2,7 +2,6 @@ name = "basic"
 code = """
 ```rust
 use glam::DVec3;
-use log::LevelFilter;
 use ranim::{
     animation::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     color::palettes::manim,
@@ -18,7 +17,6 @@ use ranim::{
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
-#[preview]
 #[output(dir = "basic")]
 fn basic(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -59,27 +57,8 @@ fn basic(r: &mut RanimScene) {
         TimeMark::Capture("preview.png".to_string()),
     );
 }
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(basic_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(basic_scene)
-}
 ```"""
-hash = "fa662d5c13fa7ca12956125df9cdfe3d36058948"
-preview_imgs = ["/examples/basic/preview.png"]
-output_files = ["/examples/basic/basic_1920x1080_60.mp4"]
+hash = "403f5d60454c83de778393bfbdcb76c7f1c4b9d0"
+preview_imgs = ["/examples/basic/preview.png", "/examples/basic/preview.png"]
+output_files = ["/examples/basic/basic_1920x1080_60.mp4", "/examples/basic/output.mp4"]
 wasm = true

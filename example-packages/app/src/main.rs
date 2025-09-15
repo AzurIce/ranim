@@ -1,5 +1,5 @@
 use app::hello_ranim_scene;
-use ranim::app::preview;
+use ranim::app::preview_scene;
 
 fn main() {
     #[cfg(not(target_arch = "wasm32"))]
@@ -7,5 +7,5 @@ fn main() {
         .filter(Some("ranim"), log::LevelFilter::Info)
         .init();
 
-    preview(hello_ranim_scene);
+    preview_scene(hello_ranim_scene);
 }

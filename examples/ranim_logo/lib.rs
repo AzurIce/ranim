@@ -63,7 +63,6 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     ]
 }
 #[scene]
-#[preview]
 #[output(dir = "ranim_logo")]
 fn ranim_logo(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());

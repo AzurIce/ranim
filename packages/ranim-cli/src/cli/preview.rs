@@ -7,6 +7,7 @@ use krates::Kid;
 use notify_debouncer_full::{DebouncedEvent, Debouncer};
 use ranim::app::{AppCmd, AppState};
 
+use anyhow::Result;
 use async_channel::{Receiver, bounded, unbounded};
 use log::{error, info, trace};
 use notify::RecursiveMode;
@@ -116,7 +117,7 @@ fn watch_krate(
     (debouncer, rx)
 }
 
-pub fn preview_command(args: &CliArgs) {
+pub fn preview_command(args: &CliArgs) -> Result<()> {
     info!("Loading workspace...");
     let workspace = Workspace::current().unwrap();
 
@@ -152,7 +153,7 @@ pub fn preview_command(args: &CliArgs) {
     let Ok(scene) = lib.get_preview_func() else {
         error!("Failed to get preview scene, available scenes:");
         for scene in lib.scenes() {
-            info!("Scene: {:?} preview: {:?}", scene.name, scene.preview);
+            info!("- {:?}", scene.name);
         }
         panic!("Failed to get preview scene");
     };
@@ -176,7 +177,7 @@ pub fn preview_command(args: &CliArgs) {
                 let Ok(scene) = new_lib.get_preview_func() else {
                     error!("Failed to get preview scene, available scenes:");
                     for scene in new_lib.scenes() {
-                        info!("Scene: {:?} preview: {:?}", scene.name, scene.preview);
+                        info!("- {:?}", scene.name);
                     }
                     continue;
                 };
@@ -198,4 +199,5 @@ pub fn preview_command(args: &CliArgs) {
     ranim::app::run_app(app);
     shutdown_tx.send_blocking(()).unwrap();
     daemon.join().unwrap();
+    Ok(())
 }

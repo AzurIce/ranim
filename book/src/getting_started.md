@@ -11,31 +11,64 @@
 在 Ranim 中，定义并渲染一段动画的代码基本长成下面这个样子：
 
 ```rust
-use ranim::prelude::*;
+#[scene]
+#[output]
+fn scene_name(r: &mut RanimScene) {
+    let _r_cam = r.insert_and_show(CameraFrame::default());
 
-{{#include ../../examples/hello_ranim/main.rs:18:19}}
-        // ...
-    }
-}
-
-fn main() {
-    render_scene_output(
-        hello_ranim,
-        "hello_ranim".to_string(),
-        &SceneConfig::default(),
-        &Output::default()
-    );
+    let r_square = r.insert(square);
+    r.timeline_mut(&r_square)
+        .play_with(|square| square.fade_in())
+        .forward(0.5);
+    // ...
 }
 ```
 
-`render_scene` 函数接收一个 `impl SceneConstructor` 并使用它对动画进行构造、求值、渲染，并将渲染结果按照传入的 `Output` 定义输出为视频。
+形如 `fn(&mut RanimScene)` 的函数被称为场景函数，在其中可以通过 `RanimScene` 这个核心结构来对时间线进行操作以编码动画。
 
-默认的输出路径为 `./output/<scene_name>_<width>x<height>_<fps>.mp4`。
+上面的例子中涉及了一些宏：
 
-此外，当启用了 `app` feature 时，可以使用 `run_scene_app` 来启动一个能够可视化时间线并拖动进度条预览画面的应用：
+- `#[scene]`：为场景函数生成一个对应的 `static <scene_name>_scene: &'static Scene`，包含了场景名称、函数指针、场景设置、输出设置（通过 `#[output]` 来设置）等信息。
+  可以配置一些属性：
+  - `#[scene(name = "...")]`：为场景指定一个名称，默认与函数名相同。
+  - `#[scene(frame_height = 8.0)]`：为场景指定一个默认的高度，默认值为 8.0。
+  - `#[output]`：为场景添加一个输出：
+    输出的文件名 `<output_name>` 会被命名为 `<scene_name>_<width>x<height>_<frame_rate>`。
+    - `#[output(dir = "...")]`：设置相对于 `./output` 的输出目录，也可以是绝对路径
+    - `#[output(pixel_size = (1920, 1080))]`：设置输出像素大小
+    - `#[output(frame_rate = 60)]`：设置输出帧率
+    - `#[output(save_frames = true)]`：设置是否保存每一帧（保存在 `<dir>/<output_name>-frames/` 下）
+  - `#[wasm_demo_doc]`：为场景指定一个文档字符串，默认值为空字符串。
+
+使用 *ranim-cli* 可以方便的对场景进行预览、渲染：
+<div class="warning">
+注意：
+
+如果想要使用 *ranim-cli*，需要为 `crate-type` 添加 `dylib`。
+</div>
+
+- `ranim preview`：调用 Cargo 构建指定的 target，然后启动一个预览应用加载编译出的 dylib，并监听改动进行重载。
+
+  ```bash
+  ranim preview # 预览根 package 的 lib target
+  ranim preview -p package_name # 预览 package_name 包的 lib target
+  ranim preview -p package_name --example example_name # 预览 package_name 包的 example_name 示例
+  ```
+
+- `ranim render`：调用 Cargo 构建指定的 target，然后启动一个渲染应用加载编译出的 dylib，并渲染动画。
+
+  ```bash
+  ranim render # 渲染根 package 的全部场景的所有输出
+  ranim render scene_name # 渲染根 package 中名称为 scene_name 的场景的所有输出
+  ranim render -p package_name # 渲染 package_name 包的全部场景的所有输出
+  ranim render -p package_name --example example_name # 渲染 package_name 包的 example_name 示例中的全部场景的所有输出
+  ```
+
+此外，`ranim` 还提供了一些 api 来直接渲染或预览场景。
 
 ```rust,ignore
-run_scene_app(hello_ranim, "hello_ranim".to_string());
+render_scene(hello_ranim_scene);
+preview_scene(hello_ranim_scene); // 需要 `app` feature
 ```
 
 ## 1. 场景的构造
@@ -129,7 +162,7 @@ let timelines = r.timelines_mut();
 下面的例子使用一个 `Square` 物件创建了一个时间线，然后编码了淡入 1 秒、显示 0.5 秒、消失 0.5 秒、显示 0.5 秒、淡出 1 秒的动画：
 
 ```rust,ignore
-{{#rustdoc_include ../../examples/getting_started0/main.rs:construct}}
+{{#rustdoc_include ../../examples/getting_started0/lib.rs:construct}}
 ```
 
 ### 2.3 转换时间线类型
@@ -138,5 +171,5 @@ let timelines = r.timelines_mut();
 此时就需要对时间线类型进行转换：
 
 ```rust,ignore
-{{#rustdoc_include ../../examples/getting_started1/main.rs:construct}}
+{{#rustdoc_include ../../examples/getting_started1/lib.rs:construct}}
 ```

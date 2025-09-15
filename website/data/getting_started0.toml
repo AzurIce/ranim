@@ -1,14 +1,13 @@
 name = "getting_started0"
 code = """
 ```rust
-use log::LevelFilter;
 use ranim::{
     animation::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square,
     prelude::*,
 };
 
+// ANCHOR: construct
 #[scene]
-#[preview]
 #[output(dir = "getting_started0")]
 fn getting_started0(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -31,27 +30,8 @@ fn getting_started0(r: &mut RanimScene) {
     }
 }
 // ANCHOR_END: construct
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(getting_started0_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(getting_started0_scene);
-}
 ```"""
-hash = "449712a43b15935d06c5b7a237182a064320f21c"
+hash = "868e0ee5ecb4ae6612fcd416c2690334786ee8ec"
 preview_imgs = []
-output_files = ["/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
+output_files = ["/examples/getting_started0/output.mp4", "/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
 wasm = true

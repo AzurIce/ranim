@@ -14,7 +14,6 @@ use ranim::{
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
-#[preview]
 #[output(dir = "basic")]
 fn basic(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());

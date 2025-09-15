@@ -27,8 +27,7 @@ use ranim::{
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
-#[preview]
-#[output]
+#[output(save_frames = true, dir = "output")]
 fn test(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     let n = 8;

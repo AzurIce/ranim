@@ -8,7 +8,6 @@ use ranim::{
 };
 
 #[scene]
-#[preview]
 #[output(dir = "palettes")]
 fn palettes(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());

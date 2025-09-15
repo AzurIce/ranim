@@ -669,7 +669,7 @@ pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
 }
 
 /// Preview a scene
-pub fn preview(s: &Scene) {
+pub fn preview_scene(s: &Scene) {
     run_scene_app(s.constructor, s.name.to_string());
 }
 
