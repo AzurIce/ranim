@@ -84,10 +84,11 @@ egui = { version = "0.32.1", optional = true }
 winit = { version = "0.30.12", optional = true }
 egui-wgpu = { version = "0.32.1", optional = true }
 
-serde = { version = "1", features = ["derive"], optional = true }
+serde = { version = "1.0.223", features = ["derive"], optional = true }
 typst = "0.13.1"
 typst-kit = { version = "0.13.1", default-features = false, features = [
   "fonts",
+  "embed-fonts",
 ] }
 # time = "0.3.41"
 typst-svg = "0.13.1"
