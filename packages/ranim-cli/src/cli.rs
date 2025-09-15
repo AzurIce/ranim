@@ -13,15 +13,6 @@ pub struct TargetArg {
     pub example: Option<String>,
 }
 
-// impl Default for TargetArg {
-//     fn default() -> Self {
-//         Self {
-//             lib: true,
-//             example: None,
-//         }
-//     }
-// }
-
 #[derive(Parser, Debug, Clone, Default)]
 pub struct CliArgs {
     #[arg(global = true, short, long, help_heading = "Cargo Options")]
@@ -51,8 +42,8 @@ impl Cli {
         let args = self.args;
 
         match self.command {
-            Commands::Preview => {
-                preview::preview_command(&args)?;
+            Commands::Preview { scene } => {
+                preview::preview_command(&args, &scene)?;
             }
             Commands::Render { scenes } => {
                 render::render_command(&args, &scenes)?;
@@ -66,7 +57,7 @@ impl Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Launch a preview app, watch the lib crate and rebuild it to dylib when it is changed
-    Preview,
+    Preview { scene: Option<String> },
     /// Build the lib crate and load it, then render it to video
     Render {
         /// Optional scene names to render (if not provided, render all scenes)
@@ -99,7 +90,7 @@ mod test {
         assert!(cli.args.target.example.is_none());
 
         let cli = parse_args(&["ranim", "preview", "--lib"]).unwrap();
-        assert!(matches!(cli.command, Commands::Preview));
+        assert!(matches!(cli.command, Commands::Preview { scene: None }));
         assert!(cli.args.package.is_none());
         let TargetArg { lib, example } = cli.args.target.clone();
         assert!(lib);
@@ -107,7 +98,7 @@ mod test {
         assert_eq!(Target::from(cli.args.target.clone()), Target::Lib);
 
         let cli = parse_args(&["ranim", "preview", "--example", "example"]).unwrap();
-        assert!(matches!(cli.command, Commands::Preview));
+        assert!(matches!(cli.command, Commands::Preview { scene: None }));
         assert!(cli.args.package.is_none());
         let TargetArg { lib, example } = cli.args.target.clone();
         assert!(!lib);
