@@ -12,19 +12,72 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
+    crane.url = "github:ipetkov/crane";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { nixpkgs, rust-overlay, flake-utils, ... }:
+  outputs = { nixpkgs, crane, rust-overlay, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
-        rust-tools = pkgs.rust-bin.nightly.latest.default.override {
-          extensions = [ "rust-src" ];
-          targets = [ "wasm32-unknown-unknown" ];
+        inherit (pkgs) lib;
+        craneLib = (crane.mkLib pkgs).overrideToolchain (
+          p:
+          p.rust-bin.nightly."2025-09-10".default.override {
+            targets = [ "wasm32-unknown-unknown" ];
+          }
+        );
+        src = craneLib.cleanCargoSource ./.;
+
+        commonArgs = {
+          inherit src;
+          strictDeps = true;
+
+          buildInputs = [
+            # Add additional build inputs here
+          ]
+          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            # Additional darwin specific inputs can be set here
+            pkgs.libiconv
+          ];
         };
+        # Build *just* the cargo dependencies (of the entire workspace),
+        # so we can reuse all of that work (e.g. via cachix) when running in CI
+        # It is *highly* recommended to use something like cargo-hakari to avoid
+        # cache misses when building individual top-level-crates
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+        fileSetForCrate =
+          crate:
+          lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.unions [
+              ./Cargo.toml
+              ./Cargo.lock
+              (craneLib.fileset.commonCargoSources ./packages/ranim-cli)
+              (craneLib.fileset.commonCargoSources ./packages/ranim-macros)
+              (craneLib.fileset.commonCargoSources crate)
+            ];
+          };
+        individualCrateArgs = commonArgs // {
+          inherit cargoArtifacts;
+          inherit (craneLib.crateNameFromCargoToml { inherit src; }) version;
+          # NB: we disable tests since we'll run them all via cargo-nextest
+          doCheck = false;
+        };
+        ranim-cli = craneLib.buildPackage (
+          individualCrateArgs
+          // {
+            pname = "ranim-cli";
+            cargoExtraArgs = "-p ranim-cli";
+            src = fileSetForCrate ./packages/ranim-cli;
+          }
+        );
+
         puffin_viewer = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
           pname = "puffin_viewer";
           version = "0.22.0";
@@ -42,15 +95,13 @@
           cargoHash = "sha256-zhijQ+9vVB4IL/t1+IGLAnvJka0AB1yJRWo/qEyUfx0=";
         });
       in {
-        devShells.default = pkgs.mkShell {
-          # prioritize system clang, see https://github.com/zed-industries/zed/issues/7036
-          # https://github.com/gfx-rs/gfx/issues/2309
-          # https://mac.install.guide/commandlinetools/7
-          shellHook = ''
-            export PATH=/usr/bin:$PATH
-          '';
-
-          buildInputs = with pkgs; [ clang libiconv ] ++ [ rust-tools ];
+        packages = { inherit ranim-cli; };
+        apps = {
+          ranim-cli = flake-utils.lib.mkApp {
+            drv = ranim-cli;
+          };
+        };
+        devShells.default = craneLib.devShell {
           packages = [ puffin_viewer ] ++ (with pkgs; [
             git-cliff
             cargo-release
