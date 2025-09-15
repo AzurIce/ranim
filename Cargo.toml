@@ -10,6 +10,9 @@ readme = "README.md"
 keywords = ["animation", "manim", "wgpu"]
 exclude = ["website", "assets", "book"]
 
+[lib]
+crate-type = ["rlib", "dylib"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
@@ -45,19 +48,19 @@ ranim-macros.workspace = true
 itertools.workspace = true
 web-time = "1.1.0"
 sha1 = "0.10.6"
-lru = "0.16.0"
+lru = "0.16.1"
 async-channel = "2.3.1"
 bytemuck = { version = "1.23.2", features = ["derive"] }
 glam = { version = "0.30.3", features = ["bytemuck"] }
-image = "0.25.6"
-log = "0.4.27"
+image = "0.25.8"
+log = "0.4.28"
 pollster = "0.4.0"
 wgpu = "25.0.2"
 anyhow = "1.0.99"
 usvg = "0.45.1"
-regex = "1.11.1"
+regex = "1.11.2"
 indicatif = "0.18.0"
-color = "0.3.1"
+color = "0.3.2"
 variadics_please = "1.1.0"
 derive_more = { version = "2.0.1", features = [
   "deref_mut",
@@ -91,13 +94,14 @@ typst-svg = "0.13.1"
 chrono = "0.4.41"
 reqwest = "0.12.23"
 slotmap = "1.0.7"
+inventory = "0.3.21"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 egui-winit = { version = "0.32.1", optional = true }
 which = "8.0.0"
 flate2 = "1.1.2"
 reqwest = { version = "0.12.22", features = ["blocking"] }
-linkme = "0.3.33"
+# linkme = "0.3.33"
 
 # web:
 [target.'cfg(target_family = "wasm")'.dependencies]
@@ -141,35 +145,94 @@ pre-release-replacements = [
 # MARK: Examples
 [[example]]
 name = "arc"
-path = "examples/arc/main.rs"
+path = "examples/arc/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.arc]
 wasm = true
 
 [[example]]
 name = "arc_between_points"
-path = "examples/arc_between_points/main.rs"
+path = "examples/arc_between_points/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.arc_between_points]
 wasm = true
 
 [[example]]
 name = "basic"
-path = "examples/basic/main.rs"
+path = "examples/basic/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.basic]
 wasm = true
 
 [[example]]
+name = "hanoi"
+path = "examples/hanoi/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.hanoi]
+wasm = true
+
+[[example]]
+name = "hello_ranim"
+path = "examples/hello_ranim/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.hello_ranim]
+wasm = true
+
+[[example]]
+name = "palettes"
+path = "examples/palettes/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "perspective_blend"
+path = "examples/perspective_blend/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.perspective_blend]
+wasm = true
+
+[[example]]
+name = "ranim_logo"
+path = "examples/ranim_logo/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.ranim_logo]
+wasm = true
+
+[[example]]
+name = "extract_vitem_visualize"
+path = "examples/extract_vitem_visualize/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.extract_vitem_visualize]
+wasm = true
+
+[[example]]
+name = "test"
+path = "examples/test/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.test]
+hide = true
+wasm = false
+
+[[example]]
 name = "bubble_sort"
-path = "examples/bubble_sort/main.rs"
+path = "examples/bubble_sort/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.bubble_sort]
 wasm = true
 
 [[example]]
 name = "getting_started0"
-path = "examples/getting_started0/main.rs"
+path = "examples/getting_started0/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.getting_started0]
 wasm = true
@@ -177,7 +240,8 @@ hide = true
 
 [[example]]
 name = "getting_started1"
-path = "examples/getting_started1/main.rs"
+path = "examples/getting_started1/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.getting_started1]
 wasm = true
@@ -185,54 +249,17 @@ hide = true
 
 [[example]]
 name = "getting_started2"
-path = "examples/getting_started2/main.rs"
+path = "examples/getting_started2/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.getting_started2]
 wasm = true
 hide = true
 
 [[example]]
-name = "hanoi"
-path = "examples/hanoi/main.rs"
-
-[package.metadata.example.hanoi]
-wasm = true
-
-[[example]]
-name = "hello_ranim"
-path = "examples/hello_ranim/main.rs"
-
-[package.metadata.example.hello_ranim]
-wasm = true
-
-[[example]]
-name = "palettes"
-path = "examples/palettes/main.rs"
-
-[[example]]
-name = "perspective_blend"
-path = "examples/perspective_blend/main.rs"
-
-[package.metadata.example.perspective_blend]
-wasm = true
-
-[[example]]
-name = "ranim_logo"
-path = "examples/ranim_logo/main.rs"
-
-[package.metadata.example.ranim_logo]
-wasm = true
-
-[[example]]
 name = "selective_sort"
-path = "examples/selective_sort/main.rs"
+path = "examples/selective_sort/lib.rs"
+crate-type = ["cdylib"]
 
 [package.metadata.example.selective_sort]
-wasm = true
-
-[[example]]
-name = "extract_vitem_visualize"
-path = "examples/extract_vitem_visualize/main.rs"
-
-[package.metadata.example.extract_vitem_visualize]
 wasm = true

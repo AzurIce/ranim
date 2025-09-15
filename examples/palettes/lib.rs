@@ -1,4 +1,3 @@
-use log::LevelFilter;
 use ranim::{
     color::palettes::manim::*,
     components::Anchor,
@@ -9,7 +8,6 @@ use ranim::{
 };
 
 #[scene]
-#[preview]
 #[output(dir = "palettes")]
 fn palettes(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -55,23 +53,4 @@ fn palettes(r: &mut RanimScene) {
     r.insert_and_show(squares);
     r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
     r.timelines_mut().forward(0.01);
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(palettes_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(palettes_scene);
 }

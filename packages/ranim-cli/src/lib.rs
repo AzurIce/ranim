@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use async_channel::{Receiver, Sender, bounded};
 use libloading::{Library, Symbol};
-use log::{debug, error, info};
+use log::{error, info};
 use ranim::Scene;
 use std::{
     path::{Path, PathBuf},
@@ -10,7 +10,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::{cli::Args, workspace::Workspace};
+use crate::{cli::CliArgs, workspace::Workspace};
 
 pub mod cli;
 pub mod workspace;
@@ -19,7 +19,8 @@ pub mod workspace;
 pub struct BuildProcess {
     workspace: Arc<Workspace>,
     package_name: String,
-    args: Args,
+    target: Target,
+    args: CliArgs,
     current_dir: PathBuf,
 
     res_tx: Sender<Result<RanimUserLibrary>>,
@@ -31,6 +32,7 @@ impl BuildProcess {
         if let Err(err) = cargo_build(
             &self.current_dir,
             &self.package_name,
+            &self.target,
             &self.args,
             Some(self.cancel_rx),
         ) {
@@ -39,7 +41,12 @@ impl BuildProcess {
                 .send_blocking(Err(anyhow::anyhow!("Failed to build package: {err:?}")))
                 .unwrap();
         } else {
-            let dylib_path = get_dylib_path(&self.workspace, &self.package_name, &self.args.args);
+            let dylib_path = get_dylib_path(
+                &self.workspace,
+                &self.package_name,
+                &self.target,
+                &self.args.args,
+            );
             // let tmp_dir = std::env::temp_dir();
             info!("loading {dylib_path:?}...");
 
@@ -61,7 +68,8 @@ impl RanimUserLibraryBuilder {
     pub fn new(
         workspace: Arc<Workspace>,
         package_name: String,
-        args: Args,
+        target: Target,
+        args: CliArgs,
         current_dir: PathBuf,
     ) -> Self {
         let (res_tx, res_rx) = bounded(1);
@@ -70,6 +78,7 @@ impl RanimUserLibraryBuilder {
         let build_process = BuildProcess {
             workspace,
             package_name,
+            target,
             args,
             current_dir,
             res_tx,
@@ -118,6 +127,21 @@ pub struct RanimUserLibrary {
     temp_path: PathBuf,
 }
 
+pub struct RanimUserLibrarySceneIter<'a> {
+    lib: &'a RanimUserLibrary,
+    idx: usize,
+}
+
+impl<'a> Iterator for RanimUserLibrarySceneIter<'a> {
+    type Item = &'a Scene;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.lib.get_scene(self.idx);
+        self.idx += 1;
+        res
+    }
+}
+
 impl RanimUserLibrary {
     pub fn load(dylib_path: impl AsRef<Path>) -> Self {
         let dylib_path = dylib_path.as_ref();
@@ -146,26 +170,28 @@ impl RanimUserLibrary {
         }
     }
 
-    /// Safety: dylib has a `scenes` and a `scene_cnt` fn with the correct signature and safe implementation
-    pub fn scenes(&self) -> &[Scene] {
+    pub fn scene_cnt(&self) -> usize {
         let scene_cnt: Symbol<extern "C" fn() -> usize> =
             unsafe { self.inner.as_ref().unwrap().get(b"scene_cnt").unwrap() };
+        scene_cnt()
+    }
 
-        let scenes: Symbol<extern "C" fn() -> *const Scene> =
-            unsafe { self.inner.as_ref().unwrap().get(b"scenes").unwrap() };
+    pub fn get_scene(&self, idx: usize) -> Option<&Scene> {
+        let get_scene: Symbol<extern "C" fn(usize) -> *const Scene> =
+            unsafe { self.inner.as_ref().unwrap().get(b"get_scene").unwrap() };
+        if self.scene_cnt() <= idx {
+            None
+        } else {
+            Some(unsafe { &*get_scene(idx) })
+        }
+    }
 
-        let scene_cnt = scene_cnt();
-        debug!("scene_cnt: {scene_cnt}");
-        let scenes = scenes();
-
-        unsafe { std::slice::from_raw_parts(scenes, scene_cnt) }
+    pub fn scenes(&self) -> impl Iterator<Item = &Scene> {
+        RanimUserLibrarySceneIter { lib: self, idx: 0 }
     }
 
     pub fn get_preview_func(&self) -> Result<&Scene> {
-        self.scenes()
-            .iter()
-            .find(|s| s.preview)
-            .context("no scene marked with `#[preview]` found")
+        self.scenes().next().context("no scene found")
     }
 }
 
@@ -178,23 +204,45 @@ impl Drop for RanimUserLibrary {
     }
 }
 
-fn cargo_build(
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum Target {
+    #[default]
+    Lib,
+    Example(String),
+}
+
+impl From<cli::TargetArg> for Target {
+    fn from(arg: cli::TargetArg) -> Self {
+        if arg.lib {
+            Target::Lib
+        } else if let Some(example) = arg.example {
+            Target::Example(example)
+        } else {
+            Self::default()
+        }
+    }
+}
+
+pub fn cargo_build(
     path: impl AsRef<Path>,
     package: &str,
-    args: &Args,
+    target: &Target,
+    args: &CliArgs,
     cancel_rx: Option<Receiver<()>>,
 ) -> Result<()> {
     let path = path.as_ref();
     let mut cmd = Command::new("cargo");
-    cmd.args([
-        "build",
-        "-p",
-        package,
-        "--lib",
-        "--color=always",
-        // "--message-format=json-render-diagnostics",
-    ])
-    .current_dir(path);
+    cmd.args(["build", "-p", package, "--color=always"])
+        // .env("RUSTFLAGS", "-C prefer_dynamic")
+        .current_dir(path);
+    match target {
+        Target::Lib => {
+            cmd.arg("--lib");
+        }
+        Target::Example(x) => {
+            cmd.args(["--example", x]);
+        }
+    }
     cmd.args(&args.args);
 
     // Start an async task to wait for completion
@@ -234,9 +282,14 @@ fn cargo_build(
     }
 }
 
-fn get_dylib_path(workspace: &Workspace, package_name: &str, args: &[String]) -> PathBuf {
+fn get_dylib_path(
+    workspace: &Workspace,
+    package_name: &str,
+    target: &Target,
+    args: &[String],
+) -> PathBuf {
     // Construct the dylib path
-    let target_dir = workspace
+    let mut target_dir = workspace
         .krates
         .workspace_root()
         .as_std_path()
@@ -246,15 +299,23 @@ fn get_dylib_path(workspace: &Workspace, package_name: &str, args: &[String]) ->
         } else {
             "debug"
         });
+    if let Target::Example(_) = target {
+        target_dir = target_dir.join("examples");
+    }
+
+    let artifact_name = match target {
+        Target::Lib => package_name,
+        Target::Example(example) => example,
+    };
 
     #[cfg(target_os = "windows")]
-    let dylib_name = format!("{}.dll", package_name.replace("-", "_"));
+    let dylib_name = format!("{}.dll", artifact_name.replace("-", "_"));
 
     #[cfg(target_os = "macos")]
-    let dylib_name = format!("lib{}.dylib", package_name.replace("-", "_"));
+    let dylib_name = format!("lib{}.dylib", artifact_name.replace("-", "_"));
 
     #[cfg(target_os = "linux")]
-    let dylib_name = format!("lib{}.so", package_name.replace("-", "_"));
+    let dylib_name = format!("lib{}.so", artifact_name.replace("-", "_"));
 
     target_dir.join(dylib_name)
 }

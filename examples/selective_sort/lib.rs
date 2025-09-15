@@ -1,5 +1,4 @@
 use glam::{DVec3, dvec2};
-use log::LevelFilter;
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     animation::transform::TransformAnim, color::palettes::manim, components::Anchor,
@@ -96,37 +95,13 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
 }
 
 #[scene]
-#[preview]
 #[output(dir = "selective_sort")]
 fn selective_sort_10(r: &mut RanimScene) {
     selective_sort(r, 10);
 }
 
 #[scene(name = "selective_sort")]
-#[preview]
 #[output(dir = "selective_sort")]
 fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(selective_sort_100_scene);
-    #[cfg(not(feature = "app"))]
-    {
-        render_scene(selective_sort_10_scene);
-        render_scene(selective_sort_100_scene);
-    }
 }

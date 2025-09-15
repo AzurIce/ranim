@@ -2,7 +2,6 @@ use std::f64::consts::PI;
 
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
-use log::LevelFilter;
 use ranim::{
     animation::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
     color::palettes::manim,
@@ -64,7 +63,6 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     ]
 }
 #[scene]
-#[preview]
 #[output(dir = "ranim_logo")]
 fn ranim_logo(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -151,23 +149,4 @@ fn ranim_logo(r: &mut RanimScene) {
             item.unwrite().with_duration(3.0).with_rate_func(linear)
         })
     });
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(ranim_logo_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(ranim_logo_scene);
 }

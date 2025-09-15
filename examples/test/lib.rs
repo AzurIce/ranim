@@ -4,7 +4,6 @@ use std::{f64::consts::PI, time::Duration};
 
 use ::color::palette::css;
 use glam::{DVec3, dvec3};
-use log::LevelFilter;
 use ranim::{
     animation::{
         creation::{CreationAnim, WritingAnim},
@@ -28,8 +27,7 @@ use ranim::{
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
-#[preview]
-#[output]
+#[output(save_frames = true, dir = "output")]
 fn test(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     let n = 8;
@@ -55,45 +53,4 @@ fn test(r: &mut RanimScene) {
     //     data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
     // }));
     r.timelines_mut().forward(1.0);
-}
-
-fn main() {
-    #[cfg(debug_assertions)]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Trace)
-        .init();
-    #[cfg(not(debug_assertions))]
-    pretty_env_logger::formatted_timed_builder()
-        .filter(Some("ranim"), LevelFilter::Info)
-        .init();
-    // println!("main");
-    // render_scene(
-    //     TestScene,
-    //     &AppOptions {
-    //         frame_rate: 60,
-    //         ..AppOptions::default()
-    //     },
-    // );
-    // #[cfg(not(feature = "app"))]
-    // render_scene_at_sec(
-    //     TestScene,
-    //     0.0,
-    //     "test.png",
-    //     &AppOptions {
-    //         pixel_size: (1080, 1080),
-    //         ..Default::default()
-    //     },
-    // );
-    #[cfg(not(feature = "app"))]
-    render_scene(test_scene);
-
-    // requires "app" feature
-    #[cfg(feature = "app")]
-    preview(test_scene);
-    // TestScene.render(&AppOptions {
-    //     frame_rate: 60,
-    //     frame_size: (3840, 2160),
-    //     save_frames: true,
-    //     ..Default::default()
-    // });
 }

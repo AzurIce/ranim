@@ -4,14 +4,14 @@
 
 ```rust,ignore
 #[scene]
-#[preview]
+
 #[output]
 pub fn scene_constructor1(r: &mut RanimScene) {
     // ...
 }
 
 #[scene(frame_height = 8.0, name = "custom")]
-#[preview]
+
 #[output(width = 1920, height = 1080, frame_rate = 60, save_frames = false, dir = "output")]
 pub fn scene_constructor2(r: &mut RanimScene) {
     // ...

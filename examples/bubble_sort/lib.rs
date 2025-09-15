@@ -1,4 +1,3 @@
-use log::LevelFilter;
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     animation::transform::TransformAnim,
@@ -106,37 +105,13 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
 }
 
 #[scene]
-#[preview]
 #[output(dir = "bubble_sort")]
 fn bubble_sort_10(r: &mut RanimScene) {
     bubble_sort(r, 10);
 }
 
 #[scene(name = "bubble_sort")]
-#[preview]
 #[output(dir = "bubble_sort")]
 fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(bubble_sort_100_scene);
-    #[cfg(not(feature = "app"))]
-    {
-        render_scene(bubble_sort_10_scene);
-        render_scene(bubble_sort_100_scene);
-    }
 }

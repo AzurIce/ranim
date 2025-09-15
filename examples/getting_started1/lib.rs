@@ -1,4 +1,3 @@
-use log::LevelFilter;
 use ranim::{
     animation::{creation::WritingAnim, transform::TransformAnim},
     color::palettes::manim,
@@ -11,7 +10,6 @@ use ranim::{
 
 // ANCHOR: construct
 #[scene]
-#[preview]
 #[output(dir = "getting_started1")]
 fn getting_started1(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -34,22 +32,3 @@ fn getting_started1(r: &mut RanimScene) {
     }
 }
 // ANCHOR_END: construct
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(getting_started1_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(getting_started1_scene);
-}

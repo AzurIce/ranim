@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use log::LevelFilter;
 use ranim::{
     animation::{fading::FadingAnim, lagged::LaggedAnim},
     color::HueDirection,
@@ -10,7 +9,6 @@ use ranim::{
 };
 
 #[scene]
-#[preview]
 #[output(dir = "arc_between_points")]
 fn arc_between_points(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -54,23 +52,4 @@ fn arc_between_points(r: &mut RanimScene) {
         r.timelines().max_total_secs(),
         TimeMark::Capture("preview.png".to_string()),
     );
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(arc_between_points_scene);
-    #[cfg(not(feature = "app"))]
-    render_scene(arc_between_points_scene)
 }
