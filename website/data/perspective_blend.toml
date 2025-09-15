@@ -74,7 +74,7 @@ fn perspective_blend(r: &mut RanimScene) {
             r.timeline_mut(r_face)
                 .play_with(|face| face.transform(transform_fn).with_rate_func(linear))
                 .hide()
-                .state()
+                .snapshot()
                 .clone()
         })
         .collect::<Vec<_>>();
@@ -103,7 +103,7 @@ fn perspective_blend(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "b59d3b8eaa61e4038446c44ccd4f3120f38b4ae7"
+hash = "c905ec232342c53a47174d6f7c07032ee842e3b4"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

@@ -546,7 +546,7 @@ impl ItemDynTimelines {
             let is_showing = timeline.planning_static_start_sec.is_some();
             timeline.seal();
             (
-                timeline.state().clone(),
+                timeline.snapshot().clone(),
                 timeline.end_sec().unwrap_or(0.0),
                 is_showing,
             )
@@ -675,9 +675,18 @@ impl<T: Clone + 'static> ItemTimeline<T> {
     pub fn cur_sec(&self) -> f64 {
         self.cur_sec
     }
-    /// Get the current item state
-    pub fn state(&self) -> &T {
+    /// Get the reference of current item state
+    pub fn snapshot_ref(&self) -> &T {
         &self.state
+    }
+    /// Get the current item state
+    pub fn snapshot(&self) -> T {
+        self.state.clone()
+    }
+    /// Do something on the timeline with current snapshot captured
+    pub fn with_snapshot<R>(&mut self, f: impl Fn(&mut Self, T) -> R) -> R {
+        let state = self.snapshot();
+        f(self, state)
     }
     /// Update the state
     pub fn update(&mut self, state: T) -> &mut Self {
