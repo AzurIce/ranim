@@ -195,7 +195,10 @@ impl AppState {
                 AppCmd::ReloadScene(constructor, tx) => {
                     let timeline = constructor.build_scene();
                     let timeline_infos = timeline.get_timeline_infos();
+                    let old_cur_second = self.timeline_state.current_sec;
                     self.timeline_state = TimelineState::new(timeline.total_secs(), timeline_infos);
+                    self.timeline_state.current_sec =
+                        old_cur_second.clamp(0.0, self.timeline_state.total_sec);
                     self.timeline = timeline;
                     self.render_instances = RenderInstances::default();
                     self.need_eval = true;

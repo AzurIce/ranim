@@ -117,7 +117,7 @@ fn watch_krate(
     (debouncer, rx)
 }
 
-pub fn preview_command(args: &CliArgs) -> Result<()> {
+pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()> {
     info!("Loading workspace...");
     let workspace = Workspace::current().unwrap();
 
@@ -150,16 +150,20 @@ pub fn preview_command(args: &CliArgs) -> Result<()> {
         .unwrap()
         .expect("Failed on initial build");
 
-    let Ok(scene) = lib.get_preview_func() else {
-        error!("Failed to get preview scene, available scenes:");
-        for scene in lib.scenes() {
-            info!("- {:?}", scene.name);
-        }
-        panic!("Failed to get preview scene");
-    };
+    let scene = match scene_name {
+        Some(scene) => lib.scenes().find(|s| s.name == scene),
+        None => lib.scenes().next(),
+    }
+    .ok_or(anyhow::anyhow!("Failed to find preview scene"))?;
+    // error!("Failed to get preview scene, available scenes:");
+    // for scene in lib.scenes() {
+    //     info!("- {:?}", scene.name);
+    // }
+    // panic!("Failed to get preview scene");
     let app = AppState::new_with_title(scene.constructor, scene.name.to_string());
     let cmd_tx = app.cmd_tx.clone();
 
+    let scene_name = scene_name.clone();
     let res_rx = builder.res_rx.clone();
     let (shutdown_tx, shutdown_rx) = bounded(1);
     let daemon = thread::spawn(move || {
@@ -174,13 +178,16 @@ pub fn preview_command(args: &CliArgs) -> Result<()> {
             if let Ok(new_lib) = res_rx.try_recv()
                 && let Ok(new_lib) = new_lib
             {
-                let Ok(scene) = new_lib.get_preview_func() else {
-                    error!("Failed to get preview scene, available scenes:");
-                    for scene in new_lib.scenes() {
-                        info!("- {:?}", scene.name);
-                    }
+                let scene = match &scene_name {
+                    Some(scene) => new_lib.scenes().find(|s| s.name == scene),
+                    None => new_lib.scenes().next(),
+                }
+                .ok_or(anyhow::anyhow!("Failed to find preview scene"));
+                if let Err(err) = scene {
+                    error!("Failed to find preview scene: {err}");
                     continue;
-                };
+                }
+                let scene = scene.unwrap();
 
                 let (tx, rx) = bounded(1);
                 cmd_tx
