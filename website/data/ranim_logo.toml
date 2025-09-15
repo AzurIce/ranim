@@ -155,6 +155,6 @@ fn ranim_logo(r: &mut RanimScene) {
 }
 ```"""
 hash = "1e35c2c64ba710ecbd9f7d1660b91f5229046527"
-preview_imgs = ["/examples/ranim_logo/preview.png", "/examples/ranim_logo/preview.png"]
-output_files = ["/examples/ranim_logo/output.mp4", "/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
+preview_imgs = ["/examples/ranim_logo/preview.png"]
+output_files = ["/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
 wasm = true

@@ -50,6 +50,6 @@ fn hello_ranim(r: &mut RanimScene) {
 }
 ```"""
 hash = "50d81c423298bfb73fe86df47a45e4e3a89a44cb"
-preview_imgs = ["/examples/hello_ranim/preview.png", "/examples/hello_ranim/preview.png"]
-output_files = ["/examples/hello_ranim/output.mp4", "/examples/hello_ranim/hello_ranim_1920x1080_60.mp4"]
+preview_imgs = ["/examples/hello_ranim/preview.png"]
+output_files = ["/examples/hello_ranim/hello_ranim_1920x1080_60.mp4"]
 wasm = true

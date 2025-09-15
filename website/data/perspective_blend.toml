@@ -104,6 +104,6 @@ fn perspective_blend(r: &mut RanimScene) {
 }
 ```"""
 hash = "b59d3b8eaa61e4038446c44ccd4f3120f38b4ae7"
-preview_imgs = ["/examples/perspective_blend/preview.png", "/examples/perspective_blend/preview.png"]
-output_files = ["/examples/perspective_blend/output.mp4", "/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
+preview_imgs = ["/examples/perspective_blend/preview.png"]
+output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

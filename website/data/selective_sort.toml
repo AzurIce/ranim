@@ -110,6 +110,6 @@ fn selective_sort_100(r: &mut RanimScene) {
 }
 ```"""
 hash = "e3e6bd11d3f0e5f75680cf8b56ce81bd5fe96cce"
-preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png", "/examples/selective_sort/preview-100.png"]
-output_files = ["/examples/selective_sort/selective_sort_1920x1080_60.mp4", "/examples/selective_sort/output-100.mp4", "/examples/selective_sort/output-10.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
+preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
+output_files = ["/examples/selective_sort/selective_sort_1920x1080_60.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
 wasm = true

@@ -58,6 +58,6 @@ fn arc_between_points(r: &mut RanimScene) {
 }
 ```"""
 hash = "f116a79d0af1979367bcdcf1db12e7b19d88e4ca"
-preview_imgs = ["/examples/arc_between_points/preview.png", "/examples/arc_between_points/preview.png"]
-output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4", "/examples/arc_between_points/output.mp4"]
+preview_imgs = ["/examples/arc_between_points/preview.png"]
+output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
 wasm = true

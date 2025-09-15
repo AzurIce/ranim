@@ -59,6 +59,6 @@ fn palettes(r: &mut RanimScene) {
 }
 ```"""
 hash = "5e0eede9b8688bc1d55818bb83a2c56faf2f494d"
-preview_imgs = ["/examples/palettes/preview.png", "/examples/palettes/preview.png"]
-output_files = ["/examples/palettes/palettes_1920x1080_60.mp4", "/examples/palettes/output.png"]
+preview_imgs = ["/examples/palettes/preview.png"]
+output_files = ["/examples/palettes/palettes_1920x1080_60.mp4"]
 wasm = false
