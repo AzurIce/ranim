@@ -30,10 +30,13 @@
   {% if example_data.wasm %}
   <sl-tab-panel name="app">
     <script type="module">
-      import init from '{{ get_url(path="examples/" ~ example_name ~ "/pkg/" ~ example_name ~ ".js") }}';
-      init();
+      import init, * as ranim from '{{ get_url(path="examples/" ~ example_name ~ "/pkg/" ~ example_name ~ ".js") }}';
+      window.ranim_examples = init().then(() => ranim);
+
+      const { find_scene } = await ranim_examples;
+      find_scene("{{ example_name }}").run_app();
     </script>
-    <canvas id="app-{{ example_name }}" width="1280" height="1020" style="width: 100%; aspect-ratio: 16 / 12;"></canvas>
+    <canvas id="ranim-app-{{ example_name }}" width="1280" height="1020" style="width: 100%; aspect-ratio: 16 / 12;"></canvas>
 
   </sl-tab-panel>
   {% endif %}

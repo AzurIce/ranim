@@ -1,4 +1,3 @@
-use log::LevelFilter;
 use ranim::{
     animation::transform::TransformAnim,
     color::{HueDirection, palettes::manim},
@@ -111,37 +110,13 @@ fn hanoi(r: &mut RanimScene, n: usize) {
 }
 
 #[scene]
-#[preview]
 #[output(dir = "hanoi")]
 fn hanoi_5(r: &mut RanimScene) {
     hanoi(r, 5);
 }
 
 #[scene(name = "hanoi")]
-#[preview]
 #[output(dir = "hanoi")]
 fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
-}
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(feature = "app")]
-    preview(hanoi_10_scene);
-    #[cfg(not(feature = "app"))]
-    {
-        render_scene(hanoi_5_scene);
-        render_scene(hanoi_10_scene);
-    }
 }

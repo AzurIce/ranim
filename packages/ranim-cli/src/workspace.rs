@@ -5,7 +5,7 @@ use ignore::gitignore::Gitignore;
 use krates::{Kid, KrateDetails, Krates};
 use log::{debug, error};
 
-use crate::cli::Args;
+use crate::cli::CliArgs;
 
 pub struct Workspace {
     pub krates: Krates,
@@ -125,7 +125,7 @@ impl Workspace {
 /// This combines the info from args and workspace:
 /// - If `--package` is specified, use that.
 /// - Otherwise, use workspace's main package.
-pub fn get_target_package(workspace: &Workspace, args: &Args) -> (Kid, String) {
+pub fn get_target_package(workspace: &Workspace, args: &CliArgs) -> (Kid, String) {
     let kid = if let Some(package) = args.package.as_ref() {
         workspace.get_package(package)
     } else {

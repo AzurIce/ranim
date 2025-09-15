@@ -36,8 +36,8 @@ pub fn parse_scene_attrs(
     }
 
     for attr in attrs {
-        if attr.path().is_ident("preview") {
-            res.preview = true;
+        if attr.path().is_ident("wasm_demo_doc") {
+            res.wasm_demo_doc = true;
             continue;
         }
 

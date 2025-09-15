@@ -5,6 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+ranim-cli = { path = "../../packages/ranim-cli" }
 walkdir = "2.3"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.9.1"
@@ -13,5 +14,5 @@ toml = "0.9.1"
 # ] }
 clap = { version = "4.5", features = ["derive"] }
 sha1 = "0.10.6"
-base16ct = { version = "0.2.0", features = ["alloc"] }
+base16ct = { version = "0.3.0", features = ["alloc"] }
 anyhow = "1.0.98"

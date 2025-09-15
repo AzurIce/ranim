@@ -7,13 +7,14 @@ use krates::Kid;
 use notify_debouncer_full::{DebouncedEvent, Debouncer};
 use ranim::app::{AppCmd, AppState};
 
+use anyhow::Result;
 use async_channel::{Receiver, bounded, unbounded};
 use log::{error, info, trace};
 use notify::RecursiveMode;
 
 use crate::{
-    RanimUserLibraryBuilder,
-    cli::Args,
+    RanimUserLibraryBuilder, Target,
+    cli::CliArgs,
     workspace::{Workspace, get_target_package},
 };
 
@@ -116,7 +117,7 @@ fn watch_krate(
     (debouncer, rx)
 }
 
-pub fn preview_command(args: &Args) {
+pub fn preview_command(args: &CliArgs) -> Result<()> {
     info!("Loading workspace...");
     let workspace = Workspace::current().unwrap();
 
@@ -125,6 +126,10 @@ pub fn preview_command(args: &Args) {
     let (kid, package_name) = get_target_package(&workspace, args);
     info!("Target package name: {package_name}");
 
+    // let target = args.target.clone().map(Target::from).unwrap_or_default();
+    let target = Target::from(args.target.clone());
+    info!("Target: {target:?}");
+
     info!("Watching package...");
     let (_watcher, rx) = watch_krate(&workspace, &kid);
 
@@ -132,6 +137,7 @@ pub fn preview_command(args: &Args) {
     let mut builder = RanimUserLibraryBuilder::new(
         workspace.clone(),
         package_name.clone(),
+        target,
         args.clone(),
         current_dir.clone(),
     );
@@ -147,7 +153,7 @@ pub fn preview_command(args: &Args) {
     let Ok(scene) = lib.get_preview_func() else {
         error!("Failed to get preview scene, available scenes:");
         for scene in lib.scenes() {
-            info!("Scene: {:?} preview: {:?}", scene.name, scene.preview);
+            info!("- {:?}", scene.name);
         }
         panic!("Failed to get preview scene");
     };
@@ -171,7 +177,7 @@ pub fn preview_command(args: &Args) {
                 let Ok(scene) = new_lib.get_preview_func() else {
                     error!("Failed to get preview scene, available scenes:");
                     for scene in new_lib.scenes() {
-                        info!("Scene: {:?} preview: {:?}", scene.name, scene.preview);
+                        info!("- {:?}", scene.name);
                     }
                     continue;
                 };
@@ -193,4 +199,5 @@ pub fn preview_command(args: &Args) {
     ranim::app::run_app(app);
     shutdown_tx.send_blocking(()).unwrap();
     daemon.join().unwrap();
+    Ok(())
 }
