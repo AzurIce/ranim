@@ -8,5 +8,5 @@ fn main() {
         .parse_default_env()
         .init();
     // tracing_log::LogTracer::init().unwrap();
-    Cli::parse().run();
+    Cli::parse().run().unwrap();
 }

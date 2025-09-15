@@ -1,6 +1,3 @@
-name = "getting_started2"
-code = """
-```rust
 use ranim::{
     animation::{
         creation::{CreationAnim, WritingAnim},
@@ -55,8 +52,3 @@ fn getting_started2(r: &mut RanimScene) {
     let r_rect: ItemId<VItem> = r.map(r_rect, VItem::from);
     r.timeline_mut(&r_rect).play_with(|rect| rect.uncreate());
 }
-```"""
-hash = "95225fe1fa6fe68cb1bd11f058ed77f64c036524"
-preview_imgs = []
-output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4", "/examples/getting_started2/output.mp4"]
-wasm = true

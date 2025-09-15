@@ -1,7 +1,6 @@
 name = "perspective_blend"
 code = """
 ```rust
-use log::LevelFilter;
 use ranim::{
     animation::transform::TransformAnim,
     color::palettes::manim,
@@ -16,7 +15,6 @@ use ranim::{
 };
 
 #[scene]
-#[preview]
 #[output(dir = "perspective_blend")]
 fn perspective_blend(r: &mut RanimScene) {
     let r_cam = r.insert_and_show(CameraFrame::default());
@@ -104,28 +102,8 @@ fn perspective_blend(r: &mut RanimScene) {
         TimeMark::Capture("preview.png".to_string()),
     );
 }
-
-fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        #[cfg(debug_assertions)]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Trace)
-            .init();
-        #[cfg(not(debug_assertions))]
-        pretty_env_logger::formatted_timed_builder()
-            .filter(Some("ranim"), LevelFilter::Info)
-            .init();
-    }
-
-    #[cfg(not(feature = "app"))]
-    render_scene(perspective_blend_scene);
-
-    #[cfg(feature = "app")]
-    preview(perspective_blend_scene);
-}
 ```"""
-hash = "86d68e635df7e641058860a30420a9627009fbdf"
-preview_imgs = ["/examples/perspective_blend/preview.png"]
-output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
+hash = "b59d3b8eaa61e4038446c44ccd4f3120f38b4ae7"
+preview_imgs = ["/examples/perspective_blend/preview.png", "/examples/perspective_blend/preview.png"]
+output_files = ["/examples/perspective_blend/output.mp4", "/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

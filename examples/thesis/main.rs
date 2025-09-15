@@ -34,7 +34,6 @@ fn pentagon() -> VItem {
 
 #[allow(unused)]
 #[scene]
-#[preview]
 #[output]
 fn fading(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -69,7 +68,6 @@ fn creation(r: &mut RanimScene) {
 
 #[allow(unused)]
 #[scene]
-#[preview]
 #[output]
 fn writing(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -87,7 +85,6 @@ fn writing(r: &mut RanimScene) {
 
 #[allow(unused)]
 #[scene]
-#[preview]
 #[output]
 fn transform(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
@@ -108,10 +105,10 @@ fn transform(r: &mut RanimScene) {
 fn main() {
     #[cfg(feature = "app")]
     {
-        preview(fading_scene);
-        preview(creation_scene);
-        preview(writing_scene);
-        preview(transform_scene);
+        preview_scene(fading_scene);
+        preview_scene(creation_scene);
+        preview_scene(writing_scene);
+        preview_scene(transform_scene);
     }
     #[cfg(not(feature = "app"))]
     {

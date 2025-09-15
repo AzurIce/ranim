@@ -110,14 +110,12 @@ fn hanoi(r: &mut RanimScene, n: usize) {
 }
 
 #[scene]
-#[preview]
 #[output(dir = "hanoi")]
 fn hanoi_5(r: &mut RanimScene) {
     hanoi(r, 5);
 }
 
 #[scene(name = "hanoi")]
-#[preview]
 #[output(dir = "hanoi")]
 fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);

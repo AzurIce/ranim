@@ -1,6 +1,3 @@
-name = "getting_started1"
-code = """
-```rust
 use ranim::{
     animation::{creation::WritingAnim, transform::TransformAnim},
     color::palettes::manim,
@@ -35,8 +32,3 @@ fn getting_started1(r: &mut RanimScene) {
     }
 }
 // ANCHOR_END: construct
-```"""
-hash = "c53ea9b4614d1e4a60dc3d148607079037f14b02"
-preview_imgs = []
-output_files = ["/examples/getting_started1/output.mp4", "/examples/getting_started1/getting_started1_1920x1080_60.mp4"]
-wasm = true

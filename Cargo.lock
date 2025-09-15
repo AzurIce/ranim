@@ -327,9 +327,9 @@ dependencies = [
 
 [[package]]
 name = "base16ct"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
+checksum = "d8b59d472eab27ade8d770dcb11da7201c11234bef9f82ce7aa517be028d462b"
 
 [[package]]
 name = "base64"
@@ -6915,6 +6915,7 @@ dependencies = [
  "anyhow",
  "base16ct",
  "clap",
+ "ranim-cli",
  "serde",
  "sha1",
  "toml 0.9.5",

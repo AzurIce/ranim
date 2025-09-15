@@ -25,12 +25,11 @@ fn ranim_path() -> proc_macro2::TokenStream {
     }
 }
 
-/// 解析单个属性（#[scene(...)] / #[preview] / #[output(...)]）
+/// 解析单个属性（#[scene(...)] /  / #[output(...)]）
 #[derive(Default)]
 struct SceneAttrs {
     name: Option<String>,      // #[scene(name = "...")]
     frame_height: Option<f64>, // #[scene(frame_height = 8.0)]
-    preview: bool,             // #[preview]
     wasm_demo_doc: bool,       // #[wasm_demo_doc]
     outputs: Vec<OutputDef>,   // #[output(...)]
 }
@@ -98,7 +97,6 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         });
     }
 
-    let preview = attrs.preview;
     let doc = if attrs.wasm_demo_doc {
         quote! {
             #[doc = concat!("<canvas id=\"ranim-app-", stringify!(#fn_name), "\" width=\"1280\" height=\"720\" style=\"width: 100%;\"></canvas>")]
@@ -129,7 +127,6 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
             constructor: #fn_name,
             config: #scene_config,
             outputs: &#static_output_name,
-            preview: #preview,
         }
     };
 
@@ -158,10 +155,10 @@ pub fn output(_: TokenStream, _: TokenStream) -> TokenStream {
     TokenStream::new()
 }
 
-#[proc_macro_attribute]
-pub fn preview(_: TokenStream, _: TokenStream) -> TokenStream {
-    TokenStream::new()
-}
+// #[proc_macro_attribute]
+// pub fn preview(_: TokenStream, _: TokenStream) -> TokenStream {
+//     TokenStream::new()
+// }
 
 #[proc_macro_attribute]
 pub fn wasm_demo_doc(_attr: TokenStream, _: TokenStream) -> TokenStream {

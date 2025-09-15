@@ -1,6 +1,3 @@
-name = "bubble_sort"
-code = """
-```rust
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     animation::transform::TransformAnim,
@@ -118,8 +115,3 @@ fn bubble_sort_10(r: &mut RanimScene) {
 fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
 }
-```"""
-hash = "59460038b68ccda5f8a605f5fa3b192176a947aa"
-preview_imgs = ["/examples/bubble_sort/preview-100.png", "/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-10.png", "/examples/bubble_sort/preview-100.png"]
-output_files = ["/examples/bubble_sort/bubble_sort_10_1920x1080_60.mp4", "/examples/bubble_sort/output-100.mp4", "/examples/bubble_sort/output-10.mp4", "/examples/bubble_sort/bubble_sort_1920x1080_60.mp4"]
-wasm = true

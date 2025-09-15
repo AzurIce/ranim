@@ -12,7 +12,6 @@ use ranim::{
 };
 
 #[scene]
-#[preview]
 #[output(dir = "perspective_blend")]
 fn perspective_blend(r: &mut RanimScene) {
     let r_cam = r.insert_and_show(CameraFrame::default());

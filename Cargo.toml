@@ -218,4 +218,48 @@ path = "examples/test/lib.rs"
 crate-type = ["cdylib"]
 
 [package.metadata.example.test]
+hide = true
 wasm = false
+
+[[example]]
+name = "bubble_sort"
+path = "examples/bubble_sort/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.bubble_sort]
+wasm = true
+
+[[example]]
+name = "getting_started0"
+path = "examples/getting_started0/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.getting_started0]
+wasm = true
+hide = true
+
+[[example]]
+name = "getting_started1"
+path = "examples/getting_started1/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.getting_started1]
+wasm = true
+hide = true
+
+[[example]]
+name = "getting_started2"
+path = "examples/getting_started2/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.getting_started2]
+wasm = true
+hide = true
+
+[[example]]
+name = "selective_sort"
+path = "examples/selective_sort/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.selective_sort]
+wasm = true

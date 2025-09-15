@@ -1,3 +1,6 @@
+name = "test"
+code = """
+```rust
 #![allow(clippy::all)]
 #![allow(unused)]
 use std::{f64::consts::PI, time::Duration};
@@ -54,3 +57,8 @@ fn test(r: &mut RanimScene) {
     // }));
     r.timelines_mut().forward(1.0);
 }
+```"""
+hash = "acfdc524331371002e46b8fb6108a529956404b8"
+preview_imgs = []
+output_files = ["/examples/test/test.png"]
+wasm = false

@@ -1,6 +1,7 @@
 pub mod preview;
 pub mod render;
 
+use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Args, Debug, Clone, Default)]
@@ -46,17 +47,19 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn run(self) {
+    pub fn run(self) -> Result<()> {
         let args = self.args;
 
         match self.command {
             Commands::Preview => {
-                preview::preview_command(&args);
+                preview::preview_command(&args)?;
             }
             Commands::Render { scenes } => {
-                render::render_command(&args, &scenes);
+                render::render_command(&args, &scenes)?;
             }
         }
+
+        Ok(())
     }
 }
 

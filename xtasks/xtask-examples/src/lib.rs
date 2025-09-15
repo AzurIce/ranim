@@ -5,6 +5,8 @@ use std::{
 };
 
 use anyhow::Result;
+use clap::Parser;
+use ranim_cli::cli::Cli;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use toml::Table;
@@ -107,14 +109,17 @@ impl Example {
 
         let mut preview_imgs = vec![];
         let mut output_files = vec![];
-        let status = Command::new("cargo")
-            .current_dir(root_dir)
-            .args(["run", "--example", &self.name, "--release"])
-            .stdout(std::process::Stdio::null())
-            .status()
-            .unwrap();
-        if !status.success() {
-            panic!("failed to build example")
+
+        let cli = Cli::parse_from(["ranim", "render", "--example", &self.name]);
+        let res = cli.run();
+        // let status = Command::new("cargo")
+        //     .current_dir(root_dir)
+        //     .args(["run", "--example", &self.name, "--release"])
+        //     .stdout(std::process::Stdio::null())
+        //     .status()
+        //     .unwrap();
+        if let Err(err) = res {
+            panic!("failed to build example <{}>: {err:?}", self.name)
         }
         for entry in WalkDir::new(root_dir.join("output").join(&self.name))
             .into_iter()

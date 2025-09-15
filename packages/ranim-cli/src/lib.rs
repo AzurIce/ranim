@@ -191,9 +191,7 @@ impl RanimUserLibrary {
     }
 
     pub fn get_preview_func(&self) -> Result<&Scene> {
-        self.scenes()
-            .find(|s| s.preview)
-            .context("no scene marked with `#[preview]` found")
+        self.scenes().next().context("no scene found")
     }
 }
 
