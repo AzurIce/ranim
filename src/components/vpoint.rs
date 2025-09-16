@@ -181,7 +181,8 @@ impl Alignable for VPointComponentVec {
         // }
 
         let sps_to_points = |sps: Vec<Vec<DVec3>>| -> Vec<DVec3> {
-            let mut points = sps.into_iter()
+            let mut points = sps
+                .into_iter()
                 .flat_map(|sp| {
                     let last = *sp.last().unwrap();
                     sp.into_iter().chain(std::iter::once(last))

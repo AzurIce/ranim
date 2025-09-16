@@ -6,8 +6,9 @@ use itertools::Itertools;
 use log::warn;
 
 use crate::{
-    components::{vpoint::wrap_point_func_with_anchor, width::Width, Anchor, ScaleHint},
-    items::Group, utils::resize_preserving_order,
+    components::{Anchor, ScaleHint, vpoint::wrap_point_func_with_anchor, width::Width},
+    items::Group,
+    utils::resize_preserving_order,
 };
 
 // MARK: Interpolatable
