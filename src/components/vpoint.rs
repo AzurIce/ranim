@@ -14,7 +14,7 @@ use crate::traits::Scale;
 use crate::traits::Shift;
 use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
-use crate::utils::resize_preserving_order;
+use crate::utils::resize_preserving_order_with_indices;
 
 use super::Anchor;
 use super::ComponentVec;
@@ -78,14 +78,24 @@ impl Alignable for VPointComponentVec {
         // for (i, sp) in sps_other.iter().enumerate() {
         //     println!("[{i}] {} {:?}", sp.len(), sp);
         // }
+        let center_of =
+            |points: &Vec<DVec3>| -> DVec3 { points.iter().sum::<DVec3>() / points.len() as f64 };
         let len = sps_self.len().max(sps_other.len());
         // println!("#####{len}#####");
         if sps_self.len() != len {
-            let x = resize_preserving_order(&sps_self, len);
+            let (mut x, idxs) = resize_preserving_order_with_indices(&sps_self, len);
+            for idx in idxs {
+                let center = center_of(&x[idx]);
+                x[idx].fill(center);
+            }
             sps_self = x;
         }
         if sps_other.len() != len {
-            let x = resize_preserving_order(&sps_other, len);
+            let (mut x, idxs) = resize_preserving_order_with_indices(&sps_other, len);
+            for idx in idxs {
+                let center = center_of(&x[idx]);
+                x[idx].fill(center);
+            }
             sps_other = x;
         }
         // println!("self: {}", sps_self.len());

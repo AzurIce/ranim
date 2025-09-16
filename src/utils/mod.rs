@@ -158,6 +158,25 @@ pub fn resize_preserving_order<T: Clone>(vec: &[T], new_len: usize) -> Vec<T> {
     indices.map(|i| vec[i].clone()).collect()
 }
 
+/// Resize the vec while preserving the order
+pub fn resize_preserving_order_with_indices<T: Clone>(
+    vec: &[T],
+    new_len: usize,
+) -> (Vec<T>, Vec<usize>) {
+    let mut res = Vec::with_capacity(new_len);
+    let mut added_idxs = Vec::with_capacity(new_len);
+    let mut prev_index = None;
+    for i in 0..new_len {
+        let index = i * vec.len() / new_len;
+        if prev_index.map(|i| i == index).unwrap_or(false) {
+            added_idxs.push(res.len());
+        }
+        res.push(vec[index].clone());
+        prev_index = Some(index);
+    }
+    (res, added_idxs)
+}
+
 /// Extend the vec with last element
 pub fn extend_with_last<T: Clone + Default>(vec: &mut Vec<T>, new_len: usize) {
     let v = vec![vec.last().cloned().unwrap_or_default(); new_len - vec.len()];
