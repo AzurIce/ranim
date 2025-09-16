@@ -28,10 +28,11 @@ fn ranim_path() -> proc_macro2::TokenStream {
 /// 解析单个属性（#[scene(...)] /  / #[output(...)]）
 #[derive(Default)]
 struct SceneAttrs {
-    name: Option<String>,      // #[scene(name = "...")]
-    frame_height: Option<f64>, // #[scene(frame_height = 8.0)]
-    wasm_demo_doc: bool,       // #[wasm_demo_doc]
-    outputs: Vec<OutputDef>,   // #[output(...)]
+    name: Option<String>,        // #[scene(name = "...")]
+    frame_height: Option<f64>,   // #[scene(frame_height = 8.0)]
+    clear_color: Option<String>, // #[scene(clear_color = "#000000")]
+    wasm_demo_doc: bool,         // #[wasm_demo_doc]
+    outputs: Vec<OutputDef>,     // #[output(...)]
 }
 
 /// 一个 #[output(...)] 里的字段
@@ -65,9 +66,11 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // SceneConfig
     let frame_height = attrs.frame_height.unwrap_or(8.0);
+    let clear_color = attrs.clear_color.unwrap_or("#333333ff".to_string());
     let scene_config = quote! {
         #ranim::SceneConfig {
             frame_height: #frame_height,
+            clear_color: #clear_color,
         }
     };
 

@@ -42,3 +42,14 @@ macro_rules! color {
             .to_alpha_color::<Srgb>()
     }};
 }
+
+/// A macro to parse color string to [`AlphaColor<Srgb>`]
+///
+/// In its inner it uses [`color::parse_color`]
+#[macro_export]
+macro_rules! try_color {
+    ($color_str:expr) => {{
+        use ::color::{Srgb, parse_color};
+        parse_color($color_str).map(|c| c.to_alpha_color::<Srgb>())
+    }};
+}
