@@ -1,17 +1,40 @@
-# Changelog
+## [0.1.4] - 2025-09-16
 
-All notable changes to this project will be documented in this file.
+### 🚀 Features
 
+- Play control button for app
+- Support example target for ranim-cli
+- *(timeline)* Rename state -> snapshot_ref, added snapshot, with_snapshot method
+- Support preview specific scene
+- Added `#[scene(color = "#....")]` to support setting clear color (#90)
+
+### 🐛 Bug Fixes
+
+- Wasm app freezing on init
+- Fixed `Alignable` implementation for `VPointComponentVec`, `VItem` and `Group<T>` (#91)
+
+### 🚜 Refactor
+
+- Use inventory instead of linkme for find_scene api in wasm
+
+### ⚙️ Miscellaneous Tasks
+
+- *(flake)* Use rust nightly
+- Update deps
+- Update flake to output ranim-cli
 ## [0.1.3] - 2025-08-20
 
 ### 🐛 Bug Fixes
 
 - `#[preview] not working when `#[scene]` has no args
 
-### Bench
+### 💼 Other
 
 - Added bench for extract
 
+### ⚙️ Miscellaneous Tasks
+
+- Release
 ## [0.1.2] - 2025-08-18
 
 ### 🐛 Bug Fixes
@@ -21,21 +44,19 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.1] - 2025-08-10
 
 ### 🐛 Bug Fixes
 
 - Scene macro's attrs not working
 
-### ⚙️ Miscellaneous Tasks
-
-- Release
-
-### Example
+### 💼 Other
 
 - Added extract_vitem_visualize
 
+### ⚙️ Miscellaneous Tasks
+
+- Release
 ## [0.1.0] - 2025-08-10
 
 ### 🚀 Features
@@ -61,7 +82,6 @@ All notable changes to this project will be documented in this file.
 - Update workflow
 - Use nightly
 - Release
-
 ## [0.1.0-alpha.17] - 2025-07-11
 
 ### 🚀 Features
@@ -76,6 +96,11 @@ All notable changes to this project will be documented in this file.
 - ItemTimeline eval range incorrect
 - Zero-length vec normalization error, correct test usecases, closes: #70
 
+### 💼 Other
+
+- Fix include
+- Fix book and doc link
+
 ### 📚 Documentation
 
 - Added `#![warn(missing_docs)]`, first step to enhance documents
@@ -87,15 +112,6 @@ All notable changes to this project will be documented in this file.
 - Added git-cliff to flake's shell packages
 - Release
 - Release
-
-### Book
-
-- Fix include
-
-### Website
-
-- Fix book and doc link
-
 ## [0.1.0-alpha.14] - 2025-07-01
 
 ### 🚀 Features
@@ -106,6 +122,12 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Use chrono instead of time for typst world
+
+### 💼 Other
+
+- Refactor rabject and timeline
+- Moved getting started to guide based on mdbook, added doc
+- Update book and examples
 
 ### 🚜 Refactor
 
@@ -128,16 +150,6 @@ All notable changes to this project will be documented in this file.
 
 - Update deps
 - Release
-
-### WIP
-
-- Refactor rabject and timeline
-
-### Website
-
-- Moved getting started to guide based on mdbook, added doc
-- Update book and examples
-
 ## [0.1.0-alpha.13] - 2025-05-01
 
 ### 🚀 Features
@@ -147,6 +159,10 @@ All notable changes to this project will be documented in this file.
 - Align vitem points according to ratio, closes: #33
 - An attempt to share pass between items
 - Scale with stroke
+
+### 💼 Other
+
+- More items
 
 ### 🚜 Refactor
 
@@ -158,11 +174,6 @@ All notable changes to this project will be documented in this file.
 - Use pretty_env_logger instead of env_logger
 - Added puffin_viewer to flake shell
 - Release
-
-### WIP
-
-- More items
-
 ## [0.1.0-alpha.12] - 2025-04-20
 
 ### 🚜 Refactor
@@ -178,7 +189,6 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.0-alpha.11] - 2025-04-01
 
 ### 🚀 Features
@@ -188,6 +198,10 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - #56, fixed subtract with overflow
+
+### 💼 Other
+
+- Added hanoi example, closes: #47
 
 ### 🚜 Refactor
 
@@ -202,11 +216,6 @@ All notable changes to this project will be documented in this file.
 - Release
 - Update cargo exclude
 - Release
-
-### Examples
-
-- Added hanoi example, closes: #47
-
 ## [0.1.0-alpha.9] - 2025-03-29
 
 ### 🚀 Features
@@ -249,7 +258,6 @@ All notable changes to this project will be documented in this file.
 
 - Release
 - Release
-
 ## [0.1.0-alpha.7] - 2025-03-19
 
 ### 🚀 Features
@@ -271,7 +279,6 @@ All notable changes to this project will be documented in this file.
 
 - *(xtask/build-examples)* Added clean arg to clean non-exist examples
 - Release
-
 ## [0.1.0-alpha.6] - 2025-03-17
 
 ### 🚀 Features
@@ -288,7 +295,6 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.0-alpha.5] - 2025-03-16
 
 ### 🚀 Features
@@ -308,22 +314,17 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.0-alpha.4] - 2025-03-14
+
+### 💼 Other
+
+- Added logo
+- Support for RabjectGroup
 
 ### ⚙️ Miscellaneous Tasks
 
 - Release
 - Release
-
-### WIP
-
-- Support for RabjectGroup
-
-### Misc
-
-- Added logo
-
 ## [0.1.0-alpha.3] - 2025-03-14
 
 ### 🚀 Features
@@ -341,7 +342,6 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.0-alpha.2] - 2025-03-13
 
 ### 🚜 Refactor
@@ -352,14 +352,12 @@ All notable changes to this project will be documented in this file.
 
 - Update cargo-release config
 - Release
-
 ## [0.1.0-alpha.1] - 2025-03-13
 
 ### ⚙️ Miscellaneous Tasks
 
 - Update cargo-release config
 - Release
-
 ## [ranim-macros-v0.0.0] - 2025-03-12
 
 ### 🚀 Features
@@ -411,6 +409,22 @@ All notable changes to this project will be documented in this file.
 - #27
 - *(website)* Fix toml output
 - #29
+
+### 💼 Other
+
+- Refactoring bezier for filling
+- Fixing arc between points put start_and_end modifies the width
+- Refactor to correct vectorized objects
+- Finishing the refactor
+- Finished refactor but with stroke and fill not finished
+- Refactor project structure
+- Fixing aligning for animation
+- Rewrite camera
+- Refactor to support hierarchy
+- Refactor object management and scene render architecture, but with animation not compatible
+- Introduce vello
+- New codeblock style with linenos, update examples
+- Examples page
 
 ### 🚜 Refactor
 
@@ -472,24 +486,3 @@ All notable changes to this project will be documented in this file.
 - *(ci)* Removed test job due to no gpu on runner
 - Added github pages workflow
 - Gh deploy only when push to main
-
-### WIP
-
-- Refactoring bezier for filling
-- Fixing arc between points put start_and_end modifies the width
-- Refactor to correct vectorized objects
-- Finishing the refactor
-- Finished refactor but with stroke and fill not finished
-- Refactor project structure
-- Fixing aligning for animation
-- Rewrite camera
-- Refactor to support hierarchy
-- Refactor object management and scene render architecture, but with animation not compatible
-- Introduce vello
-
-### Website
-
-- New codeblock style with linenos, update examples
-- Examples page
-
-<!-- generated by git-cliff -->
