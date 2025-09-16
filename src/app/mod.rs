@@ -702,7 +702,7 @@ pub fn preview_scene(s: &Scene) {
     run_app(
         app_state,
         #[cfg(target_arch = "wasm32")]
-        format!("ranim-app-{name}"),
+        format!("ranim-app-{}", s.name),
     );
 }
 
