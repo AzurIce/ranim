@@ -160,7 +160,8 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
     //     info!("- {:?}", scene.name);
     // }
     // panic!("Failed to get preview scene");
-    let app = AppState::new_with_title(scene.constructor, scene.name.to_string());
+    let mut app = AppState::new_with_title(scene.constructor, scene.name.to_string());
+    app.set_clear_color_str(scene.config.clear_color);
     let cmd_tx = app.cmd_tx.clone();
 
     let scene_name = scene_name.clone();
@@ -191,7 +192,7 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
 
                 let (tx, rx) = bounded(1);
                 cmd_tx
-                    .send_blocking(AppCmd::ReloadScene(Box::new(scene.constructor), tx))
+                    .send_blocking(AppCmd::ReloadScene(Box::new(scene.clone()), tx))
                     .unwrap();
                 rx.recv_blocking().unwrap();
                 lib.replace(new_lib);

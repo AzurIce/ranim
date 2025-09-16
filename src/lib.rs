@@ -150,11 +150,16 @@ pub struct SceneConfig {
     ///
     /// This will be the coordinate in the scene. The width is calculated by the aspect ratio from [`Output::width`] and [`Output::height`].
     pub frame_height: f64,
+    /// The clear color
+    pub clear_color: &'static str,
 }
 
 impl Default for SceneConfig {
     fn default() -> Self {
-        Self { frame_height: 8.0 }
+        Self {
+            frame_height: 8.0,
+            clear_color: "#333333ff",
+        }
     }
 }
 
@@ -265,6 +270,7 @@ struct RanimRenderApp {
     /// Whether to save the frames
     frame_count: u32,
     scene_name: String,
+    clear_color: wgpu::Color,
 
     width: u32,
     height: u32,
@@ -279,6 +285,8 @@ struct RanimRenderApp {
 impl RanimRenderApp {
     fn new(scene_name: String, scene_config: &SceneConfig, output: &Output) -> Self {
         use std::time::Instant;
+
+        use ::color::LinearSrgb;
 
         info!("Checking ffmpeg...");
         let t = Instant::now();
@@ -317,6 +325,11 @@ impl RanimRenderApp {
             output.width as usize,
             output.height as usize,
         );
+        let clear_color = try_color!(scene_config.clear_color)
+            .unwrap_or(color!("#333333ff"))
+            .convert::<LinearSrgb>();
+        let [r, g, b, a] = clear_color.components.map(|x| x as f64);
+        let clear_color = wgpu::Color { r, g, b, a };
         Self {
             // world: World::new(),
             renderer,
@@ -339,6 +352,7 @@ impl RanimRenderApp {
             save_frames: output.save_frames,
             output_dir,
             scene_name,
+            clear_color,
             render_instances: RenderInstances::default(),
         }
     }
@@ -446,7 +460,8 @@ impl RanimRenderApp {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("render");
 
-                    self.renderer.render(&self.ctx, &render_primitives);
+                    self.renderer
+                        .render(&self.ctx, self.clear_color, &render_primitives);
                 }
 
                 self.update_frame();
@@ -542,7 +557,8 @@ impl RanimRenderApp {
         // println!("{:?}", camera_frame);
         // println!("{}", render_primitives.len());
         self.renderer.update_uniforms(&self.ctx, camera_frame);
-        self.renderer.render(&self.ctx, &render_primitives);
+        self.renderer
+            .render(&self.ctx, self.clear_color, &render_primitives);
         self.save_frame_to_image(
             self.output_dir
                 .join(format!(
