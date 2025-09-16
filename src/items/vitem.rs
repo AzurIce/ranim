@@ -178,9 +178,19 @@ impl Alignable for VItem {
     }
     fn align_with(&mut self, other: &mut Self) {
         self.vpoints.align_with(&mut other.vpoints);
-        self.stroke_rgbas.align_with(&mut other.stroke_rgbas);
-        self.stroke_widths.align_with(&mut other.stroke_widths);
-        self.fill_rgbas.align_with(&mut other.fill_rgbas);
+        let len = self.vpoints.len().div_ceil(2);
+        if self.stroke_rgbas.len() != len {
+            self.stroke_rgbas.resize_preserving_order(len);
+        }
+        if self.stroke_widths.len() != len {
+            self.stroke_widths.resize_preserving_order(len);
+        }
+        if self.fill_rgbas.len() != len {
+            self.fill_rgbas.resize_preserving_order(len);
+        }
+        // self.stroke_rgbas.align_with(&mut other.stroke_rgbas);
+        // self.stroke_widths.align_with(&mut other.stroke_widths);
+        // self.fill_rgbas.align_with(&mut other.fill_rgbas);
     }
 }
 
