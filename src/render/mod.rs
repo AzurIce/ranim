@@ -3,14 +3,12 @@ pub(crate) mod pipelines;
 /// The basic renderable structs
 pub mod primitives;
 
-use color::LinearSrgb;
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Rgba};
 use pipelines::{Map3dTo2dPipeline, VItemPipeline};
 use primitives::RenderCommand;
 
 use crate::{
-    color::rgba8,
     items::camera_frame::CameraFrame,
     utils::{PipelinesStorage, wgpu::WgpuBuffer, wgpu::WgpuContext},
 };
@@ -137,7 +135,6 @@ pub(crate) struct Renderer {
     size: (usize, usize),
     pub(crate) pipelines: PipelinesStorage,
 
-    clear_color: wgpu::Color,
     pub(crate) render_textures: RenderTextures,
 
     uniforms_buffer: WgpuBuffer<CameraUniforms>,
@@ -181,9 +178,9 @@ impl Renderer {
         );
         let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
 
-        let bg = rgba8(0x33, 0x33, 0x33, 0xff).convert::<LinearSrgb>();
-        let [r, g, b, a] = bg.components.map(|x| x as f64);
-        let clear_color = wgpu::Color { r, g, b, a };
+        // let bg = rgba8(0x33, 0x33, 0x33, 0xff).convert::<LinearSrgb>();
+        // let [r, g, b, a] = bg.components.map(|x| x as f64);
+        // let clear_color = wgpu::Color { r, g, b, a };
 
         #[cfg(feature = "profiling")]
         let profiler = wgpu_profiler::GpuProfiler::new(
@@ -195,7 +192,6 @@ impl Renderer {
         Self {
             frame_height,
             size: (width, height),
-            clear_color,
             pipelines: PipelinesStorage::default(),
             render_textures,
             // Outputs
@@ -212,7 +208,7 @@ impl Renderer {
     }
 
     /// Clears the screen with `Renderer::clear_color`
-    pub fn clear_screen(&mut self, ctx: &WgpuContext) {
+    pub fn clear_screen(&mut self, ctx: &WgpuContext, clear_color: wgpu::Color) {
         #[cfg(feature = "profiling")]
         profiling::scope!("clear_screen");
         // trace!("clear screen {:?}", self.clear_color);
@@ -238,7 +234,7 @@ impl Renderer {
                     view: render_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(self.clear_color),
+                        load: wgpu::LoadOp::Clear(clear_color),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -262,8 +258,13 @@ impl Renderer {
         self.output_texture_updated = false;
     }
 
-    pub fn render(&mut self, ctx: &WgpuContext, renderable: &impl RenderCommand) {
-        self.clear_screen(ctx);
+    pub fn render(
+        &mut self,
+        ctx: &WgpuContext,
+        clear_color: wgpu::Color,
+        renderable: &impl RenderCommand,
+    ) {
+        self.clear_screen(ctx, clear_color);
         let mut encoder = ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());

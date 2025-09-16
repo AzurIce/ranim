@@ -4,6 +4,7 @@ mod timeline;
 use std::sync::Arc;
 
 use async_channel::{Receiver, Sender, unbounded};
+use color::LinearSrgb;
 use egui_wgpu::ScreenDescriptor;
 use log::{info, warn};
 #[cfg(feature = "serde")]
@@ -64,7 +65,7 @@ impl TimelineInfo {
 /// App command
 pub enum AppCmd {
     /// Reload the scene, will send a `()` after reloaded
-    ReloadScene(Box<dyn SceneConstructor>, Sender<()>),
+    ReloadScene(Box<Scene>, Sender<()>),
 }
 
 /// App's state
@@ -75,6 +76,7 @@ pub struct AppState {
     pub cmd_tx: Sender<AppCmd>,
 
     title: String,
+    clear_color: wgpu::Color,
     timeline: SealedRanimScene,
     need_eval: bool,
     // app_options: AppOptions<'a>,
@@ -105,6 +107,7 @@ impl AppState {
             cmd_tx,
             cmd_rx,
             title,
+            clear_color: wgpu::Color::TRANSPARENT,
             need_eval: false,
             // renderer,
             last_sec: -1.0,
@@ -112,6 +115,20 @@ impl AppState {
             timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
             timeline,
         }
+    }
+
+    /// Set clear color str
+    pub fn set_clear_color_str(&mut self, color: &str) {
+        let bg = crate::try_color!(color)
+            .unwrap_or(crate::color!("#333333ff"))
+            .convert::<LinearSrgb>();
+        let [r, g, b, a] = bg.components.map(|x| x as f64);
+        let clear_color = wgpu::Color { r, g, b, a };
+        self.set_clear_color(clear_color);
+    }
+    /// Set clear color
+    pub fn set_clear_color(&mut self, color: wgpu::Color) {
+        self.clear_color = color;
     }
     // fn new(scene_constructor: SceneConstructor) -> Self {
     //     Self::new_with_title(scene_constructor, "preview_app".to_string())
@@ -185,15 +202,17 @@ impl AppState {
             #[cfg(feature = "profiling")]
             profiling::scope!("render");
 
-            app_renderer.ranim_renderer.render(ctx, &render_primitives);
+            app_renderer
+                .ranim_renderer
+                .render(ctx, self.clear_color, &render_primitives);
         }
     }
 
     fn handle_events(&mut self) {
         if let Ok(cmd) = self.cmd_rx.try_recv() {
             match cmd {
-                AppCmd::ReloadScene(constructor, tx) => {
-                    let timeline = constructor.build_scene();
+                AppCmd::ReloadScene(scene, tx) => {
+                    let timeline = scene.constructor.build_scene();
                     let timeline_infos = timeline.get_timeline_infos();
                     let old_cur_second = self.timeline_state.current_sec;
                     self.timeline_state = TimelineState::new(timeline.total_secs(), timeline_infos);
@@ -202,6 +221,8 @@ impl AppState {
                     self.timeline = timeline;
                     self.render_instances = RenderInstances::default();
                     self.need_eval = true;
+
+                    self.set_clear_color_str(scene.config.clear_color);
 
                     if let Err(err) = tx.try_send(()) {
                         log::error!("Failed to send reloaded signal: {err:?}");
@@ -663,7 +684,9 @@ impl Scene {
 
 /// Runs a scene preview app on a scene constructor
 pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
-    let app_state = AppState::new_with_title(constructor, name.clone());
+    let mut app_state = AppState::new_with_title(constructor, name.clone());
+    app_state.set_clear_color_str("#333333ff");
+
     run_app(
         app_state,
         #[cfg(target_arch = "wasm32")]
@@ -673,7 +696,14 @@ pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
 
 /// Preview a scene
 pub fn preview_scene(s: &Scene) {
-    run_scene_app(s.constructor, s.name.to_string());
+    let mut app_state = AppState::new_with_title(s.constructor, s.name.to_string());
+    app_state.set_clear_color_str(s.config.clear_color);
+
+    run_app(
+        app_state,
+        #[cfg(target_arch = "wasm32")]
+        format!("ranim-app-{}", s.name),
+    );
 }
 
 #[allow(unused)]
