@@ -28,8 +28,9 @@
         inherit (pkgs) lib;
         craneLib = (crane.mkLib pkgs).overrideToolchain (
           p:
-          p.rust-bin.nightly."2025-09-10".default.override {
+          p.rust-bin.nightly.latest.default.override {
             targets = [ "wasm32-unknown-unknown" ];
+            extensions = [ "rust-src" ];
           }
         );
         src = craneLib.cleanCargoSource ./.;
