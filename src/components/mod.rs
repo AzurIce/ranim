@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     prelude::{Alignable, Interpolatable},
     traits::BoundingBox,
-    utils::math::interpolate_usize,
+    utils::{math::interpolate_usize, resize_preserving_order},
 };
 
 /// Point
@@ -120,6 +120,10 @@ impl<T: Component> ComponentVec<T> {
     pub fn resize_with_last(&mut self, new_len: usize) {
         let last = self.last().cloned().unwrap_or_default();
         self.0.resize(new_len, last);
+    }
+    /// Resize preserved order
+    pub fn resize_preserving_order(&mut self, new_len: usize) {
+        self.0 = resize_preserving_order(&self.0, new_len);
     }
     /// Set all element to a value
     pub fn set_all(&mut self, value: impl Into<T>) {

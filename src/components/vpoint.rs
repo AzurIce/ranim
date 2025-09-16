@@ -14,6 +14,7 @@ use crate::traits::Scale;
 use crate::traits::Shift;
 use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
+use crate::utils::resize_preserving_order;
 
 use super::Anchor;
 use super::ComponentVec;
@@ -45,6 +46,7 @@ impl Alignable for VPointComponentVec {
         }
         if self.len() > other.len() {
             other.align_with(self);
+            return;
         }
 
         let into_closed_subpaths = |subpaths: Vec<Vec<DVec3>>| -> Vec<Vec<DVec3>> {
@@ -66,20 +68,34 @@ impl Alignable for VPointComponentVec {
                 })
                 .collect::<Vec<_>>()
         };
-        let sps_self = into_closed_subpaths(self.get_subpaths());
-        let sps_other = into_closed_subpaths(other.get_subpaths());
-
-        let sps_to_points = |mut sps: Vec<Vec<DVec3>>| -> Vec<DVec3> {
-            let sps_cnt = sps.len();
-            let last_sp = sps.split_off(sps_cnt - 1);
-            sps.into_iter()
-                .flat_map(|sp| sp.into_iter())
-                .chain(last_sp[0].iter().cloned())
-                .collect()
-        };
-
-        let points_self = sps_to_points(sps_self);
-        let points_other = sps_to_points(sps_other);
+        let mut sps_self = into_closed_subpaths(self.get_subpaths());
+        let mut sps_other = into_closed_subpaths(other.get_subpaths());
+        // println!("self: {}", sps_self.len());
+        // for (i, sp) in sps_self.iter().enumerate() {
+        //     println!("[{i}] {} {:?}", sp.len(), sp);
+        // }
+        // println!("other: {}", sps_other.len());
+        // for (i, sp) in sps_other.iter().enumerate() {
+        //     println!("[{i}] {} {:?}", sp.len(), sp);
+        // }
+        let len = sps_self.len().max(sps_other.len());
+        // println!("#####{len}#####");
+        if sps_self.len() != len {
+            let x = resize_preserving_order(&sps_self, len);
+            sps_self = x;
+        }
+        if sps_other.len() != len {
+            let x = resize_preserving_order(&sps_other, len);
+            sps_other = x;
+        }
+        // println!("self: {}", sps_self.len());
+        // for (i, sp) in sps_self.iter().enumerate() {
+        //     println!("[{i}] {} {:?}", sp.len(), sp);
+        // }
+        // println!("other: {}", sps_other.len());
+        // for (i, sp) in sps_other.iter().enumerate() {
+        //     println!("[{i}] {} {:?}", sp.len(), sp);
+        // }
 
         let points_to_bez_tuples = |points: &Vec<DVec3>| -> Vec<[DVec3; 3]> {
             let it0 = points.iter().step_by(2).cloned();
@@ -87,8 +103,8 @@ impl Alignable for VPointComponentVec {
             let it2 = points.iter().skip(2).step_by(2).cloned();
             it0.zip(it1).zip(it2).map(|((a, b), c)| [a, b, c]).collect()
         };
-        let align_points = |points: Vec<DVec3>, len: usize| -> Vec<DVec3> {
-            let bez_tuples = points_to_bez_tuples(&points);
+        let align_points = |points: &Vec<DVec3>, len: usize| -> Vec<DVec3> {
+            let bez_tuples = points_to_bez_tuples(points);
 
             let diff_len = (len - points.len()) / 2;
             // println!("{:?}", bez_tuples);
@@ -143,13 +159,43 @@ impl Alignable for VPointComponentVec {
             new_points
         };
 
-        if points_self.len() < points_other.len() {
-            self.0 = align_points(points_self, points_other.len()).into();
-            other.0 = points_other.into();
-        } else {
-            other.0 = align_points(points_other, points_self.len()).into();
-            self.0 = points_self.into();
-        }
+        sps_self
+            .iter_mut()
+            .zip(sps_other.iter_mut())
+            .for_each(|(sp_a, sp_b)| {
+                let len = sp_a.len().max(sp_b.len());
+                if sp_a.len() != len {
+                    *sp_a = align_points(sp_a, len)
+                }
+                if sp_b.len() != len {
+                    *sp_b = align_points(sp_b, len)
+                }
+            });
+        // println!("self: {}", sps_self.len());
+        // for (i, sp) in sps_self.iter().enumerate() {
+        //     println!("[{i}] {} {:?}", sp.len(), sp);
+        // }
+        // println!("other: {}", sps_other.len());
+        // for (i, sp) in sps_other.iter().enumerate() {
+        //     println!("[{i}] {} {:?}", sp.len(), sp);
+        // }
+
+        let sps_to_points = |sps: Vec<Vec<DVec3>>| -> Vec<DVec3> {
+            let mut points = sps.into_iter()
+                .flat_map(|sp| {
+                    let last = *sp.last().unwrap();
+                    sp.into_iter().chain(std::iter::once(last))
+                })
+                .collect::<Vec<_>>();
+            points.pop();
+            points
+        };
+
+        let points_self = sps_to_points(sps_self);
+        let points_other = sps_to_points(sps_other);
+
+        self.0 = points_self.into();
+        other.0 = points_other.into();
     }
 }
 
@@ -168,13 +214,16 @@ impl VPointComponentVec {
             match (a, b) {
                 (Some(a), Some(b)) => {
                     subpath.push(*a);
-                    subpath.push(*b);
-                    if a == b {
+                    if a != b {
+                        subpath.push(*b);
+                    } else {
+                        assert!(subpath.len() % 2 != 0);
                         subpaths.push(std::mem::take(&mut subpath));
                     }
                 }
                 (Some(a), None) => {
                     subpath.push(*a);
+                    assert!(subpath.len() % 2 != 0);
                     subpaths.push(std::mem::take(&mut subpath))
                 }
                 _ => unreachable!(),
