@@ -3,11 +3,9 @@
 pub mod geometry;
 /// Svg item
 pub mod svg;
-/// Typst (use Svg with `typst_svg` for now)
+/// Typst items
 pub mod typst;
 // pub mod line;
-/// Code item
-pub mod code;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
