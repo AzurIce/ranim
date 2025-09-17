@@ -196,9 +196,15 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     let anchor_index = idx / 2;
 
     // TODO: Antialias
-    let antialias_radius = 0.015;
+    let antialias_radius = 0.015 / 2.0;
     var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[anchor_index], fill_rgbas[anchor_index + 1], ratio), is_closed(idx));
     fill_rgba.a *= smoothstep(1.0, -1.0, (sgn_d) / antialias_radius);
+    // let fade = select(
+    //     smoothstep(1.0, -1.0, (sgn_d) / (antialias_radius / 8.0)), // 内部：完全不透明
+    //     smoothstep(1.0, -1.0, (sgn_d) / antialias_radius), // 外部：渐变透明
+    //     sgn_d > 0.0
+    // );
+    // fill_rgba.a *= fade;
 
     let stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
     var stroke_rgba: vec4<f32> = mix(stroke_rgbas[anchor_index], stroke_rgbas[anchor_index + 1], ratio);

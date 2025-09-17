@@ -5,6 +5,7 @@ use std::{
 };
 
 use chrono::{DateTime, Datelike, Local};
+use diff_match_patch_rs::{Efficient, Ops};
 use lru::LruCache;
 use sha1::{Digest, Sha1};
 use typst::{
@@ -18,7 +19,15 @@ use typst::{
 };
 use typst_kit::fonts::{FontSearcher, Fonts};
 
-use crate::utils::typst::get_typst_element;
+use crate::{
+    items::{
+        Group,
+        vitem::{VItem, svg::SvgItem},
+    },
+    render::primitives::{Extract, vitem::VItemPrimitive},
+    traits::*,
+    utils::typst::get_typst_element,
+};
 
 struct TypstLruCache {
     inner: LruCache<[u8; 20], String>,
@@ -216,6 +225,270 @@ impl World for TypstWorldWithSource<'_> {
     }
 }
 
+/// A Text item construted through typst
+///
+/// Note that the methods this item provides assumes that the typst string
+/// you provide only produces text output, otherwise undefined behaviours may happens.
+#[derive(Clone)]
+pub struct TypstText {
+    chars: String,
+    vitems: Vec<VItem>,
+}
+
+impl TypstText {
+    /// Create a TypstText with typst string.
+    ///
+    /// The typst string you provide should only produces text output,
+    /// otherwise undefined behaviours may happens.
+    pub fn new(typst_str: &str) -> Self {
+        let svg = SvgItem::new(typst_svg(typst_str));
+        let chars = typst_str
+            .replace(" ", "")
+            .replace("\n", "")
+            .replace("\r", "")
+            .replace("\t", "");
+
+        let vitems = Vec::<VItem>::from(svg);
+        assert_eq!(chars.len(), vitems.len());
+        Self { chars, vitems }
+    }
+
+    /// Inline code
+    pub fn new_inline_code(code: &str) -> Self {
+        Self::new(format!("`{code}`").as_str())
+    }
+
+    /// Multiline code
+    pub fn new_multiline_code(code: &str, language: Option<&str>) -> Self {
+        let language = language.unwrap_or("");
+        Self::new(format!("```{language}\n{code}\n```").as_str())
+    }
+}
+
+impl Alignable for TypstText {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.vitems.len() == other.vitems.len()
+            && self
+                .vitems
+                .iter()
+                .zip(&other.vitems)
+                .all(|(a, b)| a.is_aligned(b))
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        let dmp = diff_match_patch_rs::DiffMatchPatch::new();
+        let diffs = dmp
+            .diff_main::<Efficient>(&self.chars, &other.chars)
+            .unwrap();
+
+        let len = self.vitems.len().max(other.vitems.len());
+        let mut vitems_self: Vec<VItem> = Vec::with_capacity(len);
+        let mut vitems_other: Vec<VItem> = Vec::with_capacity(len);
+        let mut ia = 0;
+        let mut ib = 0;
+        let mut last_neq_idx_a = 0;
+        let mut last_neq_idx_b = 0;
+        let align_and_push_diff = |vitems_self: &mut Vec<VItem>,
+                                   vitems_other: &mut Vec<VItem>,
+                                   ia,
+                                   ib,
+                                   last_neq_idx_a,
+                                   last_neq_idx_b| {
+            if last_neq_idx_a != ia || last_neq_idx_b != ib {
+                let mut vitems_a = self.vitems[last_neq_idx_a..ia]
+                    .iter()
+                    .cloned()
+                    .collect::<Group<_>>();
+                let mut vitems_b = other.vitems[last_neq_idx_b..ib]
+                    .iter()
+                    .cloned()
+                    .collect::<Group<_>>();
+                if vitems_a.is_empty() {
+                    vitems_a.extend(vitems_b.iter().map(|x| {
+                        x.clone().with(|x| {
+                            x.shrink();
+                        })
+                    }));
+                }
+                if vitems_b.is_empty() {
+                    vitems_b.extend(vitems_a.iter().map(|x| {
+                        x.clone().with(|x| {
+                            x.shrink();
+                        })
+                    }));
+                }
+                if last_neq_idx_a != ia && last_neq_idx_b != ib {
+                    vitems_a.align_with(&mut vitems_b);
+                }
+                vitems_self.extend(vitems_a);
+                vitems_other.extend(vitems_b);
+            }
+        };
+
+        for diff in &diffs {
+            // println!("[{ia}] {last_neq_idx_a} [{ib}] {last_neq_idx_b}");
+            // println!("{diff:?}");
+            match diff.op() {
+                Ops::Equal => {
+                    align_and_push_diff(
+                        &mut vitems_self,
+                        &mut vitems_other,
+                        ia,
+                        ib,
+                        last_neq_idx_a,
+                        last_neq_idx_b,
+                    );
+                    let l = diff.size();
+                    vitems_self.extend(self.vitems[ia..ia + l].iter().cloned());
+                    vitems_other.extend(other.vitems[ib..ib + l].iter().cloned());
+                    ia += l;
+                    ib += l;
+                    last_neq_idx_a = ia;
+                    last_neq_idx_b = ib;
+                }
+                Ops::Delete => {
+                    ia += diff.size();
+                }
+                Ops::Insert => {
+                    ib += diff.size();
+                }
+            }
+        }
+        align_and_push_diff(
+            &mut vitems_self,
+            &mut vitems_other,
+            ia,
+            ib,
+            last_neq_idx_a,
+            last_neq_idx_b,
+        );
+
+        assert_eq!(vitems_self.len(), vitems_other.len());
+        vitems_self
+            .iter_mut()
+            .zip(vitems_other.iter_mut())
+            .for_each(|(a, b)| {
+                // println!("{i} {}", a.is_aligned(b));
+                // println!("{} {}", a.vpoints.len(), b.vpoints.len());
+                if !a.is_aligned(b) {
+                    a.align_with(b);
+                }
+            });
+
+        self.vitems = vitems_self;
+        other.vitems = vitems_other;
+    }
+}
+
+impl Interpolatable for TypstText {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        let vitems = self
+            .vitems
+            .iter()
+            .zip(&target.vitems)
+            .map(|(a, b)| a.lerp(b, t))
+            .collect::<Vec<_>>();
+        Self {
+            chars: self.chars.clone(),
+            vitems,
+        }
+    }
+}
+
+impl Extract for TypstText {
+    type Target = Vec<VItemPrimitive>;
+    fn extract(&self) -> Self::Target {
+        self.vitems.iter().map(Extract::extract).collect()
+    }
+}
+
+impl BoundingBox for TypstText {
+    fn get_bounding_box(&self) -> [glam::DVec3; 3] {
+        self.vitems.get_bounding_box()
+    }
+}
+
+impl Shift for TypstText {
+    fn shift(&mut self, shift: glam::DVec3) -> &mut Self {
+        self.vitems.shift(shift);
+        self
+    }
+}
+
+impl Rotate for TypstText {
+    fn rotate_by_anchor(
+        &mut self,
+        angle: f64,
+        axis: glam::DVec3,
+        anchor: crate::components::Anchor,
+    ) -> &mut Self {
+        self.vitems.rotate_by_anchor(angle, axis, anchor);
+        self
+    }
+}
+
+impl Scale for TypstText {
+    fn scale_by_anchor(
+        &mut self,
+        scale: glam::DVec3,
+        anchor: crate::components::Anchor,
+    ) -> &mut Self {
+        self.vitems.scale_by_anchor(scale, anchor);
+        self
+    }
+}
+
+impl FillColor for TypstText {
+    fn fill_color(&self) -> color::AlphaColor<color::Srgb> {
+        self.vitems[0].fill_color()
+    }
+    fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
+        self.vitems.set_fill_color(color);
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.vitems.set_fill_opacity(opacity);
+        self
+    }
+}
+
+impl StrokeColor for TypstText {
+    fn stroke_color(&self) -> color::AlphaColor<color::Srgb> {
+        self.vitems[0].fill_color()
+    }
+    fn set_stroke_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
+        self.vitems.set_stroke_color(color);
+        self
+    }
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.vitems.set_stroke_opacity(opacity);
+        self
+    }
+}
+
+impl Opacity for TypstText {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.vitems.set_fill_opacity(opacity);
+        self.vitems.set_stroke_opacity(opacity);
+        self
+    }
+}
+
+impl StrokeWidth for TypstText {
+    fn apply_stroke_func(
+        &mut self,
+        f: impl for<'a> Fn(&'a mut [crate::components::width::Width]),
+    ) -> &mut Self {
+        self.vitems.iter_mut().for_each(|vitem| {
+            vitem.apply_stroke_func(&f);
+        });
+        self
+    }
+    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+        self.vitems.set_stroke_width(width);
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
@@ -262,5 +535,23 @@ mod tests {
 
         println!("{res}");
         // println!("{}", typst_svg!(source))
+    }
+
+    #[test]
+    fn foo() {
+        let code_a = r#"#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "Hello World!" << endl;
+}
+"#;
+        let mut code_a = TypstText::new_multiline_code(code_a, Some("cpp"));
+        let code_b = r#"fn main() {
+    println!("Hello World!");
+}"#;
+        let mut code_b = TypstText::new_multiline_code(code_b, Some("rust"));
+
+        code_a.align_with(&mut code_b);
     }
 }

@@ -8,7 +8,6 @@ use log::warn;
 use crate::{
     components::{Anchor, ScaleHint, vpoint::wrap_point_func_with_anchor, width::Width},
     items::Group,
-    utils::resize_preserving_order,
 };
 
 // MARK: Interpolatable
@@ -114,25 +113,28 @@ impl Alignable for DVec3 {
 }
 
 // TODO: make this better
-impl<T: Alignable + Clone> Alignable for Group<T> {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
-    }
-    fn align_with(&mut self, other: &mut Self) {
-        let len = self.len().max(other.len());
-        if self.len() != len {
-            let inner = resize_preserving_order(&self.0, len);
-            self.0 = inner;
-        }
-        if other.len() != len {
-            let inner = resize_preserving_order(&other.0, len);
-            other.0 = inner;
-        }
-        self.iter_mut().zip(other).for_each(|(a, b)| {
-            a.align_with(b);
-        });
-    }
-}
+// impl<T: Alignable + Clone> Alignable for Group<T> {
+//     fn is_aligned(&self, other: &Self) -> bool {
+//         self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
+//     }
+//     fn align_with(&mut self, other: &mut Self) {
+//         let len = self.len().max(other.len());
+//         // println!("&&&&&&&&& align: {} {}", self.len(), other.len());
+//         if self.len() != len {
+//             let inner = resize_preserving_order(&self.0, len);
+//             self.0 = inner;
+//         }
+//         if other.len() != len {
+//             let inner = resize_preserving_order(&other.0, len);
+//             other.0 = inner;
+//         }
+//         // println!("&&&&&&&&& align: {} {}", self.len(), other.len());
+//         // println!("resize: {} {}", self.len(), other.len());
+//         self.iter_mut().zip(other).for_each(|(a, b)| {
+//             a.align_with(b);
+//         });
+//     }
+// }
 
 // MARK: Opacity
 /// A trait for items with opacity
