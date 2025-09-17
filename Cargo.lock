@@ -1087,6 +1087,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "diff-match-patch-rs"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1e836eb966678daed8789e698dbdb1016a260c3cdaca6172585e13580c4e4be"
+dependencies = [
+ "chrono",
+ "percent-encoding",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4041,6 +4051,7 @@ dependencies = [
  "console_error_panic_hook",
  "console_log",
  "derive_more",
+ "diff-match-patch-rs",
  "egui",
  "egui-wgpu",
  "egui-winit",

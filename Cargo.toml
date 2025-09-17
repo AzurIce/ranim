@@ -96,6 +96,7 @@ chrono = "0.4.41"
 reqwest = "0.12.23"
 slotmap = "1.0.7"
 inventory = "0.3.21"
+diff-match-patch-rs = "0.5.1"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 egui-winit = { version = "0.32.1", optional = true }
