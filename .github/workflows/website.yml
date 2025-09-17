@@ -36,8 +36,6 @@ jobs:
           tool: just, mdbook, zola, mdbook-katex, wasm-bindgen
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "build"
 
       - name: Build wasm examples
         run: cargo examples build

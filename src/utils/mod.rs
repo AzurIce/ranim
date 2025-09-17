@@ -13,6 +13,8 @@ pub(crate) mod wgpu;
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
+    iter::Sum,
+    ops::Div,
 };
 #[cfg(not(target_arch = "wasm32"))]
 use std::{
@@ -141,6 +143,11 @@ pub fn rotation_between_vectors(v1: Vec3, v2: Vec3) -> Mat3 {
     Mat3::from_axis_angle(axis, angle)
 }
 
+/// Get data's avg
+pub fn avg<T: Clone + Sum + Div<f64, Output = T>>(data: &[T]) -> T {
+    data.iter().cloned().sum::<T>() / data.len() as f64
+}
+
 /// Get angle between vectors
 pub fn angle_between_vectors(v1: Vec3, v2: Vec3) -> f32 {
     if v1.length() == 0.0 || v2.length() == 0.0 {
@@ -159,7 +166,13 @@ pub fn resize_preserving_order<T: Clone>(vec: &[T], new_len: usize) -> Vec<T> {
 }
 
 /// Resize the vec while preserving the order
-pub fn resize_preserving_order_with_indices<T: Clone>(
+///
+/// returns the repeated idxs
+/// ```
+///                     *     *     *     *  repeated
+/// [0, 1, 2, 3] -> [0, 0, 1, 1, 2, 2, 3 ,3]
+/// ```
+pub fn resize_preserving_order_with_repeated_indices<T: Clone>(
     vec: &[T],
     new_len: usize,
 ) -> (Vec<T>, Vec<usize>) {
@@ -177,10 +190,69 @@ pub fn resize_preserving_order_with_indices<T: Clone>(
     (res, added_idxs)
 }
 
+/// Resize the vec while preserving the order
+///
+/// returns the repeated cnt of each value
+/// ```
+///                 [2  2][2  2][2  2][2  2]
+/// [0, 1, 2, 3] -> [0, 0, 1, 1, 2, 2, 3 ,3]
+/// ```
+pub fn resize_preserving_order_with_repeated_cnt<T: Clone>(
+    vec: &[T],
+    new_len: usize,
+) -> (Vec<T>, Vec<usize>) {
+    let mut res = Vec::with_capacity(new_len);
+    let mut cnts = vec![0; vec.len()];
+
+    let mut src_indices = Vec::with_capacity(new_len);
+    for i in 0..new_len {
+        let index = i * vec.len() / new_len;
+        cnts[index] += 1;
+        res.push(vec[index].clone());
+        src_indices.push(index);
+    }
+    (res, src_indices.into_iter().map(|i| cnts[i]).collect())
+}
+
 /// Extend the vec with last element
 pub fn extend_with_last<T: Clone + Default>(vec: &mut Vec<T>, new_len: usize) {
     let v = vec![vec.last().cloned().unwrap_or_default(); new_len - vec.len()];
     vec.extend(v)
+}
+
+// f.a + b.a * (1.0 - f.a)
+fn merge_alpha(alpha: f32, n: usize) -> f32 {
+    let mut result = alpha;
+    for _ in 1..n {
+        result = result + (1.0 - result) * alpha;
+    }
+    result
+}
+
+/// Get a target alpha value that can get value of given alpha after mixed n times
+pub fn apart_alpha(alpha: f32, n: usize, eps: f32) -> f32 {
+    if alpha == 0.0 {
+        return 0.0;
+    }
+    let mut left = (0.0, 0.0);
+    let mut right = (1.0, 1.0);
+
+    while right.0 - left.0 > eps {
+        let mid_single = (left.0 + right.0) / 2.0;
+        let mid_merged = merge_alpha(mid_single, n);
+
+        if (mid_merged - alpha).abs() < f32::EPSILON {
+            return mid_single;
+        }
+
+        if mid_merged < alpha {
+            left = (mid_single, mid_merged);
+        } else {
+            right = (mid_single, mid_merged);
+        }
+    }
+
+    ((left.0 + right.0) / 2.0).clamp(0.0, 1.0)
 }
 
 // Should not be called frequently
@@ -309,4 +381,24 @@ pub fn download_ffmpeg(target_dir: impl AsRef<Path>) -> Result<PathBuf, anyhow::
     }
     info!("ffmpeg downloaded to {target_dir:?}");
     Ok(ffmpeg_path)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_resize_preserve_order_with_repeated_cnt() {
+        let values = vec![0, 1, 2, 3];
+        let (v, c) = resize_preserving_order_with_repeated_cnt(&values, 8);
+        assert_eq!(v, vec![0, 0, 1, 1, 2, 2, 3, 3]);
+        assert_eq!(c, vec![2; 8]);
+    }
+
+    #[test]
+    fn tset_apart_alpha() {
+        let a = apart_alpha(1.0, 10, 1e-3);
+        println!("{a}");
+        println!("{}", merge_alpha(1.0, 10));
+    }
 }

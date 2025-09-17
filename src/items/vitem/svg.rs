@@ -4,7 +4,7 @@ use crate::{
     items::Group,
     render::primitives::{Extract, vitem::VItemPrimitive},
     traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth},
-    utils::svg::vitems_from_tree,
+    utils::svg::vitems_from_svg,
 };
 
 use super::VItem;
@@ -16,13 +16,16 @@ use super::VItem;
 #[derive(Clone)]
 pub struct SvgItem(Vec<VItem>);
 
+impl From<SvgItem> for Vec<VItem> {
+    fn from(value: SvgItem) -> Self {
+        value.0
+    }
+}
+
 impl SvgItem {
     /// Creates a new SvgItem from a SVG string
     pub fn new(svg: impl AsRef<str>) -> Self {
-        let svg = svg.as_ref();
-        let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();
-
-        let mut vitem_group = Self(vitems_from_tree(&tree));
+        let mut vitem_group = Self(vitems_from_svg(svg.as_ref()));
         vitem_group.put_center_on(DVec3::ZERO);
         vitem_group.rotate(std::f64::consts::PI, DVec3::X);
         vitem_group

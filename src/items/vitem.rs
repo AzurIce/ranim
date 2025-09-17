@@ -3,7 +3,7 @@
 pub mod geometry;
 /// Svg item
 pub mod svg;
-/// Typst (use Svg with `typst_svg` for now)
+/// Typst items
 pub mod typst;
 // pub mod line;
 
@@ -15,9 +15,11 @@ use glam::{DVec3, Vec4, vec4};
 
 use crate::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
+    items::Group,
     prelude::{Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, StrokeWidth},
     render::primitives::{Extract, vitem::VItemPrimitive},
     traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
+    utils::resize_preserving_order_with_repeated_indices,
 };
 
 /// A vectorized item.
@@ -104,6 +106,12 @@ impl VItem {
         }
         self
     }
+    /// Shrink to center
+    pub fn shrink(&mut self) -> &mut Self {
+        let bb = self.get_bounding_box();
+        self.vpoints.0 = vec![bb[1]; self.vpoints.len()].into();
+        self
+    }
     /// Set the vpoints of the VItem
     pub fn set_points(&mut self, vpoints: Vec<DVec3>) {
         self.vpoints.0 = vpoints.into();
@@ -179,18 +187,65 @@ impl Alignable for VItem {
     fn align_with(&mut self, other: &mut Self) {
         self.vpoints.align_with(&mut other.vpoints);
         let len = self.vpoints.len().div_ceil(2);
-        if self.stroke_rgbas.len() != len {
-            self.stroke_rgbas.resize_preserving_order(len);
+        self.stroke_rgbas.resize_preserving_order(len);
+        other.stroke_rgbas.resize_preserving_order(len);
+        self.stroke_widths.resize_preserving_order(len);
+        other.stroke_widths.resize_preserving_order(len);
+        self.fill_rgbas.resize_preserving_order(len);
+        other.fill_rgbas.resize_preserving_order(len);
+    }
+}
+
+impl Alignable for Group<VItem> {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        let len = self.len().max(other.len());
+        // let apart_alpha = |vitems: &mut Vec<VItem>, cnt: Vec<usize>| {
+        //     vitems
+        //         .iter_mut()
+        //         .zip(cnt)
+        //         .filter(|(_, cnt)| *cnt >= 2)
+        //         .for_each(|(item, cnt)| {
+        //             AsMut::<Vec<Rgba>>::as_mut(&mut item.stroke_rgbas)
+        //                 .iter_mut()
+        //                 .for_each(|c| {
+        //                     if c.0.w > f32::EPSILON {
+        //                         // print!("stroke: {c:?} {cnt} -> ");
+        //                         c.0.w = apart_alpha(c.0.w, cnt, 1e-3);
+        //                         // println!("{c:?}");
+        //                     }
+        //                 });
+        //             AsMut::<Vec<Rgba>>::as_mut(&mut item.fill_rgbas)
+        //                 .iter_mut()
+        //                 .for_each(|c| {
+        //                     if c.0.w > f32::EPSILON {
+        //                         // print!("fill: {c:?} {cnt} -> ");
+        //                         c.0.w = apart_alpha(c.0.w, cnt, 1e-3);
+        //                         // println!("{c:?}");
+        //                     }
+        //                 });
+        //         });
+        // };
+        let transparent_repeated = |vitems: &mut Vec<VItem>, repeat_idxs: Vec<usize>| {
+            for idx in repeat_idxs {
+                vitems[idx].set_opacity(0.0);
+            }
+        };
+        if self.len() != len {
+            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&self.0, len);
+            transparent_repeated(&mut items, idxs);
+            self.0 = items;
         }
-        if self.stroke_widths.len() != len {
-            self.stroke_widths.resize_preserving_order(len);
+        if other.len() != len {
+            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&other.0, len);
+            transparent_repeated(&mut items, idxs);
+            other.0 = items;
         }
-        if self.fill_rgbas.len() != len {
-            self.fill_rgbas.resize_preserving_order(len);
-        }
-        // self.stroke_rgbas.align_with(&mut other.stroke_rgbas);
-        // self.stroke_widths.align_with(&mut other.stroke_widths);
-        // self.fill_rgbas.align_with(&mut other.fill_rgbas);
+        self.iter_mut().zip(other).for_each(|(a, b)| {
+            a.align_with(b);
+        });
     }
 }
 

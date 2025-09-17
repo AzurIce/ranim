@@ -49,9 +49,9 @@ itertools.workspace = true
 web-time = "1.1.0"
 sha1 = "0.10.6"
 lru = "0.16.1"
-async-channel = "2.3.1"
+async-channel = "2.5.0"
 bytemuck = { version = "1.23.2", features = ["derive"] }
-glam = { version = "0.30.3", features = ["bytemuck"] }
+glam = { version = "0.30.5", features = ["bytemuck"] }
 image = "0.25.8"
 log = "0.4.28"
 pollster = "0.4.0"
@@ -80,11 +80,11 @@ profiling = { version = "1.0.17", optional = true, features = [
   "profile-with-puffin",
 ] }
 
-egui = { version = "0.32.1", optional = true }
+egui = { version = "0.32.3", optional = true }
 winit = { version = "0.30.12", optional = true }
-egui-wgpu = { version = "0.32.1", optional = true }
+egui-wgpu = { version = "0.32.3", optional = true }
 
-serde = { version = "1.0.223", features = ["derive"], optional = true }
+serde = { version = "1.0.225", features = ["derive"], optional = true }
 typst = "0.13.1"
 typst-kit = { version = "0.13.1", default-features = false, features = [
   "fonts",
@@ -92,26 +92,26 @@ typst-kit = { version = "0.13.1", default-features = false, features = [
 ] }
 # time = "0.3.41"
 typst-svg = "0.13.1"
-chrono = "0.4.41"
-reqwest = "0.12.23"
+chrono = "0.4.42"
 slotmap = "1.0.7"
 inventory = "0.3.21"
+diff-match-patch-rs = "0.5.1"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-egui-winit = { version = "0.32.1", optional = true }
+egui-winit = { version = "0.32.3", optional = true }
 which = "8.0.0"
 flate2 = "1.1.2"
-reqwest = { version = "0.12.22", features = ["blocking"] }
+reqwest = { version = "0.12.23", features = ["blocking"] }
 # linkme = "0.3.33"
 
 # web:
 [target.'cfg(target_family = "wasm")'.dependencies]
-wasm-bindgen = "0.2.100"
-wasm-bindgen-futures = { version = "0.4.50" }
-web-sys = { version = "0.3.77" }
+wasm-bindgen = "0.2.102"
+wasm-bindgen-futures = { version = "0.4.52" }
+web-sys = { version = "0.3.79" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
-egui-winit = { version = "0.32.0", default-features = false, optional = true }
+egui-winit = { version = "0.32.3", default-features = false, optional = true }
 getrandom = { version = "0.3.3", features = ["wasm_js"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]

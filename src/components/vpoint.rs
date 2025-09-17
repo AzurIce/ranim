@@ -12,9 +12,10 @@ use crate::traits::PointsFunc;
 use crate::traits::Rotate;
 use crate::traits::Scale;
 use crate::traits::Shift;
+use crate::utils::avg;
 use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
-use crate::utils::resize_preserving_order_with_indices;
+use crate::utils::resize_preserving_order_with_repeated_indices;
 
 use super::Anchor;
 use super::ComponentVec;
@@ -41,6 +42,11 @@ impl Alignable for VPointComponentVec {
         self.len() == other.len()
     }
     fn align_with(&mut self, other: &mut Self) {
+        // println!(
+        //     "VPointComponentVec::align_with: {} {}",
+        //     self.len(),
+        //     other.len()
+        // );
         if self.is_empty() {
             self.0 = vec![DVec3::ZERO; 3].into();
         }
@@ -53,8 +59,12 @@ impl Alignable for VPointComponentVec {
             subpaths
                 .into_iter()
                 .map(|sp| {
+                    // println!("into_closed_subpaths {}", sp.len());
+                    // if sp.len() == 1 {
+                    //     return vec![sp[0]; 3];
+                    // }
                     // should have no zero-length subpath
-                    if !get_subpath_closed_flag(&sp).unwrap().1 {
+                    if !get_subpath_closed_flag(&sp).map(|f| f.1).unwrap() {
                         let sp_len = sp.len();
                         let sp_iter = sp.into_iter();
                         sp_iter
@@ -78,22 +88,20 @@ impl Alignable for VPointComponentVec {
         // for (i, sp) in sps_other.iter().enumerate() {
         //     println!("[{i}] {} {:?}", sp.len(), sp);
         // }
-        let center_of =
-            |points: &Vec<DVec3>| -> DVec3 { points.iter().sum::<DVec3>() / points.len() as f64 };
         let len = sps_self.len().max(sps_other.len());
         // println!("#####{len}#####");
         if sps_self.len() != len {
-            let (mut x, idxs) = resize_preserving_order_with_indices(&sps_self, len);
+            let (mut x, idxs) = resize_preserving_order_with_repeated_indices(&sps_self, len);
             for idx in idxs {
-                let center = center_of(&x[idx]);
+                let center = avg(&x[idx]);
                 x[idx].fill(center);
             }
             sps_self = x;
         }
         if sps_other.len() != len {
-            let (mut x, idxs) = resize_preserving_order_with_indices(&sps_other, len);
+            let (mut x, idxs) = resize_preserving_order_with_repeated_indices(&sps_other, len);
             for idx in idxs {
-                let center = center_of(&x[idx]);
+                let center = avg(&x[idx]);
                 x[idx].fill(center);
             }
             sps_other = x;
@@ -173,6 +181,7 @@ impl Alignable for VPointComponentVec {
             .iter_mut()
             .zip(sps_other.iter_mut())
             .for_each(|(sp_a, sp_b)| {
+                // println!("sp align: {} {}", sp_a.len(), sp_b.len());
                 let len = sp_a.len().max(sp_b.len());
                 if sp_a.len() != len {
                     *sp_a = align_points(sp_a, len)
@@ -220,14 +229,24 @@ impl VPointComponentVec {
         let mut subpaths = Vec::new();
 
         let mut subpath = Vec::new();
-        for mut chunk in self.iter().chunks(2).into_iter() {
-            let (a, b) = (chunk.next(), chunk.next());
-            match (a, b) {
+        let mut iter_a = self.iter().step_by(2).peekable();
+        let mut iter_b = self.iter().skip(1).step_by(2).peekable();
+
+        loop {
+            match (iter_a.next(), iter_b.next()) {
                 (Some(a), Some(b)) => {
                     subpath.push(*a);
                     if a != b {
                         subpath.push(*b);
                     } else {
+                        while let (Some(c), Some(d)) = (iter_a.peek(), iter_b.peek())
+                            && b == *c
+                            && c == d
+                        {
+                            subpath.extend([**c; 2]);
+                            iter_a.next();
+                            iter_b.next();
+                        }
                         assert!(subpath.len() % 2 != 0);
                         subpaths.push(std::mem::take(&mut subpath));
                     }
@@ -235,11 +254,16 @@ impl VPointComponentVec {
                 (Some(a), None) => {
                     subpath.push(*a);
                     assert!(subpath.len() % 2 != 0);
-                    subpaths.push(std::mem::take(&mut subpath))
+                    subpaths.push(std::mem::take(&mut subpath));
+                    break;
                 }
                 _ => unreachable!(),
             }
         }
+
+        // for sp in &subpaths {
+        //     println!("{}\n - {:?}", sp.len(), sp);
+        // }
 
         subpaths
     }
@@ -366,13 +390,43 @@ mod test {
     use glam::{DVec3, dvec3};
 
     use crate::{
-        components::{Anchor, vpoint::VPointComponentVec},
+        components::{Anchor, ComponentVec, vpoint::VPointComponentVec},
         items::vitem::{
             VItem,
             geometry::{Circle, Square},
         },
         traits::{Alignable, Rotate},
     };
+
+    #[test]
+    fn test_get_subpath() {
+        let points = VPointComponentVec(ComponentVec(vec![DVec3::ZERO; 9]));
+        let sps = points.get_subpaths();
+        println!("{:?}", sps);
+        let points = VPointComponentVec(ComponentVec(vec![
+            DVec3::X,
+            DVec3::Y,
+            DVec3::Z,
+            DVec3::Z,
+            DVec3::NEG_X,
+            DVec3::NEG_Y,
+            DVec3::ZERO,
+        ]));
+        let sps = points.get_subpaths();
+        println!("{:?}", sps);
+        let points = VPointComponentVec(ComponentVec(vec![DVec3::X, DVec3::Y, DVec3::Z]));
+        let sps = points.get_subpaths();
+        println!("{:?}", sps);
+        let points = VPointComponentVec(ComponentVec(vec![
+            DVec3::X,
+            DVec3::Y,
+            DVec3::Z,
+            DVec3::Z,
+            DVec3::Z,
+        ]));
+        let sps = points.get_subpaths();
+        println!("{:?}", sps);
+    }
 
     #[test]
     fn test_align() {
