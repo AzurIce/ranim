@@ -110,7 +110,7 @@ fn main() {
         preview_scene(writing_scene);
         preview_scene(transform_scene);
     }
-    #[cfg(not(feature = "app"))]
+    #[cfg(feature = "render")]
     {
         render_scene(fading_scene);
         render_scene(creation_scene);
