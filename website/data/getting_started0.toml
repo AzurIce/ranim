@@ -2,8 +2,7 @@ name = "getting_started0"
 code = """
 ```rust
 use ranim::{
-    animation::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square,
-    prelude::*,
+    anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,
 };
 
 // ANCHOR: construct
@@ -31,7 +30,7 @@ fn getting_started0(r: &mut RanimScene) {
 }
 // ANCHOR_END: construct
 ```"""
-hash = "868e0ee5ecb4ae6612fcd416c2690334786ee8ec"
+hash = "1a54eabf117e9d919fe6233b70ccc92efcc9d8f9"
 preview_imgs = []
 output_files = ["/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
 wasm = true

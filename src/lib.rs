@@ -187,7 +187,7 @@ impl Output {
 pub mod prelude {
     #[cfg(feature = "app")]
     pub use crate::app::{preview_scene, run_app, run_scene_app};
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "render"))]
     pub use crate::render::app::{render_scene, render_scene_output};
 
     pub use ranim_core::prelude::*;

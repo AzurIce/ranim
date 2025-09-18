@@ -9,6 +9,7 @@ use crate::{
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::{info, trace};
 use ranim_core::color::{self, LinearSrgb};
+use std::time::Duration;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -147,10 +148,6 @@ impl RanimRenderApp {
     }
 
     fn render_timeline(&mut self, timeline: &SealedRanimScene) {
-        use std::time::Duration;
-
-        use indicatif::ProgressStyle;
-
         let start = Instant::now();
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {

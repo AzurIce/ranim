@@ -2,9 +2,8 @@ name = "hanoi"
 code = """
 ```rust
 use ranim::{
-    animation::transform::TransformAnim,
+    anims::transform::TransformAnim,
     color::{HueDirection, palettes::manim},
-    components::Anchor,
     glam::dvec3,
     items::vitem::geometry::Rectangle,
     prelude::*,
@@ -37,7 +36,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
 
     let _rods = [-1, 0, 1]
         .into_iter()
-        .map(|i| {
+        .map(|i: i32| {
             Rectangle::new(rod_width, rod_height).with(|rect| {
                 rect.set_color(manim::GREY_C).put_anchor_on(
                     Anchor::edge(0, -1, 0),
@@ -124,7 +123,7 @@ fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
 }
 ```"""
-hash = "129b0f37efaebdbe6392341502b0b51f9c7a574f"
+hash = "99fb3b0abb78aac6a5a8be9c2c4051790b1f4137"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/hanoi_5_1920x1080_60.mp4", "/examples/hanoi/hanoi_1920x1080_60.mp4"]
 wasm = true

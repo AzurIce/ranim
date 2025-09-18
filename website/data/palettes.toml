@@ -3,7 +3,6 @@ code = """
 ```rust
 use ranim::{
     color::palettes::manim::*,
-    components::Anchor,
     glam::{dvec2, dvec3},
     items::{Group, vitem::geometry::Rectangle},
     prelude::*,
@@ -58,7 +57,7 @@ fn palettes(r: &mut RanimScene) {
     r.timelines_mut().forward(0.01);
 }
 ```"""
-hash = "5e0eede9b8688bc1d55818bb83a2c56faf2f494d"
+hash = "b3fe17d24ea537e175bb7b1c8024121f274cab30"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/palettes_1920x1080_60.mp4"]
 wasm = false

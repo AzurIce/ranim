@@ -3,10 +3,11 @@ code = """
 ```rust
 use itertools::Itertools;
 use ranim::{
-    animation::{fading::FadingAnim, lagged::LaggedAnim},
+    anims::{fading::FadingAnim, lagged::LaggedAnim},
+    color,
     color::HueDirection,
     glam::{DMat2, dvec2},
-    items::{Group, vitem::geometry::ArcBetweenPoints},
+    items::vitem::{Group, geometry::ArcBetweenPoints},
     prelude::*,
     timeline::TimeMark,
 };
@@ -17,8 +18,8 @@ fn arc_between_points(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     let center = dvec2(0.0, 0.0);
 
-    let start_color = color!("#FF8080FF");
-    let end_color = color!("#58C4DDFF");
+    let start_color = color::color("#FF8080FF");
+    let end_color = color::color("#58C4DDFF");
     let ntan = 16;
     let nrad = 5;
 
@@ -57,7 +58,7 @@ fn arc_between_points(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "f116a79d0af1979367bcdcf1db12e7b19d88e4ca"
+hash = "99b5dd2b19350a3405feacc58da9c9040ad38773"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
 wasm = true

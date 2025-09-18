@@ -3,13 +3,9 @@ code = """
 ```rust
 use glam::DVec3;
 use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
+    anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     color::palettes::manim,
-    components::ScaleHint,
-    items::{
-        Group,
-        vitem::{VItem, svg::SvgItem, typst::typst_svg},
-    },
+    items::vitem::{Group, VItem, svg::SvgItem, typst::typst_svg},
     prelude::*,
     timeline::TimeMark,
 };
@@ -58,7 +54,7 @@ fn basic(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "403f5d60454c83de778393bfbdcb76c7f1c4b9d0"
+hash = "af0d256d09ec670d83de78aabb6556268e1224db"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/basic_1920x1080_60.mp4"]
 wasm = true

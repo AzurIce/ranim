@@ -4,7 +4,7 @@ code = """
 use std::f64::consts::PI;
 
 use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
     glam::DVec3,
     items::vitem::{
@@ -78,7 +78,7 @@ fn hello_ranim_chained(r: &mut RanimScene) {
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "95b59b1d59b253b6bc62a6fc19e04430eead3921"
+hash = "f2b0341847c14308250e30c92ad0ac614a6c3dd4"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/hello_ranim_1920x1080_60.mp4"]
 wasm = true
