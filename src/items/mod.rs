@@ -1,16 +1,9 @@
-use std::{fmt::Debug, ops::Deref, vec};
+use std::{fmt::Debug, ops::Deref};
 
-use derive_more::{Deref, DerefMut};
-use ranim_core::Extract;
-// use variadics_please::all_tuples;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
-use crate::render::primitives::Renderable;
+pub use ranim_core::Group;
 pub use ranim_items::*;
 
 /// An item id.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ItemId<T> {
     id: usize,
     _phantom: std::marker::PhantomData<T>,
@@ -44,5 +37,3 @@ impl<T> ItemId<T> {
         }
     }
 }
-
-pub use ranim_core::Group;

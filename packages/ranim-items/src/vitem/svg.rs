@@ -9,9 +9,9 @@ use ranim_core::{
 };
 use ranim_core::{color, glam};
 
-use ranim_core::{
-    Group,
-    traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth},
+use crate::vitem::Group;
+use ranim_core::traits::{
+    BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth,
 };
 
 use super::VItem;

@@ -2,14 +2,27 @@
 pub(crate) mod pipelines;
 /// The basic renderable structs
 pub mod primitives;
+/// Rendering related utils
+pub mod utils;
+
+/// The render app
+#[cfg(not(target_arch = "wasm32"))]
+pub mod app;
+#[cfg(not(target_arch = "wasm32"))]
+mod file_writer;
 
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Rgba};
+use log::warn;
 use pipelines::{Map3dTo2dPipeline, VItemPipeline};
 use primitives::RenderCommand;
 
-use crate::utils::{PipelinesStorage, wgpu::WgpuBuffer, wgpu::WgpuContext};
-use ranim_core::primitives::camera_frame::CameraFrame;
+use crate::{render::primitives::Renderable, timeline::SealedRanimScene};
+use ranim_core::{
+    animation::EvalResult,
+    primitives::{Primitives, camera_frame::CameraFrame},
+};
+use utils::{PipelinesStorage, WgpuBuffer, WgpuContext};
 
 pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const ALIGNMENT: usize = 256;
@@ -62,6 +75,98 @@ mod profiling_utils {
             }
             None => println!("No profiling results available yet!"),
         }
+    }
+}
+
+// MARK: TimelineEvalResult
+
+use std::sync::Arc;
+
+trait RenderableResult {
+    fn convert(self) -> EvalResult<dyn Renderable>;
+}
+
+impl<T: Renderable + 'static> RenderableResult for EvalResult<T> {
+    fn convert(self) -> EvalResult<dyn Renderable> {
+        match self {
+            Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Renderable>),
+            Self::Static(rc) => EvalResult::Static(rc as Arc<dyn Renderable>),
+        }
+    }
+}
+
+/// The evaluation result
+///
+/// This is produced from [`SealedRanimScene::eval_alpha`] or [`SealedRanimScene::eval_sec`]
+#[allow(clippy::type_complexity)]
+pub struct TimelineEvalResult {
+    /// (`EvalResult<CameraFrame>`, id hash)
+    pub camera_frame: (EvalResult<CameraFrame>, u64),
+    /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, id hash)
+    pub visual_items: Vec<(usize, EvalResult<dyn Renderable>, u64)>,
+}
+
+impl SealedRanimScene {
+    // MARK: eval_sec
+    /// Evaluate the state of timelines at `target_sec`
+    pub fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
+        let mut items = Vec::with_capacity(self.timelines.len());
+
+        let mut camera_frame = None::<(EvalResult<CameraFrame>, u64)>;
+
+        for (id, timeline) in self.timelines.iter().enumerate() {
+            // println!("### eval_sec timeline id {id} ###");
+            let Some((res, id_hash)) = timeline.eval_primitives_at_sec(target_sec) else {
+                continue;
+            };
+            // ! Note that the `TypeId` between different compile units maybe different.
+            // if let Some(x) = res.downcast_ref::<CameraFrame>() {
+            //     println!("Camera frame found at sec {target_sec} with anim idx {id}");
+            //     camera_frame = Some((x.clone(), anim_idx));
+            // } else if let Some(x) = res.downcast_ref::<VItemPrimitive>() {
+            //     println!("Visual item found at sec {target_sec} with anim idx {id}");
+            //     items.push((id, x.clone(), anim_idx));
+            // }
+            match res.as_ref() {
+                Primitives::CameraFrame(_) => {
+                    camera_frame = Some((
+                        res.map(|x| {
+                            let Primitives::CameraFrame(res) = x else {
+                                unreachable!()
+                            };
+                            res.into_iter().next().unwrap()
+                        }),
+                        id_hash,
+                    ));
+                }
+                Primitives::VItemPrimitive(_) => {
+                    items.push((
+                        id,
+                        res.map(|x| {
+                            let Primitives::VItemPrimitive(res) = x else {
+                                unreachable!()
+                            };
+                            res
+                        })
+                        .convert(),
+                        id_hash,
+                    ));
+                }
+            }
+        }
+
+        if camera_frame.is_none() {
+            warn!("No camera frame found at sec {target_sec}");
+        }
+
+        TimelineEvalResult {
+            camera_frame: camera_frame.unwrap(),
+            visual_items: items,
+        }
+    }
+    /// Evaluate the state of timelines at `alpha`
+    pub fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
+        self.eval_sec(alpha * self.total_secs)
     }
 }
 
@@ -464,7 +569,6 @@ impl Renderer {
 }
 
 // MARK: RenderTextures
-
 /// Texture resources used for rendering
 #[allow(unused)]
 pub struct RenderTextures {

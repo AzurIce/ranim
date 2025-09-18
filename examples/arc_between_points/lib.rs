@@ -1,9 +1,10 @@
 use itertools::Itertools;
 use ranim::{
     anims::{fading::FadingAnim, lagged::LaggedAnim},
+    color,
     color::HueDirection,
     glam::{DMat2, dvec2},
-    items::{Group, vitem::geometry::ArcBetweenPoints},
+    items::vitem::{Group, geometry::ArcBetweenPoints},
     prelude::*,
     timeline::TimeMark,
 };
@@ -14,8 +15,8 @@ fn arc_between_points(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     let center = dvec2(0.0, 0.0);
 
-    let start_color = color!("#FF8080FF");
-    let end_color = color!("#58C4DDFF");
+    let start_color = color::color("#FF8080FF");
+    let end_color = color::color("#58C4DDFF");
     let ntan = 16;
     let nrad = 5;
 

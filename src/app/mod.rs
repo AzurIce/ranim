@@ -4,9 +4,9 @@ mod timeline;
 use std::sync::Arc;
 
 use async_channel::{Receiver, Sender, unbounded};
-use color::LinearSrgb;
 use egui_wgpu::ScreenDescriptor;
 use log::{info, warn};
+use ranim_core::color::{self, LinearSrgb};
 use timeline::TimelineState;
 use web_time::Instant;
 use wgpu::SurfaceError;
@@ -22,12 +22,12 @@ use crate::{
     Scene, SceneConstructor,
     app::egui_tools::EguiRenderer,
     render::{
-        Renderer,
+        Renderer, TimelineEvalResult,
         pipelines::app::{AppPipeline, Viewport},
         primitives::RenderInstances,
+        utils::WgpuContext,
     },
-    timeline::{SealedRanimScene, TimelineEvalResult},
-    utils::wgpu::WgpuContext,
+    timeline::SealedRanimScene,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -115,8 +115,8 @@ impl AppState {
 
     /// Set clear color str
     pub fn set_clear_color_str(&mut self, color: &str) {
-        let bg = crate::try_color!(color)
-            .unwrap_or(crate::color!("#333333ff"))
+        let bg = color::try_color(color)
+            .unwrap_or(color::color("#333333ff"))
             .convert::<LinearSrgb>();
         let [r, g, b, a] = bg.components.map(|x| x as f64);
         let clear_color = wgpu::Color { r, g, b, a };
@@ -155,20 +155,14 @@ impl AppState {
 
             self.timeline.eval_sec(self.timeline_state.current_sec)
         };
-        println!("{} visual_items", visual_items.len());
+        // println!("{} visual_items", visual_items.len());
 
         let extracted = {
             #[cfg(feature = "profiling")]
             profiling::scope!("extract");
             visual_items
                 .iter()
-                .map(|(id, res, _)| {
-                    // let renderable = match res {
-                    //     EvalResult::Dynamic(res) => res.extract_renderable(),
-                    //     EvalResult::Static(res) => res.extract_renderable(),
-                    // };
-                    (*id, res)
-                })
+                .map(|(id, res, _)| (*id, res.as_ref()))
                 .collect::<Vec<_>>()
         };
 
@@ -185,12 +179,6 @@ impl AppState {
             .iter()
             .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
             .collect::<Vec<_>>();
-        // let camera_frame = match &camera_frame.0 {
-        //     EvalResult::Dynamic(res) => res,
-        //     EvalResult::Static(res) => res,
-        // };
-        // println!("{:?}", camera_frame);
-        // println!("{}", render_primitives.len());
         app_renderer
             .ranim_renderer
             .update_uniforms(ctx, &camera_frame.0);

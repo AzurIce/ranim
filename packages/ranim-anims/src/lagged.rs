@@ -1,28 +1,28 @@
-use ranim_core::{
-    Group,
-    animation::{AnimationSpan, EvalDynamic, Evaluator},
-    traits::Opacity,
-};
+use ranim_core::animation::{AnimationSpan, EvalDynamic, Evaluator};
 
 // MARK: LaggedAnim
 /// The methods to create animations for `Group<T>`
-pub trait LaggedAnim<T> {
+pub trait LaggedAnim<T, I> {
     /// Create a [`Lagged`] anim.
     fn lagged(
         self,
         lag_ratio: f64,
         anim_func: impl FnMut(T) -> AnimationSpan<T>,
-    ) -> AnimationSpan<Self>
+    ) -> AnimationSpan<I>
     where
-        Self: Sized;
+        Self: Sized,
+        I: IntoIterator<Item = T> + FromIterator<T>;
 }
 
-impl<T: Clone + 'static> LaggedAnim<T> for Group<T> {
+impl<T: Clone + 'static, I> LaggedAnim<T, I> for I
+where
+    I: IntoIterator<Item = T> + FromIterator<T> + 'static,
+{
     fn lagged(
         self,
         lag_ratio: f64,
         anim_func: impl FnMut(T) -> AnimationSpan<T>,
-    ) -> AnimationSpan<Self> {
+    ) -> AnimationSpan<I> {
         AnimationSpan::from_evaluator(Evaluator::new_dynamic(Lagged::new(
             self, lag_ratio, anim_func,
         )))
@@ -61,8 +61,8 @@ impl<T> Lagged<T> {
     }
 }
 
-impl<T: Clone> EvalDynamic<Group<T>> for Lagged<T> {
-    fn eval_alpha(&self, alpha: f64) -> Group<T> {
+impl<T: Clone, I: FromIterator<T>> EvalDynamic<I> for Lagged<T> {
+    fn eval_alpha(&self, alpha: f64) -> I {
         // -|--
         //  -|--
         //   -|--

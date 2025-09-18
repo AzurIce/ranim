@@ -1,7 +1,10 @@
-use ranim_core::{
-    animation::{AnimationSpan, EvalDynamic, Evaluator}, primitives::vitem::DEFAULT_STROKE_WIDTH, traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth}, utils::rate_functions::smooth
-};
 use log::warn;
+use ranim_core::{
+    animation::{AnimationSpan, EvalDynamic, Evaluator},
+    primitives::vitem::DEFAULT_STROKE_WIDTH,
+    traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth},
+    utils::rate_functions::smooth,
+};
 
 // MARK: Creation
 

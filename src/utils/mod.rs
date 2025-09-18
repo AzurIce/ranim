@@ -1,91 +1,17 @@
-/// Bezier related stuffs
-pub mod bezier;
-/// Math stuffs
-pub mod math;
-/// The rate functions
-pub mod rate_functions;
 /// Typst related stuffs
 pub mod typst;
+pub use ranim_core::utils::*;
 pub(crate) mod wgpu;
 
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-    iter::Sum,
-    ops::Div,
-};
 #[cfg(not(target_arch = "wasm32"))]
 use std::{
     env::current_exe,
     io::{BufReader, Read},
     path::{Path, PathBuf},
 };
+use std::{iter::Sum, ops::Div};
 
 use glam::{Mat3, Vec2, Vec3, vec2, vec3};
-
-use crate::{render::RenderResource, utils::wgpu::WgpuContext};
-
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// pub struct Id(u128);
-
-// impl Default for Id {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }
-
-// impl Id {
-//     pub fn new() -> Self {
-//         Self(uuid::Uuid::new_v4().as_u128())
-//     }
-// }
-
-/// A storage for pipelines
-#[derive(Default)]
-pub struct PipelinesStorage {
-    inner: HashMap<TypeId, Box<dyn Any>>,
-}
-
-impl PipelinesStorage {
-    pub(crate) fn get_or_init<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &P {
-        let id = std::any::TypeId::of::<P>();
-        self.inner
-            .entry(id)
-            .or_insert_with(|| {
-                let pipeline = P::new(ctx);
-                Box::new(pipeline)
-            })
-            .downcast_ref::<P>()
-            .unwrap()
-    }
-    // pub(crate) fn get_or_init_mut<P: RenderResource + 'static>(
-    //     &mut self,
-    //     ctx: &WgpuContext,
-    // ) -> &mut P {
-    //     let id = std::any::TypeId::of::<P>();
-    //     self.inner
-    //         .entry(id)
-    //         .or_insert_with(|| {
-    //             let pipeline = P::new(ctx);
-    //             Box::new(pipeline)
-    //         })
-    //         .downcast_mut::<P>()
-    //         .unwrap()
-    // }
-}
-
-// #[derive(Debug, Clone, Copy)]
-// pub enum SubpathWidth {
-//     Inner(f32),
-//     Outer(f32),
-//     Middle(f32),
-// }
-
-// impl Default for SubpathWidth {
-//     fn default() -> Self {
-//         Self::Middle(1.0)
-//     }
-// }
 
 /// Projects a 3D point onto a plane defined by a unit normal vector.
 pub fn project(p: Vec3, unit_normal: Vec3) -> Vec3 {
@@ -253,76 +179,7 @@ pub fn apart_alpha(alpha: f32, n: usize, eps: f32) -> f32 {
     ((left.0 + right.0) / 2.0).clamp(0.0, 1.0)
 }
 
-// Should not be called frequently
-/// Get texture data from a wgpu texture
-#[allow(unused)]
-pub(crate) fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8> {
-    const ALIGNMENT: usize = 256;
-    use ::wgpu;
-    let bytes_per_row =
-        ((texture.size().width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
-    let mut texture_data = vec![0u8; bytes_per_row * texture.size().height as usize];
-
-    let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Output Staging Buffer"),
-        size: (bytes_per_row * texture.size().height as usize) as u64,
-        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-
-    let mut encoder = ctx
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Get Texture Data"),
-        });
-    encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo {
-            aspect: wgpu::TextureAspect::All,
-            texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-        },
-        wgpu::TexelCopyBufferInfo {
-            buffer: &output_staging_buffer,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(bytes_per_row as u32),
-                rows_per_image: Some(texture.size().height),
-            },
-        },
-        texture.size(),
-    );
-    ctx.queue.submit(Some(encoder.finish()));
-    pollster::block_on(async {
-        let buffer_slice = output_staging_buffer.slice(..);
-
-        // NOTE: We have to create the mapping THEN device.poll() before await
-        // the future. Otherwise the application will freeze.
-        let (tx, rx) = async_channel::bounded(1);
-        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            pollster::block_on(tx.send(result)).unwrap()
-        });
-        ctx.device.poll(wgpu::PollType::Wait).unwrap();
-        rx.recv().await.unwrap().unwrap();
-
-        {
-            let view = buffer_slice.get_mapped_range();
-            // texture_data.copy_from_slice(&view);
-            for y in 0..texture.size().height as usize {
-                let src_row_start = y * bytes_per_row;
-                let dst_row_start = y * texture.size().width as usize * 4;
-
-                texture_data[dst_row_start..dst_row_start + texture.size().width as usize * 4]
-                    .copy_from_slice(
-                        &view[src_row_start..src_row_start + texture.size().width as usize * 4],
-                    );
-            }
-        }
-    });
-    output_staging_buffer.unmap();
-    texture_data
-}
-
+#[cfg(not(target_arch = "wasm32"))]
 const FFMPEG_RELEASE_URL: &str = "https://github.com/eugeneware/ffmpeg-static/releases/latest";
 
 #[allow(unused)]

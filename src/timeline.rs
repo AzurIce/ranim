@@ -1,14 +1,11 @@
 use itertools::Itertools;
-use log::{trace, warn};
+use log::trace;
 use ranim_core::Extract;
-use ranim_core::primitives::Primitives;
 use ranim_core::timeline::{
     AnimationInfo, ItemDynTimelines, ItemTimeline, TimelineFunc, TimelinesFunc,
 };
 
 use crate::items::ItemId;
-use crate::render::primitives::Renderable;
-use ranim_core::primitives::camera_frame::CameraFrame;
 use std::{any::TypeId, fmt::Debug};
 
 /// TimeMark
@@ -18,25 +15,14 @@ pub enum TimeMark {
     Capture(String),
 }
 
-/// The evaluation result
-///
-/// This is produced from [`SealedRanimScene::eval_alpha`] or [`SealedRanimScene::eval_sec`]
-#[allow(clippy::type_complexity)]
-pub struct TimelineEvalResult {
-    /// (`EvalResult<CameraFrame>`, `animation idx`)
-    pub camera_frame: (CameraFrame, usize),
-    /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, `animation idx`)
-    pub visual_items: Vec<(usize, Box<dyn Renderable>, usize)>,
-}
-
 // MARK: RanimScene
 /// The main struct that offers the ranim's API, and encodes animations
 /// The rabjects insert to it will hold a reference to it, so it has interior mutability
 #[derive(Default)]
 pub struct RanimScene {
     // Timeline<CameraFrame> or Timeline<Item>
-    timelines: Vec<ItemDynTimelines>,
-    time_marks: Vec<(f64, TimeMark)>,
+    pub(crate) timelines: Vec<ItemDynTimelines>,
+    pub(crate) time_marks: Vec<(f64, TimeMark)>,
 }
 
 impl RanimScene {
@@ -153,9 +139,9 @@ impl Debug for RanimScene {
 /// the timelines and time marks cannot be modified after sealed. And
 /// once the [`RanimScene`] is sealed, it can be used for evaluating.
 pub struct SealedRanimScene {
-    total_secs: f64,
-    timelines: Vec<ItemDynTimelines>,
-    time_marks: Vec<(f64, TimeMark)>,
+    pub(crate) total_secs: f64,
+    pub(crate) timelines: Vec<ItemDynTimelines>,
+    pub(crate) time_marks: Vec<(f64, TimeMark)>,
 }
 
 impl SealedRanimScene {
@@ -166,59 +152,6 @@ impl SealedRanimScene {
     /// Get time marks
     pub fn time_marks(&self) -> &[(f64, TimeMark)] {
         &self.time_marks
-    }
-    /// Evaluate the state of timelines at `target_sec`
-    pub fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
-        let mut items = Vec::with_capacity(self.timelines.len());
-
-        let mut camera_frame = None::<(CameraFrame, usize)>;
-
-        for (id, timeline) in self.timelines.iter().enumerate() {
-            // println!("### eval_sec timeline id {id} ###");
-            let Some((res, anim_idx)) = timeline.eval_sec_extracted_any(target_sec) else {
-                continue;
-            };
-            // ! Note that the `TypeId` between different compile units maybe different.
-            // if let Some(x) = res.downcast_ref::<CameraFrame>() {
-            //     println!("Camera frame found at sec {target_sec} with anim idx {id}");
-            //     camera_frame = Some((x.clone(), anim_idx));
-            // } else if let Some(x) = res.downcast_ref::<VItemPrimitive>() {
-            //     println!("Visual item found at sec {target_sec} with anim idx {id}");
-            //     items.push((id, x.clone(), anim_idx));
-            // }
-            match res.into_owned() {
-                Primitives::CameraFrame(res) => {
-                    // println!("CameraFrame found at sec timeline id {id}");
-                    camera_frame = Some((res[0].clone(), anim_idx));
-                }
-                Primitives::VItemPrimitive(res) => {
-                    // println!("VItemPrimitive found at sec timeline id {id}");
-                    items.push((id, Box::new(res) as Box<dyn Renderable>, anim_idx));
-                }
-            }
-
-            // match res {
-            //     DynTimelineEvalResult::CameraFrame((res, idx)) => {
-            //         camera_frame = Some((res, timeline_idx, idx))
-            //     }
-            //     DynTimelineEvalResult::VisualItem((res, idx)) => {
-            //         items.push((timeline.id, res, timeline_idx, idx));
-            //     }
-            // }
-        }
-
-        if camera_frame.is_none() {
-            warn!("No camera frame found at sec {target_sec}");
-        }
-
-        TimelineEvalResult {
-            camera_frame: camera_frame.unwrap(),
-            visual_items: items,
-        }
-    }
-    /// Evaluate the state of timelines at `alpha`
-    pub fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
-        self.eval_sec(alpha * self.total_secs)
     }
 
     /// Get timeline infos.

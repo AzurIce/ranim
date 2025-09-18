@@ -1,15 +1,9 @@
-use crate::{
-    render::{
-        RenderTextures,
-        pipelines::{
-            Map3dTo2dPipeline, VItemPipeline, map_3d_to_2d::ComputeBindGroup,
-            vitem::RenderBindGroup,
-        },
+use crate::render::{
+    RenderTextures,
+    pipelines::{
+        Map3dTo2dPipeline, VItemPipeline, map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup,
     },
-    utils::{
-        PipelinesStorage,
-        wgpu::{WgpuBuffer, WgpuContext, WgpuVecBuffer},
-    },
+    utils::{PipelinesStorage, WgpuBuffer, WgpuContext, WgpuVecBuffer},
 };
 use glam::Vec4;
 use ranim_core::{
@@ -276,10 +270,10 @@ mod test {
         render::{
             CameraUniforms, CameraUniformsBindGroup, RenderTextures,
             primitives::{RenderCommand, RenderResource},
+            utils::{PipelinesStorage, get_texture_data, WgpuBuffer},
         },
-        utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
     };
-    use ranim_core::{primitives::camera_frame::CameraFrame, Extract};
+    use ranim_core::{Extract, primitives::camera_frame::CameraFrame};
 
     use super::*;
 

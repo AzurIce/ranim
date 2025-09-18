@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info};
-use ranim::{Scene, render_scene};
+use ranim::{Scene, prelude::render_scene};
 
 use crate::{
     RanimUserLibraryBuilder, Target,

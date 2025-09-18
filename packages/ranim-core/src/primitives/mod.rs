@@ -1,4 +1,3 @@
-
 use crate::{
     Extract,
     primitives::{camera_frame::CameraFrame, vitem::VItemPrimitive},

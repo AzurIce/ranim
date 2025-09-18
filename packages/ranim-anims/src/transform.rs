@@ -1,5 +1,5 @@
 use ranim_core::{
-animation::{AnimationSpan, EvalDynamic, Evaluator},
+    animation::{AnimationSpan, EvalDynamic, Evaluator},
     traits::{Alignable, Interpolatable},
     utils::rate_functions::smooth,
 };

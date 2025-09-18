@@ -1,8 +1,11 @@
 use std::f64::consts::PI;
 
-use ranim_core::{Extract, color, glam, traits::{Anchor, Interpolatable}};
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
+use ranim_core::{
+    Extract, color, glam,
+    traits::{Anchor, Interpolatable},
+};
 
 use ranim_core::{
     primitives::vitem::{DEFAULT_STROKE_WIDTH, VItemPrimitive},

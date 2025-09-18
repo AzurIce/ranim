@@ -4,6 +4,7 @@ use crate::{
     Extract,
     animation::{AnimationSpan, EvalResult, Evaluator},
     primitives::Primitives,
+    utils::calculate_hash,
 };
 
 // MARK: TimelineFunc
@@ -43,7 +44,7 @@ pub trait TimelineFunc: Any {
     fn type_name(&self) -> &str;
 
     // fn eval_sec_any(&self, target_sec: f64) -> Option<(EvalResult<dyn Any>, usize)>;
-    fn eval_sec_extracted_any(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, usize)>;
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)>;
 }
 
 // MARK: TimelinesFunc
@@ -125,8 +126,8 @@ impl TimelineFunc for Box<dyn TimelineFunc> {
     // fn eval_sec_any(&self, target_sec: f64) -> Option<(EvalResult<dyn Any>, usize)> {
     //     self.as_ref().eval_sec_any(target_sec)
     // }
-    fn eval_sec_extracted_any(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, usize)> {
-        self.as_ref().eval_sec_extracted_any(target_sec)
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)> {
+        self.as_ref().eval_primitives_at_sec(target_sec)
     }
 }
 
@@ -134,6 +135,7 @@ impl TimelineFunc for Box<dyn TimelineFunc> {
 // ANCHOR: ItemDynTimelines
 /// A item timeline which contains multiple [`DynTimeline`], so
 /// that it can contains multiple [`ItemTimeline<T>`] in different type of `T`.
+#[derive(Default)]
 pub struct ItemDynTimelines {
     inner: Vec<Box<dyn TimelineFunc>>,
 }
@@ -169,47 +171,27 @@ impl TimelineFunc for ItemDynTimelines {
     fn type_name(&self) -> &str {
         self.get_dyn().type_name()
     }
-    // fn eval_sec_any(&self, target_sec: f64) -> Option<(EvalResult<dyn Any>, usize)> {
-    //     self.eval_sec_any(target_sec)
-    // }
-    fn eval_sec_extracted_any(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, usize)> {
-        self.eval_sec_extracted_any(target_sec)
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)> {
+        self.eval_primitives_at_sec(target_sec)
     }
 }
 
 impl ItemDynTimelines {
     /// Create a new [`ItemDynTimelines`]
     pub fn new() -> Self {
-        Self { inner: vec![] }
+        Self::default()
     }
     /// Push a new [`ItemTimeline<T>`] to the end of the timelines
     pub fn push<T: Extract + Clone + 'static>(&mut self, timeline: ItemTimeline<T>) {
         self.inner.push(Box::new(timeline));
     }
-    // /// Evaluate the timeline at `target_sec`
-    // pub fn eval_sec_any(&self, target_sec: f64) -> Option<(EvalResult<dyn Any>, usize)> {
-    //     // println!("len: {}", self.timelines.len());
-
-    //     let (timeline_idx, timeline) = self.inner.iter().enumerate().find(|(idx, timeline)| {
-    //         // TODO: make this unwrap better
-    //         let range = timeline.range_sec().unwrap();
-    //         range.contains(&target_sec) || *idx == self.inner.len() - 1 && range.end == target_sec
-    //     })?;
-
-    //     timeline
-    //         .eval_sec_any(target_sec)
-    //         .map(|(res, idx)| (res, timeline_idx))
-    // }
-    /// Evaluate the timeline at `alpha`
-    pub fn eval_alpha_extracted_any(&self, alpha: f64) -> Option<(EvalResult<Primitives>, usize)> {
+    /// Evaluate the timeline and extract to primitives at `alpha`
+    pub fn eval_primitives_at_alpha(&self, alpha: f64) -> Option<(EvalResult<Primitives>, u64)> {
         let target_sec = self.inner.max_total_secs() * alpha;
-        self.eval_sec_extracted_any(target_sec)
+        self.eval_primitives_at_sec(target_sec)
     }
     /// Evaluate the timeline at `target_sec`
-    pub fn eval_sec_extracted_any(
-        &self,
-        target_sec: f64,
-    ) -> Option<(EvalResult<Primitives>, usize)> {
+    pub fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)> {
         // println!("len: {}", self.timelines.len());
         // println!("ItemDynTimelines::eval_sec_extracted_any: {}", target_sec);
 
@@ -224,30 +206,8 @@ impl ItemDynTimelines {
         })?;
 
         timeline
-            .eval_sec_extracted_any(target_sec)
-            .map(|(res, idx)| {
-                (res, idx)
-            })
-        // match timeline {
-        //     DynTimeline::CameraFrame(inner) => {
-        //         // println!("{:?}", inner.type_id());
-        //         // println!("{:?}", (inner.as_ref() as &dyn Any).type_id());
-        //         // println!("{:?}", std::any::TypeId::of::<&ItemTimeline<CameraFrame>>());
-        //         // println!("{:?}", std::any::TypeId::of::<ItemTimeline<CameraFrame>>());
-        //         // println!("{:?}", std::any::TypeId::of::<CameraFrame>());
-
-        //         let timeline = unsafe {
-        //             (inner.as_ref() as &dyn Any)
-        //                 .downcast_ref_unchecked::<ItemTimeline<CameraFrame>>()
-        //         };
-        //         timeline
-        //             .eval_sec(target_sec)
-        //             .map(|res| (timeline_idx, DynTimelineEvalResult::CameraFrame(res)))
-        //     }
-        //     DynTimeline::VisualItem(inner) => inner
-        //         .eval_sec(target_sec)
-        //         .map(|res| (timeline_idx, DynTimelineEvalResult::VisualItem(res))),
-        // }
+            .eval_primitives_at_sec(target_sec)
+            .map(|(res, idx)| (res, calculate_hash(&(timeline_idx, idx))))
     }
 }
 
@@ -398,8 +358,8 @@ impl<T: Extract + Any + Clone + 'static> TimelineFunc for ItemTimeline<T> {
     //     self.eval_sec(target_sec)
     //         .map(|(res, idx)| (res.into_any(), idx))
     // }
-    fn eval_sec_extracted_any(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, usize)> {
-        self.eval_sec(target_sec)
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)> {
+        self.eval_at_sec(target_sec)
             .map(|(res, idx)| (res.map(|res| res.extract_to_primitives()), idx))
     }
 }
@@ -498,14 +458,14 @@ impl<T: Clone + 'static> ItemTimeline<T> {
         self
     }
     /// Evaluate the state at `alpha`
-    pub fn eval_alpha(&self, alpha: f64) -> Option<(EvalResult<T>, usize)> {
+    pub fn eval_at_alpha(&self, alpha: f64) -> Option<(EvalResult<T>, u64)> {
         let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
             return None;
         };
-        self.eval_sec(alpha * (end - start) + start)
+        self.eval_at_sec(alpha * (end - start) + start)
     }
     /// Evaluate the state at `target_sec`
-    pub fn eval_sec(&self, target_sec: f64) -> Option<(EvalResult<T>, usize)> {
+    pub fn eval_at_sec(&self, target_sec: f64) -> Option<(EvalResult<T>, u64)> {
         let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
             return None;
         };
@@ -528,7 +488,7 @@ impl<T: Clone + 'static> ItemTimeline<T> {
             })
             .map(|(idx, anim, range)| {
                 let alpha = (target_sec - range.start) / (range.end - range.start);
-                (anim.eval_alpha(alpha), idx)
+                (anim.eval_alpha(alpha), idx as u64)
             })
     }
 }
@@ -547,7 +507,7 @@ mod tests {
             stroke_widths: vec![],
         };
         let mut timeline = ItemTimeline::new(vitem.clone());
-        assert!(timeline.eval_alpha(0.0).is_none());
+        assert!(timeline.eval_at_alpha(0.0).is_none());
         timeline.show();
         timeline.forward(1.0);
         timeline.seal();
@@ -555,11 +515,11 @@ mod tests {
         assert_eq!(timeline.start_sec(), Some(0.0));
         assert_eq!(timeline.end_sec(), Some(1.0));
 
-        let (res, _) = timeline.eval_alpha(0.0).unwrap();
+        let (res, _) = timeline.eval_at_alpha(0.0).unwrap();
         assert_eq!(res.as_ref(), &vitem);
-        let (res, _) = timeline.eval_alpha(0.5).unwrap();
+        let (res, _) = timeline.eval_at_alpha(0.5).unwrap();
         assert_eq!(res.as_ref(), &vitem);
-        let (res, _) = timeline.eval_alpha(1.0).unwrap();
+        let (res, _) = timeline.eval_at_alpha(1.0).unwrap();
         assert_eq!(res.as_ref(), &vitem);
 
         let x = Group(vec![VItemPrimitive {
@@ -569,7 +529,7 @@ mod tests {
             stroke_widths: vec![],
         }]);
         let mut timeline = ItemTimeline::new(x.clone());
-        assert!(timeline.eval_alpha(0.0).is_none());
+        assert!(timeline.eval_at_alpha(0.0).is_none());
         timeline.show();
         timeline.forward(1.0);
         timeline.seal();
@@ -577,11 +537,11 @@ mod tests {
         assert_eq!(timeline.start_sec(), Some(0.0));
         assert_eq!(timeline.end_sec(), Some(1.0));
 
-        let (res, _) = timeline.eval_alpha(0.0).unwrap();
+        let (res, _) = timeline.eval_at_alpha(0.0).unwrap();
         assert_eq!(res.as_ref(), &x);
-        let (res, _) = timeline.eval_alpha(0.5).unwrap();
+        let (res, _) = timeline.eval_at_alpha(0.5).unwrap();
         assert_eq!(res.as_ref(), &x);
-        let (res, _) = timeline.eval_alpha(1.0).unwrap();
+        let (res, _) = timeline.eval_at_alpha(1.0).unwrap();
         assert_eq!(res.as_ref(), &x);
     }
 
@@ -595,16 +555,16 @@ mod tests {
         };
         let mut timeline = ItemDynTimelines::new();
         timeline.push(ItemTimeline::new(vitem.clone()));
-        assert!(timeline.eval_alpha_extracted_any(0.0).is_none());
+        assert!(timeline.eval_primitives_at_alpha(0.0).is_none());
 
-        timeline.show();
-        timeline.forward(1.0);
-        timeline.seal();
+        timeline.get_dyn_mut().show();
+        timeline.get_dyn_mut().forward(1.0);
+        timeline.get_dyn_mut().seal();
 
-        assert_eq!(timeline.start_sec(), Some(0.0));
-        assert_eq!(timeline.end_sec(), Some(1.0));
+        assert_eq!(timeline.get_dyn().start_sec(), Some(0.0));
+        assert_eq!(timeline.get_dyn().end_sec(), Some(1.0));
 
-        let (res, _) = timeline.eval_alpha_extracted_any(0.0).unwrap();
+        let (res, _) = timeline.eval_primitives_at_alpha(0.0).unwrap();
         assert_eq!(res.as_ref(), &Primitives::VItemPrimitive(vec![vitem]));
 
         let x = vec![VItemPrimitive {
@@ -615,16 +575,16 @@ mod tests {
         }];
         let mut timeline = ItemDynTimelines::new();
         timeline.push(ItemTimeline::new(Group(x.clone())));
-        assert!(timeline.eval_alpha_extracted_any(0.0).is_none());
+        assert!(timeline.eval_primitives_at_alpha(0.0).is_none());
 
-        timeline.show();
-        timeline.forward(1.0);
-        timeline.seal();
+        timeline.get_dyn_mut().show();
+        timeline.get_dyn_mut().forward(1.0);
+        timeline.get_dyn_mut().seal();
 
-        assert_eq!(timeline.start_sec(), Some(0.0));
-        assert_eq!(timeline.end_sec(), Some(1.0));
+        assert_eq!(timeline.get_dyn().start_sec(), Some(0.0));
+        assert_eq!(timeline.get_dyn().end_sec(), Some(1.0));
 
-        let (res, _) = timeline.eval_alpha_extracted_any(0.0).unwrap();
+        let (res, _) = timeline.eval_primitives_at_alpha(0.0).unwrap();
         assert_eq!(res.as_ref(), &Primitives::VItemPrimitive(x));
     }
 }

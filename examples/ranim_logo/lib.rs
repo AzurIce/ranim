@@ -5,14 +5,11 @@ use itertools::Itertools;
 use ranim::{
     anims::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
     color::palettes::manim,
-    items::{
-        Group,
-        vitem::{
-            VItem,
-            geometry::{Polygon, Rectangle, Square},
-            svg::SvgItem,
-            typst::typst_svg,
-        },
+    items::vitem::{
+        Group, VItem,
+        geometry::{Polygon, Rectangle, Square},
+        svg::SvgItem,
+        typst::typst_svg,
     },
     prelude::*,
     timeline::TimeMark,

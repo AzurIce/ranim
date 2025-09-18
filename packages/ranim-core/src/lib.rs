@@ -20,7 +20,6 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
-    pub use crate::Group;
     pub use crate::primitives::camera_frame::CameraFrame;
     pub use crate::timeline::{TimelineFunc, TimelinesFunc};
 }
@@ -136,7 +135,7 @@ impl<T: Opacity + Alignable + Clone> Alignable for Group<T> {
 impl<E: Extract> Extract for Group<E> {
     type Target = E::Target;
     fn extract(&self) -> Vec<Self::Target> {
-        self.iter().map(|x| x.extract()).flatten().collect()
+        self.iter().flat_map(|x| x.extract()).collect()
     }
 }
 

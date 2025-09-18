@@ -1,9 +1,6 @@
 use std::ops::Deref;
 
-use crate::{
-    render::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT, RenderResource},
-    utils::wgpu::WgpuContext,
-};
+use crate::render::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT, RenderResource, WgpuContext};
 
 pub struct RenderBindGroup(wgpu::BindGroup);
 

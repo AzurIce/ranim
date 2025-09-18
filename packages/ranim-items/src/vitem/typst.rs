@@ -21,9 +21,9 @@ use typst::{
 };
 use typst_kit::fonts::{FontSearcher, Fonts};
 
-use crate::vitem::{VItem, svg::SvgItem};
+use crate::vitem::{Group, VItem, svg::SvgItem};
 use ranim_core::{
-    Extract, Group, color,
+    Extract, color,
     components::width::Width,
     glam,
     primitives::vitem::VItemPrimitive,
@@ -237,6 +237,14 @@ pub struct TypstText {
 }
 
 impl TypstText {
+    fn _new(str: &str) -> Self {
+        let svg = SvgItem::new(typst_svg(str));
+        let chars = str.to_string();
+
+        let vitems = Group::<VItem>::from(svg);
+        assert_eq!(chars.len(), vitems.len());
+        Self { chars, vitems }
+    }
     /// Create a TypstText with typst string.
     ///
     /// The typst string you provide should only produces text output,
@@ -256,13 +264,32 @@ impl TypstText {
 
     /// Inline code
     pub fn new_inline_code(code: &str) -> Self {
-        Self::new(format!("`{code}`").as_str())
+        let svg = SvgItem::new(typst_svg(format!("`{code}`").as_str()));
+        let chars = code
+            .replace(" ", "")
+            .replace("\n", "")
+            .replace("\r", "")
+            .replace("\t", "");
+
+        let vitems = Group::<VItem>::from(svg);
+        assert_eq!(chars.len(), vitems.len());
+        Self { chars, vitems }
     }
 
     /// Multiline code
     pub fn new_multiline_code(code: &str, language: Option<&str>) -> Self {
         let language = language.unwrap_or("");
-        Self::new(format!("```{language}\n{code}\n```").as_str())
+        // Self::new(format!("```{language}\n{code}\n```").as_str())
+        let svg = SvgItem::new(typst_svg(format!("```{language}\n{code}```").as_str()));
+        let chars = code
+            .replace(" ", "")
+            .replace("\n", "")
+            .replace("\r", "")
+            .replace("\t", "");
+
+        let vitems = Group::<VItem>::from(svg);
+        assert_eq!(chars.len(), vitems.len());
+        Self { chars, vitems }
     }
 }
 

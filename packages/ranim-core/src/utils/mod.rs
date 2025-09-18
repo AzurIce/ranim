@@ -10,7 +10,11 @@ pub mod rate_functions;
 // pub mod typst;
 // pub(crate) mod wgpu;
 
-use std::{iter::Sum, ops::Div};
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    iter::Sum,
+    ops::Div,
+};
 
 use glam::{Mat3, Vec2, Vec3, vec2, vec3};
 
@@ -175,6 +179,12 @@ pub fn apart_alpha(alpha: f32, n: usize, eps: f32) -> f32 {
     }
 
     ((left.0 + right.0) / 2.0).clamp(0.0, 1.0)
+}
+
+pub fn calculate_hash<T: Hash>(t: &T) -> u64 {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    s.finish()
 }
 
 #[cfg(test)]

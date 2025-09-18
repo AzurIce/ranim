@@ -46,8 +46,9 @@ profiling = [
   "dep:profiling",
 ]
 # output = ["dep:async-channel"]
-app = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:winit"]
-serde = ["dep:serde", "glam/serde", "color/serde"]
+app = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:winit", "render"]
+render = []
+serde = ["dep:serde", "glam/serde"]
 
 [dependencies]
 ranim-core.workspace = true
@@ -68,8 +69,6 @@ wgpu = "25.0.2"
 anyhow = "1.0.99"
 usvg = "0.45.1"
 regex = "1.11.2"
-indicatif = "0.18.0"
-color = "0.3.2"
 variadics_please = "1.1.0"
 derive_more = { version = "2.0.1", features = [
   "deref_mut",
@@ -82,6 +81,7 @@ derive_more = { version = "2.0.1", features = [
   "into_iterator",
 ] }
 
+indicatif = { version = "0.18.0", optional = true }
 puffin = { version = "0.19.1", optional = true }
 puffin_http = { version = "0.16.1", optional = true }
 wgpu-profiler = { version = "0.23.0", optional = true, features = ["puffin"] }

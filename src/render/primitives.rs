@@ -5,7 +5,7 @@ use std::{any::Any, collections::HashMap};
 
 use variadics_please::{all_tuples, all_tuples_enumerated};
 
-use crate::utils::wgpu::WgpuContext;
+use crate::render::utils::WgpuContext;
 
 use super::RenderTextures;
 

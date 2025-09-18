@@ -1,9 +1,10 @@
 use itertools::Itertools;
 use ranim::{
     anims::{fading::FadingAnim, lagged::LaggedAnim},
+    color,
     color::HueDirection,
     glam::dvec2,
-    items::{Group, vitem::geometry::Arc},
+    items::vitem::{Group, geometry::Arc},
     prelude::*,
     timeline::TimeMark,
 };
@@ -17,8 +18,8 @@ pub fn arc(r: &mut RanimScene) {
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
 
-    let start_color = color!("#FF8080FF");
-    let end_color = color!("#58C4DDFF");
+    let start_color = color::color("#FF8080FF");
+    let end_color = color::color("#58C4DDFF");
 
     let nrow = 10;
     let ncol = 10;

@@ -2,16 +2,14 @@ use std::f64::consts::PI;
 
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    color,
     color::palettes::manim,
     core::{Extract, components::width::Width, primitives::vitem::VItemPrimitive},
-    items::{
-        Group,
-        vitem::{
-            VItem,
-            geometry::{Circle, Square},
-            svg::SvgItem,
-            typst::typst_svg,
-        },
+    items::vitem::{
+        Group, VItem,
+        geometry::{Circle, Square},
+        svg::SvgItem,
+        typst::typst_svg,
     },
     prelude::*,
     timeline::TimeMark,

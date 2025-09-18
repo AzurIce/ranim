@@ -420,12 +420,7 @@ impl Shift for Polygon {
 }
 
 impl Rotate for Polygon {
-    fn rotate_by_anchor(
-        &mut self,
-        angle: f64,
-        axis: DVec3,
-        anchor: Anchor,
-    ) -> &mut Self {
+    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         self.points.rotate_by_anchor(angle, axis, anchor);
         self
     }

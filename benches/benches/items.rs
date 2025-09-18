@@ -2,9 +2,9 @@ use std::{f64::consts::PI, hint::black_box};
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use ranim::{
+    core::Extract,
     glam::{DVec3, dvec3},
     items::vitem::geometry::{Arc, Circle, Polygon, Rectangle, Square},
-    core::Extract,
 };
 
 fn extract_bench(c: &mut Criterion) {

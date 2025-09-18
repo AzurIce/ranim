@@ -2,10 +2,7 @@ use glam::DVec3;
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     color::palettes::manim,
-    items::{
-        Group,
-        vitem::{VItem, svg::SvgItem, typst::typst_svg},
-    },
+    items::vitem::{Group, VItem, svg::SvgItem, typst::typst_svg},
     prelude::*,
     timeline::TimeMark,
 };

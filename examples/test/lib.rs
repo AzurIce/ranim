@@ -2,7 +2,6 @@
 #![allow(unused)]
 use std::{f64::consts::PI, time::Duration};
 
-use ::color::palette::css;
 use glam::{DVec3, dvec3};
 use ranim::{
     anims::{
@@ -10,7 +9,10 @@ use ranim::{
         fading::FadingAnim,
         transform::TransformAnim,
     },
-    color::palettes::manim::{self, BLUE_C, RED_C},
+    color::palettes::{
+        css,
+        manim::{self, BLUE_C, RED_C},
+    },
     items::{
         Group,
         vitem::{
