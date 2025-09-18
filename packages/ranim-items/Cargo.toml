@@ -1,0 +1,37 @@
+[package]
+name = "ranim-items"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ranim-core.workspace = true
+log.workspace = true
+itertools.workspace = true
+derive_more = { version = "2.0.1", features = [
+  "deref_mut",
+  "deref",
+  "index",
+  "index_mut",
+  "is_variant",
+  "as_ref",
+  "from",
+  "into_iterator",
+] }
+sha1 = "0.10.6"
+lru = "0.16.1"
+usvg = "0.45.1"
+typst = "0.13.1"
+typst-kit = { version = "0.13.1", default-features = false, features = [
+  "fonts",
+  "embed-fonts",
+] }
+# time = "0.3.41"
+typst-svg = "0.13.1"
+chrono = "0.4.42"
+diff-match-patch-rs = "0.5.1"
+regex = "1.11.2"
+
+[dev-dependencies]
+assert_float_eq = "1.1.4"

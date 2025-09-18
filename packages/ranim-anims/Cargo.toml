@@ -1,0 +1,10 @@
+[package]
+name = "ranim-anims"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ranim-core.workspace = true
+log.workspace = true

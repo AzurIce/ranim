@@ -1,0 +1,27 @@
+[package]
+name = "ranim-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# ranim-macros.workspace = true
+log.workspace = true
+itertools.workspace = true
+glam = { workspace = true, features = ["bytemuck"] }
+bytemuck = { workspace = true, features = ["derive"] }
+derive_more = { version = "2.0.1", features = [
+  "deref_mut",
+  "deref",
+  "index",
+  "index_mut",
+  "is_variant",
+  "as_ref",
+  "from",
+  "into_iterator",
+] }
+color = "0.3.2"
+
+[dev-dependencies]
+assert_float_eq = "1.1.4"
