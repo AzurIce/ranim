@@ -4072,6 +4072,9 @@ dependencies = [
  "puffin_http",
  "rand 0.9.2",
  "rand_chacha 0.9.0",
+ "ranim-anims",
+ "ranim-core",
+ "ranim-items",
  "ranim-macros",
  "regex",
  "reqwest",
@@ -4094,6 +4097,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ranim-anims"
+version = "0.1.4"
+dependencies = [
+ "log",
+ "ranim-core",
+]
+
+[[package]]
+name = "ranim-app"
+version = "0.1.4"
+
+[[package]]
 name = "ranim-cli"
 version = "0.1.4"
 dependencies = [
@@ -4110,6 +4125,39 @@ dependencies = [
  "pretty_env_logger",
  "ranim",
  "toml 0.9.6",
+]
+
+[[package]]
+name = "ranim-core"
+version = "0.1.4"
+dependencies = [
+ "assert_float_eq",
+ "bytemuck",
+ "color",
+ "derive_more",
+ "glam",
+ "itertools 0.14.0",
+ "log",
+]
+
+[[package]]
+name = "ranim-items"
+version = "0.1.4"
+dependencies = [
+ "assert_float_eq",
+ "chrono",
+ "derive_more",
+ "diff-match-patch-rs",
+ "itertools 0.14.0",
+ "log",
+ "lru",
+ "ranim-core",
+ "regex",
+ "sha1",
+ "typst",
+ "typst-kit",
+ "typst-svg",
+ "usvg 0.45.1",
 ]
 
 [[package]]

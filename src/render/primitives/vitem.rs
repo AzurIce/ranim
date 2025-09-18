@@ -1,5 +1,4 @@
 use crate::{
-    components::{rgba::Rgba, width::Width},
     render::{
         RenderTextures,
         pipelines::{
@@ -7,45 +6,21 @@ use crate::{
             vitem::RenderBindGroup,
         },
     },
-    traits::FillColor,
     utils::{
         PipelinesStorage,
         wgpu::{WgpuBuffer, WgpuContext, WgpuVecBuffer},
     },
 };
-use color::AlphaColor;
 use glam::Vec4;
+use ranim_core::{
+    components::{rgba::Rgba, width::Width},
+    primitives::vitem::VItemPrimitive,
+};
 
 use super::{Primitive, RenderCommand, RenderResource};
 
-#[derive(Clone)]
-/// A primitive for rendering a vitem.
-pub struct VItemPrimitive {
-    pub(crate) points2d: Vec<Vec4>,
-    pub(crate) fill_rgbas: Vec<Rgba>,
-    pub(crate) stroke_rgbas: Vec<Rgba>,
-    pub(crate) stroke_widths: Vec<Width>,
-}
-
 impl Primitive for VItemPrimitive {
     type RenderInstance = VItemRenderInstance;
-}
-
-impl FillColor for VItemPrimitive {
-    fn fill_color(&self) -> color::AlphaColor<color::Srgb> {
-        let Rgba(rgba) = self.fill_rgbas[0];
-        AlphaColor::new([rgba.x, rgba.y, rgba.z, rgba.w])
-    }
-    fn set_fill_color(&mut self, color: AlphaColor<color::Srgb>) -> &mut Self {
-        self.fill_rgbas.fill(color.into());
-        self
-    }
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rgbas
-            .iter_mut()
-            .for_each(|rgba| rgba.0.w = opacity);
-        self
-    }
 }
 
 /// [`VItemPrimitive`]'s render instance.
@@ -297,16 +272,14 @@ mod test {
     use image::Rgba;
 
     use crate::{
-        items::{
-            camera_frame::CameraFrame,
-            vitem::{VItem, geometry::Square},
-        },
+        items::vitem::{VItem, geometry::Square},
         render::{
             CameraUniforms, CameraUniformsBindGroup, RenderTextures,
-            primitives::{Extract, RenderCommand, RenderResource},
+            primitives::{RenderCommand, RenderResource},
         },
         utils::{PipelinesStorage, get_texture_data, wgpu::WgpuBuffer},
     };
+    use ranim_core::{primitives::camera_frame::CameraFrame, Extract};
 
     use super::*;
 
@@ -322,7 +295,7 @@ mod test {
         .unwrap();
         let vitem = VItem::from(Square::new(8.0));
 
-        let renderable = vitem.extract();
+        let renderable = vitem.extract()[0].clone();
         let mut pipelines = PipelinesStorage::default();
         let vitem_primitive = VItemRenderInstance::init(&ctx, &renderable);
 

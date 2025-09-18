@@ -3,9 +3,8 @@ use std::f64::consts::PI;
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
 use ranim::{
-    animation::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
     color::palettes::manim,
-    components::{Anchor, ScaleHint},
     items::{
         Group,
         vitem::{

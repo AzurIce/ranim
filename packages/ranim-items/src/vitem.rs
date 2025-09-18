@@ -157,13 +157,13 @@ impl VItem {
 /// See [`VItemPrimitive`].
 impl Extract for VItem {
     type Target = VItemPrimitive;
-    fn extract(&self) -> Self::Target {
-        VItemPrimitive {
+    fn extract(&self) -> Vec<Self::Target> {
+        vec![VItemPrimitive {
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect(),
             stroke_widths: self.stroke_widths.iter().cloned().collect(),
-        }
+        }]
     }
 }
 

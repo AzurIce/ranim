@@ -1,9 +1,9 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
-    components::ScaleHint,
+    core::{Extract, components::width::Width, primitives::vitem::VItemPrimitive},
     items::{
         Group,
         vitem::{
@@ -14,7 +14,6 @@ use ranim::{
         },
     },
     prelude::*,
-    render::primitives::{Extract, vitem::VItemPrimitive},
     timeline::TimeMark,
 };
 
@@ -159,10 +158,7 @@ impl FillColor for VisualVItem {
 }
 
 impl StrokeWidth for VisualVItem {
-    fn apply_stroke_func(
-        &mut self,
-        f: impl for<'a> Fn(&'a mut [ranim::components::width::Width]),
-    ) -> &mut Self {
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         self.0.apply_stroke_func(f);
         self
     }
@@ -173,8 +169,8 @@ impl StrokeWidth for VisualVItem {
 }
 
 impl Extract for VisualVItem {
-    type Target = Vec<VItemPrimitive>;
-    fn extract(&self) -> Self::Target {
+    type Target = VItemPrimitive;
+    fn extract(&self) -> Vec<Self::Target> {
         let mut points = Vec::with_capacity(self.0.vpoints.len());
 
         let subpaths = self.0.vpoints.get_subpaths();
@@ -236,6 +232,7 @@ impl Extract for VisualVItem {
                 .extract()
             }))
             .chain(points.into_iter().map(|x| x.extract()))
+            .flatten()
             .collect()
     }
 }

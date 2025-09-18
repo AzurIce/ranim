@@ -8,10 +8,8 @@ use image::{ImageBuffer, Rgba};
 use pipelines::{Map3dTo2dPipeline, VItemPipeline};
 use primitives::RenderCommand;
 
-use crate::{
-    items::camera_frame::CameraFrame,
-    utils::{PipelinesStorage, wgpu::WgpuBuffer, wgpu::WgpuContext},
-};
+use crate::utils::{PipelinesStorage, wgpu::WgpuBuffer, wgpu::WgpuContext};
+use ranim_core::primitives::camera_frame::CameraFrame;
 
 pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const ALIGNMENT: usize = 256;

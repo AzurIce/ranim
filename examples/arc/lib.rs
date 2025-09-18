@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ranim::{
-    animation::{fading::FadingAnim, lagged::LaggedAnim},
+    anims::{fading::FadingAnim, lagged::LaggedAnim},
     color::HueDirection,
     glam::dvec2,
     items::{Group, vitem::geometry::Arc},

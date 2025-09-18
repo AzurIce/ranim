@@ -21,9 +21,9 @@ use super::VItem;
 ///
 /// Its inner is a `Vec<VItem>`
 #[derive(Clone)]
-pub struct SvgItem(Vec<VItem>);
+pub struct SvgItem(Group<VItem>);
 
-impl From<SvgItem> for Vec<VItem> {
+impl From<SvgItem> for Group<VItem> {
     fn from(value: SvgItem) -> Self {
         value.0
     }
@@ -32,7 +32,7 @@ impl From<SvgItem> for Vec<VItem> {
 impl SvgItem {
     /// Creates a new SvgItem from a SVG string
     pub fn new(svg: impl AsRef<str>) -> Self {
-        let mut vitem_group = Self(vitems_from_svg(svg.as_ref()));
+        let mut vitem_group = Self(Group(vitems_from_svg(svg.as_ref())));
         vitem_group.put_center_on(DVec3::ZERO);
         vitem_group.rotate(std::f64::consts::PI, DVec3::X);
         vitem_group
@@ -117,16 +117,10 @@ impl StrokeWidth for SvgItem {
 }
 
 // MARK: Conversions
-impl From<SvgItem> for Group<VItem> {
-    fn from(value: SvgItem) -> Self {
-        Self(value.0)
-    }
-}
-
 impl Extract for SvgItem {
-    type Target = Vec<VItemPrimitive>;
-    fn extract(&self) -> Self::Target {
-        self.0.iter().map(|vitem| vitem.extract()).collect()
+    type Target = VItemPrimitive;
+    fn extract(&self) -> Vec<Self::Target> {
+        self.0.extract()
     }
 }
 

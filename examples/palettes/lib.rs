@@ -1,6 +1,5 @@
 use ranim::{
     color::palettes::manim::*,
-    components::Anchor,
     glam::{dvec2, dvec3},
     items::{Group, vitem::geometry::Rectangle},
     prelude::*,

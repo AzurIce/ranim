@@ -1,7 +1,6 @@
 use ranim::{
-    animation::transform::TransformAnim,
+    anims::transform::TransformAnim,
     color::{HueDirection, palettes::manim},
-    components::Anchor,
     glam::dvec3,
     items::vitem::geometry::Rectangle,
     prelude::*,
@@ -34,7 +33,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
 
     let _rods = [-1, 0, 1]
         .into_iter()
-        .map(|i| {
+        .map(|i: i32| {
             Rectangle::new(rod_width, rod_height).with(|rect| {
                 rect.set_color(manim::GREY_C).put_anchor_on(
                     Anchor::edge(0, -1, 0),

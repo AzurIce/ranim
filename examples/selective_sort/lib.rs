@@ -1,7 +1,7 @@
 use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
-    animation::transform::TransformAnim, color::palettes::manim, components::Anchor,
+    anims::transform::TransformAnim, color::palettes::manim,
     items::vitem::geometry::Rectangle, prelude::*, timeline::TimeMark,
     utils::rate_functions::linear,
 };

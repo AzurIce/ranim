@@ -1,6 +1,7 @@
 use ranim_core::{
     Group,
     animation::{AnimationSpan, EvalDynamic, Evaluator},
+    traits::Opacity,
 };
 
 // MARK: LaggedAnim
@@ -11,7 +12,9 @@ pub trait LaggedAnim<T> {
         self,
         lag_ratio: f64,
         anim_func: impl FnMut(T) -> AnimationSpan<T>,
-    ) -> AnimationSpan<Group<T>>;
+    ) -> AnimationSpan<Self>
+    where
+        Self: Sized;
 }
 
 impl<T: Clone + 'static> LaggedAnim<T> for Group<T> {
@@ -19,7 +22,7 @@ impl<T: Clone + 'static> LaggedAnim<T> for Group<T> {
         self,
         lag_ratio: f64,
         anim_func: impl FnMut(T) -> AnimationSpan<T>,
-    ) -> AnimationSpan<Group<T>> {
+    ) -> AnimationSpan<Self> {
         AnimationSpan::from_evaluator(Evaluator::new_dynamic(Lagged::new(
             self, lag_ratio, anim_func,
         )))

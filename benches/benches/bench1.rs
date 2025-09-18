@@ -2,7 +2,7 @@ use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion
 use itertools::Itertools;
 use ranim::{
     Output, SceneConfig, SceneConstructor,
-    animation::transform::TransformAnim,
+    anims::transform::TransformAnim,
     glam::{DVec3, dvec3},
     items::vitem::{
         VItem,

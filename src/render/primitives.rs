@@ -5,7 +5,7 @@ use std::{any::Any, collections::HashMap};
 
 use variadics_please::{all_tuples, all_tuples_enumerated};
 
-use crate::{items::Group, utils::wgpu::WgpuContext};
+use crate::utils::wgpu::WgpuContext;
 
 use super::RenderTextures;
 
@@ -170,20 +170,20 @@ impl<T: RenderCommand, const N: usize> RenderCommand for [T; N] {
 //     fn extract(data: &T) -> Self::Target;
 // }
 
-/// Extract a [`Extract::Target`] from reference.
-pub trait Extract {
-    /// The extraction result
-    type Target;
-    /// Extract a [`Extract::Target`] from reference.
-    fn extract(&self) -> Self::Target;
-}
+// /// Extract a [`Extract::Target`] from reference.
+// pub trait Extract {
+//     /// The extraction result
+//     type Target;
+//     /// Extract a [`Extract::Target`] from reference.
+//     fn extract(&self) -> Self::Target;
+// }
 
-impl<E: Extract> Extract for Group<E> {
-    type Target = Vec<E::Target>;
-    fn extract(&self) -> Self::Target {
-        self.iter().map(|x| x.extract()).collect()
-    }
-}
+// impl<E: Extract> Extract for Group<E> {
+//     type Target = Vec<E::Target>;
+//     fn extract(&self) -> Self::Target {
+//         self.iter().map(|x| x.extract()).collect()
+//     }
+// }
 
 /// The Primitive is the basic renderable object in Ranim.
 ///

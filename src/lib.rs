@@ -23,7 +23,7 @@
 )]
 #![feature(downcast_unchecked)]
 
-use animation::EvalResult;
+// use animation::EvalResult;
 use log::{info, trace};
 use timeline::{RanimScene, SealedRanimScene};
 
@@ -37,21 +37,23 @@ use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 #[cfg(not(target_arch = "wasm32"))]
 use render::{Renderer, primitives::RenderInstances};
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 #[cfg(not(target_arch = "wasm32"))]
 use utils::wgpu::WgpuContext;
 
-pub mod animation;
+// pub mod animation;
+pub use ranim_anims as anims;
+pub use ranim_core as core;
+
 /// The preview app
 #[cfg(feature = "app")]
 pub mod app;
 /// Colors and Palettes
 pub mod color;
-/// Basic data representation
-pub mod components;
+// /// Basic data representation
+// pub mod components;
 #[cfg(not(target_arch = "wasm32"))]
 mod file_writer;
 /// Builtin items
@@ -60,8 +62,8 @@ pub mod items;
 pub mod render;
 /// The core structure to encode animations
 pub mod timeline;
-/// The basic traits for items
-pub mod traits;
+// /// The basic traits for items
+// pub mod traits;
 /// Utils
 pub mod utils;
 
@@ -208,12 +210,10 @@ pub mod prelude {
     pub use crate::{render_scene, render_scene_output};
 
     pub use ranim_macros::{output, scene, wasm_demo_doc};
+    pub use ranim_core::prelude::*;
 
-    pub use crate::items::{ItemId, camera_frame::CameraFrame};
-    pub use crate::timeline::{RanimScene, TimelineFunc, TimelinesFunc};
-
-    pub use crate::color::prelude::*;
-    pub use crate::traits::*;
+    pub use crate::items::ItemId;
+    pub use crate::timeline::RanimScene;
 }
 
 #[cfg(feature = "profiling")]
@@ -389,7 +389,7 @@ impl RanimRenderApp {
             })
             .progress_chars("#>-"),
         );
-        let mut last_idx = HashMap::new();
+        // let mut last_idx = HashMap::new();
         (0..frames)
             .map(|f| f as f64 / (frames - 1) as f64)
             .for_each(|alpha| {
@@ -415,22 +415,25 @@ impl RanimRenderApp {
                     profiling::scope!("extract");
                     visual_items
                         .iter()
-                        .filter_map(|(id, res, timeline_idx, idx)| {
-                            let idx = (*timeline_idx as i32, *idx as i32);
-                            let last_idx = last_idx.entry(*id).or_insert((-1, -1));
-                            let prev_last_idx = *last_idx;
-                            *last_idx = idx;
-                            let renderable = match res {
-                                EvalResult::Dynamic(res) => Some(res.extract_renderable()),
-                                EvalResult::Static(res) => {
-                                    if prev_last_idx != idx {
-                                        Some(res.extract_renderable())
-                                    } else {
-                                        None
-                                    }
-                                }
-                            };
-                            renderable.map(|renderable| (*id, renderable))
+                        .filter_map(|(id, res, anim_idx)| {
+                            Some((*id, res.clone()))
+                            // TODO: cache, lazy update
+                            // let idx = (*anim_idx as i32);
+                            // let last_idx = last_idx.entry(*id).or_insert((-1, -1));
+                            // let prev_last_idx = *last_idx;
+                            // *last_idx = anim_idx;
+                            // let renderable = match res {
+                            //     EvalResult::Dynamic(res) => Some(res.extract_renderable()),
+                            //     EvalResult::Static(res) => {
+                            //         if prev_last_idx != idx {
+                            //             Some(res.extract_renderable())
+                            //         } else {
+                            //             None
+                            //         }
+                            //     }
+                            // };
+                            // let renderable = Box::new(res.clone());
+                            // renderable.map(|renderable| (*id, renderable))
                         })
                         .collect::<Vec<_>>()
                 };
@@ -439,6 +442,8 @@ impl RanimRenderApp {
                     #[cfg(feature = "profiling")]
                     profiling::scope!("prepare");
                     extracted_updates.iter().for_each(|(id, res)| {
+                        use crate::render::primitives::Renderable;
+
                         res.prepare_for_id(&self.ctx, &mut self.render_instances, *id);
                     });
                     self.ctx.queue.submit([]);
@@ -446,15 +451,15 @@ impl RanimRenderApp {
 
                 let render_primitives = visual_items
                     .iter()
-                    .filter_map(|(id, _, _, _)| self.render_instances.get_render_instance_dyn(*id))
+                    .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
                     .collect::<Vec<_>>();
-                let camera_frame = match &camera_frame.0 {
-                    EvalResult::Dynamic(res) => res,
-                    EvalResult::Static(res) => res,
-                };
+                // let camera_frame = match &camera_frame.0 {
+                //     EvalResult::Dynamic(res) => res,
+                //     EvalResult::Static(res) => res,
+                // };
                 // println!("{:?}", camera_frame);
                 // println!("{}", render_primitives.len());
-                self.renderer.update_uniforms(&self.ctx, camera_frame);
+                self.renderer.update_uniforms(&self.ctx, &camera_frame.0);
 
                 {
                     #[cfg(feature = "profiling")]
@@ -534,12 +539,12 @@ impl RanimRenderApp {
 
         let extracted = visual_items
             .iter()
-            .map(|(id, res, _, _)| {
-                let renderable = match res {
-                    EvalResult::Dynamic(res) => res.extract_renderable(),
-                    EvalResult::Static(res) => res.extract_renderable(),
-                };
-                (*id, renderable)
+            .map(|(id, res, _)| {
+                // let renderable = match res {
+                //     EvalResult::Dynamic(res) => res.extract_renderable(),
+                //     EvalResult::Static(res) => res.extract_renderable(),
+                // };
+                (*id, res)
             })
             .collect::<Vec<_>>();
 
@@ -548,15 +553,15 @@ impl RanimRenderApp {
         });
         let render_primitives = visual_items
             .iter()
-            .filter_map(|(id, _, _, _)| self.render_instances.get_render_instance_dyn(*id))
+            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
             .collect::<Vec<_>>();
-        let camera_frame = match &camera_frame.0 {
-            EvalResult::Dynamic(res) => res,
-            EvalResult::Static(res) => res,
-        };
+        // let camera_frame = match &camera_frame.0 {
+        //     EvalResult::Dynamic(res) => res,
+        //     EvalResult::Static(res) => res,
+        // };
         // println!("{:?}", camera_frame);
         // println!("{}", render_primitives.len());
-        self.renderer.update_uniforms(&self.ctx, camera_frame);
+        self.renderer.update_uniforms(&self.ctx, &camera_frame.0);
         self.renderer
             .render(&self.ctx, self.clear_color, &render_primitives);
         self.save_frame_to_image(

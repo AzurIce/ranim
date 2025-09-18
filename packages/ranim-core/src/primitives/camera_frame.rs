@@ -2,13 +2,16 @@
 
 use glam::{DMat4, DVec3, dvec2};
 
-use crate::prelude::{Alignable, Interpolatable};
+use crate::{
+    prelude::{Alignable, Interpolatable},
+    primitives::{Primitive, Primitives},
+};
 
 /// The data of a camera
 ///
 /// The [`CameraFrame`] has a [`CameraFrame::perspective_blend`] property (default is `0.0`),
 /// which is used to blend between orthographic and perspective projection.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CameraFrame {
     /// The position
     pub pos: DVec3,
@@ -27,6 +30,12 @@ pub struct CameraFrame {
     pub far: f64,
     /// The perspective blend value in [0.0, 1.0]
     pub perspective_blend: f64,
+}
+
+impl Primitive for CameraFrame {
+    fn build_primitives<T: IntoIterator<Item = Self>>(iter: T) -> super::Primitives {
+        Primitives::CameraFrame(iter.into_iter().collect())
+    }
 }
 
 impl Interpolatable for CameraFrame {

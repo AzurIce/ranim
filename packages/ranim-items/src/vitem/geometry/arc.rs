@@ -190,7 +190,7 @@ impl From<Arc> for VItem {
 
 impl Extract for Arc {
     type Target = VItemPrimitive;
-    fn extract(&self) -> Self::Target {
+    fn extract(&self) -> Vec<Self::Target> {
         VItem::from(self.clone()).extract()
     }
 }
@@ -369,7 +369,7 @@ impl From<ArcBetweenPoints> for VItem {
 
 impl Extract for ArcBetweenPoints {
     type Target = VItemPrimitive;
-    fn extract(&self) -> Self::Target {
+    fn extract(&self) -> Vec<Self::Target> {
         Arc::from(self.clone()).extract()
     }
 }

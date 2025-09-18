@@ -2,14 +2,11 @@ use egui::{
     Align2, Color32, Frame, PointerButton, Rect, Rgba, ScrollArea, Shape, Stroke, TextStyle,
     emath::GuiRounding, pos2, remap_clamp,
 };
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
 use crate::{color::palettes::manim, timeline::ItemDynTimelinesInfo};
 
 use super::TimelineInfo;
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(super) struct TimelineState {
     pub(super) total_sec: f64,
     pub(super) current_sec: f64,

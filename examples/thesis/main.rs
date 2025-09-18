@@ -2,7 +2,7 @@ use std::f64::consts::PI;
 
 use glam::{DVec3, dvec3};
 use ranim::{
-    animation::{
+    anims::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
         transform::TransformAnim,
@@ -20,7 +20,7 @@ use ranim::{
 fn pentagon() -> VItem {
     Polygon::new(
         (0..=5)
-            .map(|i| {
+            .map(|i: i32| {
                 let angle = i as f64 / 5.0 * 2.0 * PI;
                 dvec3(angle.cos(), angle.sin(), 0.0) * 2.0
             })

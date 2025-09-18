@@ -7,8 +7,6 @@ use async_channel::{Receiver, Sender, unbounded};
 use color::LinearSrgb;
 use egui_wgpu::ScreenDescriptor;
 use log::{info, warn};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use timeline::TimelineState;
 use web_time::Instant;
 use wgpu::SurfaceError;
@@ -22,7 +20,6 @@ use winit::{
 
 use crate::{
     Scene, SceneConstructor,
-    animation::EvalResult,
     app::egui_tools::EguiRenderer,
     render::{
         Renderer,
@@ -37,7 +34,6 @@ use crate::{
 use wasm_bindgen::prelude::*;
 
 #[derive(Default, Debug, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct OccupiedScreenSpace {
     top: f32,
     bottom: f32,
@@ -159,18 +155,19 @@ impl AppState {
 
             self.timeline.eval_sec(self.timeline_state.current_sec)
         };
+        println!("{} visual_items", visual_items.len());
 
         let extracted = {
             #[cfg(feature = "profiling")]
             profiling::scope!("extract");
             visual_items
                 .iter()
-                .map(|(id, res, _, _)| {
-                    let renderable = match res {
-                        EvalResult::Dynamic(res) => res.extract_renderable(),
-                        EvalResult::Static(res) => res.extract_renderable(),
-                    };
-                    (*id, renderable)
+                .map(|(id, res, _)| {
+                    // let renderable = match res {
+                    //     EvalResult::Dynamic(res) => res.extract_renderable(),
+                    //     EvalResult::Static(res) => res.extract_renderable(),
+                    // };
+                    (*id, res)
                 })
                 .collect::<Vec<_>>()
         };
@@ -186,17 +183,17 @@ impl AppState {
 
         let render_primitives = visual_items
             .iter()
-            .filter_map(|(id, _, _, _)| self.render_instances.get_render_instance_dyn(*id))
+            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
             .collect::<Vec<_>>();
-        let camera_frame = match &camera_frame.0 {
-            EvalResult::Dynamic(res) => res,
-            EvalResult::Static(res) => res,
-        };
+        // let camera_frame = match &camera_frame.0 {
+        //     EvalResult::Dynamic(res) => res,
+        //     EvalResult::Static(res) => res,
+        // };
         // println!("{:?}", camera_frame);
         // println!("{}", render_primitives.len());
         app_renderer
             .ranim_renderer
-            .update_uniforms(ctx, camera_frame);
+            .update_uniforms(ctx, &camera_frame.0);
 
         {
             #[cfg(feature = "profiling")]

@@ -1,5 +1,8 @@
 use std::{
-    collections::HashMap, io::Write, num::NonZeroUsize, sync::{Arc, Mutex, OnceLock}
+    collections::HashMap,
+    io::Write,
+    num::NonZeroUsize,
+    sync::{Arc, Mutex, OnceLock},
 };
 
 use chrono::{DateTime, Datelike, Local};
@@ -19,7 +22,13 @@ use typst::{
 use typst_kit::fonts::{FontSearcher, Fonts};
 
 use crate::vitem::{VItem, svg::SvgItem};
-use ranim_core::{traits::Anchor, Extract, Group, color, components::width::Width, glam, primitives::vitem::VItemPrimitive, traits::*};
+use ranim_core::{
+    Extract, Group, color,
+    components::width::Width,
+    glam,
+    primitives::vitem::VItemPrimitive,
+    traits::{Anchor, *},
+};
 
 struct TypstLruCache {
     inner: LruCache<[u8; 20], String>,
@@ -224,7 +233,7 @@ impl World for TypstWorldWithSource<'_> {
 #[derive(Clone)]
 pub struct TypstText {
     chars: String,
-    vitems: Vec<VItem>,
+    vitems: Group<VItem>,
 }
 
 impl TypstText {
@@ -240,7 +249,7 @@ impl TypstText {
             .replace("\r", "")
             .replace("\t", "");
 
-        let vitems = Vec::<VItem>::from(svg);
+        let vitems = Group::<VItem>::from(svg);
         assert_eq!(chars.len(), vitems.len());
         Self { chars, vitems }
     }
@@ -366,8 +375,8 @@ impl Alignable for TypstText {
                 }
             });
 
-        self.vitems = vitems_self;
-        other.vitems = vitems_other;
+        self.vitems = Group(vitems_self);
+        other.vitems = Group(vitems_other);
     }
 }
 
@@ -378,7 +387,7 @@ impl Interpolatable for TypstText {
             .iter()
             .zip(&target.vitems)
             .map(|(a, b)| a.lerp(b, t))
-            .collect::<Vec<_>>();
+            .collect::<Group<_>>();
         Self {
             chars: self.chars.clone(),
             vitems,
@@ -387,9 +396,9 @@ impl Interpolatable for TypstText {
 }
 
 impl Extract for TypstText {
-    type Target = Vec<VItemPrimitive>;
-    fn extract(&self) -> Self::Target {
-        self.vitems.iter().map(Extract::extract).collect()
+    type Target = VItemPrimitive;
+    fn extract(&self) -> Vec<Self::Target> {
+        self.vitems.extract()
     }
 }
 
@@ -407,23 +416,14 @@ impl Shift for TypstText {
 }
 
 impl Rotate for TypstText {
-    fn rotate_by_anchor(
-        &mut self,
-        angle: f64,
-        axis: glam::DVec3,
-        anchor: Anchor,
-    ) -> &mut Self {
+    fn rotate_by_anchor(&mut self, angle: f64, axis: glam::DVec3, anchor: Anchor) -> &mut Self {
         self.vitems.rotate_by_anchor(angle, axis, anchor);
         self
     }
 }
 
 impl Scale for TypstText {
-    fn scale_by_anchor(
-        &mut self,
-        scale: glam::DVec3,
-        anchor: Anchor,
-    ) -> &mut Self {
+    fn scale_by_anchor(&mut self, scale: glam::DVec3, anchor: Anchor) -> &mut Self {
         self.vitems.scale_by_anchor(scale, anchor);
         self
     }
@@ -466,10 +466,7 @@ impl Opacity for TypstText {
 }
 
 impl StrokeWidth for TypstText {
-    fn apply_stroke_func(
-        &mut self,
-        f: impl for<'a> Fn(&'a mut [Width]),
-    ) -> &mut Self {
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         self.vitems.iter_mut().for_each(|vitem| {
             vitem.apply_stroke_func(&f);
         });

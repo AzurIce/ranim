@@ -162,7 +162,7 @@ impl FillColor for Square {
 
 impl Extract for Square {
     type Target = VItemPrimitive;
-    fn extract(&self) -> Self::Target {
+    fn extract(&self) -> Vec<Self::Target> {
         VItem::from(self.clone()).extract()
     }
 }
@@ -370,7 +370,7 @@ impl From<Rectangle> for VItem {
 
 impl Extract for Rectangle {
     type Target = VItemPrimitive;
-    fn extract(&self) -> Self::Target {
+    fn extract(&self) -> Vec<Self::Target> {
         VItem::from(self.clone()).extract()
     }
 }
@@ -541,7 +541,7 @@ impl From<Polygon> for VItem {
 
 impl Extract for Polygon {
     type Target = VItemPrimitive;
-    fn extract(&self) -> Self::Target {
+    fn extract(&self) -> Vec<Self::Target> {
         // trace!("extract");
         // let mut need_update = self._need_update.borrow_mut();
         // let mut cache = self._extract_cache.borrow_mut();

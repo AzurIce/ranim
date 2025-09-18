@@ -183,7 +183,7 @@ impl From<Circle> for VItem {
 
 impl Extract for Circle {
     type Target = VItemPrimitive;
-    fn extract(&self) -> Self::Target {
+    fn extract(&self) -> Vec<Self::Target> {
         VItem::from(self.clone()).extract()
     }
 }

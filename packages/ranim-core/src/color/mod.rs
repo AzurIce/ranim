@@ -8,7 +8,7 @@ pub use ::color::HueDirection;
 /// Color preludes
 pub mod prelude {
     pub use super::{rgb, rgb8, rgba, rgba8};
-    pub use crate::color;
+    pub use crate::{color_macro as color, try_color_macro as try_color};
 }
 
 /// Construct an [`AlphaColor<Srgb>`] from rgb u8, the alpha value will be 255
@@ -35,7 +35,7 @@ pub const fn rgba(r: f32, g: f32, b: f32, a: f32) -> AlphaColor<Srgb> {
 ///
 /// In its inner it uses [`color::parse_color`]
 #[macro_export]
-macro_rules! color {
+macro_rules! color_macro {
     ($color_str:expr) => {{
         use ::color::{Srgb, parse_color};
         parse_color($color_str)
@@ -48,7 +48,7 @@ macro_rules! color {
 ///
 /// In its inner it uses [`color::parse_color`]
 #[macro_export]
-macro_rules! try_color {
+macro_rules! try_color_macro {
     ($color_str:expr) => {{
         use ::color::{Srgb, parse_color};
         parse_color($color_str).map(|c| c.to_alpha_color::<Srgb>())

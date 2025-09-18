@@ -52,28 +52,6 @@ impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
     }
 }
 
-// /// The Trait for `I: IntoIterator<Item = T>` where `T` satisfies [`WritingRequirement`]
-// pub trait GroupWritingAnim<T: WritingRequirement + 'static> {
-//     /// Create a [`Write`] anim for a group.
-//     fn group_write(self, lag_ratio: f64) -> AnimationSpan<Group<T>>;
-//     /// Create an [`Unwrite`] anim for a group.
-//     fn group_unwrite(self, lag_ratio: f64) -> AnimationSpan<Group<T>>;
-// }
-
-// impl<T: WritingRequirement + 'static, I> GroupWritingAnim<T> for I
-// where
-//     I: IntoIterator<Item = T>,
-// {
-//     fn group_write(self, lag_ratio: f64) -> AnimationSpan<Group<T>> {
-//         AnimationSpan::from_evaluator(Evaluator::new_dynamic(GroupWrite::new(self, lag_ratio)))
-//             .with_rate_func(smooth)
-//     }
-//     fn group_unwrite(self, lag_ratio: f64) -> AnimationSpan<Group<T>> {
-//         AnimationSpan::from_evaluator(Evaluator::new_dynamic(GroupWrite::new(self, lag_ratio)))
-//             .with_rate_func(smooth)
-//     }
-// }
-
 // ---------------------------------------------------- //
 
 // MARK: Impl
@@ -179,50 +157,6 @@ impl<T: WritingRequirement> EvalDynamic<T> for Write<T> {
         }
     }
 }
-
-// /// [`Write`] for a group of items.
-// ///
-// /// with a `lag_ratio`
-// pub struct GroupWrite<T: WritingRequirement> {
-//     anims: Vec<Write<T>>,
-//     lag_ratio: f64,
-// }
-
-// impl<T: WritingRequirement> GroupWrite<T> {
-//     /// Constructor
-//     pub fn new<I>(target: I, lag_ratio: f64) -> Self
-//     where
-//         I: IntoIterator<Item = T>,
-//     {
-//         Self {
-//             anims: target.into_iter().map(Write::new).collect(),
-//             lag_ratio,
-//         }
-//     }
-// }
-
-// impl<T: WritingRequirement> EvalDynamic<Group<T>> for GroupWrite<T> {
-//     fn eval_alpha(&self, alpha: f64) -> Group<T> {
-//         // -|--
-//         //  -|--
-//         //   -|--
-//         // total_time - unit_time * (1.0 - lag_ratio)  = unit_time * lag_ratio * n
-//         // total_time = unit_time * (1.0 + (n - 1) lag_ratio)
-//         let unit_time = 1.0 / (1.0 + (self.anims.len() - 1) as f64 * self.lag_ratio);
-//         let unit_lagged_time = unit_time * self.lag_ratio;
-//         self.anims
-//             .iter()
-//             .enumerate()
-//             .map(|(i, anim)| {
-//                 let start = unit_lagged_time * i as f64;
-
-//                 let alpha = (alpha - start) / unit_time;
-//                 let alpha = alpha.clamp(0.0, 1.0);
-//                 anim.eval_alpha(alpha)
-//             })
-//             .collect()
-//     }
-// }
 
 /// Unwrite
 ///

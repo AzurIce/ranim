@@ -1,5 +1,5 @@
 use ranim::{
-    animation::transform::TransformAnim,
+    anims::transform::TransformAnim,
     color::palettes::manim,
     glam::DVec3,
     items::{

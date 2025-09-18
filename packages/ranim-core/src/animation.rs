@@ -4,7 +4,7 @@ use crate::utils::rate_functions::linear;
 
 #[allow(unused)]
 use log::trace;
-use std::{any::Any, fmt::Debug, sync::Arc};
+use std::{any::Any, fmt::Debug, ops::Deref, sync::Arc};
 
 // MARK: Eval
 // ANCHOR: EvalDynamic
@@ -56,7 +56,7 @@ impl<T> Evaluator<T> {
             Self::Dynamic {
                 inner,
                 type_name: _,
-            } => EvalResult::Dynamic(inner.eval_alpha(alpha)),
+            } => EvalResult::Dynamic(Box::new(inner.eval_alpha(alpha))),
             Self::Static(e) => EvalResult::Static(e.clone()),
         }
     }
@@ -64,18 +64,46 @@ impl<T> Evaluator<T> {
 
 /// The evaluation result of [`Evaluator`]
 #[derive(Debug)]
-pub enum EvalResult<T> {
+pub enum EvalResult<T: ?Sized> {
     /// A dynamic evaluation result
-    Dynamic(T),
+    Dynamic(Box<T>),
     /// A static evaluation result
     Static(Arc<T>),
+}
+
+impl<T: ?Sized> AsRef<T> for EvalResult<T> {
+    fn as_ref(&self) -> &T {
+        match self {
+            Self::Dynamic(t) => t,
+            Self::Static(rc) => rc,
+        }
+    }
+}
+
+impl<T: ?Sized> Deref for EvalResult<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Dynamic(t) => t,
+            Self::Static(rc) => rc,
+        }
+    }
+}
+
+impl<T: Clone + 'static> EvalResult<T> {
+    pub fn into_any(self) -> EvalResult<dyn Any> {
+        match self {
+            Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Any>),
+            Self::Static(rc) => EvalResult::Static(rc as Arc<dyn Any>),
+        }
+    }
 }
 
 impl<T: Clone> EvalResult<T> {
     /// Maps the evaluation result to another type
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> EvalResult<U> {
         match self {
-            Self::Dynamic(t) => EvalResult::Dynamic(f(t)),
+            Self::Dynamic(t) => EvalResult::Dynamic(Box::new(f((*t).clone()))),
             Self::Static(rc) => EvalResult::Static(Arc::new(f((*rc).clone()))),
         }
     }
@@ -85,7 +113,7 @@ impl<T: Clone> EvalResult<T> {
     /// Consumes the evaluation result, and convert it into an owned value.
     pub fn into_owned(self) -> T {
         match self {
-            Self::Dynamic(t) => t,
+            Self::Dynamic(t) => (*t).clone(),
             Self::Static(rc) => (*rc).clone(),
         }
     }

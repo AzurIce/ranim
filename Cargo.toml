@@ -28,8 +28,14 @@ repository = "https://github.com/AzurIce/ranim"
 
 [workspace.dependencies]
 ranim = { path = ".", version = "0.1.4" }
+ranim-core = { path = "packages/ranim-core", version = "0.1.4" }
+ranim-items = { path = "packages/ranim-items", version = "0.1.4" }
+ranim-anims = { path = "packages/ranim-anims", version = "0.1.4" }
 ranim-macros = { path = "packages/ranim-macros", version = "0.1.4" }
+glam = "0.30.5"
+log = "0.4.28"
 itertools = "0.14"
+bytemuck = "1.23.2"
 
 [features]
 # default = ["output"]
@@ -44,16 +50,19 @@ app = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:winit"]
 serde = ["dep:serde", "glam/serde", "color/serde"]
 
 [dependencies]
+ranim-core.workspace = true
+ranim-items.workspace = true
+ranim-anims.workspace = true
 ranim-macros.workspace = true
 itertools.workspace = true
 web-time = "1.1.0"
 sha1 = "0.10.6"
 lru = "0.16.1"
 async-channel = "2.5.0"
-bytemuck = { version = "1.23.2", features = ["derive"] }
-glam = { version = "0.30.5", features = ["bytemuck"] }
+bytemuck = { workspace = true, features = ["derive"] }
+glam = { workspace = true, features = ["bytemuck"] }
+log.workspace = true
 image = "0.25.8"
-log = "0.4.28"
 pollster = "0.4.0"
 wgpu = "25.0.2"
 anyhow = "1.0.99"

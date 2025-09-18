@@ -105,58 +105,6 @@ impl Alignable for DVec3 {
     }
 }
 
-// impl<T: Opacity + Alignable + Clone> Alignable for Group<T, OpacityMark> {
-//     fn is_aligned(&self, other: &Self) -> bool {
-//         self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
-//     }
-//     fn align_with(&mut self, other: &mut Self) {
-//         let len = self.len().max(other.len());
-
-//         let transparent_repeated = |items: &mut Vec<T>, repeat_idxs: Vec<usize>| {
-//             for idx in repeat_idxs {
-//                 items[idx].set_opacity(0.0);
-//             }
-//         };
-//         if self.len() != len {
-//             let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&self.inner, len);
-//             transparent_repeated(&mut items, idxs);
-//             self.inner = items;
-//         }
-//         if other.len() != len {
-//             let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&other.inner, len);
-//             transparent_repeated(&mut items, idxs);
-//             other.inner = items;
-//         }
-//         self.iter_mut()
-//             .zip(other)
-//             .for_each(|(a, b)| a.align_with(b));
-//     }
-// }
-
-// TODO: make this better
-// impl<T: Alignable + Clone> Alignable for Group<T> {
-//     fn is_aligned(&self, other: &Self) -> bool {
-//         self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
-//     }
-//     fn align_with(&mut self, other: &mut Self) {
-//         let len = self.len().max(other.len());
-//         // println!("&&&&&&&&& align: {} {}", self.len(), other.len());
-//         if self.len() != len {
-//             let inner = resize_preserving_order(&self.0, len);
-//             self.0 = inner;
-//         }
-//         if other.len() != len {
-//             let inner = resize_preserving_order(&other.0, len);
-//             other.0 = inner;
-//         }
-//         // println!("&&&&&&&&& align: {} {}", self.len(), other.len());
-//         // println!("resize: {} {}", self.len(), other.len());
-//         self.iter_mut().zip(other).for_each(|(a, b)| {
-//             a.align_with(b);
-//         });
-//     }
-// }
-
 // MARK: Opacity
 /// A trait for items with opacity
 pub trait Opacity {

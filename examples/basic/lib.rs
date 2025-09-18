@@ -1,8 +1,7 @@
 use glam::DVec3;
 use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
+    anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     color::palettes::manim,
-    components::ScaleHint,
     items::{
         Group,
         vitem::{VItem, svg::SvgItem, typst::typst_svg},

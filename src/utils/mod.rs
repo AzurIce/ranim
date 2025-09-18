@@ -4,8 +4,6 @@ pub mod bezier;
 pub mod math;
 /// The rate functions
 pub mod rate_functions;
-/// Svg related stuffs
-pub mod svg;
 /// Typst related stuffs
 pub mod typst;
 pub(crate) mod wgpu;
