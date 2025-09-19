@@ -133,9 +133,7 @@ impl<T: WritingRequirement> Write<T> {
     /// Constructor
     pub fn new(target: T) -> Self {
         let mut outline = target.clone();
-        outline
-            .set_fill_opacity(0.0)
-            .set_stroke_opacity(1.0);
+        outline.set_fill_opacity(0.0).set_stroke_opacity(1.0);
         if outline.stroke_width() == 0.0 {
             outline.set_stroke_width(DEFAULT_STROKE_WIDTH);
         }
@@ -175,9 +173,7 @@ impl<T: WritingRequirement> Unwrite<T> {
     /// Constructor
     pub fn new(target: T) -> Self {
         let mut outline = target.clone();
-        outline
-            .set_fill_opacity(0.0)
-            .set_stroke_opacity(1.0);
+        outline.set_fill_opacity(0.0).set_stroke_opacity(1.0);
         if outline.stroke_width() == 0.0 {
             outline.set_stroke_width(DEFAULT_STROKE_WIDTH);
         }

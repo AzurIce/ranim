@@ -154,9 +154,9 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 /// Define a video output.
-/// 
+///
 /// Default: 1920x1080 60fps, save_frames = false
-/// 
+///
 /// Available attributes:
 /// - `pixel_size`: (width, height)
 /// - `fps`: frames per second
