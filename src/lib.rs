@@ -43,8 +43,8 @@ pub mod utils {
 #[cfg(feature = "render")]
 pub use ranim_render as render;
 
-pub use ranim_core::{glam, inventory};
 pub use ranim_core::{Output, RanimScene, Scene, SceneConfig, SceneConstructor};
+pub use ranim_core::{glam, inventory};
 
 /// The preludes
 pub mod prelude {

@@ -5,8 +5,8 @@ fmt:
     cargo fmt --all
 
 lint: lint-no-features
-    just lint-features app
-    just lint-features serde
+    just lint-features preview
+    just lint-features render
     just lint-features profiling
 
 lint-no-features: fmt

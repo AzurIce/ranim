@@ -26,9 +26,8 @@ const ALIGNMENT: usize = 256;
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
 // the singleton returned by `puffin::GlobalProfiler::lock`. Instead, we need our own `puffin::GlobalProfiler` that we
 // can be several frames behind puffin's main global profiler singleton.
-pub static PUFFIN_GPU_PROFILER: std::sync::LazyLock<
-    std::sync::Mutex<puffin::GlobalProfiler>,
-> = std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
+pub static PUFFIN_GPU_PROFILER: std::sync::LazyLock<std::sync::Mutex<puffin::GlobalProfiler>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
 
 #[allow(unused)]
 #[cfg(feature = "profiling")]
@@ -81,7 +80,6 @@ mod profiling_utils {
 // MARK: TimelineEvalResult
 
 use std::sync::Arc;
-
 
 /// Ext for [`SealedRanimScene`] to eval to [`TimelineEvalResult`]
 pub trait RenderEval {
@@ -157,7 +155,6 @@ impl RenderEval for SealedRanimScene {
         }
     }
 }
-
 
 trait RenderableResult {
     fn convert(self) -> EvalResult<dyn Renderable>;

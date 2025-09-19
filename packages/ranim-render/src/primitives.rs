@@ -296,11 +296,7 @@ impl RenderInstances {
             .get_mut(&id)
             .and_then(|x| (x.as_mut() as &mut dyn Any).downcast_mut::<T>())
     }
-    pub fn insert_render_instance<T: RenderCommand + 'static>(
-        &mut self,
-        id: usize,
-        instance: T,
-    ) {
+    pub fn insert_render_instance<T: RenderCommand + 'static>(&mut self, id: usize, instance: T) {
         self.items.insert(id, Box::new(instance));
     }
 }

@@ -12,7 +12,6 @@ use ranim::{
 };
 
 #[scene]
-
 pub fn hello_ranim(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
 

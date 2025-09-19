@@ -408,10 +408,10 @@ pub(crate) fn exe_dir() -> PathBuf {
 
 /// Download latest release of ffmpeg from <https://github.com/eugeneware/ffmpeg-static/releases/latest> to <target_dir>/ffmpeg
 pub fn download_ffmpeg(target_dir: impl AsRef<Path>) -> Result<PathBuf, anyhow::Error> {
-    use std::io::Read;
     use anyhow::Context;
     use itertools::Itertools;
     use log::info;
+    use std::io::Read;
 
     let target_dir = target_dir.as_ref();
 

@@ -7,8 +7,8 @@ pub use ::color::HueDirection;
 
 /// Color preludes
 pub mod prelude {
-    pub use super::{rgb, rgb8, rgba, rgba8};
     pub use super::{color, try_color};
+    pub use super::{rgb, rgb8, rgba, rgba8};
 }
 
 /// Construct an [`AlphaColor<Srgb>`] from rgb u8, the alpha value will be 255

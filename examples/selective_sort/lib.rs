@@ -1,6 +1,6 @@
-use ranim::glam;
 use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
+use ranim::glam;
 use ranim::{
     anims::transform::TransformAnim, color::palettes::manim, items::vitem::geometry::Rectangle,
     prelude::*, utils::rate_functions::linear,

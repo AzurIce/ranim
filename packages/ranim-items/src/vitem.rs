@@ -361,6 +361,6 @@ impl<T: Opacity + Alignable + Clone> Alignable for Group<T> {
 impl<E: Extract + Opacity> Extract for Group<E> {
     type Target = E::Target;
     fn extract(&self) -> Vec<Self::Target> {
-        self.iter().map(|x| x.extract()).flatten().collect()
+        self.iter().flat_map(|x| x.extract()).collect()
     }
 }

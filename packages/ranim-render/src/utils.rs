@@ -1,5 +1,9 @@
-
-use std::{any::{Any, TypeId}, collections::HashMap, fmt::Debug, marker::PhantomData};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    fmt::Debug,
+    marker::PhantomData,
+};
 
 use log::info;
 use wgpu::util::DeviceExt;
@@ -290,7 +294,6 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
     }
 }
 
-
 /// A storage for pipelines
 #[derive(Default)]
 pub struct PipelinesStorage {
@@ -394,7 +397,6 @@ pub(crate) fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> 
     output_staging_buffer.unmap();
     texture_data
 }
-
 
 #[cfg(test)]
 mod test {

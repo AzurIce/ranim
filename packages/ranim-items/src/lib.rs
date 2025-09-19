@@ -1,5 +1,9 @@
 use derive_more::{Deref, DerefMut};
-use ranim_core::{Extract, traits::{Alignable, Interpolatable, Opacity}, utils::resize_preserving_order_with_repeated_indices};
+use ranim_core::{
+    Extract,
+    traits::{Alignable, Interpolatable, Opacity},
+    utils::resize_preserving_order_with_repeated_indices,
+};
 
 /// The vectorized item.
 pub mod vitem;
