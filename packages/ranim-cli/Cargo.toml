@@ -12,7 +12,7 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
-ranim = { workspace = true, features = ["app"] }
+ranim = { workspace = true, features = ["preview", "render"] }
 anyhow = "1.0.98"
 cargo_toml = "0.22.3"
 clap = { version = "4.5.42", features = ["derive"] }

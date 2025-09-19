@@ -1,27 +1,27 @@
 #![allow(clippy::all)]
 #![allow(unused)]
+use ranim::glam;
 use std::{f64::consts::PI, time::Duration};
 
-use ::color::palette::css;
 use glam::{DVec3, dvec3};
 use ranim::{
-    animation::{
+    anims::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
         transform::TransformAnim,
     },
-    color::palettes::manim::{self, BLUE_C, RED_C},
-    components::{Anchor, ScaleHint},
+    color::palettes::{
+        css,
+        manim::{self, BLUE_C, RED_C},
+    },
     items::{
         Group,
-        camera_frame::CameraFrame,
         vitem::{
             self, VItem,
             geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
         },
     },
     prelude::*,
-    timeline::{TimelineFunc, TimelinesFunc},
 };
 
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -32,7 +32,7 @@ fn test(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
     let n = 8;
     let arcs = (0..n)
-        .map(|i| {
+        .map(|i: i32| {
             let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
             ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
         })

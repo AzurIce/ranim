@@ -1,5 +1,5 @@
 use ranim::{
-    animation::{creation::WritingAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, transform::TransformAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,

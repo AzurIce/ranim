@@ -1,5 +1,5 @@
 use app::hello_ranim_scene;
-use ranim::app::preview_scene;
+use ranim::cmd::preview::preview_scene;
 
 fn main() {
     #[cfg(not(target_arch = "wasm32"))]

@@ -2,9 +2,9 @@ use std::{f64::consts::PI, hint::black_box};
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use ranim::{
+    core::Extract,
     glam::{DVec3, dvec3},
     items::vitem::geometry::{Arc, Circle, Polygon, Rectangle, Square},
-    render::primitives::Extract,
 };
 
 fn extract_bench(c: &mut Criterion) {
@@ -14,7 +14,7 @@ fn extract_bench(c: &mut Criterion) {
     for n in [5, 10, 20, 40].iter() {
         g.bench_with_input(BenchmarkId::new("polygon", n), n, |b, n| {
             let points = (0..*n)
-                .map(|i| {
+                .map(|i: i32| {
                     let angle = 2.0 * std::f64::consts::PI * (i as f64) / 16.0;
                     dvec3(angle.cos(), angle.sin(), 0.0)
                 })

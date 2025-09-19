@@ -104,8 +104,8 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {
             #[doc = concat!("<canvas id=\"ranim-app-", stringify!(#fn_name), "\" width=\"1280\" height=\"720\" style=\"width: 100%;\"></canvas>")]
             #[doc = concat!("<script type=\"module\">")]
-            #[doc = concat!("  const { find_scene } = await ranim_examples;")]
-            #[doc = concat!("  find_scene(\"", stringify!(#fn_name), "\").run_app();")]
+            #[doc = concat!("  const { find_scene, preview_scene } = await ranim_examples;")]
+            #[doc = concat!("  preview_scene(find_scene(\"", stringify!(#fn_name), "\"));")]
             #[doc = "</script>"]
         }
     } else {
@@ -137,7 +137,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #doc
         #(#doc_attrs)*
-        #vis fn #fn_name(r: &mut #ranim::timeline::RanimScene) #fn_body
+        #vis fn #fn_name(r: &mut #ranim::RanimScene) #fn_body
 
         static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
         #[doc(hidden)]
@@ -153,6 +153,15 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Define a video output.
+///
+/// Default: 1920x1080 60fps, save_frames = false
+///
+/// Available attributes:
+/// - `pixel_size`: (width, height)
+/// - `fps`: frames per second
+/// - `save_frames`: save frames to disk
+/// - `dir`: directory for output
 #[proc_macro_attribute]
 pub fn output(_: TokenStream, _: TokenStream) -> TokenStream {
     TokenStream::new()
