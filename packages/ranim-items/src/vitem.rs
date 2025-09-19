@@ -278,6 +278,9 @@ impl StrokeColor for VItem {
 }
 
 impl StrokeWidth for VItem {
+    fn stroke_width(&self) -> f32 {
+        self.stroke_widths[0].0
+    }
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         f(self.stroke_widths.as_mut());
         self

@@ -104,6 +104,9 @@ impl Opacity for SvgItem {
 }
 
 impl StrokeWidth for SvgItem {
+    fn stroke_width(&self) -> f32 {
+        self.0.stroke_width()
+    }
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         self.0.iter_mut().for_each(|vitem| {
             vitem.apply_stroke_func(&f);
@@ -221,18 +224,19 @@ pub fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
             transform.ty as f64,
         ]);
         vitem.apply_affine(affine);
-        if let Some(fill) = path.fill() {
-            let color = parse_paint(fill.paint()).with_alpha(fill.opacity().get());
-            vitem.set_fill_color(color);
+        let fill_color = if let Some(fill) = path.fill() {
+            parse_paint(fill.paint()).with_alpha(fill.opacity().get())
         } else {
-            vitem.set_fill_color(rgba(0.0, 0.0, 0.0, 0.0));
-        }
+            rgba(0.0, 0.0, 0.0, 0.0)
+        };
+        vitem.set_fill_color(fill_color);
         if let Some(stroke) = path.stroke() {
             let color = parse_paint(stroke.paint()).with_alpha(stroke.opacity().get());
             vitem.set_stroke_color(color);
             vitem.set_stroke_width(stroke.width().get());
         } else {
-            vitem.set_stroke_color(rgba(0.0, 0.0, 0.0, 0.0));
+            vitem.set_stroke_color(fill_color.with_alpha(0.0));
+            vitem.set_stroke_width(0.0);
         }
         vitems.push(vitem);
     }

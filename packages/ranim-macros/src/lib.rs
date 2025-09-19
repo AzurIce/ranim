@@ -153,6 +153,15 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Define a video output.
+/// 
+/// Default: 1920x1080 60fps, save_frames = false
+/// 
+/// Available attributes:
+/// - `pixel_size`: (width, height)
+/// - `fps`: frames per second
+/// - `save_frames`: save frames to disk
+/// - `dir`: directory for output
 #[proc_macro_attribute]
 pub fn output(_: TokenStream, _: TokenStream) -> TokenStream {
     TokenStream::new()

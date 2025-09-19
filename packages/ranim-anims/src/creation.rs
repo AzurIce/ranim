@@ -135,8 +135,10 @@ impl<T: WritingRequirement> Write<T> {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)
-            .set_stroke_width(DEFAULT_STROKE_WIDTH)
             .set_stroke_opacity(1.0);
+        if outline.stroke_width() == 0.0 {
+            outline.set_stroke_width(DEFAULT_STROKE_WIDTH);
+        }
         Self {
             original: target,
             outline,
@@ -175,8 +177,10 @@ impl<T: WritingRequirement> Unwrite<T> {
         let mut outline = target.clone();
         outline
             .set_fill_opacity(0.0)
-            .set_stroke_width(DEFAULT_STROKE_WIDTH)
             .set_stroke_opacity(1.0);
+        if outline.stroke_width() == 0.0 {
+            outline.set_stroke_width(DEFAULT_STROKE_WIDTH);
+        }
         Self {
             original: target,
             outline,

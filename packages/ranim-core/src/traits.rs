@@ -197,6 +197,7 @@ impl<T: StrokeColor> StrokeColor for [T] {
 /// A trait for items have stroke width
 pub trait StrokeWidth {
     // TODO: Make this better
+    fn stroke_width(&self) -> f32;
     /// Applying stroke width function to an item
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self;
     /// Setting stroke width of an item
@@ -206,6 +207,9 @@ pub trait StrokeWidth {
 }
 
 impl<T: StrokeWidth> StrokeWidth for [T] {
+    fn stroke_width(&self) -> f32 {
+        self[0].stroke_width()
+    }
     fn apply_stroke_func(
         &mut self,
         f: impl for<'a> Fn(&'a mut [crate::components::width::Width]),
@@ -419,11 +423,11 @@ pub fn wrap_point_func_with_point(
 /// A hint for scaling the mobject.
 #[derive(Debug, Clone, Copy)]
 pub enum ScaleHint {
-    /// Scale the mobject's X axe, while keep other axes unchanged.
+    /// Scale the mobject's X axe
     X(f64),
-    /// Scale the mobject's Y axe, while keep other axes unchanged.
+    /// Scale the mobject's Y axe
     Y(f64),
-    /// Scale the mobject's Z axe, while keep other axes unchanged.
+    /// Scale the mobject's Z axe
     Z(f64),
     /// Scale the mobject's X axe, while other axes are scaled accordingly.
     PorportionalX(f64),
@@ -465,6 +469,30 @@ pub trait Scale: BoundingBox {
     /// See [`ScaleHint`] for more details.
     fn scale_to(&mut self, hint: ScaleHint) -> &mut Self {
         self.scale(self.calc_scale_ratio(hint));
+        self
+    }
+    /// Scale the item to the minimum scale ratio of each axis from the given hints.
+    ///
+    /// See [`ScaleHint`] for more details.
+    fn scale_to_min(&mut self, hints: &[ScaleHint]) -> &mut Self {
+        let scale = hints
+            .iter()
+            .map(|hint| self.calc_scale_ratio(*hint))
+            .reduce(|a, b| a.min(b))
+            .unwrap_or(DVec3::ONE);
+        self.scale(scale);
+        self
+    }
+    /// Scale the item to the maximum scale ratio of each axis from the given hints.
+    ///
+    /// See [`ScaleHint`] for more details.
+    fn scale_to_max(&mut self, hints: &[ScaleHint]) -> &mut Self {
+        let scale = hints
+            .iter()
+            .map(|hint| self.calc_scale_ratio(*hint))
+            .reduce(|a, b| a.max(b))
+            .unwrap_or(DVec3::ONE);
+        self.scale(scale);
         self
     }
 }

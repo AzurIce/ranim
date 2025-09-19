@@ -422,6 +422,12 @@ impl Interpolatable for TypstText {
     }
 }
 
+impl From<TypstText> for Group<VItem> {
+    fn from(value: TypstText) -> Self {
+        value.vitems
+    }
+}
+
 impl Extract for TypstText {
     type Target = VItemPrimitive;
     fn extract(&self) -> Vec<Self::Target> {
@@ -493,6 +499,9 @@ impl Opacity for TypstText {
 }
 
 impl StrokeWidth for TypstText {
+    fn stroke_width(&self) -> f32 {
+        self.vitems.stroke_width()
+    }
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         self.vitems.iter_mut().for_each(|vitem| {
             vitem.apply_stroke_func(&f);

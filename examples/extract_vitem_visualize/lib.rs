@@ -156,6 +156,9 @@ impl FillColor for VisualVItem {
 }
 
 impl StrokeWidth for VisualVItem {
+    fn stroke_width(&self) -> f32 {
+        self.0.stroke_width()
+    }
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         self.0.apply_stroke_func(f);
         self
