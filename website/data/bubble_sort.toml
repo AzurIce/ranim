@@ -8,7 +8,6 @@ use ranim::{
     glam::{DVec3, dvec2},
     items::vitem::geometry::Rectangle,
     prelude::*,
-    timeline::TimeMark,
     utils::rate_functions::linear,
 };
 
@@ -118,7 +117,7 @@ fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
 }
 ```"""
-hash = "4aa16e1587ea77ad6562743bc9dcb56788b2e416"
+hash = "994beaf72283708642868372b43c6845579e7403"
 preview_imgs = ["/examples/bubble_sort/preview-100.png", "/examples/bubble_sort/preview-10.png"]
 output_files = ["/examples/bubble_sort/bubble_sort_10_1920x1080_60.mp4", "/examples/bubble_sort/bubble_sort_1920x1080_60.mp4"]
 wasm = true

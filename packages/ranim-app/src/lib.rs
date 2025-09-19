@@ -22,7 +22,9 @@ use winit::{
 use egui_tools::EguiRenderer;
 use pipeline::{AppPipeline, Viewport};
 use ranim_core::{Scene, SceneConstructor, SealedRanimScene};
-use ranim_render::{RenderEval, Renderer, TimelineEvalResult, primitives::RenderInstances, utils::WgpuContext};
+use ranim_render::{
+    RenderEval, Renderer, TimelineEvalResult, primitives::RenderInstances, utils::WgpuContext,
+};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -640,7 +642,7 @@ pub fn run_app(app: AppState, #[cfg(target_arch = "wasm32")] container_id: Strin
 
     #[cfg(target_arch = "wasm32")]
     {
-        let mut app = WinitApp::new(app, &event_loop, container_id);
+        let app = WinitApp::new(app, &event_loop, container_id);
         use winit::platform::web::EventLoopExtWebSys;
         event_loop.spawn_app(app);
     }
@@ -652,22 +654,21 @@ pub fn run_app(app: AppState, #[cfg(target_arch = "wasm32")] container_id: Strin
 }
 
 pub trait ScenePreview {
-    fn run_app(&self);
-    fn run_app_with_name(&self, name: String);
+    fn preview(&self);
+    fn preview_with_name(&self, name: String);
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl ScenePreview for Scene {
-    fn run_app(&self) {
-        run_scene_app(self.constructor, self.name.to_string());
+    fn preview(&self) {
+        preview_constructor_with_name(self.constructor, self.name.to_string());
     }
-    fn run_app_with_name(&self, name: String) {
-        run_scene_app(self.constructor, name);
+    fn preview_with_name(&self, name: String) {
+        preview_constructor_with_name(self.constructor, name);
     }
 }
 
 /// Runs a scene preview app on a scene constructor
-pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
+pub fn preview_constructor_with_name(constructor: impl SceneConstructor, name: String) {
     let mut app_state = AppState::new_with_title(constructor, name.clone());
     app_state.set_clear_color_str("#333333ff");
 
@@ -679,8 +680,14 @@ pub fn run_scene_app(constructor: impl SceneConstructor, name: String) {
 }
 
 /// Preview a scene
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn preview_scene(s: &Scene) {
-    let mut app_state = AppState::new_with_title(s.constructor, s.name.to_string());
+    preview_scene_with_name(s, s.name.to_string());
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn preview_scene_with_name(s: &Scene, name: String) {
+    let mut app_state = AppState::new_with_title(s.constructor, name.clone());
     app_state.set_clear_color_str(s.config.clear_color);
 
     run_app(

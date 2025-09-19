@@ -9,7 +9,6 @@ use ranim::{
     glam::dvec2,
     items::vitem::{Group, geometry::Arc},
     prelude::*,
-    timeline::TimeMark,
 };
 
 #[scene]
@@ -60,7 +59,7 @@ pub fn arc(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "4c5218ec224c0af6a5b43136e5d2cc6ea685fcb2"
+hash = "53721c30986df2764822b0212da5a3c0a5bb7b8c"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

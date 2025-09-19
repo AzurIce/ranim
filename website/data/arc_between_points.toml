@@ -9,7 +9,6 @@ use ranim::{
     glam::{DMat2, dvec2},
     items::vitem::{Group, geometry::ArcBetweenPoints},
     prelude::*,
-    timeline::TimeMark,
 };
 
 #[scene]
@@ -58,7 +57,7 @@ fn arc_between_points(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "99b5dd2b19350a3405feacc58da9c9040ad38773"
+hash = "dcecf0fb9c6b521e49089f8f45d81f9657087c08"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
 wasm = true

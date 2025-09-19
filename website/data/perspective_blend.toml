@@ -11,7 +11,6 @@ use ranim::{
         vitem::{VItem, geometry::Square},
     },
     prelude::*,
-    timeline::TimeMark,
     utils::rate_functions::linear,
 };
 
@@ -104,7 +103,7 @@ fn perspective_blend(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "17606a3976b86729bff2d65e0063318e5d309186"
+hash = "7e3450d7eb046dee99232edfdeb02106472b1f02"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

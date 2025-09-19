@@ -1,11 +1,12 @@
 name = "selective_sort"
 code = """
 ```rust
+use ranim::glam;
 use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     anims::transform::TransformAnim, color::palettes::manim, items::vitem::geometry::Rectangle,
-    prelude::*, timeline::TimeMark, utils::rate_functions::linear,
+    prelude::*, utils::rate_functions::linear,
 };
 
 fn selective_sort(r: &mut RanimScene, num: usize) {
@@ -108,7 +109,7 @@ fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
 ```"""
-hash = "a22ab83b0c8c506128eb2b9bac91d0342e896086"
+hash = "42b5f6078e05e3b59edaa029443f78e38e456d53"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/selective_sort_1920x1080_60.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
 wasm = true

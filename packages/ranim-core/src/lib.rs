@@ -78,7 +78,12 @@ unsafe extern "C" {
 /// Return a scene with matched name
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn find_scene(name: &str) -> Option<Scene> {
-    inventory::iter::<Scene>().find(|s| s.name == name).cloned()
+    inventory::iter::<Scene>()
+        .find(|s| {
+            println!("find_scene: {:?}", s.name);
+            s.name == name
+        })
+        .cloned()
 }
 
 #[cfg(target_arch = "wasm32")]

@@ -7,7 +7,6 @@ use ranim::{
     glam::dvec3,
     items::vitem::geometry::Rectangle,
     prelude::*,
-    timeline::TimeMark,
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
 
@@ -123,7 +122,7 @@ fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
 }
 ```"""
-hash = "99fb3b0abb78aac6a5a8be9c2c4051790b1f4137"
+hash = "25b4b08d70b6967c5f10f7d733af0f9081b63330"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/hanoi_5_1920x1080_60.mp4", "/examples/hanoi/hanoi_1920x1080_60.mp4"]
 wasm = true

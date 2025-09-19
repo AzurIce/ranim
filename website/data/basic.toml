@@ -1,13 +1,14 @@
 name = "basic"
 code = """
 ```rust
+use ranim::glam;
+
 use glam::DVec3;
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     color::palettes::manim,
     items::vitem::{Group, VItem, svg::SvgItem, typst::typst_svg},
     prelude::*,
-    timeline::TimeMark,
 };
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -54,7 +55,7 @@ fn basic(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "af0d256d09ec670d83de78aabb6556268e1224db"
+hash = "f6fdbaac69d06d5280a39163f0539159fa087951"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/basic_1920x1080_60.mp4"]
 wasm = true

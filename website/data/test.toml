@@ -3,6 +3,7 @@ code = """
 ```rust
 #![allow(clippy::all)]
 #![allow(unused)]
+use ranim::glam;
 use std::{f64::consts::PI, time::Duration};
 
 use glam::{DVec3, dvec3};
@@ -57,7 +58,7 @@ fn test(r: &mut RanimScene) {
     r.timelines_mut().forward(1.0);
 }
 ```"""
-hash = "8ea2e751ee3a02846d74e8e63fdba6acac48e730"
+hash = "57e76cde42f53648ac732cdcfa73f21c169259d7"
 preview_imgs = []
 output_files = []
 wasm = false

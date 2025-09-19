@@ -12,7 +12,6 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
-    timeline::TimeMark,
 };
 
 #[scene]
@@ -78,7 +77,7 @@ fn hello_ranim_chained(r: &mut RanimScene) {
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "f2b0341847c14308250e30c92ad0ac614a6c3dd4"
+hash = "468ec9719542f090cca47613c1f03e2535db4f27"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/hello_ranim_1920x1080_60.mp4"]
 wasm = true

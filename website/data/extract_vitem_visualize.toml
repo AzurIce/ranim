@@ -1,6 +1,7 @@
 name = "extract_vitem_visualize"
 code = """
 ```rust
+use ranim::glam;
 use std::f64::consts::PI;
 
 use ranim::{
@@ -15,7 +16,6 @@ use ranim::{
         typst::typst_svg,
     },
     prelude::*,
-    timeline::TimeMark,
 };
 
 use glam::DVec3;
@@ -244,7 +244,7 @@ impl Empty for VisualVItem {
     }
 }
 ```"""
-hash = "e5d51fb26a8f1b296318c4bec1bb44d3b23057ab"
+hash = "6e7994931b6f3dbc13f6f84a16057a92f170d118"
 preview_imgs = ["/examples/extract_vitem_visualize/preview-ranim_text.png", "/examples/extract_vitem_visualize/preview-hello_ranim.png"]
 output_files = ["/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4", "/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4"]
 wasm = true
