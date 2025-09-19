@@ -1,10 +1,11 @@
+use ranim::glam;
+
 use glam::DVec3;
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     color::palettes::manim,
     items::vitem::{Group, VItem, svg::SvgItem, typst::typst_svg},
     prelude::*,
-    timeline::TimeMark,
 };
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");

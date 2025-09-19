@@ -6,7 +6,6 @@ use ranim::{
     glam::{DMat2, dvec2},
     items::vitem::{Group, geometry::ArcBetweenPoints},
     prelude::*,
-    timeline::TimeMark,
 };
 
 #[scene]

@@ -496,7 +496,7 @@ impl<T: Clone + 'static> ItemTimeline<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Group, primitives::vitem::VItemPrimitive, timeline::ItemTimeline};
+    use crate::{primitives::vitem::VItemPrimitive, timeline::ItemTimeline};
 
     #[test]
     fn test_item_timeline() {
@@ -521,28 +521,6 @@ mod tests {
         assert_eq!(res.as_ref(), &vitem);
         let (res, _) = timeline.eval_at_alpha(1.0).unwrap();
         assert_eq!(res.as_ref(), &vitem);
-
-        let x = Group(vec![VItemPrimitive {
-            points2d: vec![],
-            fill_rgbas: vec![],
-            stroke_rgbas: vec![],
-            stroke_widths: vec![],
-        }]);
-        let mut timeline = ItemTimeline::new(x.clone());
-        assert!(timeline.eval_at_alpha(0.0).is_none());
-        timeline.show();
-        timeline.forward(1.0);
-        timeline.seal();
-
-        assert_eq!(timeline.start_sec(), Some(0.0));
-        assert_eq!(timeline.end_sec(), Some(1.0));
-
-        let (res, _) = timeline.eval_at_alpha(0.0).unwrap();
-        assert_eq!(res.as_ref(), &x);
-        let (res, _) = timeline.eval_at_alpha(0.5).unwrap();
-        assert_eq!(res.as_ref(), &x);
-        let (res, _) = timeline.eval_at_alpha(1.0).unwrap();
-        assert_eq!(res.as_ref(), &x);
     }
 
     #[test]
@@ -566,25 +544,5 @@ mod tests {
 
         let (res, _) = timeline.eval_primitives_at_alpha(0.0).unwrap();
         assert_eq!(res.as_ref(), &Primitives::VItemPrimitive(vec![vitem]));
-
-        let x = vec![VItemPrimitive {
-            points2d: vec![],
-            fill_rgbas: vec![],
-            stroke_rgbas: vec![],
-            stroke_widths: vec![],
-        }];
-        let mut timeline = ItemDynTimelines::new();
-        timeline.push(ItemTimeline::new(Group(x.clone())));
-        assert!(timeline.eval_primitives_at_alpha(0.0).is_none());
-
-        timeline.get_dyn_mut().show();
-        timeline.get_dyn_mut().forward(1.0);
-        timeline.get_dyn_mut().seal();
-
-        assert_eq!(timeline.get_dyn().start_sec(), Some(0.0));
-        assert_eq!(timeline.get_dyn().end_sec(), Some(1.0));
-
-        let (res, _) = timeline.eval_primitives_at_alpha(0.0).unwrap();
-        assert_eq!(res.as_ref(), &Primitives::VItemPrimitive(x));
     }
 }

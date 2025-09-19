@@ -1,5 +1,6 @@
 #![allow(clippy::all)]
 #![allow(unused)]
+use ranim::glam;
 use std::{f64::consts::PI, time::Duration};
 
 use glam::{DVec3, dvec3};

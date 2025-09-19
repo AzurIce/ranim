@@ -1,6 +1,7 @@
+
 use std::ops::Deref;
 
-use crate::render::WgpuContext;
+use ranim_render::utils::WgpuContext;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -121,7 +122,7 @@ impl AppPipeline {
     ) -> Self {
         let WgpuContext { device, .. } = ctx;
 
-        let module = &device.create_shader_module(wgpu::include_wgsl!("./shaders/app.wgsl"));
+        let module = &device.create_shader_module(wgpu::include_wgsl!("./shader.wgsl"));
 
         let pipeline_layout = ctx
             .device

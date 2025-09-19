@@ -9,7 +9,6 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
-    timeline::TimeMark,
 };
 
 #[scene]

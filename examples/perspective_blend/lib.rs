@@ -8,7 +8,6 @@ use ranim::{
         vitem::{VItem, geometry::Square},
     },
     prelude::*,
-    timeline::TimeMark,
     utils::rate_functions::linear,
 };
 

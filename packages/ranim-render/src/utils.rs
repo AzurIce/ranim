@@ -4,7 +4,7 @@ use std::{any::{Any, TypeId}, collections::HashMap, fmt::Debug, marker::PhantomD
 use log::info;
 use wgpu::util::DeviceExt;
 
-use crate::render::RenderResource;
+use crate::RenderResource;
 
 /// Wgpu context
 pub struct WgpuContext {

@@ -1,3 +1,4 @@
+use ranim::glam;
 use std::f64::consts::PI;
 
 use glam::{DVec3, dvec2, dvec3};
@@ -12,7 +13,6 @@ use ranim::{
         typst::typst_svg,
     },
     prelude::*,
-    timeline::TimeMark,
     utils::rate_functions::{linear, smooth},
 };
 

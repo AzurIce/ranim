@@ -3,7 +3,7 @@ use egui::{
     emath::GuiRounding, pos2, remap_clamp,
 };
 
-use crate::{color::palettes::manim, timeline::ItemDynTimelinesInfo};
+use ranim_core::{ItemDynTimelinesInfo, color::palettes::manim};
 
 use super::TimelineInfo;
 

@@ -7,11 +7,6 @@ use log::warn;
 
 use crate::components::width::Width;
 
-// use crate::{
-//     components::{Anchor, ScaleHint, vpoint::wrap_point_func_with_anchor, width::Width},
-//     items::Group,
-// };
-
 // MARK: Interpolatable
 /// A trait for interpolating to values
 ///

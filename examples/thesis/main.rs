@@ -1,3 +1,4 @@
+use ranim::glam;
 use std::f64::consts::PI;
 
 use glam::{DVec3, dvec3};
@@ -103,8 +104,9 @@ fn transform(r: &mut RanimScene) {
 }
 
 fn main() {
-    #[cfg(feature = "app")]
+    #[cfg(feature = "preview")]
     {
+        use ranim::cmd::preview_scene;
         preview_scene(fading_scene);
         preview_scene(creation_scene);
         preview_scene(writing_scene);
@@ -112,6 +114,7 @@ fn main() {
     }
     #[cfg(feature = "render")]
     {
+        use ranim::cmd::render_scene;
         render_scene(fading_scene);
         render_scene(creation_scene);
         render_scene(writing_scene);

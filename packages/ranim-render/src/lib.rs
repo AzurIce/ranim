@@ -1,15 +1,9 @@
 //! This module
-pub(crate) mod pipelines;
+pub mod pipelines;
 /// The basic renderable structs
 pub mod primitives;
 /// Rendering related utils
 pub mod utils;
-
-/// The render app
-#[cfg(not(target_arch = "wasm32"))]
-pub mod app;
-#[cfg(not(target_arch = "wasm32"))]
-mod file_writer;
 
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Rgba};
@@ -17,8 +11,9 @@ use log::warn;
 use pipelines::{Map3dTo2dPipeline, VItemPipeline};
 use primitives::RenderCommand;
 
-use crate::{render::primitives::Renderable, timeline::SealedRanimScene};
+use crate::primitives::Renderable;
 use ranim_core::{
+    SealedRanimScene,
     animation::EvalResult,
     primitives::{Primitives, camera_frame::CameraFrame},
 };
@@ -28,7 +23,12 @@ pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureForma
 const ALIGNMENT: usize = 256;
 
 #[cfg(feature = "profiling")]
-use crate::PUFFIN_GPU_PROFILER;
+// Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
+// the singleton returned by `puffin::GlobalProfiler::lock`. Instead, we need our own `puffin::GlobalProfiler` that we
+// can be several frames behind puffin's main global profiler singleton.
+pub static PUFFIN_GPU_PROFILER: std::sync::LazyLock<
+    std::sync::Mutex<puffin::GlobalProfiler>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
 
 #[allow(unused)]
 #[cfg(feature = "profiling")]
@@ -82,39 +82,31 @@ mod profiling_utils {
 
 use std::sync::Arc;
 
-trait RenderableResult {
-    fn convert(self) -> EvalResult<dyn Renderable>;
-}
 
-impl<T: Renderable + 'static> RenderableResult for EvalResult<T> {
-    fn convert(self) -> EvalResult<dyn Renderable> {
-        match self {
-            Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Renderable>),
-            Self::Static(rc) => EvalResult::Static(rc as Arc<dyn Renderable>),
-        }
+/// Ext for [`SealedRanimScene`] to eval to [`TimelineEvalResult`]
+pub trait RenderEval {
+    /// Get the total seconds of the
+    fn total_secs(&self) -> f64;
+    /// Evaluate the state of timelines at `target_sec`
+    fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult;
+    /// Evaluate the state of timelines at `alpha`
+    fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
+        self.eval_sec(alpha * self.total_secs())
     }
 }
 
-/// The evaluation result
-///
-/// This is produced from [`SealedRanimScene::eval_alpha`] or [`SealedRanimScene::eval_sec`]
-#[allow(clippy::type_complexity)]
-pub struct TimelineEvalResult {
-    /// (`EvalResult<CameraFrame>`, id hash)
-    pub camera_frame: (EvalResult<CameraFrame>, u64),
-    /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, id hash)
-    pub visual_items: Vec<(usize, EvalResult<dyn Renderable>, u64)>,
-}
-
-impl SealedRanimScene {
+impl RenderEval for SealedRanimScene {
+    fn total_secs(&self) -> f64 {
+        self.total_secs()
+    }
     // MARK: eval_sec
     /// Evaluate the state of timelines at `target_sec`
-    pub fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
-        let mut items = Vec::with_capacity(self.timelines.len());
+    fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
+        let mut items = Vec::with_capacity(self.timelines_cnt());
 
         let mut camera_frame = None::<(EvalResult<CameraFrame>, u64)>;
 
-        for (id, timeline) in self.timelines.iter().enumerate() {
+        for (id, timeline) in self.timelines_iter().enumerate() {
             // println!("### eval_sec timeline id {id} ###");
             let Some((res, id_hash)) = timeline.eval_primitives_at_sec(target_sec) else {
                 continue;
@@ -164,10 +156,31 @@ impl SealedRanimScene {
             visual_items: items,
         }
     }
-    /// Evaluate the state of timelines at `alpha`
-    pub fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
-        self.eval_sec(alpha * self.total_secs)
+}
+
+
+trait RenderableResult {
+    fn convert(self) -> EvalResult<dyn Renderable>;
+}
+
+impl<T: Renderable + 'static> RenderableResult for EvalResult<T> {
+    fn convert(self) -> EvalResult<dyn Renderable> {
+        match self {
+            Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Renderable>),
+            Self::Static(rc) => EvalResult::Static(rc as Arc<dyn Renderable>),
+        }
     }
+}
+
+/// The evaluation result
+///
+/// This is produced from [`SealedRanimScene::eval_alpha`] or [`SealedRanimScene::eval_sec`]
+#[allow(clippy::type_complexity)]
+pub struct TimelineEvalResult {
+    /// (`EvalResult<CameraFrame>`, id hash)
+    pub camera_frame: (EvalResult<CameraFrame>, u64),
+    /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, id hash)
+    pub visual_items: Vec<(usize, EvalResult<dyn Renderable>, u64)>,
 }
 
 // MARK: CameraUniforms
@@ -233,12 +246,12 @@ impl CameraUniformsBindGroup {
 
 // MARK: Renderer
 
-pub(crate) struct Renderer {
+pub struct Renderer {
     frame_height: f64,
     size: (usize, usize),
     pub(crate) pipelines: PipelinesStorage,
 
-    pub(crate) render_textures: RenderTextures,
+    pub render_textures: RenderTextures,
 
     uniforms_buffer: WgpuBuffer<CameraUniforms>,
     pub(crate) uniforms_bind_group: CameraUniformsBindGroup,
@@ -252,7 +265,7 @@ pub(crate) struct Renderer {
 }
 
 impl Renderer {
-    pub(crate) fn new(ctx: &WgpuContext, frame_height: f64, width: usize, height: usize) -> Self {
+    pub fn new(ctx: &WgpuContext, frame_height: f64, width: usize, height: usize) -> Self {
         let camera = CameraFrame::new();
 
         let render_textures = RenderTextures::new(ctx, width, height);
@@ -532,7 +545,7 @@ impl Renderer {
     //     &self.render_texture
     // }
 
-    pub(crate) fn get_rendered_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
+    pub fn get_rendered_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
         if !self.output_texture_updated {
             // trace!("[Camera] Updating rendered texture data...");
             self.update_rendered_texture_data(ctx);
@@ -572,11 +585,11 @@ impl Renderer {
 /// Texture resources used for rendering
 #[allow(unused)]
 pub struct RenderTextures {
-    pub(crate) render_texture: wgpu::Texture,
+    pub render_texture: wgpu::Texture,
     // multisample_texture: wgpu::Texture,
     // depth_stencil_texture: wgpu::Texture,
-    pub(crate) render_view: wgpu::TextureView,
-    pub(crate) linear_render_view: wgpu::TextureView,
+    pub render_view: wgpu::TextureView,
+    pub linear_render_view: wgpu::TextureView,
     // pub(crate) multisample_view: wgpu::TextureView,
     // pub(crate) depth_stencil_view: wgpu::TextureView,
 }

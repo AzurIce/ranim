@@ -32,43 +32,50 @@ ranim-core = { path = "packages/ranim-core", version = "0.1.4" }
 ranim-items = { path = "packages/ranim-items", version = "0.1.4" }
 ranim-anims = { path = "packages/ranim-anims", version = "0.1.4" }
 ranim-macros = { path = "packages/ranim-macros", version = "0.1.4" }
-glam = "0.30.5"
+ranim-app = { path = "packages/ranim-app", version = "0.1.4" }
+ranim-render = { path = "packages/ranim-render", version = "0.1.4" }
+wgpu-profiler = { version = "0.23.0", features = ["puffin"] }
+glam = "0.30.6"
 log = "0.4.28"
 itertools = "0.14"
 bytemuck = "1.23.2"
+wgpu = "25.0.2"
+image = "0.25.8"
 
 [features]
 # default = ["output"]
 default = []
 profiling = [
-  "dep:wgpu-profiler",
+  "ranim-render/profiling",
+  "ranim-app/profiling",
   "dep:puffin",
   "dep:puffin_http",
   "dep:profiling",
 ]
 # output = ["dep:async-channel"]
-app = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:winit", "render"]
-render = ["dep:indicatif"]
-serde = ["dep:serde", "glam/serde"]
+preview = [
+  "dep:ranim-render",
+  "dep:ranim-app",
+]
+render = [
+  "dep:ranim-render",
+  "dep:wgpu",
+  "dep:pollster",
+  "dep:which",
+  "dep:indicatif",
+  "dep:flate2",
+  "dep:reqwest",
+]
+# serde = ["dep:serde", "glam/serde"]
 
 [dependencies]
 ranim-core.workspace = true
 ranim-items.workspace = true
 ranim-anims.workspace = true
 ranim-macros.workspace = true
+ranim-app = { workspace = true, optional = true }
 itertools.workspace = true
-web-time = "1.1.0"
-async-channel = "2.5.0"
-bytemuck = { workspace = true, features = ["derive"] }
-glam = { workspace = true, features = ["bytemuck"] }
 log.workspace = true
-image = "0.25.8"
-pollster = "0.4.0"
-wgpu = "25.0.2"
-anyhow = "1.0.99"
-usvg = "0.45.1"
-regex = "1.11.2"
-variadics_please = "1.1.0"
 derive_more = { version = "2.0.1", features = [
   "deref_mut",
   "deref",
@@ -79,47 +86,21 @@ derive_more = { version = "2.0.1", features = [
   "from",
   "into_iterator",
 ] }
-
+anyhow = "1.0.99"
+ranim-render = { workspace = true, optional = true }
+# render feature
+wgpu = { workspace = true, optional = true }
+pollster = { version = "0.4.0", optional = true }
+which = { version = "8.0.0", optional = true }
 indicatif = { version = "0.18.0", optional = true }
+flate2 = { version = "1.1.2", optional = true }
+reqwest = { version = "0.12.23", features = ["blocking"], optional = true }
+# profiling
 puffin = { version = "0.19.1", optional = true }
 puffin_http = { version = "0.16.1", optional = true }
-wgpu-profiler = { version = "0.23.0", optional = true, features = ["puffin"] }
 profiling = { version = "1.0.17", optional = true, features = [
   "profile-with-puffin",
 ] }
-
-egui = { version = "0.32.3", optional = true }
-winit = { version = "0.30.12", optional = true }
-egui-wgpu = { version = "0.32.3", optional = true }
-
-serde = { version = "1.0.225", features = ["derive"], optional = true }
-typst = "0.13.1"
-typst-kit = { version = "0.13.1", default-features = false, features = [
-  "fonts",
-  "embed-fonts",
-] }
-# time = "0.3.41"
-typst-svg = "0.13.1"
-chrono = "0.4.42"
-slotmap = "1.0.7"
-inventory = "0.3.21"
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-egui-winit = { version = "0.32.3", optional = true }
-which = "8.0.0"
-flate2 = "1.1.2"
-reqwest = { version = "0.12.23", features = ["blocking"] }
-# linkme = "0.3.33"
-
-# web:
-[target.'cfg(target_family = "wasm")'.dependencies]
-wasm-bindgen = "0.2.102"
-wasm-bindgen-futures = { version = "0.4.52" }
-web-sys = { version = "0.3.79" }
-console_error_panic_hook = { version = "0.1.7" }
-console_log = { version = "1.0.0" }
-egui-winit = { version = "0.32.3", default-features = false, optional = true }
-getrandom = { version = "0.3.3", features = ["wasm_js"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"
@@ -128,6 +109,7 @@ pretty_env_logger = "0.5.0"
 assert_float_eq = "1.1.4"
 rand = "0.9.2"
 rand_chacha = "0.9.0"
+getrandom = { version = "0.3.3", features = ["wasm_js"] }
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

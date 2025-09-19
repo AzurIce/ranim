@@ -1,20 +1,23 @@
 // MARK: Render api
-use super::file_writer::{FileWriter, FileWriterBuilder};
-use crate::render::utils::WgpuContext;
-use crate::{
-    Output, Scene, SceneConfig, SceneConstructor,
-    render::{Renderer, TimelineEvalResult, primitives::RenderInstances},
-    timeline::SealedRanimScene,
-};
+use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::{info, trace};
 use ranim_core::color::{self, LinearSrgb};
+use ranim_core::{Output, Scene, SceneConfig, SceneConstructor, SealedRanimScene, TimeMark};
+use ranim_render::{
+    RenderEval, Renderer, TimelineEvalResult, primitives::RenderInstances, utils::WgpuContext,
+};
 use std::time::Duration;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     time::Instant,
 };
+
+mod file_writer;
+
+#[cfg(feature = "profiling")]
+use ranim_render::PUFFIN_GPU_PROFILER;
 
 /// Render a scene
 pub fn render_scene(scene: &Scene) {
@@ -83,7 +86,6 @@ impl RanimRenderApp {
         } else {
             use std::path::Path;
 
-            use crate::utils::download_ffmpeg;
             info!(
                 "ffmpeg not found from path env, searching in {:?}...",
                 Path::new("./").canonicalize().unwrap()
@@ -159,8 +161,8 @@ impl RanimRenderApp {
             // custom gpu profiler in `PUFFIN_GPU_PROFILER`
             let gpu_server = puffin_http::Server::new_custom(
                 &format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT + 1),
-                |sink| crate::PUFFIN_GPU_PROFILER.lock().unwrap().add_sink(sink),
-                |id| _ = crate::PUFFIN_GPU_PROFILER.lock().unwrap().remove_sink(id),
+                |sink| PUFFIN_GPU_PROFILER.lock().unwrap().add_sink(sink),
+                |id| _ = PUFFIN_GPU_PROFILER.lock().unwrap().remove_sink(id),
             )
             .unwrap();
             (cpu_server, gpu_server)
@@ -280,8 +282,6 @@ impl RanimRenderApp {
     }
 
     fn render_capture_marks(&mut self, timeline: &SealedRanimScene) {
-        use crate::timeline::TimeMark;
-
         let start = Instant::now();
         let timemarks = timeline
             .time_marks()
@@ -392,4 +392,65 @@ impl RanimRenderApp {
         let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx);
         buffer.save(path).unwrap();
     }
+}
+
+// MARK: Download ffmpeg
+const FFMPEG_RELEASE_URL: &str = "https://github.com/eugeneware/ffmpeg-static/releases/latest";
+
+#[allow(unused)]
+pub(crate) fn exe_dir() -> PathBuf {
+    std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf()
+}
+
+/// Download latest release of ffmpeg from <https://github.com/eugeneware/ffmpeg-static/releases/latest> to <target_dir>/ffmpeg
+pub fn download_ffmpeg(target_dir: impl AsRef<Path>) -> Result<PathBuf, anyhow::Error> {
+    use std::io::Read;
+    use anyhow::Context;
+    use itertools::Itertools;
+    use log::info;
+
+    let target_dir = target_dir.as_ref();
+
+    let res = reqwest::blocking::get(FFMPEG_RELEASE_URL).context("failed to get release url")?;
+    let url = res.url().to_string();
+    let url = url.split("tag").collect_array::<2>().unwrap();
+    let url = format!("{}/download/{}", url[0], url[1]);
+    info!("ffmpeg release url: {url:?}");
+
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+    let url = format!("{url}/ffmpeg-win32-x64.gz");
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    let url = format!("{url}/ffmpeg-linux-x64.gz");
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    let url = format!("{url}/ffmpeg-linux-arm64.gz");
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    let url = format!("{url}/ffmpeg-darwin-x64.gz");
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    let url = format!("{url}/ffmpeg-darwin-arm64.gz");
+
+    info!("downloading ffmpeg from {url:?}...");
+
+    let res = reqwest::blocking::get(&url).context("get err")?;
+    let mut decoder = flate2::bufread::GzDecoder::new(std::io::BufReader::new(
+        std::io::Cursor::new(res.bytes().unwrap()),
+    ));
+    let mut bytes = Vec::new();
+    decoder
+        .read_to_end(&mut bytes)
+        .context("GzDecoder decode err")?;
+    let ffmpeg_path = target_dir.join("ffmpeg");
+    std::fs::write(&ffmpeg_path, bytes).unwrap();
+
+    #[cfg(target_family = "unix")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        std::fs::set_permissions(&ffmpeg_path, std::fs::Permissions::from_mode(0o755))?;
+    }
+    info!("ffmpeg downloaded to {target_dir:?}");
+    Ok(ffmpeg_path)
 }

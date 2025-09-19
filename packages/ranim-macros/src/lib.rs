@@ -137,7 +137,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #doc
         #(#doc_attrs)*
-        #vis fn #fn_name(r: &mut #ranim::timeline::RanimScene) #fn_body
+        #vis fn #fn_name(r: &mut #ranim::RanimScene) #fn_body
 
         static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
         #[doc(hidden)]

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::render::{CameraUniforms, RenderResource, WgpuContext};
+use crate::{CameraUniforms, RenderResource, WgpuContext};
 
 pub struct Map3dTo2dPipeline {
     pipeline: wgpu::ComputePipeline,

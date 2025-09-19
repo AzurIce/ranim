@@ -5,7 +5,7 @@ use std::{any::Any, collections::HashMap};
 
 use variadics_please::{all_tuples, all_tuples_enumerated};
 
-use crate::render::utils::WgpuContext;
+use crate::utils::WgpuContext;
 
 use super::RenderTextures;
 
@@ -282,12 +282,12 @@ impl RenderInstances {
     //         .get(&id)
     //         .and_then(|x| (x.as_ref() as &dyn Any).downcast_ref::<T>())
     // }
-    pub(crate) fn get_render_instance_dyn(&self, id: usize) -> Option<&dyn RenderCommand> {
+    pub fn get_render_instance_dyn(&self, id: usize) -> Option<&dyn RenderCommand> {
         self.items
             .get(&id)
             .map(|x| x.as_ref() as &dyn RenderCommand)
     }
-    pub(crate) fn get_render_instance_mut<T: RenderCommand + 'static>(
+    pub fn get_render_instance_mut<T: RenderCommand + 'static>(
         &mut self,
         id: usize,
     ) -> Option<&mut T> {
@@ -296,7 +296,7 @@ impl RenderInstances {
             .get_mut(&id)
             .and_then(|x| (x.as_mut() as &mut dyn Any).downcast_mut::<T>())
     }
-    pub(crate) fn insert_render_instance<T: RenderCommand + 'static>(
+    pub fn insert_render_instance<T: RenderCommand + 'static>(
         &mut self,
         id: usize,
         instance: T,
