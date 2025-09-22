@@ -1,25 +1,21 @@
 name = "ranim_logo"
 code = """
 ```rust
+use ranim::glam;
 use std::f64::consts::PI;
 
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
 use ranim::{
-    animation::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
     color::palettes::manim,
-    components::{Anchor, ScaleHint},
-    items::{
-        Group,
-        vitem::{
-            VItem,
-            geometry::{Polygon, Rectangle, Square},
-            svg::SvgItem,
-            typst::typst_svg,
-        },
+    items::vitem::{
+        Group, VItem,
+        geometry::{Polygon, Rectangle, Square},
+        svg::SvgItem,
+        typst::typst_svg,
     },
     prelude::*,
-    timeline::TimeMark,
     utils::rate_functions::{linear, smooth},
 };
 
@@ -154,7 +150,7 @@ fn ranim_logo(r: &mut RanimScene) {
     });
 }
 ```"""
-hash = "1e35c2c64ba710ecbd9f7d1660b91f5229046527"
+hash = "2619fb8947da675bc91c48356f045284ac6fa8dc"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
 wasm = true

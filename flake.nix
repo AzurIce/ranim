@@ -106,6 +106,7 @@
           packages = [ puffin_viewer ] ++ (with pkgs; [
             git-cliff
             cargo-release
+            cargo-udeps
             miniserve
             trunk
             zola

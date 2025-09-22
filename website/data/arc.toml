@@ -3,12 +3,12 @@ code = """
 ```rust
 use itertools::Itertools;
 use ranim::{
-    animation::{fading::FadingAnim, lagged::LaggedAnim},
+    anims::{fading::FadingAnim, lagged::LaggedAnim},
+    color,
     color::HueDirection,
     glam::dvec2,
-    items::{Group, vitem::geometry::Arc},
+    items::vitem::{Group, geometry::Arc},
     prelude::*,
-    timeline::TimeMark,
 };
 
 #[scene]
@@ -20,8 +20,8 @@ pub fn arc(r: &mut RanimScene) {
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
 
-    let start_color = color!("#FF8080FF");
-    let end_color = color!("#58C4DDFF");
+    let start_color = color::color("#FF8080FF");
+    let end_color = color::color("#58C4DDFF");
 
     let nrow = 10;
     let ncol = 10;
@@ -59,7 +59,7 @@ pub fn arc(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "dc18d016814001956ff917be890bfdaa19fc5f1e"
+hash = "53721c30986df2764822b0212da5a3c0a5bb7b8c"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

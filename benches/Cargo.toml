@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 itertools.workspace = true
 criterion = { version = "0.7.0", features = ["html_reports"] }
-ranim = { path = "../" }
+ranim = { path = "../", features = ["render"] }
 
 [[bench]]
 name = "bench1"

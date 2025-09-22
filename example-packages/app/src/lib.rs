@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
     glam::DVec3,
     items::vitem::{
@@ -12,7 +12,6 @@ use ranim::{
 };
 
 #[scene]
-
 pub fn hello_ranim(r: &mut RanimScene) {
     let _r_cam = r.insert_and_show(CameraFrame::default());
 
