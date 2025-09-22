@@ -199,7 +199,7 @@ impl Example {
                     "wasm32-unknown-unknown",
                     "--release",
                     "--features",
-                    "app",
+                    "preview",
                 ])
                 .stdout(std::process::Stdio::null())
                 .status()

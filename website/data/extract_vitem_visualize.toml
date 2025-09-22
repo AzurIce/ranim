@@ -1,24 +1,21 @@
 name = "extract_vitem_visualize"
 code = """
 ```rust
+use ranim::glam;
 use std::f64::consts::PI;
 
 use ranim::{
-    animation::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    color,
     color::palettes::manim,
-    components::ScaleHint,
-    items::{
-        Group,
-        vitem::{
-            VItem,
-            geometry::{Circle, Square},
-            svg::SvgItem,
-            typst::typst_svg,
-        },
+    core::{Extract, components::width::Width, primitives::vitem::VItemPrimitive},
+    items::vitem::{
+        Group, VItem,
+        geometry::{Circle, Square},
+        svg::SvgItem,
+        typst::typst_svg,
     },
     prelude::*,
-    render::primitives::{Extract, vitem::VItemPrimitive},
-    timeline::TimeMark,
 };
 
 use glam::DVec3;
@@ -162,10 +159,7 @@ impl FillColor for VisualVItem {
 }
 
 impl StrokeWidth for VisualVItem {
-    fn apply_stroke_func(
-        &mut self,
-        f: impl for<'a> Fn(&'a mut [ranim::components::width::Width]),
-    ) -> &mut Self {
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         self.0.apply_stroke_func(f);
         self
     }
@@ -176,8 +170,8 @@ impl StrokeWidth for VisualVItem {
 }
 
 impl Extract for VisualVItem {
-    type Target = Vec<VItemPrimitive>;
-    fn extract(&self) -> Self::Target {
+    type Target = VItemPrimitive;
+    fn extract(&self) -> Vec<Self::Target> {
         let mut points = Vec::with_capacity(self.0.vpoints.len());
 
         let subpaths = self.0.vpoints.get_subpaths();
@@ -239,6 +233,7 @@ impl Extract for VisualVItem {
                 .extract()
             }))
             .chain(points.into_iter().map(|x| x.extract()))
+            .flatten()
             .collect()
     }
 }
@@ -249,7 +244,7 @@ impl Empty for VisualVItem {
     }
 }
 ```"""
-hash = "97ffffed29c6fe633d3166df74190853a006f130"
+hash = "6e7994931b6f3dbc13f6f84a16057a92f170d118"
 preview_imgs = ["/examples/extract_vitem_visualize/preview-ranim_text.png", "/examples/extract_vitem_visualize/preview-hello_ranim.png"]
 output_files = ["/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4", "/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4"]
 wasm = true

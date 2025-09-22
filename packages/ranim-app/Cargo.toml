@@ -1,0 +1,44 @@
+[package]
+name = "ranim-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+profiling = ["dep:puffin", "dep:puffin_http", "dep:profiling"]
+
+[dependencies]
+ranim-core.workspace = true
+ranim-render.workspace = true
+wgpu.workspace = true
+log.workspace = true
+bytemuck = { workspace = true, features = ["derive"] }
+egui = "0.32.3"
+winit = "0.30.12"
+egui-wgpu = "0.32.3"
+async-channel = "2.5.0"
+web-time = "1.1.0"
+# profiling
+puffin = { version = "0.19.1", optional = true }
+puffin_http = { version = "0.16.1", optional = true }
+profiling = { version = "1.0.17", optional = true, features = [
+  "profile-with-puffin",
+] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+egui-winit = "0.32.3"
+pollster = "0.4.0"
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+egui-winit = { version = "0.32.3", default-features = false }
+wasm-bindgen = "0.2.102"
+wasm-bindgen-futures = "0.4.52"
+web-sys = { version = "0.3.79" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.release]
+tag = false

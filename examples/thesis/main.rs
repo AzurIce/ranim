@@ -1,8 +1,9 @@
+use ranim::glam;
 use std::f64::consts::PI;
 
 use glam::{DVec3, dvec3};
 use ranim::{
-    animation::{
+    anims::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
         transform::TransformAnim,
@@ -20,7 +21,7 @@ use ranim::{
 fn pentagon() -> VItem {
     Polygon::new(
         (0..=5)
-            .map(|i| {
+            .map(|i: i32| {
                 let angle = i as f64 / 5.0 * 2.0 * PI;
                 dvec3(angle.cos(), angle.sin(), 0.0) * 2.0
             })
@@ -103,15 +104,17 @@ fn transform(r: &mut RanimScene) {
 }
 
 fn main() {
-    #[cfg(feature = "app")]
+    #[cfg(feature = "preview")]
     {
+        use ranim::cmd::preview_scene;
         preview_scene(fading_scene);
         preview_scene(creation_scene);
         preview_scene(writing_scene);
         preview_scene(transform_scene);
     }
-    #[cfg(not(feature = "app"))]
+    #[cfg(feature = "render")]
     {
+        use ranim::cmd::render_scene;
         render_scene(fading_scene);
         render_scene(creation_scene);
         render_scene(writing_scene);

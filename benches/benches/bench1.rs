@@ -2,13 +2,15 @@ use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion
 use itertools::Itertools;
 use ranim::{
     Output, SceneConfig, SceneConstructor,
-    animation::transform::TransformAnim,
+    anims::transform::TransformAnim,
+    cmd::render_scene_output,
     glam::{DVec3, dvec3},
     items::vitem::{
         VItem,
         geometry::{Circle, Square},
     },
     prelude::*,
+    render::RenderEval,
 };
 
 fn static_squares(r: &mut RanimScene, n: usize) {

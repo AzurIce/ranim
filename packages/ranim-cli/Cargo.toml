@@ -12,7 +12,7 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
-ranim = { workspace = true, features = ["app"] }
+ranim = { workspace = true, features = ["preview", "render"] }
 anyhow = "1.0.98"
 cargo_toml = "0.22.3"
 clap = { version = "4.5.42", features = ["derive"] }
@@ -25,6 +25,10 @@ notify-debouncer-full = "0.6.0"
 async-channel = "2.5.0"
 toml = "0.9.5"
 pretty_env_logger = "0.5.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.release]
 tag = false

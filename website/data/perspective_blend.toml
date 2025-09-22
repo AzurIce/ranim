@@ -2,7 +2,8 @@ name = "perspective_blend"
 code = """
 ```rust
 use ranim::{
-    animation::transform::TransformAnim,
+    anims::transform::TransformAnim,
+    color,
     color::palettes::manim,
     glam::DVec3,
     items::{
@@ -10,7 +11,6 @@ use ranim::{
         vitem::{VItem, geometry::Square},
     },
     prelude::*,
-    timeline::TimeMark,
     utils::rate_functions::linear,
 };
 
@@ -103,7 +103,7 @@ fn perspective_blend(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "c905ec232342c53a47174d6f7c07032ee842e3b4"
+hash = "7e3450d7eb046dee99232edfdeb02106472b1f02"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

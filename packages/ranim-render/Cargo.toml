@@ -1,0 +1,32 @@
+[package]
+name = "ranim-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+profiling = ["dep:wgpu-profiler", "dep:puffin", "dep:profiling"]
+
+[dependencies]
+ranim-core.workspace = true
+wgpu.workspace = true
+wgpu-profiler = { workspace = true, optional = true }
+puffin = { version = "0.19.1", optional = true }
+profiling = { version = "1.0.17", optional = true, features = [
+  "profile-with-puffin",
+] }
+image.workspace = true
+log.workspace = true
+bytemuck = { workspace = true, features = ["derive"] }
+glam = { workspace = true, features = ["bytemuck"] }
+pollster = "0.4.0"
+async-channel = "2.5.0"
+variadics_please = "1.1.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.release]
+tag = false

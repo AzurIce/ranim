@@ -1,12 +1,10 @@
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
-    animation::transform::TransformAnim,
+    anims::transform::TransformAnim,
     color::palettes::manim,
-    components::Anchor,
     glam::{DVec3, dvec2},
     items::vitem::geometry::Rectangle,
     prelude::*,
-    timeline::TimeMark,
     utils::rate_functions::linear,
 };
 
