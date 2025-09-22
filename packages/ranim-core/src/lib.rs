@@ -1,14 +1,32 @@
+//! The core of ranim.
+//!
+//!
+#![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![allow(rustdoc::private_intra_doc_links)]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
+    html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
+)]
+/// Fondation of animation
 pub mod animation;
+/// Color
 pub mod color;
+/// Component data
 pub mod components;
+/// The structure to encode animation spans
 pub mod timeline;
+/// Fondamental traits
 pub mod traits;
+/// Utils
 pub mod utils;
 
+/// The core primitives
 pub mod primitives;
 
 pub use glam;
 
+/// Prelude
 pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
@@ -28,6 +46,7 @@ pub trait Extract {
     type Target: Primitive + Clone;
     /// Extract a [`Extract::Target`] from reference.
     fn extract(&self) -> Vec<Self::Target>;
+    /// Extract to [`Primitive`] from reference.
     fn extract_to_primitives(&self) -> Primitives {
         Self::Target::build_primitives(self.extract())
     }

@@ -7,14 +7,19 @@ use crate::{
     traits::FillColor,
 };
 
+/// Default vitem stroke width
 pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
 
 #[derive(Debug, Clone, PartialEq)]
 /// A primitive for rendering a vitem.
 pub struct VItemPrimitive {
+    /// Points 2d.
     pub points2d: Vec<Vec4>,
+    /// Fill rgbas, see [`Rgba`].
     pub fill_rgbas: Vec<Rgba>,
+    /// Stroke rgbs, see [`Rgba`].
     pub stroke_rgbas: Vec<Rgba>,
+    /// Stroke widths, see [`Width`].
     pub stroke_widths: Vec<Width>,
 }
 

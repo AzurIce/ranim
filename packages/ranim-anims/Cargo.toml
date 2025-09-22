@@ -8,3 +8,10 @@ repository.workspace = true
 [dependencies]
 ranim-core.workspace = true
 log.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.release]
+tag = false

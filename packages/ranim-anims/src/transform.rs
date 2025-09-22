@@ -1,5 +1,5 @@
 use ranim_core::{
-    animation::{AnimationSpan, EvalDynamic, Evaluator},
+    animation::{AnimationSpan, EvalDynamic},
     traits::{Alignable, Interpolatable},
     utils::rate_functions::smooth,
 };
@@ -24,15 +24,18 @@ impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
     fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationSpan<T> {
         let mut dst = self.clone();
         (f)(&mut dst);
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Transform::new(self.clone(), dst)))
+        Transform::new(self.clone(), dst)
+            .into_animation_span()
             .with_rate_func(smooth)
     }
     fn transform_from(self, s: T) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Transform::new(s, self.clone())))
+        Transform::new(s, self.clone())
+            .into_animation_span()
             .with_rate_func(smooth)
     }
     fn transform_to(self, d: T) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Transform::new(self.clone(), d)))
+        Transform::new(self.clone(), d)
+            .into_animation_span()
             .with_rate_func(smooth)
     }
 }

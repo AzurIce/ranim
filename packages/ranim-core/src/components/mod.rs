@@ -21,11 +21,6 @@ pub trait Component: Debug + Default + Clone + PartialEq {}
 
 impl<T: Debug + Default + Clone + PartialEq> Component for T {}
 
-pub trait HasComponent<T: Component> {
-    fn get_component(&self) -> &T;
-    fn set_component_mut(&mut self) -> &mut T;
-}
-
 /// A component vec
 #[derive(Default, Debug, Clone, PartialEq, Deref, DerefMut, AsMut, AsRef)]
 #[as_ref(forward)]

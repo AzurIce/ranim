@@ -1,5 +1,5 @@
 use ranim_core::{
-    animation::{AnimationSpan, EvalDynamic, Evaluator},
+    animation::{AnimationSpan, EvalDynamic},
     traits::{Interpolatable, Opacity},
     utils::rate_functions::smooth,
 };
@@ -20,11 +20,13 @@ pub trait FadingAnim<T: FadingRequirement + 'static> {
 
 impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
     fn fade_in(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(FadeIn::new(self.clone())))
+        FadeIn::new(self.clone())
+            .into_animation_span()
             .with_rate_func(smooth)
     }
     fn fade_out(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(FadeOut::new(self.clone())))
+        FadeOut::new(self.clone())
+            .into_animation_span()
             .with_rate_func(smooth)
     }
 }

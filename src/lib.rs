@@ -23,14 +23,22 @@
 )]
 #![feature(downcast_unchecked)]
 
-/// Builtin anims
+#[cfg(feature = "anims")]
+#[doc(inline)]
 pub use ranim_anims as anims;
-/// Core
+#[doc(inline)]
 pub use ranim_core as core;
 /// Color
+#[doc(inline)]
 pub use ranim_core::color;
-/// Builtin items
+#[cfg(feature = "items")]
+#[doc(inline)]
 pub use ranim_items as items;
+/// Rendering stuff
+#[cfg(feature = "render")]
+#[doc(inline)]
+pub use ranim_render as render;
+
 /// Commands like preview and render
 pub mod cmd;
 
@@ -38,10 +46,6 @@ pub mod cmd;
 pub mod utils {
     pub use ranim_core::utils::*;
 }
-
-/// Rendering stuff
-#[cfg(feature = "render")]
-pub use ranim_render as render;
 
 pub use ranim_core::{Output, RanimScene, Scene, SceneConfig, SceneConstructor};
 pub use ranim_core::{glam, inventory};

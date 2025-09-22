@@ -197,6 +197,7 @@ impl<T: StrokeColor> StrokeColor for [T] {
 /// A trait for items have stroke width
 pub trait StrokeWidth {
     // TODO: Make this better
+    /// Get the stroke width
     fn stroke_width(&self) -> f32;
     /// Applying stroke width function to an item
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self;

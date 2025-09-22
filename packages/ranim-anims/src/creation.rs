@@ -46,11 +46,13 @@ pub trait WritingAnim<T: WritingRequirement + 'static> {
 
 impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
     fn write(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Write::new(self)))
+        Write::new(self)
+            .into_animation_span()
             .with_rate_func(smooth)
     }
     fn unwrite(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Unwrite::new(self)))
+        Unwrite::new(self)
+            .into_animation_span()
             .with_rate_func(smooth)
     }
 }

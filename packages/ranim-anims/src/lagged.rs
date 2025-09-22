@@ -1,7 +1,14 @@
-use ranim_core::animation::{AnimationSpan, EvalDynamic, Evaluator};
+use ranim_core::animation::{AnimationSpan, EvalDynamic};
 
 // MARK: LaggedAnim
 /// The methods to create animations for `Group<T>`
+///
+/// # Example
+/// ```rust,ignore
+/// let item_group: Group::<VItem> = ...;
+/// let anim_lagged = item_group.lagged(0.5, |x| x.fade_in()); # lagged with ratio of 0.5
+/// let anim_not_lagged = item_group.lagged(0.0, |x| x.fade_in()); # not lagged (anim at the same time)
+/// ```
 pub trait LaggedAnim<T, I> {
     /// Create a [`Lagged`] anim.
     fn lagged(
@@ -23,9 +30,7 @@ where
         lag_ratio: f64,
         anim_func: impl FnMut(T) -> AnimationSpan<T>,
     ) -> AnimationSpan<I> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Lagged::new(
-            self, lag_ratio, anim_func,
-        )))
+        Lagged::new(self, lag_ratio, anim_func).into_animation_span()
     }
 }
 
@@ -41,7 +46,7 @@ where
 
 /// The lagged anim.
 ///
-/// This is only applyable to [`Group<T>`], and this will apply
+/// This is applyable to `IntoIterator<Item = T>`, and this will apply
 /// the anims in the order of the elements with the lag ratio.
 pub struct Lagged<T> {
     anims: Vec<AnimationSpan<T>>,

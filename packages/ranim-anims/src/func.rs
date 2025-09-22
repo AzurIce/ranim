@@ -1,7 +1,4 @@
-use ranim_core::{
-    animation::{AnimationSpan, EvalDynamic, Evaluator},
-    utils::rate_functions::smooth,
-};
+use ranim_core::animation::{AnimationSpan, EvalDynamic};
 
 // MARK: Require Trait
 /// The requirement for [`Func`]
@@ -16,8 +13,7 @@ pub trait FuncAnim<T: FuncRequirement + 'static> {
 
 impl<T: FuncRequirement + 'static> FuncAnim<T> for T {
     fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Func::new(self.clone(), f)))
-            .with_rate_func(smooth)
+        Func::new(self.clone(), f).into_animation_span()
     }
 }
 

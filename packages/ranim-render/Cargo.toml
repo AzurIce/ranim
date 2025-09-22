@@ -23,3 +23,10 @@ glam = { workspace = true, features = ["bytemuck"] }
 pollster = "0.4.0"
 async-channel = "2.5.0"
 variadics_please = "1.1.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.release]
+tag = false

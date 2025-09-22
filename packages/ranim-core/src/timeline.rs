@@ -44,6 +44,7 @@ pub trait TimelineFunc: Any {
     fn type_name(&self) -> &str;
 
     // fn eval_sec_any(&self, target_sec: f64) -> Option<(EvalResult<dyn Any>, usize)>;
+    /// Evaluate timeline's primitives at target sec
     fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)>;
 }
 
@@ -133,7 +134,7 @@ impl TimelineFunc for Box<dyn TimelineFunc> {
 
 // MARK: ItemDynTimelines
 // ANCHOR: ItemDynTimelines
-/// A item timeline which contains multiple [`DynTimeline`], so
+/// A item timeline which contains multiple `Box<dyn TimelineFunc>`, so
 /// that it can contains multiple [`ItemTimeline<T>`] in different type of `T`.
 #[derive(Default)]
 pub struct ItemDynTimelines {
@@ -365,9 +366,11 @@ impl<T: Extract + Any + Clone + 'static> TimelineFunc for ItemTimeline<T> {
 }
 
 impl<T: Clone + 'static> ItemTimeline<T> {
+    /// Get the start sec
     pub fn start_sec(&self) -> Option<f64> {
         self.anims.first().map(|(_, range)| range.start)
     }
+    /// Get the end sec
     pub fn end_sec(&self) -> Option<f64> {
         self.anims.last().map(|(_, range)| range.end)
     }

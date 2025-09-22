@@ -31,7 +31,7 @@ doc-nightly:
     cp -r target/doc/ website/static/doc/
 
 doc:
-    cargo doc --no-deps -p ranim --document-private-items --all-features
+    RUSTDOCFLAGS="--cfg docsrs" cargo doc --no-deps -p ranim --document-private-items --all-features
     -rm -r website/static/doc/
     cp -r target/doc/ website/static/doc/
 

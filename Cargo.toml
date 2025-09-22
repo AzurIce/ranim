@@ -44,7 +44,9 @@ image = "0.25.8"
 
 [features]
 # default = ["output"]
-default = []
+default = ["anims", "items"]
+anims = []
+items = []
 profiling = [
   "ranim-render/profiling",
   "ranim-app/profiling",
@@ -53,10 +55,7 @@ profiling = [
   "dep:profiling",
 ]
 # output = ["dep:async-channel"]
-preview = [
-  "dep:ranim-render",
-  "dep:ranim-app",
-]
+preview = ["dep:ranim-render", "dep:ranim-app"]
 render = [
   "dep:ranim-render",
   "dep:wgpu",

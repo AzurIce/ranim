@@ -181,6 +181,7 @@ pub fn apart_alpha(alpha: f32, n: usize, eps: f32) -> f32 {
     ((left.0 + right.0) / 2.0).clamp(0.0, 1.0)
 }
 
+/// Calculate hash
 pub fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);

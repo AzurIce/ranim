@@ -15,6 +15,16 @@ use std::{any::Any, fmt::Debug, ops::Deref, sync::Arc};
 pub trait EvalDynamic<T> {
     /// Evaluates at the given progress value `alpha` in range [0, 1].
     fn eval_alpha(&self, alpha: f64) -> T;
+    /// Converts the evaluator into an [`AnimationSpan`].
+    ///
+    /// Equivalent to `AnimationSpan::from_evaluator(Evaluator::new_dynamic(self))`.
+    fn into_animation_span(self) -> AnimationSpan<T>
+    where
+        Self: Sized + 'static,
+        T: 'static,
+    {
+        AnimationSpan::from_evaluator(Evaluator::new_dynamic(self))
+    }
 }
 // ANCHOR_END: EvalDynamic
 
@@ -91,6 +101,7 @@ impl<T: ?Sized> Deref for EvalResult<T> {
 }
 
 impl<T: Clone + 'static> EvalResult<T> {
+    /// Convert `EvalResult<T>` into `EvalResult<dyn Any>`
     pub fn into_any(self) -> EvalResult<dyn Any> {
         match self {
             Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Any>),

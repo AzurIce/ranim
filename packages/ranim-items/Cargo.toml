@@ -35,3 +35,10 @@ regex = "1.11.2"
 
 [dev-dependencies]
 assert_float_eq = "1.1.4"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.release]
+tag = false
