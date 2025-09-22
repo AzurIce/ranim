@@ -55,10 +55,10 @@ ranim = { git = "https://github.com/azurice/ranim" }
 For the usage, check out the [examples](./examples) folder. You can run the examples with:
 
 ```bash
-cargo run --example <example-name>
+cargo run -p ranim-cli --release -- --example <example-name>
 ```
 
-and you can use `--release` flag for faster rendering.
+See Ranim Cli for more.
 
 ### Ranim Cli
 
@@ -75,27 +75,36 @@ cargo install ranim-cli
 Or install from git:
 
 ```bash
-cargo install --git https://github.com/azurice/ranim
+cargo install --git https://github.com/azurice/ranim --bin ranim
 ```
 
 Basic Usage:
-- `ranim preview`: Launch a preview app and invoke cargo to build your library automatically when the source code is changed, then reload it through *libloading* and show it in the preview app.
-- `ranim render[ <scene-name>]`: Render scene's output, when no scene name is specified, render all scenes.
+- `ranim preview[ <scene_name>]`: Launch a preview app and invoke cargo to build your library automatically when the source code is changed, then reload it through *libloading* and show it in the preview app.
+- `ranim render[ <scene-name1> <scene_name2> ...]`: Render scene's output, when no scene name is specified, render all scenes.
 
-You can specify the package with `--package` (just like cargo), and other aditional arguments you want to pass to `cargo build` can be passed after `--`.
+You can specify the package with `--package` and `--example` (just like cargo, note that your anim target should have crate-type of `dylib` or `cdylib`), and other aditional arguments you want to pass to `cargo build` can be passed after `--`.
 
 For example:
 
 ```bash
-ranim render -p xxx scene_a scene_b -- --release
+ranim render -p render scene_a scene_b -- --release
 ```
 
 ## Feature Flags
 
-- `app`: enable the preview app api
+- Default features
+
+  - `anims`: re-export `ranim-anims`
+
+  - `items`: re-expoet `ranim-items`
+
+- `render`: enable render api in cmd module
   
-  use `preview` or `run_scene_app` API to launch an preview app on a scene
-  
+  use `render_scene` or `render_scene_output` to render scene to output
+
+- `preview`: enbale preview api in cmd module
+
+  use `preview_scene` api to launch an preview app on a scene
   https://github.com/user-attachments/assets/5bf287e2-b06f-42f8-83b6-76f3775e298e
 - `profiling`: enable profiling with https://github.com/EmbarkStudios/puffin
 
