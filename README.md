@@ -78,6 +78,24 @@ Or install from git:
 cargo install --git https://github.com/azurice/ranim --bin ranim
 ```
 
+Or you can create a bin, and run cli from `ranim_cli` directly (this can make sure the version of `ranim` matches `ranim_cli`):
+
+```rust
+use clap::Parser;
+use ranim_cli::cli::Cli;
+
+fn main() {
+    // Optional
+    // pretty_env_logger::formatted_timed_builder()
+    //     .filter(Some("ranim_cli"), log::LevelFilter::Info)
+    //     .filter(Some("ranim"), log::LevelFilter::Info)
+    //     .parse_default_env()
+    //     .init();
+
+    Cli::parse().run().unwrap();
+}
+```
+
 Basic Usage:
 - `ranim preview[ <scene_name>]`: Launch a preview app and invoke cargo to build your library automatically when the source code is changed, then reload it through *libloading* and show it in the preview app.
 - `ranim render[ <scene-name1> <scene_name2> ...]`: Render scene's output, when no scene name is specified, render all scenes.
@@ -96,7 +114,7 @@ ranim render -p render scene_a scene_b -- --release
 
   - `anims`: re-export `ranim-anims`
 
-  - `items`: re-expoet `ranim-items`
+  - `items`: re-export `ranim-items`
 
 - `render`: enable render api in cmd module
   
