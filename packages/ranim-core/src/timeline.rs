@@ -260,7 +260,7 @@ impl ItemDynTimelines {
             timeline.seal();
             (
                 timeline.snapshot().clone(),
-                timeline.end_sec().unwrap_or(0.0),
+                timeline.end_sec().unwrap_or(timeline.cur_sec()),
                 is_showing,
             )
         };
