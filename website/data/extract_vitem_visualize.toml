@@ -159,6 +159,9 @@ impl FillColor for VisualVItem {
 }
 
 impl StrokeWidth for VisualVItem {
+    fn stroke_width(&self) -> f32 {
+        self.0.stroke_width()
+    }
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         self.0.apply_stroke_func(f);
         self
@@ -244,7 +247,7 @@ impl Empty for VisualVItem {
     }
 }
 ```"""
-hash = "6e7994931b6f3dbc13f6f84a16057a92f170d118"
+hash = "d5716db46ec5930436121e7002f864496075557c"
 preview_imgs = ["/examples/extract_vitem_visualize/preview-ranim_text.png", "/examples/extract_vitem_visualize/preview-hello_ranim.png"]
 output_files = ["/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4", "/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4"]
 wasm = true
