@@ -661,20 +661,6 @@ pub fn run_app(app: AppState, #[cfg(target_arch = "wasm32")] container_id: Strin
     }
 }
 
-pub trait ScenePreview {
-    fn preview(&self);
-    fn preview_with_name(&self, name: String);
-}
-
-impl ScenePreview for Scene {
-    fn preview(&self) {
-        preview_constructor_with_name(self.constructor, self.name.to_string());
-    }
-    fn preview_with_name(&self, name: String) {
-        preview_constructor_with_name(self.constructor, name);
-    }
-}
-
 /// Runs a scene preview app on a scene constructor
 pub fn preview_constructor_with_name(constructor: impl SceneConstructor, name: String) {
     let mut app_state = AppState::new_with_title(constructor, name.clone());

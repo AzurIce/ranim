@@ -6,6 +6,8 @@ pub use render::{render_scene, render_scene_output};
 
 /// Things for preview app
 #[cfg(feature = "preview")]
-pub mod preview;
+pub mod preview {
+    pub use ranim_app::*;
+}
 #[cfg(feature = "preview")]
 pub use preview::preview_scene;
