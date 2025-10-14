@@ -4047,6 +4047,7 @@ version = "0.1.4"
 dependencies = [
  "anyhow",
  "assert_float_eq",
+ "async-channel",
  "derive_more",
  "flate2",
  "getrandom 0.3.3",

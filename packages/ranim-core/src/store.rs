@@ -4,7 +4,7 @@ use crate::{
 };
 
 /// A store of [`CoreItem`]s.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct CoreItemStore {
     /// Id, CameraFrames
     pub camera_frames: Vec<CameraFrame>,

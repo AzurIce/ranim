@@ -15,7 +15,10 @@ use std::sync::Arc;
 use async_channel::{Receiver, Sender, unbounded};
 use egui_wgpu::ScreenDescriptor;
 use log::{info, warn};
-use ranim_core::{color::{self, LinearSrgb}, store::CoreItemStore};
+use ranim_core::{
+    color::{self, LinearSrgb},
+    store::CoreItemStore,
+};
 use timeline::TimelineState;
 use web_time::Instant;
 use wgpu::SurfaceError;
@@ -30,9 +33,7 @@ use winit::{
 use egui_tools::EguiRenderer;
 use pipeline::{AppPipeline, Viewport};
 use ranim_core::{Scene, SceneConstructor, SealedRanimScene};
-use ranim_render::{
-    Renderer, primitives::{RenderInstances, RenderPool}, utils::WgpuContext,
-};
+use ranim_render::{Renderer, primitives::RenderPool, utils::WgpuContext};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -153,9 +154,15 @@ impl AppState {
         self.need_eval = false;
         self.last_sec = self.timeline_state.current_sec;
 
-        self.store.update(self.timeline.eval_primitives_at_sec(self.timeline_state.current_sec));
+        self.store
+            .update(self.timeline.eval_at_sec(self.timeline_state.current_sec));
         // println!("camera: {}, vitems: {}", self.store.camera_frames.len(), self.store.vitems.len());
-        app_renderer.ranim_renderer.render_store_with_pool(ctx, self.clear_color, &self.store, &mut self.pool);
+        app_renderer.ranim_renderer.render_store_with_pool(
+            ctx,
+            self.clear_color,
+            &self.store,
+            &mut self.pool,
+        );
     }
 
     fn handle_events(&mut self) {

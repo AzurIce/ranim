@@ -297,11 +297,14 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
 /// A storage for pipelines
 #[derive(Default)]
 pub struct PipelinesStorage {
-    inner: HashMap<TypeId, Box<dyn Any>>,
+    inner: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl PipelinesStorage {
-    pub(crate) fn get_or_init<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &P {
+    pub(crate) fn get_or_init<P: RenderResource + Send + Sync + 'static>(
+        &mut self,
+        ctx: &WgpuContext,
+    ) -> &P {
         let id = std::any::TypeId::of::<P>();
         self.inner
             .entry(id)

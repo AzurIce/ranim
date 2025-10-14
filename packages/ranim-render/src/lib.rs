@@ -15,15 +15,12 @@ pub mod utils;
 
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Rgba};
-use log::warn;
 use pipelines::{Map3dTo2dPipeline, VItemPipeline};
 use primitives::RenderCommand;
 
-use crate::primitives::{RenderPool, Renderable, vitem::VItemRenderInstance};
+use crate::primitives::{RenderPool, vitem::VItemRenderInstance};
 use ranim_core::{
-    SealedRanimScene,
-    animation::EvalResult,
-    primitives::{Primitives, camera_frame::CameraFrame, vitem::VItemPrimitive},
+    primitives::{camera_frame::CameraFrame, vitem::VItemPrimitive},
     store::CoreItemStore,
 };
 use utils::{PipelinesStorage, WgpuBuffer, WgpuContext};
@@ -87,8 +84,6 @@ mod profiling_utils {
 }
 
 // MARK: TimelineEvalResult
-
-use std::sync::Arc;
 
 // /// Ext for [`SealedRanimScene`] to eval to [`TimelineEvalResult`]
 // pub trait RenderEval {
@@ -239,7 +234,6 @@ impl CameraUniformsBindGroup {
 // MARK: Renderer
 
 pub struct Renderer {
-    frame_height: f64,
     size: (usize, usize),
     pub(crate) pipelines: PipelinesStorage,
 
@@ -314,7 +308,6 @@ impl Renderer {
         .unwrap();
 
         Self {
-            frame_height,
             size: (width, height),
             pipelines: PipelinesStorage::default(),
             render_textures,
@@ -400,7 +393,7 @@ impl Renderer {
             .filter_map(|k| pool.get(*k).map(|x| x as &dyn RenderCommand))
             .collect::<Vec<_>>();
 
-        self.camera_state.update_uniforms(ctx, &camera_frame);
+        self.camera_state.update_uniforms(ctx, camera_frame);
 
         {
             #[cfg(feature = "profiling")]
@@ -549,17 +542,17 @@ impl Renderer {
         );
         ctx.queue.submit(Some(encoder.finish()));
 
-        pollster::block_on(async {
+        {
             let buffer_slice = self.output_staging_buffer.slice(..);
 
             // NOTE: We have to create the mapping THEN device.poll() before await
             // the future. Otherwise the application will freeze.
             let (tx, rx) = async_channel::bounded(1);
             buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-                pollster::block_on(tx.send(result)).unwrap()
+                tx.send_blocking(result).unwrap()
             });
             ctx.device.poll(wgpu::PollType::Wait).unwrap();
-            rx.recv().await.unwrap().unwrap();
+            rx.recv_blocking().unwrap().unwrap();
 
             {
                 let view = buffer_slice.get_mapped_range();
@@ -572,7 +565,7 @@ impl Renderer {
                         .copy_from_slice(&view[src_row_start..src_row_start + self.size.0 * 4]);
                 }
             }
-        });
+        };
         self.output_staging_buffer.unmap();
 
         self.output_texture_data = Some(texture_data);

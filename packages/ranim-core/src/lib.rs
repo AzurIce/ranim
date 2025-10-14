@@ -23,7 +23,7 @@ pub mod utils;
 
 /// The core primitives
 pub mod primitives;
-
+/// The [`CoreItem`] store
 pub mod store;
 
 pub use glam;
@@ -401,10 +401,9 @@ impl SealedRanimScene {
     }
 
     /// Eval primitives
-    pub fn eval_primitives_at_sec(&self, target_sec: f64) -> impl Iterator<Item = CoreItem> {
+    pub fn eval_at_sec(&self, target_sec: f64) -> impl Iterator<Item = CoreItem> {
         self.timelines_iter()
-            .enumerate()
-            .filter_map(move |(_idx, t)| {
+            .filter_map(move |t| {
                 t.eval_primitives_at_sec(target_sec)
                     .map(|(res, _id_hash)| res.to_owned().boom())
             })
@@ -412,8 +411,8 @@ impl SealedRanimScene {
     }
 
     /// Eval primitives
-    pub fn eval_primitives_at_alpha(&self, alpha: f64) -> impl Iterator<Item = CoreItem> {
-        self.eval_primitives_at_sec(self.total_secs() * alpha)
+    pub fn eval_at_alpha(&self, alpha: f64) -> impl Iterator<Item = CoreItem> {
+        self.eval_at_sec(self.total_secs() * alpha)
     }
 }
 

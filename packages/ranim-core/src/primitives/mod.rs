@@ -31,6 +31,7 @@ pub enum Primitives {
 }
 
 impl Primitives {
+    /// This is temporary to convert [`Primitives`] to [`CoreItem`]s
     pub fn boom(self) -> Vec<CoreItem> {
         match self {
             Primitives::CameraFrame(x) => x.into_iter().map(CoreItem::CameraFrame).collect(),
