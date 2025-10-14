@@ -106,6 +106,7 @@
           packages = [ puffin_viewer ] ++ (with pkgs; [
             git-cliff
             cargo-release
+            samply
             cargo-udeps
             miniserve
             trunk

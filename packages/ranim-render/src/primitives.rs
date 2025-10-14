@@ -1,7 +1,9 @@
 /// Primitive for vitem
 pub mod vitem;
 
-use std::{any::Any, collections::HashMap};
+use std::{
+    any::{Any, TypeId}, collections::HashMap, sync::Arc
+};
 
 use variadics_please::{all_tuples, all_tuples_enumerated};
 
@@ -130,6 +132,7 @@ impl<T: RenderCommand> RenderCommand for Vec<T> {
         self.iter().for_each(|x| x.debug(_ctx));
     }
 }
+
 impl<T: RenderCommand, const N: usize> RenderCommand for [T; N] {
     fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         self.iter()
@@ -198,6 +201,7 @@ pub trait Primitive {
 }
 
 /// A trait for type erasing
+#[deprecated]
 pub trait Renderable {
     /// Prepare render instance for id
     fn prepare_for_id(&self, ctx: &WgpuContext, render_instances: &mut RenderInstances, id: usize);
@@ -265,10 +269,96 @@ macro_rules! impl_tuple_renderable {
 
 all_tuples_enumerated!(impl_tuple_renderable, 1, 16, T);
 
+slotmap::new_key_type! { pub struct RenderInstanceKey; }
+
+pub struct RenderPool {
+    inner: slotmap::SlotMap<
+        RenderInstanceKey,
+        (Arc<RenderInstanceKey>, TypeId, Box<dyn AnyRenderCommand>),
+    >,
+    last_frame_dropped: HashMap<TypeId, Vec<RenderInstanceKey>>,
+}
+
+impl RenderPool {
+    pub fn new() -> Self {
+        Self {
+            inner: slotmap::SlotMap::with_key(),
+            last_frame_dropped: HashMap::new(),
+        }
+    }
+
+    pub fn get(&self, key: RenderInstanceKey) -> Option<&dyn AnyRenderCommand> {
+        self.inner.get(key).map(|x| x.2.as_ref() as &dyn AnyRenderCommand)
+    }
+    
+    pub fn show(&self) {
+        self.inner.iter().enumerate().for_each(|(idx, (_, (k, _, _)))| {
+            print!("{idx}: {}, ", Arc::strong_count(k));
+        });
+        println!("");
+    }
+
+    pub fn alloc<T: RenderCommand + RenderResource<Data = D> + 'static, D>(
+        &mut self,
+        ctx: &WgpuContext,
+        data: &D,
+    ) -> Arc<RenderInstanceKey> {
+        let last_frame_dropped = self
+            .last_frame_dropped
+            .entry(TypeId::of::<T>())
+            .or_insert(Vec::new());
+        if let Some(key) = last_frame_dropped.pop() {
+            let entry = self.inner.get_mut(key).unwrap();
+            let key = entry.0.clone();
+            (entry.2.as_mut() as &mut dyn Any)
+                .downcast_mut::<T>()
+                .unwrap()
+                .update(ctx, data);
+            key
+        } else {
+            let handle = self.inner.insert_with_key(|key| {
+                (
+                    Arc::new(key),
+                    TypeId::of::<T>(),
+                    Box::new(T::init(ctx, data)),
+                )
+            });
+            self.inner.get(handle).unwrap().0.clone()
+        }
+    }
+
+    pub fn clean(&mut self) {
+        self.inner.retain(|key, (_, t_id, _)| {
+            self.last_frame_dropped
+                .get(t_id)
+                .map(|x| !x.contains(&key))
+                .unwrap_or(true)
+        });
+        // println!("dropped {}", self.last_frame_dropped.len());
+        self.last_frame_dropped.clear();
+        self.inner
+            .iter()
+            .filter(|(_, (key, _, _))| Arc::strong_count(key) == 1)
+            .for_each(|(key, (_, t_id, _))| {
+                self.last_frame_dropped
+                    .entry(*t_id)
+                    .or_insert(Vec::new())
+                    .push(key);
+            });
+    }
+    // pub fn new_with_max_mem(max_size: u64) -> Self {
+    //     Self {
+    //         max_size,
+    //         size: 0,
+    //     }
+    // }
+}
+
 /// Type erased [`RenderCommand`]
 pub trait AnyRenderCommand: Any + RenderCommand {}
 impl<T: RenderCommand + Any> AnyRenderCommand for T {}
 
+#[deprecated = "use [`RenderPool`] instead"]
 /// Storage for [`RenderCommand`]s
 #[derive(Default)]
 pub struct RenderInstances {

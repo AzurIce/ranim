@@ -15,7 +15,7 @@ use std::sync::Arc;
 use async_channel::{Receiver, Sender, unbounded};
 use egui_wgpu::ScreenDescriptor;
 use log::{info, warn};
-use ranim_core::color::{self, LinearSrgb};
+use ranim_core::{color::{self, LinearSrgb}, store::CoreItemStore};
 use timeline::TimelineState;
 use web_time::Instant;
 use wgpu::SurfaceError;
@@ -31,7 +31,7 @@ use egui_tools::EguiRenderer;
 use pipeline::{AppPipeline, Viewport};
 use ranim_core::{Scene, SceneConstructor, SealedRanimScene};
 use ranim_render::{
-    RenderEval, Renderer, TimelineEvalResult, primitives::RenderInstances, utils::WgpuContext,
+    Renderer, primitives::{RenderInstances, RenderPool}, utils::WgpuContext,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -78,12 +78,15 @@ pub struct AppState {
     title: String,
     clear_color: wgpu::Color,
     timeline: SealedRanimScene,
+    // store: CoreItemStore,
     need_eval: bool,
     // app_options: AppOptions<'a>,
     // timeline: RanimTimeline,
     // renderer: Renderer,
     last_sec: f64,
-    render_instances: RenderInstances,
+    store: CoreItemStore,
+    pool: RenderPool,
+    // render_instances: RenderInstances,
     timeline_state: TimelineState,
     play_prev_t: Option<Instant>,
 }
@@ -111,7 +114,9 @@ impl AppState {
             need_eval: false,
             // renderer,
             last_sec: -1.0,
-            render_instances: RenderInstances::default(),
+            store: CoreItemStore::default(),
+            pool: RenderPool::new(),
+            // render_instances: RenderInstances::default(),
             timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
             timeline,
         }
@@ -148,53 +153,9 @@ impl AppState {
         self.need_eval = false;
         self.last_sec = self.timeline_state.current_sec;
 
-        let TimelineEvalResult {
-            // EvalResult<CameraFrame>, idx
-            camera_frame,
-            // Vec<(rabject_id, EvalResult<Item>, idx)>
-            visual_items,
-        } = {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("eval");
-
-            self.timeline.eval_sec(self.timeline_state.current_sec)
-        };
-        // println!("{} visual_items", visual_items.len());
-
-        let extracted = {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("extract");
-            visual_items
-                .iter()
-                .map(|(id, res, _)| (*id, res.as_ref()))
-                .collect::<Vec<_>>()
-        };
-
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("prepare");
-            extracted.iter().for_each(|(id, renderable)| {
-                renderable.prepare_for_id(ctx, &mut self.render_instances, *id);
-            });
-            ctx.queue.submit([]);
-        }
-
-        let render_primitives = visual_items
-            .iter()
-            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
-            .collect::<Vec<_>>();
-        app_renderer
-            .ranim_renderer
-            .update_uniforms(ctx, &camera_frame.0);
-
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("render");
-
-            app_renderer
-                .ranim_renderer
-                .render(ctx, self.clear_color, &render_primitives);
-        }
+        self.store.update(self.timeline.eval_primitives_at_sec(self.timeline_state.current_sec));
+        // println!("camera: {}, vitems: {}", self.store.camera_frames.len(), self.store.vitems.len());
+        app_renderer.ranim_renderer.render_store_with_pool(ctx, self.clear_color, &self.store, &mut self.pool);
     }
 
     fn handle_events(&mut self) {
@@ -208,7 +169,9 @@ impl AppState {
                     self.timeline_state.current_sec =
                         old_cur_second.clamp(0.0, self.timeline_state.total_sec);
                     self.timeline = timeline;
-                    self.render_instances = RenderInstances::default();
+                    // self.render_instances = RenderInstances::default();
+                    self.store.update(std::iter::empty());
+                    self.pool.clean();
                     self.need_eval = true;
 
                     self.set_clear_color_str(scene.config.clear_color);

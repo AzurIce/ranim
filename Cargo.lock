@@ -4182,6 +4182,7 @@ dependencies = [
  "profiling",
  "puffin",
  "ranim-core",
+ "slotmap",
  "variadics_please",
  "wgpu",
  "wgpu-profiler",

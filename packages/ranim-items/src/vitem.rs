@@ -287,7 +287,6 @@ impl StrokeWidth for VItem {
     }
 }
 
-/// Group
 /// A Group of type `T`.
 ///
 /// Just like a [`Vec`]

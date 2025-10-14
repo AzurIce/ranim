@@ -29,3 +29,20 @@ pub enum Primitives {
     /// `Vec<VItemPrimitive>`
     VItemPrimitive(Vec<VItemPrimitive>),
 }
+
+impl Primitives {
+    pub fn boom(self) -> Vec<CoreItem> {
+        match self {
+            Primitives::CameraFrame(x) => x.into_iter().map(CoreItem::CameraFrame).collect(),
+            Primitives::VItemPrimitive(x) => x.into_iter().map(CoreItem::VItemPrimitive).collect(),
+        }
+    }
+}
+
+/// The core ranim builtin items
+pub enum CoreItem {
+    /// [`CameraFrame`]
+    CameraFrame(CameraFrame),
+    /// [`VItemPrimitive`]
+    VItemPrimitive(VItemPrimitive),
+}

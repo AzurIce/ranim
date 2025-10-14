@@ -3,13 +3,12 @@ use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::{info, trace};
 use ranim_core::color::{self, LinearSrgb};
+use ranim_core::store::CoreItemStore;
 use ranim_core::{Output, Scene, SceneConfig, SceneConstructor, SealedRanimScene, TimeMark};
-use ranim_render::{
-    RenderEval, Renderer, TimelineEvalResult, primitives::RenderInstances, utils::WgpuContext,
-};
+use ranim_render::primitives::RenderPool;
+use ranim_render::{Renderer, utils::WgpuContext};
 use std::time::Duration;
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -74,7 +73,8 @@ struct RanimRenderApp {
     save_frames: bool,
     output_dir: PathBuf,
 
-    pub(crate) render_instances: RenderInstances,
+    store: CoreItemStore,
+    pool: RenderPool,
 }
 
 impl RanimRenderApp {
@@ -123,6 +123,8 @@ impl RanimRenderApp {
         let [r, g, b, a] = clear_color.components.map(|x| x as f64);
         let clear_color = wgpu::Color { r, g, b, a };
         Self {
+            store: CoreItemStore::default(),
+            pool: RenderPool::new(),
             // world: World::new(),
             renderer,
             // frame_size: options.frame_size,
@@ -145,7 +147,6 @@ impl RanimRenderApp {
             output_dir,
             scene_name,
             clear_color,
-            render_instances: RenderInstances::default(),
         }
     }
 
@@ -181,89 +182,25 @@ impl RanimRenderApp {
             })
             .progress_chars("#>-"),
         );
-        let mut last_hash = HashMap::<usize, u64>::new();
+
+        // `save_frames` is true
+        let save_path = if self.save_frames {
+            Some(
+                self.output_dir
+                    .join(format!(
+                        "{}_{}x{}_{}-frames",
+                        self.scene_name, self.width, self.height, self.fps
+                    ))
+                    .join(format!("{:04}.png", self.frame_count)),
+            )
+        } else {
+            None
+        };
+        let save_path = save_path.as_deref();
         (0..frames)
             .map(|f| f as f64 / (frames - 1) as f64)
             .for_each(|alpha| {
-                #[cfg(feature = "profiling")]
-                profiling::scope!("frame");
-
-                let TimelineEvalResult {
-                    // EvalResult<CameraFrame>, idx
-                    camera_frame,
-                    // Vec<(rabject_id, EvalResult<Item>, idx)>
-                    visual_items,
-                } = {
-                    #[cfg(feature = "profiling")]
-                    profiling::scope!("eval");
-
-                    timeline.eval_alpha(alpha)
-                };
-
-                let extracted_updates = {
-                    #[cfg(feature = "profiling")]
-                    profiling::scope!("extract");
-                    visual_items
-                        .iter()
-                        .filter_map(|(id, res, id_hash)| {
-                            // Some((*id, res))
-
-                            use ranim_core::animation::EvalResult;
-                            let is_same_hash = last_hash
-                                .get(id)
-                                .map(|hash| hash == id_hash)
-                                .unwrap_or(false);
-
-                            let renderable = match res {
-                                EvalResult::Dynamic(res) => Some(res.as_ref()),
-                                EvalResult::Static(res) => {
-                                    if is_same_hash {
-                                        Some(res.as_ref())
-                                    } else {
-                                        None
-                                    }
-                                }
-                            };
-                            last_hash.insert(*id, *id_hash);
-                            renderable.map(|renderable| (*id, renderable))
-                        })
-                        .collect::<Vec<_>>()
-                };
-
-                {
-                    #[cfg(feature = "profiling")]
-                    profiling::scope!("prepare");
-                    extracted_updates.iter().for_each(|(id, res)| {
-                        res.prepare_for_id(&self.ctx, &mut self.render_instances, *id);
-                    });
-                    self.ctx.queue.submit([]);
-                }
-
-                let render_primitives = visual_items
-                    .iter()
-                    .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
-                    .collect::<Vec<_>>();
-                // let camera_frame = match &camera_frame.0 {
-                //     EvalResult::Dynamic(res) => res.as_ref(),
-                //     EvalResult::Static(res) => res.as_ref(),
-                // };
-                // println!("{:?}", camera_frame);
-                // println!("{}", render_primitives.len());
-                self.renderer.update_uniforms(&self.ctx, &camera_frame.0);
-
-                {
-                    #[cfg(feature = "profiling")]
-                    profiling::scope!("render");
-
-                    self.renderer
-                        .render(&self.ctx, self.clear_color, &render_primitives);
-                }
-
-                self.update_frame();
-
-                #[cfg(feature = "profiling")]
-                profiling::finish_frame!();
-
+                self.render_timeline_frame_at_alpha(timeline, alpha, save_path);
                 pb.inc(1);
                 pb.set_message(format!(
                     "rendering {:.1?}/{:.1?}",
@@ -302,7 +239,8 @@ impl RanimRenderApp {
             .progress_chars("#>-"),
         );
         for (sec, TimeMark::Capture(filename)) in &timemarks {
-            self.render_timeline_frame(timeline, *sec, filename);
+            let alpha = *sec / timeline.total_secs();
+            self.render_timeline_frame_at_alpha(timeline, alpha, Some(filename));
             pb.inc(1);
         }
         pb.finish_with_message(format!(
@@ -312,55 +250,36 @@ impl RanimRenderApp {
         trace!("save capture frames cost: {:?}", start.elapsed());
     }
 
-    fn render_timeline_frame(
+    fn render_timeline_frame_at_alpha(
         &mut self,
         timeline: &SealedRanimScene,
-        sec: f64,
-        filename: impl AsRef<Path>,
+        alpha: f64,
+        save_path: Option<impl AsRef<Path>>,
     ) {
-        let TimelineEvalResult {
-            camera_frame,
-            visual_items,
-        } = timeline.eval_sec(sec);
+        #[cfg(feature = "profiling")]
+        profiling::scope!("frame");
 
-        let extracted = visual_items
-            .iter()
-            .map(|(id, res, _)| {
-                // let renderable = match res {
-                //     EvalResult::Dynamic(res) => res.extract_renderable(),
-                //     EvalResult::Static(res) => res.extract_renderable(),
-                // };
-                (*id, res)
-            })
-            .collect::<Vec<_>>();
+        self.store.update(timeline.eval_primitives_at_alpha(alpha));
 
-        extracted.iter().for_each(|(id, renderable)| {
-            renderable.prepare_for_id(&self.ctx, &mut self.render_instances, *id)
-        });
-        let render_primitives = visual_items
-            .iter()
-            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
-            .collect::<Vec<_>>();
-        // let camera_frame = match &camera_frame.0 {
-        //     EvalResult::Dynamic(res) => res,
-        //     EvalResult::Static(res) => res,
-        // };
-        // println!("{:?}", camera_frame);
-        // println!("{}", render_primitives.len());
-        self.renderer.update_uniforms(&self.ctx, &camera_frame.0);
-        self.renderer
-            .render(&self.ctx, self.clear_color, &render_primitives);
-        self.save_frame_to_image(
-            self.output_dir
-                .join(format!(
-                    "{}_{}x{}_{}",
-                    self.scene_name, self.width, self.height, self.fps
-                ))
-                .join(filename),
-        );
+        {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("render");
+
+            self.renderer.render_store_with_pool(
+                &self.ctx,
+                self.clear_color,
+                &self.store,
+                &mut self.pool,
+            );
+        }
+        self.pool.clean();
+        self.write_frame(save_path);
+
+        #[cfg(feature = "profiling")]
+        profiling::finish_frame!();
     }
 
-    fn update_frame(&mut self) {
+    fn write_frame(&mut self, save_path: Option<impl AsRef<Path>>) {
         // `output_video` is true
         if let Some(video_writer) = self.video_writer.as_mut() {
             video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
@@ -370,16 +289,8 @@ impl RanimRenderApp {
                 .write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
         }
 
-        // `save_frames` is true
-        if self.save_frames {
-            let path = self
-                .output_dir
-                .join(format!(
-                    "{}_{}x{}_{}-frames",
-                    self.scene_name, self.width, self.height, self.fps
-                ))
-                .join(format!("{:04}.png", self.frame_count));
-            self.save_frame_to_image(path);
+        if let Some(save_path) = save_path {
+            self.save_frame_to_image(save_path);
         }
         self.frame_count += 1;
     }

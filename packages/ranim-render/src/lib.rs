@@ -19,11 +19,12 @@ use log::warn;
 use pipelines::{Map3dTo2dPipeline, VItemPipeline};
 use primitives::RenderCommand;
 
-use crate::primitives::Renderable;
+use crate::primitives::{RenderPool, Renderable, vitem::VItemRenderInstance};
 use ranim_core::{
     SealedRanimScene,
     animation::EvalResult,
-    primitives::{Primitives, camera_frame::CameraFrame},
+    primitives::{Primitives, camera_frame::CameraFrame, vitem::VItemPrimitive},
+    store::CoreItemStore,
 };
 use utils::{PipelinesStorage, WgpuBuffer, WgpuContext};
 
@@ -89,104 +90,77 @@ mod profiling_utils {
 
 use std::sync::Arc;
 
-/// Ext for [`SealedRanimScene`] to eval to [`TimelineEvalResult`]
-pub trait RenderEval {
-    /// Get the total seconds of the
-    fn total_secs(&self) -> f64;
-    /// Evaluate the state of timelines at `target_sec`
-    fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult;
-    /// Evaluate the state of timelines at `alpha`
-    fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
-        self.eval_sec(alpha * self.total_secs())
-    }
-}
+// /// Ext for [`SealedRanimScene`] to eval to [`TimelineEvalResult`]
+// pub trait RenderEval {
+//     /// Get the total seconds of the
+//     fn total_secs(&self) -> f64;
+//     /// Evaluate the state of timelines at `target_sec`
+//     fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult;
+//     /// Evaluate the state of timelines at `alpha`
+//     fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
+//         self.eval_sec(alpha * self.total_secs())
+//     }
+// }
 
-impl RenderEval for SealedRanimScene {
-    fn total_secs(&self) -> f64 {
-        self.total_secs()
-    }
-    // MARK: eval_sec
-    /// Evaluate the state of timelines at `target_sec`
-    fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
-        let mut items = Vec::with_capacity(self.timelines_cnt());
+// impl RenderEval for SealedRanimScene {
+//     fn total_secs(&self) -> f64 {
+//         self.total_secs()
+//     }
+//     // MARK: eval_sec
+//     /// Evaluate the state of timelines at `target_sec`
+//     fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
+//         let primitives = self.eval_primitives_at_sec(target_sec).collect::<Vec<_>>();
 
-        let mut camera_frame = None::<(EvalResult<CameraFrame>, u64)>;
+//         let mut visual_items = Vec::with_capacity(self.timelines_cnt());
+//         let mut camera_frames = Vec::new();
 
-        for (id, timeline) in self.timelines_iter().enumerate() {
-            // println!("### eval_sec timeline id {id} ###");
-            let Some((res, id_hash)) = timeline.eval_primitives_at_sec(target_sec) else {
-                continue;
-            };
-            // ! Note that the `TypeId` between different compile units maybe different.
-            // if let Some(x) = res.downcast_ref::<CameraFrame>() {
-            //     println!("Camera frame found at sec {target_sec} with anim idx {id}");
-            //     camera_frame = Some((x.clone(), anim_idx));
-            // } else if let Some(x) = res.downcast_ref::<VItemPrimitive>() {
-            //     println!("Visual item found at sec {target_sec} with anim idx {id}");
-            //     items.push((id, x.clone(), anim_idx));
-            // }
-            match res.as_ref() {
-                Primitives::CameraFrame(_) => {
-                    camera_frame = Some((
-                        res.map(|x| {
-                            let Primitives::CameraFrame(res) = x else {
-                                unreachable!()
-                            };
-                            res.into_iter().next().unwrap()
-                        }),
-                        id_hash,
-                    ));
-                }
-                Primitives::VItemPrimitive(_) => {
-                    items.push((
-                        id,
-                        res.map(|x| {
-                            let Primitives::VItemPrimitive(res) = x else {
-                                unreachable!()
-                            };
-                            res
-                        })
-                        .convert(),
-                        id_hash,
-                    ));
-                }
-            }
-        }
+//         for (primitive, id_hash) in primitives {
+//             match primitive {
+//                 Primitives::CameraFrame(x) => {
+//                     if let Some(x) = x.into_iter().next() {
+//                         camera_frames.push((x, id_hash));
+//                     }
+//                 }
+//                 Primitives::VItemPrimitive(x) => {
+//                     visual_items.push((Box::new(x) as Box::<dyn Renderable>, id_hash));
+//                 }
+//             }
+//         }
 
-        if camera_frame.is_none() {
-            warn!("No camera frame found at sec {target_sec}");
-        }
+//         if camera_frames.is_empty() {
+//             warn!("No camera frame found at sec {target_sec}");
+//         }
 
-        TimelineEvalResult {
-            camera_frame: camera_frame.unwrap(),
-            visual_items: items,
-        }
-    }
-}
+//         TimelineEvalResult {
+//             camera_frames,
+//             visual_items,
+//         }
+//     }
+// }
 
-trait RenderableResult {
-    fn convert(self) -> EvalResult<dyn Renderable>;
-}
+// trait RenderableResult {
+//     fn convert(self) -> EvalResult<dyn Renderable>;
+// }
 
-impl<T: Renderable + 'static> RenderableResult for EvalResult<T> {
-    fn convert(self) -> EvalResult<dyn Renderable> {
-        match self {
-            Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Renderable>),
-            Self::Static(rc) => EvalResult::Static(rc as Arc<dyn Renderable>),
-        }
-    }
-}
+// impl<T: Renderable + 'static> RenderableResult for EvalResult<T> {
+//     fn convert(self) -> EvalResult<dyn Renderable> {
+//         match self {
+//             Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Renderable>),
+//             Self::Static(rc) => EvalResult::Static(rc as Arc<dyn Renderable>),
+//         }
+//     }
+// }
 
-/// The evaluation result
-///
-/// This is produced from [`SealedRanimScene::eval_alpha`] or [`SealedRanimScene::eval_sec`]
-#[allow(clippy::type_complexity)]
-pub struct TimelineEvalResult {
-    /// (`EvalResult<CameraFrame>`, id hash)
-    pub camera_frame: (EvalResult<CameraFrame>, u64),
-    /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, id hash)
-    pub visual_items: Vec<(usize, EvalResult<dyn Renderable>, u64)>,
-}
+// /// The evaluation result
+// ///
+// /// This is produced from [`SealedRanimScene::eval_alpha`] or [`SealedRanimScene::eval_sec`]
+// #[allow(clippy::type_complexity)]
+// pub struct TimelineEvalResult {
+//     /// (`EvalResult<CameraFrame>`, id hash)
+//     pub camera_frames: Vec<(CameraFrame, u64)>,
+//     /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, id hash)
+//     pub visual_items: Vec<(Box<dyn Renderable>, u64)>,
+// }
 
 // MARK: CameraUniforms
 
@@ -201,6 +175,19 @@ pub struct CameraUniforms {
 }
 
 impl CameraUniforms {
+    pub fn from_camera_frame(camera_frame: &CameraFrame, frame_height: f64, ratio: f64) -> Self {
+        Self {
+            proj_mat: camera_frame
+                .projection_matrix(frame_height, ratio)
+                .as_mat4(),
+            view_mat: camera_frame.view_matrix().as_mat4(),
+            half_frame_size: Vec2::new(
+                (frame_height * ratio) as f32 / 2.0,
+                frame_height as f32 / 2.0,
+            ),
+            _padding: [0.0; 2],
+        }
+    }
     pub(crate) fn as_bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
             binding,
@@ -257,9 +244,7 @@ pub struct Renderer {
     pub(crate) pipelines: PipelinesStorage,
 
     pub render_textures: RenderTextures,
-
-    uniforms_buffer: WgpuBuffer<CameraUniforms>,
-    pub(crate) uniforms_bind_group: CameraUniformsBindGroup,
+    pub camera_state: Camera,
 
     output_staging_buffer: wgpu::Buffer,
     output_texture_data: Option<Vec<u8>>,
@@ -269,11 +254,44 @@ pub struct Renderer {
     pub(crate) profiler: wgpu_profiler::GpuProfiler,
 }
 
+pub struct Camera {
+    frame_height: f64,
+    ratio: f64,
+    uniforms_buffer: WgpuBuffer<CameraUniforms>,
+    uniforms_bind_group: CameraUniformsBindGroup,
+}
+
+impl Camera {
+    pub fn new(ctx: &WgpuContext, camera: &CameraFrame, frame_height: f64, ratio: f64) -> Self {
+        let uniforms = CameraUniforms::from_camera_frame(camera, frame_height, ratio);
+        let uniforms_buffer = WgpuBuffer::new_init(
+            ctx,
+            Some("Uniforms Buffer"),
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            uniforms,
+        );
+        let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
+        Self {
+            frame_height,
+            ratio,
+            uniforms_buffer,
+            uniforms_bind_group,
+        }
+    }
+    pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext, camera_frame: &CameraFrame) {
+        self.uniforms_buffer.set(
+            wgpu_ctx,
+            CameraUniforms::from_camera_frame(camera_frame, self.frame_height, self.ratio),
+        );
+    }
+}
+
 impl Renderer {
     pub fn new(ctx: &WgpuContext, frame_height: f64, width: usize, height: usize) -> Self {
         let camera = CameraFrame::new();
 
         let render_textures = RenderTextures::new(ctx, width, height);
+        let camera_state = Camera::new(ctx, &camera, frame_height, width as f64 / height as f64);
         let bytes_per_row = ((width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
         let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
@@ -282,22 +300,7 @@ impl Renderer {
             mapped_at_creation: false,
         });
 
-        let uniforms = CameraUniforms {
-            proj_mat: camera
-                .projection_matrix(width as f64, height as f64)
-                .as_mat4(),
-            view_mat: camera.view_matrix().as_mat4(),
-            half_frame_size: Vec2::new(width as f32 / 2.0, height as f32 / 2.0),
-            _padding: [0.0; 2],
-        };
         // trace!("init renderer uniform: {:?}", uniforms);
-        let uniforms_buffer = WgpuBuffer::new_init(
-            ctx,
-            Some("Uniforms Buffer"),
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            uniforms,
-        );
-        let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
 
         // let bg = rgba8(0x33, 0x33, 0x33, 0xff).convert::<LinearSrgb>();
         // let [r, g, b, a] = bg.components.map(|x| x as f64);
@@ -319,9 +322,8 @@ impl Renderer {
             output_staging_buffer,
             output_texture_data: None,
             output_texture_updated: false,
-            // Uniforms
-            uniforms_buffer,
-            uniforms_bind_group,
+            // Camera State
+            camera_state,
             // Profiler
             #[cfg(feature = "profiling")]
             profiler,
@@ -379,6 +381,37 @@ impl Renderer {
         self.output_texture_updated = false;
     }
 
+    pub fn render_store_with_pool(
+        &mut self,
+        ctx: &WgpuContext,
+        clear_color: wgpu::Color,
+        store: &CoreItemStore,
+        pool: &mut RenderPool,
+    ) {
+        // println!("camera: {}, vitems: {}", store.camera_frames.len(), store.vitems.len());
+        let camera_frame = &store.camera_frames[0];
+        let visual_items = store
+            .vitems
+            .iter()
+            .map(|x| pool.alloc::<VItemRenderInstance, VItemPrimitive>(ctx, x))
+            .collect::<Vec<_>>();
+        let render_primitives = visual_items
+            .into_iter()
+            .filter_map(|k| pool.get(*k).map(|x| x as &dyn RenderCommand))
+            .collect::<Vec<_>>();
+
+        self.camera_state.update_uniforms(ctx, &camera_frame);
+
+        {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("render");
+
+            self.render(ctx, clear_color, &render_primitives);
+        }
+
+        drop(render_primitives);
+    }
+
     pub fn render(
         &mut self,
         ctx: &WgpuContext,
@@ -402,7 +435,7 @@ impl Renderer {
                 timestamp_writes: None,
             });
             cpass.set_pipeline(self.pipelines.get_or_init::<Map3dTo2dPipeline>(ctx));
-            cpass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
+            cpass.set_bind_group(0, &self.camera_state.uniforms_bind_group.bind_group, &[]);
 
             renderable.encode_compute_pass_command(&mut cpass);
         }
@@ -435,7 +468,7 @@ impl Renderer {
             #[cfg(not(feature = "profiling"))]
             let mut rpass = encoder.begin_render_pass(&rpass_desc);
             rpass.set_pipeline(self.pipelines.get_or_init::<VItemPipeline>(ctx));
-            rpass.set_bind_group(0, &self.uniforms_bind_group.bind_group, &[]);
+            rpass.set_bind_group(0, &self.camera_state.uniforms_bind_group.bind_group, &[]);
 
             renderable.encode_render_pass_command(&mut rpass);
         }
@@ -564,25 +597,6 @@ impl Renderer {
         let size = self.size;
         let data = self.get_rendered_texture_data(ctx);
         ImageBuffer::from_raw(size.0 as u32, size.1 as u32, data).unwrap()
-    }
-
-    pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext, camera_frame: &CameraFrame) {
-        let ratio = self.size.0 as f64 / self.size.1 as f64;
-        let uniforms = CameraUniforms {
-            view_mat: camera_frame.view_matrix().as_mat4(),
-            proj_mat: camera_frame
-                .projection_matrix(self.frame_height, ratio)
-                .as_mat4(),
-            // center of the screen
-            half_frame_size: Vec2::new(
-                (self.frame_height * ratio) as f32 / 2.0,
-                self.frame_height as f32 / 2.0,
-            ),
-            _padding: [0.0; 2],
-        };
-        // trace!("Uniforms: {:?}", self.uniforms);
-        // trace!("[Camera] uploading camera uniforms to buffer...");
-        self.uniforms_buffer.set(wgpu_ctx, uniforms);
     }
 }
 
