@@ -6,6 +6,9 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[lib]
+bench = false
+
 [dependencies]
 itertools.workspace = true
 criterion = { version = "0.7.0", features = ["html_reports"] }
