@@ -494,7 +494,9 @@ impl Renderer {
             self.profiler.end_frame().unwrap();
 
             // Query for oldest finished frame (this is almost certainly not the one we just submitted!) and display results in the command line.
-            ctx.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+            ctx.device
+                .poll(wgpu::PollType::wait_indefinitely())
+                .unwrap();
             let latest_profiler_results = self
                 .profiler
                 .process_finished_frame(ctx.queue.get_timestamp_period());
@@ -553,7 +555,9 @@ impl Renderer {
             buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
                 pollster::block_on(tx.send(result)).unwrap()
             });
-            ctx.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+            ctx.device
+                .poll(wgpu::PollType::wait_indefinitely())
+                .unwrap();
             pollster::block_on(rx.recv()).unwrap().unwrap();
 
             {
