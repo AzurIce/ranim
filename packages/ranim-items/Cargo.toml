@@ -31,10 +31,10 @@ typst-kit = { version = "0.13.1", default-features = false, features = [
 typst-svg = "0.13.1"
 chrono = "0.4.42"
 diff-match-patch-rs = "0.5.1"
-regex = "1.11.2"
+regex = "1.12.2"
 
 [dev-dependencies]
-assert_float_eq = "1.1.4"
+assert_float_eq = "1.2.0"
 
 [package.metadata.docs.rs]
 all-features = true

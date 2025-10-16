@@ -14,9 +14,9 @@ ranim-render.workspace = true
 wgpu.workspace = true
 log.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
-egui = "0.32.3"
+egui = "0.33.0"
 winit = "0.30.12"
-egui-wgpu = "0.32.3"
+egui-wgpu = "0.33.0"
 async-channel = "2.5.0"
 web-time = "1.1.0"
 # profiling
@@ -27,14 +27,14 @@ profiling = { version = "1.0.17", optional = true, features = [
 ] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-egui-winit = "0.32.3"
+egui-winit = "0.33.0"
 pollster = "0.4.0"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen.workspace = true
-egui-winit = { version = "0.32.3", default-features = false }
-wasm-bindgen-futures = "0.4.52"
-web-sys = { version = "0.3.79" }
+egui-winit = { version = "0.33.0", default-features = false }
+wasm-bindgen-futures = "0.4.54"
+web-sys = { version = "0.3.81" }
 
 [package.metadata.docs.rs]
 all-features = true
