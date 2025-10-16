@@ -18,9 +18,10 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    ciallo.url = "github:azurice/ciallo";
   };
 
-  outputs = { nixpkgs, crane, rust-overlay, flake-utils, ... }:
+  outputs = { nixpkgs, crane, rust-overlay, flake-utils, ciallo, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
@@ -106,6 +107,7 @@
           packages = [ puffin_viewer ] ++ (with pkgs; [
             git-cliff
             cargo-release
+            samply
             cargo-udeps
             miniserve
             trunk
@@ -118,6 +120,7 @@
             mdbook-i18n-helpers
           ]) ++ [
             (pkgs.callPackage ./wasm-bindgen-cli.nix {})
+            ciallo.packages.${system}.default
           ];
         };
       });

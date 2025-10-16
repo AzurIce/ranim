@@ -16,17 +16,17 @@ doc = false
 
 [dependencies]
 ranim = { workspace = true, features = ["preview", "render"] }
-anyhow = "1.0.98"
+anyhow = "1.0.100"
 cargo_toml = "0.22.3"
-clap = { version = "4.5.42", features = ["derive"] }
-ignore = "0.4.23"
+clap = { version = "4.5.49", features = ["derive"] }
+ignore = "0.4.24"
 krates = "0.20.0"
-libloading = "0.8.8"
-log = "0.4.27"
+libloading = "0.8.9"
+log = "0.4.28"
 notify = "8.2.0"
 notify-debouncer-full = "0.6.0"
 async-channel = "2.5.0"
-toml = "0.9.5"
+toml = "0.9.8"
 pretty_env_logger = "0.5.0"
 
 [package.metadata.docs.rs]
