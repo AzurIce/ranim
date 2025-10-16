@@ -549,10 +549,10 @@ impl Renderer {
             // the future. Otherwise the application will freeze.
             let (tx, rx) = async_channel::bounded(1);
             buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-                tx.send_blocking(result).unwrap()
+                pollster::block_on(tx.send(result)).unwrap()
             });
             ctx.device.poll(wgpu::PollType::Wait).unwrap();
-            rx.recv_blocking().unwrap().unwrap();
+            pollster::block_on(rx.recv()).unwrap().unwrap();
 
             {
                 let view = buffer_slice.get_mapped_range();
