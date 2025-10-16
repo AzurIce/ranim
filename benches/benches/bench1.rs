@@ -14,6 +14,7 @@ use ranim::{
 };
 
 fn static_squares(r: &mut RanimScene, n: usize) {
+    let _r_cam = r.insert_and_show(CameraFrame::new());
     let buff = 0.1;
     let size = 8.0 / n as f64;
 
@@ -33,6 +34,7 @@ fn static_squares(r: &mut RanimScene, n: usize) {
 }
 
 fn transform_squares(r: &mut RanimScene, n: usize) {
+    let _r_cam = r.insert_and_show(CameraFrame::new());
     let buff = 0.1;
     let size = 8.0 / n as f64 - buff;
 
@@ -109,7 +111,7 @@ fn eval_benchmark(c: &mut Criterion) {
     // rayon::ThreadPoolBuilder::new().build_global().unwrap();
 
     // 测试不同规模的场景
-    for n in [10, 100, 1000, 10000].iter() {
+    for n in [10, 100, 1000].iter() {
         group.bench_with_input(BenchmarkId::new("eval_static_squares", n), n, |b, n| {
             let timeline = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
             b.iter(|| {
