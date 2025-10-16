@@ -1,0 +1,3 @@
+[cmd.bench]
+command = "cargo bench -p benches"
+hooks = [ "feishu" ]
