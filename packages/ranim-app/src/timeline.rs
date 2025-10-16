@@ -309,7 +309,7 @@ pub fn paint_time_grid(
             let text_x = line_x + 4.0;
             let text_color = Rgba::from_white_alpha((text_alpha * 2.0).min(1.0)).into();
             // Timestamp on top
-            painter.fonts(|f| {
+            painter.fonts_mut(|f| {
                 shapes.push(egui::Shape::text(
                     f,
                     pos2(text_x, rect.min.y),
@@ -320,7 +320,7 @@ pub fn paint_time_grid(
                 ));
             });
             // Timestamp on bottom
-            painter.fonts(|f| {
+            painter.fonts_mut(|f| {
                 shapes.push(egui::Shape::text(
                     f,
                     pos2(text_x, rect.max.y - 12.0),
@@ -423,7 +423,7 @@ pub fn paint_timeline(
                 let text_x = line_x + 4.0;
                 let text_color = Rgba::from_white_alpha((text_alpha * 2.0).min(1.0)).into();
                 // Timestamp on top
-                info.painter.fonts(|f| {
+                info.painter.fonts_mut(|f| {
                     shapes.push(egui::Shape::text(
                         f,
                         pos2(text_x, rect.min.y),
@@ -434,7 +434,7 @@ pub fn paint_timeline(
                     ));
                 });
                 // Timestamp on bottom
-                info.painter.fonts(|f| {
+                info.painter.fonts_mut(|f| {
                     shapes.push(egui::Shape::text(
                         f,
                         pos2(text_x, rect.max.y - info.text_height),

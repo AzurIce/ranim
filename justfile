@@ -1,3 +1,5 @@
+set windows-shell := ["powershell.exe", "-Command"]
+
 clean:
     -rm *.log
 

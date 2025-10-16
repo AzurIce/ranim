@@ -34,13 +34,13 @@ ranim-anims = { path = "packages/ranim-anims", version = "0.1.4" }
 ranim-macros = { path = "packages/ranim-macros", version = "0.1.4" }
 ranim-app = { path = "packages/ranim-app", version = "0.1.4" }
 ranim-render = { path = "packages/ranim-render", version = "0.1.4" }
-wgpu-profiler = { version = "0.23.0", features = ["puffin"] }
-wasm-bindgen = "0.2.103"
+wgpu-profiler = { version = "0.25.0", features = ["puffin"] }
+wasm-bindgen = "0.2.104"
 glam = "0.30.6"
 log = "0.4.28"
 itertools = "0.14"
-bytemuck = "1.23.2"
-wgpu = "25.0.2"
+bytemuck = "1.24.0"
+wgpu = "27.0.1"
 image = "0.25.8"
 
 [features]
@@ -93,23 +93,24 @@ wgpu = { workspace = true, optional = true }
 pollster = { version = "0.4.0", optional = true }
 which = { version = "8.0.0", optional = true }
 indicatif = { version = "0.18.0", optional = true }
-flate2 = { version = "1.1.2", optional = true }
-reqwest = { version = "0.12.23", features = ["blocking"], optional = true }
+flate2 = { version = "1.1.4", optional = true }
+reqwest = { version = "0.12.24", features = ["blocking"], optional = true }
 # profiling
 puffin = { version = "0.19.1", optional = true }
 puffin_http = { version = "0.16.1", optional = true }
 profiling = { version = "1.0.17", optional = true, features = [
   "profile-with-puffin",
 ] }
+async-channel = "2.5.0"
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"
 
 [dev-dependencies]
-assert_float_eq = "1.1.4"
+assert_float_eq = "1.2.0"
 rand = "0.9.2"
 rand_chacha = "0.9.0"
-getrandom = { version = "0.3.3", features = ["wasm_js"] }
+getrandom = { version = "0.3.4", features = ["wasm_js"] }
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

@@ -3,13 +3,12 @@ use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::{info, trace};
 use ranim_core::color::{self, LinearSrgb};
+use ranim_core::store::CoreItemStore;
 use ranim_core::{Output, Scene, SceneConfig, SceneConstructor, SealedRanimScene, TimeMark};
-use ranim_render::{
-    RenderEval, Renderer, TimelineEvalResult, primitives::RenderInstances, utils::WgpuContext,
-};
+use ranim_render::primitives::RenderPool;
+use ranim_render::{Renderer, utils::WgpuContext};
 use std::time::Duration;
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -53,31 +52,47 @@ pub fn render_scene_output(
     }
 }
 
-/// MARK: RanimRenderApp
-struct RanimRenderApp {
+/// drop it will close the channel and the thread loop will be terminated
+struct RenderThreadHandle {
+    submit_frame_tx: async_channel::Sender<CoreItemStore>,
+    back_rx: async_channel::Receiver<CoreItemStore>,
+    worker_rx: async_channel::Receiver<RenderWorker>,
+}
+
+impl RenderThreadHandle {
+    fn sync_and_submit(&self, f: impl FnOnce(&mut CoreItemStore)) {
+        let mut store = self.get_store();
+        f(&mut store);
+        self.submit_frame_tx.send_blocking(store).unwrap();
+    }
+    fn get_store(&self) -> CoreItemStore {
+        self.back_rx.recv_blocking().unwrap()
+    }
+    fn retrive(&self) -> RenderWorker {
+        self.submit_frame_tx.close(); // This terminates the worker thread loop
+        self.worker_rx.recv_blocking().unwrap()
+    }
+}
+
+struct RenderWorker {
     ctx: WgpuContext,
     // frame_size: (u32, u32),
     renderer: Renderer,
-
-    /// The writer for the output.mp4 video
-    video_writer: Option<FileWriter>,
-    /// Whether to auto create a [`FileWriter`] to output the video
-    video_writer_builder: Option<FileWriterBuilder>,
-    /// Whether to save the frames
-    frame_count: u32,
-    scene_name: String,
+    pool: RenderPool,
     clear_color: wgpu::Color,
-
+    // video writer
+    video_writer: Option<FileWriter>,
+    video_writer_builder: Option<FileWriterBuilder>,
+    frame_count: u32,
+    save_frames: bool,
+    output_dir: PathBuf,
+    scene_name: String,
     width: u32,
     height: u32,
     fps: u32,
-    save_frames: bool,
-    output_dir: PathBuf,
-
-    pub(crate) render_instances: RenderInstances,
 }
 
-impl RanimRenderApp {
+impl RenderWorker {
     fn new(scene_name: String, scene_config: &SceneConfig, output: &Output) -> Self {
         info!("Checking ffmpeg...");
         let t = Instant::now();
@@ -122,10 +137,12 @@ impl RanimRenderApp {
             .convert::<LinearSrgb>();
         let [r, g, b, a] = clear_color.components.map(|x| x as f64);
         let clear_color = wgpu::Color { r, g, b, a };
+
         Self {
-            // world: World::new(),
+            ctx,
             renderer,
-            // frame_size: options.frame_size,
+            pool: RenderPool::new(),
+            clear_color,
             video_writer: None,
             video_writer_builder: Some(
                 FileWriterBuilder::default()
@@ -137,15 +154,125 @@ impl RanimRenderApp {
                     ))),
             ),
             frame_count: 0,
-            ctx,
-            width: output.width,
-            height: output.height,
-            fps: output.fps,
             save_frames: output.save_frames,
             output_dir,
             scene_name,
-            clear_color,
-            render_instances: RenderInstances::default(),
+            width: output.width,
+            height: output.height,
+            fps: output.fps,
+        }
+    }
+
+    fn yeet(self) -> RenderThreadHandle {
+        let (submit_frame_tx, submit_frame_rx) = async_channel::bounded(1);
+        let (back_tx, back_rx) = async_channel::bounded(1);
+        let (worker_tx, worker_rx) = async_channel::bounded(1);
+
+        back_tx.send_blocking(CoreItemStore::default()).unwrap();
+        std::thread::spawn(move || {
+            let mut worker = self;
+            let save_path = if worker.save_frames {
+                Some(
+                    worker
+                        .output_dir
+                        .join(format!(
+                            "{}_{}x{}_{}-frames",
+                            worker.scene_name, worker.width, worker.height, worker.fps
+                        ))
+                        .join(format!("{:04}.png", worker.frame_count)),
+                )
+            } else {
+                None
+            };
+            let save_path = save_path.as_deref();
+
+            while let Ok(store) = submit_frame_rx.recv_blocking() {
+                worker.render_store(&store, save_path);
+
+                back_tx.send_blocking(store).unwrap();
+            }
+
+            worker_tx.send_blocking(worker).unwrap();
+        });
+        RenderThreadHandle {
+            submit_frame_tx,
+            back_rx,
+            worker_rx,
+        }
+    }
+
+    fn render_store(&mut self, store: &CoreItemStore, save_path: Option<impl AsRef<Path>>) {
+        #[cfg(feature = "profiling")]
+        profiling::scope!("frame");
+
+        {
+            #[cfg(feature = "profiling")]
+            profiling::scope!("render");
+
+            self.renderer.render_store_with_pool(
+                &self.ctx,
+                self.clear_color,
+                store,
+                &mut self.pool,
+            );
+        }
+        self.pool.clean();
+        self.write_frame(save_path);
+
+        #[cfg(feature = "profiling")]
+        profiling::finish_frame!();
+    }
+    fn write_frame(&mut self, save_path: Option<impl AsRef<Path>>) {
+        // `output_video` is true
+        if let Some(video_writer) = self.video_writer.as_mut() {
+            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
+        } else if let Some(builder) = self.video_writer_builder.as_ref() {
+            self.video_writer
+                .get_or_insert(builder.clone().build())
+                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
+        }
+
+        if let Some(save_path) = save_path {
+            self.save_frame_to_image(save_path);
+        }
+        self.frame_count += 1;
+    }
+
+    pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
+        let path = path.as_ref();
+        let path = if !path.is_absolute() {
+            self.output_dir
+                .join(format!(
+                    "{}_{}x{}_{}",
+                    self.scene_name, self.width, self.height, self.fps
+                ))
+                .join(path)
+        } else {
+            path.to_path_buf()
+        };
+        let dir = path.parent().unwrap();
+        if !dir.exists() || !dir.is_dir() {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx);
+        buffer.save(path).unwrap();
+    }
+}
+
+/// MARK: RanimRenderApp
+struct RanimRenderApp {
+    render_worker: Option<RenderWorker>,
+    fps: u32,
+    store: CoreItemStore,
+}
+
+impl RanimRenderApp {
+    fn new(scene_name: String, scene_config: &SceneConfig, output: &Output) -> Self {
+        let render_worker = RenderWorker::new(scene_name, scene_config, output);
+        Self {
+            render_worker: Some(render_worker),
+            fps: output.fps,
+            store: CoreItemStore::default(),
         }
     }
 
@@ -168,6 +295,8 @@ impl RanimRenderApp {
             (cpu_server, gpu_server)
         };
 
+        let worker_thread = self.render_worker.take().unwrap().yeet();
+
         let frames = (timeline.total_secs() * self.fps as f64).ceil() as usize;
         let frames = frames.max(2);
         let pb = ProgressBar::new(frames as u64);
@@ -181,88 +310,13 @@ impl RanimRenderApp {
             })
             .progress_chars("#>-"),
         );
-        let mut last_hash = HashMap::<usize, u64>::new();
+
         (0..frames)
             .map(|f| f as f64 / (frames - 1) as f64)
             .for_each(|alpha| {
-                #[cfg(feature = "profiling")]
-                profiling::scope!("frame");
-
-                let TimelineEvalResult {
-                    // EvalResult<CameraFrame>, idx
-                    camera_frame,
-                    // Vec<(rabject_id, EvalResult<Item>, idx)>
-                    visual_items,
-                } = {
-                    #[cfg(feature = "profiling")]
-                    profiling::scope!("eval");
-
-                    timeline.eval_alpha(alpha)
-                };
-
-                let extracted_updates = {
-                    #[cfg(feature = "profiling")]
-                    profiling::scope!("extract");
-                    visual_items
-                        .iter()
-                        .filter_map(|(id, res, id_hash)| {
-                            // Some((*id, res))
-
-                            use ranim_core::animation::EvalResult;
-                            let is_same_hash = last_hash
-                                .get(id)
-                                .map(|hash| hash == id_hash)
-                                .unwrap_or(false);
-
-                            let renderable = match res {
-                                EvalResult::Dynamic(res) => Some(res.as_ref()),
-                                EvalResult::Static(res) => {
-                                    if is_same_hash {
-                                        Some(res.as_ref())
-                                    } else {
-                                        None
-                                    }
-                                }
-                            };
-                            last_hash.insert(*id, *id_hash);
-                            renderable.map(|renderable| (*id, renderable))
-                        })
-                        .collect::<Vec<_>>()
-                };
-
-                {
-                    #[cfg(feature = "profiling")]
-                    profiling::scope!("prepare");
-                    extracted_updates.iter().for_each(|(id, res)| {
-                        res.prepare_for_id(&self.ctx, &mut self.render_instances, *id);
-                    });
-                    self.ctx.queue.submit([]);
-                }
-
-                let render_primitives = visual_items
-                    .iter()
-                    .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
-                    .collect::<Vec<_>>();
-                // let camera_frame = match &camera_frame.0 {
-                //     EvalResult::Dynamic(res) => res.as_ref(),
-                //     EvalResult::Static(res) => res.as_ref(),
-                // };
-                // println!("{:?}", camera_frame);
-                // println!("{}", render_primitives.len());
-                self.renderer.update_uniforms(&self.ctx, &camera_frame.0);
-
-                {
-                    #[cfg(feature = "profiling")]
-                    profiling::scope!("render");
-
-                    self.renderer
-                        .render(&self.ctx, self.clear_color, &render_primitives);
-                }
-
-                self.update_frame();
-
-                #[cfg(feature = "profiling")]
-                profiling::finish_frame!();
+                worker_thread.sync_and_submit(|store| {
+                    store.update(timeline.eval_at_alpha(alpha));
+                });
 
                 pb.inc(1);
                 pb.set_message(format!(
@@ -271,6 +325,7 @@ impl RanimRenderApp {
                     Duration::from_secs_f64(timeline.total_secs())
                 ));
             });
+        self.render_worker.replace(worker_thread.retrive());
 
         let msg = format!(
             "rendered {} frames({:?})",
@@ -302,7 +357,13 @@ impl RanimRenderApp {
             .progress_chars("#>-"),
         );
         for (sec, TimeMark::Capture(filename)) in &timemarks {
-            self.render_timeline_frame(timeline, *sec, filename);
+            let alpha = *sec / timeline.total_secs();
+
+            self.store.update(timeline.eval_at_alpha(alpha));
+            self.render_worker
+                .as_mut()
+                .unwrap()
+                .render_store(&self.store, Some(filename));
             pb.inc(1);
         }
         pb.finish_with_message(format!(
@@ -310,87 +371,6 @@ impl RanimRenderApp {
             timemarks.len()
         ));
         trace!("save capture frames cost: {:?}", start.elapsed());
-    }
-
-    fn render_timeline_frame(
-        &mut self,
-        timeline: &SealedRanimScene,
-        sec: f64,
-        filename: impl AsRef<Path>,
-    ) {
-        let TimelineEvalResult {
-            camera_frame,
-            visual_items,
-        } = timeline.eval_sec(sec);
-
-        let extracted = visual_items
-            .iter()
-            .map(|(id, res, _)| {
-                // let renderable = match res {
-                //     EvalResult::Dynamic(res) => res.extract_renderable(),
-                //     EvalResult::Static(res) => res.extract_renderable(),
-                // };
-                (*id, res)
-            })
-            .collect::<Vec<_>>();
-
-        extracted.iter().for_each(|(id, renderable)| {
-            renderable.prepare_for_id(&self.ctx, &mut self.render_instances, *id)
-        });
-        let render_primitives = visual_items
-            .iter()
-            .filter_map(|(id, _, _)| self.render_instances.get_render_instance_dyn(*id))
-            .collect::<Vec<_>>();
-        // let camera_frame = match &camera_frame.0 {
-        //     EvalResult::Dynamic(res) => res,
-        //     EvalResult::Static(res) => res,
-        // };
-        // println!("{:?}", camera_frame);
-        // println!("{}", render_primitives.len());
-        self.renderer.update_uniforms(&self.ctx, &camera_frame.0);
-        self.renderer
-            .render(&self.ctx, self.clear_color, &render_primitives);
-        self.save_frame_to_image(
-            self.output_dir
-                .join(format!(
-                    "{}_{}x{}_{}",
-                    self.scene_name, self.width, self.height, self.fps
-                ))
-                .join(filename),
-        );
-    }
-
-    fn update_frame(&mut self) {
-        // `output_video` is true
-        if let Some(video_writer) = self.video_writer.as_mut() {
-            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
-        } else if let Some(builder) = self.video_writer_builder.as_ref() {
-            self.video_writer
-                .get_or_insert(builder.clone().build())
-                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
-        }
-
-        // `save_frames` is true
-        if self.save_frames {
-            let path = self
-                .output_dir
-                .join(format!(
-                    "{}_{}x{}_{}-frames",
-                    self.scene_name, self.width, self.height, self.fps
-                ))
-                .join(format!("{:04}.png", self.frame_count));
-            self.save_frame_to_image(path);
-        }
-        self.frame_count += 1;
-    }
-
-    pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
-        let dir = path.as_ref().parent().unwrap();
-        if !dir.exists() || !dir.is_dir() {
-            std::fs::create_dir_all(dir).unwrap();
-        }
-        let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx);
-        buffer.save(path).unwrap();
     }
 }
 

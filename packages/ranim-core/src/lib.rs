@@ -23,6 +23,8 @@ pub mod utils;
 
 /// The core primitives
 pub mod primitives;
+/// The [`CoreItem`] store
+pub mod store;
 
 pub use glam;
 
@@ -36,7 +38,7 @@ pub mod prelude {
     pub use crate::{ItemId, RanimScene, TimeMark};
 }
 
-use crate::primitives::{Primitive, Primitives};
+use crate::primitives::{CoreItem, Primitive, Primitives};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
@@ -396,6 +398,21 @@ impl SealedRanimScene {
                 animation_infos: timeline.get_animation_infos(),
             })
             .collect()
+    }
+
+    /// Eval primitives
+    pub fn eval_at_sec(&self, target_sec: f64) -> impl Iterator<Item = CoreItem> {
+        self.timelines_iter()
+            .filter_map(move |t| {
+                t.eval_primitives_at_sec(target_sec)
+                    .map(|(res, _id_hash)| res.to_owned().boom())
+            })
+            .flatten()
+    }
+
+    /// Eval primitives
+    pub fn eval_at_alpha(&self, alpha: f64) -> impl Iterator<Item = CoreItem> {
+        self.eval_at_sec(self.total_secs() * alpha)
     }
 }
 

@@ -76,3 +76,4 @@ output/
 /output*
 
 .direnv/
+profile.json.gz

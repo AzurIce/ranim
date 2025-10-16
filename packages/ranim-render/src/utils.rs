@@ -44,6 +44,7 @@ impl WgpuContext {
                 required_limits: wgpu::Limits::default(),
                 memory_hints: wgpu::MemoryHints::default(),
                 trace: wgpu::Trace::Off,
+                experimental_features: wgpu::ExperimentalFeatures::disabled(),
             })
             .await
             .unwrap();
@@ -147,7 +148,9 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             pollster::block_on(tx.send(result)).unwrap()
         });
-        ctx.device.poll(wgpu::PollType::Wait).unwrap();
+        ctx.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
         pollster::block_on(rx.recv()).unwrap().unwrap();
 
         buffer_slice.get_mapped_range().to_vec()
@@ -286,7 +289,9 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             pollster::block_on(tx.send(result)).unwrap()
         });
-        ctx.device.poll(wgpu::PollType::Wait).unwrap();
+        ctx.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
         pollster::block_on(rx.recv()).unwrap().unwrap();
 
         let x = buffer_slice.get_mapped_range().to_vec();
@@ -297,11 +302,14 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
 /// A storage for pipelines
 #[derive(Default)]
 pub struct PipelinesStorage {
-    inner: HashMap<TypeId, Box<dyn Any>>,
+    inner: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl PipelinesStorage {
-    pub(crate) fn get_or_init<P: RenderResource + 'static>(&mut self, ctx: &WgpuContext) -> &P {
+    pub(crate) fn get_or_init<P: RenderResource + Send + Sync + 'static>(
+        &mut self,
+        ctx: &WgpuContext,
+    ) -> &P {
         let id = std::any::TypeId::of::<P>();
         self.inner
             .entry(id)
@@ -377,7 +385,9 @@ pub(crate) fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> 
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             pollster::block_on(tx.send(result)).unwrap()
         });
-        ctx.device.poll(wgpu::PollType::Wait).unwrap();
+        ctx.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
         rx.recv().await.unwrap().unwrap();
 
         {

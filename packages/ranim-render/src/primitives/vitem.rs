@@ -231,6 +231,7 @@ impl RenderCommand for VItemRenderInstance {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     // view: multisample_view,
                     // resolve_target: Some(render_view),
+                    depth_slice: None,
                     view: render_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
