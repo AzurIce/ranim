@@ -16,5 +16,9 @@ name = "bench1"
 harness = false
 
 [[bench]]
+name = "render"
+harness = false
+
+[[bench]]
 name = "items"
 harness = false
