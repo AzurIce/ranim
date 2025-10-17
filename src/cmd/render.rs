@@ -83,7 +83,6 @@ struct RenderWorker {
     // video writer
     video_writer: Option<FileWriter>,
     video_writer_builder: Option<FileWriterBuilder>,
-    frame_count: u32,
     save_frames: bool,
     output_dir: PathBuf,
     scene_name: String,
@@ -153,7 +152,6 @@ impl RenderWorker {
                         output.width, output.height, output.fps
                     ))),
             ),
-            frame_count: 0,
             save_frames: output.save_frames,
             output_dir,
             scene_name,
@@ -161,6 +159,13 @@ impl RenderWorker {
             height: output.height,
             fps: output.fps,
         }
+    }
+
+    fn save_frame_dir(&self) -> PathBuf {
+        self.output_dir.join(format!(
+            "{}_{}x{}_{}-frames",
+            self.scene_name, self.width, self.height, self.fps
+        ))
     }
 
     fn yeet(self) -> RenderThreadHandle {
@@ -171,23 +176,19 @@ impl RenderWorker {
         back_tx.send_blocking(CoreItemStore::default()).unwrap();
         std::thread::spawn(move || {
             let mut worker = self;
-            let save_path = if worker.save_frames {
-                Some(
-                    worker
-                        .output_dir
-                        .join(format!(
-                            "{}_{}x{}_{}-frames",
-                            worker.scene_name, worker.width, worker.height, worker.fps
-                        ))
-                        .join(format!("{:04}.png", worker.frame_count)),
-                )
-            } else {
-                None
-            };
-            let save_path = save_path.as_deref();
+            let mut frame_count = 0;
 
             while let Ok(store) = submit_frame_rx.recv_blocking() {
-                worker.render_store(&store, save_path);
+                worker.render_store(&store);
+                worker.write_frame();
+                if worker.save_frames {
+                    worker.capture_frame(
+                        worker
+                            .save_frame_dir()
+                            .join(format!("{frame_count:04}.png")),
+                    );
+                };
+                frame_count += 1;
 
                 back_tx.send_blocking(store).unwrap();
             }
@@ -201,7 +202,7 @@ impl RenderWorker {
         }
     }
 
-    fn render_store(&mut self, store: &CoreItemStore, save_path: Option<impl AsRef<Path>>) {
+    fn render_store(&mut self, store: &CoreItemStore) {
         #[cfg(feature = "profiling")]
         profiling::scope!("frame");
 
@@ -217,12 +218,13 @@ impl RenderWorker {
             );
         }
         self.pool.clean();
-        self.write_frame(save_path);
 
         #[cfg(feature = "profiling")]
         profiling::finish_frame!();
     }
-    fn write_frame(&mut self, save_path: Option<impl AsRef<Path>>) {
+
+    /// Write frame to video file
+    fn write_frame(&mut self) {
         // `output_video` is true
         if let Some(video_writer) = self.video_writer.as_mut() {
             video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
@@ -231,14 +233,10 @@ impl RenderWorker {
                 .get_or_insert(builder.clone().build())
                 .write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
         }
-
-        if let Some(save_path) = save_path {
-            self.save_frame_to_image(save_path);
-        }
-        self.frame_count += 1;
     }
 
-    pub fn save_frame_to_image(&mut self, path: impl AsRef<Path>) {
+    /// Capture frame to image file
+    pub fn capture_frame(&mut self, path: impl AsRef<Path>) {
         let path = path.as_ref();
         let path = if !path.is_absolute() {
             self.output_dir
@@ -360,10 +358,9 @@ impl RanimRenderApp {
             let alpha = *sec / timeline.total_secs();
 
             self.store.update(timeline.eval_at_alpha(alpha));
-            self.render_worker
-                .as_mut()
-                .unwrap()
-                .render_store(&self.store, Some(filename));
+            let worker = self.render_worker.as_mut().unwrap();
+            worker.render_store(&self.store);
+            worker.capture_frame(filename);
             pb.inc(1);
         }
         pb.finish_with_message(format!(
