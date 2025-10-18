@@ -178,6 +178,7 @@ impl AppState {
             &self.store,
             &mut self.pool,
         );
+        self.pool.clean();
     }
 
     fn handle_events(&mut self) {
