@@ -56,7 +56,7 @@ pub trait Extract {
 
 use crate::timeline::{AnimationInfo, ItemDynTimelines, ItemTimeline, TimelineFunc, TimelinesFunc};
 use itertools::Itertools;
-use log::trace;
+use tracing::trace;
 
 use std::{any::TypeId, fmt::Debug, ops::Deref};
 

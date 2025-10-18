@@ -7,7 +7,7 @@ repository.workspace = true
 
 [dependencies]
 ranim-core.workspace = true
-log.workspace = true
+tracing.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

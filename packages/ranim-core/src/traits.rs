@@ -3,7 +3,7 @@ use std::{cmp::Ordering, ops::Range};
 use color::{AlphaColor, ColorSpace, Srgb};
 use glam::{DAffine2, DMat3, DMat4, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
 use itertools::Itertools;
-use log::warn;
+use tracing::warn;
 
 use crate::components::width::Width;
 

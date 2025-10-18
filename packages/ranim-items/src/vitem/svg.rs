@@ -1,13 +1,13 @@
 use color::{AlphaColor, Srgb, palette::css, rgb8, rgba};
 use glam::DVec3;
 use glam::{DAffine2, dvec3};
-use log::warn;
 use ranim_core::traits::PointsFunc;
 use ranim_core::{
     Extract, components::width::Width, primitives::vitem::VItemPrimitive, traits::Anchor,
     utils::bezier::PathBuilder,
 };
 use ranim_core::{color, glam};
+use tracing::warn;
 
 use crate::vitem::Group;
 use ranim_core::traits::{

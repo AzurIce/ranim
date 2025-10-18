@@ -1,7 +1,6 @@
 // MARK: Render api
 use file_writer::{FileWriter, FileWriterBuilder};
-use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use log::{info, trace};
+use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::store::CoreItemStore;
 use ranim_core::{Output, Scene, SceneConfig, SceneConstructor, SealedRanimScene, TimeMark};
@@ -12,6 +11,8 @@ use std::{
     path::{Path, PathBuf},
     time::Instant,
 };
+use tracing::{Span, info, instrument, trace};
+use tracing_indicatif::span_ext::IndicatifSpanExt;
 
 mod file_writer;
 
@@ -38,8 +39,6 @@ pub fn render_scene_output(
     output: &Output,
 ) {
     use std::time::Instant;
-
-    use log::trace;
 
     let t = Instant::now();
     let scene = constructor.build_scene();
@@ -274,6 +273,7 @@ impl RanimRenderApp {
         }
     }
 
+    #[instrument(skip_all)]
     fn render_timeline(&mut self, timeline: &SealedRanimScene) {
         let start = Instant::now();
         #[cfg(feature = "profiling")]
@@ -297,17 +297,18 @@ impl RanimRenderApp {
 
         let frames = (timeline.total_secs() * self.fps as f64).ceil() as usize;
         let frames = frames.max(2);
-        let pb = ProgressBar::new(frames as u64);
-        pb.set_style(
-            ProgressStyle::with_template(
+        let style =             ProgressStyle::with_template(
                 "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} (eta {eta}) {msg}",
             )
             .unwrap()
             .with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| {
                 write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
             })
-            .progress_chars("#>-"),
-        );
+            .progress_chars("#>-");
+
+        let span = Span::current();
+        span.pb_set_style(&style);
+        span.pb_set_length(frames as u64);
 
         (0..frames)
             .map(|f| f as f64 / (frames - 1) as f64)
@@ -316,24 +317,29 @@ impl RanimRenderApp {
                     store.update(timeline.eval_at_alpha(alpha));
                 });
 
-                pb.inc(1);
-                pb.set_message(format!(
-                    "rendering {:.1?}/{:.1?}",
-                    Duration::from_secs_f64(alpha * timeline.total_secs()),
-                    Duration::from_secs_f64(timeline.total_secs())
-                ));
+                span.pb_inc(1);
+                span.pb_set_message(
+                    format!(
+                        "rendering {:.1?}/{:.1?}",
+                        Duration::from_secs_f64(alpha * timeline.total_secs()),
+                        Duration::from_secs_f64(timeline.total_secs())
+                    )
+                    .as_str(),
+                );
             });
         self.render_worker.replace(worker_thread.retrive());
 
         let msg = format!(
-            "rendered {} frames({:?})",
+            "rendered {} frames({:?}) in {:?}",
             frames,
             Duration::from_secs_f64(timeline.total_secs()),
+            start.elapsed(),
         );
-        pb.finish_with_message(msg);
+        span.pb_set_finish_message(msg.as_str());
         trace!("render timeline cost: {:?}", start.elapsed());
     }
 
+    #[instrument(skip_all)]
     fn render_capture_marks(&mut self, timeline: &SealedRanimScene) {
         let start = Instant::now();
         let timemarks = timeline
@@ -342,18 +348,20 @@ impl RanimRenderApp {
             .filter(|mark| matches!(mark.1, TimeMark::Capture(_)))
             .collect::<Vec<_>>();
 
-        let pb = ProgressBar::new(timemarks.len() as u64)
-            .with_message("saving capture frames from time marks...");
-        pb.set_style(
-            ProgressStyle::with_template(
-                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] capture frame {human_pos}/{human_len} (eta {eta}) {msg}",
+        let style =             ProgressStyle::with_template(
+                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} (eta {eta}) {msg}",
             )
             .unwrap()
             .with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| {
                 write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
             })
-            .progress_chars("#>-"),
-        );
+            .progress_chars("#>-");
+
+        let span = Span::current();
+        span.pb_set_style(&style);
+        span.pb_set_length(timemarks.len() as u64);
+        let _enter = span.enter();
+
         for (sec, TimeMark::Capture(filename)) in &timemarks {
             let alpha = *sec / timeline.total_secs();
 
@@ -361,12 +369,11 @@ impl RanimRenderApp {
             let worker = self.render_worker.as_mut().unwrap();
             worker.render_store(&self.store);
             worker.capture_frame(filename);
-            pb.inc(1);
+            span.pb_inc(1);
         }
-        pb.finish_with_message(format!(
-            "saved {} capture frames from time marks",
-            timemarks.len()
-        ));
+        span.pb_set_finish_message(
+            format!("saved {} capture frames from time marks", timemarks.len()).as_str(),
+        );
         trace!("save capture frames cost: {:?}", start.elapsed());
     }
 }
@@ -387,8 +394,8 @@ pub(crate) fn exe_dir() -> PathBuf {
 pub fn download_ffmpeg(target_dir: impl AsRef<Path>) -> Result<PathBuf, anyhow::Error> {
     use anyhow::Context;
     use itertools::Itertools;
-    use log::info;
     use std::io::Read;
+    use tracing::info;
 
     let target_dir = target_dir.as_ref();
 

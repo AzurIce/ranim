@@ -2,8 +2,6 @@
 
 use crate::utils::rate_functions::linear;
 
-#[allow(unused)]
-use log::trace;
 use std::{any::Any, fmt::Debug, ops::Deref, sync::Arc};
 
 // MARK: Eval
