@@ -9,7 +9,6 @@
 use anyhow::{Context, Result};
 use async_channel::{Receiver, Sender, bounded};
 use libloading::{Library, Symbol};
-use log::{error, info};
 use ranim::Scene;
 use std::{
     path::{Path, PathBuf},
@@ -17,6 +16,7 @@ use std::{
     sync::Arc,
     thread::{self, JoinHandle},
 };
+use tracing::{error, info};
 
 use crate::{cli::CliArgs, workspace::Workspace};
 

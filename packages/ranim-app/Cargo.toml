@@ -12,7 +12,7 @@ profiling = ["dep:puffin", "dep:puffin_http", "dep:profiling"]
 ranim-core.workspace = true
 ranim-render.workspace = true
 wgpu.workspace = true
-log.workspace = true
+tracing.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
 egui = "0.33.0"
 winit = "0.30.12"

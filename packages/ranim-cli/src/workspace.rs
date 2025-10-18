@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use ignore::gitignore::Gitignore;
 use krates::{Kid, KrateDetails, Krates};
-use log::{debug, error};
+use tracing::{debug, error};
 
 use crate::cli::CliArgs;
 

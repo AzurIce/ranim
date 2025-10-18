@@ -9,8 +9,8 @@ use ranim::cmd::preview::{AppCmd, AppState};
 
 use anyhow::Result;
 use async_channel::{Receiver, bounded, unbounded};
-use log::{error, info, trace};
 use notify::RecursiveMode;
+use tracing::{error, info, trace};
 
 use crate::{
     RanimUserLibraryBuilder, Target,

@@ -5,7 +5,7 @@ use std::{
     marker::PhantomData,
 };
 
-use log::info;
+use tracing::info;
 use wgpu::util::DeviceExt;
 
 use crate::RenderResource;

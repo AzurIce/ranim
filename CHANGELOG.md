@@ -1,3 +1,22 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [unreleased]
+
+### 🚀 Features
+
+- Added `TypstText` item with `Alignable` impl by char diff (#93)
+
+### 🐛 Bug Fixes
+
+- Map timeline reset next start sec to 0 when the previous inner item timeline is empty
+- `save_frames = true` saves all frames to 0000.png
+
+### 🚜 Refactor
+
+- Add ranim-core, ranim-anims, ranim-items to reduce user code dep (#94)
+
 ## [0.1.4] - 2025-09-16
 
 ### 🚀 Features
@@ -22,19 +41,22 @@
 - *(flake)* Use rust nightly
 - Update deps
 - Update flake to output ranim-cli
+- Release
+
 ## [0.1.3] - 2025-08-20
 
 ### 🐛 Bug Fixes
 
 - `#[preview] not working when `#[scene]` has no args
 
-### 💼 Other
-
-- Added bench for extract
-
 ### ⚙️ Miscellaneous Tasks
 
 - Release
+
+### Bench
+
+- Added bench for extract
+
 ## [0.1.2] - 2025-08-18
 
 ### 🐛 Bug Fixes
@@ -44,19 +66,21 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Release
+
 ## [0.1.1] - 2025-08-10
 
 ### 🐛 Bug Fixes
 
 - Scene macro's attrs not working
 
-### 💼 Other
-
-- Added extract_vitem_visualize
-
 ### ⚙️ Miscellaneous Tasks
 
 - Release
+
+### Example
+
+- Added extract_vitem_visualize
+
 ## [0.1.0] - 2025-08-10
 
 ### 🚀 Features
@@ -82,6 +106,7 @@
 - Update workflow
 - Use nightly
 - Release
+
 ## [0.1.0-alpha.17] - 2025-07-11
 
 ### 🚀 Features
@@ -96,11 +121,6 @@
 - ItemTimeline eval range incorrect
 - Zero-length vec normalization error, correct test usecases, closes: #70
 
-### 💼 Other
-
-- Fix include
-- Fix book and doc link
-
 ### 📚 Documentation
 
 - Added `#![warn(missing_docs)]`, first step to enhance documents
@@ -112,6 +132,15 @@
 - Added git-cliff to flake's shell packages
 - Release
 - Release
+
+### Book
+
+- Fix include
+
+### Website
+
+- Fix book and doc link
+
 ## [0.1.0-alpha.14] - 2025-07-01
 
 ### 🚀 Features
@@ -122,12 +151,6 @@
 ### 🐛 Bug Fixes
 
 - Use chrono instead of time for typst world
-
-### 💼 Other
-
-- Refactor rabject and timeline
-- Moved getting started to guide based on mdbook, added doc
-- Update book and examples
 
 ### 🚜 Refactor
 
@@ -150,6 +173,16 @@
 
 - Update deps
 - Release
+
+### WIP
+
+- Refactor rabject and timeline
+
+### Website
+
+- Moved getting started to guide based on mdbook, added doc
+- Update book and examples
+
 ## [0.1.0-alpha.13] - 2025-05-01
 
 ### 🚀 Features
@@ -159,10 +192,6 @@
 - Align vitem points according to ratio, closes: #33
 - An attempt to share pass between items
 - Scale with stroke
-
-### 💼 Other
-
-- More items
 
 ### 🚜 Refactor
 
@@ -174,6 +203,11 @@
 - Use pretty_env_logger instead of env_logger
 - Added puffin_viewer to flake shell
 - Release
+
+### WIP
+
+- More items
+
 ## [0.1.0-alpha.12] - 2025-04-20
 
 ### 🚜 Refactor
@@ -189,6 +223,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Release
+
 ## [0.1.0-alpha.11] - 2025-04-01
 
 ### 🚀 Features
@@ -198,10 +233,6 @@
 ### 🐛 Bug Fixes
 
 - #56, fixed subtract with overflow
-
-### 💼 Other
-
-- Added hanoi example, closes: #47
 
 ### 🚜 Refactor
 
@@ -216,6 +247,11 @@
 - Release
 - Update cargo exclude
 - Release
+
+### Examples
+
+- Added hanoi example, closes: #47
+
 ## [0.1.0-alpha.9] - 2025-03-29
 
 ### 🚀 Features
@@ -258,6 +294,7 @@
 
 - Release
 - Release
+
 ## [0.1.0-alpha.7] - 2025-03-19
 
 ### 🚀 Features
@@ -279,6 +316,7 @@
 
 - *(xtask/build-examples)* Added clean arg to clean non-exist examples
 - Release
+
 ## [0.1.0-alpha.6] - 2025-03-17
 
 ### 🚀 Features
@@ -295,6 +333,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Release
+
 ## [0.1.0-alpha.5] - 2025-03-16
 
 ### 🚀 Features
@@ -314,17 +353,22 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Release
+
 ## [0.1.0-alpha.4] - 2025-03-14
-
-### 💼 Other
-
-- Added logo
-- Support for RabjectGroup
 
 ### ⚙️ Miscellaneous Tasks
 
 - Release
 - Release
+
+### WIP
+
+- Support for RabjectGroup
+
+### Misc
+
+- Added logo
+
 ## [0.1.0-alpha.3] - 2025-03-14
 
 ### 🚀 Features
@@ -342,6 +386,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Release
+
 ## [0.1.0-alpha.2] - 2025-03-13
 
 ### 🚜 Refactor
@@ -352,12 +397,14 @@
 
 - Update cargo-release config
 - Release
+
 ## [0.1.0-alpha.1] - 2025-03-13
 
 ### ⚙️ Miscellaneous Tasks
 
 - Update cargo-release config
 - Release
+
 ## [ranim-macros-v0.0.0] - 2025-03-12
 
 ### 🚀 Features
@@ -409,22 +456,6 @@
 - #27
 - *(website)* Fix toml output
 - #29
-
-### 💼 Other
-
-- Refactoring bezier for filling
-- Fixing arc between points put start_and_end modifies the width
-- Refactor to correct vectorized objects
-- Finishing the refactor
-- Finished refactor but with stroke and fill not finished
-- Refactor project structure
-- Fixing aligning for animation
-- Rewrite camera
-- Refactor to support hierarchy
-- Refactor object management and scene render architecture, but with animation not compatible
-- Introduce vello
-- New codeblock style with linenos, update examples
-- Examples page
 
 ### 🚜 Refactor
 
@@ -486,3 +517,24 @@
 - *(ci)* Removed test job due to no gpu on runner
 - Added github pages workflow
 - Gh deploy only when push to main
+
+### WIP
+
+- Refactoring bezier for filling
+- Fixing arc between points put start_and_end modifies the width
+- Refactor to correct vectorized objects
+- Finishing the refactor
+- Finished refactor but with stroke and fill not finished
+- Refactor project structure
+- Fixing aligning for animation
+- Rewrite camera
+- Refactor to support hierarchy
+- Refactor object management and scene render architecture, but with animation not compatible
+- Introduce vello
+
+### Website
+
+- New codeblock style with linenos, update examples
+- Examples page
+
+<!-- generated by git-cliff -->

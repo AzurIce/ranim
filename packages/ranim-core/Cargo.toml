@@ -8,7 +8,7 @@ repository.workspace = true
 [dependencies]
 # ranim-macros.workspace = true
 inventory = "0.3.21"
-log.workspace = true
+tracing.workspace = true
 itertools.workspace = true
 glam = { workspace = true, features = ["bytemuck"] }
 bytemuck = { workspace = true, features = ["derive"] }

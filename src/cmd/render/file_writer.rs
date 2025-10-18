@@ -4,7 +4,7 @@ use std::{
     process::{Child, ChildStdin, Command, Stdio},
 };
 
-use log::info;
+use tracing::info;
 
 #[derive(Debug, Clone)]
 pub struct FileWriterBuilder {

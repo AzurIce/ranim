@@ -14,12 +14,12 @@ use std::sync::Arc;
 
 use async_channel::{Receiver, Sender, unbounded};
 use egui_wgpu::ScreenDescriptor;
-use log::{info, warn};
 use ranim_core::{
     color::{self, LinearSrgb},
     store::CoreItemStore,
 };
 use timeline::TimelineState;
+use tracing::{error, info, warn};
 use web_time::Instant;
 use wgpu::SurfaceError;
 use winit::{
@@ -184,7 +184,7 @@ impl AppState {
                     self.set_clear_color_str(scene.config.clear_color);
 
                     if let Err(err) = tx.try_send(()) {
-                        log::error!("Failed to send reloaded signal: {err:?}");
+                        error!("Failed to send reloaded signal: {err:?}");
                     }
                 }
             }
@@ -416,7 +416,7 @@ fn redraw(
 // MARK: Resize
 fn resize(ctx: &WgpuContext, app_renderer: &mut AppRenderer, size: PhysicalSize<u32>) {
     if size.width == 0 || size.height == 0 {
-        log::warn!("[resize]: ignored resize to value <= 0: {size:?}");
+        warn!("[resize]: ignored resize to value <= 0: {size:?}");
         return;
     }
     {
@@ -484,12 +484,12 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
             // window_attrs = winit_window_attrs.with_append(true);
         }
 
-        log::info!("[resume]: creating window...");
+        info!("[resume]: creating window...");
         let Ok(window) = event_loop.create_window(window_attrs) else {
-            log::error!("[resume]: failed to create window");
+            error!("[resume]: failed to create window");
             return;
         };
-        log::info!("[resume]: window size: {:?}", window.inner_size());
+        info!("[resume]: window size: {:?}", window.inner_size());
         #[cfg(not(target_arch = "wasm32"))]
         {
             let size = window.inner_size();
@@ -502,7 +502,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
         let Some(event_loop_proxy) = self.event_loop_proxy.take() else {
             return;
         };
-        log::info!("[resume]: initializing wgpu ctx...");
+        info!("[resume]: initializing wgpu ctx...");
         let init_wgpu_ctx = async move {
             let wgpu_ctx = WgpuContext::new().await;
             assert!(event_loop_proxy.send_event(wgpu_ctx).is_ok());

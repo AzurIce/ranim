@@ -17,7 +17,7 @@ profiling = { version = "1.0.17", optional = true, features = [
   "profile-with-puffin",
 ] }
 image.workspace = true
-log.workspace = true
+tracing.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
 glam = { workspace = true, features = ["bytemuck"] }
 pollster = "0.4.0"
