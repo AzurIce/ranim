@@ -38,6 +38,21 @@ use ranim_render::{Renderer, primitives::RenderPool, utils::WgpuContext};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+#[cfg(target_arch = "wasm32")]
+unsafe extern "C" {
+    fn __wasm_call_ctors();
+}
+
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
+fn wasm_start() {
+    unsafe {
+        __wasm_call_ctors();
+    }
+    console_error_panic_hook::set_once();
+    wasm_tracing::set_as_global_default();
+}
+
 #[derive(Default, Debug, Clone, Copy)]
 struct OccupiedScreenSpace {
     top: f32,
@@ -443,20 +458,20 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
             let window = web_sys::window().unwrap();
             let document = window.document().unwrap();
 
-            log::info!("searching for {}", self.container_id);
+            info!("searching for {}", self.container_id);
             let canvas = document
                 .get_element_by_id(&self.container_id)
                 .and_then(|canvas| canvas.dyn_into::<web_sys::HtmlCanvasElement>().ok());
 
             let canvas = match canvas {
                 Some(canvas) => {
-                    log::info!("found canvas");
+                    info!("found canvas");
                     self.size = (canvas.width(), canvas.height());
-                    log::info!("canvas size: {:?}", self.size);
+                    info!("canvas size: {:?}", self.size);
                     canvas
                 }
                 None => {
-                    log::info!("canvas not found, creating a new one");
+                    info!("canvas not found, creating a new one");
                     let canvas = document
                         .create_element("canvas")
                         .unwrap()
@@ -472,7 +487,7 @@ impl ApplicationHandler<WgpuContext> for WinitApp {
                     document.body().unwrap().append_child(&canvas).unwrap();
 
                     self.size = (canvas.width(), canvas.height());
-                    log::info!("created canvas with size: {:?}", self.size);
+                    info!("created canvas with size: {:?}", self.size);
                     canvas
                 }
             };

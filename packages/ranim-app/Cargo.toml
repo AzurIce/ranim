@@ -34,7 +34,9 @@ pollster = "0.4.0"
 wasm-bindgen.workspace = true
 egui-winit = { version = "0.33.0", default-features = false }
 wasm-bindgen-futures = "0.4.54"
-web-sys = { version = "0.3.81" }
+web-sys = "0.3.81"
+console_error_panic_hook = "0.1.7"
+wasm-tracing = "2.1.0"
 
 [package.metadata.docs.rs]
 all-features = true
