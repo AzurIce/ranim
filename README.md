@@ -42,7 +42,7 @@ Currently, it is experimental on crates.io:
 
 ```toml
 [dependencies]
-ranim = "0.1.4"
+ranim = "0.1.5"
 ```
 
 You can also use from git for the latest updates:
