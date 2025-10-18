@@ -55,7 +55,8 @@ ranim = { git = "https://github.com/azurice/ranim" }
 For the usage, check out the [examples](./examples) folder. You can run the examples with:
 
 ```bash
-cargo run -p ranim-cli --release -- --example <example-name>
+cargo run -p ranim-cli --release -- preview --example <example-name> # run a preview app for the example
+cargo run -p ranim-cli --release -- render --example <example-name> # render the example
 ```
 
 See Ranim Cli for more.
@@ -75,24 +76,14 @@ cargo install ranim-cli
 Or install from git:
 
 ```bash
-cargo install --git https://github.com/azurice/ranim --bin ranim
+cargo install --git https://github.com/azurice/ranim ranim-cli --locked
 ```
 
 Or you can create a bin, and run cli from `ranim_cli` directly (this can make sure the version of `ranim` matches `ranim_cli`):
 
 ```rust
-use clap::Parser;
-use ranim_cli::cli::Cli;
-
 fn main() {
-    // Optional
-    // pretty_env_logger::formatted_timed_builder()
-    //     .filter(Some("ranim_cli"), log::LevelFilter::Info)
-    //     .filter(Some("ranim"), log::LevelFilter::Info)
-    //     .parse_default_env()
-    //     .init();
-
-    Cli::parse().run().unwrap();
+    ranim_cli::main();
 }
 ```
 
@@ -112,9 +103,9 @@ ranim render -p render scene_a scene_b -- --release
 
 - Default features
 
-  - `anims`: re-export `ranim-anims`
+  - `anims`: re-export `ranim-anims`, default on.
 
-  - `items`: re-export `ranim-items`
+  - `items`: re-export `ranim-items`, default on.
 
 - `render`: enable render api in cmd module
   
