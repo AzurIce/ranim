@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.1.5] - 2025-10-18
 
 ### 🚀 Features
 
@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 - Map timeline reset next start sec to 0 when the previous inner item timeline is empty
 - `save_frames = true` saves all frames to 0000.png
+- Fix gpu out of memory
 
 ### 🚜 Refactor
 
