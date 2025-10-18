@@ -65,6 +65,7 @@ render = [
   "dep:pollster",
   "dep:which",
   "dep:indicatif",
+  "dep:tracing-indicatif",
   "dep:flate2",
   "dep:reqwest",
 ]
@@ -77,7 +78,6 @@ ranim-anims.workspace = true
 ranim-macros.workspace = true
 ranim-app = { workspace = true, optional = true }
 itertools.workspace = true
-tracing-indicatif.workspace = true
 tracing.workspace = true
 derive_more = { version = "2.0.1", features = [
   "deref_mut",
@@ -96,6 +96,7 @@ wgpu = { workspace = true, optional = true }
 pollster = { version = "0.4.0", optional = true }
 which = { version = "8.0.0", optional = true }
 indicatif = { version = "0.18.0", optional = true }
+tracing-indicatif = { workspace = true, optional = true }
 flate2 = { version = "1.1.4", optional = true }
 reqwest = { version = "0.12.24", features = ["blocking"], optional = true }
 # profiling

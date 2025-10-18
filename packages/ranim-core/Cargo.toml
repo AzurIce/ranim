@@ -26,8 +26,6 @@ color = "0.3.2"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen.workspace = true
-console_error_panic_hook = { version = "0.1.7" }
-console_log = { version = "1.0.0" }
 
 [dev-dependencies]
 assert_float_eq = "1.2.0"

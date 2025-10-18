@@ -91,25 +91,10 @@ pub extern "C" fn scene_cnt() -> usize {
     inventory::iter::<Scene>().count()
 }
 
-#[cfg(target_arch = "wasm32")]
-unsafe extern "C" {
-    fn __wasm_call_ctors();
-}
-
 /// Return a scene with matched name
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn find_scene(name: &str) -> Option<Scene> {
     inventory::iter::<Scene>().find(|s| s.name == name).cloned()
-}
-
-#[cfg(target_arch = "wasm32")]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
-fn wasm_start() {
-    unsafe {
-        __wasm_call_ctors();
-    }
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    console_log::init().expect("Failed to initialize console_log");
 }
 
 /// Scene config
