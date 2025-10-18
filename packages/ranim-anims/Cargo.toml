@@ -1,5 +1,6 @@
 [package]
 name = "ranim-anims"
+description = "The built-in animations of Ranim."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

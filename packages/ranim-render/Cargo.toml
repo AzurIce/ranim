@@ -1,5 +1,6 @@
 [package]
 name = "ranim-render"
+description = "The renderer of Ranim."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

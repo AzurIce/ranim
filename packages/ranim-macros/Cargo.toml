@@ -1,6 +1,6 @@
 [package]
 name = "ranim-macros"
-description = "macros for ranim"
+description = "The macros for Ranim."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
