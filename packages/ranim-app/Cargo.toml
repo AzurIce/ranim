@@ -1,5 +1,6 @@
 [package]
 name = "ranim-app"
+description = "The preview application for Ranim."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

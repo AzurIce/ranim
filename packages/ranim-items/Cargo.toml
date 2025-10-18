@@ -1,5 +1,6 @@
 [package]
 name = "ranim-items"
+description = "The built-in items of Ranim."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

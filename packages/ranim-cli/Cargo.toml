@@ -1,6 +1,6 @@
 [package]
 name = "ranim-cli"
-description = "Command line tool for working with ranim"
+description = "The command line tool for Ranim."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
