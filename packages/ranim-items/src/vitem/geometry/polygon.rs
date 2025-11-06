@@ -1,4 +1,4 @@
-use ranim_core::{Extract, color, glam, traits::Anchor};
+use ranim_core::{Extract, color, glam, primitives::CoreItem, traits::Anchor};
 
 use color::{AlphaColor, Srgb};
 use glam::{DVec3, dvec3};
@@ -161,7 +161,7 @@ impl FillColor for Square {
 }
 
 impl Extract for Square {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
         VItem::from(self.clone()).extract()
     }
@@ -369,7 +369,7 @@ impl From<Rectangle> for VItem {
 }
 
 impl Extract for Rectangle {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
         VItem::from(self.clone()).extract()
     }
@@ -535,7 +535,7 @@ impl From<Polygon> for VItem {
 }
 
 impl Extract for Polygon {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
         // trace!("extract");
         // let mut need_update = self._need_update.borrow_mut();

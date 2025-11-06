@@ -2,8 +2,9 @@ use color::{AlphaColor, Srgb};
 use glam::Vec4;
 
 use crate::{
+    Extract,
     components::{rgba::Rgba, width::Width},
-    primitives::{Primitive, Primitives},
+    primitives::CoreItem,
     traits::FillColor,
 };
 
@@ -23,11 +24,29 @@ pub struct VItemPrimitive {
     pub stroke_widths: Vec<Width>,
 }
 
-impl Primitive for VItemPrimitive {
-    fn build_primitives<T: IntoIterator<Item = Self>>(iter: T) -> super::Primitives {
-        Primitives::VItemPrimitive(iter.into_iter().collect())
+impl Default for VItemPrimitive {
+    fn default() -> Self {
+        Self {
+            points2d: vec![Vec4::ZERO; 3],
+            stroke_widths: vec![Width::default(); 2],
+            stroke_rgbas: vec![Rgba::default(); 2],
+            fill_rgbas: vec![Rgba::default(); 2],
+        }
     }
 }
+
+impl Extract for VItemPrimitive {
+    type Target = CoreItem;
+    fn extract(&self) -> Vec<Self::Target> {
+        vec![CoreItem::VItemPrimitive(self.clone())]
+    }
+}
+
+// impl Primitive for VItemPrimitive {
+//     fn build_primitives<T: IntoIterator<Item = Self>>(iter: T) -> super::Primitives {
+//         Primitives::VItemPrimitive(iter.into_iter().collect())
+//     }
+// }
 
 impl FillColor for VItemPrimitive {
     fn fill_color(&self) -> AlphaColor<Srgb> {

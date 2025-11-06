@@ -3,8 +3,9 @@
 use glam::{DMat4, DVec3, dvec2};
 
 use crate::{
+    Extract,
     prelude::{Alignable, Interpolatable},
-    primitives::{Primitive, Primitives},
+    primitives::CoreItem,
 };
 
 /// The data of a camera
@@ -32,11 +33,17 @@ pub struct CameraFrame {
     pub perspective_blend: f64,
 }
 
-impl Primitive for CameraFrame {
-    fn build_primitives<T: IntoIterator<Item = Self>>(iter: T) -> super::Primitives {
-        Primitives::CameraFrame(iter.into_iter().collect())
+impl Extract for CameraFrame {
+    type Target = CoreItem;
+    fn extract(&self) -> Vec<Self::Target> {
+        vec![CoreItem::CameraFrame(self.clone())]
     }
 }
+// impl Primitive for CameraFrame {
+//     fn build_primitives<T: IntoIterator<Item = Self>>(iter: T) -> super::Primitives {
+//         Primitives::CameraFrame(iter.into_iter().collect())
+//     }
+// }
 
 impl Interpolatable for CameraFrame {
     fn lerp(&self, target: &Self, t: f64) -> Self {

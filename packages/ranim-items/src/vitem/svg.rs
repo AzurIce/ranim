@@ -1,6 +1,7 @@
 use color::{AlphaColor, Srgb, palette::css, rgb8, rgba};
 use glam::DVec3;
 use glam::{DAffine2, dvec3};
+use ranim_core::primitives::CoreItem;
 use ranim_core::traits::PointsFunc;
 use ranim_core::{
     Extract, components::width::Width, primitives::vitem::VItemPrimitive, traits::Anchor,
@@ -121,7 +122,7 @@ impl StrokeWidth for SvgItem {
 
 // MARK: Conversions
 impl Extract for SvgItem {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
         self.0.extract()
     }

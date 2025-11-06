@@ -3,8 +3,7 @@ use std::f64::consts::PI;
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::{
-    Extract, color, glam,
-    traits::{Anchor, Interpolatable},
+    Extract, color, glam, primitives::CoreItem, traits::{Anchor, Interpolatable}
 };
 
 use ranim_core::{
@@ -185,7 +184,7 @@ impl From<Circle> for VItem {
 }
 
 impl Extract for Circle {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
         VItem::from(self.clone()).extract()
     }

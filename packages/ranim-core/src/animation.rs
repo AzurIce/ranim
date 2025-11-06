@@ -1,175 +1,57 @@
 //! Evaluation and animation
+//!
+//! The evaluation core of an animation is a `E: Eval<T>`.
+//!
+//! When constructing an animation, we need [`AnimationInfo`] besides the evaluation core, which is
+//! [`AnimationCell<T>`].
+//!
+//! When satisfies `T: Extract<Target = CoreItem>`, [`AnimationCell<T>`] can be converted to a [`PrimitiveAnimationCell`].
 
-use crate::utils::rate_functions::linear;
+use crate::{Extract, primitives::CoreItem, utils::rate_functions::linear};
 
 use std::{any::Any, fmt::Debug, ops::Deref, sync::Arc};
 
-// MARK: Eval
-// ANCHOR: EvalDynamic
-/// This is the core of any animation, an animation is basically a function on time.
-///
-/// This represents a normalized animation function for type `T`, which accepts
-/// a progress value `alpha` in range [0, 1] and returns the evaluation result in type `T`.
-pub trait EvalDynamic<T> {
-    /// Evaluates at the given progress value `alpha` in range [0, 1].
-    fn eval_alpha(&self, alpha: f64) -> T;
-    /// Converts the evaluator into an [`AnimationSpan`].
-    ///
-    /// Equivalent to `AnimationSpan::from_evaluator(Evaluator::new_dynamic(self))`.
-    fn into_animation_span(self) -> AnimationSpan<T>
-    where
-        Self: Sized + 'static,
-        T: 'static,
-    {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(self))
-    }
-}
-// ANCHOR_END: EvalDynamic
-
-// ANCHOR: Evaluator
-/// An Evaluator is whether [`Evaluator::Dynamic`] or [`Evaluator::Static`].
-///
-/// It has [`Evaluator::eval_alpha`] method which outputs [`EvalResult<T>`].
-pub enum Evaluator<T> {
-    /// A dynamic evaluator
-    Dynamic {
-        /// The type name of the evaluator
-        type_name: String,
-        /// The inner dynamic evaluator
-        inner: Box<dyn EvalDynamic<T>>,
-    },
-    /// A static evaluator
-    Static(Arc<T>),
-}
-// ANCHOR_END: Evaluator
-
-impl<T> Evaluator<T> {
-    // Any is for type name
-    // TODO: should I include Send here directly?
-    /// Creates a dynamic evaluator
-    pub fn new_dynamic<F: EvalDynamic<T> + Any + 'static>(func: F) -> Self {
-        let type_name = std::any::type_name::<F>().to_string();
-        Self::Dynamic {
-            type_name,
-            inner: Box::new(func),
-        }
-    }
-    /// Creates a static evaluator
-    pub fn new_static(e: T) -> Self {
-        Self::Static(Arc::new(e))
-    }
-    /// Evaluates at the given progress value `alpha` in range [0, 1].
-    pub fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
-        match self {
-            Self::Dynamic {
-                inner,
-                type_name: _,
-            } => EvalResult::Dynamic(Box::new(inner.eval_alpha(alpha))),
-            Self::Static(e) => EvalResult::Static(e.clone()),
-        }
-    }
-}
-
-/// The evaluation result of [`Evaluator`]
-#[derive(Debug)]
-pub enum EvalResult<T: ?Sized> {
-    /// A dynamic evaluation result
-    Dynamic(Box<T>),
-    /// A static evaluation result
-    Static(Arc<T>),
-}
-
-impl<T: ?Sized> AsRef<T> for EvalResult<T> {
-    fn as_ref(&self) -> &T {
-        match self {
-            Self::Dynamic(t) => t,
-            Self::Static(rc) => rc,
-        }
-    }
-}
-
-impl<T: ?Sized> Deref for EvalResult<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Dynamic(t) => t,
-            Self::Static(rc) => rc,
-        }
-    }
-}
-
-impl<T: Clone + 'static> EvalResult<T> {
-    /// Convert `EvalResult<T>` into `EvalResult<dyn Any>`
-    pub fn into_any(self) -> EvalResult<dyn Any> {
-        match self {
-            Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Any>),
-            Self::Static(rc) => EvalResult::Static(rc as Arc<dyn Any>),
-        }
-    }
-}
-
-impl<T: Clone> EvalResult<T> {
-    /// Maps the evaluation result to another type
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> EvalResult<U> {
-        match self {
-            Self::Dynamic(t) => EvalResult::Dynamic(Box::new(f((*t).clone()))),
-            Self::Static(rc) => EvalResult::Static(Arc::new(f((*rc).clone()))),
-        }
-    }
-}
-
-impl<T: Clone> EvalResult<T> {
-    /// Consumes the evaluation result, and convert it into an owned value.
-    pub fn into_owned(self) -> T {
-        match self {
-            Self::Dynamic(t) => (*t).clone(),
-            Self::Static(rc) => (*rc).clone(),
-        }
-    }
-}
-
-// MARK: Animation
-// ANCHOR: AnimationSpan
-/// An [`AnimationSpan<T>`] consist of an [`Evaluator<T>`] and some metadata,
-/// such as `rate_func` and `duration_secs`, to control the evaluation process.
-pub struct AnimationSpan<T> {
-    pub(crate) evaluator: Evaluator<T>,
+#[derive(Debug, Clone)]
+pub struct AnimationInfo {
     /// The rate function used for evaluating
     pub rate_func: fn(f64) -> f64,
+    /// Show sec
+    pub show_sec: f64,
     /// The duration seconds
     pub duration_secs: f64,
 }
-// ANCHOR_END: AnimationSpan
 
-impl<T> Debug for AnimationSpan<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Animation {{ duration_secs: {}, rate_func: {:?} }}",
-            self.duration_secs, self.rate_func
-        )
-    }
-}
-
-impl<T: 'static> AnimationSpan<T> {
-    /// Construct an [`AnimationSpan`] from [`Evaluator`], this uses [`linear`]
-    /// rate function and `1.0` duration seconds for default.
-    pub fn from_evaluator(evaluator: Evaluator<T>) -> Self {
+impl Default for AnimationInfo {
+    fn default() -> Self {
         Self {
-            evaluator,
             rate_func: linear,
+            show_sec: 0.0,
             duration_secs: 1.0,
         }
     }
 }
 
-impl<T> AnimationSpan<T> {
-    /// Get the type name of the [`Evaluator`] of this [`AnimationSpan`].
-    pub fn type_name(&self) -> &str {
-        match &self.evaluator {
-            Evaluator::Dynamic { type_name, .. } => type_name,
-            Evaluator::Static(_) => "Static",
+impl AnimationInfo {
+    pub fn range(&self) -> std::ops::Range<f64> {
+        self.show_sec..self.show_sec + self.duration_secs
+    }
+    pub fn map_alpha(&self, alpha: f64) -> f64 {
+        (self.rate_func)(alpha)
+    }
+    pub fn map_sec(&self, sec: f64) -> Option<f64> {
+        if (self.show_sec..=self.show_sec + self.duration_secs).contains(&sec) {
+            Some((sec - self.show_sec) / self.duration_secs)
+        } else {
+            None
         }
+    }
+}
+
+impl AnimationInfo {
+    /// A builder func to modify `show_sec`
+    pub fn with_show_sec(mut self, show_sec: f64) -> Self {
+        self.show_sec = show_sec;
+        self
     }
     /// A builder func to modify `rate_func`
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
@@ -183,16 +65,253 @@ impl<T> AnimationSpan<T> {
     }
 }
 
-// ANCHOR: AnimationSpan-eval
-impl<T> AnimationSpan<T> {
-    /// Evaluate at the given progress value `alpha` in [0, 1]
-    pub fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
-        self.eval_sec(alpha * self.duration_secs)
+pub trait CoreItemAnimation {
+    fn eval_alpha_core_item(&self, alpha: f64) -> Vec<CoreItem>;
+    fn anim_info(&self) -> &AnimationInfo;
+}
+
+pub struct AnimationCell<T> {
+    inner: Box<dyn Eval<T>>,
+    pub info: AnimationInfo,
+}
+
+impl<T> AnimationCell<T> {
+    pub fn with_show_sec(mut self, show_sec: f64) -> Self {
+        self.info = self.info.with_show_sec(show_sec);
+        self
     }
-    /// Evaluate at the given second `sec`
-    pub fn eval_sec(&self, sec: f64) -> EvalResult<T> {
-        self.evaluator
-            .eval_alpha((self.rate_func)((sec / self.duration_secs).clamp(0.0, 1.0)))
+    pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
+        self.info = self.info.with_rate_func(rate_func);
+        self
+    }
+    pub fn with_duration(mut self, duration_secs: f64) -> Self {
+        self.info = self.info.with_duration(duration_secs);
+        self
     }
 }
-// ANCHOR_END: AnimationSpan-eval
+
+impl<T> Eval<T> for AnimationCell<T> {
+    fn eval_alpha(&self, alpha: f64) -> T {
+        self.inner.eval_alpha(alpha)
+    }
+}
+
+impl<T: Extract<Target = CoreItem>> CoreItemAnimation for AnimationCell<T> {
+    fn eval_alpha_core_item(&self, alpha: f64) -> Vec<CoreItem> {
+        self.inner.eval_alpha(alpha).extract()
+    }
+    fn anim_info(&self) -> &AnimationInfo {
+        &self.info
+    }
+}
+
+// MARK: Eval
+// ANCHOR: EvalDynamic
+/// This is the core of any animation, an animation is basically a function on time.
+///
+/// This represents a normalized animation function for type `T`, which accepts
+/// a progress value `alpha` in range [0, 1] and returns the evaluation result in type `T`.
+pub trait Eval<T> {
+    /// Evaluates at the given progress value `alpha` in range [0, 1].
+    fn eval_alpha(&self, alpha: f64) -> T;
+    // /// Converts the evaluator into an [`AnimationSpan`].
+    // ///
+    // /// Equivalent to `AnimationSpan::from_evaluator(Evaluator::new_dynamic(self))`.
+    // fn into_animation_span(self) -> AnimationSpan<T>
+    // where
+    //     Self: Sized + 'static,
+    //     T: 'static,
+    // {
+    //     AnimationSpan::from_evaluator(Evaluator::new_dynamic(self))
+    // }
+    fn into_animation_cell(self) -> AnimationCell<T>
+    where
+        Self: Sized + 'static,
+    {
+        AnimationCell {
+            inner: Box::new(self),
+            info: AnimationInfo::default(),
+        }
+    }
+}
+
+pub struct StaticAnim<T>(pub T);
+
+impl<T: Clone> Eval<T> for StaticAnim<T> {
+    fn eval_alpha(&self, _alpha: f64) -> T {
+        self.0.clone()
+    }
+}
+
+// ANCHOR_END: EvalDynamic
+
+// // ANCHOR: Evaluator
+// /// An Evaluator is whether [`Evaluator::Dynamic`] or [`Evaluator::Static`].
+// ///
+// /// It has [`Evaluator::eval_alpha`] method which outputs [`EvalResult<T>`].
+// pub enum Evaluator<T> {
+//     /// A dynamic evaluator
+//     Dynamic {
+//         /// The type name of the evaluator
+//         type_name: String,
+//         /// The inner dynamic evaluator
+//         inner: Box<dyn Eval<T>>,
+//     },
+//     /// A static evaluator
+//     Static(Arc<T>),
+// }
+// // ANCHOR_END: Evaluator
+
+// impl<T> Evaluator<T> {
+//     // Any is for type name
+//     // TODO: should I include Send here directly?
+//     /// Creates a dynamic evaluator
+//     pub fn new_dynamic<F: Eval<T> + Any + 'static>(func: F) -> Self {
+//         let type_name = std::any::type_name::<F>().to_string();
+//         Self::Dynamic {
+//             type_name,
+//             inner: Box::new(func),
+//         }
+//     }
+//     /// Creates a static evaluator
+//     pub fn new_static(e: T) -> Self {
+//         Self::Static(Arc::new(e))
+//     }
+//     /// Evaluates at the given progress value `alpha` in range [0, 1].
+//     pub fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
+//         match self {
+//             Self::Dynamic {
+//                 inner,
+//                 type_name: _,
+//             } => EvalResult::Dynamic(Box::new(inner.eval_alpha(alpha))),
+//             Self::Static(e) => EvalResult::Static(e.clone()),
+//         }
+//     }
+// }
+
+// /// The evaluation result of [`Evaluator`]
+// #[derive(Debug)]
+// pub enum EvalResult<T: ?Sized> {
+//     /// A dynamic evaluation result
+//     Dynamic(Box<T>),
+//     /// A static evaluation result
+//     Static(Arc<T>),
+// }
+
+// impl<T: ?Sized> AsRef<T> for EvalResult<T> {
+//     fn as_ref(&self) -> &T {
+//         match self {
+//             Self::Dynamic(t) => t,
+//             Self::Static(rc) => rc,
+//         }
+//     }
+// }
+
+// impl<T: ?Sized> Deref for EvalResult<T> {
+//     type Target = T;
+//     fn deref(&self) -> &Self::Target {
+//         match self {
+//             Self::Dynamic(t) => t,
+//             Self::Static(rc) => rc,
+//         }
+//     }
+// }
+
+// impl<T: Clone + 'static> EvalResult<T> {
+//     /// Convert `EvalResult<T>` into `EvalResult<dyn Any>`
+//     pub fn into_any(self) -> EvalResult<dyn Any> {
+//         match self {
+//             Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Any>),
+//             Self::Static(rc) => EvalResult::Static(rc as Arc<dyn Any>),
+//         }
+//     }
+// }
+
+// impl<T: Clone> EvalResult<T> {
+//     /// Maps the evaluation result to another type
+//     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> EvalResult<U> {
+//         match self {
+//             Self::Dynamic(t) => EvalResult::Dynamic(Box::new(f((*t).clone()))),
+//             Self::Static(rc) => EvalResult::Static(Arc::new(f((*rc).clone()))),
+//         }
+//     }
+// }
+
+// impl<T: Clone> EvalResult<T> {
+//     /// Consumes the evaluation result, and convert it into an owned value.
+//     pub fn into_owned(self) -> T {
+//         match self {
+//             Self::Dynamic(t) => (*t).clone(),
+//             Self::Static(rc) => (*rc).clone(),
+//         }
+//     }
+// }
+
+// // MARK: Animation
+// // ANCHOR: AnimationSpan
+// /// An [`AnimationSpan<T>`] consist of an [`Evaluator<T>`] and some metadata,
+// /// such as `rate_func` and `duration_secs`, to control the evaluation process.
+// pub struct AnimationSpan<T> {
+//     pub(crate) evaluator: Evaluator<T>,
+//     /// The rate function used for evaluating
+//     pub rate_func: fn(f64) -> f64,
+//     /// The duration seconds
+//     pub duration_secs: f64,
+// }
+// // ANCHOR_END: AnimationSpan
+
+// impl<T> Debug for AnimationSpan<T> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(
+//             f,
+//             "Animation {{ duration_secs: {}, rate_func: {:?} }}",
+//             self.duration_secs, self.rate_func
+//         )
+//     }
+// }
+
+// impl<T: 'static> AnimationSpan<T> {
+//     /// Construct an [`AnimationSpan`] from [`Evaluator`], this uses [`linear`]
+//     /// rate function and `1.0` duration seconds for default.
+//     pub fn from_evaluator(evaluator: Evaluator<T>) -> Self {
+//         Self {
+//             evaluator,
+//             rate_func: linear,
+//             duration_secs: 1.0,
+//         }
+//     }
+// }
+
+// impl<T> AnimationSpan<T> {
+//     /// Get the type name of the [`Evaluator`] of this [`AnimationSpan`].
+//     pub fn type_name(&self) -> &str {
+//         match &self.evaluator {
+//             Evaluator::Dynamic { type_name, .. } => type_name,
+//             Evaluator::Static(_) => "Static",
+//         }
+//     }
+//     /// A builder func to modify `rate_func`
+//     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
+//         self.rate_func = rate_func;
+//         self
+//     }
+//     /// A builder func to modify `secs`
+//     pub fn with_duration(mut self, secs: f64) -> Self {
+//         self.duration_secs = secs;
+//         self
+//     }
+// }
+
+// // ANCHOR: AnimationSpan-eval
+// impl<T> AnimationSpan<T> {
+//     /// Evaluate at the given progress value `alpha` in [0, 1]
+//     pub fn eval_alpha(&self, alpha: f64) -> EvalResult<T> {
+//         self.eval_sec(alpha * self.duration_secs)
+//     }
+//     /// Evaluate at the given second `sec`
+//     pub fn eval_sec(&self, sec: f64) -> EvalResult<T> {
+//         self.evaluator
+//             .eval_alpha((self.rate_func)((sec / self.duration_secs).clamp(0.0, 1.0)))
+//     }
+// }
+// // ANCHOR_END: AnimationSpan-eval

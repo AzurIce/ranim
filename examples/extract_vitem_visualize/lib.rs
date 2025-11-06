@@ -1,11 +1,12 @@
 use ranim::glam;
+use ranim_core::primitives::CoreItem;
 use std::f64::consts::PI;
 
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color,
     color::palettes::manim,
-    core::{Extract, components::width::Width, primitives::vitem::VItemPrimitive},
+    core::{Extract, components::width::Width},
     items::vitem::{
         Group, VItem,
         geometry::{Circle, Square},
@@ -170,7 +171,7 @@ impl StrokeWidth for VisualVItem {
 }
 
 impl Extract for VisualVItem {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
         let mut points = Vec::with_capacity(self.0.vpoints.len());
 
