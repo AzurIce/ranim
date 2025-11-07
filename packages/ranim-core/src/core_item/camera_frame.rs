@@ -5,7 +5,7 @@ use glam::{DMat4, DVec3, dvec2};
 use crate::{
     Extract,
     prelude::{Alignable, Interpolatable},
-    primitives::CoreItem,
+    core_item::CoreItem,
 };
 
 /// The data of a camera

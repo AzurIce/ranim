@@ -25,8 +25,8 @@ use crate::vitem::{Group, VItem, svg::SvgItem};
 use ranim_core::{
     Extract, color,
     components::width::Width,
+    core_item::CoreItem,
     glam,
-    primitives::{CoreItem, vitem::VItemPrimitive},
     traits::{Anchor, *},
 };
 

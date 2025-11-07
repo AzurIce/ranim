@@ -22,7 +22,7 @@ pub mod traits;
 pub mod utils;
 
 /// The core primitives
-pub mod primitives;
+pub mod core_item;
 /// The [`CoreItem`] store
 pub mod store;
 
@@ -33,12 +33,12 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
-    pub use crate::primitives::camera_frame::CameraFrame;
+    pub use crate::core_item::camera_frame::CameraFrame;
     pub use crate::timeline::{TimelineFunc, TimelinesFunc};
     pub use crate::{ItemId, RanimScene, TimeMark};
 }
 
-use crate::primitives::CoreItem;
+use crate::core_item::CoreItem;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 

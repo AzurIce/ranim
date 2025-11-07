@@ -1,5 +1,5 @@
 use ranim::glam;
-use ranim_core::primitives::CoreItem;
+use ranim_core::core_item::CoreItem;
 use std::f64::consts::PI;
 
 use ranim::{

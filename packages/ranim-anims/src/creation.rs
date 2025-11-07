@@ -1,6 +1,6 @@
 use ranim_core::{
     animation::{AnimationCell, Eval},
-    primitives::vitem::DEFAULT_STROKE_WIDTH,
+    core_item::vitem::DEFAULT_STROKE_WIDTH,
     traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth},
     utils::rate_functions::smooth,
 };

@@ -1,14 +1,10 @@
-use std::{
-    any::{Any, TypeId},
-    cell::RefCell,
-    marker::PhantomData,
-};
+use std::{any::Any, cell::RefCell};
 
 use crate::{
     Extract,
-    animation::{AnimationCell, CoreItemAnimation, Eval},
+    animation::{AnimationCell, CoreItemAnimation},
+    core_item::{CoreItem, vitem::VItemPrimitive},
     prelude::CameraFrame,
-    primitives::{CoreItem, vitem::VItemPrimitive},
 };
 
 /// A store of animations
@@ -93,29 +89,6 @@ impl AnimationStore {
     }
 }
 
-#[test]
-fn test_animation_store() {
-    #[derive(Default)]
-    struct A<T: Default> {
-        _phantom: PhantomData<T>,
-    }
-    impl<T: Default> Eval<T> for A<T> {
-        fn eval_alpha(&self, _alpha: f64) -> T {
-            T::default()
-        }
-    }
-
-    let store = AnimationStore::new();
-    let anim = store.push_animation(A::<VItemPrimitive>::default().into_animation_cell());
-    // drop(store); // This should cause a compile error because anim's lifetime is tied to store
-    assert_eq!(anim.eval_alpha(0.0), VItemPrimitive::default());
-    assert_eq!(
-        anim.eval_alpha_core_item(0.0),
-        vec![CoreItem::VItemPrimitive(VItemPrimitive::default())]
-    );
-    drop(store);
-}
-
 /// A store of [`CoreItem`]s.
 #[derive(Default, Clone)]
 pub struct CoreItemStore {
@@ -141,5 +114,35 @@ impl CoreItemStore {
                 CoreItem::VItemPrimitive(x) => self.vitems.push(x),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_animation_store() {
+        use crate::animation::Eval;
+        use std::marker::PhantomData;
+        #[derive(Default)]
+        struct A<T: Default> {
+            _phantom: PhantomData<T>,
+        }
+        impl<T: Default> Eval<T> for A<T> {
+            fn eval_alpha(&self, _alpha: f64) -> T {
+                T::default()
+            }
+        }
+
+        let store = AnimationStore::new();
+        let anim = store.push_animation(A::<VItemPrimitive>::default().into_animation_cell());
+        // drop(store); // This should cause a compile error because anim's lifetime is tied to store
+        assert_eq!(anim.eval_alpha(0.0), VItemPrimitive::default());
+        assert_eq!(
+            anim.eval_alpha_core_item(0.0),
+            vec![CoreItem::VItemPrimitive(VItemPrimitive::default())]
+        );
+        drop(store);
     }
 }

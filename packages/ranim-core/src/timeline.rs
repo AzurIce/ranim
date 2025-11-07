@@ -1,9 +1,9 @@
-use std::{any::Any, sync::Arc};
+use std::any::Any;
 
 use crate::{
     Extract,
     animation::{AnimationCell, Eval, StaticAnim},
-    primitives::CoreItem,
+    core_item::CoreItem,
     utils::calculate_hash,
 };
 
@@ -183,7 +183,10 @@ impl ItemDynTimelines {
         Self::default()
     }
     /// Push a new [`ItemTimeline<T>`] to the end of the timelines
-    pub fn push<T: Extract<Target = CoreItem> + Clone + 'static>(&mut self, timeline: ItemTimeline<T>) {
+    pub fn push<T: Extract<Target = CoreItem> + Clone + 'static>(
+        &mut self,
+        timeline: ItemTimeline<T>,
+    ) {
         self.inner.push(Box::new(timeline));
     }
     /// Evaluate the timeline and extract to primitives at `alpha`
@@ -250,7 +253,10 @@ impl ItemDynTimelines {
     /// If there is a planning static anim, it will get submitted and the new
     /// timeline will start planning a static anim immediately just like the
     /// static anim goes "cross" two timeline of different type.
-    pub fn apply_map<T: Extract<Target = CoreItem> + Clone + 'static, E: Extract<Target = CoreItem> + Clone + 'static>(
+    pub fn apply_map<
+        T: Extract<Target = CoreItem> + Clone + 'static,
+        E: Extract<Target = CoreItem> + Clone + 'static,
+    >(
         &mut self,
         map_fn: impl FnOnce(T) -> E,
     ) {
@@ -372,7 +378,9 @@ impl<T: Clone + 'static> ItemTimeline<T> {
     }
     /// Get the end sec
     pub fn end_sec(&self) -> Option<f64> {
-        self.anims.last().map(|anim| anim.info.show_sec + anim.info.duration_secs)
+        self.anims
+            .last()
+            .map(|anim| anim.info.show_sec + anim.info.duration_secs)
     }
     /// Get the current second
     pub fn cur_sec(&self) -> f64 {
@@ -455,7 +463,8 @@ impl<T: Clone + 'static> ItemTimeline<T> {
         self._submit_planning_static_anim();
         let res = anim.eval_alpha(1.0);
         let duration = anim.info.duration_secs;
-        self.anims.push(anim.with_show_sec(self.cur_sec).with_duration(duration));
+        self.anims
+            .push(anim.with_show_sec(self.cur_sec).with_duration(duration));
         self.cur_sec += duration;
         self.update(res);
         self.show();
@@ -501,7 +510,7 @@ impl<T: Clone + 'static> ItemTimeline<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{primitives::vitem::VItemPrimitive, timeline::ItemTimeline};
+    use crate::{core_item::vitem::VItemPrimitive, timeline::ItemTimeline};
 
     // #[test]
     // fn test_item_timeline() {

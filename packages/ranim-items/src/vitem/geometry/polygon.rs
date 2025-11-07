@@ -1,11 +1,11 @@
-use ranim_core::{Extract, color, glam, primitives::CoreItem, traits::Anchor};
+use ranim_core::{Extract, color, core_item::CoreItem, glam, traits::Anchor};
 
 use color::{AlphaColor, Srgb};
 use glam::{DVec3, dvec3};
 use itertools::Itertools;
 
 use ranim_core::{
-    primitives::vitem::{DEFAULT_STROKE_WIDTH, VItemPrimitive},
+    core_item::vitem::DEFAULT_STROKE_WIDTH,
     traits::{
         Alignable, BoundingBox, FillColor, Interpolatable, Opacity, Rotate, Scale, Shift,
         StrokeColor, StrokeWidth, With,

@@ -4,7 +4,7 @@ use glam::Vec4;
 use crate::{
     Extract,
     components::{rgba::Rgba, width::Width},
-    primitives::CoreItem,
+    core_item::CoreItem,
     traits::FillColor,
 };
 
