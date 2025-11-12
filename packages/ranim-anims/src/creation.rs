@@ -1,6 +1,6 @@
 use ranim_core::{
-    animation::{AnimationSpan, EvalDynamic, Evaluator},
-    primitives::vitem::DEFAULT_STROKE_WIDTH,
+    animation::{AnimationCell, Eval},
+    core_item::vitem::DEFAULT_STROKE_WIDTH,
     traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth},
     utils::rate_functions::smooth,
 };
@@ -15,18 +15,20 @@ impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`CreationRequirement`]
 pub trait CreationAnim<T: CreationRequirement + 'static> {
     /// Create a [`Create`] anim for `T`.
-    fn create(self) -> AnimationSpan<T>;
+    fn create(self) -> AnimationCell<T>;
     /// Create an [`UnCreate`] anim for `T`.
-    fn uncreate(self) -> AnimationSpan<T>;
+    fn uncreate(self) -> AnimationCell<T>;
 }
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
-    fn create(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(Create::new(self)))
+    fn create(self) -> AnimationCell<T> {
+        Create::new(self)
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
-    fn uncreate(self) -> AnimationSpan<T> {
-        AnimationSpan::from_evaluator(Evaluator::new_dynamic(UnCreate::new(self)))
+    fn uncreate(self) -> AnimationCell<T> {
+        UnCreate::new(self)
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
 }
@@ -39,20 +41,20 @@ impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequ
 /// The methods to create animations for `T` that satisfies [`WritingRequirement`]
 pub trait WritingAnim<T: WritingRequirement + 'static> {
     /// Create a [`Write`] anim for `T`.
-    fn write(self) -> AnimationSpan<T>;
+    fn write(self) -> AnimationCell<T>;
     /// Create a [`Unwrite`] anim for `T`.
-    fn unwrite(self) -> AnimationSpan<T>;
+    fn unwrite(self) -> AnimationCell<T>;
 }
 
 impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
-    fn write(self) -> AnimationSpan<T> {
+    fn write(self) -> AnimationCell<T> {
         Write::new(self)
-            .into_animation_span()
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
-    fn unwrite(self) -> AnimationSpan<T> {
+    fn unwrite(self) -> AnimationCell<T> {
         Unwrite::new(self)
-            .into_animation_span()
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
 }
@@ -75,7 +77,7 @@ impl<T: CreationRequirement> Create<T> {
     }
 }
 
-impl<T: CreationRequirement> EvalDynamic<T> for Create<T> {
+impl<T: CreationRequirement> Eval<T> for Create<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         if alpha == 0.0 {
             T::empty()
@@ -104,7 +106,7 @@ impl<T: CreationRequirement> UnCreate<T> {
     }
 }
 
-impl<T: CreationRequirement> EvalDynamic<T> for UnCreate<T> {
+impl<T: CreationRequirement> Eval<T> for UnCreate<T> {
     fn eval_alpha(&self, mut alpha: f64) -> T {
         if !(0.0..=1.0).contains(&alpha) {
             warn!("the alpha is out of range: {alpha}, clampped to 0.0..=1.0");
@@ -146,7 +148,7 @@ impl<T: WritingRequirement> Write<T> {
     }
 }
 
-impl<T: WritingRequirement> EvalDynamic<T> for Write<T> {
+impl<T: WritingRequirement> Eval<T> for Write<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         let alpha = alpha * 2.0;
         if (0.0..1.0).contains(&alpha) {
@@ -186,7 +188,7 @@ impl<T: WritingRequirement> Unwrite<T> {
     }
 }
 
-impl<T: WritingRequirement> EvalDynamic<T> for Unwrite<T> {
+impl<T: WritingRequirement> Eval<T> for Unwrite<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         let alpha = alpha * 2.0;
         if (0.0..1.0).contains(&alpha) {

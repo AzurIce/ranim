@@ -8,7 +8,6 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
-/// Fondation of animation
 pub mod animation;
 /// Color
 pub mod color;
@@ -21,8 +20,7 @@ pub mod traits;
 /// Utils
 pub mod utils;
 
-/// The core primitives
-pub mod primitives;
+pub mod core_item;
 /// The [`CoreItem`] store
 pub mod store;
 
@@ -33,25 +31,25 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
-    pub use crate::primitives::camera_frame::CameraFrame;
+    pub use crate::core_item::camera_frame::CameraFrame;
     pub use crate::timeline::{TimelineFunc, TimelinesFunc};
     pub use crate::{ItemId, RanimScene, TimeMark};
 }
 
-use crate::primitives::{CoreItem, Primitive, Primitives};
+use crate::core_item::CoreItem;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
 /// Extract a [`Extract::Target`] from reference.
 pub trait Extract {
     /// The extraction result
-    type Target: Primitive + Clone;
+    type Target: Clone;
     /// Extract a [`Extract::Target`] from reference.
     fn extract(&self) -> Vec<Self::Target>;
-    /// Extract to [`Primitive`] from reference.
-    fn extract_to_primitives(&self) -> Primitives {
-        Self::Target::build_primitives(self.extract())
-    }
+    // /// Extract to [`Primitive`] from reference.
+    // fn extract_to_primitives(&self) -> Primitives {
+    //     Self::Target::build_primitives(self.extract())
+    // }
 }
 
 use crate::timeline::{AnimationInfo, ItemDynTimelines, ItemTimeline, TimelineFunc, TimelinesFunc};
@@ -253,17 +251,23 @@ impl RanimScene {
     /// Note that, the new timeline is hidden by default, use [`ItemTimeline::forward`] and
     /// [`ItemTimeline::forward_to`] to modify the start time of the first anim, and use
     /// [`ItemTimeline::show`] to start encoding and static anim.
-    pub fn insert<T: Extract + Clone + 'static>(&mut self, state: T) -> ItemId<T> {
+    pub fn insert<T: Extract<Target = CoreItem> + Clone + 'static>(
+        &mut self,
+        state: T,
+    ) -> ItemId<T> {
         self.insert_and(state, |_| {})
     }
     /// Use the item state to create a new [`ItemDynTimelines`], and call [`ItemTimeline::show`] on it.
-    pub fn insert_and_show<T: Extract + Clone + 'static>(&mut self, state: T) -> ItemId<T> {
+    pub fn insert_and_show<T: Extract<Target = CoreItem> + Clone + 'static>(
+        &mut self,
+        state: T,
+    ) -> ItemId<T> {
         self.insert_and(state, |timeline| {
             timeline.show();
         })
     }
     /// Use the item state to create a new [`ItemDynTimelines`], and call `f` on it.
-    pub fn insert_and<T: Extract + Clone + 'static>(
+    pub fn insert_and<T: Extract<Target = CoreItem> + Clone + 'static>(
         &mut self,
         state: T,
         f: impl FnOnce(&mut ItemTimeline<T>),
@@ -281,7 +285,10 @@ impl RanimScene {
     /// Consumes an [`ItemId<T>`], and convert it into [`ItemId<E>`].
     ///
     /// This insert inserts an [`ItemTimeline<E>`] into the corresponding [`ItemDynTimelines`]
-    pub fn map<T: Extract + Clone + 'static, E: Extract + Clone + 'static>(
+    pub fn map<
+        T: Extract<Target = CoreItem> + Clone + 'static,
+        E: Extract<Target = CoreItem> + Clone + 'static,
+    >(
         &mut self,
         item_id: ItemId<T>,
         map_fn: impl FnOnce(T) -> E,
@@ -390,7 +397,7 @@ impl SealedRanimScene {
         self.timelines_iter()
             .filter_map(move |t| {
                 t.eval_primitives_at_sec(target_sec)
-                    .map(|(res, _id_hash)| res.to_owned().boom())
+                    .map(|(res, _id_hash)| res)
             })
             .flatten()
     }

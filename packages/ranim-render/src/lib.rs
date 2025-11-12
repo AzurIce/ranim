@@ -20,7 +20,7 @@ use primitives::RenderCommand;
 
 use crate::primitives::{RenderPool, vitem::VItemRenderInstance};
 use ranim_core::{
-    primitives::{camera_frame::CameraFrame, vitem::VItemPrimitive},
+    core_item::{camera_frame::CameraFrame, vitem::VItemPrimitive},
     store::CoreItemStore,
 };
 use utils::{PipelinesStorage, WgpuBuffer, WgpuContext};

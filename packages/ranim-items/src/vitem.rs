@@ -10,7 +10,8 @@ pub mod typst;
 use color::{AlphaColor, Srgb, palette::css};
 use derive_more::{Deref, DerefMut};
 use glam::{DVec3, Vec4, vec4};
-use ranim_core::primitives::vitem::VItemPrimitive;
+use ranim_core::core_item::CoreItem;
+use ranim_core::core_item::vitem::VItemPrimitive;
 use ranim_core::traits::Anchor;
 use ranim_core::utils::resize_preserving_order_with_repeated_indices;
 use ranim_core::{Extract, color, glam};
@@ -158,14 +159,14 @@ impl VItem {
 
 /// See [`VItemPrimitive`].
 impl Extract for VItem {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
-        vec![VItemPrimitive {
+        vec![CoreItem::VItemPrimitive(VItemPrimitive {
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect(),
             stroke_widths: self.stroke_widths.iter().cloned().collect(),
-        }]
+        })]
     }
 }
 
@@ -360,9 +361,9 @@ impl<T: Opacity + Alignable + Clone> Alignable for Group<T> {
     }
 }
 
-impl<E: Extract + Opacity> Extract for Group<E> {
-    type Target = E::Target;
+impl<E: Extract<Target = CoreItem> + Opacity> Extract for Group<E> {
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
-        self.iter().flat_map(|x| x.extract()).collect()
+        self.into_iter().flat_map(|x| x.extract()).collect()
     }
 }

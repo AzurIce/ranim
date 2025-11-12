@@ -1,5 +1,5 @@
 use ranim_core::{
-    animation::{AnimationSpan, EvalDynamic},
+    animation::{AnimationCell, Eval},
     traits::{Interpolatable, Opacity},
     utils::rate_functions::smooth,
 };
@@ -13,20 +13,20 @@ impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`FadingRequirement`]
 pub trait FadingAnim<T: FadingRequirement + 'static> {
     /// Create a [`FadeIn`] anim.
-    fn fade_in(self) -> AnimationSpan<T>;
+    fn fade_in(self) -> AnimationCell<T>;
     /// Create a [`FadeOut`] anim.
-    fn fade_out(self) -> AnimationSpan<T>;
+    fn fade_out(self) -> AnimationCell<T>;
 }
 
 impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
-    fn fade_in(self) -> AnimationSpan<T> {
+    fn fade_in(self) -> AnimationCell<T> {
         FadeIn::new(self.clone())
-            .into_animation_span()
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
-    fn fade_out(self) -> AnimationSpan<T> {
+    fn fade_out(self) -> AnimationCell<T> {
         FadeOut::new(self.clone())
-            .into_animation_span()
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
 }
@@ -53,7 +53,7 @@ impl<T: FadingRequirement> FadeIn<T> {
     }
 }
 
-impl<T: FadingRequirement> EvalDynamic<T> for FadeIn<T> {
+impl<T: FadingRequirement> Eval<T> for FadeIn<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         self.src.lerp(&self.dst, alpha)
     }
@@ -79,7 +79,7 @@ impl<T: FadingRequirement> FadeOut<T> {
     }
 }
 
-impl<T: FadingRequirement> EvalDynamic<T> for FadeOut<T> {
+impl<T: FadingRequirement> Eval<T> for FadeOut<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         self.src.lerp(&self.dst, alpha)
     }

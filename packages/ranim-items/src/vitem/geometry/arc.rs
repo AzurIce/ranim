@@ -1,11 +1,12 @@
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::Extract;
+use ranim_core::core_item::CoreItem;
 use ranim_core::traits::Anchor;
 use ranim_core::{color, glam, traits::Interpolatable};
 
 use ranim_core::{
-    primitives::vitem::{DEFAULT_STROKE_WIDTH, VItemPrimitive},
+    core_item::vitem::DEFAULT_STROKE_WIDTH,
     traits::{BoundingBox, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With},
 };
 
@@ -189,7 +190,7 @@ impl From<Arc> for VItem {
 }
 
 impl Extract for Arc {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
         VItem::from(self.clone()).extract()
     }
@@ -368,7 +369,7 @@ impl From<ArcBetweenPoints> for VItem {
 }
 
 impl Extract for ArcBetweenPoints {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
         Arc::from(self.clone()).extract()
     }
