@@ -1,4 +1,4 @@
-use ranim_core::animation::{AnimationSpan, EvalDynamic};
+use ranim_core::animation::{AnimationCell, Eval};
 
 // MARK: Require Trait
 /// The requirement for [`Func`]
@@ -8,12 +8,12 @@ pub trait FuncRequirement: Clone {}
 /// The methods to create animations for `T` that satisfies [`FuncRequirement`]
 pub trait FuncAnim<T: FuncRequirement + 'static> {
     /// Create a [`Func`] anim.
-    fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationSpan<T>;
+    fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationCell<T>;
 }
 
 impl<T: FuncRequirement + 'static> FuncAnim<T> for T {
-    fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationSpan<T> {
-        Func::new(self.clone(), f).into_animation_span()
+    fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationCell<T> {
+        Func::new(self.clone(), f).into_animation_cell()
     }
 }
 
@@ -37,7 +37,7 @@ impl<T: FuncRequirement> Func<T> {
     }
 }
 
-impl<T: FuncRequirement> EvalDynamic<T> for Func<T> {
+impl<T: FuncRequirement> Eval<T> for Func<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         (self.f)(&self.src, alpha)
     }

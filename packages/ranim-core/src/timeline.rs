@@ -1,9 +1,9 @@
-use std::{any::Any, sync::Arc};
+use std::any::Any;
 
 use crate::{
     Extract,
-    animation::{AnimationSpan, EvalResult, Evaluator},
-    primitives::Primitives,
+    animation::{AnimationCell, CoreItemAnimation, Eval, StaticAnim},
+    core_item::CoreItem,
     utils::calculate_hash,
 };
 
@@ -45,7 +45,7 @@ pub trait TimelineFunc: Any {
 
     // fn eval_sec_any(&self, target_sec: f64) -> Option<(EvalResult<dyn Any>, usize)>;
     /// Evaluate timeline's primitives at target sec
-    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)>;
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(Vec<CoreItem>, u64)>;
 }
 
 // MARK: TimelinesFunc
@@ -127,7 +127,7 @@ impl TimelineFunc for Box<dyn TimelineFunc> {
     // fn eval_sec_any(&self, target_sec: f64) -> Option<(EvalResult<dyn Any>, usize)> {
     //     self.as_ref().eval_sec_any(target_sec)
     // }
-    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)> {
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(Vec<CoreItem>, u64)> {
         self.as_ref().eval_primitives_at_sec(target_sec)
     }
 }
@@ -172,7 +172,7 @@ impl TimelineFunc for ItemDynTimelines {
     fn type_name(&self) -> &str {
         self.get_dyn().type_name()
     }
-    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)> {
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(Vec<CoreItem>, u64)> {
         self.eval_primitives_at_sec(target_sec)
     }
 }
@@ -183,16 +183,19 @@ impl ItemDynTimelines {
         Self::default()
     }
     /// Push a new [`ItemTimeline<T>`] to the end of the timelines
-    pub fn push<T: Extract + Clone + 'static>(&mut self, timeline: ItemTimeline<T>) {
+    pub fn push<T: Extract<Target = CoreItem> + Clone + 'static>(
+        &mut self,
+        timeline: ItemTimeline<T>,
+    ) {
         self.inner.push(Box::new(timeline));
     }
     /// Evaluate the timeline and extract to primitives at `alpha`
-    pub fn eval_primitives_at_alpha(&self, alpha: f64) -> Option<(EvalResult<Primitives>, u64)> {
+    pub fn eval_primitives_at_alpha(&self, alpha: f64) -> Option<(Vec<CoreItem>, u64)> {
         let target_sec = self.inner.max_total_secs() * alpha;
         self.eval_primitives_at_sec(target_sec)
     }
     /// Evaluate the timeline at `target_sec`
-    pub fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)> {
+    pub fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(Vec<CoreItem>, u64)> {
         // println!("len: {}", self.timelines.len());
         // println!("ItemDynTimelines::eval_sec_extracted_any: {}", target_sec);
 
@@ -250,7 +253,10 @@ impl ItemDynTimelines {
     /// If there is a planning static anim, it will get submitted and the new
     /// timeline will start planning a static anim immediately just like the
     /// static anim goes "cross" two timeline of different type.
-    pub fn apply_map<T: Extract + Clone + 'static, E: Extract + Clone + 'static>(
+    pub fn apply_map<
+        T: Extract<Target = CoreItem> + Clone + 'static,
+        E: Extract<Target = CoreItem> + Clone + 'static,
+    >(
         &mut self,
         map_fn: impl FnOnce(T) -> E,
     ) {
@@ -276,10 +282,10 @@ impl ItemDynTimelines {
 
 // MARK: ItemTimeline<T>
 /// `ItemTimeline<T>` is used to encode animations for a single type `T`,
-/// it contains a list of [`AnimationSpan<T>`] and the corresponding metadata for each span.
+/// it contains a list of [`AnimationCell<T>`] and the corresponding metadata for each cell.
 pub struct ItemTimeline<T> {
     type_name: String,
-    anims: Vec<(AnimationSpan<T>, std::ops::Range<f64>)>,
+    anims: Vec<AnimationCell<T>>,
 
     // Followings are states use while constructing
     cur_sec: f64,
@@ -317,7 +323,7 @@ pub struct AnimationInfo {
     pub range: std::ops::Range<f64>,
 }
 
-impl<T: Extract + Any + Clone + 'static> TimelineFunc for ItemTimeline<T> {
+impl<T: Extract<Target = CoreItem> + Any + Clone + 'static> TimelineFunc for ItemTimeline<T> {
     fn start_sec(&self) -> Option<f64> {
         self.start_sec()
     }
@@ -345,9 +351,9 @@ impl<T: Extract + Any + Clone + 'static> TimelineFunc for ItemTimeline<T> {
         // const MAX_INFO_CNT: usize = 100;
         self.anims
             .iter()
-            .map(|(anim, range)| AnimationInfo {
+            .map(|anim| AnimationInfo {
                 anim_name: anim.type_name().to_string(),
-                range: range.clone(),
+                range: anim.info.range(),
             })
             // .take(MAX_INFO_CNT)
             .collect()
@@ -359,20 +365,22 @@ impl<T: Extract + Any + Clone + 'static> TimelineFunc for ItemTimeline<T> {
     //     self.eval_sec(target_sec)
     //         .map(|(res, idx)| (res.into_any(), idx))
     // }
-    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(EvalResult<Primitives>, u64)> {
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(Vec<CoreItem>, u64)> {
         self.eval_at_sec(target_sec)
-            .map(|(res, idx)| (res.map(|res| res.extract_to_primitives()), idx))
+            .map(|(res, idx)| (res.extract(), idx))
     }
 }
 
 impl<T: Clone + 'static> ItemTimeline<T> {
     /// Get the start sec
     pub fn start_sec(&self) -> Option<f64> {
-        self.anims.first().map(|(_, range)| range.start)
+        self.anims.first().map(|anim| anim.info.show_sec)
     }
     /// Get the end sec
     pub fn end_sec(&self) -> Option<f64> {
-        self.anims.last().map(|(_, range)| range.end)
+        self.anims
+            .last()
+            .map(|anim| anim.info.show_sec + anim.info.duration_secs)
     }
     /// Get the current second
     pub fn cur_sec(&self) -> f64 {
@@ -436,39 +444,41 @@ impl<T: Clone + 'static> ItemTimeline<T> {
     fn _submit_planning_static_anim(&mut self) -> bool {
         // println!("{:?}", self.planning_static_start_sec);
         if let Some(start) = self.planning_static_start_sec.take() {
-            self.anims.push((
-                AnimationSpan::from_evaluator(Evaluator::Static(Arc::new(self.state.clone()))),
-                start..self.cur_sec,
-            ));
+            self.anims.push(
+                StaticAnim(self.state.clone())
+                    .into_animation_cell()
+                    .with_show_sec(start)
+                    .with_duration(self.cur_sec - start),
+            );
             return true;
         }
         false
     }
     /// Plays an anim with `anim_func`.
-    pub fn play_with(&mut self, anim_func: impl FnOnce(T) -> AnimationSpan<T>) -> &mut Self {
+    pub fn play_with(&mut self, anim_func: impl FnOnce(T) -> AnimationCell<T>) -> &mut Self {
         self.play(anim_func(self.state.clone()))
     }
     /// Plays an anim.
-    pub fn play(&mut self, anim: AnimationSpan<T>) -> &mut Self {
+    pub fn play(&mut self, anim: AnimationCell<T>) -> &mut Self {
         self._submit_planning_static_anim();
-        let res = anim.eval_alpha(1.0).into_owned();
-        let duration = anim.duration_secs;
-        let end = self.cur_sec + duration;
-        self.anims.push((anim, self.cur_sec..end));
-        self.cur_sec = end;
+        let res = anim.eval_alpha(1.0);
+        let duration = anim.info.duration_secs;
+        self.anims
+            .push(anim.with_show_sec(self.cur_sec).with_duration(duration));
+        self.cur_sec += duration;
         self.update(res);
         self.show();
         self
     }
     /// Evaluate the state at `alpha`
-    pub fn eval_at_alpha(&self, alpha: f64) -> Option<(EvalResult<T>, u64)> {
+    pub fn eval_at_alpha(&self, alpha: f64) -> Option<(T, u64)> {
         let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
             return None;
         };
         self.eval_at_sec(alpha * (end - start) + start)
     }
     /// Evaluate the state at `target_sec`
-    pub fn eval_at_sec(&self, target_sec: f64) -> Option<(EvalResult<T>, u64)> {
+    pub fn eval_at_sec(&self, target_sec: f64) -> Option<(T, u64)> {
         let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
             return None;
         };
@@ -480,7 +490,8 @@ impl<T: Clone + 'static> ItemTimeline<T> {
         self.anims
             .iter()
             .enumerate()
-            .find_map(|(idx, (anim, range))| {
+            .find_map(|(idx, anim)| {
+                let range = anim.info.range();
                 if range.contains(&target_sec)
                     || (idx == self.anims.len() - 1 && target_sec == range.end)
                 {
@@ -499,7 +510,7 @@ impl<T: Clone + 'static> ItemTimeline<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{primitives::vitem::VItemPrimitive, timeline::ItemTimeline};
+    use crate::{core_item::vitem::VItemPrimitive, timeline::ItemTimeline};
 
     #[test]
     fn test_item_timeline() {
@@ -519,11 +530,11 @@ mod tests {
         assert_eq!(timeline.end_sec(), Some(1.0));
 
         let (res, _) = timeline.eval_at_alpha(0.0).unwrap();
-        assert_eq!(res.as_ref(), &vitem);
+        assert_eq!(res, vitem);
         let (res, _) = timeline.eval_at_alpha(0.5).unwrap();
-        assert_eq!(res.as_ref(), &vitem);
+        assert_eq!(res, vitem);
         let (res, _) = timeline.eval_at_alpha(1.0).unwrap();
-        assert_eq!(res.as_ref(), &vitem);
+        assert_eq!(res, vitem);
     }
 
     #[test]
@@ -546,6 +557,6 @@ mod tests {
         assert_eq!(timeline.get_dyn().end_sec(), Some(1.0));
 
         let (res, _) = timeline.eval_primitives_at_alpha(0.0).unwrap();
-        assert_eq!(res.as_ref(), &Primitives::VItemPrimitive(vec![vitem]));
+        assert_eq!(res, vec![CoreItem::VItemPrimitive(vitem)]);
     }
 }

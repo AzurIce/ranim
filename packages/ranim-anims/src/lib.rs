@@ -2,16 +2,16 @@
 //!
 //! This crate contains the built-in animations for Ranim.
 //!
-//! An **Animation** in ranim is basically a struct that implements the [`ranim_core::animation::EvalDynamic`] trait:
+//! An **Animation** in ranim is basically a struct that implements the [`ranim_core::animation::Eval`] trait:
 //!
 //! ```rust,ignore
-//! pub trait EvalDynamic<T> {
+//! pub trait Eval<T> {
 //!     /// Evaluates at the given progress value `alpha` in range [0, 1].
 //!     fn eval_alpha(&self, alpha: f64) -> T;
 //! }
 //! ```
 //!
-//! Every animation self-contains the evaluation process (the trait impl of [`ranim_core::animation::EvalDynamic::eval_alpha`])
+//! Every animation self-contains the evaluation process (the trait impl of [`ranim_core::animation::Eval::eval_alpha`])
 //! and the data that the evaluation process needs (the struct it self). Here is the example of [`fading::FadeIn`] animation:
 //!
 //! ```rust,ignore
@@ -32,7 +32,7 @@
 //!     }
 //! }
 //!
-//! impl<T: FadingRequirement> EvalDynamic<T> for FadeIn<T> {
+//! impl<T: FadingRequirement> Eval<T> for FadeIn<T> {
 //!     fn eval_alpha(&self, alpha: f64) -> T {
 //!         self.src.lerp(&self.dst, alpha)
 //!     }
@@ -45,19 +45,19 @@
 //! ```rust,ignore
 //! /// The methods to create animations for `T` that satisfies [`FadingRequirement`]
 //! pub trait FadingAnim<T: FadingRequirement + 'static> {
-//!     fn fade_in(self) -> AnimationSpan<T>;
-//!     fn fade_out(self) -> AnimationSpan<T>;
+//!     fn fade_in(self) -> AnimationCell<T>;
+//!     fn fade_out(self) -> AnimationCell<T>;
 //! }
 //!
 //! impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
 //!     fn fade_in(self) -> AnimationSpan<T> {
 //!         FadeIn::new(self.clone())
-//!             .into_animation_span()
+//!             .into_animation_cell()
 //!             .with_rate_func(smooth)
 //!     }
 //!     fn fade_out(self) -> AnimationSpan<T> {
 //!         FadeOut::new(self.clone())
-//!             .into_animation_span()
+//!             .into_animation_cell()
 //!             .with_rate_func(smooth)
 //!     }
 //! }

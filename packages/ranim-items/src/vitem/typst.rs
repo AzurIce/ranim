@@ -25,8 +25,8 @@ use crate::vitem::{Group, VItem, svg::SvgItem};
 use ranim_core::{
     Extract, color,
     components::width::Width,
+    core_item::CoreItem,
     glam,
-    primitives::vitem::VItemPrimitive,
     traits::{Anchor, *},
 };
 
@@ -429,7 +429,7 @@ impl From<TypstText> for Group<VItem> {
 }
 
 impl Extract for TypstText {
-    type Target = VItemPrimitive;
+    type Target = CoreItem;
     fn extract(&self) -> Vec<Self::Target> {
         self.vitems.extract()
     }

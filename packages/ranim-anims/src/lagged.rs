@@ -1,4 +1,4 @@
-use ranim_core::animation::{AnimationSpan, EvalDynamic};
+use ranim_core::animation::{AnimationCell, Eval};
 
 // MARK: LaggedAnim
 /// The methods to create animations for `Group<T>`
@@ -14,8 +14,8 @@ pub trait LaggedAnim<T, I> {
     fn lagged(
         self,
         lag_ratio: f64,
-        anim_func: impl FnMut(T) -> AnimationSpan<T>,
-    ) -> AnimationSpan<I>
+        anim_func: impl FnMut(T) -> AnimationCell<T>,
+    ) -> AnimationCell<I>
     where
         Self: Sized,
         I: IntoIterator<Item = T> + FromIterator<T>;
@@ -28,15 +28,15 @@ where
     fn lagged(
         self,
         lag_ratio: f64,
-        anim_func: impl FnMut(T) -> AnimationSpan<T>,
-    ) -> AnimationSpan<I> {
-        Lagged::new(self, lag_ratio, anim_func).into_animation_span()
+        anim_func: impl FnMut(T) -> AnimationCell<T>,
+    ) -> AnimationCell<I> {
+        Lagged::new(self, lag_ratio, anim_func).into_animation_cell()
     }
 }
 
 // pub fn lagged<T, I>(
 //     lag_ratio: f64,
-//     mut anim_func: impl FnMut(T) -> AnimationSpan<T>,
+//     mut anim_func: impl FnMut(T) -> AnimationCell<T>,
 // ) -> impl FnMut(I) -> Lagged<T>
 // where
 //     I: IntoIterator<Item = T>,
@@ -49,13 +49,13 @@ where
 /// This is applyable to `IntoIterator<Item = T>`, and this will apply
 /// the anims in the order of the elements with the lag ratio.
 pub struct Lagged<T> {
-    anims: Vec<AnimationSpan<T>>,
+    anims: Vec<AnimationCell<T>>,
     lag_ratio: f64,
 }
 
 impl<T> Lagged<T> {
     /// Constructor
-    pub fn new<I>(target: I, lag_ratio: f64, anim_func: impl FnMut(T) -> AnimationSpan<T>) -> Self
+    pub fn new<I>(target: I, lag_ratio: f64, anim_func: impl FnMut(T) -> AnimationCell<T>) -> Self
     where
         I: IntoIterator<Item = T>,
     {
@@ -66,7 +66,7 @@ impl<T> Lagged<T> {
     }
 }
 
-impl<T: Clone, I: FromIterator<T>> EvalDynamic<I> for Lagged<T> {
+impl<T: Clone, I: FromIterator<T>> Eval<I> for Lagged<T> {
     fn eval_alpha(&self, alpha: f64) -> I {
         // -|--
         //  -|--
@@ -83,7 +83,7 @@ impl<T: Clone, I: FromIterator<T>> EvalDynamic<I> for Lagged<T> {
 
                 let alpha = (alpha - start) / unit_time;
                 let alpha = alpha.clamp(0.0, 1.0);
-                anim.eval_alpha(alpha).into_owned()
+                anim.eval_alpha(alpha)
             })
             .collect()
     }

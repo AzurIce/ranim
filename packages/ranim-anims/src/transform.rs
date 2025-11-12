@@ -1,5 +1,5 @@
 use ranim_core::{
-    animation::{AnimationSpan, EvalDynamic},
+    animation::{AnimationCell, Eval},
     traits::{Alignable, Interpolatable},
     utils::rate_functions::smooth,
 };
@@ -13,29 +13,29 @@ impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`TransformRequirement`]
 pub trait TransformAnim<T: TransformRequirement + 'static> {
     /// Create a [`Transform`] anim with a func.
-    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationSpan<T>;
+    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationCell<T>;
     /// Create a [`Transform`] anim from src.
-    fn transform_from(self, src: T) -> AnimationSpan<T>;
+    fn transform_from(self, src: T) -> AnimationCell<T>;
     /// Create a [`Transform`] anim to dst.
-    fn transform_to(self, dst: T) -> AnimationSpan<T>;
+    fn transform_to(self, dst: T) -> AnimationCell<T>;
 }
 
 impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
-    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationSpan<T> {
+    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationCell<T> {
         let mut dst = self.clone();
         (f)(&mut dst);
         Transform::new(self.clone(), dst)
-            .into_animation_span()
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
-    fn transform_from(self, s: T) -> AnimationSpan<T> {
+    fn transform_from(self, s: T) -> AnimationCell<T> {
         Transform::new(s, self.clone())
-            .into_animation_span()
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
-    fn transform_to(self, d: T) -> AnimationSpan<T> {
+    fn transform_to(self, d: T) -> AnimationCell<T> {
         Transform::new(self.clone(), d)
-            .into_animation_span()
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
 }
@@ -68,7 +68,7 @@ impl<T: TransformRequirement> Transform<T> {
 }
 
 // ANCHOR: Transform-EvalDynamic
-impl<T: TransformRequirement> EvalDynamic<T> for Transform<T> {
+impl<T: TransformRequirement> Eval<T> for Transform<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         if alpha == 0.0 {
             self.src.clone()

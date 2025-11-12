@@ -8,7 +8,7 @@ use crate::{
 use glam::Vec4;
 use ranim_core::{
     components::{rgba::Rgba, width::Width},
-    primitives::vitem::VItemPrimitive,
+    core_item::vitem::VItemPrimitive,
 };
 
 use super::{Primitive, RenderCommand, RenderResource};
