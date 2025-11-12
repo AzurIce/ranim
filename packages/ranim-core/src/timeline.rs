@@ -2,7 +2,7 @@ use std::any::Any;
 
 use crate::{
     Extract,
-    animation::{AnimationCell, Eval, StaticAnim},
+    animation::{AnimationCell, CoreItemAnimation, Eval, StaticAnim},
     core_item::CoreItem,
     utils::calculate_hash,
 };
@@ -352,7 +352,7 @@ impl<T: Extract<Target = CoreItem> + Any + Clone + 'static> TimelineFunc for Ite
         self.anims
             .iter()
             .map(|anim| AnimationInfo {
-                anim_name: "TODO".to_string(),
+                anim_name: anim.type_name().to_string(),
                 range: anim.info.range(),
             })
             // .take(MAX_INFO_CNT)
