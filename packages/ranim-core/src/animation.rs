@@ -5,12 +5,13 @@
 //! When constructing an animation, we need [`AnimationInfo`] besides the evaluation core, which is
 //! [`AnimationCell<T>`].
 //!
-//! When satisfies `T: Extract<Target = CoreItem>`, [`AnimationCell<T>`] can be converted to a [`PrimitiveAnimationCell`].
+//! When satisfies `T: Extract<Target = CoreItem>`, [`AnimationCell<T>`] will implement [`CoreItemAnimation`].
 
 use crate::{Extract, core_item::CoreItem, utils::rate_functions::linear};
 
 use std::fmt::Debug;
 
+/// An animation info.
 #[derive(Debug, Clone)]
 pub struct AnimationInfo {
     /// The rate function used for evaluating
@@ -32,12 +33,15 @@ impl Default for AnimationInfo {
 }
 
 impl AnimationInfo {
+    /// Get the range of the animation
     pub fn range(&self) -> std::ops::Range<f64> {
         self.show_sec..self.show_sec + self.duration_secs
     }
+    /// Map the alpha to the rate function
     pub fn map_alpha(&self, alpha: f64) -> f64 {
         (self.rate_func)(alpha)
     }
+    /// Map the sec to the alpha
     pub fn map_sec(&self, sec: f64) -> Option<f64> {
         if (self.show_sec..=self.show_sec + self.duration_secs).contains(&sec) {
             Some((sec - self.show_sec) / self.duration_secs)
@@ -65,25 +69,33 @@ impl AnimationInfo {
     }
 }
 
+/// A trait for animations that can be evaluated as core items.
 pub trait CoreItemAnimation {
+    /// Evaluate the animation at `alpha` as core items
     fn eval_alpha_core_item(&self, alpha: f64) -> Vec<CoreItem>;
+    /// Get the animation info
     fn anim_info(&self) -> &AnimationInfo;
 }
 
+/// An animation cell.
 pub struct AnimationCell<T> {
     inner: Box<dyn Eval<T>>,
+    /// The animation info
     pub info: AnimationInfo,
 }
 
 impl<T> AnimationCell<T> {
+    /// A builder func to modify `show_sec`
     pub fn with_show_sec(mut self, show_sec: f64) -> Self {
         self.info = self.info.with_show_sec(show_sec);
         self
     }
+    /// A builder func to modify `rate_func`
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.info = self.info.with_rate_func(rate_func);
         self
     }
+    /// A builder func to modify `duration_secs`
     pub fn with_duration(mut self, duration_secs: f64) -> Self {
         self.info = self.info.with_duration(duration_secs);
         self

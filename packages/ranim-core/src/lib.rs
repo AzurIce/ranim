@@ -8,7 +8,6 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
-/// Fondation of animation
 pub mod animation;
 /// Color
 pub mod color;
@@ -21,7 +20,6 @@ pub mod traits;
 /// Utils
 pub mod utils;
 
-/// The core primitives
 pub mod core_item;
 /// The [`CoreItem`] store
 pub mod store;
@@ -253,11 +251,17 @@ impl RanimScene {
     /// Note that, the new timeline is hidden by default, use [`ItemTimeline::forward`] and
     /// [`ItemTimeline::forward_to`] to modify the start time of the first anim, and use
     /// [`ItemTimeline::show`] to start encoding and static anim.
-    pub fn insert<T: Extract<Target = CoreItem> + Clone + 'static>(&mut self, state: T) -> ItemId<T> {
+    pub fn insert<T: Extract<Target = CoreItem> + Clone + 'static>(
+        &mut self,
+        state: T,
+    ) -> ItemId<T> {
         self.insert_and(state, |_| {})
     }
     /// Use the item state to create a new [`ItemDynTimelines`], and call [`ItemTimeline::show`] on it.
-    pub fn insert_and_show<T: Extract<Target = CoreItem> + Clone + 'static>(&mut self, state: T) -> ItemId<T> {
+    pub fn insert_and_show<T: Extract<Target = CoreItem> + Clone + 'static>(
+        &mut self,
+        state: T,
+    ) -> ItemId<T> {
         self.insert_and(state, |timeline| {
             timeline.show();
         })
@@ -281,7 +285,10 @@ impl RanimScene {
     /// Consumes an [`ItemId<T>`], and convert it into [`ItemId<E>`].
     ///
     /// This insert inserts an [`ItemTimeline<E>`] into the corresponding [`ItemDynTimelines`]
-    pub fn map<T: Extract<Target = CoreItem> + Clone + 'static, E: Extract<Target = CoreItem> + Clone + 'static>(
+    pub fn map<
+        T: Extract<Target = CoreItem> + Clone + 'static,
+        E: Extract<Target = CoreItem> + Clone + 'static,
+    >(
         &mut self,
         item_id: ItemId<T>,
         map_fn: impl FnOnce(T) -> E,

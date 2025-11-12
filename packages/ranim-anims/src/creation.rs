@@ -22,11 +22,13 @@ pub trait CreationAnim<T: CreationRequirement + 'static> {
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
     fn create(self) -> AnimationCell<T> {
-        Create::new(self).into_animation_cell()
+        Create::new(self)
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
     fn uncreate(self) -> AnimationCell<T> {
-        UnCreate::new(self).into_animation_cell()
+        UnCreate::new(self)
+            .into_animation_cell()
             .with_rate_func(smooth)
     }
 }

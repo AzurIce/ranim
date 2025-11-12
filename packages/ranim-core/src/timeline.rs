@@ -282,7 +282,7 @@ impl ItemDynTimelines {
 
 // MARK: ItemTimeline<T>
 /// `ItemTimeline<T>` is used to encode animations for a single type `T`,
-/// it contains a list of [`AnimationSpan<T>`] and the corresponding metadata for each span.
+/// it contains a list of [`AnimationCell<T>`] and the corresponding metadata for each cell.
 pub struct ItemTimeline<T> {
     type_name: String,
     anims: Vec<AnimationCell<T>>,
@@ -512,51 +512,51 @@ mod tests {
     use super::*;
     use crate::{core_item::vitem::VItemPrimitive, timeline::ItemTimeline};
 
-    // #[test]
-    // fn test_item_timeline() {
-    //     let vitem = VItemPrimitive {
-    //         points2d: vec![],
-    //         fill_rgbas: vec![],
-    //         stroke_rgbas: vec![],
-    //         stroke_widths: vec![],
-    //     };
-    //     let mut timeline = ItemTimeline::new(vitem.clone());
-    //     assert!(timeline.eval_at_alpha(0.0).is_none());
-    //     timeline.show();
-    //     timeline.forward(1.0);
-    //     timeline.seal();
+    #[test]
+    fn test_item_timeline() {
+        let vitem = VItemPrimitive {
+            points2d: vec![],
+            fill_rgbas: vec![],
+            stroke_rgbas: vec![],
+            stroke_widths: vec![],
+        };
+        let mut timeline = ItemTimeline::new(vitem.clone());
+        assert!(timeline.eval_at_alpha(0.0).is_none());
+        timeline.show();
+        timeline.forward(1.0);
+        timeline.seal();
 
-    //     assert_eq!(timeline.start_sec(), Some(0.0));
-    //     assert_eq!(timeline.end_sec(), Some(1.0));
+        assert_eq!(timeline.start_sec(), Some(0.0));
+        assert_eq!(timeline.end_sec(), Some(1.0));
 
-    //     let (res, _) = timeline.eval_at_alpha(0.0).unwrap();
-    //     assert_eq!(res.as_ref(), &vitem);
-    //     let (res, _) = timeline.eval_at_alpha(0.5).unwrap();
-    //     assert_eq!(res.as_ref(), &vitem);
-    //     let (res, _) = timeline.eval_at_alpha(1.0).unwrap();
-    //     assert_eq!(res.as_ref(), &vitem);
-    // }
+        let (res, _) = timeline.eval_at_alpha(0.0).unwrap();
+        assert_eq!(res, vitem);
+        let (res, _) = timeline.eval_at_alpha(0.5).unwrap();
+        assert_eq!(res, vitem);
+        let (res, _) = timeline.eval_at_alpha(1.0).unwrap();
+        assert_eq!(res, vitem);
+    }
 
-    // #[test]
-    // fn test_item_dyn_timelines() {
-    //     let vitem = VItemPrimitive {
-    //         points2d: vec![],
-    //         fill_rgbas: vec![],
-    //         stroke_rgbas: vec![],
-    //         stroke_widths: vec![],
-    //     };
-    //     let mut timeline = ItemDynTimelines::new();
-    //     timeline.push(ItemTimeline::new(vitem.clone()));
-    //     assert!(timeline.eval_primitives_at_alpha(0.0).is_none());
+    #[test]
+    fn test_item_dyn_timelines() {
+        let vitem = VItemPrimitive {
+            points2d: vec![],
+            fill_rgbas: vec![],
+            stroke_rgbas: vec![],
+            stroke_widths: vec![],
+        };
+        let mut timeline = ItemDynTimelines::new();
+        timeline.push(ItemTimeline::new(vitem.clone()));
+        assert!(timeline.eval_primitives_at_alpha(0.0).is_none());
 
-    //     timeline.get_dyn_mut().show();
-    //     timeline.get_dyn_mut().forward(1.0);
-    //     timeline.get_dyn_mut().seal();
+        timeline.get_dyn_mut().show();
+        timeline.get_dyn_mut().forward(1.0);
+        timeline.get_dyn_mut().seal();
 
-    //     assert_eq!(timeline.get_dyn().start_sec(), Some(0.0));
-    //     assert_eq!(timeline.get_dyn().end_sec(), Some(1.0));
+        assert_eq!(timeline.get_dyn().start_sec(), Some(0.0));
+        assert_eq!(timeline.get_dyn().end_sec(), Some(1.0));
 
-    //     let (res, _) = timeline.eval_primitives_at_alpha(0.0).unwrap();
-    //     assert_eq!(res.as_ref(), &Primitives::VItemPrimitive(vec![vitem]));
-    // }
+        let (res, _) = timeline.eval_primitives_at_alpha(0.0).unwrap();
+        assert_eq!(res, vec![CoreItem::VItemPrimitive(vitem)]);
+    }
 }

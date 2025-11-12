@@ -1,7 +1,7 @@
 //! Core items of Ranim.
-//! 
+//!
 //! [`CoreItem`]s are the fundamental items of Ranim. All other Items are built upon them.
-//! 
+//!
 //! Currently, there are two types of [`CoreItem`]s:
 //! - [`CameraFrame`]: The camera frame.
 //! - [`VItemPrimitive`]: The vitem primitive.

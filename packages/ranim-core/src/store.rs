@@ -26,6 +26,7 @@ use crate::{
 ///   `Vec` reallocates (which moves the `Box`es), the heap data itself doesn't move, so the pointers
 ///   remain valid. This is safe because `Box` owns heap-allocated data, and the data doesn't move
 ///   when the `Box` is moved within the `Vec`.
+#[derive(Default)]
 pub struct AnimationStore {
     anims: RefCell<Vec<Box<dyn CoreItemAnimation>>>,
 }
@@ -33,9 +34,7 @@ pub struct AnimationStore {
 impl AnimationStore {
     /// Create a new store.
     pub fn new() -> Self {
-        Self {
-            anims: RefCell::new(Vec::new()),
-        }
+        Self::default()
     }
 
     /// Push an `AnimationCell<T>` into the store and return a reference to it.
