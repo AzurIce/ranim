@@ -22,7 +22,8 @@ use glam::DVec3;
 #[scene]
 #[output(dir = "extract_vitem_visualize")]
 fn ranim_text(r: &mut RanimScene) {
-    let r_cam = r.insert_and_show(CameraFrame::default());
+    let mut cam = CameraFrame::default();
+    let r_cam = r.insert(cam.clone());
 
     let text = SvgItem::new(typst_svg("Ranim")).with(|item| {
         item.set_fill_color(manim::WHITE)
@@ -33,27 +34,25 @@ fn ranim_text(r: &mut RanimScene) {
     let _r_texts = Group::<VItem>::from(text)
         .into_iter()
         .map(VisualVItem)
-        .map(|item| r.insert_and_show(item))
+        .map(|item| r.insert(item))
         .collect::<Vec<_>>();
-    let default_cam = r.timeline(&r_cam).snapshot().clone();
+
     r.timelines_mut().forward(1.0);
-    r.timeline_mut(&r_cam).play_with(|cam| {
-        cam.transform(|cam| {
-            cam.scale = 0.3;
-            cam.up = DVec3::NEG_X;
-            cam.pos.shift(DVec3::NEG_X * 6.0);
-        })
-    });
+    r.timeline_mut(r_cam).play(cam.transform_mut(|cam| {
+        cam.scale = 0.3;
+        cam.up = DVec3::NEG_X;
+        cam.pos.shift(DVec3::NEG_X * 6.0);
+    }));
     r.timelines_mut().forward(1.0);
-    r.timeline_mut(&r_cam).play_with(|cam| {
-        cam.transform(|cam| {
+    r.timeline_mut(r_cam).play(
+        cam.transform_mut(|cam| {
             cam.pos.shift(DVec3::X * 12.0);
         })
-        .with_duration(7.0)
-    });
+        .with_duration(7.0),
+    );
     r.timelines_mut().forward(1.0);
-    r.timeline_mut(&r_cam)
-        .play_with(|cam| cam.transform_to(default_cam));
+    r.timeline_mut(r_cam)
+        .play(cam.transform_to_mut(CameraFrame::default()));
 
     // r.timelines_mut().forward(1.0);
     r.insert_time_mark(5.0, TimeMark::Capture("preview-ranim_text.png".to_string()));
@@ -62,29 +61,27 @@ fn ranim_text(r: &mut RanimScene) {
 #[scene(name = "extract_vitem_visualize")]
 #[output(dir = "extract_vitem_visualize")]
 pub fn hello_ranim(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
 
     let square = VisualVItem(VItem::from(Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
     })));
-    let r_vitem = r.insert(square);
-
     let circle = VisualVItem(VItem::from(Circle::new(2.0).with(|circle| {
         circle
             .set_color(manim::GREEN_C)
             .rotate(-PI / 4.0 + PI, DVec3::Z);
     })));
 
+    let r_vitem = r.new_timeline();
     {
-        let timeline = r.timeline_mut(&r_vitem);
+        let timeline = r.timeline_mut(r_vitem);
         timeline
-            .play_with(|item| item.transform_to(circle))
+            .play(square.transform_to(circle.clone()))
             .forward(1.0);
-        let circle = timeline.snapshot().clone();
         timeline
-            .play_with(|circle| circle.unwrite().with_duration(2.0))
-            .play(circle.write().with_duration(2.0))
-            .play_with(|circle| circle.fade_out());
+            .play(circle.unwrite_ref().with_duration(2.0))
+            .play(circle.write_ref().with_duration(2.0))
+            .play(circle.fade_out_ref());
     }
 
     r.timelines_mut().sync();

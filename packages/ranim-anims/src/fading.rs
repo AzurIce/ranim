@@ -11,20 +11,36 @@ impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 
 // MARK: Anim Trait
 /// The methods to create animations for `T` that satisfies [`FadingRequirement`]
-pub trait FadingAnim<T: FadingRequirement + 'static> {
+pub trait FadingAnim: FadingRequirement + Sized + 'static {
     /// Create a [`FadeIn`] anim.
-    fn fade_in(self) -> AnimationCell<T>;
+    fn fade_in(self) -> AnimationCell<Self>;
+    fn fade_in_ref(&self) -> AnimationCell<Self> {
+        self.clone().fade_in()
+    }
+    fn fade_in_mut(&mut self) -> AnimationCell<Self> {
+        let anim = self.fade_in_ref();
+        *self = anim.eval_alpha(1.0);
+        anim
+    }
     /// Create a [`FadeOut`] anim.
-    fn fade_out(self) -> AnimationCell<T>;
+    fn fade_out(self) -> AnimationCell<Self>;
+    fn fade_out_ref(&self) -> AnimationCell<Self> {
+        self.clone().fade_out()
+    }
+    fn fade_out_mut(&mut self) -> AnimationCell<Self> {
+        let anim = self.fade_out_ref();
+        *self = anim.eval_alpha(1.0);
+        anim
+    }
 }
 
-impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
-    fn fade_in(self) -> AnimationCell<T> {
+impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
+    fn fade_in(self) -> AnimationCell<Self> {
         FadeIn::new(self.clone())
             .into_animation_cell()
             .with_rate_func(smooth)
     }
-    fn fade_out(self) -> AnimationCell<T> {
+    fn fade_out(self) -> AnimationCell<Self> {
         FadeOut::new(self.clone())
             .into_animation_cell()
             .with_rate_func(smooth)

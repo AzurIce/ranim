@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 # ranim-macros.workspace = true
+dyn-clone = "1.0.20"
 inventory = "0.3.21"
 tracing.workspace = true
 itertools.workspace = true
@@ -24,6 +25,7 @@ derive_more = { version = "2.0.1", features = [
   "into_iterator",
 ] }
 color = "0.3.2"
+variadics_please = "1.1.0"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen.workspace = true

@@ -1,9 +1,8 @@
-use std::{any::Any, cell::RefCell};
+use std::cell::RefCell;
 
 use crate::{
-    Extract,
     animation::{AnimationCell, CoreItemAnimation},
-    core_item::{CoreItem, vitem::VItemPrimitive},
+    core_item::{AnyExtractCoreItem, CoreItem, vitem::VItemPrimitive},
     prelude::CameraFrame,
 };
 
@@ -67,7 +66,7 @@ impl AnimationStore {
     ///
     /// 5. **No mutation after push**: Once pushed, the animation is never mutated or removed,
     ///    so the pointer remains valid for the lifetime of the store.
-    pub fn push_animation<T: Any + Extract<Target = CoreItem>>(
+    pub fn push_animation<T: AnyExtractCoreItem>(
         &self,
         anim: AnimationCell<T>,
     ) -> &AnimationCell<T> {

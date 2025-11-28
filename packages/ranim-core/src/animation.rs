@@ -5,13 +5,15 @@
 //! When constructing an animation, we need [`AnimationInfo`] besides the evaluation core, which is
 //! [`AnimationCell<T>`].
 //!
-//! When satisfies `T: Extract<Target = CoreItem>`, [`AnimationCell<T>`] will implement [`CoreItemAnimation`].
+//! When satisfies `T: Extract<Target = CoreItem>`, [`AnimationCell<T>`] can be converted to a [`PrimitiveAnimationCell`].
 
-use crate::{Extract, core_item::CoreItem, utils::rate_functions::linear};
+use crate::{
+    core_item::{AnyExtractCoreItem, CoreItem, DynItem},
+    utils::rate_functions::linear,
+};
 
 use std::fmt::Debug;
 
-/// An animation info.
 #[derive(Debug, Clone)]
 pub struct AnimationInfo {
     /// The rate function used for evaluating
@@ -20,6 +22,8 @@ pub struct AnimationInfo {
     pub show_sec: f64,
     /// The duration seconds
     pub duration_secs: f64,
+    /// Is enabled
+    pub enabled: bool,
 }
 
 impl Default for AnimationInfo {
@@ -28,20 +32,18 @@ impl Default for AnimationInfo {
             rate_func: linear,
             show_sec: 0.0,
             duration_secs: 1.0,
+            enabled: true,
         }
     }
 }
 
 impl AnimationInfo {
-    /// Get the range of the animation
     pub fn range(&self) -> std::ops::Range<f64> {
         self.show_sec..self.show_sec + self.duration_secs
     }
-    /// Map the alpha to the rate function
     pub fn map_alpha(&self, alpha: f64) -> f64 {
         (self.rate_func)(alpha)
     }
-    /// Map the sec to the alpha
     pub fn map_sec(&self, sec: f64) -> Option<f64> {
         if (self.show_sec..=self.show_sec + self.duration_secs).contains(&sec) {
             Some((sec - self.show_sec) / self.duration_secs)
@@ -67,41 +69,39 @@ impl AnimationInfo {
         self.duration_secs = secs;
         self
     }
+    /// A builder func to modify `enabled`
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
 }
 
-/// A trait for animations that can be evaluated as core items.
 pub trait CoreItemAnimation {
-    /// Evaluate the animation at `alpha` as core items
+    fn eval_alpha_dyn(&self, alpha: f64) -> DynItem;
     fn eval_alpha_core_item(&self, alpha: f64) -> Vec<CoreItem>;
-    /// Get the animation info
     fn anim_info(&self) -> &AnimationInfo;
-    /// Get the type name of the animation
-    fn type_name(&self) -> &str;
 }
 
-/// An animation cell.
 pub struct AnimationCell<T> {
     inner: Box<dyn Eval<T>>,
-    /// The animation info
     pub info: AnimationInfo,
-    /// The type name of the animation
-    pub type_name: String,
 }
 
 impl<T> AnimationCell<T> {
-    /// A builder func to modify `show_sec`
     pub fn with_show_sec(mut self, show_sec: f64) -> Self {
         self.info = self.info.with_show_sec(show_sec);
         self
     }
-    /// A builder func to modify `rate_func`
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.info = self.info.with_rate_func(rate_func);
         self
     }
-    /// A builder func to modify `duration_secs`
     pub fn with_duration(mut self, duration_secs: f64) -> Self {
         self.info = self.info.with_duration(duration_secs);
+        self
+    }
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.info = self.info.with_enabled(enabled);
         self
     }
 }
@@ -112,15 +112,15 @@ impl<T> Eval<T> for AnimationCell<T> {
     }
 }
 
-impl<T: Extract<Target = CoreItem>> CoreItemAnimation for AnimationCell<T> {
+impl<T: AnyExtractCoreItem> CoreItemAnimation for AnimationCell<T> {
+    fn eval_alpha_dyn(&self, alpha: f64) -> DynItem {
+        DynItem(Box::new(self.inner.eval_alpha(alpha)))
+    }
     fn eval_alpha_core_item(&self, alpha: f64) -> Vec<CoreItem> {
         self.inner.eval_alpha(alpha).extract()
     }
     fn anim_info(&self) -> &AnimationInfo {
         &self.info
-    }
-    fn type_name(&self) -> &str {
-        &self.type_name
     }
 }
 
@@ -141,15 +141,37 @@ pub trait Eval<T> {
         AnimationCell {
             inner: Box::new(self),
             info: AnimationInfo::default(),
-            type_name: std::any::type_name::<Self>().to_string(),
         }
     }
 }
 
-/// A static animation.
-pub struct StaticAnim<T>(pub T);
+// MARK: StaticAnim
+pub trait StaticAnimRequirement: Clone {}
 
-impl<T: Clone> Eval<T> for StaticAnim<T> {
+impl<T: Clone> StaticAnimRequirement for T {}
+
+pub trait StaticAnim<T: StaticAnimRequirement> {
+    fn show(&self) -> AnimationCell<T>;
+    fn hide(&self) -> AnimationCell<T>;
+}
+
+impl<T: StaticAnimRequirement + 'static> StaticAnim<T> for T {
+    fn show(&self) -> AnimationCell<T> {
+        Static(self.clone())
+            .into_animation_cell()
+            .with_duration(0.0)
+    }
+    fn hide(&self) -> AnimationCell<T> {
+        Static(self.clone())
+            .into_animation_cell()
+            .with_enabled(false)
+            .with_duration(0.0)
+    }
+}
+/// A static animation.
+pub struct Static<T>(pub T);
+
+impl<T: Clone> Eval<T> for Static<T> {
     fn eval_alpha(&self, _alpha: f64) -> T {
         self.0.clone()
     }
