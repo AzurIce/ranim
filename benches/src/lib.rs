@@ -14,7 +14,7 @@ pub mod test_scenes {
     use super::*;
 
     pub fn static_squares(r: &mut RanimScene, n: usize) {
-        let _r_cam = r.insert_and_show(CameraFrame::default());
+        let _r_cam = r.insert(CameraFrame::default());
 
         let buff = 0.1;
         let size = 8.0 / n as f64;
@@ -30,13 +30,13 @@ pub mod test_scenes {
                     );
                 })
             })
-            .map(|item| r.insert_and_show(item))
+            .map(|item| r.insert(item))
             .collect::<Vec<_>>();
         r.timelines_mut().forward(1.0);
     }
 
     pub fn transform_squares(r: &mut RanimScene, n: usize) {
-        let _r_cam = r.insert_and_show(CameraFrame::default());
+        let _r_cam = r.insert(CameraFrame::default());
 
         let buff = 0.1;
         let size = 8.0 / n as f64 - buff;
@@ -52,7 +52,7 @@ pub mod test_scenes {
                     );
                 }))
             })
-            .map(|item| r.insert(item))
+            .map(|item| (r.insert(item.clone()), item))
             .collect::<Vec<_>>();
         let circles = (0..n)
             .cartesian_product(0..n)
@@ -64,9 +64,9 @@ pub mod test_scenes {
                 }))
             })
             .collect::<Vec<_>>();
-        squares.iter().zip(circles).for_each(|(r_square, circle)| {
+        squares.into_iter().zip(circles).for_each(|((r_square, item), circle)| {
             r.timeline_mut(r_square)
-                .play_with(|item| item.transform_to(circle));
+                .play(item.transform_to(circle));
         });
     }
 }

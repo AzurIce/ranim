@@ -37,20 +37,36 @@ pub trait WritingRequirement: CreationRequirement + StrokeWidth + StrokeColor + 
 impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequirement for T {}
 
 /// The methods to create animations for `T` that satisfies [`WritingRequirement`]
-pub trait WritingAnim<T: WritingRequirement + 'static> {
+pub trait WritingAnim: WritingRequirement + Sized + 'static {
     /// Create a [`Write`] anim for `T`.
-    fn write(self) -> AnimationCell<T>;
+    fn write(self) -> AnimationCell<Self>;
+    fn write_ref(&self) -> AnimationCell<Self> {
+        self.clone().write()
+    }
+    fn write_mut(&mut self) -> AnimationCell<Self> {
+        let anim = self.write_ref();
+        *self = anim.eval_alpha(1.0);
+        anim
+    }
     /// Create a [`Unwrite`] anim for `T`.
-    fn unwrite(self) -> AnimationCell<T>;
+    fn unwrite(self) -> AnimationCell<Self>;
+    fn unwrite_ref(&self) -> AnimationCell<Self> {
+        self.clone().unwrite()
+    }
+    fn unwrite_mut(&mut self) -> AnimationCell<Self> {
+        let anim = self.unwrite_ref();
+        *self = anim.eval_alpha(1.0);
+        anim
+    }
 }
 
-impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
-    fn write(self) -> AnimationCell<T> {
+impl<T: WritingRequirement + Sized + 'static> WritingAnim for T {
+    fn write(self) -> AnimationCell<Self> {
         Write::new(self)
             .into_animation_cell()
             .with_rate_func(smooth)
     }
-    fn unwrite(self) -> AnimationCell<T> {
+    fn unwrite(self) -> AnimationCell<Self> {
         Unwrite::new(self)
             .into_animation_cell()
             .with_rate_func(smooth)

@@ -11,16 +11,41 @@ impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 // ANCHOR_END: TransformRequirement
 
 /// The methods to create animations for `T` that satisfies [`TransformRequirement`]
-pub trait TransformAnim<T: TransformRequirement + 'static> {
+pub trait TransformAnim: TransformRequirement + Sized + 'static {
     /// Create a [`Transform`] anim with a func.
-    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationCell<T>;
+    fn transform<F: Fn(&mut Self)>(self, f: F) -> AnimationCell<Self>;
+
+    fn transform_ref<F: Fn(&mut Self)>(&self, f: F) -> AnimationCell<Self> {
+        self.clone().transform(f)
+    }
+    fn transform_mut<F: Fn(&mut Self)>(&mut self, f: F) -> AnimationCell<Self> {
+        let anim = self.transform_ref(f);
+        *self = anim.eval_alpha(1.0);
+        anim
+    }
     /// Create a [`Transform`] anim from src.
-    fn transform_from(self, src: T) -> AnimationCell<T>;
+    fn transform_from(self, src: Self) -> AnimationCell<Self>;
+    fn transform_from_ref(&self, src: Self) -> AnimationCell<Self> {
+        self.clone().transform_from(src)
+    }
+    fn transform_from_mut(&mut self, src: Self) -> AnimationCell<Self> {
+        let anim = self.transform_from_ref(src);
+        *self = anim.eval_alpha(1.0);
+        anim
+    }
     /// Create a [`Transform`] anim to dst.
-    fn transform_to(self, dst: T) -> AnimationCell<T>;
+    fn transform_to(self, dst: Self) -> AnimationCell<Self>;
+    fn transform_to_ref(&self, dst: Self) -> AnimationCell<Self> {
+        self.clone().transform_to(dst)
+    }
+    fn transform_to_mut(&mut self, dst: Self) -> AnimationCell<Self> {
+        let anim = self.transform_to_ref(dst);
+        *self = anim.eval_alpha(1.0);
+        anim
+    }
 }
 
-impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
+impl<T: TransformRequirement + 'static> TransformAnim for T {
     fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationCell<T> {
         let mut dst = self.clone();
         (f)(&mut dst);
