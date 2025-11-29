@@ -160,13 +160,13 @@ impl VItem {
 /// See [`VItemPrimitive`].
 impl Extract for VItem {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        vec![CoreItem::VItemPrimitive(VItemPrimitive {
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        buf.push(CoreItem::VItemPrimitive(VItemPrimitive {
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
-            stroke_rgbas: self.stroke_rgbas.iter().cloned().collect(),
-            stroke_widths: self.stroke_widths.iter().cloned().collect(),
-        })]
+            stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>().into(),
+            stroke_widths: self.stroke_widths.iter().cloned().collect::<Vec<_>>().into(),
+        }));
     }
 }
 

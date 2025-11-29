@@ -25,17 +25,19 @@ pub enum CoreItem {
     VItemPrimitive(VItemPrimitive),
 }
 
+/// The item that can be extracted to [`CoreItem`]s
 pub trait AnyExtractCoreItem: Any + Extract<Target = CoreItem> + DynClone {}
 impl<T: Extract<Target = CoreItem> + Any + DynClone> AnyExtractCoreItem for T {}
 
 dyn_clone::clone_trait_object!(AnyExtractCoreItem);
 
+/// A dynamic item, basically type erased [`AnyExtractCoreItem`]
 #[derive(Clone)]
 pub struct DynItem(pub Box<dyn AnyExtractCoreItem>);
 
 impl Extract for DynItem {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        self.0.extract()
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        self.0.extract_into(buf);
     }
 }

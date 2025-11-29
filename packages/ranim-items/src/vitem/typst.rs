@@ -430,8 +430,8 @@ impl From<TypstText> for Group<VItem> {
 
 impl Extract for TypstText {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        self.vitems.extract()
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        self.vitems.extract_into(buf);
     }
 }
 

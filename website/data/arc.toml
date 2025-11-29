@@ -1,66 +1,66 @@
 name = "arc"
 code = """
 ```rust
-use itertools::Itertools;\r
-use ranim::{\r
-    anims::{fading::FadingAnim, lagged::LaggedAnim},\r
-    color,\r
-    color::HueDirection,\r
-    glam::dvec2,\r
-    items::vitem::{Group, geometry::Arc},\r
-    prelude::*,\r
-};\r
-\r
-#[scene]\r
-#[output(dir = "arc")]\r
-pub fn arc(r: &mut RanimScene) {\r
-    let _r_cam = r.insert(CameraFrame::default());\r
-\r
-    // let frame_size = app.camera().size;\r
-    let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
-    let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);\r
-\r
-    let start_color = color::color("#FF8080FF");\r
-    let end_color = color::color("#58C4DDFF");\r
-\r
-    let nrow = 10;\r
-    let ncol = 10;\r
-    let step_x = frame_size.x / ncol as f64;\r
-    let step_y = frame_size.y / nrow as f64;\r
-\r
-    let mut arcs = (0..nrow)\r
-        .cartesian_product(0..ncol)\r
-        .map(|(i, j)| {\r
-            let (i, j) = (i as f64, j as f64);\r
-\r
-            let angle = std::f64::consts::PI * (j + 1.0) / ncol as f64 * 360.0 / 180.0;\r
-            let radius = step_y / 2.0 * 0.8;\r
-            let color = start_color.lerp(\r
-                end_color,\r
-                i as f32 / (nrow - 1) as f32,\r
-                HueDirection::Increasing,\r
-            );\r
-            let offset = frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);\r
-            Arc::new(angle, radius).with(|arc| {\r
-                arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;\r
-                arc.set_stroke_color(color)\r
-                    .put_center_on(offset.extend(0.0));\r
-            })\r
-        })\r
-        .collect::<Group<_>>();\r
-    let r_arcs = r.new_timeline();\r
-\r
-    r.timeline_mut(r_arcs)\r
-        .play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));\r
-    r.timelines_mut().sync();\r
-\r
-    r.insert_time_mark(\r
-        r.timelines().max_total_secs(),\r
-        TimeMark::Capture("preview.png".to_string()),\r
-    );\r
-}\r
+use itertools::Itertools;
+use ranim::{
+    anims::{fading::FadingAnim, lagged::LaggedAnim},
+    color,
+    color::HueDirection,
+    glam::dvec2,
+    items::vitem::{Group, geometry::Arc},
+    prelude::*,
+};
+
+#[scene]
+#[output(dir = "arc")]
+pub fn arc(r: &mut RanimScene) {
+    let _r_cam = r.insert(CameraFrame::default());
+
+    // let frame_size = app.camera().size;
+    let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
+    let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
+
+    let start_color = color::color("#FF8080FF");
+    let end_color = color::color("#58C4DDFF");
+
+    let nrow = 10;
+    let ncol = 10;
+    let step_x = frame_size.x / ncol as f64;
+    let step_y = frame_size.y / nrow as f64;
+
+    let mut arcs = (0..nrow)
+        .cartesian_product(0..ncol)
+        .map(|(i, j)| {
+            let (i, j) = (i as f64, j as f64);
+
+            let angle = std::f64::consts::PI * (j + 1.0) / ncol as f64 * 360.0 / 180.0;
+            let radius = step_y / 2.0 * 0.8;
+            let color = start_color.lerp(
+                end_color,
+                i as f32 / (nrow - 1) as f32,
+                HueDirection::Increasing,
+            );
+            let offset = frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
+            Arc::new(angle, radius).with(|arc| {
+                arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
+                arc.set_stroke_color(color)
+                    .put_center_on(offset.extend(0.0));
+            })
+        })
+        .collect::<Group<_>>();
+    let r_arcs = r.new_timeline();
+
+    r.timeline_mut(r_arcs)
+        .play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+    r.timelines_mut().sync();
+
+    r.insert_time_mark(
+        r.timelines().max_total_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
+}
 ```"""
-hash = "ca75841b21a03a2a64cb6cebf46917e99e9a7e07"
+hash = "4ba19703b69666cb4bd6c61ca67e542b5ed35fa5"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

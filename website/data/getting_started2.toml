@@ -1,62 +1,62 @@
 name = "getting_started2"
 code = """
 ```rust
-use ranim::{\r
-    anims::{\r
-        creation::{CreationAnim, WritingAnim},\r
-        transform::TransformAnim,\r
-    },\r
-    color::palettes::manim,\r
-    items::vitem::{\r
-        VItem,\r
-        geometry::{Circle, Rectangle, Square},\r
-    },\r
-    prelude::*,\r
-    utils::rate_functions::linear,\r
-};\r
-\r
-#[scene]\r
-#[output(dir = "getting_started2")]\r
-fn getting_started2(r: &mut RanimScene) {\r
-    let _r_cam = r.insert(CameraFrame::default());\r
-    let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {\r
-        rect.set_stroke_color(manim::GREEN_C);\r
-    });\r
-\r
-    // The new initialized timeline is hidden by default, use show to start encoding a static anim and make it show\r
-    let r_rect = r.insert(rect.clone());\r
-\r
-    r.timelines_mut().forward(1.0);\r
-\r
-    let square: VItem = Square::new(2.0)\r
-        .with(|square| {\r
-            square.set_color(manim::BLUE_C);\r
-        })\r
-        .into();\r
-    let circle: VItem = Circle::new(2.0)\r
-        .with(|circle| {\r
-            circle.set_color(manim::RED_C);\r
-        })\r
-        .into();\r
-    let r_vitem = r.insert(square.clone());\r
-    {\r
-        let timeline = r.timeline_mut(r_vitem);\r
-        timeline\r
-            .forward(1.0)\r
-            .play(square.clone().create())\r
-            .play(\r
-                square\r
-                    .clone()\r
-                    .transform_to(circle.clone())\r
-                    .with_rate_func(linear),\r
-            )\r
-            .play(circle.clone().unwrite());\r
-    }\r
-\r
-    r.timeline_mut(r_rect).play(VItem::from(rect).uncreate());\r
-}\r
+use ranim::{
+    anims::{
+        creation::{CreationAnim, WritingAnim},
+        transform::TransformAnim,
+    },
+    color::palettes::manim,
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Rectangle, Square},
+    },
+    prelude::*,
+    utils::rate_functions::linear,
+};
+
+#[scene]
+#[output(dir = "getting_started2")]
+fn getting_started2(r: &mut RanimScene) {
+    let _r_cam = r.insert(CameraFrame::default());
+    let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
+        rect.set_stroke_color(manim::GREEN_C);
+    });
+
+    // The new initialized timeline is hidden by default, use show to start encoding a static anim and make it show
+    let r_rect = r.insert(rect.clone());
+
+    r.timelines_mut().forward(1.0);
+
+    let square: VItem = Square::new(2.0)
+        .with(|square| {
+            square.set_color(manim::BLUE_C);
+        })
+        .into();
+    let circle: VItem = Circle::new(2.0)
+        .with(|circle| {
+            circle.set_color(manim::RED_C);
+        })
+        .into();
+    let r_vitem = r.insert(square.clone());
+    {
+        let timeline = r.timeline_mut(r_vitem);
+        timeline
+            .forward(1.0)
+            .play(square.clone().create())
+            .play(
+                square
+                    .clone()
+                    .transform_to(circle.clone())
+                    .with_rate_func(linear),
+            )
+            .play(circle.clone().unwrite());
+    }
+
+    r.timeline_mut(r_rect).play(VItem::from(rect).uncreate());
+}
 ```"""
-hash = "a64ed2ae984e01ecd10a7abd3c45e0ad791243d1"
+hash = "e18dce100dd758fa742545284441686ce82fcdb5"
 preview_imgs = []
 output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
 wasm = true
