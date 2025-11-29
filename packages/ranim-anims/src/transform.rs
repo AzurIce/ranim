@@ -13,55 +13,36 @@ impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`TransformRequirement`]
 pub trait TransformAnim: TransformRequirement + Sized + 'static {
     /// Create a [`Transform`] anim with a func.
-    fn transform<F: Fn(&mut Self)>(self, f: F) -> AnimationCell<Self>;
-
-    fn transform_ref<F: Fn(&mut Self)>(&self, f: F) -> AnimationCell<Self> {
-        self.clone().transform(f)
-    }
-    fn transform_mut<F: Fn(&mut Self)>(&mut self, f: F) -> AnimationCell<Self> {
-        let anim = self.transform_ref(f);
-        *self = anim.eval_alpha(1.0);
-        anim
-    }
+    fn transform<F: Fn(&mut Self)>(&mut self, f: F) -> AnimationCell<Self>;
     /// Create a [`Transform`] anim from src.
-    fn transform_from(self, src: Self) -> AnimationCell<Self>;
-    fn transform_from_ref(&self, src: Self) -> AnimationCell<Self> {
-        self.clone().transform_from(src)
-    }
-    fn transform_from_mut(&mut self, src: Self) -> AnimationCell<Self> {
-        let anim = self.transform_from_ref(src);
-        *self = anim.eval_alpha(1.0);
-        anim
-    }
+    fn transform_from(&mut self, src: Self) -> AnimationCell<Self>;
     /// Create a [`Transform`] anim to dst.
-    fn transform_to(self, dst: Self) -> AnimationCell<Self>;
-    fn transform_to_ref(&self, dst: Self) -> AnimationCell<Self> {
-        self.clone().transform_to(dst)
-    }
-    fn transform_to_mut(&mut self, dst: Self) -> AnimationCell<Self> {
-        let anim = self.transform_to_ref(dst);
-        *self = anim.eval_alpha(1.0);
-        anim
-    }
+    fn transform_to(&mut self, dst: Self) -> AnimationCell<Self>;
 }
 
 impl<T: TransformRequirement + 'static> TransformAnim for T {
-    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationCell<T> {
+    fn transform<F: Fn(&mut T)>(&mut self, f: F) -> AnimationCell<T> {
         let mut dst = self.clone();
         (f)(&mut dst);
-        Transform::new(self.clone(), dst)
+        let anim = Transform::new(self.clone(), dst)
             .into_animation_cell()
-            .with_rate_func(smooth)
+            .with_rate_func(smooth);
+        *self = anim.eval_alpha(1.0);
+        anim
     }
-    fn transform_from(self, s: T) -> AnimationCell<T> {
-        Transform::new(s, self.clone())
+    fn transform_from(&mut self, s: T) -> AnimationCell<T> {
+        let anim = Transform::new(s, self.clone())
             .into_animation_cell()
-            .with_rate_func(smooth)
+            .with_rate_func(smooth);
+        *self = anim.eval_alpha(1.0);
+        anim
     }
-    fn transform_to(self, d: T) -> AnimationCell<T> {
-        Transform::new(self.clone(), d)
+    fn transform_to(&mut self, d: T) -> AnimationCell<T> {
+        let anim = Transform::new(self.clone(), d)
             .into_animation_cell()
-            .with_rate_func(smooth)
+            .with_rate_func(smooth);
+        *self = anim.eval_alpha(1.0);
+        anim
     }
 }
 

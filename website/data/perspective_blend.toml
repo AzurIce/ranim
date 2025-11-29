@@ -1,109 +1,114 @@
 name = "perspective_blend"
 code = """
 ```rust
-use ranim::{
-    anims::transform::TransformAnim,
-    color,
-    color::palettes::manim,
-    glam::DVec3,
-    items::{
-        Group,
-        vitem::{VItem, geometry::Square},
-    },
-    prelude::*,
-    utils::rate_functions::linear,
-};
-
-#[scene]
-#[output(dir = "perspective_blend")]
-fn perspective_blend(r: &mut RanimScene) {
-    let r_cam = r.insert_and_show(CameraFrame::default());
-    r.timeline_mut(&r_cam).update_with(|cam| {
-        cam.pos = DVec3::Z * 5.0;
-    });
-
-    // Create a cube
-    let side_length = 2.0;
-
-    let square_with_color = |color: color::AlphaColor<color::Srgb>| {
-        VItem::from(Square::new(side_length).with(|square| {
-            square.set_color(color).set_fill_opacity(0.5);
-        }))
-    };
-
-    // bottom, right, back, top, front, left
-    let square_faces = [
-        manim::TEAL_C,
-        manim::GREEN_C,
-        manim::BLUE_C,
-        manim::PURPLE_C,
-        manim::RED_C,
-        manim::YELLOW_C,
-    ]
-    .map(|color| r.insert(square_with_color(color)));
-
-    let transform_fns: [&dyn Fn(&mut VItem); 6] = [
-        &(|data| {
-            data.shift(DVec3::NEG_Y * side_length / 2.0)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::X);
-        }),
-        &(|data| {
-            data.shift(DVec3::X * side_length / 2.0)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
-        }),
-        &(|data| {
-            data.shift(DVec3::NEG_Z * side_length / 2.0);
-        }),
-        &(|data| {
-            data.shift(DVec3::Y * side_length / 2.0)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
-        }),
-        &(|data| {
-            data.shift(DVec3::Z * side_length / 2.0);
-        }),
-        &(|data| {
-            data.shift(DVec3::NEG_X * side_length / 2.0)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
-        }),
-    ];
-
-    let square_faces = square_faces
-        .iter()
-        .zip(transform_fns)
-        .map(|(r_face, transform_fn)| {
-            r.timeline_mut(r_face)
-                .play_with(|face| face.transform(transform_fn).with_rate_func(linear))
-                .hide()
-                .snapshot()
-                .clone()
-        })
-        .collect::<Vec<_>>();
-
-    let faces = Group(square_faces);
-    let r_faces = r.insert(faces);
-    r.timelines_mut().sync(); // TODO: make this better
-    r.timeline_mut(&r_faces).play_with(|faces| {
-        faces
-            .transform(|data| {
-                data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
-                    .rotate(std::f64::consts::PI / 6.0, DVec3::X);
-            })
-            .with_duration(4.0)
-    });
-
-    r.timeline_mut(&r_cam).forward(2.0).play_with(|cam| {
-        cam.transform(|data| {
-            data.perspective_blend = 1.0;
-        })
-        .with_duration(2.0)
-    });
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
-}
+use ranim::{\r
+    anims::transform::TransformAnim,\r
+    color,\r
+    color::palettes::manim,\r
+    glam::DVec3,\r
+    items::{\r
+        Group,\r
+        vitem::{VItem, geometry::Square},\r
+    },\r
+    prelude::*,\r
+    utils::rate_functions::linear,\r
+};\r
+use ranim_core::animation::StaticAnim;\r
+\r
+#[scene]\r
+#[output(dir = "perspective_blend")]\r
+fn perspective_blend(r: &mut RanimScene) {\r
+    let mut cam = CameraFrame::default();\r
+    let r_cam = r.insert(cam.clone());\r
+\r
+    // Update camera's state and show the new state\r
+    cam.pos = DVec3::Z * 5.0;\r
+    r.timeline_mut(r_cam).play(cam.show());\r
+\r
+    // Create a cube\r
+    let side_length = 2.0;\r
+\r
+    let square_with_color = |color: color::AlphaColor<color::Srgb>| {\r
+        VItem::from(Square::new(side_length).with(|square| {\r
+            square.set_color(color).set_fill_opacity(0.5);\r
+        }))\r
+    };\r
+\r
+    // bottom, right, back, top, front, left\r
+    let mut square_faces = [\r
+        manim::TEAL_C,\r
+        manim::GREEN_C,\r
+        manim::BLUE_C,\r
+        manim::PURPLE_C,\r
+        manim::RED_C,\r
+        manim::YELLOW_C,\r
+    ]\r
+    .map(|color| {\r
+        let face = square_with_color(color);\r
+        (r.insert(face.clone()), face)\r
+    });\r
+\r
+    let transform_fns: [&dyn Fn(&mut VItem); 6] = [\r
+        &(|data| {\r
+            data.shift(DVec3::NEG_Y * side_length / 2.0)\r
+                .rotate(std::f64::consts::PI / 2.0, DVec3::X);\r
+        }),\r
+        &(|data| {\r
+            data.shift(DVec3::X * side_length / 2.0)\r
+                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);\r
+        }),\r
+        &(|data| {\r
+            data.shift(DVec3::NEG_Z * side_length / 2.0);\r
+        }),\r
+        &(|data| {\r
+            data.shift(DVec3::Y * side_length / 2.0)\r
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);\r
+        }),\r
+        &(|data| {\r
+            data.shift(DVec3::Z * side_length / 2.0);\r
+        }),\r
+        &(|data| {\r
+            data.shift(DVec3::NEG_X * side_length / 2.0)\r
+                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);\r
+        }),\r
+    ];\r
+\r
+    square_faces\r
+        .iter_mut()\r
+        .zip(transform_fns)\r
+        .for_each(|((r_face, face), transform_fn)| {\r
+            r.timeline_mut(*r_face)\r
+                .play(face.transform(transform_fn).with_rate_func(linear))\r
+                .hide();\r
+        });\r
+\r
+    let faces = square_faces.map(|(_, face)| face);\r
+    let mut faces = Group(faces.to_vec());\r
+\r
+    let r_faces = r.new_timeline();\r
+    r.timelines_mut().sync(); // TODO: make this better\r
+    r.timeline_mut(r_faces).play(\r
+        faces\r
+            .transform(|data| {\r
+                data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)\r
+                    .rotate(std::f64::consts::PI / 6.0, DVec3::X);\r
+            })\r
+            .with_duration(4.0),\r
+    );\r
+\r
+    r.timeline_mut(r_cam).forward(2.0).play(\r
+        cam.transform(|data| {\r
+            data.perspective_blend = 1.0;\r
+        })\r
+        .with_duration(2.0),\r
+    );\r
+    r.insert_time_mark(\r
+        r.timelines().max_total_secs(),\r
+        TimeMark::Capture("preview.png".to_string()),\r
+    );\r
+}\r
 ```"""
-hash = "7e3450d7eb046dee99232edfdeb02106472b1f02"
+hash = "a34479ecc8fbf692763eed849620bcd138a34592"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

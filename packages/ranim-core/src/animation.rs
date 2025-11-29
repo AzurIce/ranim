@@ -178,3 +178,9 @@ impl<T: Clone> Eval<T> for Static<T> {
 }
 
 // ANCHOR_END: EvalDynamic
+
+macro anim {
+    ($anim:ident, $target:expr, $($args:tt)*) => {
+        $anim::new($target, $($args)*)
+    }
+}

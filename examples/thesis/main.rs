@@ -37,58 +37,58 @@ fn pentagon() -> VItem {
 #[scene]
 #[output]
 fn fading(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
-    let pentagon_in = pentagon().with(|x| {
+    let _r_cam = r.insert(CameraFrame::default());
+    let mut pentagon_in = pentagon().with(|x| {
         x.put_center_on(dvec3(0.0, 2.0, 0.0));
     });
-    let pentagon_out = pentagon().with(|x| {
+    let mut pentagon_out = pentagon().with(|x| {
         x.put_center_on(dvec3(0.0, -2.0, 0.0));
     });
-    let r_in = r.insert(pentagon_in);
-    let r_out = r.insert(pentagon_out);
-    r.timeline_mut(&r_in).play_with(|item| item.fade_in());
-    r.timeline_mut(&r_out).play_with(|item| item.fade_out());
+    let r_in = r.new_timeline();
+    let r_out = r.new_timeline();
+    r.timeline_mut(r_in).play(pentagon_in.fade_in());
+    r.timeline_mut(r_out).play(pentagon_out.fade_out());
 }
 
 #[allow(unused)]
 #[scene]
 fn creation(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
 
-    let pentagon_in = pentagon().with(|x| {
+    let mut pentagon_in = pentagon().with(|x| {
         x.put_center_on(dvec3(0.0, 2.0, 0.0));
     });
-    let pentagon_out = pentagon().with(|x| {
+    let mut pentagon_out = pentagon().with(|x| {
         x.put_center_on(dvec3(0.0, -2.0, 0.0));
     });
-    let r_in = r.insert(pentagon_in);
-    let r_out = r.insert(pentagon_out);
-    r.timeline_mut(&r_in).play_with(|item| item.create());
-    r.timeline_mut(&r_out).play_with(|item| item.uncreate());
+    let r_in = r.new_timeline();
+    let r_out = r.new_timeline();
+    r.timeline_mut(r_in).play(pentagon_in.create());
+    r.timeline_mut(r_out).play(pentagon_out.uncreate());
 }
 
 #[allow(unused)]
 #[scene]
 #[output]
 fn writing(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
-    let pentagon_in = pentagon().with(|x| {
+    let _r_cam = r.insert(CameraFrame::default());
+    let mut pentagon_in = pentagon().with(|x| {
         x.put_center_on(dvec3(0.0, 2.0, 0.0));
     });
-    let pentagon_out = pentagon().with(|x| {
+    let mut pentagon_out = pentagon().with(|x| {
         x.put_center_on(dvec3(0.0, -2.0, 0.0));
     });
-    let r_in = r.insert(pentagon_in);
-    let r_out = r.insert(pentagon_out);
-    r.timeline_mut(&r_in).play_with(|item| item.write());
-    r.timeline_mut(&r_out).play_with(|item| item.unwrite());
+    let r_in = r.new_timeline();
+    let r_out = r.new_timeline();
+    r.timeline_mut(r_in).play(pentagon_in.write());
+    r.timeline_mut(r_out).play(pentagon_out.unwrite());
 }
 
 #[allow(unused)]
 #[scene]
 #[output]
 fn transform(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
     let src = Square::new(2.0).with(|x| {
         x.set_color(manim::RED_C)
             .put_center_on(dvec3(0.0, 2.0, 0.0));
@@ -98,9 +98,12 @@ fn transform(r: &mut RanimScene) {
             .put_center_on(dvec3(0.0, -2.0, 0.0));
     });
     // dst.rotate(PI / 4.0 + PI, DVec3::Z); // rotate to match src
-    let r_item = r.insert(VItem::from(src));
-    r.timeline_mut(&r_item)
-        .play_with(|item| item.transform_to(VItem::from(dst)).with_rate_func(linear));
+    let r_item = r.new_timeline();
+    r.timeline_mut(r_item).play(
+        VItem::from(src)
+            .transform_to(VItem::from(dst))
+            .with_rate_func(linear),
+    );
 }
 
 fn main() {

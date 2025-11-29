@@ -9,28 +9,28 @@ use ranim_core::animation::{AnimationCell, Eval};
 /// let anim_lagged = item_group.lagged(0.5, |x| x.fade_in()); # lagged with ratio of 0.5
 /// let anim_not_lagged = item_group.lagged(0.0, |x| x.fade_in()); # not lagged (anim at the same time)
 /// ```
-pub trait LaggedAnim<T, I> {
+pub trait LaggedAnim<T>: Sized + 'static {
     /// Create a [`Lagged`] anim.
     fn lagged(
-        self,
+        &mut self,
         lag_ratio: f64,
-        anim_func: impl FnMut(T) -> AnimationCell<T>,
-    ) -> AnimationCell<I>
-    where
-        Self: Sized,
-        I: IntoIterator<Item = T> + FromIterator<T>;
+        anim_func: impl FnMut(&mut T) -> AnimationCell<T>,
+    ) -> AnimationCell<Vec<T>>;
 }
 
-impl<T: Clone + 'static, I> LaggedAnim<T, I> for I
+impl<T: Clone + 'static, I> LaggedAnim<T> for I
 where
-    I: IntoIterator<Item = T> + FromIterator<T> + 'static,
+    for<'a> &'a mut I: IntoIterator<Item = &'a mut T>,
+    I: 'static,
 {
     fn lagged(
-        self,
+        &mut self,
         lag_ratio: f64,
-        anim_func: impl FnMut(T) -> AnimationCell<T>,
-    ) -> AnimationCell<I> {
-        Lagged::new(self, lag_ratio, anim_func).into_animation_cell()
+        anim_func: impl FnMut(&mut T) -> AnimationCell<T>,
+    ) -> AnimationCell<Vec<T>> {
+        let anim =
+            Lagged::new(lag_ratio, self.into_iter().map(anim_func).collect()).into_animation_cell();
+        anim
     }
 }
 
@@ -55,14 +55,8 @@ pub struct Lagged<T> {
 
 impl<T> Lagged<T> {
     /// Constructor
-    pub fn new<I>(target: I, lag_ratio: f64, anim_func: impl FnMut(T) -> AnimationCell<T>) -> Self
-    where
-        I: IntoIterator<Item = T>,
-    {
-        Self {
-            anims: target.into_iter().map(anim_func).collect(),
-            lag_ratio,
-        }
+    pub fn new(lag_ratio: f64, anims: Vec<AnimationCell<T>>) -> Self {
+        Self { anims, lag_ratio }
     }
 }
 

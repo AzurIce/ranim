@@ -38,21 +38,21 @@ fn ranim_text(r: &mut RanimScene) {
         .collect::<Vec<_>>();
 
     r.timelines_mut().forward(1.0);
-    r.timeline_mut(r_cam).play(cam.transform_mut(|cam| {
+    r.timeline_mut(r_cam).play(cam.transform(|cam| {
         cam.scale = 0.3;
         cam.up = DVec3::NEG_X;
         cam.pos.shift(DVec3::NEG_X * 6.0);
     }));
     r.timelines_mut().forward(1.0);
     r.timeline_mut(r_cam).play(
-        cam.transform_mut(|cam| {
+        cam.transform(|cam| {
             cam.pos.shift(DVec3::X * 12.0);
         })
         .with_duration(7.0),
     );
     r.timelines_mut().forward(1.0);
     r.timeline_mut(r_cam)
-        .play(cam.transform_to_mut(CameraFrame::default()));
+        .play(cam.transform_to(CameraFrame::default()));
 
     // r.timelines_mut().forward(1.0);
     r.insert_time_mark(5.0, TimeMark::Capture("preview-ranim_text.png".to_string()));
@@ -66,7 +66,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
     let square = VisualVItem(VItem::from(Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
     })));
-    let circle = VisualVItem(VItem::from(Circle::new(2.0).with(|circle| {
+    let mut circle = VisualVItem(VItem::from(Circle::new(2.0).with(|circle| {
         circle
             .set_color(manim::GREEN_C)
             .rotate(-PI / 4.0 + PI, DVec3::Z);
@@ -76,12 +76,12 @@ pub fn hello_ranim(r: &mut RanimScene) {
     {
         let timeline = r.timeline_mut(r_vitem);
         timeline
-            .play(square.transform_to(circle.clone()))
+            .play(square.clone().transform_to(circle.clone()))
             .forward(1.0);
         timeline
-            .play(circle.unwrite_ref().with_duration(2.0))
-            .play(circle.write_ref().with_duration(2.0))
-            .play(circle.fade_out_ref());
+            .play(circle.clone().unwrite().with_duration(2.0))
+            .play(circle.write().with_duration(2.0))
+            .play(circle.fade_out());
     }
 
     r.timelines_mut().sync();

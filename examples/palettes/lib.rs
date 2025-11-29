@@ -8,7 +8,7 @@ use ranim::{
 #[scene]
 #[output(dir = "palettes")]
 fn palettes(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let padded_frame_size = frame_size * 0.9;
 
@@ -48,7 +48,7 @@ fn palettes(r: &mut RanimScene) {
             })
         })
         .collect::<Group<_>>();
-    r.insert_and_show(squares);
+    r.insert(squares);
     r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
     r.timelines_mut().forward(0.01);
 }

@@ -9,6 +9,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
 #![feature(slice_ptr_get)]
+#![feature(decl_macro)]
 /// Fondation of animation
 pub mod animation;
 /// Color
@@ -53,6 +54,13 @@ pub trait Extract {
     // fn extract_to_primitives(&self) -> Primitives {
     //     Self::Target::build_primitives(self.extract())
     // }
+}
+
+impl<E: Extract, I: IntoIterator<Item = E> + Clone> Extract for I {
+    type Target = E::Target;
+    fn extract(&self) -> Vec<Self::Target> {
+        self.clone().into_iter().flat_map(|e| e.extract()).collect()
+    }
 }
 
 use crate::timeline::{AnimationInfo, TimelineFunc, TimelinesFunc};

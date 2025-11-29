@@ -43,14 +43,14 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
         .collect::<Vec<_>>();
 
     let anim_highlight = |rect: &mut Rectangle| {
-        rect.transform_mut(|data| {
+        rect.transform(|data| {
             data.set_fill_color(manim::BLUE_C.with_alpha(0.5));
         })
         .with_duration(anim_step_duration)
         .with_rate_func(linear)
     };
     let anim_unhighlight = |rect: &mut Rectangle| {
-        rect.transform_mut(|data| {
+        rect.transform(|data| {
             data.set_fill_color(manim::WHITE.with_alpha(0.5));
         })
         .with_duration(anim_step_duration)
@@ -65,7 +65,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
             .zip(swap_shift.iter())
             .for_each(|((timeline, rect), shift)| {
                 timeline.play(
-                    rect.transform_mut(|data| {
+                    rect.transform(|data| {
                         data.shift(*shift);
                     })
                     .with_duration(anim_step_duration)
