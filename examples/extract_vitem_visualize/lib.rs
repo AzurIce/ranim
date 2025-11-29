@@ -169,12 +169,12 @@ impl StrokeWidth for VisualVItem {
 
 impl Extract for VisualVItem {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        let mut points = Vec::with_capacity(self.0.vpoints.len());
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        // The VItem itself
+        self.0.extract_into(buf);
 
-        let subpaths = self.0.vpoints.get_subpaths();
-
-        subpaths.iter().for_each(|subpath| {
+        // VItem's vpoints as circles
+        self.0.vpoints.get_subpaths().iter().for_each(|subpath| {
             let subpath_len = subpath.len();
 
             subpath.iter().enumerate().for_each(|(idx, p)| {
@@ -204,10 +204,10 @@ impl Extract for VisualVItem {
                 .with(|circle| {
                     circle.put_center_on(*p);
                 });
-                points.push(point);
+                point.extract_into(buf);
             });
         });
-        let mut lines = Vec::with_capacity(self.0.vpoints.len());
+        // lines between VItem's vpoints
         self.0
             .vpoints
             .iter()
@@ -216,23 +216,18 @@ impl Extract for VisualVItem {
             .zip(self.0.vpoints.iter().skip(2).step_by(2))
             .for_each(|((p0, p1), p2)| {
                 if p0 != p1 {
-                    lines.extend_from_slice(&[
-                        VItem::from_vpoints(vec![*p0, (p0 + p1) / 2.0, *p1]),
-                        VItem::from_vpoints(vec![*p1, (p1 + p2) / 2.0, *p2]),
-                    ]);
+                    VItem::from_vpoints(vec![*p0, (p0 + p1) / 2.0, *p1])
+                        .with(|x| {
+                            x.set_stroke_width(0.015);
+                        })
+                        .extract_into(buf);
+                    VItem::from_vpoints(vec![*p1, (p1 + p2) / 2.0, *p2])
+                        .with(|x| {
+                            x.set_stroke_width(0.015);
+                        })
+                        .extract_into(buf);
                 }
             });
-        [self.0.extract()]
-            .into_iter()
-            .chain(lines.into_iter().map(|x| {
-                x.with(|item| {
-                    item.set_stroke_width(0.015);
-                })
-                .extract()
-            }))
-            .chain(points.into_iter().map(|x| x.extract()))
-            .flatten()
-            .collect()
     }
 }
 

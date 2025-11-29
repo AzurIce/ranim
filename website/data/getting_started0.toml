@@ -1,39 +1,39 @@
 name = "getting_started0"
 code = """
 ```rust
-use ranim::{\r
-    anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,\r
-};\r
-\r
-// ANCHOR: construct\r
-#[scene]\r
-#[output(dir = "getting_started0")]\r
-fn getting_started0(r: &mut RanimScene) {\r
-    // Equivalent to creating a new timeline then playing `CameraFrame::default().show()` on it\r
-    let _r_cam = r.insert(CameraFrame::default());\r
-    // A Square with size 2.0 and color blue\r
-    let square = Square::new(2.0).with(|square| {\r
-        square.set_color(manim::BLUE_C);\r
-    });\r
-\r
-    let r_square = r.new_timeline();\r
-    {\r
-        let timeline = r.timeline_mut(r_square);\r
-        timeline\r
-            .play(square.clone().fade_in()) // Can be written as `square.fade_in_ref()`\r
-            .forward(1.0)\r
-            .hide()\r
-            .forward(1.0)\r
-            .show()\r
-            .forward(1.0)\r
-            .play(square.clone().fade_out()); // Can be written as `square.fade_out_ref()`\r
-    }\r
-    // In the end, ranim will automatically sync all timelines and forward to the end.\r
-    // Equivalent to `r.timelines_mut().sync();`\r
-}\r
-// ANCHOR_END: construct\r
+use ranim::{
+    anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,
+};
+
+// ANCHOR: construct
+#[scene]
+#[output(dir = "getting_started0")]
+fn getting_started0(r: &mut RanimScene) {
+    // Equivalent to creating a new timeline then playing `CameraFrame::default().show()` on it
+    let _r_cam = r.insert(CameraFrame::default());
+    // A Square with size 2.0 and color blue
+    let square = Square::new(2.0).with(|square| {
+        square.set_color(manim::BLUE_C);
+    });
+
+    let r_square = r.new_timeline();
+    {
+        let timeline = r.timeline_mut(r_square);
+        timeline
+            .play(square.clone().fade_in()) // Can be written as `square.fade_in_ref()`
+            .forward(1.0)
+            .hide()
+            .forward(1.0)
+            .show()
+            .forward(1.0)
+            .play(square.clone().fade_out()); // Can be written as `square.fade_out_ref()`
+    }
+    // In the end, ranim will automatically sync all timelines and forward to the end.
+    // Equivalent to `r.timelines_mut().sync();`
+}
+// ANCHOR_END: construct
 ```"""
-hash = "ca66701e94bd86d73ccc9e781f5c8dcb350abbeb"
+hash = "263441ad33e1abbf2d48c87b05e834817588980b"
 preview_imgs = []
 output_files = ["/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
 wasm = true

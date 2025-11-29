@@ -8,8 +8,6 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
-#![feature(slice_ptr_get)]
-#![feature(decl_macro)]
 /// Fondation of animation
 pub mod animation;
 /// Color
@@ -49,17 +47,24 @@ pub trait Extract {
     /// The extraction result
     type Target: Clone;
     /// Extract a [`Extract::Target`] from reference.
-    fn extract(&self) -> Vec<Self::Target>;
-    // /// Extract to [`Primitive`] from reference.
-    // fn extract_to_primitives(&self) -> Primitives {
-    //     Self::Target::build_primitives(self.extract())
-    // }
+    fn extract_into(&self, buf: &mut Vec<Self::Target>);
+    /// Extract a [`Extract::Target`] from reference.
+    fn extract(&self) -> Vec<Self::Target> {
+        let mut buf = Vec::new();
+        self.extract_into(&mut buf);
+        buf
+    }
 }
 
-impl<E: Extract, I: IntoIterator<Item = E> + Clone> Extract for I {
+impl<E: Extract, I> Extract for I
+where
+    for<'a> &'a I: IntoIterator<Item = &'a E>,
+{
     type Target = E::Target;
-    fn extract(&self) -> Vec<Self::Target> {
-        self.clone().into_iter().flat_map(|e| e.extract()).collect()
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        for e in self {
+            e.extract_into(buf);
+        }
     }
 }
 
@@ -260,7 +265,7 @@ impl RanimScene {
         sec: f64,
     ) -> TimelineId {
         self.new_timeline_with(|t| {
-            t.play(item.show().with_show_sec(sec));
+            t.play(item.show().at(sec));
         })
     }
 

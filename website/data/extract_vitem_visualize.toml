@@ -1,251 +1,251 @@
 name = "extract_vitem_visualize"
 code = """
 ```rust
-use ranim::glam;\r
-use ranim_core::core_item::CoreItem;\r
-use std::f64::consts::PI;\r
-\r
-use ranim::{\r
-    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},\r
-    color,\r
-    color::palettes::manim,\r
-    core::{Extract, components::width::Width},\r
-    items::vitem::{\r
-        Group, VItem,\r
-        geometry::{Circle, Square},\r
-        svg::SvgItem,\r
-        typst::typst_svg,\r
-    },\r
-    prelude::*,\r
-};\r
-\r
-use glam::DVec3;\r
-\r
-// MARK: ranim_text\r
-#[scene]\r
-#[output(dir = "extract_vitem_visualize")]\r
-fn ranim_text(r: &mut RanimScene) {\r
-    let mut cam = CameraFrame::default();\r
-    let r_cam = r.insert(cam.clone());\r
-\r
-    let text = SvgItem::new(typst_svg("Ranim")).with(|item| {\r
-        item.set_fill_color(manim::WHITE)\r
-            .set_fill_opacity(0.5)\r
-            .scale_to_with_stroke(ScaleHint::PorportionalY(3.6))\r
-            .put_center_on(DVec3::ZERO);\r
-    });\r
-    let _r_texts = Group::<VItem>::from(text)\r
-        .into_iter()\r
-        .map(VisualVItem)\r
-        .map(|item| r.insert(item))\r
-        .collect::<Vec<_>>();\r
-\r
-    r.timelines_mut().forward(1.0);\r
-    r.timeline_mut(r_cam).play(cam.transform(|cam| {\r
-        cam.scale = 0.3;\r
-        cam.up = DVec3::NEG_X;\r
-        cam.pos.shift(DVec3::NEG_X * 6.0);\r
-    }));\r
-    r.timelines_mut().forward(1.0);\r
-    r.timeline_mut(r_cam).play(\r
-        cam.transform(|cam| {\r
-            cam.pos.shift(DVec3::X * 12.0);\r
-        })\r
-        .with_duration(7.0),\r
-    );\r
-    r.timelines_mut().forward(1.0);\r
-    r.timeline_mut(r_cam)\r
-        .play(cam.transform_to(CameraFrame::default()));\r
-\r
-    // r.timelines_mut().forward(1.0);\r
-    r.insert_time_mark(5.0, TimeMark::Capture("preview-ranim_text.png".to_string()));\r
-}\r
-\r
-#[scene(name = "extract_vitem_visualize")]\r
-#[output(dir = "extract_vitem_visualize")]\r
-pub fn hello_ranim(r: &mut RanimScene) {\r
-    let _r_cam = r.insert(CameraFrame::default());\r
-\r
-    let square = VisualVItem(VItem::from(Square::new(2.0).with(|square| {\r
-        square.set_color(manim::BLUE_C);\r
-    })));\r
-    let mut circle = VisualVItem(VItem::from(Circle::new(2.0).with(|circle| {\r
-        circle\r
-            .set_color(manim::GREEN_C)\r
-            .rotate(-PI / 4.0 + PI, DVec3::Z);\r
-    })));\r
-\r
-    let r_vitem = r.new_timeline();\r
-    {\r
-        let timeline = r.timeline_mut(r_vitem);\r
-        timeline\r
-            .play(square.clone().transform_to(circle.clone()))\r
-            .forward(1.0);\r
-        timeline\r
-            .play(circle.clone().unwrite().with_duration(2.0))\r
-            .play(circle.write().with_duration(2.0))\r
-            .play(circle.fade_out());\r
-    }\r
-\r
-    r.timelines_mut().sync();\r
-    r.insert_time_mark(\r
-        3.2,\r
-        TimeMark::Capture("preview-hello_ranim.png".to_string()),\r
-    );\r
-}\r
-\r
-#[derive(Clone)]\r
-pub struct VisualVItem(VItem);\r
-\r
-impl Interpolatable for VisualVItem {\r
-    fn lerp(&self, target: &Self, t: f64) -> Self {\r
-        Self(self.0.lerp(&target.0, t))\r
-    }\r
-}\r
-\r
-impl Alignable for VisualVItem {\r
-    fn is_aligned(&self, other: &Self) -> bool {\r
-        self.0.is_aligned(&other.0)\r
-    }\r
-    fn align_with(&mut self, other: &mut Self) {\r
-        self.0.align_with(&mut other.0);\r
-    }\r
-}\r
-\r
-impl Partial for VisualVItem {\r
-    fn get_partial(&self, range: std::ops::Range<f64>) -> Self {\r
-        Self(self.0.get_partial(range))\r
-    }\r
-    fn get_partial_closed(&self, range: std::ops::Range<f64>) -> Self {\r
-        Self(self.0.get_partial_closed(range))\r
-    }\r
-}\r
-\r
-impl Opacity for VisualVItem {\r
-    fn set_opacity(&mut self, opacity: f32) -> &mut Self {\r
-        self.0.set_opacity(opacity);\r
-        self\r
-    }\r
-}\r
-\r
-impl StrokeColor for VisualVItem {\r
-    fn set_stroke_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {\r
-        self.0.set_stroke_color(color);\r
-        self\r
-    }\r
-    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {\r
-        self.0.set_stroke_opacity(opacity);\r
-        self\r
-    }\r
-    fn stroke_color(&self) -> color::AlphaColor<color::Srgb> {\r
-        self.0.stroke_color()\r
-    }\r
-}\r
-\r
-impl FillColor for VisualVItem {\r
-    fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {\r
-        self.0.set_fill_color(color);\r
-        self\r
-    }\r
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {\r
-        self.0.set_fill_opacity(opacity);\r
-        self\r
-    }\r
-    fn fill_color(&self) -> color::AlphaColor<color::Srgb> {\r
-        self.0.fill_color()\r
-    }\r
-}\r
-\r
-impl StrokeWidth for VisualVItem {\r
-    fn stroke_width(&self) -> f32 {\r
-        self.0.stroke_width()\r
-    }\r
-    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {\r
-        self.0.apply_stroke_func(f);\r
-        self\r
-    }\r
-    fn set_stroke_width(&mut self, width: f32) -> &mut Self {\r
-        self.0.set_stroke_width(width);\r
-        self\r
-    }\r
-}\r
-\r
-impl Extract for VisualVItem {\r
-    type Target = CoreItem;\r
-    fn extract(&self) -> Vec<Self::Target> {\r
-        let mut points = Vec::with_capacity(self.0.vpoints.len());\r
-\r
-        let subpaths = self.0.vpoints.get_subpaths();\r
-\r
-        subpaths.iter().for_each(|subpath| {\r
-            let subpath_len = subpath.len();\r
-\r
-            subpath.iter().enumerate().for_each(|(idx, p)| {\r
-                if idx == subpath_len - 1 && !idx.is_multiple_of(2) {\r
-                    return;\r
-                }\r
-                let point = if idx.is_multiple_of(2) {\r
-                    Circle::new(0.06).with(|circle| {\r
-                        circle\r
-                            .set_color(if idx == 0 {\r
-                                manim::GREEN_C\r
-                            } else if idx / 2 == (subpath_len - 1) / 2 {\r
-                                manim::RED_C\r
-                            } else {\r
-                                manim::BLUE_C\r
-                            })\r
-                            .set_fill_opacity(0.6);\r
-                    })\r
-                } else {\r
-                    Circle::new(0.04).with(|circle| {\r
-                        circle\r
-                            .set_color(manim::WHITE)\r
-                            .set_stroke_opacity(0.8)\r
-                            .set_fill_opacity(0.4);\r
-                    })\r
-                }\r
-                .with(|circle| {\r
-                    circle.put_center_on(*p);\r
-                });\r
-                points.push(point);\r
-            });\r
-        });\r
-        let mut lines = Vec::with_capacity(self.0.vpoints.len());\r
-        self.0\r
-            .vpoints\r
-            .iter()\r
-            .step_by(2)\r
-            .zip(self.0.vpoints.iter().skip(1).step_by(2))\r
-            .zip(self.0.vpoints.iter().skip(2).step_by(2))\r
-            .for_each(|((p0, p1), p2)| {\r
-                if p0 != p1 {\r
-                    lines.extend_from_slice(&[\r
-                        VItem::from_vpoints(vec![*p0, (p0 + p1) / 2.0, *p1]),\r
-                        VItem::from_vpoints(vec![*p1, (p1 + p2) / 2.0, *p2]),\r
-                    ]);\r
-                }\r
-            });\r
-        [self.0.extract()]\r
-            .into_iter()\r
-            .chain(lines.into_iter().map(|x| {\r
-                x.with(|item| {\r
-                    item.set_stroke_width(0.015);\r
-                })\r
-                .extract()\r
-            }))\r
-            .chain(points.into_iter().map(|x| x.extract()))\r
-            .flatten()\r
-            .collect()\r
-    }\r
-}\r
-\r
-impl Empty for VisualVItem {\r
-    fn empty() -> Self {\r
-        Self(VItem::empty())\r
-    }\r
-}\r
+use ranim::glam;
+use ranim_core::core_item::CoreItem;
+use std::f64::consts::PI;
+
+use ranim::{
+    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    color,
+    color::palettes::manim,
+    core::{Extract, components::width::Width},
+    items::vitem::{
+        Group, VItem,
+        geometry::{Circle, Square},
+        svg::SvgItem,
+        typst::typst_svg,
+    },
+    prelude::*,
+};
+
+use glam::DVec3;
+
+// MARK: ranim_text
+#[scene]
+#[output(dir = "extract_vitem_visualize")]
+fn ranim_text(r: &mut RanimScene) {
+    let mut cam = CameraFrame::default();
+    let r_cam = r.insert(cam.clone());
+
+    let text = SvgItem::new(typst_svg("Ranim")).with(|item| {
+        item.set_fill_color(manim::WHITE)
+            .set_fill_opacity(0.5)
+            .scale_to_with_stroke(ScaleHint::PorportionalY(3.6))
+            .put_center_on(DVec3::ZERO);
+    });
+    let _r_texts = Group::<VItem>::from(text)
+        .into_iter()
+        .map(VisualVItem)
+        .map(|item| r.insert(item))
+        .collect::<Vec<_>>();
+
+    r.timelines_mut().forward(1.0);
+    r.timeline_mut(r_cam).play(cam.transform(|cam| {
+        cam.scale = 0.3;
+        cam.up = DVec3::NEG_X;
+        cam.pos.shift(DVec3::NEG_X * 6.0);
+    }));
+    r.timelines_mut().forward(1.0);
+    r.timeline_mut(r_cam).play(
+        cam.transform(|cam| {
+            cam.pos.shift(DVec3::X * 12.0);
+        })
+        .with_duration(7.0),
+    );
+    r.timelines_mut().forward(1.0);
+    r.timeline_mut(r_cam)
+        .play(cam.transform_to(CameraFrame::default()));
+
+    // r.timelines_mut().forward(1.0);
+    r.insert_time_mark(5.0, TimeMark::Capture("preview-ranim_text.png".to_string()));
+}
+
+#[scene(name = "extract_vitem_visualize")]
+#[output(dir = "extract_vitem_visualize")]
+pub fn hello_ranim(r: &mut RanimScene) {
+    let _r_cam = r.insert(CameraFrame::default());
+
+    let square = VisualVItem(VItem::from(Square::new(2.0).with(|square| {
+        square.set_color(manim::BLUE_C);
+    })));
+    let mut circle = VisualVItem(VItem::from(Circle::new(2.0).with(|circle| {
+        circle
+            .set_color(manim::GREEN_C)
+            .rotate(-PI / 4.0 + PI, DVec3::Z);
+    })));
+
+    let r_vitem = r.new_timeline();
+    {
+        let timeline = r.timeline_mut(r_vitem);
+        timeline
+            .play(square.clone().transform_to(circle.clone()))
+            .forward(1.0);
+        timeline
+            .play(circle.clone().unwrite().with_duration(2.0))
+            .play(circle.write().with_duration(2.0))
+            .play(circle.fade_out());
+    }
+
+    r.timelines_mut().sync();
+    r.insert_time_mark(
+        3.2,
+        TimeMark::Capture("preview-hello_ranim.png".to_string()),
+    );
+}
+
+#[derive(Clone)]
+pub struct VisualVItem(VItem);
+
+impl Interpolatable for VisualVItem {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        Self(self.0.lerp(&target.0, t))
+    }
+}
+
+impl Alignable for VisualVItem {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.0.is_aligned(&other.0)
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        self.0.align_with(&mut other.0);
+    }
+}
+
+impl Partial for VisualVItem {
+    fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
+        Self(self.0.get_partial(range))
+    }
+    fn get_partial_closed(&self, range: std::ops::Range<f64>) -> Self {
+        Self(self.0.get_partial_closed(range))
+    }
+}
+
+impl Opacity for VisualVItem {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.0.set_opacity(opacity);
+        self
+    }
+}
+
+impl StrokeColor for VisualVItem {
+    fn set_stroke_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
+        self.0.set_stroke_color(color);
+        self
+    }
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.0.set_stroke_opacity(opacity);
+        self
+    }
+    fn stroke_color(&self) -> color::AlphaColor<color::Srgb> {
+        self.0.stroke_color()
+    }
+}
+
+impl FillColor for VisualVItem {
+    fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
+        self.0.set_fill_color(color);
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.0.set_fill_opacity(opacity);
+        self
+    }
+    fn fill_color(&self) -> color::AlphaColor<color::Srgb> {
+        self.0.fill_color()
+    }
+}
+
+impl StrokeWidth for VisualVItem {
+    fn stroke_width(&self) -> f32 {
+        self.0.stroke_width()
+    }
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
+        self.0.apply_stroke_func(f);
+        self
+    }
+    fn set_stroke_width(&mut self, width: f32) -> &mut Self {
+        self.0.set_stroke_width(width);
+        self
+    }
+}
+
+impl Extract for VisualVItem {
+    type Target = CoreItem;
+    fn extract(&self) -> Vec<Self::Target> {
+        let mut points = Vec::with_capacity(self.0.vpoints.len());
+
+        let subpaths = self.0.vpoints.get_subpaths();
+
+        subpaths.iter().for_each(|subpath| {
+            let subpath_len = subpath.len();
+
+            subpath.iter().enumerate().for_each(|(idx, p)| {
+                if idx == subpath_len - 1 && !idx.is_multiple_of(2) {
+                    return;
+                }
+                let point = if idx.is_multiple_of(2) {
+                    Circle::new(0.06).with(|circle| {
+                        circle
+                            .set_color(if idx == 0 {
+                                manim::GREEN_C
+                            } else if idx / 2 == (subpath_len - 1) / 2 {
+                                manim::RED_C
+                            } else {
+                                manim::BLUE_C
+                            })
+                            .set_fill_opacity(0.6);
+                    })
+                } else {
+                    Circle::new(0.04).with(|circle| {
+                        circle
+                            .set_color(manim::WHITE)
+                            .set_stroke_opacity(0.8)
+                            .set_fill_opacity(0.4);
+                    })
+                }
+                .with(|circle| {
+                    circle.put_center_on(*p);
+                });
+                points.push(point);
+            });
+        });
+        let mut lines = Vec::with_capacity(self.0.vpoints.len());
+        self.0
+            .vpoints
+            .iter()
+            .step_by(2)
+            .zip(self.0.vpoints.iter().skip(1).step_by(2))
+            .zip(self.0.vpoints.iter().skip(2).step_by(2))
+            .for_each(|((p0, p1), p2)| {
+                if p0 != p1 {
+                    lines.extend_from_slice(&[
+                        VItem::from_vpoints(vec![*p0, (p0 + p1) / 2.0, *p1]),
+                        VItem::from_vpoints(vec![*p1, (p1 + p2) / 2.0, *p2]),
+                    ]);
+                }
+            });
+        [self.0.extract()]
+            .into_iter()
+            .chain(lines.into_iter().map(|x| {
+                x.with(|item| {
+                    item.set_stroke_width(0.015);
+                })
+                .extract()
+            }))
+            .chain(points.into_iter().map(|x| x.extract()))
+            .flatten()
+            .collect()
+    }
+}
+
+impl Empty for VisualVItem {
+    fn empty() -> Self {
+        Self(VItem::empty())
+    }
+}
 ```"""
-hash = "c5cef2a0c8f6868d113981983e381c12b1832bd6"
-preview_imgs = ["/examples/extract_vitem_visualize/preview-hello_ranim.png", "/examples/extract_vitem_visualize/preview-ranim_text.png"]
-output_files = ["/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4", "/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4"]
+hash = "af564bab129d613588be05f92f7ad869513c61ae"
+preview_imgs = ["/examples/extract_vitem_visualize/preview-ranim_text.png", "/examples/extract_vitem_visualize/preview-hello_ranim.png"]
+output_files = ["/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4", "/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4"]
 wasm = true

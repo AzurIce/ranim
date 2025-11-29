@@ -14,15 +14,18 @@ use crate::{
 
 use std::fmt::Debug;
 
+/// Info of an animation.
+/// 
+/// When [`AnimationInfo::enabled`] is `false`, the animation will not be evaluated.
 #[derive(Debug, Clone)]
 pub struct AnimationInfo {
-    /// The rate function used for evaluating
+    /// The rate function used for evaluating, default value: [`linear`]
     pub rate_func: fn(f64) -> f64,
-    /// Show sec
-    pub show_sec: f64,
-    /// The duration seconds
+    /// Show sec, default value: 0.0
+    pub at_sec: f64,
+    /// The duration seconds, default value: 1.0
     pub duration_secs: f64,
-    /// Is enabled
+    /// Is enabled, default value: true
     pub enabled: bool,
 }
 
@@ -30,7 +33,7 @@ impl Default for AnimationInfo {
     fn default() -> Self {
         Self {
             rate_func: linear,
-            show_sec: 0.0,
+            at_sec: 0.0,
             duration_secs: 1.0,
             enabled: true,
         }
@@ -38,15 +41,14 @@ impl Default for AnimationInfo {
 }
 
 impl AnimationInfo {
+    /// The time range of the animation
     pub fn range(&self) -> std::ops::Range<f64> {
-        self.show_sec..self.show_sec + self.duration_secs
+        self.at_sec..self.at_sec + self.duration_secs
     }
-    pub fn map_alpha(&self, alpha: f64) -> f64 {
-        (self.rate_func)(alpha)
-    }
+    /// Map the global sec to alpha
     pub fn map_sec(&self, sec: f64) -> Option<f64> {
-        if (self.show_sec..=self.show_sec + self.duration_secs).contains(&sec) {
-            Some((sec - self.show_sec) / self.duration_secs)
+        if (self.at_sec..=self.at_sec + self.duration_secs).contains(&sec) {
+            Some((self.rate_func)((sec - self.at_sec) / self.duration_secs))
         } else {
             None
         }
@@ -54,52 +56,62 @@ impl AnimationInfo {
 }
 
 impl AnimationInfo {
-    /// A builder func to modify `show_sec`
-    pub fn with_show_sec(mut self, show_sec: f64) -> Self {
-        self.show_sec = show_sec;
+    /// A builder func to modify [`AnimationInfo::at_sec`]
+    pub fn at(mut self, at_sec: f64) -> Self {
+        self.at_sec = at_sec;
         self
     }
-    /// A builder func to modify `rate_func`
+    /// A builder func to modify [`AnimationInfo::rate_func`]
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.rate_func = rate_func;
         self
     }
-    /// A builder func to modify `secs`
+    /// A builder func to modify [`AnimationInfo::duration_secs`]
     pub fn with_duration(mut self, secs: f64) -> Self {
         self.duration_secs = secs;
         self
     }
-    /// A builder func to modify `enabled`
+    /// A builder func to modify [`AnimationInfo::enabled`]
     pub fn with_enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 }
 
+/// Animation of core items.
 pub trait CoreItemAnimation {
+    /// Evaluate to [`DynItem`]
     fn eval_alpha_dyn(&self, alpha: f64) -> DynItem;
+    /// Evaluate to [`CoreItem`]s
     fn eval_alpha_core_item(&self, alpha: f64) -> Vec<CoreItem>;
+    /// Get the animation info
     fn anim_info(&self) -> &AnimationInfo;
 }
 
+/// A cell of an animation
 pub struct AnimationCell<T> {
     inner: Box<dyn Eval<T>>,
+    /// The animation info
     pub info: AnimationInfo,
 }
 
 impl<T> AnimationCell<T> {
-    pub fn with_show_sec(mut self, show_sec: f64) -> Self {
-        self.info = self.info.with_show_sec(show_sec);
+    /// A builder func to modify [`AnimationInfo::at_sec`]
+    pub fn at(mut self, at_sec: f64) -> Self {
+        self.info = self.info.at(at_sec);
         self
     }
+    /// A builder func to modify [`AnimationInfo::rate_func`]
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
         self.info = self.info.with_rate_func(rate_func);
         self
     }
+    /// A builder func to modify [`AnimationInfo::duration_secs`]
     pub fn with_duration(mut self, duration_secs: f64) -> Self {
         self.info = self.info.with_duration(duration_secs);
         self
     }
+    /// A builder func to modify [`AnimationInfo::enabled`]
     pub fn with_enabled(mut self, enabled: bool) -> Self {
         self.info = self.info.with_enabled(enabled);
         self
@@ -146,28 +158,33 @@ pub trait Eval<T> {
 }
 
 // MARK: StaticAnim
+/// The requirement for [`StaticAnim`]
 pub trait StaticAnimRequirement: Clone {}
 
 impl<T: Clone> StaticAnimRequirement for T {}
 
-pub trait StaticAnim<T: StaticAnimRequirement> {
-    fn show(&self) -> AnimationCell<T>;
-    fn hide(&self) -> AnimationCell<T>;
+/// The helper methods for [`Static`], i.e. evaluates to the same value
+pub trait StaticAnim: StaticAnimRequirement {
+    /// Show the item
+    fn show(&self) -> AnimationCell<Self>;
+    /// Hide the item
+    fn hide(&self) -> AnimationCell<Self>;
 }
 
-impl<T: StaticAnimRequirement + 'static> StaticAnim<T> for T {
-    fn show(&self) -> AnimationCell<T> {
+impl<T: StaticAnimRequirement + 'static> StaticAnim for T {
+    fn show(&self) -> AnimationCell<Self> {
         Static(self.clone())
             .into_animation_cell()
             .with_duration(0.0)
     }
-    fn hide(&self) -> AnimationCell<T> {
+    fn hide(&self) -> AnimationCell<Self> {
         Static(self.clone())
             .into_animation_cell()
             .with_enabled(false)
             .with_duration(0.0)
     }
 }
+
 /// A static animation.
 pub struct Static<T>(pub T);
 
@@ -178,9 +195,3 @@ impl<T: Clone> Eval<T> for Static<T> {
 }
 
 // ANCHOR_END: EvalDynamic
-
-macro anim {
-    ($anim:ident, $target:expr, $($args:tt)*) => {
-        $anim::new($target, $($args)*)
-    }
-}

@@ -1,60 +1,60 @@
 name = "basic"
 code = """
 ```rust
-use ranim::glam;\r
-\r
-use glam::DVec3;\r
-use ranim::{\r
-    anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},\r
-    color::palettes::manim,\r
-    items::vitem::{Group, VItem, svg::SvgItem, typst::typst_svg},\r
-    prelude::*,\r
-};\r
-\r
-const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");\r
-\r
-#[scene]\r
-#[output(dir = "basic")]\r
-fn basic(r: &mut RanimScene) {\r
-    let _r_cam = r.insert(CameraFrame::default());\r
-    r.timelines_mut().forward(0.2);\r
-\r
-    let mut svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {\r
-        svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))\r
-            .put_center_on(DVec3::Y * 2.0);\r
-    }));\r
-    let mut text = Group::<VItem>::from(\r
-        SvgItem::new(typst_svg(\r
-            r#"\r
-            #align(center)[\r
-                #text(18pt)[Ranim]\r
-\r
-                #text(6pt)[Hello 你好]\r
-            ]\r
-            "#,\r
-        ))\r
-        .with(|text| {\r
-            text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))\r
-                .put_center_on(DVec3::NEG_Y * 2.0)\r
-                .set_color(manim::WHITE)\r
-                .set_fill_opacity(0.8);\r
-        }),\r
-    );\r
-    let r_svg = r.insert(svg.clone());\r
-    let r_text = r.insert(text.clone());\r
-\r
-    r.timeline_mut(r_text)\r
-        .play(text.lagged(0.2, |e| e.write()).with_duration(3.0));\r
-    r.timeline_mut(r_svg).play(svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in\r
-    r.timelines_mut().sync();\r
-\r
-    r.insert_time_mark(\r
-        r.timelines().max_total_secs(),\r
-        TimeMark::Capture("preview.png".to_string()),\r
-    );\r
-}\r
+use ranim::glam;
+
+use glam::DVec3;
+use ranim::{
+    anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
+    color::palettes::manim,
+    items::vitem::{Group, VItem, svg::SvgItem, typst::typst_svg},
+    prelude::*,
+};
+
+const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
+
+#[scene]
+#[output(dir = "basic")]
+fn basic(r: &mut RanimScene) {
+    let _r_cam = r.insert(CameraFrame::default());
+    r.timelines_mut().forward(0.2);
+
+    let mut svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {
+        svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
+            .put_center_on(DVec3::Y * 2.0);
+    }));
+    let mut text = Group::<VItem>::from(
+        SvgItem::new(typst_svg(
+            r#"
+            #align(center)[
+                #text(18pt)[Ranim]
+
+                #text(6pt)[Hello 你好]
+            ]
+            "#,
+        ))
+        .with(|text| {
+            text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
+                .put_center_on(DVec3::NEG_Y * 2.0)
+                .set_color(manim::WHITE)
+                .set_fill_opacity(0.8);
+        }),
+    );
+    let r_svg = r.insert(svg.clone());
+    let r_text = r.insert(text.clone());
+
+    r.timeline_mut(r_text)
+        .play(text.lagged(0.2, |e| e.write()).with_duration(3.0));
+    r.timeline_mut(r_svg).play(svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
+    r.timelines_mut().sync();
+
+    r.insert_time_mark(
+        r.timelines().max_total_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
+}
 ```"""
-hash = "74affbbdc4514d28a575c9efce1603efb15c75ea"
+hash = "f2d9e850426db542686c749b791ad048f7b2cc4b"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/basic_1920x1080_60.mp4"]
 wasm = true

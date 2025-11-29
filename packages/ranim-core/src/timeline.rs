@@ -60,7 +60,7 @@ impl NeoItemTimeline {
             self.anims.push(Box::new(
                 Static(state)
                     .into_animation_cell()
-                    .with_show_sec(start)
+                    .at(start)
                     .with_duration(self.cur_sec - start)
                     .with_enabled(last_anim.anim_info().enabled),
             ));
@@ -77,9 +77,8 @@ impl NeoItemTimeline {
         self._submit_planning_static_anim();
         // let res = anim.eval_alpha(1.0);
         let duration = anim.info.duration_secs;
-        self.anims.push(Box::new(
-            anim.with_show_sec(self.cur_sec).with_duration(duration),
-        ));
+        self.anims
+            .push(Box::new(anim.at(self.cur_sec).with_duration(duration)));
         self.cur_sec += duration;
         // self.update(res);
         self.show();
@@ -157,8 +156,11 @@ impl TimelineFunc for NeoItemTimeline {
         // self.get_dyn().type_name()
     }
     fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(Vec<CoreItem>, u64)> {
-        self.eval_at_sec(target_sec)
-            .map(|(dyn_item, idx)| (dyn_item.extract(), idx))
+        self.eval_at_sec(target_sec).map(|(dyn_item, idx)| {
+            let mut items = Vec::new();
+            dyn_item.extract_into(&mut items);
+            (items, idx)
+        })
     }
 }
 
