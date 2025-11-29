@@ -1,42 +1,42 @@
 name = "getting_started1"
 code = """
 ```rust
-use ranim::{
-    anims::{creation::WritingAnim, transform::TransformAnim},
-    color::palettes::manim,
-    items::vitem::{
-        VItem,
-        geometry::{Circle, Square},
-    },
-    prelude::*,
-};
-
-// ANCHOR: construct
-#[scene]
-#[output(dir = "getting_started1")]
-fn getting_started1(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
-    // A Square with size 2.0 and color blue
-    let square = Square::new(2.0).with(|square| {
-        square.set_color(manim::BLUE_C);
-    });
-
-    let circle = Circle::new(2.0).with(|circle| {
-        circle.set_color(manim::RED_C);
-    });
-
-    // In order to do more low-level opeerations,
-    // sometimes we need to convert the item to a low-level item.
-    let r_vitem = r.insert(VItem::from(square));
-    {
-        let timeline = r.timeline_mut(&r_vitem);
-        timeline.play_with(|vitem| vitem.transform_to(VItem::from(circle.clone())));
-        timeline.play_with(|vitem| vitem.unwrite());
-    }
-}
-// ANCHOR_END: construct
+use ranim::{\r
+    anims::{creation::WritingAnim, transform::TransformAnim},\r
+    color::palettes::manim,\r
+    items::vitem::{\r
+        VItem,\r
+        geometry::{Circle, Square},\r
+    },\r
+    prelude::*,\r
+};\r
+\r
+// ANCHOR: construct\r
+#[scene]\r
+#[output(dir = "getting_started1")]\r
+fn getting_started1(r: &mut RanimScene) {\r
+    let _r_cam = r.insert(CameraFrame::default());\r
+    // A Square with size 2.0 and color blue\r
+    let square = Square::new(2.0).with(|square| {\r
+        square.set_color(manim::BLUE_C);\r
+    });\r
+\r
+    let circle = Circle::new(2.0).with(|circle| {\r
+        circle.set_color(manim::RED_C);\r
+    });\r
+\r
+    let r_vitem = r.new_timeline();\r
+    {\r
+        let timeline = r.timeline_mut(r_vitem);\r
+        // In order to do more low-level opeerations,\r
+        // sometimes we need to convert the item to a low-level item.\r
+        timeline.play(VItem::from(square).transform_to(VItem::from(circle.clone())));\r
+        timeline.play(VItem::from(circle).unwrite());\r
+    }\r
+}\r
+// ANCHOR_END: construct\r
 ```"""
-hash = "3acfe0135b3a90853dcffbfb79262e5aeb3931c4"
+hash = "1e6d910b73d9ac9587fd1f211b465c3ef4df1031"
 preview_imgs = []
 output_files = ["/examples/getting_started1/getting_started1_1920x1080_60.mp4"]
 wasm = true

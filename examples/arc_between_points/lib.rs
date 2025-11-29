@@ -19,7 +19,7 @@ fn arc_between_points(r: &mut RanimScene) {
     let ntan = 16;
     let nrad = 5;
 
-    let arcs = (0..nrad)
+    let mut arcs = (0..nrad)
         .map(|i| {
             let radius = 6.0 * (i + 1) as f64 / nrad as f64;
             let width = 0.12 * ((nrad - i) as f64 / nrad as f64).powi(2);

@@ -15,21 +15,23 @@ impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`CreationRequirement`]
 pub trait CreationAnim<T: CreationRequirement + 'static> {
     /// Create a [`Create`] anim for `T`.
-    fn create(self) -> AnimationCell<T>;
+    fn create(&mut self) -> AnimationCell<T>;
     /// Create an [`UnCreate`] anim for `T`.
-    fn uncreate(self) -> AnimationCell<T>;
+    fn uncreate(&mut self) -> AnimationCell<T>;
 }
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
-    fn create(self) -> AnimationCell<T> {
-        Create::new(self)
-            .into_animation_cell()
-            .with_rate_func(smooth)
+    fn create(&mut self) -> AnimationCell<T> {
+        let anim = Create::new(self.clone()).into_animation_cell()
+            .with_rate_func(smooth);
+        *self = anim.eval_alpha(1.0);
+        anim
     }
-    fn uncreate(self) -> AnimationCell<T> {
-        UnCreate::new(self)
-            .into_animation_cell()
-            .with_rate_func(smooth)
+    fn uncreate(&mut self) -> AnimationCell<T> {
+        let anim = UnCreate::new(self.clone()).into_animation_cell()
+            .with_rate_func(smooth);
+        *self = anim.eval_alpha(1.0);
+        anim
     }
 }
 
@@ -41,37 +43,25 @@ impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequ
 /// The methods to create animations for `T` that satisfies [`WritingRequirement`]
 pub trait WritingAnim: WritingRequirement + Sized + 'static {
     /// Create a [`Write`] anim for `T`.
-    fn write(self) -> AnimationCell<Self>;
-    fn write_ref(&self) -> AnimationCell<Self> {
-        self.clone().write()
-    }
-    fn write_mut(&mut self) -> AnimationCell<Self> {
-        let anim = self.write_ref();
-        *self = anim.eval_alpha(1.0);
-        anim
-    }
+    fn write(&mut self) -> AnimationCell<Self>;
     /// Create a [`Unwrite`] anim for `T`.
-    fn unwrite(self) -> AnimationCell<Self>;
-    fn unwrite_ref(&self) -> AnimationCell<Self> {
-        self.clone().unwrite()
-    }
-    fn unwrite_mut(&mut self) -> AnimationCell<Self> {
-        let anim = self.unwrite_ref();
-        *self = anim.eval_alpha(1.0);
-        anim
-    }
+    fn unwrite(&mut self) -> AnimationCell<Self>;
 }
 
 impl<T: WritingRequirement + Sized + 'static> WritingAnim for T {
-    fn write(self) -> AnimationCell<Self> {
-        Write::new(self)
+    fn write(&mut self) -> AnimationCell<Self> {
+        let anim = Write::new(self.clone())
             .into_animation_cell()
-            .with_rate_func(smooth)
+            .with_rate_func(smooth);
+        *self = anim.eval_alpha(1.0);
+        anim
     }
-    fn unwrite(self) -> AnimationCell<Self> {
-        Unwrite::new(self)
+    fn unwrite(&mut self) -> AnimationCell<Self> {
+        let anim = Unwrite::new(self.clone())
             .into_animation_cell()
-            .with_rate_func(smooth)
+            .with_rate_func(smooth);
+        *self = anim.eval_alpha(1.0);
+        anim
     }
 }
 

@@ -16,11 +16,11 @@ fn basic(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     r.timelines_mut().forward(0.2);
 
-    let svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {
+    let mut svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {
         svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
             .put_center_on(DVec3::Y * 2.0);
     }));
-    let text = Group::<VItem>::from(
+    let mut text = Group::<VItem>::from(
         SvgItem::new(typst_svg(
             r#"
             #align(center)[

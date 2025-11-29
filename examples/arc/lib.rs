@@ -25,7 +25,7 @@ pub fn arc(r: &mut RanimScene) {
     let step_x = frame_size.x / ncol as f64;
     let step_y = frame_size.y / nrow as f64;
 
-    let arcs = (0..nrow)
+    let mut arcs = (0..nrow)
         .cartesian_product(0..ncol)
         .map(|(i, j)| {
             let (i, j) = (i as f64, j as f64);

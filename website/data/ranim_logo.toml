@@ -1,156 +1,153 @@
 name = "ranim_logo"
 code = """
 ```rust
-use ranim::glam;
-use std::f64::consts::PI;
-
-use glam::{DVec3, dvec2, dvec3};
-use itertools::Itertools;
-use ranim::{
-    anims::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
-    color::palettes::manim,
-    items::vitem::{
-        Group, VItem,
-        geometry::{Polygon, Rectangle, Square},
-        svg::SvgItem,
-        typst::typst_svg,
-    },
-    prelude::*,
-    utils::rate_functions::{linear, smooth},
-};
-
-fn build_logo(logo_width: f64) -> [VItem; 6] {
-    let red_bg_rect = Rectangle::new(logo_width / 2.0, logo_width).with(|rect| {
-        rect.set_color(manim::RED_C.with_alpha(0.5))
-            .put_center_on(dvec3(-logo_width / 4.0, 0.0, 0.0));
-    });
-    let red_rect = Rectangle::new(logo_width / 4.0, logo_width).with(|rect| {
-        rect.set_color(manim::RED_C)
-            .put_anchor_on(Anchor::edge(1, 0, 0), dvec3(-logo_width / 4.0, 0.0, 0.0));
-    });
-
-    let green_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
-        sq.set_color(manim::GREEN_C.with_alpha(0.5))
-            .put_center_on(dvec3(logo_width / 4.0, logo_width / 4.0, 0.0));
-    });
-    let green_triangle = Polygon::new(vec![
-        dvec3(0.0, logo_width / 2.0, 0.0),
-        dvec3(logo_width / 2.0, logo_width / 2.0, 0.0),
-        dvec3(logo_width / 2.0, 0.0, 0.0),
-    ])
-    .with(|tri| {
-        tri.set_color(manim::GREEN_C);
-    }); // ◥
-
-    let blue_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
-        sq.set_color(manim::BLUE_C.with_alpha(0.5))
-            .put_center_on(dvec3(logo_width / 4.0, -logo_width / 4.0, 0.0));
-    });
-    let blue_triangle = green_triangle.clone().with(|tri| {
-        tri.set_color(manim::BLUE_C)
-            .rotate(PI, DVec3::Z)
-            .shift(DVec3::NEG_Y * logo_width / 2.0);
-    }); // ◣
-
-    [
-        VItem::from(red_bg_rect),
-        VItem::from(red_rect),
-        VItem::from(green_bg_sq),
-        VItem::from(green_triangle),
-        VItem::from(blue_bg_sq),
-        VItem::from(blue_triangle),
-    ]
-}
-#[scene]
-#[output(dir = "ranim_logo")]
-fn ranim_logo(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
-    let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
-    let logo_width = frame_size.y * 0.618;
-
-    let logo = build_logo(logo_width);
-    let r_logo = logo.map(|item| r.insert(item));
-
-    let ranim_text = Group::<VItem>::from(
-        SvgItem::new(typst_svg(
-            r#"
-#align(center)[
-    #text(10pt, font: "LXGW Bright")[Ranim]
-]"#,
-        ))
-        .with(|text| {
-            text.set_color(manim::WHITE)
-                .scale_to(ScaleHint::PorportionalY(1.0))
-                .put_center_on(DVec3::NEG_Y * 2.5);
-        }),
-    );
-    let r_ranim_text = r.insert(ranim_text);
-
-    r_logo.iter().for_each(|item| {
-        r.timeline_mut(item)
-            .play_with(|item| item.write().with_duration(3.0).with_rate_func(smooth));
-    });
-    r.timelines_mut().sync();
-
-    let gap_ratio = 1.0 / 60.0;
-    let gap = logo_width * gap_ratio;
-    let scale = (logo_width - gap * 2.0) / logo_width;
-    let scale = [
-        dvec3(scale, 1.0, 1.0),
-        dvec3(scale, scale, 1.0),
-        dvec3(scale, scale, 1.0),
-    ];
-    let anchor = [
-        Anchor::edge(-1, 0, 0),
-        Anchor::edge(1, 1, 0),
-        Anchor::edge(1, -1, 0),
-    ];
-    r_logo
-        .iter()
-        .chunks(2)
-        .into_iter()
-        .zip(scale.into_iter().zip(anchor))
-        .for_each(|(chunk, (scale, anchor))| {
-            let chunk = chunk.collect_array::<2>().unwrap();
-            r.timeline_mut(&chunk).iter_mut().for_each(|timeline| {
-                timeline.play_with(|item| {
-                    item.transform(|data| {
-                        data.scale_by_anchor(scale, anchor)
-                            .scale_by_anchor(dvec3(0.9, 0.9, 1.0), Anchor::ORIGIN)
-                            .shift(dvec3(0.0, 1.3, 0.0));
-                    })
-                    .with_rate_func(smooth)
-                });
-            });
-        });
-    r.timeline_mut(&r_ranim_text)
-        .forward(0.5)
-        .play_with(|text| {
-            text.lagged(0.2, |item| {
-                item.write().with_duration(2.0).with_rate_func(linear)
-            })
-            .with_duration(2.0)
-        });
-    r.timelines_mut().sync();
-
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
-    r.timelines_mut().forward(1.0);
-
-    r_logo.iter().for_each(|r_logo_part| {
-        r.timeline_mut(r_logo_part)
-            .play_with(|item| item.unwrite().with_duration(3.0).with_rate_func(smooth));
-    });
-    r.timeline_mut(&r_ranim_text).play_with(|text| {
-        text.lagged(0.0, |item| {
-            item.unwrite().with_duration(3.0).with_rate_func(linear)
-        })
-    });
-}
+use ranim::glam;\r
+use std::f64::consts::PI;\r
+\r
+use glam::{DVec3, dvec2, dvec3};\r
+use itertools::Itertools;\r
+use ranim::{\r
+    anims::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},\r
+    color::palettes::manim,\r
+    items::vitem::{\r
+        Group, VItem,\r
+        geometry::{Polygon, Rectangle, Square},\r
+        svg::SvgItem,\r
+        typst::typst_svg,\r
+    },\r
+    prelude::*,\r
+    utils::rate_functions::{linear, smooth},\r
+};\r
+\r
+fn build_logo(logo_width: f64) -> [VItem; 6] {\r
+    let red_bg_rect = Rectangle::new(logo_width / 2.0, logo_width).with(|rect| {\r
+        rect.set_color(manim::RED_C.with_alpha(0.5))\r
+            .put_center_on(dvec3(-logo_width / 4.0, 0.0, 0.0));\r
+    });\r
+    let red_rect = Rectangle::new(logo_width / 4.0, logo_width).with(|rect| {\r
+        rect.set_color(manim::RED_C)\r
+            .put_anchor_on(Anchor::edge(1, 0, 0), dvec3(-logo_width / 4.0, 0.0, 0.0));\r
+    });\r
+\r
+    let green_bg_sq = Square::new(logo_width / 2.0).with(|sq| {\r
+        sq.set_color(manim::GREEN_C.with_alpha(0.5))\r
+            .put_center_on(dvec3(logo_width / 4.0, logo_width / 4.0, 0.0));\r
+    });\r
+    let green_triangle = Polygon::new(vec![\r
+        dvec3(0.0, logo_width / 2.0, 0.0),\r
+        dvec3(logo_width / 2.0, logo_width / 2.0, 0.0),\r
+        dvec3(logo_width / 2.0, 0.0, 0.0),\r
+    ])\r
+    .with(|tri| {\r
+        tri.set_color(manim::GREEN_C);\r
+    }); // ◥\r
+\r
+    let blue_bg_sq = Square::new(logo_width / 2.0).with(|sq| {\r
+        sq.set_color(manim::BLUE_C.with_alpha(0.5))\r
+            .put_center_on(dvec3(logo_width / 4.0, -logo_width / 4.0, 0.0));\r
+    });\r
+    let blue_triangle = green_triangle.clone().with(|tri| {\r
+        tri.set_color(manim::BLUE_C)\r
+            .rotate(PI, DVec3::Z)\r
+            .shift(DVec3::NEG_Y * logo_width / 2.0);\r
+    }); // ◣\r
+\r
+    [\r
+        VItem::from(red_bg_rect),\r
+        VItem::from(red_rect),\r
+        VItem::from(green_bg_sq),\r
+        VItem::from(green_triangle),\r
+        VItem::from(blue_bg_sq),\r
+        VItem::from(blue_triangle),\r
+    ]\r
+}\r
+#[scene]\r
+#[output(dir = "ranim_logo")]\r
+fn ranim_logo(r: &mut RanimScene) {\r
+    let _r_cam = r.insert(CameraFrame::default());\r
+    let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);\r
+    let logo_width = frame_size.y * 0.618;\r
+\r
+    let logo = build_logo(logo_width);\r
+    let mut r_logo = logo.map(|item| (r.insert(item.clone()), item));\r
+\r
+    let mut ranim_text = Group::<VItem>::from(\r
+        SvgItem::new(typst_svg(\r
+            r#"\r
+#align(center)[\r
+    #text(10pt, font: "LXGW Bright")[Ranim]\r
+]"#,\r
+        ))\r
+        .with(|text| {\r
+            text.set_color(manim::WHITE)\r
+                .scale_to(ScaleHint::PorportionalY(1.0))\r
+                .put_center_on(DVec3::NEG_Y * 2.5);\r
+        }),\r
+    );\r
+    let r_ranim_text = r.insert(ranim_text.clone());\r
+\r
+    r_logo.iter_mut().for_each(|(r_logo, item)| {\r
+        r.timeline_mut(*r_logo)\r
+            .play(item.write().with_duration(3.0).with_rate_func(smooth));\r
+    });\r
+    r.timelines_mut().sync();\r
+\r
+    let gap_ratio = 1.0 / 60.0;\r
+    let gap = logo_width * gap_ratio;\r
+    let scale = (logo_width - gap * 2.0) / logo_width;\r
+    let scale = [\r
+        dvec3(scale, 1.0, 1.0),\r
+        dvec3(scale, scale, 1.0),\r
+        dvec3(scale, scale, 1.0),\r
+    ];\r
+    let anchor = [\r
+        Anchor::edge(-1, 0, 0),\r
+        Anchor::edge(1, 1, 0),\r
+        Anchor::edge(1, -1, 0),\r
+    ];\r
+    r_logo\r
+        .iter_mut()\r
+        .chunks(2)\r
+        .into_iter()\r
+        .zip(scale.into_iter().zip(anchor))\r
+        .for_each(|(chunk, (scale, anchor))| {\r
+            chunk.for_each(|(r_item, item)| {\r
+                r.timeline_mut(*r_item).play(\r
+                    item.transform(|data| {\r
+                        data.scale_by_anchor(scale, anchor)\r
+                            .scale_by_anchor(dvec3(0.9, 0.9, 1.0), Anchor::ORIGIN)\r
+                            .shift(dvec3(0.0, 1.3, 0.0));\r
+                    })\r
+                    .with_rate_func(smooth),\r
+                );\r
+            })\r
+        });\r
+    r.timeline_mut(r_ranim_text).forward(0.5).play(\r
+        ranim_text\r
+            .lagged(0.2, |item| {\r
+                item.write().with_duration(2.0).with_rate_func(linear)\r
+            })\r
+            .with_duration(2.0),\r
+    );\r
+    r.timelines_mut().sync();\r
+\r
+    r.insert_time_mark(\r
+        r.timelines().max_total_secs(),\r
+        TimeMark::Capture("preview.png".to_string()),\r
+    );\r
+    r.timelines_mut().forward(1.0);\r
+\r
+    r_logo.iter_mut().for_each(|(r_logo_part, item)| {\r
+        r.timeline_mut(*r_logo_part)\r
+            .play(item.unwrite().with_duration(3.0).with_rate_func(smooth));\r
+    });\r
+    r.timeline_mut(r_ranim_text)\r
+        .play(ranim_text.lagged(0.0, |item| {\r
+            item.unwrite().with_duration(3.0).with_rate_func(linear)\r
+        }));\r
+}\r
 ```"""
-hash = "2619fb8947da675bc91c48356f045284ac6fa8dc"
+hash = "b5335c564db44b35d0bdbf375b0f1ae5b3ab22be"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
 wasm = true

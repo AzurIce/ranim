@@ -360,10 +360,3 @@ impl<T: Opacity + Alignable + Clone> Alignable for Group<T> {
             .for_each(|(a, b)| a.align_with(b));
     }
 }
-
-impl<E: Extract<Target = CoreItem> + Opacity> Extract for Group<E> {
-    type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        self.into_iter().flat_map(|x| x.extract()).collect()
-    }
-}

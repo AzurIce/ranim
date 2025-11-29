@@ -61,14 +61,14 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
 #[scene]
 #[output(dir = "ranim_logo")]
 fn ranim_logo(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let logo_width = frame_size.y * 0.618;
 
     let logo = build_logo(logo_width);
-    let r_logo = logo.map(|item| r.insert(item));
+    let mut r_logo = logo.map(|item| (r.insert(item.clone()), item));
 
-    let ranim_text = Group::<VItem>::from(
+    let mut ranim_text = Group::<VItem>::from(
         SvgItem::new(typst_svg(
             r#"
 #align(center)[
@@ -81,11 +81,11 @@ fn ranim_logo(r: &mut RanimScene) {
                 .put_center_on(DVec3::NEG_Y * 2.5);
         }),
     );
-    let r_ranim_text = r.insert(ranim_text);
+    let r_ranim_text = r.insert(ranim_text.clone());
 
-    r_logo.iter().for_each(|item| {
-        r.timeline_mut(item)
-            .play_with(|item| item.write().with_duration(3.0).with_rate_func(smooth));
+    r_logo.iter_mut().for_each(|(r_logo, item)| {
+        r.timeline_mut(*r_logo)
+            .play(item.write().with_duration(3.0).with_rate_func(smooth));
     });
     r.timelines_mut().sync();
 
@@ -103,31 +103,29 @@ fn ranim_logo(r: &mut RanimScene) {
         Anchor::edge(1, -1, 0),
     ];
     r_logo
-        .iter()
+        .iter_mut()
         .chunks(2)
         .into_iter()
         .zip(scale.into_iter().zip(anchor))
         .for_each(|(chunk, (scale, anchor))| {
-            let chunk = chunk.collect_array::<2>().unwrap();
-            r.timeline_mut(&chunk).iter_mut().for_each(|timeline| {
-                timeline.play_with(|item| {
+            chunk.for_each(|(r_item, item)| {
+                r.timeline_mut(*r_item).play(
                     item.transform(|data| {
                         data.scale_by_anchor(scale, anchor)
                             .scale_by_anchor(dvec3(0.9, 0.9, 1.0), Anchor::ORIGIN)
                             .shift(dvec3(0.0, 1.3, 0.0));
                     })
-                    .with_rate_func(smooth)
-                });
-            });
+                    .with_rate_func(smooth),
+                );
+            })
         });
-    r.timeline_mut(&r_ranim_text)
-        .forward(0.5)
-        .play_with(|text| {
-            text.lagged(0.2, |item| {
+    r.timeline_mut(r_ranim_text).forward(0.5).play(
+        ranim_text
+            .lagged(0.2, |item| {
                 item.write().with_duration(2.0).with_rate_func(linear)
             })
-            .with_duration(2.0)
-        });
+            .with_duration(2.0),
+    );
     r.timelines_mut().sync();
 
     r.insert_time_mark(
@@ -136,13 +134,12 @@ fn ranim_logo(r: &mut RanimScene) {
     );
     r.timelines_mut().forward(1.0);
 
-    r_logo.iter().for_each(|r_logo_part| {
-        r.timeline_mut(r_logo_part)
-            .play_with(|item| item.unwrite().with_duration(3.0).with_rate_func(smooth));
+    r_logo.iter_mut().for_each(|(r_logo_part, item)| {
+        r.timeline_mut(*r_logo_part)
+            .play(item.unwrite().with_duration(3.0).with_rate_func(smooth));
     });
-    r.timeline_mut(&r_ranim_text).play_with(|text| {
-        text.lagged(0.0, |item| {
+    r.timeline_mut(r_ranim_text)
+        .play(ranim_text.lagged(0.0, |item| {
             item.unwrite().with_duration(3.0).with_rate_func(linear)
-        })
-    });
+        }));
 }
