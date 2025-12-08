@@ -1,12 +1,12 @@
 # Getting Started
 
-<div class="warning">
+> [!CAUTION]
+> 本章内容已过时，请结合 Example 和源码来了解
 
-注意：
-
-当前本章内容非常不完善，结构不清晰、内容不完整，目前建议结合 Example 和源码来了解。
-
-</div>
+> [!WARNING]
+> 注意：
+> 
+> 当前本章内容非常不完善，结构不清晰、内容不完整，目前建议结合 Example 和源码来了解。
 
 在 Ranim 中，定义并渲染一段动画的代码基本长成下面这个样子：
 
@@ -42,11 +42,11 @@ fn scene_name(r: &mut RanimScene) {
   - `#[wasm_demo_doc]`：为场景指定一个文档字符串，默认值为空字符串。
 
 使用 *ranim-cli* 可以方便的对场景进行预览、渲染：
-<div class="warning">
-注意：
 
-如果想要使用 *ranim-cli*，需要为 `crate-type` 添加 `dylib`。
-</div>
+> [!IMPORTANT]
+> 注意：
+> 
+> 如果想要使用 *ranim-cli*，需要为 `crate-type` 添加 `dylib`。
 
 - `ranim preview`：调用 Cargo 构建指定的 target，然后启动一个预览应用加载编译出的 dylib，并监听改动进行重载。
 
@@ -77,7 +77,7 @@ preview_scene(hello_ranim_scene); // 需要 `app` feature
 任何实现了 `SceneConstructor` Trait 的类型都可以被用于构造场景：
 
 ```rust,ignore
-{{#include ../../src/lib.rs:SceneConstructor}}
+{{#include ../../packages/ranim-core/src/lib.rs:SceneConstructor}}
 ```
 
 *ranim* 自动为 `F:  Fn(&mut RanimScene) + Send + Sync` 实现了该 Trait。
@@ -90,7 +90,7 @@ preview_scene(hello_ranim_scene); // 需要 `app` feature
 
 ## 2. 时间线
 
-每一个被插入时间线的物件都有一个唯一的 `ItemId`，同时也有一条对应的时间线。
+每一条被插入到场景中的时间线都有一个唯一的 `TimelineId`。
 
 时间线是一种用于编码物件动画的结构，它的内部有一个存储了动画以及展示时间的列表，以及用于编码静态动画的物件状态。
 
@@ -99,6 +99,14 @@ preview_scene(hello_ranim_scene); // 需要 `app` feature
 ![Timeline](timeline.png)
 
 ### 2.1 插入物件（创建时间线）
+
+使用 `r.new_timeline()` 可以插入一条空白的时间线：
+
+```rust,ignore
+let tid: TimelineId = r.new_timeline();
+```
+
+// TODO: 后面还没更新
 
 通过 `r.insert(state)` 可以插入一个物件并为其创建一条时间线：
 
@@ -110,9 +118,9 @@ let circle = Circle::new(1.0).with(|x| {
     x.set_color(manim::RED_C);
 });
 
-let r_square1 = r.insert(square.clone()); // 类型为 `ItemId<Square>`
-let r_square2 = r.insert(square); // 类型为 `ItemId<Square>`
-let r_circle = r.insert(circle); // 类型为 `ItemId<Circle>`
+let r_square1 = r.insert(square.clone());
+let r_square2 = r.insert(square);
+let r_circle = r.insert(circle);
 ```
 
 ### 2.1 访问时间线

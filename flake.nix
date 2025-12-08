@@ -112,14 +112,16 @@
             miniserve
             trunk
             zola
-            mdbook
+            # mdbook
             wasm-pack
             mdbook-mermaid
-            mdbook-katex
+            # mdbook-katex
             # wasm-bindgen-cli
-            mdbook-i18n-helpers
+            # mdbook-i18n-helpers
           ]) ++ [
             (pkgs.callPackage ./wasm-bindgen-cli.nix {})
+            (pkgs.callPackage ./mdbook.nix {})
+            (pkgs.callPackage ./mdbook-katex.nix {})
             ciallo.packages.${system}.default
           ];
         };

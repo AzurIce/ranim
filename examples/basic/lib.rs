@@ -13,14 +13,14 @@ const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 #[scene]
 #[output(dir = "basic")]
 fn basic(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
     r.timelines_mut().forward(0.2);
 
-    let svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {
+    let mut svg = Group::<VItem>::from(SvgItem::new(SVG).with(|svg| {
         svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
             .put_center_on(DVec3::Y * 2.0);
     }));
-    let text = Group::<VItem>::from(
+    let mut text = Group::<VItem>::from(
         SvgItem::new(typst_svg(
             r#"
             #align(center)[
@@ -37,13 +37,12 @@ fn basic(r: &mut RanimScene) {
                 .set_fill_opacity(0.8);
         }),
     );
-    let r_svg = r.insert(svg);
-    let r_text = r.insert(text);
+    let r_svg = r.insert(svg.clone());
+    let r_text = r.insert(text.clone());
 
-    r.timeline_mut(&r_text)
-        .play_with(|text| text.lagged(0.2, |e| e.write()).with_duration(3.0));
-    r.timeline_mut(&r_svg)
-        .play_with(|svg| svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
+    r.timeline_mut(r_text)
+        .play(text.lagged(0.2, |e| e.write()).with_duration(3.0));
+    r.timeline_mut(r_svg).play(svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
     r.timelines_mut().sync();
 
     r.insert_time_mark(

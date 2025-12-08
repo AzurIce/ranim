@@ -120,8 +120,8 @@ impl StrokeWidth for SvgItem {
 // MARK: Conversions
 impl Extract for SvgItem {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        self.0.extract()
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        self.0.extract_into(buf);
     }
 }
 

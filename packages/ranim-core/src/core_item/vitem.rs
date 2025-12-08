@@ -37,16 +37,10 @@ impl Default for VItemPrimitive {
 
 impl Extract for VItemPrimitive {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        vec![CoreItem::VItemPrimitive(self.clone())]
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        buf.push(CoreItem::VItemPrimitive(self.clone()));
     }
 }
-
-// impl Primitive for VItemPrimitive {
-//     fn build_primitives<T: IntoIterator<Item = Self>>(iter: T) -> super::Primitives {
-//         Primitives::VItemPrimitive(iter.into_iter().collect())
-//     }
-// }
 
 impl FillColor for VItemPrimitive {
     fn fill_color(&self) -> AlphaColor<Srgb> {

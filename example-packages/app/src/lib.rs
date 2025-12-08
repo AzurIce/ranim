@@ -13,16 +13,16 @@ use ranim::{
 
 #[scene]
 pub fn hello_ranim(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
 
-    let square = Square::new(2.0).with(|square| {
+    let mut square = Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
     });
 
-    let r_square = r.insert(square);
+    let r_square = r.new_timeline();
     {
-        let timeline = r.timeline_mut(&r_square);
-        timeline.play_with(|square| square.fade_in());
+        let timeline = r.timeline_mut(r_square);
+        timeline.play(square.fade_in());
     };
 
     let circle = Circle::new(2.0).with(|circle| {
@@ -31,14 +31,11 @@ pub fn hello_ranim(r: &mut RanimScene) {
             .rotate(PI / 4.0 + PI, DVec3::Z);
     });
 
-    let r_vitem = r.map(r_square, VItem::from);
-    {
-        let timeline = r.timeline_mut(&r_vitem);
-        timeline.play_with(|state| state.transform_to(circle.into()));
-        timeline.forward(1.0);
-        let circle = timeline.snapshot().clone();
-        timeline.play_with(|circle| circle.unwrite());
-        timeline.play(circle.write());
-        timeline.play_with(|circle| circle.fade_out());
-    };
+    let mut vitem = VItem::from(square);
+    r.timeline_mut(r_square)
+        .play(vitem.transform_to(circle.into()))
+        .forward(1.0)
+        .play(vitem.clone().unwrite())
+        .play(vitem.write())
+        .play(vitem.fade_out());
 }

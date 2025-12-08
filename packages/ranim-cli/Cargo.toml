@@ -18,10 +18,10 @@ doc = false
 ranim = { workspace = true, features = ["preview", "render"] }
 anyhow = "1.0.100"
 cargo_toml = "0.22.3"
-clap = { version = "4.5.49", features = ["derive"] }
-ignore = "0.4.24"
+clap = { version = "4.5.53", features = ["derive"] }
+ignore = "0.4.25"
 krates = "0.20.0"
-libloading = "0.8.9"
+libloading = "0.9.0"
 tracing.workspace = true
 tracing-indicatif.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

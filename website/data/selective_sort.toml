@@ -10,7 +10,7 @@ use ranim::{
 };
 
 fn selective_sort(r: &mut RanimScene, num: usize) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
 
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let padded_frame_size = frame_size * 0.9;
@@ -38,18 +38,18 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                 rect.scale(DVec3::splat(0.8))
                     .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
             });
-            r.insert_and_show(rect)
+            (r.insert(rect.clone()), rect)
         })
         .collect::<Vec<_>>();
 
-    let highlight = |rect: Rectangle| {
+    let highlight = |rect: &mut Rectangle| {
         rect.transform(|data| {
             data.set_color(manim::RED_C).set_fill_opacity(0.5);
         })
         .with_duration(anim_step_duration)
         .with_rate_func(linear)
     };
-    let unhighlight = |rect: Rectangle| {
+    let unhighlight = |rect: &mut Rectangle| {
         rect.transform(|data| {
             data.set_color(manim::WHITE).set_fill_opacity(0.5);
         })
@@ -59,36 +59,41 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
 
     let shift_right = DVec3::X * width_unit;
     for i in 0..num - 1 {
-        r.timeline_mut(&r_rects[i]).play_with(highlight);
+        r.timeline_mut(r_rects[i].0)
+            .play(highlight(&mut r_rects[i].1));
         for j in i + 1..num {
-            r.timeline_mut(&r_rects[j]).play_with(highlight);
+            r.timeline_mut(r_rects[j].0)
+                .play(highlight(&mut r_rects[j].1));
             r.timelines_mut().sync();
 
             if heights[i] > heights[j] {
                 let dir = [shift_right, -shift_right];
                 let color = [manim::BLUE_C, manim::RED_C];
-                r.timeline_mut(&[&r_rects[i], &r_rects[j]])
-                    .iter_mut()
+                r.timeline_mut(r_rects.get_disjoint_mut([i, j]).unwrap())
+                    .unwrap()
+                    .into_iter()
                     .zip(dir)
                     .zip(color)
-                    .for_each(|((timeline, dir), color)| {
-                        timeline.play_with(|rect| {
+                    .for_each(|(((timeline, rect), dir), color)| {
+                        timeline.play(
                             rect.transform(|rect| {
                                 rect.shift(dir * (j - i) as f64)
                                     .set_color(color)
                                     .set_fill_opacity(0.5);
                             })
                             .with_duration(anim_step_duration)
-                            .with_rate_func(linear)
-                        });
+                            .with_rate_func(linear),
+                        );
                     });
                 heights.swap(i, j);
                 r_rects.swap(i, j);
             }
-            r.timeline_mut(&r_rects[j]).play_with(unhighlight);
+            r.timeline_mut(r_rects[j].0)
+                .play(unhighlight(&mut r_rects[j].1));
             r.timelines_mut().sync();
         }
-        r.timeline_mut(&r_rects[i]).play_with(unhighlight);
+        r.timeline_mut(r_rects[i].0)
+            .play(unhighlight(&mut r_rects[i].1));
     }
 
     r.insert_time_mark(
@@ -109,7 +114,7 @@ fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
 ```"""
-hash = "dc6f700ee881dd412d82541ab1134795f2a43bac"
+hash = "73373829a5eab40d4967639269bb9c52bd9de2f1"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/selective_sort_1920x1080_60.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
 wasm = true

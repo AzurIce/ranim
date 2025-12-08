@@ -10,7 +10,7 @@ repository.workspace = true
 ranim-core.workspace = true
 tracing.workspace = true
 itertools.workspace = true
-derive_more = { version = "2.0.1", features = [
+derive_more = { workspace = true, features = [
   "deref_mut",
   "deref",
   "index",
@@ -21,15 +21,15 @@ derive_more = { version = "2.0.1", features = [
   "into_iterator",
 ] }
 sha1 = "0.10.6"
-lru = "0.16.1"
+lru = "0.16.2"
 usvg = "0.45.1"
-typst = "0.13.1"
-typst-kit = { version = "0.13.1", default-features = false, features = [
+typst = "0.14.1"
+typst-kit = { version = "0.14.1", default-features = false, features = [
   "fonts",
   "embed-fonts",
 ] }
 # time = "0.3.41"
-typst-svg = "0.13.1"
+typst-svg = "0.14.1"
 chrono = "0.4.42"
 diff-match-patch-rs = "0.5.1"
 regex = "1.12.2"

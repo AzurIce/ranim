@@ -6,14 +6,16 @@ pub trait FuncRequirement: Clone {}
 
 // MARK: Anim Trait
 /// The methods to create animations for `T` that satisfies [`FuncRequirement`]
-pub trait FuncAnim<T: FuncRequirement + 'static> {
+pub trait FuncAnim: FuncRequirement + 'static {
     /// Create a [`Func`] anim.
-    fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationCell<T>;
+    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> AnimationCell<Self>;
 }
 
-impl<T: FuncRequirement + 'static> FuncAnim<T> for T {
-    fn func(self, f: impl Fn(&T, f64) -> T + 'static) -> AnimationCell<T> {
-        Func::new(self.clone(), f).into_animation_cell()
+impl<T: FuncRequirement + 'static> FuncAnim for T {
+    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> AnimationCell<Self> {
+        Func::new(self.clone(), f)
+            .into_animation_cell()
+            .apply_to(self)
     }
 }
 

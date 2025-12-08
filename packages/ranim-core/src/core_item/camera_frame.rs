@@ -35,15 +35,10 @@ pub struct CameraFrame {
 
 impl Extract for CameraFrame {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        vec![CoreItem::CameraFrame(self.clone())]
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        buf.push(CoreItem::CameraFrame(self.clone()));
     }
 }
-// impl Primitive for CameraFrame {
-//     fn build_primitives<T: IntoIterator<Item = Self>>(iter: T) -> super::Primitives {
-//         Primitives::CameraFrame(iter.into_iter().collect())
-//     }
-// }
 
 impl Interpolatable for CameraFrame {
     fn lerp(&self, target: &Self, t: f64) -> Self {

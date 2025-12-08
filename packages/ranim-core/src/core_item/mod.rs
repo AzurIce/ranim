@@ -5,7 +5,14 @@
 //! Currently, there are two types of [`CoreItem`]s:
 //! - [`CameraFrame`]: The camera frame.
 //! - [`VItemPrimitive`]: The vitem primitive.
-use crate::core_item::{camera_frame::CameraFrame, vitem::VItemPrimitive};
+use std::any::Any;
+
+use dyn_clone::DynClone;
+
+use crate::{
+    Extract,
+    core_item::{camera_frame::CameraFrame, vitem::VItemPrimitive},
+};
 
 /// Camera frame
 pub mod camera_frame;
@@ -19,4 +26,21 @@ pub enum CoreItem {
     CameraFrame(CameraFrame),
     /// [`VItemPrimitive`]
     VItemPrimitive(VItemPrimitive),
+}
+
+/// The item that can be extracted to [`CoreItem`]s
+pub trait AnyExtractCoreItem: Any + Extract<Target = CoreItem> + DynClone {}
+impl<T: Extract<Target = CoreItem> + Any + DynClone> AnyExtractCoreItem for T {}
+
+dyn_clone::clone_trait_object!(AnyExtractCoreItem);
+
+/// A dynamic item, basically type erased [`AnyExtractCoreItem`]
+#[derive(Clone)]
+pub struct DynItem(pub Box<dyn AnyExtractCoreItem>);
+
+impl Extract for DynItem {
+    type Target = CoreItem;
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        self.0.extract_into(buf);
+    }
 }

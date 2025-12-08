@@ -69,6 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Commands::Build { examples } => {
             filter_examples(&examples);
             for example in all_examples {
+                println!("正在构建示例 {}...", example.name);
                 example.build_wasm(&workspace_root);
                 println!("示例 {} 处理完成", example.name);
             }
@@ -76,6 +77,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Commands::Run { lazy_run, examples } => {
             filter_examples(&examples);
             for example in all_examples {
+                println!("正在运行示例 {}...", example.name);
                 example.run(&workspace_root, lazy_run);
                 println!("示例 {} 处理完成", example.name);
             }

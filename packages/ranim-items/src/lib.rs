@@ -9,7 +9,6 @@
 
 use derive_more::{Deref, DerefMut};
 use ranim_core::{
-    Extract,
     traits::{Alignable, Interpolatable, Opacity},
     utils::resize_preserving_order_with_repeated_indices,
 };
@@ -87,12 +86,5 @@ impl<T: Opacity + Alignable + Clone> Alignable for Group<T> {
         self.iter_mut()
             .zip(other)
             .for_each(|(a, b)| a.align_with(b));
-    }
-}
-
-impl<E: Extract> Extract for Group<E> {
-    type Target = E::Target;
-    fn extract(&self) -> Vec<Self::Target> {
-        self.iter().flat_map(|x| x.extract()).collect()
     }
 }

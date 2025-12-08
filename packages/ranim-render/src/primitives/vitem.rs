@@ -137,18 +137,15 @@ impl RenderResource for VItemRenderInstance {
         }
     }
     fn update(&mut self, ctx: &WgpuContext, data: &Self::Data) {
-        if self.point_cnt_buffer.is_none() {
+        if let Some(point_cnt_buffer) = self.point_cnt_buffer.as_mut() {
+            point_cnt_buffer.set(ctx, data.points2d.len() as u32);
+        } else {
             self.point_cnt_buffer = Some(WgpuBuffer::new_init(
                 ctx,
                 Some("Point Cnt Buffer"),
                 wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                 data.points2d.len() as u32,
             ));
-        } else {
-            self.point_cnt_buffer
-                .as_mut()
-                .unwrap()
-                .set(ctx, data.points2d.len() as u32);
         }
         // Dynamic sized
         if [
