@@ -132,7 +132,6 @@ impl Default for SceneConfig {
 
 /// The output of a scene
 #[derive(Debug, Clone)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct Output {
     /// The width of the output texture in pixels.
     pub width: u32,
@@ -145,7 +144,6 @@ pub struct Output {
     /// The directory to save the output
     ///
     /// Related to the `output` folder, Or absolute.
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub dir: &'static str,
 }
 

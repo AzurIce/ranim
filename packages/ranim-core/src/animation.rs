@@ -86,6 +86,8 @@ pub trait CoreItemAnimation {
     fn eval_alpha_core_item(&self, alpha: f64) -> Vec<CoreItem>;
     /// Get the animation info
     fn anim_info(&self) -> &AnimationInfo;
+    /// Get the name of the animation
+    fn anim_name(&self) -> &str;
 }
 
 /// A cell of an animation
@@ -93,6 +95,7 @@ pub struct AnimationCell<T> {
     inner: Box<dyn Eval<T>>,
     /// The animation info
     pub info: AnimationInfo,
+    anim_name: String,
 }
 
 impl<T> AnimationCell<T> {
@@ -134,6 +137,9 @@ impl<T: AnyExtractCoreItem> CoreItemAnimation for AnimationCell<T> {
     fn anim_info(&self) -> &AnimationInfo {
         &self.info
     }
+    fn anim_name(&self) -> &str {
+        &self.anim_name
+    }
 }
 
 // MARK: Eval
@@ -153,6 +159,7 @@ pub trait Eval<T> {
         AnimationCell {
             inner: Box::new(self),
             info: AnimationInfo::default(),
+            anim_name: std::any::type_name::<Self>().to_string(),
         }
     }
 }

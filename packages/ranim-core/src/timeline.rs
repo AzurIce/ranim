@@ -145,11 +145,13 @@ impl TimelineFunc for NeoItemTimeline {
         self.hide();
     }
     fn get_animation_infos(&self) -> Vec<AnimationInfo> {
-        // self.inner
-        //     .iter()
-        //     .flat_map(|timeline| timeline.get_animation_infos())
-        //     .collect()
-        vec![]
+        self.anims
+            .iter()
+            .map(|a| AnimationInfo {
+                anim_name: a.anim_name().to_string(),
+                range: a.anim_info().range(),
+            })
+            .collect()
     }
     fn type_name(&self) -> &str {
         ""
