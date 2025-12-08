@@ -3,21 +3,21 @@ use egui::{
     emath::GuiRounding, pos2, remap_clamp,
 };
 
-use ranim_core::{ItemDynTimelinesInfo, color::palettes::manim};
+use ranim_core::{TimelineInfo, color::palettes::manim};
 
-use super::TimelineInfo;
+use super::TimelineInfoState;
 
 pub(super) struct TimelineState {
     pub(super) total_sec: f64,
     pub(super) current_sec: f64,
     pub(super) width_sec: f64,
     pub(super) offset_points: f32,
-    pub(super) timeline_infos: Vec<ItemDynTimelinesInfo>,
+    pub(super) timeline_infos: Vec<TimelineInfo>,
 }
 
 #[allow(unused)]
 impl TimelineState {
-    pub fn new(total_sec: f64, timeline_infos: Vec<ItemDynTimelinesInfo>) -> Self {
+    pub fn new(total_sec: f64, timeline_infos: Vec<TimelineInfo>) -> Self {
         Self {
             total_sec,
             current_sec: 0.0,
@@ -52,7 +52,7 @@ impl TimelineState {
         });
     }
 
-    pub fn interact_preview_timeline(&mut self, info: &TimelineInfo) {
+    pub fn interact_preview_timeline(&mut self, info: &TimelineInfoState) {
         let response = &info.response;
 
         if response.clicked()
@@ -101,7 +101,7 @@ impl TimelineState {
                     ui.id().with("canvas"),
                     egui::Sense::click_and_drag(),
                 );
-                let info = TimelineInfo {
+                let info = TimelineInfoState {
                     ctx: ui.ctx().clone(),
                     canvas,
                     response,
@@ -133,7 +133,7 @@ impl TimelineState {
         });
     }
 
-    pub fn interact_main_timeline(&mut self, info: &TimelineInfo) {
+    pub fn interact_main_timeline(&mut self, info: &TimelineInfoState) {
         let response = &info.response;
 
         if response.drag_delta().x != 0.0 {
@@ -170,7 +170,7 @@ impl TimelineState {
     }
 }
 
-pub fn ui_canvas(state: &mut TimelineState, info: &TimelineInfo) -> f32 {
+pub fn ui_canvas(state: &mut TimelineState, info: &TimelineInfoState) -> f32 {
     let line_height = 16.0;
     let gap = 4.0;
 
@@ -196,7 +196,10 @@ pub fn ui_canvas(state: &mut TimelineState, info: &TimelineInfo) -> f32 {
             }
 
             let rect = Rect::from_min_max(pos2(start_x, top_y), pos2(end_x, bottom_y));
-            let rect_color = if animation_info.anim_name.starts_with("ranim_core::animation::Static") {
+            let rect_color = if animation_info
+                .anim_name
+                .starts_with("ranim_core::animation::Static")
+            {
                 manim::YELLOW_C.to_rgba8()
             } else {
                 manim::BLUE_C.to_rgba8()
@@ -345,7 +348,7 @@ pub fn paint_time_grid(
 }
 
 pub fn paint_timeline(
-    info: &TimelineInfo,
+    info: &TimelineInfoState,
     rect: egui::Rect,
     state: &TimelineState,
     current_ms: i64,

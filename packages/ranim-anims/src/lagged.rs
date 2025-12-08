@@ -28,9 +28,7 @@ where
         lag_ratio: f64,
         anim_func: impl FnMut(&mut T) -> AnimationCell<T>,
     ) -> AnimationCell<Vec<T>> {
-        let anim =
-            Lagged::new(lag_ratio, self.into_iter().map(anim_func).collect()).into_animation_cell();
-        anim
+        Lagged::new(lag_ratio, self.into_iter().map(anim_func).collect()).into_animation_cell()
     }
 }
 

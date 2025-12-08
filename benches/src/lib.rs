@@ -64,9 +64,12 @@ pub mod test_scenes {
                 }))
             })
             .collect::<Vec<_>>();
-        squares.into_iter().zip(circles).for_each(|((r_square, item), circle)| {
-            r.timeline_mut(r_square)
-                .play(item.clone().transform_to(circle));
-        });
+        squares
+            .into_iter()
+            .zip(circles)
+            .for_each(|((r_square, item), circle)| {
+                r.timeline_mut(r_square)
+                    .play(item.clone().transform_to(circle));
+            });
     }
 }

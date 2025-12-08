@@ -291,9 +291,9 @@ impl RanimScene {
     }
 }
 
-/// The information of an [`ItemDynTimelines`].
-pub struct ItemDynTimelinesInfo {
-    /// The inner id value of the [`ItemId`]
+/// The information of an [`Timeline`].
+pub struct TimelineInfo {
+    /// The inner id value of the [`TimelineId`]
     pub id: usize,
     /// The animation infos.
     pub animation_infos: Vec<AnimationInfo>,
@@ -338,13 +338,13 @@ impl SealedRanimScene {
     }
 
     /// Get timeline infos.
-    pub fn get_timeline_infos(&self) -> Vec<ItemDynTimelinesInfo> {
+    pub fn get_timeline_infos(&self) -> Vec<TimelineInfo> {
         // const MAX_TIMELINE_CNT: usize = 100;
         self.timelines
             .iter()
             .enumerate()
             // .take(MAX_TIMELINE_CNT)
-            .map(|(id, timeline)| ItemDynTimelinesInfo {
+            .map(|(id, timeline)| TimelineInfo {
                 id,
                 animation_infos: timeline.get_animation_infos(),
             })
@@ -382,9 +382,9 @@ impl SealedRanimScene {
 /// |   `TQ: TimelineQuery<'a>`    | `TQ::RessembleResult` and `TQ::RessembleMutResult` |
 /// |   `[TQ: TimelineQuery<'a>; N]`    | `[TQ::RessembleResult; N]` and `Result<[TQ::RessembleMutResult; N], TimelineIndexMutError>` |
 pub trait TimelineIndex<'a> {
-    /// Output of [`TimelineIndex::timeline`]
+    /// Output of [`TimelineIndex::get_index_ref`]
     type RefOutput;
-    /// Output of [`TimelineIndex::timeline_mut`]
+    /// Output of [`TimelineIndex::get_index_mut`]
     type MutOutput;
     /// Get the reference of timeline(s) from [`RanimScene`] by the [`TimelineIndex`].
     fn get_index_ref(self, timelines: &'a [Timeline]) -> Self::RefOutput;
@@ -542,9 +542,9 @@ impl<'a, TI: TimelineQuery<'a>, const N: usize> TimelineIndex<'a> for [TI; N] {
         // We use ManuallyDrop to prevent double-drop of self's elements after
         // reading them with ptr::read.
         let res = unsafe {
-            for i in 0..N {
-                let timeline_ref = &mut *timelines_ptr.add(indices[i]);
-                let ti = std::ptr::read(self_manually_drop.as_ptr().add(i));
+            for (i, &idx) in indices.iter().enumerate() {
+                let timeline_ref = &mut *timelines_ptr.add(idx);
+                let ti = std::ptr::read(self_manually_drop.as_ptr().add(idx));
                 arr_ptr
                     .cast::<TI::RessembleMutResult>()
                     .add(i)

@@ -117,6 +117,7 @@ impl Timeline {
             })
             .map(|(idx, anim, range)| {
                 let alpha = (target_sec - range.start) / (range.end - range.start);
+                let alpha = if alpha.is_nan() { 1.0 } else { alpha };
                 (anim.eval_alpha_dyn(alpha), idx as u64)
             })
     }

@@ -164,8 +164,8 @@ impl Extract for VItem {
         buf.push(CoreItem::VItemPrimitive(VItemPrimitive {
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
-            stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>().into(),
-            stroke_widths: self.stroke_widths.iter().cloned().collect::<Vec<_>>().into(),
+            stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
+            stroke_widths: self.stroke_widths.iter().cloned().collect::<Vec<_>>(),
         }));
     }
 }

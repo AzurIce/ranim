@@ -9,7 +9,10 @@ use std::any::Any;
 
 use dyn_clone::DynClone;
 
-use crate::{Extract, core_item::{camera_frame::CameraFrame, vitem::VItemPrimitive}};
+use crate::{
+    Extract,
+    core_item::{camera_frame::CameraFrame, vitem::VItemPrimitive},
+};
 
 /// Camera frame
 pub mod camera_frame;

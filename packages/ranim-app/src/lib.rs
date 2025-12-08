@@ -46,7 +46,7 @@ struct OccupiedScreenSpace {
     right: f32,
 }
 
-struct TimelineInfo {
+struct TimelineInfoState {
     ctx: egui::Context,
     canvas: egui::Rect,
     response: egui::Response,
@@ -55,7 +55,7 @@ struct TimelineInfo {
     font_id: egui::FontId,
 }
 
-impl TimelineInfo {
+impl TimelineInfoState {
     fn point_from_ms(&self, state: &TimelineState, ms: i64) -> f32 {
         self.canvas.min.x
             + state.offset_points

@@ -15,7 +15,7 @@ use crate::{
 use std::fmt::Debug;
 
 /// Info of an animation.
-/// 
+///
 /// When [`AnimationInfo::enabled`] is `false`, the animation will not be evaluated.
 #[derive(Debug, Clone)]
 pub struct AnimationInfo {
