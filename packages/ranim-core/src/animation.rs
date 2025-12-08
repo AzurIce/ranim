@@ -69,21 +69,13 @@ impl Default for AnimationInfo {
 // ANCHOR_END: AnimationInfo
 
 impl AnimationInfo {
-    /// Get the start sec of the animation
-    pub fn start_sec(&self) -> f64 {
-        self.start_sec
-    }
-    /// Get the end sec of the animation
-    pub fn end_sec(&self) -> f64 {
-        self.start_sec + self.duration_secs
-    }
     /// Get the range of the animation
     pub fn range(&self) -> std::ops::Range<f64> {
-        self.start_sec()..self.end_sec()
+        self.start_sec..self.start_sec + self.duration_secs
     }
     /// Get the inclusive range of the animation
     pub fn range_inclusive(&self) -> std::ops::RangeInclusive<f64> {
-        self.start_sec()..=self.end_sec()
+        self.start_sec..=self.start_sec + self.duration_secs
     }
     // ANCHOR: AnimationInfo-map_alpha
     /// Map the outer alpha to inner alpha
@@ -108,7 +100,7 @@ impl AnimationInfo {
 }
 
 impl AnimationInfo {
-    /// A builder func to modify [`AnimationInfo::at_sec`]
+    /// A builder func to modify [`AnimationInfo::start_sec`]
     pub fn at(mut self, at_sec: f64) -> Self {
         self.start_sec = at_sec;
         self
