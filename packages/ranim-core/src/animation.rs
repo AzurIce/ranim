@@ -5,7 +5,7 @@
 //! When constructing an animation, we need [`AnimationInfo`] besides the evaluation core, which is
 //! [`AnimationCell<T>`].
 //!
-//! When satisfies `T: Extract<Target = CoreItem>`, [`AnimationCell<T>`] can be converted to a [`PrimitiveAnimationCell`].
+//! When satisfies `T: Extract<Target = CoreItem>`, [`AnimationCell<T>`] can be converted to a [`CoreItemAnimation`].
 
 use crate::{
     core_item::{AnyExtractCoreItem, CoreItem, DynItem},

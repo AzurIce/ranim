@@ -8,7 +8,6 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
-/// Fondation of animation
 pub mod animation;
 /// Color
 pub mod color;
@@ -21,9 +20,8 @@ pub mod traits;
 /// Utils
 pub mod utils;
 
-/// The core primitives
 pub mod core_item;
-/// The [`CoreItem`] store
+/// The [`core_item::CoreItem`] store
 pub mod store;
 
 pub use glam;
@@ -267,12 +265,12 @@ impl RanimScene {
         })
     }
 
-    /// Get reference of all timelines in the type erased [`ItemDynTimelines`] type.
+    /// Get reference of all timelines
     pub fn timelines(&self) -> &[Timeline] {
         trace!("timelines");
         &self.timelines
     }
-    /// Get mutable reference of all timelines in the type erased [`ItemDynTimelines`] type.
+    /// Get mutable reference of all timelines
     pub fn timelines_mut(&mut self) -> &mut [Timeline] {
         trace!("timelines_mut");
         &mut self.timelines
