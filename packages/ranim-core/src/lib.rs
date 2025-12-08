@@ -543,7 +543,7 @@ impl<'a, TI: TimelineQuery<'a>, const N: usize> TimelineIndex<'a> for [TI; N] {
         let res = unsafe {
             for (i, &idx) in indices.iter().enumerate() {
                 let timeline_ref = &mut *timelines_ptr.add(idx);
-                let ti = std::ptr::read(self_manually_drop.as_ptr().add(idx));
+                let ti = std::ptr::read(self_manually_drop.as_ptr().add(i));
                 arr_ptr
                     .cast::<TI::RessembleMutResult>()
                     .add(i)
