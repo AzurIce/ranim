@@ -15,7 +15,7 @@ use ranim::{
 #[scene]
 #[output(dir = "getting_started1")]
 fn getting_started1(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
     // A Square with size 2.0 and color blue
     let square = Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
@@ -25,18 +25,18 @@ fn getting_started1(r: &mut RanimScene) {
         circle.set_color(manim::RED_C);
     });
 
-    // In order to do more low-level opeerations,
-    // sometimes we need to convert the item to a low-level item.
-    let r_vitem = r.insert(VItem::from(square));
+    let r_vitem = r.new_timeline();
     {
-        let timeline = r.timeline_mut(&r_vitem);
-        timeline.play_with(|vitem| vitem.transform_to(VItem::from(circle.clone())));
-        timeline.play_with(|vitem| vitem.unwrite());
+        let timeline = r.timeline_mut(r_vitem);
+        // In order to do more low-level opeerations,
+        // sometimes we need to convert the item to a low-level item.
+        timeline.play(VItem::from(square).transform_to(VItem::from(circle.clone())));
+        timeline.play(VItem::from(circle).unwrite());
     }
 }
 // ANCHOR_END: construct
 ```"""
-hash = "3acfe0135b3a90853dcffbfb79262e5aeb3931c4"
+hash = "849548e2724f7c97cd54748bacc8c0e852987637"
 preview_imgs = []
 output_files = ["/examples/getting_started1/getting_started1_1920x1080_60.mp4"]
 wasm = true

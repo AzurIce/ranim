@@ -11,7 +11,7 @@ use lru::LruCache;
 use regex::bytes::Regex;
 use sha1::{Digest, Sha1};
 use typst::{
-    Library, World,
+    Library, LibraryExt, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime},
     layout::Abs,
@@ -430,8 +430,8 @@ impl From<TypstText> for Group<VItem> {
 
 impl Extract for TypstText {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        self.vitems.extract()
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        self.vitems.extract_into(buf);
     }
 }
 

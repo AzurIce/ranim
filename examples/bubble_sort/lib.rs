@@ -9,7 +9,7 @@ use ranim::{
 };
 
 fn bubble_sort(r: &mut RanimScene, num: usize) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
 
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let padded_frame_size = frame_size * 0.9;
@@ -38,18 +38,18 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
                     .scale(DVec3::splat(0.8))
                     .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
             });
-            r.insert_and_show(rect)
+            (r.insert(rect.clone()), rect)
         })
         .collect::<Vec<_>>();
 
-    let anim_highlight = |rect: Rectangle| {
+    let anim_highlight = |rect: &mut Rectangle| {
         rect.transform(|data| {
             data.set_fill_color(manim::BLUE_C.with_alpha(0.5));
         })
         .with_duration(anim_step_duration)
         .with_rate_func(linear)
     };
-    let anim_unhighlight = |rect: Rectangle| {
+    let anim_unhighlight = |rect: &mut Rectangle| {
         rect.transform(|data| {
             data.set_fill_color(manim::WHITE.with_alpha(0.5));
         })
@@ -58,39 +58,41 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
     };
     let shift_right = DVec3::X * width_unit;
     let swap_shift = [shift_right, -shift_right];
-    let anim_swap = |timeline: &mut RanimScene, r_rectab: &[&ItemId<Rectangle>; 2]| {
-        let timelines = timeline.timeline_mut(r_rectab);
+    let anim_swap = |r: &mut RanimScene, r_rectab: [&mut (TimelineId, Rectangle); 2]| {
+        let timelines = r.timeline_mut(r_rectab).unwrap();
         timelines
             .into_iter()
             .zip(swap_shift.iter())
-            .for_each(|(timeline, shift)| {
-                timeline.play_with(|rect| {
+            .for_each(|((timeline, rect), shift)| {
+                timeline.play(
                     rect.transform(|data| {
                         data.shift(*shift);
                     })
                     .with_duration(anim_step_duration)
-                    .with_rate_func(linear)
-                });
+                    .with_rate_func(linear),
+                );
             });
     };
 
     for i in (1..num).rev() {
         for j in 0..i {
-            r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])
+            r.timeline_mut(r_rects.get_disjoint_mut([j, j + 1]).unwrap())
+                .unwrap()
                 .into_iter()
-                .for_each(|timeline| {
-                    timeline.play_with(anim_highlight);
+                .for_each(|(timeline, rect)| {
+                    timeline.play(anim_highlight(rect));
                 });
             if heights[j] > heights[j + 1] {
-                anim_swap(r, &[&r_rects[j], &r_rects[j + 1]]);
+                anim_swap(r, r_rects.get_disjoint_mut([j, j + 1]).unwrap());
                 r.timelines_mut().sync();
                 heights.swap(j, j + 1);
                 r_rects.swap(j, j + 1);
             }
-            r.timeline_mut(&[&r_rects[j], &r_rects[j + 1]])
+            r.timeline_mut(r_rects.get_disjoint_mut([j, j + 1]).unwrap())
+                .unwrap()
                 .into_iter()
-                .for_each(|timeline| {
-                    timeline.play_with(anim_unhighlight);
+                .for_each(|(timeline, rect)| {
+                    timeline.play(anim_unhighlight(rect));
                 });
             r.timelines_mut().sync();
         }

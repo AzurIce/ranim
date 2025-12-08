@@ -24,7 +24,7 @@ fn solve_hanoi(
 }
 
 fn hanoi(r: &mut RanimScene, n: usize) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
     let total_sec = 10.0;
     let rod_width = 0.4;
     let rod_height = 5.0;
@@ -40,7 +40,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 );
             })
         })
-        .map(|rect| r.insert_and_show(rect))
+        .map(|rect| (r.insert(rect.clone()), rect))
         .collect::<Vec<_>>();
 
     let min_disk_width = rod_width * 1.7;
@@ -50,7 +50,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
         .map(|i| {
             let factor = i as f64 / (n - 1) as f64;
             let disk_width = min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);
-            r.insert_and_show(Rectangle::new(disk_width, disk_height).with(|rect| {
+            let disk = Rectangle::new(disk_width, disk_height).with(|rect| {
                 let color =
                     manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
                 rect.stroke_width = 0.0;
@@ -58,7 +58,8 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                     Anchor::edge(0, -1, 0),
                     dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.0),
                 );
-            }))
+            });
+            (r.insert(disk.clone()), disk)
         })
         .collect::<Vec<_>>();
 
@@ -69,18 +70,18 @@ fn hanoi(r: &mut RanimScene, n: usize) {
         let top_disk_y = |idx: usize| r_disks[idx].len() as f64 * disk_height - 4.0;
         let top_src = top_disk_y(idx_src) - disk_height;
         let top_dst = top_disk_y(idx_dst);
-        let r_disk = r_disks[idx_src].pop().unwrap();
+        let mut r_disk = r_disks[idx_src].pop().unwrap();
 
         {
-            let timeline = r.timeline_mut(&r_disk);
-            timeline.play_with(|disk| {
+            let (timeline, disk) = r.timeline_mut(&mut r_disk);
+            timeline.play(
                 disk.transform(|data| {
                     data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
                 })
                 .with_duration(anim_duration)
-                .with_rate_func(ease_in_quad)
-            });
-            timeline.play_with(|disk| {
+                .with_rate_func(ease_in_quad),
+            );
+            timeline.play(
                 disk.transform(|data| {
                     data.shift(dvec3(
                         (idx_dst as f64 - idx_src as f64) * rod_section_width,
@@ -89,15 +90,15 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                     ));
                 })
                 .with_duration(anim_duration)
-                .with_rate_func(linear)
-            });
-            timeline.play_with(|disk| {
+                .with_rate_func(linear),
+            );
+            timeline.play(
                 disk.transform(|data| {
                     data.shift(dvec3(0.0, top_dst - 3.0, 0.0));
                 })
                 .with_duration(anim_duration)
-                .with_rate_func(ease_out_quad)
-            });
+                .with_rate_func(ease_out_quad),
+            );
         }
         r.timelines_mut().sync();
         r_disks[idx_dst].push(r_disk);

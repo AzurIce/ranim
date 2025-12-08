@@ -18,45 +18,45 @@ use ranim::{
 #[scene]
 #[output(dir = "getting_started2")]
 fn getting_started2(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
     let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
         rect.set_stroke_color(manim::GREEN_C);
     });
 
     // The new initialized timeline is hidden by default, use show to start encoding a static anim and make it show
-    let r_rect: ItemId<Rectangle> = r.insert_and(rect, |timeline| {
-        timeline.show();
-    });
-    // or use `insert_and_show`
-    // let r_rect: ItemId<Rectangle> = r.insert_and_show(rect)
+    let r_rect = r.insert(rect.clone());
 
     r.timelines_mut().forward(1.0);
 
-    let square = Square::new(2.0).with(|square| {
-        square.set_color(manim::BLUE_C);
-    });
-    let circle = Circle::new(2.0).with(|circle| {
-        circle.set_color(manim::RED_C);
-    });
-    let r_vitem = r.insert(VItem::from(square));
+    let square: VItem = Square::new(2.0)
+        .with(|square| {
+            square.set_color(manim::BLUE_C);
+        })
+        .into();
+    let circle: VItem = Circle::new(2.0)
+        .with(|circle| {
+            circle.set_color(manim::RED_C);
+        })
+        .into();
+    let r_vitem = r.insert(square.clone());
     {
-        let timeline = r.timeline_mut(&r_vitem);
+        let timeline = r.timeline_mut(r_vitem);
         timeline
             .forward(1.0)
-            .play_with(|vitem| vitem.create())
-            .play_with(|vitem| {
-                vitem
-                    .transform_to(VItem::from(circle.clone()))
-                    .with_rate_func(linear)
-            })
-            .play_with(|vitem| vitem.unwrite());
+            .play(square.clone().create())
+            .play(
+                square
+                    .clone()
+                    .transform_to(circle.clone())
+                    .with_rate_func(linear),
+            )
+            .play(circle.clone().unwrite());
     }
 
-    let r_rect: ItemId<VItem> = r.map(r_rect, VItem::from);
-    r.timeline_mut(&r_rect).play_with(|rect| rect.uncreate());
+    r.timeline_mut(r_rect).play(VItem::from(rect).uncreate());
 }
 ```"""
-hash = "56994dde238642f32bdd887cd92a1acd7fa13251"
+hash = "e18dce100dd758fa742545284441686ce82fcdb5"
 preview_imgs = []
 output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
 wasm = true

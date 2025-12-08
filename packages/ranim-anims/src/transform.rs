@@ -10,35 +10,42 @@ pub trait TransformRequirement: Alignable + Interpolatable + Clone {}
 impl<T: Alignable + Interpolatable + Clone> TransformRequirement for T {}
 // ANCHOR_END: TransformRequirement
 
+// ANCHOR: TransformAnim
 /// The methods to create animations for `T` that satisfies [`TransformRequirement`]
-pub trait TransformAnim<T: TransformRequirement + 'static> {
+pub trait TransformAnim: TransformRequirement + Sized + 'static {
     /// Create a [`Transform`] anim with a func.
-    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationCell<T>;
+    fn transform<F: Fn(&mut Self)>(&mut self, f: F) -> AnimationCell<Self>;
     /// Create a [`Transform`] anim from src.
-    fn transform_from(self, src: T) -> AnimationCell<T>;
+    fn transform_from(&mut self, src: Self) -> AnimationCell<Self>;
     /// Create a [`Transform`] anim to dst.
-    fn transform_to(self, dst: T) -> AnimationCell<T>;
+    fn transform_to(&mut self, dst: Self) -> AnimationCell<Self>;
 }
+// ANCHOR_END: TransformAnim
 
-impl<T: TransformRequirement + 'static> TransformAnim<T> for T {
-    fn transform<F: Fn(&mut T)>(self, f: F) -> AnimationCell<T> {
+// ANCHOR: TransformAnim-Impl
+impl<T: TransformRequirement + 'static> TransformAnim for T {
+    fn transform<F: Fn(&mut T)>(&mut self, f: F) -> AnimationCell<T> {
         let mut dst = self.clone();
         (f)(&mut dst);
         Transform::new(self.clone(), dst)
             .into_animation_cell()
             .with_rate_func(smooth)
+            .apply_to(self)
     }
-    fn transform_from(self, s: T) -> AnimationCell<T> {
+    fn transform_from(&mut self, s: T) -> AnimationCell<T> {
         Transform::new(s, self.clone())
             .into_animation_cell()
             .with_rate_func(smooth)
+            .apply_to(self)
     }
-    fn transform_to(self, d: T) -> AnimationCell<T> {
+    fn transform_to(&mut self, d: T) -> AnimationCell<T> {
         Transform::new(self.clone(), d)
             .into_animation_cell()
             .with_rate_func(smooth)
+            .apply_to(self)
     }
 }
+// ANCHOR_END: TransformAnim-Impl
 
 // ANCHOR: Transform
 /// Transform Anim
@@ -67,7 +74,7 @@ impl<T: TransformRequirement> Transform<T> {
     }
 }
 
-// ANCHOR: Transform-EvalDynamic
+// ANCHOR: Transform-Eval
 impl<T: TransformRequirement> Eval<T> for Transform<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         if alpha == 0.0 {
@@ -81,4 +88,4 @@ impl<T: TransformRequirement> Eval<T> for Transform<T> {
         }
     }
 }
-// ANCHOR_END: Transform-EvalDynamic
+// ANCHOR_END: Transform-Eval

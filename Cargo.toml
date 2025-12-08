@@ -35,15 +35,16 @@ ranim-macros = { path = "packages/ranim-macros", version = "0.1.5" }
 ranim-app = { path = "packages/ranim-app", version = "0.1.5" }
 ranim-render = { path = "packages/ranim-render", version = "0.1.5" }
 wgpu-profiler = { version = "0.25.0", features = ["puffin"] }
-wasm-bindgen = "0.2.105"
+wasm-bindgen = "0.2.106"
 glam = "0.30.9"
-tracing = "0.1.41"
-tracing-indicatif = "0.3.13"
-tracing-subscriber = "0.3.20"
+tracing = "0.1.43"
+tracing-indicatif = "0.3.14"
+tracing-subscriber = "0.3.22"
 itertools = "0.14"
 bytemuck = "1.24.0"
 wgpu = "27.0.1"
-image = "0.25.8"
+image = "0.25.9"
+derive_more = "2.1.0"
 
 [features]
 # default = ["output"]
@@ -79,7 +80,7 @@ ranim-macros.workspace = true
 ranim-app = { workspace = true, optional = true }
 itertools.workspace = true
 tracing.workspace = true
-derive_more = { version = "2.0.1", features = [
+derive_more = { workspace = true, features = [
   "deref_mut",
   "deref",
   "index",
@@ -95,7 +96,7 @@ ranim-render = { workspace = true, optional = true }
 wgpu = { workspace = true, optional = true }
 pollster = { version = "0.4.0", optional = true }
 which = { version = "8.0.0", optional = true }
-indicatif = { version = "0.18.2", optional = true }
+indicatif = { version = "0.18.3", optional = true }
 tracing-indicatif = { workspace = true, optional = true }
 flate2 = { version = "1.1.5", optional = true }
 reqwest = { version = "0.12.24", features = ["blocking"], optional = true }

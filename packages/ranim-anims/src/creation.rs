@@ -15,21 +15,23 @@ impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`CreationRequirement`]
 pub trait CreationAnim<T: CreationRequirement + 'static> {
     /// Create a [`Create`] anim for `T`.
-    fn create(self) -> AnimationCell<T>;
+    fn create(&mut self) -> AnimationCell<T>;
     /// Create an [`UnCreate`] anim for `T`.
-    fn uncreate(self) -> AnimationCell<T>;
+    fn uncreate(&mut self) -> AnimationCell<T>;
 }
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
-    fn create(self) -> AnimationCell<T> {
-        Create::new(self)
+    fn create(&mut self) -> AnimationCell<T> {
+        Create::new(self.clone())
             .into_animation_cell()
             .with_rate_func(smooth)
+            .apply_to(self)
     }
-    fn uncreate(self) -> AnimationCell<T> {
-        UnCreate::new(self)
+    fn uncreate(&mut self) -> AnimationCell<T> {
+        UnCreate::new(self.clone())
             .into_animation_cell()
             .with_rate_func(smooth)
+            .apply_to(self)
     }
 }
 
@@ -39,23 +41,25 @@ pub trait WritingRequirement: CreationRequirement + StrokeWidth + StrokeColor + 
 impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequirement for T {}
 
 /// The methods to create animations for `T` that satisfies [`WritingRequirement`]
-pub trait WritingAnim<T: WritingRequirement + 'static> {
+pub trait WritingAnim: WritingRequirement + Sized + 'static {
     /// Create a [`Write`] anim for `T`.
-    fn write(self) -> AnimationCell<T>;
+    fn write(&mut self) -> AnimationCell<Self>;
     /// Create a [`Unwrite`] anim for `T`.
-    fn unwrite(self) -> AnimationCell<T>;
+    fn unwrite(&mut self) -> AnimationCell<Self>;
 }
 
-impl<T: WritingRequirement + 'static> WritingAnim<T> for T {
-    fn write(self) -> AnimationCell<T> {
-        Write::new(self)
+impl<T: WritingRequirement + Sized + 'static> WritingAnim for T {
+    fn write(&mut self) -> AnimationCell<Self> {
+        Write::new(self.clone())
             .into_animation_cell()
             .with_rate_func(smooth)
+            .apply_to(self)
     }
-    fn unwrite(self) -> AnimationCell<T> {
-        Unwrite::new(self)
+    fn unwrite(&mut self) -> AnimationCell<Self> {
+        Unwrite::new(self.clone())
             .into_animation_cell()
             .with_rate_func(smooth)
+            .apply_to(self)
     }
 }
 

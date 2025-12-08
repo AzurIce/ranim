@@ -11,7 +11,7 @@ use ranim::{
 #[scene]
 #[output(dir = "arc")]
 pub fn arc(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
 
     // let frame_size = app.camera().size;
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
@@ -25,7 +25,7 @@ pub fn arc(r: &mut RanimScene) {
     let step_x = frame_size.x / ncol as f64;
     let step_y = frame_size.y / nrow as f64;
 
-    let arcs = (0..nrow)
+    let mut arcs = (0..nrow)
         .cartesian_product(0..ncol)
         .map(|(i, j)| {
             let (i, j) = (i as f64, j as f64);
@@ -45,10 +45,11 @@ pub fn arc(r: &mut RanimScene) {
             })
         })
         .collect::<Group<_>>();
-    let r_arcs = r.insert(arcs);
+    let r_arcs = r.new_timeline();
 
-    r.timeline_mut(&r_arcs)
-        .play_with(|arcs| arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+    r.timeline_mut(r_arcs)
+        .play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+    r.timelines_mut().sync();
 
     r.insert_time_mark(
         r.timelines().max_total_secs(),

@@ -191,8 +191,8 @@ impl From<Arc> for VItem {
 
 impl Extract for Arc {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        VItem::from(self.clone()).extract()
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        VItem::from(self.clone()).extract_into(buf);
     }
 }
 
@@ -370,8 +370,8 @@ impl From<ArcBetweenPoints> for VItem {
 
 impl Extract for ArcBetweenPoints {
     type Target = CoreItem;
-    fn extract(&self) -> Vec<Self::Target> {
-        Arc::from(self.clone()).extract()
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        Arc::from(self.clone()).extract_into(buf);
     }
 }
 

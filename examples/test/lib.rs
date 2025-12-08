@@ -29,7 +29,7 @@ use ranim::{
 #[scene]
 #[output(save_frames = true, dir = "output")]
 fn test(r: &mut RanimScene) {
-    let _r_cam = r.insert_and_show(CameraFrame::default());
+    let _r_cam = r.insert(CameraFrame::default());
     let n = 8;
     let arcs = (0..n)
         .map(|i: i32| {
@@ -37,7 +37,7 @@ fn test(r: &mut RanimScene) {
             ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
         })
         .collect::<Group<_>>();
-    let r_arcs = r.insert_and_show(arcs);
+    let r_arcs = r.insert(arcs);
 
     // text.set_stroke_color(manim::RED_C)
     //     .set_stroke_width(0.05)
