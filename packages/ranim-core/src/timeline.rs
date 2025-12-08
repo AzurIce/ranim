@@ -6,6 +6,7 @@ use crate::{
     core_item::{AnyExtractCoreItem, CoreItem, DynItem},
 };
 
+// ANCHOR: Timeline
 /// A timeline for a animations.
 #[derive(Default)]
 pub struct Timeline {
@@ -13,9 +14,10 @@ pub struct Timeline {
     // Followings are states use while constructing
     cur_sec: f64,
     /// The start time of the planning static anim.
-    /// When it is true, it means that it is showing.
+    /// When it is some, it means that it is showing and has a planning static anim.
     planning_static_start_sec: Option<f64>,
 }
+// ANCHOR_END: Timeline
 
 impl Timeline {
     /// Create a new timeline.
@@ -106,19 +108,17 @@ impl Timeline {
             .enumerate()
             .filter(|(_, a)| a.anim_info().enabled)
             .find_map(|(idx, anim)| {
+                // here we use an exclusive range, because we want to use the latest applied anim as the true state
                 let range = anim.anim_info().range();
+                // for the last anim, we use an exclusive range, because we want it take effect in the last frame.
                 if range.contains(&target_sec)
                     || (idx == self.anims.len() - 1 && target_sec == range.end)
                 {
-                    Some((idx, anim, range))
+                    anim.eval_global_sec_dyn(target_sec)
+                        .map(|dyn_item| (dyn_item, idx as u64))
                 } else {
                     None
                 }
-            })
-            .map(|(idx, anim, range)| {
-                let alpha = (target_sec - range.start) / (range.end - range.start);
-                let alpha = if alpha.is_nan() { 1.0 } else { alpha };
-                (anim.eval_alpha_dyn(alpha), idx as u64)
             })
     }
 }

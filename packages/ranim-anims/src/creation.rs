@@ -22,18 +22,16 @@ pub trait CreationAnim<T: CreationRequirement + 'static> {
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
     fn create(&mut self) -> AnimationCell<T> {
-        let anim = Create::new(self.clone())
+        Create::new(self.clone())
             .into_animation_cell()
-            .with_rate_func(smooth);
-        *self = anim.eval_alpha(1.0);
-        anim
+            .with_rate_func(smooth)
+            .apply_to(self)
     }
     fn uncreate(&mut self) -> AnimationCell<T> {
-        let anim = UnCreate::new(self.clone())
+        UnCreate::new(self.clone())
             .into_animation_cell()
-            .with_rate_func(smooth);
-        *self = anim.eval_alpha(1.0);
-        anim
+            .with_rate_func(smooth)
+            .apply_to(self)
     }
 }
 
@@ -52,18 +50,16 @@ pub trait WritingAnim: WritingRequirement + Sized + 'static {
 
 impl<T: WritingRequirement + Sized + 'static> WritingAnim for T {
     fn write(&mut self) -> AnimationCell<Self> {
-        let anim = Write::new(self.clone())
+        Write::new(self.clone())
             .into_animation_cell()
-            .with_rate_func(smooth);
-        *self = anim.eval_alpha(1.0);
-        anim
+            .with_rate_func(smooth)
+            .apply_to(self)
     }
     fn unwrite(&mut self) -> AnimationCell<Self> {
-        let anim = Unwrite::new(self.clone())
+        Unwrite::new(self.clone())
             .into_animation_cell()
-            .with_rate_func(smooth);
-        *self = anim.eval_alpha(1.0);
-        anim
+            .with_rate_func(smooth)
+            .apply_to(self)
     }
 }
 

@@ -20,18 +20,16 @@ pub trait FadingAnim: FadingRequirement + Sized + 'static {
 
 impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
     fn fade_in(&mut self) -> AnimationCell<Self> {
-        let anim = FadeIn::new(self.clone())
+        FadeIn::new(self.clone())
             .into_animation_cell()
-            .with_rate_func(smooth);
-        *self = anim.eval_alpha(1.0);
-        anim
+            .with_rate_func(smooth)
+            .apply_to(self)
     }
     fn fade_out(&mut self) -> AnimationCell<Self> {
-        let anim = FadeOut::new(self.clone())
+        FadeOut::new(self.clone())
             .into_animation_cell()
-            .with_rate_func(smooth);
-        *self = anim.eval_alpha(1.0);
-        anim
+            .with_rate_func(smooth)
+            .apply_to(self)
     }
 }
 

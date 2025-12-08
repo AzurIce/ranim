@@ -33,7 +33,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: just, mdbook, zola, mdbook-katex, wasm-bindgen
+          tool: just, mdbook@0.5, zola, mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17, wasm-bindgen
 
       - uses: Swatinem/rust-cache@v2
 

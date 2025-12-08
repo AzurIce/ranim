@@ -8,6 +8,7 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
+#![feature(decl_macro)]
 pub mod animation;
 /// Color
 pub mod color;
