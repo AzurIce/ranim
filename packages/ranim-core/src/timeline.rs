@@ -8,7 +8,7 @@ use crate::{
 
 /// A timeline for a animations.
 #[derive(Default)]
-pub struct NeoItemTimeline {
+pub struct Timeline {
     anims: Vec<Box<dyn CoreItemAnimation>>,
     // Followings are states use while constructing
     cur_sec: f64,
@@ -17,7 +17,7 @@ pub struct NeoItemTimeline {
     planning_static_start_sec: Option<f64>,
 }
 
-impl NeoItemTimeline {
+impl Timeline {
     /// Create a new timeline.
     pub fn new() -> Self {
         Self::default()
@@ -122,7 +122,7 @@ impl NeoItemTimeline {
     }
 }
 
-impl TimelineFunc for NeoItemTimeline {
+impl TimelineFunc for Timeline {
     fn start_sec(&self) -> Option<f64> {
         self.anims.first().map(|a| a.anim_info().range().start)
     }
