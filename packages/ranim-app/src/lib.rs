@@ -38,21 +38,6 @@ use ranim_render::{Renderer, primitives::RenderPool, utils::WgpuContext};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-#[cfg(target_arch = "wasm32")]
-unsafe extern "C" {
-    fn __wasm_call_ctors();
-}
-
-#[cfg(target_arch = "wasm32")]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
-fn wasm_start() {
-    unsafe {
-        __wasm_call_ctors();
-    }
-    console_error_panic_hook::set_once();
-    wasm_tracing::set_as_global_default();
-}
-
 #[derive(Default, Debug, Clone, Copy)]
 struct OccupiedScreenSpace {
     top: f32,
@@ -674,7 +659,7 @@ pub fn preview_scene_with_name(s: &Scene, name: String) {
     run_app(
         app_state,
         #[cfg(target_arch = "wasm32")]
-        format!("ranim-app-{}", s.name),
+        format!("ranim-app-{name}"),
     );
 }
 
@@ -693,27 +678,9 @@ impl AppRenderer {
     fn new(ctx: &WgpuContext, window: Arc<Window>, size: (u32, u32)) -> Self {
         let surface = ctx.instance.create_surface(window.clone()).unwrap();
 
-        // let swapchain_capabilities = surface.get_capabilities(&ctx.adapter);
-        // let selected_format = wgpu::TextureFormat::Bgra8UnormSrgb;
-        // let swapchain_format = swapchain_capabilities
-        //     .formats
-        //     .iter()
-        //     .find(|d| **d == selected_format)
-        //     .expect("failed to select proper surface texture format!");
-
         let surface_config = surface
             .get_default_config(&ctx.adapter, size.0, size.1)
             .expect("failed to get surface config");
-        // let surface_config = wgpu::SurfaceConfiguration {
-        //     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        //     format: *swapchain_format,
-        //     width: size.0,
-        //     height: size.1,
-        //     present_mode: wgpu::PresentMode::AutoVsync,
-        //     desired_maximum_frame_latency: 0,
-        //     alpha_mode: swapchain_capabilities.alpha_modes[0],
-        //     view_formats: vec![],
-        // };
 
         surface.configure(&ctx.device, &surface_config);
 
@@ -745,12 +712,6 @@ impl AppRenderer {
             ranim_renderer,
             sampler,
             app_pipeline,
-            // viewport: Viewport {
-            //     width: 1.0,
-            //     height: 1.0,
-            //     x: 0.0,
-            //     y: 0.0
-            // }
         }
     }
     fn calc_viewport(
@@ -811,5 +772,23 @@ impl AppRenderer {
             x: viewport_x,
             y: viewport_y,
         }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+mod wasm {
+    use super::*;
+
+    unsafe extern "C" {
+        fn __wasm_call_ctors();
+    }
+
+    #[wasm_bindgen(start)]
+    fn wasm_start() {
+        unsafe {
+            __wasm_call_ctors();
+        }
+        console_error_panic_hook::set_once();
+        wasm_tracing::set_as_global_default();
     }
 }
