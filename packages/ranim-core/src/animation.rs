@@ -134,7 +134,7 @@ pub struct AnimationCell<T> {
 }
 
 impl<T> AnimationCell<T> {
-    /// A builder func to modify [`AnimationInfo::at_sec`]
+    /// A builder func to modify [`AnimationInfo::start_sec`]
     pub fn at(mut self, at_sec: f64) -> Self {
         self.info = self.info.at(at_sec);
         self
