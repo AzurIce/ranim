@@ -262,7 +262,8 @@ impl RanimScene {
         sec: f64,
     ) -> TimelineId {
         self.new_timeline_with(|t| {
-            t.play(item.show().at(sec));
+            t.forward_to(sec);
+            t.play(item.show());
         })
     }
 
