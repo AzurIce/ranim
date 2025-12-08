@@ -11,7 +11,7 @@ use lru::LruCache;
 use regex::bytes::Regex;
 use sha1::{Digest, Sha1};
 use typst::{
-    Library, World,
+    Library, LibraryExt, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime},
     layout::Abs,

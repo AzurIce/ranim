@@ -14,7 +14,7 @@ tracing.workspace = true
 itertools.workspace = true
 glam = { workspace = true, features = ["bytemuck"] }
 bytemuck = { workspace = true, features = ["derive"] }
-derive_more = { version = "2.0.1", features = [
+derive_more = { workspace = true, features = [
   "deref_mut",
   "deref",
   "index",
