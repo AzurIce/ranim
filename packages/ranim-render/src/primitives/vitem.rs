@@ -1,9 +1,6 @@
 use crate::{
-    RenderTextures,
-    pipelines::{
-        Map3dTo2dPipeline, VItemPipeline, map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup,
-    },
-    utils::{PipelinesStorage, WgpuBuffer, WgpuContext, WgpuVecBuffer},
+    pipelines::{map_3d_to_2d::ComputeBindGroup, vitem::RenderBindGroup},
+    utils::{WgpuBuffer, WgpuContext, WgpuVecBuffer},
 };
 use glam::Vec4;
 use ranim_core::{
@@ -46,8 +43,6 @@ impl RenderResource for VItemRenderInstance {
     type Data = VItemPrimitive;
 
     fn init(ctx: &WgpuContext, data: &Self::Data) -> Self {
-        // info!("init");
-        // info!("3d: {}", data.points2d.len());
         let points3d_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Points 3d Buffer"),
@@ -56,7 +51,6 @@ impl RenderResource for VItemRenderInstance {
                 | wgpu::BufferUsages::COPY_SRC,
             &data.points2d,
         );
-        // info!("2d: {}", data.points2d.len());
         let points2d_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Points 2d Buffer"),
@@ -65,7 +59,6 @@ impl RenderResource for VItemRenderInstance {
                 | wgpu::BufferUsages::COPY_SRC,
             &data.points2d,
         );
-        // info!("clip");
         let clip_info_buffer = WgpuVecBuffer::new_init(
             ctx,
             Some("Clip Info Buffer"),
@@ -74,28 +67,24 @@ impl RenderResource for VItemRenderInstance {
                 | wgpu::BufferUsages::COPY_SRC,
             &[i32::MAX, i32::MIN, i32::MAX, i32::MIN, 0],
         );
-        // info!("point_cnt");
         let point_cnt_buffer = WgpuBuffer::new_init(
             ctx,
             Some("Point Cnt Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             data.points2d.len() as u32,
         );
-        // info!("fill: {}",data.fill_rgbas.len());
         let fill_rgbas = WgpuVecBuffer::new_init(
             ctx,
             Some("Fill Rgbas Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             &data.fill_rgbas,
         );
-        // info!("stroke: {}",data.stroke_rgbas.len());
         let stroke_rgbas = WgpuVecBuffer::new_init(
             ctx,
             Some("Stroke Rgbas Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             &data.stroke_rgbas,
         );
-        // info!("stroke_widths: {}",data.stroke_widths.len());
         let stroke_widths = WgpuVecBuffer::new_init(
             ctx,
             Some("Stroke Widths Buffer"),
@@ -103,7 +92,6 @@ impl RenderResource for VItemRenderInstance {
             &data.stroke_widths,
         );
 
-        // info!("compute_bind_group");
         let compute_bind_group = ComputeBindGroup::new(
             ctx,
             points3d_buffer.buffer.as_ref().unwrap(),
@@ -113,7 +101,6 @@ impl RenderResource for VItemRenderInstance {
             point_cnt_buffer.as_ref(),
         );
 
-        // info!("render_bind_group");
         let render_bind_group = RenderBindGroup::new(
             ctx,
             points2d_buffer.buffer.as_ref().unwrap(),
@@ -122,7 +109,6 @@ impl RenderResource for VItemRenderInstance {
             stroke_widths.buffer.as_ref().unwrap(),
             clip_info_buffer.buffer.as_ref().unwrap(),
         );
-        // info!("init done");
 
         Self {
             points3d_buffer,
@@ -188,72 +174,53 @@ impl RenderCommand for VItemRenderInstance {
         cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
         cpass.dispatch_workgroups(self.points3d_buffer.len().div_ceil(256) as u32, 1, 1);
     }
+    fn encode_depth_render_pass_command(&self, _rpass: &mut wgpu::RenderPass) {}
     fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
         rpass.draw(0..4, 0..1);
-    }
-    fn encode_render_command(
-        &self,
-        ctx: &WgpuContext,
-        pipelines: &mut PipelinesStorage,
-        encoder: &mut wgpu::CommandEncoder,
-        uniforms_bind_group: &wgpu::BindGroup,
-        render_textures: &RenderTextures,
-        #[cfg(feature = "profiling")] profiler: &mut wgpu_profiler::GpuProfiler,
-    ) {
-        #[cfg(feature = "profiling")]
-        let mut scope = profiler.scope("vitem rendering", encoder);
-        {
-            #[cfg(feature = "profiling")]
-            let mut cpass = scope.scoped_compute_pass("VItem Map Points Compute Pass");
-            #[cfg(not(feature = "profiling"))]
-            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("VItem Map Points Compute Pass"),
-                timestamp_writes: None,
-            });
-            cpass.set_pipeline(pipelines.get_or_init::<Map3dTo2dPipeline>(ctx));
-            cpass.set_bind_group(0, uniforms_bind_group, &[]);
-
-            cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
-            cpass.dispatch_workgroups(self.points3d_buffer.len().div_ceil(256) as u32, 1, 1);
-        }
-        {
-            let RenderTextures {
-                // multisample_view,
-                render_view,
-                ..
-            } = render_textures;
-            let rpass_desc = wgpu::RenderPassDescriptor {
-                label: Some("VItem Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    // view: multisample_view,
-                    // resolve_target: Some(render_view),
-                    depth_slice: None,
-                    view: render_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            };
-            #[cfg(feature = "profiling")]
-            let mut rpass = scope.scoped_render_pass("VItem Render Pass", rpass_desc);
-            #[cfg(not(feature = "profiling"))]
-            let mut rpass = encoder.begin_render_pass(&rpass_desc);
-            rpass.set_pipeline(pipelines.get_or_init::<VItemPipeline>(ctx));
-            rpass.set_bind_group(0, uniforms_bind_group, &[]);
-
-            rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
-            rpass.draw(0..4, 0..1);
-        }
     }
     fn debug(&self, _ctx: &WgpuContext) {
         // let points2d = self.points2d_buffer.read_buffer(ctx).unwrap();
         // let points2d = bytemuck::cast_slice::<_, Vec4>(&points2d);
         // println!("points2d: {:?}", points2d);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use glam::vec4;
+    use ranim_core::{core_item::CoreItem, prelude::CameraFrame, store::CoreItemStore};
+
+    use super::*;
+    use crate::{Renderer, primitives::RenderPool, utils::WgpuContext};
+
+    #[test]
+    fn test_render_vitem_primitive() {
+        let ctx = pollster::block_on(WgpuContext::new());
+        let mut renderer = Renderer::new(&ctx, 8.0, 1920, 720);
+        let clear_color = wgpu::Color::BLACK;
+
+        let vitem_primitive_data = VItemPrimitive {
+            points2d: vec![
+                Vec4::new(0.0, 0.0, 0.0, 1.0),
+                Vec4::new(0.5, 1.0, 0.0, 1.0),
+                Vec4::new(1.0, 0.0, 0.0, 1.0),
+                Vec4::new(0.5, 0.0, 0.0, 1.0),
+                Vec4::new(0.0, 0.0, 0.0, 1.0),
+            ],
+            fill_rgbas: vec![Rgba(vec4(1.0, 0.0, 0.0, 1.0)); 3],
+            stroke_rgbas: vec![Rgba(vec4(0.0, 1.0, 0.0, 1.0)); 3],
+            stroke_widths: vec![Width(0.02); 3],
+        };
+        let mut pool = RenderPool::new();
+        let mut store = CoreItemStore::new();
+        store.update(
+            std::iter::once(CoreItem::VItemPrimitive(vitem_primitive_data)).chain(std::iter::once(
+                CoreItem::CameraFrame(CameraFrame::default()),
+            )),
+        );
+        renderer.render_store_with_pool(&ctx, clear_color, &store, &mut pool);
+        let img = renderer.get_rendered_texture_img_buffer(&ctx);
+        img.save("../../output/vitem_primitive.png").unwrap();
     }
 }
