@@ -254,6 +254,11 @@ pub fn cargo_build(
             cmd.args(["--example", x]);
         }
     }
+
+    if !args.features.is_empty() {
+        cmd.args(std::iter::once("--features").chain(args.features.iter().map(|s| s.as_str())));
+    }
+
     cmd.args(&args.args);
 
     // Start an async task to wait for completion

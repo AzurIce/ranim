@@ -18,6 +18,9 @@ pub struct CliArgs {
     #[arg(global = true, short, long, help_heading = "Cargo Options")]
     pub package: Option<String>,
 
+    #[arg(global = true, long, help_heading = "Cargo Options")]
+    pub features: Vec<String>,
+
     #[command(flatten)]
     pub target: TargetArg,
 
