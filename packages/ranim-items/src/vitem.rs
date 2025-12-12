@@ -47,6 +47,20 @@ impl Interpolatable for Plane {
     }
 }
 
+impl BoundingBox for Plane {
+    fn get_bounding_box(&self) -> [DVec3; 3] {
+        let basis = self.origin + self.basis.0 + self.basis.1;
+        [self.origin, basis / 2.0, basis]
+    }
+}
+
+impl Shift for Plane {
+    fn shift(&mut self, shift: DVec3) -> &mut Self {
+        self.origin.shift(shift);
+        self
+    }
+}
+
 impl Default for Plane {
     fn default() -> Self {
         Self::XY
@@ -109,6 +123,8 @@ impl BoundingBox for VItem {
 impl Shift for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
+        #[cfg(feature = "vitem2d")]
+        self.plane.shift(shift);
         self
     }
 }
