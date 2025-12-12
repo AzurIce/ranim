@@ -48,7 +48,7 @@ derive_more = "2.1.0"
 
 [features]
 # default = ["output"]
-default = ["anims", "items", "vitem2d"]
+default = ["anims", "items"]
 anims = []
 items = []
 profiling = [
