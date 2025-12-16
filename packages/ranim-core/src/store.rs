@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use crate::{
     animation::{AnimationCell, CoreItemAnimation},
-    core_item::{AnyExtractCoreItem, CoreItem, vitem::VItemPrimitive},
+    core_item::{AnyExtractCoreItem, CoreItem, vitem::VItemPrimitive, vitem_2d::VItem2d},
     prelude::CameraFrame,
 };
 
@@ -94,6 +94,8 @@ pub struct CoreItemStore {
     pub camera_frames: Vec<CameraFrame>,
     /// Id, VItemPrimitive
     pub vitems: Vec<VItemPrimitive>,
+    /// Id, VItem2d
+    pub vitems2d: Vec<VItem2d>,
 }
 
 impl CoreItemStore {
@@ -106,10 +108,12 @@ impl CoreItemStore {
     pub fn update(&mut self, items: impl Iterator<Item = CoreItem>) {
         self.camera_frames.clear();
         self.vitems.clear();
+        self.vitems2d.clear();
         for item in items {
             match item {
                 CoreItem::CameraFrame(x) => self.camera_frames.push(x),
                 CoreItem::VItemPrimitive(x) => self.vitems.push(x),
+                CoreItem::VItem2D(x) => self.vitems2d.push(x),
             }
         }
     }

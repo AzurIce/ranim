@@ -9,9 +9,9 @@ use ranim_core::{
     traits::{Anchor, Interpolatable},
 };
 
-use ranim_core::{
-    core_item::vitem::DEFAULT_STROKE_WIDTH,
-    traits::{BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, With},
+use crate::vitem::DEFAULT_STROKE_WIDTH;
+use ranim_core::traits::{
+    BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, With,
 };
 
 use crate::vitem::VItem;
