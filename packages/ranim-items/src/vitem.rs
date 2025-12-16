@@ -15,7 +15,6 @@ use ranim_core::core_item::CoreItem;
 use ranim_core::core_item::vitem::VItemPrimitive;
 #[cfg(feature = "vitem2d")]
 use ranim_core::core_item::vitem_2d::VItem2d;
-use ranim_core::glam::{Vec3, vec3};
 use ranim_core::traits::Anchor;
 use ranim_core::utils::resize_preserving_order_with_repeated_indices;
 use ranim_core::{Extract, color, glam};
