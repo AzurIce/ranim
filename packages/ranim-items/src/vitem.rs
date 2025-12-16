@@ -144,7 +144,10 @@ impl Scale for VItem {
 }
 
 /// Default stroke width
-pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
+#[cfg(not(feature = "vitem2d"))]
+pub use ranim_core::core_item::vitem::DEFAULT_STROKE_WIDTH;
+#[cfg(feature = "vitem2d")]
+pub use ranim_core::core_item::vitem_2d::DEFAULT_STROKE_WIDTH;
 
 impl VItem {
     /// Close the VItem

@@ -1,5 +1,6 @@
 use ranim::glam;
 use ranim_core::core_item::CoreItem;
+use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
 use std::f64::consts::PI;
 
 use ranim::{
@@ -218,12 +219,12 @@ impl Extract for VisualVItem {
                 if p0 != p1 {
                     VItem::from_vpoints(vec![*p0, (p0 + p1) / 2.0, *p1])
                         .with(|x| {
-                            x.set_stroke_width(0.015);
+                            x.set_stroke_width(DEFAULT_STROKE_WIDTH * 0.75);
                         })
                         .extract_into(buf);
                     VItem::from_vpoints(vec![*p1, (p1 + p2) / 2.0, *p2])
                         .with(|x| {
-                            x.set_stroke_width(0.015);
+                            x.set_stroke_width(DEFAULT_STROKE_WIDTH * 0.75);
                         })
                         .extract_into(buf);
                 }

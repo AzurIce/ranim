@@ -200,15 +200,20 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     // TODO: Antialias - this depends on screen space derivative?
     // Since we are in local space, we need to know the pixel scale.
     // dpdx and dpdy can help.
-    let antialias_radius = 0.015 / 2.0; // Fixed for now, should use fwidth
-    // Better AA:
-    // let dist_grad = fwidth(d);
-    // let antialias_radius = dist_grad * 0.5;
+    // let antialias_radius = 0.015 / 4.0; // Fixed for now, should use fwidth
+    // Antialias using screen space derivative of the coordinate system
+    // We use the gradient of 'pos' instead of 'd' because 'd' has discontinuities 
+    // at voronoi boundaries (subpath joins), causing artifacts/striations when using fwidth(d).
+    let dist_grad = max(length(dpdx(pos)), length(dpdy(pos)));
+    // let dist_grad = length(fwidth(pos));
+    let antialias_radius = dist_grad * 0.75;
 
     var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[anchor_index], fill_rgbas[anchor_index + 1], ratio), is_closed(idx));
     fill_rgba.a *= smoothstep(1.0, -1.0, (sgn_d) / antialias_radius);
 
-    let stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
+    var stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
+    stroke_width = stroke_width * dist_grad;
+    // stroke_width = stroke_width * 100.0;
     var stroke_rgba: vec4<f32> = mix(stroke_rgbas[anchor_index], stroke_rgbas[anchor_index + 1], ratio);
     stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width) / antialias_radius);
 
