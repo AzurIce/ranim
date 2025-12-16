@@ -4,12 +4,10 @@ use color::{AlphaColor, Srgb};
 use glam::{DVec3, dvec3};
 use itertools::Itertools;
 
-use ranim_core::{
-    core_item::vitem::DEFAULT_STROKE_WIDTH,
-    traits::{
-        Alignable, BoundingBox, FillColor, Interpolatable, Opacity, Rotate, Scale, Shift,
-        StrokeColor, StrokeWidth, With,
-    },
+use crate::vitem::DEFAULT_STROKE_WIDTH;
+use ranim_core::traits::{
+    Alignable, BoundingBox, FillColor, Interpolatable, Opacity, Rotate, Scale, Shift, StrokeColor,
+    StrokeWidth, With,
 };
 
 use crate::vitem::VItem;

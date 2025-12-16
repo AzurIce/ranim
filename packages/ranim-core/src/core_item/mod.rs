@@ -11,13 +11,15 @@ use dyn_clone::DynClone;
 
 use crate::{
     Extract,
-    core_item::{camera_frame::CameraFrame, vitem::VItemPrimitive},
+    core_item::{camera_frame::CameraFrame, vitem::VItemPrimitive, vitem_2d::VItem2d},
 };
 
 /// Camera frame
 pub mod camera_frame;
 /// Vitem
 pub mod vitem;
+/// Vitem in 2d plane
+pub mod vitem_2d;
 
 /// The core ranim builtin items
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +28,8 @@ pub enum CoreItem {
     CameraFrame(CameraFrame),
     /// [`VItemPrimitive`]
     VItemPrimitive(VItemPrimitive),
+    /// [`VItem2d`]
+    VItem2D(VItem2d),
 }
 
 /// The item that can be extracted to [`CoreItem`]s

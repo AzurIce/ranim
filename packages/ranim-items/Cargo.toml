@@ -6,6 +6,9 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+vitem2d = []
+
 [dependencies]
 ranim-core.workspace = true
 tracing.workspace = true

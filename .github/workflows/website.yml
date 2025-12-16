@@ -27,8 +27,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2025-12-16
           targets: wasm32-unknown-unknown
 
       - uses: taiki-e/install-action@v2
@@ -36,6 +37,8 @@ jobs:
           tool: just, mdbook@0.5, zola, mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17, wasm-bindgen
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "wasm-examples"
 
       - name: Build wasm examples
         run: cargo examples build

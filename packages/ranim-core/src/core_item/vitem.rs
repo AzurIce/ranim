@@ -1,10 +1,10 @@
 use color::{AlphaColor, Srgb};
-use glam::Vec4;
+use glam::{Vec4, vec4};
 
 use crate::{
     Extract,
     components::{rgba::Rgba, width::Width},
-    core_item::CoreItem,
+    core_item::{CoreItem, vitem_2d::VItem2d},
     traits::FillColor,
 };
 
@@ -22,6 +22,24 @@ pub struct VItemPrimitive {
     pub stroke_rgbas: Vec<Rgba>,
     /// Stroke widths, see [`Width`].
     pub stroke_widths: Vec<Width>,
+}
+
+impl From<VItem2d> for VItemPrimitive {
+    fn from(value: VItem2d) -> Self {
+        Self {
+            points2d: value
+                .points2d
+                .into_iter()
+                .map(|p| {
+                    let r = value.origin + value.basis.0 * p.x + value.basis.1 * p.y;
+                    vec4(r.x, r.y, r.z, p.z)
+                })
+                .collect(),
+            fill_rgbas: value.fill_rgbas,
+            stroke_rgbas: value.stroke_rgbas,
+            stroke_widths: value.stroke_widths,
+        }
+    }
 }
 
 impl Default for VItemPrimitive {

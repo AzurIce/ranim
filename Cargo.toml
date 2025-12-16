@@ -70,6 +70,7 @@ render = [
   "dep:flate2",
   "dep:reqwest",
 ]
+vitem2d = ["ranim-items/vitem2d"]
 # serde = ["dep:serde", "glam/serde"]
 
 [dependencies]

@@ -5,12 +5,11 @@ use ranim_core::core_item::CoreItem;
 use ranim_core::traits::Anchor;
 use ranim_core::{color, glam, traits::Interpolatable};
 
-use ranim_core::{
-    core_item::vitem::DEFAULT_STROKE_WIDTH,
-    traits::{BoundingBox, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With},
+use ranim_core::traits::{
+    BoundingBox, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With,
 };
 
-use crate::vitem::VItem;
+use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
 
 // MARK: ### Arc ###
 /// An arc
