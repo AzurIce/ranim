@@ -3,6 +3,7 @@ code = """
 ```rust
 use ranim::glam;
 use ranim_core::core_item::CoreItem;
+use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
 use std::f64::consts::PI;
 
 use ranim::{
@@ -221,12 +222,12 @@ impl Extract for VisualVItem {
                 if p0 != p1 {
                     VItem::from_vpoints(vec![*p0, (p0 + p1) / 2.0, *p1])
                         .with(|x| {
-                            x.set_stroke_width(0.015);
+                            x.set_stroke_width(DEFAULT_STROKE_WIDTH * 0.75);
                         })
                         .extract_into(buf);
                     VItem::from_vpoints(vec![*p1, (p1 + p2) / 2.0, *p2])
                         .with(|x| {
-                            x.set_stroke_width(0.015);
+                            x.set_stroke_width(DEFAULT_STROKE_WIDTH * 0.75);
                         })
                         .extract_into(buf);
                 }
@@ -240,7 +241,7 @@ impl Empty for VisualVItem {
     }
 }
 ```"""
-hash = "6dbc2d7c5ec146c1d9f89ce5013dcffec5304b44"
+hash = "b253a2155424060ae9eb1341a5a356336cae322d"
 preview_imgs = ["/examples/extract_vitem_visualize/preview-ranim_text.png", "/examples/extract_vitem_visualize/preview-hello_ranim.png"]
 output_files = ["/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4", "/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4"]
 wasm = true
