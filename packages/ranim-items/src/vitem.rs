@@ -10,6 +10,8 @@ pub mod typst;
 use color::{AlphaColor, Srgb, palette::css};
 use derive_more::{Deref, DerefMut};
 use glam::{DVec3, Vec4, vec4};
+#[cfg(feature = "vitem2d")]
+use glam::{Vec3, vec3};
 use ranim_core::core_item::CoreItem;
 #[cfg(not(feature = "vitem2d"))]
 use ranim_core::core_item::vitem::VItemPrimitive;
