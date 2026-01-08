@@ -205,19 +205,25 @@ impl RenderResource for VItem2dRenderInstance {
     }
 }
 
-impl RenderCommand for VItem2dRenderInstance {
-    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
+impl VItem2dRenderInstance {
+    pub fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         cpass.set_bind_group(0, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
         cpass.dispatch_workgroups(self.points2d_buffer.len().div_ceil(256) as u32, 1, 1);
     }
-    fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
+    pub fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
         rpass.draw(0..4, 0..1);
     }
-    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
+    pub fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
         rpass.draw(0..4, 0..1);
     }
+}
+
+impl RenderCommand for VItem2dRenderInstance {
+    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {}
+    fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {}
+    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {}
     fn debug(&self, _ctx: &WgpuContext) {}
 }
 

@@ -10,7 +10,15 @@ use std::{
 
 use variadics_please::all_tuples;
 
-use crate::utils::WgpuContext;
+use crate::{
+    Camera, RenderTextures,
+    pipelines::{
+        ClipBox2dPipeline, Map3dTo2dPipeline, VItem2dColorPipeline, VItem2dDepthPipeline,
+        VItemPipeline,
+    },
+    primitives::{vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance},
+    utils::{PipelinesStorage, WgpuContext},
+};
 
 /// The RenderResource encapsules the wgpu resources.
 ///
@@ -24,7 +32,338 @@ pub trait RenderResource {
     fn update(&mut self, ctx: &WgpuContext, data: &Self::Data);
 }
 
+pub trait RenderPacket {}
+
+pub struct VItemComputeRenderNode;
+
+type VItemRenderPacket = VItemRenderInstance;
+impl RenderPacket for VItemRenderPacket {}
+
+type VItem2dRenderPacket = VItem2dRenderInstance;
+impl RenderPacket for VItem2dRenderPacket {}
+
+pub trait RenderNodeTrait {
+    type Query: RenderPacketsQuery;
+    fn run(
+        &self,
+        packets_query_output: <Self::Query as RenderPacketsQuery>::Output<'_>,
+        #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
+        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        pipelines: &mut PipelinesStorage,
+        render_textures: &RenderTextures,
+        camera_state: &Camera,
+        ctx: &WgpuContext,
+    );
+    fn exec(
+        &self,
+        packets_store: &RenderPacketsStore,
+        #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
+        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        pipelines: &mut PipelinesStorage,
+        render_textures: &RenderTextures,
+        camera_state: &Camera,
+        ctx: &WgpuContext,
+    ) {
+        self.run(
+            Self::Query::query(packets_store),
+            #[cfg(not(feature = "profiling"))]
+            encoder,
+            #[cfg(feature = "profiling")]
+            scope,
+            pipelines,
+            render_textures,
+            camera_state,
+            ctx,
+        );
+    }
+}
+
+impl RenderNodeTrait for VItemComputeRenderNode {
+    type Query = (VItemRenderPacket, VItem2dRenderPacket);
+
+    fn run(
+        &self,
+        (vitem_packets, vitem2d_packets): <Self::Query as RenderPacketsQuery>::Output<'_>,
+        #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
+        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        pipelines: &mut PipelinesStorage,
+        _render_textures: &RenderTextures,
+        camera_state: &Camera,
+        ctx: &WgpuContext,
+    ) {
+        #[cfg(feature = "profiling")]
+        let mut scope = scope.scope("Compute Pass");
+        // VItem Compute Pass
+        {
+            #[cfg(feature = "profiling")]
+            let mut cpass = scope.scoped_compute_pass("VItem Map Points Compute Pass");
+            #[cfg(not(feature = "profiling"))]
+            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("VItem Map Points Compute Pass"),
+                timestamp_writes: None,
+            });
+            cpass.set_pipeline(pipelines.get_or_init::<Map3dTo2dPipeline>(ctx));
+            cpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
+
+            vitem_packets
+                .iter()
+                .for_each(|vitem| vitem.encode_compute_pass_command(&mut cpass));
+        }
+        // VItem2d Compute Pass
+        {
+            #[cfg(feature = "profiling")]
+            let mut cpass = scope.scoped_compute_pass("VItem2d Map Points Compute Pass");
+            #[cfg(not(feature = "profiling"))]
+            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("VItem2d Map Points Compute Pass"),
+                timestamp_writes: None,
+            });
+            cpass.set_pipeline(pipelines.get_or_init::<ClipBox2dPipeline>(ctx));
+
+            vitem2d_packets
+                .iter()
+                .for_each(|vitem| vitem.encode_compute_pass_command(&mut cpass));
+        }
+    }
+}
+
+pub struct VItem2dDepthNode;
+
+impl RenderNodeTrait for VItem2dDepthNode {
+    type Query = VItem2dRenderPacket;
+    fn run(
+        &self,
+        vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
+        #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
+        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        pipelines: &mut PipelinesStorage,
+        render_textures: &RenderTextures,
+        camera_state: &Camera,
+        ctx: &WgpuContext,
+    ) {
+        #[cfg(feature = "profiling")]
+        let mut scope = scope.scope("Depth Render Pass");
+        // VItem2d Depth Render Pass
+        {
+            let RenderTextures {
+                depth_stencil_view, ..
+            } = &render_textures;
+            let rpass_desc = wgpu::RenderPassDescriptor {
+                label: Some("VItem2d Depth Render Pass"),
+                color_attachments: &[],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: depth_stencil_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            };
+            #[cfg(feature = "profiling")]
+            let mut rpass = scope.scoped_render_pass("VItem2d Depth Render Pass", rpass_desc);
+            #[cfg(not(feature = "profiling"))]
+            let mut rpass = encoder.begin_render_pass(&rpass_desc);
+            rpass.set_pipeline(pipelines.get_or_init::<VItem2dDepthPipeline>(ctx));
+            rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
+            vitem2d_packets
+                .iter()
+                .for_each(|vitem| vitem.encode_depth_render_pass_command(&mut rpass));
+        }
+    }
+}
+
+pub struct VItemRenderNode;
+
+impl RenderNodeTrait for VItemRenderNode {
+    type Query = VItemRenderPacket;
+    fn run(
+        &self,
+        vitem_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
+        #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
+        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        pipelines: &mut PipelinesStorage,
+        render_textures: &RenderTextures,
+        camera_state: &Camera,
+        ctx: &WgpuContext,
+    ) {
+        let RenderTextures {
+            // multisample_view,
+            render_view,
+            depth_stencil_view,
+            ..
+        } = render_textures;
+        let rpass_desc = wgpu::RenderPassDescriptor {
+            label: Some("VItem Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                // view: multisample_view,
+                // resolve_target: Some(render_view),
+                depth_slice: None,
+                view: render_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth_stencil_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        };
+        #[cfg(feature = "profiling")]
+        let mut rpass = scope.scoped_render_pass("VItem Render Pass", rpass_desc);
+        #[cfg(not(feature = "profiling"))]
+        let mut rpass = encoder.begin_render_pass(&rpass_desc);
+        rpass.set_pipeline(pipelines.get_or_init::<VItemPipeline>(ctx));
+        rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
+        vitem_packets
+            .iter()
+            .for_each(|vitem| vitem.encode_render_pass_command(&mut rpass));
+    }
+}
+
+pub struct VItem2dRenderNode;
+
+impl RenderNodeTrait for VItem2dRenderNode {
+    type Query = VItem2dRenderPacket;
+    fn run(
+        &self,
+        vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
+        #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
+        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        pipelines: &mut PipelinesStorage,
+        render_textures: &RenderTextures,
+        camera_state: &Camera,
+        ctx: &WgpuContext,
+    ) {
+        // VItem2d Render Pass
+        let RenderTextures {
+            render_view,
+            depth_stencil_view,
+            ..
+        } = render_textures;
+        let rpass_desc = wgpu::RenderPassDescriptor {
+            label: Some("VItem2d Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: render_view,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth_stencil_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        };
+        #[cfg(feature = "profiling")]
+        let mut rpass = scope.scoped_render_pass("VItem2d Render Pass", rpass_desc);
+        #[cfg(not(feature = "profiling"))]
+        let mut rpass = encoder.begin_render_pass(&rpass_desc);
+        rpass.set_pipeline(pipelines.get_or_init::<VItem2dColorPipeline>(ctx));
+        rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
+        vitem2d_packets
+            .iter()
+            .for_each(|vitem| vitem.encode_render_pass_command(&mut rpass));
+    }
+}
+
+pub trait RenderPacketsQuery {
+    type Output<'s>;
+    fn query(store: &RenderPacketsStore) -> Self::Output<'_>;
+}
+
+impl<T: RenderPacket + 'static> RenderPacketsQuery for T {
+    type Output<'s> = &'s [T];
+    fn query(store: &RenderPacketsStore) -> Self::Output<'_> {
+        store.get_packets()
+    }
+}
+
+macro_rules! impl_tuple_render_packet_query {
+    ($($T:ident),*) => {
+        impl<$($T: RenderPacket + 'static,)*> RenderPacketsQuery for ($($T,)*) {
+            type Output<'s> = ($(&'s [$T],)*);
+            fn query(store: &RenderPacketsStore) -> Self::Output<'_> {
+                ($(store.get_packets::<$T>(),)*)
+            }
+        }
+    };
+}
+
+all_tuples!(impl_tuple_render_packet_query, 1, 16, T);
+
+/// A trait to support calling `clear` on the type erased trait object.
+pub trait AnyRenderPackets: Any {
+    fn clear(&mut self);
+}
+
+impl<T: Any> AnyRenderPackets for Vec<T> {
+    fn clear(&mut self) {
+        self.clear();
+    }
+}
+
+#[derive(Default)]
+pub struct RenderPacketsStore {
+    pub packets: HashMap<TypeId, Box<dyn AnyRenderPackets>>,
+}
+
+impl RenderPacketsStore {
+    pub fn init_packets<T: RenderPacket + 'static>(&mut self) -> &mut Vec<T> {
+        let entry = self
+            .packets
+            .entry(TypeId::of::<T>())
+            .or_insert(Box::<Vec<T>>::default());
+        (entry.as_mut() as &mut dyn Any)
+            .downcast_mut::<Vec<T>>()
+            .unwrap()
+    }
+    pub fn get_packets<T: RenderPacket + 'static>(&self) -> &[T] {
+        self.packets
+            .get(&TypeId::of::<T>())
+            .and_then(|v| (v.as_ref() as &dyn Any).downcast_ref::<Vec<T>>())
+            .map(|v| v.as_ref())
+            .unwrap_or(&[])
+    }
+    pub fn extend<T: RenderPacket + 'static>(&mut self, packets: impl IntoIterator<Item = T>) {
+        (self.init_packets::<T>() as &mut dyn Any)
+            .downcast_mut::<Vec<T>>()
+            .unwrap()
+            .extend(packets);
+    }
+    pub fn push<T: RenderPacket + 'static>(&mut self, packet: T) {
+        (self.init_packets::<T>() as &mut dyn Any)
+            .downcast_mut::<Vec<T>>()
+            .unwrap()
+            .push(packet);
+    }
+    pub fn clear(&mut self) {
+        self.packets.iter_mut().for_each(|(_, v)| {
+            v.clear();
+        });
+    }
+}
+
 /// The RenderCommand encodes the commands.
+#[deprecated]
 pub trait RenderCommand {
     /// Encode the compute pass command
     fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass);

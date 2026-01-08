@@ -21,7 +21,10 @@ use crate::{
         ClipBox2dPipeline, Map3dTo2dPipeline, VItem2dColorPipeline, VItem2dDepthPipeline,
         VItemPipeline,
     },
-    primitives::RenderPool,
+    primitives::{
+        RenderNodeTrait, RenderPacketsStore, RenderPool, VItem2dDepthNode, VItem2dRenderNode,
+        VItemComputeRenderNode, VItemRenderNode, vitem::VItemRenderInstance,
+    },
 };
 use ranim_core::{core_item::camera_frame::CameraFrame, store::CoreItemStore};
 use utils::{PipelinesStorage, WgpuBuffer, WgpuContext};
@@ -237,6 +240,7 @@ impl CameraUniformsBindGroup {
 pub struct Renderer {
     size: (usize, usize),
     pub(crate) pipelines: PipelinesStorage,
+    packets_store: RenderPacketsStore,
 
     pub render_textures: RenderTextures,
     pub camera_state: Camera,
@@ -322,6 +326,7 @@ impl Renderer {
             size: (width, height),
             pipelines: PipelinesStorage::default(),
             render_textures,
+            packets_store: RenderPacketsStore::default(),
             // Outputs
             output_staging_buffer,
             output_texture_data: None,
@@ -397,6 +402,8 @@ impl Renderer {
     ) {
         // println!("camera: {}, vitems: {}", store.camera_frames.len(), store.vitems.len());
         let camera_frame = &store.camera_frames[0];
+        self.packets_store.clear();
+
         let vitems = store
             .vitems
             .iter()
@@ -440,186 +447,46 @@ impl Renderer {
                 let mut scope = self.profiler.scope("render", &mut encoder);
 
                 // Compute Pass
-                {
-                    #[cfg(feature = "profiling")]
-                    let mut scope = scope.scope("Compute Pass");
-                    // VItem Compute Pass
-                    {
-                        #[cfg(feature = "profiling")]
-                        let mut cpass = scope.scoped_compute_pass("VItem Map Points Compute Pass");
-                        #[cfg(not(feature = "profiling"))]
-                        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                            label: Some("VItem Map Points Compute Pass"),
-                            timestamp_writes: None,
-                        });
-                        cpass.set_pipeline(self.pipelines.get_or_init::<Map3dTo2dPipeline>(ctx));
-                        cpass.set_bind_group(
-                            0,
-                            &self.camera_state.uniforms_bind_group.bind_group,
-                            &[],
-                        );
-
-                        vitems
-                            .iter()
-                            .for_each(|vitem| vitem.encode_compute_pass_command(&mut cpass));
-                    }
-                    // VItem2d Compute Pass
-                    {
-                        #[cfg(feature = "profiling")]
-                        let mut cpass =
-                            scope.scoped_compute_pass("VItem2d Map Points Compute Pass");
-                        #[cfg(not(feature = "profiling"))]
-                        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                            label: Some("VItem2d Map Points Compute Pass"),
-                            timestamp_writes: None,
-                        });
-                        cpass.set_pipeline(self.pipelines.get_or_init::<ClipBox2dPipeline>(ctx));
-
-                        vitem2ds
-                            .iter()
-                            .for_each(|vitem| vitem.encode_compute_pass_command(&mut cpass));
-                    }
-                }
+                // VItem and VItem2d
+                VItemComputeRenderNode.exec(
+                    &self.packets_store,
+                    &mut scope,
+                    &mut self.pipelines,
+                    &self.render_textures,
+                    &self.camera_state,
+                    ctx,
+                );
 
                 // Depth Render Pass
-                {
-                    #[cfg(feature = "profiling")]
-                    let mut scope = scope.scope("Depth Render Pass");
-                    // VItem2d Depth Render Pass
-                    {
-                        let RenderTextures {
-                            depth_stencil_view, ..
-                        } = &self.render_textures;
-                        let rpass_desc = wgpu::RenderPassDescriptor {
-                            label: Some("VItem2d Depth Render Pass"),
-                            color_attachments: &[],
-                            depth_stencil_attachment: Some(
-                                wgpu::RenderPassDepthStencilAttachment {
-                                    view: depth_stencil_view,
-                                    depth_ops: Some(wgpu::Operations {
-                                        load: wgpu::LoadOp::Load,
-                                        store: wgpu::StoreOp::Store,
-                                    }),
-                                    stencil_ops: None,
-                                },
-                            ),
-                            timestamp_writes: None,
-                            occlusion_query_set: None,
-                        };
-                        #[cfg(feature = "profiling")]
-                        let mut rpass =
-                            scope.scoped_render_pass("VItem2d Depth Render Pass", rpass_desc);
-                        #[cfg(not(feature = "profiling"))]
-                        let mut rpass = encoder.begin_render_pass(&rpass_desc);
-                        rpass.set_pipeline(self.pipelines.get_or_init::<VItem2dDepthPipeline>(ctx));
-                        rpass.set_bind_group(
-                            0,
-                            &self.camera_state.uniforms_bind_group.bind_group,
-                            &[],
-                        );
-                        vitem2ds
-                            .iter()
-                            .for_each(|vitem| vitem.encode_depth_render_pass_command(&mut rpass));
-                    }
-                }
+                // VItem2d
+                VItem2dDepthNode.exec(
+                    &self.packets_store,
+                    &mut scope,
+                    &mut self.pipelines,
+                    &self.render_textures,
+                    &self.camera_state,
+                    ctx,
+                );
 
-                // Render Pass
                 {
                     #[cfg(feature = "profiling")]
                     let mut scope = scope.scope("Render Pass");
-                    // VItem Render Pass
-                    {
-                        let RenderTextures {
-                            // multisample_view,
-                            render_view,
-                            depth_stencil_view,
-                            ..
-                        } = &self.render_textures;
-                        let rpass_desc = wgpu::RenderPassDescriptor {
-                            label: Some("VItem Render Pass"),
-                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                // view: multisample_view,
-                                // resolve_target: Some(render_view),
-                                depth_slice: None,
-                                view: render_view,
-                                resolve_target: None,
-                                ops: wgpu::Operations {
-                                    load: wgpu::LoadOp::Load,
-                                    store: wgpu::StoreOp::Store,
-                                },
-                            })],
-                            depth_stencil_attachment: Some(
-                                wgpu::RenderPassDepthStencilAttachment {
-                                    view: depth_stencil_view,
-                                    depth_ops: Some(wgpu::Operations {
-                                        load: wgpu::LoadOp::Load,
-                                        store: wgpu::StoreOp::Store,
-                                    }),
-                                    stencil_ops: None,
-                                },
-                            ),
-                            timestamp_writes: None,
-                            occlusion_query_set: None,
-                        };
-                        #[cfg(feature = "profiling")]
-                        let mut rpass = scope.scoped_render_pass("VItem Render Pass", rpass_desc);
-                        #[cfg(not(feature = "profiling"))]
-                        let mut rpass = encoder.begin_render_pass(&rpass_desc);
-                        rpass.set_pipeline(self.pipelines.get_or_init::<VItemPipeline>(ctx));
-                        rpass.set_bind_group(
-                            0,
-                            &self.camera_state.uniforms_bind_group.bind_group,
-                            &[],
-                        );
-                        vitems
-                            .iter()
-                            .for_each(|vitem| vitem.encode_render_pass_command(&mut rpass));
-                    }
-                    // VItem2d Render Pass
-                    {
-                        let RenderTextures {
-                            render_view,
-                            depth_stencil_view,
-                            ..
-                        } = &self.render_textures;
-                        let rpass_desc = wgpu::RenderPassDescriptor {
-                            label: Some("VItem2d Render Pass"),
-                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                view: render_view,
-                                resolve_target: None,
-                                depth_slice: None,
-                                ops: wgpu::Operations {
-                                    load: wgpu::LoadOp::Load,
-                                    store: wgpu::StoreOp::Store,
-                                },
-                            })],
-                            depth_stencil_attachment: Some(
-                                wgpu::RenderPassDepthStencilAttachment {
-                                    view: depth_stencil_view,
-                                    depth_ops: Some(wgpu::Operations {
-                                        load: wgpu::LoadOp::Load,
-                                        store: wgpu::StoreOp::Store,
-                                    }),
-                                    stencil_ops: None,
-                                },
-                            ),
-                            timestamp_writes: None,
-                            occlusion_query_set: None,
-                        };
-                        #[cfg(feature = "profiling")]
-                        let mut rpass = scope.scoped_render_pass("VItem2d Render Pass", rpass_desc);
-                        #[cfg(not(feature = "profiling"))]
-                        let mut rpass = encoder.begin_render_pass(&rpass_desc);
-                        rpass.set_pipeline(self.pipelines.get_or_init::<VItem2dColorPipeline>(ctx));
-                        rpass.set_bind_group(
-                            0,
-                            &self.camera_state.uniforms_bind_group.bind_group,
-                            &[],
-                        );
-                        vitem2ds
-                            .iter()
-                            .for_each(|vitem| vitem.encode_render_pass_command(&mut rpass));
-                    }
+                    VItemRenderNode.exec(
+                        &self.packets_store,
+                        &mut scope,
+                        &mut self.pipelines,
+                        &self.render_textures,
+                        &self.camera_state,
+                        ctx,
+                    );
+                    VItem2dRenderNode.exec(
+                        &self.packets_store,
+                        &mut scope,
+                        &mut self.pipelines,
+                        &self.render_textures,
+                        &self.camera_state,
+                        ctx,
+                    );
                 }
             }
 
