@@ -6,6 +6,8 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
+/// Render Graph
+pub mod graph;
 /// The pipelines
 pub mod pipelines;
 /// The basic renderable structs
@@ -16,9 +18,12 @@ pub mod utils;
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Luma, Rgba};
 
-use crate::primitives::{
-    RenderNodeTrait, RenderPackets, RenderPool, VItem2dDepthNode, VItem2dRenderNode,
-    VItemComputeRenderNode, VItemRenderNode,
+use crate::{
+    graph::{AnyRenderNodeTrait, RenderGraph, RenderPackets},
+    primitives::{
+        RenderPool, VItem2dDepthNode, VItem2dRenderNode, VItemComputeRenderNode, VItemRenderNode,
+    },
+    utils::RenderContext,
 };
 use ranim_core::{core_item::camera_frame::CameraFrame, store::CoreItemStore};
 use utils::{PipelinesStorage, WgpuBuffer, WgpuContext};
@@ -81,85 +86,10 @@ mod profiling_utils {
     }
 }
 
-// MARK: TimelineEvalResult
-
-// /// Ext for [`SealedRanimScene`] to eval to [`TimelineEvalResult`]
-// pub trait RenderEval {
-//     /// Get the total seconds of the
-//     fn total_secs(&self) -> f64;
-//     /// Evaluate the state of timelines at `target_sec`
-//     fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult;
-//     /// Evaluate the state of timelines at `alpha`
-//     fn eval_alpha(&self, alpha: f64) -> TimelineEvalResult {
-//         self.eval_sec(alpha * self.total_secs())
-//     }
-// }
-
-// impl RenderEval for SealedRanimScene {
-//     fn total_secs(&self) -> f64 {
-//         self.total_secs()
-//     }
-//     // MARK: eval_sec
-//     /// Evaluate the state of timelines at `target_sec`
-//     fn eval_sec(&self, target_sec: f64) -> TimelineEvalResult {
-//         let primitives = self.eval_primitives_at_sec(target_sec).collect::<Vec<_>>();
-
-//         let mut visual_items = Vec::with_capacity(self.timelines_cnt());
-//         let mut camera_frames = Vec::new();
-
-//         for (primitive, id_hash) in primitives {
-//             match primitive {
-//                 Primitives::CameraFrame(x) => {
-//                     if let Some(x) = x.into_iter().next() {
-//                         camera_frames.push((x, id_hash));
-//                     }
-//                 }
-//                 Primitives::VItemPrimitive(x) => {
-//                     visual_items.push((Box::new(x) as Box::<dyn Renderable>, id_hash));
-//                 }
-//             }
-//         }
-
-//         if camera_frames.is_empty() {
-//             warn!("No camera frame found at sec {target_sec}");
-//         }
-
-//         TimelineEvalResult {
-//             camera_frames,
-//             visual_items,
-//         }
-//     }
-// }
-
-// trait RenderableResult {
-//     fn convert(self) -> EvalResult<dyn Renderable>;
-// }
-
-// impl<T: Renderable + 'static> RenderableResult for EvalResult<T> {
-//     fn convert(self) -> EvalResult<dyn Renderable> {
-//         match self {
-//             Self::Dynamic(t) => EvalResult::Dynamic(t as Box<dyn Renderable>),
-//             Self::Static(rc) => EvalResult::Static(rc as Arc<dyn Renderable>),
-//         }
-//     }
-// }
-
-// /// The evaluation result
-// ///
-// /// This is produced from [`SealedRanimScene::eval_alpha`] or [`SealedRanimScene::eval_sec`]
-// #[allow(clippy::type_complexity)]
-// pub struct TimelineEvalResult {
-//     /// (`EvalResult<CameraFrame>`, id hash)
-//     pub camera_frames: Vec<(CameraFrame, u64)>,
-//     /// (`id`, `EvalResult<Box<dyn RenderableItem>>`, id hash)
-//     pub visual_items: Vec<(Box<dyn Renderable>, u64)>,
-// }
-
 // MARK: CameraUniforms
-
+/// Uniforms for the camera
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-/// Uniforms for the camera
 pub struct CameraUniforms {
     proj_mat: Mat4,
     view_mat: Mat4,
@@ -235,6 +165,7 @@ pub struct Renderer {
     size: (usize, usize),
     pub(crate) pipelines: PipelinesStorage,
     packets: RenderPackets,
+    render_graph: RenderGraph,
 
     pub render_textures: RenderTextures,
     pub camera_state: Camera,
@@ -316,11 +247,21 @@ impl Renderer {
         )
         .unwrap();
 
+        let mut render_graph = RenderGraph::new();
+        let vitem2d_depth = render_graph.insert_node(VItem2dDepthNode);
+        let vitem2d_render = render_graph.insert_node(VItem2dRenderNode);
+        let vitem_render = render_graph.insert_node(VItemRenderNode);
+        let vitem_compute = render_graph.insert_node(VItemComputeRenderNode);
+        render_graph.insert_edge(vitem_compute, vitem_render);
+        render_graph.insert_edge(vitem_compute, vitem2d_depth);
+        render_graph.insert_edge(vitem2d_depth, vitem2d_render);
+
         Self {
             size: (width, height),
             pipelines: PipelinesStorage::default(),
             render_textures,
             packets: RenderPackets::default(),
+            render_graph,
             // Outputs
             output_staging_buffer,
             output_texture_data: None,
@@ -426,64 +367,69 @@ impl Renderer {
                 #[cfg(feature = "profiling")]
                 let mut scope = self.profiler.scope("render", &mut encoder);
 
-                // Compute Pass
-                // VItem and VItem2d
-                VItemComputeRenderNode.exec(
+                let mut ctx = RenderContext {
+                    pipelines: &mut self.pipelines,
+                    render_textures: &self.render_textures,
+                    render_pool: pool,
+                    wgpu_ctx: ctx,
+                };
+
+                self.render_graph.exec(
                     #[cfg(not(feature = "profiling"))]
                     &mut encoder,
                     #[cfg(feature = "profiling")]
                     &mut scope,
                     &self.packets,
-                    &self.render_textures,
-                    &pool,
-                    &mut self.pipelines,
+                    &mut ctx,
                     &self.camera_state,
-                    ctx,
                 );
 
-                // Depth Render Pass
-                // VItem2d
-                VItem2dDepthNode.exec(
-                    #[cfg(not(feature = "profiling"))]
-                    &mut encoder,
-                    #[cfg(feature = "profiling")]
-                    &mut scope,
-                    &self.packets,
-                    &self.render_textures,
-                    &pool,
-                    &mut self.pipelines,
-                    &self.camera_state,
-                    ctx,
-                );
+                // // Compute Pass
+                // // VItem and VItem2d
+                // VItemComputeRenderNode.exec(
+                //     #[cfg(not(feature = "profiling"))]
+                //     &mut encoder,
+                //     #[cfg(feature = "profiling")]
+                //     &mut scope,
+                //     &self.packets,
+                //     &mut ctx,
+                //     &self.camera_state,
+                // );
 
-                {
-                    #[cfg(feature = "profiling")]
-                    let mut scope = scope.scope("Render Pass");
-                    VItemRenderNode.exec(
-                        #[cfg(not(feature = "profiling"))]
-                        &mut encoder,
-                        #[cfg(feature = "profiling")]
-                        &mut scope,
-                        &self.packets,
-                        &self.render_textures,
-                        &pool,
-                        &mut self.pipelines,
-                        &self.camera_state,
-                        ctx,
-                    );
-                    VItem2dRenderNode.exec(
-                        #[cfg(not(feature = "profiling"))]
-                        &mut encoder,
-                        #[cfg(feature = "profiling")]
-                        &mut scope,
-                        &self.packets,
-                        &self.render_textures,
-                        &pool,
-                        &mut self.pipelines,
-                        &self.camera_state,
-                        ctx,
-                    );
-                }
+                // // Depth Render Pass
+                // // VItem2d
+                // VItem2dDepthNode.exec(
+                //     #[cfg(not(feature = "profiling"))]
+                //     &mut encoder,
+                //     #[cfg(feature = "profiling")]
+                //     &mut scope,
+                //     &self.packets,
+                //     &mut ctx,
+                //     &self.camera_state,
+                // );
+
+                // {
+                //     #[cfg(feature = "profiling")]
+                //     let mut scope = scope.scope("Render Pass");
+                //     VItemRenderNode.exec(
+                //         #[cfg(not(feature = "profiling"))]
+                //         &mut encoder,
+                //         #[cfg(feature = "profiling")]
+                //         &mut scope,
+                //         &self.packets,
+                //         &mut ctx,
+                //         &self.camera_state,
+                //     );
+                //     VItem2dRenderNode.exec(
+                //         #[cfg(not(feature = "profiling"))]
+                //         &mut encoder,
+                //         #[cfg(feature = "profiling")]
+                //         &mut scope,
+                //         &self.packets,
+                //         &mut ctx,
+                //         &self.camera_state,
+                //     );
+                // }
             }
 
             #[cfg(not(feature = "profiling"))]

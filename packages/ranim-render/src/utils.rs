@@ -8,7 +8,7 @@ use std::{
 use tracing::info;
 use wgpu::util::DeviceExt;
 
-use crate::RenderResource;
+use crate::{RenderResource, RenderTextures, primitives::RenderPool};
 
 pub mod collections {
     use std::{
@@ -64,6 +64,13 @@ pub mod collections {
             });
         }
     }
+}
+
+pub struct RenderContext<'a> {
+    pub render_textures: &'a RenderTextures,
+    pub render_pool: &'a RenderPool,
+    pub pipelines: &'a mut PipelinesStorage,
+    pub wgpu_ctx: &'a WgpuContext,
 }
 
 /// Wgpu context
