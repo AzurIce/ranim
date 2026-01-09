@@ -9,10 +9,10 @@ use ranim_core::{
     core_item::vitem_2d::VItem2d,
 };
 
-use super::{Primitive, RenderCommand, RenderResource};
+use super::{Primitive, RenderResource};
 
 impl Primitive for VItem2d {
-    type RenderInstance = VItem2dRenderInstance;
+    type RenderPacket = VItem2dRenderInstance;
 }
 
 #[repr(C)]
@@ -220,13 +220,6 @@ impl VItem2dRenderInstance {
     }
 }
 
-impl RenderCommand for VItem2dRenderInstance {
-    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {}
-    fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {}
-    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {}
-    fn debug(&self, _ctx: &WgpuContext) {}
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,7 +320,9 @@ mod tests {
             make_items(Vec3::ZERO, 1.0)
                 .chain(make_items(Vec3::new(1.0, 0.0, 0.0), 0.5))
                 .map(CoreItem::VItem2D)
-                .chain(std::iter::once(CoreItem::CameraFrame(camera))),
+                .chain(std::iter::once(CoreItem::CameraFrame(camera)))
+                .enumerate()
+                .map(|(id, x)| ((id, id), x)),
         );
 
         renderer.render_store_with_pool(&ctx, clear_color, &store, &mut pool);

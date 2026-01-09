@@ -17,7 +17,7 @@ use crate::{
         VItemPipeline,
     },
     primitives::{vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance},
-    utils::{PipelinesStorage, WgpuContext},
+    utils::{PipelinesStorage, WgpuContext, collections::TypeBinnedVec},
 };
 
 /// The RenderResource encapsules the wgpu resources.
@@ -32,46 +32,41 @@ pub trait RenderResource {
     fn update(&mut self, ctx: &WgpuContext, data: &Self::Data);
 }
 
-pub trait RenderPacket {}
-
 pub struct VItemComputeRenderNode;
-
-type VItemRenderPacket = VItemRenderInstance;
-impl RenderPacket for VItemRenderPacket {}
-
-type VItem2dRenderPacket = VItem2dRenderInstance;
-impl RenderPacket for VItem2dRenderPacket {}
 
 pub trait RenderNodeTrait {
     type Query: RenderPacketsQuery;
     fn run(
         &self,
-        packets_query_output: <Self::Query as RenderPacketsQuery>::Output<'_>,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        pipelines: &mut PipelinesStorage,
+        render_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         render_textures: &RenderTextures,
+        render_pool: &RenderPool,
+        pipelines: &mut PipelinesStorage,
         camera_state: &Camera,
         ctx: &WgpuContext,
     );
     fn exec(
         &self,
-        packets_store: &RenderPacketsStore,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        pipelines: &mut PipelinesStorage,
+        render_packets: &RenderPackets,
         render_textures: &RenderTextures,
+        render_pool: &RenderPool,
+        pipelines: &mut PipelinesStorage,
         camera_state: &Camera,
         ctx: &WgpuContext,
     ) {
         self.run(
-            Self::Query::query(packets_store),
             #[cfg(not(feature = "profiling"))]
             encoder,
             #[cfg(feature = "profiling")]
             scope,
-            pipelines,
+            Self::Query::query(render_packets),
             render_textures,
+            render_pool,
+            pipelines,
             camera_state,
             ctx,
         );
@@ -79,15 +74,16 @@ pub trait RenderNodeTrait {
 }
 
 impl RenderNodeTrait for VItemComputeRenderNode {
-    type Query = (VItemRenderPacket, VItem2dRenderPacket);
+    type Query = (VItemRenderInstance, VItem2dRenderInstance);
 
     fn run(
         &self,
-        (vitem_packets, vitem2d_packets): <Self::Query as RenderPacketsQuery>::Output<'_>,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        pipelines: &mut PipelinesStorage,
+        (vitem_packets, vitem2d_packets): <Self::Query as RenderPacketsQuery>::Output<'_>,
         _render_textures: &RenderTextures,
+        render_pool: &RenderPool,
+        pipelines: &mut PipelinesStorage,
         camera_state: &Camera,
         ctx: &WgpuContext,
     ) {
@@ -107,6 +103,7 @@ impl RenderNodeTrait for VItemComputeRenderNode {
 
             vitem_packets
                 .iter()
+                .map(|h| render_pool.get_packet(h))
                 .for_each(|vitem| vitem.encode_compute_pass_command(&mut cpass));
         }
         // VItem2d Compute Pass
@@ -122,6 +119,7 @@ impl RenderNodeTrait for VItemComputeRenderNode {
 
             vitem2d_packets
                 .iter()
+                .map(|h| render_pool.get_packet(h))
                 .for_each(|vitem| vitem.encode_compute_pass_command(&mut cpass));
         }
     }
@@ -130,14 +128,15 @@ impl RenderNodeTrait for VItemComputeRenderNode {
 pub struct VItem2dDepthNode;
 
 impl RenderNodeTrait for VItem2dDepthNode {
-    type Query = VItem2dRenderPacket;
+    type Query = VItem2dRenderInstance;
     fn run(
         &self,
-        vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        pipelines: &mut PipelinesStorage,
+        vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         render_textures: &RenderTextures,
+        render_pool: &RenderPool,
+        pipelines: &mut PipelinesStorage,
         camera_state: &Camera,
         ctx: &WgpuContext,
     ) {
@@ -170,6 +169,7 @@ impl RenderNodeTrait for VItem2dDepthNode {
             rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
             vitem2d_packets
                 .iter()
+                .map(|h| render_pool.get_packet(h))
                 .for_each(|vitem| vitem.encode_depth_render_pass_command(&mut rpass));
         }
     }
@@ -178,14 +178,15 @@ impl RenderNodeTrait for VItem2dDepthNode {
 pub struct VItemRenderNode;
 
 impl RenderNodeTrait for VItemRenderNode {
-    type Query = VItemRenderPacket;
+    type Query = VItemRenderInstance;
     fn run(
         &self,
-        vitem_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        pipelines: &mut PipelinesStorage,
+        vitem_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         render_textures: &RenderTextures,
+        render_pool: &RenderPool,
+        pipelines: &mut PipelinesStorage,
         camera_state: &Camera,
         ctx: &WgpuContext,
     ) {
@@ -227,6 +228,7 @@ impl RenderNodeTrait for VItemRenderNode {
         rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
         vitem_packets
             .iter()
+            .map(|h| render_pool.get_packet(h))
             .for_each(|vitem| vitem.encode_render_pass_command(&mut rpass));
     }
 }
@@ -234,14 +236,15 @@ impl RenderNodeTrait for VItemRenderNode {
 pub struct VItem2dRenderNode;
 
 impl RenderNodeTrait for VItem2dRenderNode {
-    type Query = VItem2dRenderPacket;
+    type Query = VItem2dRenderInstance;
     fn run(
         &self,
-        vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        pipelines: &mut PipelinesStorage,
+        vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         render_textures: &RenderTextures,
+        render_pool: &RenderPool,
+        pipelines: &mut PipelinesStorage,
         camera_state: &Camera,
         ctx: &WgpuContext,
     ) {
@@ -281,28 +284,34 @@ impl RenderNodeTrait for VItem2dRenderNode {
         rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
         vitem2d_packets
             .iter()
+            .map(|h| render_pool.get_packet(h))
             .for_each(|vitem| vitem.encode_render_pass_command(&mut rpass));
     }
 }
 
 pub trait RenderPacketsQuery {
     type Output<'s>;
-    fn query(store: &RenderPacketsStore) -> Self::Output<'_>;
+    fn query(store: &RenderPackets) -> Self::Output<'_>;
 }
 
-impl<T: RenderPacket + 'static> RenderPacketsQuery for T {
-    type Output<'s> = &'s [T];
-    fn query(store: &RenderPacketsStore) -> Self::Output<'_> {
-        store.get_packets()
+/// A marker trait to make compiler happy.
+pub trait RenderPacketMark {}
+impl RenderPacketMark for VItemRenderInstance {}
+impl RenderPacketMark for VItem2dRenderInstance {}
+
+impl<T: RenderPacketMark + Send + Sync + 'static> RenderPacketsQuery for T {
+    type Output<'s> = &'s [Handle<T>];
+    fn query(store: &RenderPackets) -> Self::Output<'_> {
+        store.get()
     }
 }
 
 macro_rules! impl_tuple_render_packet_query {
     ($($T:ident),*) => {
-        impl<$($T: RenderPacket + 'static,)*> RenderPacketsQuery for ($($T,)*) {
-            type Output<'s> = ($(&'s [$T],)*);
-            fn query(store: &RenderPacketsStore) -> Self::Output<'_> {
-                ($(store.get_packets::<$T>(),)*)
+        impl<$($T: RenderPacketMark + Send + Sync + 'static,)*> RenderPacketsQuery for ($($T,)*) {
+            type Output<'s> = ($(&'s [Handle<$T>],)*);
+            fn query(store: &RenderPackets) -> Self::Output<'_> {
+                ($(store.get::<$T>(),)*)
             }
         }
     };
@@ -310,148 +319,33 @@ macro_rules! impl_tuple_render_packet_query {
 
 all_tuples!(impl_tuple_render_packet_query, 1, 16, T);
 
-/// A trait to support calling `clear` on the type erased trait object.
-pub trait AnyRenderPackets: Any {
-    fn clear(&mut self);
-}
-
-impl<T: Any> AnyRenderPackets for Vec<T> {
-    fn clear(&mut self) {
-        self.clear();
-    }
-}
-
+/// A type-erased container of [`Handle`]s for render packets.
+///
+/// Its inner is a [`TypeBinnedVec`].
 #[derive(Default)]
-pub struct RenderPacketsStore {
-    pub packets: HashMap<TypeId, Box<dyn AnyRenderPackets>>,
+pub struct RenderPackets {
+    inner: TypeBinnedVec,
 }
 
-impl RenderPacketsStore {
-    pub fn init_packets<T: RenderPacket + 'static>(&mut self) -> &mut Vec<T> {
-        let entry = self
-            .packets
-            .entry(TypeId::of::<T>())
-            .or_insert(Box::<Vec<T>>::default());
-        (entry.as_mut() as &mut dyn Any)
-            .downcast_mut::<Vec<T>>()
-            .unwrap()
+impl RenderPackets {
+    #[inline]
+    pub fn get<T: RenderPacketMark + Send + Sync + 'static>(&self) -> &[Handle<T>] {
+        self.inner.get_row::<Handle<T>>()
     }
-    pub fn get_packets<T: RenderPacket + 'static>(&self) -> &[T] {
-        self.packets
-            .get(&TypeId::of::<T>())
-            .and_then(|v| (v.as_ref() as &dyn Any).downcast_ref::<Vec<T>>())
-            .map(|v| v.as_ref())
-            .unwrap_or(&[])
+    #[inline]
+    pub fn extend<T: RenderPacketMark + Send + Sync + 'static>(
+        &mut self,
+        packets: impl IntoIterator<Item = Handle<T>>,
+    ) {
+        self.inner.extend(packets);
     }
-    pub fn extend<T: RenderPacket + 'static>(&mut self, packets: impl IntoIterator<Item = T>) {
-        (self.init_packets::<T>() as &mut dyn Any)
-            .downcast_mut::<Vec<T>>()
-            .unwrap()
-            .extend(packets);
+    #[inline]
+    pub fn push<T: RenderPacketMark + Send + Sync + 'static>(&mut self, packet: Handle<T>) {
+        self.inner.push(packet);
     }
-    pub fn push<T: RenderPacket + 'static>(&mut self, packet: T) {
-        (self.init_packets::<T>() as &mut dyn Any)
-            .downcast_mut::<Vec<T>>()
-            .unwrap()
-            .push(packet);
-    }
+    #[inline]
     pub fn clear(&mut self) {
-        self.packets.iter_mut().for_each(|(_, v)| {
-            v.clear();
-        });
-    }
-}
-
-/// The RenderCommand encodes the commands.
-#[deprecated]
-pub trait RenderCommand {
-    /// Encode the compute pass command
-    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass);
-    fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass);
-    /// Encode the render pass command
-    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass);
-
-    /// Debug
-    fn debug(&self, _ctx: &WgpuContext) {}
-}
-
-macro_rules! impl_tuple_render_command {
-    ($($T:ident),*) => {
-        impl<$($T: RenderCommand,)*> RenderCommand for ($($T,)*) {
-            fn encode_compute_pass_command(
-                &self,
-                cpass: &mut wgpu::ComputePass,
-            ) {
-                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
-                let ($($T,)*) = self;
-                $($T.encode_compute_pass_command(
-                    cpass,
-                );)*
-            }
-            fn encode_depth_render_pass_command(
-                &self,
-                rpass: &mut wgpu::RenderPass,
-            ) {
-                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
-                let ($($T,)*) = self;
-                $($T.encode_depth_render_pass_command(
-                    rpass,
-                );)*
-            }
-            fn encode_render_pass_command(
-                &self,
-                rpass: &mut wgpu::RenderPass,
-            ) {
-                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
-                let ($($T,)*) = self;
-                $($T.encode_render_pass_command(
-                    rpass,
-                );)*
-            }
-            fn debug(&self, ctx: &WgpuContext) {
-                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
-                let ($($T,)*) = self;
-                $($T.debug(ctx);)*
-            }
-        }
-    };
-}
-
-all_tuples!(impl_tuple_render_command, 1, 16, T);
-
-impl<T: RenderCommand> RenderCommand for Vec<T> {
-    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
-        self.iter()
-            .for_each(|x| x.encode_compute_pass_command(cpass))
-    }
-    fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
-        self.iter()
-            .for_each(|x| x.encode_depth_render_pass_command(rpass))
-    }
-    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
-        self.iter()
-            .for_each(|x| x.encode_render_pass_command(rpass))
-    }
-    fn debug(&self, _ctx: &WgpuContext) {
-        self.iter().for_each(|x| x.debug(_ctx));
-    }
-}
-
-impl<T: RenderCommand, const N: usize> RenderCommand for [T; N] {
-    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
-        self.iter()
-            .for_each(|x| x.encode_compute_pass_command(cpass))
-    }
-    fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
-        self.iter()
-            .for_each(|x| x.encode_depth_render_pass_command(rpass))
-    }
-    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
-        self.iter()
-            .for_each(|x| x.encode_render_pass_command(rpass))
-    }
-    fn debug(&self, _ctx: &WgpuContext) {
-        self.iter().for_each(|x| x.debug(_ctx));
+        self.inner.clear();
     }
 }
 
@@ -464,7 +358,7 @@ impl<T: RenderCommand, const N: usize> RenderCommand for [T; N] {
 /// - [`RenderCommand`]: A trait about encoding GPU commands.
 pub trait Primitive {
     /// The RenderInstance
-    type RenderInstance: RenderResource<Data = Self> + RenderCommand + Send + Sync + 'static;
+    type RenderPacket: RenderResource<Data = Self> + Send + Sync + 'static;
 }
 
 slotmap::new_key_type! { pub struct RenderInstanceKey; }
@@ -475,9 +369,30 @@ pub struct RenderPool {
     #[allow(clippy::type_complexity)]
     inner: slotmap::SlotMap<
         RenderInstanceKey,
-        (Arc<RenderInstanceKey>, TypeId, Box<dyn AnyRenderCommand>),
+        (
+            Arc<RenderInstanceKey>,
+            TypeId,
+            Box<dyn Any + Send + Sync + 'static>,
+        ),
     >,
     last_frame_dropped: HashMap<TypeId, Vec<RenderInstanceKey>>,
+}
+
+/// A handle to a render packet.
+///
+/// In its inner is an [`Arc`] reference count of the [`RenderInstanceKey`].
+pub struct Handle<T> {
+    key: Arc<RenderInstanceKey>,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> Clone for Handle<T> {
+    fn clone(&self) -> Self {
+        Self {
+            key: self.key.clone(),
+            _phantom: std::marker::PhantomData,
+        }
+    }
 }
 
 impl RenderPool {
@@ -485,10 +400,22 @@ impl RenderPool {
         Self::default()
     }
 
-    pub fn get(&self, key: RenderInstanceKey) -> Option<&dyn AnyRenderCommand> {
-        self.inner
-            .get(key)
-            .map(|x| x.2.as_ref() as &dyn AnyRenderCommand)
+    pub fn get_packet<T: 'static>(&self, handle: &Handle<T>) -> &T {
+        self.get(*handle.key)
+            .map(|x| x.downcast_ref::<T>().unwrap())
+            .unwrap()
+    }
+
+    pub fn alloc_packet<P: Primitive>(
+        &mut self,
+        ctx: &WgpuContext,
+        data: &P,
+    ) -> Handle<P::RenderPacket> {
+        let key = self.alloc(ctx, data);
+        Handle {
+            key,
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     pub fn show(&self) {
@@ -501,16 +428,20 @@ impl RenderPool {
         println!();
     }
 
-    pub fn alloc<P: Primitive>(&mut self, ctx: &WgpuContext, data: &P) -> Arc<RenderInstanceKey> {
+    fn get(&self, key: RenderInstanceKey) -> Option<&(dyn Any + Send + Sync + 'static)> {
+        self.inner.get(key).map(|x| x.2.as_ref())
+    }
+
+    fn alloc<P: Primitive>(&mut self, ctx: &WgpuContext, data: &P) -> Arc<RenderInstanceKey> {
         let last_frame_dropped = self
             .last_frame_dropped
-            .entry(TypeId::of::<P::RenderInstance>())
+            .entry(TypeId::of::<P::RenderPacket>())
             .or_default();
         if let Some(key) = last_frame_dropped.pop() {
             let entry = self.inner.get_mut(key).unwrap();
             let key = entry.0.clone();
             (entry.2.as_mut() as &mut dyn Any)
-                .downcast_mut::<P::RenderInstance>()
+                .downcast_mut::<P::RenderPacket>()
                 .unwrap()
                 .update(ctx, data);
             key
@@ -518,14 +449,16 @@ impl RenderPool {
             let handle = self.inner.insert_with_key(|key| {
                 (
                     Arc::new(key),
-                    TypeId::of::<P::RenderInstance>(),
-                    Box::new(P::RenderInstance::init(ctx, data)),
+                    TypeId::of::<P::RenderPacket>(),
+                    Box::new(P::RenderPacket::init(ctx, data)),
                 )
             });
             self.inner.get(handle).unwrap().0.clone()
         }
     }
 
+    /// When called, all instances not referenced are recorded into the `last_frame_dropped` map.
+    /// An will be cleaned in the next call.
     pub fn clean(&mut self) {
         self.inner.retain(|key, (_, t_id, _)| {
             self.last_frame_dropped
@@ -541,32 +474,5 @@ impl RenderPool {
             .for_each(|(key, (_, t_id, _))| {
                 self.last_frame_dropped.entry(*t_id).or_default().push(key);
             });
-    }
-}
-
-/// Type erased [`RenderCommand`]
-pub trait AnyRenderCommand: Any + RenderCommand + Send + Sync {}
-impl<T: RenderCommand + Any + Send + Sync> AnyRenderCommand for T {}
-
-impl RenderCommand for Vec<&dyn RenderCommand> {
-    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
-        for render_instance in self {
-            render_instance.encode_compute_pass_command(cpass);
-        }
-    }
-    fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
-        for render_instance in self {
-            render_instance.encode_depth_render_pass_command(rpass);
-        }
-    }
-    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
-        for render_instance in self {
-            render_instance.encode_render_pass_command(rpass);
-        }
-    }
-    fn debug(&self, ctx: &WgpuContext) {
-        for render_instance in self {
-            render_instance.debug(ctx);
-        }
     }
 }

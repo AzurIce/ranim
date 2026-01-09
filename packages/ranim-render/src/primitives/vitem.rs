@@ -8,10 +8,10 @@ use ranim_core::{
     core_item::vitem::VItemPrimitive,
 };
 
-use super::{Primitive, RenderCommand, RenderResource};
+use super::{Primitive, RenderResource};
 
 impl Primitive for VItemPrimitive {
-    type RenderInstance = VItemRenderInstance;
+    type RenderPacket = VItemRenderInstance;
 }
 
 /// [`VItemPrimitive`]'s render instance.
@@ -180,17 +180,6 @@ impl VItemRenderInstance {
     }
 }
 
-impl RenderCommand for VItemRenderInstance {
-    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {}
-    fn encode_depth_render_pass_command(&self, _rpass: &mut wgpu::RenderPass) {}
-    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {}
-    fn debug(&self, _ctx: &WgpuContext) {
-        // let points2d = self.points2d_buffer.read_buffer(ctx).unwrap();
-        // let points2d = bytemuck::cast_slice::<_, Vec4>(&points2d);
-        // println!("points2d: {:?}", points2d);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use glam::vec4;
@@ -220,9 +209,12 @@ mod tests {
         let mut pool = RenderPool::new();
         let mut store = CoreItemStore::new();
         store.update(
-            std::iter::once(CoreItem::VItemPrimitive(vitem_primitive_data)).chain(std::iter::once(
-                CoreItem::CameraFrame(CameraFrame::default()),
-            )),
+            std::iter::once(CoreItem::VItemPrimitive(vitem_primitive_data))
+                .chain(std::iter::once(CoreItem::CameraFrame(
+                    CameraFrame::default(),
+                )))
+                .enumerate()
+                .map(|(id, x)| ((id, id), x)),
         );
         renderer.render_store_with_pool(&ctx, clear_color, &store, &mut pool);
         let img = renderer.get_rendered_texture_img_buffer(&ctx);

@@ -16,15 +16,9 @@ pub mod utils;
 use glam::{Mat4, Vec2};
 use image::{ImageBuffer, Luma, Rgba};
 
-use crate::{
-    pipelines::{
-        ClipBox2dPipeline, Map3dTo2dPipeline, VItem2dColorPipeline, VItem2dDepthPipeline,
-        VItemPipeline,
-    },
-    primitives::{
-        RenderNodeTrait, RenderPacketsStore, RenderPool, VItem2dDepthNode, VItem2dRenderNode,
-        VItemComputeRenderNode, VItemRenderNode, vitem::VItemRenderInstance,
-    },
+use crate::primitives::{
+    RenderNodeTrait, RenderPackets, RenderPool, VItem2dDepthNode, VItem2dRenderNode,
+    VItemComputeRenderNode, VItemRenderNode,
 };
 use ranim_core::{core_item::camera_frame::CameraFrame, store::CoreItemStore};
 use utils::{PipelinesStorage, WgpuBuffer, WgpuContext};
@@ -240,7 +234,7 @@ impl CameraUniformsBindGroup {
 pub struct Renderer {
     size: (usize, usize),
     pub(crate) pipelines: PipelinesStorage,
-    packets_store: RenderPacketsStore,
+    packets: RenderPackets,
 
     pub render_textures: RenderTextures,
     pub camera_state: Camera,
@@ -326,7 +320,7 @@ impl Renderer {
             size: (width, height),
             pipelines: PipelinesStorage::default(),
             render_textures,
-            packets_store: RenderPacketsStore::default(),
+            packets: RenderPackets::default(),
             // Outputs
             output_staging_buffer,
             output_texture_data: None,
@@ -401,34 +395,20 @@ impl Renderer {
         pool: &mut RenderPool,
     ) {
         // println!("camera: {}, vitems: {}", store.camera_frames.len(), store.vitems.len());
-        let camera_frame = &store.camera_frames[0];
-        self.packets_store.clear();
+        let (_id, camera_frame) = &store.camera_frames[0];
 
-        let vitems = store
-            .vitems
-            .iter()
-            .map(|x| pool.alloc(ctx, x))
-            .collect::<Vec<_>>();
-        let vitem2ds = store
-            .vitems2d
-            .iter()
-            .map(|x| pool.alloc(ctx, x))
-            .collect::<Vec<_>>();
-        let vitems = vitems
-            .into_iter()
-            .filter_map(|x| pool.get(*x))
-            .collect::<Vec<_>>();
-        let vitem2ds = vitem2ds
-            .into_iter()
-            .filter_map(|x| pool.get(*x))
-            .collect::<Vec<_>>();
-        // info!("vitems: {}, vitem2ds: {}", vitems.len(), vitem2ds.len());
-        // let render_primitives = vitems
-        //     .into_iter()
-        //     .filter_map(|k| pool.get(*k))
-        //     .chain(vitem2ds.into_iter().filter_map(|x| pool.get(*x)))
-        //     .map(|x| x as &dyn RenderCommand)
-        //     .collect::<Vec<_>>();
+        self.packets.extend(
+            store
+                .vitems
+                .iter()
+                .map(|(_id, data)| pool.alloc_packet(ctx, data)),
+        );
+        self.packets.extend(
+            store
+                .vitems2d
+                .iter()
+                .map(|(_id, data)| pool.alloc_packet(ctx, data)),
+        );
 
         self.camera_state.update_uniforms(ctx, camera_frame);
 
@@ -449,10 +429,14 @@ impl Renderer {
                 // Compute Pass
                 // VItem and VItem2d
                 VItemComputeRenderNode.exec(
-                    &self.packets_store,
+                    #[cfg(not(feature = "profiling"))]
+                    &mut encoder,
+                    #[cfg(feature = "profiling")]
                     &mut scope,
-                    &mut self.pipelines,
+                    &self.packets,
                     &self.render_textures,
+                    &pool,
+                    &mut self.pipelines,
                     &self.camera_state,
                     ctx,
                 );
@@ -460,10 +444,14 @@ impl Renderer {
                 // Depth Render Pass
                 // VItem2d
                 VItem2dDepthNode.exec(
-                    &self.packets_store,
+                    #[cfg(not(feature = "profiling"))]
+                    &mut encoder,
+                    #[cfg(feature = "profiling")]
                     &mut scope,
-                    &mut self.pipelines,
+                    &self.packets,
                     &self.render_textures,
+                    &pool,
+                    &mut self.pipelines,
                     &self.camera_state,
                     ctx,
                 );
@@ -472,18 +460,26 @@ impl Renderer {
                     #[cfg(feature = "profiling")]
                     let mut scope = scope.scope("Render Pass");
                     VItemRenderNode.exec(
-                        &self.packets_store,
+                        #[cfg(not(feature = "profiling"))]
+                        &mut encoder,
+                        #[cfg(feature = "profiling")]
                         &mut scope,
-                        &mut self.pipelines,
+                        &self.packets,
                         &self.render_textures,
+                        &pool,
+                        &mut self.pipelines,
                         &self.camera_state,
                         ctx,
                     );
                     VItem2dRenderNode.exec(
-                        &self.packets_store,
+                        #[cfg(not(feature = "profiling"))]
+                        &mut encoder,
+                        #[cfg(feature = "profiling")]
                         &mut scope,
-                        &mut self.pipelines,
+                        &self.packets,
                         &self.render_textures,
+                        &pool,
+                        &mut self.pipelines,
                         &self.camera_state,
                         ctx,
                     );
@@ -526,6 +522,7 @@ impl Renderer {
             self.depth_texture_updated = false;
         }
 
+        self.packets.clear();
         // drop(render_primitives);
     }
 

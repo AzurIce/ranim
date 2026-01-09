@@ -10,9 +10,65 @@ use wgpu::util::DeviceExt;
 
 use crate::RenderResource;
 
+pub mod collections {
+    use std::{
+        any::{Any, TypeId},
+        collections::HashMap,
+    };
+
+    /// A trait to support calling `clear` on the type erased trait object.
+    pub trait AnyClear: Any + Send + Sync {
+        fn clear(&mut self);
+    }
+
+    impl<T: Any + Send + Sync> AnyClear for Vec<T> {
+        fn clear(&mut self) {
+            self.clear();
+        }
+    }
+
+    /// A type-erased container for render packets.
+    ///
+    /// Basically a HashMap of TypeId -> type-erased Vec<RenderPacketHandle<T>>
+    #[derive(Default)]
+    pub struct TypeBinnedVec {
+        inner: HashMap<TypeId, Box<dyn AnyClear>>,
+    }
+
+    impl TypeBinnedVec {
+        fn init_row<T: Send + Sync + 'static>(&mut self) -> &mut Vec<T> {
+            let entry = self
+                .inner
+                .entry(TypeId::of::<T>())
+                .or_insert(Box::<Vec<T>>::default());
+            (entry.as_mut() as &mut dyn Any)
+                .downcast_mut::<Vec<T>>()
+                .unwrap()
+        }
+        pub fn get_row<T: Send + Sync + 'static>(&self) -> &[T] {
+            self.inner
+                .get(&TypeId::of::<T>())
+                .and_then(|v| (v.as_ref() as &dyn Any).downcast_ref::<Vec<T>>())
+                .map(|v| v.as_ref())
+                .unwrap_or(&[])
+        }
+        pub fn extend<T: Send + Sync + 'static>(&mut self, packets: impl IntoIterator<Item = T>) {
+            self.init_row::<T>().extend(packets);
+        }
+        pub fn push<T: Send + Sync + 'static>(&mut self, packet: T) {
+            self.init_row::<T>().push(packet);
+        }
+        pub fn clear(&mut self) {
+            self.inner.iter_mut().for_each(|(_, v)| {
+                v.clear();
+            });
+        }
+    }
+}
+
 /// Wgpu context
 pub struct WgpuContext {
-    /// The wgpu instance   
+    /// The wgpu instance
     pub instance: wgpu::Instance,
     /// The wgpu adapter
     pub adapter: wgpu::Adapter,
