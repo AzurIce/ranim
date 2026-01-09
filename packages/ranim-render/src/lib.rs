@@ -23,13 +23,12 @@ use crate::{
     primitives::{
         RenderPool, VItem2dDepthNode, VItem2dRenderNode, VItemComputeRenderNode, VItemRenderNode,
     },
-    utils::RenderContext,
+    utils::{ReadbackWgpuTexture, RenderContext},
 };
 use ranim_core::{core_item::camera_frame::CameraFrame, store::CoreItemStore};
 use utils::{PipelinesStorage, WgpuBuffer, WgpuContext};
 
 pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
-const ALIGNMENT: usize = 256;
 
 #[cfg(feature = "profiling")]
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
@@ -170,13 +169,8 @@ pub struct Renderer {
     pub render_textures: RenderTextures,
     pub camera_state: Camera,
 
-    output_staging_buffer: wgpu::Buffer,
-    output_texture_data: Option<Vec<u8>>,
-    pub(crate) output_texture_updated: bool,
-
-    depth_staging_buffer: wgpu::Buffer,
-    depth_texture_data: Option<Vec<f32>>,
-    pub(crate) depth_texture_updated: bool,
+    pub(crate) output_texture_dirty: bool,
+    pub(crate) depth_texture_dirty: bool,
 
     #[cfg(feature = "profiling")]
     pub(crate) profiler: wgpu_profiler::GpuProfiler,
@@ -220,20 +214,6 @@ impl Renderer {
 
         let render_textures = RenderTextures::new(ctx, width, height);
         let camera_state = Camera::new(ctx, &camera, frame_height, width as f64 / height as f64);
-        let bytes_per_row = ((width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
-        let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Output Staging Buffer"),
-            size: (bytes_per_row * height) as u64,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-        let depth_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Depth Staging Buffer"),
-            size: (bytes_per_row * height) as u64,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-
         // trace!("init renderer uniform: {:?}", uniforms);
 
         // let bg = rgba8(0x33, 0x33, 0x33, 0xff).convert::<LinearSrgb>();
@@ -262,14 +242,9 @@ impl Renderer {
             render_textures,
             packets: RenderPackets::default(),
             render_graph,
-            // Outputs
-            output_staging_buffer,
-            output_texture_data: None,
-            output_texture_updated: false,
-            // Depth
-            depth_staging_buffer,
-            depth_texture_data: None,
-            depth_texture_updated: false,
+            // Textures state
+            output_texture_dirty: false,
+            depth_texture_dirty: false,
             // Camera State
             camera_state,
             // Profiler
@@ -324,8 +299,8 @@ impl Renderer {
             });
         }
         ctx.queue.submit(Some(encoder.finish()));
-        self.output_texture_updated = false;
-        self.depth_texture_updated = false;
+        self.output_texture_dirty = false;
+        self.depth_texture_dirty = false;
     }
 
     pub fn render_store_with_pool(
@@ -464,90 +439,21 @@ impl Renderer {
                 gpu_profiler.new_frame();
             }
 
-            self.output_texture_updated = false;
-            self.depth_texture_updated = false;
+            self.output_texture_dirty = false;
+            self.depth_texture_dirty = false;
         }
 
         self.packets.clear();
         // drop(render_primitives);
     }
 
-    fn update_rendered_texture_data(&mut self, ctx: &WgpuContext) {
-        let bytes_per_row =
-            ((self.size.0 * 4) as f64 / ALIGNMENT as f64).ceil() as usize * ALIGNMENT;
-        let mut texture_data =
-            self.output_texture_data
-                .take()
-                .unwrap_or(vec![0; self.size.0 * self.size.1 * 4]);
-
-        let mut encoder = ctx
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
-
-        let RenderTextures { render_texture, .. } = &self.render_textures;
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                aspect: wgpu::TextureAspect::All,
-                texture: render_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &self.output_staging_buffer,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(bytes_per_row as u32),
-                    rows_per_image: Some(self.size.1 as u32),
-                },
-            },
-            render_texture.size(),
-        );
-        ctx.queue.submit(Some(encoder.finish()));
-
-        {
-            let buffer_slice = self.output_staging_buffer.slice(..);
-
-            // NOTE: We have to create the mapping THEN device.poll() before await
-            // the future. Otherwise the application will freeze.
-            let (tx, rx) = async_channel::bounded(1);
-            buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-                pollster::block_on(tx.send(result)).unwrap()
-            });
-            ctx.device
-                .poll(wgpu::PollType::wait_indefinitely())
-                .unwrap();
-            pollster::block_on(rx.recv()).unwrap().unwrap();
-
-            {
-                let view = buffer_slice.get_mapped_range();
-                // texture_data.copy_from_slice(&view);
-                for y in 0..self.size.1 {
-                    let src_row_start = y * bytes_per_row;
-                    let dst_row_start = y * self.size.0 * 4;
-
-                    texture_data[dst_row_start..dst_row_start + self.size.0 * 4]
-                        .copy_from_slice(&view[src_row_start..src_row_start + self.size.0 * 4]);
-                }
-            }
-        };
-        self.output_staging_buffer.unmap();
-
-        self.output_texture_data = Some(texture_data);
-        self.output_texture_updated = true;
-    }
-
-    // pub(crate) fn get_render_texture(&self) -> &wgpu::Texture {
-    //     &self.render_texture
-    // }
-
     pub fn get_rendered_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
-        if !self.output_texture_updated {
+        if !self.output_texture_dirty {
             // trace!("[Camera] Updating rendered texture data...");
-            self.update_rendered_texture_data(ctx);
+            return self.render_textures.render_texture.texture_data();
         }
-        self.output_texture_data.as_ref().unwrap()
+        self.output_texture_dirty = false;
+        self.render_textures.render_texture.update_texture_data(ctx)
     }
     pub fn get_rendered_texture_img_buffer(
         &mut self,
@@ -558,80 +464,14 @@ impl Renderer {
         ImageBuffer::from_raw(size.0 as u32, size.1 as u32, data).unwrap()
     }
 
-    fn update_depth_texture_data(&mut self, ctx: &WgpuContext) {
-        let bytes_per_row =
-            ((self.size.0 * 4) as f64 / ALIGNMENT as f64).ceil() as usize * ALIGNMENT;
-        let mut texture_data =
-            self.depth_texture_data
-                .take()
-                .unwrap_or(vec![0.0; self.size.0 * self.size.1]);
-
-        let mut encoder = ctx
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Depth Encoder"),
-            });
-
-        let RenderTextures {
-            depth_stencil_texture,
-            ..
-        } = &self.render_textures;
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                aspect: wgpu::TextureAspect::DepthOnly,
-                texture: depth_stencil_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &self.depth_staging_buffer,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(bytes_per_row as u32),
-                    rows_per_image: Some(self.size.1 as u32),
-                },
-            },
-            depth_stencil_texture.size(),
-        );
-        ctx.queue.submit(Some(encoder.finish()));
-
-        {
-            let buffer_slice = self.depth_staging_buffer.slice(..);
-
-            let (tx, rx) = async_channel::bounded(1);
-            buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-                pollster::block_on(tx.send(result)).unwrap()
-            });
-            ctx.device
-                .poll(wgpu::PollType::wait_indefinitely())
-                .unwrap();
-            pollster::block_on(rx.recv()).unwrap().unwrap();
-
-            {
-                let view = buffer_slice.get_mapped_range();
-                let floats: &[f32] = bytemuck::cast_slice(&view);
-                let floats_per_row = bytes_per_row / 4;
-
-                for y in 0..self.size.1 {
-                    let src_row_start = y * floats_per_row;
-                    let dst_row_start = y * self.size.0;
-
-                    texture_data[dst_row_start..dst_row_start + self.size.0]
-                        .copy_from_slice(&floats[src_row_start..src_row_start + self.size.0]);
-                }
-            }
-        };
-        self.depth_staging_buffer.unmap();
-
-        self.depth_texture_data = Some(texture_data);
-        self.depth_texture_updated = true;
-    }
-
     pub fn get_depth_texture_data(&mut self, ctx: &WgpuContext) -> &[f32] {
-        if !self.depth_texture_updated {
-            self.update_depth_texture_data(ctx);
+        if !self.depth_texture_dirty {
+            return self.render_textures.depth_stencil_texture.texture_data();
         }
-        self.depth_texture_data.as_ref().unwrap()
+        self.depth_texture_dirty = false;
+        self.render_textures
+            .depth_stencil_texture
+            .update_texture_data(ctx)
     }
 
     pub fn get_depth_texture_img_buffer(
@@ -653,9 +493,9 @@ impl Renderer {
 /// Texture resources used for rendering
 #[allow(unused)]
 pub struct RenderTextures {
-    pub render_texture: wgpu::Texture,
+    pub render_texture: ReadbackWgpuTexture<u8>,
     // multisample_texture: wgpu::Texture,
-    pub depth_stencil_texture: wgpu::Texture,
+    pub depth_stencil_texture: ReadbackWgpuTexture<f32>,
     pub render_view: wgpu::TextureView,
     pub linear_render_view: wgpu::TextureView,
     // pub(crate) multisample_view: wgpu::TextureView,
@@ -665,26 +505,29 @@ pub struct RenderTextures {
 impl RenderTextures {
     pub(crate) fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
         let format = OUTPUT_TEXTURE_FORMAT;
-        let render_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Target Texture"),
-            size: wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth_or_array_layers: 1,
+        let render_texture = ReadbackWgpuTexture::new(
+            ctx,
+            &wgpu::TextureDescriptor {
+                label: Some("Target Texture"),
+                size: wgpu::Extent3d {
+                    width: width as u32,
+                    height: height as u32,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::COPY_SRC
+                    | wgpu::TextureUsages::COPY_DST
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[
+                    wgpu::TextureFormat::Rgba8UnormSrgb,
+                    wgpu::TextureFormat::Rgba8Unorm,
+                ],
             },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::COPY_SRC
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[
-                wgpu::TextureFormat::Rgba8UnormSrgb,
-                wgpu::TextureFormat::Rgba8Unorm,
-            ],
-        });
+        );
         // let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
         //     label: Some("Multisample Texture"),
         //     size: wgpu::Extent3d {
@@ -702,20 +545,23 @@ impl RenderTextures {
         //         wgpu::TextureFormat::Rgba8Unorm,
         //     ],
         // });
-        let depth_stencil_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Depth Stencil Texture"),
-            size: wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth_or_array_layers: 1,
+        let depth_stencil_texture = ReadbackWgpuTexture::new(
+            ctx,
+            &wgpu::TextureDescriptor {
+                label: Some("Depth Stencil Texture"),
+                size: wgpu::Extent3d {
+                    width: width as u32,
+                    height: height as u32,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Depth32Float,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+                view_formats: &[],
             },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
+        );
         let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
             format: Some(format),
             ..Default::default()

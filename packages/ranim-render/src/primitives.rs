@@ -19,7 +19,7 @@ use crate::{
         VItemPipeline,
     },
     primitives::{vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance},
-    utils::{PipelinesStorage, WgpuContext},
+    utils::WgpuContext,
 };
 
 /// The RenderResource encapsules the wgpu resources.

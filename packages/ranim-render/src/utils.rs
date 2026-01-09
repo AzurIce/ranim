@@ -3,9 +3,11 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     marker::PhantomData,
+    ops::Deref,
 };
 
-use tracing::info;
+use bytemuck::AnyBitPattern;
+use tracing::{info, warn};
 use wgpu::util::DeviceExt;
 
 use crate::{RenderResource, RenderTextures, primitives::RenderPool};
@@ -383,20 +385,156 @@ impl PipelinesStorage {
             .downcast_ref::<P>()
             .unwrap()
     }
-    // pub(crate) fn get_or_init_mut<P: RenderResource + 'static>(
-    //     &mut self,
-    //     ctx: &WgpuContext,
-    // ) -> &mut P {
-    //     let id = std::any::TypeId::of::<P>();
-    //     self.inner
-    //         .entry(id)
-    //         .or_insert_with(|| {
-    //             let pipeline = P::new(ctx);
-    //             Box::new(pipeline)
-    //         })
-    //         .downcast_mut::<P>()
-    //         .unwrap()
-    // }
+}
+
+pub struct WgpuTexture {
+    inner: wgpu::Texture,
+}
+
+impl WgpuTexture {
+    pub fn new(ctx: &WgpuContext, desc: &wgpu::TextureDescriptor) -> Self {
+        Self {
+            inner: ctx.device.create_texture(desc),
+        }
+    }
+}
+
+impl Deref for WgpuTexture {
+    type Target = wgpu::Texture;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+pub struct ReadbackWgpuTexture<T> {
+    inner: WgpuTexture,
+    bytes_per_row: usize,
+    staging_buffer: wgpu::Buffer,
+    bytes: Vec<T>,
+}
+
+impl<T> Deref for ReadbackWgpuTexture<T> {
+    type Target = WgpuTexture;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+const ALIGNMENT: usize = 256;
+impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
+    pub fn new(ctx: &WgpuContext, desc: &wgpu::TextureDescriptor) -> Self {
+        if !desc.usage.contains(wgpu::TextureUsages::COPY_SRC) {
+            warn!(
+                "ReadbackWgpuTexture should have COPY_SRC usage, but got {:?}, will auto add this usage",
+                desc.usage
+            );
+        }
+        let texture = WgpuTexture::new(
+            ctx,
+            &wgpu::TextureDescriptor {
+                usage: desc.usage | wgpu::TextureUsages::COPY_SRC,
+                ..*desc
+            },
+        );
+        let block_size = desc.format.block_copy_size(None).unwrap();
+        let bytes_per_row = ((texture.size().width * block_size) as f32 / ALIGNMENT as f32).ceil()
+            as usize
+            * ALIGNMENT;
+
+        let staging_buffer_label = desc.label.map(|s| format!("{s} Staging Buffer"));
+        let staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            label: staging_buffer_label.as_deref(),
+            size: (bytes_per_row * texture.size().height as usize) as u64,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        assert!(
+            block_size as usize % std::mem::size_of::<T>() == 0,
+            "Block size {} is not a multiple of element size {}",
+            block_size,
+            std::mem::size_of::<T>()
+        );
+        let len =
+            (texture.size().width as usize * texture.size().height as usize * block_size as usize)
+                / std::mem::size_of::<T>();
+        let mut bytes = Vec::with_capacity(len);
+        unsafe {
+            bytes.set_len(len);
+            std::ptr::write_bytes(bytes.as_mut_ptr(), 0, len);
+        }
+
+        Self {
+            inner: texture,
+            bytes_per_row,
+            staging_buffer,
+            bytes,
+        }
+    }
+    pub fn texture_data(&self) -> &[T] {
+        &self.bytes
+    }
+    pub fn update_texture_data(&mut self, ctx: &WgpuContext) -> &[T] {
+        let size = self.size();
+
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Get Texture Data"),
+            });
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                aspect: wgpu::TextureAspect::All,
+                texture: self,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &self.staging_buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(self.bytes_per_row as u32),
+                    rows_per_image: Some(size.height),
+                },
+            },
+            size,
+        );
+        ctx.queue.submit(Some(encoder.finish()));
+        pollster::block_on(async {
+            let buffer_slice = self.staging_buffer.slice(..);
+
+            // NOTE: We have to create the mapping THEN device.poll() before await
+            // the future. Otherwise the application will freeze.
+            let (tx, rx) = async_channel::bounded(1);
+            buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+                pollster::block_on(tx.send(result)).unwrap()
+            });
+            ctx.device
+                .poll(wgpu::PollType::wait_indefinitely())
+                .unwrap();
+            rx.recv().await.unwrap().unwrap();
+
+            {
+                let view = buffer_slice.get_mapped_range();
+                let slice: &[T] = bytemuck::cast_slice(&view);
+                let elems_per_row = self.bytes_per_row / std::mem::size_of::<T>();
+                let block_size = self.inner.format().block_copy_size(None).unwrap();
+                let elems_in_row =
+                    (size.width as usize * block_size as usize) / std::mem::size_of::<T>();
+
+                // texture_data.copy_from_slice(&view);
+                for y in 0..size.height as usize {
+                    let src_row_start = y * elems_per_row;
+                    let dst_row_start = y * elems_in_row;
+
+                    self.bytes[dst_row_start..dst_row_start + elems_in_row]
+                        .copy_from_slice(&slice[src_row_start..src_row_start + elems_in_row]);
+                }
+            }
+        });
+        self.staging_buffer.unmap();
+
+        &self.bytes
+    }
 }
 
 // Should not be called frequently
