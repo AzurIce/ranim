@@ -186,7 +186,7 @@ mod tests {
     use ranim_core::{core_item::CoreItem, prelude::CameraFrame, store::CoreItemStore};
 
     use super::*;
-    use crate::{Renderer, primitives::RenderPool, utils::WgpuContext};
+    use crate::{Renderer, resource::RenderPool, utils::WgpuContext};
 
     #[test]
     fn test_render_vitem_primitive() {

@@ -223,7 +223,7 @@ impl VItem2dRenderInstance {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Renderer, primitives::RenderPool, utils::WgpuContext};
+    use crate::{Renderer, resource::RenderPool, utils::WgpuContext};
     use glam::{Vec3, vec4};
     use ranim_core::{core_item::CoreItem, store::CoreItemStore};
 

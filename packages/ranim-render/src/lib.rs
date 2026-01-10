@@ -12,6 +12,7 @@ pub mod graph;
 pub mod pipelines;
 /// The basic renderable structs
 pub mod primitives;
+pub mod resource;
 /// Rendering related utils
 pub mod utils;
 
@@ -20,15 +21,10 @@ use image::{ImageBuffer, Luma, Rgba};
 
 use crate::{
     graph::{AnyRenderNodeTrait, RenderGraph, RenderPackets},
-    primitives::{
-        RenderPool, VItem2dDepthNode, VItem2dRenderNode, VItemComputeRenderNode, VItemRenderNode,
-    },
-    utils::{ReadbackWgpuTexture, RenderContext},
+    resource::{PipelinesPool, RenderPool, RenderTextures},
 };
 use ranim_core::{core_item::camera_frame::CameraFrame, store::CoreItemStore};
-use utils::{PipelinesStorage, WgpuBuffer, WgpuContext};
-
-pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+use utils::{WgpuBuffer, WgpuContext};
 
 #[cfg(feature = "profiling")]
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
@@ -158,11 +154,17 @@ impl CameraUniformsBindGroup {
     }
 }
 
-// MARK: Renderer
+pub struct RenderContext<'a> {
+    pub render_textures: &'a RenderTextures,
+    pub render_pool: &'a RenderPool,
+    pub pipelines: &'a mut PipelinesPool,
+    pub wgpu_ctx: &'a WgpuContext,
+}
 
+// MARK: Renderer
 pub struct Renderer {
     size: (usize, usize),
-    pub(crate) pipelines: PipelinesStorage,
+    pub(crate) pipelines: PipelinesPool,
     packets: RenderPackets,
     render_graph: RenderGraph,
 
@@ -228,17 +230,20 @@ impl Renderer {
         .unwrap();
 
         let mut render_graph = RenderGraph::new();
-        let vitem2d_depth = render_graph.insert_node(VItem2dDepthNode);
-        let vitem2d_render = render_graph.insert_node(VItem2dRenderNode);
-        let vitem_render = render_graph.insert_node(VItemRenderNode);
-        let vitem_compute = render_graph.insert_node(VItemComputeRenderNode);
-        render_graph.insert_edge(vitem_compute, vitem_render);
-        render_graph.insert_edge(vitem_compute, vitem2d_depth);
-        render_graph.insert_edge(vitem2d_depth, vitem2d_render);
+        {
+            use graph::*;
+            let vitem2d_depth = render_graph.insert_node(VItem2dDepthNode);
+            let vitem2d_render = render_graph.insert_node(VItem2dRenderNode);
+            let vitem_render = render_graph.insert_node(VItemRenderNode);
+            let vitem_compute = render_graph.insert_node(VItemComputeRenderNode);
+            render_graph.insert_edge(vitem_compute, vitem_render);
+            render_graph.insert_edge(vitem_compute, vitem2d_depth);
+            render_graph.insert_edge(vitem2d_depth, vitem2d_render);
+        }
 
         Self {
             size: (width, height),
-            pipelines: PipelinesStorage::default(),
+            pipelines: PipelinesPool::default(),
             render_textures,
             packets: RenderPackets::default(),
             render_graph,
@@ -358,53 +363,6 @@ impl Renderer {
                     &mut ctx,
                     &self.camera_state,
                 );
-
-                // // Compute Pass
-                // // VItem and VItem2d
-                // VItemComputeRenderNode.exec(
-                //     #[cfg(not(feature = "profiling"))]
-                //     &mut encoder,
-                //     #[cfg(feature = "profiling")]
-                //     &mut scope,
-                //     &self.packets,
-                //     &mut ctx,
-                //     &self.camera_state,
-                // );
-
-                // // Depth Render Pass
-                // // VItem2d
-                // VItem2dDepthNode.exec(
-                //     #[cfg(not(feature = "profiling"))]
-                //     &mut encoder,
-                //     #[cfg(feature = "profiling")]
-                //     &mut scope,
-                //     &self.packets,
-                //     &mut ctx,
-                //     &self.camera_state,
-                // );
-
-                // {
-                //     #[cfg(feature = "profiling")]
-                //     let mut scope = scope.scope("Render Pass");
-                //     VItemRenderNode.exec(
-                //         #[cfg(not(feature = "profiling"))]
-                //         &mut encoder,
-                //         #[cfg(feature = "profiling")]
-                //         &mut scope,
-                //         &self.packets,
-                //         &mut ctx,
-                //         &self.camera_state,
-                //     );
-                //     VItem2dRenderNode.exec(
-                //         #[cfg(not(feature = "profiling"))]
-                //         &mut encoder,
-                //         #[cfg(feature = "profiling")]
-                //         &mut scope,
-                //         &self.packets,
-                //         &mut ctx,
-                //         &self.camera_state,
-                //     );
-                // }
             }
 
             #[cfg(not(feature = "profiling"))]
@@ -487,111 +445,4 @@ impl Renderer {
             .collect();
         ImageBuffer::from_raw(size.0 as u32, size.1 as u32, u8_data).unwrap()
     }
-}
-
-// MARK: RenderTextures
-/// Texture resources used for rendering
-#[allow(unused)]
-pub struct RenderTextures {
-    pub render_texture: ReadbackWgpuTexture<u8>,
-    // multisample_texture: wgpu::Texture,
-    pub depth_stencil_texture: ReadbackWgpuTexture<f32>,
-    pub render_view: wgpu::TextureView,
-    pub linear_render_view: wgpu::TextureView,
-    // pub(crate) multisample_view: wgpu::TextureView,
-    pub(crate) depth_stencil_view: wgpu::TextureView,
-}
-
-impl RenderTextures {
-    pub(crate) fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
-        let format = OUTPUT_TEXTURE_FORMAT;
-        let render_texture = ReadbackWgpuTexture::new(
-            ctx,
-            &wgpu::TextureDescriptor {
-                label: Some("Target Texture"),
-                size: wgpu::Extent3d {
-                    width: width as u32,
-                    height: height as u32,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                    | wgpu::TextureUsages::COPY_SRC
-                    | wgpu::TextureUsages::COPY_DST
-                    | wgpu::TextureUsages::TEXTURE_BINDING,
-                view_formats: &[
-                    wgpu::TextureFormat::Rgba8UnormSrgb,
-                    wgpu::TextureFormat::Rgba8Unorm,
-                ],
-            },
-        );
-        // let multisample_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-        //     label: Some("Multisample Texture"),
-        //     size: wgpu::Extent3d {
-        //         width: width as u32,
-        //         height: height as u32,
-        //         depth_or_array_layers: 1,
-        //     },
-        //     mip_level_count: 1,
-        //     sample_count: 4,
-        //     dimension: wgpu::TextureDimension::D2,
-        //     format,
-        //     usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        //     view_formats: &[
-        //         wgpu::TextureFormat::Rgba8UnormSrgb,
-        //         wgpu::TextureFormat::Rgba8Unorm,
-        //     ],
-        // });
-        let depth_stencil_texture = ReadbackWgpuTexture::new(
-            ctx,
-            &wgpu::TextureDescriptor {
-                label: Some("Depth Stencil Texture"),
-                size: wgpu::Extent3d {
-                    width: width as u32,
-                    height: height as u32,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Depth32Float,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-                view_formats: &[],
-            },
-        );
-        let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(format),
-            ..Default::default()
-        });
-        let linear_render_view = render_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
-            ..Default::default()
-        });
-        // let multisample_view = multisample_texture.create_view(&wgpu::TextureViewDescriptor {
-        //     format: Some(format),
-        //     ..Default::default()
-        // });
-        let depth_stencil_view =
-            depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        Self {
-            render_texture,
-            // multisample_texture,
-            depth_stencil_texture,
-            render_view,
-            linear_render_view,
-            // multisample_view,
-            depth_stencil_view,
-        }
-    }
-}
-
-/// A render resource.
-pub(crate) trait RenderResource {
-    fn new(ctx: &WgpuContext) -> Self
-    where
-        Self: Sized;
 }

@@ -1,16 +1,8 @@
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-    fmt::Debug,
-    marker::PhantomData,
-    ops::Deref,
-};
+use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 
 use bytemuck::AnyBitPattern;
 use tracing::{info, warn};
 use wgpu::util::DeviceExt;
-
-use crate::{RenderResource, RenderTextures, primitives::RenderPool};
 
 pub mod collections {
     use std::{
@@ -66,13 +58,6 @@ pub mod collections {
             });
         }
     }
-}
-
-pub struct RenderContext<'a> {
-    pub render_textures: &'a RenderTextures,
-    pub render_pool: &'a RenderPool,
-    pub pipelines: &'a mut PipelinesStorage,
-    pub wgpu_ctx: &'a WgpuContext,
 }
 
 /// Wgpu context
@@ -361,29 +346,6 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
 
         let x = buffer_slice.get_mapped_range().to_vec();
         Some(x)
-    }
-}
-
-/// A storage for pipelines
-#[derive(Default)]
-pub struct PipelinesStorage {
-    inner: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
-}
-
-impl PipelinesStorage {
-    pub(crate) fn get_or_init<P: RenderResource + Send + Sync + 'static>(
-        &mut self,
-        ctx: &WgpuContext,
-    ) -> &P {
-        let id = std::any::TypeId::of::<P>();
-        self.inner
-            .entry(id)
-            .or_insert_with(|| {
-                let pipeline = P::new(ctx);
-                Box::new(pipeline)
-            })
-            .downcast_ref::<P>()
-            .unwrap()
     }
 }
 

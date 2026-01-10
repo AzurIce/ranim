@@ -1,10 +1,18 @@
+pub mod vitem_color;
+pub use vitem_color::*;
+pub mod vitem_compute;
+pub use vitem_compute::*;
+pub mod vitem_depth;
+pub use vitem_depth::*;
+
 use slotmap::{SecondaryMap, SlotMap};
 use variadics_please::all_tuples;
 
 use crate::{
-    Camera,
-    primitives::{Handle, vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance},
-    utils::{RenderContext, collections::TypeBinnedVec},
+    Camera, RenderContext,
+    primitives::{vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance},
+    resource::Handle,
+    utils::collections::TypeBinnedVec,
 };
 
 slotmap::new_key_type! { pub struct RenderNodeKey; }
