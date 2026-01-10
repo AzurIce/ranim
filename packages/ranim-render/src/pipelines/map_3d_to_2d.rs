@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{CameraUniforms, RenderResource, WgpuContext};
+use crate::{CameraUniforms, WgpuContext, resource::GpuResource};
 
 pub struct Map3dTo2dPipeline {
     pipeline: wgpu::ComputePipeline,
@@ -153,7 +153,7 @@ impl Deref for Map3dTo2dPipeline {
     }
 }
 
-impl RenderResource for Map3dTo2dPipeline {
+impl GpuResource for Map3dTo2dPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 

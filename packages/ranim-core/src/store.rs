@@ -91,11 +91,11 @@ impl AnimationStore {
 #[derive(Default, Clone)]
 pub struct CoreItemStore {
     /// Id, CameraFrames
-    pub camera_frames: Vec<CameraFrame>,
+    pub camera_frames: Vec<((usize, usize), CameraFrame)>,
     /// Id, VItemPrimitive
-    pub vitems: Vec<VItemPrimitive>,
+    pub vitems: Vec<((usize, usize), VItemPrimitive)>,
     /// Id, VItem2d
-    pub vitems2d: Vec<VItem2d>,
+    pub vitems2d: Vec<((usize, usize), VItem2d)>,
 }
 
 impl CoreItemStore {
@@ -105,15 +105,15 @@ impl CoreItemStore {
     }
 
     /// Update the inner store with the given iterator
-    pub fn update(&mut self, items: impl Iterator<Item = CoreItem>) {
+    pub fn update(&mut self, items: impl Iterator<Item = ((usize, usize), CoreItem)>) {
         self.camera_frames.clear();
         self.vitems.clear();
         self.vitems2d.clear();
-        for item in items {
+        for (id, item) in items {
             match item {
-                CoreItem::CameraFrame(x) => self.camera_frames.push(x),
-                CoreItem::VItemPrimitive(x) => self.vitems.push(x),
-                CoreItem::VItem2D(x) => self.vitems2d.push(x),
+                CoreItem::CameraFrame(x) => self.camera_frames.push((id, x)),
+                CoreItem::VItemPrimitive(x) => self.vitems.push((id, x)),
+                CoreItem::VItem2D(x) => self.vitems2d.push((id, x)),
             }
         }
     }

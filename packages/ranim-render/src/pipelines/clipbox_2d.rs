@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{RenderResource, WgpuContext};
+use crate::{WgpuContext, resource::GpuResource};
 
 pub struct ClipBox2dPipeline {
     pipeline: wgpu::ComputePipeline,
@@ -133,7 +133,7 @@ impl Deref for ClipBox2dPipeline {
     }
 }
 
-impl RenderResource for ClipBox2dPipeline {
+impl GpuResource for ClipBox2dPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 

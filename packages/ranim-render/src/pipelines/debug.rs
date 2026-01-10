@@ -2,7 +2,10 @@ use std::ops::Deref;
 
 use glam::Vec4;
 
-use crate::{OUTPUT_TEXTURE_FORMAT, RenderResource, WgpuContext};
+use crate::{
+    WgpuContext,
+    resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
+};
 
 #[allow(unused)]
 pub struct DebugPipeline {
@@ -16,7 +19,7 @@ impl Deref for DebugPipeline {
     }
 }
 
-impl RenderResource for DebugPipeline {
+impl GpuResource for DebugPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 

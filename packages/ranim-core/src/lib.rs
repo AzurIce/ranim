@@ -352,17 +352,18 @@ impl SealedRanimScene {
     }
 
     /// Eval primitives
-    pub fn eval_at_sec(&self, target_sec: f64) -> impl Iterator<Item = CoreItem> {
+    pub fn eval_at_sec(&self, target_sec: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
         self.timelines_iter()
-            .filter_map(move |t| {
+            .enumerate()
+            .filter_map(move |(t_id, t)| {
                 t.eval_primitives_at_sec(target_sec)
-                    .map(|(res, _id_hash)| res)
+                    .map(move |(a_id, res)| res.into_iter().map(move |x| ((t_id, a_id), x)))
             })
             .flatten()
     }
 
     /// Eval primitives
-    pub fn eval_at_alpha(&self, alpha: f64) -> impl Iterator<Item = CoreItem> {
+    pub fn eval_at_alpha(&self, alpha: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
         self.eval_at_sec(self.total_secs() * alpha)
     }
 }

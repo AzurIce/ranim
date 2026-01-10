@@ -4,7 +4,7 @@ use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::store::CoreItemStore;
 use ranim_core::{Output, Scene, SceneConfig, SceneConstructor, SealedRanimScene, TimeMark};
-use ranim_render::primitives::RenderPool;
+use ranim_render::resource::RenderPool;
 use ranim_render::{Renderer, utils::WgpuContext};
 use std::time::Duration;
 use std::{

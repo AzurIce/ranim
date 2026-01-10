@@ -1,6 +1,9 @@
 use std::ops::Deref;
 
-use crate::{CameraUniformsBindGroup, OUTPUT_TEXTURE_FORMAT, RenderResource, WgpuContext};
+use crate::{
+    CameraUniformsBindGroup, WgpuContext,
+    resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
+};
 
 pub struct RenderBindGroup(wgpu::BindGroup);
 
@@ -139,7 +142,7 @@ impl Deref for VItemPipeline {
     }
 }
 
-impl RenderResource for VItemPipeline {
+impl GpuResource for VItemPipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 

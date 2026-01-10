@@ -33,7 +33,7 @@ use winit::{
 use egui_tools::EguiRenderer;
 use pipeline::{AppPipeline, Viewport};
 use ranim_core::{Scene, SceneConstructor, SealedRanimScene};
-use ranim_render::{Renderer, primitives::RenderPool, utils::WgpuContext};
+use ranim_render::{Renderer, resource::RenderPool, utils::WgpuContext};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
