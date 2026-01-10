@@ -2,6 +2,7 @@ struct CameraUniforms {
     proj_mat: mat4x4<f32>,
     view_mat: mat4x4<f32>,
     half_frame_size: vec2<f32>,
+    resolution: vec2<u32>,
 }
 @group(0) @binding(0) var<uniform> cam_uniforms : CameraUniforms;
 
@@ -82,7 +83,7 @@ fn distance_bezier(pos: vec2<f32>, A: vec2<f32>, _B: vec2<f32>, C: vec2<f32>) ->
     let b = A - B * 2.0 + C;
     let c = a * 2.0;
     let d = A - pos;
-    
+
     let k = vec3(3.0 * dot(a, b), 2.0 * dot(a, a) + dot(d, b), dot(d, a)) / dot(b, b);
     let solved = solve_cubic(k.x, k.y, k.z);
     let t = vec3(
@@ -202,7 +203,7 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     // dpdx and dpdy can help.
     // let antialias_radius = 0.015 / 4.0; // Fixed for now, should use fwidth
     // Antialias using screen space derivative of the coordinate system
-    // We use the gradient of 'pos' instead of 'd' because 'd' has discontinuities 
+    // We use the gradient of 'pos' instead of 'd' because 'd' has discontinuities
     // at voronoi boundaries (subpath joins), causing artifacts/striations when using fwidth(d).
     let dist_grad = max(length(dpdx(pos)), length(dpdy(pos)));
     // let dist_grad = length(fwidth(pos));
@@ -218,7 +219,7 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width) / antialias_radius);
 
     var f_color = blend_color(stroke_rgba, fill_rgba);
-    
+
     // Discard if fully transparent
     if (f_color.a < 0.01) {
         discard;
@@ -243,19 +244,19 @@ fn fs_main(@builtin(position) frag_pos: vec4<f32>, @location(0) pos: vec2<f32>) 
 
     out.color = color;
     out.depth = frag_pos.z;
-    
+
     return out;
 }
 
 @fragment
 fn fs_depth_only(@builtin(position) frag_pos: vec4<f32>, @location(0) pos: vec2<f32>) -> @builtin(frag_depth) f32 {
     let color = render(pos);
-    
+
     // Only write depth for opaque parts.
     if (color.a < 0.99) {
         discard;
     }
-    
+
     return frag_pos.z;
 }
 

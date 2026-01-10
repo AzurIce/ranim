@@ -223,14 +223,14 @@ impl VItem2dRenderInstance {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Renderer, resource::RenderPool, utils::WgpuContext};
+    use crate::{Renderer, ViewportUniform, resource::RenderPool, utils::WgpuContext};
     use glam::{Vec3, vec4};
     use ranim_core::{core_item::CoreItem, store::CoreItemStore};
 
     #[test]
     fn foo_clear_screen() {
         let ctx = pollster::block_on(WgpuContext::new());
-        let mut renderer = Renderer::new(&ctx, 8.0, 1280, 720);
+        let mut renderer = Renderer::new(&ctx, 1280, 720);
         let clear_color = wgpu::Color {
             r: 0.8,
             g: 0.8,
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn foo_render_vitem2d_primitive() {
         let ctx = pollster::block_on(WgpuContext::new());
-        let mut renderer = Renderer::new(&ctx, 8.0, 1280, 720);
+        let mut renderer = Renderer::new(&ctx, 1280, 720);
         let clear_color = wgpu::Color {
             r: 0.8,
             g: 0.8,
@@ -313,7 +313,10 @@ mod tests {
                 .chain(std::iter::once(item3))
         };
 
-        renderer.camera_state.update_uniforms(&ctx, &camera);
+        renderer.viewport.update(
+            &ctx,
+            &ViewportUniform::from_camera_frame(&camera, 1280, 720),
+        );
         let mut pool = RenderPool::new();
         let mut store = CoreItemStore::new();
         store.update(

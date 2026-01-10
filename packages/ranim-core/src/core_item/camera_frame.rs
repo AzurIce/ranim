@@ -20,10 +20,7 @@ pub struct CameraFrame {
     pub up: DVec3,
     /// The facing unit vec
     pub facing: DVec3,
-    /// The scaling factor, used in orthographic projection
-    pub scale: f64,
-    /// The field of view angle, used in perspective projection
-    pub fovy: f64,
+
     // far > near
     /// The near pane
     pub near: f64,
@@ -31,6 +28,14 @@ pub struct CameraFrame {
     pub far: f64,
     /// The perspective blend value in [0.0, 1.0]
     pub perspective_blend: f64,
+
+    /// **Ortho**: Top - Bottom
+    pub frame_height: f64,
+    /// **Ortho**: The scaling factor
+    pub scale: f64,
+
+    /// **Perspective**: The field of view angle, used in perspective projection
+    pub fovy: f64,
 }
 
 impl Extract for CameraFrame {
@@ -50,6 +55,7 @@ impl Interpolatable for CameraFrame {
             fovy: self.fovy.lerp(&target.fovy, t),
             near: self.near.lerp(&target.near, t),
             far: self.far.lerp(&target.far, t),
+            frame_height: self.frame_height.lerp(&target.frame_height, t),
             perspective_blend: self
                 .perspective_blend
                 .lerp(&target.perspective_blend, t)
@@ -72,12 +78,14 @@ impl Default for CameraFrame {
             up: DVec3::Y,
             facing: DVec3::NEG_Z,
 
-            scale: 1.0,
-            fovy: std::f64::consts::PI / 2.0,
-
             near: -1000.0,
             far: 1000.0,
             perspective_blend: 0.0,
+
+            scale: 1.0,
+            frame_height: 8.0,
+
+            fovy: std::f64::consts::PI / 2.0,
         }
     }
 }
@@ -92,12 +100,12 @@ impl CameraFrame {
 impl CameraFrame {
     /// The view matrix of the camera
     pub fn view_matrix(&self) -> DMat4 {
-        DMat4::look_at_rh(self.pos, self.pos + self.facing, self.up)
+        DMat4::look_to_rh(self.pos, self.facing, self.up)
     }
 
     /// Use the given frame size as `left`, `right`, `bottom`, `top` to construct an orthographic matrix
-    pub fn orthographic_mat(&self, frame_height: f64, aspect_ratio: f64) -> DMat4 {
-        let frame_size = dvec2(frame_height * aspect_ratio, frame_height);
+    pub fn orthographic_mat(&self, aspect_ratio: f64) -> DMat4 {
+        let frame_size = dvec2(self.frame_height * aspect_ratio, self.frame_height);
         let frame_size = frame_size * self.scale;
         DMat4::orthographic_rh(
             -frame_size.x / 2.0,
@@ -117,14 +125,14 @@ impl CameraFrame {
     }
 
     /// Use the given frame size to construct projection matrix
-    pub fn projection_matrix(&self, frame_height: f64, aspect_ratio: f64) -> DMat4 {
-        self.orthographic_mat(frame_height, aspect_ratio)
+    pub fn projection_matrix(&self, aspect_ratio: f64) -> DMat4 {
+        self.orthographic_mat(aspect_ratio)
             .lerp(&self.perspective_mat(aspect_ratio), self.perspective_blend)
     }
 
     /// Use the given frame size to construct view projection matrix
-    pub fn view_projection_matrix(&self, frame_height: f64, aspect_ratio: f64) -> DMat4 {
-        self.projection_matrix(frame_height, aspect_ratio) * self.view_matrix()
+    pub fn view_projection_matrix(&self, aspect_ratio: f64) -> DMat4 {
+        self.projection_matrix(aspect_ratio) * self.view_matrix()
     }
 }
 

@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn test_render_vitem_primitive() {
         let ctx = pollster::block_on(WgpuContext::new());
-        let mut renderer = Renderer::new(&ctx, 8.0, 1920, 720);
+        let mut renderer = Renderer::new(&ctx, 1920, 720);
         let clear_color = wgpu::Color::BLACK;
 
         let vitem_primitive_data = VItemPrimitive {

@@ -9,7 +9,7 @@ use slotmap::{SecondaryMap, SlotMap};
 use variadics_please::all_tuples;
 
 use crate::{
-    Camera, RenderContext,
+    RenderContext, ViewportGpuPacket,
     primitives::{vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance},
     resource::Handle,
     utils::collections::TypeBinnedVec,
@@ -100,7 +100,7 @@ impl AnyRenderNodeTrait for RenderGraph {
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         render_packets: &RenderPackets,
         render_ctx: &mut RenderContext,
-        camera_state: &Camera,
+        viewport: &ViewportGpuPacket,
     ) {
         self.iter().for_each(|n| {
             n.exec(
@@ -110,7 +110,7 @@ impl AnyRenderNodeTrait for RenderGraph {
                 scope,
                 render_packets,
                 render_ctx,
-                camera_state,
+                viewport,
             );
         });
     }
@@ -123,7 +123,7 @@ pub trait AnyRenderNodeTrait {
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         render_packets: &RenderPackets,
         render_ctx: &mut RenderContext,
-        camera_state: &Camera,
+        viewport: &ViewportGpuPacket,
     );
 }
 
@@ -134,7 +134,7 @@ impl<T: RenderNodeTrait> AnyRenderNodeTrait for T {
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         render_packets: &RenderPackets,
         render_ctx: &mut RenderContext,
-        camera_state: &Camera,
+        viewport: &ViewportGpuPacket,
     ) {
         self.run(
             #[cfg(not(feature = "profiling"))]
@@ -143,7 +143,7 @@ impl<T: RenderNodeTrait> AnyRenderNodeTrait for T {
             scope,
             <Self as RenderNodeTrait>::Query::query(render_packets),
             render_ctx,
-            camera_state,
+            viewport,
         );
     }
 }
@@ -156,7 +156,7 @@ pub trait RenderNodeTrait {
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         render_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         render_ctx: &mut RenderContext,
-        camera_state: &Camera,
+        viewport: &ViewportGpuPacket,
     );
 }
 

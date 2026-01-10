@@ -21,6 +21,7 @@ use image::{ImageBuffer, Luma, Rgba};
 
 use crate::{
     graph::{AnyRenderNodeTrait, RenderGraph, RenderPackets},
+    primitives::RenderResource,
     resource::{PipelinesPool, RenderPool, RenderTextures},
 };
 use ranim_core::{core_item::camera_frame::CameraFrame, store::CoreItemStore};
@@ -81,29 +82,30 @@ mod profiling_utils {
     }
 }
 
-// MARK: CameraUniforms
+// MARK: ViewportUniform
+pub type CameraUniforms = ViewportUniform;
+
 /// Uniforms for the camera
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct CameraUniforms {
+pub struct ViewportUniform {
     proj_mat: Mat4,
     view_mat: Mat4,
     half_frame_size: Vec2,
-    _padding: [f32; 2],
+    screen_size: [u32; 2],
 }
 
-impl CameraUniforms {
-    pub fn from_camera_frame(camera_frame: &CameraFrame, frame_height: f64, ratio: f64) -> Self {
+impl ViewportUniform {
+    pub fn from_camera_frame(camera_frame: &CameraFrame, width: u32, height: u32) -> Self {
+        let ratio = width as f64 / height as f64;
         Self {
-            proj_mat: camera_frame
-                .projection_matrix(frame_height, ratio)
-                .as_mat4(),
+            proj_mat: camera_frame.projection_matrix(ratio).as_mat4(),
             view_mat: camera_frame.view_matrix().as_mat4(),
             half_frame_size: Vec2::new(
-                (frame_height * ratio) as f32 / 2.0,
-                frame_height as f32 / 2.0,
+                (camera_frame.frame_height * ratio) as f32 / 2.0,
+                camera_frame.frame_height as f32 / 2.0,
             ),
-            _padding: [0.0; 2],
+            screen_size: [width, height],
         }
     }
     pub(crate) fn as_bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
@@ -120,26 +122,28 @@ impl CameraUniforms {
     }
 }
 
-pub(crate) struct CameraUniformsBindGroup {
-    pub(crate) bind_group: wgpu::BindGroup,
+pub type CameraUniformsBindGroup = ViewportBindGroup;
+
+pub struct ViewportBindGroup {
+    pub bind_group: wgpu::BindGroup,
 }
 
-impl AsRef<wgpu::BindGroup> for CameraUniformsBindGroup {
+impl AsRef<wgpu::BindGroup> for ViewportBindGroup {
     fn as_ref(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
 }
 
-impl CameraUniformsBindGroup {
+impl ViewportBindGroup {
     pub(crate) fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
         ctx.device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Simple Pipeline Uniforms"),
-                entries: &[CameraUniforms::as_bind_group_layout_entry(0)],
+                entries: &[ViewportUniform::as_bind_group_layout_entry(0)],
             })
     }
 
-    pub(crate) fn new(ctx: &WgpuContext, uniforms_buffer: &WgpuBuffer<CameraUniforms>) -> Self {
+    pub(crate) fn new(ctx: &WgpuContext, uniforms_buffer: &WgpuBuffer<ViewportUniform>) -> Self {
         let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Camera Uniforms"),
             layout: &Self::bind_group_layout(ctx),
@@ -163,13 +167,13 @@ pub struct RenderContext<'a> {
 
 // MARK: Renderer
 pub struct Renderer {
-    size: (usize, usize),
+    resolution: (usize, usize),
     pub(crate) pipelines: PipelinesPool,
     packets: RenderPackets,
     render_graph: RenderGraph,
 
     pub render_textures: RenderTextures,
-    pub camera_state: Camera,
+    pub viewport: ViewportGpuPacket,
 
     pub(crate) output_texture_dirty: bool,
     pub(crate) depth_texture_dirty: bool,
@@ -178,44 +182,42 @@ pub struct Renderer {
     pub(crate) profiler: wgpu_profiler::GpuProfiler,
 }
 
-pub struct Camera {
-    frame_height: f64,
-    ratio: f64,
-    uniforms_buffer: WgpuBuffer<CameraUniforms>,
-    uniforms_bind_group: CameraUniformsBindGroup,
+pub struct ViewportGpuPacket {
+    uniforms_buffer: WgpuBuffer<ViewportUniform>,
+    uniforms_bind_group: ViewportBindGroup,
 }
 
-impl Camera {
-    pub fn new(ctx: &WgpuContext, camera: &CameraFrame, frame_height: f64, ratio: f64) -> Self {
-        let uniforms = CameraUniforms::from_camera_frame(camera, frame_height, ratio);
+impl RenderResource for ViewportGpuPacket {
+    type Data = ViewportUniform;
+
+    fn init(ctx: &WgpuContext, data: &Self::Data) -> Self {
         let uniforms_buffer = WgpuBuffer::new_init(
             ctx,
             Some("Uniforms Buffer"),
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            uniforms,
+            *data,
         );
-        let uniforms_bind_group = CameraUniformsBindGroup::new(ctx, &uniforms_buffer);
+        let uniforms_bind_group = ViewportBindGroup::new(ctx, &uniforms_buffer);
         Self {
-            frame_height,
-            ratio,
             uniforms_buffer,
             uniforms_bind_group,
         }
     }
-    pub fn update_uniforms(&mut self, wgpu_ctx: &WgpuContext, camera_frame: &CameraFrame) {
-        self.uniforms_buffer.set(
-            wgpu_ctx,
-            CameraUniforms::from_camera_frame(camera_frame, self.frame_height, self.ratio),
-        );
+
+    fn update(&mut self, ctx: &WgpuContext, data: &Self::Data) {
+        self.uniforms_buffer.set(ctx, *data);
     }
 }
 
 impl Renderer {
-    pub fn new(ctx: &WgpuContext, frame_height: f64, width: usize, height: usize) -> Self {
+    pub fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
         let camera = CameraFrame::new();
 
         let render_textures = RenderTextures::new(ctx, width, height);
-        let camera_state = Camera::new(ctx, &camera, frame_height, width as f64 / height as f64);
+        let viewport = ViewportGpuPacket::init(
+            ctx,
+            &ViewportUniform::from_camera_frame(&camera, width as u32, height as u32),
+        );
         // trace!("init renderer uniform: {:?}", uniforms);
 
         // let bg = rgba8(0x33, 0x33, 0x33, 0xff).convert::<LinearSrgb>();
@@ -242,7 +244,7 @@ impl Renderer {
         }
 
         Self {
-            size: (width, height),
+            resolution: (width, height),
             pipelines: PipelinesPool::default(),
             render_textures,
             packets: RenderPackets::default(),
@@ -251,7 +253,7 @@ impl Renderer {
             output_texture_dirty: true,
             depth_texture_dirty: true,
             // Camera State
-            camera_state,
+            viewport,
             // Profiler
             #[cfg(feature = "profiling")]
             profiler,
@@ -331,7 +333,14 @@ impl Renderer {
                 .map(|(_id, data)| pool.alloc_packet(ctx, data)),
         );
 
-        self.camera_state.update_uniforms(ctx, camera_frame);
+        self.viewport.update(
+            ctx,
+            &ViewportUniform::from_camera_frame(
+                camera_frame,
+                self.resolution.0 as u32,
+                self.resolution.1 as u32,
+            ),
+        );
 
         {
             #[cfg(feature = "profiling")]
@@ -361,7 +370,7 @@ impl Renderer {
                     &mut scope,
                     &self.packets,
                     &mut ctx,
-                    &self.camera_state,
+                    &self.viewport,
                 );
             }
 
@@ -417,7 +426,7 @@ impl Renderer {
         &mut self,
         ctx: &WgpuContext,
     ) -> ImageBuffer<Rgba<u8>, &[u8]> {
-        let size = self.size;
+        let size = self.resolution;
         let data = self.get_rendered_texture_data(ctx);
         ImageBuffer::from_raw(size.0 as u32, size.1 as u32, data).unwrap()
     }
@@ -436,7 +445,7 @@ impl Renderer {
         &mut self,
         ctx: &WgpuContext,
     ) -> ImageBuffer<Luma<u8>, Vec<u8>> {
-        let size = self.size;
+        let size = self.resolution;
         let data = self.get_depth_texture_data(ctx);
         // Map 0.0-1.0 to 0-255
         let u8_data: Vec<u8> = data

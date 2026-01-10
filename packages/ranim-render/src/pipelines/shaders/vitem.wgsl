@@ -2,6 +2,7 @@ struct CameraUniforms {
     proj_mat: mat4x4<f32>,
     view_mat: mat4x4<f32>,
     half_frame_size: vec2<f32>,
+    resolution: vec2<u32>,
 }
 @group(0) @binding(0) var<uniform> cam_uniforms : CameraUniforms;
 
@@ -75,7 +76,7 @@ fn distance_bezier(pos: vec2<f32>, A: vec2<f32>, _B: vec2<f32>, C: vec2<f32>) ->
     let b = A - B * 2.0 + C;
     let c = a * 2.0;
     let d = A - pos;
-    
+
     let k = vec3(3.0 * dot(a, b), 2.0 * dot(a, a) + dot(d, b), dot(d, a)) / dot(b, b);
     let solved = solve_cubic(k.x, k.y, k.z);
     let t = vec3(
@@ -254,7 +255,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
     // let x_base = min_x - max_w;
     // let x_offset = (max_x - min_x + max_w * 2.0) * f32((vertex_index >> 1u) & 1u);
-    
+
     // let y_base = min_y - max_w;
     // let y_offset = (max_y - min_y + max_w * 2.0) * f32(vertex_index & 1u);
 

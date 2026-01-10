@@ -1,5 +1,5 @@
 use crate::{
-    Camera, RenderContext, RenderTextures,
+    RenderContext, RenderTextures, ViewportGpuPacket,
     graph::{RenderNodeTrait, RenderPacketsQuery},
     pipelines::VItem2dDepthPipeline,
     primitives::vitem2d::VItem2dRenderInstance,
@@ -14,7 +14,7 @@ impl RenderNodeTrait for VItem2dDepthNode {
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         ctx: &mut RenderContext,
-        camera_state: &Camera,
+        viewport: &ViewportGpuPacket,
     ) {
         #[cfg(feature = "profiling")]
         let mut scope = scope.scope("Depth Render Pass");
@@ -45,7 +45,7 @@ impl RenderNodeTrait for VItem2dDepthNode {
                 ctx.pipelines
                     .get_or_init::<VItem2dDepthPipeline>(ctx.wgpu_ctx),
             );
-            rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
+            rpass.set_bind_group(0, &viewport.uniforms_bind_group.bind_group, &[]);
             vitem2d_packets
                 .iter()
                 .map(|h| ctx.render_pool.get_packet(h))

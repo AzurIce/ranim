@@ -1,5 +1,5 @@
 use crate::{
-    Camera, RenderContext, RenderTextures,
+    RenderContext, RenderTextures, ViewportGpuPacket,
     graph::{RenderNodeTrait, RenderPacketsQuery},
     pipelines::{VItem2dColorPipeline, VItemPipeline},
     primitives::{vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance},
@@ -15,7 +15,7 @@ impl RenderNodeTrait for VItemRenderNode {
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         vitem_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         ctx: &mut RenderContext,
-        camera_state: &Camera,
+        viewport: &ViewportGpuPacket,
     ) {
         let RenderTextures {
             // multisample_view,
@@ -52,7 +52,7 @@ impl RenderNodeTrait for VItemRenderNode {
         #[cfg(not(feature = "profiling"))]
         let mut rpass = encoder.begin_render_pass(&rpass_desc);
         rpass.set_pipeline(ctx.pipelines.get_or_init::<VItemPipeline>(ctx.wgpu_ctx));
-        rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
+        rpass.set_bind_group(0, &viewport.uniforms_bind_group.bind_group, &[]);
         vitem_packets
             .iter()
             .map(|h| ctx.render_pool.get_packet(h))
@@ -70,7 +70,7 @@ impl RenderNodeTrait for VItem2dRenderNode {
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         ctx: &mut RenderContext,
-        camera_state: &Camera,
+        viewport: &ViewportGpuPacket,
     ) {
         // VItem2d Render Pass
         let RenderTextures {
@@ -108,7 +108,7 @@ impl RenderNodeTrait for VItem2dRenderNode {
             ctx.pipelines
                 .get_or_init::<VItem2dColorPipeline>(ctx.wgpu_ctx),
         );
-        rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
+        rpass.set_bind_group(0, &viewport.uniforms_bind_group.bind_group, &[]);
         vitem2d_packets
             .iter()
             .map(|h| ctx.render_pool.get_packet(h))
