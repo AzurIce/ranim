@@ -31,6 +31,7 @@ pub mod collections {
 
     impl TypeBinnedVec {
         fn init_row<T: Send + Sync + 'static>(&mut self) -> &mut Vec<T> {
+            #[allow(clippy::unwrap_or_default)]
             let entry = self
                 .inner
                 .entry(TypeId::of::<T>())
@@ -411,7 +412,7 @@ impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
             mapped_at_creation: false,
         });
         assert!(
-            block_size as usize % std::mem::size_of::<T>() == 0,
+            (block_size as usize).is_multiple_of(std::mem::size_of::<T>()),
             "Block size {} is not a multiple of element size {}",
             block_size,
             std::mem::size_of::<T>()
@@ -419,11 +420,7 @@ impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
         let len =
             (texture.size().width as usize * texture.size().height as usize * block_size as usize)
                 / std::mem::size_of::<T>();
-        let mut bytes = Vec::with_capacity(len);
-        unsafe {
-            bytes.set_len(len);
-            std::ptr::write_bytes(bytes.as_mut_ptr(), 0, len);
-        }
+        let bytes = Vec::with_capacity(len);
 
         Self {
             inner: texture,

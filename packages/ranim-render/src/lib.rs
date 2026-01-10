@@ -248,8 +248,8 @@ impl Renderer {
             packets: RenderPackets::default(),
             render_graph,
             // Textures state
-            output_texture_dirty: false,
-            depth_texture_dirty: false,
+            output_texture_dirty: true,
+            depth_texture_dirty: true,
             // Camera State
             camera_state,
             // Profiler
