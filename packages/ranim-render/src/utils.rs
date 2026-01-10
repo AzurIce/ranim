@@ -420,7 +420,14 @@ impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
         let len =
             (texture.size().width as usize * texture.size().height as usize * block_size as usize)
                 / std::mem::size_of::<T>();
-        let bytes = Vec::with_capacity(len);
+        let mut bytes = Vec::with_capacity(len);
+        // SAFETY: T is AnyBitPattern, so it's safe to interpret any bit pattern as T.
+        // We zero-initialize the memory to avoid reading uninitialized memory (UB).
+        #[allow(clippy::uninit_vec)]
+        unsafe {
+            bytes.set_len(len);
+            std::ptr::write_bytes(bytes.as_mut_ptr(), 0, len);
+        }
 
         Self {
             inner: texture,

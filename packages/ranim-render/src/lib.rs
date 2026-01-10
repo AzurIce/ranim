@@ -304,8 +304,8 @@ impl Renderer {
             });
         }
         ctx.queue.submit(Some(encoder.finish()));
-        self.output_texture_dirty = false;
-        self.depth_texture_dirty = false;
+        self.output_texture_dirty = true;
+        self.depth_texture_dirty = true;
     }
 
     pub fn render_store_with_pool(
@@ -397,8 +397,8 @@ impl Renderer {
                 gpu_profiler.new_frame();
             }
 
-            self.output_texture_dirty = false;
-            self.depth_texture_dirty = false;
+            self.output_texture_dirty = true;
+            self.depth_texture_dirty = true;
         }
 
         self.packets.clear();
