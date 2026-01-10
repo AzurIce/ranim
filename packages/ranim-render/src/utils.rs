@@ -23,7 +23,7 @@ pub mod collections {
 
     /// A type-erased container for render packets.
     ///
-    /// Basically a HashMap of TypeId -> type-erased Vec<RenderPacketHandle<T>>
+    /// Basically a HashMap of `TypeId` -> type-erased `Vec<T>`
     #[derive(Default)]
     pub struct TypeBinnedVec {
         inner: HashMap<TypeId, Box<dyn AnyClear>>,
