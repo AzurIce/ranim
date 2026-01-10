@@ -8,10 +8,10 @@ use ranim_core::{
     core_item::vitem::VItemPrimitive,
 };
 
-use super::{Primitive, RenderCommand, RenderResource};
+use super::{Primitive, RenderResource};
 
 impl Primitive for VItemPrimitive {
-    type RenderInstance = VItemRenderInstance;
+    type RenderPacket = VItemRenderInstance;
 }
 
 /// [`VItemPrimitive`]'s render instance.
@@ -169,20 +169,14 @@ impl RenderResource for VItemRenderInstance {
     }
 }
 
-impl RenderCommand for VItemRenderInstance {
-    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
+impl VItemRenderInstance {
+    pub fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         cpass.set_bind_group(1, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
         cpass.dispatch_workgroups(self.points3d_buffer.len().div_ceil(256) as u32, 1, 1);
     }
-    fn encode_depth_render_pass_command(&self, _rpass: &mut wgpu::RenderPass) {}
-    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
+    pub fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
         rpass.draw(0..4, 0..1);
-    }
-    fn debug(&self, _ctx: &WgpuContext) {
-        // let points2d = self.points2d_buffer.read_buffer(ctx).unwrap();
-        // let points2d = bytemuck::cast_slice::<_, Vec4>(&points2d);
-        // println!("points2d: {:?}", points2d);
     }
 }
 
@@ -192,7 +186,7 @@ mod tests {
     use ranim_core::{core_item::CoreItem, prelude::CameraFrame, store::CoreItemStore};
 
     use super::*;
-    use crate::{Renderer, primitives::RenderPool, utils::WgpuContext};
+    use crate::{Renderer, resource::RenderPool, utils::WgpuContext};
 
     #[test]
     fn test_render_vitem_primitive() {
@@ -215,9 +209,12 @@ mod tests {
         let mut pool = RenderPool::new();
         let mut store = CoreItemStore::new();
         store.update(
-            std::iter::once(CoreItem::VItemPrimitive(vitem_primitive_data)).chain(std::iter::once(
-                CoreItem::CameraFrame(CameraFrame::default()),
-            )),
+            std::iter::once(CoreItem::VItemPrimitive(vitem_primitive_data))
+                .chain(std::iter::once(CoreItem::CameraFrame(
+                    CameraFrame::default(),
+                )))
+                .enumerate()
+                .map(|(id, x)| ((id, id), x)),
         );
         renderer.render_store_with_pool(&ctx, clear_color, &store, &mut pool);
         let img = renderer.get_rendered_texture_img_buffer(&ctx);

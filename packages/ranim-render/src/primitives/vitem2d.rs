@@ -9,10 +9,10 @@ use ranim_core::{
     core_item::vitem_2d::VItem2d,
 };
 
-use super::{Primitive, RenderCommand, RenderResource};
+use super::{Primitive, RenderResource};
 
 impl Primitive for VItem2d {
-    type RenderInstance = VItem2dRenderInstance;
+    type RenderPacket = VItem2dRenderInstance;
 }
 
 #[repr(C)]
@@ -205,26 +205,25 @@ impl RenderResource for VItem2dRenderInstance {
     }
 }
 
-impl RenderCommand for VItem2dRenderInstance {
-    fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
+impl VItem2dRenderInstance {
+    pub fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         cpass.set_bind_group(0, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
         cpass.dispatch_workgroups(self.points2d_buffer.len().div_ceil(256) as u32, 1, 1);
     }
-    fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
+    pub fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
         rpass.draw(0..4, 0..1);
     }
-    fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
+    pub fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
         rpass.draw(0..4, 0..1);
     }
-    fn debug(&self, _ctx: &WgpuContext) {}
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Renderer, primitives::RenderPool, utils::WgpuContext};
+    use crate::{Renderer, resource::RenderPool, utils::WgpuContext};
     use glam::{Vec3, vec4};
     use ranim_core::{core_item::CoreItem, store::CoreItemStore};
 
@@ -321,7 +320,9 @@ mod tests {
             make_items(Vec3::ZERO, 1.0)
                 .chain(make_items(Vec3::new(1.0, 0.0, 0.0), 0.5))
                 .map(CoreItem::VItem2D)
-                .chain(std::iter::once(CoreItem::CameraFrame(camera))),
+                .chain(std::iter::once(CoreItem::CameraFrame(camera)))
+                .enumerate()
+                .map(|(id, x)| ((id, id), x)),
         );
 
         renderer.render_store_with_pool(&ctx, clear_color, &store, &mut pool);

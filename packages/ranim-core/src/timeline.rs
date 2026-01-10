@@ -87,14 +87,14 @@ impl Timeline {
         self
     }
     /// Evaluate the state at `alpha`
-    pub fn eval_at_alpha(&self, alpha: f64) -> Option<(DynItem, u64)> {
+    pub fn eval_at_alpha(&self, alpha: f64) -> Option<(usize, DynItem)> {
         let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
             return None;
         };
         self.eval_at_sec(alpha * (end - start) + start)
     }
     /// Evaluate the state at `target_sec`
-    pub fn eval_at_sec(&self, target_sec: f64) -> Option<(DynItem, u64)> {
+    pub fn eval_at_sec(&self, target_sec: f64) -> Option<(usize, DynItem)> {
         let (Some(start), Some(end)) = (self.start_sec(), self.end_sec()) else {
             return None;
         };
@@ -115,7 +115,7 @@ impl Timeline {
                     || (idx == self.anims.len() - 1 && target_sec == range.end)
                 {
                     anim.eval_global_sec_dyn(target_sec)
-                        .map(|dyn_item| (dyn_item, idx as u64))
+                        .map(|dyn_item| (idx, dyn_item))
                 } else {
                     None
                 }
@@ -158,11 +158,11 @@ impl TimelineFunc for Timeline {
         ""
         // self.get_dyn().type_name()
     }
-    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(Vec<CoreItem>, u64)> {
-        self.eval_at_sec(target_sec).map(|(dyn_item, idx)| {
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(usize, Vec<CoreItem>)> {
+        self.eval_at_sec(target_sec).map(|(idx, dyn_item)| {
             let mut items = Vec::new();
             dyn_item.extract_into(&mut items);
-            (items, idx)
+            (idx, items)
         })
     }
 }
@@ -205,7 +205,7 @@ pub trait TimelineFunc: Any {
 
     // fn eval_sec_any(&self, target_sec: f64) -> Option<(EvalResult<dyn Any>, usize)>;
     /// Evaluate timeline's primitives at target sec
-    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(Vec<CoreItem>, u64)>;
+    fn eval_primitives_at_sec(&self, target_sec: f64) -> Option<(usize, Vec<CoreItem>)>;
 }
 
 // MARK: TimelinesFunc
