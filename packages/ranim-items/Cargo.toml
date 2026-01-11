@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [features]
+default = ["vitem2d"]
 vitem2d = []
 
 [dependencies]

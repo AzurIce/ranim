@@ -25,7 +25,7 @@ use crate::{
     resource::{PipelinesPool, RenderPool, RenderTextures},
 };
 use ranim_core::{core_item::camera_frame::CameraFrame, store::CoreItemStore};
-use utils::{WgpuBuffer, WgpuContext};
+use utils::{WgpuBuffer, WgpuContext, WgpuVecBuffer};
 
 #[cfg(feature = "profiling")]
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
@@ -93,6 +93,8 @@ pub struct ViewportUniform {
     view_mat: Mat4,
     half_frame_size: Vec2,
     screen_size: [u32; 2],
+    oit_layers: u32,
+    _padding: [u32; 3],
 }
 
 impl ViewportUniform {
@@ -106,6 +108,8 @@ impl ViewportUniform {
                 camera_frame.frame_height as f32 / 2.0,
             ),
             screen_size: [width, height],
+            oit_layers: camera_frame.oit_layers,
+            _padding: [0; 3],
         }
     }
     pub(crate) fn as_bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
@@ -139,20 +143,78 @@ impl ViewportBindGroup {
         ctx.device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Simple Pipeline Uniforms"),
-                entries: &[ViewportUniform::as_bind_group_layout_entry(0)],
+                entries: &[
+                    ViewportUniform::as_bind_group_layout_entry(0),
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
             })
     }
 
-    pub(crate) fn new(ctx: &WgpuContext, uniforms_buffer: &WgpuBuffer<ViewportUniform>) -> Self {
+    pub(crate) fn new(
+        ctx: &WgpuContext,
+        uniforms_buffer: &WgpuBuffer<ViewportUniform>,
+        pixel_count_buffer: &WgpuVecBuffer<u32>,
+        oit_colors_buffer: &WgpuVecBuffer<u32>,
+        oit_depths_buffer: &WgpuVecBuffer<f32>,
+    ) -> Self {
         let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Camera Uniforms"),
             layout: &Self::bind_group_layout(ctx),
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(
-                    uniforms_buffer.as_ref().as_entire_buffer_binding(),
-                ),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(
+                        uniforms_buffer.as_ref().as_entire_buffer_binding(),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Buffer(
+                        pixel_count_buffer.buffer.as_entire_buffer_binding(),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Buffer(
+                        oit_colors_buffer.buffer.as_entire_buffer_binding(),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Buffer(
+                        oit_depths_buffer.buffer.as_entire_buffer_binding(),
+                    ),
+                },
+            ],
         });
         Self { bind_group }
     }
@@ -184,6 +246,9 @@ pub struct Renderer {
 
 pub struct ViewportGpuPacket {
     uniforms_buffer: WgpuBuffer<ViewportUniform>,
+    pub pixel_count_buffer: WgpuVecBuffer<u32>,
+    pub oit_colors_buffer: WgpuVecBuffer<u32>,
+    pub oit_depths_buffer: WgpuVecBuffer<f32>,
     uniforms_bind_group: ViewportBindGroup,
 }
 
@@ -197,15 +262,85 @@ impl RenderResource for ViewportGpuPacket {
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             *data,
         );
-        let uniforms_bind_group = ViewportBindGroup::new(ctx, &uniforms_buffer);
+
+        let pixel_count = (data.screen_size[0] * data.screen_size[1]) as usize;
+        let layers = data.oit_layers as usize;
+        let total_nodes = pixel_count * layers;
+
+        let pixel_count_buffer = WgpuVecBuffer::new(
+            ctx,
+            Some("OIT Pixel Count Buffer"),
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+            pixel_count,
+        );
+        let oit_colors_buffer = WgpuVecBuffer::new(
+            ctx,
+            Some("OIT Colors Buffer"),
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC
+                | wgpu::BufferUsages::COPY_DST,
+            total_nodes,
+        );
+        let oit_depths_buffer = WgpuVecBuffer::new(
+            ctx,
+            Some("OIT Depths Buffer"),
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC
+                | wgpu::BufferUsages::COPY_DST,
+            total_nodes,
+        );
+
+        let uniforms_bind_group = ViewportBindGroup::new(
+            ctx,
+            &uniforms_buffer,
+            &pixel_count_buffer,
+            &oit_colors_buffer,
+            &oit_depths_buffer,
+        );
         Self {
             uniforms_buffer,
+            pixel_count_buffer,
+            oit_colors_buffer,
+            oit_depths_buffer,
             uniforms_bind_group,
         }
     }
 
     fn update(&mut self, ctx: &WgpuContext, data: &Self::Data) {
         self.uniforms_buffer.set(ctx, *data);
+
+        let pixel_count = (data.screen_size[0] * data.screen_size[1]) as usize;
+        let layers = data.oit_layers as usize;
+        let total_nodes = pixel_count * layers;
+
+        let mut bind_group_dirty = false;
+
+        if self.pixel_count_buffer.len() != pixel_count {
+            self.pixel_count_buffer.resize(ctx, pixel_count);
+            bind_group_dirty = true;
+        }
+
+        if self.oit_colors_buffer.len() != total_nodes {
+            self.oit_colors_buffer.resize(ctx, total_nodes);
+            bind_group_dirty = true;
+        }
+
+        if self.oit_depths_buffer.len() != total_nodes {
+            self.oit_depths_buffer.resize(ctx, total_nodes);
+            bind_group_dirty = true;
+        }
+
+        if bind_group_dirty {
+            self.uniforms_bind_group = ViewportBindGroup::new(
+                ctx,
+                &self.uniforms_buffer,
+                &self.pixel_count_buffer,
+                &self.oit_colors_buffer,
+                &self.oit_depths_buffer,
+            );
+        }
     }
 }
 
@@ -234,13 +369,15 @@ impl Renderer {
         let mut render_graph = RenderGraph::new();
         {
             use graph::*;
+            let vitem_compute = render_graph.insert_node(VItemComputeRenderNode);
             let vitem2d_depth = render_graph.insert_node(VItem2dDepthNode);
             let vitem2d_render = render_graph.insert_node(VItem2dRenderNode);
             let vitem_render = render_graph.insert_node(VItemRenderNode);
-            let vitem_compute = render_graph.insert_node(VItemComputeRenderNode);
+            let oit_resolve = render_graph.insert_node(OITResolveNode);
             render_graph.insert_edge(vitem_compute, vitem_render);
             render_graph.insert_edge(vitem_compute, vitem2d_depth);
             render_graph.insert_edge(vitem2d_depth, vitem2d_render);
+            render_graph.insert_edge(vitem2d_render, oit_resolve);
         }
 
         Self {
@@ -433,12 +570,14 @@ impl Renderer {
 
     pub fn get_depth_texture_data(&mut self, ctx: &WgpuContext) -> &[f32] {
         if !self.depth_texture_dirty {
-            return self.render_textures.depth_stencil_texture.texture_data();
+            return bytemuck::cast_slice(self.render_textures.depth_stencil_texture.texture_data());
         }
         self.depth_texture_dirty = false;
-        self.render_textures
-            .depth_stencil_texture
-            .update_texture_data(ctx)
+        bytemuck::cast_slice(
+            self.render_textures
+                .depth_stencil_texture
+                .update_texture_data(ctx),
+        )
     }
 
     pub fn get_depth_texture_img_buffer(

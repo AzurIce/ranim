@@ -3,8 +3,18 @@ struct CameraUniforms {
     view_mat: mat4x4<f32>,
     half_frame_size: vec2<f32>,
     resolution: vec2<u32>,
+    oit_layers: u32,
 }
 @group(0) @binding(0) var<uniform> cam_uniforms : CameraUniforms;
+
+@group(0) @binding(1) var<storage, read_write> pixel_count: array<atomic<u32>>;
+@group(0) @binding(2) var<storage, read_write> oit_colors: array<u32>;
+@group(0) @binding(3) var<storage, read_write> oit_depths: array<f32>;
+
+fn pack_color(color: vec4<f32>) -> u32 {
+    let c = vec4<u32>(color * 255.0);
+    return (c.r) | (c.g << 8u) | (c.b << 16u) | (c.a << 24u);
+}
 
 @group(1) @binding(0) var<storage> points: array<vec4<f32>>; // x, y, is_closed, padding
 @group(1) @binding(1) var<storage> fill_rgbas: array<vec4<f32>>;
@@ -242,10 +252,23 @@ fn fs_main(@builtin(position) frag_pos: vec4<f32>, @location(0) pos: vec2<f32>) 
     var out: FragmentOutput;
     let color = render(pos);
 
-    out.color = color;
-    out.depth = frag_pos.z;
+    if (color.a >= 0.99) {
+        out.color = color;
+        out.depth = frag_pos.z;
+        return out;
+    }
 
-    return out;
+    let coords = vec2<u32>(floor(frag_pos.xy));
+    let pixel_idx = coords.y * cam_uniforms.resolution.x + coords.x;
+    let layer_idx = atomicAdd(&pixel_count[pixel_idx], 1u);
+
+    if (layer_idx < cam_uniforms.oit_layers) {
+        let buffer_idx = pixel_idx * cam_uniforms.oit_layers + layer_idx;
+        oit_colors[buffer_idx] = pack_color(color);
+        oit_depths[buffer_idx] = frag_pos.z;
+    }
+
+    discard;
 }
 
 @fragment

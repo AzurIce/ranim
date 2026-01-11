@@ -72,6 +72,12 @@ impl RenderNodeTrait for VItem2dRenderNode {
         ctx: &mut RenderContext,
         viewport: &ViewportGpuPacket,
     ) {
+        // Clear OIT pixel count buffer
+        #[cfg(not(feature = "profiling"))]
+        encoder.clear_buffer(&viewport.pixel_count_buffer.buffer, 0, None);
+        #[cfg(feature = "profiling")]
+        scope.clear_buffer(&viewport.pixel_count_buffer.buffer, 0, None);
+
         // VItem2d Render Pass
         let RenderTextures {
             render_view,

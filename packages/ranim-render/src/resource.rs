@@ -43,9 +43,9 @@ impl PipelinesPool {
 /// Texture resources used for rendering
 #[allow(unused)]
 pub struct RenderTextures {
-    pub render_texture: ReadbackWgpuTexture<u8>,
+    pub render_texture: ReadbackWgpuTexture,
     // multisample_texture: wgpu::Texture,
-    pub depth_stencil_texture: ReadbackWgpuTexture<f32>,
+    pub depth_stencil_texture: ReadbackWgpuTexture,
     pub render_view: wgpu::TextureView,
     pub linear_render_view: wgpu::TextureView,
     // pub(crate) multisample_view: wgpu::TextureView,

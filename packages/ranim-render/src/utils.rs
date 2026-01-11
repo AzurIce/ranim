@@ -210,7 +210,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
 
 pub(crate) struct WgpuVecBuffer<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> {
     label: Option<&'static str>,
-    pub(crate) buffer: Option<wgpu::Buffer>,
+    pub(crate) buffer: wgpu::Buffer,
     usage: wgpu::BufferUsages,
     /// Keep match to the buffer size
     len: usize,
@@ -219,14 +219,25 @@ pub(crate) struct WgpuVecBuffer<T: Default + bytemuck::Pod + bytemuck::Zeroable 
 }
 
 impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
-    pub(crate) fn new(label: Option<&'static str>, usage: wgpu::BufferUsages) -> Self {
+    pub(crate) fn new(
+        ctx: &WgpuContext,
+        label: Option<&'static str>,
+        usage: wgpu::BufferUsages,
+        len: usize,
+    ) -> Self {
         assert!(
             usage.contains(wgpu::BufferUsages::COPY_DST),
             "Buffer {label:?} does not contains COPY_DST"
         );
+        let size = (std::mem::size_of::<T>() * len) as u64;
         Self {
             label,
-            buffer: None,
+            buffer: ctx.device.create_buffer(&wgpu::BufferDescriptor {
+                label: label,
+                size,
+                usage: usage,
+                mapped_at_creation: false,
+            }),
             usage,
             len: 0,
             _phantom: PhantomData,
@@ -240,7 +251,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         usage: wgpu::BufferUsages,
         data: &[T],
     ) -> Self {
-        let mut buffer = Self::new(label, usage);
+        let mut buffer = Self::new(ctx, label, usage, data.len());
         buffer.set(ctx, data);
         buffer
     }
@@ -254,20 +265,16 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
 
     pub(crate) fn resize(&mut self, ctx: &WgpuContext, len: usize) -> bool {
         let size = (std::mem::size_of::<T>() * len) as u64;
-        let realloc = self
-            .buffer
-            .as_ref()
-            .map(|b| b.size() != size)
-            .unwrap_or(true);
+        let realloc = self.buffer.size() != size;
         if realloc {
             self.len = len;
             // self.inner.resize(len, T::default());
-            self.buffer = Some(ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            self.buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
                 label: self.label,
                 size,
                 usage: self.usage,
                 mapped_at_creation: false,
-            }))
+            })
         }
         realloc
     }
@@ -277,11 +284,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         // self.inner.resize(data.len(), T::default());
         // self.inner.copy_from_slice(data);
         self.len = data.len();
-        let realloc = self
-            .buffer
-            .as_ref()
-            .map(|b| b.size() != (std::mem::size_of_val(data)) as u64)
-            .unwrap_or(true);
+        let realloc = self.buffer.size() != std::mem::size_of_val(data) as u64;
 
         if realloc {
             // info!("realloc");
@@ -295,14 +298,14 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             ctx.queue
                 .write_buffer(&buffer, 0, bytemuck::cast_slice(data));
             // info!("new");
-            self.buffer = Some(buffer);
+            self.buffer = buffer;
         } else {
             // info!("queue copy");
             {
                 let mut view = ctx
                     .queue
                     .write_buffer_with(
-                        self.buffer.as_ref().unwrap(),
+                        &self.buffer,
                         0,
                         wgpu::BufferSize::new((std::mem::size_of_val(data)) as u64).unwrap(),
                     )
@@ -317,7 +320,6 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
 
     #[allow(unused)]
     pub(crate) fn read_buffer(&self, ctx: &WgpuContext) -> Option<Vec<u8>> {
-        let buffer = self.buffer.as_ref()?;
         let size = std::mem::size_of::<T>() * self.len;
         let staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Debug Staging Buffer"),
@@ -332,13 +334,13 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                 label: Some("Debug Read Encoder"),
             });
 
-        encoder.copy_buffer_to_buffer(buffer, 0, &staging_buffer, 0, size as u64);
+        encoder.copy_buffer_to_buffer(&self.buffer, 0, &staging_buffer, 0, size as u64);
         ctx.queue.submit(Some(encoder.finish()));
 
         let buffer_slice = staging_buffer.slice(..);
         let (tx, rx) = async_channel::bounded(1);
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            pollster::block_on(tx.send(result)).unwrap()
+            tx.try_send(result).unwrap()
         });
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -369,14 +371,16 @@ impl Deref for WgpuTexture {
     }
 }
 
-pub struct ReadbackWgpuTexture<T> {
+/// A [`WgpuTexture`] with [`wgpu::TextureUsages::COPY_SRC`] usage and wrapped with a staging buffer and
+/// a cpu side bytes `Vec<T>` buffer to read back from the texture.
+pub struct ReadbackWgpuTexture {
     inner: WgpuTexture,
-    bytes_per_row: usize,
+    aligned_bytes_per_row: usize,
     staging_buffer: wgpu::Buffer,
-    bytes: Vec<T>,
+    bytes: Vec<u8>,
 }
 
-impl<T> Deref for ReadbackWgpuTexture<T> {
+impl Deref for ReadbackWgpuTexture {
     type Target = WgpuTexture;
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -384,7 +388,7 @@ impl<T> Deref for ReadbackWgpuTexture<T> {
 }
 
 const ALIGNMENT: usize = 256;
-impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
+impl ReadbackWgpuTexture {
     pub fn new(ctx: &WgpuContext, desc: &wgpu::TextureDescriptor) -> Self {
         if !desc.usage.contains(wgpu::TextureUsages::COPY_SRC) {
             warn!(
@@ -400,9 +404,8 @@ impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
             },
         );
         let block_size = desc.format.block_copy_size(None).unwrap();
-        let bytes_per_row = ((texture.size().width * block_size) as f32 / ALIGNMENT as f32).ceil()
-            as usize
-            * ALIGNMENT;
+        let bytes_per_row =
+            (texture.size().width * block_size).div_ceil(ALIGNMENT as u32) as usize * ALIGNMENT;
 
         let staging_buffer_label = desc.label.map(|s| format!("{s} Staging Buffer"));
         let staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
@@ -411,35 +414,21 @@ impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        assert!(
-            (block_size as usize).is_multiple_of(std::mem::size_of::<T>()),
-            "Block size {} is not a multiple of element size {}",
-            block_size,
-            std::mem::size_of::<T>()
-        );
         let len =
-            (texture.size().width as usize * texture.size().height as usize * block_size as usize)
-                / std::mem::size_of::<T>();
-        let mut bytes = Vec::with_capacity(len);
-        // SAFETY: T is AnyBitPattern, so it's safe to interpret any bit pattern as T.
-        // We zero-initialize the memory to avoid reading uninitialized memory (UB).
-        #[allow(clippy::uninit_vec)]
-        unsafe {
-            bytes.set_len(len);
-            std::ptr::write_bytes(bytes.as_mut_ptr(), 0, len);
-        }
+            (texture.size().width as usize * texture.size().height as usize * block_size as usize);
+        let bytes = vec![0u8; len];
 
         Self {
             inner: texture,
-            bytes_per_row,
+            aligned_bytes_per_row: bytes_per_row,
             staging_buffer,
             bytes,
         }
     }
-    pub fn texture_data(&self) -> &[T] {
+    pub fn texture_data(&self) -> &[u8] {
         &self.bytes
     }
-    pub fn update_texture_data(&mut self, ctx: &WgpuContext) -> &[T] {
+    pub fn update_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
         let size = self.size();
 
         let mut encoder = ctx
@@ -458,12 +447,13 @@ impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
                 buffer: &self.staging_buffer,
                 layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
-                    bytes_per_row: Some(self.bytes_per_row as u32),
+                    bytes_per_row: Some(self.aligned_bytes_per_row as u32),
                     rows_per_image: Some(size.height),
                 },
             },
             size,
         );
+        // println!("copying");
         ctx.queue.submit(Some(encoder.finish()));
         pollster::block_on(async {
             let buffer_slice = self.staging_buffer.slice(..);
@@ -472,28 +462,28 @@ impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
             // the future. Otherwise the application will freeze.
             let (tx, rx) = async_channel::bounded(1);
             buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-                pollster::block_on(tx.send(result)).unwrap()
+                let _ = tx.try_send(result);
             });
+            // println!("mapping");
             ctx.device
                 .poll(wgpu::PollType::wait_indefinitely())
                 .unwrap();
+            // println!("mapped");
             rx.recv().await.unwrap().unwrap();
 
             {
                 let view = buffer_slice.get_mapped_range();
-                let slice: &[T] = bytemuck::cast_slice(&view);
-                let elems_per_row = self.bytes_per_row / std::mem::size_of::<T>();
                 let block_size = self.inner.format().block_copy_size(None).unwrap();
-                let elems_in_row =
-                    (size.width as usize * block_size as usize) / std::mem::size_of::<T>();
+                let bytes_in_row = (size.width * block_size) as usize;
+                // dbg!(bytes_in_row, block_size, size);
 
                 // texture_data.copy_from_slice(&view);
                 for y in 0..size.height as usize {
-                    let src_row_start = y * elems_per_row;
-                    let dst_row_start = y * elems_in_row;
+                    let src_row_start = y * self.aligned_bytes_per_row;
+                    let dst_row_start = y * bytes_in_row;
 
-                    self.bytes[dst_row_start..dst_row_start + elems_in_row]
-                        .copy_from_slice(&slice[src_row_start..src_row_start + elems_in_row]);
+                    self.bytes[dst_row_start..dst_row_start + bytes_in_row]
+                        .copy_from_slice(&view[src_row_start..src_row_start + bytes_in_row]);
                 }
             }
         });
@@ -503,77 +493,77 @@ impl<T: AnyBitPattern> ReadbackWgpuTexture<T> {
     }
 }
 
-// Should not be called frequently
-/// Get texture data from a wgpu texture
-#[allow(unused)]
-pub(crate) fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8> {
-    const ALIGNMENT: usize = 256;
-    use ::wgpu;
-    let bytes_per_row =
-        ((texture.size().width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
-    let mut texture_data = vec![0u8; bytes_per_row * texture.size().height as usize];
+// // Should not be called frequently
+// /// Get texture data from a wgpu texture
+// #[allow(unused)]
+// pub(crate) fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8> {
+//     const ALIGNMENT: usize = 256;
+//     use ::wgpu;
+//     let bytes_per_row =
+//         ((texture.size().width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
+//     let mut texture_data = vec![0u8; bytes_per_row * texture.size().height as usize];
 
-    let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Output Staging Buffer"),
-        size: (bytes_per_row * texture.size().height as usize) as u64,
-        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
+//     let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+//         label: Some("Output Staging Buffer"),
+//         size: (bytes_per_row * texture.size().height as usize) as u64,
+//         usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+//         mapped_at_creation: false,
+//     });
 
-    let mut encoder = ctx
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Get Texture Data"),
-        });
-    encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo {
-            aspect: wgpu::TextureAspect::All,
-            texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-        },
-        wgpu::TexelCopyBufferInfo {
-            buffer: &output_staging_buffer,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(bytes_per_row as u32),
-                rows_per_image: Some(texture.size().height),
-            },
-        },
-        texture.size(),
-    );
-    ctx.queue.submit(Some(encoder.finish()));
-    pollster::block_on(async {
-        let buffer_slice = output_staging_buffer.slice(..);
+//     let mut encoder = ctx
+//         .device
+//         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+//             label: Some("Get Texture Data"),
+//         });
+//     encoder.copy_texture_to_buffer(
+//         wgpu::TexelCopyTextureInfo {
+//             aspect: wgpu::TextureAspect::All,
+//             texture,
+//             mip_level: 0,
+//             origin: wgpu::Origin3d::ZERO,
+//         },
+//         wgpu::TexelCopyBufferInfo {
+//             buffer: &output_staging_buffer,
+//             layout: wgpu::TexelCopyBufferLayout {
+//                 offset: 0,
+//                 bytes_per_row: Some(bytes_per_row as u32),
+//                 rows_per_image: Some(texture.size().height),
+//             },
+//         },
+//         texture.size(),
+//     );
+//     ctx.queue.submit(Some(encoder.finish()));
+//     pollster::block_on(async {
+//         let buffer_slice = output_staging_buffer.slice(..);
 
-        // NOTE: We have to create the mapping THEN device.poll() before await
-        // the future. Otherwise the application will freeze.
-        let (tx, rx) = async_channel::bounded(1);
-        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            pollster::block_on(tx.send(result)).unwrap()
-        });
-        ctx.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .unwrap();
-        rx.recv().await.unwrap().unwrap();
+//         // NOTE: We have to create the mapping THEN device.poll() before await
+//         // the future. Otherwise the application will freeze.
+//         let (tx, rx) = async_channel::bounded(1);
+//         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+//             pollster::block_on(tx.send(result)).unwrap()
+//         });
+//         ctx.device
+//             .poll(wgpu::PollType::wait_indefinitely())
+//             .unwrap();
+//         rx.recv().await.unwrap().unwrap();
 
-        {
-            let view = buffer_slice.get_mapped_range();
-            // texture_data.copy_from_slice(&view);
-            for y in 0..texture.size().height as usize {
-                let src_row_start = y * bytes_per_row;
-                let dst_row_start = y * texture.size().width as usize * 4;
+//         {
+//             let view = buffer_slice.get_mapped_range();
+//             // texture_data.copy_from_slice(&view);
+//             for y in 0..texture.size().height as usize {
+//                 let src_row_start = y * bytes_per_row;
+//                 let dst_row_start = y * texture.size().width as usize * 4;
 
-                texture_data[dst_row_start..dst_row_start + texture.size().width as usize * 4]
-                    .copy_from_slice(
-                        &view[src_row_start..src_row_start + texture.size().width as usize * 4],
-                    );
-            }
-        }
-    });
-    output_staging_buffer.unmap();
-    texture_data
-}
+//                 texture_data[dst_row_start..dst_row_start + texture.size().width as usize * 4]
+//                     .copy_from_slice(
+//                         &view[src_row_start..src_row_start + texture.size().width as usize * 4],
+//                     );
+//             }
+//         }
+//     });
+//     output_staging_buffer.unmap();
+//     texture_data
+// }
 
 #[cfg(test)]
 mod test {

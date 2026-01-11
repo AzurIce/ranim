@@ -119,19 +119,19 @@ impl RenderResource for VItem2dRenderInstance {
 
         let compute_bind_group = Clipbox2dComputeBindGroup::new(
             ctx,
-            points2d_buffer.buffer.as_ref().unwrap(),
-            stroke_widths.buffer.as_ref().unwrap(),
-            clip_info_buffer.buffer.as_ref().unwrap(),
+            &points2d_buffer.buffer,
+            &stroke_widths.buffer,
+            &clip_info_buffer.buffer,
             point_cnt_buffer.as_ref(),
         );
 
         let render_bind_group = RenderBindGroup::new(
             ctx,
-            points2d_buffer.buffer.as_ref().unwrap(),
-            fill_rgbas.buffer.as_ref().unwrap(),
-            stroke_rgbas.buffer.as_ref().unwrap(),
-            stroke_widths.buffer.as_ref().unwrap(),
-            clip_info_buffer.buffer.as_ref().unwrap(),
+            &points2d_buffer.buffer,
+            &fill_rgbas.buffer,
+            &stroke_rgbas.buffer,
+            &stroke_widths.buffer,
+            &clip_info_buffer.buffer,
             plane_buffer.as_ref(),
         );
 
@@ -187,18 +187,18 @@ impl RenderResource for VItem2dRenderInstance {
         {
             self.compute_bind_group = Some(Clipbox2dComputeBindGroup::new(
                 ctx,
-                self.points2d_buffer.buffer.as_ref().unwrap(),
-                self.stroke_widths.buffer.as_ref().unwrap(),
-                self.clip_info_buffer.buffer.as_ref().unwrap(),
+                &self.points2d_buffer.buffer,
+                &self.stroke_widths.buffer,
+                &self.clip_info_buffer.buffer,
                 self.point_cnt_buffer.as_ref().unwrap().as_ref(),
             ));
             self.render_bind_group = Some(RenderBindGroup::new(
                 ctx,
-                self.points2d_buffer.buffer.as_ref().unwrap(),
-                self.fill_rgbas.buffer.as_ref().unwrap(),
-                self.stroke_rgbas.buffer.as_ref().unwrap(),
-                self.stroke_widths.buffer.as_ref().unwrap(),
-                self.clip_info_buffer.buffer.as_ref().unwrap(),
+                &self.points2d_buffer.buffer,
+                &self.fill_rgbas.buffer,
+                &self.stroke_rgbas.buffer,
+                &self.stroke_widths.buffer,
+                &self.clip_info_buffer.buffer,
                 self.plane_buffer.as_ref(),
             ));
         }
@@ -224,8 +224,8 @@ impl VItem2dRenderInstance {
 mod tests {
     use super::*;
     use crate::{Renderer, ViewportUniform, resource::RenderPool, utils::WgpuContext};
-    use glam::{Vec3, vec4};
-    use ranim_core::{core_item::CoreItem, store::CoreItemStore};
+    use glam::{Vec3, vec3, vec4};
+    use ranim_core::{core_item::CoreItem, store::CoreItemStore, traits::With};
 
     #[test]
     fn foo_clear_screen() {
@@ -270,43 +270,53 @@ mod tests {
 
         // A simple "leaf" shape points (local 2D)
         // Set z=1.0 to enable fill (is_closed=true)
-        let points = vec![
-            Vec3::new(0.0, 0.0, 1.0),
-            Vec3::new(0.5, 1.0, 1.0),
+        let scale = 2.0;
+        let mut points = vec![
+            Vec3::new(-1.0, -1.0, 1.0),
+            Vec3::new(-1.0, 0.0, 1.0),
+            Vec3::new(-1.0, 1.0, 1.0),
+            Vec3::new(0.0, 1.0, 1.0),
+            Vec3::new(1.0, 1.0, 1.0),
             Vec3::new(1.0, 0.0, 1.0),
-            Vec3::new(0.5, 0.0, 1.0),
-            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, -1.0, 1.0),
+            Vec3::new(0.0, -1.0, 1.0),
+            Vec3::new(-1.0, -1.0, 1.0),
         ];
+        let n = (points.len() + 1) / 2;
+        points.iter_mut().for_each(|p| {
+            p.x *= scale;
+            p.y *= scale;
+        });
 
-        let make_items = |base: Vec3, alpha: f32| {
+        let make_items = |origin: Vec3, alpha: f32| {
             // Red on XY plane
             let item1 = VItem2d {
-                origin: base + Vec3::new(-0.5, -0.5, 0.0),
+                origin,
                 basis: (Vec3::X, Vec3::Y),
                 points2d: points.clone(),
-                fill_rgbas: vec![Rgba(vec4(1.0, 0.0, 0.0, alpha)); 3],
-                stroke_rgbas: vec![Rgba(vec4(0.5, 0.0, 0.0, 1.0)); 3],
-                stroke_widths: vec![Width(0.02); 3],
+                fill_rgbas: vec![Rgba(vec4(1.0, 0.0, 0.0, alpha)); n],
+                stroke_rgbas: vec![Rgba(vec4(0.5, 0.0, 0.0, 1.0)); n],
+                stroke_widths: vec![Width(0.02); n],
             };
 
             // Green on YZ
             let item2 = VItem2d {
-                origin: base + Vec3::new(0.0, -0.5, -0.5),
+                origin,
                 basis: (Vec3::Z, Vec3::Y), // Z is "X", Y is "Y"
                 points2d: points.clone(),
-                fill_rgbas: vec![Rgba(vec4(0.0, 1.0, 0.0, alpha)); 3],
-                stroke_rgbas: vec![Rgba(vec4(0.0, 0.5, 0.0, 1.0)); 3],
-                stroke_widths: vec![Width(0.02); 3],
+                fill_rgbas: vec![Rgba(vec4(0.0, 1.0, 0.0, alpha)); n],
+                stroke_rgbas: vec![Rgba(vec4(0.0, 0.5, 0.0, 1.0)); n],
+                stroke_widths: vec![Width(0.02); n],
             };
 
             // Blue on XZ
             let item3 = VItem2d {
-                origin: base + Vec3::new(-0.5, 0.0, -0.5),
+                origin,
                 basis: (Vec3::X, Vec3::Z), // X is "X", Z is "Y"
                 points2d: points.clone(),
-                fill_rgbas: vec![Rgba(vec4(0.0, 0.0, 1.0, alpha)); 3],
-                stroke_rgbas: vec![Rgba(vec4(0.0, 0.0, 0.5, 1.0)); 3],
-                stroke_widths: vec![Width(0.02); 3],
+                fill_rgbas: vec![Rgba(vec4(0.0, 0.0, 1.0, alpha)); n],
+                stroke_rgbas: vec![Rgba(vec4(0.0, 0.0, 0.5, 1.0)); n],
+                stroke_widths: vec![Width(0.02); n],
             };
             std::iter::once(item1)
                 .chain(std::iter::once(item2))
@@ -319,9 +329,11 @@ mod tests {
         );
         let mut pool = RenderPool::new();
         let mut store = CoreItemStore::new();
+        let center = Vec3::ZERO;
+        let dir = (Vec3::X + Vec3::NEG_Z).normalize();
         store.update(
-            make_items(Vec3::ZERO, 1.0)
-                .chain(make_items(Vec3::new(1.0, 0.0, 0.0), 0.5))
+            make_items(-scale * 1.5 * dir + center, 1.0)
+                .chain(make_items(scale * 1.5 * dir + center, 0.5))
                 .map(CoreItem::VItem2D)
                 .chain(std::iter::once(CoreItem::CameraFrame(camera)))
                 .enumerate()

@@ -66,6 +66,15 @@ impl Shift for Plane {
     }
 }
 
+impl Rotate for Plane {
+    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
+        self.origin.rotate_by_anchor(angle, axis, anchor);
+        self.basis.0.rotate(angle, axis);
+        self.basis.1.rotate(angle, axis);
+        self
+    }
+}
+
 impl Default for Plane {
     fn default() -> Self {
         Self::XY
@@ -128,7 +137,6 @@ impl BoundingBox for VItem {
 impl Shift for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
-        #[cfg(feature = "vitem2d")]
         self.plane.shift(shift);
         self
     }
@@ -137,6 +145,7 @@ impl Shift for VItem {
 impl Rotate for VItem {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         self.vpoints.rotate_by_anchor(angle, axis, anchor);
+        self.plane.rotate(angle, axis);
         self
     }
 }
@@ -245,7 +254,10 @@ impl Extract for VItem {
         #[cfg(feature = "vitem2d")]
         buf.push(CoreItem::VItem2D(VItem2d {
             origin: self.plane.origin.as_vec3(),
-            basis: (self.plane.basis.0.as_vec3(), self.plane.basis.1.as_vec3()),
+            basis: (
+                self.plane.basis.0.as_vec3().normalize(),
+                self.plane.basis.1.as_vec3().normalize(),
+            ),
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),

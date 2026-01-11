@@ -94,20 +94,20 @@ impl RenderResource for VItemRenderInstance {
 
         let compute_bind_group = ComputeBindGroup::new(
             ctx,
-            points3d_buffer.buffer.as_ref().unwrap(),
-            stroke_widths.buffer.as_ref().unwrap(),
-            points2d_buffer.buffer.as_ref().unwrap(),
-            clip_info_buffer.buffer.as_ref().unwrap(),
+            &points3d_buffer.buffer,
+            &stroke_widths.buffer,
+            &points2d_buffer.buffer,
+            &clip_info_buffer.buffer,
             point_cnt_buffer.as_ref(),
         );
 
         let render_bind_group = RenderBindGroup::new(
             ctx,
-            points2d_buffer.buffer.as_ref().unwrap(),
-            fill_rgbas.buffer.as_ref().unwrap(),
-            stroke_rgbas.buffer.as_ref().unwrap(),
-            stroke_widths.buffer.as_ref().unwrap(),
-            clip_info_buffer.buffer.as_ref().unwrap(),
+            &points2d_buffer.buffer,
+            &fill_rgbas.buffer,
+            &stroke_rgbas.buffer,
+            &stroke_widths.buffer,
+            &clip_info_buffer.buffer,
         );
 
         Self {
@@ -151,19 +151,19 @@ impl RenderResource for VItemRenderInstance {
         {
             self.compute_bind_group = Some(ComputeBindGroup::new(
                 ctx,
-                self.points3d_buffer.buffer.as_ref().unwrap(),
-                self.stroke_widths.buffer.as_ref().unwrap(),
-                self.points2d_buffer.buffer.as_ref().unwrap(),
-                self.clip_info_buffer.buffer.as_ref().unwrap(),
+                &self.points3d_buffer.buffer,
+                &self.stroke_widths.buffer,
+                &self.points2d_buffer.buffer,
+                &self.clip_info_buffer.buffer,
                 self.point_cnt_buffer.as_ref().unwrap().as_ref(),
             ));
             self.render_bind_group = Some(RenderBindGroup::new(
                 ctx,
-                self.points2d_buffer.buffer.as_ref().unwrap(),
-                self.fill_rgbas.buffer.as_ref().unwrap(),
-                self.stroke_rgbas.buffer.as_ref().unwrap(),
-                self.stroke_widths.buffer.as_ref().unwrap(),
-                self.clip_info_buffer.buffer.as_ref().unwrap(),
+                &self.points2d_buffer.buffer,
+                &self.fill_rgbas.buffer,
+                &self.stroke_rgbas.buffer,
+                &self.stroke_widths.buffer,
+                &self.clip_info_buffer.buffer,
             ));
         }
     }

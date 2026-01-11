@@ -36,6 +36,9 @@ pub struct CameraFrame {
 
     /// **Perspective**: The field of view angle, used in perspective projection
     pub fovy: f64,
+
+    /// The number of OIT layers, default is 8
+    pub oit_layers: u32,
 }
 
 impl Extract for CameraFrame {
@@ -60,6 +63,11 @@ impl Interpolatable for CameraFrame {
                 .perspective_blend
                 .lerp(&target.perspective_blend, t)
                 .clamp(0.0, 1.0),
+            oit_layers: if t < 0.5 {
+                self.oit_layers
+            } else {
+                target.oit_layers
+            },
         }
     }
 }
@@ -86,6 +94,7 @@ impl Default for CameraFrame {
             frame_height: 8.0,
 
             fovy: std::f64::consts::PI / 2.0,
+            oit_layers: 8,
         }
     }
 }

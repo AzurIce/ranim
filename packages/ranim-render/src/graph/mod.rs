@@ -4,6 +4,8 @@ pub mod vitem_compute;
 pub use vitem_compute::*;
 pub mod vitem_depth;
 pub use vitem_depth::*;
+pub mod oit_resolve;
+pub use oit_resolve::*;
 
 use slotmap::{SecondaryMap, SlotMap};
 use variadics_please::all_tuples;
@@ -175,6 +177,11 @@ impl<T: RenderPacketMark + Send + Sync + 'static> RenderPacketsQuery for T {
     fn query(store: &RenderPackets) -> Self::Output<'_> {
         store.get()
     }
+}
+
+impl RenderPacketsQuery for () {
+    type Output<'s> = ();
+    fn query(_store: &RenderPackets) -> Self::Output<'_> {}
 }
 
 macro_rules! impl_tuple_render_packet_query {
