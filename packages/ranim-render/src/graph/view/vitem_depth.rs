@@ -1,23 +1,23 @@
 use crate::{
-    RenderContext, RenderTextures, ViewportGpuPacket,
-    graph::{RenderNodeTrait, RenderPacketsQuery},
+    RenderContext, RenderTextures,
+    graph::{RenderPacketsQuery, view::ViewRenderNodeTrait},
     pipelines::VItem2dDepthPipeline,
-    primitives::vitem2d::VItem2dRenderInstance,
+    primitives::{viewport::ViewportGpuPacket, vitem2d::VItem2dRenderInstance},
 };
 pub struct VItem2dDepthNode;
 
-impl RenderNodeTrait for VItem2dDepthNode {
+impl ViewRenderNodeTrait for VItem2dDepthNode {
     type Query = VItem2dRenderInstance;
     fn run(
         &self,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
-        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        #[cfg(feature = "profiling")] encoder: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
-        ctx: &mut RenderContext,
+        ctx: RenderContext,
         viewport: &ViewportGpuPacket,
     ) {
         #[cfg(feature = "profiling")]
-        let mut scope = scope.scope("Depth Render Pass");
+        let mut encoder = encoder.scope("Depth Render Pass");
         // VItem2d Depth Render Pass
         {
             let RenderTextures {
@@ -38,14 +38,15 @@ impl RenderNodeTrait for VItem2dDepthNode {
                 occlusion_query_set: None,
             };
             #[cfg(feature = "profiling")]
-            let mut rpass = scope.scoped_render_pass("VItem2d Depth Render Pass", rpass_desc);
+            let mut rpass = encoder.scoped_render_pass("VItem2d Depth Render Pass", rpass_desc);
             #[cfg(not(feature = "profiling"))]
             let mut rpass = encoder.begin_render_pass(&rpass_desc);
             rpass.set_pipeline(
-                ctx.pipelines
+                &ctx.pipelines
                     .get_or_init::<VItem2dDepthPipeline>(ctx.wgpu_ctx),
             );
-            rpass.set_bind_group(0, &viewport.uniforms_bind_group.bind_group, &[]);
+            rpass.set_bind_group(0, &ctx.resolution_info.bind_group, &[]);
+            rpass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
             vitem2d_packets
                 .iter()
                 .map(|h| ctx.render_pool.get_packet(h))

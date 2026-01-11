@@ -1,164 +1,99 @@
-pub mod vitem_color;
-pub use vitem_color::*;
-pub mod vitem_compute;
-pub use vitem_compute::*;
-pub mod vitem_depth;
-pub use vitem_depth::*;
-pub mod oit_resolve;
-pub use oit_resolve::*;
+use std::ops::{Deref, DerefMut};
 
-use slotmap::{SecondaryMap, SlotMap};
+pub mod view;
+
+pub mod clear;
+pub use clear::*;
+
 use variadics_please::all_tuples;
 
 use crate::{
-    RenderContext, ViewportGpuPacket,
-    primitives::{vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance},
+    RenderContext,
+    primitives::{
+        viewport::ViewportGpuPacket, vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance,
+    },
     resource::Handle,
-    utils::collections::TypeBinnedVec,
+    utils::collections::{Graph, TypeBinnedVec},
 };
 
-slotmap::new_key_type! { pub struct RenderNodeKey; }
-
+slotmap::new_key_type! { pub struct GlobalRenderNodeKey; }
+/// Global render graph is something executed globally, which is, NOT per-view.
+///
+/// For per-view's render graph see [`view::ViewRenderGraph`].
 #[derive(Default)]
-pub struct RenderGraph {
-    nodes: SlotMap<RenderNodeKey, Box<dyn AnyRenderNodeTrait + Send + Sync>>,
-    nexts: SecondaryMap<RenderNodeKey, Vec<RenderNodeKey>>,
-    prevs: SecondaryMap<RenderNodeKey, Vec<RenderNodeKey>>,
+pub struct GlobalRenderGraph {
+    inner: Graph<GlobalRenderNodeKey, Box<dyn AnyGlobalRenderNodeTrait + Send + Sync>>,
 }
 
-impl RenderGraph {
+impl Deref for GlobalRenderGraph {
+    type Target = Graph<GlobalRenderNodeKey, Box<dyn AnyGlobalRenderNodeTrait + Send + Sync>>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for GlobalRenderGraph {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl GlobalRenderGraph {
     pub fn new() -> Self {
         Self::default()
     }
     pub fn insert_node(
         &mut self,
-        node: impl AnyRenderNodeTrait + Send + Sync + 'static,
-    ) -> RenderNodeKey {
-        let key = self.nodes.insert(Box::new(node));
-        self.nexts.insert(key, Vec::new());
-        self.prevs.insert(key, Vec::new());
-        key
-    }
-    pub fn insert_edge(&mut self, from: RenderNodeKey, to: RenderNodeKey) {
-        self.nexts.get_mut(from).unwrap().push(to);
-        self.prevs.get_mut(to).unwrap().push(from);
-    }
-    pub fn iter(&self) -> RenderGraphTopoIter<'_> {
-        RenderGraphTopoIter::new(self)
+        node: impl AnyGlobalRenderNodeTrait + Send + Sync + 'static,
+    ) -> GlobalRenderNodeKey {
+        self.inner.insert_node(Box::new(node))
     }
 }
 
-pub struct RenderGraphTopoIter<'a> {
-    graph: &'a RenderGraph,
-    in_degrees: SecondaryMap<RenderNodeKey, usize>,
-    ready_stack: Vec<RenderNodeKey>,
-}
-
-impl<'a> RenderGraphTopoIter<'a> {
-    pub fn new(graph: &'a RenderGraph) -> Self {
-        let mut in_degrees = SecondaryMap::new();
-        let mut ready_stack = Vec::new();
-
-        for (key, _) in graph.nodes.iter() {
-            let degree = graph.prevs[key].len();
-            in_degrees.insert(key, degree);
-
-            if degree == 0 {
-                ready_stack.push(key);
-            }
-        }
-
-        Self {
-            graph,
-            in_degrees,
-            ready_stack,
-        }
-    }
-}
-
-impl<'a> Iterator for RenderGraphTopoIter<'a> {
-    type Item = &'a Box<dyn AnyRenderNodeTrait + Send + Sync>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let current_key = self.ready_stack.pop()?;
-
-        let next_nodes = self.graph.nexts.get(current_key).unwrap();
-        for &next_key in next_nodes {
-            let degree = self.in_degrees.get_mut(next_key).unwrap();
-            *degree -= 1;
-            if *degree == 0 {
-                self.ready_stack.push(next_key);
-            }
-        }
-
-        self.graph.nodes.get(current_key)
-    }
-}
-
-impl AnyRenderNodeTrait for RenderGraph {
+impl AnyGlobalRenderNodeTrait for GlobalRenderGraph {
     fn exec(
         &self,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
-        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        render_packets: &RenderPackets,
-        render_ctx: &mut RenderContext,
-        viewport: &ViewportGpuPacket,
+        #[cfg(feature = "profiling")] encoder: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        render_ctx: RenderContext,
     ) {
         self.iter().for_each(|n| {
-            n.exec(
-                #[cfg(not(feature = "profiling"))]
-                encoder,
-                #[cfg(feature = "profiling")]
-                scope,
-                render_packets,
-                render_ctx,
-                viewport,
-            );
+            n.exec(encoder, render_ctx);
         });
     }
 }
 
-pub trait AnyRenderNodeTrait {
+pub trait AnyGlobalRenderNodeTrait {
     fn exec(
         &self,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        render_packets: &RenderPackets,
-        render_ctx: &mut RenderContext,
-        viewport: &ViewportGpuPacket,
+        render_ctx: RenderContext,
     );
 }
-
-impl<T: RenderNodeTrait> AnyRenderNodeTrait for T {
+impl<T: GlobalRenderNodeTrait> AnyGlobalRenderNodeTrait for T {
     fn exec(
         &self,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
-        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        render_packets: &RenderPackets,
-        render_ctx: &mut RenderContext,
-        viewport: &ViewportGpuPacket,
+        #[cfg(feature = "profiling")] encoder: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        render_ctx: RenderContext,
     ) {
         self.run(
-            #[cfg(not(feature = "profiling"))]
             encoder,
-            #[cfg(feature = "profiling")]
-            scope,
-            <Self as RenderNodeTrait>::Query::query(render_packets),
+            <Self as GlobalRenderNodeTrait>::Query::query(render_ctx.render_packets),
             render_ctx,
-            viewport,
         );
     }
 }
 
-pub trait RenderNodeTrait {
+pub trait GlobalRenderNodeTrait {
     type Query: RenderPacketsQuery;
     fn run(
         &self,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
-        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        #[cfg(feature = "profiling")] encoder: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         render_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
-        render_ctx: &mut RenderContext,
-        viewport: &ViewportGpuPacket,
+        render_ctx: RenderContext,
     );
 }
 
@@ -171,6 +106,7 @@ pub trait RenderPacketsQuery {
 pub trait RenderPacketMark {}
 impl RenderPacketMark for VItemRenderInstance {}
 impl RenderPacketMark for VItem2dRenderInstance {}
+impl RenderPacketMark for ViewportGpuPacket {}
 
 impl<T: RenderPacketMark + Send + Sync + 'static> RenderPacketsQuery for T {
     type Output<'s> = &'s [Handle<T>];

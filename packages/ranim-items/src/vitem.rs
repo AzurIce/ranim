@@ -247,7 +247,6 @@ impl VItem {
     }
 }
 
-/// See [`VItemPrimitive`].
 impl Extract for VItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {

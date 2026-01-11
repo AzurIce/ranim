@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
 use crate::{
-    CameraUniformsBindGroup, WgpuContext,
+    WgpuContext,
+    primitives::viewport::ViewportBindGroup,
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
 };
 
@@ -151,7 +152,7 @@ impl GpuResource for VItemPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("VItem Pipeline Layout"),
             bind_group_layouts: &[
-                &CameraUniformsBindGroup::bind_group_layout(wgpu_ctx),
+                &ViewportBindGroup::bind_group_layout(wgpu_ctx),
                 &RenderBindGroup::bind_group_layout(wgpu_ctx),
             ],
             push_constant_ranges: &[],

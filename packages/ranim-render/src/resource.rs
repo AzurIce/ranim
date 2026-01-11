@@ -1,7 +1,7 @@
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 use crate::{
@@ -19,22 +19,30 @@ pub(crate) trait GpuResource {
 /// A storage for pipelines
 #[derive(Default)]
 pub struct PipelinesPool {
-    inner: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    inner: RwLock<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
 }
 
 impl PipelinesPool {
     pub(crate) fn get_or_init<P: GpuResource + Send + Sync + 'static>(
-        &mut self,
+        &self,
         ctx: &WgpuContext,
-    ) -> &P {
+    ) -> Arc<P> {
         let id = std::any::TypeId::of::<P>();
-        self.inner
+        {
+            let inner = self.inner.read().unwrap();
+            if let Some(pipeline) = inner.get(&id) {
+                return pipeline.clone().downcast::<P>().unwrap();
+            }
+        }
+        let mut inner = self.inner.write().unwrap();
+        inner
             .entry(id)
             .or_insert_with(|| {
                 let pipeline = P::new(ctx);
-                Box::new(pipeline)
+                Arc::new(pipeline)
             })
-            .downcast_ref::<P>()
+            .clone()
+            .downcast::<P>()
             .unwrap()
     }
 }
@@ -54,15 +62,15 @@ pub struct RenderTextures {
 
 pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 impl RenderTextures {
-    pub(crate) fn new(ctx: &WgpuContext, width: usize, height: usize) -> Self {
+    pub(crate) fn new(ctx: &WgpuContext, width: u32, height: u32) -> Self {
         let format = OUTPUT_TEXTURE_FORMAT;
         let render_texture = ReadbackWgpuTexture::new(
             ctx,
             &wgpu::TextureDescriptor {
                 label: Some("Target Texture"),
                 size: wgpu::Extent3d {
-                    width: width as u32,
-                    height: height as u32,
+                    width,
+                    height,
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,
@@ -101,8 +109,8 @@ impl RenderTextures {
             &wgpu::TextureDescriptor {
                 label: Some("Depth Stencil Texture"),
                 size: wgpu::Extent3d {
-                    width: width as u32,
-                    height: height as u32,
+                    width,
+                    height,
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,

@@ -686,7 +686,7 @@ impl AppRenderer {
 
         let egui_renderer =
             egui_tools::EguiRenderer::new(&ctx.device, surface_config.format, None, 1, &window);
-        let ranim_renderer = Renderer::new(ctx, 1280, 720);
+        let ranim_renderer = Renderer::new(ctx, 1280, 720, 8);
 
         let sampler = ctx.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,

@@ -124,7 +124,7 @@ impl RenderWorker {
                 .join("./output")
                 .join(output_dir);
         }
-        let renderer = Renderer::new(&ctx, output.width as usize, output.height as usize);
+        let renderer = Renderer::new(&ctx, output.width, output.height, 8);
         let clear_color = color::try_color(scene_config.clear_color)
             .unwrap_or(color::color("#333333ff"))
             .convert::<LinearSrgb>();

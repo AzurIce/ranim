@@ -2,7 +2,6 @@ struct CameraUniforms {
     proj_mat: mat4x4<f32>,
     view_mat: mat4x4<f32>,
     half_frame_size: vec2<f32>,
-    resolution: vec2<u32>,
 }
 @group(0) @binding(0) var<uniform> cam_uniforms : CameraUniforms;
 

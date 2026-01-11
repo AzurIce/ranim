@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
 use crate::{
-    CameraUniformsBindGroup, WgpuContext,
+    ResolutionInfo, WgpuContext,
+    primitives::viewport::ViewportBindGroup,
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
 };
 
@@ -25,7 +26,10 @@ impl GpuResource for OITResolvePipeline {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("OIT Resolve Pipeline Layout"),
-            bind_group_layouts: &[&CameraUniformsBindGroup::bind_group_layout(wgpu_ctx)],
+            bind_group_layouts: &[
+                &ResolutionInfo::create_bind_group_layout(wgpu_ctx),
+                &ViewportBindGroup::bind_group_layout(wgpu_ctx),
+            ],
             push_constant_ranges: &[],
         });
 

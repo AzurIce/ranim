@@ -1,14 +1,96 @@
 use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 
-use bytemuck::AnyBitPattern;
 use tracing::{info, warn};
 use wgpu::util::DeviceExt;
 
 pub mod collections {
+    use slotmap::{Key, SecondaryMap, SlotMap};
     use std::{
         any::{Any, TypeId},
         collections::HashMap,
     };
+
+    pub struct Graph<K: Key, N> {
+        nodes: SlotMap<K, N>,
+        nexts: SecondaryMap<K, Vec<K>>,
+        prevs: SecondaryMap<K, Vec<K>>,
+    }
+
+    impl<K: Key, N> Default for Graph<K, N> {
+        fn default() -> Self {
+            Self {
+                nodes: SlotMap::default(),
+                nexts: SecondaryMap::default(),
+                prevs: SecondaryMap::default(),
+            }
+        }
+    }
+
+    impl<K: Key, N> Graph<K, N> {
+        pub fn new() -> Self {
+            Self::default()
+        }
+        pub fn insert_node(&mut self, node: N) -> K {
+            let key = self.nodes.insert(node);
+            self.nexts.insert(key, Vec::new());
+            self.prevs.insert(key, Vec::new());
+            key
+        }
+        pub fn insert_edge(&mut self, from: K, to: K) {
+            self.nexts.get_mut(from).unwrap().push(to);
+            self.prevs.get_mut(to).unwrap().push(from);
+        }
+        pub fn iter(&self) -> GraphTopoIter<'_, K, N> {
+            GraphTopoIter::new(self)
+        }
+    }
+
+    pub struct GraphTopoIter<'a, K: Key, N> {
+        graph: &'a Graph<K, N>,
+        in_degrees: SecondaryMap<K, usize>,
+        ready_stack: Vec<K>,
+    }
+
+    impl<'a, K: Key, N> GraphTopoIter<'a, K, N> {
+        fn new(graph: &'a Graph<K, N>) -> Self {
+            let mut in_degrees = SecondaryMap::new();
+            let mut ready_stack = Vec::new();
+
+            for (key, _) in graph.nodes.iter() {
+                let degree = graph.prevs[key].len();
+                in_degrees.insert(key, degree);
+
+                if degree == 0 {
+                    ready_stack.push(key);
+                }
+            }
+
+            Self {
+                graph,
+                in_degrees,
+                ready_stack,
+            }
+        }
+    }
+
+    impl<'a, K: Key, N> Iterator for GraphTopoIter<'a, K, N> {
+        type Item = &'a N;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let current_key = self.ready_stack.pop()?;
+
+            let next_nodes = self.graph.nexts.get(current_key).unwrap();
+            for &next_key in next_nodes {
+                let degree = self.in_degrees.get_mut(next_key).unwrap();
+                *degree -= 1;
+                if *degree == 0 {
+                    self.ready_stack.push(next_key);
+                }
+            }
+
+            self.graph.nodes.get(current_key)
+        }
+    }
 
     /// A trait to support calling `clear` on the type erased trait object.
     pub trait AnyClear: Any + Send + Sync {
@@ -233,9 +315,9 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         Self {
             label,
             buffer: ctx.device.create_buffer(&wgpu::BufferDescriptor {
-                label: label,
+                label,
                 size,
-                usage: usage,
+                usage,
                 mapped_at_creation: false,
             }),
             usage,
@@ -414,9 +496,8 @@ impl ReadbackWgpuTexture {
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let len =
-            (texture.size().width as usize * texture.size().height as usize * block_size as usize);
-        let bytes = vec![0u8; len];
+        let len = texture.size().width * texture.size().height * block_size;
+        let bytes = vec![0u8; len as usize];
 
         Self {
             inner: texture,
@@ -492,78 +573,6 @@ impl ReadbackWgpuTexture {
         &self.bytes
     }
 }
-
-// // Should not be called frequently
-// /// Get texture data from a wgpu texture
-// #[allow(unused)]
-// pub(crate) fn get_texture_data(ctx: &WgpuContext, texture: &::wgpu::Texture) -> Vec<u8> {
-//     const ALIGNMENT: usize = 256;
-//     use ::wgpu;
-//     let bytes_per_row =
-//         ((texture.size().width * 4) as f32 / ALIGNMENT as f32).ceil() as usize * ALIGNMENT;
-//     let mut texture_data = vec![0u8; bytes_per_row * texture.size().height as usize];
-
-//     let output_staging_buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
-//         label: Some("Output Staging Buffer"),
-//         size: (bytes_per_row * texture.size().height as usize) as u64,
-//         usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-//         mapped_at_creation: false,
-//     });
-
-//     let mut encoder = ctx
-//         .device
-//         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-//             label: Some("Get Texture Data"),
-//         });
-//     encoder.copy_texture_to_buffer(
-//         wgpu::TexelCopyTextureInfo {
-//             aspect: wgpu::TextureAspect::All,
-//             texture,
-//             mip_level: 0,
-//             origin: wgpu::Origin3d::ZERO,
-//         },
-//         wgpu::TexelCopyBufferInfo {
-//             buffer: &output_staging_buffer,
-//             layout: wgpu::TexelCopyBufferLayout {
-//                 offset: 0,
-//                 bytes_per_row: Some(bytes_per_row as u32),
-//                 rows_per_image: Some(texture.size().height),
-//             },
-//         },
-//         texture.size(),
-//     );
-//     ctx.queue.submit(Some(encoder.finish()));
-//     pollster::block_on(async {
-//         let buffer_slice = output_staging_buffer.slice(..);
-
-//         // NOTE: We have to create the mapping THEN device.poll() before await
-//         // the future. Otherwise the application will freeze.
-//         let (tx, rx) = async_channel::bounded(1);
-//         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-//             pollster::block_on(tx.send(result)).unwrap()
-//         });
-//         ctx.device
-//             .poll(wgpu::PollType::wait_indefinitely())
-//             .unwrap();
-//         rx.recv().await.unwrap().unwrap();
-
-//         {
-//             let view = buffer_slice.get_mapped_range();
-//             // texture_data.copy_from_slice(&view);
-//             for y in 0..texture.size().height as usize {
-//                 let src_row_start = y * bytes_per_row;
-//                 let dst_row_start = y * texture.size().width as usize * 4;
-
-//                 texture_data[dst_row_start..dst_row_start + texture.size().width as usize * 4]
-//                     .copy_from_slice(
-//                         &view[src_row_start..src_row_start + texture.size().width as usize * 4],
-//                     );
-//             }
-//         }
-//     });
-//     output_staging_buffer.unmap();
-//     texture_data
-// }
 
 #[cfg(test)]
 mod test {

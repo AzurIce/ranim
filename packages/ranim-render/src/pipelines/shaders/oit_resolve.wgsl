@@ -1,15 +1,14 @@
+@group(0) @binding(0) var<uniform> frame: vec3<u32>;
+@group(0) @binding(1) var<storage, read_write> pixel_count: array<atomic<u32>>;
+@group(0) @binding(2) var<storage, read_write> oit_colors: array<u32>;
+@group(0) @binding(3) var<storage, read_write> oit_depths: array<f32>;
+
 struct CameraUniforms {
     proj_mat: mat4x4<f32>,
     view_mat: mat4x4<f32>,
     half_frame_size: vec2<f32>,
-    resolution: vec2<u32>,
-    oit_layers: u32,
 }
-@group(0) @binding(0) var<uniform> cam_uniforms : CameraUniforms;
-
-@group(0) @binding(1) var<storage, read_write> pixel_count: array<atomic<u32>>;
-@group(0) @binding(2) var<storage, read_write> oit_colors: array<u32>;
-@group(0) @binding(3) var<storage, read_write> oit_depths: array<f32>;
+@group(1) @binding(0) var<uniform> cam_uniforms : CameraUniforms;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -70,20 +69,9 @@ fn fs_main(@builtin(position) frag_pos: vec4<f32>) -> FragmentOutput {
     // Start with fully transparent
     var final_color = vec4<f32>(0.0);
 
-    let pixel_idx = u32(coords.y) * cam_uniforms.resolution.x + u32(coords.x);
+    let pixel_idx = u32(coords.y) * frame.x + u32(coords.x);
     let count_atomic = atomicLoad(&pixel_count[pixel_idx]);
-
-    // Clear the counter for the next frame (IMPORTANT! This acts as the clear pass for the atomic buffer)
-    // NOTE: In a real multi-pass architecture, clearing might be done in a separate Compute Pass or by the API.
-    // But since this is a read-modify-write structure, we need to reset it.
-    // However, atomicExchange here is racy if we are rendering *while* resolving (which shouldn't happen due to barriers/pass structure).
-    // A safer way is a separate clear pass, but for simplicity in this specific setup if we assume sequential execution:
-    // atomicStore(&pixel_count[pixel_idx], 0u);
-    // Actually, doing it here prevents us from using the data for anything else later and implies read-after-write hazard if not careful.
-    // It's better to clear it at the start of the frame.
-    // We will assume a separate Clear logic exists or `pixel_count` is cleared before the OIT recording pass.
-
-    let count = min(count_atomic, cam_uniforms.oit_layers);
+    let count = min(count_atomic, frame.z);
 
     if (count == 0u) {
         discard;
@@ -95,7 +83,7 @@ fn fs_main(@builtin(position) frag_pos: vec4<f32>) -> FragmentOutput {
     let loops = min(count, MAX_LAYERS);
 
     for (var i = 0u; i < loops; i++) {
-        let buffer_idx = pixel_idx * cam_uniforms.oit_layers + i;
+        let buffer_idx = pixel_idx * frame.z + i;
         nodes[i].color = unpack_color(oit_colors[buffer_idx]);
         nodes[i].depth = oit_depths[buffer_idx];
     }

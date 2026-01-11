@@ -211,11 +211,11 @@ impl VItem2dRenderInstance {
         cpass.dispatch_workgroups(self.points2d_buffer.len().div_ceil(256) as u32, 1, 1);
     }
     pub fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
-        rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
+        rpass.set_bind_group(2, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
         rpass.draw(0..4, 0..1);
     }
     pub fn encode_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
-        rpass.set_bind_group(1, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
+        rpass.set_bind_group(2, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
         rpass.draw(0..4, 0..1);
     }
 }
@@ -223,44 +223,23 @@ impl VItem2dRenderInstance {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Renderer, ViewportUniform, resource::RenderPool, utils::WgpuContext};
-    use glam::{Vec3, vec3, vec4};
-    use ranim_core::{core_item::CoreItem, store::CoreItemStore, traits::With};
-
-    #[test]
-    fn foo_clear_screen() {
-        let ctx = pollster::block_on(WgpuContext::new());
-        let mut renderer = Renderer::new(&ctx, 1280, 720);
-        let clear_color = wgpu::Color {
-            r: 0.8,
-            g: 0.8,
-            b: 0.8,
-            a: 1.0,
-        };
-        renderer.clear_screen(&ctx, clear_color);
-
-        let img = renderer.get_rendered_texture_img_buffer(&ctx);
-        img.save("../../output/clear_screen.png").unwrap();
-        let depth_img = renderer.get_depth_texture_img_buffer(&ctx);
-        depth_img
-            .save("../../output/clear_screen_depth.png")
-            .unwrap();
-    }
+    use crate::{Renderer, resource::RenderPool, utils::WgpuContext};
+    use glam::{DVec3, Vec3, vec4};
+    use ranim_core::{
+        core_item::{CoreItem, camera_frame::CameraFrame},
+        store::CoreItemStore,
+    };
 
     #[test]
     fn foo_render_vitem2d_primitive() {
         let ctx = pollster::block_on(WgpuContext::new());
-        let mut renderer = Renderer::new(&ctx, 1280, 720);
+        let mut renderer = Renderer::new(&ctx, 1280, 720, 8);
         let clear_color = wgpu::Color {
             r: 0.8,
             g: 0.8,
             b: 0.8,
             a: 1.0,
         };
-
-        // Setup Camera for Perspective View
-        use glam::DVec3;
-        use ranim_core::core_item::camera_frame::CameraFrame;
 
         let mut camera = CameraFrame::new();
         camera.pos = DVec3::new(3.0, 3.0, 3.0);
@@ -268,7 +247,6 @@ mod tests {
         camera.up = DVec3::Y;
         camera.perspective_blend = 1.0; // Use perspective
 
-        // A simple "leaf" shape points (local 2D)
         // Set z=1.0 to enable fill (is_closed=true)
         let scale = 2.0;
         let mut points = vec![
@@ -282,7 +260,7 @@ mod tests {
             Vec3::new(0.0, -1.0, 1.0),
             Vec3::new(-1.0, -1.0, 1.0),
         ];
-        let n = (points.len() + 1) / 2;
+        let n = points.len().div_ceil(2);
         points.iter_mut().for_each(|p| {
             p.x *= scale;
             p.y *= scale;
@@ -323,10 +301,6 @@ mod tests {
                 .chain(std::iter::once(item3))
         };
 
-        renderer.viewport.update(
-            &ctx,
-            &ViewportUniform::from_camera_frame(&camera, 1280, 720),
-        );
         let mut pool = RenderPool::new();
         let mut store = CoreItemStore::new();
         let center = Vec3::ZERO;
