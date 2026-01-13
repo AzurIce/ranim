@@ -11,12 +11,12 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  
+
 # Allow one concurrent deployment
 concurrency:
   group: "pages"
   cancel-in-progress: true
-      
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -34,7 +34,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: just, mdbook@0.5, zola, mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17, wasm-bindgen
+          tool: just, mdbook@0.5, zola@0.22, mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17, wasm-bindgen
 
       - uses: Swatinem/rust-cache@v2
         with:

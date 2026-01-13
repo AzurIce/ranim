@@ -1,3 +1,4 @@
+use approx::{RelativeEq, relative_eq};
 use glam::{DVec3, Vec3Swizzles};
 use itertools::Itertools;
 
@@ -148,7 +149,7 @@ pub fn trim_cubic_bezier(bezier: &[DVec3; 4], a: f64, b: f64) -> [DVec3; 4] {
 }
 
 /// When path is empty, returns None
-pub fn get_subpath_closed_flag(path: &[DVec3]) -> Option<(usize, bool)> {
+pub fn get_subpath_closed_flag<T: RelativeEq>(path: &[T]) -> Option<(usize, bool)> {
     if path.len() < 3 {
         return None;
     }
@@ -164,7 +165,7 @@ pub fn get_subpath_closed_flag(path: &[DVec3]) -> Option<(usize, bool)> {
             _ => unreachable!(),
         } {
             // println!("### path end ###");
-            if (a - path[0]).length_squared() <= 0.0001 {
+            if relative_eq!(a, &path[0]) {
                 return Some((ia, true));
             } else {
                 return Some((ia, false));

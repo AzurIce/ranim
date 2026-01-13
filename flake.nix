@@ -21,8 +21,17 @@
     ciallo.url = "github:azurice/ciallo";
   };
 
-  outputs = { nixpkgs, crane, rust-overlay, flake-utils, ciallo, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      nixpkgs,
+      crane,
+      rust-overlay,
+      flake-utils,
+      ciallo,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
@@ -96,7 +105,8 @@
 
           cargoHash = "sha256-zhijQ+9vVB4IL/t1+IGLAnvJka0AB1yJRWo/qEyUfx0=";
         });
-      in {
+      in
+      {
         packages = { inherit ranim-cli; };
         apps = {
           ranim-cli = flake-utils.lib.mkApp {
@@ -104,7 +114,10 @@
           };
         };
         devShells.default = craneLib.devShell {
-          packages = [ puffin_viewer ] ++ (with pkgs; [
+          packages = [
+            puffin_viewer
+          ]
+          ++ (with pkgs; [
             git-cliff
             cargo-release
             samply
@@ -112,18 +125,19 @@
             miniserve
             trunk
             zola
-            # mdbook
+            mdbook
             wasm-pack
             mdbook-mermaid
+            wasm-bindgen-cli_0_2_106
             # mdbook-katex
             # wasm-bindgen-cli
             # mdbook-i18n-helpers
-          ]) ++ [
-            (pkgs.callPackage ./wasm-bindgen-cli.nix {})
-            (pkgs.callPackage ./mdbook.nix {})
-            (pkgs.callPackage ./mdbook-katex.nix {})
+          ])
+          ++ [
+            (pkgs.callPackage ./mdbook-katex.nix { })
             ciallo.packages.${system}.default
           ];
         };
-      });
+      }
+    );
 }

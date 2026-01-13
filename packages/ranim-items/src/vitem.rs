@@ -32,7 +32,7 @@ use ranim_core::{
 pub struct Plane {
     /// The origin of the plane.
     pub origin: DVec3,
-    /// The basis vectors of the plane.
+    /// The basis vectors of the plane. Normalized.
     pub basis: (DVec3, DVec3),
 }
 
