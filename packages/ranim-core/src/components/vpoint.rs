@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use derive_more::{Deref, DerefMut};
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 use itertools::Itertools;
 
 use crate::traits::*;
@@ -10,6 +10,11 @@ use crate::utils::math::interpolate_usize;
 use crate::utils::{avg, resize_preserving_order_with_repeated_indices};
 
 use super::ComponentVec;
+
+/// A point in bezier path.
+///
+/// `x`, `y`
+pub struct VPoint(DVec2);
 
 /// VPointComponentVec is used to represent a bunch of quad bezier paths.
 ///

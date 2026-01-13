@@ -1,3 +1,5 @@
+//! Quadratic Bezier Concatenated Item on a 2D [`Plane`]
+//!
 // pub mod arrow;
 /// Geometry items
 pub mod geometry;
@@ -21,72 +23,12 @@ use ranim_core::traits::Anchor;
 use ranim_core::utils::resize_preserving_order_with_repeated_indices;
 use ranim_core::{Extract, color, glam};
 
+use crate::Plane;
 use ranim_core::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
     prelude::{Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, StrokeWidth},
     traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
-
-/// A plane in 3D space.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Plane {
-    /// The origin of the plane.
-    pub origin: DVec3,
-    /// The basis vectors of the plane. Normalized.
-    pub basis: (DVec3, DVec3),
-}
-
-impl Interpolatable for Plane {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self {
-            origin: self.origin.lerp(target.origin, t),
-            basis: (
-                self.basis.0.lerp(target.basis.0, t),
-                self.basis.1.lerp(target.basis.1, t),
-            ),
-        }
-    }
-}
-
-impl BoundingBox for Plane {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        let basis_vec = self.basis.0 + self.basis.1;
-        [
-            self.origin - basis_vec / 2.0,
-            self.origin,
-            self.origin + basis_vec / 2.0,
-        ]
-    }
-}
-
-impl Shift for Plane {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.origin.shift(shift);
-        self
-    }
-}
-
-impl Rotate for Plane {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        self.origin.rotate_by_anchor(angle, axis, anchor);
-        self.basis.0.rotate(angle, axis);
-        self.basis.1.rotate(angle, axis);
-        self
-    }
-}
-
-impl Default for Plane {
-    fn default() -> Self {
-        Self::XY
-    }
-}
-
-impl Plane {
-    const XY: Self = Self {
-        origin: DVec3::ZERO,
-        basis: (DVec3::X, DVec3::Y),
-    };
-}
 
 /// A vectorized item.
 ///

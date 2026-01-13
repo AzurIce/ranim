@@ -14,12 +14,9 @@ use ranim::{
         css,
         manim::{self, BLUE_C, RED_C},
     },
-    items::{
-        Group,
-        vitem::{
-            self, VItem,
-            geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
-        },
+    items::vitem::{
+        self, VItem,
+        geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
     },
     prelude::*,
 };
@@ -36,7 +33,7 @@ fn test(r: &mut RanimScene) {
             let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
             ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
         })
-        .collect::<Group<_>>();
+        .collect::<Vec<_>>();
     let r_arcs = r.insert(arcs);
 
     // text.set_stroke_color(manim::RED_C)
