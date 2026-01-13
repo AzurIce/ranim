@@ -25,12 +25,6 @@ pub fn parse_scene_attrs(
                 }) = nv.value
             {
                 res.name = Some(s.value());
-            } else if nv.path.is_ident("frame_height")
-                && let Expr::Lit(ExprLit {
-                    lit: Lit::Float(f), ..
-                }) = nv.value
-            {
-                res.frame_height = Some(f.base10_parse()?);
             } else if nv.path.is_ident("clear_color")
                 && let Expr::Lit(ExprLit {
                     lit: Lit::Str(s), ..

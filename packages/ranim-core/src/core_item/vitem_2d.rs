@@ -16,7 +16,7 @@ pub const DEFAULT_STROKE_WIDTH: f32 = 2.0;
 pub struct VItem2d {
     /// The base point of the item, a.k.a. the origin of the item's local coordinate system.
     pub origin: Vec3,
-    /// The basis vectors of the item's local coordinate system.
+    /// The basis vectors of the item's local coordinate system. Normalized.
     pub basis: (Vec3, Vec3),
     /// The points of the item in the item's local coordinate system.
     /// (x, y, is_closed)

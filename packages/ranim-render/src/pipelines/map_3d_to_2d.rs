@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{CameraUniforms, WgpuContext, resource::GpuResource};
+use crate::{WgpuContext, primitives::viewport::ViewportUniform, resource::GpuResource};
 
 pub struct Map3dTo2dPipeline {
     pipeline: wgpu::ComputePipeline,
@@ -163,7 +163,7 @@ impl GpuResource for Map3dTo2dPipeline {
         let cam_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Map 3D to 2D Bind Group Layout"),
-                entries: &[CameraUniforms::as_bind_group_layout_entry(0)],
+                entries: &[ViewportUniform::as_bind_group_layout_entry(0)],
             });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Map 3D to 2D Pipeline Layout"),

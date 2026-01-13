@@ -12,11 +12,25 @@ author = "AzurIce"
 [languages.zh]
 # generate_feeds = true
 
-[markdown]
-# Whether to do syntax highlighting
-# Theme can be customised by setting the `highlight_theme` variable to a theme supported by Zola
-highlight_code = true
-highlight_theme = "css"
+[markdown.highlighting]
+# When set to "true", missing highlight languages are treated as errors. Defaults to false but recommended to set to true.
+error_on_missing_language = false
+
+# Whether to use inline hex colours (`inline`) or CSS classes (`class`)
+style = "class"
+
+# If you use a single theme, put its name here. See the syntax highlighting  page for the possible choices.
+theme = "catppuccin-mocha"
+
+# If you want light/dark themes, use the 2 fields below instead. See the syntax highlighting  page for the possible choices.
+light_theme = ""
+dark_theme = ""
+
+# A list of files for additional JSON TextMate grammars
+extra_grammars = []
+
+# A list of files for additional JSON TextMate themes
+extra_themes = []
 
 [extra]
 # Put all your custom variables here

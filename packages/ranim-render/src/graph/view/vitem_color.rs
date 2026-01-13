@@ -1,21 +1,23 @@
 use crate::{
-    Camera, RenderContext, RenderTextures,
-    graph::{RenderNodeTrait, RenderPacketsQuery},
+    RenderContext, RenderTextures,
+    graph::{RenderPacketsQuery, view::ViewRenderNodeTrait},
     pipelines::{VItem2dColorPipeline, VItemPipeline},
-    primitives::{vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance},
+    primitives::{
+        viewport::ViewportGpuPacket, vitem::VItemRenderInstance, vitem2d::VItem2dRenderInstance,
+    },
 };
 
 pub struct VItemRenderNode;
 
-impl RenderNodeTrait for VItemRenderNode {
+impl ViewRenderNodeTrait for VItemRenderNode {
     type Query = VItemRenderInstance;
     fn run(
         &self,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
         #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         vitem_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
-        ctx: &mut RenderContext,
-        camera_state: &Camera,
+        ctx: RenderContext,
+        viewport: &ViewportGpuPacket,
     ) {
         let RenderTextures {
             // multisample_view,
@@ -51,8 +53,8 @@ impl RenderNodeTrait for VItemRenderNode {
         let mut rpass = scope.scoped_render_pass("VItem Render Pass", rpass_desc);
         #[cfg(not(feature = "profiling"))]
         let mut rpass = encoder.begin_render_pass(&rpass_desc);
-        rpass.set_pipeline(ctx.pipelines.get_or_init::<VItemPipeline>(ctx.wgpu_ctx));
-        rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
+        rpass.set_pipeline(&ctx.pipelines.get_or_init::<VItemPipeline>(ctx.wgpu_ctx));
+        rpass.set_bind_group(0, &viewport.uniforms_bind_group.bind_group, &[]);
         vitem_packets
             .iter()
             .map(|h| ctx.render_pool.get_packet(h))
@@ -60,17 +62,17 @@ impl RenderNodeTrait for VItemRenderNode {
     }
 }
 
-pub struct VItem2dRenderNode;
+pub struct VItem2dColorNode;
 
-impl RenderNodeTrait for VItem2dRenderNode {
+impl ViewRenderNodeTrait for VItem2dColorNode {
     type Query = VItem2dRenderInstance;
     fn run(
         &self,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
-        #[cfg(feature = "profiling")] scope: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        #[cfg(feature = "profiling")] encoder: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
-        ctx: &mut RenderContext,
-        camera_state: &Camera,
+        ctx: RenderContext,
+        viewport: &ViewportGpuPacket,
     ) {
         // VItem2d Render Pass
         let RenderTextures {
@@ -101,14 +103,15 @@ impl RenderNodeTrait for VItem2dRenderNode {
             occlusion_query_set: None,
         };
         #[cfg(feature = "profiling")]
-        let mut rpass = scope.scoped_render_pass("VItem2d Render Pass", rpass_desc);
+        let mut rpass = encoder.scoped_render_pass("VItem2d Render Pass", rpass_desc);
         #[cfg(not(feature = "profiling"))]
         let mut rpass = encoder.begin_render_pass(&rpass_desc);
         rpass.set_pipeline(
-            ctx.pipelines
+            &ctx.pipelines
                 .get_or_init::<VItem2dColorPipeline>(ctx.wgpu_ctx),
         );
-        rpass.set_bind_group(0, &camera_state.uniforms_bind_group.bind_group, &[]);
+        rpass.set_bind_group(0, &ctx.resolution_info.bind_group, &[]);
+        rpass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
         vitem2d_packets
             .iter()
             .map(|h| ctx.render_pool.get_packet(h))

@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
 use crate::{
-    CameraUniformsBindGroup, WgpuContext,
+    ResolutionInfo, WgpuContext,
+    primitives::viewport::ViewportBindGroup,
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
 };
 
@@ -174,7 +175,8 @@ impl GpuResource for VItem2dColorPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("VItem2d Pipeline Layout"),
             bind_group_layouts: &[
-                &CameraUniformsBindGroup::bind_group_layout(wgpu_ctx),
+                &ResolutionInfo::create_bind_group_layout(wgpu_ctx),
+                &ViewportBindGroup::bind_group_layout(wgpu_ctx),
                 &RenderBindGroup::bind_group_layout(wgpu_ctx),
             ],
             push_constant_ranges: &[],
@@ -242,7 +244,8 @@ impl GpuResource for VItem2dDepthPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("VItem2d Pipeline Layout"),
             bind_group_layouts: &[
-                &CameraUniformsBindGroup::bind_group_layout(wgpu_ctx),
+                &ResolutionInfo::create_bind_group_layout(wgpu_ctx),
+                &ViewportBindGroup::bind_group_layout(wgpu_ctx),
                 &RenderBindGroup::bind_group_layout(wgpu_ctx),
             ],
             push_constant_ranges: &[],

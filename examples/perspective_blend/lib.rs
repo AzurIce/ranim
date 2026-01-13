@@ -23,7 +23,7 @@ fn perspective_blend(r: &mut RanimScene) {
     r.timeline_mut(r_cam).play(cam.show());
 
     // Create a cube
-    let side_length = 2.0;
+    let side_length = 4.0;
 
     let square_with_color = |color: color::AlphaColor<color::Srgb>| {
         VItem::from(Square::new(side_length).with(|square| {
@@ -45,27 +45,28 @@ fn perspective_blend(r: &mut RanimScene) {
         (r.insert(face.clone()), face)
     });
 
+    let frac = 3.0;
     let transform_fns: [&dyn Fn(&mut VItem); 6] = [
         &(|data| {
-            data.shift(DVec3::NEG_Y * side_length / 2.0)
+            data.shift(DVec3::NEG_Y * side_length / frac)
                 .rotate(std::f64::consts::PI / 2.0, DVec3::X);
         }),
         &(|data| {
-            data.shift(DVec3::X * side_length / 2.0)
+            data.shift(DVec3::X * side_length / frac)
                 .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
         }),
         &(|data| {
-            data.shift(DVec3::NEG_Z * side_length / 2.0);
+            data.shift(DVec3::NEG_Z * side_length / frac);
         }),
         &(|data| {
-            data.shift(DVec3::Y * side_length / 2.0)
+            data.shift(DVec3::Y * side_length / frac)
                 .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
         }),
         &(|data| {
-            data.shift(DVec3::Z * side_length / 2.0);
+            data.shift(DVec3::Z * side_length / frac);
         }),
         &(|data| {
-            data.shift(DVec3::NEG_X * side_length / 2.0)
+            data.shift(DVec3::NEG_X * side_length / frac)
                 .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
         }),
     ];

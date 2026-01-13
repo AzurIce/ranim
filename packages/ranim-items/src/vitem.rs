@@ -32,7 +32,7 @@ use ranim_core::{
 pub struct Plane {
     /// The origin of the plane.
     pub origin: DVec3,
-    /// The basis vectors of the plane.
+    /// The basis vectors of the plane. Normalized.
     pub basis: (DVec3, DVec3),
 }
 
@@ -62,6 +62,15 @@ impl BoundingBox for Plane {
 impl Shift for Plane {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.origin.shift(shift);
+        self
+    }
+}
+
+impl Rotate for Plane {
+    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
+        self.origin.rotate_by_anchor(angle, axis, anchor);
+        self.basis.0.rotate(angle, axis);
+        self.basis.1.rotate(angle, axis);
         self
     }
 }
@@ -128,7 +137,6 @@ impl BoundingBox for VItem {
 impl Shift for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
-        #[cfg(feature = "vitem2d")]
         self.plane.shift(shift);
         self
     }
@@ -137,6 +145,7 @@ impl Shift for VItem {
 impl Rotate for VItem {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         self.vpoints.rotate_by_anchor(angle, axis, anchor);
+        self.plane.rotate(angle, axis);
         self
     }
 }
@@ -238,14 +247,16 @@ impl VItem {
     }
 }
 
-/// See [`VItemPrimitive`].
 impl Extract for VItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         #[cfg(feature = "vitem2d")]
         buf.push(CoreItem::VItem2D(VItem2d {
             origin: self.plane.origin.as_vec3(),
-            basis: (self.plane.basis.0.as_vec3(), self.plane.basis.1.as_vec3()),
+            basis: (
+                self.plane.basis.0.as_vec3().normalize(),
+                self.plane.basis.1.as_vec3().normalize(),
+            ),
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),

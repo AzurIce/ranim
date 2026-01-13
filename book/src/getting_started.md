@@ -31,7 +31,6 @@ fn scene_name(r: &mut RanimScene) {
 - `#[scene]`：为场景函数生成一个对应的 `static <scene_name>_scene: &'static Scene`，包含了场景名称、函数指针、场景设置、输出设置（通过 `#[output]` 来设置）等信息。
   可以配置一些属性：
   - `#[scene(name = "...")]`：为场景指定一个名称，默认与函数名相同。
-  - `#[scene(frame_height = 8.0)]`：为场景指定一个默认的高度，默认值为 8.0。
   - `#[scene(clear_color = "#ffffffff")]`：为场景指定一个清除颜色，默认值为 `#333333ff`。
   - `#[output]`：为场景添加一个输出：
     输出的文件名 `<output_name>` 会被命名为 `<scene_name>_<width>x<height>_<frame_rate>`。

@@ -12,6 +12,7 @@ pub mod point;
 /// Rgba
 pub mod rgba;
 /// Vpoint
+#[deprecated]
 pub mod vpoint;
 /// Width
 pub mod width;
