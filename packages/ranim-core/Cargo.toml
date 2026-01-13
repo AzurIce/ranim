@@ -8,11 +8,12 @@ repository.workspace = true
 
 [dependencies]
 # ranim-macros.workspace = true
+approx = "0.5.1"
 dyn-clone = "1.0.20"
 inventory = "0.3.21"
 tracing.workspace = true
 itertools.workspace = true
-glam = { workspace = true, features = ["bytemuck"] }
+glam = { workspace = true, features = ["approx", "bytemuck"] }
 bytemuck = { workspace = true, features = ["derive"] }
 derive_more = { workspace = true, features = [
   "deref_mut",

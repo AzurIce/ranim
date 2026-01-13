@@ -112,10 +112,6 @@ pub fn find_scene(name: &str) -> Option<Scene> {
 /// Scene config
 #[derive(Debug, Clone)]
 pub struct SceneConfig {
-    /// The height of the frame
-    ///
-    /// This will be the coordinate in the scene. The width is calculated by the aspect ratio from [`Output::width`] and [`Output::height`].
-    pub frame_height: f64,
     /// The clear color
     pub clear_color: &'static str,
 }
@@ -123,7 +119,6 @@ pub struct SceneConfig {
 impl Default for SceneConfig {
     fn default() -> Self {
         Self {
-            frame_height: 8.0,
             clear_color: "#333333ff",
         }
     }
