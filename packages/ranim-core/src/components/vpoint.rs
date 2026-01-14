@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use derive_more::{Deref, DerefMut};
-use glam::{DVec2, DVec3};
+use glam::DVec3;
 use itertools::Itertools;
 
 use crate::traits::*;

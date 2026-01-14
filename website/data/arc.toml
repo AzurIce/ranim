@@ -7,7 +7,7 @@ use ranim::{
     color,
     color::HueDirection,
     glam::dvec2,
-    items::vitem::{Group, geometry::Arc},
+    items::vitem::geometry::Arc,
     prelude::*,
 };
 
@@ -47,7 +47,7 @@ pub fn arc(r: &mut RanimScene) {
                     .put_center_on(offset.extend(0.0));
             })
         })
-        .collect::<Group<_>>();
+        .collect::<Vec<_>>();
     let r_arcs = r.new_timeline();
 
     r.timeline_mut(r_arcs)
@@ -60,7 +60,7 @@ pub fn arc(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "4ba19703b69666cb4bd6c61ca67e542b5ed35fa5"
+hash = "68450c437bf41f7fee8483ede64a976b7e5d9fb6"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

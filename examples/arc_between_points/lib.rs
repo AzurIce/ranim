@@ -4,7 +4,7 @@ use ranim::{
     color,
     color::HueDirection,
     glam::{DMat2, dvec2},
-    items::vitem::{Group, geometry::ArcBetweenPoints},
+    items::vitem::geometry::ArcBetweenPoints,
     prelude::*,
 };
 
@@ -42,7 +42,7 @@ fn arc_between_points(r: &mut RanimScene) {
                 },
             )
         })
-        .collect::<Group<_>>();
+        .collect::<Vec<_>>();
     let r_arcs = r.new_timeline();
 
     r.timeline_mut(r_arcs)

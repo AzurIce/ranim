@@ -9,7 +9,7 @@ use ranim::{
     color::palettes::manim,
     core::{Extract, components::width::Width},
     items::vitem::{
-        Group, VItem,
+        VItem,
         geometry::{Circle, Square},
         svg::SvgItem,
         typst::typst_svg,
@@ -32,7 +32,7 @@ fn ranim_text(r: &mut RanimScene) {
             .scale_to_with_stroke(ScaleHint::PorportionalY(3.6))
             .put_center_on(DVec3::ZERO);
     });
-    let _r_texts = Group::<VItem>::from(text)
+    let _r_texts = Vec::<VItem>::from(text)
         .into_iter()
         .map(VisualVItem)
         .map(|item| r.insert(item))

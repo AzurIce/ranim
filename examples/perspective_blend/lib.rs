@@ -3,9 +3,7 @@ use ranim::{
     color,
     color::palettes::manim,
     glam::DVec3,
-    items::{
-        vitem::{VItem, geometry::Square},
-    },
+    items::vitem::{VItem, geometry::Square},
     prelude::*,
     utils::rate_functions::linear,
 };
@@ -44,7 +42,7 @@ fn perspective_blend(r: &mut RanimScene) {
         (r.insert(face.clone()), face)
     });
 
-    let frac = 3.0;
+    let frac = 2.0;
     let transform_fns: [&dyn Fn(&mut VItem); 6] = [
         &(|data| {
             data.shift(DVec3::NEG_Y * side_length / frac)

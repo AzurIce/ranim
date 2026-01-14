@@ -267,6 +267,9 @@ fn fs_main(@builtin(position) frag_pos: vec4<f32>, @location(0) pos: vec2<f32>) 
     }
 
     discard;
+    out.color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    out.depth = 1.0;
+    return out;
 }
 
 @fragment

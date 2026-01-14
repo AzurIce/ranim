@@ -7,7 +7,7 @@ use ranim::{
     anims::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
     color::palettes::manim,
     items::vitem::{
-        Group, VItem,
+        VItem,
         geometry::{Polygon, Rectangle, Square},
         svg::SvgItem,
         typst::typst_svg,
@@ -68,7 +68,7 @@ fn ranim_logo(r: &mut RanimScene) {
     let logo = build_logo(logo_width);
     let mut r_logo = logo.map(|item| (r.insert(item.clone()), item));
 
-    let mut ranim_text = Group::<VItem>::from(
+    let mut ranim_text = Vec::<VItem>::from(
         SvgItem::new(typst_svg(
             r#"
 #align(center)[

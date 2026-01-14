@@ -10,7 +10,7 @@ use ranim::{
     anims::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
     color::palettes::manim,
     items::vitem::{
-        Group, VItem,
+        VItem,
         geometry::{Polygon, Rectangle, Square},
         svg::SvgItem,
         typst::typst_svg,
@@ -71,7 +71,7 @@ fn ranim_logo(r: &mut RanimScene) {
     let logo = build_logo(logo_width);
     let mut r_logo = logo.map(|item| (r.insert(item.clone()), item));
 
-    let mut ranim_text = Group::<VItem>::from(
+    let mut ranim_text = Vec::<VItem>::from(
         SvgItem::new(typst_svg(
             r#"
 #align(center)[
@@ -147,7 +147,7 @@ fn ranim_logo(r: &mut RanimScene) {
         }));
 }
 ```"""
-hash = "b9f5745499bc0b29d12741303c8c43463a218846"
+hash = "ff26d43257a1ce0ca2a543bf3128af344d1d8b88"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
 wasm = true

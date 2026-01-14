@@ -7,7 +7,6 @@ use ranim::{
     color::palettes::manim,
     glam::DVec3,
     items::{
-        Group,
         vitem::{VItem, geometry::Square},
     },
     prelude::*,
@@ -26,7 +25,7 @@ fn perspective_blend(r: &mut RanimScene) {
     r.timeline_mut(r_cam).play(cam.show());
 
     // Create a cube
-    let side_length = 2.0;
+    let side_length = 4.0;
 
     let square_with_color = |color: color::AlphaColor<color::Srgb>| {
         VItem::from(Square::new(side_length).with(|square| {
@@ -48,27 +47,28 @@ fn perspective_blend(r: &mut RanimScene) {
         (r.insert(face.clone()), face)
     });
 
+    let frac = 3.0;
     let transform_fns: [&dyn Fn(&mut VItem); 6] = [
         &(|data| {
-            data.shift(DVec3::NEG_Y * side_length / 2.0)
+            data.shift(DVec3::NEG_Y * side_length / frac)
                 .rotate(std::f64::consts::PI / 2.0, DVec3::X);
         }),
         &(|data| {
-            data.shift(DVec3::X * side_length / 2.0)
+            data.shift(DVec3::X * side_length / frac)
                 .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
         }),
         &(|data| {
-            data.shift(DVec3::NEG_Z * side_length / 2.0);
+            data.shift(DVec3::NEG_Z * side_length / frac);
         }),
         &(|data| {
-            data.shift(DVec3::Y * side_length / 2.0)
+            data.shift(DVec3::Y * side_length / frac)
                 .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
         }),
         &(|data| {
-            data.shift(DVec3::Z * side_length / 2.0);
+            data.shift(DVec3::Z * side_length / frac);
         }),
         &(|data| {
-            data.shift(DVec3::NEG_X * side_length / 2.0)
+            data.shift(DVec3::NEG_X * side_length / frac)
                 .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
         }),
     ];
@@ -83,7 +83,7 @@ fn perspective_blend(r: &mut RanimScene) {
         });
 
     let faces = square_faces.map(|(_, face)| face);
-    let mut faces = Group(faces.to_vec());
+    let mut faces = faces.to_vec();
 
     let r_faces = r.new_timeline();
     r.timelines_mut().sync(); // TODO: make this better
@@ -108,7 +108,7 @@ fn perspective_blend(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "bb5b1e934eba90997bdd776af0e92fdc4e7c4b0e"
+hash = "fb87097355a54ad662766a188be9c561c29d18de"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

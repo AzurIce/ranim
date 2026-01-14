@@ -1,12 +1,13 @@
 //! Quadratic Bezier Concatenated Item
 //!
-//! VItem itself is represented by 3d points, but with an additional quaternion to represent the projection plane's rotation.
+//! VItem itself is composed with 3d bezier path segments, but when *ranim* renders VItem,
+//! it assumes that all points are in the same plane to calculate depth information.
+//! Which means that ranim actually renders a **projection** of the VItem onto a plane.
 //!
-//! When ranim renders VItem, it assumes that all points are in the same plane to calculate
-//! depth information. See `ranim_render`'s documentation for more details.
+//! The projection is defined with [`Proj`], which is basically a [`glam::DQuat`].
+//! The projection target plane has the initial basis and normal defined as `(DVec3::X, DVec3::Y)` and `DVec3::Z` respectively, and it contains the first point of the VItem.
 //!
-//!
-//!
+//! So the normal way to use a [`VItem`] is to make sure that all points are in the same plane, at this time the **projection** is equivalent to the VItem itself. Or you may break this, and let ranim renders the **projection** of it.
 // pub mod arrow;
 /// Geometry items
 pub mod geometry;
@@ -17,12 +18,10 @@ pub mod typst;
 // pub mod line;
 
 use color::{AlphaColor, Srgb, palette::css};
-use derive_more::{Deref, DerefMut};
 use glam::{DQuat, DVec3, Vec3, Vec4, vec3, vec4};
 use ranim_core::core_item::CoreItem;
 use ranim_core::core_item::vitem_2d::VItem2d;
 use ranim_core::traits::Anchor;
-use ranim_core::utils::resize_preserving_order_with_repeated_indices;
 use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
@@ -31,32 +30,47 @@ use ranim_core::{
     traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
 
+/// The projection of a [`VItem`].
 #[derive(Default, Debug, Clone, Copy, PartialEq, ranim_macros::Interpolatable)]
 pub struct Proj {
     quat: DQuat,
 }
 
+impl From<DQuat> for Proj {
+    fn from(value: DQuat) -> Self {
+        Self { quat: value }
+    }
+}
+
 impl Proj {
+    /// The initial basis of the projection target plane.
     pub const INITIAL_BASIS: (DVec3, DVec3) = (DVec3::X, DVec3::Y);
+    /// The initial normal of the projection target plane.
     pub const INITIAL_NORMAL: DVec3 = DVec3::Z;
+
+    /// Get the normal of the projection target plane.
     #[inline]
     pub fn normal(&self) -> DVec3 {
         self.quat * Proj::INITIAL_NORMAL
     }
+    /// Get the basis_u of the projection target plane.
     #[inline]
     pub fn basis_u(&self) -> DVec3 {
         self.quat * Proj::INITIAL_BASIS.0
     }
+    /// Get the basis_v of the projection target plane.
     #[inline]
     pub fn basis_v(&self) -> DVec3 {
         self.quat * Proj::INITIAL_BASIS.1
     }
+    /// Get the basis of the projection target plane.
     #[inline]
     pub fn basis(&self) -> (DVec3, DVec3) {
         (self.basis_u(), self.basis_v())
     }
+    /// Rotate the projection.
     pub fn rotate(&mut self, angle: f64, axis: DVec3) {
-        self.quat = self.quat * DQuat::from_axis_angle(axis, angle);
+        self.quat = DQuat::from_axis_angle(axis, angle) * self.quat;
     }
 }
 
@@ -157,6 +171,7 @@ impl VItem {
     pub fn get_anchor(&self, idx: usize) -> Option<&DVec3> {
         self.vpoints.get(idx * 2)
     }
+    /// Set the projection of the VItem
     pub fn set_proj(&mut self, proj: Proj) {
         self.proj = proj;
     }
@@ -185,10 +200,14 @@ impl VItem {
 
     pub(crate) fn get_render_points(&self) -> Vec<Vec3> {
         let (u, v) = self.proj.basis();
+        let origin = self.vpoints.first().unwrap();
         self.vpoints
             .iter()
             .zip(self.vpoints.get_closepath_flags().iter())
-            .map(|(p, f)| vec3(p.dot(u) as f32, p.dot(v) as f32, if *f { 1.0 } else { 0.0 }))
+            .map(|(p, f)| {
+                let p = p - origin;
+                vec3(p.dot(u) as f32, p.dot(v) as f32, if *f { 1.0 } else { 0.0 })
+            })
             .collect()
     }
     /// Put start and end on
@@ -202,11 +221,8 @@ impl Extract for VItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         buf.push(CoreItem::VItem2D(VItem2d {
-            origin: Vec3::ZERO,
-            basis: (
-                self.proj.basis_u().as_vec3().normalize(),
-                self.proj.basis_v().as_vec3().normalize(),
-            ),
+            origin: self.vpoints.first().unwrap().as_vec3(),
+            basis: (self.proj.basis_u().as_vec3(), self.proj.basis_v().as_vec3()),
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
@@ -334,78 +350,5 @@ impl StrokeWidth for VItem {
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         f(self.stroke_widths.as_mut());
         self
-    }
-}
-
-/// A Group of type `T`.
-///
-/// Just like a [`Vec`]
-#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut)]
-pub struct Group<T: Opacity>(pub Vec<T>);
-
-impl<T: Opacity> IntoIterator for Group<T> {
-    type IntoIter = std::vec::IntoIter<T>;
-    type Item = T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl<'a, T: Opacity> IntoIterator for &'a Group<T> {
-    type IntoIter = std::slice::Iter<'a, T>;
-    type Item = &'a T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl<'a, T: Opacity> IntoIterator for &'a mut Group<T> {
-    type IntoIter = std::slice::IterMut<'a, T>;
-    type Item = &'a mut T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter_mut()
-    }
-}
-
-impl<T: Opacity> FromIterator<T> for Group<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self(Vec::from_iter(iter))
-    }
-}
-
-impl<T: Interpolatable + Opacity> Interpolatable for Group<T> {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        self.into_iter()
-            .zip(target)
-            .map(|(a, b)| a.lerp(b, t))
-            .collect()
-    }
-}
-
-impl<T: Opacity + Alignable + Clone> Alignable for Group<T> {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
-    }
-    fn align_with(&mut self, other: &mut Self) {
-        let len = self.len().max(other.len());
-
-        let transparent_repeated = |items: &mut Vec<T>, repeat_idxs: Vec<usize>| {
-            for idx in repeat_idxs {
-                items[idx].set_opacity(0.0);
-            }
-        };
-        if self.len() != len {
-            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&self.0, len);
-            transparent_repeated(&mut items, idxs);
-            self.0 = items;
-        }
-        if other.len() != len {
-            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&other.0, len);
-            transparent_repeated(&mut items, idxs);
-            other.0 = items;
-        }
-        self.iter_mut()
-            .zip(other)
-            .for_each(|(a, b)| a.align_with(b));
     }
 }

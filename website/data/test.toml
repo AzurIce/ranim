@@ -17,12 +17,9 @@ use ranim::{
         css,
         manim::{self, BLUE_C, RED_C},
     },
-    items::{
-        Group,
-        vitem::{
-            self, VItem,
-            geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
-        },
+    items::vitem::{
+        self, VItem,
+        geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
     },
     prelude::*,
 };
@@ -39,7 +36,7 @@ fn test(r: &mut RanimScene) {
             let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
             ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
         })
-        .collect::<Group<_>>();
+        .collect::<Vec<_>>();
     let r_arcs = r.insert(arcs);
 
     // text.set_stroke_color(manim::RED_C)
@@ -58,7 +55,7 @@ fn test(r: &mut RanimScene) {
     r.timelines_mut().forward(1.0);
 }
 ```"""
-hash = "f94c6b4c2deaa0b7296764017ac38373745a2802"
+hash = "d5dcf759144810caef40732c17ca507ac564d3e3"
 preview_imgs = []
 output_files = []
 wasm = false
