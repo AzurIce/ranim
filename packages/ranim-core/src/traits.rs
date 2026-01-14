@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, ops::Range};
 
 use color::{AlphaColor, ColorSpace, Srgb};
-use glam::{DAffine2, DMat3, DMat4, DVec2, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
+use glam::{DAffine2, DMat3, DMat4, DQuat, DVec2, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
 use itertools::Itertools;
 use tracing::warn;
 
@@ -37,6 +37,12 @@ impl Interpolatable for DVec3 {
 impl Interpolatable for DVec2 {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         self + (target - self) * t
+    }
+}
+
+impl Interpolatable for DQuat {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        self.slerp(*target, t)
     }
 }
 

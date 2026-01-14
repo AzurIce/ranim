@@ -1,4 +1,11 @@
-//! Quadratic Bezier Concatenated Item on a 2D [`Plane`]
+//! Quadratic Bezier Concatenated Item
+//!
+//! VItem itself is represented by 3d points, but with an additional quaternion to represent the projection plane's rotation.
+//!
+//! When ranim renders VItem, it assumes that all points are in the same plane to calculate
+//! depth information. See `ranim_render`'s documentation for more details.
+//!
+//!
 //!
 // pub mod arrow;
 /// Geometry items
@@ -11,24 +18,47 @@ pub mod typst;
 
 use color::{AlphaColor, Srgb, palette::css};
 use derive_more::{Deref, DerefMut};
-use glam::{DVec3, Vec4, vec4};
-#[cfg(feature = "vitem2d")]
-use glam::{Vec3, vec3};
+use glam::{DQuat, DVec3, Vec3, Vec4, vec3, vec4};
 use ranim_core::core_item::CoreItem;
-#[cfg(not(feature = "vitem2d"))]
-use ranim_core::core_item::vitem::VItemPrimitive;
-#[cfg(feature = "vitem2d")]
 use ranim_core::core_item::vitem_2d::VItem2d;
 use ranim_core::traits::Anchor;
 use ranim_core::utils::resize_preserving_order_with_repeated_indices;
 use ranim_core::{Extract, color, glam};
 
-use crate::Plane;
 use ranim_core::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
     prelude::{Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, StrokeWidth},
     traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, ranim_macros::Interpolatable)]
+pub struct Proj {
+    quat: DQuat,
+}
+
+impl Proj {
+    pub const INITIAL_BASIS: (DVec3, DVec3) = (DVec3::X, DVec3::Y);
+    pub const INITIAL_NORMAL: DVec3 = DVec3::Z;
+    #[inline]
+    pub fn normal(&self) -> DVec3 {
+        self.quat * Proj::INITIAL_NORMAL
+    }
+    #[inline]
+    pub fn basis_u(&self) -> DVec3 {
+        self.quat * Proj::INITIAL_BASIS.0
+    }
+    #[inline]
+    pub fn basis_v(&self) -> DVec3 {
+        self.quat * Proj::INITIAL_BASIS.1
+    }
+    #[inline]
+    pub fn basis(&self) -> (DVec3, DVec3) {
+        (self.basis_u(), self.basis_v())
+    }
+    pub fn rotate(&mut self, angle: f64, axis: DVec3) {
+        self.quat = self.quat * DQuat::from_axis_angle(axis, angle);
+    }
+}
 
 /// A vectorized item.
 ///
@@ -51,8 +81,10 @@ use ranim_core::{
 ///
 #[derive(Debug, Clone, PartialEq)]
 pub struct VItem {
-    /// The plane this vitem is on
-    pub plane: Plane,
+    /// The projection info.
+    ///
+    /// See [`Proj`]
+    pub proj: Proj,
     /// vpoints data
     pub vpoints: VPointComponentVec,
     /// stroke widths
@@ -79,7 +111,6 @@ impl BoundingBox for VItem {
 impl Shift for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
-        self.plane.shift(shift);
         self
     }
 }
@@ -87,7 +118,7 @@ impl Shift for VItem {
 impl Rotate for VItem {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         self.vpoints.rotate_by_anchor(angle, axis, anchor);
-        self.plane.rotate(angle, axis);
+        self.proj.rotate(angle, axis);
         self
     }
 }
@@ -100,9 +131,6 @@ impl Scale for VItem {
 }
 
 /// Default stroke width
-#[cfg(not(feature = "vitem2d"))]
-pub use ranim_core::core_item::vitem::DEFAULT_STROKE_WIDTH;
-#[cfg(feature = "vitem2d")]
 pub use ranim_core::core_item::vitem_2d::DEFAULT_STROKE_WIDTH;
 
 impl VItem {
@@ -129,13 +157,16 @@ impl VItem {
     pub fn get_anchor(&self, idx: usize) -> Option<&DVec3> {
         self.vpoints.get(idx * 2)
     }
+    pub fn set_proj(&mut self, proj: Proj) {
+        self.proj = proj;
+    }
     /// Construct a [`VItem`] form vpoints
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
         let stroke_widths = vec![DEFAULT_STROKE_WIDTH; vpoints.len().div_ceil(2)];
         let stroke_rgbas = vec![vec4(1.0, 1.0, 1.0, 1.0); vpoints.len().div_ceil(2)];
         let fill_rgbas = vec![vec4(0.0, 0.0, 0.0, 0.0); vpoints.len().div_ceil(2)];
         Self {
-            plane: Plane::default(),
+            proj: Proj::default(),
             vpoints: VPointComponentVec(vpoints.into()),
             stroke_rgbas: stroke_rgbas.into(),
             stroke_widths: stroke_widths.into(),
@@ -152,34 +183,12 @@ impl VItem {
         self.stroke_widths.resize_with_last(len.div_ceil(2));
     }
 
-    #[cfg(not(feature = "vitem2d"))]
-    pub(crate) fn get_render_points(&self) -> Vec<Vec4> {
-        self.vpoints
-            .iter()
-            .zip(self.vpoints.get_closepath_flags().iter())
-            .map(|(p, f)| {
-                vec4(
-                    p.x as f32,
-                    p.y as f32,
-                    p.z as f32,
-                    if *f { 1.0 } else { 0.0 },
-                )
-            })
-            .collect()
-    }
-    #[cfg(feature = "vitem2d")]
     pub(crate) fn get_render_points(&self) -> Vec<Vec3> {
+        let (u, v) = self.proj.basis();
         self.vpoints
             .iter()
             .zip(self.vpoints.get_closepath_flags().iter())
-            .map(|(p, f)| {
-                let v = *p - self.plane.origin;
-                vec3(
-                    v.dot(self.plane.basis.0) as f32,
-                    v.dot(self.plane.basis.1) as f32,
-                    if *f { 1.0 } else { 0.0 },
-                )
-            })
+            .map(|(p, f)| vec3(p.dot(u) as f32, p.dot(v) as f32, if *f { 1.0 } else { 0.0 }))
             .collect()
     }
     /// Put start and end on
@@ -192,20 +201,12 @@ impl VItem {
 impl Extract for VItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        #[cfg(feature = "vitem2d")]
         buf.push(CoreItem::VItem2D(VItem2d {
-            origin: self.plane.origin.as_vec3(),
+            origin: Vec3::ZERO,
             basis: (
-                self.plane.basis.0.as_vec3().normalize(),
-                self.plane.basis.1.as_vec3().normalize(),
+                self.proj.basis_u().as_vec3().normalize(),
+                self.proj.basis_v().as_vec3().normalize(),
             ),
-            points2d: self.get_render_points(),
-            fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
-            stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
-            stroke_widths: self.stroke_widths.iter().cloned().collect::<Vec<_>>(),
-        }));
-        #[cfg(not(feature = "vitem2d"))]
-        buf.push(CoreItem::VItemPrimitive(VItemPrimitive {
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
@@ -236,13 +237,13 @@ impl Alignable for VItem {
 
 impl Interpolatable for VItem {
     fn lerp(&self, target: &Self, t: f64) -> Self {
-        let plane = self.plane.lerp(&target.plane, t);
+        let proj = self.proj.lerp(&target.proj, t);
         let vpoints = self.vpoints.lerp(&target.vpoints, t);
         let stroke_rgbas = self.stroke_rgbas.lerp(&target.stroke_rgbas, t);
         let stroke_widths = self.stroke_widths.lerp(&target.stroke_widths, t);
         let fill_rgbas = self.fill_rgbas.lerp(&target.fill_rgbas, t);
         Self {
-            plane,
+            proj,
             vpoints,
             stroke_widths,
             stroke_rgbas,
@@ -266,7 +267,7 @@ impl Partial for VItem {
         let stroke_widths = self.stroke_widths.get_partial(range.clone());
         let fill_rgbas = self.fill_rgbas.get_partial(range.clone());
         Self {
-            plane: self.plane.clone(),
+            proj: self.proj,
             vpoints,
             stroke_widths,
             stroke_rgbas,
@@ -283,7 +284,7 @@ impl Partial for VItem {
 impl Empty for VItem {
     fn empty() -> Self {
         Self {
-            plane: Plane::default(),
+            proj: Proj::default(),
             vpoints: VPointComponentVec(vec![DVec3::ZERO; 3].into()),
             stroke_widths: vec![0.0, 0.0].into(),
             stroke_rgbas: vec![Vec4::ZERO; 2].into(),

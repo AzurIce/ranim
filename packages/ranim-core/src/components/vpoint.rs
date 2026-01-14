@@ -14,7 +14,6 @@ use super::ComponentVec;
 /// A point in bezier path.
 ///
 /// `x`, `y`
-pub struct VPoint(DVec2);
 
 /// VPointComponentVec is used to represent a bunch of quad bezier paths.
 ///

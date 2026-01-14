@@ -9,9 +9,6 @@ publish = false
 [lib]
 bench = false
 
-[features]
-vitem2d = ["ranim/vitem2d"]
-
 [dependencies]
 itertools.workspace = true
 criterion = { version = "0.8.1", features = ["html_reports"] }

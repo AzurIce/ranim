@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// Default vitem stroke width
-pub const DEFAULT_STROKE_WIDTH: f32 = 2.0;
+pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
 
 #[derive(Debug, Clone, PartialEq)]
 /// A primitive for rendering a vitem.
