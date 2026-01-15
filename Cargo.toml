@@ -35,7 +35,7 @@ ranim-macros = { path = "packages/ranim-macros", version = "0.1.5" }
 ranim-app = { path = "packages/ranim-app", version = "0.1.5" }
 ranim-render = { path = "packages/ranim-render", version = "0.1.5" }
 wgpu-profiler = { version = "0.25.0", features = ["puffin"] }
-wasm-bindgen = "0.2.106"
+wasm-bindgen = "0.2.108"
 glam = "0.30.9"
 tracing = "0.1.43"
 tracing-indicatif = "0.3.14"
