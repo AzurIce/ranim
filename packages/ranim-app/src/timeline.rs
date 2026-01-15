@@ -7,12 +7,12 @@ use ranim_core::{TimelineInfo, color::palettes::manim};
 
 use super::TimelineInfoState;
 
-pub(super) struct TimelineState {
-    pub(super) total_sec: f64,
-    pub(super) current_sec: f64,
-    pub(super) width_sec: f64,
-    pub(super) offset_points: f32,
-    pub(super) timeline_infos: Vec<TimelineInfo>,
+pub struct TimelineState {
+    pub total_sec: f64,
+    pub current_sec: f64,
+    pub width_sec: f64,
+    pub offset_points: f32,
+    pub timeline_infos: Vec<TimelineInfo>,
 }
 
 #[allow(unused)]
