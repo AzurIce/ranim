@@ -139,12 +139,11 @@ impl RenderTextures {
         let depth_stencil_view =
             depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let depth_texture_view =
-            depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor {
-                label: Some("Depth Texture View"),
-                aspect: wgpu::TextureAspect::DepthOnly,
-                ..Default::default()
-            });
+        let depth_texture_view = depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("Depth Texture View"),
+            aspect: wgpu::TextureAspect::DepthOnly,
+            ..Default::default()
+        });
 
         Self {
             render_texture,

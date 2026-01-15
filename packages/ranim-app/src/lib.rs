@@ -1,5 +1,5 @@
-mod timeline;
 mod depth_visual;
+mod timeline;
 
 use async_channel::{Receiver, Sender, unbounded};
 use depth_visual::DepthVisualPipeline;
@@ -13,7 +13,6 @@ use ranim_render::utils::WgpuContext;
 use timeline::TimelineState;
 use tracing::{error, info};
 use web_time::Instant;
-use wgpu;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -199,7 +198,8 @@ impl RanimApp {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             });
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -247,11 +247,11 @@ impl RanimApp {
                 self.depth_visual_pipeline.as_ref(),
                 self.depth_visual_view.as_ref(),
             ) {
-                let mut encoder = ctx
-                    .device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                        label: Some("Depth Visual Encoder"),
-                    });
+                let mut encoder =
+                    ctx.device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                            label: Some("Depth Visual Encoder"),
+                        });
 
                 let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("Depth Visual Bind Group"),
@@ -486,7 +486,7 @@ pub fn preview_scene(scene: &Scene) {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn preview_scene_with_name(scene: &Scene, name: &str) {
-    let mut app = RanimApp::new(scene.constructor.clone(), name.to_string());
+    let mut app = RanimApp::new(scene.constructor, name.to_string());
     app.set_clear_color_str(scene.config.clear_color);
     run_app(
         app,

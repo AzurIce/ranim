@@ -1,6 +1,5 @@
 use ranim_render::utils::WgpuContext;
 use std::borrow::Cow;
-use wgpu;
 
 pub struct DepthVisualPipeline {
     pub pipeline: wgpu::RenderPipeline,
@@ -13,7 +12,9 @@ impl DepthVisualPipeline {
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Depth Visual Shader"),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("./shaders/depth_visual.wgsl"))),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
+                "./shaders/depth_visual.wgsl"
+            ))),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
