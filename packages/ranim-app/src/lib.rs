@@ -61,6 +61,8 @@ pub struct RanimApp {
     renderer: Option<Renderer>,
     texture_id: Option<egui::TextureId>,
     wgpu_ctx: Option<WgpuContext>,
+    last_render_time: Option<std::time::Duration>,
+    last_eval_time: Option<std::time::Duration>,
 }
 
 impl RanimApp {
@@ -91,6 +93,8 @@ impl RanimApp {
             renderer: None,
             texture_id: None,
             wgpu_ctx: None,
+            last_render_time: None,
+            last_eval_time: None,
         }
     }
 
@@ -179,10 +183,14 @@ impl RanimApp {
             self.need_eval = false;
             self.last_sec = self.timeline_state.current_sec;
 
+            let start_eval = Instant::now();
             self.store
                 .update(self.timeline.eval_at_sec(self.timeline_state.current_sec));
+            self.last_eval_time = Some(start_eval.elapsed());
 
+            let start = Instant::now();
             renderer.render_store_with_pool(ctx, self.clear_color, &self.store, &mut self.pool);
+            self.last_render_time = Some(start.elapsed());
             self.pool.clean();
         }
     }
@@ -206,6 +214,32 @@ impl eframe::App for RanimApp {
         }
 
         self.render_animation();
+
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.heading(&self.title);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let dark_mode = ui.visuals().dark_mode;
+                    let button_text = if dark_mode { "☀ Light" } else { "🌙 Dark" };
+                    if ui.button(button_text).clicked() {
+                        if dark_mode {
+                            ctx.set_visuals(egui::Visuals::light());
+                        } else {
+                            ctx.set_visuals(egui::Visuals::dark());
+                        }
+                    }
+
+                    if let Some(duration) = self.last_render_time {
+                        ui.label(format!("Render: {:.2}ms", duration.as_secs_f64() * 1000.0));
+                        ui.separator();
+                    }
+                    if let Some(duration) = self.last_eval_time {
+                        ui.label(format!("Eval: {:.2}ms", duration.as_secs_f64() * 1000.0));
+                        ui.separator();
+                    }
+                });
+            });
+        });
 
         egui::TopBottomPanel::bottom("bottom_panel")
             .resizable(true)
