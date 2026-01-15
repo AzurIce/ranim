@@ -1,28 +1,44 @@
+@group(0) @binding(0) var<uniform> frame: vec3<u32>;
+@group(0) @binding(1) var<storage, read_write> pixel_count: array<atomic<u32>>;
+@group(0) @binding(2) var<storage, read_write> oit_colors: array<u32>;
+@group(0) @binding(3) var<storage, read_write> oit_depths: array<f32>;
 struct CameraUniforms {
     proj_mat: mat4x4<f32>,
     view_mat: mat4x4<f32>,
     half_frame_size: vec2<f32>,
 }
-@group(0) @binding(0) var<uniform> cam_uniforms : CameraUniforms;
+@group(1) @binding(0) var<uniform> cam_uniforms : CameraUniforms;
 
-@group(1) @binding(0) var<storage> points: array<vec4<f32>>;
-@group(1) @binding(1) var<storage> fill_rgbas: array<vec4<f32>>;
-@group(1) @binding(2) var<storage> stroke_rgbas: array<vec4<f32>>;
-@group(1) @binding(3) var<storage> stroke_widths: array<f32>;
+fn pack_color(color: vec4<f32>) -> u32 {
+    let c = vec4<u32>(color * 255.0);
+    return (c.r) | (c.g << 8u) | (c.b << 16u) | (c.a << 24u);
+}
+
+@group(2) @binding(0) var<storage> points: array<vec4<f32>>; // x, y, is_closed, padding
+@group(2) @binding(1) var<storage> fill_rgbas: array<vec4<f32>>;
+@group(2) @binding(2) var<storage> stroke_rgbas: array<vec4<f32>>;
+@group(2) @binding(3) var<storage> stroke_widths: array<f32>;
 struct ClipBox {
     min_x: i32,
     max_x: i32,
     min_y: i32,
     max_y: i32,
-    max_w:i32,
+    max_w: i32,
 }
-@group(1) @binding(4) var<storage> clip_box: ClipBox;
+@group(2) @binding(4) var<storage> clip_box: ClipBox;
+
+struct Plane {
+    origin: vec3<f32>,
+    basis_u: vec3<f32>,
+    basis_v: vec3<f32>,
+}
+@group(2) @binding(5) var<uniform> plane: Plane;
 
 fn point(idx: u32) -> vec2<f32> {
     return points[idx].xy;
 }
 fn is_closed(idx: u32) -> bool {
-    return bool(points[idx].w);
+    return bool(points[idx].z);
 }
 
 struct SubpathAttr {
@@ -145,7 +161,6 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
         let c = point(i + 2u);
         if length(b - a) == 0.0 {
             attr.end_idx = i;
-            // attr.debug = vec4(0.0, 0.5, 0.5, 1.0);
             break;
         }
 
@@ -153,7 +168,6 @@ fn get_subpath_attr(pos: vec2<f32>, start_idx: u32) -> SubpathAttr {
         let v2 = normalize(c - b);
 
         let is_line = abs(cross_2d(v1, v2)) < 0.0001 && dot(v1, v2) > 0.0;
-        // let is_line = true;
         let dist = select(distance_bezier(pos, a, b, c), distance_line(pos, a, c), is_line);
         if dist < attr.d {
             attr.d = dist;
@@ -186,54 +200,88 @@ fn render(pos: vec2<f32>) -> vec4<f32> {
     }
 
     let sgn_d = sgn * d;
-    // return vec4(vec3(d), 1.0);
-    // return vec4(vec3(sgn), 1.0);
-    // return vec4(vec3(sgn_d), 1.0);
 
     let e = point(idx + 1u).xy - point(idx).xy;
     let w = pos.xy - point(idx).xy;
     let ratio = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
     let anchor_index = idx / 2;
 
-    // TODO: Antialias
-    let antialias_radius = 0.015 / 2.0;
+    // TODO: Antialias - this depends on screen space derivative?
+    // Since we are in local space, we need to know the pixel scale.
+    // dpdx and dpdy can help.
+    let antialias_radius = 0.015 / 4.0; // Fixed for now, should use fwidth
+    // Antialias using screen space derivative of the coordinate system
+    // We use the gradient of 'pos' instead of 'd' because 'd' has discontinuities
+    // at voronoi boundaries (subpath joins), causing artifacts/striations when using fwidth(d).
+    // let dist_grad = max(length(dpdx(pos)), length(dpdy(pos)));
+    // let dist_grad = length(fwidth(pos));
+    // let antialias_radius = dist_grad * 0.75;
+
     var fill_rgba: vec4<f32> = select(vec4(0.0), mix(fill_rgbas[anchor_index], fill_rgbas[anchor_index + 1], ratio), is_closed(idx));
     fill_rgba.a *= smoothstep(1.0, -1.0, (sgn_d) / antialias_radius);
-    // let fade = select(
-    //     smoothstep(1.0, -1.0, (sgn_d) / (antialias_radius / 8.0)), // 内部：完全不透明
-    //     smoothstep(1.0, -1.0, (sgn_d) / antialias_radius), // 外部：渐变透明
-    //     sgn_d > 0.0
-    // );
-    // fill_rgba.a *= fade;
 
-    let stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
+    var stroke_width = mix(stroke_widths[anchor_index], stroke_widths[anchor_index + 1], ratio);
+    // stroke_width = stroke_width * dist_grad;
+    // stroke_width = stroke_width * 100.0;
     var stroke_rgba: vec4<f32> = mix(stroke_rgbas[anchor_index], stroke_rgbas[anchor_index + 1], ratio);
     stroke_rgba.a *= smoothstep(1.0, -1.0, (d - stroke_width) / antialias_radius);
 
     var f_color = blend_color(stroke_rgba, fill_rgba);
-    // TODO: handle depth
+
+    // Discard if fully transparent
+    if (f_color.a < 0.01) {
+        discard;
+    }
 
     return f_color;
 }
 
-fn render_control_points(pos: vec2<f32>) -> vec4<f32> {
-    let points_len = arrayLength(&points);
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
+}
 
-    var d = length(pos - point(0u));
-    for (var i = 1u; i < points_len; i++) {
-        d = min(d, length(pos - point(i)));
-    }
-    return select(vec4(0.0), vec4(1.0), d < 1);
+struct DepthOnlyOutput {
+    @builtin(frag_depth) depth: f32,
 }
 
 @fragment
-fn fs_main(@location(0) pos: vec2<f32>) -> @location(0) vec4<f32> {
-    var f_color: vec4<f32> = vec4(1.0, 0.0, 0.0, 1.0);
-    f_color = render(pos);
-    // let attr = get_subpath_attr(pos, 14u);
-    // f_color = vec4(f32(attr.d));
-    // f_color = blend_color(f_color, render_control_points(pos));
-    return f_color;
+fn fs_main(@builtin(position) frag_pos: vec4<f32>, @location(0) pos: vec2<f32>) -> FragmentOutput {
+    var out: FragmentOutput;
+    let color = render(pos);
+
+    if (color.a >= 0.99) {
+        out.color = color;
+        out.depth = frag_pos.z;
+        return out;
+    }
+
+    let coords = vec2<u32>(floor(frag_pos.xy));
+    let pixel_idx = coords.y * frame.x + coords.x;
+    let layer_idx = atomicAdd(&pixel_count[pixel_idx], 1u);
+
+    if (layer_idx < frame.z) {
+        let buffer_idx = pixel_idx * frame.z + layer_idx;
+        oit_colors[buffer_idx] = pack_color(color);
+        oit_depths[buffer_idx] = frag_pos.z;
+    }
+
+    discard;
+    out.color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    out.depth = 1.0;
+    return out;
+}
+
+@fragment
+fn fs_depth_only(@builtin(position) frag_pos: vec4<f32>, @location(0) pos: vec2<f32>) -> @builtin(frag_depth) f32 {
+    let color = render(pos);
+
+    // Only write depth for opaque parts.
+    if (color.a < 0.99) {
+        discard;
+    }
+
+    return frag_pos.z;
 }
 
 struct VertexOutput {
@@ -241,27 +289,25 @@ struct VertexOutput {
     @location(0) pos: vec2<f32>,
 }
 
+// At here we simply construct two triangles that covers all vitem points.
+//
+// We'll need the following vertex data:
+// - frag_pos: the clip space coordinate.
+// - pos: the pos in the plane's coordinate system used to calculate sdf things
+//
+// Actually, we don't mind which coordinate system `pos` use. As long as it
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;
 
-    let x = vertex_index & 1u;
-    let min_x = f32(clip_box.min_x);
-    let max_x = f32(clip_box.max_x);
-    let min_y = f32(clip_box.min_y);
-    let max_y = f32(clip_box.max_y);
-    let max_w = f32(clip_box.max_w);
+    let scale = 1000.0;
+    let min_x = f32(clip_box.min_x) / scale;
+    let max_x = f32(clip_box.max_x) / scale;
+    let min_y = f32(clip_box.min_y) / scale;
+    let max_y = f32(clip_box.max_y) / scale;
+    let max_w = f32(clip_box.max_w) / scale;
 
-    // let x_base = min_x - max_w;
-    // let x_offset = (max_x - min_x + max_w * 2.0) * f32((vertex_index >> 1u) & 1u);
-
-    // let y_base = min_y - max_w;
-    // let y_offset = (max_y - min_y + max_w * 2.0) * f32(vertex_index & 1u);
-
-    // let clip_point = vec2(
-    //     x_base + x_offset,
-    //     y_base + y_offset
-    // );
+    // Clip point in the plane's coordinate system
     var clip_point: vec2<f32>;
     clip_point.x = select(
         max_x + max_w,
@@ -274,7 +320,12 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
         (vertex_index & 1u) == 0u
     );
 
-    out.frag_pos = vec4(clip_point / cam_uniforms.half_frame_size, 0.0, 1.0);
+    let u = clip_point.x;
+    let v = clip_point.y;
+
+    let pos3d = plane.origin + u * plane.basis_u + v * plane.basis_v;
+
+    out.frag_pos = cam_uniforms.proj_mat * cam_uniforms.view_mat * vec4(pos3d, 1.0);
     out.pos = clip_point;
     return out;
 }

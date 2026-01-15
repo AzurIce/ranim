@@ -4,7 +4,7 @@ use ranim::{
     color,
     color::HueDirection,
     glam::dvec2,
-    items::vitem::{Group, geometry::Arc},
+    items::vitem::geometry::Arc,
     prelude::*,
 };
 
@@ -44,7 +44,7 @@ pub fn arc(r: &mut RanimScene) {
                     .put_center_on(offset.extend(0.0));
             })
         })
-        .collect::<Group<_>>();
+        .collect::<Vec<_>>();
     let r_arcs = r.new_timeline();
 
     r.timeline_mut(r_arcs)

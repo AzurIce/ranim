@@ -7,7 +7,6 @@ use ranim_core::{Extract, components::width::Width, traits::Anchor, utils::bezie
 use ranim_core::{color, glam};
 use tracing::warn;
 
-use crate::vitem::Group;
 use ranim_core::traits::{
     BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth,
 };
@@ -19,9 +18,9 @@ use super::VItem;
 ///
 /// Its inner is a `Vec<VItem>`
 #[derive(Clone)]
-pub struct SvgItem(Group<VItem>);
+pub struct SvgItem(Vec<VItem>);
 
-impl From<SvgItem> for Group<VItem> {
+impl From<SvgItem> for Vec<VItem> {
     fn from(value: SvgItem) -> Self {
         value.0
     }
@@ -30,7 +29,7 @@ impl From<SvgItem> for Group<VItem> {
 impl SvgItem {
     /// Creates a new SvgItem from a SVG string
     pub fn new(svg: impl AsRef<str>) -> Self {
-        let mut vitem_group = Self(Group(vitems_from_svg(svg.as_ref())));
+        let mut vitem_group = Self(vitems_from_svg(svg.as_ref()));
         vitem_group.put_center_on(DVec3::ZERO);
         vitem_group.rotate(std::f64::consts::PI, DVec3::X);
         vitem_group

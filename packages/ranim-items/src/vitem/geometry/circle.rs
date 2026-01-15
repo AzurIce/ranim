@@ -2,14 +2,9 @@ use std::f64::consts::PI;
 
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
-use ranim_core::{
-    Extract, color,
-    core_item::CoreItem,
-    glam,
-    traits::{Anchor, Interpolatable},
-};
+use ranim_core::{Extract, color, core_item::CoreItem, glam, traits::Anchor};
 
-use crate::vitem::DEFAULT_STROKE_WIDTH;
+use crate::vitem::{DEFAULT_STROKE_WIDTH, Proj};
 use ranim_core::traits::{
     BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, With,
 };
@@ -20,15 +15,14 @@ use super::Arc;
 
 // MARK: ### Circle ###
 /// An circle
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Circle {
+    /// Proj
+    pub proj: Proj,
     /// Center
     pub center: DVec3,
     /// Radius
     pub radius: f64,
-    up: DVec3,
-    /// Normal vec of the circle plane
-    pub normal: DVec3,
 
     /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
@@ -38,28 +32,13 @@ pub struct Circle {
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
-impl Interpolatable for Circle {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self {
-            center: Interpolatable::lerp(&self.center, &target.center, t),
-            radius: Interpolatable::lerp(&self.radius, &target.radius, t),
-            up: Interpolatable::lerp(&self.up, &target.up, t),
-            normal: Interpolatable::lerp(&self.normal, &target.normal, t),
-            stroke_rgba: Interpolatable::lerp(&self.stroke_rgba, &target.stroke_rgba, t),
-            stroke_width: Interpolatable::lerp(&self.stroke_width, &target.stroke_width, t),
-            fill_rgba: Interpolatable::lerp(&self.fill_rgba, &target.fill_rgba, t),
-        }
-    }
-}
-
 impl Circle {
     /// Constructor
     pub fn new(radius: f64) -> Self {
         Self {
+            proj: Proj::default(),
             center: DVec3::ZERO,
             radius,
-            up: DVec3::Y,
-            normal: DVec3::Z,
 
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
@@ -91,12 +70,9 @@ impl Circle {
 // MARK: Traits impl
 impl BoundingBox for Circle {
     fn get_bounding_box(&self) -> [DVec3; 3] {
-        let right = -self.normal.cross(self.up).normalize();
-        [
-            self.center - self.radius * right + self.radius * self.up,
-            self.center + self.radius * right - self.radius * self.up,
-        ]
-        .get_bounding_box()
+        let (u, v) = self.proj.basis();
+        let r = self.radius * (u + v);
+        [self.center + r, self.center - r].get_bounding_box()
     }
 }
 
@@ -111,8 +87,7 @@ impl Rotate for Circle {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         let anchor = Anchor::Point(anchor.get_pos(self));
         self.center.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
-        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.proj.rotate(angle, axis);
         self
     }
 }
@@ -157,19 +132,17 @@ impl FillColor for Circle {
 impl From<Circle> for Arc {
     fn from(value: Circle) -> Self {
         let Circle {
+            proj,
             center,
             radius,
-            up,
-            normal,
             stroke_rgba,
             stroke_width,
             ..
         } = value;
         Self {
+            proj,
             center,
             radius,
-            up,
-            normal,
             angle: 2.0 * PI,
             stroke_rgba,
             stroke_width,

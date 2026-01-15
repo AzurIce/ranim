@@ -3,27 +3,26 @@ use glam::DVec3;
 use ranim_core::Extract;
 use ranim_core::core_item::CoreItem;
 use ranim_core::traits::Anchor;
-use ranim_core::{color, glam, traits::Interpolatable};
+use ranim_core::{color, glam};
 
 use ranim_core::traits::{
     BoundingBox, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With,
 };
 
-use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
+use crate::vitem::{DEFAULT_STROKE_WIDTH, Proj, VItem};
 
 // MARK: ### Arc ###
 /// An arc
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Arc {
+    /// Projection
+    pub proj: Proj,
     /// Center
     pub center: DVec3,
     /// Radius
     pub radius: f64,
     /// Angle
     pub angle: f64,
-    pub(super) up: DVec3,
-    /// The normal vec of the arc plane
-    pub normal: DVec3,
 
     /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
@@ -31,29 +30,14 @@ pub struct Arc {
     pub stroke_width: f32,
 }
 
-impl Interpolatable for Arc {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self {
-            center: Interpolatable::lerp(&self.center, &target.center, t),
-            radius: Interpolatable::lerp(&self.radius, &target.radius, t),
-            angle: Interpolatable::lerp(&self.angle, &target.angle, t),
-            up: Interpolatable::lerp(&self.up, &target.up, t),
-            normal: Interpolatable::lerp(&self.normal, &target.normal, t),
-            stroke_rgba: Interpolatable::lerp(&self.stroke_rgba, &target.stroke_rgba, t),
-            stroke_width: Interpolatable::lerp(&self.stroke_width, &target.stroke_width, t),
-        }
-    }
-}
-
 impl Arc {
     /// Constructor
     pub fn new(angle: f64, radius: f64) -> Self {
         Self {
+            proj: Proj::default(),
             center: DVec3::ZERO,
             radius,
             angle,
-            up: DVec3::Y,
-            normal: DVec3::Z,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
         }
@@ -77,15 +61,13 @@ impl Arc {
     }
     /// The start point
     pub fn start(&self) -> DVec3 {
-        let right = self.up.cross(self.normal).normalize();
-        self.center + self.radius * right
+        self.center + self.radius * self.proj.basis_u()
     }
     /// The end point
     pub fn end(&self) -> DVec3 {
-        let right = self.up.cross(self.normal).normalize();
-        self.center
-            + self.radius * self.angle.cos() * right
-            + self.radius * self.angle.sin() * self.up
+        let u = self.angle.cos() * self.proj.basis_u();
+        let v = self.angle.sin() * self.proj.basis_v();
+        self.center + self.radius * (u + v)
     }
 }
 
@@ -93,12 +75,9 @@ impl Arc {
 impl BoundingBox for Arc {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
     fn get_bounding_box(&self) -> [DVec3; 3] {
-        let right = -self.normal.cross(self.up).normalize();
-        [
-            self.center - self.radius * right + self.radius * self.up,
-            self.center + self.radius * right - self.radius * self.up,
-        ]
-        .get_bounding_box()
+        let (u, v) = self.proj.basis();
+        let r = self.radius * (u + v);
+        [self.center - r, self.center + r].get_bounding_box()
     }
 }
 
@@ -116,8 +95,7 @@ impl Rotate for Arc {
             Anchor::Edge(edge) => self.get_bounding_box_point(edge),
         });
         self.center.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
-        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.proj.rotate(angle, axis);
         self
     }
 }
@@ -150,17 +128,15 @@ impl From<Arc> for VItem {
         let len = 2 * NUM_SEGMENTS + 1;
 
         let Arc {
+            proj,
             center,
             radius,
             angle,
-            up,
-            normal,
             stroke_rgba,
             stroke_width,
         } = value;
 
-        let right = -normal.cross(up).normalize();
-
+        let (u, v) = proj.basis();
         let mut vpoints = (0..len)
             .map(|i| {
                 let angle = angle * i as f64 / (len - 1) as f64;
@@ -171,7 +147,7 @@ impl From<Arc> for VItem {
                 if y.abs() < 1.8e-7 {
                     y = 0.0;
                 }
-                (x * right + y * up) * radius
+                (x * u + y * v) * radius
             })
             .collect::<Vec<_>>();
 
@@ -197,17 +173,16 @@ impl Extract for Arc {
 
 // MARK: ### ArcBetweenPoints ###
 /// An arc between points
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct ArcBetweenPoints {
+    /// Projection
+    pub proj: Proj,
     /// Start point
     pub start: DVec3,
     /// End point
     pub end: DVec3,
     /// Arc angle
     pub angle: f64,
-    up: DVec3,
-    /// Arc plane normal vec
-    pub normal: DVec3,
 
     /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
@@ -215,29 +190,14 @@ pub struct ArcBetweenPoints {
     pub stroke_width: f32,
 }
 
-impl Interpolatable for ArcBetweenPoints {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self {
-            start: Interpolatable::lerp(&self.start, &target.start, t),
-            end: Interpolatable::lerp(&self.end, &target.end, t),
-            angle: Interpolatable::lerp(&self.angle, &target.angle, t),
-            up: Interpolatable::lerp(&self.up, &target.up, t),
-            normal: Interpolatable::lerp(&self.normal, &target.normal, t),
-            stroke_rgba: Interpolatable::lerp(&self.stroke_rgba, &target.stroke_rgba, t),
-            stroke_width: Interpolatable::lerp(&self.stroke_width, &target.stroke_width, t),
-        }
-    }
-}
-
 impl ArcBetweenPoints {
     /// Constructor
     pub fn new(start: DVec3, end: DVec3, angle: f64) -> Self {
         Self {
+            proj: Proj::default(),
             start,
             end,
             angle,
-            up: DVec3::Y,
-            normal: DVec3::Z,
 
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
@@ -290,8 +250,7 @@ impl Rotate for ArcBetweenPoints {
         });
         self.start.rotate_by_anchor(angle, axis, anchor);
         self.end.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
-        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.proj.rotate(angle, axis);
         self
     }
 }
@@ -321,22 +280,20 @@ impl StrokeColor for ArcBetweenPoints {
 impl From<ArcBetweenPoints> for Arc {
     fn from(value: ArcBetweenPoints) -> Arc {
         let ArcBetweenPoints {
+            proj,
             start,
             end,
             angle,
-            up,
-            normal,
             stroke_rgba,
             stroke_width,
         } = value;
         let radius = (start.distance(end) / 2.0) / (angle / 2.0).sin();
 
         Arc {
+            proj,
             angle,
             radius,
             center: DVec3::ZERO,
-            up,
-            normal,
             stroke_rgba,
             stroke_width,
         }

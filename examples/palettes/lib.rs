@@ -1,7 +1,7 @@
 use ranim::{
     color::palettes::manim::*,
     glam::{dvec2, dvec3},
-    items::{Group, vitem::geometry::Rectangle},
+    items::vitem::geometry::Rectangle,
     prelude::*,
 };
 
@@ -47,7 +47,7 @@ fn palettes(r: &mut RanimScene) {
                 })
             })
         })
-        .collect::<Group<_>>();
+        .collect::<Vec<_>>();
     r.insert(squares);
     r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
     r.timelines_mut().forward(0.01);

@@ -7,84 +7,70 @@
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
 
-use derive_more::{Deref, DerefMut};
 use ranim_core::{
-    traits::{Alignable, Interpolatable, Opacity},
-    utils::resize_preserving_order_with_repeated_indices,
+    glam::DVec3,
+    traits::{Anchor, BoundingBox, Interpolatable, Rotate, Shift},
 };
 
-/// The vectorized item.
 pub mod vitem;
 
-/// A Group of type `T`.
-///
-/// Just like a [`Vec`]
-#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut)]
-pub struct Group<T>(pub Vec<T>);
-
-impl<T> IntoIterator for Group<T> {
-    type IntoIter = std::vec::IntoIter<T>;
-    type Item = T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
+/// A plane in 3D space.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Plane {
+    /// The origin of the plane.
+    pub origin: DVec3,
+    /// The basis vectors of the plane. Normalized.
+    pub basis: (DVec3, DVec3),
 }
 
-impl<'a, T> IntoIterator for &'a Group<T> {
-    type IntoIter = std::slice::Iter<'a, T>;
-    type Item = &'a T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl<'a, T> IntoIterator for &'a mut Group<T> {
-    type IntoIter = std::slice::IterMut<'a, T>;
-    type Item = &'a mut T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter_mut()
-    }
-}
-
-impl<T> FromIterator<T> for Group<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self(Vec::from_iter(iter))
-    }
-}
-
-impl<T: Interpolatable> Interpolatable for Group<T> {
+impl Interpolatable for Plane {
     fn lerp(&self, target: &Self, t: f64) -> Self {
-        self.into_iter()
-            .zip(target)
-            .map(|(a, b)| a.lerp(b, t))
-            .collect()
+        Self {
+            origin: self.origin.lerp(target.origin, t),
+            basis: (
+                self.basis.0.lerp(target.basis.0, t),
+                self.basis.1.lerp(target.basis.1, t),
+            ),
+        }
     }
 }
 
-impl<T: Opacity + Alignable + Clone> Alignable for Group<T> {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
+impl BoundingBox for Plane {
+    fn get_bounding_box(&self) -> [DVec3; 3] {
+        let basis_vec = self.basis.0 + self.basis.1;
+        [
+            self.origin - basis_vec / 2.0,
+            self.origin,
+            self.origin + basis_vec / 2.0,
+        ]
     }
-    fn align_with(&mut self, other: &mut Self) {
-        let len = self.len().max(other.len());
+}
 
-        let transparent_repeated = |items: &mut Vec<T>, repeat_idxs: Vec<usize>| {
-            for idx in repeat_idxs {
-                items[idx].set_opacity(0.0);
-            }
-        };
-        if self.len() != len {
-            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&self.0, len);
-            transparent_repeated(&mut items, idxs);
-            self.0 = items;
-        }
-        if other.len() != len {
-            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&other.0, len);
-            transparent_repeated(&mut items, idxs);
-            other.0 = items;
-        }
-        self.iter_mut()
-            .zip(other)
-            .for_each(|(a, b)| a.align_with(b));
+impl Shift for Plane {
+    fn shift(&mut self, shift: DVec3) -> &mut Self {
+        self.origin.shift(shift);
+        self
     }
+}
+
+impl Rotate for Plane {
+    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
+        self.origin.rotate_by_anchor(angle, axis, anchor);
+        self.basis.0.rotate(angle, axis);
+        self.basis.1.rotate(angle, axis);
+        self
+    }
+}
+
+impl Default for Plane {
+    fn default() -> Self {
+        Self::XY
+    }
+}
+
+impl Plane {
+    const XY: Self = Self {
+        origin: DVec3::ZERO,
+        basis: (DVec3::X, DVec3::Y),
+    };
 }

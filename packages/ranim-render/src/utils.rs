@@ -345,6 +345,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
     //     self.inner.as_ref()
     // }
 
+    #[allow(unused)]
     pub(crate) fn resize(&mut self, ctx: &WgpuContext, len: usize) -> bool {
         let size = (std::mem::size_of::<T>() * len) as u64;
         let realloc = self.buffer.size() != size;

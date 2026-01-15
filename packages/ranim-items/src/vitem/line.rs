@@ -1,20 +1,16 @@
-use glam::DVec3;
+use ranim_core::{Extract, core_item::CoreItem, glam::DVec3};
 use ranim_macros::{
     Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, Position, Stroke,
 };
 
-use crate::render::primitives::{Extract, vitem::VItemPrimitive};
+use super::VItem;
 
-use super::{VItem, arrow::Arrow};
+// #[derive(Clone)]
+// pub struct NumberLine {
+//     pub arrow: Arrow,
+// }
 
-#[derive(Clone)]
-pub struct NumberLine {
-    pub arrow: Arrow,
-}
-
-#[derive(
-    Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position, Partial,
-)]
+#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Partial)]
 pub struct Line(pub VItem);
 
 impl From<Line> for VItem {
@@ -58,8 +54,8 @@ impl Line {
 }
 
 impl Extract for Line {
-    type Target = VItemPrimitive;
-    fn extract(&self) -> Self::Target {
-        self.0.extract()
+    type Target = CoreItem;
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        VItem::from(self.clone()).extract_into(buf);
     }
 }

@@ -1,3 +1,12 @@
+//! Quadratic Bezier Concatenated Item
+//!
+//! VItem itself is composed with 3d bezier path segments, but when *ranim* renders VItem,
+//! it assumes that all points are in the same plane to calculate depth information.
+//! Which means that ranim actually renders a **projection** of the VItem onto a plane.
+//!
+//! The projection target plane has the initial basis and normal defined as `(DVec3::X, DVec3::Y)` and `DVec3::Z` respectively, and it contains the first point of the VItem.
+//!
+//! So the normal way to use a [`VItem`] is to make sure that all points are in the same plane, at this time the **projection** is equivalent to the VItem itself. Or you may break this, and let ranim renders the **projection** of it.
 // pub mod arrow;
 /// Geometry items
 pub mod geometry;
@@ -8,84 +17,69 @@ pub mod typst;
 // pub mod line;
 
 use color::{AlphaColor, Srgb, palette::css};
-use derive_more::{Deref, DerefMut};
 use glam::{DVec3, Vec4, vec4};
-#[cfg(feature = "vitem2d")]
-use glam::{Vec3, vec3};
 use ranim_core::core_item::CoreItem;
-#[cfg(not(feature = "vitem2d"))]
-use ranim_core::core_item::vitem::VItemPrimitive;
-#[cfg(feature = "vitem2d")]
-use ranim_core::core_item::vitem_2d::VItem2d;
 use ranim_core::traits::Anchor;
-use ranim_core::utils::resize_preserving_order_with_repeated_indices;
 use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
-    prelude::{Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, StrokeWidth},
+    prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
     traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
 
-/// A plane in 3D space.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Plane {
-    /// The origin of the plane.
-    pub origin: DVec3,
-    /// The basis vectors of the plane. Normalized.
-    pub basis: (DVec3, DVec3),
+/// The projection of a [`VItem`].
+#[derive(Debug, Clone, Copy, PartialEq, ranim_macros::Interpolatable)]
+pub struct Proj {
+    /// The basis vector in the u direction.
+    basis_u: DVec3,
+    /// The basis vector in the v direction.
+    basis_v: DVec3,
 }
 
-impl Interpolatable for Plane {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
+impl Default for Proj {
+    fn default() -> Self {
         Self {
-            origin: self.origin.lerp(target.origin, t),
-            basis: (
-                self.basis.0.lerp(target.basis.0, t),
-                self.basis.1.lerp(target.basis.1, t),
-            ),
+            basis_u: DVec3::X,
+            basis_v: DVec3::Y,
         }
     }
 }
 
-impl BoundingBox for Plane {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        let basis_vec = self.basis.0 + self.basis.1;
-        [
-            self.origin - basis_vec / 2.0,
-            self.origin,
-            self.origin + basis_vec / 2.0,
-        ]
+impl Proj {
+    /// The basis vector in the u direction.
+    pub fn basis_u(&self) -> DVec3 {
+        self.basis_u.normalize()
     }
-}
-
-impl Shift for Plane {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.origin.shift(shift);
-        self
+    /// The basis vector in the v direction.
+    pub fn basis_v(&self) -> DVec3 {
+        self.basis_v.normalize()
     }
-}
-
-impl Rotate for Plane {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        self.origin.rotate_by_anchor(angle, axis, anchor);
-        self.basis.0.rotate(angle, axis);
-        self.basis.1.rotate(angle, axis);
-        self
+    /// The basis vectors
+    pub fn basis(&self) -> (DVec3, DVec3) {
+        (self.basis_u(), self.basis_v())
     }
-}
-
-impl Default for Plane {
-    fn default() -> Self {
-        Self::XY
+    /// The corrected basis vector in the u direction.
+    /// This is same as [`Proj::basis_u`].
+    pub fn corrected_basis_u(&self) -> DVec3 {
+        self.basis_u.normalize()
     }
-}
-
-impl Plane {
-    const XY: Self = Self {
-        origin: DVec3::ZERO,
-        basis: (DVec3::X, DVec3::Y),
-    };
+    /// The corrected basis vector in the v direction.
+    /// This is recalculated to ensure orthogonality.
+    pub fn corrected_basis_v(&self) -> DVec3 {
+        let normal = self.basis_u.cross(self.basis_v);
+        normal.cross(self.basis_u).normalize()
+    }
+    /// Rotate the projection.
+    pub fn rotate(&mut self, angle: f64, axis: DVec3) {
+        self.basis_u = self.basis_u.rotate_axis(axis, angle).normalize();
+        self.basis_v = self.basis_v.rotate_axis(axis, angle).normalize();
+    }
+    /// Get the normal vector of the projection target plane.
+    #[inline]
+    pub fn normal(&self) -> DVec3 {
+        self.basis_u.cross(self.basis_v).normalize()
+    }
 }
 
 /// A vectorized item.
@@ -105,12 +99,12 @@ impl Plane {
 ///     dvec3(0.5, 1.0, 0.0),
 /// ]);
 /// ```
-///
-///
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, ranim_macros::Interpolatable)]
 pub struct VItem {
-    /// The plane this vitem is on
-    pub plane: Plane,
+    /// The projection info.
+    ///
+    /// See [`Proj`]
+    pub proj: Proj,
     /// vpoints data
     pub vpoints: VPointComponentVec,
     /// stroke widths
@@ -137,7 +131,6 @@ impl BoundingBox for VItem {
 impl Shift for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
-        self.plane.shift(shift);
         self
     }
 }
@@ -145,7 +138,7 @@ impl Shift for VItem {
 impl Rotate for VItem {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         self.vpoints.rotate_by_anchor(angle, axis, anchor);
-        self.plane.rotate(angle, axis);
+        self.proj.rotate(angle, axis);
         self
     }
 }
@@ -158,10 +151,7 @@ impl Scale for VItem {
 }
 
 /// Default stroke width
-#[cfg(not(feature = "vitem2d"))]
 pub use ranim_core::core_item::vitem::DEFAULT_STROKE_WIDTH;
-#[cfg(feature = "vitem2d")]
-pub use ranim_core::core_item::vitem_2d::DEFAULT_STROKE_WIDTH;
 
 impl VItem {
     /// Close the VItem
@@ -187,13 +177,22 @@ impl VItem {
     pub fn get_anchor(&self, idx: usize) -> Option<&DVec3> {
         self.vpoints.get(idx * 2)
     }
+    /// Set the projection of the VItem
+    pub fn with_proj(mut self, proj: Proj) -> Self {
+        self.proj = proj;
+        self
+    }
+    /// Set the projection of the VItem
+    pub fn set_proj(&mut self, proj: Proj) {
+        self.proj = proj;
+    }
     /// Construct a [`VItem`] form vpoints
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
         let stroke_widths = vec![DEFAULT_STROKE_WIDTH; vpoints.len().div_ceil(2)];
         let stroke_rgbas = vec![vec4(1.0, 1.0, 1.0, 1.0); vpoints.len().div_ceil(2)];
         let fill_rgbas = vec![vec4(0.0, 0.0, 0.0, 0.0); vpoints.len().div_ceil(2)];
         Self {
-            plane: Plane::default(),
+            proj: Proj::default(),
             vpoints: VPointComponentVec(vpoints.into()),
             stroke_rgbas: stroke_rgbas.into(),
             stroke_widths: stroke_widths.into(),
@@ -210,34 +209,11 @@ impl VItem {
         self.stroke_widths.resize_with_last(len.div_ceil(2));
     }
 
-    #[cfg(not(feature = "vitem2d"))]
     pub(crate) fn get_render_points(&self) -> Vec<Vec4> {
         self.vpoints
             .iter()
-            .zip(self.vpoints.get_closepath_flags().iter())
-            .map(|(p, f)| {
-                vec4(
-                    p.x as f32,
-                    p.y as f32,
-                    p.z as f32,
-                    if *f { 1.0 } else { 0.0 },
-                )
-            })
-            .collect()
-    }
-    #[cfg(feature = "vitem2d")]
-    pub(crate) fn get_render_points(&self) -> Vec<Vec3> {
-        self.vpoints
-            .iter()
-            .zip(self.vpoints.get_closepath_flags().iter())
-            .map(|(p, f)| {
-                let v = *p - self.plane.origin;
-                vec3(
-                    v.dot(self.plane.basis.0) as f32,
-                    v.dot(self.plane.basis.1) as f32,
-                    if *f { 1.0 } else { 0.0 },
-                )
-            })
+            .zip(self.vpoints.get_closepath_flags())
+            .map(|(p, f)| p.as_vec3().extend(f.into()))
             .collect()
     }
     /// Put start and end on
@@ -250,21 +226,13 @@ impl VItem {
 impl Extract for VItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        #[cfg(feature = "vitem2d")]
-        buf.push(CoreItem::VItem2D(VItem2d {
-            origin: self.plane.origin.as_vec3(),
+        buf.push(CoreItem::VItem(ranim_core::core_item::vitem::VItem {
+            origin: self.vpoints.first().unwrap().as_vec3(),
             basis: (
-                self.plane.basis.0.as_vec3().normalize(),
-                self.plane.basis.1.as_vec3().normalize(),
+                self.proj.corrected_basis_u().as_vec3(),
+                self.proj.corrected_basis_v().as_vec3(),
             ),
-            points2d: self.get_render_points(),
-            fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
-            stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
-            stroke_widths: self.stroke_widths.iter().cloned().collect::<Vec<_>>(),
-        }));
-        #[cfg(not(feature = "vitem2d"))]
-        buf.push(CoreItem::VItemPrimitive(VItemPrimitive {
-            points2d: self.get_render_points(),
+            points: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
             stroke_widths: self.stroke_widths.iter().cloned().collect::<Vec<_>>(),
@@ -292,23 +260,6 @@ impl Alignable for VItem {
     }
 }
 
-impl Interpolatable for VItem {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        let plane = self.plane.lerp(&target.plane, t);
-        let vpoints = self.vpoints.lerp(&target.vpoints, t);
-        let stroke_rgbas = self.stroke_rgbas.lerp(&target.stroke_rgbas, t);
-        let stroke_widths = self.stroke_widths.lerp(&target.stroke_widths, t);
-        let fill_rgbas = self.fill_rgbas.lerp(&target.fill_rgbas, t);
-        Self {
-            plane,
-            vpoints,
-            stroke_widths,
-            stroke_rgbas,
-            fill_rgbas,
-        }
-    }
-}
-
 impl Opacity for VItem {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.stroke_rgbas.set_opacity(opacity);
@@ -324,7 +275,7 @@ impl Partial for VItem {
         let stroke_widths = self.stroke_widths.get_partial(range.clone());
         let fill_rgbas = self.fill_rgbas.get_partial(range.clone());
         Self {
-            plane: self.plane.clone(),
+            proj: self.proj,
             vpoints,
             stroke_widths,
             stroke_rgbas,
@@ -341,7 +292,7 @@ impl Partial for VItem {
 impl Empty for VItem {
     fn empty() -> Self {
         Self {
-            plane: Plane::default(),
+            proj: Proj::default(),
             vpoints: VPointComponentVec(vec![DVec3::ZERO; 3].into()),
             stroke_widths: vec![0.0, 0.0].into(),
             stroke_rgbas: vec![Vec4::ZERO; 2].into(),
@@ -391,78 +342,5 @@ impl StrokeWidth for VItem {
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         f(self.stroke_widths.as_mut());
         self
-    }
-}
-
-/// A Group of type `T`.
-///
-/// Just like a [`Vec`]
-#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut)]
-pub struct Group<T: Opacity>(pub Vec<T>);
-
-impl<T: Opacity> IntoIterator for Group<T> {
-    type IntoIter = std::vec::IntoIter<T>;
-    type Item = T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl<'a, T: Opacity> IntoIterator for &'a Group<T> {
-    type IntoIter = std::slice::Iter<'a, T>;
-    type Item = &'a T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl<'a, T: Opacity> IntoIterator for &'a mut Group<T> {
-    type IntoIter = std::slice::IterMut<'a, T>;
-    type Item = &'a mut T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter_mut()
-    }
-}
-
-impl<T: Opacity> FromIterator<T> for Group<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self(Vec::from_iter(iter))
-    }
-}
-
-impl<T: Interpolatable + Opacity> Interpolatable for Group<T> {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        self.into_iter()
-            .zip(target)
-            .map(|(a, b)| a.lerp(b, t))
-            .collect()
-    }
-}
-
-impl<T: Opacity + Alignable + Clone> Alignable for Group<T> {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
-    }
-    fn align_with(&mut self, other: &mut Self) {
-        let len = self.len().max(other.len());
-
-        let transparent_repeated = |items: &mut Vec<T>, repeat_idxs: Vec<usize>| {
-            for idx in repeat_idxs {
-                items[idx].set_opacity(0.0);
-            }
-        };
-        if self.len() != len {
-            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&self.0, len);
-            transparent_repeated(&mut items, idxs);
-            self.0 = items;
-        }
-        if other.len() != len {
-            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(&other.0, len);
-            transparent_repeated(&mut items, idxs);
-            other.0 = items;
-        }
-        self.iter_mut()
-            .zip(other)
-            .for_each(|(a, b)| a.align_with(b));
     }
 }
