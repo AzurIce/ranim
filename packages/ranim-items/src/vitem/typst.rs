@@ -322,14 +322,8 @@ impl Alignable for TypstText {
                                    last_neq_idx_a,
                                    last_neq_idx_b| {
             if last_neq_idx_a != ia || last_neq_idx_b != ib {
-                let mut vitems_a = self.vitems[last_neq_idx_a..ia]
-                    .iter()
-                    .cloned()
-                    .collect::<Vec<_>>();
-                let mut vitems_b = other.vitems[last_neq_idx_b..ib]
-                    .iter()
-                    .cloned()
-                    .collect::<Vec<_>>();
+                let mut vitems_a = self.vitems[last_neq_idx_a..ia].to_vec();
+                let mut vitems_b = other.vitems[last_neq_idx_b..ib].to_vec();
                 if vitems_a.is_empty() {
                     vitems_a.extend(vitems_b.iter().map(|x| {
                         x.clone().with(|x| {

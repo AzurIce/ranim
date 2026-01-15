@@ -67,10 +67,7 @@ impl Interpolatable for DMat4 {
 
 impl<T: Interpolatable> Interpolatable for Vec<T> {
     fn lerp(&self, target: &Self, t: f64) -> Self {
-        self.into_iter()
-            .zip(target)
-            .map(|(a, b)| a.lerp(b, t))
-            .collect()
+        self.iter().zip(target).map(|(a, b)| a.lerp(b, t)).collect()
     }
 }
 

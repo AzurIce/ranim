@@ -11,10 +11,6 @@ use crate::utils::{avg, resize_preserving_order_with_repeated_indices};
 
 use super::ComponentVec;
 
-/// A point in bezier path.
-///
-/// `x`, `y`
-
 /// VPointComponentVec is used to represent a bunch of quad bezier paths.
 ///
 /// Every 3 elements in the inner vector is a quad bezier path.

@@ -122,7 +122,7 @@ impl RenderResource for VItem2dRenderInstance {
 
         let compute_bind_group = Clipbox2dComputeBindGroup::new(
             ctx,
-            &plane_buffer.as_ref(),
+            plane_buffer.as_ref(),
             &points3d_buffer.buffer,
             &stroke_widths.buffer,
             &points2d_buffer.buffer,
@@ -191,7 +191,7 @@ impl RenderResource for VItem2dRenderInstance {
         {
             self.compute_bind_group = Some(Clipbox2dComputeBindGroup::new(
                 ctx,
-                &self.plane_buffer.as_ref(),
+                self.plane_buffer.as_ref(),
                 &self.points3d_buffer.buffer,
                 &self.stroke_widths.buffer,
                 &self.points2d_buffer.buffer,

@@ -213,7 +213,7 @@ impl VItem {
     pub(crate) fn get_render_points(&self) -> Vec<Vec4> {
         self.vpoints
             .iter()
-            .zip(self.vpoints.get_closepath_flags().into_iter())
+            .zip(self.vpoints.get_closepath_flags())
             .map(|(p, f)| p.as_vec3().extend(f.into()))
             .collect()
     }
