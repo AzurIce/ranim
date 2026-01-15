@@ -6,24 +6,22 @@ use itertools::Itertools;
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, Proj};
 use ranim_core::traits::{
-    Alignable, BoundingBox, FillColor, Interpolatable, Opacity, Rotate, Scale, Shift, StrokeColor,
-    StrokeWidth, With,
+    Alignable, BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth,
+    With,
 };
 
 use crate::vitem::VItem;
 
 // MARK: ### Square ###
 /// A Square
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Square {
+    /// Projection
+    pub proj: Proj,
     /// Center
     pub center: DVec3,
     /// Size
     pub size: f64,
-    /// Up vec
-    pub up: DVec3,
-    /// Normal vec
-    pub normal: DVec3,
 
     /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
@@ -33,28 +31,13 @@ pub struct Square {
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
-impl Interpolatable for Square {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self {
-            center: Interpolatable::lerp(&self.center, &target.center, t),
-            size: Interpolatable::lerp(&self.size, &target.size, t),
-            up: Interpolatable::lerp(&self.up, &target.up, t),
-            normal: Interpolatable::lerp(&self.normal, &target.normal, t),
-            stroke_rgba: Interpolatable::lerp(&self.stroke_rgba, &target.stroke_rgba, t),
-            stroke_width: Interpolatable::lerp(&self.stroke_width, &target.stroke_width, t),
-            fill_rgba: Interpolatable::lerp(&self.fill_rgba, &target.fill_rgba, t),
-        }
-    }
-}
-
 impl Square {
     /// Constructor
     pub fn new(size: f64) -> Self {
         Self {
+            proj: Proj::default(),
             center: dvec3(0.0, 0.0, 0.0),
             size,
-            up: dvec3(0.0, 1.0, 0.0),
-            normal: dvec3(0.0, 0.0, 1.0),
 
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
@@ -86,10 +69,10 @@ impl Square {
 // MARK: Traits impl
 impl BoundingBox for Square {
     fn get_bounding_box(&self) -> [DVec3; 3] {
-        let right = -self.normal.cross(self.up).normalize();
+        let (u, v) = self.proj.basis();
         [
-            self.center - self.size / 2.0 * right + self.size / 2.0 * self.up,
-            self.center + self.size / 2.0 * right - self.size / 2.0 * self.up,
+            self.center + self.size / 2.0 * (u + v),
+            self.center - self.size / 2.0 * (u + v),
         ]
         .get_bounding_box()
     }
@@ -109,8 +92,7 @@ impl Rotate for Square {
             Anchor::Edge(edge) => self.get_bounding_box_point(edge),
         });
         self.center.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
-        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.proj.rotate(angle, axis);
         self
     }
 }
@@ -169,22 +151,20 @@ impl Extract for Square {
 impl From<Square> for Rectangle {
     fn from(value: Square) -> Self {
         let Square {
+            proj,
             center,
             size: width,
-            up,
-            normal,
             stroke_rgba,
             stroke_width,
             fill_rgba,
         } = value;
-        let right = up.cross(normal).normalize();
-        let p1 = center - width / 2.0 * right + width / 2.0 * up;
-        let p2 = center + width / 2.0 * right - width / 2.0 * up;
+        let (u, v) = proj.basis();
+        let p1 = center - width / 2.0 * u + width / 2.0 * v;
+        let p2 = center + width / 2.0 * u - width / 2.0 * v;
         Rectangle {
+            proj,
             p1,
             p2,
-            up,
-            normal,
             stroke_rgba,
             stroke_width,
             fill_rgba,
@@ -206,15 +186,14 @@ impl From<Square> for VItem {
 
 // MARK: ### Rectangle ###
 /// Rectangle
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Rectangle {
+    /// Projection info
+    pub proj: Proj,
     /// Corner 1
     pub p1: DVec3,
     /// Corner 2
     pub p2: DVec3,
-    up: DVec3,
-    /// Normal vec
-    pub normal: DVec3,
 
     /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
@@ -224,30 +203,15 @@ pub struct Rectangle {
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
-impl Interpolatable for Rectangle {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self {
-            p1: Interpolatable::lerp(&self.p1, &target.p1, t),
-            p2: Interpolatable::lerp(&self.p2, &target.p2, t),
-            up: Interpolatable::lerp(&self.up, &target.up, t),
-            normal: Interpolatable::lerp(&self.normal, &target.normal, t),
-            stroke_rgba: Interpolatable::lerp(&self.stroke_rgba, &target.stroke_rgba, t),
-            stroke_width: Interpolatable::lerp(&self.stroke_width, &target.stroke_width, t),
-            fill_rgba: Interpolatable::lerp(&self.fill_rgba, &target.fill_rgba, t),
-        }
-    }
-}
-
 impl Rectangle {
     /// Constructor
     pub fn new(width: f64, height: f64) -> Self {
         let half_width = width / 2.0;
         let half_height = height / 2.0;
         Self {
+            proj: Proj::default(),
             p1: dvec3(-half_width, half_height, 0.0),
             p2: dvec3(half_width, -half_height, 0.0),
-            up: DVec3::Y,
-            normal: DVec3::Z,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
             fill_rgba: AlphaColor::TRANSPARENT,
@@ -255,12 +219,11 @@ impl Rectangle {
     }
     /// Width
     pub fn width(&self) -> f64 {
-        let right = self.up.cross(self.normal).normalize();
-        (self.p2 - self.p1).dot(right).abs()
+        (self.p2 - self.p1).dot(self.proj.basis_u()).abs()
     }
     /// Height
     pub fn height(&self) -> f64 {
-        (self.p2 - self.p1).dot(self.up).abs()
+        (self.p2 - self.p1).dot(self.proj.basis_v()).abs()
     }
 }
 
@@ -284,8 +247,7 @@ impl Rotate for Rectangle {
         let anchor = Anchor::Point(anchor.get_pos(self));
         self.p1.rotate_by_anchor(angle, axis, anchor);
         self.p2.rotate_by_anchor(angle, axis, anchor);
-        self.up.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
-        self.normal.rotate_by_anchor(angle, axis, Anchor::ORIGIN);
+        self.proj.rotate(angle, axis);
         self
     }
 }
@@ -347,15 +309,12 @@ impl From<Rectangle> for Polygon {
     fn from(value: Rectangle) -> Self {
         let points = vec![
             value.p1,
-            value.p1 - value.up * value.height(),
+            value.p1 - value.proj.basis_v() * value.height(),
             value.p2,
-            value.p2 + value.up * value.height(),
+            value.p2 + value.proj.basis_v() * value.height(),
         ];
         Polygon {
-            proj: Proj {
-                basis_u: value.up.normalize(),
-                basis_v: value.up.cross(value.normal).normalize(),
-            },
+            proj: value.proj,
             points,
             stroke_rgba: value.stroke_rgba,
             stroke_width: value.stroke_width,
@@ -379,8 +338,9 @@ impl Extract for Rectangle {
 
 // MARK: ### Polygon ###
 /// A Polygon with uniform stroke and fill
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Polygon {
+    /// Projection info
     pub proj: Proj,
     /// Corner points
     pub points: Vec<DVec3>,
@@ -390,8 +350,6 @@ pub struct Polygon {
     pub stroke_width: f32,
     /// Fill rgba
     pub fill_rgba: AlphaColor<Srgb>,
-    // _need_update: RefCell<bool>,
-    // _extract_cache: RefCell<Option<VItem>>,
 }
 
 impl Polygon {
@@ -403,8 +361,6 @@ impl Polygon {
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
             fill_rgba: AlphaColor::TRANSPARENT,
-            // _need_update: RefCell::new(true),
-            // _extract_cache: RefCell::new(None),
         }
     }
 }
@@ -448,25 +404,6 @@ impl Alignable for Polygon {
         // TODO: find a better algo to minimize the distance
         self.points
             .resize(other.points.len(), self.points.last().cloned().unwrap());
-    }
-}
-
-impl Interpolatable for Polygon {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self {
-            proj: self.proj.lerp(&target.proj, t),
-            points: self
-                .points
-                .iter()
-                .zip(target.points.iter())
-                .map(|(a, b)| a.lerp(b, t))
-                .collect(),
-            stroke_rgba: Interpolatable::lerp(&self.stroke_rgba, &target.stroke_rgba, t),
-            stroke_width: self.stroke_width.lerp(&target.stroke_width, t),
-            fill_rgba: Interpolatable::lerp(&self.fill_rgba, &target.fill_rgba, t),
-            // _need_update: RefCell::new(true),
-            // _extract_cache: RefCell::new(None),
-        }
     }
 }
 
@@ -543,65 +480,6 @@ impl From<Polygon> for VItem {
 impl Extract for Polygon {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        // trace!("extract");
-        // let mut need_update = self._need_update.borrow_mut();
-        // let mut cache = self._extract_cache.borrow_mut();
-        // if *need_update || cache.is_none() {
-        //     trace!("extract: replace vitem");
-        //     cache.replace(VItem::from(self.clone()));
-        //     *need_update = false;
-        // }
-        // cache.as_ref().unwrap().extract()
         VItem::from(self.clone()).extract_into(buf);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use assert_float_eq::assert_float_absolute_eq;
-
-    use super::*;
-    #[test]
-    fn test_square() {
-        let square = Square::new(2.0).with(|data| {
-            data.shift(DVec3::NEG_Y)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::X);
-        });
-        assert_float_absolute_eq!(square.center.distance_squared(DVec3::NEG_Y), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Z), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::NEG_Y), 0.0, 1e-10);
-        let square = Square::new(2.0).with(|data| {
-            data.shift(DVec3::X)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
-        });
-        assert_float_absolute_eq!(square.center.distance_squared(DVec3::X), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Y), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::X), 0.0, 1e-10);
-        let square = Square::new(2.0).with(|data| {
-            data.shift(DVec3::NEG_Z);
-        });
-        assert_float_absolute_eq!(square.center.distance_squared(DVec3::NEG_Z), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Y), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::Z), 0.0, 1e-10);
-        let square = Square::new(2.0).with(|data| {
-            data.shift(DVec3::Y)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
-        });
-        assert_float_absolute_eq!(square.center.distance_squared(DVec3::Y), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.up.distance_squared(DVec3::NEG_Z), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::Y), 0.0, 1e-10);
-        let square = Square::new(2.0).with(|data| {
-            data.shift(DVec3::Z);
-        });
-        assert_float_absolute_eq!(square.center.distance_squared(DVec3::Z), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Y), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::Z), 0.0, 1e-10);
-        let square = Square::new(2.0).with(|data| {
-            data.shift(DVec3::NEG_X)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
-        });
-        assert_float_absolute_eq!(square.center.distance_squared(DVec3::NEG_X), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.up.distance_squared(DVec3::Y), 0.0, 1e-10);
-        assert_float_absolute_eq!(square.normal.distance_squared(DVec3::NEG_X), 0.0, 1e-10);
     }
 }
