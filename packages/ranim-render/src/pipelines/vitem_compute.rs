@@ -2,26 +2,26 @@ use std::ops::Deref;
 
 use crate::{WgpuContext, resource::GpuResource};
 
-pub struct ClipBox2dPipeline {
+pub struct VItemComputePipeline {
     pipeline: wgpu::ComputePipeline,
 }
 
-pub struct Clipbox2dComputeBindGroup(wgpu::BindGroup);
+pub struct VItemComputeBindGroup(wgpu::BindGroup);
 
-impl AsRef<wgpu::BindGroup> for Clipbox2dComputeBindGroup {
+impl AsRef<wgpu::BindGroup> for VItemComputeBindGroup {
     fn as_ref(&self) -> &wgpu::BindGroup {
         &self.0
     }
 }
 
-impl Clipbox2dComputeBindGroup {
+impl VItemComputeBindGroup {
     pub fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
         ctx.device
             .create_bind_group_layout(&Self::bind_group_layout_desc())
     }
     pub fn bind_group_layout_desc<'a>() -> wgpu::BindGroupLayoutDescriptor<'a> {
         wgpu::BindGroupLayoutDescriptor {
-            label: Some("ClipBox 2d Points Bind Group Layout"),
+            label: Some("VItem Compute Bind Group Layout"),
             entries: &[
                 // plane: (origin, basis_u, basis_v)
                 wgpu::BindGroupLayoutEntry {
@@ -103,8 +103,8 @@ impl Clipbox2dComputeBindGroup {
         point_cnt_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("ClipBox 2d Compute Bind Group"),
-            layout: &Clipbox2dComputeBindGroup::bind_group_layout(ctx),
+            label: Some("VItem Compute Bind Group"),
+            layout: &VItemComputeBindGroup::bind_group_layout(ctx),
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -166,27 +166,28 @@ impl Clipbox2dComputeBindGroup {
     }
 }
 
-impl Deref for ClipBox2dPipeline {
+impl Deref for VItemComputePipeline {
     type Target = wgpu::ComputePipeline;
     fn deref(&self) -> &Self::Target {
         &self.pipeline
     }
 }
 
-impl GpuResource for ClipBox2dPipeline {
+impl GpuResource for VItemComputePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
 
-        let module = &device.create_shader_module(wgpu::include_wgsl!("./shaders/clipbox_2d.wgsl"));
+        let module =
+            &device.create_shader_module(wgpu::include_wgsl!("./shaders/vitem_compute.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("ClipBox 2d Pipeline Layout"),
-            bind_group_layouts: &[&Clipbox2dComputeBindGroup::bind_group_layout(wgpu_ctx)],
+            label: Some("VItemCompute Pipeline Layout"),
+            bind_group_layouts: &[&VItemComputeBindGroup::bind_group_layout(wgpu_ctx)],
             push_constant_ranges: &[],
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("ClipBox 2d Pipeline"),
+            label: Some("VItemCompute Pipeline"),
             layout: Some(&pipeline_layout),
             module,
             entry_point: Some("cs_main"),

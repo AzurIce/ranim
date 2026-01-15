@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use crate::{
     animation::{AnimationCell, CoreItemAnimation},
-    core_item::{AnyExtractCoreItem, CoreItem, vitem::VItemPrimitive, vitem_2d::VItem2d},
+    core_item::{AnyExtractCoreItem, CoreItem, vitem::VItem},
     prelude::CameraFrame,
 };
 
@@ -92,10 +92,8 @@ impl AnimationStore {
 pub struct CoreItemStore {
     /// Id, CameraFrames
     pub camera_frames: Vec<((usize, usize), CameraFrame)>,
-    /// Id, VItemPrimitive
-    pub vitems: Vec<((usize, usize), VItemPrimitive)>,
-    /// Id, VItem2d
-    pub vitems2d: Vec<((usize, usize), VItem2d)>,
+    /// Id, VItem
+    pub vitems: Vec<((usize, usize), VItem)>,
 }
 
 impl CoreItemStore {
@@ -108,12 +106,10 @@ impl CoreItemStore {
     pub fn update(&mut self, items: impl Iterator<Item = ((usize, usize), CoreItem)>) {
         self.camera_frames.clear();
         self.vitems.clear();
-        self.vitems2d.clear();
         for (id, item) in items {
             match item {
                 CoreItem::CameraFrame(x) => self.camera_frames.push((id, x)),
-                CoreItem::VItemPrimitive(x) => self.vitems.push((id, x)),
-                CoreItem::VItem2D(x) => self.vitems2d.push((id, x)),
+                CoreItem::VItem(x) => self.vitems.push((id, x)),
             }
         }
     }
@@ -138,12 +134,12 @@ mod tests {
         }
 
         let store = AnimationStore::new();
-        let anim = store.push_animation(A::<VItemPrimitive>::default().into_animation_cell());
+        let anim = store.push_animation(A::<VItem>::default().into_animation_cell());
         // drop(store); // This should cause a compile error because anim's lifetime is tied to store
-        assert_eq!(anim.eval_alpha(0.0), VItemPrimitive::default());
+        assert_eq!(anim.eval_alpha(0.0), VItem::default());
         assert_eq!(
             anim.eval_alpha_core_item(0.0),
-            vec![CoreItem::VItemPrimitive(VItemPrimitive::default())]
+            vec![CoreItem::VItem(VItem::default())]
         );
         drop(store);
     }

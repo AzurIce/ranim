@@ -19,7 +19,6 @@ pub mod typst;
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
 use ranim_core::core_item::CoreItem;
-use ranim_core::core_item::vitem_2d::VItem2d;
 use ranim_core::traits::Anchor;
 use ranim_core::{Extract, color, glam};
 
@@ -152,7 +151,7 @@ impl Scale for VItem {
 }
 
 /// Default stroke width
-pub use ranim_core::core_item::vitem_2d::DEFAULT_STROKE_WIDTH;
+pub use ranim_core::core_item::vitem::DEFAULT_STROKE_WIDTH;
 
 impl VItem {
     /// Close the VItem
@@ -227,7 +226,7 @@ impl VItem {
 impl Extract for VItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(CoreItem::VItem2D(VItem2d {
+        buf.push(CoreItem::VItem(ranim_core::core_item::vitem::VItem {
             origin: self.vpoints.first().unwrap().as_vec3(),
             basis: (
                 self.proj.corrected_basis_u().as_vec3(),
