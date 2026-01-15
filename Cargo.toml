@@ -42,7 +42,7 @@ tracing-indicatif = "0.3.14"
 tracing-subscriber = "0.3.22"
 itertools = "0.14.0"
 bytemuck = "1.24.0"
-wgpu = "27.0.1"
+wgpu = "27.0.0"
 image = "0.25.9"
 derive_more = "2.1.1"
 

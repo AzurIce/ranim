@@ -8,10 +8,13 @@ use ranim_core::{Scene, SceneConstructor, SealedRanimScene, color};
 use ranim_render::Renderer;
 use ranim_render::resource::RenderPool;
 use ranim_render::utils::WgpuContext;
-use std::time::Instant;
 use timeline::TimelineState;
 use tracing::{error, info};
+use web_time::Instant;
 use wgpu;
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
 // Copied from original lib.rs
 pub struct TimelineInfoState {
@@ -43,6 +46,7 @@ pub enum AppCmd {
 pub struct RanimApp {
     cmd_rx: Receiver<AppCmd>,
     pub cmd_tx: Sender<AppCmd>,
+    #[allow(unused)]
     title: String,
     clear_color: wgpu::Color,
     timeline: SealedRanimScene,
@@ -135,10 +139,14 @@ impl RanimApp {
             return;
         }
 
+        tracing::info!("preparing renderer...");
         let Some(render_state) = frame.wgpu_render_state() else {
+            tracing::info!("frame.wgpu_render_state() is none");
+            tracing::info!("{:?}", frame.info());
             return;
         };
 
+        tracing::info!("constructing renderer...");
         // Construct WgpuContext using eframe's resources.
         // NOTE: We assume ranim-render doesn't strictly depend on the instance for the operations we do here.
         let ctx = WgpuContext {
@@ -265,56 +273,95 @@ impl eframe::App for RanimApp {
     }
 }
 
-pub fn run_app(app: RanimApp) {
-    let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title(&app.title)
-            .with_inner_size([1280.0, 720.0]),
-        renderer: eframe::Renderer::Wgpu,
-        ..Default::default()
-    };
+pub fn run_app(app: RanimApp, #[cfg(target_arch = "wasm32")] container_id: String) {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let native_options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_title(&app.title)
+                .with_inner_size([1280.0, 720.0]),
+            renderer: eframe::Renderer::Wgpu,
+            ..Default::default()
+        };
 
-    // We need to clone title because run_native takes String (or &str) and app is moved into closure
-    let title = app.title.clone();
+        // We need to clone title because run_native takes String (or &str) and app is moved into closure
+        let title = app.title.clone();
 
-    eframe::run_native(
-        &title,
-        native_options,
-        Box::new(|_cc| {
-            // If we wanted to access wgpu context on creation, we could do it here from _cc.wgpu_render_state
-            Ok(Box::new(app))
-        }),
-    )
-    .unwrap();
+        eframe::run_native(
+            &title,
+            native_options,
+            Box::new(|_cc| {
+                // If we wanted to access wgpu context on creation, we could do it here from _cc.wgpu_render_state
+                Ok(Box::new(app))
+            }),
+        )
+        .unwrap();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        use wasm_bindgen::JsCast;
+        let web_options = eframe::WebOptions {
+            ..Default::default()
+        };
+
+        // Handling canvas creation if not found to ensure compatibility
+        let document = web_sys::window().unwrap().document().unwrap();
+        let canvas = document
+            .get_element_by_id(&container_id)
+            .and_then(|c| c.dyn_into::<web_sys::HtmlCanvasElement>().ok());
+
+        let canvas = if let Some(canvas) = canvas {
+            canvas
+        } else {
+            let canvas = document.create_element("canvas").unwrap();
+            canvas.set_id(&container_id);
+            document.body().unwrap().append_child(&canvas).unwrap();
+            canvas.dyn_into::<web_sys::HtmlCanvasElement>().unwrap()
+        };
+
+        wasm_bindgen_futures::spawn_local(async {
+            eframe::WebRunner::new()
+                .start(canvas, web_options, Box::new(|_cc| Ok(Box::new(app))))
+                .await
+                .expect("failed to start eframe");
+        });
+    }
 }
 
 pub fn preview_constructor_with_name(scene: impl SceneConstructor, name: &str) {
     let app = RanimApp::new(scene, name.to_string());
-    run_app(app);
+    run_app(
+        app,
+        #[cfg(target_arch = "wasm32")]
+        format!("ranim-app-{name}"),
+    );
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn preview_scene(scene: &Scene) {
-    preview_scene_with_name(scene, "Ranim Preview");
+    preview_scene_with_name(scene, scene.name);
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn preview_scene_with_name(scene: &Scene, name: &str) {
     let mut app = RanimApp::new(scene.constructor.clone(), name.to_string());
     app.set_clear_color_str(scene.config.clear_color);
-    run_app(app);
+    run_app(
+        app,
+        #[cfg(target_arch = "wasm32")]
+        format!("ranim-app-{name}"),
+    );
 }
 
 // WASM support needs refactoring, mostly keeping it commented or adapting basic entry point.
 #[cfg(target_arch = "wasm32")]
 mod wasm {
-    use super::*;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen(start)]
     pub async fn wasm_start() {
         console_error_panic_hook::set_once();
-        tracing_wasm::set_as_global_default();
-
-        // eframe::WebRunner would be used here.
-        // For now, leaving empty or placeholder.
+        wasm_tracing::set_as_global_default();
     }
 }
