@@ -11,7 +11,6 @@ profiling = ["dep:wgpu-profiler", "dep:puffin", "dep:profiling"]
 
 [dependencies]
 ranim-core.workspace = true
-wgpu.workspace = true
 wgpu-profiler = { workspace = true, optional = true }
 puffin = { version = "0.19.1", optional = true }
 profiling = { version = "1.0.17", optional = true, features = [
@@ -25,6 +24,12 @@ pollster = "0.4.0"
 async-channel = "2.5.0"
 variadics_please = "1.1.0"
 slotmap = "1.1.1"
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+wgpu.workspace = true
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wgpu = { workspace = true, features = ["fragile-send-sync-non-atomic-wasm"] }
 
 [package.metadata.docs.rs]
 all-features = true

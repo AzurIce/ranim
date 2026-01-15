@@ -113,6 +113,18 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    pub fn ratio(&self) -> f32 {
+        self.width as f32 / self.height as f32
+    }
+
     pub fn new(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> Self {
         let resolution_info = ResolutionInfo::new(ctx, width, height, oit_layers);
         let render_textures = RenderTextures::new(ctx, width, height);

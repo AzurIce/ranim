@@ -56,6 +56,7 @@ pub struct RenderTextures {
     pub depth_stencil_texture: ReadbackWgpuTexture,
     pub render_view: wgpu::TextureView,
     pub linear_render_view: wgpu::TextureView,
+    pub depth_texture_view: wgpu::TextureView,
     // pub(crate) multisample_view: wgpu::TextureView,
     pub(crate) depth_stencil_view: wgpu::TextureView,
 }
@@ -117,7 +118,9 @@ impl RenderTextures {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Depth32Float,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::COPY_SRC
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
         );
@@ -136,12 +139,19 @@ impl RenderTextures {
         let depth_stencil_view =
             depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        let depth_texture_view = depth_stencil_texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("Depth Texture View"),
+            aspect: wgpu::TextureAspect::DepthOnly,
+            ..Default::default()
+        });
+
         Self {
             render_texture,
             // multisample_texture,
             depth_stencil_texture,
             render_view,
             linear_render_view,
+            depth_texture_view,
             // multisample_view,
             depth_stencil_view,
         }
