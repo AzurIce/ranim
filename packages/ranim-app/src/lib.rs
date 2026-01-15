@@ -1,6 +1,8 @@
 mod timeline;
+mod depth_visual;
 
 use async_channel::{Receiver, Sender, unbounded};
+use depth_visual::DepthVisualPipeline;
 use eframe::egui;
 use ranim_core::color::LinearSrgb;
 use ranim_core::store::CoreItemStore;
@@ -43,6 +45,12 @@ pub enum AppCmd {
     ReloadScene(Scene, Sender<()>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewMode {
+    Output,
+    Depth,
+}
+
 pub struct RanimApp {
     cmd_rx: Receiver<AppCmd>,
     pub cmd_tx: Sender<AppCmd>,
@@ -60,9 +68,16 @@ pub struct RanimApp {
     // Rendering
     renderer: Option<Renderer>,
     texture_id: Option<egui::TextureId>,
+    depth_texture_id: Option<egui::TextureId>,
+    view_mode: ViewMode,
     wgpu_ctx: Option<WgpuContext>,
     last_render_time: Option<std::time::Duration>,
     last_eval_time: Option<std::time::Duration>,
+
+    // Depth Visual
+    depth_visual_pipeline: Option<DepthVisualPipeline>,
+    depth_visual_texture: Option<wgpu::Texture>,
+    depth_visual_view: Option<wgpu::TextureView>,
 }
 
 impl RanimApp {
@@ -92,9 +107,14 @@ impl RanimApp {
             play_prev_t: None,
             renderer: None,
             texture_id: None,
+            depth_texture_id: None,
+            view_mode: ViewMode::Output,
             wgpu_ctx: None,
             last_render_time: None,
             last_eval_time: None,
+            depth_visual_pipeline: None,
+            depth_visual_texture: None,
+            depth_visual_view: None,
         }
     }
 
@@ -162,6 +182,31 @@ impl RanimApp {
 
         let renderer = Renderer::new(&ctx, 2560, 1440, 8); // TODO: dynamic size
 
+        // Init Depth Visual Pipeline
+        if self.depth_visual_pipeline.is_none() {
+            self.depth_visual_pipeline = Some(DepthVisualPipeline::new(&ctx));
+        }
+        // Init Depth Visual Texture
+        if self.depth_visual_texture.is_none() {
+            let texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("Depth Visual Texture"),
+                size: wgpu::Extent3d {
+                    width: renderer.width(),
+                    height: renderer.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            });
+            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+            self.depth_visual_texture = Some(texture);
+            self.depth_visual_view = Some(view);
+        }
+
         // Register texture with egui
         let texture_view = &renderer.render_textures.linear_render_view;
         let id = render_state.renderer.write().register_native_texture(
@@ -169,8 +214,15 @@ impl RanimApp {
             texture_view,
             wgpu::FilterMode::Linear,
         );
+        let depth_view = self.depth_visual_view.as_ref().unwrap();
+        let depth_id = render_state.renderer.write().register_native_texture(
+            &render_state.device,
+            depth_view,
+            wgpu::FilterMode::Nearest,
+        );
 
         self.texture_id = Some(id);
+        self.depth_texture_id = Some(depth_id);
         self.renderer = Some(renderer);
         self.wgpu_ctx = Some(ctx);
     }
@@ -190,6 +242,51 @@ impl RanimApp {
 
             let start = Instant::now();
             renderer.render_store_with_pool(ctx, self.clear_color, &self.store, &mut self.pool);
+
+            if let (Some(pipeline), Some(view)) = (
+                self.depth_visual_pipeline.as_ref(),
+                self.depth_visual_view.as_ref(),
+            ) {
+                let mut encoder = ctx
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("Depth Visual Encoder"),
+                    });
+
+                let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Depth Visual Bind Group"),
+                    layout: &pipeline.bind_group_layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(
+                            &renderer.render_textures.depth_texture_view,
+                        ),
+                    }],
+                });
+
+                {
+                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Depth Visual Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view,
+                            resolve_target: None,
+                            depth_slice: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                    rpass.set_pipeline(&pipeline.pipeline);
+                    rpass.set_bind_group(0, &bind_group, &[]);
+                    rpass.draw(0..3, 0..1);
+                }
+                ctx.queue.submit(Some(encoder.finish()));
+            }
+
             self.last_render_time = Some(start.elapsed());
             self.pool.clean();
         }
@@ -228,6 +325,11 @@ impl eframe::App for RanimApp {
                             ctx.set_visuals(egui::Visuals::dark());
                         }
                     }
+
+                    ui.separator();
+                    ui.selectable_value(&mut self.view_mode, ViewMode::Output, "Output");
+                    ui.selectable_value(&mut self.view_mode, ViewMode::Depth, "Depth");
+                    ui.separator();
 
                     if let Some(duration) = self.last_render_time {
                         ui.label(format!("Render: {:.2}ms", duration.as_secs_f64() * 1000.0));
@@ -278,7 +380,12 @@ impl eframe::App for RanimApp {
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            if let Some(tid) = self.texture_id {
+            let texture_id = match self.view_mode {
+                ViewMode::Output => self.texture_id,
+                ViewMode::Depth => self.depth_texture_id,
+            };
+
+            if let Some(tid) = texture_id {
                 // Maintain aspect ratio
                 // TODO: We could update renderer size here if we want dynamic resolution
                 let available_size = ui.available_size();
