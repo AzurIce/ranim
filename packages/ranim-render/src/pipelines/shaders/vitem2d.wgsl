@@ -289,6 +289,13 @@ struct VertexOutput {
     @location(0) pos: vec2<f32>,
 }
 
+// At here we simply construct two triangles that covers all vitem points.
+//
+// We'll need the following vertex data:
+// - frag_pos: the clip space coordinate.
+// - pos: the pos in the plane's coordinate system used to calculate sdf things
+//
+// Actually, we don't mind which coordinate system `pos` use. As long as it
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;

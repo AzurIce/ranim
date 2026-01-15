@@ -4,7 +4,7 @@ use color::{AlphaColor, Srgb};
 use glam::{DVec3, dvec3};
 use itertools::Itertools;
 
-use crate::vitem::DEFAULT_STROKE_WIDTH;
+use crate::vitem::{DEFAULT_STROKE_WIDTH, Proj};
 use ranim_core::traits::{
     Alignable, BoundingBox, FillColor, Interpolatable, Opacity, Rotate, Scale, Shift, StrokeColor,
     StrokeWidth, With,
@@ -352,6 +352,10 @@ impl From<Rectangle> for Polygon {
             value.p2 + value.up * value.height(),
         ];
         Polygon {
+            proj: Proj {
+                basis_u: value.up.normalize(),
+                basis_v: value.up.cross(value.normal).normalize(),
+            },
             points,
             stroke_rgba: value.stroke_rgba,
             stroke_width: value.stroke_width,
@@ -377,6 +381,7 @@ impl Extract for Rectangle {
 /// A Polygon with uniform stroke and fill
 #[derive(Clone, Debug)]
 pub struct Polygon {
+    pub proj: Proj,
     /// Corner points
     pub points: Vec<DVec3>,
     /// Stroke rgba
@@ -393,6 +398,7 @@ impl Polygon {
     /// Constructor
     pub fn new(points: Vec<DVec3>) -> Self {
         Self {
+            proj: Proj::default(),
             points,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
@@ -448,6 +454,7 @@ impl Alignable for Polygon {
 impl Interpolatable for Polygon {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         Self {
+            proj: self.proj.lerp(&target.proj, t),
             points: self
                 .points
                 .iter()
@@ -507,6 +514,7 @@ impl From<Polygon> for VItem {
             stroke_rgba,
             stroke_width,
             fill_rgba,
+            proj,
             ..
         } = value;
         assert!(points.len() > 2);
@@ -523,7 +531,7 @@ impl From<Polygon> for VItem {
 
         // Interleave anchors and handles
         let vpoints = anchors.into_iter().interleave(handles).collect::<Vec<_>>();
-        VItem::from_vpoints(vpoints).with(|vitem| {
+        VItem::from_vpoints(vpoints).with_proj(proj).with(|vitem| {
             vitem
                 .set_fill_color(fill_rgba)
                 .set_stroke_color(stroke_rgba)

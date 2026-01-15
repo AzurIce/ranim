@@ -26,15 +26,17 @@ use ranim::{
 #[scene]
 #[output(save_frames = true, dir = "output")]
 fn test(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
-    let n = 8;
-    let arcs = (0..n)
-        .map(|i: i32| {
-            let angle = i as f64 / (n - 1) as f64 * PI * 2.0;
-            ArcBetweenPoints::new(DVec3::ZERO, dvec3(angle.cos(), angle.sin(), 0.0), PI)
-        })
-        .collect::<Vec<_>>();
-    let r_arcs = r.insert(arcs);
+    let _r_cam = r.insert(CameraFrame::default().with(|x| {
+        x.perspective_blend = 1.0;
+        x.pos = DVec3::Z * 5.0;
+    }));
+    let mut square = VItem::from(Square::new(4.0).with(|x| {
+        x.set_color(manim::BLUE_C).set_fill_opacity(0.5);
+    }));
+    let r_square = r.insert(square.clone());
+    r.timeline_mut(r_square).play(square.transform(|x| {
+        x.rotate(PI / 2.0, DVec3::Y);
+    }));
 
     // text.set_stroke_color(manim::RED_C)
     //     .set_stroke_width(0.05)

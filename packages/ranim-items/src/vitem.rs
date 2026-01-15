@@ -31,46 +31,56 @@ use ranim_core::{
 };
 
 /// The projection of a [`VItem`].
-#[derive(Default, Debug, Clone, Copy, PartialEq, ranim_macros::Interpolatable)]
+#[derive(Debug, Clone, Copy, PartialEq, ranim_macros::Interpolatable)]
 pub struct Proj {
-    quat: DQuat,
+    /// The basis vector in the u direction.
+    basis_u: DVec3,
+    /// The basis vector in the v direction.
+    basis_v: DVec3,
 }
 
-impl From<DQuat> for Proj {
-    fn from(value: DQuat) -> Self {
-        Self { quat: value }
+impl Default for Proj {
+    fn default() -> Self {
+        Self {
+            basis_u: DVec3::X,
+            basis_v: DVec3::Y,
+        }
     }
 }
 
 impl Proj {
-    /// The initial basis of the projection target plane.
-    pub const INITIAL_BASIS: (DVec3, DVec3) = (DVec3::X, DVec3::Y);
-    /// The initial normal of the projection target plane.
-    pub const INITIAL_NORMAL: DVec3 = DVec3::Z;
-
-    /// Get the normal of the projection target plane.
-    #[inline]
-    pub fn normal(&self) -> DVec3 {
-        self.quat * Proj::INITIAL_NORMAL
-    }
-    /// Get the basis_u of the projection target plane.
-    #[inline]
+    /// The basis vector in the u direction.
     pub fn basis_u(&self) -> DVec3 {
-        self.quat * Proj::INITIAL_BASIS.0
+        self.basis_u.normalize()
     }
-    /// Get the basis_v of the projection target plane.
-    #[inline]
+    /// The basis vector in the v direction.
     pub fn basis_v(&self) -> DVec3 {
-        self.quat * Proj::INITIAL_BASIS.1
+        self.basis_v.normalize()
     }
-    /// Get the basis of the projection target plane.
-    #[inline]
+    /// The basis vectors
     pub fn basis(&self) -> (DVec3, DVec3) {
         (self.basis_u(), self.basis_v())
     }
+    /// The corrected basis vector in the u direction.
+    /// This is same as [`Proj::basis_u`].
+    pub fn corrected_basis_u(&self) -> DVec3 {
+        self.basis_u.normalize()
+    }
+    /// The corrected basis vector in the v direction.
+    /// This is recalculated to ensure orthogonality.
+    pub fn corrected_basis_v(&self) -> DVec3 {
+        let normal = self.basis_u.cross(self.basis_v);
+        normal.cross(self.basis_u).normalize()
+    }
     /// Rotate the projection.
     pub fn rotate(&mut self, angle: f64, axis: DVec3) {
-        self.quat = DQuat::from_axis_angle(axis, angle) * self.quat;
+        self.basis_u = self.basis_u.rotate_axis(axis, angle).normalize();
+        self.basis_v = self.basis_v.rotate_axis(axis, angle).normalize();
+    }
+    /// Get the normal vector of the projection target plane.
+    #[inline]
+    pub fn normal(&self) -> DVec3 {
+        self.basis_u.cross(self.basis_v).normalize()
     }
 }
 
@@ -91,9 +101,7 @@ impl Proj {
 ///     dvec3(0.5, 1.0, 0.0),
 /// ]);
 /// ```
-///
-///
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, ranim_macros::Interpolatable)]
 pub struct VItem {
     /// The projection info.
     ///
@@ -172,6 +180,11 @@ impl VItem {
         self.vpoints.get(idx * 2)
     }
     /// Set the projection of the VItem
+    pub fn with_proj(mut self, proj: Proj) -> Self {
+        self.proj = proj;
+        self
+    }
+    /// Set the projection of the VItem
     pub fn set_proj(&mut self, proj: Proj) {
         self.proj = proj;
     }
@@ -199,14 +212,17 @@ impl VItem {
     }
 
     pub(crate) fn get_render_points(&self) -> Vec<Vec3> {
-        let (u, v) = self.proj.basis();
         let origin = self.vpoints.first().unwrap();
         self.vpoints
             .iter()
             .zip(self.vpoints.get_closepath_flags().iter())
             .map(|(p, f)| {
                 let p = p - origin;
-                vec3(p.dot(u) as f32, p.dot(v) as f32, if *f { 1.0 } else { 0.0 })
+                vec3(
+                    p.dot(self.proj.corrected_basis_u()) as f32,
+                    p.dot(self.proj.corrected_basis_v()) as f32,
+                    if *f { 1.0 } else { 0.0 },
+                )
             })
             .collect()
     }
@@ -222,7 +238,10 @@ impl Extract for VItem {
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         buf.push(CoreItem::VItem2D(VItem2d {
             origin: self.vpoints.first().unwrap().as_vec3(),
-            basis: (self.proj.basis_u().as_vec3(), self.proj.basis_v().as_vec3()),
+            basis: (
+                self.proj.corrected_basis_u().as_vec3(),
+                self.proj.corrected_basis_v().as_vec3(),
+            ),
             points2d: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
@@ -248,23 +267,6 @@ impl Alignable for VItem {
         other.stroke_widths.resize_preserving_order(len);
         self.fill_rgbas.resize_preserving_order(len);
         other.fill_rgbas.resize_preserving_order(len);
-    }
-}
-
-impl Interpolatable for VItem {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        let proj = self.proj.lerp(&target.proj, t);
-        let vpoints = self.vpoints.lerp(&target.vpoints, t);
-        let stroke_rgbas = self.stroke_rgbas.lerp(&target.stroke_rgbas, t);
-        let stroke_widths = self.stroke_widths.lerp(&target.stroke_widths, t);
-        let fill_rgbas = self.fill_rgbas.lerp(&target.fill_rgbas, t);
-        Self {
-            proj,
-            vpoints,
-            stroke_widths,
-            stroke_rgbas,
-            fill_rgbas,
-        }
     }
 }
 
