@@ -138,14 +138,11 @@ impl Renderer {
                 use graph::view::*;
                 // View Render Nodes that executes per-viewport in every frame
                 let mut render_graph = ViewRenderGraph::new();
-                let vitem_compute = render_graph.insert_node(VItemComputeRenderNode);
-                let vitem2d_depth = render_graph.insert_node(VItem2dDepthNode);
-                let vitem2d_render = render_graph.insert_node(VItem2dColorNode);
-                let vitem_render = render_graph.insert_node(VItemRenderNode);
+                let vitem_compute = render_graph.insert_node(VItemComputeNode);
+                let vitem2d_depth = render_graph.insert_node(VItemDepthNode);
+                let vitem2d_render = render_graph.insert_node(VItemColorNode);
                 let oit_resolve = render_graph.insert_node(OITResolveNode);
-                render_graph.insert_edge(vitem_compute, vitem_render);
                 render_graph.insert_edge(vitem_compute, vitem2d_depth);
-
                 render_graph.insert_edge(vitem2d_depth, vitem2d_render);
                 render_graph.insert_edge(vitem2d_render, oit_resolve);
                 render_graph
@@ -184,12 +181,6 @@ impl Renderer {
         self.packets.extend(
             store
                 .vitems
-                .iter()
-                .map(|(_id, data)| pool.alloc_packet(ctx, data)),
-        );
-        self.packets.extend(
-            store
-                .vitems2d
                 .iter()
                 .map(|(_id, data)| pool.alloc_packet(ctx, data)),
         );
@@ -431,7 +422,8 @@ impl ResolutionInfo {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::all(),
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT
+                            | wgpu::ShaderStages::COMPUTE,
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,

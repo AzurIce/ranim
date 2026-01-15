@@ -21,7 +21,7 @@ use typst::{
 };
 use typst_kit::fonts::{FontSearcher, Fonts};
 
-use crate::vitem::{Group, VItem, svg::SvgItem};
+use crate::vitem::{VItem, svg::SvgItem};
 use ranim_core::{
     Extract, color,
     components::width::Width,
@@ -233,7 +233,7 @@ impl World for TypstWorldWithSource<'_> {
 #[derive(Clone)]
 pub struct TypstText {
     chars: String,
-    vitems: Group<VItem>,
+    vitems: Vec<VItem>,
 }
 
 impl TypstText {
@@ -241,7 +241,7 @@ impl TypstText {
         let svg = SvgItem::new(typst_svg(str));
         let chars = str.to_string();
 
-        let vitems = Group::<VItem>::from(svg);
+        let vitems = Vec::<VItem>::from(svg);
         assert_eq!(chars.len(), vitems.len());
         Self { chars, vitems }
     }
@@ -257,7 +257,7 @@ impl TypstText {
             .replace("\r", "")
             .replace("\t", "");
 
-        let vitems = Group::<VItem>::from(svg);
+        let vitems = Vec::<VItem>::from(svg);
         assert_eq!(chars.len(), vitems.len());
         Self { chars, vitems }
     }
@@ -271,7 +271,7 @@ impl TypstText {
             .replace("\r", "")
             .replace("\t", "");
 
-        let vitems = Group::<VItem>::from(svg);
+        let vitems = Vec::<VItem>::from(svg);
         assert_eq!(chars.len(), vitems.len());
         Self { chars, vitems }
     }
@@ -287,7 +287,7 @@ impl TypstText {
             .replace("\r", "")
             .replace("\t", "");
 
-        let vitems = Group::<VItem>::from(svg);
+        let vitems = Vec::<VItem>::from(svg);
         assert_eq!(chars.len(), vitems.len());
         Self { chars, vitems }
     }
@@ -322,14 +322,8 @@ impl Alignable for TypstText {
                                    last_neq_idx_a,
                                    last_neq_idx_b| {
             if last_neq_idx_a != ia || last_neq_idx_b != ib {
-                let mut vitems_a = self.vitems[last_neq_idx_a..ia]
-                    .iter()
-                    .cloned()
-                    .collect::<Group<_>>();
-                let mut vitems_b = other.vitems[last_neq_idx_b..ib]
-                    .iter()
-                    .cloned()
-                    .collect::<Group<_>>();
+                let mut vitems_a = self.vitems[last_neq_idx_a..ia].to_vec();
+                let mut vitems_b = other.vitems[last_neq_idx_b..ib].to_vec();
                 if vitems_a.is_empty() {
                     vitems_a.extend(vitems_b.iter().map(|x| {
                         x.clone().with(|x| {
@@ -402,8 +396,8 @@ impl Alignable for TypstText {
                 }
             });
 
-        self.vitems = Group(vitems_self);
-        other.vitems = Group(vitems_other);
+        self.vitems = vitems_self;
+        other.vitems = vitems_other;
     }
 }
 
@@ -414,7 +408,7 @@ impl Interpolatable for TypstText {
             .iter()
             .zip(&target.vitems)
             .map(|(a, b)| a.lerp(b, t))
-            .collect::<Group<_>>();
+            .collect::<Vec<_>>();
         Self {
             chars: self.chars.clone(),
             vitems,
@@ -422,7 +416,7 @@ impl Interpolatable for TypstText {
     }
 }
 
-impl From<TypstText> for Group<VItem> {
+impl From<TypstText> for Vec<VItem> {
     fn from(value: TypstText) -> Self {
         value.vitems
     }

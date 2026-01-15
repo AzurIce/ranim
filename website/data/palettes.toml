@@ -4,7 +4,7 @@ code = """
 use ranim::{
     color::palettes::manim::*,
     glam::{dvec2, dvec3},
-    items::{Group, vitem::geometry::Rectangle},
+    items::vitem::geometry::Rectangle,
     prelude::*,
 };
 
@@ -50,13 +50,13 @@ fn palettes(r: &mut RanimScene) {
                 })
             })
         })
-        .collect::<Group<_>>();
+        .collect::<Vec<_>>();
     r.insert(squares);
     r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
     r.timelines_mut().forward(0.01);
 }
 ```"""
-hash = "2b662a531315e5c893549e7ad6c87900c3dd908c"
+hash = "8e4a4bdb13b5ff4f8b395af06bf6ab4f6286d954"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/palettes_1920x1080_60.mp4"]
 wasm = false

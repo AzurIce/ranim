@@ -6,12 +6,9 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[features]
-default = ["vitem2d"]
-vitem2d = []
-
 [dependencies]
 ranim-core.workspace = true
+ranim-macros.workspace = true
 tracing.workspace = true
 itertools.workspace = true
 derive_more = { workspace = true, features = [

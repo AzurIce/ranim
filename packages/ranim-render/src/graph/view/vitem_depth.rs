@@ -1,13 +1,13 @@
 use crate::{
     RenderContext, RenderTextures,
     graph::{RenderPacketsQuery, view::ViewRenderNodeTrait},
-    pipelines::VItem2dDepthPipeline,
-    primitives::{viewport::ViewportGpuPacket, vitem2d::VItem2dRenderInstance},
+    pipelines::VItemDepthPipeline,
+    primitives::{viewport::ViewportGpuPacket, vitem::VItemRenderInstance},
 };
-pub struct VItem2dDepthNode;
+pub struct VItemDepthNode;
 
-impl ViewRenderNodeTrait for VItem2dDepthNode {
-    type Query = VItem2dRenderInstance;
+impl ViewRenderNodeTrait for VItemDepthNode {
+    type Query = VItemRenderInstance;
     fn run(
         &self,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
@@ -43,7 +43,7 @@ impl ViewRenderNodeTrait for VItem2dDepthNode {
             let mut rpass = encoder.begin_render_pass(&rpass_desc);
             rpass.set_pipeline(
                 &ctx.pipelines
-                    .get_or_init::<VItem2dDepthPipeline>(ctx.wgpu_ctx),
+                    .get_or_init::<VItemDepthPipeline>(ctx.wgpu_ctx),
             );
             rpass.set_bind_group(0, &ctx.resolution_info.bind_group, &[]);
             rpass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);

@@ -7,7 +7,7 @@ use ranim::{
     color,
     color::HueDirection,
     glam::{DMat2, dvec2},
-    items::vitem::{Group, geometry::ArcBetweenPoints},
+    items::vitem::geometry::ArcBetweenPoints,
     prelude::*,
 };
 
@@ -45,7 +45,7 @@ fn arc_between_points(r: &mut RanimScene) {
                 },
             )
         })
-        .collect::<Group<_>>();
+        .collect::<Vec<_>>();
     let r_arcs = r.new_timeline();
 
     r.timeline_mut(r_arcs)
@@ -57,7 +57,7 @@ fn arc_between_points(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "e09c69fc392fcd24aaee05d356123a2813deffc6"
+hash = "f31ce9f20b3031017fbb25ed56e15607f5ece27f"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
 wasm = true

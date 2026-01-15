@@ -1,7 +1,5 @@
 pub mod viewport;
-/// Primitive for vitem
 pub mod vitem;
-pub mod vitem2d;
 
 use crate::utils::WgpuContext;
 

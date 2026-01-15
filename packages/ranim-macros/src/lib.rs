@@ -25,6 +25,29 @@ fn ranim_path() -> proc_macro2::TokenStream {
     }
 }
 
+fn ranim_core_path() -> proc_macro2::TokenStream {
+    if let Ok(res) = crate_name("ranim-core") {
+        match (res, std::env::var("CARGO_CRATE_NAME").as_deref()) {
+            (FoundCrate::Itself, Ok("ranim-core") | Ok("ranim_core")) => return quote!(crate),
+            (FoundCrate::Name(name), _) => {
+                let ident = Ident::new(&name, Span::call_site());
+                return quote!(::#ident);
+            }
+            _ => (),
+        }
+    } else if let Ok(res) = crate_name("ranim") {
+        match (res, std::env::var("CARGO_CRATE_NAME").as_deref()) {
+            (FoundCrate::Itself, Ok("ranim")) => return quote!(crate::core),
+            (FoundCrate::Name(name), _) => {
+                let ident = Ident::new(&name, Span::call_site());
+                return quote!(::#ident::core);
+            }
+            _ => (),
+        }
+    }
+    ranim_path()
+}
+
 /// 解析单个属性（#[scene(...)] /  / #[output(...)]）
 #[derive(Default)]
 struct SceneAttrs {
@@ -178,93 +201,84 @@ pub fn wasm_demo_doc(_attr: TokenStream, _: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Fill)]
 pub fn derive_fill(input: TokenStream) -> TokenStream {
-    impl_derive(
-        input,
-        |ranim| quote! {#ranim::traits::Fill},
-        |ranim, field_positions| {
-            quote! {
-                fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-                    #(
-                        self.#field_positions.set_fill_opacity(opacity);
-                    )*
-                    self
-                }
-                fn fill_color(&self) -> #ranim::color::AlphaColor<#ranim::color::Srgb> {
-                    [#(self.#field_positions.fill_color(), )*].first().cloned().unwrap()
-                }
-                fn set_fill_color(&mut self, color:  #ranim::color::AlphaColor<#ranim::color::Srgb>) -> &mut Self {
-                    #(
-                        self.#field_positions.set_fill_color(color);
-                    )*
-                    self
-                }
+    let core = ranim_core_path();
+    impl_derive(input, quote! {#core::traits::Fill}, |field_positions| {
+        quote! {
+            fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+                #(
+                    self.#field_positions.set_fill_opacity(opacity);
+                )*
+                self
             }
-        },
-    )
+            fn fill_color(&self) -> #core::color::AlphaColor<#core::color::Srgb> {
+                [#(self.#field_positions.fill_color(), )*].first().cloned().unwrap()
+            }
+            fn set_fill_color(&mut self, color: #core::color::AlphaColor<#core::color::Srgb>) -> &mut Self {
+                #(
+                    self.#field_positions.set_fill_color(color);
+                )*
+                self
+            }
+        }
+    })
 }
 
 #[proc_macro_derive(Stroke)]
 pub fn derive_stroke(input: TokenStream) -> TokenStream {
-    impl_derive(
-        input,
-        |ranim| quote! {#ranim::traits::Stroke},
-        |ranim, field_positions| {
-            quote! {
-                fn stroke_color(&self) -> #ranim::color::AlphaColor<#ranim::color::Srgb> {
-                    [#(self.#field_positions.stroke_color(), )*].first().cloned().unwrap()
-                }
-                fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [#ranim::components::width::Width])) -> &mut Self {
-                    #(
-                        self.#field_positions.apply_stroke_func(&f);
-                    )*
-                    self
-                }
-                fn set_stroke_color(&mut self, color: #ranim::color::AlphaColor<#ranim::color::Srgb>) -> &mut Self {
-                    #(
-                        self.#field_positions.set_stroke_color(color);
-                    )*
-                    self
-                }
-                fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-                    #(
-                        self.#field_positions.set_stroke_opacity(opacity);
-                    )*
-                    self
-                }
+    let core = ranim_core_path();
+    impl_derive(input, quote! {#core::traits::Stroke}, |field_positions| {
+        quote! {
+            fn stroke_color(&self) -> #core::color::AlphaColor<#core::color::Srgb> {
+                [#(self.#field_positions.stroke_color(), )*].first().cloned().unwrap()
             }
-        },
-    )
+            fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [#core::components::width::Width])) -> &mut Self {
+                #(
+                    self.#field_positions.apply_stroke_func(&f);
+                )*
+                self
+            }
+            fn set_stroke_color(&mut self, color: #core::color::AlphaColor<#core::color::Srgb>) -> &mut Self {
+                #(
+                    self.#field_positions.set_stroke_color(color);
+                )*
+                self
+            }
+            fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+                #(
+                    self.#field_positions.set_stroke_opacity(opacity);
+                )*
+                self
+            }
+        }
+    })
 }
 
 #[proc_macro_derive(Partial)]
 pub fn derive_partial(input: TokenStream) -> TokenStream {
-    impl_derive(
-        input,
-        |ranim| quote! {#ranim::traits::Partial},
-        |_ranim, field_positions| {
-            quote! {
-                fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
-                    Self {
-                        #(
-                            #field_positions: self.#field_positions.get_partial(range.clone()),
-                        )*
-                    }
-                }
-                fn get_partial_closed(&self, range: std::ops::Range<f64>) -> Self {
-                    Self {
-                        #(
-                            #field_positions: self.#field_positions.get_partial(range.clone()),
-                        )*
-                    }
+    let core = ranim_core_path();
+    impl_derive(input, quote! {#core::traits::Partial}, |field_positions| {
+        quote! {
+            fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
+                Self {
+                    #(
+                        #field_positions: self.#field_positions.get_partial(range.clone()),
+                    )*
                 }
             }
-        },
-    )
+            fn get_partial_closed(&self, range: std::ops::Range<f64>) -> Self {
+                Self {
+                    #(
+                        #field_positions: self.#field_positions.get_partial(range.clone()),
+                    )*
+                }
+            }
+        }
+    })
 }
 
 #[proc_macro_derive(Empty)]
 pub fn derive_empty(input: TokenStream) -> TokenStream {
-    let ranim = ranim_path();
+    let core = ranim_core_path();
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let generics = &input.generics;
@@ -302,7 +316,7 @@ pub fn derive_empty(input: TokenStream) -> TokenStream {
     };
 
     let expanded = quote! {
-        impl #impl_generics #ranim::traits::Empty for #name #ty_generics #where_clause {
+        impl #impl_generics #core::traits::Empty for #name #ty_generics #where_clause {
             fn empty() -> Self {
                 #field_impls
             }
@@ -314,28 +328,26 @@ pub fn derive_empty(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Opacity)]
 pub fn derive_opacity(input: TokenStream) -> TokenStream {
-    impl_derive(
-        input,
-        |ranim| quote! {#ranim::traits::Opacity},
-        |_ranim, field_positions| {
-            quote! {
-                fn set_opacity(&mut self, opacity: f32) -> &mut Self {
-                    #(
-                        self.#field_positions.set_opacity(opacity);
-                    )*
-                    self
-                }
+    let core = ranim_core_path();
+    impl_derive(input, quote! {#core::traits::Opacity}, |field_positions| {
+        quote! {
+            fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+                #(
+                    self.#field_positions.set_opacity(opacity);
+                )*
+                self
             }
-        },
-    )
+        }
+    })
 }
 
 #[proc_macro_derive(Alignable)]
 pub fn derive_alignable(input: TokenStream) -> TokenStream {
+    let core = ranim_core_path();
     impl_derive(
         input,
-        |ranim| quote! {#ranim::traits::Alignable},
-        |_ranim, field_positions| {
+        quote! {#core::traits::Alignable},
+        |field_positions| {
             quote! {
                 fn is_aligned(&self, other: &Self) -> bool {
                     #(
@@ -354,15 +366,16 @@ pub fn derive_alignable(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Interpolatable)]
 pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
+    let core = ranim_core_path();
     impl_derive(
         input,
-        |ranim| quote! {#ranim::traits::Interpolatable},
-        |ranim, field_positions| {
+        quote! {#core::traits::Interpolatable},
+        |field_positions| {
             quote! {
                 fn lerp(&self, other: &Self, t: f64) -> Self {
                     Self {
                         #(
-                            #field_positions: #ranim::traits::Interpolatable::lerp(&self.#field_positions, &other.#field_positions, t),
+                            #field_positions: #core::traits::Interpolatable::lerp(&self.#field_positions, &other.#field_positions, t),
                         )*
                     }
                 }
@@ -373,7 +386,7 @@ pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(BoundingBox)]
 pub fn derive_bounding_box(input: TokenStream) -> TokenStream {
-    let ranim = ranim_path();
+    let core = ranim_core_path();
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let generics = &input.generics;
@@ -389,7 +402,7 @@ pub fn derive_bounding_box(input: TokenStream) -> TokenStream {
         .unwrap();
 
     let expanded = quote! {
-        impl #impl_generics #ranim::traits::BoundingBox for #name #ty_generics #where_clause {
+        impl #impl_generics #core::traits::BoundingBox for #name #ty_generics #where_clause {
             fn get_bounding_box(&self) -> [DVec3; 3] {
                 let [min, max] = [#(self.#field_positions.get_bounding_box(), )*]
                     .into_iter()
@@ -406,40 +419,34 @@ pub fn derive_bounding_box(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Position)]
 pub fn derive_position(input: TokenStream) -> TokenStream {
-    impl_derive(
-        input,
-        |ranim| {
-            quote! {#ranim::traits::Position}
-        },
-        |ranim, field_positions| {
-            quote! {
-                fn shift(&mut self, shift: DVec3) -> &mut Self {
-                    #(self.#field_positions.shift(shift);)*
-                    self
-                }
-
-                fn rotate_by_anchor(&mut self, angle: f64, axis: #ranim::glam::DVec3, anchor: #ranim::components::Anchor) -> &mut Self {
-                    #(self.#field_positions.rotate_by_anchor(angle, axis, anchor);)*
-                    self
-                }
-
-                fn scale_by_anchor(&mut self, scale: #ranim::glam::DVec3, anchor: #ranim::components::Anchor) -> &mut Self {
-                    #(self.#field_positions.scale_by_anchor(scale, anchor);)*
-                    self
-                }
+    let core = ranim_core_path();
+    impl_derive(input, quote! {#core::traits::Position}, |field_positions| {
+        quote! {
+            fn shift(&mut self, shift: DVec3) -> &mut Self {
+                #(self.#field_positions.shift(shift);)*
+                self
             }
-        },
-    )
+
+            fn rotate_by_anchor(&mut self, angle: f64, axis: #core::glam::DVec3, anchor: #core::components::Anchor) -> &mut Self {
+                #(self.#field_positions.rotate_by_anchor(angle, axis, anchor);)*
+                self
+            }
+
+            fn scale_by_anchor(&mut self, scale: #core::glam::DVec3, anchor: #core::components::Anchor) -> &mut Self {
+                #(self.#field_positions.scale_by_anchor(scale, anchor);)*
+                self
+            }
+        }
+    })
 }
 
 #[proc_macro_derive(PointsFunc)]
 pub fn derive_point_func(input: TokenStream) -> TokenStream {
+    let core = ranim_core_path();
     impl_derive(
         input,
-        |ranim| {
-            quote! {#ranim::traits::PointsFunc}
-        },
-        |_ranim, field_positions| {
+        quote! {#core::traits::PointsFunc},
+        |field_positions| {
             quote! {
                 fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self {
                     #(self.#field_positions.apply_points_func(f);)*
@@ -452,13 +459,9 @@ pub fn derive_point_func(input: TokenStream) -> TokenStream {
 
 fn impl_derive(
     input: TokenStream,
-    trait_path: impl Fn(&proc_macro2::TokenStream) -> proc_macro2::TokenStream,
-    impl_token: impl Fn(
-        &proc_macro2::TokenStream,
-        Vec<proc_macro2::TokenStream>,
-    ) -> proc_macro2::TokenStream,
+    trait_path: proc_macro2::TokenStream,
+    impl_token: impl Fn(Vec<proc_macro2::TokenStream>) -> proc_macro2::TokenStream,
 ) -> TokenStream {
-    let ranim = ranim_path();
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let generics = &input.generics;
@@ -473,8 +476,7 @@ fn impl_derive(
         .ok_or("cannot get field from unit struct")
         .unwrap();
 
-    let trait_path = trait_path(&ranim);
-    let impl_token = impl_token(&ranim, field_positions);
+    let impl_token = impl_token(field_positions);
     let expanded = quote! {
         impl #impl_generics #trait_path for #name #ty_generics #where_clause {
             #impl_token

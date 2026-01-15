@@ -3,10 +3,7 @@ use ranim::{
     color,
     color::palettes::manim,
     glam::DVec3,
-    items::{
-        Group,
-        vitem::{VItem, geometry::Square},
-    },
+    items::vitem::{VItem, geometry::Square},
     prelude::*,
     utils::rate_functions::linear,
 };
@@ -45,7 +42,7 @@ fn perspective_blend(r: &mut RanimScene) {
         (r.insert(face.clone()), face)
     });
 
-    let frac = 3.0;
+    let frac = 2.0;
     let transform_fns: [&dyn Fn(&mut VItem); 6] = [
         &(|data| {
             data.shift(DVec3::NEG_Y * side_length / frac)
@@ -81,7 +78,7 @@ fn perspective_blend(r: &mut RanimScene) {
         });
 
     let faces = square_faces.map(|(_, face)| face);
-    let mut faces = Group(faces.to_vec());
+    let mut faces = faces.to_vec();
 
     let r_faces = r.new_timeline();
     r.timelines_mut().sync(); // TODO: make this better

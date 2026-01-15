@@ -1,11 +1,11 @@
 use std::{cmp::Ordering, ops::Range};
 
 use color::{AlphaColor, ColorSpace, Srgb};
-use glam::{DAffine2, DMat3, DMat4, DVec2, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
+use glam::{DAffine2, DMat3, DMat4, DQuat, DVec2, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
 use itertools::Itertools;
 use tracing::warn;
 
-use crate::components::width::Width;
+use crate::{components::width::Width, utils::resize_preserving_order_with_repeated_indices};
 
 // MARK: Interpolatable
 /// A trait for interpolating to values
@@ -40,6 +40,12 @@ impl Interpolatable for DVec2 {
     }
 }
 
+impl Interpolatable for DQuat {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        self.slerp(*target, t)
+    }
+}
+
 impl<CS: ColorSpace> Interpolatable for AlphaColor<CS> {
     fn lerp(&self, other: &Self, t: f64) -> Self {
         // TODO: figure out to use `lerp_rect` or `lerp`
@@ -56,6 +62,40 @@ impl Interpolatable for DMat4 {
             }
         }
         result
+    }
+}
+
+impl<T: Interpolatable> Interpolatable for Vec<T> {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        self.iter().zip(target).map(|(a, b)| a.lerp(b, t)).collect()
+    }
+}
+
+impl<T: Opacity + Alignable + Clone> Alignable for Vec<T> {
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        let len = self.len().max(other.len());
+
+        let transparent_repeated = |items: &mut Vec<T>, repeat_idxs: Vec<usize>| {
+            for idx in repeat_idxs {
+                items[idx].set_opacity(0.0);
+            }
+        };
+        if self.len() != len {
+            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(self, len);
+            transparent_repeated(&mut items, idxs);
+            *self = items;
+        }
+        if other.len() != len {
+            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(other, len);
+            transparent_repeated(&mut items, idxs);
+            *other = items;
+        }
+        self.iter_mut()
+            .zip(other)
+            .for_each(|(a, b)| a.align_with(b));
     }
 }
 

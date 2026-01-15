@@ -128,13 +128,14 @@
             mdbook
             wasm-pack
             mdbook-mermaid
-            wasm-bindgen-cli_0_2_106
+            # wasm-bindgen-cli_0_2_106
             # mdbook-katex
             # wasm-bindgen-cli
             # mdbook-i18n-helpers
           ])
           ++ [
             (pkgs.callPackage ./mdbook-katex.nix { })
+            (pkgs.callPackage ./wasm-bindgen-cli.nix { })
             ciallo.packages.${system}.default
           ];
         };
