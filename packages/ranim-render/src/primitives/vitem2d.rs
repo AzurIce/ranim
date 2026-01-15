@@ -26,7 +26,9 @@ pub struct PlaneUniform {
 /// [`VItem2d`]'s render instance.
 pub struct VItem2dRenderInstance {
     // since the storage buffer is aligned to 16 bytes, we use vec4 for alignment
-    /// COMPUTE INPUT, RENDER INPUT: (x, y, is_closed, _padding)
+    /// COMPUTE INPUT: (x, y, z, is_closed)
+    pub(crate) points3d_buffer: WgpuVecBuffer<Vec4>,
+    /// COMPUTE OUTPUT, RENDER INPUT: (x, y, is_closed, _padding)
     pub(crate) points2d_buffer: WgpuVecBuffer<Vec4>,
     /// COMPUTE OUTPUT, RENDER INPUT: (min_x, max_x, min_y, max_y, max_w)
     pub(crate) clip_info_buffer: WgpuVecBuffer<i32>,
@@ -53,11 +55,12 @@ impl RenderResource for VItem2dRenderInstance {
     type Data = VItem2d;
 
     fn init(ctx: &WgpuContext, data: &Self::Data) -> Self {
-        let points_data: Vec<Vec4> = data
-            .points2d
-            .iter()
-            .map(|p| Vec4::new(p.x, p.y, p.z, 0.0))
-            .collect();
+        let points3d_buffer = WgpuVecBuffer::new_init(
+            ctx,
+            Some("Points 3d Buffer"),
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            &data.points,
+        );
 
         let points2d_buffer = WgpuVecBuffer::new_init(
             ctx,
@@ -65,7 +68,7 @@ impl RenderResource for VItem2dRenderInstance {
             wgpu::BufferUsages::STORAGE
                 | wgpu::BufferUsages::COPY_DST
                 | wgpu::BufferUsages::COPY_SRC,
-            &points_data,
+            &vec![Vec4::ZERO; data.points.len()],
         );
 
         let clip_info_buffer = WgpuVecBuffer::new_init(
@@ -81,7 +84,7 @@ impl RenderResource for VItem2dRenderInstance {
             ctx,
             Some("Point Cnt Buffer"),
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            data.points2d.len() as u32,
+            data.points.len() as u32,
         );
 
         let fill_rgbas = WgpuVecBuffer::new_init(
@@ -119,8 +122,10 @@ impl RenderResource for VItem2dRenderInstance {
 
         let compute_bind_group = Clipbox2dComputeBindGroup::new(
             ctx,
-            &points2d_buffer.buffer,
+            &plane_buffer.as_ref(),
+            &points3d_buffer.buffer,
             &stroke_widths.buffer,
+            &points2d_buffer.buffer,
             &clip_info_buffer.buffer,
             point_cnt_buffer.as_ref(),
         );
@@ -136,6 +141,7 @@ impl RenderResource for VItem2dRenderInstance {
         );
 
         Self {
+            points3d_buffer,
             points2d_buffer,
             clip_info_buffer,
             point_cnt_buffer: Some(point_cnt_buffer),
@@ -149,21 +155,15 @@ impl RenderResource for VItem2dRenderInstance {
     }
     fn update(&mut self, ctx: &WgpuContext, data: &Self::Data) {
         if let Some(point_cnt_buffer) = self.point_cnt_buffer.as_mut() {
-            point_cnt_buffer.set(ctx, data.points2d.len() as u32);
+            point_cnt_buffer.set(ctx, data.points.len() as u32);
         } else {
             self.point_cnt_buffer = Some(WgpuBuffer::new_init(
                 ctx,
                 Some("Point Cnt Buffer"),
                 wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                data.points2d.len() as u32,
+                data.points.len() as u32,
             ));
         }
-
-        let points_data: Vec<Vec4> = data
-            .points2d
-            .iter()
-            .map(|p| Vec4::new(p.x, p.y, p.z, 0.0))
-            .collect();
 
         let plane_data = PlaneUniform {
             origin: Vec4::from((data.origin, 0.0)),
@@ -173,8 +173,12 @@ impl RenderResource for VItem2dRenderInstance {
         self.plane_buffer.set(ctx, plane_data);
 
         // Dynamic sized
+        let points2d_recreated = self
+            .points2d_buffer
+            .set(ctx, &vec![Vec4::ZERO; data.points.len()]);
         if [
-            self.points2d_buffer.set(ctx, &points_data),
+            self.points3d_buffer.set(ctx, &data.points),
+            points2d_recreated,
             self.fill_rgbas.set(ctx, &data.fill_rgbas),
             self.stroke_rgbas.set(ctx, &data.stroke_rgbas),
             self.stroke_widths.set(ctx, &data.stroke_widths),
@@ -187,8 +191,10 @@ impl RenderResource for VItem2dRenderInstance {
         {
             self.compute_bind_group = Some(Clipbox2dComputeBindGroup::new(
                 ctx,
-                &self.points2d_buffer.buffer,
+                &self.plane_buffer.as_ref(),
+                &self.points3d_buffer.buffer,
                 &self.stroke_widths.buffer,
+                &self.points2d_buffer.buffer,
                 &self.clip_info_buffer.buffer,
                 self.point_cnt_buffer.as_ref().unwrap().as_ref(),
             ));
@@ -208,7 +214,7 @@ impl RenderResource for VItem2dRenderInstance {
 impl VItem2dRenderInstance {
     pub fn encode_compute_pass_command(&self, cpass: &mut wgpu::ComputePass) {
         cpass.set_bind_group(0, self.compute_bind_group.as_ref().unwrap().as_ref(), &[]);
-        cpass.dispatch_workgroups(self.points2d_buffer.len().div_ceil(256) as u32, 1, 1);
+        cpass.dispatch_workgroups(self.points3d_buffer.len().div_ceil(256) as u32, 1, 1);
     }
     pub fn encode_depth_render_pass_command(&self, rpass: &mut wgpu::RenderPass) {
         rpass.set_bind_group(2, self.render_bind_group.as_ref().unwrap().as_ref(), &[]);
@@ -224,7 +230,7 @@ impl VItem2dRenderInstance {
 mod tests {
     use super::*;
     use crate::{Renderer, resource::RenderPool, utils::WgpuContext};
-    use glam::{DVec3, Vec3, vec4};
+    use glam::{DVec3, Vec3, Vec4, vec4};
     use ranim_core::{
         core_item::{CoreItem, camera_frame::CameraFrame},
         store::CoreItemStore,
@@ -250,15 +256,15 @@ mod tests {
         // Set z=1.0 to enable fill (is_closed=true)
         let scale = 2.0;
         let mut points = vec![
-            Vec3::new(-1.0, -1.0, 1.0),
-            Vec3::new(-1.0, 0.0, 1.0),
-            Vec3::new(-1.0, 1.0, 1.0),
-            Vec3::new(0.0, 1.0, 1.0),
-            Vec3::new(1.0, 1.0, 1.0),
-            Vec3::new(1.0, 0.0, 1.0),
-            Vec3::new(1.0, -1.0, 1.0),
-            Vec3::new(0.0, -1.0, 1.0),
-            Vec3::new(-1.0, -1.0, 1.0),
+            Vec4::new(-1.0, -1.0, 0.0, 1.0),
+            Vec4::new(-1.0, 0.0, 0.0, 1.0),
+            Vec4::new(-1.0, 1.0, 0.0, 1.0),
+            Vec4::new(0.0, 1.0, 0.0, 1.0),
+            Vec4::new(1.0, 1.0, 0.0, 1.0),
+            Vec4::new(1.0, 0.0, 0.0, 1.0),
+            Vec4::new(1.0, -1.0, 0.0, 1.0),
+            Vec4::new(0.0, -1.0, 0.0, 1.0),
+            Vec4::new(-1.0, -1.0, 0.0, 1.0),
         ];
         let n = points.len().div_ceil(2);
         points.iter_mut().for_each(|p| {
@@ -271,7 +277,7 @@ mod tests {
             let item1 = VItem2d {
                 origin,
                 basis: (Vec3::X, Vec3::Y),
-                points2d: points.clone(),
+                points: points.clone(),
                 fill_rgbas: vec![Rgba(vec4(1.0, 0.0, 0.0, alpha)); n],
                 stroke_rgbas: vec![Rgba(vec4(0.5, 0.0, 0.0, 1.0)); n],
                 stroke_widths: vec![Width(0.02); n],
@@ -281,7 +287,7 @@ mod tests {
             let item2 = VItem2d {
                 origin,
                 basis: (Vec3::Z, Vec3::Y), // Z is "X", Y is "Y"
-                points2d: points.clone(),
+                points: points.clone(),
                 fill_rgbas: vec![Rgba(vec4(0.0, 1.0, 0.0, alpha)); n],
                 stroke_rgbas: vec![Rgba(vec4(0.0, 0.5, 0.0, 1.0)); n],
                 stroke_widths: vec![Width(0.02); n],
@@ -291,7 +297,7 @@ mod tests {
             let item3 = VItem2d {
                 origin,
                 basis: (Vec3::X, Vec3::Z), // X is "X", Z is "Y"
-                points2d: points.clone(),
+                points: points.clone(),
                 fill_rgbas: vec![Rgba(vec4(0.0, 0.0, 1.0, alpha)); n],
                 stroke_rgbas: vec![Rgba(vec4(0.0, 0.0, 0.5, 1.0)); n],
                 stroke_widths: vec![Width(0.02); n],

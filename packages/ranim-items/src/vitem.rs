@@ -4,7 +4,6 @@
 //! it assumes that all points are in the same plane to calculate depth information.
 //! Which means that ranim actually renders a **projection** of the VItem onto a plane.
 //!
-//! The projection is defined with [`Proj`], which is basically a [`glam::DQuat`].
 //! The projection target plane has the initial basis and normal defined as `(DVec3::X, DVec3::Y)` and `DVec3::Z` respectively, and it contains the first point of the VItem.
 //!
 //! So the normal way to use a [`VItem`] is to make sure that all points are in the same plane, at this time the **projection** is equivalent to the VItem itself. Or you may break this, and let ranim renders the **projection** of it.
@@ -18,7 +17,7 @@ pub mod typst;
 // pub mod line;
 
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{DQuat, DVec3, Vec3, Vec4, vec3, vec4};
+use glam::{DVec3, Vec4, vec4};
 use ranim_core::core_item::CoreItem;
 use ranim_core::core_item::vitem_2d::VItem2d;
 use ranim_core::traits::Anchor;
@@ -26,7 +25,7 @@ use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
     components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
-    prelude::{Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, StrokeWidth},
+    prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
     traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
 
@@ -211,19 +210,11 @@ impl VItem {
         self.stroke_widths.resize_with_last(len.div_ceil(2));
     }
 
-    pub(crate) fn get_render_points(&self) -> Vec<Vec3> {
-        let origin = self.vpoints.first().unwrap();
+    pub(crate) fn get_render_points(&self) -> Vec<Vec4> {
         self.vpoints
             .iter()
-            .zip(self.vpoints.get_closepath_flags().iter())
-            .map(|(p, f)| {
-                let p = p - origin;
-                vec3(
-                    p.dot(self.proj.corrected_basis_u()) as f32,
-                    p.dot(self.proj.corrected_basis_v()) as f32,
-                    if *f { 1.0 } else { 0.0 },
-                )
-            })
+            .zip(self.vpoints.get_closepath_flags().into_iter())
+            .map(|(p, f)| p.as_vec3().extend(f.into()))
             .collect()
     }
     /// Put start and end on
@@ -242,7 +233,7 @@ impl Extract for VItem {
                 self.proj.corrected_basis_u().as_vec3(),
                 self.proj.corrected_basis_v().as_vec3(),
             ),
-            points2d: self.get_render_points(),
+            points: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
             stroke_widths: self.stroke_widths.iter().cloned().collect::<Vec<_>>(),

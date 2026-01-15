@@ -23,18 +23,18 @@ impl Clipbox2dComputeBindGroup {
         wgpu::BindGroupLayoutDescriptor {
             label: Some("ClipBox 2d Points Bind Group Layout"),
             entries: &[
-                // points2d: (x, y, is_closed)
+                // plane: (origin, basis_u, basis_v)
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     },
                     count: None,
                 },
-                // stroke_widths
+                // points3d: (x, y, z, is_closed)
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE,
@@ -45,9 +45,31 @@ impl Clipbox2dComputeBindGroup {
                     },
                     count: None,
                 },
-                // clip_info: (min_x, max_x, min_y, max_y, max_w)
+                // stroke_widths
                 wgpu::BindGroupLayoutEntry {
                     binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // points2d: (x, y, is_closed, padding)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // clip_info: (min_x, max_x, min_y, max_y, max_w)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -58,7 +80,7 @@ impl Clipbox2dComputeBindGroup {
                 },
                 // point_cnt
                 wgpu::BindGroupLayoutEntry {
-                    binding: 3,
+                    binding: 5,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
@@ -73,8 +95,10 @@ impl Clipbox2dComputeBindGroup {
 
     fn new_bind_group(
         ctx: &WgpuContext,
-        points2d_buffer: &wgpu::Buffer,
+        plane_buffer: &wgpu::Buffer,
+        points3d_buffer: &wgpu::Buffer,
         stroke_width_buffer: &wgpu::Buffer,
+        points2d_buffer: &wgpu::Buffer,
         clip_box_buffer: &wgpu::Buffer,
         point_cnt_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
@@ -85,23 +109,35 @@ impl Clipbox2dComputeBindGroup {
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer(
-                        points2d_buffer.as_entire_buffer_binding(),
+                        plane_buffer.as_entire_buffer_binding(),
                     ),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Buffer(
-                        stroke_width_buffer.as_entire_buffer_binding(),
+                        points3d_buffer.as_entire_buffer_binding(),
                     ),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::Buffer(
-                        clip_box_buffer.as_entire_buffer_binding(),
+                        stroke_width_buffer.as_entire_buffer_binding(),
                     ),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
+                    resource: wgpu::BindingResource::Buffer(
+                        points2d_buffer.as_entire_buffer_binding(),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Buffer(
+                        clip_box_buffer.as_entire_buffer_binding(),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
                     resource: wgpu::BindingResource::Buffer(
                         point_cnt_buffer.as_entire_buffer_binding(),
                     ),
@@ -111,15 +147,19 @@ impl Clipbox2dComputeBindGroup {
     }
     pub(crate) fn new(
         ctx: &WgpuContext,
-        points2d_buffer: &wgpu::Buffer,
+        plane_buffer: &wgpu::Buffer,
+        points3d_buffer: &wgpu::Buffer,
         stroke_width_buffer: &wgpu::Buffer,
+        points2d_buffer: &wgpu::Buffer,
         clip_box_buffer: &wgpu::Buffer,
         point_cnt_buffer: &wgpu::Buffer,
     ) -> Self {
         Self(Self::new_bind_group(
             ctx,
-            points2d_buffer,
+            plane_buffer,
+            points3d_buffer,
             stroke_width_buffer,
+            points2d_buffer,
             clip_box_buffer,
             point_cnt_buffer,
         ))

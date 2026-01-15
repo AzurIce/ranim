@@ -1,7 +1,16 @@
-// (x, y, is_closed, padding)
-@group(0) @binding(0) var<storage> points2d: array<vec4<f32>>;
+struct Plane {
+    origin: vec3<f32>,
+    basis_u: vec3<f32>,
+    basis_v: vec3<f32>,
+}
+
+@group(0) @binding(0) var<uniform> plane: Plane;
+// (x, y, z, is_closed)
+@group(0) @binding(1) var<storage> points3d: array<vec4<f32>>;
 // width
-@group(0) @binding(1) var<storage> stroke_width: array<f32>;
+@group(0) @binding(2) var<storage> stroke_width: array<f32>;
+// (x, y, is_closed, padding)
+@group(0) @binding(3) var<storage, read_write> points2d: array<vec4<f32>>;
 struct ClipBox {
     min_x: atomic<i32>,
     max_x: atomic<i32>,
@@ -9,8 +18,8 @@ struct ClipBox {
     max_y: atomic<i32>,
     max_w: atomic<i32>,
 }
-@group(0) @binding(2) var<storage, read_write> clip_points: ClipBox;
-@group(0) @binding(3) var<storage> point_cnt: u32;
+@group(0) @binding(4) var<storage, read_write> clip_points: ClipBox;
+@group(0) @binding(5) var<storage> point_cnt: u32;
 
 @compute
 @workgroup_size(256)
@@ -23,11 +32,18 @@ fn cs_main(
         return;
     }
 
-    let point = points2d[index];
-    let x = point.x;
-    let y = point.y;
+    let p_vec = points3d[index];
+    let p = p_vec.xyz;
+    let is_closed = p_vec.w;
+    let diff = p - plane.origin;
+
+    // Project diff onto the plane spanned by basis_u and basis_v
+    // Since basis_u and basis_v are orthogonal and normalized, we can use dot product directly.
+    let x = dot(diff, plane.basis_u);
+    let y = dot(diff, plane.basis_v);
     let w = stroke_width[index / 2];
-    // z is is_closed, w is padding
+
+    points2d[index] = vec4(x, y, is_closed, 0.0);
 
     // Note that atomicMin/Max can only work on u32 or i32
     // so we turn the float into int by multiplying by a scale factor

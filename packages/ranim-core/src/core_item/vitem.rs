@@ -1,5 +1,5 @@
 use color::{AlphaColor, Srgb};
-use glam::{Vec4, vec4};
+use glam::Vec4;
 
 use crate::{
     Extract,
@@ -27,14 +27,7 @@ pub struct VItemPrimitive {
 impl From<VItem2d> for VItemPrimitive {
     fn from(value: VItem2d) -> Self {
         Self {
-            points2d: value
-                .points2d
-                .into_iter()
-                .map(|p| {
-                    let r = value.origin + value.basis.0 * p.x + value.basis.1 * p.y;
-                    vec4(r.x, r.y, r.z, p.z)
-                })
-                .collect(),
+            points2d: value.points,
             fill_rgbas: value.fill_rgbas,
             stroke_rgbas: value.stroke_rgbas,
             stroke_widths: value.stroke_widths,

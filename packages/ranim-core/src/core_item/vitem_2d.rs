@@ -1,5 +1,5 @@
 use color::{AlphaColor, Srgb};
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 
 use crate::{
     Extract,
@@ -19,8 +19,8 @@ pub struct VItem2d {
     /// The basis vectors of the item's local coordinate system. Normalized.
     pub basis: (Vec3, Vec3),
     /// The points of the item in the item's local coordinate system.
-    /// (x, y, is_closed)
-    pub points2d: Vec<Vec3>,
+    /// (x, y, z, is_closed)
+    pub points: Vec<Vec4>,
     /// Fill rgbas, see [`Rgba`].
     pub fill_rgbas: Vec<Rgba>,
     /// Stroke rgbs, see [`Rgba`].
@@ -34,7 +34,7 @@ impl Default for VItem2d {
         Self {
             origin: Vec3::ZERO,
             basis: (Vec3::X, Vec3::Y),
-            points2d: vec![Vec3::ZERO; 3],
+            points: vec![Vec4::ZERO; 3],
             stroke_widths: vec![Width::default(); 2],
             stroke_rgbas: vec![Rgba::default(); 2],
             fill_rgbas: vec![Rgba::default(); 2],
