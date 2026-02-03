@@ -1,4 +1,9 @@
-use ranim_core::{Extract, color, core_item::CoreItem, glam::{self, DVec2}, traits::Anchor};
+use ranim_core::{
+    Extract, color,
+    core_item::CoreItem,
+    glam::{self, DVec2, Vec3Swizzles as _, dvec2},
+    traits::Anchor,
+};
 
 use color::{AlphaColor, Srgb};
 use glam::{DVec3, dvec3};
@@ -159,12 +164,11 @@ impl From<Square> for Rectangle {
             fill_rgba,
         } = value;
         let (u, v) = proj.basis();
-        let p1 = center - width / 2.0 * u + width / 2.0 * v;
-        let p2 = center + width / 2.0 * u - width / 2.0 * v;
+        let p0 = center - width / 2.0 * u + width / 2.0 * v;
         Rectangle {
             proj,
-            p1,
-            p2,
+            p0,
+            size: dvec2(width, width),
             stroke_rgba,
             stroke_width,
             fill_rgba,
@@ -191,9 +195,9 @@ pub struct Rectangle {
     /// Projection info
     pub proj: Proj,
     /// Bottom left corner (minimum)
-    pub p1: DVec3,
-    /// Top right corner (maximum)
-    pub p2: DVec3,
+    pub p0: DVec3,
+    /// Width and height
+    pub size: DVec2,
 
     /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
@@ -207,8 +211,8 @@ impl Default for Rectangle {
     fn default() -> Self {
         Self {
             proj: Proj::default(),
-            p1: dvec3(0.0, 0.0, 0.0),
-            p2: dvec3(1.0, 1.0, 0.0),
+            p0: dvec3(0.0, 0.0, 0.0),
+            size: dvec2(1.0, 1.0),
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
             fill_rgba: AlphaColor::TRANSPARENT,
@@ -222,55 +226,57 @@ impl Rectangle {
         let half_width = width / 2.0;
         let half_height = height / 2.0;
         Self {
-            p1: dvec3(-half_width, -half_height, 0.0),
-            p2: dvec3(half_width, half_height, 0.0),
+            p0: dvec3(-half_width, -half_height, 0.0),
+            size: dvec2(width, height),
             ..Default::default()
         }
     }
     /// Construct a rectangle from the bottom-left point (minimum) and size.
-    pub fn from_min_size(p_min: DVec3, size: DVec2) -> Self {
-        let p1 = p_min;
-        let p2 = p1 + dvec3(size.x, size.y, 0.);
+    pub fn from_min_size(p0: DVec3, size: DVec2) -> Self {
         Self {
-            p1,
-            p2,
+            p0,
+            size,
             ..Default::default()
         }
     }
     /// Construct a rectangle from two corner points
     pub fn from_two_points(p1: DVec3, p2: DVec3) -> Self {
-        let (x1, x2) = if p1.x < p2.x { (p1.x, p2.x) } else { (p2.x, p1.x) };
-        let (y1, y2) = if p1.y < p2.y { (p1.y, p2.y) } else { (p2.y, p1.y) };
+        let w = (p2.x - p1.x).abs();
+        let h = (p2.y - p1.y).abs();
+        let x = p1.x.min(p2.x);
+        let y = p1.y.min(p2.y);
         let z = p1.z;
-        let p1 = dvec3(x1, y1, z);
-        let p2 = dvec3(x2, y2, z);
+        let p0 = dvec3(x, y, z);
+        let size = dvec2(w, h);
         Self {
-            p1,
-            p2,
+            p0,
+            size,
             ..Default::default()
         }
     }
     /// Width
     pub fn width(&self) -> f64 {
-        (self.p2 - self.p1).dot(self.proj.basis_u()).abs()
+        self.size.x.abs()
     }
     /// Height
     pub fn height(&self) -> f64 {
-        (self.p2 - self.p1).dot(self.proj.basis_v()).abs()
+        self.size.y.abs()
     }
 }
 
 // MARK: Traits impl
 impl BoundingBox for Rectangle {
     fn get_min_max(&self) -> [DVec3; 2] {
-        [self.p1, self.p2].get_min_max()
+        let (u, v) = self.proj.basis();
+        let p1 = self.p0;
+        let p2 = self.p0 + self.size.x * u + self.size.y * v;
+        [p1, p2].get_min_max()
     }
 }
 
 impl Shift for Rectangle {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.p1.shift(shift);
-        self.p2.shift(shift);
+        self.p0.shift(shift);
         self
     }
 }
@@ -278,8 +284,7 @@ impl Shift for Rectangle {
 impl Rotate for Rectangle {
     fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
         let anchor = Anchor::Point(anchor.get_pos(self));
-        self.p1.rotate_by_anchor(angle, axis, anchor);
-        self.p2.rotate_by_anchor(angle, axis, anchor);
+        self.p0.rotate_by_anchor(angle, axis, anchor);
         self.proj.rotate(angle, axis);
         self
     }
@@ -288,8 +293,8 @@ impl Rotate for Rectangle {
 impl Scale for Rectangle {
     fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
         let anchor = Anchor::Point(anchor.get_pos(self));
-        self.p1.scale_by_anchor(scale, anchor);
-        self.p2.scale_by_anchor(scale, anchor);
+        self.p0.scale_by_anchor(scale, anchor);
+        self.size *= scale.xy();
         self
     }
 }
@@ -340,12 +345,10 @@ impl FillColor for Rectangle {
 // MARK: Conversions
 impl From<Rectangle> for Polygon {
     fn from(value: Rectangle) -> Self {
-        let points = vec![
-            value.p1,
-            value.p1 + value.proj.basis_v() * value.height(),
-            value.p2,
-            value.p2 + value.proj.basis_v() * value.height(),
-        ];
+        let p0 = value.p0;
+        let (u, v) = value.proj.basis();
+        let DVec2 { x: w, y: h } = value.size;
+        let points = vec![p0, p0 + v * h, p0 + u * w + v * h, p0 + u * w];
         Polygon {
             proj: value.proj,
             points,
