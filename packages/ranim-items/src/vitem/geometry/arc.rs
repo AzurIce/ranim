@@ -74,10 +74,10 @@ impl Arc {
 // MARK: Traits impl
 impl BoundingBox for Arc {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
-    fn get_bounding_box(&self) -> [DVec3; 3] {
+    fn get_min_max(&self) -> [DVec3; 2] {
         let (u, v) = self.proj.basis();
         let r = self.radius * (u + v);
-        [self.center - r, self.center + r].get_bounding_box()
+        [self.center - r, self.center + r].get_min_max()
     }
 }
 
@@ -228,9 +228,9 @@ impl ArcBetweenPoints {
 // MARK: Traits impl
 impl BoundingBox for ArcBetweenPoints {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
-    fn get_bounding_box(&self) -> [DVec3; 3] {
+    fn get_min_max(&self) -> [DVec3; 2] {
         // TODO: optimize this
-        Arc::from(self.clone()).get_bounding_box()
+        Arc::from(self.clone()).get_min_max()
     }
 }
 

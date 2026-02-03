@@ -69,10 +69,10 @@ impl Circle {
 
 // MARK: Traits impl
 impl BoundingBox for Circle {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
+    fn get_min_max(&self) -> [DVec3; 2] {
         let (u, v) = self.proj.basis();
         let r = self.radius * (u + v);
-        [self.center + r, self.center - r].get_bounding_box()
+        [self.center + r, self.center - r].get_min_max()
     }
 }
 

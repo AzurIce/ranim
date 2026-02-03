@@ -38,8 +38,8 @@ impl SvgItem {
 
 // MARK: Trait impls
 impl BoundingBox for SvgItem {
-    fn get_bounding_box(&self) -> [glam::DVec3; 3] {
-        self.0.get_bounding_box()
+    fn get_min_max(&self) -> [glam::DVec3; 2] {
+        self.0.get_min_max()
     }
 }
 

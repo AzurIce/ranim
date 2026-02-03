@@ -1,4 +1,4 @@
-use ranim_core::{Extract, color, core_item::CoreItem, glam, traits::Anchor};
+use ranim_core::{Extract, color, core_item::CoreItem, glam::{self, DVec2}, traits::Anchor};
 
 use color::{AlphaColor, Srgb};
 use glam::{DVec3, dvec3};
@@ -68,13 +68,13 @@ impl Square {
 
 // MARK: Traits impl
 impl BoundingBox for Square {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
+    fn get_min_max(&self) -> [DVec3; 2] {
         let (u, v) = self.proj.basis();
         [
             self.center + self.size / 2.0 * (u + v),
             self.center - self.size / 2.0 * (u + v),
         ]
-        .get_bounding_box()
+        .get_min_max()
     }
 }
 
@@ -190,9 +190,9 @@ impl From<Square> for VItem {
 pub struct Rectangle {
     /// Projection info
     pub proj: Proj,
-    /// Corner 1
+    /// Bottom left corner (minimum)
     pub p1: DVec3,
-    /// Corner 2
+    /// Top right corner (maximum)
     pub p2: DVec3,
 
     /// Stroke rgba
@@ -203,18 +203,51 @@ pub struct Rectangle {
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
+impl Default for Rectangle {
+    fn default() -> Self {
+        Self {
+            proj: Proj::default(),
+            p1: dvec3(0.0, 0.0, 0.0),
+            p2: dvec3(1.0, 1.0, 0.0),
+            stroke_rgba: AlphaColor::WHITE,
+            stroke_width: DEFAULT_STROKE_WIDTH,
+            fill_rgba: AlphaColor::TRANSPARENT,
+        }
+    }
+}
+
 impl Rectangle {
     /// Constructor
     pub fn new(width: f64, height: f64) -> Self {
         let half_width = width / 2.0;
         let half_height = height / 2.0;
         Self {
-            proj: Proj::default(),
-            p1: dvec3(-half_width, half_height, 0.0),
-            p2: dvec3(half_width, -half_height, 0.0),
-            stroke_rgba: AlphaColor::WHITE,
-            stroke_width: DEFAULT_STROKE_WIDTH,
-            fill_rgba: AlphaColor::TRANSPARENT,
+            p1: dvec3(-half_width, -half_height, 0.0),
+            p2: dvec3(half_width, half_height, 0.0),
+            ..Default::default()
+        }
+    }
+    /// Construct a rectangle from the bottom-left point (minimum) and size.
+    pub fn from_min_size(p_min: DVec3, size: DVec2) -> Self {
+        let p1 = p_min;
+        let p2 = p1 + dvec3(size.x, size.y, 0.);
+        Self {
+            p1,
+            p2,
+            ..Default::default()
+        }
+    }
+    /// Construct a rectangle from two corner points
+    pub fn from_two_points(p1: DVec3, p2: DVec3) -> Self {
+        let (x1, x2) = if p1.x < p2.x { (p1.x, p2.x) } else { (p2.x, p1.x) };
+        let (y1, y2) = if p1.y < p2.y { (p1.y, p2.y) } else { (p2.y, p1.y) };
+        let z = p1.z;
+        let p1 = dvec3(x1, y1, z);
+        let p2 = dvec3(x2, y2, z);
+        Self {
+            p1,
+            p2,
+            ..Default::default()
         }
     }
     /// Width
@@ -229,8 +262,8 @@ impl Rectangle {
 
 // MARK: Traits impl
 impl BoundingBox for Rectangle {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        [self.p1, self.p2].get_bounding_box()
+    fn get_min_max(&self) -> [DVec3; 2] {
+        [self.p1, self.p2].get_min_max()
     }
 }
 
@@ -309,7 +342,7 @@ impl From<Rectangle> for Polygon {
     fn from(value: Rectangle) -> Self {
         let points = vec![
             value.p1,
-            value.p1 - value.proj.basis_v() * value.height(),
+            value.p1 + value.proj.basis_v() * value.height(),
             value.p2,
             value.p2 + value.proj.basis_v() * value.height(),
         ];
@@ -367,8 +400,8 @@ impl Polygon {
 
 // MARK: Traits impl
 impl BoundingBox for Polygon {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        self.points.get_bounding_box()
+    fn get_min_max(&self) -> [DVec3; 2] {
+        self.points.get_min_max()
     }
 }
 

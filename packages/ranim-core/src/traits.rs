@@ -286,8 +286,13 @@ impl<T: FillColor + StrokeColor + ?Sized> Color for T {}
 // MARK: BoundingBox
 /// A trait for items that have a bounding box
 pub trait BoundingBox {
+    /// Get the bottom-left (minimum) and top-right (maximum) points of the bounding box.
+    fn get_min_max(&self) -> [DVec3; 2];
     /// Get the bounding box of the mobject in [min, mid, max] order.
-    fn get_bounding_box(&self) -> [DVec3; 3];
+    fn get_bounding_box(&self) -> [DVec3; 3] {
+        let [min, max] = self.get_min_max();
+        [min, (min + max) / 2., max]
+    }
     /// Get the bounding box point of the mobject at an edge Anchor.
     ///
     /// See [`Anchor`].
@@ -315,16 +320,36 @@ pub trait BoundingBox {
             .try_into()
             .unwrap()
     }
+    /// Get the size of the bounding box in each axis.
+    fn bbox_size(&self) -> DVec3 {
+        let [min, max] = self.get_min_max();
+        max - min
+    }
+    /// Get the width (size in _x_ axis) of the bounding box.
+    fn bbox_width(&self) -> f64 {
+        self.bbox_size().x
+    }
+    /// Get the height (size in _y_ axis) of the bounding box.
+    fn bbox_height(&self) -> f64 {
+        self.bbox_size().y
+    }
+    /// Get the depth (size in _z_ axis) of the bounding box.
+    fn bbox_depth(&self) -> f64 {
+        self.bbox_size().z
+    }
 }
 
 impl BoundingBox for DVec3 {
+    fn get_min_max(&self) -> [DVec3; 2] {
+        [*self, *self]
+    }
     fn get_bounding_box(&self) -> [DVec3; 3] {
         [*self, *self, *self]
     }
 }
 
 impl<T: BoundingBox> BoundingBox for [T] {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
+    fn get_min_max(&self) -> [DVec3; 2] {
         let [min, max] = self
             .iter()
             .map(|x| x.get_bounding_box())
@@ -334,7 +359,7 @@ impl<T: BoundingBox> BoundingBox for [T] {
         if min == max {
             warn!("Empty bounding box, is the slice empty?")
         }
-        [min, (min + max) / 2.0, max]
+        [min, max]
     }
 }
 
