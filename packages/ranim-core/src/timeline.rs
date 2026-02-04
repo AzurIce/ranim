@@ -47,7 +47,7 @@ impl Timeline {
         self
     }
     /// Forward the timeline to `target_sec` if the current sec is smaller than it.
-    pub fn forward_to(&mut self, target_sec: f64) -> &mut Self {
+    pub fn forward_to<'a: 'b, 'b>(&'a mut self, target_sec: f64) -> &'b mut Self {
         if target_sec > self.cur_sec {
             self.forward(target_sec - self.cur_sec);
         }

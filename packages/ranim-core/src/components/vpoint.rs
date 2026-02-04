@@ -9,9 +9,7 @@ use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
 use crate::utils::{avg, resize_preserving_order_with_repeated_indices};
 
-use super::ComponentVec;
-
-/// VPointComponentVec is used to represent a bunch of quad bezier paths.
+/// A Vec of VPoint Data. It is used to represent a bunch of quad bezier paths.
 ///
 /// Every 3 elements in the inner vector is a quad bezier path.
 ///
@@ -24,25 +22,20 @@ use super::ComponentVec;
 /// | 0(Anchor) | 1(Handle) | 2(Anchor) | 3(Handle) | 4(Anchor) | 5(Handle) | 6(Anchor) |
 /// |-----------|-----------|-----------|-----------|-----------|-----------|-----------|
 /// | a | b | c | c(subpath0) | d | e | f (subpath1) |
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut)]
-pub struct VPointComponentVec(pub ComponentVec<DVec3>);
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, ranim_macros::Interpolatable)]
+pub struct VPointVec(pub Vec<DVec3>);
 
-impl Interpolatable for VPointComponentVec {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self(self.0.lerp(&target.0, t))
+impl Aabb for VPointVec {
+    fn aabb(&self) -> [DVec3; 2] {
+        self.0.aabb()
     }
 }
 
-impl Alignable for VPointComponentVec {
+impl Alignable for VPointVec {
     fn is_aligned(&self, other: &Self) -> bool {
         self.len() == other.len()
     }
     fn align_with(&mut self, other: &mut Self) {
-        // println!(
-        //     "VPointComponentVec::align_with: {} {}",
-        //     self.len(),
-        //     other.len()
-        // );
         if self.is_empty() {
             self.0 = vec![DVec3::ZERO; 3].into();
         }
@@ -55,10 +48,6 @@ impl Alignable for VPointComponentVec {
             subpaths
                 .into_iter()
                 .map(|sp| {
-                    // println!("into_closed_subpaths {}", sp.len());
-                    // if sp.len() == 1 {
-                    //     return vec![sp[0]; 3];
-                    // }
                     // should have no zero-length subpath
                     if !get_subpath_closed_flag(&sp).map(|f| f.1).unwrap() {
                         let sp_len = sp.len();
@@ -76,16 +65,7 @@ impl Alignable for VPointComponentVec {
         };
         let mut sps_self = into_closed_subpaths(self.get_subpaths());
         let mut sps_other = into_closed_subpaths(other.get_subpaths());
-        // println!("self: {}", sps_self.len());
-        // for (i, sp) in sps_self.iter().enumerate() {
-        //     println!("[{i}] {} {:?}", sp.len(), sp);
-        // }
-        // println!("other: {}", sps_other.len());
-        // for (i, sp) in sps_other.iter().enumerate() {
-        //     println!("[{i}] {} {:?}", sp.len(), sp);
-        // }
         let len = sps_self.len().max(sps_other.len());
-        // println!("#####{len}#####");
         if sps_self.len() != len {
             let (mut x, idxs) = resize_preserving_order_with_repeated_indices(&sps_self, len);
             for idx in idxs {
@@ -102,14 +82,6 @@ impl Alignable for VPointComponentVec {
             }
             sps_other = x;
         }
-        // println!("self: {}", sps_self.len());
-        // for (i, sp) in sps_self.iter().enumerate() {
-        //     println!("[{i}] {} {:?}", sp.len(), sp);
-        // }
-        // println!("other: {}", sps_other.len());
-        // for (i, sp) in sps_other.iter().enumerate() {
-        //     println!("[{i}] {} {:?}", sp.len(), sp);
-        // }
 
         let points_to_bez_tuples = |points: &Vec<DVec3>| -> Vec<[DVec3; 3]> {
             let it0 = points.iter().step_by(2).cloned();
@@ -186,14 +158,6 @@ impl Alignable for VPointComponentVec {
                     *sp_b = align_points(sp_b, len)
                 }
             });
-        // println!("self: {}", sps_self.len());
-        // for (i, sp) in sps_self.iter().enumerate() {
-        //     println!("[{i}] {} {:?}", sp.len(), sp);
-        // }
-        // println!("other: {}", sps_other.len());
-        // for (i, sp) in sps_other.iter().enumerate() {
-        //     println!("[{i}] {} {:?}", sp.len(), sp);
-        // }
 
         let sps_to_points = |sps: Vec<Vec<DVec3>>| -> Vec<DVec3> {
             let mut points = sps
@@ -219,7 +183,7 @@ impl Alignable for VPointComponentVec {
 //     let beziers = subpath.iter().zip(other)
 // }
 
-impl VPointComponentVec {
+impl VPointVec {
     /// Get Subpaths
     pub fn get_subpaths(&self) -> Vec<Vec<DVec3>> {
         let mut subpaths = Vec::new();
@@ -298,24 +262,19 @@ impl VPointComponentVec {
         }
 
         let v = end - start;
-        self.scale_by_anchor(
-            DVec3::splat(v.length() / cur_v.length()),
-            Anchor::Point(cur_start),
-        );
+        self.scale_at(DVec3::splat(v.length() / cur_v.length()), cur_start);
         let rotate_angle = cur_v.angle_between(v);
         let mut rotate_axis = cur_v.cross(v);
         if rotate_axis.length_squared() <= f64::EPSILON {
             rotate_axis = DVec3::Z;
         }
         rotate_axis = rotate_axis.normalize();
-        self.rotate_by_anchor(rotate_angle, rotate_axis, Anchor::Point(cur_start));
+        self.rotate_at(rotate_angle, rotate_axis, cur_start);
         self.shift(start - cur_start);
 
         self
     }
-}
 
-impl VPointComponentVec {
     /// Get partial of the vpoint.
     ///
     /// This will trim the bezier.
@@ -328,7 +287,7 @@ impl VPointComponentVec {
         if end_index - start_index == 0 {
             let seg = self.get_seg(start_index).unwrap().map(|p| p);
             let quad = trim_quad_bezier(&seg, start_residue, end_residue);
-            VPointComponentVec(quad.into())
+            VPointVec(quad.into())
         } else {
             let mut partial = Vec::with_capacity((end_index - start_index + 1 + 2) * 2 + 1);
 
@@ -353,15 +312,8 @@ impl VPointComponentVec {
                 partial.extend_from_slice(&end_part[1..]);
             }
 
-            VPointComponentVec(partial.into())
+            VPointVec(partial.into())
         }
-    }
-}
-
-impl PointsFunc for [DVec3] {
-    fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self {
-        f(self);
-        self
     }
 }
 
@@ -372,17 +324,14 @@ mod test {
     use assert_float_eq::assert_float_absolute_eq;
     use glam::{DVec3, dvec3};
 
-    use crate::{
-        components::{ComponentVec, vpoint::VPointComponentVec},
-        traits::{Anchor, Rotate},
-    };
+    use crate::{components::vpoint::VPointVec, traits::Rotate};
 
     #[test]
     fn test_get_subpath() {
-        let points = VPointComponentVec(ComponentVec(vec![DVec3::ZERO; 9]));
+        let points = VPointVec(vec![DVec3::ZERO; 9]);
         let sps = points.get_subpaths();
         println!("{:?}", sps);
-        let points = VPointComponentVec(ComponentVec(vec![
+        let points = VPointVec(vec![
             DVec3::X,
             DVec3::Y,
             DVec3::Z,
@@ -390,26 +339,20 @@ mod test {
             DVec3::NEG_X,
             DVec3::NEG_Y,
             DVec3::ZERO,
-        ]));
+        ]);
         let sps = points.get_subpaths();
         println!("{:?}", sps);
-        let points = VPointComponentVec(ComponentVec(vec![DVec3::X, DVec3::Y, DVec3::Z]));
+        let points = VPointVec(vec![DVec3::X, DVec3::Y, DVec3::Z]);
         let sps = points.get_subpaths();
         println!("{:?}", sps);
-        let points = VPointComponentVec(ComponentVec(vec![
-            DVec3::X,
-            DVec3::Y,
-            DVec3::Z,
-            DVec3::Z,
-            DVec3::Z,
-        ]));
+        let points = VPointVec(vec![DVec3::X, DVec3::Y, DVec3::Z, DVec3::Z, DVec3::Z]);
         let sps = points.get_subpaths();
         println!("{:?}", sps);
     }
 
     #[test]
     fn test_get_partial() {
-        let points = VPointComponentVec(
+        let points = VPointVec(
             vec![
                 dvec3(0.0, 0.0, 0.0),
                 dvec3(1.0, 1.0, 1.0),
@@ -430,7 +373,7 @@ mod test {
 
     #[test]
     fn test_rotate() {
-        let mut points = VPointComponentVec(
+        let mut points = VPointVec(
             vec![
                 dvec3(0.0, 0.0, 0.0),
                 dvec3(1.0, 0.0, 0.0),
@@ -438,7 +381,7 @@ mod test {
             ]
             .into(),
         );
-        points.rotate_by_anchor(PI, DVec3::Z, Anchor::Point(DVec3::ZERO));
+        points.rotate_at(PI, DVec3::Z, DVec3::ZERO);
         points
             .0
             .iter()
@@ -454,7 +397,7 @@ mod test {
 
     #[test]
     fn test_put_start_and_end_on() {
-        let mut points = VPointComponentVec(
+        let mut points = VPointVec(
             vec![
                 dvec3(0.0, 0.0, 0.0),
                 dvec3(1.0, 0.0, 0.0),

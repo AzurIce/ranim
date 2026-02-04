@@ -1,28 +1,25 @@
 use ranim_core::{
     Extract, color,
     core_item::CoreItem,
-    glam::{self, DVec2, Vec3Swizzles as _, dvec2},
-    traits::Anchor,
+    glam,
+    traits::{AabbPoint, AnchorPoint},
 };
 
 use color::{AlphaColor, Srgb};
-use glam::{DVec3, dvec3};
+use glam::{DVec2, DVec3, dvec2, dvec3};
 use itertools::Itertools;
 
-use crate::vitem::{DEFAULT_STROKE_WIDTH, Proj};
+use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
 use ranim_core::traits::{
-    Alignable, BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth,
-    With,
+    Aabb, Alignable, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With,
 };
-
-use crate::vitem::VItem;
 
 // MARK: ### Square ###
 /// A Square
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Square {
     /// Projection
-    pub proj: Proj,
+    pub proj: ProjectionPlane,
     /// Center
     pub center: DVec3,
     /// Size
@@ -40,7 +37,7 @@ impl Square {
     /// Constructor
     pub fn new(size: f64) -> Self {
         Self {
-            proj: Proj::default(),
+            proj: ProjectionPlane::default(),
             center: dvec3(0.0, 0.0, 0.0),
             size,
 
@@ -54,32 +51,29 @@ impl Square {
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the square a square.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, Anchor::CENTER)
+        self.scale_at(scale, AabbPoint::CENTER)
     }
     /// Scale the square by the given scale, with the given anchor as the center.
     ///
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the square a square.
-    pub fn scale_by_anchor(&mut self, scale: f64, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        });
+    pub fn scale_at(&mut self, scale: f64, anchor: impl AnchorPoint) -> &mut Self {
+        let anchor = anchor.get_pos(self);
         self.size *= scale;
-        self.center.scale_by_anchor(DVec3::splat(scale), anchor);
+        self.center.scale_at(DVec3::splat(scale), anchor);
         self
     }
 }
 
 // MARK: Traits impl
-impl BoundingBox for Square {
-    fn get_min_max(&self) -> [DVec3; 2] {
+impl Aabb for Square {
+    fn aabb(&self) -> [DVec3; 2] {
         let (u, v) = self.proj.basis();
         [
             self.center + self.size / 2.0 * (u + v),
             self.center - self.size / 2.0 * (u + v),
         ]
-        .get_min_max()
+        .aabb()
     }
 }
 
@@ -91,12 +85,9 @@ impl Shift for Square {
 }
 
 impl Rotate for Square {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        });
-        self.center.rotate_by_anchor(angle, axis, anchor);
+    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor: impl AnchorPoint) -> &mut Self {
+        let anchor = anchor.get_pos(self);
+        self.center.rotate_at(angle, axis, anchor);
         self.proj.rotate(angle, axis);
         self
     }
@@ -193,7 +184,7 @@ impl From<Square> for VItem {
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Rectangle {
     /// Projection info
-    pub proj: Proj,
+    pub proj: ProjectionPlane,
     /// Bottom left corner (minimum)
     pub p0: DVec3,
     /// Width and height
@@ -219,7 +210,7 @@ impl Rectangle {
     /// Construct a rectangle from the bottom-left point (minimum) and size.
     pub fn from_min_size(p0: DVec3, size: DVec2) -> Self {
         Self {
-            proj: Proj::default(),
+            proj: ProjectionPlane::default(),
             p0,
             size,
             stroke_rgba: AlphaColor::WHITE,
@@ -238,12 +229,12 @@ impl Rectangle {
 }
 
 // MARK: Traits impl
-impl BoundingBox for Rectangle {
-    fn get_min_max(&self) -> [DVec3; 2] {
+impl Aabb for Rectangle {
+    fn aabb(&self) -> [DVec3; 2] {
         let (u, v) = self.proj.basis();
         let p1 = self.p0;
         let p2 = self.p0 + self.size.x * u + self.size.y * v;
-        [p1, p2].get_min_max()
+        [p1, p2].aabb()
     }
 }
 
@@ -255,19 +246,22 @@ impl Shift for Rectangle {
 }
 
 impl Rotate for Rectangle {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(anchor.get_pos(self));
-        self.p0.rotate_by_anchor(angle, axis, anchor);
+    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor: impl AnchorPoint) -> &mut Self {
+        let anchor = anchor.get_pos(self);
+        self.p0.rotate_at(angle, axis, anchor);
         self.proj.rotate(angle, axis);
         self
     }
 }
 
 impl Scale for Rectangle {
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(anchor.get_pos(self));
-        self.p0.scale_by_anchor(scale, anchor);
-        self.size *= scale.xy();
+    fn scale_at(&mut self, scale: DVec3, anchor: impl AnchorPoint) -> &mut Self {
+        let anchor = anchor.get_pos(self);
+        self.p0.scale_at(scale, anchor);
+        let (u, v) = self.proj.basis();
+        let scale_u = scale.dot(u);
+        let scale_v = scale.dot(v);
+        self.size *= dvec2(scale_u, scale_v);
         self
     }
 }
@@ -350,7 +344,7 @@ impl Extract for Rectangle {
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Polygon {
     /// Projection info
-    pub proj: Proj,
+    pub proj: ProjectionPlane,
     /// Corner points
     pub points: Vec<DVec3>,
     /// Stroke rgba
@@ -365,7 +359,7 @@ impl Polygon {
     /// Constructor
     pub fn new(points: Vec<DVec3>) -> Self {
         Self {
-            proj: Proj::default(),
+            proj: ProjectionPlane::default(),
             points,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
@@ -375,9 +369,9 @@ impl Polygon {
 }
 
 // MARK: Traits impl
-impl BoundingBox for Polygon {
-    fn get_min_max(&self) -> [DVec3; 2] {
-        self.points.get_min_max()
+impl Aabb for Polygon {
+    fn aabb(&self) -> [DVec3; 2] {
+        self.points.aabb()
     }
 }
 
@@ -389,15 +383,15 @@ impl Shift for Polygon {
 }
 
 impl Rotate for Polygon {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        self.points.rotate_by_anchor(angle, axis, anchor);
+    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor: impl AnchorPoint) -> &mut Self {
+        self.points.rotate_at(angle, axis, anchor);
         self
     }
 }
 
 impl Scale for Polygon {
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
-        self.points.scale_by_anchor(scale, anchor);
+    fn scale_at(&mut self, scale: DVec3, anchor: impl AnchorPoint) -> &mut Self {
+        self.points.scale_at(scale, anchor);
         self
     }
 }

@@ -19,7 +19,7 @@ fn hello_ranim(r: &mut RanimScene) {
     let mut square = Square::new(2.0);
     square.set_color(manim::BLUE_C);
 
-    let r_square = r.new_timeline();
+    let r_square = r.insert_empty();
     {
         let t = r.timeline_mut(r_square);
         t.play(square.clone().fade_in());
@@ -50,7 +50,7 @@ fn hello_ranim_chained(r: &mut RanimScene) {
         square.set_color(manim::BLUE_C);
     });
 
-    let r_square = r.new_timeline();
+    let r_square = r.insert_empty();
     {
         let t = r.timeline_mut(r_square);
         t.play(square.clone().fade_in());

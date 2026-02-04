@@ -1,38 +1,33 @@
 use std::fmt::Debug;
 
-use derive_more::{AsMut, AsRef, Deref, DerefMut};
+use derive_more::{Deref, DerefMut, From};
 
 use crate::{
     prelude::{Alignable, Interpolatable},
     utils::{math::interpolate_usize, resize_preserving_order},
 };
 
-/// Point
-pub mod point;
-/// Rgba
-pub mod rgba;
-/// Vpoint
-pub mod vpoint;
-/// Width
-pub mod width;
+/// A Vec of Pointwise data
+#[derive(Debug, PartialEq, Eq, Deref, DerefMut, From)]
+pub struct PointVec<T>(Vec<T>);
 
-/// An component
-pub trait Component: Debug + Default + Clone + PartialEq {}
+impl<T: Interpolatable> Interpolatable for PointVec<T> {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        Self(self.0.lerp(&target.0, t))
+    }
+}
 
-impl<T: Debug + Default + Clone + PartialEq> Component for T {}
+impl<T: Clone> Clone for PointVec<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 
-/// A component vec
-#[derive(Default, Debug, Clone, PartialEq, Deref, DerefMut, AsMut, AsRef)]
-#[as_ref(forward)]
-#[as_mut(forward)]
-pub struct ComponentVec<T: Component>(pub(crate) Vec<T>);
-
-// MARK: Trait impls
-
-impl<T: Component + PointWise + Interpolatable> ComponentVec<T> {
-    /// Get partial of data
+impl<T: Component + Interpolatable> PointVec<T> {
+    /// Get a partial PointVec within a specified range.
     ///
-    /// This will interpolate between point wise data
+    /// This will interpolate the values at the start and end indices, and then
+    /// return a new PointVec containing the interpolated values.
     pub fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
         let max_idx = self.len() - 2;
 
@@ -69,7 +64,46 @@ impl<T: Component + PointWise + Interpolatable> ComponentVec<T> {
     }
 }
 
-impl<T: Component> Alignable for ComponentVec<T> {
+/// Point
+pub mod point;
+/// Rgba
+pub mod rgba;
+/// Vpoint
+pub mod vpoint;
+/// Width
+pub mod width;
+
+/// An component
+pub trait Component: Debug + Default + Clone + PartialEq {}
+
+impl<T: Debug + Default + Clone + PartialEq> Component for T {}
+
+pub trait ComponentVecTrait {
+    /// Resize with default value
+    fn resize_with_default(&mut self, new_len: usize);
+    /// Resize with last element
+    fn resize_with_last(&mut self, new_len: usize);
+    /// Resize preserved order
+    fn resize_preserving_order(&mut self, new_len: usize);
+}
+
+impl<T: Component> ComponentVecTrait for Vec<T> {
+    /// Resize with default value
+    fn resize_with_default(&mut self, new_len: usize) {
+        self.resize(new_len, Default::default());
+    }
+    /// Resize with last element
+    fn resize_with_last(&mut self, new_len: usize) {
+        let last = self.last().cloned().unwrap_or_default();
+        self.resize(new_len, last);
+    }
+    /// Resize preserved order
+    fn resize_preserving_order(&mut self, new_len: usize) {
+        *self = resize_preserving_order(self, new_len);
+    }
+}
+
+impl<T: Component> Alignable for PointVec<T> {
     fn is_aligned(&self, other: &Self) -> bool {
         self.len() == other.len()
     }
@@ -85,99 +119,47 @@ impl<T: Component> Alignable for ComponentVec<T> {
     }
 }
 
-impl<T: Component + Interpolatable> Interpolatable for ComponentVec<T> {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self(
-            self.iter()
-                .zip(target.iter())
-                .map(|(a, b)| a.lerp(b, t))
-                .collect::<Vec<_>>(),
-        )
-    }
-}
-
-impl<T: Component, I: IntoIterator<Item = impl Into<T>>> From<I> for ComponentVec<T> {
-    fn from(v: I) -> Self {
-        Self(v.into_iter().map(Into::into).collect())
-    }
-}
-
-impl<T: Component> ComponentVec<T> {
-    /// Extend from a vec
-    pub fn extend_from_vec(&mut self, vec: Vec<T>) {
-        self.0.extend(vec);
-    }
-    /// Resize with default value
-    pub fn resize_with_default(&mut self, new_len: usize) {
-        self.0.resize(new_len, Default::default());
-    }
-    /// Resize with last element
-    pub fn resize_with_last(&mut self, new_len: usize) {
-        let last = self.last().cloned().unwrap_or_default();
-        self.0.resize(new_len, last);
-    }
-    /// Resize preserved order
-    pub fn resize_preserving_order(&mut self, new_len: usize) {
-        self.0 = resize_preserving_order(&self.0, new_len);
-    }
-    /// Set all element to a value
-    pub fn set_all(&mut self, value: impl Into<T>) {
-        let value = value.into();
-        self.iter_mut().for_each(|x| *x = value.clone());
-    }
-}
-
-/// A marker trait for components that has each element as a point data.
-pub trait PointWise {}
-
 // MARK: Test
 #[cfg(test)]
 mod test {
     use glam::{DVec3, IVec3, dvec3, ivec3};
 
     use crate::{
-        components::vpoint::VPointComponentVec,
-        traits::{BoundingBox, Scale},
+        components::vpoint::VPointVec,
+        traits::{Aabb, AabbPoint, Scale, SomeNamePoint},
     };
 
     #[test]
     fn test_bounding_box() {
-        let points: VPointComponentVec = VPointComponentVec(
-            vec![
-                dvec3(-100.0, -100.0, 0.0),
-                dvec3(-100.0, 100.0, 0.0),
-                dvec3(100.0, 100.0, 0.0),
-                dvec3(100.0, -200.0, 0.0),
-            ]
-            .into(),
-        );
+        let points: VPointVec = VPointVec(vec![
+            dvec3(-100.0, -100.0, 0.0),
+            dvec3(-100.0, 100.0, 0.0),
+            dvec3(100.0, 100.0, 0.0),
+            dvec3(100.0, -200.0, 0.0),
+        ]);
         assert_eq!(
-            points.get_bounding_box(),
-            [
-                dvec3(-100.0, -200.0, 0.0),
-                dvec3(0.0, -50.0, 0.0),
-                dvec3(100.0, 100.0, 0.0)
-            ]
+            points.aabb(),
+            [dvec3(-100.0, -200.0, 0.0), dvec3(100.0, 100.0, 0.0)]
         );
         assert_eq!(
             dvec3(0.0, -50.0, 0.0),
-            points.get_bounding_box_point(ivec3(0, 0, 0))
+            points.get_point(AabbPoint(dvec3(0.0, 0.0, 0.0)))
         );
         assert_eq!(
             dvec3(-100.0, -200.0, 0.0),
-            points.get_bounding_box_point(ivec3(-1, -1, 0))
+            points.get_point(AabbPoint(dvec3(-1.0, -1.0, 0.0)))
         );
         assert_eq!(
             dvec3(-100.0, 100.0, 0.0),
-            points.get_bounding_box_point(ivec3(-1, 1, 0))
+            points.get_point(AabbPoint(dvec3(-1.0, 1.0, 0.0)))
         );
         assert_eq!(
             dvec3(100.0, -200.0, 0.0),
-            points.get_bounding_box_point(ivec3(1, -1, 0))
+            points.get_point(AabbPoint(dvec3(1.0, -1.0, 0.0)))
         );
         assert_eq!(
             dvec3(100.0, 100.0, 0.0),
-            points.get_bounding_box_point(ivec3(1, 1, 0))
+            points.get_point(AabbPoint(dvec3(1.0, 1.0, 0.0)))
         );
     }
 
@@ -190,23 +172,20 @@ mod test {
             dvec3(-3.0, 3.0, 0.0),
             dvec3(4.0, 4.0, 0.0),
         ];
-        let mut scale_origin = VPointComponentVec(square.clone().into());
+        let mut scale_origin = VPointVec(square.clone());
         assert_eq!(
-            scale_origin.get_bounding_box_point(IVec3::ZERO),
+            scale_origin.get_point(AabbPoint(DVec3::ZERO)),
             dvec3(0.5, 1.0, 0.0)
         );
         scale_origin.scale(DVec3::splat(3.0));
 
-        let ans = VPointComponentVec(
-            vec![
-                dvec3(-4.0, -5.0, 0.0),
-                dvec3(5.0, -8.0, 0.0),
-                dvec3(0.5, 1.0, 0.0),
-                dvec3(-10.0, 7.0, 0.0),
-                dvec3(11.0, 10.0, 0.0),
-            ]
-            .into(),
-        );
+        let ans = VPointVec(vec![
+            dvec3(-4.0, -5.0, 0.0),
+            dvec3(5.0, -8.0, 0.0),
+            dvec3(0.5, 1.0, 0.0),
+            dvec3(-10.0, 7.0, 0.0),
+            dvec3(11.0, 10.0, 0.0),
+        ]);
         assert_eq!(scale_origin, ans);
     }
 }

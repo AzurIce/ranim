@@ -1,8 +1,11 @@
 use std::{cmp::Ordering, ops::Range};
 
 use color::{AlphaColor, ColorSpace, Srgb};
-use glam::{DAffine2, DMat3, DMat4, DQuat, DVec2, DVec3, IVec3, Vec3Swizzles, dvec3, ivec3};
+use glam::{
+    DAffine2, DMat3, DMat4, DQuat, DVec2, DVec3, IVec3, USizeVec3, Vec3Swizzles, dvec3, ivec3,
+};
 use itertools::Itertools;
+use num::complex::Complex64;
 use tracing::warn;
 
 use crate::{components::width::Width, utils::resize_preserving_order_with_repeated_indices};
@@ -124,6 +127,24 @@ pub trait With {
 }
 
 impl<T> With for T {}
+
+/// A trait for discarding a value.
+///
+/// It is useful when you want a short closure:
+/// ```
+/// let x = Square::new(1.0).with(|x| {
+///     x.set_color(manim::BLUE_C);
+/// });
+/// let x = Square::new(1.0).with(|x|
+///     x.set_color(manim::BLUE_C).discard()
+/// );
+/// ```
+pub trait Discard {
+    /// Simply returns `()`
+    fn discard(&self) -> () {}
+}
+
+impl<T> Discard for T {}
 
 // MARK: Alignable
 /// A trait for aligning two items
@@ -283,65 +304,47 @@ pub trait Color: FillColor + StrokeColor {
 
 impl<T: FillColor + StrokeColor + ?Sized> Color for T {}
 
+pub trait SomeNamePoint<T> {
+    fn get_point(&self, point: T) -> DVec3;
+}
+
+impl<T: Aabb + ?Sized> SomeNamePoint<AabbPoint> for T {
+    fn get_point(&self, point: AabbPoint) -> DVec3 {
+        let center = self.aabb_center();
+        let half_size = self.aabb_size() / 2.0;
+        center + point.0 * half_size
+    }
+}
+// pub trait AnchorPoint<T> {}
+
 // MARK: BoundingBox
 /// A trait for items that have a bounding box
-pub trait BoundingBox {
-    /// Get the bottom-left (minimum) and top-right (maximum) points of the bounding box.
-    fn get_min_max(&self) -> [DVec3; 2];
-    /// Get the bounding box of the mobject in [min, mid, max] order.
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        let [min, max] = self.get_min_max();
-        [min, (min + max) / 2., max]
-    }
-    /// Get the bounding box point of the mobject at an edge Anchor.
-    ///
-    /// See [`Anchor`].
-    fn get_bounding_box_point(&self, edge: IVec3) -> DVec3 {
-        let bb = self.get_bounding_box();
-        let signum = (edge.signum() + IVec3::ONE).as_uvec3();
-
-        dvec3(
-            bb[signum.x as usize].x,
-            bb[signum.y as usize].y,
-            bb[signum.z as usize].z,
-        )
-    }
-    /// Get the bounding box corners of the mobject.
-    ///
-    /// The order is the cartesian product of [-1, 1] on x, y, z axis.
-    /// Which is `(-1, -1, -1)`, `(-1, -1, 1)`, `(-1, 1, -1)`, `(-1, 1, 1)`, ...
-    fn get_bounding_box_corners(&self) -> [DVec3; 8] {
-        [-1, 1]
-            .into_iter()
-            .cartesian_product([-1, 1])
-            .cartesian_product([-1, 1])
-            .map(|((x, y), z)| self.get_bounding_box_point(ivec3(x, y, z)))
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap()
-    }
-    /// Get the size of the bounding box in each axis.
-    fn bbox_size(&self) -> DVec3 {
-        let [min, max] = self.get_min_max();
+pub trait Aabb {
+    /// Get the Axis-aligned bounding box represent in `[<min>, <max>]`.
+    fn aabb(&self) -> [DVec3; 2];
+    /// Get the size of the Aabb.
+    fn aabb_size(&self) -> DVec3 {
+        let [min, max] = self.aabb();
         max - min
     }
-}
-
-impl BoundingBox for DVec3 {
-    fn get_min_max(&self) -> [DVec3; 2] {
-        [*self, *self]
-    }
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        [*self, *self, *self]
+    /// Get the center of the Aabb.
+    fn aabb_center(&self) -> DVec3 {
+        let [min, max] = self.aabb();
+        (max + min) / 2.0
     }
 }
 
-impl<T: BoundingBox> BoundingBox for [T] {
-    fn get_min_max(&self) -> [DVec3; 2] {
+impl Aabb for DVec3 {
+    fn aabb(&self) -> [DVec3; 2] {
+        [*self; 2]
+    }
+}
+
+impl<T: Aabb> Aabb for [T] {
+    fn aabb(&self) -> [DVec3; 2] {
         let [min, max] = self
             .iter()
-            .map(|x| x.get_bounding_box())
-            .map(|[min, _, max]| [min, max])
+            .map(|x| x.aabb())
             .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
             .unwrap_or([DVec3::ZERO, DVec3::ZERO]);
         if min == max {
@@ -356,6 +359,7 @@ impl<T: BoundingBox> BoundingBox for [T] {
 pub trait PointsFunc {
     /// Applying points function to an item
     fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self;
+
     /// Applying affine transform to an item
     fn apply_affine(&mut self, affine: DAffine2) -> &mut Self {
         self.apply_points_func(|points| {
@@ -367,23 +371,97 @@ pub trait PointsFunc {
         });
         self
     }
+
+    /// Applying point function to an item
+    fn apply_point_func(&mut self, f: impl Fn(&mut DVec3)) -> &mut Self {
+        self.apply_points_func(|points| {
+            points.iter_mut().for_each(&f);
+        });
+        self
+    }
+    /// Applying point function to an item
+    fn apply_point_map(&mut self, f: impl Fn(DVec3) -> DVec3) -> &mut Self {
+        self.apply_points_func(|points| {
+            points.iter_mut().for_each(|p| *p = f(*p));
+        });
+        self
+    }
+
+    /// Applying complex function to an item.
+    ///
+    /// The point's x and y coordinates will be used as real and imaginary parts of a complex number.
+    fn apply_complex_func(&mut self, f: impl Fn(&mut Complex64)) -> &mut Self {
+        self.apply_point_func(|p| {
+            let mut c = Complex64::new(p.x, p.y);
+            f(&mut c);
+            p.x = c.re;
+            p.y = c.im;
+        });
+        self
+    }
+    /// Applying complex function to an item.
+    ///
+    /// The point's x and y coordinates will be used as real and imaginary parts of a complex number.
+    fn apply_complex_map(&mut self, f: impl Fn(Complex64) -> Complex64) -> &mut Self {
+        self.apply_complex_func(|p| {
+            *p = f(*p);
+        });
+        self
+    }
+}
+
+impl PointsFunc for DVec3 {
+    fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self {
+        f(std::slice::from_mut(self));
+        self
+    }
+}
+
+impl<T: PointsFunc> PointsFunc for [T] {
+    fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self {
+        self.iter_mut()
+            .for_each(|x| x.apply_points_func(&f).discard());
+        self
+    }
 }
 
 // MARK: Shift
 /// A trait for shifting operations.
-pub trait Shift: BoundingBox {
+///
+/// To implement this trait, you need to implement the [`BoundingBox`] trait first.
+pub trait Shift: Aabb {
     /// Shift the item by a given vector.
-    fn shift(&mut self, shift: DVec3) -> &mut Self;
+    fn shift(&mut self, offset: DVec3) -> &mut Self;
     /// Put anchor at a given point.
     ///
     /// See [`Anchor`] for more details.
-    fn put_anchor_on(&mut self, anchor: Anchor, point: DVec3) -> &mut Self {
-        self.shift(point - anchor.get_pos(self));
+    fn move_anchor_to<T>(&mut self, anchor_point: T, point: DVec3) -> &mut Self
+    where
+        Self: SomeNamePoint<T>,
+    {
+        self.shift(point - self.get_point(anchor_point));
         self
     }
     /// Put center at a given point.
-    fn put_center_on(&mut self, point: DVec3) -> &mut Self {
-        self.put_anchor_on(Anchor::CENTER, point)
+    fn move_to(&mut self, point: DVec3) -> &mut Self {
+        self.move_anchor_to(AabbPoint::CENTER, point)
+    }
+    /// Put negative anchor of self on anchor of target
+    fn move_next_to<T: Aabb + ?Sized>(&mut self, target: &T, anchor: AabbPoint) -> &mut Self {
+        self.move_next_to_padded(target, anchor, 0.0)
+    }
+    /// Put negative anchor of self on anchor of target, with a distance of `padding`
+    fn move_next_to_padded<T: Aabb + ?Sized>(
+        &mut self,
+        target: &T,
+        anchor: AabbPoint,
+        padding: f64,
+    ) -> &mut Self {
+        let neg_anchor = AabbPoint(-anchor.0);
+        self.move_anchor_to(
+            neg_anchor,
+            anchor.get_pos(target) + anchor.0.normalize() * padding,
+        )
     }
 }
 
@@ -402,67 +480,59 @@ pub trait Rotate {
     /// Rotate the item by a given angle about a given axis at anchor.
     ///
     /// See [`Anchor`]
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self;
+    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor_point: impl AnchorPoint) -> &mut Self;
     /// Rotate the mobject by a given angle about a given axis at center.
     ///
     /// This is equivalent to [`Rotate::rotate_by_anchor`] with [`Anchor::CENTER`].
     fn rotate(&mut self, angle: f64, axis: DVec3) -> &mut Self {
-        self.rotate_by_anchor(angle, axis, Anchor::CENTER)
+        self.rotate_at(angle, axis, AabbPoint::CENTER)
     }
 }
 
-impl<T: Rotate + BoundingBox> Rotate for [T] {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(anchor.get_pos(self));
+impl<T: Rotate + Aabb> Rotate for [T] {
+    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor_point: impl AnchorPoint) -> &mut Self {
+        let anchor = anchor_point.get_pos(self);
         self.iter_mut().for_each(|x| {
-            x.rotate_by_anchor(angle, axis, anchor);
+            x.rotate_at(angle, axis, anchor);
         });
         self
     }
 }
 
 // MARK: Anchor
-/// The anchor of the transformation.
-///
-/// - [`DVec3`] implements [`Into`] [`Anchor::Point`]
-/// - [`IVec3`] implements [`Into`] [`Anchor::Edge`]
-#[derive(Debug, Clone, Copy)]
-pub enum Anchor {
-    /// A point anchor, which is an absolute coordinate
-    Point(DVec3),
-    /// An edge anchor, use -1, 0, 1 to specify the edge on each axis, (0, 0, 0) is the center point.
-    /// ```text
-    ///      +Y
-    ///      |
-    ///      |
-    ///      +----- +X
-    ///    /
-    /// +Z
-    /// ```
-    Edge(IVec3),
+/// A point based on [`Aabb`], the number in each axis means the fraction of the size of the [`Aabb`].
+/// (0, 0, 0) is the center point.
+/// ```text
+///      +Y
+///      |
+///      |
+///      +----- +X
+///    /
+/// +Z
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AabbPoint(pub DVec3);
+
+impl AabbPoint {
+    /// Center point, shorthand of `Anchor(DVec3::ZERO)`.
+    pub const CENTER: Self = Self(DVec3::ZERO);
 }
 
-impl Anchor {
-    /// The origin point: `Anchor::Point(DVec3::ZERO)`
-    pub const ORIGIN: Self = Self::Point(DVec3::ZERO);
-    /// The center edge: `Anchor::Edge(IVec3::ZERO)`
-    pub const CENTER: Self = Self::Edge(IVec3::ZERO);
+pub trait AnchorPoint {
+    fn get_pos<T: Aabb + ?Sized>(&self, bbox: &T) -> DVec3;
+}
 
-    /// Construct a [`Anchor::Point`]
-    pub fn point(x: f64, y: f64, z: f64) -> Self {
-        Self::Point(dvec3(x, y, z))
+impl AnchorPoint for DVec3 {
+    fn get_pos<T: Aabb + ?Sized>(&self, _bbox: &T) -> DVec3 {
+        *self
     }
-    /// Construct a [`Anchor::Edge`]
-    pub fn edge(x: i32, y: i32, z: i32) -> Self {
-        Self::Edge(ivec3(x, y, z).clamp(IVec3::NEG_ONE, IVec3::ONE))
-    }
+}
 
-    /// Get the position of the anchor based on a [`BoundingBox`]
-    pub fn get_pos<T: BoundingBox + ?Sized>(self, bbox: &T) -> DVec3 {
-        match self {
-            Self::Point(x) => x,
-            Self::Edge(x) => bbox.get_bounding_box_point(x),
-        }
+impl AnchorPoint for AabbPoint {
+    fn get_pos<T: Aabb + ?Sized>(&self, bbox: &T) -> DVec3 {
+        let bbox = bbox.aabb();
+        let pos = bbox[1] + self.0 * bbox.aabb_size() * 0.5;
+        pos
     }
 }
 
@@ -499,29 +569,29 @@ pub enum ScaleHint {
 
 // MARK: Scale
 /// A trait for scaling operations
-pub trait Scale: BoundingBox {
+pub trait Scale: Aabb {
     /// Scale the item by a given scale at anchor.
     ///
     /// See [`Anchor`]
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self;
+    fn scale_at(&mut self, scale: DVec3, anchor_point: impl AnchorPoint) -> &mut Self;
     /// Scale the item by a given scale at center.
     ///
     /// This is equivalent to [`Scale::scale_by_anchor`] with [`Anchor::CENTER`].
     fn scale(&mut self, scale: DVec3) -> &mut Self {
-        self.scale_by_anchor(scale, Anchor::CENTER)
+        self.scale_at(scale, AabbPoint::CENTER)
     }
     /// Calculate the scale ratio for a given hint.
     ///
     /// See [`ScaleHint`] for more details.
     fn calc_scale_ratio(&self, hint: ScaleHint) -> DVec3 {
-        let bb = self.get_bounding_box();
+        let aabb_size = self.aabb_size();
         match hint {
-            ScaleHint::X(v) => dvec3(v / (bb[2].x - bb[0].x), 1.0, 1.0),
-            ScaleHint::Y(v) => dvec3(1.0, v / (bb[2].y - bb[0].y), 1.0),
-            ScaleHint::Z(v) => dvec3(1.0, 1.0, v / (bb[2].z - bb[0].z)),
-            ScaleHint::PorportionalX(v) => DVec3::splat(v / (bb[2].x - bb[0].x)),
-            ScaleHint::PorportionalY(v) => DVec3::splat(v / (bb[2].y - bb[0].y)),
-            ScaleHint::PorportionalZ(v) => DVec3::splat(v / (bb[2].z - bb[0].z)),
+            ScaleHint::X(v) => dvec3(v / (aabb_size.x), 1.0, 1.0),
+            ScaleHint::Y(v) => dvec3(1.0, v / (aabb_size.y), 1.0),
+            ScaleHint::Z(v) => dvec3(1.0, 1.0, v / aabb_size.z),
+            ScaleHint::PorportionalX(v) => DVec3::splat(v / aabb_size.x),
+            ScaleHint::PorportionalY(v) => DVec3::splat(v / aabb_size.y),
+            ScaleHint::PorportionalZ(v) => DVec3::splat(v / aabb_size.z),
         }
     }
     /// Scale the item to a given hint.
@@ -558,13 +628,10 @@ pub trait Scale: BoundingBox {
 }
 
 impl<T: Scale> Scale for [T] {
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = match anchor {
-            Anchor::Point(p) => p,
-            Anchor::Edge(e) => self.get_bounding_box_point(e),
-        };
+    fn scale_at(&mut self, scale: DVec3, anchor_point: impl AnchorPoint) -> &mut Self {
+        let p = anchor_point.get_pos(self);
         self.iter_mut().for_each(|x| {
-            x.scale_by_anchor(scale, Anchor::Point(anchor));
+            x.scale_at(scale, p);
         });
         self
     }
@@ -578,12 +645,9 @@ impl Shift for DVec3 {
 }
 
 impl Rotate for DVec3 {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
+    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor: impl AnchorPoint) -> &mut Self {
         let rotation = DMat3::from_axis_angle(axis, angle);
-        let p = match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        };
+        let p = anchor.get_pos(self);
         wrap_point_func_with_point(|p| *p = rotation * *p, p)(self);
         if self.x.abs() < 1e-10 {
             self.x = 0.0;
@@ -599,59 +663,112 @@ impl Rotate for DVec3 {
 }
 
 impl Scale for DVec3 {
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
-        let p = match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        };
+    fn scale_at(&mut self, scale: DVec3, anchor: impl AnchorPoint) -> &mut Self {
+        let p = anchor.get_pos(self);
         wrap_point_func_with_point(|p| *p *= scale, p)(self);
         self
     }
 }
 
+// MARK: Align
+pub trait AlignSlice<T: Shift>: AsMut<[T]> {
+    /// Align items' anchors in a given axis, based on the first item.
+    fn align_anchor(&mut self, axis: DVec3, anchor: AabbPoint) -> &mut Self {
+        let Some(dir) = axis.try_normalize() else {
+            return self;
+        };
+        let Some(point) = self.as_mut().first().map(|x| anchor.get_pos(x)) else {
+            return self;
+        };
+
+        self.as_mut().iter_mut().for_each(|x| {
+            let p = anchor.get_pos(x);
+
+            let v = p - point;
+            let proj = dir * v.dot(dir);
+            let closest = point + proj;
+            let displacement = closest - p;
+            x.shift(displacement);
+        });
+        self
+    }
+    /// Align items' centers in a given axis, based on the first item.
+    fn align(&mut self, axis: DVec3) -> &mut Self {
+        self.align_anchor(axis, AabbPoint::CENTER)
+    }
+    // fn align(&mut self, point: DVec3, axis: DVec3) -> &mut Self {
+    //     self.align_anchor_at(Anchor::CENTER, point, axis)
+    // }
+}
+
 // MARK: Arrange
 /// A trait for arranging operations.
-pub trait Arrange: Shift {
+pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
     /// Arrange the items by a given function.
     ///
     /// The `pos_func` takes index as input and output the center position.
-    fn arrange(&mut self, pos_func: impl Fn(usize) -> DVec3);
+    fn arrange_with(&mut self, pos_func: impl Fn(usize) -> DVec3) {
+        self.as_mut().iter_mut().enumerate().for_each(|(i, x)| {
+            x.move_to(pos_func(i));
+        });
+    }
+    fn arrange_in_y(&mut self, gap: f64) {
+        let Some(mut bbox) = self.as_mut().first().map(|x| x.aabb()) else {
+            return;
+        };
+
+        self.as_mut().iter_mut().for_each(|x| {
+            x.move_next_to_padded(bbox.as_slice(), AabbPoint(DVec3::Y), gap);
+            bbox = x.aabb();
+        });
+    }
+    /// Arrange the items in a grid.
+    fn arrange_in_grid(&mut self, cell_cnt: USizeVec3, cell_size: DVec3, gap: DVec3) -> &mut Self {
+        // x -> y -> z
+        let pos_func = |idx: usize| {
+            let x = idx % cell_cnt.x;
+            let temp = idx / cell_cnt.x;
+
+            let y = temp % cell_cnt.y;
+            let z = temp / cell_cnt.y;
+            dvec3(x as f64, y as f64, z as f64) * cell_size
+                + gap * dvec3(x as f64, y as f64, z as f64)
+        };
+        self.arrange_with(pos_func);
+        self
+    }
     /// Arrange the items in a grid with given number of columns.
     ///
     /// The `pos_func` takes row and column index as input and output the center position.
-    fn arrange_cols(&mut self, ncols: usize, pos_func: impl Fn(usize, usize) -> DVec3);
-    /// Arrange the items in a grid with given number of rows.
-    ///
-    /// The `pos_func` takes row and column index as input and output the center position.
-    fn arrange_rows(&mut self, nrows: usize, pos_func: impl Fn(usize, usize) -> DVec3);
-}
-
-impl<T: Shift> Arrange for [T] {
-    fn arrange(&mut self, pos_func: impl Fn(usize) -> DVec3) {
-        self.iter_mut().enumerate().for_each(|(i, item)| {
-            item.put_center_on(pos_func(i));
-        });
-    }
-    fn arrange_cols(&mut self, ncols: usize, pos_func: impl Fn(usize, usize) -> DVec3) {
+    fn arrange_in_cols_with(&mut self, ncols: usize, pos_func: impl Fn(usize, usize) -> DVec3) {
         let pos_func = |idx: usize| {
             let row = idx / ncols;
             let col = idx % ncols;
             pos_func(row, col)
         };
-        self.arrange(pos_func);
+        self.arrange_with(pos_func);
     }
-    fn arrange_rows(&mut self, nrows: usize, pos_func: impl Fn(usize, usize) -> DVec3) {
-        let ncols = self.len().div_ceil(nrows);
-        self.arrange_cols(ncols, pos_func);
+    /// Arrange the items in a grid with given number of rows.
+    ///
+    /// The `pos_func` takes row and column index as input and output the center position.
+    fn arrange_in_rows_with(&mut self, nrows: usize, pos_func: impl Fn(usize, usize) -> DVec3) {
+        let ncols = self.as_mut().len().div_ceil(nrows);
+        self.arrange_in_cols_with(ncols, pos_func);
     }
 }
+
+impl<T: Shift, E: AsMut<[T]>> ArrangeSlice<T> for E {}
 
 // MARK: ScaleStrokeExt
 /// A trait for scaling operations with stroke width.
 pub trait ScaleStrokeExt: Scale + StrokeWidth {
     /// Scale the item by a given scale at anchor with stroke width.
-    fn scale_with_stroke_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
-        self.scale_by_anchor(scale, anchor);
+    fn scale_with_stroke_by_anchor(
+        &mut self,
+        scale: DVec3,
+        anchor_point: impl AnchorPoint,
+    ) -> &mut Self {
+        self.scale_at(scale, anchor_point);
 
         let scales = [scale.x, scale.y, scale.z];
         let idx = scales
@@ -665,7 +782,7 @@ pub trait ScaleStrokeExt: Scale + StrokeWidth {
     }
     /// Scale the item by a given scale with stroke width.
     fn scale_with_stroke(&mut self, scale: DVec3) -> &mut Self {
-        self.scale_with_stroke_by_anchor(scale, Anchor::CENTER)
+        self.scale_with_stroke_by_anchor(scale, AabbPoint::CENTER)
     }
     /// Scale the item to a given hint.
     ///

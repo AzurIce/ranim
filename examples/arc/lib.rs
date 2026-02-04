@@ -40,12 +40,11 @@ pub fn arc(r: &mut RanimScene) {
             let offset = frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
             Arc::new(angle, radius).with(|arc| {
                 arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
-                arc.set_stroke_color(color)
-                    .put_center_on(offset.extend(0.0));
+                arc.set_stroke_color(color).move_to(offset.extend(0.0));
             })
         })
         .collect::<Vec<_>>();
-    let r_arcs = r.new_timeline();
+    let r_arcs = r.insert_empty();
 
     r.timeline_mut(r_arcs)
         .play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
