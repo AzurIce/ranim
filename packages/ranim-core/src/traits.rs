@@ -325,18 +325,6 @@ pub trait BoundingBox {
         let [min, max] = self.get_min_max();
         max - min
     }
-    /// Get the width (size in _x_ axis) of the bounding box.
-    fn bbox_width(&self) -> f64 {
-        self.bbox_size().x
-    }
-    /// Get the height (size in _y_ axis) of the bounding box.
-    fn bbox_height(&self) -> f64 {
-        self.bbox_size().y
-    }
-    /// Get the depth (size in _z_ axis) of the bounding box.
-    fn bbox_depth(&self) -> f64 {
-        self.bbox_size().z
-    }
 }
 
 impl BoundingBox for DVec3 {
