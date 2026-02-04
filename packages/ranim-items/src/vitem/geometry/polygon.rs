@@ -227,21 +227,6 @@ impl Rectangle {
             fill_rgba: AlphaColor::TRANSPARENT,
         }
     }
-    /// Construct a rectangle from two corner points
-    pub fn from_two_points(p1: DVec3, p2: DVec3) -> Self {
-        let w = (p2.x - p1.x).abs();
-        let h = (p2.y - p1.y).abs();
-        let x = p1.x.min(p2.x);
-        let y = p1.y.min(p2.y);
-        let z = p1.z;
-        let p0 = dvec3(x, y, z);
-        let size = dvec2(w, h);
-        Self {
-            p0,
-            size,
-            ..Default::default()
-        }
-    }
     /// Width
     pub fn width(&self) -> f64 {
         self.size.x.abs()
