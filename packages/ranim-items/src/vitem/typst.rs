@@ -430,8 +430,8 @@ impl Extract for TypstText {
 }
 
 impl BoundingBox for TypstText {
-    fn get_bounding_box(&self) -> [glam::DVec3; 3] {
-        self.vitems.get_bounding_box()
+    fn get_min_max(&self) -> [glam::DVec3; 2] {
+        self.vitems.get_min_max()
     }
 }
 
