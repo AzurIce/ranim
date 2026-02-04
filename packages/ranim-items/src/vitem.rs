@@ -123,8 +123,8 @@ impl PointsFunc for VItem {
 }
 
 impl BoundingBox for VItem {
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        self.vpoints.get_bounding_box()
+    fn get_min_max(&self) -> [DVec3; 2] {
+        self.vpoints.get_min_max()
     }
 }
 
