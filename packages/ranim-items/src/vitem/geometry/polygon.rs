@@ -207,36 +207,24 @@ pub struct Rectangle {
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
-impl Default for Rectangle {
-    fn default() -> Self {
-        Self {
-            proj: Proj::default(),
-            p0: dvec3(0.0, 0.0, 0.0),
-            size: dvec2(1.0, 1.0),
-            stroke_rgba: AlphaColor::WHITE,
-            stroke_width: DEFAULT_STROKE_WIDTH,
-            fill_rgba: AlphaColor::TRANSPARENT,
-        }
-    }
-}
-
 impl Rectangle {
     /// Constructor
     pub fn new(width: f64, height: f64) -> Self {
         let half_width = width / 2.0;
         let half_height = height / 2.0;
-        Self {
-            p0: dvec3(-half_width, -half_height, 0.0),
-            size: dvec2(width, height),
-            ..Default::default()
-        }
+        let p0 = dvec3(-half_width, -half_height, 0.0);
+        let size = dvec2(width, height);
+        Self::from_min_size(p0, size)
     }
     /// Construct a rectangle from the bottom-left point (minimum) and size.
     pub fn from_min_size(p0: DVec3, size: DVec2) -> Self {
         Self {
+            proj: Proj::default(),
             p0,
             size,
-            ..Default::default()
+            stroke_rgba: AlphaColor::WHITE,
+            stroke_width: DEFAULT_STROKE_WIDTH,
+            fill_rgba: AlphaColor::TRANSPARENT,
         }
     }
     /// Construct a rectangle from two corner points
