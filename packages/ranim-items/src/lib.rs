@@ -40,14 +40,6 @@ impl BoundingBox for Plane {
         let basis_vec = self.basis.0 + self.basis.1;
         [self.origin - basis_vec / 2.0, self.origin + basis_vec / 2.0]
     }
-    fn get_bounding_box(&self) -> [DVec3; 3] {
-        let basis_vec = self.basis.0 + self.basis.1;
-        [
-            self.origin - basis_vec / 2.0,
-            self.origin,
-            self.origin + basis_vec / 2.0,
-        ]
-    }
 }
 
 impl Shift for Plane {
