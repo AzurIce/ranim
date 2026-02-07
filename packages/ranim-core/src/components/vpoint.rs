@@ -4,6 +4,7 @@ use derive_more::{Deref, DerefMut};
 use glam::DVec3;
 use itertools::Itertools;
 
+use crate::anchor::Aabb;
 use crate::traits::*;
 use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
@@ -28,6 +29,39 @@ pub struct VPointVec(pub Vec<DVec3>);
 impl Aabb for VPointVec {
     fn aabb(&self) -> [DVec3; 2] {
         self.0.aabb()
+    }
+}
+
+impl AsRef<[DVec3]> for VPointVec {
+    fn as_ref(&self) -> &[DVec3] {
+        self.0.as_ref()
+    }
+}
+
+impl AsMut<[DVec3]> for VPointVec {
+    fn as_mut(&mut self) -> &mut [DVec3] {
+        self.0.as_mut()
+    }
+}
+
+impl ShiftImpl for VPointVec {
+    fn shift(&mut self, offset: DVec3) -> &mut Self {
+        self.as_mut().shift(offset);
+        self
+    }
+}
+
+impl RotateImpl for VPointVec {
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.as_mut().rotate_at_point(angle, axis, point);
+        self
+    }
+}
+
+impl ScaleImpl for VPointVec {
+    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
+        self.as_mut().scale_at_point(scale, point);
+        self
     }
 }
 

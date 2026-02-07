@@ -1,11 +1,13 @@
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::Extract;
+use ranim_core::anchor::{Aabb, Locate, Pivot};
 use ranim_core::core_item::CoreItem;
-use ranim_core::traits::{AabbPoint, AnchorPoint};
 use ranim_core::{color, glam};
 
-use ranim_core::traits::{Aabb, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With};
+use ranim_core::traits::{
+    Opacity, Rotate, RotateImpl, Scale, Shift, ShiftImpl, StrokeColor, StrokeWidth, With,
+};
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
 
@@ -28,6 +30,12 @@ pub struct Arc {
     pub stroke_width: f32,
 }
 
+impl Locate<Pivot> for Arc {
+    fn locate(&self, _target: Pivot) -> DVec3 {
+        self.center
+    }
+}
+
 impl Arc {
     /// Constructor
     pub fn new(angle: f64, radius: f64) -> Self {
@@ -45,14 +53,17 @@ impl Arc {
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, AabbPoint::CENTER)
+        self.scale_by_anchor(scale, Pivot)
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
-    pub fn scale_by_anchor(&mut self, scale: f64, anchor_point: impl AnchorPoint) -> &mut Self {
-        let anchor = anchor_point.get_pos(self);
+    pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
+    where
+        Self: Locate<T>,
+    {
+        let anchor = Locate::<T>::locate(self, anchor);
         self.radius *= scale;
         self.center.scale_at(DVec3::splat(scale), anchor);
         self
@@ -79,17 +90,16 @@ impl Aabb for Arc {
     }
 }
 
-impl Shift for Arc {
+impl ShiftImpl for Arc {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.center.shift(shift);
         self
     }
 }
 
-impl Rotate for Arc {
-    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor_point: impl AnchorPoint) -> &mut Self {
-        let p = anchor_point.get_pos(self);
-        self.center.rotate_at(angle, axis, p);
+impl RotateImpl for Arc {
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.center.rotate_at(angle, axis, point);
         self.proj.rotate(angle, axis);
         self
     }
@@ -185,6 +195,12 @@ pub struct ArcBetweenPoints {
     pub stroke_width: f32,
 }
 
+// impl Locate<Pivot> for ArcBetweenPoints {
+//     fn locate(&self, _target: Pivot) -> DVec3 {
+
+//     }
+// }
+
 impl ArcBetweenPoints {
     /// Constructor
     pub fn new(start: DVec3, end: DVec3, angle: f64) -> Self {
@@ -198,21 +214,24 @@ impl ArcBetweenPoints {
             stroke_width: DEFAULT_STROKE_WIDTH,
         }
     }
+    // /// Scale the arc by the given scale, with the given anchor as the center.
+    // ///
+    // /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    // /// because this keeps the arc a arc.
+    // pub fn scale(&mut self, scale: f64) -> &mut Self {
+    //     self.scale_at(scale, AabbPoint::CENTER)
+    // }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
-    pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_at(scale, AabbPoint::CENTER)
-    }
-    /// Scale the arc by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
-    /// because this keeps the arc a arc.
-    pub fn scale_at(&mut self, scale: f64, anchor_point: impl AnchorPoint) -> &mut Self {
-        let p = anchor_point.get_pos(self);
-        self.start.scale_at(DVec3::splat(scale), p);
-        self.end.scale_at(DVec3::splat(scale), p);
+    pub fn scale_at<T>(&mut self, scale: f64, anchor: T) -> &mut Self
+    where
+        Self: Locate<T>,
+    {
+        let point = Locate::<T>::locate(self, anchor);
+        self.start.scale_at(DVec3::splat(scale), point);
+        self.end.scale_at(DVec3::splat(scale), point);
         self
     }
 }
@@ -226,7 +245,7 @@ impl Aabb for ArcBetweenPoints {
     }
 }
 
-impl Shift for ArcBetweenPoints {
+impl ShiftImpl for ArcBetweenPoints {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.start.shift(shift);
         self.end.shift(shift);
@@ -234,11 +253,10 @@ impl Shift for ArcBetweenPoints {
     }
 }
 
-impl Rotate for ArcBetweenPoints {
-    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor_point: impl AnchorPoint) -> &mut Self {
-        let p = anchor_point.get_pos(self);
-        self.start.rotate_at(angle, axis, p);
-        self.end.rotate_at(angle, axis, p);
+impl RotateImpl for ArcBetweenPoints {
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.start.rotate_at(angle, axis, point);
+        self.end.rotate_at(angle, axis, point);
         self.proj.rotate(angle, axis);
         self
     }

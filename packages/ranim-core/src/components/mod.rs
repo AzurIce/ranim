@@ -78,7 +78,8 @@ pub trait Component: Debug + Default + Clone + PartialEq {}
 
 impl<T: Debug + Default + Clone + PartialEq> Component for T {}
 
-pub trait ComponentVecTrait {
+/// Vec resizing utils
+pub trait VecResizeTrait {
     /// Resize with default value
     fn resize_with_default(&mut self, new_len: usize);
     /// Resize with last element
@@ -87,7 +88,7 @@ pub trait ComponentVecTrait {
     fn resize_preserving_order(&mut self, new_len: usize);
 }
 
-impl<T: Component> ComponentVecTrait for Vec<T> {
+impl<T: Component> VecResizeTrait for Vec<T> {
     /// Resize with default value
     fn resize_with_default(&mut self, new_len: usize) {
         self.resize(new_len, Default::default());
@@ -122,11 +123,12 @@ impl<T: Component> Alignable for PointVec<T> {
 // MARK: Test
 #[cfg(test)]
 mod test {
-    use glam::{DVec3, IVec3, dvec3, ivec3};
+    use glam::{DVec3, dvec3};
 
     use crate::{
+        anchor::{Aabb, AabbPoint, Locate},
         components::vpoint::VPointVec,
-        traits::{Aabb, AabbPoint, Scale, SomeNamePoint},
+        traits::Scale,
     };
 
     #[test]
@@ -143,23 +145,23 @@ mod test {
         );
         assert_eq!(
             dvec3(0.0, -50.0, 0.0),
-            points.get_point(AabbPoint(dvec3(0.0, 0.0, 0.0)))
+            points.locate(AabbPoint(dvec3(0.0, 0.0, 0.0)))
         );
         assert_eq!(
             dvec3(-100.0, -200.0, 0.0),
-            points.get_point(AabbPoint(dvec3(-1.0, -1.0, 0.0)))
+            points.locate(AabbPoint(dvec3(-1.0, -1.0, 0.0)))
         );
         assert_eq!(
             dvec3(-100.0, 100.0, 0.0),
-            points.get_point(AabbPoint(dvec3(-1.0, 1.0, 0.0)))
+            points.locate(AabbPoint(dvec3(-1.0, 1.0, 0.0)))
         );
         assert_eq!(
             dvec3(100.0, -200.0, 0.0),
-            points.get_point(AabbPoint(dvec3(1.0, -1.0, 0.0)))
+            points.locate(AabbPoint(dvec3(1.0, -1.0, 0.0)))
         );
         assert_eq!(
             dvec3(100.0, 100.0, 0.0),
-            points.get_point(AabbPoint(dvec3(1.0, 1.0, 0.0)))
+            points.locate(AabbPoint(dvec3(1.0, 1.0, 0.0)))
         );
     }
 
@@ -174,10 +176,10 @@ mod test {
         ];
         let mut scale_origin = VPointVec(square.clone());
         assert_eq!(
-            scale_origin.get_point(AabbPoint(DVec3::ZERO)),
+            scale_origin.locate(AabbPoint(DVec3::ZERO)),
             dvec3(0.5, 1.0, 0.0)
         );
-        scale_origin.scale(DVec3::splat(3.0));
+        scale_origin.scale_at(DVec3::splat(3.0), AabbPoint::CENTER);
 
         let ans = VPointVec(vec![
             dvec3(-4.0, -5.0, 0.0),

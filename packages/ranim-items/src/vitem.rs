@@ -18,14 +18,15 @@ pub mod typst;
 
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
+use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
-use ranim_core::traits::AnchorPoint;
+use ranim_core::traits::{RotateImpl, ScaleImpl, ShiftImpl};
 use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
-    components::{ComponentVecTrait, PointVec, rgba::Rgba, vpoint::VPointVec, width::Width},
+    components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
     prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
-    traits::{Aabb, PointsFunc, Rotate, Scale, Shift, StrokeColor},
+    traits::{PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
 
 /// The projection of a [`VItem`].
@@ -128,24 +129,24 @@ impl Aabb for VItem {
     }
 }
 
-impl Shift for VItem {
+impl ShiftImpl for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
         self
     }
 }
 
-impl Rotate for VItem {
-    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor_point: impl AnchorPoint) -> &mut Self {
-        self.vpoints.rotate_at(angle, axis, anchor_point);
+impl RotateImpl for VItem {
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.vpoints.rotate_at_point(angle, axis, point);
         self.proj.rotate(angle, axis);
         self
     }
 }
 
-impl Scale for VItem {
-    fn scale_at(&mut self, scale: DVec3, anchor_point: impl AnchorPoint) -> &mut Self {
-        self.vpoints.scale_at(scale, anchor_point);
+impl ScaleImpl for VItem {
+    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
+        self.vpoints.scale_at_point(scale, point);
         self
     }
 }

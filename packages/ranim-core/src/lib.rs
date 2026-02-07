@@ -25,7 +25,10 @@ pub mod core_item;
 /// The [`core_item::CoreItem`] store
 pub mod store;
 
+pub mod anchor;
+
 pub use glam;
+pub use num;
 
 /// Prelude
 pub mod prelude {

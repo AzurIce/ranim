@@ -8,8 +8,9 @@
 )]
 
 use ranim_core::{
+    anchor::Aabb,
     glam::DVec3,
-    traits::{Aabb, AnchorPoint, Interpolatable, Rotate, Shift},
+    traits::{Interpolatable, Rotate, RotateImpl, Shift, ShiftImpl},
 };
 
 pub mod vitem;
@@ -42,16 +43,16 @@ impl Aabb for Plane {
     }
 }
 
-impl Shift for Plane {
+impl ShiftImpl for Plane {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.origin.shift(shift);
         self
     }
 }
 
-impl Rotate for Plane {
-    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor_point: impl AnchorPoint) -> &mut Self {
-        self.origin.rotate_at(angle, axis, anchor_point);
+impl RotateImpl for Plane {
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.origin.rotate_at_point(angle, axis, point);
         self.basis.0.rotate(angle, axis);
         self.basis.1.rotate(angle, axis);
         self

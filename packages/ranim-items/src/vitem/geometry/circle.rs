@@ -3,14 +3,16 @@ use std::f64::consts::PI;
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::{
-    Extract, color,
+    Extract,
+    anchor::{Aabb, Locate, Pivot},
+    color,
     core_item::CoreItem,
     glam,
-    traits::{AabbPoint, AnchorPoint},
+    traits::{RotateImpl, ShiftImpl},
 };
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane};
-use ranim_core::traits::{Aabb, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, With};
+use ranim_core::traits::{FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, With};
 
 use crate::vitem::VItem;
 
@@ -35,6 +37,12 @@ pub struct Circle {
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
+impl Locate<Pivot> for Circle {
+    fn locate(&self, _target: Pivot) -> DVec3 {
+        self.center
+    }
+}
+
 impl Circle {
     /// Constructor
     pub fn new(radius: f64) -> Self {
@@ -53,16 +61,19 @@ impl Circle {
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, AabbPoint::CENTER)
+        self.scale_by_anchor(scale, Pivot)
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
-    pub fn scale_by_anchor(&mut self, scale: f64, anchor: impl AnchorPoint) -> &mut Self {
-        let anchor = anchor.get_pos(self);
+    pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
+    where
+        Self: Locate<T>,
+    {
+        let point = Locate::<T>::locate(self, anchor);
         self.radius *= scale;
-        self.center.scale_at(DVec3::splat(scale), anchor);
+        self.center.scale_at(DVec3::splat(scale), point);
         self
     }
 }
@@ -76,17 +87,16 @@ impl Aabb for Circle {
     }
 }
 
-impl Shift for Circle {
+impl ShiftImpl for Circle {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.center.shift(shift);
         self
     }
 }
 
-impl Rotate for Circle {
-    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor: impl AnchorPoint) -> &mut Self {
-        let anchor = anchor.get_pos(self);
-        self.center.rotate_at(angle, axis, anchor);
+impl RotateImpl for Circle {
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.center.rotate_at(angle, axis, point);
         self.proj.rotate(angle, axis);
         self
     }

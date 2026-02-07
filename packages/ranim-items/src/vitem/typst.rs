@@ -23,11 +23,7 @@ use typst_kit::fonts::{FontSearcher, Fonts};
 
 use crate::vitem::{VItem, svg::SvgItem};
 use ranim_core::{
-    Extract, color,
-    components::width::Width,
-    core_item::CoreItem,
-    glam,
-    traits::{AnchorPoint, *},
+    Extract, anchor::Aabb, color, components::width::Width, core_item::CoreItem, glam, traits::*,
 };
 
 struct TypstLruCache {
@@ -435,23 +431,23 @@ impl Aabb for TypstText {
     }
 }
 
-impl Shift for TypstText {
+impl ShiftImpl for TypstText {
     fn shift(&mut self, shift: glam::DVec3) -> &mut Self {
         self.vitems.shift(shift);
         self
     }
 }
 
-impl Rotate for TypstText {
-    fn rotate_at(&mut self, angle: f64, axis: glam::DVec3, anchor: impl AnchorPoint) -> &mut Self {
-        self.vitems.rotate_at(angle, axis, anchor);
+impl RotateImpl for TypstText {
+    fn rotate_at_point(&mut self, angle: f64, axis: glam::DVec3, point: glam::DVec3) -> &mut Self {
+        self.vitems.rotate_at_point(angle, axis, point);
         self
     }
 }
 
-impl Scale for TypstText {
-    fn scale_at(&mut self, scale: glam::DVec3, anchor: impl AnchorPoint) -> &mut Self {
-        self.vitems.scale_at(scale, anchor);
+impl ScaleImpl for TypstText {
+    fn scale_at_point(&mut self, scale: glam::DVec3, point: glam::DVec3) -> &mut Self {
+        self.vitems.scale_at_point(scale, point);
         self
     }
 }
