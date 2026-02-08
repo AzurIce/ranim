@@ -83,7 +83,7 @@ fn perspective_blend(r: &mut RanimScene) {
     let faces = square_faces.map(|(_, face)| face);
     let mut faces = faces.to_vec();
 
-    let r_faces = r.new_timeline();
+    let r_faces = r.insert_empty();
     r.timelines_mut().sync(); // TODO: make this better
     r.timeline_mut(r_faces).play(
         faces
@@ -106,7 +106,7 @@ fn perspective_blend(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "b88f1098ac36094df5a10a512b4ccf10a24d6c8f"
+hash = "1a52947cc32e391acc04f7e73f5a24ea0e655d04"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

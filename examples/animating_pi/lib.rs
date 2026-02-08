@@ -11,8 +11,8 @@ use ranim_core::animation::StaticAnim;
 use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 
 #[scene(clear_color = "#000000")]
-#[output(dir = "animaiting_pi")]
-fn hello_ranim(r: &mut RanimScene) {
+#[output(dir = "animating_pi")]
+fn animating_pi(r: &mut RanimScene) {
     let cam = CameraFrame::default();
     let _r_cam = r.insert(cam.clone());
 
@@ -71,6 +71,7 @@ fn hello_ranim(r: &mut RanimScene) {
             )
             .forward(1.0);
     });
+    r.insert_time_mark(5.0, TimeMark::Capture("preview.png".to_string()));
 }
 
 #[test]

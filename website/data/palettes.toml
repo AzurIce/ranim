@@ -43,8 +43,8 @@ fn palettes(r: &mut RanimScene) {
                 Rectangle::new(w_step as f64, h_step as f64).with(|rect| {
                     rect.stroke_width = 0.0;
 
-                    rect.set_color(*color).put_anchor_on(
-                        Anchor::edge(-1, -1, 0),
+                    rect.set_color(*color).move_anchor_to(
+                        AabbPoint(dvec3(-1.0, -1.0, 0.0)),
                         padded_frame_start.extend(0.0) + dvec3(x, y, 0.0),
                     );
                 })
@@ -56,7 +56,7 @@ fn palettes(r: &mut RanimScene) {
     r.timelines_mut().forward(0.01);
 }
 ```"""
-hash = "8e4a4bdb13b5ff4f8b395af06bf6ab4f6286d954"
+hash = "6d96b2f257799d61230c0e2a593487c334eb80c3"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/palettes_1920x1080_60.mp4"]
 wasm = false
