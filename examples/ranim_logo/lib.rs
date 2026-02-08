@@ -19,16 +19,21 @@ use ranim::{
 fn build_logo(logo_width: f64) -> [VItem; 6] {
     let red_bg_rect = Rectangle::new(logo_width / 2.0, logo_width).with(|rect| {
         rect.set_color(manim::RED_C.with_alpha(0.5))
-            .put_center_on(dvec3(-logo_width / 4.0, 0.0, 0.0));
+            .move_to(dvec3(-logo_width / 4.0, 0.0, 0.0));
     });
     let red_rect = Rectangle::new(logo_width / 4.0, logo_width).with(|rect| {
-        rect.set_color(manim::RED_C)
-            .put_anchor_on(Anchor::edge(1, 0, 0), dvec3(-logo_width / 4.0, 0.0, 0.0));
+        rect.set_color(manim::RED_C).move_anchor_to(
+            AabbPoint(dvec3(1.0, 0.0, 0.0)),
+            dvec3(-logo_width / 4.0, 0.0, 0.0),
+        );
     });
 
     let green_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
-        sq.set_color(manim::GREEN_C.with_alpha(0.5))
-            .put_center_on(dvec3(logo_width / 4.0, logo_width / 4.0, 0.0));
+        sq.set_color(manim::GREEN_C.with_alpha(0.5)).move_to(dvec3(
+            logo_width / 4.0,
+            logo_width / 4.0,
+            0.0,
+        ));
     });
     let green_triangle = Polygon::new(vec![
         dvec3(0.0, logo_width / 2.0, 0.0),
@@ -40,8 +45,11 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     }); // ◥
 
     let blue_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
-        sq.set_color(manim::BLUE_C.with_alpha(0.5))
-            .put_center_on(dvec3(logo_width / 4.0, -logo_width / 4.0, 0.0));
+        sq.set_color(manim::BLUE_C.with_alpha(0.5)).move_to(dvec3(
+            logo_width / 4.0,
+            -logo_width / 4.0,
+            0.0,
+        ));
     });
     let blue_triangle = green_triangle.clone().with(|tri| {
         tri.set_color(manim::BLUE_C)
@@ -78,10 +86,10 @@ fn ranim_logo(r: &mut RanimScene) {
         .with(|text| {
             text.set_color(manim::WHITE)
                 .scale_to(ScaleHint::PorportionalY(1.0))
-                .put_center_on(DVec3::NEG_Y * 2.5);
+                .move_to(DVec3::NEG_Y * 2.5);
         }),
     );
-    let r_ranim_text = r.insert(ranim_text.clone());
+    let r_ranim_text = r.insert_empty();
 
     r_logo.iter_mut().for_each(|(r_logo, item)| {
         r.timeline_mut(*r_logo)
@@ -98,9 +106,9 @@ fn ranim_logo(r: &mut RanimScene) {
         dvec3(scale, scale, 1.0),
     ];
     let anchor = [
-        Anchor::edge(-1, 0, 0),
-        Anchor::edge(1, 1, 0),
-        Anchor::edge(1, -1, 0),
+        AabbPoint(dvec3(-1.0, 0.0, 0.0)),
+        AabbPoint(dvec3(1.0, 1.0, 0.0)),
+        AabbPoint(dvec3(1.0, -1.0, 0.0)),
     ];
     r_logo
         .iter_mut()
@@ -111,8 +119,8 @@ fn ranim_logo(r: &mut RanimScene) {
             chunk.for_each(|(r_item, item)| {
                 r.timeline_mut(*r_item).play(
                     item.transform(|data| {
-                        data.scale_by_anchor(scale, anchor)
-                            .scale_by_anchor(dvec3(0.9, 0.9, 1.0), Anchor::ORIGIN)
+                        data.scale_at(scale, anchor)
+                            .scale_at(dvec3(0.9, 0.9, 1.0), DVec3::ZERO)
                             .shift(dvec3(0.0, 1.3, 0.0));
                     })
                     .with_rate_func(smooth),

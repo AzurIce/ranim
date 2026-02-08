@@ -25,7 +25,10 @@ pub mod core_item;
 /// The [`core_item::CoreItem`] store
 pub mod store;
 
+pub mod anchor;
+
 pub use glam;
+pub use num;
 
 /// Prelude
 pub mod prelude {
@@ -228,21 +231,19 @@ impl RanimScene {
         Self::default()
     }
 
-    /// Create a new timeline.
-    pub fn new_timeline(&mut self) -> TimelineId {
-        self.new_timeline_with(|_| ())
+    /// Insert an empty timeline.
+    pub fn insert_empty(&mut self) -> TimelineId {
+        self.insert_empty_at(0.0)
     }
 
-    /// Create a new timeline and call `f` on it.
-    pub fn new_timeline_with(&mut self, f: impl FnOnce(&mut Timeline)) -> TimelineId {
-        let id = TimelineId(self.timelines.len());
-        let mut timeline = Timeline::new();
-        f(&mut timeline);
-        self.timelines.push(timeline);
-        id
+    /// Insert an empty timeline and forward it to the given sec.
+    pub fn insert_empty_at(&mut self, sec: f64) -> TimelineId {
+        self.insert_with(|t| {
+            t.forward_to(sec);
+        })
     }
 
-    /// Create a new timeline and play [`StaticAnim::show`] on it at `0.0` sec.
+    /// Insert a timeline at `0.0` sec and play [`StaticAnim::show`] on it.
     pub fn insert<T: Extract<Target = CoreItem> + Clone + 'static>(
         &mut self,
         item: T,
@@ -250,16 +251,25 @@ impl RanimScene {
         self.insert_at(item, 0.0)
     }
 
-    /// Create a new timeline and play [`StaticAnim::show`] on it at the given sec.
+    /// Insert a timeline at the given sec and play [`StaticAnim::show`] on it.
     pub fn insert_at<T: Extract<Target = CoreItem> + Clone + 'static>(
         &mut self,
         item: T,
         sec: f64,
     ) -> TimelineId {
-        self.new_timeline_with(|t| {
+        self.insert_with(|t| {
             t.forward_to(sec);
             t.play(item.show());
         })
+    }
+
+    /// Insert a empty timeline and call `f` on it.
+    pub fn insert_with(&mut self, mut f: impl FnMut(&mut Timeline)) -> TimelineId {
+        let id = TimelineId(self.timelines.len());
+        let mut timeline = Timeline::new();
+        f(&mut timeline);
+        self.timelines.push(timeline);
+        id
     }
 
     /// Get reference of all timelines

@@ -33,7 +33,7 @@ fn ranim_text(r: &mut RanimScene) {
         item.set_fill_color(manim::WHITE)
             .set_fill_opacity(0.5)
             .scale_to_with_stroke(ScaleHint::PorportionalY(3.6))
-            .put_center_on(DVec3::ZERO);
+            .move_to(DVec3::ZERO);
     });
     let _r_texts = Vec::<VItem>::from(text)
         .into_iter()
@@ -76,7 +76,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
             .rotate(-PI / 4.0 + PI, DVec3::Z);
     })));
 
-    let r_vitem = r.new_timeline();
+    let r_vitem = r.insert_empty();
     {
         let timeline = r.timeline_mut(r_vitem);
         timeline
@@ -206,7 +206,7 @@ impl Extract for VisualVItem {
                     })
                 }
                 .with(|circle| {
-                    circle.put_center_on(*p);
+                    circle.move_to(*p);
                 });
                 point.extract_into(buf);
             });
@@ -241,7 +241,7 @@ impl Empty for VisualVItem {
     }
 }
 ```"""
-hash = "c450425c84be6bae063266f264feff2b031bedf4"
+hash = "4c989bee7b307ab232196cb0e240bf83afb7d04c"
 preview_imgs = ["/examples/extract_vitem_visualize/preview-ranim_text.png", "/examples/extract_vitem_visualize/preview-hello_ranim.png"]
 output_files = ["/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4", "/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4"]
 wasm = true

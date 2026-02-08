@@ -2,7 +2,7 @@ use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     anims::transform::TransformAnim,
     color::palettes::manim,
-    glam::{DVec3, dvec2},
+    glam::{DVec3, dvec2, dvec3},
     items::vitem::geometry::Rectangle,
     prelude::*,
     utils::rate_functions::linear,
@@ -36,7 +36,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
                 rect.stroke_width = 0.0;
                 rect.set_fill_color(manim::WHITE.with_alpha(0.5))
                     .scale(DVec3::splat(0.8))
-                    .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
+                    .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
             (r.insert(rect.clone()), rect)
         })

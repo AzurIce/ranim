@@ -30,7 +30,7 @@ fn ranim_text(r: &mut RanimScene) {
         item.set_fill_color(manim::WHITE)
             .set_fill_opacity(0.5)
             .scale_to_with_stroke(ScaleHint::PorportionalY(3.6))
-            .put_center_on(DVec3::ZERO);
+            .move_to(DVec3::ZERO);
     });
     let _r_texts = Vec::<VItem>::from(text)
         .into_iter()
@@ -73,7 +73,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
             .rotate(-PI / 4.0 + PI, DVec3::Z);
     })));
 
-    let r_vitem = r.new_timeline();
+    let r_vitem = r.insert_empty();
     {
         let timeline = r.timeline_mut(r_vitem);
         timeline
@@ -203,7 +203,7 @@ impl Extract for VisualVItem {
                     })
                 }
                 .with(|circle| {
-                    circle.put_center_on(*p);
+                    circle.move_to(*p);
                 });
                 point.extract_into(buf);
             });

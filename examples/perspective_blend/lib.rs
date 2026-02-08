@@ -80,7 +80,7 @@ fn perspective_blend(r: &mut RanimScene) {
     let faces = square_faces.map(|(_, face)| face);
     let mut faces = faces.to_vec();
 
-    let r_faces = r.new_timeline();
+    let r_faces = r.insert_empty();
     r.timelines_mut().sync(); // TODO: make this better
     r.timeline_mut(r_faces).play(
         faces

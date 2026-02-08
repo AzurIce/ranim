@@ -22,7 +22,7 @@ fn getting_started1(r: &mut RanimScene) {
         circle.set_color(manim::RED_C);
     });
 
-    let r_vitem = r.new_timeline();
+    let r_vitem = r.insert_empty();
     {
         let timeline = r.timeline_mut(r_vitem);
         // In order to do more low-level opeerations,

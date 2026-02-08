@@ -1,6 +1,12 @@
-use ranim_core::{Extract, core_item::CoreItem, glam::DVec3};
+use ranim_core::{
+    anchor::{Aabb, Locate},
+    core_item::CoreItem,
+    glam::DVec3,
+    Extract,
+};
 use ranim_macros::{
-    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, Position, Stroke,
+    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, RotateImpl, ScaleImpl,
+    ShiftImpl, Stroke,
 };
 
 use super::VItem;
@@ -10,7 +16,20 @@ use super::VItem;
 //     pub arrow: Arrow,
 // }
 
-#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Partial)]
+#[derive(
+    Clone,
+    Interpolatable,
+    Alignable,
+    Opacity,
+    Empty,
+    Partial,
+    ShiftImpl,
+    RotateImpl,
+    ScaleImpl,
+    BoundingBox,
+    Stroke,
+    Fill,
+)]
 pub struct Line(pub VItem);
 
 impl From<Line> for VItem {

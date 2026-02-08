@@ -1,6 +1,6 @@
 use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
-use ranim::glam;
+use ranim::glam::{self, dvec3};
 use ranim::{
     anims::transform::TransformAnim, color::palettes::manim, items::vitem::geometry::Rectangle,
     prelude::*, utils::rate_functions::linear,
@@ -33,7 +33,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
             let rect = Rectangle::new(width_unit, height).with(|rect| {
                 rect.fill_rgba = manim::WHITE.with_alpha(0.5);
                 rect.scale(DVec3::splat(0.8))
-                    .put_anchor_on(Anchor::edge(0, -1, 0), target_bc_coord);
+                    .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
             (r.insert(rect.clone()), rect)
         })
