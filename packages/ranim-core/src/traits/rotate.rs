@@ -10,8 +10,6 @@ use crate::{
 /// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: Rotate`.
 pub trait Rotate {
     /// Rotate the item by a given angle about a given axis at the given point.
-    ///
-    /// See [`Anchor`]
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self;
 }
 
@@ -41,13 +39,13 @@ impl<T: RotateExt> Rotate for [T] {
     }
 }
 
-/// A trait for rotating operations
+/// Useful extensions for rotating operations.
 ///
-/// This trait is implemented automatically for types that implement [`RotateImpl`], you should not implement it yourself.
+/// This trait is implemented automatically for types that implement [`Rotate`], you should not implement it yourself.
 pub trait RotateExt: Rotate {
     /// Rotate the mobject by a given angle about a given axis at center.
     ///
-    /// This is equivalent to [`Rotate::rotate_by_anchor`] with [`AabbPoint::CENTER`].
+    /// This is equivalent to [`RotateExt::rotate_at`] with [`AabbPoint::CENTER`].
     fn rotate(&mut self, angle: f64, axis: DVec3) -> &mut Self
     where
         AabbPoint: Locate<Self>,
@@ -55,8 +53,6 @@ pub trait RotateExt: Rotate {
         self.rotate_at(angle, axis, AabbPoint::CENTER)
     }
     /// Rotate the item by a given angle about a given axis at anchor.
-    ///
-    /// See [`Anchor`]
     fn rotate_at<T>(&mut self, angle: f64, axis: DVec3, anchor: T) -> &mut Self
     where
         T: Locate<Self>,

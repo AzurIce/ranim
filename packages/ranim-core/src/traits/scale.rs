@@ -51,6 +51,8 @@ impl<T: Scale> Scale for [T] {
 }
 
 /// Useful extensions for scaling operations.
+///
+/// This trait is implemented automatically for types that implement [`Scale`], you should not implement it yourself.
 pub trait ScaleExt: Scale {
     /// Scale the item by a given scale at an anchor.
     ///
@@ -64,7 +66,7 @@ pub trait ScaleExt: Scale {
     }
     /// Scale the item by a given scale at [`AabbPoint::CENTER`].
     ///
-    /// This is equivalent to [`Scale::scale_at`] with anchor of [`AabbPoint::CENTER`].
+    /// This is equivalent to [`ScaleExt::scale_at`] with anchor of [`AabbPoint::CENTER`].
     fn scale(&mut self, scale: DVec3) -> &mut Self
     where
         AabbPoint: Locate<Self>,

@@ -5,19 +5,19 @@ use crate::anchor::{Aabb, AabbPoint, Locate};
 /// Shifting operations.
 ///
 /// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: Shift`.
-pub trait ShiftImpl {
+pub trait Shift {
     /// Shift the item by a given vector.
     fn shift(&mut self, offset: DVec3) -> &mut Self;
 }
 
-impl ShiftImpl for DVec3 {
+impl Shift for DVec3 {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         *self += shift;
         self
     }
 }
 
-impl<T: Shift> ShiftImpl for [T] {
+impl<T: ShiftExt> Shift for [T] {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.iter_mut().for_each(|x| {
             x.shift(shift);
@@ -26,13 +26,13 @@ impl<T: Shift> ShiftImpl for [T] {
     }
 }
 
-/// A trait for shifting operations.
+/// Useful extensions for shifting operations.
 ///
-/// To implement this trait, you need to implement the [`BoundingBox`] trait first.
-pub trait Shift: ShiftImpl {
+/// This trait is implemented automatically for types that implement [`Shift`], you should not implement it yourself.
+pub trait ShiftExt: Shift {
     /// Put anchor at a given point.
     ///
-    /// See [`Anchor`] for more details.
+    /// See [`crate::anchor`]'s [`Locate`] for more details.
     fn move_anchor_to<A>(&mut self, anchor: A, point: DVec3) -> &mut Self
     where
         A: Locate<Self>,
@@ -72,4 +72,4 @@ pub trait Shift: ShiftImpl {
     }
 }
 
-impl<T: ShiftImpl + ?Sized> Shift for T {}
+impl<T: Shift + ?Sized> ShiftExt for T {}

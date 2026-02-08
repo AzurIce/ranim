@@ -55,7 +55,7 @@ impl<T> With for T {}
 /// ```
 pub trait Discard {
     /// Simply returns `()`
-    fn discard(&self) -> () {}
+    fn discard(&self) {}
 }
 
 impl<T> Discard for T {}
@@ -383,11 +383,11 @@ impl<T: PointsFunc> PointsFunc for [T] {
 
 // MARK: Align
 /// Align a slice of items
-pub trait AlignSlice<T: Shift>: AsMut<[T]> {
+pub trait AlignSlice<T: ShiftExt>: AsMut<[T]> {
     /// Align items' anchors in a given axis, based on the first item.
-    fn align_anchor<A: Clone>(&mut self, axis: DVec3, anchor: A) -> &mut Self
+    fn align_anchor<A>(&mut self, axis: DVec3, anchor: A) -> &mut Self
     where
-        A: Locate<T>,
+        A: Locate<T> + Clone,
     {
         let Some(dir) = axis.try_normalize() else {
             return self;
@@ -418,7 +418,7 @@ pub trait AlignSlice<T: Shift>: AsMut<[T]> {
 
 // MARK: Arrange
 /// A trait for arranging operations.
-pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
+pub trait ArrangeSlice<T: ShiftExt>: AsMut<[T]> {
     /// Arrange the items by a given function.
     ///
     /// The `pos_func` takes index as input and output the center position.
@@ -489,4 +489,4 @@ pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
     }
 }
 
-impl<T: Shift, E: AsMut<[T]>> ArrangeSlice<T> for E {}
+impl<T: ShiftExt, E: AsMut<[T]>> ArrangeSlice<T> for E {}

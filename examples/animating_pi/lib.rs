@@ -1,4 +1,4 @@
-use std::{f64::consts::TAU, usize};
+use std::f64::consts::TAU;
 
 use itertools::Itertools;
 use ranim::{

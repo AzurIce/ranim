@@ -11,19 +11,19 @@ use lru::LruCache;
 use regex::bytes::Regex;
 use sha1::{Digest, Sha1};
 use typst::{
+    Library, LibraryExt, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime},
     layout::Abs,
     syntax::{FileId, Source},
     text::{Font, FontBook},
     utils::LazyHash,
-    Library, LibraryExt, World,
 };
 use typst_kit::fonts::{FontSearcher, Fonts};
 
-use crate::vitem::{svg::SvgItem, VItem};
+use crate::vitem::{VItem, svg::SvgItem};
 use ranim_core::{
-    anchor::Aabb, color, components::width::Width, core_item::CoreItem, glam, traits::*, Extract,
+    Extract, anchor::Aabb, color, components::width::Width, core_item::CoreItem, glam, traits::*,
 };
 
 struct TypstLruCache {
@@ -431,7 +431,7 @@ impl Aabb for TypstText {
     }
 }
 
-impl ShiftImpl for TypstText {
+impl Shift for TypstText {
     fn shift(&mut self, shift: glam::DVec3) -> &mut Self {
         self.vitems.shift(shift);
         self

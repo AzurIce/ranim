@@ -16,16 +16,16 @@ pub mod svg;
 pub mod typst;
 // pub mod line;
 
-use color::{palette::css, AlphaColor, Srgb};
-use glam::{vec4, DVec3, Vec4};
+use color::{AlphaColor, Srgb, palette::css};
+use glam::{DVec3, Vec4, vec4};
 use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
-use ranim_core::{color, glam, Extract};
+use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
-    components::{rgba::Rgba, vpoint::VPointVec, width::Width, PointVec, VecResizeTrait},
+    components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
     prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
-    traits::{PointsFunc, Rotate, Scale, ShiftImpl, StrokeColor},
+    traits::{PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
 
 /// The projection of a [`VItem`].
@@ -60,7 +60,7 @@ impl ProjectionPlane {
         (self.basis_u(), self.basis_v())
     }
     /// The corrected basis vector in the u direction.
-    /// This is same as [`Proj::basis_u`].
+    /// This is same as [`ProjectionPlane::basis_u`].
     pub fn corrected_basis_u(&self) -> DVec3 {
         self.basis_u.normalize()
     }
@@ -85,12 +85,12 @@ impl ProjectionPlane {
 /// A vectorized item.
 ///
 /// It is built from four components:
-/// - [`VItem::vpoints`]: the vpoints of the item, see [`VPointComponentVec`].
+/// - [`VItem::vpoints`]: the vpoints of the item, see [`VPointVec`].
 /// - [`VItem::stroke_widths`]: the stroke widths of the item, see [`Width`].
 /// - [`VItem::stroke_rgbas`]: the stroke colors of the item, see [`Rgba`].
 /// - [`VItem::fill_rgbas`]: the fill colors of the item, see [`Rgba`].
 ///
-/// You can construct a [`VItem`] from a list of VPoints, see [`VPointComponentVec`]:
+/// You can construct a [`VItem`] from a list of VPoints, see [`VPointVec`]:
 ///
 /// ```rust
 /// let vitem = VItem::from_vpoints(vec![
@@ -103,7 +103,7 @@ impl ProjectionPlane {
 pub struct VItem {
     /// The projection info.
     ///
-    /// See [`Proj`]
+    /// See [`ProjectionPlane`]
     pub proj: ProjectionPlane,
     /// vpoints data
     pub vpoints: VPointVec,
@@ -128,7 +128,7 @@ impl Aabb for VItem {
     }
 }
 
-impl ShiftImpl for VItem {
+impl Shift for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
         self
@@ -166,12 +166,12 @@ impl VItem {
     /// Shrink to center
     pub fn shrink(&mut self) -> &mut Self {
         let bb = self.aabb();
-        self.vpoints.0 = vec![bb[1]; self.vpoints.len()].into();
+        self.vpoints.0 = vec![bb[1]; self.vpoints.len()];
         self
     }
     /// Set the vpoints of the VItem
     pub fn set_points(&mut self, vpoints: Vec<DVec3>) {
-        self.vpoints.0 = vpoints.into();
+        self.vpoints.0 = vpoints;
     }
     /// Get anchor points
     pub fn get_anchor(&self, idx: usize) -> Option<&DVec3> {
@@ -293,7 +293,7 @@ impl Empty for VItem {
     fn empty() -> Self {
         Self {
             proj: ProjectionPlane::default(),
-            vpoints: VPointVec(vec![DVec3::ZERO; 3].into()),
+            vpoints: VPointVec(vec![DVec3::ZERO; 3]),
             stroke_widths: vec![0.0.into(); 2].into(),
             stroke_rgbas: vec![Vec4::ZERO.into(); 2].into(),
             fill_rgbas: vec![Vec4::ZERO.into(); 2].into(),

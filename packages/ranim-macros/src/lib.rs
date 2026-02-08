@@ -417,44 +417,55 @@ pub fn derive_bounding_box(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-
 #[proc_macro_derive(ShiftImpl)]
 pub fn derive_shift_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
-    impl_derive(input, quote! {#core::traits::ShiftImpl}, |field_positions| {
-        quote! {
-            fn shift(&mut self, shift: #core::glam::DVec3) -> &mut Self {
-                #(self.#field_positions.shift(shift);)*
-                self
+    impl_derive(
+        input,
+        quote! {#core::traits::ShiftImpl},
+        |field_positions| {
+            quote! {
+                fn shift(&mut self, shift: #core::glam::DVec3) -> &mut Self {
+                    #(self.#field_positions.shift(shift);)*
+                    self
+                }
             }
-        }
-    })
+        },
+    )
 }
 
 #[proc_macro_derive(RotateImpl)]
 pub fn derive_rotate_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
-    impl_derive(input, quote! {#core::traits::RotateImpl}, |field_positions| {
-        quote! {
-            fn rotate_at_point(&mut self, angle: f64, axis: #core::glam::DVec3, point: #core::glam::DVec3) -> &mut Self {
-                #(self.#field_positions.rotate_at_point(angle, axis, point);)*
-                self
+    impl_derive(
+        input,
+        quote! {#core::traits::RotateImpl},
+        |field_positions| {
+            quote! {
+                fn rotate_at_point(&mut self, angle: f64, axis: #core::glam::DVec3, point: #core::glam::DVec3) -> &mut Self {
+                    #(self.#field_positions.rotate_at_point(angle, axis, point);)*
+                    self
+                }
             }
-        }
-    })
+        },
+    )
 }
 
 #[proc_macro_derive(ScaleImpl)]
 pub fn derive_scale_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
-    impl_derive(input, quote! {#core::traits::ScaleImpl}, |field_positions| {
-        quote! {
-            fn scale_at_point(&mut self, scale: #core::glam::DVec3, point: #core::glam::DVec3) -> &mut Self {
-                #(self.#field_positions.scale_at_point(scale, point);)*
-                self
+    impl_derive(
+        input,
+        quote! {#core::traits::ScaleImpl},
+        |field_positions| {
+            quote! {
+                fn scale_at_point(&mut self, scale: #core::glam::DVec3, point: #core::glam::DVec3) -> &mut Self {
+                    #(self.#field_positions.scale_at_point(scale, point);)*
+                    self
+                }
             }
-        }
-    })
+        },
+    )
 }
 
 #[proc_macro_derive(PointsFunc)]

@@ -44,7 +44,7 @@ impl AsMut<[DVec3]> for VPointVec {
     }
 }
 
-impl ShiftImpl for VPointVec {
+impl Shift for VPointVec {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
         self.as_mut().shift(offset);
         self
@@ -71,7 +71,7 @@ impl Alignable for VPointVec {
     }
     fn align_with(&mut self, other: &mut Self) {
         if self.is_empty() {
-            self.0 = vec![DVec3::ZERO; 3].into();
+            self.0 = vec![DVec3::ZERO; 3];
         }
         if self.len() > other.len() {
             other.align_with(self);
@@ -205,11 +205,8 @@ impl Alignable for VPointVec {
             points
         };
 
-        let points_self = sps_to_points(sps_self);
-        let points_other = sps_to_points(sps_other);
-
-        self.0 = points_self.into();
-        other.0 = points_other.into();
+        self.0 = sps_to_points(sps_self);
+        other.0 = sps_to_points(sps_other);
     }
 }
 
@@ -346,7 +343,7 @@ impl VPointVec {
                 partial.extend_from_slice(&end_part[1..]);
             }
 
-            VPointVec(partial.into())
+            VPointVec(partial)
         }
     }
 }
@@ -386,18 +383,15 @@ mod test {
 
     #[test]
     fn test_get_partial() {
-        let points = VPointVec(
-            vec![
-                dvec3(0.0, 0.0, 0.0),
-                dvec3(1.0, 1.0, 1.0),
-                dvec3(2.0, 2.0, 2.0),
-                dvec3(2.0, 2.0, 2.0),
-                dvec3(3.0, 3.0, 3.0),
-                dvec3(4.0, 4.0, 4.0),
-                dvec3(5.0, 5.0, 5.0),
-            ]
-            .into(),
-        );
+        let points = VPointVec(vec![
+            dvec3(0.0, 0.0, 0.0),
+            dvec3(1.0, 1.0, 1.0),
+            dvec3(2.0, 2.0, 2.0),
+            dvec3(2.0, 2.0, 2.0),
+            dvec3(3.0, 3.0, 3.0),
+            dvec3(4.0, 4.0, 4.0),
+            dvec3(5.0, 5.0, 5.0),
+        ]);
         let partial = points.get_partial(0.0..1.0);
         assert_eq!(partial, points);
 
@@ -407,14 +401,11 @@ mod test {
 
     #[test]
     fn test_rotate() {
-        let mut points = VPointVec(
-            vec![
-                dvec3(0.0, 0.0, 0.0),
-                dvec3(1.0, 0.0, 0.0),
-                dvec3(2.0, 2.0, 0.0),
-            ]
-            .into(),
-        );
+        let mut points = VPointVec(vec![
+            dvec3(0.0, 0.0, 0.0),
+            dvec3(1.0, 0.0, 0.0),
+            dvec3(2.0, 2.0, 0.0),
+        ]);
         points.rotate_at(PI, DVec3::Z, DVec3::ZERO);
         points
             .0
@@ -431,14 +422,11 @@ mod test {
 
     #[test]
     fn test_put_start_and_end_on() {
-        let mut points = VPointVec(
-            vec![
-                dvec3(0.0, 0.0, 0.0),
-                dvec3(1.0, 0.0, 0.0),
-                dvec3(2.0, 2.0, 0.0),
-            ]
-            .into(),
-        );
+        let mut points = VPointVec(vec![
+            dvec3(0.0, 0.0, 0.0),
+            dvec3(1.0, 0.0, 0.0),
+            dvec3(2.0, 2.0, 0.0),
+        ]);
         points.put_start_and_end_on(dvec3(0.0, 0.0, 0.0), dvec3(4.0, 4.0, 0.0));
         points
             .0

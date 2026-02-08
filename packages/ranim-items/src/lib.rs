@@ -10,7 +10,7 @@
 use ranim_core::{
     anchor::Aabb,
     glam::DVec3,
-    traits::{Interpolatable, Rotate, RotateExt, ShiftImpl},
+    traits::{Interpolatable, Rotate, RotateExt, Shift},
 };
 
 pub mod vitem;
@@ -43,7 +43,7 @@ impl Aabb for Plane {
     }
 }
 
-impl ShiftImpl for Plane {
+impl Shift for Plane {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.origin.shift(shift);
         self

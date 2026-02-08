@@ -3,15 +3,15 @@ use std::f64::consts::PI;
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::{
+    Extract,
     anchor::{Aabb, Locate},
     color,
     core_item::CoreItem,
     glam,
-    traits::{Rotate, ShiftImpl},
-    Extract,
+    traits::{Rotate, Shift},
 };
 
-use crate::vitem::{ProjectionPlane, DEFAULT_STROKE_WIDTH};
+use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane};
 use ranim_core::anchor::AabbPoint;
 use ranim_core::traits::{FillColor, Opacity, RotateExt, ScaleExt, StrokeColor, With};
 
@@ -53,14 +53,14 @@ impl Circle {
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
         self.scale_by_anchor(scale, AabbPoint::CENTER)
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
@@ -82,7 +82,7 @@ impl Aabb for Circle {
     }
 }
 
-impl ShiftImpl for Circle {
+impl Shift for Circle {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.center.shift(shift);
         self

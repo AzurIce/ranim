@@ -90,12 +90,10 @@ fn writing(r: &mut RanimScene) {
 fn transform(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let src = Square::new(2.0).with(|x| {
-        x.set_color(manim::RED_C)
-            .move_to(dvec3(0.0, 2.0, 0.0));
+        x.set_color(manim::RED_C).move_to(dvec3(0.0, 2.0, 0.0));
     });
     let dst = Circle::new(1.5).with(|x| {
-        x.set_color(manim::BLUE_C)
-            .move_to(dvec3(0.0, -2.0, 0.0));
+        x.set_color(manim::BLUE_C).move_to(dvec3(0.0, -2.0, 0.0));
     });
     // dst.rotate(PI / 4.0 + PI, DVec3::Z); // rotate to match src
     let r_item = r.insert_empty();

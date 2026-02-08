@@ -188,6 +188,19 @@ pub fn calculate_hash<T: Hash>(t: &T) -> u64 {
     s.finish()
 }
 
+/// Apply the function by first transform the points to origin based on a point,
+/// then apply the function, then transform the points back.
+pub fn wrap_point_func_with_point(
+    f: impl Fn(&mut DVec3) + Copy,
+    point: DVec3,
+) -> impl Fn(&mut DVec3) + Copy {
+    move |points| {
+        *points -= point;
+        f(points);
+        *points += point;
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -205,18 +218,5 @@ mod test {
         let a = apart_alpha(1.0, 10, 1e-3);
         println!("{a}");
         println!("{}", merge_alpha(1.0, 10));
-    }
-}
-
-/// Apply the function by first transform the points to origin based on a point,
-/// then apply the function, then transform the points back.
-pub fn wrap_point_func_with_point(
-    f: impl Fn(&mut DVec3) + Copy,
-    point: DVec3,
-) -> impl Fn(&mut DVec3) + Copy {
-    move |points| {
-        *points -= point;
-        f(points);
-        *points += point;
     }
 }

@@ -1,15 +1,15 @@
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
+use ranim_core::Extract;
 use ranim_core::anchor::{Aabb, Locate};
 use ranim_core::core_item::CoreItem;
-use ranim_core::Extract;
 use ranim_core::{color, glam};
 
 use ranim_core::traits::{
-    Opacity, Rotate, RotateExt, ScaleExt, ShiftImpl, StrokeColor, StrokeWidth, With,
+    Opacity, Rotate, RotateExt, ScaleExt, Shift, StrokeColor, StrokeWidth, With,
 };
 
-use crate::vitem::{ProjectionPlane, VItem, DEFAULT_STROKE_WIDTH};
+use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
 use ranim_core::anchor::AabbPoint;
 
 // MARK: ### Arc ###
@@ -45,14 +45,14 @@ impl Arc {
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
         self.scale_by_anchor(scale, AabbPoint::CENTER)
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
@@ -85,7 +85,7 @@ impl Aabb for Arc {
     }
 }
 
-impl ShiftImpl for Arc {
+impl Shift for Arc {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.center.shift(shift);
         self
@@ -205,14 +205,14 @@ impl ArcBetweenPoints {
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
         self.scale_at(scale, AabbPoint::CENTER)
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale_at<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
@@ -234,7 +234,7 @@ impl Aabb for ArcBetweenPoints {
     }
 }
 
-impl ShiftImpl for ArcBetweenPoints {
+impl Shift for ArcBetweenPoints {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.start.shift(shift);
         self.end.shift(shift);

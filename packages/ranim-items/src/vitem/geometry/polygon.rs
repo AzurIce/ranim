@@ -4,7 +4,7 @@ use ranim_core::{
     color,
     core_item::CoreItem,
     glam,
-    traits::{Rotate, RotateExt, Scale, ShiftImpl},
+    traits::{Rotate, RotateExt, Scale, Shift},
 };
 
 use color::{AlphaColor, Srgb};
@@ -80,7 +80,7 @@ impl Aabb for Square {
     }
 }
 
-impl ShiftImpl for Square {
+impl Shift for Square {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.center.shift(shift);
         self
@@ -240,7 +240,7 @@ impl Aabb for Rectangle {
     }
 }
 
-impl ShiftImpl for Rectangle {
+impl Shift for Rectangle {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.p0.shift(shift);
         self
@@ -375,7 +375,7 @@ impl Aabb for Polygon {
     }
 }
 
-impl ShiftImpl for Polygon {
+impl Shift for Polygon {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.points.shift(shift);
         self
