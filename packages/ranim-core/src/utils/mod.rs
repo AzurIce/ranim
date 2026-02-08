@@ -16,7 +16,7 @@ use std::{
     ops::Div,
 };
 
-use glam::{Mat3, Vec2, Vec3, vec2, vec3};
+use glam::{DVec3, Mat3, Vec2, Vec3, vec2, vec3};
 
 /// Projects a 3D point onto a plane defined by a unit normal vector.
 pub fn project(p: Vec3, unit_normal: Vec3) -> Vec3 {
@@ -186,6 +186,19 @@ pub fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);
     s.finish()
+}
+
+/// Apply the function by first transform the points to origin based on a point,
+/// then apply the function, then transform the points back.
+pub fn wrap_point_func_with_point(
+    f: impl Fn(&mut DVec3) + Copy,
+    point: DVec3,
+) -> impl Fn(&mut DVec3) + Copy {
+    move |points| {
+        *points -= point;
+        f(points);
+        *points += point;
+    }
 }
 
 #[cfg(test)]

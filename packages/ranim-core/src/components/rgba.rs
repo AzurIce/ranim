@@ -4,16 +4,15 @@ use std::ops::{Deref, DerefMut};
 use color::{AlphaColor, ColorSpace, LinearSrgb, Srgb};
 use glam::{Vec4, vec4};
 
-use crate::prelude::{Interpolatable, Opacity};
-
-use super::{ComponentVec, PointWise};
+use crate::{
+    components::PointVec,
+    prelude::{Interpolatable, Opacity},
+};
 
 /// Rgba
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Rgba(pub Vec4);
-
-impl PointWise for Rgba {}
 
 impl Opacity for Rgba {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
@@ -22,7 +21,7 @@ impl Opacity for Rgba {
     }
 }
 
-impl Opacity for ComponentVec<Rgba> {
+impl Opacity for PointVec<Rgba> {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.iter_mut().for_each(|rgba| {
             rgba.set_opacity(opacity);

@@ -1,15 +1,16 @@
 use glam::DVec3;
+use ranim_core::anchor::{Aabb, Locate};
 use ranim_macros::{
-    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, Position, Stroke,
+    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, RotateImpl, ScaleImpl,
+    ShiftImpl, Stroke,
 };
 
 use crate::{
-    components::Anchor,
     items::Blueprint,
-    render::primitives::{Extract, vitem::VItemPrimitive},
+    render::primitives::{vitem::VItemPrimitive, Extract},
 };
 
-use super::{Polygon, VItem, line::Line};
+use super::{line::Line, Polygon, VItem};
 
 /// An arrow tip
 ///
@@ -22,7 +23,18 @@ use super::{Polygon, VItem, line::Line};
 /// 0.1 * -X +-----+ 0.1 * X
 /// ```
 #[derive(
-    Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, BoundingBox, Position, Partial,
+    Clone,
+    Interpolatable,
+    Alignable,
+    Opacity,
+    Empty,
+    Stroke,
+    Fill,
+    BoundingBox,
+    ShiftImpl,
+    RotateImpl,
+    ScaleImpl,
+    Partial,
 )]
 pub struct ArrowTip(pub VItem);
 
@@ -62,12 +74,12 @@ impl ArrowTip {
     }
     pub fn put_tip_on(&mut self, pos: DVec3) -> &mut Self {
         let tip_point = self.tip_point();
-        self.0.put_anchor_on(Anchor::Point(tip_point), pos);
+        self.0.move_anchor_to(tip_point, pos);
         self
     }
     pub fn put_bottom_center_on(&mut self, pos: DVec3) -> &mut Self {
         let tip_point = self.tip_point();
-        self.0.put_anchor_on(Anchor::Point(tip_point), pos);
+        self.0.move_anchor_to(tip_point, pos);
         self
     }
     /// The point on the tip
@@ -91,7 +103,20 @@ impl Extract for ArrowTip {
     }
 }
 
-#[derive(Clone, Interpolatable, Alignable, Opacity, Empty, Stroke, Fill, Partial)]
+#[derive(
+    Clone,
+    Interpolatable,
+    Alignable,
+    Opacity,
+    Empty,
+    Stroke,
+    Fill,
+    Partial,
+    ShiftImpl,
+    RotateImpl,
+    ScaleImpl,
+    BoundingBox,
+)]
 pub struct Arrow {
     pub tip: ArrowTip,
     pub line: Line,

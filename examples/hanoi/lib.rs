@@ -34,8 +34,8 @@ fn hanoi(r: &mut RanimScene, n: usize) {
         .into_iter()
         .map(|i: i32| {
             Rectangle::new(rod_width, rod_height).with(|rect| {
-                rect.set_color(manim::GREY_C).put_anchor_on(
-                    Anchor::edge(0, -1, 0),
+                rect.set_color(manim::GREY_C).move_anchor_to(
+                    AabbPoint(dvec3(0.0, -1.0, 0.0)),
                     dvec3(i as f64 * rod_section_width, -4.0, 0.0),
                 );
             })
@@ -54,8 +54,8 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 let color =
                     manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
                 rect.stroke_width = 0.0;
-                rect.set_color(color).put_anchor_on(
-                    Anchor::edge(0, -1, 0),
+                rect.set_color(color).move_anchor_to(
+                    AabbPoint(dvec3(0.0, -1.0, 0.0)),
                     dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.0),
                 );
             });

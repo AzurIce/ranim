@@ -23,11 +23,7 @@ use typst_kit::fonts::{FontSearcher, Fonts};
 
 use crate::vitem::{VItem, svg::SvgItem};
 use ranim_core::{
-    Extract, color,
-    components::width::Width,
-    core_item::CoreItem,
-    glam,
-    traits::{Anchor, *},
+    Extract, anchor::Aabb, color, components::width::Width, core_item::CoreItem, glam, traits::*,
 };
 
 struct TypstLruCache {
@@ -429,9 +425,9 @@ impl Extract for TypstText {
     }
 }
 
-impl BoundingBox for TypstText {
-    fn get_min_max(&self) -> [glam::DVec3; 2] {
-        self.vitems.get_min_max()
+impl Aabb for TypstText {
+    fn aabb(&self) -> [glam::DVec3; 2] {
+        self.vitems.aabb()
     }
 }
 
@@ -443,15 +439,15 @@ impl Shift for TypstText {
 }
 
 impl Rotate for TypstText {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: glam::DVec3, anchor: Anchor) -> &mut Self {
-        self.vitems.rotate_by_anchor(angle, axis, anchor);
+    fn rotate_at_point(&mut self, angle: f64, axis: glam::DVec3, point: glam::DVec3) -> &mut Self {
+        self.vitems.rotate_at_point(angle, axis, point);
         self
     }
 }
 
 impl Scale for TypstText {
-    fn scale_by_anchor(&mut self, scale: glam::DVec3, anchor: Anchor) -> &mut Self {
-        self.vitems.scale_by_anchor(scale, anchor);
+    fn scale_at_point(&mut self, scale: glam::DVec3, point: glam::DVec3) -> &mut Self {
+        self.vitems.scale_at_point(scale, point);
         self
     }
 }
@@ -512,10 +508,12 @@ impl StrokeWidth for TypstText {
 pub fn get_typst_element(svg: &str) -> String {
     let re = Regex::new(r"<path[^>]*(?:>.*?<\/path>|\/>)").unwrap();
     let removed_bg = re.replace(svg.as_bytes(), b"");
+    let re = Regex::new(r#"\s+(?:viewBox|width|height)="[^"]*""#).unwrap();
+    let removed_size = re.replace_all(&removed_bg, b"");
 
     // println!("{}", String::from_utf8_lossy(&output));
     // println!("{}", String::from_utf8_lossy(&removed_bg));
-    String::from_utf8_lossy(&removed_bg).to_string()
+    String::from_utf8_lossy(&removed_size).to_string()
 }
 
 /// Compiles typst code to SVG string by spawning a typst process
@@ -580,6 +578,7 @@ mod tests {
 
         let start = Instant::now();
         let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
+        println!("{svg}");
         println!("svg output: {:?}", start.elapsed());
 
         let start = Instant::now();

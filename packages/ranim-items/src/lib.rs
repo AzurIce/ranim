@@ -8,8 +8,9 @@
 )]
 
 use ranim_core::{
+    anchor::Aabb,
     glam::DVec3,
-    traits::{Anchor, BoundingBox, Interpolatable, Rotate, Shift},
+    traits::{Interpolatable, Rotate, RotateExt, Shift},
 };
 
 pub mod vitem;
@@ -35,8 +36,8 @@ impl Interpolatable for Plane {
     }
 }
 
-impl BoundingBox for Plane {
-    fn get_min_max(&self) -> [DVec3; 2] {
+impl Aabb for Plane {
+    fn aabb(&self) -> [DVec3; 2] {
         let basis_vec = self.basis.0 + self.basis.1;
         [self.origin - basis_vec / 2.0, self.origin + basis_vec / 2.0]
     }
@@ -50,10 +51,10 @@ impl Shift for Plane {
 }
 
 impl Rotate for Plane {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        self.origin.rotate_by_anchor(angle, axis, anchor);
-        self.basis.0.rotate(angle, axis);
-        self.basis.1.rotate(angle, axis);
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.origin.rotate_at_point(angle, axis, point);
+        self.basis.0.rotate_at(angle, axis, DVec3::ZERO);
+        self.basis.1.rotate_at(angle, axis, DVec3::ZERO);
         self
     }
 }

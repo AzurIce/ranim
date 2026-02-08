@@ -19,7 +19,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
         square.set_color(manim::BLUE_C);
     });
 
-    let r_square = r.new_timeline();
+    let r_square = r.insert_empty();
     {
         let timeline = r.timeline_mut(r_square);
         timeline.play(square.fade_in());

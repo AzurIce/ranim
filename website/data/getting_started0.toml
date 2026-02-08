@@ -16,7 +16,7 @@ fn getting_started0(r: &mut RanimScene) {
         square.set_color(manim::BLUE_C);
     });
 
-    let r_square = r.new_timeline();
+    let r_square = r.insert_empty();
     {
         let timeline = r.timeline_mut(r_square);
         timeline
@@ -33,7 +33,7 @@ fn getting_started0(r: &mut RanimScene) {
 }
 // ANCHOR_END: construct
 ```"""
-hash = "263441ad33e1abbf2d48c87b05e834817588980b"
+hash = "0847cce09e76ab8908da4c5550fa5141d48a76ea"
 preview_imgs = []
 output_files = ["/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
 wasm = true

@@ -140,6 +140,14 @@ pre-release-replacements = [
 
 # MARK: Examples
 [[example]]
+name = "animating_pi"
+path = "examples/animating_pi/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.animating_pi]
+wasm = true
+
+[[example]]
 name = "arc"
 path = "examples/arc/lib.rs"
 crate-type = ["cdylib"]

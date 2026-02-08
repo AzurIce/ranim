@@ -2,14 +2,10 @@ use derive_more::From;
 
 use crate::prelude::Interpolatable;
 
-use super::PointWise;
-
 /// Width
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, bytemuck::Pod, bytemuck::Zeroable, From)]
 pub struct Width(pub f32);
-
-impl PointWise for Width {}
 
 impl Width {
     /// Max

@@ -1,15 +1,14 @@
 use color::{AlphaColor, Srgb, palette::css, rgb8, rgba};
 use glam::DVec3;
 use glam::{DAffine2, dvec3};
+use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
-use ranim_core::traits::PointsFunc;
-use ranim_core::{Extract, components::width::Width, traits::Anchor, utils::bezier::PathBuilder};
+use ranim_core::traits::{PointsFunc, Rotate, Scale, Shift};
+use ranim_core::{Extract, components::width::Width, utils::bezier::PathBuilder};
 use ranim_core::{color, glam};
 use tracing::warn;
 
-use ranim_core::traits::{
-    BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth,
-};
+use ranim_core::traits::{FillColor, Opacity, RotateExt, ShiftExt, StrokeColor, StrokeWidth};
 
 use super::VItem;
 
@@ -30,16 +29,16 @@ impl SvgItem {
     /// Creates a new SvgItem from a SVG string
     pub fn new(svg: impl AsRef<str>) -> Self {
         let mut vitem_group = Self(vitems_from_svg(svg.as_ref()));
-        vitem_group.put_center_on(DVec3::ZERO);
+        vitem_group.move_to(DVec3::ZERO);
         vitem_group.rotate(std::f64::consts::PI, DVec3::X);
         vitem_group
     }
 }
 
 // MARK: Trait impls
-impl BoundingBox for SvgItem {
-    fn get_min_max(&self) -> [glam::DVec3; 2] {
-        self.0.get_min_max()
+impl Aabb for SvgItem {
+    fn aabb(&self) -> [glam::DVec3; 2] {
+        self.0.aabb()
     }
 }
 
@@ -51,15 +50,15 @@ impl Shift for SvgItem {
 }
 
 impl Rotate for SvgItem {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: glam::DVec3, anchor: Anchor) -> &mut Self {
-        self.0.rotate_by_anchor(angle, axis, anchor);
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.0.rotate_at_point(angle, axis, point);
         self
     }
 }
 
 impl Scale for SvgItem {
-    fn scale_by_anchor(&mut self, scale: glam::DVec3, anchor: Anchor) -> &mut Self {
-        self.0.scale_by_anchor(scale, anchor);
+    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
+        self.0.scale_at_point(scale, point);
         self
     }
 }
@@ -183,6 +182,7 @@ pub fn vitems_from_svg(svg: &str) -> Vec<VItem> {
 pub fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
     let mut vitems = vec![];
     for (path, transform) in walk_svg_group(tree.root()) {
+        // println!("path: {:?}", path);
         // let transform = path.abs_transform();
 
         let mut builder = PathBuilder::new();
@@ -247,9 +247,31 @@ mod tests {
     use glam::dvec3;
 
     use crate::vitem::{geometry::Arc, typst::typst_svg};
-    use ranim_core::traits::{ScaleHint, ScaleStrokeExt, With};
+    use ranim_core::{
+        anchor::{AabbPoint, Locate},
+        traits::{ScaleExt, ScaleHint, ScaleStrokeExt, With},
+    };
 
     use super::*;
+    #[test]
+    fn foo_test_vitems_from_svg() {
+        let svg = typst_svg("R");
+        let mut vitems = vitems_from_svg(&svg);
+
+        println!("{:?}", vitems.aabb());
+        let scale = vitems.calc_scale_ratio(ScaleHint::PorportionalY(8.0));
+        println!("scale: {}", scale);
+        let center = AabbPoint::CENTER.locate(AsRef::<[VItem]>::as_ref(&vitems));
+        println!("{:?}", center);
+        vitems
+            // .scale_to(ScaleHint::PorportionalY(8.0))
+            .move_anchor_to(AabbPoint::CENTER, DVec3::ZERO);
+
+        println!(
+            "\n{:?}",
+            vitems.iter().map(|x| &x.vpoints).collect::<Vec<_>>()
+        );
+    }
 
     fn print_typst_vitem(points: Vec<DVec3>) {
         let colors = ["blue.darken(40%)", "yellow.darken(50%)"];
@@ -305,10 +327,10 @@ mod tests {
     fn test_foo() {
         let svg = SvgItem::new(typst_svg("R")).with(|svg| {
             svg.scale_to_with_stroke(ScaleHint::PorportionalY(4.0))
-                .put_center_on(dvec3(2.0, 2.0, 0.0));
+                .move_to(dvec3(2.0, 2.0, 0.0));
         });
         // println!("{:?}", svg.0[0].vpoints);
-        let points = (*svg.0[0].vpoints.0).clone();
+        let points = (svg.0[0].vpoints.0).clone();
 
         print_typst_vitem(points);
     }
@@ -318,10 +340,10 @@ mod tests {
         let angle = PI / 3.0 * 2.0;
         let arc = Arc::new(angle, 2.0).with(|arc| {
             arc.rotate(PI / 2.0 - angle / 2.0, DVec3::Z)
-                .put_center_on(dvec3(2.0, 2.0, 0.0));
+                .move_to(dvec3(2.0, 2.0, 0.0));
         });
         let arc = VItem::from(arc);
-        let points = (**arc.vpoints).clone();
+        let points = (*arc.vpoints).clone();
         println!("{points:?}");
 
         print_typst_vitem(points);

@@ -18,26 +18,26 @@ pub mod typst;
 
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
+use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
-use ranim_core::traits::Anchor;
 use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
-    components::{ComponentVec, rgba::Rgba, vpoint::VPointComponentVec, width::Width},
+    components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
     prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
-    traits::{BoundingBox, PointsFunc, Rotate, Scale, Shift, StrokeColor},
+    traits::{PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
 
 /// The projection of a [`VItem`].
 #[derive(Debug, Clone, Copy, PartialEq, ranim_macros::Interpolatable)]
-pub struct Proj {
+pub struct ProjectionPlane {
     /// The basis vector in the u direction.
     basis_u: DVec3,
     /// The basis vector in the v direction.
     basis_v: DVec3,
 }
 
-impl Default for Proj {
+impl Default for ProjectionPlane {
     fn default() -> Self {
         Self {
             basis_u: DVec3::X,
@@ -46,7 +46,7 @@ impl Default for Proj {
     }
 }
 
-impl Proj {
+impl ProjectionPlane {
     /// The basis vector in the u direction.
     pub fn basis_u(&self) -> DVec3 {
         self.basis_u.normalize()
@@ -60,7 +60,7 @@ impl Proj {
         (self.basis_u(), self.basis_v())
     }
     /// The corrected basis vector in the u direction.
-    /// This is same as [`Proj::basis_u`].
+    /// This is same as [`ProjectionPlane::basis_u`].
     pub fn corrected_basis_u(&self) -> DVec3 {
         self.basis_u.normalize()
     }
@@ -85,12 +85,12 @@ impl Proj {
 /// A vectorized item.
 ///
 /// It is built from four components:
-/// - [`VItem::vpoints`]: the vpoints of the item, see [`VPointComponentVec`].
+/// - [`VItem::vpoints`]: the vpoints of the item, see [`VPointVec`].
 /// - [`VItem::stroke_widths`]: the stroke widths of the item, see [`Width`].
 /// - [`VItem::stroke_rgbas`]: the stroke colors of the item, see [`Rgba`].
 /// - [`VItem::fill_rgbas`]: the fill colors of the item, see [`Rgba`].
 ///
-/// You can construct a [`VItem`] from a list of VPoints, see [`VPointComponentVec`]:
+/// You can construct a [`VItem`] from a list of VPoints, see [`VPointVec`]:
 ///
 /// ```rust
 /// let vitem = VItem::from_vpoints(vec![
@@ -103,16 +103,16 @@ impl Proj {
 pub struct VItem {
     /// The projection info.
     ///
-    /// See [`Proj`]
-    pub proj: Proj,
+    /// See [`ProjectionPlane`]
+    pub proj: ProjectionPlane,
     /// vpoints data
-    pub vpoints: VPointComponentVec,
+    pub vpoints: VPointVec,
     /// stroke widths
-    pub stroke_widths: ComponentVec<Width>,
+    pub stroke_widths: PointVec<Width>,
     /// stroke rgbas
-    pub stroke_rgbas: ComponentVec<Rgba>,
+    pub stroke_rgbas: PointVec<Rgba>,
     /// fill rgbas
-    pub fill_rgbas: ComponentVec<Rgba>,
+    pub fill_rgbas: PointVec<Rgba>,
 }
 
 impl PointsFunc for VItem {
@@ -122,9 +122,9 @@ impl PointsFunc for VItem {
     }
 }
 
-impl BoundingBox for VItem {
-    fn get_min_max(&self) -> [DVec3; 2] {
-        self.vpoints.get_min_max()
+impl Aabb for VItem {
+    fn aabb(&self) -> [DVec3; 2] {
+        self.vpoints.aabb()
     }
 }
 
@@ -136,16 +136,16 @@ impl Shift for VItem {
 }
 
 impl Rotate for VItem {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        self.vpoints.rotate_by_anchor(angle, axis, anchor);
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.vpoints.rotate_at_point(angle, axis, point);
         self.proj.rotate(angle, axis);
         self
     }
 }
 
 impl Scale for VItem {
-    fn scale_by_anchor(&mut self, scale: DVec3, anchor: Anchor) -> &mut Self {
-        self.vpoints.scale_by_anchor(scale, anchor);
+    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
+        self.vpoints.scale_at_point(scale, point);
         self
     }
 }
@@ -165,35 +165,35 @@ impl VItem {
     }
     /// Shrink to center
     pub fn shrink(&mut self) -> &mut Self {
-        let bb = self.get_bounding_box();
-        self.vpoints.0 = vec![bb[1]; self.vpoints.len()].into();
+        let bb = self.aabb();
+        self.vpoints.0 = vec![bb[1]; self.vpoints.len()];
         self
     }
     /// Set the vpoints of the VItem
     pub fn set_points(&mut self, vpoints: Vec<DVec3>) {
-        self.vpoints.0 = vpoints.into();
+        self.vpoints.0 = vpoints;
     }
     /// Get anchor points
     pub fn get_anchor(&self, idx: usize) -> Option<&DVec3> {
         self.vpoints.get(idx * 2)
     }
     /// Set the projection of the VItem
-    pub fn with_proj(mut self, proj: Proj) -> Self {
+    pub fn with_proj(mut self, proj: ProjectionPlane) -> Self {
         self.proj = proj;
         self
     }
     /// Set the projection of the VItem
-    pub fn set_proj(&mut self, proj: Proj) {
+    pub fn set_proj(&mut self, proj: ProjectionPlane) {
         self.proj = proj;
     }
     /// Construct a [`VItem`] form vpoints
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
-        let stroke_widths = vec![DEFAULT_STROKE_WIDTH; vpoints.len().div_ceil(2)];
-        let stroke_rgbas = vec![vec4(1.0, 1.0, 1.0, 1.0); vpoints.len().div_ceil(2)];
-        let fill_rgbas = vec![vec4(0.0, 0.0, 0.0, 0.0); vpoints.len().div_ceil(2)];
+        let stroke_widths = vec![DEFAULT_STROKE_WIDTH.into(); vpoints.len().div_ceil(2)];
+        let stroke_rgbas = vec![vec4(1.0, 1.0, 1.0, 1.0).into(); vpoints.len().div_ceil(2)];
+        let fill_rgbas = vec![vec4(0.0, 0.0, 0.0, 0.0).into(); vpoints.len().div_ceil(2)];
         Self {
-            proj: Proj::default(),
-            vpoints: VPointComponentVec(vpoints.into()),
+            proj: ProjectionPlane::default(),
+            vpoints: VPointVec(vpoints),
             stroke_rgbas: stroke_rgbas.into(),
             stroke_widths: stroke_widths.into(),
             fill_rgbas: fill_rgbas.into(),
@@ -201,7 +201,7 @@ impl VItem {
     }
     /// Extend vpoints of the VItem
     pub fn extend_vpoints(&mut self, vpoints: &[DVec3]) {
-        self.vpoints.extend_from_vec(vpoints.to_vec());
+        self.vpoints.extend(vpoints.to_vec());
 
         let len = self.vpoints.len();
         self.fill_rgbas.resize_with_last(len.div_ceil(2));
@@ -292,11 +292,11 @@ impl Partial for VItem {
 impl Empty for VItem {
     fn empty() -> Self {
         Self {
-            proj: Proj::default(),
-            vpoints: VPointComponentVec(vec![DVec3::ZERO; 3].into()),
-            stroke_widths: vec![0.0, 0.0].into(),
-            stroke_rgbas: vec![Vec4::ZERO; 2].into(),
-            fill_rgbas: vec![Vec4::ZERO; 2].into(),
+            proj: ProjectionPlane::default(),
+            vpoints: VPointVec(vec![DVec3::ZERO; 3]),
+            stroke_widths: vec![0.0.into(); 2].into(),
+            stroke_rgbas: vec![Vec4::ZERO.into(); 2].into(),
+            fill_rgbas: vec![Vec4::ZERO.into(); 2].into(),
         }
     }
 }
@@ -309,7 +309,9 @@ impl FillColor for VItem {
             .unwrap_or(css::WHITE)
     }
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.fill_rgbas.set_all(color);
+        self.fill_rgbas
+            .iter_mut()
+            .for_each(|rgba| *rgba = color.into());
         self
     }
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
@@ -326,7 +328,9 @@ impl StrokeColor for VItem {
             .unwrap_or(css::WHITE)
     }
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.stroke_rgbas.set_all(color);
+        self.stroke_rgbas
+            .iter_mut()
+            .for_each(|rgba| *rgba = color.into());
         self
     }
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {

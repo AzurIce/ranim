@@ -46,7 +46,7 @@ fn arc_between_points(r: &mut RanimScene) {
             )
         })
         .collect::<Vec<_>>();
-    let r_arcs = r.new_timeline();
+    let r_arcs = r.insert_empty();
 
     r.timeline_mut(r_arcs)
         .play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
@@ -57,7 +57,7 @@ fn arc_between_points(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "f31ce9f20b3031017fbb25ed56e15607f5ece27f"
+hash = "726e7ddd56fc030581e7dd53c1e06500e45abf84"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
 wasm = true

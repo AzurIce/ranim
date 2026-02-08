@@ -2,12 +2,18 @@ use std::f64::consts::PI;
 
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
-use ranim_core::{Extract, color, core_item::CoreItem, glam, traits::Anchor};
-
-use crate::vitem::{DEFAULT_STROKE_WIDTH, Proj};
-use ranim_core::traits::{
-    BoundingBox, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, With,
+use ranim_core::{
+    Extract,
+    anchor::{Aabb, Locate},
+    color,
+    core_item::CoreItem,
+    glam,
+    traits::{Rotate, Shift},
 };
+
+use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane};
+use ranim_core::anchor::AabbPoint;
+use ranim_core::traits::{FillColor, Opacity, RotateExt, ScaleExt, StrokeColor, With};
 
 use crate::vitem::VItem;
 
@@ -18,7 +24,7 @@ use super::Arc;
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Circle {
     /// Proj
-    pub proj: Proj,
+    pub proj: ProjectionPlane,
     /// Center
     pub center: DVec3,
     /// Radius
@@ -36,7 +42,7 @@ impl Circle {
     /// Constructor
     pub fn new(radius: f64) -> Self {
         Self {
-            proj: Proj::default(),
+            proj: ProjectionPlane::default(),
             center: DVec3::ZERO,
             radius,
 
@@ -47,32 +53,32 @@ impl Circle {
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, Anchor::CENTER)
+        self.scale_by_anchor(scale, AabbPoint::CENTER)
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
-    pub fn scale_by_anchor(&mut self, scale: f64, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(match anchor {
-            Anchor::Point(point) => point,
-            Anchor::Edge(edge) => self.get_bounding_box_point(edge),
-        });
+    pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
+    where
+        T: Locate<Self>,
+    {
+        let point = anchor.locate(self);
         self.radius *= scale;
-        self.center.scale_by_anchor(DVec3::splat(scale), anchor);
+        self.center.scale_at(DVec3::splat(scale), point);
         self
     }
 }
 
 // MARK: Traits impl
-impl BoundingBox for Circle {
-    fn get_min_max(&self) -> [DVec3; 2] {
+impl Aabb for Circle {
+    fn aabb(&self) -> [DVec3; 2] {
         let (u, v) = self.proj.basis();
         let r = self.radius * (u + v);
-        [self.center + r, self.center - r].get_min_max()
+        [self.center + r, self.center - r].aabb()
     }
 }
 
@@ -84,9 +90,8 @@ impl Shift for Circle {
 }
 
 impl Rotate for Circle {
-    fn rotate_by_anchor(&mut self, angle: f64, axis: DVec3, anchor: Anchor) -> &mut Self {
-        let anchor = Anchor::Point(anchor.get_pos(self));
-        self.center.rotate_by_anchor(angle, axis, anchor);
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.center.rotate_at(angle, axis, point);
         self.proj.rotate(angle, axis);
         self
     }
