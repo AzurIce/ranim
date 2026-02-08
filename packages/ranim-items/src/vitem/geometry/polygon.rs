@@ -1,10 +1,10 @@
 use ranim_core::{
     Extract,
-    anchor::{Aabb, Locate, Pivot},
+    anchor::{Aabb, AabbPoint, Locate},
     color,
     core_item::CoreItem,
     glam,
-    traits::{Rotate, RotateImpl, ScaleImpl, ShiftImpl},
+    traits::{Rotate, RotateExt, Scale, ShiftImpl},
 };
 
 use color::{AlphaColor, Srgb};
@@ -12,7 +12,7 @@ use glam::{DVec2, DVec3, dvec2, dvec3};
 use itertools::Itertools;
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
-use ranim_core::traits::{Alignable, FillColor, Opacity, Scale, StrokeColor, StrokeWidth, With};
+use ranim_core::traits::{Alignable, FillColor, Opacity, ScaleExt, StrokeColor, StrokeWidth, With};
 
 // MARK: ### Square ###
 /// A Square
@@ -33,12 +33,6 @@ pub struct Square {
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
-impl Locate<Pivot> for Square {
-    fn locate(&self, _target: Pivot) -> DVec3 {
-        self.center
-    }
-}
-
 impl Square {
     /// Constructor
     pub fn new(size: f64) -> Self {
@@ -57,7 +51,7 @@ impl Square {
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the square a square.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_at(scale, Pivot)
+        self.scale_at(scale, AabbPoint::CENTER)
     }
     /// Scale the square by the given scale, with the given anchor as the center.
     ///
@@ -65,9 +59,9 @@ impl Square {
     /// because this keeps the square a square.
     pub fn scale_at<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
-        Self: Locate<T>,
+        T: Locate<Self>,
     {
-        let anchor = Locate::<T>::locate(self, anchor);
+        let anchor = anchor.locate(self);
         self.size *= scale;
         self.center.scale_at(DVec3::splat(scale), anchor);
         self
@@ -93,7 +87,7 @@ impl ShiftImpl for Square {
     }
 }
 
-impl RotateImpl for Square {
+impl Rotate for Square {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.center.rotate_at(angle, axis, point);
         self.proj.rotate(angle, axis);
@@ -163,7 +157,7 @@ impl From<Square> for Rectangle {
             fill_rgba,
         } = value;
         let (u, v) = proj.basis();
-        let p0 = center - width / 2.0 * u + width / 2.0 * v;
+        let p0 = center - width / 2.0 * u - width / 2.0 * v;
         Rectangle {
             proj,
             p0,
@@ -253,7 +247,7 @@ impl ShiftImpl for Rectangle {
     }
 }
 
-impl RotateImpl for Rectangle {
+impl Rotate for Rectangle {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.p0.rotate_at(angle, axis, point);
         self.proj.rotate(angle, axis);
@@ -261,7 +255,7 @@ impl RotateImpl for Rectangle {
     }
 }
 
-impl ScaleImpl for Rectangle {
+impl Scale for Rectangle {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.p0.scale_at(scale, point);
         let (u, v) = self.proj.basis();
@@ -321,7 +315,7 @@ impl From<Rectangle> for Polygon {
         let p0 = value.p0;
         let (u, v) = value.proj.basis();
         let DVec2 { x: w, y: h } = value.size;
-        let points = vec![p0, p0 + v * h, p0 + u * w + v * h, p0 + u * w];
+        let points = vec![p0, p0 + u * w, p0 + u * w + v * h, p0 + v * h];
         Polygon {
             proj: value.proj,
             points,
@@ -388,14 +382,14 @@ impl ShiftImpl for Polygon {
     }
 }
 
-impl RotateImpl for Polygon {
+impl Rotate for Polygon {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.points.rotate_at(angle, axis, point);
         self
     }
 }
 
-impl ScaleImpl for Polygon {
+impl Scale for Polygon {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.points.scale_at(scale, point);
         self

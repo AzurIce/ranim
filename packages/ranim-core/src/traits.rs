@@ -2,6 +2,8 @@ mod rotate;
 mod scale;
 mod shift;
 
+pub use crate::anchor::{Aabb, AabbPoint, Locate};
+
 pub use rotate::*;
 pub use scale::*;
 pub use shift::*;
@@ -12,11 +14,7 @@ use color::{AlphaColor, ColorSpace, Srgb};
 use glam::{DAffine2, DMat4, DQuat, DVec2, DVec3, USizeVec3, Vec3Swizzles, dvec3};
 use num::complex::Complex64;
 
-use crate::{
-    anchor::{Aabb, AabbPoint, Locate, Pivot},
-    components::width::Width,
-    utils::resize_preserving_order_with_repeated_indices,
-};
+use crate::{components::width::Width, utils::resize_preserving_order_with_repeated_indices};
 
 // MARK: With
 /// A trait for mutating a value in place.
@@ -384,21 +382,22 @@ impl<T: PointsFunc> PointsFunc for [T] {
 }
 
 // MARK: Align
+/// Align a slice of items
 pub trait AlignSlice<T: Shift>: AsMut<[T]> {
     /// Align items' anchors in a given axis, based on the first item.
     fn align_anchor<A: Clone>(&mut self, axis: DVec3, anchor: A) -> &mut Self
     where
-        T: Locate<A>,
+        A: Locate<T>,
     {
         let Some(dir) = axis.try_normalize() else {
             return self;
         };
-        let Some(point) = self.as_mut().first().map(|x| x.locate(anchor.clone())) else {
+        let Some(point) = self.as_mut().first().map(|x| anchor.locate(x)) else {
             return self;
         };
 
         self.as_mut().iter_mut().for_each(|x| {
-            let p = Locate::<A>::locate(x, anchor.clone());
+            let p = anchor.locate(x);
 
             let v = p - point;
             let proj = dir * v.dot(dir);
@@ -411,9 +410,9 @@ pub trait AlignSlice<T: Shift>: AsMut<[T]> {
     /// Align items' centers in a given axis, based on the first item.
     fn align(&mut self, axis: DVec3) -> &mut Self
     where
-        T: Locate<Pivot>,
+        T: Aabb,
     {
-        self.align_anchor(axis, Pivot)
+        self.align_anchor(axis, AabbPoint::CENTER)
     }
 }
 
@@ -425,15 +424,17 @@ pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
     /// The `pos_func` takes index as input and output the center position.
     fn arrange_with(&mut self, pos_func: impl Fn(usize) -> DVec3)
     where
-        T: Locate<Pivot>,
+        AabbPoint: Locate<T>,
     {
         self.as_mut().iter_mut().enumerate().for_each(|(i, x)| {
             x.move_to(pos_func(i));
         });
     }
+    /// Arrange the items in a col
     fn arrange_in_y(&mut self, gap: f64)
     where
         T: Aabb,
+        AabbPoint: Locate<T>,
     {
         let Some(mut bbox) = self.as_mut().first().map(|x| x.aabb()) else {
             return;
@@ -447,7 +448,7 @@ pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
     /// Arrange the items in a grid.
     fn arrange_in_grid(&mut self, cell_cnt: USizeVec3, cell_size: DVec3, gap: DVec3) -> &mut Self
     where
-        T: Locate<Pivot>,
+        AabbPoint: Locate<T>,
     {
         // x -> y -> z
         let pos_func = |idx: usize| {
@@ -467,7 +468,7 @@ pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
     /// The `pos_func` takes row and column index as input and output the center position.
     fn arrange_in_cols_with(&mut self, ncols: usize, pos_func: impl Fn(usize, usize) -> DVec3)
     where
-        T: Locate<Pivot>,
+        AabbPoint: Locate<T>,
     {
         let pos_func = |idx: usize| {
             let row = idx / ncols;
@@ -481,7 +482,7 @@ pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
     /// The `pos_func` takes row and column index as input and output the center position.
     fn arrange_in_rows_with(&mut self, nrows: usize, pos_func: impl Fn(usize, usize) -> DVec3)
     where
-        T: Locate<Pivot>,
+        AabbPoint: Locate<T>,
     {
         let ncols = self.as_mut().len().div_ceil(nrows);
         self.arrange_in_cols_with(ncols, pos_func);

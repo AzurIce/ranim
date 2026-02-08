@@ -89,7 +89,7 @@ fn ranim_logo(r: &mut RanimScene) {
                 .move_to(DVec3::NEG_Y * 2.5);
         }),
     );
-    let r_ranim_text = r.insert(ranim_text.clone());
+    let r_ranim_text = r.insert_empty();
 
     r_logo.iter_mut().for_each(|(r_logo, item)| {
         r.timeline_mut(*r_logo)

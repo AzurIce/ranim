@@ -3,16 +3,17 @@ use std::f64::consts::PI;
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::{
-    Extract,
-    anchor::{Aabb, Locate, Pivot},
+    anchor::{Aabb, Locate},
     color,
     core_item::CoreItem,
     glam,
-    traits::{RotateImpl, ShiftImpl},
+    traits::{Rotate, ShiftImpl},
+    Extract,
 };
 
-use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane};
-use ranim_core::traits::{FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, With};
+use crate::vitem::{ProjectionPlane, DEFAULT_STROKE_WIDTH};
+use ranim_core::anchor::AabbPoint;
+use ranim_core::traits::{FillColor, Opacity, RotateExt, ScaleExt, StrokeColor, With};
 
 use crate::vitem::VItem;
 
@@ -37,12 +38,6 @@ pub struct Circle {
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
-impl Locate<Pivot> for Circle {
-    fn locate(&self, _target: Pivot) -> DVec3 {
-        self.center
-    }
-}
-
 impl Circle {
     /// Constructor
     pub fn new(radius: f64) -> Self {
@@ -61,7 +56,7 @@ impl Circle {
     /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, Pivot)
+        self.scale_by_anchor(scale, AabbPoint::CENTER)
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
@@ -69,9 +64,9 @@ impl Circle {
     /// because this keeps the circle a circle.
     pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
-        Self: Locate<T>,
+        T: Locate<Self>,
     {
-        let point = Locate::<T>::locate(self, anchor);
+        let point = anchor.locate(self);
         self.radius *= scale;
         self.center.scale_at(DVec3::splat(scale), point);
         self
@@ -94,7 +89,7 @@ impl ShiftImpl for Circle {
     }
 }
 
-impl RotateImpl for Circle {
+impl Rotate for Circle {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.center.rotate_at(angle, axis, point);
         self.proj.rotate(angle, axis);

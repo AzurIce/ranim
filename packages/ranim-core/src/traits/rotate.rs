@@ -1,18 +1,21 @@
 use glam::{DMat3, DVec3};
 
 use crate::{
-    anchor::{Locate, Pivot},
+    anchor::{AabbPoint, Locate},
     utils::wrap_point_func_with_point,
 };
 
-pub trait RotateImpl {
+/// Rotating operations.
+///
+/// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: Rotate`.
+pub trait Rotate {
     /// Rotate the item by a given angle about a given axis at the given point.
     ///
     /// See [`Anchor`]
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self;
 }
 
-impl RotateImpl for DVec3 {
+impl Rotate for DVec3 {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         let rotation = DMat3::from_axis_angle(axis, angle);
         wrap_point_func_with_point(|p| *p = rotation * *p, point)(self);
@@ -29,7 +32,7 @@ impl RotateImpl for DVec3 {
     }
 }
 
-impl<T: Rotate> RotateImpl for [T] {
+impl<T: RotateExt> Rotate for [T] {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.iter_mut().for_each(|x| {
             x.rotate_at_point(angle, axis, point);
@@ -39,26 +42,28 @@ impl<T: Rotate> RotateImpl for [T] {
 }
 
 /// A trait for rotating operations
-pub trait Rotate: RotateImpl {
+///
+/// This trait is implemented automatically for types that implement [`RotateImpl`], you should not implement it yourself.
+pub trait RotateExt: Rotate {
     /// Rotate the mobject by a given angle about a given axis at center.
     ///
-    /// This is equivalent to [`Rotate::rotate_by_anchor`] with [`Anchor::CENTER`].
+    /// This is equivalent to [`Rotate::rotate_by_anchor`] with [`AabbPoint::CENTER`].
     fn rotate(&mut self, angle: f64, axis: DVec3) -> &mut Self
     where
-        Self: Locate<Pivot>,
+        AabbPoint: Locate<Self>,
     {
-        self.rotate_at(angle, axis, Pivot)
+        self.rotate_at(angle, axis, AabbPoint::CENTER)
     }
     /// Rotate the item by a given angle about a given axis at anchor.
     ///
     /// See [`Anchor`]
     fn rotate_at<T>(&mut self, angle: f64, axis: DVec3, anchor: T) -> &mut Self
     where
-        Self: Locate<T>,
+        T: Locate<Self>,
     {
-        let point = Locate::<T>::locate(self, anchor);
-        RotateImpl::rotate_at_point(self, angle, axis, point)
+        let point = anchor.locate(self);
+        Rotate::rotate_at_point(self, angle, axis, point)
     }
 }
 
-impl<T: RotateImpl + ?Sized> Rotate for T {}
+impl<T: Rotate + ?Sized> RotateExt for T {}

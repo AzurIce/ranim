@@ -51,14 +51,14 @@ impl ShiftImpl for VPointVec {
     }
 }
 
-impl RotateImpl for VPointVec {
+impl Rotate for VPointVec {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.as_mut().rotate_at_point(angle, axis, point);
         self
     }
 }
 
-impl ScaleImpl for VPointVec {
+impl Scale for VPointVec {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.as_mut().scale_at_point(scale, point);
         self
@@ -358,7 +358,7 @@ mod test {
     use assert_float_eq::assert_float_absolute_eq;
     use glam::{DVec3, dvec3};
 
-    use crate::{components::vpoint::VPointVec, traits::Rotate};
+    use crate::{components::vpoint::VPointVec, traits::RotateExt};
 
     #[test]
     fn test_get_subpath() {

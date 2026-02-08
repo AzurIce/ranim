@@ -128,7 +128,7 @@ mod test {
     use crate::{
         anchor::{Aabb, AabbPoint, Locate},
         components::vpoint::VPointVec,
-        traits::Scale,
+        traits::ScaleExt,
     };
 
     #[test]
@@ -145,23 +145,23 @@ mod test {
         );
         assert_eq!(
             dvec3(0.0, -50.0, 0.0),
-            points.locate(AabbPoint(dvec3(0.0, 0.0, 0.0)))
+            AabbPoint(dvec3(0.0, 0.0, 0.0)).locate(&points)
         );
         assert_eq!(
             dvec3(-100.0, -200.0, 0.0),
-            points.locate(AabbPoint(dvec3(-1.0, -1.0, 0.0)))
+            AabbPoint(dvec3(-1.0, -1.0, 0.0)).locate(&points)
         );
         assert_eq!(
             dvec3(-100.0, 100.0, 0.0),
-            points.locate(AabbPoint(dvec3(-1.0, 1.0, 0.0)))
+            AabbPoint(dvec3(-1.0, 1.0, 0.0)).locate(&points)
         );
         assert_eq!(
             dvec3(100.0, -200.0, 0.0),
-            points.locate(AabbPoint(dvec3(1.0, -1.0, 0.0)))
+            AabbPoint(dvec3(1.0, -1.0, 0.0)).locate(&points)
         );
         assert_eq!(
             dvec3(100.0, 100.0, 0.0),
-            points.locate(AabbPoint(dvec3(1.0, 1.0, 0.0)))
+            AabbPoint(dvec3(1.0, 1.0, 0.0)).locate(&points)
         );
     }
 
@@ -176,7 +176,7 @@ mod test {
         ];
         let mut scale_origin = VPointVec(square.clone());
         assert_eq!(
-            scale_origin.locate(AabbPoint(DVec3::ZERO)),
+            AabbPoint(DVec3::ZERO).locate(&scale_origin),
             dvec3(0.5, 1.0, 0.0)
         );
         scale_origin.scale_at(DVec3::splat(3.0), AabbPoint::CENTER);

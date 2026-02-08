@@ -1,7 +1,10 @@
 use glam::DVec3;
 
-use crate::anchor::{Aabb, AabbPoint, Locate, Pivot};
+use crate::anchor::{Aabb, AabbPoint, Locate};
 
+/// Shifting operations.
+///
+/// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: Shift`.
 pub trait ShiftImpl {
     /// Shift the item by a given vector.
     fn shift(&mut self, offset: DVec3) -> &mut Self;
@@ -30,24 +33,24 @@ pub trait Shift: ShiftImpl {
     /// Put anchor at a given point.
     ///
     /// See [`Anchor`] for more details.
-    fn move_anchor_to<T>(&mut self, anchor: T, point: DVec3) -> &mut Self
+    fn move_anchor_to<A>(&mut self, anchor: A, point: DVec3) -> &mut Self
     where
-        Self: Locate<T>,
+        A: Locate<Self>,
     {
-        self.shift(point - Locate::<T>::locate(self, anchor));
+        self.shift(point - anchor.locate(self));
         self
     }
     /// Put pivot at a given point.
     fn move_to(&mut self, point: DVec3) -> &mut Self
     where
-        Self: Locate<Pivot>,
+        AabbPoint: Locate<Self>,
     {
-        self.move_anchor_to(Pivot, point)
+        self.move_anchor_to(AabbPoint::CENTER, point)
     }
     /// Put negative anchor of self on anchor of target
     fn move_next_to<T: Aabb + ?Sized>(&mut self, target: &T, anchor: AabbPoint) -> &mut Self
     where
-        Self: Locate<AabbPoint>,
+        AabbPoint: Locate<Self>,
     {
         self.move_next_to_padded(target, anchor, 0.0)
     }
@@ -59,12 +62,12 @@ pub trait Shift: ShiftImpl {
         padding: f64,
     ) -> &mut Self
     where
-        Self: Locate<AabbPoint>,
+        AabbPoint: Locate<Self>,
     {
         let neg_anchor = AabbPoint(-anchor.0);
         self.move_anchor_to(
             neg_anchor,
-            target.locate(anchor) + anchor.0.normalize() * padding,
+            Locate::<T>::locate(&anchor, target) + anchor.0.normalize() * padding,
         )
     }
 }

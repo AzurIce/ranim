@@ -11,19 +11,19 @@ use lru::LruCache;
 use regex::bytes::Regex;
 use sha1::{Digest, Sha1};
 use typst::{
-    Library, LibraryExt, World,
     diag::{FileError, FileResult},
     foundations::{Bytes, Datetime},
     layout::Abs,
     syntax::{FileId, Source},
     text::{Font, FontBook},
     utils::LazyHash,
+    Library, LibraryExt, World,
 };
 use typst_kit::fonts::{FontSearcher, Fonts};
 
-use crate::vitem::{VItem, svg::SvgItem};
+use crate::vitem::{svg::SvgItem, VItem};
 use ranim_core::{
-    Extract, anchor::Aabb, color, components::width::Width, core_item::CoreItem, glam, traits::*,
+    anchor::Aabb, color, components::width::Width, core_item::CoreItem, glam, traits::*, Extract,
 };
 
 struct TypstLruCache {
@@ -438,14 +438,14 @@ impl ShiftImpl for TypstText {
     }
 }
 
-impl RotateImpl for TypstText {
+impl Rotate for TypstText {
     fn rotate_at_point(&mut self, angle: f64, axis: glam::DVec3, point: glam::DVec3) -> &mut Self {
         self.vitems.rotate_at_point(angle, axis, point);
         self
     }
 }
 
-impl ScaleImpl for TypstText {
+impl Scale for TypstText {
     fn scale_at_point(&mut self, scale: glam::DVec3, point: glam::DVec3) -> &mut Self {
         self.vitems.scale_at_point(scale, point);
         self

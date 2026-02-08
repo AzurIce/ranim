@@ -1,14 +1,14 @@
-use color::{AlphaColor, Srgb, palette::css, rgb8, rgba};
+use color::{palette::css, rgb8, rgba, AlphaColor, Srgb};
 use glam::DVec3;
-use glam::{DAffine2, dvec3};
+use glam::{dvec3, DAffine2};
 use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
-use ranim_core::traits::{PointsFunc, RotateImpl, ScaleImpl, ShiftImpl};
-use ranim_core::{Extract, components::width::Width, utils::bezier::PathBuilder};
+use ranim_core::traits::{PointsFunc, Rotate, Scale, ShiftImpl};
 use ranim_core::{color, glam};
+use ranim_core::{components::width::Width, utils::bezier::PathBuilder, Extract};
 use tracing::warn;
 
-use ranim_core::traits::{FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth};
+use ranim_core::traits::{FillColor, Opacity, RotateExt, Shift, StrokeColor, StrokeWidth};
 
 use super::VItem;
 
@@ -49,14 +49,14 @@ impl ShiftImpl for SvgItem {
     }
 }
 
-impl RotateImpl for SvgItem {
+impl Rotate for SvgItem {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.0.rotate_at_point(angle, axis, point);
         self
     }
 }
 
-impl ScaleImpl for SvgItem {
+impl Scale for SvgItem {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.0.scale_at_point(scale, point);
         self
@@ -249,7 +249,7 @@ mod tests {
     use crate::vitem::{geometry::Arc, typst::typst_svg};
     use ranim_core::{
         anchor::{AabbPoint, Locate},
-        traits::{ScaleHint, ScaleStrokeExt, With},
+        traits::{ScaleExt, ScaleHint, ScaleStrokeExt, With},
     };
 
     use super::*;
@@ -261,8 +261,7 @@ mod tests {
         println!("{:?}", vitems.aabb());
         let scale = vitems.calc_scale_ratio(ScaleHint::PorportionalY(8.0));
         println!("scale: {}", scale);
-        let center =
-            Locate::<AabbPoint>::locate(AsRef::<[VItem]>::as_ref(&vitems), AabbPoint::CENTER);
+        let center = AabbPoint::CENTER.locate(AsRef::<[VItem]>::as_ref(&vitems));
         println!("{:?}", center);
         vitems
             // .scale_to(ScaleHint::PorportionalY(8.0))
@@ -327,14 +326,14 @@ mod tests {
 
     #[test]
     fn test_foo() {
-        // let svg = SvgItem::new(typst_svg("R")).with(|svg| {
-        //     svg.scale_to_with_stroke(ScaleHint::PorportionalY(4.0))
-        //         .move_to(dvec3(2.0, 2.0, 0.0));
-        // });
-        // // println!("{:?}", svg.0[0].vpoints);
-        // let points = (svg.0[0].vpoints.0).clone();
+        let svg = SvgItem::new(typst_svg("R")).with(|svg| {
+            svg.scale_to_with_stroke(ScaleHint::PorportionalY(4.0))
+                .move_to(dvec3(2.0, 2.0, 0.0));
+        });
+        // println!("{:?}", svg.0[0].vpoints);
+        let points = (svg.0[0].vpoints.0).clone();
 
-        // print_typst_vitem(points);
+        print_typst_vitem(points);
     }
 
     #[test]

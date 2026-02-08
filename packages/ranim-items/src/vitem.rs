@@ -16,17 +16,16 @@ pub mod svg;
 pub mod typst;
 // pub mod line;
 
-use color::{AlphaColor, Srgb, palette::css};
-use glam::{DVec3, Vec4, vec4};
+use color::{palette::css, AlphaColor, Srgb};
+use glam::{vec4, DVec3, Vec4};
 use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
-use ranim_core::traits::{RotateImpl, ScaleImpl, ShiftImpl};
-use ranim_core::{Extract, color, glam};
+use ranim_core::{color, glam, Extract};
 
 use ranim_core::{
-    components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
+    components::{rgba::Rgba, vpoint::VPointVec, width::Width, PointVec, VecResizeTrait},
     prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
-    traits::{PointsFunc, Rotate, Scale, Shift, StrokeColor},
+    traits::{PointsFunc, Rotate, Scale, ShiftImpl, StrokeColor},
 };
 
 /// The projection of a [`VItem`].
@@ -136,7 +135,7 @@ impl ShiftImpl for VItem {
     }
 }
 
-impl RotateImpl for VItem {
+impl Rotate for VItem {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.vpoints.rotate_at_point(angle, axis, point);
         self.proj.rotate(angle, axis);
@@ -144,7 +143,7 @@ impl RotateImpl for VItem {
     }
 }
 
-impl ScaleImpl for VItem {
+impl Scale for VItem {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.vpoints.scale_at_point(scale, point);
         self
