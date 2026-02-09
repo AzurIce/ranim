@@ -29,7 +29,7 @@ impl SvgItem {
     /// Creates a new SvgItem from a SVG string
     pub fn new(svg: impl AsRef<str>) -> Self {
         let mut vitem_group = Self(vitems_from_svg(svg.as_ref()));
-        vitem_group.move_to(DVec3::ZERO);
+        vitem_group.move_center_to(DVec3::ZERO);
         vitem_group.rotate(std::f64::consts::PI, DVec3::X);
         vitem_group
     }
@@ -327,7 +327,7 @@ mod tests {
     fn test_foo() {
         let svg = SvgItem::new(typst_svg("R")).with(|svg| {
             svg.scale_to_with_stroke(ScaleHint::PorportionalY(4.0))
-                .move_to(dvec3(2.0, 2.0, 0.0));
+                .move_center_to(dvec3(2.0, 2.0, 0.0));
         });
         // println!("{:?}", svg.0[0].vpoints);
         let points = (svg.0[0].vpoints.0).clone();
@@ -340,7 +340,7 @@ mod tests {
         let angle = PI / 3.0 * 2.0;
         let arc = Arc::new(angle, 2.0).with(|arc| {
             arc.rotate(PI / 2.0 - angle / 2.0, DVec3::Z)
-                .move_to(dvec3(2.0, 2.0, 0.0));
+                .move_center_to(dvec3(2.0, 2.0, 0.0));
         });
         let arc = VItem::from(arc);
         let points = (*arc.vpoints).clone();

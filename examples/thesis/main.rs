@@ -39,10 +39,10 @@ fn pentagon() -> VItem {
 fn fading(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let mut pentagon_in = pentagon().with(|x| {
-        x.move_to(dvec3(0.0, 2.0, 0.0));
+        x.move_center_to(dvec3(0.0, 2.0, 0.0));
     });
     let mut pentagon_out = pentagon().with(|x| {
-        x.move_to(dvec3(0.0, -2.0, 0.0));
+        x.move_center_to(dvec3(0.0, -2.0, 0.0));
     });
     let r_in = r.insert_empty();
     let r_out = r.insert_empty();
@@ -56,10 +56,10 @@ fn creation(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 
     let mut pentagon_in = pentagon().with(|x| {
-        x.move_to(dvec3(0.0, 2.0, 0.0));
+        x.move_center_to(dvec3(0.0, 2.0, 0.0));
     });
     let mut pentagon_out = pentagon().with(|x| {
-        x.move_to(dvec3(0.0, -2.0, 0.0));
+        x.move_center_to(dvec3(0.0, -2.0, 0.0));
     });
     let r_in = r.insert_empty();
     let r_out = r.insert_empty();
@@ -73,10 +73,10 @@ fn creation(r: &mut RanimScene) {
 fn writing(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let mut pentagon_in = pentagon().with(|x| {
-        x.move_to(dvec3(0.0, 2.0, 0.0));
+        x.move_center_to(dvec3(0.0, 2.0, 0.0));
     });
     let mut pentagon_out = pentagon().with(|x| {
-        x.move_to(dvec3(0.0, -2.0, 0.0));
+        x.move_center_to(dvec3(0.0, -2.0, 0.0));
     });
     let r_in = r.insert_empty();
     let r_out = r.insert_empty();

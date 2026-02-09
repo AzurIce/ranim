@@ -1,12 +1,14 @@
 mod rotate;
 mod scale;
 mod shift;
+mod origin;
 
 pub use crate::anchor::{Aabb, AabbPoint, Locate};
 
 pub use rotate::*;
 pub use scale::*;
 pub use shift::*;
+pub use origin::*;
 
 use std::ops::Range;
 
@@ -427,7 +429,7 @@ pub trait ArrangeSlice<T: ShiftExt>: AsMut<[T]> {
         AabbPoint: Locate<T>,
     {
         self.as_mut().iter_mut().enumerate().for_each(|(i, x)| {
-            x.move_to(pos_func(i));
+            x.move_center_to(pos_func(i));
         });
     }
     /// Arrange the items in a col

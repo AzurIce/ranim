@@ -8,7 +8,7 @@ use ranim_core::{
     color,
     core_item::CoreItem,
     glam,
-    traits::{Rotate, Shift},
+    traits::{Origin, Rotate, Shift},
 };
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane};
@@ -74,6 +74,17 @@ impl Circle {
 }
 
 // MARK: Traits impl
+impl Origin for Circle {
+    fn origin(&self) -> DVec3 {
+        self.center
+    }
+
+    fn move_to(&mut self, origin: DVec3) -> &mut Self {
+        self.center = origin;
+        self
+    }
+}
+
 impl Aabb for Circle {
     fn aabb(&self) -> [DVec3; 2] {
         let (u, v) = self.proj.basis();

@@ -30,7 +30,7 @@ fn ranim_text(r: &mut RanimScene) {
         item.set_fill_color(manim::WHITE)
             .set_fill_opacity(0.5)
             .scale_to_with_stroke(ScaleHint::PorportionalY(3.6))
-            .move_to(DVec3::ZERO);
+            .move_center_to(DVec3::ZERO);
     });
     let _r_texts = Vec::<VItem>::from(text)
         .into_iter()

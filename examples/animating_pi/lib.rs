@@ -38,7 +38,7 @@ fn animating_pi(r: &mut RanimScene) {
         DVec3::splat(8.0 / 10.0),
         DVec3::splat(0.2),
     )
-    .move_to(DVec3::ZERO);
+    .move_center_to(DVec3::ZERO);
 
     let mut vitems = pis
         .into_iter()
@@ -46,7 +46,7 @@ fn animating_pi(r: &mut RanimScene) {
         .collect::<Vec<_>>();
     vitems
         .scale_to(ScaleHint::PorportionalY(TAU - 0.25))
-        .move_to(DVec3::ZERO);
+        .move_center_to(DVec3::ZERO);
 
     r.insert_with(|t| {
         t.play(vitems.clone().show())

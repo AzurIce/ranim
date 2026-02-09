@@ -41,7 +41,7 @@ pub trait ShiftExt: Shift {
         self
     }
     /// Put pivot at a given point.
-    fn move_to(&mut self, point: DVec3) -> &mut Self
+    fn move_center_to(&mut self, point: DVec3) -> &mut Self
     where
         AabbPoint: Locate<Self>,
     {

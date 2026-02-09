@@ -18,7 +18,7 @@ fn basic(r: &mut RanimScene) {
 
     let mut svg = Vec::<VItem>::from(SvgItem::new(SVG).with(|svg| {
         svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
-            .move_to(DVec3::Y * 2.0);
+            .move_center_to(DVec3::Y * 2.0);
     }));
     let mut text = Vec::<VItem>::from(
         SvgItem::new(typst_svg(
@@ -32,7 +32,7 @@ fn basic(r: &mut RanimScene) {
         ))
         .with(|text| {
             text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
-                .move_to(DVec3::NEG_Y * 2.0)
+                .move_center_to(DVec3::NEG_Y * 2.0)
                 .set_color(manim::WHITE)
                 .set_fill_opacity(0.8);
         }),

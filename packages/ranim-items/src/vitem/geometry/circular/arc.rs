@@ -6,7 +6,7 @@ use ranim_core::core_item::CoreItem;
 use ranim_core::{color, glam};
 
 use ranim_core::traits::{
-    Opacity, Rotate, RotateExt, ScaleExt, Shift, StrokeColor, StrokeWidth, With,
+    Opacity, Origin, Rotate, RotateExt, ScaleExt, Shift, StrokeColor, StrokeWidth, With
 };
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
@@ -76,6 +76,17 @@ impl Arc {
 }
 
 // MARK: Traits impl
+impl Origin for Arc {
+    fn origin(&self) -> DVec3 {
+        self.center
+    }
+
+    fn move_to(&mut self, origin: DVec3) -> &mut Self {
+        self.center = origin;
+        self
+    }
+}
+
 impl Aabb for Arc {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
     fn aabb(&self) -> [DVec3; 2] {
@@ -226,6 +237,13 @@ impl ArcBetweenPoints {
 }
 
 // MARK: Traits impl
+impl Origin for ArcBetweenPoints {
+    fn origin(&self) -> DVec3 {
+        // TODO: optimize this
+        Arc::from(self.clone()).center
+    }
+}
+
 impl Aabb for ArcBetweenPoints {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
     fn aabb(&self) -> [DVec3; 2] {

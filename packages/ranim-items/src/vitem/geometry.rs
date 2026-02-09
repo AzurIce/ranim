@@ -1,7 +1,7 @@
-mod arc;
-mod circle;
+mod circular;
 mod polygon;
 
-pub use arc::*;
-pub use circle::*;
+pub use circular::*;
 pub use polygon::*;
+
+// TODO: Ellipse, RegPolygon, etc.

@@ -86,7 +86,7 @@ fn ranim_logo(r: &mut RanimScene) {
         .with(|text| {
             text.set_color(manim::WHITE)
                 .scale_to(ScaleHint::PorportionalY(1.0))
-                .move_to(DVec3::NEG_Y * 2.5);
+                .move_center_to(DVec3::NEG_Y * 2.5);
         }),
     );
     let r_ranim_text = r.insert_empty();
