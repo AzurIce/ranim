@@ -1,14 +1,14 @@
+mod origin;
 mod rotate;
 mod scale;
 mod shift;
-mod origin;
 
 pub use crate::anchor::{Aabb, AabbPoint, Locate};
 
+pub use origin::*;
 pub use rotate::*;
 pub use scale::*;
 pub use shift::*;
-pub use origin::*;
 
 use std::ops::Range;
 

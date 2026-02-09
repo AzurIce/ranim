@@ -1,9 +1,7 @@
-mod square;
-mod rect;
 mod polygon;
+mod rect;
+mod square;
 
-pub use square::*;
-pub use rect::*;
 pub use polygon::*;
-
-
+pub use rect::*;
+pub use square::*;

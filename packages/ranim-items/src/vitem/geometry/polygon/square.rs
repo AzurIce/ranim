@@ -10,9 +10,9 @@ use ranim_core::{
 use color::{AlphaColor, Srgb};
 use glam::{DVec3, dvec2, dvec3};
 
+use super::{Polygon, Rectangle};
 use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
 use ranim_core::traits::{Alignable, FillColor, Opacity, ScaleExt, StrokeColor};
-use super::{Polygon, Rectangle};
 
 // MARK: ### Square ###
 /// A Square

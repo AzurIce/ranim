@@ -40,7 +40,8 @@ pub fn arc(r: &mut RanimScene) {
             let offset = frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
             Arc::new(angle, radius).with(|arc| {
                 arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
-                arc.set_stroke_color(color).move_center_to(offset.extend(0.0));
+                arc.set_stroke_color(color)
+                    .move_center_to(offset.extend(0.0));
             })
         })
         .collect::<Vec<_>>();

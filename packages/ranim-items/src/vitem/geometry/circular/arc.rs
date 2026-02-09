@@ -6,7 +6,7 @@ use ranim_core::core_item::CoreItem;
 use ranim_core::{color, glam};
 
 use ranim_core::traits::{
-    Opacity, Origin, Rotate, RotateExt, ScaleExt, Shift, StrokeColor, StrokeWidth, With
+    Opacity, Origin, Rotate, RotateExt, ScaleExt, Shift, StrokeColor, StrokeWidth, With,
 };
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
