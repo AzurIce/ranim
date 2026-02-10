@@ -1,4 +1,4 @@
-use std::f64::consts::TAU;
+use std::f64::consts::{PI, TAU};
 
 use ranim_core::{
     Extract,
@@ -565,7 +565,7 @@ impl RegularPolygon {
     }
     /// Returns the inner circle of the polygon.
     pub fn inner_circle(&self) -> Circle {
-        Circle::new(self.radius * (1.0 - 1.0 / self.sides as f64))
+        Circle::new(self.radius * (PI / self.sides as f64).cos())
             .with(|x| x.move_to(self.center).discard())
     }
 }
