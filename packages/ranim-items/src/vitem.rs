@@ -20,6 +20,7 @@ use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
 use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
+use ranim_core::core_item::vitem::Basis2d;
 use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
@@ -27,60 +28,6 @@ use ranim_core::{
     prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
     traits::{PointsFunc, Rotate, Scale, Shift, StrokeColor},
 };
-
-/// The projection of a [`VItem`].
-#[derive(Debug, Clone, Copy, PartialEq, ranim_macros::Interpolatable)]
-pub struct ProjectionPlane {
-    /// The basis vector in the u direction.
-    basis_u: DVec3,
-    /// The basis vector in the v direction.
-    basis_v: DVec3,
-}
-
-impl Default for ProjectionPlane {
-    fn default() -> Self {
-        Self {
-            basis_u: DVec3::X,
-            basis_v: DVec3::Y,
-        }
-    }
-}
-
-impl ProjectionPlane {
-    /// The basis vector in the u direction.
-    pub fn basis_u(&self) -> DVec3 {
-        self.basis_u.normalize()
-    }
-    /// The basis vector in the v direction.
-    pub fn basis_v(&self) -> DVec3 {
-        self.basis_v.normalize()
-    }
-    /// The basis vectors
-    pub fn basis(&self) -> (DVec3, DVec3) {
-        (self.basis_u(), self.basis_v())
-    }
-    /// The corrected basis vector in the u direction.
-    /// This is same as [`ProjectionPlane::basis_u`].
-    pub fn corrected_basis_u(&self) -> DVec3 {
-        self.basis_u.normalize()
-    }
-    /// The corrected basis vector in the v direction.
-    /// This is recalculated to ensure orthogonality.
-    pub fn corrected_basis_v(&self) -> DVec3 {
-        let normal = self.basis_u.cross(self.basis_v);
-        normal.cross(self.basis_u).normalize()
-    }
-    /// Rotate the projection.
-    pub fn rotate(&mut self, angle: f64, axis: DVec3) {
-        self.basis_u = self.basis_u.rotate_axis(axis, angle).normalize();
-        self.basis_v = self.basis_v.rotate_axis(axis, angle).normalize();
-    }
-    /// Get the normal vector of the projection target plane.
-    #[inline]
-    pub fn normal(&self) -> DVec3 {
-        self.basis_u.cross(self.basis_v).normalize()
-    }
-}
 
 /// A vectorized item.
 ///
@@ -101,10 +48,10 @@ impl ProjectionPlane {
 /// ```
 #[derive(Debug, Clone, PartialEq, ranim_macros::Interpolatable)]
 pub struct VItem {
-    /// The projection info.
+    /// The 2d basis used for projecting the item during rendering.
     ///
-    /// See [`ProjectionPlane`]
-    pub proj: ProjectionPlane,
+    /// See [`Basis2d`]
+    pub basis: Basis2d,
     /// vpoints data
     pub vpoints: VPointVec,
     /// stroke widths
@@ -138,7 +85,7 @@ impl Shift for VItem {
 impl Rotate for VItem {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.vpoints.rotate_at_point(angle, axis, point);
-        self.proj.rotate(angle, axis);
+        self.basis.rotate_axis(axis, angle);
         self
     }
 }
@@ -178,13 +125,13 @@ impl VItem {
         self.vpoints.get(idx * 2)
     }
     /// Set the projection of the VItem
-    pub fn with_proj(mut self, proj: ProjectionPlane) -> Self {
-        self.proj = proj;
+    pub fn with_basis(mut self, basis: Basis2d) -> Self {
+        self.basis = basis;
         self
     }
     /// Set the projection of the VItem
-    pub fn set_proj(&mut self, proj: ProjectionPlane) {
-        self.proj = proj;
+    pub fn set_proj(&mut self, basis: Basis2d) {
+        self.basis = basis;
     }
     /// Construct a [`VItem`] form vpoints
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
@@ -192,7 +139,7 @@ impl VItem {
         let stroke_rgbas = vec![vec4(1.0, 1.0, 1.0, 1.0).into(); vpoints.len().div_ceil(2)];
         let fill_rgbas = vec![vec4(0.0, 0.0, 0.0, 0.0).into(); vpoints.len().div_ceil(2)];
         Self {
-            proj: ProjectionPlane::default(),
+            basis: Basis2d::default(),
             vpoints: VPointVec(vpoints),
             stroke_rgbas: stroke_rgbas.into(),
             stroke_widths: stroke_widths.into(),
@@ -228,10 +175,7 @@ impl Extract for VItem {
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         buf.push(CoreItem::VItem(ranim_core::core_item::vitem::VItem {
             origin: self.vpoints.first().unwrap().as_vec3(),
-            basis: (
-                self.proj.corrected_basis_u().as_vec3(),
-                self.proj.corrected_basis_v().as_vec3(),
-            ),
+            basis: self.basis,
             points: self.get_render_points(),
             fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
@@ -275,7 +219,7 @@ impl Partial for VItem {
         let stroke_widths = self.stroke_widths.get_partial(range.clone());
         let fill_rgbas = self.fill_rgbas.get_partial(range.clone());
         Self {
-            proj: self.proj,
+            basis: self.basis,
             vpoints,
             stroke_widths,
             stroke_rgbas,
@@ -292,7 +236,7 @@ impl Partial for VItem {
 impl Empty for VItem {
     fn empty() -> Self {
         Self {
-            proj: ProjectionPlane::default(),
+            basis: Basis2d::default(),
             vpoints: VPointVec(vec![DVec3::ZERO; 3]),
             stroke_widths: vec![0.0.into(); 2].into(),
             stroke_rgbas: vec![Vec4::ZERO.into(); 2].into(),

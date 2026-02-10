@@ -69,6 +69,12 @@ pub trait Interpolatable {
     fn lerp(&self, target: &Self, t: f64) -> Self;
 }
 
+impl Interpolatable for usize {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        (*self as f32).lerp(&(*target as f32), t) as usize
+    }
+}
+
 impl Interpolatable for f32 {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         self + (target - self) * t as f32

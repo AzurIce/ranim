@@ -1,0 +1,135 @@
+name = "regular_polygon"
+code = """
+```rust
+use std::f64::consts::PI;
+
+use ranim::{
+    anims::transform::TransformAnim,
+    color::{HueDirection, palettes::manim},
+    glam::{DVec3, dvec2},
+    items::vitem::geometry::RegularPolygon,
+    prelude::*,
+    utils::rate_functions::smooth,
+};
+use ranim_core::animation::Eval;
+use ranim_items::vitem::geometry::anchor::Origin;
+
+#[scene]
+#[output(dir = "regular_polygon")]
+pub fn regular_polygon(r: &mut RanimScene) {
+    let _r_cam = r.insert(CameraFrame::default());
+
+    let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
+    let max_radius = frame_size.x.max(frame_size.y) / 2.0 * 0.9;
+
+    let n_layers = 12;
+    let total_rotation = PI / 2.0; // 90° total rotation spread
+
+    // Colors
+    let start_color = manim::BLUE_C;
+    let end_color = manim::RED_C;
+
+    // Target radii
+    let radii: Vec<f64> = (0..n_layers)
+        .map(|i| max_radius * (i + 1) as f64 / n_layers as f64)
+        .collect();
+
+    // Create polygons starting from zero radius
+    let mut polygons = (0..n_layers)
+        .map(|i| {
+            let sides = i + 3;
+            let t = i as f32 / (n_layers - 1).max(1) as f32;
+            let color = start_color.lerp(end_color, t, HueDirection::Increasing);
+
+            RegularPolygon::new(sides, 0.0).with(|p| {
+                p.set_stroke_color(color);
+                p.stroke_width = 0.05;
+                p.set_fill_color(color.with_alpha(0.08));
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let r_polygons = r.insert_empty();
+
+    // Phase 1: Expand from center with lagged effect
+    r.timeline_mut(r_polygons).play(
+        polygons
+            .iter_mut()
+            .zip(radii.iter())
+            .map(|(poly, &target_radius)| {
+                poly.transform(|p| {
+                    p.radius = target_radius;
+                })
+                .with_rate_func(smooth)
+            })
+            .collect::<Vec<_>>()
+            .lagged_raw(0.2)
+            .with_duration(1.0),
+    );
+
+    r.timelines_mut().sync();
+
+    // Phase 2: Rotate each layer at different speeds
+    let rotations: Vec<f64> = (0..n_layers)
+        .map(|i| total_rotation * (n_layers - i) as f64 / n_layers as f64)
+        .collect();
+
+    r.timeline_mut(r_polygons).play(
+        polygons
+            .iter_mut()
+            .zip(rotations.iter())
+            .map(|(poly, &rot)| {
+                poly.transform(|p| {
+                    p.rotate_at(rot, DVec3::Z, Origin.locate(&p.outer_circle()));
+                })
+                .with_rate_func(smooth)
+            })
+            .collect::<Vec<_>>()
+            .lagged_raw(0.2)
+            .with_duration(1.0),
+    );
+
+    r.timelines_mut().sync();
+
+    r.insert_time_mark(
+        r.timelines().max_total_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
+
+    r.timelines_mut().forward(0.5);
+
+    // Phase 3: Collapse back to center (reverse order - outer first)
+    r.timeline_mut(r_polygons).play(
+        polygons
+            .iter_mut()
+            .rev()
+            .map(|poly| {
+                poly.transform(|p| {
+                    p.radius = 0.0;
+                })
+                .with_rate_func(smooth)
+            })
+            .collect::<Vec<_>>()
+            .lagged_raw(0.2)
+            .with_duration(1.0),
+    );
+
+    r.timelines_mut().sync();
+}
+
+// TODO: redesign lagged
+/// Extension trait for raw lagged animation on Vec of AnimationCells
+trait LaggedRawExt<T> {
+    fn lagged_raw(self, lag_ratio: f64) -> ranim_core::animation::AnimationCell<Vec<T>>;
+}
+
+impl<T: Clone + 'static> LaggedRawExt<T> for Vec<ranim_core::animation::AnimationCell<T>> {
+    fn lagged_raw(self, lag_ratio: f64) -> ranim_core::animation::AnimationCell<Vec<T>> {
+        ranim_anims::lagged::Lagged::new(lag_ratio, self).into_animation_cell()
+    }
+}
+```"""
+hash = "126791705412f333ada43abc3c150572d4cb1604"
+preview_imgs = ["/examples/regular_polygon/preview.png"]
+output_files = ["/examples/regular_polygon/regular_polygon_1920x1080_60.mp4"]
+wasm = true

@@ -3,13 +3,14 @@ use glam::DVec3;
 use ranim_core::Extract;
 use ranim_core::anchor::{Aabb, Locate};
 use ranim_core::core_item::CoreItem;
+use ranim_core::core_item::vitem::Basis2d;
 use ranim_core::{color, glam};
 
 use ranim_core::traits::{
     Opacity, Rotate, RotateExt, ScaleExt, Shift, StrokeColor, StrokeWidth, With,
 };
 
-use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
+use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
 use ranim_core::anchor::AabbPoint;
 
 // MARK: ### Arc ###
@@ -17,7 +18,7 @@ use ranim_core::anchor::AabbPoint;
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Arc {
     /// Projection
-    pub proj: ProjectionPlane,
+    pub basis: Basis2d,
     /// Center
     pub center: DVec3,
     /// Radius
@@ -35,7 +36,7 @@ impl Arc {
     /// Constructor
     pub fn new(angle: f64, radius: f64) -> Self {
         Self {
-            proj: ProjectionPlane::default(),
+            basis: Basis2d::default(),
             center: DVec3::ZERO,
             radius,
             angle,
@@ -65,12 +66,12 @@ impl Arc {
     }
     /// The start point
     pub fn start(&self) -> DVec3 {
-        self.center + self.radius * self.proj.basis_u()
+        self.center + self.radius * self.basis.u()
     }
     /// The end point
     pub fn end(&self) -> DVec3 {
-        let u = self.angle.cos() * self.proj.basis_u();
-        let v = self.angle.sin() * self.proj.basis_v();
+        let u = self.angle.cos() * self.basis.u();
+        let v = self.angle.sin() * self.basis.v();
         self.center + self.radius * (u + v)
     }
 }
@@ -79,9 +80,7 @@ impl Arc {
 impl Aabb for Arc {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = self.proj.basis();
-        let r = self.radius * (u + v);
-        [self.center - r, self.center + r].aabb()
+        VItem::from(self.clone()).aabb()
     }
 }
 
@@ -95,7 +94,7 @@ impl Shift for Arc {
 impl Rotate for Arc {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.center.rotate_at(angle, axis, point);
-        self.proj.rotate(angle, axis);
+        self.basis.rotate_axis(axis, angle);
         self
     }
 }
@@ -128,7 +127,7 @@ impl From<Arc> for VItem {
         let len = 2 * NUM_SEGMENTS + 1;
 
         let Arc {
-            proj,
+            basis: proj,
             center,
             radius,
             angle,
@@ -136,7 +135,7 @@ impl From<Arc> for VItem {
             stroke_width,
         } = value;
 
-        let (u, v) = proj.basis();
+        let (u, v) = proj.uv();
         let mut vpoints = (0..len)
             .map(|i| {
                 let angle = angle * i as f64 / (len - 1) as f64;
@@ -176,7 +175,7 @@ impl Extract for Arc {
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct ArcBetweenPoints {
     /// Projection
-    pub proj: ProjectionPlane,
+    pub basis: Basis2d,
     /// Start point
     pub start: DVec3,
     /// End point
@@ -194,7 +193,7 @@ impl ArcBetweenPoints {
     /// Constructor
     pub fn new(start: DVec3, end: DVec3, angle: f64) -> Self {
         Self {
-            proj: ProjectionPlane::default(),
+            basis: Basis2d::default(),
             start,
             end,
             angle,
@@ -246,7 +245,7 @@ impl Rotate for ArcBetweenPoints {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.start.rotate_at(angle, axis, point);
         self.end.rotate_at(angle, axis, point);
-        self.proj.rotate(angle, axis);
+        self.basis.rotate_axis(axis, angle);
         self
     }
 }
@@ -276,7 +275,7 @@ impl StrokeColor for ArcBetweenPoints {
 impl From<ArcBetweenPoints> for Arc {
     fn from(value: ArcBetweenPoints) -> Arc {
         let ArcBetweenPoints {
-            proj,
+            basis: proj,
             start,
             end,
             angle,
@@ -286,7 +285,7 @@ impl From<ArcBetweenPoints> for Arc {
         let radius = (start.distance(end) / 2.0) / (angle / 2.0).sin();
 
         Arc {
-            proj,
+            basis: proj,
             angle,
             radius,
             center: DVec3::ZERO,

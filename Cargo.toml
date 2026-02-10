@@ -267,3 +267,11 @@ crate-type = ["cdylib"]
 
 [package.metadata.example.selective_sort]
 wasm = true
+
+[[example]]
+name = "regular_polygon"
+path = "examples/regular_polygon/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.regular_polygon]
+wasm = true
