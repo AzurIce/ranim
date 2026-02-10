@@ -110,6 +110,11 @@ impl Origin for CoordinateSystem {
     fn origin(&self) -> DVec3 {
         self.origin
     }
+
+    fn move_to(&mut self, origin: DVec3) -> &mut Self {
+        self.origin = origin;
+        self
+    }
 }
 
 impl LocalCoordinate for CoordinateSystem {
