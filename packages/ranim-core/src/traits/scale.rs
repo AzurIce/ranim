@@ -76,6 +76,12 @@ pub trait Scale {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self;
 }
 
+/// Scaling operations relative to the item's origin.
+pub trait ScaleByOrigin: Origin {
+    /// Scale the item by a given scale at the item's origin.
+    fn scale(&mut self, scale: DVec3) -> &mut Self;
+}
+
 /// Scaling operations with the definition of axes relative to a projection plane.
 pub trait ScaleByProj {
     /// Scale at a given point with a projection plane.
