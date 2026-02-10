@@ -11,20 +11,52 @@ use ranim_core::{
     traits::{Rotate, Shift},
 };
 
-use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane};
+use crate::vitem::DEFAULT_STROKE_WIDTH;
 use ranim_core::anchor::AabbPoint;
+use ranim_core::core_item::vitem::Basis2d;
 use ranim_core::traits::{FillColor, Opacity, RotateExt, ScaleExt, StrokeColor, With};
 
 use crate::vitem::VItem;
 
 use super::Arc;
 
+/// `Origin` anchor
+pub mod anchor {
+    use super::*;
+    use ranim_core::{glam::DVec3, traits::Locate};
+
+    use crate::vitem::geometry::{Arc, ArcBetweenPoints};
+
+    /// The origin of the circle
+    #[derive(Debug, Clone, Copy)]
+    pub struct Origin;
+
+    impl Locate<Arc> for Origin {
+        fn locate(&self, target: &Arc) -> DVec3 {
+            target.center
+        }
+    }
+
+    impl Locate<ArcBetweenPoints> for Origin {
+        fn locate(&self, target: &ArcBetweenPoints) -> DVec3 {
+            // TODO: make this better
+            Arc::from(target.clone()).center
+        }
+    }
+
+    impl Locate<Circle> for Origin {
+        fn locate(&self, target: &Circle) -> DVec3 {
+            target.center
+        }
+    }
+}
+
 // MARK: ### Circle ###
 /// An circle
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Circle {
-    /// Proj
-    pub proj: ProjectionPlane,
+    /// Basis
+    pub basis: Basis2d,
     /// Center
     pub center: DVec3,
     /// Radius
@@ -42,7 +74,7 @@ impl Circle {
     /// Constructor
     pub fn new(radius: f64) -> Self {
         Self {
-            proj: ProjectionPlane::default(),
+            basis: Basis2d::default(),
             center: DVec3::ZERO,
             radius,
 
@@ -76,7 +108,7 @@ impl Circle {
 // MARK: Traits impl
 impl Aabb for Circle {
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = self.proj.basis();
+        let (u, v) = self.basis.uv();
         let r = self.radius * (u + v);
         [self.center + r, self.center - r].aabb()
     }
@@ -92,7 +124,7 @@ impl Shift for Circle {
 impl Rotate for Circle {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.center.rotate_at(angle, axis, point);
-        self.proj.rotate(angle, axis);
+        self.basis.rotate_axis(axis, angle);
         self
     }
 }
@@ -137,7 +169,7 @@ impl FillColor for Circle {
 impl From<Circle> for Arc {
     fn from(value: Circle) -> Self {
         let Circle {
-            proj,
+            basis,
             center,
             radius,
             stroke_rgba,
@@ -145,7 +177,7 @@ impl From<Circle> for Arc {
             ..
         } = value;
         Self {
-            proj,
+            basis,
             center,
             radius,
             angle: 2.0 * PI,
