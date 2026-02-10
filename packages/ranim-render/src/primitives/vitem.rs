@@ -110,8 +110,8 @@ impl RenderResource for VItemRenderInstance {
 
         let plane_data = PlaneUniform {
             origin: Vec4::from((data.origin, 0.0)),
-            basis_u: Vec4::from((data.basis.0, 0.0)),
-            basis_v: Vec4::from((data.basis.1, 0.0)),
+            basis_u: Vec4::from((data.basis.u().as_vec3(), 0.0)),
+            basis_v: Vec4::from((data.basis.v().as_vec3(), 0.0)),
         };
         let plane_buffer = WgpuBuffer::new_init(
             ctx,
@@ -167,8 +167,8 @@ impl RenderResource for VItemRenderInstance {
 
         let plane_data = PlaneUniform {
             origin: Vec4::from((data.origin, 0.0)),
-            basis_u: Vec4::from((data.basis.0, 0.0)),
-            basis_v: Vec4::from((data.basis.1, 0.0)),
+            basis_u: Vec4::from((data.basis.u().as_vec3(), 0.0)),
+            basis_v: Vec4::from((data.basis.v().as_vec3(), 0.0)),
         };
         self.plane_buffer.set(ctx, plane_data);
 
@@ -232,7 +232,7 @@ mod tests {
     use crate::{Renderer, resource::RenderPool, utils::WgpuContext};
     use glam::{DVec3, Vec3, Vec4, vec4};
     use ranim_core::{
-        core_item::{CoreItem, camera_frame::CameraFrame},
+        core_item::{CoreItem, camera_frame::CameraFrame, vitem::Basis2d},
         store::CoreItemStore,
     };
 
@@ -276,7 +276,7 @@ mod tests {
             // Red on XY plane
             let item1 = VItem {
                 origin,
-                basis: (Vec3::X, Vec3::Y),
+                basis: Basis2d::XY,
                 points: points.clone(),
                 fill_rgbas: vec![Rgba(vec4(1.0, 0.0, 0.0, alpha)); n],
                 stroke_rgbas: vec![Rgba(vec4(0.5, 0.0, 0.0, 1.0)); n],
@@ -286,7 +286,7 @@ mod tests {
             // Green on YZ
             let item2 = VItem {
                 origin,
-                basis: (Vec3::Z, Vec3::Y), // Z is "X", Y is "Y"
+                basis: Basis2d::YZ,
                 points: points.clone(),
                 fill_rgbas: vec![Rgba(vec4(0.0, 1.0, 0.0, alpha)); n],
                 stroke_rgbas: vec![Rgba(vec4(0.0, 0.5, 0.0, 1.0)); n],
@@ -296,7 +296,7 @@ mod tests {
             // Blue on XZ
             let item3 = VItem {
                 origin,
-                basis: (Vec3::X, Vec3::Z), // X is "X", Z is "Y"
+                basis: Basis2d::XZ,
                 points: points.clone(),
                 fill_rgbas: vec![Rgba(vec4(0.0, 0.0, 1.0, alpha)); n],
                 stroke_rgbas: vec![Rgba(vec4(0.0, 0.0, 0.5, 1.0)); n],
