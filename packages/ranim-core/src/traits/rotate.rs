@@ -2,6 +2,7 @@ use glam::{DMat3, DVec3};
 
 use crate::{
     anchor::{AabbPoint, Locate},
+    traits::LocalCoordinate,
     utils::wrap_point_func_with_point,
 };
 
@@ -11,6 +12,17 @@ use crate::{
 pub trait Rotate {
     /// Rotate the item by a given angle about a given axis at the given point.
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self;
+}
+
+/// Rotate operations for local coordinates.
+pub trait RotateLocal: LocalCoordinate + Rotate {
+    /// Rotate the item by a given angle about its local axis at center.
+    fn rotate_local(&mut self, angle: f64) -> &mut Self {
+        let point = self.origin();
+        let axis = self.proj().normal();
+        self.rotate_at_point(angle, axis, point);
+        self
+    }
 }
 
 impl Rotate for DVec3 {

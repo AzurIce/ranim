@@ -32,7 +32,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                 padded_frame_bl.extend(0.0) + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);
             let rect = Rectangle::new(width_unit, height).with(|rect| {
                 rect.fill_rgba = manim::WHITE.with_alpha(0.5);
-                rect.scale(DVec3::splat(0.8))
+                rect.scale_uniform_at_center(0.8)
                     .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
             (r.insert(rect.clone()), rect)

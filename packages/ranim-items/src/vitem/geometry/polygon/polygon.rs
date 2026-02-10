@@ -4,6 +4,7 @@ use ranim_core::{
     color,
     core_item::CoreItem,
     glam,
+    proj::ProjectionPlane,
     traits::{Rotate, RotateExt, Scale, Shift},
 };
 
@@ -11,7 +12,7 @@ use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use itertools::Itertools;
 
-use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
+use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
 use ranim_core::traits::{Alignable, FillColor, Opacity, ScaleExt, StrokeColor, StrokeWidth, With};
 
 // MARK: ### Polygon ###

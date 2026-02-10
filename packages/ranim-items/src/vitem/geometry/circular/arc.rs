@@ -3,23 +3,23 @@ use glam::DVec3;
 use ranim_core::Extract;
 use ranim_core::anchor::{Aabb, Locate};
 use ranim_core::core_item::CoreItem;
+use ranim_core::proj::{CoordinateSystem, ProjectionPlane};
 use ranim_core::{color, glam};
 
 use ranim_core::traits::{
-    Opacity, Origin, Rotate, RotateExt, ScaleExt, Shift, StrokeColor, StrokeWidth, With,
+    LocalCoordinate, Opacity, Origin, Rotate, RotateExt, ScaleExt, ScaleUniform,
+    ScaleUniformByOrigin, ScaleUniformLocal, Shift, StrokeColor, StrokeWidth, With,
 };
 
-use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
+use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
 use ranim_core::anchor::AabbPoint;
 
 // MARK: ### Arc ###
 /// An arc
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Arc {
-    /// Projection
-    pub proj: ProjectionPlane,
-    /// Center
-    pub center: DVec3,
+    /// Local coordinate system
+    pub coord: CoordinateSystem,
     /// Radius
     pub radius: f64,
     /// Angle
@@ -35,78 +35,82 @@ impl Arc {
     /// Constructor
     pub fn new(angle: f64, radius: f64) -> Self {
         Self {
-            proj: ProjectionPlane::default(),
-            center: DVec3::ZERO,
+            coord: CoordinateSystem::default(),
             radius,
             angle,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
         }
     }
-    /// Scale the arc by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
-    /// because this keeps the arc a arc.
-    pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, AabbPoint::CENTER)
-    }
-    /// Scale the arc by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
-    /// because this keeps the arc a arc.
-    pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
-    where
-        T: Locate<Self>,
-    {
-        let anchor = anchor.locate(self);
-        self.radius *= scale;
-        self.center.scale_at(DVec3::splat(scale), anchor);
-        self
-    }
     /// The start point
     pub fn start(&self) -> DVec3 {
-        self.center + self.radius * self.proj.basis_u()
+        self.origin() + self.radius * self.coord().basis_u()
     }
     /// The end point
     pub fn end(&self) -> DVec3 {
-        let u = self.angle.cos() * self.proj.basis_u();
-        let v = self.angle.sin() * self.proj.basis_v();
-        self.center + self.radius * (u + v)
+        let coord = self.coord;
+        let center = coord.origin();
+        let u = self.angle.cos() * coord.basis_u();
+        let v = self.angle.sin() * coord.basis_v();
+        center + self.radius * (u + v)
     }
 }
 
 // MARK: Traits impl
 impl Origin for Arc {
     fn origin(&self) -> DVec3 {
-        self.center
+        self.coord.origin
     }
 
     fn move_to(&mut self, origin: DVec3) -> &mut Self {
-        self.center = origin;
+        self.coord.move_to(origin);
         self
     }
 }
 
+impl LocalCoordinate for Arc {
+    fn coord(&self) -> CoordinateSystem {
+        self.coord
+    }
+}
+
+impl ScaleUniformByOrigin for Arc {
+    fn scale_uniform(&mut self, scale: f64) -> &mut Self {
+        self.radius *= scale;
+        self
+    }
+}
+
+impl ScaleUniform for Arc {
+    fn scale_uniform_at_point(&mut self, scale: f64, point: DVec3) -> &mut Self {
+        self.coord().origin.scale_uniform_at_point(scale, point);
+        self.radius *= scale;
+        self
+    }
+}
+
+impl ScaleUniformLocal for Arc {}
+
 impl Aabb for Arc {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = self.proj.basis();
+        let center = self.origin();
+        let (u, v) = self.coord().basis();
         let r = self.radius * (u + v);
-        [self.center - r, self.center + r].aabb()
+        [center - r, center + r].aabb()
     }
 }
 
 impl Shift for Arc {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.center.shift(shift);
+        self.coord().shift(shift);
         self
     }
 }
 
 impl Rotate for Arc {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.center.rotate_at(angle, axis, point);
-        self.proj.rotate(angle, axis);
+        self.coord.rotate_at_point(angle, axis, point);
         self
     }
 }
@@ -139,15 +143,15 @@ impl From<Arc> for VItem {
         let len = 2 * NUM_SEGMENTS + 1;
 
         let Arc {
-            proj,
-            center,
+            coord,
             radius,
             angle,
             stroke_rgba,
             stroke_width,
         } = value;
 
-        let (u, v) = proj.basis();
+        let center = coord.origin();
+        let (u, v) = coord.basis();
         let mut vpoints = (0..len)
             .map(|i| {
                 let angle = angle * i as f64 / (len - 1) as f64;
@@ -240,7 +244,7 @@ impl ArcBetweenPoints {
 impl Origin for ArcBetweenPoints {
     fn origin(&self) -> DVec3 {
         // TODO: optimize this
-        Arc::from(self.clone()).center
+        Arc::from(self.clone()).coord.origin
     }
 }
 
@@ -304,10 +308,9 @@ impl From<ArcBetweenPoints> for Arc {
         let radius = (start.distance(end) / 2.0) / (angle / 2.0).sin();
 
         Arc {
-            proj,
+            coord: proj.into(),
             angle,
             radius,
-            center: DVec3::ZERO,
             stroke_rgba,
             stroke_width,
         }
@@ -365,7 +368,7 @@ mod tests {
             ArcBetweenPoints::new(dvec3(2.0, 0.0, 0.0), dvec3(0.0, 2.0, 0.0), PI / 2.0);
         let arc_between_points = Arc::from(arc_between_points);
         assert_float_absolute_eq!(
-            arc.center.distance_squared(arc_between_points.center),
+            arc.origin().distance_squared(arc_between_points.origin()),
             0.0,
             1e-10
         );
@@ -379,7 +382,7 @@ mod tests {
             arc.rotate(PI, DVec3::NEG_Z).shift(dvec3(2.0, 2.0, 0.0));
         });
         assert_float_absolute_eq!(
-            arc.center.distance_squared(arc_between_points.center),
+            arc.origin().distance_squared(arc_between_points.origin()),
             0.0,
             1e-10
         );

@@ -14,6 +14,8 @@ pub mod animation;
 pub mod color;
 /// Component data
 pub mod components;
+/// Projection
+pub mod proj;
 /// The structure to encode animation spans
 pub mod timeline;
 /// Fondamental traits

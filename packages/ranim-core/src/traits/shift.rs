@@ -1,6 +1,9 @@
 use glam::DVec3;
 
-use crate::anchor::{Aabb, AabbPoint, Locate};
+use crate::{
+    anchor::{Aabb, AabbPoint, Locate},
+    traits::LocalCoordinate,
+};
 
 /// Shifting operations.
 ///
@@ -73,3 +76,12 @@ pub trait ShiftExt: Shift {
 }
 
 impl<T: Shift + ?Sized> ShiftExt for T {}
+
+/// Performs a shift operation in local coordinates.
+pub trait ShiftLocal: LocalCoordinate {
+    /// Shift the item by a given vector in local coordinates.
+    fn shift_local(&mut self, offset: DVec3) -> &mut Self {
+        self.shift(self.coord().c2v(offset));
+        self
+    }
+}

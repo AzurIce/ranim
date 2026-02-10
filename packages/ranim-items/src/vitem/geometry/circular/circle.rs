@@ -4,16 +4,19 @@ use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::{
     Extract,
-    anchor::{Aabb, Locate},
+    anchor::Aabb,
     color,
     core_item::CoreItem,
     glam,
-    traits::{Origin, Rotate, Shift},
+    proj::CoordinateSystem,
+    traits::{
+        LocalCoordinate, Origin, Rotate, ScaleUniform, ScaleUniformByOrigin, ScaleUniformLocal,
+        Shift,
+    },
 };
 
-use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane};
-use ranim_core::anchor::AabbPoint;
-use ranim_core::traits::{FillColor, Opacity, RotateExt, ScaleExt, StrokeColor, With};
+use crate::vitem::DEFAULT_STROKE_WIDTH;
+use ranim_core::traits::{FillColor, Opacity, StrokeColor, With};
 
 use crate::vitem::VItem;
 
@@ -23,10 +26,8 @@ use super::Arc;
 /// An circle
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Circle {
-    /// Proj
-    pub proj: ProjectionPlane,
-    /// Center
-    pub center: DVec3,
+    /// Local coordinate system
+    pub coord: CoordinateSystem,
     /// Radius
     pub radius: f64,
 
@@ -42,8 +43,7 @@ impl Circle {
     /// Constructor
     pub fn new(radius: f64) -> Self {
         Self {
-            proj: ProjectionPlane::default(),
-            center: DVec3::ZERO,
+            coord: CoordinateSystem::default(),
             radius,
 
             stroke_rgba: AlphaColor::WHITE,
@@ -51,59 +51,61 @@ impl Circle {
             fill_rgba: AlphaColor::TRANSPARENT,
         }
     }
-    /// Scale the circle by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
-    /// because this keeps the circle a circle.
-    pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, AabbPoint::CENTER)
+}
+
+impl Origin for Circle {
+    fn origin(&self) -> DVec3 {
+        self.coord.origin()
     }
-    /// Scale the circle by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
-    /// because this keeps the circle a circle.
-    pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
-    where
-        T: Locate<Self>,
-    {
-        let point = anchor.locate(self);
-        self.radius *= scale;
-        self.center.scale_at(DVec3::splat(scale), point);
+    fn move_to(&mut self, origin: DVec3) -> &mut Self {
+        self.coord.move_to(origin);
         self
     }
 }
 
 // MARK: Traits impl
-impl Origin for Circle {
-    fn origin(&self) -> DVec3 {
-        self.center
+impl LocalCoordinate for Circle {
+    fn coord(&self) -> ranim_core::proj::CoordinateSystem {
+        self.coord
     }
+}
 
-    fn move_to(&mut self, origin: DVec3) -> &mut Self {
-        self.center = origin;
+impl ScaleUniformByOrigin for Circle {
+    fn scale_uniform(&mut self, scale: f64) -> &mut Self {
+        self.radius *= scale;
         self
     }
 }
 
+impl ScaleUniform for Circle {
+    fn scale_uniform_at_point(&mut self, scale: f64, point: DVec3) -> &mut Self {
+        self.coord.origin.scale_uniform_at_point(scale, point);
+        self.radius *= scale;
+        self
+    }
+}
+
+impl ScaleUniformLocal for Circle {}
+
 impl Aabb for Circle {
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = self.proj.basis();
+        let center = self.coord().origin();
+        let (u, v) = self.coord().basis();
         let r = self.radius * (u + v);
-        [self.center + r, self.center - r].aabb()
+        [center + r, center - r].aabb()
     }
 }
 
 impl Shift for Circle {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.center.shift(shift);
+        self.coord.shift(shift);
         self
     }
 }
 
 impl Rotate for Circle {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.center.rotate_at(angle, axis, point);
-        self.proj.rotate(angle, axis);
+        self.coord.rotate_at_point(angle, axis, point);
         self
     }
 }
@@ -148,16 +150,14 @@ impl FillColor for Circle {
 impl From<Circle> for Arc {
     fn from(value: Circle) -> Self {
         let Circle {
-            proj,
-            center,
+            coord,
             radius,
             stroke_rgba,
             stroke_width,
             ..
         } = value;
         Self {
-            proj,
-            center,
+            coord,
             radius,
             angle: 2.0 * PI,
             stroke_rgba,

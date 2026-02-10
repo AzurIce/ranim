@@ -5,7 +5,8 @@ use itertools::Itertools;
 
 use crate::{
     anchor::{Aabb, AabbPoint, Locate},
-    traits::StrokeWidth,
+    proj::ProjectionPlane,
+    traits::{LocalCoordinate, Origin, StrokeWidth},
     utils::wrap_point_func_with_point,
 };
 
@@ -26,12 +27,100 @@ pub enum ScaleHint {
     PorportionalZ(f64),
 }
 
+// TODO: Maybe add a derive macro for items with `Scale` or `ScaleByProj`?
+/// Uniform scaling operations. (i.e. Scale ratio is the same for each axis)
+pub trait ScaleUniform {
+    /// Scale the item uniformly by a given scale at a given point.
+    fn scale_uniform_at_point(&mut self, scale: f64, point: DVec3) -> &mut Self;
+    /// Scale the item uniformly by a given scale at an anchor.
+    ///
+    /// See [`Locate`]
+    fn scale_uniform_at<T>(&mut self, scale: f64, anchor: T) -> &mut Self
+    where
+        T: Locate<Self>,
+    {
+        let point = anchor.locate(self);
+        self.scale_uniform_at_point(scale, point);
+        self
+    }
+
+    /// Scale the item by a given scale at [`AabbPoint::CENTER`].
+    fn scale_uniform_at_center(&mut self, scale: f64) -> &mut Self
+    where
+        AabbPoint: Locate<Self>,
+    {
+        self.scale_uniform_at(scale, AabbPoint::CENTER);
+        self
+    }
+}
+
+/// Uniform scaling operations relative to the item's origin.
+pub trait ScaleUniformByOrigin: Origin {
+    /// Scale the item uniformly by a given scale at the item's origin.
+    fn scale_uniform(&mut self, scale: f64) -> &mut Self;
+}
+
+/// Uniform scaling in local coordinate system.
+pub trait ScaleUniformLocal: LocalCoordinate + ScaleUniform {
+    /// Scale the item by a given scale in the local coordinate system.
+    fn scale_uniform_at_coord(&mut self, scale: f64, coord: DVec3) -> &mut Self {
+        self.scale_uniform_at_point(scale, self.coord().c2p(coord))
+    }
+}
+
 /// Scaling operations.
 ///
 /// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: Scale`.
 pub trait Scale {
     /// Scale at a given point.
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self;
+}
+
+/// Scaling operations with the definition of axes relative to a projection plane.
+pub trait ScaleByProj {
+    /// Scale at a given point with a projection plane.
+    fn scale_by_proj_at_point(
+        &mut self,
+        scale: DVec3,
+        point: DVec3,
+        proj: ProjectionPlane,
+    ) -> &mut Self;
+}
+
+/// Scaling operations in local coordinate system.
+pub trait ScaleLocal: LocalCoordinate {
+    /// Scale the item by a given scale in the local coordinate system.
+    fn scale_local_at_coord(&mut self, scale: DVec3, coord: DVec3) -> &mut Self;
+    /// Scale the item by a given scale in the local coordinate system at a given point.
+    fn scale_local_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
+        self.scale_local_at_coord(scale, self.coord().c2p(point));
+        self
+    }
+    /// Scale the item by a given scale in the local coordinate system at the item's origin.
+    fn scale_local(&mut self, scale: DVec3) -> &mut Self {
+        self.scale_local_at_coord(scale, DVec3::ZERO);
+        self
+    }
+}
+
+impl ScaleUniform for DVec3 {
+    fn scale_uniform_at_point(&mut self, scale: f64, point: DVec3) -> &mut Self {
+        wrap_point_func_with_point(|p| *p *= scale, point)(self);
+        self
+    }
+
+    fn scale_uniform_at_center(&mut self, _scale: f64) -> &mut Self
+    where
+        AabbPoint: Locate<Self>,
+    {
+        self
+    }
+}
+
+impl ScaleUniformByOrigin for DVec3 {
+    fn scale_uniform(&mut self, _scale: f64) -> &mut Self {
+        self
+    }
 }
 
 impl Scale for DVec3 {
@@ -41,10 +130,55 @@ impl Scale for DVec3 {
     }
 }
 
+impl ScaleByProj for DVec3 {
+    fn scale_by_proj_at_point(
+        &mut self,
+        scale: DVec3,
+        point: DVec3,
+        proj: ProjectionPlane,
+    ) -> &mut Self {
+        let (u, v) = proj.basis();
+        let w = proj.normal();
+        // let disp = self - point;
+        wrap_point_func_with_point(
+            |p| {
+                let rel = dvec3(p.dot(u), p.dot(v), p.dot(w));
+                let scaled = rel * scale;
+                *p = u * scaled.x + v * scaled.y + w * scaled.z
+            },
+            point,
+        )(self);
+        self
+    }
+}
+
+impl<T: ScaleUniform> ScaleUniform for [T] {
+    fn scale_uniform_at_point(&mut self, scale: f64, point: DVec3) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.scale_uniform_at_point(scale, point);
+        });
+        self
+    }
+}
+
 impl<T: Scale> Scale for [T] {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.iter_mut().for_each(|x| {
             x.scale_at_point(scale, point);
+        });
+        self
+    }
+}
+
+impl<T: ScaleByProj> ScaleByProj for [T] {
+    fn scale_by_proj_at_point(
+        &mut self,
+        scale: DVec3,
+        point: DVec3,
+        proj: ProjectionPlane,
+    ) -> &mut Self {
+        self.iter_mut().for_each(|x| {
+            x.scale_by_proj_at_point(scale, point, proj);
         });
         self
     }
@@ -67,7 +201,7 @@ pub trait ScaleExt: Scale {
     /// Scale the item by a given scale at [`AabbPoint::CENTER`].
     ///
     /// This is equivalent to [`ScaleExt::scale_at`] with anchor of [`AabbPoint::CENTER`].
-    fn scale(&mut self, scale: DVec3) -> &mut Self
+    fn scale_at_center(&mut self, scale: DVec3) -> &mut Self
     where
         AabbPoint: Locate<Self>,
     {
@@ -109,7 +243,7 @@ pub trait ScaleExt: Scale {
         Self: Aabb,
         AabbPoint: Locate<Self>,
     {
-        self.scale(self.calc_scale_ratio(hint));
+        self.scale_at_center(self.calc_scale_ratio(hint));
         self
     }
     /// Scale the item to the minimum scale ratio of each axis from the given hints.
@@ -125,7 +259,7 @@ pub trait ScaleExt: Scale {
             .map(|hint| self.calc_scale_ratio(*hint))
             .reduce(|a, b| a.min(b))
             .unwrap_or(DVec3::ONE);
-        self.scale(scale);
+        self.scale_at_center(scale);
         self
     }
     /// Scale the item to the maximum scale ratio of each axis from the given hints.
@@ -141,7 +275,7 @@ pub trait ScaleExt: Scale {
             .map(|hint| self.calc_scale_ratio(*hint))
             .reduce(|a, b| a.max(b))
             .unwrap_or(DVec3::ONE);
-        self.scale(scale);
+        self.scale_at_center(scale);
         self
     }
 }

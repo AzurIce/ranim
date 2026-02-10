@@ -3,25 +3,27 @@ use ranim_core::{
     anchor::Aabb,
     color,
     core_item::CoreItem,
-    glam,
-    traits::{Origin, Rotate, RotateExt, Scale, Shift},
+    glam::{self, Vec3Swizzles},
+    proj::CoordinateSystem,
+    traits::{
+        LocalCoordinate, Origin, Rotate, RotateLocal, ScaleByProj, ScaleLocal, ScaleUniform,
+        ScaleUniformByOrigin, ScaleUniformLocal, Shift, With,
+    },
 };
 
 use color::{AlphaColor, Srgb};
 use glam::{DVec2, DVec3, dvec2, dvec3};
 
 use super::Polygon;
-use crate::vitem::{DEFAULT_STROKE_WIDTH, ProjectionPlane, VItem};
-use ranim_core::traits::{Alignable, FillColor, Opacity, ScaleExt, StrokeColor};
+use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
+use ranim_core::traits::{Alignable, FillColor, Opacity, StrokeColor};
 
 // MARK: ### Rectangle ###
 /// Rectangle
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Rectangle {
-    /// Projection info
-    pub proj: ProjectionPlane,
-    /// Bottom left corner (minimum)
-    pub p0: DVec3,
+    /// Local coordinate system
+    pub coord: CoordinateSystem,
     /// Width and height
     pub size: DVec2,
 
@@ -45,8 +47,9 @@ impl Rectangle {
     /// Construct a rectangle from the bottom-left point (minimum) and size.
     pub fn from_min_size(p0: DVec3, size: DVec2) -> Self {
         Self {
-            proj: ProjectionPlane::default(),
-            p0,
+            coord: CoordinateSystem::default().with(|coord| {
+                coord.move_to(p0);
+            }),
             size,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
@@ -63,49 +66,83 @@ impl Rectangle {
     }
 }
 
-// MARK: Traits impl
 impl Origin for Rectangle {
     fn origin(&self) -> DVec3 {
-        self.p0
+        self.coord.origin
     }
-
     fn move_to(&mut self, origin: DVec3) -> &mut Self {
-        self.p0 = origin;
+        self.coord.move_to(origin);
         self
+    }
+}
+
+// MARK: Traits impl
+impl LocalCoordinate for Rectangle {
+    fn coord(&self) -> CoordinateSystem {
+        self.coord
     }
 }
 
 impl Aabb for Rectangle {
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = self.proj.basis();
-        let p1 = self.p0;
-        let p2 = self.p0 + self.size.x * u + self.size.y * v;
+        let (u, v) = self.coord.basis();
+        let p1 = self.coord.origin;
+        let p2 = p1 + self.size.x * u + self.size.y * v;
         [p1, p2].aabb()
     }
 }
 
 impl Shift for Rectangle {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.p0.shift(shift);
+        self.coord.shift(shift);
         self
     }
 }
 
 impl Rotate for Rectangle {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.p0.rotate_at(angle, axis, point);
-        self.proj.rotate(angle, axis);
+        self.coord.rotate_at_point(angle, axis, point);
         self
     }
 }
 
-impl Scale for Rectangle {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
-        self.p0.scale_at(scale, point);
-        let (u, v) = self.proj.basis();
-        let scale_u = scale.dot(u);
-        let scale_v = scale.dot(v);
-        self.size *= dvec2(scale_u, scale_v);
+impl RotateLocal for Rectangle {
+    fn rotate_local(&mut self, angle: f64) -> &mut Self {
+        self.coord.rotate_local(angle);
+        self
+    }
+}
+
+impl ScaleUniform for Rectangle {
+    fn scale_uniform_at_point(&mut self, scale: f64, point: DVec3) -> &mut Self {
+        self.coord.origin.scale_uniform_at_point(scale, point);
+        self.size *= scale;
+        self
+    }
+}
+
+impl ScaleUniformByOrigin for Rectangle {
+    fn scale_uniform(&mut self, scale: f64) -> &mut Self {
+        self.size *= scale;
+        self
+    }
+}
+
+impl ScaleUniformLocal for Rectangle {}
+
+impl ScaleLocal for Rectangle {
+    fn scale_local_at_coord(&mut self, scale: DVec3, coord: DVec3) -> &mut Self {
+        self.scale_local_at_point(scale, self.coord.c2p(coord));
+        self
+    }
+    fn scale_local_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
+        self.coord
+            .origin
+            .scale_by_proj_at_point(scale, point, self.coord.proj);
+        self
+    }
+    fn scale_local(&mut self, scale: DVec3) -> &mut Self {
+        self.size *= scale.xy();
         self
     }
 }
@@ -156,12 +193,12 @@ impl FillColor for Rectangle {
 // MARK: Conversions
 impl From<Rectangle> for Polygon {
     fn from(value: Rectangle) -> Self {
-        let p0 = value.p0;
-        let (u, v) = value.proj.basis();
+        let p0 = value.origin();
+        let (u, v) = value.coord().basis();
         let DVec2 { x: w, y: h } = value.size;
         let points = vec![p0, p0 + u * w, p0 + u * w + v * h, p0 + v * h];
         Polygon {
-            proj: value.proj,
+            proj: value.proj(),
             points,
             stroke_rgba: value.stroke_rgba,
             stroke_width: value.stroke_width,
