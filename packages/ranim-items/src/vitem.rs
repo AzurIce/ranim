@@ -26,7 +26,7 @@ use ranim_core::{Extract, color, glam};
 use ranim_core::{
     components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
     prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
-    traits::{PointsFunc, Rotate, Scale, Shift, StrokeColor},
+    traits::{PointsFunc, Rotate, Scale, ScaleUniform, Shift, StrokeColor},
 };
 
 /// A vectorized item.
@@ -93,6 +93,13 @@ impl Rotate for VItem {
 impl Scale for VItem {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.vpoints.scale_at_point(scale, point);
+        self
+    }
+}
+
+impl ScaleUniform for VItem {
+    fn scale_uniform_at_point(&mut self, scale: f64, point: DVec3) -> &mut Self {
+        self.vpoints.scale_uniform_at_point(scale, point);
         self
     }
 }
