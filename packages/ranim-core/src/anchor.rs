@@ -5,8 +5,10 @@
 //!
 //! Ranim provides some built-in anchors and related [`Locate`] implementations:
 //! - [`DVec3`]: The point itself in 3d space.
-//! - [`AabbPoint`]: A point based on [`Aabb`]'s size, the number in each axis means the fraction of the size of the [`Aabb`].
+//! - [`Centroid`]: The avg point of all points.
+//!   Note that sometime the center of Aabb is not the centroid.
 //!   (0, 0, 0) is the center point.
+//! - [`AabbPoint`]: A point based on [`Aabb`]'s size, the number in each axis means the fraction of the size of the [`Aabb`].
 
 use glam::DVec3;
 use tracing::warn;
@@ -20,6 +22,26 @@ pub trait Locate<T: ?Sized> {
 impl<T: ?Sized> Locate<T> for DVec3 {
     fn locate(&self, _target: &T) -> DVec3 {
         *self
+    }
+}
+
+/// The centroid.
+///
+/// Avg of all points.
+pub struct Centroid;
+
+impl Locate<DVec3> for Centroid {
+    fn locate(&self, target: &DVec3) -> DVec3 {
+        *target
+    }
+}
+
+impl<T> Locate<[T]> for Centroid
+where
+    Centroid: Locate<T>,
+{
+    fn locate(&self, target: &[T]) -> DVec3 {
+        target.iter().map(|x| self.locate(x)).sum::<DVec3>() / target.len() as f64
     }
 }
 
