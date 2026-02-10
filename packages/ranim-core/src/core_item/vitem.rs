@@ -63,7 +63,7 @@ impl Basis2d {
         (self.u(), self.v())
     }
     /// The corrected basis vector in the u direction.
-    /// This is same as [`ProjectionPlane::basis_u`].
+    /// This is same as [`Self::u`].
     pub fn corrected_u(&self) -> DVec3 {
         self.u.normalize()
     }
