@@ -37,14 +37,13 @@ pub fn render_command(args: &CliArgs, scenes: &[String]) -> Result<()> {
         .unwrap()
         .context("Failed on initial build")?;
 
-    let all_scenes: Vec<&Scene> = lib.scenes().collect::<Vec<_>>();
+    let all_scenes: Vec<Scene> = lib.scenes().collect::<Vec<_>>();
     let scenes_to_render: Vec<&Scene> = if scenes.is_empty() {
-        all_scenes.clone()
+        all_scenes.iter().collect()
     } else {
         all_scenes
             .iter()
-            .filter(|scene| scenes.iter().any(|s| s == scene.name))
-            .cloned()
+            .filter(|scene| scenes.iter().any(|s| s == &scene.name))
             .collect()
     };
 
