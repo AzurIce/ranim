@@ -80,9 +80,7 @@ impl Arc {
 impl Aabb for Arc {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = self.basis.uv();
-        let r = self.radius * (u + v);
-        [self.center - r, self.center + r].aabb()
+        VItem::from(self.clone()).aabb()
     }
 }
 
