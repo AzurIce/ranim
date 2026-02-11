@@ -107,6 +107,7 @@ profiling = { version = "1.0.17", optional = true, features = [
   "profile-with-puffin",
 ] }
 async-channel = "2.5.0"
+paste = "1.0"
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"

@@ -19,15 +19,10 @@ mod file_writer;
 #[cfg(feature = "profiling")]
 use ranim_render::PUFFIN_GPU_PROFILER;
 
-/// Render a scene
+/// Render a scene with all its outputs
 pub fn render_scene(scene: &Scene) {
-    for output in scene.outputs {
-        render_scene_output(
-            scene.constructor,
-            scene.name.to_string(),
-            &scene.config,
-            output,
-        );
+    for output in &scene.outputs {
+        render_scene_output(scene.constructor, scene.name.clone(), &scene.config, output);
     }
 }
 
@@ -117,7 +112,7 @@ impl RenderWorker {
         let ctx = pollster::block_on(WgpuContext::new());
         trace!("Create wgpu context cost: {:?}", t.elapsed());
 
-        let mut output_dir = PathBuf::from(output.dir);
+        let mut output_dir = PathBuf::from(&output.dir);
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir()
                 .unwrap()
@@ -125,7 +120,7 @@ impl RenderWorker {
                 .join(output_dir);
         }
         let renderer = Renderer::new(&ctx, output.width, output.height, 8);
-        let clear_color = color::try_color(scene_config.clear_color)
+        let clear_color = color::try_color(&scene_config.clear_color)
             .unwrap_or(color::color("#333333ff"))
             .convert::<LinearSrgb>();
         let [r, g, b, a] = clear_color.components.map(|x| x as f64);

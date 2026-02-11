@@ -4724,6 +4724,7 @@ dependencies = [
  "getrandom 0.3.4",
  "indicatif",
  "itertools 0.14.0",
+ "paste",
  "pollster",
  "pretty_env_logger",
  "profiling",

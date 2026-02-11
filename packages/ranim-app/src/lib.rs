@@ -147,7 +147,7 @@ impl RanimApp {
                     self.pool.clean();
                     self.need_eval = true;
 
-                    self.set_clear_color_str(scene.config.clear_color);
+                    self.set_clear_color_str(&scene.config.clear_color);
 
                     if let Err(err) = tx.try_send(()) {
                         error!("Failed to send reloaded signal: {err:?}");
@@ -479,15 +479,15 @@ pub fn preview_constructor_with_name(scene: impl SceneConstructor, name: &str) {
     );
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+/// Preview a scene
 pub fn preview_scene(scene: &Scene) {
-    preview_scene_with_name(scene, scene.name);
+    preview_scene_with_name(scene, &scene.name.clone());
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+/// Preview a scene with a custom name
 pub fn preview_scene_with_name(scene: &Scene, name: &str) {
     let mut app = RanimApp::new(scene.constructor, name.to_string());
-    app.set_clear_color_str(scene.config.clear_color);
+    app.set_clear_color_str(&scene.config.clear_color);
     run_app(
         app,
         #[cfg(target_arch = "wasm32")]
@@ -498,11 +498,17 @@ pub fn preview_scene_with_name(scene: &Scene, name: &str) {
 // WASM support needs refactoring, mostly keeping it commented or adapting basic entry point.
 #[cfg(target_arch = "wasm32")]
 mod wasm {
-    use wasm_bindgen::prelude::*;
+    use super::*;
 
     #[wasm_bindgen(start)]
     pub async fn wasm_start() {
         console_error_panic_hook::set_once();
         wasm_tracing::set_as_global_default();
+    }
+
+    /// WASM wrapper: preview a scene (accepts owned [`Scene`] from `find_scene`)
+    #[wasm_bindgen]
+    pub fn preview_scene(scene: &Scene) {
+        super::preview_scene(scene);
     }
 }

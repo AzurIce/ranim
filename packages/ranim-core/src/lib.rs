@@ -41,8 +41,6 @@ pub mod prelude {
 }
 
 use crate::{animation::StaticAnim, core_item::CoreItem, timeline::Timeline};
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
 
 /// Extract a [`Extract::Target`] from reference.
 pub trait Extract {
@@ -75,54 +73,42 @@ use tracing::trace;
 
 use std::fmt::Debug;
 
-// MARK: Dylib part
+// MARK: Scene / Dylib
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+/// Scene types for dylib / inventory registration and runtime use.
+mod link_magic;
+pub use link_magic::*;
+
 #[doc(hidden)]
 #[derive(Clone)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct Scene {
+    /// Scene name
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
-    pub name: &'static str,
+    pub name: String,
+    /// Scene constructor
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub constructor: fn(&mut RanimScene),
+    /// Scene config
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub config: SceneConfig,
+    /// Scene outputs
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
-    pub outputs: &'static [Output],
-}
-
-pub use inventory;
-
-inventory::collect!(Scene);
-
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-pub extern "C" fn get_scene(idx: usize) -> *const Scene {
-    inventory::iter::<Scene>().skip(idx).take(1).next().unwrap()
-}
-
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-pub extern "C" fn scene_cnt() -> usize {
-    inventory::iter::<Scene>().count()
-}
-
-/// Return a scene with matched name
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn find_scene(name: &str) -> Option<Scene> {
-    inventory::iter::<Scene>().find(|s| s.name == name).cloned()
+    pub outputs: Vec<Output>,
 }
 
 /// Scene config
 #[derive(Debug, Clone)]
 pub struct SceneConfig {
     /// The clear color
-    pub clear_color: &'static str,
+    pub clear_color: String,
 }
 
 impl Default for SceneConfig {
     fn default() -> Self {
         Self {
-            clear_color: "#333333ff",
+            clear_color: "#333333ff".to_string(),
         }
     }
 }
@@ -141,24 +127,19 @@ pub struct Output {
     /// The directory to save the output
     ///
     /// Related to the `output` folder, Or absolute.
-    pub dir: &'static str,
+    pub dir: String,
 }
 
 impl Default for Output {
     fn default() -> Self {
-        Self::DEFAULT
+        Self {
+            width: 1920,
+            height: 1080,
+            fps: 60,
+            save_frames: false,
+            dir: "./".to_string(),
+        }
     }
-}
-
-impl Output {
-    /// 1920x1080 60fps save_frames=false dir="./"
-    pub const DEFAULT: Self = Self {
-        width: 1920,
-        height: 1080,
-        fps: 60,
-        save_frames: false,
-        dir: "./",
-    };
 }
 
 /// TimeMark
