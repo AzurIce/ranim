@@ -7,12 +7,14 @@ use ranim_core::{
     anchor::Aabb,
     color::{self, AlphaColor},
     core_item::CoreItem,
-    glam::dvec2,
+    glam::{DVec3, dvec2},
+    traits::{Rotate, Scale, Shift},
 };
 
 use crate::vitem::geometry::Rectangle;
 
 /// Wrapper that visualizes the AABB of the inner item as a wireframe rectangle.
+#[derive(Clone)]
 pub struct VisualizeAabbItem<T: Aabb>(pub T);
 
 impl<T: Aabb> Deref for VisualizeAabbItem<T> {
@@ -25,6 +27,33 @@ impl<T: Aabb> Deref for VisualizeAabbItem<T> {
 impl<T: Aabb> DerefMut for VisualizeAabbItem<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl<T: Aabb> Aabb for VisualizeAabbItem<T> {
+    fn aabb(&self) -> [DVec3; 2] {
+        self.0.aabb()
+    }
+}
+
+impl<T: Aabb + Shift> Shift for VisualizeAabbItem<T> {
+    fn shift(&mut self, offset: DVec3) -> &mut Self {
+        self.0.shift(offset);
+        self
+    }
+}
+
+impl<T: Aabb + Rotate> Rotate for VisualizeAabbItem<T> {
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.0.rotate_at_point(angle, axis, point);
+        self
+    }
+}
+
+impl<T: Aabb + Scale> Scale for VisualizeAabbItem<T> {
+    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
+        self.0.scale_at_point(scale, point);
+        self
     }
 }
 

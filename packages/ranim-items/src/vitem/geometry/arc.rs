@@ -129,7 +129,7 @@ impl From<Arc> for VItem {
 impl Extract for Arc {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        EllipticArc::from(self.clone()).extract_into(buf);
+        VItem::from(self.clone()).extract_into(buf);
     }
 }
 

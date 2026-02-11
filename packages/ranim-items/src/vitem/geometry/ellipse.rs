@@ -69,8 +69,9 @@ impl From<Circle> for Ellipse {
 
 impl From<Ellipse> for VItem {
     fn from(value: Ellipse) -> Self {
-        VItem::from(EllipticArc::from(value.clone()))
-            .with(|item| item.set_fill_color(value.fill_rgba).discard())
+        let fill_rgba = value.fill_rgba;
+        VItem::from(EllipticArc::from(value))
+            .with(|item| item.set_fill_color(fill_rgba).discard())
     }
 }
 

@@ -64,11 +64,11 @@ impl EllipticArc {
         } = self;
 
         let (u, v) = basis.uv();
+        let DVec2 { x: rx, y: ry } = radius;
         let mut vpoints = (0..len)
             .map(|i| i as f64 / NUM_SEGMENTS as f64 / 2. * angle + start_angle)
-            .map(|angle| {
-                let DVec2 { x: rx, y: ry } = radius;
-                let (mut x, mut y) = (angle.cos(), angle.sin());
+            .map(|theta| {
+                let (mut x, mut y) = (theta.cos(), theta.sin());
                 if x.abs() < 1.8e-7 {
                     x = 0.;
                 }
