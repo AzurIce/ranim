@@ -10,7 +10,8 @@ use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
 use crate::utils::{avg, resize_preserving_order_with_repeated_indices};
 
-fn points_aabb(points: &mut impl Iterator<Item = DVec3>) -> [DVec3; 2] {
+fn points_aabb(points: impl IntoIterator<Item = DVec3>) -> [DVec3; 2] {
+    let mut points = points.into_iter();
     if let Some(first) = points.next() {
         let (mut min, mut max) = (first, first);
         for point in points {
@@ -24,11 +25,18 @@ fn points_aabb(points: &mut impl Iterator<Item = DVec3>) -> [DVec3; 2] {
 }
 
 fn bezier_aabb(p1: DVec3, p2: DVec3, p3: DVec3) -> [DVec3; 2] {
-    let t_extremum = (p1 - p2) / (p1 - 2. * p2 + p3);
+    // The parametric equation of a quadratic bezier curve is:
+    // $ P(t) = (1 - t)^2 P_1 + 2 t (1 - t) P_2 + t^2 P_3 $
+    // By taking the derivative of the equation, we get:
+    // $ P'(t) = 2 (1 - t) (P_2 - P_1) + 2 t (P_3 - P_2) $
+    // Extrema of the curve are points at parameter $t in [0, 1]$
+    // where one component ($x$, $y$ or $z$) of $P'(t)$ is zero.
+    let t_extrema = ((p1 - p2) / (p1 - 2. * p2 + p3))
+        .to_array()
+        .into_iter()
+        .filter(|t| (0. ..=1.).contains(t));
     points_aabb(
-        &mut <[f64; 3]>::from(t_extremum)
-            .into_iter()
-            .filter(|&t| (0. ..=1.).contains(&t))
+        t_extrema
             .map(|t| (1. - t).powi(2) * p1 + 2. * t * (1. - t) * p2 + t.powi(2) * p3)
             .chain([p1, p3]),
     )
