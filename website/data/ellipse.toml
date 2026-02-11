@@ -2,11 +2,7 @@ name = "ellipse"
 code = """
 ```rust
 use ranim::{
-    anims::{
-        creation::WritingAnim,
-        fading::FadingAnim,
-        transform::TransformAnim,
-    },
+    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
     glam::dvec2,
     items::vitem::{
@@ -47,13 +43,10 @@ fn ellipse(r: &mut RanimScene) {
     // Fade out
     r.timeline_mut(r_item).play(vitem.fade_out());
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    r.insert_time_mark(1.0, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "6550d0e5f9f5151da77162595547b5d418e487ab"
+hash = "e137b48e0e975c449f5962f8c4c23cdb95b7c727"
 preview_imgs = ["/examples/ellipse/preview.png"]
 output_files = ["/examples/ellipse/ellipse_1920x1080_60.mp4"]
 wasm = true

@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cargo check:*)",
       "Bash(git worktree add:*)",
-      "Bash(cargo test:*)"
+      "Bash(cargo test:*)",
+      "Bash(gh pr list:*)"
     ]
   }
 }

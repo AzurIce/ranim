@@ -1,9 +1,5 @@
 use ranim::{
-    anims::{
-        creation::WritingAnim,
-        fading::FadingAnim,
-        transform::TransformAnim,
-    },
+    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
     color::palettes::manim,
     glam::dvec2,
     items::vitem::{
@@ -44,8 +40,5 @@ fn ellipse(r: &mut RanimScene) {
     // Fade out
     r.timeline_mut(r_item).play(vitem.fade_out());
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    r.insert_time_mark(1.0, TimeMark::Capture("preview.png".to_string()));
 }
