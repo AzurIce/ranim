@@ -424,7 +424,7 @@ pub trait AlignSlice<T: ShiftExt>: AsMut<[T]> {
 
 // MARK: Arrange
 /// A trait for arranging operations.
-pub trait ArrangeSlice<T: ShiftExt>: AsMut<[T]> {
+pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
     /// Arrange the items by a given function.
     ///
     /// The `pos_func` takes index as input and output the center position.
@@ -495,4 +495,4 @@ pub trait ArrangeSlice<T: ShiftExt>: AsMut<[T]> {
     }
 }
 
-impl<T: ShiftExt, E: AsMut<[T]>> ArrangeSlice<T> for E {}
+impl<T: Shift, E: AsMut<[T]>> ArrangeSlice<T> for E {}
