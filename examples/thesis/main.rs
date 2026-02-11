@@ -107,18 +107,16 @@ fn transform(r: &mut RanimScene) {
 fn main() {
     #[cfg(feature = "preview")]
     {
-        use ranim::cmd::preview_scene;
-        preview_scene(fading_scene);
-        preview_scene(creation_scene);
-        preview_scene(writing_scene);
-        preview_scene(transform_scene);
+        ranim::preview_scene!(fading);
+        ranim::preview_scene!(creation);
+        ranim::preview_scene!(writing);
+        ranim::preview_scene!(transform);
     }
     #[cfg(feature = "render")]
     {
-        use ranim::cmd::render_scene;
-        render_scene(fading_scene);
-        render_scene(creation_scene);
-        render_scene(writing_scene);
-        render_scene(transform_scene);
+        ranim::render_scene!(fading);
+        ranim::render_scene!(creation);
+        ranim::render_scene!(writing);
+        ranim::render_scene!(transform);
     }
 }
