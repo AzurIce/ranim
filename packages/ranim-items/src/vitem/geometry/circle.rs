@@ -20,37 +20,6 @@ use crate::vitem::VItem;
 
 use super::Arc;
 
-/// `Origin` anchor
-pub mod anchor {
-    use super::*;
-    use ranim_core::{glam::DVec3, traits::Locate};
-
-    use crate::vitem::geometry::{Arc, ArcBetweenPoints};
-
-    /// The origin of the circle
-    #[derive(Debug, Clone, Copy)]
-    pub struct Origin;
-
-    impl Locate<Arc> for Origin {
-        fn locate(&self, target: &Arc) -> DVec3 {
-            target.center
-        }
-    }
-
-    impl Locate<ArcBetweenPoints> for Origin {
-        fn locate(&self, target: &ArcBetweenPoints) -> DVec3 {
-            // TODO: make this better
-            Arc::from(target.clone()).center
-        }
-    }
-
-    impl Locate<Circle> for Origin {
-        fn locate(&self, target: &Circle) -> DVec3 {
-            target.center
-        }
-    }
-}
-
 // MARK: ### Circle ###
 /// An circle
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]

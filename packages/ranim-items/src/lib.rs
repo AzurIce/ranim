@@ -13,6 +13,7 @@ use ranim_core::{
     traits::{Interpolatable, Rotate, RotateExt, Shift},
 };
 
+pub mod debug;
 pub mod vitem;
 
 /// A plane in 3D space.
