@@ -61,6 +61,7 @@ pub fn parse_output_list(list: &MetaList) -> syn::Result<OutputDef> {
         fps: 60,
         save_frames: false,
         dir: "./".into(),
+        format: None,
     };
 
     let parser = Punctuated::<MetaNameValue, Comma>::parse_terminated;
@@ -82,6 +83,14 @@ pub fn parse_output_list(list: &MetaList) -> syn::Result<OutputDef> {
                 }) = nv.value
                 {
                     def.dir = s.value();
+                }
+            }
+            Some("format") => {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Str(s), ..
+                }) = nv.value
+                {
+                    def.format = Some(s.value());
                 }
             }
             _ => {}

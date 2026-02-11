@@ -1,6 +1,6 @@
 //! Scene types for dylib / inventory registration and runtime use.
 
-use crate::{Output, RanimScene, Scene, SceneConfig};
+use crate::{Output, OutputFormat, RanimScene, Scene, SceneConfig};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -40,6 +40,8 @@ pub struct StaticOutput {
     pub save_frames: bool,
     /// The directory to save the output
     pub dir: &'static str,
+    /// The output format
+    pub format: OutputFormat,
 }
 
 impl StaticOutput {
@@ -50,6 +52,7 @@ impl StaticOutput {
         fps: 60,
         save_frames: false,
         dir: "./",
+        format: OutputFormat::Mp4,
     };
 }
 
@@ -112,6 +115,7 @@ impl From<&StaticOutput> for Output {
             fps: o.fps,
             save_frames: o.save_frames,
             dir: o.dir.to_string(),
+            format: o.format,
         }
     }
 }

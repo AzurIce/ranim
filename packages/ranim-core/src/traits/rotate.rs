@@ -39,6 +39,13 @@ impl<T: RotateExt> Rotate for [T] {
     }
 }
 
+impl<T: RotateExt> Rotate for Vec<T> {
+    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
+        self.as_mut_slice().rotate_at_point(angle, axis, point);
+        self
+    }
+}
+
 /// Useful extensions for rotating operations.
 ///
 /// This trait is implemented automatically for types that implement [`Rotate`], you should not implement it yourself.

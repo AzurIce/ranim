@@ -43,8 +43,8 @@ pub mod utils {
 pub use core::{glam, inventory};
 pub use paste;
 pub use ranim_core::{
-    Output, RanimScene, Scene, SceneConfig, SceneConstructor, StaticOutput, StaticScene,
-    StaticSceneConfig,
+    Output, OutputFormat, RanimScene, Scene, SceneConfig, SceneConstructor, StaticOutput,
+    StaticScene, StaticSceneConfig,
 };
 
 /// Render a scene by name. Expands `render_scene!(foo)` to call
