@@ -78,5 +78,7 @@ pub mod fading;
 pub mod func;
 /// Lagged animation
 pub mod lagged;
+/// Rotating animation
+pub mod rotating;
 /// Transform animation
 pub mod transform;
