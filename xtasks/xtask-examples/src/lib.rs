@@ -142,7 +142,7 @@ impl Example {
                     }
                 } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                     print!(", output file");
-                    if ["mp4", "png", "jpg"].contains(&ext) {
+                    if ["mp4", "webm", /*"mov",*/ "gif", "png", "jpg"].contains(&ext) {
                         print!(", copying...");
                         output_files.push(
                             copy_file(path, &output_dir).expect("failed to copy output file"),

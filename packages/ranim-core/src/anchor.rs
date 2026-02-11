@@ -124,3 +124,9 @@ impl<T: Aabb> Aabb for [T] {
         [min, max]
     }
 }
+
+impl<T: Aabb> Aabb for Vec<T> {
+    fn aabb(&self) -> [DVec3; 2] {
+        self.as_slice().aabb()
+    }
+}

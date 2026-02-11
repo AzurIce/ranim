@@ -10,6 +10,7 @@ use ranim::{
     items::vitem::geometry::Arc,
     prelude::*,
 };
+use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
 #[output(dir = "arc")]
@@ -43,7 +44,8 @@ pub fn arc(r: &mut RanimScene) {
             let offset = frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
             Arc::new(angle, radius).with(|arc| {
                 arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
-                arc.set_stroke_color(color).move_to(offset.extend(0.0));
+                arc.set_stroke_color(color)
+                    .move_anchor_to(Origin, offset.extend(0.0));
             })
         })
         .collect::<Vec<_>>();
@@ -59,7 +61,7 @@ pub fn arc(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "ed3272c69fbb93f754ecf84920ad2986c7e21943"
+hash = "169b059a1366a1ab0e53c16f8b2d658edc3a0739"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

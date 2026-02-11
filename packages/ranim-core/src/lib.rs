@@ -113,6 +113,66 @@ impl Default for SceneConfig {
     }
 }
 
+/// The output format of a scene
+///
+/// Each variant bundles a complete, consistent set of ffmpeg encoding parameters
+/// (codec, pixel format, container extension), avoiding invalid combinations.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputFormat {
+    /// H.264 in MP4 container (default, opaque)
+    #[default]
+    Mp4,
+    /// VP9 with alpha in WebM container (transparent)
+    Webm,
+    /// ProRes 4444 in MOV container (transparent)
+    Mov,
+    /// GIF (opaque, limited palette)
+    Gif,
+}
+
+impl OutputFormat {
+    /// Returns `(video_codec, pixel_format, file_extension)`.
+    pub fn encoding_params(&self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Self::Mp4 => ("libx264", "yuv420p", "mp4"),
+            Self::Webm => ("libvpx-vp9", "yuva420p", "webm"),
+            Self::Mov => ("prores_ks", "yuva444p10le", "mov"),
+            Self::Gif => ("gif", "rgb8", "gif"),
+        }
+    }
+
+    /// Returns extra codec arguments for ffmpeg.
+    pub fn extra_args(&self) -> &'static [&'static str] {
+        match self {
+            Self::Mov => &["-profile:v", "4444"],
+            _ => &[],
+        }
+    }
+
+    /// Whether this format has an alpha channel.
+    pub fn has_alpha(&self) -> bool {
+        matches!(self, Self::Webm | Self::Mov)
+    }
+
+    /// Whether the `eq` video filter is compatible with this format.
+    ///
+    /// The `eq` filter does not support alpha pixel formats.
+    pub fn supports_eq_filter(&self) -> bool {
+        !self.has_alpha()
+    }
+}
+
+impl std::fmt::Display for OutputFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (_, _, ext) = self.encoding_params();
+        match self {
+            Self::Webm => write!(f, "transparent webm"),
+            Self::Mov => write!(f, "transparent mov"),
+            _ => write!(f, "{ext}"),
+        }
+    }
+}
+
 /// The output of a scene
 #[derive(Debug, Clone)]
 pub struct Output {
@@ -128,6 +188,8 @@ pub struct Output {
     ///
     /// Related to the `output` folder, Or absolute.
     pub dir: String,
+    /// The output video format.
+    pub format: OutputFormat,
 }
 
 impl Default for Output {
@@ -138,6 +200,7 @@ impl Default for Output {
             fps: 60,
             save_frames: false,
             dir: "./".to_string(),
+            format: OutputFormat::default(),
         }
     }
 }

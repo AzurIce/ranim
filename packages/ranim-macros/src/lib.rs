@@ -65,6 +65,7 @@ struct OutputDef {
     fps: u32,
     save_frames: bool,
     dir: String,
+    format: Option<String>,
 }
 
 // MARK: scene
@@ -102,8 +103,16 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         fps,
         save_frames,
         dir,
+        format,
     } in attrs.outputs
     {
+        let format_token = match format.as_deref() {
+            Some("mp4") | None => quote! { #ranim::OutputFormat::Mp4 },
+            Some("webm") => quote! { #ranim::OutputFormat::Webm },
+            Some("mov") => quote! { #ranim::OutputFormat::Mov },
+            Some("gif") => quote! { #ranim::OutputFormat::Gif },
+            Some(other) => panic!("unknown output format: {other:?}"),
+        };
         outputs.push(quote! {
             #ranim::StaticOutput {
                 width: #width,
@@ -111,6 +120,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
                 fps: #fps,
                 save_frames: #save_frames,
                 dir: #dir,
+                format: #format_token,
             }
         });
     }
