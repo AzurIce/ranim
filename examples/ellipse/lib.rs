@@ -1,0 +1,44 @@
+use ranim::{
+    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    color::palettes::manim,
+    glam::dvec2,
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Ellipse},
+    },
+    prelude::*,
+};
+
+#[scene]
+#[output(dir = "ellipse")]
+fn ellipse(r: &mut RanimScene) {
+    let _r_cam = r.insert(CameraFrame::default());
+
+    // Create an ellipse (semi-axes: 3.0 x 1.5) and write it in
+    let ellipse = Ellipse::new(dvec2(3.0, 1.5)).with(|e| {
+        e.set_stroke_color(manim::BLUE_C);
+    });
+    let mut vitem = VItem::from(ellipse);
+
+    let r_item = r.insert_empty();
+    r.timeline_mut(r_item).play(vitem.write());
+
+    // Transform to a circle
+    let circle = Circle::new(2.0).with(|c| {
+        c.set_stroke_color(manim::RED_C);
+    });
+    r.timeline_mut(r_item)
+        .play(vitem.transform_to(VItem::from(circle)));
+
+    // Transform to a vertical ellipse
+    let ellipse_v = Ellipse::new(dvec2(1.0, 2.5)).with(|e| {
+        e.set_stroke_color(manim::GREEN_C);
+    });
+    r.timeline_mut(r_item)
+        .play(vitem.transform_to(VItem::from(ellipse_v)));
+
+    // Fade out
+    r.timeline_mut(r_item).play(vitem.fade_out());
+
+    r.insert_time_mark(1.0, TimeMark::Capture("preview.png".to_string()));
+}
