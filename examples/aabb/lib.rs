@@ -1,0 +1,126 @@
+use std::f64::consts::PI;
+
+use ranim::{
+    anims::rotating::RotatingAnim,
+    color::palettes::manim,
+    core::animation::StaticAnim,
+    glam::{DVec3, dvec2, dvec3},
+    items::{
+        debug::VisualizeAabbItem,
+        vitem::{
+            VItem,
+            geometry::{
+                Arc, ArcBetweenPoints, Circle, Ellipse, EllipticArc, Polygon, Rectangle,
+                RegularPolygon, Square,
+            },
+            typst::TypstText,
+        },
+    },
+    prelude::*,
+};
+
+#[scene]
+#[output(dir = "aabb")]
+fn aabb(r: &mut RanimScene) {
+    let _r_cam = r.insert(CameraFrame::default());
+
+    let frame_w = 8.0 * 16.0 / 9.0;
+    let frame_h = 8.0;
+    let cols = 4;
+    let rows = 4;
+    let cell_w = frame_w / cols as f64;
+    let cell_h = frame_h / rows as f64;
+    let target = cell_h * 0.6;
+
+    let cell_center = |col: usize, row: usize| -> DVec3 {
+        let x = (col as f64 + 0.5) * cell_w - frame_w / 2.0;
+        let y = (rows - 1 - row) as f64 * cell_h + cell_h / 2.0 - frame_h / 2.0;
+        dvec3(x, y, 0.0)
+    };
+
+    // Helper: convert to VItem, wrap, scale & position, then play a rotating animation
+    macro_rules! vi {
+        ($r:expr, $item:expr, $col:expr, $row:expr) => {{
+            let mut item = VisualizeAabbItem(VItem::from($item)).with(|v| {
+                v.scale_to(ScaleHint::PorportionalY(target));
+                v.move_to(cell_center($col, $row));
+            });
+            let r_id = $r.insert_empty();
+            $r.timeline_mut(r_id)
+                .play(item.show())
+                .play(item.rotating(PI * 2.0, DVec3::Z));
+        }};
+    }
+
+    // Row 0: Square, Rectangle, Circle, Ellipse
+    vi!(r, Square::new(2.0).with(|s| { s.set_color(manim::BLUE_C); }), 0, 0);
+    vi!(r, Rectangle::new(3.0, 1.5).with(|s| { s.set_color(manim::RED_C); }), 1, 0);
+    vi!(r, Circle::new(1.0).with(|c| { c.set_color(manim::GREEN_C); }), 2, 0);
+    vi!(r, Ellipse::new(dvec2(2.0, 1.0)).with(|e| { e.set_color(manim::TEAL_C); }), 3, 0);
+
+    // Row 1: Arc, ArcBetweenPoints, EllipticArc, RegularPolygon(5)
+    vi!(r, Arc::new(PI * 1.2, 1.0).with(|a| { a.set_stroke_color(manim::YELLOW_D); }), 0, 1);
+    vi!(r, ArcBetweenPoints::new(
+        dvec3(-1.0, -0.5, 0.0), dvec3(1.0, 0.5, 0.0), PI / 3.0,
+    ).with(|a| { a.set_stroke_color(manim::ORANGE); }), 1, 1);
+    vi!(r, EllipticArc::new(0.0, PI * 1.5, dvec2(1.5, 0.8)).with(|e| {
+        e.set_stroke_color(manim::PINK);
+    }), 2, 1);
+    vi!(r, Polygon::from(RegularPolygon::new(5, 1.0).with(|p| {
+        p.set_color(manim::PURPLE_C);
+    })), 3, 1);
+
+    // Row 2: Polygon(triangle), RegularPolygon(6), rotated Rectangle, rotated Ellipse
+    vi!(r, Polygon::new(vec![
+        dvec3(0.0, 1.0, 0.0), dvec3(-1.0, -0.6, 0.0),
+        dvec3(1.0, -0.6, 0.0), dvec3(0.0, 1.0, 0.0),
+    ]).with(|p| { p.set_color(manim::MAROON_C); }), 0, 2);
+    vi!(r, Polygon::from(RegularPolygon::new(6, 1.0).with(|p| {
+        p.set_color(manim::BLUE_D);
+    })), 1, 2);
+    vi!(r, Rectangle::new(3.0, 1.5).with(|s| {
+        s.set_color(manim::GREEN_D);
+        s.rotate(PI / 6.0, DVec3::Z);
+    }), 2, 2);
+    vi!(r, Ellipse::new(dvec2(2.0, 0.8)).with(|e| {
+        e.set_color(manim::RED_D);
+        e.rotate(PI / 4.0, DVec3::Z);
+    }), 3, 2);
+
+    // Row 3: VItem(star), TypstText, rotated Arc, rotated RegularPolygon(3)
+    let star_points: Vec<DVec3> = (0..10)
+        .map(|i| {
+            let angle = i as f64 / 10.0 * PI * 2.0 + PI / 2.0;
+            let rad = if i % 2 == 0 { 1.0 } else { 0.5 };
+            dvec3(angle.cos() * rad, angle.sin() * rad, 0.0)
+        })
+        .chain(std::iter::once(dvec3(0.0, 1.0, 0.0)))
+        .collect();
+    vi!(r, Polygon::new(star_points).with(|p| { p.set_color(manim::YELLOW_B); }), 0, 3);
+
+    // TypstText: has Scale directly
+    {
+        let mut item = VisualizeAabbItem(TypstText::new("Ranim")).with(|v| {
+            v.scale_to_with_stroke(ScaleHint::PorportionalY(target));
+            v.move_to(cell_center(1, 3));
+        });
+        let r_id = r.insert_empty();
+        r.timeline_mut(r_id)
+            .play(item.show())
+            .play(item.rotating(PI * 2.0, DVec3::Z));
+    }
+
+    vi!(r, Arc::new(PI * 0.8, 1.0).with(|a| {
+        a.set_stroke_color(manim::LIGHT_PINK);
+        a.rotate(PI / 3.0, DVec3::Z);
+    }), 2, 3);
+    vi!(r, Polygon::from(RegularPolygon::new(3, 1.0).with(|p| {
+        p.set_color(manim::TEAL_D);
+        p.rotate(PI / 5.0, DVec3::Z);
+    })), 3, 3);
+
+    r.insert_time_mark(
+        r.timelines().max_total_secs(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
+}

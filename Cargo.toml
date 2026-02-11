@@ -141,6 +141,14 @@ pre-release-replacements = [
 
 # MARK: Examples
 [[example]]
+name = "aabb"
+path = "examples/aabb/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.aabb]
+wasm = true
+
+[[example]]
 name = "animating_pi"
 path = "examples/animating_pi/lib.rs"
 crate-type = ["cdylib"]
@@ -275,6 +283,14 @@ path = "examples/regular_polygon/lib.rs"
 crate-type = ["cdylib"]
 
 [package.metadata.example.regular_polygon]
+wasm = true
+
+[[example]]
+name = "ellipse"
+path = "examples/ellipse/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.ellipse]
 wasm = true
 
 [[example]]
