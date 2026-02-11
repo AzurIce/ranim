@@ -76,7 +76,11 @@ impl From<Ellipse> for VItem {
 
 impl Aabb for Ellipse {
     fn aabb(&self) -> [DVec3; 2] {
-        EllipticArc::from(self.clone()).aabb()
+        let center = self.center;
+        let (u, v) = self.basis.uv();
+        let DVec2 { x: rx, y: ry } = self.radius;
+        let r = u * rx + v * ry;
+        [center - r, center + r].aabb()
     }
 }
 
