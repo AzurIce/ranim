@@ -138,30 +138,27 @@ impl Alignable for VPointVec {
         let mut sps_self = into_closed_subpaths(self.get_subpaths());
         let mut sps_other = into_closed_subpaths(other.get_subpaths());
         let len = sps_self.len().max(sps_other.len());
-        if sps_self.len() != len {
-            let (mut x, idxs) = resize_preserving_order_with_repeated_indices(&sps_self, len);
-            for idx in idxs {
-                let center = avg(&x[idx]);
-                x[idx].fill(center);
+        let resize_subpaths = |sps: &mut Vec<Vec<DVec3>>| {
+            if sps.len() != len {
+                let (mut x, idxs) = resize_preserving_order_with_repeated_indices(sps, len);
+                for idx in idxs {
+                    let center = avg(&x[idx]);
+                    x[idx].fill(center);
+                }
+                *sps = x;
             }
-            sps_self = x;
-        }
-        if sps_other.len() != len {
-            let (mut x, idxs) = resize_preserving_order_with_repeated_indices(&sps_other, len);
-            for idx in idxs {
-                let center = avg(&x[idx]);
-                x[idx].fill(center);
-            }
-            sps_other = x;
-        }
-
-        let points_to_bez_tuples = |points: &Vec<DVec3>| -> Vec<[DVec3; 3]> {
-            let it0 = points.iter().step_by(2).cloned();
-            let it1 = points.iter().skip(1).step_by(2).cloned();
-            let it2 = points.iter().skip(2).step_by(2).cloned();
-            it0.zip(it1).zip(it2).map(|((a, b), c)| [a, b, c]).collect()
         };
-        let align_points = |points: &Vec<DVec3>, len: usize| -> Vec<DVec3> {
+        resize_subpaths(&mut sps_self);
+        resize_subpaths(&mut sps_other);
+
+        let points_to_bez_tuples = |points: &[DVec3]| -> Vec<[DVec3; 3]> {
+            points
+                .windows(3)
+                .step_by(2)
+                .map(|w| [w[0], w[1], w[2]])
+                .collect()
+        };
+        let align_points = |points: &[DVec3], len: usize| -> Vec<DVec3> {
             let bez_tuples = points_to_bez_tuples(points);
 
             let diff_len = (len - points.len()) / 2;
@@ -354,13 +351,13 @@ impl VPointVec {
         let (end_index, end_residue) = interpolate_usize(0, max_anchor_idx, range.end);
 
         if end_index - start_index == 0 {
-            let seg = self.get_seg(start_index).unwrap().map(|p| p);
+            let seg = *self.get_seg(start_index).unwrap();
             let quad = trim_quad_bezier(&seg, start_residue, end_residue);
             VPointVec(quad.into())
         } else {
             let mut partial = Vec::with_capacity((end_index - start_index + 1 + 2) * 2 + 1);
 
-            let seg = self.get_seg(start_index).unwrap().map(|p| p);
+            let seg = *self.get_seg(start_index).unwrap();
             let start_part = trim_quad_bezier(&seg, start_residue, 1.0);
             partial.extend_from_slice(&start_part);
 
@@ -376,7 +373,7 @@ impl VPointVec {
             }
 
             if end_residue != 0.0 {
-                let seg = self.get_seg(end_index).unwrap().map(|p| p);
+                let seg = *self.get_seg(end_index).unwrap();
                 let end_part = trim_quad_bezier(&seg, 0.0, end_residue);
                 partial.extend_from_slice(&end_part[1..]);
             }
