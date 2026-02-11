@@ -19,9 +19,15 @@ mod file_writer;
 #[cfg(feature = "profiling")]
 use ranim_render::PUFFIN_GPU_PROFILER;
 
-/// Render a scene
+/// Render a scene with all its outputs
 pub fn render_scene(scene: &Scene) {
-    for output in scene.outputs {
+    for (i, output) in scene.outputs.iter().enumerate() {
+        info!(
+            "Rendering output {}/{} ({})",
+            i + 1,
+            scene.outputs.len(),
+            output.format
+        );
         render_scene_output(
             scene.constructor,
             scene.name.to_string(),
@@ -117,7 +123,7 @@ impl RenderWorker {
         let ctx = pollster::block_on(WgpuContext::new());
         trace!("Create wgpu context cost: {:?}", t.elapsed());
 
-        let mut output_dir = PathBuf::from(output.dir);
+        let mut output_dir = PathBuf::from(&output.dir);
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir()
                 .unwrap()
@@ -125,12 +131,13 @@ impl RenderWorker {
                 .join(output_dir);
         }
         let renderer = Renderer::new(&ctx, output.width, output.height, 8);
-        let clear_color = color::try_color(scene_config.clear_color)
+        let clear_color = color::try_color(&scene_config.clear_color)
             .unwrap_or(color::color("#333333ff"))
             .convert::<LinearSrgb>();
         let [r, g, b, a] = clear_color.components.map(|x| x as f64);
         let clear_color = wgpu::Color { r, g, b, a };
 
+        let (_, _, ext) = output.format.encoding_params();
         Self {
             ctx,
             renderer,
@@ -142,9 +149,10 @@ impl RenderWorker {
                     .with_fps(output.fps)
                     .with_size(output.width, output.height)
                     .with_file_path(output_dir.join(format!(
-                        "{scene_name}_{}x{}_{}.mp4",
+                        "{scene_name}_{}x{}_{}.{ext}",
                         output.width, output.height, output.fps
-                    ))),
+                    )))
+                    .with_output_format(output.format),
             ),
             save_frames: output.save_frames,
             output_dir,
@@ -324,13 +332,12 @@ impl RanimRenderApp {
             });
         self.render_worker.replace(worker_thread.retrive());
 
-        let msg = format!(
+        info!(
             "rendered {} frames({:?}) in {:?}",
             frames,
             Duration::from_secs_f64(timeline.total_secs()),
             start.elapsed(),
         );
-        span.pb_set_finish_message(msg.as_str());
         trace!("render timeline cost: {:?}", start.elapsed());
     }
 
@@ -366,9 +373,7 @@ impl RanimRenderApp {
             worker.capture_frame(filename);
             span.pb_inc(1);
         }
-        span.pb_set_finish_message(
-            format!("saved {} capture frames from time marks", timemarks.len()).as_str(),
-        );
+        info!("saved {} capture frames from time marks", timemarks.len());
         trace!("save capture frames cost: {:?}", start.elapsed());
     }
 }

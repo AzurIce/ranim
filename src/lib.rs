@@ -41,7 +41,43 @@ pub mod utils {
 }
 
 pub use core::{glam, inventory};
-pub use ranim_core::{Output, RanimScene, Scene, SceneConfig, SceneConstructor};
+pub use paste;
+pub use ranim_core::{
+    Output, OutputFormat, RanimScene, Scene, SceneConfig, SceneConstructor, StaticOutput,
+    StaticScene, StaticSceneConfig,
+};
+
+/// Render a scene by name. Expands `render_scene!(foo)` to call
+/// `cmd::render_scene(&Scene::from(foo_scene))`.
+///
+/// ```rust,ignore
+/// render_scene!(fading);
+/// ```
+#[cfg(all(not(target_family = "wasm"), feature = "render"))]
+#[macro_export]
+macro_rules! render_scene {
+    ($scene:ident) => {
+        $crate::paste::paste! {
+            $crate::cmd::render_scene(&$crate::Scene::from([< $scene _scene >]))
+        }
+    };
+}
+
+/// Preview a scene by name. Expands `preview_scene!(foo)` to call
+/// `cmd::preview_scene(&Scene::from(foo_scene))`.
+///
+/// ```rust,ignore
+/// preview_scene!(fading);
+/// ```
+#[cfg(feature = "preview")]
+#[macro_export]
+macro_rules! preview_scene {
+    ($scene:ident) => {
+        $crate::paste::paste! {
+            $crate::cmd::preview_scene(&$crate::Scene::from([< $scene _scene >]))
+        }
+    };
+}
 
 /// The preludes
 pub mod prelude {

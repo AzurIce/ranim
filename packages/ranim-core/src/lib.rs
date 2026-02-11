@@ -41,8 +41,6 @@ pub mod prelude {
 }
 
 use crate::{animation::StaticAnim, core_item::CoreItem, timeline::Timeline};
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
 
 /// Extract a [`Extract::Target`] from reference.
 pub trait Extract {
@@ -75,54 +73,102 @@ use tracing::trace;
 
 use std::fmt::Debug;
 
-// MARK: Dylib part
+// MARK: Scene / Dylib
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+/// Scene types for dylib / inventory registration and runtime use.
+mod link_magic;
+pub use link_magic::*;
+
 #[doc(hidden)]
 #[derive(Clone)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct Scene {
+    /// Scene name
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
-    pub name: &'static str,
+    pub name: String,
+    /// Scene constructor
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub constructor: fn(&mut RanimScene),
+    /// Scene config
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub config: SceneConfig,
+    /// Scene outputs
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
-    pub outputs: &'static [Output],
-}
-
-pub use inventory;
-
-inventory::collect!(Scene);
-
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-pub extern "C" fn get_scene(idx: usize) -> *const Scene {
-    inventory::iter::<Scene>().skip(idx).take(1).next().unwrap()
-}
-
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-pub extern "C" fn scene_cnt() -> usize {
-    inventory::iter::<Scene>().count()
-}
-
-/// Return a scene with matched name
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn find_scene(name: &str) -> Option<Scene> {
-    inventory::iter::<Scene>().find(|s| s.name == name).cloned()
+    pub outputs: Vec<Output>,
 }
 
 /// Scene config
 #[derive(Debug, Clone)]
 pub struct SceneConfig {
     /// The clear color
-    pub clear_color: &'static str,
+    pub clear_color: String,
 }
 
 impl Default for SceneConfig {
     fn default() -> Self {
         Self {
-            clear_color: "#333333ff",
+            clear_color: "#333333ff".to_string(),
+        }
+    }
+}
+
+/// The output format of a scene
+///
+/// Each variant bundles a complete, consistent set of ffmpeg encoding parameters
+/// (codec, pixel format, container extension), avoiding invalid combinations.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputFormat {
+    /// H.264 in MP4 container (default, opaque)
+    #[default]
+    Mp4,
+    /// VP9 with alpha in WebM container (transparent)
+    Webm,
+    /// ProRes 4444 in MOV container (transparent)
+    Mov,
+    /// GIF (opaque, limited palette)
+    Gif,
+}
+
+impl OutputFormat {
+    /// Returns `(video_codec, pixel_format, file_extension)`.
+    pub fn encoding_params(&self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Self::Mp4 => ("libx264", "yuv420p", "mp4"),
+            Self::Webm => ("libvpx-vp9", "yuva420p", "webm"),
+            Self::Mov => ("prores_ks", "yuva444p10le", "mov"),
+            Self::Gif => ("gif", "rgb8", "gif"),
+        }
+    }
+
+    /// Returns extra codec arguments for ffmpeg.
+    pub fn extra_args(&self) -> &'static [&'static str] {
+        match self {
+            Self::Mov => &["-profile:v", "4444"],
+            _ => &[],
+        }
+    }
+
+    /// Whether this format has an alpha channel.
+    pub fn has_alpha(&self) -> bool {
+        matches!(self, Self::Webm | Self::Mov)
+    }
+
+    /// Whether the `eq` video filter is compatible with this format.
+    ///
+    /// The `eq` filter does not support alpha pixel formats.
+    pub fn supports_eq_filter(&self) -> bool {
+        !self.has_alpha()
+    }
+}
+
+impl std::fmt::Display for OutputFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (_, _, ext) = self.encoding_params();
+        match self {
+            Self::Webm => write!(f, "transparent webm"),
+            Self::Mov => write!(f, "transparent mov"),
+            _ => write!(f, "{ext}"),
         }
     }
 }
@@ -141,24 +187,22 @@ pub struct Output {
     /// The directory to save the output
     ///
     /// Related to the `output` folder, Or absolute.
-    pub dir: &'static str,
+    pub dir: String,
+    /// The output video format.
+    pub format: OutputFormat,
 }
 
 impl Default for Output {
     fn default() -> Self {
-        Self::DEFAULT
+        Self {
+            width: 1920,
+            height: 1080,
+            fps: 60,
+            save_frames: false,
+            dir: "./".to_string(),
+            format: OutputFormat::default(),
+        }
     }
-}
-
-impl Output {
-    /// 1920x1080 60fps save_frames=false dir="./"
-    pub const DEFAULT: Self = Self {
-        width: 1920,
-        height: 1080,
-        fps: 60,
-        save_frames: false,
-        dir: "./",
-    };
 }
 
 /// TimeMark

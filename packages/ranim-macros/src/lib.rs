@@ -65,6 +65,7 @@ struct OutputDef {
     fps: u32,
     save_frames: bool,
     dir: String,
+    format: Option<String>,
 }
 
 // MARK: scene
@@ -86,15 +87,15 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     // 场景名称
     let scene_name = attrs.name.unwrap_or_else(|| fn_name.to_string());
 
-    // SceneConfig
+    // StaticSceneConfig
     let clear_color = attrs.clear_color.unwrap_or("#333333ff".to_string());
     let scene_config = quote! {
-        #ranim::SceneConfig {
+        #ranim::StaticSceneConfig {
             clear_color: #clear_color,
         }
     };
 
-    // Output 列表
+    // StaticOutput 列表
     let mut outputs = Vec::new();
     for OutputDef {
         width,
@@ -102,21 +103,30 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         fps,
         save_frames,
         dir,
+        format,
     } in attrs.outputs
     {
+        let format_token = match format.as_deref() {
+            Some("mp4") | None => quote! { #ranim::OutputFormat::Mp4 },
+            Some("webm") => quote! { #ranim::OutputFormat::Webm },
+            Some("mov") => quote! { #ranim::OutputFormat::Mov },
+            Some("gif") => quote! { #ranim::OutputFormat::Gif },
+            Some(other) => panic!("unknown output format: {other:?}"),
+        };
         outputs.push(quote! {
-            #ranim::Output {
+            #ranim::StaticOutput {
                 width: #width,
                 height: #height,
                 fps: #fps,
                 save_frames: #save_frames,
                 dir: #dir,
+                format: #format_token,
             }
         });
     }
     if outputs.is_empty() {
         outputs.push(quote! {
-            #ranim::Output::DEFAULT
+            #ranim::StaticOutput::DEFAULT
         });
     }
 
@@ -145,7 +155,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let output_cnt = outputs.len();
 
     let scene = quote! {
-        #ranim::Scene {
+        #ranim::StaticScene {
             name: #scene_name,
             constructor: #fn_name,
             config: #scene_config,
@@ -153,21 +163,21 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    // 构造 Scene 并塞进分布式切片
+    // 构造 StaticScene 并塞进分布式切片
     let expanded = quote! {
         #doc
         #(#doc_attrs)*
         #vis fn #fn_name(r: &mut #ranim::RanimScene) #fn_body
 
-        static #static_output_name: [#ranim::Output; #output_cnt] = [#(#outputs),*];
+        static #static_output_name: [#ranim::StaticOutput; #output_cnt] = [#(#outputs),*];
         #[doc(hidden)]
-        static #static_name: #ranim::Scene = #scene;
+        static #static_name: #ranim::StaticScene = #scene;
         #ranim::inventory::submit!{
             #scene
         }
 
         #[allow(non_upper_case_globals)]
-        #vis static #static_scene_name: &'static #ranim::Scene = &#static_name;
+        #vis static #static_scene_name: &'static #ranim::StaticScene = &#static_name;
     };
 
     TokenStream::from(expanded)
