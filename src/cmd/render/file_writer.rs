@@ -111,23 +111,12 @@ impl FileWriterBuilder {
 
         // Input options (before -i)
         command.args([
-            "-y",
-            "-f", "rawvideo",
-            "-s", &size,
-            "-pix_fmt", "rgba",
-            "-r", &fps,
-            "-i", "-",
+            "-y", "-f", "rawvideo", "-s", &size, "-pix_fmt", "rgba", "-r", &fps, "-i", "-",
         ]);
         // Output options (before output file)
-        command.args([
-            "-an",
-            "-loglevel", "error",
-            "-vcodec", &self.video_codec,
-        ]);
+        command.args(["-an", "-loglevel", "error", "-vcodec", &self.video_codec]);
         command.args(&self.extra_codec_args);
-        command.args([
-            "-pix_fmt", &self.pixel_format,
-        ]);
+        command.args(["-pix_fmt", &self.pixel_format]);
         if !self.vf_args.is_empty() {
             let vf = self.vf_args.join(",");
             command.args(["-vf", &vf]);
