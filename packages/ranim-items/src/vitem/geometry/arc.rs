@@ -6,10 +6,9 @@ use ranim_core::core_item::CoreItem;
 use ranim_core::core_item::vitem::Basis2d;
 use ranim_core::{color, glam};
 
-use ranim_core::traits::{
-    Opacity, Rotate, RotateExt, ScaleExt, Shift, StrokeColor, StrokeWidth, With,
-};
+use ranim_core::traits::{Opacity, Rotate, RotateExt, ScaleExt, Shift, StrokeColor, With};
 
+use crate::vitem::geometry::EllipticArc;
 use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
 use ranim_core::anchor::AabbPoint;
 
@@ -123,50 +122,14 @@ impl StrokeColor for Arc {
 // MARK: Conversions
 impl From<Arc> for VItem {
     fn from(value: Arc) -> Self {
-        const NUM_SEGMENTS: usize = 8;
-        let len = 2 * NUM_SEGMENTS + 1;
-
-        let Arc {
-            basis: proj,
-            center,
-            radius,
-            angle,
-            stroke_rgba,
-            stroke_width,
-        } = value;
-
-        let (u, v) = proj.uv();
-        let mut vpoints = (0..len)
-            .map(|i| {
-                let angle = angle * i as f64 / (len - 1) as f64;
-                let (mut x, mut y) = (angle.cos(), angle.sin());
-                if x.abs() < 1.8e-7 {
-                    x = 0.0;
-                }
-                if y.abs() < 1.8e-7 {
-                    y = 0.0;
-                }
-                (x * u + y * v) * radius
-            })
-            .collect::<Vec<_>>();
-
-        let theta = angle / NUM_SEGMENTS as f64;
-        vpoints.iter_mut().skip(1).step_by(2).for_each(|p| {
-            *p /= (theta / 2.0).cos();
-        });
-        VItem::from_vpoints(vpoints).with(|vitem| {
-            vitem
-                .set_stroke_color(stroke_rgba)
-                .set_stroke_width(stroke_width)
-                .shift(center);
-        })
+        EllipticArc::from(value).into()
     }
 }
 
 impl Extract for Arc {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+        EllipticArc::from(self.clone()).extract_into(buf);
     }
 }
 

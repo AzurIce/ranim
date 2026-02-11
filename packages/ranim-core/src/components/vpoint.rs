@@ -10,6 +10,30 @@ use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
 use crate::utils::{avg, resize_preserving_order_with_repeated_indices};
 
+fn points_aabb(points: &mut impl Iterator<Item = DVec3>) -> [DVec3; 2] {
+    if let Some(first) = points.next() {
+        let (mut min, mut max) = (first, first);
+        for point in points {
+            min = min.min(point);
+            max = max.max(point);
+        }
+        [min, max]
+    } else {
+        [DVec3::ZERO; 2]
+    }
+}
+
+fn bezier_aabb(p1: DVec3, p2: DVec3, p3: DVec3) -> [DVec3; 2] {
+    let t_extremum = (p1 - p2) / (p1 - 2. * p2 + p3);
+    points_aabb(
+        &mut <[f64; 3]>::from(t_extremum)
+            .into_iter()
+            .filter(|&t| (0. ..=1.).contains(&t))
+            .map(|t| (1. - t).powi(2) * p1 + 2. * t * (1. - t) * p2 + t.powi(2) * p3)
+            .chain([p1, p3]),
+    )
+}
+
 /// A Vec of VPoint Data. It is used to represent a bunch of quad bezier paths.
 ///
 /// Every 3 elements in the inner vector is a quad bezier path.
@@ -28,7 +52,27 @@ pub struct VPointVec(pub Vec<DVec3>);
 
 impl Aabb for VPointVec {
     fn aabb(&self) -> [DVec3; 2] {
-        self.0.aabb()
+        let mut iter = self.0.iter().cloned();
+        if let Some(first) = iter.next() {
+            let (mut min, mut max) = (first, first);
+            let mut p1 = first;
+            loop {
+                if let Some(p2) = iter.next() {
+                    if let Some(p3) = iter.next() {
+                        let [bezier_min, bezier_max] = bezier_aabb(p1, p2, p3);
+                        min = min.min(bezier_min);
+                        max = max.max(bezier_max);
+                        p1 = p3;
+                    } else {
+                        unreachable!()
+                    }
+                } else {
+                    return [min, max];
+                }
+            }
+        } else {
+            [DVec3::ZERO; 2]
+        }
     }
 }
 
@@ -355,7 +399,10 @@ mod test {
     use assert_float_eq::assert_float_absolute_eq;
     use glam::{DVec3, dvec3};
 
-    use crate::{components::vpoint::VPointVec, traits::RotateExt};
+    use crate::{
+        components::vpoint::VPointVec,
+        traits::{Aabb as _, RotateExt},
+    };
 
     #[test]
     fn test_get_subpath() {
@@ -452,5 +499,17 @@ mod test {
             .for_each(|(res, truth)| {
                 assert_float_absolute_eq!(res.distance_squared(truth), 0.0, 1e-10);
             });
+    }
+
+    #[test]
+    fn test_aabb() {
+        let points = VPointVec(vec![
+            dvec3(-2., 1., 0.),
+            dvec3(0., -1., 0.),
+            dvec3(2., 1., 0.),
+        ]); // parabola y = x^2 / 4 with x in [-2, 2]
+        let [min, max] = points.aabb();
+        assert_float_absolute_eq!(min.distance(dvec3(-2., 0., 0.)), 0.0, 1e-10);
+        assert_float_absolute_eq!(max.distance(dvec3(2., 1., 0.)), 0.0, 1e-10);
     }
 }
