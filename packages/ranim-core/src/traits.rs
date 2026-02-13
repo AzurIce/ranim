@@ -1,9 +1,11 @@
+mod affine;
 mod rotate;
 mod scale;
 mod shift;
 
 pub use crate::anchor::{Aabb, AabbPoint, Locate};
 
+pub use affine::*;
 pub use rotate::*;
 pub use scale::*;
 pub use shift::*;
@@ -127,6 +129,12 @@ impl Interpolatable for DMat4 {
 impl<T: Interpolatable> Interpolatable for Vec<T> {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         self.iter().zip(target).map(|(a, b)| a.lerp(b, t)).collect()
+    }
+}
+
+impl<T: Interpolatable, const N: usize> Interpolatable for [T; N] {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        core::array::from_fn(|i| self[i].lerp(&target[i], t))
     }
 }
 

@@ -6,7 +6,7 @@ use ranim_core::{
         vitem::{Basis2d, DEFAULT_STROKE_WIDTH},
     },
     glam::{DVec2, DVec3},
-    traits::{Aabb, Discard, FillColor, Rotate, Shift, StrokeColor, With as _},
+    traits::{Aabb, Discard, FillColor, Opacity, Rotate, Shift, StrokeColor, With as _},
 };
 
 use crate::vitem::{
@@ -127,6 +127,13 @@ impl FillColor for Ellipse {
 
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.fill_rgba = color;
+        self
+    }
+}
+
+impl Opacity for Ellipse {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.set_fill_opacity(opacity).set_stroke_opacity(opacity);
         self
     }
 }

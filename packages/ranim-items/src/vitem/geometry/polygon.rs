@@ -5,8 +5,8 @@ use ranim_core::{
     anchor::{Aabb, AabbPoint, Locate},
     color,
     core_item::CoreItem,
-    glam,
-    traits::{Discard, Rotate, RotateExt, Scale, Shift, ShiftExt},
+    glam::{self, DAffine3},
+    traits::{AffineTransform, Discard, Rotate, RotateExt, Scale, Shift, ShiftExt},
 };
 
 use color::{AlphaColor, Srgb};
@@ -407,6 +407,14 @@ impl Rotate for Polygon {
 impl Scale for Polygon {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.points.scale_at(scale, point);
+        self
+    }
+}
+
+impl AffineTransform for Polygon {
+    fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
+        self.points.affine_transform_at_point(mat, origin);
+        // TODO: how to transform basis?
         self
     }
 }

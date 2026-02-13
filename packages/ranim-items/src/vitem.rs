@@ -21,6 +21,8 @@ use glam::{DVec3, Vec4, vec4};
 use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
 use ranim_core::core_item::vitem::Basis2d;
+use ranim_core::glam::DAffine3;
+use ranim_core::traits::AffineTransform;
 use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
@@ -93,6 +95,13 @@ impl Rotate for VItem {
 impl Scale for VItem {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.vpoints.scale_at_point(scale, point);
+        self
+    }
+}
+
+impl AffineTransform for VItem {
+    fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
+        self.vpoints.affine_transform_at_point(mat, origin);
         self
     }
 }

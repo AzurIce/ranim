@@ -50,7 +50,7 @@ impl<T: RotateExt> Rotate for Vec<T> {
 ///
 /// This trait is implemented automatically for types that implement [`Rotate`], you should not implement it yourself.
 pub trait RotateExt: Rotate {
-    /// Rotate the mobject by a given angle about a given axis at center.
+    /// Rotate the item by a given angle about a given axis at center.
     ///
     /// This is equivalent to [`RotateExt::rotate_at`] with [`AabbPoint::CENTER`].
     fn rotate(&mut self, angle: f64, axis: DVec3) -> &mut Self
@@ -60,10 +60,7 @@ pub trait RotateExt: Rotate {
         self.rotate_at(angle, axis, AabbPoint::CENTER)
     }
     /// Rotate the item by a given angle about a given axis at anchor.
-    fn rotate_at<T>(&mut self, angle: f64, axis: DVec3, anchor: T) -> &mut Self
-    where
-        T: Locate<Self>,
-    {
+    fn rotate_at(&mut self, angle: f64, axis: DVec3, anchor: impl Locate<Self>) -> &mut Self {
         let point = anchor.locate(self);
         Rotate::rotate_at_point(self, angle, axis, point)
     }
