@@ -1,4 +1,7 @@
-use std::{cell::{Ref, RefCell}, collections::HashMap};
+use std::{
+    cell::{Ref, RefCell},
+    collections::HashMap,
+};
 
 use ranim_core::{
     Extract,
@@ -13,7 +16,7 @@ use ranim_core::{
 use typst::foundations::Repr;
 
 use crate::vitem::{VItem, geometry::anchor::Origin, svg::SvgItem, typst::typst_svg};
-pub use typst::text::{FontVariant, FontStretch, FontStyle, FontWeight};
+pub use typst::text::{FontStretch, FontStyle, FontVariant, FontWeight};
 
 /// Font information for text items
 #[derive(Clone, Debug)]
@@ -48,8 +51,12 @@ impl TextFont {
         self
     }
     /// Add OTF features
-    pub fn with_features(mut self, features: impl IntoIterator<Item = (impl Into<String>, u32)>) -> Self {
-        self.features.extend(features.into_iter().map(|(k, v)| (k.into(), v)));
+    pub fn with_features(
+        mut self,
+        features: impl IntoIterator<Item = (impl Into<String>, u32)>,
+    ) -> Self {
+        self.features
+            .extend(features.into_iter().map(|(k, v)| (k.into(), v)));
         self
     }
 }
@@ -310,10 +317,10 @@ mod tests {
     #[test]
     fn test_font() {
         let font = TextFont::new(["Arial", "Helvetica"])
-           .with_weight(FontWeight::BOLD)
-           .with_style(FontStyle::Italic)
-           .with_stretch(FontStretch::CONDENSED)
-           .with_features([("liga", 1), ("dlig", 1)]);
+            .with_weight(FontWeight::BOLD)
+            .with_style(FontStyle::Italic)
+            .with_stretch(FontStretch::CONDENSED)
+            .with_features([("liga", 1), ("dlig", 1)]);
         dbg!(&font);
     }
 }
