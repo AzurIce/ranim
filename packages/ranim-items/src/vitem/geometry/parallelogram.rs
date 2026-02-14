@@ -69,7 +69,7 @@ impl Shift for Parallelogram {
 impl Rotate for Parallelogram {
     fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
         self.origin.rotate_at_point(angle, axis, point);
-        self.basis.rotate_at_point(angle, axis, point);
+        self.basis.rotate_at_point(angle, axis, DVec3::ZERO);
         self
     }
 }
@@ -77,7 +77,7 @@ impl Rotate for Parallelogram {
 impl Scale for Parallelogram {
     fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
         self.origin.scale_at_point(scale, point);
-        self.basis.scale_at_point(scale, point);
+        self.basis.iter_mut().for_each(|v| *v *= scale);
         self
     }
 }
@@ -85,7 +85,9 @@ impl Scale for Parallelogram {
 impl AffineTransform for Parallelogram {
     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
         self.origin.affine_transform_at_point(mat, origin);
-        self.basis.affine_transform_at_point(mat, origin);
+        self.basis
+            .iter_mut()
+            .for_each(|v| *v = mat.transform_vector3(*v));
         self
     }
 }

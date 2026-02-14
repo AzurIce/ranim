@@ -12,6 +12,8 @@
 pub mod geometry;
 /// Svg item
 pub mod svg;
+/// Simple text items
+pub mod text;
 /// Typst items
 pub mod typst;
 // pub mod line;
