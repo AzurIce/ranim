@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell};
+use std::{cell::{Ref, RefCell}, collections::HashMap};
 
 use ranim_core::{
     Extract,
@@ -10,8 +10,55 @@ use ranim_core::{
         Shift, With as _,
     },
 };
+use typst::foundations::Repr;
 
 use crate::vitem::{VItem, geometry::anchor::Origin, svg::SvgItem, typst::typst_svg};
+pub use typst::text::{FontVariant, FontStretch, FontStyle, FontWeight};
+
+/// Font information for text items
+#[derive(Clone, Debug)]
+pub struct TextFont {
+    families: Vec<String>,
+    variant: FontVariant,
+    features: HashMap<String, u32>,
+}
+
+impl TextFont {
+    /// Create a new font
+    pub fn new(families: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        Self {
+            families: families.into_iter().map(|v| v.into()).collect(),
+            variant: Default::default(),
+            features: Default::default(),
+        }
+    }
+    /// Set font weight
+    pub fn with_weight(mut self, weight: FontWeight) -> Self {
+        self.variant.weight = weight;
+        self
+    }
+    /// Set font style
+    pub fn with_style(mut self, style: FontStyle) -> Self {
+        self.variant.style = style;
+        self
+    }
+    /// Set font stretch
+    pub fn with_stretch(mut self, stretch: FontStretch) -> Self {
+        self.variant.stretch = stretch;
+        self
+    }
+    /// Add OTF features
+    pub fn with_features(mut self, features: impl IntoIterator<Item = (impl Into<String>, u32)>) -> Self {
+        self.features.extend(features.into_iter().map(|(k, v)| (k.into(), v)));
+        self
+    }
+}
+
+impl Default for TextFont {
+    fn default() -> Self {
+        Self::new(["New Computer Modern", "Libertinus Serif"])
+    }
+}
 
 /// Simple single-line text item
 #[derive(Clone, Debug)]
@@ -22,6 +69,8 @@ pub struct TextItem {
     origin: DVec3,
     /// Text content
     text: String,
+    /// Font info
+    font: TextFont,
     /// Cached items
     items: RefCell<Option<Vec<VItem>>>,
     /// Fill color
@@ -41,19 +90,88 @@ impl TextItem {
             basis: [DVec3::X * em_size, DVec3::Y * em_size],
             origin: DVec3::ZERO,
             text: text.into(),
+            font: TextFont::default(),
             items: RefCell::default(),
             fill_rbgas: AlphaColor::WHITE,
         }
     }
 
+    /// Set font
+    pub fn with_font(mut self, font: TextFont) -> Self {
+        self.font = font;
+        self.items.take();
+        self
+    }
+
+    /// Get font
+    pub fn font(&self) -> &TextFont {
+        &self.font
+    }
+
+    /// Get basis
+    pub fn basis(&self) -> [DVec3; 2] {
+        self.basis
+    }
+
+    /// Get text
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
     fn generate_items(&self) -> Vec<VItem> {
+        let font = &self.font;
         let text = self.text.as_str();
+
+        // font families
+        let mut families = String::new();
+        for family in font.families.iter() {
+            families.push('"');
+            families.push_str(family);
+            families.push_str("\", ");
+        }
+
+        // font weight as an integer between 100 and 900
+        let weight = font.variant.weight.to_number();
+
+        // font style
+        let style = {
+            use FontStyle::*;
+            match font.variant.style {
+                Normal => "normal",
+                Italic => "italic",
+                Oblique => "oblique",
+            }
+        };
+
+        // font stretch
+        let stretch = font.variant.stretch.to_ratio().repr();
+
+        // OTF features
+        let features = if font.features.is_empty() {
+            ":".to_string()
+        } else {
+            let mut features = String::new();
+            for (tag, value) in font.features.iter() {
+                features.push('"');
+                features.push_str(tag);
+                features.push_str("\": ");
+                features.push_str(value.to_string().as_str());
+                features.push_str(", ");
+            }
+            features
+        };
+
         let svg_src = dbg!(typst_svg(
             format!(
                 r#"
 #set text(
     top-edge: 1em,
     bottom-edge: "baseline",
+    font: ({families}),
+    weight: {weight},
+    style: "{style}",
+    stretch: {stretch},
+    features: ({features}),
 )
 #set page(
     width: auto,
@@ -151,11 +269,13 @@ impl FillColor for TextItem {
 
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.fill_rbgas = color;
+        self.transform_items(|item| item.set_fill_color(color).discard());
         self
     }
 
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
         self.fill_rbgas = self.fill_rbgas.with_alpha(opacity);
+        self.transform_items(|item| item.set_fill_opacity(opacity).discard());
         self
     }
 }
@@ -171,5 +291,29 @@ impl Extract for TextItem {
 
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         self.items().extract_into(buf);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use assert_float_eq::assert_float_absolute_eq;
+
+    use super::*;
+
+    #[test]
+    fn test_text_item() {
+        let item = TextItem::new("Hello, world!", 0.25);
+        assert_float_absolute_eq!(item.basis[0].length(), 0.25, 1e-10);
+        assert_float_absolute_eq!(item.origin.distance(DVec3::ZERO), 0.0, 1e-10);
+    }
+
+    #[test]
+    fn test_font() {
+        let font = TextFont::new(["Arial", "Helvetica"])
+           .with_weight(FontWeight::BOLD)
+           .with_style(FontStyle::Italic)
+           .with_stretch(FontStretch::CONDENSED)
+           .with_features([("liga", 1), ("dlig", 1)]);
+        dbg!(&font);
     }
 }
