@@ -10,7 +10,7 @@ use ranim_core::{
     glam::{DAffine3, DMat3, DVec3},
     traits::{
         Aabb, AffineTransform, AffineTransformExt, Discard, FillColor, Locate, Rotate, Scale,
-        Shift, With as _,
+        Shift, StrokeColor, StrokeWidth, With as _,
     },
 };
 use typst::foundations::Repr;
@@ -81,7 +81,11 @@ pub struct TextItem {
     /// Cached items
     items: RefCell<Option<Vec<VItem>>>,
     /// Fill color
-    fill_rbgas: AlphaColor<Srgb>,
+    fill_rgbas: AlphaColor<Srgb>,
+    /// Stroke color
+    stroke_rgbas: AlphaColor<Srgb>,
+    /// Stroke width
+    stroke_width: f32,
 }
 
 impl Locate<TextItem> for Origin {
@@ -99,7 +103,9 @@ impl TextItem {
             text: text.into(),
             font: TextFont::default(),
             items: RefCell::default(),
-            fill_rbgas: AlphaColor::WHITE,
+            fill_rgbas: AlphaColor::WHITE,
+            stroke_rgbas: AlphaColor::WHITE,
+            stroke_width: 0.0,
         }
     }
 
@@ -208,7 +214,18 @@ impl TextItem {
                 .scale_at_point(DVec3::splat(1. / h), DVec3::ZERO)
                 .affine_transform(mat);
         });
-        items[1..].into()
+        let &Self {
+            fill_rgbas,
+            stroke_rgbas,
+            stroke_width,
+            ..
+        } = self;
+        Vec::<VItem>::from(&items[1..]).with(|item| {
+            item.set_fill_color(fill_rgbas)
+                .set_stroke_color(stroke_rgbas)
+                .set_stroke_width(stroke_width)
+                .discard()
+        })
     }
 
     fn items(&self) -> Ref<'_, Vec<VItem>> {
@@ -271,17 +288,17 @@ impl AffineTransform for TextItem {
 
 impl FillColor for TextItem {
     fn fill_color(&self) -> AlphaColor<Srgb> {
-        self.fill_rbgas
+        self.fill_rgbas
     }
 
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.fill_rbgas = color;
+        self.fill_rgbas = color;
         self.transform_items(|item| item.set_fill_color(color).discard());
         self
     }
 
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rbgas = self.fill_rbgas.with_alpha(opacity);
+        self.fill_rgbas = self.fill_rgbas.with_alpha(opacity);
         self.transform_items(|item| item.set_fill_opacity(opacity).discard());
         self
     }
