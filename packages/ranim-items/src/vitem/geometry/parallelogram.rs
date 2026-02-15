@@ -2,10 +2,9 @@ use ranim_core::{
     Extract,
     color::{AlphaColor, Srgb},
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
-    glam::{DAffine3, DVec3},
+    glam::DVec3,
     traits::{
-        Aabb, AffineTransform, Discard, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor,
-        StrokeWidth, With,
+        Aabb, Discard, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With,
     },
     utils::bezier::PathBuilder,
 };
@@ -82,15 +81,15 @@ impl Scale for Parallelogram {
     }
 }
 
-impl AffineTransform for Parallelogram {
-    fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
-        self.origin.affine_transform_at_point(mat, origin);
-        self.basis
-            .iter_mut()
-            .for_each(|v| *v = mat.transform_vector3(*v));
-        self
-    }
-}
+// impl AffineTransform for Parallelogram {
+//     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
+//         self.origin.affine_transform_at_point(mat, origin);
+//         self.basis
+//             .iter_mut()
+//             .for_each(|v| *v = mat.transform_vector3(*v));
+//         self
+//     }
+// }
 
 impl StrokeColor for Parallelogram {
     fn stroke_color(&self) -> AlphaColor<Srgb> {

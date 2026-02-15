@@ -5,12 +5,11 @@ use ranim_core::{
     anchor::{Aabb, AabbPoint, Locate},
     color,
     core_item::CoreItem,
-    glam::{self, DAffine3},
-    traits::{AffineTransform, Discard, Rotate, RotateExt, Scale, Shift, ShiftExt},
+    glam::{DVec2, DVec3, dvec2, dvec3},
+    traits::{Discard, Rotate, RotateExt, Scale, Shift, ShiftExt},
 };
 
 use color::{AlphaColor, Srgb};
-use glam::{DVec2, DVec3, dvec2, dvec3};
 use itertools::Itertools;
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem, geometry::Circle};
@@ -411,13 +410,13 @@ impl Scale for Polygon {
     }
 }
 
-impl AffineTransform for Polygon {
-    fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
-        self.points.affine_transform_at_point(mat, origin);
-        // TODO: how to transform basis?
-        self
-    }
-}
+// impl AffineTransform for Polygon {
+//     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
+//         self.points.affine_transform_at_point(mat, origin);
+//         // TODO: how to transform basis?
+//         self
+//     }
+// }
 
 impl Alignable for Polygon {
     fn is_aligned(&self, other: &Self) -> bool {

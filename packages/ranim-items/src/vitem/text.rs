@@ -9,13 +9,18 @@ use ranim_core::{
     core_item::CoreItem,
     glam::{DAffine3, DMat3, DVec3},
     traits::{
-        Aabb, AffineTransform, AffineTransformExt, Discard, FillColor, Locate, Rotate, Scale,
-        Shift, StrokeColor, StrokeWidth, With as _,
+        Aabb, Discard, FillColor, Locate, PointsFunc, Rotate, Scale, Shift, StrokeColor,
+        StrokeWidth, With as _,
     },
 };
 use typst::foundations::Repr;
 
-use crate::{vitem::{VItem, geometry::anchor::Origin, svg::SvgItem, typst::typst_svg}};
+use crate::vitem::{
+    VItem,
+    geometry::{Parallelogram, anchor::Origin},
+    svg::SvgItem,
+    typst::typst_svg,
+};
 pub use typst::text::{FontStretch, FontStyle, FontVariant, FontWeight};
 
 /// Font information for text items
@@ -140,6 +145,12 @@ impl TextItem {
         self.inline_em_size.get().unwrap()
     }
 
+    /// Returns the text outline box starting from baseline origin to the width of last character and em height.
+    pub fn text_box(&self) -> Parallelogram {
+        let [u, v] = self.basis;
+        Parallelogram::new(self.origin, [u * self.inline_em_size(), v])
+    }
+
     fn generate_items(&self) -> Vec<VItem> {
         let font = &self.font;
         let text = self.text.as_str();
@@ -212,7 +223,7 @@ impl TextItem {
                 origin,
                 ..
             } = self;
-            let [min, max] = item[0].aabb();
+            let [min, max] = dbg!(item[0].aabb());
             let h = max.y - min.y;
             let length = (max.x - min.x) / h;
             self.inline_em_size.set(Some(length));
@@ -222,7 +233,7 @@ impl TextItem {
             );
             item.shift(-min)
                 .scale_at_point(DVec3::splat(1. / h), DVec3::ZERO)
-                .affine_transform(mat);
+                .apply_point_func(|p| *p = mat.transform_point3(*p));
         });
         let &Self {
             fill_rgbas,
@@ -255,13 +266,14 @@ impl TextItem {
 
 impl Aabb for TextItem {
     fn aabb(&self) -> [DVec3; 2] {
-        self.items().aabb()
+        dbg!(self.items().aabb())
     }
 }
 
 impl Shift for TextItem {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
-        self.origin += offset;
+        println!("shift");
+        self.origin += dbg!(offset);
         self.transform_items(|item| item.shift(offset).discard());
         self
     }
@@ -285,16 +297,16 @@ impl Scale for TextItem {
     }
 }
 
-impl AffineTransform for TextItem {
-    fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
-        self.origin.affine_transform_at_point(mat, origin);
-        self.basis
-            .iter_mut()
-            .for_each(|v| *v = mat.transform_vector3(*v));
-        self.transform_items(|item| item.affine_transform_at_point(mat, origin).discard());
-        self
-    }
-}
+// impl AffineTransform for TextItem {
+//     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
+//         self.origin.affine_transform_at_point(mat, origin);
+//         self.basis
+//             .iter_mut()
+//             .for_each(|v| *v = mat.transform_vector3(*v));
+//         self.transform_items(|item| item.affine_transform_at_point(mat, origin).discard());
+//         self
+//     }
+// }
 
 impl FillColor for TextItem {
     fn fill_color(&self) -> AlphaColor<Srgb> {
