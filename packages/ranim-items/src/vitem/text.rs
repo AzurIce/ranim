@@ -174,10 +174,9 @@ impl TextItem {
             features
         };
 
-        let svg_src = dbg!(typst_svg(
+        let svg_src = typst_svg(
             format!(
-                r#"
-#set text(
+                r#"#set text(
     top-edge: 1em,
     bottom-edge: "baseline",
     font: ({families}),
@@ -194,10 +193,10 @@ impl TextItem {
 )
 
 {text}
-        "#
+"#
             )
-            .as_str()
-        ));
+            .as_str(),
+        );
         let items = Vec::<VItem>::from(SvgItem::new(svg_src)).with(|item| {
             let &Self {
                 basis: [x_axis, y_axis],
