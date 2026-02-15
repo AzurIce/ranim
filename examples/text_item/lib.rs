@@ -6,7 +6,7 @@ use ranim_anims::{
     lagged::LaggedAnim,
     rotating::RotatingAnim,
 };
-use ranim_items::vitem::{VItem, geometry::anchor::Origin, text::TextItem};
+use ranim_items::vitem::{VItem, text::TextItem};
 
 #[scene]
 #[output(dir = "text_item")]
@@ -15,7 +15,6 @@ fn text_item(r: &mut RanimScene) {
     let text = "The quick brown fox jumps over the lazy dog.";
 
     let i_text = TextItem::new(text, 0.5).with(|item| item.move_to(DVec3::ZERO).discard());
-    println!("{}", Origin.locate(&i_text));
     let i_text_box = i_text
         .text_box()
         .with(|item| item.set_stroke_color(manim::RED_C).discard());

@@ -223,7 +223,7 @@ impl TextItem {
                 origin,
                 ..
             } = self;
-            let [min, max] = dbg!(item[0].aabb());
+            let [min, max] = item[0].aabb();
             let h = max.y - min.y;
             let length = (max.x - min.x) / h;
             self.inline_em_size.set(Some(length));
@@ -266,14 +266,13 @@ impl TextItem {
 
 impl Aabb for TextItem {
     fn aabb(&self) -> [DVec3; 2] {
-        dbg!(self.items().aabb())
+        self.items().aabb()
     }
 }
 
 impl Shift for TextItem {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
-        println!("shift");
-        self.origin += dbg!(offset);
+        self.origin += offset;
         self.transform_items(|item| item.shift(offset).discard());
         self
     }
