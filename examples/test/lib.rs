@@ -3,20 +3,21 @@
 use ranim::glam;
 use std::{f64::consts::PI, time::Duration};
 
-use glam::{DVec3, dvec3};
+use glam::{dvec3, DVec3};
 use ranim::{
     anims::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
-        transform::TransformAnim,
+        morph::MorphAnim,
     },
     color::palettes::{
         css,
         manim::{self, BLUE_C, RED_C},
     },
     items::vitem::{
-        self, VItem,
+        self,
         geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
+        VItem,
     },
     prelude::*,
 };
@@ -34,8 +35,10 @@ fn test(r: &mut RanimScene) {
         x.set_color(manim::BLUE_C).set_fill_opacity(0.5);
     }));
     let r_square = r.insert(square.clone());
-    r.timeline_mut(r_square).play(square.transform(|x| {
-        x.rotate(PI / 2.0, DVec3::Y);
+    r.timeline_mut(r_square).play(square.morph(|x| {
+        x.with_origin(AabbPoint::CENTER, |x| {
+            x.rotate_y(PI / 2.0);
+        });
     }));
 
     // text.set_stroke_color(manim::RED_C)
@@ -47,7 +50,7 @@ fn test(r: &mut RanimScene) {
     // let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
     // let mut arrow = timeline.insert(arrow);
 
-    // timeline.play(arrow.transform(|data| {
+    // timeline.play(arrow.morph(|data| {
     //     data.set_color(RED_C);
     //     data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
     // }));

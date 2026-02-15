@@ -3,12 +3,12 @@ use std::f64::consts::TAU;
 use itertools::Itertools;
 use ranim::{
     color::palettes::manim,
-    glam::{DVec3, usizevec3},
+    glam::{usizevec3, DVec3},
     prelude::*,
 };
-use ranim_anims::transform::TransformAnim;
+use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
-use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
+use ranim_items::vitem::{svg::SvgItem, typst::typst_svg, VItem};
 
 #[scene(clear_color = "#000000")]
 #[output(dir = "animating_pi")]
@@ -53,7 +53,7 @@ fn animating_pi(r: &mut RanimScene) {
             .forward(1.0)
             .play(
                 vitems
-                    .transform(|x| {
+                    .morph(|x| {
                         x.apply_complex_map(|c| c.exp());
                     })
                     .with_duration(5.0),
@@ -61,7 +61,7 @@ fn animating_pi(r: &mut RanimScene) {
             .forward(1.0)
             .play(
                 vitems
-                    .transform(|x| {
+                    .morph(|x| {
                         x.apply_point_func(|p| {
                             p.x += 0.5 * p.y.sin();
                             p.y += 0.5 * p.x.cos();

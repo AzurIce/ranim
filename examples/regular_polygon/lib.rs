@@ -1,9 +1,9 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::transform::TransformAnim,
-    color::{HueDirection, palettes::manim},
-    glam::{DVec3, dvec2},
+    anims::morph::MorphAnim,
+    color::{palettes::manim, HueDirection},
+    glam::dvec2,
     items::vitem::geometry::RegularPolygon,
     prelude::*,
     utils::rate_functions::smooth,
@@ -54,7 +54,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .iter_mut()
             .zip(radii.iter())
             .map(|(poly, &target_radius)| {
-                poly.transform(|p| {
+                poly.morph(|p| {
                     p.radius = target_radius;
                 })
                 .with_rate_func(smooth)
@@ -76,8 +76,10 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .iter_mut()
             .zip(rotations.iter())
             .map(|(poly, &rot)| {
-                poly.transform(|p| {
-                    p.rotate_at(rot, DVec3::Z, Origin.locate(&p.outer_circle()));
+                poly.morph(|p| {
+                    p.with_origin(Origin.locate(&p.outer_circle()), |x| {
+                        x.rotate_z(rot);
+                    });
                 })
                 .with_rate_func(smooth)
             })
@@ -101,7 +103,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .iter_mut()
             .rev()
             .map(|poly| {
-                poly.transform(|p| {
+                poly.morph(|p| {
                     p.radius = 0.0;
                 })
                 .with_rate_func(smooth)

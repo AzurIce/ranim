@@ -1,13 +1,9 @@
 use std::cmp::Ordering;
 
-use glam::{DVec3, dvec3};
+use glam::{dvec3, DVec3};
 use itertools::Itertools;
 
-use crate::{
-    anchor::{Aabb, AabbPoint, Locate},
-    traits::StrokeWidth,
-    utils::wrap_point_func_with_point,
-};
+use crate::{anchor::Aabb, traits::StrokeWidth};
 
 /// A hint for scaling the mobject.
 #[derive(Debug, Clone, Copy)]
@@ -28,51 +24,39 @@ pub enum ScaleHint {
 
 /// Scaling operations.
 ///
-/// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: Scale`.
-pub trait Scale {
-    /// Scale at a given point.
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self;
+/// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: ScaleTransform`.
+pub trait ScaleTransform {
+    /// Scale at the origin.
+    fn scale(&mut self, scale: DVec3) -> &mut Self;
 }
 
-impl Scale for DVec3 {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
-        wrap_point_func_with_point(|p| *p *= scale, point)(self);
+impl ScaleTransform for DVec3 {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
+        *self *= scale;
         self
     }
 }
 
-impl<T: Scale> Scale for [T] {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
+impl<T: ScaleTransform> ScaleTransform for [T] {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.iter_mut().for_each(|x| {
-            x.scale_at_point(scale, point);
+            x.scale(scale);
         });
+        self
+    }
+}
+
+impl<T: ScaleTransform> ScaleTransform for Vec<T> {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
+        self.as_mut_slice().scale(scale);
         self
     }
 }
 
 /// Useful extensions for scaling operations.
 ///
-/// This trait is implemented automatically for types that implement [`Scale`], you should not implement it yourself.
-pub trait ScaleExt: Scale {
-    /// Scale the item by a given scale at an anchor.
-    ///
-    /// See [`Locate`]
-    fn scale_at<T>(&mut self, scale: DVec3, anchor: T) -> &mut Self
-    where
-        T: Locate<Self>,
-    {
-        let point = anchor.locate(self);
-        self.scale_at_point(scale, point)
-    }
-    /// Scale the item by a given scale at [`AabbPoint::CENTER`].
-    ///
-    /// This is equivalent to [`ScaleExt::scale_at`] with anchor of [`AabbPoint::CENTER`].
-    fn scale(&mut self, scale: DVec3) -> &mut Self
-    where
-        AabbPoint: Locate<Self>,
-    {
-        self.scale_at(scale, AabbPoint::CENTER)
-    }
+/// This trait is implemented automatically for types that implement [`ScaleTransform`], you should not implement it yourself.
+pub trait ScaleTransformExt: ScaleTransform {
     /// Calculate the scale ratio for a given hint.
     ///
     /// See [`ScaleHint`] for more details.
@@ -90,24 +74,12 @@ pub trait ScaleExt: Scale {
             ScaleHint::PorportionalZ(v) => DVec3::splat(v / aabb_size.z),
         }
     }
-    /// Scale the item to a given hint.
-    ///
-    /// See [`ScaleHint`].
-    fn scale_to_at<T>(&mut self, hint: ScaleHint, anchor: T) -> &mut Self
-    where
-        Self: Aabb,
-        T: Locate<Self>,
-    {
-        self.scale_at(self.calc_scale_ratio(hint), anchor);
-        self
-    }
-    /// Scale the item to a given hint.
+    /// Scale the item to a given hint (at origin).
     ///
     /// See [`ScaleHint`] for more details.
     fn scale_to(&mut self, hint: ScaleHint) -> &mut Self
     where
         Self: Aabb,
-        AabbPoint: Locate<Self>,
     {
         self.scale(self.calc_scale_ratio(hint));
         self
@@ -118,7 +90,6 @@ pub trait ScaleExt: Scale {
     fn scale_to_min(&mut self, hints: &[ScaleHint]) -> &mut Self
     where
         Self: Aabb,
-        AabbPoint: Locate<Self>,
     {
         let scale = hints
             .iter()
@@ -134,7 +105,6 @@ pub trait ScaleExt: Scale {
     fn scale_to_max(&mut self, hints: &[ScaleHint]) -> &mut Self
     where
         Self: Aabb,
-        AabbPoint: Locate<Self>,
     {
         let scale = hints
             .iter()
@@ -146,16 +116,13 @@ pub trait ScaleExt: Scale {
     }
 }
 
-impl<T: Scale + ?Sized> ScaleExt for T {}
+impl<T: ScaleTransform + ?Sized> ScaleTransformExt for T {}
 
 /// A trait for scaling operations with stroke width.
-pub trait ScaleStrokeExt: ScaleExt + StrokeWidth {
-    /// Scale the item by a given scale at anchor with stroke width.
-    fn scale_with_stroke_by_anchor<A>(&mut self, scale: DVec3, anchor_point: A) -> &mut Self
-    where
-        A: Locate<Self>,
-    {
-        self.scale_at(scale, anchor_point);
+pub trait ScaleStrokeTransformExt: ScaleTransform + StrokeWidth {
+    /// Scale the item with stroke width (at origin).
+    fn scale_with_stroke(&mut self, scale: DVec3) -> &mut Self {
+        self.scale(scale);
 
         let scales = [scale.x, scale.y, scale.z];
         let idx = scales
@@ -167,24 +134,16 @@ pub trait ScaleStrokeExt: ScaleExt + StrokeWidth {
         self.apply_stroke_func(|widths| widths.iter_mut().for_each(|w| w.0 *= scale as f32));
         self
     }
-    /// Scale the item by a given scale with stroke width.
-    fn scale_with_stroke(&mut self, scale: DVec3) -> &mut Self
-    where
-        AabbPoint: Locate<Self>,
-    {
-        self.scale_with_stroke_by_anchor(scale, AabbPoint::CENTER)
-    }
-    /// Scale the item to a given hint.
+    /// Scale the item to a given hint with stroke width.
     ///
     /// See [`ScaleHint`] for more details.
     fn scale_to_with_stroke(&mut self, hint: ScaleHint) -> &mut Self
     where
         Self: Aabb,
-        AabbPoint: Locate<Self>,
     {
         let scale = self.calc_scale_ratio(hint);
         self.scale_with_stroke(scale)
     }
 }
 
-impl<T: ScaleExt + StrokeWidth + ?Sized> ScaleStrokeExt for T {}
+impl<T: ScaleTransform + StrokeWidth + ?Sized> ScaleStrokeTransformExt for T {}

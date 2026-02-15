@@ -1,12 +1,12 @@
 use ranim::{
     anims::{
         creation::{CreationAnim, WritingAnim},
-        transform::TransformAnim,
+        morph::MorphAnim,
     },
     color::palettes::manim,
     items::vitem::{
-        VItem,
         geometry::{Circle, Rectangle, Square},
+        VItem,
     },
     prelude::*,
     utils::rate_functions::linear,
@@ -44,7 +44,7 @@ fn getting_started2(r: &mut RanimScene) {
             .play(
                 square
                     .clone()
-                    .transform_to(circle.clone())
+                    .morph_to(circle.clone())
                     .with_rate_func(linear),
             )
             .play(circle.clone().unwrite());

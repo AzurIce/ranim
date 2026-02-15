@@ -128,7 +128,7 @@ mod test {
     use crate::{
         anchor::{Aabb, AabbPoint, Locate},
         components::vpoint::VPointVec,
-        traits::ScaleExt,
+        traits::{ScaleTransform, ShiftTransformExt},
     };
 
     #[test]
@@ -179,7 +179,7 @@ mod test {
             AabbPoint(DVec3::ZERO).locate(&scale_origin),
             dvec3(0.5, 1.0, 0.0)
         );
-        scale_origin.scale_at(DVec3::splat(3.0), AabbPoint::CENTER);
+        scale_origin.with_origin(AabbPoint::CENTER, |x| { x.scale(DVec3::splat(3.0)); });
 
         let ans = VPointVec(vec![
             dvec3(-4.0, -5.0, 0.0),

@@ -1,6 +1,6 @@
 use ranim::{
-    anims::transform::TransformAnim,
-    color::{HueDirection, palettes::manim},
+    anims::morph::MorphAnim,
+    color::{palettes::manim, HueDirection},
     glam::dvec3,
     items::vitem::geometry::Rectangle,
     prelude::*,
@@ -75,14 +75,14 @@ fn hanoi(r: &mut RanimScene, n: usize) {
         {
             let (timeline, disk) = r.timeline_mut(&mut r_disk);
             timeline.play(
-                disk.transform(|data| {
+                disk.morph(|data| {
                     data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
                 })
                 .with_duration(anim_duration)
                 .with_rate_func(ease_in_quad),
             );
             timeline.play(
-                disk.transform(|data| {
+                disk.morph(|data| {
                     data.shift(dvec3(
                         (idx_dst as f64 - idx_src as f64) * rod_section_width,
                         0.0,
@@ -93,7 +93,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 .with_rate_func(linear),
             );
             timeline.play(
-                disk.transform(|data| {
+                disk.morph(|data| {
                     data.shift(dvec3(0.0, top_dst - 3.0, 0.0));
                 })
                 .with_duration(anim_duration)

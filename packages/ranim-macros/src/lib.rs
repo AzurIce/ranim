@@ -452,8 +452,8 @@ pub fn derive_rotate_impl(input: TokenStream) -> TokenStream {
         quote! {#core::traits::RotateImpl},
         |field_positions| {
             quote! {
-                fn rotate_at_point(&mut self, angle: f64, axis: #core::glam::DVec3, point: #core::glam::DVec3) -> &mut Self {
-                    #(self.#field_positions.rotate_at_point(angle, axis, point);)*
+                fn rotate_axis(&mut self, axis: #core::glam::DVec3, angle: f64) -> &mut Self {
+                    #(self.#field_positions.rotate_axis(axis, angle);)*
                     self
                 }
             }
@@ -469,8 +469,8 @@ pub fn derive_scale_impl(input: TokenStream) -> TokenStream {
         quote! {#core::traits::ScaleImpl},
         |field_positions| {
             quote! {
-                fn scale_at_point(&mut self, scale: #core::glam::DVec3, point: #core::glam::DVec3) -> &mut Self {
-                    #(self.#field_positions.scale_at_point(scale, point);)*
+                fn scale(&mut self, scale: #core::glam::DVec3) -> &mut Self {
+                    #(self.#field_positions.scale(scale);)*
                     self
                 }
             }

@@ -4,20 +4,20 @@ use crate::anchor::{Aabb, AabbPoint, Locate};
 
 /// Shifting operations.
 ///
-/// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: Shift`.
-pub trait Shift {
+/// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: ShiftTransform`.
+pub trait ShiftTransform {
     /// Shift the item by a given vector.
     fn shift(&mut self, offset: DVec3) -> &mut Self;
 }
 
-impl Shift for DVec3 {
+impl ShiftTransform for DVec3 {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         *self += shift;
         self
     }
 }
 
-impl<T: ShiftExt> Shift for [T] {
+impl<T: ShiftTransformExt> ShiftTransform for [T] {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.iter_mut().for_each(|x| {
             x.shift(shift);
@@ -26,10 +26,26 @@ impl<T: ShiftExt> Shift for [T] {
     }
 }
 
+impl<T: ShiftTransformExt> ShiftTransform for Vec<T> {
+    fn shift(&mut self, shift: DVec3) -> &mut Self {
+        self.as_mut_slice().shift(shift);
+        self
+    }
+}
+
 /// Useful extensions for shifting operations.
 ///
-/// This trait is implemented automatically for types that implement [`Shift`], you should not implement it yourself.
-pub trait ShiftExt: Shift {
+/// This trait is implemented automatically for types that implement [`ShiftTransform`], you should not implement it yourself.
+pub trait ShiftTransformExt: ShiftTransform {
+    /// Do something with the origin of the item.
+    ///
+    /// See [`crate::anchor`]'s [`Locate`] for more details.
+    fn with_origin(&mut self, p: impl Locate<Self>, f: impl FnOnce(&mut Self)) {
+        let p = p.locate(self);
+        self.shift(-p);
+        f(self);
+        self.shift(p);
+    }
     /// Put anchor at a given point.
     ///
     /// See [`crate::anchor`]'s [`Locate`] for more details.
@@ -72,4 +88,4 @@ pub trait ShiftExt: Shift {
     }
 }
 
-impl<T: Shift + ?Sized> ShiftExt for T {}
+impl<T: ShiftTransform + ?Sized> ShiftTransformExt for T {}

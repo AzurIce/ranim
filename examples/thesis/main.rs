@@ -1,17 +1,17 @@
 use ranim::glam;
 use std::f64::consts::PI;
 
-use glam::{DVec3, dvec3};
+use glam::dvec3;
 use ranim::{
     anims::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
-        transform::TransformAnim,
+        morph::MorphAnim,
     },
     color::palettes::manim,
     items::vitem::{
-        VItem,
         geometry::{Circle, Polygon, Square},
+        VItem,
     },
     prelude::*,
     utils::rate_functions::linear,
@@ -28,7 +28,10 @@ fn pentagon() -> VItem {
             .collect(),
     )
     .with(|x| {
-        x.set_color(manim::RED_C).rotate(PI / 2.0, DVec3::Z);
+        x.set_color(manim::RED_C);
+        x.with_origin(AabbPoint::CENTER, |x| {
+            x.rotate_z(PI / 2.0);
+        });
     })
     .into()
 }
@@ -95,11 +98,11 @@ fn transform(r: &mut RanimScene) {
     let dst = Circle::new(1.5).with(|x| {
         x.set_color(manim::BLUE_C).move_to(dvec3(0.0, -2.0, 0.0));
     });
-    // dst.rotate(PI / 4.0 + PI, DVec3::Z); // rotate to match src
+    // dst.with_origin(AabbPoint::CENTER, |x| { x.rotate_z(PI / 4.0 + PI); }); // rotate to match src
     let r_item = r.insert_empty();
     r.timeline_mut(r_item).play(
         VItem::from(src)
-            .transform_to(VItem::from(dst))
+            .morph_to(VItem::from(dst))
             .with_rate_func(linear),
     );
 }

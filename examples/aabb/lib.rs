@@ -4,15 +4,15 @@ use ranim::{
     anims::rotating::RotatingAnim,
     color::palettes::manim,
     core::animation::StaticAnim,
-    glam::{DVec3, dvec2, dvec3},
+    glam::{dvec2, dvec3, DVec3},
     items::{
         debug::VisualizeAabbItem,
         vitem::{
-            VItem,
             geometry::{
                 Arc, ArcBetweenPoints, Circle, Ellipse, EllipticArc, Polygon, Rectangle,
                 RegularPolygon, Square,
             },
+            VItem,
         },
     },
     prelude::*,
@@ -107,7 +107,9 @@ fn aabb(r: &mut RanimScene) {
         Ellipse::new(dvec2(2.0, 0.8))
             .with(|e| {
                 e.set_color(manim::RED_D);
-                e.rotate(PI / 4.0, DVec3::Z);
+                e.with_origin(AabbPoint::CENTER, |x| {
+                    x.rotate_z(PI / 4.0);
+                });
             })
             .into(),
         Polygon::new(star_points)

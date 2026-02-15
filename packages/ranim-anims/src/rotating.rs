@@ -1,14 +1,14 @@
 use ranim_core::{
     animation::{AnimationCell, Eval},
     glam::DVec3,
-    traits::{Aabb, AabbPoint, Locate, Rotate},
+    traits::{Aabb, AabbPoint, Locate, RotateTransform, ShiftTransformExt},
     utils::rate_functions::smooth,
 };
 
 // MARK: Require Trait
 /// The requirement of [`RotatingAnimation`]
-pub trait RotatingRequirement: Rotate + Clone {}
-impl<T: Rotate + Clone> RotatingRequirement for T {}
+pub trait RotatingRequirement: RotateTransform + ShiftTransformExt + Clone {}
+impl<T: RotateTransform + ShiftTransformExt + Clone> RotatingRequirement for T {}
 
 // MARK: Anim Trait
 /// The methods to create rotation animations for `T` that satisfies [`RotatingRequirement`]
@@ -41,7 +41,7 @@ impl<T: RotatingRequirement + 'static> RotatingAnim for T {}
 
 /// Rotation animation.
 ///
-/// Unlike [`Transform`](crate::transform::Transform) which linearly interpolates between
+/// Unlike [`Morph`](crate::morph::Morph) which linearly interpolates between
 /// start and end states, this animation applies incremental rotation at each frame,
 /// producing a true circular arc motion.
 pub struct RotatingAnimation<T: RotatingRequirement> {
@@ -66,7 +66,9 @@ impl<T: RotatingRequirement> RotatingAnimation<T> {
 impl<T: RotatingRequirement> Eval<T> for RotatingAnimation<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         let mut result = self.src.clone();
-        result.rotate_at_point(self.angle * alpha, self.axis, self.point);
+        result.with_origin(self.point, |x| {
+            x.rotate_axis(self.axis, self.angle * alpha);
+        });
         result
     }
 }

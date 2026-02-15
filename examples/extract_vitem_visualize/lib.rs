@@ -4,15 +4,15 @@ use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
     color,
     color::palettes::manim,
-    core::{Extract, components::width::Width},
+    core::{components::width::Width, Extract},
     items::vitem::{
-        VItem,
         geometry::{Circle, Square},
         svg::SvgItem,
         typst::typst_svg,
+        VItem,
     },
     prelude::*,
 };
@@ -39,21 +39,21 @@ fn ranim_text(r: &mut RanimScene) {
         .collect::<Vec<_>>();
 
     r.timelines_mut().forward(1.0);
-    r.timeline_mut(r_cam).play(cam.transform(|cam| {
+    r.timeline_mut(r_cam).play(cam.morph(|cam| {
         cam.scale = 0.3;
         cam.up = DVec3::NEG_X;
         cam.pos.shift(DVec3::NEG_X * 6.0);
     }));
     r.timelines_mut().forward(1.0);
     r.timeline_mut(r_cam).play(
-        cam.transform(|cam| {
+        cam.morph(|cam| {
             cam.pos.shift(DVec3::X * 12.0);
         })
         .with_duration(7.0),
     );
     r.timelines_mut().forward(1.0);
     r.timeline_mut(r_cam)
-        .play(cam.transform_to(CameraFrame::default()));
+        .play(cam.morph_to(CameraFrame::default()));
 
     // r.timelines_mut().forward(1.0);
     r.insert_time_mark(5.0, TimeMark::Capture("preview-ranim_text.png".to_string()));
@@ -70,14 +70,16 @@ pub fn hello_ranim(r: &mut RanimScene) {
     let mut circle = VisualVItem(VItem::from(Circle::new(2.0).with(|circle| {
         circle
             .set_color(manim::GREEN_C)
-            .rotate(-PI / 4.0 + PI, DVec3::Z);
+            .with_origin(AabbPoint::CENTER, |x| {
+                x.rotate_z(-PI / 4.0 + PI);
+            });
     })));
 
     let r_vitem = r.insert_empty();
     {
         let timeline = r.timeline_mut(r_vitem);
         timeline
-            .play(square.clone().transform_to(circle.clone()))
+            .play(square.clone().morph_to(circle.clone()))
             .forward(1.0);
         timeline
             .play(circle.clone().unwrite().with_duration(2.0))
