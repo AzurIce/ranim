@@ -1,5 +1,5 @@
 use std::{
-    cell::{Ref, RefCell},
+    cell::{Cell, Ref, RefCell},
     collections::HashMap,
 };
 
@@ -15,7 +15,7 @@ use ranim_core::{
 };
 use typst::foundations::Repr;
 
-use crate::vitem::{VItem, geometry::anchor::Origin, svg::SvgItem, typst::typst_svg};
+use crate::{vitem::{VItem, geometry::anchor::Origin, svg::SvgItem, typst::typst_svg}};
 pub use typst::text::{FontStretch, FontStyle, FontVariant, FontWeight};
 
 /// Font information for text items
@@ -78,14 +78,16 @@ pub struct TextItem {
     text: String,
     /// Font info
     font: TextFont,
-    /// Cached items
-    items: RefCell<Option<Vec<VItem>>>,
     /// Fill color
     fill_rgbas: AlphaColor<Srgb>,
     /// Stroke color
     stroke_rgbas: AlphaColor<Srgb>,
     /// Stroke width
     stroke_width: f32,
+    /// Cached items
+    items: RefCell<Option<Vec<VItem>>>,
+    /// cached text inline size
+    inline_em_size: Cell<Option<f64>>,
 }
 
 impl Locate<TextItem> for Origin {
@@ -102,10 +104,11 @@ impl TextItem {
             origin: DVec3::ZERO,
             text: text.into(),
             font: TextFont::default(),
-            items: RefCell::default(),
             fill_rgbas: AlphaColor::WHITE,
-            stroke_rgbas: AlphaColor::TRANSPARENT,
+            stroke_rgbas: AlphaColor::WHITE,
             stroke_width: 0.0,
+            items: RefCell::default(),
+            inline_em_size: Cell::default(),
         }
     }
 
@@ -129,6 +132,12 @@ impl TextItem {
     /// Get text
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// Get inline em size
+    pub fn inline_em_size(&self) -> f64 {
+        let _ = self.items(); // ensure items are generated
+        self.inline_em_size.get().unwrap()
     }
 
     fn generate_items(&self) -> Vec<VItem> {
@@ -205,6 +214,8 @@ impl TextItem {
             } = self;
             let [min, max] = item[0].aabb();
             let h = max.y - min.y;
+            let length = (max.x - min.x) / h;
+            self.inline_em_size.set(Some(length));
             let mat = DAffine3::from_mat3_translation(
                 DMat3::from_cols(x_axis, y_axis, DVec3::ZERO),
                 origin,
