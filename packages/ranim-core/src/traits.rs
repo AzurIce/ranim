@@ -32,7 +32,7 @@ use crate::{components::width::Width, utils::resize_preserving_order_with_repeat
 /// assert_eq!(a, 2);
 /// ```
 pub trait With {
-    /// Mutating a value inplace
+    /// Mutating a value in place
     fn with(mut self, f: impl Fn(&mut Self)) -> Self
     where
         Self: Sized,
@@ -238,15 +238,13 @@ impl<T: FillColor> FillColor for [T] {
         self[0].fill_color()
     }
     fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_fill_color(color);
-        });
+        self.iter_mut()
+            .for_each(|x| x.set_fill_color(color).discard());
         self
     }
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_fill_opacity(opacity);
-        });
+        self.iter_mut()
+            .for_each(|x| x.set_fill_opacity(opacity).discard());
         self
     }
 }

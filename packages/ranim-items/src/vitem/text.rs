@@ -104,7 +104,7 @@ impl TextItem {
             font: TextFont::default(),
             items: RefCell::default(),
             fill_rgbas: AlphaColor::WHITE,
-            stroke_rgbas: AlphaColor::WHITE,
+            stroke_rgbas: AlphaColor::TRANSPARENT,
             stroke_width: 0.0,
         }
     }
@@ -299,6 +299,24 @@ impl FillColor for TextItem {
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
         self.fill_rgbas = self.fill_rgbas.with_alpha(opacity);
         self.transform_items(|item| item.set_fill_opacity(opacity).discard());
+        self
+    }
+}
+
+impl StrokeColor for TextItem {
+    fn stroke_color(&self) -> AlphaColor<Srgb> {
+        self.stroke_rgbas
+    }
+
+    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
+        self.stroke_rgbas = color;
+        self.transform_items(|item| item.set_stroke_color(color).discard());
+        self
+    }
+
+    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.stroke_rgbas = self.stroke_rgbas.with_alpha(opacity);
+        self.transform_items(|item| item.set_stroke_opacity(opacity).discard());
         self
     }
 }
