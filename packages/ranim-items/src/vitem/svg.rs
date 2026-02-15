@@ -220,7 +220,7 @@ pub fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
             transform.tx as f64,
             transform.ty as f64,
         ]);
-        vitem.apply_affine(affine);
+        vitem.apply_affine2(affine);
         let fill_color = if let Some(fill) = path.fill() {
             parse_paint(fill.paint()).with_alpha(fill.opacity().get())
         } else {

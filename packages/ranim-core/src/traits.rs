@@ -13,7 +13,7 @@ pub use shift::*;
 use std::ops::Range;
 
 use color::{AlphaColor, ColorSpace, Srgb};
-use glam::{DAffine2, DMat4, DQuat, DVec2, DVec3, USizeVec3, Vec3Swizzles, dvec3};
+use glam::{DAffine2, DAffine3, DMat4, DQuat, DVec2, DVec3, USizeVec3, Vec3Swizzles, dvec3};
 use num::complex::Complex64;
 
 use crate::{components::width::Width, utils::resize_preserving_order_with_repeated_indices};
@@ -328,15 +328,19 @@ pub trait PointsFunc {
     /// Applying points function to an item
     fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self;
 
-    /// Applying affine transform to an item
-    fn apply_affine(&mut self, affine: DAffine2) -> &mut Self {
-        self.apply_points_func(|points| {
-            points.iter_mut().for_each(|p| {
-                let transformed = affine.transform_point2(p.xy());
-                p.x = transformed.x;
-                p.y = transformed.y;
-            });
+    /// Applying affine transform in xy plane to an item
+    fn apply_affine2(&mut self, affine: DAffine2) -> &mut Self {
+        self.apply_point_func(|p| {
+            let transformed = affine.transform_point2(p.xy());
+            p.x = transformed.x;
+            p.y = transformed.y;
         });
+        self
+    }
+
+    /// Applying affine transform to an item
+    fn apply_affine3(&mut self, affine: DAffine3) -> &mut Self {
+        self.apply_point_func(|p| *p = affine.transform_point3(*p));
         self
     }
 
