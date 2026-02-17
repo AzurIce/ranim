@@ -1,0 +1,49 @@
+name = "text_item"
+code = """
+```rust
+use std::f64::consts::TAU;
+
+use ranim::{color::palettes::manim, glam::DVec3, prelude::*};
+use ranim_anims::{
+    creation::{CreationAnim, WritingAnim},
+    lagged::LaggedAnim,
+    rotating::RotatingAnim,
+};
+use ranim_items::vitem::{VItem, text::TextItem};
+
+#[scene]
+#[output(dir = "text_item")]
+fn text_item(r: &mut RanimScene) {
+    let _r_cam = r.insert(CameraFrame::default());
+    let text = "The quick brown fox jumps over the lazy dog.";
+
+    let text = TextItem::new(text, 0.5).with(|item| item.move_to(DVec3::ZERO).discard());
+    let text_box = text
+        .text_box()
+        .with(|item| item.set_stroke_color(manim::RED_C).discard());
+
+    r.insert_with(|t| {
+        t.play(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.write()))
+            .forward(3.)
+            .play(text.clone().rotating(TAU * 4., DVec3::Z).with_duration(4.))
+            .forward(1.)
+            .play(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.unwrite()))
+            .forward(1.);
+    });
+
+    r.insert_with(|t| {
+        t.forward(1.)
+            .play(VItem::from(text_box.clone()).create())
+            .play(VItem::from(text_box.clone()).uncreate());
+    });
+
+    r.insert_time_mark(
+        r.timelines().max_total_secs() / 2.0,
+        TimeMark::Capture("preview.png".to_string()),
+    );
+}
+```"""
+hash = "44add00a68478bc34f1615d2753f70c6e1783b37"
+preview_imgs = ["/examples/text_item/preview.png"]
+output_files = ["/examples/text_item/text_item_1920x1080_60.mp4"]
+wasm = true

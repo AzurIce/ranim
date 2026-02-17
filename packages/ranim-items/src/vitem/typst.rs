@@ -22,8 +22,18 @@ use typst::{
 use typst_kit::fonts::{FontSearcher, Fonts};
 
 use crate::vitem::{VItem, svg::SvgItem};
+use ranim_core::Extract;
+use ranim_core::traits::Interpolatable;
 use ranim_core::{
-    Extract, anchor::Aabb, color, components::width::Width, core_item::CoreItem, glam, traits::*,
+    anchor::Aabb,
+    color,
+    components::width::Width,
+    core_item::CoreItem,
+    glam,
+    traits::{
+        Alignable, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
+        StrokeColor, StrokeWidth, With,
+    },
 };
 
 struct TypstLruCache {
@@ -431,23 +441,23 @@ impl Aabb for TypstText {
     }
 }
 
-impl Shift for TypstText {
+impl ShiftTransform for TypstText {
     fn shift(&mut self, shift: glam::DVec3) -> &mut Self {
         self.vitems.shift(shift);
         self
     }
 }
 
-impl Rotate for TypstText {
-    fn rotate_at_point(&mut self, angle: f64, axis: glam::DVec3, point: glam::DVec3) -> &mut Self {
-        self.vitems.rotate_at_point(angle, axis, point);
+impl RotateTransform for TypstText {
+    fn rotate_on_axis(&mut self, axis: glam::DVec3, angle: f64) -> &mut Self {
+        self.vitems.rotate_on_axis(axis, angle);
         self
     }
 }
 
-impl Scale for TypstText {
-    fn scale_at_point(&mut self, scale: glam::DVec3, point: glam::DVec3) -> &mut Self {
-        self.vitems.scale_at_point(scale, point);
+impl ScaleTransform for TypstText {
+    fn scale(&mut self, scale: glam::DVec3) -> &mut Self {
+        self.vitems.scale(scale);
         self
     }
 }
@@ -537,7 +547,7 @@ pub fn compile_typst_code(typst_code: &str) -> String {
     let output = child.wait_with_output().unwrap().stdout;
     let output = String::from_utf8_lossy(&output);
 
-    get_typst_element(&output)
+    output.to_string()
 }
 
 #[cfg(test)]
@@ -587,6 +597,36 @@ mod tests {
 
         println!("{res}");
         // println!("{}", typst_svg!(source))
+    }
+
+    ///
+    /// ```
+    /// <svg class="typst-doc" viewBox="0 0 11.483999999999998 11" width="11.483999999999998pt" height="11pt" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:h5="http://www.w3.org/1999/xhtml">
+    ///    <path class="typst-shape" fill="#ffffff" fill-rule="nonzero" d="M 0 0v 11 h 11.484 v -11 Z "/>
+    ///    <g>
+    ///        <g class="typst-text" transform="matrix(1 0 0 -1 0 11)">
+    ///            <use xlink:href="#gB5279FC30F2C6542A76CE0CDC73F9462" x="0" y="0" fill="#000000" fill-rule="nonzero"/>
+    ///            <use xlink:href="#gC5A0A6F735BE491513D9F5FD3BD367ED" x="6.457" y="0" fill="#000000" fill-rule="nonzero"/>
+    ///        </g>
+    ///    </g>
+    /// ```
+    /// ```
+    /// <svg class="typst-doc" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:h5="http://www.w3.org/1999/xhtml">
+    /// <g>
+    ///     <g class="typst-text" transform="matrix(1 0 0 -1 0 11)">
+    ///         <use xlink:href="#gB5279FC30F2C6542A76CE0CDC73F9462" x="0" y="0" fill="#000000" fill-rule="nonzero"/>
+    ///         <use xlink:href="#gC5A0A6F735BE491513D9F5FD3BD367ED" x="6.457" y="0" fill="#000000" fill-rule="nonzero"/>
+    ///     </g>
+    /// </g>
+    /// ```
+    #[test]
+    fn foo_page() {
+        let text = r#"Ra"#;
+        let res = compile_typst_code(text);
+        println!("{res}");
+
+        let res = typst_svg(text);
+        println!("{res}");
     }
 
     #[test]

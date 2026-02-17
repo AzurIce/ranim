@@ -41,3 +41,6 @@ doc:
 
 book:
     mdbook build book
+
+preview EXAMPLE:
+    cargo run -p ranim-cli -- preview --example {{ EXAMPLE }}

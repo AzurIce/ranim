@@ -128,6 +128,7 @@
             mdbook
             wasm-pack
             mdbook-mermaid
+            typst
             # wasm-bindgen-cli_0_2_106
             # mdbook-katex
             # wasm-bindgen-cli

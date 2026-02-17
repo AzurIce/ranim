@@ -107,7 +107,9 @@ fn aabb(r: &mut RanimScene) {
         Ellipse::new(dvec2(2.0, 0.8))
             .with(|e| {
                 e.set_color(manim::RED_D);
-                e.rotate(PI / 4.0, DVec3::Z);
+                e.with_origin(AabbPoint::CENTER, |x| {
+                    x.rotate_on_z(PI / 4.0);
+                });
             })
             .into(),
         Polygon::new(star_points)

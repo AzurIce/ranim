@@ -2,7 +2,7 @@ name = "hanoi"
 code = """
 ```rust
 use ranim::{
-    anims::transform::TransformAnim,
+    anims::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
     glam::dvec3,
     items::vitem::geometry::Rectangle,
@@ -78,14 +78,14 @@ fn hanoi(r: &mut RanimScene, n: usize) {
         {
             let (timeline, disk) = r.timeline_mut(&mut r_disk);
             timeline.play(
-                disk.transform(|data| {
+                disk.morph(|data| {
                     data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
                 })
                 .with_duration(anim_duration)
                 .with_rate_func(ease_in_quad),
             );
             timeline.play(
-                disk.transform(|data| {
+                disk.morph(|data| {
                     data.shift(dvec3(
                         (idx_dst as f64 - idx_src as f64) * rod_section_width,
                         0.0,
@@ -96,7 +96,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 .with_rate_func(linear),
             );
             timeline.play(
-                disk.transform(|data| {
+                disk.morph(|data| {
                     data.shift(dvec3(0.0, top_dst - 3.0, 0.0));
                 })
                 .with_duration(anim_duration)
@@ -123,7 +123,7 @@ fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
 }
 ```"""
-hash = "506fb771996a1406fc2341ac06494d8d96f1c5d2"
+hash = "5c57f538e0d1fb6110b3c2a68936264eff582b54"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/hanoi_5_1920x1080_60.mp4", "/examples/hanoi/hanoi_1920x1080_60.mp4"]
 wasm = true

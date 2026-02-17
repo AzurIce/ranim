@@ -9,7 +9,9 @@ use ranim_core::{
         vitem::{Basis2d, DEFAULT_STROKE_WIDTH},
     },
     glam::{DVec2, DVec3},
-    traits::{Aabb, Discard, Rotate, Shift, StrokeColor, StrokeWidth as _, With as _},
+    traits::{
+        Aabb, Discard, Opacity, RotateTransform, ShiftTransform, StrokeColor, StrokeWidth, With,
+    },
 };
 
 use crate::vitem::{
@@ -197,17 +199,24 @@ impl StrokeColor for EllipticArc {
     }
 }
 
-impl Shift for EllipticArc {
+impl Opacity for EllipticArc {
+    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.set_stroke_opacity(opacity);
+        self
+    }
+}
+
+impl ShiftTransform for EllipticArc {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.center += shift;
         self
     }
 }
 
-impl Rotate for EllipticArc {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.basis.rotate_axis(axis, angle);
-        self.center.rotate_at_point(angle, axis, point);
+impl RotateTransform for EllipticArc {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.basis.rotate_on_axis(axis, angle);
+        self.center.rotate_on_axis(axis, angle);
         self
     }
 }

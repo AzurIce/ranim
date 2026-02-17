@@ -1,17 +1,21 @@
-mod rotate;
-mod scale;
-mod shift;
+/// Transform related traits
+pub mod transform {
+    mod rotate;
+    mod scale;
+    mod shift;
+
+    pub use rotate::*;
+    pub use scale::*;
+    pub use shift::*;
+}
+pub use transform::*;
 
 pub use crate::anchor::{Aabb, AabbPoint, Locate};
-
-pub use rotate::*;
-pub use scale::*;
-pub use shift::*;
 
 use std::ops::Range;
 
 use color::{AlphaColor, ColorSpace, Srgb};
-use glam::{DAffine2, DMat4, DQuat, DVec2, DVec3, USizeVec3, Vec3Swizzles, dvec3};
+use glam::{DAffine2, DAffine3, DMat4, DQuat, DVec2, DVec3, USizeVec3, Vec3Swizzles, dvec3};
 use num::complex::Complex64;
 
 use crate::{components::width::Width, utils::resize_preserving_order_with_repeated_indices};
@@ -22,7 +26,7 @@ use crate::{components::width::Width, utils::resize_preserving_order_with_repeat
 /// This trait is automatically implemented for `T`.
 ///
 /// # Example
-/// ```
+/// ```ignore
 /// use ranim::prelude::*;
 ///
 /// let mut a = 1;
@@ -30,7 +34,7 @@ use crate::{components::width::Width, utils::resize_preserving_order_with_repeat
 /// assert_eq!(a, 2);
 /// ```
 pub trait With {
-    /// Mutating a value inplace
+    /// Mutating a value in place
     fn with(mut self, f: impl Fn(&mut Self)) -> Self
     where
         Self: Sized,
@@ -45,7 +49,7 @@ impl<T> With for T {}
 /// A trait for discarding a value.
 ///
 /// It is useful when you want a short closure:
-/// ```
+/// ```ignore
 /// let x = Square::new(1.0).with(|x| {
 ///     x.set_color(manim::BLUE_C);
 /// });
@@ -129,6 +133,26 @@ impl<T: Interpolatable> Interpolatable for Vec<T> {
         self.iter().zip(target).map(|(a, b)| a.lerp(b, t)).collect()
     }
 }
+
+impl<T: Interpolatable, const N: usize> Interpolatable for [T; N] {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        core::array::from_fn(|i| self[i].lerp(&target[i], t))
+    }
+}
+
+macro_rules! impl_interpolatable_tuple {
+    ($(($T:ident, $s:ident)),*) => {
+        impl<$($T: Interpolatable),*> Interpolatable for ($($T,)*) {
+            #[allow(non_snake_case)]
+            fn lerp(&self, target: &Self, t: f64) -> Self {
+                let ($($s,)*) = self;
+                let ($($T,)*) = target;
+                ($($s.lerp($T, t),)*)
+            }
+        }
+    }
+}
+variadics_please::all_tuples!(impl_interpolatable_tuple, 1, 12, T, S);
 
 impl<T: Opacity + Alignable + Clone> Alignable for Vec<T> {
     fn is_aligned(&self, other: &Self) -> bool {
@@ -230,15 +254,13 @@ impl<T: FillColor> FillColor for [T] {
         self[0].fill_color()
     }
     fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_fill_color(color);
-        });
+        self.iter_mut()
+            .for_each(|x| x.set_fill_color(color).discard());
         self
     }
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.set_fill_opacity(opacity);
-        });
+        self.iter_mut()
+            .for_each(|x| x.set_fill_opacity(opacity).discard());
         self
     }
 }
@@ -322,15 +344,19 @@ pub trait PointsFunc {
     /// Applying points function to an item
     fn apply_points_func(&mut self, f: impl for<'a> Fn(&'a mut [DVec3])) -> &mut Self;
 
-    /// Applying affine transform to an item
-    fn apply_affine(&mut self, affine: DAffine2) -> &mut Self {
-        self.apply_points_func(|points| {
-            points.iter_mut().for_each(|p| {
-                let transformed = affine.transform_point2(p.xy());
-                p.x = transformed.x;
-                p.y = transformed.y;
-            });
+    /// Applying affine transform in xy plane to an item
+    fn apply_affine2(&mut self, affine: DAffine2) -> &mut Self {
+        self.apply_point_func(|p| {
+            let transformed = affine.transform_point2(p.xy());
+            p.x = transformed.x;
+            p.y = transformed.y;
         });
+        self
+    }
+
+    /// Applying affine transform to an item
+    fn apply_affine3(&mut self, affine: DAffine3) -> &mut Self {
+        self.apply_point_func(|p| *p = affine.transform_point3(*p));
         self
     }
 
@@ -389,7 +415,7 @@ impl<T: PointsFunc> PointsFunc for [T] {
 
 // MARK: Align
 /// Align a slice of items
-pub trait AlignSlice<T: ShiftExt>: AsMut<[T]> {
+pub trait AlignSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     /// Align items' anchors in a given axis, based on the first item.
     fn align_anchor<A>(&mut self, axis: DVec3, anchor: A) -> &mut Self
     where
@@ -424,7 +450,7 @@ pub trait AlignSlice<T: ShiftExt>: AsMut<[T]> {
 
 // MARK: Arrange
 /// A trait for arranging operations.
-pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
+pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     /// Arrange the items by a given function.
     ///
     /// The `pos_func` takes index as input and output the center position.
@@ -495,4 +521,4 @@ pub trait ArrangeSlice<T: Shift>: AsMut<[T]> {
     }
 }
 
-impl<T: Shift, E: AsMut<[T]>> ArrangeSlice<T> for E {}
+impl<T: transform::ShiftTransformExt, E: AsMut<[T]>> ArrangeSlice<T> for E {}

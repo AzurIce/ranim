@@ -82,23 +82,23 @@ impl AsMut<[DVec3]> for VPointVec {
     }
 }
 
-impl Shift for VPointVec {
+impl transform::ShiftTransform for VPointVec {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
         self.as_mut().shift(offset);
         self
     }
 }
 
-impl Rotate for VPointVec {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.as_mut().rotate_at_point(angle, axis, point);
+impl transform::RotateTransform for VPointVec {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.as_mut().rotate_on_axis(axis, angle);
         self
     }
 }
 
-impl Scale for VPointVec {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
-        self.as_mut().scale_at_point(scale, point);
+impl transform::ScaleTransform for VPointVec {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
+        self.as_mut().scale(scale);
         self
     }
 }
@@ -328,14 +328,18 @@ impl VPointVec {
         }
 
         let v = end - start;
-        self.scale_at(DVec3::splat(v.length() / cur_v.length()), cur_start);
+        self.with_origin(cur_start, |x| {
+            x.scale(DVec3::splat(v.length() / cur_v.length()));
+        });
         let rotate_angle = cur_v.angle_between(v);
         let mut rotate_axis = cur_v.cross(v);
         if rotate_axis.length_squared() <= f64::EPSILON {
             rotate_axis = DVec3::Z;
         }
         rotate_axis = rotate_axis.normalize();
-        self.rotate_at(rotate_angle, rotate_axis, cur_start);
+        self.with_origin(cur_start, |x| {
+            x.rotate_on_axis(rotate_axis, rotate_angle);
+        });
         self.shift(start - cur_start);
 
         self
@@ -392,7 +396,7 @@ mod test {
 
     use crate::{
         components::vpoint::VPointVec,
-        traits::{Aabb as _, RotateExt},
+        traits::{Aabb, RotateTransform},
     };
 
     fn assert_dvec3_eq(a: DVec3, b: DVec3) {
@@ -518,7 +522,7 @@ mod test {
             dvec3(1.0, 0.0, 0.0),
             dvec3(2.0, 2.0, 0.0),
         ]);
-        points.rotate_at(PI, DVec3::Z, DVec3::ZERO);
+        points.rotate_on_z(PI);
         assert_points_eq(
             &points.0,
             &[

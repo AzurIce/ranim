@@ -3,7 +3,7 @@ use ranim::prelude::*;
 pub mod test_scenes {
     use itertools::Itertools;
     use ranim::{
-        anims::transform::TransformAnim,
+        anims::morph::MorphAnim,
         glam::{DVec3, dvec3},
         items::vitem::{
             VItem,
@@ -62,8 +62,7 @@ pub mod test_scenes {
             .into_iter()
             .zip(circles)
             .for_each(|((r_square, item), circle)| {
-                r.timeline_mut(r_square)
-                    .play(item.clone().transform_to(circle));
+                r.timeline_mut(r_square).play(item.clone().morph_to(circle));
             });
     }
 }

@@ -4,9 +4,9 @@ code = """
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::transform::TransformAnim,
+    anims::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
-    glam::{DVec3, dvec2},
+    glam::dvec2,
     items::vitem::geometry::RegularPolygon,
     prelude::*,
     utils::rate_functions::smooth,
@@ -57,7 +57,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .iter_mut()
             .zip(radii.iter())
             .map(|(poly, &target_radius)| {
-                poly.transform(|p| {
+                poly.morph(|p| {
                     p.radius = target_radius;
                 })
                 .with_rate_func(smooth)
@@ -79,8 +79,10 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .iter_mut()
             .zip(rotations.iter())
             .map(|(poly, &rot)| {
-                poly.transform(|p| {
-                    p.rotate_at(rot, DVec3::Z, Origin.locate(&p.outer_circle()));
+                poly.morph(|p| {
+                    p.with_origin(Origin.locate(&p.outer_circle()), |x| {
+                        x.rotate_on_z(rot);
+                    });
                 })
                 .with_rate_func(smooth)
             })
@@ -104,7 +106,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .iter_mut()
             .rev()
             .map(|poly| {
-                poly.transform(|p| {
+                poly.morph(|p| {
                     p.radius = 0.0;
                 })
                 .with_rate_func(smooth)
@@ -129,7 +131,7 @@ impl<T: Clone + 'static> LaggedRawExt<T> for Vec<ranim_core::animation::Animatio
     }
 }
 ```"""
-hash = "126791705412f333ada43abc3c150572d4cb1604"
+hash = "3f061a7710baf6c1150bf159a5c829cf47817592"
 preview_imgs = ["/examples/regular_polygon/preview.png"]
 output_files = ["/examples/regular_polygon/regular_polygon_1920x1080_60.mp4"]
 wasm = true

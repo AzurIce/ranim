@@ -8,13 +8,13 @@ use ranim_core::{
     color,
     core_item::CoreItem,
     glam,
-    traits::{Rotate, Shift},
+    traits::{RotateTransform, ScaleTransform, ShiftTransform},
 };
 
 use crate::vitem::DEFAULT_STROKE_WIDTH;
 use ranim_core::anchor::AabbPoint;
 use ranim_core::core_item::vitem::Basis2d;
-use ranim_core::traits::{FillColor, Opacity, RotateExt, ScaleExt, StrokeColor, With};
+use ranim_core::traits::{FillColor, Opacity, StrokeColor, With};
 
 use crate::vitem::VItem;
 
@@ -54,14 +54,14 @@ impl Circle {
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
         self.scale_by_anchor(scale, AabbPoint::CENTER)
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
@@ -69,7 +69,10 @@ impl Circle {
     {
         let point = anchor.locate(self);
         self.radius *= scale;
-        self.center.scale_at(DVec3::splat(scale), point);
+        self.center
+            .shift(-point)
+            .scale(DVec3::splat(scale))
+            .shift(point);
         self
     }
 }
@@ -83,17 +86,17 @@ impl Aabb for Circle {
     }
 }
 
-impl Shift for Circle {
+impl ShiftTransform for Circle {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.center.shift(shift);
         self
     }
 }
 
-impl Rotate for Circle {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.center.rotate_at(angle, axis, point);
-        self.basis.rotate_axis(axis, angle);
+impl RotateTransform for Circle {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.center.rotate_on_axis(axis, angle);
+        self.basis.rotate_on_axis(axis, angle);
         self
     }
 }
