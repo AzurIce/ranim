@@ -7,15 +7,15 @@ use ranim::{
     anims::rotating::RotatingAnim,
     color::palettes::manim,
     core::animation::StaticAnim,
-    glam::{dvec2, dvec3, DVec3},
+    glam::{DVec3, dvec2, dvec3},
     items::{
         debug::VisualizeAabbItem,
         vitem::{
+            VItem,
             geometry::{
                 Arc, ArcBetweenPoints, Circle, Ellipse, EllipticArc, Polygon, Rectangle,
                 RegularPolygon, Square,
             },
-            VItem,
         },
     },
     prelude::*,
@@ -183,7 +183,7 @@ fn aabb(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "add8e23624f7e9e3a676b901e3a6083499515dd3"
+hash = "65f4c03913d28293774ec21b3fd9137d45e0060c"
 preview_imgs = ["/examples/aabb/preview.png"]
 output_files = ["/examples/aabb/aabb_1920x1080_60.mp4"]
 wasm = true

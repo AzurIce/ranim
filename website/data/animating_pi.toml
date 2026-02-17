@@ -9,7 +9,7 @@ use ranim::{
     glam::{DVec3, usizevec3},
     prelude::*,
 };
-use ranim_anims::transform::TransformAnim;
+use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
 use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 
@@ -56,7 +56,7 @@ fn animating_pi(r: &mut RanimScene) {
             .forward(1.0)
             .play(
                 vitems
-                    .transform(|x| {
+                    .morph(|x| {
                         x.apply_complex_map(|c| c.exp());
                     })
                     .with_duration(5.0),
@@ -64,7 +64,7 @@ fn animating_pi(r: &mut RanimScene) {
             .forward(1.0)
             .play(
                 vitems
-                    .transform(|x| {
+                    .morph(|x| {
                         x.apply_point_func(|p| {
                             p.x += 0.5 * p.y.sin();
                             p.y += 0.5 * p.x.cos();
@@ -89,7 +89,7 @@ fn foo_2() {
     println!("{svg}");
 }
 ```"""
-hash = "5f77e8994a9d7a432d45fc7e7f7de8c301343d14"
+hash = "74558da7271afe9e4abec85c23f1bbbca5400131"
 preview_imgs = ["/examples/animating_pi/preview.png"]
 output_files = ["/examples/animating_pi/animating_pi_1920x1080_60.mp4"]
 wasm = true

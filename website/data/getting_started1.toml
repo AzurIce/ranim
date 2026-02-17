@@ -2,7 +2,7 @@ name = "getting_started1"
 code = """
 ```rust
 use ranim::{
-    anims::{creation::WritingAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, morph::MorphAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -30,13 +30,13 @@ fn getting_started1(r: &mut RanimScene) {
         let timeline = r.timeline_mut(r_vitem);
         // In order to do more low-level opeerations,
         // sometimes we need to convert the item to a low-level item.
-        timeline.play(VItem::from(square).transform_to(VItem::from(circle.clone())));
+        timeline.play(VItem::from(square).morph_to(VItem::from(circle.clone())));
         timeline.play(VItem::from(circle).unwrite());
     }
 }
 // ANCHOR_END: construct
 ```"""
-hash = "a4a2bb4620c39a61ee76b589328b62a7858fef2f"
+hash = "7617f641a13987bc8b53fc9a5a2124d11a1d2bae"
 preview_imgs = []
 output_files = ["/examples/getting_started1/getting_started1_1920x1080_60.mp4"]
 wasm = true
