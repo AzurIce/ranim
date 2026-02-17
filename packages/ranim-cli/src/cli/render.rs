@@ -8,7 +8,7 @@ use crate::{
     workspace::{Workspace, get_target_package},
 };
 
-pub fn render_command(args: &CliArgs, scenes: &[String]) -> Result<()> {
+pub fn render_command(args: &CliArgs, scenes: &[String], buffer_count: usize) -> Result<()> {
     info!("Loading workspace...");
     let workspace = Workspace::current().unwrap();
 
@@ -62,7 +62,7 @@ pub fn render_command(args: &CliArgs, scenes: &[String]) -> Result<()> {
 
     for scene in scenes_to_render {
         info!("Rendering scene: {}", scene.name);
-        render_scene(scene);
+        render_scene(scene, buffer_count);
     }
     Ok(())
 }

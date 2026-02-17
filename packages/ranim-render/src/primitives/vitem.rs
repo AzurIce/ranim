@@ -240,6 +240,7 @@ mod tests {
     fn foo_render_vitem2d_primitive() {
         let ctx = pollster::block_on(WgpuContext::new());
         let mut renderer = Renderer::new(&ctx, 1280, 720, 8);
+        let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
             r: 0.8,
             g: 0.8,
@@ -320,11 +321,11 @@ mod tests {
                 .map(|(id, x)| ((id, id), x)),
         );
 
-        renderer.render_store_with_pool(&ctx, clear_color, &store, &mut pool);
-        let img = renderer.get_rendered_texture_img_buffer(&ctx);
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        let img = render_textures.get_rendered_texture_img_buffer(&ctx);
         img.save("../../output/vitem2d_intersecting_perspective.png")
             .unwrap();
-        let depth_img = renderer.get_depth_texture_img_buffer(&ctx);
+        let depth_img = render_textures.get_depth_texture_img_buffer(&ctx);
         depth_img
             .save("../../output/vitem2d_intersecting_perspective_depth.png")
             .unwrap();
