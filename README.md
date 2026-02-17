@@ -122,6 +122,10 @@ ranim render -p render scene_a scene_b -- --release
   ![image](https://github.com/user-attachments/assets/36bf841c-e30f-45cc-adbc-bd4bfff9bc4c)
    
 
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
 ## Design
 
 Once the design is stablized, I may write about it.
