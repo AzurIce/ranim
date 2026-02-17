@@ -4,6 +4,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use image::{ImageBuffer, Luma, Rgba};
+
 use crate::{
     primitives::{Primitive, RenderResource},
     utils::{ReadbackWgpuTexture, WgpuContext},
@@ -51,6 +53,8 @@ impl PipelinesPool {
 /// Texture resources used for rendering
 #[allow(unused)]
 pub struct RenderTextures {
+    width: u32,
+    height: u32,
     pub render_texture: ReadbackWgpuTexture,
     // multisample_texture: wgpu::Texture,
     pub depth_stencil_texture: ReadbackWgpuTexture,
@@ -59,10 +63,25 @@ pub struct RenderTextures {
     pub depth_texture_view: wgpu::TextureView,
     // pub(crate) multisample_view: wgpu::TextureView,
     pub(crate) depth_stencil_view: wgpu::TextureView,
+
+    output_dirty: bool,
+    depth_dirty: bool,
 }
 
 pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 impl RenderTextures {
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    pub fn ratio(&self) -> f32 {
+        self.width as f32 / self.height as f32
+    }
+
     pub(crate) fn new(ctx: &WgpuContext, width: u32, height: u32) -> Self {
         let format = OUTPUT_TEXTURE_FORMAT;
         let render_texture = ReadbackWgpuTexture::new(
@@ -146,6 +165,8 @@ impl RenderTextures {
         });
 
         Self {
+            width,
+            height,
             render_texture,
             // multisample_texture,
             depth_stencil_texture,
@@ -154,7 +175,50 @@ impl RenderTextures {
             depth_texture_view,
             // multisample_view,
             depth_stencil_view,
+            output_dirty: true,
+            depth_dirty: true,
         }
+    }
+
+    /// Mark textures as dirty after rendering.
+    pub fn mark_dirty(&mut self) {
+        self.output_dirty = true;
+        self.depth_dirty = true;
+    }
+
+    pub fn get_rendered_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
+        if !self.output_dirty {
+            return self.render_texture.texture_data();
+        }
+        self.output_dirty = false;
+        self.render_texture.update_texture_data(ctx)
+    }
+
+    pub fn get_rendered_texture_img_buffer(
+        &mut self,
+        ctx: &WgpuContext,
+    ) -> ImageBuffer<Rgba<u8>, &[u8]> {
+        ImageBuffer::from_raw(self.width, self.height, self.get_rendered_texture_data(ctx)).unwrap()
+    }
+
+    pub fn get_depth_texture_data(&mut self, ctx: &WgpuContext) -> &[f32] {
+        if !self.depth_dirty {
+            return bytemuck::cast_slice(self.depth_stencil_texture.texture_data());
+        }
+        self.depth_dirty = false;
+        bytemuck::cast_slice(self.depth_stencil_texture.update_texture_data(ctx))
+    }
+
+    pub fn get_depth_texture_img_buffer(
+        &mut self,
+        ctx: &WgpuContext,
+    ) -> ImageBuffer<Luma<u8>, Vec<u8>> {
+        let data = self
+            .get_depth_texture_data(ctx)
+            .iter()
+            .map(|&d| (d.clamp(0.0, 1.0) * 255.0) as u8)
+            .collect::<Vec<_>>();
+        ImageBuffer::from_raw(self.width, self.height, data).unwrap()
     }
 }
 

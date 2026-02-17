@@ -8,7 +8,7 @@ use ranim_core::color::LinearSrgb;
 use ranim_core::store::CoreItemStore;
 use ranim_core::{Scene, SceneConstructor, SealedRanimScene, color};
 use ranim_render::Renderer;
-use ranim_render::resource::RenderPool;
+use ranim_render::resource::{RenderPool, RenderTextures};
 use ranim_render::utils::WgpuContext;
 use timeline::TimelineState;
 use tracing::{error, info};
@@ -66,6 +66,7 @@ pub struct RanimApp {
 
     // Rendering
     renderer: Option<Renderer>,
+    render_textures: Option<RenderTextures>,
     texture_id: Option<egui::TextureId>,
     depth_texture_id: Option<egui::TextureId>,
     view_mode: ViewMode,
@@ -105,6 +106,7 @@ impl RanimApp {
             pool: RenderPool::new(),
             play_prev_t: None,
             renderer: None,
+            render_textures: None,
             texture_id: None,
             depth_texture_id: None,
             view_mode: ViewMode::Output,
@@ -180,6 +182,7 @@ impl RanimApp {
         };
 
         let renderer = Renderer::new(&ctx, 2560, 1440, 8); // TODO: dynamic size
+        let render_textures = renderer.new_render_textures(&ctx);
 
         // Init Depth Visual Pipeline
         if self.depth_visual_pipeline.is_none() {
@@ -190,8 +193,8 @@ impl RanimApp {
             let texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("Depth Visual Texture"),
                 size: wgpu::Extent3d {
-                    width: renderer.width(),
-                    height: renderer.height(),
+                    width: render_textures.width(),
+                    height: render_textures.height(),
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,
@@ -208,7 +211,7 @@ impl RanimApp {
         }
 
         // Register texture with egui
-        let texture_view = &renderer.render_textures.linear_render_view;
+        let texture_view = &render_textures.linear_render_view;
         let id = render_state.renderer.write().register_native_texture(
             &render_state.device,
             texture_view,
@@ -223,12 +226,17 @@ impl RanimApp {
 
         self.texture_id = Some(id);
         self.depth_texture_id = Some(depth_id);
+        self.render_textures = Some(render_textures);
         self.renderer = Some(renderer);
         self.wgpu_ctx = Some(ctx);
     }
 
     fn render_animation(&mut self) {
-        if let (Some(ctx), Some(renderer)) = (self.wgpu_ctx.as_ref(), self.renderer.as_mut()) {
+        if let (Some(ctx), Some(renderer), Some(render_textures)) = (
+            self.wgpu_ctx.as_ref(),
+            self.renderer.as_mut(),
+            self.render_textures.as_mut(),
+        ) {
             if self.last_sec == self.timeline_state.current_sec && !self.need_eval {
                 return;
             }
@@ -241,7 +249,7 @@ impl RanimApp {
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();
-            renderer.render_store_with_pool(ctx, self.clear_color, &self.store, &mut self.pool);
+            renderer.render_store_with_pool(ctx, render_textures, self.clear_color, &self.store, &mut self.pool);
 
             if let (Some(pipeline), Some(view)) = (
                 self.depth_visual_pipeline.as_ref(),
@@ -259,7 +267,7 @@ impl RanimApp {
                     entries: &[wgpu::BindGroupEntry {
                         binding: 0,
                         resource: wgpu::BindingResource::TextureView(
-                            &renderer.render_textures.depth_texture_view,
+                            &render_textures.depth_texture_view,
                         ),
                     }],
                 });
@@ -390,9 +398,9 @@ impl eframe::App for RanimApp {
                 // TODO: We could update renderer size here if we want dynamic resolution
                 let available_size = ui.available_size();
                 let aspect_ratio = self
-                    .renderer
+                    .render_textures
                     .as_ref()
-                    .map(|r| r.ratio())
+                    .map(|rt| rt.ratio())
                     .unwrap_or(1280.0 / 7.0);
                 let mut size = available_size;
 

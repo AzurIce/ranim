@@ -17,7 +17,6 @@ pub mod resource;
 pub mod utils;
 
 use glam::{UVec3, uvec3};
-use image::{ImageBuffer, Luma, Rgba};
 
 use crate::{
     graph::{AnyGlobalRenderNodeTrait, GlobalRenderGraph, RenderPackets},
@@ -103,11 +102,6 @@ pub struct Renderer {
     packets: RenderPackets,
     render_graph: GlobalRenderGraph,
 
-    pub render_textures: RenderTextures,
-
-    pub(crate) output_texture_dirty: bool,
-    pub(crate) depth_texture_dirty: bool,
-
     #[cfg(feature = "profiling")]
     pub(crate) profiler: wgpu_profiler::GpuProfiler,
 }
@@ -127,12 +121,6 @@ impl Renderer {
 
     pub fn new(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> Self {
         let resolution_info = ResolutionInfo::new(ctx, width, height, oit_layers);
-        let render_textures = RenderTextures::new(ctx, width, height);
-
-        // let viewport = ViewportGpuPacket::init(
-        //     ctx,
-        //     &ViewportUniform::from_camera_frame(&camera, width as u32, height as u32),
-        // );
 
         #[cfg(feature = "profiling")]
         let profiler = wgpu_profiler::GpuProfiler::new(
@@ -167,21 +155,22 @@ impl Renderer {
             height,
             resolution_info,
             pipelines: PipelinesPool::default(),
-            render_textures,
             packets: RenderPackets::default(),
             render_graph,
-            // Textures state
-            output_texture_dirty: true,
-            depth_texture_dirty: true,
             // Profiler
             #[cfg(feature = "profiling")]
             profiler,
         }
     }
 
+    pub fn new_render_textures(&self, ctx: &WgpuContext) -> RenderTextures {
+        RenderTextures::new(ctx, self.width, self.height)
+    }
+
     pub fn render_store_with_pool(
         &mut self,
         ctx: &WgpuContext,
+        render_textures: &mut RenderTextures,
         clear_color: wgpu::Color,
         store: &CoreItemStore,
         pool: &mut RenderPool,
@@ -211,7 +200,7 @@ impl Renderer {
 
                 let ctx = RenderContext {
                     pipelines: &self.pipelines,
-                    render_textures: &self.render_textures,
+                    render_textures,
                     render_packets: &self.packets,
                     render_pool: pool,
                     wgpu_ctx: ctx,
@@ -260,52 +249,10 @@ impl Renderer {
                 gpu_profiler.new_frame();
             }
 
-            self.output_texture_dirty = true;
-            self.depth_texture_dirty = true;
+            render_textures.mark_dirty();
         }
 
         self.packets.clear();
-        // drop(render_primitives);
-    }
-
-    pub fn get_rendered_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
-        if !self.output_texture_dirty {
-            // trace!("[Camera] Updating rendered texture data...");
-            return self.render_textures.render_texture.texture_data();
-        }
-        self.output_texture_dirty = false;
-        self.render_textures.render_texture.update_texture_data(ctx)
-    }
-    pub fn get_rendered_texture_img_buffer(
-        &mut self,
-        ctx: &WgpuContext,
-    ) -> ImageBuffer<Rgba<u8>, &[u8]> {
-        ImageBuffer::from_raw(self.width, self.height, self.get_rendered_texture_data(ctx)).unwrap()
-    }
-
-    pub fn get_depth_texture_data(&mut self, ctx: &WgpuContext) -> &[f32] {
-        if !self.depth_texture_dirty {
-            return bytemuck::cast_slice(self.render_textures.depth_stencil_texture.texture_data());
-        }
-        self.depth_texture_dirty = false;
-        bytemuck::cast_slice(
-            self.render_textures
-                .depth_stencil_texture
-                .update_texture_data(ctx),
-        )
-    }
-
-    pub fn get_depth_texture_img_buffer(
-        &mut self,
-        ctx: &WgpuContext,
-    ) -> ImageBuffer<Luma<u8>, Vec<u8>> {
-        let data = self
-            .get_depth_texture_data(ctx)
-            .iter()
-            // Map 0.0-1.0 to 0-255
-            .map(|&d| (d.clamp(0.0, 1.0) * 255.0) as u8)
-            .collect::<Vec<_>>();
-        ImageBuffer::from_raw(self.width, self.height, data).unwrap()
     }
 }
 

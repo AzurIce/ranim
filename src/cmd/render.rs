@@ -4,7 +4,7 @@ use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::store::CoreItemStore;
 use ranim_core::{Output, Scene, SceneConfig, SceneConstructor, SealedRanimScene, TimeMark};
-use ranim_render::resource::RenderPool;
+use ranim_render::resource::{RenderPool, RenderTextures};
 use ranim_render::{Renderer, utils::WgpuContext};
 use std::time::Duration;
 use std::{
@@ -81,8 +81,8 @@ impl RenderThreadHandle {
 
 struct RenderWorker {
     ctx: WgpuContext,
-    // frame_size: (u32, u32),
     renderer: Renderer,
+    render_textures: RenderTextures,
     pool: RenderPool,
     clear_color: wgpu::Color,
     // video writer
@@ -131,6 +131,7 @@ impl RenderWorker {
                 .join(output_dir);
         }
         let renderer = Renderer::new(&ctx, output.width, output.height, 8);
+        let render_textures = renderer.new_render_textures(&ctx);
         let clear_color = color::try_color(&scene_config.clear_color)
             .unwrap_or(color::color("#333333ff"))
             .convert::<LinearSrgb>();
@@ -141,6 +142,7 @@ impl RenderWorker {
         Self {
             ctx,
             renderer,
+            render_textures,
             pool: RenderPool::new(),
             clear_color,
             video_writer: None,
@@ -214,6 +216,7 @@ impl RenderWorker {
 
             self.renderer.render_store_with_pool(
                 &self.ctx,
+                &mut self.render_textures,
                 self.clear_color,
                 store,
                 &mut self.pool,
@@ -229,11 +232,11 @@ impl RenderWorker {
     fn write_frame(&mut self) {
         // `output_video` is true
         if let Some(video_writer) = self.video_writer.as_mut() {
-            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
+            video_writer.write_frame(self.render_textures.get_rendered_texture_data(&self.ctx));
         } else if let Some(builder) = self.video_writer_builder.as_ref() {
             self.video_writer
                 .get_or_insert(builder.clone().build())
-                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
+                .write_frame(self.render_textures.get_rendered_texture_data(&self.ctx));
         }
     }
 
@@ -254,7 +257,7 @@ impl RenderWorker {
         if !dir.exists() || !dir.is_dir() {
             std::fs::create_dir_all(dir).unwrap();
         }
-        let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx);
+        let buffer = self.render_textures.get_rendered_texture_img_buffer(&self.ctx);
         buffer.save(path).unwrap();
     }
 }
