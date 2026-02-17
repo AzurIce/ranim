@@ -20,6 +20,7 @@ fn render_benchmark(c: &mut Criterion) {
                         dir: "bench".to_string(),
                         ..Default::default()
                     },
+                    2,
                 );
             });
         });
@@ -34,6 +35,7 @@ fn render_benchmark(c: &mut Criterion) {
                         dir: "bench".to_string(),
                         ..Default::default()
                     },
+                    2,
                 );
             });
         });

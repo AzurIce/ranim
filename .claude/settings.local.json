@@ -9,7 +9,8 @@
       "Bash(cargo build:*)",
       "Bash(git stash:*)",
       "Bash(git checkout:*)",
-      "Bash(cargo bench:*)"
+      "Bash(cargo bench:*)",
+      "Bash(cargo clippy:*)"
     ]
   }
 }

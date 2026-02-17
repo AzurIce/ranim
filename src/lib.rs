@@ -48,7 +48,7 @@ pub use ranim_core::{
 };
 
 /// Render a scene by name. Expands `render_scene!(foo)` to call
-/// `cmd::render_scene(&Scene::from(foo_scene))`.
+/// `cmd::render_scene(&Scene::from(foo_scene), 2)`.
 ///
 /// ```rust,ignore
 /// render_scene!(fading);
@@ -58,7 +58,7 @@ pub use ranim_core::{
 macro_rules! render_scene {
     ($scene:ident) => {
         $crate::paste::paste! {
-            $crate::cmd::render_scene(&$crate::Scene::from([< $scene _scene >]))
+            $crate::cmd::render_scene(&$crate::Scene::from([< $scene _scene >]), 2)
         }
     };
 }

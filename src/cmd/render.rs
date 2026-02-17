@@ -1,10 +1,12 @@
 // MARK: Render api
+use std::collections::VecDeque;
+
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::store::CoreItemStore;
 use ranim_core::{Output, Scene, SceneConfig, SceneConstructor, SealedRanimScene, TimeMark};
-use ranim_render::resource::RenderPool;
+use ranim_render::resource::{RenderPool, RenderTextures};
 use ranim_render::{Renderer, utils::WgpuContext};
 use std::time::Duration;
 use std::{
@@ -20,7 +22,7 @@ mod file_writer;
 use ranim_render::PUFFIN_GPU_PROFILER;
 
 /// Render a scene with all its outputs
-pub fn render_scene(scene: &Scene) {
+pub fn render_scene(scene: &Scene, buffer_count: usize) {
     for (i, output) in scene.outputs.iter().enumerate() {
         info!(
             "Rendering output {}/{} ({})",
@@ -33,6 +35,7 @@ pub fn render_scene(scene: &Scene) {
             scene.name.to_string(),
             &scene.config,
             output,
+            buffer_count,
         );
     }
 }
@@ -43,6 +46,7 @@ pub fn render_scene_output(
     name: String,
     scene_config: &SceneConfig,
     output: &Output,
+    buffer_count: usize,
 ) {
     use std::time::Instant;
 
@@ -50,7 +54,7 @@ pub fn render_scene_output(
     let scene = constructor.build_scene();
     trace!("Build timeline cost: {:?}", t.elapsed());
 
-    let mut app = RanimRenderApp::new(name, scene_config, output);
+    let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
     app.render_timeline(&scene);
     if !scene.time_marks().is_empty() {
         app.render_capture_marks(&scene);
@@ -81,8 +85,8 @@ impl RenderThreadHandle {
 
 struct RenderWorker {
     ctx: WgpuContext,
-    // frame_size: (u32, u32),
     renderer: Renderer,
+    render_textures: Vec<RenderTextures>,
     pool: RenderPool,
     clear_color: wgpu::Color,
     // video writer
@@ -97,7 +101,13 @@ struct RenderWorker {
 }
 
 impl RenderWorker {
-    fn new(scene_name: String, scene_config: &SceneConfig, output: &Output) -> Self {
+    fn new(
+        scene_name: String,
+        scene_config: &SceneConfig,
+        output: &Output,
+        buffer_count: usize,
+    ) -> Self {
+        assert!(buffer_count >= 1, "buffer_count must be at least 1");
         info!("Checking ffmpeg...");
         let t = Instant::now();
         if let Ok(ffmpeg_path) = which::which("ffmpeg") {
@@ -131,6 +141,9 @@ impl RenderWorker {
                 .join(output_dir);
         }
         let renderer = Renderer::new(&ctx, output.width, output.height, 8);
+        let render_textures: Vec<RenderTextures> = (0..buffer_count)
+            .map(|_| renderer.new_render_textures(&ctx))
+            .collect();
         let clear_color = color::try_color(&scene_config.clear_color)
             .unwrap_or(color::color("#333333ff"))
             .convert::<LinearSrgb>();
@@ -141,6 +154,7 @@ impl RenderWorker {
         Self {
             ctx,
             renderer,
+            render_textures,
             pool: RenderPool::new(),
             clear_color,
             video_writer: None,
@@ -178,21 +192,54 @@ impl RenderWorker {
         back_tx.send_blocking(CoreItemStore::default()).unwrap();
         std::thread::spawn(move || {
             let mut worker = self;
-            let mut frame_count = 0;
+            let n = worker.render_textures.len();
+            let mut frame_count = 0u64;
+            let mut cur = 0usize;
+            let mut pending: VecDeque<(usize, u64)> = VecDeque::new();
 
             while let Ok(store) = submit_frame_rx.recv_blocking() {
-                worker.render_store(&store);
-                worker.write_frame();
-                if worker.save_frames {
-                    worker.capture_frame(
-                        worker
-                            .save_frame_dir()
-                            .join(format!("{frame_count:04}.png")),
-                    );
-                };
-                frame_count += 1;
+                // Drain oldest pending readback if all targets are occupied
+                if pending.len() >= n {
+                    let (prev, prev_fc) = pending.pop_front().unwrap();
+                    worker.render_textures[prev].finish_readback(&worker.ctx);
+                    worker.output_frame_from(prev, prev_fc);
+                }
 
+                // Render current frame and start async readback
+                worker.renderer.render_store_with_pool(
+                    &worker.ctx,
+                    &mut worker.render_textures[cur],
+                    worker.clear_color,
+                    &store,
+                    &mut worker.pool,
+                );
+                worker.render_textures[cur].start_readback(&worker.ctx);
+                worker.pool.clean();
+
+                pending.push_back((cur, frame_count));
+                frame_count += 1;
+                cur = (cur + 1) % n;
+
+                // Return store early so main thread can eval next frame
+                // while GPU processes the readback
                 back_tx.send_blocking(store).unwrap();
+
+                // Now try to drain any completed readbacks while we wait
+                // for the next frame from the main thread
+                while let Some(&(prev, _)) = pending.front() {
+                    // Non-blocking: check if the oldest readback is ready
+                    if !worker.render_textures[prev].try_finish_readback(&worker.ctx) {
+                        break;
+                    }
+                    let (prev, prev_fc) = pending.pop_front().unwrap();
+                    worker.output_frame_from(prev, prev_fc);
+                }
+            }
+
+            // Flush all remaining pending frames
+            while let Some((prev, prev_fc)) = pending.pop_front() {
+                worker.render_textures[prev].finish_readback(&worker.ctx);
+                worker.output_frame_from(prev, prev_fc);
             }
 
             worker_tx.send_blocking(worker).unwrap();
@@ -214,6 +261,7 @@ impl RenderWorker {
 
             self.renderer.render_store_with_pool(
                 &self.ctx,
+                &mut self.render_textures[0],
                 self.clear_color,
                 store,
                 &mut self.pool,
@@ -225,19 +273,41 @@ impl RenderWorker {
         profiling::finish_frame!();
     }
 
-    /// Write frame to video file
-    fn write_frame(&mut self) {
-        // `output_video` is true
-        if let Some(video_writer) = self.video_writer.as_mut() {
-            video_writer.write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
-        } else if let Some(builder) = self.video_writer_builder.as_ref() {
-            self.video_writer
-                .get_or_insert(builder.clone().build())
-                .write_frame(self.renderer.get_rendered_texture_data(&self.ctx));
+    /// Write and save (if [`Self::save_frames`] is true)
+    fn output_frame_from(&mut self, target_idx: usize, frame_number: u64) {
+        self.write_frame_from(target_idx);
+        if self.save_frames {
+            self.save_frame_from(target_idx, frame_number);
         }
     }
 
-    /// Capture frame to image file
+    /// Write frame data from the given target to the video file.
+    fn write_frame_from(&mut self, target_idx: usize) {
+        let data = self.render_textures[target_idx]
+            .render_texture
+            .texture_data();
+        if let Some(video_writer) = self.video_writer.as_mut() {
+            video_writer.write_frame(data);
+        } else if let Some(builder) = self.video_writer_builder.as_ref() {
+            self.video_writer
+                .get_or_insert(builder.clone().build())
+                .write_frame(data);
+        }
+    }
+
+    /// Save frame from the given target as a PNG image.
+    fn save_frame_from(&mut self, target_idx: usize, frame_number: u64) {
+        let path = self.save_frame_dir().join(format!("{frame_number:04}.png"));
+        let dir = path.parent().unwrap();
+        if !dir.exists() || !dir.is_dir() {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        // Data is already in cpu buffer after finish_readback, this won't trigger GPU work
+        let buffer = self.render_textures[target_idx].get_rendered_texture_img_buffer(&self.ctx);
+        buffer.save(path).unwrap();
+    }
+
+    /// Capture frame to image file (sync path, uses target 0).
     pub fn capture_frame(&mut self, path: impl AsRef<Path>) {
         let path = path.as_ref();
         let path = if !path.is_absolute() {
@@ -254,7 +324,7 @@ impl RenderWorker {
         if !dir.exists() || !dir.is_dir() {
             std::fs::create_dir_all(dir).unwrap();
         }
-        let buffer = self.renderer.get_rendered_texture_img_buffer(&self.ctx);
+        let buffer = self.render_textures[0].get_rendered_texture_img_buffer(&self.ctx);
         buffer.save(path).unwrap();
     }
 }
@@ -267,8 +337,13 @@ struct RanimRenderApp {
 }
 
 impl RanimRenderApp {
-    fn new(scene_name: String, scene_config: &SceneConfig, output: &Output) -> Self {
-        let render_worker = RenderWorker::new(scene_name, scene_config, output);
+    fn new(
+        scene_name: String,
+        scene_config: &SceneConfig,
+        output: &Output,
+        buffer_count: usize,
+    ) -> Self {
+        let render_worker = RenderWorker::new(scene_name, scene_config, output, buffer_count);
         Self {
             render_worker: Some(render_worker),
             fps: output.fps,

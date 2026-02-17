@@ -461,6 +461,9 @@ pub struct ReadbackWgpuTexture {
     aligned_bytes_per_row: usize,
     staging_buffer: wgpu::Buffer,
     bytes: Vec<u8>,
+    /// Pending async readback receiver. Present when `start_readback` has been called
+    /// but `finish_readback` has not yet completed.
+    pending_rx: Option<async_channel::Receiver<Result<(), wgpu::BufferAsyncError>>>,
 }
 
 impl Deref for ReadbackWgpuTexture {
@@ -505,18 +508,24 @@ impl ReadbackWgpuTexture {
             aligned_bytes_per_row: bytes_per_row,
             staging_buffer,
             bytes,
+            pending_rx: None,
         }
     }
     pub fn texture_data(&self) -> &[u8] {
         &self.bytes
     }
-    pub fn update_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
+
+    /// Start an async readback: copy texture to staging buffer, submit, and begin mapping.
+    ///
+    /// This is non-blocking. Call [`finish_readback`](Self::finish_readback) later to
+    /// poll the device and copy the data into the CPU-side buffer.
+    pub fn start_readback(&mut self, ctx: &WgpuContext) {
         let size = self.size();
 
         let mut encoder = ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Get Texture Data"),
+                label: Some("Readback Copy Encoder"),
             });
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
@@ -535,42 +544,81 @@ impl ReadbackWgpuTexture {
             },
             size,
         );
-        // println!("copying");
         ctx.queue.submit(Some(encoder.finish()));
-        pollster::block_on(async {
-            let buffer_slice = self.staging_buffer.slice(..);
 
-            // NOTE: We have to create the mapping THEN device.poll() before await
-            // the future. Otherwise the application will freeze.
-            let (tx, rx) = async_channel::bounded(1);
-            buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-                let _ = tx.try_send(result);
-            });
-            // println!("mapping");
-            ctx.device
-                .poll(wgpu::PollType::wait_indefinitely())
-                .unwrap();
-            // println!("mapped");
-            rx.recv().await.unwrap().unwrap();
-
-            {
-                let view = buffer_slice.get_mapped_range();
-                let block_size = self.inner.format().block_copy_size(None).unwrap();
-                let bytes_in_row = (size.width * block_size) as usize;
-                // dbg!(bytes_in_row, block_size, size);
-
-                // texture_data.copy_from_slice(&view);
-                for y in 0..size.height as usize {
-                    let src_row_start = y * self.aligned_bytes_per_row;
-                    let dst_row_start = y * bytes_in_row;
-
-                    self.bytes[dst_row_start..dst_row_start + bytes_in_row]
-                        .copy_from_slice(&view[src_row_start..src_row_start + bytes_in_row]);
-                }
-            }
+        let buffer_slice = self.staging_buffer.slice(..);
+        let (tx, rx) = async_channel::bounded(1);
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            let _ = tx.try_send(result);
         });
-        self.staging_buffer.unmap();
+        self.pending_rx = Some(rx);
+    }
 
+    /// Finish a pending async readback: poll the device, copy data from the staging
+    /// buffer into the CPU-side buffer, and unmap.
+    ///
+    /// If no readback is pending, this is a no-op.
+    pub fn finish_readback(&mut self, ctx: &WgpuContext) {
+        let Some(rx) = self.pending_rx.take() else {
+            return;
+        };
+
+        ctx.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
+        pollster::block_on(rx.recv()).unwrap().unwrap();
+
+        self.copy_staging_to_bytes();
+    }
+
+    /// Try to finish a pending readback without blocking.
+    /// Returns `true` if completed (or nothing was pending), `false` if GPU isn't done yet.
+    pub fn try_finish_readback(&mut self, ctx: &WgpuContext) -> bool {
+        let Some(rx) = self.pending_rx.as_ref() else {
+            return true;
+        };
+
+        // Non-blocking poll to nudge the GPU
+        let _ = ctx.device.poll(wgpu::PollType::Poll);
+
+        // Check if the mapping callback has fired
+        match rx.try_recv() {
+            Ok(result) => {
+                result.unwrap();
+                self.pending_rx = None;
+                self.copy_staging_to_bytes();
+                true
+            }
+            Err(async_channel::TryRecvError::Empty) => false,
+            Err(async_channel::TryRecvError::Closed) => {
+                self.pending_rx = None;
+                true
+            }
+        }
+    }
+
+    fn copy_staging_to_bytes(&mut self) {
+        let size = self.size();
+        let buffer_slice = self.staging_buffer.slice(..);
+        let view = buffer_slice.get_mapped_range();
+        let block_size = self.inner.format().block_copy_size(None).unwrap();
+        let bytes_in_row = (size.width * block_size) as usize;
+
+        for y in 0..size.height as usize {
+            let src_row_start = y * self.aligned_bytes_per_row;
+            let dst_row_start = y * bytes_in_row;
+
+            self.bytes[dst_row_start..dst_row_start + bytes_in_row]
+                .copy_from_slice(&view[src_row_start..src_row_start + bytes_in_row]);
+        }
+        drop(view);
+        self.staging_buffer.unmap();
+    }
+
+    /// Synchronous readback: start + finish in one call.
+    pub fn update_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
+        self.start_readback(ctx);
+        self.finish_readback(ctx);
         &self.bytes
     }
 }
