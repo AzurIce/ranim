@@ -4,7 +4,7 @@ code = """
 use ranim::{
     anims::{
         creation::{CreationAnim, WritingAnim},
-        transform::TransformAnim,
+        morph::MorphAnim,
     },
     color::palettes::manim,
     items::vitem::{
@@ -47,7 +47,7 @@ fn getting_started2(r: &mut RanimScene) {
             .play(
                 square
                     .clone()
-                    .transform_to(circle.clone())
+                    .morph_to(circle.clone())
                     .with_rate_func(linear),
             )
             .play(circle.clone().unwrite());
@@ -56,7 +56,7 @@ fn getting_started2(r: &mut RanimScene) {
     r.timeline_mut(r_rect).play(VItem::from(rect).uncreate());
 }
 ```"""
-hash = "e18dce100dd758fa742545284441686ce82fcdb5"
+hash = "0a2eb68891eae92cf32f1dc0b2cd21ee7128de0d"
 preview_imgs = []
 output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
 wasm = true

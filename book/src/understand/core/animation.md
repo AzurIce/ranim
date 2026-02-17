@@ -110,21 +110,21 @@ let vitem_b = // ...;
 // vitem_a = anim.eval_alpha(1.0);
 // r.timeline_mut(t_id).play(anim);
 
-r.timeline_mut(t_id).play(vitem_a.transform_to(vitem_b));
+r.timeline_mut(t_id).play(vitem_a.morph_to(vitem_b));
 ```
 
 这是 Ranim 动画的一种编程模式，每一个动画都有一个对应的 Requirement Trait：
 
 ```rust,ignore
-{{#include ../../../../packages/ranim-anims/src/transform.rs:TransformRequirement}}
+{{#include ../../../../packages/ranim-anims/src/morph.rs:MorphRequirement}}
 ```
 
 同时还有一个对应的 Animation Trait，包含了一系列的 Helper 函数，以及为 `T: <Requirement Trait>` 的实现：
 
 ```rust,ignore
-{{#include ../../../../packages/ranim-anims/src/transform.rs:TransformAnim}}
+{{#include ../../../../packages/ranim-anims/src/morph.rs:MorphAnim}}
 
-{{#include ../../../../packages/ranim-anims/src/transform.rs:TransformAnim-Impl}}
+{{#include ../../../../packages/ranim-anims/src/morph.rs:MorphAnim-Impl}}
 ```
 
 通过这种模式可以便捷地构造动画，并将动画的效果应用到物件状态上。

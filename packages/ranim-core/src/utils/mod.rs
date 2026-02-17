@@ -94,7 +94,7 @@ pub fn resize_preserving_order<T: Clone>(vec: &[T], new_len: usize) -> Vec<T> {
 /// Resize the vec while preserving the order
 ///
 /// returns the repeated idxs
-/// ```
+/// ```ignore
 ///                     *     *     *     *  repeated
 /// [0, 1, 2, 3] -> [0, 0, 1, 1, 2, 2, 3 ,3]
 /// ```
@@ -119,7 +119,7 @@ pub fn resize_preserving_order_with_repeated_indices<T: Clone>(
 /// Resize the vec while preserving the order
 ///
 /// returns the repeated cnt of each value
-/// ```
+/// ```ignore
 ///                 [2  2][2  2][2  2][2  2]
 /// [0, 1, 2, 3] -> [0, 0, 1, 1, 2, 2, 3 ,3]
 /// ```

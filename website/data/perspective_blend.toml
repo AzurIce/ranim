@@ -2,7 +2,7 @@ name = "perspective_blend"
 code = """
 ```rust
 use ranim::{
-    anims::transform::TransformAnim,
+    anims::morph::MorphAnim,
     color,
     color::palettes::manim,
     glam::DVec3,
@@ -48,26 +48,34 @@ fn perspective_blend(r: &mut RanimScene) {
     let frac = 2.0;
     let transform_fns: [&dyn Fn(&mut VItem); 6] = [
         &(|data| {
-            data.shift(DVec3::NEG_Y * side_length / frac)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::X);
+            data.shift(DVec3::NEG_Y * side_length / frac);
+            data.with_origin(AabbPoint::CENTER, |x| {
+                x.rotate_on_x(std::f64::consts::PI / 2.0);
+            });
         }),
         &(|data| {
-            data.shift(DVec3::X * side_length / frac)
-                .rotate(std::f64::consts::PI / 2.0, DVec3::Y);
+            data.shift(DVec3::X * side_length / frac);
+            data.with_origin(AabbPoint::CENTER, |x| {
+                x.rotate_on_y(std::f64::consts::PI / 2.0);
+            });
         }),
         &(|data| {
             data.shift(DVec3::NEG_Z * side_length / frac);
         }),
         &(|data| {
-            data.shift(DVec3::Y * side_length / frac)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::X);
+            data.shift(DVec3::Y * side_length / frac);
+            data.with_origin(AabbPoint::CENTER, |x| {
+                x.rotate_on_x(-std::f64::consts::PI / 2.0);
+            });
         }),
         &(|data| {
             data.shift(DVec3::Z * side_length / frac);
         }),
         &(|data| {
-            data.shift(DVec3::NEG_X * side_length / frac)
-                .rotate(-std::f64::consts::PI / 2.0, DVec3::Y);
+            data.shift(DVec3::NEG_X * side_length / frac);
+            data.with_origin(AabbPoint::CENTER, |x| {
+                x.rotate_on_y(-std::f64::consts::PI / 2.0);
+            });
         }),
     ];
 
@@ -76,7 +84,7 @@ fn perspective_blend(r: &mut RanimScene) {
         .zip(transform_fns)
         .for_each(|((r_face, face), transform_fn)| {
             r.timeline_mut(*r_face)
-                .play(face.transform(transform_fn).with_rate_func(linear))
+                .play(face.morph(transform_fn).with_rate_func(linear))
                 .hide();
         });
 
@@ -87,15 +95,19 @@ fn perspective_blend(r: &mut RanimScene) {
     r.timelines_mut().sync(); // TODO: make this better
     r.timeline_mut(r_faces).play(
         faces
-            .transform(|data| {
-                data.rotate(std::f64::consts::PI / 6.0, DVec3::Y)
-                    .rotate(std::f64::consts::PI / 6.0, DVec3::X);
+            .morph(|data| {
+                data.with_origin(AabbPoint::CENTER, |x| {
+                    x.rotate_on_y(std::f64::consts::PI / 6.0);
+                });
+                data.with_origin(AabbPoint::CENTER, |x| {
+                    x.rotate_on_x(std::f64::consts::PI / 6.0);
+                });
             })
             .with_duration(4.0),
     );
 
     r.timeline_mut(r_cam).forward(2.0).play(
-        cam.transform(|data| {
+        cam.morph(|data| {
             data.perspective_blend = 1.0;
         })
         .with_duration(2.0),
@@ -106,7 +118,7 @@ fn perspective_blend(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "1a52947cc32e391acc04f7e73f5a24ea0e655d04"
+hash = "3d5d46ed8702b720750881c8c31e4ae1cb059dd7"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

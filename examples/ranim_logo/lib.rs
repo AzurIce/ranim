@@ -4,7 +4,7 @@ use std::f64::consts::PI;
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
 use ranim::{
-    anims::{creation::WritingAnim, lagged::LaggedAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, lagged::LaggedAnim, morph::MorphAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -52,9 +52,11 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
         ));
     });
     let blue_triangle = green_triangle.clone().with(|tri| {
-        tri.set_color(manim::BLUE_C)
-            .rotate(PI, DVec3::Z)
-            .shift(DVec3::NEG_Y * logo_width / 2.0);
+        tri.set_color(manim::BLUE_C);
+        tri.with_origin(AabbPoint::CENTER, |x| {
+            x.rotate_on_z(PI);
+        });
+        tri.shift(DVec3::NEG_Y * logo_width / 2.0);
     }); // ◣
 
     [
@@ -118,10 +120,14 @@ fn ranim_logo(r: &mut RanimScene) {
         .for_each(|(chunk, (scale, anchor))| {
             chunk.for_each(|(r_item, item)| {
                 r.timeline_mut(*r_item).play(
-                    item.transform(|data| {
-                        data.scale_at(scale, anchor)
-                            .scale_at(dvec3(0.9, 0.9, 1.0), DVec3::ZERO)
-                            .shift(dvec3(0.0, 1.3, 0.0));
+                    item.morph(|data| {
+                        data.with_origin(anchor, |x| {
+                            x.scale(scale);
+                        });
+                        data.with_origin(DVec3::ZERO, |x| {
+                            x.scale(dvec3(0.9, 0.9, 1.0));
+                        });
+                        data.shift(dvec3(0.0, 1.3, 0.0));
                     })
                     .with_rate_func(smooth),
                 );

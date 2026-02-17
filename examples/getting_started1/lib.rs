@@ -1,5 +1,5 @@
 use ranim::{
-    anims::{creation::WritingAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, morph::MorphAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -27,7 +27,7 @@ fn getting_started1(r: &mut RanimScene) {
         let timeline = r.timeline_mut(r_vitem);
         // In order to do more low-level opeerations,
         // sometimes we need to convert the item to a low-level item.
-        timeline.play(VItem::from(square).transform_to(VItem::from(circle.clone())));
+        timeline.play(VItem::from(square).morph_to(VItem::from(circle.clone())));
         timeline.play(VItem::from(circle).unwrite());
     }
 }

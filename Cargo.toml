@@ -297,3 +297,11 @@ wasm = true
 name = "output_formats"
 path = "examples/output_formats/lib.rs"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "text_item"
+path = "examples/text_item/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.text_item]
+wasm = true

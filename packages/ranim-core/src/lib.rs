@@ -427,8 +427,8 @@ impl SealedRanimScene {
 ///
 /// | Index Type | Output Type |
 /// |------------|-------------|
-/// |   `usize`    | `Option<&NeoItemTimeline>` and `Option<&mut NeoItemTimeline>` |
-/// |   `TimelineId`    | `&NeoItemTimeline` and `&mut NeoItemTimeline` |
+/// |   `usize`    | `Option<&Timeline>` and `Option<&mut Timeline>` |
+/// |   `TimelineId`    | `&Timeline` and `&mut Timeline` |
 /// |   `TQ: TimelineQuery<'a>`    | `TQ::RessembleResult` and `TQ::RessembleMutResult` |
 /// |   `[TQ: TimelineQuery<'a>; N]`    | `[TQ::RessembleResult; N]` and `Result<[TQ::RessembleMutResult; N], TimelineIndexMutError>` |
 pub trait TimelineIndex<'a> {

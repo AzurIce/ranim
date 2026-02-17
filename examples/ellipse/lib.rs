@@ -1,5 +1,5 @@
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, transform::TransformAnim},
+    anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
     color::palettes::manim,
     glam::dvec2,
     items::vitem::{
@@ -28,14 +28,14 @@ fn ellipse(r: &mut RanimScene) {
         c.set_stroke_color(manim::RED_C);
     });
     r.timeline_mut(r_item)
-        .play(vitem.transform_to(VItem::from(circle)));
+        .play(vitem.morph_to(VItem::from(circle)));
 
     // Transform to a vertical ellipse
     let ellipse_v = Ellipse::new(dvec2(1.0, 2.5)).with(|e| {
         e.set_stroke_color(manim::GREEN_C);
     });
     r.timeline_mut(r_item)
-        .play(vitem.transform_to(VItem::from(ellipse_v)));
+        .play(vitem.morph_to(VItem::from(ellipse_v)));
 
     // Fade out
     r.timeline_mut(r_item).play(vitem.fade_out());

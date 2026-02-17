@@ -5,8 +5,8 @@ use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};
 use ranim::{
-    anims::transform::TransformAnim, color::palettes::manim, items::vitem::geometry::Rectangle,
-    prelude::*, utils::rate_functions::linear,
+    anims::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle, prelude::*,
+    utils::rate_functions::linear,
 };
 
 fn selective_sort(r: &mut RanimScene, num: usize) {
@@ -43,14 +43,14 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
         .collect::<Vec<_>>();
 
     let highlight = |rect: &mut Rectangle| {
-        rect.transform(|data| {
+        rect.morph(|data| {
             data.set_color(manim::RED_C).set_fill_opacity(0.5);
         })
         .with_duration(anim_step_duration)
         .with_rate_func(linear)
     };
     let unhighlight = |rect: &mut Rectangle| {
-        rect.transform(|data| {
+        rect.morph(|data| {
             data.set_color(manim::WHITE).set_fill_opacity(0.5);
         })
         .with_duration(anim_step_duration)
@@ -76,7 +76,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                     .zip(color)
                     .for_each(|(((timeline, rect), dir), color)| {
                         timeline.play(
-                            rect.transform(|rect| {
+                            rect.morph(|rect| {
                                 rect.shift(dir * (j - i) as f64)
                                     .set_color(color)
                                     .set_fill_opacity(0.5);
@@ -114,7 +114,7 @@ fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
 ```"""
-hash = "4bf4012be389bbbddf632c9c403564d30572bdab"
+hash = "f4ed3be19b1e59b479964a2c78ac46259b4c707c"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/selective_sort_1920x1080_60.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
 wasm = true

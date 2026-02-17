@@ -5,17 +5,16 @@ use ranim_core::{
     anchor::{Aabb, AabbPoint, Locate},
     color,
     core_item::CoreItem,
-    glam,
-    traits::{Discard, Rotate, RotateExt, Scale, Shift, ShiftExt},
+    glam::{DVec2, DVec3, dvec2, dvec3},
+    traits::{Discard, RotateTransform, ScaleTransform, ShiftTransform, ShiftTransformExt},
 };
 
 use color::{AlphaColor, Srgb};
-use glam::{DVec2, DVec3, dvec2, dvec3};
 use itertools::Itertools;
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem, geometry::Circle};
 use ranim_core::core_item::vitem::Basis2d;
-use ranim_core::traits::{Alignable, FillColor, Opacity, ScaleExt, StrokeColor, StrokeWidth, With};
+use ranim_core::traits::{Alignable, FillColor, Opacity, StrokeColor, StrokeWidth, With};
 
 // MARK: ### Square ###
 /// A Square
@@ -51,14 +50,14 @@ impl Square {
     }
     /// Scale the square by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ScaleTransform`]'s `DVec3`,
     /// because this keeps the square a square.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
         self.scale_at(scale, AabbPoint::CENTER)
     }
     /// Scale the square by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ScaleTransform`]'s `DVec3`,
     /// because this keeps the square a square.
     pub fn scale_at<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
@@ -66,7 +65,10 @@ impl Square {
     {
         let anchor = anchor.locate(self);
         self.size *= scale;
-        self.center.scale_at(DVec3::splat(scale), anchor);
+        self.center
+            .shift(-anchor)
+            .scale(DVec3::splat(scale))
+            .shift(anchor);
         self
     }
 }
@@ -83,17 +85,17 @@ impl Aabb for Square {
     }
 }
 
-impl Shift for Square {
+impl ShiftTransform for Square {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.center.shift(shift);
         self
     }
 }
 
-impl Rotate for Square {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.center.rotate_at(angle, axis, point);
-        self.basis.rotate_axis(axis, angle);
+impl RotateTransform for Square {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.center.rotate_on_axis(axis, angle);
+        self.basis.rotate_on_axis(axis, angle);
         self
     }
 }
@@ -254,24 +256,24 @@ impl Aabb for Rectangle {
     }
 }
 
-impl Shift for Rectangle {
+impl ShiftTransform for Rectangle {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.p0.shift(shift);
         self
     }
 }
 
-impl Rotate for Rectangle {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.p0.rotate_at(angle, axis, point);
-        self.basis.rotate_axis(axis, angle);
+impl RotateTransform for Rectangle {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.p0.rotate_on_axis(axis, angle);
+        self.basis.rotate_on_axis(axis, angle);
         self
     }
 }
 
-impl Scale for Rectangle {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
-        self.p0.scale_at(scale, point);
+impl ScaleTransform for Rectangle {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
+        self.p0.scale(scale);
         let (u, v) = self.basis.uv();
         let scale_u = scale.dot(u);
         let scale_v = scale.dot(v);
@@ -389,27 +391,35 @@ impl Aabb for Polygon {
     }
 }
 
-impl Shift for Polygon {
+impl ShiftTransform for Polygon {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.points.shift(shift);
         self
     }
 }
 
-impl Rotate for Polygon {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.points.rotate_at(angle, axis, point);
-        self.basis.rotate_axis(axis, angle);
+impl RotateTransform for Polygon {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.points.rotate_on_axis(axis, angle);
+        self.basis.rotate_on_axis(axis, angle);
         self
     }
 }
 
-impl Scale for Polygon {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
-        self.points.scale_at(scale, point);
+impl ScaleTransform for Polygon {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
+        self.points.scale(scale);
         self
     }
 }
+
+// impl AffineTransform for Polygon {
+//     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
+//         self.points.affine_transform_at_point(mat, origin);
+//         // TODO: how to transform basis?
+//         self
+//     }
+// }
 
 impl Alignable for Polygon {
     fn is_aligned(&self, other: &Self) -> bool {
@@ -576,17 +586,17 @@ impl Aabb for RegularPolygon {
     }
 }
 
-impl Shift for RegularPolygon {
+impl ShiftTransform for RegularPolygon {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
         self.center.shift(offset);
         self
     }
 }
 
-impl Rotate for RegularPolygon {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.basis.rotate_axis(axis, angle);
-        self.center.rotate_at_point(angle, axis, point);
+impl RotateTransform for RegularPolygon {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.basis.rotate_on_axis(axis, angle);
+        self.center.rotate_on_axis(axis, angle);
         self
     }
 }
