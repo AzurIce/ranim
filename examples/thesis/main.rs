@@ -30,7 +30,7 @@ fn pentagon() -> VItem {
     .with(|x| {
         x.set_color(manim::RED_C);
         x.with_origin(AabbPoint::CENTER, |x| {
-            x.rotate_z(PI / 2.0);
+            x.rotate_on_z(PI / 2.0);
         });
     })
     .into()
@@ -98,7 +98,7 @@ fn transform(r: &mut RanimScene) {
     let dst = Circle::new(1.5).with(|x| {
         x.set_color(manim::BLUE_C).move_to(dvec3(0.0, -2.0, 0.0));
     });
-    // dst.with_origin(AabbPoint::CENTER, |x| { x.rotate_z(PI / 4.0 + PI); }); // rotate to match src
+    // dst.with_origin(AabbPoint::CENTER, |x| { x.rotate_on_z(PI / 4.0 + PI); }); // rotate to match src
     let r_item = r.insert_empty();
     r.timeline_mut(r_item).play(
         VItem::from(src)

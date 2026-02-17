@@ -8,7 +8,7 @@ use ranim_core::{
     color::{self, AlphaColor},
     core_item::CoreItem,
     glam::{DVec3, dvec2},
-    traits::{Rotate, Scale, Shift},
+    traits::{RotateTransform, ScaleTransform, ShiftTransform},
 };
 
 use crate::vitem::geometry::Rectangle;
@@ -36,23 +36,23 @@ impl<T: Aabb> Aabb for VisualizeAabbItem<T> {
     }
 }
 
-impl<T: Aabb + Shift> Shift for VisualizeAabbItem<T> {
+impl<T: Aabb + ShiftTransform> ShiftTransform for VisualizeAabbItem<T> {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
         self.0.shift(offset);
         self
     }
 }
 
-impl<T: Aabb + Rotate> Rotate for VisualizeAabbItem<T> {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.0.rotate_at_point(angle, axis, point);
+impl<T: Aabb + RotateTransform> RotateTransform for VisualizeAabbItem<T> {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.0.rotate_on_axis(axis, angle);
         self
     }
 }
 
-impl<T: Aabb + Scale> Scale for VisualizeAabbItem<T> {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
-        self.0.scale_at_point(scale, point);
+impl<T: Aabb + ScaleTransform> ScaleTransform for VisualizeAabbItem<T> {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
+        self.0.scale(scale);
         self
     }
 }

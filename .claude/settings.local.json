@@ -4,7 +4,11 @@
       "Bash(cargo check:*)",
       "Bash(git worktree add:*)",
       "Bash(cargo test:*)",
-      "Bash(gh pr list:*)"
+      "Bash(gh pr list:*)",
+      "WebFetch(domain:docs.rs)",
+      "Bash(cargo build:*)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

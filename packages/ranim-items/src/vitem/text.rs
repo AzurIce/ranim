@@ -9,8 +9,8 @@ use ranim_core::{
     core_item::CoreItem,
     glam::{DAffine3, DMat3, DVec3},
     traits::{
-        Aabb, Discard, FillColor, Locate, PointsFunc, Rotate, Scale, Shift, StrokeColor,
-        StrokeWidth, With as _,
+        Aabb, Discard, FillColor, Locate, PointsFunc, RotateTransform, ScaleTransform,
+        ShiftTransform, StrokeColor, StrokeWidth, With,
     },
 };
 use typst::foundations::Repr;
@@ -148,7 +148,7 @@ impl TextItem {
     /// Returns the text outline box starting from baseline origin to the width of last character and em height.
     pub fn text_box(&self) -> Parallelogram {
         let [u, v] = self.basis;
-        Parallelogram::new(self.origin, [u * self.inline_em_size(), v])
+        Parallelogram::new(self.origin, (u * self.inline_em_size(), v))
     }
 
     fn generate_items(&self) -> Vec<VItem> {
@@ -232,7 +232,7 @@ impl TextItem {
                 origin,
             );
             item.shift(-min)
-                .scale_at_point(DVec3::splat(1. / h), DVec3::ZERO)
+                .scale(DVec3::splat(1. / h))
                 .apply_point_func(|p| *p = mat.transform_point3(*p));
         });
         let &Self {
@@ -270,7 +270,7 @@ impl Aabb for TextItem {
     }
 }
 
-impl Shift for TextItem {
+impl ShiftTransform for TextItem {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
         self.origin += offset;
         self.transform_items(|item| item.shift(offset).discard());
@@ -278,20 +278,22 @@ impl Shift for TextItem {
     }
 }
 
-impl Rotate for TextItem {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.origin.rotate_at_point(angle, axis, point);
-        self.basis.rotate_at_point(angle, axis, DVec3::ZERO);
-        self.transform_items(|item| item.rotate_at_point(angle, axis, point).discard());
+impl RotateTransform for TextItem {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.origin.rotate_on_axis(axis, angle);
+        self.basis
+            .iter_mut()
+            .for_each(|v| v.rotate_on_axis(axis, angle).discard());
+        self.transform_items(|item| item.rotate_on_axis(axis, angle).discard());
         self
     }
 }
 
-impl Scale for TextItem {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
-        self.origin.scale_at_point(scale, point);
+impl ScaleTransform for TextItem {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
+        self.origin.scale(scale).discard();
         self.basis.iter_mut().for_each(|v| *v *= scale);
-        self.transform_items(|item| item.scale_at_point(scale, point).discard());
+        self.transform_items(|item| item.scale(scale).discard());
         self
     }
 }

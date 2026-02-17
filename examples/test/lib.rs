@@ -37,7 +37,7 @@ fn test(r: &mut RanimScene) {
     let r_square = r.insert(square.clone());
     r.timeline_mut(r_square).play(square.morph(|x| {
         x.with_origin(AabbPoint::CENTER, |x| {
-            x.rotate_y(PI / 2.0);
+            x.rotate_on_y(PI / 2.0);
         });
     }));
 

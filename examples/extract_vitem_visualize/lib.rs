@@ -71,7 +71,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
         circle
             .set_color(manim::GREEN_C)
             .with_origin(AabbPoint::CENTER, |x| {
-                x.rotate_z(-PI / 4.0 + PI);
+                x.rotate_on_z(-PI / 4.0 + PI);
             });
     })));
 

@@ -108,7 +108,7 @@ fn aabb(r: &mut RanimScene) {
             .with(|e| {
                 e.set_color(manim::RED_D);
                 e.with_origin(AabbPoint::CENTER, |x| {
-                    x.rotate_z(PI / 4.0);
+                    x.rotate_on_z(PI / 4.0);
                 });
             })
             .into(),

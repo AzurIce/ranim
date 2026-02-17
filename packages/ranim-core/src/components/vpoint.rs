@@ -90,8 +90,8 @@ impl transform::ShiftTransform for VPointVec {
 }
 
 impl transform::RotateTransform for VPointVec {
-    fn rotate_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.as_mut().rotate_axis(axis, angle);
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.as_mut().rotate_on_axis(axis, angle);
         self
     }
 }
@@ -338,7 +338,7 @@ impl VPointVec {
         }
         rotate_axis = rotate_axis.normalize();
         self.with_origin(cur_start, |x| {
-            x.rotate_axis(rotate_axis, rotate_angle);
+            x.rotate_on_axis(rotate_axis, rotate_angle);
         });
         self.shift(start - cur_start);
 
@@ -396,7 +396,7 @@ mod test {
 
     use crate::{
         components::vpoint::VPointVec,
-        traits::{Aabb as _, Discard, RotateTransform, ShiftTransformExt},
+        traits::{Aabb, RotateTransform},
     };
 
     fn assert_dvec3_eq(a: DVec3, b: DVec3) {
@@ -522,7 +522,7 @@ mod test {
             dvec3(1.0, 0.0, 0.0),
             dvec3(2.0, 2.0, 0.0),
         ]);
-        points.with_origin(DVec3::ZERO, |x| x.rotate_z(PI).discard());
+        points.rotate_on_z(PI);
         assert_points_eq(
             &points.0,
             &[

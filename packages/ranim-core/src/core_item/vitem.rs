@@ -84,9 +84,9 @@ impl Basis2d {
         self.u.cross(self.v).normalize()
     }
     /// Rotate the basis vectors around the given axis.
-    pub fn rotate_axis(&mut self, axis: DVec3, angle: f64) {
-        self.u = self.u.rotate_axis(axis, angle).normalize();
-        self.v = self.v.rotate_axis(axis, angle).normalize();
+    pub fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) {
+        self.u = DVec3::rotate_axis(self.u, axis, angle).normalize();
+        self.v = DVec3::rotate_axis(self.v, axis, angle).normalize();
     }
 }
 

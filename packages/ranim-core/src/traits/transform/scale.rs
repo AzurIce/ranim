@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use glam::{dvec3, DVec3};
+use glam::{DVec3, dvec3};
 use itertools::Itertools;
 
 use crate::{anchor::Aabb, traits::StrokeWidth};
@@ -119,7 +119,7 @@ pub trait ScaleTransformExt: ScaleTransform {
 impl<T: ScaleTransform + ?Sized> ScaleTransformExt for T {}
 
 /// A trait for scaling operations with stroke width.
-pub trait ScaleStrokeTransformExt: ScaleTransform + StrokeWidth {
+pub trait ScaleTransformStrokeExt: ScaleTransform + StrokeWidth {
     /// Scale the item with stroke width (at origin).
     fn scale_with_stroke(&mut self, scale: DVec3) -> &mut Self {
         self.scale(scale);
@@ -146,4 +146,4 @@ pub trait ScaleStrokeTransformExt: ScaleTransform + StrokeWidth {
     }
 }
 
-impl<T: ScaleTransform + StrokeWidth + ?Sized> ScaleStrokeTransformExt for T {}
+impl<T: ScaleTransform + StrokeWidth + ?Sized> ScaleTransformStrokeExt for T {}

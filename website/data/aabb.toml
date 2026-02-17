@@ -7,15 +7,15 @@ use ranim::{
     anims::rotating::RotatingAnim,
     color::palettes::manim,
     core::animation::StaticAnim,
-    glam::{DVec3, dvec2, dvec3},
+    glam::{dvec2, dvec3, DVec3},
     items::{
         debug::VisualizeAabbItem,
         vitem::{
-            VItem,
             geometry::{
                 Arc, ArcBetweenPoints, Circle, Ellipse, EllipticArc, Polygon, Rectangle,
                 RegularPolygon, Square,
             },
+            VItem,
         },
     },
     prelude::*,
@@ -52,48 +52,116 @@ fn aabb(r: &mut RanimScene) {
 
     let items: Vec<VItem> = vec![
         // Row 0: basic shapes
-        Square::new(2.0).with(|s| { s.set_color(manim::BLUE_C); }).into(),
-        Rectangle::new(3.0, 1.5).with(|s| { s.set_color(manim::RED_C); }).into(),
-        Circle::new(1.0).with(|c| { c.set_color(manim::GREEN_C); }).into(),
-        Ellipse::new(dvec2(2.0, 1.0)).with(|e| { e.set_color(manim::TEAL_C); }).into(),
+        Square::new(2.0)
+            .with(|s| {
+                s.set_color(manim::BLUE_C);
+            })
+            .into(),
+        Rectangle::new(3.0, 1.5)
+            .with(|s| {
+                s.set_color(manim::RED_C);
+            })
+            .into(),
+        Circle::new(1.0)
+            .with(|c| {
+                c.set_color(manim::GREEN_C);
+            })
+            .into(),
+        Ellipse::new(dvec2(2.0, 1.0))
+            .with(|e| {
+                e.set_color(manim::TEAL_C);
+            })
+            .into(),
         // Row 1: arcs & regular polygon
-        Arc::new(PI * 1.2, 1.0).with(|a| { a.set_stroke_color(manim::YELLOW_D); }).into(),
+        Arc::new(PI * 1.2, 1.0)
+            .with(|a| {
+                a.set_stroke_color(manim::YELLOW_D);
+            })
+            .into(),
         ArcBetweenPoints::new(dvec3(-1.0, -0.5, 0.0), dvec3(1.0, 0.5, 0.0), PI / 3.0)
-            .with(|a| { a.set_stroke_color(manim::ORANGE); }).into(),
+            .with(|a| {
+                a.set_stroke_color(manim::ORANGE);
+            })
+            .into(),
         EllipticArc::new(0.0, PI * 1.5, dvec2(1.5, 0.8))
-            .with(|e| { e.set_stroke_color(manim::PINK); }).into(),
-        Polygon::from(RegularPolygon::new(5, 1.0).with(|p| { p.set_color(manim::PURPLE_C); })).into(),
+            .with(|e| {
+                e.set_stroke_color(manim::PINK);
+            })
+            .into(),
+        Polygon::from(RegularPolygon::new(5, 1.0).with(|p| {
+            p.set_color(manim::PURPLE_C);
+        }))
+        .into(),
         // Row 2: polygons & rotated shapes
         Polygon::new(vec![
-            dvec3(0.0, 1.0, 0.0), dvec3(-1.0, -0.6, 0.0),
-            dvec3(1.0, -0.6, 0.0), dvec3(0.0, 1.0, 0.0),
-        ]).with(|p| { p.set_color(manim::MAROON_C); }).into(),
-        Polygon::from(RegularPolygon::new(6, 1.0).with(|p| { p.set_color(manim::BLUE_D); })).into(),
-        Ellipse::new(dvec2(2.0, 0.8)).with(|e| {
-            e.set_color(manim::RED_D);
-            e.rotate(PI / 4.0, DVec3::Z);
-        }).into(),
-        Polygon::new(star_points).with(|p| { p.set_color(manim::YELLOW_B); }).into(),
+            dvec3(0.0, 1.0, 0.0),
+            dvec3(-1.0, -0.6, 0.0),
+            dvec3(1.0, -0.6, 0.0),
+            dvec3(0.0, 1.0, 0.0),
+        ])
+        .with(|p| {
+            p.set_color(manim::MAROON_C);
+        })
+        .into(),
+        Polygon::from(RegularPolygon::new(6, 1.0).with(|p| {
+            p.set_color(manim::BLUE_D);
+        }))
+        .into(),
+        Ellipse::new(dvec2(2.0, 0.8))
+            .with(|e| {
+                e.set_color(manim::RED_D);
+                e.with_origin(AabbPoint::CENTER, |x| {
+                    x.rotate_on_z(PI / 4.0);
+                });
+            })
+            .into(),
+        Polygon::new(star_points)
+            .with(|p| {
+                p.set_color(manim::YELLOW_B);
+            })
+            .into(),
         // Row 3: bezier curves — old (control-point min/max) vs new (exact extrema) AABB differ
         //
         // Single segment: handle at (0,3,0), curve only reaches y≈1.5
         VItem::from_vpoints(vec![
-            dvec3(-1.0, 0.0, 0.0), dvec3(0.0, 3.0, 0.0), dvec3(1.0, 0.0, 0.0),
-        ]).with(|v| { v.set_stroke_color(manim::GREEN_C); }),
+            dvec3(-1.0, 0.0, 0.0),
+            dvec3(0.0, 3.0, 0.0),
+            dvec3(1.0, 0.0, 0.0),
+        ])
+        .with(|v| {
+            v.set_stroke_color(manim::GREEN_C);
+        }),
         // S-curve: handles at y=±3, curve stays near y=0
         VItem::from_vpoints(vec![
-            dvec3(-1.0, 0.0, 0.0), dvec3(-0.3, -3.0, 0.0), dvec3(0.0, 0.0, 0.0),
-            dvec3(0.3, 3.0, 0.0), dvec3(1.0, 0.0, 0.0),
-        ]).with(|v| { v.set_stroke_color(manim::RED_C); }),
+            dvec3(-1.0, 0.0, 0.0),
+            dvec3(-0.3, -3.0, 0.0),
+            dvec3(0.0, 0.0, 0.0),
+            dvec3(0.3, 3.0, 0.0),
+            dvec3(1.0, 0.0, 0.0),
+        ])
+        .with(|v| {
+            v.set_stroke_color(manim::RED_C);
+        }),
         // Handle overshoots in x: handle at (3,2,0), endpoint at (1,0,0)
         VItem::from_vpoints(vec![
-            dvec3(0.0, 0.0, 0.0), dvec3(3.0, 2.0, 0.0), dvec3(1.0, 0.0, 0.0),
-        ]).with(|v| { v.set_stroke_color(manim::BLUE_C); }),
+            dvec3(0.0, 0.0, 0.0),
+            dvec3(3.0, 2.0, 0.0),
+            dvec3(1.0, 0.0, 0.0),
+        ])
+        .with(|v| {
+            v.set_stroke_color(manim::BLUE_C);
+        }),
         // Symmetric loop: handles extend to x=±3
         VItem::from_vpoints(vec![
-            dvec3(0.0, -0.5, 0.0), dvec3(-3.0, 2.0, 0.0), dvec3(0.0, 0.5, 0.0),
-            dvec3(3.0, 2.0, 0.0), dvec3(0.0, -0.5, 0.0),
-        ]).with(|v| { v.set_stroke_color(manim::YELLOW_D); }),
+            dvec3(0.0, -0.5, 0.0),
+            dvec3(-3.0, 2.0, 0.0),
+            dvec3(0.0, 0.5, 0.0),
+            dvec3(3.0, 2.0, 0.0),
+            dvec3(0.0, -0.5, 0.0),
+        ])
+        .with(|v| {
+            v.set_stroke_color(manim::YELLOW_D);
+        }),
     ];
 
     for (i, item) in items.into_iter().enumerate() {
@@ -115,7 +183,7 @@ fn aabb(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "74e86aba0d1a0ca6ac369f1352be1a8b6baa81ca"
+hash = "add8e23624f7e9e3a676b901e3a6083499515dd3"
 preview_imgs = ["/examples/aabb/preview.png"]
 output_files = ["/examples/aabb/aabb_1920x1080_60.mp4"]
 wasm = true

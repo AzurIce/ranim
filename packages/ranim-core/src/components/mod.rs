@@ -133,9 +133,12 @@ mod test {
 
     #[test]
     fn test_bounding_box() {
+        // 5 points = 2 bezier segments: [P0,P1,P2] and [P2,P3,P4]
+        // P3 == P2 signals a subpath break, so 2nd segment is a line from P2 to P4.
         let points: VPointVec = VPointVec(vec![
             dvec3(-100.0, -100.0, 0.0),
             dvec3(-100.0, 100.0, 0.0),
+            dvec3(100.0, 100.0, 0.0),
             dvec3(100.0, 100.0, 0.0),
             dvec3(100.0, -200.0, 0.0),
         ]);
@@ -175,18 +178,19 @@ mod test {
             dvec3(4.0, 4.0, 0.0),
         ];
         let mut scale_origin = VPointVec(square.clone());
+        // Bezier-aware AABB center: ((-1+4)/2, (-1.25+4)/2, 0) = (1.5, 1.375, 0)
         assert_eq!(
             AabbPoint(DVec3::ZERO).locate(&scale_origin),
-            dvec3(0.5, 1.0, 0.0)
+            dvec3(1.5, 1.375, 0.0)
         );
         scale_origin.with_origin(AabbPoint::CENTER, |x| { x.scale(DVec3::splat(3.0)); });
 
         let ans = VPointVec(vec![
-            dvec3(-4.0, -5.0, 0.0),
-            dvec3(5.0, -8.0, 0.0),
-            dvec3(0.5, 1.0, 0.0),
-            dvec3(-10.0, 7.0, 0.0),
-            dvec3(11.0, 10.0, 0.0),
+            dvec3(-6.0, -5.75, 0.0),
+            dvec3(3.0, -8.75, 0.0),
+            dvec3(-1.5, 0.25, 0.0),
+            dvec3(-12.0, 6.25, 0.0),
+            dvec3(9.0, 9.25, 0.0),
         ]);
         assert_eq!(scale_origin, ans);
     }

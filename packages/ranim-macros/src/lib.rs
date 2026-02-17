@@ -394,45 +394,12 @@ pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
     )
 }
 
-#[proc_macro_derive(BoundingBox)]
-pub fn derive_bounding_box(input: TokenStream) -> TokenStream {
-    let core = ranim_core_path();
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    let generics = &input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
-
-    let fields = match &input.data {
-        Data::Struct(data) => &data.fields,
-        _ => panic!("Can only be derived for structs"),
-    };
-
-    let field_positions = get_field_positions(fields)
-        .ok_or("cannot get field from unit struct")
-        .unwrap();
-
-    let expanded = quote! {
-        impl #impl_generics #core::traits::BoundingBox for #name #ty_generics #where_clause {
-            fn get_bounding_box(&self) -> [DVec3; 3] {
-                let [min, max] = [#(self.#field_positions.get_bounding_box(), )*]
-                    .into_iter()
-                    .map(|[min, _, max]| [min, max])
-                    .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
-                    .unwrap();
-                [min, (min + max) / 2.0, max]
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
-}
-
-#[proc_macro_derive(ShiftImpl)]
+#[proc_macro_derive(ShiftTransform)]
 pub fn derive_shift_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
     impl_derive(
         input,
-        quote! {#core::traits::ShiftImpl},
+        quote! {#core::traits::ShiftTransform},
         |field_positions| {
             quote! {
                 fn shift(&mut self, shift: #core::glam::DVec3) -> &mut Self {
@@ -444,16 +411,16 @@ pub fn derive_shift_impl(input: TokenStream) -> TokenStream {
     )
 }
 
-#[proc_macro_derive(RotateImpl)]
+#[proc_macro_derive(RotateTransform)]
 pub fn derive_rotate_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
     impl_derive(
         input,
-        quote! {#core::traits::RotateImpl},
+        quote! {#core::traits::RotateTransform},
         |field_positions| {
             quote! {
-                fn rotate_axis(&mut self, axis: #core::glam::DVec3, angle: f64) -> &mut Self {
-                    #(self.#field_positions.rotate_axis(axis, angle);)*
+                fn rotate_on_axis(&mut self, axis: #core::glam::DVec3, angle: f64) -> &mut Self {
+                    #(self.#field_positions.rotate_on_axis(axis, angle);)*
                     self
                 }
             }
@@ -461,12 +428,12 @@ pub fn derive_rotate_impl(input: TokenStream) -> TokenStream {
     )
 }
 
-#[proc_macro_derive(ScaleImpl)]
+#[proc_macro_derive(ScaleTransform)]
 pub fn derive_scale_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
     impl_derive(
         input,
-        quote! {#core::traits::ScaleImpl},
+        quote! {#core::traits::ScaleTransform},
         |field_positions| {
             quote! {
                 fn scale(&mut self, scale: #core::glam::DVec3) -> &mut Self {

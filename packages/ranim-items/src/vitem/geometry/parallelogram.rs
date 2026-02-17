@@ -4,7 +4,8 @@ use ranim_core::{
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::DVec3,
     traits::{
-        Aabb, Discard, FillColor, Opacity, Rotate, Scale, Shift, StrokeColor, StrokeWidth, With,
+        Aabb, Discard, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
+        StrokeColor, StrokeWidth, With,
     },
     utils::bezier::PathBuilder,
 };
@@ -18,9 +19,9 @@ use crate::vitem::{
 #[derive(Debug, Clone, ranim_macros::Interpolatable)]
 pub struct Parallelogram {
     /// Origin of the paralleogram
-    origin: DVec3,
+    pub origin: DVec3,
     /// vectors representing two edges of the paralleogram
-    basis: [DVec3; 2],
+    pub basis: (DVec3, DVec3),
     /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
     /// Stroke width
@@ -31,7 +32,7 @@ pub struct Parallelogram {
 
 impl Parallelogram {
     /// Create a new parallelogram with the given origin and basis vectors.
-    pub fn new(origin: DVec3, basis: [DVec3; 2]) -> Self {
+    pub fn new(origin: DVec3, basis: (DVec3, DVec3)) -> Self {
         Self {
             origin,
             basis,
@@ -45,7 +46,7 @@ impl Parallelogram {
     pub fn vertices(&self) -> [DVec3; 4] {
         let &Parallelogram {
             origin,
-            basis: [u, v],
+            basis: (u, v),
             ..
         } = self;
         [origin, origin + u, origin + u + v, origin + v]
@@ -58,38 +59,30 @@ impl Aabb for Parallelogram {
     }
 }
 
-impl Shift for Parallelogram {
+impl ShiftTransform for Parallelogram {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
         self.origin += offset;
         self
     }
 }
 
-impl Rotate for Parallelogram {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.origin.rotate_at_point(angle, axis, point);
-        self.basis.rotate_at_point(angle, axis, DVec3::ZERO);
+impl RotateTransform for Parallelogram {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.origin.rotate_on_axis(axis, angle);
+        self.basis.0.rotate_on_axis(axis, angle);
+        self.basis.1.rotate_on_axis(axis, angle);
         self
     }
 }
 
-impl Scale for Parallelogram {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
-        self.origin.scale_at_point(scale, point);
-        self.basis.iter_mut().for_each(|v| *v *= scale);
+impl ScaleTransform for Parallelogram {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
+        self.origin.scale(scale).discard();
+        self.basis.0 *= scale;
+        self.basis.1 *= scale;
         self
     }
 }
-
-// impl AffineTransform for Parallelogram {
-//     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
-//         self.origin.affine_transform_at_point(mat, origin);
-//         self.basis
-//             .iter_mut()
-//             .for_each(|v| *v = mat.transform_vector3(*v));
-//         self
-//     }
-// }
 
 impl StrokeColor for Parallelogram {
     fn stroke_color(&self) -> AlphaColor<Srgb> {
@@ -141,7 +134,7 @@ impl From<Rectangle> for Parallelogram {
             fill_rgba,
         } = value;
         let (u, v) = basis.uv();
-        let basis = [u * size.x, v * size.y];
+        let basis = (u * size.x, v * size.y);
         Self {
             origin: p0,
             basis,
@@ -163,7 +156,7 @@ impl From<Square> for Parallelogram {
             fill_rgba,
         } = value;
         let (u, v) = basis.uv();
-        let basis = [u * size, v * size];
+        let basis = (u * size, v * size);
         let origin = center - (u + v) * size / 2.;
         Self {
             origin,
@@ -194,12 +187,11 @@ impl From<Parallelogram> for VItem {
     fn from(value: Parallelogram) -> Self {
         let Parallelogram {
             origin,
-            basis,
+            basis: (u, v),
             stroke_rgba,
             stroke_width,
             fill_rgba,
         } = value;
-        let [u, v] = basis;
         VItem::from_vpoints(
             PathBuilder::new()
                 .move_to(origin)

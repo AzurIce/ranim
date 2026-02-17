@@ -54,7 +54,7 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     let blue_triangle = green_triangle.clone().with(|tri| {
         tri.set_color(manim::BLUE_C);
         tri.with_origin(AabbPoint::CENTER, |x| {
-            x.rotate_z(PI);
+            x.rotate_on_z(PI);
         });
         tri.shift(DVec3::NEG_Y * logo_width / 2.0);
     }); // ◣

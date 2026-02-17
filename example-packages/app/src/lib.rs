@@ -3,7 +3,6 @@ use std::f64::consts::PI;
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
     color::palettes::manim,
-    glam::DVec3,
     items::vitem::{
         geometry::{Circle, Square},
         VItem,
@@ -29,7 +28,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
         circle
             .set_color(manim::RED_C)
             .with_origin(AabbPoint::CENTER, |x| {
-                x.rotate_z(PI / 4.0 + PI);
+                x.rotate_on_z(PI / 4.0 + PI);
             });
     });
 

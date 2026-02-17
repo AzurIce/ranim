@@ -28,7 +28,7 @@ use ranim_core::{Extract, color, glam};
 use ranim_core::{
     components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
     prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
-    traits::{PointsFunc, Rotate, Scale, Shift, StrokeColor},
+    traits::{PointsFunc, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor},
 };
 
 /// A vectorized item.
@@ -77,24 +77,24 @@ impl Aabb for VItem {
     }
 }
 
-impl Shift for VItem {
+impl ShiftTransform for VItem {
     fn shift(&mut self, shift: DVec3) -> &mut Self {
         self.vpoints.shift(shift);
         self
     }
 }
 
-impl Rotate for VItem {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.vpoints.rotate_at_point(angle, axis, point);
-        self.basis.rotate_axis(axis, angle);
+impl RotateTransform for VItem {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.vpoints.rotate_on_axis(axis, angle);
+        self.basis.rotate_on_axis(axis, angle);
         self
     }
 }
 
-impl Scale for VItem {
-    fn scale_at_point(&mut self, scale: DVec3, point: DVec3) -> &mut Self {
-        self.vpoints.scale_at_point(scale, point);
+impl ScaleTransform for VItem {
+    fn scale(&mut self, scale: DVec3) -> &mut Self {
+        self.vpoints.scale(scale);
         self
     }
 }

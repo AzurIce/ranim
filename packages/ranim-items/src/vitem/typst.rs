@@ -22,8 +22,18 @@ use typst::{
 use typst_kit::fonts::{FontSearcher, Fonts};
 
 use crate::vitem::{VItem, svg::SvgItem};
+use ranim_core::Extract;
+use ranim_core::traits::Interpolatable;
 use ranim_core::{
-    Extract, anchor::Aabb, color, components::width::Width, core_item::CoreItem, glam, traits::*,
+    anchor::Aabb,
+    color,
+    components::width::Width,
+    core_item::CoreItem,
+    glam,
+    traits::{
+        Alignable, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
+        StrokeColor, StrokeWidth, With,
+    },
 };
 
 struct TypstLruCache {
@@ -431,23 +441,23 @@ impl Aabb for TypstText {
     }
 }
 
-impl Shift for TypstText {
+impl ShiftTransform for TypstText {
     fn shift(&mut self, shift: glam::DVec3) -> &mut Self {
         self.vitems.shift(shift);
         self
     }
 }
 
-impl Rotate for TypstText {
-    fn rotate_at_point(&mut self, angle: f64, axis: glam::DVec3, point: glam::DVec3) -> &mut Self {
-        self.vitems.rotate_at_point(angle, axis, point);
+impl RotateTransform for TypstText {
+    fn rotate_on_axis(&mut self, axis: glam::DVec3, angle: f64) -> &mut Self {
+        self.vitems.rotate_on_axis(axis, angle);
         self
     }
 }
 
-impl Scale for TypstText {
-    fn scale_at_point(&mut self, scale: glam::DVec3, point: glam::DVec3) -> &mut Self {
-        self.vitems.scale_at_point(scale, point);
+impl ScaleTransform for TypstText {
+    fn scale(&mut self, scale: glam::DVec3) -> &mut Self {
+        self.vitems.scale(scale);
         self
     }
 }

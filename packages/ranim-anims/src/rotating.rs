@@ -67,7 +67,7 @@ impl<T: RotatingRequirement> Eval<T> for RotatingAnimation<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         let mut result = self.src.clone();
         result.with_origin(self.point, |x| {
-            x.rotate_axis(self.axis, self.angle * alpha);
+            x.rotate_on_axis(self.axis, self.angle * alpha);
         });
         result
     }

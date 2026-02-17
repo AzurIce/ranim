@@ -40,11 +40,11 @@ pub trait ShiftTransformExt: ShiftTransform {
     /// Do something with the origin of the item.
     ///
     /// See [`crate::anchor`]'s [`Locate`] for more details.
-    fn with_origin(&mut self, p: impl Locate<Self>, f: impl FnOnce(&mut Self)) {
+    fn with_origin(&mut self, p: impl Locate<Self>, f: impl FnOnce(&mut Self)) -> &mut Self {
         let p = p.locate(self);
         self.shift(-p);
         f(self);
-        self.shift(p);
+        self.shift(p)
     }
     /// Put anchor at a given point.
     ///

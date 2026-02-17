@@ -26,7 +26,7 @@ use crate::{components::width::Width, utils::resize_preserving_order_with_repeat
 /// This trait is automatically implemented for `T`.
 ///
 /// # Example
-/// ```
+/// ```ignore
 /// use ranim::prelude::*;
 ///
 /// let mut a = 1;
@@ -49,7 +49,7 @@ impl<T> With for T {}
 /// A trait for discarding a value.
 ///
 /// It is useful when you want a short closure:
-/// ```
+/// ```ignore
 /// let x = Square::new(1.0).with(|x| {
 ///     x.set_color(manim::BLUE_C);
 /// });
@@ -139,6 +139,20 @@ impl<T: Interpolatable, const N: usize> Interpolatable for [T; N] {
         core::array::from_fn(|i| self[i].lerp(&target[i], t))
     }
 }
+
+macro_rules! impl_interpolatable_tuple {
+    ($(($T:ident, $s:ident)),*) => {
+        impl<$($T: Interpolatable),*> Interpolatable for ($($T,)*) {
+            #[allow(non_snake_case)]
+            fn lerp(&self, target: &Self, t: f64) -> Self {
+                let ($($s,)*) = self;
+                let ($($T,)*) = target;
+                ($($s.lerp($T, t),)*)
+            }
+        }
+    }
+}
+variadics_please::all_tuples!(impl_interpolatable_tuple, 1, 12, T, S);
 
 impl<T: Opacity + Alignable + Clone> Alignable for Vec<T> {
     fn is_aligned(&self, other: &Self) -> bool {

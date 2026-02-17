@@ -6,7 +6,9 @@ use ranim_core::{
         vitem::{Basis2d, DEFAULT_STROKE_WIDTH},
     },
     glam::{DVec2, DVec3},
-    traits::{Aabb, Discard, FillColor, Opacity, Rotate, Shift, StrokeColor, With as _},
+    traits::{
+        Aabb, Discard, FillColor, Opacity, RotateTransform, ShiftTransform, StrokeColor, With,
+    },
 };
 
 use crate::vitem::{
@@ -84,17 +86,17 @@ impl Aabb for Ellipse {
     }
 }
 
-impl Shift for Ellipse {
+impl ShiftTransform for Ellipse {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
         self.center += offset;
         self
     }
 }
 
-impl Rotate for Ellipse {
-    fn rotate_at_point(&mut self, angle: f64, axis: DVec3, point: DVec3) -> &mut Self {
-        self.basis.rotate_axis(axis, angle);
-        self.center.rotate_at_point(angle, axis, point);
+impl RotateTransform for Ellipse {
+    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
+        self.basis.rotate_on_axis(axis, angle);
+        self.center.rotate_on_axis(axis, angle);
         self
     }
 }
