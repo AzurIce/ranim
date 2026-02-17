@@ -46,4 +46,4 @@ fn text_item(r: &mut RanimScene) {
 hash = "44add00a68478bc34f1615d2753f70c6e1783b37"
 preview_imgs = ["/examples/text_item/preview.png"]
 output_files = ["/examples/text_item/text_item_1920x1080_60.mp4"]
-wasm = false
+wasm = true

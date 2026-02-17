@@ -302,3 +302,6 @@ crate-type = ["cdylib"]
 name = "text_item"
 path = "examples/text_item/lib.rs"
 crate-type = ["cdylib"]
+
+[package.metadata.example.text_item]
+wasm = true
