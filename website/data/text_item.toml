@@ -17,37 +17,33 @@ fn text_item(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let text = "The quick brown fox jumps over the lazy dog.";
 
-    let i_text = TextItem::new(text, 0.5).with(|item| item.move_to(DVec3::ZERO).discard());
-    let i_text_box = i_text
+    let text = TextItem::new(text, 0.5).with(|item| item.move_to(DVec3::ZERO).discard());
+    let text_box = text
         .text_box()
         .with(|item| item.set_stroke_color(manim::RED_C).discard());
 
-    let r_text = r.insert_empty();
-    let tl = r.timeline_mut(r_text);
-    tl.play(
-        Vec::<VItem>::from(i_text.clone())
-            .lagged(0.1, |item| item.write())
-            .with_duration(1.),
-    )
-    .forward(3.)
-    .play(
-        i_text
-            .clone()
-            .rotating(TAU * 4., DVec3::Z)
-            .with_duration(4.),
-    )
-    .forward(1.)
-    .play(Vec::<VItem>::from(i_text.clone()).lagged(0.1, |item| item.unwrite()))
-    .forward(1.);
+    r.insert_with(|t| {
+        t.play(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.write()))
+            .forward(3.)
+            .play(text.clone().rotating(TAU * 4., DVec3::Z).with_duration(4.))
+            .forward(1.)
+            .play(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.unwrite()))
+            .forward(1.);
+    });
 
-    let r_outline = r.insert_empty();
-    let tl = r.timeline_mut(r_outline);
-    tl.forward(1.)
-        .play(VItem::from(i_text_box.clone()).create().with_duration(1.))
-        .play(VItem::from(i_text_box.clone()).uncreate().with_duration(1.));
+    r.insert_with(|t| {
+        t.forward(1.)
+            .play(VItem::from(text_box.clone()).create())
+            .play(VItem::from(text_box.clone()).uncreate());
+    });
+
+    r.insert_time_mark(
+        r.timelines().max_total_secs() / 2.0,
+        TimeMark::Capture("preview.png".to_string()),
+    );
 }
 ```"""
-hash = "c3e3ed84c542d1524cfc0d7df30c936a720cdbc9"
-preview_imgs = []
+hash = "44add00a68478bc34f1615d2753f70c6e1783b37"
+preview_imgs = ["/examples/text_item/preview.png"]
 output_files = ["/examples/text_item/text_item_1920x1080_60.mp4"]
 wasm = false

@@ -75,10 +75,10 @@ impl Default for TextFont {
 /// Simple single-line text item
 #[derive(Clone, Debug)]
 pub struct TextItem {
-    /// Basis
-    basis: [DVec3; 2],
     /// Origin
     origin: DVec3,
+    /// Basis
+    basis: (DVec3, DVec3),
     /// Text content
     text: String,
     /// Font info
@@ -92,7 +92,7 @@ pub struct TextItem {
     /// Cached items
     items: RefCell<Option<Vec<VItem>>>,
     /// cached text inline size
-    inline_em_size: Cell<Option<f64>>,
+    inline_length_em: Cell<Option<f64>>,
 }
 
 impl Locate<TextItem> for Origin {
@@ -105,15 +105,15 @@ impl TextItem {
     /// Create a new text item
     pub fn new(text: impl Into<String>, em_size: f64) -> Self {
         Self {
-            basis: [DVec3::X * em_size, DVec3::Y * em_size],
             origin: DVec3::ZERO,
+            basis: (DVec3::X * em_size, DVec3::Y * em_size),
             text: text.into(),
             font: TextFont::default(),
             fill_rgbas: AlphaColor::WHITE,
             stroke_rgbas: AlphaColor::WHITE,
             stroke_width: 0.0,
             items: RefCell::default(),
-            inline_em_size: Cell::default(),
+            inline_length_em: Cell::default(),
         }
     }
 
@@ -130,7 +130,7 @@ impl TextItem {
     }
 
     /// Get basis
-    pub fn basis(&self) -> [DVec3; 2] {
+    pub fn basis(&self) -> (DVec3, DVec3) {
         self.basis
     }
 
@@ -139,16 +139,16 @@ impl TextItem {
         &self.text
     }
 
-    /// Get inline em size
-    pub fn inline_em_size(&self) -> f64 {
+    /// Get inline length in em units
+    pub fn inline_length_em(&self) -> f64 {
         let _ = self.items(); // ensure items are generated
-        self.inline_em_size.get().unwrap()
+        self.inline_length_em.get().unwrap()
     }
 
     /// Returns the text outline box starting from baseline origin to the width of last character and em height.
     pub fn text_box(&self) -> Parallelogram {
-        let [u, v] = self.basis;
-        Parallelogram::new(self.origin, (u * self.inline_em_size(), v))
+        let (u, v) = self.basis;
+        Parallelogram::new(self.origin, (u * self.inline_length_em(), v))
     }
 
     fn generate_items(&self) -> Vec<VItem> {
@@ -198,7 +198,6 @@ impl TextItem {
             format!(
                 r#"#set text(
     top-edge: 1em,
-    bottom-edge: "baseline",
     font: ({families}),
     weight: {weight},
     style: "{style}",
@@ -217,32 +216,28 @@ impl TextItem {
             )
             .as_str(),
         );
-        let items = Vec::<VItem>::from(SvgItem::new(svg_src)).with(|item| {
-            let &Self {
-                basis: [x_axis, y_axis],
-                origin,
-                ..
-            } = self;
-            let [min, max] = item[0].aabb();
-            let h = max.y - min.y;
-            let length = (max.x - min.x) / h;
-            self.inline_em_size.set(Some(length));
-            let mat = DAffine3::from_mat3_translation(
-                DMat3::from_cols(x_axis, y_axis, DVec3::ZERO),
-                origin,
-            );
-            item.shift(-min)
-                .scale(DVec3::splat(1. / h))
-                .apply_point_func(|p| *p = mat.transform_point3(*p));
-        });
+
+        let mut items = Vec::<VItem>::from(SvgItem::new(svg_src));
+        let baseline_em_box = items[0].aabb();
+        let texts = items.split_off(1);
+
         let &Self {
+            basis: (u, v),
+            origin,
             fill_rgbas,
             stroke_rgbas,
             stroke_width,
             ..
         } = self;
-        Vec::<VItem>::from(&items[1..]).with(|item| {
-            item.set_fill_color(fill_rgbas)
+        let [min, max] = baseline_em_box;
+        let h = max.y - min.y;
+        self.inline_length_em.set(Some((max.x - min.x) / h));
+        let mat = DAffine3::from_mat3_translation(DMat3::from_cols(u, v, DVec3::ZERO), origin);
+        texts.with(|x| {
+            x.shift(-min)
+                .scale(DVec3::splat(1. / h)) // Make height = 1.0
+                .apply_point_func(|p| *p = mat.transform_point3(*p))
+                .set_fill_color(fill_rgbas)
                 .set_stroke_color(stroke_rgbas)
                 .set_stroke_width(stroke_width)
                 .discard()
@@ -281,9 +276,8 @@ impl ShiftTransform for TextItem {
 impl RotateTransform for TextItem {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.origin.rotate_on_axis(axis, angle);
-        self.basis
-            .iter_mut()
-            .for_each(|v| v.rotate_on_axis(axis, angle).discard());
+        self.basis.0.rotate_on_axis(axis, angle);
+        self.basis.1.rotate_on_axis(axis, angle);
         self.transform_items(|item| item.rotate_on_axis(axis, angle).discard());
         self
     }
@@ -292,22 +286,12 @@ impl RotateTransform for TextItem {
 impl ScaleTransform for TextItem {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.origin.scale(scale).discard();
-        self.basis.iter_mut().for_each(|v| *v *= scale);
+        self.basis.0 *= scale;
+        self.basis.1 *= scale;
         self.transform_items(|item| item.scale(scale).discard());
         self
     }
 }
-
-// impl AffineTransform for TextItem {
-//     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
-//         self.origin.affine_transform_at_point(mat, origin);
-//         self.basis
-//             .iter_mut()
-//             .for_each(|v| *v = mat.transform_vector3(*v));
-//         self.transform_items(|item| item.affine_transform_at_point(mat, origin).discard());
-//         self
-//     }
-// }
 
 impl FillColor for TextItem {
     fn fill_color(&self) -> AlphaColor<Srgb> {
@@ -368,7 +352,7 @@ mod tests {
     #[test]
     fn test_text_item() {
         let item = TextItem::new("Hello, world!", 0.25);
-        assert_float_absolute_eq!(item.basis[0].length(), 0.25, 1e-10);
+        assert_float_absolute_eq!(item.basis.0.length(), 0.25, 1e-10);
         assert_float_absolute_eq!(item.origin.distance(DVec3::ZERO), 0.0, 1e-10);
     }
 
