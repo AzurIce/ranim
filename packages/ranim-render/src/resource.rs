@@ -186,6 +186,24 @@ impl RenderTextures {
         self.depth_dirty = true;
     }
 
+    /// Start async readback of the output texture (non-blocking).
+    pub fn start_readback(&mut self, ctx: &WgpuContext) {
+        self.render_texture.start_readback(ctx);
+        self.output_dirty = false;
+    }
+
+    /// Finish a pending async readback, copying data into the CPU-side buffer.
+    pub fn finish_readback(&mut self, ctx: &WgpuContext) {
+        self.render_texture.finish_readback(ctx);
+    }
+
+    /// Try to finish a pending readback without blocking.
+    /// Returns `true` if the readback completed (or there was nothing pending),
+    /// `false` if the GPU hasn't finished yet.
+    pub fn try_finish_readback(&mut self, ctx: &WgpuContext) -> bool {
+        self.render_texture.try_finish_readback(ctx)
+    }
+
     pub fn get_rendered_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
         if !self.output_dirty {
             return self.render_texture.texture_data();

@@ -48,8 +48,11 @@ impl Cli {
             Commands::Preview { scene } => {
                 preview::preview_command(&args, &scene)?;
             }
-            Commands::Render { scenes } => {
-                render::render_command(&args, &scenes)?;
+            Commands::Render {
+                scenes,
+                buffer_count,
+            } => {
+                render::render_command(&args, &scenes, buffer_count)?;
             }
         }
 
@@ -66,6 +69,10 @@ pub enum Commands {
         /// Optional scene names to render (if not provided, render all scenes)
         #[arg(num_args = 0..)]
         scenes: Vec<String>,
+
+        /// Number of GPU readback buffers (higher = more parallelism, more VRAM)
+        #[arg(long, default_value_t = 2)]
+        buffer_count: usize,
     },
 }
 
@@ -84,7 +91,7 @@ mod test {
             cli
         };
         let cli = parse_args(&["ranim", "render", "-p", "package"]).unwrap();
-        let Commands::Render { scenes } = &cli.command else {
+        let Commands::Render { scenes, .. } = &cli.command else {
             unreachable!()
         };
         assert!(scenes.is_empty());
