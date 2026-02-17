@@ -1,8 +1,8 @@
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     anims::morph::MorphAnim,
     color::palettes::manim,
-    glam::{dvec2, dvec3, DVec3},
+    glam::{DVec3, dvec2, dvec3},
     items::vitem::geometry::Rectangle,
     prelude::*,
     utils::rate_functions::linear,

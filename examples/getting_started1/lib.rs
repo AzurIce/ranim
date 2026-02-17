@@ -2,8 +2,8 @@ use ranim::{
     anims::{creation::WritingAnim, morph::MorphAnim},
     color::palettes::manim,
     items::vitem::{
-        geometry::{Circle, Square},
         VItem,
+        geometry::{Circle, Square},
     },
     prelude::*,
 };

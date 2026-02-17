@@ -3,8 +3,8 @@ use ranim::{
     color::palettes::manim,
     glam::dvec2,
     items::vitem::{
-        geometry::{Circle, Ellipse},
         VItem,
+        geometry::{Circle, Ellipse},
     },
     prelude::*,
 };

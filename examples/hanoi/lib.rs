@@ -1,6 +1,6 @@
 use ranim::{
     anims::morph::MorphAnim,
-    color::{palettes::manim, HueDirection},
+    color::{HueDirection, palettes::manim},
     glam::dvec3,
     items::vitem::geometry::Rectangle,
     prelude::*,

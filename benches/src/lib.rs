@@ -4,10 +4,10 @@ pub mod test_scenes {
     use itertools::Itertools;
     use ranim::{
         anims::morph::MorphAnim,
-        glam::{dvec3, DVec3},
+        glam::{DVec3, dvec3},
         items::vitem::{
-            geometry::{Circle, Square},
             VItem,
+            geometry::{Circle, Square},
         },
     };
 

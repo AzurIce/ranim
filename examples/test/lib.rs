@@ -3,7 +3,7 @@
 use ranim::glam;
 use std::{f64::consts::PI, time::Duration};
 
-use glam::{dvec3, DVec3};
+use glam::{DVec3, dvec3};
 use ranim::{
     anims::{
         creation::{CreationAnim, WritingAnim},
@@ -15,9 +15,8 @@ use ranim::{
         manim::{self, BLUE_C, RED_C},
     },
     items::vitem::{
-        self,
+        self, VItem,
         geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
-        VItem,
     },
     prelude::*,
 };

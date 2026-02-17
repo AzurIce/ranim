@@ -3,12 +3,12 @@ use std::f64::consts::TAU;
 use itertools::Itertools;
 use ranim::{
     color::palettes::manim,
-    glam::{usizevec3, DVec3},
+    glam::{DVec3, usizevec3},
     prelude::*,
 };
 use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
-use ranim_items::vitem::{svg::SvgItem, typst::typst_svg, VItem};
+use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 
 #[scene(clear_color = "#000000")]
 #[output(dir = "animating_pi")]

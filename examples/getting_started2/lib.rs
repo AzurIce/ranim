@@ -5,8 +5,8 @@ use ranim::{
     },
     color::palettes::manim,
     items::vitem::{
-        geometry::{Circle, Rectangle, Square},
         VItem,
+        geometry::{Circle, Rectangle, Square},
     },
     prelude::*,
     utils::rate_functions::linear,

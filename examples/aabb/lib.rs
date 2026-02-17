@@ -4,15 +4,15 @@ use ranim::{
     anims::rotating::RotatingAnim,
     color::palettes::manim,
     core::animation::StaticAnim,
-    glam::{dvec2, dvec3, DVec3},
+    glam::{DVec3, dvec2, dvec3},
     items::{
         debug::VisualizeAabbItem,
         vitem::{
+            VItem,
             geometry::{
                 Arc, ArcBetweenPoints, Circle, Ellipse, EllipticArc, Polygon, Rectangle,
                 RegularPolygon, Square,
             },
-            VItem,
         },
     },
     prelude::*,

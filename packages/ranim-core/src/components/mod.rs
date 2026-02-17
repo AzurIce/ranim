@@ -183,7 +183,9 @@ mod test {
             AabbPoint(DVec3::ZERO).locate(&scale_origin),
             dvec3(1.5, 1.375, 0.0)
         );
-        scale_origin.with_origin(AabbPoint::CENTER, |x| { x.scale(DVec3::splat(3.0)); });
+        scale_origin.with_origin(AabbPoint::CENTER, |x| {
+            x.scale(DVec3::splat(3.0));
+        });
 
         let ans = VPointVec(vec![
             dvec3(-6.0, -5.75, 0.0),

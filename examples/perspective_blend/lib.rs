@@ -3,7 +3,7 @@ use ranim::{
     color,
     color::palettes::manim,
     glam::DVec3,
-    items::vitem::{geometry::Square, VItem},
+    items::vitem::{VItem, geometry::Square},
     prelude::*,
     utils::rate_functions::linear,
 };

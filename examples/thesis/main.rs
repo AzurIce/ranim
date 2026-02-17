@@ -10,8 +10,8 @@ use ranim::{
     },
     color::palettes::manim,
     items::vitem::{
-        geometry::{Circle, Polygon, Square},
         VItem,
+        geometry::{Circle, Polygon, Square},
     },
     prelude::*,
     utils::rate_functions::linear,

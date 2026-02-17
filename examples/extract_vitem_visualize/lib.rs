@@ -7,12 +7,12 @@ use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
     color,
     color::palettes::manim,
-    core::{components::width::Width, Extract},
+    core::{Extract, components::width::Width},
     items::vitem::{
+        VItem,
         geometry::{Circle, Square},
         svg::SvgItem,
         typst::typst_svg,
-        VItem,
     },
     prelude::*,
 };

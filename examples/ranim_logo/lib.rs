@@ -1,16 +1,16 @@
 use ranim::glam;
 use std::f64::consts::PI;
 
-use glam::{dvec2, dvec3, DVec3};
+use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
 use ranim::{
     anims::{creation::WritingAnim, lagged::LaggedAnim, morph::MorphAnim},
     color::palettes::manim,
     items::vitem::{
+        VItem,
         geometry::{Polygon, Rectangle, Square},
         svg::SvgItem,
         typst::typst_svg,
-        VItem,
     },
     prelude::*,
     utils::rate_functions::{linear, smooth},

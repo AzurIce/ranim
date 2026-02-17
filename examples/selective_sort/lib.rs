@@ -1,5 +1,5 @@
-use glam::{dvec2, DVec3};
-use rand::{seq::SliceRandom, SeedableRng};
+use glam::{DVec3, dvec2};
+use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};
 use ranim::{
     anims::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle, prelude::*,

@@ -2,7 +2,7 @@ use std::f64::consts::PI;
 
 use ranim::{
     anims::morph::MorphAnim,
-    color::{palettes::manim, HueDirection},
+    color::{HueDirection, palettes::manim},
     glam::dvec2,
     items::vitem::geometry::RegularPolygon,
     prelude::*,
