@@ -249,7 +249,13 @@ impl RanimApp {
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();
-            renderer.render_store_with_pool(ctx, render_textures, self.clear_color, &self.store, &mut self.pool);
+            renderer.render_store_with_pool(
+                ctx,
+                render_textures,
+                self.clear_color,
+                &self.store,
+                &mut self.pool,
+            );
 
             if let (Some(pipeline), Some(view)) = (
                 self.depth_visual_pipeline.as_ref(),
