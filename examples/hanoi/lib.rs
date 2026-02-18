@@ -6,6 +6,8 @@ use ranim::{
     prelude::*,
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
 
 fn solve_hanoi(
     n: usize,

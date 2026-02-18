@@ -11,11 +11,11 @@ use ranim::{
         color::{self, LinearSrgb},
         store::CoreItemStore,
     },
-    render::{
-        Renderer,
-        resource::{RenderPool, RenderTextures},
-        utils::WgpuContext,
-    },
+};
+use ranim_render::{
+    Renderer,
+    resource::{RenderPool, RenderTextures},
+    utils::WgpuContext,
 };
 use timeline::TimelineState;
 use tracing::{error, info};

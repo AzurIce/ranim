@@ -1,6 +1,9 @@
 name = "selective_sort"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};
@@ -114,7 +117,7 @@ fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
 ```"""
-hash = "f4ed3be19b1e59b479964a2c78ac46259b4c707c"
+hash = "efef60d2adbb5a640b53c1970a2bedd44e0bd717"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/selective_sort_1920x1080_60.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
 wasm = true

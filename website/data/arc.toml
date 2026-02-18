@@ -10,6 +10,8 @@ use ranim::{
     items::vitem::geometry::Arc,
     prelude::*,
 };
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
@@ -61,7 +63,7 @@ pub fn arc(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "169b059a1366a1ab0e53c16f8b2d658edc3a0739"
+hash = "0a7c73835db2ae8ddd2375dddaaf1aa019863302"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

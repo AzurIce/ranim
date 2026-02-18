@@ -1,4 +1,4 @@
-use ranim::render::utils::WgpuContext;
+use ranim_render::utils::WgpuContext;
 use std::borrow::Cow;
 
 pub struct DepthVisualPipeline {

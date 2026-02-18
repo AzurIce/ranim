@@ -7,7 +7,6 @@ fmt:
     cargo fmt --all
 
 lint: lint-no-features
-    just lint-features preview
     just lint-features render
     just lint-features profiling
 

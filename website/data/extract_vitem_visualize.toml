@@ -1,6 +1,9 @@
 name = "extract_vitem_visualize"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::glam;
 use ranim_core::core_item::CoreItem;
 use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
@@ -243,7 +246,7 @@ impl Empty for VisualVItem {
     }
 }
 ```"""
-hash = "437a3784982fdf4c07eaf6e7dc1429e9a5dea04d"
+hash = "2b7317f692dd9634b4e8cc1d568e65b2266a097a"
 preview_imgs = ["/examples/extract_vitem_visualize/preview-ranim_text.png", "/examples/extract_vitem_visualize/preview-hello_ranim.png"]
 output_files = ["/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4", "/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4"]
 wasm = true

@@ -7,6 +7,8 @@ use ranim::{
     items::vitem::geometry::Arc,
     prelude::*,
 };
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]

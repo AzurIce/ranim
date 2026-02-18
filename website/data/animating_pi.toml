@@ -1,6 +1,8 @@
 name = "animating_pi"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
 use std::f64::consts::TAU;
 
 use itertools::Itertools;
@@ -89,7 +91,7 @@ fn foo_2() {
     println!("{svg}");
 }
 ```"""
-hash = "74558da7271afe9e4abec85c23f1bbbca5400131"
+hash = "79c8f0b9ee0842ebaa955ace4401595542897e52"
 preview_imgs = ["/examples/animating_pi/preview.png"]
 output_files = ["/examples/animating_pi/animating_pi_1920x1080_60.mp4"]
 wasm = true
