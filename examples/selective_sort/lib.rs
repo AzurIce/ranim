@@ -1,3 +1,6 @@
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};

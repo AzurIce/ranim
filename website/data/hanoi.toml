@@ -9,6 +9,8 @@ use ranim::{
     prelude::*,
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
 
 fn solve_hanoi(
     n: usize,
@@ -123,7 +125,7 @@ fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
 }
 ```"""
-hash = "5c57f538e0d1fb6110b3c2a68936264eff582b54"
+hash = "4e186a2faa90a486a95005edb40458daa7126d8e"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/hanoi_5_1920x1080_60.mp4", "/examples/hanoi/hanoi_1920x1080_60.mp4"]
 wasm = true

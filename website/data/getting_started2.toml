@@ -1,6 +1,9 @@
 name = "getting_started2"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::{
     anims::{
         creation::{CreationAnim, WritingAnim},
@@ -56,7 +59,7 @@ fn getting_started2(r: &mut RanimScene) {
     r.timeline_mut(r_rect).play(VItem::from(rect).uncreate());
 }
 ```"""
-hash = "0a2eb68891eae92cf32f1dc0b2cd21ee7128de0d"
+hash = "174e16d9eabadbc7955c695471c11ec5f0dbb185"
 preview_imgs = []
 output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
 wasm = true

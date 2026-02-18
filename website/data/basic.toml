@@ -2,6 +2,8 @@ name = "basic"
 code = """
 ```rust
 use ranim::glam;
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
 
 use glam::DVec3;
 use ranim::{
@@ -54,7 +56,7 @@ fn basic(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "2765a30ce90d3c154d56d20ecf484d21438fe7d6"
+hash = "fecd13c0a36ece436690352bcf7d86ec7338254a"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/basic_1920x1080_60.mp4"]
 wasm = true

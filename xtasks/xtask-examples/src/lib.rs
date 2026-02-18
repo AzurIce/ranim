@@ -198,8 +198,6 @@ impl Example {
                     "--target",
                     "wasm32-unknown-unknown",
                     "--release",
-                    "--features",
-                    "preview",
                 ])
                 .stdout(std::process::Stdio::null())
                 .status()

@@ -1,6 +1,9 @@
 name = "hello_ranim"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use std::f64::consts::PI;
 
 use ranim::{
@@ -79,7 +82,7 @@ fn hello_ranim_chained(r: &mut RanimScene) {
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "76fc97cdb82f68dd84400c3ca4efc631efb68aa9"
+hash = "f276c95283a94da3d999c1a0cc8cc55577f17226"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/hello_ranim_1920x1080_60.mp4"]
 wasm = true

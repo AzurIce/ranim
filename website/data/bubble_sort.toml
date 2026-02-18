@@ -1,6 +1,9 @@
 name = "bubble_sort"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     anims::morph::MorphAnim,
@@ -119,7 +122,7 @@ fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
 }
 ```"""
-hash = "86a405825b68223cf57b64f30cc136ad04e3dd63"
+hash = "91925042b139474dc337c7c8c14bc3c4b59d336f"
 preview_imgs = ["/examples/bubble_sort/preview-100.png", "/examples/bubble_sort/preview-10.png"]
 output_files = ["/examples/bubble_sort/bubble_sort_10_1920x1080_60.mp4", "/examples/bubble_sort/bubble_sort_1920x1080_60.mp4"]
 wasm = true

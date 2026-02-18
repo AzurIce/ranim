@@ -10,6 +10,8 @@ use ranim::{
     items::vitem::geometry::ArcBetweenPoints,
     prelude::*,
 };
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
 
 #[scene]
 #[output(dir = "arc_between_points")]
@@ -57,7 +59,7 @@ fn arc_between_points(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "726e7ddd56fc030581e7dd53c1e06500e45abf84"
+hash = "4db6a2a8a67cd160e00b082158ae9c0937891017"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
 wasm = true

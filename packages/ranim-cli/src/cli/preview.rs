@@ -5,7 +5,7 @@ use std::{
 
 use krates::Kid;
 use notify_debouncer_full::{DebouncedEvent, Debouncer};
-use ranim::cmd::preview::{AppCmd, RanimApp};
+use ranim_app::{AppCmd, RanimApp};
 
 use anyhow::Result;
 use async_channel::{Receiver, bounded, unbounded};
@@ -204,7 +204,7 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
             std::thread::sleep(Duration::from_millis(200));
         }
     });
-    ranim::cmd::preview::run_app(app);
+    ranim_app::run_app(app);
     shutdown_tx.send_blocking(()).unwrap();
     daemon.join().unwrap();
     Ok(())

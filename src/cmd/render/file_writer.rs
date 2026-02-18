@@ -4,8 +4,46 @@ use std::{
     process::{Child, ChildStdin, Command, Stdio},
 };
 
-use ranim_core::OutputFormat;
+use crate::OutputFormat;
 use tracing::info;
+
+/// Extension trait providing ffmpeg encoding parameters for [`OutputFormat`].
+pub(crate) trait OutputFormatExt {
+    /// Returns `(video_codec, pixel_format, file_extension)`.
+    fn encoding_params(&self) -> (&'static str, &'static str, &'static str);
+    /// Returns extra codec arguments for ffmpeg.
+    fn extra_args(&self) -> &'static [&'static str];
+    /// Whether this format has an alpha channel.
+    fn has_alpha(&self) -> bool;
+    /// Whether the `eq` video filter is compatible with this format.
+    fn supports_eq_filter(&self) -> bool;
+}
+
+impl OutputFormatExt for OutputFormat {
+    fn encoding_params(&self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Self::Mp4 => ("libx264", "yuv420p", "mp4"),
+            Self::Webm => ("libvpx-vp9", "yuva420p", "webm"),
+            Self::Mov => ("prores_ks", "yuva444p10le", "mov"),
+            Self::Gif => ("gif", "rgb8", "gif"),
+        }
+    }
+
+    fn extra_args(&self) -> &'static [&'static str] {
+        match self {
+            Self::Mov => &["-profile:v", "4444"],
+            _ => &[],
+        }
+    }
+
+    fn has_alpha(&self) -> bool {
+        matches!(self, Self::Webm | Self::Mov)
+    }
+
+    fn supports_eq_filter(&self) -> bool {
+        !self.has_alpha()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct FileWriterBuilder {

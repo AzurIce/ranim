@@ -1,6 +1,9 @@
 name = "perspective_blend"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::{
     anims::morph::MorphAnim,
     color,
@@ -118,7 +121,7 @@ fn perspective_blend(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "3d5d46ed8702b720750881c8c31e4ae1cb059dd7"
+hash = "b095716b16f0722c1824b94b42572713912e7b46"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

@@ -1,3 +1,6 @@
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::{
     anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,
 };

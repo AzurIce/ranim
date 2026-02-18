@@ -1,6 +1,9 @@
 name = "ranim_logo"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::glam;
 use std::f64::consts::PI;
 
@@ -161,7 +164,7 @@ fn ranim_logo(r: &mut RanimScene) {
         }));
 }
 ```"""
-hash = "3583ad0be555c0bf55f4d3d79ba91321ac615e47"
+hash = "e9f07373db6011ec55a2a89593319e76d680725b"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
 wasm = true

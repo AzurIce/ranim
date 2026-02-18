@@ -1,6 +1,8 @@
 name = "aabb"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
 use std::f64::consts::PI;
 
 use ranim::{
@@ -183,7 +185,7 @@ fn aabb(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "65f4c03913d28293774ec21b3fd9137d45e0060c"
+hash = "5cd40838db3a8e2993d18aa41029d215f786618b"
 preview_imgs = ["/examples/aabb/preview.png"]
 output_files = ["/examples/aabb/aabb_1920x1080_60.mp4"]
 wasm = true
