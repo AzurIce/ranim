@@ -7,6 +7,8 @@ use ranim::{
     items::vitem::geometry::ArcBetweenPoints,
     prelude::*,
 };
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
 
 #[scene]
 #[output(dir = "arc_between_points")]

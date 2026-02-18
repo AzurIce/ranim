@@ -1,3 +1,6 @@
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::glam;
 use ranim_core::core_item::CoreItem;
 use ranim_items::vitem::DEFAULT_STROKE_WIDTH;

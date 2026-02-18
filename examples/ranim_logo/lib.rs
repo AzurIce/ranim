@@ -1,3 +1,6 @@
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::glam;
 use std::f64::consts::PI;
 

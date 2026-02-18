@@ -1,6 +1,9 @@
 name = "getting_started1"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::{
     anims::{creation::WritingAnim, morph::MorphAnim},
     color::palettes::manim,
@@ -36,7 +39,7 @@ fn getting_started1(r: &mut RanimScene) {
 }
 // ANCHOR_END: construct
 ```"""
-hash = "7617f641a13987bc8b53fc9a5a2124d11a1d2bae"
+hash = "20372f668139a4bb396004fe4710214a81b6f19e"
 preview_imgs = []
 output_files = ["/examples/getting_started1/getting_started1_1920x1080_60.mp4"]
 wasm = true

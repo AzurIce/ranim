@@ -1,6 +1,9 @@
 name = "regular_polygon"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use std::f64::consts::PI;
 
 use ranim::{
@@ -131,7 +134,7 @@ impl<T: Clone + 'static> LaggedRawExt<T> for Vec<ranim_core::animation::Animatio
     }
 }
 ```"""
-hash = "3f061a7710baf6c1150bf159a5c829cf47817592"
+hash = "71feda0676946c739cc9eedc65ed5fda3865027f"
 preview_imgs = ["/examples/regular_polygon/preview.png"]
 output_files = ["/examples/regular_polygon/regular_polygon_1920x1080_60.mp4"]
 wasm = true

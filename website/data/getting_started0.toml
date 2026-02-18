@@ -1,6 +1,9 @@
 name = "getting_started0"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::{
     anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,
 };
@@ -33,7 +36,7 @@ fn getting_started0(r: &mut RanimScene) {
 }
 // ANCHOR_END: construct
 ```"""
-hash = "0847cce09e76ab8908da4c5550fa5141d48a76ea"
+hash = "a7c28f6e54db99feacb5276b066c45a785dbd923"
 preview_imgs = []
 output_files = ["/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
 wasm = true

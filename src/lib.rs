@@ -40,15 +40,18 @@ pub mod utils {
     pub use ranim_core::utils::*;
 }
 
-pub use core::{glam, inventory};
-pub use paste;
-pub use ranim_core::{
-    Output, OutputFormat, RanimScene, Scene, SceneConfig, SceneConstructor, StaticOutput,
-    StaticScene, StaticSceneConfig,
-};
+/// Scene types for dylib / inventory registration and runtime use.
+mod link_magic;
+pub use link_magic::*;
 
-/// Render a scene by name. Expands `render_scene!(foo)` to call
-/// `cmd::render_scene(&Scene::from(foo_scene), 2)`.
+/// Scene description types (Scene, Output, OutputFormat, etc.)
+mod scene;
+pub use scene::*;
+
+pub use core::glam;
+pub use ranim_core::RanimScene;
+
+/// Render a scene by name.
 ///
 /// ```rust,ignore
 /// render_scene!(fading);
@@ -57,25 +60,7 @@ pub use ranim_core::{
 #[macro_export]
 macro_rules! render_scene {
     ($scene:ident) => {
-        $crate::paste::paste! {
-            $crate::cmd::render_scene(&$crate::Scene::from([< $scene _scene >]), 2)
-        }
-    };
-}
-
-/// Preview a scene by name. Expands `preview_scene!(foo)` to call
-/// `cmd::preview_scene(&Scene::from(foo_scene))`.
-///
-/// ```rust,ignore
-/// preview_scene!(fading);
-/// ```
-#[cfg(feature = "preview")]
-#[macro_export]
-macro_rules! preview_scene {
-    ($scene:ident) => {
-        $crate::paste::paste! {
-            $crate::cmd::preview_scene(&$crate::Scene::from([< $scene _scene >]))
-        }
+        $crate::cmd::render_scene(&$scene::scene(), 2)
     };
 }
 

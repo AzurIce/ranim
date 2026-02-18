@@ -1,6 +1,7 @@
 # Summary
 
 - [Getting Started](./getting_started.md)
+- [Ranim Packages](./packages.md)
 - [Ranim Cli](./cli.md)
 
 # 理解 Ranim

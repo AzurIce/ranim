@@ -1,11 +1,13 @@
 // MARK: Render api
 use std::collections::VecDeque;
 
+use crate::cmd::render::file_writer::OutputFormatExt;
+use crate::{Output, Scene, SceneConfig, SceneConstructor};
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::store::CoreItemStore;
-use ranim_core::{Output, Scene, SceneConfig, SceneConstructor, SealedRanimScene, TimeMark};
+use ranim_core::{SealedRanimScene, TimeMark};
 use ranim_render::resource::{RenderPool, RenderTextures};
 use ranim_render::{Renderer, utils::WgpuContext};
 use std::time::Duration;

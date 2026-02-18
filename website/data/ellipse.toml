@@ -1,6 +1,9 @@
 name = "ellipse"
 code = """
 ```rust
+#[cfg(target_arch = "wasm32")]
+use ranim_app as _;
+
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
     color::palettes::manim,
@@ -46,7 +49,7 @@ fn ellipse(r: &mut RanimScene) {
     r.insert_time_mark(1.0, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "ad7a08d5374e3c4293e75b9f9096045b10a7cb0b"
+hash = "22e48a9f065ad8050a416fab9a19693058140b9d"
 preview_imgs = ["/examples/ellipse/preview.png"]
 output_files = ["/examples/ellipse/ellipse_1920x1080_60.mp4"]
 wasm = true
