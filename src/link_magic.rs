@@ -1,11 +1,6 @@
 //! Scene types for dylib / inventory registration and runtime use.
-
-use crate::{Output, OutputFormat, RanimScene, Scene, SceneConfig};
-
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-
-// MARK: Static types (for inventory registration)
+use crate::{Output, OutputFormat, Scene, SceneConfig};
+use ranim_core::RanimScene;
 
 /// Static scene type for inventory registration
 #[doc(hidden)]

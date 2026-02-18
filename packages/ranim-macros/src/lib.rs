@@ -142,42 +142,39 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         quote! {}
     };
 
-    let static_output_name = syn::Ident::new(
-        &format!("__SCENE_{}_OUTPUTS", fn_name.to_string().to_uppercase()),
-        fn_name.span(),
-    );
-    let static_name = syn::Ident::new(
-        &format!("__SCENE_{}", fn_name.to_string().to_uppercase()),
-        fn_name.span(),
-    );
-    let static_scene_name = syn::Ident::new(&format!("{fn_name}_scene"), fn_name.span());
+    let static_output_name = syn::Ident::new("__OUTPUTS", fn_name.span());
+    let static_scene_name = syn::Ident::new("__SCENE", fn_name.span());
 
     let output_cnt = outputs.len();
 
     let scene = quote! {
         #ranim::StaticScene {
             name: #scene_name,
-            constructor: #fn_name,
+            constructor: super::#fn_name,
             config: #scene_config,
             outputs: &#static_output_name,
         }
     };
 
-    // 构造 StaticScene 并塞进分布式切片
     let expanded = quote! {
         #doc
         #(#doc_attrs)*
         #vis fn #fn_name(r: &mut #ranim::RanimScene) #fn_body
 
-        static #static_output_name: [#ranim::StaticOutput; #output_cnt] = [#(#outputs),*];
         #[doc(hidden)]
-        static #static_name: #ranim::StaticScene = #scene;
-        #ranim::inventory::submit!{
-            #scene
-        }
+        #vis mod #fn_name {
+            /// The static outputs.
+            pub static #static_output_name: [#ranim::StaticOutput; #output_cnt] = [#(#outputs),*];
+            /// The static scene descriptor.
+            pub static #static_scene_name: #ranim::StaticScene = #scene;
+            #ranim::inventory::submit!{
+                #scene
+            }
 
-        #[allow(non_upper_case_globals)]
-        #vis static #static_scene_name: &'static #ranim::StaticScene = &#static_name;
+            pub fn scene() -> #ranim::Scene {
+                #ranim::Scene::from(&#static_scene_name)
+            }
+        }
     };
 
     TokenStream::from(expanded)

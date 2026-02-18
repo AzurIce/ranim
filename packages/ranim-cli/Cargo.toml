@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [features]
-profiling = ["ranim/profiling"]
+profiling = ["ranim/profiling", "ranim-app/profiling"]
 
 [[bin]]
 name = "ranim"
@@ -15,7 +15,8 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
-ranim = { workspace = true, features = ["preview", "render"] }
+ranim = { workspace = true, features = ["render"] }
+ranim-app.workspace = true
 anyhow = "1.0.100"
 cargo_toml = "0.22.3"
 clap = { version = "4.5.53", features = ["derive"] }

@@ -275,6 +275,7 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "ranim",
+ "ranim-app",
 ]
 
 [[package]]
@@ -4760,8 +4761,8 @@ dependencies = [
  "flate2",
  "getrandom 0.3.4",
  "indicatif",
+ "inventory",
  "itertools 0.14.0",
- "paste",
  "pollster",
  "pretty_env_logger",
  "profiling",
@@ -4770,7 +4771,6 @@ dependencies = [
  "rand 0.9.2",
  "rand_chacha 0.9.0",
  "ranim-anims",
- "ranim-app",
  "ranim-core",
  "ranim-items",
  "ranim-macros",
@@ -4778,6 +4778,7 @@ dependencies = [
  "reqwest",
  "tracing",
  "tracing-indicatif",
+ "wasm-bindgen",
  "wgpu",
  "which",
 ]
@@ -4803,8 +4804,7 @@ dependencies = [
  "profiling",
  "puffin",
  "puffin_http",
- "ranim-core",
- "ranim-render",
+ "ranim",
  "tracing",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -4828,6 +4828,7 @@ dependencies = [
  "notify",
  "notify-debouncer-full",
  "ranim",
+ "ranim-app",
  "toml 0.9.12+spec-1.1.0",
  "tracing",
  "tracing-indicatif",
@@ -4845,13 +4846,11 @@ dependencies = [
  "derive_more",
  "dyn-clone",
  "glam",
- "inventory",
  "itertools 0.14.0",
  "num",
  "ranim-macros",
  "tracing",
  "variadics_please",
- "wasm-bindgen",
 ]
 
 [[package]]

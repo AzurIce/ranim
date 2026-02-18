@@ -4,12 +4,19 @@ mod timeline;
 use async_channel::{Receiver, Sender, unbounded};
 use depth_visual::DepthVisualPipeline;
 use eframe::egui;
-use ranim_core::color::LinearSrgb;
-use ranim_core::store::CoreItemStore;
-use ranim_core::{Scene, SceneConstructor, SealedRanimScene, color};
-use ranim_render::Renderer;
-use ranim_render::resource::{RenderPool, RenderTextures};
-use ranim_render::utils::WgpuContext;
+use ranim::{
+    Scene, SceneConstructor,
+    core::{
+        SealedRanimScene,
+        color::{self, LinearSrgb},
+        store::CoreItemStore,
+    },
+    render::{
+        Renderer,
+        resource::{RenderPool, RenderTextures},
+        utils::WgpuContext,
+    },
+};
 use timeline::TimelineState;
 use tracing::{error, info};
 use web_time::Instant;
@@ -495,7 +502,7 @@ pub fn preview_constructor_with_name(scene: impl SceneConstructor, name: &str) {
 
 /// Preview a scene
 pub fn preview_scene(scene: &Scene) {
-    preview_scene_with_name(scene, &scene.name.clone());
+    preview_scene_with_name(scene, &scene.name);
 }
 
 /// Preview a scene with a custom name
@@ -507,6 +514,18 @@ pub fn preview_scene_with_name(scene: &Scene, name: &str) {
         #[cfg(target_arch = "wasm32")]
         format!("ranim-app-{name}"),
     );
+}
+
+/// Preview a scene by name.
+///
+/// ```rust,ignore
+/// ranim_app::preview_scene!(fading);
+/// ```
+#[macro_export]
+macro_rules! preview_scene {
+    ($scene:ident) => {
+        $crate::preview_scene(&$scene::scene())
+    };
 }
 
 // WASM support needs refactoring, mostly keeping it commented or adapting basic entry point.

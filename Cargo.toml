@@ -27,7 +27,7 @@ license = "MIT"
 repository = "https://github.com/AzurIce/ranim"
 
 [workspace.dependencies]
-ranim = { path = ".", version = "0.1.5" }
+ranim = { path = ".", version = "0.1.5", default-features = false }
 ranim-core = { path = "packages/ranim-core", version = "0.1.5" }
 ranim-items = { path = "packages/ranim-items", version = "0.1.5" }
 ranim-anims = { path = "packages/ranim-anims", version = "0.1.5" }
@@ -53,13 +53,11 @@ anims = []
 items = []
 profiling = [
   "ranim-render/profiling",
-  "ranim-app/profiling",
   "dep:puffin",
   "dep:puffin_http",
   "dep:profiling",
 ]
 # output = ["dep:async-channel"]
-preview = ["dep:ranim-render", "dep:ranim-app"]
 render = [
   "dep:ranim-render",
   "dep:wgpu",
@@ -77,7 +75,6 @@ ranim-core.workspace = true
 ranim-items.workspace = true
 ranim-anims.workspace = true
 ranim-macros.workspace = true
-ranim-app = { workspace = true, optional = true }
 itertools.workspace = true
 tracing.workspace = true
 derive_more = { workspace = true, features = [
@@ -107,7 +104,10 @@ profiling = { version = "1.0.17", optional = true, features = [
   "profile-with-puffin",
 ] }
 async-channel = "2.5.0"
-paste = "1.0"
+inventory = "0.3.21"
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wasm-bindgen.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"
