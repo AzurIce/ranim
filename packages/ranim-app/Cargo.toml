@@ -10,8 +10,7 @@ repository.workspace = true
 profiling = ["dep:puffin", "dep:puffin_http", "dep:profiling"]
 
 [dependencies]
-ranim = { workspace = true, default-features = false }
-ranim-render.workspace = true
+ranim = { workspace = true, default-features = false, features = ["render"] }
 tracing.workspace = true
 wgpu.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }

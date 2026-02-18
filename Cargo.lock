@@ -4806,7 +4806,6 @@ dependencies = [
  "puffin",
  "puffin_http",
  "ranim",
- "ranim-render",
  "tracing",
  "wasm-bindgen",
  "wasm-bindgen-futures",
