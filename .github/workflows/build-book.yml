@@ -32,12 +32,19 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Fetch version-select assets from main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: .github/book-assets
+          path: __main
+
       - name: Install mdbook and plugins
         uses: taiki-e/install-action@v2
         with:
           tool: mdbook@${{ inputs.mdbook-version }}, ${{ inputs.mdbook-plugins }}
 
-      - name: Patch book.toml
+      - name: Patch book.toml and inject version-select
         run: |
           SITE_URL="${{ inputs.site-url }}"
           if [ -z "$SITE_URL" ]; then
@@ -48,6 +55,22 @@ jobs:
 
           sed -i "s|site-url = .*|site-url = \"${SITE_URL}\"|" book/book.toml
           sed -i "s|build-dir = .*|build-dir = \"build\"|" book/book.toml
+
+          # Inject version-select assets
+          cp __main/.github/book-assets/version-select.js book/
+          cp __main/.github/book-assets/version-select.css book/
+
+          # Append to additional-css / additional-js, or add them
+          if grep -q 'additional-css' book/book.toml; then
+            sed -i 's|additional-css = \[|additional-css = ["version-select.css", |' book/book.toml
+          else
+            echo 'additional-css = ["version-select.css"]' >> book/book.toml
+          fi
+          if grep -q 'additional-js' book/book.toml; then
+            sed -i 's|additional-js *= *\[|additional-js  = ["version-select.js", |' book/book.toml
+          else
+            echo 'additional-js = ["version-select.js"]' >> book/book.toml
+          fi
 
       - name: Build book
         run: mdbook build book

@@ -61,7 +61,7 @@ jobs:
           name: book
           path: book-output
 
-      - name: Deploy to ranim-book
+      - name: Deploy book
         uses: peaceiris/actions-gh-pages@v4
         with:
           deploy_key: ${{ secrets.BOOK_DEPLOY_KEY }}
@@ -69,3 +69,27 @@ jobs:
           publish_dir: ./book-output
           destination_dir: ${{ needs.determine-ref.outputs.ref != 'main' && needs.determine-ref.outputs.ref || '' }}
           keep_files: true
+
+      - name: Update versions.json
+        uses: actions/checkout@v4
+        with:
+          repository: AzurIce/ranim-book
+          ref: gh-pages
+          ssh-key: ${{ secrets.BOOK_DEPLOY_KEY }}
+          path: gh-pages
+
+      - name: Generate versions.json and push
+        run: |
+          cd gh-pages
+          VERSIONS=$(find . -maxdepth 1 -type d -name 'v*' -printf '%f\n' | sort -V)
+          echo '["main"' > versions.json
+          for v in $VERSIONS; do
+            echo ", \"$v\"" >> versions.json
+          done
+          echo ']' >> versions.json
+          # Pretty-print
+          cat versions.json | jq '.' > versions.json.tmp && mv versions.json.tmp versions.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add versions.json
+          git diff --cached --quiet || (git commit -m "Update versions.json" && git push)
