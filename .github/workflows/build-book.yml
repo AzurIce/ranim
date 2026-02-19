@@ -39,6 +39,14 @@ jobs:
           sparse-checkout: .github/book-assets
           path: __main
 
+      - name: Cache mdbook tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/mdbook
+            ~/.cargo/bin/mdbook-*
+          key: mdbook-${{ inputs.mdbook-version }}-${{ inputs.mdbook-plugins }}
+
       - name: Install mdbook and plugins
         uses: taiki-e/install-action@v2
         with:
