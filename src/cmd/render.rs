@@ -377,8 +377,15 @@ impl RanimRenderApp {
 
         let total_secs = timeline.total_secs();
         let fps = self.fps as f64;
-        // +1 to ensure the final state (total_secs) is sampled exactly
-        let num_frames = (total_secs * fps).ceil() as u64 + 1;
+        let raw_frames = total_secs * fps;
+        // Add an extra frame to sample the final state exactly,
+        // unless total_secs * fps is already an integer (last frame lands on total_secs).
+        let n = raw_frames.ceil() as u64;
+        let num_frames = if (raw_frames - raw_frames.round()).abs() < 1e-9 {
+            n
+        } else {
+            n + 1
+        };
         let style =             ProgressStyle::with_template(
                 "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} (eta {eta}) {msg}",
             )
