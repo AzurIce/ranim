@@ -1,0 +1,55 @@
+name: Doc
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "doc"
+  cancel-in-progress: true
+
+jobs:
+  build-doc:
+    runs-on: ubuntu-22.04
+    if: github.repository == 'AzurIce/ranim'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-12-16
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "doc"
+
+      - name: Build rustdoc
+        run: RUSTDOCFLAGS="--cfg docsrs" cargo doc --workspace --no-deps --document-private-items --all-features --exclude app --exclude xtask-examples --exclude benches
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: doc
+          path: target/doc
+
+  deploy-doc:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: build-doc
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: doc
+          path: doc-output
+
+      - name: Deploy to ranim-doc
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.DOC_DEPLOY_KEY }}
+          external_repository: AzurIce/ranim-doc
+          publish_dir: ./doc-output
+          force_orphan: true

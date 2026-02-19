@@ -1,0 +1,71 @@
+name: Book
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Ref to build (e.g. main, v0.1.0)"
+        default: "main"
+      mdbook-version:
+        description: "mdbook version"
+        default: "0.5"
+      mdbook-plugins:
+        description: "Comma-separated mdbook plugins"
+        default: "mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "book"
+  cancel-in-progress: false
+
+jobs:
+  determine-ref:
+    runs-on: ubuntu-latest
+    if: github.repository == 'AzurIce/ranim'
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - name: Determine ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            REF="${{ github.ref }}"
+            REF="${REF#refs/tags/}"
+            REF="${REF#refs/heads/}"
+          else
+            REF="${{ inputs.ref }}"
+          fi
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: determine-ref
+    uses: ./.github/workflows/build-book.yml
+    with:
+      ref: ${{ needs.determine-ref.outputs.ref }}
+      artifact-name: book
+      site-url: ${{ needs.determine-ref.outputs.ref == 'main' && '/ranim-book/' || '' }}
+      mdbook-version: ${{ inputs.mdbook-version || '0.5' }}
+      mdbook-plugins: ${{ inputs.mdbook-plugins || 'mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17' }}
+
+  deploy:
+    needs: [determine-ref, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: book
+          path: book-output
+
+      - name: Deploy to ranim-book
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.BOOK_DEPLOY_KEY }}
+          external_repository: AzurIce/ranim-book
+          publish_dir: ./book-output
+          destination_dir: ${{ needs.determine-ref.outputs.ref != 'main' && needs.determine-ref.outputs.ref || '' }}
+          keep_files: true
