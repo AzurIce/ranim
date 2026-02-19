@@ -20,8 +20,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: "book"
-  cancel-in-progress: false
+  group: "book-${{ inputs.ref || github.ref }}"
+  cancel-in-progress: true
 
 jobs:
   determine-ref:
@@ -55,6 +55,9 @@ jobs:
   deploy:
     needs: [determine-ref, build]
     runs-on: ubuntu-latest
+    concurrency:
+      group: "book-deploy"
+      cancel-in-progress: false
     steps:
       - uses: actions/download-artifact@v4
         with:
