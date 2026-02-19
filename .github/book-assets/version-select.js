@@ -10,16 +10,15 @@
 
     var versionsUrl = siteBase + "/versions.json";
 
-    // Detect current version from the URL path
-    var currentVersion = (function () {
+    function detectVersion() {
         var rel = location.pathname.slice(siteBase.length).replace(/^\//, "");
         var seg = rel.split("/")[0];
-        // If the first segment looks like a version tag, we're in that version
         if (seg && /^v\d/.test(seg)) return seg;
         return "main";
-    })();
+    }
 
     function createSelect(versions) {
+        var currentVersion = detectVersion();
         var select = document.createElement("select");
         select.className = "version-select";
         select.setAttribute("aria-label", "Select version");
@@ -66,4 +65,12 @@
         }
     };
     xhr.send();
+
+    // Re-sync select value when restored from bfcache (back/forward)
+    window.addEventListener("pageshow", function (e) {
+        if (e.persisted) {
+            var select = document.querySelector(".version-select");
+            if (select) select.value = detectVersion();
+        }
+    });
 })();
