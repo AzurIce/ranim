@@ -12,7 +12,8 @@
       "Bash(cargo bench:*)",
       "Bash(cargo clippy:*)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(git pull:*)"
     ],
     "additionalDirectories": [
       "/Volumes/Files/_ranim"

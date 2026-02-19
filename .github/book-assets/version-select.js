@@ -59,7 +59,7 @@
     }
 
     function inject(versions) {
-        var bar = document.getElementById("mdbook-menu-bar");
+        var bar = document.getElementById("mdbook-menu-bar") || document.getElementById("menu-bar");
         if (!bar) return;
         var rightButtons = bar.querySelector(".right-buttons");
         if (!rightButtons) return;
