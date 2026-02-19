@@ -39,15 +39,21 @@ jobs:
           sparse-checkout: .github/book-assets
           path: __main
 
+      - name: Compute tool cache key
+        id: tool-key
+        run: echo "hash=$(echo '${{ inputs.mdbook-version }} ${{ inputs.mdbook-plugins }}' | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
       - name: Cache mdbook tools
+        id: cache-mdbook
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/mdbook
             ~/.cargo/bin/mdbook-*
-          key: mdbook-${{ inputs.mdbook-version }}-${{ inputs.mdbook-plugins }}
+          key: mdbook-${{ steps.tool-key.outputs.hash }}
 
       - name: Install mdbook and plugins
+        if: steps.cache-mdbook.outputs.cache-hit != 'true'
         uses: taiki-e/install-action@v2
         with:
           tool: mdbook@${{ inputs.mdbook-version }}, ${{ inputs.mdbook-plugins }}
