@@ -93,7 +93,7 @@ jobs:
           ssh-key: ${{ secrets.BOOK_DEPLOY_KEY }}
           path: gh-pages
 
-      - name: Generate versions.json, index.html and push
+      - name: Generate versions.json and push
         run: |
           cd gh-pages
           VERSIONS=$(find . -maxdepth 1 -type d -name 'v*' -printf '%f\n' | sort -V)
@@ -104,15 +104,7 @@ jobs:
           echo ']' >> versions.json
           cat versions.json | jq '.' > versions.json.tmp && mv versions.json.tmp versions.json
 
-          cat > index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head><meta http-equiv="refresh" content="0; url=main/"></head>
-          <body><a href="main/">Redirecting to main...</a></body>
-          </html>
-          EOF
-
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add versions.json index.html
-          git diff --cached --quiet || (git commit -m "Update versions.json and index.html" && git push)
+          git add versions.json
+          git diff --cached --quiet || (git commit -m "Update versions.json" && git push)
