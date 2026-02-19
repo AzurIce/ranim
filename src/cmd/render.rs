@@ -375,8 +375,10 @@ impl RanimRenderApp {
 
         let worker_thread = self.render_worker.take().unwrap().yeet();
 
-        let frames = (timeline.total_secs() * self.fps as f64).ceil() as usize;
-        let frames = frames.max(2);
+        let total_secs = timeline.total_secs();
+        let fps = self.fps as f64;
+        // +1 to ensure the final state (total_secs) is sampled exactly
+        let num_frames = (total_secs * fps).ceil() as u64 + 1;
         let style =             ProgressStyle::with_template(
                 "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} (eta {eta}) {msg}",
             )
@@ -388,21 +390,21 @@ impl RanimRenderApp {
 
         let span = Span::current();
         span.pb_set_style(&style);
-        span.pb_set_length(frames as u64);
+        span.pb_set_length(num_frames);
 
-        (0..frames)
-            .map(|f| f as f64 / (frames - 1) as f64)
-            .for_each(|alpha| {
+        (0..num_frames)
+            .map(|f| (f as f64 / fps).min(total_secs))
+            .for_each(|sec| {
                 worker_thread.sync_and_submit(|store| {
-                    store.update(timeline.eval_at_alpha(alpha));
+                    store.update(timeline.eval_at_sec(sec));
                 });
 
                 span.pb_inc(1);
                 span.pb_set_message(
                     format!(
                         "rendering {:.1?}/{:.1?}",
-                        Duration::from_secs_f64(alpha * timeline.total_secs()),
-                        Duration::from_secs_f64(timeline.total_secs())
+                        Duration::from_secs_f64(sec),
+                        Duration::from_secs_f64(total_secs)
                     )
                     .as_str(),
                 );
@@ -411,7 +413,7 @@ impl RanimRenderApp {
 
         info!(
             "rendered {} frames({:?}) in {:?}",
-            frames,
+            num_frames,
             Duration::from_secs_f64(timeline.total_secs()),
             start.elapsed(),
         );

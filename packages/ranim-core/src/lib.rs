@@ -93,10 +93,8 @@ impl TimelineId {
 
 // MARK: RanimScene
 /// The main struct that offers the ranim's API, and encodes animations
-/// The rabjects insert to it will hold a reference to it, so it has interior mutability
 #[derive(Default)]
 pub struct RanimScene {
-    // Timeline<CameraFrame> or Timeline<Item>
     pub(crate) timelines: Vec<Timeline>,
     pub(crate) time_marks: Vec<(f64, TimeMark)>,
 }
