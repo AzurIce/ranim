@@ -1,4 +1,5 @@
 name: Book
+run-name: "Book: ${{ inputs.refs || github.ref }}"
 
 on:
   push:
