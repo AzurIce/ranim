@@ -3,6 +3,7 @@ use ranim_core::animation::{AnimationCell, Eval};
 // MARK: Require Trait
 /// The requirement for [`Func`]
 pub trait FuncRequirement: Clone {}
+impl<T: Clone> FuncRequirement for T {}
 
 // MARK: Anim Trait
 /// The methods to create animations for `T` that satisfies [`FuncRequirement`]
