@@ -22,8 +22,6 @@ changelog:
     git cliff -o CHANGELOG.md
 
 website:
-    just doc
-    just book
     zola --root website build
 
 doc-nightly:

@@ -1,0 +1,58 @@
+name: Build Book
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to build"
+        type: string
+        required: true
+      artifact-name:
+        description: "Name for the uploaded artifact"
+        type: string
+        required: true
+      mdbook-version:
+        description: "mdbook version"
+        type: string
+        default: "0.5"
+      mdbook-plugins:
+        description: "Comma-separated mdbook plugins"
+        type: string
+        default: "mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17"
+      site-url:
+        description: "Override site-url (e.g. /ranim-book/). If empty, derived from ref."
+        type: string
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install mdbook and plugins
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@${{ inputs.mdbook-version }}, ${{ inputs.mdbook-plugins }}
+
+      - name: Patch book.toml
+        run: |
+          SITE_URL="${{ inputs.site-url }}"
+          if [ -z "$SITE_URL" ]; then
+            REF="${{ inputs.ref }}"
+            TAG="${REF#refs/tags/}"
+            SITE_URL="/ranim-book/${TAG}/"
+          fi
+
+          sed -i "s|site-url = .*|site-url = \"${SITE_URL}\"|" book/book.toml
+          sed -i "s|build-dir = .*|build-dir = \"build\"|" book/book.toml
+
+      - name: Build book
+        run: mdbook build book
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: book/build
