@@ -1,34 +1,66 @@
-.version-select {
+.version-picker {
+    position: relative;
+    display: inline-block;
+    margin: auto 4px;
+}
+
+.version-picker-btn {
     appearance: none;
     -webkit-appearance: none;
-    background-color: transparent;
+    background: transparent;
     border: 1px solid var(--searchbar-border-color);
     border-radius: 4px;
     color: var(--fg);
     cursor: pointer;
-    font-size: 0.75em;
+    font-size: 0.7em;
     font-family: inherit;
-    line-height: 1.2;
-    padding: 4px 22px 4px 8px;
-    margin: auto 4px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+    line-height: 1.4;
+    padding: 4px 20px 4px 8px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23888'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 6px center;
-    background-size: 10px 6px;
-    max-width: 100px;
-    text-overflow: ellipsis;
+    background-size: 8px 5px;
 }
 
-.version-select:hover {
+.version-picker-btn:hover {
     border-color: var(--icons-hover);
 }
 
-.version-select:focus {
-    outline: none;
-    border-color: var(--links);
+.version-popup {
+    position: absolute;
+    right: 0;
+    top: calc(var(--menu-bar-height) - 12px);
+    z-index: 400;
+    border-radius: 4px;
+    font-size: 0.7em;
+    color: var(--fg);
+    background: var(--theme-popup-bg);
+    border: 1px solid var(--theme-popup-border);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: none;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
-.version-select option {
-    background-color: var(--bg);
-    color: var(--fg);
+.version-popup.open {
+    display: block;
+}
+
+.version-popup li a {
+    display: block;
+    padding: 5px 15px;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.version-popup li a:hover {
+    background-color: var(--theme-hover);
+}
+
+.version-popup li a.active {
+    font-weight: bold;
+    color: var(--sidebar-active);
 }

@@ -1,9 +1,7 @@
 (function () {
-    // Resolve the base URL of the book site (e.g. /ranim-book/)
     var siteBase = (function () {
         var base = document.querySelector("base");
         if (base) return base.getAttribute("href").replace(/\/$/, "");
-        // Fallback: strip known sub-paths from current path
         var m = location.pathname.match(/^(\/ranim-book)/);
         return m ? m[1] : "";
     })();
@@ -13,45 +11,75 @@
     function detectVersion() {
         var rel = location.pathname.slice(siteBase.length).replace(/^\//, "");
         var seg = rel.split("/")[0];
-        if (seg && /^v\d/.test(seg)) return seg;
+        if (seg && (seg === "main" || /^v\d/.test(seg))) return seg;
         return "main";
     }
 
-    function createSelect(versions) {
-        var currentVersion = detectVersion();
-        var select = document.createElement("select");
-        select.className = "version-select";
-        select.setAttribute("aria-label", "Select version");
+    function createPicker(versions) {
+        var current = detectVersion();
+
+        var wrapper = document.createElement("div");
+        wrapper.className = "version-picker";
+
+        var btn = document.createElement("button");
+        btn.className = "version-picker-btn";
+        btn.setAttribute("type", "button");
+        btn.setAttribute("aria-label", "Select version");
+        btn.setAttribute("aria-haspopup", "true");
+        btn.setAttribute("aria-expanded", "false");
+        btn.textContent = current;
+
+        var popup = document.createElement("ul");
+        popup.className = "version-popup";
 
         versions.forEach(function (v) {
-            var opt = document.createElement("option");
-            opt.value = v;
-            opt.textContent = v;
-            if (v === currentVersion) opt.selected = true;
-            select.appendChild(opt);
+            var li = document.createElement("li");
+            var a = document.createElement("a");
+            a.href = siteBase + "/" + v + "/";
+            a.textContent = v;
+            if (v === current) a.className = "active";
+            li.appendChild(a);
+            popup.appendChild(li);
         });
 
-        select.addEventListener("change", function () {
-            var target = select.value;
-            var path = target === "main" ? siteBase + "/" : siteBase + "/" + target + "/";
-            location.href = path;
+        btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var open = popup.classList.toggle("open");
+            btn.setAttribute("aria-expanded", open);
         });
 
-        return select;
+        document.addEventListener("click", function () {
+            popup.classList.remove("open");
+            btn.setAttribute("aria-expanded", "false");
+        });
+
+        wrapper.appendChild(btn);
+        wrapper.appendChild(popup);
+        return wrapper;
     }
 
     function inject(versions) {
         var bar = document.getElementById("mdbook-menu-bar");
         if (!bar) return;
-
         var rightButtons = bar.querySelector(".right-buttons");
         if (!rightButtons) return;
-
-        var select = createSelect(versions);
-        rightButtons.insertBefore(select, rightButtons.firstChild);
+        rightButtons.insertBefore(createPicker(versions), rightButtons.firstChild);
     }
 
-    // Fetch versions.json and inject the selector
+    function syncPicker() {
+        var current = detectVersion();
+        var btn = document.querySelector(".version-picker-btn");
+        if (btn) btn.textContent = current;
+        var links = document.querySelectorAll(".version-popup li a");
+        for (var i = 0; i < links.length; i++) {
+            if (links[i].textContent === current) {
+                links[i].className = "active";
+            } else {
+                links[i].className = "";
+            }
+        }
+    }
+
     var xhr = new XMLHttpRequest();
     xhr.open("GET", versionsUrl);
     xhr.onload = function () {
@@ -61,16 +89,12 @@
                 if (Array.isArray(versions) && versions.length > 1) {
                     inject(versions);
                 }
-            } catch (e) { /* ignore parse errors */ }
+            } catch (e) {}
         }
     };
     xhr.send();
 
-    // Re-sync select value when restored from bfcache (back/forward)
     window.addEventListener("pageshow", function (e) {
-        if (e.persisted) {
-            var select = document.querySelector(".version-select");
-            if (select) select.value = detectVersion();
-        }
+        if (e.persisted) syncPicker();
     });
 })();
