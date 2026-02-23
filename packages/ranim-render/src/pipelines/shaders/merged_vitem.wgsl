@@ -66,49 +66,6 @@ fn item_stroke_width(info: ItemInfo, anchor_idx: u32) -> f32 {
     return stroke_widths[info.attr_offset + anchor_idx];
 }
 
-// === Vertex shader ===
-
-@vertex
-fn vs_main(
-    @builtin(vertex_index) vertex_index: u32,
-    @builtin(instance_index) instance_index: u32,
-) -> VertexOutput {
-    var out: VertexOutput;
-
-    let info = item_infos[instance_index];
-    let plane = planes[instance_index];
-    let clip_base = instance_index * 5u;
-
-    let scale = 1000.0;
-    let min_x = f32(clip_boxes[clip_base + 0u]) / scale;
-    let max_x = f32(clip_boxes[clip_base + 1u]) / scale;
-    let min_y = f32(clip_boxes[clip_base + 2u]) / scale;
-    let max_y = f32(clip_boxes[clip_base + 3u]) / scale;
-    let max_w = f32(clip_boxes[clip_base + 4u]) / scale;
-
-    var clip_point: vec2<f32>;
-    clip_point.x = select(
-        max_x + max_w,
-        min_x - max_w,
-        (vertex_index & 2u) == 0u
-    );
-    clip_point.y = select(
-        max_y + max_w,
-        min_y - max_w,
-        (vertex_index & 1u) == 0u
-    );
-
-    let u = clip_point.x;
-    let v = clip_point.y;
-
-    let pos3d = plane.origin.xyz + u * plane.basis_u.xyz + v * plane.basis_v.xyz;
-
-    out.frag_pos = cam_uniforms.proj_mat * cam_uniforms.view_mat * vec4(pos3d, 1.0);
-    out.pos = clip_point;
-    out.instance_id = instance_index;
-    return out;
-}
-
 // === SDF math (same as original) ===
 
 fn pack_color(color: vec4<f32>) -> u32 {
@@ -346,4 +303,47 @@ fn fs_depth_only(
     }
 
     return frag_pos.z;
+}
+
+// === Vertex shader ===
+
+@vertex
+fn vs_main(
+    @builtin(vertex_index) vertex_index: u32,
+    @builtin(instance_index) instance_index: u32,
+) -> VertexOutput {
+    var out: VertexOutput;
+
+    let info = item_infos[instance_index];
+    let plane = planes[instance_index];
+    let clip_base = instance_index * 5u;
+
+    let scale = 1000.0;
+    let min_x = f32(clip_boxes[clip_base + 0u]) / scale;
+    let max_x = f32(clip_boxes[clip_base + 1u]) / scale;
+    let min_y = f32(clip_boxes[clip_base + 2u]) / scale;
+    let max_y = f32(clip_boxes[clip_base + 3u]) / scale;
+    let max_w = f32(clip_boxes[clip_base + 4u]) / scale;
+
+    var clip_point: vec2<f32>;
+    clip_point.x = select(
+        max_x + max_w,
+        min_x - max_w,
+        (vertex_index & 2u) == 0u
+    );
+    clip_point.y = select(
+        max_y + max_w,
+        min_y - max_w,
+        (vertex_index & 1u) == 0u
+    );
+
+    let u = clip_point.x;
+    let v = clip_point.y;
+
+    let pos3d = plane.origin.xyz + u * plane.basis_u.xyz + v * plane.basis_v.xyz;
+
+    out.frag_pos = cam_uniforms.proj_mat * cam_uniforms.view_mat * vec4(pos3d, 1.0);
+    out.pos = clip_point;
+    out.instance_id = instance_index;
+    return out;
 }

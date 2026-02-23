@@ -9,11 +9,18 @@ pub use vitem_depth::*;
 pub mod oit_resolve;
 pub use oit_resolve::*;
 
+pub mod merged_vitem_compute;
+pub use merged_vitem_compute::*;
+pub mod merged_vitem_depth;
+pub use merged_vitem_depth::*;
+pub mod merged_vitem_color;
+pub use merged_vitem_color::*;
+
 use crate::{
-    RenderContext,
     graph::{GlobalRenderNodeTrait, RenderPacketsQuery},
     primitives::viewport::ViewportGpuPacket,
     utils::collections::Graph,
+    RenderContext,
 };
 
 slotmap::new_key_type! { pub struct ViewRenderNodeKey; }

@@ -229,10 +229,10 @@ impl VItemRenderInstance {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{resource::RenderPool, utils::WgpuContext, Renderer};
-    use glam::{vec4, DVec3, Vec3, Vec4};
+    use crate::{Renderer, resource::RenderPool, utils::WgpuContext};
+    use glam::{DVec3, Vec3, Vec4, vec4};
     use ranim_core::{
-        core_item::{camera_frame::CameraFrame, vitem::Basis2d, CoreItem},
+        core_item::{CoreItem, camera_frame::CameraFrame, vitem::Basis2d},
         store::CoreItemStore,
     };
 
@@ -398,6 +398,7 @@ mod tests {
                 .chain(std::iter::once(item3))
         };
 
+        let mut pool = RenderPool::new();
         let mut store = CoreItemStore::new();
         let center = Vec3::ZERO;
         let dir = (Vec3::X + Vec3::NEG_Z).normalize();
@@ -410,7 +411,7 @@ mod tests {
                 .map(|(id, x)| ((id, id), x)),
         );
 
-        renderer.render_store_merged(&ctx, &mut render_textures, clear_color, &store);
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();

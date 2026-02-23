@@ -7,10 +7,10 @@
 use std::hint::black_box;
 
 use benches::test_scenes::static_squares;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
-use ranim::{prelude::*, SceneConstructor};
+use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
+use ranim::{SceneConstructor, prelude::*};
 use ranim_core::store::CoreItemStore;
-use ranim_render::{resource::RenderPool, utils::WgpuContext, Renderer};
+use ranim_render::{Renderer, resource::RenderPool, utils::WgpuContext};
 
 /// Pure GPU render benchmark: only measures render_store_with_pool + device.poll
 fn gpu_render_benchmark(c: &mut Criterion) {
@@ -140,6 +140,7 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
 
         let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
         let mut render_textures = renderer.new_render_textures(&ctx);
+        let mut pool = RenderPool::new();
         let clear_color = wgpu::Color {
             r: 0.2,
             g: 0.2,
@@ -148,7 +149,8 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
         };
 
         // Warm up
-        renderer.render_store_merged(&ctx, &mut render_textures, clear_color, &store);
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        pool.clean();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();
@@ -158,7 +160,14 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
             &vitem_count,
             |b, _| {
                 b.iter(|| {
-                    renderer.render_store_merged(&ctx, &mut render_textures, clear_color, &store);
+                    renderer.render_store_with_pool(
+                        &ctx,
+                        &mut render_textures,
+                        clear_color,
+                        &store,
+                        &mut pool,
+                    );
+                    pool.clean();
                     ctx.device
                         .poll(wgpu::PollType::wait_indefinitely())
                         .unwrap();
@@ -187,6 +196,7 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
 
         let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
         let mut render_textures = renderer.new_render_textures(&ctx);
+        let mut pool = RenderPool::new();
         let clear_color = wgpu::Color {
             r: 0.2,
             g: 0.2,
@@ -195,7 +205,8 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
         };
 
         // Warm up
-        renderer.render_store_merged(&ctx, &mut render_textures, clear_color, &store);
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        pool.clean();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();
@@ -205,7 +216,14 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
             &vitem_count,
             |b, _| {
                 b.iter(|| {
-                    renderer.render_store_merged(&ctx, &mut render_textures, clear_color, &store);
+                    renderer.render_store_with_pool(
+                        &ctx,
+                        &mut render_textures,
+                        clear_color,
+                        &store,
+                        &mut pool,
+                    );
+                    pool.clean();
                     black_box(());
                 });
             },
