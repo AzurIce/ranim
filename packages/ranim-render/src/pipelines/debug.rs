@@ -3,8 +3,8 @@ use std::ops::Deref;
 use glam::Vec4;
 
 use crate::{
-    WgpuContext,
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
+    WgpuContext,
 };
 
 #[allow(unused)]

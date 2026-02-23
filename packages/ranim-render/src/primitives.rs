@@ -1,3 +1,4 @@
+pub mod merged_vitem;
 pub mod viewport;
 pub mod vitem;
 

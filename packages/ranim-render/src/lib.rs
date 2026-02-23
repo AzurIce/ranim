@@ -20,7 +20,14 @@ use glam::{UVec3, uvec3};
 
 use crate::{
     graph::{AnyGlobalRenderNodeTrait, GlobalRenderGraph, RenderPackets},
-    primitives::viewport::ViewportUniform,
+    pipelines::{
+        MergedVItemColorPipeline, MergedVItemComputePipeline, MergedVItemDepthPipeline,
+        OITResolvePipeline,
+    },
+    primitives::{
+        merged_vitem::MergedVItemBuffer,
+        viewport::{ViewportBindGroup, ViewportUniform},
+    },
     resource::{PipelinesPool, RenderPool, RenderTextures},
     utils::{WgpuBuffer, WgpuVecBuffer},
 };
@@ -102,6 +109,9 @@ pub struct Renderer {
     packets: RenderPackets,
     render_graph: GlobalRenderGraph,
 
+    /// Merged buffer for the merged rendering path (lazily initialized)
+    merged_buffer: Option<MergedVItemBuffer>,
+
     #[cfg(feature = "profiling")]
     pub(crate) profiler: wgpu_profiler::GpuProfiler,
 }
@@ -157,6 +167,7 @@ impl Renderer {
             pipelines: PipelinesPool::default(),
             packets: RenderPackets::default(),
             render_graph,
+            merged_buffer: None,
             // Profiler
             #[cfg(feature = "profiling")]
             profiler,
@@ -175,6 +186,8 @@ impl Renderer {
         store: &CoreItemStore,
         pool: &mut RenderPool,
     ) {
+        self.render_store_merged(ctx, render_textures, clear_color, store);
+        return;
         let (_id, camera_frame) = &store.camera_frames[0];
         let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
 
@@ -253,6 +266,206 @@ impl Renderer {
         }
 
         self.packets.clear();
+    }
+
+    /// Render using the merged buffer path — all VItems packed into a single set of GPU buffers.
+    /// Bypasses the render graph and directly encodes commands.
+    pub fn render_store_merged(
+        &mut self,
+        ctx: &WgpuContext,
+        render_textures: &mut RenderTextures,
+        clear_color: wgpu::Color,
+        store: &CoreItemStore,
+    ) {
+        // 1. Build viewport uniform + bind group
+        let (_id, camera_frame) = &store.camera_frames[0];
+        let viewport_uniform =
+            ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
+        let viewport_buffer = WgpuBuffer::new_init(
+            ctx,
+            Some("Merged Viewport Buffer"),
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            viewport_uniform,
+        );
+        let viewport_bind_group = ViewportBindGroup::new(ctx, &viewport_buffer);
+
+        // 2. Update merged buffer with all VItems
+        let merged = self
+            .merged_buffer
+            .get_or_insert_with(|| MergedVItemBuffer::new(ctx));
+        merged.update(ctx, &store.vitems);
+
+        if merged.item_count() == 0 {
+            return;
+        }
+
+        let item_count = merged.item_count();
+        let total_points = merged.total_points();
+
+        // 3. Encode all passes into a single command encoder
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Merged Render Encoder"),
+            });
+
+        // --- Clear pass ---
+        {
+            let pass_desc = wgpu::RenderPassDescriptor {
+                label: Some("Merged Clear Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &render_textures.render_view,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(clear_color),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &render_textures.depth_stencil_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            };
+            encoder.begin_render_pass(&pass_desc);
+        }
+
+        // --- Compute pass: project 3D→2D + clip boxes ---
+        {
+            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Merged Compute Pass"),
+                timestamp_writes: None,
+            });
+            cpass.set_pipeline(
+                &self
+                    .pipelines
+                    .get_or_init::<MergedVItemComputePipeline>(ctx),
+            );
+            cpass.set_bind_group(
+                0,
+                merged.compute_bind_group.as_ref().unwrap(),
+                &[],
+            );
+            cpass.dispatch_workgroups(total_points.div_ceil(256), 1, 1);
+        }
+
+        // --- Depth prepass: single instanced draw ---
+        {
+            let rpass_desc = wgpu::RenderPassDescriptor {
+                label: Some("Merged Depth Pass"),
+                color_attachments: &[],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &render_textures.depth_stencil_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            };
+            let mut rpass = encoder.begin_render_pass(&rpass_desc);
+            rpass.set_pipeline(
+                &self
+                    .pipelines
+                    .get_or_init::<MergedVItemDepthPipeline>(ctx),
+            );
+            rpass.set_bind_group(0, &self.resolution_info.bind_group, &[]);
+            rpass.set_bind_group(1, &viewport_bind_group.bind_group, &[]);
+            rpass.set_bind_group(
+                2,
+                merged.render_bind_group.as_ref().unwrap(),
+                &[],
+            );
+            rpass.draw(0..4, 0..item_count);
+        }
+
+        // --- Color pass: single instanced draw with OIT ---
+        {
+            let rpass_desc = wgpu::RenderPassDescriptor {
+                label: Some("Merged Color Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &render_textures.render_view,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &render_textures.depth_stencil_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            };
+            let mut rpass = encoder.begin_render_pass(&rpass_desc);
+            rpass.set_pipeline(
+                &self
+                    .pipelines
+                    .get_or_init::<MergedVItemColorPipeline>(ctx),
+            );
+            rpass.set_bind_group(0, &self.resolution_info.bind_group, &[]);
+            rpass.set_bind_group(1, &viewport_bind_group.bind_group, &[]);
+            rpass.set_bind_group(
+                2,
+                merged.render_bind_group.as_ref().unwrap(),
+                &[],
+            );
+            rpass.draw(0..4, 0..item_count);
+        }
+
+        // --- OIT resolve pass ---
+        {
+            let rpass_desc = wgpu::RenderPassDescriptor {
+                label: Some("Merged OIT Resolve Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &render_textures.render_view,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &render_textures.depth_stencil_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            };
+            let mut rpass = encoder.begin_render_pass(&rpass_desc);
+            rpass.set_pipeline(
+                &self.pipelines.get_or_init::<OITResolvePipeline>(ctx),
+            );
+            rpass.set_bind_group(0, &self.resolution_info.bind_group, &[]);
+            rpass.set_bind_group(1, &viewport_bind_group.bind_group, &[]);
+            rpass.draw(0..3, 0..1);
+        }
+
+        // Clear OIT pixel count buffer
+        encoder.clear_buffer(&self.resolution_info.pixel_count_buffer.buffer, 0, None);
+
+        // 4. Submit
+        ctx.queue.submit(Some(encoder.finish()));
+        render_textures.mark_dirty();
     }
 }
 

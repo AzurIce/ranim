@@ -124,5 +124,102 @@ fn cpu_submit_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, gpu_render_benchmark, cpu_submit_benchmark);
+/// Merged buffer path: GPU render benchmark (with GPU wait)
+fn merged_gpu_render_benchmark(c: &mut Criterion) {
+    let ctx = pollster::block_on(WgpuContext::new());
+
+    let mut group = c.benchmark_group("merged_gpu_render");
+    group.sampling_mode(SamplingMode::Flat).sample_size(50);
+
+    for n in [5, 10, 20, 40, 60].iter() {
+        let vitem_count = n * n;
+
+        let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
+        let mut store = CoreItemStore::new();
+        store.update(scene.eval_at_alpha(0.5));
+
+        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
+        let mut render_textures = renderer.new_render_textures(&ctx);
+        let clear_color = wgpu::Color {
+            r: 0.2,
+            g: 0.2,
+            b: 0.2,
+            a: 1.0,
+        };
+
+        // Warm up
+        renderer.render_store_merged(&ctx, &mut render_textures, clear_color, &store);
+        ctx.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
+
+        group.bench_with_input(
+            BenchmarkId::new("submit", vitem_count),
+            &vitem_count,
+            |b, _| {
+                b.iter(|| {
+                    renderer.render_store_merged(&ctx, &mut render_textures, clear_color, &store);
+                    ctx.device
+                        .poll(wgpu::PollType::wait_indefinitely())
+                        .unwrap();
+                    black_box(());
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Merged buffer path: CPU-only submission benchmark (no GPU wait)
+fn merged_cpu_submit_benchmark(c: &mut Criterion) {
+    let ctx = pollster::block_on(WgpuContext::new());
+
+    let mut group = c.benchmark_group("merged_cpu_submit");
+    group.sampling_mode(SamplingMode::Flat).sample_size(50);
+
+    for n in [5, 10, 20, 40, 60].iter() {
+        let vitem_count = n * n;
+
+        let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
+        let mut store = CoreItemStore::new();
+        store.update(scene.eval_at_alpha(0.5));
+
+        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
+        let mut render_textures = renderer.new_render_textures(&ctx);
+        let clear_color = wgpu::Color {
+            r: 0.2,
+            g: 0.2,
+            b: 0.2,
+            a: 1.0,
+        };
+
+        // Warm up
+        renderer.render_store_merged(&ctx, &mut render_textures, clear_color, &store);
+        ctx.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
+
+        group.bench_with_input(
+            BenchmarkId::new("no_wait", vitem_count),
+            &vitem_count,
+            |b, _| {
+                b.iter(|| {
+                    renderer.render_store_merged(&ctx, &mut render_textures, clear_color, &store);
+                    black_box(());
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    gpu_render_benchmark,
+    cpu_submit_benchmark,
+    merged_gpu_render_benchmark,
+    merged_cpu_submit_benchmark
+);
 criterion_main!(benches);
