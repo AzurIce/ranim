@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::{resource::GpuResource, WgpuContext};
+use crate::{WgpuContext, resource::GpuResource};
 
 pub struct VItemComputePipeline {
     pipeline: wgpu::ComputePipeline,

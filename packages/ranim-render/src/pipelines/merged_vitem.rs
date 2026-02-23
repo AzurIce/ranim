@@ -1,9 +1,9 @@
 use std::ops::Deref;
 
 use crate::{
+    ResolutionInfo, WgpuContext,
     primitives::{merged_vitem::MergedVItemBuffer, viewport::ViewportBindGroup},
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
-    ResolutionInfo, WgpuContext,
 };
 
 // MARK: Compute pipeline

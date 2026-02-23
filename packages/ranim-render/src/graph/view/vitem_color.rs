@@ -1,8 +1,8 @@
 use crate::{
-    graph::{view::ViewRenderNodeTrait, RenderPacketsQuery},
+    RenderContext, RenderTextures,
+    graph::{RenderPacketsQuery, view::ViewRenderNodeTrait},
     pipelines::VItemColorPipeline,
     primitives::{viewport::ViewportGpuPacket, vitem::VItemRenderInstance},
-    RenderContext, RenderTextures,
 };
 
 pub struct VItemColorNode;

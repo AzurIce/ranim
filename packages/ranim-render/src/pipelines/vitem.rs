@@ -1,9 +1,9 @@
 use std::ops::Deref;
 
 use crate::{
+    ResolutionInfo, WgpuContext,
     primitives::viewport::ViewportBindGroup,
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
-    ResolutionInfo, WgpuContext,
 };
 
 pub struct RenderBindGroup(wgpu::BindGroup);

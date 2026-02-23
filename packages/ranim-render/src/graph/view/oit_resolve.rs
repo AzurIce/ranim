@@ -1,8 +1,8 @@
 use crate::{
-    graph::{view::ViewRenderNodeTrait, RenderPacketsQuery},
+    RenderContext, RenderTextures,
+    graph::{RenderPacketsQuery, view::ViewRenderNodeTrait},
     pipelines::OITResolvePipeline,
     primitives::viewport::ViewportGpuPacket,
-    RenderContext, RenderTextures,
 };
 
 pub struct OITResolveNode;

@@ -17,10 +17,10 @@ pub mod merged_vitem_color;
 pub use merged_vitem_color::*;
 
 use crate::{
+    RenderContext,
     graph::{GlobalRenderNodeTrait, RenderPacketsQuery},
     primitives::viewport::ViewportGpuPacket,
     utils::collections::Graph,
-    RenderContext,
 };
 
 slotmap::new_key_type! { pub struct ViewRenderNodeKey; }

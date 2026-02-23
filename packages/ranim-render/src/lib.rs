@@ -210,9 +210,6 @@ impl Renderer {
     }
 
     /// Render a frame. Pushes viewport + VItem packets via pool, then execs the render graph.
-    ///
-    /// For the merged path (created via [`Self::new_merged`]), also updates the
-    /// [`MergedVItemBuffer`] so that merged graph nodes can read from it.
     pub fn render_store_with_pool(
         &mut self,
         ctx: &WgpuContext,

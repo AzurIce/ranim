@@ -1,8 +1,8 @@
 use crate::{
-    graph::{view::ViewRenderNodeTrait, RenderPacketsQuery},
+    RenderContext,
+    graph::{RenderPacketsQuery, view::ViewRenderNodeTrait},
     pipelines::MergedVItemComputePipeline,
     primitives::viewport::ViewportGpuPacket,
-    RenderContext,
 };
 
 pub struct MergedVItemComputeNode;
