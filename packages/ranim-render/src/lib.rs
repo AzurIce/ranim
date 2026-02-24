@@ -134,13 +134,13 @@ impl Renderer {
             let compute = render_graph.insert_node(MergedVItemComputeNode);
             let depth = render_graph.insert_node(MergedVItemDepthNode);
             let color = render_graph.insert_node(MergedVItemColorNode);
-            let oit_resolve = render_graph.insert_node(OITResolveNode);
             render_graph.insert_edge(compute, depth);
             render_graph.insert_edge(depth, color);
-            render_graph.insert_edge(color, oit_resolve);
             render_graph
         });
+        let oit_resolve = render_graph.insert_node(OITResolveNode);
         render_graph.insert_edge(clear, view_render);
+        render_graph.insert_edge(view_render, oit_resolve);
         render_graph
     }
 

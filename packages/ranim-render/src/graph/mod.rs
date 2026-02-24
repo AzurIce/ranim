@@ -5,6 +5,9 @@ pub mod view;
 pub mod clear;
 pub use clear::*;
 
+pub mod oit_resolve;
+pub use oit_resolve::*;
+
 use variadics_please::all_tuples;
 
 use crate::{

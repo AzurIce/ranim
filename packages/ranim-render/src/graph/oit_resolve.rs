@@ -1,13 +1,12 @@
 use crate::{
     RenderContext, RenderTextures,
-    graph::{RenderPacketsQuery, view::ViewRenderNodeTrait},
+    graph::{GlobalRenderNodeTrait, RenderPacketsQuery},
     pipelines::OITResolvePipeline,
-    primitives::viewport::ViewportGpuPacket,
 };
 
 pub struct OITResolveNode;
 
-impl ViewRenderNodeTrait for OITResolveNode {
+impl GlobalRenderNodeTrait for OITResolveNode {
     type Query = ();
     fn run(
         &self,
@@ -15,7 +14,6 @@ impl ViewRenderNodeTrait for OITResolveNode {
         #[cfg(feature = "profiling")] encoder: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         _packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         ctx: RenderContext,
-        viewport: &ViewportGpuPacket,
     ) {
         let RenderTextures {
             render_view,
@@ -58,7 +56,6 @@ impl ViewRenderNodeTrait for OITResolveNode {
                     .get_or_init::<OITResolvePipeline>(ctx.wgpu_ctx),
             );
             rpass.set_bind_group(0, &ctx.resolution_info.bind_group, &[]);
-            rpass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
             rpass.draw(0..3, 0..1);
         }
         // Clear OIT pixel count buffer

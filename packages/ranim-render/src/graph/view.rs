@@ -1,8 +1,5 @@
 use std::ops::{Deref, DerefMut};
 
-pub mod oit_resolve;
-pub use oit_resolve::*;
-
 pub mod vitem_compute;
 pub use vitem_compute::*;
 pub mod vitem_depth;
