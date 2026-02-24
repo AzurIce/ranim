@@ -657,7 +657,11 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "itertools 0.14.0",
+ "pollster",
  "ranim",
+ "ranim-core",
+ "ranim-render",
+ "wgpu",
 ]
 
 [[package]]
