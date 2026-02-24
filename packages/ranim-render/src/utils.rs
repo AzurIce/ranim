@@ -327,6 +327,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn new_init(
         ctx: &WgpuContext,
         label: Option<&'static str>,
@@ -338,6 +339,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         buffer
     }
 
+    #[allow(unused)]
     pub(crate) fn len(&self) -> usize {
         self.len
     }

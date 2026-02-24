@@ -1,20 +1,11 @@
-pub mod vitem_color;
 use std::ops::{Deref, DerefMut};
 
-pub use vitem_color::*;
 pub mod vitem_compute;
 pub use vitem_compute::*;
 pub mod vitem_depth;
 pub use vitem_depth::*;
-pub mod oit_resolve;
-pub use oit_resolve::*;
-
-pub mod merged_vitem_compute;
-pub use merged_vitem_compute::*;
-pub mod merged_vitem_depth;
-pub use merged_vitem_depth::*;
-pub mod merged_vitem_color;
-pub use merged_vitem_color::*;
+pub mod vitem_color;
+pub use vitem_color::*;
 
 use crate::{
     RenderContext,

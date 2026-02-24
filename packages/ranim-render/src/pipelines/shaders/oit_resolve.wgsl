@@ -3,13 +3,6 @@
 @group(0) @binding(2) var<storage, read_write> oit_colors: array<u32>;
 @group(0) @binding(3) var<storage, read_write> oit_depths: array<f32>;
 
-struct CameraUniforms {
-    proj_mat: mat4x4<f32>,
-    view_mat: mat4x4<f32>,
-    half_frame_size: vec2<f32>,
-}
-@group(1) @binding(0) var<uniform> cam_uniforms : CameraUniforms;
-
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,

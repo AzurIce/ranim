@@ -35,7 +35,7 @@ pub struct PlaneData {
 /// Instead of one set of buffers per VItem, all data is packed into
 /// contiguous arrays with an index table (`item_infos`) that tells
 /// shaders where each item's data lives.
-pub struct MergedVItemBuffer {
+pub struct VItemsBuffer {
     /// Per-item metadata: offsets and counts
     pub(crate) item_infos_buffer: WgpuVecBuffer<ItemInfo>,
     /// Per-item plane data (origin + basis)
@@ -65,7 +65,7 @@ pub struct MergedVItemBuffer {
     pub(crate) render_bind_group: Option<wgpu::BindGroup>,
 }
 
-impl MergedVItemBuffer {
+impl VItemsBuffer {
     pub fn new(ctx: &WgpuContext) -> Self {
         // Start with empty buffers (minimum size 1 to avoid zero-size buffer)
         let storage_rw = wgpu::BufferUsages::STORAGE
