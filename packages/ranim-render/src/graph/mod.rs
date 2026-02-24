@@ -9,7 +9,7 @@ use variadics_please::all_tuples;
 
 use crate::{
     RenderContext,
-    primitives::{viewport::ViewportGpuPacket, vitem::VItemRenderInstance},
+    primitives::viewport::ViewportGpuPacket,
     resource::Handle,
     utils::collections::{Graph, TypeBinnedVec},
 };
@@ -102,7 +102,6 @@ pub trait RenderPacketsQuery {
 
 /// A marker trait to make compiler happy.
 pub trait RenderPacketMark {}
-impl RenderPacketMark for VItemRenderInstance {}
 impl RenderPacketMark for ViewportGpuPacket {}
 
 impl<T: RenderPacketMark + Send + Sync + 'static> RenderPacketsQuery for T {

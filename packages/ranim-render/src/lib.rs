@@ -20,7 +20,7 @@ use glam::{UVec3, uvec3};
 
 use crate::{
     graph::{AnyGlobalRenderNodeTrait, GlobalRenderGraph, RenderPackets},
-    primitives::{merged_vitem::MergedVItemBuffer, viewport::ViewportUniform},
+    primitives::{viewport::ViewportUniform, vitems::VItemsBuffer},
     resource::{PipelinesPool, RenderPool, RenderTextures},
     utils::{WgpuBuffer, WgpuVecBuffer},
 };
@@ -92,7 +92,7 @@ pub struct RenderContext<'a> {
     pub resolution_info: &'a ResolutionInfo,
     pub clear_color: wgpu::Color,
     /// Present when using the merged rendering path.
-    pub merged_buffer: Option<&'a MergedVItemBuffer>,
+    pub merged_buffer: Option<&'a VItemsBuffer>,
 }
 
 // MARK: Renderer
@@ -105,7 +105,7 @@ pub struct Renderer {
     render_graph: GlobalRenderGraph,
 
     /// Present when using the merged rendering path (lazily initialized on first use).
-    merged_buffer: Option<MergedVItemBuffer>,
+    merged_buffer: Option<VItemsBuffer>,
 
     #[cfg(feature = "profiling")]
     pub(crate) profiler: wgpu_profiler::GpuProfiler,
@@ -124,29 +124,7 @@ impl Renderer {
         self.width as f32 / self.height as f32
     }
 
-    #[allow(unused)]
-    #[deprecated(note = "will be replaced by the GPU-driven one instead.")]
     fn build_render_graph() -> GlobalRenderGraph {
-        use graph::*;
-        let mut render_graph = GlobalRenderGraph::new();
-        let clear = render_graph.insert_node(ClearNode);
-        let view_render = render_graph.insert_node({
-            use graph::view::*;
-            let mut render_graph = ViewRenderGraph::new();
-            let vitem_compute = render_graph.insert_node(VItemComputeNode);
-            let vitem2d_depth = render_graph.insert_node(VItemDepthNode);
-            let vitem2d_render = render_graph.insert_node(VItemColorNode);
-            let oit_resolve = render_graph.insert_node(OITResolveNode);
-            render_graph.insert_edge(vitem_compute, vitem2d_depth);
-            render_graph.insert_edge(vitem2d_depth, vitem2d_render);
-            render_graph.insert_edge(vitem2d_render, oit_resolve);
-            render_graph
-        });
-        render_graph.insert_edge(clear, view_render);
-        render_graph
-    }
-
-    fn build_merged_render_graph() -> GlobalRenderGraph {
         use graph::*;
         let mut render_graph = GlobalRenderGraph::new();
         let clear = render_graph.insert_node(ClearNode);
@@ -167,13 +145,7 @@ impl Renderer {
     }
 
     pub fn new(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> Self {
-        Self::new_with_graph(
-            ctx,
-            width,
-            height,
-            oit_layers,
-            Self::build_merged_render_graph(),
-        )
+        Self::new_with_graph(ctx, width, height, oit_layers, Self::build_render_graph())
     }
 
     fn new_with_graph(
@@ -223,18 +195,10 @@ impl Renderer {
         let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
         self.packets.push(pool.alloc_packet(ctx, &viewport));
 
-        // Per-VItem packets (old path nodes query these; merged nodes ignore them)
-        self.packets.extend(
-            store
-                .vitems
-                .iter()
-                .map(|(_id, data)| pool.alloc_packet(ctx, data)),
-        );
-
         // Merged buffer (merged nodes read this; old nodes ignore it)
         let merged = self
             .merged_buffer
-            .get_or_insert_with(|| MergedVItemBuffer::new(ctx));
+            .get_or_insert_with(|| VItemsBuffer::new(ctx));
         merged.update(ctx, &store.vitems);
 
         // Encode & submit
