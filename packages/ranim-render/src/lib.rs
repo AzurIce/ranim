@@ -124,8 +124,6 @@ impl Renderer {
         self.width as f32 / self.height as f32
     }
 
-    #[allow(unused)]
-    #[deprecated(note = "will be replaced by the GPU-driven one instead.")]
     fn build_render_graph() -> GlobalRenderGraph {
         use graph::*;
         let mut render_graph = GlobalRenderGraph::new();
@@ -133,29 +131,9 @@ impl Renderer {
         let view_render = render_graph.insert_node({
             use graph::view::*;
             let mut render_graph = ViewRenderGraph::new();
-            let vitem_compute = render_graph.insert_node(VItemComputeNode);
-            let vitem2d_depth = render_graph.insert_node(VItemDepthNode);
-            let vitem2d_render = render_graph.insert_node(VItemColorNode);
-            let oit_resolve = render_graph.insert_node(OITResolveNode);
-            render_graph.insert_edge(vitem_compute, vitem2d_depth);
-            render_graph.insert_edge(vitem2d_depth, vitem2d_render);
-            render_graph.insert_edge(vitem2d_render, oit_resolve);
-            render_graph
-        });
-        render_graph.insert_edge(clear, view_render);
-        render_graph
-    }
-
-    fn build_merged_render_graph() -> GlobalRenderGraph {
-        use graph::*;
-        let mut render_graph = GlobalRenderGraph::new();
-        let clear = render_graph.insert_node(ClearNode);
-        let view_render = render_graph.insert_node({
-            use graph::view::*;
-            let mut render_graph = ViewRenderGraph::new();
-            let compute = render_graph.insert_node(MergedVItemComputeNode);
-            let depth = render_graph.insert_node(MergedVItemDepthNode);
-            let color = render_graph.insert_node(MergedVItemColorNode);
+            let compute = render_graph.insert_node(VItemComputeNode);
+            let depth = render_graph.insert_node(VItemDepthNode);
+            let color = render_graph.insert_node(VItemColorNode);
             let oit_resolve = render_graph.insert_node(OITResolveNode);
             render_graph.insert_edge(compute, depth);
             render_graph.insert_edge(depth, color);
@@ -172,7 +150,7 @@ impl Renderer {
             width,
             height,
             oit_layers,
-            Self::build_merged_render_graph(),
+            Self::build_render_graph(),
         )
     }
 

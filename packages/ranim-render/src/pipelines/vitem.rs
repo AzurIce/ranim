@@ -2,158 +2,50 @@ use std::ops::Deref;
 
 use crate::{
     ResolutionInfo, WgpuContext,
-    primitives::viewport::ViewportBindGroup,
+    primitives::{merged_vitem::MergedVItemBuffer, viewport::ViewportBindGroup},
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
 };
 
-pub struct RenderBindGroup(wgpu::BindGroup);
+// MARK: Compute pipeline
 
-impl AsRef<wgpu::BindGroup> for RenderBindGroup {
-    fn as_ref(&self) -> &wgpu::BindGroup {
-        &self.0
+pub struct VItemComputePipeline {
+    pipeline: wgpu::ComputePipeline,
+}
+
+impl Deref for VItemComputePipeline {
+    type Target = wgpu::ComputePipeline;
+    fn deref(&self) -> &Self::Target {
+        &self.pipeline
     }
 }
 
-impl RenderBindGroup {
-    pub fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
-        ctx.device
-            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("VItem2d Render Bind Group Layout"),
-                entries: &[
-                    // points2d
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // fill_rgbas
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // stroke_rgbas
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // stroke_widths
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 3,
-                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // clip_info
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 4,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    // plane (origin, basis)
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 5,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-            })
-    }
-
-    fn new_bind_group(
-        ctx: &WgpuContext,
-        points: &wgpu::Buffer,
-        fill_rgbas: &wgpu::Buffer,
-        stroke_rgbas: &wgpu::Buffer,
-        stroke_widths: &wgpu::Buffer,
-        clip_info: &wgpu::Buffer,
-        plane: &wgpu::Buffer,
-    ) -> wgpu::BindGroup {
-        ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("VItem2d Render Bind Group"),
-            layout: &RenderBindGroup::bind_group_layout(ctx),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(points.as_entire_buffer_binding()),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Buffer(fill_rgbas.as_entire_buffer_binding()),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Buffer(
-                        stroke_rgbas.as_entire_buffer_binding(),
-                    ),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Buffer(
-                        stroke_widths.as_entire_buffer_binding(),
-                    ),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: wgpu::BindingResource::Buffer(clip_info.as_entire_buffer_binding()),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: wgpu::BindingResource::Buffer(plane.as_entire_buffer_binding()),
-                },
-            ],
-        })
-    }
-    pub(crate) fn new(
-        ctx: &WgpuContext,
-        points: &wgpu::Buffer,
-        fill_rgbas: &wgpu::Buffer,
-        stroke_rgbas: &wgpu::Buffer,
-        stroke_widths: &wgpu::Buffer,
-        clip_info: &wgpu::Buffer,
-        plane: &wgpu::Buffer,
-    ) -> Self {
-        Self(Self::new_bind_group(
-            ctx,
-            points,
-            fill_rgbas,
-            stroke_rgbas,
-            stroke_widths,
-            clip_info,
-            plane,
-        ))
+impl GpuResource for VItemComputePipeline {
+    fn new(ctx: &WgpuContext) -> Self {
+        let module = &ctx
+            .device
+            .create_shader_module(wgpu::include_wgsl!("./shaders/vitem_compute.wgsl"));
+        let layout = ctx
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("VItem Compute Pipeline Layout"),
+                bind_group_layouts: &[&MergedVItemBuffer::compute_bind_group_layout(ctx)],
+                push_constant_ranges: &[],
+            });
+        let pipeline = ctx
+            .device
+            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("VItem Compute Pipeline"),
+                layout: Some(&layout),
+                module,
+                entry_point: Some("cs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                cache: None,
+            });
+        Self { pipeline }
     }
 }
+
+// MARK: Color pipeline
 
 pub struct VItemColorPipeline {
     pipeline: wgpu::RenderPipeline,
@@ -167,62 +59,66 @@ impl Deref for VItemColorPipeline {
 }
 
 impl GpuResource for VItemColorPipeline {
-    fn new(wgpu_ctx: &WgpuContext) -> Self {
-        let WgpuContext { device, .. } = wgpu_ctx;
-
-        let module = &device.create_shader_module(wgpu::include_wgsl!("./shaders/vitem.wgsl"));
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("VItem2d Pipeline Layout"),
-            bind_group_layouts: &[
-                &ResolutionInfo::create_bind_group_layout(wgpu_ctx),
-                &ViewportBindGroup::bind_group_layout(wgpu_ctx),
-                &RenderBindGroup::bind_group_layout(wgpu_ctx),
-            ],
-            push_constant_ranges: &[],
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("VItem2d Color Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module,
-                entry_point: Some("vs_main"),
-                buffers: &[],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module,
-                entry_point: Some("fs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: OUTPUT_TEXTURE_FORMAT,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleStrip,
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::LessEqual,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-            cache: None,
-        });
-
+    fn new(ctx: &WgpuContext) -> Self {
+        let module = &ctx
+            .device
+            .create_shader_module(wgpu::include_wgsl!("./shaders/vitem.wgsl"));
+        let layout = ctx
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("VItem Color Pipeline Layout"),
+                bind_group_layouts: &[
+                    &ResolutionInfo::create_bind_group_layout(ctx),
+                    &ViewportBindGroup::bind_group_layout(ctx),
+                    &MergedVItemBuffer::render_bind_group_layout(ctx),
+                ],
+                push_constant_ranges: &[],
+            });
+        let pipeline = ctx
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("VItem Color Pipeline"),
+                layout: Some(&layout),
+                vertex: wgpu::VertexState {
+                    module,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module,
+                    entry_point: Some("fs_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: OUTPUT_TEXTURE_FORMAT,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleStrip,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: false,
+                    depth_compare: wgpu::CompareFunction::LessEqual,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+                cache: None,
+            });
         Self { pipeline }
     }
 }
+
+// MARK: Depth pipeline
 
 pub struct VItemDepthPipeline {
     pipeline: wgpu::RenderPipeline,
@@ -236,55 +132,58 @@ impl Deref for VItemDepthPipeline {
 }
 
 impl GpuResource for VItemDepthPipeline {
-    fn new(wgpu_ctx: &WgpuContext) -> Self {
-        let WgpuContext { device, .. } = wgpu_ctx;
-
-        let module = &device.create_shader_module(wgpu::include_wgsl!("./shaders/vitem.wgsl"));
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("VItem2d Pipeline Layout"),
-            bind_group_layouts: &[
-                &ResolutionInfo::create_bind_group_layout(wgpu_ctx),
-                &ViewportBindGroup::bind_group_layout(wgpu_ctx),
-                &RenderBindGroup::bind_group_layout(wgpu_ctx),
-            ],
-            push_constant_ranges: &[],
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("VItem2d Depth Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module,
-                entry_point: Some("vs_main"),
-                buffers: &[],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module,
-                entry_point: Some("fs_depth_only"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleStrip,
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-            cache: None,
-        });
-
+    fn new(ctx: &WgpuContext) -> Self {
+        let module = &ctx
+            .device
+            .create_shader_module(wgpu::include_wgsl!("./shaders/vitem.wgsl"));
+        let layout = ctx
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("VItem Depth Pipeline Layout"),
+                bind_group_layouts: &[
+                    &ResolutionInfo::create_bind_group_layout(ctx),
+                    &ViewportBindGroup::bind_group_layout(ctx),
+                    &MergedVItemBuffer::render_bind_group_layout(ctx),
+                ],
+                push_constant_ranges: &[],
+            });
+        let pipeline = ctx
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("VItem Depth Pipeline"),
+                layout: Some(&layout),
+                vertex: wgpu::VertexState {
+                    module,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module,
+                    entry_point: Some("fs_depth_only"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &[],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleStrip,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+                cache: None,
+            });
         Self { pipeline }
     }
 }
+

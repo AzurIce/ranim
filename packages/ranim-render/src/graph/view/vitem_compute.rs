@@ -2,41 +2,46 @@ use crate::{
     RenderContext,
     graph::{RenderPacketsQuery, view::ViewRenderNodeTrait},
     pipelines::VItemComputePipeline,
-    primitives::{viewport::ViewportGpuPacket, vitem::VItemRenderInstance},
+    primitives::viewport::ViewportGpuPacket,
 };
+
 pub struct VItemComputeNode;
 
 impl ViewRenderNodeTrait for VItemComputeNode {
-    type Query = VItemRenderInstance;
+    type Query = ();
 
     fn run(
         &self,
         #[cfg(not(feature = "profiling"))] encoder: &mut wgpu::CommandEncoder,
         #[cfg(feature = "profiling")] encoder: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
-        vitem2d_packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
+        _packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         ctx: RenderContext,
         _viewport: &ViewportGpuPacket,
     ) {
+        let Some(merged) = ctx.merged_buffer else {
+            return;
+        };
+        if merged.item_count() == 0 {
+            return;
+        }
+
         #[cfg(feature = "profiling")]
         let mut encoder = encoder.scope("Compute Pass");
-        // VItem2d Compute Pass
+
         {
             #[cfg(feature = "profiling")]
-            let mut cpass = encoder.scoped_compute_pass("VItem2d Map Points Compute Pass");
+            let mut cpass = encoder.scoped_compute_pass("VItem Map Points Compute Pass");
             #[cfg(not(feature = "profiling"))]
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("VItem2d Map Points Compute Pass"),
+                label: Some("VItem Map Points Compute Pass"),
                 timestamp_writes: None,
             });
             cpass.set_pipeline(
                 &ctx.pipelines
                     .get_or_init::<VItemComputePipeline>(ctx.wgpu_ctx),
             );
-
-            vitem2d_packets
-                .iter()
-                .map(|h| ctx.render_pool.get_packet(h))
-                .for_each(|vitem| vitem.encode_compute_pass_command(&mut cpass));
+            cpass.set_bind_group(0, merged.compute_bind_group.as_ref().unwrap(), &[]);
+            cpass.dispatch_workgroups(merged.total_points().div_ceil(256), 1, 1);
         }
     }
 }
