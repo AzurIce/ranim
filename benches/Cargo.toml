@@ -13,6 +13,10 @@ bench = false
 itertools.workspace = true
 criterion = { version = "0.8.1", features = ["html_reports"] }
 ranim = { path = "../", features = ["render"] }
+ranim-core = { path = "../packages/ranim-core" }
+ranim-render = { path = "../packages/ranim-render" }
+wgpu = { workspace = true }
+pollster = "0.4.0"
 
 [[bench]]
 name = "eval"
@@ -24,4 +28,8 @@ harness = false
 
 [[bench]]
 name = "extract"
+harness = false
+
+[[bench]]
+name = "gpu_render"
 harness = false

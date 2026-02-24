@@ -20,7 +20,7 @@ use glam::{UVec3, uvec3};
 
 use crate::{
     graph::{AnyGlobalRenderNodeTrait, GlobalRenderGraph, RenderPackets},
-    primitives::viewport::ViewportUniform,
+    primitives::{merged_vitem::MergedVItemBuffer, viewport::ViewportUniform},
     resource::{PipelinesPool, RenderPool, RenderTextures},
     utils::{WgpuBuffer, WgpuVecBuffer},
 };
@@ -91,6 +91,8 @@ pub struct RenderContext<'a> {
     pub wgpu_ctx: &'a WgpuContext,
     pub resolution_info: &'a ResolutionInfo,
     pub clear_color: wgpu::Color,
+    /// Present when using the merged rendering path.
+    pub merged_buffer: Option<&'a MergedVItemBuffer>,
 }
 
 // MARK: Renderer
@@ -101,6 +103,9 @@ pub struct Renderer {
     pub(crate) pipelines: PipelinesPool,
     packets: RenderPackets,
     render_graph: GlobalRenderGraph,
+
+    /// Present when using the merged rendering path (lazily initialized on first use).
+    merged_buffer: Option<MergedVItemBuffer>,
 
     #[cfg(feature = "profiling")]
     pub(crate) profiler: wgpu_profiler::GpuProfiler,
@@ -119,7 +124,65 @@ impl Renderer {
         self.width as f32 / self.height as f32
     }
 
+    #[allow(unused)]
+    #[deprecated(note = "will be replaced by the GPU-driven one instead.")]
+    fn build_render_graph() -> GlobalRenderGraph {
+        use graph::*;
+        let mut render_graph = GlobalRenderGraph::new();
+        let clear = render_graph.insert_node(ClearNode);
+        let view_render = render_graph.insert_node({
+            use graph::view::*;
+            let mut render_graph = ViewRenderGraph::new();
+            let vitem_compute = render_graph.insert_node(VItemComputeNode);
+            let vitem2d_depth = render_graph.insert_node(VItemDepthNode);
+            let vitem2d_render = render_graph.insert_node(VItemColorNode);
+            let oit_resolve = render_graph.insert_node(OITResolveNode);
+            render_graph.insert_edge(vitem_compute, vitem2d_depth);
+            render_graph.insert_edge(vitem2d_depth, vitem2d_render);
+            render_graph.insert_edge(vitem2d_render, oit_resolve);
+            render_graph
+        });
+        render_graph.insert_edge(clear, view_render);
+        render_graph
+    }
+
+    fn build_merged_render_graph() -> GlobalRenderGraph {
+        use graph::*;
+        let mut render_graph = GlobalRenderGraph::new();
+        let clear = render_graph.insert_node(ClearNode);
+        let view_render = render_graph.insert_node({
+            use graph::view::*;
+            let mut render_graph = ViewRenderGraph::new();
+            let compute = render_graph.insert_node(MergedVItemComputeNode);
+            let depth = render_graph.insert_node(MergedVItemDepthNode);
+            let color = render_graph.insert_node(MergedVItemColorNode);
+            let oit_resolve = render_graph.insert_node(OITResolveNode);
+            render_graph.insert_edge(compute, depth);
+            render_graph.insert_edge(depth, color);
+            render_graph.insert_edge(color, oit_resolve);
+            render_graph
+        });
+        render_graph.insert_edge(clear, view_render);
+        render_graph
+    }
+
     pub fn new(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> Self {
+        Self::new_with_graph(
+            ctx,
+            width,
+            height,
+            oit_layers,
+            Self::build_merged_render_graph(),
+        )
+    }
+
+    fn new_with_graph(
+        ctx: &WgpuContext,
+        width: u32,
+        height: u32,
+        oit_layers: usize,
+        render_graph: GlobalRenderGraph,
+    ) -> Self {
         let resolution_info = ResolutionInfo::new(ctx, width, height, oit_layers);
 
         #[cfg(feature = "profiling")]
@@ -129,27 +192,6 @@ impl Renderer {
         )
         .unwrap();
 
-        let mut render_graph = GlobalRenderGraph::new();
-        {
-            use graph::*;
-            // Global Render Nodes that executes per-frame
-            let clear = render_graph.insert_node(ClearNode);
-            let view_render = render_graph.insert_node({
-                use graph::view::*;
-                // View Render Nodes that executes per-viewport in every frame
-                let mut render_graph = ViewRenderGraph::new();
-                let vitem_compute = render_graph.insert_node(VItemComputeNode);
-                let vitem2d_depth = render_graph.insert_node(VItemDepthNode);
-                let vitem2d_render = render_graph.insert_node(VItemColorNode);
-                let oit_resolve = render_graph.insert_node(OITResolveNode);
-                render_graph.insert_edge(vitem_compute, vitem2d_depth);
-                render_graph.insert_edge(vitem2d_depth, vitem2d_render);
-                render_graph.insert_edge(vitem2d_render, oit_resolve);
-                render_graph
-            });
-            render_graph.insert_edge(clear, view_render);
-        }
-
         Self {
             width,
             height,
@@ -157,7 +199,7 @@ impl Renderer {
             pipelines: PipelinesPool::default(),
             packets: RenderPackets::default(),
             render_graph,
-            // Profiler
+            merged_buffer: None,
             #[cfg(feature = "profiling")]
             profiler,
         }
@@ -167,6 +209,7 @@ impl Renderer {
         RenderTextures::new(ctx, self.width, self.height)
     }
 
+    /// Render a frame. Pushes viewport + VItem packets via pool, then execs the render graph.
     pub fn render_store_with_pool(
         &mut self,
         ctx: &WgpuContext,
@@ -175,10 +218,12 @@ impl Renderer {
         store: &CoreItemStore,
         pool: &mut RenderPool,
     ) {
+        // Viewport — always needed
         let (_id, camera_frame) = &store.camera_frames[0];
         let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
-
         self.packets.push(pool.alloc_packet(ctx, &viewport));
+
+        // Per-VItem packets (old path nodes query these; merged nodes ignore them)
         self.packets.extend(
             store
                 .vitems
@@ -186,6 +231,13 @@ impl Renderer {
                 .map(|(_id, data)| pool.alloc_packet(ctx, data)),
         );
 
+        // Merged buffer (merged nodes read this; old nodes ignore it)
+        let merged = self
+            .merged_buffer
+            .get_or_insert_with(|| MergedVItemBuffer::new(ctx));
+        merged.update(ctx, &store.vitems);
+
+        // Encode & submit
         {
             #[cfg(feature = "profiling")]
             profiling::scope!("render");
@@ -198,7 +250,7 @@ impl Renderer {
                 #[cfg(feature = "profiling")]
                 let mut scope = self.profiler.scope("render", &mut encoder);
 
-                let ctx = RenderContext {
+                let render_ctx = RenderContext {
                     pipelines: &self.pipelines,
                     render_textures,
                     render_packets: &self.packets,
@@ -206,6 +258,7 @@ impl Renderer {
                     wgpu_ctx: ctx,
                     resolution_info: &self.resolution_info,
                     clear_color,
+                    merged_buffer: self.merged_buffer.as_ref(),
                 };
 
                 self.render_graph.exec(
@@ -213,7 +266,7 @@ impl Renderer {
                     &mut encoder,
                     #[cfg(feature = "profiling")]
                     &mut scope,
-                    ctx,
+                    render_ctx,
                 );
             }
 
@@ -228,19 +281,14 @@ impl Renderer {
                     ctx.queue.submit(Some(encoder.finish()));
                 }
 
-                // renderable.debug(ctx);
-
-                // Signal to the profiler that the frame is finished.
                 self.profiler.end_frame().unwrap();
 
-                // Query for oldest finished frame (this is almost certainly not the one we just submitted!) and display results in the command line.
                 ctx.device
                     .poll(wgpu::PollType::wait_indefinitely())
                     .unwrap();
                 let latest_profiler_results = self
                     .profiler
                     .process_finished_frame(ctx.queue.get_timestamp_period());
-                // profiling_utils::console_output(&latest_profiler_results, ctx.wgpu_ctx.device.features());
                 let mut gpu_profiler = PUFFIN_GPU_PROFILER.lock().unwrap();
                 wgpu_profiler::puffin::output_frame_to_puffin(
                     &mut gpu_profiler,
