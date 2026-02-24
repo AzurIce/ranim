@@ -223,14 +223,6 @@ impl Renderer {
         let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
         self.packets.push(pool.alloc_packet(ctx, &viewport));
 
-        // Per-VItem packets (old path nodes query these; merged nodes ignore them)
-        self.packets.extend(
-            store
-                .vitems
-                .iter()
-                .map(|(_id, data)| pool.alloc_packet(ctx, data)),
-        );
-
         // Merged buffer (merged nodes read this; old nodes ignore it)
         let merged = self
             .merged_buffer
