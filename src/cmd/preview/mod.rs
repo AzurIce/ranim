@@ -1,10 +1,7 @@
 mod depth_visual;
 mod timeline;
 
-use async_channel::{Receiver, Sender, unbounded};
-use depth_visual::DepthVisualPipeline;
-use eframe::egui;
-use ranim::{
+use crate::{
     Scene, SceneConstructor,
     core::{
         SealedRanimScene,
@@ -17,6 +14,9 @@ use ranim::{
         utils::WgpuContext,
     },
 };
+use async_channel::{Receiver, Sender, unbounded};
+use depth_visual::DepthVisualPipeline;
+use eframe::egui;
 use timeline::TimelineState;
 use tracing::{error, info};
 use web_time::Instant;
@@ -47,7 +47,7 @@ impl TimelineInfoState {
     }
 }
 
-pub enum AppCmd {
+pub enum RanimPreviewAppCmd {
     ReloadScene(Scene, Sender<()>),
 }
 
@@ -57,9 +57,9 @@ pub enum ViewMode {
     Depth,
 }
 
-pub struct RanimApp {
-    cmd_rx: Receiver<AppCmd>,
-    pub cmd_tx: Sender<AppCmd>,
+pub struct RanimPreviewApp {
+    cmd_rx: Receiver<RanimPreviewAppCmd>,
+    pub cmd_tx: Sender<RanimPreviewAppCmd>,
     #[allow(unused)]
     title: String,
     clear_color: wgpu::Color,
@@ -87,7 +87,7 @@ pub struct RanimApp {
     depth_visual_view: Option<wgpu::TextureView>,
 }
 
-impl RanimApp {
+impl RanimPreviewApp {
     pub fn new(scene_constructor: impl SceneConstructor, title: String) -> Self {
         let t = Instant::now();
         info!("building scene...");
@@ -144,7 +144,7 @@ impl RanimApp {
     fn handle_events(&mut self) {
         if let Ok(cmd) = self.cmd_rx.try_recv() {
             match cmd {
-                AppCmd::ReloadScene(scene, tx) => {
+                RanimPreviewAppCmd::ReloadScene(scene, tx) => {
                     let timeline = scene.constructor.build_scene();
                     let timeline_infos = timeline.get_timeline_infos();
                     let old_cur_second = self.timeline_state.current_sec;
@@ -314,7 +314,7 @@ impl RanimApp {
     }
 }
 
-impl eframe::App for RanimApp {
+impl eframe::App for RanimPreviewApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.prepare_renderer(frame);
         self.handle_events();
@@ -435,7 +435,7 @@ impl eframe::App for RanimApp {
     }
 }
 
-pub fn run_app(app: RanimApp, #[cfg(target_arch = "wasm32")] container_id: String) {
+pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id: String) {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let native_options = eframe::NativeOptions {
@@ -492,7 +492,7 @@ pub fn run_app(app: RanimApp, #[cfg(target_arch = "wasm32")] container_id: Strin
 }
 
 pub fn preview_constructor_with_name(scene: impl SceneConstructor, name: &str) {
-    let app = RanimApp::new(scene, name.to_string());
+    let app = RanimPreviewApp::new(scene, name.to_string());
     run_app(
         app,
         #[cfg(target_arch = "wasm32")]
@@ -507,7 +507,7 @@ pub fn preview_scene(scene: &Scene) {
 
 /// Preview a scene with a custom name
 pub fn preview_scene_with_name(scene: &Scene, name: &str) {
-    let mut app = RanimApp::new(scene.constructor, name.to_string());
+    let mut app = RanimPreviewApp::new(scene.constructor, name.to_string());
     app.set_clear_color_str(&scene.config.clear_color);
     run_app(
         app,
@@ -519,12 +519,13 @@ pub fn preview_scene_with_name(scene: &Scene, name: &str) {
 /// Preview a scene by name.
 ///
 /// ```rust,ignore
-/// ranim_app::preview_scene!(fading);
+/// ranim::preview_scene!(fading);
+/// ranim::preview_scene!(ranim_020::code_structure);
 /// ```
 #[macro_export]
 macro_rules! preview_scene {
-    ($scene:ident) => {
-        $crate::preview_scene(&$scene::scene())
+    ($($scene:tt)::+) => {
+        $crate::cmd::preview_scene(&$($scene)::+::scene())
     };
 }
 

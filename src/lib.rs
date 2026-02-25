@@ -55,12 +55,13 @@ pub use ranim_core::RanimScene;
 ///
 /// ```rust,ignore
 /// render_scene!(fading);
+/// render_scene!(ranim_020::code_structure);
 /// ```
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 #[macro_export]
 macro_rules! render_scene {
-    ($scene:ident) => {
-        $crate::cmd::render_scene(&$scene::scene(), 2)
+    ($($scene:tt)::+) => {
+        $crate::cmd::render_scene(&$($scene)::+::scene(), 2)
     };
 }
 

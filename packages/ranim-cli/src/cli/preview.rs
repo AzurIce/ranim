@@ -5,7 +5,7 @@ use std::{
 
 use krates::Kid;
 use notify_debouncer_full::{DebouncedEvent, Debouncer};
-use ranim_app::{AppCmd, RanimApp};
+use ranim::cmd::preview::{RanimPreviewApp, RanimPreviewAppCmd};
 
 use anyhow::Result;
 use async_channel::{Receiver, bounded, unbounded};
@@ -160,7 +160,7 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
     //     info!("- {:?}", scene.name);
     // }
     // panic!("Failed to get preview scene");
-    let mut app = RanimApp::new(scene.constructor, scene.name.clone());
+    let mut app = RanimPreviewApp::new(scene.constructor, scene.name.clone());
     app.set_clear_color_str(&scene.config.clear_color);
     let cmd_tx = app.cmd_tx.clone();
 
@@ -192,7 +192,7 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
 
                 let (tx, rx) = bounded(1);
                 cmd_tx
-                    .send_blocking(AppCmd::ReloadScene(scene.clone(), tx))
+                    .send_blocking(RanimPreviewAppCmd::ReloadScene(scene.clone(), tx))
                     .unwrap();
                 rx.recv_blocking().unwrap();
                 lib.replace(new_lib);
@@ -204,7 +204,7 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
             std::thread::sleep(Duration::from_millis(200));
         }
     });
-    ranim_app::run_app(app);
+    ranim::cmd::preview::run_app(app);
     shutdown_tx.send_blocking(()).unwrap();
     daemon.join().unwrap();
     Ok(())
