@@ -275,7 +275,6 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "ranim",
- "ranim-app",
 ]
 
 [[package]]
@@ -4761,7 +4760,11 @@ dependencies = [
  "anyhow",
  "assert_float_eq",
  "async-channel",
+ "bytemuck",
+ "console_error_panic_hook",
  "derive_more",
+ "eframe",
+ "egui",
  "flate2",
  "getrandom 0.3.4",
  "indicatif",
@@ -4775,7 +4778,6 @@ dependencies = [
  "rand 0.9.2",
  "rand_chacha 0.9.0",
  "ranim-anims",
- "ranim-app",
  "ranim-core",
  "ranim-items",
  "ranim-macros",
@@ -4784,6 +4786,10 @@ dependencies = [
  "tracing",
  "tracing-indicatif",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-tracing",
+ "web-sys",
+ "web-time",
  "wgpu",
  "which",
 ]
@@ -4794,29 +4800,6 @@ version = "0.1.5"
 dependencies = [
  "ranim-core",
  "tracing",
-]
-
-[[package]]
-name = "ranim-app"
-version = "0.1.5"
-dependencies = [
- "async-channel",
- "bytemuck",
- "console_error_panic_hook",
- "eframe",
- "egui",
- "pollster",
- "profiling",
- "puffin",
- "puffin_http",
- "ranim",
- "tracing",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-tracing",
- "web-sys",
- "web-time",
- "wgpu",
 ]
 
 [[package]]
@@ -4833,7 +4816,6 @@ dependencies = [
  "notify",
  "notify-debouncer-full",
  "ranim",
- "ranim-app",
  "toml 0.9.12+spec-1.1.0",
  "tracing",
  "tracing-indicatif",

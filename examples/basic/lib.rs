@@ -1,6 +1,4 @@
 use ranim::glam;
-#[cfg(target_arch = "wasm32")]
-use ranim_app as _;
 
 use glam::DVec3;
 use ranim::{
