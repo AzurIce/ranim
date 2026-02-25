@@ -1,6 +1,3 @@
-#[cfg(target_arch = "wasm32")]
-use ranim_app as _;
-
 use std::f64::consts::TAU;
 
 use ranim::{color::palettes::manim, glam::DVec3, prelude::*};

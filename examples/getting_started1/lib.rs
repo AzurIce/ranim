@@ -1,6 +1,3 @@
-#[cfg(target_arch = "wasm32")]
-use ranim_app as _;
-
 use ranim::{
     anims::{creation::WritingAnim, morph::MorphAnim},
     color::palettes::manim,

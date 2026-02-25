@@ -1,6 +1,3 @@
-#[cfg(target_arch = "wasm32")]
-use ranim_app as _;
-
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     anims::morph::MorphAnim,

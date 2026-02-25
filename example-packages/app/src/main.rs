@@ -6,5 +6,5 @@ fn main() {
         .filter(Some("ranim"), log::LevelFilter::Info)
         .init();
 
-    ranim_app::preview_scene!(hello_ranim);
+    ranim::preview_scene!(hello_ranim);
 }
