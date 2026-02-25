@@ -188,11 +188,9 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
                     error!("Failed to find preview scene: {err}");
                     continue;
                 }
-                let scene = scene.unwrap();
-
                 let (tx, rx) = bounded(1);
                 cmd_tx
-                    .send_blocking(RanimPreviewAppCmd::ReloadScene(scene.clone(), tx))
+                    .send_blocking(RanimPreviewAppCmd::ReloadScene(scene.unwrap(), tx))
                     .unwrap();
                 rx.recv_blocking().unwrap();
                 lib.replace(new_lib);
