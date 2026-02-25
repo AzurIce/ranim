@@ -516,19 +516,6 @@ pub fn preview_scene_with_name(scene: &Scene, name: &str) {
     );
 }
 
-/// Preview a scene by name.
-///
-/// ```rust,ignore
-/// ranim::preview_scene!(fading);
-/// ranim::preview_scene!(ranim_020::code_structure);
-/// ```
-#[macro_export]
-macro_rules! preview_scene {
-    ($($scene:tt)::+) => {
-        $crate::cmd::preview_scene(&$($scene)::+::scene())
-    };
-}
-
 // WASM support needs refactoring, mostly keeping it commented or adapting basic entry point.
 #[cfg(target_arch = "wasm32")]
 mod wasm {
