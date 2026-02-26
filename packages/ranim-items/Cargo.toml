@@ -22,18 +22,18 @@ derive_more = { workspace = true, features = [
   "into_iterator",
 ] }
 sha1 = "0.10.6"
-lru = "0.16.2"
+lru = "0.16.3"
 usvg = "0.45.1"
-typst = "0.14.1"
-typst-kit = { version = "0.14.1", default-features = false, features = [
+typst = "0.14.2"
+typst-kit = { version = "0.14.2", default-features = false, features = [
   "fonts",
   "embed-fonts",
 ] }
 # time = "0.3.41"
-typst-svg = "0.14.1"
-chrono = "0.4.42"
+typst-svg = "0.14.2"
+chrono = "0.4.44"
 diff-match-patch-rs = "0.5.1"
-regex = "1.12.2"
+regex = "1.12.3"
 
 [dev-dependencies]
 assert_float_eq = "1.2.0"

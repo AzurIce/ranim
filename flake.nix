@@ -119,7 +119,8 @@
           ]
           ++ (with pkgs; [
             git-cliff
-            cargo-release
+            # cargo-release
+            cargo-edit
             samply
             cargo-udeps
             miniserve
@@ -135,6 +136,7 @@
             # mdbook-i18n-helpers
           ])
           ++ [
+            (pkgs.callPackage ./cargo-release.nix { })
             (pkgs.callPackage ./mdbook-katex.nix { })
             (pkgs.callPackage ./wasm-bindgen-cli.nix { })
             ciallo.packages.${system}.default
