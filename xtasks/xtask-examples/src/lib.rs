@@ -195,6 +195,8 @@ impl Example {
                     "build",
                     "--example",
                     &self.name,
+                    "--features",
+                    "preview",
                     "--target",
                     "wasm32-unknown-unknown",
                     "--release",
