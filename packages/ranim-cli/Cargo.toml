@@ -16,9 +16,9 @@ doc = false
 
 [dependencies]
 ranim = { workspace = true, features = ["render", "preview"] }
-anyhow = "1.0.100"
+anyhow = "1.0.102"
 cargo_toml = "0.22.3"
-clap = { version = "4.5.53", features = ["derive"] }
+clap = { version = "4.5.60", features = ["derive"] }
 ignore = "0.4.25"
 krates = "0.20.0"
 libloading = "0.9.0"
@@ -28,7 +28,7 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 notify = "8.2.0"
 notify-debouncer-full = "0.6.0"
 async-channel = "2.5.0"
-toml = "0.9.8"
+toml = "1.0.3"
 
 [package.metadata.docs.rs]
 all-features = true

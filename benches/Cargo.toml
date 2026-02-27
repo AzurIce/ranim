@@ -11,7 +11,7 @@ bench = false
 
 [dependencies]
 itertools.workspace = true
-criterion = { version = "0.8.1", features = ["html_reports"] }
+criterion = { version = "0.8.2", features = ["html_reports"] }
 ranim = { path = "../", features = ["render"] }
 ranim-core = { path = "../packages/ranim-core" }
 ranim-render = { path = "../packages/ranim-render" }
