@@ -336,9 +336,10 @@ fn get_dylib_path(
     target_dir.join(dylib_name)
 }
 
-/// main
-pub fn main() {
-    use clap::Parser;
+/// This should only be called once per process.
+///
+/// If you use [`main`], this is called automatically.
+pub fn init_tracing() {
     use tracing::level_filters::LevelFilter;
     use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -365,6 +366,11 @@ pub fn main() {
         .with(indicatif_layer)
         .with(build_filter())
         .init();
+}
 
+/// main
+pub fn main() {
+    use clap::Parser;
+    init_tracing();
     Cli::parse().run().unwrap();
 }

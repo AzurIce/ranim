@@ -78,6 +78,10 @@ pub struct Output {
     pub fps: u32,
     /// Whether to save the frames.
     pub save_frames: bool,
+    /// The name of the video, uses scene's name by default.
+    ///
+    /// e.g. the output of name `my_video` will be outputed as `my_video_<width>x<height>_<fps>.mp4`.
+    pub name: Option<String>,
     /// The directory to save the output
     ///
     /// Related to the `output` folder, Or absolute.
@@ -93,6 +97,7 @@ impl Default for Output {
             height: 1080,
             fps: 60,
             save_frames: false,
+            name: None,
             dir: "./".to_string(),
             format: OutputFormat::default(),
         }
