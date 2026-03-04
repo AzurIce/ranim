@@ -11,11 +11,12 @@ struct CameraUniforms {
 @group(1) @binding(0) var<uniform> cam_uniforms: CameraUniforms;
 
 @group(2) @binding(0) var<storage> transforms: array<mat4x4<f32>>;
-@group(2) @binding(1) var<storage> fill_rgbas: array<vec4<f32>>;
 
 struct VertexOutput {
     @builtin(position) frag_pos: vec4<f32>,
     @location(0) @interpolate(flat) mesh_id: u32,
+    @location(1) world_pos: vec3<f32>,
+    @location(2) vertex_color: vec4<f32>,
 }
 
 fn pack_color(color: vec4<f32>) -> u32 {
@@ -28,13 +29,24 @@ struct FragmentOutput {
     @builtin(frag_depth) depth: f32,
 }
 
+fn compute_lighting(world_pos: vec3<f32>, base_color: vec4<f32>) -> vec4<f32> {
+    let normal = normalize(cross(dpdx(world_pos), dpdy(world_pos)));
+    let light_dir = normalize(vec3<f32>(0.3, 1.0, 0.5));
+    let ambient = 0.35;
+    let diffuse = abs(dot(normal, light_dir));
+    let lit = ambient + (1.0 - ambient) * diffuse;
+    return vec4<f32>(base_color.rgb * lit, base_color.a);
+}
+
 @fragment
 fn fs_main(
     @builtin(position) frag_pos: vec4<f32>,
     @location(0) @interpolate(flat) mesh_id: u32,
+    @location(1) world_pos: vec3<f32>,
+    @location(2) vertex_color: vec4<f32>,
 ) -> FragmentOutput {
     var out: FragmentOutput;
-    let color = fill_rgbas[mesh_id];
+    let color = compute_lighting(world_pos, vertex_color);
 
     if (color.a >= 0.99) {
         out.color = color;
@@ -62,8 +74,10 @@ fn fs_main(
 fn fs_depth_only(
     @builtin(position) frag_pos: vec4<f32>,
     @location(0) @interpolate(flat) mesh_id: u32,
+    @location(1) world_pos: vec3<f32>,
+    @location(2) vertex_color: vec4<f32>,
 ) -> @builtin(frag_depth) f32 {
-    let color = fill_rgbas[mesh_id];
+    let color = vertex_color;
 
     if (color.a < 0.99) {
         discard;
@@ -76,6 +90,7 @@ fn fs_depth_only(
 fn vs_main(
     @location(0) position: vec3<f32>,
     @location(1) mesh_id: u32,
+    @location(2) vertex_color: vec4<f32>,
 ) -> VertexOutput {
     var out: VertexOutput;
 
@@ -84,6 +99,8 @@ fn vs_main(
 
     out.frag_pos = cam_uniforms.proj_mat * cam_uniforms.view_mat * pos_world;
     out.mesh_id = mesh_id;
+    out.world_pos = pos_world.xyz;
+    out.vertex_color = vertex_color;
 
     return out;
 }

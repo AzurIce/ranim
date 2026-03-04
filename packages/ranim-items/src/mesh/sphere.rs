@@ -6,7 +6,7 @@ use ranim_core::{
     Extract,
     anchor::Aabb,
     color::{self, AlphaColor, Srgb},
-    core_item::{mesh_item::MeshItem, CoreItem},
+    core_item::{CoreItem, mesh_item::MeshItem},
     glam::{DMat4, DVec3},
     traits::{FillColor, Interpolatable, Opacity, ShiftTransform},
 };
@@ -92,11 +92,11 @@ impl Sphere {
         let points = self.generate_points();
         let triangle_indices = generate_grid_indices(self.resolution.0, self.resolution.1);
         Surface {
+            resolution: self.resolution,
+            vertex_colors: vec![self.fill_rgba; points.len()],
+            transform: DMat4::from_translation(self.center),
             points,
             triangle_indices,
-            resolution: self.resolution,
-            fill_rgba: self.fill_rgba,
-            transform: DMat4::from_translation(self.center),
         }
     }
 }
@@ -160,7 +160,7 @@ impl Extract for Sphere {
             points: points.iter().map(|p| p.as_vec3()).collect(),
             triangle_indices,
             transform: DMat4::from_translation(self.center).as_mat4(),
-            fill_rgba: self.fill_rgba.into(),
+            vertex_colors: vec![self.fill_rgba.into(); points.len()],
         }));
     }
 }
@@ -191,7 +191,10 @@ mod tests {
     fn test_sphere_center_to_transform() {
         let sphere = Sphere::new(1.0).with_center(dvec3(1.0, 2.0, 3.0));
         let surface = sphere.to_surface();
-        assert_eq!(surface.transform, DMat4::from_translation(dvec3(1.0, 2.0, 3.0)));
+        assert_eq!(
+            surface.transform,
+            DMat4::from_translation(dvec3(1.0, 2.0, 3.0))
+        );
     }
 
     #[test]

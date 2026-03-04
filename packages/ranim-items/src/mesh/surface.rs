@@ -3,12 +3,42 @@
 use ranim_core::{
     Extract,
     color::{self, AlphaColor, Srgb},
+    components::rgba::Rgba,
     core_item::{CoreItem, mesh_item::MeshItem},
     glam::{DMat4, DVec3},
     traits::{FillColor, Interpolatable, Opacity},
 };
 
 use super::generate_grid_indices;
+
+/// Linearly interpolate a color from a sorted colorscale based on a value.
+fn colorscale_lookup(colorscale: &[(AlphaColor<Srgb>, f64)], value: f64) -> AlphaColor<Srgb> {
+    if colorscale.is_empty() {
+        return color::palette::css::WHITE.with_alpha(1.0);
+    }
+    if value <= colorscale[0].1 {
+        return colorscale[0].0;
+    }
+    if value >= colorscale[colorscale.len() - 1].1 {
+        return colorscale[colorscale.len() - 1].0;
+    }
+    for i in 0..colorscale.len() - 1 {
+        let (c0, v0) = colorscale[i];
+        let (c1, v1) = colorscale[i + 1];
+        if value >= v0 && value <= v1 {
+            let t = ((value - v0) / (v1 - v0)) as f32;
+            let [r0, g0, b0, a0] = c0.components;
+            let [r1, g1, b1, a1] = c1.components;
+            return AlphaColor::new([
+                r0 + (r1 - r0) * t,
+                g0 + (g1 - g0) * t,
+                b0 + (b1 - b0) * t,
+                a0 + (a1 - a0) * t,
+            ]);
+        }
+    }
+    colorscale[colorscale.len() - 1].0
+}
 
 /// A parametric surface defined by pre-generated mesh data.
 ///
@@ -22,8 +52,8 @@ pub struct Surface {
     pub triangle_indices: Vec<u32>,
     /// Grid resolution `(nu, nv)`.
     pub resolution: (u32, u32),
-    /// Fill color (with alpha).
-    pub fill_rgba: AlphaColor<Srgb>,
+    /// Per-vertex colors.
+    pub vertex_colors: Vec<AlphaColor<Srgb>>,
     /// Transform matrix applied when rendering.
     pub transform: DMat4,
 }
@@ -53,18 +83,33 @@ impl Surface {
 
         let triangle_indices = generate_grid_indices(nu, nv);
 
+        let vertex_colors = vec![color::palette::css::BLUE.with_alpha(1.0); points.len()];
         Self {
             points,
             triangle_indices,
             resolution,
-            fill_rgba: color::palette::css::BLUE.with_alpha(1.0),
+            vertex_colors,
             transform: DMat4::IDENTITY,
         }
     }
 
-    /// Set the fill color. Returns `self` for chaining.
-    pub fn with_fill_color(mut self, color: AlphaColor<Srgb>) -> Self {
-        self.fill_rgba = color;
+    /// Set per-vertex colors. Returns `self` for chaining.
+    pub fn with_vertex_colors(mut self, colors: Vec<AlphaColor<Srgb>>) -> Self {
+        self.vertex_colors = colors;
+        self
+    }
+
+    /// Set per-vertex colors by mapping the Y coordinate of each vertex through a colorscale.
+    ///
+    /// `colorscale` is a list of `(color, y_value)` pairs sorted by ascending `y_value`.
+    /// The vertex color is linearly interpolated between adjacent entries.
+    pub fn with_fill_by_y(mut self, colorscale: &[(AlphaColor<Srgb>, f64)]) -> Self {
+        let colors = self
+            .points
+            .iter()
+            .map(|p| colorscale_lookup(colorscale, p.y))
+            .collect();
+        self.vertex_colors = colors;
         self
     }
 
@@ -90,7 +135,7 @@ impl Interpolatable for Surface {
             } else {
                 target.resolution
             },
-            fill_rgba: Interpolatable::lerp(&self.fill_rgba, &target.fill_rgba, t),
+            vertex_colors: self.vertex_colors.lerp(&target.vertex_colors, t),
             transform: Interpolatable::lerp(&self.transform, &target.transform, t),
         }
     }
@@ -98,22 +143,34 @@ impl Interpolatable for Surface {
 
 impl FillColor for Surface {
     fn fill_color(&self) -> AlphaColor<Srgb> {
-        self.fill_rgba
+        // TODO: make it better
+        let Rgba(rgba) = self
+            .vertex_colors
+            .first()
+            .cloned()
+            .map(Rgba::from)
+            .unwrap_or_default();
+        AlphaColor::new([rgba.x, rgba.y, rgba.z, rgba.w])
     }
+
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.fill_rgba = color;
+        if let Some(x) = self.vertex_colors.first_mut() {
+            *x = color.into();
+        }
         self
     }
+
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
+        if let Some(x) = self.vertex_colors.first_mut() {
+            *x = x.with_alpha(opacity);
+        }
         self
     }
 }
 
 impl Opacity for Surface {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
-        self
+        self.set_fill_opacity(opacity)
     }
 }
 
@@ -124,7 +181,12 @@ impl Extract for Surface {
             points: self.points.iter().map(|p| p.as_vec3()).collect(),
             triangle_indices: self.triangle_indices.clone(),
             transform: self.transform.as_mat4(),
-            fill_rgba: self.fill_rgba.into(),
+            vertex_colors: self
+                .vertex_colors
+                .clone()
+                .into_iter()
+                .map(Rgba::from)
+                .collect(),
         }));
     }
 }

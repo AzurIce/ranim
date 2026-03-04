@@ -19,15 +19,16 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     let r_cam = r.insert(cam.clone());
 
     // Regular tetrahedron centered at the origin, edge length `a`.
+    // Y is the vertical axis; the three base vertices share the same Y coordinate.
     let a: f64 = 2.5;
     let sqrt6 = 6.0_f64.sqrt();
     let sqrt3 = 3.0_f64.sqrt();
 
     let vertices = [
-        DVec3::new(0.0, 0.0, a * sqrt6 / 4.0),
-        DVec3::new(0.0, a * sqrt3 / 3.0, -a * sqrt6 / 12.0),
-        DVec3::new(-a / 2.0, -a * sqrt3 / 6.0, -a * sqrt6 / 12.0),
-        DVec3::new(a / 2.0, -a * sqrt3 / 6.0, -a * sqrt6 / 12.0),
+        DVec3::new(0.0, a * sqrt6 / 4.0, 0.0),                        // apex
+        DVec3::new(0.0, -a * sqrt6 / 12.0, a * sqrt3 / 3.0),          // base
+        DVec3::new(-a / 2.0, -a * sqrt6 / 12.0, -a * sqrt3 / 6.0),    // base
+        DVec3::new(a / 2.0, -a * sqrt6 / 12.0, -a * sqrt3 / 6.0),     // base
     ];
 
     let colors = [

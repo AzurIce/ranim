@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    color,
+    color::palettes::manim,
     glam::DVec3,
     items::mesh::Surface,
     prelude::*,
@@ -58,6 +58,30 @@ fn grad(hash: usize, x: f64, y: f64) -> f64 {
     (x * gx + y * gy) * SQRT5_INV
 }
 
+fn noise(x: f64, y: f64) -> f64 {
+    let xi = x.floor() as i64 as usize;
+    let yi = y.floor() as i64 as usize;
+
+    let xf = x - x.floor();
+    let yf = y - y.floor();
+
+    let u = fade(xf);
+    let v = fade(yf);
+
+    let a = perm(xi) + (yi & 255);
+    let b = perm(xi.wrapping_add(1)) + (yi & 255);
+    let p0 = grad(perm(a), xf, yf);
+    let p1 = grad(perm(b), xf - 1.0, yf);
+    let p2 = grad(perm(a + 1), xf, yf - 1.0);
+    let p3 = grad(perm(b + 1), xf - 1.0, yf - 1.0);
+
+    fn lerp(t: f64, a: f64, b: f64) -> f64 {
+        a + t * (b - a)
+    }
+
+    lerp(v, lerp(u, p0, p1), lerp(u, p2, p3))
+}
+
 fn noise_with_derivative(x: f64, y: f64) -> (f64, f64, f64) {
     let xi = x.floor() as i64 as usize;
     let yi = y.floor() as i64 as usize;
@@ -86,6 +110,22 @@ fn noise_with_derivative(x: f64, y: f64) -> (f64, f64, f64) {
     (n, dndx, dndy)
 }
 
+fn fractal_noise(x: f64, y: f64, octaves: u32, persistence: f64) -> f64 {
+    let mut total = 0.0;
+    let mut frequency = 1.0;
+    let mut amplitude = 1.0;
+    let mut max_value = 0.0;
+
+    for _ in 0..octaves {
+        total += noise(x * frequency, y * frequency) * amplitude;
+        max_value += amplitude;
+        amplitude *= persistence;
+        frequency *= 2.0;
+    }
+
+    total / max_value
+}
+
 fn fractal_with_derivative_noise(x: f64, y: f64, octaves: u32, persistence: f64) -> f64 {
     let mut total = 0.0;
     let mut frequency = 1.0;
@@ -108,52 +148,75 @@ fn fractal_with_derivative_noise(x: f64, y: f64, octaves: u32, persistence: f64)
     total / max_value
 }
 
-// --- Scene ---
+// --- Constants (matching Python cg-report) ---
 
 const GRID_SIZE: f64 = 32.0;
 const LATTICE_CNT: f64 = 8.0;
 const DEPTH: f64 = 3.0;
-const RESOLUTION: u32 = 128;
+const RESOLUTION: u32 = 256;
 
-fn terrain_height(u: f64, v: f64) -> f64 {
-    let nx = u / GRID_SIZE * LATTICE_CNT;
-    let ny = v / GRID_SIZE * LATTICE_CNT;
-    fractal_with_derivative_noise(nx, ny, 8, 0.5) * DEPTH
+// Python: cut_radius=16, mid=15, l=0, r=30
+const U_MIN: f64 = 0.0;
+const U_MAX: f64 = 30.0;
+// Python: surface.shift(size / 2 * (DOWN + LEFT))
+const CENTER_OFFSET: f64 = 16.0; // size / 2
+
+// Height-based color scale matching the Python reference.
+// Python: [(c, x * depth) for c, x in [...]]
+// Colors map to the Y-coordinate of the vertex (raw height, no scaling).
+fn terrain_colorscale() -> Vec<(ranim::color::AlphaColor<ranim::color::Srgb>, f64)> {
+    vec![
+        (manim::BLUE_E, -1.0 * DEPTH),
+        (manim::BLUE_E, -0.9 * DEPTH),
+        (manim::BLUE_C, -0.8 * DEPTH),
+        (manim::GOLD_E, -0.7 * DEPTH),
+        (manim::GREY_BROWN, -0.1 * DEPTH),
+        (manim::GREY_BROWN, 0.1 * DEPTH),
+        (manim::GREY_D, 0.25 * DEPTH),
+        (manim::GREY_C, 0.6 * DEPTH),
+        (manim::WHITE, 0.7 * DEPTH),
+        (manim::WHITE, 1.0 * DEPTH),
+    ]
 }
 
-#[scene]
-#[output(dir = "perlin_terrain")]
-fn perlin_terrain(r: &mut RanimScene) {
-    let phi = 60.0 * PI / 180.0;
+// --- Helper to build a terrain scene ---
+
+fn build_terrain_scene(
+    r: &mut RanimScene,
+    height_func: impl Fn(f64, f64) -> f64,
+) {
+    let phi = 70.0 * PI / 180.0;
     let theta = 30.0 * PI / 180.0;
-    let distance = 8.0;
+    let distance = 25.0;
 
     let mut cam = CameraFrame::from_spherical(phi, theta, distance);
     let r_cam = r.insert(cam.clone());
 
-    // Terrain
-    let half = GRID_SIZE / 2.0;
-    let scale = 8.0 / GRID_SIZE;
+    let colorscale = terrain_colorscale();
 
+    // No extra scaling — positions match Python's world-space coordinates.
+    // Python: axes.c2p(u, v, noise_func(v, u, size) * depth)
+    //         then shift(size/2 * (DOWN + LEFT))
+    // In ranim (Y-up): x = u - offset, y = height, z = v - offset
     let terrain = Surface::from_uv_func(
         |u, v| {
-            let x = (u - half) * scale;
-            let y = terrain_height(u, v) * scale;
-            let z = (v - half) * scale;
+            let x = u - CENTER_OFFSET;
+            let y = height_func(u, v);
+            let z = v - CENTER_OFFSET;
             DVec3::new(x, y, z)
         },
-        (0.0, GRID_SIZE),
-        (0.0, GRID_SIZE),
+        (U_MIN, U_MAX),
+        (U_MIN, U_MAX),
         (RESOLUTION, RESOLUTION),
     )
-    .with_fill_color(color::palette::css::DARK_SEA_GREEN.with_alpha(1.0));
+    .with_fill_by_y(&colorscale);
 
     let _r_terrain = r.insert(terrain);
 
-    // Camera orbit: full revolution in 8 seconds
+    // Match Python: rate=0.4 rad/s for 5 seconds → 2 radians total
     r.timeline_mut(r_cam).play(
-        cam.orbit(DVec3::ZERO, 2.0 * PI)
-            .with_duration(8.0)
+        cam.orbit(DVec3::ZERO, 2.0)
+            .with_duration(5.0)
             .with_rate_func(linear),
     );
 
@@ -161,4 +224,44 @@ fn perlin_terrain(r: &mut RanimScene) {
         r.timelines().max_total_secs(),
         TimeMark::Capture("preview.png".to_string()),
     );
+}
+
+// --- Scenes ---
+
+/// Basic Perlin noise terrain.
+#[scene]
+#[output(dir = "perlin_terrain/perlin")]
+fn perlin(r: &mut RanimScene) {
+    // Python: get_noise(x, y, size) → noise(v, u) (note v, u swap)
+    // height = noise_func(v, u, size) * depth = noise * depth
+    build_terrain_scene(r, |u, v| {
+        let nx = v / GRID_SIZE * LATTICE_CNT;
+        let ny = u / GRID_SIZE * LATTICE_CNT;
+        noise(nx, ny) * DEPTH
+    });
+}
+
+/// Fractal Perlin noise terrain (octave stacking).
+#[scene]
+#[output(dir = "perlin_terrain/fractal")]
+fn fractal_perlin(r: &mut RanimScene) {
+    // Python: get_fractal_noise(x, y, size) * depth → fractal_noise(v, u) * depth
+    // height = noise_func(v, u, size) * depth = fractal_noise * depth * depth
+    build_terrain_scene(r, |u, v| {
+        let nx = v / GRID_SIZE * LATTICE_CNT;
+        let ny = u / GRID_SIZE * LATTICE_CNT;
+        fractal_noise(nx, ny, 8, 0.5) * DEPTH * DEPTH
+    });
+}
+
+/// Fractal Perlin noise with derivative-based erosion.
+#[scene]
+#[output(dir = "perlin_terrain/erosion")]
+fn fractal_erosion(r: &mut RanimScene) {
+    // Same pattern as fractal_perlin but with derivative-based erosion
+    build_terrain_scene(r, |u, v| {
+        let nx = v / GRID_SIZE * LATTICE_CNT;
+        let ny = u / GRID_SIZE * LATTICE_CNT;
+        fractal_with_derivative_noise(nx, ny, 8, 0.5) * DEPTH * DEPTH
+    });
 }
