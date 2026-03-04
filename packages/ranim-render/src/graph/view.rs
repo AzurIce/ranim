@@ -1,11 +1,19 @@
-use std::ops::{Deref, DerefMut};
-
 pub mod vitem_compute;
 pub use vitem_compute::*;
+
 pub mod vitem_depth;
 pub use vitem_depth::*;
+
 pub mod vitem_color;
 pub use vitem_color::*;
+
+pub mod mesh_item_depth;
+pub use mesh_item_depth::*;
+
+pub mod mesh_item_color;
+pub use mesh_item_color::*;
+
+use std::ops::{Deref, DerefMut};
 
 use crate::{
     RenderContext,
