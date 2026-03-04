@@ -335,3 +335,13 @@ crate-type = ["cdylib"]
 
 [package.metadata.example.text_item]
 wasm = true
+
+[[example]]
+name = "perlin_terrain"
+path = "examples/perlin_terrain/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "tetrahedron_spheres"
+path = "examples/tetrahedron_spheres/lib.rs"
+crate-type = ["cdylib"]

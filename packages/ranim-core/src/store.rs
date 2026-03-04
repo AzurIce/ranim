@@ -90,14 +90,17 @@ impl AnimationStore {
 /// A store of [`CoreItem`]s.
 #[derive(Default, Clone)]
 pub struct CoreItemStore {
+    /// Id of [`CameraFrame`]s
     pub camera_frame_ids: Vec<(usize, usize)>,
     /// [`CameraFrame`]s
     pub camera_frames: Vec<CameraFrame>,
 
+    /// Id of [`VItem`]s
     pub vitem_ids: Vec<(usize, usize)>,
     /// [`VItem`]s
     pub vitems: Vec<VItem>,
 
+    /// Id of [`MeshItem`]s
     pub mesh_item_ids: Vec<(usize, usize)>,
     /// [`MeshItem`]s
     pub mesh_items: Vec<MeshItem>,
