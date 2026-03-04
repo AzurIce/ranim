@@ -38,7 +38,7 @@
         inherit (pkgs) lib;
         craneLib = (crane.mkLib pkgs).overrideToolchain (
           p:
-          p.rust-bin.nightly.latest.default.override {
+          p.rust-bin.nightly."2026-01-01".default.override {
             targets = [ "wasm32-unknown-unknown" ];
             extensions = [ "rust-src" ];
           }
