@@ -9,7 +9,7 @@ use ranim_core::{
     traits::{FillColor, Interpolatable, Opacity},
 };
 
-use super::generate_grid_indices;
+use super::{compute_smooth_normals, generate_grid_indices};
 
 /// Linearly interpolate a color from a sorted colorscale based on a value.
 fn colorscale_lookup(colorscale: &[(AlphaColor<Srgb>, f64)], value: f64) -> AlphaColor<Srgb> {
@@ -54,6 +54,8 @@ pub struct Surface {
     pub resolution: (u32, u32),
     /// Per-vertex colors.
     pub vertex_colors: Vec<AlphaColor<Srgb>>,
+    /// Per-vertex normals for smooth shading. All-zero → flat shading.
+    pub vertex_normals: Vec<DVec3>,
     /// Transform matrix applied when rendering.
     pub transform: DMat4,
 }
@@ -84,11 +86,13 @@ impl Surface {
         let triangle_indices = generate_grid_indices(nu, nv);
 
         let vertex_colors = vec![color::palette::css::BLUE.with_alpha(1.0); points.len()];
+        let vertex_normals = compute_smooth_normals(&points, &triangle_indices);
         Self {
             points,
             triangle_indices,
             resolution,
             vertex_colors,
+            vertex_normals,
             transform: DMat4::IDENTITY,
         }
     }
@@ -99,15 +103,15 @@ impl Surface {
         self
     }
 
-    /// Set per-vertex colors by mapping the Y coordinate of each vertex through a colorscale.
+    /// Set per-vertex colors by mapping the Z coordinate of each vertex through a colorscale.
     ///
-    /// `colorscale` is a list of `(color, y_value)` pairs sorted by ascending `y_value`.
+    /// `colorscale` is a list of `(color, z_value)` pairs sorted by ascending `z_value`.
     /// The vertex color is linearly interpolated between adjacent entries.
-    pub fn with_fill_by_y(mut self, colorscale: &[(AlphaColor<Srgb>, f64)]) -> Self {
+    pub fn with_fill_by_z(mut self, colorscale: &[(AlphaColor<Srgb>, f64)]) -> Self {
         let colors = self
             .points
             .iter()
-            .map(|p| colorscale_lookup(colorscale, p.y))
+            .map(|p| colorscale_lookup(colorscale, p.z))
             .collect();
         self.vertex_colors = colors;
         self
@@ -116,6 +120,12 @@ impl Surface {
     /// Set the transform matrix. Returns `self` for chaining.
     pub fn with_transform(mut self, transform: DMat4) -> Self {
         self.transform = transform;
+        self
+    }
+
+    /// Clear vertex normals so the shader falls back to flat shading.
+    pub fn with_flat_normals(mut self) -> Self {
+        self.vertex_normals = vec![DVec3::ZERO; self.points.len()];
         self
     }
 }
@@ -136,6 +146,7 @@ impl Interpolatable for Surface {
                 target.resolution
             },
             vertex_colors: self.vertex_colors.lerp(&target.vertex_colors, t),
+            vertex_normals: self.vertex_normals.lerp(&target.vertex_normals, t),
             transform: Interpolatable::lerp(&self.transform, &target.transform, t),
         }
     }
@@ -187,6 +198,7 @@ impl Extract for Surface {
                 .into_iter()
                 .map(Rgba::from)
                 .collect(),
+            vertex_normals: self.vertex_normals.iter().map(|n| n.as_vec3()).collect(),
         }));
     }
 }

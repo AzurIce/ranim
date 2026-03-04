@@ -19,6 +19,9 @@ pub struct MeshItem {
     pub transform: Mat4,
     /// Optional per-vertex colors. When `Some`, overrides `fill_rgba`.
     pub vertex_colors: Vec<Rgba>,
+    /// Per-vertex normals for smooth shading.
+    /// All-zero (or empty) → shader falls back to flat shading via `dpdx`/`dpdy`.
+    pub vertex_normals: Vec<Vec3>,
 }
 
 impl Interpolatable for MeshItem {
@@ -32,6 +35,7 @@ impl Interpolatable for MeshItem {
             },
             transform: self.transform.lerp(&target.transform, t),
             vertex_colors: self.vertex_colors.lerp(&target.vertex_colors, t),
+            vertex_normals: self.vertex_normals.lerp(&target.vertex_normals, t),
         }
     }
 }
@@ -43,6 +47,7 @@ impl Default for MeshItem {
             triangle_indices: Vec::new(),
             transform: Mat4::IDENTITY,
             vertex_colors: Vec::new(),
+            vertex_normals: Vec::new(),
         }
     }
 }

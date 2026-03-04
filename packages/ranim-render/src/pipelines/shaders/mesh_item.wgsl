@@ -17,6 +17,7 @@ struct VertexOutput {
     @location(0) @interpolate(flat) mesh_id: u32,
     @location(1) world_pos: vec3<f32>,
     @location(2) vertex_color: vec4<f32>,
+    @location(3) world_normal: vec3<f32>,
 }
 
 fn pack_color(color: vec4<f32>) -> u32 {
@@ -29,8 +30,14 @@ struct FragmentOutput {
     @builtin(frag_depth) depth: f32,
 }
 
-fn compute_lighting(world_pos: vec3<f32>, base_color: vec4<f32>) -> vec4<f32> {
-    let normal = normalize(cross(dpdx(world_pos), dpdy(world_pos)));
+fn compute_lighting(world_pos: vec3<f32>, world_normal: vec3<f32>, base_color: vec4<f32>) -> vec4<f32> {
+    var normal: vec3<f32>;
+    // If the interpolated normal is near-zero, fall back to flat shading via screen-space derivatives
+    if (dot(world_normal, world_normal) < 0.0001) {
+        normal = normalize(cross(dpdx(world_pos), dpdy(world_pos)));
+    } else {
+        normal = normalize(world_normal);
+    }
     let light_dir = normalize(vec3<f32>(0.3, 1.0, 0.5));
     let ambient = 0.35;
     let diffuse = abs(dot(normal, light_dir));
@@ -44,9 +51,10 @@ fn fs_main(
     @location(0) @interpolate(flat) mesh_id: u32,
     @location(1) world_pos: vec3<f32>,
     @location(2) vertex_color: vec4<f32>,
+    @location(3) world_normal: vec3<f32>,
 ) -> FragmentOutput {
     var out: FragmentOutput;
-    let color = compute_lighting(world_pos, vertex_color);
+    let color = compute_lighting(world_pos, world_normal, vertex_color);
 
     if (color.a >= 0.99) {
         out.color = color;
@@ -76,6 +84,7 @@ fn fs_depth_only(
     @location(0) @interpolate(flat) mesh_id: u32,
     @location(1) world_pos: vec3<f32>,
     @location(2) vertex_color: vec4<f32>,
+    @location(3) world_normal: vec3<f32>,
 ) -> @builtin(frag_depth) f32 {
     let color = vertex_color;
 
@@ -91,6 +100,7 @@ fn vs_main(
     @location(0) position: vec3<f32>,
     @location(1) mesh_id: u32,
     @location(2) vertex_color: vec4<f32>,
+    @location(3) vertex_normal: vec3<f32>,
 ) -> VertexOutput {
     var out: VertexOutput;
 
@@ -101,6 +111,7 @@ fn vs_main(
     out.mesh_id = mesh_id;
     out.world_pos = pos_world.xyz;
     out.vertex_color = vertex_color;
+    out.world_normal = (transform * vec4<f32>(vertex_normal, 0.0)).xyz;
 
     return out;
 }

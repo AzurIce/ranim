@@ -16,6 +16,8 @@ pub struct MeshItemsBuffer {
     pub(crate) mesh_ids_buffer: WgpuVecBuffer<u32>,
     /// Per-vertex colors (vertex buffer)
     pub(crate) vertex_colors_buffer: WgpuVecBuffer<Rgba>,
+    /// Per-vertex normals (vertex buffer) — all-zero → flat shading fallback
+    pub(crate) vertex_normals_buffer: WgpuVecBuffer<Vec3>,
     /// Merged triangle indices (index buffer)
     pub(crate) indices_buffer: WgpuVecBuffer<u32>,
 
@@ -44,6 +46,12 @@ impl MeshItemsBuffer {
                 vertex_usage,
                 1,
             ),
+            vertex_normals_buffer: WgpuVecBuffer::new(
+                ctx,
+                Some("MeshVertexNormals"),
+                vertex_usage,
+                1,
+            ),
             indices_buffer: WgpuVecBuffer::new(ctx, Some("MeshIndices"), index_usage, 1),
             transforms_buffer: WgpuVecBuffer::new(ctx, Some("MeshTransforms"), storage_ro, 1),
             item_count: 0,
@@ -69,6 +77,7 @@ impl MeshItemsBuffer {
         let mut all_vertices = Vec::with_capacity(total_vertices);
         let mut all_mesh_ids = Vec::with_capacity(total_vertices);
         let mut all_vertex_colors = Vec::with_capacity(total_vertices);
+        let mut all_vertex_normals = Vec::with_capacity(total_vertices);
         let mut all_indices = Vec::with_capacity(total_indices);
 
         let mut vertex_offset: u32 = 0;
@@ -84,6 +93,16 @@ impl MeshItemsBuffer {
             all_mesh_ids.extend(std::iter::repeat(mesh_idx as u32).take(vc as usize));
             all_vertex_colors.extend_from_slice(&mesh.vertex_colors);
 
+            // Pad normals with zero if shorter than points (flat shading fallback)
+            let normals = &mesh.vertex_normals;
+            let normals_len = normals.len();
+            if normals_len >= vc as usize {
+                all_vertex_normals.extend_from_slice(&normals[..vc as usize]);
+            } else {
+                all_vertex_normals.extend_from_slice(normals);
+                all_vertex_normals.extend(std::iter::repeat(Vec3::ZERO).take(vc as usize - normals_len));
+            }
+
             all_indices.extend(mesh.triangle_indices.iter().map(|&i| i + vertex_offset));
 
             vertex_offset += vc;
@@ -97,6 +116,7 @@ impl MeshItemsBuffer {
         self.vertices_buffer.set(ctx, &all_vertices);
         self.mesh_ids_buffer.set(ctx, &all_mesh_ids);
         self.vertex_colors_buffer.set(ctx, &all_vertex_colors);
+        self.vertex_normals_buffer.set(ctx, &all_vertex_normals);
         self.indices_buffer.set(ctx, &all_indices);
 
         // Storage buffers (bind group recreated on realloc)
@@ -115,7 +135,7 @@ impl MeshItemsBuffer {
         self.total_indices
     }
 
-    pub fn vertex_buffer_layouts() -> [wgpu::VertexBufferLayout<'static>; 3] {
+    pub fn vertex_buffer_layouts() -> [wgpu::VertexBufferLayout<'static>; 4] {
         [
             // Slot 0: positions (vec3<f32>)
             wgpu::VertexBufferLayout {
@@ -145,6 +165,16 @@ impl MeshItemsBuffer {
                     format: wgpu::VertexFormat::Float32x4,
                     offset: 0,
                     shader_location: 2,
+                }],
+            },
+            // Slot 3: vertex_normal (vec3<f32>)
+            wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<Vec3>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &[wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: 0,
+                    shader_location: 3,
                 }],
             },
         ]
@@ -212,6 +242,7 @@ mod tests {
             triangle_indices: vec![0, 1, 2],
             transform: Mat4::IDENTITY,
             vertex_colors: vec![color; 3],
+            vertex_normals: vec![Vec3::ZERO; 3],
         }
     }
 
@@ -226,6 +257,7 @@ mod tests {
             triangle_indices: vec![0, 1, 2, 0, 2, 3],
             transform: Mat4::IDENTITY,
             vertex_colors: vec![color; 4],
+            vertex_normals: vec![Vec3::ZERO; 4],
         }
     }
 

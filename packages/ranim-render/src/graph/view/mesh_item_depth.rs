@@ -56,6 +56,7 @@ impl ViewRenderNodeTrait for MergedMeshItemDepthNode {
         rpass.set_vertex_buffer(0, merged.vertices_buffer.buffer.slice(..));
         rpass.set_vertex_buffer(1, merged.mesh_ids_buffer.buffer.slice(..));
         rpass.set_vertex_buffer(2, merged.vertex_colors_buffer.buffer.slice(..));
+        rpass.set_vertex_buffer(3, merged.vertex_normals_buffer.buffer.slice(..));
         rpass.set_index_buffer(
             merged.indices_buffer.buffer.slice(..),
             wgpu::IndexFormat::Uint32,

@@ -152,24 +152,25 @@ impl CameraFrame {
 }
 
 impl CameraFrame {
-    /// Create a perspective camera positioned using spherical coordinates, looking at the origin.
+    /// Create a perspective camera positioned using spherical coordinates (Z-up), looking at the origin.
     ///
-    /// - `phi`: elevation angle in radians (0 = XZ plane, π/2 = straight up)
-    /// - `theta`: azimuth angle in radians (0 = +X direction, π/2 = +Z direction)
+    /// - `phi`: elevation angle in radians (0 = XY plane, π/2 = straight up along +Z)
+    /// - `theta`: azimuth angle in radians (0 = +X direction, π/2 = +Y direction)
     /// - `distance`: distance from the origin
     pub fn from_spherical(phi: f64, theta: f64, distance: f64) -> Self {
         let mut cam = Self {
             perspective_blend: 1.0,
+            up: DVec3::Z,
             ..Self::default()
         };
         cam.set_spherical(phi, theta, distance, DVec3::ZERO);
         cam
     }
 
-    /// Position the camera using spherical coordinates around a target point.
+    /// Position the camera using spherical coordinates (Z-up) around a target point.
     ///
-    /// - `phi`: elevation angle in radians (0 = XZ plane, π/2 = straight up)
-    /// - `theta`: azimuth angle in radians (0 = +X direction, π/2 = +Z direction)
+    /// - `phi`: elevation angle in radians (0 = XY plane, π/2 = straight up along +Z)
+    /// - `theta`: azimuth angle in radians (0 = +X direction, π/2 = +Y direction)
     /// - `distance`: distance from `target`
     /// - `target`: the point the camera looks at
     pub fn set_spherical(
@@ -182,10 +183,11 @@ impl CameraFrame {
         self.pos = target
             + DVec3::new(
                 distance * phi.cos() * theta.cos(),
-                distance * phi.sin(),
                 distance * phi.cos() * theta.sin(),
+                distance * phi.sin(),
             );
         self.facing = (target - self.pos).normalize();
+        self.up = DVec3::Z;
         self
     }
 
@@ -196,7 +198,7 @@ impl CameraFrame {
     }
 
     /// Create an orbit animation that rotates the camera around `target`
-    /// by `total_angle` radians.
+    /// by `total_angle` radians in the XY plane (Z-up).
     ///
     /// The camera's current position is used to derive the spherical
     /// coordinates (distance, elevation) which are kept constant during the orbit.
@@ -217,11 +219,11 @@ impl CameraFrame {
         let offset = self.pos - target;
         let distance = offset.length();
         let phi = if distance > 0.0 {
-            (offset.y / distance).asin()
+            (offset.z / distance).asin()
         } else {
             0.0
         };
-        let theta0 = offset.z.atan2(offset.x);
+        let theta0 = offset.y.atan2(offset.x);
         let src = self.clone();
 
         struct Orbit {

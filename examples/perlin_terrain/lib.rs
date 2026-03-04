@@ -1,10 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    color::palettes::manim,
-    glam::DVec3,
-    items::mesh::Surface,
-    prelude::*,
+    color::palettes::manim, glam::DVec3, items::mesh::Surface, prelude::*,
     utils::rate_functions::linear,
 };
 
@@ -153,17 +150,15 @@ fn fractal_with_derivative_noise(x: f64, y: f64, octaves: u32, persistence: f64)
 const GRID_SIZE: f64 = 32.0;
 const LATTICE_CNT: f64 = 8.0;
 const DEPTH: f64 = 3.0;
-const RESOLUTION: u32 = 256;
+const RESOLUTION: u32 = 512;
 
-// Python: cut_radius=16, mid=15, l=0, r=30
 const U_MIN: f64 = 0.0;
 const U_MAX: f64 = 30.0;
-// Python: surface.shift(size / 2 * (DOWN + LEFT))
-const CENTER_OFFSET: f64 = 16.0; // size / 2
+const CENTER_OFFSET: f64 = 16.0;
 
 // Height-based color scale matching the Python reference.
 // Python: [(c, x * depth) for c, x in [...]]
-// Colors map to the Y-coordinate of the vertex (raw height, no scaling).
+// Colors map to the Z-coordinate of the vertex (raw height, no scaling).
 fn terrain_colorscale() -> Vec<(ranim::color::AlphaColor<ranim::color::Srgb>, f64)> {
     vec![
         (manim::BLUE_E, -1.0 * DEPTH),
@@ -181,49 +176,41 @@ fn terrain_colorscale() -> Vec<(ranim::color::AlphaColor<ranim::color::Srgb>, f6
 
 // --- Helper to build a terrain scene ---
 
-fn build_terrain_scene(
-    r: &mut RanimScene,
-    height_func: impl Fn(f64, f64) -> f64,
-) {
-    let phi = 70.0 * PI / 180.0;
+fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64) {
+    let phi = 20.0 * PI / 180.0;
     let theta = 30.0 * PI / 180.0;
-    let distance = 25.0;
+    let distance = 22.0;
 
     let mut cam = CameraFrame::from_spherical(phi, theta, distance);
+    cam.fovy = 50.0 * PI / 180.0;
     let r_cam = r.insert(cam.clone());
 
     let colorscale = terrain_colorscale();
 
-    // No extra scaling — positions match Python's world-space coordinates.
-    // Python: axes.c2p(u, v, noise_func(v, u, size) * depth)
-    //         then shift(size/2 * (DOWN + LEFT))
-    // In ranim (Y-up): x = u - offset, y = height, z = v - offset
+    // Z-up: x = u - offset, y = v - offset, z = height
     let terrain = Surface::from_uv_func(
         |u, v| {
             let x = u - CENTER_OFFSET;
-            let y = height_func(u, v);
-            let z = v - CENTER_OFFSET;
+            let y = v - CENTER_OFFSET;
+            let z = height_func(u, v);
             DVec3::new(x, y, z)
         },
         (U_MIN, U_MAX),
         (U_MIN, U_MAX),
         (RESOLUTION, RESOLUTION),
     )
-    .with_fill_by_y(&colorscale);
+    .with_fill_by_z(&colorscale)
+    .with_flat_normals();
 
     let _r_terrain = r.insert(terrain);
 
-    // Match Python: rate=0.4 rad/s for 5 seconds → 2 radians total
     r.timeline_mut(r_cam).play(
         cam.orbit(DVec3::ZERO, 2.0)
             .with_duration(5.0)
             .with_rate_func(linear),
     );
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
 }
 
 // --- Scenes ---
