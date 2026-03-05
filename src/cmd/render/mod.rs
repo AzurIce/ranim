@@ -167,7 +167,9 @@ impl RenderWorker {
                     .with_file_path(output_dir.join(format!(
                         "{}_{}x{}_{}.{ext}",
                         output.name.clone().unwrap_or(scene_name.clone()),
-                        output.width, output.height, output.fps
+                        output.width,
+                        output.height,
+                        output.fps
                     )))
                     .with_output_format(output.format),
             ),

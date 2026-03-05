@@ -16,7 +16,6 @@ pub mod svg;
 pub mod text;
 /// Typst items
 pub mod typst;
-// pub mod line;
 
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
