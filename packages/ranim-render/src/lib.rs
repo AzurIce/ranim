@@ -157,7 +157,7 @@ impl Renderer {
         Self::new_with_graph(ctx, width, height, oit_layers, Self::build_render_graph())
     }
 
-    pub(crate) fn new_with_graph(
+    pub fn new_with_graph(
         ctx: &WgpuContext,
         width: u32,
         height: u32,
