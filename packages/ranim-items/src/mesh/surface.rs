@@ -174,7 +174,7 @@ impl FillColor for Surface {
 
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         if let Some(x) = self.vertex_colors.first_mut() {
-            *x = color.into();
+            *x = color
         }
         self
     }

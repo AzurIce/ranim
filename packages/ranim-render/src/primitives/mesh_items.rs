@@ -90,7 +90,7 @@ impl MeshItemsBuffer {
             });
 
             all_vertices.extend_from_slice(&mesh.points);
-            all_mesh_ids.extend(std::iter::repeat(mesh_idx as u32).take(vc as usize));
+            all_mesh_ids.extend(std::iter::repeat_n(mesh_idx as u32, vc as usize));
             all_vertex_colors.extend_from_slice(&mesh.vertex_colors);
 
             // Pad normals with zero if shorter than points (flat shading fallback)
@@ -100,7 +100,8 @@ impl MeshItemsBuffer {
                 all_vertex_normals.extend_from_slice(&normals[..vc as usize]);
             } else {
                 all_vertex_normals.extend_from_slice(normals);
-                all_vertex_normals.extend(std::iter::repeat(Vec3::ZERO).take(vc as usize - normals_len));
+                all_vertex_normals
+                    .extend(std::iter::repeat_n(Vec3::ZERO, vc as usize - normals_len));
             }
 
             all_indices.extend(mesh.triangle_indices.iter().map(|&i| i + vertex_offset));
@@ -195,9 +196,7 @@ impl MeshItemsBuffer {
         ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("MeshItems Render BG"),
             layout: &Self::render_bind_group_layout(ctx),
-            entries: &[
-                bg_entry(0, &this.transforms_buffer.buffer),
-            ],
+            entries: &[bg_entry(0, &this.transforms_buffer.buffer)],
         })
     }
 }

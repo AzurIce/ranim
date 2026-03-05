@@ -159,6 +159,7 @@ const CENTER_OFFSET: f64 = 16.0;
 // Height-based color scale matching the Python reference.
 // Python: [(c, x * depth) for c, x in [...]]
 // Colors map to the Z-coordinate of the vertex (raw height, no scaling).
+#[allow(clippy::neg_multiply)]
 fn terrain_colorscale() -> Vec<(ranim::color::AlphaColor<ranim::color::Srgb>, f64)> {
     vec![
         (manim::BLUE_E, -1.0 * DEPTH),
