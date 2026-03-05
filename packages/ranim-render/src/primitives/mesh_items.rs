@@ -260,6 +260,59 @@ mod tests {
         }
     }
 
+    fn create_sphere_mesh(color: Rgba, radius: f32, position: Vec3) -> MeshItem {
+        let mut points = Vec::new();
+        let mut indices = Vec::new();
+
+        // Simple UV sphere
+        let lat_segments = 20;
+        let lon_segments = 20;
+
+        for lat in 0..=lat_segments {
+            let theta = lat as f32 * std::f32::consts::PI / lat_segments as f32;
+            let sin_theta = theta.sin();
+            let cos_theta = theta.cos();
+
+            for lon in 0..=lon_segments {
+                let phi = lon as f32 * 2.0 * std::f32::consts::PI / lon_segments as f32;
+                let sin_phi = phi.sin();
+                let cos_phi = phi.cos();
+
+                let x = sin_theta * cos_phi;
+                let y = sin_theta * sin_phi;
+                let z = cos_theta;
+
+                points.push(Vec3::new(x * radius, y * radius, z * radius) + position);
+            }
+        }
+
+        for lat in 0..lat_segments {
+            for lon in 0..lon_segments {
+                let first = lat * (lon_segments + 1) + lon;
+                let second = first + lon_segments + 1;
+
+                indices.push(first);
+                indices.push(second);
+                indices.push(first + 1);
+
+                indices.push(second);
+                indices.push(second + 1);
+                indices.push(first + 1);
+            }
+        }
+
+        let vertex_colors = vec![color; points.len()];
+        let vertex_normals = points.iter().map(|p| (*p - position).normalize()).collect();
+
+        MeshItem {
+            points,
+            triangle_indices: indices,
+            transform: Mat4::IDENTITY,
+            vertex_colors,
+            vertex_normals,
+        }
+    }
+
     #[test]
     fn render_mesh_items() {
         use ranim_core::core_item::camera_frame::CameraFrame;
@@ -320,5 +373,278 @@ mod tests {
         println!("Open it to see the mesh rendering result!");
 
         assert!(output_path.exists(), "Image file should be created");
+    }
+
+    #[test]
+    fn test_nested_transparent_spheres() {
+        use ranim_core::core_item::camera_frame::CameraFrame;
+
+        let ctx = block_on(WgpuContext::new());
+        let width = 800u32;
+        let height = 600u32;
+
+        let mut renderer = Renderer::new(&ctx, width, height, 8);
+        let mut render_textures = renderer.new_render_textures(&ctx);
+        let mut pool = RenderPool::new();
+        let mut store = CoreItemStore::new();
+
+        // Create nested spheres:
+        // 1. Outer transparent sphere (blue, alpha=0.3, radius=2.0)
+        // 2. Middle opaque sphere (red, alpha=1.0, radius=1.5)
+        // 3. Inner transparent sphere (green, alpha=0.5, radius=1.0)
+
+        let outer_transparent = Rgba(glam::Vec4::new(0.0, 0.0, 1.0, 0.3));
+        let middle_opaque = Rgba(glam::Vec4::new(1.0, 0.0, 0.0, 1.0));
+        let inner_transparent = Rgba(glam::Vec4::new(0.0, 1.0, 0.0, 0.5));
+
+        let outer_sphere = create_sphere_mesh(outer_transparent, 2.0, Vec3::ZERO);
+        let middle_sphere = create_sphere_mesh(middle_opaque, 1.5, Vec3::ZERO);
+        let inner_sphere = create_sphere_mesh(inner_transparent, 1.0, Vec3::ZERO);
+
+        let camera_frame = CameraFrame::default();
+
+        store.update(
+            [
+                ((0, 0), CoreItem::CameraFrame(camera_frame)),
+                ((1, 0), CoreItem::MeshItem(outer_sphere)),
+                ((2, 0), CoreItem::MeshItem(middle_sphere)),
+                ((3, 0), CoreItem::MeshItem(inner_sphere)),
+            ]
+            .into_iter(),
+        );
+
+        let clear_color = wgpu::Color {
+            r: 0.1,
+            g: 0.1,
+            b: 0.1,
+            a: 1.0,
+        };
+
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        pool.clean();
+
+        ctx.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+
+        // Analyze depth buffer
+        let depth_data = render_textures.get_depth_texture_data(&ctx);
+        let mut min_depth = f32::MAX;
+        let mut max_depth = f32::MIN;
+        let mut depth_histogram: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+
+        for &d in depth_data {
+            if (d - 1.0).abs() > 0.001 {
+                min_depth = min_depth.min(d);
+                max_depth = max_depth.max(d);
+                let bucket = (d * 10000.0) as u32;
+                *depth_histogram.entry(bucket).or_insert(0) += 1;
+            }
+        }
+
+        println!("\n=== Nested Spheres Depth Test ===");
+        println!("Depth buffer analysis:");
+        println!("  Min depth: {}", min_depth);
+        println!("  Max depth: {}", max_depth);
+        println!("\nDepth histogram (top 10 buckets):");
+        let mut buckets: Vec<_> = depth_histogram.iter().collect();
+        buckets.sort_by_key(|(k, _)| *k);
+        for (bucket, count) in buckets.iter().take(10) {
+            println!("    depth ~{:.4}: {} pixels", **bucket as f32 / 10000.0, count);
+        }
+
+        let buffer = render_textures.get_rendered_texture_img_buffer(&ctx);
+
+        // Sample some pixels to see actual colors
+        println!("\nColor samples (center region):");
+        let center_x = width / 2;
+        let center_y = height / 2;
+        for dy in [-50, 0, 50].iter() {
+            for dx in [-50, 0, 50].iter() {
+                let x = (center_x as i32 + dx) as u32;
+                let y = (center_y as i32 + dy) as u32;
+                if x < width && y < height {
+                    let pixel = buffer.get_pixel(x, y);
+                    println!("  ({:3}, {:3}): R={:3} G={:3} B={:3} A={:3}",
+                             dx, dy, pixel[0], pixel[1], pixel[2], pixel[3]);
+                }
+            }
+        }
+
+        let buffer = render_textures.get_rendered_texture_img_buffer(&ctx);
+        let output_path = Path::new("../../output/nested_spheres_render.png");
+        buffer.save(output_path).expect("Failed to save image");
+
+        let depth_buffer = render_textures.get_depth_texture_img_buffer(&ctx);
+        let depth_path = Path::new("../../output/nested_spheres_depth.png");
+        depth_buffer.save(depth_path).expect("Failed to save depth image");
+
+        println!("\nImages saved to output/");
+        println!("\nExpected behavior:");
+        println!("  - Outer transparent blue sphere should be visible");
+        println!("  - Middle opaque red sphere should occlude inner green sphere");
+        println!("  - Inner green sphere should NOT be visible from outside");
+        println!("  - Depth buffer should show opaque red sphere's depth");
+
+        assert!(output_path.exists(), "Image file should be created");
+        assert!(depth_path.exists(), "Depth image file should be created");
+    }
+
+    /// Diagnostic test: count fragment shader invocations via pixel_count atomics
+    /// to determine whether Early-Z is active.
+    ///
+    /// Uses a render graph WITHOUT OIT resolve (so pixel_count isn't cleared).
+    /// After rendering, reads back pixel_count to see how many transparent fragment
+    /// shader invocations actually ran.
+    ///
+    /// If Early-Z is active: occluded transparent fragments (behind opaque red sphere)
+    /// are culled BEFORE the shader runs → lower pixel_count.
+    /// If Late-Z: all fragments run the shader (atomicAdd happens) → higher pixel_count.
+    #[test]
+    fn diagnose_early_z() {
+        use ranim_core::core_item::camera_frame::CameraFrame;
+
+        let ctx = block_on(WgpuContext::new());
+        let width = 800u32;
+        let height = 600u32;
+
+        // Build a render graph WITHOUT OIT resolve → pixel_count won't be cleared
+        let render_graph = {
+            use crate::graph::*;
+            let mut rg = GlobalRenderGraph::new();
+            let clear = rg.insert_node(ClearNode);
+            let view_render = rg.insert_node({
+                use crate::graph::view::*;
+                let mut vrg = ViewRenderGraph::new();
+                let vitem_compute = vrg.insert_node(MergedVItemComputeNode);
+                let vitem_depth = vrg.insert_node(MergedVItemDepthNode);
+                let mesh_depth = vrg.insert_node(MergedMeshItemDepthNode);
+                let vitem_color = vrg.insert_node(MergedVItemColorNode);
+                let mesh_color = vrg.insert_node(MergedMeshItemColorNode);
+
+                vrg.insert_edge(vitem_compute, vitem_depth);
+                vrg.insert_edge(vitem_depth, mesh_depth);
+                vrg.insert_edge(mesh_depth, vitem_color);
+                vrg.insert_edge(vitem_color, mesh_color);
+                vrg
+            });
+            // NO OIT resolve node → pixel_count preserved
+            rg.insert_edge(clear, view_render);
+            rg
+        };
+
+        let mut renderer = Renderer::new_with_graph(&ctx, width, height, 8, render_graph);
+        let mut render_textures = renderer.new_render_textures(&ctx);
+        let mut pool = RenderPool::new();
+        let mut store = CoreItemStore::new();
+
+        // Nested spheres: outer transparent blue, middle opaque red, inner transparent green
+        let outer_transparent = Rgba(glam::Vec4::new(0.0, 0.0, 1.0, 0.3));
+        let middle_opaque = Rgba(glam::Vec4::new(1.0, 0.0, 0.0, 1.0));
+        let inner_transparent = Rgba(glam::Vec4::new(0.0, 1.0, 0.0, 0.5));
+
+        let outer_sphere = create_sphere_mesh(outer_transparent, 2.0, Vec3::ZERO);
+        let middle_sphere = create_sphere_mesh(middle_opaque, 1.5, Vec3::ZERO);
+        let inner_sphere = create_sphere_mesh(inner_transparent, 1.0, Vec3::ZERO);
+
+        let camera_frame = CameraFrame::default();
+        store.update(
+            [
+                ((0, 0), CoreItem::CameraFrame(camera_frame)),
+                ((1, 0), CoreItem::MeshItem(outer_sphere)),
+                ((2, 0), CoreItem::MeshItem(middle_sphere)),
+                ((3, 0), CoreItem::MeshItem(inner_sphere)),
+            ]
+            .into_iter(),
+        );
+
+        let clear_color = wgpu::Color {
+            r: 0.1,
+            g: 0.1,
+            b: 0.1,
+            a: 1.0,
+        };
+
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        pool.clean();
+        ctx.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+
+        // Read back pixel_count buffer (not cleared since no OIT resolve)
+        let pixel_count_buffer = &renderer.resolution_info.pixel_count_buffer.buffer;
+        let buf_size = pixel_count_buffer.size();
+        let readback = ctx.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Readback"),
+            size: buf_size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        encoder.copy_buffer_to_buffer(pixel_count_buffer, 0, &readback, 0, buf_size);
+        ctx.queue.submit(Some(encoder.finish()));
+        ctx.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+
+        let slice = readback.slice(..);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |result| {
+            sender.send(result).unwrap();
+        });
+        ctx.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+        receiver.recv().unwrap().unwrap();
+
+        let data = slice.get_mapped_range();
+        let pixel_counts: &[u32] = bytemuck::cast_slice(&data);
+
+        // Analyze results
+        let total_invocations: u64 = pixel_counts.iter().map(|&c| c as u64).sum();
+        let nonzero_pixels = pixel_counts.iter().filter(|&&c| c > 0).count();
+        let max_count = pixel_counts.iter().copied().max().unwrap_or(0);
+
+        // Sample center pixel
+        let cx = width / 2;
+        let cy = height / 2;
+        let center_idx = (cy * width + cx) as usize;
+        let center_count = pixel_counts[center_idx];
+
+        // Also sample nearby center pixels (in case exact center hits a triangle edge)
+        let mut center_region_counts = Vec::new();
+        for dy in -5i32..=5 {
+            for dx in -5i32..=5 {
+                let x = (cx as i32 + dx) as u32;
+                let y = (cy as i32 + dy) as u32;
+                if x < width && y < height {
+                    let idx = (y * width + x) as usize;
+                    center_region_counts.push(pixel_counts[idx]);
+                }
+            }
+        }
+        let center_max = center_region_counts.iter().copied().max().unwrap_or(0);
+        let center_avg: f32 =
+            center_region_counts.iter().map(|&c| c as f32).sum::<f32>() / center_region_counts.len() as f32;
+
+        println!("\n=== Early-Z Diagnostic ===");
+        println!("Total transparent fragment invocations: {}", total_invocations);
+        println!("Pixels with nonzero count: {} / {}", nonzero_pixels, width * height);
+        println!("Max per-pixel count: {}", max_count);
+        println!("Center pixel ({},{}) count: {}", cx, cy, center_count);
+        println!("Center region (11x11) max: {}", center_max);
+        println!("Center region (11x11) avg: {:.2}", center_avg);
+        println!();
+        println!("Interpretation:");
+        println!("  - 3 concentric spheres: outer blue (a=0.3, r=2), middle red (a=1.0, r=1.5), inner green (a=0.5, r=1)");
+        println!("  - Depth prepass writes opaque depth (middle red front face)");
+        println!("  - At center, transparent layers visible to camera: outer blue FRONT face only");
+        println!("  - Occluded transparent layers: outer blue BACK, inner green FRONT + BACK");
+        println!();
+        if center_max <= 2 {
+            println!("  → CENTER COUNT <= 2: Early-Z likely ACTIVE");
+            println!("    (only outer blue front face counted; occluded fragments culled before shader)");
+        } else {
+            println!("  → CENTER COUNT > 2: Early-Z likely INACTIVE (Late-Z)");
+            println!("    (occluded transparent fragments still ran the shader → atomicAdd happened)");
+        }
+
+        drop(data);
+        readback.unmap();
     }
 }

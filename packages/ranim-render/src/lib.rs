@@ -101,7 +101,7 @@ pub struct RenderContext<'a> {
 pub struct Renderer {
     width: u32,
     height: u32,
-    resolution_info: ResolutionInfo,
+    pub(crate) resolution_info: ResolutionInfo,
     pub(crate) pipelines: PipelinesPool,
     packets: RenderPackets,
     render_graph: GlobalRenderGraph,
@@ -137,14 +137,14 @@ impl Renderer {
             let mut render_graph = ViewRenderGraph::new();
             let vitem_compute = render_graph.insert_node(MergedVItemComputeNode);
             let vitem_depth = render_graph.insert_node(MergedVItemDepthNode);
-            let vitem_color = render_graph.insert_node(MergedVItemColorNode);
             let mesh_depth = render_graph.insert_node(MergedMeshItemDepthNode);
+            let vitem_color = render_graph.insert_node(MergedVItemColorNode);
             let mesh_color = render_graph.insert_node(MergedMeshItemColorNode);
 
             render_graph.insert_edge(vitem_compute, vitem_depth);
-            render_graph.insert_edge(vitem_depth, vitem_color);
-            render_graph.insert_edge(vitem_color, mesh_depth);
-            render_graph.insert_edge(mesh_depth, mesh_color);
+            render_graph.insert_edge(vitem_depth, mesh_depth);
+            render_graph.insert_edge(mesh_depth, vitem_color);
+            render_graph.insert_edge(vitem_color, mesh_color);
             render_graph
         });
         let oit_resolve = render_graph.insert_node(OITResolveNode);
@@ -157,7 +157,7 @@ impl Renderer {
         Self::new_with_graph(ctx, width, height, oit_layers, Self::build_render_graph())
     }
 
-    fn new_with_graph(
+    pub(crate) fn new_with_graph(
         ctx: &WgpuContext,
         width: u32,
         height: u32,

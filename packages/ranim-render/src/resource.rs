@@ -61,6 +61,8 @@ pub struct RenderTextures {
     pub render_view: wgpu::TextureView,
     pub linear_render_view: wgpu::TextureView,
     pub depth_texture_view: wgpu::TextureView,
+    /// Bind group for depth texture (used in OIT resolve)
+    pub(crate) depth_bind_group: wgpu::BindGroup,
     // pub(crate) multisample_view: wgpu::TextureView,
     pub(crate) depth_stencil_view: wgpu::TextureView,
 
@@ -164,6 +166,17 @@ impl RenderTextures {
             ..Default::default()
         });
 
+        // Create depth bind group for OIT resolve
+        use crate::pipelines::OITResolvePipeline;
+        let depth_bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Depth Texture Bind Group"),
+            layout: &OITResolvePipeline::depth_bind_group_layout(ctx),
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&depth_texture_view),
+            }],
+        });
+
         Self {
             width,
             height,
@@ -173,6 +186,7 @@ impl RenderTextures {
             render_view,
             linear_render_view,
             depth_texture_view,
+            depth_bind_group,
             // multisample_view,
             depth_stencil_view,
             output_dirty: true,

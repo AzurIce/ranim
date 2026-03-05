@@ -27,7 +27,6 @@ fn pack_color(color: vec4<f32>) -> u32 {
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
-    @builtin(frag_depth) depth: f32,
 }
 
 fn compute_lighting(world_pos: vec3<f32>, world_normal: vec3<f32>, base_color: vec4<f32>) -> vec4<f32> {
@@ -46,22 +45,21 @@ fn compute_lighting(world_pos: vec3<f32>, world_normal: vec3<f32>, base_color: v
 }
 
 @fragment
-fn fs_main(
+fn fs_color(
     @builtin(position) frag_pos: vec4<f32>,
     @location(0) @interpolate(flat) mesh_id: u32,
     @location(1) world_pos: vec3<f32>,
     @location(2) vertex_color: vec4<f32>,
     @location(3) world_normal: vec3<f32>,
-) -> FragmentOutput {
-    var out: FragmentOutput;
+) -> @location(0) vec4<f32> {
     let color = compute_lighting(world_pos, world_normal, vertex_color);
 
+    // Opaque: output directly
     if (color.a >= 0.99) {
-        out.color = color;
-        out.depth = frag_pos.z;
-        return out;
+        return color;
     }
 
+    // Transparent: write to OIT buffer, then discard
     let coords = vec2<u32>(floor(frag_pos.xy));
     let pixel_idx = coords.y * frame.x + coords.x;
     let layer_idx = atomicAdd(&pixel_count[pixel_idx], 1u);
@@ -73,13 +71,10 @@ fn fs_main(
     }
 
     discard;
-    out.color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-    out.depth = 1.0;
-    return out;
 }
 
 @fragment
-fn fs_depth_only(
+fn fs_depth(
     @builtin(position) frag_pos: vec4<f32>,
     @location(0) @interpolate(flat) mesh_id: u32,
     @location(1) world_pos: vec3<f32>,
@@ -88,6 +83,7 @@ fn fs_depth_only(
 ) -> @builtin(frag_depth) f32 {
     let color = vertex_color;
 
+    // Only write depth for opaque objects
     if (color.a < 0.99) {
         discard;
     }

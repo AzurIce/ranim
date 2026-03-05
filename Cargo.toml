@@ -345,3 +345,11 @@ crate-type = ["cdylib"]
 name = "tetrahedron_spheres"
 path = "examples/tetrahedron_spheres/lib.rs"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "solar_system"
+path = "examples/solar_system/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.solar_system]
+wasm = true

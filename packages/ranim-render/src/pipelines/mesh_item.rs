@@ -47,7 +47,7 @@ impl GpuResource for MeshItemColorPipeline {
                 },
                 fragment: Some(wgpu::FragmentState {
                     module,
-                    entry_point: Some("fs_main"),
+                    entry_point: Some("fs_color"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: OUTPUT_TEXTURE_FORMAT,
@@ -119,7 +119,7 @@ impl GpuResource for MeshItemDepthPipeline {
                 },
                 fragment: Some(wgpu::FragmentState {
                     module,
-                    entry_point: Some("fs_depth_only"),
+                    entry_point: Some("fs_depth"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[],
                 }),

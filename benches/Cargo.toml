@@ -16,6 +16,7 @@ ranim = { path = "../", features = ["render"] }
 ranim-core = { path = "../packages/ranim-core" }
 ranim-render = { path = "../packages/ranim-render" }
 wgpu = { workspace = true }
+glam = { workspace = true }
 pollster = "0.4.0"
 
 [[bench]]
@@ -32,4 +33,8 @@ harness = false
 
 [[bench]]
 name = "gpu_render"
+harness = false
+
+[[bench]]
+name = "mesh_discard"
 harness = false
