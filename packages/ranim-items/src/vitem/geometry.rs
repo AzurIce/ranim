@@ -6,6 +6,7 @@ mod ellipse;
 mod elliptic_arc;
 mod parallelogram;
 mod polygon;
+mod line;
 
 pub use arc::*;
 pub use circle::*;
@@ -13,3 +14,4 @@ pub use ellipse::*;
 pub use elliptic_arc::*;
 pub use parallelogram::*;
 pub use polygon::*;
+pub use line::*;
