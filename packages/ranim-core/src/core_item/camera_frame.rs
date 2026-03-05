@@ -98,6 +98,20 @@ impl CameraFrame {
 }
 
 impl CameraFrame {
+    /// Set the view matrix of the camera.
+    pub fn set_view_matrix(&mut self, view_matrix: DMat4) {
+        let inv = view_matrix.inverse();
+        self.pos = inv.transform_point3(DVec3::ZERO);
+        self.up = inv.transform_vector3(DVec3::Y).normalize();
+        self.facing = inv.transform_vector3(DVec3::NEG_Z).normalize();
+    }
+
+    /// Set the view matrix of the camera and return the modified `Self`.
+    pub fn with_view_matrix(mut self, view_matrix: DMat4) -> Self {
+        self.set_view_matrix(view_matrix);
+        self
+    }
+
     /// The view matrix of the camera
     pub fn view_matrix(&self) -> DMat4 {
         DMat4::look_to_rh(self.pos, self.facing, self.up)
@@ -163,5 +177,69 @@ impl CameraFrame {
         self.pos = center + normal * distance;
         self.facing = -normal;
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::dvec3;
+
+    #[test]
+    fn test_set_view_matrix_default() {
+        let camera = CameraFrame::new();
+        let view_matrix = camera.view_matrix();
+
+        let mut new_camera = CameraFrame::new();
+        new_camera.set_view_matrix(view_matrix);
+
+        assert!(new_camera.pos.distance(camera.pos) < 1e-10);
+        assert!(new_camera.up.angle_between(camera.up) < 1e-10);
+        assert!(new_camera.facing.angle_between(camera.facing) < 1e-10);
+    }
+
+    #[test]
+    fn test_set_view_matrix_translated() {
+        let mut camera = CameraFrame::new();
+        camera.pos = dvec3(5.0, 3.0, -2.0);
+        let view_matrix = camera.view_matrix();
+
+        let mut new_camera = CameraFrame::new();
+        new_camera.set_view_matrix(view_matrix);
+
+        assert!(new_camera.pos.distance(camera.pos) < 1e-10);
+        assert!(new_camera.up.angle_between(camera.up) < 1e-10);
+        assert!(new_camera.facing.angle_between(camera.facing) < 1e-10);
+    }
+
+    #[test]
+    fn test_set_view_matrix_rotated() {
+        let mut camera = CameraFrame::new();
+        camera.facing = dvec3(1.0, 0.0, 0.0);
+        camera.up = dvec3(0.0, 1.0, 0.0);
+        let view_matrix = camera.view_matrix();
+
+        let mut new_camera = CameraFrame::new();
+        new_camera.set_view_matrix(view_matrix);
+
+        assert!(new_camera.pos.distance(camera.pos) < 1e-10);
+        assert!(new_camera.up.angle_between(camera.up) < 1e-10);
+        assert!(new_camera.facing.angle_between(camera.facing) < 1e-10);
+    }
+
+    #[test]
+    fn test_set_view_matrix_complex() {
+        let mut camera = CameraFrame::new();
+        camera.pos = dvec3(10.0, 5.0, 3.0);
+        camera.facing = dvec3(1.0, 0.0, 1.0).normalize();
+        camera.up = dvec3(0.0, 1.0, 0.0);
+        let view_matrix = camera.view_matrix();
+
+        let mut new_camera = CameraFrame::new();
+        new_camera.set_view_matrix(view_matrix);
+
+        assert!(new_camera.pos.distance(camera.pos) < 1e-10);
+        assert!(new_camera.up.angle_between(camera.up) < 1e-10);
+        assert!(new_camera.facing.angle_between(camera.facing) < 1e-10);
     }
 }
