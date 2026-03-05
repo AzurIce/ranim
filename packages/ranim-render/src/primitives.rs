@@ -1,5 +1,5 @@
 pub mod viewport;
-pub mod vitem;
+pub mod vitems;
 
 use crate::utils::WgpuContext;
 

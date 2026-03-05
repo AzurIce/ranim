@@ -64,6 +64,7 @@ struct OutputDef {
     height: u32,
     fps: u32,
     save_frames: bool,
+    name: Option<String>,
     dir: String,
     format: Option<String>,
 }
@@ -102,10 +103,15 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         height,
         fps,
         save_frames,
+        name,
         dir,
         format,
     } in attrs.outputs
     {
+        let name_token = match name.as_deref() {
+            Some(n) if !n.is_empty() => quote! { Some(#n) },
+            _ => quote! { None },
+        };
         let format_token = match format.as_deref() {
             Some("mp4") | None => quote! { #ranim::OutputFormat::Mp4 },
             Some("webm") => quote! { #ranim::OutputFormat::Webm },
@@ -119,6 +125,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
                 height: #height,
                 fps: #fps,
                 save_frames: #save_frames,
+                name: #name_token,
                 dir: #dir,
                 format: #format_token,
             }

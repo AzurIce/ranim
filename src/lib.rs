@@ -51,19 +51,6 @@ pub use scene::*;
 pub use core::glam;
 pub use ranim_core::RanimScene;
 
-/// Render a scene by name.
-///
-/// ```rust,ignore
-/// render_scene!(fading);
-/// ```
-#[cfg(all(not(target_family = "wasm"), feature = "render"))]
-#[macro_export]
-macro_rules! render_scene {
-    ($scene:ident) => {
-        $crate::cmd::render_scene(&$scene::scene(), 2)
-    };
-}
-
 /// The preludes
 pub mod prelude {
     pub use ranim_core::prelude::*;
