@@ -4,7 +4,8 @@ use ranim_core::{
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::DVec3,
     traits::{
-        Aabb, Discard as _, Locate, Opacity, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor, StrokeWidth, With as _
+        Aabb, Discard as _, Locate, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
+        StrokeColor, StrokeWidth, With as _,
     },
 };
 use ranim_macros::Interpolatable;
