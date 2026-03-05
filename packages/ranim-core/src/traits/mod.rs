@@ -14,7 +14,7 @@ pub use crate::anchor::{Aabb, AabbPoint, Locate};
 
 use std::ops::Range;
 
-use color::{AlphaColor, ColorSpace, Srgb};
+use color::{AlphaColor, ColorSpace, OpaqueColor, Srgb};
 use glam::{DAffine2, DAffine3, DMat4, DQuat, DVec2, DVec3, USizeVec3, Vec3Swizzles, dvec3};
 use num::complex::Complex64;
 
@@ -110,18 +110,25 @@ impl Interpolatable for DQuat {
 }
 
 impl<CS: ColorSpace> Interpolatable for AlphaColor<CS> {
-    fn lerp(&self, other: &Self, t: f64) -> Self {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
         // TODO: figure out to use `lerp_rect` or `lerp`
-        AlphaColor::lerp_rect(*self, *other, t as f32)
+        AlphaColor::lerp_rect(*self, *target, t as f32)
+    }
+}
+
+impl<CS: ColorSpace> Interpolatable for OpaqueColor<CS> {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        // TODO: figure out to use `lerp_rect` or `lerp`
+        OpaqueColor::lerp_rect(*self, *target, t as f32)
     }
 }
 
 impl Interpolatable for DMat4 {
-    fn lerp(&self, other: &Self, t: f64) -> Self {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
         let mut result = DMat4::ZERO;
         for i in 0..4 {
             for j in 0..4 {
-                result.col_mut(i)[j] = self.col(i)[j].lerp(&other.col(i)[j], t);
+                result.col_mut(i)[j] = self.col(i)[j].lerp(&target.col(i)[j], t);
             }
         }
         result
