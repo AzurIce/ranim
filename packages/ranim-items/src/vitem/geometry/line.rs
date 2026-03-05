@@ -21,7 +21,7 @@ pub struct Line {
     /// Positive value means extension and negative value means shrinking.
     pub extrude: [f64; 2],
     /// Stroke RGBA values.
-    pub stroke_rgbas: AlphaColor<Srgb>,
+    pub stroke_rgba: AlphaColor<Srgb>,
     /// Stroke width.
     pub stroke_width: f32,
 }
@@ -32,17 +32,15 @@ impl Line {
         Self {
             points: [start, end],
             extrude: [0., 0.],
-            stroke_rgbas: AlphaColor::WHITE,
+            stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
         }
     }
 
     /// Inverts the direction of the line segment.
     pub fn invert(&mut self) -> &mut Self {
-        let [start, end] = self.points;
-        let [ext1, ext2] = self.extrude;
-        self.points = [end, start];
-        self.extrude = [ext2, ext1];
+        self.points.reverse();
+        self.extrude.reverse();
         self
     }
 
@@ -70,16 +68,14 @@ impl Aabb for Line {
 
 impl ShiftTransform for Line {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
-        self.points.iter_mut().for_each(|p| *p += offset);
+        self.points.shift(offset);
         self
     }
 }
 
 impl RotateTransform for Line {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.points
-            .iter_mut()
-            .for_each(|p| p.rotate_on_axis(axis, angle).discard());
+        self.points.rotate_on_axis(axis, angle);
         self
     }
 }
@@ -96,16 +92,16 @@ impl ScaleTransform for Line {
 
 impl StrokeColor for Line {
     fn stroke_color(&self) -> AlphaColor<Srgb> {
-        self.stroke_rgbas
+        self.stroke_rgba
     }
 
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.stroke_rgbas = self.stroke_rgbas.with_alpha(opacity);
+        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
         self
     }
 
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.stroke_rgbas = color;
+        self.stroke_rgba = color;
         self
     }
 }
@@ -114,7 +110,7 @@ impl From<Line> for VItem {
     fn from(value: Line) -> Self {
         let [p1, p2] = value.points_with_extrude();
         VItem::from_vpoints(vec![p1, (p1 + p2) / 2., p2]).with(|item| {
-            item.set_stroke_color(value.stroke_rgbas)
+            item.set_stroke_color(value.stroke_rgba)
                 .set_stroke_width(value.stroke_width)
                 .discard()
         })
