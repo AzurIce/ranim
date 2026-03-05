@@ -105,7 +105,7 @@ impl Sphere {
             vertex_colors: vec![self.fill_rgba; points.len()],
             vertex_normals,
             transform: DMat4::from_translation(self.center),
-            points,
+            vertices: points,
             triangle_indices,
         }
     }
@@ -238,7 +238,7 @@ mod tests {
             .with_center(dvec3(1.0, 0.0, 0.0))
             .with_resolution((5, 5));
         let surface = sphere.to_surface();
-        assert_eq!(surface.points.len(), 25);
+        assert_eq!(surface.vertices.len(), 25);
         assert_eq!(surface.resolution, (5, 5));
         assert_eq!(
             surface.transform,

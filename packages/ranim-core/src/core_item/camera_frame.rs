@@ -154,7 +154,7 @@ impl CameraFrame {
 impl CameraFrame {
     /// Create a perspective camera positioned using spherical coordinates (Z-up), looking at the origin.
     ///
-    /// - `phi`: elevation angle in radians (0 = XY plane, π/2 = straight up along +Z)
+    /// - `phi`: polar angle from +Z axis in radians (0 = straight up along +Z, π/2 = XY plane)
     /// - `theta`: azimuth angle in radians (0 = +X direction, π/2 = +Y direction)
     /// - `distance`: distance from the origin
     pub fn from_spherical(phi: f64, theta: f64, distance: f64) -> Self {
@@ -169,7 +169,7 @@ impl CameraFrame {
 
     /// Position the camera using spherical coordinates (Z-up) around a target point.
     ///
-    /// - `phi`: elevation angle in radians (0 = XY plane, π/2 = straight up along +Z)
+    /// - `phi`: polar angle from +Z axis in radians (0 = straight up along +Z, π/2 = XY plane)
     /// - `theta`: azimuth angle in radians (0 = +X direction, π/2 = +Y direction)
     /// - `distance`: distance from `target`
     /// - `target`: the point the camera looks at
@@ -182,9 +182,9 @@ impl CameraFrame {
     ) -> &mut Self {
         self.pos = target
             + DVec3::new(
-                distance * phi.cos() * theta.cos(),
-                distance * phi.cos() * theta.sin(),
-                distance * phi.sin(),
+                distance * phi.sin() * theta.cos(),
+                distance * phi.sin() * theta.sin(),
+                distance * phi.cos(),
             );
         self.facing = (target - self.pos).normalize();
         self.up = DVec3::Z;
@@ -219,7 +219,7 @@ impl CameraFrame {
         let offset = self.pos - target;
         let distance = offset.length();
         let phi = if distance > 0.0 {
-            (offset.z / distance).asin()
+            (offset.z / distance).acos()
         } else {
             0.0
         };

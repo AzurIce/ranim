@@ -31,7 +31,7 @@ impl Eval<Surface> for RotateAroundZ {
 #[scene]
 #[output(dir = "tetrahedron_spheres")]
 fn tetrahedron_spheres(r: &mut RanimScene) {
-    let phi = 30.0 * PI / 180.0;
+    let phi = 60.0 * PI / 180.0;
     let theta = PI / 2.0;
     let distance = 6.0;
 
@@ -65,7 +65,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
             .with_resolution(resolution)
             .with_fill_color(color.with_alpha(0.5))
             .to_surface()
-            .with_flat_normals()
+            .with_smooth_normals()
             .with_transform(DMat4::from_translation(left_center + *vertex));
 
         let r_surface = r.insert(surface.clone());

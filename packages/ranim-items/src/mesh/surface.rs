@@ -44,18 +44,21 @@ fn colorscale_lookup(colorscale: &[(AlphaColor<Srgb>, f64)], value: f64) -> Alph
 ///
 /// Vertices are stored in row-major order: `points[i * nv + j]` where
 /// `i` is the u-index and `j` is the v-index.
+///
+/// By default, vertex normals are all-zero, which causes flat shading.
+/// To enable smooth shading, call [`Self::with_smooth_normals`] or [`Self::update_smooth_normals`] to update the normals.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Surface {
     /// Vertices — `nu * nv` points in row-major order.
-    pub points: Vec<DVec3>,
-    /// Triangle indices — `6 * (nu-1) * (nv-1)` entries.
-    pub triangle_indices: Vec<u32>,
-    /// Grid resolution `(nu, nv)`.
-    pub resolution: (u32, u32),
+    pub vertices: Vec<DVec3>,
     /// Per-vertex colors.
     pub vertex_colors: Vec<AlphaColor<Srgb>>,
     /// Per-vertex normals for smooth shading. All-zero → flat shading.
     pub vertex_normals: Vec<DVec3>,
+    /// Triangle indices — `6 * (nu-1) * (nv-1)` entries.
+    pub triangle_indices: Vec<u32>,
+    /// Grid resolution `(nu, nv)`.
+    pub resolution: (u32, u32),
     /// Transform matrix applied when rendering.
     pub transform: DMat4,
 }
@@ -86,9 +89,9 @@ impl Surface {
         let triangle_indices = generate_grid_indices(nu, nv);
 
         let vertex_colors = vec![color::palette::css::BLUE.with_alpha(1.0); points.len()];
-        let vertex_normals = compute_smooth_normals(&points, &triangle_indices);
+        let vertex_normals = vec![DVec3::ZERO; points.len()];
         Self {
-            points,
+            vertices: points,
             triangle_indices,
             resolution,
             vertex_colors,
@@ -109,7 +112,7 @@ impl Surface {
     /// The vertex color is linearly interpolated between adjacent entries.
     pub fn with_fill_by_z(mut self, colorscale: &[(AlphaColor<Srgb>, f64)]) -> Self {
         let colors = self
-            .points
+            .vertices
             .iter()
             .map(|p| colorscale_lookup(colorscale, p.z))
             .collect();
@@ -123,9 +126,14 @@ impl Surface {
         self
     }
 
-    /// Clear vertex normals so the shader falls back to flat shading.
-    pub fn with_flat_normals(mut self) -> Self {
-        self.vertex_normals = vec![DVec3::ZERO; self.points.len()];
+    /// Update per-vertex normals to smooth shading. Returns `self` for chaining.
+    pub fn with_smooth_normals(mut self) -> Self {
+        self.update_smooth_normals();
+        self
+    }
+    /// Update per-vertex normals to smooth shading.
+    pub fn update_smooth_normals(&mut self) -> &mut Self {
+        self.vertex_normals = compute_smooth_normals(&self.vertices, &self.triangle_indices);
         self
     }
 }
@@ -133,7 +141,7 @@ impl Surface {
 impl Interpolatable for Surface {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         Self {
-            points: self.points.lerp(&target.points, t),
+            vertices: self.vertices.lerp(&target.vertices, t),
             // TODO: better interpolation
             triangle_indices: if t < 0.5 {
                 self.triangle_indices.clone()
@@ -189,7 +197,7 @@ impl Extract for Surface {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         buf.push(CoreItem::MeshItem(MeshItem {
-            points: self.points.iter().map(|p| p.as_vec3()).collect(),
+            points: self.vertices.iter().map(|p| p.as_vec3()).collect(),
             triangle_indices: self.triangle_indices.clone(),
             transform: self.transform.as_mat4(),
             vertex_colors: self
@@ -212,15 +220,15 @@ mod tests {
     fn test_flat_surface() {
         let surface =
             Surface::from_uv_func(|u, v| dvec3(u, v, 0.0), (0.0, 1.0), (0.0, 1.0), (3, 3));
-        assert_eq!(surface.points.len(), 9);
+        assert_eq!(surface.vertices.len(), 9);
         assert_eq!(surface.triangle_indices.len(), 24);
         assert_eq!(surface.resolution, (3, 3));
 
         // Check corners
-        assert_eq!(surface.points[0], dvec3(0.0, 0.0, 0.0));
-        assert_eq!(surface.points[2], dvec3(0.0, 1.0, 0.0));
-        assert_eq!(surface.points[6], dvec3(1.0, 0.0, 0.0));
-        assert_eq!(surface.points[8], dvec3(1.0, 1.0, 0.0));
+        assert_eq!(surface.vertices[0], dvec3(0.0, 0.0, 0.0));
+        assert_eq!(surface.vertices[2], dvec3(0.0, 1.0, 0.0));
+        assert_eq!(surface.vertices[6], dvec3(1.0, 0.0, 0.0));
+        assert_eq!(surface.vertices[8], dvec3(1.0, 1.0, 0.0));
     }
 
     #[test]
@@ -244,7 +252,7 @@ mod tests {
         let b = Surface::from_uv_func(|u, v| dvec3(u, v, 1.0), (0.0, 1.0), (0.0, 1.0), (2, 2));
         let mid = a.lerp(&b, 0.5);
         // z should be 0.5 for all points
-        for p in &mid.points {
+        for p in &mid.vertices {
             assert!((p.z - 0.5).abs() < 1e-10);
         }
     }

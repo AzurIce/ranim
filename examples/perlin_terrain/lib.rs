@@ -177,7 +177,7 @@ fn terrain_colorscale() -> Vec<(ranim::color::AlphaColor<ranim::color::Srgb>, f6
 // --- Helper to build a terrain scene ---
 
 fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64) {
-    let phi = 20.0 * PI / 180.0;
+    let phi = 70.0 * PI / 180.0;
     let theta = 30.0 * PI / 180.0;
     let distance = 22.0;
 
@@ -199,8 +199,7 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
         (U_MIN, U_MAX),
         (RESOLUTION, RESOLUTION),
     )
-    .with_fill_by_z(&colorscale)
-    .with_flat_normals();
+    .with_fill_by_z(&colorscale);
 
     let _r_terrain = r.insert(terrain);
 
