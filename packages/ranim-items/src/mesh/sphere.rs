@@ -11,6 +11,8 @@ use ranim_core::{
     traits::{FillColor, Interpolatable, Opacity, ShiftTransform, With},
 };
 
+use crate::mesh::MeshItem;
+
 use super::Surface;
 
 /// A sphere defined by center, radius, and resolution.
@@ -77,6 +79,12 @@ impl Sphere {
         let y = u.sin() * v.sin();
         let z = -v.cos();
         DVec3::new(x, y, z)
+    }
+}
+
+impl From<Sphere> for MeshItem {
+    fn from(value: Sphere) -> Self {
+        Surface::from(value).into()
     }
 }
 
