@@ -264,6 +264,6 @@ fn fractal_erosion(r: &mut RanimScene) {
 }
 ```"""
 hash = "956fe615960e0c088f7d61b44351ef6f511f5839"
-preview_imgs = ["/examples/perlin_terrain/preview.png", "/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview.png", "/examples/perlin_terrain/preview-fractal-perlin.png", "/examples/perlin_terrain/preview.png", "/examples/perlin_terrain/preview-perlin.png"]
+preview_imgs = ["/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview-fractal-perlin.png", "/examples/perlin_terrain/preview-perlin.png"]
 output_files = ["/examples/perlin_terrain/fractal_erosion_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_perlin_1920x1080_60.mp4", "/examples/perlin_terrain/perlin_1920x1080_60.mp4"]
-wasm = false
+wasm = true
