@@ -78,18 +78,22 @@ impl MeshItem {
     }
 }
 
+impl From<MeshItem> for ranim_core::core_item::mesh_item::MeshItem {
+    fn from(value: MeshItem) -> Self {
+        Self {
+            points: value.points.iter().copied().collect(),
+            triangle_indices: value.triangle_indices,
+            transform: value.transform,
+            vertex_colors: value.vertex_colors.iter().copied().collect(),
+            vertex_normals: value.vertex_normals.iter().copied().collect(),
+        }
+    }
+}
+
 impl Extract for MeshItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(CoreItem::MeshItem(
-            ranim_core::core_item::mesh_item::MeshItem {
-                points: self.points.iter().copied().collect(),
-                triangle_indices: self.triangle_indices.clone(),
-                transform: self.transform,
-                vertex_colors: self.vertex_colors.iter().copied().collect(),
-                vertex_normals: self.vertex_normals.iter().copied().collect(),
-            },
-        ));
+        buf.push(CoreItem::MeshItem(self.clone().into()));
     }
 }
 

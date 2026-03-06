@@ -4,10 +4,12 @@ use ranim_core::{
     Extract,
     color::{self, AlphaColor, Srgb},
     components::rgba::Rgba,
-    core_item::{CoreItem, mesh_item::MeshItem},
+    core_item::CoreItem,
     glam::{DMat4, DVec3},
     traits::{FillColor, Interpolatable, Opacity},
 };
+
+use crate::mesh::MeshItem;
 
 use super::{compute_smooth_normals, generate_grid_indices};
 
@@ -191,21 +193,37 @@ impl Opacity for Surface {
     }
 }
 
+impl From<Surface> for MeshItem {
+    fn from(value: Surface) -> Self {
+        MeshItem {
+            points: value
+                .vertices
+                .iter()
+                .map(|p| p.as_vec3())
+                .collect::<Vec<_>>()
+                .into(),
+            triangle_indices: value.triangle_indices,
+            transform: value.transform.as_mat4(),
+            vertex_colors: value
+                .vertex_colors
+                .into_iter()
+                .map(Rgba::from)
+                .collect::<Vec<_>>()
+                .into(),
+            vertex_normals: value
+                .vertex_normals
+                .iter()
+                .map(|n| n.as_vec3())
+                .collect::<Vec<_>>()
+                .into(),
+        }
+    }
+}
+
 impl Extract for Surface {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(CoreItem::MeshItem(MeshItem {
-            points: self.vertices.iter().map(|p| p.as_vec3()).collect(),
-            triangle_indices: self.triangle_indices.clone(),
-            transform: self.transform.as_mat4(),
-            vertex_colors: self
-                .vertex_colors
-                .clone()
-                .into_iter()
-                .map(Rgba::from)
-                .collect(),
-            vertex_normals: self.vertex_normals.iter().map(|n| n.as_vec3()).collect(),
-        }));
+        MeshItem::from(self.clone()).extract_into(buf);
     }
 }
 
