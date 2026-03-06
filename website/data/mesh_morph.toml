@@ -130,4 +130,4 @@ fn create_disc_shape(radius: f64, resolution: (u32, u32)) -> Surface {
 hash = "345e873db9ea2a7c6ff59f675ffb57a0af013af8"
 preview_imgs = ["/examples/mesh_morph/preview_torus.png", "/examples/mesh_morph/preview_disc.png"]
 output_files = ["/examples/mesh_morph/mesh_morph_1920x1080_60.mp4"]
-wasm = false
+wasm = true

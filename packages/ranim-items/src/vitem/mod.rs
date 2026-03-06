@@ -178,17 +178,23 @@ impl VItem {
     }
 }
 
+impl From<VItem> for ranim_core::core_item::vitem::VItem {
+    fn from(value: VItem) -> Self {
+        Self {
+            origin: value.vpoints.first().unwrap().as_vec3(),
+            basis: value.basis,
+            points: value.get_render_points(),
+            fill_rgbas: value.fill_rgbas.iter().cloned().collect(),
+            stroke_rgbas: value.stroke_rgbas.iter().cloned().collect(),
+            stroke_widths: value.stroke_widths.iter().cloned().collect(),
+        }
+    }
+}
+
 impl Extract for VItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(CoreItem::VItem(ranim_core::core_item::vitem::VItem {
-            origin: self.vpoints.first().unwrap().as_vec3(),
-            basis: self.basis,
-            points: self.get_render_points(),
-            fill_rgbas: self.fill_rgbas.iter().cloned().collect(),
-            stroke_rgbas: self.stroke_rgbas.iter().cloned().collect::<Vec<_>>(),
-            stroke_widths: self.stroke_widths.iter().cloned().collect::<Vec<_>>(),
-        }));
+        ranim_core::core_item::vitem::VItem::from(self.clone()).extract_into(buf);
     }
 }
 

@@ -248,7 +248,7 @@ fn fractal_perlin(r: &mut RanimScene) {
 }
 
 /// Fractal Perlin noise with derivative-based erosion.
-#[scene]
+#[scene(name = "perline_terrain")]
 #[output(dir = "perlin_terrain/erosion")]
 fn fractal_erosion(r: &mut RanimScene) {
     // Same pattern as fractal_perlin but with derivative-based erosion
@@ -263,7 +263,7 @@ fn fractal_erosion(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "956fe615960e0c088f7d61b44351ef6f511f5839"
-preview_imgs = ["/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview-fractal-perlin.png", "/examples/perlin_terrain/preview-perlin.png"]
-output_files = ["/examples/perlin_terrain/fractal_erosion_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_perlin_1920x1080_60.mp4", "/examples/perlin_terrain/perlin_1920x1080_60.mp4"]
+hash = "d0dda717244de9babcdebf2da884922d1d50b02a"
+preview_imgs = ["/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview-fractal-perlin.png", "/examples/perlin_terrain/preview-perlin.png"]
+output_files = ["/examples/perlin_terrain/perline_terrain_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_erosion_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_perlin_1920x1080_60.mp4", "/examples/perlin_terrain/perlin_1920x1080_60.mp4"]
 wasm = true
