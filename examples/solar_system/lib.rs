@@ -196,7 +196,8 @@ fn solar_system(r: &mut RanimScene) {
                 Sphere::new(planet.radius)
                     .with_resolution((20, 10))
                     .with_fill_color(planet.color.with_alpha(0.3)),
-            );
+            )
+            .with_smooth_normals();
             atmosphere.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
 
             let r_atmosphere = r.insert(atmosphere.clone());
@@ -235,7 +236,8 @@ fn solar_system(r: &mut RanimScene) {
                 Sphere::new(planet.radius)
                     .with_resolution((20, 10))
                     .with_fill_color(planet.color.with_alpha(1.0)),
-            );
+            )
+            .with_smooth_normals();
             planet_surface.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
 
             let r_planet = r.insert(planet_surface.clone());
