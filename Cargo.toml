@@ -341,15 +341,24 @@ name = "perlin_terrain"
 path = "examples/perlin_terrain/lib.rs"
 crate-type = ["cdylib"]
 
+[package.metadata.example.perlin_terrain]
+wasm = true
+
 [[example]]
 name = "mesh_morph"
 path = "examples/mesh_morph/lib.rs"
 crate-type = ["cdylib"]
 
+[package.metadata.example.mesh_morph]
+wasm = true
+
 [[example]]
 name = "tetrahedron_spheres"
 path = "examples/tetrahedron_spheres/lib.rs"
 crate-type = ["cdylib"]
+
+[package.metadata.example.tetrahedron_spheres]
+wasm = true
 
 [[example]]
 name = "solar_system"
