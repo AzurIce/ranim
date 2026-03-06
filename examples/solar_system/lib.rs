@@ -131,10 +131,11 @@ fn solar_system(r: &mut RanimScene) {
     let _r_cam = r.insert(cam);
 
     // Create the Sun at the origin (already visible at start)
-    let sun = Sphere::new(2.0)
-        .with_resolution((30, 15))
-        .with_fill_color(manim::YELLOW_C.with_alpha(0.5))
-        .to_surface();
+    let sun = Surface::from(
+        Sphere::new(2.0)
+            .with_resolution((30, 15))
+            .with_fill_color(manim::YELLOW_C.with_alpha(0.5)),
+    );
     let _r_sun = r.insert(sun);
 
     // Orbit rings fade in (0-1s)
@@ -181,19 +182,21 @@ fn solar_system(r: &mut RanimScene) {
             // Planets with atmosphere: solid core + transparent atmosphere layer
 
             // Core (solid, opaque)
-            let mut core = Sphere::new(planet.radius * 0.9)
-                .with_resolution((20, 10))
-                .with_fill_color(planet.color.with_alpha(1.0))
-                .to_surface();
+            let mut core = Surface::from(
+                Sphere::new(planet.radius * 0.9)
+                    .with_resolution((20, 10))
+                    .with_fill_color(planet.color.with_alpha(1.0)),
+            );
             core.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
 
             let r_core = r.insert(core.clone());
 
             // Atmosphere (larger, semi-transparent)
-            let mut atmosphere = Sphere::new(planet.radius)
-                .with_resolution((20, 10))
-                .with_fill_color(planet.color.with_alpha(0.3))
-                .to_surface();
+            let mut atmosphere = Surface::from(
+                Sphere::new(planet.radius)
+                    .with_resolution((20, 10))
+                    .with_fill_color(planet.color.with_alpha(0.3)),
+            );
             atmosphere.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
 
             let r_atmosphere = r.insert(atmosphere.clone());
@@ -228,10 +231,11 @@ fn solar_system(r: &mut RanimScene) {
             );
         } else {
             // Planets without atmosphere: single solid sphere
-            let mut planet_surface = Sphere::new(planet.radius)
-                .with_resolution((20, 10))
-                .with_fill_color(planet.color.with_alpha(1.0))
-                .to_surface();
+            let mut planet_surface = Surface::from(
+                Sphere::new(planet.radius)
+                    .with_resolution((20, 10))
+                    .with_fill_color(planet.color.with_alpha(1.0)),
+            );
             planet_surface.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
 
             let r_planet = r.insert(planet_surface.clone());

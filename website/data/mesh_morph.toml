@@ -1,0 +1,133 @@
+name = "mesh_morph"
+code = """
+```rust
+use std::f64::consts::PI;
+
+use ranim::{
+    anims::morph::MorphAnim,
+    color::palettes::manim,
+    glam::{DVec3, Vec3},
+    items::mesh::{MeshItem, Sphere, Surface},
+    prelude::*,
+    utils::rate_functions::linear,
+};
+
+/// Comprehensive mesh morphing demo: sphere -> torus -> disc -> sphere
+#[scene]
+#[output(dir = "mesh_morph")]
+fn mesh_morph(r: &mut RanimScene) {
+    // Setup camera
+    let phi = 70.0 * PI / 180.0;
+    let theta = 30.0 * PI / 180.0;
+    let distance = 8.0;
+
+    let mut cam = CameraFrame::from_spherical(phi, theta, distance);
+    cam.fovy = 50.0 * PI / 180.0;
+    let r_cam = r.insert(cam.clone());
+
+    // Create meshes with better colors from manim palette
+    let sphere_surface = Sphere::new(2.0)
+        .with_fill_color(manim::BLUE_D) // Deep blue
+        .with_resolution((50, 30));
+    let mut sphere = surface_to_mesh(Surface::from(sphere_surface));
+
+    let torus_surface = create_torus_shape(2.0, 0.8, (50, 30));
+    let mut torus = surface_to_mesh(torus_surface);
+    torus.set_fill_color(manim::TEAL_D); // Teal for torus
+
+    let disc_surface = create_disc_shape(2.5, (50, 30));
+    let mut disc = surface_to_mesh(disc_surface);
+    disc.set_fill_color(manim::PURPLE_D); // Purple for disc
+
+    let sphere_red_surface = Sphere::new(2.0)
+        .with_fill_color(manim::MAROON_D) // Deep red
+        .with_resolution((50, 30));
+    let sphere_red = surface_to_mesh(Surface::from(sphere_red_surface));
+
+    let r_mesh = r.insert(sphere.clone());
+
+    // Animation sequence:
+    // 1. Sphere -> Torus
+    r.timeline_mut(r_mesh)
+        .play(sphere.morph_to(torus.clone()).with_duration(2.5));
+
+    // 2. Torus -> Disc
+    r.timeline_mut(r_mesh)
+        .forward(0.5)
+        .play(torus.morph_to(disc.clone()).with_duration(2.5));
+
+    // 3. Disc -> Sphere (different color)
+    r.timeline_mut(r_mesh)
+        .forward(0.5)
+        .play(disc.morph_to(sphere_red).with_duration(2.5));
+
+    // Rotate camera continuously
+    r.timeline_mut(r_cam).play(
+        cam.orbit(DVec3::ZERO, 2.0)
+            .with_duration(9.0)
+            .with_rate_func(linear),
+    );
+
+    // Add preview captures at key moments
+    r.insert_time_mark(2.5, TimeMark::Capture("preview_torus.png".to_string()));
+    r.insert_time_mark(5.5, TimeMark::Capture("preview_disc.png".to_string()));
+}
+
+/// Convert Surface to MeshItem
+fn surface_to_mesh(surface: Surface) -> MeshItem {
+    let points: Vec<Vec3> = surface.vertices.iter().map(|v| v.as_vec3()).collect();
+
+    // Build MeshItem manually
+    let mut mesh = MeshItem::from_indexed_vertices(points, surface.triangle_indices);
+
+    // Set colors by iterating through surface colors and using set_fill_color
+    // Since we can't directly access vertex_colors from outside, we'll just use the first color
+    if let Some(first_color) = surface.vertex_colors.first() {
+        mesh.set_fill_color(*first_color);
+    }
+
+    mesh.with_transform(surface.transform.as_mat4())
+}
+
+/// Create a torus-like shape
+fn create_torus_shape(major_radius: f64, minor_radius: f64, resolution: (u32, u32)) -> Surface {
+    Surface::from_uv_func(
+        |u, v| {
+            let theta = u * 2.0 * PI;
+            let phi = v * 2.0 * PI;
+
+            let x = (major_radius + minor_radius * phi.cos()) * theta.cos();
+            let y = (major_radius + minor_radius * phi.cos()) * theta.sin();
+            let z = minor_radius * phi.sin();
+
+            DVec3::new(x, y, z)
+        },
+        (0.0, 1.0),
+        (0.0, 1.0),
+        resolution,
+    )
+}
+
+/// Create a flattened disc-like shape
+fn create_disc_shape(radius: f64, resolution: (u32, u32)) -> Surface {
+    Surface::from_uv_func(
+        |u, v| {
+            let theta = u * 2.0 * PI;
+            let r = v * radius;
+
+            let x = r * theta.cos();
+            let y = r * theta.sin();
+            let z = 0.3 * (1.0 - v) * (u * 4.0 * PI).sin(); // Small wave pattern
+
+            DVec3::new(x, y, z)
+        },
+        (0.0, 1.0),
+        (0.0, 1.0),
+        resolution,
+    )
+}
+```"""
+hash = "345e873db9ea2a7c6ff59f675ffb57a0af013af8"
+preview_imgs = ["/examples/mesh_morph/preview_torus.png", "/examples/mesh_morph/preview_disc.png"]
+output_files = ["/examples/mesh_morph/mesh_morph_1920x1080_60.mp4"]
+wasm = false

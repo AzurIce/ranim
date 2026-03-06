@@ -6,12 +6,12 @@ use ranim_core::{
     Extract,
     anchor::Aabb,
     color::{self, AlphaColor, Srgb},
-    core_item::{CoreItem, mesh_item::MeshItem},
+    core_item::CoreItem,
     glam::{DMat4, DVec3},
-    traits::{FillColor, Interpolatable, Opacity, ShiftTransform},
+    traits::{FillColor, Interpolatable, Opacity, ShiftTransform, With},
 };
 
-use super::{Surface, generate_grid_indices};
+use super::Surface;
 
 /// A sphere defined by center, radius, and resolution.
 ///
@@ -66,48 +66,32 @@ impl Sphere {
         self
     }
 
-    /// Generate the sphere mesh points and their analytical normals.
-    fn generate_points_and_normals(&self) -> (Vec<DVec3>, Vec<DVec3>) {
-        let (nu, nv) = self.resolution;
-        let r = self.radius;
-        let mut points = Vec::with_capacity((nu * nv) as usize);
-        let mut normals = Vec::with_capacity((nu * nv) as usize);
-        for i in 0..nu {
-            let u = TAU * (i as f64 / (nu - 1) as f64);
-            for j in 0..nv {
-                let v = PI * (j as f64 / (nv - 1) as f64);
-                let x = r * u.cos() * v.sin();
-                let y = r * u.sin() * v.sin();
-                let z = r * (-v.cos());
-                let p = DVec3::new(x, y, z);
-                points.push(p);
-                // Analytical outward normal for a sphere centered at the origin
-                let len = p.length();
-                if len > 1e-10 {
-                    normals.push(p / len);
-                } else {
-                    normals.push(DVec3::ZERO);
-                }
-            }
-        }
-        (points, normals)
+    /// Generate a point on the sphere using UV coordinates.
+    pub fn points_uv_func(u: f64, v: f64, r: f64) -> DVec3 {
+        Self::normals_uv_func(u, v) * r
     }
 
-    /// Convert this sphere to a [`Surface`].
-    ///
-    /// Useful when you need point-level morph animations between a sphere
-    /// and another surface.
-    pub fn to_surface(&self) -> Surface {
-        let (points, vertex_normals) = self.generate_points_and_normals();
-        let triangle_indices = generate_grid_indices(self.resolution.0, self.resolution.1);
-        Surface {
-            resolution: self.resolution,
-            vertex_colors: vec![self.fill_rgba; points.len()],
-            vertex_normals,
-            transform: DMat4::from_translation(self.center),
-            vertices: points,
-            triangle_indices,
-        }
+    /// Generate a normal on the sphere using UV coordinates.
+    pub fn normals_uv_func(u: f64, v: f64) -> DVec3 {
+        let x = u.cos() * v.sin();
+        let y = u.sin() * v.sin();
+        let z = -v.cos();
+        DVec3::new(x, y, z)
+    }
+}
+
+impl From<Sphere> for Surface {
+    fn from(value: Sphere) -> Self {
+        Surface::from_uv_func(
+            |u, v| Sphere::points_uv_func(u, v, value.radius),
+            (0.0, TAU),
+            (0.0, PI),
+            value.resolution,
+        )
+        .with_transform(DMat4::from_translation(value.center))
+        .with(|x| {
+            x.set_fill_color(value.fill_rgba);
+        })
     }
 }
 
@@ -164,15 +148,7 @@ impl Aabb for Sphere {
 impl Extract for Sphere {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        let (points, normals) = self.generate_points_and_normals();
-        let triangle_indices = generate_grid_indices(self.resolution.0, self.resolution.1);
-        buf.push(CoreItem::MeshItem(MeshItem {
-            points: points.iter().map(|p| p.as_vec3()).collect(),
-            triangle_indices,
-            transform: DMat4::from_translation(self.center).as_mat4(),
-            vertex_colors: vec![self.fill_rgba.into(); points.len()],
-            vertex_normals: normals.iter().map(|n| n.as_vec3()).collect(),
-        }));
+        Surface::from(self.clone()).extract_into(buf);
     }
 }
 
@@ -182,26 +158,9 @@ mod tests {
     use ranim_core::glam::dvec3;
 
     #[test]
-    fn test_sphere_points_on_sphere() {
-        let sphere = Sphere::new(2.0).with_resolution((11, 6));
-        let (points, _normals) = sphere.generate_points_and_normals();
-
-        // All points should be at distance ~radius from origin
-        for p in &points {
-            let dist = p.length();
-            assert!(
-                (dist - 2.0).abs() < 1e-10,
-                "point {:?} has distance {} from origin, expected 2.0",
-                p,
-                dist
-            );
-        }
-    }
-
-    #[test]
     fn test_sphere_center_to_transform() {
         let sphere = Sphere::new(1.0).with_center(dvec3(1.0, 2.0, 3.0));
-        let surface = sphere.to_surface();
+        let surface = Surface::from(sphere);
         assert_eq!(
             surface.transform,
             DMat4::from_translation(dvec3(1.0, 2.0, 3.0))
@@ -237,7 +196,7 @@ mod tests {
         let sphere = Sphere::new(1.0)
             .with_center(dvec3(1.0, 0.0, 0.0))
             .with_resolution((5, 5));
-        let surface = sphere.to_surface();
+        let surface = Surface::from(sphere);
         assert_eq!(surface.vertices.len(), 25);
         assert_eq!(surface.resolution, (5, 5));
         assert_eq!(

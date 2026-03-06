@@ -173,16 +173,14 @@ impl FillColor for Surface {
     }
 
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        if let Some(x) = self.vertex_colors.first_mut() {
-            *x = color
-        }
+        self.vertex_colors.fill(color);
         self
     }
 
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        if let Some(x) = self.vertex_colors.first_mut() {
-            *x = x.with_alpha(opacity);
-        }
+        self.vertex_colors
+            .iter_mut()
+            .for_each(|x| *x = x.with_alpha(opacity));
         self
     }
 }

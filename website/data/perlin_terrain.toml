@@ -212,8 +212,6 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
             .with_duration(5.0)
             .with_rate_func(linear),
     );
-
-    r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
 }
 
 // --- Scenes ---
@@ -229,6 +227,7 @@ fn perlin(r: &mut RanimScene) {
         let ny = u / GRID_SIZE * LATTICE_CNT;
         noise(nx, ny) * DEPTH
     });
+    r.insert_time_mark(0.0, TimeMark::Capture("preview-perlin.png".to_string()));
 }
 
 /// Fractal Perlin noise terrain (octave stacking).
@@ -242,6 +241,10 @@ fn fractal_perlin(r: &mut RanimScene) {
         let ny = u / GRID_SIZE * LATTICE_CNT;
         fractal_noise(nx, ny, 8, 0.5) * DEPTH * DEPTH
     });
+    r.insert_time_mark(
+        0.0,
+        TimeMark::Capture("preview-fractal-perlin.png".to_string()),
+    );
 }
 
 /// Fractal Perlin noise with derivative-based erosion.
@@ -254,9 +257,13 @@ fn fractal_erosion(r: &mut RanimScene) {
         let ny = u / GRID_SIZE * LATTICE_CNT;
         fractal_with_derivative_noise(nx, ny, 8, 0.5) * DEPTH * DEPTH
     });
+    r.insert_time_mark(
+        0.0,
+        TimeMark::Capture("preview-fractal-erosion-perlin.png".to_string()),
+    );
 }
 ```"""
-hash = "4ad36332d2c0c4afcfda19a055094198bc983da8"
-preview_imgs = ["/examples/perlin_terrain/preview.png", "/examples/perlin_terrain/preview.png", "/examples/perlin_terrain/preview.png"]
+hash = "956fe615960e0c088f7d61b44351ef6f511f5839"
+preview_imgs = ["/examples/perlin_terrain/preview.png", "/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview.png", "/examples/perlin_terrain/preview-fractal-perlin.png", "/examples/perlin_terrain/preview.png", "/examples/perlin_terrain/preview-perlin.png"]
 output_files = ["/examples/perlin_terrain/fractal_erosion_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_perlin_1920x1080_60.mp4", "/examples/perlin_terrain/perlin_1920x1080_60.mp4"]
 wasm = false

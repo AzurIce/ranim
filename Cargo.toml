@@ -342,6 +342,11 @@ path = "examples/perlin_terrain/lib.rs"
 crate-type = ["cdylib"]
 
 [[example]]
+name = "mesh_morph"
+path = "examples/mesh_morph/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "tetrahedron_spheres"
 path = "examples/tetrahedron_spheres/lib.rs"
 crate-type = ["cdylib"]

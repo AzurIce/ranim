@@ -209,8 +209,6 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
             .with_duration(5.0)
             .with_rate_func(linear),
     );
-
-    r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
 }
 
 // --- Scenes ---
@@ -226,6 +224,7 @@ fn perlin(r: &mut RanimScene) {
         let ny = u / GRID_SIZE * LATTICE_CNT;
         noise(nx, ny) * DEPTH
     });
+    r.insert_time_mark(0.0, TimeMark::Capture("preview-perlin.png".to_string()));
 }
 
 /// Fractal Perlin noise terrain (octave stacking).
@@ -239,6 +238,10 @@ fn fractal_perlin(r: &mut RanimScene) {
         let ny = u / GRID_SIZE * LATTICE_CNT;
         fractal_noise(nx, ny, 8, 0.5) * DEPTH * DEPTH
     });
+    r.insert_time_mark(
+        0.0,
+        TimeMark::Capture("preview-fractal-perlin.png".to_string()),
+    );
 }
 
 /// Fractal Perlin noise with derivative-based erosion.
@@ -251,4 +254,8 @@ fn fractal_erosion(r: &mut RanimScene) {
         let ny = u / GRID_SIZE * LATTICE_CNT;
         fractal_with_derivative_noise(nx, ny, 8, 0.5) * DEPTH * DEPTH
     });
+    r.insert_time_mark(
+        0.0,
+        TimeMark::Capture("preview-fractal-erosion-perlin.png".to_string()),
+    );
 }

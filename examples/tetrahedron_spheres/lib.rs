@@ -61,12 +61,13 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     // Left group: flat shading (normals zeroed out)
     let left_center = DVec3::new(-x_offset, 0.0, 0.0);
     for (vertex, color) in vertices.iter().zip(colors.iter()) {
-        let mut surface = Sphere::new(radius)
-            .with_resolution(resolution)
-            .with_fill_color(color.with_alpha(0.5))
-            .to_surface()
-            .with_smooth_normals()
-            .with_transform(DMat4::from_translation(left_center + *vertex));
+        let mut surface = Surface::from(
+            Sphere::new(radius)
+                .with_resolution(resolution)
+                .with_fill_color(color.with_alpha(0.5)),
+        )
+        .with_smooth_normals()
+        .with_transform(DMat4::from_translation(left_center + *vertex));
 
         let r_surface = r.insert(surface.clone());
         r.timeline_mut(r_surface).play(
@@ -86,11 +87,12 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     // Right group: smooth shading (analytical normals from Sphere)
     let right_center = DVec3::new(x_offset, 0.0, 0.0);
     for (vertex, color) in vertices.iter().zip(colors.iter()) {
-        let mut surface = Sphere::new(radius)
-            .with_resolution(resolution)
-            .with_fill_color(color.with_alpha(0.5))
-            .to_surface()
-            .with_transform(DMat4::from_translation(right_center + *vertex));
+        let mut surface = Surface::from(
+            Sphere::new(radius)
+                .with_resolution(resolution)
+                .with_fill_color(color.with_alpha(0.5)),
+        )
+        .with_transform(DMat4::from_translation(right_center + *vertex));
 
         let r_surface = r.insert(surface.clone());
         r.timeline_mut(r_surface).play(
