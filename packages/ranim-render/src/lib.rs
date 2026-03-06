@@ -142,9 +142,10 @@ impl Renderer {
             let mesh_color = render_graph.insert_node(MergedMeshItemColorNode);
 
             render_graph.insert_edge(vitem_compute, vitem_depth);
-            render_graph.insert_edge(vitem_depth, mesh_depth);
+            render_graph.insert_edge(vitem_depth, vitem_color);
+            render_graph.insert_edge(vitem_depth, mesh_color);
+            render_graph.insert_edge(mesh_depth, mesh_color);
             render_graph.insert_edge(mesh_depth, vitem_color);
-            render_graph.insert_edge(vitem_color, mesh_color);
             render_graph
         });
         let oit_resolve = render_graph.insert_node(OITResolveNode);
