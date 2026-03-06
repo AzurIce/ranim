@@ -30,13 +30,14 @@ struct FragmentOutput {
 }
 
 fn compute_lighting(world_pos: vec3<f32>, world_normal: vec3<f32>, base_color: vec4<f32>) -> vec4<f32> {
-    var normal: vec3<f32>;
-    // If the interpolated normal is near-zero, fall back to flat shading via screen-space derivatives
-    if (dot(world_normal, world_normal) < 0.0001) {
-        normal = normalize(cross(dpdx(world_pos), dpdy(world_pos)));
-    } else {
-        normal = normalize(world_normal);
-    }
+    // Compute both normals unconditionally (derivatives require uniform control flow)
+    let flat_normal = normalize(cross(dpdx(world_pos), dpdy(world_pos)));
+    let smooth_normal = normalize(world_normal);
+
+    // Select which normal to use based on whether world_normal is near-zero
+    let use_flat = dot(world_normal, world_normal) < 0.0001;
+    let normal = select(smooth_normal, flat_normal, use_flat);
+
     let light_dir = normalize(vec3<f32>(0.3, 1.0, 0.5));
     let ambient = 0.35;
     let diffuse = abs(dot(normal, light_dir));
@@ -71,6 +72,7 @@ fn fs_color(
     }
 
     discard;
+    return vec4<f32>(0.0); // To make wasm happy
 }
 
 @fragment
