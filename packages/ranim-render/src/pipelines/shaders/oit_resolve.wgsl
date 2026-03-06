@@ -3,6 +3,8 @@
 @group(0) @binding(2) var<storage, read_write> oit_colors: array<u32>;
 @group(0) @binding(3) var<storage, read_write> oit_depths: array<f32>;
 
+@group(1) @binding(0) var depth_texture: texture_depth_2d;
+
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
@@ -50,13 +52,8 @@ fn blend(src: vec4<f32>, dst: vec4<f32>) -> vec4<f32> {
     return vec4(out_rgb, out_a);
 }
 
-struct FragmentOutput {
-    @location(0) color: vec4<f32>,
-    @builtin(frag_depth) depth: f32,
-}
-
 @fragment
-fn fs_main(@builtin(position) frag_pos: vec4<f32>) -> FragmentOutput {
+fn fs_main(@builtin(position) frag_pos: vec4<f32>) -> @location(0) vec4<f32> {
     let coords = vec2<i32>(floor(frag_pos.xy));
 
     // Start with fully transparent
@@ -70,19 +67,37 @@ fn fs_main(@builtin(position) frag_pos: vec4<f32>) -> FragmentOutput {
         discard;
     }
 
+    // Sample opaque depth
+    let opaque_depth = textureLoad(depth_texture, vec2<u32>(coords), 0);
+
     const MAX_LAYERS: u32 = 16u;
     var nodes: array<Node, MAX_LAYERS>;
 
     let loops = min(count, MAX_LAYERS);
 
+    // Load layers and filter by depth
+    var valid_count = 0u;
     for (var i = 0u; i < loops; i++) {
         let buffer_idx = pixel_idx * frame.z + i;
-        nodes[i].color = unpack_color(oit_colors[buffer_idx]);
-        nodes[i].depth = oit_depths[buffer_idx];
+        let layer_depth = oit_depths[buffer_idx];
+
+        // Skip layers behind opaque surfaces
+        if (layer_depth > opaque_depth) {
+            continue;
+        }
+
+        nodes[valid_count].color = unpack_color(oit_colors[buffer_idx]);
+        nodes[valid_count].depth = layer_depth;
+        valid_count++;
     }
 
-    for (var i = 0u; i < loops; i++) {
-        for (var j = i + 1u; j < loops; j++) {
+    if (valid_count == 0u) {
+        discard;
+    }
+
+    // Sort valid layers by depth (back to front)
+    for (var i = 0u; i < valid_count; i++) {
+        for (var j = i + 1u; j < valid_count; j++) {
             if (nodes[i].depth < nodes[j].depth) {
                 let temp = nodes[i];
                 nodes[i] = nodes[j];
@@ -91,25 +106,12 @@ fn fs_main(@builtin(position) frag_pos: vec4<f32>) -> FragmentOutput {
         }
     }
 
-    // Blend
-    for (var i = 0u; i < loops; i++) {
-        // Simple alpha blend: src OVER dst
-        // final_color is 'dst' (background), node is 'src' (foreground layer)
+    // Blend valid layers
+    for (var i = 0u; i < valid_count; i++) {
         let src = nodes[i].color;
         let dst = final_color;
-
-        // Standard alpha blending:
-        // out_a = src_a + dst_a * (1 - src_a)
-        // out_rgb = (src_rgb * src_a + dst_rgb * dst_a * (1 - src_a)) / out_a
-
-        // Optimised accumulation:
-        // We can just accumulate normally.
         final_color = blend(src, dst);
     }
 
-    var output: FragmentOutput;
-
-    output.color = final_color;
-    output.depth = nodes[loops - 1].depth;
-    return output;
+    return final_color;
 }

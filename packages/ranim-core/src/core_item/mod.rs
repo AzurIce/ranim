@@ -11,11 +11,13 @@ use dyn_clone::DynClone;
 
 use crate::{
     Extract,
-    core_item::{camera_frame::CameraFrame, vitem::VItem},
+    core_item::{camera_frame::CameraFrame, mesh_item::MeshItem, vitem::VItem},
 };
 
 /// Camera frame
 pub mod camera_frame;
+/// MeshItem
+pub mod mesh_item;
 /// Vitem
 pub mod vitem;
 
@@ -26,6 +28,8 @@ pub enum CoreItem {
     CameraFrame(CameraFrame),
     /// [`VItem`]
     VItem(VItem),
+    /// [`MeshItem`]
+    MeshItem(MeshItem),
 }
 
 /// The item that can be extracted to [`CoreItem`]s

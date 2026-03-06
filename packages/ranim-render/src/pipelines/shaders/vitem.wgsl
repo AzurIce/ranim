@@ -275,6 +275,7 @@ fn fs_main(
 
     let coords = vec2<u32>(floor(frag_pos.xy));
     let pixel_idx = coords.y * frame.x + coords.x;
+
     let layer_idx = atomicAdd(&pixel_count[pixel_idx], 1u);
 
     if (layer_idx < frame.z) {

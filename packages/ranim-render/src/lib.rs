@@ -20,7 +20,7 @@ use glam::{UVec3, uvec3};
 
 use crate::{
     graph::{AnyGlobalRenderNodeTrait, GlobalRenderGraph, RenderPackets},
-    primitives::{viewport::ViewportUniform, vitems::VItemsBuffer},
+    primitives::{mesh_items::MeshItemsBuffer, viewport::ViewportUniform, vitems::VItemsBuffer},
     resource::{PipelinesPool, RenderPool, RenderTextures},
     utils::{WgpuBuffer, WgpuVecBuffer},
 };
@@ -93,19 +93,23 @@ pub struct RenderContext<'a> {
     pub clear_color: wgpu::Color,
     /// Present when using the merged rendering path.
     pub merged_buffer: Option<&'a VItemsBuffer>,
+    /// Present when using the merged mesh rendering path.
+    pub merged_mesh_buffer: Option<&'a MeshItemsBuffer>,
 }
 
 // MARK: Renderer
 pub struct Renderer {
     width: u32,
     height: u32,
-    resolution_info: ResolutionInfo,
+    pub(crate) resolution_info: ResolutionInfo,
     pub(crate) pipelines: PipelinesPool,
     packets: RenderPackets,
     render_graph: GlobalRenderGraph,
 
     /// Present when using the merged rendering path (lazily initialized on first use).
     merged_buffer: Option<VItemsBuffer>,
+    /// Present when using the merged mesh rendering path (lazily initialized on first use).
+    merged_mesh_buffer: Option<MeshItemsBuffer>,
 
     #[cfg(feature = "profiling")]
     pub(crate) profiler: wgpu_profiler::GpuProfiler,
@@ -131,11 +135,17 @@ impl Renderer {
         let view_render = render_graph.insert_node({
             use graph::view::*;
             let mut render_graph = ViewRenderGraph::new();
-            let compute = render_graph.insert_node(MergedVItemComputeNode);
-            let depth = render_graph.insert_node(MergedVItemDepthNode);
-            let color = render_graph.insert_node(MergedVItemColorNode);
-            render_graph.insert_edge(compute, depth);
-            render_graph.insert_edge(depth, color);
+            let vitem_compute = render_graph.insert_node(MergedVItemComputeNode);
+            let vitem_depth = render_graph.insert_node(MergedVItemDepthNode);
+            let mesh_depth = render_graph.insert_node(MergedMeshItemDepthNode);
+            let vitem_color = render_graph.insert_node(MergedVItemColorNode);
+            let mesh_color = render_graph.insert_node(MergedMeshItemColorNode);
+
+            render_graph.insert_edge(vitem_compute, vitem_depth);
+            render_graph.insert_edge(vitem_depth, vitem_color);
+            render_graph.insert_edge(vitem_depth, mesh_color);
+            render_graph.insert_edge(mesh_depth, mesh_color);
+            render_graph.insert_edge(mesh_depth, vitem_color);
             render_graph
         });
         let oit_resolve = render_graph.insert_node(OITResolveNode);
@@ -148,7 +158,7 @@ impl Renderer {
         Self::new_with_graph(ctx, width, height, oit_layers, Self::build_render_graph())
     }
 
-    fn new_with_graph(
+    pub fn new_with_graph(
         ctx: &WgpuContext,
         width: u32,
         height: u32,
@@ -172,6 +182,7 @@ impl Renderer {
             packets: RenderPackets::default(),
             render_graph,
             merged_buffer: None,
+            merged_mesh_buffer: None,
             #[cfg(feature = "profiling")]
             profiler,
         }
@@ -191,7 +202,7 @@ impl Renderer {
         pool: &mut RenderPool,
     ) {
         // Viewport — always needed
-        let (_id, camera_frame) = &store.camera_frames[0];
+        let camera_frame = &store.camera_frames[0];
         let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
         self.packets.push(pool.alloc_packet(ctx, &viewport));
 
@@ -200,6 +211,12 @@ impl Renderer {
             .merged_buffer
             .get_or_insert_with(|| VItemsBuffer::new(ctx));
         merged.update(ctx, &store.vitems);
+
+        // Merged mesh buffer
+        let merged_mesh = self
+            .merged_mesh_buffer
+            .get_or_insert_with(|| MeshItemsBuffer::new(ctx));
+        merged_mesh.update(ctx, &store.mesh_items);
 
         // Encode & submit
         {
@@ -223,6 +240,7 @@ impl Renderer {
                     resolution_info: &self.resolution_info,
                     clear_color,
                     merged_buffer: self.merged_buffer.as_ref(),
+                    merged_mesh_buffer: self.merged_mesh_buffer.as_ref(),
                 };
 
                 self.render_graph.exec(

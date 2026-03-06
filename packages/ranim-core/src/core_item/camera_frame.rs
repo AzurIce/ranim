@@ -4,6 +4,7 @@ use glam::{DMat4, DVec3, dvec2};
 
 use crate::{
     Extract,
+    animation::{AnimationCell, Eval},
     core_item::CoreItem,
     prelude::{Alignable, Interpolatable},
 };
@@ -147,6 +148,112 @@ impl CameraFrame {
     /// Use the given frame size to construct view projection matrix
     pub fn view_projection_matrix(&self, aspect_ratio: f64) -> DMat4 {
         self.projection_matrix(aspect_ratio) * self.view_matrix()
+    }
+}
+
+impl CameraFrame {
+    /// Create a perspective camera positioned using spherical coordinates (Z-up), looking at the origin.
+    ///
+    /// - `phi`: polar angle from +Z axis in radians (0 = straight up along +Z, π/2 = XY plane)
+    /// - `theta`: azimuth angle in radians (0 = +X direction, π/2 = +Y direction)
+    /// - `distance`: distance from the origin
+    pub fn from_spherical(phi: f64, theta: f64, distance: f64) -> Self {
+        let mut cam = Self {
+            perspective_blend: 1.0,
+            up: DVec3::Z,
+            ..Self::default()
+        };
+        cam.set_spherical(phi, theta, distance, DVec3::ZERO);
+        cam
+    }
+
+    /// Position the camera using spherical coordinates (Z-up) around a target point.
+    ///
+    /// - `phi`: polar angle from +Z axis in radians (0 = straight up along +Z, π/2 = XY plane)
+    /// - `theta`: azimuth angle in radians (0 = +X direction, π/2 = +Y direction)
+    /// - `distance`: distance from `target`
+    /// - `target`: the point the camera looks at
+    pub fn set_spherical(
+        &mut self,
+        phi: f64,
+        theta: f64,
+        distance: f64,
+        target: DVec3,
+    ) -> &mut Self {
+        self.pos = target
+            + DVec3::new(
+                distance * phi.sin() * theta.cos(),
+                distance * phi.sin() * theta.sin(),
+                distance * phi.cos(),
+            );
+        self.facing = (target - self.pos).normalize();
+        self.up = DVec3::Z;
+        self
+    }
+
+    /// Set the camera to look at a target point.
+    pub fn look_at(&mut self, target: DVec3) -> &mut Self {
+        self.facing = (target - self.pos).normalize();
+        self
+    }
+
+    /// Create an orbit animation that rotates the camera around `target`
+    /// by `total_angle` radians in the XY plane (Z-up).
+    ///
+    /// The camera's current position is used to derive the spherical
+    /// coordinates (distance, elevation) which are kept constant during the orbit.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use std::f64::consts::TAU;
+    ///
+    /// let mut cam = CameraFrame::from_spherical(phi, theta, distance);
+    /// let r_cam = r.insert(cam.clone());
+    /// r.timeline_mut(r_cam).play(
+    ///     cam.orbit(DVec3::ZERO, TAU)
+    ///        .with_duration(8.0)
+    ///        .with_rate_func(linear),
+    /// );
+    /// ```
+    pub fn orbit(&mut self, target: DVec3, total_angle: f64) -> AnimationCell<Self> {
+        let offset = self.pos - target;
+        let distance = offset.length();
+        let phi = if distance > 0.0 {
+            (offset.z / distance).acos()
+        } else {
+            0.0
+        };
+        let theta0 = offset.y.atan2(offset.x);
+        let src = self.clone();
+
+        struct Orbit {
+            src: CameraFrame,
+            target: DVec3,
+            distance: f64,
+            phi: f64,
+            theta0: f64,
+            total_angle: f64,
+        }
+
+        impl Eval<CameraFrame> for Orbit {
+            fn eval_alpha(&self, alpha: f64) -> CameraFrame {
+                let theta = self.theta0 + self.total_angle * alpha;
+                let mut result = self.src.clone();
+                result.set_spherical(self.phi, theta, self.distance, self.target);
+                result
+            }
+        }
+
+        Orbit {
+            src,
+            target,
+            distance,
+            phi,
+            theta0,
+            total_angle,
+        }
+        .into_animation_cell()
+        .apply_to(self)
     }
 }
 
