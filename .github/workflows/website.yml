@@ -37,7 +37,7 @@ jobs:
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2026-03-01
+          toolchain: nightly-2026-01-01
           targets: wasm32-unknown-unknown
 
       - uses: taiki-e/install-action@v2

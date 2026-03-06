@@ -21,7 +21,6 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
-#![feature(downcast_unchecked)]
 
 #[cfg(feature = "anims")]
 pub use ranim_anims as anims;

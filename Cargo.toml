@@ -34,7 +34,7 @@ ranim-anims = { path = "packages/ranim-anims", version = "0.1.5" }
 ranim-macros = { path = "packages/ranim-macros", version = "0.1.5" }
 ranim-render = { path = "packages/ranim-render", version = "0.1.5" }
 wgpu-profiler = { version = "0.25.0", features = ["puffin"] }
-wasm-bindgen = "0.2.113"
+wasm-bindgen = "0.2.114"
 glam = "0.30.10"
 tracing = "0.1.44"
 tracing-indicatif = "0.3.14"
@@ -334,4 +334,27 @@ path = "examples/text_item/lib.rs"
 crate-type = ["cdylib"]
 
 [package.metadata.example.text_item]
+wasm = true
+
+[[example]]
+name = "perlin_terrain"
+path = "examples/perlin_terrain/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "mesh_morph"
+path = "examples/mesh_morph/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "tetrahedron_spheres"
+path = "examples/tetrahedron_spheres/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "solar_system"
+path = "examples/solar_system/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.solar_system]
 wasm = true

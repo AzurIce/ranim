@@ -15,7 +15,9 @@ pub use crate::anchor::{Aabb, AabbPoint, Locate};
 use std::ops::Range;
 
 use color::{AlphaColor, ColorSpace, OpaqueColor, Srgb};
-use glam::{DAffine2, DAffine3, DMat4, DQuat, DVec2, DVec3, USizeVec3, Vec3Swizzles, dvec3};
+use glam::{
+    DAffine2, DAffine3, DMat4, DQuat, DVec2, DVec3, Mat4, USizeVec3, Vec3, Vec3Swizzles, dvec3,
+};
 use num::complex::Complex64;
 
 use crate::{components::width::Width, utils::resize_preserving_order_with_repeated_indices};
@@ -97,6 +99,12 @@ impl Interpolatable for DVec3 {
     }
 }
 
+impl Interpolatable for Vec3 {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        self + (target - self) * t as f32
+    }
+}
+
 impl Interpolatable for DVec2 {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         self + (target - self) * t
@@ -129,6 +137,19 @@ impl Interpolatable for DMat4 {
         for i in 0..4 {
             for j in 0..4 {
                 result.col_mut(i)[j] = self.col(i)[j].lerp(&target.col(i)[j], t);
+            }
+        }
+        result
+    }
+}
+
+impl Interpolatable for Mat4 {
+    fn lerp(&self, other: &Self, t: f64) -> Self {
+        let t = t as f32;
+        let mut result = Mat4::ZERO;
+        for i in 0..4 {
+            for j in 0..4 {
+                result.col_mut(i)[j] = self.col(i)[j] + (other.col(i)[j] - self.col(i)[j]) * t;
             }
         }
         result

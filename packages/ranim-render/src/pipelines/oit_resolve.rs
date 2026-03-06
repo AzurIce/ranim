@@ -16,6 +16,25 @@ impl Deref for OITResolvePipeline {
     }
 }
 
+impl OITResolvePipeline {
+    pub fn depth_bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
+        ctx.device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("OIT Resolve Depth BGL"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                }],
+            })
+    }
+}
+
 impl GpuResource for OITResolvePipeline {
     fn new(wgpu_ctx: &WgpuContext) -> Self {
         let WgpuContext { device, .. } = wgpu_ctx;
@@ -25,7 +44,10 @@ impl GpuResource for OITResolvePipeline {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("OIT Resolve Pipeline Layout"),
-            bind_group_layouts: &[&ResolutionInfo::create_bind_group_layout(wgpu_ctx)],
+            bind_group_layouts: &[
+                &ResolutionInfo::create_bind_group_layout(wgpu_ctx),
+                &Self::depth_bind_group_layout(wgpu_ctx),
+            ],
             push_constant_ranges: &[],
         });
 
@@ -52,13 +74,7 @@ impl GpuResource for OITResolvePipeline {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 ..Default::default()
             },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::LessEqual,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
+            depth_stencil: None, // No depth attachment
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,
