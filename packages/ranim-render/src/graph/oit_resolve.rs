@@ -15,10 +15,7 @@ impl GlobalRenderNodeTrait for OITResolveNode {
         _packets: <Self::Query as RenderPacketsQuery>::Output<'_>,
         ctx: RenderContext,
     ) {
-        let RenderTextures {
-            render_view,
-            ..
-        } = ctx.render_textures;
+        let RenderTextures { render_view, .. } = ctx.render_textures;
 
         // OIT Resolve Pass: Blend the transparent layers onto the opaque background
         let rpass_desc = wgpu::RenderPassDescriptor {
@@ -32,7 +29,7 @@ impl GlobalRenderNodeTrait for OITResolveNode {
                     store: wgpu::StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: None,  // No depth attachment
+            depth_stencil_attachment: None, // No depth attachment
             timestamp_writes: None,
             occlusion_query_set: None,
         };

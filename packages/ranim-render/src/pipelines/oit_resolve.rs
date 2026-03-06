@@ -74,7 +74,7 @@ impl GpuResource for OITResolvePipeline {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 ..Default::default()
             },
-            depth_stencil: None,  // No depth attachment
+            depth_stencil: None, // No depth attachment
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,

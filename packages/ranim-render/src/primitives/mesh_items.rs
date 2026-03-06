@@ -423,13 +423,16 @@ mod tests {
         renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
         pool.clean();
 
-        ctx.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+        ctx.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
 
         // Analyze depth buffer
         let depth_data = render_textures.get_depth_texture_data(&ctx);
         let mut min_depth = f32::MAX;
         let mut max_depth = f32::MIN;
-        let mut depth_histogram: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+        let mut depth_histogram: std::collections::HashMap<u32, usize> =
+            std::collections::HashMap::new();
 
         for &d in depth_data {
             if (d - 1.0).abs() > 0.001 {
@@ -448,7 +451,11 @@ mod tests {
         let mut buckets: Vec<_> = depth_histogram.iter().collect();
         buckets.sort_by_key(|(k, _)| *k);
         for (bucket, count) in buckets.iter().take(10) {
-            println!("    depth ~{:.4}: {} pixels", **bucket as f32 / 10000.0, count);
+            println!(
+                "    depth ~{:.4}: {} pixels",
+                **bucket as f32 / 10000.0,
+                count
+            );
         }
 
         let buffer = render_textures.get_rendered_texture_img_buffer(&ctx);
@@ -463,8 +470,10 @@ mod tests {
                 let y = (center_y as i32 + dy) as u32;
                 if x < width && y < height {
                     let pixel = buffer.get_pixel(x, y);
-                    println!("  ({:3}, {:3}): R={:3} G={:3} B={:3} A={:3}",
-                             dx, dy, pixel[0], pixel[1], pixel[2], pixel[3]);
+                    println!(
+                        "  ({:3}, {:3}): R={:3} G={:3} B={:3} A={:3}",
+                        dx, dy, pixel[0], pixel[1], pixel[2], pixel[3]
+                    );
                 }
             }
         }
@@ -475,7 +484,9 @@ mod tests {
 
         let depth_buffer = render_textures.get_depth_texture_img_buffer(&ctx);
         let depth_path = Path::new("../../output/nested_spheres_depth.png");
-        depth_buffer.save(depth_path).expect("Failed to save depth image");
+        depth_buffer
+            .save(depth_path)
+            .expect("Failed to save depth image");
 
         println!("\nImages saved to output/");
         println!("\nExpected behavior:");
