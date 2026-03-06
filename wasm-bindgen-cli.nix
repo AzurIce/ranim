@@ -7,13 +7,13 @@
 buildWasmBindgenCli rec {
   src = fetchCrate {
     pname = "wasm-bindgen-cli";
-    version = "0.2.113";
-    hash = "sha256-CWxeRhlO1i4Yq93OVLFDvJFIaBB7q2Ps0yqk+Euz+8w=";
+    version = "0.2.114";
+    hash = "sha256-xrCym+rFY6EUQFWyWl6OPA+LtftpUAE5pIaElAIVqW0=";
   };
 
   cargoDeps = rustPlatform.fetchCargoVendor {
     inherit src;
     inherit (src) pname version;
-    hash = "sha256-XmIx55PKfu+tVUGFC7MGF4AAYeV7z/p3KuLnY0bYMH8=";
+    hash = "sha256-Z8+dUXPQq7S+Q7DWNr2Y9d8GMuEdSnq00quUR0wDNPM=";
   };
 }
