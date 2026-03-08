@@ -245,7 +245,7 @@ fn fractal_perlin(r: &mut RanimScene) {
 }
 
 /// Fractal Perlin noise with derivative-based erosion.
-#[scene(name = "perline_terrain")]
+#[scene(name = "perlin_terrain")]
 #[output(dir = "perlin_terrain/erosion")]
 fn fractal_erosion(r: &mut RanimScene) {
     // Same pattern as fractal_perlin but with derivative-based erosion
