@@ -57,12 +57,64 @@ pub enum ViewMode {
     Depth,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Resolution {
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Resolution {
+    pub const fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
+    }
+
+    pub fn ratio(&self) -> f32 {
+        self.width as f32 / self.height as f32
+    }
+
+    /// Calculate and return the simplified aspect ratio (e.g., (16, 9) for 1920x1080)
+    pub fn aspect_ratio(&self) -> (u32, u32) {
+        fn gcd(a: u32, b: u32) -> u32 {
+            if b == 0 { a } else { gcd(b, a % b) }
+        }
+        let g = gcd(self.width, self.height);
+        (self.width / g, self.height / g)
+    }
+
+    pub fn aspect_ratio_str(&self) -> String {
+        let (w, h) = self.aspect_ratio();
+        format!("{w}:{h}")
+    }
+}
+
+// Common resolutions
+impl Resolution {
+    // 16:9
+    pub const HD: Self = Self::new(1280, 720);
+    pub const FHD: Self = Self::new(1920, 1080);
+    pub const QHD: Self = Self::new(2560, 1440);
+    pub const UHD: Self = Self::new(3840, 2160);
+    // 16:10
+    pub const WXGA: Self = Self::new(1280, 800);
+    pub const WUXGA: Self = Self::new(1920, 1200);
+    // 4:3
+    pub const SVGA: Self = Self::new(800, 600);
+    pub const XGA: Self = Self::new(1024, 768);
+    pub const SXGA: Self = Self::new(1280, 960);
+    // 1:1
+    pub const _1K_SQUARE: Self = Self::new(1080, 1080);
+    pub const _2K_SQUARE: Self = Self::new(2160, 2160);
+    // 21:9
+    pub const UW_QHD: Self = Self::new(3440, 1440);
+}
+
 pub struct RanimPreviewApp {
     cmd_rx: Receiver<RanimPreviewAppCmd>,
     pub cmd_tx: Sender<RanimPreviewAppCmd>,
     #[allow(unused)]
     title: String,
     clear_color: wgpu::Color,
+    resolution: Resolution,
     timeline: SealedRanimScene,
     need_eval: bool,
     last_sec: f64,
@@ -85,6 +137,9 @@ pub struct RanimPreviewApp {
     depth_visual_pipeline: Option<DepthVisualPipeline>,
     depth_visual_texture: Option<wgpu::Texture>,
     depth_visual_view: Option<wgpu::TextureView>,
+
+    // Resolution changed flag
+    resolution_dirty: bool,
 }
 
 impl RanimPreviewApp {
@@ -105,6 +160,7 @@ impl RanimPreviewApp {
             cmd_tx,
             title,
             clear_color: wgpu::Color::TRANSPARENT,
+            resolution: Resolution::QHD,
             timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
             timeline,
             need_eval: false,
@@ -123,6 +179,7 @@ impl RanimPreviewApp {
             depth_visual_pipeline: None,
             depth_visual_texture: None,
             depth_visual_view: None,
+            resolution_dirty: false,
         }
     }
 
@@ -139,6 +196,39 @@ impl RanimPreviewApp {
     /// Set clear color
     pub fn set_clear_color(&mut self, color: wgpu::Color) {
         self.clear_color = color;
+    }
+
+    /// Set preview resolution
+    pub fn set_resolution(&mut self, resolution: Resolution) {
+        if self.resolution != resolution {
+            self.resolution = resolution;
+            self.resolution_dirty = true;
+        }
+    }
+
+    /// Calculate OIT layers based on resolution to stay within GPU buffer limits
+    fn calculate_oit_layers(&self, ctx: &WgpuContext, width: u32, height: u32) -> usize {
+        const BYTES_PER_PIXEL_PER_LAYER: usize = 8; // 4 bytes color + 4 bytes depth
+        const MAX_OIT_LAYERS: usize = 8;
+
+        let limits = ctx.device.limits();
+        let max_buffer_size = limits.max_storage_buffer_binding_size as usize;
+        let pixel_count = (width * height) as usize;
+        let max_layers_by_buffer = max_buffer_size / (pixel_count * BYTES_PER_PIXEL_PER_LAYER);
+        let oit_layers = max_layers_by_buffer.clamp(1, MAX_OIT_LAYERS);
+
+        if oit_layers < MAX_OIT_LAYERS {
+            tracing::warn!(
+                "OIT layers reduced from {} to {} due to GPU buffer size limit ({}MB @ {}x{})",
+                MAX_OIT_LAYERS,
+                oit_layers,
+                max_buffer_size / 1024 / 1024,
+                width,
+                height
+            );
+        }
+
+        oit_layers
     }
 
     fn handle_events(&mut self) {
@@ -167,18 +257,26 @@ impl RanimPreviewApp {
     }
 
     fn prepare_renderer(&mut self, frame: &eframe::Frame) {
-        if self.renderer.is_some() {
+        // Check if we need to recreate renderer
+        let needs_init = self.renderer.is_none();
+        let needs_resize = self.resolution_dirty && self.renderer.is_some();
+
+        if !needs_init && !needs_resize {
             return;
         }
 
-        tracing::info!("preparing renderer...");
         let Some(render_state) = frame.wgpu_render_state() else {
             tracing::info!("frame.wgpu_render_state() is none");
             tracing::info!("{:?}", frame.info());
             return;
         };
 
-        tracing::info!("constructing renderer...");
+        if needs_init {
+            tracing::info!("preparing renderer...");
+        } else if needs_resize {
+            tracing::info!("recreating renderer for resolution change...");
+        }
+
         // Construct WgpuContext using eframe's resources.
         // NOTE: We assume ranim-render doesn't strictly depend on the instance for the operations we do here.
         let ctx = WgpuContext {
@@ -188,54 +286,56 @@ impl RanimPreviewApp {
             queue: wgpu::Queue::clone(&render_state.queue),
         };
 
-        let renderer = Renderer::new(&ctx, 2560, 1440, 8); // TODO: dynamic size
+        let (width, height) = (self.resolution.width, self.resolution.height);
+        let oit_layers = self.calculate_oit_layers(&ctx, width, height);
+        let renderer = Renderer::new(&ctx, width, height, oit_layers);
         let render_textures = renderer.new_render_textures(&ctx);
 
         // Init Depth Visual Pipeline
         if self.depth_visual_pipeline.is_none() {
             self.depth_visual_pipeline = Some(DepthVisualPipeline::new(&ctx));
         }
-        // Init Depth Visual Texture
-        if self.depth_visual_texture.is_none() {
-            let texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("Depth Visual Texture"),
-                size: wgpu::Extent3d {
-                    width: render_textures.width(),
-                    height: render_textures.height(),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                    | wgpu::TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            });
-            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-            self.depth_visual_texture = Some(texture);
-            self.depth_visual_view = Some(view);
-        }
+
+        // Create Depth Visual Texture
+        let depth_visual_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depth Visual Texture"),
+            size: wgpu::Extent3d {
+                width: render_textures.width(),
+                height: render_textures.height(),
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let depth_visual_view =
+            depth_visual_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // Register texture with egui
         let texture_view = &render_textures.linear_render_view;
-        let id = render_state.renderer.write().register_native_texture(
+        let texture_id = render_state.renderer.write().register_native_texture(
             &render_state.device,
             texture_view,
             wgpu::FilterMode::Linear,
         );
-        let depth_view = self.depth_visual_view.as_ref().unwrap();
         let depth_id = render_state.renderer.write().register_native_texture(
             &render_state.device,
-            depth_view,
+            &depth_visual_view,
             wgpu::FilterMode::Nearest,
         );
 
-        self.texture_id = Some(id);
+        self.texture_id = Some(texture_id);
         self.depth_texture_id = Some(depth_id);
+        self.depth_visual_texture = Some(depth_visual_texture);
+        self.depth_visual_view = Some(depth_visual_view);
         self.render_textures = Some(render_textures);
         self.renderer = Some(renderer);
         self.wgpu_ctx = Some(ctx);
+        self.resolution_dirty = false;
+        self.need_eval = true; // Force re-render with new resolution
     }
 
     fn render_animation(&mut self) {
@@ -336,6 +436,98 @@ impl eframe::App for RanimPreviewApp {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading(&self.title);
+
+                // Resolution selector
+                {
+                    let resolution = self.resolution;
+                    egui::ComboBox::from_label("Resolution")
+                        .selected_text(format!(
+                            "{}x{} ({})",
+                            resolution.width,
+                            resolution.height,
+                            resolution.aspect_ratio_str()
+                        ))
+                        .show_ui(ui, |ui| {
+                            // 16:9
+                            ui.label(egui::RichText::new("16:9").strong());
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::HD,
+                                "1280x720 (HD)",
+                            );
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::FHD,
+                                "1920x1080 (FHD)",
+                            );
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::QHD,
+                                "2560x1440 (QHD)",
+                            );
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::UHD,
+                                "3840x2160 (UHD)",
+                            );
+                            ui.separator();
+                            // 16:10
+                            ui.label(egui::RichText::new("16:10").strong());
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::WXGA,
+                                "1280x800 (WXGA)",
+                            );
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::WUXGA,
+                                "1920x1200 (WUXGA)",
+                            );
+                            ui.separator();
+                            // 4:3
+                            ui.label(egui::RichText::new("4:3").strong());
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::SVGA,
+                                "800x600 (SVGA)",
+                            );
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::XGA,
+                                "1024x768 (XGA)",
+                            );
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::SXGA,
+                                "1280x960 (SXGA)",
+                            );
+                            ui.separator();
+                            // 1:1
+                            ui.label(egui::RichText::new("1:1").strong());
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::_1K_SQUARE,
+                                "1080x1080",
+                            );
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::_2K_SQUARE,
+                                "2160x2160",
+                            );
+                            ui.separator();
+                            // 21:9
+                            ui.label(egui::RichText::new("21:9").strong());
+                            ui.selectable_value(
+                                &mut self.resolution,
+                                Resolution::UW_QHD,
+                                "3440x1440 (UW-QHD)",
+                            );
+                        });
+                    if self.resolution != resolution {
+                        self.resolution_dirty = true;
+                    }
+                }
+
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let dark_mode = ui.visuals().dark_mode;
                     let button_text = if dark_mode { "☀ Light" } else { "🌙 Dark" };
