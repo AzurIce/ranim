@@ -93,7 +93,7 @@ impl Resolution {
     pub const HD: Self = Self::new(1280, 720);
     pub const FHD: Self = Self::new(1920, 1080);
     pub const QHD: Self = Self::new(2560, 1440);
-    pub const _4K: Self = Self::new(3840, 2160);
+    pub const UHD: Self = Self::new(3840, 2160);
     // 16:10
     pub const WXGA: Self = Self::new(1280, 800);
     pub const WUXGA: Self = Self::new(1920, 1200);
@@ -467,8 +467,8 @@ impl eframe::App for RanimPreviewApp {
                             );
                             ui.selectable_value(
                                 &mut self.resolution,
-                                Resolution::_4K,
-                                "3840x2160 (4K)",
+                                Resolution::UHD,
+                                "3840x2160 (UHD)",
                             );
                             ui.separator();
                             // 16:10
