@@ -61,46 +61,51 @@ pub enum ViewMode {
 pub struct Resolution {
     pub width: u32,
     pub height: u32,
-    pub aspect_ratio: (u32, u32),
 }
 
 impl Resolution {
-    pub const fn new(width: u32, height: u32, aspect_ratio: (u32, u32)) -> Self {
-        Self {
-            width,
-            height,
-            aspect_ratio,
-        }
+    pub const fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
     }
 
     pub fn ratio(&self) -> f32 {
         self.width as f32 / self.height as f32
     }
 
+    /// Calculate and return the simplified aspect ratio (e.g., (16, 9) for 1920x1080)
+    pub fn aspect_ratio(&self) -> (u32, u32) {
+        fn gcd(a: u32, b: u32) -> u32 {
+            if b == 0 { a } else { gcd(b, a % b) }
+        }
+        let g = gcd(self.width, self.height);
+        (self.width / g, self.height / g)
+    }
+
     pub fn aspect_ratio_str(&self) -> String {
-        format!("{}:{}", self.aspect_ratio.0, self.aspect_ratio.1)
+        let (w, h) = self.aspect_ratio();
+        format!("{w}:{h}")
     }
 }
 
-// Common resolutions with aspect ratios
+// Common resolutions
 impl Resolution {
     // 16:9
-    pub const HD: Self = Self::new(1280, 720, (16, 9));
-    pub const FHD: Self = Self::new(1920, 1080, (16, 9));
-    pub const QHD: Self = Self::new(2560, 1440, (16, 9));
-    pub const _4K: Self = Self::new(3840, 2160, (16, 9));
+    pub const HD: Self = Self::new(1280, 720);
+    pub const FHD: Self = Self::new(1920, 1080);
+    pub const QHD: Self = Self::new(2560, 1440);
+    pub const _4K: Self = Self::new(3840, 2160);
     // 16:10
-    pub const WXGA: Self = Self::new(1280, 800, (16, 10));
-    pub const WUXGA: Self = Self::new(1920, 1200, (16, 10));
+    pub const WXGA: Self = Self::new(1280, 800);
+    pub const WUXGA: Self = Self::new(1920, 1200);
     // 4:3
-    pub const SVGA: Self = Self::new(800, 600, (4, 3));
-    pub const XGA: Self = Self::new(1024, 768, (4, 3));
-    pub const SXGA: Self = Self::new(1280, 960, (4, 3));
+    pub const SVGA: Self = Self::new(800, 600);
+    pub const XGA: Self = Self::new(1024, 768);
+    pub const SXGA: Self = Self::new(1280, 960);
     // 1:1
-    pub const _1K_SQUARE: Self = Self::new(1080, 1080, (1, 1));
-    pub const _2K_SQUARE: Self = Self::new(2160, 2160, (1, 1));
+    pub const _1K_SQUARE: Self = Self::new(1080, 1080);
+    pub const _2K_SQUARE: Self = Self::new(2160, 2160);
     // 21:9
-    pub const UW_QHD: Self = Self::new(3440, 1440, (21, 9));
+    pub const UW_QHD: Self = Self::new(3440, 1440);
 }
 
 pub struct RanimPreviewApp {
