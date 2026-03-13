@@ -8,18 +8,54 @@ use crate::{
 };
 
 /// A Vec of Pointwise data
-#[derive(Debug, PartialEq, Eq, Deref, DerefMut, From)]
+///
+/// Supports flexible sampling and interpolation: when two `PointVec`s have
+/// different lengths, values are linearly interpolated to match (similar to
+/// CSS `linear-gradient`).
+///
+/// - 1 element: uniform value across all points
+/// - 2 elements: linear gradient from start to end
+/// - N elements: evenly spaced, interpolated to target length
+#[derive(Default, Debug, Clone, PartialEq, Eq, Deref, DerefMut, From)]
 pub struct PointVec<T>(Vec<T>);
 
-impl<T: Interpolatable> Interpolatable for PointVec<T> {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self(self.0.lerp(&target.0, t))
+impl<T: Clone> PointVec<T> {
+    /// Set the values from a slice.
+    pub fn set(&mut self, value: &[T]) {
+        self.0 = value.to_vec();
     }
 }
 
-impl<T: Clone> Clone for PointVec<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
+impl<T: Interpolatable + Clone> PointVec<T> {
+    /// Sample at position `i` out of `total` points.
+    ///
+    /// Maps `i` into `[0, len-1]` via linear interpolation, producing a
+    /// smoothly interpolated value even when `total != self.len()`.
+    pub fn sample(&self, i: usize, total: usize) -> T {
+        debug_assert!(!self.0.is_empty(), "PointVec must not be empty");
+        if self.0.len() == 1 || total <= 1 {
+            return self.0[0].clone();
+        }
+        let t = i as f64 / (total - 1) as f64;
+        let pos = t * (self.0.len() - 1) as f64;
+        let lo = (pos as usize).min(self.0.len() - 2);
+        let frac = pos - lo as f64;
+        self.0[lo].lerp(&self.0[lo + 1], frac)
+    }
+
+    /// Expand to exactly `len` elements by sampling.
+    pub fn expand(&self, len: usize) -> Vec<T> {
+        (0..len).map(|i| self.sample(i, len)).collect()
+    }
+}
+
+impl<T: Interpolatable + Clone> Interpolatable for PointVec<T> {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        let len = self.0.len().max(target.0.len());
+        let data = (0..len)
+            .map(|i| self.sample(i, len).lerp(&target.sample(i, len), t))
+            .collect();
+        Self(data)
     }
 }
 
