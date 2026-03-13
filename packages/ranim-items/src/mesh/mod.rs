@@ -8,7 +8,7 @@ use ranim_core::{
     core_item::CoreItem,
     glam::{DVec3, Mat4, Vec3},
     traits::{
-        Alignable, Empty, FillColor, Interpolatable, Opacity, RotateTransform, ScaleTransform,
+        Empty, FillColor, Interpolatable, Opacity, RotateTransform, ScaleTransform,
         ShiftTransform,
     },
 };
@@ -97,20 +97,6 @@ impl Extract for MeshItem {
     }
 }
 
-impl Alignable for MeshItem {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.points.is_aligned(&other.points)
-            && self.vertex_colors.is_aligned(&other.vertex_colors)
-            && self.vertex_normals.is_aligned(&other.vertex_normals)
-    }
-
-    fn align_with(&mut self, other: &mut Self) {
-        self.points.align_with(&mut other.points);
-        self.vertex_colors.align_with(&mut other.vertex_colors);
-        self.vertex_normals.align_with(&mut other.vertex_normals);
-    }
-}
-
 impl Interpolatable for MeshItem {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         Self {
@@ -124,6 +110,16 @@ impl Interpolatable for MeshItem {
             vertex_colors: self.vertex_colors.lerp(&target.vertex_colors, t),
             vertex_normals: self.vertex_normals.lerp(&target.vertex_normals, t),
         }
+    }
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.points.is_aligned(&other.points)
+            && self.vertex_colors.is_aligned(&other.vertex_colors)
+            && self.vertex_normals.is_aligned(&other.vertex_normals)
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        self.points.align_with(&mut other.points);
+        self.vertex_colors.align_with(&mut other.vertex_colors);
+        self.vertex_normals.align_with(&mut other.vertex_normals);
     }
 }
 
@@ -308,7 +304,7 @@ mod tests {
         anchor::Aabb,
         color::palette::css,
         glam::{Mat4, Vec3},
-        traits::{Alignable, Empty, RotateTransform, ScaleTransform, ShiftTransform},
+        traits::{Empty, Interpolatable, RotateTransform, ScaleTransform, ShiftTransform},
     };
 
     #[test]

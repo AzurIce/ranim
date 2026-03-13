@@ -101,9 +101,6 @@ impl Interpolatable for VisualVItem {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         Self(self.0.lerp(&target.0, t))
     }
-}
-
-impl Alignable for VisualVItem {
     fn is_aligned(&self, other: &Self) -> bool {
         self.0.is_aligned(&other.0)
     }

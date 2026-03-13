@@ -26,8 +26,8 @@ use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
     components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
-    prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
-    traits::{PointsFunc, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor},
+    prelude::{Empty, FillColor, Opacity, Partial, StrokeWidth},
+    traits::{Interpolatable, PointsFunc, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor},
 };
 
 /// A vectorized item.
@@ -47,7 +47,7 @@ use ranim_core::{
 ///     dvec3(0.5, 1.0, 0.0),
 /// ]);
 /// ```
-#[derive(Debug, Clone, PartialEq, ranim_macros::Interpolatable)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VItem {
     /// The 2d basis used for projecting the item during rendering.
     ///
@@ -199,7 +199,16 @@ impl Extract for VItem {
 }
 
 // MARK: Anim traits impl
-impl Alignable for VItem {
+impl Interpolatable for VItem {
+    fn lerp(&self, other: &Self, t: f64) -> Self {
+        Self {
+            basis: Interpolatable::lerp(&self.basis, &other.basis, t),
+            vpoints: Interpolatable::lerp(&self.vpoints, &other.vpoints, t),
+            stroke_widths: Interpolatable::lerp(&self.stroke_widths, &other.stroke_widths, t),
+            stroke_rgbas: Interpolatable::lerp(&self.stroke_rgbas, &other.stroke_rgbas, t),
+            fill_rgbas: Interpolatable::lerp(&self.fill_rgbas, &other.fill_rgbas, t),
+        }
+    }
     fn is_aligned(&self, other: &Self) -> bool {
         self.vpoints.is_aligned(&other.vpoints)
             && self.stroke_widths.is_aligned(&other.stroke_widths)
@@ -215,6 +224,26 @@ impl Alignable for VItem {
         other.stroke_widths.resize_preserving_order(len);
         self.fill_rgbas.resize_preserving_order(len);
         other.fill_rgbas.resize_preserving_order(len);
+    }
+    fn vec_align_with(a: &mut Vec<Self>, b: &mut Vec<Self>) {
+        use ranim_core::utils::resize_preserving_order_with_repeated_indices;
+        let len = a.len().max(b.len());
+        let transparent_repeated = |items: &mut Vec<Self>, repeat_idxs: Vec<usize>| {
+            for idx in repeat_idxs {
+                items[idx].set_opacity(0.0);
+            }
+        };
+        if a.len() != len {
+            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(a, len);
+            transparent_repeated(&mut items, idxs);
+            *a = items;
+        }
+        if b.len() != len {
+            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(b, len);
+            transparent_repeated(&mut items, idxs);
+            *b = items;
+        }
+        a.iter_mut().zip(b).for_each(|(x, y)| x.align_with(y));
     }
 }
 

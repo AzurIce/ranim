@@ -355,29 +355,6 @@ pub fn derive_opacity(input: TokenStream) -> TokenStream {
     })
 }
 
-#[proc_macro_derive(Alignable)]
-pub fn derive_alignable(input: TokenStream) -> TokenStream {
-    let core = ranim_core_path();
-    impl_derive(
-        input,
-        quote! {#core::traits::Alignable},
-        |field_positions| {
-            quote! {
-                fn is_aligned(&self, other: &Self) -> bool {
-                    #(
-                        self.#field_positions.is_aligned(&other.#field_positions) &&
-                    )* true
-                }
-                fn align_with(&mut self, other: &mut Self) {
-                    #(
-                        self.#field_positions.align_with(&mut other.#field_positions);
-                    )*
-                }
-            }
-        },
-    )
-}
-
 #[proc_macro_derive(Interpolatable)]
 pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
@@ -392,6 +369,16 @@ pub fn derive_interpolatable(input: TokenStream) -> TokenStream {
                             #field_positions: #core::traits::Interpolatable::lerp(&self.#field_positions, &other.#field_positions, t),
                         )*
                     }
+                }
+                fn is_aligned(&self, other: &Self) -> bool {
+                    #(
+                        #core::traits::Interpolatable::is_aligned(&self.#field_positions, &other.#field_positions) &&
+                    )* true
+                }
+                fn align_with(&mut self, other: &mut Self) {
+                    #(
+                        #core::traits::Interpolatable::align_with(&mut self.#field_positions, &mut other.#field_positions);
+                    )*
                 }
             }
         },

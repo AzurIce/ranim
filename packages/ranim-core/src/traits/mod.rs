@@ -20,7 +20,10 @@ use glam::{
 };
 use num::complex::Complex64;
 
-use crate::{components::width::Width, utils::resize_preserving_order_with_repeated_indices};
+use crate::{
+    components::width::Width,
+    utils::resize_preserving_order,
+};
 
 // MARK: With
 /// A trait for mutating a value in place.
@@ -70,9 +73,33 @@ impl<T> Discard for T {}
 /// A trait for interpolating to values
 ///
 /// It uses the reference of two values and produce an owned interpolated value.
-pub trait Interpolatable {
+///
+/// Alignment is the preparation for interpolation.
+/// For example, if we want to interpolate two VItems, we need to
+/// align all their inner components like `VPointVec` to the same length.
+pub trait Interpolatable: Clone {
     /// Lerping between values
     fn lerp(&self, target: &Self, t: f64) -> Self;
+    /// Checking if two items are aligned
+    fn is_aligned(&self, _other: &Self) -> bool {
+        true
+    }
+    /// Aligning two items
+    fn align_with(&mut self, _other: &mut Self) {}
+
+    /// Defines how `Vec<Self>` should be aligned.
+    /// Each type can customize this behavior.
+    /// Default: resize_preserving_order + recursively align each element.
+    fn vec_align_with(a: &mut Vec<Self>, b: &mut Vec<Self>) {
+        let len = a.len().max(b.len());
+        if a.len() != len {
+            *a = resize_preserving_order(a, len);
+        }
+        if b.len() != len {
+            *b = resize_preserving_order(b, len);
+        }
+        a.iter_mut().zip(b).for_each(|(x, y)| x.align_with(y));
+    }
 }
 
 impl Interpolatable for usize {
@@ -160,6 +187,12 @@ impl<T: Interpolatable> Interpolatable for Vec<T> {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         self.iter().zip(target).map(|(a, b)| a.lerp(b, t)).collect()
     }
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        T::vec_align_with(self, other);
+    }
 }
 
 impl<T: Interpolatable, const N: usize> Interpolatable for [T; N] {
@@ -181,55 +214,6 @@ macro_rules! impl_interpolatable_tuple {
     }
 }
 variadics_please::all_tuples!(impl_interpolatable_tuple, 1, 12, T, S);
-
-impl<T: Opacity + Alignable + Clone> Alignable for Vec<T> {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.is_aligned(b))
-    }
-    fn align_with(&mut self, other: &mut Self) {
-        let len = self.len().max(other.len());
-
-        let transparent_repeated = |items: &mut Vec<T>, repeat_idxs: Vec<usize>| {
-            for idx in repeat_idxs {
-                items[idx].set_opacity(0.0);
-            }
-        };
-        if self.len() != len {
-            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(self, len);
-            transparent_repeated(&mut items, idxs);
-            *self = items;
-        }
-        if other.len() != len {
-            let (mut items, idxs) = resize_preserving_order_with_repeated_indices(other, len);
-            transparent_repeated(&mut items, idxs);
-            *other = items;
-        }
-        self.iter_mut()
-            .zip(other)
-            .for_each(|(a, b)| a.align_with(b));
-    }
-}
-
-// MARK: Alignable
-/// A trait for aligning two items
-///
-/// Alignment is actually the meaning of preparation for interpolation.
-///
-/// For example, if we want to interpolate two VItems, we need to
-/// align all their inner components like `ComponentVec<VPoint>` to the same length.
-pub trait Alignable: Clone {
-    /// Checking if two items are aligned
-    fn is_aligned(&self, other: &Self) -> bool;
-    /// Aligning two items
-    fn align_with(&mut self, other: &mut Self);
-}
-
-impl Alignable for DVec3 {
-    fn align_with(&mut self, _other: &mut Self) {}
-    fn is_aligned(&self, _other: &Self) -> bool {
-        true
-    }
-}
 
 // MARK: Opacity
 /// A trait for items with opacity
