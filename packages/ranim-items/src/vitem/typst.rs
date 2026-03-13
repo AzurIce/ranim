@@ -23,7 +23,6 @@ use typst_kit::fonts::FontStore;
 
 use crate::vitem::{VItem, svg::SvgItem};
 use ranim_core::Extract;
-use ranim_core::traits::Interpolatable;
 use ranim_core::{
     anchor::Aabb,
     color,
@@ -31,7 +30,7 @@ use ranim_core::{
     core_item::CoreItem,
     glam,
     traits::{
-        Alignable, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
+        FillColor, Interpolatable, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
         StrokeColor, StrokeWidth, With,
     },
 };
@@ -308,7 +307,19 @@ impl TypstText {
     }
 }
 
-impl Alignable for TypstText {
+impl Interpolatable for TypstText {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        let vitems = self
+            .vitems
+            .iter()
+            .zip(&target.vitems)
+            .map(|(a, b)| a.lerp(b, t))
+            .collect::<Vec<_>>();
+        Self {
+            chars: self.chars.clone(),
+            vitems,
+        }
+    }
     fn is_aligned(&self, other: &Self) -> bool {
         self.vitems.len() == other.vitems.len()
             && self
@@ -362,8 +373,6 @@ impl Alignable for TypstText {
         };
 
         for diff in &diffs {
-            // println!("[{ia}] {last_neq_idx_a} [{ib}] {last_neq_idx_b}");
-            // println!("{diff:?}");
             match diff.op() {
                 Ops::Equal => {
                     align_and_push_diff(
@@ -404,8 +413,6 @@ impl Alignable for TypstText {
             .iter_mut()
             .zip(vitems_other.iter_mut())
             .for_each(|(a, b)| {
-                // println!("{i} {}", a.is_aligned(b));
-                // println!("{} {}", a.vpoints.len(), b.vpoints.len());
                 if !a.is_aligned(b) {
                     a.align_with(b);
                 }
@@ -413,21 +420,6 @@ impl Alignable for TypstText {
 
         self.vitems = vitems_self;
         other.vitems = vitems_other;
-    }
-}
-
-impl Interpolatable for TypstText {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        let vitems = self
-            .vitems
-            .iter()
-            .zip(&target.vitems)
-            .map(|(a, b)| a.lerp(b, t))
-            .collect::<Vec<_>>();
-        Self {
-            chars: self.chars.clone(),
-            vitems,
-        }
     }
 }
 

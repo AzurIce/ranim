@@ -51,7 +51,7 @@ fn bezier_aabb(p1: DVec3, p2: DVec3, p3: DVec3) -> [DVec3; 2] {
 /// | 0(Anchor) | 1(Handle) | 2(Anchor) | 3(Handle) | 4(Anchor) | 5(Handle) | 6(Anchor) |
 /// |-----------|-----------|-----------|-----------|-----------|-----------|-----------|
 /// | a | b | c | c(subpath0) | d | e | f (subpath1) |
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut, ranim_macros::Interpolatable)]
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut)]
 pub struct VPointVec(pub Vec<DVec3>);
 
 impl Aabb for VPointVec {
@@ -103,7 +103,10 @@ impl transform::ScaleTransform for VPointVec {
     }
 }
 
-impl Alignable for VPointVec {
+impl Interpolatable for VPointVec {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        Self(self.0.lerp(&target.0, t))
+    }
     fn is_aligned(&self, other: &Self) -> bool {
         self.len() == other.len()
     }

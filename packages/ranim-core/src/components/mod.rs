@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use derive_more::{Deref, DerefMut, From};
 
 use crate::{
-    prelude::{Alignable, Interpolatable},
+    prelude::Interpolatable,
     utils::{math::interpolate_usize, resize_preserving_order},
 };
 
@@ -49,13 +49,26 @@ impl<T: Interpolatable + Clone> PointVec<T> {
     }
 }
 
-impl<T: Interpolatable + Clone> Interpolatable for PointVec<T> {
+impl<T: Interpolatable + Component> Interpolatable for PointVec<T> {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         let len = self.0.len().max(target.0.len());
         let data = (0..len)
             .map(|i| self.sample(i, len).lerp(&target.sample(i, len), t))
             .collect();
         Self(data)
+    }
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.len() == other.len()
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        if self.len() == other.len() {
+            return;
+        }
+        if self.len() < other.len() {
+            self.resize_with_last(other.len());
+        } else {
+            other.resize_with_last(self.len());
+        }
     }
 }
 
@@ -137,22 +150,6 @@ impl<T: Component> VecResizeTrait for Vec<T> {
     /// Resize preserved order
     fn resize_preserving_order(&mut self, new_len: usize) {
         *self = resize_preserving_order(self, new_len);
-    }
-}
-
-impl<T: Component> Alignable for PointVec<T> {
-    fn is_aligned(&self, other: &Self) -> bool {
-        self.len() == other.len()
-    }
-    fn align_with(&mut self, other: &mut Self) {
-        if self.len() == other.len() {
-            return;
-        }
-        if self.len() < other.len() {
-            self.resize_with_last(other.len());
-        } else {
-            other.resize_with_last(self.len());
-        }
     }
 }
 

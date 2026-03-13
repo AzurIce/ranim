@@ -1,13 +1,13 @@
 use ranim_core::{
     animation::{AnimationCell, Eval},
-    traits::{Alignable, Interpolatable},
+    traits::Interpolatable,
     utils::rate_functions::smooth,
 };
 
 // ANCHOR: MorphRequirement
 /// The requirement of [`Morph`]
-pub trait MorphRequirement: Alignable + Interpolatable + Clone {}
-impl<T: Alignable + Interpolatable + Clone> MorphRequirement for T {}
+pub trait MorphRequirement: Interpolatable {}
+impl<T: Interpolatable> MorphRequirement for T {}
 // ANCHOR_END: MorphRequirement
 
 // ANCHOR: MorphAnim
