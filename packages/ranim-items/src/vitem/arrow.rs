@@ -1,7 +1,7 @@
 use glam::DVec3;
 use ranim_core::anchor::{Aabb, Locate};
 use ranim_macros::{
-    Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, RotateImpl, ScaleImpl,
+    BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, RotateImpl, ScaleImpl,
     ShiftImpl, Stroke,
 };
 
@@ -25,7 +25,6 @@ use super::{line::Line, Polygon, VItem};
 #[derive(
     Clone,
     Interpolatable,
-    Alignable,
     Opacity,
     Empty,
     Stroke,
@@ -106,7 +105,6 @@ impl Extract for ArrowTip {
 #[derive(
     Clone,
     Interpolatable,
-    Alignable,
     Opacity,
     Empty,
     Stroke,

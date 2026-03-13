@@ -13,7 +13,7 @@ use color::{AlphaColor, Srgb};
 use itertools::Itertools;
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem, geometry::Circle};
-use ranim_core::traits::{Alignable, FillColor, Opacity, StrokeColor, StrokeWidth, With};
+use ranim_core::traits::{FillColor, Interpolatable, Opacity, StrokeColor, StrokeWidth, With};
 
 // MARK: ### Square ###
 /// A Square
@@ -100,13 +100,6 @@ impl RotateTransform for Square {
         self.axes.1 = self.axes.1.normalize();
         self
     }
-}
-
-impl Alignable for Square {
-    fn is_aligned(&self, _other: &Self) -> bool {
-        true
-    }
-    fn align_with(&mut self, _other: &mut Self) {}
 }
 
 impl Opacity for Square {
@@ -295,13 +288,6 @@ impl Opacity for Rectangle {
     }
 }
 
-impl Alignable for Rectangle {
-    fn align_with(&mut self, _other: &mut Self) {}
-    fn is_aligned(&self, _other: &Self) -> bool {
-        true
-    }
-}
-
 impl StrokeColor for Rectangle {
     fn stroke_color(&self) -> AlphaColor<Srgb> {
         self.stroke_rgba
@@ -362,7 +348,7 @@ impl Extract for Rectangle {
 
 // MARK: ### Polygon ###
 /// A Polygon with uniform stroke and fill
-#[derive(Clone, Debug, ranim_macros::Interpolatable)]
+#[derive(Clone, Debug)]
 pub struct Polygon {
     /// Axes info
     pub axes: (DVec3, DVec3),
@@ -429,7 +415,16 @@ impl ScaleTransform for Polygon {
 //     }
 // }
 
-impl Alignable for Polygon {
+impl Interpolatable for Polygon {
+    fn lerp(&self, other: &Self, t: f64) -> Self {
+        Self {
+            axes: Interpolatable::lerp(&self.axes, &other.axes, t),
+            points: Interpolatable::lerp(&self.points, &other.points, t),
+            stroke_rgba: Interpolatable::lerp(&self.stroke_rgba, &other.stroke_rgba, t),
+            stroke_width: Interpolatable::lerp(&self.stroke_width, &other.stroke_width, t),
+            fill_rgba: Interpolatable::lerp(&self.fill_rgba, &other.fill_rgba, t),
+        }
+    }
     fn is_aligned(&self, other: &Self) -> bool {
         self.points.len() == other.points.len()
     }
@@ -539,13 +534,6 @@ pub struct RegularPolygon {
     pub stroke_width: f32,
     /// Fill rgba
     pub fill_rgba: AlphaColor<Srgb>,
-}
-
-impl Alignable for RegularPolygon {
-    fn is_aligned(&self, _other: &Self) -> bool {
-        true
-    }
-    fn align_with(&mut self, _other: &mut Self) {}
 }
 
 impl RegularPolygon {

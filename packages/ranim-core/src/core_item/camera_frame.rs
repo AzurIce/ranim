@@ -6,7 +6,7 @@ use crate::{
     Extract,
     animation::{AnimationCell, Eval},
     core_item::CoreItem,
-    prelude::{Alignable, Interpolatable},
+    prelude::Interpolatable,
 };
 
 /// The data of a camera
@@ -63,13 +63,6 @@ impl Interpolatable for CameraFrame {
                 .clamp(0.0, 1.0),
         }
     }
-}
-
-impl Alignable for CameraFrame {
-    fn is_aligned(&self, _other: &Self) -> bool {
-        true
-    }
-    fn align_with(&mut self, _other: &mut Self) {}
 }
 
 impl Default for CameraFrame {
