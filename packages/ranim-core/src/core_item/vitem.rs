@@ -1,5 +1,5 @@
 use color::{AlphaColor, Srgb};
-use glam::{DVec3, Vec3, Vec4};
+use glam::{DVec3, Vec4};
 
 use crate::{
     Extract,
@@ -94,7 +94,7 @@ impl Basis2d {
 /// A primitive for rendering a vitem.
 pub struct VItem {
     /// The base point of the item, a.k.a. the origin of the item's local coordinate system.
-    pub origin: Vec3,
+    pub origin: DVec3,
     /// The basis vectors of the item's local coordinate system. Normalized.
     pub basis: Basis2d,
     /// The points of the item in the item's local coordinate system.
@@ -111,7 +111,7 @@ pub struct VItem {
 impl Default for VItem {
     fn default() -> Self {
         Self {
-            origin: Vec3::ZERO,
+            origin: DVec3::ZERO,
             basis: Basis2d::default(),
             points: vec![Vec4::ZERO; 3],
             stroke_widths: vec![Width::default(); 2],

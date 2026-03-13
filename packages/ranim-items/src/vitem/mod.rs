@@ -181,7 +181,7 @@ impl VItem {
 impl From<VItem> for ranim_core::core_item::vitem::VItem {
     fn from(value: VItem) -> Self {
         Self {
-            origin: value.vpoints.first().unwrap().as_vec3(),
+            origin: value.vpoints[0],
             basis: value.basis,
             points: value.get_render_points(),
             fill_rgbas: value.fill_rgbas.iter().cloned().collect(),

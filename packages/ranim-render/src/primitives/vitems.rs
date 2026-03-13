@@ -131,7 +131,7 @@ impl VItemsBuffer {
             });
 
             planes.push(PlaneData {
-                origin: Vec4::from((vitem.origin, 0.0)),
+                origin: Vec4::from((vitem.origin.as_vec3(), 0.0)),
                 basis_u: Vec4::from((vitem.basis.u().as_vec3(), 0.0)),
                 basis_v: Vec4::from((vitem.basis.v().as_vec3(), 0.0)),
             });
