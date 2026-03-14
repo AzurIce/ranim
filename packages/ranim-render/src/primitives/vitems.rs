@@ -120,7 +120,8 @@ impl VItemsBuffer {
         let mut attr_offset: u32 = 0;
 
         for vitem in vitems {
-            let pc = vitem.points.len() as u32;
+            let render_points = vitem.get_render_points();
+            let pc = render_points.len() as u32;
             let ac = pc.div_ceil(2);
 
             item_infos.push(ItemInfo {
@@ -136,7 +137,7 @@ impl VItemsBuffer {
                 basis_v: Vec4::from((vitem.basis.v().as_vec3(), 0.0)),
             });
 
-            all_points3d.extend_from_slice(&vitem.points);
+            all_points3d.extend_from_slice(&render_points);
             all_fill_rgbas.extend(vitem.fill_rgbas.expand(ac as usize));
             all_stroke_rgbas.extend(vitem.stroke_rgbas.expand(ac as usize));
             all_stroke_widths.extend(vitem.stroke_widths.expand(ac as usize));

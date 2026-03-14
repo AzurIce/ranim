@@ -4,7 +4,7 @@ use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
+    anims::{creation::WritingAnim, direct_morph::DirectMorphAnim, fading::FadingAnim, morph::MorphAnim},
     color,
     color::palettes::manim,
     core::{Extract, components::width::Width},
@@ -79,7 +79,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
     {
         let timeline = r.timeline_mut(r_vitem);
         timeline
-            .play(square.clone().morph_to(circle.clone()))
+            .play(square.clone().direct_morph_to(circle.clone()))
             .forward(1.0);
         timeline
             .play(circle.clone().unwrite().with_duration(2.0))

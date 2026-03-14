@@ -164,13 +164,6 @@ impl VItem {
         self.stroke_widths.resize_with_last(len.div_ceil(2));
     }
 
-    pub(crate) fn get_render_points(&self) -> Vec<Vec4> {
-        self.vpoints
-            .iter()
-            .zip(self.vpoints.get_closepath_flags())
-            .map(|(p, f)| p.as_vec3().extend(f.into()))
-            .collect()
-    }
     /// Put start and end on
     pub fn put_start_and_end_on(&mut self, start: DVec3, end: DVec3) -> &mut Self {
         self.vpoints.put_start_and_end_on(start, end);
@@ -183,7 +176,7 @@ impl From<VItem> for ranim_core::core_item::vitem::VItem {
         Self {
             origin: value.vpoints[0],
             basis: value.basis,
-            points: value.get_render_points(),
+            points: value.vpoints,
             fill_rgbas: value.fill_rgbas,
             stroke_rgbas: value.stroke_rgbas,
             stroke_widths: value.stroke_widths,

@@ -1,11 +1,11 @@
 use color::{AlphaColor, Srgb};
-use glam::{DVec3, Vec4};
+use glam::DVec3;
 
 use crate::{
     Extract,
-    components::{PointVec, rgba::Rgba, width::Width},
+    components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
     core_item::CoreItem,
-    traits::FillColor,
+    traits::{FillColor, Interpolatable},
 };
 
 /// Default vitem stroke width
@@ -97,9 +97,8 @@ pub struct VItem {
     pub origin: DVec3,
     /// The basis vectors of the item's local coordinate system. Normalized.
     pub basis: Basis2d,
-    /// The points of the item in the item's local coordinate system.
-    /// (x, y, z, is_closed)
-    pub points: Vec<Vec4>,
+    /// The vpoints of the item in the item's local coordinate system.
+    pub points: VPointVec,
     /// Fill rgbas, see [`Rgba`].
     pub fill_rgbas: PointVec<Rgba>,
     /// Stroke rgbs, see [`Rgba`].
@@ -113,7 +112,7 @@ impl Default for VItem {
         Self {
             origin: DVec3::ZERO,
             basis: Basis2d::default(),
-            points: vec![Vec4::ZERO; 3],
+            points: VPointVec(vec![DVec3::ZERO; 3]),
             stroke_widths: vec![Width::default(); 2].into(),
             stroke_rgbas: vec![Rgba::default(); 2].into(),
             fill_rgbas: vec![Rgba::default(); 2].into(),
@@ -142,5 +141,46 @@ impl FillColor for VItem {
             .iter_mut()
             .for_each(|rgba| rgba.0.w = opacity);
         self
+    }
+}
+
+impl Interpolatable for VItem {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        Self {
+            origin: self.origin.lerp(target.origin, t),
+            basis: self.basis.lerp(&target.basis, t),
+            points: self.points.lerp(&target.points, t),
+            fill_rgbas: self.fill_rgbas.lerp(&target.fill_rgbas, t),
+            stroke_rgbas: self.stroke_rgbas.lerp(&target.stroke_rgbas, t),
+            stroke_widths: self.stroke_widths.lerp(&target.stroke_widths, t),
+        }
+    }
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.points.is_aligned(&other.points)
+            && self.fill_rgbas.is_aligned(&other.fill_rgbas)
+            && self.stroke_rgbas.is_aligned(&other.stroke_rgbas)
+            && self.stroke_widths.is_aligned(&other.stroke_widths)
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        self.points.align_with(&mut other.points);
+        let len = self.points.len().div_ceil(2);
+        self.fill_rgbas.resize_preserving_order(len);
+        other.fill_rgbas.resize_preserving_order(len);
+        self.stroke_rgbas.resize_preserving_order(len);
+        other.stroke_rgbas.resize_preserving_order(len);
+        self.stroke_widths.resize_preserving_order(len);
+        other.stroke_widths.resize_preserving_order(len);
+    }
+}
+
+impl VItem {
+    /// Get render points as Vec<Vec4> with is_closed flag in w component.
+    /// This is used at the render boundary to produce GPU-ready data.
+    pub fn get_render_points(&self) -> Vec<glam::Vec4> {
+        self.points
+            .iter()
+            .zip(self.points.get_closepath_flags())
+            .map(|(p, f)| p.as_vec3().extend(f.into()))
+            .collect()
     }
 }

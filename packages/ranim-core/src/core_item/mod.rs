@@ -12,6 +12,7 @@ use dyn_clone::DynClone;
 use crate::{
     Extract,
     core_item::{camera_frame::CameraFrame, mesh_item::MeshItem, vitem::VItem},
+    traits::Interpolatable,
 };
 
 /// Camera frame
@@ -46,5 +47,32 @@ impl Extract for DynItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         self.0.extract_into(buf);
+    }
+}
+
+impl Extract for CoreItem {
+    type Target = CoreItem;
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        buf.push(self.clone());
+    }
+}
+
+impl Interpolatable for CoreItem {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        match (self, target) {
+            (CoreItem::CameraFrame(a), CoreItem::CameraFrame(b)) => {
+                CoreItem::CameraFrame(a.lerp(b, t))
+            }
+            (CoreItem::VItem(a), CoreItem::VItem(b)) => CoreItem::VItem(a.lerp(b, t)),
+            (CoreItem::MeshItem(a), CoreItem::MeshItem(b)) => CoreItem::MeshItem(a.lerp(b, t)),
+            // Mismatched variants: snap at t=1
+            _ => {
+                if t < 1.0 {
+                    self.clone()
+                } else {
+                    target.clone()
+                }
+            }
+        }
     }
 }

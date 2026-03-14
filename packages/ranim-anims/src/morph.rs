@@ -1,55 +1,69 @@
 use ranim_core::{
+    Extract,
     animation::{AnimationCell, Eval},
+    core_item::CoreItem,
     traits::Interpolatable,
     utils::rate_functions::smooth,
 };
 
 // ANCHOR: MorphRequirement
-/// The requirement of [`Morph`]
-pub trait MorphRequirement: Interpolatable {}
-impl<T: Interpolatable> MorphRequirement for T {}
+/// The requirement of [`MorphAnim`]
+///
+/// Only requires `Extract<Target = CoreItem>`: `T` is converted to `Vec<CoreItem>`
+/// first, and interpolation happens at the `Vec<CoreItem>` level.
+pub trait MorphRequirement: Clone + Extract<Target = CoreItem> {}
+impl<T: Clone + Extract<Target = CoreItem>> MorphRequirement for T {}
 // ANCHOR_END: MorphRequirement
 
 // ANCHOR: MorphAnim
-/// The methods to create animations for `T` that satisfies [`MorphRequirement`]
+/// The methods to create morph animations.
+///
+/// Morph converts items to `Vec<CoreItem>` via [`Extract`], then interpolates
+/// at the core item level. This ensures that all types sharing the same core
+/// representation can be morphed uniformly.
 pub trait MorphAnim: MorphRequirement + Sized + 'static {
     /// Create a [`Morph`] anim with a func.
-    fn morph<F: Fn(&mut Self)>(&mut self, f: F) -> AnimationCell<Self>;
+    fn morph<F: Fn(&mut Self)>(&mut self, f: F) -> AnimationCell<Vec<CoreItem>>;
     /// Create a [`Morph`] anim from src.
-    fn morph_from(&mut self, src: Self) -> AnimationCell<Self>;
+    fn morph_from(&mut self, src: Self) -> AnimationCell<Vec<CoreItem>>;
     /// Create a [`Morph`] anim to dst.
-    fn morph_to(&mut self, dst: Self) -> AnimationCell<Self>;
+    fn morph_to(&mut self, dst: Self) -> AnimationCell<Vec<CoreItem>>;
 }
 // ANCHOR_END: MorphAnim
 
 // ANCHOR: MorphAnim-Impl
 impl<T: MorphRequirement + 'static> MorphAnim for T {
-    fn morph<F: Fn(&mut T)>(&mut self, f: F) -> AnimationCell<T> {
+    fn morph<F: Fn(&mut T)>(&mut self, f: F) -> AnimationCell<Vec<CoreItem>> {
         let mut dst = self.clone();
         (f)(&mut dst);
-        Morph::new(self.clone(), dst)
+        let src_items = self.extract();
+        let dst_items = dst.extract();
+        *self = dst;
+        Morph::new(src_items, dst_items)
             .into_animation_cell()
             .with_rate_func(smooth)
-            .apply_to(self)
     }
-    fn morph_from(&mut self, s: T) -> AnimationCell<T> {
-        Morph::new(s, self.clone())
+    fn morph_from(&mut self, s: T) -> AnimationCell<Vec<CoreItem>> {
+        let src_items = s.extract();
+        let dst_items = self.extract();
+        Morph::new(src_items, dst_items)
             .into_animation_cell()
             .with_rate_func(smooth)
-            .apply_to(self)
     }
-    fn morph_to(&mut self, d: T) -> AnimationCell<T> {
-        Morph::new(self.clone(), d)
+    fn morph_to(&mut self, d: T) -> AnimationCell<Vec<CoreItem>> {
+        let src_items = self.extract();
+        let dst_items = d.extract();
+        *self = d;
+        Morph::new(src_items, dst_items)
             .into_animation_cell()
             .with_rate_func(smooth)
-            .apply_to(self)
     }
 }
 // ANCHOR_END: MorphAnim-Impl
 
 // ANCHOR: Morph
 /// Morph Anim
-pub struct Morph<T: MorphRequirement> {
+pub struct Morph<T: Interpolatable> {
     src: T,
     dst: T,
     aligned_src: T,
@@ -57,7 +71,7 @@ pub struct Morph<T: MorphRequirement> {
 }
 // ANCHOR_END: Morph
 
-impl<T: MorphRequirement> Morph<T> {
+impl<T: Interpolatable> Morph<T> {
     /// Constructor
     pub fn new(src: T, dst: T) -> Self {
         let mut aligned_src = src.clone();
@@ -75,7 +89,7 @@ impl<T: MorphRequirement> Morph<T> {
 }
 
 // ANCHOR: Morph-Eval
-impl<T: MorphRequirement> Eval<T> for Morph<T> {
+impl<T: Interpolatable> Eval<T> for Morph<T> {
     fn eval_alpha(&self, alpha: f64) -> T {
         if alpha == 0.0 {
             self.src.clone()
