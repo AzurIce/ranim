@@ -3,7 +3,7 @@ use glam::{Vec3, Vec4};
 
 use crate::{
     Extract,
-    components::{rgba::Rgba, width::Width},
+    components::{PointVec, rgba::Rgba, width::Width},
     core_item::CoreItem,
     traits::FillColor,
 };
@@ -38,11 +38,11 @@ pub struct VItem {
     /// (x, y, z, is_closed)
     pub points: Vec<Vec4>,
     /// Fill rgbas, see [`Rgba`].
-    pub fill_rgbas: Vec<Rgba>,
+    pub fill_rgbas: PointVec<Rgba>,
     /// Stroke rgbs, see [`Rgba`].
-    pub stroke_rgbas: Vec<Rgba>,
+    pub stroke_rgbas: PointVec<Rgba>,
     /// Stroke widths, see [`Width`].
-    pub stroke_widths: Vec<Width>,
+    pub stroke_widths: PointVec<Width>,
 }
 
 impl Default for VItem {
@@ -50,9 +50,9 @@ impl Default for VItem {
         Self {
             normal: None,
             points: vec![Vec4::ZERO; 3],
-            stroke_widths: vec![Width::default(); 2],
-            stroke_rgbas: vec![Rgba::default(); 2],
-            fill_rgbas: vec![Rgba::default(); 2],
+            stroke_widths: vec![Width::default(); 2].into(),
+            stroke_rgbas: vec![Rgba::default(); 2].into(),
+            fill_rgbas: vec![Rgba::default(); 2].into(),
         }
     }
 }

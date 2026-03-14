@@ -51,23 +51,20 @@ impl<T: Interpolatable + Clone> PointVec<T> {
 
 impl<T: Interpolatable + Component> Interpolatable for PointVec<T> {
     fn lerp(&self, target: &Self, t: f64) -> Self {
-        let len = self.0.len().max(target.0.len());
-        let data = (0..len)
-            .map(|i| self.sample(i, len).lerp(&target.sample(i, len), t))
-            .collect();
-        Self(data)
+        self.iter()
+            .zip(target.iter())
+            .map(|(a, b)| a.lerp(b, t))
+            .collect::<Vec<_>>()
+            .into()
     }
     fn is_aligned(&self, other: &Self) -> bool {
         self.len() == other.len()
     }
     fn align_with(&mut self, other: &mut Self) {
-        if self.len() == other.len() {
-            return;
-        }
         if self.len() < other.len() {
-            self.resize_with_last(other.len());
+            self.0 = self.expand(other.len());
         } else {
-            other.resize_with_last(self.len());
+            other.0 = other.expand(self.len());
         }
     }
 }
