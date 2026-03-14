@@ -72,13 +72,15 @@
 
 /// Creation animation
 pub mod creation;
+/// Direct morph animation (interpolates on T directly)
+pub mod direct_morph;
 /// Fading animation
 pub mod fading;
 /// Func animation
 pub mod func;
 /// Lagged animation
 pub mod lagged;
-/// Morph animation
+/// Morph animation (interpolates on CoreItem)
 pub mod morph;
 /// Rotating animation
 pub mod rotating;

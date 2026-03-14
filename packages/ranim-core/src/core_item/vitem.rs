@@ -3,9 +3,9 @@ use glam::{Vec3, Vec4};
 
 use crate::{
     Extract,
-    components::{PointVec, rgba::Rgba, width::Width},
+    components::{PointVec, VecResizeTrait, rgba::Rgba, width::Width},
     core_item::CoreItem,
-    traits::FillColor,
+    traits::{FillColor, Interpolatable},
 };
 
 /// Default vitem stroke width
@@ -78,5 +78,46 @@ impl FillColor for VItem {
             .iter_mut()
             .for_each(|rgba| rgba.0.w = opacity);
         self
+    }
+}
+
+impl Interpolatable for VItem {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        Self {
+            normal: match (self.normal, target.normal) {
+                (Some(a), Some(b)) => Some(a.lerp(b, t)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            },
+            points: self.points.lerp(&target.points, t),
+            fill_rgbas: self.fill_rgbas.lerp(&target.fill_rgbas, t),
+            stroke_rgbas: self.stroke_rgbas.lerp(&target.stroke_rgbas, t),
+            stroke_widths: self.stroke_widths.lerp(&target.stroke_widths, t),
+        }
+    }
+    fn is_aligned(&self, other: &Self) -> bool {
+        self.points.is_aligned(&other.points)
+            && self.fill_rgbas.is_aligned(&other.fill_rgbas)
+            && self.stroke_rgbas.is_aligned(&other.stroke_rgbas)
+            && self.stroke_widths.is_aligned(&other.stroke_widths)
+    }
+    fn align_with(&mut self, other: &mut Self) {
+        self.points.align_with(&mut other.points);
+        let len = self.points.len().div_ceil(2);
+        self.fill_rgbas.resize_preserving_order(len);
+        other.fill_rgbas.resize_preserving_order(len);
+        self.stroke_rgbas.resize_preserving_order(len);
+        other.stroke_rgbas.resize_preserving_order(len);
+        self.stroke_widths.resize_preserving_order(len);
+        other.stroke_widths.resize_preserving_order(len);
+    }
+}
+
+impl VItem {
+    /// Get render points as Vec<Vec4> with is_closed flag in w component.
+    /// This is used at the render boundary to produce GPU-ready data.
+    pub fn get_render_points(&self) -> Vec<glam::Vec4> {
+        self.points.clone()
     }
 }
