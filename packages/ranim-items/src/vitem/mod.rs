@@ -65,23 +65,6 @@ pub struct VItem {
     pub fill_rgbas: PointVec<Rgba>,
 }
 
-impl ranim_core::traits::Interpolatable for VItem {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        Self {
-            normal: match (self.normal, target.normal) {
-                (Some(a), Some(b)) => Some(a.lerp(b, t)),
-                (Some(a), None) => Some(a),
-                (None, Some(b)) => Some(b),
-                (None, None) => None,
-            },
-            vpoints: self.vpoints.lerp(&target.vpoints, t),
-            stroke_widths: self.stroke_widths.lerp(&target.stroke_widths, t),
-            stroke_rgbas: self.stroke_rgbas.lerp(&target.stroke_rgbas, t),
-            fill_rgbas: self.fill_rgbas.lerp(&target.fill_rgbas, t),
-        }
-    }
-}
-
 impl PointsFunc for VItem {
     fn apply_points_func(&mut self, f: impl Fn(&mut [DVec3])) -> &mut Self {
         self.vpoints.apply_points_func(f);
@@ -192,6 +175,7 @@ impl VItem {
             .map(|(p, f)| p.as_vec3().extend(f.into()))
             .collect()
     }
+
     /// Put start and end on
     pub fn put_start_and_end_on(&mut self, start: DVec3, end: DVec3) -> &mut Self {
         self.vpoints.put_start_and_end_on(start, end);
@@ -222,7 +206,12 @@ impl Extract for VItem {
 impl Interpolatable for VItem {
     fn lerp(&self, other: &Self, t: f64) -> Self {
         Self {
-            basis: Interpolatable::lerp(&self.basis, &other.basis, t),
+            normal: match (self.normal, other.normal) {
+                (Some(a), Some(b)) => Some(a.lerp(b, t)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            },
             vpoints: Interpolatable::lerp(&self.vpoints, &other.vpoints, t),
             stroke_widths: Interpolatable::lerp(&self.stroke_widths, &other.stroke_widths, t),
             stroke_rgbas: Interpolatable::lerp(&self.stroke_rgbas, &other.stroke_rgbas, t),
