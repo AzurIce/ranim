@@ -184,9 +184,9 @@ impl From<VItem> for ranim_core::core_item::vitem::VItem {
             origin: value.vpoints[0],
             basis: value.basis,
             points: value.get_render_points(),
-            fill_rgbas: value.fill_rgbas.iter().cloned().collect(),
-            stroke_rgbas: value.stroke_rgbas.iter().cloned().collect(),
-            stroke_widths: value.stroke_widths.iter().cloned().collect(),
+            fill_rgbas: value.fill_rgbas,
+            stroke_rgbas: value.stroke_rgbas,
+            stroke_widths: value.stroke_widths,
         }
     }
 }

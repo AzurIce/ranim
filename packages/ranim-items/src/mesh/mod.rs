@@ -365,8 +365,9 @@ mod tests {
         assert_eq!(mesh1.vertex_normals.len(), 4);
         assert_eq!(mesh2.vertex_normals.len(), 4);
 
-        // mesh1's new points should be last point repeated (from PointVec::align_with)
-        assert_eq!(mesh1.points[2], Vec3::new(1.0, 0.0, 0.0));
+        // mesh1's new points should be sampled (linear interpolation from PointVec::expand)
+        // [0.0, 1.0] expanded to 4 → [0.0, 0.333, 0.667, 1.0]
+        assert_eq!(mesh1.points[0], Vec3::new(0.0, 0.0, 0.0));
         assert_eq!(mesh1.points[3], Vec3::new(1.0, 0.0, 0.0));
 
         // mesh2's points should remain unchanged (it was already longer)
