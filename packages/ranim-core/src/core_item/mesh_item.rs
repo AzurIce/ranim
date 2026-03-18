@@ -1,7 +1,6 @@
 use glam::{Mat4, Vec3};
 
 use crate::{
-    Extract,
     components::rgba::Rgba,
     core_item::CoreItem,
     traits::{FillColor, Interpolatable},
@@ -52,10 +51,9 @@ impl Default for MeshItem {
     }
 }
 
-impl Extract for MeshItem {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(CoreItem::MeshItem(self.clone()));
+impl From<MeshItem> for CoreItem {
+    fn from(value: MeshItem) -> Self {
+        CoreItem::MeshItem(value)
     }
 }
 

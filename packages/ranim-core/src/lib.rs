@@ -39,7 +39,14 @@ pub mod prelude {
     pub use crate::{RanimScene, TimeMark, TimelineId};
 }
 
-use crate::{animation::StaticAnim, core_item::CoreItem, timeline::Timeline};
+use crate::{
+    animation::StaticAnim,
+    core_item::CoreItem,
+    timeline::{AnimationInfo, Timeline, TimelineFunc, TimelinesFunc},
+};
+use tracing::trace;
+
+use std::fmt::Debug;
 
 /// Extract a [`Extract::Target`] from reference.
 pub trait Extract {
@@ -54,23 +61,6 @@ pub trait Extract {
         buf
     }
 }
-
-impl<E: Extract, I> Extract for I
-where
-    for<'a> &'a I: IntoIterator<Item = &'a E>,
-{
-    type Target = E::Target;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        for e in self {
-            e.extract_into(buf);
-        }
-    }
-}
-
-use crate::timeline::{AnimationInfo, TimelineFunc, TimelinesFunc};
-use tracing::trace;
-
-use std::fmt::Debug;
 
 /// TimeMark
 #[derive(Debug, Clone)]

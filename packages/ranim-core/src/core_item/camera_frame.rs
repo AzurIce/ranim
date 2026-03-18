@@ -3,7 +3,6 @@
 use glam::{DMat4, DVec3, dvec2};
 
 use crate::{
-    Extract,
     animation::{AnimationCell, Eval},
     core_item::CoreItem,
     prelude::Interpolatable,
@@ -39,10 +38,9 @@ pub struct CameraFrame {
     pub fovy: f64,
 }
 
-impl Extract for CameraFrame {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(CoreItem::CameraFrame(self.clone()));
+impl From<CameraFrame> for CoreItem {
+    fn from(value: CameraFrame) -> Self {
+        CoreItem::CameraFrame(value)
     }
 }
 
