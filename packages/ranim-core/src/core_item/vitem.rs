@@ -2,7 +2,6 @@ use color::{AlphaColor, Srgb};
 use glam::{Vec3, Vec4};
 
 use crate::{
-    Extract,
     components::{PointVec, VecResizeTrait, rgba::Rgba, width::Width},
     core_item::CoreItem,
     traits::{FillColor, Interpolatable},
@@ -57,10 +56,9 @@ impl Default for VItem {
     }
 }
 
-impl Extract for VItem {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(CoreItem::VItem(self.clone()));
+impl From<VItem> for CoreItem {
+    fn from(value: VItem) -> Self {
+        CoreItem::VItem(value)
     }
 }
 

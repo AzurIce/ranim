@@ -50,10 +50,19 @@ impl Extract for DynItem {
     }
 }
 
-impl Extract for CoreItem {
+impl<T: Into<CoreItem> + Clone> Extract for T {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(self.clone());
+        buf.push(self.clone().into());
+    }
+}
+
+impl<T: Extract<Target = CoreItem>> Extract for Vec<T> {
+    type Target = CoreItem;
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        for item in self {
+            item.extract_into(buf);
+        }
     }
 }
 
