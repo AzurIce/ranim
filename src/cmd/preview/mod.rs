@@ -819,6 +819,33 @@ impl eframe::App for RanimPreviewApp {
                     });
 
                     ui.add_space(8.0);
+
+                    // Show resolved output path preview
+                    {
+                        let mut output_dir = std::path::PathBuf::from(&self.export_config.dir);
+                        if !output_dir.is_absolute() {
+                            output_dir = std::env::current_dir()
+                                .unwrap_or_default()
+                                .join("output")
+                                .join(&output_dir);
+                        }
+                        let (_, _, ext) = self.export_config.format.encoding_params();
+                        let name = self.export_config.name.as_deref().unwrap_or(&self.title);
+                        let file_path = output_dir.join(format!(
+                            "{}_{}x{}_{}.{ext}",
+                            name,
+                            self.export_config.width,
+                            self.export_config.height,
+                            self.export_config.fps,
+                        ));
+                        ui.label(
+                            egui::RichText::new(format!("→ {}", file_path.display()))
+                                .small()
+                                .color(ui.visuals().weak_text_color()),
+                        );
+                    }
+
+                    ui.add_space(4.0);
                     if ui.button("Start Export").clicked() {
                         self.start_export(ctx.clone());
                         self.export_dialog_open = false;
