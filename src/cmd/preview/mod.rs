@@ -152,6 +152,10 @@ pub struct RanimPreviewApp {
     export_dialog_open: bool,
     export_config: Output,
     export_progress_rx: Option<Receiver<ExportProgress>>,
+
+    // Playback
+    playback_speed: f64,
+    looping: bool,
 }
 
 impl RanimPreviewApp {
@@ -197,6 +201,8 @@ impl RanimPreviewApp {
             export_dialog_open: false,
             export_config: Output::default(),
             export_progress_rx: None,
+            playback_speed: 1.0,
+            looping: false,
         }
     }
 
@@ -486,12 +492,33 @@ impl eframe::App for RanimPreviewApp {
             }
         }
 
+        // Arrow keys step forward/back one frame
+        {
+            let frame_dur = 1.0 / self.export_config.fps as f64;
+            if ctx.input(|i| i.key_pressed(egui::Key::ArrowLeft)) {
+                self.play_prev_t = None;
+                self.timeline_state.current_sec =
+                    (self.timeline_state.current_sec - frame_dur).max(0.0);
+            }
+            if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
+                self.play_prev_t = None;
+                self.timeline_state.current_sec =
+                    (self.timeline_state.current_sec + frame_dur).min(self.timeline_state.total_sec);
+            }
+        }
+
         if let Some(play_prev_t) = self.play_prev_t {
-            let elapsed = play_prev_t.elapsed().as_secs_f64();
+            let elapsed = play_prev_t.elapsed().as_secs_f64() * self.playback_speed;
             self.timeline_state.current_sec =
                 (self.timeline_state.current_sec + elapsed).min(self.timeline_state.total_sec);
-            if self.timeline_state.current_sec == self.timeline_state.total_sec {
-                self.play_prev_t = None;
+            if self.timeline_state.current_sec >= self.timeline_state.total_sec {
+                if self.looping {
+                    self.timeline_state.current_sec = 0.0;
+                    self.play_prev_t = Some(Instant::now());
+                    ctx.request_repaint();
+                } else {
+                    self.play_prev_t = None;
+                }
             } else {
                 self.play_prev_t = Some(Instant::now());
                 ctx.request_repaint(); // Animation loop
@@ -636,25 +663,75 @@ impl eframe::App for RanimPreviewApp {
                 ui.label("Timeline");
 
                 ui.horizontal(|ui| {
-                    if ui.button("<<").clicked() {
+                    let fps = self.export_config.fps as f64;
+                    let frame_dur = 1.0 / fps;
+
+                    // |< Jump to start
+                    if ui.button("⏮").on_hover_text("Jump to start").clicked() {
                         self.timeline_state.current_sec = 0.0;
+                        self.play_prev_t = None;
                     }
-                    #[allow(clippy::collapsible_else_if)]
-                    if self.play_prev_t.is_none() {
-                        if ui.button("play").clicked() {
+
+                    // < Step back one frame
+                    if ui.button("⏪").on_hover_text("Step back one frame").clicked() {
+                        self.play_prev_t = None;
+                        self.timeline_state.current_sec =
+                            (self.timeline_state.current_sec - frame_dur).max(0.0);
+                    }
+
+                    // Play / Pause
+                    let is_playing = self.play_prev_t.is_some();
+                    let play_label = if is_playing { "⏸" } else { "▶" };
+                    let play_tooltip = if is_playing { "Pause" } else { "Play" };
+                    if ui.button(play_label).on_hover_text(play_tooltip).clicked() {
+                        if is_playing {
+                            self.play_prev_t = None;
+                        } else {
                             if self.timeline_state.current_sec >= self.timeline_state.total_sec {
                                 self.timeline_state.current_sec = 0.0;
                             }
                             self.play_prev_t = Some(Instant::now());
                         }
-                    } else {
-                        if ui.button("pause").clicked() {
-                            self.play_prev_t = None;
-                        }
                     }
-                    if ui.button(">>").clicked() {
+
+                    // > Step forward one frame
+                    if ui.button("⏩").on_hover_text("Step forward one frame").clicked() {
+                        self.play_prev_t = None;
+                        self.timeline_state.current_sec =
+                            (self.timeline_state.current_sec + frame_dur).min(self.timeline_state.total_sec);
+                    }
+
+                    // >| Jump to end
+                    if ui.button("⏭").on_hover_text("Jump to end").clicked() {
                         self.timeline_state.current_sec = self.timeline_state.total_sec;
+                        self.play_prev_t = None;
                     }
+
+                    ui.separator();
+
+                    // Loop toggle
+                    let loop_label = if self.looping { "🔁" } else { "🔁" };
+                    let mut loop_btn = egui::Button::new(loop_label);
+                    if self.looping {
+                        loop_btn = loop_btn.fill(ui.visuals().selection.bg_fill);
+                    }
+                    if ui.add(loop_btn).on_hover_text(if self.looping { "Looping: ON" } else { "Looping: OFF" }).clicked() {
+                        self.looping = !self.looping;
+                    }
+
+                    ui.separator();
+
+                    // Speed control
+                    let drag_speed = (self.playback_speed * 0.02).max(0.01);
+                    ui.add(
+                        egui::DragValue::new(&mut self.playback_speed)
+                            .speed(drag_speed)
+                            .range(0.1..=10.0)
+                            .suffix("x"),
+                    ).on_hover_text("Playback speed");
+
+                    ui.separator();
+
                     ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
                     ui.add(
                         egui::Slider::new(
