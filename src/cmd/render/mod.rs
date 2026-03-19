@@ -50,6 +50,20 @@ pub fn render_scene_output(
     output: &Output,
     buffer_count: usize,
 ) {
+    render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None);
+}
+
+/// Render a scene output with optional progress callback.
+///
+/// The callback receives `(current_frame, total_frames)`.
+pub fn render_scene_output_with_progress(
+    constructor: impl SceneConstructor,
+    name: String,
+    scene_config: &SceneConfig,
+    output: &Output,
+    buffer_count: usize,
+    on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+) {
     use std::time::Instant;
 
     let t = Instant::now();
@@ -57,7 +71,7 @@ pub fn render_scene_output(
     trace!("Build timeline cost: {:?}", t.elapsed());
 
     let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
-    app.render_timeline(&scene);
+    app.render_timeline(&scene, &on_progress);
     if !scene.time_marks().is_empty() {
         app.render_capture_marks(&scene);
     }
@@ -357,7 +371,7 @@ impl RanimRenderApp {
     }
 
     #[instrument(skip_all)]
-    fn render_timeline(&mut self, timeline: &SealedRanimScene) {
+    fn render_timeline(&mut self, timeline: &SealedRanimScene, on_progress: &Option<Box<dyn Fn(u64, u64) + Send>>) {
         let start = Instant::now();
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {
@@ -404,12 +418,16 @@ impl RanimRenderApp {
 
         (0..num_frames)
             .map(|f| (f as f64 / fps).min(total_secs))
-            .for_each(|sec| {
+            .enumerate()
+            .for_each(|(i, sec)| {
                 worker_thread.sync_and_submit(|store| {
                     store.update(timeline.eval_at_sec(sec));
                 });
 
                 span.pb_inc(1);
+                if let Some(cb) = on_progress {
+                    cb(i as u64 + 1, num_frames);
+                }
                 span.pb_set_message(
                     format!(
                         "rendering {:.1?}/{:.1?}",

@@ -52,6 +52,8 @@ pub enum RanimPreviewAppCmd {
 }
 
 enum ExportProgress {
+    /// (current_frame, total_frames)
+    Progress(u64, u64),
     Done,
     Error(String),
 }
@@ -152,6 +154,8 @@ pub struct RanimPreviewApp {
     export_dialog_open: bool,
     export_config: Output,
     export_progress_rx: Option<Receiver<ExportProgress>>,
+    export_current_frame: u64,
+    export_total_frames: u64,
 
     // Playback
     playback_speed: f64,
@@ -201,6 +205,8 @@ impl RanimPreviewApp {
             export_dialog_open: false,
             export_config: Output::default(),
             export_progress_rx: None,
+            export_current_frame: 0,
+            export_total_frames: 0,
             playback_speed: 1.0,
             looping: false,
         }
@@ -447,13 +453,19 @@ impl RanimPreviewApp {
         let name = self.title.clone();
 
         std::thread::spawn(move || {
+            let progress_tx_cb = progress_tx.clone();
+            let ctx_cb = ctx.clone();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                crate::cmd::render::render_scene_output(
+                crate::cmd::render::render_scene_output_with_progress(
                     constructor,
                     name,
                     &scene_config,
                     &output,
                     2,
+                    Some(Box::new(move |current, total| {
+                        let _ = progress_tx_cb.send_blocking(ExportProgress::Progress(current, total));
+                        ctx_cb.request_repaint();
+                    })),
                 );
 
                 let _ = progress_tx.send_blocking(ExportProgress::Done);
@@ -861,6 +873,10 @@ impl eframe::App for RanimPreviewApp {
 
             while let Ok(msg) = rx.try_recv() {
                 match msg {
+                    ExportProgress::Progress(current, total) => {
+                        self.export_current_frame = current;
+                        self.export_total_frames = total;
+                    }
                     ExportProgress::Done => {
                         done = true;
                     }
@@ -873,6 +889,8 @@ impl eframe::App for RanimPreviewApp {
 
             if done {
                 self.export_progress_rx = None;
+                self.export_current_frame = 0;
+                self.export_total_frames = 0;
                 if let Some(err) = error_msg {
                     error!("Export failed: {err}");
                 } else {
@@ -883,10 +901,20 @@ impl eframe::App for RanimPreviewApp {
                     .collapsible(false)
                     .resizable(false)
                     .show(ctx, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.spinner();
-                            ui.label("Rendering video...");
-                        });
+                        let current = self.export_current_frame;
+                        let total = self.export_total_frames;
+                        if total > 0 {
+                            let progress = current as f32 / total as f32;
+                            ui.add(egui::ProgressBar::new(progress).text(format!(
+                                "{current}/{total} frames ({:.0}%)",
+                                progress * 100.0
+                            )));
+                        } else {
+                            ui.horizontal(|ui| {
+                                ui.spinner();
+                                ui.label("Preparing...");
+                            });
+                        }
                     });
                 ctx.request_repaint();
             }
