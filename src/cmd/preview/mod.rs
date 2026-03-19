@@ -2,7 +2,7 @@ mod depth_visual;
 mod timeline;
 
 use crate::{
-    Scene, SceneConstructor,
+    Output, OutputFormat, Scene, SceneConfig, SceneConstructor,
     core::{
         SealedRanimScene,
         color::{self, LinearSrgb},
@@ -49,6 +49,11 @@ impl TimelineInfoState {
 
 pub enum RanimPreviewAppCmd {
     ReloadScene(Scene, Sender<()>),
+}
+
+enum ExportProgress {
+    Done,
+    Error(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,6 +119,8 @@ pub struct RanimPreviewApp {
     #[allow(unused)]
     title: String,
     clear_color: wgpu::Color,
+    scene_constructor: fn(&mut crate::core::RanimScene),
+    scene_config: SceneConfig,
     resolution: Resolution,
     timeline: SealedRanimScene,
     need_eval: bool,
@@ -140,10 +147,15 @@ pub struct RanimPreviewApp {
 
     // Resolution changed flag
     resolution_dirty: bool,
+
+    // Export
+    export_dialog_open: bool,
+    export_config: Output,
+    export_progress_rx: Option<Receiver<ExportProgress>>,
 }
 
 impl RanimPreviewApp {
-    pub fn new(scene_constructor: impl SceneConstructor, title: String) -> Self {
+    pub fn new(scene_constructor: fn(&mut crate::core::RanimScene), title: String, scene_config: SceneConfig) -> Self {
         let t = Instant::now();
         info!("building scene...");
         let timeline = scene_constructor.build_scene();
@@ -160,6 +172,8 @@ impl RanimPreviewApp {
             cmd_tx,
             title,
             clear_color: wgpu::Color::TRANSPARENT,
+            scene_constructor,
+            scene_config,
             resolution: Resolution::QHD,
             timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
             timeline,
@@ -180,6 +194,9 @@ impl RanimPreviewApp {
             depth_visual_texture: None,
             depth_visual_view: None,
             resolution_dirty: false,
+            export_dialog_open: false,
+            export_config: Output::default(),
+            export_progress_rx: None,
         }
     }
 
@@ -412,12 +429,62 @@ impl RanimPreviewApp {
             self.pool.clean();
         }
     }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start_export(&mut self, ctx: egui::Context) {
+        let (progress_tx, progress_rx) = unbounded();
+        self.export_progress_rx = Some(progress_rx);
+
+        let constructor = self.scene_constructor;
+        let scene_config = self.scene_config.clone();
+        let output = self.export_config.clone();
+        let name = self.title.clone();
+
+        std::thread::spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                crate::cmd::render::render_scene_output(
+                    constructor,
+                    name,
+                    &scene_config,
+                    &output,
+                    2,
+                );
+
+                let _ = progress_tx.send_blocking(ExportProgress::Done);
+                ctx.request_repaint();
+            }));
+
+            if let Err(e) = result {
+                let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = e.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "Unknown export error".to_string()
+                };
+                let _ = progress_tx.send_blocking(ExportProgress::Error(msg));
+                ctx.request_repaint();
+            }
+        });
+    }
 }
 
 impl eframe::App for RanimPreviewApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.prepare_renderer(frame);
         self.handle_events();
+
+        // Space bar toggles play/pause
+        if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
+            if self.play_prev_t.is_some() {
+                self.play_prev_t = None;
+            } else {
+                if self.timeline_state.current_sec >= self.timeline_state.total_sec {
+                    self.timeline_state.current_sec = 0.0;
+                }
+                self.play_prev_t = Some(Instant::now());
+            }
+        }
 
         if let Some(play_prev_t) = self.play_prev_t {
             let elapsed = play_prev_t.elapsed().as_secs_f64();
@@ -540,6 +607,12 @@ impl eframe::App for RanimPreviewApp {
                     }
 
                     ui.separator();
+                    let exporting = self.export_progress_rx.is_some();
+                    if ui.add_enabled(!exporting, egui::Button::new("Export")).clicked() {
+                        self.export_dialog_open = true;
+                    }
+
+                    ui.separator();
                     ui.selectable_value(&mut self.view_mode, ViewMode::Output, "Output");
                     ui.selectable_value(&mut self.view_mode, ViewMode::Depth, "Depth");
                     ui.separator();
@@ -569,6 +642,9 @@ impl eframe::App for RanimPreviewApp {
                     #[allow(clippy::collapsible_else_if)]
                     if self.play_prev_t.is_none() {
                         if ui.button("play").clicked() {
+                            if self.timeline_state.current_sec >= self.timeline_state.total_sec {
+                                self.timeline_state.current_sec = 0.0;
+                            }
                             self.play_prev_t = Some(Instant::now());
                         }
                     } else {
@@ -624,6 +700,93 @@ impl eframe::App for RanimPreviewApp {
                 });
             }
         });
+
+        // Export configuration dialog
+        if self.export_dialog_open {
+            let mut open = self.export_dialog_open;
+            egui::Window::new("Export")
+                .open(&mut open)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    egui::Grid::new("export_grid").num_columns(2).show(ui, |ui| {
+                        ui.label("Width:");
+                        ui.add(egui::DragValue::new(&mut self.export_config.width).range(1..=7680));
+                        ui.end_row();
+
+                        ui.label("Height:");
+                        ui.add(egui::DragValue::new(&mut self.export_config.height).range(1..=4320));
+                        ui.end_row();
+
+                        ui.label("FPS:");
+                        ui.add(egui::DragValue::new(&mut self.export_config.fps).range(1..=240));
+                        ui.end_row();
+
+                        ui.label("Format:");
+                        egui::ComboBox::from_id_salt("export_format")
+                            .selected_text(format!("{}", self.export_config.format))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.export_config.format, OutputFormat::Mp4, "mp4");
+                                ui.selectable_value(&mut self.export_config.format, OutputFormat::Webm, "webm");
+                                ui.selectable_value(&mut self.export_config.format, OutputFormat::Mov, "mov");
+                                ui.selectable_value(&mut self.export_config.format, OutputFormat::Gif, "gif");
+                            });
+                        ui.end_row();
+
+                        ui.label("Output dir:");
+                        ui.text_edit_singleline(&mut self.export_config.dir);
+                        ui.end_row();
+
+                        ui.label("Save frames:");
+                        ui.checkbox(&mut self.export_config.save_frames, "");
+                        ui.end_row();
+                    });
+
+                    ui.add_space(8.0);
+                    if ui.button("Start Export").clicked() {
+                        self.start_export(ctx.clone());
+                        self.export_dialog_open = false;
+                    }
+                });
+            self.export_dialog_open = open;
+        }
+
+        // Export progress dialog
+        if let Some(rx) = &self.export_progress_rx {
+            let mut done = false;
+            let mut error_msg = None;
+
+            while let Ok(msg) = rx.try_recv() {
+                match msg {
+                    ExportProgress::Done => {
+                        done = true;
+                    }
+                    ExportProgress::Error(err) => {
+                        error_msg = Some(err);
+                        done = true;
+                    }
+                }
+            }
+
+            if done {
+                self.export_progress_rx = None;
+                if let Some(err) = error_msg {
+                    error!("Export failed: {err}");
+                } else {
+                    info!("Export completed");
+                }
+            } else {
+                egui::Window::new("Exporting...")
+                    .collapsible(false)
+                    .resizable(false)
+                    .show(ctx, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.spinner();
+                            ui.label("Rendering video...");
+                        });
+                    });
+                ctx.request_repaint();
+            }
+        }
     }
 }
 
@@ -683,8 +846,8 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
     }
 }
 
-pub fn preview_constructor_with_name(scene: impl SceneConstructor, name: &str) {
-    let app = RanimPreviewApp::new(scene, name.to_string());
+pub fn preview_constructor_with_name(scene: fn(&mut crate::core::RanimScene), name: &str, scene_config: &SceneConfig) {
+    let app = RanimPreviewApp::new(scene, name.to_string(), scene_config.clone());
     run_app(
         app,
         #[cfg(target_arch = "wasm32")]
@@ -699,7 +862,7 @@ pub fn preview_scene(scene: &Scene) {
 
 /// Preview a scene with a custom name
 pub fn preview_scene_with_name(scene: &Scene, name: &str) {
-    let mut app = RanimPreviewApp::new(scene.constructor, name.to_string());
+    let mut app = RanimPreviewApp::new(scene.constructor, name.to_string(), scene.config.clone());
     app.set_clear_color_str(&scene.config.clear_color);
     run_app(
         app,
