@@ -10,7 +10,7 @@ use ranim::{
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
-#[output(dir = "arc")]
+#[output(dir = "./output/arc")]
 pub fn arc(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 

@@ -21,7 +21,7 @@ use glam::DVec3;
 
 // MARK: ranim_text
 #[scene]
-#[output(dir = "extract_vitem_visualize")]
+#[output(dir = "./output/extract_vitem_visualize")]
 fn ranim_text(r: &mut RanimScene) {
     let mut cam = CameraFrame::default();
     let r_cam = r.insert(cam.clone());
@@ -60,7 +60,7 @@ fn ranim_text(r: &mut RanimScene) {
 }
 
 #[scene(name = "extract_vitem_visualize")]
-#[output(dir = "extract_vitem_visualize")]
+#[output(dir = "./output/extract_vitem_visualize")]
 pub fn hello_ranim(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 
