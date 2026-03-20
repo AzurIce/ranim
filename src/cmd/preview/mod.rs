@@ -56,7 +56,6 @@ enum ExportProgress {
     /// (current_frame, total_frames)
     Progress(u64, u64),
     Done,
-    Cancelled,
     Error(String),
 }
 
@@ -156,7 +155,6 @@ pub struct RanimPreviewApp {
     export_dialog_open: bool,
     export_config: Output,
     export_progress_rx: Option<Receiver<ExportProgress>>,
-    export_cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
     export_current_frame: u64,
     export_total_frames: u64,
 
@@ -212,7 +210,6 @@ impl RanimPreviewApp {
             export_dialog_open: false,
             export_config: Output::default(),
             export_progress_rx: None,
-            export_cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             export_current_frame: 0,
             export_total_frames: 0,
             playback_speed: 1.0,
@@ -452,23 +449,19 @@ impl RanimPreviewApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn start_export(&mut self, ctx: egui::Context) {
-        use std::sync::atomic::Ordering;
-
         let (progress_tx, progress_rx) = unbounded();
         self.export_progress_rx = Some(progress_rx);
-        self.export_cancel.store(false, Ordering::Relaxed);
 
         let constructor = self.scene_constructor;
         let scene_config = self.scene_config.clone();
         let output = self.export_config.clone();
         let name = self.title.clone();
-        let cancel = self.export_cancel.clone();
 
         std::thread::spawn(move || {
             let progress_tx_cb = progress_tx.clone();
             let ctx_cb = ctx.clone();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let cancelled = crate::cmd::render::render_scene_output_with_progress(
+                crate::cmd::render::render_scene_output_with_progress(
                     constructor,
                     name,
                     &scene_config,
@@ -479,14 +472,9 @@ impl RanimPreviewApp {
                             progress_tx_cb.send_blocking(ExportProgress::Progress(current, total));
                         ctx_cb.request_repaint();
                     })),
-                    Some(cancel),
                 );
 
-                if cancelled {
-                    let _ = progress_tx.send_blocking(ExportProgress::Cancelled);
-                } else {
-                    let _ = progress_tx.send_blocking(ExportProgress::Done);
-                }
+                let _ = progress_tx.send_blocking(ExportProgress::Done);
                 ctx.request_repaint();
             }));
 
@@ -654,7 +642,11 @@ impl eframe::App for RanimPreviewApp {
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let dark_mode = ui.visuals().dark_mode;
-                    let button_text = if dark_mode { "☀ Light" } else { "🌙 Dark" };
+                    let button_text = if dark_mode {
+                        format!("{} Light", egui_phosphor::regular::SUN)
+                    } else {
+                        format!("{} Dark", egui_phosphor::regular::MOON)
+                    };
                     if ui.button(button_text).clicked() {
                         if dark_mode {
                             ctx.set_visuals(egui::Visuals::light());
@@ -700,14 +692,14 @@ impl eframe::App for RanimPreviewApp {
                     let frame_dur = 1.0 / fps;
 
                     // |< Jump to start
-                    if ui.button("⏮").on_hover_text("Jump to start").clicked() {
+                    if ui.button(egui_phosphor::regular::SKIP_BACK).on_hover_text("Jump to start").clicked() {
                         self.timeline_state.current_sec = 0.0;
                         self.play_prev_t = None;
                     }
 
                     // < Step back one frame
                     if ui
-                        .button("⏪")
+                        .button(egui_phosphor::regular::CARET_LEFT)
                         .on_hover_text("Step back one frame")
                         .clicked()
                     {
@@ -718,7 +710,11 @@ impl eframe::App for RanimPreviewApp {
 
                     // Play / Pause
                     let is_playing = self.play_prev_t.is_some();
-                    let play_label = if is_playing { "⏸" } else { "▶" };
+                    let play_label = if is_playing {
+                        egui_phosphor::regular::PAUSE
+                    } else {
+                        egui_phosphor::regular::PLAY
+                    };
                     let play_tooltip = if is_playing { "Pause" } else { "Play" };
                     if ui.button(play_label).on_hover_text(play_tooltip).clicked() {
                         if is_playing {
@@ -733,7 +729,7 @@ impl eframe::App for RanimPreviewApp {
 
                     // > Step forward one frame
                     if ui
-                        .button("⏩")
+                        .button(egui_phosphor::regular::CARET_RIGHT)
                         .on_hover_text("Step forward one frame")
                         .clicked()
                     {
@@ -744,7 +740,7 @@ impl eframe::App for RanimPreviewApp {
                     }
 
                     // >| Jump to end
-                    if ui.button("⏭").on_hover_text("Jump to end").clicked() {
+                    if ui.button(egui_phosphor::regular::SKIP_FORWARD).on_hover_text("Jump to end").clicked() {
                         self.timeline_state.current_sec = self.timeline_state.total_sec;
                         self.play_prev_t = None;
                     }
@@ -752,8 +748,7 @@ impl eframe::App for RanimPreviewApp {
                     ui.separator();
 
                     // Loop toggle
-                    let loop_label = if self.looping { "🔁" } else { "🔁" };
-                    let mut loop_btn = egui::Button::new(loop_label);
+                    let mut loop_btn = egui::Button::new(egui_phosphor::regular::ARROWS_CLOCKWISE);
                     if self.looping {
                         loop_btn = loop_btn.fill(ui.visuals().selection.bg_fill);
                     }
@@ -841,9 +836,6 @@ impl eframe::App for RanimPreviewApp {
                         self.export_total_frames = total;
                     }
                     ExportProgress::Done => {
-                        done = true;
-                    }
-                    ExportProgress::Cancelled => {
                         done = true;
                     }
                     ExportProgress::Error(err) => {
@@ -981,10 +973,6 @@ impl eframe::App for RanimPreviewApp {
                                 ui.label("Preparing...");
                             });
                         }
-                        if ui.button("Cancel").clicked() {
-                            self.export_cancel
-                                .store(true, std::sync::atomic::Ordering::Relaxed);
-                        }
                     } else if ui.button("Start Export").clicked() {
                         self.start_export(ctx.clone());
                     }
@@ -1014,8 +1002,10 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
         eframe::run_native(
             &title,
             native_options,
-            Box::new(|_cc| {
-                // If we wanted to access wgpu context on creation, we could do it here from _cc.wgpu_render_state
+            Box::new(|cc| {
+                let mut fonts = egui::FontDefinitions::default();
+                egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+                cc.egui_ctx.set_fonts(fonts);
                 Ok(Box::new(app))
             }),
         )

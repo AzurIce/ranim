@@ -10,8 +10,6 @@ use ranim_core::store::CoreItemStore;
 use ranim_core::{SealedRanimScene, TimeMark};
 use ranim_render::resource::{RenderPool, RenderTextures};
 use ranim_render::{Renderer, utils::WgpuContext};
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -50,14 +48,12 @@ pub fn render_scene_output(
     output: &Output,
     buffer_count: usize,
 ) {
-    render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None, None);
+    render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None);
 }
 
-/// Render a scene output with optional progress callback and cancellation.
+/// Render a scene output with optional progress callback.
 ///
-/// - `on_progress` receives `(current_frame, total_frames)` each frame.
-/// - `cancel` can be set to `true` to stop the render early.
-/// - Returns `true` if the render was cancelled.
+/// The callback receives `(current_frame, total_frames)` each frame.
 pub fn render_scene_output_with_progress(
     constructor: impl SceneConstructor,
     name: String,
@@ -65,8 +61,7 @@ pub fn render_scene_output_with_progress(
     output: &Output,
     buffer_count: usize,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
-    cancel: Option<Arc<AtomicBool>>,
-) -> bool {
+) {
     use std::time::Instant;
 
     info!(
@@ -79,11 +74,10 @@ pub fn render_scene_output_with_progress(
     trace!("Build timeline cost: {:?}", t.elapsed());
 
     let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
-    let cancelled = app.render_timeline(&scene, on_progress, cancel);
-    if !cancelled && !scene.time_marks().is_empty() {
+    app.render_timeline(&scene, on_progress);
+    if !scene.time_marks().is_empty() {
         app.render_capture_marks(&scene);
     }
-    cancelled
 }
 
 /// drop it will close the channel and the thread loop will be terminated
@@ -382,8 +376,7 @@ impl RanimRenderApp {
         &mut self,
         timeline: &SealedRanimScene,
         on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
-        cancel: Option<Arc<AtomicBool>>,
-    ) -> bool {
+    ) {
         let start = Instant::now();
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {
@@ -428,47 +421,36 @@ impl RanimRenderApp {
         span.pb_set_style(&style);
         span.pb_set_length(num_frames);
 
-        let mut cancelled = false;
-        for (i, sec) in (0..num_frames)
+        (0..num_frames)
             .map(|f| (f as f64 / fps).min(total_secs))
             .enumerate()
-        {
-            worker_thread.sync_and_submit(|store| {
-                store.update(timeline.eval_at_sec(sec));
-            });
+            .for_each(|(i, sec)| {
+                worker_thread.sync_and_submit(|store| {
+                    store.update(timeline.eval_at_sec(sec));
+                });
 
-            span.pb_inc(1);
-            if let Some(cb) = &on_progress {
-                cb(i as u64 + 1, num_frames);
-            }
-            if cancel.as_ref().is_some_and(|c| c.load(std::sync::atomic::Ordering::Relaxed)) {
-                info!("Export cancelled at frame {}/{}", i + 1, num_frames);
-                cancelled = true;
-                break;
-            }
-            span.pb_set_message(
-                format!(
-                    "rendering {:.1?}/{:.1?}",
-                    Duration::from_secs_f64(sec),
-                    Duration::from_secs_f64(total_secs)
-                )
-                .as_str(),
-            );
-        }
+                span.pb_inc(1);
+                if let Some(cb) = &on_progress {
+                    cb(i as u64 + 1, num_frames);
+                }
+                span.pb_set_message(
+                    format!(
+                        "rendering {:.1?}/{:.1?}",
+                        Duration::from_secs_f64(sec),
+                        Duration::from_secs_f64(total_secs)
+                    )
+                    .as_str(),
+                );
+            });
         self.render_worker.replace(worker_thread.retrive());
 
-        if cancelled {
-            info!("Export cancelled");
-        } else {
-            info!(
-                "rendered {} frames({:?}) in {:?}",
-                num_frames,
-                Duration::from_secs_f64(timeline.total_secs()),
-                start.elapsed(),
-            );
-        }
+        info!(
+            "rendered {} frames({:?}) in {:?}",
+            num_frames,
+            Duration::from_secs_f64(timeline.total_secs()),
+            start.elapsed(),
+        );
         trace!("render timeline cost: {:?}", start.elapsed());
-        cancelled
     }
 
     #[instrument(skip_all)]
