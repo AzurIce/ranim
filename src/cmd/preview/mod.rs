@@ -3,6 +3,7 @@ mod timeline;
 
 use crate::{
     Output, OutputFormat, Scene, SceneConfig, SceneConstructor,
+    cmd::render::file_writer::OutputFormatExt,
     core::{
         SealedRanimScene,
         color::{self, LinearSrgb},
@@ -163,7 +164,11 @@ pub struct RanimPreviewApp {
 }
 
 impl RanimPreviewApp {
-    pub fn new(scene_constructor: fn(&mut crate::core::RanimScene), title: String, scene_config: SceneConfig) -> Self {
+    pub fn new(
+        scene_constructor: fn(&mut crate::core::RanimScene),
+        title: String,
+        scene_config: SceneConfig,
+    ) -> Self {
         let t = Instant::now();
         info!("building scene...");
         let timeline = scene_constructor.build_scene();
@@ -463,7 +468,8 @@ impl RanimPreviewApp {
                     &output,
                     2,
                     Some(Box::new(move |current, total| {
-                        let _ = progress_tx_cb.send_blocking(ExportProgress::Progress(current, total));
+                        let _ =
+                            progress_tx_cb.send_blocking(ExportProgress::Progress(current, total));
                         ctx_cb.request_repaint();
                     })),
                 );
@@ -514,8 +520,8 @@ impl eframe::App for RanimPreviewApp {
             }
             if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
                 self.play_prev_t = None;
-                self.timeline_state.current_sec =
-                    (self.timeline_state.current_sec + frame_dur).min(self.timeline_state.total_sec);
+                self.timeline_state.current_sec = (self.timeline_state.current_sec + frame_dur)
+                    .min(self.timeline_state.total_sec);
             }
         }
 
@@ -647,7 +653,10 @@ impl eframe::App for RanimPreviewApp {
 
                     ui.separator();
                     let exporting = self.export_progress_rx.is_some();
-                    if ui.add_enabled(!exporting, egui::Button::new("Export")).clicked() {
+                    if ui
+                        .add_enabled(!exporting, egui::Button::new("Export"))
+                        .clicked()
+                    {
                         self.export_dialog_open = true;
                     }
 
@@ -685,7 +694,11 @@ impl eframe::App for RanimPreviewApp {
                     }
 
                     // < Step back one frame
-                    if ui.button("⏪").on_hover_text("Step back one frame").clicked() {
+                    if ui
+                        .button("⏪")
+                        .on_hover_text("Step back one frame")
+                        .clicked()
+                    {
                         self.play_prev_t = None;
                         self.timeline_state.current_sec =
                             (self.timeline_state.current_sec - frame_dur).max(0.0);
@@ -707,10 +720,15 @@ impl eframe::App for RanimPreviewApp {
                     }
 
                     // > Step forward one frame
-                    if ui.button("⏩").on_hover_text("Step forward one frame").clicked() {
+                    if ui
+                        .button("⏩")
+                        .on_hover_text("Step forward one frame")
+                        .clicked()
+                    {
                         self.play_prev_t = None;
-                        self.timeline_state.current_sec =
-                            (self.timeline_state.current_sec + frame_dur).min(self.timeline_state.total_sec);
+                        self.timeline_state.current_sec = (self.timeline_state.current_sec
+                            + frame_dur)
+                            .min(self.timeline_state.total_sec);
                     }
 
                     // >| Jump to end
@@ -727,7 +745,15 @@ impl eframe::App for RanimPreviewApp {
                     if self.looping {
                         loop_btn = loop_btn.fill(ui.visuals().selection.bg_fill);
                     }
-                    if ui.add(loop_btn).on_hover_text(if self.looping { "Looping: ON" } else { "Looping: OFF" }).clicked() {
+                    if ui
+                        .add(loop_btn)
+                        .on_hover_text(if self.looping {
+                            "Looping: ON"
+                        } else {
+                            "Looping: OFF"
+                        })
+                        .clicked()
+                    {
                         self.looping = !self.looping;
                     }
 
@@ -740,7 +766,8 @@ impl eframe::App for RanimPreviewApp {
                             .speed(drag_speed)
                             .range(0.1..=10.0)
                             .suffix("x"),
-                    ).on_hover_text("Playback speed");
+                    )
+                    .on_hover_text("Playback speed");
 
                     ui.separator();
 
@@ -790,83 +817,7 @@ impl eframe::App for RanimPreviewApp {
             }
         });
 
-        // Export configuration dialog
-        if self.export_dialog_open {
-            let mut open = self.export_dialog_open;
-            egui::Window::new("Export")
-                .open(&mut open)
-                .resizable(false)
-                .show(ctx, |ui| {
-                    egui::Grid::new("export_grid").num_columns(2).show(ui, |ui| {
-                        ui.label("Width:");
-                        ui.add(egui::DragValue::new(&mut self.export_config.width).range(1..=7680));
-                        ui.end_row();
-
-                        ui.label("Height:");
-                        ui.add(egui::DragValue::new(&mut self.export_config.height).range(1..=4320));
-                        ui.end_row();
-
-                        ui.label("FPS:");
-                        ui.add(egui::DragValue::new(&mut self.export_config.fps).range(1..=240));
-                        ui.end_row();
-
-                        ui.label("Format:");
-                        egui::ComboBox::from_id_salt("export_format")
-                            .selected_text(format!("{}", self.export_config.format))
-                            .show_ui(ui, |ui| {
-                                ui.selectable_value(&mut self.export_config.format, OutputFormat::Mp4, "mp4");
-                                ui.selectable_value(&mut self.export_config.format, OutputFormat::Webm, "webm");
-                                ui.selectable_value(&mut self.export_config.format, OutputFormat::Mov, "mov");
-                                ui.selectable_value(&mut self.export_config.format, OutputFormat::Gif, "gif");
-                            });
-                        ui.end_row();
-
-                        ui.label("Output dir:");
-                        ui.text_edit_singleline(&mut self.export_config.dir);
-                        ui.end_row();
-
-                        ui.label("Save frames:");
-                        ui.checkbox(&mut self.export_config.save_frames, "");
-                        ui.end_row();
-                    });
-
-                    ui.add_space(8.0);
-
-                    // Show resolved output path preview
-                    {
-                        let mut output_dir = std::path::PathBuf::from(&self.export_config.dir);
-                        if !output_dir.is_absolute() {
-                            output_dir = std::env::current_dir()
-                                .unwrap_or_default()
-                                .join("output")
-                                .join(&output_dir);
-                        }
-                        let (_, _, ext) = self.export_config.format.encoding_params();
-                        let name = self.export_config.name.as_deref().unwrap_or(&self.title);
-                        let file_path = output_dir.join(format!(
-                            "{}_{}x{}_{}.{ext}",
-                            name,
-                            self.export_config.width,
-                            self.export_config.height,
-                            self.export_config.fps,
-                        ));
-                        ui.label(
-                            egui::RichText::new(format!("→ {}", file_path.display()))
-                                .small()
-                                .color(ui.visuals().weak_text_color()),
-                        );
-                    }
-
-                    ui.add_space(4.0);
-                    if ui.button("Start Export").clicked() {
-                        self.start_export(ctx.clone());
-                        self.export_dialog_open = false;
-                    }
-                });
-            self.export_dialog_open = open;
-        }
-
-        // Export progress dialog
+        // Poll export progress
         if let Some(rx) = &self.export_progress_rx {
             let mut done = false;
             let mut error_msg = None;
@@ -897,10 +848,110 @@ impl eframe::App for RanimPreviewApp {
                     info!("Export completed");
                 }
             } else {
-                egui::Window::new("Exporting...")
-                    .collapsible(false)
-                    .resizable(false)
-                    .show(ctx, |ui| {
+                ctx.request_repaint();
+            }
+        }
+
+        // Export configuration dialog
+        let exporting = self.export_progress_rx.is_some();
+        if self.export_dialog_open || exporting {
+            let mut open = self.export_dialog_open;
+            egui::Window::new("Export")
+                .open(&mut open)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.add_enabled_ui(!exporting, |ui| {
+                    egui::Grid::new("export_grid")
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            ui.label("Width:");
+                            ui.add(
+                                egui::DragValue::new(&mut self.export_config.width).range(1..=7680),
+                            );
+                            ui.end_row();
+
+                            ui.label("Height:");
+                            ui.add(
+                                egui::DragValue::new(&mut self.export_config.height)
+                                    .range(1..=4320),
+                            );
+                            ui.end_row();
+
+                            ui.label("FPS:");
+                            ui.add(
+                                egui::DragValue::new(&mut self.export_config.fps).range(1..=240),
+                            );
+                            ui.end_row();
+
+                            ui.label("Format:");
+                            egui::ComboBox::from_id_salt("export_format")
+                                .selected_text(format!("{}", self.export_config.format))
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut self.export_config.format,
+                                        OutputFormat::Mp4,
+                                        "mp4",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.export_config.format,
+                                        OutputFormat::Webm,
+                                        "webm",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.export_config.format,
+                                        OutputFormat::Mov,
+                                        "mov",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.export_config.format,
+                                        OutputFormat::Gif,
+                                        "gif",
+                                    );
+                                });
+                            ui.end_row();
+
+                            ui.label("Output dir:");
+                            ui.text_edit_singleline(&mut self.export_config.dir);
+                            ui.end_row();
+
+                            // Show resolved output path preview right below the dir input
+                            ui.label("");
+                            {
+                                let mut output_dir =
+                                    std::path::PathBuf::from(&self.export_config.dir);
+                                if !output_dir.is_absolute() {
+                                    output_dir = std::env::current_dir()
+                                        .unwrap_or_default()
+                                        .join(&output_dir);
+                                }
+                                let (_, _, ext) = self.export_config.format.encoding_params();
+                                let name =
+                                    self.export_config.name.as_deref().unwrap_or(&self.title);
+                                let file_path = output_dir.join(format!(
+                                    "{}_{}x{}_{}.{ext}",
+                                    name,
+                                    self.export_config.width,
+                                    self.export_config.height,
+                                    self.export_config.fps,
+                                ));
+                                ui.label(
+                                    egui::RichText::new(format!("-> {}", file_path.display()))
+                                        .small()
+                                        .color(ui.visuals().weak_text_color()),
+                                );
+                            }
+                            ui.end_row();
+
+                            ui.label("Save frames:");
+                            ui.checkbox(&mut self.export_config.save_frames, "");
+                            ui.end_row();
+                        });
+                    }); // end add_enabled_ui
+
+                    ui.add_space(8.0);
+
+                    // Show progress bar inline when exporting
+                    if exporting {
                         let current = self.export_current_frame;
                         let total = self.export_total_frames;
                         if total > 0 {
@@ -915,8 +966,13 @@ impl eframe::App for RanimPreviewApp {
                                 ui.label("Preparing...");
                             });
                         }
-                    });
-                ctx.request_repaint();
+                    } else if ui.button("Start Export").clicked() {
+                        self.start_export(ctx.clone());
+                    }
+                });
+            // Don't allow closing the window while exporting
+            if !exporting {
+                self.export_dialog_open = open;
             }
         }
     }
@@ -978,7 +1034,11 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
     }
 }
 
-pub fn preview_constructor_with_name(scene: fn(&mut crate::core::RanimScene), name: &str, scene_config: &SceneConfig) {
+pub fn preview_constructor_with_name(
+    scene: fn(&mut crate::core::RanimScene),
+    name: &str,
+    scene_config: &SceneConfig,
+) {
     let app = RanimPreviewApp::new(scene, name.to_string(), scene_config.clone());
     run_app(
         app,

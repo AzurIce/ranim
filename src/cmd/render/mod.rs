@@ -18,7 +18,7 @@ use std::{
 use tracing::{Span, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
-mod file_writer;
+pub(crate) mod file_writer;
 
 #[cfg(feature = "profiling")]
 use ranim_render::PUFFIN_GPU_PROFILER;
@@ -65,6 +65,11 @@ pub fn render_scene_output_with_progress(
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
 ) {
     use std::time::Instant;
+
+    info!(
+        "Output: {}x{} {}fps {} dir={:?} save_frames={}",
+        output.width, output.height, output.fps, output.format, output.dir, output.save_frames
+    );
 
     let t = Instant::now();
     let scene = constructor.build_scene();
@@ -153,7 +158,6 @@ impl RenderWorker {
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir()
                 .unwrap()
-                .join("./output")
                 .join(output_dir);
         }
         let renderer = Renderer::new(&ctx, output.width, output.height, 8);
@@ -371,7 +375,11 @@ impl RanimRenderApp {
     }
 
     #[instrument(skip_all)]
-    fn render_timeline(&mut self, timeline: &SealedRanimScene, on_progress: &Option<Box<dyn Fn(u64, u64) + Send>>) {
+    fn render_timeline(
+        &mut self,
+        timeline: &SealedRanimScene,
+        on_progress: &Option<Box<dyn Fn(u64, u64) + Send>>,
+    ) {
         let start = Instant::now();
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {

@@ -61,7 +61,7 @@ pub fn parse_output_list(list: &MetaList) -> syn::Result<OutputDef> {
         fps: 60,
         save_frames: false,
         name: None,
-        dir: "./".into(),
+        dir: "./output".into(),
         format: None,
     };
 

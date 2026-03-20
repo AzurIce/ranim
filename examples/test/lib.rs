@@ -24,7 +24,7 @@ use ranim::{
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
-#[output(save_frames = true, dir = "output")]
+#[output(save_frames = true, dir = "./output/output")]
 fn test(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default().with(|x| {
         x.perspective_blend = 1.0;
