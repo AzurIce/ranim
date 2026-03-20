@@ -12,7 +12,7 @@ use ranim_core::animation::Eval;
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
-#[output(dir = "regular_polygon")]
+#[output(dir = "./output/regular_polygon")]
 pub fn regular_polygon(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 

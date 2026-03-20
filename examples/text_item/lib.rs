@@ -9,7 +9,7 @@ use ranim_anims::{
 use ranim_items::vitem::{VItem, text::TextItem};
 
 #[scene]
-#[output(dir = "text_item")]
+#[output(dir = "./output/text_item")]
 fn text_item(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let text = "The quick brown fox jumps over the lazy dog.";

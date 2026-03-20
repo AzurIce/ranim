@@ -9,7 +9,7 @@ use ranim::{
 };
 
 #[scene]
-#[output(dir = "arc_between_points")]
+#[output(dir = "./output/arc_between_points")]
 fn arc_between_points(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let center = dvec2(0.0, 0.0);

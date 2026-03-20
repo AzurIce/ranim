@@ -10,7 +10,7 @@ use ranim::{
 };
 
 #[scene]
-#[output(dir = "ellipse")]
+#[output(dir = "./output/ellipse")]
 fn ellipse(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 

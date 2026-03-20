@@ -11,7 +11,7 @@ use ranim_core::animation::StaticAnim;
 use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 
 #[scene(clear_color = "#000000")]
-#[output(dir = "animating_pi")]
+#[output(dir = "./output/animating_pi")]
 fn animating_pi(r: &mut RanimScene) {
     let cam = CameraFrame::default();
     let _r_cam = r.insert(cam.clone());

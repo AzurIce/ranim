@@ -10,7 +10,7 @@ use ranim::{
 use ranim_core::animation::StaticAnim;
 
 #[scene]
-#[output(dir = "perspective_blend")]
+#[output(dir = "./output/perspective_blend")]
 fn perspective_blend(r: &mut RanimScene) {
     let mut cam = CameraFrame::default();
     let r_cam = r.insert(cam.clone());

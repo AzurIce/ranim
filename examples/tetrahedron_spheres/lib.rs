@@ -29,7 +29,7 @@ impl Eval<Surface> for RotateAroundZ {
 }
 
 #[scene]
-#[output(dir = "tetrahedron_spheres")]
+#[output(dir = "./output/tetrahedron_spheres")]
 fn tetrahedron_spheres(r: &mut RanimScene) {
     let phi = 60.0 * PI / 180.0;
     let theta = PI / 2.0;

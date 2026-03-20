@@ -10,15 +10,13 @@ use ranim_core::store::CoreItemStore;
 use ranim_core::{SealedRanimScene, TimeMark};
 use ranim_render::resource::{RenderPool, RenderTextures};
 use ranim_render::{Renderer, utils::WgpuContext};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
-use std::{
-    path::{Path, PathBuf},
-    time::Instant,
-};
+use std::time::Instant;
 use tracing::{Span, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
-mod file_writer;
+pub(crate) mod file_writer;
 
 #[cfg(feature = "profiling")]
 use ranim_render::PUFFIN_GPU_PROFILER;
@@ -50,14 +48,33 @@ pub fn render_scene_output(
     output: &Output,
     buffer_count: usize,
 ) {
+    render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None);
+}
+
+/// Render a scene output with optional progress callback.
+///
+/// The callback receives `(current_frame, total_frames)` each frame.
+pub fn render_scene_output_with_progress(
+    constructor: impl SceneConstructor,
+    name: String,
+    scene_config: &SceneConfig,
+    output: &Output,
+    buffer_count: usize,
+    on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+) {
     use std::time::Instant;
+
+    info!(
+        "Output: {}x{} {}fps {} dir={:?} save_frames={}",
+        output.width, output.height, output.fps, output.format, output.dir, output.save_frames
+    );
 
     let t = Instant::now();
     let scene = constructor.build_scene();
     trace!("Build timeline cost: {:?}", t.elapsed());
 
     let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
-    app.render_timeline(&scene);
+    app.render_scene_with_progress(&scene, on_progress);
     if !scene.time_marks().is_empty() {
         app.render_capture_marks(&scene);
     }
@@ -137,10 +154,7 @@ impl RenderWorker {
 
         let mut output_dir = PathBuf::from(&output.dir);
         if !output_dir.is_absolute() {
-            output_dir = std::env::current_dir()
-                .unwrap()
-                .join("./output")
-                .join(output_dir);
+            output_dir = std::env::current_dir().unwrap().join(output_dir);
         }
         let renderer = Renderer::new(&ctx, output.width, output.height, 8);
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
@@ -151,7 +165,6 @@ impl RenderWorker {
             .convert::<LinearSrgb>();
         let [r, g, b, a] = clear_color.components.map(|x| x as f64);
         let clear_color = wgpu::Color { r, g, b, a };
-
         let (_, _, ext) = output.format.encoding_params();
         Self {
             ctx,
@@ -357,7 +370,11 @@ impl RanimRenderApp {
     }
 
     #[instrument(skip_all)]
-    fn render_timeline(&mut self, timeline: &SealedRanimScene) {
+    pub fn render_scene_with_progress(
+        &mut self,
+        timeline: &SealedRanimScene,
+        on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+    ) {
         let start = Instant::now();
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {
@@ -404,12 +421,16 @@ impl RanimRenderApp {
 
         (0..num_frames)
             .map(|f| (f as f64 / fps).min(total_secs))
-            .for_each(|sec| {
+            .enumerate()
+            .for_each(|(i, sec)| {
                 worker_thread.sync_and_submit(|store| {
                     store.update(timeline.eval_at_sec(sec));
                 });
 
                 span.pb_inc(1);
+                if let Some(cb) = &on_progress {
+                    cb(i as u64 + 1, num_frames);
+                }
                 span.pb_set_message(
                     format!(
                         "rendering {:.1?}/{:.1?}",

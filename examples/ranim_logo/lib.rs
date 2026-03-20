@@ -69,7 +69,7 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     ]
 }
 #[scene]
-#[output(dir = "ranim_logo")]
+#[output(dir = "./output/ranim_logo")]
 fn ranim_logo(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);

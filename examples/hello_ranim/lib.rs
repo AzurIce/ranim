@@ -11,7 +11,7 @@ use ranim::{
 };
 
 #[scene]
-#[output(dir = "hello_ranim")]
+#[output(dir = "./output/hello_ranim")]
 fn hello_ranim(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 

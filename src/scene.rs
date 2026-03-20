@@ -82,9 +82,9 @@ pub struct Output {
     ///
     /// e.g. the output of name `my_video` will be outputed as `my_video_<width>x<height>_<fps>.mp4`.
     pub name: Option<String>,
-    /// The directory to save the output
+    /// The directory to save the output.
     ///
-    /// Related to the `output` folder, Or absolute.
+    /// Can be relative (resolved from cwd) or absolute.
     pub dir: String,
     /// The output video format.
     pub format: OutputFormat,
@@ -98,7 +98,7 @@ impl Default for Output {
             fps: 60,
             save_frames: false,
             name: None,
-            dir: "./".to_string(),
+            dir: "./output".to_string(),
             format: OutputFormat::default(),
         }
     }

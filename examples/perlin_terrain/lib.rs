@@ -215,7 +215,7 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
 
 /// Basic Perlin noise terrain.
 #[scene]
-#[output(dir = "perlin_terrain/perlin")]
+#[output(dir = "./output/perlin_terrain/perlin")]
 fn perlin(r: &mut RanimScene) {
     // Python: get_noise(x, y, size) → noise(v, u) (note v, u swap)
     // height = noise_func(v, u, size) * depth = noise * depth
@@ -229,7 +229,7 @@ fn perlin(r: &mut RanimScene) {
 
 /// Fractal Perlin noise terrain (octave stacking).
 #[scene]
-#[output(dir = "perlin_terrain/fractal")]
+#[output(dir = "./output/perlin_terrain/fractal")]
 fn fractal_perlin(r: &mut RanimScene) {
     // Python: get_fractal_noise(x, y, size) * depth → fractal_noise(v, u) * depth
     // height = noise_func(v, u, size) * depth = fractal_noise * depth * depth
@@ -246,7 +246,7 @@ fn fractal_perlin(r: &mut RanimScene) {
 
 /// Fractal Perlin noise with derivative-based erosion.
 #[scene(name = "perlin_terrain")]
-#[output(dir = "perlin_terrain/erosion")]
+#[output(dir = "./output/perlin_terrain/erosion")]
 fn fractal_erosion(r: &mut RanimScene) {
     // Same pattern as fractal_perlin but with derivative-based erosion
     build_terrain_scene(r, |u, v| {

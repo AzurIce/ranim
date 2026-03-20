@@ -11,7 +11,7 @@ use ranim::{
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
-#[output(dir = "basic")]
+#[output(dir = "./output/basic")]
 fn basic(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     r.timelines_mut().forward(0.2);

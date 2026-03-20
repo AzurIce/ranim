@@ -119,7 +119,7 @@ const PLANETS: &[PlanetData] = &[
 ];
 
 #[scene]
-#[output(dir = "solar_system")]
+#[output(dir = "./output/solar_system")]
 fn solar_system(r: &mut RanimScene) {
     // Setup camera looking down from above (top-down view)
     let phi = 50.0f64.to_radians(); // Small angle from +Z axis (almost straight down)

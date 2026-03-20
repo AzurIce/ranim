@@ -10,7 +10,7 @@ use ranim::{
 
 // ANCHOR: construct
 #[scene]
-#[output(dir = "getting_started1")]
+#[output(dir = "./output/getting_started1")]
 fn getting_started1(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     // A Square with size 2.0 and color blue

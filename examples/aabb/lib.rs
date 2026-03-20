@@ -19,7 +19,7 @@ use ranim::{
 };
 
 #[scene]
-#[output(dir = "aabb")]
+#[output(dir = "./output/aabb")]
 fn aabb(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 
