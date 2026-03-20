@@ -2,7 +2,7 @@ mod depth_visual;
 mod timeline;
 
 use crate::{
-    Output, OutputFormat, Scene, SceneConstructor,
+    Output, OutputFormat, Scene, SceneConfig, SceneConstructor,
     cmd::render::file_writer::OutputFormatExt,
     core::{
         SealedRanimScene,
@@ -124,6 +124,7 @@ pub struct RanimPreviewApp {
     title: String,
     clear_color: wgpu::Color,
     scene_constructor: fn(&mut crate::core::RanimScene),
+    scene_config: SceneConfig,
     resolution: Resolution,
     timeline: SealedRanimScene,
     need_eval: bool,
@@ -168,6 +169,7 @@ impl RanimPreviewApp {
     pub fn new(
         scene_constructor: fn(&mut crate::core::RanimScene),
         title: String,
+        scene_config: SceneConfig,
     ) -> Self {
         let t = Instant::now();
         info!("building scene...");
@@ -186,6 +188,7 @@ impl RanimPreviewApp {
             title,
             clear_color: wgpu::Color::TRANSPARENT,
             scene_constructor,
+            scene_config,
             resolution: Resolution::QHD,
             timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
             timeline,
@@ -456,7 +459,7 @@ impl RanimPreviewApp {
         self.export_cancel.store(false, Ordering::Relaxed);
 
         let constructor = self.scene_constructor;
-        let clear_color = self.clear_color;
+        let scene_config = self.scene_config.clone();
         let output = self.export_config.clone();
         let name = self.title.clone();
         let cancel = self.export_cancel.clone();
@@ -468,16 +471,15 @@ impl RanimPreviewApp {
                 let cancelled = crate::cmd::render::render_scene_output_with_progress(
                     constructor,
                     name,
-                    clear_color,
+                    &scene_config,
                     &output,
                     2,
                     Some(Box::new(move |current, total| {
                         let _ =
                             progress_tx_cb.send_blocking(ExportProgress::Progress(current, total));
                         ctx_cb.request_repaint();
-                        // Return false to cancel
-                        !cancel.load(Ordering::Relaxed)
                     })),
+                    Some(cancel),
                 );
 
                 if cancelled {
@@ -1054,8 +1056,9 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
 pub fn preview_constructor_with_name(
     scene: fn(&mut crate::core::RanimScene),
     name: &str,
+    scene_config: &SceneConfig,
 ) {
-    let app = RanimPreviewApp::new(scene, name.to_string());
+    let app = RanimPreviewApp::new(scene, name.to_string(), scene_config.clone());
     run_app(
         app,
         #[cfg(target_arch = "wasm32")]
@@ -1070,7 +1073,7 @@ pub fn preview_scene(scene: &Scene) {
 
 /// Preview a scene with a custom name
 pub fn preview_scene_with_name(scene: &Scene, name: &str) {
-    let mut app = RanimPreviewApp::new(scene.constructor, name.to_string());
+    let mut app = RanimPreviewApp::new(scene.constructor, name.to_string(), scene.config.clone());
     app.set_clear_color_str(&scene.config.clear_color);
     run_app(
         app,

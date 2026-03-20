@@ -160,7 +160,7 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
     //     info!("- {:?}", scene.name);
     // }
     // panic!("Failed to get preview scene");
-    let mut app = RanimPreviewApp::new(scene.constructor, scene.name.clone());
+    let mut app = RanimPreviewApp::new(scene.constructor, scene.name.clone(), scene.config.clone());
     app.set_clear_color_str(&scene.config.clear_color);
     let cmd_tx = app.cmd_tx.clone();
 

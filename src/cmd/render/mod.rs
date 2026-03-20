@@ -10,11 +10,11 @@ use ranim_core::store::CoreItemStore;
 use ranim_core::{SealedRanimScene, TimeMark};
 use ranim_render::resource::{RenderPool, RenderTextures};
 use ranim_render::{Renderer, utils::WgpuContext};
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::Duration;
-use std::{
-    path::{Path, PathBuf},
-    time::Instant,
-};
+use std::path::{Path, PathBuf};
+use std::time::Instant;
 use tracing::{Span, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
@@ -25,7 +25,6 @@ use ranim_render::PUFFIN_GPU_PROFILER;
 
 /// Render a scene with all its outputs
 pub fn render_scene(scene: &Scene, buffer_count: usize) {
-    let clear_color = scene_config_to_clear_color(&scene.config);
     for (i, output) in scene.outputs.iter().enumerate() {
         info!(
             "Rendering output {}/{} ({})",
@@ -33,13 +32,12 @@ pub fn render_scene(scene: &Scene, buffer_count: usize) {
             scene.outputs.len(),
             output.format
         );
-        render_scene_output_with_progress(
+        render_scene_output(
             scene.constructor,
             scene.name.to_string(),
-            clear_color,
+            &scene.config,
             output,
             buffer_count,
-            None,
         );
     }
 }
@@ -52,29 +50,22 @@ pub fn render_scene_output(
     output: &Output,
     buffer_count: usize,
 ) {
-    let clear_color = scene_config_to_clear_color(scene_config);
-    render_scene_output_with_progress(constructor, name, clear_color, output, buffer_count, None);
+    render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None, None);
 }
 
-fn scene_config_to_clear_color(scene_config: &SceneConfig) -> wgpu::Color {
-    let bg = color::try_color(&scene_config.clear_color)
-        .unwrap_or(color::color("#333333ff"))
-        .convert::<LinearSrgb>();
-    let [r, g, b, a] = bg.components.map(|x| x as f64);
-    wgpu::Color { r, g, b, a }
-}
-
-/// Render a scene output with optional progress callback.
+/// Render a scene output with optional progress callback and cancellation.
 ///
-/// The callback receives `(current_frame, total_frames)` and returns `true` to continue
-/// or `false` to cancel. Returns `true` if the render was cancelled.
+/// - `on_progress` receives `(current_frame, total_frames)` each frame.
+/// - `cancel` can be set to `true` to stop the render early.
+/// - Returns `true` if the render was cancelled.
 pub fn render_scene_output_with_progress(
     constructor: impl SceneConstructor,
     name: String,
-    clear_color: wgpu::Color,
+    scene_config: &SceneConfig,
     output: &Output,
     buffer_count: usize,
-    on_progress: Option<Box<dyn Fn(u64, u64) -> bool + Send>>,
+    on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+    cancel: Option<Arc<AtomicBool>>,
 ) -> bool {
     use std::time::Instant;
 
@@ -87,8 +78,8 @@ pub fn render_scene_output_with_progress(
     let scene = constructor.build_scene();
     trace!("Build timeline cost: {:?}", t.elapsed());
 
-    let mut app = RanimRenderApp::new(name, clear_color, output, buffer_count);
-    let cancelled = app.render_timeline(&scene, &on_progress);
+    let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
+    let cancelled = app.render_timeline(&scene, on_progress, cancel);
     if !cancelled && !scene.time_marks().is_empty() {
         app.render_capture_marks(&scene);
     }
@@ -137,7 +128,7 @@ struct RenderWorker {
 impl RenderWorker {
     fn new(
         scene_name: String,
-        clear_color: wgpu::Color,
+        scene_config: &SceneConfig,
         output: &Output,
         buffer_count: usize,
     ) -> Self {
@@ -177,6 +168,11 @@ impl RenderWorker {
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
             .map(|_| renderer.new_render_textures(&ctx))
             .collect();
+        let clear_color = color::try_color(&scene_config.clear_color)
+            .unwrap_or(color::color("#333333ff"))
+            .convert::<LinearSrgb>();
+        let [r, g, b, a] = clear_color.components.map(|x| x as f64);
+        let clear_color = wgpu::Color { r, g, b, a };
         let (_, _, ext) = output.format.encoding_params();
         Self {
             ctx,
@@ -369,11 +365,11 @@ struct RanimRenderApp {
 impl RanimRenderApp {
     fn new(
         scene_name: String,
-        clear_color: wgpu::Color,
+        scene_config: &SceneConfig,
         output: &Output,
         buffer_count: usize,
     ) -> Self {
-        let render_worker = RenderWorker::new(scene_name, clear_color, output, buffer_count);
+        let render_worker = RenderWorker::new(scene_name, scene_config, output, buffer_count);
         Self {
             render_worker: Some(render_worker),
             fps: output.fps,
@@ -385,7 +381,8 @@ impl RanimRenderApp {
     fn render_timeline(
         &mut self,
         timeline: &SealedRanimScene,
-        on_progress: &Option<Box<dyn Fn(u64, u64) -> bool + Send>>,
+        on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+        cancel: Option<Arc<AtomicBool>>,
     ) -> bool {
         let start = Instant::now();
         #[cfg(feature = "profiling")]
@@ -441,12 +438,13 @@ impl RanimRenderApp {
             });
 
             span.pb_inc(1);
-            if let Some(cb) = on_progress {
-                if !cb(i as u64 + 1, num_frames) {
-                    info!("Export cancelled at frame {}/{}", i + 1, num_frames);
-                    cancelled = true;
-                    break;
-                }
+            if let Some(cb) = &on_progress {
+                cb(i as u64 + 1, num_frames);
+            }
+            if cancel.as_ref().is_some_and(|c| c.load(std::sync::atomic::Ordering::Relaxed)) {
+                info!("Export cancelled at frame {}/{}", i + 1, num_frames);
+                cancelled = true;
+                break;
             }
             span.pb_set_message(
                 format!(
