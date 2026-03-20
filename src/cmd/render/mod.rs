@@ -10,8 +10,8 @@ use ranim_core::store::CoreItemStore;
 use ranim_core::{SealedRanimScene, TimeMark};
 use ranim_render::resource::{RenderPool, RenderTextures};
 use ranim_render::{Renderer, utils::WgpuContext};
-use std::time::Duration;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use std::time::Instant;
 use tracing::{Span, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
@@ -74,7 +74,7 @@ pub fn render_scene_output_with_progress(
     trace!("Build timeline cost: {:?}", t.elapsed());
 
     let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
-    app.render_timeline(&scene, on_progress);
+    app.render_scene_with_progress(&scene, on_progress);
     if !scene.time_marks().is_empty() {
         app.render_capture_marks(&scene);
     }
@@ -154,9 +154,7 @@ impl RenderWorker {
 
         let mut output_dir = PathBuf::from(&output.dir);
         if !output_dir.is_absolute() {
-            output_dir = std::env::current_dir()
-                .unwrap()
-                .join(output_dir);
+            output_dir = std::env::current_dir().unwrap().join(output_dir);
         }
         let renderer = Renderer::new(&ctx, output.width, output.height, 8);
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
@@ -372,7 +370,7 @@ impl RanimRenderApp {
     }
 
     #[instrument(skip_all)]
-    fn render_timeline(
+    pub fn render_scene_with_progress(
         &mut self,
         timeline: &SealedRanimScene,
         on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
