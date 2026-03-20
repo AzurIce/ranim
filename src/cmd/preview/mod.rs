@@ -2,7 +2,7 @@ mod depth_visual;
 mod timeline;
 
 use crate::{
-    Output, OutputFormat, Scene, SceneConfig, SceneConstructor,
+    Output, OutputFormat, Scene, SceneConstructor,
     cmd::render::file_writer::OutputFormatExt,
     core::{
         SealedRanimScene,
@@ -56,6 +56,7 @@ enum ExportProgress {
     /// (current_frame, total_frames)
     Progress(u64, u64),
     Done,
+    Cancelled,
     Error(String),
 }
 
@@ -123,7 +124,6 @@ pub struct RanimPreviewApp {
     title: String,
     clear_color: wgpu::Color,
     scene_constructor: fn(&mut crate::core::RanimScene),
-    scene_config: SceneConfig,
     resolution: Resolution,
     timeline: SealedRanimScene,
     need_eval: bool,
@@ -155,6 +155,7 @@ pub struct RanimPreviewApp {
     export_dialog_open: bool,
     export_config: Output,
     export_progress_rx: Option<Receiver<ExportProgress>>,
+    export_cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
     export_current_frame: u64,
     export_total_frames: u64,
 
@@ -167,7 +168,6 @@ impl RanimPreviewApp {
     pub fn new(
         scene_constructor: fn(&mut crate::core::RanimScene),
         title: String,
-        scene_config: SceneConfig,
     ) -> Self {
         let t = Instant::now();
         info!("building scene...");
@@ -186,7 +186,6 @@ impl RanimPreviewApp {
             title,
             clear_color: wgpu::Color::TRANSPARENT,
             scene_constructor,
-            scene_config,
             resolution: Resolution::QHD,
             timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
             timeline,
@@ -210,6 +209,7 @@ impl RanimPreviewApp {
             export_dialog_open: false,
             export_config: Output::default(),
             export_progress_rx: None,
+            export_cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             export_current_frame: 0,
             export_total_frames: 0,
             playback_speed: 1.0,
@@ -449,32 +449,42 @@ impl RanimPreviewApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn start_export(&mut self, ctx: egui::Context) {
+        use std::sync::atomic::Ordering;
+
         let (progress_tx, progress_rx) = unbounded();
         self.export_progress_rx = Some(progress_rx);
+        self.export_cancel.store(false, Ordering::Relaxed);
 
         let constructor = self.scene_constructor;
-        let scene_config = self.scene_config.clone();
+        let clear_color = self.clear_color;
         let output = self.export_config.clone();
         let name = self.title.clone();
+        let cancel = self.export_cancel.clone();
 
         std::thread::spawn(move || {
             let progress_tx_cb = progress_tx.clone();
             let ctx_cb = ctx.clone();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                crate::cmd::render::render_scene_output_with_progress(
+                let cancelled = crate::cmd::render::render_scene_output_with_progress(
                     constructor,
                     name,
-                    &scene_config,
+                    clear_color,
                     &output,
                     2,
                     Some(Box::new(move |current, total| {
                         let _ =
                             progress_tx_cb.send_blocking(ExportProgress::Progress(current, total));
                         ctx_cb.request_repaint();
+                        // Return false to cancel
+                        !cancel.load(Ordering::Relaxed)
                     })),
                 );
 
-                let _ = progress_tx.send_blocking(ExportProgress::Done);
+                if cancelled {
+                    let _ = progress_tx.send_blocking(ExportProgress::Cancelled);
+                } else {
+                    let _ = progress_tx.send_blocking(ExportProgress::Done);
+                }
                 ctx.request_repaint();
             }));
 
@@ -831,6 +841,9 @@ impl eframe::App for RanimPreviewApp {
                     ExportProgress::Done => {
                         done = true;
                     }
+                    ExportProgress::Cancelled => {
+                        done = true;
+                    }
                     ExportProgress::Error(err) => {
                         error_msg = Some(err);
                         done = true;
@@ -966,6 +979,10 @@ impl eframe::App for RanimPreviewApp {
                                 ui.label("Preparing...");
                             });
                         }
+                        if ui.button("Cancel").clicked() {
+                            self.export_cancel
+                                .store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
                     } else if ui.button("Start Export").clicked() {
                         self.start_export(ctx.clone());
                     }
@@ -1037,9 +1054,8 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
 pub fn preview_constructor_with_name(
     scene: fn(&mut crate::core::RanimScene),
     name: &str,
-    scene_config: &SceneConfig,
 ) {
-    let app = RanimPreviewApp::new(scene, name.to_string(), scene_config.clone());
+    let app = RanimPreviewApp::new(scene, name.to_string());
     run_app(
         app,
         #[cfg(target_arch = "wasm32")]
@@ -1054,7 +1070,7 @@ pub fn preview_scene(scene: &Scene) {
 
 /// Preview a scene with a custom name
 pub fn preview_scene_with_name(scene: &Scene, name: &str) {
-    let mut app = RanimPreviewApp::new(scene.constructor, name.to_string(), scene.config.clone());
+    let mut app = RanimPreviewApp::new(scene.constructor, name.to_string());
     app.set_clear_color_str(&scene.config.clear_color);
     run_app(
         app,

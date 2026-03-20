@@ -25,6 +25,7 @@ use ranim_render::PUFFIN_GPU_PROFILER;
 
 /// Render a scene with all its outputs
 pub fn render_scene(scene: &Scene, buffer_count: usize) {
+    let clear_color = scene_config_to_clear_color(&scene.config);
     for (i, output) in scene.outputs.iter().enumerate() {
         info!(
             "Rendering output {}/{} ({})",
@@ -32,12 +33,13 @@ pub fn render_scene(scene: &Scene, buffer_count: usize) {
             scene.outputs.len(),
             output.format
         );
-        render_scene_output(
+        render_scene_output_with_progress(
             scene.constructor,
             scene.name.to_string(),
-            &scene.config,
+            clear_color,
             output,
             buffer_count,
+            None,
         );
     }
 }
@@ -50,20 +52,30 @@ pub fn render_scene_output(
     output: &Output,
     buffer_count: usize,
 ) {
-    render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None);
+    let clear_color = scene_config_to_clear_color(scene_config);
+    render_scene_output_with_progress(constructor, name, clear_color, output, buffer_count, None);
+}
+
+fn scene_config_to_clear_color(scene_config: &SceneConfig) -> wgpu::Color {
+    let bg = color::try_color(&scene_config.clear_color)
+        .unwrap_or(color::color("#333333ff"))
+        .convert::<LinearSrgb>();
+    let [r, g, b, a] = bg.components.map(|x| x as f64);
+    wgpu::Color { r, g, b, a }
 }
 
 /// Render a scene output with optional progress callback.
 ///
-/// The callback receives `(current_frame, total_frames)`.
+/// The callback receives `(current_frame, total_frames)` and returns `true` to continue
+/// or `false` to cancel. Returns `true` if the render was cancelled.
 pub fn render_scene_output_with_progress(
     constructor: impl SceneConstructor,
     name: String,
-    scene_config: &SceneConfig,
+    clear_color: wgpu::Color,
     output: &Output,
     buffer_count: usize,
-    on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
-) {
+    on_progress: Option<Box<dyn Fn(u64, u64) -> bool + Send>>,
+) -> bool {
     use std::time::Instant;
 
     info!(
@@ -75,11 +87,12 @@ pub fn render_scene_output_with_progress(
     let scene = constructor.build_scene();
     trace!("Build timeline cost: {:?}", t.elapsed());
 
-    let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
-    app.render_timeline(&scene, &on_progress);
-    if !scene.time_marks().is_empty() {
+    let mut app = RanimRenderApp::new(name, clear_color, output, buffer_count);
+    let cancelled = app.render_timeline(&scene, &on_progress);
+    if !cancelled && !scene.time_marks().is_empty() {
         app.render_capture_marks(&scene);
     }
+    cancelled
 }
 
 /// drop it will close the channel and the thread loop will be terminated
@@ -124,7 +137,7 @@ struct RenderWorker {
 impl RenderWorker {
     fn new(
         scene_name: String,
-        scene_config: &SceneConfig,
+        clear_color: wgpu::Color,
         output: &Output,
         buffer_count: usize,
     ) -> Self {
@@ -164,12 +177,6 @@ impl RenderWorker {
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
             .map(|_| renderer.new_render_textures(&ctx))
             .collect();
-        let clear_color = color::try_color(&scene_config.clear_color)
-            .unwrap_or(color::color("#333333ff"))
-            .convert::<LinearSrgb>();
-        let [r, g, b, a] = clear_color.components.map(|x| x as f64);
-        let clear_color = wgpu::Color { r, g, b, a };
-
         let (_, _, ext) = output.format.encoding_params();
         Self {
             ctx,
@@ -362,11 +369,11 @@ struct RanimRenderApp {
 impl RanimRenderApp {
     fn new(
         scene_name: String,
-        scene_config: &SceneConfig,
+        clear_color: wgpu::Color,
         output: &Output,
         buffer_count: usize,
     ) -> Self {
-        let render_worker = RenderWorker::new(scene_name, scene_config, output, buffer_count);
+        let render_worker = RenderWorker::new(scene_name, clear_color, output, buffer_count);
         Self {
             render_worker: Some(render_worker),
             fps: output.fps,
@@ -378,8 +385,8 @@ impl RanimRenderApp {
     fn render_timeline(
         &mut self,
         timeline: &SealedRanimScene,
-        on_progress: &Option<Box<dyn Fn(u64, u64) + Send>>,
-    ) {
+        on_progress: &Option<Box<dyn Fn(u64, u64) -> bool + Send>>,
+    ) -> bool {
         let start = Instant::now();
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {
@@ -424,36 +431,46 @@ impl RanimRenderApp {
         span.pb_set_style(&style);
         span.pb_set_length(num_frames);
 
-        (0..num_frames)
+        let mut cancelled = false;
+        for (i, sec) in (0..num_frames)
             .map(|f| (f as f64 / fps).min(total_secs))
             .enumerate()
-            .for_each(|(i, sec)| {
-                worker_thread.sync_and_submit(|store| {
-                    store.update(timeline.eval_at_sec(sec));
-                });
-
-                span.pb_inc(1);
-                if let Some(cb) = on_progress {
-                    cb(i as u64 + 1, num_frames);
-                }
-                span.pb_set_message(
-                    format!(
-                        "rendering {:.1?}/{:.1?}",
-                        Duration::from_secs_f64(sec),
-                        Duration::from_secs_f64(total_secs)
-                    )
-                    .as_str(),
-                );
+        {
+            worker_thread.sync_and_submit(|store| {
+                store.update(timeline.eval_at_sec(sec));
             });
+
+            span.pb_inc(1);
+            if let Some(cb) = on_progress {
+                if !cb(i as u64 + 1, num_frames) {
+                    info!("Export cancelled at frame {}/{}", i + 1, num_frames);
+                    cancelled = true;
+                    break;
+                }
+            }
+            span.pb_set_message(
+                format!(
+                    "rendering {:.1?}/{:.1?}",
+                    Duration::from_secs_f64(sec),
+                    Duration::from_secs_f64(total_secs)
+                )
+                .as_str(),
+            );
+        }
         self.render_worker.replace(worker_thread.retrive());
 
-        info!(
-            "rendered {} frames({:?}) in {:?}",
-            num_frames,
-            Duration::from_secs_f64(timeline.total_secs()),
-            start.elapsed(),
-        );
+        if cancelled {
+            info!("Export cancelled");
+        } else {
+            info!(
+                "rendered {} frames({:?}) in {:?}",
+                num_frames,
+                Duration::from_secs_f64(timeline.total_secs()),
+                start.elapsed(),
+            );
+        }
         trace!("render timeline cost: {:?}", start.elapsed());
+        cancelled
     }
 
     #[instrument(skip_all)]
