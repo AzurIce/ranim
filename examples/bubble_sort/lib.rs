@@ -105,13 +105,13 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
 }
 
 #[scene]
-#[output(dir = "bubble_sort")]
+#[output(dir = "./output/bubble_sort")]
 fn bubble_sort_10(r: &mut RanimScene) {
     bubble_sort(r, 10);
 }
 
 #[scene(name = "bubble_sort")]
-#[output(dir = "bubble_sort")]
+#[output(dir = "./output/bubble_sort")]
 fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
 }

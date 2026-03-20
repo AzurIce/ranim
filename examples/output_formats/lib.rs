@@ -9,10 +9,10 @@ use ranim::{
 };
 
 #[scene(clear_color = "#00000000")]
-#[output(dir = "output_formats", format = "mp4")]
-#[output(dir = "output_formats", format = "webm")]
-#[output(dir = "output_formats", format = "mov")]
-#[output(dir = "output_formats", format = "gif")]
+#[output(dir = "./output/output_formats", format = "mp4")]
+#[output(dir = "./output/output_formats", format = "webm")]
+#[output(dir = "./output/output_formats", format = "mov")]
+#[output(dir = "./output/output_formats", format = "gif")]
 fn output_formats(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 

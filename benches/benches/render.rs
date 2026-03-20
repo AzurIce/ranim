@@ -17,7 +17,7 @@ fn render_benchmark(c: &mut Criterion) {
                     format!("static_squares_{n}"),
                     &SceneConfig::default(),
                     &Output {
-                        dir: "bench".to_string(),
+                        dir: "./output/bench".to_string(),
                         ..Default::default()
                     },
                     2,
@@ -32,7 +32,7 @@ fn render_benchmark(c: &mut Criterion) {
                     format!("transform_squares_{n}"),
                     &SceneConfig::default(),
                     &Output {
-                        dir: "bench".to_string(),
+                        dir: "./output/bench".to_string(),
                         ..Default::default()
                     },
                     2,

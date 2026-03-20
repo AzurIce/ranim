@@ -100,13 +100,13 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
 }
 
 #[scene]
-#[output(dir = "selective_sort")]
+#[output(dir = "./output/selective_sort")]
 fn selective_sort_10(r: &mut RanimScene) {
     selective_sort(r, 10);
 }
 
 #[scene(name = "selective_sort")]
-#[output(dir = "selective_sort")]
+#[output(dir = "./output/selective_sort")]
 fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
