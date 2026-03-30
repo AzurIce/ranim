@@ -4,7 +4,9 @@ use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::{creation::WritingAnim, direct_morph::DirectMorphAnim, fading::FadingAnim, morph::MorphAnim},
+    anims::{
+        creation::WritingAnim, direct_morph::DirectMorphAnim, fading::FadingAnim, morph::MorphAnim,
+    },
     color,
     color::palettes::manim,
     core::{Extract, components::width::Width},

@@ -2,6 +2,7 @@ use color::{AlphaColor, Srgb, palette::css, rgb8, rgba};
 use glam::DVec3;
 use glam::{DAffine2, dvec3};
 use ranim_core::anchor::Aabb;
+use ranim_core::components::vpoint::VPointVec;
 use ranim_core::core_item::CoreItem;
 use ranim_core::traits::{PointsFunc, RotateTransform, ShiftTransformExt};
 use ranim_core::{Extract, components::width::Width, utils::bezier::PathBuilder};
@@ -19,7 +20,7 @@ use super::VItem;
 #[derive(
     Clone, ranim_macros::ShiftTransform, ranim_macros::RotateTransform, ranim_macros::ScaleTransform,
 )]
-pub struct SvgItem(Vec<VItem>);
+pub struct SvgItem(Vec<VItem<VPointVec>>);
 
 impl From<SvgItem> for Vec<VItem> {
     fn from(value: SvgItem) -> Self {
@@ -228,9 +229,9 @@ mod tests {
 
     use glam::dvec3;
 
-    use crate::vitem::{geometry::Arc, typst::typst_svg};
+    use crate::vitem::{VPath, geometry::Arc, typst::typst_svg};
     use ranim_core::{
-        anchor::{AabbPoint, Locate},
+        anchor::{AabbPoint, Anchor},
         traits::{ScaleHint, ScaleTransformExt, ScaleTransformStrokeExt, With},
     };
 
@@ -243,7 +244,7 @@ mod tests {
         println!("{:?}", vitems.aabb());
         let scale = vitems.calc_scale_ratio(ScaleHint::PorportionalY(8.0));
         println!("scale: {}", scale);
-        let center = AabbPoint::CENTER.locate(AsRef::<[VItem]>::as_ref(&vitems));
+        let center = AabbPoint::CENTER.locate_on(AsRef::<[VItem]>::as_ref(&vitems));
         println!("{:?}", center);
         vitems
             // .scale_to(ScaleHint::PorportionalY(8.0))
@@ -251,11 +252,11 @@ mod tests {
 
         println!(
             "\n{:?}",
-            vitems.iter().map(|x| &x.vpoints).collect::<Vec<_>>()
+            vitems.iter().map(|x| &x.inner).collect::<Vec<_>>()
         );
     }
 
-    fn print_typst_vitem(points: Vec<DVec3>) {
+    fn print_typst_vitem(points: &[DVec3]) {
         let colors = ["blue.darken(40%)", "yellow.darken(50%)"];
         let mut last_anchor = None;
         let mut subpath_cnt = 0;
@@ -311,23 +312,22 @@ mod tests {
             svg.scale_to_with_stroke(ScaleHint::PorportionalY(4.0))
                 .move_to(dvec3(2.0, 2.0, 0.0));
         });
-        // println!("{:?}", svg.0[0].vpoints);
-        let points = (svg.0[0].vpoints.0).clone();
+        // println!("{:?}", svg.0[0].inner);
+        let points = (svg.0[0].inner.0).clone();
 
-        print_typst_vitem(points);
+        print_typst_vitem(&points);
     }
 
     #[test]
     fn test_foo2() {
         let angle = PI / 3.0 * 2.0;
-        let arc = Arc::new(angle, 2.0).with(|arc| {
+        let arc = VItem::<Arc>::new(angle, 2.0).with(|arc| {
             arc.rotate_on_axis(DVec3::Z, PI / 2.0 - angle / 2.0)
                 .move_to(dvec3(2.0, 2.0, 0.0));
         });
-        let arc = VItem::from(arc);
-        let points = (*arc.vpoints).clone();
+        let points = arc.inner.build_vpoint_vec();
         println!("{points:?}");
 
-        print_typst_vitem(points);
+        print_typst_vitem(&points);
     }
 }

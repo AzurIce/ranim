@@ -77,7 +77,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .zip(rotations.iter())
             .map(|(poly, &rot)| {
                 poly.morph(|p| {
-                    p.with_origin(Origin.locate(&p.outer_circle()), |x| {
+                    p.with_origin(Origin.locate_on(&p.outer_circle()), |x| {
                         x.rotate_on_z(rot);
                     });
                 })

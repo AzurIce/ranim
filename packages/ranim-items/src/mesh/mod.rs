@@ -8,8 +8,7 @@ use ranim_core::{
     core_item::CoreItem,
     glam::{DVec3, Mat4, Vec3},
     traits::{
-        Empty, FillColor, Interpolatable, Opacity, RotateTransform, ScaleTransform,
-        ShiftTransform,
+        Empty, FillColor, Interpolatable, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
     },
 };
 
