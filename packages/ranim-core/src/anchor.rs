@@ -14,13 +14,13 @@ use glam::DVec3;
 use tracing::warn;
 
 /// Locate a point.
-pub trait Locate<T: ?Sized> {
+pub trait Anchor<T: ?Sized> {
     /// Locate self on the target
-    fn locate(&self, target: &T) -> DVec3;
+    fn locate_on(&self, target: &T) -> DVec3;
 }
 
-impl<T: ?Sized> Locate<T> for DVec3 {
-    fn locate(&self, _target: &T) -> DVec3 {
+impl<T: ?Sized> Anchor<T> for DVec3 {
+    fn locate_on(&self, _target: &T) -> DVec3 {
         *self
     }
 }
@@ -30,18 +30,18 @@ impl<T: ?Sized> Locate<T> for DVec3 {
 /// Avg of all points.
 pub struct Centroid;
 
-impl Locate<DVec3> for Centroid {
-    fn locate(&self, target: &DVec3) -> DVec3 {
+impl Anchor<DVec3> for Centroid {
+    fn locate_on(&self, target: &DVec3) -> DVec3 {
         *target
     }
 }
 
-impl<T> Locate<[T]> for Centroid
+impl<T> Anchor<[T]> for Centroid
 where
-    Centroid: Locate<T>,
+    Centroid: Anchor<T>,
 {
-    fn locate(&self, target: &[T]) -> DVec3 {
-        target.iter().map(|x| self.locate(x)).sum::<DVec3>() / target.len() as f64
+    fn locate_on(&self, target: &[T]) -> DVec3 {
+        target.iter().map(|x| self.locate_on(x)).sum::<DVec3>() / target.len() as f64
     }
 }
 
@@ -79,8 +79,8 @@ impl AabbPoint {
     // pub const BOTTOM_LEFT: Self = Self(dvec3(-1.0, -1.0, 0.0));
 }
 
-impl<T: Aabb + ?Sized> Locate<T> for AabbPoint {
-    fn locate(&self, target: &T) -> DVec3 {
+impl<T: Aabb + ?Sized> Anchor<T> for AabbPoint {
+    fn locate_on(&self, target: &T) -> DVec3 {
         let center = target.aabb_center();
         let half_size = target.aabb_size() / 2.0;
         center + self.0 * half_size

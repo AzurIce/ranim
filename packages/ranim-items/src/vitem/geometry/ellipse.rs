@@ -1,20 +1,12 @@
 use ranim_core::{
-    Extract,
-    color::{AlphaColor, Srgb},
-    core_item::{
-        CoreItem,
-        vitem::{Basis2d, DEFAULT_STROKE_WIDTH},
-    },
+    components::vpoint::VPointVec,
+    core_item::vitem::Basis2d,
     glam::{DVec2, DVec3},
-    traits::{
-        Aabb, Discard, FillColor, Opacity, RotateTransform, ShiftTransform, StrokeColor, With,
-    },
+    traits::{Aabb, RotateTransform, ShiftTransform},
 };
 
-use crate::vitem::{
-    VItem,
-    geometry::{Circle, EllipticArc},
-};
+use crate::vitem::{VItem, VPath};
+use crate::vitem::geometry::{Circle, EllipticArc};
 
 /// An ellipse.
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
@@ -25,26 +17,16 @@ pub struct Ellipse {
     pub center: DVec3,
     /// Semi-axes in x and y directions
     pub radius: DVec2,
-
-    /// Stroke rgba
-    pub stroke_rgba: AlphaColor<Srgb>,
-    /// Stroke width
-    pub stroke_width: f32,
-    /// Fill rgba
-    pub fill_rgba: AlphaColor<Srgb>,
 }
 
-impl Ellipse {
+impl VItem<Ellipse> {
     /// Creates a new ellipse.
     pub fn new(radius: DVec2) -> Self {
-        Self {
+        Self::new_with(Ellipse {
             basis: Basis2d::default(),
             center: DVec3::ZERO,
             radius,
-            stroke_rgba: AlphaColor::WHITE,
-            stroke_width: DEFAULT_STROKE_WIDTH,
-            fill_rgba: AlphaColor::TRANSPARENT,
-        }
+        })
     }
 }
 
@@ -54,25 +36,21 @@ impl From<Circle> for Ellipse {
             basis,
             center,
             radius,
-            stroke_rgba,
-            stroke_width,
-            fill_rgba,
         } = value;
         Self {
             basis,
             center,
             radius: DVec2::splat(radius),
-            stroke_rgba,
-            stroke_width,
-            fill_rgba,
         }
     }
 }
 
-impl From<Ellipse> for VItem {
-    fn from(value: Ellipse) -> Self {
-        let fill_rgba = value.fill_rgba;
-        VItem::from(EllipticArc::from(value)).with(|item| item.set_fill_color(fill_rgba).discard())
+impl VPath for Ellipse {
+    fn normal(&self) -> DVec3 {
+        self.basis.normal()
+    }
+    fn build_vpoint_vec(&self) -> VPointVec {
+        EllipticArc::from(self.clone()).build_vpoint_vec()
     }
 }
 
@@ -98,52 +76,5 @@ impl RotateTransform for Ellipse {
         self.basis.rotate_on_axis(axis, angle);
         self.center.rotate_on_axis(axis, angle);
         self
-    }
-}
-
-impl StrokeColor for Ellipse {
-    fn stroke_color(&self) -> AlphaColor<Srgb> {
-        self.stroke_rgba
-    }
-
-    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
-        self
-    }
-
-    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.stroke_rgba = color;
-        self
-    }
-}
-
-impl FillColor for Ellipse {
-    fn fill_color(&self) -> AlphaColor<Srgb> {
-        self.fill_rgba
-    }
-
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
-        self
-    }
-
-    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.fill_rgba = color;
-        self
-    }
-}
-
-impl Opacity for Ellipse {
-    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.set_fill_opacity(opacity).set_stroke_opacity(opacity);
-        self
-    }
-}
-
-impl Extract for Ellipse {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
     }
 }

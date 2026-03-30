@@ -156,7 +156,7 @@ mod test {
     use glam::{DVec3, dvec3};
 
     use crate::{
-        anchor::{Aabb, AabbPoint, Locate},
+        anchor::{Aabb, AabbPoint, Anchor},
         components::vpoint::VPointVec,
         traits::{ScaleTransform, ShiftTransformExt},
     };
@@ -178,23 +178,23 @@ mod test {
         );
         assert_eq!(
             dvec3(0.0, -50.0, 0.0),
-            AabbPoint(dvec3(0.0, 0.0, 0.0)).locate(&points)
+            AabbPoint(dvec3(0.0, 0.0, 0.0)).locate_on(&points)
         );
         assert_eq!(
             dvec3(-100.0, -200.0, 0.0),
-            AabbPoint(dvec3(-1.0, -1.0, 0.0)).locate(&points)
+            AabbPoint(dvec3(-1.0, -1.0, 0.0)).locate_on(&points)
         );
         assert_eq!(
             dvec3(-100.0, 100.0, 0.0),
-            AabbPoint(dvec3(-1.0, 1.0, 0.0)).locate(&points)
+            AabbPoint(dvec3(-1.0, 1.0, 0.0)).locate_on(&points)
         );
         assert_eq!(
             dvec3(100.0, -200.0, 0.0),
-            AabbPoint(dvec3(1.0, -1.0, 0.0)).locate(&points)
+            AabbPoint(dvec3(1.0, -1.0, 0.0)).locate_on(&points)
         );
         assert_eq!(
             dvec3(100.0, 100.0, 0.0),
-            AabbPoint(dvec3(1.0, 1.0, 0.0)).locate(&points)
+            AabbPoint(dvec3(1.0, 1.0, 0.0)).locate_on(&points)
         );
     }
 
@@ -210,7 +210,7 @@ mod test {
         let mut scale_origin = VPointVec(square.clone());
         // Bezier-aware AABB center: ((-1+4)/2, (-1.25+4)/2, 0) = (1.5, 1.375, 0)
         assert_eq!(
-            AabbPoint(DVec3::ZERO).locate(&scale_origin),
+            AabbPoint(DVec3::ZERO).locate_on(&scale_origin),
             dvec3(1.5, 1.375, 0.0)
         );
         scale_origin.with_origin(AabbPoint::CENTER, |x| {

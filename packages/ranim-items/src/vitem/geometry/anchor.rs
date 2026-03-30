@@ -1,10 +1,13 @@
 use ranim_core::{
     core_item::vitem::Basis2d,
     glam::{DVec2, DVec3},
-    traits::Locate,
+    traits::Anchor,
 };
 
-use crate::vitem::geometry::{Arc, ArcBetweenPoints, Circle, Ellipse, EllipticArc};
+use crate::vitem::{
+    VItem,
+    geometry::{Arc, ArcBetweenPoints, Circle, Ellipse, EllipticArc},
+};
 
 /// `Origin` anchor for shapes with an origin point.
 #[derive(Debug, Clone, Copy)]
@@ -23,40 +26,40 @@ impl Focus {
     pub const NEG: Self = Focus { pos: false };
 }
 
-impl Locate<Arc> for Origin {
-    fn locate(&self, target: &Arc) -> DVec3 {
-        target.center
+impl Anchor<VItem<Arc>> for Origin {
+    fn locate_on(&self, target: &VItem<Arc>) -> DVec3 {
+        target.inner.center
     }
 }
 
-impl Locate<Arc> for Focus {
-    fn locate(&self, target: &Arc) -> DVec3 {
-        target.center
+impl Anchor<VItem<Arc>> for Focus {
+    fn locate_on(&self, target: &VItem<Arc>) -> DVec3 {
+        target.inner.center
     }
 }
 
-impl Locate<ArcBetweenPoints> for Origin {
-    fn locate(&self, target: &ArcBetweenPoints) -> DVec3 {
+impl Anchor<ArcBetweenPoints> for Origin {
+    fn locate_on(&self, target: &ArcBetweenPoints) -> DVec3 {
         // TODO: make this better
         Arc::from(target.clone()).center
     }
 }
 
-impl Locate<ArcBetweenPoints> for Focus {
-    fn locate(&self, target: &ArcBetweenPoints) -> DVec3 {
+impl Anchor<ArcBetweenPoints> for Focus {
+    fn locate_on(&self, target: &ArcBetweenPoints) -> DVec3 {
         // TODO: make this better
         Arc::from(target.clone()).center
     }
 }
 
-impl Locate<Circle> for Origin {
-    fn locate(&self, target: &Circle) -> DVec3 {
+impl Anchor<Circle> for Origin {
+    fn locate_on(&self, target: &Circle) -> DVec3 {
         target.center
     }
 }
 
-impl Locate<Circle> for Focus {
-    fn locate(&self, target: &Circle) -> DVec3 {
+impl Anchor<Circle> for Focus {
+    fn locate_on(&self, target: &Circle) -> DVec3 {
         target.center
     }
 }
@@ -67,14 +70,14 @@ fn ellipse_focus(basis: Basis2d, radius: DVec2) -> DVec3 {
     (if rx > ry { basis.u() } else { basis.v() }) * c
 }
 
-impl Locate<EllipticArc> for Origin {
-    fn locate(&self, target: &EllipticArc) -> DVec3 {
+impl Anchor<EllipticArc> for Origin {
+    fn locate_on(&self, target: &EllipticArc) -> DVec3 {
         target.center
     }
 }
 
-impl Locate<EllipticArc> for Focus {
-    fn locate(&self, target: &EllipticArc) -> DVec3 {
+impl Anchor<EllipticArc> for Focus {
+    fn locate_on(&self, target: &EllipticArc) -> DVec3 {
         let &EllipticArc {
             basis,
             center,
@@ -90,14 +93,14 @@ impl Locate<EllipticArc> for Focus {
     }
 }
 
-impl Locate<Ellipse> for Origin {
-    fn locate(&self, target: &Ellipse) -> DVec3 {
+impl Anchor<Ellipse> for Origin {
+    fn locate_on(&self, target: &Ellipse) -> DVec3 {
         target.center
     }
 }
 
-impl Locate<Ellipse> for Focus {
-    fn locate(&self, target: &Ellipse) -> DVec3 {
+impl Anchor<Ellipse> for Focus {
+    fn locate_on(&self, target: &Ellipse) -> DVec3 {
         let &Ellipse {
             basis,
             center,

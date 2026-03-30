@@ -49,48 +49,48 @@ fn aabb(r: &mut RanimScene) {
 
     let items: Vec<VItem> = vec![
         // Row 0: basic shapes
-        Square::new(2.0)
+        VItem::<Square>::new(2.0)
             .with(|s| {
                 s.set_color(manim::BLUE_C);
             })
-            .into(),
-        Rectangle::new(3.0, 1.5)
+            .convert(),
+        VItem::<Rectangle>::new(3.0, 1.5)
             .with(|s| {
                 s.set_color(manim::RED_C);
             })
             .into(),
-        Circle::new(1.0)
+        VItem::<Circle>::new(1.0)
             .with(|c| {
                 c.set_color(manim::GREEN_C);
             })
             .into(),
-        Ellipse::new(dvec2(2.0, 1.0))
+        VItem::<Ellipse>::new(dvec2(2.0, 1.0))
             .with(|e| {
                 e.set_color(manim::TEAL_C);
             })
             .into(),
         // Row 1: arcs & regular polygon
-        Arc::new(PI * 1.2, 1.0)
+        VItem::<Arc>::new(PI * 1.2, 1.0)
             .with(|a| {
                 a.set_stroke_color(manim::YELLOW_D);
             })
             .into(),
-        ArcBetweenPoints::new(dvec3(-1.0, -0.5, 0.0), dvec3(1.0, 0.5, 0.0), PI / 3.0)
+        VItem::<ArcBetweenPoints>::new(dvec3(-1.0, -0.5, 0.0), dvec3(1.0, 0.5, 0.0), PI / 3.0)
             .with(|a| {
                 a.set_stroke_color(manim::ORANGE);
             })
             .into(),
-        EllipticArc::new(0.0, PI * 1.5, dvec2(1.5, 0.8))
+        VItem::<EllipticArc>::new(0.0, PI * 1.5, dvec2(1.5, 0.8))
             .with(|e| {
                 e.set_stroke_color(manim::PINK);
             })
             .into(),
-        Polygon::from(RegularPolygon::new(5, 1.0).with(|p| {
+        VItem::<Polygon>::from(RegularPolygon::new(5, 1.0).with(|p| {
             p.set_color(manim::PURPLE_C);
         }))
         .into(),
         // Row 2: polygons & rotated shapes
-        Polygon::new(vec![
+        VItem::<Polygon>::new(vec![
             dvec3(0.0, 1.0, 0.0),
             dvec3(-1.0, -0.6, 0.0),
             dvec3(1.0, -0.6, 0.0),
@@ -100,11 +100,11 @@ fn aabb(r: &mut RanimScene) {
             p.set_color(manim::MAROON_C);
         })
         .into(),
-        Polygon::from(RegularPolygon::new(6, 1.0).with(|p| {
+        VItem::<Polygon>::from(RegularPolygon::new(6, 1.0).with(|p| {
             p.set_color(manim::BLUE_D);
         }))
         .into(),
-        Ellipse::new(dvec2(2.0, 0.8))
+        VItem::<Ellipse>::new(dvec2(2.0, 0.8))
             .with(|e| {
                 e.set_color(manim::RED_D);
                 e.with_origin(AabbPoint::CENTER, |x| {
@@ -112,7 +112,7 @@ fn aabb(r: &mut RanimScene) {
                 });
             })
             .into(),
-        Polygon::new(star_points)
+        VItem::<Polygon>::new(star_points)
             .with(|p| {
                 p.set_color(manim::YELLOW_B);
             })

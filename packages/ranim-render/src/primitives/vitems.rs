@@ -1,10 +1,21 @@
 use crate::utils::{WgpuContext, WgpuVecBuffer};
 use bytemuck::{Pod, Zeroable};
-use glam::Vec4;
+use glam::{Vec3, Vec4};
 use ranim_core::{
     components::{rgba::Rgba, width::Width},
     core_item::vitem::VItem,
 };
+
+/// Build orthonormal basis from normal vector
+fn build_basis(normal: Vec3) -> (Vec3, Vec3) {
+    let mut ref_vec = Vec3::Y;
+    if normal.dot(ref_vec).abs() > 0.999 {
+        ref_vec = Vec3::X;
+    }
+    let u = ref_vec.cross(normal).normalize();
+    let v = normal.cross(u).normalize();
+    (u, v)
+}
 
 /// Per-item metadata stored in a GPU buffer.
 /// Tells shaders where each VItem's data lives in the merged buffers.
@@ -131,10 +142,12 @@ impl VItemsBuffer {
                 attr_count: ac,
             });
 
+            let (basis_u, basis_v) = build_basis(vitem.normal.as_vec3());
+
             planes.push(PlaneData {
-                origin: Vec4::from((vitem.origin.as_vec3(), 0.0)),
-                basis_u: Vec4::from((vitem.basis.u().as_vec3(), 0.0)),
-                basis_v: Vec4::from((vitem.basis.v().as_vec3(), 0.0)),
+                origin: vitem.points[0].as_vec3().extend(0.0),
+                basis_u: basis_u.extend(0.0),
+                basis_v: basis_v.extend(0.0),
             });
 
             all_points3d.extend_from_slice(&render_points);

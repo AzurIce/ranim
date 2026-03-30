@@ -1,6 +1,6 @@
 use glam::DVec3;
 
-use crate::anchor::{Aabb, AabbPoint, Locate};
+use crate::anchor::{Aabb, AabbPoint, Anchor};
 
 /// Shifting operations.
 ///
@@ -40,8 +40,8 @@ pub trait ShiftTransformExt: ShiftTransform {
     /// Do something with the origin of the item.
     ///
     /// See [`crate::anchor`]'s [`Locate`] for more details.
-    fn with_origin(&mut self, p: impl Locate<Self>, f: impl FnOnce(&mut Self)) -> &mut Self {
-        let p = p.locate(self);
+    fn with_origin(&mut self, p: impl Anchor<Self>, f: impl FnOnce(&mut Self)) -> &mut Self {
+        let p = p.locate_on(self);
         self.shift(-p);
         f(self);
         self.shift(p)
@@ -51,22 +51,22 @@ pub trait ShiftTransformExt: ShiftTransform {
     /// See [`crate::anchor`]'s [`Locate`] for more details.
     fn move_anchor_to<A>(&mut self, anchor: A, point: DVec3) -> &mut Self
     where
-        A: Locate<Self>,
+        A: Anchor<Self>,
     {
-        self.shift(point - anchor.locate(self));
+        self.shift(point - anchor.locate_on(self));
         self
     }
     /// Put pivot at a given point.
     fn move_to(&mut self, point: DVec3) -> &mut Self
     where
-        AabbPoint: Locate<Self>,
+        AabbPoint: Anchor<Self>,
     {
         self.move_anchor_to(AabbPoint::CENTER, point)
     }
     /// Put negative anchor of self on anchor of target
     fn move_next_to<T: Aabb + ?Sized>(&mut self, target: &T, anchor: AabbPoint) -> &mut Self
     where
-        AabbPoint: Locate<Self>,
+        AabbPoint: Anchor<Self>,
     {
         self.move_next_to_padded(target, anchor, 0.0)
     }
@@ -78,12 +78,12 @@ pub trait ShiftTransformExt: ShiftTransform {
         padding: f64,
     ) -> &mut Self
     where
-        AabbPoint: Locate<Self>,
+        AabbPoint: Anchor<Self>,
     {
         let neg_anchor = AabbPoint(-anchor.0);
         self.move_anchor_to(
             neg_anchor,
-            Locate::<T>::locate(&anchor, target) + anchor.0.normalize() * padding,
+            Anchor::<T>::locate_on(&anchor, target) + anchor.0.normalize() * padding,
         )
     }
 }

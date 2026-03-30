@@ -9,7 +9,7 @@ use ranim_core::{
     core_item::CoreItem,
     glam::{DAffine3, DMat3, DVec3},
     traits::{
-        Aabb, Discard, FillColor, Locate, PointsFunc, RotateTransform, ScaleTransform,
+        Aabb, Anchor, Discard, FillColor, PointsFunc, RotateTransform, ScaleTransform,
         ShiftTransform, StrokeColor, StrokeWidth, With,
     },
 };
@@ -95,8 +95,8 @@ pub struct TextItem {
     inline_length_em: Cell<Option<f64>>,
 }
 
-impl Locate<TextItem> for Origin {
-    fn locate(&self, target: &TextItem) -> DVec3 {
+impl Anchor<TextItem> for Origin {
+    fn locate_on(&self, target: &TextItem) -> DVec3 {
         target.origin
     }
 }

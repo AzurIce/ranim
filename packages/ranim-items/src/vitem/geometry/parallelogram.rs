@@ -1,19 +1,11 @@
 use ranim_core::{
-    Extract,
-    color::{AlphaColor, Srgb},
-    core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
+    components::vpoint::VPointVec,
     glam::DVec3,
-    traits::{
-        Aabb, Discard, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
-        StrokeColor, StrokeWidth, With,
-    },
-    utils::bezier::PathBuilder,
+    traits::{Aabb, RotateTransform, ScaleTransform, ShiftTransform, Discard},
 };
 
-use crate::vitem::{
-    VItem,
-    geometry::{Polygon, Rectangle, Square},
-};
+use crate::vitem::{VItem, VPath};
+use crate::vitem::geometry::Polygon;
 
 /// A parallelogram.
 #[derive(Debug, Clone, ranim_macros::Interpolatable)]
@@ -22,24 +14,19 @@ pub struct Parallelogram {
     pub origin: DVec3,
     /// vectors representing two edges of the paralleogram
     pub basis: (DVec3, DVec3),
-    /// Stroke rgba
-    pub stroke_rgba: AlphaColor<Srgb>,
-    /// Stroke width
-    pub stroke_width: f32,
-    /// Fill rgba
-    pub fill_rgba: AlphaColor<Srgb>,
+}
+
+impl VItem<Parallelogram> {
+    /// Create a new parallelogram with the given origin and basis vectors.
+    pub fn new(origin: DVec3, basis: (DVec3, DVec3)) -> Self {
+        Self::new_with(Parallelogram { origin, basis })
+    }
 }
 
 impl Parallelogram {
     /// Create a new parallelogram with the given origin and basis vectors.
     pub fn new(origin: DVec3, basis: (DVec3, DVec3)) -> Self {
-        Self {
-            origin,
-            basis,
-            stroke_rgba: AlphaColor::WHITE,
-            stroke_width: DEFAULT_STROKE_WIDTH,
-            fill_rgba: AlphaColor::TRANSPARENT,
-        }
+        Self { origin, basis }
     }
 
     /// Get the vertices of the parallelogram.
@@ -47,7 +34,6 @@ impl Parallelogram {
         let &Parallelogram {
             origin,
             basis: (u, v),
-            ..
         } = self;
         [origin, origin + u, origin + u + v, origin + v]
     }
@@ -84,137 +70,17 @@ impl ScaleTransform for Parallelogram {
     }
 }
 
-impl StrokeColor for Parallelogram {
-    fn stroke_color(&self) -> AlphaColor<Srgb> {
-        self.stroke_rgba
+impl VPath for Parallelogram {
+    fn normal(&self) -> DVec3 {
+        self.basis.0.cross(self.basis.1).normalize()
     }
-
-    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
-        self
-    }
-
-    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.stroke_rgba = color;
-        self
-    }
-}
-
-impl FillColor for Parallelogram {
-    fn fill_color(&self) -> AlphaColor<Srgb> {
-        self.fill_rgba
-    }
-
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
-        self
-    }
-
-    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.fill_rgba = color;
-        self
-    }
-}
-
-impl Opacity for Parallelogram {
-    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.set_stroke_opacity(opacity).set_fill_opacity(opacity);
-        self
-    }
-}
-
-impl From<Rectangle> for Parallelogram {
-    fn from(value: Rectangle) -> Self {
-        let Rectangle {
-            basis,
-            p0,
-            size,
-            stroke_rgba,
-            stroke_width,
-            fill_rgba,
-        } = value;
-        let (u, v) = basis.uv();
-        let basis = (u * size.x, v * size.y);
-        Self {
-            origin: p0,
-            basis,
-            stroke_rgba,
-            stroke_width,
-            fill_rgba,
-        }
-    }
-}
-
-impl From<Square> for Parallelogram {
-    fn from(value: Square) -> Self {
-        let Square {
-            basis,
-            center,
-            size,
-            stroke_rgba,
-            stroke_width,
-            fill_rgba,
-        } = value;
-        let (u, v) = basis.uv();
-        let basis = (u * size, v * size);
-        let origin = center - (u + v) * size / 2.;
-        Self {
-            origin,
-            basis,
-            stroke_rgba,
-            stroke_width,
-            fill_rgba,
-        }
+    fn build_vpoint_vec(&self) -> VPointVec {
+        Polygon::from(self.clone()).build_vpoint_vec()
     }
 }
 
 impl From<Parallelogram> for Polygon {
     fn from(value: Parallelogram) -> Self {
-        let Parallelogram {
-            stroke_rgba,
-            stroke_width,
-            fill_rgba,
-            ..
-        } = value;
-        Polygon::new(value.vertices().to_vec()).with(|item| {
-            item.set_stroke_color(stroke_rgba).set_fill_color(fill_rgba);
-            item.stroke_width = stroke_width;
-        })
-    }
-}
-
-impl From<Parallelogram> for VItem {
-    fn from(value: Parallelogram) -> Self {
-        let Parallelogram {
-            origin,
-            basis: (u, v),
-            stroke_rgba,
-            stroke_width,
-            fill_rgba,
-        } = value;
-        VItem::from_vpoints(
-            PathBuilder::new()
-                .move_to(origin)
-                .line_to(origin + u)
-                .line_to(origin + u + v)
-                .line_to(origin + v)
-                .close_path()
-                .vpoints()
-                .into(),
-        )
-        .with(|item| {
-            item.set_fill_color(fill_rgba)
-                .set_stroke_color(stroke_rgba)
-                .set_stroke_width(stroke_width)
-                .discard()
-        })
-    }
-}
-
-impl Extract for Parallelogram {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf)
+        Polygon::new(value.vertices().to_vec())
     }
 }

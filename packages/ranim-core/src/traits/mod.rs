@@ -10,7 +10,7 @@ pub mod transform {
 }
 pub use transform::*;
 
-pub use crate::anchor::{Aabb, AabbPoint, Locate};
+pub use crate::anchor::{Aabb, AabbPoint, Anchor};
 
 use std::ops::Range;
 
@@ -20,10 +20,7 @@ use glam::{
 };
 use num::complex::Complex64;
 
-use crate::{
-    components::width::Width,
-    utils::resize_preserving_order,
-};
+use crate::{components::width::Width, utils::resize_preserving_order};
 
 // MARK: With
 /// A trait for mutating a value in place.
@@ -431,17 +428,17 @@ pub trait AlignSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     /// Align items' anchors in a given axis, based on the first item.
     fn align_anchor<A>(&mut self, axis: DVec3, anchor: A) -> &mut Self
     where
-        A: Locate<T> + Clone,
+        A: Anchor<T> + Clone,
     {
         let Some(dir) = axis.try_normalize() else {
             return self;
         };
-        let Some(point) = self.as_mut().first().map(|x| anchor.locate(x)) else {
+        let Some(point) = self.as_mut().first().map(|x| anchor.locate_on(x)) else {
             return self;
         };
 
         self.as_mut().iter_mut().for_each(|x| {
-            let p = anchor.locate(x);
+            let p = anchor.locate_on(x);
 
             let v = p - point;
             let proj = dir * v.dot(dir);
@@ -468,7 +465,7 @@ pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     /// The `pos_func` takes index as input and output the center position.
     fn arrange_with(&mut self, pos_func: impl Fn(usize) -> DVec3)
     where
-        AabbPoint: Locate<T>,
+        AabbPoint: Anchor<T>,
     {
         self.as_mut().iter_mut().enumerate().for_each(|(i, x)| {
             x.move_to(pos_func(i));
@@ -478,7 +475,7 @@ pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     fn arrange_in_y(&mut self, gap: f64)
     where
         T: Aabb,
-        AabbPoint: Locate<T>,
+        AabbPoint: Anchor<T>,
     {
         let Some(mut bbox) = self.as_mut().first().map(|x| x.aabb()) else {
             return;
@@ -492,7 +489,7 @@ pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     /// Arrange the items in a grid.
     fn arrange_in_grid(&mut self, cell_cnt: USizeVec3, cell_size: DVec3, gap: DVec3) -> &mut Self
     where
-        AabbPoint: Locate<T>,
+        AabbPoint: Anchor<T>,
     {
         // x -> y -> z
         let pos_func = |idx: usize| {
@@ -512,7 +509,7 @@ pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     /// The `pos_func` takes row and column index as input and output the center position.
     fn arrange_in_cols_with(&mut self, ncols: usize, pos_func: impl Fn(usize, usize) -> DVec3)
     where
-        AabbPoint: Locate<T>,
+        AabbPoint: Anchor<T>,
     {
         let pos_func = |idx: usize| {
             let row = idx / ncols;
@@ -526,7 +523,7 @@ pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     /// The `pos_func` takes row and column index as input and output the center position.
     fn arrange_in_rows_with(&mut self, nrows: usize, pos_func: impl Fn(usize, usize) -> DVec3)
     where
-        AabbPoint: Locate<T>,
+        AabbPoint: Anchor<T>,
     {
         let ncols = self.as_mut().len().div_ceil(nrows);
         self.arrange_in_cols_with(ncols, pos_func);

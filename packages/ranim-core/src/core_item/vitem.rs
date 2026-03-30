@@ -92,10 +92,8 @@ impl Basis2d {
 #[derive(Debug, Clone, PartialEq)]
 /// A primitive for rendering a vitem.
 pub struct VItem {
-    /// The base point of the item, a.k.a. the origin of the item's local coordinate system.
-    pub origin: DVec3,
-    /// The basis vectors of the item's local coordinate system. Normalized.
-    pub basis: Basis2d,
+    /// The normalized normal vector
+    pub normal: DVec3,
     /// The vpoints of the item in the item's local coordinate system.
     pub points: VPointVec,
     /// Fill rgbas, see [`Rgba`].
@@ -109,8 +107,7 @@ pub struct VItem {
 impl Default for VItem {
     fn default() -> Self {
         Self {
-            origin: DVec3::ZERO,
-            basis: Basis2d::default(),
+            normal: DVec3::Z,
             points: VPointVec(vec![DVec3::ZERO; 3]),
             stroke_widths: vec![Width::default(); 2].into(),
             stroke_rgbas: vec![Rgba::default(); 2].into(),
@@ -125,28 +122,10 @@ impl From<VItem> for CoreItem {
     }
 }
 
-impl FillColor for VItem {
-    fn fill_color(&self) -> AlphaColor<Srgb> {
-        let Rgba(rgba) = self.fill_rgbas[0];
-        AlphaColor::new([rgba.x, rgba.y, rgba.z, rgba.w])
-    }
-    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.fill_rgbas.fill(color.into());
-        self
-    }
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rgbas
-            .iter_mut()
-            .for_each(|rgba| rgba.0.w = opacity);
-        self
-    }
-}
-
 impl Interpolatable for VItem {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         Self {
-            origin: self.origin.lerp(target.origin, t),
-            basis: self.basis.lerp(&target.basis, t),
+            normal: self.normal.lerp(target.normal, t),
             points: self.points.lerp(&target.points, t),
             fill_rgbas: self.fill_rgbas.lerp(&target.fill_rgbas, t),
             stroke_rgbas: self.stroke_rgbas.lerp(&target.stroke_rgbas, t),
@@ -168,6 +147,23 @@ impl Interpolatable for VItem {
         other.stroke_rgbas.resize_preserving_order(len);
         self.stroke_widths.resize_preserving_order(len);
         other.stroke_widths.resize_preserving_order(len);
+    }
+}
+
+impl FillColor for VItem {
+    fn fill_color(&self) -> AlphaColor<Srgb> {
+        let Rgba(rgba) = self.fill_rgbas[0];
+        AlphaColor::new([rgba.x, rgba.y, rgba.z, rgba.w])
+    }
+    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
+        self.fill_rgbas.fill(color.into());
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.fill_rgbas
+            .iter_mut()
+            .for_each(|rgba| rgba.0.w = opacity);
+        self
     }
 }
 

@@ -1,7 +1,7 @@
 use ranim_core::{
     animation::{AnimationCell, Eval},
     glam::DVec3,
-    traits::{Aabb, AabbPoint, Locate, RotateTransform, ShiftTransformExt},
+    traits::{Aabb, AabbPoint, Anchor, RotateTransform, ShiftTransformExt},
     utils::rate_functions::smooth,
 };
 
@@ -22,13 +22,13 @@ pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
     }
 
     /// Rotate by a given angle about a given axis at the given anchor.
-    fn rotating_at<A: Locate<Self>>(
+    fn rotating_at<A: Anchor<Self>>(
         &mut self,
         angle: f64,
         axis: DVec3,
         anchor: A,
     ) -> AnimationCell<Self> {
-        RotatingAnimation::new(self.clone(), angle, axis, anchor.locate(self))
+        RotatingAnimation::new(self.clone(), angle, axis, anchor.locate_on(self))
             .into_animation_cell()
             .with_rate_func(smooth)
             .apply_to(self)
