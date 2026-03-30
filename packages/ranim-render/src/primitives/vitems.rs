@@ -3,8 +3,19 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
 use ranim_core::{
     components::{rgba::Rgba, width::Width},
-    core_item::vitem::{VItem, vitem_normal_from_points},
+    core_item::vitem::VItem,
 };
+
+/// Build orthonormal basis from normal vector
+fn build_basis(normal: Vec3) -> (Vec3, Vec3) {
+    let mut ref_vec = Vec3::Y;
+    if normal.dot(ref_vec).abs() > 0.999 {
+        ref_vec = Vec3::X;
+    }
+    let u = ref_vec.cross(normal).normalize();
+    let v = normal.cross(u).normalize();
+    (u, v)
+}
 
 /// Per-item metadata stored in a GPU buffer.
 /// Tells shaders where each VItem's data lives in the merged buffers.
@@ -21,14 +32,13 @@ pub struct ItemInfo {
     pub attr_count: u32,
 }
 
-/// Per-item plane data (normal + origin), stored as array of structs.
-/// The origin is the first point of the item (used by vertex shader).
-/// basis_u/basis_v are generated deterministically from the normal in the shader.
+/// Per-item plane data (origin + basis), stored as array of structs.
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
 pub struct PlaneData {
-    pub normal: Vec4, // xyz = normal, w = pad
-    pub origin: Vec4, // xyz = first point, w = pad
+    pub origin: Vec4,  // xyz, w=pad
+    pub basis_u: Vec4, // xyz, w=pad
+    pub basis_v: Vec4, // xyz, w=pad
 }
 
 /// Merged GPU buffers for all VItems in a frame.
@@ -39,7 +49,7 @@ pub struct PlaneData {
 pub struct VItemsBuffer {
     /// Per-item metadata: offsets and counts
     pub(crate) item_infos_buffer: WgpuVecBuffer<ItemInfo>,
-    /// Per-item plane data (normal + origin for vertex shader)
+    /// Per-item plane data (origin + basis)
     pub(crate) planes_buffer: WgpuVecBuffer<PlaneData>,
     /// Per-item clip boxes (5 i32 each: min_x, max_x, min_y, max_y, max_w)
     pub(crate) clip_boxes_buffer: WgpuVecBuffer<i32>,
@@ -132,13 +142,12 @@ impl VItemsBuffer {
                 attr_count: ac,
             });
 
-            let normal = vitem
-                .normal
-                .unwrap_or_else(|| vitem_normal_from_points(&vitem.points));
-            let origin = Vec3::new(vitem.points[0].x, vitem.points[0].y, vitem.points[0].z);
+            let (basis_u, basis_v) = build_basis(vitem.normal.as_vec3());
+
             planes.push(PlaneData {
-                normal: Vec4::from((normal, 0.0)),
-                origin: Vec4::from((origin, 0.0)),
+                origin: vitem.points[0].as_vec3().extend(0.0),
+                basis_u: basis_u.extend(0.0),
+                basis_v: basis_v.extend(0.0),
             });
 
             all_points3d.extend_from_slice(&render_points);
@@ -220,7 +229,7 @@ impl VItemsBuffer {
                 entries: &[
                     // binding 0: item_infos
                     bgl_entry(0, vf, false),
-                    // binding 1: planes (normal + origin)
+                    // binding 1: planes
                     bgl_entry(1, v, false),
                     // binding 2: clip_boxes
                     bgl_entry(2, v, false),

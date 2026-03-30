@@ -253,6 +253,47 @@ impl Interpolatable for VPointVec {
 // }
 
 impl VPointVec {
+    /// Compute the best-fit normal via Newell's method (3D generalization of shoelace)
+    pub fn normal(&self) -> DVec3 {
+        let anchors: Vec<DVec3> = self.iter().step_by(2).copied().collect();
+        let n = anchors.len();
+        if n < 2 {
+            return DVec3::Z;
+        }
+        let normal: DVec3 = (0..n)
+            .map(|i| {
+                let p = anchors[i];
+                let q = anchors[(i + 1) % n];
+                let diff = p - q;
+                let sum = p + q;
+                DVec3::new(diff.y * sum.z, diff.z * sum.x, diff.x * sum.y)
+            })
+            .sum();
+        if normal.length_squared() < f64::EPSILON {
+            return DVec3::Z;
+        }
+        normal.normalize()
+    }
+    /// Close the VItem
+    pub fn close(&mut self) -> &mut Self {
+        if self.last() != self.first() && !self.is_empty() {
+            let start = self[0];
+            let end = self[self.len() - 1];
+            self.extend(&[(start + end) / 2.0, start]);
+        }
+        self
+    }
+    /// Shrink to center
+    pub fn shrink(&mut self) -> &mut Self {
+        let bb = self.aabb();
+        self.0 = vec![(bb[0] + bb[1]) / 2.0; self.len()];
+        self
+    }
+
+    /// Get anchor points
+    pub fn get_anchor(&self, idx: usize) -> Option<&DVec3> {
+        self.get(idx * 2)
+    }
     /// Get Subpaths
     pub fn get_subpaths(&self) -> Vec<Vec<DVec3>> {
         let mut subpaths = Vec::new();

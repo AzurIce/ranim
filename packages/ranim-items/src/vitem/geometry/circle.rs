@@ -1,85 +1,76 @@
 use std::f64::consts::PI;
 
-use color::{AlphaColor, Srgb};
 use glam::DVec3;
+use ranim_core::anchor::AabbPoint;
 use ranim_core::{
-    Extract,
-    anchor::{Aabb, Locate},
-    color,
-    core_item::CoreItem,
+    anchor::{Aabb, Anchor},
+    components::vpoint::VPointVec,
+    core_item::vitem::Basis2d,
     glam,
     traits::{RotateTransform, ScaleTransform, ShiftTransform},
 };
 
-use crate::vitem::DEFAULT_STROKE_WIDTH;
-use ranim_core::anchor::AabbPoint;
-use ranim_core::traits::{FillColor, Opacity, StrokeColor, With};
-
-use crate::vitem::VItem;
-
 use super::Arc;
+use crate::vitem::{VItem, VPath};
 
 // MARK: ### Circle ###
 /// An circle
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Circle {
-    /// Axes
-    pub axes: (DVec3, DVec3),
+    /// Basis
+    pub basis: Basis2d,
     /// Center
     pub center: DVec3,
     /// Radius
     pub radius: f64,
+}
 
-    /// Stroke rgba
-    pub stroke_rgba: AlphaColor<Srgb>,
-    /// Stroke width
-    pub stroke_width: f32,
-    /// Fill rgba
-    pub fill_rgba: AlphaColor<Srgb>,
+impl VItem<Circle> {
+    /// Constructor
+    pub fn new(radius: f64) -> Self {
+        Self::new_with(Circle {
+            basis: Basis2d::default(),
+            center: DVec3::ZERO,
+            radius,
+        })
+    }
+    /// Scale the circle by the given scale, with the given anchor as the center.
+    pub fn scale(&mut self, scale: f64) -> &mut Self {
+        self.scale_by_anchor(scale, AabbPoint::CENTER)
+    }
+    /// Scale the circle by the given scale, with the given anchor as the center.
+    pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
+    where
+        T: Anchor<Self>,
+    {
+        let point = anchor.locate_on(self);
+        self.with_inner_mut(|circle| {
+            circle.radius *= scale;
+            circle
+                .center
+                .shift(-point)
+                .scale(DVec3::splat(scale))
+                .shift(point);
+        });
+        self
+    }
 }
 
 impl Circle {
     /// Constructor
     pub fn new(radius: f64) -> Self {
         Self {
-            axes: (DVec3::X, DVec3::Y),
+            basis: Basis2d::default(),
             center: DVec3::ZERO,
             radius,
-
-            stroke_rgba: AlphaColor::WHITE,
-            stroke_width: DEFAULT_STROKE_WIDTH,
-            fill_rgba: AlphaColor::TRANSPARENT,
         }
-    }
-    /// Scale the circle by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
-    /// because this keeps the circle a circle.
-    pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, AabbPoint::CENTER)
-    }
-    /// Scale the circle by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
-    /// because this keeps the circle a circle.
-    pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
-    where
-        T: Locate<Self>,
-    {
-        let point = anchor.locate(self);
-        self.radius *= scale;
-        self.center
-            .shift(-point)
-            .scale(DVec3::splat(scale))
-            .shift(point);
-        self
     }
 }
 
 // MARK: Traits impl
 impl Aabb for Circle {
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
+        let (u, v) = self.basis.uv();
         let r = self.radius * (u + v);
         [self.center + r, self.center - r].aabb()
     }
@@ -95,84 +86,33 @@ impl ShiftTransform for Circle {
 impl RotateTransform for Circle {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.center.rotate_on_axis(axis, angle);
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
+        self.basis.rotate_on_axis(axis, angle);
         self
     }
 }
 
-impl Opacity for Circle {
-    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
-        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
-        self
-    }
-}
-
-impl StrokeColor for Circle {
-    fn stroke_color(&self) -> AlphaColor<Srgb> {
-        self.stroke_rgba
-    }
-    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.stroke_rgba = color;
-        self
-    }
-    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
-        self
-    }
-}
-
-impl FillColor for Circle {
-    fn fill_color(&self) -> AlphaColor<Srgb> {
-        self.fill_rgba
-    }
-    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.fill_rgba = color;
-        self
-    }
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rgba = self.fill_rgba.with_alpha(opacity);
-        self
-    }
-}
-
-// MARK: Conversions
 impl From<Circle> for Arc {
     fn from(value: Circle) -> Self {
         let Circle {
-            axes,
+            basis,
             center,
             radius,
-            stroke_rgba,
-            stroke_width,
-            ..
         } = value;
         Self {
-            axes,
+            normal: basis.normal(),
+            start_dir: basis.u(),
             center,
             radius,
             angle: 2.0 * PI,
-            stroke_rgba,
-            stroke_width,
         }
     }
 }
 
-impl From<Circle> for VItem {
-    fn from(value: Circle) -> Self {
-        let fill_rgba = value.fill_rgba;
-        VItem::from(Arc::from(value)).with(|item| {
-            item.set_fill_color(fill_rgba);
-        })
+impl VPath for Circle {
+    fn normal(&self) -> DVec3 {
+        self.basis.normal()
     }
-}
-
-impl Extract for Circle {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn build_vpoint_vec(&self) -> VPointVec {
+        Arc::from(self.clone()).build_vpoint_vec()
     }
 }

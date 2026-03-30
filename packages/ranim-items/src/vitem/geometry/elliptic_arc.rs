@@ -1,26 +1,20 @@
 use std::f64::consts::TAU;
 
 use ranim_core::{
-    Extract,
-    color::{AlphaColor, Srgb},
     components::vpoint::VPointVec,
-    core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
+    core_item::vitem::Basis2d,
     glam::{DVec2, DVec3},
-    traits::{
-        Aabb, Discard, Opacity, RotateTransform, ShiftTransform, StrokeColor, StrokeWidth, With,
-    },
+    traits::{Aabb, RotateTransform, ShiftTransform},
 };
 
-use crate::vitem::{
-    VItem,
-    geometry::{Arc, Circle, Ellipse},
-};
+use crate::vitem::geometry::{Arc, Circle, Ellipse};
+use crate::vitem::{VItem, VPath};
 
 /// An elliptic arc.
 #[derive(Debug, Clone, ranim_macros::Interpolatable)]
 pub struct EllipticArc {
-    /// Axes
-    pub axes: (DVec3, DVec3),
+    /// Basis
+    pub basis: Basis2d,
     /// Center
     pub center: DVec3,
     /// Semi-axes in the x and y directions
@@ -29,40 +23,35 @@ pub struct EllipticArc {
     pub start_angle: f64,
     /// Span angle in radians
     pub angle: f64,
-    /// Stroke rgba
-    pub stroke_rgba: AlphaColor<Srgb>,
-    /// Stroke width
-    pub stroke_width: f32,
 }
 
-impl EllipticArc {
+impl VItem<EllipticArc> {
     /// Creates a new elliptic arc.
     pub fn new(start_angle: f64, angle: f64, radius: DVec2) -> Self {
-        EllipticArc {
-            axes: (DVec3::X, DVec3::Y),
+        Self::new_with(EllipticArc {
+            basis: Basis2d::default(),
             center: DVec3::ZERO,
             radius,
             start_angle,
             angle,
-            stroke_rgba: AlphaColor::WHITE,
-            stroke_width: DEFAULT_STROKE_WIDTH,
-        }
+        })
     }
+}
 
+impl EllipticArc {
     fn generate_vpoints(&self) -> Vec<DVec3> {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
 
         let &EllipticArc {
-            axes,
+            basis,
             center,
             radius,
             start_angle,
             angle,
-            ..
         } = self;
 
-        let (u, v) = (axes.0.normalize(), axes.1.normalize());
+        let (u, v) = basis.uv();
         let DVec2 { x: rx, y: ry } = radius;
         let mut vpoints = (0..len)
             .map(|i| i as f64 / NUM_SEGMENTS as f64 / 2. * angle + start_angle)
@@ -88,21 +77,19 @@ impl EllipticArc {
 impl From<Arc> for EllipticArc {
     fn from(value: Arc) -> Self {
         let Arc {
-            axes,
+            normal,
+            start_dir,
             center,
             radius,
             angle,
-            stroke_rgba,
-            stroke_width,
         } = value;
-        EllipticArc {
-            axes,
+        let v_dir = normal.cross(start_dir);
+        Self {
+            basis: Basis2d::new(start_dir, v_dir),
             center,
             radius: DVec2::splat(radius),
             start_angle: 0.,
             angle,
-            stroke_rgba,
-            stroke_width,
         }
     }
 }
@@ -110,96 +97,49 @@ impl From<Arc> for EllipticArc {
 impl From<Circle> for EllipticArc {
     fn from(value: Circle) -> Self {
         let Circle {
-            axes,
+            basis,
             center,
             radius,
-            stroke_rgba,
-            stroke_width,
-            ..
         } = value;
-        EllipticArc {
-            axes,
+        Self {
+            basis,
             center,
             radius: DVec2::splat(radius),
             start_angle: 0.,
             angle: TAU,
-            stroke_rgba,
-            stroke_width,
         }
-    }
-}
-
-impl From<EllipticArc> for VItem {
-    fn from(value: EllipticArc) -> Self {
-        let EllipticArc {
-            stroke_rgba,
-            stroke_width,
-            ..
-        } = value;
-        VItem::from_vpoints(value.generate_vpoints()).with(|vitem| {
-            vitem
-                .set_stroke_color(stroke_rgba)
-                .set_stroke_width(stroke_width)
-                .discard()
-        })
     }
 }
 
 impl From<Ellipse> for EllipticArc {
     fn from(value: Ellipse) -> Self {
         let Ellipse {
-            axes,
+            basis,
             center,
             radius,
-            stroke_rgba,
-            stroke_width,
-            ..
         } = value;
-        EllipticArc {
-            axes,
+        Self {
+            basis,
             center,
             radius,
             start_angle: 0.,
             angle: TAU,
-            stroke_rgba,
-            stroke_width,
         }
+    }
+}
+
+impl VPath for EllipticArc {
+    fn normal(&self) -> DVec3 {
+        self.basis.normal()
+    }
+    fn build_vpoint_vec(&self) -> VPointVec {
+        VPointVec(self.generate_vpoints())
     }
 }
 
 impl Aabb for EllipticArc {
     fn aabb(&self) -> [DVec3; 2] {
-        // TODO: maybe calculate AABB by linear algebra?
-        // that would be extremely complicated
         VPointVec(self.generate_vpoints()).aabb()
-    }
-}
-
-impl Extract for EllipticArc {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
-    }
-}
-
-impl StrokeColor for EllipticArc {
-    fn stroke_color(&self) -> AlphaColor<Srgb> {
-        self.stroke_rgba
-    }
-    fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.stroke_rgba = self.stroke_rgba.with_alpha(opacity);
-        self
-    }
-    fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.stroke_rgba = color;
-        self
-    }
-}
-
-impl Opacity for EllipticArc {
-    fn set_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.set_stroke_opacity(opacity);
-        self
     }
 }
 
@@ -212,10 +152,7 @@ impl ShiftTransform for EllipticArc {
 
 impl RotateTransform for EllipticArc {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
+        self.basis.rotate_on_axis(axis, angle);
         self.center.rotate_on_axis(axis, angle);
         self
     }
