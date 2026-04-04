@@ -33,16 +33,16 @@ ranim-items = { path = "packages/ranim-items", version = "0.1.5" }
 ranim-anims = { path = "packages/ranim-anims", version = "0.1.5" }
 ranim-macros = { path = "packages/ranim-macros", version = "0.1.5" }
 ranim-render = { path = "packages/ranim-render", version = "0.1.5" }
-wgpu-profiler = { version = "0.25.0", features = ["puffin"] }
-wasm-bindgen = "0.2.114"
+wgpu-profiler = { version = "0.27.0", features = ["puffin"] }
+wasm-bindgen = "0.2.117"
 glam = "0.30.10"
 tracing = "0.1.44"
 tracing-indicatif = "0.3.14"
-tracing-subscriber = "0.3.22"
+tracing-subscriber = "0.3.23"
 itertools = "0.14.0"
 bytemuck = "1.25.0"
-wgpu = "27.0.1"
-image = "0.25.9"
+wgpu = "29.0.1"
+image = "0.25.10"
 derive_more = "2.1.1"
 
 [features]
@@ -102,7 +102,7 @@ ranim-render = { workspace = true, optional = true }
 # render feature (wasm-compatible deps here, rest in target-specific section below)
 wgpu = { workspace = true, optional = true }
 # app feature
-egui = { version = "0.33.0", optional = true }
+egui = { version = "0.34.1", optional = true }
 web-time = { version = "1.1.0", optional = true }
 bytemuck = { workspace = true, features = ["derive"], optional = true }
 # profiling
@@ -112,32 +112,32 @@ profiling = { version = "1.0.17", optional = true, features = [
   "profile-with-puffin",
 ] }
 async-channel = "2.5.0"
-inventory = "0.3.22"
+inventory = "0.3.24"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen.workspace = true
 # app feature (wasm)
-eframe = { version = "0.33.0", default-features = false, features = [
+eframe = { version = "0.34.1", default-features = false, features = [
     "accesskit",
     "default_fonts",
     "web_screen_reader",
     "wgpu",
 ], optional = true }
-wasm-bindgen-futures = { version = "0.4.54", optional = true }
-web-sys = { version = "0.3.81", optional = true }
+wasm-bindgen-futures = { version = "0.4.67", optional = true }
+web-sys = { version = "0.3.94", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 wasm-tracing = { version = "2.1.0", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 # render deps (wasm-incompatible, only used in cfg(not(wasm)) code)
 pollster = { version = "0.4.0", optional = true }
-which = { version = "8.0.0", optional = true }
+which = { version = "8.0.2", optional = true }
 indicatif = { version = "0.18.4", optional = true }
 tracing-indicatif = { workspace = true, optional = true }
 flate2 = { version = "1.1.9", optional = true }
 reqwest = { version = "0.13.2", features = ["blocking"], optional = true }
 # app feature (native)
-eframe = { version = "0.33.0", features = ["wgpu"], optional = true }
+eframe = { version = "0.34.1", features = ["wgpu"], optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"

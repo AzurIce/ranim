@@ -300,6 +300,7 @@ impl RanimPreviewApp {
                         depth_stencil_attachment: None,
                         timestamp_writes: None,
                         occlusion_query_set: None,
+                        multiview_mask: None,
                     });
                     rpass.set_pipeline(&pipeline.pipeline);
                     rpass.set_bind_group(0, &bind_group, &[]);
@@ -315,7 +316,8 @@ impl RanimPreviewApp {
 }
 
 impl eframe::App for RanimPreviewApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         self.prepare_renderer(frame);
         self.handle_events();
 
@@ -327,13 +329,13 @@ impl eframe::App for RanimPreviewApp {
                 self.play_prev_t = None;
             } else {
                 self.play_prev_t = Some(Instant::now());
-                ctx.request_repaint(); // Animation loop
+                ctx.request_repaint();
             }
         }
 
         self.render_animation();
 
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+        egui::Panel::top("top_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.heading(&self.title);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -364,10 +366,10 @@ impl eframe::App for RanimPreviewApp {
             });
         });
 
-        egui::TopBottomPanel::bottom("bottom_panel")
+        egui::Panel::bottom("bottom_panel")
             .resizable(true)
-            .max_height(600.0)
-            .show(ctx, |ui| {
+            .max_size(600.0)
+            .show_inside(ui, |ui| {
                 ui.label("Timeline");
 
                 ui.horizontal(|ui| {
@@ -400,7 +402,7 @@ impl eframe::App for RanimPreviewApp {
                 self.timeline_state.ui_main_timeline(ui);
             });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             let texture_id = match self.view_mode {
                 ViewMode::Output => self.texture_id,
                 ViewMode::Depth => self.depth_texture_id,
