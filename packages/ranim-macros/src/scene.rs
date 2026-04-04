@@ -1,7 +1,6 @@
 use crate::utils::{expr_to_bool, expr_to_u32};
 use crate::{OutputDef, SceneAttrs};
 
-use quote::ToTokens;
 use syn::{Expr, ExprLit, Lit, Meta, MetaList, MetaNameValue, token::Comma};
 
 /// 解析 #[scene(...)] 中的参数
