@@ -70,13 +70,9 @@ pub fn parse_output_list(list: &MetaList) -> syn::Result<OutputDef> {
 
     for nv in kvs {
         match nv.path.get_ident().map(|i| i.to_string()).as_deref() {
-            Some("pixel_size") => {
-                let tuple: syn::ExprTuple = syn::parse2(nv.value.to_token_stream())?;
-                let mut elems = tuple.elems.iter();
-                def.width = expr_to_u32(elems.next().unwrap())?;
-                def.height = expr_to_u32(elems.next().unwrap())?;
-            }
-            Some("frame_rate") => def.fps = expr_to_u32(&nv.value)?,
+            Some("width") => def.width = expr_to_u32(&nv.value)?,
+            Some("height") => def.height = expr_to_u32(&nv.value)?,
+            Some("fps") => def.fps = expr_to_u32(&nv.value)?,
             Some("save_frames") => def.save_frames = expr_to_bool(&nv.value)?,
             Some("name") => {
                 if let Expr::Lit(ExprLit {
