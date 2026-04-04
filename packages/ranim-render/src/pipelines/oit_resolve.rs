@@ -45,10 +45,10 @@ impl GpuResource for OITResolvePipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("OIT Resolve Pipeline Layout"),
             bind_group_layouts: &[
-                &ResolutionInfo::create_bind_group_layout(wgpu_ctx),
-                &Self::depth_bind_group_layout(wgpu_ctx),
+                Some(&ResolutionInfo::create_bind_group_layout(wgpu_ctx)),
+                Some(&Self::depth_bind_group_layout(wgpu_ctx)),
             ],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -80,7 +80,7 @@ impl GpuResource for OITResolvePipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 

@@ -45,6 +45,7 @@ impl ViewRenderNodeTrait for MergedVItemDepthNode {
                 }),
                 timestamp_writes: None,
                 occlusion_query_set: None,
+                multiview_mask: None,
             };
             #[cfg(feature = "profiling")]
             let mut rpass =

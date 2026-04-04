@@ -41,6 +41,7 @@ impl ViewRenderNodeTrait for MergedMeshItemDepthNode {
             }),
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         };
         #[cfg(feature = "profiling")]
         let mut rpass = encoder.scoped_render_pass("Merged MeshItem Depth Render Pass", rpass_desc);

@@ -32,6 +32,7 @@ impl GlobalRenderNodeTrait for OITResolveNode {
             depth_stencil_attachment: None, // No depth attachment
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         };
 
         {

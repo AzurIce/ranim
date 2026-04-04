@@ -163,6 +163,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
+    // ANCHOR: SCENE_MACRO
     let expanded = quote! {
         #doc
         #(#doc_attrs)*
@@ -183,6 +184,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     };
+    // ANCHOR_END: SCENE_MACRO
 
     TokenStream::from(expanded)
 }
@@ -192,7 +194,8 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Default: 1920x1080 60fps, save_frames = false
 ///
 /// Available attributes:
-/// - `pixel_size`: (width, height)
+/// - `width`: output width in pixels
+/// - `height`: output height in pixels
 /// - `fps`: frames per second
 /// - `save_frames`: save frames to disk
 /// - `dir`: directory for output
