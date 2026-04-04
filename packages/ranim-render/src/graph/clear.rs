@@ -23,8 +23,6 @@ impl GlobalRenderNodeTrait for ClearNode {
         let pass_desc = wgpu::RenderPassDescriptor {
             label: Some("Clear Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                // view: multisample_view,
-                // resolve_target: Some(render_view),
                 depth_slice: None,
                 view: render_view,
                 resolve_target: None,
@@ -41,9 +39,9 @@ impl GlobalRenderNodeTrait for ClearNode {
                 }),
                 stencil_ops: None,
             }),
-            // depth_stencil_attachment: None,
-            occlusion_query_set: None,
             timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
         };
         encoder.begin_render_pass(&pass_desc);
     }
