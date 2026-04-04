@@ -11,7 +11,7 @@ use ranim::{
 
 /// Comprehensive mesh morphing demo: sphere -> torus -> disc -> sphere
 #[scene]
-#[output(dir = "mesh_morph")]
+#[output(dir = "./output/mesh_morph")]
 fn mesh_morph(r: &mut RanimScene) {
     // Setup camera
     let phi = 70.0 * PI / 180.0;

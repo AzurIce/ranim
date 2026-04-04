@@ -84,7 +84,7 @@ fn main() {
   - `#[scene(clear_color = "#ffffffff")]`：为场景指定一个清除颜色，默认值为 `#333333ff`。
   - `#[output]`：为场景添加一个输出：
     输出的文件名 `<output_name>` 会被命名为 `<scene_name>_<width>x<height>_<frame_rate>`。
-    - `#[output(dir = "...")]`：设置相对于 `./output` 的输出目录，也可以是绝对路径
+    - `#[output(dir = "...")]`：设置相对于 `.` 的输出目录，也可以是绝对路径，默认是 `./output`
     - `#[output(width = 1920)]`：设置输出宽度
     - `#[output(height = 1080)]`：设置输出高度
     - `#[output(fps = 60)]`：设置输出帧率

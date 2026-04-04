@@ -6,7 +6,7 @@ use ranim::{
 };
 
 #[scene]
-#[output(dir = "palettes")]
+#[output(dir = "./output/palettes")]
 fn palettes(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
