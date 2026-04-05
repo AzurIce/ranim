@@ -1,7 +1,62 @@
-# Changelog
+## [0.2.0] - 2026-04-05
 
-All notable changes to this project will be documented in this file.
+### 🚀 Features
 
+- Multi-format video output and rotating animation (#126)
+- Ellipse/EllipticArc types, improved VPointVec AABB & code quality (#128)
+- *(preview)* Support dynamic resolution with aspect ratio presets (#156)
+- *(preview)* Improve export UX and simplify Output.dir (#159)
+
+### 🐛 Bug Fixes
+
+- Texture dirty mark and read back texture bytes buffer init
+- Polygon inner circle
+- Add auto-impl for FuncRequirement
+- Make book's version selector sync with url
+- Correct frame sampling interval (#137)
+- Web examples build
+- Fix mesh type conversion
+- Make wgsl on web happy
+
+### 💼 Other
+
+- Refactor animation implementation (#99)
+- Remove timeline state (#104)
+- Experimental `VItem2d` core item with depth support (#107)
+- Refactor renderer (#109)
+- Experimental Order Independent Transparency (#110)
+- Stabilize VItem2d and OIT (#112)
+- Enhance app (#114)
+- Enhancements on `BoundingBox` trait and additional `Rectangle` constructors (#116)
+- New anchor system, traits and APIs refactor (#120)
+- Basis2d (#123)
+- Removed static limit on render and preview api (#125)
+- `Parallelogram` and `TextItem` item (#129)
+- Double buffer (#132)
+- Move link magic and ffi things out of ranim-core, flip ranim-app dependency (#133)
+- Experimental GPU-driven rendering (#138)
+- Removed per-item pipeline (#142)
+- Refactor module structure: Move ranim-app into ranim (#143)
+- Update dependencies (#144)
+- Impl Interpolatable for OpaqueColor (#149)
+- New `Line` item (#150)
+- Mesh Item (#146)
+- Prepare v0.2.0 release (#161)
+
+### ⚙️ Miscellaneous Tasks
+
+- Update deps
+- Udpate deps, update wasm-bindgen to 0.2.105
+- Deploy book and doc to ranim-book and ranim-doc repo, support multiple tags
+- Add book version select patch
+- *(book)* Move main to sub dir
+- *(book)* Concurrent ref build
+- *(book)* Add cache for mdbook stuff
+- *(book)* Fix cache key
+- *(book)* Support multi refs concurrent build
+- *(book)* Add run name
+- *(book)* Fix version select injection for 0.4.x version of mdbook
+- *(book)* Removed redirection, make website link directly to main book
 ## [0.1.5] - 2025-10-18
 
 ### 🚀 Features
@@ -12,12 +67,20 @@ All notable changes to this project will be documented in this file.
 
 - Map timeline reset next start sec to 0 when the previous inner item timeline is empty
 - `save_frames = true` saves all frames to 0000.png
+- Fix wasm32 build
 - Fix gpu out of memory
+
+### 💼 Other
+
+- Render pool and pipelined rendering (#96)
 
 ### 🚜 Refactor
 
 - Add ranim-core, ranim-anims, ranim-items to reduce user code dep (#94)
 
+### ⚙️ Miscellaneous Tasks
+
+- Release
 ## [0.1.4] - 2025-09-16
 
 ### 🚀 Features
@@ -30,6 +93,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- Fix bubble_sort example's insert and show
 - Wasm app freezing on init
 - Fixed `Alignable` implementation for `VPointComponentVec`, `VItem` and `Group<T>` (#91)
 
@@ -43,7 +107,6 @@ All notable changes to this project will be documented in this file.
 - Update deps
 - Update flake to output ranim-cli
 - Release
-
 ## [0.1.3] - 2025-08-20
 
 ### 🐛 Bug Fixes
@@ -53,11 +116,6 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
-### Bench
-
-- Added bench for extract
-
 ## [0.1.2] - 2025-08-18
 
 ### 🐛 Bug Fixes
@@ -67,7 +125,6 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.1] - 2025-08-10
 
 ### 🐛 Bug Fixes
@@ -77,11 +134,6 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
-### Example
-
-- Added extract_vitem_visualize
-
 ## [0.1.0] - 2025-08-10
 
 ### 🚀 Features
@@ -107,7 +159,6 @@ All notable changes to this project will be documented in this file.
 - Update workflow
 - Use nightly
 - Release
-
 ## [0.1.0-alpha.17] - 2025-07-11
 
 ### 🚀 Features
@@ -121,6 +172,7 @@ All notable changes to this project will be documented in this file.
 
 - ItemTimeline eval range incorrect
 - Zero-length vec normalization error, correct test usecases, closes: #70
+- Fix workflow and lint
 
 ### 📚 Documentation
 
@@ -133,15 +185,6 @@ All notable changes to this project will be documented in this file.
 - Added git-cliff to flake's shell packages
 - Release
 - Release
-
-### Book
-
-- Fix include
-
-### Website
-
-- Fix book and doc link
-
 ## [0.1.0-alpha.14] - 2025-07-01
 
 ### 🚀 Features
@@ -151,7 +194,9 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- Fix lint
 - Use chrono instead of time for typst world
+- Fix lint
 
 ### 🚜 Refactor
 
@@ -160,6 +205,7 @@ All notable changes to this project will be documented in this file.
 - Added PinnedItem, rework on timeline and anim APIs(WIP)
 - Refactor timeline with show_secs
 - Migrated some items and examples to the new item and timeline system
+- Refactor Anchor
 - Rework timeline
 - Rename RabjectTimeline to ItemTimeline
 - Removed padding from AnimationSpan
@@ -174,16 +220,6 @@ All notable changes to this project will be documented in this file.
 
 - Update deps
 - Release
-
-### WIP
-
-- Refactor rabject and timeline
-
-### Website
-
-- Moved getting started to guide based on mdbook, added doc
-- Update book and examples
-
 ## [0.1.0-alpha.13] - 2025-05-01
 
 ### 🚀 Features
@@ -204,11 +240,6 @@ All notable changes to this project will be documented in this file.
 - Use pretty_env_logger instead of env_logger
 - Added puffin_viewer to flake shell
 - Release
-
-### WIP
-
-- More items
-
 ## [0.1.0-alpha.12] - 2025-04-20
 
 ### 🚜 Refactor
@@ -224,7 +255,6 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.0-alpha.11] - 2025-04-01
 
 ### 🚀 Features
@@ -248,11 +278,6 @@ All notable changes to this project will be documented in this file.
 - Release
 - Update cargo exclude
 - Release
-
-### Examples
-
-- Added hanoi example, closes: #47
-
 ## [0.1.0-alpha.9] - 2025-03-29
 
 ### 🚀 Features
@@ -295,13 +320,17 @@ All notable changes to this project will be documented in this file.
 
 - Release
 - Release
-
 ## [0.1.0-alpha.7] - 2025-03-19
 
 ### 🚀 Features
 
 - Implemented Debug for EvalResult, Animation and AnimSchedule
 - Added perspective_blend, closes: #43
+
+### 🐛 Bug Fixes
+
+- Fix lint
+- Fix lint and docs
 
 ### 🚜 Refactor
 
@@ -317,7 +346,6 @@ All notable changes to this project will be documented in this file.
 
 - *(xtask/build-examples)* Added clean arg to clean non-exist examples
 - Release
-
 ## [0.1.0-alpha.6] - 2025-03-17
 
 ### 🚀 Features
@@ -334,7 +362,6 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.0-alpha.5] - 2025-03-16
 
 ### 🚀 Features
@@ -354,22 +381,12 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.0-alpha.4] - 2025-03-14
 
 ### ⚙️ Miscellaneous Tasks
 
 - Release
 - Release
-
-### WIP
-
-- Support for RabjectGroup
-
-### Misc
-
-- Added logo
-
 ## [0.1.0-alpha.3] - 2025-03-14
 
 ### 🚀 Features
@@ -387,7 +404,6 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-
 ## [0.1.0-alpha.2] - 2025-03-13
 
 ### 🚜 Refactor
@@ -398,14 +414,12 @@ All notable changes to this project will be documented in this file.
 
 - Update cargo-release config
 - Release
-
 ## [0.1.0-alpha.1] - 2025-03-13
 
 ### ⚙️ Miscellaneous Tasks
 
 - Update cargo-release config
 - Release
-
 ## [ranim-macros-v0.0.0] - 2025-03-12
 
 ### 🚀 Features
@@ -436,6 +450,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Support zero length (or single point) beziers to vertex
+- Fix color lerp
 - #1
 - Vmobject's compute uniforms are not correctly initialized
 - Incorrect alignment of VMobject's points
@@ -453,6 +468,7 @@ All notable changes to this project will be documented in this file.
 - Get_closedpath_flag
 - Render frame to image
 - AnimSchedule.apply now updates the freeze_anim of the timeline
+- Fix example attachments url
 - #26
 - #27
 - *(website)* Fix toml output
@@ -460,11 +476,13 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Refactor traits, added Mobject struct, impl render func on Vertex struct instead of pipeline
 - Moved wgpu related field and functions of Mobject to ExtractedMobject, added ToMobject trait, added width for Arc and Polygon, added radius for Arc
 - Make scene support different pipeline
 - Adjust visibilities
 - Make functions support any type implemented PipelineVertex
 - Introduced Renderer trait for multi shader of object's single draw
+- Refactoring bezier for filling
 - Finished stroke based on compute shader
 - Added Renderer trait, avoid depth problem for VMobject using stencil test
 - Use Newell's Method to calculate VMobject's normal
@@ -518,24 +536,3 @@ All notable changes to this project will be documented in this file.
 - *(ci)* Removed test job due to no gpu on runner
 - Added github pages workflow
 - Gh deploy only when push to main
-
-### WIP
-
-- Refactoring bezier for filling
-- Fixing arc between points put start_and_end modifies the width
-- Refactor to correct vectorized objects
-- Finishing the refactor
-- Finished refactor but with stroke and fill not finished
-- Refactor project structure
-- Fixing aligning for animation
-- Rewrite camera
-- Refactor to support hierarchy
-- Refactor object management and scene render architecture, but with animation not compatible
-- Introduce vello
-
-### Website
-
-- New codeblock style with linenos, update examples
-- Examples page
-
-<!-- generated by git-cliff -->

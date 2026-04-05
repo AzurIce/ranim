@@ -21,18 +21,18 @@ rustdoc-args = ["--cfg", "docsrs"]
 members = ["benches", "example-packages/*", "packages/*", "xtasks/*"]
 
 [workspace.package]
-version = "0.1.5"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/AzurIce/ranim"
 
 [workspace.dependencies]
-ranim = { path = ".", version = "0.1.5", default-features = false }
-ranim-core = { path = "packages/ranim-core", version = "0.1.5" }
-ranim-items = { path = "packages/ranim-items", version = "0.1.5" }
-ranim-anims = { path = "packages/ranim-anims", version = "0.1.5" }
-ranim-macros = { path = "packages/ranim-macros", version = "0.1.5" }
-ranim-render = { path = "packages/ranim-render", version = "0.1.5" }
+ranim = { path = ".", version = "0.2.0", default-features = false }
+ranim-core = { path = "packages/ranim-core", version = "0.2.0" }
+ranim-items = { path = "packages/ranim-items", version = "0.2.0" }
+ranim-anims = { path = "packages/ranim-anims", version = "0.2.0" }
+ranim-macros = { path = "packages/ranim-macros", version = "0.2.0" }
+ranim-render = { path = "packages/ranim-render", version = "0.2.0" }
 wgpu-profiler = { version = "0.27.0", features = ["puffin"] }
 wasm-bindgen = "0.2.117"
 glam = "0.30.10"
