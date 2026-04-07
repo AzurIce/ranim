@@ -167,23 +167,23 @@ impl WgpuContext {
             .await
             .unwrap();
         info!("wgpu adapter info: {:?}", adapter.get_info());
+        let required_limits = adapter.limits();
 
         #[cfg(feature = "profiling")]
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                label: None,
-                required_features: adapter.features()
-                    & wgpu_profiler::GpuProfiler::ALL_WGPU_TIMER_FEATURES,
-                required_limits: wgpu::Limits::default(),
-                memory_hints: wgpu::MemoryHints::default(),
-                trace: wgpu::Trace::Off,
-                experimental_features: wgpu::ExperimentalFeatures::disabled(),
+                required_features: wgpu_profiler::GpuProfiler::ALL_WGPU_TIMER_FEATURES,
+                required_limits,
+                ..Default::default()
             })
             .await
             .unwrap();
         #[cfg(not(feature = "profiling"))]
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor::default())
+            .request_device(&wgpu::DeviceDescriptor {
+                required_limits,
+                ..Default::default()
+            })
             .await
             .unwrap();
 
