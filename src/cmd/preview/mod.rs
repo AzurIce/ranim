@@ -18,7 +18,7 @@ use crate::{
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
 use async_channel::{Receiver, Sender, unbounded};
 use depth_visual::DepthVisualPipeline;
-use eframe::egui;
+use eframe::{App, egui};
 use timeline::TimelineState;
 use tracing::{error, info};
 use web_time::Instant;
@@ -1021,30 +1021,27 @@ impl eframe::App for RanimPreviewApp {
 }
 
 pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id: String) {
+    let title = app.title.clone();
+    let build_app = |cc: &eframe::CreationContext| {
+        let mut fonts = egui::FontDefinitions::default();
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        cc.egui_ctx.set_fonts(fonts);
+        Ok(Box::new(app) as Box<dyn App>)
+    };
+
     #[cfg(not(target_family = "wasm"))]
     {
         let native_options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
-                .with_title(&app.title)
+                .with_title(&title)
                 .with_inner_size([1280.0, 720.0]),
             renderer: eframe::Renderer::Wgpu,
             ..Default::default()
         };
 
         // We need to clone title because run_native takes String (or &str) and app is moved into closure
-        let title = app.title.clone();
 
-        eframe::run_native(
-            &title,
-            native_options,
-            Box::new(|cc| {
-                let mut fonts = egui::FontDefinitions::default();
-                egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
-                cc.egui_ctx.set_fonts(fonts);
-                Ok(Box::new(app))
-            }),
-        )
-        .unwrap();
+        eframe::run_native(&title, native_options, Box::new(build_app)).unwrap();
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -1071,7 +1068,7 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
 
         wasm_bindgen_futures::spawn_local(async {
             eframe::WebRunner::new()
-                .start(canvas, web_options, Box::new(|_cc| Ok(Box::new(app))))
+                .start(canvas, web_options, Box::new(build_app))
                 .await
                 .expect("failed to start eframe");
         });
