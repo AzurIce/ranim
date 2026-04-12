@@ -1,6 +1,8 @@
 mod depth_visual;
 mod timeline;
 
+use std::sync::Arc;
+
 use crate::{
     Output, Scene, SceneConfig, SceneConstructor,
     core::{
@@ -124,7 +126,7 @@ pub struct RanimPreviewApp {
     #[allow(unused)]
     title: String,
     clear_color: wgpu::Color,
-    scene_constructor: fn(&mut crate::core::RanimScene),
+    scene_constructor: Arc<dyn SceneConstructor>,
     scene_config: SceneConfig,
     resolution: Resolution,
     timeline: SealedRanimScene,
@@ -171,11 +173,13 @@ pub struct RanimPreviewApp {
 
 impl RanimPreviewApp {
     pub fn new(
-        scene_constructor: fn(&mut crate::core::RanimScene),
+        scene_constructor: impl SceneConstructor + 'static,
         title: String,
         scene_config: SceneConfig,
     ) -> Self {
         let t = Instant::now();
+        let scene_constructor = Arc::new(scene_constructor);
+
         info!("building scene...");
         let timeline = scene_constructor.build_scene();
         info!("Scene built, cost: {:?}", t.elapsed());
@@ -463,7 +467,7 @@ impl RanimPreviewApp {
         let (progress_tx, progress_rx) = unbounded();
         self.export_progress_rx = Some(progress_rx);
 
-        let constructor = self.scene_constructor;
+        let constructor = self.scene_constructor.clone();
         let scene_config = self.scene_config.clone();
         let output = self.export_config.clone();
         let name = self.title.clone();
@@ -1076,7 +1080,7 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
 }
 
 pub fn preview_constructor_with_name(
-    scene: fn(&mut crate::core::RanimScene),
+    scene: impl SceneConstructor + 'static,
     name: &str,
     scene_config: &SceneConfig,
 ) {
