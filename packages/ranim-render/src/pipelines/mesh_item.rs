@@ -27,11 +27,11 @@ impl GpuResource for MeshItemColorPipeline {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("MeshItem Color Pipeline Layout"),
                 bind_group_layouts: &[
-                    &ResolutionInfo::create_bind_group_layout(ctx),
-                    &ViewportBindGroup::bind_group_layout(ctx),
-                    &MeshItemsBuffer::render_bind_group_layout(ctx),
+                    Some(&ResolutionInfo::create_bind_group_layout(ctx)),
+                    Some(&ViewportBindGroup::bind_group_layout(ctx)),
+                    Some(&MeshItemsBuffer::render_bind_group_layout(ctx)),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
         let vertex_buffer_layouts = MeshItemsBuffer::vertex_buffer_layouts();
         let pipeline = ctx
@@ -61,8 +61,8 @@ impl GpuResource for MeshItemColorPipeline {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: false,
-                    depth_compare: wgpu::CompareFunction::LessEqual,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -71,7 +71,7 @@ impl GpuResource for MeshItemColorPipeline {
                     mask: !0,
                     alpha_to_coverage_enabled: false,
                 },
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
         Self { pipeline }
@@ -99,11 +99,11 @@ impl GpuResource for MeshItemDepthPipeline {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("MeshItem Depth Pipeline Layout"),
                 bind_group_layouts: &[
-                    &ResolutionInfo::create_bind_group_layout(ctx),
-                    &ViewportBindGroup::bind_group_layout(ctx),
-                    &MeshItemsBuffer::render_bind_group_layout(ctx),
+                    Some(&ResolutionInfo::create_bind_group_layout(ctx)),
+                    Some(&ViewportBindGroup::bind_group_layout(ctx)),
+                    Some(&MeshItemsBuffer::render_bind_group_layout(ctx)),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
         let vertex_buffer_layouts = MeshItemsBuffer::vertex_buffer_layouts();
         let pipeline = ctx
@@ -129,8 +129,8 @@ impl GpuResource for MeshItemDepthPipeline {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -139,7 +139,7 @@ impl GpuResource for MeshItemDepthPipeline {
                     mask: !0,
                     alpha_to_coverage_enabled: false,
                 },
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
         Self { pipeline }

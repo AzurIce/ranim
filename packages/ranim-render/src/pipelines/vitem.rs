@@ -28,8 +28,8 @@ impl GpuResource for VItemComputePipeline {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("VItem Compute Pipeline Layout"),
-                bind_group_layouts: &[&VItemsBuffer::compute_bind_group_layout(ctx)],
-                push_constant_ranges: &[],
+                bind_group_layouts: &[Some(&VItemsBuffer::compute_bind_group_layout(ctx))],
+                immediate_size: 0,
             });
         let pipeline = ctx
             .device
@@ -68,11 +68,11 @@ impl GpuResource for VItemColorPipeline {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("VItem Color Pipeline Layout"),
                 bind_group_layouts: &[
-                    &ResolutionInfo::create_bind_group_layout(ctx),
-                    &ViewportBindGroup::bind_group_layout(ctx),
-                    &VItemsBuffer::render_bind_group_layout(ctx),
+                    Some(&ResolutionInfo::create_bind_group_layout(ctx)),
+                    Some(&ViewportBindGroup::bind_group_layout(ctx)),
+                    Some(&VItemsBuffer::render_bind_group_layout(ctx)),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
         let pipeline = ctx
             .device
@@ -101,8 +101,8 @@ impl GpuResource for VItemColorPipeline {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: false,
-                    depth_compare: wgpu::CompareFunction::LessEqual,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -111,7 +111,7 @@ impl GpuResource for VItemColorPipeline {
                     mask: !0,
                     alpha_to_coverage_enabled: false,
                 },
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
         Self { pipeline }
@@ -141,11 +141,11 @@ impl GpuResource for VItemDepthPipeline {
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("VItem Depth Pipeline Layout"),
                 bind_group_layouts: &[
-                    &ResolutionInfo::create_bind_group_layout(ctx),
-                    &ViewportBindGroup::bind_group_layout(ctx),
-                    &VItemsBuffer::render_bind_group_layout(ctx),
+                    Some(&ResolutionInfo::create_bind_group_layout(ctx)),
+                    Some(&ViewportBindGroup::bind_group_layout(ctx)),
+                    Some(&VItemsBuffer::render_bind_group_layout(ctx)),
                 ],
-                push_constant_ranges: &[],
+                immediate_size: 0,
             });
         let pipeline = ctx
             .device
@@ -170,8 +170,8 @@ impl GpuResource for VItemDepthPipeline {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -180,7 +180,7 @@ impl GpuResource for VItemDepthPipeline {
                     mask: !0,
                     alpha_to_coverage_enabled: false,
                 },
-                multiview: None,
+                multiview_mask: None,
                 cache: None,
             });
         Self { pipeline }

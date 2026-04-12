@@ -18,7 +18,7 @@ use crate::{
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
 use async_channel::{Receiver, Sender, unbounded};
 use depth_visual::DepthVisualPipeline;
-use eframe::egui;
+use eframe::{App, egui};
 use timeline::TimelineState;
 use tracing::{error, info};
 use web_time::Instant;
@@ -444,6 +444,7 @@ impl RanimPreviewApp {
                         depth_stencil_attachment: None,
                         timestamp_writes: None,
                         occlusion_query_set: None,
+                        multiview_mask: None,
                     });
                     rpass.set_pipeline(&pipeline.pipeline);
                     rpass.set_bind_group(0, &bind_group, &[]);
@@ -504,7 +505,8 @@ impl RanimPreviewApp {
 }
 
 impl eframe::App for RanimPreviewApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         self.prepare_renderer(frame);
         self.handle_events();
 
@@ -549,13 +551,13 @@ impl eframe::App for RanimPreviewApp {
                 }
             } else {
                 self.play_prev_t = Some(Instant::now());
-                ctx.request_repaint(); // Animation loop
+                ctx.request_repaint();
             }
         }
 
         self.render_animation();
 
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+        egui::Panel::top("top_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.heading(&self.title);
 
@@ -693,10 +695,10 @@ impl eframe::App for RanimPreviewApp {
             });
         });
 
-        egui::TopBottomPanel::bottom("bottom_panel")
+        egui::Panel::bottom("bottom_panel")
             .resizable(true)
-            .max_height(600.0)
-            .show(ctx, |ui| {
+            .max_size(600.0)
+            .show_inside(ui, |ui| {
                 ui.label("Timeline");
 
                 ui.horizontal(|ui| {
@@ -811,7 +813,7 @@ impl eframe::App for RanimPreviewApp {
                 self.timeline_state.ui_main_timeline(ui);
             });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             let texture_id = match self.view_mode {
                 ViewMode::Output => self.texture_id,
                 ViewMode::Depth => self.depth_texture_id,
@@ -889,7 +891,7 @@ impl eframe::App for RanimPreviewApp {
                 egui::Window::new("Export")
                     .open(&mut open)
                     .resizable(false)
-                    .show(ctx, |ui| {
+                    .show(&ctx, |ui| {
                         ui.add_enabled_ui(!exporting, |ui| {
                             egui::Grid::new("export_grid")
                                 .num_columns(2)
@@ -1019,30 +1021,27 @@ impl eframe::App for RanimPreviewApp {
 }
 
 pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id: String) {
+    let title = app.title.clone();
+    let build_app = |cc: &eframe::CreationContext| {
+        let mut fonts = egui::FontDefinitions::default();
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        cc.egui_ctx.set_fonts(fonts);
+        Ok(Box::new(app) as Box<dyn App>)
+    };
+
     #[cfg(not(target_family = "wasm"))]
     {
         let native_options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
-                .with_title(&app.title)
+                .with_title(&title)
                 .with_inner_size([1280.0, 720.0]),
             renderer: eframe::Renderer::Wgpu,
             ..Default::default()
         };
 
         // We need to clone title because run_native takes String (or &str) and app is moved into closure
-        let title = app.title.clone();
 
-        eframe::run_native(
-            &title,
-            native_options,
-            Box::new(|cc| {
-                let mut fonts = egui::FontDefinitions::default();
-                egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
-                cc.egui_ctx.set_fonts(fonts);
-                Ok(Box::new(app))
-            }),
-        )
-        .unwrap();
+        eframe::run_native(&title, native_options, Box::new(build_app)).unwrap();
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -1069,7 +1068,7 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
 
         wasm_bindgen_futures::spawn_local(async {
             eframe::WebRunner::new()
-                .start(canvas, web_options, Box::new(|_cc| Ok(Box::new(app))))
+                .start(canvas, web_options, Box::new(build_app))
                 .await
                 .expect("failed to start eframe");
         });
