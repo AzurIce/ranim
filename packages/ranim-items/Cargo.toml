@@ -21,9 +21,9 @@ derive_more = { workspace = true, features = [
   "from",
   "into_iterator",
 ] }
-sha1 = "0.10.6"
+sha1 = "0.11.0"
 lru = "0.16.3"
-usvg = "0.45.1"
+usvg = "0.47.0"
 typst = "0.14.2"
 typst-kit = { version = "0.14.2", default-features = false, features = [
   "fonts",

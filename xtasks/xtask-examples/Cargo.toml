@@ -13,6 +13,6 @@ toml = "1.1.2"
 #   "parse",
 # ] }
 clap = { version = "4.6", features = ["derive"] }
-sha1 = "0.10.6"
-base16ct = { version = "0.3.0", features = ["alloc"] }
+sha1 = "0.11.0"
+base16ct = { version = "1.0.0", features = ["alloc"] }
 anyhow = "1.0.102"
