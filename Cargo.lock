@@ -4879,6 +4879,7 @@ dependencies = [
  "reqwest",
  "tracing",
  "tracing-indicatif",
+ "tracing-subscriber",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-tracing",
