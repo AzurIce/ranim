@@ -25,6 +25,13 @@ pub mod preview;
 #[cfg(feature = "preview")]
 pub use preview::{preview_constructor_with_name, preview_scene, preview_scene_with_name};
 
+/// The editor application
+#[cfg(feature = "editor")]
+#[allow(missing_docs)]
+pub mod editor;
+#[cfg(feature = "editor")]
+pub use editor::run_editor;
+
 /// Preview a scene by name.
 ///
 /// ```rust,ignore
