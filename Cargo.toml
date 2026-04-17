@@ -79,6 +79,10 @@ preview = [
   "dep:console_error_panic_hook",
   "dep:wasm-tracing",
 ]
+editor = [
+  "preview",
+  "items",
+]
 # serde = ["dep:serde", "glam/serde"]
 
 [dependencies]
@@ -115,6 +119,7 @@ profiling = { version = "1.0.17", optional = true, features = [
 ] }
 async-channel = "2.5.0"
 inventory = "0.3.24"
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen.workspace = true
