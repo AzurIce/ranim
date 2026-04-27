@@ -3,6 +3,8 @@
 //! These types describe *what* to render (scene metadata, output settings)
 //! rather than *how* to animate (which lives in `ranim-core`).
 
+use std::sync::Arc;
+
 use ranim_core::{RanimScene, SealedRanimScene};
 
 #[cfg(target_arch = "wasm32")]
@@ -126,5 +128,11 @@ pub trait SceneConstructor: Send + Sync {
 impl<F: Fn(&mut RanimScene) + Send + Sync> SceneConstructor for F {
     fn construct(&self, r: &mut RanimScene) {
         self(r);
+    }
+}
+
+impl SceneConstructor for Arc<dyn SceneConstructor> {
+    fn construct(&self, r: &mut RanimScene) {
+        self.as_ref().construct(r)
     }
 }
