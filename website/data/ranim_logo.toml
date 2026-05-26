@@ -72,7 +72,7 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     ]
 }
 #[scene]
-#[output(dir = "ranim_logo")]
+#[output(dir = "./output/ranim_logo")]
 fn ranim_logo(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
@@ -161,7 +161,7 @@ fn ranim_logo(r: &mut RanimScene) {
         }));
 }
 ```"""
-hash = "3583ad0be555c0bf55f4d3d79ba91321ac615e47"
+hash = "4b4a7f955c47f0334d92c67b79628276fe4ca7a2"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
 wasm = true
