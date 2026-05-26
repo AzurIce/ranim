@@ -12,7 +12,7 @@ use ranim_anims::{
 use ranim_items::vitem::{VItem, text::TextItem};
 
 #[scene]
-#[output(dir = "text_item")]
+#[output(dir = "./output/text_item")]
 fn text_item(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let text = "The quick brown fox jumps over the lazy dog.";
@@ -43,7 +43,7 @@ fn text_item(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "44add00a68478bc34f1615d2753f70c6e1783b37"
+hash = "83e5d6963acf0eaa0660fa5cffbf752095fe0bc8"
 preview_imgs = ["/examples/text_item/preview.png"]
 output_files = ["/examples/text_item/text_item_1920x1080_60.mp4"]
 wasm = true

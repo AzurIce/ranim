@@ -12,10 +12,10 @@ use ranim::{
 };
 
 #[scene(clear_color = "#00000000")]
-#[output(dir = "output_formats", format = "mp4")]
-#[output(dir = "output_formats", format = "webm")]
-#[output(dir = "output_formats", format = "mov")]
-#[output(dir = "output_formats", format = "gif")]
+#[output(dir = "./output/output_formats", format = "mp4")]
+#[output(dir = "./output/output_formats", format = "webm")]
+#[output(dir = "./output/output_formats", format = "mov")]
+#[output(dir = "./output/output_formats", format = "gif")]
 fn output_formats(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 
@@ -50,7 +50,7 @@ fn output_formats(r: &mut RanimScene) {
     r.insert_time_mark(1.5, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "211cf867d7503ce4700ae32114cc522fb9a31088"
+hash = "6024d3f263a1ebb60198ed952703db4b68c4ba2e"
 preview_imgs = ["/examples/output_formats/preview.png"]
 output_files = ["/examples/output_formats/output_formats_1920x1080_60.webm", "/examples/output_formats/output_formats_1920x1080_60.mp4", "/examples/output_formats/output_formats_1920x1080_60.gif"]
 wasm = false

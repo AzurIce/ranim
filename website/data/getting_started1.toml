@@ -13,7 +13,7 @@ use ranim::{
 
 // ANCHOR: construct
 #[scene]
-#[output(dir = "getting_started1")]
+#[output(dir = "./output/getting_started1")]
 fn getting_started1(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     // A Square with size 2.0 and color blue
@@ -36,7 +36,7 @@ fn getting_started1(r: &mut RanimScene) {
 }
 // ANCHOR_END: construct
 ```"""
-hash = "7617f641a13987bc8b53fc9a5a2124d11a1d2bae"
+hash = "ca4b6f7bd8445f969c5e2ccd373592b9e1c44a4d"
 preview_imgs = []
 output_files = ["/examples/getting_started1/getting_started1_1920x1080_60.mp4"]
 wasm = true

@@ -18,9 +18,9 @@ doc = false
 ranim = { workspace = true, features = ["render", "preview"] }
 anyhow = "1.0.102"
 cargo_toml = "0.22.3"
-clap = { version = "4.6.0", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 ignore = "0.4.25"
-krates = "0.21.1"
+krates = "0.21.2"
 libloading = "0.9.0"
 tracing.workspace = true
 tracing-indicatif.workspace = true

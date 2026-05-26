@@ -15,7 +15,7 @@ use ranim_core::animation::Eval;
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
-#[output(dir = "regular_polygon")]
+#[output(dir = "./output/regular_polygon")]
 pub fn regular_polygon(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 
@@ -131,7 +131,7 @@ impl<T: Clone + 'static> LaggedRawExt<T> for Vec<ranim_core::animation::Animatio
     }
 }
 ```"""
-hash = "3f061a7710baf6c1150bf159a5c829cf47817592"
+hash = "cf11d26df9906d39d41eff4d4478588bef27ebea"
 preview_imgs = ["/examples/regular_polygon/preview.png"]
 output_files = ["/examples/regular_polygon/regular_polygon_1920x1080_60.mp4"]
 wasm = true

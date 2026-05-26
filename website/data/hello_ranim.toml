@@ -14,7 +14,7 @@ use ranim::{
 };
 
 #[scene]
-#[output(dir = "hello_ranim")]
+#[output(dir = "./output/hello_ranim")]
 fn hello_ranim(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
 
@@ -79,7 +79,7 @@ fn hello_ranim_chained(r: &mut RanimScene) {
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "76fc97cdb82f68dd84400c3ca4efc631efb68aa9"
+hash = "d7f152ca3b9223e2a155785414a80c7053b56c33"
 preview_imgs = ["/examples/hello_ranim/preview.png"]
 output_files = ["/examples/hello_ranim/hello_ranim_1920x1080_60.mp4"]
 wasm = true

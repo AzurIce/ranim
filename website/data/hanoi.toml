@@ -112,18 +112,18 @@ fn hanoi(r: &mut RanimScene, n: usize) {
 }
 
 #[scene]
-#[output(dir = "hanoi")]
+#[output(dir = "./output/hanoi")]
 fn hanoi_5(r: &mut RanimScene) {
     hanoi(r, 5);
 }
 
 #[scene(name = "hanoi")]
-#[output(dir = "hanoi")]
+#[output(dir = "./output/hanoi")]
 fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
 }
 ```"""
-hash = "192987cf1b406df430c7de384b85ac180cb7106f"
+hash = "cb3a69c5d860988ac0d71f3c00bbc5a0adccd9d1"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/hanoi_5_1920x1080_60.mp4", "/examples/hanoi/hanoi_1920x1080_60.mp4"]
 wasm = true

@@ -7,7 +7,7 @@ use ranim::{
 
 // ANCHOR: construct
 #[scene]
-#[output(dir = "getting_started0")]
+#[output(dir = "./output/getting_started0")]
 fn getting_started0(r: &mut RanimScene) {
     // Equivalent to creating a new timeline then playing `CameraFrame::default().show()` on it
     let _r_cam = r.insert(CameraFrame::default());
@@ -33,7 +33,7 @@ fn getting_started0(r: &mut RanimScene) {
 }
 // ANCHOR_END: construct
 ```"""
-hash = "0847cce09e76ab8908da4c5550fa5141d48a76ea"
+hash = "4712857cc3a67752d86c1c5a755abb17d68d249f"
 preview_imgs = []
 output_files = ["/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
 wasm = true
