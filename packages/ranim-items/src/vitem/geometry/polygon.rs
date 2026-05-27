@@ -13,15 +13,14 @@ use color::{AlphaColor, Srgb};
 use itertools::Itertools;
 
 use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem, geometry::Circle};
-use ranim_core::core_item::vitem::Basis2d;
 use ranim_core::traits::{Alignable, FillColor, Opacity, StrokeColor, StrokeWidth, With};
 
 // MARK: ### Square ###
 /// A Square
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Square {
-    /// Basis
-    pub basis: Basis2d,
+    /// Axes
+    pub axes: (DVec3, DVec3),
     /// Center
     pub center: DVec3,
     /// Size
@@ -39,7 +38,7 @@ impl Square {
     /// Constructor
     pub fn new(size: f64) -> Self {
         Self {
-            basis: Basis2d::default(),
+            axes: (DVec3::X, DVec3::Y),
             center: dvec3(0.0, 0.0, 0.0),
             size,
 
@@ -76,7 +75,7 @@ impl Square {
 // MARK: Traits impl
 impl Aabb for Square {
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = self.basis.uv();
+        let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
         [
             self.center + self.size / 2.0 * (u + v),
             self.center - self.size / 2.0 * (u + v),
@@ -95,7 +94,10 @@ impl ShiftTransform for Square {
 impl RotateTransform for Square {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.center.rotate_on_axis(axis, angle);
-        self.basis.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self
     }
 }
@@ -154,17 +156,17 @@ impl Extract for Square {
 impl From<Square> for Rectangle {
     fn from(value: Square) -> Self {
         let Square {
-            basis,
+            axes,
             center,
             size: width,
             stroke_rgba,
             stroke_width,
             fill_rgba,
         } = value;
-        let (u, v) = basis.uv();
+        let (u, v) = (axes.0.normalize(), axes.1.normalize());
         let p0 = center - width / 2.0 * u - width / 2.0 * v;
         Rectangle {
-            basis,
+            axes,
             p0,
             size: dvec2(width, width),
             stroke_rgba,
@@ -177,7 +179,7 @@ impl From<Square> for Rectangle {
 impl From<Square> for RegularPolygon {
     fn from(value: Square) -> Self {
         RegularPolygon::new(4, value.size / 2.0 * 2.0f64.sqrt()).with(|x| {
-            x.basis = value.basis;
+            x.axes = value.axes;
             x.stroke_rgba = value.stroke_rgba;
             x.stroke_width = value.stroke_width;
             x.fill_rgba = value.fill_rgba;
@@ -201,8 +203,8 @@ impl From<Square> for VItem {
 /// Rectangle
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Rectangle {
-    /// Basis info
-    pub basis: Basis2d,
+    /// Axes info
+    pub axes: (DVec3, DVec3),
     /// Bottom left corner (minimum)
     pub p0: DVec3,
     /// Width and height
@@ -228,7 +230,7 @@ impl Rectangle {
     /// Construct a rectangle from the bottom-left point (minimum) and size.
     pub fn from_min_size(p0: DVec3, size: DVec2) -> Self {
         Self {
-            basis: Basis2d::default(),
+            axes: (DVec3::X, DVec3::Y),
             p0,
             size,
             stroke_rgba: AlphaColor::WHITE,
@@ -249,7 +251,7 @@ impl Rectangle {
 // MARK: Traits impl
 impl Aabb for Rectangle {
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = self.basis.uv();
+        let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
         let p1 = self.p0;
         let p2 = self.p0 + self.size.x * u + self.size.y * v;
         [p1, p2].aabb()
@@ -266,7 +268,10 @@ impl ShiftTransform for Rectangle {
 impl RotateTransform for Rectangle {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.p0.rotate_on_axis(axis, angle);
-        self.basis.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self
     }
 }
@@ -274,7 +279,7 @@ impl RotateTransform for Rectangle {
 impl ScaleTransform for Rectangle {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.p0.scale(scale);
-        let (u, v) = self.basis.uv();
+        let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
         let scale_u = scale.dot(u);
         let scale_v = scale.dot(v);
         self.size *= dvec2(scale_u, scale_v);
@@ -329,11 +334,11 @@ impl FillColor for Rectangle {
 impl From<Rectangle> for Polygon {
     fn from(value: Rectangle) -> Self {
         let p0 = value.p0;
-        let (u, v) = value.basis.uv();
+        let (u, v) = (value.axes.0.normalize(), value.axes.1.normalize());
         let DVec2 { x: w, y: h } = value.size;
         let points = vec![p0, p0 + u * w, p0 + u * w + v * h, p0 + v * h];
         Polygon {
-            basis: value.basis,
+            axes: value.axes,
             points,
             stroke_rgba: value.stroke_rgba,
             stroke_width: value.stroke_width,
@@ -359,8 +364,8 @@ impl Extract for Rectangle {
 /// A Polygon with uniform stroke and fill
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Polygon {
-    /// Basis info
-    pub basis: Basis2d,
+    /// Axes info
+    pub axes: (DVec3, DVec3),
     /// Corner points
     pub points: Vec<DVec3>,
     /// Stroke rgba
@@ -375,7 +380,7 @@ impl Polygon {
     /// Constructor
     pub fn new(points: Vec<DVec3>) -> Self {
         Self {
-            basis: Basis2d::default(),
+            axes: (DVec3::X, DVec3::Y),
             points,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
@@ -401,7 +406,10 @@ impl ShiftTransform for Polygon {
 impl RotateTransform for Polygon {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.points.rotate_on_axis(axis, angle);
-        self.basis.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self
     }
 }
@@ -416,7 +424,7 @@ impl ScaleTransform for Polygon {
 // impl AffineTransform for Polygon {
 //     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
 //         self.points.affine_transform_at_point(mat, origin);
-//         // TODO: how to transform basis?
+//         // TODO: how to transform axes?
 //         self
 //     }
 // }
@@ -479,7 +487,7 @@ impl From<Polygon> for VItem {
             stroke_rgba,
             stroke_width,
             fill_rgba,
-            basis,
+            axes,
             ..
         } = value;
         assert!(points.len() > 2);
@@ -497,7 +505,7 @@ impl From<Polygon> for VItem {
         // Interleave anchors and handles
         let vpoints = anchors.into_iter().interleave(handles).collect::<Vec<_>>();
         VItem::from_vpoints(vpoints)
-            .with_basis(basis)
+            .with_normal(axes.0.cross(axes.1).normalize())
             .with(|vitem| {
                 vitem
                     .set_fill_color(fill_rgba)
@@ -518,7 +526,7 @@ impl Extract for Polygon {
 /// A regular polygon.
 pub struct RegularPolygon {
     /// Local coordinate system
-    pub basis: Basis2d,
+    pub axes: (DVec3, DVec3),
     /// Center of the polygon
     pub center: DVec3,
     /// Number of sides
@@ -545,7 +553,7 @@ impl RegularPolygon {
     pub fn new(sides: usize, radius: f64) -> Self {
         assert!(sides >= 3);
         Self {
-            basis: Basis2d::default(),
+            axes: (DVec3::X, DVec3::Y),
             center: DVec3::ZERO,
             sides,
             radius,
@@ -562,8 +570,8 @@ impl RegularPolygon {
             center,
             ..
         } = self;
-        let u = self.basis.u();
-        let normal = self.basis.normal();
+        let u = self.axes.0.normalize();
+        let normal = self.axes.0.cross(self.axes.1).normalize();
         (0..sides)
             .map(|i| TAU * (i as f64 / sides as f64))
             .map(|angle| u.rotate_axis(normal, angle) * radius + center)
@@ -595,7 +603,10 @@ impl ShiftTransform for RegularPolygon {
 
 impl RotateTransform for RegularPolygon {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.basis.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self.center.rotate_on_axis(axis, angle);
         self
     }
@@ -644,7 +655,7 @@ impl StrokeColor for RegularPolygon {
 impl From<RegularPolygon> for Polygon {
     fn from(value: RegularPolygon) -> Self {
         Polygon::new(value.points()).with(|x| {
-            x.basis = value.basis;
+            x.axes = value.axes;
             x.fill_rgba = value.fill_rgba;
             x.stroke_rgba = value.stroke_rgba;
             x.stroke_width = value.stroke_width;

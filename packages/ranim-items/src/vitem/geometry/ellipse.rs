@@ -3,7 +3,7 @@ use ranim_core::{
     color::{AlphaColor, Srgb},
     core_item::{
         CoreItem,
-        vitem::{Basis2d, DEFAULT_STROKE_WIDTH},
+        vitem::DEFAULT_STROKE_WIDTH,
     },
     glam::{DVec2, DVec3},
     traits::{
@@ -19,8 +19,8 @@ use crate::vitem::{
 /// An ellipse.
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Ellipse {
-    /// Basis
-    pub basis: Basis2d,
+    /// Axes
+    pub axes: (DVec3, DVec3),
     /// Center
     pub center: DVec3,
     /// Semi-axes in x and y directions
@@ -38,7 +38,7 @@ impl Ellipse {
     /// Creates a new ellipse.
     pub fn new(radius: DVec2) -> Self {
         Self {
-            basis: Basis2d::default(),
+            axes: (DVec3::X, DVec3::Y),
             center: DVec3::ZERO,
             radius,
             stroke_rgba: AlphaColor::WHITE,
@@ -51,7 +51,7 @@ impl Ellipse {
 impl From<Circle> for Ellipse {
     fn from(value: Circle) -> Self {
         let Circle {
-            basis,
+            axes,
             center,
             radius,
             stroke_rgba,
@@ -59,7 +59,7 @@ impl From<Circle> for Ellipse {
             fill_rgba,
         } = value;
         Self {
-            basis,
+            axes,
             center,
             radius: DVec2::splat(radius),
             stroke_rgba,
@@ -79,7 +79,7 @@ impl From<Ellipse> for VItem {
 impl Aabb for Ellipse {
     fn aabb(&self) -> [DVec3; 2] {
         let center = self.center;
-        let (u, v) = self.basis.uv();
+        let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
         let DVec2 { x: rx, y: ry } = self.radius;
         let r = u * rx + v * ry;
         [center - r, center + r].aabb()
@@ -95,7 +95,10 @@ impl ShiftTransform for Ellipse {
 
 impl RotateTransform for Ellipse {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.basis.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self.center.rotate_on_axis(axis, angle);
         self
     }

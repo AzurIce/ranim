@@ -6,25 +6,29 @@ struct ItemInfo {
     attr_count: u32,
 }
 
-struct Plane {
-    origin: vec3<f32>,
-    basis_u: vec3<f32>,
-    basis_v: vec3<f32>,
-}
-
-// Padded version matching the Rust repr
-struct PlaneData {
-    origin: vec4<f32>,
-    basis_u: vec4<f32>,
-    basis_v: vec4<f32>,
-}
-
 struct ClipBox {
     min_x: atomic<i32>,
     max_x: atomic<i32>,
     min_y: atomic<i32>,
     max_y: atomic<i32>,
     max_w: atomic<i32>,
+}
+
+struct Basis {
+    u: vec3<f32>,
+    v: vec3<f32>,
+}
+
+struct PlaneData {
+    normal: vec4<f32>,
+    origin: vec4<f32>,
+}
+
+fn basis_from_normal(n: vec3<f32>) -> Basis {
+    let arbitrary = select(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), abs(n.x) > 0.99);
+    let basis_u = normalize(cross(n, arbitrary));
+    let basis_v = cross(n, basis_u);
+    return Basis(basis_u, basis_v);
 }
 
 @group(0) @binding(0) var<storage> item_infos: array<ItemInfo>;
@@ -64,19 +68,17 @@ fn cs_main(
     }
     let item_idx = lo;
     let info = item_infos[item_idx];
-    let plane_data = planes[item_idx];
-
-    let plane_origin = plane_data.origin.xyz;
-    let plane_basis_u = plane_data.basis_u.xyz;
-    let plane_basis_v = plane_data.basis_v.xyz;
+    let plane = planes[item_idx];
+    let basis = basis_from_normal(plane.normal.xyz);
+    let plane_origin = plane.origin.xyz;
 
     let p_vec = points3d[index];
     let p = p_vec.xyz;
     let is_closed = p_vec.w;
     let diff = p - plane_origin;
 
-    let x = dot(diff, plane_basis_u);
-    let y = dot(diff, plane_basis_v);
+    let x = dot(diff, basis.u);
+    let y = dot(diff, basis.v);
 
     // Local index within this item's points
     let local_idx = index - info.point_offset;
