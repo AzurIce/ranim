@@ -63,7 +63,11 @@ impl Locate<Circle> for Focus {
 fn ellipse_focus(axes: (DVec3, DVec3), radius: DVec2) -> DVec3 {
     let DVec2 { x: rx, y: ry } = radius;
     let c = (rx * rx - ry * ry).abs().sqrt();
-    (if rx > ry { axes.0.normalize() } else { axes.1.normalize() }) * c
+    (if rx > ry {
+        axes.0.normalize()
+    } else {
+        axes.1.normalize()
+    }) * c
 }
 
 impl Locate<EllipticArc> for Origin {

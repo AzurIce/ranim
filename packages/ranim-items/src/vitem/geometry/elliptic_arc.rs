@@ -4,10 +4,7 @@ use ranim_core::{
     Extract,
     color::{AlphaColor, Srgb},
     components::vpoint::VPointVec,
-    core_item::{
-        CoreItem,
-        vitem::DEFAULT_STROKE_WIDTH,
-    },
+    core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
     traits::{
         Aabb, Discard, Opacity, RotateTransform, ShiftTransform, StrokeColor, StrokeWidth, With,
