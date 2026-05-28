@@ -13,7 +13,6 @@ use ranim_core::{
 
 use crate::vitem::DEFAULT_STROKE_WIDTH;
 use ranim_core::anchor::AabbPoint;
-use ranim_core::core_item::vitem::Basis2d;
 use ranim_core::traits::{FillColor, Opacity, StrokeColor, With};
 
 use crate::vitem::VItem;
@@ -24,8 +23,8 @@ use super::Arc;
 /// An circle
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Circle {
-    /// Basis
-    pub basis: Basis2d,
+    /// Axes
+    pub axes: (DVec3, DVec3),
     /// Center
     pub center: DVec3,
     /// Radius
@@ -43,7 +42,7 @@ impl Circle {
     /// Constructor
     pub fn new(radius: f64) -> Self {
         Self {
-            basis: Basis2d::default(),
+            axes: (DVec3::X, DVec3::Y),
             center: DVec3::ZERO,
             radius,
 
@@ -80,7 +79,7 @@ impl Circle {
 // MARK: Traits impl
 impl Aabb for Circle {
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = self.basis.uv();
+        let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
         let r = self.radius * (u + v);
         [self.center + r, self.center - r].aabb()
     }
@@ -96,7 +95,10 @@ impl ShiftTransform for Circle {
 impl RotateTransform for Circle {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.center.rotate_on_axis(axis, angle);
-        self.basis.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self
     }
 }
@@ -141,7 +143,7 @@ impl FillColor for Circle {
 impl From<Circle> for Arc {
     fn from(value: Circle) -> Self {
         let Circle {
-            basis,
+            axes,
             center,
             radius,
             stroke_rgba,
@@ -149,7 +151,7 @@ impl From<Circle> for Arc {
             ..
         } = value;
         Self {
-            basis,
+            axes,
             center,
             radius,
             angle: 2.0 * PI,

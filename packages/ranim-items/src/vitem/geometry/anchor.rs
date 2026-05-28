@@ -1,5 +1,4 @@
 use ranim_core::{
-    core_item::vitem::Basis2d,
     glam::{DVec2, DVec3},
     traits::Locate,
 };
@@ -61,10 +60,14 @@ impl Locate<Circle> for Focus {
     }
 }
 
-fn ellipse_focus(basis: Basis2d, radius: DVec2) -> DVec3 {
+fn ellipse_focus(axes: (DVec3, DVec3), radius: DVec2) -> DVec3 {
     let DVec2 { x: rx, y: ry } = radius;
     let c = (rx * rx - ry * ry).abs().sqrt();
-    (if rx > ry { basis.u() } else { basis.v() }) * c
+    (if rx > ry {
+        axes.0.normalize()
+    } else {
+        axes.1.normalize()
+    }) * c
 }
 
 impl Locate<EllipticArc> for Origin {
@@ -76,12 +79,12 @@ impl Locate<EllipticArc> for Origin {
 impl Locate<EllipticArc> for Focus {
     fn locate(&self, target: &EllipticArc) -> DVec3 {
         let &EllipticArc {
-            basis,
+            axes,
             center,
             radius,
             ..
         } = target;
-        let focus = ellipse_focus(basis, radius);
+        let focus = ellipse_focus(axes, radius);
         if self.pos {
             center + focus
         } else {
@@ -99,12 +102,12 @@ impl Locate<Ellipse> for Origin {
 impl Locate<Ellipse> for Focus {
     fn locate(&self, target: &Ellipse) -> DVec3 {
         let &Ellipse {
-            basis,
+            axes,
             center,
             radius,
             ..
         } = target;
-        let focus = ellipse_focus(basis, radius);
+        let focus = ellipse_focus(axes, radius);
         if self.pos {
             center + focus
         } else {
