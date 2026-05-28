@@ -21,7 +21,6 @@ use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
 use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
-use ranim_core::core_item::vitem::Basis2d;
 use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
@@ -47,12 +46,11 @@ use ranim_core::{
 ///     dvec3(0.5, 1.0, 0.0),
 /// ]);
 /// ```
-#[derive(Debug, Clone, PartialEq, ranim_macros::Interpolatable)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VItem {
-    /// The 2d basis used for projecting the item during rendering.
-    ///
-    /// See [`Basis2d`]
-    pub basis: Basis2d,
+    /// The normal vector of the projection target plane.
+    /// If `None`, the normal will be computed from the first three points at render time.
+    pub normal: Option<DVec3>,
     /// vpoints data
     pub vpoints: VPointVec,
     /// stroke widths
@@ -61,6 +59,23 @@ pub struct VItem {
     pub stroke_rgbas: PointVec<Rgba>,
     /// fill rgbas
     pub fill_rgbas: PointVec<Rgba>,
+}
+
+impl ranim_core::traits::Interpolatable for VItem {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        Self {
+            normal: match (self.normal, target.normal) {
+                (Some(a), Some(b)) => Some(a.lerp(b, t)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            },
+            vpoints: self.vpoints.lerp(&target.vpoints, t),
+            stroke_widths: self.stroke_widths.lerp(&target.stroke_widths, t),
+            stroke_rgbas: self.stroke_rgbas.lerp(&target.stroke_rgbas, t),
+            fill_rgbas: self.fill_rgbas.lerp(&target.fill_rgbas, t),
+        }
+    }
 }
 
 impl PointsFunc for VItem {
@@ -86,7 +101,9 @@ impl ShiftTransform for VItem {
 impl RotateTransform for VItem {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.vpoints.rotate_on_axis(axis, angle);
-        self.basis.rotate_on_axis(axis, angle);
+        if let Some(ref mut n) = self.normal {
+            *n = DVec3::rotate_axis(*n, axis, angle);
+        }
         self
     }
 }
@@ -132,14 +149,14 @@ impl VItem {
     pub fn get_anchor(&self, idx: usize) -> Option<&DVec3> {
         self.vpoints.get(idx * 2)
     }
-    /// Set the projection of the VItem
-    pub fn with_basis(mut self, basis: Basis2d) -> Self {
-        self.basis = basis;
+    /// Set the normal of the VItem's projection plane
+    pub fn with_normal(mut self, normal: DVec3) -> Self {
+        self.normal = Some(normal);
         self
     }
-    /// Set the projection of the VItem
-    pub fn set_proj(&mut self, basis: Basis2d) {
-        self.basis = basis;
+    /// Set the normal of the VItem's projection plane
+    pub fn set_normal(&mut self, normal: DVec3) {
+        self.normal = Some(normal);
     }
     /// Construct a [`VItem`] form vpoints
     pub fn from_vpoints(vpoints: Vec<DVec3>) -> Self {
@@ -147,7 +164,7 @@ impl VItem {
         let stroke_rgbas = vec![vec4(1.0, 1.0, 1.0, 1.0).into(); vpoints.len().div_ceil(2)];
         let fill_rgbas = vec![vec4(0.0, 0.0, 0.0, 0.0).into(); vpoints.len().div_ceil(2)];
         Self {
-            basis: Basis2d::default(),
+            normal: None,
             vpoints: VPointVec(vpoints),
             stroke_rgbas: stroke_rgbas.into(),
             stroke_widths: stroke_widths.into(),
@@ -181,8 +198,7 @@ impl VItem {
 impl From<VItem> for ranim_core::core_item::vitem::VItem {
     fn from(value: VItem) -> Self {
         Self {
-            origin: value.vpoints.first().unwrap().as_vec3(),
-            basis: value.basis,
+            normal: value.normal.map(|n| n.as_vec3()),
             points: value.get_render_points(),
             fill_rgbas: value.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: value.stroke_rgbas.iter().cloned().collect(),
@@ -233,7 +249,7 @@ impl Partial for VItem {
         let stroke_widths = self.stroke_widths.get_partial(range.clone());
         let fill_rgbas = self.fill_rgbas.get_partial(range.clone());
         Self {
-            basis: self.basis,
+            normal: self.normal,
             vpoints,
             stroke_widths,
             stroke_rgbas,
@@ -250,7 +266,7 @@ impl Partial for VItem {
 impl Empty for VItem {
     fn empty() -> Self {
         Self {
-            basis: Basis2d::default(),
+            normal: Some(DVec3::Z),
             vpoints: VPointVec(vec![DVec3::ZERO; 3]),
             stroke_widths: vec![0.0.into(); 2].into(),
             stroke_rgbas: vec![Vec4::ZERO.into(); 2].into(),

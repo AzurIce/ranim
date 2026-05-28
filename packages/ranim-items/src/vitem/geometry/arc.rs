@@ -3,7 +3,7 @@ use glam::DVec3;
 use ranim_core::Extract;
 use ranim_core::anchor::{Aabb, Locate};
 use ranim_core::core_item::CoreItem;
-use ranim_core::core_item::vitem::Basis2d;
+
 use ranim_core::{color, glam};
 
 use ranim_core::traits::{
@@ -18,8 +18,8 @@ use ranim_core::anchor::AabbPoint;
 /// An arc
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Arc {
-    /// Projection
-    pub basis: Basis2d,
+    /// Axes
+    pub axes: (DVec3, DVec3),
     /// Center
     pub center: DVec3,
     /// Radius
@@ -37,7 +37,7 @@ impl Arc {
     /// Constructor
     pub fn new(angle: f64, radius: f64) -> Self {
         Self {
-            basis: Basis2d::default(),
+            axes: (DVec3::X, DVec3::Y),
             center: DVec3::ZERO,
             radius,
             angle,
@@ -70,12 +70,12 @@ impl Arc {
     }
     /// The start point
     pub fn start(&self) -> DVec3 {
-        self.center + self.radius * self.basis.u()
+        self.center + self.radius * self.axes.0.normalize()
     }
     /// The end point
     pub fn end(&self) -> DVec3 {
-        let u = self.angle.cos() * self.basis.u();
-        let v = self.angle.sin() * self.basis.v();
+        let u = self.angle.cos() * self.axes.0.normalize();
+        let v = self.angle.sin() * self.axes.1.normalize();
         self.center + self.radius * (u + v)
     }
 }
@@ -98,7 +98,10 @@ impl ShiftTransform for Arc {
 impl RotateTransform for Arc {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.center.rotate_on_axis(axis, angle);
-        self.basis.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self
     }
 }
@@ -142,8 +145,8 @@ impl Extract for Arc {
 /// An arc between points
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct ArcBetweenPoints {
-    /// Projection
-    pub basis: Basis2d,
+    /// Axes
+    pub axes: (DVec3, DVec3),
     /// Start point
     pub start: DVec3,
     /// End point
@@ -161,7 +164,7 @@ impl ArcBetweenPoints {
     /// Constructor
     pub fn new(start: DVec3, end: DVec3, angle: f64) -> Self {
         Self {
-            basis: Basis2d::default(),
+            axes: (DVec3::X, DVec3::Y),
             start,
             end,
             angle,
@@ -219,7 +222,10 @@ impl RotateTransform for ArcBetweenPoints {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.start.rotate_on_axis(axis, angle);
         self.end.rotate_on_axis(axis, angle);
-        self.basis.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self
     }
 }
@@ -249,7 +255,7 @@ impl StrokeColor for ArcBetweenPoints {
 impl From<ArcBetweenPoints> for Arc {
     fn from(value: ArcBetweenPoints) -> Arc {
         let ArcBetweenPoints {
-            basis: proj,
+            axes: proj,
             start,
             end,
             angle,
@@ -259,7 +265,7 @@ impl From<ArcBetweenPoints> for Arc {
         let radius = (start.distance(end) / 2.0) / (angle / 2.0).sin();
 
         Arc {
-            basis: proj,
+            axes: proj,
             angle,
             radius,
             center: DVec3::ZERO,

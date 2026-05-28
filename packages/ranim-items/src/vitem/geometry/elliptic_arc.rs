@@ -4,10 +4,7 @@ use ranim_core::{
     Extract,
     color::{AlphaColor, Srgb},
     components::vpoint::VPointVec,
-    core_item::{
-        CoreItem,
-        vitem::{Basis2d, DEFAULT_STROKE_WIDTH},
-    },
+    core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
     traits::{
         Aabb, Discard, Opacity, RotateTransform, ShiftTransform, StrokeColor, StrokeWidth, With,
@@ -22,8 +19,8 @@ use crate::vitem::{
 /// An elliptic arc.
 #[derive(Debug, Clone, ranim_macros::Interpolatable)]
 pub struct EllipticArc {
-    /// Basis
-    pub basis: Basis2d,
+    /// Axes
+    pub axes: (DVec3, DVec3),
     /// Center
     pub center: DVec3,
     /// Semi-axes in the x and y directions
@@ -42,7 +39,7 @@ impl EllipticArc {
     /// Creates a new elliptic arc.
     pub fn new(start_angle: f64, angle: f64, radius: DVec2) -> Self {
         EllipticArc {
-            basis: Basis2d::default(),
+            axes: (DVec3::X, DVec3::Y),
             center: DVec3::ZERO,
             radius,
             start_angle,
@@ -57,7 +54,7 @@ impl EllipticArc {
         let len = 2 * NUM_SEGMENTS + 1;
 
         let &EllipticArc {
-            basis,
+            axes,
             center,
             radius,
             start_angle,
@@ -65,7 +62,7 @@ impl EllipticArc {
             ..
         } = self;
 
-        let (u, v) = basis.uv();
+        let (u, v) = (axes.0.normalize(), axes.1.normalize());
         let DVec2 { x: rx, y: ry } = radius;
         let mut vpoints = (0..len)
             .map(|i| i as f64 / NUM_SEGMENTS as f64 / 2. * angle + start_angle)
@@ -91,7 +88,7 @@ impl EllipticArc {
 impl From<Arc> for EllipticArc {
     fn from(value: Arc) -> Self {
         let Arc {
-            basis,
+            axes,
             center,
             radius,
             angle,
@@ -99,7 +96,7 @@ impl From<Arc> for EllipticArc {
             stroke_width,
         } = value;
         EllipticArc {
-            basis,
+            axes,
             center,
             radius: DVec2::splat(radius),
             start_angle: 0.,
@@ -113,7 +110,7 @@ impl From<Arc> for EllipticArc {
 impl From<Circle> for EllipticArc {
     fn from(value: Circle) -> Self {
         let Circle {
-            basis,
+            axes,
             center,
             radius,
             stroke_rgba,
@@ -121,7 +118,7 @@ impl From<Circle> for EllipticArc {
             ..
         } = value;
         EllipticArc {
-            basis,
+            axes,
             center,
             radius: DVec2::splat(radius),
             start_angle: 0.,
@@ -151,7 +148,7 @@ impl From<EllipticArc> for VItem {
 impl From<Ellipse> for EllipticArc {
     fn from(value: Ellipse) -> Self {
         let Ellipse {
-            basis,
+            axes,
             center,
             radius,
             stroke_rgba,
@@ -159,7 +156,7 @@ impl From<Ellipse> for EllipticArc {
             ..
         } = value;
         EllipticArc {
-            basis,
+            axes,
             center,
             radius,
             start_angle: 0.,
@@ -215,7 +212,10 @@ impl ShiftTransform for EllipticArc {
 
 impl RotateTransform for EllipticArc {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.basis.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self.center.rotate_on_axis(axis, angle);
         self
     }

@@ -21,7 +21,7 @@ pub struct Parallelogram {
     /// Origin of the paralleogram
     pub origin: DVec3,
     /// vectors representing two edges of the paralleogram
-    pub basis: (DVec3, DVec3),
+    pub axes: (DVec3, DVec3),
     /// Stroke rgba
     pub stroke_rgba: AlphaColor<Srgb>,
     /// Stroke width
@@ -31,11 +31,11 @@ pub struct Parallelogram {
 }
 
 impl Parallelogram {
-    /// Create a new parallelogram with the given origin and basis vectors.
-    pub fn new(origin: DVec3, basis: (DVec3, DVec3)) -> Self {
+    /// Create a new parallelogram with the given origin and axes vectors.
+    pub fn new(origin: DVec3, axes: (DVec3, DVec3)) -> Self {
         Self {
             origin,
-            basis,
+            axes,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
             fill_rgba: AlphaColor::TRANSPARENT,
@@ -46,7 +46,7 @@ impl Parallelogram {
     pub fn vertices(&self) -> [DVec3; 4] {
         let &Parallelogram {
             origin,
-            basis: (u, v),
+            axes: (u, v),
             ..
         } = self;
         [origin, origin + u, origin + u + v, origin + v]
@@ -69,8 +69,10 @@ impl ShiftTransform for Parallelogram {
 impl RotateTransform for Parallelogram {
     fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
         self.origin.rotate_on_axis(axis, angle);
-        self.basis.0.rotate_on_axis(axis, angle);
-        self.basis.1.rotate_on_axis(axis, angle);
+        self.axes.0.rotate_on_axis(axis, angle);
+        self.axes.0 = self.axes.0.normalize();
+        self.axes.1.rotate_on_axis(axis, angle);
+        self.axes.1 = self.axes.1.normalize();
         self
     }
 }
@@ -78,8 +80,8 @@ impl RotateTransform for Parallelogram {
 impl ScaleTransform for Parallelogram {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.origin.scale(scale).discard();
-        self.basis.0 *= scale;
-        self.basis.1 *= scale;
+        self.axes.0 *= scale;
+        self.axes.1 *= scale;
         self
     }
 }
@@ -126,18 +128,18 @@ impl Opacity for Parallelogram {
 impl From<Rectangle> for Parallelogram {
     fn from(value: Rectangle) -> Self {
         let Rectangle {
-            basis,
+            axes,
             p0,
             size,
             stroke_rgba,
             stroke_width,
             fill_rgba,
         } = value;
-        let (u, v) = basis.uv();
-        let basis = (u * size.x, v * size.y);
+        let (u, v) = (axes.0.normalize(), axes.1.normalize());
+        let axes = (u * size.x, v * size.y);
         Self {
             origin: p0,
-            basis,
+            axes,
             stroke_rgba,
             stroke_width,
             fill_rgba,
@@ -148,19 +150,19 @@ impl From<Rectangle> for Parallelogram {
 impl From<Square> for Parallelogram {
     fn from(value: Square) -> Self {
         let Square {
-            basis,
+            axes,
             center,
             size,
             stroke_rgba,
             stroke_width,
             fill_rgba,
         } = value;
-        let (u, v) = basis.uv();
-        let basis = (u * size, v * size);
+        let (u, v) = (axes.0.normalize(), axes.1.normalize());
+        let axes = (u * size, v * size);
         let origin = center - (u + v) * size / 2.;
         Self {
             origin,
-            basis,
+            axes,
             stroke_rgba,
             stroke_width,
             fill_rgba,
@@ -187,7 +189,7 @@ impl From<Parallelogram> for VItem {
     fn from(value: Parallelogram) -> Self {
         let Parallelogram {
             origin,
-            basis: (u, v),
+            axes: (u, v),
             stroke_rgba,
             stroke_width,
             fill_rgba,

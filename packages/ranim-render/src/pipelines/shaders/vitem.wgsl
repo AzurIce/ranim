@@ -22,9 +22,8 @@ struct ItemInfo {
 }
 
 struct PlaneData {
+    normal: vec4<f32>,
     origin: vec4<f32>,
-    basis_u: vec4<f32>,
-    basis_v: vec4<f32>,
 }
 
 @group(2) @binding(0) var<storage> item_infos: array<ItemInfo>;
@@ -306,6 +305,18 @@ fn fs_depth_only(
     return frag_pos.z;
 }
 
+struct Basis {
+    u: vec3<f32>,
+    v: vec3<f32>,
+}
+
+fn basis_from_normal(n: vec3<f32>) -> Basis {
+    let arbitrary = select(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), abs(n.x) > 0.99);
+    let basis_u = normalize(cross(n, arbitrary));
+    let basis_v = cross(n, basis_u);
+    return Basis(basis_u, basis_v);
+}
+
 // === Vertex shader ===
 
 @vertex
@@ -316,7 +327,6 @@ fn vs_main(
     var out: VertexOutput;
 
     let info = item_infos[instance_index];
-    let plane = planes[instance_index];
     let clip_base = instance_index * 5u;
 
     let scale = 1000.0;
@@ -341,7 +351,11 @@ fn vs_main(
     let u = clip_point.x;
     let v = clip_point.y;
 
-    let pos3d = plane.origin.xyz + u * plane.basis_u.xyz + v * plane.basis_v.xyz;
+    let plane_normal = planes[instance_index].normal.xyz;
+    let basis = basis_from_normal(plane_normal);
+    let plane_origin = planes[instance_index].origin.xyz;
+
+    let pos3d = plane_origin + u * basis.u + v * basis.v;
 
     out.frag_pos = cam_uniforms.proj_mat * cam_uniforms.view_mat * vec4(pos3d, 1.0);
     out.pos = clip_point;
