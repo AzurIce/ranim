@@ -4917,7 +4917,7 @@ checksum = "ca45419789ae5a7899559e9512e58ca889e41f04f1f2445e9f4b290ceccd1d08"
 
 [[package]]
 name = "ranim"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "assert_float_eq",
@@ -4959,7 +4959,7 @@ dependencies = [
 
 [[package]]
 name = "ranim-anims"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ranim-core",
  "tracing",
@@ -4967,7 +4967,7 @@ dependencies = [
 
 [[package]]
 name = "ranim-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -4987,7 +4987,7 @@ dependencies = [
 
 [[package]]
 name = "ranim-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "approx",
  "assert_float_eq",
@@ -5005,7 +5005,7 @@ dependencies = [
 
 [[package]]
 name = "ranim-items"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "assert_float_eq",
  "chrono",
@@ -5026,7 +5026,7 @@ dependencies = [
 
 [[package]]
 name = "ranim-macros"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -5036,7 +5036,7 @@ dependencies = [
 
 [[package]]
 name = "ranim-render"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-channel",
  "bytemuck",

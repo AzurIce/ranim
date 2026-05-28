@@ -1,3 +1,18 @@
+## [0.2.1] - 2026-05-28
+
+### 🐛 Bug Fixes
+
+- Phosphor icons are missing on web, closes: #164
+- Make PreviewApp accepts impl SceneConstructor instead of fn pointer
+
+### 💼 Other
+
+- Fix crashing when generating 4K outputs (#163)
+
+### ⚙️ Miscellaneous Tasks
+
+- Update dependencies
+- Update dependencies and regenerate examples
 ## [0.2.0] - 2026-04-05
 
 ### 🚀 Features
@@ -57,6 +72,7 @@
 - *(book)* Add run name
 - *(book)* Fix version select injection for 0.4.x version of mdbook
 - *(book)* Removed redirection, make website link directly to main book
+- Release
 ## [0.1.5] - 2025-10-18
 
 ### 🚀 Features
