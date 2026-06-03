@@ -23,12 +23,49 @@ impl<T: Clone> Clone for PointVec<T> {
     }
 }
 
+impl<T: Clone> PointVec<T> {
+    /// Set all pointwise values from a slice.
+    pub fn set(&mut self, values: &[T]) {
+        self.0 = values.to_vec();
+    }
+}
+
 impl<T: Component + Interpolatable> PointVec<T> {
+    /// Sample the values at position `idx` in a target sequence of length `total`.
+    ///
+    /// A single value is treated as uniform; two or more values are treated as
+    /// evenly spaced key values and interpolated linearly.
+    pub fn sample(&self, idx: usize, total: usize) -> T {
+        match self.len() {
+            0 => T::default(),
+            1 => self[0].clone(),
+            len => {
+                if total <= 1 {
+                    return self[0].clone();
+                }
+                let t = idx as f64 / (total - 1) as f64;
+                let pos = t * (len - 1) as f64;
+                let lo = (pos.floor() as usize).min(len - 2);
+                let frac = pos - lo as f64;
+                self[lo].lerp(&self[lo + 1], frac)
+            }
+        }
+    }
+
+    /// Expand values to exactly `len` entries by linear sampling.
+    pub fn expand_to(&self, len: usize) -> Vec<T> {
+        (0..len).map(|idx| self.sample(idx, len)).collect()
+    }
+
     /// Get a partial PointVec within a specified range.
     ///
     /// This will interpolate the values at the start and end indices, and then
     /// return a new PointVec containing the interpolated values.
     pub fn get_partial(&self, range: std::ops::Range<f64>) -> Self {
+        if self.len() <= 1 {
+            return self.clone();
+        }
+
         let max_idx = self.len() - 2;
 
         let (start_index, start_residue) = interpolate_usize(0, max_idx, range.start);
@@ -127,9 +164,32 @@ mod test {
 
     use crate::{
         anchor::{Aabb, AabbPoint, Locate},
-        components::vpoint::VPointVec,
+        components::{PointVec, vpoint::VPointVec, width::Width},
         traits::{ScaleTransform, ShiftTransformExt},
     };
+
+    #[test]
+    fn point_vec_samples_uniform_values() {
+        let widths: PointVec<Width> = vec![2.0.into()].into();
+        let expanded = widths.expand_to(4);
+
+        assert_eq!(expanded, vec![2.0.into(); 4]);
+    }
+
+    #[test]
+    fn point_vec_samples_between_end_values() {
+        let widths: PointVec<Width> = vec![0.0.into(), 2.0.into()].into();
+        let expanded = widths.expand_to(3);
+
+        assert_eq!(expanded, vec![0.0.into(), 1.0.into(), 2.0.into()]);
+    }
+
+    #[test]
+    fn point_vec_partial_accepts_single_value() {
+        let widths: PointVec<Width> = vec![2.0.into()].into();
+
+        assert_eq!(widths.get_partial(0.25..0.75), widths);
+    }
 
     #[test]
     fn test_bounding_box() {
