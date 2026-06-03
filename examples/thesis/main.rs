@@ -108,8 +108,11 @@ fn transform(r: &mut RanimScene) {
 }
 
 fn main() {
-    ranim::render_scene!(fading);
-    ranim::render_scene!(creation);
-    ranim::render_scene!(writing);
-    ranim::render_scene!(transform);
+    #[cfg(feature = "render")]
+    {
+        ranim::render_scene!(fading);
+        ranim::render_scene!(creation);
+        ranim::render_scene!(writing);
+        ranim::render_scene!(transform);
+    }
 }

@@ -106,8 +106,8 @@ impl VItemsBuffer {
         let item_count = vitems.len();
 
         // Pre-calculate total sizes
-        let total_points: usize = vitems.iter().map(|v| v.points.len()).sum();
-        let total_attrs: usize = vitems.iter().map(|v| v.points.len().div_ceil(2)).sum();
+        let total_points: usize = vitems.iter().map(|v| v.get_render_points().len()).sum();
+        let total_attrs: usize = vitems.iter().map(|x| x.vpoints.len().div_ceil(2)).sum();
 
         // Build index table and collect data
         let mut item_infos = Vec::with_capacity(item_count);
@@ -121,32 +121,34 @@ impl VItemsBuffer {
         let mut attr_offset: u32 = 0;
 
         for vitem in vitems {
-            let pc = vitem.points.len() as u32;
-            let ac = pc.div_ceil(2);
+            let render_points = vitem.get_render_points();
+            let pc = render_points.len() as u32;
+            let ac = vitem.vpoints.len().div_ceil(2);
 
             item_infos.push(ItemInfo {
                 point_offset,
                 point_count: pc,
                 attr_offset,
-                attr_count: ac,
+                attr_count: ac as u32,
             });
 
             let normal = vitem
                 .normal
-                .unwrap_or_else(|| vitem_normal_from_points(&vitem.points));
-            let origin = Vec3::new(vitem.points[0].x, vitem.points[0].y, vitem.points[0].z);
+                .map(|n| n.as_vec3())
+                .unwrap_or_else(|| vitem_normal_from_points(&render_points));
+            let origin = Vec3::new(render_points[0].x, render_points[0].y, render_points[0].z);
             planes.push(PlaneData {
                 normal: Vec4::from((normal, 0.0)),
                 origin: Vec4::from((origin, 0.0)),
             });
 
-            all_points3d.extend_from_slice(&vitem.points);
-            all_fill_rgbas.extend_from_slice(&vitem.fill_rgbas);
-            all_stroke_rgbas.extend_from_slice(&vitem.stroke_rgbas);
-            all_stroke_widths.extend_from_slice(&vitem.stroke_widths);
+            all_points3d.extend_from_slice(&render_points);
+            all_fill_rgbas.extend(vitem.fill_rgbas.expand_to(ac));
+            all_stroke_rgbas.extend(vitem.stroke_rgbas.expand_to(ac));
+            all_stroke_widths.extend(vitem.stroke_widths.expand_to(ac));
 
             point_offset += pc;
-            attr_offset += ac;
+            attr_offset += ac as u32;
         }
 
         // Build clip_boxes initial values: [MAX, MIN, MAX, MIN, 0] per item
