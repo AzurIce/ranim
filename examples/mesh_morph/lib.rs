@@ -1,10 +1,11 @@
 use std::f64::consts::PI;
 
 use ranim::{
+    MeshItem,
     anims::morph::MorphAnim,
     color::palettes::manim,
     glam::{DVec3, Vec3},
-    items::mesh::{MeshItem, Sphere, Surface},
+    items::mesh::{Sphere, Surface},
     prelude::*,
     utils::rate_functions::linear,
 };

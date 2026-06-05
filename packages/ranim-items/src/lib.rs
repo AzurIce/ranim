@@ -10,3 +10,5 @@
 pub mod debug;
 pub mod mesh;
 pub mod vitem;
+
+pub use mesh::MeshItem;

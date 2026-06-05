@@ -48,10 +48,11 @@ mod scene;
 pub use scene::*;
 
 pub use core::glam;
-pub use ranim_core::RanimScene;
+pub use ranim_core::{CameraFrame, CoreItem, DynItem, MeshItem, RanimScene, VItem};
 
 /// The preludes
 pub mod prelude {
+    pub use ranim_core::MeshItem;
     pub use ranim_core::prelude::*;
     pub use ranim_macros::{output, scene, wasm_demo_doc};
 }

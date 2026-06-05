@@ -2,9 +2,8 @@ use color::{AlphaColor, Srgb, palette::css, rgb8, rgba};
 use glam::DVec3;
 use glam::{DAffine2, dvec3};
 use ranim_core::anchor::Aabb;
-use ranim_core::core_item::CoreItem;
 use ranim_core::traits::{PointsFunc, RotateTransform, ShiftTransformExt};
-use ranim_core::{Extract, components::width::Width, utils::bezier::PathBuilder};
+use ranim_core::{CoreItem, Extract, components::width::Width, utils::bezier::PathBuilder};
 use ranim_core::{color, glam};
 use tracing::warn;
 

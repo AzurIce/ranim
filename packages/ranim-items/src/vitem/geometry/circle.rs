@@ -3,11 +3,9 @@ use std::f64::consts::PI;
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::{
-    Extract,
+    CoreItem, Extract,
     anchor::{Aabb, Locate},
-    color,
-    core_item::CoreItem,
-    glam,
+    color, glam,
     traits::{RotateTransform, ScaleTransform, ShiftTransform},
 };
 

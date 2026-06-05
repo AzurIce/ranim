@@ -1,7 +1,7 @@
 use crate::utils::{WgpuContext, WgpuVecBuffer};
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
-use ranim_core::{components::rgba::Rgba, core_item::mesh_item::MeshItem};
+use ranim_core::{MeshItem, components::rgba::Rgba};
 
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
@@ -89,9 +89,9 @@ impl MeshItemsBuffer {
                 transform: mesh.transform.to_cols_array_2d(),
             });
 
-            all_vertices.extend_from_slice(&mesh.points);
+            all_vertices.extend_from_slice(&mesh.points[..]);
             all_mesh_ids.extend(std::iter::repeat_n(mesh_idx as u32, vc as usize));
-            all_vertex_colors.extend_from_slice(&mesh.vertex_colors);
+            all_vertex_colors.extend_from_slice(&mesh.vertex_colors[..]);
 
             // Pad normals with zero if shorter than points (flat shading fallback)
             let normals = &mesh.vertex_normals;
@@ -99,7 +99,7 @@ impl MeshItemsBuffer {
             if normals_len >= vc as usize {
                 all_vertex_normals.extend_from_slice(&normals[..vc as usize]);
             } else {
-                all_vertex_normals.extend_from_slice(normals);
+                all_vertex_normals.extend_from_slice(&normals[..]);
                 all_vertex_normals
                     .extend(std::iter::repeat_n(Vec3::ZERO, vc as usize - normals_len));
             }
@@ -229,7 +229,7 @@ mod tests {
     use crate::{Renderer, resource::RenderPool};
     use glam::{Mat4, Vec3};
     use pollster::block_on;
-    use ranim_core::{components::rgba::Rgba, core_item::CoreItem, store::CoreItemStore};
+    use ranim_core::{CoreItem, components::rgba::Rgba, store::CoreItemStore};
 
     fn create_triangle_mesh(color: Rgba, offset: Vec3) -> MeshItem {
         MeshItem {
@@ -237,11 +237,12 @@ mod tests {
                 Vec3::new(0.0, 1.0, 0.0) + offset,
                 Vec3::new(-1.0, -1.0, 0.0) + offset,
                 Vec3::new(1.0, -1.0, 0.0) + offset,
-            ],
+            ]
+            .into(),
             triangle_indices: vec![0, 1, 2],
             transform: Mat4::IDENTITY,
-            vertex_colors: vec![color; 3],
-            vertex_normals: vec![Vec3::ZERO; 3],
+            vertex_colors: vec![color; 3].into(),
+            vertex_normals: vec![Vec3::ZERO; 3].into(),
         }
     }
 
@@ -252,11 +253,12 @@ mod tests {
                 Vec3::new(1.0, 1.0, 0.0) + offset,
                 Vec3::new(1.0, -1.0, 0.0) + offset,
                 Vec3::new(-1.0, -1.0, 0.0) + offset,
-            ],
+            ]
+            .into(),
             triangle_indices: vec![0, 1, 2, 0, 2, 3],
             transform: Mat4::IDENTITY,
-            vertex_colors: vec![color; 4],
-            vertex_normals: vec![Vec3::ZERO; 4],
+            vertex_colors: vec![color; 4].into(),
+            vertex_normals: vec![Vec3::ZERO; 4].into(),
         }
     }
 
@@ -301,11 +303,15 @@ mod tests {
             }
         }
 
-        let vertex_colors = vec![color; points.len()];
-        let vertex_normals = points.iter().map(|p| (*p - position).normalize()).collect();
+        let vertex_colors = vec![color; points.len()].into();
+        let vertex_normals = points
+            .iter()
+            .map(|p| (*p - position).normalize())
+            .collect::<Vec<_>>()
+            .into();
 
         MeshItem {
-            points,
+            points: points.into(),
             triangle_indices: indices,
             transform: Mat4::IDENTITY,
             vertex_colors,
@@ -315,7 +321,7 @@ mod tests {
 
     #[test]
     fn render_mesh_items() {
-        use ranim_core::core_item::camera_frame::CameraFrame;
+        use ranim_core::CameraFrame;
 
         let ctx = block_on(WgpuContext::new());
 
@@ -377,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_nested_transparent_spheres() {
-        use ranim_core::core_item::camera_frame::CameraFrame;
+        use ranim_core::CameraFrame;
 
         let ctx = block_on(WgpuContext::new());
         let width = 800u32;

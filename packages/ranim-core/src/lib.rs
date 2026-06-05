@@ -21,6 +21,10 @@ pub mod traits;
 pub mod utils;
 
 pub mod core_item;
+pub use core_item::{
+    AnyExtractCoreItem, CoreItem, DynItem, camera_frame::CameraFrame, mesh_item::MeshItem,
+    vitem::VItem,
+};
 /// The [`core_item::CoreItem`] store
 pub mod store;
 
@@ -34,12 +38,12 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
-    pub use crate::core_item::camera_frame::CameraFrame;
+    pub use crate::CameraFrame;
     pub use crate::timeline::{TimelineFunc, TimelinesFunc};
     pub use crate::{RanimScene, TimeMark, TimelineId};
 }
 
-use crate::{animation::StaticAnim, core_item::CoreItem, timeline::Timeline};
+use crate::{animation::StaticAnim, timeline::Timeline};
 
 /// Extract a [`Extract::Target`] from reference.
 pub trait Extract {

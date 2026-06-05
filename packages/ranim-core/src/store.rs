@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 
 use crate::{
+    AnyExtractCoreItem, CoreItem, MeshItem, VItem,
     animation::{AnimationCell, CoreItemAnimation},
-    core_item::{AnyExtractCoreItem, CoreItem, mesh_item::MeshItem, vitem::VItem},
     prelude::CameraFrame,
 };
 

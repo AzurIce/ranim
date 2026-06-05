@@ -3,9 +3,8 @@
 use glam::{DMat4, DVec3, dvec2};
 
 use crate::{
-    Extract,
+    CoreItem, Extract,
     animation::{AnimationCell, Eval},
-    core_item::CoreItem,
     prelude::{Alignable, Interpolatable},
 };
 
