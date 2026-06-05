@@ -2,10 +2,9 @@ use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec3, Vec4, vec4};
 
 use crate::{
-    Extract,
+    CoreItem, Extract,
     anchor::Aabb,
     components::{PointVec, rgba::Rgba, vpoint::VPointVec, width::Width},
-    core_item::CoreItem,
     traits::{
         Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, PointsFunc, RotateTransform,
         ScaleTransform, ShiftTransform, StrokeColor, StrokeWidth,
@@ -44,7 +43,7 @@ pub fn vitem_normal_from_points(points: &[Vec4]) -> Vec3 {
 /// You can construct a [`VItem`] from a list of VPoints, see [`VPointVec`]:
 ///
 /// ```rust
-/// use ranim_core::{core_item::vitem::VItem, glam::dvec3};
+/// use ranim_core::{VItem, glam::dvec3};
 ///
 /// let vitem = VItem::from_vpoints(vec![
 ///     dvec3(0.0, 0.0, 0.0),
@@ -197,14 +196,14 @@ impl Alignable for VItem {
     fn align_with(&mut self, other: &mut Self) {
         self.vpoints.align_with(&mut other.vpoints);
         let n = self.stroke_rgbas.len().max(other.stroke_rgbas.len());
-        self.stroke_rgbas = self.stroke_rgbas.expand_to(n).into();
-        other.stroke_rgbas = other.stroke_rgbas.expand_to(n).into();
+        self.stroke_rgbas = self.stroke_rgbas.resize_by_sample(n).into();
+        other.stroke_rgbas = other.stroke_rgbas.resize_by_sample(n).into();
         let n = self.stroke_widths.len().max(other.stroke_widths.len());
-        self.stroke_widths = self.stroke_widths.expand_to(n).into();
-        other.stroke_widths = other.stroke_widths.expand_to(n).into();
+        self.stroke_widths = self.stroke_widths.resize_by_sample(n).into();
+        other.stroke_widths = other.stroke_widths.resize_by_sample(n).into();
         let n = self.fill_rgbas.len().max(other.fill_rgbas.len());
-        self.fill_rgbas = self.fill_rgbas.expand_to(n).into();
-        other.fill_rgbas = other.fill_rgbas.expand_to(n).into();
+        self.fill_rgbas = self.fill_rgbas.resize_by_sample(n).into();
+        other.fill_rgbas = other.fill_rgbas.resize_by_sample(n).into();
     }
 }
 

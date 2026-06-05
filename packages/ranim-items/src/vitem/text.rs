@@ -4,9 +4,8 @@ use std::{
 };
 
 use ranim_core::{
-    Extract,
+    CoreItem, Extract,
     color::{AlphaColor, Srgb},
-    core_item::CoreItem,
     glam::{DAffine3, DMat3, DVec3},
     traits::{
         Aabb, Discard, FillColor, Locate, PointsFunc, RotateTransform, ScaleTransform,

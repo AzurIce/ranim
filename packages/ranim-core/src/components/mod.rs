@@ -53,7 +53,7 @@ impl<T: Component + Interpolatable> PointVec<T> {
     }
 
     /// Expand values to exactly `len` entries by linear sampling.
-    pub fn expand_to(&self, len: usize) -> Vec<T> {
+    pub fn resize_by_sample(&self, len: usize) -> Vec<T> {
         (0..len).map(|idx| self.sample(idx, len)).collect()
     }
 
@@ -171,7 +171,7 @@ mod test {
     #[test]
     fn point_vec_samples_uniform_values() {
         let widths: PointVec<Width> = vec![2.0.into()].into();
-        let expanded = widths.expand_to(4);
+        let expanded = widths.resize_by_sample(4);
 
         assert_eq!(expanded, vec![2.0.into(); 4]);
     }
@@ -179,7 +179,7 @@ mod test {
     #[test]
     fn point_vec_samples_between_end_values() {
         let widths: PointVec<Width> = vec![0.0.into(), 2.0.into()].into();
-        let expanded = widths.expand_to(3);
+        let expanded = widths.resize_by_sample(3);
 
         assert_eq!(expanded, vec![0.0.into(), 1.0.into(), 2.0.into()]);
     }

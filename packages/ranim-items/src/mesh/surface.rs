@@ -1,10 +1,9 @@
 //! Surface — a parametric surface mesh item.
 
 use ranim_core::{
-    Extract,
+    CoreItem, Extract,
     color::{self, AlphaColor, Srgb},
     components::rgba::Rgba,
-    core_item::CoreItem,
     glam::{DMat4, DVec3},
     traits::{FillColor, Interpolatable, Opacity},
 };

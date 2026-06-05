@@ -1,5 +1,5 @@
 use ranim::glam;
-use ranim_core::core_item::CoreItem;
+use ranim_core::CoreItem;
 use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
 use std::f64::consts::PI;
 

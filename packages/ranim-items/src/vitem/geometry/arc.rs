@@ -1,8 +1,8 @@
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
+use ranim_core::CoreItem;
 use ranim_core::Extract;
 use ranim_core::anchor::{Aabb, Locate};
-use ranim_core::core_item::CoreItem;
 
 use ranim_core::{color, glam};
 
