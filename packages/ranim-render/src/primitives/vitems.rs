@@ -143,9 +143,9 @@ impl VItemsBuffer {
             });
 
             all_points3d.extend_from_slice(&render_points);
-            all_fill_rgbas.extend(vitem.fill_rgbas.expand_to(ac));
-            all_stroke_rgbas.extend(vitem.stroke_rgbas.expand_to(ac));
-            all_stroke_widths.extend(vitem.stroke_widths.expand_to(ac));
+            all_fill_rgbas.extend(vitem.fill_rgbas.resize_by_sample(ac));
+            all_stroke_rgbas.extend(vitem.stroke_rgbas.resize_by_sample(ac));
+            all_stroke_widths.extend(vitem.stroke_widths.resize_by_sample(ac));
 
             point_offset += pc;
             attr_offset += ac as u32;

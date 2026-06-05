@@ -25,10 +25,10 @@ use crate::vitem::{VItem, svg::SvgItem};
 use ranim_core::Extract;
 use ranim_core::traits::Interpolatable;
 use ranim_core::{
+    CoreItem,
     anchor::Aabb,
     color,
     components::width::Width,
-    core_item::CoreItem,
     glam,
     traits::{
         Alignable, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,

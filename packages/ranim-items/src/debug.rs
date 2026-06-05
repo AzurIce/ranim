@@ -3,10 +3,9 @@
 use std::ops::{Deref, DerefMut};
 
 use ranim_core::{
-    Extract,
+    CoreItem, Extract,
     anchor::Aabb,
     color::{self, AlphaColor},
-    core_item::CoreItem,
     glam::{DVec3, dvec2},
     traits::{RotateTransform, ScaleTransform, ShiftTransform},
 };

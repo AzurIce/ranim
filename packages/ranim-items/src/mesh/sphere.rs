@@ -3,10 +3,9 @@
 use std::f64::consts::{PI, TAU};
 
 use ranim_core::{
-    Extract,
+    CoreItem, Extract,
     anchor::Aabb,
     color::{self, AlphaColor, Srgb},
-    core_item::CoreItem,
     glam::{DMat4, DVec3},
     traits::{FillColor, Interpolatable, Opacity, ShiftTransform, With},
 };
