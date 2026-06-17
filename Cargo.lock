@@ -4976,7 +4976,6 @@ dependencies = [
  "pollster 1.0.1",
  "profiling",
  "puffin",
- "ranim-core",
  "slotmap",
  "tracing",
  "variadics_please",

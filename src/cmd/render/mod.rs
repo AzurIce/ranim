@@ -2,14 +2,14 @@
 use std::collections::VecDeque;
 
 use crate::cmd::render::file_writer::OutputFormatExt;
-use crate::{Output, Scene, SceneConfig, SceneConstructor};
+use crate::{Output, RenderSceneCoreExt, Scene, SceneConfig, SceneConstructor};
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::store::CoreItemStore;
 use ranim_core::{SealedRanimScene, TimeMark};
-use ranim_render::resource::{RenderPool, RenderTextures};
-use ranim_render::{Renderer, utils::WgpuContext};
+use ranim_render::resource::RenderTextures;
+use ranim_render::{Renderer, scene::RenderScene, utils::WgpuContext};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::Instant;
@@ -106,7 +106,7 @@ struct RenderWorker {
     ctx: WgpuContext,
     renderer: Renderer,
     render_textures: Vec<RenderTextures>,
-    pool: RenderPool,
+    render_scene: RenderScene,
     clear_color: wgpu::Color,
     // video writer
     video_writer: Option<FileWriter>,
@@ -170,7 +170,7 @@ impl RenderWorker {
             ctx,
             renderer,
             render_textures,
-            pool: RenderPool::new(),
+            render_scene: RenderScene::new(),
             clear_color,
             video_writer: None,
             video_writer_builder: Some(
@@ -224,15 +224,16 @@ impl RenderWorker {
                 }
 
                 // Render current frame and start async readback
-                worker.renderer.render_store_with_pool(
+                worker
+                    .render_scene
+                    .update_from_core_store(&store, worker.width, worker.height);
+                worker.renderer.render_scene(
                     &worker.ctx,
                     &mut worker.render_textures[cur],
                     worker.clear_color,
-                    &store,
-                    &mut worker.pool,
+                    &worker.render_scene,
                 );
                 worker.render_textures[cur].start_readback(&worker.ctx);
-                worker.pool.clean();
 
                 pending.push_back((cur, frame_count));
                 frame_count += 1;
@@ -277,15 +278,15 @@ impl RenderWorker {
             #[cfg(feature = "profiling")]
             profiling::scope!("render");
 
-            self.renderer.render_store_with_pool(
+            self.render_scene
+                .update_from_core_store(store, self.width, self.height);
+            self.renderer.render_scene(
                 &self.ctx,
                 &mut self.render_textures[0],
                 self.clear_color,
-                store,
-                &mut self.pool,
+                &self.render_scene,
             );
         }
-        self.pool.clean();
 
         #[cfg(feature = "profiling")]
         profiling::finish_frame!();

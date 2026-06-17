@@ -1,10 +1,8 @@
 use crate::utils::{WgpuContext, WgpuVecBuffer};
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
-use ranim_core::{
-    components::{rgba::Rgba, width::Width},
-    core_item::vitem::{VItem, vitem_normal_from_points},
-};
+
+use crate::scene::VItemRenderData;
 
 /// Per-item metadata stored in a GPU buffer.
 /// Tells shaders where each VItem's data lives in the merged buffers.
@@ -49,11 +47,11 @@ pub struct VItemsBuffer {
     /// Merged 2D projected points (written by compute shader)
     pub(crate) points2d_buffer: WgpuVecBuffer<Vec4>,
     /// Merged fill colors
-    pub(crate) fill_rgbas_buffer: WgpuVecBuffer<Rgba>,
+    pub(crate) fill_rgbas_buffer: WgpuVecBuffer<Vec4>,
     /// Merged stroke colors
-    pub(crate) stroke_rgbas_buffer: WgpuVecBuffer<Rgba>,
+    pub(crate) stroke_rgbas_buffer: WgpuVecBuffer<Vec4>,
     /// Merged stroke widths
-    pub(crate) stroke_widths_buffer: WgpuVecBuffer<Width>,
+    pub(crate) stroke_widths_buffer: WgpuVecBuffer<f32>,
 
     /// Number of items
     pub(crate) item_count: u32,
@@ -96,18 +94,17 @@ impl VItemsBuffer {
     }
 
     /// Pack all VItems into the merged buffers. Called once per frame.
-    pub fn update(&mut self, ctx: &WgpuContext, vitems: &[VItem]) {
-        if vitems.is_empty() {
+    pub fn update(&mut self, ctx: &WgpuContext, vitems: &[VItemRenderData]) {
+        let item_count = vitems.iter().filter(|v| !v.points.is_empty()).count();
+        if item_count == 0 {
             self.item_count = 0;
             self.total_points = 0;
             return;
         }
 
-        let item_count = vitems.len();
-
         // Pre-calculate total sizes
-        let total_points: usize = vitems.iter().map(|v| v.get_render_points().len()).sum();
-        let total_attrs: usize = vitems.iter().map(|x| x.vpoints.len().div_ceil(2)).sum();
+        let total_points: usize = vitems.iter().map(|v| v.points.len()).sum();
+        let total_attrs: usize = vitems.iter().map(VItemRenderData::attr_count).sum();
 
         // Build index table and collect data
         let mut item_infos = Vec::with_capacity(item_count);
@@ -120,10 +117,10 @@ impl VItemsBuffer {
         let mut point_offset: u32 = 0;
         let mut attr_offset: u32 = 0;
 
-        for vitem in vitems {
-            let render_points = vitem.get_render_points();
+        for vitem in vitems.iter().filter(|v| !v.points.is_empty()) {
+            let render_points = &vitem.points;
             let pc = render_points.len() as u32;
-            let ac = vitem.vpoints.len().div_ceil(2);
+            let ac = vitem.attr_count();
 
             item_infos.push(ItemInfo {
                 point_offset,
@@ -134,18 +131,18 @@ impl VItemsBuffer {
 
             let normal = vitem
                 .normal
-                .map(|n| n.as_vec3())
-                .unwrap_or_else(|| vitem_normal_from_points(&render_points));
+                .map(|n| n)
+                .unwrap_or_else(|| vitem_normal_from_points(render_points));
             let origin = Vec3::new(render_points[0].x, render_points[0].y, render_points[0].z);
             planes.push(PlaneData {
                 normal: Vec4::from((normal, 0.0)),
                 origin: Vec4::from((origin, 0.0)),
             });
 
-            all_points3d.extend_from_slice(&render_points);
-            all_fill_rgbas.extend(vitem.fill_rgbas.resize_by_sample(ac));
-            all_stroke_rgbas.extend(vitem.stroke_rgbas.resize_by_sample(ac));
-            all_stroke_widths.extend(vitem.stroke_widths.resize_by_sample(ac));
+            all_points3d.extend_from_slice(render_points);
+            all_fill_rgbas.extend(resize_vec4_by_sample(&vitem.fill_rgbas, ac));
+            all_stroke_rgbas.extend(resize_vec4_by_sample(&vitem.stroke_rgbas, ac));
+            all_stroke_widths.extend(resize_f32_by_sample(&vitem.stroke_widths, ac));
 
             point_offset += pc;
             attr_offset += ac as u32;
@@ -266,6 +263,66 @@ impl VItemsBuffer {
                 bg_entry(6, &this.stroke_widths_buffer.buffer),
             ],
         })
+    }
+}
+
+/// Compute the normal vector from rendered VItem points.
+///
+/// Falls back to Z axis if the first three points are collinear.
+pub fn vitem_normal_from_points(points: &[Vec4]) -> Vec3 {
+    if points.len() < 3 {
+        return Vec3::Z;
+    }
+    let p0 = Vec3::new(points[0].x, points[0].y, points[0].z);
+    let p1 = Vec3::new(points[1].x, points[1].y, points[1].z);
+    let p2 = Vec3::new(points[2].x, points[2].y, points[2].z);
+    let n = (p1 - p0).cross(p2 - p0);
+    if n.length_squared() < 1e-6 {
+        Vec3::Z
+    } else {
+        n.normalize()
+    }
+}
+
+fn resize_vec4_by_sample(values: &[Vec4], len: usize) -> Vec<Vec4> {
+    (0..len).map(|idx| sample_vec4(values, idx, len)).collect()
+}
+
+fn sample_vec4(values: &[Vec4], idx: usize, total: usize) -> Vec4 {
+    match values.len() {
+        0 => Vec4::ZERO,
+        1 => values[0],
+        len => {
+            if total <= 1 {
+                return values[0];
+            }
+            let t = idx as f32 / (total - 1) as f32;
+            let pos = t * (len - 1) as f32;
+            let lo = (pos.floor() as usize).min(len - 2);
+            let frac = pos - lo as f32;
+            values[lo] + (values[lo + 1] - values[lo]) * frac
+        }
+    }
+}
+
+fn resize_f32_by_sample(values: &[f32], len: usize) -> Vec<f32> {
+    (0..len).map(|idx| sample_f32(values, idx, len)).collect()
+}
+
+fn sample_f32(values: &[f32], idx: usize, total: usize) -> f32 {
+    match values.len() {
+        0 => 0.0,
+        1 => values[0],
+        len => {
+            if total <= 1 {
+                return values[0];
+            }
+            let t = idx as f32 / (total - 1) as f32;
+            let pos = t * (len - 1) as f32;
+            let lo = (pos.floor() as usize).min(len - 2);
+            let frac = pos - lo as f32;
+            values[lo] + (values[lo + 1] - values[lo]) * frac
+        }
     }
 }
 

@@ -13,6 +13,8 @@ pub mod pipelines;
 /// The basic renderable structs
 pub mod primitives;
 pub mod resource;
+/// Render-side scene data.
+pub mod scene;
 /// Rendering related utils
 pub mod utils;
 
@@ -22,9 +24,9 @@ use crate::{
     graph::{AnyGlobalRenderNodeTrait, GlobalRenderGraph, RenderPackets},
     primitives::{mesh_items::MeshItemsBuffer, viewport::ViewportUniform, vitems::VItemsBuffer},
     resource::{PipelinesPool, RenderPool, RenderTextures},
+    scene::RenderScene,
     utils::{WgpuBuffer, WgpuVecBuffer},
 };
-use ranim_core::store::CoreItemStore;
 use utils::WgpuContext;
 
 #[cfg(feature = "profiling")]
@@ -104,6 +106,7 @@ pub struct Renderer {
     pub(crate) resolution_info: ResolutionInfo,
     pub(crate) pipelines: PipelinesPool,
     packets: RenderPackets,
+    pool: RenderPool,
     render_graph: GlobalRenderGraph,
 
     /// Present when using the merged rendering path (lazily initialized on first use).
@@ -182,6 +185,7 @@ impl Renderer {
             resolution_info,
             pipelines: PipelinesPool::default(),
             packets: RenderPackets::default(),
+            pool: RenderPool::default(),
             render_graph,
             merged_buffer: None,
             merged_mesh_buffer: None,
@@ -194,31 +198,29 @@ impl Renderer {
         RenderTextures::new(ctx, self.width, self.height)
     }
 
-    /// Render a frame. Pushes viewport + VItem packets via pool, then execs the render graph.
-    pub fn render_store_with_pool(
+    /// Render a render-side scene.
+    pub fn render_scene(
         &mut self,
         ctx: &WgpuContext,
         render_textures: &mut RenderTextures,
         clear_color: wgpu::Color,
-        store: &CoreItemStore,
-        pool: &mut RenderPool,
+        scene: &RenderScene,
     ) {
         // Viewport — always needed
-        let camera_frame = &store.camera_frames[0];
-        let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
-        self.packets.push(pool.alloc_packet(ctx, &viewport));
+        let viewport = ViewportUniform::from_view_data(scene.view);
+        self.packets.push(self.pool.alloc_packet(ctx, &viewport));
 
         // Merged buffer (merged nodes read this; old nodes ignore it)
         let merged = self
             .merged_buffer
             .get_or_insert_with(|| VItemsBuffer::new(ctx));
-        merged.update(ctx, &store.vitems);
+        merged.update(ctx, &scene.vitems);
 
         // Merged mesh buffer
         let merged_mesh = self
             .merged_mesh_buffer
             .get_or_insert_with(|| MeshItemsBuffer::new(ctx));
-        merged_mesh.update(ctx, &store.mesh_items);
+        merged_mesh.update(ctx, &scene.meshes);
 
         // Encode & submit
         {
@@ -237,7 +239,7 @@ impl Renderer {
                     pipelines: &self.pipelines,
                     render_textures,
                     render_packets: &self.packets,
-                    render_pool: pool,
+                    render_pool: &self.pool,
                     wgpu_ctx: ctx,
                     resolution_info: &self.resolution_info,
                     clear_color,
@@ -285,6 +287,7 @@ impl Renderer {
         }
 
         self.packets.clear();
+        self.pool.clean();
     }
 }
 
