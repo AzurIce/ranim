@@ -1,8 +1,8 @@
 use glam::{Mat4, Vec2};
-use ranim_core::prelude::CameraFrame;
 
 use crate::{
     primitives::{Primitive, RenderResource},
+    scene::ViewData,
     utils::{WgpuBuffer, WgpuContext},
 };
 
@@ -20,15 +20,11 @@ impl Primitive for ViewportUniform {
 }
 
 impl ViewportUniform {
-    pub fn from_camera_frame(camera_frame: &CameraFrame, width: u32, height: u32) -> Self {
-        let ratio = width as f64 / height as f64;
+    pub fn from_view_data(view: ViewData) -> Self {
         Self {
-            proj_mat: camera_frame.projection_matrix(ratio).as_mat4(),
-            view_mat: camera_frame.view_matrix().as_mat4(),
-            half_frame_size: Vec2::new(
-                (camera_frame.frame_height * ratio) as f32 / 2.0,
-                camera_frame.frame_height as f32 / 2.0,
-            ),
+            proj_mat: view.proj_mat,
+            view_mat: view.view_mat,
+            half_frame_size: view.half_frame_size,
             _padding: [0; 2],
         }
     }

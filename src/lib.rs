@@ -29,6 +29,10 @@ pub use ranim_core as core;
 pub use ranim_items as items;
 #[cfg(feature = "render")]
 pub use ranim_render as render;
+#[cfg(feature = "render")]
+mod render_adapter;
+#[cfg(feature = "render")]
+pub use render_adapter::*;
 
 /// Commands like preview and render
 pub mod cmd;

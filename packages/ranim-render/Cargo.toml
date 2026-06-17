@@ -10,7 +10,6 @@ repository.workspace = true
 profiling = ["dep:wgpu-profiler", "dep:puffin", "dep:profiling"]
 
 [dependencies]
-ranim-core.workspace = true
 wgpu-profiler = { workspace = true, optional = true }
 puffin = { version = "0.19.1", optional = true }
 profiling = { version = "1.0.18", optional = true, features = [

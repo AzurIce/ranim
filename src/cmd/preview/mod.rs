@@ -4,17 +4,13 @@ mod timeline;
 use std::sync::Arc;
 
 use crate::{
-    Output, Scene, SceneConfig, SceneConstructor,
+    Output, RenderSceneCoreExt, Scene, SceneConfig, SceneConstructor,
     core::{
         SealedRanimScene,
         color::{self, LinearSrgb},
         store::CoreItemStore,
     },
-    render::{
-        Renderer,
-        resource::{RenderPool, RenderTextures},
-        utils::WgpuContext,
-    },
+    render::{Renderer, resource::RenderTextures, scene::RenderScene, utils::WgpuContext},
 };
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
@@ -133,7 +129,7 @@ pub struct RanimPreviewApp {
     need_eval: bool,
     last_sec: f64,
     store: CoreItemStore,
-    pool: RenderPool,
+    render_scene: RenderScene,
     timeline_state: TimelineState,
     play_prev_t: Option<Instant>,
 
@@ -203,7 +199,7 @@ impl RanimPreviewApp {
             need_eval: false,
             last_sec: -1.0,
             store: CoreItemStore::default(),
-            pool: RenderPool::new(),
+            render_scene: RenderScene::new(),
             play_prev_t: None,
             renderer: None,
             render_textures: None,
@@ -291,7 +287,7 @@ impl RanimPreviewApp {
                         old_cur_second.clamp(0.0, self.timeline_state.total_sec);
                     self.timeline = timeline;
                     self.store.update(std::iter::empty());
-                    self.pool.clean();
+                    self.render_scene.reset();
                     self.need_eval = true;
 
                     self.set_clear_color_str(&scene.config.clear_color);
@@ -326,13 +322,11 @@ impl RanimPreviewApp {
         }
 
         // Construct WgpuContext using eframe's resources.
-        // NOTE: We assume ranim-render doesn't strictly depend on the instance for the operations we do here.
-        let ctx = WgpuContext {
-            instance: wgpu::Instance::default(), // Dummy instance
-            adapter: wgpu::Adapter::clone(&render_state.adapter),
-            device: wgpu::Device::clone(&render_state.device),
-            queue: wgpu::Queue::clone(&render_state.queue),
-        };
+        let ctx = WgpuContext::from_device(
+            wgpu::Adapter::clone(&render_state.adapter),
+            wgpu::Device::clone(&render_state.device),
+            wgpu::Queue::clone(&render_state.queue),
+        );
 
         let (width, height) = (self.resolution.width, self.resolution.height);
         let oit_layers = self.calculate_oit_layers(&ctx, width, height);
@@ -404,13 +398,12 @@ impl RanimPreviewApp {
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();
-            renderer.render_store_with_pool(
-                ctx,
-                render_textures,
-                self.clear_color,
+            self.render_scene.update_from_core_store(
                 &self.store,
-                &mut self.pool,
+                self.resolution.width,
+                self.resolution.height,
             );
+            renderer.render_scene(ctx, render_textures, self.clear_color, &self.render_scene);
 
             if let (Some(pipeline), Some(view)) = (
                 self.depth_visual_pipeline.as_ref(),
@@ -458,7 +451,6 @@ impl RanimPreviewApp {
             }
 
             self.last_render_time = Some(start.elapsed());
-            self.pool.clean();
         }
     }
 

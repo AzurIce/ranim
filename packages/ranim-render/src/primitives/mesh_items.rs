@@ -1,7 +1,8 @@
 use crate::utils::{WgpuContext, WgpuVecBuffer};
 use bytemuck::{Pod, Zeroable};
-use glam::Vec3;
-use ranim_core::{MeshItem, components::rgba::Rgba};
+use glam::{Vec3, Vec4};
+
+use crate::scene::MeshRenderData;
 
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
@@ -15,7 +16,7 @@ pub struct MeshItemsBuffer {
     /// Per-vertex mesh id (vertex buffer)
     pub(crate) mesh_ids_buffer: WgpuVecBuffer<u32>,
     /// Per-vertex colors (vertex buffer)
-    pub(crate) vertex_colors_buffer: WgpuVecBuffer<Rgba>,
+    pub(crate) vertex_colors_buffer: WgpuVecBuffer<Vec4>,
     /// Per-vertex normals (vertex buffer) — all-zero → flat shading fallback
     pub(crate) vertex_normals_buffer: WgpuVecBuffer<Vec3>,
     /// Merged triangle indices (index buffer)
@@ -61,17 +62,17 @@ impl MeshItemsBuffer {
         }
     }
 
-    pub fn update(&mut self, ctx: &WgpuContext, mesh_items: &[MeshItem]) {
-        if mesh_items.is_empty() {
+    pub fn update(&mut self, ctx: &WgpuContext, mesh_items: &[MeshRenderData]) {
+        let item_count = mesh_items.iter().filter(|m| !m.points.is_empty()).count();
+        if item_count == 0 {
             self.item_count = 0;
             self.total_vertices = 0;
             self.total_indices = 0;
             return;
         }
 
-        let item_count = mesh_items.len();
         let total_vertices: usize = mesh_items.iter().map(|m| m.points.len()).sum();
-        let total_indices: usize = mesh_items.iter().map(|m| m.triangle_indices.len()).sum();
+        let total_indices: usize = mesh_items.iter().map(|m| m.indices.len()).sum();
 
         let mut transforms = Vec::with_capacity(item_count);
         let mut all_vertices = Vec::with_capacity(total_vertices);
@@ -82,7 +83,11 @@ impl MeshItemsBuffer {
 
         let mut vertex_offset: u32 = 0;
 
-        for (mesh_idx, mesh) in mesh_items.iter().enumerate() {
+        for (mesh_idx, mesh) in mesh_items
+            .iter()
+            .filter(|m| !m.points.is_empty())
+            .enumerate()
+        {
             let vc = mesh.points.len() as u32;
 
             transforms.push(MeshTransform {
@@ -91,7 +96,7 @@ impl MeshItemsBuffer {
 
             all_vertices.extend_from_slice(&mesh.points[..]);
             all_mesh_ids.extend(std::iter::repeat_n(mesh_idx as u32, vc as usize));
-            all_vertex_colors.extend_from_slice(&mesh.vertex_colors[..]);
+            all_vertex_colors.extend(resize_vec4_by_sample(&mesh.vertex_colors, vc as usize));
 
             // Pad normals with zero if shorter than points (flat shading fallback)
             let normals = &mesh.vertex_normals;
@@ -104,7 +109,7 @@ impl MeshItemsBuffer {
                     .extend(std::iter::repeat_n(Vec3::ZERO, vc as usize - normals_len));
             }
 
-            all_indices.extend(mesh.triangle_indices.iter().map(|&i| i + vertex_offset));
+            all_indices.extend(mesh.indices.iter().map(|&i| i + vertex_offset));
 
             vertex_offset += vc;
         }
@@ -160,7 +165,7 @@ impl MeshItemsBuffer {
             },
             // Slot 2: vertex_color (vec4<f32>)
             wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<Rgba>() as u64,
+                array_stride: std::mem::size_of::<Vec4>() as u64,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &[wgpu::VertexAttribute {
                     format: wgpu::VertexFormat::Float32x4,
@@ -201,6 +206,26 @@ impl MeshItemsBuffer {
     }
 }
 
+fn resize_vec4_by_sample(values: &[Vec4], len: usize) -> Vec<Vec4> {
+    (0..len).map(|idx| sample_vec4(values, idx, len)).collect()
+}
+
+fn sample_vec4(values: &[Vec4], idx: usize, total: usize) -> Vec4 {
+    match values.len() {
+        0 => Vec4::ONE,
+        1 => values[0],
+        len => {
+            if total <= 1 {
+                return values[0];
+            }
+            let t = idx as f32 / (total - 1) as f32;
+            let pos = t * (len - 1) as f32;
+            let lo = (pos.floor() as usize).min(len - 2);
+            values[lo].lerp(values[lo + 1], pos - lo as f32)
+        }
+    }
+}
+
 fn bgl_storage_entry(binding: u32, visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
@@ -226,43 +251,61 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::{Renderer, resource::RenderPool};
-    use glam::{Mat4, Vec3};
+    use crate::{
+        Renderer,
+        scene::{RenderScene, ViewData},
+    };
+    use glam::{Mat4, Vec2, Vec3, Vec4};
     use pollster::block_on;
-    use ranim_core::{CoreItem, components::rgba::Rgba, store::CoreItemStore};
 
-    fn create_triangle_mesh(color: Rgba, offset: Vec3) -> MeshItem {
-        MeshItem {
+    fn test_view(width: u32, height: u32) -> ViewData {
+        let ratio = width as f32 / height as f32;
+        let frame_height = 8.0;
+        let frame_width = frame_height * ratio;
+        ViewData {
+            proj_mat: Mat4::orthographic_rh(
+                -frame_width / 2.0,
+                frame_width / 2.0,
+                -frame_height / 2.0,
+                frame_height / 2.0,
+                -1000.0,
+                1000.0,
+            ),
+            view_mat: Mat4::look_to_rh(Vec3::ZERO, Vec3::NEG_Z, Vec3::Y),
+            half_frame_size: Vec2::new(frame_width / 2.0, frame_height / 2.0),
+        }
+    }
+
+    fn create_triangle_mesh(color: Vec4, offset: Vec3) -> MeshRenderData {
+        MeshRenderData {
             points: vec![
                 Vec3::new(0.0, 1.0, 0.0) + offset,
                 Vec3::new(-1.0, -1.0, 0.0) + offset,
                 Vec3::new(1.0, -1.0, 0.0) + offset,
-            ]
-            .into(),
-            triangle_indices: vec![0, 1, 2],
+            ],
+            indices: vec![0, 1, 2],
             transform: Mat4::IDENTITY,
-            vertex_colors: vec![color; 3].into(),
-            vertex_normals: vec![Vec3::ZERO; 3].into(),
+            vertex_colors: vec![color; 3],
+            vertex_normals: vec![Vec3::ZERO; 3],
         }
     }
 
-    fn create_quad_mesh(color: Rgba, offset: Vec3) -> MeshItem {
-        MeshItem {
+    fn create_quad_mesh(color: Vec4, offset: Vec3) -> MeshRenderData {
+        MeshRenderData {
             points: vec![
                 Vec3::new(-1.0, 1.0, 0.0) + offset,
                 Vec3::new(1.0, 1.0, 0.0) + offset,
                 Vec3::new(1.0, -1.0, 0.0) + offset,
                 Vec3::new(-1.0, -1.0, 0.0) + offset,
-            ]
-            .into(),
-            triangle_indices: vec![0, 1, 2, 0, 2, 3],
+            ],
+            indices: vec![0, 1, 2, 0, 2, 3],
             transform: Mat4::IDENTITY,
-            vertex_colors: vec![color; 4].into(),
-            vertex_normals: vec![Vec3::ZERO; 4].into(),
+            vertex_colors: vec![color; 4],
+            vertex_normals: vec![Vec3::ZERO; 4],
         }
     }
 
-    fn create_sphere_mesh(color: Rgba, radius: f32, position: Vec3) -> MeshItem {
+    fn create_sphere_mesh(color: Vec4, radius: f32, position: Vec3) -> MeshRenderData {
         let mut points = Vec::new();
         let mut indices = Vec::new();
 
@@ -303,16 +346,15 @@ mod tests {
             }
         }
 
-        let vertex_colors = vec![color; points.len()].into();
+        let vertex_colors = vec![color; points.len()];
         let vertex_normals = points
             .iter()
             .map(|p| (*p - position).normalize())
-            .collect::<Vec<_>>()
-            .into();
+            .collect::<Vec<_>>();
 
-        MeshItem {
-            points: points.into(),
-            triangle_indices: indices,
+        MeshRenderData {
+            points,
+            indices,
             transform: Mat4::IDENTITY,
             vertex_colors,
             vertex_normals,
@@ -321,8 +363,6 @@ mod tests {
 
     #[test]
     fn render_mesh_items() {
-        use ranim_core::CameraFrame;
-
         let ctx = block_on(WgpuContext::new());
 
         let width = 800u32;
@@ -330,31 +370,22 @@ mod tests {
 
         let mut renderer = Renderer::new(&ctx, width, height, 8);
         let mut render_textures = renderer.new_render_textures(&ctx);
-        let mut pool = RenderPool::new();
 
-        let mut store = CoreItemStore::new();
+        let red = Vec4::new(1.0, 0.0, 0.0, 1.0);
+        let green = Vec4::new(0.0, 1.0, 0.0, 1.0);
+        let blue = Vec4::new(0.0, 0.0, 1.0, 0.8);
+        let yellow = Vec4::new(1.0, 1.0, 0.0, 0.9);
 
-        let red = Rgba(glam::Vec4::new(1.0, 0.0, 0.0, 1.0));
-        let green = Rgba(glam::Vec4::new(0.0, 1.0, 0.0, 1.0));
-        let blue = Rgba(glam::Vec4::new(0.0, 0.0, 1.0, 0.8));
-        let yellow = Rgba(glam::Vec4::new(1.0, 1.0, 0.0, 0.9));
-
-        let camera_frame = CameraFrame::default();
         let triangle1 = create_triangle_mesh(red, Vec3::new(-2.0, 0.0, 0.0));
         let triangle2 = create_triangle_mesh(green, Vec3::new(2.0, 0.0, 0.0));
         let quad1 = create_quad_mesh(blue, Vec3::new(0.0, 2.0, 0.0));
         let quad2 = create_quad_mesh(yellow, Vec3::new(0.0, -2.0, 0.0));
 
-        store.update(
-            [
-                ((0, 0), CoreItem::CameraFrame(camera_frame)),
-                ((1, 0), CoreItem::MeshItem(triangle1)),
-                ((1, 1), CoreItem::MeshItem(triangle2)),
-                ((2, 0), CoreItem::MeshItem(quad1)),
-                ((3, 1), CoreItem::MeshItem(quad2)),
-            ]
-            .into_iter(),
-        );
+        let scene = RenderScene {
+            view: test_view(width, height),
+            vitems: Vec::new(),
+            meshes: vec![triangle1, triangle2, quad1, quad2],
+        };
 
         let clear_color = wgpu::Color {
             r: 0.1,
@@ -363,8 +394,7 @@ mod tests {
             a: 1.0,
         };
 
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
-        pool.clean();
+        renderer.render_scene(&ctx, &mut render_textures, clear_color, &scene);
 
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -383,41 +413,31 @@ mod tests {
 
     #[test]
     fn test_nested_transparent_spheres() {
-        use ranim_core::CameraFrame;
-
         let ctx = block_on(WgpuContext::new());
         let width = 800u32;
         let height = 600u32;
 
         let mut renderer = Renderer::new(&ctx, width, height, 8);
         let mut render_textures = renderer.new_render_textures(&ctx);
-        let mut pool = RenderPool::new();
-        let mut store = CoreItemStore::new();
 
         // Create nested spheres:
         // 1. Outer transparent sphere (blue, alpha=0.3, radius=2.0)
         // 2. Middle opaque sphere (red, alpha=1.0, radius=1.5)
         // 3. Inner transparent sphere (green, alpha=0.5, radius=1.0)
 
-        let outer_transparent = Rgba(glam::Vec4::new(0.0, 0.0, 1.0, 0.3));
-        let middle_opaque = Rgba(glam::Vec4::new(1.0, 0.0, 0.0, 1.0));
-        let inner_transparent = Rgba(glam::Vec4::new(0.0, 1.0, 0.0, 0.5));
+        let outer_transparent = Vec4::new(0.0, 0.0, 1.0, 0.3);
+        let middle_opaque = Vec4::new(1.0, 0.0, 0.0, 1.0);
+        let inner_transparent = Vec4::new(0.0, 1.0, 0.0, 0.5);
 
         let outer_sphere = create_sphere_mesh(outer_transparent, 2.0, Vec3::ZERO);
         let middle_sphere = create_sphere_mesh(middle_opaque, 1.5, Vec3::ZERO);
         let inner_sphere = create_sphere_mesh(inner_transparent, 1.0, Vec3::ZERO);
 
-        let camera_frame = CameraFrame::default();
-
-        store.update(
-            [
-                ((0, 0), CoreItem::CameraFrame(camera_frame)),
-                ((1, 0), CoreItem::MeshItem(outer_sphere)),
-                ((2, 0), CoreItem::MeshItem(middle_sphere)),
-                ((3, 0), CoreItem::MeshItem(inner_sphere)),
-            ]
-            .into_iter(),
-        );
+        let scene = RenderScene {
+            view: test_view(width, height),
+            vitems: Vec::new(),
+            meshes: vec![outer_sphere, middle_sphere, inner_sphere],
+        };
 
         let clear_color = wgpu::Color {
             r: 0.1,
@@ -426,8 +446,7 @@ mod tests {
             a: 1.0,
         };
 
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
-        pool.clean();
+        renderer.render_scene(&ctx, &mut render_textures, clear_color, &scene);
 
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
