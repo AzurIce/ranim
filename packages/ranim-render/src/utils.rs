@@ -145,8 +145,8 @@ pub mod collections {
 
 /// Wgpu context
 pub struct WgpuContext {
-    /// The wgpu instance
-    pub instance: wgpu::Instance,
+    /// The wgpu instance, when this context owns one.
+    pub instance: Option<wgpu::Instance>,
     /// The wgpu adapter
     pub adapter: wgpu::Adapter,
     /// The wgpu device
@@ -188,7 +188,17 @@ impl WgpuContext {
             .unwrap();
 
         Self {
-            instance,
+            instance: Some(instance),
+            adapter,
+            device,
+            queue,
+        }
+    }
+
+    /// Create a context from externally managed wgpu handles.
+    pub fn from_device(adapter: wgpu::Adapter, device: wgpu::Device, queue: wgpu::Queue) -> Self {
+        Self {
+            instance: None,
             adapter,
             device,
             queue,
