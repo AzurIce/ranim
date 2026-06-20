@@ -84,6 +84,11 @@ impl RenderTextures {
         self.width as f32 / self.height as f32
     }
 
+    /// The color texture produced by [`crate::Renderer::render_scene`].
+    pub fn output_texture(&self) -> &wgpu::Texture {
+        self.render_texture.texture()
+    }
+
     pub(crate) fn new(ctx: &WgpuContext, width: u32, height: u32) -> Self {
         let format = OUTPUT_TEXTURE_FORMAT;
         let render_texture = ReadbackWgpuTexture::new(
