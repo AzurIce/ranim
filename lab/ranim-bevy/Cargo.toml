@@ -17,15 +17,13 @@ path = "src/bin/demo.rs"
 
 [dependencies]
 bevy = { version = "0.19.0", default-features = false, features = [
-  "default_app",
-  "default_platform",
-  "2d_api",
-  "2d_bevy_render",
+  "3d",
 ] }
 ranim-core.workspace = true
 ranim-render.workspace = true
 tracing.workspace = true
 wgpu.workspace = true
+bytemuck = { workspace = true, features = ["derive"] }
 
 [package.metadata.release]
 tag = false
