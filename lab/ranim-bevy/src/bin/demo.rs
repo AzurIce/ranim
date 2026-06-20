@@ -1,7 +1,10 @@
 use std::f64::consts::TAU;
 
-use bevy::prelude::*;
-use ranim_bevy::{RanimBevyPlugin, RanimRenderTarget, RanimVItem};
+use bevy::{
+    core_pipeline::{oit::OrderIndependentTransparencySettings, prepass::DepthPrepass},
+    prelude::*,
+};
+use ranim_bevy::{RanimBevyPlugin, RanimVItem};
 use ranim_core::{
     VItem,
     components::{rgba::Rgba, width::Width},
@@ -27,13 +30,51 @@ fn main() {
 #[derive(Component)]
 struct AnimatedRanimShape;
 
-fn setup(mut commands: Commands, target: Res<RanimRenderTarget>) {
-    commands.spawn(Camera2d);
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     commands.spawn((
-        Sprite::from_image(target.image.clone()),
-        Transform::from_scale(Vec3::splat(0.55)),
+        Camera3d::default(),
+        Transform::from_xyz(0.0, 0.0, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
+        OrderIndependentTransparencySettings::default(),
+        DepthPrepass,
+        Msaa::Off,
     ));
-    commands.spawn((AnimatedRanimShape, RanimVItem::new(make_shape(0.0))));
+    commands.spawn((
+        PointLight {
+            intensity: 1_500.0,
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        Transform::from_xyz(3.0, 4.0, 6.0),
+    ));
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(2.4, 2.4, 0.18))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.18, 0.20, 0.24),
+            perceptual_roughness: 0.72,
+            ..default()
+        })),
+        Transform::from_xyz(0.0, 0.0, -0.55),
+    ));
+    commands.spawn((
+        Mesh3d(meshes.add(Rectangle::new(3.8, 3.8).mesh())),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgba(1.0, 0.75, 0.18, 0.28),
+            alpha_mode: AlphaMode::Blend,
+            unlit: true,
+            ..default()
+        })),
+        Transform::from_xyz(0.15, -0.1, 0.25)
+            .with_rotation(Quat::from_rotation_y(0.42)),
+    ));
+    commands.spawn((
+        AnimatedRanimShape,
+        RanimVItem::new(make_shape(0.0)),
+        Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::splat(0.76)),
+    ));
 }
 
 fn animate_vitem(time: Res<Time>, mut query: Query<&mut RanimVItem, With<AnimatedRanimShape>>) {
