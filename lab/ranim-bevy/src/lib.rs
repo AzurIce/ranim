@@ -25,8 +25,8 @@ use bevy::{
         render_resource::{
             BindGroup, BindGroupEntries, BindGroupLayoutDescriptor, BindGroupLayoutEntries,
             BlendState, Buffer, BufferInitDescriptor, BufferUsages, ColorTargetState, ColorWrites,
-            CompareFunction, DepthBiasState, DepthStencilState, Face, FragmentState,
-            MultisampleState, PipelineCache, PrimitiveState, PrimitiveTopology,
+            CompareFunction, DepthBiasState, DepthStencilState, FragmentState, MultisampleState,
+            PipelineCache, PrimitiveState, PrimitiveTopology,
             RenderPipelineDescriptor, ShaderStages, ShaderType, SpecializedRenderPipeline,
             SpecializedRenderPipelines, StencilFaceState, StencilState, VertexState,
             binding_types::storage_buffer_read_only,
@@ -302,7 +302,7 @@ impl SpecializedRenderPipeline for RanimVItemPipeline {
             }),
             primitive: PrimitiveState {
                 topology: PrimitiveTopology::TriangleStrip,
-                cull_mode: Some(Face::Back),
+                cull_mode: None,
                 ..default()
             },
             depth_stencil: Some(DepthStencilState {
