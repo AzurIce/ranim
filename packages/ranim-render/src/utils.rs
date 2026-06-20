@@ -457,6 +457,10 @@ impl WgpuTexture {
             inner: ctx.device.create_texture(desc),
         }
     }
+
+    pub fn texture(&self) -> &wgpu::Texture {
+        &self.inner
+    }
 }
 
 impl Deref for WgpuTexture {

@@ -1,0 +1,33 @@
+[package]
+name = "ranim-lab"
+description = "The lab of Ranim."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ranim = { workspace = true, features = ["render"] }
+ranim-core.workspace = true
+ranim-render.workspace = true
+ranim-macros.workspace = true
+tracing.workspace = true
+itertools.workspace = true
+glam = { workspace = true, features = ["approx", "bytemuck"] }
+bytemuck = { workspace = true, features = ["derive"] }
+wgpu.workspace = true
+
+eframe = { workspace = true, default-features = true, features = ["wgpu"] }
+egui.workspace = true
+egui-phosphor.workspace = true
+
+
+[dev-dependencies]
+assert_float_eq = "1.2.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.release]
+tag = false
