@@ -1,5 +1,11 @@
 [alias]
 examples = "run --package xtask-examples"
 
+[target.aarch64-apple-darwin]
+linker = "clang"
+
+[target.x86_64-apple-darwin]
+linker = "clang"
+
 [target.wasm32-unknown-unknown]
 rustflags = ['--cfg', 'getrandom_backend="wasm_js"']

@@ -1,0 +1,31 @@
+[package]
+name = "ranim-bevy"
+description = "Experimental Bevy integration for Ranim."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "ranim_bevy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ranim-bevy-demo"
+path = "src/bin/demo.rs"
+
+[dependencies]
+bevy = { version = "0.19.0", default-features = false, features = [
+  "default_app",
+  "default_platform",
+  "2d_api",
+  "2d_bevy_render",
+] }
+ranim-core.workspace = true
+ranim-render.workspace = true
+tracing.workspace = true
+wgpu.workspace = true
+
+[package.metadata.release]
+tag = false
