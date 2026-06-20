@@ -1,7 +1,7 @@
 use std::f64::consts::TAU;
 
 use bevy::{
-    core_pipeline::{oit::OrderIndependentTransparencySettings, prepass::DepthPrepass},
+    core_pipeline::oit::OrderIndependentTransparencySettings,
     prelude::*,
 };
 use ranim_bevy::{RanimBevyPlugin, RanimVItem};
@@ -39,7 +39,6 @@ fn setup(
         Camera3d::default(),
         Transform::from_xyz(0.0, 0.0, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
         OrderIndependentTransparencySettings::default(),
-        DepthPrepass,
         Msaa::Off,
     ));
     commands.spawn((
