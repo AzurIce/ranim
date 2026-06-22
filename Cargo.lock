@@ -1243,7 +1243,7 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.18",
  "tracing",
- "wgpu-types",
+ "wgpu-types 29.0.4",
 ]
 
 [[package]]
@@ -5283,7 +5283,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d50be8a24c37debdf3170be6ca396d5b5b165f37f94837891adac735ca416b8"
 dependencies = [
- "bitflags 2.11.1",
+ "bitflags 2.13.0",
 ]
 
 [[package]]
@@ -7120,10 +7120,15 @@ version = "0.2.1"
 dependencies = [
  "bevy",
  "bytemuck",
+ "image",
+ "indicatif",
  "ranim-core",
  "ranim-render",
  "tracing",
+ "tracing-indicatif",
+ "tracing-subscriber",
  "wgpu 30.0.0",
+ "which",
 ]
 
 [[package]]

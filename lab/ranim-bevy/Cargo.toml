@@ -11,6 +11,15 @@ publish = false
 name = "ranim_bevy"
 path = "src/lib.rs"
 
+[features]
+video = [
+  "dep:image",
+  "dep:which",
+  "dep:indicatif",
+  "dep:tracing-indicatif",
+  "dep:tracing-subscriber",
+]
+
 [[bin]]
 name = "ranim-bevy-demo"
 path = "src/bin/demo.rs"
@@ -24,6 +33,11 @@ ranim-render.workspace = true
 tracing.workspace = true
 wgpu.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
+image = { workspace = true, optional = true }
+which = { version = "8.0.2", optional = true }
+indicatif = { version = "0.18.4", optional = true }
+tracing-indicatif = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, optional = true }
 
 [package.metadata.release]
 tag = false

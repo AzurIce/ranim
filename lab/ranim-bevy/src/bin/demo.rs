@@ -1,9 +1,6 @@
 use std::f64::consts::TAU;
 
-use bevy::{
-    core_pipeline::oit::OrderIndependentTransparencySettings,
-    prelude::*,
-};
+use bevy::{core_pipeline::oit::OrderIndependentTransparencySettings, prelude::*};
 use ranim_bevy::{RanimBevyPlugin, RanimVItem};
 use ranim_core::{
     VItem,
@@ -66,8 +63,7 @@ fn setup(
             unlit: true,
             ..default()
         })),
-        Transform::from_xyz(0.15, -0.1, 0.25)
-            .with_rotation(Quat::from_rotation_y(0.42)),
+        Transform::from_xyz(0.15, -0.1, 0.25).with_rotation(Quat::from_rotation_y(0.42)),
     ));
     commands.spawn((
         AnimatedRanimShape,
