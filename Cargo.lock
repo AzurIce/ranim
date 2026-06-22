@@ -6942,10 +6942,15 @@ version = "0.2.1"
 dependencies = [
  "bevy",
  "bytemuck",
+ "image",
+ "indicatif",
  "ranim-core",
  "ranim-render",
  "tracing",
+ "tracing-indicatif",
+ "tracing-subscriber",
  "wgpu",
+ "which",
 ]
 
 [[package]]
