@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use ranim::{Scene, cmd::render_scene};
+use ranim::{Scene, cmd::render_scene_checked};
 use tracing::{error, info};
 
 use crate::{
@@ -62,7 +62,7 @@ pub fn render_command(args: &CliArgs, scenes: &[String], buffer_count: usize) ->
 
     for scene in scenes_to_render {
         info!("Rendering scene: {}", scene.name);
-        render_scene(scene, buffer_count);
+        render_scene_checked(scene, buffer_count).map_err(anyhow::Error::msg)?;
     }
     Ok(())
 }

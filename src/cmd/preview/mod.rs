@@ -1,7 +1,10 @@
 mod depth_visual;
 mod timeline;
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use crate::{
     Output, Scene, SceneConfig, SceneConstructor,
@@ -144,6 +147,7 @@ pub struct RanimPreviewApp {
     depth_texture_id: Option<egui::TextureId>,
     view_mode: ViewMode,
     wgpu_ctx: Option<WgpuContext>,
+    wgpu_device_lost: Arc<AtomicBool>,
     last_render_time: Option<std::time::Duration>,
     last_eval_time: Option<std::time::Duration>,
 
@@ -211,6 +215,7 @@ impl RanimPreviewApp {
             depth_texture_id: None,
             view_mode: ViewMode::Output,
             wgpu_ctx: None,
+            wgpu_device_lost: Arc::new(AtomicBool::new(false)),
             last_render_time: None,
             last_eval_time: None,
             depth_visual_pipeline: None,
@@ -306,10 +311,28 @@ impl RanimPreviewApp {
 
     fn prepare_renderer(&mut self, frame: &eframe::Frame) {
         // Check if we need to recreate renderer
+        if self.wgpu_device_lost.load(Ordering::Acquire) {
+            let lost_device = self.wgpu_ctx.as_ref().map(|ctx| ctx.device.clone());
+            self.drop_gpu_resources();
+            if frame.wgpu_render_state().is_some_and(|render_state| {
+                lost_device
+                    .as_ref()
+                    .is_some_and(|device| *device == render_state.device)
+            }) {
+                return;
+            }
+            self.wgpu_device_lost.store(false, Ordering::Release);
+        }
+
         let needs_init = self.renderer.is_none();
         let needs_resize = self.resolution_dirty && self.renderer.is_some();
+        let needs_new_device = self.wgpu_ctx.as_ref().is_some_and(|ctx| {
+            frame
+                .wgpu_render_state()
+                .is_some_and(|render_state| ctx.device != render_state.device)
+        });
 
-        if !needs_init && !needs_resize {
+        if !needs_init && !needs_resize && !needs_new_device {
             return;
         }
 
@@ -319,10 +342,14 @@ impl RanimPreviewApp {
             return;
         };
 
-        if needs_init {
+        if needs_init || needs_new_device {
             tracing::info!("preparing renderer...");
         } else if needs_resize {
             tracing::info!("recreating renderer for resolution change...");
+        }
+
+        if needs_new_device {
+            self.drop_gpu_resources();
         }
 
         // Construct WgpuContext using eframe's resources.
@@ -333,6 +360,11 @@ impl RanimPreviewApp {
             device: wgpu::Device::clone(&render_state.device),
             queue: wgpu::Queue::clone(&render_state.queue),
         };
+        let device_lost = self.wgpu_device_lost.clone();
+        ctx.device.set_device_lost_callback(move |reason, message| {
+            tracing::warn!("wgpu device lost in preview: {reason:?}: {message}");
+            device_lost.store(true, Ordering::Release);
+        });
 
         let (width, height) = (self.resolution.width, self.resolution.height);
         let oit_layers = self.calculate_oit_layers(&ctx, width, height);
@@ -382,16 +414,31 @@ impl RanimPreviewApp {
         self.render_textures = Some(render_textures);
         self.renderer = Some(renderer);
         self.wgpu_ctx = Some(ctx);
+        self.wgpu_device_lost.store(false, Ordering::Release);
         self.resolution_dirty = false;
         self.need_eval = true; // Force re-render with new resolution
     }
 
+    fn drop_gpu_resources(&mut self) {
+        self.renderer = None;
+        self.render_textures = None;
+        self.texture_id = None;
+        self.depth_texture_id = None;
+        self.wgpu_ctx = None;
+        self.depth_visual_pipeline = None;
+        self.depth_visual_texture = None;
+        self.depth_visual_view = None;
+        self.pool = RenderPool::new();
+        self.need_eval = true;
+    }
+
     fn render_animation(&mut self) {
-        if let (Some(ctx), Some(renderer), Some(render_textures)) = (
-            self.wgpu_ctx.as_ref(),
-            self.renderer.as_mut(),
-            self.render_textures.as_mut(),
-        ) {
+        if self.wgpu_device_lost.load(Ordering::Acquire) {
+            self.drop_gpu_resources();
+            return;
+        }
+
+        if self.wgpu_ctx.is_some() && self.renderer.is_some() && self.render_textures.is_some() {
             if self.last_sec == self.timeline_state.current_sec && !self.need_eval {
                 return;
             }
@@ -404,57 +451,78 @@ impl RanimPreviewApp {
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();
-            renderer.render_store_with_pool(
-                ctx,
-                render_textures,
-                self.clear_color,
-                &self.store,
-                &mut self.pool,
-            );
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let ctx = self.wgpu_ctx.as_ref().unwrap();
+                let renderer = self.renderer.as_mut().unwrap();
+                let render_textures = self.render_textures.as_mut().unwrap();
 
-            if let (Some(pipeline), Some(view)) = (
-                self.depth_visual_pipeline.as_ref(),
-                self.depth_visual_view.as_ref(),
-            ) {
-                let mut encoder =
-                    ctx.device
-                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("Depth Visual Encoder"),
-                        });
+                renderer.render_store_with_pool(
+                    ctx,
+                    render_textures,
+                    self.clear_color,
+                    &self.store,
+                    &mut self.pool,
+                );
 
-                let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("Depth Visual Bind Group"),
-                    layout: &pipeline.bind_group_layout,
-                    entries: &[wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(
-                            &render_textures.depth_texture_view,
-                        ),
-                    }],
-                });
+                if let (Some(pipeline), Some(view)) = (
+                    self.depth_visual_pipeline.as_ref(),
+                    self.depth_visual_view.as_ref(),
+                ) {
+                    let mut encoder =
+                        ctx.device
+                            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                                label: Some("Depth Visual Encoder"),
+                            });
 
-                {
-                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("Depth Visual Pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view,
-                            resolve_target: None,
-                            depth_slice: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                        multiview_mask: None,
+                    let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("Depth Visual Bind Group"),
+                        layout: &pipeline.bind_group_layout,
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(
+                                &render_textures.depth_texture_view,
+                            ),
+                        }],
                     });
-                    rpass.set_pipeline(&pipeline.pipeline);
-                    rpass.set_bind_group(0, &bind_group, &[]);
-                    rpass.draw(0..3, 0..1);
+
+                    {
+                        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("Depth Visual Pass"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view,
+                                resolve_target: None,
+                                depth_slice: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            timestamp_writes: None,
+                            occlusion_query_set: None,
+                            multiview_mask: None,
+                        });
+                        rpass.set_pipeline(&pipeline.pipeline);
+                        rpass.set_bind_group(0, &bind_group, &[]);
+                        rpass.draw(0..3, 0..1);
+                    }
+                    ctx.queue.submit(Some(encoder.finish()));
                 }
-                ctx.queue.submit(Some(encoder.finish()));
+            }));
+
+            if let Err(panic) = result {
+                if self.wgpu_device_lost.load(Ordering::Acquire) {
+                    tracing::warn!("skipping preview frame after wgpu device loss");
+                    self.drop_gpu_resources();
+                    return;
+                }
+                std::panic::resume_unwind(panic);
+            }
+
+            if self.wgpu_device_lost.load(Ordering::Acquire) {
+                tracing::warn!("dropping preview GPU resources after wgpu device loss");
+                self.drop_gpu_resources();
+                return;
             }
 
             self.last_render_time = Some(start.elapsed());
@@ -475,32 +543,39 @@ impl RanimPreviewApp {
         std::thread::spawn(move || {
             let progress_tx_cb = progress_tx.clone();
             let ctx_cb = ctx.clone();
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                crate::cmd::render::render_scene_output_with_progress(
-                    constructor,
-                    name,
-                    &scene_config,
-                    &output,
-                    2,
-                    Some(Box::new(move |current, total| {
-                        let _ =
-                            progress_tx_cb.send_blocking(ExportProgress::Progress(current, total));
-                        ctx_cb.request_repaint();
-                    })),
-                );
+            let result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<(), String> {
+                    crate::cmd::render::render_scene_output_with_progress_checked(
+                        constructor,
+                        name,
+                        &scene_config,
+                        &output,
+                        2,
+                        Some(Box::new(move |current, total| {
+                            let _ = progress_tx_cb
+                                .send_blocking(ExportProgress::Progress(current, total));
+                            ctx_cb.request_repaint();
+                        })),
+                    )?;
 
-                let _ = progress_tx.send_blocking(ExportProgress::Done);
-                ctx.request_repaint();
-            }));
+                    let _ = progress_tx.send_blocking(ExportProgress::Done);
+                    ctx.request_repaint();
+                    Ok(())
+                }));
 
-            if let Err(e) = result {
-                let msg = if let Some(s) = e.downcast_ref::<&str>() {
+            let error_msg = match result {
+                Ok(Ok(())) => None,
+                Ok(Err(err)) => Some(err),
+                Err(e) => Some(if let Some(s) = e.downcast_ref::<&str>() {
                     s.to_string()
                 } else if let Some(s) = e.downcast_ref::<String>() {
                     s.clone()
                 } else {
                     "Unknown export error".to_string()
-                };
+                }),
+            };
+
+            if let Some(msg) = error_msg {
                 let _ = progress_tx.send_blocking(ExportProgress::Error(msg));
                 ctx.request_repaint();
             }
@@ -1035,11 +1110,26 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
 
     #[cfg(not(target_family = "wasm"))]
     {
+        let mut wgpu_options = eframe::egui_wgpu::WgpuConfiguration::default();
+        wgpu_options.on_surface_status = Arc::new(|status| match status {
+            wgpu::CurrentSurfaceTexture::Lost | wgpu::CurrentSurfaceTexture::Outdated => {
+                tracing::warn!("wgpu surface needs reconfiguration after {status:?}");
+                eframe::egui_wgpu::SurfaceErrorAction::RecreateSurface
+            }
+            wgpu::CurrentSurfaceTexture::Occluded
+            | wgpu::CurrentSurfaceTexture::Timeout
+            | wgpu::CurrentSurfaceTexture::Validation => {
+                tracing::warn!("skipping preview frame after wgpu surface status: {status:?}");
+                eframe::egui_wgpu::SurfaceErrorAction::SkipFrame
+            }
+            _ => eframe::egui_wgpu::SurfaceErrorAction::SkipFrame,
+        });
         let native_options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
                 .with_title(&title)
                 .with_inner_size([1280.0, 720.0]),
             renderer: eframe::Renderer::Wgpu,
+            wgpu_options,
             ..Default::default()
         };
 

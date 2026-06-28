@@ -2,7 +2,10 @@
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 pub mod render;
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
-pub use render::{render_scene, render_scene_output, render_scene_output_with_progress};
+pub use render::{
+    render_scene, render_scene_checked, render_scene_output, render_scene_output_checked,
+    render_scene_output_with_progress, render_scene_output_with_progress_checked,
+};
 
 /// Render a scene by name.
 ///

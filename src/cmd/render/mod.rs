@@ -1,5 +1,8 @@
 // MARK: Render api
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    panic::{AssertUnwindSafe, catch_unwind},
+};
 
 use crate::cmd::render::file_writer::OutputFormatExt;
 use crate::{Output, Scene, SceneConfig, SceneConstructor};
@@ -23,6 +26,11 @@ use ranim_render::PUFFIN_GPU_PROFILER;
 
 /// Render a scene with all its outputs
 pub fn render_scene(scene: &Scene, buffer_count: usize) {
+    render_scene_checked(scene, buffer_count).unwrap_or_else(|err| panic!("{err}"));
+}
+
+/// Render a scene with all its outputs.
+pub fn render_scene_checked(scene: &Scene, buffer_count: usize) -> Result<(), String> {
     for (i, output) in scene.outputs.iter().enumerate() {
         info!(
             "Rendering output {}/{} ({})",
@@ -30,14 +38,15 @@ pub fn render_scene(scene: &Scene, buffer_count: usize) {
             scene.outputs.len(),
             output.format
         );
-        render_scene_output(
+        render_scene_output_checked(
             scene.constructor,
             scene.name.to_string(),
             &scene.config,
             output,
             buffer_count,
-        );
+        )?;
     }
+    Ok(())
 }
 
 /// Render a scene output
@@ -48,7 +57,26 @@ pub fn render_scene_output(
     output: &Output,
     buffer_count: usize,
 ) {
-    render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None);
+    render_scene_output_checked(constructor, name, scene_config, output, buffer_count)
+        .unwrap_or_else(|err| panic!("{err}"));
+}
+
+/// Render a scene output.
+pub fn render_scene_output_checked(
+    constructor: impl SceneConstructor,
+    name: String,
+    scene_config: &SceneConfig,
+    output: &Output,
+    buffer_count: usize,
+) -> Result<(), String> {
+    render_scene_output_with_progress_checked(
+        constructor,
+        name,
+        scene_config,
+        output,
+        buffer_count,
+        None,
+    )
 }
 
 /// Render a scene output with optional progress callback.
@@ -62,6 +90,28 @@ pub fn render_scene_output_with_progress(
     buffer_count: usize,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
 ) {
+    render_scene_output_with_progress_checked(
+        constructor,
+        name,
+        scene_config,
+        output,
+        buffer_count,
+        on_progress,
+    )
+    .unwrap_or_else(|err| panic!("{err}"));
+}
+
+/// Render a scene output with optional progress callback.
+///
+/// The callback receives `(current_frame, total_frames)` each frame.
+pub fn render_scene_output_with_progress_checked(
+    constructor: impl SceneConstructor,
+    name: String,
+    scene_config: &SceneConfig,
+    output: &Output,
+    buffer_count: usize,
+    on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+) -> Result<(), String> {
     use std::time::Instant;
 
     info!(
@@ -74,31 +124,54 @@ pub fn render_scene_output_with_progress(
     trace!("Build timeline cost: {:?}", t.elapsed());
 
     let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
-    app.render_scene_with_progress(&scene, on_progress);
+    app.render_scene_with_progress(&scene, on_progress)?;
     if !scene.time_marks().is_empty() {
-        app.render_capture_marks(&scene);
+        app.render_capture_marks(&scene)?;
     }
+    Ok(())
 }
 
 /// drop it will close the channel and the thread loop will be terminated
 struct RenderThreadHandle {
     submit_frame_tx: async_channel::Sender<CoreItemStore>,
     back_rx: async_channel::Receiver<CoreItemStore>,
-    worker_rx: async_channel::Receiver<RenderWorker>,
+    worker_rx: async_channel::Receiver<Result<RenderWorker, String>>,
 }
 
 impl RenderThreadHandle {
-    fn sync_and_submit(&self, f: impl FnOnce(&mut CoreItemStore)) {
-        let mut store = self.get_store();
+    fn sync_and_submit(&self, f: impl FnOnce(&mut CoreItemStore)) -> Result<(), String> {
+        let mut store = self.get_store()?;
         f(&mut store);
-        self.submit_frame_tx.send_blocking(store).unwrap();
+        self.submit_frame_tx.send_blocking(store).map_err(|_| {
+            self.worker_rx
+                .recv_blocking()
+                .unwrap_or_else(|_| {
+                    Err("render worker stopped before accepting the next frame".to_string())
+                })
+                .err()
+                .unwrap_or_else(|| {
+                    "render worker stopped before accepting the next frame".to_string()
+                })
+        })
     }
-    fn get_store(&self) -> CoreItemStore {
-        self.back_rx.recv_blocking().unwrap()
+    fn get_store(&self) -> Result<CoreItemStore, String> {
+        self.back_rx.recv_blocking().map_err(|_| {
+            self.worker_rx
+                .recv_blocking()
+                .unwrap_or_else(|_| {
+                    Err("render worker stopped before returning its frame store".to_string())
+                })
+                .err()
+                .unwrap_or_else(|| {
+                    "render worker stopped before returning its frame store".to_string()
+                })
+        })
     }
-    fn retrive(&self) -> RenderWorker {
+    fn retrive(&self) -> Result<RenderWorker, String> {
         self.submit_frame_tx.close(); // This terminates the worker thread loop
-        self.worker_rx.recv_blocking().unwrap()
+        self.worker_rx.recv_blocking().unwrap_or_else(|_| {
+            Err("render worker stopped without returning its state".to_string())
+        })
     }
 }
 
@@ -209,58 +282,69 @@ impl RenderWorker {
 
         back_tx.send_blocking(CoreItemStore::default()).unwrap();
         std::thread::spawn(move || {
-            let mut worker = self;
-            let n = worker.render_textures.len();
-            let mut frame_count = 0u64;
-            let mut cur = 0usize;
-            let mut pending: VecDeque<(usize, u64)> = VecDeque::new();
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                let mut worker = self;
+                let n = worker.render_textures.len();
+                let mut frame_count = 0u64;
+                let mut cur = 0usize;
+                let mut pending: VecDeque<(usize, u64)> = VecDeque::new();
 
-            while let Ok(store) = submit_frame_rx.recv_blocking() {
-                // Drain oldest pending readback if all targets are occupied
-                if pending.len() >= n {
-                    let (prev, prev_fc) = pending.pop_front().unwrap();
+                while let Ok(store) = submit_frame_rx.recv_blocking() {
+                    // Drain oldest pending readback if all targets are occupied
+                    if pending.len() >= n {
+                        let (prev, prev_fc) = pending.pop_front().unwrap();
+                        worker.render_textures[prev].finish_readback(&worker.ctx);
+                        worker.output_frame_from(prev, prev_fc);
+                    }
+
+                    // Render current frame and start async readback
+                    worker.renderer.render_store_with_pool(
+                        &worker.ctx,
+                        &mut worker.render_textures[cur],
+                        worker.clear_color,
+                        &store,
+                        &mut worker.pool,
+                    );
+                    worker.render_textures[cur].start_readback(&worker.ctx);
+                    worker.pool.clean();
+
+                    pending.push_back((cur, frame_count));
+                    frame_count += 1;
+                    cur = (cur + 1) % n;
+
+                    // Return store early so main thread can eval next frame
+                    // while GPU processes the readback
+                    if back_tx.send_blocking(store).is_err() {
+                        break;
+                    }
+
+                    // Now try to drain any completed readbacks while we wait
+                    // for the next frame from the main thread
+                    while let Some(&(prev, _)) = pending.front() {
+                        // Non-blocking: check if the oldest readback is ready
+                        if !worker.render_textures[prev].try_finish_readback(&worker.ctx) {
+                            break;
+                        }
+                        let (prev, prev_fc) = pending.pop_front().unwrap();
+                        worker.output_frame_from(prev, prev_fc);
+                    }
+                }
+
+                // Flush all remaining pending frames
+                while let Some((prev, prev_fc)) = pending.pop_front() {
                     worker.render_textures[prev].finish_readback(&worker.ctx);
                     worker.output_frame_from(prev, prev_fc);
                 }
 
-                // Render current frame and start async readback
-                worker.renderer.render_store_with_pool(
-                    &worker.ctx,
-                    &mut worker.render_textures[cur],
-                    worker.clear_color,
-                    &store,
-                    &mut worker.pool,
-                );
-                worker.render_textures[cur].start_readback(&worker.ctx);
-                worker.pool.clean();
+                worker
+            }));
 
-                pending.push_back((cur, frame_count));
-                frame_count += 1;
-                cur = (cur + 1) % n;
-
-                // Return store early so main thread can eval next frame
-                // while GPU processes the readback
-                back_tx.send_blocking(store).unwrap();
-
-                // Now try to drain any completed readbacks while we wait
-                // for the next frame from the main thread
-                while let Some(&(prev, _)) = pending.front() {
-                    // Non-blocking: check if the oldest readback is ready
-                    if !worker.render_textures[prev].try_finish_readback(&worker.ctx) {
-                        break;
-                    }
-                    let (prev, prev_fc) = pending.pop_front().unwrap();
-                    worker.output_frame_from(prev, prev_fc);
-                }
-            }
-
-            // Flush all remaining pending frames
-            while let Some((prev, prev_fc)) = pending.pop_front() {
-                worker.render_textures[prev].finish_readback(&worker.ctx);
-                worker.output_frame_from(prev, prev_fc);
-            }
-
-            worker_tx.send_blocking(worker).unwrap();
+            let result = result.map_err(|panic| {
+                panic_message(panic).unwrap_or_else(|| {
+                    "render worker panicked while waiting for GPU work".to_string()
+                })
+            });
+            let _ = worker_tx.send_blocking(result);
         });
         RenderThreadHandle {
             submit_frame_tx,
@@ -347,6 +431,14 @@ impl RenderWorker {
     }
 }
 
+fn panic_message(panic: Box<dyn std::any::Any + Send>) -> Option<String> {
+    if let Some(s) = panic.downcast_ref::<&str>() {
+        Some((*s).to_string())
+    } else {
+        panic.downcast_ref::<String>().cloned()
+    }
+}
+
 /// MARK: RanimRenderApp
 struct RanimRenderApp {
     render_worker: Option<RenderWorker>,
@@ -374,7 +466,7 @@ impl RanimRenderApp {
         &mut self,
         timeline: &SealedRanimScene,
         on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
-    ) {
+    ) -> Result<(), String> {
         let start = Instant::now();
         #[cfg(feature = "profiling")]
         let (_cpu_server, _gpu_server) = {
@@ -419,28 +511,28 @@ impl RanimRenderApp {
         span.pb_set_style(&style);
         span.pb_set_length(num_frames);
 
-        (0..num_frames)
+        for (i, sec) in (0..num_frames)
             .map(|f| (f as f64 / fps).min(total_secs))
             .enumerate()
-            .for_each(|(i, sec)| {
-                worker_thread.sync_and_submit(|store| {
-                    store.update(timeline.eval_at_sec(sec));
-                });
+        {
+            worker_thread.sync_and_submit(|store| {
+                store.update(timeline.eval_at_sec(sec));
+            })?;
 
-                span.pb_inc(1);
-                if let Some(cb) = &on_progress {
-                    cb(i as u64 + 1, num_frames);
-                }
-                span.pb_set_message(
-                    format!(
-                        "rendering {:.1?}/{:.1?}",
-                        Duration::from_secs_f64(sec),
-                        Duration::from_secs_f64(total_secs)
-                    )
-                    .as_str(),
-                );
-            });
-        self.render_worker.replace(worker_thread.retrive());
+            span.pb_inc(1);
+            if let Some(cb) = &on_progress {
+                cb(i as u64 + 1, num_frames);
+            }
+            span.pb_set_message(
+                format!(
+                    "rendering {:.1?}/{:.1?}",
+                    Duration::from_secs_f64(sec),
+                    Duration::from_secs_f64(total_secs)
+                )
+                .as_str(),
+            );
+        }
+        self.render_worker.replace(worker_thread.retrive()?);
 
         info!(
             "rendered {} frames({:?}) in {:?}",
@@ -449,10 +541,11 @@ impl RanimRenderApp {
             start.elapsed(),
         );
         trace!("render timeline cost: {:?}", start.elapsed());
+        Ok(())
     }
 
     #[instrument(skip_all)]
-    fn render_capture_marks(&mut self, timeline: &SealedRanimScene) {
+    fn render_capture_marks(&mut self, timeline: &SealedRanimScene) -> Result<(), String> {
         let start = Instant::now();
         let timemarks = timeline
             .time_marks()
@@ -479,12 +572,20 @@ impl RanimRenderApp {
 
             self.store.update(timeline.eval_at_alpha(alpha));
             let worker = self.render_worker.as_mut().unwrap();
-            worker.render_store(&self.store);
-            worker.capture_frame(filename);
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                worker.render_store(&self.store);
+                worker.capture_frame(filename);
+            }));
+            if let Err(panic) = result {
+                return Err(panic_message(panic).unwrap_or_else(|| {
+                    "render worker panicked while capturing a GPU frame".to_string()
+                }));
+            }
             span.pb_inc(1);
         }
         info!("saved {} capture frames from time marks", timemarks.len());
         trace!("save capture frames cost: {:?}", start.elapsed());
+        Ok(())
     }
 }
 
