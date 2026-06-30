@@ -5054,6 +5054,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ranim-slide"
+version = "0.2.1"
+dependencies = [
+ "eframe",
+ "egui",
+ "egui-phosphor",
+]
+
+[[package]]
 name = "rav1e"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,15 @@
+[package]
+name = "ranim-slide"
+description = "A slide editor experiment for Ranim."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+eframe = { workspace = true, default-features = true, features = ["wgpu"] }
+egui.workspace = true
+egui-phosphor.workspace = true
+
+[package.metadata.release]
+tag = false
