@@ -44,6 +44,7 @@ bytemuck = "1.25.0"
 wgpu = "29.0.3"
 image = "0.25.10"
 derive_more = "2.1.1"
+dyn-clone = "1.0.20"
 eframe = { version = "0.34.2", default-features = false }
 egui = "0.34.2"
 egui-phosphor = "0.12.0"

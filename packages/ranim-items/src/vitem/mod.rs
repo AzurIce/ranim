@@ -40,6 +40,9 @@ use ranim_core::{
 /// You can construct a [`VItem`] from a list of VPoints, see [`VPointVec`]:
 ///
 /// ```rust
+/// use ranim_core::glam::dvec3;
+/// use ranim_items::vitem::VItem;
+///
 /// let vitem = VItem::from_vpoints(vec![
 ///     dvec3(0.0, 0.0, 0.0),
 ///     dvec3(1.0, 0.0, 0.0),

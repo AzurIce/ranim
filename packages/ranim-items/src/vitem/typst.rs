@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     io::Write,
     num::NonZeroUsize,
+    panic::{AssertUnwindSafe, catch_unwind},
     sync::{Arc, Mutex, OnceLock},
 };
 
@@ -12,7 +13,7 @@ use regex::bytes::Regex;
 use sha1::{Digest, Sha1};
 use typst::{
     Library, LibraryExt, World,
-    diag::{FileError, FileResult},
+    diag::{FileError, FileResult, SourceDiagnostic},
     foundations::{Bytes, Datetime},
     layout::Abs,
     syntax::{FileId, Source},
@@ -52,23 +53,19 @@ impl TypstLruCache {
     //     let sha1 = sha1.finalize();
     //     self.inner.get::<[u8; 20]>(sha1.as_ref())
     // }
-    fn get_or_insert(&mut self, typst_str: &str) -> &String {
+    fn try_get_or_insert(&mut self, typst_str: &str) -> Result<&String, String> {
         let mut sha1 = Sha1::new();
         sha1.update(typst_str.as_bytes());
         let sha1 = sha1.finalize();
         self.inner
-            .get_or_insert_ref(AsRef::<[u8; 20]>::as_ref(&sha1), || {
-                // let world = SingleFileTypstWorld::new(typst_str);
-                let world = typst_world().lock().unwrap();
-                let world = world.with_source_str(typst_str);
-                // world.set_source(typst_str);
-                let document = typst::compile(&world)
-                    .output
-                    .expect("failed to compile typst source");
-
-                let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
-                get_typst_element(&svg)
+            .try_get_or_insert_ref(AsRef::<[u8; 20]>::as_ref(&sha1), || {
+                compile_typst_to_svg(typst_str)
             })
+    }
+
+    fn get_or_insert(&mut self, typst_str: &str) -> &String {
+        self.try_get_or_insert(typst_str)
+            .unwrap_or_else(|err| panic!("failed to compile typst source: {err}"))
     }
 }
 
@@ -101,6 +98,61 @@ pub fn typst_svg(source: &str) -> String {
 
     // let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
     // get_typst_element(&svg)
+}
+
+/// Compiles typst string to SVG string without panicking on compile errors.
+pub fn try_typst_svg(source: &str) -> Result<String, String> {
+    typst_lru()
+        .lock()
+        .unwrap()
+        .try_get_or_insert(source)
+        .cloned()
+}
+
+fn compile_typst_to_svg(source_text: &str) -> Result<String, String> {
+    let source = Source::detached(source_text);
+    let world = typst_world().lock().unwrap();
+    let world = world.with_source(source.clone());
+    let document = typst::compile(&world)
+        .output
+        .map_err(|diagnostics| format_typst_diagnostics(&source, &diagnostics))?;
+
+    let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
+    Ok(get_typst_element(&svg))
+}
+
+fn format_typst_diagnostics(source: &Source, diagnostics: &[SourceDiagnostic]) -> String {
+    diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let location = source
+                .range(diagnostic.span)
+                .and_then(|range| source.lines().byte_to_line_column(range.start))
+                .map(|(line, col)| format!("{}:{}", line + 1, col + 1))
+                .unwrap_or_else(|| "unknown".to_owned());
+
+            let mut message = format!(
+                "{:?} at {location}: {}",
+                diagnostic.severity, diagnostic.message
+            );
+            for hint in &diagnostic.hints {
+                message.push_str("\nhint: ");
+                message.push_str(hint);
+            }
+            message
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn panic_payload(payload: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else if let Some(message) = payload.downcast_ref::<&'static str>() {
+        (*message).to_owned()
+    } else {
+        "unknown panic".to_owned()
+    }
 }
 
 struct FileEntry {
@@ -140,6 +192,7 @@ impl TypstWorld {
             files: Mutex::new(HashMap::new()),
         }
     }
+    #[allow(dead_code)]
     pub(crate) fn with_source_str(&self, source: &str) -> TypstWorldWithSource<'_> {
         self.with_source(Source::detached(source))
     }
@@ -256,7 +309,20 @@ impl TypstText {
     /// The typst string you provide should only produces text output,
     /// otherwise undefined behaviours may happens.
     pub fn new(typst_str: &str) -> Self {
-        let svg = SvgItem::new(typst_svg(typst_str));
+        Self::try_new(typst_str).unwrap_or_else(|err| panic!("failed to compile typst text: {err}"))
+    }
+
+    /// Create a TypstText with typst string without panicking on compile errors.
+    ///
+    /// The typst string you provide should only produce text output.
+    pub fn try_new(typst_str: &str) -> Result<Self, String> {
+        let svg = try_typst_svg(typst_str)?;
+        Self::from_svg(typst_str, svg)
+    }
+
+    fn from_svg(typst_str: &str, svg: String) -> Result<Self, String> {
+        let svg = catch_unwind(AssertUnwindSafe(|| SvgItem::new(svg)))
+            .map_err(|payload| format!("failed to parse typst SVG: {}", panic_payload(payload)))?;
         let chars = typst_str
             .replace(" ", "")
             .replace("\n", "")
@@ -264,8 +330,14 @@ impl TypstText {
             .replace("\t", "");
 
         let vitems = Vec::<VItem>::from(svg);
-        assert_eq!(chars.len(), vitems.len());
-        Self { chars, vitems }
+        if chars.len() != vitems.len() {
+            return Err(format!(
+                "typst output produced {} vector items for {} non-whitespace characters; TypstText only supports text-only output",
+                vitems.len(),
+                chars.len()
+            ));
+        }
+        Ok(Self { chars, vitems })
     }
 
     /// Inline code
@@ -478,7 +550,7 @@ impl FillColor for TypstText {
 
 impl StrokeColor for TypstText {
     fn stroke_color(&self) -> color::AlphaColor<color::Srgb> {
-        self.vitems[0].fill_color()
+        self.vitems[0].stroke_color()
     }
     fn set_stroke_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
         self.vitems.set_stroke_color(color);
@@ -555,6 +627,10 @@ mod tests {
     use std::time::Instant;
 
     use super::*;
+    use ranim_core::{
+        color::{AlphaColor, Srgb, rgb8},
+        traits::{FillColor, StrokeColor},
+    };
 
     /*
     fonts search: 322.844709ms
@@ -597,6 +673,25 @@ mod tests {
 
         println!("{res}");
         // println!("{}", typst_svg!(source))
+    }
+
+    #[test]
+    fn stroke_color_getter_reads_stroke_not_fill() {
+        let mut text = TypstText::try_new("R").expect("typst text should compile");
+        text.set_fill_color(rgb8(10, 20, 30));
+        text.set_stroke_color(rgb8(200, 150, 100));
+
+        assert_color_near(text.fill_color(), rgb8(10, 20, 30));
+        assert_color_near(text.stroke_color(), rgb8(200, 150, 100));
+    }
+
+    fn assert_color_near(actual: AlphaColor<Srgb>, expected: AlphaColor<Srgb>) {
+        for (actual, expected) in actual.components.into_iter().zip(expected.components) {
+            assert!(
+                (actual - expected).abs() <= 1.0e-6,
+                "{actual} != {expected}"
+            );
+        }
     }
 
     ///

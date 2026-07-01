@@ -5057,9 +5057,16 @@ dependencies = [
 name = "ranim-slide"
 version = "0.2.1"
 dependencies = [
+ "dyn-clone",
  "eframe",
  "egui",
  "egui-phosphor",
+ "ranim-core",
+ "ranim-items",
+ "ranim-render",
+ "tracing",
+ "tracing-subscriber",
+ "wgpu",
 ]
 
 [[package]]
