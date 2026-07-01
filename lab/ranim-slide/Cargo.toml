@@ -7,9 +7,16 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+dyn-clone.workspace = true
 eframe = { workspace = true, default-features = true, features = ["wgpu"] }
 egui.workspace = true
 egui-phosphor.workspace = true
+ranim-core.workspace = true
+ranim-items.workspace = true
+ranim-render.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+wgpu.workspace = true
 
 [package.metadata.release]
 tag = false

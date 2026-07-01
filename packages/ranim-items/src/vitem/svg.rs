@@ -61,7 +61,7 @@ impl FillColor for SvgItem {
 
 impl StrokeColor for SvgItem {
     fn stroke_color(&self) -> AlphaColor<Srgb> {
-        self.0[0].fill_color()
+        self.0[0].stroke_color()
     }
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.0.set_stroke_color(color);
@@ -231,10 +231,36 @@ mod tests {
     use crate::vitem::{geometry::Arc, typst::typst_svg};
     use ranim_core::{
         anchor::{AabbPoint, Locate},
-        traits::{ScaleHint, ScaleTransformExt, ScaleTransformStrokeExt, With},
+        traits::{
+            FillColor, ScaleHint, ScaleTransformExt, ScaleTransformStrokeExt, StrokeColor, With,
+        },
     };
 
     use super::*;
+
+    #[test]
+    fn stroke_color_getter_reads_stroke_not_fill() {
+        let mut svg = SvgItem::new(
+            r##"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+<path d="M1 1 L9 1 L9 9 Z" fill="#ff0000" stroke="#0000ff" stroke-width="1"/>
+</svg>"##,
+        );
+        svg.set_fill_color(rgb8(10, 20, 30));
+        svg.set_stroke_color(rgb8(200, 150, 100));
+
+        assert_color_near(svg.fill_color(), rgb8(10, 20, 30));
+        assert_color_near(svg.stroke_color(), rgb8(200, 150, 100));
+    }
+
+    fn assert_color_near(actual: AlphaColor<Srgb>, expected: AlphaColor<Srgb>) {
+        for (actual, expected) in actual.components.into_iter().zip(expected.components) {
+            assert!(
+                (actual - expected).abs() <= 1.0e-6,
+                "{actual} != {expected}"
+            );
+        }
+    }
+
     #[test]
     fn foo_test_vitems_from_svg() {
         let svg = typst_svg("R");
