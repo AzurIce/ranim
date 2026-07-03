@@ -39,6 +39,15 @@ pub trait Eval<T> {
 }
 // ANCHOR_END: Eval
 
+impl<T, F> Eval<T> for F
+where
+    F: Fn(f64) -> T,
+{
+    fn eval_alpha(&self, alpha: f64) -> T {
+        (self)(alpha)
+    }
+}
+
 // MARK: AnimationInfo
 // ANCHOR: AnimationInfo
 /// Info of an animation.
