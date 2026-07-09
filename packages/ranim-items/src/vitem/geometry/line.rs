@@ -4,9 +4,10 @@ use ranim_core::{
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::DVec3,
     traits::{
-        Aabb, Discard as _, Locate, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
+        Discard as _, Locate, Opacity, RotateTransform, Scale, SemanticBounds, ShiftTransform,
         StrokeColor, StrokeWidth, With as _,
     },
+    utils::math::DBounds3,
 };
 use ranim_macros::Interpolatable;
 
@@ -60,9 +61,9 @@ impl Locate<Line> for f64 {
     }
 }
 
-impl Aabb for Line {
-    fn aabb(&self) -> [DVec3; 2] {
-        self.points_with_extrude().aabb()
+impl SemanticBounds for Line {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.points_with_extrude().semantic_bounds()
     }
 }
 
@@ -80,7 +81,7 @@ impl RotateTransform for Line {
     }
 }
 
-impl ScaleTransform for Line {
+impl Scale for Line {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         let [p1, p2] = self.points;
         let k = ((p2 - p1).normalize() * scale).length();

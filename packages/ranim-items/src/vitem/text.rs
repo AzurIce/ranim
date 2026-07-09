@@ -3,14 +3,16 @@ use std::{
     collections::HashMap,
 };
 
+use ranim_core::utils::math::DBounds3;
 use ranim_core::{
     Extract,
+    anchor::BoundsAnchor,
     color::{AlphaColor, Srgb},
     core_item::CoreItem,
     glam::{DAffine3, DMat3, DVec3},
     traits::{
-        Aabb, Discard, FillColor, Locate, PointsFunc, RotateTransform, ScaleTransform,
-        ShiftTransform, StrokeColor, StrokeWidth, With,
+        Discard, FillColor, Locate, PointsFunc, Resize, RotateTransform, Scale, SemanticBounds,
+        ShiftTransform, StrokeColor, StrokeWidth, With, resize_xy_by_bounds,
     },
 };
 use typst::foundations::Repr;
@@ -218,7 +220,7 @@ impl TextItem {
         );
 
         let mut items = Vec::<VItem>::from(SvgItem::new(svg_src));
-        let baseline_em_box = items[0].aabb();
+        let baseline_em_box = items[0].semantic_bounds();
         let texts = items.split_off(1);
 
         let &Self {
@@ -229,7 +231,8 @@ impl TextItem {
             stroke_width,
             ..
         } = self;
-        let [min, max] = baseline_em_box;
+        let min = baseline_em_box.world_min();
+        let max = baseline_em_box.world_max();
         let h = max.y - min.y;
         self.inline_length_em.set(Some((max.x - min.x) / h));
         let mat = DAffine3::from_mat3_translation(DMat3::from_cols(u, v, DVec3::ZERO), origin);
@@ -259,9 +262,9 @@ impl TextItem {
     }
 }
 
-impl Aabb for TextItem {
-    fn aabb(&self) -> [DVec3; 2] {
-        self.items().aabb()
+impl SemanticBounds for TextItem {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.items().semantic_bounds()
     }
 }
 
@@ -283,12 +286,36 @@ impl RotateTransform for TextItem {
     }
 }
 
-impl ScaleTransform for TextItem {
+impl Scale for TextItem {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.origin.scale(scale).discard();
         self.basis.0 *= scale;
         self.basis.1 *= scale;
         self.transform_items(|item| item.scale(scale).discard());
+        self
+    }
+}
+
+impl Resize<DVec3> for TextItem {
+    fn resize_about_bounds(
+        &mut self,
+        bounds: DBounds3,
+        anchor: BoundsAnchor,
+        size: DVec3,
+    ) -> &mut Self {
+        resize_xy_by_bounds(self, bounds, anchor, size.truncate());
+        self
+    }
+}
+
+impl Resize<f64> for TextItem {
+    fn resize_about_bounds(
+        &mut self,
+        bounds: DBounds3,
+        anchor: BoundsAnchor,
+        size: f64,
+    ) -> &mut Self {
+        Resize::<DVec3>::resize_about_bounds(self, bounds, anchor, DVec3::splat(size));
         self
     }
 }

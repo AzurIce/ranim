@@ -1,5 +1,5 @@
 use glam::DVec3;
-use ranim_core::anchor::{Aabb, Locate};
+use ranim_core::anchor::{SemanticBounds, Locate};
 use ranim_macros::{
     Alignable, BoundingBox, Empty, Fill, Interpolatable, Opacity, Partial, RotateImpl, ScaleImpl,
     ShiftImpl, Stroke,

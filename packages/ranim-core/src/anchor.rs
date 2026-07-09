@@ -1,21 +1,25 @@
-//! Anchor
+//! Anchors and bounds.
 //!
-//! Ranim has an anchor system based on generics, an anchor can be any type `T`,
-//! and types that implements [`Locate<T>`] can use [`Locate::locate`] to convert the anchor to a [`DVec3`] point.
+//! Ranim has an anchor system based on generics: an anchor can be any type `T`,
+//! and types that implement [`Locate<T>`] can convert that anchor to a [`DVec3`]
+//! point.
 //!
-//! Ranim provides some built-in anchors and related [`Locate`] implementations:
-//! - [`DVec3`]: The point itself in 3d space.
-//! - [`Centroid`]: The avg point of all points.
-//!   Note that sometime the center of Aabb is not the centroid.
-//!   (0, 0, 0) is the center point.
-//! - [`AabbPoint`]: A point based on [`Aabb`]'s size, the number in each axis means the fraction of the size of the [`Aabb`].
+//! Ranim provides built-in anchors and bounds:
+//! - [`DVec3`]: the point itself in 3D space.
+//! - [`Centroid`]: the average point of all points.
+//! - [`BoundsAnchor`]: a normalized point inside semantic bounds.
+//! - [`DRange3`]: an axis-aligned local range.
+//! - [`DCoordSystem3`]: a local coordinate system in world space.
+//! - [`DBounds3`]: a coordinate system plus a local semantic range.
 
 use glam::DVec3;
 use tracing::warn;
 
+pub use crate::utils::math::{DBounds3, DCoordSystem3, DRange3};
+
 /// Locate a point.
 pub trait Locate<T: ?Sized> {
-    /// Locate self on the target
+    /// Locate self on the target.
     fn locate(&self, target: &T) -> DVec3;
 }
 
@@ -27,7 +31,7 @@ impl<T: ?Sized> Locate<T> for DVec3 {
 
 /// The centroid.
 ///
-/// Avg of all points.
+/// Average of all points.
 pub struct Centroid;
 
 impl Locate<DVec3> for Centroid {
@@ -45,8 +49,11 @@ where
     }
 }
 
-/// A point based on [`Aabb`], the number in each axis means the fraction of the size of the [`Aabb`].
-/// (0, 0, 0) is the center point.
+/// A normalized point inside bounds.
+///
+/// `(-1, -1, -1)` is the minimum corner, `(0, 0, 0)` is the center, and
+/// `(1, 1, 1)` is the maximum corner.
+///
 /// ```text
 ///      +Y
 ///      |
@@ -56,77 +63,81 @@ where
 /// +Z
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AabbPoint(pub DVec3);
+pub struct BoundsAnchor(pub DVec3);
 
-impl AabbPoint {
-    /// Center point, shorthand of `Anchor(DVec3::ZERO)`.
+impl BoundsAnchor {
+    /// Center anchor.
     pub const CENTER: Self = Self(DVec3::ZERO);
-    // /// Left point (-X)
-    // pub const LEFT: Self = Self(DVec3::NEG_X);
-    // /// Right point (+X)
-    // pub const RIGHT: Self = Self(DVec3::X);
-    // /// Top point (+Y)
-    // pub const TOP: Self = Self(DVec3::Y);
-    // /// Bottom point (-Y)
-    // pub const BOTTOM: Self = Self(DVec3::NEG_Y);
-    // /// Top Right point (+X, +Y)
-    // pub const TOP_RIGHT: Self = Self(dvec3(1.0, 1.0, 0.0));
-    // /// Top Left point (-X, +Y)
-    // pub const TOP_LEFT: Self = Self(dvec3(-1.0, 1.0, 0.0));
-    // /// Bottom Right point (+X, -Y)
-    // pub const BOTTOM_RIGHT: Self = Self(dvec3(1.0, -1.0, 0.0));
-    // /// Bottom Left point (-X, -Y)
-    // pub const BOTTOM_LEFT: Self = Self(dvec3(-1.0, -1.0, 0.0));
+    /// Minimum corner anchor.
+    pub const MIN: Self = Self(DVec3::NEG_ONE);
+    /// Maximum corner anchor.
+    pub const MAX: Self = Self(DVec3::ONE);
+
+    /// Locates this anchor inside explicit bounds.
+    pub fn locate_in(self, bounds: DBounds3) -> DVec3 {
+        bounds.locate(self)
+    }
 }
 
-impl<T: Aabb + ?Sized> Locate<T> for AabbPoint {
+impl<T: SemanticBounds + ?Sized> Locate<T> for BoundsAnchor {
     fn locate(&self, target: &T) -> DVec3 {
-        let center = target.aabb_center();
-        let half_size = target.aabb_size() / 2.0;
-        center + self.0 * half_size
+        target.semantic_bounds().locate(*self)
     }
 }
 
-/// Axis-Aligned Bounding Box
+/// User-facing default operation bounds for anchors, alignment and scale-to-size.
 ///
-/// This is the basic trait for an item.
-pub trait Aabb {
-    /// Get the Axis-aligned bounding box represent in `[<min>, <max>]`.
-    fn aabb(&self) -> [DVec3; 2];
-    /// Get the size of the Aabb.
-    fn aabb_size(&self) -> DVec3 {
-        let [min, max] = self.aabb();
-        max - min
+/// Semantic bounds describe the box a user/API operation should treat as the
+/// item's size. They are not render coverage. If the caller wants the bounds of
+/// rendered primitives, they should extract the item to [`crate::core_item::CoreItem`]
+/// and query those core items' semantic bounds.
+///
+/// This is the default bounds used by convenience APIs. Bounds-aware operations
+/// can also take an explicit [`DBounds3`] when the caller wants to use extracted
+/// primitive bounds or any custom reference bounds instead.
+pub trait SemanticBounds {
+    /// Get the semantic bounds.
+    fn semantic_bounds(&self) -> DBounds3;
+
+    /// Get the size of the semantic bounds.
+    fn semantic_bounds_size(&self) -> DVec3 {
+        self.semantic_bounds().size()
     }
-    /// Get the center of the Aabb.
-    fn aabb_center(&self) -> DVec3 {
-        let [min, max] = self.aabb();
-        (max + min) / 2.0
+
+    /// Get the center of the semantic bounds.
+    fn semantic_bounds_center(&self) -> DVec3 {
+        self.semantic_bounds().center()
     }
 }
 
-impl Aabb for DVec3 {
-    fn aabb(&self) -> [DVec3; 2] {
-        [*self; 2]
+impl SemanticBounds for DVec3 {
+    fn semantic_bounds(&self) -> DBounds3 {
+        DBounds3::point(*self)
     }
 }
 
-impl<T: Aabb> Aabb for [T] {
-    fn aabb(&self) -> [DVec3; 2] {
-        let [min, max] = self
+impl SemanticBounds for DBounds3 {
+    fn semantic_bounds(&self) -> DBounds3 {
+        *self
+    }
+}
+
+impl<T: SemanticBounds> SemanticBounds for [T] {
+    fn semantic_bounds(&self) -> DBounds3 {
+        let bounds = self
             .iter()
-            .map(|x| x.aabb())
-            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
-            .unwrap_or([DVec3::ZERO, DVec3::ZERO]);
-        if min == max {
-            warn!("Empty bounding box, is the slice empty?")
+            .map(|x| x.semantic_bounds())
+            .reduce(DBounds3::union)
+            .unwrap_or(DBounds3::ZERO);
+        if bounds.is_zero_size() {
+            warn!("Empty semantic bounds, is the slice empty?")
         }
-        [min, max]
+        bounds
     }
 }
 
-impl<T: Aabb> Aabb for Vec<T> {
-    fn aabb(&self) -> [DVec3; 2] {
-        self.as_slice().aabb()
+impl<T: SemanticBounds> SemanticBounds for Vec<T> {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.as_slice().semantic_bounds()
     }
 }

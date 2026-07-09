@@ -32,7 +32,7 @@ fn ranim_text(r: &mut RanimScene) {
     let text = SvgItem::new(typst_svg("Ranim")).with(|item| {
         item.set_fill_color(manim::WHITE)
             .set_fill_opacity(0.5)
-            .scale_to_with_stroke(ScaleHint::PorportionalY(3.6))
+            .scale_to_with_stroke(ScaleHint::ProportionalY(3.6))
             .move_to(DVec3::ZERO);
     });
     let _r_texts = Vec::<VItem>::from(text)
@@ -73,7 +73,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
     let mut circle = VisualVItem(VItem::from(Circle::new(2.0).with(|circle| {
         circle
             .set_color(manim::GREEN_C)
-            .with_origin(AabbPoint::CENTER, |x| {
+            .with_origin(BoundsAnchor::CENTER, |x| {
                 x.rotate_on_z(-PI / 4.0 + PI);
             });
     })));

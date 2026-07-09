@@ -2,11 +2,11 @@ use std::f64::consts::{PI, TAU};
 
 use ranim_core::{
     Extract,
-    anchor::{Aabb, AabbPoint, Locate},
+    anchor::{BoundsAnchor, DBounds3, Locate, SemanticBounds},
     color,
     core_item::CoreItem,
     glam::{DVec2, DVec3, dvec2, dvec3},
-    traits::{Discard, RotateTransform, ScaleTransform, ShiftTransform, ShiftTransformExt},
+    traits::{Discard, RotateTransform, Scale, ShiftTransform, ShiftTransformExt},
 };
 
 use color::{AlphaColor, Srgb};
@@ -49,14 +49,14 @@ impl Square {
     }
     /// Scale the square by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ScaleTransform`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the square a square.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_at(scale, AabbPoint::CENTER)
+        self.scale_at(scale, BoundsAnchor::CENTER)
     }
     /// Scale the square by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ScaleTransform`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`Scale`]'s `DVec3`,
     /// because this keeps the square a square.
     pub fn scale_at<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
@@ -73,14 +73,17 @@ impl Square {
 }
 
 // MARK: Traits impl
-impl Aabb for Square {
-    fn aabb(&self) -> [DVec3; 2] {
+impl SemanticBounds for Square {
+    fn semantic_bounds(&self) -> DBounds3 {
         let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
+        let half = self.size.abs() / 2.0;
         [
-            self.center + self.size / 2.0 * (u + v),
-            self.center - self.size / 2.0 * (u + v),
+            self.center - half * u - half * v,
+            self.center + half * u - half * v,
+            self.center + half * u + half * v,
+            self.center - half * u + half * v,
         ]
-        .aabb()
+        .semantic_bounds()
     }
 }
 
@@ -98,6 +101,14 @@ impl RotateTransform for Square {
         self.axes.0 = self.axes.0.normalize();
         self.axes.1.rotate_on_axis(axis, angle);
         self.axes.1 = self.axes.1.normalize();
+        self
+    }
+}
+
+impl Scale<f64> for Square {
+    fn scale(&mut self, scale: f64) -> &mut Self {
+        self.size *= scale;
+        self.center.scale(DVec3::splat(scale));
         self
     }
 }
@@ -249,12 +260,14 @@ impl Rectangle {
 }
 
 // MARK: Traits impl
-impl Aabb for Rectangle {
-    fn aabb(&self) -> [DVec3; 2] {
+impl SemanticBounds for Rectangle {
+    fn semantic_bounds(&self) -> DBounds3 {
         let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
-        let p1 = self.p0;
-        let p2 = self.p0 + self.size.x * u + self.size.y * v;
-        [p1, p2].aabb()
+        let p0 = self.p0;
+        let p1 = p0 + self.size.x * u;
+        let p2 = p1 + self.size.y * v;
+        let p3 = p0 + self.size.y * v;
+        [p0, p1, p2, p3].semantic_bounds()
     }
 }
 
@@ -276,7 +289,7 @@ impl RotateTransform for Rectangle {
     }
 }
 
-impl ScaleTransform for Rectangle {
+impl Scale for Rectangle {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.p0.scale(scale);
         let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
@@ -390,9 +403,9 @@ impl Polygon {
 }
 
 // MARK: Traits impl
-impl Aabb for Polygon {
-    fn aabb(&self) -> [DVec3; 2] {
-        self.points.aabb()
+impl SemanticBounds for Polygon {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.points.semantic_bounds()
     }
 }
 
@@ -414,7 +427,7 @@ impl RotateTransform for Polygon {
     }
 }
 
-impl ScaleTransform for Polygon {
+impl Scale for Polygon {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.points.scale(scale);
         self
@@ -588,9 +601,9 @@ impl RegularPolygon {
     }
 }
 
-impl Aabb for RegularPolygon {
-    fn aabb(&self) -> [DVec3; 2] {
-        self.points().aabb()
+impl SemanticBounds for RegularPolygon {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.points().semantic_bounds()
     }
 }
 
@@ -608,6 +621,14 @@ impl RotateTransform for RegularPolygon {
         self.axes.1.rotate_on_axis(axis, angle);
         self.axes.1 = self.axes.1.normalize();
         self.center.rotate_on_axis(axis, angle);
+        self
+    }
+}
+
+impl Scale<f64> for RegularPolygon {
+    fn scale(&mut self, scale: f64) -> &mut Self {
+        self.radius *= scale;
+        self.center.scale(DVec3::splat(scale));
         self
     }
 }

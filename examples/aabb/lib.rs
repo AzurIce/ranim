@@ -6,7 +6,7 @@ use ranim::{
     core::animation::StaticAnim,
     glam::{DVec3, dvec2, dvec3},
     items::{
-        debug::VisualizeAabbItem,
+        debug::VisualizeSemanticBoundsItem,
         vitem::{
             VItem,
             geometry::{
@@ -107,7 +107,7 @@ fn aabb(r: &mut RanimScene) {
         Ellipse::new(dvec2(2.0, 0.8))
             .with(|e| {
                 e.set_color(manim::RED_D);
-                e.with_origin(AabbPoint::CENTER, |x| {
+                e.with_origin(BoundsAnchor::CENTER, |x| {
                     x.rotate_on_z(PI / 4.0);
                 });
             })
@@ -164,8 +164,8 @@ fn aabb(r: &mut RanimScene) {
     for (i, item) in items.into_iter().enumerate() {
         let col = i % cols;
         let row = i / cols;
-        let mut wrapped = VisualizeAabbItem(item).with(|v| {
-            v.scale_to(ScaleHint::PorportionalY(target));
+        let mut wrapped = VisualizeSemanticBoundsItem(item).with(|v| {
+            v.scale_to(ScaleHint::ProportionalY(target));
             v.move_to(cell_center(col, row));
         });
         let r_id = r.insert_empty();

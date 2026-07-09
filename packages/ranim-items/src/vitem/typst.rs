@@ -24,16 +24,16 @@ use typst_kit::fonts::FontStore;
 
 use crate::vitem::{VItem, svg::SvgItem};
 use ranim_core::Extract;
-use ranim_core::traits::Interpolatable;
+use ranim_core::traits::{Interpolatable, Resize, resize_xy_by_bounds};
 use ranim_core::{
-    anchor::Aabb,
+    anchor::{BoundsAnchor, DBounds3, SemanticBounds},
     color,
     components::width::Width,
     core_item::CoreItem,
-    glam,
+    glam::{self, DVec2, dvec2, dvec3},
     traits::{
-        Alignable, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
-        StrokeColor, StrokeWidth, With,
+        Alignable, FillColor, Opacity, RotateTransform, Scale, ShiftTransform, StrokeColor,
+        StrokeWidth, With,
     },
 };
 
@@ -300,18 +300,25 @@ impl World for TypstWorldWithSource<'_> {
 /// you provide only produces text output, otherwise undefined behaviours may happens.
 #[derive(Clone)]
 pub struct TypstText {
+    source: String,
     chars: String,
     vitems: Vec<VItem>,
+    layout_size: Option<DVec2>,
 }
 
 impl TypstText {
     fn _new(str: &str) -> Self {
         let svg = SvgItem::new(typst_svg(str));
-        let chars = str.to_string();
+        let chars = typst_text_chars(str);
 
         let vitems = Vec::<VItem>::from(svg);
         assert_eq!(chars.len(), vitems.len());
-        Self { chars, vitems }
+        Self {
+            source: str.to_owned(),
+            chars,
+            vitems,
+            layout_size: None,
+        }
     }
     /// Create a TypstText with typst string.
     ///
@@ -329,14 +336,30 @@ impl TypstText {
         Self::from_svg(typst_str, svg)
     }
 
+    /// Create a TypstText with a block layout width in Typst points.
+    ///
+    /// The source text is wrapped in a Typst block before compilation, but
+    /// character alignment still uses the original text.
+    pub fn try_new_with_layout_width(typst_str: &str, width_pt: f64) -> Result<Self, String> {
+        let width_pt = width_pt.max(1.0e-6);
+        let wrapped = format!("#block(width: {width_pt}pt)[{typst_str}]");
+        let svg = try_typst_svg(&wrapped)?;
+        Self::from_svg_with_layout(typst_str, typst_str, svg, Some(dvec2(width_pt, 0.0)))
+    }
+
     fn from_svg(typst_str: &str, svg: String) -> Result<Self, String> {
+        Self::from_svg_with_layout(typst_str, typst_str, svg, None)
+    }
+
+    fn from_svg_with_layout(
+        source_text: &str,
+        chars_text: &str,
+        svg: String,
+        layout_size: Option<DVec2>,
+    ) -> Result<Self, String> {
         let svg = catch_unwind(AssertUnwindSafe(|| SvgItem::new(svg)))
             .map_err(|payload| format!("failed to parse typst SVG: {}", panic_payload(payload)))?;
-        let chars = typst_str
-            .replace(" ", "")
-            .replace("\n", "")
-            .replace("\r", "")
-            .replace("\t", "");
+        let chars = typst_text_chars(chars_text);
 
         let vitems = Vec::<VItem>::from(svg);
         if chars.len() != vitems.len() {
@@ -346,7 +369,48 @@ impl TypstText {
                 chars.len()
             ));
         }
-        Ok(Self { chars, vitems })
+        let layout_size = layout_size.map(|size| {
+            let bounds = vitems.semantic_bounds();
+            let world_size = bounds.world_size();
+            dvec2(size.x.max(1.0e-6), size.y.max(world_size.y))
+        });
+        Ok(Self {
+            source: source_text.to_owned(),
+            chars,
+            vitems,
+            layout_size,
+        })
+    }
+
+    fn compile_current_layout(&self) -> Result<Vec<VItem>, String> {
+        let source = if let Some(layout_size) = self.layout_size {
+            format!(
+                "#block(width: {}pt)[{}]",
+                layout_size.x.max(1.0e-6),
+                self.source
+            )
+        } else {
+            self.source.clone()
+        };
+        let svg = try_typst_svg(&source)?;
+        let svg = catch_unwind(AssertUnwindSafe(|| SvgItem::new(svg)))
+            .map_err(|payload| format!("failed to parse typst SVG: {}", panic_payload(payload)))?;
+        let vitems = Vec::<VItem>::from(svg);
+        if self.chars.len() != vitems.len() {
+            return Err(format!(
+                "typst output produced {} vector items for {} non-whitespace characters; TypstText only supports text-only output",
+                vitems.len(),
+                self.chars.len()
+            ));
+        }
+        Ok(vitems)
+    }
+
+    fn relayout_preserving_semantic_min(&mut self, min: glam::DVec3) -> Result<(), String> {
+        self.vitems = self.compile_current_layout()?;
+        let new_min = self.semantic_bounds().world_min();
+        self.vitems.shift(min - new_min);
+        Ok(())
     }
 
     /// Inline code
@@ -360,7 +424,12 @@ impl TypstText {
 
         let vitems = Vec::<VItem>::from(svg);
         assert_eq!(chars.len(), vitems.len());
-        Self { chars, vitems }
+        Self {
+            source: format!("`{code}`"),
+            chars,
+            vitems,
+            layout_size: None,
+        }
     }
 
     /// Multiline code
@@ -376,8 +445,20 @@ impl TypstText {
 
         let vitems = Vec::<VItem>::from(svg);
         assert_eq!(chars.len(), vitems.len());
-        Self { chars, vitems }
+        Self {
+            source: format!("```{language}\n{code}```"),
+            chars,
+            vitems,
+            layout_size: None,
+        }
     }
+}
+
+fn typst_text_chars(text: &str) -> String {
+    text.replace(" ", "")
+        .replace("\n", "")
+        .replace("\r", "")
+        .replace("\t", "")
 }
 
 impl Alignable for TypstText {
@@ -497,8 +578,15 @@ impl Interpolatable for TypstText {
             .map(|(a, b)| a.lerp(b, t))
             .collect::<Vec<_>>();
         Self {
+            source: self.source.clone(),
             chars: self.chars.clone(),
             vitems,
+            layout_size: match (self.layout_size, target.layout_size) {
+                (Some(a), Some(b)) => Some(a.lerp(b, t)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            },
         }
     }
 }
@@ -516,9 +604,16 @@ impl Extract for TypstText {
     }
 }
 
-impl Aabb for TypstText {
-    fn aabb(&self) -> [glam::DVec3; 2] {
-        self.vitems.aabb()
+impl SemanticBounds for TypstText {
+    fn semantic_bounds(&self) -> DBounds3 {
+        let bounds = self.vitems.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
+        if let Some(size) = self.layout_size {
+            DBounds3::new(min, min + dvec3(size.x, size.y, max.z - min.z))
+        } else {
+            bounds
+        }
     }
 }
 
@@ -536,9 +631,43 @@ impl RotateTransform for TypstText {
     }
 }
 
-impl ScaleTransform for TypstText {
+impl Scale for TypstText {
     fn scale(&mut self, scale: glam::DVec3) -> &mut Self {
-        self.vitems.scale(scale);
+        let bounds = self.semantic_bounds();
+        let min = bounds.world_min();
+        let size = bounds.size();
+        let target_min = min * scale;
+        self.layout_size = Some(dvec2(
+            (size.x * scale.x.abs()).max(1.0e-6),
+            (size.y * scale.y.abs()).max(1.0e-6),
+        ));
+        if self.relayout_preserving_semantic_min(target_min).is_err() {
+            self.vitems.scale(scale);
+        }
+        self
+    }
+}
+
+impl Resize<glam::DVec3> for TypstText {
+    fn resize_about_bounds(
+        &mut self,
+        bounds: DBounds3,
+        anchor: BoundsAnchor,
+        size: glam::DVec3,
+    ) -> &mut Self {
+        resize_xy_by_bounds(self, bounds, anchor, size.truncate());
+        self
+    }
+}
+
+impl Resize<f64> for TypstText {
+    fn resize_about_bounds(
+        &mut self,
+        bounds: DBounds3,
+        anchor: BoundsAnchor,
+        size: f64,
+    ) -> &mut Self {
+        Resize::<glam::DVec3>::resize_about_bounds(self, bounds, anchor, glam::DVec3::splat(size));
         self
     }
 }
@@ -637,8 +766,9 @@ mod tests {
 
     use super::*;
     use ranim_core::{
+        Extract,
         color::{AlphaColor, Srgb, rgb8},
-        traits::{FillColor, StrokeColor},
+        traits::{FillColor, Scale, SemanticBounds, StrokeColor},
     };
 
     /*
@@ -692,6 +822,22 @@ mod tests {
 
         assert_color_near(text.fill_color(), rgb8(10, 20, 30));
         assert_color_near(text.stroke_color(), rgb8(200, 150, 100));
+    }
+
+    #[test]
+    fn scale_updates_typst_layout_bounds_without_scaling_extracted_primitives() {
+        let mut text =
+            TypstText::try_new_with_layout_width("R", 12.0).expect("typst text should compile");
+        let before_extracted = text.extract().semantic_bounds_size();
+        let before_semantic = text.semantic_bounds_size();
+
+        text.scale(dvec3(2.0, 1.5, 1.0));
+
+        let after_extracted = text.extract().semantic_bounds_size();
+        let after_semantic = text.semantic_bounds_size();
+        assert!((after_semantic.x - before_semantic.x * 2.0).abs() < 1.0e-6);
+        assert!((after_semantic.y - before_semantic.y * 1.5).abs() < 1.0e-6);
+        assert!((after_extracted.x - before_extracted.x * 2.0).abs() > 1.0e-3);
     }
 
     fn assert_color_near(actual: AlphaColor<Srgb>, expected: AlphaColor<Srgb>) {

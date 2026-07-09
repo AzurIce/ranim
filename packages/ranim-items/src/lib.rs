@@ -9,4 +9,5 @@
 
 pub mod debug;
 pub mod mesh;
+pub mod resize;
 pub mod vitem;

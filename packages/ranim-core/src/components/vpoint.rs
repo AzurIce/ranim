@@ -4,13 +4,13 @@ use derive_more::{Deref, DerefMut};
 use glam::DVec3;
 use itertools::Itertools;
 
-use crate::anchor::Aabb;
+use crate::anchor::{DBounds3, SemanticBounds};
 use crate::traits::*;
 use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
 use crate::utils::{avg, resize_preserving_order_with_repeated_indices};
 
-fn bezier_aabb(p1: DVec3, p2: DVec3, p3: DVec3) -> [DVec3; 2] {
+fn bezier_bounds(p1: DVec3, p2: DVec3, p3: DVec3) -> DBounds3 {
     // The parametric equation of a quadratic bezier curve is:
     // $ P(t) = (1 - t)^2 P_1 + 2 t (1 - t) P_2 + t^2 P_3 $
     // By taking the derivative of the equation, we get:
@@ -35,7 +35,7 @@ fn bezier_aabb(p1: DVec3, p2: DVec3, p3: DVec3) -> [DVec3; 2] {
         }
     }
 
-    [min, max]
+    DBounds3::new(min, max)
 }
 
 /// A Vec of VPoint Data. It is used to represent a bunch of quad bezier paths.
@@ -54,19 +54,19 @@ fn bezier_aabb(p1: DVec3, p2: DVec3, p3: DVec3) -> [DVec3; 2] {
 #[derive(Debug, Clone, PartialEq, Deref, DerefMut, ranim_macros::Interpolatable)]
 pub struct VPointVec(pub Vec<DVec3>);
 
-impl Aabb for VPointVec {
+impl SemanticBounds for VPointVec {
     /// Note: This iterates over all consecutive bezier segments without distinguishing
     /// subpath breaks. A subpath break segment `[c, c, d]` (where handle == previous anchor)
     /// produces B(t) = (1-t²)·c + t²·d, which is monotonic from c to d with no interior
-    /// extrema. Since both c and d are real anchor points already included in the AABB,
+    /// extrema. Since both c and d are real anchor points already included in the bounds,
     /// the break segment contributes nothing extra, making special-casing unnecessary.
-    fn aabb(&self) -> [DVec3; 2] {
+    fn semantic_bounds(&self) -> DBounds3 {
         self.0
             .windows(3)
             .step_by(2)
-            .map(|w| bezier_aabb(w[0], w[1], w[2]))
-            .reduce(|[acc_min, acc_max], [min, max]| [acc_min.min(min), acc_max.max(max)])
-            .unwrap_or([DVec3::ZERO; 2])
+            .map(|w| bezier_bounds(w[0], w[1], w[2]))
+            .reduce(DBounds3::union)
+            .unwrap_or(DBounds3::ZERO)
     }
 }
 
@@ -96,7 +96,7 @@ impl transform::RotateTransform for VPointVec {
     }
 }
 
-impl transform::ScaleTransform for VPointVec {
+impl transform::Scale for VPointVec {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.as_mut().scale(scale);
         self
@@ -396,7 +396,7 @@ mod test {
 
     use crate::{
         components::vpoint::VPointVec,
-        traits::{Aabb, RotateTransform},
+        traits::{RotateTransform, SemanticBounds},
     };
 
     fn assert_dvec3_eq(a: DVec3, b: DVec3) {
@@ -563,33 +563,37 @@ mod test {
     }
 
     #[test]
-    fn test_aabb_single_segment_with_extremum() {
+    fn test_semantic_bounds_single_segment_with_extremum() {
         // Parabola: control point below endpoints → min.y is at the curve extremum
         let points = VPointVec(vec![
             dvec3(-2., 1., 0.),
             dvec3(0., -1., 0.),
             dvec3(2., 1., 0.),
         ]);
-        let [min, max] = points.aabb();
+        let bounds = points.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
         assert_dvec3_eq(min, dvec3(-2., 0., 0.));
         assert_dvec3_eq(max, dvec3(2., 1., 0.));
     }
 
     #[test]
-    fn test_aabb_straight_line() {
+    fn test_semantic_bounds_straight_line() {
         // Handle on the line → no extremum beyond endpoints
         let points = VPointVec(vec![
             dvec3(0., 0., 0.),
             dvec3(1., 1., 0.),
             dvec3(2., 2., 0.),
         ]);
-        let [min, max] = points.aabb();
+        let bounds = points.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
         assert_dvec3_eq(min, dvec3(0., 0., 0.));
         assert_dvec3_eq(max, dvec3(2., 2., 0.));
     }
 
     #[test]
-    fn test_aabb_multiple_segments() {
+    fn test_semantic_bounds_multiple_segments() {
         // Two symmetric segments with handles pulling in opposite y directions
         let points = VPointVec(vec![
             dvec3(0., 0., 0.),
@@ -598,14 +602,16 @@ mod test {
             dvec3(3., -2., 0.),
             dvec3(4., 0., 0.),
         ]);
-        let [min, max] = points.aabb();
+        let bounds = points.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
         // Extrema at t=0.5 of each segment: y=1.0 and y=-1.0
         assert_dvec3_eq(min, dvec3(0., -1., 0.));
         assert_dvec3_eq(max, dvec3(4., 1., 0.));
     }
 
     #[test]
-    fn test_aabb_multiple_subpaths() {
+    fn test_semantic_bounds_multiple_subpaths() {
         // Two subpaths: first curves up (y extremum=1), second curves down (y extremum=-1)
         let points = VPointVec(vec![
             dvec3(0., 0., 0.),
@@ -616,23 +622,29 @@ mod test {
             dvec3(3., -2., 0.),
             dvec3(5., 0., 0.),
         ]);
-        let [min, max] = points.aabb();
+        let bounds = points.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
         assert_dvec3_eq(min, dvec3(0., -1., 0.));
         assert_dvec3_eq(max, dvec3(5., 1., 0.));
     }
 
     #[test]
-    fn test_aabb_degenerate_single_point() {
+    fn test_semantic_bounds_degenerate_single_point() {
         let points = VPointVec(vec![DVec3::ONE; 3]);
-        let [min, max] = points.aabb();
+        let bounds = points.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
         assert_dvec3_eq(min, DVec3::ONE);
         assert_dvec3_eq(max, DVec3::ONE);
     }
 
     #[test]
-    fn test_aabb_empty() {
+    fn test_semantic_bounds_empty() {
         let points = VPointVec(vec![]);
-        let [min, max] = points.aabb();
+        let bounds = points.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
         assert_dvec3_eq(min, DVec3::ZERO);
         assert_dvec3_eq(max, DVec3::ZERO);
     }

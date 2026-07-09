@@ -1,8 +1,9 @@
 use color::{AlphaColor, Srgb};
-use glam::{Vec3, Vec4};
+use glam::{DVec3, Vec3, Vec4};
 
 use crate::{
     Extract,
+    anchor::{DBounds3, SemanticBounds},
     components::{rgba::Rgba, width::Width},
     core_item::CoreItem,
     traits::FillColor,
@@ -61,6 +62,16 @@ impl Extract for VItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         buf.push(CoreItem::VItem(self.clone()));
+    }
+}
+
+impl SemanticBounds for VItem {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.points
+            .iter()
+            .map(|p| DBounds3::point(DVec3::new(p.x as f64, p.y as f64, p.z as f64)))
+            .reduce(DBounds3::union)
+            .unwrap_or(DBounds3::ZERO)
     }
 }
 

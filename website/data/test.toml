@@ -38,7 +38,7 @@ fn test(r: &mut RanimScene) {
     }));
     let r_square = r.insert(square.clone());
     r.timeline_mut(r_square).play(square.morph(|x| {
-        x.with_origin(AabbPoint::CENTER, |x| {
+        x.with_origin(BoundsAnchor::CENTER, |x| {
             x.rotate_on_y(PI / 2.0);
         });
     }));
@@ -47,7 +47,7 @@ fn test(r: &mut RanimScene) {
     //     .set_stroke_width(0.05)
     //     .set_fill_color(BLUE_C)
     //     .set_fill_opacity(0.5);
-    // text.scale_to(ScaleHint::PorportionalHeight(8.0 * 0.8));
+    // text.scale_to(ScaleHint::ProportionalY(8.0 * 0.8));
     // let mut text = timeline.insert(text);
     // let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
     // let mut arrow = timeline.insert(arrow);

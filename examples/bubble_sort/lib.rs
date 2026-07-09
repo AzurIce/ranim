@@ -36,7 +36,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
                 rect.stroke_width = 0.0;
                 rect.set_fill_color(manim::WHITE.with_alpha(0.5))
                     .scale(DVec3::splat(0.8))
-                    .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
+                    .move_anchor_to(BoundsAnchor(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
             (r.insert(rect.clone()), rect)
         })

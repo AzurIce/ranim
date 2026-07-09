@@ -1,18 +1,16 @@
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::Extract;
-use ranim_core::anchor::{Aabb, Locate};
+use ranim_core::anchor::{DBounds3, Locate, SemanticBounds};
 use ranim_core::core_item::CoreItem;
 
 use ranim_core::{color, glam};
 
-use ranim_core::traits::{
-    Opacity, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor, With,
-};
+use ranim_core::traits::{Opacity, RotateTransform, Scale, ShiftTransform, StrokeColor, With};
 
 use crate::vitem::geometry::EllipticArc;
 use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
-use ranim_core::anchor::AabbPoint;
+use ranim_core::anchor::BoundsAnchor;
 
 // MARK: ### Arc ###
 /// An arc
@@ -47,14 +45,14 @@ impl Arc {
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, AabbPoint::CENTER)
+        self.scale_by_anchor(scale, BoundsAnchor::CENTER)
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
@@ -81,10 +79,10 @@ impl Arc {
 }
 
 // MARK: Traits impl
-impl Aabb for Arc {
+impl SemanticBounds for Arc {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
-    fn aabb(&self) -> [DVec3; 2] {
-        VItem::from(self.clone()).aabb()
+    fn semantic_bounds(&self) -> DBounds3 {
+        VItem::from(self.clone()).semantic_bounds()
     }
 }
 
@@ -102,6 +100,14 @@ impl RotateTransform for Arc {
         self.axes.0 = self.axes.0.normalize();
         self.axes.1.rotate_on_axis(axis, angle);
         self.axes.1 = self.axes.1.normalize();
+        self
+    }
+}
+
+impl Scale<f64> for Arc {
+    fn scale(&mut self, scale: f64) -> &mut Self {
+        self.radius *= scale;
+        self.center.scale(DVec3::splat(scale));
         self
     }
 }
@@ -175,14 +181,14 @@ impl ArcBetweenPoints {
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_at(scale, AabbPoint::CENTER)
+        self.scale_at(scale, BoundsAnchor::CENTER)
     }
     /// Scale the arc by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the arc a arc.
     pub fn scale_at<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
@@ -202,11 +208,11 @@ impl ArcBetweenPoints {
 }
 
 // MARK: Traits impl
-impl Aabb for ArcBetweenPoints {
+impl SemanticBounds for ArcBetweenPoints {
     /// Note that the arc's bounding box is actually same as the circle's bounding box.
-    fn aabb(&self) -> [DVec3; 2] {
+    fn semantic_bounds(&self) -> DBounds3 {
         // TODO: optimize this
-        Arc::from(self.clone()).aabb()
+        Arc::from(self.clone()).semantic_bounds()
     }
 }
 
@@ -226,6 +232,15 @@ impl RotateTransform for ArcBetweenPoints {
         self.axes.0 = self.axes.0.normalize();
         self.axes.1.rotate_on_axis(axis, angle);
         self.axes.1 = self.axes.1.normalize();
+        self
+    }
+}
+
+impl Scale<f64> for ArcBetweenPoints {
+    fn scale(&mut self, scale: f64) -> &mut Self {
+        let scale = DVec3::splat(scale);
+        self.start.scale(scale);
+        self.end.scale(scale);
         self
     }
 }

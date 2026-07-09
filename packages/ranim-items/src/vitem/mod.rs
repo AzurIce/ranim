@@ -23,14 +23,14 @@ pub mod typst;
 
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
-use ranim_core::anchor::Aabb;
+use ranim_core::anchor::{DBounds3, SemanticBounds};
 use ranim_core::core_item::CoreItem;
 use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
     components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
     prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
-    traits::{PointsFunc, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor},
+    traits::{PointsFunc, RotateTransform, Scale, ShiftTransform, StrokeColor},
 };
 
 /// A vectorized item.
@@ -92,9 +92,9 @@ impl PointsFunc for VItem {
     }
 }
 
-impl Aabb for VItem {
-    fn aabb(&self) -> [DVec3; 2] {
-        self.vpoints.aabb()
+impl SemanticBounds for VItem {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.vpoints.semantic_bounds()
     }
 }
 
@@ -115,7 +115,7 @@ impl RotateTransform for VItem {
     }
 }
 
-impl ScaleTransform for VItem {
+impl Scale for VItem {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.vpoints.scale(scale);
         self
@@ -144,8 +144,8 @@ impl VItem {
     }
     /// Shrink to center
     pub fn shrink(&mut self) -> &mut Self {
-        let bb = self.aabb();
-        self.vpoints.0 = vec![bb[1]; self.vpoints.len()];
+        let bb = self.semantic_bounds();
+        self.vpoints.0 = vec![bb.world_max(); self.vpoints.len()];
         self
     }
     /// Set the vpoints of the VItem

@@ -435,21 +435,17 @@ pub fn derive_rotate_impl(input: TokenStream) -> TokenStream {
     )
 }
 
-#[proc_macro_derive(ScaleTransform)]
+#[proc_macro_derive(Scale)]
 pub fn derive_scale_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
-    impl_derive(
-        input,
-        quote! {#core::traits::ScaleTransform},
-        |field_positions| {
-            quote! {
-                fn scale(&mut self, scale: #core::glam::DVec3) -> &mut Self {
-                    #(self.#field_positions.scale(scale);)*
-                    self
-                }
+    impl_derive(input, quote! {#core::traits::Scale}, |field_positions| {
+        quote! {
+            fn scale(&mut self, scale: #core::glam::DVec3) -> &mut Self {
+                #(self.#field_positions.scale(scale);)*
+                self
             }
-        },
-    )
+        }
+    })
 }
 
 #[proc_macro_derive(PointsFunc)]

@@ -1,7 +1,7 @@
 use ranim_core::{
     animation::{AnimationCell, Eval},
     glam::DVec3,
-    traits::{Aabb, AabbPoint, Locate, RotateTransform, ShiftTransformExt},
+    traits::{BoundsAnchor, Locate, RotateTransform, SemanticBounds, ShiftTransformExt},
     utils::rate_functions::smooth,
 };
 
@@ -16,9 +16,9 @@ pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
     /// Rotate by a given angle about a given axis at center.
     fn rotating(&mut self, angle: f64, axis: DVec3) -> AnimationCell<Self>
     where
-        Self: Aabb,
+        Self: SemanticBounds,
     {
-        self.rotating_at(angle, axis, AabbPoint::CENTER)
+        self.rotating_at(angle, axis, BoundsAnchor::CENTER)
     }
 
     /// Rotate by a given angle about a given axis at the given anchor.

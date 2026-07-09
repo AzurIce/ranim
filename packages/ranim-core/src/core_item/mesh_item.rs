@@ -1,7 +1,8 @@
-use glam::{Mat4, Vec3};
+use glam::{DVec3, Mat4, Vec3};
 
 use crate::{
     Extract,
+    anchor::{DBounds3, SemanticBounds},
     components::rgba::Rgba,
     core_item::CoreItem,
     traits::{FillColor, Interpolatable},
@@ -56,6 +57,19 @@ impl Extract for MeshItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         buf.push(CoreItem::MeshItem(self.clone()));
+    }
+}
+
+impl SemanticBounds for MeshItem {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.points
+            .iter()
+            .map(|point| {
+                let point = self.transform.transform_point3(*point);
+                DBounds3::point(DVec3::new(point.x as f64, point.y as f64, point.z as f64))
+            })
+            .reduce(DBounds3::union)
+            .unwrap_or(DBounds3::ZERO)
     }
 }
 
