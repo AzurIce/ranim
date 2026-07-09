@@ -26,8 +26,8 @@ fn animating_pi(r: &mut RanimScene) {
                 })
                 .with(|x| {
                     x.scale_to_min(&[
-                        ScaleHint::PorportionalY(cam.frame_height / h as f64),
-                        ScaleHint::PorportionalX(cam.frame_height / w as f64),
+                        ScaleHint::ProportionalY(cam.frame_height / h as f64),
+                        ScaleHint::ProportionalX(cam.frame_height / w as f64),
                     ])
                     .discard()
                 })
@@ -45,7 +45,7 @@ fn animating_pi(r: &mut RanimScene) {
         .flat_map(Vec::<VItem>::from)
         .collect::<Vec<_>>();
     vitems
-        .scale_to(ScaleHint::PorportionalY(TAU - 0.25))
+        .scale_to(ScaleHint::ProportionalY(TAU - 0.25))
         .move_to(DVec3::ZERO);
 
     r.insert_with(|t| {

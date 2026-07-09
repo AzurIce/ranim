@@ -1,6 +1,6 @@
 use glam::DVec3;
 
-use crate::anchor::{Aabb, AabbPoint, Locate};
+use crate::anchor::{BoundsAnchor, Locate, SemanticBounds};
 
 /// Shifting operations.
 ///
@@ -59,28 +59,32 @@ pub trait ShiftTransformExt: ShiftTransform {
     /// Put pivot at a given point.
     fn move_to(&mut self, point: DVec3) -> &mut Self
     where
-        AabbPoint: Locate<Self>,
+        BoundsAnchor: Locate<Self>,
     {
-        self.move_anchor_to(AabbPoint::CENTER, point)
+        self.move_anchor_to(BoundsAnchor::CENTER, point)
     }
     /// Put negative anchor of self on anchor of target
-    fn move_next_to<T: Aabb + ?Sized>(&mut self, target: &T, anchor: AabbPoint) -> &mut Self
+    fn move_next_to<T: SemanticBounds + ?Sized>(
+        &mut self,
+        target: &T,
+        anchor: BoundsAnchor,
+    ) -> &mut Self
     where
-        AabbPoint: Locate<Self>,
+        BoundsAnchor: Locate<Self>,
     {
         self.move_next_to_padded(target, anchor, 0.0)
     }
     /// Put negative anchor of self on anchor of target, with a distance of `padding`
-    fn move_next_to_padded<T: Aabb + ?Sized>(
+    fn move_next_to_padded<T: SemanticBounds + ?Sized>(
         &mut self,
         target: &T,
-        anchor: AabbPoint,
+        anchor: BoundsAnchor,
         padding: f64,
     ) -> &mut Self
     where
-        AabbPoint: Locate<Self>,
+        BoundsAnchor: Locate<Self>,
     {
-        let neg_anchor = AabbPoint(-anchor.0);
+        let neg_anchor = BoundsAnchor(-anchor.0);
         self.move_anchor_to(
             neg_anchor,
             Locate::<T>::locate(&anchor, target) + anchor.0.normalize() * padding,

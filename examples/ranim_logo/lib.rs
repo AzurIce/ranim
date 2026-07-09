@@ -23,7 +23,7 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     });
     let red_rect = Rectangle::new(logo_width / 4.0, logo_width).with(|rect| {
         rect.set_color(manim::RED_C).move_anchor_to(
-            AabbPoint(dvec3(1.0, 0.0, 0.0)),
+            BoundsAnchor(dvec3(1.0, 0.0, 0.0)),
             dvec3(-logo_width / 4.0, 0.0, 0.0),
         );
     });
@@ -53,7 +53,7 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     });
     let blue_triangle = green_triangle.clone().with(|tri| {
         tri.set_color(manim::BLUE_C);
-        tri.with_origin(AabbPoint::CENTER, |x| {
+        tri.with_origin(BoundsAnchor::CENTER, |x| {
             x.rotate_on_z(PI);
         });
         tri.shift(DVec3::NEG_Y * logo_width / 2.0);
@@ -87,7 +87,7 @@ fn ranim_logo(r: &mut RanimScene) {
         ))
         .with(|text| {
             text.set_color(manim::WHITE)
-                .scale_to(ScaleHint::PorportionalY(1.0))
+                .scale_to(ScaleHint::ProportionalY(1.0))
                 .move_to(DVec3::NEG_Y * 2.5);
         }),
     );
@@ -108,9 +108,9 @@ fn ranim_logo(r: &mut RanimScene) {
         dvec3(scale, scale, 1.0),
     ];
     let anchor = [
-        AabbPoint(dvec3(-1.0, 0.0, 0.0)),
-        AabbPoint(dvec3(1.0, 1.0, 0.0)),
-        AabbPoint(dvec3(1.0, -1.0, 0.0)),
+        BoundsAnchor(dvec3(-1.0, 0.0, 0.0)),
+        BoundsAnchor(dvec3(1.0, 1.0, 0.0)),
+        BoundsAnchor(dvec3(1.0, -1.0, 0.0)),
     ];
     r_logo
         .iter_mut()

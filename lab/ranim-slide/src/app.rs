@@ -879,7 +879,14 @@ impl RanimSlideApp {
         });
 
         ui.label("Size");
-        ui.checkbox(&mut element.lock_aspect, "Lock aspect ratio");
+        let resize_capability = element.resize_capability();
+        if !resize_capability.aspect.can_unlock() {
+            element.lock_aspect = true;
+        }
+        ui.add_enabled(
+            resize_capability.aspect.can_unlock(),
+            egui::Checkbox::new(&mut element.lock_aspect, "Lock aspect ratio"),
+        );
         ui.horizontal(|ui| {
             let bounds = element.object.bounds();
             let old_size = vec2(

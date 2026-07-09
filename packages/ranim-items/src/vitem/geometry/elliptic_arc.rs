@@ -7,8 +7,10 @@ use ranim_core::{
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
     traits::{
-        Aabb, Discard, Opacity, RotateTransform, ShiftTransform, StrokeColor, StrokeWidth, With,
+        Discard, Opacity, RotateTransform, SemanticBounds, ShiftTransform, StrokeColor,
+        StrokeWidth, With,
     },
+    utils::math::DBounds3,
 };
 
 use crate::vitem::{
@@ -167,11 +169,11 @@ impl From<Ellipse> for EllipticArc {
     }
 }
 
-impl Aabb for EllipticArc {
-    fn aabb(&self) -> [DVec3; 2] {
-        // TODO: maybe calculate AABB by linear algebra?
+impl SemanticBounds for EllipticArc {
+    fn semantic_bounds(&self) -> DBounds3 {
+        // TODO: maybe calculate semantic bounds by linear algebra?
         // that would be extremely complicated
-        VPointVec(self.generate_vpoints()).aabb()
+        VPointVec(self.generate_vpoints()).semantic_bounds()
     }
 }
 

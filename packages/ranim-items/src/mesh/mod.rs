@@ -2,13 +2,13 @@
 
 use ranim_core::{
     Extract,
-    anchor::Aabb,
+    anchor::{DBounds3, SemanticBounds},
     color::{AlphaColor, Srgb},
     components::{PointVec, rgba::Rgba},
     core_item::CoreItem,
     glam::{DVec3, Mat4, Vec3},
     traits::{
-        Alignable, Empty, FillColor, Interpolatable, Opacity, RotateTransform, ScaleTransform,
+        Alignable, Empty, FillColor, Interpolatable, Opacity, RotateTransform, Scale,
         ShiftTransform,
     },
 };
@@ -152,10 +152,10 @@ impl Opacity for MeshItem {
     }
 }
 
-impl Aabb for MeshItem {
-    fn aabb(&self) -> [DVec3; 2] {
+impl SemanticBounds for MeshItem {
+    fn semantic_bounds(&self) -> DBounds3 {
         if self.points.is_empty() {
-            return [DVec3::ZERO, DVec3::ZERO];
+            return DBounds3::ZERO;
         }
 
         // Convert transform to DMat4 for calculations
@@ -177,7 +177,7 @@ impl Aabb for MeshItem {
             max = max.max(p);
         }
 
-        [min, max]
+        DBounds3::new(min, max)
     }
 }
 
@@ -199,7 +199,7 @@ impl RotateTransform for MeshItem {
     }
 }
 
-impl ScaleTransform for MeshItem {
+impl Scale for MeshItem {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         // Apply scale by modifying the transform matrix
         let scale_mat = Mat4::from_scale(scale.as_vec3());
@@ -305,10 +305,10 @@ pub fn generate_grid_indices(nu: u32, nv: u32) -> Vec<u32> {
 mod tests {
     use super::*;
     use ranim_core::{
-        anchor::Aabb,
+        anchor::SemanticBounds,
         color::palette::css,
         glam::{Mat4, Vec3},
-        traits::{Alignable, Empty, RotateTransform, ScaleTransform, ShiftTransform},
+        traits::{Alignable, Empty, RotateTransform, Scale, ShiftTransform},
     };
 
     #[test]
@@ -416,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mesh_item_aabb() {
+    fn test_mesh_item_semantic_bounds() {
         use ranim_core::glam::dvec3;
 
         let mesh = MeshItem::from_indexed_vertices(
@@ -429,7 +429,9 @@ mod tests {
             vec![0, 1, 2],
         );
 
-        let [min, max] = mesh.aabb();
+        let bounds = mesh.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
         assert_eq!(min, dvec3(-1.0, -1.0, -1.0));
         assert_eq!(max, dvec3(1.0, 1.0, 1.0));
     }
@@ -445,8 +447,8 @@ mod tests {
 
         mesh.shift(dvec3(1.0, 2.0, 3.0));
 
-        // Check AABB after shift
-        let [min, _max] = mesh.aabb();
+        // Check semantic bounds after shift.
+        let min = mesh.semantic_bounds().world_min();
         assert!((min.x - 1.0).abs() < 1e-5);
         assert!((min.y - 2.0).abs() < 1e-5);
         assert!((min.z - 3.0).abs() < 1e-5);
@@ -463,8 +465,10 @@ mod tests {
 
         mesh.scale(dvec3(2.0, 2.0, 2.0));
 
-        // Check AABB after scale
-        let [min, max] = mesh.aabb();
+        // Check semantic bounds after scale.
+        let bounds = mesh.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
         assert!((min.x - 2.0).abs() < 1e-5);
         assert!((max.x - 4.0).abs() < 1e-5);
     }
@@ -479,7 +483,7 @@ mod tests {
         // Rotate 90 degrees around Z axis
         mesh.rotate_on_axis(dvec3(0.0, 0.0, 1.0), PI / 2.0);
 
-        let [min, _max] = mesh.aabb();
+        let min = mesh.semantic_bounds().world_min();
         // After rotation, x should be ~0, y should be ~1
         assert!(min.x.abs() < 1e-5);
         assert!((min.y - 1.0).abs() < 1e-5);

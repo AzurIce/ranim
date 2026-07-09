@@ -4,15 +4,15 @@ use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::{
     Extract,
-    anchor::{Aabb, Locate},
+    anchor::{DBounds3, Locate, SemanticBounds},
     color,
     core_item::CoreItem,
     glam,
-    traits::{RotateTransform, ScaleTransform, ShiftTransform},
+    traits::{RotateTransform, Scale, ShiftTransform},
 };
 
 use crate::vitem::DEFAULT_STROKE_WIDTH;
-use ranim_core::anchor::AabbPoint;
+use ranim_core::anchor::BoundsAnchor;
 use ranim_core::traits::{FillColor, Opacity, StrokeColor, With};
 
 use crate::vitem::VItem;
@@ -53,14 +53,14 @@ impl Circle {
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, AabbPoint::CENTER)
+        self.scale_by_anchor(scale, BoundsAnchor::CENTER)
     }
     /// Scale the circle by the given scale, with the given anchor as the center.
     ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::ScaleTransform`]'s `DVec3`,
+    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::Scale`]'s `DVec3`,
     /// because this keeps the circle a circle.
     pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
@@ -77,11 +77,15 @@ impl Circle {
 }
 
 // MARK: Traits impl
-impl Aabb for Circle {
-    fn aabb(&self) -> [DVec3; 2] {
+impl SemanticBounds for Circle {
+    fn semantic_bounds(&self) -> DBounds3 {
         let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
-        let r = self.radius * (u + v);
-        [self.center + r, self.center - r].aabb()
+        let extent = DVec3::new(
+            (u.x * u.x + v.x * v.x).sqrt(),
+            (u.y * u.y + v.y * v.y).sqrt(),
+            (u.z * u.z + v.z * v.z).sqrt(),
+        ) * self.radius.abs();
+        DBounds3::new(self.center - extent, self.center + extent)
     }
 }
 
@@ -99,6 +103,14 @@ impl RotateTransform for Circle {
         self.axes.0 = self.axes.0.normalize();
         self.axes.1.rotate_on_axis(axis, angle);
         self.axes.1 = self.axes.1.normalize();
+        self
+    }
+}
+
+impl Scale<f64> for Circle {
+    fn scale(&mut self, scale: f64) -> &mut Self {
+        self.radius *= scale;
+        self.center.scale(DVec3::splat(scale));
         self
     }
 }

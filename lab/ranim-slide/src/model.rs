@@ -1,7 +1,7 @@
 use egui::{Pos2, Vec2, pos2, vec2};
-use ranim_core::{glam::dvec3, prelude::CameraFrame};
+use ranim_core::{glam::dvec3, prelude::CameraFrame, traits::BoundsAnchor};
 
-use crate::object::{SlideObject, SlideObjectDescriptor};
+use crate::object::{EditorResizeRequest, ResizeCapability, SlideObject, SlideObjectDescriptor};
 
 pub const SLIDE_ASPECT_RATIO: f32 = 16.0 / 9.0;
 pub const SLIDE_FRAME_HEIGHT: f32 = 8.0;
@@ -102,15 +102,17 @@ impl Deck {
 
     pub fn add_object_to_current_page(&mut self, descriptor: &'static SlideObjectDescriptor) {
         let id = self.alloc_id();
+        let object = (descriptor.create_default)();
+        let lock_aspect = object.resize_capability().aspect.default_locked();
         let element = Element {
             id,
             name: format!("{} {id}", descriptor.display_name),
             z_index: id as i32,
             visible: true,
             locked: false,
-            lock_aspect: true,
+            lock_aspect,
             selected: false,
-            object: (descriptor.create_default)(),
+            object,
         };
         self.current_page_mut().insert_element(element);
     }
@@ -248,10 +250,37 @@ impl Element {
         self.object.set_position3(dvec3(x, y, z));
     }
 
+    pub fn resize_capability(&self) -> ResizeCapability {
+        self.object.resize_capability()
+    }
+
     pub fn set_size(&mut self, width: f32, height: f32) {
-        self.object.set_size(vec2(
-            width.max(MIN_OBJECT_SIZE),
-            height.max(MIN_OBJECT_SIZE),
+        let capability = self.resize_capability();
+        if !capability.aspect.can_unlock() {
+            self.lock_aspect = true;
+        }
+
+        let current_size = self.object.bounds3().size();
+        let mut size = dvec3(
+            width.max(MIN_OBJECT_SIZE) as f64,
+            height.max(MIN_OBJECT_SIZE) as f64,
+            current_size.z.abs().max(MIN_OBJECT_SIZE as f64),
+        );
+        if capability.aspect.preserve_aspect(self.lock_aspect) {
+            let current_width = current_size.x.abs().max(MIN_OBJECT_SIZE as f64);
+            let current_height = current_size.y.abs().max(MIN_OBJECT_SIZE as f64);
+            let ratio = current_width / current_height;
+            let width_delta = (size.x / current_width - 1.0).abs();
+            let height_delta = (size.y / current_height - 1.0).abs();
+            if width_delta >= height_delta {
+                size.y = (size.x / ratio).max(MIN_OBJECT_SIZE as f64);
+            } else {
+                size.x = (size.y * ratio).max(MIN_OBJECT_SIZE as f64);
+            }
+        }
+        self.object.apply_editor_resize(EditorResizeRequest::new(
+            size,
+            BoundsAnchor(dvec3(-1.0, -1.0, -1.0)),
         ));
     }
 }
@@ -259,7 +288,7 @@ impl Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::object::RECTANGLE_DESCRIPTOR;
+    use crate::object::{CIRCLE_DESCRIPTOR, RECTANGLE_DESCRIPTOR};
 
     #[test]
     fn hidden_elements_are_not_hit_tested() {
@@ -315,5 +344,37 @@ mod tests {
         deck.current_page_mut().delete_selected();
         assert_eq!(deck.current_page().elements.len(), 1);
         assert!(deck.current_page().selected_camera);
+    }
+
+    #[test]
+    fn element_aspect_lock_defaults_to_object_capability() {
+        let mut deck = Deck::default();
+
+        deck.add_object_to_current_page(&RECTANGLE_DESCRIPTOR);
+        let rect_id = deck.current_page().selected_element.unwrap();
+        let rect = deck.current_page().element(rect_id).unwrap();
+        assert!(rect.lock_aspect);
+        assert!(rect.resize_capability().aspect.can_unlock());
+
+        deck.add_object_to_current_page(&CIRCLE_DESCRIPTOR);
+        let circle_id = deck.current_page().selected_element.unwrap();
+        let circle = deck.current_page().element(circle_id).unwrap();
+        assert!(circle.lock_aspect);
+        assert!(!circle.resize_capability().aspect.can_unlock());
+    }
+
+    #[test]
+    fn always_locked_resize_restores_element_aspect_lock() {
+        let mut deck = Deck::default();
+        deck.add_object_to_current_page(&CIRCLE_DESCRIPTOR);
+        let id = deck.current_page().selected_element.unwrap();
+        let element = deck.current_page_mut().element_mut(id).unwrap();
+
+        element.lock_aspect = false;
+        element.set_size(4.0, 2.0);
+
+        let bounds = element.object.bounds();
+        assert!(element.lock_aspect);
+        assert!((bounds.width() - bounds.height()).abs() < f32::EPSILON);
     }
 }

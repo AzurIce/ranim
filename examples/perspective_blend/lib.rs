@@ -46,13 +46,13 @@ fn perspective_blend(r: &mut RanimScene) {
     let transform_fns: [&dyn Fn(&mut VItem); 6] = [
         &(|data| {
             data.shift(DVec3::NEG_Y * side_length / frac);
-            data.with_origin(AabbPoint::CENTER, |x| {
+            data.with_origin(BoundsAnchor::CENTER, |x| {
                 x.rotate_on_x(std::f64::consts::PI / 2.0);
             });
         }),
         &(|data| {
             data.shift(DVec3::X * side_length / frac);
-            data.with_origin(AabbPoint::CENTER, |x| {
+            data.with_origin(BoundsAnchor::CENTER, |x| {
                 x.rotate_on_y(std::f64::consts::PI / 2.0);
             });
         }),
@@ -61,7 +61,7 @@ fn perspective_blend(r: &mut RanimScene) {
         }),
         &(|data| {
             data.shift(DVec3::Y * side_length / frac);
-            data.with_origin(AabbPoint::CENTER, |x| {
+            data.with_origin(BoundsAnchor::CENTER, |x| {
                 x.rotate_on_x(-std::f64::consts::PI / 2.0);
             });
         }),
@@ -70,7 +70,7 @@ fn perspective_blend(r: &mut RanimScene) {
         }),
         &(|data| {
             data.shift(DVec3::NEG_X * side_length / frac);
-            data.with_origin(AabbPoint::CENTER, |x| {
+            data.with_origin(BoundsAnchor::CENTER, |x| {
                 x.rotate_on_y(-std::f64::consts::PI / 2.0);
             });
         }),
@@ -93,10 +93,10 @@ fn perspective_blend(r: &mut RanimScene) {
     r.timeline_mut(r_faces).play(
         faces
             .morph(|data| {
-                data.with_origin(AabbPoint::CENTER, |x| {
+                data.with_origin(BoundsAnchor::CENTER, |x| {
                     x.rotate_on_y(std::f64::consts::PI / 6.0);
                 });
-                data.with_origin(AabbPoint::CENTER, |x| {
+                data.with_origin(BoundsAnchor::CENTER, |x| {
                     x.rotate_on_x(std::f64::consts::PI / 6.0);
                 });
             })

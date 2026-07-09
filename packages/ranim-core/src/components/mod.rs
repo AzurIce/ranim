@@ -126,13 +126,13 @@ mod test {
     use glam::{DVec3, dvec3};
 
     use crate::{
-        anchor::{Aabb, AabbPoint, Locate},
+        anchor::{BoundsAnchor, DBounds3, Locate, SemanticBounds},
         components::vpoint::VPointVec,
-        traits::{ScaleTransform, ShiftTransformExt},
+        traits::{Scale, ShiftTransformExt},
     };
 
     #[test]
-    fn test_bounding_box() {
+    fn test_semantic_bounds() {
         // 5 points = 2 bezier segments: [P0,P1,P2] and [P2,P3,P4]
         // P3 == P2 signals a subpath break, so 2nd segment is a line from P2 to P4.
         let points: VPointVec = VPointVec(vec![
@@ -143,28 +143,28 @@ mod test {
             dvec3(100.0, -200.0, 0.0),
         ]);
         assert_eq!(
-            points.aabb(),
-            [dvec3(-100.0, -200.0, 0.0), dvec3(100.0, 100.0, 0.0)]
+            points.semantic_bounds(),
+            DBounds3::new(dvec3(-100.0, -200.0, 0.0), dvec3(100.0, 100.0, 0.0))
         );
         assert_eq!(
             dvec3(0.0, -50.0, 0.0),
-            AabbPoint(dvec3(0.0, 0.0, 0.0)).locate(&points)
+            BoundsAnchor(dvec3(0.0, 0.0, 0.0)).locate(&points)
         );
         assert_eq!(
             dvec3(-100.0, -200.0, 0.0),
-            AabbPoint(dvec3(-1.0, -1.0, 0.0)).locate(&points)
+            BoundsAnchor(dvec3(-1.0, -1.0, 0.0)).locate(&points)
         );
         assert_eq!(
             dvec3(-100.0, 100.0, 0.0),
-            AabbPoint(dvec3(-1.0, 1.0, 0.0)).locate(&points)
+            BoundsAnchor(dvec3(-1.0, 1.0, 0.0)).locate(&points)
         );
         assert_eq!(
             dvec3(100.0, -200.0, 0.0),
-            AabbPoint(dvec3(1.0, -1.0, 0.0)).locate(&points)
+            BoundsAnchor(dvec3(1.0, -1.0, 0.0)).locate(&points)
         );
         assert_eq!(
             dvec3(100.0, 100.0, 0.0),
-            AabbPoint(dvec3(1.0, 1.0, 0.0)).locate(&points)
+            BoundsAnchor(dvec3(1.0, 1.0, 0.0)).locate(&points)
         );
     }
 
@@ -178,12 +178,13 @@ mod test {
             dvec3(4.0, 4.0, 0.0),
         ];
         let mut scale_origin = VPointVec(square.clone());
-        // Bezier-aware AABB center: ((-1+4)/2, (-1.25+4)/2, 0) = (1.5, 1.375, 0)
+        // Bezier-aware semantic bounds center:
+        // ((-1+4)/2, (-1.25+4)/2, 0) = (1.5, 1.375, 0)
         assert_eq!(
-            AabbPoint(DVec3::ZERO).locate(&scale_origin),
+            BoundsAnchor(DVec3::ZERO).locate(&scale_origin),
             dvec3(1.5, 1.375, 0.0)
         );
-        scale_origin.with_origin(AabbPoint::CENTER, |x| {
+        scale_origin.with_origin(BoundsAnchor::CENTER, |x| {
             x.scale(DVec3::splat(3.0));
         });
 

@@ -6,7 +6,8 @@ use ranim_core::{
     components::rgba::Rgba,
     core_item::CoreItem,
     glam::{DMat4, DVec3},
-    traits::{FillColor, Interpolatable, Opacity},
+    traits::{FillColor, Interpolatable, Opacity, SemanticBounds},
+    utils::math::DBounds3,
 };
 
 use crate::mesh::MeshItem;
@@ -217,6 +218,12 @@ impl From<Surface> for MeshItem {
                 .collect::<Vec<_>>()
                 .into(),
         }
+    }
+}
+
+impl SemanticBounds for Surface {
+    fn semantic_bounds(&self) -> DBounds3 {
+        MeshItem::from(self.clone()).semantic_bounds()
     }
 }
 

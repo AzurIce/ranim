@@ -4,10 +4,10 @@ use ranim_core::{
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::DVec3,
     traits::{
-        Aabb, Discard, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
+        Discard, FillColor, Opacity, RotateTransform, Scale, SemanticBounds, ShiftTransform,
         StrokeColor, StrokeWidth, With,
     },
-    utils::bezier::PathBuilder,
+    utils::{bezier::PathBuilder, math::DBounds3},
 };
 
 use crate::vitem::{
@@ -53,9 +53,9 @@ impl Parallelogram {
     }
 }
 
-impl Aabb for Parallelogram {
-    fn aabb(&self) -> [DVec3; 2] {
-        self.vertices().aabb()
+impl SemanticBounds for Parallelogram {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.vertices().semantic_bounds()
     }
 }
 
@@ -77,7 +77,7 @@ impl RotateTransform for Parallelogram {
     }
 }
 
-impl ScaleTransform for Parallelogram {
+impl Scale for Parallelogram {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.origin.scale(scale).discard();
         self.axes.0 *= scale;

@@ -11,10 +11,12 @@ use egui::{
 };
 use ranim_core::{
     Extract,
+    anchor::BoundsAnchor,
     color::{AlphaColor, Srgb},
     core_item::CoreItem,
     glam::{DMat4, DVec2, DVec3, Vec3, dvec2, dvec3, vec3},
-    traits::{Aabb, FillColor, ScaleTransform, ShiftTransform, StrokeColor, StrokeWidth},
+    traits::{FillColor, Resize, Scale, SemanticBounds, ShiftTransform, StrokeColor, StrokeWidth},
+    utils::math::DBounds3,
 };
 use ranim_items::{
     mesh::{MeshItem, Sphere, Surface},
@@ -152,18 +154,116 @@ pub struct InspectorCtx;
 #[derive(Clone, Copy, Debug)]
 pub struct RenderCtx;
 
-pub trait SlideObject: Any + DynClone {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResizeKind {
+    Free,
+    Uniform,
+    Affine,
+    Endpoints,
+    SourceScale,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResizeAspect {
+    Free,
+    Lockable,
+    AlwaysLocked,
+}
+
+impl ResizeAspect {
+    pub fn default_locked(self) -> bool {
+        matches!(self, Self::Lockable | Self::AlwaysLocked)
+    }
+
+    pub fn can_unlock(self) -> bool {
+        !matches!(self, Self::AlwaysLocked)
+    }
+
+    pub fn preserve_aspect(self, requested: bool) -> bool {
+        match self {
+            Self::Free => false,
+            Self::Lockable => requested,
+            Self::AlwaysLocked => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResizeCapability {
+    pub kind: ResizeKind,
+    pub aspect: ResizeAspect,
+}
+
+impl ResizeCapability {
+    pub const fn new(kind: ResizeKind, aspect: ResizeAspect) -> Self {
+        Self { kind, aspect }
+    }
+
+    pub const fn lockable() -> Self {
+        Self::new(ResizeKind::Free, ResizeAspect::Lockable)
+    }
+
+    pub const fn uniform() -> Self {
+        Self::new(ResizeKind::Uniform, ResizeAspect::AlwaysLocked)
+    }
+
+    pub const fn affine() -> Self {
+        Self::new(ResizeKind::Affine, ResizeAspect::Lockable)
+    }
+
+    pub const fn endpoints() -> Self {
+        Self::new(ResizeKind::Endpoints, ResizeAspect::Lockable)
+    }
+
+    pub const fn source_scale() -> Self {
+        Self::new(ResizeKind::SourceScale, ResizeAspect::Lockable)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EditorResizeRequest {
+    pub size: DVec3,
+    pub anchor: BoundsAnchor,
+}
+
+impl EditorResizeRequest {
+    pub fn new(size: DVec3, anchor: BoundsAnchor) -> Self {
+        Self {
+            size: dvec3(
+                size.x.abs().max(MIN_OBJECT_SIZE as f64),
+                size.y.abs().max(MIN_OBJECT_SIZE as f64),
+                size.z.abs().max(MIN_OBJECT_SIZE as f64),
+            ),
+            anchor,
+        }
+    }
+}
+
+fn editor_uniform_xy_extent(size: DVec3) -> f64 {
+    size.x.min(size.y).max(MIN_OBJECT_SIZE as f64)
+}
+
+fn editor_uniform_xyz_extent(size: DVec3) -> f64 {
+    size.x.min(size.y).min(size.z).max(MIN_OBJECT_SIZE as f64)
+}
+
+pub trait EditorResize {
+    fn resize_capability(&self) -> ResizeCapability;
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest);
+}
+
+pub trait SlideObject: Any + DynClone + EditorResize {
     fn descriptor(&self) -> &'static SlideObjectDescriptor;
     fn bounds(&self) -> Rect;
-    fn bounds3(&self) -> [DVec3; 2] {
+    fn bounds3(&self) -> DBounds3 {
         let bounds = self.bounds();
-        [
+        DBounds3::new(
             dvec3(bounds.min.x as f64, bounds.min.y as f64, 0.0),
             dvec3(bounds.max.x as f64, bounds.max.y as f64, 0.0),
-        ]
+        )
     }
     fn position(&self) -> DVec3 {
-        ordered_aabb(self.bounds3())[0]
+        self.bounds3().world_min()
     }
     fn translate(&mut self, delta: Vec2);
     fn translate3(&mut self, delta: DVec3) {
@@ -174,7 +274,6 @@ pub trait SlideObject: Any + DynClone {
         let current = self.position();
         self.translate3(pos - current);
     }
-    fn set_size(&mut self, size: Vec2);
     fn inspector_ui(&mut self, ui: &mut Ui, ctx: &mut InspectorCtx) -> InspectorResponse;
     fn paint_preview(&self, ui: &Ui, ctx: &PaintCtx);
     fn extract_core_items(&self, ctx: &RenderCtx, out: &mut Vec<CoreItem>);
@@ -193,6 +292,160 @@ impl std::fmt::Debug for dyn SlideObject {
         f.debug_struct("SlideObject")
             .field("type_id", &self.descriptor().type_id)
             .finish_non_exhaustive()
+    }
+}
+
+impl EditorResize for Rectangle {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::lockable()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
+    }
+}
+
+impl EditorResize for Circle {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::uniform()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<f64>::resize_about(self, request.anchor, editor_uniform_xy_extent(request.size));
+    }
+}
+
+impl EditorResize for Square {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::uniform()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<f64>::resize_about(self, request.anchor, editor_uniform_xy_extent(request.size));
+    }
+}
+
+impl EditorResize for Ellipse {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::lockable()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
+    }
+}
+
+impl EditorResize for Line {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::endpoints()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
+    }
+}
+
+impl EditorResize for Arc {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::uniform()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<f64>::resize_about(self, request.anchor, editor_uniform_xy_extent(request.size));
+    }
+}
+
+impl EditorResize for ArcBetweenPoints {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::endpoints()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
+    }
+}
+
+impl EditorResize for EllipticArc {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::lockable()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
+    }
+}
+
+impl EditorResize for Parallelogram {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::lockable()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
+    }
+}
+
+impl EditorResize for Polygon {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::affine()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
+    }
+}
+
+impl EditorResize for RegularPolygon {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::uniform()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<f64>::resize_about(self, request.anchor, editor_uniform_xy_extent(request.size));
+    }
+}
+
+impl EditorResize for VItem {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::affine()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
+    }
+}
+
+impl EditorResize for Sphere {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::uniform()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<f64>::resize_about(
+            self,
+            request.anchor,
+            editor_uniform_xyz_extent(request.size),
+        );
+    }
+}
+
+impl EditorResize for Surface {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::affine()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
+    }
+}
+
+impl EditorResize for MeshItem {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::affine()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        Resize::<DVec3>::resize_about(self, request.anchor, request.size);
     }
 }
 
@@ -217,6 +470,22 @@ impl TextObject {
     }
 }
 
+impl EditorResize for TextObject {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::lockable()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        let before = request.anchor.locate_in(self.bounds3());
+        self.rect = Rect::from_min_size(
+            self.rect.min,
+            vec2(request.size.x as f32, request.size.y as f32),
+        );
+        let after = request.anchor.locate_in(self.bounds3());
+        self.translate3(before - after);
+    }
+}
+
 impl SlideObject for TextObject {
     fn descriptor(&self) -> &'static SlideObjectDescriptor {
         &TEXT_DESCRIPTOR
@@ -226,11 +495,11 @@ impl SlideObject for TextObject {
         self.rect
     }
 
-    fn bounds3(&self) -> [DVec3; 2] {
-        [
+    fn bounds3(&self) -> DBounds3 {
+        DBounds3::new(
             dvec3(self.rect.min.x as f64, self.rect.min.y as f64, self.z),
             dvec3(self.rect.max.x as f64, self.rect.max.y as f64, self.z),
-        ]
+        )
     }
 
     fn translate(&mut self, delta: Vec2) {
@@ -244,10 +513,6 @@ impl SlideObject for TextObject {
 
     fn set_position(&mut self, pos: Pos2) {
         self.rect = Rect::from_min_size(pos, self.rect.size());
-    }
-
-    fn set_size(&mut self, size: Vec2) {
-        self.rect = Rect::from_min_size(self.rect.min, clamp_size(size));
     }
 
     fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -304,14 +569,11 @@ impl SlideObject for Rectangle {
     }
 
     fn bounds(&self) -> Rect {
-        Rect::from_min_size(
-            pos2(self.p0.x as f32, self.p0.y as f32),
-            vec2(self.size.x.abs() as f32, self.size.y.abs() as f32),
-        )
+        bounds3_to_rect(self.semantic_bounds())
     }
 
-    fn bounds3(&self) -> [DVec3; 2] {
-        self.aabb()
+    fn bounds3(&self) -> DBounds3 {
+        self.semantic_bounds()
     }
 
     fn translate(&mut self, delta: Vec2) {
@@ -324,13 +586,8 @@ impl SlideObject for Rectangle {
     }
 
     fn set_position(&mut self, pos: Pos2) {
-        self.p0.x = pos.x as f64;
-        self.p0.y = pos.y as f64;
-    }
-
-    fn set_size(&mut self, size: Vec2) {
-        let size = clamp_size(size);
-        self.size = dvec2(size.x as f64, size.y as f64);
+        let bounds = self.bounds();
+        self.translate(pos - bounds.min);
     }
 
     fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -383,13 +640,11 @@ impl SlideObject for Circle {
     }
 
     fn bounds(&self) -> Rect {
-        let radius = self.radius.abs() as f32;
-        let center = pos2(self.center.x as f32, self.center.y as f32);
-        Rect::from_center_size(center, vec2(radius * 2.0, radius * 2.0))
+        bounds3_to_rect(self.semantic_bounds())
     }
 
-    fn bounds3(&self) -> [DVec3; 2] {
-        self.aabb()
+    fn bounds3(&self) -> DBounds3 {
+        self.semantic_bounds()
     }
 
     fn translate(&mut self, delta: Vec2) {
@@ -402,14 +657,8 @@ impl SlideObject for Circle {
     }
 
     fn set_position(&mut self, pos: Pos2) {
-        let size = self.bounds().size();
-        self.center.x = (pos.x + size.x / 2.0) as f64;
-        self.center.y = (pos.y + size.y / 2.0) as f64;
-    }
-
-    fn set_size(&mut self, size: Vec2) {
-        let size = clamp_size(size);
-        self.radius = (size.x.min(size.y) / 2.0) as f64;
+        let bounds = self.bounds();
+        self.translate(pos - bounds.min);
     }
 
     fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -509,7 +758,7 @@ pub struct RegularPolygonObject {
 pub struct SvgObject {
     pub position: DVec3,
     pub scale: DVec3,
-    pub intrinsic_bounds: [DVec3; 2],
+    pub intrinsic_bounds: DBounds3,
     pub source: String,
     pub source_error: Option<String>,
 }
@@ -518,7 +767,8 @@ pub struct SvgObject {
 pub struct TypstTextObject {
     pub position: DVec3,
     pub scale: DVec3,
-    pub intrinsic_bounds: [DVec3; 2],
+    pub layout_size: DVec2,
+    pub intrinsic_bounds: DBounds3,
     pub source: String,
     pub compile_error: Option<String>,
 }
@@ -541,137 +791,6 @@ pub struct SurfaceObject {
 #[derive(Debug, Clone)]
 pub struct RawMeshObject {
     pub item: MeshItem,
-}
-
-trait SlideItemResize {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2);
-}
-
-impl SlideItemResize for Square {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        let size = clamp_size(size);
-        self.size = size.x.min(size.y) as f64;
-        self.center = dvec3(
-            (bounds.min.x + size.x / 2.0) as f64,
-            (bounds.min.y + size.y / 2.0) as f64,
-            self.center.z,
-        );
-    }
-}
-
-impl SlideItemResize for Ellipse {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        let size = clamp_size(size);
-        self.radius = dvec2(size.x as f64 / 2.0, size.y as f64 / 2.0);
-        self.center = dvec3(
-            (bounds.min.x + size.x / 2.0) as f64,
-            (bounds.min.y + size.y / 2.0) as f64,
-            self.center.z,
-        );
-    }
-}
-
-impl SlideItemResize for Line {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        let size = clamp_size(size);
-        let [start, end] = self.points;
-        self.points = [
-            dvec3(bounds.min.x as f64, bounds.min.y as f64, start.z),
-            dvec3(
-                (bounds.min.x + size.x) as f64,
-                (bounds.min.y + size.y) as f64,
-                end.z,
-            ),
-        ];
-    }
-}
-
-impl SlideItemResize for Arc {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        let size = clamp_size(size);
-        self.radius = size.x.min(size.y) as f64 / 2.0;
-        self.center = dvec3(
-            (bounds.min.x + size.x / 2.0) as f64,
-            (bounds.min.y + size.y / 2.0) as f64,
-            self.center.z,
-        );
-    }
-}
-
-impl SlideItemResize for ArcBetweenPoints {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        let size = clamp_size(size);
-        self.start = dvec3(
-            bounds.min.x as f64,
-            (bounds.min.y + size.y) as f64,
-            self.start.z,
-        );
-        self.end = dvec3(
-            (bounds.min.x + size.x) as f64,
-            (bounds.min.y + size.y) as f64,
-            self.end.z,
-        );
-    }
-}
-
-impl SlideItemResize for EllipticArc {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        let size = clamp_size(size);
-        self.radius = dvec2(size.x as f64 / 2.0, size.y as f64 / 2.0);
-        self.center = dvec3(
-            (bounds.min.x + size.x / 2.0) as f64,
-            (bounds.min.y + size.y / 2.0) as f64,
-            self.center.z,
-        );
-    }
-}
-
-impl SlideItemResize for Parallelogram {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        let size = clamp_size(size);
-        self.origin = dvec3(bounds.min.x as f64, bounds.min.y as f64, self.origin.z);
-        self.axes = (
-            dvec3(size.x as f64, 0.0, 0.0),
-            dvec3(size.x as f64 * 0.25, size.y as f64, 0.0),
-        );
-    }
-}
-
-impl SlideItemResize for Polygon {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        let size = clamp_size(size);
-        let current = clamp_size(bounds.size());
-        let sx = size.x / current.x;
-        let sy = size.y / current.y;
-        for point in &mut self.points {
-            point.x = bounds.min.x as f64 + (point.x - bounds.min.x as f64) * sx as f64;
-            point.y = bounds.min.y as f64 + (point.y - bounds.min.y as f64) * sy as f64;
-        }
-    }
-}
-
-impl SlideItemResize for RegularPolygon {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        let size = clamp_size(size);
-        self.radius = size.x.min(size.y) as f64 / 2.0;
-        self.center = dvec3(
-            (bounds.min.x + size.x / 2.0) as f64,
-            (bounds.min.y + size.y / 2.0) as f64,
-            self.center.z,
-        );
-    }
-}
-
-impl SlideItemResize for VItem {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        scale_item_to_size(self, bounds, size);
-    }
-}
-
-impl SlideItemResize for MeshItem {
-    fn resize_to(&mut self, bounds: Rect, size: Vec2) {
-        scale_item_to_size(self, bounds, size);
-    }
 }
 
 trait SlideItemInspector {
@@ -856,17 +975,27 @@ impl SlideItemInspector for RegularPolygon {
 
 macro_rules! impl_extract_object {
     ($ty:ty, $field:ident, $descriptor:ident) => {
+        impl EditorResize for $ty {
+            fn resize_capability(&self) -> ResizeCapability {
+                self.$field.resize_capability()
+            }
+
+            fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+                self.$field.apply_editor_resize(request);
+            }
+        }
+
         impl SlideObject for $ty {
             fn descriptor(&self) -> &'static SlideObjectDescriptor {
                 &$descriptor
             }
 
             fn bounds(&self) -> Rect {
-                aabb_to_rect(self.$field.aabb())
+                bounds3_to_rect(self.$field.semantic_bounds())
             }
 
-            fn bounds3(&self) -> [DVec3; 2] {
-                self.$field.aabb()
+            fn bounds3(&self) -> DBounds3 {
+                self.$field.semantic_bounds()
             }
 
             fn translate(&mut self, delta: Vec2) {
@@ -881,11 +1010,6 @@ macro_rules! impl_extract_object {
             fn set_position(&mut self, pos: Pos2) {
                 let bounds = self.bounds();
                 self.translate(pos - bounds.min);
-            }
-
-            fn set_size(&mut self, size: Vec2) {
-                let bounds = self.bounds();
-                self.$field.resize_to(bounds, size);
             }
 
             fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -912,17 +1036,27 @@ macro_rules! impl_extract_object {
 
 macro_rules! impl_filled_extract_object {
     ($ty:ty, $field:ident, $descriptor:ident) => {
+        impl EditorResize for $ty {
+            fn resize_capability(&self) -> ResizeCapability {
+                self.$field.resize_capability()
+            }
+
+            fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+                self.$field.apply_editor_resize(request);
+            }
+        }
+
         impl SlideObject for $ty {
             fn descriptor(&self) -> &'static SlideObjectDescriptor {
                 &$descriptor
             }
 
             fn bounds(&self) -> Rect {
-                aabb_to_rect(self.$field.aabb())
+                bounds3_to_rect(self.$field.semantic_bounds())
             }
 
-            fn bounds3(&self) -> [DVec3; 2] {
-                self.$field.aabb()
+            fn bounds3(&self) -> DBounds3 {
+                self.$field.semantic_bounds()
             }
 
             fn translate(&mut self, delta: Vec2) {
@@ -937,11 +1071,6 @@ macro_rules! impl_filled_extract_object {
             fn set_position(&mut self, pos: Pos2) {
                 let bounds = self.bounds();
                 self.translate(pos - bounds.min);
-            }
-
-            fn set_size(&mut self, size: Vec2) {
-                let bounds = self.bounds();
-                self.$field.resize_to(bounds, size);
             }
 
             fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -976,17 +1105,27 @@ impl_filled_extract_object!(ParallelogramObject, item, PARALLELOGRAM_DESCRIPTOR)
 impl_filled_extract_object!(PolygonObject, item, POLYGON_DESCRIPTOR);
 impl_filled_extract_object!(RegularPolygonObject, item, REGULAR_POLYGON_DESCRIPTOR);
 
+impl EditorResize for RawVItemObject {
+    fn resize_capability(&self) -> ResizeCapability {
+        self.item.resize_capability()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        self.item.apply_editor_resize(request);
+    }
+}
+
 impl SlideObject for RawVItemObject {
     fn descriptor(&self) -> &'static SlideObjectDescriptor {
         &RAW_VITEM_DESCRIPTOR
     }
 
     fn bounds(&self) -> Rect {
-        aabb_to_rect(self.item.aabb())
+        bounds3_to_rect(self.item.semantic_bounds())
     }
 
-    fn bounds3(&self) -> [DVec3; 2] {
-        self.item.aabb()
+    fn bounds3(&self) -> DBounds3 {
+        self.item.semantic_bounds()
     }
 
     fn translate(&mut self, delta: Vec2) {
@@ -1000,11 +1139,6 @@ impl SlideObject for RawVItemObject {
     fn set_position(&mut self, pos: Pos2) {
         let bounds = self.bounds();
         self.translate(pos - bounds.min);
-    }
-
-    fn set_size(&mut self, size: Vec2) {
-        let bounds = self.bounds();
-        self.item.resize_to(bounds, size);
     }
 
     fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -1053,7 +1187,7 @@ impl SvgObject {
         let mut object = Self {
             position: dvec3(-1.2, -1.0, 0.0),
             scale: DVec3::ONE,
-            intrinsic_bounds: [DVec3::ZERO, dvec3(2.4, 2.0, 0.0)],
+            intrinsic_bounds: DBounds3::new(DVec3::ZERO, dvec3(2.4, 2.0, 0.0)),
             source,
             source_error: None,
         };
@@ -1065,7 +1199,7 @@ impl SvgObject {
     fn refresh_intrinsic_bounds(&mut self) -> bool {
         match try_svg_item(&self.source) {
             Ok(item) => {
-                self.intrinsic_bounds = item.aabb();
+                self.intrinsic_bounds = item.semantic_bounds();
                 self.source_error = None;
                 true
             }
@@ -1077,16 +1211,31 @@ impl SvgObject {
     }
 }
 
+impl EditorResize for SvgObject {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::source_scale()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        apply_source_object_resize(
+            &mut self.position,
+            &mut self.scale,
+            self.intrinsic_bounds,
+            request,
+        );
+    }
+}
+
 impl SlideObject for SvgObject {
     fn descriptor(&self) -> &'static SlideObjectDescriptor {
         &SVG_DESCRIPTOR
     }
 
     fn bounds(&self) -> Rect {
-        aabb_to_rect(self.bounds3())
+        bounds3_to_rect(self.bounds3())
     }
 
-    fn bounds3(&self) -> [DVec3; 2] {
+    fn bounds3(&self) -> DBounds3 {
         source_object_bounds3(self.position, self.intrinsic_bounds, self.scale)
     }
 
@@ -1101,10 +1250,6 @@ impl SlideObject for SvgObject {
     fn set_position(&mut self, pos: Pos2) {
         self.position.x = pos.x as f64;
         self.position.y = pos.y as f64;
-    }
-
-    fn set_size(&mut self, size: Vec2) {
-        source_object_set_size(&mut self.scale, self.intrinsic_bounds, size);
     }
 
     fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -1147,19 +1292,43 @@ impl TypstTextObject {
         let mut object = Self {
             position: dvec3(-1.2, -0.5, 0.0),
             scale: DVec3::ONE,
-            intrinsic_bounds: [DVec3::ZERO, dvec3(2.4, 1.0, 0.0)],
+            layout_size: dvec2(2.4, 1.0),
+            intrinsic_bounds: DBounds3::new(DVec3::ZERO, dvec3(2.4, 1.0, 0.0)),
             source,
             compile_error: None,
         };
-        object.refresh_intrinsic_bounds();
+        object.refresh_unconstrained_intrinsic_bounds();
         source_object_set_size(&mut object.scale, object.intrinsic_bounds, vec2(2.4, 1.0));
+        object.refresh_intrinsic_bounds();
         object
     }
 
-    fn refresh_intrinsic_bounds(&mut self) -> bool {
+    fn layout_width_pt(&self) -> f64 {
+        self.layout_size.x.max(MIN_OBJECT_SIZE as f64) / self.scale.x.abs().max(0.001)
+    }
+
+    fn compile_item(&self) -> Result<TypstText, String> {
+        TypstText::try_new_with_layout_width(&self.source, self.layout_width_pt())
+    }
+
+    fn refresh_unconstrained_intrinsic_bounds(&mut self) -> bool {
         match TypstText::try_new(&self.source) {
             Ok(item) => {
-                self.intrinsic_bounds = item.aabb();
+                self.intrinsic_bounds = item.semantic_bounds();
+                self.compile_error = None;
+                true
+            }
+            Err(err) => {
+                self.compile_error = Some(err);
+                false
+            }
+        }
+    }
+
+    fn refresh_intrinsic_bounds(&mut self) -> bool {
+        match self.compile_item() {
+            Ok(item) => {
+                self.intrinsic_bounds = item.semantic_bounds();
                 self.compile_error = None;
                 true
             }
@@ -1171,17 +1340,37 @@ impl TypstTextObject {
     }
 }
 
+impl EditorResize for TypstTextObject {
+    fn resize_capability(&self) -> ResizeCapability {
+        ResizeCapability::source_scale()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        let before = request.anchor.locate_in(self.bounds3());
+        self.layout_size = dvec2(
+            request.size.x.max(MIN_OBJECT_SIZE as f64),
+            request.size.y.max(MIN_OBJECT_SIZE as f64),
+        );
+        self.refresh_intrinsic_bounds();
+        let after = request.anchor.locate_in(self.bounds3());
+        self.position += before - after;
+    }
+}
+
 impl SlideObject for TypstTextObject {
     fn descriptor(&self) -> &'static SlideObjectDescriptor {
         &TYPST_TEXT_DESCRIPTOR
     }
 
     fn bounds(&self) -> Rect {
-        aabb_to_rect(self.bounds3())
+        bounds3_to_rect(self.bounds3())
     }
 
-    fn bounds3(&self) -> [DVec3; 2] {
-        source_object_bounds3(self.position, self.intrinsic_bounds, self.scale)
+    fn bounds3(&self) -> DBounds3 {
+        DBounds3::new(
+            self.position,
+            self.position + dvec3(self.layout_size.x, self.layout_size.y, 0.0),
+        )
     }
 
     fn translate(&mut self, delta: Vec2) {
@@ -1197,10 +1386,6 @@ impl SlideObject for TypstTextObject {
         self.position.y = pos.y as f64;
     }
 
-    fn set_size(&mut self, size: Vec2) {
-        source_object_set_size(&mut self.scale, self.intrinsic_bounds, size);
-    }
-
     fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
         let mut changed = false;
         ui.label("Typst source");
@@ -1208,8 +1393,19 @@ impl SlideObject for TypstTextObject {
             changed = true;
             self.refresh_intrinsic_bounds();
         }
-        changed |= dvec3_ui(ui, "Scale", &mut self.scale);
-        clamp_source_scale(&mut self.scale);
+        if dvec2_ui(ui, "Layout", &mut self.layout_size) {
+            self.layout_size.x = self.layout_size.x.max(MIN_OBJECT_SIZE as f64);
+            self.layout_size.y = self.layout_size.y.max(MIN_OBJECT_SIZE as f64);
+            self.refresh_intrinsic_bounds();
+            changed = true;
+        }
+        if dvec3_ui(ui, "Scale", &mut self.scale) {
+            clamp_source_scale(&mut self.scale);
+            self.refresh_intrinsic_bounds();
+            changed = true;
+        } else {
+            clamp_source_scale(&mut self.scale);
+        }
         if let Some(err) = &self.compile_error {
             ui.colored_label(Color32::from_rgb(190, 60, 60), err);
         }
@@ -1219,7 +1415,7 @@ impl SlideObject for TypstTextObject {
     fn paint_preview(&self, _ui: &Ui, _ctx: &PaintCtx) {}
 
     fn extract_core_items(&self, _ctx: &RenderCtx, out: &mut Vec<CoreItem>) {
-        let Ok(mut item) = TypstText::try_new(&self.source) else {
+        let Ok(mut item) = self.compile_item() else {
             return;
         };
         place_source_item(&mut item, self.position, self.intrinsic_bounds, self.scale);
@@ -1235,17 +1431,27 @@ impl SlideObject for TypstTextObject {
     }
 }
 
+impl EditorResize for SphereObject {
+    fn resize_capability(&self) -> ResizeCapability {
+        self.item.resize_capability()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        self.item.apply_editor_resize(request);
+    }
+}
+
 impl SlideObject for SphereObject {
     fn descriptor(&self) -> &'static SlideObjectDescriptor {
         &SPHERE_DESCRIPTOR
     }
 
     fn bounds(&self) -> Rect {
-        aabb_to_rect(self.item.aabb())
+        bounds3_to_rect(self.item.semantic_bounds())
     }
 
-    fn bounds3(&self) -> [DVec3; 2] {
-        self.item.aabb()
+    fn bounds3(&self) -> DBounds3 {
+        self.item.semantic_bounds()
     }
 
     fn translate(&mut self, delta: Vec2) {
@@ -1259,10 +1465,6 @@ impl SlideObject for SphereObject {
     fn set_position(&mut self, pos: Pos2) {
         let bounds = self.bounds();
         self.translate(pos - bounds.min);
-    }
-
-    fn set_size(&mut self, size: Vec2) {
-        self.item.radius = (size.x.min(size.y) / 2.0).max(MIN_OBJECT_SIZE) as f64;
     }
 
     fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -1296,17 +1498,27 @@ impl SlideObject for SphereObject {
     }
 }
 
+impl EditorResize for SurfaceObject {
+    fn resize_capability(&self) -> ResizeCapability {
+        self.item.resize_capability()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        self.item.apply_editor_resize(request);
+    }
+}
+
 impl SlideObject for SurfaceObject {
     fn descriptor(&self) -> &'static SlideObjectDescriptor {
         &SURFACE_DESCRIPTOR
     }
 
     fn bounds(&self) -> Rect {
-        aabb_to_rect(MeshItem::from(self.item.clone()).aabb())
+        bounds3_to_rect(MeshItem::from(self.item.clone()).semantic_bounds())
     }
 
-    fn bounds3(&self) -> [DVec3; 2] {
-        MeshItem::from(self.item.clone()).aabb()
+    fn bounds3(&self) -> DBounds3 {
+        MeshItem::from(self.item.clone()).semantic_bounds()
     }
 
     fn translate(&mut self, delta: Vec2) {
@@ -1321,17 +1533,6 @@ impl SlideObject for SurfaceObject {
     fn set_position(&mut self, pos: Pos2) {
         let bounds = self.bounds();
         self.translate(pos - bounds.min);
-    }
-
-    fn set_size(&mut self, size: Vec2) {
-        let size = clamp_size(size);
-        let bounds = self.bounds();
-        let current = clamp_size(bounds.size());
-        self.item.transform = DMat4::from_scale(dvec3(
-            (size.x / current.x) as f64,
-            (size.y / current.y) as f64,
-            1.0,
-        )) * self.item.transform;
     }
 
     fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -1365,17 +1566,27 @@ impl SlideObject for SurfaceObject {
     }
 }
 
+impl EditorResize for RawMeshObject {
+    fn resize_capability(&self) -> ResizeCapability {
+        self.item.resize_capability()
+    }
+
+    fn apply_editor_resize(&mut self, request: EditorResizeRequest) {
+        self.item.apply_editor_resize(request);
+    }
+}
+
 impl SlideObject for RawMeshObject {
     fn descriptor(&self) -> &'static SlideObjectDescriptor {
         &RAW_MESH_DESCRIPTOR
     }
 
     fn bounds(&self) -> Rect {
-        aabb_to_rect(self.item.aabb())
+        bounds3_to_rect(self.item.semantic_bounds())
     }
 
-    fn bounds3(&self) -> [DVec3; 2] {
-        self.item.aabb()
+    fn bounds3(&self) -> DBounds3 {
+        self.item.semantic_bounds()
     }
 
     fn translate(&mut self, delta: Vec2) {
@@ -1389,11 +1600,6 @@ impl SlideObject for RawMeshObject {
     fn set_position(&mut self, pos: Pos2) {
         let bounds = self.bounds();
         self.translate(pos - bounds.min);
-    }
-
-    fn set_size(&mut self, size: Vec2) {
-        let bounds = self.bounds();
-        self.item.resize_to(bounds, size);
     }
 
     fn inspector_ui(&mut self, ui: &mut Ui, _ctx: &mut InspectorCtx) -> InspectorResponse {
@@ -1682,43 +1888,45 @@ fn clamp_size(size: Vec2) -> Vec2 {
     vec2(size.x.max(MIN_OBJECT_SIZE), size.y.max(MIN_OBJECT_SIZE))
 }
 
-fn ordered_aabb(aabb: [DVec3; 2]) -> [DVec3; 2] {
-    [aabb[0].min(aabb[1]), aabb[0].max(aabb[1])]
-}
-
-fn aabb_to_rect(aabb: [DVec3; 2]) -> Rect {
-    let [min, max] = ordered_aabb(aabb);
+fn bounds3_to_rect(bounds: DBounds3) -> Rect {
+    let min = bounds.world_min();
+    let max = bounds.world_max();
     Rect::from_min_max(
         pos2(min.x as f32, min.y as f32),
         pos2(max.x as f32, max.y as f32),
     )
 }
 
-fn scale_item_to_size<T: ScaleTransform>(item: &mut T, bounds: Rect, size: Vec2) {
-    let size = clamp_size(size);
-    let current = clamp_size(bounds.size());
-    let scale = dvec3(
-        (size.x / current.x) as f64,
-        (size.y / current.y) as f64,
-        1.0,
+fn source_object_bounds3(position: DVec3, intrinsic_bounds: DBounds3, scale: DVec3) -> DBounds3 {
+    let size = intrinsic_bounds.size() * scale.abs();
+    DBounds3::new(position, position + size)
+}
+
+fn apply_source_object_resize(
+    position: &mut DVec3,
+    scale: &mut DVec3,
+    intrinsic_bounds: DBounds3,
+    request: EditorResizeRequest,
+) {
+    let before =
+        request
+            .anchor
+            .locate_in(source_object_bounds3(*position, intrinsic_bounds, *scale));
+    source_object_set_size(
+        scale,
+        intrinsic_bounds,
+        vec2(request.size.x as f32, request.size.y as f32),
     );
-    item.scale(scale);
+    let after =
+        request
+            .anchor
+            .locate_in(source_object_bounds3(*position, intrinsic_bounds, *scale));
+    *position += before - after;
 }
 
-fn source_object_bounds3(
-    position: DVec3,
-    intrinsic_bounds: [DVec3; 2],
-    scale: DVec3,
-) -> [DVec3; 2] {
-    let [min, max] = ordered_aabb(intrinsic_bounds);
-    let size = (max - min) * scale.abs();
-    [position, position + size]
-}
-
-fn source_object_set_size(scale: &mut DVec3, intrinsic_bounds: [DVec3; 2], size: Vec2) {
+fn source_object_set_size(scale: &mut DVec3, intrinsic_bounds: DBounds3, size: Vec2) {
     let size = clamp_size(size);
-    let [min, max] = ordered_aabb(intrinsic_bounds);
-    let intrinsic_size = max - min;
+    let intrinsic_size = intrinsic_bounds.size();
     if intrinsic_size.x.abs() > f64::EPSILON {
         scale.x = size.x as f64 / intrinsic_size.x.abs();
     }
@@ -1728,11 +1936,11 @@ fn source_object_set_size(scale: &mut DVec3, intrinsic_bounds: [DVec3; 2], size:
     clamp_source_scale(scale);
 }
 
-fn place_source_item<T>(item: &mut T, position: DVec3, intrinsic_bounds: [DVec3; 2], scale: DVec3)
+fn place_source_item<T>(item: &mut T, position: DVec3, intrinsic_bounds: DBounds3, scale: DVec3)
 where
-    T: ScaleTransform + ShiftTransform,
+    T: Scale + ShiftTransform,
 {
-    let [min, _] = ordered_aabb(intrinsic_bounds);
+    let min = intrinsic_bounds.world_min();
     item.scale(scale);
     item.shift(position - min * scale);
 }
@@ -2026,13 +2234,32 @@ mod tests {
     }
 
     #[test]
-    fn typst_bounds_follow_intrinsic_content_width() {
+    fn typst_bounds_keep_layout_frame_when_content_changes() {
         let mut object = TypstTextObject::new_default();
-        let short_width = object.bounds().width();
+        let frame = object.bounds();
 
         object.source = "Typst Typst Typst".to_owned();
         assert!(object.refresh_intrinsic_bounds());
-        assert!(object.bounds().width() > short_width * 2.0);
+        assert_eq!(object.bounds(), frame);
+        assert!(object.intrinsic_bounds.world_max().x > object.intrinsic_bounds.world_min().x);
+    }
+
+    #[test]
+    fn typst_resize_changes_layout_without_scaling_source_semantic() {
+        let mut object = TypstTextObject::new_default();
+        let old_position = object.position;
+        let old_scale = object.scale;
+
+        object.apply_editor_resize(EditorResizeRequest::new(
+            dvec3(4.0, 1.5, MIN_OBJECT_SIZE as f64),
+            ranim_core::anchor::BoundsAnchor(DVec3::NEG_ONE),
+        ));
+
+        let bounds = object.bounds();
+        assert!((object.position - old_position).length() < 1.0e-9);
+        assert_eq!(object.scale, old_scale);
+        assert!((bounds.width() - 4.0).abs() < f32::EPSILON);
+        assert!((bounds.height() - 1.5).abs() < f32::EPSILON);
     }
 
     fn assert_color_near(actual: AlphaColor<Srgb>, expected: [f32; 4]) {

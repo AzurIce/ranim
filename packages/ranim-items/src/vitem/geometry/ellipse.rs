@@ -4,8 +4,10 @@ use ranim_core::{
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
     traits::{
-        Aabb, Discard, FillColor, Opacity, RotateTransform, ShiftTransform, StrokeColor, With,
+        Discard, FillColor, Opacity, RotateTransform, SemanticBounds, ShiftTransform, StrokeColor,
+        With,
     },
+    utils::math::DBounds3,
 };
 
 use crate::vitem::{
@@ -73,13 +75,17 @@ impl From<Ellipse> for VItem {
     }
 }
 
-impl Aabb for Ellipse {
-    fn aabb(&self) -> [DVec3; 2] {
+impl SemanticBounds for Ellipse {
+    fn semantic_bounds(&self) -> DBounds3 {
         let center = self.center;
         let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
         let DVec2 { x: rx, y: ry } = self.radius;
-        let r = u * rx + v * ry;
-        [center - r, center + r].aabb()
+        let extent = DVec3::new(
+            ((u.x * rx).powi(2) + (v.x * ry).powi(2)).sqrt(),
+            ((u.y * rx).powi(2) + (v.y * ry).powi(2)).sqrt(),
+            ((u.z * rx).powi(2) + (v.z * ry).powi(2)).sqrt(),
+        );
+        DBounds3::new(center - extent, center + extent)
     }
 }
 

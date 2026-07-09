@@ -4,6 +4,7 @@ use glam::{DMat4, DVec3, dvec2};
 
 use crate::{
     Extract,
+    anchor::{DBounds3, SemanticBounds},
     animation::{AnimationCell, Eval},
     core_item::CoreItem,
     prelude::{Alignable, Interpolatable},
@@ -43,6 +44,12 @@ impl Extract for CameraFrame {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         buf.push(CoreItem::CameraFrame(self.clone()));
+    }
+}
+
+impl SemanticBounds for CameraFrame {
+    fn semantic_bounds(&self) -> DBounds3 {
+        DBounds3::point(self.pos)
     }
 }
 

@@ -262,7 +262,7 @@ fn solar_system(r: &mut RanimScene) {
         let label_z_offset = planet.radius + 0.5;
         let label = TextItem::new(planet.name, 0.6).with(|item| {
             item.move_to(DVec3::new(x, y, label_z_offset))
-                .with_origin(AabbPoint::CENTER, |x| {
+                .with_origin(BoundsAnchor::CENTER, |x| {
                     x.rotate_on_x(30.0f64.to_radians()).discard()
                 })
                 .discard()

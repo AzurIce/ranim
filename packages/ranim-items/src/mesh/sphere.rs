@@ -4,11 +4,11 @@ use std::f64::consts::{PI, TAU};
 
 use ranim_core::{
     Extract,
-    anchor::Aabb,
+    anchor::{DBounds3, SemanticBounds},
     color::{self, AlphaColor, Srgb},
     core_item::CoreItem,
     glam::{DMat4, DVec3},
-    traits::{FillColor, Interpolatable, Opacity, ShiftTransform, With},
+    traits::{FillColor, Interpolatable, Opacity, Scale, ShiftTransform, With},
 };
 
 use crate::mesh::MeshItem;
@@ -146,10 +146,18 @@ impl ShiftTransform for Sphere {
     }
 }
 
-impl Aabb for Sphere {
-    fn aabb(&self) -> [DVec3; 2] {
+impl SemanticBounds for Sphere {
+    fn semantic_bounds(&self) -> DBounds3 {
         let r = DVec3::splat(self.radius);
-        [self.center - r, self.center + r]
+        DBounds3::new(self.center - r, self.center + r)
+    }
+}
+
+impl Scale<f64> for Sphere {
+    fn scale(&mut self, scale: f64) -> &mut Self {
+        self.radius *= scale;
+        self.center.scale(DVec3::splat(scale));
+        self
     }
 }
 
@@ -176,9 +184,11 @@ mod tests {
     }
 
     #[test]
-    fn test_sphere_aabb() {
+    fn test_sphere_semantic_bounds() {
         let sphere = Sphere::new(1.0).with_center(dvec3(1.0, 2.0, 3.0));
-        let [min, max] = sphere.aabb();
+        let bounds = sphere.semantic_bounds();
+        let min = bounds.world_min();
+        let max = bounds.world_max();
         assert_eq!(min, dvec3(0.0, 1.0, 2.0));
         assert_eq!(max, dvec3(2.0, 3.0, 4.0));
     }

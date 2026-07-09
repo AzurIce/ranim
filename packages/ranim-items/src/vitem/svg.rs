@@ -1,9 +1,11 @@
 use color::{AlphaColor, Srgb, palette::css, rgb8, rgba};
 use glam::DVec3;
 use glam::{DAffine2, dvec3};
-use ranim_core::anchor::Aabb;
+use ranim_core::anchor::{BoundsAnchor, DBounds3, SemanticBounds};
 use ranim_core::core_item::CoreItem;
-use ranim_core::traits::{PointsFunc, RotateTransform, ShiftTransformExt};
+use ranim_core::traits::{
+    PointsFunc, Resize, RotateTransform, ShiftTransformExt, resize_xy_by_bounds,
+};
 use ranim_core::{Extract, components::width::Width, utils::bezier::PathBuilder};
 use ranim_core::{color, glam};
 use tracing::warn;
@@ -17,7 +19,7 @@ use super::VItem;
 ///
 /// Its inner is a `Vec<VItem>`
 #[derive(
-    Clone, ranim_macros::ShiftTransform, ranim_macros::RotateTransform, ranim_macros::ScaleTransform,
+    Clone, ranim_macros::ShiftTransform, ranim_macros::RotateTransform, ranim_macros::Scale,
 )]
 pub struct SvgItem(Vec<VItem>);
 
@@ -39,9 +41,33 @@ impl SvgItem {
 }
 
 // MARK: Trait impls
-impl Aabb for SvgItem {
-    fn aabb(&self) -> [glam::DVec3; 2] {
-        self.0.aabb()
+impl SemanticBounds for SvgItem {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.0.semantic_bounds()
+    }
+}
+
+impl Resize<DVec3> for SvgItem {
+    fn resize_about_bounds(
+        &mut self,
+        bounds: DBounds3,
+        anchor: BoundsAnchor,
+        size: DVec3,
+    ) -> &mut Self {
+        resize_xy_by_bounds(self, bounds, anchor, size.truncate());
+        self
+    }
+}
+
+impl Resize<f64> for SvgItem {
+    fn resize_about_bounds(
+        &mut self,
+        bounds: DBounds3,
+        anchor: BoundsAnchor,
+        size: f64,
+    ) -> &mut Self {
+        Resize::<DVec3>::resize_about_bounds(self, bounds, anchor, DVec3::splat(size));
+        self
     }
 }
 
@@ -230,10 +256,8 @@ mod tests {
 
     use crate::vitem::{geometry::Arc, typst::typst_svg};
     use ranim_core::{
-        anchor::{AabbPoint, Locate},
-        traits::{
-            FillColor, ScaleHint, ScaleTransformExt, ScaleTransformStrokeExt, StrokeColor, With,
-        },
+        anchor::{BoundsAnchor, Locate},
+        traits::{FillColor, ScaleExt, ScaleHint, ScaleStrokeExt, StrokeColor, With},
     };
 
     use super::*;
@@ -266,14 +290,14 @@ mod tests {
         let svg = typst_svg("R");
         let mut vitems = vitems_from_svg(&svg);
 
-        println!("{:?}", vitems.aabb());
-        let scale = vitems.calc_scale_ratio(ScaleHint::PorportionalY(8.0));
+        println!("{:?}", vitems.semantic_bounds());
+        let scale = vitems.calc_scale_factor(ScaleHint::ProportionalY(8.0));
         println!("scale: {}", scale);
-        let center = AabbPoint::CENTER.locate(AsRef::<[VItem]>::as_ref(&vitems));
+        let center = BoundsAnchor::CENTER.locate(AsRef::<[VItem]>::as_ref(&vitems));
         println!("{:?}", center);
         vitems
-            // .scale_to(ScaleHint::PorportionalY(8.0))
-            .move_anchor_to(AabbPoint::CENTER, DVec3::ZERO);
+            // .scale_to(ScaleHint::ProportionalY(8.0))
+            .move_anchor_to(BoundsAnchor::CENTER, DVec3::ZERO);
 
         println!(
             "\n{:?}",
@@ -334,7 +358,7 @@ mod tests {
     #[test]
     fn test_foo() {
         let svg = SvgItem::new(typst_svg("R")).with(|svg| {
-            svg.scale_to_with_stroke(ScaleHint::PorportionalY(4.0))
+            svg.scale_to_with_stroke(ScaleHint::ProportionalY(4.0))
                 .move_to(dvec3(2.0, 2.0, 0.0));
         });
         // println!("{:?}", svg.0[0].vpoints);

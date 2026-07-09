@@ -27,7 +27,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
     let circle = Circle::new(2.0).with(|circle| {
         circle
             .set_color(manim::RED_C)
-            .with_origin(AabbPoint::CENTER, |x| {
+            .with_origin(BoundsAnchor::CENTER, |x| {
                 x.rotate_on_z(PI / 4.0 + PI);
             });
     });
