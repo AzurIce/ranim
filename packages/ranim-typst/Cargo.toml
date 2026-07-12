@@ -1,0 +1,27 @@
+[package]
+name = "ranim-typst"
+description = "Native Typst document support for Ranim."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ranim-core.workspace = true
+ranim-items.workspace = true
+chrono = "0.4.45"
+thiserror = "2.0.18"
+ttf-parser = "0.25.1"
+typst = "0.15.0"
+typst-kit = { version = "0.15.0", default-features = false, features = [
+  "embedded-fonts",
+  "scan-fonts",
+] }
+typst-layout = "0.15.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.release]
+tag = false
