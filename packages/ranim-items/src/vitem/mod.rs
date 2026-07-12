@@ -12,14 +12,6 @@
 pub mod geometry;
 /// Svg item
 pub mod svg;
-/// Simple text items
-#[cfg(feature = "typst")]
-#[cfg_attr(docsrs, doc(cfg(feature = "typst")))]
-pub mod text;
-/// Typst items
-#[cfg(feature = "typst")]
-#[cfg_attr(docsrs, doc(cfg(feature = "typst")))]
-pub mod typst;
 
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};

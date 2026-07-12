@@ -8,10 +8,21 @@
 #![warn(missing_docs)]
 
 mod collector;
+mod text;
+mod typst_text;
 mod world;
 
-use std::{collections::BTreeMap, ops::Range};
+pub use text::{FontStretch, FontStyle, FontVariant, FontWeight, TextFont, TextItem};
+pub use typst_text::TypstText;
 
+use std::{
+    collections::BTreeMap,
+    num::NonZeroUsize,
+    ops::Range,
+    sync::{Mutex, OnceLock},
+};
+
+use lru::LruCache;
 use ranim_core::glam::DVec2;
 use ranim_items::vitem::VItem;
 use thiserror::Error;
@@ -100,7 +111,7 @@ pub struct CompileOutput {
 }
 
 /// Options controlling how Typst pages are converted.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CompileOptions {
     /// Include the page background as the first `VItem` on each page.
     pub include_page_fill: bool,
@@ -140,6 +151,11 @@ pub fn compile_with_options(
     source: &str,
     options: CompileOptions,
 ) -> Result<CompileOutput, TypstError> {
+    let key = (source.to_owned(), options);
+    if let Some(output) = compile_cache().lock().unwrap().get(&key).cloned() {
+        return Ok(output);
+    }
+
     let world = world::SingleSourceWorld::new(source);
     let Warned { output, warnings } = typst::compile::<PagedDocument>(&world);
     let document = output.map_err(|diagnostics| {
@@ -158,10 +174,22 @@ pub fn compile_with_options(
     let mut conversion_warnings = Vec::new();
     let document = collector::collect(&document, options, &mut conversion_warnings);
 
-    Ok(CompileOutput {
+    let output = CompileOutput {
         document,
         compiler_warnings,
         conversion_warnings,
+    };
+    compile_cache().lock().unwrap().put(key, output.clone());
+    Ok(output)
+}
+
+fn compile_cache() -> &'static Mutex<LruCache<(String, CompileOptions), CompileOutput>> {
+    static CACHE: OnceLock<Mutex<LruCache<(String, CompileOptions), CompileOutput>>> =
+        OnceLock::new();
+    CACHE.get_or_init(|| {
+        Mutex::new(LruCache::new(
+            NonZeroUsize::new(256).expect("cache capacity is non-zero"),
+        ))
     })
 }
 

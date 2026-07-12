@@ -56,7 +56,7 @@ egui-phosphor = "0.12.0"
 default = ["anims", "items"]
 anims = []
 items = []
-typst = ["dep:ranim-typst", "ranim-items/typst"]
+typst = ["dep:ranim-typst"]
 profiling = [
   "ranim-render/profiling",
   "dep:puffin",
