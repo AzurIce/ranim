@@ -115,14 +115,14 @@ impl CameraFrame {
 
     /// The view matrix of the camera
     pub fn view_matrix(&self) -> DMat4 {
-        DMat4::look_to_rh(self.pos, self.facing, self.up)
+        glam::dcamera::rh::view::look_to_mat4(self.pos, self.facing, self.up)
     }
 
     /// Use the given frame size as `left`, `right`, `bottom`, `top` to construct an orthographic matrix
     pub fn orthographic_mat(&self, aspect_ratio: f64) -> DMat4 {
         let frame_size = dvec2(self.frame_height * aspect_ratio, self.frame_height);
         let frame_size = frame_size * self.scale;
-        DMat4::orthographic_rh(
+        glam::dcamera::rh::proj::directx::orthographic(
             -frame_size.x / 2.0,
             frame_size.x / 2.0,
             -frame_size.y / 2.0,
@@ -136,7 +136,7 @@ impl CameraFrame {
     pub fn perspective_mat(&self, aspect_ratio: f64) -> DMat4 {
         let near = self.near.max(0.1);
         let far = self.far.max(near);
-        DMat4::perspective_rh(self.fovy, aspect_ratio, near, far)
+        glam::dcamera::rh::proj::directx::perspective(self.fovy, aspect_ratio, near, far)
     }
 
     /// Use the given frame size to construct projection matrix

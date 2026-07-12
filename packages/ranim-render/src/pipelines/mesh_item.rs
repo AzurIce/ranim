@@ -33,7 +33,7 @@ impl GpuResource for MeshItemColorPipeline {
                 ],
                 immediate_size: 0,
             });
-        let vertex_buffer_layouts = MeshItemsBuffer::vertex_buffer_layouts();
+        let vertex_buffer_layouts = MeshItemsBuffer::vertex_buffer_layouts().map(Some);
         let pipeline = ctx
             .device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -105,7 +105,7 @@ impl GpuResource for MeshItemDepthPipeline {
                 ],
                 immediate_size: 0,
             });
-        let vertex_buffer_layouts = MeshItemsBuffer::vertex_buffer_layouts();
+        let vertex_buffer_layouts = MeshItemsBuffer::vertex_buffer_layouts().map(Some);
         let pipeline = ctx
             .device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {

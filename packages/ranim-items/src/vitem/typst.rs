@@ -13,13 +13,13 @@ use sha1::{Digest, Sha1};
 use typst::{
     Library, LibraryExt, World,
     diag::{FileError, FileResult},
-    foundations::{Bytes, Datetime},
+    foundations::{Bytes, Datetime, Duration},
     layout::Abs,
     syntax::{FileId, Source},
     text::{Font, FontBook},
     utils::LazyHash,
 };
-use typst_kit::fonts::{FontSearcher, Fonts};
+use typst_kit::fonts::FontStore;
 
 use crate::vitem::{VItem, svg::SvgItem};
 use ranim_core::Extract;
@@ -66,7 +66,11 @@ impl TypstLruCache {
                     .output
                     .expect("failed to compile typst source");
 
-                let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
+                let svg = typst_svg::svg_merged(
+                    &document,
+                    &typst_svg::SvgOptions::default(),
+                    Abs::pt(2.0),
+                );
                 get_typst_element(&svg)
             })
     }
@@ -81,9 +85,14 @@ fn typst_lru() -> &'static Arc<Mutex<TypstLruCache>> {
     })
 }
 
-fn fonts() -> &'static Fonts {
-    static FONTS: OnceLock<Fonts> = OnceLock::new();
-    FONTS.get_or_init(|| FontSearcher::new().include_system_fonts(true).search())
+fn fonts() -> &'static FontStore {
+    static FONTS: OnceLock<FontStore> = OnceLock::new();
+    FONTS.get_or_init(|| {
+        let mut fonts = FontStore::new();
+        fonts.extend(typst_kit::fonts::embedded());
+        fonts.extend(typst_kit::fonts::system());
+        fonts
+    })
 }
 
 fn typst_world() -> &'static Arc<Mutex<TypstWorld>> {
@@ -136,7 +145,7 @@ impl TypstWorld {
         let fonts = fonts();
         Self {
             library: LazyHash::new(Library::default()),
-            book: LazyHash::new(fonts.book.clone()),
+            book: fonts.book().clone(),
             files: Mutex::new(HashMap::new()),
         }
     }
@@ -177,7 +186,7 @@ impl TypstWorld {
         // 	}
         // }
 
-        Err(FileError::NotFound(id.vpath().as_rootless_path().into()))
+        Err(FileError::NotFound(id.vpath().get_without_slash().into()))
     }
 }
 
@@ -213,15 +222,15 @@ impl World for TypstWorldWithSource<'_> {
     }
 
     fn font(&self, index: usize) -> Option<Font> {
-        fonts().fonts[index].get()
+        fonts().font(index)
     }
 
-    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+    fn today(&self, offset: Option<Duration>) -> Option<Datetime> {
         let now = self.now.get_or_init(chrono::Local::now);
 
         let naive = match offset {
             None => now.naive_local(),
-            Some(o) => now.naive_utc() + chrono::Duration::hours(o),
+            Some(o) => now.naive_utc() + chrono::Duration::seconds(o.seconds() as i64),
         };
 
         Datetime::from_ymd(
@@ -587,7 +596,7 @@ mod tests {
         println!("document compile: {:?}", start.elapsed());
 
         let start = Instant::now();
-        let svg = typst_svg::svg_merged(&document, Abs::pt(2.0));
+        let svg = typst_svg::svg_merged(&document, &typst_svg::SvgOptions::default(), Abs::pt(2.0));
         println!("{svg}");
         println!("svg output: {:?}", start.elapsed());
 
