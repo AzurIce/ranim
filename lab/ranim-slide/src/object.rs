@@ -766,7 +766,6 @@ pub struct SvgObject {
 #[derive(Debug, Clone)]
 pub struct TypstTextObject {
     pub position: DVec3,
-    pub scale: DVec3,
     pub layout_size: DVec2,
     pub intrinsic_bounds: DBounds3,
     pub source: String,
@@ -1291,38 +1290,17 @@ impl TypstTextObject {
         let source = "Typst".to_owned();
         let mut object = Self {
             position: dvec3(-1.2, -0.5, 0.0),
-            scale: DVec3::ONE,
             layout_size: dvec2(2.4, 1.0),
             intrinsic_bounds: DBounds3::new(DVec3::ZERO, dvec3(2.4, 1.0, 0.0)),
             source,
             compile_error: None,
         };
-        object.refresh_unconstrained_intrinsic_bounds();
-        source_object_set_size(&mut object.scale, object.intrinsic_bounds, vec2(2.4, 1.0));
         object.refresh_intrinsic_bounds();
         object
     }
 
-    fn layout_width_pt(&self) -> f64 {
-        self.layout_size.x.max(MIN_OBJECT_SIZE as f64) / self.scale.x.abs().max(0.001)
-    }
-
     fn compile_item(&self) -> Result<TypstText, String> {
-        TypstText::try_new_with_layout_width(&self.source, self.layout_width_pt())
-    }
-
-    fn refresh_unconstrained_intrinsic_bounds(&mut self) -> bool {
-        match TypstText::try_new(&self.source) {
-            Ok(item) => {
-                self.intrinsic_bounds = item.semantic_bounds();
-                self.compile_error = None;
-                true
-            }
-            Err(err) => {
-                self.compile_error = Some(err);
-                false
-            }
-        }
+        TypstText::try_new_with_layout_size(&self.source, self.layout_size)
     }
 
     fn refresh_intrinsic_bounds(&mut self) -> bool {
@@ -1399,13 +1377,6 @@ impl SlideObject for TypstTextObject {
             self.refresh_intrinsic_bounds();
             changed = true;
         }
-        if dvec3_ui(ui, "Scale", &mut self.scale) {
-            clamp_source_scale(&mut self.scale);
-            self.refresh_intrinsic_bounds();
-            changed = true;
-        } else {
-            clamp_source_scale(&mut self.scale);
-        }
         if let Some(err) = &self.compile_error {
             ui.colored_label(Color32::from_rgb(190, 60, 60), err);
         }
@@ -1418,7 +1389,7 @@ impl SlideObject for TypstTextObject {
         let Ok(mut item) = self.compile_item() else {
             return;
         };
-        place_source_item(&mut item, self.position, self.intrinsic_bounds, self.scale);
+        place_source_item(&mut item, self.position, self.intrinsic_bounds, DVec3::ONE);
         item.extract_into(out);
     }
 
@@ -2248,7 +2219,6 @@ mod tests {
     fn typst_resize_changes_layout_without_scaling_source_semantic() {
         let mut object = TypstTextObject::new_default();
         let old_position = object.position;
-        let old_scale = object.scale;
 
         object.apply_editor_resize(EditorResizeRequest::new(
             dvec3(4.0, 1.5, MIN_OBJECT_SIZE as f64),
@@ -2257,7 +2227,6 @@ mod tests {
 
         let bounds = object.bounds();
         assert!((object.position - old_position).length() < 1.0e-9);
-        assert_eq!(object.scale, old_scale);
         assert!((bounds.width() - 4.0).abs() < f32::EPSILON);
         assert!((bounds.height() - 1.5).abs() < f32::EPSILON);
     }
