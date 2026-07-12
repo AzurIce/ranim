@@ -9,9 +9,9 @@ use ranim::{
     items::vitem::{
         VItem,
         geometry::{Polygon, Rectangle, Square},
+        typst::compile_vitems,
     },
     prelude::*,
-    typst::compile_vitems,
     utils::rate_functions::{linear, smooth},
 };
 

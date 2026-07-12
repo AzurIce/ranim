@@ -9,6 +9,8 @@ repository.workspace = true
 [dependencies]
 ranim-core.workspace = true
 ranim-macros.workspace = true
+ranim-typst = { workspace = true, optional = true }
+typst = { version = "0.15.0", optional = true }
 tracing.workspace = true
 itertools.workspace = true
 derive_more = { workspace = true, features = [
@@ -25,6 +27,7 @@ usvg = "0.47.0"
 
 [features]
 default = []
+typst = ["dep:ranim-typst", "dep:typst"]
 
 [dev-dependencies]
 assert_float_eq = "1.2.0"
