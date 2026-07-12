@@ -12,6 +12,19 @@
 pub mod geometry;
 /// Svg item
 pub mod svg;
+/// Text items shaped by Typst.
+#[cfg(feature = "typst")]
+#[cfg_attr(docsrs, doc(cfg(feature = "typst")))]
+pub mod text;
+/// Typst document conversion and text morphing.
+#[cfg(feature = "typst")]
+#[cfg_attr(docsrs, doc(cfg(feature = "typst")))]
+pub mod typst;
+
+#[cfg(feature = "typst")]
+pub use text::{TextFont, TextItem};
+#[cfg(feature = "typst")]
+pub use typst::TypstText;
 
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};

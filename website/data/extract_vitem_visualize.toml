@@ -14,9 +14,9 @@ use ranim::{
     items::vitem::{
         VItem,
         geometry::{Circle, Square},
+        typst::compile_vitems,
     },
     prelude::*,
-    typst::compile_vitems,
 };
 
 use glam::DVec3;

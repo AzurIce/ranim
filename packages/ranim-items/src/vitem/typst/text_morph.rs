@@ -11,9 +11,11 @@ use ranim_core::{
     },
     utils::resize_preserving_order_with_repeated_indices,
 };
-use ranim_items::vitem::VItem;
 
-use crate::{TypstError, compile};
+use crate::vitem::{
+    VItem,
+    typst::{TypstError, compile},
+};
 
 /// Text-like Typst content with glyph-aware morph alignment.
 #[derive(Debug, Clone)]
@@ -47,7 +49,6 @@ impl TypstText {
             keys.extend(page_keys);
             vitems.extend(page.vitems);
         }
-
         Ok(Self { keys, vitems })
     }
 
@@ -127,7 +128,6 @@ impl Alignable for TypstText {
                 &mut right_out,
                 &mut keys_out,
             );
-
             let mut left = self.vitems[left_match].clone();
             let mut right = other.vitems[right_match].clone();
             align_vitems(&mut left, &mut right);
@@ -146,7 +146,6 @@ impl Alignable for TypstText {
             &mut right_out,
             &mut keys_out,
         );
-
         self.keys = keys_out.clone();
         other.keys = keys_out;
         self.vitems = left_out;
@@ -176,7 +175,6 @@ impl From<TypstText> for Vec<VItem> {
 
 impl Extract for TypstText {
     type Target = CoreItem;
-
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         self.vitems.extract_into(buf);
     }
@@ -216,12 +214,10 @@ impl FillColor for TypstText {
             .map(FillColor::fill_color)
             .unwrap_or(css::WHITE)
     }
-
     fn set_fill_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
         self.vitems.set_fill_color(color);
         self
     }
-
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
         self.vitems.set_fill_opacity(opacity);
         self
@@ -235,12 +231,10 @@ impl StrokeColor for TypstText {
             .map(StrokeColor::stroke_color)
             .unwrap_or(css::WHITE)
     }
-
     fn set_stroke_color(&mut self, color: color::AlphaColor<color::Srgb>) -> &mut Self {
         self.vitems.set_stroke_color(color);
         self
     }
-
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
         self.vitems.set_stroke_opacity(opacity);
         self
@@ -259,14 +253,12 @@ impl StrokeWidth for TypstText {
     fn stroke_width(&self) -> f32 {
         self.vitems.stroke_width()
     }
-
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         self.vitems.iter_mut().for_each(|item| {
             item.apply_stroke_func(&f);
         });
         self
     }
-
     fn set_stroke_width(&mut self, width: f32) -> &mut Self {
         self.vitems.set_stroke_width(width);
         self
@@ -284,7 +276,6 @@ fn lcs_matches(left: &[String], right: &[String]) -> Vec<(usize, usize)> {
             };
         }
     }
-
     let mut matches = Vec::new();
     let (mut left_index, mut right_index) = (0, 0);
     while left_index < left.len() && right_index < right.len() {

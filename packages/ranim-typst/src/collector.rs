@@ -2,11 +2,9 @@ use std::collections::BTreeMap;
 
 use ranim_core::{
     color::{AlphaColor, Srgb, rgba},
-    glam::{DAffine2, DVec2, DVec3},
-    traits::{FillColor, PointsFunc, ShiftTransformExt, StrokeColor, StrokeWidth},
+    glam::{DAffine2, DVec2, DVec3, Vec3Swizzles},
     utils::bezier::PathBuilder,
 };
-use ranim_items::vitem::VItem;
 use ttf_parser::{GlyphId, OutlineBuilder};
 use typst::{
     layout::{Abs, Frame, FrameItem, GroupItem, Point, Ratio, Transform},
@@ -15,7 +13,9 @@ use typst::{
 };
 use typst_layout::{Page, PagedDocument};
 
-use crate::{CompileOptions, GlyphInfo, TypstDocument, TypstPage, TypstWarning};
+use crate::{
+    CompileOptions, GlyphInfo, TypstDocument, TypstPage, TypstPath, TypstStroke, TypstWarning,
+};
 
 pub(crate) fn collect(
     document: &PagedDocument,
@@ -32,7 +32,7 @@ pub(crate) fn collect(
 
 struct PageCollector<'a> {
     options: CompileOptions,
-    vitems: Vec<VItem>,
+    paths: Vec<TypstPath>,
     groups: BTreeMap<String, Vec<usize>>,
     glyphs: Vec<GlyphInfo>,
     active_labels: Vec<String>,
@@ -43,7 +43,7 @@ impl<'a> PageCollector<'a> {
     fn new(options: CompileOptions, warnings: &'a mut Vec<TypstWarning>) -> Self {
         Self {
             options,
-            vitems: Vec::new(),
+            paths: Vec::new(),
             groups: BTreeMap::new(),
             glyphs: Vec::new(),
             active_labels: Vec::new(),
@@ -61,20 +61,18 @@ impl<'a> PageCollector<'a> {
         }
         self.collect_frame(Transform::identity(), &page.frame);
 
-        for vitem in &mut self.vitems {
-            vitem.apply_points_func(|points| {
-                for point in points {
-                    point.y = -point.y;
-                }
-            });
+        for path in &mut self.paths {
+            for point in &mut path.points {
+                point.y = -point.y;
+            }
         }
-        if self.options.center_content && !self.vitems.is_empty() {
-            self.vitems.move_to(DVec3::ZERO);
+        if self.options.center_content {
+            center_paths(&mut self.paths);
         }
 
         TypstPage {
             size: DVec2::new(page.frame.width().to_pt(), page.frame.height().to_pt()),
-            vitems: self.vitems,
+            paths: self.paths,
             groups: self.groups,
             glyphs: self.glyphs,
         }
@@ -98,7 +96,6 @@ impl<'a> PageCollector<'a> {
         if group.clip.is_some() {
             self.warn(TypstWarning::ClipPathUnsupported);
         }
-
         if let Some(label) = group.label {
             self.active_labels.push(label.resolve().to_string());
             self.collect_frame(transform, &group.frame);
@@ -129,7 +126,6 @@ impl<'a> PageCollector<'a> {
                     .to_owned(),
                 text_range,
             });
-
             x += glyph.x_advance.at(text.size);
             y += glyph.y_advance.at(text.size);
         }
@@ -154,17 +150,17 @@ impl<'a> PageCollector<'a> {
             return None;
         }
 
-        let mut vitem = VItem::from_vpoints(path.vpoints().to_vec());
-        self.apply_paint(&mut vitem, &text.fill, true);
-        if let Some(stroke) = &text.stroke {
-            self.apply_paint(&mut vitem, &stroke.paint, false);
-            vitem.set_stroke_width((stroke.thickness.to_pt() * transform_scale(transform)) as f32);
-        } else {
-            vitem.set_stroke_width(0.0);
-            vitem.set_stroke_opacity(0.0);
-        }
-        apply_transform(&mut vitem, transform);
-        Some(self.push_vitem(vitem))
+        let fill = Some(self.paint(&text.fill));
+        let stroke = text.stroke.as_ref().map(|stroke| TypstStroke {
+            color: self.paint(&stroke.paint),
+            width: (stroke.thickness.to_pt() * transform_scale(transform)) as f32,
+        });
+        let points = transform_points(path.vpoints(), transform);
+        Some(self.push_path(TypstPath {
+            points,
+            fill,
+            stroke,
+        }))
     }
 
     fn collect_shape(&mut self, transform: Transform, shape: &Shape) {
@@ -203,28 +199,24 @@ impl<'a> PageCollector<'a> {
             return;
         }
 
-        let mut vitem = VItem::from_vpoints(path.vpoints().to_vec());
-        if let Some(fill) = &shape.fill {
-            self.apply_paint(&mut vitem, fill, true);
-        } else {
-            vitem.set_fill_opacity(0.0);
-        }
         if shape.fill_rule == FillRule::EvenOdd {
             self.warn(TypstWarning::EvenOddFillUnsupported);
         }
-        if let Some(stroke) = &shape.stroke {
-            self.apply_paint(&mut vitem, &stroke.paint, false);
-            vitem.set_stroke_width((stroke.thickness.to_pt() * transform_scale(transform)) as f32);
-        } else {
-            vitem.set_stroke_width(0.0);
-            vitem.set_stroke_opacity(0.0);
-        }
-        apply_transform(&mut vitem, transform);
-        self.push_vitem(vitem);
+        let fill = shape.fill.as_ref().map(|paint| self.paint(paint));
+        let stroke = shape.stroke.as_ref().map(|stroke| TypstStroke {
+            color: self.paint(&stroke.paint),
+            width: (stroke.thickness.to_pt() * transform_scale(transform)) as f32,
+        });
+        let points = transform_points(path.vpoints(), transform);
+        self.push_path(TypstPath {
+            points,
+            fill,
+            stroke,
+        });
     }
 
-    fn apply_paint(&mut self, vitem: &mut VItem, paint: &Paint, fill: bool) {
-        let color = match paint {
+    fn paint(&mut self, paint: &Paint) -> AlphaColor<Srgb> {
+        match paint {
             Paint::Solid(color) => {
                 let (r, g, b, a) = color.to_rgb().into_components();
                 rgba(r, g, b, a)
@@ -237,17 +229,12 @@ impl<'a> PageCollector<'a> {
                 self.warn(TypstWarning::TilingUnsupported);
                 opaque_white()
             }
-        };
-        if fill {
-            vitem.set_fill_color(color);
-        } else {
-            vitem.set_stroke_color(color);
         }
     }
 
-    fn push_vitem(&mut self, vitem: VItem) -> usize {
-        let index = self.vitems.len();
-        self.vitems.push(vitem);
+    fn push_path(&mut self, path: TypstPath) -> usize {
+        let index = self.paths.len();
+        self.paths.push(path);
         for label in &self.active_labels {
             self.groups.entry(label.clone()).or_default().push(index);
         }
@@ -265,7 +252,7 @@ fn point(point: Point) -> DVec3 {
     DVec3::new(point.x.to_pt(), point.y.to_pt(), 0.0)
 }
 
-fn apply_transform(vitem: &mut VItem, transform: Transform) {
+fn transform_points(points: &[DVec3], transform: Transform) -> Vec<DVec3> {
     let affine = DAffine2::from_cols_array(&[
         transform.sx.get(),
         transform.ky.get(),
@@ -274,13 +261,31 @@ fn apply_transform(vitem: &mut VItem, transform: Transform) {
         transform.tx.to_pt(),
         transform.ty.to_pt(),
     ]);
-    vitem.apply_affine2(affine);
+    points
+        .iter()
+        .map(|point| affine.transform_point2(point.xy()).extend(point.z))
+        .collect()
 }
 
 fn transform_scale(transform: Transform) -> f64 {
     let x = transform.sx.get().hypot(transform.ky.get());
     let y = transform.kx.get().hypot(transform.sy.get());
     ((x * x + y * y) / 2.0).sqrt()
+}
+
+fn center_paths(paths: &mut [TypstPath]) {
+    let mut min = DVec3::splat(f64::INFINITY);
+    let mut max = DVec3::splat(f64::NEG_INFINITY);
+    for point in paths.iter().flat_map(|path| &path.points) {
+        min = min.min(*point);
+        max = max.max(*point);
+    }
+    if min.is_finite() && max.is_finite() {
+        let center = (min + max) / 2.0;
+        for point in paths.iter_mut().flat_map(|path| &mut path.points) {
+            *point -= center;
+        }
+    }
 }
 
 fn opaque_white() -> AlphaColor<Srgb> {

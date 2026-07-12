@@ -8,7 +8,6 @@ repository.workspace = true
 
 [dependencies]
 ranim-core.workspace = true
-ranim-items.workspace = true
 chrono = "0.4.45"
 lru = "0.18.1"
 thiserror = "2.0.18"

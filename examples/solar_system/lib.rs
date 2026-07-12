@@ -4,8 +4,8 @@ use ranim::{
     color::palettes::manim,
     glam::{DMat4, DVec3},
     items::mesh::{Sphere, Surface},
+    items::vitem::TextItem,
     prelude::*,
-    typst::TextItem,
     utils::rate_functions::linear,
 };
 use ranim_anims::fading::FadingAnim;
