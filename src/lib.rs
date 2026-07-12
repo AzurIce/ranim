@@ -29,6 +29,9 @@ pub use ranim_core as core;
 pub use ranim_items as items;
 #[cfg(feature = "render")]
 pub use ranim_render as render;
+#[cfg(feature = "typst")]
+#[cfg_attr(docsrs, doc(cfg(feature = "typst")))]
+pub use ranim_typst as typst;
 
 /// Commands like preview and render
 pub mod cmd;
