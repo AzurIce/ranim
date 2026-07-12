@@ -10,6 +10,7 @@ repository.workspace = true
 ranim-core.workspace = true
 ranim-items.workspace = true
 chrono = "0.4.45"
+lru = "0.18.1"
 thiserror = "2.0.18"
 ttf-parser = "0.25.1"
 typst = "0.15.0"
