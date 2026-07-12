@@ -4934,7 +4934,9 @@ dependencies = [
  "itertools 0.15.0",
  "ranim-core",
  "ranim-macros",
+ "ranim-typst",
  "tracing",
+ "typst",
  "usvg",
 ]
 
@@ -4974,7 +4976,6 @@ dependencies = [
  "chrono",
  "lru",
  "ranim-core",
- "ranim-items",
  "thiserror 2.0.18",
  "ttf-parser",
  "typst",

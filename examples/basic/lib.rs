@@ -4,9 +4,8 @@ use glam::DVec3;
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     color::palettes::manim,
-    items::vitem::{VItem, svg::SvgItem},
+    items::vitem::{VItem, svg::SvgItem, typst::compile_vitems},
     prelude::*,
-    typst::compile_vitems,
 };
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");

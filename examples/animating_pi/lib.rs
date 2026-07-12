@@ -8,8 +8,7 @@ use ranim::{
 };
 use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
-use ranim_items::vitem::VItem;
-use ranim_typst::compile_vitems;
+use ranim_items::vitem::{VItem, typst::compile_vitems};
 
 #[scene(clear_color = "#000000")]
 #[output(dir = "./output/animating_pi")]
