@@ -37,6 +37,11 @@ use ranim_core::{
     },
 };
 
+/// Default conversion from one Ranim scene unit to Typst points.
+pub const DEFAULT_TYPST_PT_PER_UNIT: f64 = 72.0;
+
+const MIN_TYPST_PT_PER_UNIT: f64 = 1.0e-6;
+
 struct TypstLruCache {
     inner: LruCache<[u8; 20], String>,
 }
@@ -162,6 +167,46 @@ fn panic_payload(payload: Box<dyn std::any::Any + Send>) -> String {
     } else {
         "unknown panic".to_owned()
     }
+}
+
+fn normalize_pt_per_unit(pt_per_unit: f64) -> f64 {
+    if pt_per_unit.is_finite() {
+        pt_per_unit.abs().max(MIN_TYPST_PT_PER_UNIT)
+    } else {
+        DEFAULT_TYPST_PT_PER_UNIT
+    }
+}
+
+fn ranim_units_to_typst_pt(units: f64, pt_per_unit: f64) -> f64 {
+    units.max(1.0e-6) * normalize_pt_per_unit(pt_per_unit)
+}
+
+fn wrap_typst_source(source: &str, layout_size: Option<DVec2>, pt_per_unit: f64) -> String {
+    if let Some(size) = layout_size {
+        let width = ranim_units_to_typst_pt(size.x, pt_per_unit);
+        if size.y > 0.0 {
+            let height = ranim_units_to_typst_pt(size.y, pt_per_unit);
+            format!("#block(width: {width}pt, height: {height}pt)[{source}]")
+        } else {
+            format!("#block(width: {width}pt)[{source}]")
+        }
+    } else {
+        source.to_owned()
+    }
+}
+
+fn vitems_from_typst_svg(svg: String, pt_per_unit: f64) -> Result<Vec<VItem>, String> {
+    let svg = catch_unwind(AssertUnwindSafe(|| SvgItem::new(svg)))
+        .map_err(|payload| format!("failed to parse typst SVG: {}", panic_payload(payload)))?;
+    let mut vitems = Vec::<VItem>::from(svg);
+    // Typst SVG coordinates are in points. Scale them once, at the boundary,
+    // so user source can keep using native Typst units.
+    let scale = 1.0 / normalize_pt_per_unit(pt_per_unit);
+    vitems.scale(dvec3(scale, scale, scale));
+    vitems.as_mut_slice().apply_stroke_func(|widths| {
+        widths.iter_mut().for_each(|width| width.0 *= scale as f32);
+    });
+    Ok(vitems)
 }
 
 struct FileEntry {
@@ -296,59 +341,77 @@ impl World for TypstWorldWithSource<'_> {
 
 /// A Text item construted through typst
 ///
-/// Note that the methods this item provides assumes that the typst string
-/// you provide only produces text output, otherwise undefined behaviours may happens.
+/// Plain text sources get character-level alignment for interpolation. More
+/// complex Typst sources can still render, but alignment falls back to the
+/// generated vector item order.
 #[derive(Clone)]
 pub struct TypstText {
     source: String,
     chars: String,
     vitems: Vec<VItem>,
+    pt_per_unit: f64,
     layout_size: Option<DVec2>,
 }
 
 impl TypstText {
     fn _new(str: &str) -> Self {
-        let svg = SvgItem::new(typst_svg(str));
-        let chars = typst_text_chars(str);
-
-        let vitems = Vec::<VItem>::from(svg);
-        assert_eq!(chars.len(), vitems.len());
-        Self {
-            source: str.to_owned(),
-            chars,
-            vitems,
-            layout_size: None,
-        }
+        Self::new(str)
     }
     /// Create a TypstText with typst string.
     ///
-    /// The typst string you provide should only produces text output,
-    /// otherwise undefined behaviours may happens.
+    /// Plain text sources get character-level alignment for interpolation.
     pub fn new(typst_str: &str) -> Self {
         Self::try_new(typst_str).unwrap_or_else(|err| panic!("failed to compile typst text: {err}"))
     }
 
     /// Create a TypstText with typst string without panicking on compile errors.
-    ///
-    /// The typst string you provide should only produce text output.
     pub fn try_new(typst_str: &str) -> Result<Self, String> {
-        let svg = try_typst_svg(typst_str)?;
-        Self::from_svg(typst_str, svg)
+        Self::try_new_with_pt_per_unit(typst_str, DEFAULT_TYPST_PT_PER_UNIT)
     }
 
-    /// Create a TypstText with a block layout width in Typst points.
+    /// Create a TypstText with typst string and a custom Typst-point to Ranim-unit ratio.
+    ///
+    /// User source keeps Typst's native unit syntax. Parsed SVG coordinates
+    /// are scaled by `1 / pt_per_unit` when converted into Ranim scene units.
+    pub fn try_new_with_pt_per_unit(typst_str: &str, pt_per_unit: f64) -> Result<Self, String> {
+        let pt_per_unit = normalize_pt_per_unit(pt_per_unit);
+        let wrapped = wrap_typst_source(typst_str, None, pt_per_unit);
+        let svg = try_typst_svg(&wrapped)?;
+        Self::from_svg_with_layout(typst_str, typst_str, svg, None, pt_per_unit)
+    }
+
+    /// Create a TypstText with a block layout width in Ranim scene units.
     ///
     /// The source text is wrapped in a Typst block before compilation, but
     /// character alignment still uses the original text.
-    pub fn try_new_with_layout_width(typst_str: &str, width_pt: f64) -> Result<Self, String> {
-        let width_pt = width_pt.max(1.0e-6);
-        let wrapped = format!("#block(width: {width_pt}pt)[{typst_str}]");
-        let svg = try_typst_svg(&wrapped)?;
-        Self::from_svg_with_layout(typst_str, typst_str, svg, Some(dvec2(width_pt, 0.0)))
+    pub fn try_new_with_layout_width(typst_str: &str, width: f64) -> Result<Self, String> {
+        Self::try_new_with_layout_size(typst_str, dvec2(width, 0.0))
     }
 
-    fn from_svg(typst_str: &str, svg: String) -> Result<Self, String> {
-        Self::from_svg_with_layout(typst_str, typst_str, svg, None)
+    /// Create a TypstText with a block layout size in Ranim scene units.
+    ///
+    /// The generated Typst source converts the requested Ranim layout size to
+    /// native Typst points for the wrapper block. Parsed SVG coordinates are
+    /// then converted back to Ranim units using the same ratio.
+    pub fn try_new_with_layout_size(typst_str: &str, layout_size: DVec2) -> Result<Self, String> {
+        Self::try_new_with_layout_size_and_pt_per_unit(
+            typst_str,
+            layout_size,
+            DEFAULT_TYPST_PT_PER_UNIT,
+        )
+    }
+
+    /// Create a TypstText with a block layout size and custom unit ratio.
+    pub fn try_new_with_layout_size_and_pt_per_unit(
+        typst_str: &str,
+        layout_size: DVec2,
+        pt_per_unit: f64,
+    ) -> Result<Self, String> {
+        let pt_per_unit = normalize_pt_per_unit(pt_per_unit);
+        let layout_size = dvec2(layout_size.x.max(1.0e-6), layout_size.y.max(0.0));
+        let wrapped = wrap_typst_source(typst_str, Some(layout_size), pt_per_unit);
+        let svg = try_typst_svg(&wrapped)?;
+        Self::from_svg_with_layout(typst_str, typst_str, svg, Some(layout_size), pt_per_unit)
     }
 
     fn from_svg_with_layout(
@@ -356,19 +419,12 @@ impl TypstText {
         chars_text: &str,
         svg: String,
         layout_size: Option<DVec2>,
+        pt_per_unit: f64,
     ) -> Result<Self, String> {
-        let svg = catch_unwind(AssertUnwindSafe(|| SvgItem::new(svg)))
-            .map_err(|payload| format!("failed to parse typst SVG: {}", panic_payload(payload)))?;
-        let chars = typst_text_chars(chars_text);
+        let pt_per_unit = normalize_pt_per_unit(pt_per_unit);
 
-        let vitems = Vec::<VItem>::from(svg);
-        if chars.len() != vitems.len() {
-            return Err(format!(
-                "typst output produced {} vector items for {} non-whitespace characters; TypstText only supports text-only output",
-                vitems.len(),
-                chars.len()
-            ));
-        }
+        let vitems = vitems_from_typst_svg(svg, pt_per_unit)?;
+        let chars = typst_alignment_chars(chars_text, vitems.len());
         let layout_size = layout_size.map(|size| {
             let bounds = vitems.semantic_bounds();
             let world_size = bounds.world_size();
@@ -378,56 +434,56 @@ impl TypstText {
             source: source_text.to_owned(),
             chars,
             vitems,
+            pt_per_unit,
             layout_size,
         })
     }
 
     fn compile_current_layout(&self) -> Result<Vec<VItem>, String> {
-        let source = if let Some(layout_size) = self.layout_size {
-            format!(
-                "#block(width: {}pt)[{}]",
-                layout_size.x.max(1.0e-6),
-                self.source
-            )
-        } else {
-            self.source.clone()
-        };
+        let source = wrap_typst_source(&self.source, self.layout_size, self.pt_per_unit);
         let svg = try_typst_svg(&source)?;
-        let svg = catch_unwind(AssertUnwindSafe(|| SvgItem::new(svg)))
-            .map_err(|payload| format!("failed to parse typst SVG: {}", panic_payload(payload)))?;
-        let vitems = Vec::<VItem>::from(svg);
-        if self.chars.len() != vitems.len() {
-            return Err(format!(
-                "typst output produced {} vector items for {} non-whitespace characters; TypstText only supports text-only output",
-                vitems.len(),
-                self.chars.len()
-            ));
-        }
+        let vitems = vitems_from_typst_svg(svg, self.pt_per_unit)?;
         Ok(vitems)
     }
 
     fn relayout_preserving_semantic_min(&mut self, min: glam::DVec3) -> Result<(), String> {
-        self.vitems = self.compile_current_layout()?;
+        let vitems = self.compile_current_layout()?;
+        self.chars = typst_alignment_chars(&self.source, vitems.len());
+        self.vitems = vitems;
         let new_min = self.semantic_bounds().world_min();
         self.vitems.shift(min - new_min);
         Ok(())
     }
 
+    /// Returns the Typst points represented by one Ranim scene unit.
+    pub fn pt_per_unit(&self) -> f64 {
+        self.pt_per_unit
+    }
+
+    /// Returns the optional layout size in Ranim scene units.
+    pub fn layout_size(&self) -> Option<DVec2> {
+        self.layout_size
+    }
+
     /// Inline code
     pub fn new_inline_code(code: &str) -> Self {
-        let svg = SvgItem::new(typst_svg(format!("`{code}`").as_str()));
+        let source = format!("`{code}`");
+        let wrapped = wrap_typst_source(&source, None, DEFAULT_TYPST_PT_PER_UNIT);
+        let svg = typst_svg(&wrapped);
         let chars = code
             .replace(" ", "")
             .replace("\n", "")
             .replace("\r", "")
             .replace("\t", "");
 
-        let vitems = Vec::<VItem>::from(svg);
+        let vitems = vitems_from_typst_svg(svg, DEFAULT_TYPST_PT_PER_UNIT)
+            .expect("failed to parse typst SVG");
         assert_eq!(chars.len(), vitems.len());
         Self {
-            source: format!("`{code}`"),
+            source,
             chars,
             vitems,
+            pt_per_unit: DEFAULT_TYPST_PT_PER_UNIT,
             layout_size: None,
         }
     }
@@ -435,20 +491,23 @@ impl TypstText {
     /// Multiline code
     pub fn new_multiline_code(code: &str, language: Option<&str>) -> Self {
         let language = language.unwrap_or("");
-        // Self::new(format!("```{language}\n{code}\n```").as_str())
-        let svg = SvgItem::new(typst_svg(format!("```{language}\n{code}```").as_str()));
+        let source = format!("```{language}\n{code}```");
+        let wrapped = wrap_typst_source(&source, None, DEFAULT_TYPST_PT_PER_UNIT);
+        let svg = typst_svg(&wrapped);
         let chars = code
             .replace(" ", "")
             .replace("\n", "")
             .replace("\r", "")
             .replace("\t", "");
 
-        let vitems = Vec::<VItem>::from(svg);
+        let vitems = vitems_from_typst_svg(svg, DEFAULT_TYPST_PT_PER_UNIT)
+            .expect("failed to parse typst SVG");
         assert_eq!(chars.len(), vitems.len());
         Self {
-            source: format!("```{language}\n{code}```"),
+            source,
             chars,
             vitems,
+            pt_per_unit: DEFAULT_TYPST_PT_PER_UNIT,
             layout_size: None,
         }
     }
@@ -459,6 +518,15 @@ fn typst_text_chars(text: &str) -> String {
         .replace("\n", "")
         .replace("\r", "")
         .replace("\t", "")
+}
+
+fn typst_alignment_chars(text: &str, vitems_len: usize) -> String {
+    let chars = typst_text_chars(text);
+    if chars.chars().count() == vitems_len {
+        chars
+    } else {
+        "x".repeat(vitems_len)
+    }
 }
 
 impl Alignable for TypstText {
@@ -581,6 +649,7 @@ impl Interpolatable for TypstText {
             source: self.source.clone(),
             chars: self.chars.clone(),
             vitems,
+            pt_per_unit: self.pt_per_unit.lerp(&target.pt_per_unit, t),
             layout_size: match (self.layout_size, target.layout_size) {
                 (Some(a), Some(b)) => Some(a.lerp(b, t)),
                 (Some(a), None) => Some(a),
@@ -825,9 +894,50 @@ mod tests {
     }
 
     #[test]
+    fn layout_width_is_in_ranim_units() {
+        let text =
+            TypstText::try_new_with_layout_width("R", 2.0).expect("typst text should compile");
+
+        assert_eq!(text.layout_size().unwrap().x, 2.0);
+        assert_eq!(text.pt_per_unit(), DEFAULT_TYPST_PT_PER_UNIT);
+        assert!((text.semantic_bounds_size().x - 2.0).abs() < 1.0e-9);
+        assert!(text.extract().semantic_bounds_size().x < 2.0);
+    }
+
+    #[test]
+    fn pt_per_unit_changes_extracted_size_not_layout_frame() {
+        let a = TypstText::try_new_with_layout_size_and_pt_per_unit("R", dvec2(2.0, 0.0), 72.0)
+            .expect("typst text should compile");
+        let b = TypstText::try_new_with_layout_size_and_pt_per_unit("R", dvec2(2.0, 0.0), 36.0)
+            .expect("typst text should compile");
+
+        assert!((a.semantic_bounds_size().x - 2.0).abs() < 1.0e-9);
+        assert!((b.semantic_bounds_size().x - 2.0).abs() < 1.0e-9);
+        assert!(b.extract().semantic_bounds_size().x > a.extract().semantic_bounds_size().x * 1.5);
+    }
+
+    #[test]
+    fn wrapped_layout_source_uses_native_typst_units() {
+        let source = wrap_typst_source("R", Some(dvec2(2.0, 1.0)), 72.0);
+
+        assert_eq!(source, "#block(width: 144pt, height: 72pt)[R]");
+        assert!(!source.contains("rapt"));
+    }
+
+    #[test]
+    fn native_typst_units_are_scaled_to_ranim_units() {
+        let item = TypstText::try_new("#rect(width: 2in, height: 1in, fill: red)")
+            .expect("typst source should compile");
+        let size = item.extract().semantic_bounds_size();
+
+        assert!((size.x - 2.0).abs() < 1.0e-6);
+        assert!((size.y - 1.0).abs() < 1.0e-6);
+    }
+
+    #[test]
     fn scale_updates_typst_layout_bounds_without_scaling_extracted_primitives() {
         let mut text =
-            TypstText::try_new_with_layout_width("R", 12.0).expect("typst text should compile");
+            TypstText::try_new_with_layout_width("R", 2.0).expect("typst text should compile");
         let before_extracted = text.extract().semantic_bounds_size();
         let before_semantic = text.semantic_bounds_size();
 
