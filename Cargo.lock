@@ -4883,6 +4883,7 @@ dependencies = [
  "ranim-items",
  "ranim-macros",
  "ranim-render",
+ "ranim-typst",
  "reqwest",
  "tracing",
  "tracing-indicatif",
@@ -5005,6 +5006,20 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "wgpu",
+]
+
+[[package]]
+name = "ranim-typst"
+version = "0.2.1"
+dependencies = [
+ "chrono",
+ "ranim-core",
+ "ranim-items",
+ "thiserror 2.0.18",
+ "ttf-parser",
+ "typst",
+ "typst-kit",
+ "typst-layout",
 ]
 
 [[package]]
