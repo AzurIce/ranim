@@ -1,5 +1,6 @@
 [package]
 name = "ranim"
+autoexamples = false
 description = "An animation engine inspired by manim and JAnim"
 version.workspace = true
 edition.workspace = true
@@ -33,15 +34,15 @@ ranim-items = { path = "packages/ranim-items", version = "0.2.1" }
 ranim-anims = { path = "packages/ranim-anims", version = "0.2.1" }
 ranim-macros = { path = "packages/ranim-macros", version = "0.2.1" }
 ranim-render = { path = "packages/ranim-render", version = "0.2.1" }
-wgpu-profiler = { version = "0.27.0", features = ["puffin"] }
-wasm-bindgen = "0.2.122"
-glam = "0.32.1"
+wgpu-profiler = { git = "https://github.com/Wumpf/wgpu-profiler", rev = "6b5992b3fa8627a2516e13aee564b2421b93df91", features = ["puffin"] }
+wasm-bindgen = "0.2.126"
+glam = "0.33.2"
 tracing = "0.1.44"
 tracing-indicatif = "0.3.14"
 tracing-subscriber = "0.3.23"
-itertools = "0.14.0"
-bytemuck = "1.25.0"
-wgpu = "29.0.3"
+itertools = "0.15.0"
+bytemuck = "1.25.1"
+wgpu = "30.0.0"
 image = "0.25.10"
 derive_more = "2.1.1"
 
@@ -50,6 +51,7 @@ derive_more = "2.1.1"
 default = ["anims", "items"]
 anims = []
 items = []
+typst = ["ranim-items/typst"]
 profiling = [
   "ranim-render/profiling",
   "dep:puffin",
@@ -98,18 +100,18 @@ derive_more = { workspace = true, features = [
   "from",
   "into_iterator",
 ] }
-anyhow = "1.0.102"
+anyhow = "1.0.103"
 ranim-render = { workspace = true, optional = true }
 # render feature (wasm-compatible deps here, rest in target-specific section below)
 wgpu = { workspace = true, optional = true }
 # app feature
-egui = { version = "0.34.2", optional = true }
-egui-phosphor = { version = "0.12.0", optional = true }
+egui = { version = "0.35.0", optional = true }
+egui-phosphor = { git = "https://github.com/amPerl/egui-phosphor", rev = "5a0075f68a463f6b316d39776fff519a2762b729", optional = true }
 web-time = { version = "1.1.0", optional = true }
 bytemuck = { workspace = true, features = ["derive"], optional = true }
 # profiling
-puffin = { version = "0.19.1", optional = true }
-puffin_http = { version = "0.16.1", optional = true }
+puffin = { version = "0.20.0", optional = true }
+puffin_http = { version = "0.17.0", optional = true }
 profiling = { version = "1.0.18", optional = true, features = [
   "profile-with-puffin",
 ] }
@@ -119,36 +121,39 @@ inventory = "0.3.24"
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen.workspace = true
 # app feature (wasm)
-eframe = { version = "0.34.2", default-features = false, features = [
+eframe = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981", default-features = false, features = [
     "accesskit",
     "default_fonts",
     "web_screen_reader",
     "wgpu",
 ], optional = true }
-wasm-bindgen-futures = { version = "0.4.72", optional = true }
-web-sys = { version = "0.3.99", optional = true }
+wasm-bindgen-futures = { version = "0.4.76", optional = true }
+web-sys = { version = "0.3.103", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 wasm-tracing = { version = "2.1.0", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 # render deps (wasm-incompatible, only used in cfg(not(wasm)) code)
-pollster = { version = "0.4.0", optional = true }
-which = { version = "8.0.2", optional = true }
-indicatif = { version = "0.18.4", optional = true }
+pollster = { version = "1.0.1", optional = true }
+which = { version = "8.0.4", optional = true }
+indicatif = { version = "0.18.6", optional = true }
 tracing-indicatif = { workspace = true, optional = true }
 flate2 = { version = "1.1.9", optional = true }
 reqwest = { version = "0.13.4", features = ["blocking"], optional = true }
 # app feature (native)
-eframe = { version = "0.34.2", features = ["wgpu"], optional = true }
+eframe = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981", features = ["wgpu"], optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"
 
 [dev-dependencies]
 assert_float_eq = "1.2.0"
-rand = "0.10.1"
+rand = "0.10.2"
 rand_chacha = "0.10.0"
-getrandom = { version = "0.4.2", features = ["wasm_js"] }
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
+
+[patch.crates-io]
+egui = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981" }
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
@@ -184,6 +189,7 @@ wasm = true
 name = "animating_pi"
 path = "examples/animating_pi/lib.rs"
 crate-type = ["cdylib"]
+required-features = ["typst"]
 
 [package.metadata.example.animating_pi]
 wasm = true
@@ -208,6 +214,7 @@ wasm = true
 name = "basic"
 path = "examples/basic/lib.rs"
 crate-type = ["cdylib"]
+required-features = ["typst"]
 
 [package.metadata.example.basic]
 wasm = true
@@ -245,6 +252,7 @@ wasm = true
 name = "ranim_logo"
 path = "examples/ranim_logo/lib.rs"
 crate-type = ["cdylib"]
+required-features = ["typst"]
 
 [package.metadata.example.ranim_logo]
 wasm = true
@@ -253,6 +261,7 @@ wasm = true
 name = "extract_vitem_visualize"
 path = "examples/extract_vitem_visualize/lib.rs"
 crate-type = ["cdylib"]
+required-features = ["typst"]
 
 [package.metadata.example.extract_vitem_visualize]
 wasm = true
@@ -334,6 +343,7 @@ crate-type = ["cdylib"]
 name = "text_item"
 path = "examples/text_item/lib.rs"
 crate-type = ["cdylib"]
+required-features = ["typst"]
 
 [package.metadata.example.text_item]
 wasm = true
@@ -366,6 +376,7 @@ wasm = true
 name = "solar_system"
 path = "examples/solar_system/lib.rs"
 crate-type = ["cdylib"]
+required-features = ["typst"]
 
 [package.metadata.example.solar_system]
 wasm = true

@@ -222,7 +222,7 @@ pub fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
     vitems
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "typst"))]
 mod tests {
     use std::f64::consts::PI;
 

@@ -36,7 +36,7 @@ impl GpuResource for DebugPipeline {
             vertex: wgpu::VertexState {
                 module,
                 entry_point: Some("vs_main"),
-                buffers: &[wgpu::VertexBufferLayout {
+                buffers: &[Some(wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vec4>() as u64,
                     step_mode: wgpu::VertexStepMode::Vertex,
                     attributes: &[wgpu::VertexAttribute {
@@ -44,7 +44,7 @@ impl GpuResource for DebugPipeline {
                         format: wgpu::VertexFormat::Float32x4,
                         offset: 0,
                     }],
-                }],
+                })],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {

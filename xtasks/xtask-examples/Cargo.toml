@@ -15,4 +15,4 @@ toml = "1.1.2"
 clap = { version = "4.6", features = ["derive"] }
 sha1 = "0.11.0"
 base16ct = { version = "1.0.0", features = ["alloc"] }
-anyhow = "1.0.102"
+anyhow = "1.0.103"
