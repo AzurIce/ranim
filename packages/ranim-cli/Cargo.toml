@@ -7,7 +7,9 @@ license.workspace = true
 repository.workspace = true
 
 [features]
+default = ["typst"]
 profiling = ["ranim/profiling"]
+typst = ["ranim/typst"]
 
 [[bin]]
 name = "ranim"
