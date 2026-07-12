@@ -34,6 +34,7 @@ ranim-items = { path = "packages/ranim-items", version = "0.2.1" }
 ranim-anims = { path = "packages/ranim-anims", version = "0.2.1" }
 ranim-macros = { path = "packages/ranim-macros", version = "0.2.1" }
 ranim-render = { path = "packages/ranim-render", version = "0.2.1" }
+ranim-typst = { path = "packages/ranim-typst", version = "0.2.1" }
 wgpu-profiler = { git = "https://github.com/Wumpf/wgpu-profiler", rev = "6b5992b3fa8627a2516e13aee564b2421b93df91", features = ["puffin"] }
 wasm-bindgen = "0.2.126"
 glam = "0.33.2"
@@ -51,7 +52,7 @@ derive_more = "2.1.1"
 default = ["anims", "items"]
 anims = []
 items = []
-typst = ["ranim-items/typst"]
+typst = ["dep:ranim-typst", "ranim-items/typst"]
 profiling = [
   "ranim-render/profiling",
   "dep:puffin",
@@ -88,6 +89,7 @@ ranim-core.workspace = true
 ranim-items.workspace = true
 ranim-anims.workspace = true
 ranim-macros.workspace = true
+ranim-typst = { workspace = true, optional = true }
 itertools.workspace = true
 tracing.workspace = true
 derive_more = { workspace = true, features = [
