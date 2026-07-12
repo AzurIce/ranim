@@ -227,7 +227,7 @@ impl Empty for MeshItem {
 pub fn compute_smooth_normals(points: &[DVec3], triangle_indices: &[u32]) -> Vec<DVec3> {
     let mut normals = vec![DVec3::ZERO; points.len()];
 
-    for tri in triangle_indices.chunks_exact(3) {
+    for tri in triangle_indices.as_chunks::<3>().0 {
         let (i0, i1, i2) = (tri[0] as usize, tri[1] as usize, tri[2] as usize);
         let (p0, p1, p2) = (points[i0], points[i1], points[i2]);
 
