@@ -1463,16 +1463,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diff-match-patch-rs"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1e836eb966678daed8789e698dbdb1016a260c3cdaca6172585e13580c4e4be"
-dependencies = [
- "chrono",
- "percent-encoding",
-]
-
-[[package]]
 name = "digest"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4940,19 +4930,11 @@ name = "ranim-items"
 version = "0.2.1"
 dependencies = [
  "assert_float_eq",
- "chrono",
  "derive_more",
- "diff-match-patch-rs",
  "itertools 0.15.0",
- "lru",
  "ranim-core",
  "ranim-macros",
- "regex",
- "sha1",
  "tracing",
- "typst",
- "typst-kit",
- "typst-svg",
  "usvg",
 ]
 
@@ -4990,6 +4972,7 @@ name = "ranim-typst"
 version = "0.2.1"
 dependencies = [
  "chrono",
+ "lru",
  "ranim-core",
  "ranim-items",
  "thiserror 2.0.18",

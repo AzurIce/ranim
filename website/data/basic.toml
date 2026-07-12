@@ -7,8 +7,9 @@ use glam::DVec3;
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     color::palettes::manim,
-    items::vitem::{VItem, svg::SvgItem, typst::typst_svg},
+    items::vitem::{VItem, svg::SvgItem},
     prelude::*,
+    typst::compile_vitems,
 };
 
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -23,8 +24,7 @@ fn basic(r: &mut RanimScene) {
         svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
             .move_to(DVec3::Y * 2.0);
     }));
-    let mut text = Vec::<VItem>::from(
-        SvgItem::new(typst_svg(
+    let mut text = compile_vitems(
             r#"
             #align(center)[
                 #text(18pt)[Ranim]
@@ -32,14 +32,14 @@ fn basic(r: &mut RanimScene) {
                 #text(6pt)[Hello 你好]
             ]
             "#,
-        ))
+        )
+        .unwrap()
         .with(|text| {
             text.scale_to_with_stroke(ScaleHint::PorportionalY(2.0))
                 .move_to(DVec3::NEG_Y * 2.0)
                 .set_color(manim::WHITE)
                 .set_fill_opacity(0.8);
-        }),
-    );
+        });
     let r_svg = r.insert(svg.clone());
     let r_text = r.insert(text.clone());
 

@@ -12,14 +12,6 @@
 pub mod geometry;
 /// Svg item
 pub mod svg;
-/// Simple text items
-#[cfg(feature = "typst")]
-#[cfg_attr(docsrs, doc(cfg(feature = "typst")))]
-pub mod text;
-/// Typst items
-#[cfg(feature = "typst")]
-#[cfg_attr(docsrs, doc(cfg(feature = "typst")))]
-pub mod typst;
 
 use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
@@ -44,6 +36,9 @@ use ranim_core::{
 /// You can construct a [`VItem`] from a list of VPoints, see [`VPointVec`]:
 ///
 /// ```rust
+/// use ranim_core::glam::dvec3;
+/// use ranim_items::vitem::VItem;
+///
 /// let vitem = VItem::from_vpoints(vec![
 ///     dvec3(0.0, 0.0, 0.0),
 ///     dvec3(1.0, 0.0, 0.0),

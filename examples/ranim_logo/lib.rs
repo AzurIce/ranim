@@ -9,10 +9,9 @@ use ranim::{
     items::vitem::{
         VItem,
         geometry::{Polygon, Rectangle, Square},
-        svg::SvgItem,
-        typst::typst_svg,
     },
     prelude::*,
+    typst::compile_vitems,
     utils::rate_functions::{linear, smooth},
 };
 
@@ -78,19 +77,18 @@ fn ranim_logo(r: &mut RanimScene) {
     let logo = build_logo(logo_width);
     let mut r_logo = logo.map(|item| (r.insert(item.clone()), item));
 
-    let mut ranim_text = Vec::<VItem>::from(
-        SvgItem::new(typst_svg(
-            r#"
+    let mut ranim_text = compile_vitems(
+        r#"
 #align(center)[
     #text(10pt, font: "LXGW Bright")[Ranim]
 ]"#,
-        ))
-        .with(|text| {
-            text.set_color(manim::WHITE)
-                .scale_to(ScaleHint::PorportionalY(1.0))
-                .move_to(DVec3::NEG_Y * 2.5);
-        }),
-    );
+    )
+    .unwrap()
+    .with(|text| {
+        text.set_color(manim::WHITE)
+            .scale_to(ScaleHint::PorportionalY(1.0))
+            .move_to(DVec3::NEG_Y * 2.5);
+    });
     let r_ranim_text = r.insert_empty();
 
     r_logo.iter_mut().for_each(|(r_logo, item)| {
