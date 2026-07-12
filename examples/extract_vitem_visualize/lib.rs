@@ -11,10 +11,9 @@ use ranim::{
     items::vitem::{
         VItem,
         geometry::{Circle, Square},
-        svg::SvgItem,
-        typst::typst_svg,
     },
     prelude::*,
+    typst::compile_vitems,
 };
 
 use glam::DVec3;
@@ -26,13 +25,13 @@ fn ranim_text(r: &mut RanimScene) {
     let mut cam = CameraFrame::default();
     let r_cam = r.insert(cam.clone());
 
-    let text = SvgItem::new(typst_svg("Ranim")).with(|item| {
+    let text = compile_vitems("Ranim").unwrap().with(|item| {
         item.set_fill_color(manim::WHITE)
             .set_fill_opacity(0.5)
             .scale_to_with_stroke(ScaleHint::PorportionalY(3.6))
             .move_to(DVec3::ZERO);
     });
-    let _r_texts = Vec::<VItem>::from(text)
+    let _r_texts = text
         .into_iter()
         .map(VisualVItem)
         .map(|item| r.insert(item))
