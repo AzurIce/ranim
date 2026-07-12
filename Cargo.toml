@@ -52,7 +52,7 @@ derive_more = "2.1.1"
 default = ["anims", "items"]
 anims = []
 items = []
-typst = ["dep:ranim-typst"]
+typst = ["dep:ranim-typst", "ranim-items/typst"]
 profiling = [
   "ranim-render/profiling",
   "dep:puffin",

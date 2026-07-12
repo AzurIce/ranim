@@ -13,13 +13,13 @@ use ranim_core::{
         ShiftTransform, StrokeColor, StrokeWidth, With,
     },
 };
-use ranim_items::vitem::{
-    VItem,
-    geometry::{Parallelogram, anchor::Origin},
-};
 use typst::foundations::Repr;
 
-use crate::{CompileOptions, compile_with_options};
+use crate::vitem::{
+    VItem,
+    geometry::{Parallelogram, anchor::Origin},
+    typst::{CompileOptions, compile_with_options},
+};
 
 pub use typst::text::{FontStretch, FontStyle, FontVariant, FontWeight};
 
