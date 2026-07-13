@@ -1,13 +1,13 @@
 use ranim_core::{
     Extract,
-    anchor::Aabb,
+    anchor::{DBounds3, SemanticBounds},
     color::{self, palette::css},
     components::{VecResizeTrait, width::Width},
     core_item::CoreItem,
     glam,
     traits::{
-        Alignable, FillColor, Interpolatable, Opacity, RotateTransform, ScaleTransform,
-        ShiftTransform, StrokeColor, StrokeWidth, With,
+        Alignable, FillColor, Interpolatable, Opacity, RotateTransform, Scale, ShiftTransform,
+        StrokeColor, StrokeWidth, With,
     },
     utils::resize_preserving_order_with_repeated_indices,
 };
@@ -50,6 +50,21 @@ impl TypstText {
             vitems.extend(page.vitems);
         }
         Ok(Self { keys, vitems })
+    }
+
+    /// Compiles source inside a fixed layout block measured in Ranim scene units.
+    pub fn try_new_with_layout_size(
+        source: &str,
+        layout_size: glam::DVec2,
+    ) -> Result<Self, String> {
+        const TYPST_POINTS_PER_UNIT: f64 = 72.0;
+
+        let width = layout_size.x.max(1.0e-6) * TYPST_POINTS_PER_UNIT;
+        let height = layout_size.y.max(1.0e-6) * TYPST_POINTS_PER_UNIT;
+        let wrapped = format!("#block(width: {width}pt, height: {height}pt)[{source}]");
+        let mut text = Self::try_new(&wrapped).map_err(|error| error.to_string())?;
+        text.scale(glam::DVec3::splat(1.0 / TYPST_POINTS_PER_UNIT));
+        Ok(text)
     }
 
     /// Compiles inline raw-code content.
@@ -180,9 +195,9 @@ impl Extract for TypstText {
     }
 }
 
-impl Aabb for TypstText {
-    fn aabb(&self) -> [glam::DVec3; 2] {
-        self.vitems.aabb()
+impl SemanticBounds for TypstText {
+    fn semantic_bounds(&self) -> DBounds3 {
+        self.vitems.semantic_bounds()
     }
 }
 
@@ -200,7 +215,7 @@ impl RotateTransform for TypstText {
     }
 }
 
-impl ScaleTransform for TypstText {
+impl Scale for TypstText {
     fn scale(&mut self, scale: glam::DVec3) -> &mut Self {
         self.vitems.scale(scale);
         self
