@@ -8,11 +8,11 @@ repository.workspace = true
 
 [dependencies]
 dyn-clone.workspace = true
-eframe = { workspace = true, default-features = true, features = ["wgpu"] }
-egui.workspace = true
-egui-phosphor.workspace = true
+eframe = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981", features = ["wgpu"] }
+egui = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981" }
+egui-phosphor = { git = "https://github.com/amPerl/egui-phosphor", rev = "5a0075f68a463f6b316d39776fff519a2762b729" }
 ranim-core.workspace = true
-ranim-items.workspace = true
+ranim-items = { workspace = true, features = ["typst"] }
 ranim-render.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

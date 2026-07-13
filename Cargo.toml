@@ -355,6 +355,15 @@ required-features = ["typst"]
 wasm = true
 
 [[example]]
+name = "typst_stress"
+path = "examples/typst_stress/lib.rs"
+crate-type = ["cdylib"]
+required-features = ["typst"]
+
+[package.metadata.example.typst_stress]
+wasm = true
+
+[[example]]
 name = "perlin_terrain"
 path = "examples/perlin_terrain/lib.rs"
 crate-type = ["cdylib"]
