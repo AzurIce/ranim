@@ -8,7 +8,7 @@ use ranim::{
 };
 use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
-use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
+use ranim_items::vitem::{VItem, typst::compile_vitems};
 
 #[scene(clear_color = "#000000")]
 #[output(dir = "./output/animating_pi")]
@@ -20,7 +20,8 @@ fn animating_pi(r: &mut RanimScene) {
     let mut pis = (0..h)
         .cartesian_product(0..w)
         .map(|(_, _)| {
-            SvgItem::new(typst_svg("$pi$"))
+            compile_vitems("$pi$")
+                .unwrap()
                 .with(|x| {
                     x.set_color(manim::WHITE);
                 })
@@ -72,16 +73,4 @@ fn animating_pi(r: &mut RanimScene) {
             .forward(1.0);
     });
     r.insert_time_mark(5.0, TimeMark::Capture("preview.png".to_string()));
-}
-
-#[test]
-fn foo() {
-    let svg = typst_svg("R");
-    println!("{svg}");
-}
-
-#[test]
-fn foo_2() {
-    let svg = compile_typst_code("R");
-    println!("{svg}");
 }

@@ -18,12 +18,12 @@ use typst::foundations::Repr;
 use crate::vitem::{
     VItem,
     geometry::{Parallelogram, anchor::Origin},
-    svg::SvgItem,
-    typst::typst_svg,
+    typst::{CompileOptions, compile_with_options},
 };
+
 pub use typst::text::{FontStretch, FontStyle, FontVariant, FontWeight};
 
-/// Font information for text items
+/// Font information for text items.
 #[derive(Clone, Debug)]
 pub struct TextFont {
     families: Vec<String>,
@@ -32,36 +32,40 @@ pub struct TextFont {
 }
 
 impl TextFont {
-    /// Create a new font
+    /// Creates a font configuration.
     pub fn new(families: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self {
-            families: families.into_iter().map(|v| v.into()).collect(),
-            variant: Default::default(),
-            features: Default::default(),
+            families: families.into_iter().map(Into::into).collect(),
+            variant: FontVariant::default(),
+            features: HashMap::new(),
         }
     }
-    /// Set font weight
+
+    /// Sets the font weight.
     pub fn with_weight(mut self, weight: FontWeight) -> Self {
         self.variant.weight = weight;
         self
     }
-    /// Set font style
+
+    /// Sets the font style.
     pub fn with_style(mut self, style: FontStyle) -> Self {
         self.variant.style = style;
         self
     }
-    /// Set font stretch
+
+    /// Sets the font stretch.
     pub fn with_stretch(mut self, stretch: FontStretch) -> Self {
         self.variant.stretch = stretch;
         self
     }
-    /// Add OTF features
+
+    /// Adds OpenType feature values.
     pub fn with_features(
         mut self,
         features: impl IntoIterator<Item = (impl Into<String>, u32)>,
     ) -> Self {
         self.features
-            .extend(features.into_iter().map(|(k, v)| (k.into(), v)));
+            .extend(features.into_iter().map(|(key, value)| (key.into(), value)));
         self
     }
 }
@@ -72,26 +76,17 @@ impl Default for TextFont {
     }
 }
 
-/// Simple single-line text item
+/// A simple single-line text item shaped and outlined by Typst.
 #[derive(Clone, Debug)]
 pub struct TextItem {
-    /// Origin
     origin: DVec3,
-    /// Basis
     basis: (DVec3, DVec3),
-    /// Text content
     text: String,
-    /// Font info
     font: TextFont,
-    /// Fill color
     fill_rgbas: AlphaColor<Srgb>,
-    /// Stroke color
     stroke_rgbas: AlphaColor<Srgb>,
-    /// Stroke width
     stroke_width: f32,
-    /// Cached items
     items: RefCell<Option<Vec<VItem>>>,
-    /// cached text inline size
     inline_length_em: Cell<Option<f64>>,
 }
 
@@ -102,7 +97,7 @@ impl Locate<TextItem> for Origin {
 }
 
 impl TextItem {
-    /// Create a new text item
+    /// Creates a text item with the given em size.
     pub fn new(text: impl Into<String>, em_size: f64) -> Self {
         Self {
             origin: DVec3::ZERO,
@@ -117,109 +112,61 @@ impl TextItem {
         }
     }
 
-    /// Set font
+    /// Sets the font configuration.
     pub fn with_font(mut self, font: TextFont) -> Self {
         self.font = font;
         self.items.take();
         self
     }
 
-    /// Get font
+    /// Returns the font configuration.
     pub fn font(&self) -> &TextFont {
         &self.font
     }
 
-    /// Get basis
+    /// Returns the text basis vectors.
     pub fn basis(&self) -> (DVec3, DVec3) {
         self.basis
     }
 
-    /// Get text
+    /// Returns the Typst source used as the text body.
     pub fn text(&self) -> &str {
         &self.text
     }
 
-    /// Get inline length in em units
+    /// Returns the inline length in em units.
     pub fn inline_length_em(&self) -> f64 {
-        let _ = self.items(); // ensure items are generated
-        self.inline_length_em.get().unwrap()
+        let _ = self.items();
+        self.inline_length_em.get().unwrap_or_default()
     }
 
-    /// Returns the text outline box starting from baseline origin to the width of last character and em height.
+    /// Returns the baseline-aligned em box for the text.
     pub fn text_box(&self) -> Parallelogram {
         let (u, v) = self.basis;
         Parallelogram::new(self.origin, (u * self.inline_length_em(), v))
     }
 
     fn generate_items(&self) -> Vec<VItem> {
-        let font = &self.font;
-        let text = self.text.as_str();
+        let source = self.typst_source();
+        let output = compile_with_options(
+            &source,
+            CompileOptions {
+                include_page_fill: false,
+                center_content: false,
+            },
+        )
+        .expect("failed to compile TextItem source");
+        let Some(page) = output.document.pages.into_iter().next() else {
+            self.inline_length_em.set(Some(0.0));
+            return Vec::new();
+        };
 
-        // font families
-        let mut families = String::new();
-        for family in font.families.iter() {
-            families.push('"');
-            families.push_str(family);
-            families.push_str("\", ");
+        let em_height = page.size.y;
+        if em_height <= f64::EPSILON {
+            self.inline_length_em.set(Some(0.0));
+            return Vec::new();
         }
-
-        // font weight as an integer between 100 and 900
-        let weight = font.variant.weight.to_number();
-
-        // font style
-        let style = {
-            use FontStyle::*;
-            match font.variant.style {
-                Normal => "normal",
-                Italic => "italic",
-                Oblique => "oblique",
-            }
-        };
-
-        // font stretch
-        let stretch = font.variant.stretch.to_ratio().repr();
-
-        // OTF features
-        let features = if font.features.is_empty() {
-            ":".to_string()
-        } else {
-            let mut features = String::new();
-            for (tag, value) in font.features.iter() {
-                features.push('"');
-                features.push_str(tag);
-                features.push_str("\": ");
-                features.push_str(value.to_string().as_str());
-                features.push_str(", ");
-            }
-            features
-        };
-
-        let svg_src = typst_svg(
-            format!(
-                r#"#set text(
-    top-edge: 1em,
-    font: ({families}),
-    weight: {weight},
-    style: "{style}",
-    stretch: {stretch},
-    features: ({features}),
-)
-#set page(
-    width: auto,
-    height: auto,
-    margin: 0pt,
-    background: rect(width: 100%, height: 100%),
-)
-
-{text}
-"#
-            )
-            .as_str(),
-        );
-
-        let mut items = Vec::<VItem>::from(SvgItem::new(svg_src));
-        let baseline_em_box = items[0].aabb();
-        let texts = items.split_off(1);
+        self.inline_length_em.set(Some(page.size.x / em_height));
 
         let &Self {
             basis: (u, v),
@@ -229,14 +176,14 @@ impl TextItem {
             stroke_width,
             ..
         } = self;
-        let [min, max] = baseline_em_box;
-        let h = max.y - min.y;
-        self.inline_length_em.set(Some((max.x - min.x) / h));
-        let mat = DAffine3::from_mat3_translation(DMat3::from_cols(u, v, DVec3::ZERO), origin);
-        texts.with(|x| {
-            x.shift(-min)
-                .scale(DVec3::splat(1. / h)) // Make height = 1.0
-                .apply_point_func(|p| *p = mat.transform_point3(*p))
+        let affine = DAffine3::from_mat3_translation(DMat3::from_cols(u, v, DVec3::ZERO), origin);
+        page.vitems.with(|items| {
+            items
+                .apply_point_func(|point| {
+                    point.x /= em_height;
+                    point.y = (point.y + em_height) / em_height;
+                    *point = affine.transform_point3(*point);
+                })
                 .set_fill_color(fill_rgbas)
                 .set_stroke_color(stroke_rgbas)
                 .set_stroke_width(stroke_width)
@@ -244,17 +191,58 @@ impl TextItem {
         })
     }
 
+    fn typst_source(&self) -> String {
+        let mut families = String::new();
+        for family in &self.font.families {
+            families.push('"');
+            families.push_str(family);
+            families.push_str("\", ");
+        }
+        let weight = self.font.variant.weight.to_number();
+        let style = match self.font.variant.style {
+            FontStyle::Normal => "normal",
+            FontStyle::Italic => "italic",
+            FontStyle::Oblique => "oblique",
+        };
+        let stretch = self.font.variant.stretch.to_ratio().repr();
+        let features = if self.font.features.is_empty() {
+            ":".to_owned()
+        } else {
+            self.font
+                .features
+                .iter()
+                .map(|(tag, value)| format!("\"{tag}\": {value}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let text = &self.text;
+
+        format!(
+            r#"#set text(
+    top-edge: 1em,
+    font: ({families}),
+    weight: {weight},
+    style: "{style}",
+    stretch: {stretch},
+    features: ({features}),
+)
+#set page(width: auto, height: auto, margin: 0pt)
+
+{text}
+"#
+        )
+    }
+
     fn items(&self) -> Ref<'_, Vec<VItem>> {
         if self.items.borrow().is_none() {
-            let items = self.generate_items();
-            self.items.replace(Some(items));
+            self.items.replace(Some(self.generate_items()));
         }
-        Ref::map(self.items.borrow(), |v| v.as_ref().unwrap())
+        Ref::map(self.items.borrow(), |items| items.as_ref().unwrap())
     }
 
     fn transform_items(&self, transformation: impl FnOnce(&mut Vec<VItem>)) {
-        if let Some(v) = self.items.borrow_mut().as_mut() {
-            transformation(v);
+        if let Some(items) = self.items.borrow_mut().as_mut() {
+            transformation(items);
         }
     }
 }
@@ -268,7 +256,7 @@ impl Aabb for TextItem {
 impl ShiftTransform for TextItem {
     fn shift(&mut self, offset: DVec3) -> &mut Self {
         self.origin += offset;
-        self.transform_items(|item| item.shift(offset).discard());
+        self.transform_items(|items| items.shift(offset).discard());
         self
     }
 }
@@ -278,7 +266,7 @@ impl RotateTransform for TextItem {
         self.origin.rotate_on_axis(axis, angle);
         self.basis.0.rotate_on_axis(axis, angle);
         self.basis.1.rotate_on_axis(axis, angle);
-        self.transform_items(|item| item.rotate_on_axis(axis, angle).discard());
+        self.transform_items(|items| items.rotate_on_axis(axis, angle).discard());
         self
     }
 }
@@ -288,7 +276,7 @@ impl ScaleTransform for TextItem {
         self.origin.scale(scale).discard();
         self.basis.0 *= scale;
         self.basis.1 *= scale;
-        self.transform_items(|item| item.scale(scale).discard());
+        self.transform_items(|items| items.scale(scale).discard());
         self
     }
 }
@@ -300,13 +288,13 @@ impl FillColor for TextItem {
 
     fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.fill_rgbas = color;
-        self.transform_items(|item| item.set_fill_color(color).discard());
+        self.transform_items(|items| items.set_fill_color(color).discard());
         self
     }
 
     fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
         self.fill_rgbas = self.fill_rgbas.with_alpha(opacity);
-        self.transform_items(|item| item.set_fill_opacity(opacity).discard());
+        self.transform_items(|items| items.set_fill_opacity(opacity).discard());
         self
     }
 }
@@ -318,13 +306,13 @@ impl StrokeColor for TextItem {
 
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.stroke_rgbas = color;
-        self.transform_items(|item| item.set_stroke_color(color).discard());
+        self.transform_items(|items| items.set_stroke_color(color).discard());
         self
     }
 
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
         self.stroke_rgbas = self.stroke_rgbas.with_alpha(opacity);
-        self.transform_items(|item| item.set_stroke_opacity(opacity).discard());
+        self.transform_items(|items| items.set_stroke_opacity(opacity).discard());
         self
     }
 }
@@ -345,24 +333,13 @@ impl Extract for TextItem {
 
 #[cfg(test)]
 mod tests {
-    use assert_float_eq::assert_float_absolute_eq;
-
     use super::*;
 
     #[test]
-    fn test_text_item() {
+    fn text_item_uses_page_metrics() {
         let item = TextItem::new("Hello, world!", 0.25);
-        assert_float_absolute_eq!(item.basis.0.length(), 0.25, 1e-10);
-        assert_float_absolute_eq!(item.origin.distance(DVec3::ZERO), 0.0, 1e-10);
-    }
-
-    #[test]
-    fn test_font() {
-        let font = TextFont::new(["Arial", "Helvetica"])
-            .with_weight(FontWeight::BOLD)
-            .with_style(FontStyle::Italic)
-            .with_stretch(FontStretch::CONDENSED)
-            .with_features([("liga", 1), ("dlig", 1)]);
-        dbg!(&font);
+        assert!((item.basis.0.length() - 0.25).abs() < 1e-10);
+        assert!(item.inline_length_em() > 1.0);
+        assert!(!Vec::<VItem>::from(item).is_empty());
     }
 }

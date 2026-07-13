@@ -1,12 +1,12 @@
 use std::f64::consts::TAU;
 
-use ranim::{color::palettes::manim, glam::DVec3, prelude::*};
+use ranim::{color::palettes::manim, glam::DVec3, items::vitem::TextItem, prelude::*};
 use ranim_anims::{
     creation::{CreationAnim, WritingAnim},
     lagged::LaggedAnim,
     rotating::RotatingAnim,
 };
-use ranim_items::vitem::{VItem, text::TextItem};
+use ranim_items::vitem::VItem;
 
 #[scene]
 #[output(dir = "./output/text_item")]

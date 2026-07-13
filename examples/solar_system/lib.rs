@@ -4,12 +4,13 @@ use ranim::{
     color::palettes::manim,
     glam::{DMat4, DVec3},
     items::mesh::{Sphere, Surface},
+    items::vitem::TextItem,
     prelude::*,
     utils::rate_functions::linear,
 };
 use ranim_anims::fading::FadingAnim;
 use ranim_core::animation::Eval;
-use ranim_items::vitem::{VItem, text::TextItem};
+use ranim_items::vitem::VItem;
 
 // Custom animation: orbital motion around the origin in the XY plane
 struct OrbitMotion {
