@@ -75,11 +75,21 @@ pub trait Interpolatable {
     fn lerp(&self, target: &Self, t: f64) -> Self;
 }
 
-impl Interpolatable for usize {
-    fn lerp(&self, target: &Self, t: f64) -> Self {
-        (*self as f32).lerp(&(*target as f32), t) as usize
-    }
+macro_rules! impl_interpolatable_for_int {
+    ($($t:ty),*) => {
+        $(
+            impl Interpolatable for $t {
+                fn lerp(&self, target: &Self, t: f64) -> Self {
+                    (*self as f64).lerp(&(*target as f64), t) as $t
+                }
+            }
+        )*
+    };
 }
+
+impl_interpolatable_for_int!(
+    u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
+);
 
 impl Interpolatable for f32 {
     fn lerp(&self, target: &Self, t: f64) -> Self {

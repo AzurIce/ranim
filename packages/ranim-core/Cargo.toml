@@ -25,8 +25,8 @@ derive_more = { workspace = true, features = [
   "from",
   "into_iterator",
 ] }
-color = "0.3.2"
-variadics_please = "1.1.0"
+color = "0.3.3"
+variadics_please = "2.0.0"
 
 [dev-dependencies]
 assert_float_eq = "1.2.0"

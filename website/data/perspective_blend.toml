@@ -13,7 +13,7 @@ use ranim::{
 use ranim_core::animation::StaticAnim;
 
 #[scene]
-#[output(dir = "perspective_blend")]
+#[output(dir = "./output/perspective_blend")]
 fn perspective_blend(r: &mut RanimScene) {
     let mut cam = CameraFrame::default();
     let r_cam = r.insert(cam.clone());
@@ -118,7 +118,7 @@ fn perspective_blend(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "3d5d46ed8702b720750881c8c31e4ae1cb059dd7"
+hash = "61347d1e9bff279e22f14c04a87047b74ff25d88"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

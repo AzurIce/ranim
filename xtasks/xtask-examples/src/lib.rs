@@ -32,6 +32,7 @@ pub struct Example {
     pub name: String,
     pub code: String,
     pub hash: String,
+    pub required_features: Vec<String>,
 
     pub meta: ExampleMeta,
 }
@@ -110,7 +111,12 @@ impl Example {
         let mut preview_imgs = vec![];
         let mut output_files = vec![];
 
-        let cli = Cli::parse_from(["ranim", "render", "--example", &self.name]);
+        let mut args = vec!["ranim", "render", "--example", &self.name];
+        let features = self.required_features.join(",");
+        if !features.is_empty() {
+            args.extend(["--features", &features]);
+        }
+        let cli = Cli::parse_from(args);
         let res = cli.run();
         // let status = Command::new("cargo")
         //     .current_dir(root_dir)
@@ -189,6 +195,10 @@ impl Example {
         self.clean_wasm(root_dir);
 
         if self.meta.wasm {
+            let features = std::iter::once("preview")
+                .chain(self.required_features.iter().map(String::as_str))
+                .collect::<Vec<_>>()
+                .join(",");
             let status = Command::new("cargo")
                 .current_dir(root_dir)
                 .args([
@@ -196,7 +206,7 @@ impl Example {
                     "--example",
                     &self.name,
                     "--features",
-                    "preview",
+                    &features,
                     "--target",
                     "wasm32-unknown-unknown",
                     "--release",
@@ -303,6 +313,14 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Vec<Example> {
         .map(|v| v.as_table().unwrap())
         .map(|item| {
             let name = item["name"].as_str().unwrap().to_string();
+            let required_features = item
+                .get("required-features")
+                .and_then(toml::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(toml::Value::as_str)
+                .map(str::to_owned)
+                .collect();
 
             let path = root_dir.join(item["path"].as_str().unwrap());
             let code = std::fs::read_to_string(&path).unwrap();
@@ -317,6 +335,7 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Vec<Example> {
                 path,
                 code: format!("```rust\n{code}```"),
                 hash,
+                required_features,
             }
         })
         .collect()
@@ -331,6 +350,15 @@ mod test {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir);
+        assert_eq!(examples.len(), 25);
+        assert_eq!(
+            examples
+                .iter()
+                .find(|example| example.name == "basic")
+                .unwrap()
+                .required_features,
+            ["typst"]
+        );
         println!("found {} examples:", examples.len());
         examples.iter().for_each(|example| {
             println!("{}", example.name);

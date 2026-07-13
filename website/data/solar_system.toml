@@ -122,7 +122,7 @@ const PLANETS: &[PlanetData] = &[
 ];
 
 #[scene]
-#[output(dir = "solar_system")]
+#[output(dir = "./output/solar_system")]
 fn solar_system(r: &mut RanimScene) {
     // Setup camera looking down from above (top-down view)
     let phi = 50.0f64.to_radians(); // Small angle from +Z axis (almost straight down)
@@ -301,7 +301,7 @@ fn solar_system(r: &mut RanimScene) {
     r.insert_time_mark(6.0, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "1773578495004b95e68959ccba1aa67bd91bcb8a"
+hash = "88eeba25973bf432727dcab4cb4f4d36885be8cb"
 preview_imgs = ["/examples/solar_system/preview.png"]
 output_files = ["/examples/solar_system/solar_system_1920x1080_60.mp4"]
 wasm = true

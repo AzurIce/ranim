@@ -286,7 +286,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
             .unwrap();
         pollster::block_on(rx.recv()).unwrap().unwrap();
 
-        buffer_slice.get_mapped_range().to_vec()
+        buffer_slice.get_mapped_range().unwrap().to_vec()
     }
 }
 
@@ -432,7 +432,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             .unwrap();
         pollster::block_on(rx.recv()).unwrap().unwrap();
 
-        let x = buffer_slice.get_mapped_range().to_vec();
+        let x = buffer_slice.get_mapped_range().unwrap().to_vec();
         Some(x)
     }
 }
@@ -602,7 +602,7 @@ impl ReadbackWgpuTexture {
     fn copy_staging_to_bytes(&mut self) {
         let size = self.size();
         let buffer_slice = self.staging_buffer.slice(..);
-        let view = buffer_slice.get_mapped_range();
+        let view = buffer_slice.get_mapped_range().unwrap();
         let block_size = self.inner.format().block_copy_size(None).unwrap();
         let bytes_in_row = (size.width * block_size) as usize;
 

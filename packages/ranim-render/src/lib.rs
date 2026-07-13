@@ -154,10 +154,12 @@ impl Renderer {
         render_graph
     }
 
+    /// Create a new renderer with default [`Self::build_render_graph`]
     pub fn new(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> Self {
         Self::new_with_graph(ctx, width, height, oit_layers, Self::build_render_graph())
     }
 
+    /// Create a new renderer with the given render graph
     pub fn new_with_graph(
         ctx: &WgpuContext,
         width: u32,

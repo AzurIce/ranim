@@ -32,7 +32,7 @@ impl Eval<Surface> for RotateAroundZ {
 }
 
 #[scene]
-#[output(dir = "tetrahedron_spheres")]
+#[output(dir = "./output/tetrahedron_spheres")]
 fn tetrahedron_spheres(r: &mut RanimScene) {
     let phi = 60.0 * PI / 180.0;
     let theta = PI / 2.0;
@@ -118,7 +118,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "2ab27fe9e556c042293db940c844f25fc8e20f06"
+hash = "1182dbe315d4dd61a00075feb82fff384e7ad146"
 preview_imgs = ["/examples/tetrahedron_spheres/preview.png"]
 output_files = ["/examples/tetrahedron_spheres/tetrahedron_spheres_1920x1080_60.mp4"]
 wasm = true

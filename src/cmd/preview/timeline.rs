@@ -296,7 +296,10 @@ pub fn paint_time_grid(
 
         shapes.push(egui::Shape::line_segment(
             [pos2(line_x, rect.min.y), pos2(line_x, rect.max.y)],
-            Stroke::new(1.0, Rgba::from_white_alpha(line_alpha * alpha_multiplier)),
+            Stroke::new(
+                1.0f32,
+                Rgba::from_white_alpha(line_alpha * alpha_multiplier),
+            ),
         ));
 
         let text_alpha = if big_line {
@@ -342,7 +345,7 @@ pub fn paint_time_grid(
             pos2(current_line_x, rect.min.y),
             pos2(current_line_x, rect.max.y),
         ],
-        Stroke::new(1.0, Rgba::from_white_alpha(alpha_multiplier)),
+        Stroke::new(1.0f32, Rgba::from_white_alpha(alpha_multiplier)),
     ));
     shapes
 }
@@ -389,7 +392,7 @@ pub fn paint_timeline(
             pos2(current_line_x, rect.min.y),
             pos2(current_line_x, rect.max.y),
         ],
-        Stroke::new(1.0, Rgba::from_white_alpha(alpha_multiplier)),
+        Stroke::new(1.0f32, Rgba::from_white_alpha(alpha_multiplier)),
     ));
     loop {
         let line_x = info.point_from_ms(state, start_ms + grid_ms);
@@ -410,7 +413,10 @@ pub fn paint_timeline(
 
             shapes.push(egui::Shape::line_segment(
                 [pos2(line_x, rect.min.y), pos2(line_x, rect.max.y)],
-                Stroke::new(1.0, Rgba::from_white_alpha(line_alpha * alpha_multiplier)),
+                Stroke::new(
+                    1.0f32,
+                    Rgba::from_white_alpha(line_alpha * alpha_multiplier),
+                ),
             ));
 
             let text_alpha = if big_line {

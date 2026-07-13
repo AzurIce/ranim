@@ -12,17 +12,17 @@ profiling = ["dep:wgpu-profiler", "dep:puffin", "dep:profiling"]
 [dependencies]
 ranim-core.workspace = true
 wgpu-profiler = { workspace = true, optional = true }
-puffin = { version = "0.19.1", optional = true }
-profiling = { version = "1.0.17", optional = true, features = [
+puffin = { version = "0.20.0", optional = true }
+profiling = { version = "1.0.18", optional = true, features = [
   "profile-with-puffin",
 ] }
 image.workspace = true
 tracing.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
 glam = { workspace = true, features = ["bytemuck"] }
-pollster = "0.4.0"
+pollster = "1.0.1"
 async-channel = "2.5.0"
-variadics_please = "1.1.0"
+variadics_please = "2.0.0"
 slotmap = "1.1.1"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

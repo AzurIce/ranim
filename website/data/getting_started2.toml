@@ -16,7 +16,7 @@ use ranim::{
 };
 
 #[scene]
-#[output(dir = "getting_started2")]
+#[output(dir = "./output/getting_started2")]
 fn getting_started2(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
@@ -56,7 +56,7 @@ fn getting_started2(r: &mut RanimScene) {
     r.timeline_mut(r_rect).play(VItem::from(rect).uncreate());
 }
 ```"""
-hash = "0a2eb68891eae92cf32f1dc0b2cd21ee7128de0d"
+hash = "b1820aeae57b173eacd522aa95b5fe65bd55c8dd"
 preview_imgs = []
 output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
 wasm = true

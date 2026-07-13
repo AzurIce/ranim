@@ -9,7 +9,7 @@ use ranim::{
 };
 
 #[scene]
-#[output(dir = "palettes")]
+#[output(dir = "./output/palettes")]
 fn palettes(r: &mut RanimScene) {
     let _r_cam = r.insert(CameraFrame::default());
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
@@ -56,7 +56,7 @@ fn palettes(r: &mut RanimScene) {
     r.timelines_mut().forward(0.01);
 }
 ```"""
-hash = "6d96b2f257799d61230c0e2a593487c334eb80c3"
+hash = "bca727895b41a2f8f33a5a1ba7b565accf33996f"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/palettes_1920x1080_60.mp4"]
 wasm = false

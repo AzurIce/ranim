@@ -126,7 +126,9 @@ pub struct RanimPreviewApp {
     #[allow(unused)]
     title: String,
     clear_color: wgpu::Color,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     scene_constructor: Arc<dyn SceneConstructor>,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     scene_config: SceneConfig,
     resolution: Resolution,
     timeline: SealedRanimScene,
@@ -561,7 +563,7 @@ impl eframe::App for RanimPreviewApp {
 
         self.render_animation();
 
-        egui::Panel::top("top_panel").show_inside(ui, |ui| {
+        egui::Panel::top("top_panel").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.heading(&self.title);
 
@@ -702,7 +704,7 @@ impl eframe::App for RanimPreviewApp {
         egui::Panel::bottom("bottom_panel")
             .resizable(true)
             .max_size(600.0)
-            .show_inside(ui, |ui| {
+            .show(ui, |ui| {
                 ui.label("Timeline");
 
                 ui.horizontal(|ui| {
@@ -817,7 +819,7 @@ impl eframe::App for RanimPreviewApp {
                 self.timeline_state.ui_main_timeline(ui);
             });
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             let texture_id = match self.view_mode {
                 ViewMode::Output => self.texture_id,
                 ViewMode::Depth => self.depth_texture_id,
@@ -1025,6 +1027,7 @@ impl eframe::App for RanimPreviewApp {
 }
 
 pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id: String) {
+    #[cfg(not(target_arch = "wasm32"))]
     let title = app.title.clone();
     let build_app = |cc: &eframe::CreationContext| {
         let mut fonts = egui::FontDefinitions::default();

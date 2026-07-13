@@ -103,18 +103,18 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
 }
 
 #[scene]
-#[output(dir = "selective_sort")]
+#[output(dir = "./output/selective_sort")]
 fn selective_sort_10(r: &mut RanimScene) {
     selective_sort(r, 10);
 }
 
 #[scene(name = "selective_sort")]
-#[output(dir = "selective_sort")]
+#[output(dir = "./output/selective_sort")]
 fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
 ```"""
-hash = "f4ed3be19b1e59b479964a2c78ac46259b4c707c"
+hash = "a38317e0836465fdc1f82ee591c1d8f959004f34"
 preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/selective_sort_1920x1080_60.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
 wasm = true
