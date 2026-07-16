@@ -61,17 +61,21 @@ impl MeshItemsBuffer {
         }
     }
 
-    pub fn update(&mut self, ctx: &WgpuContext, mesh_items: &[MeshItem]) {
-        if mesh_items.is_empty() {
+    pub fn update<'a>(
+        &mut self,
+        ctx: &WgpuContext,
+        mesh_items: impl Iterator<Item = &'a MeshItem> + Clone,
+    ) {
+        let item_count = mesh_items.clone().count();
+        if item_count == 0 {
             self.item_count = 0;
             self.total_vertices = 0;
             self.total_indices = 0;
             return;
         }
 
-        let item_count = mesh_items.len();
-        let total_vertices: usize = mesh_items.iter().map(|m| m.points.len()).sum();
-        let total_indices: usize = mesh_items.iter().map(|m| m.triangle_indices.len()).sum();
+        let total_vertices: usize = mesh_items.clone().map(|m| m.points.len()).sum();
+        let total_indices: usize = mesh_items.clone().map(|m| m.triangle_indices.len()).sum();
 
         let mut transforms = Vec::with_capacity(item_count);
         let mut all_vertices = Vec::with_capacity(total_vertices);
@@ -82,7 +86,7 @@ impl MeshItemsBuffer {
 
         let mut vertex_offset: u32 = 0;
 
-        for (mesh_idx, mesh) in mesh_items.iter().enumerate() {
+        for (mesh_idx, mesh) in mesh_items.enumerate() {
             let vc = mesh.points.len() as u32;
 
             transforms.push(MeshTransform {

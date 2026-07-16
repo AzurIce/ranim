@@ -14,7 +14,7 @@ use crate::{
 ///
 /// The [`CameraFrame`] has a [`CameraFrame::perspective_blend`] property (default is `0.0`),
 /// which is used to blend between orthographic and perspective projection.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(bevy_ecs::component::Component, Clone, Debug, PartialEq)]
 pub struct CameraFrame {
     /// The position
     pub pos: DVec3,

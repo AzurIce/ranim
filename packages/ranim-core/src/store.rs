@@ -1,4 +1,9 @@
-use std::cell::RefCell;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+};
+
+use bevy_ecs::{component::Component, entity::Entity, world::World};
 
 use crate::{
     animation::{AnimationCell, CoreItemAnimation},
@@ -87,23 +92,45 @@ impl AnimationStore {
     }
 }
 
-/// A store of [`CoreItem`]s.
-#[derive(Default, Clone)]
+/// The source id attached to an evaluated core item.
+pub type CoreItemSourceId = (usize, usize);
+
+/// The stable identity of one extracted core item occurrence.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CoreItemKey {
+    /// The timeline and animation that emitted the item.
+    pub source: CoreItemSourceId,
+    /// The occurrence index within all items emitted by the source.
+    pub part: usize,
+}
+
+/// The order of a core item in the current evaluated frame.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CoreItemOrder(pub usize);
+
+/// An ECS-backed store of [`CoreItem`]s.
+#[derive(Default)]
 pub struct CoreItemStore {
-    /// Id of [`CameraFrame`]s
-    pub camera_frame_ids: Vec<(usize, usize)>,
-    /// [`CameraFrame`]s
-    pub camera_frames: Vec<CameraFrame>,
+    world: World,
+    entities: HashMap<CoreItemKey, Entity>,
+    ordered_entities: Vec<Entity>,
+}
 
-    /// Id of [`VItem`]s
-    pub vitem_ids: Vec<(usize, usize)>,
-    /// [`VItem`]s
-    pub vitems: Vec<VItem>,
-
-    /// Id of [`MeshItem`]s
-    pub mesh_item_ids: Vec<(usize, usize)>,
-    /// [`MeshItem`]s
-    pub mesh_items: Vec<MeshItem>,
+impl Clone for CoreItemStore {
+    fn clone(&self) -> Self {
+        let items = self
+            .ordered_entities
+            .iter()
+            .map(|&entity| {
+                let key = *self.world.get::<CoreItemKey>(entity).unwrap();
+                let item = self.core_item(entity).unwrap();
+                (key.source, item)
+            })
+            .collect::<Vec<_>>();
+        let mut cloned = Self::new();
+        cloned.update(items.into_iter());
+        cloned
+    }
 }
 
 impl CoreItemStore {
@@ -112,38 +139,218 @@ impl CoreItemStore {
         Self::default()
     }
 
-    /// Update the inner store with the given iterator
-    pub fn update(&mut self, items: impl Iterator<Item = ((usize, usize), CoreItem)>) {
-        self.camera_frame_ids.clear();
-        self.camera_frames.clear();
+    /// Get the underlying ECS world.
+    pub fn world(&self) -> &World {
+        &self.world
+    }
 
-        self.vitem_ids.clear();
-        self.vitems.clear();
+    /// Get the underlying ECS world mutably.
+    pub fn world_mut(&mut self) -> &mut World {
+        &mut self.world
+    }
 
-        self.mesh_item_ids.clear();
-        self.mesh_items.clear();
-        for (id, item) in items {
-            match item {
-                CoreItem::CameraFrame(x) => {
-                    self.camera_frame_ids.push(id);
-                    self.camera_frames.push(x);
-                }
-                CoreItem::VItem(x) => {
-                    self.vitem_ids.push(id);
-                    self.vitems.push(x);
-                }
-                CoreItem::MeshItem(x) => {
-                    self.mesh_item_ids.push(id);
-                    self.mesh_items.push(x);
-                }
+    /// Get the number of core item entities.
+    pub fn len(&self) -> usize {
+        self.ordered_entities.len()
+    }
+
+    /// Whether the store contains no core item entities.
+    pub fn is_empty(&self) -> bool {
+        self.ordered_entities.is_empty()
+    }
+
+    /// Iterate camera frames in evaluated frame order.
+    pub fn camera_frames(&self) -> impl Iterator<Item = &CameraFrame> + Clone {
+        self.ordered_entities
+            .iter()
+            .filter_map(|&entity| self.world.get::<CameraFrame>(entity))
+    }
+
+    /// Iterate vector items in evaluated frame order.
+    pub fn vitems(&self) -> impl Iterator<Item = &VItem> + Clone {
+        self.ordered_entities
+            .iter()
+            .filter_map(|&entity| self.world.get::<VItem>(entity))
+    }
+
+    /// Iterate mesh items in evaluated frame order.
+    pub fn mesh_items(&self) -> impl Iterator<Item = &MeshItem> + Clone {
+        self.ordered_entities
+            .iter()
+            .filter_map(|&entity| self.world.get::<MeshItem>(entity))
+    }
+
+    /// Update the inner world with a fully evaluated frame.
+    pub fn update(&mut self, items: impl Iterator<Item = (CoreItemSourceId, CoreItem)>) {
+        let mut occurrences = HashMap::<CoreItemSourceId, usize>::new();
+        let mut seen = HashSet::new();
+        let mut ordered_entities = Vec::new();
+
+        for (order, (source, item)) in items.enumerate() {
+            let part = occurrences.entry(source).or_default();
+            let key = CoreItemKey {
+                source,
+                part: *part,
+            };
+            *part += 1;
+
+            let entity = if let Some(&entity) = self.entities.get(&key) {
+                let mut entity_mut = self.world.entity_mut(entity);
+                entity_mut.insert(CoreItemOrder(order));
+                match item {
+                    CoreItem::CameraFrame(item) => {
+                        entity_mut.remove::<VItem>();
+                        entity_mut.remove::<MeshItem>();
+                        entity_mut.insert(item)
+                    }
+                    CoreItem::VItem(item) => {
+                        entity_mut.remove::<CameraFrame>();
+                        entity_mut.remove::<MeshItem>();
+                        entity_mut.insert(item)
+                    }
+                    CoreItem::MeshItem(item) => {
+                        entity_mut.remove::<CameraFrame>();
+                        entity_mut.remove::<VItem>();
+                        entity_mut.insert(item)
+                    }
+                };
+                entity
+            } else {
+                let entity = match item {
+                    CoreItem::CameraFrame(item) => {
+                        self.world.spawn((key, CoreItemOrder(order), item)).id()
+                    }
+                    CoreItem::VItem(item) => {
+                        self.world.spawn((key, CoreItemOrder(order), item)).id()
+                    }
+                    CoreItem::MeshItem(item) => {
+                        self.world.spawn((key, CoreItemOrder(order), item)).id()
+                    }
+                };
+                self.entities.insert(key, entity);
+                entity
+            };
+
+            seen.insert(key);
+            ordered_entities.push(entity);
+        }
+
+        let stale = self
+            .entities
+            .keys()
+            .copied()
+            .filter(|key| !seen.contains(key))
+            .collect::<Vec<_>>();
+        for key in stale {
+            if let Some(entity) = self.entities.remove(&key) {
+                self.world.despawn(entity);
             }
         }
+
+        self.ordered_entities = ordered_entities;
+    }
+
+    fn core_item(&self, entity: Entity) -> Option<CoreItem> {
+        if let Some(item) = self.world.get::<CameraFrame>(entity) {
+            return Some(CoreItem::CameraFrame(item.clone()));
+        }
+        if let Some(item) = self.world.get::<VItem>(entity) {
+            return Some(CoreItem::VItem(item.clone()));
+        }
+        self.world
+            .get::<MeshItem>(entity)
+            .cloned()
+            .map(CoreItem::MeshItem)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn core_item_store_reconciles_entities_and_preserves_order() {
+        let source = (3, 7);
+        let mut first_vitem = VItem::default();
+        first_vitem.points[0].x = 1.0;
+        let mut second_vitem = VItem::default();
+        second_vitem.points[0].x = 2.0;
+
+        let mut store = CoreItemStore::new();
+        store.update(
+            vec![
+                (source, CoreItem::VItem(first_vitem.clone())),
+                (source, CoreItem::VItem(second_vitem.clone())),
+                ((4, 0), CoreItem::CameraFrame(CameraFrame::default())),
+            ]
+            .into_iter(),
+        );
+
+        let first_key = CoreItemKey { source, part: 0 };
+        let second_key = CoreItemKey { source, part: 1 };
+        let first_entity = store.entities[&first_key];
+        let second_entity = store.entities[&second_key];
+
+        assert_eq!(store.len(), 3);
+        assert_eq!(
+            store.vitems().cloned().collect::<Vec<_>>(),
+            vec![first_vitem.clone(), second_vitem]
+        );
+        assert_eq!(store.camera_frames().count(), 1);
+
+        first_vitem.points[0].x = 9.0;
+        store.update(
+            vec![
+                ((4, 0), CoreItem::CameraFrame(CameraFrame::default())),
+                (source, CoreItem::VItem(first_vitem.clone())),
+            ]
+            .into_iter(),
+        );
+
+        assert_eq!(store.entities[&first_key], first_entity);
+        assert!(!store.entities.contains_key(&second_key));
+        assert_eq!(store.vitems().next(), Some(&first_vitem));
+        assert_eq!(store.camera_frames().count(), 1);
+        assert_eq!(store.world.get::<CoreItemOrder>(first_entity).unwrap().0, 1);
+        assert_ne!(first_entity, second_entity);
+    }
+
+    #[test]
+    fn core_item_store_reuses_entity_when_component_kind_changes() {
+        let source = (1, 2);
+        let key = CoreItemKey { source, part: 0 };
+        let mut store = CoreItemStore::new();
+        store.update(std::iter::once((source, CoreItem::VItem(VItem::default()))));
+        let entity = store.entities[&key];
+
+        store.update(std::iter::once((
+            source,
+            CoreItem::MeshItem(MeshItem::default()),
+        )));
+
+        assert_eq!(store.entities[&key], entity);
+        assert!(store.world.get::<VItem>(entity).is_none());
+        assert!(store.world.get::<MeshItem>(entity).is_some());
+    }
+
+    #[test]
+    fn core_item_store_clone_copies_ecs_contents() {
+        let mut store = CoreItemStore::new();
+        store.update(
+            vec![
+                ((0, 0), CoreItem::CameraFrame(CameraFrame::default())),
+                ((1, 0), CoreItem::VItem(VItem::default())),
+                ((2, 0), CoreItem::MeshItem(MeshItem::default())),
+            ]
+            .into_iter(),
+        );
+
+        let cloned = store.clone();
+        assert_eq!(cloned.len(), store.len());
+        assert_eq!(cloned.camera_frames().count(), 1);
+        assert_eq!(cloned.vitems().count(), 1);
+        assert_eq!(cloned.mesh_items().count(), 1);
+    }
 
     #[test]
     fn test_animation_store() {
