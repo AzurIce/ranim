@@ -6,6 +6,7 @@ use ranim_core::{
     color,
     core_item::CoreItem,
     glam::{DVec2, DVec3, dvec2, dvec3},
+    store::ExtractToRenderWorld,
     traits::{Discard, RotateTransform, Scale, ShiftTransform, ShiftTransformExt},
 };
 
@@ -17,7 +18,7 @@ use ranim_core::traits::{Alignable, FillColor, Opacity, StrokeColor, StrokeWidth
 
 // MARK: ### Square ###
 /// A Square
-#[derive(Clone, Debug, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Square {
     /// Axes
     pub axes: (DVec3, DVec3),
@@ -160,6 +161,14 @@ impl Extract for Square {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         VItem::from(self.clone()).extract_into(buf);
+    }
+}
+
+impl ExtractToRenderWorld for Square {
+    type RenderItem = ranim_core::core_item::vitem::VItem;
+
+    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
+        output.push(VItem::from(self.clone()).into());
     }
 }
 
@@ -689,5 +698,21 @@ impl Extract for RegularPolygon {
 
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         Polygon::from(self.clone()).extract_into(buf);
+    }
+}
+
+#[cfg(test)]
+mod render_world_tests {
+    use ranim_core::store::CoreItemStore;
+
+    use super::*;
+
+    #[test]
+    fn square_can_live_in_main_world_and_extract_to_render_world() {
+        let mut store = CoreItemStore::new();
+        let entity = store.insert_item(Square::new(2.0));
+
+        assert!(store.world().get::<Square>(entity).is_some());
+        assert_eq!(store.render_world().vitems().count(), 1);
     }
 }
