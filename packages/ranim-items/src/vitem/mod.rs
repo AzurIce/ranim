@@ -30,7 +30,7 @@ use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
 use ranim_core::anchor::{DBounds3, SemanticBounds};
 use ranim_core::core_item::CoreItem;
-use ranim_core::{Extract, color, glam};
+use ranim_core::{Extract, color, glam, store::ExtractToRenderWorld};
 
 use ranim_core::{
     components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
@@ -58,7 +58,7 @@ use ranim_core::{
 ///     dvec3(0.5, 1.0, 0.0),
 /// ]);
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, PartialEq)]
 pub struct VItem {
     /// The normal vector of the projection target plane.
     /// If `None`, the normal will be computed from the first three points at render time.
@@ -223,6 +223,14 @@ impl Extract for VItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         ranim_core::core_item::vitem::VItem::from(self.clone()).extract_into(buf);
+    }
+}
+
+impl ExtractToRenderWorld for VItem {
+    type RenderItem = ranim_core::core_item::vitem::VItem;
+
+    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
+        output.push(self.clone().into());
     }
 }
 

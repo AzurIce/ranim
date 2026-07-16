@@ -24,7 +24,7 @@ use crate::{
     resource::{PipelinesPool, RenderPool, RenderTextures},
     utils::{WgpuBuffer, WgpuVecBuffer},
 };
-use ranim_core::store::CoreItemStore;
+use ranim_core::store::{CoreItemStore, RenderWorld};
 use utils::WgpuContext;
 
 #[cfg(feature = "profiling")]
@@ -203,25 +203,26 @@ impl Renderer {
         store: &CoreItemStore,
         pool: &mut RenderPool,
     ) {
-        // Viewport — always needed
-        let camera_frame = store
-            .camera_frames()
-            .next()
-            .expect("rendering requires at least one CameraFrame");
-        let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
-        self.packets.push(pool.alloc_packet(ctx, &viewport));
+        self.render_world_with_pool(
+            ctx,
+            render_textures,
+            clear_color,
+            store.render_world(),
+            pool,
+        );
+    }
 
-        // Merged buffer (merged nodes read this; old nodes ignore it)
-        let merged = self
-            .merged_buffer
-            .get_or_insert_with(|| VItemsBuffer::new(ctx));
-        merged.update(ctx, store.vitems());
-
-        // Merged mesh buffer
-        let merged_mesh = self
-            .merged_mesh_buffer
-            .get_or_insert_with(|| MeshItemsBuffer::new(ctx));
-        merged_mesh.update(ctx, store.mesh_items());
+    /// Prepare, queue, and render an extracted render world.
+    pub fn render_world_with_pool(
+        &mut self,
+        ctx: &WgpuContext,
+        render_textures: &mut RenderTextures,
+        clear_color: wgpu::Color,
+        render_world: &RenderWorld,
+        pool: &mut RenderPool,
+    ) {
+        self.prepare_render_world(ctx, render_world);
+        self.queue_render_world(ctx, render_world, pool);
 
         // Encode & submit
         {
@@ -288,6 +289,32 @@ impl Renderer {
         }
 
         self.packets.clear();
+    }
+
+    fn prepare_render_world(&mut self, ctx: &WgpuContext, render_world: &RenderWorld) {
+        let merged = self
+            .merged_buffer
+            .get_or_insert_with(|| VItemsBuffer::new(ctx));
+        merged.update(ctx, render_world.vitems());
+
+        let merged_mesh = self
+            .merged_mesh_buffer
+            .get_or_insert_with(|| MeshItemsBuffer::new(ctx));
+        merged_mesh.update(ctx, render_world.mesh_items());
+    }
+
+    fn queue_render_world(
+        &mut self,
+        ctx: &WgpuContext,
+        render_world: &RenderWorld,
+        pool: &mut RenderPool,
+    ) {
+        let camera_frame = render_world
+            .camera_frames()
+            .next()
+            .expect("rendering requires at least one CameraFrame");
+        let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
+        self.packets.push(pool.alloc_packet(ctx, &viewport));
     }
 }
 

@@ -20,6 +20,8 @@ pub mod traits;
 /// Utils
 pub mod utils;
 
+pub use bevy_ecs;
+
 pub mod core_item;
 /// The [`core_item::CoreItem`] store
 pub mod store;

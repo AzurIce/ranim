@@ -1,6 +1,8 @@
 use std::{
+    any::TypeId,
     cell::RefCell,
     collections::{HashMap, HashSet},
+    marker::PhantomData,
 };
 
 use bevy_ecs::{component::Component, entity::Entity, world::World};
@@ -108,28 +110,205 @@ pub struct CoreItemKey {
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CoreItemOrder(pub usize);
 
-/// An ECS-backed store of [`CoreItem`]s.
+/// Extract a main-world item into one or more render-world items.
+pub trait ExtractToRenderWorld: Component {
+    /// The component stored on extracted render entities.
+    type RenderItem: Component;
+
+    /// Extract render items from this main-world item.
+    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>);
+}
+
+impl ExtractToRenderWorld for CameraFrame {
+    type RenderItem = CameraFrame;
+
+    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
+        output.push(self.clone());
+    }
+}
+
+impl ExtractToRenderWorld for VItem {
+    type RenderItem = VItem;
+
+    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
+        output.push(self.clone());
+    }
+}
+
+impl ExtractToRenderWorld for MeshItem {
+    type RenderItem = MeshItem;
+
+    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
+        output.push(self.clone());
+    }
+}
+
+/// The identity of an extracted render item occurrence.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RenderItemKey {
+    /// The main-world entity that emitted the item.
+    pub source: Entity,
+    /// The registered extractor that emitted the item.
+    pub extractor: usize,
+    /// The occurrence index emitted by the extractor.
+    pub part: usize,
+}
+
+/// The main-world entity that produced a render entity.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ExtractedFrom(pub Entity);
+
+/// The order of an item in the extracted render world.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderItemOrder(pub usize);
+
+/// The ECS world consumed by render preparation.
 #[derive(Default)]
-pub struct CoreItemStore {
+pub struct RenderWorld {
     world: World,
-    entities: HashMap<CoreItemKey, Entity>,
+    entities: HashMap<RenderItemKey, Entity>,
     ordered_entities: Vec<Entity>,
 }
 
-impl Clone for CoreItemStore {
-    fn clone(&self) -> Self {
-        let items = self
-            .ordered_entities
+impl RenderWorld {
+    /// Get the underlying ECS world.
+    pub fn world(&self) -> &World {
+        &self.world
+    }
+
+    /// Iterate camera frames in extraction order.
+    pub fn camera_frames(&self) -> impl Iterator<Item = &CameraFrame> + Clone {
+        self.ordered_entities
             .iter()
-            .map(|&entity| {
-                let key = *self.world.get::<CoreItemKey>(entity).unwrap();
-                let item = self.core_item(entity).unwrap();
-                (key.source, item)
-            })
+            .filter_map(|&entity| self.world.get::<CameraFrame>(entity))
+    }
+
+    /// Iterate vector items in extraction order.
+    pub fn vitems(&self) -> impl Iterator<Item = &VItem> + Clone {
+        self.ordered_entities
+            .iter()
+            .filter_map(|&entity| self.world.get::<VItem>(entity))
+    }
+
+    /// Iterate mesh items in extraction order.
+    pub fn mesh_items(&self) -> impl Iterator<Item = &MeshItem> + Clone {
+        self.ordered_entities
+            .iter()
+            .filter_map(|&entity| self.world.get::<MeshItem>(entity))
+    }
+
+    fn upsert<T: Component>(&mut self, key: RenderItemKey, order: usize, item: T) -> Entity {
+        if let Some(&entity) = self.entities.get(&key) {
+            self.world
+                .entity_mut(entity)
+                .insert((RenderItemOrder(order), item));
+            entity
+        } else {
+            let entity = self
+                .world
+                .spawn((key, ExtractedFrom(key.source), RenderItemOrder(order), item))
+                .id();
+            self.entities.insert(key, entity);
+            entity
+        }
+    }
+
+    fn finish_extract(&mut self, seen: &HashSet<RenderItemKey>, ordered_entities: Vec<Entity>) {
+        let stale = self
+            .entities
+            .keys()
+            .copied()
+            .filter(|key| !seen.contains(key))
             .collect::<Vec<_>>();
-        let mut cloned = Self::new();
-        cloned.update(items.into_iter());
-        cloned
+        for key in stale {
+            if let Some(entity) = self.entities.remove(&key) {
+                self.world.despawn(entity);
+            }
+        }
+        self.ordered_entities = ordered_entities;
+    }
+}
+
+trait ErasedExtractor: Send + Sync {
+    fn source_type_id(&self) -> TypeId;
+    fn extract_entity(
+        &self,
+        extractor: usize,
+        main_world: &World,
+        source: Entity,
+        render_world: &mut RenderWorld,
+        seen: &mut HashSet<RenderItemKey>,
+        ordered_entities: &mut Vec<Entity>,
+    );
+}
+
+struct TypedExtractor<T>(PhantomData<fn() -> T>);
+
+impl<T> Default for TypedExtractor<T> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<T: ExtractToRenderWorld> ErasedExtractor for TypedExtractor<T> {
+    fn source_type_id(&self) -> TypeId {
+        TypeId::of::<T>()
+    }
+
+    fn extract_entity(
+        &self,
+        extractor: usize,
+        main_world: &World,
+        source: Entity,
+        render_world: &mut RenderWorld,
+        seen: &mut HashSet<RenderItemKey>,
+        ordered_entities: &mut Vec<Entity>,
+    ) {
+        let Some(item) = main_world.get::<T>(source) else {
+            return;
+        };
+
+        let mut output = Vec::new();
+        item.extract_to_render_world(&mut output);
+        for (part, item) in output.into_iter().enumerate() {
+            let key = RenderItemKey {
+                source,
+                extractor,
+                part,
+            };
+            let entity = render_world.upsert(key, ordered_entities.len(), item);
+            seen.insert(key);
+            ordered_entities.push(entity);
+        }
+    }
+}
+
+/// An ECS-backed store with separate main and render worlds.
+pub struct CoreItemStore {
+    world: World,
+    entities: HashMap<CoreItemKey, Entity>,
+    evaluated_entities: Vec<Entity>,
+    item_entities: Vec<Entity>,
+    render_world: RenderWorld,
+    extractors: Vec<Box<dyn ErasedExtractor>>,
+    extractor_types: HashSet<TypeId>,
+}
+
+impl Default for CoreItemStore {
+    fn default() -> Self {
+        let mut store = Self {
+            world: World::new(),
+            entities: HashMap::new(),
+            evaluated_entities: Vec::new(),
+            item_entities: Vec::new(),
+            render_world: RenderWorld::default(),
+            extractors: Vec::new(),
+            extractor_types: HashSet::new(),
+        };
+        store.register_item::<CameraFrame>();
+        store.register_item::<VItem>();
+        store.register_item::<MeshItem>();
+        store
     }
 }
 
@@ -149,42 +328,91 @@ impl CoreItemStore {
         &mut self.world
     }
 
+    /// Get the extracted render world.
+    pub fn render_world(&self) -> &RenderWorld {
+        &self.render_world
+    }
+
+    /// Register an item component and its extractor.
+    pub fn register_item<T: ExtractToRenderWorld>(&mut self) {
+        let type_id = TypeId::of::<T>();
+        if self.extractor_types.insert(type_id) {
+            let extractor = TypedExtractor::<T>::default();
+            debug_assert_eq!(extractor.source_type_id(), type_id);
+            self.extractors.push(Box::new(extractor));
+        }
+    }
+
+    /// Insert an arbitrary renderable item component into the main world.
+    pub fn insert_item<T: ExtractToRenderWorld>(&mut self, item: T) -> Entity {
+        self.register_item::<T>();
+        let entity = self.world.spawn(item).id();
+        self.item_entities.push(entity);
+        self.extract();
+        entity
+    }
+
+    /// Extract all registered main-world item components into the render world.
+    pub fn extract(&mut self) {
+        self.item_entities
+            .retain(|&entity| self.world.get_entity(entity).is_ok());
+        self.evaluated_entities
+            .retain(|&entity| self.world.get_entity(entity).is_ok());
+
+        let mut seen = HashSet::new();
+        let mut ordered_entities = Vec::new();
+        let sources = self
+            .item_entities
+            .iter()
+            .chain(&self.evaluated_entities)
+            .copied()
+            .collect::<Vec<_>>();
+
+        for source in sources {
+            for (extractor, registered) in self.extractors.iter().enumerate() {
+                registered.extract_entity(
+                    extractor,
+                    &self.world,
+                    source,
+                    &mut self.render_world,
+                    &mut seen,
+                    &mut ordered_entities,
+                );
+            }
+        }
+        self.render_world.finish_extract(&seen, ordered_entities);
+    }
+
     /// Get the number of core item entities.
     pub fn len(&self) -> usize {
-        self.ordered_entities.len()
+        self.item_entities.len() + self.evaluated_entities.len()
     }
 
     /// Whether the store contains no core item entities.
     pub fn is_empty(&self) -> bool {
-        self.ordered_entities.is_empty()
+        self.item_entities.is_empty() && self.evaluated_entities.is_empty()
     }
 
     /// Iterate camera frames in evaluated frame order.
     pub fn camera_frames(&self) -> impl Iterator<Item = &CameraFrame> + Clone {
-        self.ordered_entities
-            .iter()
-            .filter_map(|&entity| self.world.get::<CameraFrame>(entity))
+        self.render_world.camera_frames()
     }
 
     /// Iterate vector items in evaluated frame order.
     pub fn vitems(&self) -> impl Iterator<Item = &VItem> + Clone {
-        self.ordered_entities
-            .iter()
-            .filter_map(|&entity| self.world.get::<VItem>(entity))
+        self.render_world.vitems()
     }
 
     /// Iterate mesh items in evaluated frame order.
     pub fn mesh_items(&self) -> impl Iterator<Item = &MeshItem> + Clone {
-        self.ordered_entities
-            .iter()
-            .filter_map(|&entity| self.world.get::<MeshItem>(entity))
+        self.render_world.mesh_items()
     }
 
     /// Update the inner world with a fully evaluated frame.
     pub fn update(&mut self, items: impl Iterator<Item = (CoreItemSourceId, CoreItem)>) {
         let mut occurrences = HashMap::<CoreItemSourceId, usize>::new();
         let mut seen = HashSet::new();
-        let mut ordered_entities = Vec::new();
+        let mut evaluated_entities = Vec::new();
 
         for (order, (source, item)) in items.enumerate() {
             let part = occurrences.entry(source).or_default();
@@ -232,7 +460,7 @@ impl CoreItemStore {
             };
 
             seen.insert(key);
-            ordered_entities.push(entity);
+            evaluated_entities.push(entity);
         }
 
         let stale = self
@@ -247,20 +475,8 @@ impl CoreItemStore {
             }
         }
 
-        self.ordered_entities = ordered_entities;
-    }
-
-    fn core_item(&self, entity: Entity) -> Option<CoreItem> {
-        if let Some(item) = self.world.get::<CameraFrame>(entity) {
-            return Some(CoreItem::CameraFrame(item.clone()));
-        }
-        if let Some(item) = self.world.get::<VItem>(entity) {
-            return Some(CoreItem::VItem(item.clone()));
-        }
-        self.world
-            .get::<MeshItem>(entity)
-            .cloned()
-            .map(CoreItem::MeshItem)
+        self.evaluated_entities = evaluated_entities;
+        self.extract();
     }
 }
 
@@ -334,22 +550,63 @@ mod tests {
     }
 
     #[test]
-    fn core_item_store_clone_copies_ecs_contents() {
+    fn arbitrary_component_extracts_to_independent_render_entities() {
+        #[derive(Component)]
+        struct VItemPair([VItem; 2]);
+
+        impl ExtractToRenderWorld for VItemPair {
+            type RenderItem = VItem;
+
+            fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
+                output.extend(self.0.iter().cloned());
+            }
+        }
+
+        let mut left = VItem::default();
+        left.points[0].x = -1.0;
+        let mut right = VItem::default();
+        right.points[0].x = 1.0;
+
         let mut store = CoreItemStore::new();
-        store.update(
-            vec![
-                ((0, 0), CoreItem::CameraFrame(CameraFrame::default())),
-                ((1, 0), CoreItem::VItem(VItem::default())),
-                ((2, 0), CoreItem::MeshItem(MeshItem::default())),
-            ]
-            .into_iter(),
+        let source = store.insert_item(VItemPair([left.clone(), right.clone()]));
+
+        assert!(store.world().get::<VItemPair>(source).is_some());
+        assert_eq!(
+            store.vitems().cloned().collect::<Vec<_>>(),
+            vec![left, right]
         );
 
-        let cloned = store.clone();
-        assert_eq!(cloned.len(), store.len());
-        assert_eq!(cloned.camera_frames().count(), 1);
-        assert_eq!(cloned.vitems().count(), 1);
-        assert_eq!(cloned.mesh_items().count(), 1);
+        let before = store
+            .render_world
+            .entities
+            .iter()
+            .filter(|(key, _)| key.source == source)
+            .map(|(key, entity)| (*key, *entity))
+            .collect::<HashMap<_, _>>();
+
+        store.world_mut().get_mut::<VItemPair>(source).unwrap().0[0].points[0].x = -2.0;
+        store.extract();
+
+        let after = store
+            .render_world
+            .entities
+            .iter()
+            .filter(|(key, _)| key.source == source)
+            .map(|(key, entity)| (*key, *entity))
+            .collect::<HashMap<_, _>>();
+        assert_eq!(before, after);
+        assert_eq!(store.vitems().next().unwrap().points[0].x, -2.0);
+
+        store.world_mut().despawn(source);
+        store.extract();
+        assert_eq!(store.vitems().count(), 0);
+        assert!(
+            store
+                .render_world
+                .entities
+                .keys()
+                .all(|key| key.source != source)
+        );
     }
 
     #[test]

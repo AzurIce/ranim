@@ -11,13 +11,16 @@
 ## 总览
 
 ```text
-World（未来）/ CoreItemStore（当前）
-                │ emit / extract
+Main World / CoreItemStore（兼容期）
+                │ sync + extract
                 ▼
-          RenderFrame
+     Render World（由渲染侧持有）
+                │ queue / sort / prepare
+                ▼
+       RenderPackets + GPU resources
                 │
                 ▼
-     Renderer::render_frame(...)
+           RenderGraph
                 │
      ┌──────────┴──────────┐
      ▼                     ▼
@@ -27,32 +30,32 @@ World（未来）/ CoreItemStore（当前）
                        图片序列 / 视频编码器
 ```
 
-目前 `CoreItemStore` 是实际的帧输入，按类型保存 `CameraFrame`、`VItem` 与 `MeshItem`。它由求值层在每帧重新填充。未来 `World::emit()` 应产生一个等价的、面向渲染的 `RenderFrame`；`CoreItemStore` 可以成为其内部表示或过渡实现，但不应继续承担场景状态的角色。
+目前阶段 1B 原型中的 `CoreItemStore` 同时持有 Main World 和 Render World，并在每帧提取 `CameraFrame`、`VItem` 与 `MeshItem`。该布局只用于验证分层可行性。阶段 1C 的目标是让 `CoreItemStore` 只保留 Main World，Render World、映射和 extraction registry 移入 `ranim-render` 并跨帧复用。
 
 ## 分层与职责
 
 ### 场景提取层
 
-输入是某一时刻的场景状态，输出是仅包含渲染所需数据的帧快照。
+输入是某一时刻的 Main World，输出是渲染侧独立持有的 Render World 当前状态。
 
-- 将 World 中的实体和组件提取为 primitive；当前 primitive 为 `CoreItem`。
-- 保留稳定的实体身份，供增量上传、调试、选择和未来的多视图使用。
-- 验证渲染前提，例如每个视图需要一个相机。当前 renderer 直接使用 `store.camera_frames[0]`，因此空相机是调用方错误；未来应将这一要求变成显式的 `RenderFrame` 校验或视图描述。
+- 先同步需要渲染的 Main Entity 与稳定 render root 的生命周期；
+- 再通过注册的只读 Query 将场景组件提取为 render component 或独立 primitive entity；
+- 保留稳定的来源和 part identity，供增量上传、调试、选择和未来的多视图使用；
+- 验证渲染前提，例如每个视图需要一个相机。当前 renderer 直接使用第一个 `CameraFrame`，因此空相机是调用方错误；未来应将这一要求变成 Render World 中显式的视图描述与校验。
 - 不执行动画求值、不读取输出 FPS，也不创建 GPU 资源。
 
-建议的边界为：
+目标边界为：
 
 ```rust,ignore
-pub trait EmitRenderFrame {
-    fn emit(&self, frame: &mut RenderFrame);
-}
-
-renderer.render_frame(&ctx, &mut targets, clear_color, &frame, &mut pool);
+render_world.extract(main_world);
+renderer.render_world(&ctx, &mut targets, clear_color, &render_world, &mut pool);
 ```
+
+`extract` 完成后不再借用 Main World，因此后续 GPU 渲染、readback 与编码可以独立进行。Render World 是跨帧复用的 renderer-side scene，不是要求每帧 clone 的一次性完整快照。
 
 ### Renderer
 
-`ranim-render::Renderer` 负责 CPU 到 GPU 的上传、渲染图执行和提交 command buffer。它持有与分辨率和管线相关的长期资源：渲染图、按类型缓存的 pipeline、合并后的 VItem/MeshItem GPU buffer，以及临时 render packet 集合。
+`ranim-render::Renderer` 负责 Render World 的 extraction 编排、CPU 到 GPU 的上传、渲染图执行和 command buffer 提交。它或更高一级的 render runner 持有 Render World，以及与分辨率和管线相关的长期资源：渲染图、按类型缓存的 pipeline、合并后的 VItem/MeshItem GPU buffer 和临时 render packet 集合。
 
 每次 `render_frame` 应仅渲染一次已给定的帧，不产生磁盘副作用。当前对应入口是 `Renderer::render_store_with_pool`。
 
@@ -68,13 +71,16 @@ Renderer 不应拥有“总时长”“第几帧”或“时间标记”等时�
 
 ## 当前单帧路径
 
-当前离线路径的关键顺序如下：
+阶段 1B 原型中离线路径的关键顺序如下：
 
 ```text
 SealedRanimScene::eval_at_sec(t)
         │
         ▼
 CoreItemStore::update(items)
+        │
+        ├─ reconcile Main World
+        └─ extract 到 store 内部 Render World
         │
         ▼
 Renderer::render_store_with_pool(...)
@@ -93,7 +99,7 @@ Renderer::render_store_with_pool(...)
       start_readback / finish_readback → FileWriter
 ```
 
-`CoreItemStore::update` 会清空并重建所有按类型的数组。因此当前路径是“每帧完整提取、完整更新”的模型；虽然 GPU buffer 自身可复用，但还未以 World entity 为单位做增量同步。
+阶段 1A 已将原有按类型 Vec 改为 Main World entity reconciliation；阶段 1B 又增加了独立 Render Entity，但错误地把 Render World 放在 `CoreItemStore` 内。阶段 1C 会移动其所有权，并先保持“每帧完整 extraction、完整 GPU packing”的兼容行为，再逐步使用 change detection 和稳定 buffer range 优化。
 
 ## GPU 资源与帧目标
 
@@ -127,7 +133,7 @@ OITResolve
 
 主要依赖关系是：VItem compute 先于其深度阶段；VItem 与 MeshItem 的深度阶段先于相应颜色阶段；两类颜色阶段都等待另一类的深度结果。最后 `OITResolve` 将透明度累积结果解析到颜色目标。全局图节点通过声明其所需的 `RenderPackets` 类型获得输入，视图图则针对每个 viewport 执行。
 
-当前实际渲染采用合并缓冲路径：一帧内的所有 `VItem` 更新到 `VItemsBuffer`，所有 `MeshItem` 更新到 `MeshItemsBuffer`。`ViewportUniform` 是目前由 render packet 传递的视图数据。以后若加入灯光、材质、实例或多相机，应继续使用“帧数据 → 明确 packet/buffer → 节点查询”的方式，避免节点直接访问 World。
+当前实际渲染采用合并缓冲路径：一帧内的所有 `VItem` 更新到 `VItemsBuffer`，所有 `MeshItem` 更新到 `MeshItemsBuffer`。`ViewportUniform` 是目前由 render packet 传递的视图数据。以后若加入灯光、材质、实例或多相机，应继续使用“Render World → Queue/Sort → prepared packet/buffer → 节点查询”的方式，避免 RenderGraph 节点直接访问 Main World 或 Render World。
 
 ## 离线帧采样与编码
 
@@ -136,8 +142,8 @@ OITResolve
 每个采样时刻的流程是：
 
 1. 求值器把 World 更新到该时刻。
-2. World emit 一帧渲染数据。
-3. worker 将帧渲染至一个可用的离屏目标并启动异步 readback。
+2. render worker 将 Main World 同步、提取到自己持有的 Render World。
+3. worker Queue/Prepare 当前渲染工作集，将帧渲染至一个可用的离屏目标并启动异步 readback。
 4. 达到缓冲上限时，读取最早的目标并将像素交给编码器。
 5. 所有帧提交后，排空剩余 readback 并结束编码。
 
@@ -145,20 +151,20 @@ OITResolve
 
 ## 设计约束
 
-- 渲染输入是一个完整、可独立消费的帧快照；renderer 不得借用可变 World 跨越 GPU/编码异步边界。
+- Sync/Extract 结束后，渲染侧必须拥有独立于 Main World 的当前帧状态；renderer 不得借用 Main World 跨越 GPU/编码异步边界。
 - 同一 World 状态和同一渲染配置应产生可重复的帧。随机性、时钟和模拟步进必须在求值层被固定。
 - 渲染图节点只通过 `RenderContext`、声明的 packet 和 GPU resource 协作，避免隐式的全局状态。
 - 场景数据类型不应泄漏 `wgpu` 类型；GPU 资源只属于 `ranim-render`。
-- `RenderFrame` 应能服务预览、离线编码、截图和测试，而不是为任一输出方式专门设计。
+- 同一套 Render World extraction 和单帧渲染入口应服务预览、离线编码、截图和测试，而不是为任一输出方式维护专用场景表示。
 
 ## 与求值模型的接口
 
-渲染只要求“当前 World 的一帧”。因此理想调用关系是：
+渲染只要求“当前 Main World 提取出的 Render World 状态”。因此目标调用关系是：
 
 ```rust,ignore
-let mut world = runner.world_at(sample_time)?;
-let frame = world.emit();
-renderer.render_frame(&frame);
+runner.seek_or_tick(sample_time)?;
+renderer.extract(runner.world());
+renderer.render_current_frame();
 ```
 
-`world_at` 的实现可以是纯 Timeline 的随机求值，也可以是带 checkpoint 的模拟递推；两种差异必须停留在求值层，不能扩散到 renderer。
+`seek_or_tick` 可以由纯 Timeline 的随机求值实现，也可以由带 checkpoint 的模拟递推实现；两种差异必须停留在求值层，不能扩散到 renderer。

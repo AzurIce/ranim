@@ -5192,6 +5192,7 @@ name = "ranim-items"
 version = "0.2.1"
 dependencies = [
  "assert_float_eq",
+ "bevy_ecs",
  "derive_more",
  "itertools 0.15.0",
  "ranim-core",
