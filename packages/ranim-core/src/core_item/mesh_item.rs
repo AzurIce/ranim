@@ -10,7 +10,7 @@ use crate::{
 use color::{AlphaColor, Srgb};
 
 /// A primitive for rendering a mesh item.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, PartialEq)]
 pub struct MeshItem {
     /// The vertices of the mesh
     pub points: Vec<Vec3>,

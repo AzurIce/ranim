@@ -96,18 +96,21 @@ impl VItemsBuffer {
     }
 
     /// Pack all VItems into the merged buffers. Called once per frame.
-    pub fn update(&mut self, ctx: &WgpuContext, vitems: &[VItem]) {
-        if vitems.is_empty() {
+    pub fn update<'a>(
+        &mut self,
+        ctx: &WgpuContext,
+        vitems: impl Iterator<Item = &'a VItem> + Clone,
+    ) {
+        let item_count = vitems.clone().count();
+        if item_count == 0 {
             self.item_count = 0;
             self.total_points = 0;
             return;
         }
 
-        let item_count = vitems.len();
-
         // Pre-calculate total sizes
-        let total_points: usize = vitems.iter().map(|v| v.points.len()).sum();
-        let total_attrs: usize = vitems.iter().map(|v| v.points.len().div_ceil(2)).sum();
+        let total_points: usize = vitems.clone().map(|v| v.points.len()).sum();
+        let total_attrs: usize = vitems.clone().map(|v| v.points.len().div_ceil(2)).sum();
 
         // Build index table and collect data
         let mut item_infos = Vec::with_capacity(item_count);

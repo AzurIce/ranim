@@ -204,7 +204,10 @@ impl Renderer {
         pool: &mut RenderPool,
     ) {
         // Viewport — always needed
-        let camera_frame = &store.camera_frames[0];
+        let camera_frame = store
+            .camera_frames()
+            .next()
+            .expect("rendering requires at least one CameraFrame");
         let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
         self.packets.push(pool.alloc_packet(ctx, &viewport));
 
@@ -212,13 +215,13 @@ impl Renderer {
         let merged = self
             .merged_buffer
             .get_or_insert_with(|| VItemsBuffer::new(ctx));
-        merged.update(ctx, &store.vitems);
+        merged.update(ctx, store.vitems());
 
         // Merged mesh buffer
         let merged_mesh = self
             .merged_mesh_buffer
             .get_or_insert_with(|| MeshItemsBuffer::new(ctx));
-        merged_mesh.update(ctx, &store.mesh_items);
+        merged_mesh.update(ctx, store.mesh_items());
 
         // Encode & submit
         {

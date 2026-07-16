@@ -29,7 +29,7 @@ pub fn vitem_normal_from_points(points: &[Vec4]) -> Vec3 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, PartialEq)]
 /// A primitive for rendering a vitem.
 pub struct VItem {
     /// The normal vector of the projection target plane.

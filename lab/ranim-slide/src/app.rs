@@ -215,8 +215,8 @@ impl RanimSlideApp {
             elements = self.deck.current_page().elements.len(),
             visible_elements,
             core_items = item_count,
-            vitems = self.store.vitems.len(),
-            meshes = self.store.mesh_items.len(),
+            vitems = self.store.vitems().count(),
+            meshes = self.store.mesh_items().count(),
             elapsed_ms = start.elapsed().as_secs_f64() * 1000.0,
             "rebuilt core item store"
         );
@@ -252,8 +252,8 @@ impl RanimSlideApp {
         );
         self.render_dirty = false;
         info!(
-            vitems = self.store.vitems.len(),
-            meshes = self.store.mesh_items.len(),
+            vitems = self.store.vitems().count(),
+            meshes = self.store.mesh_items().count(),
             elapsed_ms = start.elapsed().as_secs_f64() * 1000.0,
             "rendered slide preview"
         );
