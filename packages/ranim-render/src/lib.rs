@@ -28,7 +28,7 @@ use crate::{
     resource::{PipelinesPool, RenderPool, RenderTextures},
     utils::{WgpuBuffer, WgpuVecBuffer},
 };
-use ranim_core::store::{CoreItemStore, ExtractToRenderWorld};
+use ranim_core::store::CoreItemStore;
 use utils::WgpuContext;
 
 #[cfg(feature = "profiling")]
@@ -200,11 +200,6 @@ impl Renderer {
         RenderTextures::new(ctx, self.width, self.height)
     }
 
-    /// Register extraction for a main-world item component.
-    pub fn register_item<T: ExtractToRenderWorld>(&mut self) {
-        self.render_world.register_item::<T>();
-    }
-
     /// Register a query-based 1:1 component extractor.
     pub fn register_component<E: ExtractComponent>(&mut self) {
         self.render_world.register_component::<E>();
@@ -309,19 +304,22 @@ impl Renderer {
         let merged = self
             .merged_buffer
             .get_or_insert_with(|| VItemsBuffer::new(ctx));
-        merged.update(ctx, self.render_world.vitems());
+        merged.update(ctx, self.render_world.queued_vitems());
 
         let merged_mesh = self
             .merged_mesh_buffer
             .get_or_insert_with(|| MeshItemsBuffer::new(ctx));
-        merged_mesh.update(ctx, self.render_world.mesh_items());
+        merged_mesh.update(ctx, self.render_world.queued_mesh_items());
     }
 
     fn queue_render_world(&mut self, ctx: &WgpuContext, pool: &mut RenderPool) {
+        // Queue: build the default view's work set from the extracted render
+        // world. Sort: currently the extraction-time `RenderItemOrder`; render
+        // phases, visibility and batch keys will reorder it here later.
+        self.render_world.queue_default_view();
         let camera_frame = self
             .render_world
-            .camera_frames()
-            .next()
+            .queued_camera_frame()
             .expect("rendering requires at least one CameraFrame");
         let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
         self.packets.push(pool.alloc_packet(ctx, &viewport));

@@ -3,7 +3,6 @@
 use std::{
     any::TypeId,
     collections::{HashMap, HashSet},
-    marker::PhantomData,
     mem,
 };
 
@@ -12,15 +11,17 @@ use bevy_ecs::{
     component::Component,
     entity::Entity,
     prelude::{Commands, Local, Res, ResMut, Resource},
-    query::{QueryFilter, QueryItem, QueryState, ReadOnlyQueryData},
+    query::{QueryFilter, QueryState, ReadOnlyQueryData},
     schedule::{Schedule, ScheduleLabel},
     system::SystemParam,
     world::{World, WorldId},
 };
 use ranim_core::{
     core_item::{camera_frame::CameraFrame, mesh_item::MeshItem, vitem::VItem},
-    store::{CoreItemStore, ExtractToRenderWorld},
+    store::CoreItemStore,
 };
+
+pub use ranim_core::extract::{ExtractComponent, ExtractMany, ExtractOutput};
 
 /// Schedule that extracts main-world data into the render world.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
@@ -95,10 +96,26 @@ struct FrameItemOrder {
     output: usize,
 }
 
+/// How a stale render item is cleaned up.
+#[derive(Clone, Copy)]
+enum OnStale {
+    /// Despawn the primitive entity (`ExtractMany` parts).
+    Despawn,
+    /// Remove the extracted bundle from the render root entity (1:1
+    /// `ExtractComponent` outputs), keeping the root alive for other
+    /// extractors that still match the main entity.
+    RemoveComponents(fn(&mut World, Entity)),
+}
+
+struct ItemSlot {
+    entity: Entity,
+    on_stale: OnStale,
+}
+
 #[derive(Resource, Default)]
 struct RenderEntities {
     roots: HashMap<Entity, Entity>,
-    items: HashMap<RenderItemKey, Entity>,
+    items: HashMap<RenderItemKey, ItemSlot>,
     ordered_items: Vec<Entity>,
     seen_roots: HashSet<Entity>,
     seen_items: HashSet<RenderItemKey>,
@@ -126,6 +143,7 @@ impl RenderEntities {
         }
     }
 
+    /// Upsert a primitive part entity emitted by an `ExtractMany` extractor.
     fn upsert<B: Bundle>(
         &mut self,
         key: RenderItemKey,
@@ -142,12 +160,18 @@ impl RenderEntities {
             key.root,
         );
 
-        let entity = if let Some(&entity) = self.items.get(&key) {
-            commands.entity(entity).insert(bundle);
-            entity
+        let entity = if let Some(slot) = self.items.get(&key) {
+            commands.entity(slot.entity).insert(bundle);
+            slot.entity
         } else {
             let entity = commands.spawn((key, ExtractedFrom(key.root), bundle)).id();
-            self.items.insert(key, entity);
+            self.items.insert(
+                key,
+                ItemSlot {
+                    entity,
+                    on_stale: OnStale::Despawn,
+                },
+            );
             entity
         };
         self.frame_items.push((
@@ -157,6 +181,40 @@ impl RenderEntities {
                 output: output_order,
             },
             entity,
+        ));
+    }
+
+    /// Write a 1:1 `ExtractComponent` output directly onto the render root.
+    fn upsert_root<B: Bundle>(
+        &mut self,
+        key: RenderItemKey,
+        root_order: usize,
+        bundle: B,
+        remove_components: fn(&mut World, Entity),
+        commands: &mut Commands,
+    ) {
+        assert!(
+            self.seen_items.insert(key),
+            "extractor {} emitted duplicate output for render root {:?}",
+            key.extractor,
+            key.root,
+        );
+
+        commands.entity(key.root).insert(bundle);
+        self.items.insert(
+            key,
+            ItemSlot {
+                entity: key.root,
+                on_stale: OnStale::RemoveComponents(remove_components),
+            },
+        );
+        self.frame_items.push((
+            FrameItemOrder {
+                root: root_order,
+                extractor: key.extractor,
+                output: 0,
+            },
+            key.root,
         ));
     }
 }
@@ -182,9 +240,8 @@ impl ExtractorIds {
     }
 }
 
-struct ItemExtractorKey<T>(PhantomData<fn() -> T>);
-struct ComponentExtractorKey<E>(PhantomData<fn() -> E>);
-struct ManyExtractorKey<E>(PhantomData<fn() -> E>);
+struct ComponentExtractorKey<E>(std::marker::PhantomData<fn() -> E>);
+struct ManyExtractorKey<E>(std::marker::PhantomData<fn() -> E>);
 
 struct MainQueryState<D: ReadOnlyQueryData, F: QueryFilter> {
     world_id: Option<WorldId>,
@@ -236,83 +293,11 @@ struct ExtractSystemParams<'w, 's> {
     commands: Commands<'w, 's>,
 }
 
-fn extract_item_system<T: ExtractToRenderWorld>(
-    params: ExtractSystemParams,
-    mut query_state: Local<MainQueryState<&'static T, ()>>,
-    mut matches: Local<Vec<Entity>>,
-    mut output: Local<Vec<T::RenderItem>>,
-) {
-    let ExtractSystemParams {
-        main_world,
-        scene_order,
-        extractor_ids,
-        mut render_entities,
-        mut commands,
-    } = params;
-    let main_world = main_world.world();
-    let Some(query) = query_state.get(main_world) else {
-        return;
-    };
-    collect_ordered_matches(query, main_world, &scene_order, &mut matches);
-    let extractor = extractor_ids.get::<ItemExtractorKey<T>>();
-
-    for source in matches.iter().copied() {
-        let (_, item) = query.get(main_world, source).unwrap();
-        let root_order = scene_order.get(source).unwrap();
-        let root = render_entities.ensure_root(source, root_order, &mut commands);
-
-        output.clear();
-        item.extract_to_render_world(&mut output);
-        for (part, bundle) in output.drain(..).enumerate() {
-            render_entities.upsert(
-                RenderItemKey {
-                    root,
-                    extractor,
-                    part,
-                },
-                root_order,
-                part,
-                bundle,
-                &mut commands,
-            );
-        }
+/// Remove the extracted bundle of `E` from a render root entity.
+fn remove_extracted<E: ExtractComponent>(world: &mut World, entity: Entity) {
+    if let Ok(mut entity_mut) = world.get_entity_mut(entity) {
+        entity_mut.remove::<E::Out>();
     }
-}
-
-/// Reusable output buffer for query-based 1:N extraction.
-pub struct ExtractOutput<B: Bundle> {
-    items: Vec<(usize, B)>,
-}
-
-impl<B: Bundle> Default for ExtractOutput<B> {
-    fn default() -> Self {
-        Self { items: Vec::new() }
-    }
-}
-
-impl<B: Bundle> ExtractOutput<B> {
-    /// Emit a render bundle with an explicit stable part key.
-    pub fn emit(&mut self, part: usize, bundle: B) {
-        self.items.push((part, bundle));
-    }
-
-    /// Emit a render bundle using the next sequential part key.
-    pub fn push(&mut self, bundle: B) {
-        self.emit(self.items.len(), bundle);
-    }
-}
-
-/// Extract one render bundle from arbitrary read-only main-world query data.
-pub trait ExtractComponent: Send + Sync + 'static {
-    /// Main-world data read by this extractor.
-    type QueryData: ReadOnlyQueryData;
-    /// Additional filter applied to the source entity.
-    type QueryFilter: QueryFilter;
-    /// Components inserted into the extracted render entity.
-    type Out: Bundle;
-
-    /// Return the current render bundle, or `None` to remove the previous output.
-    fn extract_component(item: QueryItem<'_, '_, Self::QueryData>) -> Option<Self::Out>;
 }
 
 fn extract_component_system<E: ExtractComponent>(
@@ -339,35 +324,19 @@ fn extract_component_system<E: ExtractComponent>(
         let root_order = scene_order.get(source).unwrap();
         let root = render_entities.ensure_root(source, root_order, &mut commands);
         if let Some(bundle) = E::extract_component(item) {
-            render_entities.upsert(
+            render_entities.upsert_root(
                 RenderItemKey {
                     root,
                     extractor,
                     part: 0,
                 },
                 root_order,
-                0,
                 bundle,
+                remove_extracted::<E>,
                 &mut commands,
             );
         }
     }
-}
-
-/// Extract zero or more render bundles from arbitrary read-only query data.
-pub trait ExtractMany: Send + Sync + 'static {
-    /// Main-world data read by this extractor.
-    type QueryData: ReadOnlyQueryData;
-    /// Additional filter applied to the source entity.
-    type QueryFilter: QueryFilter;
-    /// Components inserted into each extracted render entity.
-    type Out: Bundle;
-
-    /// Emit the current render bundles into the reusable output buffer.
-    fn extract_many(
-        item: QueryItem<'_, '_, Self::QueryData>,
-        output: &mut ExtractOutput<Self::Out>,
-    );
 }
 
 fn extract_many_system<E: ExtractMany>(
@@ -395,9 +364,9 @@ fn extract_many_system<E: ExtractMany>(
         let root_order = scene_order.get(source).unwrap();
         let root = render_entities.ensure_root(source, root_order, &mut commands);
 
-        output.items.clear();
+        output.clear();
         E::extract_many(item, &mut output);
-        for (output_order, (part, bundle)) in output.items.drain(..).enumerate() {
+        for (output_order, (part, bundle)) in output.drain().enumerate() {
             render_entities.upsert(
                 RenderItemKey {
                     root,
@@ -419,9 +388,9 @@ fn clear_render_entities(world: &mut World) {
             let render_entities = entities
                 .roots
                 .values()
-                .chain(entities.items.values())
                 .copied()
-                .collect::<Vec<_>>();
+                .chain(entities.items.values().map(|slot| slot.entity))
+                .collect::<HashSet<_>>();
             for entity in render_entities {
                 world.despawn(entity);
             }
@@ -441,15 +410,19 @@ fn finish_extract(world: &mut World) {
                 .collect::<Vec<_>>();
             for source in stale_sources {
                 let root = entities.roots.remove(&source).unwrap();
-                let stale_items = entities
+                let stale_keys = entities
                     .items
                     .keys()
                     .copied()
                     .filter(|key| key.root == root)
                     .collect::<Vec<_>>();
-                for key in stale_items {
-                    if let Some(entity) = entities.items.remove(&key) {
-                        world.despawn(entity);
+                for key in stale_keys {
+                    if let Some(slot) = entities.items.remove(&key) {
+                        // Root-direct outputs die with the root; only
+                        // primitive part entities need explicit despawn.
+                        if let OnStale::Despawn = slot.on_stale {
+                            world.despawn(slot.entity);
+                        }
                     }
                 }
                 world.despawn(root);
@@ -462,8 +435,15 @@ fn finish_extract(world: &mut World) {
                 .filter(|key| !entities.seen_items.contains(key))
                 .collect::<Vec<_>>();
             for key in stale_items {
-                if let Some(entity) = entities.items.remove(&key) {
-                    world.despawn(entity);
+                if let Some(slot) = entities.items.remove(&key) {
+                    match slot.on_stale {
+                        OnStale::Despawn => {
+                            world.despawn(slot.entity);
+                        }
+                        OnStale::RemoveComponents(remove_components) => {
+                            remove_components(world, slot.entity);
+                        }
+                    }
                 }
             }
 
@@ -472,12 +452,32 @@ fn finish_extract(world: &mut World) {
                 .sort_unstable_by_key(|(order, _)| *order);
             let frame_items = mem::take(&mut entities.frame_items);
             entities.ordered_items.clear();
-            for (order, (_, entity)) in frame_items.into_iter().enumerate() {
-                world.entity_mut(entity).insert(RenderItemOrder(order));
-                entities.ordered_items.push(entity);
+            // A render root appears once per 1:1 extractor that matched it;
+            // keep only its first occurrence in the ordered output.
+            let mut emitted = HashSet::new();
+            for (_, entity) in frame_items {
+                if emitted.insert(entity) {
+                    world
+                        .entity_mut(entity)
+                        .insert(RenderItemOrder(entities.ordered_items.len()));
+                    entities.ordered_items.push(entity);
+                }
             }
         },
     );
+}
+
+/// The queued work set for the default view, produced by the Queue stage.
+///
+/// First version: a single default view containing every extracted render
+/// item. Visibility filtering, render phases and multi-view queueing will
+/// replace this with per-view work sets.
+#[derive(Resource, Default)]
+pub struct QueuedFrame {
+    /// The camera entity used for the viewport, if any was extracted.
+    pub camera: Option<Entity>,
+    /// Render-item entities queued for the view, in render order.
+    pub items: Vec<Entity>,
 }
 
 /// A renderer-owned ECS world containing extracted render entities.
@@ -492,15 +492,16 @@ impl Default for RenderWorld {
         let mut world = World::new();
         world.init_resource::<RenderEntities>();
         world.init_resource::<ExtractorIds>();
+        world.init_resource::<QueuedFrame>();
 
         let mut render_world = Self {
             world,
             extract_schedule: Schedule::new(ExtractSchedule),
             main_world_id: None,
         };
-        render_world.register_item::<CameraFrame>();
-        render_world.register_item::<VItem>();
-        render_world.register_item::<MeshItem>();
+        render_world.register_component::<CameraFrame>();
+        render_world.register_component::<VItem>();
+        render_world.register_component::<MeshItem>();
         render_world
     }
 }
@@ -509,18 +510,6 @@ impl RenderWorld {
     /// Create a render world with the built-in core-item extractors registered.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Register extraction for a main-world item component.
-    pub fn register_item<T: ExtractToRenderWorld>(&mut self) {
-        let registered = self
-            .world
-            .resource_mut::<ExtractorIds>()
-            .register::<ItemExtractorKey<T>>()
-            .is_some();
-        if registered {
-            self.extract_schedule.add_systems(extract_item_system::<T>);
-        }
     }
 
     /// Register a query-based 1:1 component extractor.
@@ -601,6 +590,59 @@ impl RenderWorld {
             .copied()
     }
 
+    /// Iterate the extracted render-item entities in render order.
+    pub fn ordered_items(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.world
+            .resource::<RenderEntities>()
+            .ordered_items
+            .iter()
+            .copied()
+    }
+
+    /// Queue the default single-view work set for the current frame.
+    ///
+    /// Queue: every extracted render-item entity joins the default view's work
+    /// set. Sort: the work set is ordered by the extraction-time
+    /// `RenderItemOrder` (stable scene order); a dedicated Sort stage will
+    /// reorder it once render phases, visibility and batch keys exist.
+    pub fn queue_default_view(&mut self) {
+        let ordered_items = &self.world.resource::<RenderEntities>().ordered_items;
+        let camera = ordered_items
+            .iter()
+            .copied()
+            .find(|&entity| self.world.get::<CameraFrame>(entity).is_some());
+        let items = ordered_items.clone();
+        self.world.insert_resource(QueuedFrame { camera, items });
+    }
+
+    /// Borrow the queued work set of the current frame.
+    pub fn queued_frame(&self) -> &QueuedFrame {
+        self.world.resource::<QueuedFrame>()
+    }
+
+    /// The camera frame queued for the default view.
+    pub fn queued_camera_frame(&self) -> Option<&CameraFrame> {
+        self.queued_frame()
+            .camera
+            .and_then(|entity| self.world.get::<CameraFrame>(entity))
+    }
+
+    /// Iterate vector items in the queued work set, in render order.
+    pub fn queued_vitems(&self) -> impl Iterator<Item = &VItem> + Clone {
+        self.queued_frame()
+            .items
+            .iter()
+            .filter_map(|&entity| self.world.get::<VItem>(entity))
+    }
+
+    /// Iterate mesh items in the queued work set, in render order.
+    pub fn queued_mesh_items(&self) -> impl Iterator<Item = &MeshItem> + Clone {
+        self.queued_frame()
+            .items
+            .iter()
+            .filter_map(|&entity| self.world.get::<MeshItem>(entity))
+    }
+
     /// Iterate camera frames in extraction order.
     pub fn camera_frames(&self) -> impl Iterator<Item = &CameraFrame> + Clone {
         let entities = self.world.resource::<RenderEntities>();
@@ -629,24 +671,39 @@ impl RenderWorld {
     }
 
     #[cfg(test)]
-    fn item_entities(&self) -> &HashMap<RenderItemKey, Entity> {
-        &self.world.resource::<RenderEntities>().items
+    fn item_entities(&self) -> HashMap<RenderItemKey, Entity> {
+        self.world
+            .resource::<RenderEntities>()
+            .items
+            .iter()
+            .map(|(key, slot)| (*key, slot.entity))
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy_ecs::query::QueryItem;
     use ranim_core::core_item::CoreItem;
 
     #[derive(Component)]
     struct VItemList(Vec<VItem>);
 
-    impl ExtractToRenderWorld for VItemList {
-        type RenderItem = VItem;
+    struct ExtractVItemList;
 
-        fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
-            output.extend(self.0.iter().cloned());
+    impl ExtractMany for ExtractVItemList {
+        type QueryData = &'static VItemList;
+        type QueryFilter = ();
+        type Out = VItem;
+
+        fn extract_many(
+            items: QueryItem<'_, '_, Self::QueryData>,
+            output: &mut ExtractOutput<Self::Out>,
+        ) {
+            for item in &items.0 {
+                output.push(item.clone());
+            }
         }
     }
 
@@ -707,11 +764,11 @@ mod tests {
         let mut store = CoreItemStore::new();
         let source = store.insert_item(VItemList(vec![left, right]));
         let mut render_world = RenderWorld::new();
-        render_world.register_item::<VItemList>();
+        render_world.register_many::<ExtractVItemList>();
         render_world.extract(&mut store);
 
         let root = render_world.root_entity(source).unwrap();
-        let before = render_world.item_entities().clone();
+        let before = render_world.item_entities();
         let remaining_key = *before
             .keys()
             .find(|key| key.root == root && key.part == 0)
@@ -768,17 +825,82 @@ mod tests {
     }
 
     #[test]
+    fn component_extraction_writes_directly_onto_the_render_root() {
+        let mut store = CoreItemStore::new();
+        let source = store.insert_item(VItem::default());
+
+        let mut render_world = RenderWorld::new();
+        render_world.extract(&mut store);
+
+        let root = render_world.root_entity(source).unwrap();
+        // The 1:1 output lives on the render root itself, not on a child.
+        assert!(render_world.world().get::<VItem>(root).is_some());
+        assert!(
+            render_world
+                .item_entities()
+                .values()
+                .all(|&entity| entity == root)
+        );
+        assert_eq!(render_world.vitems().count(), 1);
+
+        // Removing the main-world component removes the extracted output
+        // from the root, and the root itself is cleaned up once no extractor
+        // matches the main entity anymore.
+        store.world_mut().entity_mut(source).remove::<VItem>();
+        render_world.extract(&mut store);
+        assert!(render_world.root_entity(source).is_none());
+        assert_eq!(render_world.vitems().count(), 0);
+    }
+
+    #[test]
+    fn component_and_many_extractors_can_share_a_render_root() {
+        let mut listed = VItem::default();
+        listed.points[0].x = 5.0;
+
+        let mut store = CoreItemStore::new();
+        let source = store.insert_item((VItem::default(), VItemList(vec![listed])));
+
+        let mut render_world = RenderWorld::new();
+        render_world.register_many::<ExtractVItemList>();
+        render_world.extract(&mut store);
+
+        let root = render_world.root_entity(source).unwrap();
+        assert!(render_world.world().get::<VItem>(root).is_some());
+        // root (1:1 core VItem) + one primitive part (1:N list)
+        assert_eq!(render_world.vitems().count(), 2);
+        // the root appears only once in the ordered output
+        assert_eq!(
+            render_world
+                .ordered_items()
+                .filter(|&entity| entity == root)
+                .count(),
+            1
+        );
+
+        // Removing the core VItem only removes the root's own output; the
+        // 1:N extractor still matches and keeps the root alive.
+        store.world_mut().entity_mut(source).remove::<VItem>();
+        render_world.extract(&mut store);
+
+        assert_eq!(render_world.root_entity(source), Some(root));
+        assert!(render_world.world().get::<VItem>(root).is_none());
+        assert_eq!(render_world.vitems().count(), 1);
+        assert_eq!(render_world.vitems().next().unwrap().points[0].x, 5.0);
+    }
+
+    #[test]
     fn registered_high_level_item_extracts_without_main_world_render_state() {
         use ranim_items::vitem::geometry::Square;
 
         let mut store = CoreItemStore::new();
         let source = store.insert_item(Square::new(2.0));
         let mut render_world = RenderWorld::new();
-        render_world.register_item::<Square>();
+        render_world.register_component::<Square>();
         render_world.extract(&mut store);
 
         assert!(store.world().get::<Square>(source).is_some());
-        assert!(render_world.root_entity(source).is_some());
+        let root = render_world.root_entity(source).unwrap();
+        assert!(render_world.world().get::<VItem>(root).is_some());
         assert_eq!(render_world.vitems().count(), 1);
     }
 
@@ -796,11 +918,13 @@ mod tests {
         assert_eq!(render_world.vitems().next().unwrap().points[0].x, 3.0);
         let root = render_world.root_entity(source).unwrap();
 
+        // A `None` output removes the bundle from the root but keeps the root.
         store.world_mut().get_mut::<Visible>(source).unwrap().0 = false;
         render_world.extract(&mut store);
         assert_eq!(render_world.root_entity(source), Some(root));
         assert_eq!(render_world.vitems().count(), 0);
 
+        // Once the query no longer matches, the root itself is cleaned up.
         store.world_mut().entity_mut(source).remove::<Offset>();
         render_world.extract(&mut store);
         assert!(render_world.root_entity(source).is_none());
@@ -820,7 +944,7 @@ mod tests {
         render_world.extract(&mut store);
 
         let root = render_world.root_entity(source).unwrap();
-        let before = render_world.item_entities().clone();
+        let before = render_world.item_entities();
         store
             .world_mut()
             .get_mut::<KeyedVItems>(source)
@@ -831,11 +955,11 @@ mod tests {
 
         let after = render_world.item_entities();
         for part in [10, 20] {
-            let key = before
+            let key = *before
                 .keys()
                 .find(|key| key.root == root && key.part == part)
                 .unwrap();
-            assert_eq!(after[key], before[key]);
+            assert_eq!(after[&key], before[&key]);
         }
         assert_eq!(
             render_world
@@ -871,8 +995,8 @@ mod tests {
         store.insert_item(VItemList(vec![VItem::default()]));
 
         let mut render_world = RenderWorld::new();
-        render_world.register_item::<VItemList>();
-        render_world.register_item::<VItemList>();
+        render_world.register_many::<ExtractVItemList>();
+        render_world.register_many::<ExtractVItemList>();
         render_world.extract(&mut store);
 
         assert_eq!(render_world.vitems().count(), 1);
@@ -885,7 +1009,7 @@ mod tests {
         render_world.extract(&mut store);
 
         store.insert_item(VItemList(vec![VItem::default()]));
-        render_world.register_item::<VItemList>();
+        render_world.register_many::<ExtractVItemList>();
         render_world.extract(&mut store);
 
         assert_eq!(render_world.vitems().count(), 1);

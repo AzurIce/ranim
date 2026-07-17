@@ -108,39 +108,6 @@ pub struct CoreItemKey {
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CoreItemOrder(pub usize);
 
-/// Extract a main-world item into one or more render-world items.
-pub trait ExtractToRenderWorld: Component {
-    /// The component stored on extracted render entities.
-    type RenderItem: Component;
-
-    /// Extract render items from this main-world item.
-    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>);
-}
-
-impl ExtractToRenderWorld for CameraFrame {
-    type RenderItem = CameraFrame;
-
-    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
-        output.push(self.clone());
-    }
-}
-
-impl ExtractToRenderWorld for VItem {
-    type RenderItem = VItem;
-
-    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
-        output.push(self.clone());
-    }
-}
-
-impl ExtractToRenderWorld for MeshItem {
-    type RenderItem = MeshItem;
-
-    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
-        output.push(self.clone());
-    }
-}
-
 /// An ECS-backed store for the main world.
 pub struct CoreItemStore {
     world: World,
@@ -228,6 +195,17 @@ impl CoreItemStore {
 
     /// Update the inner world with a fully evaluated frame.
     pub fn update(&mut self, items: impl Iterator<Item = (CoreItemSourceId, CoreItem)>) {
+        fn insert_if_changed<T: Component + PartialEq>(
+            entity_mut: &mut bevy_ecs::world::EntityWorldMut,
+            component: T,
+        ) {
+            // Skip the insert when the value is unchanged so the component's
+            // change tick only moves on real changes.
+            if entity_mut.get::<T>() != Some(&component) {
+                entity_mut.insert(component);
+            }
+        }
+
         let mut occurrences = HashMap::<CoreItemSourceId, usize>::new();
         let mut seen = HashSet::new();
         let mut evaluated_entities = Vec::new();
@@ -242,22 +220,22 @@ impl CoreItemStore {
 
             let entity = if let Some(&entity) = self.entities.get(&key) {
                 let mut entity_mut = self.world.entity_mut(entity);
-                entity_mut.insert(CoreItemOrder(order));
+                insert_if_changed(&mut entity_mut, CoreItemOrder(order));
                 match item {
                     CoreItem::CameraFrame(item) => {
                         entity_mut.remove::<VItem>();
                         entity_mut.remove::<MeshItem>();
-                        entity_mut.insert(item)
+                        insert_if_changed(&mut entity_mut, item);
                     }
                     CoreItem::VItem(item) => {
                         entity_mut.remove::<CameraFrame>();
                         entity_mut.remove::<MeshItem>();
-                        entity_mut.insert(item)
+                        insert_if_changed(&mut entity_mut, item);
                     }
                     CoreItem::MeshItem(item) => {
                         entity_mut.remove::<CameraFrame>();
                         entity_mut.remove::<VItem>();
-                        entity_mut.insert(item)
+                        insert_if_changed(&mut entity_mut, item);
                     }
                 };
                 entity

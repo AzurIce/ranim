@@ -23,6 +23,8 @@ pub mod utils;
 pub use bevy_ecs;
 
 pub mod core_item;
+/// Query-based extraction protocols towards the render world
+pub mod extract;
 /// The [`core_item::CoreItem`] store
 pub mod store;
 
