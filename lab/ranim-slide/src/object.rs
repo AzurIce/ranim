@@ -2205,7 +2205,7 @@ mod tests {
             object
                 .compile_error
                 .as_deref()
-                .is_some_and(|err| err.contains("Error"))
+                .is_some_and(|err| err.contains("Typst compilation failed"))
         );
         assert_eq!(object.bounds(), previous_bounds);
 

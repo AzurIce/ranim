@@ -350,7 +350,7 @@ mod test {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir);
-        assert_eq!(examples.len(), 25);
+        assert_eq!(examples.len(), 26);
         assert_eq!(
             examples
                 .iter()
