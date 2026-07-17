@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData, ops::Deref};
+use std::{fmt::Debug, ops::Deref};
 
 use tracing::{info, warn};
 use wgpu::util::DeviceExt;
@@ -16,16 +16,6 @@ pub fn uploaded_bytes() -> u64 {
 /// Read and reset the uploaded-bytes counter.
 pub fn take_uploaded_bytes() -> u64 {
     UPLOADED_BYTES.swap(0, std::sync::atomic::Ordering::Relaxed)
-}
-
-/// A cheap FNV-1a 64-bit content hash, used to skip redundant buffer uploads.
-fn fnv1a_64(bytes: &[u8]) -> u64 {
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for &b in bytes {
-        hash ^= b as u64;
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    hash
 }
 
 pub mod collections {
@@ -323,10 +313,10 @@ pub(crate) struct WgpuVecBuffer<T: Default + bytemuck::Pod + bytemuck::Zeroable 
     usage: wgpu::BufferUsages,
     /// Keep match to the buffer size
     len: usize,
-    /// Content hash of the last uploaded data, used to skip redundant uploads.
-    last_write_hash: Option<u64>,
-    _phantom: PhantomData<T>,
-    // inner: Vec<T>,
+    /// The contents uploaded last time, used to skip redundant uploads
+    /// (memcmp is cheap compared to a GPU upload, and exits early on the
+    /// first difference for animated frames).
+    prev: Vec<T>,
 }
 
 impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
@@ -351,9 +341,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             }),
             usage,
             len: 0,
-            last_write_hash: None,
-            _phantom: PhantomData,
-            // inner: vec![],
+            prev: Vec::new(),
         }
     }
 
@@ -383,29 +371,22 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         let realloc = self.buffer.size() != size;
         if realloc {
             self.len = len;
-            // self.inner.resize(len, T::default());
+            self.prev.clear();
             self.buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
                 label: self.label,
                 size,
                 usage: self.usage,
                 mapped_at_creation: false,
             });
-            // The new buffer has undefined contents; the next `set` must write.
-            self.last_write_hash = None;
         }
         realloc
     }
 
     pub(crate) fn set(&mut self, ctx: &WgpuContext, data: &[T]) -> bool {
-        // trace!("{} {}", self.inner.len(), data.len());
-        // self.inner.resize(data.len(), T::default());
-        // self.inner.copy_from_slice(data);
         self.len = data.len();
         let realloc = self.buffer.size() != std::mem::size_of_val(data) as u64;
-        let bytes = bytemuck::cast_slice(data);
 
         if realloc {
-            // info!("realloc");
             // NOTE: create_buffer_init sometimes causes freezing in wasm
             let buffer = ctx.device.create_buffer(&wgpu::BufferDescriptor {
                 label: self.label,
@@ -413,18 +394,19 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                 usage: self.usage,
                 mapped_at_creation: false,
             });
+            let bytes = bytemuck::cast_slice(data);
             UPLOADED_BYTES.fetch_add(bytes.len() as u64, std::sync::atomic::Ordering::Relaxed);
             ctx.queue.write_buffer(&buffer, 0, bytes);
-            // info!("new");
             self.buffer = buffer;
-            self.last_write_hash = Some(fnv1a_64(bytes));
         } else {
-            // Skip the upload entirely when the contents are unchanged.
-            let hash = fnv1a_64(bytes);
-            if self.last_write_hash == Some(hash) {
+            // Skip the upload entirely when the contents are unchanged
+            // (`Pod` types have no padding, so byte equality is value equality).
+            let prev_bytes: &[u8] = bytemuck::cast_slice(self.prev.as_slice());
+            let data_bytes: &[u8] = bytemuck::cast_slice(data);
+            if prev_bytes == data_bytes {
                 return false;
             }
-            // info!("queue copy");
+            let bytes = bytemuck::cast_slice(data);
             UPLOADED_BYTES.fetch_add(bytes.len() as u64, std::sync::atomic::Ordering::Relaxed);
             {
                 let mut view = ctx
@@ -437,10 +419,10 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                     .unwrap();
                 view.copy_from_slice(bytes);
             }
-            self.last_write_hash = Some(hash);
             // ctx.queue.submit([]);
         }
-        // info!("done");
+        self.prev.clear();
+        self.prev.extend_from_slice(data);
         realloc
     }
 
