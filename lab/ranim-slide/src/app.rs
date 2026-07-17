@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, time::Instant};
 
 use egui::{
     Align2, CentralPanel, Color32, Context, CornerRadius, CursorIcon, DragValue, FontId, Id, Key,
-    LayerId, Margin, Order, Panel, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, TextureId,
-    Ui, Vec2, pos2, vec2,
+    Margin, Panel, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, TextureId, Ui, Vec2, pos2,
+    vec2,
 };
 use ranim_core::{
     core_item::CoreItem,
@@ -19,7 +19,8 @@ use ranim_render::{
 use tracing::{debug, info, trace};
 
 use crate::{
-    model::{Deck, Element, MIN_OBJECT_SIZE, SlideFrame},
+    gizmo::{GizmoScene, GizmoState, paint_gizmos},
+    model::{Deck, MIN_OBJECT_SIZE, SlideFrame},
     object::{
         InspectorCtx, PaintCtx, RECTANGLE_DESCRIPTOR, RenderCtx, SlideObjectDescriptor,
         SlideObjectRegistry, TEXT_DESCRIPTOR,
@@ -50,7 +51,7 @@ enum CenterTab {
 
 impl CenterTab {
     fn allows_selection(self) -> bool {
-        matches!(self, Self::World)
+        matches!(self, Self::Output)
     }
 }
 
@@ -247,7 +248,7 @@ impl RanimSlideApp {
                 b: 0.995,
                 a: 1.0,
             },
-            &self.store,
+            &mut self.store,
             &mut self.render_pool,
         );
         self.render_dirty = false;
@@ -640,9 +641,23 @@ impl RanimSlideApp {
         );
 
         if CenterTab::Output.allows_selection() {
+            let mut gizmos = GizmoScene::default();
             for element in &self.deck.current_page().elements {
-                paint_selection_overlay(ui, element, &paint_ctx);
+                if !element.visible {
+                    continue;
+                }
+                if element.selected {
+                    gizmos.selection(element.object.bounds(), &element.name, element.locked);
+                }
+                element.object.collect_gizmos(
+                    GizmoState {
+                        selected: element.selected,
+                        locked: element.locked,
+                    },
+                    &mut gizmos,
+                );
             }
+            paint_gizmos(ui, &paint_ctx, &gizmos);
         }
     }
 
@@ -1393,47 +1408,6 @@ fn panel_frame() -> egui::Frame {
         .stroke(Stroke::new(1.0_f32, Color32::from_rgb(210, 216, 224)))
 }
 
-fn paint_selection_overlay(ui: &Ui, element: &Element, ctx: &PaintCtx) {
-    if !element.visible {
-        return;
-    }
-
-    let rect = ctx.scene_rect_to_screen(element.object.bounds());
-    let painter = ui.painter();
-
-    if element.selected {
-        let selection_color = Color32::from_rgb(20, 105, 240);
-        painter.rect_stroke(
-            rect.expand(3.0),
-            CornerRadius::same(2),
-            Stroke::new(1.5_f32, selection_color),
-            StrokeKind::Outside,
-        );
-
-        for point in resize_handles(rect.expand(3.0)) {
-            painter.rect_filled(
-                Rect::from_center_size(point, vec2(7.0, 7.0)),
-                CornerRadius::same(1),
-                selection_color,
-            );
-        }
-    }
-
-    let overlay_painter = ui.ctx().layer_painter(LayerId::new(
-        Order::Foreground,
-        Id::new("slide_selection_overlay"),
-    ));
-    if element.selected {
-        overlay_painter.text(
-            rect.left_top() + vec2(0.0, -20.0),
-            Align2::LEFT_BOTTOM,
-            &element.name,
-            FontId::proportional(12.0),
-            Color32::from_rgb(20, 105, 240),
-        );
-    }
-}
-
 #[cfg(test)]
 fn slide_camera(frame: SlideFrame) -> CameraFrame {
     frame.camera_frame()
@@ -1468,22 +1442,15 @@ fn screen_to_scene(pos: Pos2, canvas_rect: Rect, scale: f32, frame: SlideFrame) 
     ))
 }
 
-fn resize_handles(rect: Rect) -> [Pos2; 8] {
-    [
-        rect.left_top(),
-        pos2(rect.center().x, rect.top()),
-        rect.right_top(),
-        pos2(rect.right(), rect.center().y),
-        rect.right_bottom(),
-        pos2(rect.center().x, rect.bottom()),
-        rect.left_bottom(),
-        pos2(rect.left(), rect.center().y),
-    ]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn output_canvas_owns_editor_selection_gizmos() {
+        assert!(CenterTab::Output.allows_selection());
+        assert!(!CenterTab::World.allows_selection());
+    }
 
     #[test]
     fn maps_screen_positions_to_scene_units() {

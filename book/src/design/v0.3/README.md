@@ -70,3 +70,4 @@ pub struct AnimationCell<T, A: Animator<T>> {
 - [Animation 结构与求值能力](./animation-model.md)
 - [全局 Timeline 与 TimeCursor](./time-cursor.md)
 - [动画组合与 Play 调度](./animation-composition.md)
+- [ranim-typst 项目编译与资源系统](./ranim-typst.md)

@@ -32,7 +32,10 @@ use ranim_items::{
     },
 };
 
-use crate::model::MIN_OBJECT_SIZE;
+use crate::{
+    gizmo::{GizmoScene, GizmoState},
+    model::MIN_OBJECT_SIZE,
+};
 
 const DEFAULT_SHAPE_STROKE_WIDTH: f32 = 0.02;
 const EMPHASIS_STROKE_WIDTH: f32 = 0.04;
@@ -276,6 +279,7 @@ pub trait SlideObject: Any + DynClone + EditorResize {
     }
     fn inspector_ui(&mut self, ui: &mut Ui, ctx: &mut InspectorCtx) -> InspectorResponse;
     fn paint_preview(&self, ui: &Ui, ctx: &PaintCtx);
+    fn collect_gizmos(&self, _state: GizmoState, _gizmos: &mut GizmoScene) {}
     fn extract_core_items(&self, ctx: &RenderCtx, out: &mut Vec<CoreItem>);
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
@@ -1385,6 +1389,12 @@ impl SlideObject for TypstTextObject {
 
     fn paint_preview(&self, _ui: &Ui, _ctx: &PaintCtx) {}
 
+    fn collect_gizmos(&self, state: GizmoState, gizmos: &mut GizmoScene) {
+        if state.selected {
+            gizmos.size_frame(self.bounds());
+        }
+    }
+
     fn extract_core_items(&self, _ctx: &RenderCtx, out: &mut Vec<CoreItem>) {
         let Ok(mut item) = self.compile_item() else {
             return;
@@ -2213,6 +2223,22 @@ mod tests {
         assert!(object.refresh_intrinsic_bounds());
         assert_eq!(object.bounds(), frame);
         assert!(object.intrinsic_bounds.world_max().x > object.intrinsic_bounds.world_min().x);
+    }
+
+    #[test]
+    fn typst_object_contributes_a_selected_size_gizmo() {
+        let object = TypstTextObject::new_default();
+        let mut gizmos = GizmoScene::default();
+
+        object.collect_gizmos(
+            GizmoState {
+                selected: true,
+                locked: false,
+            },
+            &mut gizmos,
+        );
+
+        assert_eq!(gizmos.primitives().len(), 2);
     }
 
     #[test]
