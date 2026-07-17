@@ -1,8 +1,20 @@
-# v0.3 设计构思
+## Roadmap
 
 本目录记录 ranim v0.3 场景与求值架构调整期间的原始构思和独立设计提案。这里的内容仍在讨论中，不代表最终 API。
 
-## World
+- [ ] [使用 bevy_ecs 重构 World](./bevy-ecs-world.md)
+  基于 bevy_ecs 的 World 将是 ranim v0.3 的核心。
+  - [x] 将 ranim 的 Store 底层重构为 bevy_ecs 的 World，且重构相应的渲染 extract 等逻辑。
+- [ ] [Animation 结构与求值能力](./animation-model.md)
+  - [ ] 动画现在只有 eval_alpha 语义，但是我们改为 seek 和 tick，我们在这个基础之上构思如何避免现在的 Eval<T> 会导致频繁的内存分配（这块可能就需要借助 World，在 seek 时同步 world 物件（spawn despawn 之类的），然后 tick 时原地修改。
+  - [ ] 需要重新设计 Pure Function 式和 Simulation 式的动画
+- [ ] [全局 Timeline 与 TimeCursor](./time-cursor.md)
+- [ ] [动画组合与 Play 调度](./animation-composition.md)
+- [ ] [ranim-typst 项目编译与资源系统](./ranim-typst.md)
+
+## 想法
+
+### World
 
 在之前的版本中，*World* 的存在被极度弱化，大概只有在渲染时求值出的 `Vec<CoreItem>` 才短暂地有它的影子，之后现在为了渲染相关做了 `CoreItemStore` 其实本质上也算是属于 *World* 了。但是这些基本都仅存在于渲染时，编码逻辑时依旧只有 Timeline。
 
@@ -10,7 +22,7 @@
 
 *World* 本质是场景某一时刻的快照，是物件的 Collection。它应该是是全部逻辑的中枢，一切逻辑操作将变更落实到 *World* 上，所有渲染数据也都来源于 *World* 的状态。
 
-## Animation
+### Animation
 
 我们现在用这样一个结构来描述动画：
 
@@ -63,11 +75,3 @@ pub struct AnimationCell<T, A: Animator<T>> {
 以及我想了一下，要不干脆 play 取消掉链式调用，而改为用 `anim.chain(xxx)` 或者 `(xxx, xxx)` 的方式来做（类似 bevy 的 system 支持的语法）？或者后续要同时播放两个动画实现个类似 `stack![]` 的东西？这样的话 play 可以返回一点额外的信息（比如时间，用于辅助构造后续动画）。
 
 我还想过单独做一个 TimeCursor，这样如果用户可以 `r.with_cursor(a).play(xxx)` 来方便地做不同“时间线”的排布？以及可以对 cursor 之间做同步等操作或者一些手动 seek 操作？
-
-## 独立提案
-
-- [使用 bevy_ecs 重构 World](./bevy-ecs-world.md)
-- [Animation 结构与求值能力](./animation-model.md)
-- [全局 Timeline 与 TimeCursor](./time-cursor.md)
-- [动画组合与 Play 调度](./animation-composition.md)
-- [ranim-typst 项目编译与资源系统](./ranim-typst.md)
