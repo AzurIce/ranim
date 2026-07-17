@@ -338,7 +338,9 @@ impl RanimPreviewApp {
 
         let (width, height) = (self.resolution.width, self.resolution.height);
         let oit_layers = self.calculate_oit_layers(&ctx, width, height);
-        let renderer = Renderer::new(&ctx, width, height, oit_layers);
+        let mut renderer = Renderer::new(&ctx, width, height, oit_layers);
+        renderer.register_component::<ranim_items::vitem::VItem>();
+        renderer.register_component::<ranim_items::vitem::geometry::Square>();
         let render_textures = renderer.new_render_textures(&ctx);
 
         // Init Depth Visual Pipeline

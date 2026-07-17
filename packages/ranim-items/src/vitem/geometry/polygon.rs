@@ -5,8 +5,8 @@ use ranim_core::{
     anchor::{BoundsAnchor, DBounds3, Locate, SemanticBounds},
     color,
     core_item::CoreItem,
+    extract::ExtractComponent,
     glam::{DVec2, DVec3, dvec2, dvec3},
-    store::ExtractToRenderWorld,
     traits::{Discard, RotateTransform, Scale, ShiftTransform, ShiftTransformExt},
 };
 
@@ -164,11 +164,15 @@ impl Extract for Square {
     }
 }
 
-impl ExtractToRenderWorld for Square {
-    type RenderItem = ranim_core::core_item::vitem::VItem;
+impl ExtractComponent for Square {
+    type QueryData = &'static Square;
+    type QueryFilter = ();
+    type Out = ranim_core::core_item::vitem::VItem;
 
-    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
-        output.push(VItem::from(self.clone()).into());
+    fn extract_component(
+        item: bevy_ecs::query::QueryItem<'_, '_, Self::QueryData>,
+    ) -> Option<Self::Out> {
+        Some(VItem::from(item.clone()).into())
     }
 }
 

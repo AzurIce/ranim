@@ -30,7 +30,8 @@ use color::{AlphaColor, Srgb, palette::css};
 use glam::{DVec3, Vec4, vec4};
 use ranim_core::anchor::{DBounds3, SemanticBounds};
 use ranim_core::core_item::CoreItem;
-use ranim_core::{Extract, color, glam, store::ExtractToRenderWorld};
+use ranim_core::extract::ExtractComponent;
+use ranim_core::{Extract, color, glam};
 
 use ranim_core::{
     components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
@@ -226,11 +227,15 @@ impl Extract for VItem {
     }
 }
 
-impl ExtractToRenderWorld for VItem {
-    type RenderItem = ranim_core::core_item::vitem::VItem;
+impl ExtractComponent for VItem {
+    type QueryData = &'static VItem;
+    type QueryFilter = ();
+    type Out = ranim_core::core_item::vitem::VItem;
 
-    fn extract_to_render_world(&self, output: &mut Vec<Self::RenderItem>) {
-        output.push(self.clone().into());
+    fn extract_component(
+        item: bevy_ecs::query::QueryItem<'_, '_, Self::QueryData>,
+    ) -> Option<Self::Out> {
+        Some(item.clone().into())
     }
 }
 

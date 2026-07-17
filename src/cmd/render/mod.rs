@@ -156,7 +156,9 @@ impl RenderWorker {
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir().unwrap().join(output_dir);
         }
-        let renderer = Renderer::new(&ctx, output.width, output.height, 8);
+        let mut renderer = Renderer::new(&ctx, output.width, output.height, 8);
+        renderer.register_component::<ranim_items::vitem::VItem>();
+        renderer.register_component::<ranim_items::vitem::geometry::Square>();
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
             .map(|_| renderer.new_render_textures(&ctx))
             .collect();
