@@ -104,7 +104,7 @@ Renderer::render_store_with_pool(...)
       start_readback / finish_readback → FileWriter
 ```
 
-阶段 1C 已修正 Render World 所有权，并保留“每帧完整 extraction、完整 GPU packing”的兼容行为。Render root 与 primitive entity 会跨帧复用，下一步再使用 change detection、实际 Queue 工作集和稳定 buffer range 优化上传。
+阶段 1C 已修正 Render World 所有权，并落地了 Queue 工作集（`QueuedFrame`）与帧级上传去重：extraction 仍每帧完整执行，但内容未变化的合并缓冲不再重复上传。Render root 与 primitive entity 会跨帧复用，下一步再做 change detection 驱动的增量 extraction、逐 item 稳定 buffer range 和脏区间上传。
 
 ## GPU 资源与帧目标
 

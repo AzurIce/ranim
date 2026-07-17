@@ -118,13 +118,7 @@ struct RenderItemOrder(usize);
 
 #### 1:1 与 1:N
 
-当前为了统一 reconciliation 路径，即使 extractor 只有一个输出，也会创建 child：
-
-```text
-Main A → Render Root R → Primitive P<RenderVItem>
-```
-
-这比 Bevy 的 1:1 extraction 多一层 Entity。目标应调整为：
+当前实现已按目标模型收敛：`ExtractComponent::Out` 直接插入 render root，只有 `ExtractMany` 创建 part entity：
 
 ```text
 1:1 ExtractComponent
@@ -139,7 +133,9 @@ Main A → Render R<MainEntity(A)>
                    └─ P2<RenderVItem>
 ```
 
-也就是让 `ExtractComponent::Out` 直接插入 R，只有 `ExtractMany` 创建 part entity。兼容协议 `ExtractToRenderWorld` 的输出数量可能动态变化，在迁移完成前继续走 child 路径，避免单输出和多输出切换时改变实体身份。
+1:1 输出的 stale 清理通过类型擦除的组件移除完成：render root 上每个 `(extractor)` 输出登记一个单态化的 `remove::<E::Out>` 函数指针，extractor 返回 `None` 或 main entity 不再匹配 query 时移除对应 bundle，但保留 root 供其他仍匹配的 extractor 使用；仅当 main entity 不再匹配任何 extractor 时才 despawn root。一个 root 被多个 1:1 extractor 命中时，在有序输出中去重，只保留首次出现的位置。
+
+需要注意的约定：两个 1:1 extractor 若向同一 root 输出同一组件类型会互相覆盖（与 Bevy 的 per-entity 组件唯一性一致），注册 extractor 时应避免这种组合。
 
 ### Extract
 
@@ -160,20 +156,18 @@ RenderWorld::extract(main_world)
 
 #### 注册方式
 
-当前保留三种注册入口：
+当前保留两种注册入口：
 
-- `renderer.register_item::<T>()`：兼容现有 `ExtractToRenderWorld`；
-- `renderer.register_component::<E>()`：query-based 1:1 extraction；
-- `renderer.register_many::<E>()`：query-based 1:N extraction。
+- `renderer.register_component::<E>()`：query-based 1:1 extraction，输出直接写入 render root；
+- `renderer.register_many::<E>()`：query-based 1:N extraction，每个输出是独立 primitive entity。
 
 query-based extractor 可以读取同一 Main Entity 上的多个 Component，并输出 Render World Bundle。`ExtractMany` 使用可复用的 `ExtractOutput`，支持顺序 `push(bundle)` 和显式 `emit(part_key, bundle)`。
+
+兼容协议 `ExtractToRenderWorld` 已随阶段一第 5 步移除：core `CameraFrame`/`VItem`/`MeshItem` 与用户侧 `Square`、高层 `ranim_items::VItem` 均已迁移到 query-based 协议（trait 定义位于 `ranim-core::extract`，system 与注册位于 `ranim-render`）。其余 Item 类型的 direct-world 迁移可以在此基础上逐个增量进行。`TextItem` 因内部缓存使用 `RefCell`/`Cell`（不满足 `Sync`）暂不能作为 Main World Component，需要先改造其缓存的线程安全性。
 
 注册入口内部不再保存 `Vec<Box<dyn ErasedExtractor>>`，而是向 renderer-owned `ExtractSchedule` 添加对应的泛型 system：
 
 ```text
-register_item::<T>()
-    → ExtractSchedule.add_systems(extract_item_system::<T>)
-
 register_component::<E>()
     → ExtractSchedule.add_systems(extract_component_system::<E>)
 
@@ -200,7 +194,7 @@ register_many::<E>()
 
 # 使用 bevy_ecs 重构 World
 
-> 状态：构思中。本页描述 v0.3 第一阶段的底层存储迁移。此阶段以替换内部实现为目标，不同时重写 Animation、Timeline 和用户编码 API。
+> 状态：阶段一（1A–1C）已落地。本页描述 v0.3 第一阶段的底层存储迁移。此阶段以替换内部实现为目标，不同时重写 Animation、Timeline 和用户编码 API。
 
 ## 阶段一：CoreItem ECS 化
 
@@ -672,9 +666,9 @@ Main World 只在 Sync/Extract 期间被读取；完成 extraction 后，当前�
 
 ### Queue、Sort 与 Prepare
 
-当前原型先完整构造 `VItemsBuffer`/`MeshItemsBuffer`，之后 Queue 只生成 viewport packet。这个顺序足以保持现有单视图行为，但不适合未来的可见性、多视图和按材质/管线 batching。
+当前实现：`queue_default_view` 在帧级 GPU packing 之前产出 `QueuedFrame` 工作集 resource（camera 实体 + 按 `RenderItemOrder` 排序的 render-item 实体列表，默认单视图全量），`prepare_render_world` 只消费 queued 实体构造 `VItemsBuffer`/`MeshItemsBuffer`。Sort 目前沿用 extraction 算好的 `RenderItemOrder`，尚无独立的重排阶段。这个结构足以保持现有单视图行为，并为未来的可见性、多视图和按材质/管线 batching 留出挂点。
 
-目标阶段顺序调整为：
+目标阶段顺序为：
 
 ```text
 Sync
@@ -746,16 +740,57 @@ recycle Main World ◄────────────── send frame cont
 - `RenderWorld`、render root、primitive mapping 和 ExtractSchedule 已移动到 `ranim-render`；
 - `Renderer` 已持有并跨帧复用 Render World，`render_store_with_pool` 会在 GPU 工作前执行 Sync/Extract；
 - `CameraFrame`、core `VItem` 和 `MeshItem` extractor 由 Render World 默认注册；
-- 现有 `ExtractToRenderWorld` 被保留为兼容协议，高层 Item 或自定义 Item 可通过 `renderer.register_item::<T>()` 注册；
+- 兼容协议 `ExtractToRenderWorld` 已移除；`ExtractComponent`/`ExtractMany`/`ExtractOutput` 定义在 `ranim-core::extract`，core 三类型与用户侧 `Square`、高层 `ranim_items::VItem` 均已迁移到 query-based 协议，由根 crate 在构造 `Renderer` 后注册；
+- 1:1 `ExtractComponent` 输出直接写入 render root，不再多一层 primitive entity；只有 `ExtractMany` 创建 part entity；
 - 每个参与渲染的 Main Entity 都有稳定 render root，1:N 输出以独立 primitive entity 存储；
-- Main Entity despawn、渲染组件移除、extractor 输出缩减和 `None` 输出都会清理旧 render entity；
-- extractor 输出 Vec 已在 typed extractor 内跨帧复用，不再为每个 source 每帧新建 Vec；
-- 已实现 query-based `ExtractComponent` 与 `ExtractMany`，支持读取多个 Main World Component、输出 render Bundle 和显式稳定 part key；
-- 三类 extractor 注册已改为向 `bevy_ecs::Schedule` 添加泛型 system，不再使用 type-erased extractor Vec；
+- Main Entity despawn、渲染组件移除（类型擦除的 `remove::<E::Out>`）、extractor 输出缩减和 `None` 输出都会清理旧 render component/entity；
+- extractor 输出缓冲（`ExtractOutput`）在 typed extractor 内跨帧复用，不再为每个 source 每帧新建 Vec；
+- 两类 extractor 注册已改为向 `bevy_ecs::Schedule` 添加泛型 system，不再使用 type-erased extractor Vec；
 - QueryState 会在 Main World 的 `WorldId` 变化时重建，Render World 不会跨不同 Main World 错误复用实体身份；
-- 当前 Queue 已发生在帧级 GPU packing 之前，但仍只有默认单视图和完整工作集，尚未实现 render phase、Sort 和 visibility filtering；
-- VItemsBuffer/MeshItemsBuffer 仍每帧完整 packing，Changed-based extraction、asset handle 和增量 GPU 上传尚未实现；
+- Queue 阶段产出 `QueuedFrame` 工作集 resource（默认单视图、按 `RenderItemOrder` 排序），Prepare 只消费 queued 实体构造合并缓冲；render phase、独立 Sort 和 visibility filtering 尚未实现；
+- `CoreItemStore::update` 在值未变化时跳过 insert，Main World 的 change tick 只在真实变化时移动；
+- `WgpuVecBuffer::set` 通过内容哈希跳过与上一帧完全相同的上传，静态帧/编辑器空闲帧的 GPU 上传量降为 ~0；逐 item 稳定 buffer range 与脏区间上传尚未实现；
+- 已记录阶段 1A 与当前实现的求值时间、分配次数和上传量基线（见下节）；
 - Render Graph 仍只消费 `RenderPackets` 和 prepared GPU resource，不访问 Main World 或 Render World。
+
+### 阶段一性能基线
+
+基线对比点为阶段 1A（commit `18d19d0`）与阶段一完成状态。计时数据来自 criterion（`cargo bench -p benches`，中位数附近取均值），分配次数与上传量来自 `cargo run -p benches --release --bin profile_frame`（场景为 20×20 = 400 个 VItem）。
+
+**Timeline 求值**（`eval` bench，纯求值路径，不经过 World）：
+
+| 场景 | 1A | 阶段一完成 |
+|---|---|---|
+| eval_static_squares/1000 | 632.6 ms | 638.1 ms |
+| eval_transform_squares/1000 | 659.9 ms | 688.2 ms |
+
+**渲染提交**（`gpu_render` bench，同一静态 `CoreItemStore` 连续重渲染，`render_store_with_pool` + `device.poll`）：
+
+| VItem 数 | 1A | 阶段一完成 |
+|---|---|---|
+| 25 | 2.14 ms | 2.15 ms |
+| 400 | 2.42 ms | 2.49 ms |
+| 1600 | 2.65 ms | 3.59 ms |
+| 3600 | 2.84 ms | 4.60 ms |
+
+**分配次数与上传量**（`profile_frame`，400 VItem）：
+
+| 路径 | 时间 | 分配次数 | 分配字节 | GPU 上传 |
+|---|---|---|---|---|
+| `eval_at_alpha` | 262 µs | 9211 | 1.17 MB | — |
+| eval + `store.update` | 311 µs | 9227 | 1.05 MB | — |
+| 静态帧（cold） | 15.4 ms | — | — | 214,400 B |
+| 静态帧（steady） | 835 µs | 1761 | 0.41 MB | **144 B** |
+| 动画帧（eval+update+render） | 1.12 ms | 9421 | 2.06 MB | 全量 |
+
+结论与已知取舍：
+
+- Timeline 纯求值路径与 1A 持平（差异在噪声范围内）。
+- 静态帧 GPU 上传量从每帧全量（400 items 约 210 KB）降为 144 B（仅 viewport uniform）；动画帧上传量不变。上传去重基于 packed 内容的 memcmp（CPU 成本可忽略，`Pod` 无填充字节故字节相等即值相等）。
+- 大规模静态场景重渲染（1600+ items）帧时间高于 1A。定位结论：回归全部来自 extraction 的全量 clone——3600 items 时 CPU 提交从 0.46 ms 升至 1.96 ms（约 +1.5 ms/帧），GPU 执行时间两版基本相当（~2.4–2.9 ms），渲染输出像素级一致。这是双 World 全量 extraction 的固有成本（与 Bevy `ExtractComponent` 语义相同），也正是阶段二 `Changed<T>` 增量 extraction 与 seek/tick 原地更新的主要动机；Main World 的精确 change tick（值不变不 insert）已为此就位。
+- 注意：`cpu_submit/no_wait` bench 组在队列背压下实际测量的是 GPU 吞吐而非纯 CPU 时间（两版均 ~1.9 ms @3600），不应据此认为 CPU 成本持平。
+
+阶段一验收条件（求值时间、分配次数、渲染上传量）由此覆盖；阶段二的 seek/tick 重构应以这些数字为回归基线。
 
 ### 暂不决定
 
