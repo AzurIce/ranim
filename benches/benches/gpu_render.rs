@@ -38,7 +38,7 @@ fn gpu_render_benchmark(c: &mut Criterion) {
         };
 
         // Warm up: render once to initialize all GPU resources
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &mut store, &mut pool);
         pool.clean();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -53,7 +53,7 @@ fn gpu_render_benchmark(c: &mut Criterion) {
                         &ctx,
                         &mut render_textures,
                         clear_color,
-                        &store,
+                        &mut store,
                         &mut pool,
                     );
                     pool.clean();
@@ -95,7 +95,7 @@ fn cpu_submit_benchmark(c: &mut Criterion) {
         };
 
         // Warm up
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &mut store, &mut pool);
         pool.clean();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -110,7 +110,7 @@ fn cpu_submit_benchmark(c: &mut Criterion) {
                         &ctx,
                         &mut render_textures,
                         clear_color,
-                        &store,
+                        &mut store,
                         &mut pool,
                     );
                     pool.clean();
@@ -149,7 +149,7 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
         };
 
         // Warm up
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &mut store, &mut pool);
         pool.clean();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -164,7 +164,7 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
                         &ctx,
                         &mut render_textures,
                         clear_color,
-                        &store,
+                        &mut store,
                         &mut pool,
                     );
                     pool.clean();
@@ -205,7 +205,7 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
         };
 
         // Warm up
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &mut store, &mut pool);
         pool.clean();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -220,7 +220,7 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
                         &ctx,
                         &mut render_textures,
                         clear_color,
-                        &store,
+                        &mut store,
                         &mut pool,
                     );
                     pool.clean();
