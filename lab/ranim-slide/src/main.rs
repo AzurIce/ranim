@@ -1,4 +1,5 @@
 mod app;
+mod gizmo;
 mod model;
 mod object;
 
@@ -13,11 +14,14 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     if std::env::var_os("RANIM_SLIDE_NO_VSYNC").is_some() {
-        native_options.wgpu_options.present_mode = wgpu::PresentMode::AutoNoVsync;
-        native_options.wgpu_options.desired_maximum_frame_latency = Some(1);
+        native_options.wgpu_options.surface.present_mode = wgpu::PresentMode::AutoNoVsync;
+        native_options
+            .wgpu_options
+            .surface
+            .desired_maximum_frame_latency = Some(1);
         tracing::info!(
-            present_mode = ?native_options.wgpu_options.present_mode,
-            desired_maximum_frame_latency = ?native_options.wgpu_options.desired_maximum_frame_latency,
+            present_mode = ?native_options.wgpu_options.surface.present_mode,
+            desired_maximum_frame_latency = ?native_options.wgpu_options.surface.desired_maximum_frame_latency,
             "using experimental wgpu present settings"
         );
     }
