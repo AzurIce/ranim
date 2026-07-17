@@ -702,17 +702,16 @@ impl Extract for RegularPolygon {
 }
 
 #[cfg(test)]
-mod render_world_tests {
+mod main_world_tests {
     use ranim_core::store::CoreItemStore;
 
     use super::*;
 
     #[test]
-    fn square_can_live_in_main_world_and_extract_to_render_world() {
+    fn square_can_live_in_main_world() {
         let mut store = CoreItemStore::new();
         let entity = store.insert_item(Square::new(2.0));
 
         assert!(store.world().get::<Square>(entity).is_some());
-        assert_eq!(store.render_world().vitems().count(), 1);
     }
 }

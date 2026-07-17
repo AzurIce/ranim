@@ -215,7 +215,7 @@ impl RenderWorker {
             let mut cur = 0usize;
             let mut pending: VecDeque<(usize, u64)> = VecDeque::new();
 
-            while let Ok(store) = submit_frame_rx.recv_blocking() {
+            while let Ok(mut store) = submit_frame_rx.recv_blocking() {
                 // Drain oldest pending readback if all targets are occupied
                 if pending.len() >= n {
                     let (prev, prev_fc) = pending.pop_front().unwrap();
@@ -228,7 +228,7 @@ impl RenderWorker {
                     &worker.ctx,
                     &mut worker.render_textures[cur],
                     worker.clear_color,
-                    &store,
+                    &mut store,
                     &mut worker.pool,
                 );
                 worker.render_textures[cur].start_readback(&worker.ctx);
@@ -269,7 +269,7 @@ impl RenderWorker {
         }
     }
 
-    fn render_store(&mut self, store: &CoreItemStore) {
+    fn render_store(&mut self, store: &mut CoreItemStore) {
         #[cfg(feature = "profiling")]
         profiling::scope!("frame");
 
@@ -479,7 +479,7 @@ impl RanimRenderApp {
 
             self.store.update(timeline.eval_at_alpha(alpha));
             let worker = self.render_worker.as_mut().unwrap();
-            worker.render_store(&self.store);
+            worker.render_store(&mut self.store);
             worker.capture_frame(filename);
             span.pb_inc(1);
         }

@@ -30,7 +30,7 @@ Main World / CoreItemStore（兼容期）
                        图片序列 / 视频编码器
 ```
 
-目前阶段 1B 原型中的 `CoreItemStore` 同时持有 Main World 和 Render World，并在每帧提取 `CameraFrame`、`VItem` 与 `MeshItem`。该布局只用于验证分层可行性。阶段 1C 的目标是让 `CoreItemStore` 只保留 Main World，Render World、映射和 extraction registry 移入 `ranim-render` 并跨帧复用。
+阶段 1C 已让 `CoreItemStore` 只保留 Main World。Render World、实体映射和 ExtractSchedule 已移入 `ranim-render`，由 `Renderer` 持有并跨帧复用。
 
 ## 分层与职责
 
@@ -47,11 +47,16 @@ Main World / CoreItemStore（兼容期）
 目标边界为：
 
 ```rust,ignore
-render_world.extract(main_world);
-renderer.render_world(&ctx, &mut targets, clear_color, &render_world, &mut pool);
+renderer.render_store_with_pool(
+    &ctx,
+    &mut targets,
+    clear_color,
+    &mut store,
+    &mut pool,
+);
 ```
 
-`extract` 完成后不再借用 Main World，因此后续 GPU 渲染、readback 与编码可以独立进行。Render World 是跨帧复用的 renderer-side scene，不是要求每帧 clone 的一次性完整快照。
+该入口内部先把 Main World Sync/Extract 到 renderer-owned Render World，再执行 Queue、Prepare 和 Render。`extract` 完成后不再借用 Main World，因此后续 GPU 渲染、readback 与编码可以独立进行。Render World 是跨帧复用的 renderer-side scene，不是要求每帧 clone 的一次性完整快照。
 
 ### Renderer
 
@@ -71,7 +76,7 @@ Renderer 不应拥有“总时长”“第几帧”或“时间标记”等时�
 
 ## 当前单帧路径
 
-阶段 1B 原型中离线路径的关键顺序如下：
+当前离线路径的关键顺序如下：
 
 ```text
 SealedRanimScene::eval_at_sec(t)
@@ -79,15 +84,15 @@ SealedRanimScene::eval_at_sec(t)
         ▼
 CoreItemStore::update(items)
         │
-        ├─ reconcile Main World
-        └─ extract 到 store 内部 Render World
-        │
+        └─ reconcile Main World
         ▼
 Renderer::render_store_with_pool(...)
         │
-        ├─ CameraFrame → ViewportUniform
-        ├─ VItem       → VItemsBuffer
-        └─ MeshItem    → MeshItemsBuffer
+        ├─ Sync render roots
+        ├─ Extract registered components
+        ├─ Queue CameraFrame → ViewportUniform
+        ├─ Prepare VItem     → VItemsBuffer
+        └─ Prepare MeshItem  → MeshItemsBuffer
                  │
                  ▼
              RenderGraph
@@ -99,7 +104,7 @@ Renderer::render_store_with_pool(...)
       start_readback / finish_readback → FileWriter
 ```
 
-阶段 1A 已将原有按类型 Vec 改为 Main World entity reconciliation；阶段 1B 又增加了独立 Render Entity，但错误地把 Render World 放在 `CoreItemStore` 内。阶段 1C 会移动其所有权，并先保持“每帧完整 extraction、完整 GPU packing”的兼容行为，再逐步使用 change detection 和稳定 buffer range 优化。
+阶段 1C 已修正 Render World 所有权，并保留“每帧完整 extraction、完整 GPU packing”的兼容行为。Render root 与 primitive entity 会跨帧复用，下一步再使用 change detection、实际 Queue 工作集和稳定 buffer range 优化上传。
 
 ## GPU 资源与帧目标
 
@@ -163,8 +168,13 @@ OITResolve
 
 ```rust,ignore
 runner.seek_or_tick(sample_time)?;
-renderer.extract(runner.world());
-renderer.render_current_frame();
+renderer.render_store_with_pool(
+    &ctx,
+    &mut target,
+    clear_color,
+    runner.store_mut(),
+    &mut pool,
+);
 ```
 
 `seek_or_tick` 可以由纯 Timeline 的随机求值实现，也可以由带 checkpoint 的模拟递推实现；两种差异必须停留在求值层，不能扩散到 renderer。

@@ -4425,13 +4425,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "orphan-test"
-version = "0.2.1"
-dependencies = [
- "ranim-core",
-]
-
-[[package]]
 name = "owned_ttf_parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4652,6 +4645,10 @@ name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
+
+[[package]]
+name = "playground"
+version = "0.2.1"
 
 [[package]]
 name = "plist"
@@ -5218,6 +5215,7 @@ name = "ranim-render"
 version = "0.2.1"
 dependencies = [
  "async-channel",
+ "bevy_ecs",
  "bytemuck",
  "glam 0.33.2",
  "image",
@@ -5225,6 +5223,7 @@ dependencies = [
  "profiling",
  "puffin",
  "ranim-core",
+ "ranim-items",
  "slotmap",
  "tracing",
  "variadics_please 2.0.0",

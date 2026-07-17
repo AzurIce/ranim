@@ -410,7 +410,7 @@ impl RanimPreviewApp {
                 ctx,
                 render_textures,
                 self.clear_color,
-                &self.store,
+                &mut self.store,
                 &mut self.pool,
             );
 
