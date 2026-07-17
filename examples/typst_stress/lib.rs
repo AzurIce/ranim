@@ -79,7 +79,7 @@ office affinity efficient ffi 0123456789
 
 fn fit_to_frame(items: &mut Vec<VItem>, height: f64) {
     items
-        .scale_to(ScaleHint::PorportionalY(height))
+        .scale_to(ScaleHint::ProportionalY(height))
         .move_to(DVec3::ZERO);
 }
 
@@ -106,8 +106,8 @@ fn typst_behavior(r: &mut RanimScene) {
             }
             output.document.into_vitems().with(|items| {
                 items.scale_to_min(&[
-                    ScaleHint::PorportionalX(6.0),
-                    ScaleHint::PorportionalY(1.55),
+                    ScaleHint::ProportionalX(6.0),
+                    ScaleHint::ProportionalY(1.55),
                 ]);
             })
         })
@@ -125,16 +125,16 @@ fn typst_behavior(r: &mut RanimScene) {
         r#"#text(size: 20pt, weight: "bold", fill: rgb("66d9ef"))[Typst behavior matrix]"#,
     );
     title
-        .scale_to(ScaleHint::PorportionalY(0.35))
+        .scale_to(ScaleHint::ProportionalY(0.35))
         .move_to(DVec3::Y * 3.7);
     let _r_title = r.insert(title);
 
     let mut from = TypstText::new(r#"$ sum_(k=1)^n k = n(n+1)/2 $"#);
     let mut to = TypstText::new(r#"$ sum_(k=1)^n k^3 = (n(n+1)/2)^2 $"#);
-    from.scale_to(ScaleHint::PorportionalY(0.55))
+    from.scale_to(ScaleHint::ProportionalY(0.55))
         .move_to(DVec3::NEG_Y * 3.95)
         .set_fill_color(manim::YELLOW_C);
-    to.scale_to(ScaleHint::PorportionalY(0.55))
+    to.scale_to(ScaleHint::ProportionalY(0.55))
         .move_to(DVec3::NEG_Y * 3.95)
         .set_fill_color(manim::GREEN_C);
 
@@ -184,8 +184,8 @@ cell [{:02}, {:02}] office affine ffi 0123456789
                 .into_vitems()
                 .with(|items| {
                     items.scale_to_min(&[
-                        ScaleHint::PorportionalX(1.1),
-                        ScaleHint::PorportionalY(0.48),
+                        ScaleHint::ProportionalX(1.1),
+                        ScaleHint::ProportionalY(0.48),
                     ]);
                 })
         })
