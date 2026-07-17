@@ -361,7 +361,13 @@ mod tests {
             a: 1.0,
         };
 
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        renderer.render_store_with_pool(
+            &ctx,
+            &mut render_textures,
+            clear_color,
+            &mut store,
+            &mut pool,
+        );
         pool.clean();
 
         ctx.device
@@ -424,7 +430,13 @@ mod tests {
             a: 1.0,
         };
 
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
+        renderer.render_store_with_pool(
+            &ctx,
+            &mut render_textures,
+            clear_color,
+            &mut store,
+            &mut pool,
+        );
         pool.clean();
 
         ctx.device

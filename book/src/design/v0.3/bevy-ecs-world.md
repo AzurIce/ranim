@@ -1,3 +1,197 @@
+## RenderWorld & Extract
+
+本节集中描述 Main World 与 Render World 之间的实体同步、渲染实体身份，以及 extraction 的注册和执行方式。下面先记录当前实现，再标出需要继续向 Bevy 模型收敛的部分。
+
+### RenderWorld
+
+RenderWorld 是渲染管线专用的 ECS World。Main World 保存用户场景和动画求值产生的状态，RenderWorld 则保存从这些状态中提取出的、适合后续 Prepare、Queue 和 GPU 渲染阶段消费的数据。两者使用独立的 Entity，但需要维护稳定的实体对应关系，使连续帧可以原地更新渲染数据，而不是每帧重建全部状态。
+
+#### Bevy 的实体对应模型
+
+Bevy 在具体组件 extraction 之前执行独立的 entity sync：
+
+```text
+Main Entity A 添加 SyncToRenderWorld
+        │
+        ▼
+PendingSyncEntity 记录 Added(A)
+        │
+        ▼
+entity_sync_system
+        ├─ Render World spawn R(MainEntity(A))
+        └─ Main World 的 A 插入 RenderEntity(R)
+        │
+        ▼
+ExtractSchedule
+        └─ 根据 A 上的 RenderEntity(R) 把 Out Bundle 插入 R
+```
+
+因此 Bevy 的对应 Render Entity 本身就是 1:1 extraction 的承载者，不需要再创建一层 child。`MainEntity` 在 Sync 阶段随 R 创建，`RenderEntity` 在 R 创建后反向插入 A，之后才执行组件 extraction。
+
+#### ranim 当前的实体对应模型
+
+假设 Main World 中有 Entity A，sync 后会得到：
+
+```text
+Main World                         Render World
+
+Entity A                           Entity R
+├─ Square                          ├─ MainEntity(A)
+├─ Transform                       └─ RenderRootOrder(0)
+└─ Visibility
+```
+
+当前代码把 R 称为 render root。它不是用户场景树的根节点，也不表示 ECS hierarchy，只是 Main Entity 在 Render World 中的稳定身份代理。
+
+当前映射只存在于 renderer：
+
+```rust,ignore
+struct MainEntity(Entity);
+
+struct RenderEntityMap {
+    roots: HashMap<MainEntity, RenderEntity>,
+}
+```
+
+与 Bevy 不同，ranim 当前没有向 A 反向插入 `RenderEntity(R)`。这样 Main World 保持 renderer-neutral，但 Main World Query 无法直接取得对应 Render Entity，sync 也暂时需要扫描场景实体并匹配 extractor。
+
+`WorldId` 用于标识 RenderWorld 当前绑定的 Main World。如果 Main World 的 `WorldId` 变化，RenderWorld 会清空已有实体并重建绑定旧 World 的 `QueryState`。因此，不同 World 中碰巧相同的 Entity ID 不会被当成同一个对象。
+
+每次实体同步负责：
+
+1. 为新增且匹配 extractor 的 Main Entity 创建 R；
+2. 复用仍然有效的 R；
+3. A 被 despawn 或不再匹配任何 extractor 时，清理 R 和属于它的全部 primitive entity。
+
+#### RenderRootOrder
+
+`RenderRootOrder(usize)` 记录 Main Entity 在当前 Main World 场景序列中的位置，来源是 `CoreItemStore::scene_entities()`：
+
+```text
+Main scene entities: [A, B, C]
+
+R(A): RenderRootOrder(0)
+R(B): RenderRootOrder(1)
+R(C): RenderRootOrder(2)
+```
+
+它不是 z 坐标、深度或显式 z-index，只用于保留迁移前 Timeline/CoreItem 数组的确定性场景顺序。未来 Queue 可以把它作为默认排序信息，或者让同一 root 的多个渲染输出继承共同的场景顺序。
+
+当前 Queue 或 Prepare 尚未直接查询 `RenderRootOrder` 组件。`finish_extract` 会使用同一个 root order 值，加上 extractor 注册顺序和本次输出顺序，对帧内输出排序并生成 `ordered_items`；随后再把线性结果写成 primitive entity 上的 `RenderItemOrder`：
+
+```text
+Root A: RenderRootOrder(0), emits part 0 and part 1
+Root B: RenderRootOrder(1), emits part 0
+
+Primitive A/0: RenderItemOrder(0)
+Primitive A/1: RenderItemOrder(1)
+Primitive B/0: RenderItemOrder(2)
+```
+
+所以 root order 当前已经间接决定 extraction 输出顺序，但 `RenderRootOrder` 组件本身仍只是尚未被后续阶段查询的 root-level 元数据。建立正式 Queue/Sort 时，需要决定让 Queue 直接消费它，还是根据 layer、显式 order 等信息重新生成排序键。
+
+#### Primitive entity
+
+当前 extractor 的每个输出都会成为独立 primitive entity：
+
+```text
+Render Root R<MainEntity(A), RenderRootOrder>
+  ├─ P0<ExtractedFrom(R), RenderItemKey, RenderItemOrder, RenderVItem>
+  └─ P1<ExtractedFrom(R), RenderItemKey, RenderItemOrder, RenderVItem>
+```
+
+它们不使用 ECS hierarchy，而是通过组件表达归属和身份：
+
+```rust,ignore
+struct ExtractedFrom(Entity); // render root
+
+struct RenderItemKey {
+    root: Entity,
+    extractor: usize,
+    part: usize,
+}
+
+struct RenderItemOrder(usize);
+```
+
+稳定键为 `(render_root, extractor_id, part_key)`。已有 key 原地更新，新增 key spawn，本轮未出现的旧 key despawn。动态拓扑 Item 应使用显式语义 part key，避免插入或删除一个 part 后让后续全部 primitive 改变身份。
+
+#### 1:1 与 1:N
+
+当前为了统一 reconciliation 路径，即使 extractor 只有一个输出，也会创建 child：
+
+```text
+Main A → Render Root R → Primitive P<RenderVItem>
+```
+
+这比 Bevy 的 1:1 extraction 多一层 Entity。目标应调整为：
+
+```text
+1:1 ExtractComponent
+
+Main A → Render R<MainEntity(A), RenderVItem>
+
+1:N ExtractMany
+
+Main A → Render R<MainEntity(A)>
+                   ├─ P0<RenderVItem>
+                   ├─ P1<RenderVItem>
+                   └─ P2<RenderVItem>
+```
+
+也就是让 `ExtractComponent::Out` 直接插入 R，只有 `ExtractMany` 创建 part entity。兼容协议 `ExtractToRenderWorld` 的输出数量可能动态变化，在迁移完成前继续走 child 路径，避免单输出和多输出切换时改变实体身份。
+
+### Extract
+
+Extract 是从 Main World 读取场景组件，并将对应渲染组件写入 RenderWorld 的阶段。当前由 `Renderer::render_store_with_pool` 在每帧 GPU 工作前触发：
+
+```text
+Renderer::render_store_with_pool
+        │
+        ▼
+RenderWorld::extract(main_world)
+        │
+        ├─ 检查 Main WorldId
+        ├─ 收集匹配已注册 extractor 的 Main Entity
+        ├─ Sync render roots
+        ├─ 执行 ExtractSchedule
+        └─ 清理本帧未再次出现的输出
+```
+
+#### 注册方式
+
+当前保留三种注册入口：
+
+- `renderer.register_item::<T>()`：兼容现有 `ExtractToRenderWorld`；
+- `renderer.register_component::<E>()`：query-based 1:1 extraction；
+- `renderer.register_many::<E>()`：query-based 1:N extraction。
+
+query-based extractor 可以读取同一 Main Entity 上的多个 Component，并输出 Render World Bundle。`ExtractMany` 使用可复用的 `ExtractOutput`，支持顺序 `push(bundle)` 和显式 `emit(part_key, bundle)`。
+
+注册入口内部不再保存 `Vec<Box<dyn ErasedExtractor>>`，而是向 renderer-owned `ExtractSchedule` 添加对应的泛型 system：
+
+```text
+register_item::<T>()
+    → ExtractSchedule.add_systems(extract_item_system::<T>)
+
+register_component::<E>()
+    → ExtractSchedule.add_systems(extract_component_system::<E>)
+
+register_many::<E>()
+    → ExtractSchedule.add_systems(extract_many_system::<E>)
+```
+
+这与 Bevy 在 App 构建阶段把 extraction system 注册进 `ExtractSchedule` 的方式一致：extractor 不是单独的运行时 trait object 注册表，而是普通 ECS system。`extract_schedule_mut()` 也允许渲染模块继续向该 Schedule 添加自定义 system。
+
+#### 工作方式
+
+每帧 extraction 开始前，Main World 会临时作为 `MainWorld` Resource 移入 Render World；各 extraction system 使用自己的 `Local<QueryState>` 查询 Main World，并通过 `Commands` 和共享的 render entity mapping Resource 更新 Render World。Schedule 结束后统一应用 Commands、清理 stale 输出，再把 Main World 原样放回 `CoreItemStore`。
+
+当前尚未实现 Bevy 的 `PendingSyncEntity` 增量事件队列，也没有关闭 `ExtractSchedule` 的自动 deferred application。所有 extraction systems 仍共享可变 reconciliation Resource，因此目前会串行执行；Schedule 化首先解决注册、Query 和阶段边界，后续再拆分批量输出以获得并行 extraction。
+
+
+---
+
 1. 将 ranim 的 Store 底层重构为 bevy_ecs 的 World，且重构相应的渲染 extract 等逻辑。这一阶段的目标就是不改动全部外部接口的情况下更换我们底层的 store。
 2. 我们的动画现在只有 eval_alpha 语义，但是我们改为 seek 和 tick，我们在这个基础之上构思如何避免现在的 Eval<T> 会导致频繁的内存分配（这块可能就需要借助 World，在 seek 时同步 world 物件（spawn despawn 之类的），然后 tick 时原地修改。
 3. 然后我们再去构思模拟式的动画 API 要怎么设计。
@@ -421,7 +615,7 @@ ranim-core
 ranim-render
 ├─ RenderWorld
 ├─ Main/Render entity mapping
-├─ ExtractRegistry
+├─ ExtractSchedule
 ├─ Queue / Sort / Prepare schedules
 ├─ prepared GPU resources
 ├─ RenderPackets
@@ -476,115 +670,6 @@ Render World<Render Components + Primitive Entities>
 
 Main World 只在 Sync/Extract 期间被读取；完成 extraction 后，当前帧渲染不再借用 Main World。这样 preview、离线 worker 和未来的模拟/渲染并行都能共享同一边界。
 
-### 实体同步
-
-每个参与渲染的 Main Entity 在 Render World 中有一个稳定的 root entity：
-
-```text
-Main Entity<Square, Transform, Visibility>
-                    │
-                    ▼
-Render Root<MainEntity, RenderTransform, RenderVisibility, ...>
-```
-
-阶段 1C 首版把映射保存在 render 侧：
-
-```rust,ignore
-struct MainEntity(Entity);
-
-struct RenderEntityMap {
-    roots: HashMap<Entity, Entity>,
-}
-```
-
-这样 Main World 不需要插入 renderer 定义的 `RenderEntity` 组件，也不要求 `ranim-core` 依赖 `ranim-render`。每次 sync 负责：
-
-1. 为新增的可渲染 Main Entity 创建 render root；
-2. 复用仍然存在的 root；
-3. Main Entity 消失或不再包含任何已注册渲染来源时，清理 root 及其 primitive children。
-
-首版可以完整 reconcile 已注册 query 的实体集合。等正确性稳定后，再使用 added/removed component 事件或 change tick 将 sync 改为增量路径。只有当双向查询成为明确需求时，才考虑像 Bevy 一样把 `RenderEntity` 写回 Main World。
-
-### 1:1 与 1:N extraction
-
-对简单 Item，提取结果直接作为 component 插入稳定 root：
-
-```text
-Main Entity<core::VItem>
-        │ extract
-        ▼
-Render Root<RenderVItem>
-```
-
-对复合 Item，root 保留共同状态，每个 primitive 使用独立 child entity：
-
-```text
-Main Entity<Text>
-        │
-        ▼
-Render Root<MainEntity, RenderTransform, ...>
-  ├─ Primitive<ExtractedFrom, PartKey, RenderVItem>
-  ├─ Primitive<ExtractedFrom, PartKey, RenderVItem>
-  └─ Primitive<ExtractedFrom, PartKey, RenderVItem>
-```
-
-child 不强制使用 ECS hierarchy；只要它记录来源 root、extractor 和 part identity 即可：
-
-```rust,ignore
-struct ExtractedFrom(Entity); // render root
-struct ExtractorId(u32);
-struct PartKey(u64);
-```
-
-映射的稳定键为 `(render_root, extractor_id, part_key)`。固定拓扑的 Item 可以用顺序 index 生成 `PartKey`；Text、Group 或动态拓扑 Item 应优先提供语义稳定的 key。这样在插入、删除或重排一个 part 时，不必让后续全部 primitive 改变身份。
-
-每个 extractor 在一轮 extraction 结束时对自己的输出做 reconciliation：已有 key 原地更新，新增 key spawn，本轮未出现的旧 key despawn。一个 Main Entity 可以注册多个 extractor，从而分别输出 VItem、MeshItem 或其他不同 render bundle，不要求一个 trait 调用返回异构 Vec。
-
-### Extract 协议与注册
-
-阶段 1B 的 `&self -> Vec<RenderItem>` 只能读取单一 component，并且每次调用新建 Vec。正式协议应借鉴 Bevy 的 query-based extraction：
-
-```rust,ignore
-pub trait ExtractComponent {
-    type QueryData: ReadOnlyQueryData;
-    type QueryFilter: QueryFilter;
-    type Out: Bundle;
-
-    fn extract_component(
-        item: QueryItem<'_, '_, Self::QueryData>,
-    ) -> Option<Self::Out>;
-}
-```
-
-1:N extraction 使用独立协议或等价的注册函数：
-
-```rust,ignore
-pub trait ExtractMany {
-    type QueryData: ReadOnlyQueryData;
-    type QueryFilter: QueryFilter;
-    type Out: Bundle;
-
-    fn extract_many(
-        item: QueryItem<'_, '_, Self::QueryData>,
-        output: &mut ExtractOutput<Self::Out>,
-    );
-}
-```
-
-`ExtractOutput` 由 renderer 复用内部容量，并提供 `emit(part_key, bundle)`；它不是用户动画 API 中的 World scope，只是 extraction 系统的输出写入器。
-
-提取逻辑由 `ranim-render::ExtractRegistry` 注册和执行。首版不必复刻 Bevy 的跨 World `SystemParam`：每个 typed extractor 可以缓存 `QueryState`，显式接收 `&MainWorld` 和 `&mut RenderWorld`。当 extraction 的并行调度确实成为瓶颈时，再将 registry 升级为 `Schedule`。
-
-注册策略遵循以下原则：
-
-- 内置 core primitive 的 extractor 由 renderer 默认注册，用户没有额外负担；
-- `ranim-items` 的内置高层 Item 由 ranim 的默认 render 集成统一注册；
-- 自定义 Item 只在需要自定义渲染提取时注册一次 extractor；
-- 普通模拟状态 Component 无需实现或注册任何渲染 trait；
-- `World::spawn(square)` 与 Entity 操作不触碰 extractor registry，World 本身保持 renderer 无关。
-
-初期可以为现有 `T: Extract<Target = CoreItem> + Component` 提供兼容注册器，把旧 Item extraction 接入新的 Render World。长期再让内置 Item 使用 query-based 协议，避免这一步阻塞阶段一落地。
-
 ### Queue、Sort 与 Prepare
 
 当前原型先完整构造 `VItemsBuffer`/`MeshItemsBuffer`，之后 Queue 只生成 viewport packet。这个顺序足以保持现有单视图行为，但不适合未来的可见性、多视图和按材质/管线 batching。
@@ -634,7 +719,7 @@ recycle Main World ◄────────────── send frame cont
 
 1. 在 `ranim-render` 定义 `RenderWorld`，移动 render entity、映射和有序查询逻辑；`CoreItemStore` 只保留 Main World。
 2. 让 `Renderer` 持有或显式管理长生命周期 Render World，渲染入口改为接收 Main World 并先执行 extraction。
-3. 将当前 core 中的 type-erased extractor registry 移入 `ranim-render`，先保持现有 `&T -> Vec<RenderItem>` 兼容行为，避免一次性改动 Item API。
+3. 将当前 core 中的 extraction 注册职责移入 `ranim-render`，先以 `ExtractSchedule` system 包装现有 `&T -> Vec<RenderItem>` 兼容行为，避免一次性改动 Item API。
 4. 引入稳定 render root，分离 entity sync 与 component extraction；补齐 Main Entity despawn、component removal 和 extractor output 缩减的清理测试。
 5. 引入 query-based `ExtractComponent`/`ExtractMany` 协议和可复用输出缓冲，迁移 core VItem、MeshItem、CameraFrame，再迁移 Square、Text、Group。
 6. 新增 Queue 工作集与 Sort 阶段，让 Prepare 根据 queued order 构造合并缓冲；首版仍允许全量 packing。
@@ -654,6 +739,23 @@ recycle Main World ◄────────────── send frame cont
 - preview、离线渲染、截图和现有 examples 的输出保持一致；
 - 不新增 `bevy_render`、`bevy_app` 依赖；
 - 文档、测试和性能基线与实现同步更新。
+
+### 阶段 1C 当前实现状态
+
+- `CoreItemStore` 已只持有 Main World、Timeline reconciliation 状态和场景实体顺序；
+- `RenderWorld`、render root、primitive mapping 和 ExtractSchedule 已移动到 `ranim-render`；
+- `Renderer` 已持有并跨帧复用 Render World，`render_store_with_pool` 会在 GPU 工作前执行 Sync/Extract；
+- `CameraFrame`、core `VItem` 和 `MeshItem` extractor 由 Render World 默认注册；
+- 现有 `ExtractToRenderWorld` 被保留为兼容协议，高层 Item 或自定义 Item 可通过 `renderer.register_item::<T>()` 注册；
+- 每个参与渲染的 Main Entity 都有稳定 render root，1:N 输出以独立 primitive entity 存储；
+- Main Entity despawn、渲染组件移除、extractor 输出缩减和 `None` 输出都会清理旧 render entity；
+- extractor 输出 Vec 已在 typed extractor 内跨帧复用，不再为每个 source 每帧新建 Vec；
+- 已实现 query-based `ExtractComponent` 与 `ExtractMany`，支持读取多个 Main World Component、输出 render Bundle 和显式稳定 part key；
+- 三类 extractor 注册已改为向 `bevy_ecs::Schedule` 添加泛型 system，不再使用 type-erased extractor Vec；
+- QueryState 会在 Main World 的 `WorldId` 变化时重建，Render World 不会跨不同 Main World 错误复用实体身份；
+- 当前 Queue 已发生在帧级 GPU packing 之前，但仍只有默认单视图和完整工作集，尚未实现 render phase、Sort 和 visibility filtering；
+- VItemsBuffer/MeshItemsBuffer 仍每帧完整 packing，Changed-based extraction、asset handle 和增量 GPU 上传尚未实现；
+- Render Graph 仍只消费 `RenderPackets` 和 prepared GPU resource，不访问 Main World 或 Render World。
 
 ### 暂不决定
 

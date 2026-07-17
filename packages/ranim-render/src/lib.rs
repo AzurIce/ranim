@@ -15,6 +15,10 @@ pub mod primitives;
 pub mod resource;
 /// Rendering related utils
 pub mod utils;
+/// Renderer-owned ECS world and extraction.
+pub mod world;
+
+pub use world::{ExtractComponent, ExtractMany, ExtractOutput, RenderWorld};
 
 use glam::{UVec3, uvec3};
 
@@ -24,7 +28,7 @@ use crate::{
     resource::{PipelinesPool, RenderPool, RenderTextures},
     utils::{WgpuBuffer, WgpuVecBuffer},
 };
-use ranim_core::store::{CoreItemStore, RenderWorld};
+use ranim_core::store::{CoreItemStore, ExtractToRenderWorld};
 use utils::WgpuContext;
 
 #[cfg(feature = "profiling")]
@@ -101,6 +105,7 @@ pub struct RenderContext<'a> {
 pub struct Renderer {
     width: u32,
     height: u32,
+    render_world: RenderWorld,
     pub(crate) resolution_info: ResolutionInfo,
     pub(crate) pipelines: PipelinesPool,
     packets: RenderPackets,
@@ -179,6 +184,7 @@ impl Renderer {
         Self {
             width,
             height,
+            render_world: RenderWorld::new(),
             resolution_info,
             pipelines: PipelinesPool::default(),
             packets: RenderPackets::default(),
@@ -194,35 +200,43 @@ impl Renderer {
         RenderTextures::new(ctx, self.width, self.height)
     }
 
+    /// Register extraction for a main-world item component.
+    pub fn register_item<T: ExtractToRenderWorld>(&mut self) {
+        self.render_world.register_item::<T>();
+    }
+
+    /// Register a query-based 1:1 component extractor.
+    pub fn register_component<E: ExtractComponent>(&mut self) {
+        self.render_world.register_component::<E>();
+    }
+
+    /// Register a query-based 1:N component extractor.
+    pub fn register_many<E: ExtractMany>(&mut self) {
+        self.render_world.register_many::<E>();
+    }
+
+    /// Get the renderer-owned render world.
+    pub fn render_world(&self) -> &RenderWorld {
+        &self.render_world
+    }
+
+    /// Extract the current main-world scene without issuing GPU work.
+    pub fn extract_store(&mut self, store: &mut CoreItemStore) {
+        self.render_world.extract(store);
+    }
+
     /// Render a frame. Pushes viewport + VItem packets via pool, then execs the render graph.
     pub fn render_store_with_pool(
         &mut self,
         ctx: &WgpuContext,
         render_textures: &mut RenderTextures,
         clear_color: wgpu::Color,
-        store: &CoreItemStore,
+        store: &mut CoreItemStore,
         pool: &mut RenderPool,
     ) {
-        self.render_world_with_pool(
-            ctx,
-            render_textures,
-            clear_color,
-            store.render_world(),
-            pool,
-        );
-    }
-
-    /// Prepare, queue, and render an extracted render world.
-    pub fn render_world_with_pool(
-        &mut self,
-        ctx: &WgpuContext,
-        render_textures: &mut RenderTextures,
-        clear_color: wgpu::Color,
-        render_world: &RenderWorld,
-        pool: &mut RenderPool,
-    ) {
-        self.prepare_render_world(ctx, render_world);
-        self.queue_render_world(ctx, render_world, pool);
+        self.extract_store(store);
+        self.queue_render_world(ctx, pool);
+        self.prepare_render_world(ctx);
 
         // Encode & submit
         {
@@ -291,25 +305,21 @@ impl Renderer {
         self.packets.clear();
     }
 
-    fn prepare_render_world(&mut self, ctx: &WgpuContext, render_world: &RenderWorld) {
+    fn prepare_render_world(&mut self, ctx: &WgpuContext) {
         let merged = self
             .merged_buffer
             .get_or_insert_with(|| VItemsBuffer::new(ctx));
-        merged.update(ctx, render_world.vitems());
+        merged.update(ctx, self.render_world.vitems());
 
         let merged_mesh = self
             .merged_mesh_buffer
             .get_or_insert_with(|| MeshItemsBuffer::new(ctx));
-        merged_mesh.update(ctx, render_world.mesh_items());
+        merged_mesh.update(ctx, self.render_world.mesh_items());
     }
 
-    fn queue_render_world(
-        &mut self,
-        ctx: &WgpuContext,
-        render_world: &RenderWorld,
-        pool: &mut RenderPool,
-    ) {
-        let camera_frame = render_world
+    fn queue_render_world(&mut self, ctx: &WgpuContext, pool: &mut RenderPool) {
+        let camera_frame = self
+            .render_world
             .camera_frames()
             .next()
             .expect("rendering requires at least one CameraFrame");
