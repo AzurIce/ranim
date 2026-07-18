@@ -215,7 +215,11 @@ impl CameraFrame {
     ///        .with_rate_func(linear),
     /// );
     /// ```
-    pub fn orbit(&mut self, target: DVec3, total_angle: f64) -> AnimationCell<Self> {
+    pub fn orbit(
+        &mut self,
+        target: DVec3,
+        total_angle: f64,
+    ) -> AnimationCell<Self, impl Eval<Self> + use<>> {
         let offset = self.pos - target;
         let distance = offset.length();
         let phi = if distance > 0.0 {

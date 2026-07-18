@@ -71,12 +71,11 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
 #[scene]
 #[output(dir = "./output/ranim_logo")]
 fn ranim_logo(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let logo_width = frame_size.y * 0.618;
 
     let logo = build_logo(logo_width);
-    let mut r_logo = logo.map(|item| (r.insert(item.clone()), item));
+    let mut logo_parts = logo.map(|item| (AnimSequence::new(), item));
 
     let mut ranim_text = Vec::<VItem>::from(
         SvgItem::new(typst_svg(
@@ -91,13 +90,9 @@ fn ranim_logo(r: &mut RanimScene) {
                 .move_to(DVec3::NEG_Y * 2.5);
         }),
     );
-    let r_ranim_text = r.insert_empty();
-
-    r_logo.iter_mut().for_each(|(r_logo, item)| {
-        r.timeline_mut(*r_logo)
-            .play(item.write().with_duration(3.0).with_rate_func(smooth));
+    logo_parts.iter_mut().for_each(|(sequence, item)| {
+        sequence.play(item.write().with_duration(3.0).with_rate_func(smooth));
     });
-    r.timelines_mut().sync();
 
     let gap_ratio = 1.0 / 60.0;
     let gap = logo_width * gap_ratio;
@@ -112,14 +107,14 @@ fn ranim_logo(r: &mut RanimScene) {
         AabbPoint(dvec3(1.0, 1.0, 0.0)),
         AabbPoint(dvec3(1.0, -1.0, 0.0)),
     ];
-    r_logo
+    logo_parts
         .iter_mut()
         .chunks(2)
         .into_iter()
         .zip(scale.into_iter().zip(anchor))
         .for_each(|(chunk, (scale, anchor))| {
-            chunk.for_each(|(r_item, item)| {
-                r.timeline_mut(*r_item).play(
+            chunk.for_each(|(sequence, item)| {
+                sequence.play(
                     item.morph(|data| {
                         data.with_origin(anchor, |x| {
                             x.scale(scale);
@@ -133,27 +128,52 @@ fn ranim_logo(r: &mut RanimScene) {
                 );
             })
         });
-    r.timeline_mut(r_ranim_text).forward(0.5).play(
+    let mut text_sequence = AnimSequence::new();
+    text_sequence.forward(3.5).play(
         ranim_text
             .lagged(0.2, |item| {
                 item.write().with_duration(2.0).with_rate_func(linear)
             })
             .with_duration(2.0),
     );
-    r.timelines_mut().sync();
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
-    r.timelines_mut().forward(1.0);
+    let phase_end = logo_parts
+        .iter()
+        .map(|(sequence, _)| sequence.cursor_sec())
+        .chain(std::iter::once(text_sequence.cursor_sec()))
+        .fold(0.0, f64::max);
+    logo_parts
+        .iter_mut()
+        .for_each(|(sequence, _)| _ = sequence.hold_to(phase_end));
+    text_sequence.hold_to(phase_end);
 
-    r_logo.iter_mut().for_each(|(r_logo_part, item)| {
-        r.timeline_mut(*r_logo_part)
-            .play(item.unwrite().with_duration(3.0).with_rate_func(smooth));
+    r.insert_time_mark(phase_end, TimeMark::Capture("preview.png".to_string()));
+    logo_parts
+        .iter_mut()
+        .for_each(|(sequence, _)| _ = sequence.hold(1.0));
+    text_sequence.hold(1.0);
+
+    logo_parts.iter_mut().for_each(|(sequence, item)| {
+        sequence.play(item.unwrite().with_duration(3.0).with_rate_func(smooth));
     });
-    r.timeline_mut(r_ranim_text)
-        .play(ranim_text.lagged(0.0, |item| {
-            item.unwrite().with_duration(3.0).with_rate_func(linear)
-        }));
+    text_sequence.play(ranim_text.lagged(0.0, |item| {
+        item.unwrite().with_duration(3.0).with_rate_func(linear)
+    }));
+
+    let total_secs = logo_parts
+        .iter()
+        .map(|(sequence, _)| sequence.cursor_sec())
+        .chain(std::iter::once(text_sequence.cursor_sec()))
+        .fold(0.0, f64::max);
+    let mut content = AnimStack::new();
+    for (sequence, _) in logo_parts {
+        content.push(sequence);
+    }
+    content.push(text_sequence);
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(total_secs);
+    content.push(camera);
+    r.play(content);
 }

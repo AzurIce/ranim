@@ -11,7 +11,6 @@ use ranim::{
 #[scene]
 #[output(dir = "./output/arc_between_points")]
 fn arc_between_points(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let center = dvec2(0.0, 0.0);
 
     let start_color = color::color("#FF8080FF");
@@ -43,13 +42,15 @@ fn arc_between_points(r: &mut RanimScene) {
             )
         })
         .collect::<Vec<_>>();
-    let r_arcs = r.insert_empty();
+    let mut content = AnimSequence::new();
+    content.play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+    let total_secs = content.cursor_sec();
 
-    r.timeline_mut(r_arcs)
-        .play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(total_secs);
+    r.play(stack![camera, content]);
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

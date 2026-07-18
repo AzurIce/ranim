@@ -13,19 +13,19 @@ impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`FadingRequirement`]
 pub trait FadingAnim: FadingRequirement + Sized + 'static {
     /// Create a [`FadeIn`] anim.
-    fn fade_in(&mut self) -> AnimationCell<Self>;
+    fn fade_in(&mut self) -> AnimationCell<Self, FadeIn<Self>>;
     /// Create a [`FadeOut`] anim.
-    fn fade_out(&mut self) -> AnimationCell<Self>;
+    fn fade_out(&mut self) -> AnimationCell<Self, FadeOut<Self>>;
 }
 
 impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
-    fn fade_in(&mut self) -> AnimationCell<Self> {
+    fn fade_in(&mut self) -> AnimationCell<Self, FadeIn<Self>> {
         FadeIn::new(self.clone())
             .into_animation_cell()
             .with_rate_func(smooth)
             .apply_to(self)
     }
-    fn fade_out(&mut self) -> AnimationCell<Self> {
+    fn fade_out(&mut self) -> AnimationCell<Self, FadeOut<Self>> {
         FadeOut::new(self.clone())
             .into_animation_cell()
             .with_rate_func(smooth)

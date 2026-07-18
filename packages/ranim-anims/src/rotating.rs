@@ -14,7 +14,7 @@ impl<T: RotateTransform + ShiftTransformExt + Clone> RotatingRequirement for T {
 /// The methods to create rotation animations for `T` that satisfies [`RotatingRequirement`]
 pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
     /// Rotate by a given angle about a given axis at center.
-    fn rotating(&mut self, angle: f64, axis: DVec3) -> AnimationCell<Self>
+    fn rotating(&mut self, angle: f64, axis: DVec3) -> AnimationCell<Self, RotatingAnimation<Self>>
     where
         Self: Aabb,
     {
@@ -27,7 +27,7 @@ pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
         angle: f64,
         axis: DVec3,
         anchor: A,
-    ) -> AnimationCell<Self> {
+    ) -> AnimationCell<Self, RotatingAnimation<Self>> {
         RotatingAnimation::new(self.clone(), angle, axis, anchor.locate(self))
             .into_animation_cell()
             .with_rate_func(smooth)

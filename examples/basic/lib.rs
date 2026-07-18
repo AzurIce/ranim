@@ -4,6 +4,7 @@ use glam::DVec3;
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
     color::palettes::manim,
+    core::animation::{AnimSequence, StaticAnim},
     items::vitem::{VItem, svg::SvgItem, typst::typst_svg},
     prelude::*,
 };
@@ -13,9 +14,6 @@ const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 #[scene]
 #[output(dir = "./output/basic")]
 fn basic(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
-    r.timelines_mut().forward(0.2);
-
     let mut svg = Vec::<VItem>::from(SvgItem::new(SVG).with(|svg| {
         svg.scale_to_with_stroke(ScaleHint::PorportionalY(3.0))
             .move_to(DVec3::Y * 2.0);
@@ -37,16 +35,26 @@ fn basic(r: &mut RanimScene) {
                 .set_fill_opacity(0.8);
         }),
     );
-    let r_svg = r.insert(svg.clone());
-    let r_text = r.insert(text.clone());
 
-    r.timeline_mut(r_text)
+    let mut svg_sequence = AnimSequence::new();
+    svg_sequence
+        .play(svg.show())
+        .hold(0.2)
+        .play(svg.fade_in().with_duration(3.0));
+
+    let mut text_sequence = AnimSequence::new();
+    text_sequence
+        .play(text.show())
+        .hold(0.2)
         .play(text.lagged(0.2, |e| e.write()).with_duration(3.0));
-    r.timeline_mut(r_svg).play(svg.fade_in().with_duration(3.0)); // At the same time, the svg fade in
-    r.timelines_mut().sync();
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    let total_secs = svg_sequence.cursor_sec().max(text_sequence.cursor_sec());
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(total_secs);
+
+    r.play(stack![camera, svg_sequence, text_sequence]);
+
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

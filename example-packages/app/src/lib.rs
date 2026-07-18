@@ -12,17 +12,12 @@ use ranim::{
 
 #[scene]
 pub fn hello_ranim(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
-
     let mut square = Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
     });
 
-    let r_square = r.insert_empty();
-    {
-        let timeline = r.timeline_mut(r_square);
-        timeline.play(square.fade_in());
-    };
+    let mut content = AnimSequence::new();
+    content.play(square.fade_in());
 
     let circle = Circle::new(2.0).with(|circle| {
         circle
@@ -33,10 +28,16 @@ pub fn hello_ranim(r: &mut RanimScene) {
     });
 
     let mut vitem = VItem::from(square);
-    r.timeline_mut(r_square)
+    content
         .play(vitem.morph_to(circle.into()))
-        .forward(1.0)
+        .hold(1.0)
         .play(vitem.clone().unwrite())
         .play(vitem.write())
         .play(vitem.fade_out());
+
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(content.cursor_sec());
+    r.play(stack![camera, content]);
 }

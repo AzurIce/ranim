@@ -12,8 +12,6 @@ use ranim_items::vitem::geometry::anchor::Origin;
 #[scene]
 #[output(dir = "./output/arc")]
 pub fn arc(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
-
     // let frame_size = app.camera().size;
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
@@ -46,14 +44,15 @@ pub fn arc(r: &mut RanimScene) {
             })
         })
         .collect::<Vec<_>>();
-    let r_arcs = r.insert_empty();
+    let mut content = AnimSequence::new();
+    content.play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+    let total_secs = content.cursor_sec();
 
-    r.timeline_mut(r_arcs)
-        .play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
-    r.timelines_mut().sync();
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(total_secs);
+    r.play(stack![camera, content]);
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

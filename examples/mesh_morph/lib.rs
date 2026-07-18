@@ -20,7 +20,6 @@ fn mesh_morph(r: &mut RanimScene) {
 
     let mut cam = CameraFrame::from_spherical(phi, theta, distance);
     cam.fovy = 50.0 * PI / 180.0;
-    let r_cam = r.insert(cam.clone());
 
     // Create meshes with better colors from manim palette
     let sphere_surface = Sphere::new(2.0)
@@ -41,29 +40,23 @@ fn mesh_morph(r: &mut RanimScene) {
         .with_resolution((50, 30));
     let sphere_red = surface_to_mesh(Surface::from(sphere_red_surface));
 
-    let r_mesh = r.insert(sphere.clone());
-
-    // Animation sequence:
-    // 1. Sphere -> Torus
-    r.timeline_mut(r_mesh)
-        .play(sphere.morph_to(torus.clone()).with_duration(2.5));
-
-    // 2. Torus -> Disc
-    r.timeline_mut(r_mesh)
-        .forward(0.5)
+    let mut mesh_sequence = AnimSequence::new();
+    mesh_sequence
+        .play(sphere.morph_to(torus.clone()).with_duration(2.5))
+        .hold(0.5)
         .play(torus.morph_to(disc.clone()).with_duration(2.5));
-
-    // 3. Disc -> Sphere (different color)
-    r.timeline_mut(r_mesh)
-        .forward(0.5)
+    mesh_sequence
+        .hold(0.5)
         .play(disc.morph_to(sphere_red).with_duration(2.5));
 
-    // Rotate camera continuously
-    r.timeline_mut(r_cam).play(
+    let mut camera_sequence = AnimSequence::new();
+    camera_sequence.play(
         cam.orbit(DVec3::ZERO, 2.0)
             .with_duration(9.0)
             .with_rate_func(linear),
     );
+    mesh_sequence.hold_to(camera_sequence.cursor_sec());
+    r.play(stack![camera_sequence, mesh_sequence]);
 
     // Add preview captures at key moments
     r.insert_time_mark(2.5, TimeMark::Capture("preview_torus.png".to_string()));

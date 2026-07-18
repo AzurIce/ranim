@@ -12,7 +12,6 @@ use ranim::{
 #[scene]
 #[output(dir = "./output/getting_started1")]
 fn getting_started1(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     // A Square with size 2.0 and color blue
     let square = Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
@@ -22,13 +21,15 @@ fn getting_started1(r: &mut RanimScene) {
         circle.set_color(manim::RED_C);
     });
 
-    let r_vitem = r.insert_empty();
-    {
-        let timeline = r.timeline_mut(r_vitem);
-        // In order to do more low-level opeerations,
-        // sometimes we need to convert the item to a low-level item.
-        timeline.play(VItem::from(square).morph_to(VItem::from(circle.clone())));
-        timeline.play(VItem::from(circle).unwrite());
-    }
+    let mut content = AnimSequence::new();
+    content
+        .play(VItem::from(square).morph_to(VItem::from(circle.clone())))
+        .play(VItem::from(circle).unwrite());
+
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(content.cursor_sec());
+    r.play(stack![camera, content]);
 }
 // ANCHOR_END: construct

@@ -24,13 +24,12 @@ fn solve_hanoi(
 }
 
 fn hanoi(r: &mut RanimScene, n: usize) {
-    let _r_cam = r.insert(CameraFrame::default());
     let total_sec = 10.0;
     let rod_width = 0.4;
     let rod_height = 5.0;
     let rod_section_width = 4.0;
 
-    let _rods = [-1, 0, 1]
+    let rods = [-1, 0, 1]
         .into_iter()
         .map(|i: i32| {
             Rectangle::new(rod_width, rod_height).with(|rect| {
@@ -40,13 +39,12 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 );
             })
         })
-        .map(|rect| (r.insert(rect.clone()), rect))
         .collect::<Vec<_>>();
 
     let min_disk_width = rod_width * 1.7;
     let max_disk_width = rod_section_width * 0.8;
     let disk_height = (rod_height * 0.8) / n as f64;
-    let _disks = (0..n)
+    let disks = (0..n)
         .map(|i| {
             let factor = i as f64 / (n - 1) as f64;
             let disk_width = min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);
@@ -59,29 +57,31 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                     dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.001),
                 );
             });
-            (r.insert(disk.clone()), disk)
+            let mut sequence = AnimSequence::new();
+            sequence.play(disk.show());
+            (sequence, disk)
         })
         .collect::<Vec<_>>();
 
-    let mut r_disks = [_disks, Vec::new(), Vec::new()];
+    let mut disks_by_rod = [disks, Vec::new(), Vec::new()];
 
     let anim_duration = total_sec / (2.0f64.powi(n as i32) - 1.0) / 3.0;
     let mut move_disk = |idx_src: usize, idx_dst: usize| {
-        let top_disk_y = |idx: usize| r_disks[idx].len() as f64 * disk_height - 4.0;
+        let top_disk_y = |idx: usize| disks_by_rod[idx].len() as f64 * disk_height - 4.0;
         let top_src = top_disk_y(idx_src) - disk_height;
         let top_dst = top_disk_y(idx_dst);
-        let mut r_disk = r_disks[idx_src].pop().unwrap();
+        let mut disk_entry = disks_by_rod[idx_src].pop().unwrap();
 
         {
-            let (timeline, disk) = r.timeline_mut(&mut r_disk);
-            timeline.play(
+            let (sequence, disk) = &mut disk_entry;
+            sequence.play(
                 disk.morph(|data| {
                     data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
                 })
                 .with_duration(anim_duration)
                 .with_rate_func(ease_in_quad),
             );
-            timeline.play(
+            sequence.play(
                 disk.morph(|data| {
                     data.shift(dvec3(
                         (idx_dst as f64 - idx_src as f64) * rod_section_width,
@@ -92,7 +92,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 .with_duration(anim_duration)
                 .with_rate_func(linear),
             );
-            timeline.play(
+            sequence.play(
                 disk.morph(|data| {
                     data.shift(dvec3(0.0, top_dst - 3.0, 0.0));
                 })
@@ -100,12 +100,34 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 .with_rate_func(ease_out_quad),
             );
         }
-        r.timelines_mut().sync();
-        r_disks[idx_dst].push(r_disk);
+        let target = disk_entry.0.cursor_sec();
+        for rod in &mut disks_by_rod {
+            for (sequence, _) in rod {
+                sequence.hold_to(target);
+            }
+        }
+        disks_by_rod[idx_dst].push(disk_entry);
     };
 
     solve_hanoi(n, 0, 1, 2, &mut move_disk);
     r.insert_time_mark(0.0, TimeMark::Capture(format!("preview-{n}.png")));
+
+    let mut content = AnimStack::new();
+    for rod in disks_by_rod {
+        for (sequence, _) in rod {
+            content.push(sequence);
+        }
+    }
+    let total_secs = content.duration_secs();
+    let mut static_scene = AnimSequence::new();
+    static_scene.play(rods.show()).hold_to(total_secs);
+    content.push(static_scene);
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(total_secs);
+    content.push(camera);
+    r.play(content);
 }
 
 #[scene]

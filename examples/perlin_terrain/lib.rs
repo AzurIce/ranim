@@ -184,7 +184,6 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
 
     let mut cam = CameraFrame::from_spherical(phi, theta, distance);
     cam.fovy = 50.0 * PI / 180.0;
-    let r_cam = r.insert(cam.clone());
 
     let colorscale = terrain_colorscale();
 
@@ -202,13 +201,18 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
     )
     .with_fill_by_z(&colorscale);
 
-    let _r_terrain = r.insert(terrain);
-
-    r.timeline_mut(r_cam).play(
+    let mut camera_sequence = AnimSequence::new();
+    camera_sequence.play(
         cam.orbit(DVec3::ZERO, 2.0)
             .with_duration(5.0)
             .with_rate_func(linear),
     );
+
+    let mut terrain_sequence = AnimSequence::new();
+    terrain_sequence
+        .play(terrain.show())
+        .hold_to(camera_sequence.cursor_sec());
+    r.play(stack![camera_sequence, terrain_sequence]);
 }
 
 // --- Scenes ---

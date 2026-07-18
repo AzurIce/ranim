@@ -9,13 +9,15 @@ use ranim_core::animation::{AnimationCell, Eval};
 /// let anim_lagged = item_group.lagged(0.5, |x| x.fade_in()); # lagged with ratio of 0.5
 /// let anim_not_lagged = item_group.lagged(0.0, |x| x.fade_in()); # not lagged (anim at the same time)
 /// ```
-pub trait LaggedAnim<T>: Sized + 'static {
+pub trait LaggedAnim<T: Clone>: Sized + 'static {
     /// Create a [`Lagged`] anim.
-    fn lagged(
+    fn lagged<E>(
         &mut self,
         lag_ratio: f64,
-        anim_func: impl FnMut(&mut T) -> AnimationCell<T>,
-    ) -> AnimationCell<Vec<T>>;
+        anim_func: impl FnMut(&mut T) -> AnimationCell<T, E>,
+    ) -> AnimationCell<Vec<T>, Lagged<T, E>>
+    where
+        E: Eval<T> + 'static;
 }
 
 impl<T: Clone + 'static, I> LaggedAnim<T> for I
@@ -23,11 +25,14 @@ where
     for<'a> &'a mut I: IntoIterator<Item = &'a mut T>,
     I: 'static,
 {
-    fn lagged(
+    fn lagged<E>(
         &mut self,
         lag_ratio: f64,
-        anim_func: impl FnMut(&mut T) -> AnimationCell<T>,
-    ) -> AnimationCell<Vec<T>> {
+        anim_func: impl FnMut(&mut T) -> AnimationCell<T, E>,
+    ) -> AnimationCell<Vec<T>, Lagged<T, E>>
+    where
+        E: Eval<T> + 'static,
+    {
         Lagged::new(lag_ratio, self.into_iter().map(anim_func).collect()).into_animation_cell()
     }
 }
@@ -46,20 +51,20 @@ where
 ///
 /// This is applyable to `IntoIterator<Item = T>`, and this will apply
 /// the anims in the order of the elements with the lag ratio.
-pub struct Lagged<T> {
-    anims: Vec<AnimationCell<T>>,
+pub struct Lagged<T, E: Eval<T>> {
+    anims: Vec<AnimationCell<T, E>>,
     lag_ratio: f64,
 }
 
-impl<T> Lagged<T> {
+impl<T, E: Eval<T>> Lagged<T, E> {
     /// Constructor
-    pub fn new(lag_ratio: f64, anims: Vec<AnimationCell<T>>) -> Self {
+    pub fn new(lag_ratio: f64, anims: Vec<AnimationCell<T, E>>) -> Self {
         Self { anims, lag_ratio }
     }
 }
 
-impl<T: Clone, I: FromIterator<T>> Eval<I> for Lagged<T> {
-    fn eval_alpha(&self, alpha: f64) -> I {
+impl<T: Clone, E: Eval<T>> Eval<Vec<T>> for Lagged<T, E> {
+    fn eval_alpha(&self, alpha: f64) -> Vec<T> {
         // -|--
         //  -|--
         //   -|--

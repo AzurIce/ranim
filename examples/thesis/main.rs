@@ -40,58 +40,61 @@ fn pentagon() -> VItem {
 #[scene]
 #[output]
 fn fading(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let mut pentagon_in = pentagon().with(|x| {
         x.move_to(dvec3(0.0, 2.0, 0.0));
     });
     let mut pentagon_out = pentagon().with(|x| {
         x.move_to(dvec3(0.0, -2.0, 0.0));
     });
-    let r_in = r.insert_empty();
-    let r_out = r.insert_empty();
-    r.timeline_mut(r_in).play(pentagon_in.fade_in());
-    r.timeline_mut(r_out).play(pentagon_out.fade_out());
+    let duration = 1.0;
+    let mut camera = AnimSequence::new();
+    camera.play(CameraFrame::default().show()).hold(duration);
+    r.play(stack![
+        camera,
+        pentagon_in.fade_in(),
+        pentagon_out.fade_out()
+    ]);
 }
 
 #[allow(unused)]
 #[scene]
 fn creation(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
-
     let mut pentagon_in = pentagon().with(|x| {
         x.move_to(dvec3(0.0, 2.0, 0.0));
     });
     let mut pentagon_out = pentagon().with(|x| {
         x.move_to(dvec3(0.0, -2.0, 0.0));
     });
-    let r_in = r.insert_empty();
-    let r_out = r.insert_empty();
-    r.timeline_mut(r_in).play(pentagon_in.create());
-    r.timeline_mut(r_out).play(pentagon_out.uncreate());
+    let duration = 1.0;
+    let mut camera = AnimSequence::new();
+    camera.play(CameraFrame::default().show()).hold(duration);
+    r.play(stack![
+        camera,
+        pentagon_in.create(),
+        pentagon_out.uncreate()
+    ]);
 }
 
 #[allow(unused)]
 #[scene]
 #[output]
 fn writing(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let mut pentagon_in = pentagon().with(|x| {
         x.move_to(dvec3(0.0, 2.0, 0.0));
     });
     let mut pentagon_out = pentagon().with(|x| {
         x.move_to(dvec3(0.0, -2.0, 0.0));
     });
-    let r_in = r.insert_empty();
-    let r_out = r.insert_empty();
-    r.timeline_mut(r_in).play(pentagon_in.write());
-    r.timeline_mut(r_out).play(pentagon_out.unwrite());
+    let duration = 1.0;
+    let mut camera = AnimSequence::new();
+    camera.play(CameraFrame::default().show()).hold(duration);
+    r.play(stack![camera, pentagon_in.write(), pentagon_out.unwrite()]);
 }
 
 #[allow(unused)]
 #[scene]
 #[output]
 fn transform(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let src = Square::new(2.0).with(|x| {
         x.set_color(manim::RED_C).move_to(dvec3(0.0, 2.0, 0.0));
     });
@@ -99,12 +102,11 @@ fn transform(r: &mut RanimScene) {
         x.set_color(manim::BLUE_C).move_to(dvec3(0.0, -2.0, 0.0));
     });
     // dst.with_origin(AabbPoint::CENTER, |x| { x.rotate_on_z(PI / 4.0 + PI); }); // rotate to match src
-    let r_item = r.insert_empty();
-    r.timeline_mut(r_item).play(
-        VItem::from(src)
-            .morph_to(VItem::from(dst))
-            .with_rate_func(linear),
-    );
+    let mut item = VItem::from(src);
+    let animation = item.morph_to(VItem::from(dst)).with_rate_func(linear);
+    let mut camera = AnimSequence::new();
+    camera.play(CameraFrame::default().show()).hold(1.0);
+    r.play(stack![camera, animation]);
 }
 
 fn main() {

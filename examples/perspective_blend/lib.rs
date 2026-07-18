@@ -12,12 +12,10 @@ use ranim_core::animation::StaticAnim;
 #[scene]
 #[output(dir = "./output/perspective_blend")]
 fn perspective_blend(r: &mut RanimScene) {
-    let mut cam = CameraFrame::default();
-    let r_cam = r.insert(cam.clone());
-
-    // Update camera's state and show the new state
-    cam.pos = DVec3::Z * 5.0;
-    r.timeline_mut(r_cam).play(cam.show());
+    let mut cam = CameraFrame {
+        pos: DVec3::Z * 5.0,
+        ..Default::default()
+    };
 
     // Create a cube
     let side_length = 4.0;
@@ -37,10 +35,7 @@ fn perspective_blend(r: &mut RanimScene) {
         manim::RED_C,
         manim::YELLOW_C,
     ]
-    .map(|color| {
-        let face = square_with_color(color);
-        (r.insert(face.clone()), face)
-    });
+    .map(square_with_color);
 
     let frac = 2.0;
     let transform_fns: [&dyn Fn(&mut VItem); 6] = [
@@ -76,21 +71,18 @@ fn perspective_blend(r: &mut RanimScene) {
         }),
     ];
 
+    let mut content = AnimStack::new();
     square_faces
         .iter_mut()
         .zip(transform_fns)
-        .for_each(|((r_face, face), transform_fn)| {
-            r.timeline_mut(*r_face)
-                .play(face.morph(transform_fn).with_rate_func(linear))
-                .hide();
+        .for_each(|(face, transform_fn)| {
+            content.push(face.morph(transform_fn).with_rate_func(linear));
         });
 
-    let faces = square_faces.map(|(_, face)| face);
-    let mut faces = faces.to_vec();
+    let mut faces = square_faces.to_vec();
 
-    let r_faces = r.insert_empty();
-    r.timelines_mut().sync(); // TODO: make this better
-    r.timeline_mut(r_faces).play(
+    let mut faces_sequence = AnimSequence::new();
+    faces_sequence.forward(1.0).play(
         faces
             .morph(|data| {
                 data.with_origin(AabbPoint::CENTER, |x| {
@@ -102,15 +94,21 @@ fn perspective_blend(r: &mut RanimScene) {
             })
             .with_duration(4.0),
     );
+    content.push(faces_sequence);
 
-    r.timeline_mut(r_cam).forward(2.0).play(
-        cam.morph(|data| {
-            data.perspective_blend = 1.0;
-        })
-        .with_duration(2.0),
-    );
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    let total_secs = content.duration_secs();
+    let mut camera = AnimSequence::new();
+    camera
+        .play(cam.show())
+        .hold(2.0)
+        .play(
+            cam.morph(|data| {
+                data.perspective_blend = 1.0;
+            })
+            .with_duration(2.0),
+        )
+        .hold_to(total_secs);
+    content.push(camera);
+    r.play(content);
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

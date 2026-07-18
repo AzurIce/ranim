@@ -15,15 +15,9 @@ use ranim::{
 #[scene]
 #[output(dir = "./output/getting_started2")]
 fn getting_started2(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
         rect.set_stroke_color(manim::GREEN_C);
     });
-
-    // The new initialized timeline is hidden by default, use show to start encoding a static anim and make it show
-    let r_rect = r.insert(rect.clone());
-
-    r.timelines_mut().forward(1.0);
 
     let square: VItem = Square::new(2.0)
         .with(|square| {
@@ -35,20 +29,29 @@ fn getting_started2(r: &mut RanimScene) {
             circle.set_color(manim::RED_C);
         })
         .into();
-    let r_vitem = r.insert(square.clone());
-    {
-        let timeline = r.timeline_mut(r_vitem);
-        timeline
-            .forward(1.0)
-            .play(square.clone().create())
-            .play(
-                square
-                    .clone()
-                    .morph_to(circle.clone())
-                    .with_rate_func(linear),
-            )
-            .play(circle.clone().unwrite());
-    }
+    let mut rect_sequence = AnimSequence::new();
+    rect_sequence
+        .play(rect.clone().show())
+        .hold(1.0)
+        .play(VItem::from(rect).uncreate());
 
-    r.timeline_mut(r_rect).play(VItem::from(rect).uncreate());
+    let mut item_sequence = AnimSequence::new();
+    item_sequence
+        .play(square.clone().show())
+        .hold(1.0)
+        .play(square.clone().create())
+        .play(
+            square
+                .clone()
+                .morph_to(circle.clone())
+                .with_rate_func(linear),
+        )
+        .play(circle.clone().unwrite());
+
+    let total_secs = item_sequence.cursor_sec().max(rect_sequence.cursor_sec());
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(total_secs);
+    r.play(stack![camera, rect_sequence, item_sequence]);
 }

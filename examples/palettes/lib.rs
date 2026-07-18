@@ -8,7 +8,6 @@ use ranim::{
 #[scene]
 #[output(dir = "./output/palettes")]
 fn palettes(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let padded_frame_size = frame_size * 0.9;
 
@@ -48,7 +47,13 @@ fn palettes(r: &mut RanimScene) {
             })
         })
         .collect::<Vec<_>>();
-    r.insert(squares);
+    let total_secs = 0.01;
+    let mut content = AnimSequence::new();
+    content.play(squares.show()).hold_to(total_secs);
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(total_secs);
+    r.play(stack![camera, content]);
     r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
-    r.timelines_mut().forward(0.01);
 }

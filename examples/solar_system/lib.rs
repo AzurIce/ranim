@@ -128,7 +128,12 @@ fn solar_system(r: &mut RanimScene) {
 
     let mut cam = CameraFrame::from_spherical(phi, theta, distance);
     cam.fovy = 30.0f64.to_radians();
-    let _r_cam = r.insert(cam);
+    let total_secs = 12.0;
+    let mut content = AnimStack::new();
+
+    let mut camera = AnimSequence::new();
+    camera.play(cam.show()).hold_to(total_secs);
+    content.push(camera);
 
     // Create the Sun at the origin (already visible at start)
     let sun = Surface::from(
@@ -136,7 +141,9 @@ fn solar_system(r: &mut RanimScene) {
             .with_resolution((30, 15))
             .with_fill_color(manim::YELLOW_C.with_alpha(0.5)),
     );
-    let _r_sun = r.insert(sun);
+    let mut sun_sequence = AnimSequence::new();
+    sun_sequence.play(sun.show()).hold_to(total_secs);
+    content.push(sun_sequence);
 
     // Orbit rings fade in (0-1s)
     for planet in PLANETS {
@@ -162,9 +169,11 @@ fn solar_system(r: &mut RanimScene) {
         let color = manim::GREY_C.with_alpha(0.3);
         orbit_torus.vertex_colors = vec![color; orbit_torus.vertices.len()];
 
-        let r_orbit = r.insert_empty();
-        r.timeline_mut(r_orbit)
-            .play(orbit_torus.fade_in().with_duration(1.0));
+        let mut orbit_sequence = AnimSequence::new();
+        orbit_sequence
+            .play(orbit_torus.fade_in().with_duration(1.0))
+            .hold_to(total_secs);
+        content.push(orbit_sequence);
     }
 
     // Timeline:
@@ -189,8 +198,6 @@ fn solar_system(r: &mut RanimScene) {
             );
             core.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
 
-            let r_core = r.insert(core.clone());
-
             // Atmosphere (larger, semi-transparent)
             let mut atmosphere = Surface::from(
                 Sphere::new(planet.radius)
@@ -200,12 +207,10 @@ fn solar_system(r: &mut RanimScene) {
             .with_smooth_normals();
             atmosphere.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
 
-            let r_atmosphere = r.insert(atmosphere.clone());
-
             let orbit_total_angle = TAU * (10.0 / planet.period);
 
-            // Orbit both core and atmosphere together
-            r.timeline_mut(r_core).forward(2.0).play(
+            let mut core_sequence = AnimSequence::new();
+            core_sequence.play(core.show()).hold(2.0).play(
                 OrbitMotion {
                     src: core.clone(),
                     orbit_radius: planet.orbit_radius,
@@ -217,8 +222,10 @@ fn solar_system(r: &mut RanimScene) {
                 .with_duration(10.0)
                 .with_rate_func(linear),
             );
+            content.push(core_sequence);
 
-            r.timeline_mut(r_atmosphere).forward(2.0).play(
+            let mut atmosphere_sequence = AnimSequence::new();
+            atmosphere_sequence.play(atmosphere.show()).hold(2.0).play(
                 OrbitMotion {
                     src: atmosphere.clone(),
                     orbit_radius: planet.orbit_radius,
@@ -230,6 +237,7 @@ fn solar_system(r: &mut RanimScene) {
                 .with_duration(10.0)
                 .with_rate_func(linear),
             );
+            content.push(atmosphere_sequence);
         } else {
             // Planets without atmosphere: single solid sphere
             let mut planet_surface = Surface::from(
@@ -240,11 +248,10 @@ fn solar_system(r: &mut RanimScene) {
             .with_smooth_normals();
             planet_surface.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
 
-            let r_planet = r.insert(planet_surface.clone());
-
             let orbit_total_angle = TAU * (10.0 / planet.period);
 
-            r.timeline_mut(r_planet).forward(2.0).play(
+            let mut planet_sequence = AnimSequence::new();
+            planet_sequence.play(planet_surface.show()).hold(2.0).play(
                 OrbitMotion {
                     src: planet_surface.clone(),
                     orbit_radius: planet.orbit_radius,
@@ -256,6 +263,7 @@ fn solar_system(r: &mut RanimScene) {
                 .with_duration(10.0)
                 .with_rate_func(linear),
             );
+            content.push(planet_sequence);
         }
 
         // Create planet label
@@ -270,16 +278,14 @@ fn solar_system(r: &mut RanimScene) {
 
         let mut label_vitems = Vec::<VItem>::from(label);
 
-        let r_label = r.insert_empty();
-
-        // Labels fade in together (1-2s)
-        r.timeline_mut(r_label)
+        let mut label_sequence = AnimSequence::new();
+        label_sequence
             .forward(1.0)
             .play(label_vitems.clone().fade_in().with_duration(1.0));
 
         // Labels orbit together with planets (starts at t=2s, runs for 10s)
         let orbit_total_angle = TAU * (10.0 / planet.period);
-        r.timeline_mut(r_label).play(
+        label_sequence.play(
             LabelOrbitMotion {
                 src: label_vitems.clone(),
                 orbit_radius: planet.orbit_radius,
@@ -292,7 +298,10 @@ fn solar_system(r: &mut RanimScene) {
             .with_duration(10.0)
             .with_rate_func(linear),
         );
+        content.push(label_sequence);
     }
+
+    r.play(content);
 
     // Capture preview at the midpoint
     r.insert_time_mark(6.0, TimeMark::Capture("preview.png".to_string()));

@@ -37,7 +37,6 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
 
     // Fixed camera, Z-up
     let cam = CameraFrame::from_spherical(phi, theta, distance);
-    let _r_cam = r.insert(cam);
 
     // Regular tetrahedron centered at the origin, edge length `a`.
     // Z is the vertical axis; the three base vertices share the same Z coordinate.
@@ -58,6 +57,8 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     let resolution = (31, 16);
     let x_offset = 3.5;
 
+    let mut content = AnimStack::new();
+
     // Left group: flat shading (normals zeroed out)
     let left_center = DVec3::new(-x_offset, 0.0, 0.0);
     for (vertex, color) in vertices.iter().zip(colors.iter()) {
@@ -69,8 +70,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         .with_smooth_normals()
         .with_transform(DMat4::from_translation(left_center + *vertex));
 
-        let r_surface = r.insert(surface.clone());
-        r.timeline_mut(r_surface).play(
+        content.push(
             RotateAroundZ {
                 src: surface.clone(),
                 group_center: left_center,
@@ -94,8 +94,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         )
         .with_transform(DMat4::from_translation(right_center + *vertex));
 
-        let r_surface = r.insert(surface.clone());
-        r.timeline_mut(r_surface).play(
+        content.push(
             RotateAroundZ {
                 src: surface.clone(),
                 group_center: right_center,
@@ -109,8 +108,11 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         );
     }
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    let total_secs = content.duration_secs();
+    let mut camera = AnimSequence::new();
+    camera.play(cam.show()).hold_to(total_secs);
+    content.push(camera);
+    r.play(content);
+
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

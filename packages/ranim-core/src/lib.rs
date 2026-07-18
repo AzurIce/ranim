@@ -1,6 +1,5 @@
 //! The core of ranim.
-//!
-//!
+
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(rustdoc::private_intra_doc_links)]
@@ -8,46 +7,48 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
-pub mod animation;
-/// Color
-pub mod color;
-/// Component data
-pub mod components;
-/// The structure to encode animation spans
-pub mod timeline;
-/// Fondamental traits
-pub mod traits;
-/// Utils
-pub mod utils;
 
-pub mod core_item;
-/// The [`core_item::CoreItem`] store
-pub mod store;
-
+/// Anchors and semantic bounds.
 pub mod anchor;
+pub mod animation;
+/// Color utilities.
+pub mod color;
+/// Component data.
+pub mod components;
+/// Fundamental scene primitives.
+pub mod core_item;
+/// Scene item storage.
+pub mod store;
+/// Fundamental traits.
+pub mod traits;
+/// Utilities.
+pub mod utils;
 
 pub use glam;
 pub use num;
 
-/// Prelude
+use std::fmt::Debug;
+
+use animation::{AnimSequence, Animation, BuiltAnimation};
+use core_item::CoreItem;
+
+/// Commonly used ranim APIs.
 pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
+    pub use crate::animation::{AnimSequence, AnimStack, Animation, Placeable, StaticAnim};
     pub use crate::core_item::camera_frame::CameraFrame;
-    pub use crate::timeline::{TimelineFunc, TimelinesFunc};
-    pub use crate::{RanimScene, TimeMark, TimelineId};
+    pub use crate::{RanimScene, TimeMark};
 }
 
-use crate::{animation::StaticAnim, core_item::CoreItem, timeline::Timeline};
-
-/// Extract a [`Extract::Target`] from reference.
+/// Extract one or more target values from a reference.
 pub trait Extract {
-    /// The extraction result
+    /// Extraction target.
     type Target: Clone;
-    /// Extract a [`Extract::Target`] from reference.
+    /// Append extracted values to `buf`.
     fn extract_into(&self, buf: &mut Vec<Self::Target>);
-    /// Extract a [`Extract::Target`] from reference.
+    /// Extract into a newly allocated vector.
     fn extract(&self) -> Vec<Self::Target> {
         let mut buf = Vec::new();
         self.extract_into(&mut buf);
@@ -60,389 +61,232 @@ where
     for<'a> &'a I: IntoIterator<Item = &'a E>,
 {
     type Target = E::Target;
+
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        for e in self {
-            e.extract_into(buf);
+        for element in self {
+            element.extract_into(buf);
         }
     }
 }
 
-use crate::timeline::{AnimationInfo, TimelineFunc, TimelinesFunc};
-use tracing::trace;
-
-use std::fmt::Debug;
-
-/// TimeMark
+/// A marker attached to a time in a scene definition.
 #[derive(Debug, Clone)]
 pub enum TimeMark {
-    /// Capture a picture with a name
+    /// Capture a picture with a name.
     Capture(String),
 }
 
-/// The id of a timeline.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TimelineId(usize);
-
-impl TimelineId {
-    /// Get the inner id.
-    pub fn id(&self) -> usize {
-        self.0
-    }
-}
-
-// MARK: RanimScene
-/// The main struct that offers the ranim's API, and encodes animations
+/// Animation definition builder passed to scene constructors.
+///
+/// The built-in [`AnimSequence`] is also available independently for users to
+/// construct reusable dynamic animation groups. Calling [`RanimScene::play`]
+/// flattens a statically typed animation into this sequence and performs the
+/// single evaluator type-erasure step.
 #[derive(Default)]
 pub struct RanimScene {
-    pub(crate) timelines: Vec<Timeline>,
-    pub(crate) time_marks: Vec<(f64, TimeMark)>,
+    anims: AnimSequence,
+    time_marks: Vec<(f64, TimeMark)>,
 }
 
 impl RanimScene {
-    /// Seals the scene to [`SealedRanimScene`].
-    pub fn seal(mut self) -> SealedRanimScene {
-        let total_secs = self.timelines.max_total_secs();
-        self.timelines.forward_to(total_secs);
-        self.timelines.seal();
-        SealedRanimScene {
-            total_secs,
-            timelines: self.timelines,
-            time_marks: self.time_marks,
-        }
-    }
-    /// Create a new [`RanimScene`]
+    /// Create an empty scene definition.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Insert an empty timeline.
-    pub fn insert_empty(&mut self) -> TimelineId {
-        self.insert_empty_at(0.0)
+    /// Append an animation at the scene's current cursor.
+    pub fn play<A: Animation>(&mut self, animation: A) -> &mut Self {
+        self.anims.play(animation);
+        self
     }
 
-    /// Insert an empty timeline and forward it to the given sec.
-    pub fn insert_empty_at(&mut self, sec: f64) -> TimelineId {
-        self.insert_with(|t| {
-            t.forward_to(sec);
-        })
+    /// Append a user-built animation sequence at the current cursor.
+    pub fn extend(&mut self, sequence: AnimSequence) -> &mut Self {
+        self.anims.extend(sequence);
+        self
     }
 
-    /// Insert a timeline at `0.0` sec and play [`StaticAnim::show`] on it.
-    pub fn insert<T: Extract<Target = CoreItem> + Clone + 'static>(
-        &mut self,
-        item: T,
-    ) -> TimelineId {
-        self.insert_at(item, 0.0)
+    /// Advance the scene cursor without adding an animation.
+    pub fn forward(&mut self, secs: f64) -> &mut Self {
+        self.anims.forward(secs);
+        self
     }
 
-    /// Insert a timeline at the given sec and play [`StaticAnim::show`] on it.
-    pub fn insert_at<T: Extract<Target = CoreItem> + Clone + 'static>(
-        &mut self,
-        item: T,
-        sec: f64,
-    ) -> TimelineId {
-        self.insert_with(|t| {
-            t.forward_to(sec);
-            t.play(item.show());
-        })
+    /// Advance the scene cursor to `target_sec` without adding an animation.
+    pub fn forward_to(&mut self, target_sec: f64) -> &mut Self {
+        self.anims.forward_to(target_sec);
+        self
     }
 
-    /// Insert a empty timeline and call `f` on it.
-    pub fn insert_with(&mut self, mut f: impl FnMut(&mut Timeline)) -> TimelineId {
-        let id = TimelineId(self.timelines.len());
-        let mut timeline = Timeline::new();
-        f(&mut timeline);
-        self.timelines.push(timeline);
-        id
+    /// Advance the scene cursor while holding its current evaluated state.
+    pub fn hold(&mut self, secs: f64) -> &mut Self {
+        self.anims.hold(secs);
+        self
     }
 
-    /// Get reference of all timelines
-    pub fn timelines(&self) -> &[Timeline] {
-        trace!("timelines");
-        &self.timelines
+    /// Advance the scene cursor to `target_sec` while holding its current state.
+    pub fn hold_to(&mut self, target_sec: f64) -> &mut Self {
+        self.anims.hold_to(target_sec);
+        self
     }
-    /// Get mutable reference of all timelines
-    pub fn timelines_mut(&mut self) -> &mut [Timeline] {
-        trace!("timelines_mut");
-        &mut self.timelines
+
+    /// Borrow the root animation sequence.
+    pub fn animations(&self) -> &AnimSequence {
+        &self.anims
     }
-    /// Get the reference of timeline(s) by the [`TimelineIndex`].
-    pub fn timeline<'a, T: TimelineIndex<'a>>(&'a self, index: T) -> T::RefOutput {
-        index.get_index_ref(&self.timelines)
+
+    /// Mutably borrow the root animation sequence.
+    pub fn animations_mut(&mut self) -> &mut AnimSequence {
+        &mut self.anims
     }
-    /// Get the mutable reference of timeline(s) by the [`TimelineIndex`].
-    pub fn timeline_mut<'a, T: TimelineIndex<'a>>(&'a mut self, index: T) -> T::MutOutput {
-        index.get_index_mut(&mut self.timelines)
-    }
-    /// Inserts an [`TimeMark`]
+
+    /// Insert a time mark.
     pub fn insert_time_mark(&mut self, sec: f64, time_mark: TimeMark) {
         self.time_marks.push((sec, time_mark));
     }
-}
 
-/// The information of an [`Timeline`].
-pub struct TimelineInfo {
-    /// The inner id value of the [`TimelineId`]
-    pub id: usize,
-    /// The animation infos.
-    pub animation_infos: Vec<AnimationInfo>,
+    /// Finish the definition and produce an immutable, evaluable recipe.
+    pub fn seal(self) -> SealedRanimScene {
+        let total_secs = self.anims.cursor_sec();
+        SealedRanimScene {
+            total_secs,
+            animations: self.anims.into_built_animations(),
+            time_marks: self.time_marks,
+        }
+    }
 }
 
 impl Debug for RanimScene {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("Timeline: {} timelines", self.timelines.len()))?;
-        Ok(())
+        f.debug_struct("RanimScene")
+            .field("animations", &self.anims.built_animations().len())
+            .field("duration_secs", &self.anims.cursor_sec())
+            .finish()
     }
 }
 
-// MARK: SealedRanimScene
-/// The sealed [`RanimScene`].
+/// Lightweight animation information used by preview tooling.
+pub struct AnimationInfo {
+    /// Concrete evaluator name.
+    pub anim_name: String,
+    /// Global time range.
+    pub range: std::ops::Range<f64>,
+}
+
+/// One preview row of animation information.
 ///
-/// the timelines and time marks cannot be modified after sealed. And
-/// once the [`RanimScene`] is sealed, it can be used for evaluating.
+/// The new model has a single root animation container; nested composition can
+/// later provide richer editor grouping without restoring the old Timeline API.
+pub struct TimelineInfo {
+    /// Preview row identifier.
+    pub id: usize,
+    /// Flattened animations shown in this row.
+    pub animation_infos: Vec<AnimationInfo>,
+}
+
+/// Immutable animation recipe produced by [`RanimScene::seal`].
 pub struct SealedRanimScene {
-    pub(crate) total_secs: f64,
-    pub(crate) timelines: Vec<Timeline>,
-    pub(crate) time_marks: Vec<(f64, TimeMark)>,
+    total_secs: f64,
+    animations: Vec<BuiltAnimation>,
+    time_marks: Vec<(f64, TimeMark)>,
 }
 
 impl SealedRanimScene {
-    /// Get the total seconds of the [`SealedRanimScene`].
+    /// Total scene duration.
     pub fn total_secs(&self) -> f64 {
         self.total_secs
     }
-    /// Get time marks
+
+    /// Scene time marks.
     pub fn time_marks(&self) -> &[(f64, TimeMark)] {
         &self.time_marks
     }
 
-    /// Get the iterator of timelines
-    pub fn timelines_iter(&self) -> impl Iterator<Item = &Timeline> {
-        self.timelines.iter()
-    }
-
-    /// Get the count of timelines
-    pub fn timelines_cnt(&self) -> usize {
-        self.timelines.len()
-    }
-
-    /// Get timeline infos.
+    /// Flattened animation information for the current preview UI.
     pub fn get_timeline_infos(&self) -> Vec<TimelineInfo> {
-        // const MAX_TIMELINE_CNT: usize = 100;
-        self.timelines
+        vec![TimelineInfo {
+            id: 0,
+            animation_infos: self
+                .animations
+                .iter()
+                .map(|animation| AnimationInfo {
+                    anim_name: animation.anim_name().to_string(),
+                    range: animation.time_range(),
+                })
+                .collect(),
+        }]
+    }
+
+    /// Evaluate all clips active at `target_sec` and extract scene primitives.
+    pub fn eval_at_sec(&self, target_sec: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
+        self.animations
             .iter()
             .enumerate()
-            // .take(MAX_TIMELINE_CNT)
-            .map(|(id, timeline)| TimelineInfo {
-                id,
-                animation_infos: timeline.get_animation_infos(),
-            })
-            .collect()
-    }
-
-    /// Eval primitives
-    pub fn eval_at_sec(&self, target_sec: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
-        self.timelines_iter()
-            .enumerate()
-            .filter_map(move |(t_id, t)| {
-                t.eval_primitives_at_sec(target_sec)
-                    .map(move |(a_id, res)| res.into_iter().map(move |x| ((t_id, a_id), x)))
-            })
-            .flatten()
-    }
-
-    /// Eval primitives
-    pub fn eval_at_alpha(&self, alpha: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
-        self.eval_at_sec(self.total_secs() * alpha)
-    }
-}
-
-// MARK: TimelineIndex
-/// A trait for indexing timeline(s)
-///
-/// [`RanimScene::timeline`] and [`RanimScene::timeline_mut`] uses the
-/// reference of [`TimelineIndex`] to index the timeline(s).
-///
-/// See [`TimelineQuery`] for more details.
-///
-/// | Index Type | Output Type |
-/// |------------|-------------|
-/// |   `usize`    | `Option<&Timeline>` and `Option<&mut Timeline>` |
-/// |   `TimelineId`    | `&Timeline` and `&mut Timeline` |
-/// |   `TQ: TimelineQuery<'a>`    | `TQ::RessembleResult` and `TQ::RessembleMutResult` |
-/// |   `[TQ: TimelineQuery<'a>; N]`    | `[TQ::RessembleResult; N]` and `Result<[TQ::RessembleMutResult; N], TimelineIndexMutError>` |
-pub trait TimelineIndex<'a> {
-    /// Output of [`TimelineIndex::get_index_ref`]
-    type RefOutput;
-    /// Output of [`TimelineIndex::get_index_mut`]
-    type MutOutput;
-    /// Get the reference of timeline(s) from [`RanimScene`] by the [`TimelineIndex`].
-    fn get_index_ref(self, timelines: &'a [Timeline]) -> Self::RefOutput;
-    /// Get the mutable reference of timeline(s) from [`RanimScene`] by the [`TimelineIndex`].
-    fn get_index_mut(self, timelines: &'a mut [Timeline]) -> Self::MutOutput;
-}
-
-/// A query of timeline.
-///
-/// It is implemented for [`TimelineId`], `(TI: AsRef<TimelineId>, T)`, `&(TI: AsRef<TimelineId>, T)` and `&mut (TI: AsRef<TimelineId>, T)`.
-///
-/// `&(TI: AsRef<TimelineId>, T)` and `&mut (TI: AsRef<TimelineId>, T)` are actually `(TI, &T)` and `(TI, &mut T)`.
-pub trait TimelineQuery<'a> {
-    /// The result of [`TimelineQuery::ressemble`]
-    type RessembleResult;
-    /// The result of [`TimelineQuery::ressemble_mut`]
-    type RessembleMutResult;
-    /// Get the id of the timeline.
-    fn id(&self) -> TimelineId;
-    /// Ressemble the timeline.
-    fn ressemble(self, timeline: &'a Timeline) -> Self::RessembleResult;
-    /// Ressemble the mutable timeline.
-    fn ressemble_mut(self, timeline: &'a mut Timeline) -> Self::RessembleMutResult;
-}
-
-impl<'a> TimelineQuery<'a> for TimelineId {
-    type RessembleResult = &'a Timeline;
-    type RessembleMutResult = &'a mut Timeline;
-    fn id(&self) -> TimelineId {
-        *self
-    }
-    fn ressemble(self, timeline: &'a Timeline) -> Self::RessembleResult {
-        timeline
-    }
-    fn ressemble_mut(self, timeline: &'a mut Timeline) -> Self::RessembleMutResult {
-        timeline
-    }
-}
-
-impl<'a, TI: AsRef<TimelineId>, T> TimelineQuery<'a> for (TI, T) {
-    type RessembleResult = (&'a Timeline, T);
-    type RessembleMutResult = (&'a mut Timeline, T);
-    fn id(&self) -> TimelineId {
-        *self.0.as_ref()
-    }
-    fn ressemble(self, timeline: &'a Timeline) -> Self::RessembleResult {
-        (timeline, self.1)
-    }
-    fn ressemble_mut(self, timeline: &'a mut Timeline) -> Self::RessembleMutResult {
-        (timeline, self.1)
-    }
-}
-
-impl<'a: 'b, 'b, TI: AsRef<TimelineId>, T> TimelineQuery<'a> for &'b (TI, T) {
-    type RessembleResult = (&'b Timeline, &'b T);
-    type RessembleMutResult = (&'b mut Timeline, &'b T);
-    fn id(&self) -> TimelineId {
-        *self.0.as_ref()
-    }
-    fn ressemble(self, timeline: &'a Timeline) -> Self::RessembleResult {
-        (timeline, &self.1)
-    }
-    fn ressemble_mut(self, timeline: &'a mut Timeline) -> Self::RessembleMutResult {
-        (timeline, &self.1)
-    }
-}
-
-impl<'a: 'b, 'b, TI: AsRef<TimelineId>, T> TimelineQuery<'a> for &'b mut (TI, T) {
-    type RessembleResult = (&'b Timeline, &'b mut T);
-    type RessembleMutResult = (&'b mut Timeline, &'b mut T);
-    fn id(&self) -> TimelineId {
-        *self.0.as_ref()
-    }
-    fn ressemble(self, timeline: &'a Timeline) -> Self::RessembleResult {
-        (timeline, &mut self.1)
-    }
-    fn ressemble_mut(self, timeline: &'a mut Timeline) -> Self::RessembleMutResult {
-        (timeline, &mut self.1)
-    }
-}
-
-impl<'a> TimelineIndex<'a> for usize {
-    type RefOutput = Option<&'a Timeline>;
-    type MutOutput = Option<&'a mut Timeline>;
-    fn get_index_ref(self, timelines: &'a [Timeline]) -> Self::RefOutput {
-        timelines.get(self)
-    }
-    fn get_index_mut(self, timelines: &'a mut [Timeline]) -> Self::MutOutput {
-        timelines.get_mut(self)
-    }
-}
-
-impl AsRef<TimelineId> for TimelineId {
-    fn as_ref(&self) -> &TimelineId {
-        self
-    }
-}
-
-impl<'a, TQ: TimelineQuery<'a>> TimelineIndex<'a> for TQ {
-    type RefOutput = TQ::RessembleResult;
-    type MutOutput = TQ::RessembleMutResult;
-    fn get_index_ref(self, timelines: &'a [Timeline]) -> Self::RefOutput {
-        let id = self.id();
-        self.ressemble(id.0.get_index_ref(timelines).unwrap())
-    }
-    fn get_index_mut(self, timelines: &'a mut [Timeline]) -> Self::MutOutput {
-        let id = self.id();
-        self.ressemble_mut(id.0.get_index_mut(timelines).unwrap())
-    }
-}
-
-/// An error of timeline indexing.
-#[derive(Debug)]
-pub enum TimelineIndexMutError {
-    /// The index is overlapping.
-    IndexOverlapping,
-}
-
-impl<'a, TI: TimelineQuery<'a>, const N: usize> TimelineIndex<'a> for [TI; N] {
-    type RefOutput = [TI::RessembleResult; N];
-    type MutOutput = Result<[TI::RessembleMutResult; N], TimelineIndexMutError>;
-    fn get_index_ref(self, timelines: &'a [Timeline]) -> Self::RefOutput {
-        self.map(|x| {
-            let id = x.id();
-            x.ressemble(id.0.get_index_ref(timelines).unwrap())
-        })
-    }
-    /// Learnt from [`std::slice`]'s `get_disjoint_mut`
-    fn get_index_mut(self, timelines: &'a mut [Timeline]) -> Self::MutOutput {
-        // Check for overlapping indices
-        for (i, idx) in self.iter().enumerate() {
-            for idx2 in self[i + 1..].iter() {
-                if idx.id() == idx2.id() {
-                    return Err(TimelineIndexMutError::IndexOverlapping);
+            .filter_map(move |(animation_id, animation)| {
+                if !animation.enabled() {
+                    return None;
                 }
-            }
-        }
 
-        // Collect all indices first
-        let indices: [usize; N] = std::array::from_fn(|i| self[i].id().0);
+                let range = animation.time_range();
+                let active = range.contains(&target_sec)
+                    || (target_sec == self.total_secs && target_sec == range.end);
+                active
+                    .then(|| animation.eval_at_sec(target_sec))
+                    .flatten()
+                    .map(move |items| (animation_id, items))
+            })
+            .flat_map(|(animation_id, items)| {
+                items
+                    .into_iter()
+                    .flat_map(|item| item.extract())
+                    .map(move |item| ((0, animation_id), item))
+            })
+    }
 
-        // NB: This implementation is written as it is because any variation of
-        // `indices.map(|i| self.get_unchecked_mut(i))` would make miri unhappy,
-        // or generate worse code otherwise. This is also why we need to go
-        // through a raw pointer here.
-        let mut arr: std::mem::MaybeUninit<[TI::RessembleMutResult; N]> =
-            std::mem::MaybeUninit::uninit();
-        let arr_ptr = arr.as_mut_ptr();
-        let timelines_ptr: *mut Timeline = timelines.as_mut_ptr();
-        let self_manually_drop = std::mem::ManuallyDrop::new(self);
+    /// Evaluate by normalized scene progress.
+    pub fn eval_at_alpha(&self, alpha: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
+        self.eval_at_sec(self.total_secs * alpha)
+    }
+}
 
-        // SAFETY: We've verified that all indices are disjoint and in bounds.
-        // We use raw pointers to get multiple mutable references to different
-        // elements of the slice, which is safe because the indices are disjoint.
-        // We use ManuallyDrop to prevent double-drop of self's elements after
-        // reading them with ptr::read.
-        let res = unsafe {
-            for (i, &idx) in indices.iter().enumerate() {
-                let timeline_ref = &mut *timelines_ptr.add(idx);
-                let ti = std::ptr::read(self_manually_drop.as_ptr().add(i));
-                arr_ptr
-                    .cast::<TI::RessembleMutResult>()
-                    .add(i)
-                    .write(ti.ressemble_mut(timeline_ref));
-            }
-            arr.assume_init()
-        };
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        animation::{Eval, Placeable, Static},
+        core_item::vitem::VItem,
+    };
 
-        Ok(res)
+    fn leaf(duration: f64) -> impl Animation + Placeable {
+        Static(VItem::default())
+            .into_animation_cell()
+            .with_duration(duration)
+    }
+
+    #[test]
+    fn scene_play_builds_into_the_root_sequence() {
+        let mut scene = RanimScene::new();
+        scene.play(chain![leaf(2.0), leaf(3.0)]);
+        let sealed = scene.seal();
+
+        assert_eq!(sealed.total_secs(), 5.0);
+        let infos = sealed.get_timeline_infos();
+        assert_eq!(infos[0].animation_infos[0].range, 0.0..2.0);
+        assert_eq!(infos[0].animation_infos[1].range, 2.0..5.0);
+    }
+
+    #[test]
+    fn user_sequence_can_be_extended_at_the_scene_cursor() {
+        let mut reusable = AnimSequence::new();
+        reusable.play(leaf(2.0)).forward(1.0).play(leaf(1.0));
+
+        let mut scene = RanimScene::new();
+        scene.forward(5.0).extend(reusable);
+        let sealed = scene.seal();
+
+        assert_eq!(sealed.total_secs(), 9.0);
+        let infos = sealed.get_timeline_infos();
+        assert_eq!(infos[0].animation_infos[0].range, 5.0..7.0);
+        assert_eq!(infos[0].animation_infos[1].range, 8.0..9.0);
     }
 }

@@ -21,8 +21,6 @@ use ranim::{
 #[scene]
 #[output(dir = "./output/aabb")]
 fn aabb(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
-
     let frame_w = 8.0 * 16.0 / 9.0;
     let frame_h = 8.0;
     let cols = 4;
@@ -161,6 +159,7 @@ fn aabb(r: &mut RanimScene) {
         }),
     ];
 
+    let mut content = AnimStack::new();
     for (i, item) in items.into_iter().enumerate() {
         let col = i % cols;
         let row = i / cols;
@@ -168,14 +167,20 @@ fn aabb(r: &mut RanimScene) {
             v.scale_to(ScaleHint::PorportionalY(target));
             v.move_to(cell_center(col, row));
         });
-        let r_id = r.insert_empty();
-        r.timeline_mut(r_id)
+        let mut sequence = AnimSequence::new();
+        sequence
             .play(wrapped.show())
             .play(wrapped.rotating(PI * 2.0, DVec3::Z));
+        content.push(sequence);
     }
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    let total_secs = content.duration_secs();
+    let mut camera = AnimSequence::new();
+    camera
+        .play(CameraFrame::default().show())
+        .hold_to(total_secs);
+    content.push(camera);
+    r.play(content);
+
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
