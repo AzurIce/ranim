@@ -32,11 +32,11 @@ pub mod test_scenes {
         let mut content = AnimStack::new();
         for square in squares {
             let mut sequence = AnimSequence::new();
-            sequence.play(square.show()).hold(1.0);
+            sequence.push(square.show()).hold(1.0);
             content.push(sequence);
         }
         let mut camera = AnimSequence::new();
-        camera.play(CameraFrame::default().show()).hold(1.0);
+        camera.push(CameraFrame::default().show()).hold(1.0);
         content.push(camera);
         r.play(content);
     }
@@ -68,7 +68,7 @@ pub mod test_scenes {
             content.push(square.morph_to(circle));
         }
         let mut camera = AnimSequence::new();
-        camera.play(CameraFrame::default().show()).hold(1.0);
+        camera.push(CameraFrame::default().show()).hold(1.0);
         content.push(camera);
         r.play(content);
     }

@@ -328,110 +328,9 @@ impl Animation for BuiltAnimation {
     }
 }
 
-/// Statically typed sequential composition.
-pub struct Chained<A>(pub A);
-
-/// Statically typed overlay composition.
-pub struct Stacked<A>(pub A);
-
-impl Animation for Chained<()> {
-    fn time_range(&self) -> Range<f64> {
-        0.0..0.0
-    }
-
-    fn build(self, _origin_sec: f64, _output: &mut Vec<BuiltAnimation>) {}
-}
-
-impl Placeable for Chained<()> {}
-
-impl Animation for Stacked<()> {
-    fn time_range(&self) -> Range<f64> {
-        0.0..0.0
-    }
-
-    fn build(self, _origin_sec: f64, _output: &mut Vec<BuiltAnimation>) {}
-}
-
-impl Placeable for Stacked<()> {}
-
-macro_rules! impl_animation_tuples {
-    ($(($ty:ident, $index:tt)),+ $(,)?) => {
-        impl<$($ty),+> Animation for Chained<($($ty,)+)>
-        where
-            $($ty: Animation + Placeable,)+
-        {
-            fn time_range(&self) -> Range<f64> {
-                let duration = 0.0 $(+ self.0.$index.duration_secs())+;
-                0.0..duration
-            }
-
-            fn build(self, origin_sec: f64, output: &mut Vec<BuiltAnimation>) {
-                let mut cursor = origin_sec;
-                $(
-                    let duration = self.0.$index.duration_secs();
-                    self.0.$index.build(cursor, output);
-                    cursor += duration;
-                )+
-                let _ = cursor;
-            }
-        }
-
-        impl<$($ty),+> Placeable for Chained<($($ty,)+)>
-        where
-            Chained<($($ty,)+)>: Animation,
-        {}
-
-        impl<$($ty),+> Animation for Stacked<($($ty,)+)>
-        where
-            $($ty: Animation,)+
-        {
-            fn time_range(&self) -> Range<f64> {
-                let mut end: f64 = 0.0;
-                $(end = end.max(self.0.$index.time_range().end);)+
-                0.0..end
-            }
-
-            fn build(self, origin_sec: f64, output: &mut Vec<BuiltAnimation>) {
-                $(self.0.$index.build(origin_sec, output);)+
-            }
-        }
-
-        impl<$($ty),+> Placeable for Stacked<($($ty,)+)>
-        where
-            Stacked<($($ty,)+)>: Animation,
-        {}
-    };
-}
-
-impl_animation_tuples!((A0, 0));
-impl_animation_tuples!((A0, 0), (A1, 1));
-impl_animation_tuples!((A0, 0), (A1, 1), (A2, 2));
-impl_animation_tuples!((A0, 0), (A1, 1), (A2, 2), (A3, 3));
-impl_animation_tuples!((A0, 0), (A1, 1), (A2, 2), (A3, 3), (A4, 4));
-impl_animation_tuples!((A0, 0), (A1, 1), (A2, 2), (A3, 3), (A4, 4), (A5, 5));
-impl_animation_tuples!(
-    (A0, 0),
-    (A1, 1),
-    (A2, 2),
-    (A3, 3),
-    (A4, 4),
-    (A5, 5),
-    (A6, 6)
-);
-impl_animation_tuples!(
-    (A0, 0),
-    (A1, 1),
-    (A2, 2),
-    (A3, 3),
-    (A4, 4),
-    (A5, 5),
-    (A6, 6),
-    (A7, 7)
-);
-
 /// Dynamic sequential animation container.
 ///
-/// `play` is this container's type-erasure boundary: the input may retain its
+/// `push` is this container's type-erasure boundary: the input may retain its
 /// full static composition type, while the resulting leaves are stored as
 /// relocatable [`BuiltAnimation`] values in this sequence's local coordinates.
 #[derive(Default)]
@@ -447,7 +346,7 @@ impl AnimSequence {
     }
 
     /// Append an animation at the current cursor and advance by its local extent.
-    pub fn play<A: Animation>(&mut self, animation: A) -> &mut Self {
+    pub fn push<A: Animation>(&mut self, animation: A) -> &mut Self {
         let duration = animation.duration_secs();
         animation.build(self.cursor_sec, &mut self.animations);
         self.cursor_sec += duration;
@@ -456,7 +355,7 @@ impl AnimSequence {
 
     /// Append another sequence at the current cursor.
     pub fn extend(&mut self, sequence: AnimSequence) -> &mut Self {
-        self.play(sequence)
+        self.push(sequence)
     }
 
     /// Advance the cursor without adding an animation.
@@ -613,6 +512,11 @@ impl AnimStack {
     pub fn built_animations(&self) -> &[BuiltAnimation] {
         &self.animations
     }
+
+    /// Consume this stack into its flattened leaves.
+    pub fn into_built_animations(self) -> Vec<BuiltAnimation> {
+        self.animations
+    }
 }
 
 impl Animation for AnimStack {
@@ -630,19 +534,29 @@ impl Animation for AnimStack {
 
 impl Placeable for AnimStack {}
 
-/// Construct a statically typed sequential composition.
+/// Construct an [`AnimSequence`] by playing each animation in order.
 #[macro_export]
-macro_rules! chain {
+macro_rules! seq {
     ($($animation:expr),* $(,)?) => {
-        $crate::animation::Chained(($($animation,)*))
+        {
+            #[allow(unused_mut)]
+            let mut sequence = $crate::animation::AnimSequence::new();
+            $(sequence.push($animation);)*
+            sequence
+        }
     };
 }
 
-/// Construct a statically typed overlay composition.
+/// Construct an [`AnimStack`] by pushing each animation at the same origin.
 #[macro_export]
 macro_rules! stack {
     ($($animation:expr),* $(,)?) => {
-        $crate::animation::Stacked(($($animation,)*))
+        {
+            #[allow(unused_mut)]
+            let mut stack = $crate::animation::AnimStack::new();
+            $(stack.push($animation);)*
+            stack
+        }
     };
 }
 
@@ -717,15 +631,15 @@ mod tests {
     }
 
     #[test]
-    fn chained_uses_child_durations() {
+    fn seq_uses_child_durations() {
         let mut output = Vec::new();
-        chain![leaf(1.0, 2.0), leaf(2.0, 3.0)].build(5.0, &mut output);
+        seq![leaf(1.0, 2.0), leaf(2.0, 3.0)].build(5.0, &mut output);
         assert_eq!(output[0].time_range(), 5.0..7.0);
         assert_eq!(output[1].time_range(), 7.0..10.0);
     }
 
     #[test]
-    fn stacked_accepts_plain_and_positioned_children() {
+    fn stack_accepts_plain_and_positioned_children() {
         let mut output = Vec::new();
         let animation = stack![leaf(1.0, 2.0), leaf(2.0, 3.0).at(1.0)];
         assert_eq!(animation.time_range(), 0.0..4.0);
@@ -735,12 +649,48 @@ mod tests {
     }
 
     #[test]
+    fn composition_macros_build_dynamic_containers_without_an_arity_limit() {
+        let empty_sequence: AnimSequence = seq![];
+        let empty_stack: AnimStack = stack![];
+        assert_eq!(empty_sequence.duration_secs(), 0.0);
+        assert_eq!(empty_stack.duration_secs(), 0.0);
+
+        let sequence: AnimSequence = seq![
+            leaf(1.0, 1.0),
+            leaf(2.0, 1.0),
+            leaf(3.0, 1.0),
+            leaf(4.0, 1.0),
+            leaf(5.0, 1.0),
+            leaf(6.0, 1.0),
+            leaf(7.0, 1.0),
+            leaf(8.0, 1.0),
+            leaf(9.0, 1.0),
+        ];
+        assert_eq!(sequence.duration_secs(), 9.0);
+        assert_eq!(sequence.built_animations().len(), 9);
+
+        let stack: AnimStack = stack![
+            leaf(1.0, 1.0),
+            leaf(2.0, 2.0),
+            leaf(3.0, 3.0),
+            leaf(4.0, 4.0),
+            leaf(5.0, 5.0),
+            leaf(6.0, 6.0),
+            leaf(7.0, 7.0),
+            leaf(8.0, 8.0),
+            leaf(9.0, 9.0),
+        ];
+        assert_eq!(stack.duration_secs(), 9.0);
+        assert_eq!(stack.built_animations().len(), 9);
+    }
+
+    #[test]
     fn sequence_can_be_repositioned_after_erasure() {
         let mut sequence = AnimSequence::new();
         sequence
-            .play(leaf(1.0, 2.0))
+            .push(leaf(1.0, 2.0))
             .forward(1.0)
-            .play(leaf(2.0, 1.0));
+            .push(leaf(2.0, 1.0));
         let mut output = Vec::new();
         sequence.build(10.0, &mut output);
         assert_eq!(output[0].time_range(), 10.0..12.0);
@@ -751,7 +701,7 @@ mod tests {
     fn hold_samples_only_animations_active_before_the_cursor() {
         let mut sequence = AnimSequence::new();
         sequence
-            .play(stack![leaf(1.0, 1.0), leaf(2.0, 2.0)])
+            .push(stack![leaf(1.0, 1.0), leaf(2.0, 2.0)])
             .hold(1.0);
 
         assert_eq!(sequence.built_animations().len(), 3);
@@ -762,7 +712,7 @@ mod tests {
     #[test]
     fn repeated_hold_extends_one_flat_static_animation() {
         let mut sequence = AnimSequence::new();
-        sequence.play(leaf(3.0, 1.0)).hold(1.0).hold(2.0);
+        sequence.push(leaf(3.0, 1.0)).hold(1.0).hold(2.0);
 
         assert_eq!(sequence.cursor_sec(), 4.0);
         assert_eq!(sequence.built_animations().len(), 2);
@@ -774,7 +724,7 @@ mod tests {
     #[test]
     fn forward_does_not_hold_the_previous_state() {
         let mut sequence = AnimSequence::new();
-        sequence.play(leaf(4.0, 1.0)).forward(1.0).hold(1.0);
+        sequence.push(leaf(4.0, 1.0)).forward(1.0).hold(1.0);
 
         assert_eq!(sequence.cursor_sec(), 3.0);
         assert_eq!(sequence.built_animations().len(), 1);
@@ -786,11 +736,11 @@ mod tests {
         shown.points[0].x = 5.0;
 
         let mut hidden = AnimSequence::new();
-        hidden.play(leaf(1.0, 1.0)).play(shown.hide()).hold(1.0);
+        hidden.push(leaf(1.0, 1.0)).push(shown.hide()).hold(1.0);
         assert_eq!(hidden.built_animations().len(), 2);
 
         let mut restored = AnimSequence::new();
-        restored.play(leaf(1.0, 1.0)).play(shown.show()).hold(1.0);
+        restored.push(leaf(1.0, 1.0)).push(shown.show()).hold(1.0);
         let held = restored.built_animations()[2].eval_at_sec(1.5).unwrap();
         assert_eq!(evaluated_xs(held), vec![5.0]);
     }

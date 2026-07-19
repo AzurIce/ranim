@@ -57,7 +57,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .with_rate_func(smooth)
         })
         .collect::<Vec<_>>();
-    content.play(
+    content.push(
         ranim_anims::lagged::Lagged::new(0.2, expand)
             .into_animation_cell()
             .with_duration(1.0),
@@ -80,7 +80,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .with_rate_func(smooth)
         })
         .collect::<Vec<_>>();
-    content.play(
+    content.push(
         ranim_anims::lagged::Lagged::new(0.2, rotate)
             .into_animation_cell()
             .with_duration(1.0),
@@ -104,7 +104,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
             .with_rate_func(smooth)
         })
         .collect::<Vec<_>>();
-    content.play(
+    content.push(
         ranim_anims::lagged::Lagged::new(0.2, collapse)
             .into_animation_cell()
             .with_duration(1.0),
@@ -112,7 +112,8 @@ pub fn regular_polygon(r: &mut RanimScene) {
 
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
 }

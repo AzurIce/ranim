@@ -35,7 +35,7 @@ fn test(r: &mut RanimScene) {
     }));
     let mut content = AnimSequence::new();
     content
-        .play(square.morph(|x| {
+        .push(square.morph(|x| {
             x.with_origin(AabbPoint::CENTER, |x| {
                 x.rotate_on_y(PI / 2.0);
             });
@@ -51,13 +51,14 @@ fn test(r: &mut RanimScene) {
     // let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
     // let mut arrow = timeline.insert(arrow);
 
-    // timeline.play(arrow.morph(|data| {
+    // timeline.push(arrow.morph(|data| {
     //     data.set_color(RED_C);
     //     data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
     // }));
     let mut camera = AnimSequence::new();
     camera
-        .play(camera_frame.show())
+        .push(camera_frame.show())
         .hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
 }

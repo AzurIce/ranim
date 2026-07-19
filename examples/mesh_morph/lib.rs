@@ -42,21 +42,22 @@ fn mesh_morph(r: &mut RanimScene) {
 
     let mut mesh_sequence = AnimSequence::new();
     mesh_sequence
-        .play(sphere.morph_to(torus.clone()).with_duration(2.5))
+        .push(sphere.morph_to(torus.clone()).with_duration(2.5))
         .hold(0.5)
-        .play(torus.morph_to(disc.clone()).with_duration(2.5));
+        .push(torus.morph_to(disc.clone()).with_duration(2.5));
     mesh_sequence
         .hold(0.5)
-        .play(disc.morph_to(sphere_red).with_duration(2.5));
+        .push(disc.morph_to(sphere_red).with_duration(2.5));
 
     let mut camera_sequence = AnimSequence::new();
-    camera_sequence.play(
+    camera_sequence.push(
         cam.orbit(DVec3::ZERO, 2.0)
             .with_duration(9.0)
             .with_rate_func(linear),
     );
     mesh_sequence.hold_to(camera_sequence.cursor_sec());
-    r.play(stack![camera_sequence, mesh_sequence]);
+    r.play(camera_sequence);
+    r.play(mesh_sequence);
 
     // Add preview captures at key moments
     r.insert_time_mark(2.5, TimeMark::Capture("preview_torus.png".to_string()));

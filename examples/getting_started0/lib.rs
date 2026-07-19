@@ -13,18 +13,19 @@ fn getting_started0(r: &mut RanimScene) {
 
     let mut content = AnimSequence::new();
     content
-        .play(square.clone().fade_in())
+        .push(square.clone().fade_in())
         .hold(1.0)
-        .play(square.hide())
+        .push(square.hide())
         .forward(1.0)
-        .play(square.show())
+        .push(square.show())
         .hold(1.0)
-        .play(square.clone().fade_out());
+        .push(square.clone().fade_out());
 
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
 }
 // ANCHOR_END: construct

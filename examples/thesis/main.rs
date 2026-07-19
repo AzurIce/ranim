@@ -48,12 +48,10 @@ fn fading(r: &mut RanimScene) {
     });
     let duration = 1.0;
     let mut camera = AnimSequence::new();
-    camera.play(CameraFrame::default().show()).hold(duration);
-    r.play(stack![
-        camera,
-        pentagon_in.fade_in(),
-        pentagon_out.fade_out()
-    ]);
+    camera.push(CameraFrame::default().show()).hold(duration);
+    r.play(camera);
+    r.play(pentagon_in.fade_in());
+    r.play(pentagon_out.fade_out());
 }
 
 #[allow(unused)]
@@ -67,12 +65,10 @@ fn creation(r: &mut RanimScene) {
     });
     let duration = 1.0;
     let mut camera = AnimSequence::new();
-    camera.play(CameraFrame::default().show()).hold(duration);
-    r.play(stack![
-        camera,
-        pentagon_in.create(),
-        pentagon_out.uncreate()
-    ]);
+    camera.push(CameraFrame::default().show()).hold(duration);
+    r.play(camera);
+    r.play(pentagon_in.create());
+    r.play(pentagon_out.uncreate());
 }
 
 #[allow(unused)]
@@ -87,8 +83,10 @@ fn writing(r: &mut RanimScene) {
     });
     let duration = 1.0;
     let mut camera = AnimSequence::new();
-    camera.play(CameraFrame::default().show()).hold(duration);
-    r.play(stack![camera, pentagon_in.write(), pentagon_out.unwrite()]);
+    camera.push(CameraFrame::default().show()).hold(duration);
+    r.play(camera);
+    r.play(pentagon_in.write());
+    r.play(pentagon_out.unwrite());
 }
 
 #[allow(unused)]
@@ -105,8 +103,9 @@ fn transform(r: &mut RanimScene) {
     let mut item = VItem::from(src);
     let animation = item.morph_to(VItem::from(dst)).with_rate_func(linear);
     let mut camera = AnimSequence::new();
-    camera.play(CameraFrame::default().show()).hold(1.0);
-    r.play(stack![camera, animation]);
+    camera.push(CameraFrame::default().show()).hold(1.0);
+    r.play(camera);
+    r.play(animation);
 }
 
 fn main() {

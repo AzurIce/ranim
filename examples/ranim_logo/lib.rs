@@ -91,7 +91,7 @@ fn ranim_logo(r: &mut RanimScene) {
         }),
     );
     logo_parts.iter_mut().for_each(|(sequence, item)| {
-        sequence.play(item.write().with_duration(3.0).with_rate_func(smooth));
+        sequence.push(item.write().with_duration(3.0).with_rate_func(smooth));
     });
 
     let gap_ratio = 1.0 / 60.0;
@@ -114,7 +114,7 @@ fn ranim_logo(r: &mut RanimScene) {
         .zip(scale.into_iter().zip(anchor))
         .for_each(|(chunk, (scale, anchor))| {
             chunk.for_each(|(sequence, item)| {
-                sequence.play(
+                sequence.push(
                     item.morph(|data| {
                         data.with_origin(anchor, |x| {
                             x.scale(scale);
@@ -129,7 +129,7 @@ fn ranim_logo(r: &mut RanimScene) {
             })
         });
     let mut text_sequence = AnimSequence::new();
-    text_sequence.forward(3.5).play(
+    text_sequence.forward(3.5).push(
         ranim_text
             .lagged(0.2, |item| {
                 item.write().with_duration(2.0).with_rate_func(linear)
@@ -154,9 +154,9 @@ fn ranim_logo(r: &mut RanimScene) {
     text_sequence.hold(1.0);
 
     logo_parts.iter_mut().for_each(|(sequence, item)| {
-        sequence.play(item.unwrite().with_duration(3.0).with_rate_func(smooth));
+        sequence.push(item.unwrite().with_duration(3.0).with_rate_func(smooth));
     });
-    text_sequence.play(ranim_text.lagged(0.0, |item| {
+    text_sequence.push(ranim_text.lagged(0.0, |item| {
         item.unwrite().with_duration(3.0).with_rate_func(linear)
     }));
 
@@ -172,7 +172,7 @@ fn ranim_logo(r: &mut RanimScene) {
     content.push(text_sequence);
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(total_secs);
     content.push(camera);
     r.play(content);

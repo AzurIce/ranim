@@ -38,23 +38,27 @@ fn basic(r: &mut RanimScene) {
 
     let mut svg_sequence = AnimSequence::new();
     svg_sequence
-        .play(svg.show())
+        .push(svg.show())
         .hold(0.2)
-        .play(svg.fade_in().with_duration(3.0));
+        .push(svg.fade_in().with_duration(3.0));
 
     let mut text_sequence = AnimSequence::new();
     text_sequence
-        .play(text.show())
+        .push(text.show())
         .hold(0.2)
-        .play(text.lagged(0.2, |e| e.write()).with_duration(3.0));
+        .push(text.lagged(0.2, |e| e.write()).with_duration(3.0));
 
     let total_secs = svg_sequence.cursor_sec().max(text_sequence.cursor_sec());
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(total_secs);
 
-    r.play(stack![camera, svg_sequence, text_sequence]);
+    r.play(camera);
+
+    r.play(svg_sequence);
+
+    r.play(text_sequence);
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

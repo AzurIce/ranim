@@ -20,28 +20,29 @@ fn ellipse(r: &mut RanimScene) {
     let mut vitem = VItem::from(ellipse);
 
     let mut content = AnimSequence::new();
-    content.play(vitem.write());
+    content.push(vitem.write());
 
     // Transform to a circle
     let circle = Circle::new(2.0).with(|c| {
         c.set_stroke_color(manim::RED_C);
     });
-    content.play(vitem.morph_to(VItem::from(circle)));
+    content.push(vitem.morph_to(VItem::from(circle)));
 
     // Transform to a vertical ellipse
     let ellipse_v = Ellipse::new(dvec2(1.0, 2.5)).with(|e| {
         e.set_stroke_color(manim::GREEN_C);
     });
-    content.play(vitem.morph_to(VItem::from(ellipse_v)));
+    content.push(vitem.morph_to(VItem::from(ellipse_v)));
 
     // Fade out
-    content.play(vitem.fade_out());
+    content.push(vitem.fade_out());
 
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
 
     r.insert_time_mark(1.0, TimeMark::Capture("preview.png".to_string()));
 }

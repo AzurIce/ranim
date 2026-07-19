@@ -82,7 +82,7 @@ fn perspective_blend(r: &mut RanimScene) {
     let mut faces = square_faces.to_vec();
 
     let mut faces_sequence = AnimSequence::new();
-    faces_sequence.forward(1.0).play(
+    faces_sequence.forward(1.0).push(
         faces
             .morph(|data| {
                 data.with_origin(AabbPoint::CENTER, |x| {
@@ -99,9 +99,9 @@ fn perspective_blend(r: &mut RanimScene) {
     let total_secs = content.duration_secs();
     let mut camera = AnimSequence::new();
     camera
-        .play(cam.show())
+        .push(cam.show())
         .hold(2.0)
-        .play(
+        .push(
             cam.morph(|data| {
                 data.perspective_blend = 1.0;
             })

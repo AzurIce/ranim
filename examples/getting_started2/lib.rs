@@ -31,27 +31,29 @@ fn getting_started2(r: &mut RanimScene) {
         .into();
     let mut rect_sequence = AnimSequence::new();
     rect_sequence
-        .play(rect.clone().show())
+        .push(rect.clone().show())
         .hold(1.0)
-        .play(VItem::from(rect).uncreate());
+        .push(VItem::from(rect).uncreate());
 
     let mut item_sequence = AnimSequence::new();
     item_sequence
-        .play(square.clone().show())
+        .push(square.clone().show())
         .hold(1.0)
-        .play(square.clone().create())
-        .play(
+        .push(square.clone().create())
+        .push(
             square
                 .clone()
                 .morph_to(circle.clone())
                 .with_rate_func(linear),
         )
-        .play(circle.clone().unwrite());
+        .push(circle.clone().unwrite());
 
     let total_secs = item_sequence.cursor_sec().max(rect_sequence.cursor_sec());
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(total_secs);
-    r.play(stack![camera, rect_sequence, item_sequence]);
+    r.play(camera);
+    r.play(rect_sequence);
+    r.play(item_sequence);
 }

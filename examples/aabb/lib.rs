@@ -169,15 +169,15 @@ fn aabb(r: &mut RanimScene) {
         });
         let mut sequence = AnimSequence::new();
         sequence
-            .play(wrapped.show())
-            .play(wrapped.rotating(PI * 2.0, DVec3::Z));
+            .push(wrapped.show())
+            .push(wrapped.rotating(PI * 2.0, DVec3::Z));
         content.push(sequence);
     }
 
     let total_secs = content.duration_secs();
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(total_secs);
     content.push(camera);
     r.play(content);

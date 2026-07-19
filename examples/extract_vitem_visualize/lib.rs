@@ -35,28 +35,29 @@ fn ranim_text(r: &mut RanimScene) {
 
     let mut camera = AnimSequence::new();
     camera
-        .play(cam.show())
+        .push(cam.show())
         .hold(1.0)
-        .play(cam.morph(|cam| {
+        .push(cam.morph(|cam| {
             cam.scale = 0.3;
             cam.up = DVec3::NEG_X;
             cam.pos.shift(DVec3::NEG_X * 6.0);
         }))
         .hold(1.0)
-        .play(
+        .push(
             cam.morph(|cam| {
                 cam.pos.shift(DVec3::X * 12.0);
             })
             .with_duration(7.0),
         )
         .hold(1.0)
-        .play(cam.morph_to(CameraFrame::default()));
+        .push(cam.morph_to(CameraFrame::default()));
 
     let mut content = AnimSequence::new();
     content
-        .play(visual_text.show())
+        .push(visual_text.show())
         .hold_to(camera.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
 
     // r.timelines_mut().forward(1.0);
     r.insert_time_mark(5.0, TimeMark::Capture("preview-ranim_text.png".to_string()));
@@ -78,17 +79,18 @@ pub fn hello_ranim(r: &mut RanimScene) {
 
     let mut content = AnimSequence::new();
     content
-        .play(square.clone().morph_to(circle.clone()))
+        .push(square.clone().morph_to(circle.clone()))
         .hold(1.0)
-        .play(circle.clone().unwrite().with_duration(2.0))
-        .play(circle.write().with_duration(2.0))
-        .play(circle.fade_out());
+        .push(circle.clone().unwrite().with_duration(2.0))
+        .push(circle.write().with_duration(2.0))
+        .push(circle.fade_out());
 
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
     r.insert_time_mark(
         3.2,
         TimeMark::Capture("preview-hello_ranim.png".to_string()),

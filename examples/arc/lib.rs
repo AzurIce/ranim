@@ -45,14 +45,15 @@ pub fn arc(r: &mut RanimScene) {
         })
         .collect::<Vec<_>>();
     let mut content = AnimSequence::new();
-    content.play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+    content.push(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
     let total_secs = content.cursor_sec();
 
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(total_secs);
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

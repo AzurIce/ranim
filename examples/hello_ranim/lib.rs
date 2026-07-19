@@ -17,7 +17,7 @@ fn hello_ranim(r: &mut RanimScene) {
     square.set_color(manim::BLUE_C);
 
     let mut content = AnimSequence::new();
-    content.play(square.clone().fade_in());
+    content.push(square.clone().fade_in());
 
     let mut circle = Circle::new(2.0);
     circle
@@ -28,17 +28,18 @@ fn hello_ranim(r: &mut RanimScene) {
 
     let mut vitem = VItem::from(square);
     content
-        .play(vitem.morph_to(circle.into()))
+        .push(vitem.morph_to(circle.into()))
         .hold(1.0)
-        .play(vitem.clone().unwrite())
-        .play(vitem.write())
-        .play(vitem.fade_out());
+        .push(vitem.clone().unwrite())
+        .push(vitem.write())
+        .push(vitem.fade_out());
 
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
 
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
 }
@@ -50,7 +51,7 @@ fn hello_ranim_chained(r: &mut RanimScene) {
     });
 
     let mut content = AnimSequence::new();
-    content.play(square.clone().fade_in());
+    content.push(square.clone().fade_in());
 
     let circle = Circle::new(2.0).with(|circle| {
         circle
@@ -62,17 +63,18 @@ fn hello_ranim_chained(r: &mut RanimScene) {
 
     let mut vitem = VItem::from(square);
     content
-        .play(vitem.morph_to(circle.into()))
+        .push(vitem.morph_to(circle.into()))
         .hold(1.0)
-        .play(vitem.clone().unwrite())
-        .play(vitem.write())
-        .play(vitem.fade_out());
+        .push(vitem.clone().unwrite())
+        .push(vitem.write())
+        .push(vitem.fade_out());
 
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
 
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
 }

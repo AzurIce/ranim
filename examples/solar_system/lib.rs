@@ -132,7 +132,7 @@ fn solar_system(r: &mut RanimScene) {
     let mut content = AnimStack::new();
 
     let mut camera = AnimSequence::new();
-    camera.play(cam.show()).hold_to(total_secs);
+    camera.push(cam.show()).hold_to(total_secs);
     content.push(camera);
 
     // Create the Sun at the origin (already visible at start)
@@ -142,7 +142,7 @@ fn solar_system(r: &mut RanimScene) {
             .with_fill_color(manim::YELLOW_C.with_alpha(0.5)),
     );
     let mut sun_sequence = AnimSequence::new();
-    sun_sequence.play(sun.show()).hold_to(total_secs);
+    sun_sequence.push(sun.show()).hold_to(total_secs);
     content.push(sun_sequence);
 
     // Orbit rings fade in (0-1s)
@@ -171,7 +171,7 @@ fn solar_system(r: &mut RanimScene) {
 
         let mut orbit_sequence = AnimSequence::new();
         orbit_sequence
-            .play(orbit_torus.fade_in().with_duration(1.0))
+            .push(orbit_torus.fade_in().with_duration(1.0))
             .hold_to(total_secs);
         content.push(orbit_sequence);
     }
@@ -210,7 +210,7 @@ fn solar_system(r: &mut RanimScene) {
             let orbit_total_angle = TAU * (10.0 / planet.period);
 
             let mut core_sequence = AnimSequence::new();
-            core_sequence.play(core.show()).hold(2.0).play(
+            core_sequence.push(core.show()).hold(2.0).push(
                 OrbitMotion {
                     src: core.clone(),
                     orbit_radius: planet.orbit_radius,
@@ -225,7 +225,7 @@ fn solar_system(r: &mut RanimScene) {
             content.push(core_sequence);
 
             let mut atmosphere_sequence = AnimSequence::new();
-            atmosphere_sequence.play(atmosphere.show()).hold(2.0).play(
+            atmosphere_sequence.push(atmosphere.show()).hold(2.0).push(
                 OrbitMotion {
                     src: atmosphere.clone(),
                     orbit_radius: planet.orbit_radius,
@@ -251,7 +251,7 @@ fn solar_system(r: &mut RanimScene) {
             let orbit_total_angle = TAU * (10.0 / planet.period);
 
             let mut planet_sequence = AnimSequence::new();
-            planet_sequence.play(planet_surface.show()).hold(2.0).play(
+            planet_sequence.push(planet_surface.show()).hold(2.0).push(
                 OrbitMotion {
                     src: planet_surface.clone(),
                     orbit_radius: planet.orbit_radius,
@@ -281,11 +281,11 @@ fn solar_system(r: &mut RanimScene) {
         let mut label_sequence = AnimSequence::new();
         label_sequence
             .forward(1.0)
-            .play(label_vitems.clone().fade_in().with_duration(1.0));
+            .push(label_vitems.clone().fade_in().with_duration(1.0));
 
         // Labels orbit together with planets (starts at t=2s, runs for 10s)
         let orbit_total_angle = TAU * (10.0 / planet.period);
-        label_sequence.play(
+        label_sequence.push(
             LabelOrbitMotion {
                 src: label_vitems.clone(),
                 orbit_radius: planet.orbit_radius,

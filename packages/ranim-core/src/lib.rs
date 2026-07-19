@@ -29,7 +29,7 @@ pub use num;
 
 use std::fmt::Debug;
 
-use animation::{AnimSequence, Animation, BuiltAnimation};
+use animation::{AnimStack, Animation, BuiltAnimation};
 use core_item::CoreItem;
 
 /// Commonly used ranim APIs.
@@ -78,13 +78,13 @@ pub enum TimeMark {
 
 /// Animation definition builder passed to scene constructors.
 ///
-/// The built-in [`AnimSequence`] is also available independently for users to
-/// construct reusable dynamic animation groups. Calling [`RanimScene::play`]
-/// flattens a statically typed animation into this sequence and performs the
-/// single evaluator type-erasure step.
+/// The public [`RanimScene::root`] stack is the scene's animation composition
+/// root. Calling [`RanimScene::play`] is a convenience alias for pushing into
+/// that stack.
 #[derive(Default)]
 pub struct RanimScene {
-    anims: AnimSequence,
+    /// Root animation stack. Modules pushed here share the same local origin.
+    pub root: AnimStack,
     time_marks: Vec<(f64, TimeMark)>,
 }
 
@@ -94,50 +94,10 @@ impl RanimScene {
         Self::default()
     }
 
-    /// Append an animation at the scene's current cursor.
+    /// Push an animation module into the root stack.
     pub fn play<A: Animation>(&mut self, animation: A) -> &mut Self {
-        self.anims.play(animation);
+        self.root.push(animation);
         self
-    }
-
-    /// Append a user-built animation sequence at the current cursor.
-    pub fn extend(&mut self, sequence: AnimSequence) -> &mut Self {
-        self.anims.extend(sequence);
-        self
-    }
-
-    /// Advance the scene cursor without adding an animation.
-    pub fn forward(&mut self, secs: f64) -> &mut Self {
-        self.anims.forward(secs);
-        self
-    }
-
-    /// Advance the scene cursor to `target_sec` without adding an animation.
-    pub fn forward_to(&mut self, target_sec: f64) -> &mut Self {
-        self.anims.forward_to(target_sec);
-        self
-    }
-
-    /// Advance the scene cursor while holding its current evaluated state.
-    pub fn hold(&mut self, secs: f64) -> &mut Self {
-        self.anims.hold(secs);
-        self
-    }
-
-    /// Advance the scene cursor to `target_sec` while holding its current state.
-    pub fn hold_to(&mut self, target_sec: f64) -> &mut Self {
-        self.anims.hold_to(target_sec);
-        self
-    }
-
-    /// Borrow the root animation sequence.
-    pub fn animations(&self) -> &AnimSequence {
-        &self.anims
-    }
-
-    /// Mutably borrow the root animation sequence.
-    pub fn animations_mut(&mut self) -> &mut AnimSequence {
-        &mut self.anims
     }
 
     /// Insert a time mark.
@@ -147,10 +107,10 @@ impl RanimScene {
 
     /// Finish the definition and produce an immutable, evaluable recipe.
     pub fn seal(self) -> SealedRanimScene {
-        let total_secs = self.anims.cursor_sec();
+        let total_secs = self.root.duration_secs();
         SealedRanimScene {
             total_secs,
-            animations: self.anims.into_built_animations(),
+            animations: self.root.into_built_animations(),
             time_marks: self.time_marks,
         }
     }
@@ -159,8 +119,8 @@ impl RanimScene {
 impl Debug for RanimScene {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RanimScene")
-            .field("animations", &self.anims.built_animations().len())
-            .field("duration_secs", &self.anims.cursor_sec())
+            .field("animations", &self.root.built_animations().len())
+            .field("duration_secs", &self.root.duration_secs())
             .finish()
     }
 }
@@ -253,7 +213,7 @@ impl SealedRanimScene {
 mod tests {
     use super::*;
     use crate::{
-        animation::{Eval, Placeable, Static},
+        animation::{AnimSequence, Eval, Placeable, Static},
         core_item::vitem::VItem,
     };
 
@@ -264,9 +224,9 @@ mod tests {
     }
 
     #[test]
-    fn scene_play_builds_into_the_root_sequence() {
+    fn scene_play_pushes_into_the_root_stack() {
         let mut scene = RanimScene::new();
-        scene.play(chain![leaf(2.0), leaf(3.0)]);
+        scene.play(seq![leaf(2.0), leaf(3.0)]);
         let sealed = scene.seal();
 
         assert_eq!(sealed.total_secs(), 5.0);
@@ -276,17 +236,19 @@ mod tests {
     }
 
     #[test]
-    fn user_sequence_can_be_extended_at_the_scene_cursor() {
+    fn scene_modules_share_the_root_origin() {
         let mut reusable = AnimSequence::new();
-        reusable.play(leaf(2.0)).forward(1.0).play(leaf(1.0));
+        reusable.push(leaf(2.0)).forward(1.0).push(leaf(1.0));
 
         let mut scene = RanimScene::new();
-        scene.forward(5.0).extend(reusable);
+        scene.play(reusable);
+        scene.root.push(leaf(5.0));
         let sealed = scene.seal();
 
-        assert_eq!(sealed.total_secs(), 9.0);
+        assert_eq!(sealed.total_secs(), 5.0);
         let infos = sealed.get_timeline_infos();
-        assert_eq!(infos[0].animation_infos[0].range, 5.0..7.0);
-        assert_eq!(infos[0].animation_infos[1].range, 8.0..9.0);
+        assert_eq!(infos[0].animation_infos[0].range, 0.0..2.0);
+        assert_eq!(infos[0].animation_infos[1].range, 3.0..4.0);
+        assert_eq!(infos[0].animation_infos[2].range, 0.0..5.0);
     }
 }

@@ -58,7 +58,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 );
             });
             let mut sequence = AnimSequence::new();
-            sequence.play(disk.show());
+            sequence.push(disk.show());
             (sequence, disk)
         })
         .collect::<Vec<_>>();
@@ -74,14 +74,14 @@ fn hanoi(r: &mut RanimScene, n: usize) {
 
         {
             let (sequence, disk) = &mut disk_entry;
-            sequence.play(
+            sequence.push(
                 disk.morph(|data| {
                     data.shift(dvec3(0.0, 3.0 - top_src, 0.0));
                 })
                 .with_duration(anim_duration)
                 .with_rate_func(ease_in_quad),
             );
-            sequence.play(
+            sequence.push(
                 disk.morph(|data| {
                     data.shift(dvec3(
                         (idx_dst as f64 - idx_src as f64) * rod_section_width,
@@ -92,7 +92,7 @@ fn hanoi(r: &mut RanimScene, n: usize) {
                 .with_duration(anim_duration)
                 .with_rate_func(linear),
             );
-            sequence.play(
+            sequence.push(
                 disk.morph(|data| {
                     data.shift(dvec3(0.0, top_dst - 3.0, 0.0));
                 })
@@ -120,11 +120,11 @@ fn hanoi(r: &mut RanimScene, n: usize) {
     }
     let total_secs = content.duration_secs();
     let mut static_scene = AnimSequence::new();
-    static_scene.play(rods.show()).hold_to(total_secs);
+    static_scene.push(rods.show()).hold_to(total_secs);
     content.push(static_scene);
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(total_secs);
     content.push(camera);
     r.play(content);

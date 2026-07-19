@@ -20,29 +20,31 @@ fn text_item(r: &mut RanimScene) {
 
     let mut text_sequence = AnimSequence::new();
     text_sequence
-        .play(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.write()))
+        .push(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.write()))
         .hold(3.0)
-        .play(
+        .push(
             text.clone()
                 .rotating(TAU * 4.0, DVec3::Z)
                 .with_duration(4.0),
         )
         .hold(1.0)
-        .play(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.unwrite()))
+        .push(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.unwrite()))
         .hold(1.0);
 
     let mut box_sequence = AnimSequence::new();
     box_sequence
         .forward(1.0)
-        .play(VItem::from(text_box.clone()).create())
-        .play(VItem::from(text_box).uncreate());
+        .push(VItem::from(text_box.clone()).create())
+        .push(VItem::from(text_box).uncreate());
 
     let total_secs = text_sequence.cursor_sec().max(box_sequence.cursor_sec());
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(total_secs);
-    r.play(stack![camera, text_sequence, box_sequence]);
+    r.play(camera);
+    r.play(text_sequence);
+    r.play(box_sequence);
 
     r.insert_time_mark(
         total_secs / 2.0,

@@ -33,20 +33,21 @@ fn output_formats(r: &mut RanimScene) {
 
     let mut content = AnimSequence::new();
     content
-        .play(circles.lagged(0.3, |c| c.fade_in()).with_duration(1.0))
+        .push(circles.lagged(0.3, |c| c.fade_in()).with_duration(1.0))
         .hold(1.0)
-        .play(
+        .push(
             circles
                 .rotating_at(2.0 * PI / 3.0, DVec3::Z, DVec3::ZERO)
                 .with_duration(1.0),
         )
         .hold(1.0)
-        .play(circles.lagged(0.3, |c| c.fade_out()).with_duration(1.0));
+        .push(circles.lagged(0.3, |c| c.fade_out()).with_duration(1.0));
 
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
     r.insert_time_mark(1.5, TimeMark::Capture("preview.png".to_string()));
 }

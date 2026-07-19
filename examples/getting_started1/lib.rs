@@ -23,13 +23,14 @@ fn getting_started1(r: &mut RanimScene) {
 
     let mut content = AnimSequence::new();
     content
-        .play(VItem::from(square).morph_to(VItem::from(circle.clone())))
-        .play(VItem::from(circle).unwrite());
+        .push(VItem::from(square).morph_to(VItem::from(circle.clone())))
+        .push(VItem::from(circle).unwrite());
 
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    r.play(camera);
+    r.play(content);
 }
 // ANCHOR_END: construct

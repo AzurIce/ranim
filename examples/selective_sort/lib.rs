@@ -34,7 +34,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                     .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
             let mut sequence = AnimSequence::new();
-            sequence.play(rect.show());
+            sequence.push(rect.show());
             (sequence, rect)
         })
         .collect::<Vec<_>>();
@@ -66,10 +66,10 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
     };
     for i in 0..num - 1 {
         let (sequence, rect) = &mut rects[i];
-        sequence.play(highlight(rect));
+        sequence.push(highlight(rect));
         for j in i + 1..num {
             let (sequence, rect) = &mut rects[j];
-            sequence.play(highlight(rect));
+            sequence.push(highlight(rect));
             sync(&mut rects);
 
             if heights[i] > heights[j] {
@@ -82,7 +82,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                     .zip(dir)
                     .zip(color)
                     .for_each(|(((sequence, rect), dir), color)| {
-                        sequence.play(
+                        sequence.push(
                             rect.morph(|rect| {
                                 rect.shift(dir * (j - i) as f64)
                                     .set_color(color)
@@ -96,11 +96,11 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                 rects.swap(i, j);
             }
             let (sequence, rect) = &mut rects[j];
-            sequence.play(unhighlight(rect));
+            sequence.push(unhighlight(rect));
             sync(&mut rects);
         }
         let (sequence, rect) = &mut rects[i];
-        sequence.play(unhighlight(rect));
+        sequence.push(unhighlight(rect));
     }
     sync(&mut rects);
 
@@ -116,7 +116,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
     }
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(total_secs);
     content.push(camera);
     r.play(content);

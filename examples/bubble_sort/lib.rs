@@ -38,7 +38,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
                     .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
             let mut sequence = AnimSequence::new();
-            sequence.play(rect.show());
+            sequence.push(rect.show());
             (sequence, rect)
         })
         .collect::<Vec<_>>();
@@ -57,7 +57,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
     for i in (1..num).rev() {
         for j in 0..i {
             for (sequence, rect) in rects.get_disjoint_mut([j, j + 1]).unwrap() {
-                sequence.play(
+                sequence.push(
                     rect.morph(|rect| {
                         rect.set_fill_color(manim::BLUE_C.with_alpha(0.5));
                     })
@@ -73,7 +73,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
                     .into_iter()
                     .zip([shift_right, -shift_right])
                 {
-                    sequence.play(
+                    sequence.push(
                         rect.morph(|rect| {
                             rect.shift(shift);
                         })
@@ -87,7 +87,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
             }
 
             for (sequence, rect) in rects.get_disjoint_mut([j, j + 1]).unwrap() {
-                sequence.play(
+                sequence.push(
                     rect.morph(|rect| {
                         rect.set_fill_color(manim::WHITE.with_alpha(0.5));
                     })
@@ -106,7 +106,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
     }
     let mut camera = AnimSequence::new();
     camera
-        .play(CameraFrame::default().show())
+        .push(CameraFrame::default().show())
         .hold_to(total_secs);
     content.push(camera);
     r.play(content);

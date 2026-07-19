@@ -49,9 +49,9 @@ fn animating_pi(r: &mut RanimScene) {
 
     let mut content = AnimSequence::new();
     content
-        .play(vitems.clone().show())
+        .push(vitems.clone().show())
         .hold(1.0)
-        .play(
+        .push(
             vitems
                 .morph(|x| {
                     x.apply_complex_map(|c| c.exp());
@@ -59,7 +59,7 @@ fn animating_pi(r: &mut RanimScene) {
                 .with_duration(5.0),
         )
         .hold(1.0)
-        .play(
+        .push(
             vitems
                 .morph(|x| {
                     x.apply_point_func(|p| {
@@ -72,8 +72,9 @@ fn animating_pi(r: &mut RanimScene) {
         .hold(1.0);
 
     let mut camera = AnimSequence::new();
-    camera.play(cam.show()).hold_to(content.cursor_sec());
-    r.play(stack![camera, content]);
+    camera.push(cam.show()).hold_to(content.cursor_sec());
+    r.play(camera);
+    r.play(content);
     r.insert_time_mark(5.0, TimeMark::Capture("preview.png".to_string()));
 }
 

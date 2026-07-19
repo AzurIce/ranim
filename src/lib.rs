@@ -48,11 +48,11 @@ mod scene;
 pub use scene::*;
 
 pub use core::glam;
-pub use ranim_core::{RanimScene, chain, stack};
+pub use ranim_core::{RanimScene, seq, stack};
 
 /// The preludes
 pub mod prelude {
     pub use ranim_core::prelude::*;
-    pub use ranim_core::{chain, stack};
+    pub use ranim_core::{seq, stack};
     pub use ranim_macros::{output, scene, wasm_demo_doc};
 }
