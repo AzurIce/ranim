@@ -350,6 +350,15 @@ required-features = ["typst"]
 wasm = true
 
 [[example]]
+name = "typst_timer"
+path = "examples/typst_timer/lib.rs"
+crate-type = ["cdylib"]
+required-features = ["typst"]
+
+[package.metadata.example.typst_timer]
+wasm = false
+
+[[example]]
 name = "perlin_terrain"
 path = "examples/perlin_terrain/lib.rs"
 crate-type = ["cdylib"]
