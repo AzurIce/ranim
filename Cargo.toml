@@ -356,7 +356,7 @@ crate-type = ["cdylib"]
 required-features = ["typst"]
 
 [package.metadata.example.typst_timer]
-wasm = false
+wasm = true
 
 [[example]]
 name = "perlin_terrain"

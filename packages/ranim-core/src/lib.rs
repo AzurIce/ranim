@@ -29,6 +29,7 @@ pub use num;
 use std::fmt::Debug;
 
 use animation::{AnimStack, Animation, AnimationCell};
+pub use animation::{AnimationInfo, AnimationInfoKind};
 use core_item::CoreItem;
 
 /// Commonly used ranim APIs.
@@ -126,25 +127,6 @@ impl Debug for RanimScene {
     }
 }
 
-/// Lightweight animation information used by preview tooling.
-pub struct AnimationInfo {
-    /// Concrete evaluator name.
-    pub anim_name: String,
-    /// Global time range.
-    pub range: std::ops::Range<f64>,
-}
-
-/// One preview row of animation information.
-///
-/// The new model has a single root animation container; nested composition can
-/// later provide richer editor grouping without restoring the old Timeline API.
-pub struct TimelineInfo {
-    /// Preview row identifier.
-    pub id: usize,
-    /// Runtime leaf animations shown in this row.
-    pub animation_infos: Vec<AnimationInfo>,
-}
-
 /// Immutable animation recipe produced by [`RanimScene::seal`].
 pub struct SealedRanimScene {
     total_secs: f64,
@@ -163,22 +145,12 @@ impl SealedRanimScene {
         &self.time_marks
     }
 
-    /// Runtime animation information for the current preview UI.
-    pub fn get_timeline_infos(&self) -> Vec<TimelineInfo> {
-        let mut built_infos = Vec::new();
-        for animation in &self.animations {
-            animation.append_infos(0.0, &mut built_infos);
-        }
-        vec![TimelineInfo {
-            id: 0,
-            animation_infos: built_infos
-                .iter()
-                .map(|info| AnimationInfo {
-                    anim_name: info.anim_name.to_string(),
-                    range: info.range.clone(),
-                })
-                .collect(),
-        }]
+    /// Hierarchical runtime animation information for preview tooling.
+    pub fn get_animation_infos(&self) -> Vec<AnimationInfo> {
+        self.animations
+            .iter()
+            .map(AnimationCell::animation_info)
+            .collect()
     }
 
     /// Evaluate all clips active at `target_sec` and extract scene primitives.
@@ -232,9 +204,10 @@ mod tests {
         let sealed = scene.seal();
 
         assert_eq!(sealed.total_secs(), 5.0);
-        let infos = sealed.get_timeline_infos();
-        assert_eq!(infos[0].animation_infos[0].range, 0.0..2.0);
-        assert_eq!(infos[0].animation_infos[1].range, 2.0..5.0);
+        let infos = sealed.get_animation_infos();
+        assert_eq!(infos[0].range, 0.0..5.0);
+        assert_eq!(infos[0].children[0].range, 0.0..2.0);
+        assert_eq!(infos[0].children[1].range, 2.0..5.0);
     }
 
     #[test]
@@ -248,9 +221,10 @@ mod tests {
         let sealed = scene.seal();
 
         assert_eq!(sealed.total_secs(), 5.0);
-        let infos = sealed.get_timeline_infos();
-        assert_eq!(infos[0].animation_infos[0].range, 0.0..2.0);
-        assert_eq!(infos[0].animation_infos[1].range, 3.0..4.0);
-        assert_eq!(infos[0].animation_infos[2].range, 0.0..5.0);
+        let infos = sealed.get_animation_infos();
+        assert_eq!(infos[0].range, 0.0..4.0);
+        assert_eq!(infos[0].children[0].range, 0.0..2.0);
+        assert_eq!(infos[0].children[1].range, 3.0..4.0);
+        assert_eq!(infos[1].range, 0.0..5.0);
     }
 }

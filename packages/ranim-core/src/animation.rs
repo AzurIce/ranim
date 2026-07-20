@@ -48,8 +48,16 @@ where
 trait EvalDyn {
     fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>);
 
-    fn append_child_infos(&self, _origin_sec: f64, _output: &mut Vec<AnimationCellInfo>) -> bool {
-        false
+    fn info_kind(&self) -> AnimationInfoKind {
+        AnimationInfoKind::Eval
+    }
+
+    fn content_duration_secs(&self) -> f64 {
+        1.0
+    }
+
+    fn child_infos(&self) -> Vec<AnimationInfo> {
+        Vec::new()
     }
 }
 
@@ -58,6 +66,14 @@ struct StaticDynItems(Vec<DynItem>);
 impl EvalDyn for StaticDynItems {
     fn eval_alpha_dyn_into(&self, _alpha: f64, output: &mut Vec<DynItem>) {
         output.extend(self.0.iter().cloned());
+    }
+
+    fn info_kind(&self) -> AnimationInfoKind {
+        AnimationInfoKind::Static
+    }
+
+    fn content_duration_secs(&self) -> f64 {
+        0.0
     }
 }
 
@@ -71,9 +87,36 @@ where
     }
 }
 
-pub(crate) struct AnimationCellInfo {
-    pub(crate) anim_name: &'static str,
-    pub(crate) range: Range<f64>,
+/// Runtime animation content category used by preview tooling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimationInfoKind {
+    /// A typed evaluator without animation children.
+    Eval,
+    /// A sequential animation container.
+    Sequence,
+    /// An overlay animation container.
+    Stack,
+    /// A captured, type-erased static output batch.
+    Static,
+}
+
+/// Hierarchical runtime animation information used by preview tooling.
+#[derive(Clone)]
+pub struct AnimationInfo {
+    /// Concrete evaluator or container type name.
+    pub anim_name: String,
+    /// Runtime content category.
+    pub kind: AnimationInfoKind,
+    /// Time range in the parent content's local coordinates.
+    pub range: Range<f64>,
+    /// Duration of this node's inner content before outer timing is applied.
+    pub content_duration_secs: f64,
+    /// Time remapping function applied by this node.
+    pub rate_func: fn(f64) -> f64,
+    /// Whether this node contributes values during evaluation.
+    pub enabled: bool,
+    /// Direct animation children in this node's content coordinates.
+    pub children: Vec<AnimationInfo>,
 }
 
 /// A single runtime animation node in its parent's time coordinates.
@@ -83,7 +126,6 @@ pub struct AnimationCell {
     time_range: Range<f64>,
     enabled: bool,
     anim_name: &'static str,
-    expand_children: bool,
 }
 
 impl AnimationCell {
@@ -158,13 +200,15 @@ impl AnimationCell {
         self.time_range.contains(&sec) || (sec == parent_duration && sec == self.time_range.end)
     }
 
-    pub(crate) fn append_infos(&self, origin_sec: f64, output: &mut Vec<AnimationCellInfo>) {
-        let global_start = origin_sec + self.time_range.start;
-        if !self.expand_children || !self.inner.append_child_infos(global_start, output) {
-            output.push(AnimationCellInfo {
-                anim_name: self.anim_name,
-                range: origin_sec + self.time_range.start..origin_sec + self.time_range.end,
-            });
+    pub(crate) fn animation_info(&self) -> AnimationInfo {
+        AnimationInfo {
+            anim_name: self.anim_name.to_string(),
+            kind: self.inner.info_kind(),
+            range: self.time_range.clone(),
+            content_duration_secs: self.inner.content_duration_secs(),
+            rate_func: self.rate_func,
+            enabled: self.enabled,
+            children: self.inner.child_infos(),
         }
     }
 }
@@ -227,7 +271,6 @@ where
             rate_func: linear,
             time_range: 0.0..1.0,
             enabled: true,
-            expand_children: false,
         }
     }
 }
@@ -298,7 +341,6 @@ impl<A: Placeable + 'static> Animation for Paramed<A> {
         cell.rate_func = self.param.rate_func;
         cell.enabled = self.param.enabled;
         cell.anim_name = type_name::<A>();
-        cell.expand_children = false;
         cell
     }
 }
@@ -417,7 +459,6 @@ impl AnimSequence {
                 time_range: self.cursor_sec..self.cursor_sec + secs,
                 enabled: true,
                 anim_name: type_name::<StaticDynItems>(),
-                expand_children: false,
             });
         }
         self.cursor_sec += secs;
@@ -467,7 +508,6 @@ impl Animation for AnimSequence {
             time_range: 0.0..duration_secs,
             enabled: true,
             anim_name: type_name::<Self>(),
-            expand_children: true,
         }
     }
 }
@@ -477,11 +517,19 @@ impl EvalDyn for AnimSequence {
         self.eval_at_sec_into(self.cursor_sec * alpha, output);
     }
 
-    fn append_child_infos(&self, origin_sec: f64, output: &mut Vec<AnimationCellInfo>) -> bool {
-        for animation in &self.animations {
-            animation.append_infos(origin_sec, output);
-        }
-        true
+    fn info_kind(&self) -> AnimationInfoKind {
+        AnimationInfoKind::Sequence
+    }
+
+    fn content_duration_secs(&self) -> f64 {
+        self.cursor_sec
+    }
+
+    fn child_infos(&self) -> Vec<AnimationInfo> {
+        self.animations
+            .iter()
+            .map(AnimationCell::animation_info)
+            .collect()
     }
 }
 
@@ -563,7 +611,6 @@ impl Animation for AnimStack {
             time_range: 0.0..duration_secs,
             enabled: true,
             anim_name: type_name::<Self>(),
-            expand_children: true,
         }
     }
 }
@@ -573,11 +620,19 @@ impl EvalDyn for AnimStack {
         self.eval_at_sec_into(self.duration_secs * alpha, output);
     }
 
-    fn append_child_infos(&self, origin_sec: f64, output: &mut Vec<AnimationCellInfo>) -> bool {
-        for animation in &self.animations {
-            animation.append_infos(origin_sec, output);
-        }
-        true
+    fn info_kind(&self) -> AnimationInfoKind {
+        AnimationInfoKind::Stack
+    }
+
+    fn content_duration_secs(&self) -> f64 {
+        self.duration_secs
+    }
+
+    fn child_infos(&self) -> Vec<AnimationInfo> {
+        self.animations
+            .iter()
+            .map(AnimationCell::animation_info)
+            .collect()
     }
 }
 
@@ -685,10 +740,12 @@ mod tests {
         assert_eq!(animation.time_range(), 0.0..4.0);
         let items = animation.eval_at_sec(2.0).unwrap();
         assert_eq!(evaluated_xs(items), vec![0.5]);
-        let mut infos = Vec::new();
-        animation.append_infos(0.0, &mut infos);
-        assert_eq!(infos.len(), 1);
-        assert_eq!(infos[0].range, 0.0..4.0);
+        let info = animation.animation_info();
+        assert_eq!(info.range, 0.0..4.0);
+        assert_eq!(info.content_duration_secs, 2.0);
+        assert_eq!(info.children.len(), 2);
+        assert_eq!(info.children[0].range, 0.0..1.0);
+        assert_eq!(info.children[1].range, 1.0..2.0);
     }
 
     #[test]
@@ -752,10 +809,10 @@ mod tests {
             .forward(1.0)
             .push(leaf(2.0, 1.0));
         let animation = sequence.at(10.0).build();
-        let mut infos = Vec::new();
-        animation.append_infos(0.0, &mut infos);
-        assert_eq!(infos[0].range, 10.0..12.0);
-        assert_eq!(infos[1].range, 13.0..14.0);
+        let info = animation.animation_info();
+        assert_eq!(info.range, 10.0..14.0);
+        assert_eq!(info.children[0].range, 0.0..2.0);
+        assert_eq!(info.children[1].range, 3.0..4.0);
     }
 
     #[test]
