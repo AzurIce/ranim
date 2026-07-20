@@ -7,8 +7,6 @@ use ranim::{
     prelude::*,
     utils::rate_functions::linear,
 };
-use ranim_core::animation::Eval;
-
 // Custom animation: rotate a Surface's transform around the Z axis
 struct RotateAroundZ {
     src: Surface,
@@ -17,8 +15,10 @@ struct RotateAroundZ {
     total_angle: f64,
 }
 
-impl Eval<Surface> for RotateAroundZ {
-    fn eval_alpha(&self, alpha: f64) -> Surface {
+impl Eval for RotateAroundZ {
+    type Output = Surface;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let angle = self.total_angle * alpha;
         let mut result = self.src.clone();
         result.transform = DMat4::from_translation(self.group_center)
@@ -77,7 +77,6 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
                 vertex_offset: *vertex,
                 total_angle: TAU,
             }
-            .into_animation_cell()
             .apply_to(&mut surface)
             .with_duration(8.0)
             .with_rate_func(linear),
@@ -101,7 +100,6 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
                 vertex_offset: *vertex,
                 total_angle: TAU,
             }
-            .into_animation_cell()
             .apply_to(&mut surface)
             .with_duration(8.0)
             .with_rate_func(linear),

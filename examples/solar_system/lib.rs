@@ -8,7 +8,6 @@ use ranim::{
     utils::rate_functions::linear,
 };
 use ranim_anims::fading::FadingAnim;
-use ranim_core::animation::Eval;
 use ranim_items::vitem::{VItem, text::TextItem};
 
 // Custom animation: orbital motion around the origin in the XY plane
@@ -19,8 +18,10 @@ struct OrbitMotion {
     total_angle: f64,
 }
 
-impl Eval<Surface> for OrbitMotion {
-    fn eval_alpha(&self, alpha: f64) -> Surface {
+impl Eval for OrbitMotion {
+    type Output = Surface;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let angle = self.initial_angle + self.total_angle * alpha;
         let x = self.orbit_radius * angle.cos();
         let y = self.orbit_radius * angle.sin();
@@ -39,8 +40,10 @@ struct LabelOrbitMotion {
     z_offset: f64,
 }
 
-impl Eval<Vec<VItem>> for LabelOrbitMotion {
-    fn eval_alpha(&self, alpha: f64) -> Vec<VItem> {
+impl Eval for LabelOrbitMotion {
+    type Output = Vec<VItem>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let angle = self.initial_angle + self.total_angle * alpha;
         let x = self.orbit_radius * angle.cos();
         let y = self.orbit_radius * angle.sin();
@@ -217,7 +220,6 @@ fn solar_system(r: &mut RanimScene) {
                     initial_angle: planet.initial_angle,
                     total_angle: orbit_total_angle,
                 }
-                .into_animation_cell()
                 .apply_to(&mut core)
                 .with_duration(10.0)
                 .with_rate_func(linear),
@@ -232,7 +234,6 @@ fn solar_system(r: &mut RanimScene) {
                     initial_angle: planet.initial_angle,
                     total_angle: orbit_total_angle,
                 }
-                .into_animation_cell()
                 .apply_to(&mut atmosphere)
                 .with_duration(10.0)
                 .with_rate_func(linear),
@@ -258,7 +259,6 @@ fn solar_system(r: &mut RanimScene) {
                     initial_angle: planet.initial_angle,
                     total_angle: orbit_total_angle,
                 }
-                .into_animation_cell()
                 .apply_to(&mut planet_surface)
                 .with_duration(10.0)
                 .with_rate_func(linear),
@@ -293,7 +293,6 @@ fn solar_system(r: &mut RanimScene) {
                 total_angle: orbit_total_angle,
                 z_offset: label_z_offset,
             }
-            .into_animation_cell()
             .apply_to(&mut label_vitems)
             .with_duration(10.0)
             .with_rate_func(linear),

@@ -13,7 +13,7 @@ use ranim::{
         typst::typst_svg,
     },
     prelude::*,
-    utils::rate_functions::{linear, smooth},
+    utils::rate_functions::smooth,
 };
 
 fn build_logo(logo_width: f64) -> [VItem; 6] {
@@ -131,9 +131,7 @@ fn ranim_logo(r: &mut RanimScene) {
     let mut text_sequence = AnimSequence::new();
     text_sequence.forward(3.5).push(
         ranim_text
-            .lagged(0.2, |item| {
-                item.write().with_duration(2.0).with_rate_func(linear)
-            })
+            .lagged(0.2, |item| item.write())
             .with_duration(2.0),
     );
 
@@ -156,9 +154,7 @@ fn ranim_logo(r: &mut RanimScene) {
     logo_parts.iter_mut().for_each(|(sequence, item)| {
         sequence.push(item.unwrite().with_duration(3.0).with_rate_func(smooth));
     });
-    text_sequence.push(ranim_text.lagged(0.0, |item| {
-        item.unwrite().with_duration(3.0).with_rate_func(linear)
-    }));
+    text_sequence.push(ranim_text.lagged(0.0, |item| item.unwrite()));
 
     let total_secs = logo_parts
         .iter()

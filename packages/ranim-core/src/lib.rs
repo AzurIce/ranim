@@ -26,10 +26,9 @@ pub mod utils;
 
 pub use glam;
 pub use num;
-
 use std::fmt::Debug;
 
-use animation::{AnimStack, Animation, BuiltAnimation};
+use animation::{AnimStack, Animation, AnimationCell};
 use core_item::CoreItem;
 
 /// Commonly used ranim APIs.
@@ -37,7 +36,9 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
-    pub use crate::animation::{AnimSequence, AnimStack, Animation, Placeable, StaticAnim};
+    pub use crate::animation::{
+        AnimSequence, AnimStack, Animation, AnimationExt, Eval, Placeable, StaticAnim,
+    };
     pub use crate::core_item::camera_frame::CameraFrame;
     pub use crate::{RanimScene, TimeMark};
 }
@@ -95,7 +96,7 @@ impl RanimScene {
     }
 
     /// Push an animation module into the root stack.
-    pub fn play<A: Animation>(&mut self, animation: A) -> &mut Self {
+    pub fn play<A: Animation + 'static>(&mut self, animation: A) -> &mut Self {
         self.root.push(animation);
         self
     }
@@ -140,14 +141,14 @@ pub struct AnimationInfo {
 pub struct TimelineInfo {
     /// Preview row identifier.
     pub id: usize,
-    /// Flattened animations shown in this row.
+    /// Runtime leaf animations shown in this row.
     pub animation_infos: Vec<AnimationInfo>,
 }
 
 /// Immutable animation recipe produced by [`RanimScene::seal`].
 pub struct SealedRanimScene {
     total_secs: f64,
-    animations: Vec<BuiltAnimation>,
+    animations: Vec<AnimationCell>,
     time_marks: Vec<(f64, TimeMark)>,
 }
 
@@ -162,16 +163,19 @@ impl SealedRanimScene {
         &self.time_marks
     }
 
-    /// Flattened animation information for the current preview UI.
+    /// Runtime animation information for the current preview UI.
     pub fn get_timeline_infos(&self) -> Vec<TimelineInfo> {
+        let mut built_infos = Vec::new();
+        for animation in &self.animations {
+            animation.append_infos(0.0, &mut built_infos);
+        }
         vec![TimelineInfo {
             id: 0,
-            animation_infos: self
-                .animations
+            animation_infos: built_infos
                 .iter()
-                .map(|animation| AnimationInfo {
-                    anim_name: animation.anim_name().to_string(),
-                    range: animation.time_range(),
+                .map(|info| AnimationInfo {
+                    anim_name: info.anim_name.to_string(),
+                    range: info.range.clone(),
                 })
                 .collect(),
         }]
@@ -213,14 +217,12 @@ impl SealedRanimScene {
 mod tests {
     use super::*;
     use crate::{
-        animation::{AnimSequence, Eval, Placeable, Static},
+        animation::{AnimSequence, AnimationExt, Placeable, Static},
         core_item::vitem::VItem,
     };
 
     fn leaf(duration: f64) -> impl Animation + Placeable {
-        Static(VItem::default())
-            .into_animation_cell()
-            .with_duration(duration)
+        Static(VItem::default()).with_duration(duration)
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use ranim_core::animation::{AnimationCell, Eval};
+use ranim_core::animation::Eval;
 
 // MARK: LaggedAnim
 /// The methods to create animations for `Group<T>`
@@ -11,13 +11,9 @@ use ranim_core::animation::{AnimationCell, Eval};
 /// ```
 pub trait LaggedAnim<T: Clone>: Sized + 'static {
     /// Create a [`Lagged`] anim.
-    fn lagged<E>(
-        &mut self,
-        lag_ratio: f64,
-        anim_func: impl FnMut(&mut T) -> AnimationCell<T, E>,
-    ) -> AnimationCell<Vec<T>, Lagged<T, E>>
+    fn lagged<E>(&mut self, lag_ratio: f64, anim_func: impl FnMut(&mut T) -> E) -> Lagged<T, E>
     where
-        E: Eval<T> + 'static;
+        E: Eval<Output = T> + 'static;
 }
 
 impl<T: Clone + 'static, I> LaggedAnim<T> for I
@@ -25,21 +21,17 @@ where
     for<'a> &'a mut I: IntoIterator<Item = &'a mut T>,
     I: 'static,
 {
-    fn lagged<E>(
-        &mut self,
-        lag_ratio: f64,
-        anim_func: impl FnMut(&mut T) -> AnimationCell<T, E>,
-    ) -> AnimationCell<Vec<T>, Lagged<T, E>>
+    fn lagged<E>(&mut self, lag_ratio: f64, anim_func: impl FnMut(&mut T) -> E) -> Lagged<T, E>
     where
-        E: Eval<T> + 'static,
+        E: Eval<Output = T> + 'static,
     {
-        Lagged::new(lag_ratio, self.into_iter().map(anim_func).collect()).into_animation_cell()
+        Lagged::new(lag_ratio, self.into_iter().map(anim_func).collect())
     }
 }
 
 // pub fn lagged<T, I>(
 //     lag_ratio: f64,
-//     mut anim_func: impl FnMut(T) -> AnimationCell<T>,
+//     mut anim_func: impl FnMut(T) -> E,
 // ) -> impl FnMut(I) -> Lagged<T>
 // where
 //     I: IntoIterator<Item = T>,
@@ -51,20 +43,27 @@ where
 ///
 /// This is applyable to `IntoIterator<Item = T>`, and this will apply
 /// the anims in the order of the elements with the lag ratio.
-pub struct Lagged<T, E: Eval<T>> {
-    anims: Vec<AnimationCell<T, E>>,
+pub struct Lagged<T: Clone, E: Eval<Output = T>> {
+    anims: Vec<E>,
     lag_ratio: f64,
+    _output: std::marker::PhantomData<fn() -> T>,
 }
 
-impl<T, E: Eval<T>> Lagged<T, E> {
+impl<T: Clone, E: Eval<Output = T>> Lagged<T, E> {
     /// Constructor
-    pub fn new(lag_ratio: f64, anims: Vec<AnimationCell<T, E>>) -> Self {
-        Self { anims, lag_ratio }
+    pub fn new(lag_ratio: f64, anims: Vec<E>) -> Self {
+        Self {
+            anims,
+            lag_ratio,
+            _output: std::marker::PhantomData,
+        }
     }
 }
 
-impl<T: Clone, E: Eval<T>> Eval<Vec<T>> for Lagged<T, E> {
-    fn eval_alpha(&self, alpha: f64) -> Vec<T> {
+impl<T: Clone, E: Eval<Output = T>> Eval for Lagged<T, E> {
+    type Output = Vec<T>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         // -|--
         //  -|--
         //   -|--

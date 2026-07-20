@@ -4,7 +4,7 @@ use glam::{DMat4, DVec3, dvec2};
 
 use crate::{
     Extract,
-    animation::{AnimationCell, Eval},
+    animation::{Animation, Eval, Placeable},
     core_item::CoreItem,
     prelude::{Alignable, Interpolatable},
 };
@@ -219,7 +219,7 @@ impl CameraFrame {
         &mut self,
         target: DVec3,
         total_angle: f64,
-    ) -> AnimationCell<Self, impl Eval<Self> + use<>> {
+    ) -> impl Eval<Output = Self> + Animation + Placeable + use<> {
         let offset = self.pos - target;
         let distance = offset.length();
         let phi = if distance > 0.0 {
@@ -239,8 +239,10 @@ impl CameraFrame {
             total_angle: f64,
         }
 
-        impl Eval<CameraFrame> for Orbit {
-            fn eval_alpha(&self, alpha: f64) -> CameraFrame {
+        impl Eval for Orbit {
+            type Output = CameraFrame;
+
+            fn eval_alpha(&self, alpha: f64) -> Self::Output {
                 let theta = self.theta0 + self.total_angle * alpha;
                 let mut result = self.src.clone();
                 result.set_spherical(self.phi, theta, self.distance, self.target);
@@ -256,7 +258,6 @@ impl CameraFrame {
             theta0,
             total_angle,
         }
-        .into_animation_cell()
         .apply_to(self)
     }
 }

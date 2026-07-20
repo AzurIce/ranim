@@ -1,241 +1,92 @@
-//! Pure animation evaluation, static composition, and type-erased built clips.
+//! Pure animation evaluation and hierarchical type-erased composition.
 
-use std::{any::type_name, fmt::Debug, marker::PhantomData, ops::Range};
+use std::{any::type_name, fmt::Debug, ops::Range};
 
 use crate::{
     core_item::{AnyExtractCoreItem, DynItem},
     utils::rate_functions::linear,
 };
 
-/// A normalized, pure animation evaluator for values of type `T`.
-pub trait Eval<T> {
+/// A normalized, pure animation evaluator.
+pub trait Eval {
+    /// Value produced by this evaluator.
+    type Output;
+
     /// Evaluate the animation at a normalized progress in `[0, 1]`.
-    fn eval_alpha(&self, alpha: f64) -> T;
+    fn eval_alpha(&self, alpha: f64) -> Self::Output;
 
-    /// Wrap this evaluator in a typed animation with default timing.
-    fn into_animation_cell(self) -> AnimationCell<T, Self>
+    /// Apply the final state and return this evaluator.
+    fn apply_to(self, item: &mut Self::Output) -> Self
     where
-        Self: Sized + 'static,
+        Self: Sized,
     {
-        AnimationCell {
-            inner: self,
-            param: EvalParam::default(),
-            anim_name: type_name::<Self>(),
-            _output: PhantomData,
-        }
-    }
-
-    /// Erase both the evaluator and its output type for built storage.
-    fn into_erased_boxed(self) -> Box<dyn EvalDyn>
-    where
-        T: AnyExtractCoreItem,
-        Self: Sized + 'static,
-    {
-        Box::new(EvalDynAdapter::<T, Self> {
-            inner: self,
-            _output: PhantomData,
-        })
-    }
-}
-
-impl<T, F> Eval<T> for F
-where
-    F: Fn(f64) -> T,
-{
-    fn eval_alpha(&self, alpha: f64) -> T {
-        (self)(alpha)
-    }
-}
-
-/// Type-erased normalized evaluation used by [`BuiltAnimation`].
-pub trait EvalDyn {
-    /// Append type-erased scene items evaluated at `alpha` to `output`.
-    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>);
-
-    /// Evaluate into a flat collection of type-erased scene items.
-    fn eval_alpha_dyn(&self, alpha: f64) -> Vec<DynItem> {
-        let mut output = Vec::new();
-        self.eval_alpha_dyn_into(alpha, &mut output);
-        output
-    }
-}
-
-struct EvalDynAdapter<T, E> {
-    inner: E,
-    _output: PhantomData<fn() -> T>,
-}
-
-impl<T, E> EvalDyn for EvalDynAdapter<T, E>
-where
-    T: AnyExtractCoreItem,
-    E: Eval<T>,
-{
-    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        output.push(DynItem(Box::new(self.inner.eval_alpha(alpha))));
-    }
-}
-
-/// Local timing applied to a normalized evaluator.
-#[derive(Debug, Clone)]
-pub struct EvalParam {
-    /// Time remapping function.
-    pub rate_func: fn(f64) -> f64,
-    /// Duration in seconds.
-    pub duration_secs: f64,
-    /// Whether this animation contributes a value.
-    pub enabled: bool,
-}
-
-impl Default for EvalParam {
-    fn default() -> Self {
-        Self {
-            rate_func: linear,
-            duration_secs: 1.0,
-            enabled: true,
-        }
-    }
-}
-
-/// A concrete evaluator plus local timing, stored inline until build time.
-pub struct AnimationCell<T, E: Eval<T>> {
-    inner: E,
-    param: EvalParam,
-    anim_name: &'static str,
-    _output: PhantomData<fn() -> T>,
-}
-
-impl<T, E: Eval<T>> AnimationCell<T, E> {
-    /// Change the animation's rate function.
-    pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
-        self.param.rate_func = rate_func;
-        self
-    }
-
-    /// Change the animation's duration.
-    pub fn with_duration(mut self, duration_secs: f64) -> Self {
-        assert!(
-            duration_secs.is_finite() && duration_secs >= 0.0,
-            "animation duration must be finite and non-negative"
-        );
-        self.param.duration_secs = duration_secs;
-        self
-    }
-
-    /// Enable or disable this animation's output.
-    pub fn with_enabled(mut self, enabled: bool) -> Self {
-        self.param.enabled = enabled;
-        self
-    }
-
-    /// Animation duration in seconds.
-    pub fn duration_secs(&self) -> f64 {
-        self.param.duration_secs
-    }
-
-    /// Apply the final state and return the animation.
-    pub fn apply_to(self, item: &mut T) -> Self {
         self.apply_alpha_to(item, 1.0)
     }
 
-    /// Apply a sampled state and return the animation.
-    pub fn apply_alpha_to(self, item: &mut T, alpha: f64) -> Self {
+    /// Apply a sampled state and return this evaluator.
+    fn apply_alpha_to(self, item: &mut Self::Output, alpha: f64) -> Self
+    where
+        Self: Sized,
+    {
         *item = self.eval_alpha(alpha);
         self
     }
 }
 
-impl<T, E: Eval<T>> Eval<T> for AnimationCell<T, E> {
-    fn eval_alpha(&self, alpha: f64) -> T {
-        self.inner.eval_alpha((self.param.rate_func)(alpha))
-    }
-}
-
-/// A statically typed animation definition that can be flattened into built clips.
-pub trait Animation: Sized {
-    /// Range in this animation's local time coordinates.
-    fn time_range(&self) -> Range<f64>;
-
-    /// Build using `origin_sec` as the global origin of the local coordinates.
-    fn build(self, origin_sec: f64, output: &mut Vec<BuiltAnimation>);
-
-    /// Total local extent used when advancing a sequence cursor.
-    fn duration_secs(&self) -> f64 {
-        let range = self.time_range();
-        range.end.max(0.0)
-    }
-}
-
-/// Capability for animation definitions that may be explicitly positioned with [`Placeable::at`].
-pub trait Placeable: Sized {
-    /// Place this definition at an offset in its parent's local time coordinates.
-    fn at(self, offset_sec: f64) -> At<Self> {
-        At {
-            inner: self,
-            offset_sec,
-        }
-    }
-}
-
-/// A relative placement node used only before flattening.
-pub struct At<A> {
-    inner: A,
-    offset_sec: f64,
-}
-
-impl<A: Animation> Animation for At<A> {
-    fn time_range(&self) -> Range<f64> {
-        let range = self.inner.time_range();
-        self.offset_sec + range.start..self.offset_sec + range.end
-    }
-
-    fn build(self, origin_sec: f64, output: &mut Vec<BuiltAnimation>) {
-        self.inner.build(origin_sec + self.offset_sec, output);
-    }
-}
-
-impl<T, E> Animation for AnimationCell<T, E>
+impl<T, F> Eval for F
 where
-    T: AnyExtractCoreItem,
-    E: Eval<T> + 'static,
+    F: Fn(f64) -> T,
 {
-    fn time_range(&self) -> Range<f64> {
-        0.0..self.param.duration_secs
-    }
+    type Output = T;
 
-    fn build(self, origin_sec: f64, output: &mut Vec<BuiltAnimation>) {
-        let duration_secs = self.param.duration_secs;
-        output.push(BuiltAnimation {
-            inner: BuiltEval::Dynamic(self.inner.into_erased_boxed()),
-            rate_func: self.param.rate_func,
-            time_range: origin_sec..origin_sec + duration_secs,
-            enabled: self.param.enabled,
-            anim_name: self.anim_name,
-        });
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
+        (self)(alpha)
     }
 }
 
-impl<T, E> Placeable for AnimationCell<T, E>
+/// An auto implemented trait for erasing Eval<Output = T> where T: AnyExtractCoreItem
+trait EvalDyn {
+    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>);
+
+    fn append_child_infos(&self, _origin_sec: f64, _output: &mut Vec<AnimationCellInfo>) -> bool {
+        false
+    }
+}
+
+struct StaticDynItems(Vec<DynItem>);
+
+impl EvalDyn for StaticDynItems {
+    fn eval_alpha_dyn_into(&self, _alpha: f64, output: &mut Vec<DynItem>) {
+        output.extend(self.0.iter().cloned());
+    }
+}
+
+impl<E> EvalDyn for E
 where
-    T: AnyExtractCoreItem,
-    E: Eval<T> + 'static,
+    E: Eval,
+    E::Output: AnyExtractCoreItem,
 {
+    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
+        output.push(DynItem(Box::new(self.eval_alpha(alpha))));
+    }
 }
 
-enum BuiltEval {
-    Dynamic(Box<dyn EvalDyn>),
-    Static(Vec<DynItem>),
+pub(crate) struct AnimationCellInfo {
+    pub(crate) anim_name: &'static str,
+    pub(crate) range: Range<f64>,
 }
 
-/// A flattened animation with mutable timing outside its erased evaluator.
-pub struct BuiltAnimation {
-    inner: BuiltEval,
+/// A single runtime animation node in its parent's time coordinates.
+pub struct AnimationCell {
+    inner: Box<dyn EvalDyn>,
     rate_func: fn(f64) -> f64,
     time_range: Range<f64>,
     enabled: bool,
     anim_name: &'static str,
+    expand_children: bool,
 }
 
-impl BuiltAnimation {
+impl AnimationCell {
     /// Global or parent-relative time range, depending on its containing plan.
     pub fn time_range(&self) -> Range<f64> {
         self.time_range.clone()
@@ -244,6 +95,11 @@ impl BuiltAnimation {
     /// Duration in seconds.
     pub fn duration_secs(&self) -> f64 {
         self.time_range.end - self.time_range.start
+    }
+
+    fn shift_by(&mut self, offset_sec: f64) {
+        self.time_range.start += offset_sec;
+        self.time_range.end += offset_sec;
     }
 
     /// Whether this clip contributes a value.
@@ -256,19 +112,11 @@ impl BuiltAnimation {
         self.anim_name
     }
 
-    /// Shift both endpoints by an offset.
-    pub fn shift_by(&mut self, offset_sec: f64) {
-        self.time_range.start += offset_sec;
-        self.time_range.end += offset_sec;
-    }
-
-    /// Append normalized evaluation results after applying this clip's rate function.
+    /// Append normalized evaluation results after applying this node's rate function.
     pub fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        match &self.inner {
-            BuiltEval::Dynamic(inner) => {
-                inner.eval_alpha_dyn_into((self.rate_func)(alpha), output);
-            }
-            BuiltEval::Static(items) => output.extend(items.iter().cloned()),
+        if self.enabled {
+            self.inner
+                .eval_alpha_dyn_into((self.rate_func)(alpha), output);
         }
     }
 
@@ -293,13 +141,10 @@ impl BuiltAnimation {
         Some(self.eval_alpha_dyn(alpha))
     }
 
-    fn eval_left_at_sec_into(&self, sec: f64, output: &mut Vec<DynItem>) {
-        let is_zero_duration_at_sec = self.time_range.start == sec && self.time_range.end == sec;
-        let is_active_before_sec = self.time_range.start < sec && sec <= self.time_range.end;
-        if !self.enabled || (!is_zero_duration_at_sec && !is_active_before_sec) {
+    fn eval_at_sec_into(&self, sec: f64, output: &mut Vec<DynItem>) {
+        if sec < self.time_range.start || sec > self.time_range.end {
             return;
         }
-
         let duration = self.duration_secs();
         let alpha = if duration == 0.0 {
             1.0
@@ -309,33 +154,187 @@ impl BuiltAnimation {
         self.eval_alpha_dyn_into(alpha, output);
     }
 
-    fn static_items_mut(&mut self) -> Option<&mut Vec<DynItem>> {
-        match &mut self.inner {
-            BuiltEval::Static(items) => Some(items),
-            BuiltEval::Dynamic(_) => None,
+    fn contains_sec(&self, sec: f64, parent_duration: f64) -> bool {
+        self.time_range.contains(&sec) || (sec == parent_duration && sec == self.time_range.end)
+    }
+
+    pub(crate) fn append_infos(&self, origin_sec: f64, output: &mut Vec<AnimationCellInfo>) {
+        let global_start = origin_sec + self.time_range.start;
+        if !self.expand_children || !self.inner.append_child_infos(global_start, output) {
+            output.push(AnimationCellInfo {
+                anim_name: self.anim_name,
+                range: origin_sec + self.time_range.start..origin_sec + self.time_range.end,
+            });
         }
     }
 }
 
-impl Animation for BuiltAnimation {
-    fn time_range(&self) -> Range<f64> {
-        self.time_range()
+/// A statically typed animation definition that can be lowered into a runtime animation.
+pub trait Animation: Sized {
+    /// Lower this definition into its local runtime representation.
+    fn build(self) -> AnimationCell;
+}
+
+/// Capability for animation definitions that have not been fixed in parent time coordinates.
+///
+/// This trait is used to constrain the anims to be inserted into [`AnimSequence`].
+/// Only anims those are not placed can be inserted into it.
+pub trait Placeable: Animation {
+    /// Place this definition at an offset in its parent's local time coordinates.
+    fn at(self, offset_sec: f64) -> At<Self> {
+        At {
+            inner: self,
+            offset_sec,
+        }
+    }
+}
+
+/// Playback parameter builders for animations that have not been placed yet.
+pub trait AnimationExt: Placeable {
+    /// Change the animation's rate function.
+    fn with_rate_func(self, rate_func: fn(f64) -> f64) -> Paramed<Self> {
+        Paramed::new(self).with_rate_func(rate_func)
     }
 
-    fn build(mut self, origin_sec: f64, output: &mut Vec<BuiltAnimation>) {
-        self.shift_by(origin_sec);
-        output.push(self);
+    /// Change the animation's duration.
+    fn with_duration(self, duration_secs: f64) -> Paramed<Self> {
+        Paramed::new(self).with_duration(duration_secs)
     }
+
+    /// Enable or disable this animation's output.
+    fn with_enabled(self, enabled: bool) -> Paramed<Self> {
+        Paramed::new(self).with_enabled(enabled)
+    }
+}
+
+impl<A: Placeable> AnimationExt for A {}
+
+impl<E> Placeable for E
+where
+    E: Eval + 'static,
+    E::Output: AnyExtractCoreItem,
+{
+}
+impl<E> Animation for E
+where
+    E: Eval + 'static,
+    E::Output: AnyExtractCoreItem,
+{
+    fn build(self) -> AnimationCell {
+        AnimationCell {
+            anim_name: type_name::<E>(),
+            inner: Box::new(self),
+            rate_func: linear,
+            time_range: 0.0..1.0,
+            enabled: true,
+            expand_children: false,
+        }
+    }
+}
+
+/// Playback parameters applied to an animation definition.
+#[derive(Debug, Clone)]
+pub(crate) struct AnimationParam {
+    /// Time remapping function.
+    pub rate_func: fn(f64) -> f64,
+    /// Optional duration override in seconds.
+    pub duration_secs: Option<f64>,
+    /// Whether this animation contributes a value.
+    pub enabled: bool,
+}
+
+impl Default for AnimationParam {
+    fn default() -> Self {
+        Self {
+            rate_func: linear,
+            duration_secs: None,
+            enabled: true,
+        }
+    }
+}
+
+/// An animation definition with overridden playback parameters.
+pub struct Paramed<A> {
+    inner: A,
+    param: AnimationParam,
+}
+
+impl<A> Paramed<A> {
+    /// Wrap an animation without overriding its duration.
+    pub(crate) fn new(inner: A) -> Self {
+        Self {
+            inner,
+            param: AnimationParam::default(),
+        }
+    }
+
+    /// Change the animation's rate function.
+    pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
+        self.param.rate_func = rate_func;
+        self
+    }
+
+    /// Change the animation's duration.
+    pub fn with_duration(mut self, duration_secs: f64) -> Self {
+        assert_valid_duration(duration_secs);
+        self.param.duration_secs = Some(duration_secs);
+        self
+    }
+
+    /// Enable or disable this animation's output.
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.param.enabled = enabled;
+        self
+    }
+}
+
+impl<A: Placeable + 'static> Placeable for Paramed<A> {}
+impl<A: Placeable + 'static> Animation for Paramed<A> {
+    fn build(self) -> AnimationCell {
+        let mut cell = self.inner.build();
+        if let Some(duration_secs) = self.param.duration_secs {
+            cell.time_range = 0.0..duration_secs;
+        }
+        cell.rate_func = self.param.rate_func;
+        cell.enabled = self.param.enabled;
+        cell.anim_name = type_name::<A>();
+        cell.expand_children = false;
+        cell
+    }
+}
+
+/// An animation fixed at an offset in its parent's time coordinates.
+///
+/// This is a terminal placement entry: it implements [`Animation`] but not
+/// [`Placeable`], so playback parameters must be configured before calling
+/// [`Placeable::at`].
+pub struct At<A> {
+    inner: A,
+    offset_sec: f64,
+}
+
+impl<A: Animation> Animation for At<A> {
+    fn build(self) -> AnimationCell {
+        let mut animation = self.inner.build();
+        animation.shift_by(self.offset_sec);
+        animation
+    }
+}
+
+fn assert_valid_duration(duration_secs: f64) {
+    assert!(
+        duration_secs.is_finite() && duration_secs >= 0.0,
+        "animation duration must be finite and non-negative"
+    );
 }
 
 /// Dynamic sequential animation container.
 ///
-/// `push` is this container's type-erasure boundary: the input may retain its
-/// full static composition type, while the resulting leaves are stored as
-/// relocatable [`BuiltAnimation`] values in this sequence's local coordinates.
+/// `push` erases each direct child's Rust type while retaining its runtime
+/// composition hierarchy in this sequence's local coordinates.
 #[derive(Default)]
 pub struct AnimSequence {
-    animations: Vec<BuiltAnimation>,
+    animations: Vec<AnimationCell>,
     cursor_sec: f64,
 }
 
@@ -345,17 +344,35 @@ impl AnimSequence {
         Self::default()
     }
 
+    fn eval_at_sec_into(&self, target_sec: f64, output: &mut Vec<DynItem>) {
+        if let Some(animation) = self
+            .animations
+            .iter()
+            .rev()
+            .find(|animation| animation.contains_sec(target_sec, self.cursor_sec))
+        {
+            animation.eval_at_sec_into(target_sec, output);
+        }
+    }
+
     /// Append an animation at the current cursor and advance by its local extent.
-    pub fn push<A: Animation>(&mut self, animation: A) -> &mut Self {
-        let duration = animation.duration_secs();
-        animation.build(self.cursor_sec, &mut self.animations);
-        self.cursor_sec += duration;
+    pub fn push<A: Placeable + 'static>(&mut self, animation: A) -> &mut Self {
+        let mut animation = animation.build();
+        let duration_secs = animation.duration_secs();
+        animation.shift_by(self.cursor_sec);
+        self.animations.push(animation);
+        self.cursor_sec += duration_secs;
         self
     }
 
-    /// Append another sequence at the current cursor.
-    pub fn extend(&mut self, sequence: AnimSequence) -> &mut Self {
-        self.push(sequence)
+    /// Append another sequence's direct children at the current cursor.
+    pub fn extend(&mut self, mut sequence: AnimSequence) -> &mut Self {
+        for animation in &mut sequence.animations {
+            animation.shift_by(self.cursor_sec);
+        }
+        self.animations.extend(sequence.animations);
+        self.cursor_sec += sequence.cursor_sec;
+        self
     }
 
     /// Advance the cursor without adding an animation.
@@ -390,40 +407,17 @@ impl AnimSequence {
             return self;
         }
 
-        if let Some(last) = self.animations.last_mut()
-            && last.time_range.end == self.cursor_sec
-            && last.static_items_mut().is_some()
-        {
-            last.time_range.end += secs;
-            self.cursor_sec += secs;
-            return self;
-        }
-
-        let has_state_event = self.animations.iter().any(|animation| {
-            animation.time_range.start == self.cursor_sec
-                && animation.time_range.end == self.cursor_sec
-        });
         let mut state = Vec::new();
-        for animation in &self.animations {
-            if has_state_event {
-                if animation.enabled
-                    && animation.time_range.start == self.cursor_sec
-                    && animation.time_range.end == self.cursor_sec
-                {
-                    animation.eval_alpha_dyn_into(1.0, &mut state);
-                }
-            } else {
-                animation.eval_left_at_sec_into(self.cursor_sec, &mut state);
-            }
-        }
+        self.eval_at_sec_into(self.cursor_sec, &mut state);
 
         if !state.is_empty() {
-            self.animations.push(BuiltAnimation {
-                inner: BuiltEval::Static(state),
+            self.animations.push(AnimationCell {
+                inner: Box::new(StaticDynItems(state)),
                 rate_func: linear,
                 time_range: self.cursor_sec..self.cursor_sec + secs,
                 enabled: true,
-                anim_name: type_name::<Static<Vec<DynItem>>>(),
+                anim_name: type_name::<StaticDynItems>(),
+                expand_children: false,
             });
         }
         self.cursor_sec += secs;
@@ -447,92 +441,49 @@ impl AnimSequence {
         self.cursor_sec
     }
 
-    /// Borrow the flattened leaves in local sequence coordinates.
-    pub fn built_animations(&self) -> &[BuiltAnimation] {
+    /// Current sequence duration.
+    pub fn duration_secs(&self) -> f64 {
+        self.cursor_sec
+    }
+
+    /// Borrow the direct child animations in local sequence coordinates.
+    pub fn built_animations(&self) -> &[AnimationCell] {
         &self.animations
     }
 
-    /// Consume this sequence into its flattened leaves.
-    pub fn into_built_animations(self) -> Vec<BuiltAnimation> {
+    /// Consume this sequence into its direct child animations.
+    pub fn into_built_animations(self) -> Vec<AnimationCell> {
         self.animations
-    }
-}
-
-impl Animation for AnimSequence {
-    fn time_range(&self) -> Range<f64> {
-        0.0..self.cursor_sec
-    }
-
-    fn build(mut self, origin_sec: f64, output: &mut Vec<BuiltAnimation>) {
-        for animation in &mut self.animations {
-            animation.shift_by(origin_sec);
-        }
-        output.extend(self.animations);
     }
 }
 
 impl Placeable for AnimSequence {}
-
-/// Dynamic overlay animation container.
-///
-/// Unlike [`AnimSequence`], every pushed animation keeps its own local start
-/// time and the stack duration is the maximum child extent.
-#[derive(Default)]
-pub struct AnimStack {
-    animations: Vec<BuiltAnimation>,
-    duration_secs: f64,
-}
-
-impl AnimStack {
-    /// Create an empty dynamic stack.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Add an animation without advancing the other children.
-    pub fn push<A: Animation>(&mut self, animation: A) -> &mut Self {
-        self.duration_secs = self.duration_secs.max(animation.duration_secs());
-        animation.build(0.0, &mut self.animations);
-        self
-    }
-
-    /// Add all built leaves from another dynamic stack.
-    pub fn extend(&mut self, stack: AnimStack) -> &mut Self {
-        self.duration_secs = self.duration_secs.max(stack.duration_secs);
-        self.animations.extend(stack.animations);
-        self
-    }
-
-    /// Current maximum child extent.
-    pub fn duration_secs(&self) -> f64 {
-        self.duration_secs
-    }
-
-    /// Borrow the flattened leaves in local stack coordinates.
-    pub fn built_animations(&self) -> &[BuiltAnimation] {
-        &self.animations
-    }
-
-    /// Consume this stack into its flattened leaves.
-    pub fn into_built_animations(self) -> Vec<BuiltAnimation> {
-        self.animations
-    }
-}
-
-impl Animation for AnimStack {
-    fn time_range(&self) -> Range<f64> {
-        0.0..self.duration_secs
-    }
-
-    fn build(mut self, origin_sec: f64, output: &mut Vec<BuiltAnimation>) {
-        for animation in &mut self.animations {
-            animation.shift_by(origin_sec);
+impl Animation for AnimSequence {
+    fn build(self) -> AnimationCell {
+        let duration_secs = self.cursor_sec;
+        AnimationCell {
+            inner: Box::new(self),
+            rate_func: linear,
+            time_range: 0.0..duration_secs,
+            enabled: true,
+            anim_name: type_name::<Self>(),
+            expand_children: true,
         }
-        output.extend(self.animations);
     }
 }
 
-impl Placeable for AnimStack {}
+impl EvalDyn for AnimSequence {
+    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
+        self.eval_at_sec_into(self.cursor_sec * alpha, output);
+    }
+
+    fn append_child_infos(&self, origin_sec: f64, output: &mut Vec<AnimationCellInfo>) -> bool {
+        for animation in &self.animations {
+            animation.append_infos(origin_sec, output);
+        }
+        true
+    }
+}
 
 /// Construct an [`AnimSequence`] by playing each animation in order.
 #[macro_export]
@@ -545,6 +496,89 @@ macro_rules! seq {
             sequence
         }
     };
+}
+
+/// Dynamic overlay animation container.
+///
+/// Unlike [`AnimSequence`], every pushed animation keeps its own local start
+/// time and the stack duration is the maximum child extent.
+#[derive(Default)]
+pub struct AnimStack {
+    animations: Vec<AnimationCell>,
+    duration_secs: f64,
+}
+
+impl AnimStack {
+    /// Create an empty dynamic stack.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn eval_at_sec_into(&self, target_sec: f64, output: &mut Vec<DynItem>) {
+        for animation in &self.animations {
+            if animation.contains_sec(target_sec, self.duration_secs) {
+                animation.eval_at_sec_into(target_sec, output);
+            }
+        }
+    }
+
+    /// Add an animation without advancing the other children.
+    pub fn push<A: Animation + 'static>(&mut self, animation: A) -> &mut Self {
+        let animation = animation.build();
+        self.duration_secs = self.duration_secs.max(animation.time_range.end);
+        self.animations.push(animation);
+        self
+    }
+
+    /// Add all direct child animations from another dynamic stack.
+    pub fn extend(&mut self, stack: AnimStack) -> &mut Self {
+        self.duration_secs = self.duration_secs.max(stack.duration_secs);
+        self.animations.extend(stack.animations);
+        self
+    }
+
+    /// Current maximum child extent.
+    pub fn duration_secs(&self) -> f64 {
+        self.duration_secs
+    }
+
+    /// Borrow the direct child animations in local stack coordinates.
+    pub fn built_animations(&self) -> &[AnimationCell] {
+        &self.animations
+    }
+
+    /// Consume this stack into its direct child animations.
+    pub fn into_built_animations(self) -> Vec<AnimationCell> {
+        self.animations
+    }
+}
+
+impl Placeable for AnimStack {}
+impl Animation for AnimStack {
+    fn build(self) -> AnimationCell {
+        let duration_secs = self.duration_secs;
+        AnimationCell {
+            inner: Box::new(self),
+            rate_func: linear,
+            time_range: 0.0..duration_secs,
+            enabled: true,
+            anim_name: type_name::<Self>(),
+            expand_children: true,
+        }
+    }
+}
+
+impl EvalDyn for AnimStack {
+    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
+        self.eval_at_sec_into(self.duration_secs * alpha, output);
+    }
+
+    fn append_child_infos(&self, origin_sec: f64, output: &mut Vec<AnimationCellInfo>) -> bool {
+        for animation in &self.animations {
+            animation.append_infos(origin_sec, output);
+        }
+        true
+    }
 }
 
 /// Construct an [`AnimStack`] by pushing each animation at the same origin.
@@ -561,38 +595,35 @@ macro_rules! stack {
 }
 
 /// Requirement for [`StaticAnim`].
-pub trait StaticAnimRequirement: Clone {}
+pub trait StaticAnimRequirement: Clone + AnyExtractCoreItem {}
 
-impl<T: Clone> StaticAnimRequirement for T {}
+impl<T: Clone + AnyExtractCoreItem> StaticAnimRequirement for T {}
 
 /// Convenience methods for zero-duration static animations.
 pub trait StaticAnim: StaticAnimRequirement + Sized {
     /// Show this value.
-    fn show(&self) -> AnimationCell<Self, Static<Self>>;
+    fn show(&self) -> Paramed<Static<Self>>;
     /// Hide this value.
-    fn hide(&self) -> AnimationCell<Self, Static<Self>>;
+    fn hide(&self) -> Paramed<Static<Self>>;
 }
 
 impl<T: StaticAnimRequirement + 'static> StaticAnim for T {
-    fn show(&self) -> AnimationCell<Self, Static<Self>> {
-        Static(self.clone())
-            .into_animation_cell()
-            .with_duration(0.0)
+    fn show(&self) -> Paramed<Static<Self>> {
+        Static(self.clone()).with_duration(0.0)
     }
 
-    fn hide(&self) -> AnimationCell<Self, Static<Self>> {
-        Static(self.clone())
-            .into_animation_cell()
-            .with_enabled(false)
-            .with_duration(0.0)
+    fn hide(&self) -> Paramed<Static<Self>> {
+        Static(self.clone()).with_enabled(false).with_duration(0.0)
     }
 }
 
 /// A constant evaluator.
-pub struct Static<T>(pub T);
+pub struct Static<T: Clone>(pub T);
 
-impl<T: Clone> Eval<T> for Static<T> {
-    fn eval_alpha(&self, _alpha: f64) -> T {
+impl<T: Clone> Eval for Static<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, _alpha: f64) -> Self::Output {
         self.0.clone()
     }
 }
@@ -602,14 +633,21 @@ mod tests {
     use super::*;
     use crate::{Extract, core_item::CoreItem, core_item::vitem::VItem};
 
-    fn leaf(x: f32, duration: f64) -> AnimationCell<VItem, impl Eval<VItem>> {
+    fn leaf(x: f32, duration: f64) -> impl Animation + Placeable {
         (move |_alpha| {
             let mut item = VItem::default();
             item.points[0].x = x;
             item
         })
-        .into_animation_cell()
         .with_duration(duration)
+    }
+
+    fn progress_leaf(offset: f32) -> impl Animation + Placeable {
+        move |alpha| {
+            let mut item = VItem::default();
+            item.points[0].x = offset + alpha as f32;
+            item
+        }
     }
 
     fn evaluated_xs(items: Vec<DynItem>) -> Vec<f32> {
@@ -624,28 +662,50 @@ mod tests {
     }
 
     #[test]
-    fn at_adds_to_parent_origin() {
-        let mut output = Vec::new();
-        leaf(1.0, 2.0).at(3.0).build(10.0, &mut output);
-        assert_eq!(output[0].time_range(), 13.0..15.0);
+    fn at_offsets_the_built_animation() {
+        let animation = leaf(1.0, 2.0).at(3.0).build();
+        assert_eq!(animation.time_range(), 3.0..5.0);
+    }
+
+    #[test]
+    fn eval_uses_linear_one_second_defaults() {
+        let animation = Static(VItem::default()).build();
+        assert_eq!(animation.time_range(), 0.0..1.0);
+    }
+
+    #[test]
+    fn parametrized_sequence_remaps_the_group_timeline() {
+        use crate::utils::rate_functions::ease_in_quad;
+
+        let animation = seq![progress_leaf(0.0), progress_leaf(10.0)]
+            .with_duration(4.0)
+            .with_rate_func(ease_in_quad);
+        let animation = animation.build();
+
+        assert_eq!(animation.time_range(), 0.0..4.0);
+        let items = animation.eval_at_sec(2.0).unwrap();
+        assert_eq!(evaluated_xs(items), vec![0.5]);
+        let mut infos = Vec::new();
+        animation.append_infos(0.0, &mut infos);
+        assert_eq!(infos.len(), 1);
+        assert_eq!(infos[0].range, 0.0..4.0);
     }
 
     #[test]
     fn seq_uses_child_durations() {
-        let mut output = Vec::new();
-        seq![leaf(1.0, 2.0), leaf(2.0, 3.0)].build(5.0, &mut output);
-        assert_eq!(output[0].time_range(), 5.0..7.0);
-        assert_eq!(output[1].time_range(), 7.0..10.0);
+        let sequence = seq![leaf(1.0, 2.0), leaf(2.0, 3.0)];
+        assert_eq!(sequence.built_animations()[0].time_range(), 0.0..2.0);
+        assert_eq!(sequence.built_animations()[1].time_range(), 2.0..5.0);
+        assert_eq!(sequence.at(5.0).build().time_range(), 5.0..10.0);
     }
 
     #[test]
     fn stack_accepts_plain_and_positioned_children() {
-        let mut output = Vec::new();
         let animation = stack![leaf(1.0, 2.0), leaf(2.0, 3.0).at(1.0)];
-        assert_eq!(animation.time_range(), 0.0..4.0);
-        animation.build(10.0, &mut output);
-        assert_eq!(output[0].time_range(), 10.0..12.0);
-        assert_eq!(output[1].time_range(), 11.0..14.0);
+        assert_eq!(animation.duration_secs(), 4.0);
+        assert_eq!(animation.built_animations()[0].time_range(), 0.0..2.0);
+        assert_eq!(animation.built_animations()[1].time_range(), 1.0..4.0);
+        assert_eq!(animation.at(10.0).build().time_range(), 10.0..14.0);
     }
 
     #[test]
@@ -691,10 +751,11 @@ mod tests {
             .push(leaf(1.0, 2.0))
             .forward(1.0)
             .push(leaf(2.0, 1.0));
-        let mut output = Vec::new();
-        sequence.build(10.0, &mut output);
-        assert_eq!(output[0].time_range(), 10.0..12.0);
-        assert_eq!(output[1].time_range(), 13.0..14.0);
+        let animation = sequence.at(10.0).build();
+        let mut infos = Vec::new();
+        animation.append_infos(0.0, &mut infos);
+        assert_eq!(infos[0].range, 10.0..12.0);
+        assert_eq!(infos[1].range, 13.0..14.0);
     }
 
     #[test]
@@ -704,21 +765,38 @@ mod tests {
             .push(stack![leaf(1.0, 1.0), leaf(2.0, 2.0)])
             .hold(1.0);
 
-        assert_eq!(sequence.built_animations().len(), 3);
-        let held = sequence.built_animations()[2].eval_at_sec(2.5).unwrap();
+        assert_eq!(sequence.built_animations().len(), 2);
+        let held = sequence.built_animations()[1].eval_at_sec(2.5).unwrap();
         assert_eq!(evaluated_xs(held), vec![2.0]);
     }
 
     #[test]
-    fn repeated_hold_extends_one_flat_static_animation() {
+    fn repeated_hold_creates_adjacent_static_animations() {
         let mut sequence = AnimSequence::new();
         sequence.push(leaf(3.0, 1.0)).hold(1.0).hold(2.0);
 
         assert_eq!(sequence.cursor_sec(), 4.0);
-        assert_eq!(sequence.built_animations().len(), 2);
-        assert_eq!(sequence.built_animations()[1].time_range(), 1.0..4.0);
-        let held = sequence.built_animations()[1].eval_at_sec(3.5).unwrap();
+        assert_eq!(sequence.built_animations().len(), 3);
+        assert_eq!(sequence.built_animations()[1].time_range(), 1.0..2.0);
+        assert_eq!(sequence.built_animations()[2].time_range(), 2.0..4.0);
+        let held = sequence.built_animations()[2].eval_at_sec(3.5).unwrap();
         assert_eq!(evaluated_xs(held), vec![3.0]);
+    }
+
+    #[test]
+    fn repeated_hold_replays_dyn_items_without_nesting_the_output_batch() {
+        let mut sequence = AnimSequence::new();
+        sequence
+            .push(stack![leaf(1.0, 1.0), leaf(2.0, 1.0)])
+            .hold(1.0)
+            .hold(1.0);
+
+        let first_hold = sequence.built_animations()[1].eval_at_sec(1.5).unwrap();
+        let second_hold = sequence.built_animations()[2].eval_at_sec(2.5).unwrap();
+
+        assert_eq!(first_hold.len(), 2);
+        assert_eq!(second_hold.len(), 2);
+        assert_eq!(evaluated_xs(second_hold), vec![1.0, 2.0]);
     }
 
     #[test]
@@ -731,18 +809,43 @@ mod tests {
     }
 
     #[test]
-    fn zero_duration_state_events_override_the_left_state_for_hold() {
+    fn hold_uses_the_sequences_final_evaluation() {
         let mut shown = VItem::default();
         shown.points[0].x = 5.0;
 
         let mut hidden = AnimSequence::new();
         hidden.push(leaf(1.0, 1.0)).push(shown.hide()).hold(1.0);
         assert_eq!(hidden.built_animations().len(), 2);
+        assert!(
+            hidden.built_animations()[1]
+                .eval_at_sec(1.0)
+                .unwrap()
+                .is_empty()
+        );
 
         let mut restored = AnimSequence::new();
         restored.push(leaf(1.0, 1.0)).push(shown.show()).hold(1.0);
         let held = restored.built_animations()[2].eval_at_sec(1.5).unwrap();
         assert_eq!(evaluated_xs(held), vec![5.0]);
+    }
+
+    #[test]
+    fn nested_sequences_keep_their_own_final_evaluation() {
+        let mut shown = VItem::default();
+        shown.points[0].x = 7.0;
+
+        let inner = seq![leaf(1.0, 1.0), shown.show()];
+        let mut outer = AnimSequence::new();
+        outer.push(inner).hold(1.0);
+
+        assert_eq!(outer.built_animations().len(), 2);
+        let held = outer.built_animations()[1].eval_at_sec(1.5).unwrap();
+        assert_eq!(evaluated_xs(held), vec![7.0]);
+
+        let hidden_inner = seq![leaf(1.0, 1.0), shown.hide()];
+        let mut hidden_outer = AnimSequence::new();
+        hidden_outer.push(hidden_inner).hold(1.0);
+        assert_eq!(hidden_outer.built_animations().len(), 1);
     }
 
     #[test]
@@ -753,5 +856,35 @@ mod tests {
         assert_eq!(stack.duration_secs(), 3.0);
         assert_eq!(stack.built_animations()[0].time_range(), 0.0..1.0);
         assert_eq!(stack.built_animations()[1].time_range(), 0.0..3.0);
+    }
+
+    #[test]
+    fn sequence_extend_appends_direct_children_and_preserves_local_gaps() {
+        let mut source = AnimSequence::new();
+        source
+            .push(leaf(2.0, 1.0))
+            .forward(2.0)
+            .push(leaf(3.0, 1.0));
+
+        let mut sequence = AnimSequence::new();
+        sequence.push(leaf(1.0, 2.0)).extend(source);
+
+        assert_eq!(sequence.cursor_sec(), 6.0);
+        assert_eq!(sequence.built_animations().len(), 3);
+        assert_eq!(sequence.built_animations()[0].time_range(), 0.0..2.0);
+        assert_eq!(sequence.built_animations()[1].time_range(), 2.0..3.0);
+        assert_eq!(sequence.built_animations()[2].time_range(), 5.0..6.0);
+    }
+
+    #[test]
+    fn stack_extend_appends_direct_children() {
+        let source = stack![leaf(2.0, 1.0), leaf(3.0, 2.0).at(1.0)];
+        let mut stack = stack![leaf(1.0, 4.0)];
+        stack.extend(source);
+
+        assert_eq!(stack.duration_secs(), 4.0);
+        assert_eq!(stack.built_animations().len(), 3);
+        assert_eq!(stack.built_animations()[1].time_range(), 0.0..1.0);
+        assert_eq!(stack.built_animations()[2].time_range(), 1.0..3.0);
     }
 }

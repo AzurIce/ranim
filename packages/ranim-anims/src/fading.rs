@@ -1,7 +1,6 @@
 use ranim_core::{
-    animation::{AnimationCell, Eval},
+    animation::Eval,
     traits::{Interpolatable, Opacity},
-    utils::rate_functions::smooth,
 };
 
 // MARK: Require Trait
@@ -13,23 +12,17 @@ impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`FadingRequirement`]
 pub trait FadingAnim: FadingRequirement + Sized + 'static {
     /// Create a [`FadeIn`] anim.
-    fn fade_in(&mut self) -> AnimationCell<Self, FadeIn<Self>>;
+    fn fade_in(&mut self) -> FadeIn<Self>;
     /// Create a [`FadeOut`] anim.
-    fn fade_out(&mut self) -> AnimationCell<Self, FadeOut<Self>>;
+    fn fade_out(&mut self) -> FadeOut<Self>;
 }
 
 impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
-    fn fade_in(&mut self) -> AnimationCell<Self, FadeIn<Self>> {
-        FadeIn::new(self.clone())
-            .into_animation_cell()
-            .with_rate_func(smooth)
-            .apply_to(self)
+    fn fade_in(&mut self) -> FadeIn<Self> {
+        FadeIn::new(self.clone()).apply_to(self)
     }
-    fn fade_out(&mut self) -> AnimationCell<Self, FadeOut<Self>> {
-        FadeOut::new(self.clone())
-            .into_animation_cell()
-            .with_rate_func(smooth)
-            .apply_to(self)
+    fn fade_out(&mut self) -> FadeOut<Self> {
+        FadeOut::new(self.clone()).apply_to(self)
     }
 }
 
@@ -55,8 +48,10 @@ impl<T: FadingRequirement> FadeIn<T> {
     }
 }
 
-impl<T: FadingRequirement> Eval<T> for FadeIn<T> {
-    fn eval_alpha(&self, alpha: f64) -> T {
+impl<T: FadingRequirement> Eval for FadeIn<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         self.src.lerp(&self.dst, alpha)
     }
 }
@@ -81,8 +76,10 @@ impl<T: FadingRequirement> FadeOut<T> {
     }
 }
 
-impl<T: FadingRequirement> Eval<T> for FadeOut<T> {
-    fn eval_alpha(&self, alpha: f64) -> T {
+impl<T: FadingRequirement> Eval for FadeOut<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         self.src.lerp(&self.dst, alpha)
     }
 }

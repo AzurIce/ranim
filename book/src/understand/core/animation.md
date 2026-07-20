@@ -1,33 +1,60 @@
 # 动画
 
-## `Eval<T>`
+## `Eval`
 
 Ranim 的叶子动画核心是一个归一化纯函数：输入进度 `alpha`，输出对应状态 `T`。
 
 ```rust,ignore
-pub trait Eval<T> {
-    fn eval_alpha(&self, alpha: f64) -> T;
+pub trait Eval {
+    type Output;
+    fn eval_alpha(&self, alpha: f64) -> Self::Output;
 }
 ```
 
 具体 evaluator 同时保存求值所需的数据。例如 `Static<T>` 始终返回同一个值，`Morph<T>` 保存插值需要的源状态和目标状态。
 
-## `AnimationCell<T, E>`
+## Eval 自动成为叶子动画
 
-`AnimationCell<T, E>` 将具体 evaluator `E` 与局部时间参数组合：
+只要 `Eval::Output` 可以提取为场景元素，该 evaluator 就自动获得默认 linear、1 秒、enabled 的 `Animation` 实现：
 
-```text
-AnimationCell<T, E>
-├─ E: Eval<T>
-├─ duration
-├─ rate function
-├─ enabled
-└─ evaluator name
+```rust,ignore
+pub struct FadeIn<T: FadingRequirement> {
+    src: T,
+    dst: T,
+}
+
+impl<T: FadingRequirement> Eval for FadeIn<T> {
+    type Output = T;
+    fn eval_alpha(&self, alpha: f64) -> Self::Output { /* ... */ }
+}
 ```
 
-它不保存全局 `start_sec`。动画只有被 `At` 放置，或进入 `AnimSequence`、`AnimStack` 和 Scene 时，才需要确定开始位置。
+因此 `FadeIn<T>` 本身就是一个可组合动画，不需要 marker 或宏。`Fn(f64) -> T` 闭包也自动实现 `Eval<Output = T>`，可以直接设置播放参数：
 
-与旧实现不同，`E` 在 build 前直接内联存储，不会先擦除为 `Box<dyn Eval<T>>`。叶子动画在进入动态组合容器前始终保留具体 evaluator 类型。
+```rust,ignore
+let animation = (|alpha| Square::new(alpha)).with_duration(2.0);
+```
+
+具名 evaluator 和闭包都不会在进入动态容器前擦除类型。`AnimSequence::push`、`AnimStack::push` 或 Scene build 时会将直接子节点转换为保留层级的运行时节点。
+
+## `Paramed<A>`
+
+所有尚未固定父时间坐标的 `Placeable` 动画通过 `AnimationExt` 获得统一的播放参数 API：
+
+```rust,ignore
+animation
+    .with_duration(2.0)
+    .with_rate_func(smooth)
+    .with_enabled(true)
+```
+
+第一次调用会生成 `Paramed<A>`。它只属于 Animation 层，负责 duration override、rate function 和 enabled，不再实现 `Eval`。裸动画的默认值是 linear、1 秒和 enabled。Sequence 或 Stack 被包装时，rate function 重映射整个组合的局部时间轴。
+
+`At<A>` 表示已经固定在父时间坐标中的 entry，不再实现 `Placeable`，因此参数必须在 placement 之前设置：
+
+```rust,ignore
+animation.with_duration(2.0).at(3.0); // At<Paramed<A>>
+```
 
 ## `Animation` 与 build
 
@@ -35,38 +62,36 @@ AnimationCell<T, E>
 
 ```rust,ignore
 pub trait Animation: Sized {
-    fn time_range(&self) -> Range<f64>;
-    fn build(self, origin_sec: f64, output: &mut Vec<BuiltAnimation>);
+    fn build(self) -> AnimationCell;
 }
 ```
 
-`origin_sec` 表示当前动画局部时间坐标的父级原点：
+`Animation` 不再提前暴露 time range 或 duration，它只负责将静态定义 lower 为局部坐标中的 `AnimationCell`：
 
-- 普通叶子直接在该原点生成 `BuiltAnimation`；
-- `At<A>` 将自己的 offset 加到原点后继续 build 内部动画；
-- `AnimSequence` 中的叶子已经位于 Sequence 局部坐标，整体 build 时统一平移；
-- `AnimStack` 中的子动画共享局部 0，整体 build 时同样统一平移。
+- 普通叶子 build 为 `0.0..1.0`；
+- `Paramed<A>` build 内层后，在外层应用 duration override、rate function 和 enabled；
+- `At<A>` build 内层后移动根 time range；
+- Sequence push 时先 build 子动画，再将它移动到 cursor；
+- Stack push 时先 build 子动画，再根据 built range 更新整体 duration。
 
-`Animation::duration_secs()` 默认使用 `time_range().end`。Sequence 用它推进 cursor，Stack 用它计算最长子动画范围。
+`AnimSequence` 和 `AnimStack` 仍提供自己的 `duration_secs()` 查询，但通用 `Animation` trait 不再要求每个静态类型重复提供时间信息。
 
-## `BuiltAnimation`
+## `AnimationCell`
 
-Sequence、Stack 和 Scene 需要保存异构动画，因此 build 会生成统一的 `BuiltAnimation`：
+Sequence、Stack 和 Scene 需要保存异构动画，因此每个直接子动画会生成一个 `AnimationCell`：
 
 ```text
-BuiltAnimation
-├─ BuiltEval
-│  ├─ Dynamic(Box<dyn EvalDyn>)
-│  └─ Static(Vec<DynItem>)
+AnimationCell
+├─ Box<dyn EvalDyn>
 ├─ time range
 ├─ rate function
 ├─ enabled
 └─ evaluator name
 ```
 
-`EvalDyn` 将结果追加到扁平的 `Vec<DynItem>`。动态 evaluator 通常追加一个结果；Sequence 的 `hold` 可以将同一时刻的多个结果保存为 Static。Static 求值时直接展开其中的 items，不会把聚合 Vec 再包装进新的 `DynItem`。
+`EvalDyn` 是私有的 object-safe 求值接口：所有 `E: Eval` 通过 blanket impl 进入类型擦除，`AnimSequence` 和 `AnimStack` 也直接实现该接口。Paramed 直接修改内层 build 出来的 cell，不再额外嵌套一个 `AnimationCell`。`hold` 保存的已求值结果直接使用 `Static<Vec<DynItem>>`。
 
-类型擦除只发生在 evaluator 内部。时间范围位于 Box 外，可以在动画已经擦除后继续平移、重新放置或供 preview 查询。
+动态求值会将结果追加到 `Vec<DynItem>`，但组合树本身不会被展开。类型擦除只隐藏直接子动画的 Rust 类型，不删除组合层级。时间范围位于 Box 外，供父动画调度和 preview 查询。
 
 ## Requirement Trait 模式
 
@@ -79,10 +104,10 @@ let animation = square
     .with_rate_func(smooth);
 ```
 
-返回值仍保留具体 evaluator 类型，例如：
+返回值就是具体 evaluator 类型，例如：
 
 ```text
-AnimationCell<Square, FadeIn<Square>>
+FadeIn<Square>
 ```
 
 只有当它进入 `AnimSequence::push`、`AnimStack::push` 或 `RanimScene::play` 时才会被 build 和擦除。

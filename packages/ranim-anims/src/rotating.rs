@@ -1,8 +1,7 @@
 use ranim_core::{
-    animation::{AnimationCell, Eval},
+    animation::Eval,
     glam::DVec3,
     traits::{Aabb, AabbPoint, Locate, RotateTransform, ShiftTransformExt},
-    utils::rate_functions::smooth,
 };
 
 // MARK: Require Trait
@@ -14,7 +13,7 @@ impl<T: RotateTransform + ShiftTransformExt + Clone> RotatingRequirement for T {
 /// The methods to create rotation animations for `T` that satisfies [`RotatingRequirement`]
 pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
     /// Rotate by a given angle about a given axis at center.
-    fn rotating(&mut self, angle: f64, axis: DVec3) -> AnimationCell<Self, RotatingAnimation<Self>>
+    fn rotating(&mut self, angle: f64, axis: DVec3) -> RotatingAnimation<Self>
     where
         Self: Aabb,
     {
@@ -27,11 +26,8 @@ pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
         angle: f64,
         axis: DVec3,
         anchor: A,
-    ) -> AnimationCell<Self, RotatingAnimation<Self>> {
-        RotatingAnimation::new(self.clone(), angle, axis, anchor.locate(self))
-            .into_animation_cell()
-            .with_rate_func(smooth)
-            .apply_to(self)
+    ) -> RotatingAnimation<Self> {
+        RotatingAnimation::new(self.clone(), angle, axis, anchor.locate(self)).apply_to(self)
     }
 }
 
@@ -63,8 +59,10 @@ impl<T: RotatingRequirement> RotatingAnimation<T> {
     }
 }
 
-impl<T: RotatingRequirement> Eval<T> for RotatingAnimation<T> {
-    fn eval_alpha(&self, alpha: f64) -> T {
+impl<T: RotatingRequirement> Eval for RotatingAnimation<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let mut result = self.src.clone();
         result.with_origin(self.point, |x| {
             x.rotate_on_axis(self.axis, self.angle * alpha);

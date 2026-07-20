@@ -13,7 +13,6 @@ use ranim::{
     prelude::*,
     utils::rate_functions::linear,
 };
-use ranim_core::animation::{Eval, StaticAnim};
 use ranim_items::vitem::typst::TypstText;
 
 const DURATION_SECS: f64 = 10.0;
@@ -139,8 +138,10 @@ struct AtlasTimerEval {
     atlas: Arc<GlyphAtlas>,
 }
 
-impl Eval<Vec<VItem>> for AtlasTimerEval {
-    fn eval_alpha(&self, alpha: f64) -> Vec<VItem> {
+impl Eval for AtlasTimerEval {
+    type Output = Vec<VItem>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let alpha = alpha.clamp(0.0, 1.0);
         let characters = format_milliseconds(milliseconds_at_alpha(alpha));
         let mut output = Vec::new();
@@ -162,8 +163,10 @@ struct RecompileTimerEval {
     glyph_scale: f64,
 }
 
-impl Eval<Vec<VItem>> for RecompileTimerEval {
-    fn eval_alpha(&self, alpha: f64) -> Vec<VItem> {
+impl Eval for RecompileTimerEval {
+    type Output = Vec<VItem>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let alpha = alpha.clamp(0.0, 1.0);
         let characters = format_milliseconds(milliseconds_at_alpha(alpha));
         let timestamp = characters.iter().collect::<String>();
@@ -208,7 +211,6 @@ fn typst_timer_atlas(r: &mut RanimScene) {
     let atlas = Arc::new(GlyphAtlas::new());
     r.play(
         AtlasTimerEval { atlas }
-            .into_animation_cell()
             .with_duration(DURATION_SECS)
             .with_rate_func(linear),
     );
@@ -222,7 +224,6 @@ fn typst_timer_recompile(r: &mut RanimScene) {
         RecompileTimerEval {
             glyph_scale: timer_glyph_scale(),
         }
-        .into_animation_cell()
         .with_duration(DURATION_SECS)
         .with_rate_func(linear),
     );

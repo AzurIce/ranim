@@ -8,7 +8,6 @@ use ranim::{
     prelude::*,
     utils::rate_functions::smooth,
 };
-use ranim_core::animation::Eval;
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
@@ -51,17 +50,13 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .iter_mut()
         .zip(radii.iter())
         .map(|(poly, &target_radius)| {
-            poly.morph(|p| {
+            let animation = poly.morph(|p| {
                 p.radius = target_radius;
-            })
-            .with_rate_func(smooth)
+            });
+            move |alpha| animation.eval_alpha(smooth(alpha))
         })
         .collect::<Vec<_>>();
-    content.push(
-        ranim_anims::lagged::Lagged::new(0.2, expand)
-            .into_animation_cell()
-            .with_duration(1.0),
-    );
+    content.push(ranim_anims::lagged::Lagged::new(0.2, expand).with_duration(1.0));
 
     // Phase 2: Rotate each layer at different speeds
     let rotations: Vec<f64> = (0..n_layers)
@@ -72,19 +67,15 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .iter_mut()
         .zip(rotations.iter())
         .map(|(poly, &rot)| {
-            poly.morph(|p| {
+            let animation = poly.morph(|p| {
                 p.with_origin(Origin.locate(&p.outer_circle()), |x| {
                     x.rotate_on_z(rot);
                 });
-            })
-            .with_rate_func(smooth)
+            });
+            move |alpha| animation.eval_alpha(smooth(alpha))
         })
         .collect::<Vec<_>>();
-    content.push(
-        ranim_anims::lagged::Lagged::new(0.2, rotate)
-            .into_animation_cell()
-            .with_duration(1.0),
-    );
+    content.push(ranim_anims::lagged::Lagged::new(0.2, rotate).with_duration(1.0));
 
     r.insert_time_mark(
         content.cursor_sec(),
@@ -98,17 +89,13 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .iter_mut()
         .rev()
         .map(|poly| {
-            poly.morph(|p| {
+            let animation = poly.morph(|p| {
                 p.radius = 0.0;
-            })
-            .with_rate_func(smooth)
+            });
+            move |alpha| animation.eval_alpha(smooth(alpha))
         })
         .collect::<Vec<_>>();
-    content.push(
-        ranim_anims::lagged::Lagged::new(0.2, collapse)
-            .into_animation_cell()
-            .with_duration(1.0),
-    );
+    content.push(ranim_anims::lagged::Lagged::new(0.2, collapse).with_duration(1.0));
 
     let mut camera = AnimSequence::new();
     camera

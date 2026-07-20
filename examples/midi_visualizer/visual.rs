@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
+use crate::midi::{MidiSong, Note};
 use ranim::{
     color::{AlphaColor, Srgb, palettes::manim},
     glam::{DVec3, dvec3},
     items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
 };
-use ranim_core::animation::Eval;
-
-use crate::midi::{MidiSong, Note};
 
 const NOTE_SPEED: f64 = 5.5;
 pub(crate) const FRAME_HEIGHT: f64 = 8.0;
@@ -191,8 +189,10 @@ pub(crate) struct MidiNotesEval {
     pub(crate) layout: PianoLayout,
 }
 
-impl Eval<Vec<VItem>> for MidiNotesEval {
-    fn eval_alpha(&self, alpha: f64) -> Vec<VItem> {
+impl Eval for MidiNotesEval {
+    type Output = Vec<VItem>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let sec = alpha.clamp(0.0, 1.0) * self.song.duration_secs;
         let visible_until = sec + (FRAME_RIGHT - HIT_X) / NOTE_SPEED;
         let first_index = self
@@ -240,8 +240,10 @@ impl SingleNoteEval {
     }
 }
 
-impl Eval<Vec<VItem>> for SingleNoteEval {
-    fn eval_alpha(&self, alpha: f64) -> Vec<VItem> {
+impl Eval for SingleNoteEval {
+    type Output = Vec<VItem>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let sec = self.start_sec + alpha.clamp(0.0, 1.0) * self.duration_secs;
         let mut items = Vec::with_capacity(2);
         render_note(self.note, sec, self.layout, &mut items);
@@ -285,8 +287,10 @@ impl PianoKeyboardEval {
     }
 }
 
-impl Eval<Vec<VItem>> for PianoKeyboardEval {
-    fn eval_alpha(&self, alpha: f64) -> Vec<VItem> {
+impl Eval for PianoKeyboardEval {
+    type Output = Vec<VItem>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let sec = alpha.clamp(0.0, 1.0) * self.song.duration_secs;
         let mut keys = Vec::new();
 
@@ -334,8 +338,10 @@ pub(crate) struct HitEffectsEval {
     pub(crate) layout: PianoLayout,
 }
 
-impl Eval<Vec<VItem>> for HitEffectsEval {
-    fn eval_alpha(&self, alpha: f64) -> Vec<VItem> {
+impl Eval for HitEffectsEval {
+    type Output = Vec<VItem>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let sec = alpha.clamp(0.0, 1.0) * self.song.duration_secs;
         let first = self
             .song

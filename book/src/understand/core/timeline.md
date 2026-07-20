@@ -10,7 +10,7 @@ v0.3 不再使用 `TimelineId` 管理 Scene 内的可变时间线。动画先在
 `RanimScene` 自带一个根 `AnimStack`：
 
 ```rust,ignore
-pub fn play<A: Animation>(&mut self, animation: A) -> &mut Self {
+pub fn play<A: Animation + 'static>(&mut self, animation: A) -> &mut Self {
     self.root.push(animation);
     self
 }
@@ -20,7 +20,7 @@ pub fn play<A: Animation>(&mut self, animation: A) -> &mut Self {
 
 ## `AnimSequence`
 
-`AnimSequence::push` 在当前 cursor 处 build 动画，再按动画的局部 duration 推进 cursor：
+`AnimSequence::push` 先将动画 build 为局部 `AnimationCell`，再把它移动到当前 cursor，并按 cell duration 推进 cursor：
 
 ```rust,ignore
 let mut intro = AnimSequence::new();
@@ -32,7 +32,9 @@ intro
 r.play(intro);
 ```
 
-Sequence 是动态类型擦除边界。传入的静态 Animation 组合树会被展开为扁平的 `Vec<BuiltAnimation>`，但时间范围、rate function、enabled 和 evaluator 名称仍保存在 Box 外。
+Sequence 是动态类型擦除边界，但不会展开传入动画的组合树。每次 `push` 只将直接子动画转换为一个 `AnimationCell`；如果子动画是 Stack 或 Sequence，其内部层级会继续保留。
+
+Sequence 自己通过 cursor 决定子动画的位置，因此 `push` 只接受尚未显式放置的 `Placeable`。`At<A>` 已经固定父时间坐标，不能进入 Sequence。
 
 Sequence 本身仍实现 `Animation`，所以可以先独立构造，再整体使用 `at` 放置或加入另一个组合：
 
@@ -45,10 +47,10 @@ r.play(intro.at(2.0));
 两者都会推进 Sequence cursor，但输出语义不同：
 
 - `forward(secs)` 只推进 cursor，产生的空白区间没有输出。
-- `hold(secs)` 取得 cursor 处的 Sequence 状态，将它保存为持续 `secs` 的静态 BuiltAnimation。
+- `hold(secs)` 取得 cursor 处的 Sequence 状态，将它保存为持续 `secs` 的静态运行时节点。
 - `forward_to(target)` 和 `hold_to(target)` 是对应的绝对 cursor 版本。
 
-没有零时长 state event 时，`hold` 采样 cursor 左侧仍然活动的动画。已经提前结束的 Stack 子动画不会被自动延长。
+`hold` 没有额外的状态协议，它直接采用 Sequence 在 cursor 处的正常求值结果。Sequence 在同一时刻只求值最后一个适用的直接子动画；如果这个子动画是 Stack，则由 Stack 求值其中所有仍然适用的子动画。已经提前结束的 Stack 子动画不会被自动延长。
 
 ```text
 child A: [0, 1)
@@ -58,16 +60,16 @@ cursor:        2
 hold at 2 -> 只保持 B 的左侧终态
 ```
 
-连续 hold 会直接延长相邻的静态区间，不会形成递归的 `DynItem<Vec<DynItem<...>>>` 包装。
+连续 `hold` 会分别保存每次调用时的求值结果，形成相邻的静态区间。
 
-## `show`、`hide` 与状态快照
+## `show`、`hide` 与最终求值
 
-`show()` 和 `hide()` 都产生零时长 state event：
+`show()` 和 `hide()` 都是普通的零时长动画：
 
-- `show()` 是 enabled 的静态状态；
-- `hide()` 是 disabled 的空状态标记。
+- `show()` 是 enabled 的静态动画，求值时输出对应物件；
+- `hide()` 是 disabled 的静态动画，求值时不输出内容。
 
-当 cursor 上存在 state event 时，后续 `hold` 不再继承左侧状态，而是将该时刻全部 enabled events 的输出作为 Sequence 的新完整快照。只有 `hide` 时快照为空，因此后续区间不输出内容。
+它们不需要 `hold` 特判。因为 Sequence 在边界上选择最后一个适用的直接子动画，末尾的 `show()` 会成为最终求值结果，末尾的 `hide()` 则自然得到空结果；`hold` 只负责把这个结果保存为静态动画。
 
 ```rust,ignore
 let mut content = AnimSequence::new();
@@ -87,7 +89,7 @@ r.play(square_sequence);
 r.play(circle_sequence);
 ```
 
-如果两个物件属于同一个状态快照，则在同一 cursor 提交两个 enabled events，或直接 push 一个 `stack![...]` 组合。
+如果两个物件需要在同一时刻一起求值，应直接 push 一个 `stack![...]` 组合。
 
 ## `AnimStack` 与根场景
 
@@ -102,6 +104,8 @@ let animation = stack![
 
 r.play(animation);
 ```
+
+Stack 接受普通 `Placeable` 动画和已经放置的 `At<A>`。普通动画从 Stack 局部 0 开始，`At<A>` 使用自己的显式 offset。参数必须在调用 `at` 之前设置。
 
 运行时数量不固定时可以直接构造 `AnimStack`：
 
@@ -147,4 +151,4 @@ let scene = stack![intro, camera];
 r.play(scene);
 ```
 
-`seq!` 返回 `AnimSequence`，`stack!` 返回 `AnimStack`。二者都只是构造辅助，最终遵循同一套 `Animation::build` 规则。
+`seq!` 返回 `AnimSequence`，`stack!` 返回 `AnimStack`。二者都只是构造辅助，最终 build 为保留子节点层级的运行时动画树。
