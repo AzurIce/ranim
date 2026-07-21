@@ -8,6 +8,7 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
+    utils::rate_functions::smooth,
 };
 
 #[scene]
@@ -16,8 +17,7 @@ fn hello_ranim(r: &mut RanimScene) {
     let mut square = Square::new(2.0);
     square.set_color(manim::BLUE_C);
 
-    let mut content = AnimSequence::new();
-    content.push(square.clone().fade_in());
+    let mut content = seq![square.clone().fade_in().with_rate_func(smooth)];
 
     let mut circle = Circle::new(2.0);
     circle
@@ -27,18 +27,19 @@ fn hello_ranim(r: &mut RanimScene) {
         });
 
     let mut vitem = VItem::from(square);
-    content
-        .push(vitem.morph_to(circle.into()))
-        .hold(1.0)
-        .push(vitem.clone().unwrite())
-        .push(vitem.write())
-        .push(vitem.fade_out());
 
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(content.cursor_sec());
-    r.play(camera);
+    content.extend(seq![
+        vitem.morph_to(circle.into()).with_rate_func(smooth),
+        vitem.show(),
+        vitem.clone().unwrite().with_rate_func(smooth),
+        vitem.write().with_rate_func(smooth),
+        vitem.fade_out().with_rate_func(smooth),
+    ]);
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
     r.play(content);
 
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
@@ -50,8 +51,7 @@ fn hello_ranim_chained(r: &mut RanimScene) {
         square.set_color(manim::BLUE_C);
     });
 
-    let mut content = AnimSequence::new();
-    content.push(square.clone().fade_in());
+    let mut content = seq![square.clone().fade_in().with_rate_func(smooth)];
 
     let circle = Circle::new(2.0).with(|circle| {
         circle
@@ -63,17 +63,19 @@ fn hello_ranim_chained(r: &mut RanimScene) {
 
     let mut vitem = VItem::from(square);
     content
-        .push(vitem.morph_to(circle.into()))
+        .push(vitem.morph_to(circle.into()).with_rate_func(smooth))
         .hold(1.0)
-        .push(vitem.clone().unwrite())
-        .push(vitem.write())
-        .push(vitem.fade_out());
+        .extend(seq![
+            vitem.clone().unwrite().with_rate_func(smooth),
+            vitem.write().with_rate_func(smooth),
+            vitem.fade_out().with_rate_func(smooth),
+        ]);
 
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(content.cursor_sec());
-    r.play(camera);
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
     r.play(content);
 
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));

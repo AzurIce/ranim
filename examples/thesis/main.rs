@@ -14,7 +14,7 @@ use ranim::{
         geometry::{Circle, Polygon, Square},
     },
     prelude::*,
-    utils::rate_functions::linear,
+    utils::rate_functions::{linear, smooth},
 };
 
 #[allow(unused)]
@@ -47,11 +47,9 @@ fn fading(r: &mut RanimScene) {
         x.move_to(dvec3(0.0, -2.0, 0.0));
     });
     let duration = 1.0;
-    let mut camera = AnimSequence::new();
-    camera.push(CameraFrame::default().show()).hold(duration);
-    r.play(camera);
-    r.play(pentagon_in.fade_in());
-    r.play(pentagon_out.fade_out());
+    r.play(CameraFrame::default().show().with_duration(duration));
+    r.play(pentagon_in.fade_in().with_rate_func(smooth));
+    r.play(pentagon_out.fade_out().with_rate_func(smooth));
 }
 
 #[allow(unused)]
@@ -64,11 +62,9 @@ fn creation(r: &mut RanimScene) {
         x.move_to(dvec3(0.0, -2.0, 0.0));
     });
     let duration = 1.0;
-    let mut camera = AnimSequence::new();
-    camera.push(CameraFrame::default().show()).hold(duration);
-    r.play(camera);
-    r.play(pentagon_in.create());
-    r.play(pentagon_out.uncreate());
+    r.play(CameraFrame::default().show().with_duration(duration));
+    r.play(pentagon_in.create().with_rate_func(smooth));
+    r.play(pentagon_out.uncreate().with_rate_func(smooth));
 }
 
 #[allow(unused)]
@@ -82,11 +78,9 @@ fn writing(r: &mut RanimScene) {
         x.move_to(dvec3(0.0, -2.0, 0.0));
     });
     let duration = 1.0;
-    let mut camera = AnimSequence::new();
-    camera.push(CameraFrame::default().show()).hold(duration);
-    r.play(camera);
-    r.play(pentagon_in.write());
-    r.play(pentagon_out.unwrite());
+    r.play(CameraFrame::default().show().with_duration(duration));
+    r.play(pentagon_in.write().with_rate_func(smooth));
+    r.play(pentagon_out.unwrite().with_rate_func(smooth));
 }
 
 #[allow(unused)]
@@ -102,9 +96,7 @@ fn transform(r: &mut RanimScene) {
     // dst.with_origin(AabbPoint::CENTER, |x| { x.rotate_on_z(PI / 4.0 + PI); }); // rotate to match src
     let mut item = VItem::from(src);
     let animation = item.morph_to(VItem::from(dst)).with_rate_func(linear);
-    let mut camera = AnimSequence::new();
-    camera.push(CameraFrame::default().show()).hold(1.0);
-    r.play(camera);
+    r.play(CameraFrame::default().show().with_duration(1.0));
     r.play(animation);
 }
 

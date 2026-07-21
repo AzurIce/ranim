@@ -19,6 +19,7 @@ use ranim::{
         geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
     },
     prelude::*,
+    utils::rate_functions::smooth,
 };
 
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
@@ -33,32 +34,17 @@ fn test(r: &mut RanimScene) {
     let mut square = VItem::from(Square::new(4.0).with(|x| {
         x.set_color(manim::BLUE_C).set_fill_opacity(0.5);
     }));
-    let mut content = AnimSequence::new();
-    content
-        .push(square.morph(|x| {
-            x.with_origin(AabbPoint::CENTER, |x| {
-                x.rotate_on_y(PI / 2.0);
-            });
-        }))
-        .hold(1.0);
+    let mut content = seq![
+        square
+            .morph(|x| {
+                x.with_origin(AabbPoint::CENTER, |x| {
+                    x.rotate_on_y(PI / 2.0);
+                });
+            })
+            .with_rate_func(smooth)
+    ];
+    content.hold(1.0);
 
-    // text.set_stroke_color(manim::RED_C)
-    //     .set_stroke_width(0.05)
-    //     .set_fill_color(BLUE_C)
-    //     .set_fill_opacity(0.5);
-    // text.scale_to(ScaleHint::PorportionalY(8.0 * 0.8));
-    // let mut text = timeline.insert(text);
-    // let arrow = Arrow::new(-3.0 * DVec3::X, 3.0 * DVec3::Y);
-    // let mut arrow = timeline.insert(arrow);
-
-    // timeline.push(arrow.morph(|data| {
-    //     data.set_color(RED_C);
-    //     data.put_start_and_end_on(DVec3::NEG_Y, DVec3::Y);
-    // }));
-    let mut camera = AnimSequence::new();
-    camera
-        .push(camera_frame.show())
-        .hold_to(content.cursor_sec());
-    r.play(camera);
+    r.play(camera_frame.show().with_duration(content.cursor_sec()));
     r.play(content);
 }

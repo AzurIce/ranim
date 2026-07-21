@@ -75,7 +75,12 @@ fn ranim_logo(r: &mut RanimScene) {
     let logo_width = frame_size.y * 0.618;
 
     let logo = build_logo(logo_width);
-    let mut logo_parts = logo.map(|item| (AnimSequence::new(), item));
+    let mut logo_parts = logo.map(|mut item| {
+        (
+            seq![item.write().with_duration(3.0).with_rate_func(smooth)],
+            item,
+        )
+    });
 
     let mut ranim_text = Vec::<VItem>::from(
         SvgItem::new(typst_svg(
@@ -90,10 +95,6 @@ fn ranim_logo(r: &mut RanimScene) {
                 .move_to(DVec3::NEG_Y * 2.5);
         }),
     );
-    logo_parts.iter_mut().for_each(|(sequence, item)| {
-        sequence.push(item.write().with_duration(3.0).with_rate_func(smooth));
-    });
-
     let gap_ratio = 1.0 / 60.0;
     let gap = logo_width * gap_ratio;
     let scale = (logo_width - gap * 2.0) / logo_width;
@@ -166,10 +167,6 @@ fn ranim_logo(r: &mut RanimScene) {
         content.push(sequence);
     }
     content.push(text_sequence);
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(total_secs);
-    content.push(camera);
+    content.push(CameraFrame::default().show().with_duration(total_secs));
     r.play(content);
 }

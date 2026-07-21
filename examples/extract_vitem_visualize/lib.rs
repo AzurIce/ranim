@@ -15,6 +15,7 @@ use ranim::{
         typst::typst_svg,
     },
     prelude::*,
+    utils::rate_functions::smooth,
 };
 
 use glam::DVec3;
@@ -37,29 +38,29 @@ fn ranim_text(r: &mut RanimScene) {
     camera
         .push(cam.show())
         .hold(1.0)
-        .push(cam.morph(|cam| {
-            cam.scale = 0.3;
-            cam.up = DVec3::NEG_X;
-            cam.pos.shift(DVec3::NEG_X * 6.0);
-        }))
+        .push(
+            cam.morph(|cam| {
+                cam.scale = 0.3;
+                cam.up = DVec3::NEG_X;
+                cam.pos.shift(DVec3::NEG_X * 6.0);
+            })
+            .with_rate_func(smooth),
+        )
         .hold(1.0)
         .push(
             cam.morph(|cam| {
                 cam.pos.shift(DVec3::X * 12.0);
             })
-            .with_duration(7.0),
+            .with_duration(7.0)
+            .with_rate_func(smooth),
         )
         .hold(1.0)
-        .push(cam.morph_to(CameraFrame::default()));
+        .push(cam.morph_to(CameraFrame::default()).with_rate_func(smooth));
 
-    let mut content = AnimSequence::new();
-    content
-        .push(visual_text.show())
-        .hold_to(camera.cursor_sec());
+    let content = visual_text.show().with_duration(camera.cursor_sec());
     r.play(camera);
     r.play(content);
 
-    // r.timelines_mut().forward(1.0);
     r.insert_time_mark(5.0, TimeMark::Capture("preview-ranim_text.png".to_string()));
 }
 
@@ -77,19 +78,29 @@ pub fn hello_ranim(r: &mut RanimScene) {
             });
     })));
 
-    let mut content = AnimSequence::new();
+    let mut content = seq![
+        square
+            .clone()
+            .morph_to(circle.clone())
+            .with_rate_func(smooth)
+    ];
     content
-        .push(square.clone().morph_to(circle.clone()))
         .hold(1.0)
-        .push(circle.clone().unwrite().with_duration(2.0))
-        .push(circle.write().with_duration(2.0))
-        .push(circle.fade_out());
+        .push(
+            circle
+                .clone()
+                .unwrite()
+                .with_duration(2.0)
+                .with_rate_func(smooth),
+        )
+        .push(circle.write().with_duration(2.0).with_rate_func(smooth))
+        .push(circle.fade_out().with_rate_func(smooth));
 
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(content.cursor_sec());
-    r.play(camera);
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
     r.play(content);
     r.insert_time_mark(
         3.2,

@@ -1,5 +1,6 @@
 use ranim::{
     anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,
+    utils::rate_functions::smooth,
 };
 
 // ANCHOR: construct
@@ -11,21 +12,20 @@ fn getting_started0(r: &mut RanimScene) {
         square.set_color(manim::BLUE_C);
     });
 
-    let mut content = AnimSequence::new();
+    let mut content = seq![square.clone().fade_in().with_rate_func(smooth)];
     content
-        .push(square.clone().fade_in())
         .hold(1.0)
         .push(square.hide())
         .forward(1.0)
         .push(square.show())
         .hold(1.0)
-        .push(square.clone().fade_out());
+        .push(square.clone().fade_out().with_rate_func(smooth));
 
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(content.cursor_sec());
-    r.play(camera);
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
     r.play(content);
 }
 // ANCHOR_END: construct

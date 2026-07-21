@@ -131,6 +131,7 @@
             zola
             mdbook
             wasm-pack
+            binaryen
             mdbook-mermaid
             typst
             gh

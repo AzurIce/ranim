@@ -4,12 +4,13 @@ pub mod test_scenes {
     use itertools::Itertools;
     use ranim::{
         anims::morph::MorphAnim,
-        core::animation::{AnimSequence, AnimStack, StaticAnim},
+        core::animation::{AnimStack, StaticAnim},
         glam::{DVec3, dvec3},
         items::vitem::{
             VItem,
             geometry::{Circle, Square},
         },
+        utils::rate_functions::smooth,
     };
 
     use super::*;
@@ -31,13 +32,9 @@ pub mod test_scenes {
 
         let mut content = AnimStack::new();
         for square in squares {
-            let mut sequence = AnimSequence::new();
-            sequence.push(square.show()).hold(1.0);
-            content.push(sequence);
+            content.push(square.show().with_duration(1.0));
         }
-        let mut camera = AnimSequence::new();
-        camera.push(CameraFrame::default().show()).hold(1.0);
-        content.push(camera);
+        content.push(CameraFrame::default().show().with_duration(1.0));
         r.play(content);
     }
 
@@ -65,11 +62,9 @@ pub mod test_scenes {
             .collect::<Vec<_>>();
         let mut content = AnimStack::new();
         for (mut square, circle) in squares.into_iter().zip(circles) {
-            content.push(square.morph_to(circle));
+            content.push(square.morph_to(circle).with_rate_func(smooth));
         }
-        let mut camera = AnimSequence::new();
-        camera.push(CameraFrame::default().show()).hold(1.0);
-        content.push(camera);
+        content.push(CameraFrame::default().show().with_duration(1.0));
         r.play(content);
     }
 }

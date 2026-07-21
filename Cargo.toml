@@ -237,6 +237,14 @@ crate-type = ["cdylib"]
 wasm = true
 
 [[example]]
+name = "composable_choreography"
+path = "examples/composable_choreography/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.composable_choreography]
+wasm = true
+
+[[example]]
 name = "palettes"
 path = "examples/palettes/lib.rs"
 crate-type = ["cdylib"]

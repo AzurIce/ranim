@@ -107,9 +107,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     }
 
     let total_secs = content.duration_secs();
-    let mut camera = AnimSequence::new();
-    camera.push(cam.show()).hold_to(total_secs);
-    content.push(camera);
+    content.push(cam.show().with_duration(total_secs));
     r.play(content);
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));

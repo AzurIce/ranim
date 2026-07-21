@@ -16,6 +16,7 @@ use ranim::{
         },
     },
     prelude::*,
+    utils::rate_functions::smooth,
 };
 
 #[scene]
@@ -167,19 +168,14 @@ fn aabb(r: &mut RanimScene) {
             v.scale_to(ScaleHint::PorportionalY(target));
             v.move_to(cell_center(col, row));
         });
-        let mut sequence = AnimSequence::new();
-        sequence
-            .push(wrapped.show())
-            .push(wrapped.rotating(PI * 2.0, DVec3::Z));
-        content.push(sequence);
+        content.push(seq![
+            wrapped.show(),
+            wrapped.rotating(PI * 2.0, DVec3::Z).with_rate_func(smooth),
+        ]);
     }
 
     let total_secs = content.duration_secs();
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(total_secs);
-    content.push(camera);
+    content.push(CameraFrame::default().show().with_duration(total_secs));
     r.play(content);
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));

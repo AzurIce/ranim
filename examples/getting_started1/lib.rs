@@ -6,6 +6,7 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
+    utils::rate_functions::smooth,
 };
 
 // ANCHOR: construct
@@ -21,16 +22,18 @@ fn getting_started1(r: &mut RanimScene) {
         circle.set_color(manim::RED_C);
     });
 
-    let mut content = AnimSequence::new();
-    content
-        .push(VItem::from(square).morph_to(VItem::from(circle.clone())))
-        .push(VItem::from(circle).unwrite());
+    let content = seq![
+        VItem::from(square)
+            .morph_to(VItem::from(circle.clone()))
+            .with_rate_func(smooth),
+        VItem::from(circle).unwrite().with_rate_func(smooth),
+    ];
 
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(content.cursor_sec());
-    r.play(camera);
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
     r.play(content);
 }
 // ANCHOR_END: construct

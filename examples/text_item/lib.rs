@@ -1,5 +1,6 @@
 use std::f64::consts::TAU;
 
+use ranim::utils::rate_functions::smooth;
 use ranim::{color::palettes::manim, glam::DVec3, prelude::*};
 use ranim_anims::{
     creation::{CreationAnim, WritingAnim},
@@ -18,31 +19,37 @@ fn text_item(r: &mut RanimScene) {
         .text_box()
         .with(|item| item.set_stroke_color(manim::RED_C).discard());
 
-    let mut text_sequence = AnimSequence::new();
+    let mut text_sequence = seq![Vec::<VItem>::from(text.clone()).lagged(0.1, |item| {
+        let animation = item.write();
+        move |alpha| animation.eval_alpha(smooth(alpha))
+    })];
     text_sequence
-        .push(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.write()))
         .hold(3.0)
         .push(
             text.clone()
                 .rotating(TAU * 4.0, DVec3::Z)
-                .with_duration(4.0),
+                .with_duration(4.0)
+                .with_rate_func(smooth),
         )
         .hold(1.0)
-        .push(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.unwrite()))
+        .push(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| {
+            let animation = item.unwrite();
+            move |alpha| animation.eval_alpha(smooth(alpha))
+        }))
         .hold(1.0);
 
     let mut box_sequence = AnimSequence::new();
     box_sequence
         .forward(1.0)
-        .push(VItem::from(text_box.clone()).create())
-        .push(VItem::from(text_box).uncreate());
+        .push(
+            VItem::from(text_box.clone())
+                .create()
+                .with_rate_func(smooth),
+        )
+        .push(VItem::from(text_box).uncreate().with_rate_func(smooth));
 
     let total_secs = text_sequence.cursor_sec().max(box_sequence.cursor_sec());
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(total_secs);
-    r.play(camera);
+    r.play(CameraFrame::default().show().with_duration(total_secs));
     r.play(text_sequence);
     r.play(box_sequence);
 

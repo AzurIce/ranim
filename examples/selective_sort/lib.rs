@@ -33,8 +33,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                 rect.scale(DVec3::splat(0.8))
                     .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
-            let mut sequence = AnimSequence::new();
-            sequence.push(rect.show());
+            let sequence = seq![rect.show()];
             (sequence, rect)
         })
         .collect::<Vec<_>>();
@@ -114,11 +113,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
     for (sequence, _) in rects {
         content.push(sequence);
     }
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(total_secs);
-    content.push(camera);
+    content.push(CameraFrame::default().show().with_duration(total_secs));
     r.play(content);
 }
 

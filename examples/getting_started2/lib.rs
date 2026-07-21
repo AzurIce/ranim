@@ -9,7 +9,7 @@ use ranim::{
         geometry::{Circle, Rectangle, Square},
     },
     prelude::*,
-    utils::rate_functions::linear,
+    utils::rate_functions::{linear, smooth},
 };
 
 #[scene]
@@ -29,31 +29,25 @@ fn getting_started2(r: &mut RanimScene) {
             circle.set_color(manim::RED_C);
         })
         .into();
-    let mut rect_sequence = AnimSequence::new();
+    let mut rect_sequence = seq![rect.clone().show()];
     rect_sequence
-        .push(rect.clone().show())
         .hold(1.0)
-        .push(VItem::from(rect).uncreate());
+        .push(VItem::from(rect).uncreate().with_rate_func(smooth));
 
-    let mut item_sequence = AnimSequence::new();
+    let mut item_sequence = seq![square.clone().show()];
     item_sequence
-        .push(square.clone().show())
         .hold(1.0)
-        .push(square.clone().create())
+        .push(square.clone().create().with_rate_func(smooth))
         .push(
             square
                 .clone()
                 .morph_to(circle.clone())
                 .with_rate_func(linear),
         )
-        .push(circle.clone().unwrite());
+        .push(circle.clone().unwrite().with_rate_func(smooth));
 
     let total_secs = item_sequence.cursor_sec().max(rect_sequence.cursor_sec());
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(total_secs);
-    r.play(camera);
+    r.play(CameraFrame::default().show().with_duration(total_secs));
     r.play(rect_sequence);
     r.play(item_sequence);
 }

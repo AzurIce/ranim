@@ -5,7 +5,7 @@ use ranim::{
     glam::DVec3,
     items::vitem::{VItem, geometry::Square},
     prelude::*,
-    utils::rate_functions::linear,
+    utils::rate_functions::{linear, smooth},
 };
 use ranim_core::animation::StaticAnim;
 
@@ -92,7 +92,8 @@ fn perspective_blend(r: &mut RanimScene) {
                     x.rotate_on_x(std::f64::consts::PI / 6.0);
                 });
             })
-            .with_duration(4.0),
+            .with_duration(4.0)
+            .with_rate_func(smooth),
     );
     content.push(faces_sequence);
 
@@ -105,7 +106,8 @@ fn perspective_blend(r: &mut RanimScene) {
             cam.morph(|data| {
                 data.perspective_blend = 1.0;
             })
-            .with_duration(2.0),
+            .with_duration(2.0)
+            .with_rate_func(smooth),
         )
         .hold_to(total_secs);
     content.push(camera);

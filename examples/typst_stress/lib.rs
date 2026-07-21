@@ -12,6 +12,7 @@ use ranim::{
 };
 use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
+use ranim::utils::rate_functions::smooth;
 
 const BEHAVIOR_CELLS: &[&str] = &[
     r#"
@@ -139,20 +140,16 @@ fn typst_behavior(r: &mut RanimScene) {
     let mut morph_sequence = AnimSequence::new();
     morph_sequence
         .forward(0.5)
-        .push(from.morph_to(to.clone()).with_duration(2.0))
+        .push(
+            from.morph_to(to.clone())
+                .with_duration(2.0)
+                .with_rate_func(smooth),
+        )
         .hold(0.5);
     let total_secs = morph_sequence.cursor_sec();
 
-    let mut static_content = AnimSequence::new();
-    static_content
-        .push(stack![matrix.show(), title.show()])
-        .hold_to(total_secs);
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(total_secs);
-    r.play(camera);
-    r.play(static_content);
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(stack![matrix.show(), title.show()].with_duration(total_secs));
     r.play(morph_sequence);
     r.insert_time_mark(0.25, TimeMark::Capture("preview-behavior.png".to_owned()));
 }
@@ -228,13 +225,14 @@ cell [{:02}, {:02}] office affine ffi 0123456789
     content
         .push(items.clone().show())
         .hold(0.5)
-        .push(items.morph_to(target.clone()).with_duration(3.0))
+        .push(
+            items
+                .morph_to(target.clone())
+                .with_duration(3.0)
+                .with_rate_func(smooth),
+        )
         .hold(0.5);
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(content.cursor_sec());
-    r.play(camera);
+    r.play(CameraFrame::default().show().with_duration(content.cursor_sec()));
     r.play(content);
     r.insert_time_mark(0.25, TimeMark::Capture("preview-pressure.png".to_owned()));
 }

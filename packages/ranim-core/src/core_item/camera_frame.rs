@@ -208,11 +208,10 @@ impl CameraFrame {
     /// use std::f64::consts::TAU;
     ///
     /// let mut cam = CameraFrame::from_spherical(phi, theta, distance);
-    /// let r_cam = r.insert(cam.clone());
-    /// r.timeline_mut(r_cam).play(
+    /// r.play(
     ///     cam.orbit(DVec3::ZERO, TAU)
-    ///        .with_duration(8.0)
-    ///        .with_rate_func(linear),
+    ///         .with_duration(8.0)
+    ///         .with_rate_func(linear),
     /// );
     /// ```
     pub fn orbit(

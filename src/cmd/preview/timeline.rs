@@ -14,6 +14,10 @@ const INDENT_WIDTH: f32 = 16.0;
 const MIN_VISIBLE_SECS: f64 = 0.1;
 const MIN_TREE_WIDTH: f32 = 136.0;
 const MAX_TREE_WIDTH: f32 = 420.0;
+const MIN_INTERACTIVE_CLIP_WIDTH: f32 = 3.0;
+const VIEWPORT_SCROLLBAR_HEIGHT: f32 = 14.0;
+const VIEWPORT_SCROLLBAR_GAP: f32 = 3.0;
+const MIN_VIEWPORT_THUMB_WIDTH: f32 = 28.0;
 
 type AnimationPath = Vec<usize>;
 
@@ -53,6 +57,8 @@ pub struct TimelineState {
     expanded: HashSet<AnimationPath>,
     selected: Option<AnimationPath>,
     tree_width: f32,
+    visible_tracks: Vec<VisibleTrack>,
+    tracks_dirty: bool,
 }
 
 impl TimelineState {
@@ -71,74 +77,228 @@ impl TimelineState {
             expanded,
             selected: None,
             tree_width,
+            visible_tracks: Vec::new(),
+            tracks_dirty: true,
         }
     }
 
     pub fn ui_main_timeline(&mut self, ui: &mut Ui) {
-        let available_height = ui.available_height().max(HEADER_HEIGHT + TRACK_HEIGHT);
-
         egui::Frame::canvas(ui.style()).show(ui, |ui| {
-            ScrollArea::vertical().show(ui, |ui| {
-                let tracks = self.visible_tracks();
-                let tracks_height = tracks.len() as f32 * (TRACK_HEIGHT + TRACK_GAP);
-                let content_height = (HEADER_HEIGHT + tracks_height).max(available_height);
-                let desired_size = vec2(ui.available_width(), content_height);
-                let (canvas, response) =
-                    ui.allocate_exact_size(desired_size, Sense::click_and_drag());
+            let min_height =
+                HEADER_HEIGHT + TRACK_HEIGHT + VIEWPORT_SCROLLBAR_GAP + VIEWPORT_SCROLLBAR_HEIGHT;
+            let desired_size = vec2(ui.available_width(), ui.available_height().max(min_height));
+            let (timeline_rect, _) = ui.allocate_exact_size(desired_size, Sense::hover());
+            let scrollbar_top = timeline_rect.bottom() - VIEWPORT_SCROLLBAR_HEIGHT;
+            let track_viewport_rect = Rect::from_min_max(
+                timeline_rect.min,
+                pos2(
+                    timeline_rect.right(),
+                    scrollbar_top - VIEWPORT_SCROLLBAR_GAP,
+                ),
+            );
+            let mut track_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .id_salt("timeline_tracks")
+                    .max_rect(track_viewport_rect),
+            );
+            let scroll_output = ScrollArea::vertical()
+                .max_height(track_viewport_rect.height())
+                .show(&mut track_ui, |ui| {
+                    if self.tracks_dirty {
+                        self.visible_tracks = self.build_visible_tracks();
+                        self.tracks_dirty = false;
+                    }
+                    let tracks = std::mem::take(&mut self.visible_tracks);
+                    let tracks_height = tracks.len() as f32 * (TRACK_HEIGHT + TRACK_GAP);
+                    let available_height = ui.available_height().max(HEADER_HEIGHT + TRACK_HEIGHT);
+                    let content_height = (HEADER_HEIGHT + tracks_height).max(available_height);
+                    let desired_size = vec2(ui.available_width(), content_height);
+                    let (canvas, response) =
+                        ui.allocate_exact_size(desired_size, Sense::click_and_drag());
 
-                let max_tree_width = (canvas.width() * 0.6).min(MAX_TREE_WIDTH);
-                self.tree_width = self
-                    .tree_width
-                    .clamp(MIN_TREE_WIDTH.min(max_tree_width), max_tree_width);
+                    let max_tree_width = (canvas.width() * 0.6).min(MAX_TREE_WIDTH);
+                    self.tree_width = self
+                        .tree_width
+                        .clamp(MIN_TREE_WIDTH.min(max_tree_width), max_tree_width);
 
-                let initial_separator_x = canvas.left() + self.tree_width;
-                let splitter_rect = Rect::from_min_max(
-                    pos2(initial_separator_x - 4.0, canvas.top()),
-                    pos2(initial_separator_x + 4.0, canvas.bottom()),
-                );
-                let splitter_response = ui
-                    .interact(
-                        splitter_rect,
-                        ui.id().with("timeline_tree_splitter"),
-                        Sense::click_and_drag(),
-                    )
-                    .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
-                if splitter_response.dragged() {
-                    self.tree_width = (self.tree_width
-                        + ui.ctx().input(|input| input.pointer.delta().x))
-                    .clamp(MIN_TREE_WIDTH, max_tree_width);
-                }
-                if splitter_response.double_clicked() {
-                    self.tree_width = preferred_tree_width(&self.animation_infos)
-                        .clamp(MIN_TREE_WIDTH, max_tree_width);
-                }
-
-                let tree_rect = Rect::from_min_max(
-                    canvas.min,
-                    pos2(
-                        (canvas.left() + self.tree_width).min(canvas.right()),
-                        canvas.bottom(),
-                    ),
-                );
-                let time_rect =
-                    Rect::from_min_max(pos2(tree_rect.right(), canvas.top()), canvas.max);
-
-                self.interact_timeline(ui, &response, time_rect);
-                self.paint_timeline(ui, canvas, tree_rect, time_rect, &tracks);
-                if splitter_response.hovered() || splitter_response.dragged() {
-                    ui.painter().line_segment(
-                        [
-                            pos2(tree_rect.right(), canvas.top()),
-                            pos2(tree_rect.right(), canvas.bottom()),
-                        ],
-                        Stroke::new(2.0, ui.visuals().selection.stroke.color),
+                    let initial_separator_x = canvas.left() + self.tree_width;
+                    let splitter_rect = Rect::from_min_max(
+                        pos2(initial_separator_x - 4.0, canvas.top()),
+                        pos2(initial_separator_x + 4.0, canvas.bottom()),
                     );
-                }
-            });
+                    let splitter_response = ui
+                        .interact(
+                            splitter_rect,
+                            ui.id().with("timeline_tree_splitter"),
+                            Sense::click_and_drag(),
+                        )
+                        .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+                    if splitter_response.dragged() {
+                        self.tree_width = (self.tree_width
+                            + ui.ctx().input(|input| input.pointer.delta().x))
+                        .clamp(MIN_TREE_WIDTH, max_tree_width);
+                    }
+                    if splitter_response.double_clicked() {
+                        self.tree_width = preferred_tree_width(&self.animation_infos)
+                            .clamp(MIN_TREE_WIDTH, max_tree_width);
+                    }
+
+                    let tree_rect = Rect::from_min_max(
+                        canvas.min,
+                        pos2(
+                            (canvas.left() + self.tree_width).min(canvas.right()),
+                            canvas.bottom(),
+                        ),
+                    );
+                    let time_rect =
+                        Rect::from_min_max(pos2(tree_rect.right(), canvas.top()), canvas.max);
+
+                    self.interact_timeline(ui, &response, time_rect);
+                    self.paint_timeline(ui, canvas, tree_rect, time_rect, &tracks);
+                    if splitter_response.hovered() || splitter_response.dragged() {
+                        ui.painter().line_segment(
+                            [
+                                pos2(tree_rect.right(), canvas.top()),
+                                pos2(tree_rect.right(), canvas.bottom()),
+                            ],
+                            Stroke::new(2.0, ui.visuals().selection.stroke.color),
+                        );
+                    }
+
+                    if !self.tracks_dirty {
+                        self.visible_tracks = tracks;
+                    }
+                });
+
+            let scrollbar_rect = Rect::from_min_max(
+                pos2(timeline_rect.left(), scrollbar_top),
+                pos2(scroll_output.inner_rect.right(), timeline_rect.bottom()),
+            );
+            self.ui_viewport_scrollbar(ui, scrollbar_rect);
         });
     }
 
-    fn visible_tracks(&self) -> Vec<VisibleTrack> {
+    fn ui_viewport_scrollbar(&mut self, ui: &Ui, rect: Rect) {
+        let visuals = ui.visuals();
+        let painter = ui.painter_at(rect);
+        let tree_right = (rect.left() + self.tree_width).min(rect.right());
+
+        painter.rect_filled(rect, 0.0, visuals.panel_fill);
+        painter.line_segment(
+            [
+                pos2(rect.left(), rect.top()),
+                pos2(rect.right(), rect.top()),
+            ],
+            Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color),
+        );
+        painter.line_segment(
+            [
+                pos2(tree_right, rect.top()),
+                pos2(tree_right, rect.bottom()),
+            ],
+            Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color),
+        );
+
+        let time_rect = Rect::from_min_max(pos2(tree_right, rect.top()), rect.max);
+        let track_rect = time_rect.shrink2(vec2(6.0, 3.0));
+        if track_rect.width() <= 0.0 {
+            return;
+        }
+
+        painter.rect_filled(track_rect, CornerRadius::same(3), visuals.extreme_bg_color);
+
+        let total_sec = self.total_sec.max(MIN_VISIBLE_SECS);
+        let max_offset = (self.total_sec - self.width_sec).max(0.0);
+        let visible_ratio = (self.width_sec / total_sec).clamp(0.0, 1.0) as f32;
+        let thumb_width = (track_rect.width() * visible_ratio)
+            .max(MIN_VIEWPORT_THUMB_WIDTH.min(track_rect.width()))
+            .min(track_rect.width());
+        let thumb_travel = (track_rect.width() - thumb_width).max(0.0);
+        let offset_ratio = if max_offset > 0.0 {
+            (self.offset_sec / max_offset).clamp(0.0, 1.0) as f32
+        } else {
+            0.0
+        };
+        let thumb_left = track_rect.left() + thumb_travel * offset_ratio;
+        let thumb_rect = Rect::from_min_size(
+            pos2(thumb_left, track_rect.top()),
+            vec2(thumb_width, track_rect.height()),
+        );
+
+        let thumb_response = ui
+            .interact(
+                Rect::from_min_max(
+                    pos2(thumb_rect.left(), time_rect.top()),
+                    pos2(thumb_rect.right(), time_rect.bottom()),
+                ),
+                ui.id().with("timeline_viewport_thumb"),
+                Sense::click_and_drag(),
+            )
+            .on_hover_cursor(egui::CursorIcon::ResizeHorizontal)
+            .on_hover_text(format!(
+                "{} - {}",
+                format_time(self.offset_sec),
+                format_time(self.offset_sec + self.width_sec)
+            ));
+
+        if thumb_response.dragged() && thumb_travel > 0.0 {
+            let delta_x = ui.ctx().input(|input| input.pointer.delta().x);
+            self.offset_sec += delta_x as f64 / thumb_travel as f64 * max_offset;
+            self.clamp_viewport();
+        }
+
+        if thumb_travel > 0.0 {
+            let left_response = ui.interact(
+                Rect::from_min_max(time_rect.min, pos2(thumb_rect.left(), time_rect.bottom())),
+                ui.id().with("timeline_viewport_track_left"),
+                Sense::click(),
+            );
+            let right_response = ui.interact(
+                Rect::from_min_max(pos2(thumb_rect.right(), time_rect.top()), time_rect.max),
+                ui.id().with("timeline_viewport_track_right"),
+                Sense::click(),
+            );
+            if let Some(pointer_pos) = left_response
+                .interact_pointer_pos()
+                .filter(|_| left_response.clicked())
+                .or_else(|| {
+                    right_response
+                        .interact_pointer_pos()
+                        .filter(|_| right_response.clicked())
+                })
+            {
+                let thumb_center =
+                    (pointer_pos.x - track_rect.left() - thumb_width * 0.5) / thumb_travel;
+                self.offset_sec = thumb_center.clamp(0.0, 1.0) as f64 * max_offset;
+                self.clamp_viewport();
+            }
+        }
+
+        let thumb_color = if thumb_response.dragged() || thumb_response.hovered() {
+            visuals.widgets.hovered.bg_fill
+        } else {
+            visuals.widgets.inactive.bg_fill
+        };
+        painter.rect_filled(thumb_rect, CornerRadius::same(3), thumb_color);
+        painter.line_segment(
+            [thumb_rect.left_top(), thumb_rect.right_top()],
+            Stroke::new(1.0, Color32::WHITE.gamma_multiply(0.18)),
+        );
+
+        if self.total_sec > 0.0 {
+            let playhead_ratio = (self.current_sec / self.total_sec).clamp(0.0, 1.0) as f32;
+            let playhead_x = track_rect.left() + track_rect.width() * playhead_ratio;
+            painter.line_segment(
+                [
+                    pos2(playhead_x, track_rect.top() - 1.0),
+                    pos2(playhead_x, track_rect.bottom() + 1.0),
+                ],
+                Stroke::new(1.5, visuals.selection.stroke.color),
+            );
+        }
+    }
+
+    fn build_visible_tracks(&self) -> Vec<VisibleTrack> {
         let mut tracks = Vec::new();
         let mut path = Vec::new();
         for (index, info) in self.animation_infos.iter().enumerate() {
@@ -247,6 +407,10 @@ impl TimelineState {
                 Rect::from_min_max(track_rect.min, pos2(tree_rect.right(), track_rect.bottom()));
             let time_track_rect =
                 Rect::from_min_max(pos2(time_rect.left(), track_rect.top()), track_rect.max);
+
+            if !track_rect.intersects(painter.clip_rect()) {
+                continue;
+            }
 
             if track_index % 2 == 1 {
                 painter.rect_filled(track_rect, 0.0, visuals.faint_bg_color);
@@ -409,6 +573,7 @@ impl TimelineState {
             );
             if toggle_response.clicked() {
                 toggle_path(&mut self.expanded, &track.path);
+                self.tracks_dirty = true;
             }
         }
     }
@@ -465,11 +630,13 @@ impl TimelineState {
         track: &VisibleTrack,
         font_id: &FontId,
     ) {
-        for clip in &track.clips {
-            let info = animation_info_at_path(&self.animation_infos, &clip.path);
+        let mut clip_index = 0;
+        while clip_index < track.clips.len() {
+            let clip = &track.clips[clip_index];
             let start_x = self.x_from_sec(track_rect, clip.global_range.start);
             let end_x = self.x_from_sec(track_rect, clip.global_range.end);
             if track_rect.right() < start_x || end_x < track_rect.left() {
+                clip_index += 1;
                 continue;
             }
 
@@ -482,6 +649,69 @@ impl TimelineState {
             } else {
                 end_x.min(track_rect.right()).max(visible_start + 1.0)
             };
+
+            if visible_end - visible_start < MIN_INTERACTIVE_CLIP_WIDTH {
+                let run_start_index = clip_index;
+                let run_start_sec = clip.global_range.start;
+                let mut run_end_sec = clip.global_range.end;
+                let mut run_end_x = visible_end;
+                let mut run_inset = nested_inset;
+                let mut run_selected = self.selected.as_ref() == Some(&clip.path);
+                clip_index += 1;
+
+                while let Some(next) = track.clips.get(clip_index) {
+                    let next_start_x = self.x_from_sec(track_rect, next.global_range.start);
+                    let next_end_x = self.x_from_sec(track_rect, next.global_range.end);
+                    if next_start_x > track_rect.right() || next_start_x > run_end_x + 1.0 {
+                        break;
+                    }
+
+                    let next_zero_duration =
+                        (next.global_range.end - next.global_range.start).abs() < f64::EPSILON;
+                    let next_visible_start = next_start_x.max(track_rect.left());
+                    let next_visible_end = if next_zero_duration {
+                        (next_start_x + 4.0).min(track_rect.right())
+                    } else {
+                        next_end_x
+                            .min(track_rect.right())
+                            .max(next_visible_start + 1.0)
+                    };
+                    if next_visible_end - next_visible_start >= MIN_INTERACTIVE_CLIP_WIDTH {
+                        break;
+                    }
+
+                    run_end_sec = next.global_range.end;
+                    run_end_x = run_end_x.max(next_visible_end);
+                    run_inset = run_inset.max((5.0 + next.sequence_depth as f32 * 1.5).min(9.0));
+                    run_selected |= self.selected.as_ref() == Some(&next.path);
+                    clip_index += 1;
+                }
+
+                let run_rect = Rect::from_min_max(
+                    pos2(visible_start, track_rect.top() + run_inset),
+                    pos2(run_end_x, track_rect.bottom() - run_inset),
+                );
+                let run_len = clip_index - run_start_index;
+                let response = ui
+                    .interact(
+                        run_rect.expand2(vec2(2.0, 3.0)),
+                        ui.id()
+                            .with(("animation_clip_cluster", &track.path, run_start_index)),
+                        Sense::click(),
+                    )
+                    .on_hover_text(format!(
+                        "{run_len} animations\n{} - {}",
+                        format_time(run_start_sec),
+                        format_time(run_end_sec)
+                    ));
+                self.paint_dense_clip_run(painter, run_rect, run_selected, response.hovered());
+                if response.clicked() {
+                    self.selected = Some(track.path.clone());
+                }
+                continue;
+            }
+
+            let info = animation_info_at_path(&self.animation_infos, &clip.path);
             let clip_rect = Rect::from_min_max(
                 pos2(visible_start, track_rect.top() + nested_inset),
                 pos2(visible_end, track_rect.bottom() - nested_inset),
@@ -542,9 +772,42 @@ impl TimelineState {
                 );
                 if toggle_response.clicked() {
                     toggle_path(&mut self.expanded, &clip.path);
+                    self.tracks_dirty = true;
                 }
             }
+            clip_index += 1;
         }
+    }
+
+    fn paint_dense_clip_run(
+        &self,
+        painter: &egui::Painter,
+        rect: Rect,
+        selected: bool,
+        hovered: bool,
+    ) {
+        let mut color = animation_color(AnimationInfoKind::Sequence).gamma_multiply(0.78);
+        if hovered {
+            color = color.gamma_multiply(1.15);
+        }
+        let border = if selected {
+            painter
+                .ctx()
+                .style_of(egui::Theme::Dark)
+                .visuals
+                .selection
+                .stroke
+                .color
+        } else {
+            color.gamma_multiply(0.72)
+        };
+        painter.rect_filled(rect, CornerRadius::same(3), border);
+        let inner = rect.shrink(if selected { 2.0 } else { 1.0 });
+        painter.rect_filled(inner, CornerRadius::same(2), color);
+        painter.line_segment(
+            [inner.left_top(), inner.right_top()],
+            Stroke::new(1.0, Color32::WHITE.gamma_multiply(0.22)),
+        );
     }
 
     #[allow(clippy::too_many_arguments)]

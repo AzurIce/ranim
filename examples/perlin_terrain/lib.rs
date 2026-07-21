@@ -201,19 +201,12 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
     )
     .with_fill_by_z(&colorscale);
 
-    let mut camera_sequence = AnimSequence::new();
-    camera_sequence.push(
-        cam.orbit(DVec3::ZERO, 2.0)
-            .with_duration(5.0)
-            .with_rate_func(linear),
-    );
-
-    let mut terrain_sequence = AnimSequence::new();
-    terrain_sequence
-        .push(terrain.show())
-        .hold_to(camera_sequence.cursor_sec());
-    r.play(camera_sequence);
-    r.play(terrain_sequence);
+    let camera = cam
+        .orbit(DVec3::ZERO, 2.0)
+        .with_duration(5.0)
+        .with_rate_func(linear);
+    r.play(camera);
+    r.play(terrain.show().with_duration(5.0));
 }
 
 // --- Scenes ---

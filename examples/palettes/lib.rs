@@ -48,13 +48,7 @@ fn palettes(r: &mut RanimScene) {
         })
         .collect::<Vec<_>>();
     let total_secs = 0.01;
-    let mut content = AnimSequence::new();
-    content.push(squares.show()).hold_to(total_secs);
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(total_secs);
-    r.play(camera);
-    r.play(content);
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(squares.show().with_duration(total_secs));
     r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
 }

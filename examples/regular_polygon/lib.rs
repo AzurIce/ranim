@@ -97,10 +97,10 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .collect::<Vec<_>>();
     content.push(ranim_anims::lagged::Lagged::new(0.2, collapse).with_duration(1.0));
 
-    let mut camera = AnimSequence::new();
-    camera
-        .push(CameraFrame::default().show())
-        .hold_to(content.cursor_sec());
-    r.play(camera);
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
     r.play(content);
 }

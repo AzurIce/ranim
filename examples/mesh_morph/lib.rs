@@ -6,7 +6,7 @@ use ranim::{
     glam::{DVec3, Vec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
-    utils::rate_functions::linear,
+    utils::rate_functions::{linear, smooth},
 };
 
 /// Comprehensive mesh morphing demo: sphere -> torus -> disc -> sphere
@@ -40,23 +40,31 @@ fn mesh_morph(r: &mut RanimScene) {
         .with_resolution((50, 30));
     let sphere_red = surface_to_mesh(Surface::from(sphere_red_surface));
 
-    let mut mesh_sequence = AnimSequence::new();
-    mesh_sequence
-        .push(sphere.morph_to(torus.clone()).with_duration(2.5))
-        .hold(0.5)
-        .push(torus.morph_to(disc.clone()).with_duration(2.5));
-    mesh_sequence
-        .hold(0.5)
-        .push(disc.morph_to(sphere_red).with_duration(2.5));
-
-    let mut camera_sequence = AnimSequence::new();
-    camera_sequence.push(
-        cam.orbit(DVec3::ZERO, 2.0)
-            .with_duration(9.0)
-            .with_rate_func(linear),
+    let mut mesh_sequence = seq![
+        sphere
+            .morph_to(torus.clone())
+            .with_duration(2.5)
+            .with_rate_func(smooth)
+    ];
+    mesh_sequence.hold(0.5).push(
+        torus
+            .morph_to(disc.clone())
+            .with_duration(2.5)
+            .with_rate_func(smooth),
     );
-    mesh_sequence.hold_to(camera_sequence.cursor_sec());
-    r.play(camera_sequence);
+    mesh_sequence.hold(0.5).push(
+        disc.morph_to(sphere_red)
+            .with_duration(2.5)
+            .with_rate_func(smooth),
+    );
+
+    let total_secs = 9.0;
+    let camera = cam
+        .orbit(DVec3::ZERO, 2.0)
+        .with_duration(total_secs)
+        .with_rate_func(linear);
+    mesh_sequence.hold_to(total_secs);
+    r.play(camera);
     r.play(mesh_sequence);
 
     // Add preview captures at key moments

@@ -5,6 +5,7 @@ use ranim::{
     color::palettes::manim,
     glam::{DVec3, usizevec3},
     prelude::*,
+    utils::rate_functions::smooth,
 };
 use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
@@ -47,16 +48,16 @@ fn animating_pi(r: &mut RanimScene) {
         .scale_to(ScaleHint::PorportionalY(TAU - 0.25))
         .move_to(DVec3::ZERO);
 
-    let mut content = AnimSequence::new();
+    let mut content = seq![vitems.clone().show()];
     content
-        .push(vitems.clone().show())
         .hold(1.0)
         .push(
             vitems
                 .morph(|x| {
                     x.apply_complex_map(|c| c.exp());
                 })
-                .with_duration(5.0),
+                .with_duration(5.0)
+                .with_rate_func(smooth),
         )
         .hold(1.0)
         .push(
@@ -67,13 +68,12 @@ fn animating_pi(r: &mut RanimScene) {
                         p.y += 0.5 * p.x.cos();
                     });
                 })
-                .with_duration(5.0),
+                .with_duration(5.0)
+                .with_rate_func(smooth),
         )
         .hold(1.0);
 
-    let mut camera = AnimSequence::new();
-    camera.push(cam.show()).hold_to(content.cursor_sec());
-    r.play(camera);
+    r.play(cam.show().with_duration(content.cursor_sec()));
     r.play(content);
     r.insert_time_mark(5.0, TimeMark::Capture("preview.png".to_string()));
 }
