@@ -50,8 +50,7 @@ fn text_item(r: &mut RanimScene) {
 
     let total_secs = text_sequence.cursor_sec().max(box_sequence.cursor_sec());
     r.play(CameraFrame::default().show().with_duration(total_secs));
-    r.play(text_sequence);
-    r.play(box_sequence);
+    r.play(stack![text_sequence, box_sequence]);
 
     r.insert_time_mark(
         total_secs / 2.0,

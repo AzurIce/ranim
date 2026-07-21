@@ -48,6 +48,5 @@ fn getting_started2(r: &mut RanimScene) {
 
     let total_secs = item_sequence.cursor_sec().max(rect_sequence.cursor_sec());
     r.play(CameraFrame::default().show().with_duration(total_secs));
-    r.play(rect_sequence);
-    r.play(item_sequence);
+    r.play(stack![rect_sequence, item_sequence]);
 }

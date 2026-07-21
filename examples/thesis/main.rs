@@ -48,8 +48,10 @@ fn fading(r: &mut RanimScene) {
     });
     let duration = 1.0;
     r.play(CameraFrame::default().show().with_duration(duration));
-    r.play(pentagon_in.fade_in().with_rate_func(smooth));
-    r.play(pentagon_out.fade_out().with_rate_func(smooth));
+    r.play(stack![
+        pentagon_in.fade_in().with_rate_func(smooth),
+        pentagon_out.fade_out().with_rate_func(smooth),
+    ]);
 }
 
 #[allow(unused)]
@@ -63,8 +65,10 @@ fn creation(r: &mut RanimScene) {
     });
     let duration = 1.0;
     r.play(CameraFrame::default().show().with_duration(duration));
-    r.play(pentagon_in.create().with_rate_func(smooth));
-    r.play(pentagon_out.uncreate().with_rate_func(smooth));
+    r.play(stack![
+        pentagon_in.create().with_rate_func(smooth),
+        pentagon_out.uncreate().with_rate_func(smooth),
+    ]);
 }
 
 #[allow(unused)]
@@ -79,8 +83,10 @@ fn writing(r: &mut RanimScene) {
     });
     let duration = 1.0;
     r.play(CameraFrame::default().show().with_duration(duration));
-    r.play(pentagon_in.write().with_rate_func(smooth));
-    r.play(pentagon_out.unwrite().with_rate_func(smooth));
+    r.play(stack![
+        pentagon_in.write().with_rate_func(smooth),
+        pentagon_out.unwrite().with_rate_func(smooth),
+    ]);
 }
 
 #[allow(unused)]

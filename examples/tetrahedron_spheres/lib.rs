@@ -57,9 +57,9 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     let resolution = (31, 16);
     let x_offset = 3.5;
 
-    let mut content = AnimStack::new();
+    let mut left_group = AnimStack::new();
 
-    // Left group: flat shading (normals zeroed out)
+    // Left group: smooth shading (analytical normals from Sphere)
     let left_center = DVec3::new(-x_offset, 0.0, 0.0);
     for (vertex, color) in vertices.iter().zip(colors.iter()) {
         let mut surface = Surface::from(
@@ -70,7 +70,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         .with_smooth_normals()
         .with_transform(DMat4::from_translation(left_center + *vertex));
 
-        content.push(
+        left_group.push(
             RotateAroundZ {
                 src: surface.clone(),
                 group_center: left_center,
@@ -83,8 +83,9 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         );
     }
 
-    // Right group: smooth shading (analytical normals from Sphere)
+    // Right group: flat shading (normals zeroed out)
     let right_center = DVec3::new(x_offset, 0.0, 0.0);
+    let mut right_group = AnimStack::new();
     for (vertex, color) in vertices.iter().zip(colors.iter()) {
         let mut surface = Surface::from(
             Sphere::new(radius)
@@ -93,7 +94,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         )
         .with_transform(DMat4::from_translation(right_center + *vertex));
 
-        content.push(
+        right_group.push(
             RotateAroundZ {
                 src: surface.clone(),
                 group_center: right_center,
@@ -106,9 +107,9 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         );
     }
 
-    let total_secs = content.duration_secs();
-    content.push(cam.show().with_duration(total_secs));
-    r.play(content);
+    let total_secs = left_group.duration_secs().max(right_group.duration_secs());
+    r.play(cam.show().with_duration(total_secs));
+    r.play(stack![left_group, right_group]);
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

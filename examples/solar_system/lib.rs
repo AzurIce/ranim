@@ -10,50 +10,57 @@ use ranim::{
 use ranim_anims::fading::FadingAnim;
 use ranim_items::vitem::{VItem, text::TextItem};
 
-// Custom animation: orbital motion around the origin in the XY plane
-struct OrbitMotion {
-    src: Surface,
+const INTRO_SECS: f64 = 2.0;
+const LABEL_DELAY_SECS: f64 = 1.0;
+const LABEL_FADE_SECS: f64 = 1.0;
+const ORBIT_SECS: f64 = 10.0;
+const TOTAL_SECS: f64 = INTRO_SECS + ORBIT_SECS;
+
+/// Something that can be positioned on an orbit.
+///
+/// The same orbital evaluator can therefore animate both mesh surfaces and
+/// vector-item groups without erasing either output type.
+trait OrbitItem: Clone {
+    fn set_orbit_position(&mut self, position: DVec3);
+}
+
+impl OrbitItem for Surface {
+    fn set_orbit_position(&mut self, position: DVec3) {
+        self.transform = DMat4::from_translation(position);
+    }
+}
+
+impl OrbitItem for Vec<VItem> {
+    fn set_orbit_position(&mut self, position: DVec3) {
+        self.move_to(position);
+    }
+}
+
+/// A reusable orbital evaluator whose output keeps its concrete item type.
+struct OrbitMotion<T> {
+    src: T,
     orbit_radius: f64,
     initial_angle: f64,
     total_angle: f64,
+    z: f64,
 }
 
-impl Eval for OrbitMotion {
-    type Output = Surface;
+impl<T: OrbitItem> Eval for OrbitMotion<T> {
+    type Output = T;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let angle = self.initial_angle + self.total_angle * alpha;
-        let x = self.orbit_radius * angle.cos();
-        let y = self.orbit_radius * angle.sin();
+        let position = DVec3::new(
+            self.orbit_radius * angle.cos(),
+            self.orbit_radius * angle.sin(),
+            self.z,
+        );
         let mut result = self.src.clone();
-        result.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
+        result.set_orbit_position(position);
         result
     }
 }
 
-// Custom animation: orbital motion for text labels (simple version)
-struct LabelOrbitMotion {
-    src: Vec<VItem>,
-    orbit_radius: f64,
-    initial_angle: f64,
-    total_angle: f64,
-    z_offset: f64,
-}
-
-impl Eval for LabelOrbitMotion {
-    type Output = Vec<VItem>;
-
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
-        let angle = self.initial_angle + self.total_angle * alpha;
-        let x = self.orbit_radius * angle.cos();
-        let y = self.orbit_radius * angle.sin();
-        let mut result = self.src.clone();
-        result.move_to(DVec3::new(x, y, self.z_offset));
-        result
-    }
-}
-
-// Planet data structure
 struct PlanetData {
     name: &'static str,
     radius: f64,
@@ -61,7 +68,7 @@ struct PlanetData {
     color: ranim::color::AlphaColor<ranim::color::Srgb>,
     period: f64,
     initial_angle: f64,
-    has_atmosphere: bool, // Whether the planet has a visible atmosphere
+    has_atmosphere: bool,
 }
 
 const PLANETS: &[PlanetData] = &[
@@ -72,7 +79,7 @@ const PLANETS: &[PlanetData] = &[
         color: manim::GREY_C,
         period: 2.0,
         initial_angle: 0.0,
-        has_atmosphere: false, // No atmosphere
+        has_atmosphere: false,
     },
     PlanetData {
         name: "Venus",
@@ -81,7 +88,7 @@ const PLANETS: &[PlanetData] = &[
         color: manim::GOLD_E,
         period: 3.0,
         initial_angle: PI / 4.0,
-        has_atmosphere: true, // Thick atmosphere
+        has_atmosphere: true,
     },
     PlanetData {
         name: "Earth",
@@ -90,7 +97,7 @@ const PLANETS: &[PlanetData] = &[
         color: manim::BLUE_C,
         period: 4.0,
         initial_angle: PI / 2.0,
-        has_atmosphere: true, // Atmosphere
+        has_atmosphere: true,
     },
     PlanetData {
         name: "Mars",
@@ -99,7 +106,7 @@ const PLANETS: &[PlanetData] = &[
         color: manim::RED_C,
         period: 5.0,
         initial_angle: PI,
-        has_atmosphere: false, // Thin atmosphere (negligible)
+        has_atmosphere: false,
     },
     PlanetData {
         name: "Jupiter",
@@ -108,7 +115,7 @@ const PLANETS: &[PlanetData] = &[
         color: manim::ORANGE,
         period: 8.0,
         initial_angle: 3.0 * PI / 2.0,
-        has_atmosphere: true, // Gas giant
+        has_atmosphere: true,
     },
     PlanetData {
         name: "Saturn",
@@ -117,191 +124,167 @@ const PLANETS: &[PlanetData] = &[
         color: manim::GOLD_C,
         period: 10.0,
         initial_angle: TAU / 3.0,
-        has_atmosphere: true, // Gas giant
+        has_atmosphere: true,
     },
 ];
+
+/// Build the typed orbital evaluator reused by every planet layer and label.
+fn orbit<T: OrbitItem>(item: &mut T, planet: &PlanetData, z: f64) -> OrbitMotion<T> {
+    OrbitMotion {
+        src: item.clone(),
+        orbit_radius: planet.orbit_radius,
+        initial_angle: planet.initial_angle,
+        total_angle: TAU * (ORBIT_SECS / planet.period),
+        z,
+    }
+    .apply_to(item)
+}
+
+/// One body layer: stay visible through the intro, then enter the shared orbit.
+fn body_layer(mut surface: Surface, planet: &PlanetData) -> AnimSequence {
+    seq![
+        surface.show().with_duration(INTRO_SECS),
+        orbit(&mut surface, planet, 0.0)
+            .with_duration(ORBIT_SECS)
+            .with_rate_func(linear),
+    ]
+}
+
+/// A label has its own intro phrase, followed by the same reusable orbit phase.
+fn planet_label(planet: &PlanetData, position: DVec3) -> AnimSequence {
+    let label_z = planet.radius + 0.5;
+    let label = TextItem::new(planet.name, 0.6).with(|item| {
+        item.move_to(position.with_z(label_z))
+            .with_origin(AabbPoint::CENTER, |item| {
+                item.rotate_on_x(30.0f64.to_radians()).discard()
+            })
+            .discard()
+    });
+    let mut label = Vec::<VItem>::from(label);
+
+    let mut sequence = AnimSequence::new();
+    sequence
+        .forward(LABEL_DELAY_SECS)
+        .push(
+            label
+                .fade_in()
+                .with_duration(LABEL_FADE_SECS)
+                .with_rate_func(smooth),
+        )
+        .push(
+            orbit(&mut label, planet, label_z)
+                .with_duration(ORBIT_SECS)
+                .with_rate_func(linear),
+        );
+    sequence
+}
+
+/// Build a planet as a nested stack of body layers and its label track.
+///
+/// Atmospheric planets reuse the same body-layer phrase twice; rocky planets
+/// use it once. The outer stack keeps each planet as one semantic Timeline node.
+fn planet_system(planet: &PlanetData) -> AnimStack {
+    let position = DVec3::new(
+        planet.orbit_radius * planet.initial_angle.cos(),
+        planet.orbit_radius * planet.initial_angle.sin(),
+        0.0,
+    );
+    let mut body_layers = AnimStack::new();
+
+    if planet.has_atmosphere {
+        let mut core = Surface::from(
+            Sphere::new(planet.radius * 0.9)
+                .with_resolution((20, 10))
+                .with_fill_color(planet.color.with_alpha(1.0)),
+        );
+        core.transform = DMat4::from_translation(position);
+        body_layers.push(body_layer(core, planet));
+
+        let mut atmosphere = Surface::from(
+            Sphere::new(planet.radius)
+                .with_resolution((20, 10))
+                .with_fill_color(planet.color.with_alpha(0.3)),
+        )
+        .with_smooth_normals();
+        atmosphere.transform = DMat4::from_translation(position);
+        body_layers.push(body_layer(atmosphere, planet));
+    } else {
+        let mut surface = Surface::from(
+            Sphere::new(planet.radius)
+                .with_resolution((20, 10))
+                .with_fill_color(planet.color.with_alpha(1.0)),
+        )
+        .with_smooth_normals();
+        surface.transform = DMat4::from_translation(position);
+        body_layers.push(body_layer(surface, planet));
+    }
+
+    stack![body_layers, planet_label(planet, position)]
+}
+
+/// Fade one orbit ring in, then hold its final state for the full scene.
+fn orbit_ring(planet: &PlanetData) -> AnimSequence {
+    let major_radius = planet.orbit_radius;
+    let minor_radius = 0.05;
+    let mut ring = Surface::from_uv_func(
+        move |u, v| {
+            let u_angle = u * TAU;
+            let v_angle = v * TAU;
+            DVec3::new(
+                (major_radius + minor_radius * v_angle.cos()) * u_angle.cos(),
+                (major_radius + minor_radius * v_angle.cos()) * u_angle.sin(),
+                minor_radius * v_angle.sin(),
+            )
+        },
+        (0.0, 1.0),
+        (0.0, 1.0),
+        (128, 16),
+    );
+    let color = manim::GREY_C.with_alpha(0.3);
+    ring.vertex_colors = vec![color; ring.vertices.len()];
+
+    let mut sequence = seq![ring.fade_in().with_duration(1.0).with_rate_func(smooth),];
+    sequence.hold_to(TOTAL_SECS);
+    sequence
+}
+
+fn orbit_rings() -> AnimStack {
+    let mut rings = AnimStack::new();
+    for planet in PLANETS {
+        rings.push(orbit_ring(planet));
+    }
+    rings
+}
+
+fn planetary_systems() -> AnimStack {
+    let mut planets = AnimStack::new();
+    for planet in PLANETS {
+        planets.push(planet_system(planet));
+    }
+    planets
+}
 
 #[scene]
 #[output(dir = "./output/solar_system")]
 fn solar_system(r: &mut RanimScene) {
-    // Setup camera looking down from above (top-down view)
-    let phi = 50.0f64.to_radians(); // Small angle from +Z axis (almost straight down)
+    let phi = 50.0f64.to_radians();
     let theta = -PI / 2.0;
     let distance = 60.0;
+    let mut camera = CameraFrame::from_spherical(phi, theta, distance);
+    camera.fovy = 30.0f64.to_radians();
 
-    let mut cam = CameraFrame::from_spherical(phi, theta, distance);
-    cam.fovy = 30.0f64.to_radians();
-    let total_secs = 12.0;
-    let mut content = AnimStack::new();
-
-    content.push(cam.show().with_duration(total_secs));
-
-    // Create the Sun at the origin (already visible at start)
     let sun = Surface::from(
         Sphere::new(2.0)
             .with_resolution((30, 15))
             .with_fill_color(manim::YELLOW_C.with_alpha(0.5)),
     );
-    content.push(sun.show().with_duration(total_secs));
-
-    // Orbit rings fade in (0-1s)
-    for planet in PLANETS {
-        let major_radius = planet.orbit_radius;
-        let minor_radius = 0.05;
-        let resolution = (128, 16);
-
-        let mut orbit_torus = Surface::from_uv_func(
-            |u, v| {
-                let u_angle = u * TAU;
-                let v_angle = v * TAU;
-                DVec3::new(
-                    (major_radius + minor_radius * v_angle.cos()) * u_angle.cos(),
-                    (major_radius + minor_radius * v_angle.cos()) * u_angle.sin(),
-                    minor_radius * v_angle.sin(),
-                )
-            },
-            (0.0, 1.0),
-            (0.0, 1.0),
-            resolution,
-        );
-
-        let color = manim::GREY_C.with_alpha(0.3);
-        orbit_torus.vertex_colors = vec![color; orbit_torus.vertices.len()];
-
-        let mut orbit_sequence = seq![
-            orbit_torus
-                .fade_in()
-                .with_duration(1.0)
-                .with_rate_func(smooth),
-        ];
-        orbit_sequence.hold_to(total_secs);
-        content.push(orbit_sequence);
-    }
-
-    // Timeline:
-    // t=0s:   Sun + planets visible (static)
-    // t=0-1s: Orbit rings fade in
-    // t=1-2s: All text labels fade in
-    // t=2-12s: Planets + labels start orbiting together
-
-    // Create planets (visible at start, orbit starts at t=2s)
-    for planet in PLANETS {
-        let x = planet.orbit_radius * planet.initial_angle.cos();
-        let y = planet.orbit_radius * planet.initial_angle.sin();
-
-        if planet.has_atmosphere {
-            // Planets with atmosphere: solid core + transparent atmosphere layer
-
-            // Core (solid, opaque)
-            let mut core = Surface::from(
-                Sphere::new(planet.radius * 0.9)
-                    .with_resolution((20, 10))
-                    .with_fill_color(planet.color.with_alpha(1.0)),
-            );
-            core.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
-
-            // Atmosphere (larger, semi-transparent)
-            let mut atmosphere = Surface::from(
-                Sphere::new(planet.radius)
-                    .with_resolution((20, 10))
-                    .with_fill_color(planet.color.with_alpha(0.3)),
-            )
-            .with_smooth_normals();
-            atmosphere.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
-
-            let orbit_total_angle = TAU * (10.0 / planet.period);
-
-            content.push(seq![
-                core.show().with_duration(2.0),
-                OrbitMotion {
-                    src: core.clone(),
-                    orbit_radius: planet.orbit_radius,
-                    initial_angle: planet.initial_angle,
-                    total_angle: orbit_total_angle,
-                }
-                .apply_to(&mut core)
-                .with_duration(10.0)
-                .with_rate_func(linear),
-            ]);
-
-            content.push(seq![
-                atmosphere.show().with_duration(2.0),
-                OrbitMotion {
-                    src: atmosphere.clone(),
-                    orbit_radius: planet.orbit_radius,
-                    initial_angle: planet.initial_angle,
-                    total_angle: orbit_total_angle,
-                }
-                .apply_to(&mut atmosphere)
-                .with_duration(10.0)
-                .with_rate_func(linear),
-            ]);
-        } else {
-            // Planets without atmosphere: single solid sphere
-            let mut planet_surface = Surface::from(
-                Sphere::new(planet.radius)
-                    .with_resolution((20, 10))
-                    .with_fill_color(planet.color.with_alpha(1.0)),
-            )
-            .with_smooth_normals();
-            planet_surface.transform = DMat4::from_translation(DVec3::new(x, y, 0.0));
-
-            let orbit_total_angle = TAU * (10.0 / planet.period);
-
-            content.push(seq![
-                planet_surface.show().with_duration(2.0),
-                OrbitMotion {
-                    src: planet_surface.clone(),
-                    orbit_radius: planet.orbit_radius,
-                    initial_angle: planet.initial_angle,
-                    total_angle: orbit_total_angle,
-                }
-                .apply_to(&mut planet_surface)
-                .with_duration(10.0)
-                .with_rate_func(linear),
-            ]);
-        }
-
-        // Create planet label
-        let label_z_offset = planet.radius + 0.5;
-        let label = TextItem::new(planet.name, 0.6).with(|item| {
-            item.move_to(DVec3::new(x, y, label_z_offset))
-                .with_origin(AabbPoint::CENTER, |x| {
-                    x.rotate_on_x(30.0f64.to_radians()).discard()
-                })
-                .discard()
-        });
-
-        let mut label_vitems = Vec::<VItem>::from(label);
-
-        let mut label_sequence = AnimSequence::new();
-        label_sequence.forward(1.0).push(
-            label_vitems
-                .clone()
-                .fade_in()
-                .with_duration(1.0)
-                .with_rate_func(smooth),
-        );
-
-        // Labels orbit together with planets (starts at t=2s, runs for 10s)
-        let orbit_total_angle = TAU * (10.0 / planet.period);
-        label_sequence.push(
-            LabelOrbitMotion {
-                src: label_vitems.clone(),
-                orbit_radius: planet.orbit_radius,
-                initial_angle: planet.initial_angle,
-                total_angle: orbit_total_angle,
-                z_offset: label_z_offset,
-            }
-            .apply_to(&mut label_vitems)
-            .with_duration(10.0)
-            .with_rate_func(linear),
-        );
-        content.push(label_sequence);
-    }
-
-    r.play(content);
-
-    // Capture preview at the midpoint
-    r.insert_time_mark(6.0, TimeMark::Capture("preview.png".to_string()));
+    // Stack -> Stack -> Sequence: orbit rings and reusable planet systems
+    // remain visible as semantic groups in the preview Timeline.
+    r.play(camera.show().with_duration(TOTAL_SECS));
+    r.play(stack![
+        sun.show().with_duration(TOTAL_SECS),
+        orbit_rings(),
+        planetary_systems(),
+    ]);
+    r.insert_time_mark(6.0, TimeMark::Capture("preview.png".to_owned()));
 }

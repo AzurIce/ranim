@@ -186,14 +186,20 @@ impl Eval for RecompileTimerEval {
     }
 }
 
-fn add_common_layers(r: &mut RanimScene) {
+fn timer_label() -> impl Animation {
     let mut label = TypstText::new("ELAPSED TIME");
     label
         .scale_to(ScaleHint::PorportionalY(0.32))
         .move_to(DVec3::Y * 2.0)
         .set_fill_color(manim::GREY_B);
 
-    r.play(label.show().with_duration(DURATION_SECS));
+    label.show().with_duration(DURATION_SECS)
+}
+
+#[scene(clear_color = "#080a10")]
+#[output(fps = 60, dir = "./output/typst_timer")]
+fn typst_timer_atlas(r: &mut RanimScene) {
+    let atlas = Arc::new(GlyphAtlas::new());
     r.play(
         CameraFrame {
             frame_height: 5.0,
@@ -202,32 +208,35 @@ fn add_common_layers(r: &mut RanimScene) {
         .show()
         .with_duration(DURATION_SECS),
     );
-    r.insert_time_mark(3.456, TimeMark::Capture("preview.png".to_string()));
-}
-
-#[scene(clear_color = "#080a10")]
-#[output(fps = 60, dir = "./output/typst_timer")]
-fn typst_timer_atlas(r: &mut RanimScene) {
-    let atlas = Arc::new(GlyphAtlas::new());
-    r.play(
+    r.play(stack![
         AtlasTimerEval { atlas }
             .with_duration(DURATION_SECS)
             .with_rate_func(linear),
-    );
-    add_common_layers(r);
+        timer_label(),
+    ]);
+    r.insert_time_mark(3.456, TimeMark::Capture("preview.png".to_string()));
 }
 
 #[scene(clear_color = "#080a10")]
 #[output(fps = 60, dir = "./output/typst_timer")]
 fn typst_timer_recompile(r: &mut RanimScene) {
     r.play(
+        CameraFrame {
+            frame_height: 5.0,
+            ..Default::default()
+        }
+        .show()
+        .with_duration(DURATION_SECS),
+    );
+    r.play(stack![
         RecompileTimerEval {
             glyph_scale: timer_glyph_scale(),
         }
         .with_duration(DURATION_SECS)
         .with_rate_func(linear),
-    );
-    add_common_layers(r);
+        timer_label(),
+    ]);
+    r.insert_time_mark(3.456, TimeMark::Capture("preview.png".to_string()));
 }
 
 #[test]

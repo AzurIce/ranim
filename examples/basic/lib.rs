@@ -53,10 +53,7 @@ fn basic(r: &mut RanimScene) {
 
     let total_secs = svg_sequence.cursor_sec().max(text_sequence.cursor_sec());
     r.play(CameraFrame::default().show().with_duration(total_secs));
-
-    r.play(svg_sequence);
-
-    r.play(text_sequence);
+    r.play(stack![svg_sequence, text_sequence]);
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

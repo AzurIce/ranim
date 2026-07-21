@@ -71,12 +71,12 @@ fn perspective_blend(r: &mut RanimScene) {
         }),
     ];
 
-    let mut content = AnimStack::new();
+    let mut cube_assembly = AnimStack::new();
     square_faces
         .iter_mut()
         .zip(transform_fns)
         .for_each(|(face, transform_fn)| {
-            content.push(face.morph(transform_fn).with_rate_func(linear));
+            cube_assembly.push(face.morph(transform_fn).with_rate_func(linear));
         });
 
     let mut faces = square_faces.to_vec();
@@ -95,9 +95,9 @@ fn perspective_blend(r: &mut RanimScene) {
             .with_duration(4.0)
             .with_rate_func(smooth),
     );
-    content.push(faces_sequence);
-
-    let total_secs = content.duration_secs();
+    let total_secs = cube_assembly
+        .duration_secs()
+        .max(faces_sequence.duration_secs());
     let mut camera = AnimSequence::new();
     camera
         .push(cam.show())
@@ -110,7 +110,7 @@ fn perspective_blend(r: &mut RanimScene) {
             .with_rate_func(smooth),
         )
         .hold_to(total_secs);
-    content.push(camera);
-    r.play(content);
+    r.play(camera);
+    r.play(stack![cube_assembly, faces_sequence]);
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

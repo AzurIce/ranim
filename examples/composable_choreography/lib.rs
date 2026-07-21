@@ -116,10 +116,8 @@ fn composable_choreography(r: &mut RanimScene) {
     show.hold(0.4).push(finale);
 
     let duration_secs = show.duration_secs();
-    r.play(stack![
-        CameraFrame::default().show().with_duration(duration_secs),
-        show,
-    ]);
+    r.play(CameraFrame::default().show().with_duration(duration_secs));
+    r.play(show);
     r.insert_time_mark(
         duration_secs * 0.5,
         TimeMark::Capture("preview.png".to_owned()),

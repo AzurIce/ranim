@@ -149,8 +149,10 @@ fn typst_behavior(r: &mut RanimScene) {
     let total_secs = morph_sequence.cursor_sec();
 
     r.play(CameraFrame::default().show().with_duration(total_secs));
-    r.play(stack![matrix.show(), title.show()].with_duration(total_secs));
-    r.play(morph_sequence);
+    r.play(stack![
+        stack![matrix.show(), title.show()].with_duration(total_secs),
+        morph_sequence,
+    ]);
     r.insert_time_mark(0.25, TimeMark::Capture("preview-behavior.png".to_owned()));
 }
 
@@ -232,7 +234,11 @@ cell [{:02}, {:02}] office affine ffi 0123456789
                 .with_rate_func(smooth),
         )
         .hold(0.5);
-    r.play(CameraFrame::default().show().with_duration(content.cursor_sec()));
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
     r.play(content);
     r.insert_time_mark(0.25, TimeMark::Capture("preview-pressure.png".to_owned()));
 }

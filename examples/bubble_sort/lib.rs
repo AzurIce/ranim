@@ -103,7 +103,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
     for (sequence, _) in rects {
         content.push(sequence);
     }
-    content.push(CameraFrame::default().show().with_duration(total_secs));
+    r.play(CameraFrame::default().show().with_duration(total_secs));
     r.play(content);
 
     r.insert_time_mark(total_secs, TimeMark::Capture(format!("preview-{num}.png")));

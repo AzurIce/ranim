@@ -118,9 +118,8 @@ fn hanoi(r: &mut RanimScene, n: usize) {
         }
     }
     let total_secs = content.duration_secs();
-    content.push(rods.show().with_duration(total_secs));
-    content.push(CameraFrame::default().show().with_duration(total_secs));
-    r.play(content);
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(stack![content, rods.show().with_duration(total_secs)]);
 }
 
 #[scene]

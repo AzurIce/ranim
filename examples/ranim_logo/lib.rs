@@ -166,7 +166,6 @@ fn ranim_logo(r: &mut RanimScene) {
     for (sequence, _) in logo_parts {
         content.push(sequence);
     }
-    content.push(text_sequence);
-    content.push(CameraFrame::default().show().with_duration(total_secs));
-    r.play(content);
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(stack![content, text_sequence]);
 }

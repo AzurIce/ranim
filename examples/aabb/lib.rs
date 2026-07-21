@@ -175,7 +175,7 @@ fn aabb(r: &mut RanimScene) {
     }
 
     let total_secs = content.duration_secs();
-    content.push(CameraFrame::default().show().with_duration(total_secs));
+    r.play(CameraFrame::default().show().with_duration(total_secs));
     r.play(content);
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));

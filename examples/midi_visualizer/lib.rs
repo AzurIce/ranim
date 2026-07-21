@@ -16,34 +16,35 @@ use visual::{
     make_background,
 };
 
-fn add_common_layers(r: &mut RanimScene, song: &Arc<midi::MidiSong>, layout: PianoLayout) {
+fn common_layers(song: &Arc<midi::MidiSong>, layout: PianoLayout) -> AnimStack {
     let duration = song.duration_secs;
     let background = make_background(layout);
-    let camera = CameraFrame {
-        pos: DVec3::ZERO,
-        frame_height: FRAME_HEIGHT,
-        ..Default::default()
-    };
 
-    r.play(background.show().with_duration(duration));
-    r.play(
+    stack![
+        background.show().with_duration(duration),
         PianoKeyboardEval {
             song: song.clone(),
             layout,
         }
         .with_duration(duration)
         .with_rate_func(linear),
-    );
-    r.play(
         HitEffectsEval {
             song: song.clone(),
             layout,
         }
         .with_duration(duration)
         .with_rate_func(linear),
-    );
-    r.play(camera.show().with_duration(duration));
-    r.insert_time_mark(duration * 0.5, TimeMark::Capture("preview.png".to_string()));
+    ]
+}
+
+fn camera(duration: f64) -> impl Animation {
+    CameraFrame {
+        pos: DVec3::ZERO,
+        frame_height: FRAME_HEIGHT,
+        ..Default::default()
+    }
+    .show()
+    .with_duration(duration)
 }
 
 #[scene(clear_color = "#070711")]
@@ -53,15 +54,17 @@ fn midi_visualizer(r: &mut RanimScene) {
     let layout = PianoLayout::new(&song);
     let duration = song.duration_secs;
 
-    r.play(
+    r.play(camera(duration));
+    r.play(stack![
         MidiNotesEval {
             song: song.clone(),
             layout,
         }
         .with_duration(duration)
         .with_rate_func(linear),
-    );
-    add_common_layers(r, &song, layout);
+        common_layers(&song, layout),
+    ]);
+    r.insert_time_mark(duration * 0.5, TimeMark::Capture("preview.png".to_string()));
 }
 
 #[scene(clear_color = "#070711")]
@@ -70,18 +73,24 @@ fn midi_visualizer_per_note(r: &mut RanimScene) {
     let song = Arc::new(parse_song());
     let layout = PianoLayout::new(&song);
 
+    let mut notes = AnimStack::new();
     for &note in &song.notes {
         let note_eval = SingleNoteEval::new(note, layout);
         let start_sec = note_eval.start_sec();
         let duration_secs = note_eval.duration_secs();
-        r.play(
+        notes.push(
             note_eval
                 .with_duration(duration_secs)
                 .with_rate_func(linear)
                 .at(start_sec),
         );
     }
-    add_common_layers(r, &song, layout);
+    r.play(camera(song.duration_secs));
+    r.play(stack![notes, common_layers(&song, layout)]);
+    r.insert_time_mark(
+        song.duration_secs * 0.5,
+        TimeMark::Capture("preview.png".to_string()),
+    );
 }
 
 #[test]
