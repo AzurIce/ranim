@@ -4,7 +4,7 @@ use glam::{DMat4, DVec3, dvec2};
 
 use crate::{
     Extract,
-    animation::{Animation, Eval, Placeable},
+    animation::{Eval, Placeable},
     core_item::CoreItem,
     prelude::{Alignable, Interpolatable},
 };
@@ -218,7 +218,7 @@ impl CameraFrame {
         &mut self,
         target: DVec3,
         total_angle: f64,
-    ) -> impl Eval<Output = Self> + Animation + Placeable + use<> {
+    ) -> impl Eval<Output = Self> + Placeable + use<> {
         let offset = self.pos - target;
         let distance = offset.length();
         let phi = if distance > 0.0 {

@@ -135,20 +135,6 @@ fn watch_krate(
     (debouncer, rx)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::is_vcs_metadata;
-    use std::path::Path;
-
-    #[test]
-    fn recognizes_vcs_metadata_at_any_depth() {
-        assert!(is_vcs_metadata(Path::new("repo/.git/objects/ab/cd")));
-        assert!(is_vcs_metadata(Path::new("repo/nested/.hg/store")));
-        assert!(is_vcs_metadata(Path::new("repo/.svn/wc.db")));
-        assert!(!is_vcs_metadata(Path::new("repo/src/git.rs")));
-    }
-}
-
 pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()> {
     info!("Loading workspace...");
     let workspace = Workspace::current().unwrap();
@@ -238,4 +224,19 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
     shutdown_tx.send_blocking(()).unwrap();
     daemon.join().unwrap();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::is_vcs_metadata;
+
+    #[test]
+    fn recognizes_vcs_metadata_at_any_depth() {
+        assert!(is_vcs_metadata(Path::new("repo/.git/objects/ab/cd")));
+        assert!(is_vcs_metadata(Path::new("repo/nested/.hg/store")));
+        assert!(is_vcs_metadata(Path::new("repo/.svn/wc.db")));
+        assert!(!is_vcs_metadata(Path::new("repo/src/git.rs")));
+    }
 }

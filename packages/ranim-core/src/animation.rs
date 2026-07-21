@@ -688,7 +688,7 @@ mod tests {
     use super::*;
     use crate::{Extract, core_item::CoreItem, core_item::vitem::VItem};
 
-    fn leaf(x: f32, duration: f64) -> impl Animation + Placeable {
+    fn leaf(x: f32, duration: f64) -> impl Placeable {
         (move |_alpha| {
             let mut item = VItem::default();
             item.points[0].x = x;
@@ -697,7 +697,7 @@ mod tests {
         .with_duration(duration)
     }
 
-    fn progress_leaf(offset: f32) -> impl Animation + Placeable {
+    fn progress_leaf(offset: f32) -> impl Placeable {
         move |alpha| {
             let mut item = VItem::default();
             item.points[0].x = offset + alpha as f32;

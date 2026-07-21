@@ -97,6 +97,42 @@ pub struct VItem {
     pub stroke_widths: Vec<Width>,
 }
 
+impl Default for VItem {
+    fn default() -> Self {
+        Self {
+            normal: None,
+            points: vec![Vec4::ZERO; 3],
+            stroke_widths: vec![Width::default(); 2],
+            stroke_rgbas: vec![Rgba::default(); 2],
+            fill_rgbas: vec![Rgba::default(); 2],
+        }
+    }
+}
+
+impl Extract for VItem {
+    type Target = CoreItem;
+    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+        buf.push(CoreItem::VItem(self.clone()));
+    }
+}
+
+impl FillColor for VItem {
+    fn fill_color(&self) -> AlphaColor<Srgb> {
+        let Rgba(rgba) = self.fill_rgbas[0];
+        AlphaColor::new([rgba.x, rgba.y, rgba.z, rgba.w])
+    }
+    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
+        self.fill_rgbas.fill(color.into());
+        self
+    }
+    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
+        self.fill_rgbas
+            .iter_mut()
+            .for_each(|rgba| rgba.0.w = opacity);
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use glam::{Vec3, Vec4};
@@ -149,41 +185,5 @@ mod tests {
         let normal = vitem_normal_from_points(&points);
         assert!(normal.abs_diff_eq(Vec3::X, 1e-6));
         assert!(normal.dot(Vec3::Z).abs() < 1e-6);
-    }
-}
-
-impl Default for VItem {
-    fn default() -> Self {
-        Self {
-            normal: None,
-            points: vec![Vec4::ZERO; 3],
-            stroke_widths: vec![Width::default(); 2],
-            stroke_rgbas: vec![Rgba::default(); 2],
-            fill_rgbas: vec![Rgba::default(); 2],
-        }
-    }
-}
-
-impl Extract for VItem {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(CoreItem::VItem(self.clone()));
-    }
-}
-
-impl FillColor for VItem {
-    fn fill_color(&self) -> AlphaColor<Srgb> {
-        let Rgba(rgba) = self.fill_rgbas[0];
-        AlphaColor::new([rgba.x, rgba.y, rgba.z, rgba.w])
-    }
-    fn set_fill_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
-        self.fill_rgbas.fill(color.into());
-        self
-    }
-    fn set_fill_opacity(&mut self, opacity: f32) -> &mut Self {
-        self.fill_rgbas
-            .iter_mut()
-            .for_each(|rgba| rgba.0.w = opacity);
-        self
     }
 }

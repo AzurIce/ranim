@@ -193,7 +193,7 @@ mod tests {
         core_item::vitem::VItem,
     };
 
-    fn leaf(duration: f64) -> impl Animation + Placeable {
+    fn leaf(duration: f64) -> impl Placeable {
         Static(VItem::default()).with_duration(duration)
     }
 
