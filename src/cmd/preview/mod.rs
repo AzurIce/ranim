@@ -28,29 +28,6 @@ use web_time::Instant;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-// Copied from original lib.rs
-pub struct TimelineInfoState {
-    pub ctx: egui::Context,
-    pub canvas: egui::Rect,
-    pub response: egui::Response,
-    pub painter: egui::Painter,
-    pub text_height: f32,
-    pub font_id: egui::FontId,
-}
-
-impl TimelineInfoState {
-    pub fn point_from_ms(&self, state: &TimelineState, ms: i64) -> f32 {
-        let ms = ms as f32;
-        let offset = state.offset_points;
-        let width_sec = state.width_sec as f32;
-        let canvas_width = self.canvas.width();
-
-        let ms_per_pixel = width_sec * 1000.0 / canvas_width;
-        let x = ms / ms_per_pixel;
-        self.canvas.min.x + x - offset
-    }
-}
-
 pub enum RanimPreviewAppCmd {
     ReloadScene(Scene, Sender<()>),
 }
@@ -187,8 +164,8 @@ impl RanimPreviewApp {
         info!("Scene built, cost: {:?}", t.elapsed());
 
         info!("Getting timelines info...");
-        let timeline_infos = timeline.get_timeline_infos();
-        info!("Total {} timelines", timeline_infos.len());
+        let animation_infos = timeline.get_animation_infos();
+        info!("Total {} root animations", animation_infos.len());
 
         let (cmd_tx, cmd_rx) = unbounded();
 
@@ -200,7 +177,7 @@ impl RanimPreviewApp {
             scene_constructor,
             scene_config,
             resolution: Resolution::QHD,
-            timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
+            timeline_state: TimelineState::new(timeline.total_secs(), animation_infos),
             timeline,
             need_eval: false,
             last_sec: -1.0,
@@ -286,9 +263,10 @@ impl RanimPreviewApp {
             match cmd {
                 RanimPreviewAppCmd::ReloadScene(scene, tx) => {
                     let timeline = scene.constructor.build_scene();
-                    let timeline_infos = timeline.get_timeline_infos();
+                    let animation_infos = timeline.get_animation_infos();
                     let old_cur_second = self.timeline_state.current_sec;
-                    self.timeline_state = TimelineState::new(timeline.total_secs(), timeline_infos);
+                    self.timeline_state =
+                        TimelineState::new(timeline.total_secs(), animation_infos);
                     self.timeline_state.current_sec =
                         old_cur_second.clamp(0.0, self.timeline_state.total_sec);
                     self.timeline = timeline;
@@ -703,6 +681,8 @@ impl eframe::App for RanimPreviewApp {
 
         egui::Panel::bottom("bottom_panel")
             .resizable(true)
+            .default_size(240.0)
+            .min_size(150.0)
             .max_size(600.0)
             .show(ui, |ui| {
                 ui.label("Timeline");
@@ -806,14 +786,30 @@ impl eframe::App for RanimPreviewApp {
 
                     ui.separator();
 
-                    ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
-                    ui.add(
-                        egui::Slider::new(
-                            &mut self.timeline_state.current_sec,
-                            0.0..=self.timeline_state.total_sec,
+                    const TIME_INPUT_WIDTH: f32 = 86.0;
+                    let slider_width =
+                        (ui.available_width() - TIME_INPUT_WIDTH - ui.spacing().item_spacing.x)
+                            .max(40.0);
+                    ui.scope(|ui| {
+                        ui.style_mut().spacing.slider_width = slider_width;
+                        ui.add(
+                            egui::Slider::new(
+                                &mut self.timeline_state.current_sec,
+                                0.0..=self.timeline_state.total_sec,
+                            )
+                            .show_value(false),
                         )
-                        .text("sec"),
-                    );
+                        .on_hover_text("Timeline position");
+                    });
+                    ui.add_sized(
+                        [TIME_INPUT_WIDTH, 18.0],
+                        egui::DragValue::new(&mut self.timeline_state.current_sec)
+                            .range(0.0..=self.timeline_state.total_sec)
+                            .speed(0.001)
+                            .fixed_decimals(3)
+                            .suffix(" s"),
+                    )
+                    .on_hover_text("Drag or enter the current time");
                 });
 
                 self.timeline_state.ui_main_timeline(ui);

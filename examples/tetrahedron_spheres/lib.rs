@@ -7,8 +7,6 @@ use ranim::{
     prelude::*,
     utils::rate_functions::linear,
 };
-use ranim_core::animation::Eval;
-
 // Custom animation: rotate a Surface's transform around the Z axis
 struct RotateAroundZ {
     src: Surface,
@@ -17,8 +15,10 @@ struct RotateAroundZ {
     total_angle: f64,
 }
 
-impl Eval<Surface> for RotateAroundZ {
-    fn eval_alpha(&self, alpha: f64) -> Surface {
+impl Eval for RotateAroundZ {
+    type Output = Surface;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let angle = self.total_angle * alpha;
         let mut result = self.src.clone();
         result.transform = DMat4::from_translation(self.group_center)
@@ -37,7 +37,6 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
 
     // Fixed camera, Z-up
     let cam = CameraFrame::from_spherical(phi, theta, distance);
-    let _r_cam = r.insert(cam);
 
     // Regular tetrahedron centered at the origin, edge length `a`.
     // Z is the vertical axis; the three base vertices share the same Z coordinate.
@@ -58,7 +57,9 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     let resolution = (31, 16);
     let x_offset = 3.5;
 
-    // Left group: flat shading (normals zeroed out)
+    let mut left_group = AnimStack::new();
+
+    // Left group: smooth shading (analytical normals from Sphere)
     let left_center = DVec3::new(-x_offset, 0.0, 0.0);
     for (vertex, color) in vertices.iter().zip(colors.iter()) {
         let mut surface = Surface::from(
@@ -69,23 +70,22 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         .with_smooth_normals()
         .with_transform(DMat4::from_translation(left_center + *vertex));
 
-        let r_surface = r.insert(surface.clone());
-        r.timeline_mut(r_surface).play(
+        left_group.push(
             RotateAroundZ {
                 src: surface.clone(),
                 group_center: left_center,
                 vertex_offset: *vertex,
                 total_angle: TAU,
             }
-            .into_animation_cell()
             .apply_to(&mut surface)
             .with_duration(8.0)
             .with_rate_func(linear),
         );
     }
 
-    // Right group: smooth shading (analytical normals from Sphere)
+    // Right group: flat shading (normals zeroed out)
     let right_center = DVec3::new(x_offset, 0.0, 0.0);
+    let mut right_group = AnimStack::new();
     for (vertex, color) in vertices.iter().zip(colors.iter()) {
         let mut surface = Surface::from(
             Sphere::new(radius)
@@ -94,23 +94,22 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         )
         .with_transform(DMat4::from_translation(right_center + *vertex));
 
-        let r_surface = r.insert(surface.clone());
-        r.timeline_mut(r_surface).play(
+        right_group.push(
             RotateAroundZ {
                 src: surface.clone(),
                 group_center: right_center,
                 vertex_offset: *vertex,
                 total_angle: TAU,
             }
-            .into_animation_cell()
             .apply_to(&mut surface)
             .with_duration(8.0)
             .with_rate_func(linear),
         );
     }
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    let total_secs = left_group.duration_secs().max(right_group.duration_secs());
+    r.play(cam.show().with_duration(total_secs));
+    r.play(stack![left_group, right_group]);
+
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

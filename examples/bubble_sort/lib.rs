@@ -2,6 +2,7 @@ use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     anims::morph::MorphAnim,
     color::palettes::manim,
+    core::animation::{AnimSequence, StaticAnim},
     glam::{DVec3, dvec2, dvec3},
     items::vitem::geometry::Rectangle,
     prelude::*,
@@ -9,8 +10,6 @@ use ranim::{
 };
 
 fn bubble_sort(r: &mut RanimScene, num: usize) {
-    let _r_cam = r.insert(CameraFrame::default());
-
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let padded_frame_size = frame_size * 0.9;
 
@@ -26,7 +25,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
     heights.shuffle(&mut rng);
 
     let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
-    let mut r_rects = heights
+    let mut rects = heights
         .iter()
         .enumerate()
         .map(|(i, &height)| {
@@ -38,70 +37,76 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
                     .scale(DVec3::splat(0.8))
                     .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
-            (r.insert(rect.clone()), rect)
+            let sequence = seq![rect.show()];
+            (sequence, rect)
         })
         .collect::<Vec<_>>();
 
-    let anim_highlight = |rect: &mut Rectangle| {
-        rect.morph(|data| {
-            data.set_fill_color(manim::BLUE_C.with_alpha(0.5));
-        })
-        .with_duration(anim_step_duration)
-        .with_rate_func(linear)
-    };
-    let anim_unhighlight = |rect: &mut Rectangle| {
-        rect.morph(|data| {
-            data.set_fill_color(manim::WHITE.with_alpha(0.5));
-        })
-        .with_duration(anim_step_duration)
-        .with_rate_func(linear)
+    let sync = |rects: &mut [(AnimSequence, Rectangle)]| {
+        let target = rects
+            .iter()
+            .map(|(sequence, _)| sequence.cursor_sec())
+            .fold(0.0, f64::max);
+        rects.iter_mut().for_each(|(sequence, _)| {
+            sequence.hold_to(target);
+        });
     };
     let shift_right = DVec3::X * width_unit;
-    let swap_shift = [shift_right, -shift_right];
-    let anim_swap = |r: &mut RanimScene, r_rectab: [&mut (TimelineId, Rectangle); 2]| {
-        let timelines = r.timeline_mut(r_rectab).unwrap();
-        timelines
-            .into_iter()
-            .zip(swap_shift.iter())
-            .for_each(|((timeline, rect), shift)| {
-                timeline.play(
-                    rect.morph(|data| {
-                        data.shift(*shift);
+
+    for i in (1..num).rev() {
+        for j in 0..i {
+            for (sequence, rect) in rects.get_disjoint_mut([j, j + 1]).unwrap() {
+                sequence.push(
+                    rect.morph(|rect| {
+                        rect.set_fill_color(manim::BLUE_C.with_alpha(0.5));
                     })
                     .with_duration(anim_step_duration)
                     .with_rate_func(linear),
                 );
-            });
-    };
-
-    for i in (1..num).rev() {
-        for j in 0..i {
-            r.timeline_mut(r_rects.get_disjoint_mut([j, j + 1]).unwrap())
-                .unwrap()
-                .into_iter()
-                .for_each(|(timeline, rect)| {
-                    timeline.play(anim_highlight(rect));
-                });
-            if heights[j] > heights[j + 1] {
-                anim_swap(r, r_rects.get_disjoint_mut([j, j + 1]).unwrap());
-                r.timelines_mut().sync();
-                heights.swap(j, j + 1);
-                r_rects.swap(j, j + 1);
             }
-            r.timeline_mut(r_rects.get_disjoint_mut([j, j + 1]).unwrap())
-                .unwrap()
-                .into_iter()
-                .for_each(|(timeline, rect)| {
-                    timeline.play(anim_unhighlight(rect));
-                });
-            r.timelines_mut().sync();
+
+            if heights[j] > heights[j + 1] {
+                for ((sequence, rect), shift) in rects
+                    .get_disjoint_mut([j, j + 1])
+                    .unwrap()
+                    .into_iter()
+                    .zip([shift_right, -shift_right])
+                {
+                    sequence.push(
+                        rect.morph(|rect| {
+                            rect.shift(shift);
+                        })
+                        .with_duration(anim_step_duration)
+                        .with_rate_func(linear),
+                    );
+                }
+                sync(&mut rects);
+                heights.swap(j, j + 1);
+                rects.swap(j, j + 1);
+            }
+
+            for (sequence, rect) in rects.get_disjoint_mut([j, j + 1]).unwrap() {
+                sequence.push(
+                    rect.morph(|rect| {
+                        rect.set_fill_color(manim::WHITE.with_alpha(0.5));
+                    })
+                    .with_duration(anim_step_duration)
+                    .with_rate_func(linear),
+                );
+            }
+            sync(&mut rects);
         }
     }
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture(format!("preview-{num}.png")),
-    );
+    let total_secs = rects[0].0.cursor_sec();
+    let mut content = AnimStack::new();
+    for (sequence, _) in rects {
+        content.push(sequence);
+    }
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(content);
+
+    r.insert_time_mark(total_secs, TimeMark::Capture(format!("preview-{num}.png")));
 }
 
 #[scene]

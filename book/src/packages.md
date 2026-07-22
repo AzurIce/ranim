@@ -4,7 +4,7 @@
 .
 ├── src/                        # ranim - 顶层 facade crate
 ├── packages/
-│   ├── ranim-core/             # 核心动画引擎（时间线、组件、动画 trait）
+│   ├── ranim-core/             # 核心动画引擎（求值、组合、组件与动画 trait）
 │   ├── ranim-macros/           # proc-macro（#[scene]、#[output] 等）
 │   ├── ranim-items/            # 内置可视元素（VItem、几何图形、SVG、文本）
 │   ├── ranim-anims/            # 内置动画（淡入淡出、变形、书写等）

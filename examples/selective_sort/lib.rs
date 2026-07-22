@@ -7,8 +7,6 @@ use ranim::{
 };
 
 fn selective_sort(r: &mut RanimScene, num: usize) {
-    let _r_cam = r.insert(CameraFrame::default());
-
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let padded_frame_size = frame_size * 0.9;
 
@@ -24,7 +22,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
     heights.shuffle(&mut rng);
 
     let padded_frame_bl = dvec2(padded_frame_size.x / -2.0, padded_frame_size.y / -2.0);
-    let mut r_rects = heights
+    let mut rects = heights
         .iter()
         .enumerate()
         .map(|(i, &height)| {
@@ -35,7 +33,8 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                 rect.scale(DVec3::splat(0.8))
                     .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
-            (r.insert(rect.clone()), rect)
+            let sequence = seq![rect.show()];
+            (sequence, rect)
         })
         .collect::<Vec<_>>();
 
@@ -55,24 +54,34 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
     };
 
     let shift_right = DVec3::X * width_unit;
+    let sync = |rects: &mut [(AnimSequence, Rectangle)]| {
+        let target = rects
+            .iter()
+            .map(|(sequence, _)| sequence.cursor_sec())
+            .fold(0.0, f64::max);
+        rects.iter_mut().for_each(|(sequence, _)| {
+            sequence.hold_to(target);
+        });
+    };
     for i in 0..num - 1 {
-        r.timeline_mut(r_rects[i].0)
-            .play(highlight(&mut r_rects[i].1));
+        let (sequence, rect) = &mut rects[i];
+        sequence.push(highlight(rect));
         for j in i + 1..num {
-            r.timeline_mut(r_rects[j].0)
-                .play(highlight(&mut r_rects[j].1));
-            r.timelines_mut().sync();
+            let (sequence, rect) = &mut rects[j];
+            sequence.push(highlight(rect));
+            sync(&mut rects);
 
             if heights[i] > heights[j] {
                 let dir = [shift_right, -shift_right];
                 let color = [manim::BLUE_C, manim::RED_C];
-                r.timeline_mut(r_rects.get_disjoint_mut([i, j]).unwrap())
+                rects
+                    .get_disjoint_mut([i, j])
                     .unwrap()
                     .into_iter()
                     .zip(dir)
                     .zip(color)
-                    .for_each(|(((timeline, rect), dir), color)| {
-                        timeline.play(
+                    .for_each(|(((sequence, rect), dir), color)| {
+                        sequence.push(
                             rect.morph(|rect| {
                                 rect.shift(dir * (j - i) as f64)
                                     .set_color(color)
@@ -83,20 +92,29 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                         );
                     });
                 heights.swap(i, j);
-                r_rects.swap(i, j);
+                rects.swap(i, j);
             }
-            r.timeline_mut(r_rects[j].0)
-                .play(unhighlight(&mut r_rects[j].1));
-            r.timelines_mut().sync();
+            let (sequence, rect) = &mut rects[j];
+            sequence.push(unhighlight(rect));
+            sync(&mut rects);
         }
-        r.timeline_mut(r_rects[i].0)
-            .play(unhighlight(&mut r_rects[i].1));
+        let (sequence, rect) = &mut rects[i];
+        sequence.push(unhighlight(rect));
     }
+    sync(&mut rects);
 
+    let total_secs = rects[0].0.cursor_sec();
     r.insert_time_mark(
-        r.timelines().max_total_secs() / 2.0,
+        total_secs / 2.0,
         TimeMark::Capture(format!("preview-{num}.png")),
     );
+
+    let mut content = AnimStack::new();
+    for (sequence, _) in rects {
+        content.push(sequence);
+    }
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(content);
 }
 
 #[scene]

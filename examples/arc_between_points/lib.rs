@@ -6,12 +6,12 @@ use ranim::{
     glam::{DMat2, dvec2},
     items::vitem::geometry::ArcBetweenPoints,
     prelude::*,
+    utils::rate_functions::smooth,
 };
 
 #[scene]
 #[output(dir = "./output/arc_between_points")]
 fn arc_between_points(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let center = dvec2(0.0, 0.0);
 
     let start_color = color::color("#FF8080FF");
@@ -43,13 +43,16 @@ fn arc_between_points(r: &mut RanimScene) {
             )
         })
         .collect::<Vec<_>>();
-    let r_arcs = r.insert_empty();
+    let total_secs = 3.0;
+    let content = arcs
+        .lagged(0.2, |arc| {
+            let animation = arc.fade_in();
+            move |alpha| animation.eval_alpha(smooth(alpha))
+        })
+        .with_duration(total_secs);
 
-    r.timeline_mut(r_arcs)
-        .play(arcs.lagged(0.2, |arc| arc.fade_in()).with_duration(3.0));
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(content);
 
-    r.insert_time_mark(
-        r.timelines().max_total_secs(),
-        TimeMark::Capture("preview.png".to_string()),
-    );
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }

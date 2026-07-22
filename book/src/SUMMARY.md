@@ -4,11 +4,16 @@
 - [Ranim Packages](./packages.md)
 
 # 理解 Ranim
+
 - [核心概念](./understand/core/README.md)
     - [动画](./understand/core/animation.md)
-    - [物件与 CoreItem]()
-    - [时间线](./understand/core/timeline.md)
-- [核心循环]()
+    - [动画序列与并行组合](./understand/core/timeline.md)
 
-# 进阶使用
-- [自定义物件]()
+---
+
+# Designs
+
+- [Designs]()
+  - [v0.1]()
+  - [v0.2]()
+  - [v0.3](./designs/v0.3/README.md)

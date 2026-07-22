@@ -44,6 +44,9 @@ jobs:
         with:
           tool: just, zola@0.22, wasm-bindgen
 
+      - name: Install wasm-opt
+        run: sudo apt-get update && sudo apt-get install -y binaryen
+
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: "wasm-examples"
