@@ -8,21 +8,16 @@ use ranim::{
         geometry::{Circle, Square},
     },
     prelude::*,
+    utils::rate_functions::smooth,
 };
 
 #[scene]
 pub fn hello_ranim(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
-
     let mut square = Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
     });
 
-    let r_square = r.insert_empty();
-    {
-        let timeline = r.timeline_mut(r_square);
-        timeline.play(square.fade_in());
-    };
+    let mut content = seq![square.fade_in().with_rate_func(smooth)];
 
     let circle = Circle::new(2.0).with(|circle| {
         circle
@@ -33,10 +28,17 @@ pub fn hello_ranim(r: &mut RanimScene) {
     });
 
     let mut vitem = VItem::from(square);
-    r.timeline_mut(r_square)
-        .play(vitem.morph_to(circle.into()))
-        .forward(1.0)
-        .play(vitem.clone().unwrite())
-        .play(vitem.write())
-        .play(vitem.fade_out());
+    content
+        .push(vitem.morph_to(circle.into()).with_rate_func(smooth))
+        .hold(1.0)
+        .push(vitem.clone().unwrite().with_rate_func(smooth))
+        .push(vitem.write().with_rate_func(smooth))
+        .push(vitem.fade_out().with_rate_func(smooth));
+
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
+    r.play(content);
 }

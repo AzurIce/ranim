@@ -1,0 +1,252 @@
+//! Two seekable millisecond timers for comparing Typst evaluation strategies.
+//!
+//! `typst_timer_atlas` compiles individual glyphs once, while
+//! `typst_timer_recompile` creates a new [`TypstText`] from the complete
+//! timestamp on every frame.
+
+use std::sync::Arc;
+
+use ranim::{
+    color::{AlphaColor, Srgb, palettes::manim},
+    glam::{DVec3, dvec3},
+    items::vitem::{VItem, geometry::Rectangle},
+    prelude::*,
+    utils::rate_functions::linear,
+};
+use ranim_items::vitem::typst::TypstText;
+
+const DURATION_SECS: f64 = 10.0;
+const TIMER_Y: f64 = 0.35;
+const GLYPH_HEIGHT: f64 = 1.55;
+const CELL_WIDTH: f64 = 0.92;
+const BAR_WIDTH: f64 = 8.1;
+
+fn rectangle(
+    width: f64,
+    height: f64,
+    position: DVec3,
+    color: AlphaColor<Srgb>,
+    opacity: f32,
+) -> VItem {
+    Rectangle::new(width, height)
+        .with(|rectangle| {
+            rectangle
+                .set_stroke_opacity(0.0)
+                .set_fill_color(color)
+                .set_fill_opacity(opacity)
+                .move_to(position);
+        })
+        .into()
+}
+
+fn glyph_vitems(character: &str, scale: f64) -> Vec<VItem> {
+    let mut glyph = Vec::<VItem>::from(TypstText::new(character));
+    glyph.scale(DVec3::splat(scale)).move_to(DVec3::ZERO);
+    glyph
+}
+
+fn timer_glyph_scale() -> f64 {
+    let reference = TypstText::new("0");
+    let [min, max] = reference.aabb();
+    GLYPH_HEIGHT / (max.y - min.y)
+}
+
+struct GlyphAtlas {
+    digits: Vec<Vec<VItem>>,
+    colon: Vec<VItem>,
+    dot: Vec<VItem>,
+}
+
+impl GlyphAtlas {
+    fn new() -> Self {
+        let scale = timer_glyph_scale();
+        Self {
+            digits: (0..=9)
+                .map(|digit| glyph_vitems(&digit.to_string(), scale))
+                .collect(),
+            colon: glyph_vitems(":", scale),
+            dot: glyph_vitems(".", scale),
+        }
+    }
+
+    fn glyph(&self, character: char) -> &[VItem] {
+        match character {
+            '0'..='9' => &self.digits[character as usize - '0' as usize],
+            ':' => &self.colon,
+            '.' => &self.dot,
+            _ => unreachable!("the timer only contains digits and separators"),
+        }
+    }
+}
+
+fn milliseconds_at_alpha(alpha: f64) -> u64 {
+    (alpha.clamp(0.0, 1.0) * DURATION_SECS * 1_000.0).floor() as u64
+}
+
+fn glyph_color(index: usize, character: char) -> AlphaColor<Srgb> {
+    if index >= 6 {
+        manim::TEAL_C
+    } else if matches!(character, ':' | '.') {
+        manim::GREY_B
+    } else {
+        manim::WHITE
+    }
+}
+
+fn glyph_position(index: usize) -> DVec3 {
+    dvec3((index as f64 - 4.0) * CELL_WIDTH, TIMER_Y, 0.1)
+}
+
+fn push_progress_bar(alpha: f64, output: &mut Vec<VItem>) {
+    let progress_width = BAR_WIDTH * alpha;
+    output.push(rectangle(
+        BAR_WIDTH,
+        0.055,
+        dvec3(0.0, -1.25, 0.0),
+        manim::GREY_D,
+        0.7,
+    ));
+    if progress_width > 0.0 {
+        output.push(rectangle(
+            progress_width,
+            0.075,
+            dvec3((progress_width - BAR_WIDTH) * 0.5, -1.25, 0.02),
+            manim::TEAL_C,
+            0.95,
+        ));
+    }
+}
+
+fn format_milliseconds(milliseconds: u64) -> [char; 9] {
+    let minutes = (milliseconds / 60_000) % 100;
+    let seconds = (milliseconds / 1_000) % 60;
+    let millis = milliseconds % 1_000;
+    [
+        char::from_digit((minutes / 10) as u32, 10).unwrap(),
+        char::from_digit((minutes % 10) as u32, 10).unwrap(),
+        ':',
+        char::from_digit((seconds / 10) as u32, 10).unwrap(),
+        char::from_digit((seconds % 10) as u32, 10).unwrap(),
+        '.',
+        char::from_digit((millis / 100) as u32, 10).unwrap(),
+        char::from_digit(((millis / 10) % 10) as u32, 10).unwrap(),
+        char::from_digit((millis % 10) as u32, 10).unwrap(),
+    ]
+}
+
+struct AtlasTimerEval {
+    atlas: Arc<GlyphAtlas>,
+}
+
+impl Eval for AtlasTimerEval {
+    type Output = Vec<VItem>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
+        let alpha = alpha.clamp(0.0, 1.0);
+        let characters = format_milliseconds(milliseconds_at_alpha(alpha));
+        let mut output = Vec::new();
+
+        for (index, character) in characters.into_iter().enumerate() {
+            let mut glyph = self.atlas.glyph(character).to_vec();
+            glyph
+                .set_fill_color(glyph_color(index, character))
+                .shift(glyph_position(index));
+            output.extend(glyph);
+        }
+
+        push_progress_bar(alpha, &mut output);
+        output
+    }
+}
+
+struct RecompileTimerEval {
+    glyph_scale: f64,
+}
+
+impl Eval for RecompileTimerEval {
+    type Output = Vec<VItem>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
+        let alpha = alpha.clamp(0.0, 1.0);
+        let characters = format_milliseconds(milliseconds_at_alpha(alpha));
+        let timestamp = characters.iter().collect::<String>();
+        let glyphs = Vec::<VItem>::from(TypstText::new(&timestamp));
+        let mut output = Vec::new();
+
+        for (index, (character, mut glyph)) in characters.into_iter().zip(glyphs).enumerate() {
+            glyph
+                .scale(DVec3::splat(self.glyph_scale))
+                .move_to(glyph_position(index))
+                .set_fill_color(glyph_color(index, character));
+            output.push(glyph);
+        }
+
+        push_progress_bar(alpha, &mut output);
+        output
+    }
+}
+
+fn timer_label() -> impl Animation {
+    let mut label = TypstText::new("ELAPSED TIME");
+    label
+        .scale_to(ScaleHint::PorportionalY(0.32))
+        .move_to(DVec3::Y * 2.0)
+        .set_fill_color(manim::GREY_B);
+
+    label.show().with_duration(DURATION_SECS)
+}
+
+#[scene(clear_color = "#080a10")]
+#[output(fps = 60, dir = "./output/typst_timer")]
+fn typst_timer_atlas(r: &mut RanimScene) {
+    let atlas = Arc::new(GlyphAtlas::new());
+    r.play(
+        CameraFrame {
+            frame_height: 5.0,
+            ..Default::default()
+        }
+        .show()
+        .with_duration(DURATION_SECS),
+    );
+    r.play(stack![
+        AtlasTimerEval { atlas }
+            .with_duration(DURATION_SECS)
+            .with_rate_func(linear),
+        timer_label(),
+    ]);
+    r.insert_time_mark(3.456, TimeMark::Capture("preview.png".to_string()));
+}
+
+#[scene(clear_color = "#080a10")]
+#[output(fps = 60, dir = "./output/typst_timer")]
+fn typst_timer_recompile(r: &mut RanimScene) {
+    r.play(
+        CameraFrame {
+            frame_height: 5.0,
+            ..Default::default()
+        }
+        .show()
+        .with_duration(DURATION_SECS),
+    );
+    r.play(stack![
+        RecompileTimerEval {
+            glyph_scale: timer_glyph_scale(),
+        }
+        .with_duration(DURATION_SECS)
+        .with_rate_func(linear),
+        timer_label(),
+    ]);
+    r.insert_time_mark(3.456, TimeMark::Capture("preview.png".to_string()));
+}
+
+#[test]
+fn formats_milliseconds() {
+    assert_eq!(
+        format_milliseconds(0),
+        ['0', '0', ':', '0', '0', '.', '0', '0', '0']
+    );
+    assert_eq!(
+        format_milliseconds(63_456),
+        ['0', '1', ':', '0', '3', '.', '4', '5', '6']
+    );
+}

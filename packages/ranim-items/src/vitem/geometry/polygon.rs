@@ -487,7 +487,6 @@ impl From<Polygon> for VItem {
             stroke_rgba,
             stroke_width,
             fill_rgba,
-            axes,
             ..
         } = value;
         assert!(points.len() > 2);
@@ -504,14 +503,12 @@ impl From<Polygon> for VItem {
 
         // Interleave anchors and handles
         let vpoints = anchors.into_iter().interleave(handles).collect::<Vec<_>>();
-        VItem::from_vpoints(vpoints)
-            .with_normal(axes.0.cross(axes.1).normalize())
-            .with(|vitem| {
-                vitem
-                    .set_fill_color(fill_rgba)
-                    .set_stroke_color(stroke_rgba)
-                    .set_stroke_width(stroke_width);
-            })
+        VItem::from_vpoints(vpoints).with(|vitem| {
+            vitem
+                .set_fill_color(fill_rgba)
+                .set_stroke_color(stroke_rgba)
+                .set_stroke_width(stroke_width);
+        })
     }
 }
 

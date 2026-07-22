@@ -11,6 +11,7 @@ use async_channel::{Receiver, Sender, bounded};
 use libloading::{Library, Symbol};
 use ranim::{Scene, StaticScene};
 use std::{
+    fmt,
     path::{Path, PathBuf},
     process::Command,
     sync::Arc,
@@ -25,6 +26,17 @@ use crate::{
 
 pub mod cli;
 pub mod workspace;
+
+#[derive(Debug)]
+struct BuildCancelled;
+
+impl fmt::Display for BuildCancelled {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("build cancelled")
+    }
+}
+
+impl std::error::Error for BuildCancelled {}
 
 #[derive(Clone)]
 pub struct BuildProcess {
@@ -47,6 +59,10 @@ impl BuildProcess {
             &self.args,
             Some(self.cancel_rx),
         ) {
+            if err.downcast_ref::<BuildCancelled>().is_some() {
+                info!("Build cancelled");
+                return;
+            }
             error!("Failed to build package: {err:?}");
             self.res_tx
                 .send_blocking(Err(anyhow::anyhow!("Failed to build package: {err:?}")))
@@ -278,7 +294,7 @@ pub fn cargo_build(
             child.kill().unwrap();
             child.wait().unwrap();
 
-            anyhow::bail!("build cancelled");
+            return Err(BuildCancelled.into());
         }
         match child.try_wait() {
             Ok(res) => {

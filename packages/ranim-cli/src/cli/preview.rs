@@ -1,10 +1,11 @@
 use std::{
+    path::Path,
     thread::{self},
     time::Duration,
 };
 
 use krates::Kid;
-use notify_debouncer_full::{DebouncedEvent, Debouncer};
+use notify_debouncer_full::{DebounceEventResult, DebouncedEvent, Debouncer};
 use ranim::cmd::preview::{RanimPreviewApp, RanimPreviewAppCmd};
 
 use anyhow::Result;
@@ -18,6 +19,15 @@ use crate::{
     workspace::{Workspace, get_target_package},
 };
 
+fn is_vcs_metadata(path: &Path) -> bool {
+    path.components().any(|component| {
+        matches!(
+            component.as_os_str().to_str(),
+            Some(".git" | ".hg" | ".svn")
+        )
+    })
+}
+
 fn watch_krate(
     workspace: &Workspace,
     kid: &Kid,
@@ -27,14 +37,20 @@ fn watch_krate(
 ) {
     let (tx, rx) = unbounded();
 
-    let mut debouncer =
-        notify_debouncer_full::new_debouncer(Duration::from_millis(500), None, move |evt| {
-            let Ok(evt) = evt else {
+    let mut debouncer = notify_debouncer_full::new_debouncer(
+        Duration::from_millis(500),
+        None,
+        move |evt: DebounceEventResult| {
+            let Ok(mut evt) = evt else {
                 return;
             };
-            _ = tx.try_send(evt)
-        })
-        .expect("Failed to create debounced watcher");
+            evt.retain(|event| !event.paths.iter().all(|path| is_vcs_metadata(path)));
+            if !evt.is_empty() {
+                _ = tx.try_send(evt)
+            }
+        },
+    )
+    .expect("Failed to create debounced watcher");
 
     // All krates need to be watched, including the main package.
     let mut watch_krates = vec![];
@@ -79,7 +95,8 @@ fn watch_krate(
     let mut watch_paths = vec![];
     for krate_root in &watch_krate_roots {
         trace!("Adding watched dir for krate root {krate_root:?}");
-        let ignore_builder = ignore::gitignore::GitignoreBuilder::new(krate_root);
+        let mut ignore_builder = ignore::gitignore::GitignoreBuilder::new(krate_root);
+        ignore_builder.add(krate_root.join(".gitignore"));
         let ignore = ignore_builder.build().unwrap();
 
         for entry in krate_root
@@ -87,6 +104,7 @@ fn watch_krate(
             .into_iter()
             .flatten()
             .filter_map(|entry| entry.ok())
+            .filter(|entry| !is_vcs_metadata(&entry.path()))
             .filter(|entry| {
                 !ignore
                     .matched(entry.path(), entry.path().is_dir())
@@ -206,4 +224,19 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
     shutdown_tx.send_blocking(()).unwrap();
     daemon.join().unwrap();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::is_vcs_metadata;
+
+    #[test]
+    fn recognizes_vcs_metadata_at_any_depth() {
+        assert!(is_vcs_metadata(Path::new("repo/.git/objects/ab/cd")));
+        assert!(is_vcs_metadata(Path::new("repo/nested/.hg/store")));
+        assert!(is_vcs_metadata(Path::new("repo/.svn/wc.db")));
+        assert!(!is_vcs_metadata(Path::new("repo/src/git.rs")));
+    }
 }

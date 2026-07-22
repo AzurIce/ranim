@@ -44,6 +44,9 @@ use ranim_core::{
 /// You can construct a [`VItem`] from a list of VPoints, see [`VPointVec`]:
 ///
 /// ```rust
+/// use ranim_core::glam::dvec3;
+/// use ranim_items::vitem::VItem;
+///
 /// let vitem = VItem::from_vpoints(vec![
 ///     dvec3(0.0, 0.0, 0.0),
 ///     dvec3(1.0, 0.0, 0.0),
@@ -53,7 +56,7 @@ use ranim_core::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct VItem {
     /// The normal vector of the projection target plane.
-    /// If `None`, the normal will be computed from the first three points at render time.
+    /// If `None`, the normal will be derived from the points at render time.
     pub normal: Option<DVec3>,
     /// vpoints data
     pub vpoints: VPointVec,
@@ -270,7 +273,7 @@ impl Partial for VItem {
 impl Empty for VItem {
     fn empty() -> Self {
         Self {
-            normal: Some(DVec3::Z),
+            normal: None,
             vpoints: VPointVec(vec![DVec3::ZERO; 3]),
             stroke_widths: vec![0.0.into(); 2].into(),
             stroke_rgbas: vec![Vec4::ZERO.into(); 2].into(),
@@ -324,5 +327,37 @@ impl StrokeWidth for VItem {
     fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
         f(self.stroke_widths.as_mut());
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ranim_core::{
+        core_item::vitem::vitem_normal_from_points,
+        traits::{Empty, Interpolatable, RotateTransform},
+    };
+
+    use super::{VItem, geometry::Square};
+
+    #[test]
+    fn generated_vitems_derive_their_interpolated_plane() {
+        let source = VItem::from(Square::new(4.0));
+        assert!(source.normal.is_none());
+        assert!(VItem::empty().normal.is_none());
+
+        let mut target = source.clone();
+        target.rotate_on_y(std::f64::consts::PI / 6.0);
+        target.rotate_on_x(std::f64::consts::PI / 6.0);
+
+        let interpolated = source.lerp(&target, 0.4);
+        assert!(interpolated.normal.is_none());
+
+        let core_item = ranim_core::core_item::vitem::VItem::from(interpolated);
+        let normal = vitem_normal_from_points(&core_item.points);
+        let origin = core_item.points[0].truncate();
+        for point in &core_item.points {
+            let distance = (point.truncate() - origin).dot(normal).abs();
+            assert!(distance < 1e-5, "point is {distance} away from its plane");
+        }
     }
 }

@@ -148,6 +148,7 @@ pretty_env_logger = "0.5.0"
 
 [dev-dependencies]
 assert_float_eq = "1.2.0"
+midly = "0.5.3"
 rand = "0.10.2"
 rand_chacha = "0.10.0"
 getrandom = { version = "0.4.3", features = ["wasm_js"] }
@@ -233,6 +234,14 @@ path = "examples/hello_ranim/lib.rs"
 crate-type = ["cdylib"]
 
 [package.metadata.example.hello_ranim]
+wasm = true
+
+[[example]]
+name = "composable_choreography"
+path = "examples/composable_choreography/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.composable_choreography]
 wasm = true
 
 [[example]]
@@ -349,6 +358,15 @@ required-features = ["typst"]
 wasm = true
 
 [[example]]
+name = "typst_timer"
+path = "examples/typst_timer/lib.rs"
+crate-type = ["cdylib"]
+required-features = ["typst"]
+
+[package.metadata.example.typst_timer]
+wasm = true
+
+[[example]]
 name = "perlin_terrain"
 path = "examples/perlin_terrain/lib.rs"
 crate-type = ["cdylib"]
@@ -363,6 +381,14 @@ crate-type = ["cdylib"]
 
 [package.metadata.example.mesh_morph]
 wasm = true
+
+[[example]]
+name = "midi_visualizer"
+path = "examples/midi_visualizer/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.midi_visualizer]
+wasm = false
 
 [[example]]
 name = "tetrahedron_spheres"

@@ -5,6 +5,7 @@ use ranim::{
     color::palettes::manim,
     glam::{DVec3, usizevec3},
     prelude::*,
+    utils::rate_functions::smooth,
 };
 use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
@@ -14,7 +15,6 @@ use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 #[output(dir = "./output/animating_pi")]
 fn animating_pi(r: &mut RanimScene) {
     let cam = CameraFrame::default();
-    let _r_cam = r.insert(cam.clone());
 
     let (w, h) = (10, 10);
     let mut pis = (0..h)
@@ -48,29 +48,33 @@ fn animating_pi(r: &mut RanimScene) {
         .scale_to(ScaleHint::PorportionalY(TAU - 0.25))
         .move_to(DVec3::ZERO);
 
-    r.insert_with(|t| {
-        t.play(vitems.clone().show())
-            .forward(1.0)
-            .play(
-                vitems
-                    .morph(|x| {
-                        x.apply_complex_map(|c| c.exp());
-                    })
-                    .with_duration(5.0),
-            )
-            .forward(1.0)
-            .play(
-                vitems
-                    .morph(|x| {
-                        x.apply_point_func(|p| {
-                            p.x += 0.5 * p.y.sin();
-                            p.y += 0.5 * p.x.cos();
-                        });
-                    })
-                    .with_duration(5.0),
-            )
-            .forward(1.0);
-    });
+    let mut content = seq![vitems.clone().show()];
+    content
+        .hold(1.0)
+        .push(
+            vitems
+                .morph(|x| {
+                    x.apply_complex_map(|c| c.exp());
+                })
+                .with_duration(5.0)
+                .with_rate_func(smooth),
+        )
+        .hold(1.0)
+        .push(
+            vitems
+                .morph(|x| {
+                    x.apply_point_func(|p| {
+                        p.x += 0.5 * p.y.sin();
+                        p.y += 0.5 * p.x.cos();
+                    });
+                })
+                .with_duration(5.0)
+                .with_rate_func(smooth),
+        )
+        .hold(1.0);
+
+    r.play(cam.show().with_duration(content.cursor_sec()));
+    r.play(content);
     r.insert_time_mark(5.0, TimeMark::Capture("preview.png".to_string()));
 }
 
