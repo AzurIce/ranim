@@ -1,14 +1,16 @@
 //! Anchor
 //!
 //! Ranim has an anchor system based on generics, an anchor can be any type `T`,
-//! and types that implements [`Locate<T>`] can use [`Locate::locate`] to convert the anchor to a [`DVec3`] point.
+//! and types that implement [`crate::anchor::Locate<T>`] can use
+//! [`crate::anchor::Locate::locate`] to convert the anchor to a [`glam::DVec3`] point.
 //!
-//! Ranim provides some built-in anchors and related [`Locate`] implementations:
-//! - [`DVec3`]: The point itself in 3d space.
-//! - [`Centroid`]: The avg point of all points.
+//! Ranim provides some built-in anchors and related [`crate::anchor::Locate`] implementations:
+//! - [`glam::DVec3`]: The point itself in 3d space.
+//! - [`crate::anchor::Centroid`]: The avg point of all points.
 //!   Note that sometime the center of Aabb is not the centroid.
 //!   (0, 0, 0) is the center point.
-//! - [`AabbPoint`]: A point based on [`Aabb`]'s size, the number in each axis means the fraction of the size of the [`Aabb`].
+//! - [`crate::anchor::AabbPoint`]: A point based on [`crate::anchor::Aabb`]'s size,
+//!   the number in each axis means the fraction of the size of the [`crate::anchor::Aabb`].
 
 use glam::DVec3;
 use tracing::warn;
