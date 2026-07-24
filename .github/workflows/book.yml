@@ -15,7 +15,7 @@ on:
         default: "0.5"
       mdbook-plugins:
         description: "Comma-separated mdbook plugins"
-        default: "mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17"
+        default: "mdbook-typst-math@0.3.0, mdbook-mermaid@0.17"
 
 permissions:
   contents: read
