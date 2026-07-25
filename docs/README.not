@@ -1,0 +1,5 @@
+= ranim 文档库
+
+本目录是 ranim 的知识库 Vault，使用 Notist（`.not`）编写，本目录下不出现 Markdown 文件。
+
+- [[designs]]：设计记录（稳定的 `Dxxxx` 编号）。
