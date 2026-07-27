@@ -9,6 +9,7 @@ pub struct MeshTransform {
     pub transform: [[f32; 4]; 4],
 }
 
+#[derive(bevy_ecs::prelude::Resource)]
 pub struct MeshItemsBuffer {
     /// Per-vertex positions (vertex buffer)
     pub(crate) vertices_buffer: WgpuVecBuffer<Vec3>,
@@ -61,8 +62,13 @@ impl MeshItemsBuffer {
         }
     }
 
-    pub fn update(&mut self, ctx: &WgpuContext, mesh_items: &[MeshItem]) {
-        if mesh_items.is_empty() {
+    pub fn update<'a, I>(&mut self, ctx: &WgpuContext, mesh_items: I)
+    where
+        I: IntoIterator<Item = &'a MeshItem>,
+        I::IntoIter: ExactSizeIterator + Clone,
+    {
+        let mesh_items = mesh_items.into_iter();
+        if mesh_items.len() == 0 {
             self.item_count = 0;
             self.total_vertices = 0;
             self.total_indices = 0;
@@ -70,8 +76,8 @@ impl MeshItemsBuffer {
         }
 
         let item_count = mesh_items.len();
-        let total_vertices: usize = mesh_items.iter().map(|m| m.points.len()).sum();
-        let total_indices: usize = mesh_items.iter().map(|m| m.triangle_indices.len()).sum();
+        let total_vertices: usize = mesh_items.clone().map(|m| m.points.len()).sum();
+        let total_indices: usize = mesh_items.clone().map(|m| m.triangle_indices.len()).sum();
 
         let mut transforms = Vec::with_capacity(item_count);
         let mut all_vertices = Vec::with_capacity(total_vertices);
@@ -82,7 +88,7 @@ impl MeshItemsBuffer {
 
         let mut vertex_offset: u32 = 0;
 
-        for (mesh_idx, mesh) in mesh_items.iter().enumerate() {
+        for (mesh_idx, mesh) in mesh_items.enumerate() {
             let vc = mesh.points.len() as u32;
 
             transforms.push(MeshTransform {
@@ -226,10 +232,10 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::{Renderer, resource::RenderPool};
+    use crate::{Renderer, world::RenderFrame};
     use glam::{Mat4, Vec3};
     use pollster::block_on;
-    use ranim_core::{components::rgba::Rgba, core_item::CoreItem, store::CoreItemStore};
+    use ranim_core::{components::rgba::Rgba, core_item::CoreItem};
 
     fn create_triangle_mesh(color: Rgba, offset: Vec3) -> MeshItem {
         MeshItem {
@@ -324,9 +330,7 @@ mod tests {
 
         let mut renderer = Renderer::new(&ctx, width, height, 8);
         let mut render_textures = renderer.new_render_textures(&ctx);
-        let mut pool = RenderPool::new();
-
-        let mut store = CoreItemStore::new();
+        let mut store = RenderFrame::new();
 
         let red = Rgba(glam::Vec4::new(1.0, 0.0, 0.0, 1.0));
         let green = Rgba(glam::Vec4::new(0.0, 1.0, 0.0, 1.0));
@@ -357,8 +361,7 @@ mod tests {
             a: 1.0,
         };
 
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
-        pool.clean();
+        renderer.render_frame(&mut render_textures, clear_color, &store);
 
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -385,8 +388,7 @@ mod tests {
 
         let mut renderer = Renderer::new(&ctx, width, height, 8);
         let mut render_textures = renderer.new_render_textures(&ctx);
-        let mut pool = RenderPool::new();
-        let mut store = CoreItemStore::new();
+        let mut store = RenderFrame::new();
 
         // Create nested spheres:
         // 1. Outer transparent sphere (blue, alpha=0.3, radius=2.0)
@@ -420,8 +422,7 @@ mod tests {
             a: 1.0,
         };
 
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
-        pool.clean();
+        renderer.render_frame(&mut render_textures, clear_color, &store);
 
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())

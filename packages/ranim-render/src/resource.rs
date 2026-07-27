@@ -1,15 +1,15 @@
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
-    sync::{Arc, RwLock},
+    sync::{
+        Arc, RwLock,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use image::{ImageBuffer, Luma, Rgba};
 
-use crate::{
-    primitives::{Primitive, RenderResource},
-    utils::{ReadbackWgpuTexture, WgpuContext},
-};
+use crate::utils::{ReadbackWgpuTexture, WgpuContext};
 
 /// A render resource.
 pub(crate) trait GpuResource {
@@ -19,7 +19,7 @@ pub(crate) trait GpuResource {
 }
 
 /// A storage for pipelines
-#[derive(Default)]
+#[derive(bevy_ecs::prelude::Resource, Default)]
 pub struct PipelinesPool {
     inner: RwLock<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
 }
@@ -50,6 +50,30 @@ impl PipelinesPool {
 }
 
 // MARK: RenderTextures
+#[derive(Clone)]
+pub(crate) struct RenderTextureState(Arc<RenderTextureStateInner>);
+
+struct RenderTextureStateInner {
+    output_dirty: AtomicBool,
+    depth_dirty: AtomicBool,
+}
+
+impl Default for RenderTextureState {
+    fn default() -> Self {
+        Self(Arc::new(RenderTextureStateInner {
+            output_dirty: AtomicBool::new(true),
+            depth_dirty: AtomicBool::new(true),
+        }))
+    }
+}
+
+impl RenderTextureState {
+    pub(crate) fn mark_dirty(&self) {
+        self.0.output_dirty.store(true, Ordering::Release);
+        self.0.depth_dirty.store(true, Ordering::Release);
+    }
+}
+
 /// Texture resources used for rendering
 #[allow(unused)]
 pub struct RenderTextures {
@@ -66,8 +90,7 @@ pub struct RenderTextures {
     // pub(crate) multisample_view: wgpu::TextureView,
     pub(crate) depth_stencil_view: wgpu::TextureView,
 
-    output_dirty: bool,
-    depth_dirty: bool,
+    state: RenderTextureState,
 }
 
 pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -189,21 +212,23 @@ impl RenderTextures {
             depth_bind_group,
             // multisample_view,
             depth_stencil_view,
-            output_dirty: true,
-            depth_dirty: true,
+            state: RenderTextureState::default(),
         }
     }
 
     /// Mark textures as dirty after rendering.
-    pub fn mark_dirty(&mut self) {
-        self.output_dirty = true;
-        self.depth_dirty = true;
+    pub fn mark_dirty(&self) {
+        self.state.mark_dirty();
+    }
+
+    pub(crate) fn state(&self) -> RenderTextureState {
+        self.state.clone()
     }
 
     /// Start async readback of the output texture (non-blocking).
     pub fn start_readback(&mut self, ctx: &WgpuContext) {
         self.render_texture.start_readback(ctx);
-        self.output_dirty = false;
+        self.state.0.output_dirty.store(false, Ordering::Release);
     }
 
     /// Finish a pending async readback, copying data into the CPU-side buffer.
@@ -219,10 +244,10 @@ impl RenderTextures {
     }
 
     pub fn get_rendered_texture_data(&mut self, ctx: &WgpuContext) -> &[u8] {
-        if !self.output_dirty {
+        if !self.state.0.output_dirty.load(Ordering::Acquire) {
             return self.render_texture.texture_data();
         }
-        self.output_dirty = false;
+        self.state.0.output_dirty.store(false, Ordering::Release);
         self.render_texture.update_texture_data(ctx)
     }
 
@@ -234,10 +259,10 @@ impl RenderTextures {
     }
 
     pub fn get_depth_texture_data(&mut self, ctx: &WgpuContext) -> &[f32] {
-        if !self.depth_dirty {
+        if !self.state.0.depth_dirty.load(Ordering::Acquire) {
             return bytemuck::cast_slice(self.depth_stencil_texture.texture_data());
         }
-        self.depth_dirty = false;
+        self.state.0.depth_dirty.store(false, Ordering::Release);
         bytemuck::cast_slice(self.depth_stencil_texture.update_texture_data(ctx))
     }
 
@@ -251,121 +276,5 @@ impl RenderTextures {
             .map(|&d| (d.clamp(0.0, 1.0) * 255.0) as u8)
             .collect::<Vec<_>>();
         ImageBuffer::from_raw(self.width, self.height, data).unwrap()
-    }
-}
-
-slotmap::new_key_type! { pub struct RenderInstanceKey; }
-
-/// A handle to a render packet.
-///
-/// In its inner is an [`Arc`] reference count of the [`RenderInstanceKey`].
-pub struct Handle<T> {
-    key: Arc<RenderInstanceKey>,
-    _phantom: std::marker::PhantomData<T>,
-}
-
-impl<T> Clone for Handle<T> {
-    fn clone(&self) -> Self {
-        Self {
-            key: self.key.clone(),
-            _phantom: std::marker::PhantomData,
-        }
-    }
-}
-//
-// MARK: RenderPool
-#[derive(Default)]
-pub struct RenderPool {
-    #[allow(clippy::type_complexity)]
-    inner: slotmap::SlotMap<
-        RenderInstanceKey,
-        (
-            Arc<RenderInstanceKey>,
-            TypeId,
-            Box<dyn Any + Send + Sync + 'static>,
-        ),
-    >,
-    last_frame_dropped: HashMap<TypeId, Vec<RenderInstanceKey>>,
-}
-
-impl RenderPool {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn get_packet<T: 'static>(&self, handle: &Handle<T>) -> &T {
-        self.get(*handle.key)
-            .map(|x| x.downcast_ref::<T>().unwrap())
-            .unwrap()
-    }
-
-    pub fn alloc_packet<P: Primitive>(
-        &mut self,
-        ctx: &WgpuContext,
-        data: &P,
-    ) -> Handle<P::RenderPacket> {
-        let key = self.alloc(ctx, data);
-        Handle {
-            key,
-            _phantom: std::marker::PhantomData,
-        }
-    }
-
-    pub fn show(&self) {
-        self.inner
-            .iter()
-            .enumerate()
-            .for_each(|(idx, (_, (k, _, _)))| {
-                print!("{idx}: {}, ", Arc::strong_count(k));
-            });
-        println!();
-    }
-
-    fn get(&self, key: RenderInstanceKey) -> Option<&(dyn Any + Send + Sync + 'static)> {
-        self.inner.get(key).map(|x| x.2.as_ref())
-    }
-
-    fn alloc<P: Primitive>(&mut self, ctx: &WgpuContext, data: &P) -> Arc<RenderInstanceKey> {
-        let last_frame_dropped = self
-            .last_frame_dropped
-            .entry(TypeId::of::<P::RenderPacket>())
-            .or_default();
-        if let Some(key) = last_frame_dropped.pop() {
-            let entry = self.inner.get_mut(key).unwrap();
-            let key = entry.0.clone();
-            (entry.2.as_mut() as &mut dyn Any)
-                .downcast_mut::<P::RenderPacket>()
-                .unwrap()
-                .update(ctx, data);
-            key
-        } else {
-            let handle = self.inner.insert_with_key(|key| {
-                (
-                    Arc::new(key),
-                    TypeId::of::<P::RenderPacket>(),
-                    Box::new(P::RenderPacket::init(ctx, data)),
-                )
-            });
-            self.inner.get(handle).unwrap().0.clone()
-        }
-    }
-
-    /// When called, all instances not referenced are recorded into the `last_frame_dropped` map.
-    /// An will be cleaned in the next call.
-    pub fn clean(&mut self) {
-        self.inner.retain(|key, (_, t_id, _)| {
-            self.last_frame_dropped
-                .get(t_id)
-                .map(|x| !x.contains(&key))
-                .unwrap_or(true)
-        });
-        // println!("dropped {}", self.last_frame_dropped.len());
-        self.last_frame_dropped.clear();
-        self.inner
-            .iter()
-            .filter(|(_, (key, _, _))| Arc::strong_count(key) == 1)
-            .for_each(|(key, (_, t_id, _))| {
-                self.last_frame_dropped.entry(*t_id).or_default().push(key);
-            });
     }
 }
