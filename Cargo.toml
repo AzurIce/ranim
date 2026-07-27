@@ -45,6 +45,7 @@ bytemuck = "1.25.1"
 wgpu = "30.0.0"
 image = "0.25.10"
 derive_more = "2.1.1"
+bevy_ecs = { version = "0.19.0", default-features = false, features = ["std"] }
 
 [features]
 # default = ["output"]

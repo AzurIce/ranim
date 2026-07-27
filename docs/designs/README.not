@@ -10,7 +10,7 @@ For vibe coding
 
 == 当前设计
 
-- [[self::D0002-incremental-bevy-ecs]]：渐进式引入 bevy_ecs——ECS 纯内部化：`CoreItemStore` 换成 World、渲染原语成为组件；item 类型体系与对外接口不变，ECS 类型不跨 dylib 边界。
+- [[self::D0002-incremental-bevy-ecs]]：ECS 内部化的渲染 World——渲染原语成为组件，prepare 与 render graph 成为 schedules；item 类型体系、场景接口与 dylib 协议不变。
 
 == 历史记录
 

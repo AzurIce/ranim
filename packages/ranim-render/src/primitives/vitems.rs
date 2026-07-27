@@ -36,6 +36,7 @@ pub struct PlaneData {
 /// Instead of one set of buffers per VItem, all data is packed into
 /// contiguous arrays with an index table (`item_infos`) that tells
 /// shaders where each item's data lives.
+#[derive(bevy_ecs::prelude::Resource)]
 pub struct VItemsBuffer {
     /// Per-item metadata: offsets and counts
     pub(crate) item_infos_buffer: WgpuVecBuffer<ItemInfo>,
@@ -96,8 +97,13 @@ impl VItemsBuffer {
     }
 
     /// Pack all VItems into the merged buffers. Called once per frame.
-    pub fn update(&mut self, ctx: &WgpuContext, vitems: &[VItem]) {
-        if vitems.is_empty() {
+    pub fn update<'a, I>(&mut self, ctx: &WgpuContext, vitems: I)
+    where
+        I: IntoIterator<Item = &'a VItem>,
+        I::IntoIter: ExactSizeIterator + Clone,
+    {
+        let vitems = vitems.into_iter();
+        if vitems.len() == 0 {
             self.item_count = 0;
             self.total_points = 0;
             return;
@@ -106,8 +112,8 @@ impl VItemsBuffer {
         let item_count = vitems.len();
 
         // Pre-calculate total sizes
-        let total_points: usize = vitems.iter().map(|v| v.points.len()).sum();
-        let total_attrs: usize = vitems.iter().map(|v| v.points.len().div_ceil(2)).sum();
+        let total_points: usize = vitems.clone().map(|v| v.points.len()).sum();
+        let total_attrs: usize = vitems.clone().map(|v| v.points.len().div_ceil(2)).sum();
 
         // Build index table and collect data
         let mut item_infos = Vec::with_capacity(item_count);
