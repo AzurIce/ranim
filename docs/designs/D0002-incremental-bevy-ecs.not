@@ -1,0 +1,116 @@
+= D0002: ECS 内部化的渲染 World
+
+这份设计回答一个问题：ranim 应如何采用 `bevy_ecs`，而不改变场景作者面对的 item、动画与动态库模型？答案是让 ECS 成为完整的渲染内部模型：渲染原语进入一个 `RenderWorld`，渲染准备与 GPU pass 由 schedule 组织；用户级 item、动画求值和 dylib 协议仍停留在 World 之外。
+
+本设计取代 [[super::archive::D0001-bevy-ecs-dual-world]]。D0001 让用户级 item 进入逻辑 World，并为下游类型设计跨 dylib 注册机制；这里没有逻辑 World，也没有外部组件注册。ECS 的消费者只有 ranim 自己拥有的渲染类型与渲染系统。
+
+== World 接管渲染中段
+
+```text
+动画树 (AnimStack)
+│  eval_at_sec(t)：纯函数求值
+▼
+((animation_id, part), DynItem)
+│  vtable extract_into：降级为若干 CoreItem
+▼
+RenderWorld
+│  组件：CoreItemIdentity + SceneOrder + VItem / MeshItem / CameraFrame
+│  RenderPrepare schedule：收集、排序、打包、上传、建立 bind group
+│  RenderGraph schedule：clear、逐 view pass、OIT resolve、submit
+▼
+GPU
+```
+
+动画求值仍产生 `DynItem`，提取仍由其 vtable 完成，一个用户 item 仍可以展开成多个 `CoreItem`。提取结果的身份是 `(animation_id, part)`：`part` 是该动画输出展开后的稳定出现位置。这个身份只在渲染内部用于跨帧 reconciliation，不成为作者可引用的场景实体。
+
+改变的是 `CoreItem` 到 GPU 之间的全部组织方式。`CoreItemStore` 不再作为一组公开的类型化 `Vec` 存在；`RenderWorld` 是渲染原语、准备结果、GPU 资源和 schedule 的共同所有者。renderer 是这个 World 的驱动者，而不是另有一套与 World 平行的节点图。
+
+== 公共边界不因 ECS 移动
+
+用户级 item 绝不成为 ECS 组件。World 中只存在 ranim 自己定义并拥有的渲染原语和内部状态；用户类型与 World 之间始终隔着 `DynItem` 的 vtable 提取。`ranim-items` 不需要为了定义 item 而依赖或理解 ECS。
+
+ECS 类型也不出现在场景 API 与 dylib 协议中。item、动画和场景接口不接受 `World`、`Component`、`Query` 或 schedule；动态库边界上仍然只有既有 vtable、按值传递的 `CoreItem` 和平凡函数指针。same source + same toolchain 的已有假设不因 RenderWorld 扩大。
+
+`RenderWorld` 可以是 `ranim-render` 的公开 Rust 类型，但它的 World 与 schedule 不构成扩展承诺：调用者只能提交已提取的 `CoreItem` 并请求 prepare/render。跨 crate 所需的 façade 返回 ranim 自己的类型，不暴露 `bevy_ecs` 类型。内部组件可以定义在 core，因为渲染原语由 core 拥有；World、query 和 schedule 的所有权属于 render。
+
+这条边界避免一种滑坡：先让用户 item 进入 World，再为它补查询、反射和跨 dylib 类型分发。那会重新进入 D0001 的开放模型，却没有证明相应能力有消费者。
+
+== 身份与顺序是两件事
+
+`CoreItemIdentity(animation_id, part)` 回答“这一项是否是上一帧的同一项”。RenderWorld 按这个 key 保留实体：值相同则不写组件，使 `Changed<T>` 保持真实；值变化才替换组件；本帧不再出现的 key 对应实体被移除。若某类输出没有可信的语义 key，它应作为本帧瞬态数据处理，而不能借用 `Vec` 下标伪造跨帧身份。
+
+`SceneOrder` 回答“这一帧按什么顺序消费这些项”。ECS query 的遍历顺序没有语义，不能把 archetype 或 Entity 的内部顺序当成绘制顺序。每次 reconciliation 都根据提取顺序更新 `SceneOrder`；prepare system 显式读取它，按渲染需要排序或分桶。
+
+RenderWorld 本身不为每种原语维护 `Vec<Entity>` 顺序索引。那种索引虽然不复制组件数据，却让 World 与手写 store 同时承担集合组织，并把渲染顺序固定在存储层。需要顺序的集合应由 prepare 阶段产生，例如按 `SceneOrder` 排好的 phase items、合并 buffer 的暂存区或每 view draw list。它们是本帧渲染产物，不是第二份事实来源。
+
+有序集合并不会因为采用 ECS 而消失。透明绘制、稳定叠放和 batching 都需要 `Vec`、`IndexMap` 或 GPU buffer；关键在于这些集合属于 render phase，并可在下一帧重建或增量更新，而不是冒充 World 的主存储。
+
+== Prepare schedule 把组件变成 GPU 输入
+
+`RenderPrepare` schedule 处理所有尚未编码 GPU pass 的工作。它的基本顺序是：
+
+```text
+Collect
+  → SortAndBatch
+  → PrepareResources
+  → Upload
+  → PrepareBindGroups
+```
+
+`Collect` 查询内部原语及其 `SceneOrder`；`SortAndBatch` 形成各渲染 phase 的有序输入；`PrepareResources` 把组件展开为 storage/index/uniform 数据；`Upload` 更新 GPU buffer；`PrepareBindGroups` 只在所依赖的 buffer 或 layout 变化后重建绑定。
+
+这些名字表达数据依赖，不要求每一项永远是单独 system。可以安全并行的类型化准备应拆成独立 system，例如 VItem 与 MeshItem 的 CPU 打包；共享 GPU 资源或有明确先后关系的操作通过 system set 与访问冲突排序。`Changed<T>` 可让 prepare 跳过未变化的 CPU 数据，但它不是 GPU 上传去重的替代品：最终 buffer 内容比较仍负责避免上传相同字节。
+
+pipeline pool、resolution、render textures、prepared buffers 与 render phases 都是 RenderWorld 的资源。它们不再从一个外部 `Renderer` 结构通过手写 `RenderContext` 逐节点传递；system 用类型化资源访问声明自己的依赖。
+
+== Render graph 是 schedule
+
+ranim 不再保留自制的 `Graph<NodeKey, Box<dyn RenderNode>>`。节点 trait、拓扑容器和 `RenderPacketsQuery` 都在重复 ECS schedule 已经提供的能力：类型化数据访问、执行顺序、条件运行和系统组合。Render graph 的含义保留，但物理形态是 schedule。
+
+根 `RenderGraph` schedule 采用四个阶段：
+
+```text
+Begin
+  → Render
+  → Submit
+  → Finish
+```
+
+`Begin` 创建本帧 encoder 状态并完成 attachment 的帧级准备；`Render` 执行 clear、view schedules 与 OIT resolve；`Submit` 按 schedule 确定的顺序提交 command buffer；`Finish` 回收瞬态 render phase、处理 readback/profiling，并把纹理标记为可消费。
+
+逐 view 的渲染是子 schedule。当前只有一个相机也走同一模型，避免单 view 成为以后多 view 的特殊路径：
+
+```text
+Clear
+  → VItemCompute
+  → Depth (VItemDepth, MeshDepth)
+  → Color (VItemColor, MeshColor)
+  → OITResolve
+```
+
+Depth 内互不依赖的工作可以并行准备 command buffer；Color 必须等待所消费的 compute/depth 结果；OIT resolve 必须等待所有写入 OIT attachment 的 color pass。schedule 的 system sets 是这些 GPU 依赖的规范表达，不能依赖 system 注册顺序偶然成立。
+
+渲染 system 通过一个内部 `RenderContext` system param 取得 command encoder。每个 system 可以拥有独立 encoder，并在 system apply 时把结果放入 `PendingCommandBuffers`；`Submit` 按确定顺序统一提交。若初始实现使用单个 `FrameEncoder` 资源，也必须保持同一 system 接口与阶段边界，使以后并行编码不改变 pass 的职责。
+
+== Renderer 只驱动 World
+
+renderer 的持久状态收敛为 RenderWorld 中的资源与 schedules。外层 driver 只负责三件事：把本帧提取结果 reconcile 进 World，运行 `RenderPrepare`，运行 `RenderGraph`。它不再拥有一套需要逐字段塞进 `RenderContext` 的 pipeline、packet、buffer 和 graph。
+
+提取与渲染是否位于不同线程，是 driver 的交付拓扑，不改变这个模型。跨线程可以传递本帧的 `(CoreItemIdentity, CoreItem)` 传输缓冲；持久 RenderWorld 留在渲染线程，才能让实体身份、change tick 与 GPU 资源共同跨帧延续。传输缓冲是帧消息，不是另一份按类型分桶的 store。
+
+RenderWorld 不依赖 `bevy_app` 或 `bevy_render`。ranim 直接使用 `bevy_ecs` 的 World、Schedule、SystemSet 和 SystemParam，并借鉴 Bevy 0.19 的 schedule 形态；wgpu 管线、OIT、attachment 和 submission 仍由 ranim 自己定义。
+
+== 明确不提供的能力
+
+- 外部 item 不能被 ECS 查询，也不能使用 ECS 的逐 item 变更检测；它们仍经 vtable 降级，只有产生的内部原语进入 RenderWorld。
+- 外部 crate 不能注册新渲染原语或向 RenderGraph schedule 注入 system。体渲染、场可视化等扩展需要独立设计其 GPU 资源、phase 与依赖边界。
+- editor 的字段级内省不来自 ECS。组件存储不会自动产生字段描述，内省仍需要反射或按类型注册的独立模型。
+- schedule 不是公开插件 API。内部把一个 pass 改成 system，不等于承诺其 label、set 或资源布局长期稳定。
+
+当真实需求要求跨边界查询或内省用户 item、外部原语必须接入渲染 schedule，或 editor 需要统一的类型目录时，应重新评估 [[super::archive::D0001-bevy-ecs-dual-world]]。D0001 的双 World、类型名分发与声明式注册是那类需求的候选答案，不是本设计的隐含待办。
+
+== 依赖与代价
+
+只引入 `bevy_ecs`，关闭默认 feature，尤其不携带 `bevy_reflect`；不引入 `bevy_app` 或 `bevy_render`。core 只为 ranim 自有渲染原语提供组件能力，render 拥有 World 与调度，item 和场景包不依赖 ECS。
+
+代价包括编译时间、二进制体积、Rust 版本要求，以及把原有 renderer 状态资源化的结构调整。换来的不只是替换三个 `Vec`，而是一套共同的数据与执行模型：原语的身份、变化、准备依赖、view pass 和 submission 都由同一个 RenderWorld 解释。若最终仍保留手写 store、节点图和 packet 查询层，ECS 只会成为第四套抽象，那不符合本设计。

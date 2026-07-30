@@ -1,10 +1,7 @@
 use glam::{Mat4, Vec2};
 use ranim_core::prelude::CameraFrame;
 
-use crate::{
-    primitives::{Primitive, RenderResource},
-    utils::{WgpuBuffer, WgpuContext},
-};
+use crate::utils::{WgpuBuffer, WgpuContext};
 
 /// Uniforms for the camera
 #[repr(C, align(16))]
@@ -15,10 +12,6 @@ pub struct ViewportUniform {
     half_frame_size: Vec2,
     _padding: [u32; 2],
 }
-impl Primitive for ViewportUniform {
-    type RenderPacket = ViewportGpuPacket;
-}
-
 impl ViewportUniform {
     pub fn from_camera_frame(camera_frame: &CameraFrame, width: u32, height: u32) -> Self {
         let ratio = width as f64 / height as f64;
@@ -80,15 +73,14 @@ impl ViewportBindGroup {
     }
 }
 
+#[derive(bevy_ecs::prelude::Resource)]
 pub struct ViewportGpuPacket {
     pub(crate) uniforms_buffer: WgpuBuffer<ViewportUniform>,
     pub(crate) uniforms_bind_group: ViewportBindGroup,
 }
 
-impl RenderResource for ViewportGpuPacket {
-    type Data = ViewportUniform;
-
-    fn init(ctx: &WgpuContext, data: &Self::Data) -> Self {
+impl ViewportGpuPacket {
+    pub(crate) fn new(ctx: &WgpuContext, data: &ViewportUniform) -> Self {
         let uniforms_buffer = WgpuBuffer::new_init(
             ctx,
             Some("Uniforms Buffer"),
@@ -103,7 +95,7 @@ impl RenderResource for ViewportGpuPacket {
         }
     }
 
-    fn update(&mut self, ctx: &WgpuContext, data: &Self::Data) {
+    pub(crate) fn update(&mut self, ctx: &WgpuContext, data: &ViewportUniform) {
         self.uniforms_buffer.set(ctx, *data);
     }
 }

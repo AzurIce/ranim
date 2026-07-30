@@ -18,7 +18,6 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    ciallo.url = "github:azurice/ciallo";
   };
 
   outputs =
@@ -27,7 +26,6 @@
       crane,
       rust-overlay,
       flake-utils,
-      ciallo,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -51,6 +49,11 @@
         commonArgs = {
           inherit src;
           strictDeps = true;
+
+          # pyo3 (ranimpy) needs a python interpreter at build time
+          nativeBuildInputs = [
+            pkgs.python3
+          ];
 
           buildInputs = [
             # Add additional build inputs here
@@ -106,6 +109,9 @@
             hash = "sha256-ppE/f6jLRe6a1lfUQUlxTq/L29DwAD/a58u5utUJMoU=";
           };
 
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.gtk3 ];
+
           cargoHash = "sha256-zhijQ+9vVB4IL/t1+IGLAnvJka0AB1yJRWo/qEyUfx0=";
         });
       in
@@ -121,6 +127,10 @@
             puffin_viewer
           ]
           ++ (with pkgs; [
+            # for pyo3 (ranimpy, ranim-cli's `python` feature)
+            python3
+            # for rendering (avoids ranim downloading its own ffmpeg binary)
+            ffmpeg
             git-cliff
             # cargo-release
             cargo-edit
@@ -142,9 +152,7 @@
           ])
           ++ [
             (pkgs.callPackage ./cargo-release.nix { })
-            (pkgs.callPackage ./mdbook-katex.nix { })
             (pkgs.callPackage ./wasm-bindgen-cli.nix { })
-            ciallo.packages.${system}.default
           ];
         };
       }

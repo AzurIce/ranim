@@ -17,8 +17,6 @@ pub mod color;
 pub mod components;
 /// Fundamental scene primitives.
 pub mod core_item;
-/// Scene item storage.
-pub mod store;
 /// Fundamental traits.
 pub mod traits;
 /// Utilities.
@@ -175,7 +173,8 @@ impl SealedRanimScene {
                 items
                     .into_iter()
                     .flat_map(|item| item.extract())
-                    .map(move |item| ((0, animation_id), item))
+                    .enumerate()
+                    .map(move |(part, item)| ((animation_id, part), item))
             })
     }
 
@@ -208,6 +207,20 @@ mod tests {
         assert_eq!(infos[0].range, 0.0..5.0);
         assert_eq!(infos[0].children[0].range, 0.0..2.0);
         assert_eq!(infos[0].children[1].range, 2.0..5.0);
+    }
+
+    #[test]
+    fn extracted_items_have_unique_semantic_part_ids() {
+        let mut scene = RanimScene::new();
+        scene.play(Static(vec![VItem::default(), VItem::default()]).with_duration(1.0));
+        let sealed = scene.seal();
+
+        let ids = sealed
+            .eval_at_sec(0.5)
+            .map(|(id, _)| id)
+            .collect::<Vec<_>>();
+
+        assert_eq!(ids, [(0, 0), (0, 1)]);
     }
 
     #[test]

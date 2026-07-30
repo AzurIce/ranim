@@ -1,0 +1,5 @@
+= 设计记录存档
+
+已废止或被替换的设计记录保存在这里，仅作为设计演进的历史证据，不再约束当前实现。
+
+- [[self::D0001-bevy-ecs-dual-world]]：bevy_ecs 双 World 架构与跨 dylib 注册机制——被 [[super::D0002-incremental-bevy-ecs]] 取代（ECS 纯内部化）；双 World 与注册机制的分析保留为重新评估时的候选。

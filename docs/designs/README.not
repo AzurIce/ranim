@@ -1,0 +1,17 @@
+For vibe coding
+
+---
+
+= 设计记录
+
+活动设计记录使用稳定的 `Dxxxx` 编号，按立项（写作）顺序分配，编号不承载实现顺序——小号先落地或后落地都正常，实现进度属于 issue 与 commit，不属于本文档。
+
+设计记录是规范性的设计立场：它描述架构边界、关键取舍和不变式，不是 API 参考、开发日志或实现状态报告。废止的设计在同一提交中移入 [[self::archive]] 并结束其效力。
+
+== 当前设计
+
+- [[self::D0002-incremental-bevy-ecs]]：ECS 内部化的渲染 World——渲染原语成为组件，prepare 与 render graph 成为 schedules；item 类型体系、场景接口与 dylib 协议不变。
+
+== 历史记录
+
+- [[self::archive::D0001-bevy-ecs-dual-world]]：bevy_ecs 双 World 架构与跨 dylib 注册机制——机制服务的消费者不存在，被 D0002 取代。

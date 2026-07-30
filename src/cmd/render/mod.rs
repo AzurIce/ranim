@@ -6,10 +6,9 @@ use crate::{Output, Scene, SceneConfig, SceneConstructor};
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
-use ranim_core::store::CoreItemStore;
 use ranim_core::{SealedRanimScene, TimeMark};
-use ranim_render::resource::{RenderPool, RenderTextures};
-use ranim_render::{Renderer, utils::WgpuContext};
+use ranim_render::resource::RenderTextures;
+use ranim_render::{Renderer, utils::WgpuContext, world::RenderFrame};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::Instant;
@@ -82,18 +81,18 @@ pub fn render_scene_output_with_progress(
 
 /// drop it will close the channel and the thread loop will be terminated
 struct RenderThreadHandle {
-    submit_frame_tx: async_channel::Sender<CoreItemStore>,
-    back_rx: async_channel::Receiver<CoreItemStore>,
+    submit_frame_tx: async_channel::Sender<RenderFrame>,
+    back_rx: async_channel::Receiver<RenderFrame>,
     worker_rx: async_channel::Receiver<RenderWorker>,
 }
 
 impl RenderThreadHandle {
-    fn sync_and_submit(&self, f: impl FnOnce(&mut CoreItemStore)) {
+    fn sync_and_submit(&self, f: impl FnOnce(&mut RenderFrame)) {
         let mut store = self.get_store();
         f(&mut store);
         self.submit_frame_tx.send_blocking(store).unwrap();
     }
-    fn get_store(&self) -> CoreItemStore {
+    fn get_store(&self) -> RenderFrame {
         self.back_rx.recv_blocking().unwrap()
     }
     fn retrive(&self) -> RenderWorker {
@@ -106,7 +105,6 @@ struct RenderWorker {
     ctx: WgpuContext,
     renderer: Renderer,
     render_textures: Vec<RenderTextures>,
-    pool: RenderPool,
     clear_color: wgpu::Color,
     // video writer
     video_writer: Option<FileWriter>,
@@ -170,7 +168,6 @@ impl RenderWorker {
             ctx,
             renderer,
             render_textures,
-            pool: RenderPool::new(),
             clear_color,
             video_writer: None,
             video_writer_builder: Some(
@@ -207,7 +204,7 @@ impl RenderWorker {
         let (back_tx, back_rx) = async_channel::bounded(1);
         let (worker_tx, worker_rx) = async_channel::bounded(1);
 
-        back_tx.send_blocking(CoreItemStore::default()).unwrap();
+        back_tx.send_blocking(RenderFrame::default()).unwrap();
         std::thread::spawn(move || {
             let mut worker = self;
             let n = worker.render_textures.len();
@@ -224,15 +221,12 @@ impl RenderWorker {
                 }
 
                 // Render current frame and start async readback
-                worker.renderer.render_store_with_pool(
-                    &worker.ctx,
+                worker.renderer.render_frame(
                     &mut worker.render_textures[cur],
                     worker.clear_color,
                     &store,
-                    &mut worker.pool,
                 );
                 worker.render_textures[cur].start_readback(&worker.ctx);
-                worker.pool.clean();
 
                 pending.push_back((cur, frame_count));
                 frame_count += 1;
@@ -269,7 +263,7 @@ impl RenderWorker {
         }
     }
 
-    fn render_store(&mut self, store: &CoreItemStore) {
+    fn render_store(&mut self, store: &RenderFrame) {
         #[cfg(feature = "profiling")]
         profiling::scope!("frame");
 
@@ -277,15 +271,9 @@ impl RenderWorker {
             #[cfg(feature = "profiling")]
             profiling::scope!("render");
 
-            self.renderer.render_store_with_pool(
-                &self.ctx,
-                &mut self.render_textures[0],
-                self.clear_color,
-                store,
-                &mut self.pool,
-            );
+            self.renderer
+                .render_frame(&mut self.render_textures[0], self.clear_color, store);
         }
-        self.pool.clean();
 
         #[cfg(feature = "profiling")]
         profiling::finish_frame!();
@@ -351,7 +339,7 @@ impl RenderWorker {
 struct RanimRenderApp {
     render_worker: Option<RenderWorker>,
     fps: u32,
-    store: CoreItemStore,
+    store: RenderFrame,
 }
 
 impl RanimRenderApp {
@@ -365,7 +353,7 @@ impl RanimRenderApp {
         Self {
             render_worker: Some(render_worker),
             fps: output.fps,
-            store: CoreItemStore::default(),
+            store: RenderFrame::default(),
         }
     }
 
