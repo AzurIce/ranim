@@ -18,7 +18,6 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    ciallo.url = "github:azurice/ciallo";
   };
 
   outputs =
@@ -27,7 +26,6 @@
       crane,
       rust-overlay,
       flake-utils,
-      ciallo,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -106,6 +104,9 @@
             hash = "sha256-ppE/f6jLRe6a1lfUQUlxTq/L29DwAD/a58u5utUJMoU=";
           };
 
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.gtk3 ];
+
           cargoHash = "sha256-zhijQ+9vVB4IL/t1+IGLAnvJka0AB1yJRWo/qEyUfx0=";
         });
       in
@@ -142,9 +143,7 @@
           ])
           ++ [
             (pkgs.callPackage ./cargo-release.nix { })
-            (pkgs.callPackage ./mdbook-katex.nix { })
             (pkgs.callPackage ./wasm-bindgen-cli.nix { })
-            ciallo.packages.${system}.default
           ];
         };
       }
