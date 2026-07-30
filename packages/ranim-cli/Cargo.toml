@@ -8,6 +8,7 @@ repository.workspace = true
 
 [features]
 profiling = ["ranim/profiling"]
+python = ["dep:ranimpy"]
 
 [[bin]]
 name = "ranim"
@@ -29,6 +30,7 @@ notify = "8.2.0"
 notify-debouncer-full = "0.7.0"
 async-channel = "2.5.0"
 toml = "1.1.4"
+ranimpy = { path = "../ranimpy", optional = true }
 
 [package.metadata.docs.rs]
 all-features = true

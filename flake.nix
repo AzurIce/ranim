@@ -50,6 +50,11 @@
           inherit src;
           strictDeps = true;
 
+          # pyo3 (ranimpy) needs a python interpreter at build time
+          nativeBuildInputs = [
+            pkgs.python3
+          ];
+
           buildInputs = [
             # Add additional build inputs here
           ]
@@ -122,6 +127,10 @@
             puffin_viewer
           ]
           ++ (with pkgs; [
+            # for pyo3 (ranimpy, ranim-cli's `python` feature)
+            python3
+            # for rendering (avoids ranim downloading its own ffmpeg binary)
+            ffmpeg
             git-cliff
             # cargo-release
             cargo-edit

@@ -1,0 +1,11 @@
+[package]
+name = "ranimpy"
+description = "Experimental embedded-Python bindings for Ranim. The ranim binary hosts the interpreter; users write scenes in Python scripts."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ranim = { workspace = true, features = ["anims", "items"] }
+pyo3 = { version = "0.25", features = ["multiple-pymethods"] }
