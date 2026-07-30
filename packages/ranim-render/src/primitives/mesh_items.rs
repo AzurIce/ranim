@@ -229,13 +229,19 @@ fn bg_entry(binding: u32, buffer: &wgpu::Buffer) -> wgpu::BindGroupEntry<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use super::*;
     use crate::{Renderer, world::RenderFrame};
     use glam::{Mat4, Vec3};
     use pollster::block_on;
     use ranim_core::{components::rgba::Rgba, core_item::CoreItem};
+
+    fn test_output_path(filename: &str) -> PathBuf {
+        let output_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../output");
+        std::fs::create_dir_all(&output_dir).expect("Failed to create output directory");
+        output_dir.join(filename)
+    }
 
     fn create_triangle_mesh(color: Rgba, offset: Vec3) -> MeshItem {
         MeshItem {
@@ -369,8 +375,8 @@ mod tests {
 
         let buffer = render_textures.get_rendered_texture_img_buffer(&ctx);
 
-        let output_path = Path::new("../../output/mesh_items_render.png");
-        buffer.save(output_path).expect("Failed to save image");
+        let output_path = test_output_path("mesh_items_render.png");
+        buffer.save(&output_path).expect("Failed to save image");
 
         println!("Rendered image saved to: {:?}", output_path);
         println!("Open it to see the mesh rendering result!");
@@ -480,13 +486,13 @@ mod tests {
         }
 
         let buffer = render_textures.get_rendered_texture_img_buffer(&ctx);
-        let output_path = Path::new("../../output/nested_spheres_render.png");
-        buffer.save(output_path).expect("Failed to save image");
+        let output_path = test_output_path("nested_spheres_render.png");
+        buffer.save(&output_path).expect("Failed to save image");
 
         let depth_buffer = render_textures.get_depth_texture_img_buffer(&ctx);
-        let depth_path = Path::new("../../output/nested_spheres_depth.png");
+        let depth_path = test_output_path("nested_spheres_depth.png");
         depth_buffer
-            .save(depth_path)
+            .save(&depth_path)
             .expect("Failed to save depth image");
 
         println!("\nImages saved to output/");
