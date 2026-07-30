@@ -144,7 +144,14 @@
           ++ [
             (pkgs.callPackage ./cargo-release.nix { })
             (pkgs.callPackage ./wasm-bindgen-cli.nix { })
+          ]
+          ++ lib.optionals pkgs.stdenv.isLinux [
+            pkgs.vulkan-loader
           ];
+
+          shellHook = lib.optionalString pkgs.stdenv.isLinux ''
+            export LD_LIBRARY_PATH="${lib.makeLibraryPath [ pkgs.vulkan-loader ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          '';
         };
       }
     );
