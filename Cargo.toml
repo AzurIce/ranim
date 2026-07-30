@@ -107,7 +107,7 @@ ranim-render = { workspace = true, optional = true }
 wgpu = { workspace = true, optional = true }
 # app feature
 egui = { version = "0.35.0", optional = true }
-egui-phosphor = { git = "https://github.com/amPerl/egui-phosphor", rev = "5a0075f68a463f6b316d39776fff519a2762b729", optional = true }
+egui-phosphor = { version =  "0.13.0", optional = true }
 web-time = { version = "1.1.0", optional = true }
 bytemuck = { workspace = true, features = ["derive"], optional = true }
 # profiling
@@ -122,7 +122,7 @@ inventory = "0.3.24"
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen.workspace = true
 # app feature (wasm)
-eframe = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981", default-features = false, features = [
+eframe = { git = "https://github.com/emilk/egui", default-features = false, features = [
     "accesskit",
     "default_fonts",
     "web_screen_reader",
@@ -142,7 +142,7 @@ tracing-indicatif = { workspace = true, optional = true }
 flate2 = { version = "1.1.9", optional = true }
 reqwest = { version = "0.13.4", features = ["blocking"], optional = true }
 # app feature (native)
-eframe = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981", features = ["wgpu"], optional = true }
+eframe = { git = "https://github.com/emilk/egui", features = ["wgpu"], optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"
@@ -155,7 +155,7 @@ rand_chacha = "0.10.0"
 getrandom = { version = "0.4.3", features = ["wasm_js"] }
 
 [patch.crates-io]
-egui = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981" }
+egui = { git = "https://github.com/emilk/egui" }
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
