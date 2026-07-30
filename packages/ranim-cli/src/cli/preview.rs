@@ -136,6 +136,11 @@ fn watch_krate(
 }
 
 pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()> {
+    if let Some(scene) = scene_name
+        && scene.ends_with(".py")
+    {
+        anyhow::bail!("Previewing python scripts is not supported yet");
+    }
     info!("Loading workspace...");
     let workspace = Workspace::current().unwrap();
 
