@@ -24,16 +24,16 @@ derive_more = { workspace = true, features = [
 sha1 = { version = "0.11.0", optional = true }
 lru = { version = "0.18.1", optional = true }
 usvg = "0.47.0"
-typst = { version = "0.15.0", optional = true }
-typst-kit = { version = "0.15.0", default-features = false, features = [
+typst = { version = "0.15.1", optional = true }
+typst-kit = { version = "0.15.1", default-features = false, features = [
   "scan-fonts",
   "embedded-fonts",
 ], optional = true }
 # time = "0.3.41"
-typst-svg = { version = "0.15.0", optional = true }
+typst-svg = { version = "0.15.1", optional = true }
 chrono = { version = "0.4.45", optional = true }
 diff-match-patch-rs = { version = "0.5.1", optional = true }
-regex = { version = "1.13.0", optional = true }
+regex = { version = "1.13.1", optional = true }
 
 [features]
 default = []

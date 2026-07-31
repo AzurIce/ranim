@@ -9,6 +9,7 @@ pub struct MeshTransform {
     pub transform: [[f32; 4]; 4],
 }
 
+#[derive(bevy_ecs::prelude::Resource)]
 pub struct MeshItemsBuffer {
     /// Per-vertex positions (vertex buffer)
     pub(crate) vertices_buffer: WgpuVecBuffer<Vec3>,
@@ -61,8 +62,13 @@ impl MeshItemsBuffer {
         }
     }
 
-    pub fn update(&mut self, ctx: &WgpuContext, mesh_items: &[MeshItem]) {
-        if mesh_items.is_empty() {
+    pub fn update<'a, I>(&mut self, ctx: &WgpuContext, mesh_items: I)
+    where
+        I: IntoIterator<Item = &'a MeshItem>,
+        I::IntoIter: ExactSizeIterator + Clone,
+    {
+        let mesh_items = mesh_items.into_iter();
+        if mesh_items.len() == 0 {
             self.item_count = 0;
             self.total_vertices = 0;
             self.total_indices = 0;
@@ -70,8 +76,8 @@ impl MeshItemsBuffer {
         }
 
         let item_count = mesh_items.len();
-        let total_vertices: usize = mesh_items.iter().map(|m| m.points.len()).sum();
-        let total_indices: usize = mesh_items.iter().map(|m| m.triangle_indices.len()).sum();
+        let total_vertices: usize = mesh_items.clone().map(|m| m.points.len()).sum();
+        let total_indices: usize = mesh_items.clone().map(|m| m.triangle_indices.len()).sum();
 
         let mut transforms = Vec::with_capacity(item_count);
         let mut all_vertices = Vec::with_capacity(total_vertices);
@@ -82,7 +88,7 @@ impl MeshItemsBuffer {
 
         let mut vertex_offset: u32 = 0;
 
-        for (mesh_idx, mesh) in mesh_items.iter().enumerate() {
+        for (mesh_idx, mesh) in mesh_items.enumerate() {
             let vc = mesh.points.len() as u32;
 
             transforms.push(MeshTransform {
@@ -223,13 +229,19 @@ fn bg_entry(binding: u32, buffer: &wgpu::Buffer) -> wgpu::BindGroupEntry<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use super::*;
-    use crate::{Renderer, resource::RenderPool};
+    use crate::{Renderer, world::RenderFrame};
     use glam::{Mat4, Vec3};
     use pollster::block_on;
-    use ranim_core::{components::rgba::Rgba, core_item::CoreItem, store::CoreItemStore};
+    use ranim_core::{components::rgba::Rgba, core_item::CoreItem};
+
+    fn test_output_path(filename: &str) -> PathBuf {
+        let output_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../output");
+        std::fs::create_dir_all(&output_dir).expect("Failed to create output directory");
+        output_dir.join(filename)
+    }
 
     fn create_triangle_mesh(color: Rgba, offset: Vec3) -> MeshItem {
         MeshItem {
@@ -324,9 +336,7 @@ mod tests {
 
         let mut renderer = Renderer::new(&ctx, width, height, 8);
         let mut render_textures = renderer.new_render_textures(&ctx);
-        let mut pool = RenderPool::new();
-
-        let mut store = CoreItemStore::new();
+        let mut store = RenderFrame::new();
 
         let red = Rgba(glam::Vec4::new(1.0, 0.0, 0.0, 1.0));
         let green = Rgba(glam::Vec4::new(0.0, 1.0, 0.0, 1.0));
@@ -357,8 +367,7 @@ mod tests {
             a: 1.0,
         };
 
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
-        pool.clean();
+        renderer.render_frame(&mut render_textures, clear_color, &store);
 
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -366,8 +375,8 @@ mod tests {
 
         let buffer = render_textures.get_rendered_texture_img_buffer(&ctx);
 
-        let output_path = Path::new("../../output/mesh_items_render.png");
-        buffer.save(output_path).expect("Failed to save image");
+        let output_path = test_output_path("mesh_items_render.png");
+        buffer.save(&output_path).expect("Failed to save image");
 
         println!("Rendered image saved to: {:?}", output_path);
         println!("Open it to see the mesh rendering result!");
@@ -385,8 +394,7 @@ mod tests {
 
         let mut renderer = Renderer::new(&ctx, width, height, 8);
         let mut render_textures = renderer.new_render_textures(&ctx);
-        let mut pool = RenderPool::new();
-        let mut store = CoreItemStore::new();
+        let mut store = RenderFrame::new();
 
         // Create nested spheres:
         // 1. Outer transparent sphere (blue, alpha=0.3, radius=2.0)
@@ -420,8 +428,7 @@ mod tests {
             a: 1.0,
         };
 
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
-        pool.clean();
+        renderer.render_frame(&mut render_textures, clear_color, &store);
 
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -479,13 +486,13 @@ mod tests {
         }
 
         let buffer = render_textures.get_rendered_texture_img_buffer(&ctx);
-        let output_path = Path::new("../../output/nested_spheres_render.png");
-        buffer.save(output_path).expect("Failed to save image");
+        let output_path = test_output_path("nested_spheres_render.png");
+        buffer.save(&output_path).expect("Failed to save image");
 
         let depth_buffer = render_textures.get_depth_texture_img_buffer(&ctx);
-        let depth_path = Path::new("../../output/nested_spheres_depth.png");
+        let depth_path = test_output_path("nested_spheres_depth.png");
         depth_buffer
-            .save(depth_path)
+            .save(&depth_path)
             .expect("Failed to save depth image");
 
         println!("\nImages saved to output/");

@@ -11,12 +11,12 @@ repository.workspace = true
 proc-macro = true
 
 [dependencies]
-quote = "1.0.46"
-syn = { version = "2.0.118", features = ["full"] }
+quote = "1.0.47"
+syn = { version = "3.0.3", features = ["full"] }
 # darling = "0.20.10"
 # heck = "0.5.0"
 proc-macro-crate = "3.5.0"
-proc-macro2 = "1.0.106"
+proc-macro2 = "1.0.107"
 # paste = "1.0.15"
 
 [package.metadata.release]

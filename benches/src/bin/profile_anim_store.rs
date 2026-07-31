@@ -8,8 +8,7 @@ use std::{
 
 use benches::test_scenes::{static_squares, transform_squares};
 use ranim::{SceneConstructor, prelude::*};
-use ranim_core::store::CoreItemStore;
-use ranim_render::{Renderer, resource::RenderPool, utils::WgpuContext};
+use ranim_render::{Renderer, utils::WgpuContext, world::RenderFrame};
 
 #[global_allocator]
 static ALLOC: CountingAlloc = CountingAlloc;
@@ -65,7 +64,7 @@ fn main() {
         std::hint::black_box(scene.eval_at_alpha(0.5).collect::<Vec<_>>());
     });
 
-    let mut store = CoreItemStore::new();
+    let mut store = RenderFrame::new();
     profile("eval + store.update", cpu_iters, || {
         store.update(scene.eval_at_alpha(0.5));
     });
@@ -77,12 +76,10 @@ fn main() {
     let ctx = pollster::block_on(WgpuContext::new());
     let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
     let mut render_textures = renderer.new_render_textures(&ctx);
-    let mut pool = RenderPool::new();
     let clear_color = wgpu::Color::BLACK;
 
     let cold = Instant::now();
-    renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
-    pool.clean();
+    renderer.render_frame(&mut render_textures, clear_color, &store);
     ctx.device
         .poll(wgpu::PollType::wait_indefinitely())
         .unwrap();
@@ -93,26 +90,18 @@ fn main() {
     );
 
     profile("static frame (steady)", 20, || {
-        renderer.render_store_with_pool(&ctx, &mut render_textures, clear_color, &store, &mut pool);
-        pool.clean();
+        renderer.render_frame(&mut render_textures, clear_color, &store);
     });
 
     let animated = (|r: &mut RanimScene| transform_squares(r, n)).build_scene();
-    let mut animated_store = CoreItemStore::new();
+    let mut animated_store = RenderFrame::new();
     let frames = 30;
     let mut frame = 0;
     profile("animated frame (eval+update+render)", frames, || {
         let alpha = frame as f64 / frames as f64;
         frame += 1;
         animated_store.update(animated.eval_at_alpha(alpha));
-        renderer.render_store_with_pool(
-            &ctx,
-            &mut render_textures,
-            clear_color,
-            &animated_store,
-            &mut pool,
-        );
-        pool.clean();
+        renderer.render_frame(&mut render_textures, clear_color, &animated_store);
     });
 
     ctx.device
