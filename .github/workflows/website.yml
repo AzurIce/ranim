@@ -44,8 +44,18 @@ jobs:
         with:
           tool: just, zola@0.22, wasm-bindgen
 
+      # Binaryen must be >= 110. Older versions (e.g. Ubuntu 22.04's apt
+      # binaryen 105) mislabel the `__wbindgen_externrefs` export as the funcref
+      # table when running `wasm-opt` on wasm-bindgen output, so
+      # `__wbindgen_init_externref_table` fails with
+      # `WebAssembly.Table.grow(): failed to grow table by N` at module init.
+      # Pin a modern release instead of using apt.
       - name: Install wasm-opt
-        run: sudo apt-get update && sudo apt-get install -y binaryen
+        run: |
+          curl -sSL -o /tmp/binaryen.tar.gz \
+            "https://github.com/WebAssembly/binaryen/releases/download/version_129/binaryen-version_129-x86_64-linux.tar.gz"
+          tar -xzf /tmp/binaryen.tar.gz -C /tmp
+          echo "/tmp/binaryen-version_129/bin" >> "$GITHUB_PATH"
 
       - uses: Swatinem/rust-cache@v2
         with:
