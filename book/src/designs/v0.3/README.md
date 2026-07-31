@@ -158,7 +158,11 @@ pub struct At<A> {
 
 https://github.com/AzurIce/ranim/pull/175
 
-之前 Ranim 的求值结果由 `CoreItemStore` 承载：
+渲染侧的 ECS 化：渲染原语进入内部 `RenderWorld`，渲染准备与 GPU pass 由 schedule 组织；用户级 item、动画求值仍停留在 World 之外。
+
+### 之前：`CoreItemStore` 兼任传输与查询
+
+旧实现里，求值结果由 `CoreItemStore` 承载：
 
 ```rust
 /// A store of [`CoreItem`]s.
@@ -181,9 +185,11 @@ pub struct CoreItemStore {
 }
 ```
 
-既用于承载并传输求值结果，又用于渲染管线查询访问，
+它既用于承载并传输求值结果，又用于渲染管线查询访问——两种职责混在一起。
 
-现在拆分为了 `RenderFrame` 和 `Renderer` 内部的 ECS World：
+### 现在：`RenderFrame` 传输 + `RenderWorld` 查询
+
+拆分为了 `RenderFrame`（帧级传输缓冲）和 `Renderer` 内部的 ECS World：
 
 ```rust
 /// A reusable, frame-local transport buffer between evaluation and rendering.
@@ -201,9 +207,11 @@ pub struct Renderer {
 }
 ```
 
-前者只用于传输，而后者用于承载运行时的查询。
+前者只用于传输（求值线程 → 渲染线程），后者用于承载运行时的查询、变更检测与 schedule。
 
-每帧从 `RenderFrame` 更新 `World` 并运行渲染 Schedule：
+### Reconcile：按身份增量更新实体
+
+每帧从 `RenderFrame` 更新 `World`，再运行渲染 Schedule：
 
 ```rust
 /// Reconcile and render one evaluated frame.
@@ -220,24 +228,53 @@ pub fn render_frame(
     self.world.run_schedule(RenderGraph);
 }
 ```
+
+reconcile 以 `CoreItemIdentity(animation_id, part)` 为跨帧 key：
+
+- 每个实体携带 `CoreItemIdentity` 与 `SceneOrder`；值相同则不写组件（保留 `Changed<T>`），值变化才替换，本帧消失的 key 对应实体被移除；
+- **身份与顺序是两件事**：`CoreItemIdentity` 回答"是否是上一帧的同一项"，`SceneOrder` 回答"本帧按什么顺序消费"——ECS query 顺序不构成绘制顺序，prepare 阶段显式按 `SceneOrder` 排序分桶；
+
+### Schedule 组织渲染阶段
+
+```text
+RenderPrepare:  Collect → PrepareResources → Upload → PrepareBindGroups
+RenderGraph:    Begin → Render → Submit → Finish
+  └─ ViewRender: Clear → Compute → Depth → Color → OITResolve
+```
+
+- `RenderPrepare` 把组件展开为 GPU 输入（storage/index/uniform 数据、上传、绑定组）；
+- `RenderGraph` 驱动整个画面生命周期：`Begin` 创建 frame encoder，`Render` 运行逐 view 子 schedule，`Submit` 提交 command buffer，`Finish` 结束 profiling frame；
+- 单相机也走完整的 `ViewRender` 子 schedule（clear、VItem compute、depth、color、OIT resolve），避免单 view 成为以后多 view 的特殊路径；
+- 自制的 `Graph<NodeKey, Box<dyn RenderNode>>` 节点图被移除——节点 trait、拓扑容器和查询都在重复 ECS schedule 已提供的能力。
+
 ## 迭代式动画区段
 
 https://github.com/AzurIce/ranim/pull/177
 
 v0.3 之前的动画区段都是**函数式**的：`Eval::eval_alpha(alpha)` 从归一化进度闭式采样。这类区段无法表达**有状态的迭代式动画**（粒子、弹簧、物理模拟、三体），因为求值器无法保留跨帧状态、也无法按 `dt` 推进。
 
-### 统一求值器：`Evaluator` 与 `Eval`
+### 统一求值器：单一 `Eval` trait
 
-新增公共求值器 `Evaluator`，`Eval` 保持原名原形：
+`Eval` 从纯函数式求值器扩展为统一求值器：函数式（闭式）与迭代式（有状态）都实现同一个 trait，按各自需要覆盖方法：
 
 ```rust
-/// 统一求值器：cell 驱动的统一入口（擦除层操作它）。
-/// 迭代式区段直接实现它（sample 必需，reset/step 默认）。
-pub trait Evaluator {
+/// 统一求值器。
+///
+/// 函数式区段实现 [`Eval::eval_alpha`]；迭代式区段实现
+/// [`Eval::sample`]/[`Eval::reset`]/[`Eval::step`]——`eval_alpha` 无闭式，
+/// 默认调用即 panic。
+pub trait Eval {
     type Output;
 
-    /// 采样当前状态（统一入口）。函数式由 blanket 派生；迭代式显式实现。
-    fn sample(&self, time: &SegmentTime) -> Self::Output;
+    /// 闭式采样。函数式实现；迭代式无闭式（默认 panic，运行时经 `sample` 驱动）。
+    fn eval_alpha(&self, _alpha: f64) -> Self::Output {
+        unreachable!("iterative segment has no closed form; drive it via `sample`/`step`")
+    }
+
+    /// 采样当前状态（统一入口）。函数式默认 = eval_alpha(time.alpha)。
+    fn sample(&self, time: &SegmentTime) -> Self::Output {
+        self.eval_alpha(time.alpha)
+    }
 
     /// 回到区段起点（确定性契约：不得依赖墙钟/未播种 RNG）。
     fn reset(&mut self) {}
@@ -246,32 +283,14 @@ pub trait Evaluator {
     /// 函数式默认空操作（免费）；采样不受 step 历史影响。
     fn step(&mut self, _time: &SegmentTime) {}
 }
-
-/// 函数式：保留现有名字与形态，现有 impl 零迁移。
-/// `sample` 由 blanket 自动派生自 `eval_alpha`。
-pub trait Eval {
-    type Output;
-
-    /// 闭式采样。
-    fn eval_alpha(&self, alpha: f64) -> Self::Output;
-}
-
-// 关键：blanket 让函数式区段免费获得 Evaluator——作者只写一个 impl。
-impl<E: Eval> Evaluator for E {
-    type Output = E::Output;
-
-    fn sample(&self, time: &SegmentTime) -> Self::Output {
-        self.eval_alpha(time.alpha)
-    }
-}
 ```
 
 作者视角：
 
-- **函数式**：`impl Eval { type Output; eval_alpha }`——一个 impl，与之前完全一致（零迁移）；
-- **迭代式**：`impl Evaluator { type Output; sample; reset; step }`——一个 impl，没有 `eval_alpha`。
+- **函数式**：`impl Eval { type Output; eval_alpha }`——只实现 `eval_alpha`（`sample`/`reset`/`step` 用默认）；
+- **迭代式**：`impl Eval { type Output; sample; reset; step }`——`eval_alpha` 保持默认（无闭式，不会被调用）。
 
-cell 对擦除后的公共类型**无条件**调 `step`：函数式空步免费，且消除了"忘了标记导致 step 被跳过"的 footgun。
+cell 对擦除后的公共类型**无条件**调 `step`：函数式空步免费，且消除了"忘了标记导致 step 被跳过"的 footgun。纯求值路径（`eval_at_sec`）只支持函数式区段；迭代式区段须用 `SceneEvaluator`（纯路径调用 `eval_alpha` 会 panic 以暴露误用）。
 
 ### `SegmentTime`：传给区段的完整时间上下文
 

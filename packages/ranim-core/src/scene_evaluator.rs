@@ -131,7 +131,7 @@ mod tests {
     use super::*;
     use crate::{
         RanimScene,
-        animation::{AnimationExt, Evaluator, Placeable, SegmentTime},
+        animation::{AnimationExt, Eval, Placeable, SegmentTime},
         core_item::vitem::VItem,
         seq,
     };
@@ -142,7 +142,7 @@ mod tests {
         x: f64,
     }
 
-    impl Evaluator for ConstantVelocity {
+    impl Eval for ConstantVelocity {
         type Output = VItem;
 
         fn sample(&self, _time: &SegmentTime) -> VItem {

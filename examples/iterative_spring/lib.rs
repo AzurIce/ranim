@@ -8,7 +8,7 @@
 
 use ranim::{
     color::palettes::manim,
-    core::animation::{Evaluator, SegmentTime},
+    core::animation::{Eval, SegmentTime},
     items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
 };
@@ -32,7 +32,7 @@ impl SpringBall {
     }
 }
 
-impl Evaluator for SpringBall {
+impl Eval for SpringBall {
     type Output = VItem;
 
     fn reset(&mut self) {

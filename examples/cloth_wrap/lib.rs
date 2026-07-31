@@ -12,7 +12,7 @@
 use ranim::{
     color::palettes::manim,
     core::{
-        animation::{Evaluator, SegmentTime},
+        animation::{Eval, SegmentTime},
         components::rgba::Rgba,
     },
     glam::{DVec3, Mat4, Vec3, dvec3},
@@ -116,7 +116,7 @@ impl ClothWrap {
     }
 }
 
-impl Evaluator for ClothWrap {
+impl Eval for ClothWrap {
     type Output = Vec<MeshItem>;
 
     fn reset(&mut self) {

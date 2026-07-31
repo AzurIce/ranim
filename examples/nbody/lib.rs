@@ -7,7 +7,7 @@
 
 use ranim::{
     color::{AlphaColor, Srgb, palettes::manim},
-    core::animation::{Evaluator, SegmentTime},
+    core::animation::{Eval, SegmentTime},
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},
     prelude::*,
@@ -86,7 +86,7 @@ impl NBody {
     }
 }
 
-impl Evaluator for NBody {
+impl Eval for NBody {
     type Output = Vec<VItem>;
 
     fn reset(&mut self) {

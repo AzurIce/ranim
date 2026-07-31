@@ -7,13 +7,38 @@ use crate::{
     utils::rate_functions::linear,
 };
 
-/// A normalized, pure animation evaluator.
+/// A normalized animation evaluator.
+///
+/// Functional (closed-form) segments implement [`Eval::eval_alpha`]; the other
+/// methods default appropriately. Iterative (stateful) segments implement
+/// [`Eval::sample`]/[`Eval::reset`]/[`Eval::step`] instead — `eval_alpha` has
+/// no closed form and its default panics if called.
 pub trait Eval {
     /// Value produced by this evaluator.
     type Output;
 
     /// Evaluate the animation at a normalized progress in `[0, 1]`.
-    fn eval_alpha(&self, alpha: f64) -> Self::Output;
+    /// Functional segments implement this; iterative segments have no closed
+    /// form and the default panics (the runtime drives them via `sample`).
+    fn eval_alpha(&self, _alpha: f64) -> Self::Output {
+        unreachable!("iterative segment has no closed form; drive it via `sample`/`step`")
+    }
+
+    /// Sample the current state at the given time context.
+    /// Functional default = eval_alpha(time.alpha); iterative segments
+    /// implement this to return their current state.
+    fn sample(&self, time: &SegmentTime) -> Self::Output {
+        self.eval_alpha(time.alpha)
+    }
+
+    /// Reset to the segment's initial state (deterministic contract: no wall
+    /// clock, no unseeded RNG). No-op by default.
+    fn reset(&mut self) {}
+
+    /// Advance one logic step (or substep); `time.local_delta_secs` is the
+    /// integration step. No-op by default (functional segments are stepped as
+    /// no-ops for free; sampling is unaffected).
+    fn step(&mut self, _time: &SegmentTime) {}
 
     /// Apply the final state and return this evaluator.
     fn apply_to(self, item: &mut Self::Output) -> Self
@@ -47,7 +72,7 @@ where
 /// A complete time context for one evaluation/step of an animation segment.
 ///
 /// All time values are in seconds (`_secs`); `alpha` is normalized to `[0, 1]`.
-/// Deltas are only meaningful during [`Evaluator::step`]; during sampling they are zero.
+/// Deltas are only meaningful during [`Eval::step`]; during sampling they are zero.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SegmentTime {
     /// Global scene time `t` at the current logic tick (seconds).
@@ -68,36 +93,6 @@ pub struct SegmentTime {
     pub render_frame: u64,
     /// Whether this logic step completes a render frame (for frame-coupled segments).
     pub is_render_frame_boundary: bool,
-}
-
-/// The common evaluator surface driven by the world/runtime.
-///
-/// Iterative (stateful) segments implement [`Evaluator`] directly with
-/// `sample`/`reset`/`step`. Functional segments implement [`Eval`] and get
-/// [`Evaluator`] for free through the blanket impl below.
-pub trait Evaluator {
-    /// Value produced by this evaluator.
-    type Output;
-
-    /// Sample the current state at the given time context.
-    fn sample(&self, time: &SegmentTime) -> Self::Output;
-
-    /// Reset to the segment's initial state (deterministic contract: no wall
-    /// clock, no unseeded RNG). No-op by default.
-    fn reset(&mut self) {}
-
-    /// Advance one logic step (or substep); `time.local_delta_secs` is the
-    /// integration step. No-op by default (functional segments are stepped as
-    /// no-ops for free; sampling is unaffected).
-    fn step(&mut self, _time: &SegmentTime) {}
-}
-
-impl<E: Eval> Evaluator for E {
-    type Output = E::Output;
-
-    fn sample(&self, time: &SegmentTime) -> Self::Output {
-        self.eval_alpha(time.alpha)
-    }
 }
 
 /// An auto implemented trait for erasing Evaluator<Output = T> where T: AnyExtractCoreItem
@@ -149,18 +144,13 @@ impl EvalDyn for StaticDynItems {
 
 impl<E> EvalDyn for E
 where
-    E: Evaluator,
+    E: Eval,
     E::Output: AnyExtractCoreItem,
 {
     fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        // Pure-path compatibility: build a time context where only alpha is
-        // meaningful and sample through it. Functional = eval_alpha(alpha);
-        // iterative = current state (the pure path never steps; use SceneEvaluator).
-        let time = SegmentTime {
-            alpha,
-            ..Default::default()
-        };
-        self.sample_dyn(&time, output);
+        // Pure path (eval_at_sec) only supports functional segments; iterative
+        // segments have no closed form and must be driven via SceneEvaluator.
+        output.push(DynItem(Box::new(self.eval_alpha(alpha))));
     }
 
     fn sample_dyn(&self, time: &SegmentTime, output: &mut Vec<DynItem>) {
@@ -168,11 +158,11 @@ where
     }
 
     fn reset_dyn(&mut self) {
-        Evaluator::reset(self);
+        Eval::reset(self);
     }
 
     fn step_dyn(&mut self, time: &SegmentTime) {
-        Evaluator::step(self, time);
+        Eval::step(self, time);
     }
 }
 
@@ -338,19 +328,6 @@ impl AnimationCell {
         Some(self.eval_alpha_dyn(alpha))
     }
 
-    fn eval_at_sec_into(&self, sec: f64, output: &mut Vec<DynItem>) {
-        if sec < self.time_range.start || sec > self.time_range.end {
-            return;
-        }
-        let duration = self.duration_secs();
-        let alpha = if duration == 0.0 {
-            1.0
-        } else {
-            (sec - self.time_range.start) / duration
-        };
-        self.eval_alpha_dyn_into(alpha, output);
-    }
-
     fn contains_sec(&self, sec: f64, parent_duration: f64) -> bool {
         self.time_range.contains(&sec) || (sec == parent_duration && sec == self.time_range.end)
     }
@@ -410,13 +387,13 @@ impl<A: Placeable> AnimationExt for A {}
 
 impl<E> Placeable for E
 where
-    E: Evaluator + 'static,
+    E: Eval + 'static,
     E::Output: AnyExtractCoreItem,
 {
 }
 impl<E> Animation for E
 where
-    E: Evaluator + 'static,
+    E: Eval + 'static,
     E::Output: AnyExtractCoreItem,
 {
     fn build(self) -> AnimationCell {
@@ -565,7 +542,7 @@ impl AnimSequence {
             .rev()
             .find(|animation| animation.contains_sec(target_sec, self.cursor_sec))
         {
-            animation.eval_at_sec_into(target_sec, output);
+            animation.sample_at_sec(target_sec, output);
         }
     }
 
@@ -753,7 +730,7 @@ impl AnimStack {
     fn eval_at_sec_into(&self, target_sec: f64, output: &mut Vec<DynItem>) {
         for animation in &self.animations {
             if animation.contains_sec(target_sec, self.duration_secs) {
-                animation.eval_at_sec_into(target_sec, output);
+                animation.sample_at_sec(target_sec, output);
             }
         }
     }
