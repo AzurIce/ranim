@@ -239,6 +239,11 @@ name = "iterative_spring"
 path = "examples/iterative_spring/lib.rs"
 crate-type = ["cdylib"]
 
+[[example]]
+name = "nbody"
+path = "examples/nbody/lib.rs"
+crate-type = ["cdylib"]
+
 [package.metadata.example.hello_ranim]
 wasm = true
 
