@@ -223,11 +223,12 @@ impl Evaluator for ClothWrap {
 #[output(dir = "./output/cloth_wrap")]
 fn cloth_wrap(r: &mut RanimScene) {
     let mut camera = CameraFrame::default();
-    camera.pos = dvec3(-3.2, 2.2, 3.2);
-    camera.facing = (dvec3(0.0, 1.2, 0.0) - camera.pos).normalize();
+    // Oblique downward view (~40° below horizontal, slightly asymmetric azimuth).
+    camera.pos = dvec3(-4.0, 5.0, 2.5);
+    camera.facing = (dvec3(0.0, 1.0, 0.0) - camera.pos).normalize();
     camera.up = DVec3::Y;
     camera.perspective_blend = 1.0;
-    camera.fovy = 50.0f64.to_radians();
+    camera.fovy = 45.0f64.to_radians();
 
     r.play(camera.show().with_duration(TOTAL_SECS));
     r.play(ClothWrap::new().with_duration(TOTAL_SECS));
