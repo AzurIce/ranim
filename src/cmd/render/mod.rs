@@ -20,6 +20,21 @@ pub(crate) mod file_writer;
 #[cfg(feature = "profiling")]
 use ranim_render::PUFFIN_GPU_PROFILER;
 
+/// Render the output basename template by replacing placeholders.
+///
+/// Supported placeholders:
+/// - `{name}`: the scene/output name
+/// - `{width}`: output width in pixels
+/// - `{height}`: output height in pixels
+/// - `{fps}`: output frame rate
+fn render_output_basename(template: &str, name: &str, width: u32, height: u32, fps: u32) -> String {
+    template
+        .replace("{name}", name)
+        .replace("{width}", &width.to_string())
+        .replace("{height}", &height.to_string())
+        .replace("{fps}", &fps.to_string())
+}
+
 /// Render a scene with all its outputs
 pub fn render_scene(scene: &Scene, buffer_count: usize) {
     for (i, output) in scene.outputs.iter().enumerate() {
@@ -196,13 +211,20 @@ impl RenderWorker {
                 FileWriterBuilder::default()
                     .with_fps(output.fps)
                     .with_size(output.width, output.height)
-                    .with_file_path(output_dir.join(format!(
-                        "{}_{}x{}_{}.{ext}",
-                        output.name.clone().unwrap_or(scene_name.clone()),
-                        output.width,
-                        output.height,
-                        output.fps
-                    )))
+                    .with_file_path(output_dir.join({
+                        let template = output
+                            .name_template
+                            .as_deref()
+                            .unwrap_or("{name}_{width}x{height}_{fps}");
+                        let base_name = render_output_basename(
+                            template,
+                            output.name.as_deref().unwrap_or(&scene_name),
+                            output.width,
+                            output.height,
+                            output.fps,
+                        );
+                        format!("{base_name}.{ext}")
+                    }))
                     .with_output_format(output.format),
             ),
             save_frames: output.save_frames,
@@ -579,4 +601,39 @@ pub fn download_ffmpeg(target_dir: impl AsRef<Path>) -> Result<PathBuf, anyhow::
     }
     info!("ffmpeg downloaded to {target_dir:?}");
     Ok(ffmpeg_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render_output_basename;
+
+    #[test]
+    fn test_render_output_basename_default_template() {
+        assert_eq!(
+            render_output_basename("{name}_{width}x{height}_{fps}", "my_scene", 1920, 1080, 60),
+            "my_scene_1920x1080_60"
+        );
+    }
+
+    #[test]
+    fn test_render_output_basename_custom_template() {
+        assert_eq!(
+            render_output_basename(
+                "{name}_{fps}fps_{width}x{height}",
+                "my_scene",
+                1920,
+                1080,
+                60
+            ),
+            "my_scene_60fps_1920x1080"
+        );
+    }
+
+    #[test]
+    fn test_render_output_basename_name_only() {
+        assert_eq!(
+            render_output_basename("{name}", "my_scene", 1920, 1080, 60),
+            "my_scene"
+        );
+    }
 }
