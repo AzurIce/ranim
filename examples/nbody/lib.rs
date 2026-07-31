@@ -38,9 +38,11 @@ struct NBody {
 impl NBody {
     fn new() -> Self {
         // Three equal masses on a circle with tangential velocities plus a tiny
-        // asymmetry, so the system stays roughly bound while evolving chaotically.
+        // asymmetry. v0 ≈ 104% of the circular speed: the system stays
+        // gravitationally bound (max radius ≈ 3.4 < frame half-height 4) while
+        // evolving chaotically (the equilateral equilibrium is unstable).
         let radius = 2.0;
-        let v0 = 0.95;
+        let v0 = 0.6;
         let mut bodies = [Body {
             pos: DVec3::ZERO,
             vel: DVec3::ZERO,
@@ -49,7 +51,7 @@ impl NBody {
         for (i, body) in bodies.iter_mut().enumerate() {
             let angle = i as f64 * std::f64::consts::TAU / BODY_COUNT as f64;
             body.pos = DVec3::new(radius * angle.cos(), radius * angle.sin(), 0.0);
-            let velocity = v0 * (1.0 + 0.05 * i as f64);
+            let velocity = v0 * (1.0 + 0.02 * i as f64);
             body.vel = DVec3::new(
                 -radius * velocity * angle.sin() / radius,
                 radius * velocity * angle.cos() / radius,
