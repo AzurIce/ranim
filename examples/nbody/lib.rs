@@ -17,9 +17,7 @@ const G: f64 = 8.0;
 const BODY_COUNT: usize = 3;
 const TRAIL_SAMPLE_EVERY: usize = 4; // sample a trail point every 4th step (~30 Hz)
 const TRAIL_LEN: usize = 90; // ~3 s of trail per body
-const TOTAL_SECS: f64 = 32.0;
-/// Radius of the elastic containment shell keeping the chaotic demo in frame.
-const BOUND_R: f64 = 3.4;
+const TOTAL_SECS: f64 = 10.0;
 
 #[derive(Clone, Copy)]
 struct Body {
@@ -40,9 +38,9 @@ struct NBody {
 impl NBody {
     fn new() -> Self {
         // Three equal masses on a circle with tangential velocities plus a tiny
-        // asymmetry. v0 ≈ 104% of the circular speed, so the system evolves
-        // chaotically (the equilateral equilibrium is unstable) while an elastic
-        // shell at `BOUND_R` keeps the bodies inside the frame for any duration.
+        // asymmetry (the equilateral equilibrium is Lyapunov-unstable). v0 ≈ 104%
+        // of the circular speed: the bodies stay inside the frame for most of the
+        // scene, then the system destabilizes and ejects a body right at the end.
         let radius = 2.0;
         let v_circ = (G / 6.0).sqrt();
         let v0 = 1.04 * v_circ;
@@ -54,7 +52,7 @@ impl NBody {
         for (i, body) in bodies.iter_mut().enumerate() {
             let angle = i as f64 * std::f64::consts::TAU / BODY_COUNT as f64;
             body.pos = DVec3::new(radius * angle.cos(), radius * angle.sin(), 0.0);
-            let velocity = v0 * (1.0 + 0.02 * i as f64);
+            let velocity = v0 * (1.0 + 0.001 * i as f64);
             body.vel = DVec3::new(
                 -radius * velocity * angle.sin() / radius,
                 radius * velocity * angle.cos() / radius,
@@ -112,20 +110,6 @@ impl Evaluator for NBody {
             body.vel += (a0[i] + a1[i]) * (0.5 * dt);
         }
 
-        // Elastic containment: reflect the radial velocity and clamp the
-        // position back to the shell (close encounters can fling bodies hard).
-        for body in &mut self.bodies {
-            let r = body.pos.length();
-            if r > BOUND_R {
-                let normal = body.pos / r;
-                let radial_vel = body.vel.dot(normal);
-                if radial_vel > 0.0 {
-                    body.vel -= normal * (2.0 * radial_vel);
-                }
-                body.pos = normal * BOUND_R;
-            }
-        }
-
         self.step_count += 1;
         if self.step_count.is_multiple_of(TRAIL_SAMPLE_EVERY) {
             for (i, trail) in self.trails.iter_mut().enumerate() {
@@ -139,12 +123,6 @@ impl Evaluator for NBody {
 
     fn sample(&self, _time: &SegmentTime) -> Vec<VItem> {
         let mut items = Vec::new();
-        // The containment shell.
-        let mut shell = VItem::from(Circle::new(BOUND_R));
-        shell.set_stroke_color(manim::GREY_C);
-        shell.set_stroke_opacity(0.25);
-        shell.set_fill_opacity(0.0);
-        items.push(shell);
         // Trails: dim dots at recent positions.
         for (i, trail) in self.trails.iter().enumerate() {
             for &p in trail {
