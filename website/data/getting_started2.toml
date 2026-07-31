@@ -12,21 +12,15 @@ use ranim::{
         geometry::{Circle, Rectangle, Square},
     },
     prelude::*,
-    utils::rate_functions::linear,
+    utils::rate_functions::{linear, smooth},
 };
 
 #[scene]
 #[output(dir = "./output/getting_started2")]
 fn getting_started2(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
         rect.set_stroke_color(manim::GREEN_C);
     });
-
-    // The new initialized timeline is hidden by default, use show to start encoding a static anim and make it show
-    let r_rect = r.insert(rect.clone());
-
-    r.timelines_mut().forward(1.0);
 
     let square: VItem = Square::new(2.0)
         .with(|square| {
@@ -38,25 +32,29 @@ fn getting_started2(r: &mut RanimScene) {
             circle.set_color(manim::RED_C);
         })
         .into();
-    let r_vitem = r.insert(square.clone());
-    {
-        let timeline = r.timeline_mut(r_vitem);
-        timeline
-            .forward(1.0)
-            .play(square.clone().create())
-            .play(
-                square
-                    .clone()
-                    .morph_to(circle.clone())
-                    .with_rate_func(linear),
-            )
-            .play(circle.clone().unwrite());
-    }
+    let mut rect_sequence = seq![rect.clone().show()];
+    rect_sequence
+        .hold(1.0)
+        .push(VItem::from(rect).uncreate().with_rate_func(smooth));
 
-    r.timeline_mut(r_rect).play(VItem::from(rect).uncreate());
+    let mut item_sequence = seq![square.clone().show()];
+    item_sequence
+        .hold(1.0)
+        .push(square.clone().create().with_rate_func(smooth))
+        .push(
+            square
+                .clone()
+                .morph_to(circle.clone())
+                .with_rate_func(linear),
+        )
+        .push(circle.clone().unwrite().with_rate_func(smooth));
+
+    let total_secs = item_sequence.cursor_sec().max(rect_sequence.cursor_sec());
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(stack![rect_sequence, item_sequence]);
 }
 ```"""
-hash = "b1820aeae57b173eacd522aa95b5fe65bd55c8dd"
+hash = "0d709f63a4723de41aa242a2d9c129657c721047"
 preview_imgs = []
 output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
 wasm = true

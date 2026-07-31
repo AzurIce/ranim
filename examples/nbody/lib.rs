@@ -166,5 +166,5 @@ impl Eval for NBody {
 fn nbody(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(TOTAL_SECS));
     // n = 3: chaotic wobble that stays in frame; n >= 4: ejection finale.
-    r.play(NBody::new(3).with_duration(TOTAL_SECS));
+    r.play(NBody::new(99).with_duration(TOTAL_SECS));
 }

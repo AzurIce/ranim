@@ -404,7 +404,7 @@ path = "examples/midi_visualizer/lib.rs"
 crate-type = ["cdylib"]
 
 [package.metadata.example.midi_visualizer]
-wasm = false
+wasm = true
 
 [[example]]
 name = "tetrahedron_spheres"
