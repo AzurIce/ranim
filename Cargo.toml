@@ -244,6 +244,11 @@ name = "nbody"
 path = "examples/nbody/lib.rs"
 crate-type = ["cdylib"]
 
+[[example]]
+name = "cloth"
+path = "examples/cloth/lib.rs"
+crate-type = ["cdylib"]
+
 [package.metadata.example.hello_ranim]
 wasm = true
 
