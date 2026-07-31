@@ -147,10 +147,18 @@
           ]
           ++ lib.optionals pkgs.stdenv.isLinux [
             pkgs.vulkan-loader
+            pkgs.wayland
+            pkgs.libxkbcommon
+            pkgs.libX11
           ];
 
           shellHook = lib.optionalString pkgs.stdenv.isLinux ''
-            export LD_LIBRARY_PATH="${lib.makeLibraryPath [ pkgs.vulkan-loader ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export LD_LIBRARY_PATH="${lib.makeLibraryPath [
+              pkgs.vulkan-loader
+              pkgs.wayland
+              pkgs.libxkbcommon
+              pkgs.libX11
+            ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           '';
         };
       }
