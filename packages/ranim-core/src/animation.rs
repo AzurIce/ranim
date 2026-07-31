@@ -7,13 +7,38 @@ use crate::{
     utils::rate_functions::linear,
 };
 
-/// A normalized, pure animation evaluator.
+/// A normalized animation evaluator.
+///
+/// Functional (closed-form) segments implement [`Eval::eval_alpha`]; the other
+/// methods default appropriately. Iterative (stateful) segments implement
+/// [`Eval::sample`]/[`Eval::reset`]/[`Eval::step`] instead — `eval_alpha` has
+/// no closed form and its default panics if called.
 pub trait Eval {
     /// Value produced by this evaluator.
     type Output;
 
     /// Evaluate the animation at a normalized progress in `[0, 1]`.
-    fn eval_alpha(&self, alpha: f64) -> Self::Output;
+    /// Functional segments implement this; iterative segments have no closed
+    /// form and the default panics (the runtime drives them via `sample`).
+    fn eval_alpha(&self, _alpha: f64) -> Self::Output {
+        unreachable!("iterative segment has no closed form; drive it via `sample`/`step`")
+    }
+
+    /// Sample the current state at the given time context.
+    /// Functional default = eval_alpha(time.alpha); iterative segments
+    /// implement this to return their current state.
+    fn sample(&self, time: &SegmentTime) -> Self::Output {
+        self.eval_alpha(time.alpha)
+    }
+
+    /// Reset to the segment's initial state (deterministic contract: no wall
+    /// clock, no unseeded RNG). No-op by default.
+    fn reset(&mut self) {}
+
+    /// Advance one logic step (or substep); `time.local_delta_secs` is the
+    /// integration step. No-op by default (functional segments are stepped as
+    /// no-ops for free; sampling is unaffected).
+    fn step(&mut self, _time: &SegmentTime) {}
 
     /// Apply the final state and return this evaluator.
     fn apply_to(self, item: &mut Self::Output) -> Self
@@ -44,9 +69,49 @@ where
     }
 }
 
-/// An auto implemented trait for erasing Eval<Output = T> where T: AnyExtractCoreItem
+/// A complete time context for one evaluation/step of an animation segment.
+///
+/// All time values are in seconds (`_secs`); `alpha` is normalized to `[0, 1]`.
+/// Deltas are only meaningful during [`Eval::step`]; during sampling they are zero.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SegmentTime {
+    /// Global scene time `t` at the current logic tick (seconds).
+    pub global_secs: f64,
+    /// Global logic step length, stable (`= 1 / logic_fps`).
+    pub global_delta_secs: f64,
+    /// Segment start `s` in its parent's coordinates (seconds).
+    pub start_secs: f64,
+    /// Segment duration `D` (seconds).
+    pub duration_secs: f64,
+    /// Rate-warped local time `u(t) = D · r((t−s)/D)` (seconds).
+    pub local_secs: f64,
+    /// Local increment `Δu` for this step, varies with the rate function (seconds).
+    pub local_delta_secs: f64,
+    /// Normalized progress `alpha = local_secs / D`.
+    pub alpha: f64,
+    /// Current render frame index (for frame-coupled segments).
+    pub render_frame: u64,
+    /// Whether this logic step completes a render frame (for frame-coupled segments).
+    pub is_render_frame_boundary: bool,
+}
+
+/// An auto implemented trait for erasing Evaluator<Output = T> where T: AnyExtractCoreItem
 trait EvalDyn {
     fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>);
+
+    /// Sample at a full time context. Default rides the pure alpha path for
+    /// containers and functional leaves; iterative leaves override it via the
+    /// blanket impl below.
+    fn sample_dyn(&self, time: &SegmentTime, output: &mut Vec<DynItem>) {
+        self.eval_alpha_dyn_into(time.alpha, output);
+    }
+
+    /// Reset the internal state. No-op by default.
+    fn reset_dyn(&mut self) {}
+
+    /// Advance one logic step. No-op by default (functional segments and
+    /// containers without iterative leaves step for free).
+    fn step_dyn(&mut self, _time: &SegmentTime) {}
 
     fn info_kind(&self) -> AnimationInfoKind {
         AnimationInfoKind::Eval
@@ -83,7 +148,21 @@ where
     E::Output: AnyExtractCoreItem,
 {
     fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
+        // Pure path (eval_at_sec) only supports functional segments; iterative
+        // segments have no closed form and must be driven via SceneEvaluator.
         output.push(DynItem(Box::new(self.eval_alpha(alpha))));
+    }
+
+    fn sample_dyn(&self, time: &SegmentTime, output: &mut Vec<DynItem>) {
+        output.push(DynItem(Box::new(self.sample(time))));
+    }
+
+    fn reset_dyn(&mut self) {
+        Eval::reset(self);
+    }
+
+    fn step_dyn(&mut self, time: &SegmentTime) {
+        Eval::step(self, time);
     }
 }
 
@@ -126,6 +205,8 @@ pub struct AnimationCell {
     time_range: Range<f64>,
     enabled: bool,
     anim_name: &'static str,
+    /// Whether this cell's inner state has been reset for the current run.
+    entered: bool,
 }
 
 impl AnimationCell {
@@ -152,6 +233,70 @@ impl AnimationCell {
     /// Concrete evaluator type name captured before erasure.
     pub fn anim_name(&self) -> &str {
         self.anim_name
+    }
+
+    /// Whether the given scene time is inside this clip's inclusive range.
+    pub fn active_at(&self, sec: f64) -> bool {
+        sec >= self.time_range.start && sec <= self.time_range.end
+    }
+
+    /// Compute the time context in this cell's local coordinates.
+    fn local_time(&self, sec: f64, prev_sec: f64) -> SegmentTime {
+        let duration = self.duration_secs();
+        let alpha = if duration == 0.0 {
+            1.0
+        } else {
+            (sec - self.time_range.start) / duration
+        };
+        let prev_alpha = if duration == 0.0 {
+            1.0
+        } else {
+            (prev_sec - self.time_range.start) / duration
+        };
+        let rate_alpha = (self.rate_func)(alpha);
+        let rate_prev = (self.rate_func)(prev_alpha);
+        SegmentTime {
+            global_secs: sec,
+            global_delta_secs: sec - prev_sec,
+            start_secs: self.time_range.start,
+            duration_secs: duration,
+            local_secs: rate_alpha * duration,
+            local_delta_secs: (rate_alpha - rate_prev) * duration,
+            alpha: rate_alpha,
+            render_frame: 0,
+            is_render_frame_boundary: false,
+        }
+    }
+
+    /// Mark this clip as not yet entered (used by `SceneEvaluator::seek`).
+    pub(crate) fn reset_entered(&mut self) {
+        self.entered = false;
+    }
+
+    /// Sample this clip at a scene time (pure; no tick advancement).
+    pub(crate) fn sample_at_sec(&self, sec: f64, output: &mut Vec<DynItem>) {
+        if !self.active_at(sec) || !self.enabled {
+            return;
+        }
+        let time = self.local_time(sec, sec);
+        self.inner.sample_dyn(&time, output);
+    }
+
+    /// Advance this clip's inner state along the logic grid.
+    ///
+    /// Resets the inner state on first activation (deterministic replay), then
+    /// steps it with the rate-warped local delta. Functional leaves and
+    /// containers without iterative content step as no-ops.
+    pub(crate) fn step_at_sec(&mut self, sec: f64, prev_sec: f64) {
+        if !self.active_at(sec) || !self.enabled {
+            return;
+        }
+        if !self.entered {
+            self.inner.reset_dyn();
+            self.entered = true;
+        }
+        let time = self.local_time(sec, prev_sec);
+        self.inner.step_dyn(&time);
     }
 
     /// Append normalized evaluation results after applying this node's rate function.
@@ -181,19 +326,6 @@ impl AnimationCell {
             (sec - self.time_range.start) / duration
         };
         Some(self.eval_alpha_dyn(alpha))
-    }
-
-    fn eval_at_sec_into(&self, sec: f64, output: &mut Vec<DynItem>) {
-        if sec < self.time_range.start || sec > self.time_range.end {
-            return;
-        }
-        let duration = self.duration_secs();
-        let alpha = if duration == 0.0 {
-            1.0
-        } else {
-            (sec - self.time_range.start) / duration
-        };
-        self.eval_alpha_dyn_into(alpha, output);
     }
 
     fn contains_sec(&self, sec: f64, parent_duration: f64) -> bool {
@@ -271,6 +403,7 @@ where
             rate_func: linear,
             time_range: 0.0..1.0,
             enabled: true,
+            entered: false,
         }
     }
 }
@@ -370,6 +503,22 @@ fn assert_valid_duration(duration_secs: f64) {
     );
 }
 
+/// Map a cell-local time context into a container's content coordinates.
+///
+/// The cell wrapping the container applies its own rate function; the content
+/// position is `content_duration · (local_secs / cell_duration)`, mirroring the
+/// pure path's `content_secs = cursor · rate(alpha)` mapping.
+fn map_content_time(time: &SegmentTime, content_duration: f64) -> (f64, f64) {
+    let cell_duration = time.duration_secs;
+    if cell_duration <= 0.0 {
+        return (0.0, 0.0);
+    }
+    let content_sec = content_duration * (time.local_secs / cell_duration);
+    let prev_content_sec =
+        content_duration * ((time.local_secs - time.local_delta_secs) / cell_duration);
+    (content_sec, prev_content_sec)
+}
+
 /// Dynamic sequential animation container.
 ///
 /// `push` erases each direct child's Rust type while retaining its runtime
@@ -393,7 +542,7 @@ impl AnimSequence {
             .rev()
             .find(|animation| animation.contains_sec(target_sec, self.cursor_sec))
         {
-            animation.eval_at_sec_into(target_sec, output);
+            animation.sample_at_sec(target_sec, output);
         }
     }
 
@@ -459,6 +608,7 @@ impl AnimSequence {
                 time_range: self.cursor_sec..self.cursor_sec + secs,
                 enabled: true,
                 anim_name: type_name::<StaticDynItems>(),
+                entered: false,
             });
         }
         self.cursor_sec += secs;
@@ -508,6 +658,7 @@ impl Animation for AnimSequence {
             time_range: 0.0..duration_secs,
             enabled: true,
             anim_name: type_name::<Self>(),
+            entered: false,
         }
     }
 }
@@ -515,6 +666,20 @@ impl Animation for AnimSequence {
 impl EvalDyn for AnimSequence {
     fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
         self.eval_at_sec_into(self.cursor_sec * alpha, output);
+    }
+
+    fn step_dyn(&mut self, time: &SegmentTime) {
+        // Map the time from the wrapping cell's local coordinates into this
+        // sequence's content coordinates.
+        let (content_sec, prev_content_sec) = map_content_time(time, self.cursor_sec);
+        if let Some(child) = self
+            .animations
+            .iter_mut()
+            .rev()
+            .find(|child| child.contains_sec(content_sec, self.cursor_sec))
+        {
+            child.step_at_sec(content_sec, prev_content_sec);
+        }
     }
 
     fn info_kind(&self) -> AnimationInfoKind {
@@ -565,7 +730,7 @@ impl AnimStack {
     fn eval_at_sec_into(&self, target_sec: f64, output: &mut Vec<DynItem>) {
         for animation in &self.animations {
             if animation.contains_sec(target_sec, self.duration_secs) {
-                animation.eval_at_sec_into(target_sec, output);
+                animation.sample_at_sec(target_sec, output);
             }
         }
     }
@@ -611,6 +776,7 @@ impl Animation for AnimStack {
             time_range: 0.0..duration_secs,
             enabled: true,
             anim_name: type_name::<Self>(),
+            entered: false,
         }
     }
 }
@@ -618,6 +784,15 @@ impl Animation for AnimStack {
 impl EvalDyn for AnimStack {
     fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
         self.eval_at_sec_into(self.duration_secs * alpha, output);
+    }
+
+    fn step_dyn(&mut self, time: &SegmentTime) {
+        let (content_sec, prev_content_sec) = map_content_time(time, self.duration_secs);
+        for child in &mut self.animations {
+            if child.contains_sec(content_sec, self.duration_secs) {
+                child.step_at_sec(content_sec, prev_content_sec);
+            }
+        }
     }
 
     fn info_kind(&self) -> AnimationInfoKind {

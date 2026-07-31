@@ -1,0 +1,238 @@
+//! Zero-gravity cloth simulation: a free-floating spring net wrapped by a ball.
+//!
+//! Iterative-only: spring forces, self-collision and ball-cloth collision have
+//! no closed form; all state is carried across frames by `step`.
+//!
+//! The cloth is unpinned and weightless, so it floats perfectly flat (no
+//! self-weight sag). A ball is driven straight down through it: the cloth
+//! visibly wraps around the ball and is dragged down, then settles draped over
+//! it. The cloth is rendered as a shaded `MeshItem` surface (smooth normals
+//! each frame); the ball is a static sphere mesh moved by its transform.
+
+use ranim::{
+    color::palettes::manim,
+    core::{
+        animation::{Eval, SegmentTime},
+        components::rgba::Rgba,
+    },
+    glam::{DVec3, Mat4, Vec3, dvec3},
+    items::mesh::{MeshItem, Sphere, Surface},
+    prelude::*,
+};
+
+const ROWS: usize = 16;
+const COLS: usize = 16;
+const SPACING: f64 = 0.22;
+const CLOTH_Y: f64 = 2.2;
+const DAMPING: f64 = 0.99;
+const K_STRUCTURAL: f64 = 600.0;
+const K_SHEAR: f64 = 420.0;
+const K_BEND: f64 = 220.0;
+const REPULSION_CUTOFF: f64 = 0.35 * SPACING;
+const REPULSION_K: f64 = 300.0;
+const BALL_RADIUS: f64 = 0.65;
+/// The ball is driven straight down from `BALL_START_Y` at this speed (units/s).
+const BALL_SPEED: f64 = 1.2;
+const BALL_START_Y: f64 = 3.0;
+/// Where the ball stops, just below the cloth, letting the cloth settle draped over it.
+const BALL_STOP_Y: f64 = 1.4;
+const TOTAL_SECS: f64 = 7.0;
+
+/// A free-floating zero-gravity spring-net cloth and a driven ball.
+struct ClothWrap {
+    curr: Vec<DVec3>,
+    prev: Vec<DVec3>,
+    springs: Vec<(usize, usize, f64, f64)>, // (i, j, rest_len, stiffness)
+    initial: Vec<DVec3>,
+    ball_mesh: MeshItem,
+    cloth_indices: Vec<u32>,
+}
+
+impl ClothWrap {
+    fn new() -> Self {
+        let width = (COLS - 1) as f64 * SPACING;
+        let mut curr = Vec::with_capacity(ROWS * COLS);
+        for r in 0..ROWS {
+            for c in 0..COLS {
+                curr.push(dvec3(
+                    -width / 2.0 + c as f64 * SPACING,
+                    CLOTH_Y,
+                    -width / 2.0 + r as f64 * SPACING,
+                ));
+            }
+        }
+
+        let mut springs = Vec::new();
+        for r in 0..ROWS {
+            for c in 0..COLS {
+                let i = r * COLS + c;
+                if c + 1 < COLS {
+                    springs.push((i, i + 1, SPACING, K_STRUCTURAL));
+                }
+                if r + 1 < ROWS {
+                    springs.push((i, i + COLS, SPACING, K_STRUCTURAL));
+                }
+                if c + 1 < COLS && r + 1 < ROWS {
+                    springs.push((i, i + COLS + 1, SPACING * 2.0f64.sqrt(), K_SHEAR));
+                }
+                if c + 2 < COLS {
+                    springs.push((i, i + 2, 2.0 * SPACING, K_BEND));
+                }
+                if r + 2 < ROWS {
+                    springs.push((i, i + 2 * COLS, 2.0 * SPACING, K_BEND));
+                }
+            }
+        }
+
+        // Grid quads -> two triangles each, wound for +Y normals on the flat cloth.
+        let mut cloth_indices = Vec::with_capacity(6 * (ROWS - 1) * (COLS - 1));
+        for r in 0..ROWS - 1 {
+            for c in 0..COLS - 1 {
+                let a = (r * COLS + c) as u32;
+                let b = (r * COLS + c + 1) as u32;
+                let d = ((r + 1) * COLS + c) as u32;
+                let e = ((r + 1) * COLS + c + 1) as u32;
+                cloth_indices.extend_from_slice(&[a, e, b, a, d, e]);
+            }
+        }
+
+        let ball_mesh = MeshItem::from(
+            Surface::from(
+                Sphere::new(BALL_RADIUS)
+                    .with_resolution((20, 12))
+                    .with_fill_color(manim::RED_C),
+            )
+            .with_smooth_normals(),
+        );
+
+        Self {
+            initial: curr.clone(),
+            prev: curr.clone(),
+            curr,
+            springs,
+            ball_mesh,
+            cloth_indices,
+        }
+    }
+}
+
+impl Eval for ClothWrap {
+    type Output = Vec<MeshItem>;
+
+    fn reset(&mut self) {
+        self.curr = self.initial.clone();
+        self.prev = self.initial.clone();
+    }
+
+    fn step(&mut self, time: &SegmentTime) {
+        let dt2 = time.local_delta_secs * time.local_delta_secs;
+        let n = self.curr.len();
+
+        // Spring forces (zero gravity: the cloth floats freely and stays flat).
+        let mut ax = vec![0.0f64; n];
+        let mut ay = vec![0.0f64; n];
+        let mut az = vec![0.0f64; n];
+        for &(i, j, rest, k) in &self.springs {
+            let d = self.curr[j] - self.curr[i];
+            let dist = d.length();
+            if dist < 1e-9 {
+                continue;
+            }
+            let f = k * (dist - rest) / dist;
+            ax[i] += f * d.x;
+            ay[i] += f * d.y;
+            az[i] += f * d.z;
+            ax[j] -= f * d.x;
+            ay[j] -= f * d.y;
+            az[j] -= f * d.z;
+        }
+
+        // Self-collision repulsion (keeps the wrapped cloth from folding onto itself).
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let d = self.curr[j] - self.curr[i];
+                let dist = d.length();
+                if dist < REPULSION_CUTOFF && dist > 1e-9 {
+                    let f = REPULSION_K * (REPULSION_CUTOFF - dist) / dist;
+                    ax[i] -= f * d.x;
+                    ay[i] -= f * d.y;
+                    az[i] -= f * d.z;
+                    ax[j] += f * d.x;
+                    ay[j] += f * d.y;
+                    az[j] += f * d.z;
+                }
+            }
+        }
+
+        // Cloth Verlet integration (no gravity).
+        for i in 0..n {
+            let vx = (self.curr[i].x - self.prev[i].x) * DAMPING;
+            let vy = (self.curr[i].y - self.prev[i].y) * DAMPING;
+            let vz = (self.curr[i].z - self.prev[i].z) * DAMPING;
+            self.prev[i] = self.curr[i];
+            self.curr[i].x += vx + ax[i] * dt2;
+            self.curr[i].y += vy + ay[i] * dt2;
+            self.curr[i].z += vz + az[i] * dt2;
+        }
+
+        // Ball position: driven straight down, then held below the cloth.
+        let ball_y = (BALL_START_Y - BALL_SPEED * time.global_secs).max(BALL_STOP_Y);
+        let ball_center = dvec3(0.0, ball_y, 0.0);
+
+        // Ball-cloth collision: push cloth particles out of the ball.
+        for i in 0..n {
+            let d = self.curr[i] - ball_center;
+            let dist = d.length();
+            if dist < BALL_RADIUS && dist > 1e-9 {
+                self.curr[i] += d / dist * (BALL_RADIUS - dist);
+            }
+        }
+    }
+
+    fn sample(&self, time: &SegmentTime) -> Vec<MeshItem> {
+        let points: Vec<Vec3> = self.curr.iter().map(|p| p.as_vec3()).collect();
+
+        // Smooth normals: accumulate face normals, then normalize.
+        let mut normals = vec![Vec3::ZERO; points.len()];
+        for [a, b, c] in self.cloth_indices.as_chunks::<3>().0 {
+            let (a, b, c) = (*a as usize, *b as usize, *c as usize);
+            let face = (points[b] - points[a]).cross(points[c] - points[a]);
+            normals[a] += face;
+            normals[b] += face;
+            normals[c] += face;
+        }
+        for n in &mut normals {
+            *n = n.normalize_or_zero();
+        }
+
+        let vertex_colors = vec![Rgba::from(manim::WHITE.with_alpha(1.0)); points.len()];
+        let cloth = MeshItem {
+            points: points.into(),
+            triangle_indices: self.cloth_indices.clone(),
+            transform: Mat4::IDENTITY,
+            vertex_colors: vertex_colors.into(),
+            vertex_normals: normals.into(),
+        };
+
+        let ball_y = (BALL_START_Y - BALL_SPEED * time.global_secs).max(BALL_STOP_Y);
+        let mut ball = self.ball_mesh.clone();
+        ball.transform = Mat4::from_translation(dvec3(0.0, ball_y, 0.0).as_vec3());
+
+        vec![cloth, ball]
+    }
+}
+
+#[scene]
+#[output(dir = "./output/cloth_wrap")]
+fn cloth_wrap(r: &mut RanimScene) {
+    let mut camera = CameraFrame::default();
+    // Oblique downward view (~40° below horizontal, slightly asymmetric azimuth).
+    camera.pos = dvec3(-4.0, 5.0, 2.5);
+    camera.facing = (dvec3(0.0, 1.0, 0.0) - camera.pos).normalize();
+    camera.up = DVec3::Y;
+    camera.perspective_blend = 1.0;
+    camera.fovy = 45.0f64.to_radians();
+
+    r.play(camera.show().with_duration(TOTAL_SECS));
+    r.play(ClothWrap::new().with_duration(TOTAL_SECS));
+}

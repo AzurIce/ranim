@@ -136,6 +136,7 @@
             mdbook-mermaid
             typst
             gh
+            ffmpeg
             # wasm-bindgen-cli_0_2_106
             # mdbook-katex
             # wasm-bindgen-cli

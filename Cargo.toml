@@ -234,6 +234,21 @@ name = "hello_ranim"
 path = "examples/hello_ranim/lib.rs"
 crate-type = ["cdylib"]
 
+[[example]]
+name = "iterative_spring"
+path = "examples/iterative_spring/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "nbody"
+path = "examples/nbody/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "cloth_wrap"
+path = "examples/cloth_wrap/lib.rs"
+crate-type = ["cdylib"]
+
 [package.metadata.example.hello_ranim]
 wasm = true
 
@@ -389,7 +404,7 @@ path = "examples/midi_visualizer/lib.rs"
 crate-type = ["cdylib"]
 
 [package.metadata.example.midi_visualizer]
-wasm = false
+wasm = true
 
 [[example]]
 name = "tetrahedron_spheres"

@@ -11,7 +11,6 @@ use ranim::{
 #[scene]
 #[output(dir = "./output/palettes")]
 fn palettes(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let padded_frame_size = frame_size * 0.9;
 
@@ -51,12 +50,13 @@ fn palettes(r: &mut RanimScene) {
             })
         })
         .collect::<Vec<_>>();
-    r.insert(squares);
+    let total_secs = 0.01;
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(squares.show().with_duration(total_secs));
     r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
-    r.timelines_mut().forward(0.01);
 }
 ```"""
-hash = "bca727895b41a2f8f33a5a1ba7b565accf33996f"
+hash = "5d3c1c5460c5e5f1739411f97d547828c661faa5"
 preview_imgs = ["/examples/palettes/preview.png"]
 output_files = ["/examples/palettes/palettes_1920x1080_60.mp4"]
 wasm = false
