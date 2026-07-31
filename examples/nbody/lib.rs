@@ -17,7 +17,7 @@ const G: f64 = 8.0;
 const BODY_COUNT: usize = 3;
 const TRAIL_SAMPLE_EVERY: usize = 4; // sample a trail point every 4th step (~30 Hz)
 const TRAIL_LEN: usize = 90; // ~3 s of trail per body
-const TOTAL_SECS: f64 = 10.0;
+const TOTAL_SECS: f64 = 16.0;
 
 #[derive(Clone, Copy)]
 struct Body {
