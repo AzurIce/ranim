@@ -1,15 +1,13 @@
-//! 3D cloth simulation: a spring-net trampoline catching a falling ball.
+//! Zero-gravity cloth simulation: a free-floating spring net wrapped by a ball.
 //!
 //! Iterative-only: spring forces, self-collision and ball-cloth collision have
-//! no closed form; all state (particle positions, ball position/velocity) is
-//! carried across frames by `step`.
+//! no closed form; all state is carried across frames by `step`.
 //!
-//! The cloth is a grid of particles with its four corners pinned. A ball drops
-//! from above; the stiff spring net holds its shape under its own weight, dips
-//! elastically under the ball, bounces it a couple of times, and settles with
-//! the ball resting in the sag. The cloth is rendered as a shaded `MeshItem`
-//! surface (smooth normals computed each frame); the ball is a static sphere
-//! mesh moved by its transform.
+//! The cloth is unpinned and weightless, so it floats perfectly flat (no
+//! self-weight sag). A ball is driven straight down through it: the cloth
+//! visibly wraps around the ball and is dragged down, then settles draped over
+//! it. The cloth is rendered as a shaded `MeshItem` surface (smooth normals
+//! each frame); the ball is a static sphere mesh moved by its transform.
 
 use ranim::{
     color::palettes::manim,
@@ -26,36 +24,31 @@ const ROWS: usize = 16;
 const COLS: usize = 16;
 const SPACING: f64 = 0.22;
 const CLOTH_Y: f64 = 2.2;
-// Stiff springs keep the net from sagging noticeably under its own weight
-// (~0.2 units vs ~0.6 before); moderate gravity and damping give the ball a
-// couple of lively bounces before it settles.
-const GRAVITY: f64 = 0.8;
-const DAMPING: f64 = 0.985;
-const K_STRUCTURAL: f64 = 1200.0;
-const K_SHEAR: f64 = 800.0;
-const K_BEND: f64 = 400.0;
-const REPULSION_CUTOFF: f64 = 0.4 * SPACING;
+const DAMPING: f64 = 0.99;
+const K_STRUCTURAL: f64 = 600.0;
+const K_SHEAR: f64 = 420.0;
+const K_BEND: f64 = 220.0;
+const REPULSION_CUTOFF: f64 = 0.35 * SPACING;
 const REPULSION_K: f64 = 300.0;
-const BALL_RADIUS: f64 = 0.5;
-const BALL_START: [f64; 3] = [0.0, 3.5, 0.0];
-/// How strongly the cloth pushes the ball back during a collision (1.0 = full).
-const BALL_COLLISION_FACTOR: f64 = 1.0;
-const TOTAL_SECS: f64 = 12.0;
+const BALL_RADIUS: f64 = 0.65;
+/// The ball is driven straight down from `BALL_START_Y` at this speed (units/s).
+const BALL_SPEED: f64 = 1.2;
+const BALL_START_Y: f64 = 3.0;
+/// Where the ball stops, just below the cloth, letting the cloth settle draped over it.
+const BALL_STOP_Y: f64 = 1.4;
+const TOTAL_SECS: f64 = 7.0;
 
-/// A spring-net cloth with a falling ball.
-struct TrampolineCloth {
+/// A free-floating zero-gravity spring-net cloth and a driven ball.
+struct ClothWrap {
     curr: Vec<DVec3>,
     prev: Vec<DVec3>,
-    pinned: Vec<bool>,
     springs: Vec<(usize, usize, f64, f64)>, // (i, j, rest_len, stiffness)
     initial: Vec<DVec3>,
-    ball_curr: DVec3,
-    ball_prev: DVec3,
     ball_mesh: MeshItem,
     cloth_indices: Vec<u32>,
 }
 
-impl TrampolineCloth {
+impl ClothWrap {
     fn new() -> Self {
         let width = (COLS - 1) as f64 * SPACING;
         let mut curr = Vec::with_capacity(ROWS * COLS);
@@ -68,13 +61,6 @@ impl TrampolineCloth {
                 ));
             }
         }
-        // Pin the four corners.
-        let pinned = (0..ROWS * COLS)
-            .map(|i| {
-                let (r, c) = (i / COLS, i % COLS);
-                (r == 0 || r == ROWS - 1) && (c == 0 || c == COLS - 1)
-            })
-            .collect();
 
         let mut springs = Vec::new();
         for r in 0..ROWS {
@@ -120,36 +106,26 @@ impl TrampolineCloth {
             initial: curr.clone(),
             prev: curr.clone(),
             curr,
-            pinned,
             springs,
-            ball_curr: dvec3(BALL_START[0], BALL_START[1], BALL_START[2]),
-            ball_prev: dvec3(BALL_START[0], BALL_START[1], BALL_START[2]),
             ball_mesh,
             cloth_indices,
         }
     }
 }
 
-impl Evaluator for TrampolineCloth {
+impl Evaluator for ClothWrap {
     type Output = Vec<MeshItem>;
 
     fn reset(&mut self) {
         self.curr = self.initial.clone();
         self.prev = self.initial.clone();
-        self.ball_curr = dvec3(BALL_START[0], BALL_START[1], BALL_START[2]);
-        self.ball_prev = dvec3(BALL_START[0], BALL_START[1], BALL_START[2]);
     }
 
     fn step(&mut self, time: &SegmentTime) {
         let dt2 = time.local_delta_secs * time.local_delta_secs;
         let n = self.curr.len();
 
-        // Ball: Verlet integration with gravity.
-        let bv = (self.ball_curr - self.ball_prev) * DAMPING;
-        self.ball_prev = self.ball_curr;
-        self.ball_curr += bv - dvec3(0.0, GRAVITY, 0.0) * dt2;
-
-        // Cloth spring forces.
+        // Spring forces (zero gravity: the cloth floats freely and stays flat).
         let mut ax = vec![0.0f64; n];
         let mut ay = vec![0.0f64; n];
         let mut az = vec![0.0f64; n];
@@ -168,7 +144,7 @@ impl Evaluator for TrampolineCloth {
             az[j] -= f * d.z;
         }
 
-        // Self-collision repulsion (keeps the net from folding onto itself).
+        // Self-collision repulsion (keeps the wrapped cloth from folding onto itself).
         for i in 0..n {
             for j in (i + 1)..n {
                 let d = self.curr[j] - self.curr[i];
@@ -185,38 +161,32 @@ impl Evaluator for TrampolineCloth {
             }
         }
 
-        // Cloth Verlet integration.
+        // Cloth Verlet integration (no gravity).
         for i in 0..n {
-            if self.pinned[i] {
-                continue;
-            }
             let vx = (self.curr[i].x - self.prev[i].x) * DAMPING;
             let vy = (self.curr[i].y - self.prev[i].y) * DAMPING;
             let vz = (self.curr[i].z - self.prev[i].z) * DAMPING;
             self.prev[i] = self.curr[i];
             self.curr[i].x += vx + ax[i] * dt2;
-            self.curr[i].y += vy + (ay[i] - GRAVITY) * dt2;
+            self.curr[i].y += vy + ay[i] * dt2;
             self.curr[i].z += vz + az[i] * dt2;
         }
 
-        // Ball-cloth collision: push cloth particles out of the ball and push
-        // the ball back (leaving `ball_prev` untouched gives a natural bounce).
+        // Ball position: driven straight down, then held below the cloth.
+        let ball_y = (BALL_START_Y - BALL_SPEED * time.global_secs).max(BALL_STOP_Y);
+        let ball_center = dvec3(0.0, ball_y, 0.0);
+
+        // Ball-cloth collision: push cloth particles out of the ball.
         for i in 0..n {
-            if self.pinned[i] {
-                continue;
-            }
-            let d = self.curr[i] - self.ball_curr;
+            let d = self.curr[i] - ball_center;
             let dist = d.length();
             if dist < BALL_RADIUS && dist > 1e-9 {
-                let normal = d / dist;
-                let penetration = BALL_RADIUS - dist;
-                self.curr[i] += normal * penetration;
-                self.ball_curr -= normal * (penetration * BALL_COLLISION_FACTOR);
+                self.curr[i] += d / dist * (BALL_RADIUS - dist);
             }
         }
     }
 
-    fn sample(&self, _time: &SegmentTime) -> Vec<MeshItem> {
+    fn sample(&self, time: &SegmentTime) -> Vec<MeshItem> {
         let points: Vec<Vec3> = self.curr.iter().map(|p| p.as_vec3()).collect();
 
         // Smooth normals: accumulate face normals, then normalize.
@@ -241,23 +211,24 @@ impl Evaluator for TrampolineCloth {
             vertex_normals: normals.into(),
         };
 
+        let ball_y = (BALL_START_Y - BALL_SPEED * time.global_secs).max(BALL_STOP_Y);
         let mut ball = self.ball_mesh.clone();
-        ball.transform = Mat4::from_translation(self.ball_curr.as_vec3());
+        ball.transform = Mat4::from_translation(dvec3(0.0, ball_y, 0.0).as_vec3());
 
         vec![cloth, ball]
     }
 }
 
 #[scene]
-#[output(dir = "./output/cloth_trampoline")]
-fn cloth_trampoline(r: &mut RanimScene) {
+#[output(dir = "./output/cloth_wrap")]
+fn cloth_wrap(r: &mut RanimScene) {
     let mut camera = CameraFrame::default();
-    camera.pos = dvec3(-4.0, 3.2, 4.0);
-    camera.facing = (dvec3(0.0, 1.8, 0.0) - camera.pos).normalize();
+    camera.pos = dvec3(-3.2, 2.2, 3.2);
+    camera.facing = (dvec3(0.0, 1.2, 0.0) - camera.pos).normalize();
     camera.up = DVec3::Y;
     camera.perspective_blend = 1.0;
     camera.fovy = 50.0f64.to_radians();
 
     r.play(camera.show().with_duration(TOTAL_SECS));
-    r.play(TrampolineCloth::new().with_duration(TOTAL_SECS));
+    r.play(ClothWrap::new().with_duration(TOTAL_SECS));
 }

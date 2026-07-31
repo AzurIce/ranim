@@ -250,8 +250,8 @@ path = "examples/cloth/lib.rs"
 crate-type = ["cdylib"]
 
 [[example]]
-name = "cloth_trampoline"
-path = "examples/cloth_trampoline/lib.rs"
+name = "cloth_wrap"
+path = "examples/cloth_wrap/lib.rs"
 crate-type = ["cdylib"]
 
 [package.metadata.example.hello_ranim]
