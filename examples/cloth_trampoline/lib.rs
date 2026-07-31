@@ -5,8 +5,9 @@
 //! carried across frames by `step`.
 //!
 //! The cloth is a grid of particles with its four corners pinned. A ball drops
-//! from above; the net dips, bounces the ball a little, and settles with the
-//! ball resting in the sag. The cloth is rendered as a shaded `MeshItem`
+//! from above; the stiff spring net holds its shape under its own weight, dips
+//! elastically under the ball, bounces it a couple of times, and settles with
+//! the ball resting in the sag. The cloth is rendered as a shaded `MeshItem`
 //! surface (smooth normals computed each frame); the ball is a static sphere
 //! mesh moved by its transform.
 
@@ -25,18 +26,21 @@ const ROWS: usize = 16;
 const COLS: usize = 16;
 const SPACING: f64 = 0.22;
 const CLOTH_Y: f64 = 2.2;
-const GRAVITY: f64 = 1.5;
-const DAMPING: f64 = 0.995;
-const K_STRUCTURAL: f64 = 250.0;
-const K_SHEAR: f64 = 180.0;
-const K_BEND: f64 = 80.0;
+// Stiff springs keep the net from sagging noticeably under its own weight
+// (~0.2 units vs ~0.6 before); moderate gravity and damping give the ball a
+// couple of lively bounces before it settles.
+const GRAVITY: f64 = 0.8;
+const DAMPING: f64 = 0.985;
+const K_STRUCTURAL: f64 = 1200.0;
+const K_SHEAR: f64 = 800.0;
+const K_BEND: f64 = 400.0;
 const REPULSION_CUTOFF: f64 = 0.4 * SPACING;
 const REPULSION_K: f64 = 300.0;
 const BALL_RADIUS: f64 = 0.5;
-const BALL_START: [f64; 3] = [0.0, 4.0, 0.0];
-/// How strongly the cloth pushes the ball back during a collision.
-const BALL_COLLISION_FACTOR: f64 = 0.6;
-const TOTAL_SECS: f64 = 15.0;
+const BALL_START: [f64; 3] = [0.0, 3.5, 0.0];
+/// How strongly the cloth pushes the ball back during a collision (1.0 = full).
+const BALL_COLLISION_FACTOR: f64 = 1.0;
+const TOTAL_SECS: f64 = 12.0;
 
 /// A spring-net cloth with a falling ball.
 struct TrampolineCloth {
