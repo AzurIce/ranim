@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::{
     Output, Scene, SceneConfig, SceneConstructor,
     core::{
-        SealedRanimScene,
+        SceneEvaluator,
         color::{self, LinearSrgb},
     },
     render::{Renderer, resource::RenderTextures, utils::WgpuContext, world::RenderFrame},
@@ -26,6 +26,9 @@ use wasm_bindgen::prelude::*;
 pub enum RanimPreviewAppCmd {
     ReloadScene(Scene, Sender<()>),
 }
+
+/// Default logic grid resolution (Hz), per the time model design.
+const DEFAULT_LOGIC_FPS: f64 = 120.0;
 
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 enum ExportProgress {
@@ -103,7 +106,7 @@ pub struct RanimPreviewApp {
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     scene_config: SceneConfig,
     resolution: Resolution,
-    timeline: SealedRanimScene,
+    evaluator: SceneEvaluator,
     need_eval: bool,
     last_sec: f64,
     store: RenderFrame,
@@ -159,6 +162,8 @@ impl RanimPreviewApp {
 
         info!("Getting timelines info...");
         let animation_infos = timeline.get_animation_infos();
+        let total_secs = timeline.total_secs();
+        let evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
         info!("Total {} root animations", animation_infos.len());
 
         let (cmd_tx, cmd_rx) = unbounded();
@@ -171,8 +176,8 @@ impl RanimPreviewApp {
             scene_constructor,
             scene_config,
             resolution: Resolution::QHD,
-            timeline_state: TimelineState::new(timeline.total_secs(), animation_infos),
-            timeline,
+            timeline_state: TimelineState::new(total_secs, animation_infos),
+            evaluator,
             need_eval: false,
             last_sec: -1.0,
             store: RenderFrame::default(),
@@ -262,7 +267,7 @@ impl RanimPreviewApp {
                         TimelineState::new(timeline.total_secs(), animation_infos);
                     self.timeline_state.current_sec =
                         old_cur_second.clamp(0.0, self.timeline_state.total_sec);
-                    self.timeline = timeline;
+                    self.evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
                     self.store.update(std::iter::empty());
                     self.need_eval = true;
 
@@ -371,8 +376,16 @@ impl RanimPreviewApp {
             self.last_sec = self.timeline_state.current_sec;
 
             let start_eval = Instant::now();
-            self.store
-                .update(self.timeline.eval_at_sec(self.timeline_state.current_sec));
+            // Forward: advance the logic grid; backward scrub: seek and replay.
+            let target = self.timeline_state.current_sec;
+            if target < self.evaluator.clock() {
+                self.evaluator.seek(target);
+            } else {
+                self.evaluator.advance_to(target);
+            }
+            let mut frame_items = Vec::new();
+            self.evaluator.sample_into(&mut frame_items);
+            self.store.update(frame_items.into_iter());
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();

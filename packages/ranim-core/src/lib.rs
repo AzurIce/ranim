@@ -17,8 +17,11 @@ pub mod color;
 pub mod components;
 /// Fundamental scene primitives.
 pub mod core_item;
+/// Scene evaluation driver (lightweight session, no ECS).
+pub mod scene_evaluator;
 /// Fundamental traits.
 pub mod traits;
+pub use scene_evaluator::SceneEvaluator;
 /// Utilities.
 pub mod utils;
 
@@ -133,6 +136,15 @@ pub struct SealedRanimScene {
 }
 
 impl SealedRanimScene {
+    /// Consume this scene into a [`SceneEvaluator`] driving session.
+    ///
+    /// `logic_fps` is the fixed logic grid resolution; the time model defaults
+    /// to 120 Hz. Iterative (stateful) segments require the evaluator: the pure
+    /// [`eval_at_sec`](Self::eval_at_sec) path does not advance their state.
+    pub fn into_evaluator(self, logic_fps: f64) -> SceneEvaluator {
+        SceneEvaluator::new(self, logic_fps)
+    }
+
     /// Total scene duration.
     pub fn total_secs(&self) -> f64 {
         self.total_secs
