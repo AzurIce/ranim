@@ -21,7 +21,7 @@ use std::f64::consts::PI;
 const G: f64 = 8.0;
 const TRAIL_SAMPLE_EVERY: usize = 4; // sample a trail point every 4th step (~30 Hz)
 const TRAIL_LEN: usize = 90; // ~3 s of trail per body
-const TOTAL_SECS: f64 = 16.0;
+const TOTAL_SECS: f64 = 32.0;
 
 const PALETTE: [AlphaColor<Srgb>; 6] = [
     manim::BLUE_C,
