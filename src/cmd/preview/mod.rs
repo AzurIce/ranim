@@ -8,13 +8,8 @@ use crate::{
     core::{
         SealedRanimScene,
         color::{self, LinearSrgb},
-        store::CoreItemStore,
     },
-    render::{
-        Renderer,
-        resource::{RenderPool, RenderTextures},
-        utils::WgpuContext,
-    },
+    render::{Renderer, resource::RenderTextures, utils::WgpuContext, world::RenderFrame},
 };
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
@@ -111,8 +106,7 @@ pub struct RanimPreviewApp {
     timeline: SealedRanimScene,
     need_eval: bool,
     last_sec: f64,
-    store: CoreItemStore,
-    pool: RenderPool,
+    store: RenderFrame,
     timeline_state: TimelineState,
     play_prev_t: Option<Instant>,
 
@@ -181,8 +175,7 @@ impl RanimPreviewApp {
             timeline,
             need_eval: false,
             last_sec: -1.0,
-            store: CoreItemStore::default(),
-            pool: RenderPool::new(),
+            store: RenderFrame::default(),
             play_prev_t: None,
             renderer: None,
             render_textures: None,
@@ -271,7 +264,6 @@ impl RanimPreviewApp {
                         old_cur_second.clamp(0.0, self.timeline_state.total_sec);
                     self.timeline = timeline;
                     self.store.update(std::iter::empty());
-                    self.pool.clean();
                     self.need_eval = true;
 
                     self.set_clear_color_str(&scene.config.clear_color);
@@ -384,13 +376,7 @@ impl RanimPreviewApp {
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();
-            renderer.render_store_with_pool(
-                ctx,
-                render_textures,
-                self.clear_color,
-                &self.store,
-                &mut self.pool,
-            );
+            renderer.render_frame(render_textures, self.clear_color, &self.store);
 
             if let (Some(pipeline), Some(view)) = (
                 self.depth_visual_pipeline.as_ref(),
@@ -438,7 +424,6 @@ impl RanimPreviewApp {
             }
 
             self.last_render_time = Some(start.elapsed());
-            self.pool.clean();
         }
     }
 

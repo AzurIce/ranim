@@ -1,9 +1,47 @@
 use std::ops::Deref;
 
+use bevy_ecs::prelude::*;
+
 use crate::{
     ResolutionInfo, WgpuContext,
-    resource::{GpuResource, OUTPUT_TEXTURE_FORMAT},
+    resource::{GpuResource, OUTPUT_TEXTURE_FORMAT, PipelinesPool},
+    schedule::{FrameTarget, RenderContext},
 };
+
+pub(crate) fn resolve(
+    mut render: RenderContext,
+    ctx: Res<WgpuContext>,
+    pipelines: Res<PipelinesPool>,
+    resolution: Res<ResolutionInfo>,
+    target: Res<FrameTarget>,
+) {
+    let mut pass = render
+        .encoder()
+        .begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("OIT Resolve Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &target.render_view,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+    pass.set_pipeline(&pipelines.get_or_init::<OITResolvePipeline>(&ctx));
+    pass.set_bind_group(0, &resolution.bind_group, &[]);
+    pass.set_bind_group(1, &target.depth_bind_group, &[]);
+    pass.draw(0..3, 0..1);
+    drop(pass);
+    render
+        .encoder()
+        .clear_buffer(&resolution.pixel_count_buffer.buffer, 0, None);
+}
 
 pub struct OITResolvePipeline {
     pipeline: wgpu::RenderPipeline,

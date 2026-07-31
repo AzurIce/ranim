@@ -15,6 +15,7 @@ itertools.workspace = true
 num = "0.4.3"
 glam = { workspace = true, features = ["approx", "bytemuck"] }
 bytemuck = { workspace = true, features = ["derive"] }
+bevy_ecs.workspace = true
 derive_more = { workspace = true, features = [
   "deref_mut",
   "deref",

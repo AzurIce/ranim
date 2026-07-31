@@ -6,25 +6,26 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
-/// Render Graph
-pub mod graph;
 /// The pipelines
 pub mod pipelines;
 /// The basic renderable structs
 pub mod primitives;
 pub mod resource;
+mod schedule;
 /// Rendering related utils
 pub mod utils;
+pub mod world;
 
+use bevy_ecs::prelude::*;
 use glam::{UVec3, uvec3};
 
 use crate::{
-    graph::{AnyGlobalRenderNodeTrait, GlobalRenderGraph, RenderPackets},
     primitives::{mesh_items::MeshItemsBuffer, viewport::ViewportUniform, vitems::VItemsBuffer},
-    resource::{PipelinesPool, RenderPool, RenderTextures},
+    resource::{PipelinesPool, RenderTextures},
+    schedule::{FrameTarget, RenderDimensions, RenderGraph, RenderPrepare, install_schedules},
     utils::{WgpuBuffer, WgpuVecBuffer},
+    world::{CoreItemEntities, RenderFrame, reconcile},
 };
-use ranim_core::store::CoreItemStore;
 use utils::WgpuContext;
 
 #[cfg(feature = "profiling")]
@@ -82,37 +83,11 @@ mod profiling_utils {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct RenderContext<'a> {
-    pub render_textures: &'a RenderTextures,
-    pub render_pool: &'a RenderPool,
-    pub render_packets: &'a RenderPackets,
-    pub pipelines: &'a PipelinesPool,
-    pub wgpu_ctx: &'a WgpuContext,
-    pub resolution_info: &'a ResolutionInfo,
-    pub clear_color: wgpu::Color,
-    /// Present when using the merged rendering path.
-    pub merged_buffer: Option<&'a VItemsBuffer>,
-    /// Present when using the merged mesh rendering path.
-    pub merged_mesh_buffer: Option<&'a MeshItemsBuffer>,
-}
-
 // MARK: Renderer
 pub struct Renderer {
     width: u32,
     height: u32,
-    pub(crate) resolution_info: ResolutionInfo,
-    pub(crate) pipelines: PipelinesPool,
-    packets: RenderPackets,
-    render_graph: GlobalRenderGraph,
-
-    /// Present when using the merged rendering path (lazily initialized on first use).
-    merged_buffer: Option<VItemsBuffer>,
-    /// Present when using the merged mesh rendering path (lazily initialized on first use).
-    merged_mesh_buffer: Option<MeshItemsBuffer>,
-
-    #[cfg(feature = "profiling")]
-    pub(crate) profiler: wgpu_profiler::GpuProfiler,
+    world: World,
 }
 
 impl Renderer {
@@ -128,65 +103,34 @@ impl Renderer {
         self.width as f32 / self.height as f32
     }
 
-    fn build_render_graph() -> GlobalRenderGraph {
-        use graph::*;
-        let mut render_graph = GlobalRenderGraph::new();
-        let clear = render_graph.insert_node(ClearNode);
-        let view_render = render_graph.insert_node({
-            use graph::view::*;
-            let mut render_graph = ViewRenderGraph::new();
-            let vitem_compute = render_graph.insert_node(MergedVItemComputeNode);
-            let vitem_depth = render_graph.insert_node(MergedVItemDepthNode);
-            let mesh_depth = render_graph.insert_node(MergedMeshItemDepthNode);
-            let vitem_color = render_graph.insert_node(MergedVItemColorNode);
-            let mesh_color = render_graph.insert_node(MergedMeshItemColorNode);
-
-            render_graph.insert_edge(vitem_compute, vitem_depth);
-            render_graph.insert_edge(vitem_depth, vitem_color);
-            render_graph.insert_edge(vitem_depth, mesh_color);
-            render_graph.insert_edge(mesh_depth, mesh_color);
-            render_graph.insert_edge(mesh_depth, vitem_color);
-            render_graph
-        });
-        let oit_resolve = render_graph.insert_node(OITResolveNode);
-        render_graph.insert_edge(clear, view_render);
-        render_graph.insert_edge(view_render, oit_resolve);
-        render_graph
-    }
-
-    /// Create a new renderer with default [`Self::build_render_graph`]
     pub fn new(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> Self {
-        Self::new_with_graph(ctx, width, height, oit_layers, Self::build_render_graph())
-    }
-
-    /// Create a new renderer with the given render graph
-    pub fn new_with_graph(
-        ctx: &WgpuContext,
-        width: u32,
-        height: u32,
-        oit_layers: usize,
-        render_graph: GlobalRenderGraph,
-    ) -> Self {
-        let resolution_info = ResolutionInfo::new(ctx, width, height, oit_layers);
+        let mut world = World::new();
+        world.insert_resource(ctx.clone());
+        world.insert_resource(RenderDimensions { width, height });
+        world.insert_resource(ResolutionInfo::new(ctx, width, height, oit_layers));
+        world.init_resource::<PipelinesPool>();
+        world.insert_resource(VItemsBuffer::new(ctx));
+        world.insert_resource(MeshItemsBuffer::new(ctx));
+        world.insert_resource(primitives::viewport::ViewportGpuPacket::new(
+            ctx,
+            &ViewportUniform::from_camera_frame(&Default::default(), width, height),
+        ));
+        world.init_resource::<CoreItemEntities>();
 
         #[cfg(feature = "profiling")]
-        let profiler = wgpu_profiler::GpuProfiler::new(
-            &ctx.device,
-            wgpu_profiler::GpuProfilerSettings::default(),
-        )
-        .unwrap();
+        world.insert_resource(schedule::RenderProfiler(
+            wgpu_profiler::GpuProfiler::new(
+                &ctx.device,
+                wgpu_profiler::GpuProfilerSettings::default(),
+            )
+            .unwrap(),
+        ));
+        install_schedules(&mut world);
 
         Self {
             width,
             height,
-            resolution_info,
-            pipelines: PipelinesPool::default(),
-            packets: RenderPackets::default(),
-            render_graph,
-            merged_buffer: None,
-            merged_mesh_buffer: None,
-            #[cfg(feature = "profiling")]
-            profiler,
+            world,
         }
     }
 
@@ -194,101 +138,23 @@ impl Renderer {
         RenderTextures::new(ctx, self.width, self.height)
     }
 
-    /// Render a frame. Pushes viewport + VItem packets via pool, then execs the render graph.
-    pub fn render_store_with_pool(
+    /// Reconcile and render one evaluated frame.
+    pub fn render_frame(
         &mut self,
-        ctx: &WgpuContext,
         render_textures: &mut RenderTextures,
         clear_color: wgpu::Color,
-        store: &CoreItemStore,
-        pool: &mut RenderPool,
+        frame: &RenderFrame,
     ) {
-        // Viewport — always needed
-        let camera_frame = &store.camera_frames[0];
-        let viewport = ViewportUniform::from_camera_frame(camera_frame, self.width, self.height);
-        self.packets.push(pool.alloc_packet(ctx, &viewport));
-
-        // Merged buffer (merged nodes read this; old nodes ignore it)
-        let merged = self
-            .merged_buffer
-            .get_or_insert_with(|| VItemsBuffer::new(ctx));
-        merged.update(ctx, &store.vitems);
-
-        // Merged mesh buffer
-        let merged_mesh = self
-            .merged_mesh_buffer
-            .get_or_insert_with(|| MeshItemsBuffer::new(ctx));
-        merged_mesh.update(ctx, &store.mesh_items);
-
-        // Encode & submit
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("render");
-
-            let mut encoder = ctx
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
-            {
-                #[cfg(feature = "profiling")]
-                let mut scope = self.profiler.scope("render", &mut encoder);
-
-                let render_ctx = RenderContext {
-                    pipelines: &self.pipelines,
-                    render_textures,
-                    render_packets: &self.packets,
-                    render_pool: pool,
-                    wgpu_ctx: ctx,
-                    resolution_info: &self.resolution_info,
-                    clear_color,
-                    merged_buffer: self.merged_buffer.as_ref(),
-                    merged_mesh_buffer: self.merged_mesh_buffer.as_ref(),
-                };
-
-                self.render_graph.exec(
-                    #[cfg(not(feature = "profiling"))]
-                    &mut encoder,
-                    #[cfg(feature = "profiling")]
-                    &mut scope,
-                    render_ctx,
-                );
-            }
-
-            #[cfg(not(feature = "profiling"))]
-            ctx.queue.submit(Some(encoder.finish()));
-
-            #[cfg(feature = "profiling")]
-            {
-                self.profiler.resolve_queries(&mut encoder);
-                {
-                    profiling::scope!("submit");
-                    ctx.queue.submit(Some(encoder.finish()));
-                }
-
-                self.profiler.end_frame().unwrap();
-
-                ctx.device
-                    .poll(wgpu::PollType::wait_indefinitely())
-                    .unwrap();
-                let latest_profiler_results = self
-                    .profiler
-                    .process_finished_frame(ctx.queue.get_timestamp_period());
-                let mut gpu_profiler = PUFFIN_GPU_PROFILER.lock().unwrap();
-                wgpu_profiler::puffin::output_frame_to_puffin(
-                    &mut gpu_profiler,
-                    &latest_profiler_results.unwrap(),
-                );
-                gpu_profiler.new_frame();
-            }
-
-            render_textures.mark_dirty();
-        }
-
-        self.packets.clear();
+        reconcile(&mut self.world, frame);
+        self.world
+            .insert_resource(FrameTarget::new(render_textures, clear_color));
+        self.world.run_schedule(RenderPrepare);
+        self.world.run_schedule(RenderGraph);
     }
 }
 
 #[allow(unused)]
+#[derive(Resource)]
 pub struct ResolutionInfo {
     buffer: WgpuBuffer<UVec3>,
     pub(crate) pixel_count_buffer: WgpuVecBuffer<u32>,
