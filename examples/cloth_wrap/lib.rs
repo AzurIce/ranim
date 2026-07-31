@@ -96,11 +96,14 @@ impl ClothWrap {
             }
         }
 
-        let ball_mesh = MeshItem::from(Surface::from(
-            Sphere::new(BALL_RADIUS)
-                .with_resolution((20, 12))
-                .with_fill_color(manim::RED_C),
-        ));
+        let ball_mesh = MeshItem::from(
+            Surface::from(
+                Sphere::new(BALL_RADIUS)
+                    .with_resolution((20, 12))
+                    .with_fill_color(manim::RED_C),
+            )
+            .with_smooth_normals(),
+        );
 
         Self {
             initial: curr.clone(),
