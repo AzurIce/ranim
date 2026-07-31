@@ -11,8 +11,11 @@ permissions:
   pages: write
   id-token: write
 
+# Per-ref/PR concurrency: different branches do not cancel each other;
+# a newer run of the same branch/PR cancels the stale one. Main pushes share
+# one group so the Pages deploy is serialized (newest wins).
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.event.pull_request.number || github.ref }}"
   cancel-in-progress: true
 
 jobs:
