@@ -6,7 +6,7 @@ use crate::{Output, Scene, SceneConfig, SceneConstructor};
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
-use ranim_core::{SealedRanimScene, TimeMark};
+use ranim_core::{SceneEvaluator, TimeMark};
 use ranim_render::resource::RenderTextures;
 use ranim_render::{Renderer, utils::WgpuContext, world::RenderFrame};
 use std::path::{Path, PathBuf};
@@ -72,12 +72,19 @@ pub fn render_scene_output_with_progress(
     let scene = constructor.build_scene();
     trace!("Build timeline cost: {:?}", t.elapsed());
 
+    // Default logic grid 120 Hz (per the time model design); render fps only
+    // decides which logic states are sampled.
+    let mut evaluator = scene.into_evaluator(DEFAULT_LOGIC_FPS);
+
     let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
-    app.render_scene_with_progress(&scene, on_progress);
-    if !scene.time_marks().is_empty() {
-        app.render_capture_marks(&scene);
+    app.render_scene_with_progress(&mut evaluator, on_progress);
+    if !evaluator.time_marks().is_empty() {
+        app.render_capture_marks(&mut evaluator);
     }
 }
+
+/// Default logic grid resolution (Hz), per the time model design.
+const DEFAULT_LOGIC_FPS: f64 = 120.0;
 
 /// drop it will close the channel and the thread loop will be terminated
 struct RenderThreadHandle {
@@ -360,7 +367,7 @@ impl RanimRenderApp {
     #[instrument(skip_all)]
     pub fn render_scene_with_progress(
         &mut self,
-        timeline: &SealedRanimScene,
+        evaluator: &mut SceneEvaluator,
         on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
     ) {
         let start = Instant::now();
@@ -383,7 +390,7 @@ impl RanimRenderApp {
 
         let worker_thread = self.render_worker.take().unwrap().yeet();
 
-        let total_secs = timeline.total_secs();
+        let total_secs = evaluator.total_secs();
         let fps = self.fps as f64;
         let raw_frames = total_secs * fps;
         // Add an extra frame to sample the final state exactly,
@@ -411,8 +418,11 @@ impl RanimRenderApp {
             .map(|f| (f as f64 / fps).min(total_secs))
             .enumerate()
             .for_each(|(i, sec)| {
-                worker_thread.sync_and_submit(|store| {
-                    store.update(timeline.eval_at_sec(sec));
+                let mut frame_items = Vec::new();
+                evaluator.advance_to(sec);
+                evaluator.sample_into(&mut frame_items);
+                worker_thread.sync_and_submit(move |store| {
+                    store.update(frame_items.into_iter());
                 });
 
                 span.pb_inc(1);
@@ -433,19 +443,20 @@ impl RanimRenderApp {
         info!(
             "rendered {} frames({:?}) in {:?}",
             num_frames,
-            Duration::from_secs_f64(timeline.total_secs()),
+            Duration::from_secs_f64(evaluator.total_secs()),
             start.elapsed(),
         );
         trace!("render timeline cost: {:?}", start.elapsed());
     }
 
     #[instrument(skip_all)]
-    fn render_capture_marks(&mut self, timeline: &SealedRanimScene) {
+    fn render_capture_marks(&mut self, evaluator: &mut SceneEvaluator) {
         let start = Instant::now();
-        let timemarks = timeline
+        let timemarks = evaluator
             .time_marks()
             .iter()
             .filter(|mark| matches!(mark.1, TimeMark::Capture(_)))
+            .map(|(sec, mark)| (*sec, mark.clone()))
             .collect::<Vec<_>>();
 
         let style =             ProgressStyle::with_template(
@@ -462,16 +473,22 @@ impl RanimRenderApp {
         span.pb_set_length(timemarks.len() as u64);
         let _enter = span.enter();
 
-        for (sec, TimeMark::Capture(filename)) in &timemarks {
-            let alpha = *sec / timeline.total_secs();
-
-            self.store.update(timeline.eval_at_alpha(alpha));
+        let mut captured = 0usize;
+        for (sec, TimeMark::Capture(filename)) in timemarks {
+            // The render has advanced to the end; captures must seek back and
+            // replay (deterministic contract).
+            evaluator.seek(sec);
+            let mut frame_items = Vec::new();
+            evaluator.sample_into(&mut frame_items);
+            self.store.update(frame_items.into_iter());
             let worker = self.render_worker.as_mut().unwrap();
             worker.render_store(&self.store);
             worker.capture_frame(filename);
             span.pb_inc(1);
+            captured += 1;
         }
-        info!("saved {} capture frames from time marks", timemarks.len());
+        info!("saved {} capture frames from time marks", captured);
+
         trace!("save capture frames cost: {:?}", start.elapsed());
     }
 }
