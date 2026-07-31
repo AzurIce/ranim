@@ -1,9 +1,13 @@
 //! N-body gravitational simulation — a canonical "iterative only" animation:
 //! no closed-form solution, chaotic, and inherently stateful across frames.
 //!
-//! Three bodies mutually attract through gravity (velocity-Verlet integration).
-//! Each body leaves a fading trail of recent positions. The scene uses a
-//! default (linear) rate, so `local_delta_secs` equals the physical tick.
+//! `NBody::new(n)` places `n` equal masses on a regular n-gon with tangential
+//! velocities (exact circular speed for the relative equilibrium, plus a tiny
+//! asymmetry). Each body leaves a fading trail of recent positions. The scene
+//! uses a default (linear) rate, so `local_delta_secs` equals the physical tick.
+//!
+//! Behavior by `n`: n = 3 stays inside the frame and wobbles chaotically for
+//! the whole scene; n >= 4 destabilizes and ejects a body (a dramatic finale).
 
 use ranim::{
     color::{AlphaColor, Srgb, palettes::manim},
@@ -12,12 +16,21 @@ use ranim::{
     items::vitem::{VItem, geometry::Circle},
     prelude::*,
 };
+use std::f64::consts::PI;
 
 const G: f64 = 8.0;
-const BODY_COUNT: usize = 3;
 const TRAIL_SAMPLE_EVERY: usize = 4; // sample a trail point every 4th step (~30 Hz)
 const TRAIL_LEN: usize = 90; // ~3 s of trail per body
 const TOTAL_SECS: f64 = 16.0;
+
+const PALETTE: [AlphaColor<Srgb>; 6] = [
+    manim::BLUE_C,
+    manim::RED_C,
+    manim::YELLOW_C,
+    manim::GREEN_C,
+    manim::PURPLE_C,
+    manim::ORANGE,
+];
 
 #[derive(Clone, Copy)]
 struct Body {
@@ -26,53 +39,55 @@ struct Body {
     mass: f64,
 }
 
-/// A three-body system with mutual gravity.
+/// An N-body system with mutual gravity.
 struct NBody {
-    bodies: [Body; BODY_COUNT],
-    initial: [Body; BODY_COUNT],
-    trails: [Vec<DVec3>; BODY_COUNT],
+    bodies: Vec<Body>,
+    initial: Vec<Body>,
+    trails: Vec<Vec<DVec3>>,
     step_count: usize,
-    colors: [AlphaColor<Srgb>; BODY_COUNT],
+    colors: Vec<AlphaColor<Srgb>>,
 }
 
 impl NBody {
-    fn new() -> Self {
-        // Three equal masses on a circle with tangential velocities plus a tiny
-        // asymmetry (the equilateral equilibrium is Lyapunov-unstable). v0 ≈ 104%
-        // of the circular speed: the bodies stay inside the frame for most of the
-        // scene, then the system destabilizes and ejects a body right at the end.
+    /// Place `n` equal masses on a regular n-gon.
+    ///
+    /// The circular speed is exact for the regular n-gon relative equilibrium:
+    /// `v² = G·Σ csc(πj/n) / (4R)`. A 4% overspeed plus a tiny asymmetry keeps
+    /// the system lively (and chaotic — the n-gon equilibrium is unstable).
+    fn new(n: usize) -> Self {
+        assert!(n >= 2, "nbody needs at least 2 bodies");
         let radius = 2.0;
-        let v_circ = (G / 6.0).sqrt();
+        let csc_sum: f64 = (1..n).map(|j| 1.0 / (PI * j as f64 / n as f64).sin()).sum();
+        let v_circ = (G * csc_sum / (4.0 * radius)).sqrt();
         let v0 = 1.04 * v_circ;
-        let mut bodies = [Body {
-            pos: DVec3::ZERO,
-            vel: DVec3::ZERO,
-            mass: 1.0,
-        }; BODY_COUNT];
-        for (i, body) in bodies.iter_mut().enumerate() {
-            let angle = i as f64 * std::f64::consts::TAU / BODY_COUNT as f64;
-            body.pos = DVec3::new(radius * angle.cos(), radius * angle.sin(), 0.0);
+
+        let mut bodies = Vec::with_capacity(n);
+        for i in 0..n {
+            let angle = PI * 2.0 * i as f64 / n as f64;
+            let pos = DVec3::new(radius * angle.cos(), radius * angle.sin(), 0.0);
             let velocity = v0 * (1.0 + 0.001 * i as f64);
-            body.vel = DVec3::new(
-                -radius * velocity * angle.sin() / radius,
-                radius * velocity * angle.cos() / radius,
-                0.0,
-            );
+            let vel = DVec3::new(-velocity * angle.sin(), velocity * angle.cos(), 0.0);
+            bodies.push(Body {
+                pos,
+                vel,
+                mass: 1.0,
+            });
         }
-        let colors = [manim::BLUE_C, manim::RED_C, manim::YELLOW_C];
+
+        let colors = (0..n).map(|i| PALETTE[i % PALETTE.len()]).collect();
         Self {
-            initial: bodies,
+            initial: bodies.clone(),
             bodies,
-            trails: [Vec::new(), Vec::new(), Vec::new()],
+            trails: vec![Vec::new(); n],
             step_count: 0,
             colors,
         }
     }
 
-    fn accelerations(&self) -> [DVec3; BODY_COUNT] {
-        let mut accs = [DVec3::ZERO; BODY_COUNT];
+    fn accelerations(&self) -> Vec<DVec3> {
+        let mut accs = vec![DVec3::ZERO; self.bodies.len()];
         for (i, acc) in accs.iter_mut().enumerate() {
-            for j in 0..BODY_COUNT {
+            for j in 0..self.bodies.len() {
                 if i == j {
                     continue;
                 }
@@ -90,7 +105,7 @@ impl Eval for NBody {
     type Output = Vec<VItem>;
 
     fn reset(&mut self) {
-        self.bodies = self.initial;
+        self.bodies = self.initial.clone();
         for trail in &mut self.trails {
             trail.clear();
         }
@@ -150,5 +165,6 @@ impl Eval for NBody {
 #[output(dir = "./output/nbody")]
 fn nbody(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(TOTAL_SECS));
-    r.play(NBody::new().with_duration(TOTAL_SECS));
+    // n = 3: chaotic wobble that stays in frame; n >= 4: ejection finale.
+    r.play(NBody::new(3).with_duration(TOTAL_SECS));
 }
