@@ -84,6 +84,17 @@ pub struct Output {
     ///
     /// e.g. the output of name `my_video` will be outputed as `my_video_<width>x<height>_<fps>.mp4`.
     pub name: Option<String>,
+    /// The basename template for the rendered output.
+    ///
+    /// Supported placeholders:
+    /// - `{name}`: the scene/output name
+    /// - `{width}`: output width in pixels
+    /// - `{height}`: output height in pixels
+    /// - `{fps}`: output frame rate
+    ///
+    /// The file extension is appended automatically based on the output format.
+    /// Defaults to `{name}_{width}x{height}_{fps}`.
+    pub name_template: Option<String>,
     /// The directory to save the output.
     ///
     /// Can be relative (resolved from cwd) or absolute.
@@ -100,6 +111,7 @@ impl Default for Output {
             fps: 60,
             save_frames: false,
             name: None,
+            name_template: None,
             dir: "./output".to_string(),
             format: OutputFormat::default(),
         }

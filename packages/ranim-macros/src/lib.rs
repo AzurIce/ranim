@@ -65,6 +65,7 @@ struct OutputDef {
     fps: u32,
     save_frames: bool,
     name: Option<String>,
+    name_template: Option<String>,
     dir: String,
     format: Option<String>,
 }
@@ -104,11 +105,16 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         fps,
         save_frames,
         name,
+        name_template,
         dir,
         format,
     } in attrs.outputs
     {
         let name_token = match name.as_deref() {
+            Some(n) if !n.is_empty() => quote! { Some(#n) },
+            _ => quote! { None },
+        };
+        let name_template_token = match name_template.as_deref() {
             Some(n) if !n.is_empty() => quote! { Some(#n) },
             _ => quote! { None },
         };
@@ -126,6 +132,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
                 fps: #fps,
                 save_frames: #save_frames,
                 name: #name_token,
+                name_template: #name_template_token,
                 dir: #dir,
                 format: #format_token,
             }
@@ -199,6 +206,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 /// - `fps`: frames per second
 /// - `save_frames`: save frames to disk
 /// - `dir`: directory for output
+/// - `name_template`: basename template for the output file
 #[proc_macro_attribute]
 pub fn output(_: TokenStream, _: TokenStream) -> TokenStream {
     TokenStream::new()
