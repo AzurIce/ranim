@@ -27,7 +27,7 @@ use crate::{
     utils::{WgpuBuffer, WgpuVecBuffer},
     world::{CoreItemEntities, RenderFrame, reconcile},
 };
-use utils::WgpuContext;
+use utils::{WgpuContext, check_adapter_support};
 
 #[cfg(feature = "profiling")]
 // Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
@@ -105,6 +105,9 @@ impl Renderer {
     }
 
     pub fn new(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> Self {
+        if let Err(reason) = check_adapter_support(ctx) {
+            panic!("cannot create ranim renderer: {reason}");
+        }
         let mut world = World::new();
         world.insert_resource(ctx.clone());
         world.insert_resource(RenderDimensions { width, height });

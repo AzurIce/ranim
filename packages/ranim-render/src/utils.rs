@@ -16,6 +16,51 @@ pub struct WgpuContext {
     pub queue: wgpu::Queue,
 }
 
+/// The minimum downlevel capabilities required by the ranim renderer.
+///
+/// ranim renders with:
+/// - a compute pass that projects vitem points (`COMPUTE_SHADERS`),
+/// - OIT accumulation that appends to storage buffers from fragment shaders
+///   (`FRAGMENT_WRITABLE_STORAGE`),
+/// - merged item buffers bound as read-only storage buffers in vertex and
+///   fragment stages (`VERTEX_STORAGE`, `FRAGMENT_STORAGE`).
+///
+/// All of these are guaranteed on a WebGPU-compliant adapter. They are
+/// missing on downlevel adapters such as WebGL2/GLES, which is what wgpu
+/// silently falls back to on the web when WebGPU is unavailable.
+pub fn required_downlevel_flags() -> wgpu::DownlevelFlags {
+    wgpu::DownlevelFlags::COMPUTE_SHADERS
+        | wgpu::DownlevelFlags::FRAGMENT_WRITABLE_STORAGE
+        | wgpu::DownlevelFlags::VERTEX_STORAGE
+        | wgpu::DownlevelFlags::FRAGMENT_STORAGE
+}
+
+/// Check that the selected adapter/device can run the ranim renderer.
+///
+/// Returns an error string describing what is missing. This is checked by
+/// [`Renderer::new`](crate::Renderer::new) (and by the preview app before it
+/// constructs a renderer) so that a downlevel device — e.g. a WebGL2 fallback
+/// on the web when the browser has no WebGPU — fails with an actionable
+/// message instead of an opaque wgpu validation panic.
+pub fn check_adapter_support(ctx: &WgpuContext) -> Result<(), String> {
+    let caps = ctx.adapter.get_downlevel_capabilities();
+    let required = required_downlevel_flags();
+    let missing = required & !caps.flags;
+    if missing.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "the selected wgpu adapter does not support the downlevel capabilities required by ranim: {missing:?}\n\
+         adapter: {:?}\n\
+         available flags: {:?}\n\
+         ranim requires a WebGPU-compliant device (compute shaders and fragment-writable storage buffers).\n\
+         On the web, ranim needs WebGPU; wgpu's WebGL2 fallback is not supported.\n\
+         Use a WebGPU-capable browser (e.g. Chrome/Edge 113+, Firefox 141+, Safari 26+) with WebGPU / hardware acceleration enabled.",
+        ctx.adapter.get_info(),
+        caps.flags,
+    ))
+}
+
 impl WgpuContext {
     /// Create a new wgpu context
     pub async fn new() -> Self {

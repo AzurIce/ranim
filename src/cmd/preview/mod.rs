@@ -9,7 +9,12 @@ use crate::{
         SceneEvaluator,
         color::{self, LinearSrgb},
     },
-    render::{Renderer, resource::RenderTextures, utils::WgpuContext, world::RenderFrame},
+    render::{
+        Renderer,
+        resource::RenderTextures,
+        utils::{WgpuContext, check_adapter_support},
+        world::RenderFrame,
+    },
 };
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
@@ -115,6 +120,7 @@ pub struct RanimPreviewApp {
 
     // Rendering
     renderer: Option<Renderer>,
+    renderer_error: Option<String>,
     render_textures: Option<RenderTextures>,
     texture_id: Option<egui::TextureId>,
     depth_texture_id: Option<egui::TextureId>,
@@ -183,6 +189,7 @@ impl RanimPreviewApp {
             store: RenderFrame::default(),
             play_prev_t: None,
             renderer: None,
+            renderer_error: None,
             render_textures: None,
             texture_id: None,
             depth_texture_id: None,
@@ -290,6 +297,12 @@ impl RanimPreviewApp {
             return;
         }
 
+        // A previous init failed (e.g. the adapter lacks the capabilities ranim
+        // requires); keep showing the recorded error instead of retrying.
+        if needs_init && self.renderer_error.is_some() {
+            return;
+        }
+
         let Some(render_state) = frame.wgpu_render_state() else {
             tracing::info!("frame.wgpu_render_state() is none");
             tracing::info!("{:?}", frame.info());
@@ -310,6 +323,16 @@ impl RanimPreviewApp {
             device: wgpu::Device::clone(&render_state.device),
             queue: wgpu::Queue::clone(&render_state.queue),
         };
+
+        // The renderer needs compute shaders and fragment-writable storage, which
+        // are unavailable on downlevel devices (e.g. the WebGL2 fallback wgpu uses
+        // on the web when WebGPU is missing). Fail gracefully instead of panicking
+        // inside wgpu while creating the bind group layouts.
+        if let Err(reason) = check_adapter_support(&ctx) {
+            error!("renderer cannot be initialized: {reason}");
+            self.renderer_error = Some(reason);
+            return;
+        }
 
         let (width, height) = (self.resolution.width, self.resolution.height);
         let oit_layers = self.calculate_oit_layers(&ctx, width, height);
@@ -358,6 +381,7 @@ impl RanimPreviewApp {
         self.depth_visual_view = Some(depth_visual_view);
         self.render_textures = Some(render_textures);
         self.renderer = Some(renderer);
+        self.renderer_error = None;
         self.wgpu_ctx = Some(ctx);
         self.resolution_dirty = false;
         self.need_eval = true; // Force re-render with new resolution
@@ -833,6 +857,17 @@ impl eframe::App for RanimPreviewApp {
 
                 ui.centered_and_justified(|ui| {
                     ui.image(egui::load::SizedTexture::new(tid, size));
+                });
+            } else if let Some(err) = &self.renderer_error {
+                ui.centered_and_justified(|ui| {
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(err)
+                                .color(egui::Color32::LIGHT_RED)
+                                .size(16.0),
+                        )
+                        .wrap(),
+                    );
                 });
             } else {
                 ui.centered_and_justified(|ui| {
