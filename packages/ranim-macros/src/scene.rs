@@ -60,6 +60,7 @@ pub fn parse_output_list(list: &MetaList) -> syn::Result<OutputDef> {
         fps: 60,
         save_frames: false,
         name: None,
+        name_template: None,
         dir: "./output".into(),
         format: None,
     };
@@ -79,6 +80,14 @@ pub fn parse_output_list(list: &MetaList) -> syn::Result<OutputDef> {
                 }) = nv.value
                 {
                     def.name = Some(s.value());
+                }
+            }
+            Some("name_template") => {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Str(s), ..
+                }) = nv.value
+                {
+                    def.name_template = Some(s.value());
                 }
             }
             Some("dir") => {
