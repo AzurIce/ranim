@@ -66,28 +66,28 @@ let animation = Pure(|alpha| Square::new(alpha)).with_duration(2.0);
 **迭代（有状态、逐步推进）——`IterativeEval` + `Iterative`:**
 
 ```rust,ignore
-pub trait IterativeEval {
-    type Output;
-
-    /// 把当前内部状态投影为输出。
-    fn sample(&self) -> Self::Output;
-    /// 回到区段初始状态。
-    fn reset(&mut self);
-    /// 推进一个逻辑步。
-    fn step(&mut self, time: &Time, delta_time: &DeltaTime);
+pub trait IterativeEval<S> {
+    /// 推进一个逻辑步(状态由适配器持有,以 &mut 传入)。
+    fn step(&self, output: &mut S, time: &Time, delta_time: &DeltaTime);
 }
 ```
 
-粒子、弹簧、物理模拟这类没有闭式的动画按它实现。区段模拟多久是它自己的**构造参数**（如 `NBody::new(99, 32.0)`),`step` 里用自己的逻辑时长把 `delta_time.alpha` 换算回逻辑秒：
+只有一个方法：状态类型 `S` 同时就是区段的输出；`Iterative::new(initial, step_fn)` 持有初始状态与当前状态——`sample` 是克隆当前状态，`reset` 是恢复初始状态，两者都是结构性的，不需要也无法写错。`Fn(&mut S, &Time, &DeltaTime)` 闭包自动实现 `IterativeEval<S>`：
 
 ```rust,ignore
-fn step(&mut self, _time: &Time, delta_time: &DeltaTime) {
-    let dt = self.sim_secs * delta_time.alpha; // 逻辑秒
-    // 用 dt 积分……
-}
+let animation = Iterative::new(
+    SpringState { x: 1.0, v: 0.0 },
+    |state: &mut SpringState, _time: &Time, dt: &DeltaTime| {
+        let dt = SIM_SECS * dt.alpha; // 逻辑秒
+        let acc = -K * state.x - C * state.v;
+        state.v += acc * dt;
+        state.x += state.v * dt;
+    },
+)
+.with_duration(4.0);
 ```
 
-`IterativeEval::sample` 没有 time 参数：采样只是投影当前状态，时间只是容器路由用的信息。
+常量（物理参数、调色板）放闭包捕获或命名 step 结构体；一切可变状态都必须住在状态值里。区段模拟多久是它自己的参数（如 `SIM_SECS`)——`with_duration` 只是播放抻拉。当状态与要渲染的内容不同，为状态类型实现 `Extract`（投影点，每帧一次）。
 
 **异形区段**——两个适配器覆盖不了的需求（比如以后要查询外部世界的区段），直接在类型上实现 `Eval`。
 

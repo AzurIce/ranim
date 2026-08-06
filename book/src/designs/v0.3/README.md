@@ -9,7 +9,7 @@
 - 迭代式动画区段：粒子、弹簧、物理模拟等有状态动画（见"迭代式动画区段"一节）
   - 通用求值协议 `Eval`（`sample`/`reset`/`step`）与轻量会话驱动 `SceneEvaluator`（固定逻辑网格、确定性 seek 重放）
   - `Time`/`DeltaTime` 时刻/时段时间上下文
-  - 纯/迭代特化：*ranim-anims* 的 `PureEval` + `Pure<E>`、`IterativeEval` + `Iterative<E>`；`Fn(f64) -> T` 闭包经 `Pure(|alpha| ...)` 成为动画
+  - 纯/迭代特化：*ranim-anims* 的 `PureEval` + `Pure<E>`、`IterativeEval<S>` + `Iterative<S, E>`；闭包经 `Pure(|alpha| ...)` / `Iterative::new(state, step_fn)` 成为动画
 
 ## BREAKING CHANGES
 
@@ -306,26 +306,24 @@ pub trait Eval {
 
 ```rust
 // ranim-anims
-pub trait PureEval {           // 纯（闭式）能力：一个方法，无默认实现
+pub trait PureEval {              // 纯（闭式）能力：一个方法，无默认实现
     type Output;
     fn eval_alpha(&self, alpha: f64) -> Self::Output;
 }
-pub trait IterativeEval {      // 迭代能力：三个方法全 required
-    type Output;
-    fn sample(&self) -> Self::Output;   // 无 time：采样只是投影当前状态
-    fn reset(&mut self);
-    fn step(&mut self, time: &Time, delta_time: &DeltaTime);
+pub trait IterativeEval<S> {      // 迭代能力：一个方法，无默认实现
+    fn step(&self, output: &mut S, time: &Time, delta_time: &DeltaTime);
 }
 
-pub struct Pure<E>(pub E);        // sample = eval_alpha(time.alpha)；reset/step 平凡
-pub struct Iterative<E>(pub E);   // 直通；sample 丢掉 time
+pub struct Pure<E>(pub E);            // sample = eval_alpha(time.alpha)；reset/step 平凡
+pub struct Iterative<S, E> { ... }    // 持有初始/当前状态;sample = 克隆当前状态,reset = 恢复初始状态(结构性,不会忘不会错)
 ```
 
-- `Fn(f64) -> T` 闭包自动实现 `PureEval`，闭包动画写作 `Pure(|alpha| ...)`；
-- 能力 trait 没有任何默认实现——有状态区段忘了 `reset` 会在编译期报错，而不是悄悄破坏 seek 确定性；
+- `Fn(f64) -> T` 闭包自动实现 `PureEval`，`Fn(&mut S, &Time, &DeltaTime)` 闭包自动实现 `IterativeEval<S>`；
+- 能力 trait 没有任何默认实现；迭代侧连 `reset` 都不需要——适配器持有初始状态值，恢复是结构性的；
 - stable Rust 不允许对两个能力家族各写一个 `Animation` blanket impl（overlap），适配结构体同时解决了这个 coherence 问题：`Animation`/`Placeable` 是对 `E: Eval` 的单一 blanket impl，两个结构体免费获得 `play`/`with_duration`/`at`；
 - `Eval` 公开且可直接实现，留给异形区段（M2 world-dependent 将走这条路径）；
 - `AnimationCell` 内部是 `Box<dyn EvalDyn>`，`EvalDyn` 的方法集就是协议本身（`sample_dyn`/`reset_dyn`/`step_dyn`）；纯查询对任何区段都有定义——迭代区段返回当前已推进状态。
+- 迭代区段的状态与要渲染的内容不同时，为状态类型实现 `Extract`（投影点，每帧一次），如 `nbody` 的 bodies+trails → `VItem`。
 
 ### 时刻与时段：`Time` / `DeltaTime`
 
@@ -346,7 +344,7 @@ pub struct DeltaTime {
 - `sample` 只收 `&Time`——采样在类型层面拿不到 delta；`step` 两者都收（时变力读时刻，积分读时段）；
 - **动画逻辑只见时间读数、不见时间配置**：起点、时长、rate 属于 `AnimationCell`，由它算出 `alpha`/`Δalpha` 后传入（零时长 cell 的 `alpha = 1.0` 特判也收在 cell）；
 - `with_duration`/`with_rate_func` 对纯、迭代**统一为纯播放变换**（抻拉/扭曲局部时钟，不改变内容）；
-- 迭代区段**模拟多久是它自己的构造参数**（如 `NBody::new(99, 32.0)`），`step` 里用 `sim_secs · delta_time.alpha` 换算回逻辑秒，物理参数保持量纲；于是 `with_duration(16.0)` 就是"32s 物理 2 倍速播放"；
+- 迭代区段**模拟多久是它自己的参数**（如 `nbody` 的场景常量 `SIM_SECS`），`step` 里用 `SIM_SECS · delta_time.alpha` 换算回逻辑秒，物理参数保持量纲；于是 `with_duration(16.0)` 就是"32s 物理 2 倍速播放"；
 - 需要墙钟真实时间的区段读 `global_*`：从会话时钟出发、沿任意嵌套深度的容器原样下传，任何嵌套深度下都是真实全局时间；
 - 迭代区段按**变步长积分**编写：非线性 rate 下 `Δalpha` 逐帧变化，非单调 rate 下可以为负。
 
@@ -372,6 +370,6 @@ impl SceneEvaluator {
 
 ### 示例
 
-- `iterative_spring`：阻尼弹簧（`Iterative` 驱动；`SpringBall::new(25.0, 1.0, 4.0)` 的逻辑时长 4s）；
-- `nbody`：三体引力模拟（`NBody::new(99, 32.0)` 模拟 32s 物理；velocity Verlet、混沌弹射终场、无边界）；
-- `cloth_wrap`：零重力布料（弹簧力 + 自碰撞 + 球-布碰撞，MeshItem 曲面渲染；球的 kinematic 状态由 `step` 依墙钟 `global_secs` 驱动并保存，`sample` 只投影）。
+- `iterative_spring`：阻尼弹簧（`Iterative::new(SpringState { x: 1.0, v: 0.0 }, |state, _t, dt| ...)`，逻辑时长为场景常量 `SIM_SECS = 4.0`）；
+- `nbody`：三体引力模拟（`NBodyState` + 闭包步进，32s 物理；velocity Verlet、混沌弹射终场、无边界）；
+- `cloth_wrap`：零重力布料（弹簧力 + 自碰撞 + 球-布碰撞，MeshItem 曲面渲染；球的 kinematic 状态由 `step` 依墙钟 `global_secs` 驱动并保存，`Extract` 投影）。

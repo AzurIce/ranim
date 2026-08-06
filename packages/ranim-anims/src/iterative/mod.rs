@@ -8,21 +8,25 @@ use ranim_core::{
     time::{DeltaTime, Time},
 };
 
-/// The capability of an iterative, stateful evaluation.
+/// The capability of an iterative, stateful evaluation over a state of type `S`.
 ///
 /// This is what iterative animation types implement: particles, springs,
-/// physics simulations, and anything without a closed form. All three methods
-/// are required — the compiler enforces `reset`, so replay determinism
-/// ([`SceneEvaluator::seek`](ranim_core::SceneEvaluator::seek)) cannot be
-/// silently broken by omission.
+/// physics simulations, and anything without a closed form. The state is owned
+/// and advanced by the [`Iterative`] adapter, and `step` receives it as a
+/// mutable reference.
 ///
-/// How long the segment simulates is a construction parameter of the segment
-/// itself; `with_duration` is only a playback stretch. `step` receives the
-/// step length as `delta_time.alpha` (in warped local progress) — scale it by
-/// the segment's own logical duration to recover meaningful units:
+/// Only one method, no defaults. There is no `reset` to forget or get wrong —
+/// the adapter restores the stored initial state itself. Constants (physics
+/// parameters, palettes, ...) belong in `self` or closure captures; everything
+/// mutable must live in the state value, so a reset restores it all.
+///
+/// How long the segment simulates is part of the step logic's own parameters;
+/// `with_duration` is only a playback stretch. `step` receives the step length
+/// as `delta_time.alpha` (in warped local progress) — scale it by the
+/// segment's own logical duration to recover meaningful units:
 ///
 /// ```rust,ignore
-/// fn step(&mut self, _time: &Time, delta_time: &DeltaTime) {
+/// fn step(&self, state: &mut NBodyState, _time: &Time, delta_time: &DeltaTime) {
 ///     let dt = self.sim_secs * delta_time.alpha; // logical seconds
 ///     // integrate with dt ...
 /// }
@@ -30,47 +34,130 @@ use ranim_core::{
 ///
 /// Segments that need unwarped wall-clock-shaped time use
 /// `time.global_secs`/`delta_time.global_secs` instead.
-///
-/// Wrap an `IterativeEval` in [`Iterative`] to turn it into a full animation
-/// segment.
-pub trait IterativeEval {
-    /// Value produced by this evaluator.
-    type Output;
+pub trait IterativeEval<S> {
+    /// Advance the state by one logic step.
+    fn step(&self, output: &mut S, time: &Time, delta_time: &DeltaTime);
+}
 
-    /// Project the current internal state into the output.
-    fn sample(&self) -> Self::Output;
-
-    /// Reset to the segment's initial state (deterministic contract: no wall
-    /// clock, no unseeded RNG).
-    fn reset(&mut self);
-
-    /// Advance one logic step.
-    fn step(&mut self, time: &Time, delta_time: &DeltaTime);
+impl<S, F> IterativeEval<S> for F
+where
+    F: Fn(&mut S, &Time, &DeltaTime),
+{
+    fn step(&self, output: &mut S, time: &Time, delta_time: &DeltaTime) {
+        (self)(output, time, delta_time)
+    }
 }
 
 /// Adapter turning an [`IterativeEval`] into the general [`Eval`] protocol.
 ///
-/// An iterative segment is nearly the general case: `sample` projects the
-/// current state (the time point is routing information, dropped here), and
-/// `reset`/`step` pass straight through.
+/// The adapter owns the segment's state: it samples by cloning the current
+/// state, and resets by restoring the stored initial state — both structural,
+/// nothing for the author to implement or get wrong. When the state differs
+/// from what should be rendered, implement [`Extract`](ranim_core::Extract)
+/// for the state type: extraction is the per-frame projection point.
 ///
 /// ```rust,ignore
-/// let animation = Iterative(NBody::new(99, 32.0)).with_duration(32.0);
+/// // With a closure and a directly-renderable state:
+/// let animation = Iterative::new(state0, |state: &mut MyState, _t, dt| {
+///     state.integrate(dt.alpha * SIM_SECS);
+/// });
+///
+/// // With a named step type:
+/// let animation = Iterative::new(NBodyState::regular_ngon(99), NBodyStep { sim_secs: 32.0 });
 /// ```
-pub struct Iterative<E>(pub E);
+pub struct Iterative<S, E: IterativeEval<S>> {
+    initial: S,
+    current: S,
+    eval: E,
+}
 
-impl<E: IterativeEval> Eval for Iterative<E> {
-    type Output = E::Output;
+impl<S, E> Iterative<S, E>
+where
+    S: Clone,
+    E: IterativeEval<S>,
+{
+    /// Create an iterative segment from an initial state and a step
+    /// implementation (a closure or a named [`IterativeEval`] type).
+    pub fn new(initial: S, eval: E) -> Self {
+        Self {
+            current: initial.clone(),
+            initial,
+            eval,
+        }
+    }
+}
+
+impl<S, E> Eval for Iterative<S, E>
+where
+    S: Clone,
+    E: IterativeEval<S>,
+{
+    type Output = S;
 
     fn sample(&self, _time: &Time) -> Self::Output {
-        self.0.sample()
+        self.current.clone()
     }
 
     fn reset(&mut self) {
-        self.0.reset();
+        self.current = self.initial.clone();
     }
 
     fn step(&mut self, time: &Time, delta_time: &DeltaTime) {
-        self.0.step(time, delta_time);
+        self.eval.step(&mut self.current, time, delta_time);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ranim_core::{
+        RanimScene, SceneEvaluator,
+        animation::AnimationExt,
+        core_item::{CoreItem, vitem::VItem},
+    };
+
+    /// A closure-driven iterative segment with a directly renderable state:
+    /// stepping and seek replay must be deterministic.
+    #[test]
+    fn closure_segment_steps_and_seeks_deterministically() {
+        fn build() -> SceneEvaluator {
+            let mut scene = RanimScene::new();
+            scene.play(
+                Iterative::new(
+                    VItem::default(),
+                    |state: &mut VItem, _time: &Time, delta_time: &DeltaTime| {
+                        state.points[0].x += delta_time.alpha as f32;
+                    },
+                )
+                .with_duration(2.0),
+            );
+            scene.seal().into_evaluator(120.0)
+        }
+
+        let run = |seek: bool| {
+            let mut ev = build();
+            let mut trace = Vec::new();
+            for sec in [0.5, 1.0, 1.5, 2.0] {
+                if seek {
+                    ev.seek(sec);
+                } else {
+                    ev.advance_to(sec);
+                }
+                let mut frame = Vec::new();
+                ev.sample_into(&mut frame);
+                let x = frame.iter().find_map(|(_, item)| match item {
+                    CoreItem::VItem(v) => Some(v.points[0].x),
+                    _ => None,
+                });
+                trace.push(x);
+            }
+            trace
+        };
+
+        let forward = run(false);
+        assert_eq!(forward, run(true));
+        // 2s at 120Hz: 240 steps of Δalpha = 1/240 each → x ≈ 1.0
+        let x = forward.last().unwrap().unwrap();
+        assert!((x - 1.0).abs() < 1e-3, "x = {x}");
     }
 }

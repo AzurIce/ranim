@@ -1,72 +1,63 @@
-//! Iterative animation example: a damped spring (state driven by
-//! [`IterativeEval`], no ECS required).
+//! Iterative animation example: a damped spring (state stepped by a closure,
+//! no ECS required).
 //!
-//! The spring displacement `x` is the segment's internal state, integrated by
-//! `step` (semi-implicit Euler); `sample` projects the current state into a
-//! `VItem`. `reset` guarantees deterministic replay (`SceneEvaluator::seek`
-//! matches forward advancement).
+//! The spring's state (`x`, `v`) is owned by `Iterative` and advanced by a
+//! closure via semi-implicit Euler; the `Extract` impl projects the state into
+//! a `VItem` once per frame. Reset is structural — the adapter restores the
+//! stored initial state, so `SceneEvaluator::seek` matches forward advancement
+//! for free.
 //!
-//! The spring's logical duration is a construction parameter (`sim_secs`):
+//! The spring's logical duration is a constant of the scene (`SIM_SECS`):
 //! `with_duration` only stretches playback, while the segment integrates
-//! `sim_secs` worth of physics scaled from `DeltaTime::alpha`.
+//! `SIM_SECS` worth of physics scaled from `DeltaTime::alpha`.
 
 use ranim::{
-    anims::iterative::{Iterative, IterativeEval},
+    anims::iterative::Iterative,
     color::palettes::manim,
+    core::Extract,
+    core::core_item::CoreItem,
     core::time::{DeltaTime, Time},
     items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
 };
 
-/// A damped spring: x'' = −k·x − c·x' (m = 1).
-struct SpringBall {
-    k: f64,
-    c: f64,
+/// The spring's state: displacement and velocity.
+#[derive(Clone)]
+struct SpringState {
     x: f64,
     v: f64,
-    /// How many seconds of physics the whole segment simulates over.
-    sim_secs: f64,
 }
 
-impl SpringBall {
-    fn new(k: f64, c: f64, sim_secs: f64) -> Self {
-        Self {
-            k,
-            c,
-            x: 1.0,
-            v: 0.0,
-            sim_secs,
-        }
-    }
-}
+impl Extract for SpringState {
+    type Target = CoreItem;
 
-impl IterativeEval for SpringBall {
-    type Output = VItem;
-
-    fn reset(&mut self) {
-        self.x = 1.0;
-        self.v = 0.0;
-    }
-
-    fn step(&mut self, _time: &Time, delta_time: &DeltaTime) {
-        let dt = self.sim_secs * delta_time.alpha;
-        let acc = -self.k * self.x - self.c * self.v;
-        self.v += acc * dt;
-        self.x += self.v * dt;
-    }
-
-    fn sample(&self) -> VItem {
+    fn extract_into(&self, buf: &mut Vec<CoreItem>) {
         let mut ball = VItem::from(Rectangle::new(0.6, 0.6));
         ball.set_fill_color(manim::BLUE_C);
         ball.set_stroke_opacity(0.0);
         ball.move_to([self.x, 0.0, 0.0].into());
-        ball
+        ball.extract_into(buf);
     }
 }
+
+const K: f64 = 25.0;
+const C: f64 = 1.0;
+const SIM_SECS: f64 = 4.0;
 
 #[scene]
 #[output(dir = "./output/iterative_spring")]
 fn iterative_spring(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(4.0));
-    r.play(Iterative(SpringBall::new(25.0, 1.0, 4.0)).with_duration(4.0));
+    r.play(
+        Iterative::new(
+            SpringState { x: 1.0, v: 0.0 },
+            |state: &mut SpringState, _time: &Time, delta_time: &DeltaTime| {
+                let dt = SIM_SECS * delta_time.alpha;
+                let acc = -K * state.x - C * state.v;
+                state.v += acc * dt;
+                state.x += state.v * dt;
+            },
+        )
+        .with_duration(4.0),
+    );
 }
