@@ -18,10 +18,12 @@ fn text_item(r: &mut RanimScene) {
         .text_box()
         .with(|item| item.set_stroke_color(manim::RED_C).discard());
 
-    let mut text_sequence = seq![Vec::<VItem>::from(text.clone())
-        .iter_mut()
-        .map(|item| item.write().with_rate_func(smooth))
-        .into_lagged(0.1)];
+    let mut text_sequence = seq![
+        Vec::<VItem>::from(text.clone())
+            .iter_mut()
+            .map(|item| item.write().with_rate_func(smooth))
+            .into_lagged(0.1)
+    ];
     text_sequence
         .hold(3.0)
         .push(

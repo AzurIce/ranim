@@ -12,7 +12,10 @@
 use ranim::{
     anims::iterative::{Iterative, IterativeEval},
     color::palettes::manim,
-    core::{components::rgba::Rgba, time::{DeltaTime, Time}},
+    core::{
+        components::rgba::Rgba,
+        time::{DeltaTime, Time},
+    },
     glam::{DVec3, Mat4, Vec3, dvec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,

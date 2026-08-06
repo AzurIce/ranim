@@ -608,7 +608,11 @@ impl EvalDyn for AnimSequence {
             .rev()
             .find(|child| child.contains_sec(content_sec, self.cursor_sec))
         {
-            child.step_at_sec(content_sec, prev_content_sec, &GlobalTime::of(time, delta_time));
+            child.step_at_sec(
+                content_sec,
+                prev_content_sec,
+                &GlobalTime::of(time, delta_time),
+            );
         }
     }
 
@@ -727,7 +731,11 @@ impl EvalDyn for AnimStack {
         let prev_content_sec = self.duration_secs * (time.alpha - delta_time.alpha);
         for child in &mut self.animations {
             if child.contains_sec(content_sec, self.duration_secs) {
-                child.step_at_sec(content_sec, prev_content_sec, &GlobalTime::of(time, delta_time));
+                child.step_at_sec(
+                    content_sec,
+                    prev_content_sec,
+                    &GlobalTime::of(time, delta_time),
+                );
             }
         }
     }
@@ -961,7 +969,11 @@ impl EvalDyn for AnimLagged {
         let prev_content_sec = self.duration_secs * (time.alpha - delta_time.alpha);
         for child in &mut self.animations {
             if child.contains_sec(content_sec, self.duration_secs) {
-                child.step_at_sec(content_sec, prev_content_sec, &GlobalTime::of(time, delta_time));
+                child.step_at_sec(
+                    content_sec,
+                    prev_content_sec,
+                    &GlobalTime::of(time, delta_time),
+                );
             }
         }
     }
@@ -1494,9 +1506,7 @@ mod tests {
 
         let stack = vec![leaf(1.0, 2.0)].into_iter().into_stack();
         assert_eq!(stack.duration_secs(), 2.0);
-        let sequence = vec![leaf(1.0, 1.0), leaf(2.0, 1.0)]
-            .into_iter()
-            .into_seq();
+        let sequence = vec![leaf(1.0, 1.0), leaf(2.0, 1.0)].into_iter().into_seq();
         assert_eq!(sequence.duration_secs(), 2.0);
     }
 }

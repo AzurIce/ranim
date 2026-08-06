@@ -2,8 +2,8 @@ use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};
 use ranim::{
-    anims::pure::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle, prelude::*,
-    utils::rate_functions::linear,
+    anims::pure::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle,
+    prelude::*, utils::rate_functions::linear,
 };
 
 fn selective_sort(r: &mut RanimScene, num: usize) {

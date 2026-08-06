@@ -1,8 +1,6 @@
 //! Camera frame animations.
 
-use ranim_core::{
-    animation::Eval, core_item::camera_frame::CameraFrame, glam::DVec3,
-};
+use ranim_core::{animation::Eval, core_item::camera_frame::CameraFrame, glam::DVec3};
 
 use crate::pure::{Pure, PureEval};
 

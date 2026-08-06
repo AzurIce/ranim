@@ -504,8 +504,7 @@ impl TimelineState {
         }
 
         let indent_x = rect.left() + 6.0 + track.depth as f32 * INDENT_WIDTH;
-        let is_expandable_stack =
-            is_stack_like(info.kind) && !info.children.is_empty();
+        let is_expandable_stack = is_stack_like(info.kind) && !info.children.is_empty();
         let label_x = if is_expandable_stack {
             let marker = if self.expanded.contains(&track.path) {
                 egui_phosphor::regular::CARET_DOWN
@@ -745,10 +744,7 @@ impl TimelineState {
                 self.selected = Some(clip.path.clone());
             }
 
-            if is_stack_like(info.kind)
-                && !info.children.is_empty()
-                && clip.path != track.path
-            {
+            if is_stack_like(info.kind) && !info.children.is_empty() && clip.path != track.path {
                 let marker = if self.expanded.contains(&clip.path) {
                     egui_phosphor::regular::CARET_DOWN
                 } else {
@@ -1197,10 +1193,13 @@ fn display_anim_name(info: &AnimationInfo) -> &str {
 
 fn short_anim_name(name: &str) -> &str {
     // Trim the Pure<...>/Iterative<...> adapter wrappers to show the inner type.
-    let name = ["ranim_anims::pure::Pure<", "ranim_anims::iterative::Iterative<"]
-        .iter()
-        .find_map(|prefix| name.strip_prefix(prefix).and_then(|s| s.strip_suffix('>')))
-        .unwrap_or(name);
+    let name = [
+        "ranim_anims::pure::Pure<",
+        "ranim_anims::iterative::Iterative<",
+    ]
+    .iter()
+    .find_map(|prefix| name.strip_prefix(prefix).and_then(|s| s.strip_suffix('>')))
+    .unwrap_or(name);
     let outer_type = name.split('<').next().unwrap_or(name);
     let short = outer_type.rsplit("::").next().unwrap_or(outer_type);
     if short == "{{closure}}" {

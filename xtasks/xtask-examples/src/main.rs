@@ -89,14 +89,16 @@ fn main() {
     for (index, example) in all_examples.iter().enumerate() {
         let (verb, result) = match &args.command {
             Commands::Build { .. } => ("构建", example.build_wasm(&workspace_root)),
-            Commands::Run { lazy_run, .. } => {
-                ("运行", example.run(&workspace_root, *lazy_run))
-            }
+            Commands::Run { lazy_run, .. } => ("运行", example.run(&workspace_root, *lazy_run)),
         };
         match result {
             Ok(()) => {
                 succeeded += 1;
-                println!("[{}/{selected_cnt}] {verb}示例 {} 完成", index + 1, example.name);
+                println!(
+                    "[{}/{selected_cnt}] {verb}示例 {} 完成",
+                    index + 1,
+                    example.name
+                );
             }
             Err(err) => {
                 eprintln!(
