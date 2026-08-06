@@ -2,23 +2,23 @@
 
 ## 新增
 
-- **迭代式动画区段**：粒子、弹簧、物理模拟等有状态动画（见"迭代式动画区段"一节）
+- 可组合动画编排系统（见 "Composable Animation Arrangement" 一节）
+  - `AnimSequence`/`AnimStack` 容器与 `seq!`/`stack!` 宏，`hold`/`forward`/`extend` 等编排 API
+  - `AnimLagged` 容器（stagger 排布 + 窗口外静态填充）与 `lagged!` 宏、迭代器容器收集（`collect::<AnimStack>()`/`collect::<AnimSequence>()`、`into_stack`/`into_seq`/`into_lagged`）
+  - 播放参数 `Paramed<A>`（`with_duration`/`with_rate_func`/`with_enabled`）与放置 `At<A>`
+- 迭代式动画区段：粒子、弹簧、物理模拟等有状态动画（见"迭代式动画区段"一节）
   - 通用求值协议 `Eval`（`sample`/`reset`/`step`）与轻量会话驱动 `SceneEvaluator`（固定逻辑网格、确定性 seek 重放）
   - `Time`/`DeltaTime` 时刻/时段时间上下文
-  - *ranim-anims* 的迭代特化：`IterativeEval` + `Iterative<E>`
-- 纯/迭代特化结构：*ranim-anims* 的 `PureEval` + `Pure<E>`、`IterativeEval` + `Iterative<E>`；`Fn(f64) -> T` 闭包经 `Pure(|alpha| ...)` 成为动画
-- `AnimLagged` 容器（stagger 排布 + 窗口外静态填充）与 `lagged!` 宏、迭代器容器收集（`collect::<AnimStack>()`/`collect::<AnimSequence>()`、`into_stack`/`into_seq`/`into_lagged`）
+  - 纯/迭代特化：*ranim-anims* 的 `PureEval` + `Pure<E>`、`IterativeEval` + `Iterative<E>`；`Fn(f64) -> T` 闭包经 `Pure(|alpha| ...)` 成为动画
 
 ## BREAKING CHANGES
 
-- 重构动画组织系统
-  - 弃用 `Timeline`，用 `AnimSequence` 和 `AnimStack` 替代
-  - 修改 `Eval<T>` Trait 的泛型参数为关联类型
-  - 支持直接将 `Eval` 当作动画使用（不再需要转换为 `AnimationCell`）
-  - 用 `Paramed<A>` 和 `At<A>` 替代原先 `AnimationCell<T>` 的 `AnimationInfo`
-  - *ranim-anims* 中全部内置动画创建工具方法现在默认用 `linear` 速率函数和 `1.0` 持续秒数。
+- 动画组织系统
+  - 弃用 `Timeline`（迁移到 `AnimSequence`/`AnimStack`）
+  - `AnimationCell<T>` 的泛型参数移除、不再直接构建（`Eval` 类型可直接作为动画使用）；原先 `AnimationCell<T>` 的 `AnimationInfo` 参数改为 `Paramed<A>` 和 `At<A>`
+  - *ranim-anims* 中全部内置动画创建工具方法现在默认用 `linear` 速率函数和 `1.0` 持续秒数
 - 求值与内置动画 API
-  - `Eval` 的方法集改为 `sample`/`reset`/`step`（见"迭代式动画区段"一节）；v0.2 的 `eval_alpha` 作为纯求值能力移至 *ranim-anims* 的 `PureEval`
+  - `Eval<T>` 泛型参数改为关联类型，方法集改为 `sample`/`reset`/`step`（见"迭代式动画区段"一节）；v0.2 的 `eval_alpha` 作为纯求值能力移至 *ranim-anims* 的 `PureEval`
   - 内置动画工具方法返回类型变为 `Pure<...>`（如 `fade_in()` 返回 `Pure<FadeIn<T>>`）
   - `CameraFrame::orbit` 移到 *ranim-anims* 的 `CameraFrameAnim`
   - 删除 *ranim-anims* 的 `Lagged` 求值器与 `lagged` 模块（`LaggedAnim` 糖），stagger 排布改用 `AnimLagged` 容器
