@@ -13,11 +13,9 @@ code = """
 //! each frame); the ball is a static sphere mesh moved by its transform.
 
 use ranim::{
+    anims::iterative::{Iterative, IterativeEval},
     color::palettes::manim,
-    core::{
-        animation::{Eval, SegmentTime},
-        components::rgba::Rgba,
-    },
+    core::{components::rgba::Rgba, time::{DeltaTime, Time}},
     glam::{DVec3, Mat4, Vec3, dvec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
@@ -47,12 +45,15 @@ struct ClothWrap {
     prev: Vec<DVec3>,
     springs: Vec<(usize, usize, f64, f64)>, // (i, j, rest_len, stiffness)
     initial: Vec<DVec3>,
+    ball_y: f64,
     ball_mesh: MeshItem,
     cloth_indices: Vec<u32>,
+    /// How many seconds of physics the whole segment simulates over.
+    sim_secs: f64,
 }
 
 impl ClothWrap {
-    fn new() -> Self {
+    fn new(sim_secs: f64) -> Self {
         let width = (COLS - 1) as f64 * SPACING;
         let mut curr = Vec::with_capacity(ROWS * COLS);
         for r in 0..ROWS {
@@ -113,22 +114,26 @@ impl ClothWrap {
             prev: curr.clone(),
             curr,
             springs,
+            ball_y: BALL_START_Y,
             ball_mesh,
             cloth_indices,
+            sim_secs,
         }
     }
 }
 
-impl Eval for ClothWrap {
+impl IterativeEval for ClothWrap {
     type Output = Vec<MeshItem>;
 
     fn reset(&mut self) {
         self.curr = self.initial.clone();
         self.prev = self.initial.clone();
+        self.ball_y = BALL_START_Y;
     }
 
-    fn step(&mut self, time: &SegmentTime) {
-        let dt2 = time.local_delta_secs * time.local_delta_secs;
+    fn step(&mut self, time: &Time, delta_time: &DeltaTime) {
+        let dt = self.sim_secs * delta_time.alpha;
+        let dt2 = dt * dt;
         let n = self.curr.len();
 
         // Spring forces (zero gravity: the cloth floats freely and stays flat).
@@ -178,9 +183,11 @@ impl Eval for ClothWrap {
             self.curr[i].z += vz + az[i] * dt2;
         }
 
-        // Ball position: driven straight down, then held below the cloth.
-        let ball_y = (BALL_START_Y - BALL_SPEED * time.global_secs).max(BALL_STOP_Y);
-        let ball_center = dvec3(0.0, ball_y, 0.0);
+        // Ball position: driven straight down by the global (unwarped) clock,
+        // then held below the cloth. It is kinematic state: updated here in
+        // `step` and projected by `sample`.
+        self.ball_y = (BALL_START_Y - BALL_SPEED * time.global_secs).max(BALL_STOP_Y);
+        let ball_center = dvec3(0.0, self.ball_y, 0.0);
 
         // Ball-cloth collision: push cloth particles out of the ball.
         for i in 0..n {
@@ -192,7 +199,7 @@ impl Eval for ClothWrap {
         }
     }
 
-    fn sample(&self, time: &SegmentTime) -> Vec<MeshItem> {
+    fn sample(&self) -> Vec<MeshItem> {
         let points: Vec<Vec3> = self.curr.iter().map(|p| p.as_vec3()).collect();
 
         // Smooth normals: accumulate face normals, then normalize.
@@ -217,9 +224,8 @@ impl Eval for ClothWrap {
             vertex_normals: normals.into(),
         };
 
-        let ball_y = (BALL_START_Y - BALL_SPEED * time.global_secs).max(BALL_STOP_Y);
         let mut ball = self.ball_mesh.clone();
-        ball.transform = Mat4::from_translation(dvec3(0.0, ball_y, 0.0).as_vec3());
+        ball.transform = Mat4::from_translation(dvec3(0.0, self.ball_y, 0.0).as_vec3());
 
         vec![cloth, ball]
     }
@@ -237,10 +243,10 @@ fn cloth_wrap(r: &mut RanimScene) {
     camera.fovy = 45.0f64.to_radians();
 
     r.play(camera.show().with_duration(TOTAL_SECS));
-    r.play(ClothWrap::new().with_duration(TOTAL_SECS));
+    r.play(Iterative(ClothWrap::new(TOTAL_SECS)).with_duration(TOTAL_SECS));
 }
 ```"""
-hash = "9dc4cd4d7367799c718426550e73d4625e525069"
+hash = "609dab900a96bf6d919c27dd199a5c123fe614b3"
 preview_imgs = []
 output_files = ["/examples/cloth_wrap/cloth_wrap_1920x1080_60.mp4"]
 wasm = false

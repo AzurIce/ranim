@@ -1,17 +1,19 @@
 //! N-body gravitational simulation — a canonical "iterative only" animation:
 //! no closed-form solution, chaotic, and inherently stateful across frames.
 //!
-//! `NBody::new(n)` places `n` equal masses on a regular n-gon with tangential
-//! velocities (exact circular speed for the relative equilibrium, plus a tiny
-//! asymmetry). Each body leaves a fading trail of recent positions. The scene
-//! uses a default (linear) rate, so `local_delta_secs` equals the physical tick.
+//! `NBody::new(n, sim_secs)` places `n` equal masses on a regular n-gon with
+//! tangential velocities (exact circular speed for the relative equilibrium,
+//! plus a tiny asymmetry) and simulates `sim_secs` seconds of physics — the
+//! logical duration is a construction parameter, while `with_duration` only
+//! stretches playback. Each body leaves a fading trail of recent positions.
 //!
 //! Behavior by `n`: n = 3 stays inside the frame and wobbles chaotically for
 //! the whole scene; n >= 4 destabilizes and ejects a body (a dramatic finale).
 
 use ranim::{
+    anims::iterative::{Iterative, IterativeEval},
     color::{AlphaColor, Srgb, palettes::manim},
-    core::animation::{Eval, SegmentTime},
+    core::time::{DeltaTime, Time},
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},
     prelude::*,
@@ -46,15 +48,18 @@ struct NBody {
     trails: Vec<Vec<DVec3>>,
     step_count: usize,
     colors: Vec<AlphaColor<Srgb>>,
+    /// How many seconds of physics the whole segment simulates over.
+    sim_secs: f64,
 }
 
 impl NBody {
-    /// Place `n` equal masses on a regular n-gon.
+    /// Place `n` equal masses on a regular n-gon, simulating `sim_secs`
+    /// seconds of physics over the whole segment.
     ///
     /// The circular speed is exact for the regular n-gon relative equilibrium:
     /// `v² = G·Σ csc(πj/n) / (4R)`. A 4% overspeed plus a tiny asymmetry keeps
     /// the system lively (and chaotic — the n-gon equilibrium is unstable).
-    fn new(n: usize) -> Self {
+    fn new(n: usize, sim_secs: f64) -> Self {
         assert!(n >= 2, "nbody needs at least 2 bodies");
         let radius = 2.0;
         let csc_sum: f64 = (1..n).map(|j| 1.0 / (PI * j as f64 / n as f64).sin()).sum();
@@ -81,6 +86,7 @@ impl NBody {
             trails: vec![Vec::new(); n],
             step_count: 0,
             colors,
+            sim_secs,
         }
     }
 
@@ -101,7 +107,7 @@ impl NBody {
     }
 }
 
-impl Eval for NBody {
+impl IterativeEval for NBody {
     type Output = Vec<VItem>;
 
     fn reset(&mut self) {
@@ -112,10 +118,10 @@ impl Eval for NBody {
         self.step_count = 0;
     }
 
-    fn step(&mut self, time: &SegmentTime) {
+    fn step(&mut self, _time: &Time, delta_time: &DeltaTime) {
         // Velocity Verlet (symplectic): conserves energy far better than
         // semi-implicit Euler for gravitational orbits.
-        let dt = time.local_delta_secs;
+        let dt = self.sim_secs * delta_time.alpha;
         let a0 = self.accelerations();
         for (i, body) in self.bodies.iter_mut().enumerate() {
             body.pos += body.vel * dt + a0[i] * (0.5 * dt * dt);
@@ -136,7 +142,7 @@ impl Eval for NBody {
         }
     }
 
-    fn sample(&self, _time: &SegmentTime) -> Vec<VItem> {
+    fn sample(&self) -> Vec<VItem> {
         let mut items = Vec::new();
         // Trails: dim dots at recent positions.
         for (i, trail) in self.trails.iter().enumerate() {
@@ -166,5 +172,5 @@ impl Eval for NBody {
 fn nbody(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(TOTAL_SECS));
     // n = 3: chaotic wobble that stays in frame; n >= 4: ejection finale.
-    r.play(NBody::new(99).with_duration(TOTAL_SECS));
+    r.play(Iterative(NBody::new(99, TOTAL_SECS)).with_duration(TOTAL_SECS));
 }

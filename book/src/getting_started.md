@@ -15,7 +15,7 @@ crate-type = ["rlib", "cdylib"]
 
 ```rust,ignore
 use ranim::{
-    anims::fading::FadingAnim,
+    anims::pure::fading::FadingAnim,
     color::palettes::manim,
     items::vitem::geometry::Square,
     prelude::*,
@@ -28,7 +28,7 @@ use ranim::{
 
 ```rust,ignore
 use ranim::{
-    anims::fading::FadingAnim,
+    anims::pure::fading::FadingAnim,
     color::palettes::manim,
     items::vitem::geometry::Square,
     prelude::*,

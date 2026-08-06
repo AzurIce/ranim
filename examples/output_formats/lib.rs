@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::{fading::FadingAnim, lagged::LaggedAnim, rotating::RotatingAnim},
+    anims::pure::{fading::FadingAnim, rotating::RotatingAnim},
     color::palettes::manim,
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},
@@ -34,10 +34,9 @@ fn output_formats(r: &mut RanimScene) {
 
     let mut content = seq![
         circles
-            .lagged(0.3, |circle| {
-                let animation = circle.fade_in();
-                move |alpha| animation.eval_alpha(smooth(alpha))
-            })
+            .iter_mut()
+            .map(|circle| circle.fade_in().with_rate_func(smooth))
+            .into_lagged(0.3)
             .with_duration(1.0)
     ];
     content
@@ -51,10 +50,9 @@ fn output_formats(r: &mut RanimScene) {
         .hold(1.0)
         .push(
             circles
-                .lagged(0.3, |circle| {
-                    let animation = circle.fade_out();
-                    move |alpha| animation.eval_alpha(smooth(alpha))
-                })
+                .iter_mut()
+                .map(|circle| circle.fade_out().with_rate_func(smooth))
+                .into_lagged(0.3)
                 .with_duration(1.0),
         );
 

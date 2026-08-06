@@ -1,5 +1,5 @@
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::pure::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
     glam::dvec3,
     items::vitem::geometry::Rectangle,

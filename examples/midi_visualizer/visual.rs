@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::midi::{MidiSong, Note};
 use ranim::{
+    anims::pure::PureEval,
     color::{AlphaColor, Srgb, palettes::manim},
     glam::{DVec3, dvec3},
     items::vitem::{VItem, geometry::Rectangle},
@@ -189,7 +190,7 @@ pub(crate) struct MidiNotesEval {
     pub(crate) layout: PianoLayout,
 }
 
-impl Eval for MidiNotesEval {
+impl PureEval for MidiNotesEval {
     type Output = Vec<VItem>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -240,7 +241,7 @@ impl SingleNoteEval {
     }
 }
 
-impl Eval for SingleNoteEval {
+impl PureEval for SingleNoteEval {
     type Output = Vec<VItem>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -287,7 +288,7 @@ impl PianoKeyboardEval {
     }
 }
 
-impl Eval for PianoKeyboardEval {
+impl PureEval for PianoKeyboardEval {
     type Output = Vec<VItem>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -338,7 +339,7 @@ pub(crate) struct HitEffectsEval {
     pub(crate) layout: PianoLayout,
 }
 
-impl Eval for HitEffectsEval {
+impl PureEval for HitEffectsEval {
     type Output = Vec<VItem>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {

@@ -1,5 +1,5 @@
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
+    anims::pure::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
     color::palettes::manim,
     core::animation::StaticAnim,
     glam::dvec2,

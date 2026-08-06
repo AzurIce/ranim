@@ -3,7 +3,7 @@ use ranim::prelude::*;
 pub mod test_scenes {
     use itertools::Itertools;
     use ranim::{
-        anims::morph::MorphAnim,
+        anims::pure::morph::MorphAnim,
         core::animation::{AnimStack, StaticAnim},
         glam::{DVec3, dvec3},
         items::vitem::{

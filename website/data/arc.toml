@@ -3,7 +3,7 @@ code = """
 ```rust
 use itertools::Itertools;
 use ranim::{
-    anims::{fading::FadingAnim, lagged::LaggedAnim},
+    anims::pure::fading::FadingAnim,
     color,
     color::HueDirection,
     glam::dvec2,
@@ -50,10 +50,9 @@ pub fn arc(r: &mut RanimScene) {
         .collect::<Vec<_>>();
     let total_secs = 3.0;
     let content = arcs
-        .lagged(0.2, |arc| {
-            let animation = arc.fade_in();
-            move |alpha| animation.eval_alpha(smooth(alpha))
-        })
+        .iter_mut()
+        .map(|arc| arc.fade_in().with_rate_func(smooth))
+        .into_lagged(0.2)
         .with_duration(total_secs);
 
     r.play(CameraFrame::default().show().with_duration(total_secs));
@@ -62,7 +61,7 @@ pub fn arc(r: &mut RanimScene) {
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "1c0db9bc1dd4f30a982e62a45b9f82d521858fb7"
+hash = "bcab79525810ddfdd4bbd2a23955fa36fa397e25"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

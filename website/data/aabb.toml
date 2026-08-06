@@ -4,7 +4,7 @@ code = """
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::rotating::RotatingAnim,
+    anims::pure::rotating::RotatingAnim,
     color::palettes::manim,
     core::animation::StaticAnim,
     glam::{DVec3, dvec2, dvec3},
@@ -184,7 +184,7 @@ fn aabb(r: &mut RanimScene) {
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "b12c1cda693f99e96729867b576ac32bf7460529"
+hash = "7ac99206f52021e1b22fcf878ffac60abd00a4af"
 preview_imgs = ["/examples/aabb/preview.png"]
 output_files = ["/examples/aabb/aabb_1920x1080_60.mp4"]
 wasm = true

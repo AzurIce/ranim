@@ -19,6 +19,8 @@ pub mod components;
 pub mod core_item;
 /// Scene evaluation driver (lightweight session, no ECS).
 pub mod scene_evaluator;
+/// Time vocabulary for animation evaluation.
+pub mod time;
 /// Fundamental traits.
 pub mod traits;
 pub use scene_evaluator::SceneEvaluator;
@@ -39,9 +41,11 @@ pub mod prelude {
     pub use crate::traits::*;
 
     pub use crate::animation::{
-        AnimSequence, AnimStack, Animation, AnimationExt, Eval, Placeable, StaticAnim,
+        AnimIterExt, AnimLagged, AnimSequence, AnimStack, Animation, AnimationExt, Eval,
+        LaggedFill, Placeable, StaticAnim,
     };
     pub use crate::core_item::camera_frame::CameraFrame;
+    pub use crate::time::{DeltaTime, Time};
     pub use crate::{RanimScene, TimeMark};
 }
 
@@ -163,7 +167,12 @@ impl SealedRanimScene {
             .collect()
     }
 
-    /// Evaluate all clips active at `target_sec` and extract scene primitives.
+    /// Sample all clips active at `target_sec` and extract scene primitives.
+    ///
+    /// This is the pure query path: it samples the **current** state of every
+    /// segment without advancing anything. Stateful (iterative) segments
+    /// project whatever state they currently hold — drive them with a
+    /// [`SceneEvaluator`] session first for meaningful results.
     pub fn eval_at_sec(&self, target_sec: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
         self.animations
             .iter()
@@ -173,13 +182,9 @@ impl SealedRanimScene {
                     return None;
                 }
 
-                let range = animation.time_range();
-                let active = range.contains(&target_sec)
-                    || (target_sec == self.total_secs && target_sec == range.end);
-                active
-                    .then(|| animation.eval_at_sec(target_sec))
-                    .flatten()
-                    .map(move |items| (animation_id, items))
+                let mut items = Vec::new();
+                animation.sample_at_sec(target_sec, target_sec, &mut items);
+                (!items.is_empty()).then_some((animation_id, items))
             })
             .flat_map(|(animation_id, items)| {
                 items

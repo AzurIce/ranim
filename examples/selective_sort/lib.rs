@@ -2,7 +2,7 @@ use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};
 use ranim::{
-    anims::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle, prelude::*,
+    anims::pure::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle, prelude::*,
     utils::rate_functions::linear,
 };
 

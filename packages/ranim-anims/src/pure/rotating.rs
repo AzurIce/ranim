@@ -4,6 +4,8 @@ use ranim_core::{
     traits::{Aabb, AabbPoint, Locate, RotateTransform, ShiftTransformExt},
 };
 
+use crate::pure::{Pure, PureEval};
+
 // MARK: Require Trait
 /// The requirement of [`RotatingAnimation`]
 pub trait RotatingRequirement: RotateTransform + ShiftTransformExt + Clone {}
@@ -13,7 +15,7 @@ impl<T: RotateTransform + ShiftTransformExt + Clone> RotatingRequirement for T {
 /// The methods to create rotation animations for `T` that satisfies [`RotatingRequirement`]
 pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
     /// Rotate by a given angle about a given axis at center.
-    fn rotating(&mut self, angle: f64, axis: DVec3) -> RotatingAnimation<Self>
+    fn rotating(&mut self, angle: f64, axis: DVec3) -> Pure<RotatingAnimation<Self>>
     where
         Self: Aabb,
     {
@@ -26,8 +28,14 @@ pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
         angle: f64,
         axis: DVec3,
         anchor: A,
-    ) -> RotatingAnimation<Self> {
-        RotatingAnimation::new(self.clone(), angle, axis, anchor.locate(self)).apply_to(self)
+    ) -> Pure<RotatingAnimation<Self>> {
+        Pure(RotatingAnimation::new(
+            self.clone(),
+            angle,
+            axis,
+            anchor.locate(self),
+        ))
+        .apply_to(self)
     }
 }
 
@@ -37,7 +45,7 @@ impl<T: RotatingRequirement + 'static> RotatingAnim for T {}
 
 /// Rotation animation.
 ///
-/// Unlike [`Morph`](crate::morph::Morph) which linearly interpolates between
+/// Unlike [`Morph`](crate::pure::morph::Morph) which linearly interpolates between
 /// start and end states, this animation applies incremental rotation at each frame,
 /// producing a true circular arc motion.
 pub struct RotatingAnimation<T: RotatingRequirement> {
@@ -59,7 +67,7 @@ impl<T: RotatingRequirement> RotatingAnimation<T> {
     }
 }
 
-impl<T: RotatingRequirement> Eval for RotatingAnimation<T> {
+impl<T: RotatingRequirement> PureEval for RotatingAnimation<T> {
     type Output = T;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {

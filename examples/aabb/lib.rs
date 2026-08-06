@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::rotating::RotatingAnim,
+    anims::pure::rotating::RotatingAnim,
     color::palettes::manim,
     core::animation::StaticAnim,
     glam::{DVec3, dvec2, dvec3},

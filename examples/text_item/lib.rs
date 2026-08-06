@@ -2,9 +2,8 @@ use std::f64::consts::TAU;
 
 use ranim::utils::rate_functions::smooth;
 use ranim::{color::palettes::manim, glam::DVec3, prelude::*};
-use ranim_anims::{
+use ranim_anims::pure::{
     creation::{CreationAnim, WritingAnim},
-    lagged::LaggedAnim,
     rotating::RotatingAnim,
 };
 use ranim_items::vitem::{VItem, text::TextItem};
@@ -19,10 +18,10 @@ fn text_item(r: &mut RanimScene) {
         .text_box()
         .with(|item| item.set_stroke_color(manim::RED_C).discard());
 
-    let mut text_sequence = seq![Vec::<VItem>::from(text.clone()).lagged(0.1, |item| {
-        let animation = item.write();
-        move |alpha| animation.eval_alpha(smooth(alpha))
-    })];
+    let mut text_sequence = seq![Vec::<VItem>::from(text.clone())
+        .iter_mut()
+        .map(|item| item.write().with_rate_func(smooth))
+        .into_lagged(0.1)];
     text_sequence
         .hold(3.0)
         .push(
@@ -32,10 +31,12 @@ fn text_item(r: &mut RanimScene) {
                 .with_rate_func(smooth),
         )
         .hold(1.0)
-        .push(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| {
-            let animation = item.unwrite();
-            move |alpha| animation.eval_alpha(smooth(alpha))
-        }))
+        .push(
+            Vec::<VItem>::from(text.clone())
+                .iter_mut()
+                .map(|item| item.unwrite().with_rate_func(smooth))
+                .into_lagged(0.1),
+        )
         .hold(1.0);
 
     let mut box_sequence = AnimSequence::new();
