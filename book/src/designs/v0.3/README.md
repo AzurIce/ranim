@@ -133,7 +133,7 @@ impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
 
 ### `AnimLagged` 与迭代器收集
 
-stagger 排布（lagged）从求值器（旧 `Lagged`，一个 `PureEval`）升级为容器：
+stagger 排布由 `AnimLagged` 容器表达：
 
 ```rust
 let animation = lagged![0.2; a.fade_in(), b.fade_in(), c.write()];
@@ -142,7 +142,7 @@ let animation = lagged![0.2; a.fade_in(), b.fade_in(), c.write()];
 - 子动画要求 `Placeable`（和 `AnimSequence` 一样），放置由容器计算：`start_i = start_{i-1} + lag_ratio · d_{i-1}`。`lag_ratio` 因此是 `AnimStack`（0.0，同时）与 `AnimSequence`（1.0，相继）之间的插值；
 - 窗口外时间由 `with_leading`/`with_trailing` 配置（`LaggedFill::{Hold, Empty}`，默认都 `Hold`）：每个元素在 build 时被物化为一条 `[前填充][动画][后填充]` 的 per-item `AnimSequence` 轨道（前=初态、后=末态，采样自窗口边缘；空填充跳过；零时长子项跳过前填充）——preview 时间线所见即所得，没有隐藏的钳制规则。想让元素窗口后消失，让它的动画以 `hide` 结尾（`seq![item.fade_in(), item.hide()]`）；
 - 由于填充在 build 时采样，子动画应当是纯（闭式）动画；
-- 容器形态顺带解决了旧设计的两处尴尬：`lagged` 闭包里不再需要 `.0` 解包（容器直接收 `Pure<FadeIn>` 等 `Animation`），子动画也可以有自己的 `with_rate_func`（旧 `Lagged` 直接调子项 `eval_alpha`，无法施加速率）；
+- 子动画是完整的 `Animation`：可以自带 `with_rate_func`/`with_duration` 等播放参数，容器在各自 cell 上施加速率；
 - 配套迭代器 API：`collect::<AnimStack>()`/`collect::<AnimSequence>()`（`FromIterator`）与 `AnimIterExt::{into_stack, into_seq, into_lagged}`。
 
 ### `Paramed<A>`、`At<A>`
@@ -272,9 +272,9 @@ RenderGraph:    Begin → Render → Submit → Finish
 
 ## 迭代式动画区段
 
-https://github.com/AzurIce/ranim/pull/177（M1 机制）；随后重构为通用协议 + 时刻/时段分型
+https://github.com/AzurIce/ranim/pull/177
 
-v0.3 之前的动画区段都是**函数式**的：`eval_alpha(alpha)` 从归一化进度闭式采样。这类区段无法表达**有状态的迭代式动画**（粒子、弹簧、物理模拟、三体），因为求值器无法保留跨帧状态、也无法按 `dt` 推进。
+v0.2 的动画区段都是**函数式**的：从归一化进度闭式采样。这类区段无法表达**有状态的迭代式动画**（粒子、弹簧、物理模拟、三体），因为求值器无法保留跨帧状态、也无法按 `dt` 推进。v0.3 用一套通用求值协议统一了两类区段。
 
 ### 通用求值协议：单一 `Eval` trait
 
@@ -318,11 +318,11 @@ pub struct Pure<E>(pub E);        // sample = eval_alpha(time.alpha)；reset/ste
 pub struct Iterative<E>(pub E);   // 直通；sample 丢掉 time
 ```
 
-- `Fn(f64) -> T` 闭包自动实现 `PureEval`，闭包动画写作 `Pure(|alpha| ...)`（裸闭包不再直接是动画）；
+- `Fn(f64) -> T` 闭包自动实现 `PureEval`，闭包动画写作 `Pure(|alpha| ...)`；
 - 能力 trait 没有任何默认实现——有状态区段忘了 `reset` 会在编译期报错，而不是悄悄破坏 seek 确定性；
-- stable Rust 不允许对两个能力家族各写一个 `Animation` blanket impl（overlap），适配结构体同时解决了这个 coherence 问题：`Animation`/`Placeable` 回归对 `E: Eval` 的单一 blanket impl，两个结构体免费获得 `play`/`with_duration`/`at`；
+- stable Rust 不允许对两个能力家族各写一个 `Animation` blanket impl（overlap），适配结构体同时解决了这个 coherence 问题：`Animation`/`Placeable` 是对 `E: Eval` 的单一 blanket impl，两个结构体免费获得 `play`/`with_duration`/`at`；
 - `Eval` 公开且可直接实现，留给异形区段（M2 world-dependent 将走这条路径）；
-- `AnimationCell` 内部仍是 `Box<dyn EvalDyn>`，但 `EvalDyn` 的方法集就是协议本身（`sample_dyn`/`reset_dyn`/`step_dyn`），不再是两套协议方法的并集，纯路径的 panic 随之消失（迭代区段在纯查询下返回当前已推进状态）。
+- `AnimationCell` 内部是 `Box<dyn EvalDyn>`，`EvalDyn` 的方法集就是协议本身（`sample_dyn`/`reset_dyn`/`step_dyn`）；纯查询对任何区段都有定义——迭代区段返回当前已推进状态。
 
 ### 时刻与时段：`Time` / `DeltaTime`
 
@@ -343,8 +343,8 @@ pub struct DeltaTime {
 - `sample` 只收 `&Time`——采样在类型层面拿不到 delta；`step` 两者都收（时变力读时刻，积分读时段）；
 - **动画逻辑只见时间读数、不见时间配置**：起点、时长、rate 属于 `AnimationCell`，由它算出 `alpha`/`Δalpha` 后传入（零时长 cell 的 `alpha = 1.0` 特判也收在 cell）；
 - `with_duration`/`with_rate_func` 对纯、迭代**统一为纯播放变换**（抻拉/扭曲局部时钟，不改变内容）；
-- 迭代区段**模拟多久是它自己的构造参数**（如 `NBody::new(99, 32.0)`），`step` 里用 `sim_secs · delta_time.alpha` 换算回逻辑秒，物理参数保持量纲；于是 `with_duration(16.0)` 还能表达"32s 物理 2 倍速播放"这种 M1 表达不了的东西；
-- 需要墙钟真实时间的区段读 `global_*`：从会话时钟出发、沿任意嵌套深度的容器原样下传（修复了 M1 中嵌套容器把父级 content 坐标当作全局时间填入的问题）；
+- 迭代区段**模拟多久是它自己的构造参数**（如 `NBody::new(99, 32.0)`），`step` 里用 `sim_secs · delta_time.alpha` 换算回逻辑秒，物理参数保持量纲；于是 `with_duration(16.0)` 就是"32s 物理 2 倍速播放"；
+- 需要墙钟真实时间的区段读 `global_*`：从会话时钟出发、沿任意嵌套深度的容器原样下传，任何嵌套深度下都是真实全局时间；
 - 迭代区段按**变步长积分**编写：非线性 rate 下 `Δalpha` 逐帧变化，非单调 rate 下可以为负。
 
 ### `SceneEvaluator`：轻量会话驱动（非 ECS）
