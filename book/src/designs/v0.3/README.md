@@ -2,6 +2,13 @@
 
 ## 新增
 
+- **迭代式动画区段**：粒子、弹簧、物理模拟等有状态动画（见"迭代式动画区段"一节）
+  - 通用求值协议 `Eval`（`sample`/`reset`/`step`）与轻量会话驱动 `SceneEvaluator`（固定逻辑网格、确定性 seek 重放）
+  - `Time`/`DeltaTime` 时刻/时段时间上下文
+  - *ranim-anims* 的迭代特化：`IterativeEval` + `Iterative<E>`
+- 纯/迭代特化结构：*ranim-anims* 的 `PureEval` + `Pure<E>`、`IterativeEval` + `Iterative<E>`；`Fn(f64) -> T` 闭包经 `Pure(|alpha| ...)` 成为动画
+- `AnimLagged` 容器（stagger 排布 + 窗口外静态填充）与 `lagged!` 宏、迭代器容器收集（`collect::<AnimStack>()`/`collect::<AnimSequence>()`、`into_stack`/`into_seq`/`into_lagged`）
+
 ## BREAKING CHANGES
 
 - 重构动画组织系统
@@ -10,15 +17,11 @@
   - 支持直接将 `Eval` 当作动画使用（不再需要转换为 `AnimationCell`）
   - 用 `Paramed<A>` 和 `At<A>` 替代原先 `AnimationCell<T>` 的 `AnimationInfo`
   - *ranim-anims* 中全部内置动画创建工具方法现在默认用 `linear` 速率函数和 `1.0` 持续秒数。
-- 重构动画求值体系（见"迭代式动画区段"一节）
-  - `Eval` 改为通用求值协议（`sample`/`reset`/`step` 全部 required + 通用的 `apply_to`/`apply_alpha_to`）
-  - 删除 `SegmentTime`，时间上下文按时刻/时段分型为 `Time`/`DeltaTime`
-  - 纯/迭代特化移到 *ranim-anims*：能力 trait `PureEval`/`IterativeEval` + 适配结构体 `Pure<E>`/`Iterative<E>`，内置动画工具方法返回 `Pure<...>`
-  - 裸闭包不再直接是动画，统一 `Pure(|alpha| ...)`
-  - `with_duration` 对迭代区段的语义从"模拟时长"变为"播放抻拉"；模拟时长改为区段自己的构造参数
+- 求值与内置动画 API
+  - `Eval` 的方法集改为 `sample`/`reset`/`step`（见"迭代式动画区段"一节）；v0.2 的 `eval_alpha` 作为纯求值能力移至 *ranim-anims* 的 `PureEval`
+  - 内置动画工具方法返回类型变为 `Pure<...>`（如 `fade_in()` 返回 `Pure<FadeIn<T>>`）
   - `CameraFrame::orbit` 移到 *ranim-anims* 的 `CameraFrameAnim`
-- 新增 `AnimLagged` 容器（stagger 排布 + 窗口外静态填充）与 `lagged!` 宏、迭代器容器收集（`collect::<AnimStack>()`/`collect::<AnimSequence>()`、`into_stack`/`into_seq`/`into_lagged`）
-  - 删除 *ranim-anims* 的 `Lagged` 求值器与 `lagged` 模块（`LaggedAnim` 糖）；子动画可以自带 `with_rate_func`
+  - 删除 *ranim-anims* 的 `Lagged` 求值器与 `lagged` 模块（`LaggedAnim` 糖），stagger 排布改用 `AnimLagged` 容器
 
 ## Composable Animation Arrangement
 
