@@ -328,14 +328,27 @@ mod tests {
         assert_eq!(items.len(), 3);
 
         // Containers of tuples (container blanket impl + tuple impl).
-        let items = vec![(camera.clone(), vitem.clone()), (camera.clone(), vitem.clone())].extract();
+        let items = vec![
+            (camera.clone(), vitem.clone()),
+            (camera.clone(), vitem.clone()),
+        ]
+        .extract();
         assert_eq!(items.len(), 4);
 
         // High arity still works.
         let t13 = (
-            camera.clone(), vitem.clone(), mesh.clone(), camera.clone(),
-            vitem.clone(), mesh.clone(), camera.clone(), vitem.clone(),
-            mesh.clone(), camera.clone(), vitem.clone(), mesh.clone(),
+            camera.clone(),
+            vitem.clone(),
+            mesh.clone(),
+            camera.clone(),
+            vitem.clone(),
+            mesh.clone(),
+            camera.clone(),
+            vitem.clone(),
+            mesh.clone(),
+            camera.clone(),
+            vitem.clone(),
+            mesh.clone(),
             camera.clone(),
         );
         assert_eq!(t13.extract().len(), 13);
