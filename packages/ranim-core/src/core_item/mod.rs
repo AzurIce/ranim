@@ -1,10 +1,10 @@
 //! Core items of Ranim.
 //!
-//! [`CoreItem`]s are the fundamental items of Ranim. All other Items are built upon them.
+//! [`crate::core_item::CoreItem`]s are the fundamental items of Ranim. All other Items are built upon them.
 //!
-//! Currently, there are two types of [`CoreItem`]s:
-//! - [`CameraFrame`]: The camera frame.
-//! - [`VItem`]: The vitem primitive.
+//! Currently, there are two types of [`crate::core_item::CoreItem`]s:
+//! - [`crate::core_item::camera_frame::CameraFrame`]: The camera frame.
+//! - [`crate::core_item::vitem::VItem`]: The vitem primitive.
 use std::any::Any;
 
 use dyn_clone::DynClone;

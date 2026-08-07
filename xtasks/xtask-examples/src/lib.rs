@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result, bail};
 use clap::Parser;
 use ranim_cli::cli::Cli;
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,41 @@ fn copy_file(source: &Path, target_dir: &Path) -> Result<String> {
     std::fs::copy(source, &target_path)?;
 
     Ok(file_name)
+}
+
+/// Optimize a wasm-bindgen output module for website delivery.
+///
+/// `wasm-bindgen` may rewrite the module it receives, so this must run after
+/// bindgen has produced the final `*_bg.wasm` file in the package directory.
+fn optimize_wasm(wasm_path: &Path) -> Result<()> {
+    let optimized_path = wasm_path.with_extension("wasm-opt.wasm");
+    if optimized_path.exists() {
+        std::fs::remove_file(&optimized_path)
+            .with_context(|| format!("failed to remove {}", optimized_path.display()))?;
+    }
+
+    let status = Command::new("wasm-opt")
+        .args(["-Oz", "--output"])
+        .arg(&optimized_path)
+        .arg(wasm_path)
+        .stdout(std::process::Stdio::null())
+        .status()
+        .context(
+            "failed to run wasm-opt; install Binaryen and ensure `wasm-opt` is available on PATH",
+        )?;
+    if !status.success() {
+        bail!("wasm-opt failed for {}", wasm_path.display());
+    }
+
+    std::fs::copy(&optimized_path, wasm_path).with_context(|| {
+        format!(
+            "failed to replace {} with wasm-opt output",
+            wasm_path.display()
+        )
+    })?;
+    std::fs::remove_file(&optimized_path)
+        .with_context(|| format!("failed to remove {}", optimized_path.display()))?;
+    Ok(())
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -231,10 +266,20 @@ impl Example {
                 ])
                 .stdout(std::process::Stdio::null())
                 .status()
-                .unwrap();
+                .expect("failed to run wasm-bindgen");
             if !status.success() {
                 panic!("failed to run wasm-bindgen")
             }
+
+            let wasm_path = output_dir
+                .join("pkg")
+                .join(format!("{}_bg.wasm", self.name));
+            optimize_wasm(&wasm_path).unwrap_or_else(|err| {
+                panic!(
+                    "failed to optimize wasm for example <{}>: {err:#}",
+                    self.name
+                )
+            });
         }
     }
 
@@ -350,7 +395,7 @@ mod test {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir);
-        assert_eq!(examples.len(), 25);
+        assert_eq!(examples.len(), 31); // + iterative_spring, nbody, cloth_wrap
         assert_eq!(
             examples
                 .iter()

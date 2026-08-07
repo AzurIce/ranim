@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: "doc"
+  group: "doc-${{ github.ref }}"
   cancel-in-progress: true
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-12-16
+          toolchain: nightly-2026-05-01
 
       - uses: Swatinem/rust-cache@v2
         with:

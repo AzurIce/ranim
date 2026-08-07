@@ -12,10 +12,10 @@ on:
         default: "main"
       mdbook-version:
         description: "mdbook version"
-        default: "0.5"
+        default: "0.5.4"
       mdbook-plugins:
         description: "Comma-separated mdbook plugins"
-        default: "mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17"
+        default: "mdbook-typst-math@0.3.0, mdbook-mermaid@0.17"
 
 permissions:
   contents: read
@@ -55,8 +55,8 @@ jobs:
       ref: ${{ matrix.ref }}
       artifact-name: book-${{ matrix.ref }}
       site-url: ""
-      mdbook-version: ${{ inputs.mdbook-version || '0.5' }}
-      mdbook-plugins: ${{ inputs.mdbook-plugins || 'mdbook-katex@0.10.0-alpha, mdbook-mermaid@0.17' }}
+      mdbook-version: ${{ inputs.mdbook-version || '0.5.4' }}
+      mdbook-plugins: ${{ inputs.mdbook-plugins || 'mdbook-typst-math@0.3.0, mdbook-mermaid@0.17' }}
 
   deploy:
     needs: [determine-refs, build]

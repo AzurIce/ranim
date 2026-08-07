@@ -38,6 +38,8 @@ pub struct StaticOutput {
     pub save_frames: bool,
     /// The name of the video, uses scene's name by default.
     pub name: Option<&'static str>,
+    /// The basename template for the rendered output.
+    pub name_template: Option<&'static str>,
     /// The directory to save the output.
     pub dir: &'static str,
     /// The output format
@@ -52,6 +54,7 @@ impl StaticOutput {
         fps: 60,
         save_frames: false,
         name: None,
+        name_template: None,
         dir: "./output",
         format: OutputFormat::Mp4,
     };
@@ -116,6 +119,7 @@ impl From<&StaticOutput> for Output {
             fps: o.fps,
             save_frames: o.save_frames,
             name: o.name.map(|n| n.to_string()),
+            name_template: o.name_template.map(|n| n.to_string()),
             dir: o.dir.to_string(),
             format: o.format,
         }

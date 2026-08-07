@@ -1,5 +1,6 @@
 use std::f64::consts::TAU;
 
+use ranim::utils::rate_functions::smooth;
 use ranim::{color::palettes::manim, glam::DVec3, prelude::*};
 use ranim_anims::{
     creation::{CreationAnim, WritingAnim},
@@ -11,7 +12,6 @@ use ranim_items::vitem::{VItem, text::TextItem};
 #[scene]
 #[output(dir = "./output/text_item")]
 fn text_item(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
     let text = "The quick brown fox jumps over the lazy dog.";
 
     let text = TextItem::new(text, 0.5).with(|item| item.move_to(DVec3::ZERO).discard());
@@ -19,23 +19,41 @@ fn text_item(r: &mut RanimScene) {
         .text_box()
         .with(|item| item.set_stroke_color(manim::RED_C).discard());
 
-    r.insert_with(|t| {
-        t.play(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.write()))
-            .forward(3.)
-            .play(text.clone().rotating(TAU * 4., DVec3::Z).with_duration(4.))
-            .forward(1.)
-            .play(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| item.unwrite()))
-            .forward(1.);
-    });
+    let mut text_sequence = seq![Vec::<VItem>::from(text.clone()).lagged(0.1, |item| {
+        let animation = item.write();
+        move |alpha| animation.eval_alpha(smooth(alpha))
+    })];
+    text_sequence
+        .hold(3.0)
+        .push(
+            text.clone()
+                .rotating(TAU * 4.0, DVec3::Z)
+                .with_duration(4.0)
+                .with_rate_func(smooth),
+        )
+        .hold(1.0)
+        .push(Vec::<VItem>::from(text.clone()).lagged(0.1, |item| {
+            let animation = item.unwrite();
+            move |alpha| animation.eval_alpha(smooth(alpha))
+        }))
+        .hold(1.0);
 
-    r.insert_with(|t| {
-        t.forward(1.)
-            .play(VItem::from(text_box.clone()).create())
-            .play(VItem::from(text_box.clone()).uncreate());
-    });
+    let mut box_sequence = AnimSequence::new();
+    box_sequence
+        .forward(1.0)
+        .push(
+            VItem::from(text_box.clone())
+                .create()
+                .with_rate_func(smooth),
+        )
+        .push(VItem::from(text_box).uncreate().with_rate_func(smooth));
+
+    let total_secs = text_sequence.cursor_sec().max(box_sequence.cursor_sec());
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(stack![text_sequence, box_sequence]);
 
     r.insert_time_mark(
-        r.timelines().max_total_secs() / 2.0,
+        total_secs / 2.0,
         TimeMark::Capture("preview.png".to_string()),
     );
 }

@@ -1,8 +1,7 @@
 use ranim_core::{
-    animation::{AnimationCell, Eval},
+    animation::Eval,
     core_item::vitem::DEFAULT_STROKE_WIDTH,
     traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth},
-    utils::rate_functions::smooth,
 };
 use tracing::warn;
 
@@ -15,23 +14,17 @@ impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`CreationRequirement`]
 pub trait CreationAnim<T: CreationRequirement + 'static> {
     /// Create a [`Create`] anim for `T`.
-    fn create(&mut self) -> AnimationCell<T>;
+    fn create(&mut self) -> Create<T>;
     /// Create an [`UnCreate`] anim for `T`.
-    fn uncreate(&mut self) -> AnimationCell<T>;
+    fn uncreate(&mut self) -> UnCreate<T>;
 }
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
-    fn create(&mut self) -> AnimationCell<T> {
-        Create::new(self.clone())
-            .into_animation_cell()
-            .with_rate_func(smooth)
-            .apply_to(self)
+    fn create(&mut self) -> Create<T> {
+        Create::new(self.clone()).apply_to(self)
     }
-    fn uncreate(&mut self) -> AnimationCell<T> {
-        UnCreate::new(self.clone())
-            .into_animation_cell()
-            .with_rate_func(smooth)
-            .apply_to(self)
+    fn uncreate(&mut self) -> UnCreate<T> {
+        UnCreate::new(self.clone()).apply_to(self)
     }
 }
 
@@ -43,23 +36,17 @@ impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequ
 /// The methods to create animations for `T` that satisfies [`WritingRequirement`]
 pub trait WritingAnim: WritingRequirement + Sized + 'static {
     /// Create a [`Write`] anim for `T`.
-    fn write(&mut self) -> AnimationCell<Self>;
+    fn write(&mut self) -> Write<Self>;
     /// Create a [`Unwrite`] anim for `T`.
-    fn unwrite(&mut self) -> AnimationCell<Self>;
+    fn unwrite(&mut self) -> Unwrite<Self>;
 }
 
 impl<T: WritingRequirement + Sized + 'static> WritingAnim for T {
-    fn write(&mut self) -> AnimationCell<Self> {
-        Write::new(self.clone())
-            .into_animation_cell()
-            .with_rate_func(smooth)
-            .apply_to(self)
+    fn write(&mut self) -> Write<Self> {
+        Write::new(self.clone()).apply_to(self)
     }
-    fn unwrite(&mut self) -> AnimationCell<Self> {
-        Unwrite::new(self.clone())
-            .into_animation_cell()
-            .with_rate_func(smooth)
-            .apply_to(self)
+    fn unwrite(&mut self) -> Unwrite<Self> {
+        Unwrite::new(self.clone()).apply_to(self)
     }
 }
 
@@ -81,8 +68,10 @@ impl<T: CreationRequirement> Create<T> {
     }
 }
 
-impl<T: CreationRequirement> Eval<T> for Create<T> {
-    fn eval_alpha(&self, alpha: f64) -> T {
+impl<T: CreationRequirement> Eval for Create<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         if alpha == 0.0 {
             T::empty()
         } else if 0.0 < alpha && alpha < 1.0 {
@@ -110,8 +99,10 @@ impl<T: CreationRequirement> UnCreate<T> {
     }
 }
 
-impl<T: CreationRequirement> Eval<T> for UnCreate<T> {
-    fn eval_alpha(&self, mut alpha: f64) -> T {
+impl<T: CreationRequirement> Eval for UnCreate<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, mut alpha: f64) -> Self::Output {
         if !(0.0..=1.0).contains(&alpha) {
             warn!("the alpha is out of range: {alpha}, clampped to 0.0..=1.0");
             alpha = alpha.clamp(0.0, 1.0)
@@ -152,8 +143,10 @@ impl<T: WritingRequirement> Write<T> {
     }
 }
 
-impl<T: WritingRequirement> Eval<T> for Write<T> {
-    fn eval_alpha(&self, alpha: f64) -> T {
+impl<T: WritingRequirement> Eval for Write<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let alpha = alpha * 2.0;
         if (0.0..1.0).contains(&alpha) {
             self.outline.get_partial(0.0..alpha)
@@ -192,8 +185,10 @@ impl<T: WritingRequirement> Unwrite<T> {
     }
 }
 
-impl<T: WritingRequirement> Eval<T> for Unwrite<T> {
-    fn eval_alpha(&self, alpha: f64) -> T {
+impl<T: WritingRequirement> Eval for Unwrite<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let alpha = alpha * 2.0;
         if (0.0..1.0).contains(&alpha) {
             self.original.lerp(&self.outline, alpha)

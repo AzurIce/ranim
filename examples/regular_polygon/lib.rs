@@ -8,14 +8,11 @@ use ranim::{
     prelude::*,
     utils::rate_functions::smooth,
 };
-use ranim_core::animation::Eval;
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
 #[output(dir = "./output/regular_polygon")]
 pub fn regular_polygon(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
-
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let max_radius = frame_size.x.max(frame_size.y) / 2.0 * 0.9;
 
@@ -46,84 +43,64 @@ pub fn regular_polygon(r: &mut RanimScene) {
         })
         .collect::<Vec<_>>();
 
-    let r_polygons = r.insert_empty();
+    let mut content = AnimSequence::new();
 
     // Phase 1: Expand from center with lagged effect
-    r.timeline_mut(r_polygons).play(
-        polygons
-            .iter_mut()
-            .zip(radii.iter())
-            .map(|(poly, &target_radius)| {
-                poly.morph(|p| {
-                    p.radius = target_radius;
-                })
-                .with_rate_func(smooth)
-            })
-            .collect::<Vec<_>>()
-            .lagged_raw(0.2)
-            .with_duration(1.0),
-    );
-
-    r.timelines_mut().sync();
+    let expand = polygons
+        .iter_mut()
+        .zip(radii.iter())
+        .map(|(poly, &target_radius)| {
+            let animation = poly.morph(|p| {
+                p.radius = target_radius;
+            });
+            move |alpha| animation.eval_alpha(smooth(alpha))
+        })
+        .collect::<Vec<_>>();
+    content.push(ranim_anims::lagged::Lagged::new(0.2, expand).with_duration(1.0));
 
     // Phase 2: Rotate each layer at different speeds
     let rotations: Vec<f64> = (0..n_layers)
         .map(|i| total_rotation * (n_layers - i) as f64 / n_layers as f64)
         .collect();
 
-    r.timeline_mut(r_polygons).play(
-        polygons
-            .iter_mut()
-            .zip(rotations.iter())
-            .map(|(poly, &rot)| {
-                poly.morph(|p| {
-                    p.with_origin(Origin.locate(&p.outer_circle()), |x| {
-                        x.rotate_on_z(rot);
-                    });
-                })
-                .with_rate_func(smooth)
-            })
-            .collect::<Vec<_>>()
-            .lagged_raw(0.2)
-            .with_duration(1.0),
-    );
-
-    r.timelines_mut().sync();
+    let rotate = polygons
+        .iter_mut()
+        .zip(rotations.iter())
+        .map(|(poly, &rot)| {
+            let animation = poly.morph(|p| {
+                p.with_origin(Origin.locate(&p.outer_circle()), |x| {
+                    x.rotate_on_z(rot);
+                });
+            });
+            move |alpha| animation.eval_alpha(smooth(alpha))
+        })
+        .collect::<Vec<_>>();
+    content.push(ranim_anims::lagged::Lagged::new(0.2, rotate).with_duration(1.0));
 
     r.insert_time_mark(
-        r.timelines().max_total_secs(),
+        content.cursor_sec(),
         TimeMark::Capture("preview.png".to_string()),
     );
 
-    r.timelines_mut().forward(0.5);
+    content.hold(0.5);
 
     // Phase 3: Collapse back to center (reverse order - outer first)
-    r.timeline_mut(r_polygons).play(
-        polygons
-            .iter_mut()
-            .rev()
-            .map(|poly| {
-                poly.morph(|p| {
-                    p.radius = 0.0;
-                })
-                .with_rate_func(smooth)
-            })
-            .collect::<Vec<_>>()
-            .lagged_raw(0.2)
-            .with_duration(1.0),
+    let collapse = polygons
+        .iter_mut()
+        .rev()
+        .map(|poly| {
+            let animation = poly.morph(|p| {
+                p.radius = 0.0;
+            });
+            move |alpha| animation.eval_alpha(smooth(alpha))
+        })
+        .collect::<Vec<_>>();
+    content.push(ranim_anims::lagged::Lagged::new(0.2, collapse).with_duration(1.0));
+
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
     );
-
-    r.timelines_mut().sync();
-}
-
-// TODO: redesign lagged
-/// Extension trait for raw lagged animation on Vec of AnimationCells
-trait LaggedRawExt<T> {
-    fn lagged_raw(self, lag_ratio: f64) -> ranim_core::animation::AnimationCell<Vec<T>>;
-}
-
-impl<T: Clone + 'static> LaggedRawExt<T> for Vec<ranim_core::animation::AnimationCell<T>> {
-    fn lagged_raw(self, lag_ratio: f64) -> ranim_core::animation::AnimationCell<Vec<T>> {
-        ranim_anims::lagged::Lagged::new(lag_ratio, self).into_animation_cell()
-    }
+    r.play(content);
 }

@@ -187,7 +187,6 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
 
     let mut cam = CameraFrame::from_spherical(phi, theta, distance);
     cam.fovy = 50.0 * PI / 180.0;
-    let r_cam = r.insert(cam.clone());
 
     let colorscale = terrain_colorscale();
 
@@ -205,13 +204,12 @@ fn build_terrain_scene(r: &mut RanimScene, height_func: impl Fn(f64, f64) -> f64
     )
     .with_fill_by_z(&colorscale);
 
-    let _r_terrain = r.insert(terrain);
-
-    r.timeline_mut(r_cam).play(
-        cam.orbit(DVec3::ZERO, 2.0)
-            .with_duration(5.0)
-            .with_rate_func(linear),
-    );
+    let camera = cam
+        .orbit(DVec3::ZERO, 2.0)
+        .with_duration(5.0)
+        .with_rate_func(linear);
+    r.play(camera);
+    r.play(terrain.show().with_duration(5.0));
 }
 
 // --- Scenes ---
@@ -263,7 +261,7 @@ fn fractal_erosion(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "bcd0b449f6a3696ce272ffe091f824e367d874b5"
-preview_imgs = ["/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview-fractal-perlin.png", "/examples/perlin_terrain/preview-perlin.png"]
-output_files = ["/examples/perlin_terrain/perline_terrain_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_erosion_1920x1080_60.mp4", "/examples/perlin_terrain/perlin_terrain_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_perlin_1920x1080_60.mp4", "/examples/perlin_terrain/perlin_1920x1080_60.mp4"]
+hash = "388db046fed34085d2b363650db9f0653a98891d"
+preview_imgs = ["/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview-perlin.png", "/examples/perlin_terrain/preview-fractal-perlin.png"]
+output_files = ["/examples/perlin_terrain/perlin_terrain_1920x1080_60.mp4", "/examples/perlin_terrain/perlin_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_perlin_1920x1080_60.mp4"]
 wasm = true

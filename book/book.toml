@@ -7,8 +7,9 @@ title = "Ranim Book"
 [build]
 build-dir = "../website/static/book/"
 
-[preprocessor.katex]
-after = ["links"]
+[preprocessor.typst-math]
+# [preprocessor.katex]
+# after = ["links"]
 
 [preprocessor.mermaid]
 command = "mdbook-mermaid"

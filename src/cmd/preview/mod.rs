@@ -6,15 +6,10 @@ use std::sync::Arc;
 use crate::{
     Output, Scene, SceneConfig, SceneConstructor,
     core::{
-        SealedRanimScene,
+        SceneEvaluator,
         color::{self, LinearSrgb},
-        store::CoreItemStore,
     },
-    render::{
-        Renderer,
-        resource::{RenderPool, RenderTextures},
-        utils::WgpuContext,
-    },
+    render::{Renderer, resource::RenderTextures, utils::WgpuContext, world::RenderFrame},
 };
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
@@ -28,32 +23,12 @@ use web_time::Instant;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-// Copied from original lib.rs
-pub struct TimelineInfoState {
-    pub ctx: egui::Context,
-    pub canvas: egui::Rect,
-    pub response: egui::Response,
-    pub painter: egui::Painter,
-    pub text_height: f32,
-    pub font_id: egui::FontId,
-}
-
-impl TimelineInfoState {
-    pub fn point_from_ms(&self, state: &TimelineState, ms: i64) -> f32 {
-        let ms = ms as f32;
-        let offset = state.offset_points;
-        let width_sec = state.width_sec as f32;
-        let canvas_width = self.canvas.width();
-
-        let ms_per_pixel = width_sec * 1000.0 / canvas_width;
-        let x = ms / ms_per_pixel;
-        self.canvas.min.x + x - offset
-    }
-}
-
 pub enum RanimPreviewAppCmd {
     ReloadScene(Scene, Sender<()>),
 }
+
+/// Default logic grid resolution (Hz), per the time model design.
+const DEFAULT_LOGIC_FPS: f64 = 120.0;
 
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 enum ExportProgress {
@@ -131,11 +106,10 @@ pub struct RanimPreviewApp {
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     scene_config: SceneConfig,
     resolution: Resolution,
-    timeline: SealedRanimScene,
+    evaluator: SceneEvaluator,
     need_eval: bool,
     last_sec: f64,
-    store: CoreItemStore,
-    pool: RenderPool,
+    store: RenderFrame,
     timeline_state: TimelineState,
     play_prev_t: Option<Instant>,
 
@@ -187,8 +161,10 @@ impl RanimPreviewApp {
         info!("Scene built, cost: {:?}", t.elapsed());
 
         info!("Getting timelines info...");
-        let timeline_infos = timeline.get_timeline_infos();
-        info!("Total {} timelines", timeline_infos.len());
+        let animation_infos = timeline.get_animation_infos();
+        let total_secs = timeline.total_secs();
+        let evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
+        info!("Total {} root animations", animation_infos.len());
 
         let (cmd_tx, cmd_rx) = unbounded();
 
@@ -200,12 +176,11 @@ impl RanimPreviewApp {
             scene_constructor,
             scene_config,
             resolution: Resolution::QHD,
-            timeline_state: TimelineState::new(timeline.total_secs(), timeline_infos),
-            timeline,
+            timeline_state: TimelineState::new(total_secs, animation_infos),
+            evaluator,
             need_eval: false,
             last_sec: -1.0,
-            store: CoreItemStore::default(),
-            pool: RenderPool::new(),
+            store: RenderFrame::default(),
             play_prev_t: None,
             renderer: None,
             render_textures: None,
@@ -286,14 +261,14 @@ impl RanimPreviewApp {
             match cmd {
                 RanimPreviewAppCmd::ReloadScene(scene, tx) => {
                     let timeline = scene.constructor.build_scene();
-                    let timeline_infos = timeline.get_timeline_infos();
+                    let animation_infos = timeline.get_animation_infos();
                     let old_cur_second = self.timeline_state.current_sec;
-                    self.timeline_state = TimelineState::new(timeline.total_secs(), timeline_infos);
+                    self.timeline_state =
+                        TimelineState::new(timeline.total_secs(), animation_infos);
                     self.timeline_state.current_sec =
                         old_cur_second.clamp(0.0, self.timeline_state.total_sec);
-                    self.timeline = timeline;
+                    self.evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
                     self.store.update(std::iter::empty());
-                    self.pool.clean();
                     self.need_eval = true;
 
                     self.set_clear_color_str(&scene.config.clear_color);
@@ -401,18 +376,20 @@ impl RanimPreviewApp {
             self.last_sec = self.timeline_state.current_sec;
 
             let start_eval = Instant::now();
-            self.store
-                .update(self.timeline.eval_at_sec(self.timeline_state.current_sec));
+            // Forward: advance the logic grid; backward scrub: seek and replay.
+            let target = self.timeline_state.current_sec;
+            if target < self.evaluator.clock() {
+                self.evaluator.seek(target);
+            } else {
+                self.evaluator.advance_to(target);
+            }
+            let mut frame_items = Vec::new();
+            self.evaluator.sample_into(&mut frame_items);
+            self.store.update(frame_items.into_iter());
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();
-            renderer.render_store_with_pool(
-                ctx,
-                render_textures,
-                self.clear_color,
-                &self.store,
-                &mut self.pool,
-            );
+            renderer.render_frame(render_textures, self.clear_color, &self.store);
 
             if let (Some(pipeline), Some(view)) = (
                 self.depth_visual_pipeline.as_ref(),
@@ -460,7 +437,6 @@ impl RanimPreviewApp {
             }
 
             self.last_render_time = Some(start.elapsed());
-            self.pool.clean();
         }
     }
 
@@ -703,6 +679,8 @@ impl eframe::App for RanimPreviewApp {
 
         egui::Panel::bottom("bottom_panel")
             .resizable(true)
+            .default_size(240.0)
+            .min_size(150.0)
             .max_size(600.0)
             .show(ui, |ui| {
                 ui.label("Timeline");
@@ -806,14 +784,30 @@ impl eframe::App for RanimPreviewApp {
 
                     ui.separator();
 
-                    ui.style_mut().spacing.slider_width = ui.available_width() - 70.0;
-                    ui.add(
-                        egui::Slider::new(
-                            &mut self.timeline_state.current_sec,
-                            0.0..=self.timeline_state.total_sec,
+                    const TIME_INPUT_WIDTH: f32 = 86.0;
+                    let slider_width =
+                        (ui.available_width() - TIME_INPUT_WIDTH - ui.spacing().item_spacing.x)
+                            .max(40.0);
+                    ui.scope(|ui| {
+                        ui.style_mut().spacing.slider_width = slider_width;
+                        ui.add(
+                            egui::Slider::new(
+                                &mut self.timeline_state.current_sec,
+                                0.0..=self.timeline_state.total_sec,
+                            )
+                            .show_value(false),
                         )
-                        .text("sec"),
-                    );
+                        .on_hover_text("Timeline position");
+                    });
+                    ui.add_sized(
+                        [TIME_INPUT_WIDTH, 18.0],
+                        egui::DragValue::new(&mut self.timeline_state.current_sec)
+                            .range(0.0..=self.timeline_state.total_sec)
+                            .speed(0.001)
+                            .fixed_decimals(3)
+                            .suffix(" s"),
+                    )
+                    .on_hover_text("Drag or enter the current time");
                 });
 
                 self.timeline_state.ui_main_timeline(ui);

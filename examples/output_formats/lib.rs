@@ -6,6 +6,7 @@ use ranim::{
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},
     prelude::*,
+    utils::rate_functions::smooth,
 };
 
 #[scene(clear_color = "#00000000")]
@@ -14,8 +15,6 @@ use ranim::{
 #[output(dir = "./output/output_formats", format = "mov")]
 #[output(dir = "./output/output_formats", format = "gif")]
 fn output_formats(r: &mut RanimScene) {
-    let _r_cam = r.insert(CameraFrame::default());
-
     let colors = [manim::RED_C, manim::GREEN_C, manim::BLUE_C];
 
     let radius = 1.4;
@@ -33,16 +32,37 @@ fn output_formats(r: &mut RanimScene) {
         })
         .collect();
 
-    r.insert_with(|t| {
-        t.play(circles.lagged(0.3, |c| c.fade_in()).with_duration(1.0))
-            .forward(1.0)
-            .play(
-                circles
-                    .rotating_at(2.0 * PI / 3.0, DVec3::Z, DVec3::ZERO)
-                    .with_duration(1.0),
-            )
-            .forward(1.0)
-            .play(circles.lagged(0.3, |c| c.fade_out()).with_duration(1.0));
-    });
+    let mut content = seq![
+        circles
+            .lagged(0.3, |circle| {
+                let animation = circle.fade_in();
+                move |alpha| animation.eval_alpha(smooth(alpha))
+            })
+            .with_duration(1.0)
+    ];
+    content
+        .hold(1.0)
+        .push(
+            circles
+                .rotating_at(2.0 * PI / 3.0, DVec3::Z, DVec3::ZERO)
+                .with_duration(1.0)
+                .with_rate_func(smooth),
+        )
+        .hold(1.0)
+        .push(
+            circles
+                .lagged(0.3, |circle| {
+                    let animation = circle.fade_out();
+                    move |alpha| animation.eval_alpha(smooth(alpha))
+                })
+                .with_duration(1.0),
+        );
+
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
+    r.play(content);
     r.insert_time_mark(1.5, TimeMark::Capture("preview.png".to_string()));
 }

@@ -41,10 +41,11 @@ tracing = "0.1.44"
 tracing-indicatif = "0.3.14"
 tracing-subscriber = "0.3.23"
 itertools = "0.15.0"
-bytemuck = "1.25.1"
+bytemuck = "1.25.2"
 wgpu = "30.0.0"
 image = "0.25.10"
 derive_more = "2.1.1"
+bevy_ecs = { version = "0.19.0", default-features = false, features = ["std"] }
 
 [features]
 # default = ["output"]
@@ -100,13 +101,13 @@ derive_more = { workspace = true, features = [
   "from",
   "into_iterator",
 ] }
-anyhow = "1.0.103"
+anyhow = "1.0.104"
 ranim-render = { workspace = true, optional = true }
 # render feature (wasm-compatible deps here, rest in target-specific section below)
 wgpu = { workspace = true, optional = true }
 # app feature
 egui = { version = "0.35.0", optional = true }
-egui-phosphor = { git = "https://github.com/amPerl/egui-phosphor", rev = "5a0075f68a463f6b316d39776fff519a2762b729", optional = true }
+egui-phosphor = { version =  "0.13.0", optional = true }
 web-time = { version = "1.1.0", optional = true }
 bytemuck = { workspace = true, features = ["derive"], optional = true }
 # profiling
@@ -121,7 +122,7 @@ inventory = "0.3.24"
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen.workspace = true
 # app feature (wasm)
-eframe = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981", default-features = false, features = [
+eframe = { git = "https://github.com/emilk/egui", default-features = false, features = [
     "accesskit",
     "default_fonts",
     "web_screen_reader",
@@ -135,25 +136,26 @@ wasm-tracing = { version = "2.1.0", optional = true }
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 # render deps (wasm-incompatible, only used in cfg(not(wasm)) code)
 pollster = { version = "1.0.1", optional = true }
-which = { version = "8.0.4", optional = true }
+which = { version = "8.0.5", optional = true }
 indicatif = { version = "0.18.6", optional = true }
 tracing-indicatif = { workspace = true, optional = true }
 flate2 = { version = "1.1.9", optional = true }
 reqwest = { version = "0.13.4", features = ["blocking"], optional = true }
 # app feature (native)
-eframe = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981", features = ["wgpu"], optional = true }
+eframe = { git = "https://github.com/emilk/egui", features = ["wgpu"], optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"
 
 [dev-dependencies]
 assert_float_eq = "1.2.0"
+midly = "0.5.3"
 rand = "0.10.2"
 rand_chacha = "0.10.0"
 getrandom = { version = "0.4.3", features = ["wasm_js"] }
 
 [patch.crates-io]
-egui = { git = "https://github.com/emilk/egui", rev = "e73ad83910c04f725b7ff2b363d642face2a4981" }
+egui = { git = "https://github.com/emilk/egui" }
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
@@ -232,7 +234,30 @@ name = "hello_ranim"
 path = "examples/hello_ranim/lib.rs"
 crate-type = ["cdylib"]
 
+[[example]]
+name = "iterative_spring"
+path = "examples/iterative_spring/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "nbody"
+path = "examples/nbody/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "cloth_wrap"
+path = "examples/cloth_wrap/lib.rs"
+crate-type = ["cdylib"]
+
 [package.metadata.example.hello_ranim]
+wasm = true
+
+[[example]]
+name = "composable_choreography"
+path = "examples/composable_choreography/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.composable_choreography]
 wasm = true
 
 [[example]]
@@ -349,6 +374,15 @@ required-features = ["typst"]
 wasm = true
 
 [[example]]
+name = "typst_timer"
+path = "examples/typst_timer/lib.rs"
+crate-type = ["cdylib"]
+required-features = ["typst"]
+
+[package.metadata.example.typst_timer]
+wasm = true
+
+[[example]]
 name = "perlin_terrain"
 path = "examples/perlin_terrain/lib.rs"
 crate-type = ["cdylib"]
@@ -362,6 +396,14 @@ path = "examples/mesh_morph/lib.rs"
 crate-type = ["cdylib"]
 
 [package.metadata.example.mesh_morph]
+wasm = true
+
+[[example]]
+name = "midi_visualizer"
+path = "examples/midi_visualizer/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.midi_visualizer]
 wasm = true
 
 [[example]]

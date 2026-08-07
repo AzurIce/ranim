@@ -18,7 +18,6 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    ciallo.url = "github:azurice/ciallo";
   };
 
   outputs =
@@ -27,7 +26,6 @@
       crane,
       rust-overlay,
       flake-utils,
-      ciallo,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -106,6 +104,9 @@
             hash = "sha256-ppE/f6jLRe6a1lfUQUlxTq/L29DwAD/a58u5utUJMoU=";
           };
 
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.gtk3 ];
+
           cargoHash = "sha256-zhijQ+9vVB4IL/t1+IGLAnvJka0AB1yJRWo/qEyUfx0=";
         });
       in
@@ -131,9 +132,11 @@
             zola
             mdbook
             wasm-pack
+            binaryen
             mdbook-mermaid
             typst
             gh
+            ffmpeg
             # wasm-bindgen-cli_0_2_106
             # mdbook-katex
             # wasm-bindgen-cli
@@ -141,10 +144,23 @@
           ])
           ++ [
             (pkgs.callPackage ./cargo-release.nix { })
-            (pkgs.callPackage ./mdbook-katex.nix { })
             (pkgs.callPackage ./wasm-bindgen-cli.nix { })
-            ciallo.packages.${system}.default
+          ]
+          ++ lib.optionals pkgs.stdenv.isLinux [
+            pkgs.vulkan-loader
+            pkgs.wayland
+            pkgs.libxkbcommon
+            pkgs.libX11
           ];
+
+          shellHook = lib.optionalString pkgs.stdenv.isLinux ''
+            export LD_LIBRARY_PATH="${lib.makeLibraryPath [
+              pkgs.vulkan-loader
+              pkgs.wayland
+              pkgs.libxkbcommon
+              pkgs.libX11
+            ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          '';
         };
       }
     );

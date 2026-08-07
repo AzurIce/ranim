@@ -1,4 +1,4 @@
-use ranim_core::animation::{AnimationCell, Eval};
+use ranim_core::animation::Eval;
 
 // MARK: Require Trait
 /// The requirement for [`Func`]
@@ -9,14 +9,12 @@ impl<T: Clone> FuncRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`FuncRequirement`]
 pub trait FuncAnim: FuncRequirement + 'static {
     /// Create a [`Func`] anim.
-    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> AnimationCell<Self>;
+    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> Func<Self>;
 }
 
 impl<T: FuncRequirement + 'static> FuncAnim for T {
-    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> AnimationCell<Self> {
-        Func::new(self.clone(), f)
-            .into_animation_cell()
-            .apply_to(self)
+    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> Func<Self> {
+        Func::new(self.clone(), f).apply_to(self)
     }
 }
 
@@ -40,8 +38,10 @@ impl<T: FuncRequirement> Func<T> {
     }
 }
 
-impl<T: FuncRequirement> Eval<T> for Func<T> {
-    fn eval_alpha(&self, alpha: f64) -> T {
+impl<T: FuncRequirement> Eval for Func<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
         (self.f)(&self.src, alpha)
     }
 }
