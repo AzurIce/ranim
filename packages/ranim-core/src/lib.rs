@@ -1,5 +1,6 @@
 //! The core of ranim.
 
+#![feature(tuple_trait)]
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(rustdoc::private_intra_doc_links)]
@@ -27,7 +28,8 @@ pub mod utils;
 
 pub use glam;
 pub use num;
-use std::fmt::Debug;
+use variadics_please::all_tuples_enumerated;
+use std::{fmt::Debug, marker::Tuple};
 
 use animation::{AnimStack, Animation, AnimationCell};
 pub use animation::{AnimationInfo, AnimationInfoKind};
@@ -59,6 +61,18 @@ pub trait Extract {
     }
 }
 
+/// A group of extractable items with different types.
+#[derive(Debug, Clone)]
+pub struct Group<T: Tuple>(pub T);
+
+/// Create a group of extractable items. See [`Group`] for details.
+#[macro_export]
+macro_rules! group {
+    ($($item:tt),+$(,)?) => {
+        Group(($($item),*))
+    };
+}
+
 impl<E: Extract, I> Extract for I
 where
     for<'a> &'a I: IntoIterator<Item = &'a E>,
@@ -71,6 +85,20 @@ where
         }
     }
 }
+
+macro_rules! impl_extract_for_tuple {
+    ($(($n:tt,$E:ident$(,)?)),+$(,)?) => {
+        impl<T: Clone, $($E: Extract<Target = T>),*> Extract for Group<($($E,)*)> {
+            type Target = T;
+
+            fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+                $(self.0.$n.extract_into(buf);)*
+            }
+        }
+    };
+}
+
+all_tuples_enumerated!(impl_extract_for_tuple, 1, 15, E);
 
 /// A marker attached to a time in a scene definition.
 #[derive(Debug, Clone)]
