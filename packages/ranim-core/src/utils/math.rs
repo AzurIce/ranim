@@ -98,8 +98,6 @@ pub fn interpolate_usize(a: usize, b: usize, t: f64) -> (usize, f64) {
 
 #[cfg(test)]
 mod test {
-    use core::f64;
-
     use super::*;
 
     #[test]
