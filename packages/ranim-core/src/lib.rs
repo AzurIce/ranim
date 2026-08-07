@@ -59,11 +59,49 @@ pub trait Extract {
     }
 }
 
-impl<E: Extract, I> Extract for I
+/// Sealed marker: types whose references iterate over `&Self::Item`.
+///
+/// `Extract` is blanket-implemented for these containers. Keeping the bound on a
+/// local (sealed) trait instead of raw `IntoIterator` lets coherence prove that
+/// tuples are disjoint, which is what makes the direct tuple impls below possible
+/// without a newtype wrapper or nightly `tuple_trait`.
+mod sealed {
+    pub trait IntoExtractIter {
+        type Item;
+    }
+    impl<E> IntoExtractIter for Vec<E> {
+        type Item = E;
+    }
+    impl<E> IntoExtractIter for std::collections::VecDeque<E> {
+        type Item = E;
+    }
+    impl<E> IntoExtractIter for std::collections::LinkedList<E> {
+        type Item = E;
+    }
+    impl<E> IntoExtractIter for std::collections::HashSet<E> {
+        type Item = E;
+    }
+    impl<E> IntoExtractIter for std::collections::BTreeSet<E> {
+        type Item = E;
+    }
+    impl<E> IntoExtractIter for std::collections::BinaryHeap<E> {
+        type Item = E;
+    }
+    impl<E> IntoExtractIter for Option<E> {
+        type Item = E;
+    }
+    impl<E, const N: usize> IntoExtractIter for [E; N] {
+        type Item = E;
+    }
+}
+use sealed::IntoExtractIter;
+
+impl<I: IntoExtractIter> Extract for I
 where
-    for<'a> &'a I: IntoIterator<Item = &'a E>,
+    I::Item: Extract,
+    for<'a> &'a I: IntoIterator<Item = &'a I::Item>,
 {
-    type Target = E::Target;
+    type Target = <I::Item as Extract>::Target;
 
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         for element in self {
@@ -71,6 +109,24 @@ where
         }
     }
 }
+
+/// Direct `Extract` impls for tuples. All elements must extract to the same
+/// `Target`, which is the natural semantics of a single `Target` associated type.
+macro_rules! impl_extract_for_tuple {
+    ($(($E:ident, $e:ident)),*) => {
+        impl<T: Clone, $($E: Extract<Target = T>),*> Extract for ($($E,)*) {
+            type Target = T;
+
+            fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+                let ($($e,)*) = self;
+                $($e.extract_into(buf);)*
+            }
+        }
+    };
+}
+
+// Arity 1..=15, same as the sibling `impl_interpolatable_tuple` pattern.
+variadics_please::all_tuples!(impl_extract_for_tuple, 1, 15, E, e);
 
 /// A marker attached to a time in a scene definition.
 #[derive(Debug, Clone)]
@@ -251,5 +307,37 @@ mod tests {
         assert_eq!(infos[0].children[0].range, 0.0..2.0);
         assert_eq!(infos[0].children[1].range, 3.0..4.0);
         assert_eq!(infos[1].range, 0.0..5.0);
+    }
+
+    #[test]
+    fn heterogeneous_tuples_extract_to_core_items() {
+        use crate::core_item::{camera_frame::CameraFrame, mesh_item::MeshItem};
+
+        let camera = CameraFrame::default();
+        let vitem = VItem::default();
+        let mesh = MeshItem::default();
+
+        // Heterogeneous tuple -> single shared `Target` (`CoreItem`).
+        let items = (camera.clone(), vitem.clone()).extract();
+        assert_eq!(items.len(), 2);
+        assert!(matches!(&items[0], CoreItem::CameraFrame(_)));
+        assert!(matches!(&items[1], CoreItem::VItem(_)));
+
+        // Three distinct element types, still one `Target`.
+        let items = (camera.clone(), vitem.clone(), mesh.clone()).extract();
+        assert_eq!(items.len(), 3);
+
+        // Containers of tuples (container blanket impl + tuple impl).
+        let items = vec![(camera.clone(), vitem.clone()), (camera.clone(), vitem.clone())].extract();
+        assert_eq!(items.len(), 4);
+
+        // High arity still works.
+        let t13 = (
+            camera.clone(), vitem.clone(), mesh.clone(), camera.clone(),
+            vitem.clone(), mesh.clone(), camera.clone(), vitem.clone(),
+            mesh.clone(), camera.clone(), vitem.clone(), mesh.clone(),
+            camera.clone(),
+        );
+        assert_eq!(t13.extract().len(), 13);
     }
 }
