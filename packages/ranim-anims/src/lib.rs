@@ -9,10 +9,11 @@
 //!   animation segment. Closures `Fn(f64) -> T` implement `PureEval`
 //!   automatically, so `Pure(|alpha| ...)` just works.
 //! - **Iterative** (stateful, stepped): implement
-//!   [`iterative::IterativeEval`] — a single `step(&self, &mut S, &Time, &DeltaTime)`
-//!   method — and pass it with an initial state to
-//!   [`iterative::Iterative::new`]. Closures `Fn(&mut S, &Time, &DeltaTime)`
-//!   implement `IterativeEval<S>` automatically.
+//!   [`iterative::IterativeEval`] — an associated `Output` and a single
+//!   `step(&self, &mut Self::Output, &Time, &DeltaTime)` method — and pass it
+//!   with an initial state to [`iterative::Iterative::new`]. For closures, use
+//!   [`iterative::Iterative::from_fn`], which binds the closure's mutable input
+//!   through [`iterative::IterativeFn`].
 //!
 //! A built-in animation is basically a struct that implements
 //! [`pure::PureEval`], together with the data its closed form needs. Here is

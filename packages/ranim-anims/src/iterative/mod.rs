@@ -3,12 +3,14 @@
 //! [`Iterative`](crate::iterative::Iterative) adapter into the general
 //! [`Eval`](ranim_core::animation::Eval) protocol.
 
+use std::marker::PhantomData;
+
 use ranim_core::{
     animation::Eval,
     time::{DeltaTime, Time},
 };
 
-/// The capability of an iterative, stateful evaluation over a state of type `S`.
+/// The capability of an iterative, stateful evaluation.
 ///
 /// This is what iterative animation types implement: particles, springs,
 /// physics simulations, and anything without a closed form. The state is owned
@@ -34,17 +36,45 @@ use ranim_core::{
 ///
 /// Segments that need unwarped wall-clock-shaped time use
 /// `time.global_secs`/`delta_time.global_secs` instead.
-pub trait IterativeEval<S> {
+pub trait IterativeEval {
+    /// State produced and advanced by this evaluator.
+    type Output;
+
     /// Advance the state by one logic step.
-    fn step(&self, output: &mut S, time: &Time, delta_time: &DeltaTime);
+    fn step(&self, output: &mut Self::Output, time: &Time, delta_time: &DeltaTime);
 }
 
-impl<S, F> IterativeEval<S> for F
+/// An [`IterativeEval`] backed by a stepping function.
+///
+/// The wrapper binds the function's mutable input type as the evaluator's
+/// unique [`Output`](IterativeEval::Output). Prefer [`Iterative::from_fn`] to
+/// constructing this type directly.
+pub struct IterativeFn<S, F> {
+    eval: F,
+    output: PhantomData<fn() -> S>,
+}
+
+impl<S, F> IterativeFn<S, F>
 where
     F: Fn(&mut S, &Time, &DeltaTime),
 {
-    fn step(&self, output: &mut S, time: &Time, delta_time: &DeltaTime) {
-        (self)(output, time, delta_time)
+    /// Bind a stepping function to its state type.
+    pub fn new(eval: F) -> Self {
+        Self {
+            eval,
+            output: PhantomData,
+        }
+    }
+}
+
+impl<S, F> IterativeEval for IterativeFn<S, F>
+where
+    F: Fn(&mut S, &Time, &DeltaTime),
+{
+    type Output = S;
+
+    fn step(&self, output: &mut Self::Output, time: &Time, delta_time: &DeltaTime) {
+        (self.eval)(output, time, delta_time)
     }
 }
 
@@ -58,27 +88,27 @@ where
 ///
 /// ```rust,ignore
 /// // With a closure and a directly-renderable state:
-/// let animation = Iterative::new(state0, |state: &mut MyState, _t, dt| {
+/// let animation = Iterative::from_fn(state0, |state: &mut MyState, _t, dt| {
 ///     state.integrate(dt.alpha * SIM_SECS);
 /// });
 ///
 /// // With a named step type:
 /// let animation = Iterative::new(NBodyState::regular_ngon(99), NBodyStep { sim_secs: 32.0 });
 /// ```
-pub struct Iterative<S, E: IterativeEval<S>> {
-    initial: S,
-    current: S,
+pub struct Iterative<E: IterativeEval> {
+    initial: E::Output,
+    current: E::Output,
     eval: E,
 }
 
-impl<S, E> Iterative<S, E>
+impl<E> Iterative<E>
 where
-    S: Clone,
-    E: IterativeEval<S>,
+    E: IterativeEval,
+    E::Output: Clone,
 {
-    /// Create an iterative segment from an initial state and a step
-    /// implementation (a closure or a named [`IterativeEval`] type).
-    pub fn new(initial: S, eval: E) -> Self {
+    /// Create an iterative segment from an initial state and a named
+    /// [`IterativeEval`] implementation.
+    pub fn new(initial: E::Output, eval: E) -> Self {
         Self {
             current: initial.clone(),
             initial,
@@ -87,12 +117,24 @@ where
     }
 }
 
-impl<S, E> Eval for Iterative<S, E>
+impl<S, F> Iterative<IterativeFn<S, F>>
 where
     S: Clone,
-    E: IterativeEval<S>,
+    F: Fn(&mut S, &Time, &DeltaTime),
 {
-    type Output = S;
+    /// Create an iterative segment from an initial state and a stepping
+    /// function.
+    pub fn from_fn(initial: S, eval: F) -> Self {
+        Self::new(initial, IterativeFn::new(eval))
+    }
+}
+
+impl<E> Eval for Iterative<E>
+where
+    E: IterativeEval,
+    E::Output: Clone,
+{
+    type Output = E::Output;
 
     fn sample(&self, _time: &Time) -> Self::Output {
         self.current.clone()
@@ -116,6 +158,31 @@ mod tests {
         core_item::{CoreItem, vitem::VItem},
     };
 
+    struct MoveRight;
+
+    impl IterativeEval for MoveRight {
+        type Output = VItem;
+
+        fn step(&self, state: &mut Self::Output, _time: &Time, delta_time: &DeltaTime) {
+            state.points[0].x += delta_time.alpha as f32;
+        }
+    }
+
+    #[test]
+    fn named_evaluator_has_one_associated_output() {
+        let mut animation = Iterative::new(VItem::default(), MoveRight);
+        Eval::step(
+            &mut animation,
+            &Time::default(),
+            &DeltaTime {
+                alpha: 0.25,
+                global_secs: 1.0,
+            },
+        );
+
+        assert_eq!(Eval::sample(&animation, &Time::default()).points[0].x, 0.25);
+    }
+
     /// A closure-driven iterative segment with a directly renderable state:
     /// stepping and seek replay must be deterministic.
     #[test]
@@ -123,7 +190,7 @@ mod tests {
         fn build() -> SceneEvaluator {
             let mut scene = RanimScene::new();
             scene.play(
-                Iterative::new(
+                Iterative::from_fn(
                     VItem::default(),
                     |state: &mut VItem, _time: &Time, delta_time: &DeltaTime| {
                         state.points[0].x += delta_time.alpha as f32;

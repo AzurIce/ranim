@@ -160,7 +160,7 @@ fn nbody(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(SIM_SECS));
     // n = 3: chaotic wobble that stays in frame; n >= 4: ejection finale.
     r.play(
-        Iterative::new(
+        Iterative::from_fn(
             NBodyState::new(99),
             |state: &mut NBodyState, _time: &Time, delta_time: &DeltaTime| {
                 state.step(SIM_SECS * delta_time.alpha);

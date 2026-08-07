@@ -163,7 +163,7 @@ fn nbody(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(SIM_SECS));
     // n = 3: chaotic wobble that stays in frame; n >= 4: ejection finale.
     r.play(
-        Iterative::new(
+        Iterative::from_fn(
             NBodyState::new(99),
             |state: &mut NBodyState, _time: &Time, delta_time: &DeltaTime| {
                 state.step(SIM_SECS * delta_time.alpha);
@@ -174,7 +174,7 @@ fn nbody(r: &mut RanimScene) {
 }
 ```
 """
-hash = "f512c50c87097331516e57e38515aeac795b12eb"
+hash = "4a8bcc82c5e81a66d5381383835c8b845f84283f"
 preview_imgs = []
 output_files = ["/examples/nbody/nbody_1920x1080_60.mp4"]
 wasm = false

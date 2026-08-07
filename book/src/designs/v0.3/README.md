@@ -9,7 +9,7 @@
 - 迭代式动画区段：粒子、弹簧、物理模拟等有状态动画（见"迭代式动画区段"一节）
   - 通用求值协议 `Eval`（`sample`/`reset`/`step`）与轻量会话驱动 `SceneEvaluator`（固定逻辑网格、确定性 seek 重放）
   - `Time`/`DeltaTime` 时刻/时段时间上下文
-  - 纯/迭代特化：*ranim-anims* 的 `PureEval` + `Pure<E>`、`IterativeEval<S>` + `Iterative<S, E>`；闭包经 `Pure(|alpha| ...)` / `Iterative::new(state, step_fn)` 成为动画
+  - 纯/迭代特化：*ranim-anims* 的 `PureEval` + `Pure<E>`、`IterativeEval` + `Iterative<E>`；闭包经 `Pure(|alpha| ...)` / `Iterative::from_fn(state, step_fn)` 成为动画
 
 ## BREAKING CHANGES
 
@@ -310,15 +310,17 @@ pub trait PureEval {              // 纯（闭式）能力：一个方法，无�
     type Output;
     fn eval_alpha(&self, alpha: f64) -> Self::Output;
 }
-pub trait IterativeEval<S> {      // 迭代能力：一个方法，无默认实现
-    fn step(&self, output: &mut S, time: &Time, delta_time: &DeltaTime);
+pub trait IterativeEval {         // 迭代能力：关联输出 + 一个方法，无默认实现
+    type Output;
+    fn step(&self, output: &mut Self::Output, time: &Time, delta_time: &DeltaTime);
 }
 
 pub struct Pure<E>(pub E);            // sample = eval_alpha(time.alpha)；reset/step 平凡
-pub struct Iterative<S, E> { ... }    // 持有初始/当前状态;sample = 克隆当前状态,reset = 恢复初始状态(结构性,不会忘不会错)
+pub struct IterativeFn<S, F> { ... }  // 把闭包 F 的可变输入 S 绑定为唯一 Output
+pub struct Iterative<E> { ... }       // 持有 E::Output 的初始/当前状态;sample = 克隆当前状态,reset = 恢复初始状态
 ```
 
-- `Fn(f64) -> T` 闭包自动实现 `PureEval`，`Fn(&mut S, &Time, &DeltaTime)` 闭包自动实现 `IterativeEval<S>`；
+- `Fn(f64) -> T` 闭包自动实现 `PureEval`；迭代闭包的 `S` 位于 `Fn` 输入位置，stable Rust 无法从闭包类型反推出关联 `Output`，所以 `Iterative::from_fn(initial, step_fn)` 用 `IterativeFn<S, F>` 显式绑定二者；
 - 能力 trait 没有任何默认实现；迭代侧连 `reset` 都不需要——适配器持有初始状态值，恢复是结构性的；
 - stable Rust 不允许对两个能力家族各写一个 `Animation` blanket impl（overlap），适配结构体同时解决了这个 coherence 问题：`Animation`/`Placeable` 是对 `E: Eval` 的单一 blanket impl，两个结构体免费获得 `play`/`with_duration`/`at`；
 - `Eval` 公开且可直接实现，留给异形区段（M2 world-dependent 将走这条路径）；
@@ -370,6 +372,6 @@ impl SceneEvaluator {
 
 ### 示例
 
-- `iterative_spring`：阻尼弹簧（`Iterative::new(SpringState { x: 1.0, v: 0.0 }, |state, _t, dt| ...)`，逻辑时长为场景常量 `SIM_SECS = 4.0`）；
+- `iterative_spring`：阻尼弹簧（`Iterative::from_fn(SpringState { x: 1.0, v: 0.0 }, |state, _t, dt| ...)`，逻辑时长为场景常量 `SIM_SECS = 4.0`）；
 - `nbody`：三体引力模拟（`NBodyState` + 闭包步进，32s 物理；velocity Verlet、混沌弹射终场、无边界）；
 - `cloth_wrap`：零重力布料（弹簧力 + 自碰撞 + 球-布碰撞，MeshItem 曲面渲染；球的 kinematic 状态由 `step` 依墙钟 `global_secs` 驱动并保存，`Extract` 投影）。

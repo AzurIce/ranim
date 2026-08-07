@@ -234,7 +234,7 @@ fn cloth_wrap(r: &mut RanimScene) {
 
     r.play(camera.show().with_duration(SIM_SECS));
     r.play(
-        Iterative::new(
+        Iterative::from_fn(
             ClothState::new(),
             |state: &mut ClothState, time: &Time, delta_time: &DeltaTime| {
                 state.step(SIM_SECS * delta_time.alpha, time.global_secs);

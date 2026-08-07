@@ -237,7 +237,7 @@ fn cloth_wrap(r: &mut RanimScene) {
 
     r.play(camera.show().with_duration(SIM_SECS));
     r.play(
-        Iterative::new(
+        Iterative::from_fn(
             ClothState::new(),
             |state: &mut ClothState, time: &Time, delta_time: &DeltaTime| {
                 state.step(SIM_SECS * delta_time.alpha, time.global_secs);
@@ -248,7 +248,7 @@ fn cloth_wrap(r: &mut RanimScene) {
 }
 ```
 """
-hash = "b5451fa25c85372502b6a8d606cb58096f5dd8c8"
+hash = "889c67a2a719c92a2025747eaea39f6a9f82d039"
 preview_imgs = []
 output_files = ["/examples/cloth_wrap/cloth_wrap_1920x1080_60.mp4"]
 wasm = false

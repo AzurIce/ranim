@@ -66,16 +66,18 @@ let animation = Pure(|alpha| Square::new(alpha)).with_duration(2.0);
 **迭代（有状态、逐步推进）——`IterativeEval` + `Iterative`:**
 
 ```rust,ignore
-pub trait IterativeEval<S> {
+pub trait IterativeEval {
+    type Output;
+
     /// 推进一个逻辑步(状态由适配器持有,以 &mut 传入)。
-    fn step(&self, output: &mut S, time: &Time, delta_time: &DeltaTime);
+    fn step(&self, output: &mut Self::Output, time: &Time, delta_time: &DeltaTime);
 }
 ```
 
-只有一个方法：状态类型 `S` 同时就是区段的输出；`Iterative::new(initial, step_fn)` 持有初始状态与当前状态——`sample` 是克隆当前状态，`reset` 是恢复初始状态，两者都是结构性的，不需要也无法写错。`Fn(&mut S, &Time, &DeltaTime)` 闭包自动实现 `IterativeEval<S>`：
+一个 evaluator 类型唯一确定其 `Output`；`Iterative::new(initial, evaluator)` 持有初始状态与当前状态——`sample` 是克隆当前状态，`reset` 是恢复初始状态，两者都是结构性的。闭包的状态类型位于 `Fn` 的输入位置，无法直接用 blanket impl 反推出关联类型，因此 `Iterative::from_fn` 通过 `IterativeFn<S, F>` 将二者绑定：
 
 ```rust,ignore
-let animation = Iterative::new(
+let animation = Iterative::from_fn(
     SpringState { x: 1.0, v: 0.0 },
     |state: &mut SpringState, _time: &Time, dt: &DeltaTime| {
         let dt = SIM_SECS * dt.alpha; // 逻辑秒

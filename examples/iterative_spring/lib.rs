@@ -49,7 +49,7 @@ const SIM_SECS: f64 = 4.0;
 fn iterative_spring(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(4.0));
     r.play(
-        Iterative::new(
+        Iterative::from_fn(
             SpringState { x: 1.0, v: 0.0 },
             |state: &mut SpringState, _time: &Time, delta_time: &DeltaTime| {
                 let dt = SIM_SECS * delta_time.alpha;

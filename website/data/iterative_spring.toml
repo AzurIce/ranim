@@ -17,9 +17,9 @@ code = """
 use ranim::{
     anims::iterative::Iterative,
     color::palettes::manim,
+    core::Extract,
     core::core_item::CoreItem,
     core::time::{DeltaTime, Time},
-    core::Extract,
     items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
 };
@@ -52,7 +52,7 @@ const SIM_SECS: f64 = 4.0;
 fn iterative_spring(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(4.0));
     r.play(
-        Iterative::new(
+        Iterative::from_fn(
             SpringState { x: 1.0, v: 0.0 },
             |state: &mut SpringState, _time: &Time, delta_time: &DeltaTime| {
                 let dt = SIM_SECS * delta_time.alpha;
@@ -66,7 +66,7 @@ fn iterative_spring(r: &mut RanimScene) {
 }
 ```
 """
-hash = "e52cf2f84523c528f3a0e1028689cf0f826b8542"
+hash = "298ae312af1920543513807fd6ff5e56b700c9ce"
 preview_imgs = []
 output_files = ["/examples/iterative_spring/iterative_spring_1920x1080_60.mp4"]
 wasm = false
