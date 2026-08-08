@@ -1,17 +1,22 @@
 //! N-body gravitational simulation — a canonical "iterative only" animation:
 //! no closed-form solution, chaotic, and inherently stateful across frames.
 //!
-//! `NBody::new(n)` places `n` equal masses on a regular n-gon with tangential
-//! velocities (exact circular speed for the relative equilibrium, plus a tiny
-//! asymmetry). Each body leaves a fading trail of recent positions. The scene
-//! uses a default (linear) rate, so `local_delta_secs` equals the physical tick.
+//! `NBodyState::new(n)` places `n` equal masses on a regular n-gon with
+//! tangential velocities (exact circular speed for the relative equilibrium,
+//! plus a tiny asymmetry). The logical duration `SIM_SECS` is a scene constant:
+//! `with_duration` only stretches playback. Each body leaves a fading trail of
+//! recent positions; the `Extract` impl projects bodies and trails into
+//! `VItem`s once per frame.
 //!
 //! Behavior by `n`: n = 3 stays inside the frame and wobbles chaotically for
 //! the whole scene; n >= 4 destabilizes and ejects a body (a dramatic finale).
 
 use ranim::{
+    anims::iterative::Iterative,
     color::{AlphaColor, Srgb, palettes::manim},
-    core::animation::{Eval, SegmentTime},
+    core::Extract,
+    core::core_item::CoreItem,
+    core::time::{DeltaTime, Time},
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},
     prelude::*,
@@ -21,7 +26,7 @@ use std::f64::consts::PI;
 const G: f64 = 8.0;
 const TRAIL_SAMPLE_EVERY: usize = 4; // sample a trail point every 4th step (~30 Hz)
 const TRAIL_LEN: usize = 90; // ~3 s of trail per body
-const TOTAL_SECS: f64 = 32.0;
+const SIM_SECS: f64 = 32.0;
 
 const PALETTE: [AlphaColor<Srgb>; 6] = [
     manim::BLUE_C,
@@ -39,16 +44,16 @@ struct Body {
     mass: f64,
 }
 
-/// An N-body system with mutual gravity.
-struct NBody {
+/// The N-body system's full state.
+#[derive(Clone)]
+struct NBodyState {
     bodies: Vec<Body>,
-    initial: Vec<Body>,
     trails: Vec<Vec<DVec3>>,
     step_count: usize,
     colors: Vec<AlphaColor<Srgb>>,
 }
 
-impl NBody {
+impl NBodyState {
     /// Place `n` equal masses on a regular n-gon.
     ///
     /// The circular speed is exact for the regular n-gon relative equilibrium:
@@ -76,7 +81,6 @@ impl NBody {
 
         let colors = (0..n).map(|i| PALETTE[i % PALETTE.len()]).collect();
         Self {
-            initial: bodies.clone(),
             bodies,
             trails: vec![Vec::new(); n],
             step_count: 0,
@@ -99,23 +103,10 @@ impl NBody {
         }
         accs
     }
-}
 
-impl Eval for NBody {
-    type Output = Vec<VItem>;
-
-    fn reset(&mut self) {
-        self.bodies = self.initial.clone();
-        for trail in &mut self.trails {
-            trail.clear();
-        }
-        self.step_count = 0;
-    }
-
-    fn step(&mut self, time: &SegmentTime) {
+    fn step(&mut self, dt: f64) {
         // Velocity Verlet (symplectic): conserves energy far better than
         // semi-implicit Euler for gravitational orbits.
-        let dt = time.local_delta_secs;
         let a0 = self.accelerations();
         for (i, body) in self.bodies.iter_mut().enumerate() {
             body.pos += body.vel * dt + a0[i] * (0.5 * dt * dt);
@@ -135,9 +126,12 @@ impl Eval for NBody {
             }
         }
     }
+}
 
-    fn sample(&self, _time: &SegmentTime) -> Vec<VItem> {
-        let mut items = Vec::new();
+impl Extract for NBodyState {
+    type Target = CoreItem;
+
+    fn extract_into(&self, buf: &mut Vec<CoreItem>) {
         // Trails: dim dots at recent positions.
         for (i, trail) in self.trails.iter().enumerate() {
             for &p in trail {
@@ -146,7 +140,7 @@ impl Eval for NBody {
                 dot.set_fill_opacity(0.15);
                 dot.set_stroke_opacity(0.0);
                 dot.move_to(p);
-                items.push(dot);
+                dot.extract_into(buf);
             }
         }
         // Bodies.
@@ -155,16 +149,23 @@ impl Eval for NBody {
             ball.set_fill_color(self.colors[i]);
             ball.set_stroke_opacity(0.0);
             ball.move_to(body.pos);
-            items.push(ball);
+            ball.extract_into(buf);
         }
-        items
     }
 }
 
 #[scene]
 #[output(dir = "./output/nbody")]
 fn nbody(r: &mut RanimScene) {
-    r.play(CameraFrame::default().show().with_duration(TOTAL_SECS));
+    r.play(CameraFrame::default().show().with_duration(SIM_SECS));
     // n = 3: chaotic wobble that stays in frame; n >= 4: ejection finale.
-    r.play(NBody::new(99).with_duration(TOTAL_SECS));
+    r.play(
+        Iterative::from_fn(
+            NBodyState::new(99),
+            |state: &mut NBodyState, _time: &Time, delta_time: &DeltaTime| {
+                state.step(SIM_SECS * delta_time.alpha);
+            },
+        )
+        .with_duration(SIM_SECS),
+    );
 }

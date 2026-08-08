@@ -1,12 +1,7 @@
 use itertools::Itertools;
 use ranim::{
-    anims::{fading::FadingAnim, lagged::LaggedAnim},
-    color,
-    color::HueDirection,
-    glam::dvec2,
-    items::vitem::geometry::Arc,
-    prelude::*,
-    utils::rate_functions::smooth,
+    anims::pure::fading::FadingAnim, color, color::HueDirection, glam::dvec2,
+    items::vitem::geometry::Arc, prelude::*, utils::rate_functions::smooth,
 };
 use ranim_items::vitem::geometry::anchor::Origin;
 
@@ -47,10 +42,9 @@ pub fn arc(r: &mut RanimScene) {
         .collect::<Vec<_>>();
     let total_secs = 3.0;
     let content = arcs
-        .lagged(0.2, |arc| {
-            let animation = arc.fade_in();
-            move |alpha| animation.eval_alpha(smooth(alpha))
-        })
+        .iter_mut()
+        .map(|arc| arc.fade_in().with_rate_func(smooth))
+        .into_lagged(0.2)
         .with_duration(total_secs);
 
     r.play(CameraFrame::default().show().with_duration(total_secs));

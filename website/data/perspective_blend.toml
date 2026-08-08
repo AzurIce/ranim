@@ -2,7 +2,7 @@ name = "perspective_blend"
 code = """
 ```rust
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::pure::morph::MorphAnim,
     color,
     color::palettes::manim,
     glam::DVec3,
@@ -118,7 +118,7 @@ fn perspective_blend(r: &mut RanimScene) {
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "f8c2fa32c69a339ef12af3541652e73f82492b81"
+hash = "c3938fe441c88b26a7ad9f8dd193a3aa3cba9d31"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true

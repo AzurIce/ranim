@@ -5,7 +5,7 @@ use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};
 use ranim::{
-    anims::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle, prelude::*,
+    anims::pure::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle, prelude::*,
     utils::rate_functions::linear,
 };
 
@@ -132,7 +132,7 @@ fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
 ```"""
-hash = "158aff984ea6ab6228328348ad5083dcee837cb7"
-preview_imgs = ["/examples/selective_sort/preview-100.png", "/examples/selective_sort/preview-10.png"]
+hash = "f57737f8103ae5dac26e0d505fb22f0abe44bbd9"
+preview_imgs = ["/examples/selective_sort/preview-10.png", "/examples/selective_sort/preview-100.png"]
 output_files = ["/examples/selective_sort/selective_sort_1920x1080_60.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
 wasm = true

@@ -1,6 +1,6 @@
 use ranim::{
-    anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,
-    utils::rate_functions::smooth,
+    anims::pure::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square,
+    prelude::*, utils::rate_functions::smooth,
 };
 
 // ANCHOR: construct

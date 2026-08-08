@@ -2,7 +2,7 @@ use ranim::glam;
 
 use glam::DVec3;
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
+    anims::pure::{creation::WritingAnim, fading::FadingAnim},
     color::palettes::manim,
     core::animation::StaticAnim,
     items::vitem::{VItem, svg::SvgItem, typst::typst_svg},
@@ -44,11 +44,10 @@ fn basic(r: &mut RanimScene) {
 
     let mut text_sequence = AnimSequence::new();
     text_sequence.hold(0.2).push(
-        text.lagged(0.2, |item| {
-            let animation = item.write();
-            move |alpha| animation.eval_alpha(smooth(alpha))
-        })
-        .with_duration(3.0),
+        text.iter_mut()
+            .map(|item| item.write().with_rate_func(smooth))
+            .into_lagged(0.2)
+            .with_duration(3.0),
     );
 
     let total_secs = svg_sequence.cursor_sec().max(text_sequence.cursor_sec());

@@ -2,14 +2,26 @@
 
 ## 新增
 
+- 可组合动画编排系统（见 "Composable Animation Arrangement" 一节）
+  - `AnimSequence`/`AnimStack` 容器与 `seq!`/`stack!` 宏，`hold`/`forward`/`extend` 等编排 API
+  - `AnimLagged` 容器（stagger 排布 + 窗口外静态填充）与 `lagged!` 宏、迭代器容器收集（`collect::<AnimStack>()`/`collect::<AnimSequence>()`、`into_stack`/`into_seq`/`into_lagged`）
+  - 播放参数 `Paramed<A>`（`with_duration`/`with_rate_func`/`with_enabled`）与放置 `At<A>`
+- 迭代式动画区段：粒子、弹簧、物理模拟等有状态动画（见"迭代式动画区段"一节）
+  - 通用求值协议 `Eval`（`sample`/`reset`/`step`）与轻量会话驱动 `SceneEvaluator`（固定逻辑网格、确定性 seek 重放）
+  - `Time`/`DeltaTime` 时刻/时段时间上下文
+  - 纯/迭代特化：*ranim-anims* 的 `PureEval` + `Pure<E>`、`IterativeEval` + `Iterative<E>`；闭包经 `Pure(|alpha| ...)` / `Iterative::from_fn(state, step_fn)` 成为动画
+
 ## BREAKING CHANGES
 
-- 重构动画组织系统
-  - 弃用 `Timeline`，用 `AnimSequence` 和 `AnimStack` 替代
-  - 修改 `Eval<T>` Trait 的泛型参数为关联类型
-  - 支持直接将 `Eval<T>` 当作动画使用（不再需要转换为 `AnimationCell`）
-  - 用 `Paramed<A>` 和 `At<A>` 替代原先 `AnimationCell<T>` 的 `AnimationInfo`
-  - *ranim-anims* 中全部内置动画创建工具方法现在默认用 `linear` 速率函数和 `1.0` 持续秒数。
+- 动画组织系统
+  - 弃用 `Timeline`（迁移到 `AnimSequence`/`AnimStack`）
+  - `AnimationCell<T>` 的泛型参数移除、不再直接构建（`Eval` 类型可直接作为动画使用）；原先 `AnimationCell<T>` 的 `AnimationInfo` 参数改为 `Paramed<A>` 和 `At<A>`
+  - *ranim-anims* 中全部内置动画创建工具方法现在默认用 `linear` 速率函数和 `1.0` 持续秒数
+- 求值与内置动画 API
+  - `Eval<T>` 泛型参数改为关联类型，方法集改为 `sample`/`reset`/`step`（见"迭代式动画区段"一节）；v0.2 的 `eval_alpha` 作为纯求值能力移至 *ranim-anims* 的 `PureEval`
+  - 内置动画工具方法返回类型变为 `Pure<...>`（如 `fade_in()` 返回 `Pure<FadeIn<T>>`）
+  - `CameraFrame::orbit` 移到 *ranim-anims* 的 `CameraFrameAnim`
+  - 删除 *ranim-anims* 的 `Lagged` 求值器与 `lagged` 模块（`LaggedAnim` 糖），stagger 排布改用 `AnimLagged` 容器
 
 ## Composable Animation Arrangement
 
@@ -111,16 +123,30 @@ impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
 
 ```rust
 impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
-    fn fade_in(&mut self) -> FadeIn<Self> {
-        FadeIn::new(self.clone()).apply_to(self)
+    fn fade_in(&mut self) -> Pure<FadeIn<Self>> {
+        Pure(FadeIn::new(self.clone())).apply_to(self)
     }
-    fn fade_out(&mut self) -> FadeOut<Self> {
-        FadeOut::new(self.clone()).apply_to(self)
+    fn fade_out(&mut self) -> Pure<FadeOut<Self>> {
+        Pure(FadeOut::new(self.clone())).apply_to(self)
     }
 }
 ```
 
 `Animation` Trait 也是可组合动画的核心，`AnimSequence`、`AnimStack`、`Paramed<A>` 和 `At<A>` 也实现了该 Trait，可以当作一个动画使用。
+
+### `AnimLagged` 与迭代器收集
+
+stagger 排布由 `AnimLagged` 容器表达：
+
+```rust
+let animation = lagged![0.2; a.fade_in(), b.fade_in(), c.write()];
+```
+
+- 子动画要求 `Placeable`（和 `AnimSequence` 一样），放置由容器计算：`start_i = start_{i-1} + lag_ratio · d_{i-1}`。`lag_ratio` 因此是 `AnimStack`（0.0，同时）与 `AnimSequence`（1.0，相继）之间的插值；
+- 窗口外时间由 `with_leading`/`with_trailing` 配置（`LaggedFill::{Hold, Empty}`，默认都 `Hold`）：每个元素在 build 时被物化为一条 `[前填充][动画][后填充]` 的 per-item `AnimSequence` 轨道（前=初态、后=末态，采样自窗口边缘；空填充跳过；零时长子项跳过前填充）——preview 时间线所见即所得，没有隐藏的钳制规则。想让元素窗口后消失，让它的动画以 `hide` 结尾（`seq![item.fade_in(), item.hide()]`）；
+- 由于填充在 build 时采样，子动画应当是纯（闭式）动画；
+- 子动画是完整的 `Animation`：可以自带 `with_rate_func`/`with_duration` 等播放参数，容器在各自 cell 上施加速率；
+- 配套迭代器 API：`collect::<AnimStack>()`/`collect::<AnimSequence>()`（`FromIterator`）与 `AnimIterExt::{into_stack, into_seq, into_lagged}`。
 
 ### `Paramed<A>`、`At<A>`
 
@@ -251,72 +277,85 @@ RenderGraph:    Begin → Render → Submit → Finish
 
 https://github.com/AzurIce/ranim/pull/177
 
-v0.3 之前的动画区段都是**函数式**的：`Eval::eval_alpha(alpha)` 从归一化进度闭式采样。这类区段无法表达**有状态的迭代式动画**（粒子、弹簧、物理模拟、三体），因为求值器无法保留跨帧状态、也无法按 `dt` 推进。
+v0.2 的动画区段都是**函数式**的：从归一化进度闭式采样。这类区段无法表达**有状态的迭代式动画**（粒子、弹簧、物理模拟、三体），因为求值器无法保留跨帧状态、也无法按 `dt` 推进。v0.3 用一套通用求值协议统一了两类区段。
 
-### 统一求值器：单一 `Eval` trait
+### 通用求值协议：单一 `Eval` trait
 
-`Eval` 从纯函数式求值器扩展为统一求值器：函数式（闭式）与迭代式（有状态）都实现同一个 trait，按各自需要覆盖方法：
+纯（闭式）与迭代（有状态）区段底层是同一个协议——运行时对一个区段能做的全部事情，三个方法全部 required：
 
 ```rust
-/// 统一求值器。
-///
-/// 函数式区段实现 [`Eval::eval_alpha`]；迭代式区段实现
-/// [`Eval::sample`]/[`Eval::reset`]/[`Eval::step`]——`eval_alpha` 无闭式，
-/// 默认调用即 panic。
 pub trait Eval {
     type Output;
 
-    /// 闭式采样。函数式实现；迭代式无闭式（默认 panic，运行时经 `sample` 驱动）。
-    fn eval_alpha(&self, _alpha: f64) -> Self::Output {
-        unreachable!("iterative segment has no closed form; drive it via `sample`/`step`")
-    }
-
-    /// 采样当前状态（统一入口）。函数式默认 = eval_alpha(time.alpha)。
-    fn sample(&self, time: &SegmentTime) -> Self::Output {
-        self.eval_alpha(time.alpha)
-    }
-
-    /// 回到区段起点（确定性契约：不得依赖墙钟/未播种 RNG）。
-    fn reset(&mut self) {}
-
-    /// 推进一个逻辑步或 substep；`time.local_delta_secs` 是积分步长。
-    /// 函数式默认空操作（免费）；采样不受 step 历史影响。
-    fn step(&mut self, _time: &SegmentTime) {}
+    /// 在时刻采样输出（不携带任何 delta；采样不推进状态）。
+    fn sample(&self, time: &Time) -> Self::Output;
+    /// 回到区段初始状态（确定性契约：不依赖墙钟/未播种 RNG）。
+    fn reset(&mut self);
+    /// 推进一个逻辑步。
+    fn step(&mut self, time: &Time, delta_time: &DeltaTime);
 }
 ```
 
-作者视角：
+外层操作全部由这三个动词组合而成：render 逐帧采样与纯查询（`SealedRanimScene::eval_at_sec`）走 `sample`（纯区段的闭式就是它的 `sample`）；`SceneEvaluator::advance_to` 逐 tick 驱动 `step`；preview 的 seek（scrub）= 全员 `reset` + 会话层重放 `step`——seek 不是区段级原语（逻辑网格归会话所有，区段无法自己重放，因此协议里是 `reset` 而非 `seek`）。
 
-- **函数式**：`impl Eval { type Output; eval_alpha }`——只实现 `eval_alpha`（`sample`/`reset`/`step` 用默认）；
-- **迭代式**：`impl Eval { type Output; sample; reset; step }`——`eval_alpha` 保持默认（无闭式，不会被调用）。
+`apply_to`/`apply_alpha_to` 是经 `sample` 定义的通用便捷方法（把动画在 alpha 处的状态写入对象，构建动画的同时把 item 置为末态），对纯、迭代区段语义一致（迭代区段应用的是当前投影状态）。
 
-cell 对擦除后的公共类型**无条件**调 `step`：函数式空步免费，且消除了"忘了标记导致 step 被跳过"的 footgun。纯求值路径（`eval_at_sec`）只支持函数式区段；迭代式区段须用 `SceneEvaluator`（纯路径调用 `eval_alpha` 会 panic 以暴露误用）。
+### 特化在 ranim-anims：`Pure` 与 `Iterative`
 
-### `SegmentTime`：传给区段的完整时间上下文
+`Eval` 是**通用**协议（有状态机形态），纯区段是它的无状态特化。作者不直接实现 `Eval`（除非异形），而是实现两个能力 trait 之一，再由对应的适配结构体特化成完整协议：
 
 ```rust
-pub struct SegmentTime {
-    pub global_secs: f64,          // 全局时间 t（秒）
-    pub global_delta_secs: f64,    // 逻辑步长（恒稳，= 1/logic_fps）
-    pub start_secs: f64,           // 区段起点 s
-    pub duration_secs: f64,        // 区段时长 D
-    pub local_secs: f64,           // 局部时间 u(t) = D·r((t−s)/D)（秒）
-    pub local_delta_secs: f64,     // Δu = u(t_k) − u(t_{k−1})，随 rate 变化（秒）
-    pub alpha: f64,                // local_secs / D
-    pub render_frame: u64,         // 当前渲染帧序号（frame-coupled 内容用）
-    pub is_render_frame_boundary: bool,
+// ranim-anims
+pub trait PureEval {              // 纯（闭式）能力：一个方法，无默认实现
+    type Output;
+    fn eval_alpha(&self, alpha: f64) -> Self::Output;
+}
+pub trait IterativeEval {         // 迭代能力：关联输出 + 一个方法，无默认实现
+    type Output;
+    fn step(&self, output: &mut Self::Output, time: &Time, delta_time: &DeltaTime);
+}
+
+pub struct Pure<E>(pub E);            // sample = eval_alpha(time.alpha)；reset/step 平凡
+pub struct IterativeFn<S, F> { ... }  // 把闭包 F 的可变输入 S 绑定为唯一 Output
+pub struct Iterative<E> { ... }       // 持有 E::Output 的初始/当前状态;sample = 克隆当前状态,reset = 恢复初始状态
+```
+
+- `Fn(f64) -> T` 闭包自动实现 `PureEval`；迭代闭包的 `S` 位于 `Fn` 输入位置，stable Rust 无法从闭包类型反推出关联 `Output`，所以 `Iterative::from_fn(initial, step_fn)` 用 `IterativeFn<S, F>` 显式绑定二者；
+- 能力 trait 没有任何默认实现；迭代侧连 `reset` 都不需要——适配器持有初始状态值，恢复是结构性的；
+- stable Rust 不允许对两个能力家族各写一个 `Animation` blanket impl（overlap），适配结构体同时解决了这个 coherence 问题：`Animation`/`Placeable` 是对 `E: Eval` 的单一 blanket impl，两个结构体免费获得 `play`/`with_duration`/`at`；
+- `Eval` 公开且可直接实现，留给异形区段（M2 world-dependent 将走这条路径）；
+- `AnimationCell` 内部是 `Box<dyn EvalDyn>`，`EvalDyn` 的方法集就是协议本身（`sample_dyn`/`reset_dyn`/`step_dyn`）；纯查询对任何区段都有定义——迭代区段返回当前已推进状态。
+- 迭代区段的状态与要渲染的内容不同时，为状态类型实现 `Extract`（投影点，每帧一次），如 `nbody` 的 bodies+trails → `VItem`。
+
+### 时刻与时段：`Time` / `DeltaTime`
+
+时间上下文按"时刻 / 时段"分为两个类型（`ranim-core::time`）——点与段是不同代数（借 std `Instant`/`Duration` 的原则，但不借其类型：`Instant` 无法表达逻辑时刻，`Duration` 无符号且 `alpha` 无量纲）：
+
+```rust
+pub struct Time {
+    pub alpha: f64,        // r((t-s)/D)，由 cell 算好
+    pub global_secs: f64,  // 真实全局时刻
+}
+
+pub struct DeltaTime {
+    pub alpha: f64,        // Δalpha，随 rate 逐帧变化
+    pub global_secs: f64,  // Δt = 1/logic_fps，恒稳
 }
 ```
 
-- `global_delta_secs` 恒稳（逻辑网格构造保证）；`local_delta_secs` 仅在线性 rate 下等于逻辑步长——非线性 rate 下逐帧变化是 rate func 的本职（扭曲局部时钟），迭代区段按**变步长积分**编写；
-- 需要物理真实时间（不被 rate 扭曲）的区段改用 `global_delta_secs`。
+- `sample` 只收 `&Time`——采样在类型层面拿不到 delta；`step` 两者都收（时变力读时刻，积分读时段）；
+- **动画逻辑只见时间读数、不见时间配置**：起点、时长、rate 属于 `AnimationCell`，由它算出 `alpha`/`Δalpha` 后传入（零时长 cell 的 `alpha = 1.0` 特判也收在 cell）；
+- `with_duration`/`with_rate_func` 对纯、迭代**统一为纯播放变换**（抻拉/扭曲局部时钟，不改变内容）；
+- 迭代区段**模拟多久是它自己的参数**（如 `nbody` 的场景常量 `SIM_SECS`），`step` 里用 `SIM_SECS · delta_time.alpha` 换算回逻辑秒，物理参数保持量纲；于是 `with_duration(16.0)` 就是"32s 物理 2 倍速播放"；
+- 需要墙钟真实时间的区段读 `global_*`：从会话时钟出发、沿任意嵌套深度的容器原样下传，任何嵌套深度下都是真实全局时间；
+- 迭代区段按**变步长积分**编写：非线性 rate 下 `Δalpha` 逐帧变化，非单调 rate 下可以为负。
 
 ### `SceneEvaluator`：轻量会话驱动（非 ECS）
 
 ```rust
 impl SceneEvaluator {
     /// 渲染采样时刻驱动：内部把 `render_secs` floor 到逻辑刻并推进。
-    /// 唯一包含 tick 推进逻辑的入口。
+    /// 唯一包含 tick 推进逻辑的入口；全局时间通道在这里产生并沿 step 递归下传。
     fn advance_to(&mut self, render_secs: f64);
 
     /// 纯采样：只读内部 clock（= floor 逻辑刻），不含 tick 逻辑。
@@ -329,10 +368,10 @@ impl SceneEvaluator {
 
 - **逻辑帧与渲染帧分离**：固定逻辑网格（默认 120Hz，与 24/30/60/120 整除对齐）驱动模拟，渲染 fps 只决定读取哪些逻辑态；
 - **确定性**：`seek` 重放与正向推进逐帧一致（preview scrub 与渲染可复现）；
-- **迭代区段要求 `SceneEvaluator`**：纯 `eval_at_sec` 路径不推进其状态。
+- **迭代区段要求 `SceneEvaluator`**：纯 `eval_at_sec` 路径不推进其状态（它返回的是当前已推进状态，通常是初始状态）。
 
 ### 示例
 
-- `iterative_spring`：阻尼弹簧（`Evaluator` 驱动）；
-- `nbody`：三体引力模拟（velocity Verlet、混沌弹射终场、无边界）；
-- `cloth_wrap`：零重力布料（弹簧力 + 自碰撞 + 球-布碰撞，MeshItem 曲面渲染，球穿布后布料包裹）。
+- `iterative_spring`：阻尼弹簧（`Iterative::from_fn(SpringState { x: 1.0, v: 0.0 }, |state, _t, dt| ...)`，逻辑时长为场景常量 `SIM_SECS = 4.0`）；
+- `nbody`：三体引力模拟（`NBodyState` + 闭包步进，32s 物理；velocity Verlet、混沌弹射终场、无边界）；
+- `cloth_wrap`：零重力布料（弹簧力 + 自碰撞 + 球-布碰撞，MeshItem 曲面渲染；球的 kinematic 状态由 `step` 依墙钟 `global_secs` 驱动并保存，`Extract` 投影）。

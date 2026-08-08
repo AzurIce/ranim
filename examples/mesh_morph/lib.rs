@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::pure::{camera::CameraFrameAnim, morph::MorphAnim},
     color::palettes::manim,
     glam::{DVec3, Vec3},
     items::mesh::{MeshItem, Sphere, Surface},

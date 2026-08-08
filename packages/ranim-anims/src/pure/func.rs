@@ -1,5 +1,7 @@
 use ranim_core::animation::Eval;
 
+use crate::pure::{Pure, PureEval};
+
 // MARK: Require Trait
 /// The requirement for [`Func`]
 pub trait FuncRequirement: Clone {}
@@ -9,12 +11,12 @@ impl<T: Clone> FuncRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`FuncRequirement`]
 pub trait FuncAnim: FuncRequirement + 'static {
     /// Create a [`Func`] anim.
-    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> Func<Self>;
+    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> Pure<Func<Self>>;
 }
 
 impl<T: FuncRequirement + 'static> FuncAnim for T {
-    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> Func<Self> {
-        Func::new(self.clone(), f).apply_to(self)
+    fn func(&mut self, f: impl Fn(&Self, f64) -> Self + 'static) -> Pure<Func<Self>> {
+        Pure(Func::new(self.clone(), f)).apply_to(self)
     }
 }
 
@@ -38,7 +40,7 @@ impl<T: FuncRequirement> Func<T> {
     }
 }
 
-impl<T: FuncRequirement> Eval for Func<T> {
+impl<T: FuncRequirement> PureEval for Func<T> {
     type Output = T;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {

@@ -8,7 +8,7 @@ use krates::Kid;
 use notify_debouncer_full::{DebounceEventResult, DebouncedEvent, Debouncer};
 use ranim::cmd::preview::{RanimPreviewApp, RanimPreviewAppCmd};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_channel::{Receiver, bounded, unbounded};
 use notify::RecursiveMode;
 use tracing::{error, info, trace};
@@ -136,17 +136,11 @@ fn watch_krate(
 }
 
 pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()> {
-    info!("Loading workspace...");
-    let workspace = Workspace::current().unwrap();
+    let workspace = Workspace::current()?;
 
-    // Get the target package
-    info!("Getting target package...");
-    let (kid, package_name) = get_target_package(&workspace, args);
-    info!("Target package name: {package_name}");
-
-    // let target = args.target.clone().map(Target::from).unwrap_or_default();
+    let (kid, package_name) = get_target_package(&workspace, args)?;
     let target = Target::from(args.target.clone());
-    info!("Target: {target:?}");
+    tracing::debug!(?kid, %package_name, ?target, "resolved build target");
 
     info!("Watching package...");
     let (_watcher, rx) = watch_krate(&workspace, &kid);
@@ -165,8 +159,7 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
     let lib = builder
         .res_rx
         .recv_blocking()
-        .unwrap()
-        .expect("Failed on initial build");
+        .context("Build worker exited without reporting")??;
 
     let scene = match scene_name {
         Some(scene) => lib.scenes().find(|s| s.name == *scene),
