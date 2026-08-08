@@ -1,6 +1,7 @@
 use std::f64::consts::{PI, TAU};
 
 use ranim::{
+    anims::pure::{Pure, PureEval},
     color::palettes::manim,
     glam::{DMat4, DVec3},
     items::mesh::{Sphere, Surface},
@@ -15,7 +16,7 @@ struct RotateAroundZ {
     total_angle: f64,
 }
 
-impl Eval for RotateAroundZ {
+impl PureEval for RotateAroundZ {
     type Output = Surface;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -71,12 +72,12 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         .with_transform(DMat4::from_translation(left_center + *vertex));
 
         left_group.push(
-            RotateAroundZ {
+            Pure(RotateAroundZ {
                 src: surface.clone(),
                 group_center: left_center,
                 vertex_offset: *vertex,
                 total_angle: TAU,
-            }
+            })
             .apply_to(&mut surface)
             .with_duration(8.0)
             .with_rate_func(linear),
@@ -95,12 +96,12 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
         .with_transform(DMat4::from_translation(right_center + *vertex));
 
         right_group.push(
-            RotateAroundZ {
+            Pure(RotateAroundZ {
                 src: surface.clone(),
                 group_center: right_center,
                 vertex_offset: *vertex,
                 total_angle: TAU,
-            }
+            })
             .apply_to(&mut surface)
             .with_duration(8.0)
             .with_rate_func(linear),

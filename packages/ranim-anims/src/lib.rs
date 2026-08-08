@@ -1,40 +1,31 @@
 //! Ranim's built-in animations
 //!
-//! This crate contains the built-in animations for Ranim.
+//! This crate contains the built-in animations for Ranim, plus the two
+//! author-facing specializations of the general
+//! [`ranim_core::animation::Eval`] protocol:
 //!
-//! An **Animation** in ranim is basically a struct that implements the [`ranim_core::animation::Eval`] trait:
+//! - **Pure** (closed-form, stateless): implement [`pure::PureEval`] — a single
+//!   `eval_alpha(alpha)` method — and wrap it in [`pure::Pure`] to get a full
+//!   animation segment. Closures `Fn(f64) -> T` implement `PureEval`
+//!   automatically, so `Pure(|alpha| ...)` just works.
+//! - **Iterative** (stateful, stepped): implement
+//!   [`iterative::IterativeEval`] — an associated `Output` and a single
+//!   `step(&self, &mut Self::Output, &Time, &DeltaTime)` method — and pass it
+//!   with an initial state to [`iterative::Iterative::new`]. For closures, use
+//!   [`iterative::Iterative::from_fn`], which binds the closure's mutable input
+//!   through [`iterative::IterativeFn`].
+//!
+//! A built-in animation is basically a struct that implements
+//! [`pure::PureEval`], together with the data its closed form needs. Here is
+//! the example of [`pure::fading::FadeIn`]:
 //!
 //! ```rust,ignore
-//! pub trait Eval {
-//!     type Output;
-//!
-//!     /// Evaluates at the given progress value `alpha` in range [0, 1].
-//!     fn eval_alpha(&self, alpha: f64) -> Self::Output;
-//! }
-//! ```
-//!
-//! Every animation self-contains the evaluation process (the trait impl of [`ranim_core::animation::Eval::eval_alpha`])
-//! and the data that the evaluation process needs (the struct it self). Here is the example of [`fading::FadeIn`] animation:
-//!
-//! ```rust,ignore
-//! pub trait FadingRequirement: Opacity + Interpolatable + Clone {}
-//! impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
-//!
 //! pub struct FadeIn<T: FadingRequirement> {
 //!     src: T,
 //!     dst: T,
 //! }
 //!
-//! impl<T: FadingRequirement> FadeIn<T> {
-//!     pub fn new(target: T) -> Self {
-//!         let mut src = target.clone();
-//!         let dst = target.clone();
-//!         src.set_opacity(0.0);
-//!         Self { src, dst }
-//!     }
-//! }
-//!
-//! impl<T: FadingRequirement> Eval for FadeIn<T> {
+//! impl<T: FadingRequirement> PureEval for FadeIn<T> {
 //!     type Output = T;
 //!
 //!     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -43,22 +34,22 @@
 //! }
 //! ```
 //!
-//! In addition, to make the construction of anim for any type that satisfies the requirement,
-//! It is recommended to write a trait like this:
+//! In addition, to make the construction of anim for any type that satisfies
+//! the requirement, it is recommended to write a trait like this:
 //!
 //! ```rust,ignore
 //! /// The methods to create animations for `T` that satisfies [`FadingRequirement`]
 //! pub trait FadingAnim<T: FadingRequirement + 'static> {
-//!     fn fade_in(self) -> FadeIn<T>;
-//!     fn fade_out(self) -> FadeOut<T>;
+//!     fn fade_in(&mut self) -> Pure<FadeIn<T>>;
+//!     fn fade_out(&mut self) -> Pure<FadeOut<T>>;
 //! }
 //!
 //! impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
-//!     fn fade_in(self) -> FadeIn<T> {
-//!         FadeIn::new(self.clone())
+//!     fn fade_in(&mut self) -> Pure<FadeIn<T>> {
+//!         Pure(FadeIn::new(self.clone())).apply_to(self)
 //!     }
-//!     fn fade_out(self) -> FadeOut<T> {
-//!         FadeOut::new(self.clone())
+//!     fn fade_out(&mut self) -> Pure<FadeOut<T>> {
+//!         Pure(FadeOut::new(self.clone())).apply_to(self)
 //!     }
 //! }
 //! ```
@@ -70,15 +61,7 @@
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
 
-/// Creation animation
-pub mod creation;
-/// Fading animation
-pub mod fading;
-/// Func animation
-pub mod func;
-/// Lagged animation
-pub mod lagged;
-/// Morph animation
-pub mod morph;
-/// Rotating animation
-pub mod rotating;
+/// Iterative (stateful) evaluation
+pub mod iterative;
+/// Pure (closed-form) evaluation
+pub mod pure;

@@ -8,7 +8,7 @@ code = """
 //! preview Timeline.
 
 use ranim::{
-    anims::{fading::FadingAnim, morph::MorphAnim},
+    anims::pure::{fading::FadingAnim, morph::MorphAnim},
     color::palettes::manim,
     glam::{DVec3, dvec3},
     items::vitem::{VItem, geometry::Square},
@@ -127,7 +127,7 @@ fn composable_choreography(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "dfd36e700e8097bf05dcc83a1a4683170e5fc693"
+hash = "27d6e7989e0bd5e993306c39beb07adb4af4b9e4"
 preview_imgs = ["/examples/composable_choreography/preview.png"]
 output_files = ["/examples/composable_choreography/composable_choreography_1920x1080_60.mp4"]
 wasm = true

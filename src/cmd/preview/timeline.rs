@@ -504,8 +504,7 @@ impl TimelineState {
         }
 
         let indent_x = rect.left() + 6.0 + track.depth as f32 * INDENT_WIDTH;
-        let is_expandable_stack =
-            info.kind == AnimationInfoKind::Stack && !info.children.is_empty();
+        let is_expandable_stack = is_stack_like(info.kind) && !info.children.is_empty();
         let label_x = if is_expandable_stack {
             let marker = if self.expanded.contains(&track.path) {
                 egui_phosphor::regular::CARET_DOWN
@@ -745,10 +744,7 @@ impl TimelineState {
                 self.selected = Some(clip.path.clone());
             }
 
-            if info.kind == AnimationInfoKind::Stack
-                && !info.children.is_empty()
-                && clip.path != track.path
-            {
+            if is_stack_like(info.kind) && !info.children.is_empty() && clip.path != track.path {
                 let marker = if self.expanded.contains(&clip.path) {
                     egui_phosphor::regular::CARET_DOWN
                 } else {
@@ -870,7 +866,7 @@ impl TimelineState {
             }
         }
 
-        let label_inset = if info.kind == AnimationInfoKind::Stack && !info.children.is_empty() {
+        let label_inset = if is_stack_like(info.kind) && !info.children.is_empty() {
             17.0
         } else {
             5.0
@@ -901,7 +897,7 @@ impl TimelineState {
     ) {
         for clip in &track.clips {
             let info = animation_info_at_path(&self.animation_infos, &clip.path);
-            if info.kind != AnimationInfoKind::Stack || !self.expanded.contains(&clip.path) {
+            if !is_stack_like(info.kind) || !self.expanded.contains(&clip.path) {
                 continue;
             }
 
@@ -924,7 +920,7 @@ impl TimelineState {
                 + HEADER_HEIGHT
                 + last_descendant as f32 * (TRACK_HEIGHT + TRACK_GAP)
                 + TRACK_HEIGHT;
-            let color = animation_color(AnimationInfoKind::Stack).gamma_multiply(0.48);
+            let color = animation_color(info.kind).gamma_multiply(0.48);
             for sec in [clip.global_range.start, clip.global_range.end] {
                 let x = self.x_from_sec(time_rect, sec);
                 if time_rect.left() <= x && x <= time_rect.right() {
@@ -1006,10 +1002,10 @@ fn collect_default_expanded(
 ) {
     for (index, info) in infos.iter().enumerate() {
         path.push(index);
-        if info.kind == AnimationInfoKind::Stack && !info.children.is_empty() && stack_depth < 2 {
+        if is_stack_like(info.kind) && !info.children.is_empty() && stack_depth < 2 {
             expanded.insert(path.clone());
         }
-        let next_stack_depth = stack_depth + usize::from(info.kind == AnimationInfoKind::Stack);
+        let next_stack_depth = stack_depth + usize::from(is_stack_like(info.kind));
         collect_default_expanded(&info.children, path, next_stack_depth, expanded);
         path.pop();
     }
@@ -1067,7 +1063,7 @@ fn collect_tracks(
                 }
             }
         }
-        AnimationInfoKind::Stack => {
+        AnimationInfoKind::Stack | AnimationInfoKind::Lagged => {
             output.push(VisibleTrack {
                 path: path.clone(),
                 depth,
@@ -1142,7 +1138,7 @@ fn collect_sequence_content(
                 global_range: child_range.clone(),
                 sequence_depth,
             });
-            if child.kind == AnimationInfoKind::Stack && expanded.contains(path) {
+            if is_stack_like(child.kind) && expanded.contains(path) {
                 expanded_stacks.push(ExpandedStack {
                     path: path.clone(),
                     global_range: child_range,
@@ -1196,6 +1192,14 @@ fn display_anim_name(info: &AnimationInfo) -> &str {
 }
 
 fn short_anim_name(name: &str) -> &str {
+    // Trim the Pure<...>/Iterative<...> adapter wrappers to show the inner type.
+    let name = [
+        "ranim_anims::pure::Pure<",
+        "ranim_anims::iterative::Iterative<",
+    ]
+    .iter()
+    .find_map(|prefix| name.strip_prefix(prefix).and_then(|s| s.strip_suffix('>')))
+    .unwrap_or(name);
     let outer_type = name.split('<').next().unwrap_or(name);
     let short = outer_type.rsplit("::").next().unwrap_or(outer_type);
     if short == "{{closure}}" {
@@ -1210,7 +1214,7 @@ fn preferred_tree_width(infos: &[AnimationInfo]) -> f32 {
         for info in infos {
             if info.kind != AnimationInfoKind::Sequence || !info.children.is_empty() {
                 let indent = stack_depth as f32 * INDENT_WIDTH;
-                let toggle = if info.kind == AnimationInfoKind::Stack && !info.children.is_empty() {
+                let toggle = if is_stack_like(info.kind) && !info.children.is_empty() {
                     20.0
                 } else {
                     4.0
@@ -1219,7 +1223,7 @@ fn preferred_tree_width(infos: &[AnimationInfo]) -> f32 {
                 let duration_column = 54.0;
                 *widest = widest.max(6.0 + indent + toggle + label + duration_column);
             }
-            let child_depth = stack_depth + usize::from(info.kind == AnimationInfoKind::Stack);
+            let child_depth = stack_depth + usize::from(is_stack_like(info.kind));
             required_width(&info.children, child_depth, widest);
         }
     }
@@ -1237,11 +1241,18 @@ fn animation_color_for_info(info: &AnimationInfo) -> Color32 {
     }
 }
 
+/// Stack-like overlay containers (stack, lagged) share the tree display logic:
+/// expandable children, rails, and depth indentation.
+fn is_stack_like(kind: AnimationInfoKind) -> bool {
+    matches!(kind, AnimationInfoKind::Stack | AnimationInfoKind::Lagged)
+}
+
 fn animation_color(kind: AnimationInfoKind) -> Color32 {
     let rgba = match kind {
         AnimationInfoKind::Eval => manim::BLUE_C.to_rgba8(),
         AnimationInfoKind::Sequence => manim::TEAL_C.to_rgba8(),
         AnimationInfoKind::Stack => manim::ORANGE.to_rgba8(),
+        AnimationInfoKind::Lagged => manim::PURPLE_C.to_rgba8(),
         AnimationInfoKind::Static => manim::YELLOW_C.to_rgba8(),
     };
     Rgba::from_srgba_unmultiplied(rgba.r, rgba.g, rgba.b, rgba.a).into()

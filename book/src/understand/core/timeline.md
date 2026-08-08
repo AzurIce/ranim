@@ -117,6 +117,38 @@ for animation in animations {
 r.play(layers);
 ```
 
+## `AnimLagged`
+
+`AnimLagged` 把一组**未放置**（`Placeable`）的子动画按 stagger 规则相继排布：第 `i` 个子动画的起点是 `start_{i-1} + lag_ratio · d_{i-1}`。`lag_ratio` 插值在两种容器语义之间：
+
+- `0.0` —— 所有子动画同时开始（类似 `AnimStack`）；
+- `1.0` —— 首尾相接（类似 `AnimSequence`）；
+- 中间值 —— 重叠相继。
+
+```rust,ignore
+let animation = lagged![0.2;
+    square.fade_in(),
+    circle.fade_in(),
+    text.write(),
+];
+r.play(animation);
+```
+
+子动画窗口之外的时间默认由**真实的静态动画**填充：每个元素在 build 时被物化为一条 `[前填充][动画][后填充]` 的 per-item `AnimSequence` 轨道（前=初态，后=末态，采样自窗口边缘，空的填充会被跳过），因此 preview 时间线看到的就是实际渲染的内容，没有隐藏的求值规则。每端的行为可以用 `with_leading`/`with_trailing` 配置（`LaggedFill::{Hold, Empty}`，默认都是 `Hold`）；若希望元素在窗口结束后消失，让它的动画以 `hide` 结尾即可（如 `seq![item.fade_in(), item.hide()]`）。
+
+填充在 build 时采样，因此子动画应当是纯（闭式）动画——迭代式子动画的末态填充会得到其初态。
+
+对一组元素施加同一个动画时，用迭代器收集（core 的 `AnimIterExt`）：
+
+```rust,ignore
+let animation = group
+    .iter_mut()
+    .map(|item| item.fade_in().with_rate_func(smooth))
+    .into_lagged(0.2);
+```
+
+迭代器还可以收集为另外两个容器：`into_stack()`/`into_seq()`，或直接 `collect::<AnimStack>()`/`collect::<AnimSequence>()`。
+
 ## 场景时长与显式生命周期
 
 Scene 总时长是根 Stack 中最长子动画的 duration。新模型不会像旧 Timeline 那样在 seal 时自动把静态物件和相机延长到 Scene 结束。
@@ -137,7 +169,7 @@ r.play(content);
 
 这种写法使空白和保持区间成为动画定义的一部分。后续可以增加默认相机或 `through_scene_end` 等辅助 API，但它们不改变 Sequence/Stack 的组合语义。
 
-## `seq!` 与 `stack!`
+## `seq!`、`stack!` 与 `lagged!`
 
 固定写法可以使用宏简化：
 
@@ -151,4 +183,4 @@ let scene = stack![intro, camera];
 r.play(scene);
 ```
 
-`seq!` 返回 `AnimSequence`，`stack!` 返回 `AnimStack`。二者都只是构造辅助，最终 build 为保留子节点层级的运行时动画树。
+`seq!` 返回 `AnimSequence`，`stack!` 返回 `AnimStack`。二者都只是构造辅助，最终 build 为保留子节点层级的运行时动画树。`lagged![0.2; a, b, c]` 以 0.2 的 stagger ratio 返回 `AnimLagged`（见上文）。

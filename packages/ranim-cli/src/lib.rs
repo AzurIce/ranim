@@ -224,10 +224,11 @@ impl RanimUserLibrary {
 
 impl Drop for RanimUserLibrary {
     fn drop(&mut self) {
-        println!("Dropping RanimUserLibrary...");
-
+        tracing::debug!(?self.temp_path, "dropping user library");
         drop(self.inner.take());
-        std::fs::remove_file(&self.temp_path).unwrap();
+        if let Err(err) = std::fs::remove_file(&self.temp_path) {
+            tracing::warn!("failed to remove temp dylib {:?}: {err}", self.temp_path);
+        }
     }
 }
 
@@ -388,5 +389,8 @@ pub fn init_tracing() {
 pub fn main() {
     use clap::Parser;
     init_tracing();
-    Cli::parse().run().unwrap();
+    if let Err(err) = Cli::parse().run() {
+        error!("{err:#}");
+        std::process::exit(1);
+    }
 }

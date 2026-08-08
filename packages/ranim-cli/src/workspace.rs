@@ -5,7 +5,7 @@ use ignore::gitignore::Gitignore;
 use krates::{Kid, KrateDetails, Krates};
 use tracing::{debug, error};
 
-use crate::cli::CliArgs;
+use crate::{Target, cli::CliArgs};
 
 pub struct Workspace {
     pub krates: Krates,
@@ -118,25 +118,71 @@ impl Workspace {
 
         Ok(kid.clone())
     }
+
+    /// Find the workspace member that declares an example target named `example_name`.
+    ///
+    /// Unlike [`main_package`](Self::main_package) (which resolves from the
+    /// current directory), this searches by target name, so building an
+    /// `--example` works from any directory inside the workspace.
+    pub fn get_example_package(&self, example_name: &str) -> Result<Kid> {
+        let kid = self.krates.workspace_members().find_map(|node| {
+            if let krates::Node::Krate { id, krate, .. } = node
+                && krate.targets.iter().any(|target| {
+                    target.kind.contains(&krates::cm::TargetKind::Example)
+                        && target.name == example_name
+                })
+            {
+                return Some(id);
+            }
+            None
+        });
+
+        kid.cloned().with_context(|| {
+            let examples = self
+                .krates
+                .workspace_members()
+                .filter_map(|node| match node {
+                    krates::Node::Krate { krate, .. } => Some(
+                        krate
+                            .targets
+                            .iter()
+                            .filter(|target| {
+                                target.kind.contains(&krates::cm::TargetKind::Example)
+                            })
+                            .map(|target| target.name.clone())
+                            .collect::<Vec<_>>(),
+                    ),
+                    _ => None,
+                })
+                .flatten()
+                .collect::<Vec<_>>();
+            format!(
+                "Failed to find an example target named `{example_name}` in the workspace.\nAvailable examples: {examples:?}"
+            )
+        })
+    }
 }
 
 /// Get the target package.
 ///
 /// This combines the info from args and workspace:
 /// - If `--package` is specified, use that.
-/// - Otherwise, use workspace's main package.
-pub fn get_target_package(workspace: &Workspace, args: &CliArgs) -> (Kid, String) {
+/// - If the target is an example, resolve the package that declares it.
+/// - Otherwise, use workspace's main package (resolved from the current dir).
+pub fn get_target_package(workspace: &Workspace, args: &CliArgs) -> Result<(Kid, String)> {
     let kid = if let Some(package) = args.package.as_ref() {
         workspace.get_package(package)
     } else {
-        workspace.main_package()
-    }
-    .expect("no package");
+        match Target::from(args.target.clone()) {
+            Target::Lib => workspace.main_package(),
+            Target::Example(name) => workspace.get_example_package(&name),
+        }
+    }?;
     let package_name =
         if let krates::Node::Krate { krate, .. } = workspace.krates.node_for_kid(&kid).unwrap() {
             krate.name.to_string()
         } else {
             unreachable!()
         };
-    (kid, package_name)
+    Ok((kid, package_name))
 }

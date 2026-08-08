@@ -4,7 +4,7 @@ use std::f64::consts::PI;
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
 use ranim::{
-    anims::{creation::WritingAnim, lagged::LaggedAnim, morph::MorphAnim},
+    anims::pure::{creation::WritingAnim, morph::MorphAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -132,7 +132,9 @@ fn ranim_logo(r: &mut RanimScene) {
     let mut text_sequence = AnimSequence::new();
     text_sequence.forward(3.5).push(
         ranim_text
-            .lagged(0.2, |item| item.write())
+            .iter_mut()
+            .map(|item| item.write())
+            .into_lagged(0.2)
             .with_duration(2.0),
     );
 
@@ -155,7 +157,12 @@ fn ranim_logo(r: &mut RanimScene) {
     logo_parts.iter_mut().for_each(|(sequence, item)| {
         sequence.push(item.unwrite().with_duration(3.0).with_rate_func(smooth));
     });
-    text_sequence.push(ranim_text.lagged(0.0, |item| item.unwrite()));
+    text_sequence.push(
+        ranim_text
+            .iter_mut()
+            .map(|item| item.unwrite())
+            .into_lagged(0.0),
+    );
 
     let total_secs = logo_parts
         .iter()

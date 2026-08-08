@@ -19,6 +19,7 @@ use crate::{
     Extract, SealedRanimScene, TimeMark,
     animation::{AnimationCell, AnimationInfo},
     core_item::CoreItem,
+    time::GlobalTime,
 };
 
 /// A reusable frame-local output buffer of `((animation_id, part), CoreItem)`.
@@ -87,8 +88,14 @@ impl SceneEvaluator {
             let prev_tick_secs = self.clock;
             let tick_secs = prev_tick_secs + 1.0 / self.logic_fps;
             self.clock = tick_secs;
+            // The global channel is born here and forwarded unchanged through
+            // the whole step recursion, so nested segments see true global time.
+            let global = GlobalTime {
+                secs: tick_secs,
+                delta_secs: 1.0 / self.logic_fps,
+            };
             for cell in &mut self.cells {
-                cell.step_at_sec(tick_secs, prev_tick_secs);
+                cell.step_at_sec(tick_secs, prev_tick_secs, &global);
             }
         }
         self.clock = target;
@@ -114,7 +121,7 @@ impl SceneEvaluator {
                 continue;
             }
             let mut items = Vec::new();
-            cell.sample_at_sec(self.clock, &mut items);
+            cell.sample_at_sec(self.clock, self.clock, &mut items);
             for (part, item) in items
                 .into_iter()
                 .flat_map(|item| item.extract())
@@ -131,21 +138,27 @@ mod tests {
     use super::*;
     use crate::{
         RanimScene,
-        animation::{AnimationExt, Eval, Placeable, SegmentTime},
+        animation::{AnimationExt, Eval, Placeable},
         core_item::vitem::VItem,
         seq,
+        time::{DeltaTime, Time},
     };
 
     /// A constant-velocity iterative segment: x accumulates with local time.
+    ///
+    /// Its logical duration is a construction parameter: the cell's
+    /// `with_duration` only stretches playback, while `logical_secs` decides
+    /// how much local time the whole segment integrates over.
     struct ConstantVelocity {
         v: f64,
         x: f64,
+        logical_secs: f64,
     }
 
     impl Eval for ConstantVelocity {
         type Output = VItem;
 
-        fn sample(&self, _time: &SegmentTime) -> VItem {
+        fn sample(&self, _time: &Time) -> VItem {
             let mut item = VItem::default();
             item.points[0].x = self.x as f32;
             item
@@ -155,9 +168,26 @@ mod tests {
             self.x = 0.0;
         }
 
-        fn step(&mut self, time: &SegmentTime) {
-            self.x += self.v * time.local_delta_secs;
+        fn step(&mut self, _time: &Time, delta_time: &DeltaTime) {
+            self.x += self.v * delta_time.alpha * self.logical_secs;
         }
+    }
+
+    /// A stateless segment: x = alpha.
+    struct ProgressX;
+
+    impl Eval for ProgressX {
+        type Output = VItem;
+
+        fn sample(&self, time: &Time) -> VItem {
+            let mut item = VItem::default();
+            item.points[0].x = time.alpha as f32;
+            item
+        }
+
+        fn reset(&mut self) {}
+
+        fn step(&mut self, _time: &Time, _delta_time: &DeltaTime) {}
     }
 
     fn xs_of(frame: &EvaluatedFrame) -> Vec<f32> {
@@ -173,14 +203,7 @@ mod tests {
     #[test]
     fn functional_scene_matches_pure_eval() {
         let mut scene = RanimScene::new();
-        scene.play(
-            (move |alpha| {
-                let mut item = VItem::default();
-                item.points[0].x = alpha as f32;
-                item
-            })
-            .with_duration(2.0),
-        );
+        scene.play(ProgressX.with_duration(2.0));
         let sealed = scene.seal();
 
         let mut ev = SceneEvaluator::new(sealed, 120.0);
@@ -188,7 +211,7 @@ mod tests {
             let mut frame = EvaluatedFrame::new();
             ev.advance_to(sec);
             ev.sample_into(&mut frame);
-            // Pure path value at the same time (rate = linear, alpha = sec/2)
+            // Expected value at the same time (rate = linear, alpha = sec/2)
             let expected = (sec / 2.0) as f32;
             let got = xs_of(&frame);
             assert_eq!(got, vec![expected], "at sec={sec}");
@@ -199,9 +222,13 @@ mod tests {
     fn iterative_segment_steps_along_logic_grid() {
         let mut scene = RanimScene::new();
         scene.play(
-            ConstantVelocity { v: 1.0, x: 0.0 }
-                .with_duration(2.0)
-                .at(0.0),
+            ConstantVelocity {
+                v: 1.0,
+                x: 0.0,
+                logical_secs: 2.0,
+            }
+            .with_duration(2.0)
+            .at(0.0),
         );
         let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
 
@@ -218,9 +245,13 @@ mod tests {
         fn build_scene() -> SealedRanimScene {
             let mut scene = RanimScene::new();
             scene.play(
-                ConstantVelocity { v: 2.0, x: 0.0 }
-                    .with_duration(3.0)
-                    .at(0.0),
+                ConstantVelocity {
+                    v: 2.0,
+                    x: 0.0,
+                    logical_secs: 3.0,
+                }
+                .with_duration(3.0)
+                .at(0.0),
             );
             scene.seal()
         }
@@ -253,8 +284,18 @@ mod tests {
         let mut scene = RanimScene::new();
         scene.play(
             seq![
-                ConstantVelocity { v: 1.0, x: 0.0 }.with_duration(1.0),
-                ConstantVelocity { v: 1.0, x: 0.0 }.with_duration(1.0),
+                ConstantVelocity {
+                    v: 1.0,
+                    x: 0.0,
+                    logical_secs: 1.0,
+                }
+                .with_duration(1.0),
+                ConstantVelocity {
+                    v: 1.0,
+                    x: 0.0,
+                    logical_secs: 1.0,
+                }
+                .with_duration(1.0),
             ]
             .at(0.0),
         );
@@ -272,5 +313,50 @@ mod tests {
         ev.advance_to(2.0);
         ev.sample_into(&mut frame);
         assert_eq!(xs_of(&frame), vec![1.0]);
+    }
+
+    #[test]
+    fn seek_resets_iterative_leaves_nested_in_containers() {
+        fn build_scene() -> SealedRanimScene {
+            let mut scene = RanimScene::new();
+            scene.play(
+                seq![
+                    ConstantVelocity {
+                        v: 1.0,
+                        x: 0.0,
+                        logical_secs: 1.0,
+                    }
+                    .with_duration(1.0),
+                    ConstantVelocity {
+                        v: 1.0,
+                        x: 0.0,
+                        logical_secs: 1.0,
+                    }
+                    .with_duration(1.0),
+                ]
+                .at(0.0),
+            );
+            scene.seal()
+        }
+
+        let run = |seek_first: bool| {
+            let mut ev = SceneEvaluator::new(build_scene(), 120.0);
+            let mut trace = Vec::new();
+            for sec in [0.3, 0.7, 1.1, 1.5, 1.9] {
+                if seek_first {
+                    ev.seek(sec);
+                } else {
+                    ev.advance_to(sec);
+                }
+                let mut frame = EvaluatedFrame::new();
+                ev.sample_into(&mut frame);
+                trace.push(xs_of(&frame));
+            }
+            trace
+        };
+
+        // Without a recursive `reset_entered`, a nested leaf keeps its state
+        // across seek and accumulates on top of the previous run.
+        assert_eq!(run(false), run(true));
     }
 }

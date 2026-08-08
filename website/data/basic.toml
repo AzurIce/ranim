@@ -5,7 +5,7 @@ use ranim::glam;
 
 use glam::DVec3;
 use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, lagged::LaggedAnim},
+    anims::pure::{creation::WritingAnim, fading::FadingAnim},
     color::palettes::manim,
     core::animation::StaticAnim,
     items::vitem::{VItem, svg::SvgItem, typst::typst_svg},
@@ -47,11 +47,10 @@ fn basic(r: &mut RanimScene) {
 
     let mut text_sequence = AnimSequence::new();
     text_sequence.hold(0.2).push(
-        text.lagged(0.2, |item| {
-            let animation = item.write();
-            move |alpha| animation.eval_alpha(smooth(alpha))
-        })
-        .with_duration(3.0),
+        text.iter_mut()
+            .map(|item| item.write().with_rate_func(smooth))
+            .into_lagged(0.2)
+            .with_duration(3.0),
     );
 
     let total_secs = svg_sequence.cursor_sec().max(text_sequence.cursor_sec());
@@ -61,7 +60,7 @@ fn basic(r: &mut RanimScene) {
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "764e53090c2f1a9034df486674a3ecbd175d9d42"
+hash = "54460d3f0b1da74dbc4bede4b2815fe54e5c7ead"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/basic_1920x1080_60.mp4"]
 wasm = true

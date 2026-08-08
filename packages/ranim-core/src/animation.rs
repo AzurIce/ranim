@@ -4,114 +4,93 @@ use std::{any::type_name, fmt::Debug, ops::Range};
 
 use crate::{
     core_item::{AnyExtractCoreItem, DynItem},
+    time::{DeltaTime, GlobalTime, Time},
     utils::rate_functions::linear,
 };
 
-/// A normalized animation evaluator.
+/// The general animation segment protocol: what the runtime can do with a segment.
 ///
-/// Functional (closed-form) segments implement [`Eval::eval_alpha`]; the other
-/// methods default appropriately. Iterative (stateful) segments implement
-/// [`Eval::sample`]/[`Eval::reset`]/[`Eval::step`] instead — `eval_alpha` has
-/// no closed form and its default panics if called.
+/// This is the only protocol the runtime drives. Author-facing specializations
+/// live in `ranim-anims` (the `PureEval`/`IterativeEval` capability traits with
+/// their `Pure`/`Iterative` adapter structs); implementing `Eval` directly is
+/// the path for exotic segments. All three evaluation methods are required —
+/// a stateful segment that forgets `reset` fails to compile instead of
+/// silently breaking replay determinism.
+///
+/// How the protocol serves the outer layers:
+///
+/// - render's per-frame sampling and the pure query path both ride
+///   [`sample`](Eval::sample) (a pure segment's closed form *is* its `sample`);
+/// - [`SceneEvaluator::advance_to`](crate::SceneEvaluator::advance_to) drives
+///   `step` tick by tick;
+/// - [`SceneEvaluator::seek`](crate::SceneEvaluator::seek) (preview scrubbing)
+///   resets everything, then replays `step` — seek is a session-level
+///   composite, not a segment method.
 pub trait Eval {
     /// Value produced by this evaluator.
     type Output;
 
-    /// Evaluate the animation at a normalized progress in `[0, 1]`.
-    /// Functional segments implement this; iterative segments have no closed
-    /// form and the default panics (the runtime drives them via `sample`).
-    fn eval_alpha(&self, _alpha: f64) -> Self::Output {
-        unreachable!("iterative segment has no closed form; drive it via `sample`/`step`")
-    }
-
-    /// Sample the current state at the given time context.
-    /// Functional default = eval_alpha(time.alpha); iterative segments
-    /// implement this to return their current state.
-    fn sample(&self, time: &SegmentTime) -> Self::Output {
-        self.eval_alpha(time.alpha)
-    }
+    /// Sample the output at the current time point.
+    ///
+    /// `time.alpha` is the segment's rate-warped progress computed by the
+    /// owning cell; a stateful segment typically ignores it and projects its
+    /// current state. Sampling never advances state and carries no deltas.
+    fn sample(&self, time: &Time) -> Self::Output;
 
     /// Reset to the segment's initial state (deterministic contract: no wall
-    /// clock, no unseeded RNG). No-op by default.
-    fn reset(&mut self) {}
+    /// clock, no unseeded RNG). Stateless segments leave this empty.
+    fn reset(&mut self);
 
-    /// Advance one logic step (or substep); `time.local_delta_secs` is the
-    /// integration step. No-op by default (functional segments are stepped as
-    /// no-ops for free; sampling is unaffected).
-    fn step(&mut self, _time: &SegmentTime) {}
+    /// Advance one logic step. `delta_time.alpha` is the integration step in
+    /// the segment's warped local progress (variable under a non-linear rate);
+    /// `delta_time.global_secs` is the unwarped global step (`1 / logic_fps`)
+    /// for real-time physics. Stateless segments leave this empty.
+    fn step(&mut self, time: &Time, delta_time: &DeltaTime);
 
-    /// Apply the final state and return this evaluator.
+    /// Write the state at `alpha` into `item` and return this evaluator.
+    ///
+    /// A build-time convenience defined through `sample` (the constructed
+    /// `Time` has `global_secs == 0.0`): pure segments apply their closed-form
+    /// state; stateful segments apply their current projected state (the
+    /// initial state if never stepped).
+    fn apply_alpha_to(self, item: &mut Self::Output, alpha: f64) -> Self
+    where
+        Self: Sized,
+    {
+        *item = self.sample(&Time {
+            alpha,
+            global_secs: 0.0,
+        });
+        self
+    }
+
+    /// Write the end state (`alpha == 1.0`) into `item` and return this evaluator.
     fn apply_to(self, item: &mut Self::Output) -> Self
     where
         Self: Sized,
     {
         self.apply_alpha_to(item, 1.0)
     }
-
-    /// Apply a sampled state and return this evaluator.
-    fn apply_alpha_to(self, item: &mut Self::Output, alpha: f64) -> Self
-    where
-        Self: Sized,
-    {
-        *item = self.eval_alpha(alpha);
-        self
-    }
 }
 
-impl<T, F> Eval for F
-where
-    F: Fn(f64) -> T,
-{
-    type Output = T;
-
-    fn eval_alpha(&self, alpha: f64) -> Self::Output {
-        (self)(alpha)
-    }
-}
-
-/// A complete time context for one evaluation/step of an animation segment.
-///
-/// All time values are in seconds (`_secs`); `alpha` is normalized to `[0, 1]`.
-/// Deltas are only meaningful during [`Eval::step`]; during sampling they are zero.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct SegmentTime {
-    /// Global scene time `t` at the current logic tick (seconds).
-    pub global_secs: f64,
-    /// Global logic step length, stable (`= 1 / logic_fps`).
-    pub global_delta_secs: f64,
-    /// Segment start `s` in its parent's coordinates (seconds).
-    pub start_secs: f64,
-    /// Segment duration `D` (seconds).
-    pub duration_secs: f64,
-    /// Rate-warped local time `u(t) = D · r((t−s)/D)` (seconds).
-    pub local_secs: f64,
-    /// Local increment `Δu` for this step, varies with the rate function (seconds).
-    pub local_delta_secs: f64,
-    /// Normalized progress `alpha = local_secs / D`.
-    pub alpha: f64,
-    /// Current render frame index (for frame-coupled segments).
-    pub render_frame: u64,
-    /// Whether this logic step completes a render frame (for frame-coupled segments).
-    pub is_render_frame_boundary: bool,
-}
-
-/// An auto implemented trait for erasing Evaluator<Output = T> where T: AnyExtractCoreItem
+/// An auto implemented trait for erasing `Eval<Output = T>` where T: AnyExtractCoreItem
 trait EvalDyn {
-    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>);
-
-    /// Sample at a full time context. Default rides the pure alpha path for
-    /// containers and functional leaves; iterative leaves override it via the
-    /// blanket impl below.
-    fn sample_dyn(&self, time: &SegmentTime, output: &mut Vec<DynItem>) {
-        self.eval_alpha_dyn_into(time.alpha, output);
-    }
+    /// Sample into erased items. The only erased read path: pure leaves
+    /// evaluate their closed form, stateful leaves project current state,
+    /// containers route `time.alpha` into their content coordinates.
+    fn sample_dyn(&self, time: &Time, output: &mut Vec<DynItem>);
 
     /// Reset the internal state. No-op by default.
     fn reset_dyn(&mut self) {}
 
-    /// Advance one logic step. No-op by default (functional segments and
-    /// containers without iterative leaves step for free).
-    fn step_dyn(&mut self, _time: &SegmentTime) {}
+    /// Advance one logic step. No-op by default (`StaticDynItems` has nothing
+    /// to advance); containers override to forward stepping to their children.
+    fn step_dyn(&mut self, _time: &Time, _delta_time: &DeltaTime) {}
+
+    /// Mark all descendant cells as not yet entered, so their next activation
+    /// resets again (used by `SceneEvaluator::seek`). Containers override to
+    /// recurse; leaves have no children.
+    fn reset_entered_dyn(&mut self) {}
 
     fn info_kind(&self) -> AnimationInfoKind {
         AnimationInfoKind::Eval
@@ -129,7 +108,7 @@ trait EvalDyn {
 struct StaticDynItems(Vec<DynItem>);
 
 impl EvalDyn for StaticDynItems {
-    fn eval_alpha_dyn_into(&self, _alpha: f64, output: &mut Vec<DynItem>) {
+    fn sample_dyn(&self, _time: &Time, output: &mut Vec<DynItem>) {
         output.extend(self.0.iter().cloned());
     }
 
@@ -147,13 +126,7 @@ where
     E: Eval,
     E::Output: AnyExtractCoreItem,
 {
-    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        // Pure path (eval_at_sec) only supports functional segments; iterative
-        // segments have no closed form and must be driven via SceneEvaluator.
-        output.push(DynItem(Box::new(self.eval_alpha(alpha))));
-    }
-
-    fn sample_dyn(&self, time: &SegmentTime, output: &mut Vec<DynItem>) {
+    fn sample_dyn(&self, time: &Time, output: &mut Vec<DynItem>) {
         output.push(DynItem(Box::new(self.sample(time))));
     }
 
@@ -161,8 +134,8 @@ where
         Eval::reset(self);
     }
 
-    fn step_dyn(&mut self, time: &SegmentTime) {
-        Eval::step(self, time);
+    fn step_dyn(&mut self, time: &Time, delta_time: &DeltaTime) {
+        Eval::step(self, time, delta_time);
     }
 }
 
@@ -175,6 +148,8 @@ pub enum AnimationInfoKind {
     Sequence,
     /// An overlay animation container.
     Stack,
+    /// A lagged (staggered, end-held) animation container.
+    Lagged,
     /// A captured, type-erased static output batch.
     Static,
 }
@@ -240,54 +215,51 @@ impl AnimationCell {
         sec >= self.time_range.start && sec <= self.time_range.end
     }
 
-    /// Compute the time context in this cell's local coordinates.
-    fn local_time(&self, sec: f64, prev_sec: f64) -> SegmentTime {
+    /// Compute the rate-warped progress in this cell's local coordinates.
+    ///
+    /// The cell owns the time configuration (start, duration, rate function)
+    /// and turns it into a reading; evaluators never see the configuration
+    /// itself. A zero-duration cell reports `alpha == 1.0`.
+    fn local_alpha(&self, sec: f64) -> f64 {
         let duration = self.duration_secs();
-        let alpha = if duration == 0.0 {
+        let raw = if duration == 0.0 {
             1.0
         } else {
             (sec - self.time_range.start) / duration
         };
-        let prev_alpha = if duration == 0.0 {
-            1.0
-        } else {
-            (prev_sec - self.time_range.start) / duration
-        };
-        let rate_alpha = (self.rate_func)(alpha);
-        let rate_prev = (self.rate_func)(prev_alpha);
-        SegmentTime {
-            global_secs: sec,
-            global_delta_secs: sec - prev_sec,
-            start_secs: self.time_range.start,
-            duration_secs: duration,
-            local_secs: rate_alpha * duration,
-            local_delta_secs: (rate_alpha - rate_prev) * duration,
-            alpha: rate_alpha,
-            render_frame: 0,
-            is_render_frame_boundary: false,
-        }
+        (self.rate_func)(raw)
     }
 
-    /// Mark this clip as not yet entered (used by `SceneEvaluator::seek`).
+    /// Mark this clip and all its descendants as not yet entered (used by
+    /// `SceneEvaluator::seek`).
     pub(crate) fn reset_entered(&mut self) {
         self.entered = false;
+        self.inner.reset_entered_dyn();
     }
 
     /// Sample this clip at a scene time (pure; no tick advancement).
-    pub(crate) fn sample_at_sec(&self, sec: f64, output: &mut Vec<DynItem>) {
+    ///
+    /// `global_secs` is the true scene time, forwarded into the sampled
+    /// [`Time`] unchanged.
+    pub(crate) fn sample_at_sec(&self, sec: f64, global_secs: f64, output: &mut Vec<DynItem>) {
         if !self.active_at(sec) || !self.enabled {
             return;
         }
-        let time = self.local_time(sec, sec);
+        let time = Time {
+            alpha: self.local_alpha(sec),
+            global_secs,
+        };
         self.inner.sample_dyn(&time, output);
     }
 
     /// Advance this clip's inner state along the logic grid.
     ///
     /// Resets the inner state on first activation (deterministic replay), then
-    /// steps it with the rate-warped local delta. Functional leaves and
-    /// containers without iterative content step as no-ops.
-    pub(crate) fn step_at_sec(&mut self, sec: f64, prev_sec: f64) {
+    /// steps it with the rate-warped local delta; stateless leaves step as
+    /// no-ops. `global` is forwarded unchanged from the driving session, so
+    /// [`Time::global_secs`]/[`DeltaTime::global_secs`] stay honest at any
+    /// nesting depth.
+    pub(crate) fn step_at_sec(&mut self, sec: f64, prev_sec: f64, global: &GlobalTime) {
         if !self.active_at(sec) || !self.enabled {
             return;
         }
@@ -295,37 +267,16 @@ impl AnimationCell {
             self.inner.reset_dyn();
             self.entered = true;
         }
-        let time = self.local_time(sec, prev_sec);
-        self.inner.step_dyn(&time);
-    }
-
-    /// Append normalized evaluation results after applying this node's rate function.
-    pub fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        if self.enabled {
-            self.inner
-                .eval_alpha_dyn_into((self.rate_func)(alpha), output);
-        }
-    }
-
-    /// Evaluate normalized progress into a flat collection of scene items.
-    pub fn eval_alpha_dyn(&self, alpha: f64) -> Vec<DynItem> {
-        let mut output = Vec::new();
-        self.eval_alpha_dyn_into(alpha, &mut output);
-        output
-    }
-
-    /// Evaluate at a time contained in this clip's inclusive range.
-    pub fn eval_at_sec(&self, sec: f64) -> Option<Vec<DynItem>> {
-        if sec < self.time_range.start || sec > self.time_range.end {
-            return None;
-        }
-        let duration = self.duration_secs();
-        let alpha = if duration == 0.0 {
-            1.0
-        } else {
-            (sec - self.time_range.start) / duration
+        let alpha = self.local_alpha(sec);
+        let time = Time {
+            alpha,
+            global_secs: global.secs,
         };
-        Some(self.eval_alpha_dyn(alpha))
+        let delta_time = DeltaTime {
+            alpha: alpha - self.local_alpha(prev_sec),
+            global_secs: global.delta_secs,
+        };
+        self.inner.step_dyn(&time, &delta_time);
     }
 
     fn contains_sec(&self, sec: f64, parent_duration: f64) -> bool {
@@ -503,22 +454,6 @@ fn assert_valid_duration(duration_secs: f64) {
     );
 }
 
-/// Map a cell-local time context into a container's content coordinates.
-///
-/// The cell wrapping the container applies its own rate function; the content
-/// position is `content_duration · (local_secs / cell_duration)`, mirroring the
-/// pure path's `content_secs = cursor · rate(alpha)` mapping.
-fn map_content_time(time: &SegmentTime, content_duration: f64) -> (f64, f64) {
-    let cell_duration = time.duration_secs;
-    if cell_duration <= 0.0 {
-        return (0.0, 0.0);
-    }
-    let content_sec = content_duration * (time.local_secs / cell_duration);
-    let prev_content_sec =
-        content_duration * ((time.local_secs - time.local_delta_secs) / cell_duration);
-    (content_sec, prev_content_sec)
-}
-
 /// Dynamic sequential animation container.
 ///
 /// `push` erases each direct child's Rust type while retaining its runtime
@@ -535,14 +470,14 @@ impl AnimSequence {
         Self::default()
     }
 
-    fn eval_at_sec_into(&self, target_sec: f64, output: &mut Vec<DynItem>) {
+    fn sample_at_content_sec(&self, target_sec: f64, global_secs: f64, output: &mut Vec<DynItem>) {
         if let Some(animation) = self
             .animations
             .iter()
             .rev()
             .find(|animation| animation.contains_sec(target_sec, self.cursor_sec))
         {
-            animation.sample_at_sec(target_sec, output);
+            animation.sample_at_sec(target_sec, global_secs, output);
         }
     }
 
@@ -599,17 +534,11 @@ impl AnimSequence {
         }
 
         let mut state = Vec::new();
-        self.eval_at_sec_into(self.cursor_sec, &mut state);
+        self.sample_at_content_sec(self.cursor_sec, self.cursor_sec, &mut state);
 
         if !state.is_empty() {
-            self.animations.push(AnimationCell {
-                inner: Box::new(StaticDynItems(state)),
-                rate_func: linear,
-                time_range: self.cursor_sec..self.cursor_sec + secs,
-                enabled: true,
-                anim_name: type_name::<StaticDynItems>(),
-                entered: false,
-            });
+            self.animations
+                .push(static_cell(state, self.cursor_sec..self.cursor_sec + secs));
         }
         self.cursor_sec += secs;
         self
@@ -664,21 +593,32 @@ impl Animation for AnimSequence {
 }
 
 impl EvalDyn for AnimSequence {
-    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        self.eval_at_sec_into(self.cursor_sec * alpha, output);
+    fn sample_dyn(&self, time: &Time, output: &mut Vec<DynItem>) {
+        self.sample_at_content_sec(self.cursor_sec * time.alpha, time.global_secs, output);
     }
 
-    fn step_dyn(&mut self, time: &SegmentTime) {
-        // Map the time from the wrapping cell's local coordinates into this
-        // sequence's content coordinates.
-        let (content_sec, prev_content_sec) = map_content_time(time, self.cursor_sec);
+    fn step_dyn(&mut self, time: &Time, delta_time: &DeltaTime) {
+        // Map the wrapping cell's warped progress into this sequence's content
+        // coordinates; the global channel is forwarded unchanged.
+        let content_sec = self.cursor_sec * time.alpha;
+        let prev_content_sec = self.cursor_sec * (time.alpha - delta_time.alpha);
         if let Some(child) = self
             .animations
             .iter_mut()
             .rev()
             .find(|child| child.contains_sec(content_sec, self.cursor_sec))
         {
-            child.step_at_sec(content_sec, prev_content_sec);
+            child.step_at_sec(
+                content_sec,
+                prev_content_sec,
+                &GlobalTime::of(time, delta_time),
+            );
+        }
+    }
+
+    fn reset_entered_dyn(&mut self) {
+        for child in &mut self.animations {
+            child.reset_entered();
         }
     }
 
@@ -727,10 +667,10 @@ impl AnimStack {
         Self::default()
     }
 
-    fn eval_at_sec_into(&self, target_sec: f64, output: &mut Vec<DynItem>) {
+    fn sample_at_content_sec(&self, target_sec: f64, global_secs: f64, output: &mut Vec<DynItem>) {
         for animation in &self.animations {
             if animation.contains_sec(target_sec, self.duration_secs) {
-                animation.sample_at_sec(target_sec, output);
+                animation.sample_at_sec(target_sec, global_secs, output);
             }
         }
     }
@@ -782,16 +722,27 @@ impl Animation for AnimStack {
 }
 
 impl EvalDyn for AnimStack {
-    fn eval_alpha_dyn_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        self.eval_at_sec_into(self.duration_secs * alpha, output);
+    fn sample_dyn(&self, time: &Time, output: &mut Vec<DynItem>) {
+        self.sample_at_content_sec(self.duration_secs * time.alpha, time.global_secs, output);
     }
 
-    fn step_dyn(&mut self, time: &SegmentTime) {
-        let (content_sec, prev_content_sec) = map_content_time(time, self.duration_secs);
+    fn step_dyn(&mut self, time: &Time, delta_time: &DeltaTime) {
+        let content_sec = self.duration_secs * time.alpha;
+        let prev_content_sec = self.duration_secs * (time.alpha - delta_time.alpha);
         for child in &mut self.animations {
             if child.contains_sec(content_sec, self.duration_secs) {
-                child.step_at_sec(content_sec, prev_content_sec);
+                child.step_at_sec(
+                    content_sec,
+                    prev_content_sec,
+                    &GlobalTime::of(time, delta_time),
+                );
             }
+        }
+    }
+
+    fn reset_entered_dyn(&mut self) {
+        for child in &mut self.animations {
+            child.reset_entered();
         }
     }
 
@@ -824,6 +775,297 @@ macro_rules! stack {
     };
 }
 
+/// How an [`AnimLagged`] fills the time outside a child's window.
+///
+/// Fills are materialized as real static cells at `build` time (sampled from
+/// the child's window edges), so the preview timeline shows exactly what is
+/// rendered — there is no hidden clamping rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LaggedFill {
+    /// Render nothing outside the window.
+    Empty,
+    /// Keep showing the window-edge state with a static animation
+    /// (the initial state before, the final state after).
+    Hold,
+}
+
+/// Dynamic lagged (staggered, end-filled) animation container.
+///
+/// Children are pushed un-placed ([`Placeable`]); the container computes the
+/// placement itself: child `i` starts at `start_{i-1} + lag_ratio · d_{i-1}`.
+/// `lag_ratio` interpolates between the other two containers:
+///
+/// - `0.0` — all children start together (like [`AnimStack`]);
+/// - `1.0` — each child starts when the previous ends (like [`AnimSequence`]);
+/// - in between — overlapping succession.
+///
+/// By default the time outside a child's window is **filled with real static
+/// cells** ([`LaggedFill::Hold`] on both ends): each item is materialized at
+/// build time as a per-item sequence track `[leading fill][anim][trailing
+/// fill]` spanning the whole extent — before its start the item shows its
+/// initial state, after its end it keeps showing its final state, and the
+/// preview timeline shows exactly what is rendered. Configure with
+/// [`with_leading`](Self::with_leading) /
+/// [`with_trailing`](Self::with_trailing) — e.g. `Empty` leading makes items
+/// appear only at their window; to hide an item after its window instead of
+/// holding it, give it an animation that ends hidden, e.g.
+/// `seq![item.fade_in(), item.hide()]`.
+///
+/// Fills are sampled at build time: empty fills are skipped, and a
+/// zero-duration child gets no leading fill (it appears at its point, which is
+/// what "show from that point on" means). Because fills are build-time
+/// samples, children are expected to be pure (closed-form) animations — a
+/// stateful child's trailing fill would be its initial state, not its true
+/// final state.
+pub struct AnimLagged {
+    animations: Vec<AnimationCell>,
+    lag_ratio: f64,
+    /// Start offset for the next pushed child.
+    cursor_sec: f64,
+    duration_secs: f64,
+    leading: LaggedFill,
+    trailing: LaggedFill,
+}
+
+/// Build a static cell replaying already-sampled items over `time_range`.
+fn static_cell(state: Vec<DynItem>, time_range: Range<f64>) -> AnimationCell {
+    AnimationCell {
+        inner: Box::new(StaticDynItems(state)),
+        rate_func: linear,
+        time_range,
+        enabled: true,
+        anim_name: type_name::<StaticDynItems>(),
+        entered: false,
+    }
+}
+
+impl AnimLagged {
+    /// Create an empty lagged container with the given stagger ratio.
+    pub fn new(lag_ratio: f64) -> Self {
+        assert!(
+            lag_ratio.is_finite() && lag_ratio >= 0.0,
+            "lag ratio must be finite and non-negative"
+        );
+        Self {
+            animations: Vec::new(),
+            lag_ratio,
+            cursor_sec: 0.0,
+            duration_secs: 0.0,
+            leading: LaggedFill::Hold,
+            trailing: LaggedFill::Hold,
+        }
+    }
+
+    /// The stagger ratio between successive children.
+    pub fn lag_ratio(&self) -> f64 {
+        self.lag_ratio
+    }
+
+    /// Configure the fill before each child's window (default
+    /// [`LaggedFill::Hold`]).
+    pub fn with_leading(mut self, behavior: LaggedFill) -> Self {
+        self.leading = behavior;
+        self
+    }
+
+    /// Configure the fill after each child's window (default
+    /// [`LaggedFill::Hold`]).
+    pub fn with_trailing(mut self, behavior: LaggedFill) -> Self {
+        self.trailing = behavior;
+        self
+    }
+
+    /// Add an animation, placed by the container's stagger rule.
+    pub fn push<A: Placeable + 'static>(&mut self, animation: A) -> &mut Self {
+        let mut animation = animation.build();
+        let duration_secs = animation.duration_secs();
+        animation.shift_by(self.cursor_sec);
+        self.duration_secs = self.duration_secs.max(animation.time_range.end);
+        self.animations.push(animation);
+        self.cursor_sec += self.lag_ratio * duration_secs;
+        self
+    }
+
+    /// Materialize each child as a per-item sequence track:
+    /// `[leading fill][anim][trailing fill]` (empty fills skipped).
+    ///
+    /// The lagged container is thus a stack of per-item sequences — each
+    /// item's track spans the whole extent, with its window-edge states held
+    /// by real static cells.
+    fn materialize_fills(&mut self) {
+        let total = self.duration_secs;
+        let children = std::mem::take(&mut self.animations);
+        let mut animations = Vec::with_capacity(children.len());
+        for child in children {
+            let start = child.time_range.start;
+            let end = child.time_range.end;
+            let mut track = AnimSequence::new();
+            if self.leading == LaggedFill::Hold && start > 0.0 && child.duration_secs() > 0.0 {
+                let mut state = Vec::new();
+                child.sample_at_sec(start, start, &mut state);
+                if !state.is_empty() {
+                    track.animations.push(static_cell(state, 0.0..start));
+                }
+            }
+            track.animations.push(child);
+            if self.trailing == LaggedFill::Hold && end < total {
+                let child = track.animations.last().unwrap();
+                let mut state = Vec::new();
+                child.sample_at_sec(end, end, &mut state);
+                if !state.is_empty() {
+                    track.animations.push(static_cell(state, end..total));
+                }
+            }
+            track.cursor_sec = total;
+            animations.push(track.build());
+        }
+        self.animations = animations;
+    }
+
+    /// Current total extent (the last child's end).
+    pub fn duration_secs(&self) -> f64 {
+        self.duration_secs
+    }
+
+    /// Borrow the direct child animations in local container coordinates.
+    pub fn built_animations(&self) -> &[AnimationCell] {
+        &self.animations
+    }
+
+    /// Consume this container into its direct child animations.
+    pub fn into_built_animations(self) -> Vec<AnimationCell> {
+        self.animations
+    }
+}
+
+impl Placeable for AnimLagged {}
+impl Animation for AnimLagged {
+    fn build(mut self) -> AnimationCell {
+        self.materialize_fills();
+        let duration_secs = self.duration_secs;
+        AnimationCell {
+            inner: Box::new(self),
+            rate_func: linear,
+            time_range: 0.0..duration_secs,
+            enabled: true,
+            anim_name: type_name::<Self>(),
+            entered: false,
+        }
+    }
+}
+
+impl EvalDyn for AnimLagged {
+    fn sample_dyn(&self, time: &Time, output: &mut Vec<DynItem>) {
+        let content_sec = self.duration_secs * time.alpha;
+        for animation in &self.animations {
+            if animation.contains_sec(content_sec, self.duration_secs) {
+                animation.sample_at_sec(content_sec, time.global_secs, output);
+            }
+        }
+    }
+
+    fn step_dyn(&mut self, time: &Time, delta_time: &DeltaTime) {
+        let content_sec = self.duration_secs * time.alpha;
+        let prev_content_sec = self.duration_secs * (time.alpha - delta_time.alpha);
+        for child in &mut self.animations {
+            if child.contains_sec(content_sec, self.duration_secs) {
+                child.step_at_sec(
+                    content_sec,
+                    prev_content_sec,
+                    &GlobalTime::of(time, delta_time),
+                );
+            }
+        }
+    }
+
+    fn reset_entered_dyn(&mut self) {
+        for child in &mut self.animations {
+            child.reset_entered();
+        }
+    }
+
+    fn info_kind(&self) -> AnimationInfoKind {
+        AnimationInfoKind::Lagged
+    }
+
+    fn content_duration_secs(&self) -> f64 {
+        self.duration_secs
+    }
+
+    fn child_infos(&self) -> Vec<AnimationInfo> {
+        self.animations
+            .iter()
+            .map(AnimationCell::animation_info)
+            .collect()
+    }
+}
+
+/// Construct an [`AnimLagged`] with a stagger ratio, pushing each animation in order.
+#[macro_export]
+macro_rules! lagged {
+    ($lag_ratio:expr; $($animation:expr),* $(,)?) => {
+        {
+            #[allow(unused_mut)]
+            let mut lagged = $crate::animation::AnimLagged::new($lag_ratio);
+            $(lagged.push($animation);)*
+            lagged
+        }
+    };
+}
+
+/// Collect iterators of animations into containers.
+pub trait AnimIterExt: Iterator + Sized {
+    /// Collect the animations into an [`AnimStack`] (all at the same origin).
+    fn into_stack(self) -> AnimStack
+    where
+        Self::Item: Animation + 'static,
+    {
+        self.collect()
+    }
+
+    /// Collect the animations into an [`AnimSequence`] (played in order).
+    fn into_seq(self) -> AnimSequence
+    where
+        Self::Item: Placeable + 'static,
+    {
+        self.collect()
+    }
+
+    /// Collect the animations into an [`AnimLagged`] with the given stagger ratio.
+    fn into_lagged(self, lag_ratio: f64) -> AnimLagged
+    where
+        Self::Item: Placeable + 'static,
+    {
+        let mut lagged = AnimLagged::new(lag_ratio);
+        for animation in self {
+            lagged.push(animation);
+        }
+        lagged
+    }
+}
+
+impl<I: Iterator> AnimIterExt for I {}
+
+impl<A: Animation + 'static> FromIterator<A> for AnimStack {
+    fn from_iter<I: IntoIterator<Item = A>>(iter: I) -> Self {
+        let mut stack = AnimStack::new();
+        for animation in iter {
+            stack.push(animation);
+        }
+        stack
+    }
+}
+
+impl<A: Placeable + 'static> FromIterator<A> for AnimSequence {
+    fn from_iter<I: IntoIterator<Item = A>>(iter: I) -> Self {
+        let mut sequence = AnimSequence::new();
+        for animation in iter {
+            sequence.push(animation);
+        }
+        sequence
+    }
+}
+
 /// Requirement for [`StaticAnim`].
 pub trait StaticAnimRequirement: Clone + AnyExtractCoreItem {}
 
@@ -853,9 +1095,13 @@ pub struct Static<T: Clone>(pub T);
 impl<T: Clone> Eval for Static<T> {
     type Output = T;
 
-    fn eval_alpha(&self, _alpha: f64) -> Self::Output {
+    fn sample(&self, _time: &Time) -> Self::Output {
         self.0.clone()
     }
+
+    fn reset(&mut self) {}
+
+    fn step(&mut self, _time: &Time, _delta_time: &DeltaTime) {}
 }
 
 #[cfg(test)]
@@ -863,21 +1109,46 @@ mod tests {
     use super::*;
     use crate::{Extract, core_item::CoreItem, core_item::vitem::VItem};
 
-    fn leaf(x: f32, duration: f64) -> impl Placeable {
-        (move |_alpha| {
+    /// A stateless test double: a `VItem` shifted to a fixed x.
+    struct ShiftX(f32);
+
+    impl Eval for ShiftX {
+        type Output = VItem;
+
+        fn sample(&self, _time: &Time) -> Self::Output {
             let mut item = VItem::default();
-            item.points[0].x = x;
+            item.points[0].x = self.0;
             item
-        })
-        .with_duration(duration)
+        }
+
+        fn reset(&mut self) {}
+
+        fn step(&mut self, _time: &Time, _delta_time: &DeltaTime) {}
+    }
+
+    /// A stateless test double: x = offset + alpha.
+    struct ShiftAlpha(f32);
+
+    impl Eval for ShiftAlpha {
+        type Output = VItem;
+
+        fn sample(&self, time: &Time) -> Self::Output {
+            let mut item = VItem::default();
+            item.points[0].x = self.0 + time.alpha as f32;
+            item
+        }
+
+        fn reset(&mut self) {}
+
+        fn step(&mut self, _time: &Time, _delta_time: &DeltaTime) {}
+    }
+
+    fn leaf(x: f32, duration: f64) -> impl Placeable {
+        ShiftX(x).with_duration(duration)
     }
 
     fn progress_leaf(offset: f32) -> impl Placeable {
-        move |alpha| {
-            let mut item = VItem::default();
-            item.points[0].x = offset + alpha as f32;
-            item
-        }
+        ShiftAlpha(offset)
     }
 
     fn evaluated_xs(items: Vec<DynItem>) -> Vec<f32> {
@@ -889,6 +1160,12 @@ mod tests {
                 CoreItem::CameraFrame(_) | CoreItem::MeshItem(_) => None,
             })
             .collect()
+    }
+
+    fn sampled_xs(animation: &AnimationCell, sec: f64) -> Vec<f32> {
+        let mut items = Vec::new();
+        animation.sample_at_sec(sec, sec, &mut items);
+        evaluated_xs(items)
     }
 
     #[test]
@@ -913,8 +1190,7 @@ mod tests {
         let animation = animation.build();
 
         assert_eq!(animation.time_range(), 0.0..4.0);
-        let items = animation.eval_at_sec(2.0).unwrap();
-        assert_eq!(evaluated_xs(items), vec![0.5]);
+        assert_eq!(sampled_xs(&animation, 2.0), vec![0.5]);
         let info = animation.animation_info();
         assert_eq!(info.range, 0.0..4.0);
         assert_eq!(info.content_duration_secs, 2.0);
@@ -998,8 +1274,7 @@ mod tests {
             .hold(1.0);
 
         assert_eq!(sequence.built_animations().len(), 2);
-        let held = sequence.built_animations()[1].eval_at_sec(2.5).unwrap();
-        assert_eq!(evaluated_xs(held), vec![2.0]);
+        assert_eq!(sampled_xs(&sequence.built_animations()[1], 2.5), vec![2.0]);
     }
 
     #[test]
@@ -1011,8 +1286,7 @@ mod tests {
         assert_eq!(sequence.built_animations().len(), 3);
         assert_eq!(sequence.built_animations()[1].time_range(), 1.0..2.0);
         assert_eq!(sequence.built_animations()[2].time_range(), 2.0..4.0);
-        let held = sequence.built_animations()[2].eval_at_sec(3.5).unwrap();
-        assert_eq!(evaluated_xs(held), vec![3.0]);
+        assert_eq!(sampled_xs(&sequence.built_animations()[2], 3.5), vec![3.0]);
     }
 
     #[test]
@@ -1023,8 +1297,10 @@ mod tests {
             .hold(1.0)
             .hold(1.0);
 
-        let first_hold = sequence.built_animations()[1].eval_at_sec(1.5).unwrap();
-        let second_hold = sequence.built_animations()[2].eval_at_sec(2.5).unwrap();
+        let mut first_hold = Vec::new();
+        sequence.built_animations()[1].sample_at_sec(1.5, 1.5, &mut first_hold);
+        let mut second_hold = Vec::new();
+        sequence.built_animations()[2].sample_at_sec(2.5, 2.5, &mut second_hold);
 
         assert_eq!(first_hold.len(), 2);
         assert_eq!(second_hold.len(), 2);
@@ -1048,17 +1324,13 @@ mod tests {
         let mut hidden = AnimSequence::new();
         hidden.push(leaf(1.0, 1.0)).push(shown.hide()).hold(1.0);
         assert_eq!(hidden.built_animations().len(), 2);
-        assert!(
-            hidden.built_animations()[1]
-                .eval_at_sec(1.0)
-                .unwrap()
-                .is_empty()
-        );
+        let mut hidden_items = Vec::new();
+        hidden.built_animations()[1].sample_at_sec(1.0, 1.0, &mut hidden_items);
+        assert!(hidden_items.is_empty());
 
         let mut restored = AnimSequence::new();
         restored.push(leaf(1.0, 1.0)).push(shown.show()).hold(1.0);
-        let held = restored.built_animations()[2].eval_at_sec(1.5).unwrap();
-        assert_eq!(evaluated_xs(held), vec![5.0]);
+        assert_eq!(sampled_xs(&restored.built_animations()[2], 1.5), vec![5.0]);
     }
 
     #[test]
@@ -1071,8 +1343,7 @@ mod tests {
         outer.push(inner).hold(1.0);
 
         assert_eq!(outer.built_animations().len(), 2);
-        let held = outer.built_animations()[1].eval_at_sec(1.5).unwrap();
-        assert_eq!(evaluated_xs(held), vec![7.0]);
+        assert_eq!(sampled_xs(&outer.built_animations()[1], 1.5), vec![7.0]);
 
         let hidden_inner = seq![leaf(1.0, 1.0), shown.hide()];
         let mut hidden_outer = AnimSequence::new();
@@ -1118,5 +1389,124 @@ mod tests {
         assert_eq!(stack.built_animations().len(), 3);
         assert_eq!(stack.built_animations()[1].time_range(), 0.0..1.0);
         assert_eq!(stack.built_animations()[2].time_range(), 1.0..3.0);
+    }
+
+    #[test]
+    fn lagged_staggers_children_by_ratio_of_previous_durations() {
+        let lagged = lagged![0.5; leaf(1.0, 1.0), leaf(2.0, 2.0), leaf(3.0, 1.0)];
+        assert_eq!(lagged.built_animations()[0].time_range(), 0.0..1.0);
+        assert_eq!(lagged.built_animations()[1].time_range(), 0.5..2.5);
+        assert_eq!(lagged.built_animations()[2].time_range(), 1.5..2.5);
+        assert_eq!(lagged.duration_secs(), 2.5);
+
+        // ratio 1.0 is a sequence, ratio 0.0 is a stack.
+        let as_sequence = lagged![1.0; leaf(1.0, 1.0), leaf(2.0, 1.0)];
+        assert_eq!(as_sequence.built_animations()[1].time_range(), 1.0..2.0);
+        let as_stack = lagged![0.0; leaf(1.0, 1.0), leaf(2.0, 2.0)];
+        assert_eq!(as_stack.built_animations()[1].time_range(), 0.0..2.0);
+        assert_eq!(as_stack.duration_secs(), 2.0);
+    }
+
+    #[test]
+    fn lagged_fills_window_edges_with_static_cells() {
+        let lagged = lagged![
+            0.5;
+            progress_leaf(0.0).with_duration(1.0),
+            progress_leaf(10.0).with_duration(1.0),
+        ];
+        let animation = lagged.build();
+        assert_eq!(animation.time_range(), 0.0..1.5);
+
+        // Before the second child's start: it shows its initial state (Hold leading).
+        assert_eq!(sampled_xs(&animation, 0.25), vec![0.25, 10.0]);
+        // After the first child's end: it holds its final state (Hold trailing).
+        assert_eq!(sampled_xs(&animation, 1.0), vec![1.0, 10.5]);
+        // At the container's end: both hold their final states.
+        assert_eq!(sampled_xs(&animation, 1.5), vec![1.0, 11.0]);
+    }
+
+    #[test]
+    fn lagged_with_empty_leading_renders_nothing_before_start() {
+        let animation = lagged![
+            0.5;
+            progress_leaf(0.0).with_duration(1.0),
+            progress_leaf(10.0).with_duration(1.0),
+        ]
+        .with_leading(LaggedFill::Empty)
+        .build();
+
+        // Before the second child's start: only the first renders.
+        assert_eq!(sampled_xs(&animation, 0.25), vec![0.25]);
+        // Trailing still holds by default.
+        assert_eq!(sampled_xs(&animation, 1.0), vec![1.0, 10.5]);
+    }
+
+    #[test]
+    fn lagged_fill_structure_is_materialized_as_per_item_tracks() {
+        let animation = lagged![
+            0.5;
+            progress_leaf(0.0).with_duration(1.0),
+            progress_leaf(10.0).with_duration(1.0),
+        ]
+        .build();
+        let info = animation.animation_info();
+        // Each item becomes a sequence track spanning the whole extent:
+        // [leading fill][anim][trailing fill] (empty fills skipped).
+        assert_eq!(info.children.len(), 2);
+
+        let first = &info.children[0];
+        assert_eq!(first.kind, AnimationInfoKind::Sequence);
+        assert_eq!(first.range, 0.0..1.5);
+        assert_eq!(first.children.len(), 2);
+        assert_eq!(first.children[0].kind, AnimationInfoKind::Eval);
+        assert_eq!(first.children[0].range, 0.0..1.0);
+        assert_eq!(first.children[1].kind, AnimationInfoKind::Static);
+        assert_eq!(first.children[1].range, 1.0..1.5);
+
+        let second = &info.children[1];
+        assert_eq!(second.kind, AnimationInfoKind::Sequence);
+        assert_eq!(second.range, 0.0..1.5);
+        assert_eq!(second.children.len(), 2);
+        assert_eq!(second.children[0].kind, AnimationInfoKind::Static);
+        assert_eq!(second.children[0].range, 0.0..0.5);
+        assert_eq!(second.children[1].kind, AnimationInfoKind::Eval);
+        assert_eq!(second.children[1].range, 0.5..1.5);
+    }
+
+    #[test]
+    fn lagged_child_ending_with_hide_stays_hidden_after_its_window() {
+        let mut shown = VItem::default();
+        shown.points[0].x = 2.0;
+
+        let animation = lagged![0.5; seq![leaf(2.0, 1.0), shown.hide()]].build();
+        assert_eq!(animation.time_range(), 0.0..1.0);
+
+        assert_eq!(sampled_xs(&animation, 0.5), vec![2.0]);
+        // The seq ends with a hide cell: after the window the item stays hidden.
+        let mut items = Vec::new();
+        animation.sample_at_sec(1.0, 1.0, &mut items);
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn animations_collect_into_containers() {
+        let stack: AnimStack = vec![leaf(1.0, 1.0), leaf(2.0, 2.0)].into_iter().collect();
+        assert_eq!(stack.duration_secs(), 2.0);
+        assert_eq!(stack.built_animations()[1].time_range(), 0.0..2.0);
+
+        let sequence: AnimSequence = vec![leaf(1.0, 1.0), leaf(2.0, 2.0)].into_iter().collect();
+        assert_eq!(sequence.duration_secs(), 3.0);
+        assert_eq!(sequence.built_animations()[1].time_range(), 1.0..3.0);
+
+        let lagged = vec![leaf(1.0, 1.0), leaf(2.0, 1.0)]
+            .into_iter()
+            .into_lagged(0.5);
+        assert_eq!(lagged.built_animations()[1].time_range(), 0.5..1.5);
+        assert_eq!(lagged.duration_secs(), 1.5);
+
+        let stack = vec![leaf(1.0, 2.0)].into_iter().into_stack();
+        assert_eq!(stack.duration_secs(), 2.0);
+        let sequence = vec![leaf(1.0, 1.0), leaf(2.0, 1.0)].into_iter().into_seq();
+        assert_eq!(sequence.duration_secs(), 2.0);
     }
 }

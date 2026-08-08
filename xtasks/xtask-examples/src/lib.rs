@@ -73,7 +73,7 @@ pub struct Example {
 }
 
 impl Example {
-    pub fn clean_wasm(&self, root_dir: impl AsRef<Path>) {
+    pub fn clean_wasm(&self, root_dir: impl AsRef<Path>) -> Result<()> {
         let root_dir = root_dir.as_ref();
 
         let website_root = root_dir.join("website");
@@ -81,17 +81,22 @@ impl Example {
             .join("static/examples")
             .join(&self.name)
             .join("pkg");
-        if std::fs::exists(&output_dir).unwrap() {
-            std::fs::remove_dir_all(&output_dir).expect("failed to clean example");
+        if std::fs::exists(&output_dir)? {
+            std::fs::remove_dir_all(&output_dir)
+                .with_context(|| format!("failed to clean {}", output_dir.display()))?;
         }
+        Ok(())
     }
 
-    pub fn clean_output(&self, root_dir: impl AsRef<Path>) {
+    pub fn clean_output(&self, root_dir: impl AsRef<Path>) -> Result<()> {
         let root_dir = root_dir.as_ref();
 
         let website_root = root_dir.join("website");
         let output_dir = website_root.join("static/examples").join(&self.name);
-        for entry in std::fs::read_dir(output_dir).unwrap() {
+        if !std::fs::exists(&output_dir)? {
+            return Ok(());
+        }
+        for entry in std::fs::read_dir(&output_dir)? {
             let Ok(entry) = entry else {
                 continue;
             };
@@ -103,15 +108,22 @@ impl Example {
                 if entry.file_name().to_string_lossy() == "pkg" {
                     continue;
                 }
-                std::fs::remove_dir_all(entry.path()).expect("failed to clean example");
+                std::fs::remove_dir_all(entry.path())
+                    .with_context(|| format!("failed to clean {}", entry.path().display()))?;
             } else {
-                std::fs::remove_file(entry.path()).expect("failed to clean example");
+                std::fs::remove_file(entry.path())
+                    .with_context(|| format!("failed to clean {}", entry.path().display()))?;
             }
         }
+        Ok(())
     }
 
-    /// Output to `website/staic/examples/<example-name>/`
-    pub fn run(&self, root_dir: impl AsRef<Path>, lazy: bool) {
+    /// Render the scene and refresh `website/static/examples/<example-name>/`
+    /// and `website/data/<example-name>.toml`.
+    ///
+    /// The render runs **before** any existing website output is cleaned, so a
+    /// failed render leaves the previous outputs untouched.
+    pub fn run(&self, root_dir: impl AsRef<Path>, lazy: bool) -> Result<()> {
         #[derive(Serialize, Deserialize)]
         struct OutputData {
             name: String,
@@ -129,68 +141,50 @@ impl Example {
             .join("static")
             .join("examples")
             .join(&self.name);
-        std::fs::create_dir_all(&output_dir).expect("failed to create dir");
+        std::fs::create_dir_all(&output_dir)?;
         let data_dir = website_root.join("data");
 
         let data_path = data_dir.join(format!("{}.toml", self.name));
-        if std::fs::exists(&data_path).unwrap() {
-            let data = std::fs::read_to_string(&data_path).unwrap();
-            let data = toml::from_str::<OutputData>(&data).unwrap();
-            if data.hash == self.hash && lazy {
-                return;
-            }
+        // Missing or outdated data is not an error — it just means "regenerate".
+        let up_to_date = std::fs::read_to_string(&data_path)
+            .ok()
+            .and_then(|data| toml::from_str::<OutputData>(&data).ok())
+            .is_some_and(|data| data.hash == self.hash);
+        if lazy && up_to_date {
+            return Ok(());
         }
-
-        self.clean_output(root_dir);
-
-        let mut preview_imgs = vec![];
-        let mut output_files = vec![];
 
         let mut args = vec!["ranim", "render", "--example", &self.name];
         let features = self.required_features.join(",");
         if !features.is_empty() {
             args.extend(["--features", &features]);
         }
-        let cli = Cli::parse_from(args);
-        let res = cli.run();
-        // let status = Command::new("cargo")
-        //     .current_dir(root_dir)
-        //     .args(["run", "--example", &self.name, "--release"])
-        //     .stdout(std::process::Stdio::null())
-        //     .status()
-        //     .unwrap();
-        if let Err(err) = res {
-            panic!("failed to build example <{}>: {err:?}", self.name)
-        }
+        Cli::parse_from(args)
+            .run()
+            .with_context(|| format!("failed to render example <{}>", self.name))?;
+
+        self.clean_output(root_dir)?;
+
+        let mut preview_imgs = vec![];
+        let mut output_files = vec![];
         for entry in WalkDir::new(root_dir.join("output").join(&self.name))
             .into_iter()
             .filter_map(Result::ok)
         {
             let path = entry.path();
-            if path.is_file()
-                && let Some(file_name) = path.file_name().and_then(|name| name.to_str())
-            {
-                print!("Found {file_name:?}");
-                if file_name.starts_with("preview") {
-                    print!(", preview file");
-                    if let Some(ext) = path.extension().and_then(|e| e.to_str())
-                        && ["png", "jpg"].contains(&ext)
-                    {
-                        println!(", copying...");
-                        preview_imgs.push(
-                            copy_file(path, &output_dir).expect("failed to copy preview img"),
-                        );
-                    }
-                } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    print!(", output file");
-                    if ["mp4", "webm", /*"mov",*/ "gif", "png", "jpg"].contains(&ext) {
-                        print!(", copying...");
-                        output_files.push(
-                            copy_file(path, &output_dir).expect("failed to copy output file"),
-                        );
-                    }
-                }
-                println!()
+            if !path.is_file() {
+                continue;
+            }
+            let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+                continue;
+            };
+            if file_name.starts_with("preview") && ["png", "jpg"].contains(&ext) {
+                preview_imgs.push(copy_file(path, &output_dir)?);
+            } else if ["mp4", "webm", /*"mov",*/ "gif", "png", "jpg"].contains(&ext) {
+                output_files.push(copy_file(path, &output_dir)?);
             }
         }
 
@@ -209,81 +203,81 @@ impl Example {
                 .collect(),
             wasm: self.meta.wasm,
         };
-        let output_data = toml::to_string(&output_data).unwrap();
+        let output_data = toml::to_string(&output_data)?;
 
-        std::fs::write(&data_path, output_data).expect("failed to write data.toml");
+        std::fs::write(&data_path, output_data)?;
         if !self.meta.hide {
-            self.create_example_page(root_dir);
+            self.create_example_page(root_dir)?;
         }
+        Ok(())
     }
 
-    /// Build wasm to `website/staic/examples/<example-name>/pkg/`
-    pub fn build_wasm(&self, root_dir: impl AsRef<Path>) {
+    /// Build wasm to `website/static/examples/<example-name>/pkg/`
+    pub fn build_wasm(&self, root_dir: impl AsRef<Path>) -> Result<()> {
         let root_dir = root_dir.as_ref();
         let website_root = root_dir.join("website");
         let output_dir = website_root
             .join("static")
             .join("examples")
             .join(&self.name);
-        std::fs::create_dir_all(&output_dir).expect("failed to create dir");
+        std::fs::create_dir_all(&output_dir)?;
 
-        self.clean_wasm(root_dir);
+        self.clean_wasm(root_dir)?;
 
-        if self.meta.wasm {
-            let features = std::iter::once("preview")
-                .chain(self.required_features.iter().map(String::as_str))
-                .collect::<Vec<_>>()
-                .join(",");
-            let status = Command::new("cargo")
-                .current_dir(root_dir)
-                .args([
-                    "build",
-                    "--example",
-                    &self.name,
-                    "--features",
-                    &features,
-                    "--target",
-                    "wasm32-unknown-unknown",
-                    "--release",
-                ])
-                .stdout(std::process::Stdio::null())
-                .status()
-                .unwrap();
-            if !status.success() {
-                panic!("failed to build wasm")
-            }
-            let status = Command::new("wasm-bindgen")
-                .current_dir(root_dir)
-                .args([
-                    "--out-dir",
-                    output_dir.join("pkg").as_os_str().to_str().unwrap(),
-                    "--target",
-                    "web",
-                    &format!(
-                        "target/wasm32-unknown-unknown/release/examples/{}.wasm",
-                        self.name
-                    ),
-                ])
-                .stdout(std::process::Stdio::null())
-                .status()
-                .expect("failed to run wasm-bindgen");
-            if !status.success() {
-                panic!("failed to run wasm-bindgen")
-            }
-
-            let wasm_path = output_dir
-                .join("pkg")
-                .join(format!("{}_bg.wasm", self.name));
-            optimize_wasm(&wasm_path).unwrap_or_else(|err| {
-                panic!(
-                    "failed to optimize wasm for example <{}>: {err:#}",
-                    self.name
-                )
-            });
+        if !self.meta.wasm {
+            return Ok(());
         }
+
+        let features = std::iter::once("preview")
+            .chain(self.required_features.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(",");
+        let status = Command::new("cargo")
+            .current_dir(root_dir)
+            .args([
+                "build",
+                "--example",
+                &self.name,
+                "--features",
+                &features,
+                "--target",
+                "wasm32-unknown-unknown",
+                "--release",
+            ])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .context("failed to run cargo build for wasm")?;
+        if !status.success() {
+            bail!("failed to build wasm for example <{}>", self.name);
+        }
+        let status = Command::new("wasm-bindgen")
+            .current_dir(root_dir)
+            .args([
+                "--out-dir",
+                output_dir.join("pkg").as_os_str().to_str().unwrap(),
+                "--target",
+                "web",
+                &format!(
+                    "target/wasm32-unknown-unknown/release/examples/{}.wasm",
+                    self.name
+                ),
+            ])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .context("failed to run wasm-bindgen; is it installed?")?;
+        if !status.success() {
+            bail!("wasm-bindgen failed for example <{}>", self.name);
+        }
+
+        let wasm_path = output_dir
+            .join("pkg")
+            .join(format!("{}_bg.wasm", self.name));
+        optimize_wasm(&wasm_path)
+            .with_context(|| format!("failed to optimize wasm for example <{}>", self.name))?;
+        Ok(())
     }
 
-    pub fn create_example_page(&self, root_dir: impl AsRef<Path>) {
+    pub fn create_example_page(&self, root_dir: impl AsRef<Path>) -> Result<()> {
         let root_dir = root_dir.as_ref();
         let website_root = root_dir.join("website");
 
@@ -308,7 +302,7 @@ template = "examples-page.html"
 
         // 如果README.md存在，则复制其内容
         if readme_path.exists() {
-            let readme_content = std::fs::read_to_string(readme_path).unwrap();
+            let readme_content = std::fs::read_to_string(readme_path)?;
             md_content.push_str(&readme_content);
 
             // 确保README内容后有换行
@@ -326,7 +320,9 @@ template = "examples-page.html"
         md_content.push_str(&format!("!example-{}\n", self.name));
 
         // 写入markdown文件
-        std::fs::write(output_page_path, md_content).unwrap();
+        std::fs::write(&output_page_path, md_content)
+            .with_context(|| format!("failed to write {}", output_page_path.display()))?;
+        Ok(())
     }
 }
 
@@ -338,22 +334,25 @@ pub struct ExampleMeta {
     hide: bool,
 }
 
-pub fn get_examples(root_dir: impl AsRef<Path>) -> Vec<Example> {
+pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
     let root_dir = root_dir.as_ref();
 
     let manifest_path = root_dir.join("Cargo.toml");
-    let manifest_file = std::fs::read_to_string(manifest_path).unwrap();
+    let manifest_file = std::fs::read_to_string(&manifest_path)
+        .with_context(|| format!("failed to read {}", manifest_path.display()))?;
 
-    let manifest = manifest_file.parse::<Table>().unwrap();
+    let manifest = manifest_file
+        .parse::<Table>()
+        .context("failed to parse workspace Cargo.toml")?;
 
     let metadatas = manifest["package"]["metadata"]["example"]
         .clone()
         .try_into::<HashMap<String, ExampleMeta>>()
-        .unwrap();
+        .context("failed to parse [package.metadata.example]")?;
 
     manifest["example"]
         .as_array()
-        .unwrap()
+        .context("no [[example]] targets in workspace Cargo.toml")?
         .iter()
         .map(|v| v.as_table().unwrap())
         .map(|item| {
@@ -368,20 +367,21 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Vec<Example> {
                 .collect();
 
             let path = root_dir.join(item["path"].as_str().unwrap());
-            let code = std::fs::read_to_string(&path).unwrap();
+            let code = std::fs::read_to_string(&path)
+                .with_context(|| format!("failed to read example source {}", path.display()))?;
             let hash = {
                 let mut hasher = Sha1::new();
                 hasher.update(code.as_bytes());
                 base16ct::lower::encode_string(&hasher.finalize())
             };
-            Example {
+            Ok(Example {
                 meta: metadatas.get(&name).cloned().unwrap_or_default(),
                 name,
                 path,
                 code: format!("```rust\n{code}```"),
                 hash,
                 required_features,
-            }
+            })
         })
         .collect()
 }
@@ -394,7 +394,7 @@ mod test {
     fn test_get_examples() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
-        let examples = get_examples(&root_dir);
+        let examples = get_examples(&root_dir).unwrap();
         assert_eq!(examples.len(), 31); // + iterative_spring, nbody, cloth_wrap
         assert_eq!(
             examples
@@ -411,36 +411,48 @@ mod test {
         });
     }
 
+    /// Renders an example end-to-end (requires a GPU); ignored by default.
     #[test]
-    fn test_example_build_wasm() {
-        let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let root_dir = xtask_root.join("../../");
-        let examples = get_examples(&root_dir);
-        println!("{:?}", examples[0].name);
-        examples[0].build_wasm(&root_dir);
-    }
-    #[test]
+    #[ignore]
     fn test_example_run() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
-        let examples = get_examples(&root_dir);
+        let examples = get_examples(&root_dir).unwrap();
         println!("{:?}", examples[0].name);
-        examples[0].run(&root_dir, false);
+        examples[0].run(&root_dir, false).unwrap();
     }
+
+    /// Builds the wasm package (requires the wasm32 target, wasm-bindgen and
+    /// wasm-opt); ignored by default.
     #[test]
+    #[ignore]
+    fn test_example_build_wasm() {
+        let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let root_dir = xtask_root.join("../../");
+        let examples = get_examples(&root_dir).unwrap();
+        println!("{:?}", examples[0].name);
+        examples[0].build_wasm(&root_dir).unwrap();
+    }
+
+    /// Destructive: deletes the example's website outputs; ignored by default.
+    #[test]
+    #[ignore]
     fn test_example_clean_output() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
-        let examples = get_examples(&root_dir);
+        let examples = get_examples(&root_dir).unwrap();
         println!("{:?}", examples[0].name);
-        examples[0].clean_output(&root_dir);
+        examples[0].clean_output(&root_dir).unwrap();
     }
+
+    /// Destructive: deletes the example's wasm package; ignored by default.
     #[test]
+    #[ignore]
     fn test_example_clean_wasm() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
-        let examples = get_examples(&root_dir);
+        let examples = get_examples(&root_dir).unwrap();
         println!("{:?}", examples[0].name);
-        examples[0].clean_wasm(&root_dir);
+        examples[0].clean_wasm(&root_dir).unwrap();
     }
 }

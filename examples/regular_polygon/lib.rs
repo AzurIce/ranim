@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::pure::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
     glam::dvec2,
     items::vitem::geometry::RegularPolygon,
@@ -50,13 +50,13 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .iter_mut()
         .zip(radii.iter())
         .map(|(poly, &target_radius)| {
-            let animation = poly.morph(|p| {
+            poly.morph(|p| {
                 p.radius = target_radius;
-            });
-            move |alpha| animation.eval_alpha(smooth(alpha))
+            })
+            .with_rate_func(smooth)
         })
-        .collect::<Vec<_>>();
-    content.push(ranim_anims::lagged::Lagged::new(0.2, expand).with_duration(1.0));
+        .into_lagged(0.2);
+    content.push(expand.with_duration(1.0));
 
     // Phase 2: Rotate each layer at different speeds
     let rotations: Vec<f64> = (0..n_layers)
@@ -67,15 +67,15 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .iter_mut()
         .zip(rotations.iter())
         .map(|(poly, &rot)| {
-            let animation = poly.morph(|p| {
+            poly.morph(|p| {
                 p.with_origin(Origin.locate(&p.outer_circle()), |x| {
                     x.rotate_on_z(rot);
                 });
-            });
-            move |alpha| animation.eval_alpha(smooth(alpha))
+            })
+            .with_rate_func(smooth)
         })
-        .collect::<Vec<_>>();
-    content.push(ranim_anims::lagged::Lagged::new(0.2, rotate).with_duration(1.0));
+        .into_lagged(0.2);
+    content.push(rotate.with_duration(1.0));
 
     r.insert_time_mark(
         content.cursor_sec(),
@@ -89,13 +89,13 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .iter_mut()
         .rev()
         .map(|poly| {
-            let animation = poly.morph(|p| {
+            poly.morph(|p| {
                 p.radius = 0.0;
-            });
-            move |alpha| animation.eval_alpha(smooth(alpha))
+            })
+            .with_rate_func(smooth)
         })
-        .collect::<Vec<_>>();
-    content.push(ranim_anims::lagged::Lagged::new(0.2, collapse).with_duration(1.0));
+        .into_lagged(0.2);
+    content.push(collapse.with_duration(1.0));
 
     r.play(
         CameraFrame::default()

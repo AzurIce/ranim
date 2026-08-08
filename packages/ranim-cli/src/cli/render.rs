@@ -9,17 +9,11 @@ use crate::{
 };
 
 pub fn render_command(args: &CliArgs, scenes: &[String], buffer_count: usize) -> Result<()> {
-    info!("Loading workspace...");
-    let workspace = Workspace::current().unwrap();
+    let workspace = Workspace::current()?;
 
-    // Get the target package
-    info!("Getting target package...");
-    let (_, package_name) = get_target_package(&workspace, args);
-    info!("Target package name: {package_name}");
-
-    // let target = args.target.clone().map(Target::from).unwrap_or_default();
+    let (kid, package_name) = get_target_package(&workspace, args)?;
     let target = Target::from(args.target.clone());
-    info!("Target: {target:?}");
+    tracing::debug!(?kid, %package_name, ?target, "resolved build target");
 
     let current_dir = std::env::current_dir().context("Failed to get current directory")?;
     let mut builder = RanimUserLibraryBuilder::new(
@@ -34,8 +28,7 @@ pub fn render_command(args: &CliArgs, scenes: &[String], buffer_count: usize) ->
     let lib = builder
         .res_rx
         .recv_blocking()
-        .unwrap()
-        .context("Failed on initial build")?;
+        .context("Build worker exited without reporting")??;
 
     let all_scenes: Vec<Scene> = lib.scenes().collect::<Vec<_>>();
     let scenes_to_render: Vec<&Scene> = if scenes.is_empty() {

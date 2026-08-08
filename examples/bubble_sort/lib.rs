@@ -1,6 +1,6 @@
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
-    anims::morph::MorphAnim,
+    anims::pure::morph::MorphAnim,
     color::palettes::manim,
     core::animation::{AnimSequence, StaticAnim},
     glam::{DVec3, dvec2, dvec3},
