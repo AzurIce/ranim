@@ -5156,6 +5156,7 @@ dependencies = [
  "anyhow",
  "assert_float_eq",
  "async-channel",
+ "bevy_ecs",
  "bytemuck",
  "console_error_panic_hook",
  "derive_more",
@@ -5245,6 +5246,7 @@ dependencies = [
 name = "ranim-examples"
 version = "0.2.1"
 dependencies = [
+ "bevy_ecs",
  "getrandom 0.4.3",
  "itertools 0.15.0",
  "midly",
@@ -5261,6 +5263,7 @@ name = "ranim-items"
 version = "0.2.1"
 dependencies = [
  "assert_float_eq",
+ "bevy_ecs",
  "chrono",
  "derive_more",
  "diff-match-patch-rs",

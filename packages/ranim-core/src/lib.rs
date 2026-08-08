@@ -17,12 +17,15 @@ pub mod color;
 pub mod components;
 /// Fundamental scene primitives.
 pub mod core_item;
+/// Logic-side ECS World (M2): retained `LogicWorld` + `ScenePlayer` driver.
+pub mod logic;
 /// Scene evaluation driver (lightweight session, no ECS).
 pub mod scene_evaluator;
 /// Time vocabulary for animation evaluation.
 pub mod time;
 /// Fundamental traits.
 pub mod traits;
+pub use logic::ScenePlayer;
 pub use scene_evaluator::SceneEvaluator;
 /// Utilities.
 pub mod utils;

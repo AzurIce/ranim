@@ -16,7 +16,7 @@ use ranim_core::anchor::AabbPoint;
 
 // MARK: ### Arc ###
 /// An arc
-#[derive(Clone, Debug, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Arc {
     /// Axes
     pub axes: (DVec3, DVec3),
@@ -143,7 +143,7 @@ impl Extract for Arc {
 
 // MARK: ### ArcBetweenPoints ###
 /// An arc between points
-#[derive(Clone, Debug, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Clone, Debug, ranim_macros::Interpolatable)]
 pub struct ArcBetweenPoints {
     /// Axes
     pub axes: (DVec3, DVec3),

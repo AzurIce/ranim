@@ -24,6 +24,7 @@
 
 #[cfg(feature = "anims")]
 pub use ranim_anims as anims;
+pub use bevy_ecs;
 pub use ranim_core as core;
 #[cfg(feature = "items")]
 pub use ranim_items as items;

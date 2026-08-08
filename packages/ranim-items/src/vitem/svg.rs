@@ -16,7 +16,7 @@ use super::VItem;
 /// An Svg Item
 ///
 /// Its inner is a `Vec<VItem>`
-#[derive(
+#[derive(bevy_ecs::component::Component, 
     Clone, ranim_macros::ShiftTransform, ranim_macros::RotateTransform, ranim_macros::ScaleTransform,
 )]
 pub struct SvgItem(Vec<VItem>);

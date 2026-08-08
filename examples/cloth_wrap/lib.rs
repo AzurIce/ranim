@@ -38,7 +38,7 @@ const BALL_START_Y: f64 = 3.0;
 const BALL_STOP_Y: f64 = 1.4;
 
 /// The cloth-plus-ball system's full state.
-#[derive(Clone)]
+#[derive(ranim::bevy_ecs::component::Component, Clone)]
 struct ClothState {
     curr: Vec<DVec3>,
     prev: Vec<DVec3>,
@@ -218,6 +218,8 @@ impl Extract for ClothState {
         ball.extract_into(buf);
     }
 }
+
+impl ranim::core::logic::LogicItem for ClothState {}
 
 #[scene]
 #[wasm_demo_doc]

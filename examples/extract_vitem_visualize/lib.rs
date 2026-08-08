@@ -110,7 +110,7 @@ pub fn hello_ranim(r: &mut RanimScene) {
     );
 }
 
-#[derive(Clone)]
+#[derive(ranim::bevy_ecs::component::Component, Clone)]
 pub struct VisualVItem(VItem);
 
 impl Interpolatable for VisualVItem {
@@ -249,6 +249,8 @@ impl Extract for VisualVItem {
             });
     }
 }
+
+impl ranim::core::logic::LogicItem for VisualVItem {}
 
 impl Empty for VisualVItem {
     fn empty() -> Self {

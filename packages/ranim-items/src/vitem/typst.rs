@@ -245,7 +245,7 @@ impl World for TypstWorldWithSource<'_> {
 ///
 /// Note that the methods this item provides assumes that the typst string
 /// you provide only produces text output, otherwise undefined behaviours may happens.
-#[derive(Clone)]
+#[derive(bevy_ecs::component::Component, Clone)]
 pub struct TypstText {
     chars: String,
     vitems: Vec<VItem>,
