@@ -17,7 +17,7 @@ use ranim_core::traits::{Alignable, FillColor, Opacity, StrokeColor, StrokeWidth
 
 // MARK: ### Square ###
 /// A Square
-#[derive(Clone, Debug, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Square {
     /// Axes
     pub axes: (DVec3, DVec3),
@@ -201,7 +201,7 @@ impl From<Square> for VItem {
 
 // MARK: ### Rectangle ###
 /// Rectangle
-#[derive(Clone, Debug, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Rectangle {
     /// Axes info
     pub axes: (DVec3, DVec3),
@@ -362,7 +362,7 @@ impl Extract for Rectangle {
 
 // MARK: ### Polygon ###
 /// A Polygon with uniform stroke and fill
-#[derive(Clone, Debug, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Polygon {
     /// Axes info
     pub axes: (DVec3, DVec3),
@@ -519,7 +519,7 @@ impl Extract for Polygon {
     }
 }
 
-#[derive(Debug, Clone, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, ranim_macros::Interpolatable)]
 /// A regular polygon.
 pub struct RegularPolygon {
     /// Local coordinate system

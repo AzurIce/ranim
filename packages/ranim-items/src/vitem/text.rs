@@ -1,6 +1,6 @@
 use std::{
-    cell::{Cell, Ref, RefCell},
     collections::HashMap,
+    sync::Mutex,
 };
 
 use ranim_core::{
@@ -73,7 +73,7 @@ impl Default for TextFont {
 }
 
 /// Simple single-line text item
-#[derive(Clone, Debug)]
+#[derive(bevy_ecs::component::Component, Debug)]
 pub struct TextItem {
     /// Origin
     origin: DVec3,
@@ -89,10 +89,27 @@ pub struct TextItem {
     stroke_rgbas: AlphaColor<Srgb>,
     /// Stroke width
     stroke_width: f32,
-    /// Cached items
-    items: RefCell<Option<Vec<VItem>>>,
+    /// Cached items (Mutex for Send+Sync; the cache itself moves to
+    /// `Extracted<T>` in M2 stage 2).
+    items: Mutex<Option<Vec<VItem>>>,
     /// cached text inline size
-    inline_length_em: Cell<Option<f64>>,
+    inline_length_em: Mutex<Option<f64>>,
+}
+
+impl Clone for TextItem {
+    fn clone(&self) -> Self {
+        Self {
+            origin: self.origin,
+            basis: self.basis,
+            text: self.text.clone(),
+            font: self.font.clone(),
+            fill_rgbas: self.fill_rgbas,
+            stroke_rgbas: self.stroke_rgbas,
+            stroke_width: self.stroke_width,
+            items: Mutex::new(self.items.lock().unwrap().clone()),
+            inline_length_em: Mutex::new(*self.inline_length_em.lock().unwrap()),
+        }
+    }
 }
 
 impl Locate<TextItem> for Origin {
@@ -112,15 +129,15 @@ impl TextItem {
             fill_rgbas: AlphaColor::WHITE,
             stroke_rgbas: AlphaColor::WHITE,
             stroke_width: 0.0,
-            items: RefCell::default(),
-            inline_length_em: Cell::default(),
+            items: Mutex::default(),
+            inline_length_em: Mutex::default(),
         }
     }
 
     /// Set font
     pub fn with_font(mut self, font: TextFont) -> Self {
         self.font = font;
-        self.items.take();
+        *self.items.lock().unwrap() = None;
         self
     }
 
@@ -141,8 +158,8 @@ impl TextItem {
 
     /// Get inline length in em units
     pub fn inline_length_em(&self) -> f64 {
-        let _ = self.items(); // ensure items are generated
-        self.inline_length_em.get().unwrap()
+        drop(self.items()); // ensure items are generated
+        self.inline_length_em.lock().unwrap().unwrap()
     }
 
     /// Returns the text outline box starting from baseline origin to the width of last character and em height.
@@ -231,7 +248,7 @@ impl TextItem {
         } = self;
         let [min, max] = baseline_em_box;
         let h = max.y - min.y;
-        self.inline_length_em.set(Some((max.x - min.x) / h));
+        *self.inline_length_em.lock().unwrap() = Some((max.x - min.x) / h);
         let mat = DAffine3::from_mat3_translation(DMat3::from_cols(u, v, DVec3::ZERO), origin);
         texts.with(|x| {
             x.shift(-min)
@@ -244,16 +261,15 @@ impl TextItem {
         })
     }
 
-    fn items(&self) -> Ref<'_, Vec<VItem>> {
-        if self.items.borrow().is_none() {
-            let items = self.generate_items();
-            self.items.replace(Some(items));
+    fn items(&self) -> std::sync::MutexGuard<'_, Option<Vec<VItem>>> {
+        if self.items.lock().unwrap().is_none() {
+            *self.items.lock().unwrap() = Some(self.generate_items());
         }
-        Ref::map(self.items.borrow(), |v| v.as_ref().unwrap())
+        self.items.lock().unwrap()
     }
 
     fn transform_items(&self, transformation: impl FnOnce(&mut Vec<VItem>)) {
-        if let Some(v) = self.items.borrow_mut().as_mut() {
+        if let Some(v) = self.items.lock().unwrap().as_mut() {
             transformation(v);
         }
     }
@@ -261,7 +277,7 @@ impl TextItem {
 
 impl Aabb for TextItem {
     fn aabb(&self) -> [DVec3; 2] {
-        self.items().aabb()
+        self.items().as_ref().unwrap().aabb()
     }
 }
 
@@ -331,7 +347,7 @@ impl StrokeColor for TextItem {
 
 impl From<TextItem> for Vec<VItem> {
     fn from(item: TextItem) -> Self {
-        item.items().clone()
+        item.items().as_ref().unwrap().clone()
     }
 }
 
@@ -339,7 +355,7 @@ impl Extract for TextItem {
     type Target = CoreItem;
 
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        self.items().extract_into(buf);
+        self.items().as_ref().unwrap().extract_into(buf);
     }
 }
 

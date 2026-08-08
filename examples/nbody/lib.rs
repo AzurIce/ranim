@@ -44,7 +44,7 @@ struct Body {
 }
 
 /// The N-body system's full state.
-#[derive(Clone)]
+#[derive(ranim::bevy_ecs::component::Component, Clone)]
 struct NBodyState {
     bodies: Vec<Body>,
     trails: Vec<Vec<DVec3>>,
@@ -152,6 +152,8 @@ impl Extract for NBodyState {
         }
     }
 }
+
+impl ranim::core::logic::LogicItem for NBodyState {}
 
 #[scene]
 #[wasm_demo_doc]

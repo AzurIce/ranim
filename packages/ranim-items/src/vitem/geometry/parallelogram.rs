@@ -16,7 +16,7 @@ use crate::vitem::{
 };
 
 /// A parallelogram.
-#[derive(Debug, Clone, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, ranim_macros::Interpolatable)]
 pub struct Parallelogram {
     /// Origin of the paralleogram
     pub origin: DVec3,

@@ -49,7 +49,7 @@ fn colorscale_lookup(colorscale: &[(AlphaColor<Srgb>, f64)], value: f64) -> Alph
 ///
 /// By default, vertex normals are all-zero, which causes flat shading.
 /// To enable smooth shading, call [`Self::with_smooth_normals`] or [`Self::update_smooth_normals`] to update the normals.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, PartialEq)]
 pub struct Surface {
     /// Vertices — `nu * nv` points in row-major order.
     pub vertices: Vec<DVec3>,

@@ -89,6 +89,7 @@ ranim-core.workspace = true
 ranim-items.workspace = true
 ranim-anims.workspace = true
 ranim-macros.workspace = true
+bevy_ecs.workspace = true
 itertools.workspace = true
 tracing.workspace = true
 derive_more = { workspace = true, features = [

@@ -159,6 +159,18 @@ impl EvalDyn for AnimSequence {
         }
     }
 
+    fn materialize_dyn(&self, alpha: f64, ctx: &mut crate::logic::MaterializeCtx) {
+        let content_sec = self.cursor_sec * alpha;
+        if let Some(child) = self
+            .animations
+            .iter()
+            .rev()
+            .find(|child| child.contains_sec(content_sec, self.cursor_sec))
+        {
+            child.materialize_at(content_sec, ctx);
+        }
+    }
+
     fn info_kind(&self) -> AnimationInfoKind {
         AnimationInfoKind::Sequence
     }
