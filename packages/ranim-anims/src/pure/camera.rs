@@ -1,8 +1,12 @@
 //! Camera frame animations.
 
-use ranim_core::{animation::Eval, core_item::camera_frame::CameraFrame, glam::DVec3};
+use ranim_core::{
+    animation::{Eval, EvalExt},
+    core_item::camera_frame::CameraFrame,
+    glam::DVec3,
+};
 
-use crate::pure::{Pure, PureEval};
+
 
 // MARK: Anim Trait
 /// The methods to create animations for [`CameraFrame`].
@@ -24,11 +28,11 @@ pub trait CameraFrameAnim {
     ///         .with_rate_func(linear),
     /// );
     /// ```
-    fn orbit(&mut self, target: DVec3, total_angle: f64) -> Pure<Orbit>;
+    fn orbit(&mut self, target: DVec3, total_angle: f64) -> Orbit;
 }
 
 impl CameraFrameAnim for CameraFrame {
-    fn orbit(&mut self, target: DVec3, total_angle: f64) -> Pure<Orbit> {
+    fn orbit(&mut self, target: DVec3, total_angle: f64) -> Orbit {
         let offset = self.pos - target;
         let distance = offset.length();
         let phi = if distance > 0.0 {
@@ -38,14 +42,14 @@ impl CameraFrameAnim for CameraFrame {
         };
         let theta0 = offset.y.atan2(offset.x);
 
-        Pure(Orbit {
+        Orbit {
             src: self.clone(),
             target,
             distance,
             phi,
             theta0,
             total_angle,
-        })
+        }
         .apply_to(self)
     }
 }
@@ -67,7 +71,7 @@ pub struct Orbit {
     pub total_angle: f64,
 }
 
-impl PureEval for Orbit {
+impl Eval for Orbit {
     type Output = CameraFrame;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {

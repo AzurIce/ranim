@@ -1,9 +1,9 @@
 use ranim_core::{
-    animation::Eval,
+    animation::{Eval, EvalExt},
     traits::{Interpolatable, Opacity},
 };
 
-use crate::pure::{Pure, PureEval};
+
 
 // MARK: Require Trait
 /// The requirement of [`FadeIn`] and [`FadeOut`]
@@ -14,17 +14,17 @@ impl<T: Opacity + Interpolatable + Clone> FadingRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`FadingRequirement`]
 pub trait FadingAnim: FadingRequirement + Sized + 'static {
     /// Create a [`FadeIn`] anim.
-    fn fade_in(&mut self) -> Pure<FadeIn<Self>>;
+    fn fade_in(&mut self) -> FadeIn<Self>;
     /// Create a [`FadeOut`] anim.
-    fn fade_out(&mut self) -> Pure<FadeOut<Self>>;
+    fn fade_out(&mut self) -> FadeOut<Self>;
 }
 
 impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
-    fn fade_in(&mut self) -> Pure<FadeIn<Self>> {
-        Pure(FadeIn::new(self.clone())).apply_to(self)
+    fn fade_in(&mut self) -> FadeIn<Self> {
+        FadeIn::new(self.clone()).apply_to(self)
     }
-    fn fade_out(&mut self) -> Pure<FadeOut<Self>> {
-        Pure(FadeOut::new(self.clone())).apply_to(self)
+    fn fade_out(&mut self) -> FadeOut<Self> {
+        FadeOut::new(self.clone()).apply_to(self)
     }
 }
 
@@ -50,7 +50,7 @@ impl<T: FadingRequirement> FadeIn<T> {
     }
 }
 
-impl<T: FadingRequirement> PureEval for FadeIn<T> {
+impl<T: FadingRequirement> Eval for FadeIn<T> {
     type Output = T;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -78,7 +78,7 @@ impl<T: FadingRequirement> FadeOut<T> {
     }
 }
 
-impl<T: FadingRequirement> PureEval for FadeOut<T> {
+impl<T: FadingRequirement> Eval for FadeOut<T> {
     type Output = T;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {

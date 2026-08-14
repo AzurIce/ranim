@@ -9,7 +9,7 @@ mod visual;
 use std::sync::Arc;
 
 use midi::parse_song;
-use ranim::{anims::pure::Pure, glam::DVec3, prelude::*, utils::rate_functions::linear};
+use ranim::{glam::DVec3, prelude::*, utils::rate_functions::linear};
 use ranim_core::animation::{Placeable, StaticAnim};
 use visual::{
     FRAME_HEIGHT, HitEffectsEval, MidiNotesEval, PianoKeyboardEval, PianoLayout, SingleNoteEval,
@@ -22,16 +22,16 @@ fn common_layers(song: &Arc<midi::MidiSong>, layout: PianoLayout) -> AnimStack {
 
     stack![
         background.show().with_duration(duration),
-        Pure(PianoKeyboardEval {
+        PianoKeyboardEval {
             song: song.clone(),
             layout,
-        })
+        }
         .with_duration(duration)
         .with_rate_func(linear),
-        Pure(HitEffectsEval {
+        HitEffectsEval {
             song: song.clone(),
             layout,
-        })
+        }
         .with_duration(duration)
         .with_rate_func(linear),
     ]
@@ -56,10 +56,10 @@ fn midi_visualizer(r: &mut RanimScene) {
 
     r.play(camera(duration));
     r.play(stack![
-        Pure(MidiNotesEval {
+        MidiNotesEval {
             song: song.clone(),
             layout,
-        })
+        }
         .with_duration(duration)
         .with_rate_func(linear),
         common_layers(&song, layout),
@@ -79,7 +79,7 @@ fn midi_visualizer_per_note(r: &mut RanimScene) {
         let start_sec = note_eval.start_sec();
         let duration_secs = note_eval.duration_secs();
         notes.push(
-            Pure(note_eval)
+            note_eval
                 .with_duration(duration_secs)
                 .with_rate_func(linear)
                 .at(start_sec),

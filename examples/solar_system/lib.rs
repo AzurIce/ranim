@@ -1,7 +1,6 @@
 use std::f64::consts::{PI, TAU};
 
 use ranim::{
-    anims::pure::{Pure, PureEval},
     color::palettes::manim,
     glam::{DMat4, DVec3},
     items::mesh::{Sphere, Surface},
@@ -46,7 +45,7 @@ struct OrbitMotion<T> {
     z: f64,
 }
 
-impl<T: OrbitItem> PureEval for OrbitMotion<T> {
+impl<T: OrbitItem> Eval for OrbitMotion<T> {
     type Output = T;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -130,14 +129,14 @@ const PLANETS: &[PlanetData] = &[
 ];
 
 /// Build the typed orbital evaluator reused by every planet layer and label.
-fn orbit<T: OrbitItem>(item: &mut T, planet: &PlanetData, z: f64) -> Pure<OrbitMotion<T>> {
-    Pure(OrbitMotion {
+fn orbit<T: OrbitItem>(item: &mut T, planet: &PlanetData, z: f64) -> OrbitMotion<T> {
+    OrbitMotion {
         src: item.clone(),
         orbit_radius: planet.orbit_radius,
         initial_angle: planet.initial_angle,
         total_angle: TAU * (ORBIT_SECS / planet.period),
         z,
-    })
+    }
     .apply_to(item)
 }
 

@@ -7,7 +7,6 @@
 use std::sync::Arc;
 
 use ranim::{
-    anims::pure::{Pure, PureEval},
     color::{AlphaColor, Srgb, palettes::manim},
     glam::{DVec3, dvec3},
     items::vitem::{VItem, geometry::Rectangle},
@@ -139,7 +138,7 @@ struct AtlasTimerEval {
     atlas: Arc<GlyphAtlas>,
 }
 
-impl PureEval for AtlasTimerEval {
+impl Eval for AtlasTimerEval {
     type Output = Vec<VItem>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -164,7 +163,7 @@ struct RecompileTimerEval {
     glyph_scale: f64,
 }
 
-impl PureEval for RecompileTimerEval {
+impl Eval for RecompileTimerEval {
     type Output = Vec<VItem>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -210,8 +209,7 @@ fn typst_timer_atlas(r: &mut RanimScene) {
         .with_duration(DURATION_SECS),
     );
     r.play(stack![
-        Pure(AtlasTimerEval { atlas })
-            .with_duration(DURATION_SECS)
+        AtlasTimerEval { atlas }.with_duration(DURATION_SECS)
             .with_rate_func(linear),
         timer_label(),
     ]);
@@ -230,9 +228,9 @@ fn typst_timer_recompile(r: &mut RanimScene) {
         .with_duration(DURATION_SECS),
     );
     r.play(stack![
-        Pure(RecompileTimerEval {
+        RecompileTimerEval {
             glyph_scale: timer_glyph_scale(),
-        })
+        }
         .with_duration(DURATION_SECS)
         .with_rate_func(linear),
         timer_label(),

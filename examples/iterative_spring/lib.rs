@@ -9,14 +9,13 @@
 //!
 //! The spring's logical duration is a constant of the scene (`SIM_SECS`):
 //! `with_duration` only stretches playback, while the segment integrates
-//! `SIM_SECS` worth of physics scaled from `DeltaTime::alpha`.
+//! `SIM_SECS` worth of physics scaled from the progress step `delta_alpha`.
 
 use ranim::{
     anims::iterative::Iterative,
     color::palettes::manim,
     core::Extract,
     core::core_item::CoreItem,
-    core::time::{DeltaTime, Time},
     items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
 };
@@ -51,8 +50,8 @@ fn iterative_spring(r: &mut RanimScene) {
     r.play(
         Iterative::from_fn(
             SpringState { x: 1.0, v: 0.0 },
-            |state: &mut SpringState, _time: &Time, delta_time: &DeltaTime| {
-                let dt = SIM_SECS * delta_time.alpha;
+            |state: &mut SpringState, _alpha: f64, delta_alpha: f64| {
+                let dt = SIM_SECS * delta_alpha;
                 let acc = -K * state.x - C * state.v;
                 state.v += acc * dt;
                 state.x += state.v * dt;

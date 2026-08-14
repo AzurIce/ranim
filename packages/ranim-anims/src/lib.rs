@@ -4,19 +4,20 @@
 //! author-facing specializations of the general
 //! [`ranim_core::animation::Eval`] protocol:
 //!
-//! - **Pure** (closed-form, stateless): implement [`pure::PureEval`] — a single
-//!   `eval_alpha(alpha)` method — and wrap it in [`pure::Pure`] to get a full
-//!   animation segment. Closures `Fn(f64) -> T` implement `PureEval`
-//!   automatically, so `Pure(|alpha| ...)` just works.
+//! - **Pure** (closed-form, stateless): a struct that implements
+//!   [`Eval`](ranim_core::animation::Eval) directly with a closed-form
+//!   `eval_alpha(alpha)`. A raw closure can be turned into an `Eval` via
+//!   [`pure::PureFunc`] (`PureFunc::new(|alpha| ...)`).
 //! - **Iterative** (stateful, stepped): implement
 //!   [`iterative::IterativeEval`] — an associated `Output` and a single
-//!   `step(&self, &mut Self::Output, &Time, &DeltaTime)` method — and pass it
-//!   with an initial state to [`iterative::Iterative::new`]. For closures, use
-//!   [`iterative::Iterative::from_fn`], which binds the closure's mutable input
-//!   through [`iterative::IterativeFn`].
+//!   `step(&self, &mut Self::Output, alpha, delta_alpha)` method (both
+//!   dimensionless progress) — and pass it with an initial state to
+//!   [`iterative::Iterative::new`], optionally declaring `with_steps(N)`.
+//!   For closures, use [`iterative::Iterative::from_fn`], which binds the
+//!   closure's mutable input through [`iterative::IterativeFn`].
 //!
 //! A built-in animation is basically a struct that implements
-//! [`pure::PureEval`], together with the data its closed form needs. Here is
+//! [`Eval`](ranim_core::animation::Eval), together with the data its closed form needs. Here is
 //! the example of [`pure::fading::FadeIn`]:
 //!
 //! ```rust,ignore
@@ -25,7 +26,7 @@
 //!     dst: T,
 //! }
 //!
-//! impl<T: FadingRequirement> PureEval for FadeIn<T> {
+//! impl<T: FadingRequirement> Eval for FadeIn<T> {
 //!     type Output = T;
 //!
 //!     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -40,16 +41,16 @@
 //! ```rust,ignore
 //! /// The methods to create animations for `T` that satisfies [`FadingRequirement`]
 //! pub trait FadingAnim<T: FadingRequirement + 'static> {
-//!     fn fade_in(&mut self) -> Pure<FadeIn<T>>;
-//!     fn fade_out(&mut self) -> Pure<FadeOut<T>>;
+//!     fn fade_in(&mut self) -> FadeIn<T>;
+//!     fn fade_out(&mut self) -> FadeOut<T>;
 //! }
 //!
 //! impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
-//!     fn fade_in(&mut self) -> Pure<FadeIn<T>> {
-//!         Pure(FadeIn::new(self.clone())).apply_to(self)
+//!     fn fade_in(&mut self) -> FadeIn<T> {
+//!         FadeIn::new(self.clone()).apply_to(self)
 //!     }
-//!     fn fade_out(&mut self) -> Pure<FadeOut<T>> {
-//!         Pure(FadeOut::new(self.clone())).apply_to(self)
+//!     fn fade_out(&mut self) -> FadeOut<T> {
+//!         FadeOut::new(self.clone()).apply_to(self)
 //!     }
 //! }
 //! ```

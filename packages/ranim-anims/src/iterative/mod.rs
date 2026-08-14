@@ -2,13 +2,17 @@
 //! [`IterativeEval`](crate::iterative::IterativeEval) capability trait and its
 //! [`Iterative`](crate::iterative::Iterative) adapter into the general
 //! [`Eval`](ranim_core::animation::Eval) protocol.
+//!
+//! **Content is sequence**: an iterative segment owns its simulation step
+//! (`sim_step`, declared via `with_steps(N)`), its integration state, and its
+//! current progress. Advancing folds direction management — forward integrates
+//! `sim_step`-by-`sim_step`, backward resets and replays — so the runtime
+//! only ever asks "evaluate at progress `alpha`". No seconds, no scene clock,
+//! no `logic_fps` reach a segment's content.
 
-use std::marker::PhantomData;
+use std::{cell::RefCell, marker::PhantomData};
 
-use ranim_core::{
-    animation::Eval,
-    time::{DeltaTime, Time},
-};
+use ranim_core::animation::Eval;
 
 /// The capability of an iterative, stateful evaluation.
 ///
@@ -22,26 +26,30 @@ use ranim_core::{
 /// parameters, palettes, ...) belong in `self` or closure captures; everything
 /// mutable must live in the state value, so a reset restores it all.
 ///
-/// How long the segment simulates is part of the step logic's own parameters;
-/// `with_duration` is only a playback stretch. `step` receives the step length
-/// as `delta_time.alpha` (in warped local progress) — scale it by the
-/// segment's own logical duration to recover meaningful units:
+/// `step` receives the current progress `alpha` and the segment's own
+/// uniform progress step `delta_alpha` (`= sim_step = 1 / N`). These are
+/// **dimensionless progress**, independent of rate shaping and placement; the
+/// segment's content is a pure function of progress. To recover physical
+/// seconds, scale by the segment's own logical duration:
 ///
 /// ```rust,ignore
-/// fn step(&self, state: &mut NBodyState, _time: &Time, delta_time: &DeltaTime) {
-///     let dt = self.sim_secs * delta_time.alpha; // logical seconds
-///     // integrate with dt ...
+/// fn step(&self, state: &mut NBodyState, _alpha: f64, delta_alpha: f64) {
+///     let dt = self.sim_secs * delta_alpha; // physical seconds
+///     state.integrate(dt);
 /// }
 /// ```
 ///
-/// Segments that need unwarped wall-clock-shaped time use
-/// `time.global_secs`/`delta_time.global_secs` instead.
+/// Segments that genuinely need scene-clock-shaped time must be authored at the
+/// top level, where the author knows the placement.
 pub trait IterativeEval {
     /// State produced and advanced by this evaluator.
     type Output;
 
-    /// Advance the state by one logic step.
-    fn step(&self, output: &mut Self::Output, time: &Time, delta_time: &DeltaTime);
+    /// Advance the state by one progress step.
+    ///
+    /// `alpha` is the current progress, `delta_alpha` the segment's uniform
+    /// step (both dimensionless progress).
+    fn step(&self, output: &mut Self::Output, alpha: f64, delta_alpha: f64);
 }
 
 /// An [`IterativeEval`] backed by a stepping function.
@@ -56,7 +64,7 @@ pub struct IterativeFn<S, F> {
 
 impl<S, F> IterativeFn<S, F>
 where
-    F: Fn(&mut S, &Time, &DeltaTime),
+    F: Fn(&mut S, f64, f64),
 {
     /// Bind a stepping function to its state type.
     pub fn new(eval: F) -> Self {
@@ -69,36 +77,52 @@ where
 
 impl<S, F> IterativeEval for IterativeFn<S, F>
 where
-    F: Fn(&mut S, &Time, &DeltaTime),
+    F: Fn(&mut S, f64, f64),
 {
     type Output = S;
 
-    fn step(&self, output: &mut Self::Output, time: &Time, delta_time: &DeltaTime) {
-        (self.eval)(output, time, delta_time)
+    fn step(&self, output: &mut Self::Output, alpha: f64, delta_alpha: f64) {
+        (self.eval)(output, alpha, delta_alpha)
     }
+}
+
+/// The default content step when the author does not declare one: 1/120
+/// progress per step (the historical 120 Hz logic-grid resolution, now
+/// expressed as a per-segment content property rather than a scene parameter).
+const DEFAULT_SIM_STEP: f64 = 1.0 / 120.0;
+
+/// The memoization snapshot backing an iterative segment.
+///
+/// Holds the progress already reached (`alpha`) and the state there. Because
+/// `eval_alpha` is a **pure query** on `&self` — an animation's content is
+/// immutable once defined — the adapter keeps this snapshot behind a
+/// `RefCell`: advancing writes into it, projecting reads from it, and neither
+/// escapes the `&self` query contract. This is memoization, not mutation of
+/// the animation's definition.
+struct Snapshot<S> {
+    alpha: f64,
+    state: S,
 }
 
 /// Adapter turning an [`IterativeEval`] into the general [`Eval`] protocol.
 ///
-/// The adapter owns the segment's state: it samples by cloning the current
-/// state, and resets by restoring the stored initial state — both structural,
-/// nothing for the author to implement or get wrong. When the state differs
-/// from what should be rendered, implement [`Extract`](ranim_core::Extract)
-/// for the state type: extraction is the per-frame projection point.
+/// The adapter owns the segment's definition — the initial state, the `sim_step`,
+/// and the stepping closure — all immutable. The only mutation is the snapshot
+/// cache (`alpha` + `state`) behind a `RefCell`, so `eval_alpha(target)`
+/// integrates to `target` only when `target` is ahead of the snapshot, resets
+/// and replays when behind, and otherwise returns the cached state directly.
+/// Repeated queries at the same `alpha` are O(1).
 ///
 /// ```rust,ignore
-/// // With a closure and a directly-renderable state:
-/// let animation = Iterative::from_fn(state0, |state: &mut MyState, _t, dt| {
-///     state.integrate(dt.alpha * SIM_SECS);
-/// });
-///
-/// // With a named step type:
-/// let animation = Iterative::new(NBodyState::regular_ngon(99), NBodyStep { sim_secs: 32.0 });
+/// let animation = Iterative::from_fn(state0, |state: &mut MyState, _a, da| {
+///     state.integrate(da * SIM_SECS);
+/// }).with_steps(240);
 /// ```
 pub struct Iterative<E: IterativeEval> {
-    initial: E::Output,
-    current: E::Output,
     eval: E,
+    initial: E::Output,
+    sim_step: f64,
+    snapshot: RefCell<Snapshot<E::Output>>,
 }
 
 impl<E> Iterative<E>
@@ -107,20 +131,33 @@ where
     E::Output: Clone,
 {
     /// Create an iterative segment from an initial state and a named
-    /// [`IterativeEval`] implementation.
+    /// [`IterativeEval`] implementation (default content step 1/120).
     pub fn new(initial: E::Output, eval: E) -> Self {
         Self {
-            current: initial.clone(),
-            initial,
             eval,
+            snapshot: RefCell::new(Snapshot {
+                alpha: 0.0,
+                state: initial.clone(),
+            }),
+            initial,
+            sim_step: DEFAULT_SIM_STEP,
         }
+    }
+
+    /// Declare the content's step count N: the segment integrates in uniform
+    /// `1/N` progress increments. This is the segment's own resolution — not
+    /// a scene parameter, not a sampling knob.
+    pub fn with_steps(mut self, n: usize) -> Self {
+        assert!(n > 0, "iterative step count must be positive");
+        self.sim_step = 1.0 / n as f64;
+        self
     }
 }
 
 impl<S, F> Iterative<IterativeFn<S, F>>
 where
     S: Clone,
-    F: Fn(&mut S, &Time, &DeltaTime),
+    F: Fn(&mut S, f64, f64),
 {
     /// Create an iterative segment from an initial state and a stepping
     /// function.
@@ -136,16 +173,22 @@ where
 {
     type Output = E::Output;
 
-    fn sample(&self, _time: &Time) -> Self::Output {
-        self.current.clone()
-    }
-
-    fn reset(&mut self) {
-        self.current = self.initial.clone();
-    }
-
-    fn step(&mut self, time: &Time, delta_time: &DeltaTime) {
-        self.eval.step(&mut self.current, time, delta_time);
+    fn eval_alpha(&self, target: f64) -> Self::Output {
+        let mut snap = self.snapshot.borrow_mut();
+        if target < snap.alpha {
+            // Backward target: reset and replay from the start.
+            snap.state = self.initial.clone();
+            snap.alpha = 0.0;
+        }
+        // Integrate by whole steps (index-based: no floating-point drift).
+        let start_idx = (snap.alpha / self.sim_step).floor() as usize;
+        let end_idx = (target / self.sim_step).floor() as usize;
+        for i in start_idx..end_idx {
+            let alpha = i as f64 * self.sim_step;
+            self.eval.step(&mut snap.state, alpha, self.sim_step);
+        }
+        snap.alpha = target;
+        snap.state.clone()
     }
 }
 
@@ -163,24 +206,15 @@ mod tests {
     impl IterativeEval for MoveRight {
         type Output = VItem;
 
-        fn step(&self, state: &mut Self::Output, _time: &Time, delta_time: &DeltaTime) {
-            state.points[0].x += delta_time.alpha as f32;
+        fn step(&self, state: &mut Self::Output, _alpha: f64, delta_alpha: f64) {
+            state.points[0].x += delta_alpha as f32;
         }
     }
 
     #[test]
-    fn named_evaluator_has_one_associated_output() {
-        let mut animation = Iterative::new(VItem::default(), MoveRight);
-        Eval::step(
-            &mut animation,
-            &Time::default(),
-            &DeltaTime {
-                alpha: 0.25,
-                global_secs: 1.0,
-            },
-        );
-
-        assert_eq!(Eval::sample(&animation, &Time::default()).points[0].x, 0.25);
+    fn named_evaluator_advances_by_sim_step() {
+        let animation = Iterative::new(VItem::default(), MoveRight).with_steps(4);
+        assert_eq!(animation.eval_alpha(0.5).points[0].x, 0.5);
     }
 
     /// A closure-driven iterative segment with a directly renderable state:
@@ -192,26 +226,22 @@ mod tests {
             scene.play(
                 Iterative::from_fn(
                     VItem::default(),
-                    |state: &mut VItem, _time: &Time, delta_time: &DeltaTime| {
-                        state.points[0].x += delta_time.alpha as f32;
+                    |state: &mut VItem, _alpha: f64, delta_alpha: f64| {
+                        state.points[0].x += delta_alpha as f32;
                     },
                 )
+                .with_steps(240)
                 .with_duration(2.0),
             );
             scene.seal().into_evaluator(120.0)
         }
 
-        let run = |seek: bool| {
+        let run = || {
             let mut ev = build();
             let mut trace = Vec::new();
             for sec in [0.5, 1.0, 1.5, 2.0] {
-                if seek {
-                    ev.seek(sec);
-                } else {
-                    ev.advance_to(sec);
-                }
                 let mut frame = Vec::new();
-                ev.sample_into(&mut frame);
+                ev.sample_at(sec, &mut frame);
                 let x = frame.iter().find_map(|(_, item)| match item {
                     CoreItem::VItem(v) => Some(v.points[0].x),
                     _ => None,
@@ -221,9 +251,8 @@ mod tests {
             trace
         };
 
-        let forward = run(false);
-        assert_eq!(forward, run(true));
-        // 2s at 120Hz: 240 steps of Δalpha = 1/240 each → x ≈ 1.0
+        let forward = run();
+        assert_eq!(forward, run());
         let x = forward.last().unwrap().unwrap();
         assert!((x - 1.0).abs() < 1e-3, "x = {x}");
     }

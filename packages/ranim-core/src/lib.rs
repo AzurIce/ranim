@@ -41,11 +41,10 @@ pub mod prelude {
     pub use crate::traits::*;
 
     pub use crate::animation::{
-        AnimIterExt, AnimLagged, AnimSequence, AnimStack, Animation, AnimationExt, Eval,
+        AnimIterExt, AnimLagged, AnimSequence, AnimStack, Animation, AnimationExt, Eval, EvalExt,
         LaggedFill, Placeable, StaticAnim,
     };
     pub use crate::core_item::camera_frame::CameraFrame;
-    pub use crate::time::{DeltaTime, Time};
     pub use crate::{RanimScene, TimeMark};
 }
 
@@ -239,7 +238,7 @@ impl SealedRanimScene {
                 }
 
                 let mut items = Vec::new();
-                animation.sample_at_sec(target_sec, target_sec, &mut items);
+                animation.eval_at(target_sec, &mut items);
                 (!items.is_empty()).then_some((animation_id, items))
             })
             .flat_map(|(animation_id, items)| {

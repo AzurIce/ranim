@@ -15,7 +15,6 @@ use ranim::{
     core::Extract,
     core::components::rgba::Rgba,
     core::core_item::CoreItem,
-    core::time::{DeltaTime, Time},
     glam::{DVec3, Mat4, Vec3, dvec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
@@ -236,8 +235,8 @@ fn cloth_wrap(r: &mut RanimScene) {
     r.play(
         Iterative::from_fn(
             ClothState::new(),
-            |state: &mut ClothState, time: &Time, delta_time: &DeltaTime| {
-                state.step(SIM_SECS * delta_time.alpha, time.global_secs);
+            |state: &mut ClothState, alpha: f64, delta_alpha: f64| {
+                state.step(SIM_SECS * delta_alpha, SIM_SECS * alpha);
             },
         )
         .with_duration(SIM_SECS),

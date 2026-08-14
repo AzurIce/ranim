@@ -16,7 +16,6 @@ use ranim::{
     color::{AlphaColor, Srgb, palettes::manim},
     core::Extract,
     core::core_item::CoreItem,
-    core::time::{DeltaTime, Time},
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},
     prelude::*,
@@ -162,8 +161,8 @@ fn nbody(r: &mut RanimScene) {
     r.play(
         Iterative::from_fn(
             NBodyState::new(99),
-            |state: &mut NBodyState, _time: &Time, delta_time: &DeltaTime| {
-                state.step(SIM_SECS * delta_time.alpha);
+            |state: &mut NBodyState, _alpha: f64, delta_alpha: f64| {
+                state.step(SIM_SECS * delta_alpha);
             },
         )
         .with_duration(SIM_SECS),
