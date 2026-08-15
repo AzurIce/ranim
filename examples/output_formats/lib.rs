@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::pure::{fading::FadingAnim, rotating::RotatingAnim},
+    anims::{fading::FadingAnim, rotating::RotatingAnim},
     color::palettes::manim,
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},

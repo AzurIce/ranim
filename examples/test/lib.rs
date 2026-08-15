@@ -5,7 +5,7 @@ use std::{f64::consts::PI, time::Duration};
 
 use glam::{DVec3, dvec3};
 use ranim::{
-    anims::pure::{
+    anims::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
         morph::MorphAnim,

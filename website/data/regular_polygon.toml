@@ -4,7 +4,7 @@ code = """
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::pure::morph::MorphAnim,
+    anims::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
     glam::dvec2,
     items::vitem::geometry::RegularPolygon,
@@ -107,8 +107,9 @@ pub fn regular_polygon(r: &mut RanimScene) {
     );
     r.play(content);
 }
-```"""
-hash = "60c421b412ea4f25731fd6c411fa7e9226fc1e19"
+```
+"""
+hash = "8b6e8119a4d62be1e9ca5ee124f485004ba993a8"
 preview_imgs = ["/examples/regular_polygon/preview.png"]
 output_files = ["/examples/regular_polygon/regular_polygon_1920x1080_60.mp4"]
 wasm = true

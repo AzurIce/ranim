@@ -1,5 +1,5 @@
 use ranim::{
-    anims::pure::{
+    anims::{
         creation::{CreationAnim, WritingAnim},
         morph::MorphAnim,
     },

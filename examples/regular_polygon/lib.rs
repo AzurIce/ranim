@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::pure::morph::MorphAnim,
+    anims::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
     glam::dvec2,
     items::vitem::geometry::RegularPolygon,

@@ -466,8 +466,7 @@ impl RanimRenderApp {
             .enumerate()
             .for_each(|(i, sec)| {
                 let mut frame_items = Vec::new();
-                evaluator.advance_to(sec);
-                evaluator.sample_into(&mut frame_items);
+                evaluator.sample_at(sec, &mut frame_items);
                 worker_thread.sync_and_submit(move |store| {
                     store.update(frame_items.into_iter());
                 });
@@ -523,11 +522,10 @@ impl RanimRenderApp {
 
         let mut captured = 0usize;
         for (sec, TimeMark::Capture(filename)) in timemarks {
-            // The render has advanced to the end; captures must seek back and
-            // replay (deterministic contract).
-            evaluator.seek(sec);
+            // The render has advanced to the end; captures seek back and replay
+            // (deterministic contract, direction handled inside sample_at).
             let mut frame_items = Vec::new();
-            evaluator.sample_into(&mut frame_items);
+            evaluator.sample_at(sec, &mut frame_items);
             self.store.update(frame_items.into_iter());
             let worker = self.render_worker.as_mut().unwrap();
             worker.render_store(&self.store);

@@ -2,7 +2,7 @@ name = "getting_started1"
 code = """
 ```rust
 use ranim::{
-    anims::pure::{creation::WritingAnim, morph::MorphAnim},
+    anims::{creation::WritingAnim, morph::MorphAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -40,8 +40,9 @@ fn getting_started1(r: &mut RanimScene) {
     r.play(content);
 }
 // ANCHOR_END: construct
-```"""
-hash = "b06e96c59594b0acba7c6bac87c124570dfc6b2e"
+```
+"""
+hash = "de0c3ea43f72441dc23a649cec945646e2e554e4"
 preview_imgs = []
 output_files = ["/examples/getting_started1/getting_started1_1920x1080_60.mp4"]
 wasm = true

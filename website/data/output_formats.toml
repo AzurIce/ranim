@@ -4,7 +4,7 @@ code = """
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::pure::{fading::FadingAnim, rotating::RotatingAnim},
+    anims::{fading::FadingAnim, rotating::RotatingAnim},
     color::palettes::manim,
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},
@@ -67,8 +67,9 @@ fn output_formats(r: &mut RanimScene) {
     r.play(content);
     r.insert_time_mark(1.5, TimeMark::Capture("preview.png".to_string()));
 }
-```"""
-hash = "d3be7f01c05d6f583e21c6f2b1372b407394c603"
+```
+"""
+hash = "98e68d56ea41ff83af789ed2ea20b21886d41d42"
 preview_imgs = ["/examples/output_formats/preview.png"]
 output_files = ["/examples/output_formats/output_formats_1920x1080_60.webm", "/examples/output_formats/output_formats_1920x1080_60.mp4", "/examples/output_formats/output_formats_1920x1080_60.gif"]
 wasm = false

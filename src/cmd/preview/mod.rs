@@ -376,15 +376,10 @@ impl RanimPreviewApp {
             self.last_sec = self.timeline_state.current_sec;
 
             let start_eval = Instant::now();
-            // Forward: advance the logic grid; backward scrub: seek and replay.
+            // Forward/backward direction management is internal to sample_at.
             let target = self.timeline_state.current_sec;
-            if target < self.evaluator.clock() {
-                self.evaluator.seek(target);
-            } else {
-                self.evaluator.advance_to(target);
-            }
             let mut frame_items = Vec::new();
-            self.evaluator.sample_into(&mut frame_items);
+            self.evaluator.sample_at(target, &mut frame_items);
             self.store.update(frame_items.into_iter());
             self.last_eval_time = Some(start_eval.elapsed());
 

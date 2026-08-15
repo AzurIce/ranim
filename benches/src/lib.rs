@@ -3,8 +3,8 @@ use ranim::prelude::*;
 pub mod test_scenes {
     use itertools::Itertools;
     use ranim::{
-        anims::pure::morph::MorphAnim,
-        core::animation::{AnimStack, StaticAnim},
+        anims::morph::MorphAnim,
+        core::animation::{StaticAnim, stack::AnimStack},
         glam::{DVec3, dvec3},
         items::vitem::{
             VItem,
