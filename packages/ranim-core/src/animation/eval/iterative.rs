@@ -2,7 +2,7 @@
 //! [`IterativeEval`](crate::animation::eval::iterative::IterativeEval)
 //! capability trait and its
 //! [`Iterative`](crate::animation::eval::iterative::Iterative) adapter into the
-//! general [`Eval`](crate::animation::eval::Eval) protocol.
+//! general [`Eval`] protocol.
 //!
 //! **Content is sequence**: an iterative segment owns its simulation step
 //! (`sim_step`, declared via `with_steps(N)`), its integration state, and its

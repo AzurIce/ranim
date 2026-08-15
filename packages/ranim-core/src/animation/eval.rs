@@ -1,6 +1,6 @@
 //! Evaluation protocols and the standard author-facing adapters.
 //!
-//! [`Eval`](crate::animation::eval::Eval) is the single leaf protocol;
+//! [`Eval`] is the single leaf protocol;
 //! [`EvalExt`](crate::animation::eval::EvalExt) adds build-time conveniences;
 //! [`pure::Pure`](crate::animation::eval::pure::Pure) adapts a closure
 //! and [`iterative::Iterative`](crate::animation::eval::iterative::Iterative)
