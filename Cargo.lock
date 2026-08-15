@@ -5240,6 +5240,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ranim-examples"
+version = "0.2.1"
+dependencies = [
+ "getrandom 0.4.3",
+ "itertools 0.15.0",
+ "midly",
+ "rand 0.10.2",
+ "rand_chacha 0.10.0",
+ "ranim",
+ "ranim-anims",
+ "ranim-core",
+ "ranim-items",
+]
+
+[[package]]
 name = "ranim-items"
 version = "0.2.1"
 dependencies = [
@@ -5286,21 +5301,6 @@ dependencies = [
  "tracing",
  "wgpu",
  "wgpu-profiler",
-]
-
-[[package]]
-name = "ranim-scenes"
-version = "0.2.1"
-dependencies = [
- "getrandom 0.4.3",
- "itertools 0.15.0",
- "midly",
- "rand 0.10.2",
- "rand_chacha 0.10.0",
- "ranim",
- "ranim-anims",
- "ranim-core",
- "ranim-items",
 ]
 
 [[package]]

@@ -26,15 +26,15 @@ fn copy_file(source: &Path, target_dir: &Path) -> Result<String> {
 }
 
 /// The package and wasm names of the shared wasm scene bundle.
-const SCENES_BUNDLE_PACKAGE: &str = "ranim-scenes";
-const SCENES_BUNDLE_CRATE: &str = "ranim_scenes";
-const SCENES_BUNDLE_WEB_DIR: &str = "ranim-scenes";
+const EXAMPLES_BUNDLE_PACKAGE: &str = "ranim-examples";
+const EXAMPLES_BUNDLE_CRATE: &str = "ranim_examples";
+const EXAMPLES_BUNDLE_WEB_DIR: &str = "ranim-examples";
 
-fn clean_wasm_bundle(root_dir: &Path) -> Result<()> {
+fn clean_examples_wasm(root_dir: &Path) -> Result<()> {
     let output_dir = root_dir
         .join("website")
         .join("static")
-        .join(SCENES_BUNDLE_WEB_DIR)
+        .join(EXAMPLES_BUNDLE_WEB_DIR)
         .join("pkg");
     if std::fs::exists(&output_dir)? {
         std::fs::remove_dir_all(&output_dir)
@@ -47,21 +47,21 @@ fn clean_wasm_bundle(root_dir: &Path) -> Result<()> {
 ///
 /// The bundle is built once with the full feature set (`preview`, `anims`,
 /// `items` and `typst`) and exposed to the website as
-/// `website/static/ranim-scenes/pkg/ranim_scenes.js`.
-pub fn build_wasm_bundle(root_dir: impl AsRef<Path>) -> Result<()> {
+/// `website/static/ranim-examples/pkg/ranim_examples.js`.
+pub fn build_examples_wasm(root_dir: impl AsRef<Path>) -> Result<()> {
     let root_dir = root_dir.as_ref();
     let website_root = root_dir.join("website");
-    let output_dir = website_root.join("static").join(SCENES_BUNDLE_WEB_DIR);
+    let output_dir = website_root.join("static").join(EXAMPLES_BUNDLE_WEB_DIR);
     std::fs::create_dir_all(&output_dir)?;
 
-    clean_wasm_bundle(root_dir)?;
+    clean_examples_wasm(root_dir)?;
 
     let status = Command::new("cargo")
         .current_dir(root_dir)
         .args([
             "build",
             "-p",
-            SCENES_BUNDLE_PACKAGE,
+            EXAMPLES_BUNDLE_PACKAGE,
             "--target",
             "wasm32-unknown-unknown",
             "--release",
@@ -77,7 +77,7 @@ pub fn build_wasm_bundle(root_dir: impl AsRef<Path>) -> Result<()> {
         .join("target")
         .join("wasm32-unknown-unknown")
         .join("release")
-        .join(format!("{SCENES_BUNDLE_CRATE}.wasm"));
+        .join(format!("{EXAMPLES_BUNDLE_CRATE}.wasm"));
     let pkg_dir = output_dir.join("pkg");
     let status = Command::new("wasm-bindgen")
         .current_dir(root_dir)
@@ -95,16 +95,16 @@ pub fn build_wasm_bundle(root_dir: impl AsRef<Path>) -> Result<()> {
         bail!("wasm-bindgen failed for the wasm example bundle");
     }
 
-    let bg_wasm = pkg_dir.join(format!("{SCENES_BUNDLE_CRATE}_bg.wasm"));
+    let bg_wasm = pkg_dir.join(format!("{EXAMPLES_BUNDLE_CRATE}_bg.wasm"));
     optimize_wasm(&bg_wasm).context("failed to optimize the wasm example bundle")?;
 
-    clean_legacy_wasm_packages(root_dir)?;
+    clean_legacy_example_wasm_packages(root_dir)?;
     Ok(())
 }
 
 /// Remove per-example wasm packages left over from website builds that
-/// predate the shared `ranim-scenes` bundle.
-fn clean_legacy_wasm_packages(root_dir: &Path) -> Result<()> {
+/// predate the shared `ranim-examples` bundle.
+fn clean_legacy_example_wasm_packages(root_dir: &Path) -> Result<()> {
     let examples_root = root_dir.join("website").join("static").join("examples");
     if !std::fs::exists(&examples_root)? {
         return Ok(());
@@ -434,7 +434,7 @@ mod test {
     fn test_example_build_wasm() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
-        build_wasm_bundle(&root_dir).unwrap();
+        build_examples_wasm(&root_dir).unwrap();
     }
 
     /// Destructive: deletes the example's website outputs; ignored by default.

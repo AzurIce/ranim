@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::env;
 use std::path::Path;
-use xtask_examples::{build_wasm_bundle, get_examples};
+use xtask_examples::{build_examples_wasm, get_examples};
 
 #[derive(Parser)]
 #[command(author, version, about = "build ranim examples")]
@@ -48,7 +48,7 @@ fn main() {
     }
 
     if matches!(&args.command, Commands::Build) {
-        if let Err(err) = build_wasm_bundle(&workspace_root) {
+        if let Err(err) = build_examples_wasm(&workspace_root) {
             eprintln!("构建 wasm example bundle 失败: {err:#}");
             std::process::exit(1);
         }

@@ -25,29 +25,29 @@ website:
     zola --root website build
 
 doc-nightly:
-    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-scenes/docs-rs/header.html" \
+    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
         cargo +nightly doc --workspace --no-deps --document-private-items --all-features \
         --exclude app --exclude xtask-examples --exclude benches
     just _build-example-doc-assets
 
 doc:
-    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-scenes/docs-rs/header.html" \
+    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
         cargo doc --workspace --no-deps --document-private-items --all-features \
         --exclude app --exclude xtask-examples --exclude benches
     just _build-example-doc-assets
 
 _build-example-doc-assets:
-    cargo build -p ranim-scenes --release --target wasm32-unknown-unknown
-    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_scenes.wasm \
-        --out-dir target/doc/ranim_scenes/pkg
+    cargo build -p ranim-examples --release --target wasm32-unknown-unknown
+    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_examples.wasm \
+        --out-dir target/doc/ranim_examples/pkg
 
 doc-examples:
-    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-scenes/docs-rs/header.html" \
-        cargo doc --no-deps -p ranim-scenes --document-private-items --all-features \
-        --target-dir packages/ranim-scenes/target
-    cargo build -p ranim-scenes --release --target wasm32-unknown-unknown
-    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_scenes.wasm \
-        --out-dir packages/ranim-scenes/target/doc/ranim_scenes/pkg
+    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
+        cargo doc --no-deps -p ranim-examples --document-private-items --all-features \
+        --target-dir packages/ranim-examples/target
+    cargo build -p ranim-examples --release --target wasm32-unknown-unknown
+    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_examples.wasm \
+        --out-dir packages/ranim-examples/target/doc/ranim_examples/pkg
 
 book:
     mdbook build book

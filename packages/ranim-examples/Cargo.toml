@@ -1,5 +1,5 @@
 [package]
-name = "ranim-scenes"
+name = "ranim-examples"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +8,7 @@ publish = false
 
 [lib]
 crate-type = ["cdylib"]
-path = "../../examples/ranim_scenes_bundle.rs"
+path = "../../examples/ranim_examples_bundle.rs"
 
 [dependencies]
 ranim = { workspace = true, features = ["preview", "anims", "items", "typst"] }
