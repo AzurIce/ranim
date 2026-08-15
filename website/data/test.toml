@@ -28,6 +28,7 @@ use ranim::{
 // const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
+#[wasm_demo_doc]
 #[output(save_frames = true, dir = "./output/output")]
 fn test(r: &mut RanimScene) {
     let camera_frame = CameraFrame::default().with(|x| {
@@ -51,9 +52,8 @@ fn test(r: &mut RanimScene) {
     r.play(camera_frame.show().with_duration(content.cursor_sec()));
     r.play(content);
 }
-```
-"""
-hash = "519d49f4ef7b98b7fe5e8fe822146b5a95fe0101"
+```"""
+hash = "b65853038b4febeedcd274d707d8d8ebd191a714"
 preview_imgs = []
 output_files = []
 wasm = false

@@ -20,6 +20,7 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/aabb")]
 fn aabb(r: &mut RanimScene) {
     let frame_w = 8.0 * 16.0 / 9.0;

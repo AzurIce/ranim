@@ -23,13 +23,23 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-05-01
+          targets: wasm32-unknown-unknown
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen
 
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: "doc"
 
       - name: Build rustdoc
-        run: RUSTDOCFLAGS="--cfg docsrs" cargo doc --workspace --no-deps --document-private-items --all-features --exclude app --exclude xtask-examples --exclude benches
+        run: RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" cargo doc --workspace --no-deps --document-private-items --all-features --exclude app --exclude xtask-examples --exclude benches
+
+      - name: Build example doc wasm
+        run: |
+          cargo build -p ranim-examples --release --target wasm32-unknown-unknown
+          wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_examples.wasm --out-dir target/doc/ranim_examples/pkg
 
       - uses: actions/upload-artifact@v4
         with:

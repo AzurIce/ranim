@@ -13,6 +13,7 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/getting_started2")]
 fn getting_started2(r: &mut RanimScene) {
     let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {

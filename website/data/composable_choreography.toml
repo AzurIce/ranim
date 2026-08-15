@@ -98,6 +98,7 @@ fn tile_row(y: f64) -> Vec<VItem> {
 }
 
 #[scene(clear_color = "#11131d")]
+#[wasm_demo_doc]
 #[output(dir = "./output/composable_choreography")]
 fn composable_choreography(r: &mut RanimScene) {
     // Sequence -> Stack -> Sequence: a single staggered row.
@@ -126,9 +127,8 @@ fn composable_choreography(r: &mut RanimScene) {
         TimeMark::Capture("preview.png".to_owned()),
     );
 }
-```
-"""
-hash = "dfd36e700e8097bf05dcc83a1a4683170e5fc693"
+```"""
+hash = "0fc2e735db863a161f059b49511470f12693625c"
 preview_imgs = ["/examples/composable_choreography/preview.png"]
 output_files = ["/examples/composable_choreography/composable_choreography_1920x1080_60.mp4"]
 wasm = true

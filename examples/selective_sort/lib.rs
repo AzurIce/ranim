@@ -118,12 +118,14 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/selective_sort")]
 fn selective_sort_10(r: &mut RanimScene) {
     selective_sort(r, 10);
 }
 
 #[scene(name = "selective_sort")]
+#[wasm_demo_doc]
 #[output(dir = "./output/selective_sort")]
 fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);

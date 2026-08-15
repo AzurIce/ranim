@@ -13,6 +13,7 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/arc_between_points")]
 fn arc_between_points(r: &mut RanimScene) {
     let center = dvec2(0.0, 0.0);
@@ -58,9 +59,8 @@ fn arc_between_points(r: &mut RanimScene) {
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```
-"""
-hash = "821cdc08385bcd190617a780e94901f678092c52"
+```"""
+hash = "313ba4e302839c8b1e82f3c246a523e44aa11e7f"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
 wasm = true

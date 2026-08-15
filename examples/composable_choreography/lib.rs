@@ -95,6 +95,7 @@ fn tile_row(y: f64) -> Vec<VItem> {
 }
 
 #[scene(clear_color = "#11131d")]
+#[wasm_demo_doc]
 #[output(dir = "./output/composable_choreography")]
 fn composable_choreography(r: &mut RanimScene) {
     // Sequence -> Stack -> Sequence: a single staggered row.

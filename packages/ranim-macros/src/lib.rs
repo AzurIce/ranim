@@ -78,7 +78,14 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     let attrs = parse_scene_attrs(args, input_fn.attrs.as_slice()).unwrap();
 
     let fn_name = &input_fn.sig.ident;
-    let vis = &input_fn.vis;
+    // `#[wasm_demo_doc]` scenes are embedded into rustdoc pages, so make sure
+    // they are public enough for rustdoc to render them.
+    let vis = if attrs.wasm_demo_doc {
+        quote!(pub)
+    } else {
+        let vis = &input_fn.vis;
+        quote!(#vis)
+    };
     let fn_body = &input_fn.block;
     let doc_attrs: Vec<_> = input_fn
         .attrs
@@ -149,7 +156,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
             #[doc = concat!("<canvas id=\"ranim-app-", stringify!(#fn_name), "\" width=\"1280\" height=\"720\" style=\"width: 100%;\"></canvas>")]
             #[doc = concat!("<script type=\"module\">")]
             #[doc = concat!("  const { find_scene, preview_scene } = await ranim_examples;")]
-            #[doc = concat!("  preview_scene(find_scene(\"", stringify!(#fn_name), "\"));")]
+            #[doc = concat!("  preview_scene(find_scene(\"", #scene_name, "\"));")]
             #[doc = "</script>"]
         }
     } else {

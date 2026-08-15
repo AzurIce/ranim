@@ -8,6 +8,7 @@ use ranim::{
 
 // ANCHOR: construct
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/getting_started0")]
 fn getting_started0(r: &mut RanimScene) {
     // A Square with size 2.0 and color blue
@@ -32,9 +33,8 @@ fn getting_started0(r: &mut RanimScene) {
     r.play(content);
 }
 // ANCHOR_END: construct
-```
-"""
-hash = "d70dfda3c539d332437d3ab22d03b85eca7f2648"
+```"""
+hash = "156a886a801e34da52bd10ef57041fe26807cfd7"
 preview_imgs = []
 output_files = ["/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
 wasm = true

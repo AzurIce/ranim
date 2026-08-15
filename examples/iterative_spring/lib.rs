@@ -43,6 +43,7 @@ const K: f64 = 25.0;
 const C: f64 = 1.0;
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/iterative_spring")]
 fn iterative_spring(r: &mut RanimScene) {
     let sim_secs = 4.0;

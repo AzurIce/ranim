@@ -12,6 +12,7 @@ use ranim_anims::{
 use ranim_items::vitem::{VItem, text::TextItem};
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/text_item")]
 fn text_item(r: &mut RanimScene) {
     let text = "The quick brown fox jumps over the lazy dog.";
@@ -63,9 +64,8 @@ fn text_item(r: &mut RanimScene) {
         TimeMark::Capture("preview.png".to_string()),
     );
 }
-```
-"""
-hash = "2f93fe37ba654194a2eb90b16742a1fac47e659d"
+```"""
+hash = "4cc637af87815e47cbe46b7508ca59d6bede4b8d"
 preview_imgs = ["/examples/text_item/preview.png"]
 output_files = ["/examples/text_item/text_item_1920x1080_60.mp4"]
 wasm = true

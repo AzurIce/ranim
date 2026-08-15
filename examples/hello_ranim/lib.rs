@@ -12,6 +12,7 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/hello_ranim")]
 fn hello_ranim(r: &mut RanimScene) {
     let mut square = Square::new(2.0);

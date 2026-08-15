@@ -11,6 +11,7 @@ use ranim::{
 
 // ANCHOR: construct
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/getting_started1")]
 fn getting_started1(r: &mut RanimScene) {
     // A Square with size 2.0 and color blue

@@ -32,6 +32,7 @@ impl Eval for RotateAroundZ {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/tetrahedron_spheres")]
 fn tetrahedron_spheres(r: &mut RanimScene) {
     let phi = 60.0 * PI / 180.0;
@@ -116,9 +117,8 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```
-"""
-hash = "c2c9d216cd765a7fee49f818b6d6ae2ad0f15cf3"
+```"""
+hash = "ae953d86b816a2d4de615ad6f95ac9bee2c692d7"
 preview_imgs = ["/examples/tetrahedron_spheres/preview.png"]
 output_files = ["/examples/tetrahedron_spheres/tetrahedron_spheres_1920x1080_60.mp4"]
 wasm = true

@@ -39,7 +39,6 @@ const BALL_SPEED: f64 = 1.2;
 const BALL_START_Y: f64 = 3.0;
 /// Where the ball stops, just below the cloth, letting the cloth settle draped over it.
 const BALL_STOP_Y: f64 = 1.4;
-const SIM_SECS: f64 = 7.0;
 
 /// The cloth-plus-ball system's full state.
 #[derive(Clone)]
@@ -224,8 +223,10 @@ impl Extract for ClothState {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/cloth_wrap")]
 fn cloth_wrap(r: &mut RanimScene) {
+    let sim_secs = 7.0;
     let mut camera = CameraFrame::default();
     // Oblique downward view (~40° below horizontal, slightly asymmetric azimuth).
     camera.pos = dvec3(-4.0, 5.0, 2.5);
@@ -234,20 +235,19 @@ fn cloth_wrap(r: &mut RanimScene) {
     camera.perspective_blend = 1.0;
     camera.fovy = 45.0f64.to_radians();
 
-    r.play(camera.show().with_duration(SIM_SECS));
+    r.play(camera.show().with_duration(sim_secs));
     r.play(
         Iterative::from_fn(
             ClothState::new(),
-            |state: &mut ClothState, alpha: f64, delta_alpha: f64| {
-                state.step(SIM_SECS * delta_alpha, SIM_SECS * alpha);
+            move |state: &mut ClothState, alpha: f64, delta_alpha: f64| {
+                state.step(sim_secs * delta_alpha, sim_secs * alpha);
             },
         )
-        .with_duration(SIM_SECS),
+        .with_duration(sim_secs),
     );
 }
-```
-"""
-hash = "6aa5cc41f095cebfb62bd4f3f8cb3a841fd2285c"
+```"""
+hash = "083f7139a89be8925baf1800af6d1bdce7dd7ddc"
 preview_imgs = []
 output_files = ["/examples/cloth_wrap/cloth_wrap_1920x1080_60.mp4"]
 wasm = false
