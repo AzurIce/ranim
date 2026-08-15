@@ -25,16 +25,25 @@ website:
     zola --root website build
 
 doc-nightly:
-    RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --workspace --no-deps --document-private-items --all-features --exclude app --exclude xtask-examples --exclude benches
-    # RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --no-deps -p ranim --document-private-items --all-features
+    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-scenes/docs-rs/header.html" \
+        cargo +nightly doc --workspace --no-deps --document-private-items --all-features \
+        --exclude app --exclude xtask-examples --exclude benches
+    just _build-example-doc-assets
     -rm -r website/static/doc/
     cp -r target/doc/ website/static/doc/
 
 doc:
-    RUSTDOCFLAGS="--cfg docsrs" cargo doc --workspace --no-deps --document-private-items --all-features --exclude app --exclude xtask-examples --exclude benches
-    # RUSTDOCFLAGS="--cfg docsrs" cargo doc --no-deps -p ranim --document-private-items --all-features
+    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-scenes/docs-rs/header.html" \
+        cargo doc --workspace --no-deps --document-private-items --all-features \
+        --exclude app --exclude xtask-examples --exclude benches
+    just _build-example-doc-assets
     -rm -r website/static/doc/
     cp -r target/doc/ website/static/doc/
+
+_build-example-doc-assets:
+    cargo build -p ranim-scenes --release --target wasm32-unknown-unknown
+    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_scenes.wasm \
+        --out-dir target/doc/ranim_scenes/pkg
 
 doc-examples:
     RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-scenes/docs-rs/header.html" \
