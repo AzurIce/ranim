@@ -36,6 +36,14 @@ doc:
     -rm -r website/static/doc/
     cp -r target/doc/ website/static/doc/
 
+doc-examples:
+    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-scenes/docs-rs/header.html" \
+        cargo doc --no-deps -p ranim-scenes --document-private-items --all-features \
+        --target-dir packages/ranim-scenes/target
+    cargo build -p ranim-scenes --release --target wasm32-unknown-unknown
+    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_scenes.wasm \
+        --out-dir packages/ranim-scenes/target/doc/ranim_scenes/pkg
+
 book:
     mdbook build book
 

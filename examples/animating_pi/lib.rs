@@ -14,6 +14,7 @@ use ranim_items::vitem::typst::compile_typst_code;
 use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 
 #[scene(clear_color = "#000000")]
+#[wasm_demo_doc]
 #[output(dir = "./output/animating_pi")]
 fn animating_pi(r: &mut RanimScene) {
     let cam = CameraFrame::default();

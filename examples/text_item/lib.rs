@@ -9,6 +9,7 @@ use ranim_anims::{
 use ranim_items::vitem::{VItem, text::TextItem};
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/text_item")]
 fn text_item(r: &mut RanimScene) {
     let text = "The quick brown fox jumps over the lazy dog.";

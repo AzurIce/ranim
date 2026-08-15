@@ -220,6 +220,7 @@ impl Extract for ClothState {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/cloth_wrap")]
 fn cloth_wrap(r: &mut RanimScene) {
     let sim_secs = 7.0;

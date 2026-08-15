@@ -1,0 +1,26 @@
+[package]
+name = "ranim-scenes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+path = "../../examples/ranim_scenes_bundle.rs"
+
+[dependencies]
+ranim = { workspace = true, features = ["preview", "anims", "items", "typst"] }
+ranim-core.workspace = true
+ranim-items.workspace = true
+ranim-anims.workspace = true
+itertools.workspace = true
+rand = "0.10.2"
+rand_chacha = "0.10.0"
+midly = "0.5.3"
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "docs-rs/header.html"]

@@ -25,8 +25,8 @@ fn copy_file(source: &Path, target_dir: &Path) -> Result<String> {
     Ok(file_name)
 }
 
-/// The example target and wasm names of the shared wasm scene bundle.
-const SCENES_BUNDLE_EXAMPLE: &str = "ranim_scenes";
+/// The package and wasm names of the shared wasm scene bundle.
+const SCENES_BUNDLE_PACKAGE: &str = "ranim-scenes";
 const SCENES_BUNDLE_CRATE: &str = "ranim_scenes";
 const SCENES_BUNDLE_WEB_DIR: &str = "ranim-scenes";
 
@@ -45,10 +45,8 @@ fn clean_wasm_bundle(root_dir: &Path) -> Result<()> {
 
 /// Build the shared wasm bundle containing every example scene.
 ///
-/// The bundle is a root-package `[[example]]` target so rust-analyzer keeps
-/// the referenced example files in the same source root. It is built once
-/// with the full feature set (`preview`, `anims`, `items` and `typst`) and
-/// exposed to the website as
+/// The bundle is built once with the full feature set (`preview`, `anims`,
+/// `items` and `typst`) and exposed to the website as
 /// `website/static/ranim-scenes/pkg/ranim_scenes.js`.
 pub fn build_wasm_bundle(root_dir: impl AsRef<Path>) -> Result<()> {
     let root_dir = root_dir.as_ref();
@@ -62,10 +60,8 @@ pub fn build_wasm_bundle(root_dir: impl AsRef<Path>) -> Result<()> {
         .current_dir(root_dir)
         .args([
             "build",
-            "--example",
-            SCENES_BUNDLE_EXAMPLE,
-            "--features",
-            "preview,typst",
+            "-p",
+            SCENES_BUNDLE_PACKAGE,
             "--target",
             "wasm32-unknown-unknown",
             "--release",
@@ -81,7 +77,6 @@ pub fn build_wasm_bundle(root_dir: impl AsRef<Path>) -> Result<()> {
         .join("target")
         .join("wasm32-unknown-unknown")
         .join("release")
-        .join("examples")
         .join(format!("{SCENES_BUNDLE_CRATE}.wasm"));
     let pkg_dir = output_dir.join("pkg");
     let status = Command::new("wasm-bindgen")
@@ -342,8 +337,6 @@ pub struct ExampleMeta {
     wasm: bool,
     #[serde(default)]
     hide: bool,
-    #[serde(default)]
-    bundle: bool,
 }
 
 pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
@@ -362,7 +355,7 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
         .try_into::<HashMap<String, ExampleMeta>>()
         .context("failed to parse [package.metadata.example]")?;
 
-    let examples = manifest["example"]
+    manifest["example"]
         .as_array()
         .context("no [[example]] targets in workspace Cargo.toml")?
         .iter()
@@ -395,12 +388,7 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
                 required_features,
             })
         })
-        .collect::<Result<Vec<_>>>()?;
-
-    Ok(examples
-        .into_iter()
-        .filter(|example| !example.meta.bundle)
-        .collect())
+        .collect()
 }
 
 #[cfg(test)]

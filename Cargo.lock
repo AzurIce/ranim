@@ -5289,6 +5289,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ranim-scenes"
+version = "0.2.1"
+dependencies = [
+ "getrandom 0.4.3",
+ "itertools 0.15.0",
+ "midly",
+ "rand 0.10.2",
+ "rand_chacha 0.10.0",
+ "ranim",
+ "ranim-anims",
+ "ranim-core",
+ "ranim-items",
+]
+
+[[package]]
 name = "rav1e"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

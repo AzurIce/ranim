@@ -12,6 +12,7 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/ellipse")]
 fn ellipse(r: &mut RanimScene) {
     // Create an ellipse (semi-axes: 3.0 x 1.5) and write it in

@@ -254,6 +254,7 @@ fn timer_label(timer: Timer) -> impl Animation {
 }
 
 #[scene(clear_color = "#080a10")]
+#[wasm_demo_doc]
 #[output(fps = 60, dir = "./output/typst_timer")]
 fn typst_timer_atlas(r: &mut RanimScene) {
     let timer = Timer::new(10.0);
@@ -267,6 +268,7 @@ fn typst_timer_atlas(r: &mut RanimScene) {
 }
 
 #[scene(clear_color = "#080a10")]
+#[wasm_demo_doc]
 #[output(fps = 60, dir = "./output/typst_timer")]
 fn typst_timer_recompile(r: &mut RanimScene) {
     let timer = Timer::new(10.0);

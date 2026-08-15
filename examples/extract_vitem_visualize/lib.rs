@@ -22,6 +22,7 @@ use glam::DVec3;
 
 // MARK: ranim_text
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/extract_vitem_visualize")]
 fn ranim_text(r: &mut RanimScene) {
     let mut cam = CameraFrame::default();
@@ -65,6 +66,7 @@ fn ranim_text(r: &mut RanimScene) {
 }
 
 #[scene(name = "extract_vitem_visualize")]
+#[wasm_demo_doc]
 #[output(dir = "./output/extract_vitem_visualize")]
 pub fn hello_ranim(r: &mut RanimScene) {
     let square = VisualVItem(VItem::from(Square::new(2.0).with(|square| {

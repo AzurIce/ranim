@@ -10,6 +10,7 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/arc_between_points")]
 fn arc_between_points(r: &mut RanimScene) {
     let center = dvec2(0.0, 0.0);

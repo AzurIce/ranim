@@ -6,6 +6,7 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/palettes")]
 fn palettes(r: &mut RanimScene) {
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);

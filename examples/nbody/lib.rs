@@ -154,6 +154,7 @@ impl Extract for NBodyState {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/nbody")]
 fn nbody(r: &mut RanimScene) {
     let sim_secs = 32.0;

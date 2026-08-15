@@ -265,6 +265,7 @@ fn planetary_systems() -> AnimStack {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/solar_system")]
 fn solar_system(r: &mut RanimScene) {
     let phi = 50.0f64.to_radians();

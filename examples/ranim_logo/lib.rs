@@ -69,6 +69,7 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     ]
 }
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/ranim_logo")]
 fn ranim_logo(r: &mut RanimScene) {
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
