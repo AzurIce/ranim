@@ -13,12 +13,11 @@ code = """
 //! each frame); the ball is a static sphere mesh moved by its transform.
 
 use ranim::{
-    anims::iterative::Iterative,
     color::palettes::manim,
     core::Extract,
+    core::animation::eval::iterative::Iterative,
     core::components::rgba::Rgba,
     core::core_item::CoreItem,
-    core::time::{DeltaTime, Time},
     glam::{DVec3, Mat4, Vec3, dvec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
@@ -239,8 +238,8 @@ fn cloth_wrap(r: &mut RanimScene) {
     r.play(
         Iterative::from_fn(
             ClothState::new(),
-            |state: &mut ClothState, time: &Time, delta_time: &DeltaTime| {
-                state.step(SIM_SECS * delta_time.alpha, time.global_secs);
+            |state: &mut ClothState, alpha: f64, delta_alpha: f64| {
+                state.step(SIM_SECS * delta_alpha, SIM_SECS * alpha);
             },
         )
         .with_duration(SIM_SECS),
@@ -248,7 +247,7 @@ fn cloth_wrap(r: &mut RanimScene) {
 }
 ```
 """
-hash = "889c67a2a719c92a2025747eaea39f6a9f82d039"
+hash = "6aa5cc41f095cebfb62bd4f3f8cb3a841fd2285c"
 preview_imgs = []
 output_files = ["/examples/cloth_wrap/cloth_wrap_1920x1080_60.mp4"]
 wasm = false

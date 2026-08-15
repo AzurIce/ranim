@@ -2,7 +2,7 @@ name = "hanoi"
 code = """
 ```rust
 use ranim::{
-    anims::pure::morph::MorphAnim,
+    anims::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
     glam::dvec3,
     items::vitem::geometry::Rectangle,
@@ -136,8 +136,9 @@ fn hanoi_5(r: &mut RanimScene) {
 fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
 }
-```"""
-hash = "38ef5e359e52d7cd7de3267996cc691edcc7cb32"
+```
+"""
+hash = "65bff6973cff790f330e6cad3f155789b551446d"
 preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
 output_files = ["/examples/hanoi/hanoi_5_1920x1080_60.mp4", "/examples/hanoi/hanoi_1920x1080_60.mp4"]
 wasm = true

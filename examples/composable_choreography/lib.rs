@@ -5,7 +5,7 @@
 //! preview Timeline.
 
 use ranim::{
-    anims::pure::{fading::FadingAnim, morph::MorphAnim},
+    anims::{fading::FadingAnim, morph::MorphAnim},
     color::palettes::manim,
     glam::{DVec3, dvec3},
     items::vitem::{VItem, geometry::Square},

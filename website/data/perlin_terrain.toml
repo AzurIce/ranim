@@ -4,7 +4,7 @@ code = """
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::pure::camera::CameraFrameAnim, color::palettes::manim, glam::DVec3, items::mesh::Surface,
+    anims::camera::CameraFrameAnim, color::palettes::manim, glam::DVec3, items::mesh::Surface,
     prelude::*, utils::rate_functions::linear,
 };
 
@@ -260,8 +260,9 @@ fn fractal_erosion(r: &mut RanimScene) {
         TimeMark::Capture("preview-fractal-erosion-perlin.png".to_string()),
     );
 }
-```"""
-hash = "cb9a8ecb46556a0789120f42f17526f742815396"
+```
+"""
+hash = "da6ce809f773220906ccbe5bbeb03450799ebeec"
 preview_imgs = ["/examples/perlin_terrain/preview-fractal-erosion-perlin.png", "/examples/perlin_terrain/preview-fractal-perlin.png", "/examples/perlin_terrain/preview-perlin.png"]
 output_files = ["/examples/perlin_terrain/perlin_terrain_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_perlin_1920x1080_60.mp4", "/examples/perlin_terrain/perlin_1920x1080_60.mp4"]
 wasm = true

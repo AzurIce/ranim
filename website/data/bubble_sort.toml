@@ -3,9 +3,9 @@ code = """
 ```rust
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
-    anims::pure::morph::MorphAnim,
+    anims::morph::MorphAnim,
     color::palettes::manim,
-    core::animation::{AnimSequence, StaticAnim},
+    core::animation::{StaticAnim, sequence::AnimSequence},
     glam::{DVec3, dvec2, dvec3},
     items::vitem::geometry::Rectangle,
     prelude::*,
@@ -123,8 +123,9 @@ fn bubble_sort_10(r: &mut RanimScene) {
 fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
 }
-```"""
-hash = "3b55c87bf4f79901264b957730b1abe928755071"
+```
+"""
+hash = "a2a8ecf72032aff177db2b3e72864acf6140454b"
 preview_imgs = ["/examples/bubble_sort/preview-100.png", "/examples/bubble_sort/preview-10.png"]
 output_files = ["/examples/bubble_sort/bubble_sort_10_1920x1080_60.mp4", "/examples/bubble_sort/bubble_sort_1920x1080_60.mp4"]
 wasm = true

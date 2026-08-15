@@ -2,7 +2,7 @@ use ranim::glam;
 
 use glam::DVec3;
 use ranim::{
-    anims::pure::{creation::WritingAnim, fading::FadingAnim},
+    anims::{creation::WritingAnim, fading::FadingAnim},
     color::palettes::manim,
     core::animation::StaticAnim,
     items::vitem::{VItem, svg::SvgItem, typst::typst_svg},

@@ -1,5 +1,5 @@
 use ranim::{
-    anims::pure::morph::MorphAnim,
+    anims::morph::MorphAnim,
     color,
     color::palettes::manim,
     glam::DVec3,

@@ -10,12 +10,11 @@
 //! each frame); the ball is a static sphere mesh moved by its transform.
 
 use ranim::{
-    anims::iterative::Iterative,
     color::palettes::manim,
     core::Extract,
+    core::animation::eval::iterative::Iterative,
     core::components::rgba::Rgba,
     core::core_item::CoreItem,
-    core::time::{DeltaTime, Time},
     glam::{DVec3, Mat4, Vec3, dvec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
@@ -37,7 +36,6 @@ const BALL_SPEED: f64 = 1.2;
 const BALL_START_Y: f64 = 3.0;
 /// Where the ball stops, just below the cloth, letting the cloth settle draped over it.
 const BALL_STOP_Y: f64 = 1.4;
-const SIM_SECS: f64 = 7.0;
 
 /// The cloth-plus-ball system's full state.
 #[derive(Clone)]
@@ -224,6 +222,7 @@ impl Extract for ClothState {
 #[scene]
 #[output(dir = "./output/cloth_wrap")]
 fn cloth_wrap(r: &mut RanimScene) {
+    let sim_secs = 7.0;
     let mut camera = CameraFrame::default();
     // Oblique downward view (~40° below horizontal, slightly asymmetric azimuth).
     camera.pos = dvec3(-4.0, 5.0, 2.5);
@@ -232,14 +231,14 @@ fn cloth_wrap(r: &mut RanimScene) {
     camera.perspective_blend = 1.0;
     camera.fovy = 45.0f64.to_radians();
 
-    r.play(camera.show().with_duration(SIM_SECS));
+    r.play(camera.show().with_duration(sim_secs));
     r.play(
         Iterative::from_fn(
             ClothState::new(),
-            |state: &mut ClothState, time: &Time, delta_time: &DeltaTime| {
-                state.step(SIM_SECS * delta_time.alpha, time.global_secs);
+            move |state: &mut ClothState, alpha: f64, delta_alpha: f64| {
+                state.step(sim_secs * delta_alpha, sim_secs * alpha);
             },
         )
-        .with_duration(SIM_SECS),
+        .with_duration(sim_secs),
     );
 }

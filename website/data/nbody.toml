@@ -15,11 +15,10 @@ code = """
 //! the whole scene; n >= 4 destabilizes and ejects a body (a dramatic finale).
 
 use ranim::{
-    anims::iterative::Iterative,
     color::{AlphaColor, Srgb, palettes::manim},
     core::Extract,
+    core::animation::eval::iterative::Iterative,
     core::core_item::CoreItem,
-    core::time::{DeltaTime, Time},
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},
     prelude::*,
@@ -165,8 +164,8 @@ fn nbody(r: &mut RanimScene) {
     r.play(
         Iterative::from_fn(
             NBodyState::new(99),
-            |state: &mut NBodyState, _time: &Time, delta_time: &DeltaTime| {
-                state.step(SIM_SECS * delta_time.alpha);
+            |state: &mut NBodyState, _alpha: f64, delta_alpha: f64| {
+                state.step(SIM_SECS * delta_alpha);
             },
         )
         .with_duration(SIM_SECS),
@@ -174,7 +173,7 @@ fn nbody(r: &mut RanimScene) {
 }
 ```
 """
-hash = "4a8bcc82c5e81a66d5381383835c8b845f84283f"
+hash = "b2367964567e754a6f3fd9a94d99382c66bc3a21"
 preview_imgs = []
 output_files = ["/examples/nbody/nbody_1920x1080_60.mp4"]
 wasm = false

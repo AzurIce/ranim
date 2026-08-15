@@ -1,8 +1,8 @@
 use std::f64::consts::PI;
 
 use ranim::{
-    anims::pure::camera::CameraFrameAnim, color::palettes::manim, glam::DVec3,
-    items::mesh::Surface, prelude::*, utils::rate_functions::linear,
+    anims::camera::CameraFrameAnim, color::palettes::manim, glam::DVec3, items::mesh::Surface,
+    prelude::*, utils::rate_functions::linear,
 };
 
 // --- Improved Perlin Noise (ported from Python) ---

@@ -4,7 +4,7 @@ use std::f64::consts::PI;
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
 use ranim::{
-    anims::pure::{creation::WritingAnim, morph::MorphAnim},
+    anims::{creation::WritingAnim, morph::MorphAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,

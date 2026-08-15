@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ranim::{
-    anims::pure::fading::FadingAnim,
+    anims::fading::FadingAnim,
     color,
     color::HueDirection,
     glam::{DMat2, dvec2},

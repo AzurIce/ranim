@@ -1,11 +1,9 @@
 use ranim_core::{
-    animation::Eval,
+    animation::eval::{Eval, EvalExt},
     core_item::vitem::DEFAULT_STROKE_WIDTH,
     traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth},
 };
 use tracing::warn;
-
-use crate::pure::{Pure, PureEval};
 
 // MARK: Creation
 
@@ -16,17 +14,17 @@ impl<T: Clone + Partial + Empty + Interpolatable> CreationRequirement for T {}
 /// The methods to create animations for `T` that satisfies [`CreationRequirement`]
 pub trait CreationAnim<T: CreationRequirement + 'static> {
     /// Create a [`Create`] anim for `T`.
-    fn create(&mut self) -> Pure<Create<T>>;
+    fn create(&mut self) -> Create<T>;
     /// Create an [`UnCreate`] anim for `T`.
-    fn uncreate(&mut self) -> Pure<UnCreate<T>>;
+    fn uncreate(&mut self) -> UnCreate<T>;
 }
 
 impl<T: CreationRequirement + 'static> CreationAnim<T> for T {
-    fn create(&mut self) -> Pure<Create<T>> {
-        Pure(Create::new(self.clone())).apply_to(self)
+    fn create(&mut self) -> Create<T> {
+        Create::new(self.clone()).apply_to(self)
     }
-    fn uncreate(&mut self) -> Pure<UnCreate<T>> {
-        Pure(UnCreate::new(self.clone())).apply_to(self)
+    fn uncreate(&mut self) -> UnCreate<T> {
+        UnCreate::new(self.clone()).apply_to(self)
     }
 }
 
@@ -38,17 +36,17 @@ impl<T: CreationRequirement + StrokeWidth + StrokeColor + FillColor> WritingRequ
 /// The methods to create animations for `T` that satisfies [`WritingRequirement`]
 pub trait WritingAnim: WritingRequirement + Sized + 'static {
     /// Create a [`Write`] anim for `T`.
-    fn write(&mut self) -> Pure<Write<Self>>;
+    fn write(&mut self) -> Write<Self>;
     /// Create a [`Unwrite`] anim for `T`.
-    fn unwrite(&mut self) -> Pure<Unwrite<Self>>;
+    fn unwrite(&mut self) -> Unwrite<Self>;
 }
 
 impl<T: WritingRequirement + Sized + 'static> WritingAnim for T {
-    fn write(&mut self) -> Pure<Write<Self>> {
-        Pure(Write::new(self.clone())).apply_to(self)
+    fn write(&mut self) -> Write<Self> {
+        Write::new(self.clone()).apply_to(self)
     }
-    fn unwrite(&mut self) -> Pure<Unwrite<Self>> {
-        Pure(Unwrite::new(self.clone())).apply_to(self)
+    fn unwrite(&mut self) -> Unwrite<Self> {
+        Unwrite::new(self.clone()).apply_to(self)
     }
 }
 
@@ -70,7 +68,7 @@ impl<T: CreationRequirement> Create<T> {
     }
 }
 
-impl<T: CreationRequirement> PureEval for Create<T> {
+impl<T: CreationRequirement> Eval for Create<T> {
     type Output = T;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -101,7 +99,7 @@ impl<T: CreationRequirement> UnCreate<T> {
     }
 }
 
-impl<T: CreationRequirement> PureEval for UnCreate<T> {
+impl<T: CreationRequirement> Eval for UnCreate<T> {
     type Output = T;
 
     fn eval_alpha(&self, mut alpha: f64) -> Self::Output {
@@ -145,7 +143,7 @@ impl<T: WritingRequirement> Write<T> {
     }
 }
 
-impl<T: WritingRequirement> PureEval for Write<T> {
+impl<T: WritingRequirement> Eval for Write<T> {
     type Output = T;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -187,7 +185,7 @@ impl<T: WritingRequirement> Unwrite<T> {
     }
 }
 
-impl<T: WritingRequirement> PureEval for Unwrite<T> {
+impl<T: WritingRequirement> Eval for Unwrite<T> {
     type Output = T;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
