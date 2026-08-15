@@ -3,7 +3,7 @@ code = """
 ```rust
 use itertools::Itertools;
 use ranim::{
-    anims::pure::fading::FadingAnim,
+    anims::fading::FadingAnim,
     color,
     color::HueDirection,
     glam::{DMat2, dvec2},
@@ -58,8 +58,9 @@ fn arc_between_points(r: &mut RanimScene) {
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```"""
-hash = "1d7450eaaf18078128de2981b81f5fcd2b1ada17"
+```
+"""
+hash = "821cdc08385bcd190617a780e94901f678092c52"
 preview_imgs = ["/examples/arc_between_points/preview.png"]
 output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
 wasm = true

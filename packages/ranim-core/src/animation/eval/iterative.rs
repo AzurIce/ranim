@@ -1,7 +1,8 @@
 //! Iterative (stateful, stepped) evaluation: the
-//! [`IterativeEval`](crate::iterative::IterativeEval) capability trait and its
-//! [`Iterative`](crate::iterative::Iterative) adapter into the general
-//! [`Eval`](ranim_core::animation::Eval) protocol.
+//! [`IterativeEval`](crate::animation::eval::iterative::IterativeEval)
+//! capability trait and its
+//! [`Iterative`](crate::animation::eval::iterative::Iterative) adapter into the
+//! general [`Eval`](crate::animation::eval::Eval) protocol.
 //!
 //! **Content is sequence**: an iterative segment owns its simulation step
 //! (`sim_step`, declared via `with_steps(N)`), its integration state, and its
@@ -12,7 +13,7 @@
 
 use std::{cell::RefCell, marker::PhantomData};
 
-use ranim_core::animation::Eval;
+use super::Eval;
 
 /// The capability of an iterative, stateful evaluation.
 ///
@@ -195,7 +196,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ranim_core::{
+    use crate::{
         RanimScene, SceneEvaluator,
         animation::AnimationExt,
         core_item::{CoreItem, vitem::VItem},

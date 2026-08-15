@@ -12,7 +12,7 @@ mod visual;
 use std::sync::Arc;
 
 use midi::parse_song;
-use ranim::{anims::pure::Pure, glam::DVec3, prelude::*, utils::rate_functions::linear};
+use ranim::{glam::DVec3, prelude::*, utils::rate_functions::linear};
 use ranim_core::animation::{Placeable, StaticAnim};
 use visual::{
     FRAME_HEIGHT, HitEffectsEval, MidiNotesEval, PianoKeyboardEval, PianoLayout, SingleNoteEval,
@@ -25,16 +25,16 @@ fn common_layers(song: &Arc<midi::MidiSong>, layout: PianoLayout) -> AnimStack {
 
     stack![
         background.show().with_duration(duration),
-        Pure(PianoKeyboardEval {
+        PianoKeyboardEval {
             song: song.clone(),
             layout,
-        })
+        }
         .with_duration(duration)
         .with_rate_func(linear),
-        Pure(HitEffectsEval {
+        HitEffectsEval {
             song: song.clone(),
             layout,
-        })
+        }
         .with_duration(duration)
         .with_rate_func(linear),
     ]
@@ -59,10 +59,10 @@ fn midi_visualizer(r: &mut RanimScene) {
 
     r.play(camera(duration));
     r.play(stack![
-        Pure(MidiNotesEval {
+        MidiNotesEval {
             song: song.clone(),
             layout,
-        })
+        }
         .with_duration(duration)
         .with_rate_func(linear),
         common_layers(&song, layout),
@@ -82,7 +82,7 @@ fn midi_visualizer_per_note(r: &mut RanimScene) {
         let start_sec = note_eval.start_sec();
         let duration_secs = note_eval.duration_secs();
         notes.push(
-            Pure(note_eval)
+            note_eval
                 .with_duration(duration_secs)
                 .with_rate_func(linear)
                 .at(start_sec),
@@ -102,8 +102,9 @@ fn bundled_midi_parses() {
     assert_eq!(song.notes.len(), 3378);
     assert!(song.duration_secs > 58.0);
 }
-```"""
-hash = "e1b14048a2e7ea09c0b00808f48ea9b874ede036"
+```
+"""
+hash = "40d730abb0366b2a24e06b0465546d5857fd908f"
 preview_imgs = ["/examples/midi_visualizer/preview.png", "/examples/midi_visualizer/preview.png"]
 output_files = ["/examples/midi_visualizer/midi_visualizer_1920x1080_30.mp4", "/examples/midi_visualizer/midi_visualizer_per_note_1920x1080_30.mp4"]
 wasm = true

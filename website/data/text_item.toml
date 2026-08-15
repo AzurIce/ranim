@@ -5,7 +5,7 @@ use std::f64::consts::TAU;
 
 use ranim::utils::rate_functions::smooth;
 use ranim::{color::palettes::manim, glam::DVec3, prelude::*};
-use ranim_anims::pure::{
+use ranim_anims::{
     creation::{CreationAnim, WritingAnim},
     rotating::RotatingAnim,
 };
@@ -21,10 +21,12 @@ fn text_item(r: &mut RanimScene) {
         .text_box()
         .with(|item| item.set_stroke_color(manim::RED_C).discard());
 
-    let mut text_sequence = seq![Vec::<VItem>::from(text.clone())
-        .iter_mut()
-        .map(|item| item.write().with_rate_func(smooth))
-        .into_lagged(0.1)];
+    let mut text_sequence = seq![
+        Vec::<VItem>::from(text.clone())
+            .iter_mut()
+            .map(|item| item.write().with_rate_func(smooth))
+            .into_lagged(0.1)
+    ];
     text_sequence
         .hold(3.0)
         .push(
@@ -61,8 +63,9 @@ fn text_item(r: &mut RanimScene) {
         TimeMark::Capture("preview.png".to_string()),
     );
 }
-```"""
-hash = "4126272e56216077dee5471fbb0774dba3fb471b"
+```
+"""
+hash = "2f93fe37ba654194a2eb90b16742a1fac47e659d"
 preview_imgs = ["/examples/text_item/preview.png"]
 output_files = ["/examples/text_item/text_item_1920x1080_60.mp4"]
 wasm = true

@@ -2,7 +2,7 @@ use std::f64::consts::TAU;
 
 use ranim::utils::rate_functions::smooth;
 use ranim::{color::palettes::manim, glam::DVec3, prelude::*};
-use ranim_anims::pure::{
+use ranim_anims::{
     creation::{CreationAnim, WritingAnim},
     rotating::RotatingAnim,
 };

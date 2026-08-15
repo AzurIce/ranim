@@ -1,9 +1,7 @@
 use ranim_core::{
-    animation::{Eval, EvalExt},
+    animation::eval::{Eval, EvalExt},
     traits::{Interpolatable, Opacity},
 };
-
-
 
 // MARK: Require Trait
 /// The requirement of [`FadeIn`] and [`FadeOut`]

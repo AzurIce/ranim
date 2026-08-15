@@ -7,7 +7,7 @@ use std::f64::consts::PI;
 use glam::{DVec3, dvec2, dvec3};
 use itertools::Itertools;
 use ranim::{
-    anims::pure::{creation::WritingAnim, morph::MorphAnim},
+    anims::{creation::WritingAnim, morph::MorphAnim},
     color::palettes::manim,
     items::vitem::{
         VItem,
@@ -179,8 +179,9 @@ fn ranim_logo(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(total_secs));
     r.play(stack![content, text_sequence]);
 }
-```"""
-hash = "a8cf9ea5efd03bcaf1477680ecc267fd178b113c"
+```
+"""
+hash = "f893cd4ed6a31e582fd83c4eaf0b9f7879f6dd7c"
 preview_imgs = ["/examples/ranim_logo/preview.png"]
 output_files = ["/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
 wasm = true

@@ -209,7 +209,8 @@ fn typst_timer_atlas(r: &mut RanimScene) {
         .with_duration(DURATION_SECS),
     );
     r.play(stack![
-        AtlasTimerEval { atlas }.with_duration(DURATION_SECS)
+        AtlasTimerEval { atlas }
+            .with_duration(DURATION_SECS)
             .with_rate_func(linear),
         timer_label(),
     ]);

@@ -1,5 +1,8 @@
 # v0.3
 
+> [!note] 历史快照
+> 本文是 v0.3 早期的设计记录。后续 content-is-sequence 重构把 `Eval` 收敛为单一 `eval_alpha(&self, alpha)`，`Time`/`DeltaTime`/`PureEval` 已删除，`PureFunc` 与 `Iterative` 已移入 `ranim_core::animation`，`ranim-anims` 拍平为具体动画家族。当前行为以源码和 `understand/core/animation.md` 为准。
+
 ## 新增
 
 - 可组合动画编排系统（见 "Composable Animation Arrangement" 一节）

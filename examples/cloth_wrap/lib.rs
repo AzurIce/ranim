@@ -10,9 +10,9 @@
 //! each frame); the ball is a static sphere mesh moved by its transform.
 
 use ranim::{
-    anims::iterative::Iterative,
     color::palettes::manim,
     core::Extract,
+    core::animation::eval::iterative::Iterative,
     core::components::rgba::Rgba,
     core::core_item::CoreItem,
     glam::{DVec3, Mat4, Vec3, dvec3},

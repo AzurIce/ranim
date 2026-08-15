@@ -8,7 +8,7 @@ use std::{f64::consts::PI, time::Duration};
 
 use glam::{DVec3, dvec3};
 use ranim::{
-    anims::pure::{
+    anims::{
         creation::{CreationAnim, WritingAnim},
         fading::FadingAnim,
         morph::MorphAnim,
@@ -51,8 +51,9 @@ fn test(r: &mut RanimScene) {
     r.play(camera_frame.show().with_duration(content.cursor_sec()));
     r.play(content);
 }
-```"""
-hash = "e0f015ec30d3e0abb1660579f54fda7414e9d79a"
+```
+"""
+hash = "519d49f4ef7b98b7fe5e8fe822146b5a95fe0101"
 preview_imgs = []
 output_files = []
 wasm = false

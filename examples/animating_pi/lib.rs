@@ -7,7 +7,7 @@ use ranim::{
     prelude::*,
     utils::rate_functions::smooth,
 };
-use ranim_anims::pure::morph::MorphAnim;
+use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
 use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 

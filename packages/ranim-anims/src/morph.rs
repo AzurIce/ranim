@@ -1,9 +1,7 @@
 use ranim_core::{
-    animation::{Eval, EvalExt},
+    animation::eval::{Eval, EvalExt},
     traits::{Alignable, Interpolatable},
 };
-
-
 
 // ANCHOR: MorphRequirement
 /// The requirement of [`Morph`]

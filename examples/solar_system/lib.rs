@@ -7,7 +7,7 @@ use ranim::{
     prelude::*,
     utils::rate_functions::{linear, smooth},
 };
-use ranim_anims::pure::fading::FadingAnim;
+use ranim_anims::fading::FadingAnim;
 use ranim_items::vitem::{VItem, text::TextItem};
 
 const INTRO_SECS: f64 = 2.0;

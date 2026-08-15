@@ -3,13 +3,8 @@ code = """
 ```rust
 use itertools::Itertools;
 use ranim::{
-    anims::pure::fading::FadingAnim,
-    color,
-    color::HueDirection,
-    glam::dvec2,
-    items::vitem::geometry::Arc,
-    prelude::*,
-    utils::rate_functions::smooth,
+    anims::fading::FadingAnim, color, color::HueDirection, glam::dvec2,
+    items::vitem::geometry::Arc, prelude::*, utils::rate_functions::smooth,
 };
 use ranim_items::vitem::geometry::anchor::Origin;
 
@@ -60,8 +55,9 @@ pub fn arc(r: &mut RanimScene) {
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```"""
-hash = "bcab79525810ddfdd4bbd2a23955fa36fa397e25"
+```
+"""
+hash = "7e8b341ca0f963f591bd01d5f70d23d6b4a0ef5d"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

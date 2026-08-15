@@ -1,12 +1,10 @@
 //! Camera frame animations.
 
 use ranim_core::{
-    animation::{Eval, EvalExt},
+    animation::eval::{Eval, EvalExt},
     core_item::camera_frame::CameraFrame,
     glam::DVec3,
 };
-
-
 
 // MARK: Anim Trait
 /// The methods to create animations for [`CameraFrame`].

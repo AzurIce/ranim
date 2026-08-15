@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ranim::{
-    anims::pure::fading::FadingAnim, color, color::HueDirection, glam::dvec2,
+    anims::fading::FadingAnim, color, color::HueDirection, glam::dvec2,
     items::vitem::geometry::Arc, prelude::*, utils::rate_functions::smooth,
 };
 use ranim_items::vitem::geometry::anchor::Origin;

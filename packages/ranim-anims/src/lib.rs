@@ -1,24 +1,19 @@
-//! Ranim's built-in animations
+//! Ranim's built-in animation families.
 //!
-//! This crate contains the built-in animations for Ranim, plus the two
-//! author-facing specializations of the general
-//! [`ranim_core::animation::Eval`] protocol:
+//! Each module contains named, closed-form animation types plus the
+//! convenience traits used to construct them from an item (e.g.
+//! [`fading::FadingAnim`]). Every animation type implements
+//! [`Eval`](ranim_core::animation::eval::Eval) directly; generic authoring adapters
+//! live in `ranim_core::animation`:
 //!
-//! - **Pure** (closed-form, stateless): a struct that implements
-//!   [`Eval`](ranim_core::animation::Eval) directly with a closed-form
-//!   `eval_alpha(alpha)`. A raw closure can be turned into an `Eval` via
-//!   [`pure::PureFunc`] (`PureFunc::new(|alpha| ...)`).
-//! - **Iterative** (stateful, stepped): implement
-//!   [`iterative::IterativeEval`] — an associated `Output` and a single
-//!   `step(&self, &mut Self::Output, alpha, delta_alpha)` method (both
-//!   dimensionless progress) — and pass it with an initial state to
-//!   [`iterative::Iterative::new`], optionally declaring `with_steps(N)`.
-//!   For closures, use [`iterative::Iterative::from_fn`], which binds the
-//!   closure's mutable input through [`iterative::IterativeFn`].
+//! - [`PureFunc`](ranim_core::animation::eval::pure::PureFunc) wraps a raw
+//!   `Fn(f64) -> T` closure into an `Eval`;
+//! - [`Iterative`](ranim_core::animation::eval::iterative::Iterative) turns an
+//!   [`IterativeEval`](ranim_core::animation::eval::iterative::IterativeEval) step function
+//!   into a stateful `Eval`.
 //!
-//! A built-in animation is basically a struct that implements
-//! [`Eval`](ranim_core::animation::Eval), together with the data its closed form needs. Here is
-//! the example of [`pure::fading::FadeIn`]:
+//! A built-in animation is a struct that implements `Eval` together with the
+//! data its closed form needs. For example, [`fading::FadeIn`]:
 //!
 //! ```rust,ignore
 //! pub struct FadeIn<T: FadingRequirement> {
@@ -35,21 +30,21 @@
 //! }
 //! ```
 //!
-//! In addition, to make the construction of anim for any type that satisfies
-//! the requirement, it is recommended to write a trait like this:
+//! Construction traits mutate the source item to its end state while building
+//! the animation:
 //!
 //! ```rust,ignore
-//! /// The methods to create animations for `T` that satisfies [`FadingRequirement`]
-//! pub trait FadingAnim<T: FadingRequirement + 'static> {
-//!     fn fade_in(&mut self) -> FadeIn<T>;
-//!     fn fade_out(&mut self) -> FadeOut<T>;
+//! pub trait FadingAnim: FadingRequirement + Sized + 'static {
+//!     fn fade_in(&mut self) -> FadeIn<Self>;
+//!     fn fade_out(&mut self) -> FadeOut<Self>;
 //! }
 //!
-//! impl<T: FadingRequirement + 'static> FadingAnim<T> for T {
-//!     fn fade_in(&mut self) -> FadeIn<T> {
+//! impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
+//!     fn fade_in(&mut self) -> FadeIn<Self> {
 //!         FadeIn::new(self.clone()).apply_to(self)
 //!     }
-//!     fn fade_out(&mut self) -> FadeOut<T> {
+//!
+//!     fn fade_out(&mut self) -> FadeOut<Self> {
 //!         FadeOut::new(self.clone()).apply_to(self)
 //!     }
 //! }
@@ -62,7 +57,13 @@
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
 
-/// Iterative (stateful) evaluation
-pub mod iterative;
-/// Pure (closed-form) evaluation
-pub mod pure;
+/// Camera frame animations.
+pub mod camera;
+/// Creation animations.
+pub mod creation;
+/// Fading animations.
+pub mod fading;
+/// Morph animations.
+pub mod morph;
+/// Rotating animations.
+pub mod rotating;

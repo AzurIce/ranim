@@ -1,10 +1,8 @@
 use ranim_core::{
-    animation::{Eval, EvalExt},
+    animation::eval::{Eval, EvalExt},
     glam::DVec3,
     traits::{Aabb, AabbPoint, Locate, RotateTransform, ShiftTransformExt},
 };
-
-
 
 // MARK: Require Trait
 /// The requirement of [`RotatingAnimation`]
@@ -29,13 +27,7 @@ pub trait RotatingAnim: RotatingRequirement + Sized + 'static {
         axis: DVec3,
         anchor: A,
     ) -> RotatingAnimation<Self> {
-        RotatingAnimation::new(
-            self.clone(),
-            angle,
-            axis,
-            anchor.locate(self),
-        )
-        .apply_to(self)
+        RotatingAnimation::new(self.clone(), angle, axis, anchor.locate(self)).apply_to(self)
     }
 }
 
@@ -45,7 +37,7 @@ impl<T: RotatingRequirement + 'static> RotatingAnim for T {}
 
 /// Rotation animation.
 ///
-/// Unlike [`Morph`](crate::pure::morph::Morph) which linearly interpolates between
+/// Unlike [`Morph`](crate::morph::Morph) which linearly interpolates between
 /// start and end states, this animation applies incremental rotation at each frame,
 /// producing a true circular arc motion.
 pub struct RotatingAnimation<T: RotatingRequirement> {

@@ -88,7 +88,7 @@ mod tests {
     use super::*;
     use crate::{
         RanimScene, SealedRanimScene,
-        animation::{AnimationExt, Eval, Placeable},
+        animation::{AnimationExt, Placeable, eval::Eval},
         core_item::vitem::VItem,
         seq,
     };
@@ -216,7 +216,11 @@ mod tests {
     fn iterative_leaf_inside_sequence_steps() {
         let mut scene = RanimScene::new();
         scene.play(
-            seq![cv(1.0, 1.0).with_duration(1.0), cv(1.0, 1.0).with_duration(1.0)].at(0.0),
+            seq![
+                cv(1.0, 1.0).with_duration(1.0),
+                cv(1.0, 1.0).with_duration(1.0)
+            ]
+            .at(0.0),
         );
 
         let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
@@ -234,7 +238,11 @@ mod tests {
         fn build_scene() -> SealedRanimScene {
             let mut scene = RanimScene::new();
             scene.play(
-                seq![cv(1.0, 1.0).with_duration(1.0), cv(1.0, 1.0).with_duration(1.0)].at(0.0),
+                seq![
+                    cv(1.0, 1.0).with_duration(1.0),
+                    cv(1.0, 1.0).with_duration(1.0)
+                ]
+                .at(0.0),
             );
             scene.seal()
         }

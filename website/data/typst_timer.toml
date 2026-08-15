@@ -10,7 +10,6 @@ code = """
 use std::sync::Arc;
 
 use ranim::{
-    anims::pure::{Pure, PureEval},
     color::{AlphaColor, Srgb, palettes::manim},
     glam::{DVec3, dvec3},
     items::vitem::{VItem, geometry::Rectangle},
@@ -142,7 +141,7 @@ struct AtlasTimerEval {
     atlas: Arc<GlyphAtlas>,
 }
 
-impl PureEval for AtlasTimerEval {
+impl Eval for AtlasTimerEval {
     type Output = Vec<VItem>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -167,7 +166,7 @@ struct RecompileTimerEval {
     glyph_scale: f64,
 }
 
-impl PureEval for RecompileTimerEval {
+impl Eval for RecompileTimerEval {
     type Output = Vec<VItem>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
@@ -213,7 +212,7 @@ fn typst_timer_atlas(r: &mut RanimScene) {
         .with_duration(DURATION_SECS),
     );
     r.play(stack![
-        Pure(AtlasTimerEval { atlas })
+        AtlasTimerEval { atlas }
             .with_duration(DURATION_SECS)
             .with_rate_func(linear),
         timer_label(),
@@ -233,9 +232,9 @@ fn typst_timer_recompile(r: &mut RanimScene) {
         .with_duration(DURATION_SECS),
     );
     r.play(stack![
-        Pure(RecompileTimerEval {
+        RecompileTimerEval {
             glyph_scale: timer_glyph_scale(),
-        })
+        }
         .with_duration(DURATION_SECS)
         .with_rate_func(linear),
         timer_label(),
@@ -254,8 +253,9 @@ fn formats_milliseconds() {
         ['0', '1', ':', '0', '3', '.', '4', '5', '6']
     );
 }
-```"""
-hash = "d3e18dc56dca9d47aab14c758151576b442a0e69"
+```
+"""
+hash = "82abf6263967bf1287a3a0c163a31036ec67f39f"
 preview_imgs = ["/examples/typst_timer/preview.png", "/examples/typst_timer/preview.png", "/examples/typst_timer/preview.png"]
 output_files = ["/examples/typst_timer/typst_timer_atlas_1920x1080_60.mp4", "/examples/typst_timer/typst_timer_recompile_1920x1080_60.mp4", "/examples/typst_timer/typst_timer_1920x1080_60.mp4"]
 wasm = true

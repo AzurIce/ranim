@@ -31,7 +31,7 @@ pub use glam;
 pub use num;
 use std::fmt::Debug;
 
-use animation::{AnimStack, Animation, AnimationCell};
+use animation::{Animation, AnimationCell, stack::AnimStack};
 pub use animation::{AnimationInfo, AnimationInfoKind};
 use core_item::CoreItem;
 
@@ -40,10 +40,13 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
-    pub use crate::animation::{
-        AnimIterExt, AnimLagged, AnimSequence, AnimStack, Animation, AnimationExt, Eval, EvalExt,
-        LaggedFill, Placeable, StaticAnim,
-    };
+    pub use crate::animation::eval::iterative::{Iterative, IterativeEval, IterativeFn};
+    pub use crate::animation::eval::pure::PureFunc;
+    pub use crate::animation::eval::{Eval, EvalExt};
+    pub use crate::animation::lagged::{AnimLagged, LaggedFill};
+    pub use crate::animation::sequence::AnimSequence;
+    pub use crate::animation::stack::AnimStack;
+    pub use crate::animation::{AnimIterExt, Animation, AnimationExt, Placeable, StaticAnim};
     pub use crate::core_item::camera_frame::CameraFrame;
     pub use crate::{RanimScene, TimeMark};
 }
@@ -197,9 +200,8 @@ pub struct SealedRanimScene {
 impl SealedRanimScene {
     /// Consume this scene into a [`SceneEvaluator`] driving session.
     ///
-    /// `logic_fps` is the fixed logic grid resolution; the time model defaults
-    /// to 120 Hz. Iterative (stateful) segments require the evaluator: the pure
-    /// [`eval_at_sec`](Self::eval_at_sec) path does not advance their state.
+    /// `logic_fps` is retained for call-site compatibility; it no longer drives
+    /// stepping (each iterative segment owns its own `sim_step`).
     pub fn into_evaluator(self, logic_fps: f64) -> SceneEvaluator {
         SceneEvaluator::new(self, logic_fps)
     }
@@ -224,10 +226,8 @@ impl SealedRanimScene {
 
     /// Sample all clips active at `target_sec` and extract scene primitives.
     ///
-    /// This is the pure query path: it samples the **current** state of every
-    /// segment without advancing anything. Stateful (iterative) segments
-    /// project whatever state they currently hold — drive them with a
-    /// [`SceneEvaluator`] session first for meaningful results.
+    /// Pure query path: every active cell evaluates itself at `target_sec`
+    /// (stateful segments reset/replay or integrate internally as needed).
     pub fn eval_at_sec(&self, target_sec: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
         self.animations
             .iter()
@@ -260,7 +260,7 @@ impl SealedRanimScene {
 mod tests {
     use super::*;
     use crate::{
-        animation::{AnimSequence, AnimationExt, Placeable, Static},
+        animation::{AnimationExt, Placeable, Static, sequence::AnimSequence},
         core_item::vitem::VItem,
     };
 

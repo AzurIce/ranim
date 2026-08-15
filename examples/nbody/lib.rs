@@ -12,9 +12,9 @@
 //! the whole scene; n >= 4 destabilizes and ejects a body (a dramatic finale).
 
 use ranim::{
-    anims::iterative::Iterative,
     color::{AlphaColor, Srgb, palettes::manim},
     core::Extract,
+    core::animation::eval::iterative::Iterative,
     core::core_item::CoreItem,
     glam::DVec3,
     items::vitem::{VItem, geometry::Circle},

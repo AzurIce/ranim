@@ -1,11 +1,9 @@
 use ranim_core::{
-    animation::{Eval, EvalExt},
+    animation::eval::{Eval, EvalExt},
     core_item::vitem::DEFAULT_STROKE_WIDTH,
     traits::{Empty, FillColor, Interpolatable, Partial, StrokeColor, StrokeWidth},
 };
 use tracing::warn;
-
-
 
 // MARK: Creation
 

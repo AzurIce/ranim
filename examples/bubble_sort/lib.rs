@@ -1,8 +1,8 @@
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
-    anims::pure::morph::MorphAnim,
+    anims::morph::MorphAnim,
     color::palettes::manim,
-    core::animation::{AnimSequence, StaticAnim},
+    core::animation::{StaticAnim, sequence::AnimSequence},
     glam::{DVec3, dvec2, dvec3},
     items::vitem::geometry::Rectangle,
     prelude::*,
