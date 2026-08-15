@@ -23,6 +23,7 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/aabb")]
 fn aabb(r: &mut RanimScene) {
     let frame_w = 8.0 * 16.0 / 9.0;
@@ -183,9 +184,8 @@ fn aabb(r: &mut RanimScene) {
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```
-"""
-hash = "b12c1cda693f99e96729867b576ac32bf7460529"
+```"""
+hash = "df5fc8ffd1dfc11f65182ca9e06fb67c6ee45c33"
 preview_imgs = ["/examples/aabb/preview.png"]
 output_files = ["/examples/aabb/aabb_1920x1080_60.mp4"]
 wasm = true

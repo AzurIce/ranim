@@ -268,6 +268,7 @@ fn planetary_systems() -> AnimStack {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/solar_system")]
 fn solar_system(r: &mut RanimScene) {
     let phi = 50.0f64.to_radians();
@@ -291,9 +292,8 @@ fn solar_system(r: &mut RanimScene) {
     ]);
     r.insert_time_mark(6.0, TimeMark::Capture("preview.png".to_owned()));
 }
-```
-"""
-hash = "fdaf4d570cea6ba452711bb706cdab48d56ff5bd"
+```"""
+hash = "35864dd5049adcffe13d70bd5d28e902dd60d899"
 preview_imgs = ["/examples/solar_system/preview.png"]
 output_files = ["/examples/solar_system/solar_system_1920x1080_60.mp4"]
 wasm = true

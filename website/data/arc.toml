@@ -9,6 +9,7 @@ use ranim::{
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/arc")]
 pub fn arc(r: &mut RanimScene) {
     // let frame_size = app.camera().size;
@@ -55,9 +56,8 @@ pub fn arc(r: &mut RanimScene) {
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```
-"""
-hash = "7e8b341ca0f963f591bd01d5f70d23d6b4a0ef5d"
+```"""
+hash = "0c76838d709c87f122028f21bc4c52de762b429c"
 preview_imgs = ["/examples/arc/preview.png"]
 output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
 wasm = true

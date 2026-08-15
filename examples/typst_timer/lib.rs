@@ -253,7 +253,7 @@ fn timer_label(timer: Timer) -> impl Animation {
     label.show().with_duration(timer.duration_secs)
 }
 
-#[scene(clear_color = "#080a10")]
+#[scene(clear_color = "#080a10", name = "typst_timer")]
 #[wasm_demo_doc]
 #[output(fps = 60, dir = "./output/typst_timer")]
 fn typst_timer_atlas(r: &mut RanimScene) {

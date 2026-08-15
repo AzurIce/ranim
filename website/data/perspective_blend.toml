@@ -13,6 +13,7 @@ use ranim::{
 use ranim_core::animation::StaticAnim;
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/perspective_blend")]
 fn perspective_blend(r: &mut RanimScene) {
     let mut cam = CameraFrame {
@@ -117,9 +118,8 @@ fn perspective_blend(r: &mut RanimScene) {
     r.play(stack![cube_assembly, faces_sequence]);
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```
-"""
-hash = "f8c2fa32c69a339ef12af3541652e73f82492b81"
+```"""
+hash = "fa1c4f05100a335bd7df6afca6b489fe3abb4ed1"
 preview_imgs = ["/examples/perspective_blend/preview.png"]
 output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
 wasm = true
