@@ -3,6 +3,10 @@
 //! `typst_timer_atlas` compiles individual glyphs once, while
 //! `typst_timer_recompile` creates a new [`TypstText`] from the complete
 //! timestamp on every frame.
+//!
+//! Each timer animation owns its [`Timer`] (including the duration). The
+//! displayed elapsed milliseconds and the playback duration are both derived
+//! from that same field.
 
 use std::sync::Arc;
 
@@ -15,11 +19,35 @@ use ranim::{
 };
 use ranim_items::vitem::typst::TypstText;
 
-const DURATION_SECS: f64 = 10.0;
 const TIMER_Y: f64 = 0.35;
 const GLYPH_HEIGHT: f64 = 1.55;
 const CELL_WIDTH: f64 = 0.92;
 const BAR_WIDTH: f64 = 8.1;
+
+/// Self-contained timer configuration.
+///
+/// The duration lives here instead of in a global constant, and each timer
+/// animation owns a copy. Both the elapsed-milliseconds mapping and the
+/// playback duration passed to [`AnimationExt::with_duration`] are derived
+/// from this field, so they can never drift apart.
+#[derive(Clone, Copy)]
+struct Timer {
+    duration_secs: f64,
+}
+
+impl Timer {
+    fn new(duration_secs: f64) -> Self {
+        assert!(
+            duration_secs.is_finite() && duration_secs >= 0.0,
+            "timer duration must be finite and non-negative"
+        );
+        Self { duration_secs }
+    }
+
+    fn milliseconds_at_alpha(self, alpha: f64) -> u64 {
+        (alpha.clamp(0.0, 1.0) * self.duration_secs * 1_000.0).floor() as u64
+    }
+}
 
 fn rectangle(
     width: f64,
@@ -79,10 +107,6 @@ impl GlyphAtlas {
     }
 }
 
-fn milliseconds_at_alpha(alpha: f64) -> u64 {
-    (alpha.clamp(0.0, 1.0) * DURATION_SECS * 1_000.0).floor() as u64
-}
-
 fn glyph_color(index: usize, character: char) -> AlphaColor<Srgb> {
     if index >= 6 {
         manim::TEAL_C
@@ -136,6 +160,18 @@ fn format_milliseconds(milliseconds: u64) -> [char; 9] {
 
 struct AtlasTimerEval {
     atlas: Arc<GlyphAtlas>,
+    timer: Timer,
+}
+
+impl AtlasTimerEval {
+    fn new(atlas: Arc<GlyphAtlas>, timer: Timer) -> Self {
+        Self { atlas, timer }
+    }
+
+    fn into_animation(self) -> impl Animation {
+        let duration_secs = self.timer.duration_secs;
+        self.with_duration(duration_secs).with_rate_func(linear)
+    }
 }
 
 impl Eval for AtlasTimerEval {
@@ -143,7 +179,7 @@ impl Eval for AtlasTimerEval {
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let alpha = alpha.clamp(0.0, 1.0);
-        let characters = format_milliseconds(milliseconds_at_alpha(alpha));
+        let characters = format_milliseconds(self.timer.milliseconds_at_alpha(alpha));
         let mut output = Vec::new();
 
         for (index, character) in characters.into_iter().enumerate() {
@@ -161,6 +197,18 @@ impl Eval for AtlasTimerEval {
 
 struct RecompileTimerEval {
     glyph_scale: f64,
+    timer: Timer,
+}
+
+impl RecompileTimerEval {
+    fn new(glyph_scale: f64, timer: Timer) -> Self {
+        Self { glyph_scale, timer }
+    }
+
+    fn into_animation(self) -> impl Animation {
+        let duration_secs = self.timer.duration_secs;
+        self.with_duration(duration_secs).with_rate_func(linear)
+    }
 }
 
 impl Eval for RecompileTimerEval {
@@ -168,7 +216,7 @@ impl Eval for RecompileTimerEval {
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let alpha = alpha.clamp(0.0, 1.0);
-        let characters = format_milliseconds(milliseconds_at_alpha(alpha));
+        let characters = format_milliseconds(self.timer.milliseconds_at_alpha(alpha));
         let timestamp = characters.iter().collect::<String>();
         let glyphs = Vec::<VItem>::from(TypstText::new(&timestamp));
         let mut output = Vec::new();
@@ -186,33 +234,34 @@ impl Eval for RecompileTimerEval {
     }
 }
 
-fn timer_label() -> impl Animation {
+fn timer_camera(timer: Timer) -> impl Animation {
+    CameraFrame {
+        frame_height: 5.0,
+        ..Default::default()
+    }
+    .show()
+    .with_duration(timer.duration_secs)
+}
+
+fn timer_label(timer: Timer) -> impl Animation {
     let mut label = TypstText::new("ELAPSED TIME");
     label
         .scale_to(ScaleHint::PorportionalY(0.32))
         .move_to(DVec3::Y * 2.0)
         .set_fill_color(manim::GREY_B);
 
-    label.show().with_duration(DURATION_SECS)
+    label.show().with_duration(timer.duration_secs)
 }
 
 #[scene(clear_color = "#080a10")]
 #[output(fps = 60, dir = "./output/typst_timer")]
 fn typst_timer_atlas(r: &mut RanimScene) {
+    let timer = Timer::new(10.0);
     let atlas = Arc::new(GlyphAtlas::new());
-    r.play(
-        CameraFrame {
-            frame_height: 5.0,
-            ..Default::default()
-        }
-        .show()
-        .with_duration(DURATION_SECS),
-    );
+    r.play(timer_camera(timer));
     r.play(stack![
-        AtlasTimerEval { atlas }
-            .with_duration(DURATION_SECS)
-            .with_rate_func(linear),
-        timer_label(),
+        AtlasTimerEval::new(atlas, timer).into_animation(),
+        timer_label(timer),
     ]);
     r.insert_time_mark(3.456, TimeMark::Capture("preview.png".to_string()));
 }
@@ -220,23 +269,20 @@ fn typst_timer_atlas(r: &mut RanimScene) {
 #[scene(clear_color = "#080a10")]
 #[output(fps = 60, dir = "./output/typst_timer")]
 fn typst_timer_recompile(r: &mut RanimScene) {
-    r.play(
-        CameraFrame {
-            frame_height: 5.0,
-            ..Default::default()
-        }
-        .show()
-        .with_duration(DURATION_SECS),
-    );
+    let timer = Timer::new(10.0);
+    r.play(timer_camera(timer));
     r.play(stack![
-        RecompileTimerEval {
-            glyph_scale: timer_glyph_scale(),
-        }
-        .with_duration(DURATION_SECS)
-        .with_rate_func(linear),
-        timer_label(),
+        RecompileTimerEval::new(timer_glyph_scale(), timer).into_animation(),
+        timer_label(timer),
     ]);
     r.insert_time_mark(3.456, TimeMark::Capture("preview.png".to_string()));
+}
+
+#[test]
+fn timer_derives_milliseconds_from_its_own_duration() {
+    assert_eq!(Timer::new(10.0).milliseconds_at_alpha(0.0), 0);
+    assert_eq!(Timer::new(2.0).milliseconds_at_alpha(0.5), 1_000);
+    assert_eq!(Timer::new(2.0).milliseconds_at_alpha(1.0), 2_000);
 }
 
 #[test]

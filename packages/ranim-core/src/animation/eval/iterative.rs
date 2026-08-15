@@ -115,9 +115,22 @@ struct Snapshot<S> {
 /// Repeated queries at the same `alpha` are O(1).
 ///
 /// ```rust,ignore
-/// let animation = Iterative::from_fn(state0, |state: &mut MyState, _a, da| {
-///     state.integrate(da * SIM_SECS);
-/// }).with_steps(240);
+/// struct MyEval {
+///     sim_secs: f64,
+/// }
+///
+/// impl IterativeEval for MyEval {
+///     type Output = MyState;
+///
+///     fn step(&self, state: &mut MyState, _alpha: f64, delta_alpha: f64) {
+///         state.integrate(self.sim_secs * delta_alpha);
+///     }
+/// }
+///
+/// let sim_secs = 10.0;
+/// let animation = Iterative::new(state0, MyEval { sim_secs })
+///     .with_steps(240)
+///     .with_duration(sim_secs);
 /// ```
 pub struct Iterative<E: IterativeEval> {
     eval: E,

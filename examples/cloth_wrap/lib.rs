@@ -36,7 +36,6 @@ const BALL_SPEED: f64 = 1.2;
 const BALL_START_Y: f64 = 3.0;
 /// Where the ball stops, just below the cloth, letting the cloth settle draped over it.
 const BALL_STOP_Y: f64 = 1.4;
-const SIM_SECS: f64 = 7.0;
 
 /// The cloth-plus-ball system's full state.
 #[derive(Clone)]
@@ -184,6 +183,22 @@ impl ClothState {
     }
 }
 
+/// The cloth segment's logical duration.
+///
+/// Keeping `sim_secs` on the evaluator (instead of a global constant read by a
+/// closure) makes the integration time and the animation duration one object.
+struct ClothEval {
+    sim_secs: f64,
+}
+
+impl IterativeEval for ClothEval {
+    type Output = ClothState;
+
+    fn step(&self, state: &mut Self::Output, alpha: f64, delta_alpha: f64) {
+        state.step(self.sim_secs * delta_alpha, self.sim_secs * alpha);
+    }
+}
+
 impl Extract for ClothState {
     type Target = CoreItem;
 
@@ -223,6 +238,7 @@ impl Extract for ClothState {
 #[scene]
 #[output(dir = "./output/cloth_wrap")]
 fn cloth_wrap(r: &mut RanimScene) {
+    let sim_secs = 7.0;
     let mut camera = CameraFrame::default();
     // Oblique downward view (~40° below horizontal, slightly asymmetric azimuth).
     camera.pos = dvec3(-4.0, 5.0, 2.5);
@@ -231,14 +247,6 @@ fn cloth_wrap(r: &mut RanimScene) {
     camera.perspective_blend = 1.0;
     camera.fovy = 45.0f64.to_radians();
 
-    r.play(camera.show().with_duration(SIM_SECS));
-    r.play(
-        Iterative::from_fn(
-            ClothState::new(),
-            |state: &mut ClothState, alpha: f64, delta_alpha: f64| {
-                state.step(SIM_SECS * delta_alpha, SIM_SECS * alpha);
-            },
-        )
-        .with_duration(SIM_SECS),
-    );
+    r.play(camera.show().with_duration(sim_secs));
+    r.play(Iterative::new(ClothState::new(), ClothEval { sim_secs }).with_duration(sim_secs));
 }
