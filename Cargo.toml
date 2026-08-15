@@ -422,3 +422,12 @@ required-features = ["typst"]
 
 [package.metadata.example.solar_system]
 wasm = true
+
+[[example]]
+name = "ranim_scenes"
+path = "examples/ranim_scenes/lib.rs"
+crate-type = ["cdylib"]
+required-features = ["preview", "typst"]
+
+[package.metadata.example.ranim_scenes]
+bundle = true
