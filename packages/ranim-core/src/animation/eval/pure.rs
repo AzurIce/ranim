@@ -8,21 +8,21 @@ use super::Eval;
 /// named wrapper is the lightweight way to write a pure segment from a closure:
 ///
 /// ```rust,ignore
-/// let animation = PureFunc::new(|alpha| Square::new(alpha)).with_duration(2.0);
+/// let animation = Pure::new(|alpha| Square::new(alpha)).with_duration(2.0);
 /// ```
 ///
 /// Named pure animations implement `Eval` directly and do not need this
 /// wrapper.
-pub struct PureFunc<F>(pub F);
+pub struct Pure<F>(pub F);
 
-impl<F> PureFunc<F> {
+impl<F> Pure<F> {
     /// Wrap a closure into an `Eval` animation segment.
     pub fn new(f: F) -> Self {
         Self(f)
     }
 }
 
-impl<T, F> Eval for PureFunc<F>
+impl<T, F> Eval for Pure<F>
 where
     F: Fn(f64) -> T,
 {

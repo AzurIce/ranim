@@ -1192,9 +1192,9 @@ fn display_anim_name(info: &AnimationInfo) -> &str {
 }
 
 fn short_anim_name(name: &str) -> &str {
-    // Trim the PureFunc<...>/Iterative<...> adapter wrappers to show the inner type.
+    // Trim the Pure<...>/Iterative<...> adapter wrappers to show the inner type.
     let name = [
-        "ranim_core::animation::eval::pure::PureFunc<",
+        "ranim_core::animation::eval::pure::Pure<",
         "ranim_core::animation::eval::iterative::Iterative<",
     ]
     .iter()

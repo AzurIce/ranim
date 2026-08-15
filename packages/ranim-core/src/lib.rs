@@ -41,7 +41,7 @@ pub mod prelude {
     pub use crate::traits::*;
 
     pub use crate::animation::eval::iterative::{Iterative, IterativeEval, IterativeFn};
-    pub use crate::animation::eval::pure::PureFunc;
+    pub use crate::animation::eval::pure::Pure;
     pub use crate::animation::eval::{Eval, EvalExt};
     pub use crate::animation::lagged::{AnimLagged, LaggedFill};
     pub use crate::animation::sequence::AnimSequence;

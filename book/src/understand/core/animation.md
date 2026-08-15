@@ -40,18 +40,18 @@ pub type DeltaAlpha = f64;  // 均匀进度步长
 
 “内容即序列”：迭代动画的内容是作者声明的进度点序列 `x₀…x_N`。`N` 是定义而不是采样精度；`rate_func`、`with_duration`、placement 都只是“哪个进度何时可见”的采样重映射。
 
-## 通用适配器：`PureFunc` 与 `Iterative`
+## 通用适配器：`Pure` 与 `Iterative`
 
 两个 author-facing 适配器现在都在 `ranim_core::animation` 中。
 
-### 纯闭包：`PureFunc`
+### 纯闭包：`Pure`
 
-闭包是匿名类型，不能按名字实现 `Eval`，所以用 `PureFunc` 包一层：
+闭包是匿名类型，不能按名字实现 `Eval`，所以用 `Pure` 包一层：
 
 ```rust,ignore
-use ranim::core::animation::eval::pure::PureFunc;
+use ranim::core::animation::eval::pure::Pure;
 
-let animation = PureFunc::new(|alpha| Square::new(alpha)).with_duration(2.0);
+let animation = Pure::new(|alpha| Square::new(alpha)).with_duration(2.0);
 ```
 
 具名纯动画（`FadeIn`、`Morph`、`Create` 等）直接实现 `Eval`，不需要这个 wrapper。
@@ -70,21 +70,26 @@ pub trait IterativeEval {
 `Iterative::new(initial, evaluator)` 持有不可变的定义（初始状态、`sim_step`、step 逻辑），把积分快照放在内部 `RefCell<Snapshot>` 中：
 
 ```rust,ignore
+let sim_secs = 4.0;
+
 let animation = Iterative::from_fn(
     SpringState { x: 1.0, v: 0.0 },
-    |state: &mut SpringState, _alpha, delta_alpha| {
-        let dt = SIM_SECS * delta_alpha; // 内容自己的物理秒
+    move |state: &mut SpringState, _alpha, delta_alpha| {
+        let dt = sim_secs * delta_alpha; // 内容自己的物理秒
         let acc = -K * state.x - C * state.v;
         state.v += acc * dt;
         state.x += state.v * dt;
     },
 )
-.with_steps(240);
+.with_steps(240)
+.with_duration(sim_secs);
 ```
 
+- 逻辑时长用过程中的局部变量（例如 `sim_secs`）捕获，并同时传给 `with_duration`，不要使用全局 `const`；
+- 迭代逻辑较复杂时，实现命名 `IterativeEval` 结构体，把 `sim_secs` 等参数放在 `self` 上；
 - `with_steps(N)` 声明内容自己的步数，默认 `1/120`；
 - `eval_alpha(target)` 前进时逐 `sim_step` 积分，回退时从初始状态重置重放，重复查询同一个 `alpha` 是 O(1)；
-- 常量放闭包捕获或命名 step 结构体；可变状态全部住在 `Output` 里；
+- 可变状态全部住在 `Output` 里；
 - 闭包的状态类型位于 `Fn` 输入位置，无法从闭包类型反推出关联 `Output`，所以 `Iterative::from_fn` 通过 `IterativeFn<S, F>` 显式绑定二者。
 
 ## `Eval` 自动成为叶子动画

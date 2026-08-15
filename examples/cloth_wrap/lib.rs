@@ -183,22 +183,6 @@ impl ClothState {
     }
 }
 
-/// The cloth segment's logical duration.
-///
-/// Keeping `sim_secs` on the evaluator (instead of a global constant read by a
-/// closure) makes the integration time and the animation duration one object.
-struct ClothEval {
-    sim_secs: f64,
-}
-
-impl IterativeEval for ClothEval {
-    type Output = ClothState;
-
-    fn step(&self, state: &mut Self::Output, alpha: f64, delta_alpha: f64) {
-        state.step(self.sim_secs * delta_alpha, self.sim_secs * alpha);
-    }
-}
-
 impl Extract for ClothState {
     type Target = CoreItem;
 
@@ -248,5 +232,13 @@ fn cloth_wrap(r: &mut RanimScene) {
     camera.fovy = 45.0f64.to_radians();
 
     r.play(camera.show().with_duration(sim_secs));
-    r.play(Iterative::new(ClothState::new(), ClothEval { sim_secs }).with_duration(sim_secs));
+    r.play(
+        Iterative::from_fn(
+            ClothState::new(),
+            move |state: &mut ClothState, alpha: f64, delta_alpha: f64| {
+                state.step(sim_secs * delta_alpha, sim_secs * alpha);
+            },
+        )
+        .with_duration(sim_secs),
+    );
 }

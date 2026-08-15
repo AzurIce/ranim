@@ -1,15 +1,15 @@
-//! Iterative animation example: a damped spring (state stepped by a named
-//! [`IterativeEval`], no ECS required).
+//! Iterative animation example: a damped spring (state stepped by a closure,
+//! no ECS required).
 //!
-//! The spring's state (`x`, `v`) is owned by `Iterative` and advanced by
-//! `SpringEval` via semi-implicit Euler; the `Extract` impl projects the state
-//! into a `VItem` once per frame. Reset is structural — the adapter restores
-//! the stored initial state, so `SceneEvaluator::seek` matches forward
+//! The spring's state (`x`, `v`) is owned by `Iterative` and advanced by a
+//! closure via semi-implicit Euler; the `Extract` impl projects the state into
+//! a `VItem` once per frame. Reset is structural — the adapter restores the
+//! stored initial state, so `SceneEvaluator::sample_at` matches forward
 //! advancement for free.
 //!
-//! The spring's logical duration is owned by its evaluator (`SpringEval`):
-//! the segment integrates `sim_secs` worth of physics scaled from the progress
-//! step `delta_alpha`, and the same field sets the playback duration.
+//! The spring's logical duration is the local `sim_secs` value captured by the
+//! closure; the same value is passed to `with_duration`, so physical time and
+//! timeline time stay in sync.
 
 use ranim::{
     color::palettes::manim,
@@ -42,34 +42,21 @@ impl Extract for SpringState {
 const K: f64 = 25.0;
 const C: f64 = 1.0;
 
-/// The spring segment's logical duration.
-///
-/// The simulation time step is `sim_secs * delta_alpha`; the animation plays
-/// for the same `sim_secs`, so physical time and timeline time stay in sync.
-struct SpringEval {
-    sim_secs: f64,
-}
-
-impl IterativeEval for SpringEval {
-    type Output = SpringState;
-
-    fn step(&self, state: &mut Self::Output, _alpha: f64, delta_alpha: f64) {
-        let dt = self.sim_secs * delta_alpha;
-        let acc = -K * state.x - C * state.v;
-        state.v += acc * dt;
-        state.x += state.v * dt;
-    }
-}
-
-/// Build the spring segment with one logical duration.
-fn spring_animation(sim_secs: f64) -> impl Animation {
-    Iterative::new(SpringState { x: 1.0, v: 0.0 }, SpringEval { sim_secs }).with_duration(sim_secs)
-}
-
 #[scene]
 #[output(dir = "./output/iterative_spring")]
 fn iterative_spring(r: &mut RanimScene) {
     let sim_secs = 4.0;
     r.play(CameraFrame::default().show().with_duration(sim_secs));
-    r.play(spring_animation(sim_secs));
+    r.play(
+        Iterative::from_fn(
+            SpringState { x: 1.0, v: 0.0 },
+            move |state: &mut SpringState, _alpha: f64, delta_alpha: f64| {
+                let dt = sim_secs * delta_alpha;
+                let acc = -K * state.x - C * state.v;
+                state.v += acc * dt;
+                state.x += state.v * dt;
+            },
+        )
+        .with_duration(sim_secs),
+    );
 }

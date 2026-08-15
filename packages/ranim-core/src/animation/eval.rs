@@ -2,7 +2,7 @@
 //!
 //! [`Eval`](crate::animation::eval::Eval) is the single leaf protocol;
 //! [`EvalExt`](crate::animation::eval::EvalExt) adds build-time conveniences;
-//! [`pure::PureFunc`](crate::animation::eval::pure::PureFunc) adapts a closure
+//! [`pure::Pure`](crate::animation::eval::pure::Pure) adapts a closure
 //! and [`iterative::Iterative`](crate::animation::eval::iterative::Iterative)
 //! adapts a stepping function into that protocol. [`EvalDyn`] is the
 //! runtime-erased counterpart used by [`AnimationCell`].
@@ -33,7 +33,7 @@ pub mod pure;
 /// [`Iterative`](crate::animation::eval::iterative::Iterative) turns an
 /// [`IterativeEval`](crate::animation::eval::iterative::IterativeEval) step
 /// function into an `Eval`, and
-/// [`PureFunc`](crate::animation::eval::pure::PureFunc) wraps a raw closure
+/// [`Pure`](crate::animation::eval::pure::Pure) wraps a raw closure
 /// `Fn(f64) -> T`. Implementing `Eval` directly remains the path for
 /// exotic segments.
 pub trait Eval {

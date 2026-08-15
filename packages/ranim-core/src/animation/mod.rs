@@ -384,7 +384,7 @@ impl<T: Clone> Eval for Static<T> {
 mod tests {
     use super::*;
     use super::{
-        eval::{Eval, EvalExt, pure::PureFunc},
+        eval::{Eval, EvalExt, pure::Pure},
         lagged::LaggedFill,
         sequence::AnimSequence,
         stack::AnimStack,
@@ -467,9 +467,9 @@ mod tests {
     }
 
     #[test]
-    fn pure_func_wraps_a_closure_into_eval() {
+    fn pure_wraps_a_closure_into_eval() {
         let mut item = VItem::default();
-        PureFunc::new(|alpha: f64| {
+        Pure::new(|alpha: f64| {
             let mut item = VItem::default();
             item.points[0].x = alpha as f32;
             item

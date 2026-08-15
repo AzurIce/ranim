@@ -23,9 +23,10 @@ use super::Eval;
 /// mutable reference.
 ///
 /// Only one method, no defaults. There is no `reset` to forget or get wrong —
-/// the adapter restores the stored initial state itself. Constants (physics
-/// parameters, palettes, ...) belong in `self` or closure captures; everything
-/// mutable must live in the state value, so a reset restores it all.
+/// the adapter restores the stored initial state itself. Physics parameters,
+/// palettes, and logical durations belong on `self` or in local variables
+/// captured by a closure (not in global constants); everything mutable must
+/// live in the state value, so a reset restores it all.
 ///
 /// `step` receives the current progress `alpha` and the segment's own
 /// uniform progress step `delta_alpha` (`= sim_step = 1 / N`). These are
@@ -115,22 +116,12 @@ struct Snapshot<S> {
 /// Repeated queries at the same `alpha` are O(1).
 ///
 /// ```rust,ignore
-/// struct MyEval {
-///     sim_secs: f64,
-/// }
-///
-/// impl IterativeEval for MyEval {
-///     type Output = MyState;
-///
-///     fn step(&self, state: &mut MyState, _alpha: f64, delta_alpha: f64) {
-///         state.integrate(self.sim_secs * delta_alpha);
-///     }
-/// }
-///
 /// let sim_secs = 10.0;
-/// let animation = Iterative::new(state0, MyEval { sim_secs })
-///     .with_steps(240)
-///     .with_duration(sim_secs);
+/// let animation = Iterative::from_fn(state0, move |state, _alpha, delta_alpha| {
+///     state.integrate(sim_secs * delta_alpha);
+/// })
+/// .with_steps(240)
+/// .with_duration(sim_secs);
 /// ```
 pub struct Iterative<E: IterativeEval> {
     eval: E,

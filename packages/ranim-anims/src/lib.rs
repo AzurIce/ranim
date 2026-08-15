@@ -6,7 +6,7 @@
 //! [`Eval`](ranim_core::animation::eval::Eval) directly; generic authoring adapters
 //! live in `ranim_core::animation`:
 //!
-//! - [`PureFunc`](ranim_core::animation::eval::pure::PureFunc) wraps a raw
+//! - [`Pure`](ranim_core::animation::eval::pure::Pure) wraps a raw
 //!   `Fn(f64) -> T` closure into an `Eval`;
 //! - [`Iterative`](ranim_core::animation::eval::iterative::Iterative) turns an
 //!   [`IterativeEval`](ranim_core::animation::eval::iterative::IterativeEval) step function

@@ -3,11 +3,11 @@
 //!
 //! `NBodyState::new(n)` places `n` equal masses on a regular n-gon with
 //! tangential velocities (exact circular speed for the relative equilibrium,
-//! plus a tiny asymmetry). The logical simulation duration is owned by the
-//! `NBodyEval` segment (not a global constant), and the same field drives both
-//! physical time integration and the playback duration. Each body leaves a
-//! fading trail of recent positions; the `Extract` impl projects bodies and
-//! trails into `VItem`s once per frame.
+//! plus a tiny asymmetry). The logical simulation duration is the local
+//! `sim_secs` value captured by the step closure (not a global constant), and
+//! the same value is passed to `with_duration`. Each body leaves a fading
+//! trail of recent positions; the `Extract` impl projects bodies and trails
+//! into `VItem`s once per frame.
 //!
 //! Behavior by `n`: n = 3 stays inside the frame and wobbles chaotically for
 //! the whole scene; n >= 4 destabilizes and ejects a body (a dramatic finale).
@@ -127,22 +127,6 @@ impl NBodyState {
     }
 }
 
-/// The N-body segment's time scale.
-///
-/// `sim_secs` is part of the evaluator rather than a global constant, so the
-/// integration step and the animation duration are always defined together.
-struct NBodyEval {
-    sim_secs: f64,
-}
-
-impl IterativeEval for NBodyEval {
-    type Output = NBodyState;
-
-    fn step(&self, state: &mut Self::Output, _alpha: f64, delta_alpha: f64) {
-        state.step(self.sim_secs * delta_alpha);
-    }
-}
-
 impl Extract for NBodyState {
     type Target = CoreItem;
 
@@ -169,16 +153,19 @@ impl Extract for NBodyState {
     }
 }
 
-/// Build the n-body segment for `n` bodies with one logical duration.
-fn nbody_animation(n: usize, sim_secs: f64) -> impl Animation {
-    Iterative::new(NBodyState::new(n), NBodyEval { sim_secs }).with_duration(sim_secs)
-}
-
 #[scene]
 #[output(dir = "./output/nbody")]
 fn nbody(r: &mut RanimScene) {
     let sim_secs = 32.0;
     r.play(CameraFrame::default().show().with_duration(sim_secs));
     // n = 3: chaotic wobble that stays in frame; n >= 4: ejection finale.
-    r.play(nbody_animation(99, sim_secs));
+    r.play(
+        Iterative::from_fn(
+            NBodyState::new(99),
+            move |state: &mut NBodyState, _alpha: f64, delta_alpha: f64| {
+                state.step(sim_secs * delta_alpha);
+            },
+        )
+        .with_duration(sim_secs),
+    );
 }
