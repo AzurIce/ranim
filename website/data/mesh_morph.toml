@@ -14,6 +14,7 @@ use ranim::{
 
 /// Comprehensive mesh morphing demo: sphere -> torus -> disc -> sphere
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/mesh_morph")]
 fn mesh_morph(r: &mut RanimScene) {
     // Setup camera
@@ -128,9 +129,8 @@ fn create_disc_shape(radius: f64, resolution: (u32, u32)) -> Surface {
         resolution,
     )
 }
-```
-"""
-hash = "8a0fddce0a1186d4adc2b970612507f923b81793"
+```"""
+hash = "fd8e8f365da3e2372f1c232f1b7d622b864566d4"
 preview_imgs = ["/examples/mesh_morph/preview_torus.png", "/examples/mesh_morph/preview_disc.png"]
 output_files = ["/examples/mesh_morph/mesh_morph_1920x1080_60.mp4"]
 wasm = true

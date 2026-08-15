@@ -10,6 +10,11 @@
 //! `sim_step`-by-`sim_step`, backward resets and replays — so the runtime
 //! only ever asks "evaluate at progress `alpha`". No seconds, no scene clock,
 //! no `logic_fps` reach a segment's content.
+//!
+//! If `with_steps` is not called, the segment uses the default step of
+//! `1 / 120` (`DEFAULT_SIM_STEP`): every unit of normalized progress is integrated in 120 uniform
+//! substeps. Use `with_steps(N)` when a simulation needs a finer or coarser
+//! content resolution.
 
 use std::{cell::RefCell, marker::PhantomData};
 
@@ -50,7 +55,10 @@ pub trait IterativeEval {
     /// Advance the state by one progress step.
     ///
     /// `alpha` is the current progress, `delta_alpha` the segment's uniform
-    /// step (both dimensionless progress).
+    /// step (both dimensionless progress). The step size is declared on the
+    /// [`Iterative`] adapter with
+    /// [`Iterative::with_steps`]: `delta_alpha = 1 / N` for `with_steps(N)`,
+    /// or the default `1 / 120` when it is not called.
     fn step(&self, output: &mut Self::Output, alpha: f64, delta_alpha: f64);
 }
 
@@ -136,7 +144,11 @@ where
     E::Output: Clone,
 {
     /// Create an iterative segment from an initial state and a named
-    /// [`IterativeEval`] implementation (default content step 1/120).
+    /// [`IterativeEval`] implementation.
+    ///
+    /// The content step defaults to `1 / 120` of normalized progress. Call
+    /// [`with_steps`](Self::with_steps) to override it, e.g.
+    /// `.with_steps(240)` for `1 / 240` progress increments.
     pub fn new(initial: E::Output, eval: E) -> Self {
         Self {
             eval,
@@ -149,9 +161,21 @@ where
         }
     }
 
-    /// Declare the content's step count N: the segment integrates in uniform
-    /// `1/N` progress increments. This is the segment's own resolution — not
-    /// a scene parameter, not a sampling knob.
+    /// Declare the content's step count `N`.
+    ///
+    /// The segment then integrates in uniform `1 / N` progress increments, so
+    /// every [`IterativeEval::step`] call receives `delta_alpha = 1 / N`.
+    /// Without this call the default is `1 / 120` (`DEFAULT_SIM_STEP`).
+    ///
+    /// This is the segment's **content resolution**, not the render sampling
+    /// rate and not the scene clock. A physical time step can be recovered as
+    /// `duration_secs * delta_alpha`.
+    ///
+    /// ```rust,ignore
+    /// Iterative::from_fn(initial_state, step_function)
+    ///     .with_steps(240) // 1/240 progress per integration step
+    ///     .with_duration(10.0); // => 1/24 seconds per integration step
+    /// ```
     pub fn with_steps(mut self, n: usize) -> Self {
         assert!(n > 0, "iterative step count must be positive");
         self.sim_step = 1.0 / n as f64;
@@ -166,6 +190,9 @@ where
 {
     /// Create an iterative segment from an initial state and a stepping
     /// function.
+    ///
+    /// Uses the default `1 / 120` content step; call
+    /// [`with_steps`](Iterative::with_steps) to choose another resolution.
     pub fn from_fn(initial: S, eval: F) -> Self {
         Self::new(initial, IterativeFn::new(eval))
     }

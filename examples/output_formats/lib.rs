@@ -10,6 +10,7 @@ use ranim::{
 };
 
 #[scene(clear_color = "#00000000")]
+#[wasm_demo_doc]
 #[output(dir = "./output/output_formats", format = "mp4")]
 #[output(dir = "./output/output_formats", format = "webm")]
 #[output(dir = "./output/output_formats", format = "mov")]

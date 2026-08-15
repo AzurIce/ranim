@@ -16,6 +16,7 @@ use ranim::{
 };
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/getting_started2")]
 fn getting_started2(r: &mut RanimScene) {
     let rect = Rectangle::new(4.0, 9.0 / 4.0).with(|rect| {
@@ -53,9 +54,8 @@ fn getting_started2(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(total_secs));
     r.play(stack![rect_sequence, item_sequence]);
 }
-```
-"""
-hash = "0d709f63a4723de41aa242a2d9c129657c721047"
+```"""
+hash = "73f88532dcff48e89d4bfab72e4cd546f7ddfb5d"
 preview_imgs = []
 output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
 wasm = true

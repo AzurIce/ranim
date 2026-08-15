@@ -6,6 +6,7 @@ use ranim::{
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/arc")]
 pub fn arc(r: &mut RanimScene) {
     // let frame_size = app.camera().size;

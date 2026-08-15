@@ -113,19 +113,20 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/bubble_sort")]
 fn bubble_sort_10(r: &mut RanimScene) {
     bubble_sort(r, 10);
 }
 
 #[scene(name = "bubble_sort")]
+#[wasm_demo_doc]
 #[output(dir = "./output/bubble_sort")]
 fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
 }
-```
-"""
-hash = "a2a8ecf72032aff177db2b3e72864acf6140454b"
+```"""
+hash = "578c95772ed3e6e8a8a17bf035484df701ec4c68"
 preview_imgs = ["/examples/bubble_sort/preview-100.png", "/examples/bubble_sort/preview-10.png"]
-output_files = ["/examples/bubble_sort/bubble_sort_10_1920x1080_60.mp4", "/examples/bubble_sort/bubble_sort_1920x1080_60.mp4"]
+output_files = ["/examples/bubble_sort/bubble_sort_1920x1080_60.mp4", "/examples/bubble_sort/bubble_sort_10_1920x1080_60.mp4"]
 wasm = true

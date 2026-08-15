@@ -25,16 +25,29 @@ website:
     zola --root website build
 
 doc-nightly:
-    RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --workspace --no-deps --document-private-items --all-features --exclude app --exclude xtask-examples --exclude benches
-    # RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --no-deps -p ranim --document-private-items --all-features
-    -rm -r website/static/doc/
-    cp -r target/doc/ website/static/doc/
+    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
+        cargo +nightly doc --workspace --no-deps --document-private-items --all-features \
+        --exclude app --exclude xtask-examples --exclude benches
+    just _build-example-doc-assets
 
 doc:
-    RUSTDOCFLAGS="--cfg docsrs" cargo doc --workspace --no-deps --document-private-items --all-features --exclude app --exclude xtask-examples --exclude benches
-    # RUSTDOCFLAGS="--cfg docsrs" cargo doc --no-deps -p ranim --document-private-items --all-features
-    -rm -r website/static/doc/
-    cp -r target/doc/ website/static/doc/
+    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
+        cargo doc --workspace --no-deps --document-private-items --all-features \
+        --exclude app --exclude xtask-examples --exclude benches
+    just _build-example-doc-assets
+
+_build-example-doc-assets:
+    cargo build -p ranim-examples --release --target wasm32-unknown-unknown
+    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_examples.wasm \
+        --out-dir target/doc/ranim_examples/pkg
+
+doc-examples:
+    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
+        cargo doc --no-deps -p ranim-examples --document-private-items --all-features \
+        --target-dir packages/ranim-examples/target
+    cargo build -p ranim-examples --release --target wasm32-unknown-unknown
+    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_examples.wasm \
+        --out-dir packages/ranim-examples/target/doc/ranim_examples/pkg
 
 book:
     mdbook build book

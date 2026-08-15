@@ -11,6 +11,7 @@ use ranim::{
 use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/regular_polygon")]
 pub fn regular_polygon(r: &mut RanimScene) {
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);

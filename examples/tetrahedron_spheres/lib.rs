@@ -29,6 +29,7 @@ impl Eval for RotateAroundZ {
 }
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/tetrahedron_spheres")]
 fn tetrahedron_spheres(r: &mut RanimScene) {
     let phi = 60.0 * PI / 180.0;

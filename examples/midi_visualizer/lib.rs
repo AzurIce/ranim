@@ -3,8 +3,8 @@
 //! MIDI source: <https://freemidi.org/getter-25332>
 //! See `SOURCE.md` for the download filename, retrieval date, and checksum.
 
-mod midi;
-mod visual;
+pub mod midi;
+pub mod visual;
 
 use std::sync::Arc;
 
@@ -48,6 +48,7 @@ fn camera(duration: f64) -> impl Animation {
 }
 
 #[scene(clear_color = "#070711")]
+#[wasm_demo_doc]
 #[output(fps = 30, dir = "./output/midi_visualizer")]
 fn midi_visualizer(r: &mut RanimScene) {
     let song = Arc::new(parse_song());
@@ -68,6 +69,7 @@ fn midi_visualizer(r: &mut RanimScene) {
 }
 
 #[scene(clear_color = "#070711")]
+#[wasm_demo_doc]
 #[output(fps = 30, dir = "./output/midi_visualizer")]
 fn midi_visualizer_per_note(r: &mut RanimScene) {
     let song = Arc::new(parse_song());

@@ -6,8 +6,8 @@ code = """
 //! MIDI source: <https://freemidi.org/getter-25332>
 //! See `SOURCE.md` for the download filename, retrieval date, and checksum.
 
-mod midi;
-mod visual;
+pub mod midi;
+pub mod visual;
 
 use std::sync::Arc;
 
@@ -51,6 +51,7 @@ fn camera(duration: f64) -> impl Animation {
 }
 
 #[scene(clear_color = "#070711")]
+#[wasm_demo_doc]
 #[output(fps = 30, dir = "./output/midi_visualizer")]
 fn midi_visualizer(r: &mut RanimScene) {
     let song = Arc::new(parse_song());
@@ -71,6 +72,7 @@ fn midi_visualizer(r: &mut RanimScene) {
 }
 
 #[scene(clear_color = "#070711")]
+#[wasm_demo_doc]
 #[output(fps = 30, dir = "./output/midi_visualizer")]
 fn midi_visualizer_per_note(r: &mut RanimScene) {
     let song = Arc::new(parse_song());
@@ -102,9 +104,8 @@ fn bundled_midi_parses() {
     assert_eq!(song.notes.len(), 3378);
     assert!(song.duration_secs > 58.0);
 }
-```
-"""
-hash = "40d730abb0366b2a24e06b0465546d5857fd908f"
+```"""
+hash = "d54b44e7f377dedf64a427943beb6e6c89ea6210"
 preview_imgs = ["/examples/midi_visualizer/preview.png", "/examples/midi_visualizer/preview.png"]
 output_files = ["/examples/midi_visualizer/midi_visualizer_1920x1080_30.mp4", "/examples/midi_visualizer/midi_visualizer_per_note_1920x1080_30.mp4"]
 wasm = true

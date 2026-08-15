@@ -16,6 +16,7 @@ use ranim::{
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/basic")]
 fn basic(r: &mut RanimScene) {
     let mut svg = Vec::<VItem>::from(SvgItem::new(SVG).with(|svg| {
@@ -59,9 +60,8 @@ fn basic(r: &mut RanimScene) {
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```
-"""
-hash = "f1c268c5c2317ed518fa03ca762d6ca7589a939b"
+```"""
+hash = "d3386fc152bd02a1ead8d891d82be9cdc925e25b"
 preview_imgs = ["/examples/basic/preview.png"]
 output_files = ["/examples/basic/basic_1920x1080_60.mp4"]
 wasm = true

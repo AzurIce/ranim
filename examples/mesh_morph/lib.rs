@@ -11,6 +11,7 @@ use ranim::{
 
 /// Comprehensive mesh morphing demo: sphere -> torus -> disc -> sphere
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/mesh_morph")]
 fn mesh_morph(r: &mut RanimScene) {
     // Setup camera

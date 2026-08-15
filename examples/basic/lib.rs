@@ -13,6 +13,7 @@ use ranim::{
 const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
 
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/basic")]
 fn basic(r: &mut RanimScene) {
     let mut svg = Vec::<VItem>::from(SvgItem::new(SVG).with(|svg| {

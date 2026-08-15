@@ -12,9 +12,12 @@ use ranim::{
 };
 use ranim_anims::morph::MorphAnim;
 use ranim_core::animation::StaticAnim;
+#[cfg(test)]
+use ranim_items::vitem::typst::compile_typst_code;
 use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 
 #[scene(clear_color = "#000000")]
+#[wasm_demo_doc]
 #[output(dir = "./output/animating_pi")]
 fn animating_pi(r: &mut RanimScene) {
     let cam = CameraFrame::default();
@@ -92,9 +95,8 @@ fn foo_2() {
     let svg = compile_typst_code("R");
     println!("{svg}");
 }
-```
-"""
-hash = "f627cdae0a901d31634bb21be8cf288ccf6fee06"
+```"""
+hash = "4817dfce38fe984f653a1f7acf6269325fd871e3"
 preview_imgs = ["/examples/animating_pi/preview.png"]
 output_files = ["/examples/animating_pi/animating_pi_1920x1080_60.mp4"]
 wasm = true
