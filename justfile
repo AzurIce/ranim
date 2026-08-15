@@ -29,16 +29,12 @@ doc-nightly:
         cargo +nightly doc --workspace --no-deps --document-private-items --all-features \
         --exclude app --exclude xtask-examples --exclude benches
     just _build-example-doc-assets
-    -rm -r website/static/doc/
-    cp -r target/doc/ website/static/doc/
 
 doc:
     RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-scenes/docs-rs/header.html" \
         cargo doc --workspace --no-deps --document-private-items --all-features \
         --exclude app --exclude xtask-examples --exclude benches
     just _build-example-doc-assets
-    -rm -r website/static/doc/
-    cp -r target/doc/ website/static/doc/
 
 _build-example-doc-assets:
     cargo build -p ranim-scenes --release --target wasm32-unknown-unknown
