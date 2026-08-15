@@ -33,7 +33,7 @@
   {% if example_data.wasm %}
   <sl-tab-panel name="app">
     <script type="module">
-      import init, * as ranim from '{{ get_url(path="examples/" ~ example_name ~ "/pkg/" ~ example_name ~ ".js") }}';
+      import init, * as ranim from '{{ get_url(path="ranim-scenes/pkg/ranim_scenes.js") }}';
       window.ranim_examples = init().then(() => ranim);
 
       const { find_scene, preview_scene } = await ranim_examples;

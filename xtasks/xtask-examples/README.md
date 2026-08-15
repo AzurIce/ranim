@@ -19,3 +19,5 @@ output_type = "image" # or "video"
 output_path = "examples/xxx/output.png" # or "examples/xxx/output.mp4"
 
 在 zola 的 markdown 中使用 `!example-xxx` 来插入示例。
+`cargo examples build` 会将 `examples/` 下的全部示例编译进共享 wasm bundle，输出到
+`website/static/ranim-scenes/pkg/`；网站模板通过 `find_scene` 按名称选择场景。

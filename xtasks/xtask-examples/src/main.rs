@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::env;
 use std::path::Path;
-use xtask_examples::get_examples;
+use xtask_examples::{build_wasm_bundle, get_examples};
 
 #[derive(Parser)]
 #[command(author, version, about = "build ranim examples")]
@@ -55,26 +55,26 @@ fn main() {
         }
     };
     let total_cnt = all_examples.len();
+    let mut selected_examples = all_examples.clone();
 
-    let mut all_examples = all_examples;
     let filter = match &args.command {
         Commands::Build { examples } | Commands::Run { examples, .. } => examples,
     };
     if !filter.is_empty() {
-        all_examples.retain(|example| filter.contains(&example.name));
+        selected_examples.retain(|example| filter.contains(&example.name));
         let unknown: Vec<_> = filter
             .iter()
-            .filter(|name| !all_examples.iter().any(|e| &e.name == *name))
+            .filter(|name| !selected_examples.iter().any(|e| &e.name == *name))
             .collect();
         if !unknown.is_empty() {
             eprintln!("未找到示例: {unknown:?}");
             std::process::exit(1);
         }
     }
-    let selected_cnt = all_examples.len();
+    let selected_cnt = selected_examples.len();
     println!(
         "处理 {selected_cnt}/{total_cnt} 个示例: {:?}",
-        all_examples
+        selected_examples
             .iter()
             .map(|e| e.name.as_str())
             .collect::<Vec<_>>()
@@ -84,25 +84,43 @@ fn main() {
         // TODO: clean
     }
 
+    if matches!(args.command, Commands::Build { .. }) {
+        if let Err(err) = build_wasm_bundle(&workspace_root) {
+            eprintln!("构建 wasm example bundle 失败: {err:#}");
+            std::process::exit(1);
+        }
+
+        // The shared bundle replaced per-example wasm packages. Remove any
+        // leftovers from previous website builds.
+        for example in &all_examples {
+            if let Err(err) = example.clean_wasm(&workspace_root) {
+                eprintln!("清理示例 {} 的旧 wasm 失败: {err:#}", example.name);
+                std::process::exit(1);
+            }
+        }
+        println!("构建 wasm example bundle 完成");
+        return;
+    }
+
     let mut succeeded = 0usize;
     let mut failed: Vec<String> = vec![];
-    for (index, example) in all_examples.iter().enumerate() {
-        let (verb, result) = match &args.command {
-            Commands::Build { .. } => ("构建", example.build_wasm(&workspace_root)),
-            Commands::Run { lazy_run, .. } => ("运行", example.run(&workspace_root, *lazy_run)),
+    for (index, example) in selected_examples.iter().enumerate() {
+        let result = match &args.command {
+            Commands::Run { lazy_run, .. } => example.run(&workspace_root, *lazy_run),
+            Commands::Build { .. } => unreachable!(),
         };
         match result {
             Ok(()) => {
                 succeeded += 1;
                 println!(
-                    "[{}/{selected_cnt}] {verb}示例 {} 完成",
+                    "[{}/{selected_cnt}] 运行示例 {} 完成",
                     index + 1,
                     example.name
                 );
             }
             Err(err) => {
                 eprintln!(
-                    "[{}/{selected_cnt}] {verb}示例 {} 失败: {err:#}",
+                    "[{}/{selected_cnt}] 运行示例 {} 失败: {err:#}",
                     index + 1,
                     example.name
                 );

@@ -64,7 +64,7 @@ jobs:
         with:
           shared-key: "wasm-examples"
 
-      - name: Build wasm examples
+      - name: Build wasm example bundle
         run: cargo examples build
 
       - run: just website

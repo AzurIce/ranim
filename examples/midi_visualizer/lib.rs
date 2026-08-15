@@ -3,8 +3,8 @@
 //! MIDI source: <https://freemidi.org/getter-25332>
 //! See `SOURCE.md` for the download filename, retrieval date, and checksum.
 
-mod midi;
-mod visual;
+pub mod midi;
+pub mod visual;
 
 use std::sync::Arc;
 

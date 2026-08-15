@@ -25,6 +25,81 @@ fn copy_file(source: &Path, target_dir: &Path) -> Result<String> {
     Ok(file_name)
 }
 
+/// The package and wasm names of the shared wasm scene bundle.
+const SCENES_BUNDLE_PACKAGE: &str = "ranim-scenes";
+const SCENES_BUNDLE_CRATE: &str = "ranim_scenes";
+const SCENES_BUNDLE_WEB_DIR: &str = "ranim-scenes";
+
+fn clean_wasm_bundle(root_dir: &Path) -> Result<()> {
+    let output_dir = root_dir
+        .join("website")
+        .join("static")
+        .join(SCENES_BUNDLE_WEB_DIR)
+        .join("pkg");
+    if std::fs::exists(&output_dir)? {
+        std::fs::remove_dir_all(&output_dir)
+            .with_context(|| format!("failed to clean {}", output_dir.display()))?;
+    }
+    Ok(())
+}
+
+/// Build the shared wasm bundle containing every example scene.
+///
+/// The bundle is built once with the full feature set (`preview`, `anims`,
+/// `items` and `typst`) and exposed to the website as
+/// `website/static/ranim-scenes/pkg/ranim_scenes.js`.
+pub fn build_wasm_bundle(root_dir: impl AsRef<Path>) -> Result<()> {
+    let root_dir = root_dir.as_ref();
+    let website_root = root_dir.join("website");
+    let output_dir = website_root.join("static").join(SCENES_BUNDLE_WEB_DIR);
+    std::fs::create_dir_all(&output_dir)?;
+
+    clean_wasm_bundle(root_dir)?;
+
+    let status = Command::new("cargo")
+        .current_dir(root_dir)
+        .args([
+            "build",
+            "-p",
+            SCENES_BUNDLE_PACKAGE,
+            "--target",
+            "wasm32-unknown-unknown",
+            "--release",
+        ])
+        .stdout(std::process::Stdio::null())
+        .status()
+        .context("failed to run cargo build for the wasm example bundle")?;
+    if !status.success() {
+        bail!("failed to build the wasm example bundle");
+    }
+
+    let wasm_path = root_dir
+        .join("target")
+        .join("wasm32-unknown-unknown")
+        .join("release")
+        .join(format!("{SCENES_BUNDLE_CRATE}.wasm"));
+    let pkg_dir = output_dir.join("pkg");
+    let status = Command::new("wasm-bindgen")
+        .current_dir(root_dir)
+        .args([
+            "--out-dir",
+            pkg_dir.as_os_str().to_str().unwrap(),
+            "--target",
+            "web",
+            wasm_path.as_os_str().to_str().unwrap(),
+        ])
+        .stdout(std::process::Stdio::null())
+        .status()
+        .context("failed to run wasm-bindgen; is it installed?")?;
+    if !status.success() {
+        bail!("wasm-bindgen failed for the wasm example bundle");
+    }
+
+    let bg_wasm = pkg_dir.join(format!("{SCENES_BUNDLE_CRATE}_bg.wasm"));
+    optimize_wasm(&bg_wasm).context("failed to optimize the wasm example bundle")?;
+    Ok(())
+}
+
 /// Optimize a wasm-bindgen output module for website delivery.
 ///
 /// `wasm-bindgen` may rewrite the module it receives, so this must run after
@@ -212,69 +287,12 @@ impl Example {
         Ok(())
     }
 
-    /// Build wasm to `website/static/examples/<example-name>/pkg/`
+    /// Remove legacy per-example wasm packages.
+    ///
+    /// All wasm scenes are now bundled into the shared `ranim-scenes` package
+    /// by [`build_wasm_bundle`].
     pub fn build_wasm(&self, root_dir: impl AsRef<Path>) -> Result<()> {
-        let root_dir = root_dir.as_ref();
-        let website_root = root_dir.join("website");
-        let output_dir = website_root
-            .join("static")
-            .join("examples")
-            .join(&self.name);
-        std::fs::create_dir_all(&output_dir)?;
-
-        self.clean_wasm(root_dir)?;
-
-        if !self.meta.wasm {
-            return Ok(());
-        }
-
-        let features = std::iter::once("preview")
-            .chain(self.required_features.iter().map(String::as_str))
-            .collect::<Vec<_>>()
-            .join(",");
-        let status = Command::new("cargo")
-            .current_dir(root_dir)
-            .args([
-                "build",
-                "--example",
-                &self.name,
-                "--features",
-                &features,
-                "--target",
-                "wasm32-unknown-unknown",
-                "--release",
-            ])
-            .stdout(std::process::Stdio::null())
-            .status()
-            .context("failed to run cargo build for wasm")?;
-        if !status.success() {
-            bail!("failed to build wasm for example <{}>", self.name);
-        }
-        let status = Command::new("wasm-bindgen")
-            .current_dir(root_dir)
-            .args([
-                "--out-dir",
-                output_dir.join("pkg").as_os_str().to_str().unwrap(),
-                "--target",
-                "web",
-                &format!(
-                    "target/wasm32-unknown-unknown/release/examples/{}.wasm",
-                    self.name
-                ),
-            ])
-            .stdout(std::process::Stdio::null())
-            .status()
-            .context("failed to run wasm-bindgen; is it installed?")?;
-        if !status.success() {
-            bail!("wasm-bindgen failed for example <{}>", self.name);
-        }
-
-        let wasm_path = output_dir
-            .join("pkg")
-            .join(format!("{}_bg.wasm", self.name));
-        optimize_wasm(&wasm_path)
-            .with_context(|| format!("failed to optimize wasm for example <{}>", self.name))?;
-        Ok(())
+        self.clean_wasm(root_dir)
     }
 
     pub fn create_example_page(&self, root_dir: impl AsRef<Path>) -> Result<()> {
@@ -422,16 +440,14 @@ mod test {
         examples[0].run(&root_dir, false).unwrap();
     }
 
-    /// Builds the wasm package (requires the wasm32 target, wasm-bindgen and
-    /// wasm-opt); ignored by default.
+    /// Builds the shared wasm scene bundle (requires the wasm32 target,
+    /// wasm-bindgen and wasm-opt); ignored by default.
     #[test]
     #[ignore]
     fn test_example_build_wasm() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
-        let examples = get_examples(&root_dir).unwrap();
-        println!("{:?}", examples[0].name);
-        examples[0].build_wasm(&root_dir).unwrap();
+        build_wasm_bundle(&root_dir).unwrap();
     }
 
     /// Destructive: deletes the example's website outputs; ignored by default.
