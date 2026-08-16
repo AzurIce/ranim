@@ -140,4 +140,4 @@ For now, you can check out the code.
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=AzurIce/ranim&type=Date)](https://www.star-history.com/#AzurIce/ranim&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=AzurIce/ranim&type=Date)](https://star-history.dera.page/#AzurIce/ranim&Date)
