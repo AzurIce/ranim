@@ -39,6 +39,18 @@ example 的 AI agent，也供审阅这些内容的人类维护者参考。
 - 不要凭记忆或印象断言代码行为（“这个 example 没调 X”“默认值是 Y”）；
   先 grep / 读文件确认，再下结论。
 
+常用 API 的查询入口：
+
+- 动画系统（`Eval` / `Iterative` / `AnimSequence` / `AnimStack` / `AnimLagged` /
+  `morph` 等）：先读 `book/src/understand/core/anim.md`，再按需深入
+  `packages/ranim-core/src/animation/` 与 `packages/ranim-anims/src/` 的 rustdoc。
+- 3D 物件：`packages/ranim-items/src/mesh/mod.rs`（`MeshItem`：每顶点颜色、
+  `transform`、法线留空走 flat shading）。
+- 相机：`packages/ranim-core/src/core_item/camera_frame.rs`
+  （`CameraFrame::from_spherical`、`perspective_blend`、`fovy`）。
+- 2D 矢量物件：`packages/ranim-items/src/vitem/`（`VItem`、`geometry`）。
+- CLI 详细用法：`book/src/cli.md`。
+
 ## 核心工作方法：渲染 → 看图 → 迭代
 
 ```text
@@ -207,6 +219,10 @@ agent 在本目录工作时，统一通过 ranim-cli 完成“查询 → 渲染 
 闭环。命令示例中的 `<example-name>` 与 `<scene>` 是 example 目录名与
 `#[scene]` 场景名。
 
+CLI 各子命令的完整参数、`#[output(...)]` 属性、产物路径规则与已知局限见
+`book/src/cli.md`（CLI 文档的单一事实来源）；本节只保留迭代时必须当场知道的
+部分。
+
 ### 运行方式
 
 `ranim` 二进制通常不在 PATH 中；在仓库根目录统一用 cargo 运行（首次运行
@@ -220,9 +236,11 @@ cargo run -p ranim-cli -- <command> ...
 即可：仓库为 dev profile 开了 `opt-level = 1`、依赖 `opt-level = 3`，
 inspect 是纯 CPU 查询，渲染也足够快（参考：1080p60、1440 帧的 example 在
 RTX 4070 Ti SUPER 上约 9 s）。只有场景特别重、需要反复渲染时才考虑
-`cargo run --release -p ranim-cli -- ... -- --release`（CLI 本体与 example
-dylib 各自独立选择 profile，`-- --release` 只影响 dylib；代价是首次全量
-release 编译很慢）。
+`-- --release`（CLI 本体与 example dylib 各自独立选择 profile，
+`-- --release` 只影响 dylib；代价是首次全量 release 编译很慢）。
+
+ranim-cli 每次都会先 `cargo build` 目标 dylib，再加载其中的 `#[scene]`
+inventory；因此命令报错时先看 cargo 编译输出。
 
 ### 通用 target 参数
 
@@ -232,94 +250,24 @@ release 编译很慢）。
 ranim <command> [-p <package>] [--lib | --example <example-name>] [--features <features>] [-- <cargo args>...]
 ```
 
-- `--example <example-name>`：构建并加载名为 `<example-name>` 的 example
-  target，并自动解析到声明该 example 的 package。agent example 登记进根
-  `Cargo.toml` 后，用它迭代：
-  `ranim inspect scenes --example <example-name>`。
-- `-p/--package <package>`：指定 workspace 中的 package，优先于当前目录推断。
-- `--lib`：使用当前 package 的 lib target；与 `--example` 互斥。
-- `--features`：透传给 `cargo build`。
-- `--` 之后是额外的 cargo 构建参数，例如 `ranim output <scene> --example <name> -- --release`。
+`--example <example-name>` 会自动解析到声明该 example 的 package，是迭代本
+目录 example 的标准方式；其余参数的语义见 `book/src/cli.md`。
 
-ranim-cli 每次都会先 `cargo build` 目标 dylib，再加载其中的 `#[scene]`
-inventory；因此命令报错时先看 cargo 编译输出。
+### 子命令速查
 
-### `ranim inspect scenes`
-
-```bash
-ranim inspect scenes [--format text|json] [--example <example-name>]
-```
-
-- 不调用 scene constructor，只列出 dylib 中注册的 scene 及其 `#[output(...)]`
-  摘要（尺寸、fps、格式、输出目录、`name_template`、`save_frames`）。
-- 用于开工第一步：确认场景名拼写、scene 是否注册成功、输出配置是否符合预期。
-- JSON 输出的顶层字段为 `schema_version` 与 `scenes`，适合脚本化检查。
-
-### `ranim inspect tree [<scene>]`
-
-```bash
-ranim inspect tree [<scene>] [--format text|json] [--example <example-name>]
-```
-
-- 构建 scene 并输出层级动画树；不创建 GPU context，可在无 GPU 环境运行。
-- 每个节点包含：DFS `path`、`kind`（eval/sequence/stack/lagged/static）、
-  `anim_name`、父局部坐标下的 `range`、`content_duration_secs`、`rate_func`、
-  `enabled` 和 `children`；iterative eval 节点额外包含 `sim_step`
-  （每次积分步进的进度步长 `1/N`，由 `with_steps(N)` 声明，未声明时为默认值）。
-- 用于检查动画组织是否符合设计：顺序/叠加关系、每段起止时间、是否误用了默认
-  时长、某段是否被 `with_enabled(false)` 关闭。注意 `range` 是父局部坐标，
+- `ranim inspect scenes --example <example-name>`：列出注册的 scene 及其
+  `#[output(...)]` 摘要；不调用 scene constructor，用于开工第一步。
+- `ranim inspect tree [<scene>] --example <example-name>`：输出层级动画树
+  （各段起止时间、rate_func、enabled、sim_step）。注意 `range` 是父局部坐标，
   不要直接当成全局时间。
-- `<scene>` 省略时，只有一个 scene 会自动选择；多个 scene 会报错并列出可用
-  名称。
-
-### `ranim inspect frame <scene> --at <sec>`
-
-```bash
-ranim inspect frame <scene> --at <sec> [--format text|json] [--verbose] [--example <example-name>]
-```
-
-- 用 120 Hz 逻辑时钟在 `<sec>` 采样一帧，输出 `EvaluatedFrame` 中的物件列表。
-- 每个物件包含：`z_order`（帧内渲染/遮挡顺序）、`id`/`animation_id`/`part`、
-  `kind`（camera/vitem/mesh）、来源根动画 `source` 和 `data`。
-- `data` 摘要：VItem 的点数/子路径/闭合/颜色/线宽/法线/AABB，Mesh 的点数/
-  三角形数/transform/AABB，Camera 的 pos/facing/up/投影参数。
-- `--verbose` 追加完整几何数据（如 VItem points、Mesh 顶点/索引/颜色/法线）。
-- 用于渲染前定位“某时刻物件不对/位置不对/z-order 不对/颜色不对”等问题，避免
-  直接上 GPU 盲调。
-- 已知局限（v1 如实输出，不要误读）：
-  - `source` 只能回溯到根动画的 `animation_id`，不能定位树内叶子节点；
-  - `SvgItem`/`TypstText` 等用户层 item 会 extract 成多个 CoreItem，存在 1→N
-    映射；此时 `part` 是 extract 后的序号，不是用户层 item 的序号。
-
-### `ranim output [<scenes>...]`
-
-```bash
-ranim output [<scene1> <scene2> ...] [--example <example-name>]
-```
-
-- 渲染每个选中 scene 声明的**所有** `#[output(...)]`；不指定 scene 时渲染
-  全部 scene。
-- 按声明输出视频；`save_frames = true` 时还会保存 PNG 帧序列；渲染完主视频后
-  会处理 `TimeMark::Capture`，输出截图。
-- 产物位置（以 `#[output(dir = "./output/agents/<name>")]` 为例）：
-  - 视频：`<dir>/<basename>.<ext>`，其中 `<basename>` 由 `name_template`
-    展开，默认模板为 `{name}_{width}x{height}_{fps}`；
-  - 帧序列：`<dir>/<scene>_<width>x<height>_<fps>-frames/NNNN.png`；
-  - capture：`<dir>/<scene>_<width>x<height>_<fps>/<filename>`。
-- 这是 one-shot 交付前的最终验证命令：用它确认最终输出配置、成片与效果图。
-- 需要 GPU 与 ffmpeg；缺 ffmpeg 时 CLI 会尝试在当前目录查找或下载。
-
-### `ranim render <scene>`
-
-```bash
-ranim render <scene> [--example <example-name>]
-```
-
-- 快速渲染一个 scene **一次**，使用默认输出 `1920x1080`、60 fps、mp4，
-  输出到 `./output/<scene>_1920x1080_60.mp4`。
-- **不读取**任何 `#[output(...)]` 声明，也**不处理** `TimeMark::Capture`。
-- 用于迭代中只想快速看整体效果、不想等待/写盘多输出配置的情况；正式验收仍应
-  使用 `ranim output`。
+- `ranim inspect frame <scene> --at <sec> [--verbose]`：采样一帧，列出物件的
+  z_order / kind / source / 几何摘要；`--verbose` 输出完整几何。用于渲染前
+  定位“某时刻物件不对/位置不对/z-order 不对/颜色不对”。
+- `ranim render <scene> --example <example-name>`：固定 1920x1080@60 mp4 快速
+  冒烟；**不读取** `#[output(...)]`，**不处理** `TimeMark::Capture`。
+- `ranim output [<scenes>...] --example <example-name>`：渲染每个选中 scene
+  声明的所有 `#[output(...)]` 并处理 capture 截图；是交付前的最终验证命令。
+  需要 GPU 与 ffmpeg。
 
 ### 推荐的验证顺序
 
@@ -346,5 +294,5 @@ ranim render <scene> [--example <example-name>]
 - 不要为了显得完整而补写不存在的设计动机、迭代轮次或验证结果。
 - 代码中的输出路径、场景时长、渲染设置等必须与 README 描述一致。
 - 只提交挑选出的效果图；不提交 `output/` 下的大体积渲染产物。
-- 未在本文件中出现的 CLI 能力（如尚未实现的 agent 子命令、自动登记流程）不得
-  被假设，也不得写进代码或 README。
+- 未在本文件或 `book/src/cli.md` 中出现的 CLI 能力（如尚未实现的 agent
+  子命令、自动登记流程）不得被假设，也不得写进代码或 README。
