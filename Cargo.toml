@@ -185,6 +185,11 @@ path = "examples/agents/double_pendulum/lib.rs"
 crate-type = ["cdylib"]
 
 [[example]]
+name = "rubiks_cube"
+path = "examples/agents/rubiks_cube/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "aabb"
 path = "examples/aabb/lib.rs"
 crate-type = ["cdylib"]
