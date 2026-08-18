@@ -25,6 +25,20 @@ example 的 AI agent，也供审阅这些内容的人类维护者参考。
 - 本目录不承担 skill 功能：不要把通用建模/动画流程写进这里；通用约定放到
   仓库级文档或 skill 文件。
 
+## API 使用纪律：先读定义处的文档注释
+
+- 使用任何 ranim API 前，先读该 API **定义处**的 rustdoc（通常在
+  `packages/ranim-core/src/`、`packages/ranim-items/src/` 下），特别注意
+  “不调用 X 时的默认行为”这类说明。例如 `Iterative::from_fn` 的默认内容步长
+  是 `1/120` 进度，需要更细的模拟分辨率时应按
+  `packages/ranim-core/src/animation/eval/iterative.rs` 的文档使用
+  `.with_steps(N)`。
+- 现有 example（包括 `examples/nbody` 这类常被模仿的样板）只能当语法和
+  结构参考，**不能当最佳实践**；example 本身可能未遵循文档建议。模仿某个
+  example 的 API 用法之前，仍以定义处文档为准。
+- 不要凭记忆或印象断言代码行为（“这个 example 没调 X”“默认值是 Y”）；
+  先 grep / 读文件确认，再下结论。
+
 ## 核心工作方法：渲染 → 看图 → 迭代
 
 ```text
@@ -193,6 +207,23 @@ agent 在本目录工作时，统一通过 ranim-cli 完成“查询 → 渲染 
 闭环。命令示例中的 `<example-name>` 与 `<scene>` 是 example 目录名与
 `#[scene]` 场景名。
 
+### 运行方式
+
+`ranim` 二进制通常不在 PATH 中；在仓库根目录统一用 cargo 运行（首次运行
+需要先编译 ranim-cli，耗时较长，之后增量很快）：
+
+```bash
+cargo run -p ranim-cli -- <command> ...
+```
+
+本文档所有 `ranim <command> ...` 示例都是它的简写。默认 debug profile
+即可：仓库为 dev profile 开了 `opt-level = 1`、依赖 `opt-level = 3`，
+inspect 是纯 CPU 查询，渲染也足够快（参考：1080p60、1440 帧的 example 在
+RTX 4070 Ti SUPER 上约 9 s）。只有场景特别重、需要反复渲染时才考虑
+`cargo run --release -p ranim-cli -- ... -- --release`（CLI 本体与 example
+dylib 各自独立选择 profile，`-- --release` 只影响 dylib；代价是首次全量
+release 编译很慢）。
+
 ### 通用 target 参数
 
 以下参数对所有子命令可用：
@@ -233,7 +264,8 @@ ranim inspect tree [<scene>] [--format text|json] [--example <example-name>]
 - 构建 scene 并输出层级动画树；不创建 GPU context，可在无 GPU 环境运行。
 - 每个节点包含：DFS `path`、`kind`（eval/sequence/stack/lagged/static）、
   `anim_name`、父局部坐标下的 `range`、`content_duration_secs`、`rate_func`、
-  `enabled` 和 `children`。
+  `enabled` 和 `children`；iterative eval 节点额外包含 `sim_step`
+  （每次积分步进的进度步长 `1/N`，由 `with_steps(N)` 声明，未声明时为默认值）。
 - 用于检查动画组织是否符合设计：顺序/叠加关系、每段起止时间、是否误用了默认
   时长、某段是否被 `with_enabled(false)` 关闭。注意 `range` 是父局部坐标，
   不要直接当成全局时间。
