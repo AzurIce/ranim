@@ -167,6 +167,7 @@ fn nbody(r: &mut RanimScene) {
                 state.step(sim_secs * delta_alpha);
             },
         )
+        .with_steps((sim_secs * 60.0) as usize)
         .with_duration(sim_secs),
     );
 }
