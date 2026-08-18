@@ -193,8 +193,8 @@ impl Move {
 fn apply_move(state: &mut [[usize; 9]; 6], mv: Move) {
     let axis = FACE_NORMALS[mv.face];
     let old = *state;
-    for face in 0..6 {
-        for idx in 0..9 {
+    for (face, old_face) in old.iter().enumerate() {
+        for (idx, &color) in old_face.iter().enumerate() {
             let pos = sticker_pos(face, idx);
             if idot(pos, axis) != 1 {
                 continue; // sticker not in the turned layer
@@ -202,7 +202,7 @@ fn apply_move(state: &mut [[usize; 9]; 6], mv: Move) {
             let pos = rot90(pos, axis, mv.quarter);
             let normal = rot90(FACE_NORMALS[face], axis, mv.quarter);
             let (f2, i2) = sticker_locate(pos, normal);
-            state[f2][i2] = old[face][idx];
+            state[f2][i2] = color;
         }
     }
 }

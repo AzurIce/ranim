@@ -3,6 +3,13 @@
 This file describes how to write and update pull request descriptions in this
 repository. It applies to both human contributors and AI coding agents.
 
+## Language
+
+- PR titles and commit messages are always written in **English**.
+- The PR description is bilingual: English first, then Chinese, separated by a
+  `---` divider. Both versions carry the same content, including the
+  `Closes:` line and the Breaking Changes section.
+
 ## PR Description Format
 
 When creating or editing a PR, follow this structure:
@@ -62,6 +69,12 @@ Use code blocks, mermaid diagrams, or examples as needed.
 
 本文件描述本仓库中 pull request 描述的编写与更新规则，适用于人类贡献者和 AI
 编码代理。
+
+## 语言
+
+- PR 标题与 commit message 一律使用**英文**。
+- PR 描述使用双语：英文在前、中文在后，中间以 `---` 分割线分隔。两个版本
+  内容一致，包括 `Closes:` 行与 Breaking Changes 小节。
 
 ## PR 描述格式
 
