@@ -6,10 +6,9 @@ example 的 AI agent，也供审阅这些内容的人类维护者参考。
 它不是全局 skill：不进入通用 skill 目录，只对 `examples/agents/` 路径下的内容
 生效。仓库级 PR 与贡献流程遵守仓库根目录的 `AGENTS.md`。
 
-本目录的方法参考了
-`~/.dotfiles/.agents/skills/blender-modeling/SKILL.md` 的核心闭环：**程序化生成 →
-渲染出图 → 视觉检查 → 修改再渲染**。区别在于这里的一切都必须围绕
-**ranim 场景代码 + ranim-cli** 完成，视觉检查对象是 ranim 渲染出的 PNG/视频。
+本目录的核心工作闭环是：**程序化生成 → 渲染出图 → 视觉检查 → 修改再渲染**。
+这里的一切都必须围绕 **ranim 场景代码 + ranim-cli** 完成，视觉检查对象是
+ranim 渲染出的 PNG/视频。
 
 ## 定位
 
@@ -25,12 +24,26 @@ example 的 AI agent，也供审阅这些内容的人类维护者参考。
 - 本目录不承担 skill 功能：不要把通用建模/动画流程写进这里；通用约定放到
   仓库级文档或 skill 文件。
 
-## API 使用纪律：先读定义处的文档注释
+## API 使用纪律：先读 book，疑点深挖源码
 
-- 使用任何 ranim API 前，先读该 API **定义处**的 rustdoc（通常在
-  `packages/ranim-core/src/`、`packages/ranim-items/src/` 下），特别注意
-  “不调用 X 时的默认行为”这类说明。例如 `Iterative::from_fn` 的默认内容步长
-  是 `1/120` 进度，需要更细的模拟分辨率时应按
+- 概念与 API 用法的第一入口是仓库内的 book（`book/src/`）：
+  - 动画系统（`Eval` / `Iterative` / `AnimSequence` / `AnimStack` /
+    `AnimLagged` / `morph` 等）：`book/src/understand/core/anim.md`；
+  - `CoreItem` 与 `Extract`、三种 core item 的渲染语义：
+    `book/src/understand/core/core_item.md` 与
+    `book/src/understand/core/core_items/`；
+  - 用户层物件（`VItem` / `MeshItem` / `Surface` / `Sphere` / 几何构造器 /
+    `SvgItem` / 文字物件）：`book/src/items/`；
+  - CLI：`book/src/cli.md`。
+- book 未覆盖、或与代码表现不一致时，继续深挖该 API **定义处**的 rustdoc 与
+  源码——源码是唯一事实来源（book 也可能滞后）。常用定义处入口：
+  - 动画：`packages/ranim-core/src/animation/`、`packages/ranim-anims/src/`；
+  - 3D 物件：`packages/ranim-items/src/mesh/mod.rs`；
+  - 相机：`packages/ranim-core/src/core_item/camera_frame.rs`；
+  - 矢量物件：`packages/ranim-items/src/vitem/`。
+
+  特别注意“不调用 X 时的默认行为”这类说明。例如 `Iterative::from_fn` 的
+  默认内容步长是 `1/120` 进度，需要更细的模拟分辨率时应按
   `packages/ranim-core/src/animation/eval/iterative.rs` 的文档使用
   `.with_steps(N)`。
 - 现有 example（包括 `examples/nbody` 这类常被模仿的样板）只能当语法和
@@ -38,18 +51,6 @@ example 的 AI agent，也供审阅这些内容的人类维护者参考。
   example 的 API 用法之前，仍以定义处文档为准。
 - 不要凭记忆或印象断言代码行为（“这个 example 没调 X”“默认值是 Y”）；
   先 grep / 读文件确认，再下结论。
-
-常用 API 的查询入口：
-
-- 动画系统（`Eval` / `Iterative` / `AnimSequence` / `AnimStack` / `AnimLagged` /
-  `morph` 等）：先读 `book/src/understand/core/anim.md`，再按需深入
-  `packages/ranim-core/src/animation/` 与 `packages/ranim-anims/src/` 的 rustdoc。
-- 3D 物件：`packages/ranim-items/src/mesh/mod.rs`（`MeshItem`：每顶点颜色、
-  `transform`、法线留空走 flat shading）。
-- 相机：`packages/ranim-core/src/core_item/camera_frame.rs`
-  （`CameraFrame::from_spherical`、`perspective_blend`、`fovy`）。
-- 矢量物件：`packages/ranim-items/src/vitem/`（`VItem`、`geometry`）。
-- CLI 详细用法：`book/src/cli.md`。
 
 ## 核心工作方法：渲染 → 看图 → 迭代
 
@@ -79,7 +80,7 @@ ranim output（最终验证）或 ranim render（快速冒烟）
   发现场景名、输出配置、时间轴范围、enabled 状态、帧内物件种类/数量/z-order/
   几何摘要等问题；把昂贵的 GPU 渲染留给真正需要看效果的时候。
 - 视觉检查使用当前环境可用的读图/读视频能力（如 `ReadMediaFile`）；需要时对
-  大图裁局部看原生分辨率，参考 blender skill 的做法。
+  大图裁局部看原生分辨率。
 - 只记录真实执行过的命令和真实观察到的结果，禁止编造迭代过程或验证结论。
 
 ## 目录规则
