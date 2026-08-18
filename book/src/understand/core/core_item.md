@@ -18,7 +18,7 @@ pub enum CoreItem {
 
 三种 core item 的共同特征：数据为 f32（`Vec3` / `Vec4` / `Mat4`）、位于世界
 空间、不再携带任何动画辅助结构，每种直接对应渲染管线的一条路径。字段级的
-说明见本书 Core Items 大节。
+说明见 [Core Items](./core_items/README.md)。
 
 ## `Extract`
 

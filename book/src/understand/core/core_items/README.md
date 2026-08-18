@@ -1,8 +1,8 @@
 # Core Items
 
 Core item 是渲染器直接消费的三种 primitive，定义在 `ranim-core` 的
-`core_item` 模块，即 [`CoreItem`](../understand/core/core_item.md) 枚举的三个
-变体。与用户层 item（见 Items 大节）相比，它们：
+`core_item` 模块，即 [`CoreItem`](../core_item.md) 枚举的三个变体。与
+用户层 item（见 Items 大节）相比，它们：
 
 - 数据为 f32（`Vec3` / `Vec4` / `Mat4`），位于世界空间，可直接进入渲染管线；
 - 不携带动画辅助结构（如 `PointVec` 对齐包装）；

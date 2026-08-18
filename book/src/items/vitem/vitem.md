@@ -1,9 +1,4 @@
-# VItem 类
-
-`ranim_items::vitem` 模块：二维矢量物件。核心是 `VItem`，加上一批几何构造器
-（`geometry` 子模块）、`SvgItem` 和 `typst` feature 的文字物件。
-
-## `VItem`
+# `VItem`
 
 ```rust,ignore
 pub struct VItem {
@@ -15,7 +10,7 @@ pub struct VItem {
 }
 ```
 
-### vpoints：二次贝塞尔路径
+## vpoints：二次贝塞尔路径
 
 `vpoints` 是 anchor 与 handle 交替排列的点列：`[a₀, h₀, a₁, h₁, a₂, …]`，
 每三个连续点 `(aᵢ, hᵢ, aᵢ₊₁)` 构成一段二次贝塞尔。颜色与线宽数组按**段**
@@ -36,15 +31,16 @@ let vitem = VItem::from_vpoints(vec![
 线宽数组自动补齐）、`put_start_and_end_on(start, end)`（把首尾移到指定位
 置）、`with_normal(...)` / `set_normal(...)`（指定投影平面法向）。
 
-### 渲染语义：平面投影
+## 渲染语义：平面投影
 
 渲染时假设 `VItem` 的所有点共面，实际渲染的是它在投影平面上的投影
 （共面时投影即其本身）。`normal` 为 `None` 时投影平面在渲染时从点推导。
-语义细节见 Core Items 大节的 [VItem](../core_items/vitem.md)。把 2D 物件放
-进 3D 场景时（例如倾斜放置），建议显式 `set_normal`，避免动画中间帧的
-插值点推导出漂移的法向。
+语义细节见 Core Items 的
+[VItem](../../understand/core/core_items/vitem.md)。把 2D 物件放进 3D 场景
+时（例如倾斜放置），建议显式 `set_normal`，避免动画中间帧的插值点推导出
+漂移的法向。
 
-### 动画相关 trait
+## 动画相关 trait
 
 `VItem` 实现了 `Interpolatable`（逐点/逐颜色插值）与 `Alignable`（点数不同
 时自动补齐对齐，`morph` 依赖它），因此可以直接：
@@ -62,34 +58,3 @@ let anim = square.morph(|sq| {
 `ShiftTransform` / `RotateTransform` / `ScaleTransform`。
 
 `PointVec` 是分量数组的动画包装：对齐时按规则补齐长度，插值逐分量进行。
-
-## 几何构造器（`geometry` 子模块）
-
-构造器都是「数据 struct + `From<...> for VItem`」，字段可直接改，也实现了
-常用的定位/变换 trait：
-
-| 类型 | 说明 |
-|---|---|
-| `Circle` | 圆（半径） |
-| `Ellipse` | 椭圆 |
-| `Arc` / `ArcBetweenPoints` | 圆弧 / 过两点与半径的圆弧 |
-| `EllipticArc` | 椭圆弧 |
-| `Line` | 线段 |
-| `Square` / `Rectangle` | 正方形 / 矩形（`axes` 可改朝向） |
-| `Polygon` / `RegularPolygon` | 任意多边形 / 正多边形 |
-| `Parallelogram` | 平行四边形 |
-
-```rust,ignore
-let vitem = VItem::from(
-    Square::new(2.0).with(|sq| {
-        sq.set_color(manim::RED_C);
-    })
-);
-```
-
-## 其他 vitem 物件
-
-- **`SvgItem`**（`vitem::svg`）：从 SVG 路径/文件构造；extract 时一个
-  `SvgItem` 可能展开为多个 core `VItem`（1→N）。
-- **文字物件**（`vitem::text` / `vitem::typst`，需要 `typst` feature）：
-  简单文字与 Typst 排版；同样以 1→N 方式 extract 为多个 core `VItem`。
