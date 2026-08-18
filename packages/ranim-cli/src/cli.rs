@@ -48,11 +48,17 @@ impl Cli {
             Commands::Preview { scene } => {
                 preview::preview_command(&args, &scene)?;
             }
-            Commands::Render {
+            Commands::Output {
                 scenes,
                 buffer_count,
             } => {
-                render::render_command(&args, &scenes, buffer_count)?;
+                render::output_command(&args, &scenes, buffer_count)?;
+            }
+            Commands::Render {
+                scene,
+                buffer_count,
+            } => {
+                render::render_command(&args, &scene, buffer_count)?;
             }
         }
 
@@ -64,11 +70,20 @@ impl Cli {
 pub enum Commands {
     /// Launch a preview app, watch the lib crate and rebuild it to dylib when it is changed
     Preview { scene: Option<String> },
-    /// Build the lib crate and load it, then render it to video
-    Render {
+    /// Render every `#[output(...)]` declared by the selected scenes
+    Output {
         /// Optional scene names to render (if not provided, render all scenes)
         #[arg(num_args = 0..)]
         scenes: Vec<String>,
+
+        /// Number of GPU readback buffers (higher = more parallelism, more VRAM)
+        #[arg(long, default_value_t = 2)]
+        buffer_count: usize,
+    },
+    /// Render a single scene once with default output settings (`1920x1080`, 60 fps, mp4)
+    Render {
+        /// Scene name to render
+        scene: String,
 
         /// Number of GPU readback buffers (higher = more parallelism, more VRAM)
         #[arg(long, default_value_t = 2)]
@@ -90,14 +105,20 @@ mod test {
             println!("result: {:?}", cli);
             cli
         };
-        let cli = parse_args(&["ranim", "render", "-p", "package"]).unwrap();
-        let Commands::Render { scenes, .. } = &cli.command else {
+        let cli = parse_args(&["ranim", "output", "-p", "package"]).unwrap();
+        let Commands::Output { scenes, .. } = &cli.command else {
             unreachable!()
         };
         assert!(scenes.is_empty());
         assert_eq!(cli.args.package, Some("package".to_string()));
         assert!(!cli.args.target.lib);
         assert!(cli.args.target.example.is_none());
+
+        let cli = parse_args(&["ranim", "render", "scene_name"]).unwrap();
+        let Commands::Render { scene, .. } = &cli.command else {
+            unreachable!()
+        };
+        assert_eq!(scene, "scene_name");
 
         let cli = parse_args(&["ranim", "preview", "--lib"]).unwrap();
         assert!(matches!(cli.command, Commands::Preview { scene: None }));
