@@ -34,11 +34,15 @@ let vitem = VItem::from_vpoints(vec![
 ## 渲染语义：平面投影
 
 渲染时假设 `VItem` 的所有点共面，实际渲染的是它在投影平面上的投影
-（共面时投影即其本身）。`normal` 为 `None` 时投影平面在渲染时从点推导。
-语义细节见 Core Items 的
-[VItem](../../understand/core/core_items/vitem.md)。当物件被旋转、倾斜放置在
-3D 空间中时，建议显式 `set_normal`，避免动画中间帧的插值点推导出
-漂移的法向。
+（共面时投影即其本身）。语义细节见 Core Items 的
+[VItem](../../understand/core/core_items/vitem.md)。
+
+`normal` 一般保持默认的 `None` 即可：投影平面在渲染时从**当前点数据**推导，
+动画中间帧的插值点总是推导出与之一致的法向，不会漂移。反之，显式
+`set_normal` 之后，插值就发生在法向量本身上（`Some(a).lerp(Some(b), t)`，
+普通线性插值且不重新归一化），不再跟随点数据。因此只在确有需要时才显式
+设置，例如点共线/重合等自动推导存在歧义的退化情形，或故意要让非共面点
+渲染成投影效果。
 
 ## 动画相关 trait
 
