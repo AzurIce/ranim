@@ -15,7 +15,7 @@ use ranim::{
     core::animation::eval::iterative::Iterative,
     core::components::rgba::Rgba,
     core::core_item::CoreItem,
-    glam::{DVec3, Mat4, Vec3, dvec3},
+    glam::{DMat4, DVec3, dvec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
 };
@@ -187,10 +187,10 @@ impl Extract for ClothState {
     type Target = CoreItem;
 
     fn extract_into(&self, buf: &mut Vec<CoreItem>) {
-        let points: Vec<Vec3> = self.curr.iter().map(|p| p.as_vec3()).collect();
+        let points: Vec<DVec3> = self.curr.clone();
 
         // Smooth normals: accumulate face normals, then normalize.
-        let mut normals = vec![Vec3::ZERO; points.len()];
+        let mut normals = vec![DVec3::ZERO; points.len()];
         for [a, b, c] in self.cloth_indices.as_chunks::<3>().0 {
             let (a, b, c) = (*a as usize, *b as usize, *c as usize);
             let face = (points[b] - points[a]).cross(points[c] - points[a]);
@@ -206,13 +206,13 @@ impl Extract for ClothState {
         let cloth = MeshItem {
             points: points.into(),
             triangle_indices: self.cloth_indices.clone(),
-            transform: Mat4::IDENTITY,
+            transform: DMat4::IDENTITY,
             vertex_colors: vertex_colors.into(),
             vertex_normals: normals.into(),
         };
 
         let mut ball = self.ball_mesh.clone();
-        ball.transform = Mat4::from_translation(dvec3(0.0, self.ball_y, 0.0).as_vec3());
+        ball.transform = DMat4::from_translation(dvec3(0.0, self.ball_y, 0.0));
 
         cloth.extract_into(buf);
         ball.extract_into(buf);

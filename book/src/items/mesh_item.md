@@ -7,11 +7,11 @@
 
 ```rust,ignore
 pub struct MeshItem {
-    pub points: PointVec<Vec3>,          // 顶点（局部空间）
+    pub points: PointVec<DVec3>,         // 顶点（局部空间）
     pub triangle_indices: Vec<u32>,      // 三角形索引
-    pub transform: Mat4,                 // 局部到世界
+    pub transform: DMat4,                // 局部到世界
     pub vertex_colors: PointVec<Rgba>,   // 每顶点颜色
-    pub vertex_normals: PointVec<Vec3>,  // 每顶点法线；全零 → flat shading
+    pub vertex_normals: PointVec<DVec3>, // 每顶点法线；全零 → flat shading
 }
 ```
 
@@ -26,8 +26,8 @@ let mesh = MeshItem::from_vertices(points);
 let mesh = MeshItem::from_indexed_vertices(points, triangle_indices);
 
 let mesh = mesh
-    .with_transform(Mat4::from_translation(...))  // 设置变换
-    .with_color(manim::BLUE_C);                   // 统一每顶点颜色
+    .with_transform(DMat4::from_translation(...))  // 设置变换
+    .with_color(manim::BLUE_C);                    // 统一每顶点颜色
 mesh.vertex_colors = colors.into();               // 或逐顶点自定义
 ```
 

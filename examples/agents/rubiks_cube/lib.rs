@@ -23,7 +23,7 @@ use ranim::{
     anims::morph::MorphAnim,
     color::{AlphaColor, Srgb, palettes::manim},
     core::components::rgba::Rgba,
-    glam::{DVec3, Mat4, Vec3, dvec3},
+    glam::{DMat4, DVec3, dvec3},
     items::{
         mesh::MeshItem,
         vitem::{VItem, geometry::Square},
@@ -240,14 +240,14 @@ const STICKER_LIFT: f64 = 0.005;
 
 /// Append a double-sided quad (4 vertices, 4 triangles) to the mesh buffers.
 fn push_quad(
-    points: &mut Vec<Vec3>,
+    points: &mut Vec<DVec3>,
     colors: &mut Vec<Rgba>,
     indices: &mut Vec<u32>,
     corners: [DVec3; 4],
     color: Rgba,
 ) {
     let base = points.len() as u32;
-    points.extend(corners.map(|p| p.as_vec3()));
+    points.extend(corners);
     colors.extend([color; 4]);
     indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
     indices.extend([base + 2, base + 1, base, base + 3, base + 2, base]);
@@ -347,8 +347,7 @@ impl Eval for CubieTurn {
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let mut out = self.src.clone();
         out.transform =
-            Mat4::from_axis_angle(self.axis.as_vec3().normalize(), (self.angle * alpha) as f32)
-                * self.src.transform;
+            DMat4::from_axis_angle(self.axis.normalize(), self.angle * alpha) * self.src.transform;
         out
     }
 }
