@@ -8,6 +8,7 @@ title = "Ranim Book"
 build-dir = "../website/static/book/"
 
 [preprocessor.typst-math]
+optional = true
 # [preprocessor.katex]
 # after = ["links"]
 

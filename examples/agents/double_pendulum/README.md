@@ -127,6 +127,6 @@ ranim output double_pendulum --example double_pendulum   # 实际以 cargo run -
 |---|---|
 | 生成日期 | 2026-08-18 |
 | 生成方式 | one-shot（内部 4 轮迭代，含 1 次 ranim-cli 渲染路径 bug 修复；lib.rs 视觉一轮通过） |
-| 模型 | Kimi K3（模型别名 `kimi-code/k3`，维护者确认） |
+| 模型 | Kimi K3 |
 | Harness / Agent 环境 | Kimi Code CLI，具体版本未记录 |
 | 关键参数 | 未记录 |
