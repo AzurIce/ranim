@@ -65,7 +65,32 @@ pub fn render_scene_output(
     render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None);
 }
 
-/// Render a scene output with optional progress callback.
+/// A single rendering job: one [`Output`] plus whether capture marks should
+/// be processed after the main pass.
+///
+/// The CLI currently only creates full-scene jobs. Time-range and still-frame
+/// rendering will extend this type together with the debug rendering commands.
+pub struct RenderJob {
+    /// Output settings used for this job.
+    pub output: Output,
+    /// Render and save every [`TimeMark::Capture`] after the main pass.
+    ///
+    /// This is enabled by `ranim output` (declared outputs) and disabled by
+    /// the ad-hoc `ranim render` command.
+    pub capture_marks: bool,
+}
+
+impl RenderJob {
+    /// Creates a job that renders the whole scene.
+    pub fn full(output: Output, capture_marks: bool) -> Self {
+        Self {
+            output,
+            capture_marks,
+        }
+    }
+}
+
+/// Render one output with optional progress callback.
 ///
 /// The callback receives `(current_frame, total_frames)` each frame.
 pub fn render_scene_output_with_progress(
@@ -76,7 +101,53 @@ pub fn render_scene_output_with_progress(
     buffer_count: usize,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
 ) {
+    render_scene_job(
+        constructor,
+        name,
+        scene_config,
+        RenderJob::full(output.clone(), true),
+        buffer_count,
+        on_progress,
+    );
+}
+
+/// Render a single ad-hoc output for a scene.
+///
+/// This is the low-level rendering entry point used by `ranim render`: it
+/// renders the whole scene once with the given [`Output`], but unlike
+/// [`render_scene_output_with_progress`] it does not process capture marks.
+pub fn render_scene_once(
+    constructor: impl SceneConstructor,
+    name: String,
+    scene_config: &SceneConfig,
+    output: &Output,
+    buffer_count: usize,
+) {
+    render_scene_job(
+        constructor,
+        name,
+        scene_config,
+        RenderJob::full(output.clone(), false),
+        buffer_count,
+        None,
+    );
+}
+
+/// Build the scene and run a [`RenderJob`].
+pub fn render_scene_job(
+    constructor: impl SceneConstructor,
+    name: String,
+    scene_config: &SceneConfig,
+    job: RenderJob,
+    buffer_count: usize,
+    on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+) {
     use std::time::Instant;
+
+    let RenderJob {
+        output,
+        capture_marks,
+    } = job;
 
     info!(
         "Output: {}x{} {}fps {} dir={:?} save_frames={}",
@@ -91,9 +162,10 @@ pub fn render_scene_output_with_progress(
     // decides which logic states are sampled.
     let mut evaluator = scene.into_evaluator(DEFAULT_LOGIC_FPS);
 
-    let mut app = RanimRenderApp::new(name, scene_config, output, buffer_count);
+    let mut app = RanimRenderApp::new(name, scene_config, &output, buffer_count);
     app.render_scene_with_progress(&mut evaluator, on_progress);
-    if !evaluator.time_marks().is_empty() {
+
+    if capture_marks && !evaluator.time_marks().is_empty() {
         app.render_capture_marks(&mut evaluator);
     }
 }
