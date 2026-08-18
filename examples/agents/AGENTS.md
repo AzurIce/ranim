@@ -26,6 +26,11 @@ ranim 渲染出的 PNG/视频。
 
 ## API 使用纪律：先读 book，疑点深挖源码
 
+分层定位：book 与现有 example 是**快速了解**概念和用法的方式；但真正可信的
+事实来源永远是 API **定义处的文档注释（rustdoc）与代码本身**——book 可能
+滞后、example 可能过时。任何写进代码或 README 的行为断言，都必须能在源码
+中得到证实。
+
 - 概念与 API 用法的第一入口是仓库内的 book（`book/src/`）：
   - 动画系统（`Eval` / `Iterative` / `AnimSequence` / `AnimStack` /
     `AnimLagged` / `morph` 等）：`book/src/understand/core/anim.md`；
