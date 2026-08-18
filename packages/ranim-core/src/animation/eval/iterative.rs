@@ -205,6 +205,10 @@ where
 {
     type Output = E::Output;
 
+    fn sim_step(&self) -> Option<f64> {
+        Some(self.sim_step)
+    }
+
     fn eval_alpha(&self, target: f64) -> Self::Output {
         let mut snap = self.snapshot.borrow_mut();
         if target < snap.alpha {

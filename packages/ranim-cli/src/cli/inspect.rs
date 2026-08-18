@@ -190,6 +190,10 @@ struct TreeNodeDto {
     content_duration_secs: f64,
     rate_func: String,
     enabled: bool,
+    /// Content step of iterative segments (`1/N` progress per step); absent
+    /// for other nodes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sim_step: Option<f64>,
     children: Vec<TreeNodeDto>,
 }
 
@@ -221,6 +225,7 @@ fn animation_info_to_tree_node(info: &AnimationInfo, path: Vec<usize>) -> TreeNo
         content_duration_secs: info.content_duration_secs,
         rate_func: rate_func_name(info.rate_func).to_string(),
         enabled: info.enabled,
+        sim_step: info.sim_step,
         children: info
             .children
             .iter()
@@ -331,8 +336,12 @@ fn print_tree_node(node: &TreeNodeDto, depth: usize) {
         .map(|idx| idx.to_string())
         .collect::<Vec<_>>()
         .join(", ");
+    let sim_step = node
+        .sim_step
+        .map(|step| format!(" sim_step={step}"))
+        .unwrap_or_default();
     println!(
-        "{}[{}] {} {} [{}..{}] content={} rate_func={} enabled={}",
+        "{}[{}] {} {} [{}..{}] content={} rate_func={} enabled={}{}",
         "  ".repeat(depth),
         path,
         short_anim_name(&node.anim_name),
@@ -341,7 +350,8 @@ fn print_tree_node(node: &TreeNodeDto, depth: usize) {
         node.range[1],
         node.content_duration_secs,
         node.rate_func,
-        node.enabled
+        node.enabled,
+        sim_step
     );
     for child in &node.children {
         print_tree_node(child, depth + 1);
@@ -738,6 +748,7 @@ mod tests {
             content_duration_secs: 8.0,
             rate_func: rate_functions::linear,
             enabled: true,
+            sim_step: None,
             children: vec![AnimationInfo {
                 anim_name: "FadeIn<VItem>".to_string(),
                 kind: AnimationInfoKind::Eval,
@@ -745,6 +756,7 @@ mod tests {
                 content_duration_secs: 3.0,
                 rate_func: rate_functions::smooth,
                 enabled: true,
+                sim_step: None,
                 children: vec![],
             }],
         }
