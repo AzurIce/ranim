@@ -180,6 +180,11 @@ pre-release-replacements = [
 
 # MARK: Examples
 [[example]]
+name = "double_pendulum"
+path = "examples/agents/double_pendulum/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "aabb"
 path = "examples/aabb/lib.rs"
 crate-type = ["cdylib"]
