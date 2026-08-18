@@ -48,7 +48,7 @@ example 的 AI agent，也供审阅这些内容的人类维护者参考。
   `transform`、法线留空走 flat shading）。
 - 相机：`packages/ranim-core/src/core_item/camera_frame.rs`
   （`CameraFrame::from_spherical`、`perspective_blend`、`fovy`）。
-- 2D 矢量物件：`packages/ranim-items/src/vitem/`（`VItem`、`geometry`）。
+- 矢量物件：`packages/ranim-items/src/vitem/`（`VItem`、`geometry`）。
 - CLI 详细用法：`book/src/cli.md`。
 
 ## 核心工作方法：渲染 → 看图 → 迭代

@@ -1,6 +1,6 @@
 # 几何构造器
 
-`vitem::geometry` 子模块提供常用二维图形的构造器。它们都是「数据 struct +
+`vitem::geometry` 子模块提供常用平面图形的构造器。它们都是「数据 struct +
 `From<...> for VItem`」：字段公开可直接改，也实现了常用的定位/变换 trait。
 
 | 类型 | 说明 |

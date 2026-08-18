@@ -1,6 +1,7 @@
 # Core `VItem`
 
-2D 矢量图元的渲染表示，定义于 `ranim_core::core_item::vitem`。
+矢量图元的渲染表示，定义于 `ranim_core::core_item::vitem`。注意点是三维的
+（世界空间），「共面」只是渲染时的假设（见下文「平面投影渲染」）。
 
 ```rust,ignore
 pub struct VItem {

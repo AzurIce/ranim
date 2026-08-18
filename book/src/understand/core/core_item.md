@@ -72,6 +72,6 @@ AnimationCell::eval_at(sec)  ->  Vec<DynItem>
 ## 谁来消费
 
 渲染器（`ranim-render`）按 `CoreItem` 变体分发到对应的渲染路径：core
-`VItem` 走 2D 矢量渲染（平面投影 + 三角化），core `MeshItem` 走 3D 网格渲染，
+`VItem` 走矢量渲染（平面投影 + 三角化），core `MeshItem` 走 3D 网格渲染，
 `CameraFrame` 提供每帧的视图/投影矩阵。preview 与离线渲染共用同一条
 `sample_at` → `EvaluatedFrame` 路径。

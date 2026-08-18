@@ -36,8 +36,8 @@ let vitem = VItem::from_vpoints(vec![
 渲染时假设 `VItem` 的所有点共面，实际渲染的是它在投影平面上的投影
 （共面时投影即其本身）。`normal` 为 `None` 时投影平面在渲染时从点推导。
 语义细节见 Core Items 的
-[VItem](../../understand/core/core_items/vitem.md)。把 2D 物件放进 3D 场景
-时（例如倾斜放置），建议显式 `set_normal`，避免动画中间帧的插值点推导出
+[VItem](../../understand/core/core_items/vitem.md)。当物件被旋转、倾斜放置在
+3D 空间中时，建议显式 `set_normal`，避免动画中间帧的插值点推导出
 漂移的法向。
 
 ## 动画相关 trait

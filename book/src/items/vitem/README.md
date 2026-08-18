@@ -1,8 +1,8 @@
 # VItem 类
 
-`ranim_items::vitem` 模块：二维矢量物件。这一类物件的渲染都基于平面投影——
-渲染时假设一个 item 的所有点共面，实际渲染的是它在投影平面上的投影（共面时
-投影即其本身），语义细节见 Core Items 的
+`ranim_items::vitem` 模块：矢量物件。这类物件的点本来就是三维点，可以任意
+摆放、旋转在 3D 空间中；只是渲染时假设单个 item 的所有点共面，实际渲染的
+是它在投影平面上的投影（共面时投影即其本身），语义细节见 Core Items 的
 [VItem](../../understand/core/core_items/vitem.md)。
 
 成员：

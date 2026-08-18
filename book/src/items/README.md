@@ -9,7 +9,7 @@ trait（`Interpolatable`、`Alignable`、`FillColor`、`ShiftTransform` 等）�
 
 当前分两类：
 
-- [VItem 类](./vitem/README.md) — `vitem` 模块：二维矢量物件。核心是 `VItem`，
+- [VItem 类](./vitem/README.md) — `vitem` 模块：矢量物件。核心是 `VItem`，
   外加几何构造器（`geometry`）、`SvgItem`、以及 `typst` feature 提供的文字
   物件。
 - [MeshItem 类](./mesh/README.md) — `mesh` 模块：三维网格物件。核心是
