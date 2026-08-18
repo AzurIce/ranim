@@ -214,10 +214,13 @@ Obsidian Vault；效果图用 `![...](...)` 嵌入）。
 | 模型 | 模型名与可确认的版本；无法确认时写 `未记录` |
 | Harness / Agent 环境 | agent 框架、CLI 或运行环境及版本；无法确认时写 `未记录` |
 | 关键参数 | 如 temperature 等；未提供时写 `未记录` |
-| 仓库版本 | 当前 commit 或版本；未记录时写 `未记录` |
 
-若模型名只能知道厂商而不知道具体版本，按实际可确认的信息填写，并标注“具体版本
-未确认”，不要虚构精确版本号。
+- **不记录 commit hash / 仓库版本**：本仓库存在 squash merge 的分支工作流，
+  任务时的 commit hash 合并后可能失效，记录它没有追溯价值。
+- 模型名可以通过 harness 的配置或会话日志确认（例如 kimi-code 的
+  `config.toml` 中的 `default_model`、会话 wire 日志中的 `model` 字段），
+  确认后如实填写；只能知道厂商而不知道具体版本时，按实际可确认的信息填写
+  并标注“具体版本未确认”，不要虚构精确版本号。
 
 ## ranim-cli 工具指南
 
@@ -295,7 +298,7 @@ ranim <command> [-p <package>] [--lib | --example <example-name>] [--features <f
 
 ## 写入纪律
 
-- README 中的 prompt、效果图来源、模型、harness、参数、commit、运行结果都必须
+- README 中的 prompt、效果图来源、模型、harness、参数、运行结果都必须
   来自真实输入或真实执行；没有的信息写“未知/未记录”。
 - 不要为了显得完整而补写不存在的设计动机、迭代轮次或验证结果。
 - 代码中的输出路径、场景时长、渲染设置等必须与 README 描述一致。

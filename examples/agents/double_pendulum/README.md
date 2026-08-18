@@ -130,4 +130,3 @@ ranim output double_pendulum --example double_pendulum   # 实际以 cargo run -
 | 模型 | Kimi（Moonshot AI），具体版本未确认 |
 | Harness / Agent 环境 | Kimi Code CLI，具体版本未记录 |
 | 关键参数 | 未记录 |
-| 仓库版本 | d7e841d5d6b419d8cef6aa141dfc0c2f22cc1d9e（含未提交的工作区改动） |

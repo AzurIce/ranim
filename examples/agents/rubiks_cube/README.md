@@ -111,7 +111,6 @@ one-shot，无视觉修正轮次：第 1 版代码的视觉结果即满足 promp
 |---|---|
 | 生成日期 | 2026-08-18 |
 | 生成方式 | one-shot（内部 1 轮视觉迭代，无修正） |
-| 模型 | Kimi（Moonshot AI，具体版本未确认） |
+| 模型 | Kimi K3（模型别名 `kimi-code/k3`，据会话 wire 日志确认） |
 | Harness / Agent 环境 | Kimi Code CLI 0.36.1 |
 | 关键参数 | 未记录 |
-| 仓库版本 | 0999e460fd8e109e321c82d6150cf45c015e2fed（worktree 分支 ranim-cli-inspect，含本 example 的未提交改动） |
