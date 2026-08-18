@@ -217,10 +217,26 @@ Obsidian Vault；效果图用 `![...](...)` 嵌入）。
 
 - **不记录 commit hash / 仓库版本**：本仓库存在 squash merge 的分支工作流，
   任务时的 commit hash 合并后可能失效，记录它没有追溯价值。
-- 模型名可以通过 harness 的配置或会话日志确认（例如 kimi-code 的
-  `config.toml` 中的 `default_model`、会话 wire 日志中的 `model` 字段），
-  确认后如实填写；只能知道厂商而不知道具体版本时，按实际可确认的信息填写
-  并标注“具体版本未确认”，不要虚构精确版本号。
+- 模型名必须确认后如实填写，不能凭印象或从 harness 名称推断。以 kimi-code
+  为例，按可信度排序的确认方式：
+  1. **本会话 wire 日志**（实际发出的 LLM 请求携带真实模型，最可靠）：
+
+     ```bash
+     hash=$(printf '%s' "$PWD" | sha256sum | cut -c1-12)
+     wire=$(ls -t ~/.kimi-code/sessions/wd_$(basename "$PWD")_${hash}/session_*/agents/main/wire.jsonl | head -1)
+     grep '"type":"llm.request"' "$wire" | tail -1 | grep -o '"model":"[^"]*"\|"modelAlias":"[^"]*"'
+     ```
+
+     取最后一条 `llm.request` 的 `model` / `modelAlias`；若任务中途切换过
+     模型，在日志中按时间段确认各阶段所用模型。（会话目录命名规则
+     `wd_<目录名>_<sha256(cwd) 前 12 位>` 是 kimi-code 0.36.1 的行为，未来
+     版本可能变化，找不到时直接 glob `~/.kimi-code/sessions/` 探索。）
+  2. `~/.kimi-code/config.toml` 的 `default_model`：只是默认值，可能被
+     `-m` 参数或会话内 `/model` 覆盖；仅凭它只能写“配置默认模型为 X（本次
+     会话实际使用未确认）”。
+  3. 其他 harness 同理：先找会话日志/实际请求记录，再退到配置文件。
+- 都无法确认时写 `未记录`，或按可确认信息填写并标注“具体版本未确认”，
+  不要虚构精确版本号。
 
 ## ranim-cli 工具指南
 
