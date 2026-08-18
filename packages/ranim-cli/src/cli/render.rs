@@ -6,12 +6,17 @@ use ranim::{
 use tracing::{error, info};
 
 use crate::{
-    RanimUserLibraryBuilder, Target,
+    RanimUserLibrary, RanimUserLibraryBuilder, Target,
     cli::CliArgs,
     workspace::{Workspace, get_target_package},
 };
 
-fn load_scenes(args: &CliArgs) -> Result<Vec<Scene>> {
+/// Build the user dylib, load it and collect its scenes.
+///
+/// The returned [`RanimUserLibrary`] must be kept alive for as long as the
+/// scenes are used: `Scene::constructor` is a function pointer into the
+/// dylib, so dropping the library unmaps the code it points to.
+fn load_scenes(args: &CliArgs) -> Result<(RanimUserLibrary, Vec<Scene>)> {
     let workspace = Workspace::current()?;
 
     let (kid, package_name) = get_target_package(&workspace, args)?;
@@ -33,12 +38,13 @@ fn load_scenes(args: &CliArgs) -> Result<Vec<Scene>> {
         .recv_blocking()
         .context("Build worker exited without reporting")??;
 
-    Ok(lib.scenes().collect())
+    let scenes = lib.scenes().collect();
+    Ok((lib, scenes))
 }
 
 /// Render every `#[output(...)]` declared by the selected scenes.
 pub fn output_command(args: &CliArgs, scenes: &[String], buffer_count: usize) -> Result<()> {
-    let all_scenes = load_scenes(args)?;
+    let (_lib, all_scenes) = load_scenes(args)?;
     let scenes_to_render: Vec<&Scene> = if scenes.is_empty() {
         all_scenes.iter().collect()
     } else {
@@ -73,7 +79,7 @@ pub fn output_command(args: &CliArgs, scenes: &[String], buffer_count: usize) ->
 /// not read any `#[output(...)]` declaration and does not process
 /// `TimeMark::Capture`.
 pub fn render_command(args: &CliArgs, scene_name: &str, buffer_count: usize) -> Result<()> {
-    let all_scenes = load_scenes(args)?;
+    let (_lib, all_scenes) = load_scenes(args)?;
 
     let Some(scene) = all_scenes.iter().find(|scene| scene.name == scene_name) else {
         error!("No matching scene found for: {scene_name:?}");
