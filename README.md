@@ -91,6 +91,9 @@ Basic Usage:
 - `ranim preview[ <scene_name>]`: Launch a preview app and invoke cargo to build your library automatically when the source code is changed, then reload it through *libloading* and show it in the preview app.
 - `ranim output[ <scene-name1> <scene_name2> ...]`: Render every `#[output(...)]` declared by the selected scenes, including capture marks. When no scene name is specified, render all scenes.
 - `ranim render <scene_name>`: Render one scene once with default output settings (`1920x1080`, 60 fps, mp4). This is the low-level/ad-hoc render command, ignores `#[output(...)]`, and does not process capture marks.
+- `ranim inspect scenes [--format text|json]`: List available scenes and their output summaries.
+- `ranim inspect tree [<scene_name>] [--format text|json]`: Build a scene and print its animation tree. The scene name can be omitted when there is only one scene.
+- `ranim inspect frame <scene_name> --at <sec> [--format text|json] [--verbose]`: Sample a scene at a time and print the evaluated frame items.
 
 You can specify the package with `--package` and `--example` (just like cargo, note that your anim target should have crate-type of `dylib` or `cdylib`), and other aditional arguments you want to pass to `cargo build` can be passed after `--`.
 

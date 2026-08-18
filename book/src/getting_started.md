@@ -201,6 +201,16 @@ ranim output -p package_name --example example_name
 ranim render -p package_name --example example_name hello
 ```
 
+不渲染、只查询场景信息时使用 `inspect`：
+
+```bash
+ranim inspect scenes --example example_name
+ranim inspect tree --example example_name
+ranim inspect frame <scene_name> --at 1.0 --example example_name
+```
+
+`tree` 的 Scene 名称在只有一个 Scene 时可以省略；`frame` 必须指定 Scene 名称，`--at` 为采样时间（秒）。需要完整几何数据时给 `frame` 加 `--verbose`，机器可读输出加 `--format json`。
+
 `preview` 可以接收一个可选 Scene 名称；`output` 可以接收零个或多个 Scene 名称，并渲染它们声明的所有 `#[output(...)]`；`render` 接收恰好一个 Scene 名称，使用默认输出设置（`1920x1080`、60 fps、mp4）做一次临时渲染，不读取 `#[output(...)]`。额外的 Cargo 构建参数放在 `--` 后，例如：
 
 ```bash
