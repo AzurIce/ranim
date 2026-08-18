@@ -56,7 +56,7 @@ For the usage, check out the [examples](./examples) folder. You can run the exam
 
 ```bash
 cargo run -p ranim-cli --release -- preview --example <example-name> # run a preview app for the example
-cargo run -p ranim-cli --release -- render --example <example-name> # render the example
+cargo run -p ranim-cli --release -- output --example <example-name> # render every declared output of the example
 ```
 
 See Ranim Cli for more.
@@ -89,14 +89,16 @@ fn main() {
 
 Basic Usage:
 - `ranim preview[ <scene_name>]`: Launch a preview app and invoke cargo to build your library automatically when the source code is changed, then reload it through *libloading* and show it in the preview app.
-- `ranim render[ <scene-name1> <scene_name2> ...]`: Render scene's output, when no scene name is specified, render all scenes.
+- `ranim output[ <scene-name1> <scene_name2> ...]`: Render every `#[output(...)]` declared by the selected scenes, including capture marks. When no scene name is specified, render all scenes.
+- `ranim render <scene_name>`: Render one scene once with default output settings (`1920x1080`, 60 fps, mp4). This is the low-level/ad-hoc render command, ignores `#[output(...)]`, and does not process capture marks.
 
 You can specify the package with `--package` and `--example` (just like cargo, note that your anim target should have crate-type of `dylib` or `cdylib`), and other aditional arguments you want to pass to `cargo build` can be passed after `--`.
 
 For example:
 
 ```bash
-ranim render -p render scene_a scene_b -- --release
+ranim output -p render scene_a scene_b -- --release
+ranim render -p render scene_a -- --release
 ```
 
 ## Feature Flags

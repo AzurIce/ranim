@@ -188,7 +188,8 @@ cargo install ranim-cli
 
 ```bash
 ranim preview
-ranim render
+ranim output
+ranim output hello
 ranim render hello
 ```
 
@@ -196,12 +197,14 @@ ranim render hello
 
 ```bash
 ranim preview -p package_name --example example_name
-ranim render -p package_name --example example_name
+ranim output -p package_name --example example_name
+ranim render -p package_name --example example_name hello
 ```
 
-`preview` 可以接收一个可选 Scene 名称；`render` 可以接收零个或多个 Scene 名称。额外的 Cargo 构建参数放在 `--` 后，例如：
+`preview` 可以接收一个可选 Scene 名称；`output` 可以接收零个或多个 Scene 名称，并渲染它们声明的所有 `#[output(...)]`；`render` 接收恰好一个 Scene 名称，使用默认输出设置（`1920x1080`、60 fps、mp4）做一次临时渲染，不读取 `#[output(...)]`。额外的 Cargo 构建参数放在 `--` 后，例如：
 
 ```bash
+ranim output hello -- --release
 ranim render hello -- --release
 ```
 
@@ -209,5 +212,5 @@ ranim render hello -- --release
 
 ```bash
 cargo run -p ranim-cli --release -- preview --example getting_started0
-cargo run -p ranim-cli --release -- render --example getting_started0
+cargo run -p ranim-cli --release -- output --example getting_started0
 ```
