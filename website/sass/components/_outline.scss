@@ -1,7 +1,11 @@
 .outline {
+    box-sizing: border-box;
+    width: 100%;
+    max-height: calc(100vh - var(--header-height));
     padding: 1rem;
     overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior: contain;
 
     &__content {
         overflow: hidden;
@@ -27,12 +31,21 @@
         border-radius: .25rem;
         width: 100%;
 
-    //     &:hover {
-    //         background-color: rgba(187, 134, 148, 0.1);
-    //         box-shadow: inset 0 0 0 1px rgba(197, 135, 124, 0.4);
-    //     }
-    //     &.active {
-    //         background-color: rgba(255, 122, 73, 0.15);
-    //     }
+        &:hover {
+            background-color: rgba(0, 0, 0, 0.04);
+            color: rgb(31, 41, 55);
+        }
+
+        &.ancestor {
+            color: rgb(31, 41, 55);
+            font-weight: 600;
+        }
+
+        &.active {
+            background-color: rgba(255, 122, 73, 0.15);
+            box-shadow: inset 0 0 0 1px rgba(255, 122, 73, 0.35);
+            color: rgb(194, 65, 12);
+            font-weight: 600;
+        }
     }
 }

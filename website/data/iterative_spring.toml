@@ -63,9 +63,10 @@ fn iterative_spring(r: &mut RanimScene) {
         )
         .with_duration(sim_secs),
     );
+    r.insert_time_mark(sim_secs / 2.0, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "35a09444e746190484a27a820e984ae735a03376"
-preview_imgs = []
+hash = "21cf91d117b237d2a59ee3b14137955a08293706"
+preview_imgs = ["/examples/iterative_spring/preview.png"]
 output_files = ["/examples/iterative_spring/iterative_spring_1920x1080_60.mp4"]
 wasm = false

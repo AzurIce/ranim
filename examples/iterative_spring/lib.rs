@@ -60,4 +60,5 @@ fn iterative_spring(r: &mut RanimScene) {
         )
         .with_duration(sim_secs),
     );
+    r.insert_time_mark(sim_secs / 2.0, TimeMark::Capture("preview.png".to_string()));
 }

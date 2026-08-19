@@ -42,6 +42,16 @@ pub trait Eval {
 
     /// Evaluate the segment's content at normalized progress `alpha`.
     fn eval_alpha(&self, alpha: f64) -> Self::Output;
+
+    /// The content resolution declared by iterative segments: `1/N` progress
+    /// per integration step (`N` declared via
+    /// [`Iterative::with_steps`](crate::animation::eval::iterative::Iterative::with_steps)).
+    ///
+    /// `None` for non-iterative segments. This is an introspection query for
+    /// tooling (e.g. `ranim inspect tree`); it does not affect evaluation.
+    fn sim_step(&self) -> Option<f64> {
+        None
+    }
 }
 
 /// Build-time conveniences over [`Eval`], split out so `Eval` stays a single
@@ -87,6 +97,11 @@ pub(super) trait EvalDyn {
     fn child_infos(&self) -> Vec<AnimationInfo> {
         Vec::new()
     }
+
+    /// The iterative content step, if this node is an iterative segment.
+    fn sim_step(&self) -> Option<f64> {
+        None
+    }
 }
 
 pub(super) struct StaticDynItems(pub(super) Vec<DynItem>);
@@ -112,5 +127,9 @@ where
 {
     fn eval_dyn(&self, alpha: f64, output: &mut Vec<DynItem>) {
         output.push(DynItem(Box::new(self.eval_alpha(alpha))));
+    }
+
+    fn sim_step(&self) -> Option<f64> {
+        Eval::sim_step(self)
     }
 }

@@ -28,5 +28,6 @@ fn getting_started0(r: &mut RanimScene) {
             .with_duration(content.cursor_sec()),
     );
     r.play(content);
+    r.insert_time_mark(1.0, TimeMark::Capture("preview.png".to_string()));
 }
 // ANCHOR_END: construct

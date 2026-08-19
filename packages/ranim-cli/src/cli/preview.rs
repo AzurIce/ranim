@@ -13,11 +13,7 @@ use async_channel::{Receiver, bounded, unbounded};
 use notify::RecursiveMode;
 use tracing::{error, info, trace};
 
-use crate::{
-    RanimUserLibraryBuilder, Target,
-    cli::CliArgs,
-    workspace::{Workspace, get_target_package},
-};
+use crate::{RanimUserLibraryBuilder, cli::CliArgs, resolve_build_target, workspace::Workspace};
 
 fn is_vcs_metadata(path: &Path) -> bool {
     path.components().any(|component| {
@@ -136,11 +132,7 @@ fn watch_krate(
 }
 
 pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()> {
-    let workspace = Workspace::current()?;
-
-    let (kid, package_name) = get_target_package(&workspace, args)?;
-    let target = Target::from(args.target.clone());
-    tracing::debug!(?kid, %package_name, ?target, "resolved build target");
+    let (workspace, kid, package_name, target) = resolve_build_target(args)?;
 
     info!("Watching package...");
     let (_watcher, rx) = watch_krate(&workspace, &kid);
