@@ -134,7 +134,7 @@ fn main() -> ExitCode {
 
     for (index, example) in selected.iter().enumerate() {
         if !*quiet {
-            println!("[{:>3}/{selected_cnt}] {} {}", index + 1, example.name, "…");
+            println!("[{:>3}/{selected_cnt}] {} …", index + 1, example.name);
         }
 
         let example_started = Instant::now();
