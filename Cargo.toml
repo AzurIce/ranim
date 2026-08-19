@@ -260,6 +260,9 @@ name = "nbody"
 path = "examples/nbody/lib.rs"
 crate-type = ["cdylib"]
 
+[package.metadata.example.nbody]
+wasm = true
+
 [[example]]
 name = "cloth_wrap"
 path = "examples/cloth_wrap/lib.rs"

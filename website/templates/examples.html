@@ -1,30 +1,23 @@
-{% extends "layouts/base.html" %}
+{% import "macros/examples-page-macros.html" as examples_macros %}
+{% import "macros/examples-tree.html" as examples_tree %}
+{% extends "layouts/three-col.html" %}
 
-{% block main %}
-{# <article class="markdown-body">
-  {{ section.content | safe }}
-</article> #}
-<div class="container card-grid">
-  {% for page in section.pages %}
-  <a href="{{ page.permalink }}" class="card">
-    {% set example_data = load_data(path="/data/" ~ page.title ~ ".toml") %}
-    {% if example_data.preview_imgs and example_data.preview_imgs | length > 0 %}
-    <div class="preview-grid">
-      {% for preview_img in example_data.preview_imgs %}
-      <img src="{{ get_url(path=preview_img) }}" alt="{{ example_data.name }} 示例输出 {{ loop.index }}">
-      {% endfor %}
-    </div>
-    {% else %}
-    <img>
-    {% endif %}
-
-    <div class="card__content">
-      <h2>{{ page.title }}</h2>
-      {% if page.description %}
-      <p>{{ page.description }}</p>
-      {% endif %}
-    </div>
-  </a>
-  {% endfor %}
+{% block left_side %}
+{% set examples_section = get_section(path="examples/_index.md") %}
+<div class="outline">
+  <div class="outline__content">
+    <ul>
+      {{ examples_macros::render_nav(section=examples_section, current=section_or_page) }}
+    </ul>
+  </div>
 </div>
-{% endblock main %}
+{% endblock left_side %}
+
+{% block content %}
+<article class="markdown-body examples-article">
+  {{ examples_macros::render_breadcrumbs(current=section_or_page) }}
+  <div class="examples-list">
+    {{ examples_tree::example_cards(section=section) }}
+  </div>
+</article>
+{% endblock content %}

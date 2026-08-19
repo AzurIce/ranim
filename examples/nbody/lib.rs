@@ -162,7 +162,7 @@ fn nbody(r: &mut RanimScene) {
     // n = 3: chaotic wobble that stays in frame; n >= 4: ejection finale.
     r.play(
         Iterative::from_fn(
-            NBodyState::new(99),
+            NBodyState::new(3),
             move |state: &mut NBodyState, _alpha: f64, delta_alpha: f64| {
                 state.step(sim_secs * delta_alpha);
             },
@@ -170,4 +170,5 @@ fn nbody(r: &mut RanimScene) {
         .with_steps((sim_secs * 60.0) as usize)
         .with_duration(sim_secs),
     );
+    r.insert_time_mark(sim_secs / 2.0, TimeMark::Capture("preview.png".to_string()));
 }

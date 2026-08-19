@@ -31,10 +31,11 @@ fn getting_started0(r: &mut RanimScene) {
             .with_duration(content.cursor_sec()),
     );
     r.play(content);
+    r.insert_time_mark(1.0, TimeMark::Capture("preview.png".to_string()));
 }
 // ANCHOR_END: construct
 ```"""
-hash = "156a886a801e34da52bd10ef57041fe26807cfd7"
-preview_imgs = []
+hash = "7d6668502950ba9de3888f2123bcf8dbff666b9a"
+preview_imgs = ["/examples/getting_started0/preview.png"]
 output_files = ["/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
 wasm = true

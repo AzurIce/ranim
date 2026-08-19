@@ -243,4 +243,5 @@ fn cloth_wrap(r: &mut RanimScene) {
         .with_steps((sim_secs * 60.0) as usize)
         .with_duration(sim_secs),
     );
+    r.insert_time_mark(sim_secs, TimeMark::Capture("preview.png".to_string()));
 }
