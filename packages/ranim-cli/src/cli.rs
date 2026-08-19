@@ -1,8 +1,11 @@
+pub mod inspect;
 pub mod preview;
 pub mod render;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
+
+use crate::cli::inspect::InspectCommand;
 
 #[derive(Args, Debug, Clone, Default)]
 #[group(multiple = false)]
@@ -60,6 +63,9 @@ impl Cli {
             } => {
                 render::render_command(&args, &scene, buffer_count)?;
             }
+            Commands::Inspect { command } => {
+                inspect::inspect_command(&args, command)?;
+            }
         }
 
         Ok(())
@@ -89,11 +95,19 @@ pub enum Commands {
         #[arg(long, default_value_t = 2)]
         buffer_count: usize,
     },
+    /// Inspect scenes, animation trees, or evaluated frames without rendering
+    Inspect {
+        #[command(subcommand)]
+        command: InspectCommand,
+    },
 }
 
 #[cfg(test)]
 mod test {
-    use crate::Target;
+    use crate::{
+        Target,
+        cli::inspect::{FormatArg, InspectCommand},
+    };
 
     use super::*;
 
@@ -134,6 +148,44 @@ mod test {
         let TargetArg { lib, example } = cli.args.target.clone();
         assert!(!lib);
         assert_eq!(example, Some("example".to_string()));
+        assert_eq!(
+            Target::from(cli.args.target.clone()),
+            Target::Example("example".to_string())
+        );
+
+        let cli = parse_args(&["ranim", "inspect", "scenes", "--format", "json"]).unwrap();
+        assert!(matches!(
+            &cli.command,
+            Commands::Inspect {
+                command: InspectCommand::Scenes {
+                    format: FormatArg::Json
+                }
+            }
+        ));
+
+        let cli = parse_args(&[
+            "ranim",
+            "inspect",
+            "frame",
+            "basic",
+            "--at",
+            "2.0",
+            "--verbose",
+            "--example",
+            "example",
+        ])
+        .unwrap();
+        assert!(matches!(
+            &cli.command,
+            Commands::Inspect {
+                command: InspectCommand::Frame {
+                    scene,
+                    at: 2.0,
+                    format: FormatArg::Text,
+                    verbose: true,
+                }
+            } if scene == "basic"
+        ));
         assert_eq!(
             Target::from(cli.args.target.clone()),
             Target::Example("example".to_string())

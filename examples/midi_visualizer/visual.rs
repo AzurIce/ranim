@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::midi::{MidiSong, Note};
+use super::midi::{MidiSong, Note};
 use ranim::{
     color::{AlphaColor, Srgb, palettes::manim},
     glam::{DVec3, dvec3},

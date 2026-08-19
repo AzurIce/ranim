@@ -1,4 +1,5 @@
-{% import "macros/code-examples.html" as code_examples %}
+{% import "macros/examples-page-macros.html" as examples_macros %}
+
 {% extends "layouts/three-col.html" %}
 
 {% block left_side %}
@@ -6,21 +7,16 @@
 <div class="outline">
   <div class="outline__content">
     <ul>
-      {% for page in examples_section.pages %}
-      <li>
-        <a href="{{ page.permalink }}"
-          class="outline-item {% if section_or_page and section_or_page.permalink == page.permalink %}active{% endif %}">{{
-          page.title }}</a>
-      </li>
-      {% endfor %}
+      {{ examples_macros::render_nav(section=examples_section, current=section_or_page) }}
     </ul>
   </div>
 </div>
 {% endblock left_side %}
 
 {% block content %}
-<article class="markdown-body">
-  {{ code_examples::process_code_block(content=section_or_page.content) | safe }}
+<article class="markdown-body examples-article">
+  {{ examples_macros::render_breadcrumbs(current=section_or_page) }}
+  {{ examples_macros::process_code_block(content=section_or_page.content) | safe }}
   <!-- {{ section_or_page.content | safe }} -->
 </article>
 {% endblock content %}

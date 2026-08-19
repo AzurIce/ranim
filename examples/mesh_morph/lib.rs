@@ -3,7 +3,7 @@ use std::f64::consts::PI;
 use ranim::{
     anims::{camera::CameraFrameAnim, morph::MorphAnim},
     color::palettes::manim,
-    glam::{DVec3, Vec3},
+    glam::DVec3,
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
     utils::rate_functions::{linear, smooth},
@@ -75,10 +75,10 @@ fn mesh_morph(r: &mut RanimScene) {
 
 /// Convert Surface to MeshItem
 fn surface_to_mesh(surface: Surface) -> MeshItem {
-    let points: Vec<Vec3> = surface.vertices.iter().map(|v| v.as_vec3()).collect();
+    let points: Vec<DVec3> = surface.vertices.clone();
 
     // Build MeshItem manually
-    let mut mesh = MeshItem::from_indexed_vertices(points, surface.triangle_indices);
+    let mut mesh = MeshItem::from_indexed_vertices(points, surface.triangle_indices.clone());
 
     // Set colors by iterating through surface colors and using set_fill_color
     // Since we can't directly access vertex_colors from outside, we'll just use the first color
@@ -86,7 +86,7 @@ fn surface_to_mesh(surface: Surface) -> MeshItem {
         mesh.set_fill_color(*first_color);
     }
 
-    mesh.with_transform(surface.transform.as_mat4())
+    mesh.with_transform(surface.transform)
 }
 
 /// Create a torus-like shape

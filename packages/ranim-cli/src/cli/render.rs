@@ -1,43 +1,19 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use ranim::{
     Output, Scene,
     cmd::{render_scene, render_scene_once},
 };
 use tracing::{error, info};
 
-use crate::{
-    RanimUserLibrary, RanimUserLibraryBuilder, Target,
-    cli::CliArgs,
-    workspace::{Workspace, get_target_package},
-};
+use crate::{RanimUserLibrary, cli::CliArgs, load_user_library};
 
-/// Build the user dylib, load it and collect its scenes.
+/// Load the user library and collect its scenes.
 ///
 /// The returned [`RanimUserLibrary`] must be kept alive for as long as the
 /// scenes are used: `Scene::constructor` is a function pointer into the
 /// dylib, so dropping the library unmaps the code it points to.
 fn load_scenes(args: &CliArgs) -> Result<(RanimUserLibrary, Vec<Scene>)> {
-    let workspace = Workspace::current()?;
-
-    let (kid, package_name) = get_target_package(&workspace, args)?;
-    let target = Target::from(args.target.clone());
-    tracing::debug!(?kid, %package_name, ?target, "resolved build target");
-
-    let current_dir = std::env::current_dir().context("Failed to get current directory")?;
-    let mut builder = RanimUserLibraryBuilder::new(
-        workspace.clone(),
-        package_name.clone(),
-        target,
-        args.clone(),
-        current_dir.clone(),
-    );
-
-    builder.start_build();
-    let lib = builder
-        .res_rx
-        .recv_blocking()
-        .context("Build worker exited without reporting")??;
-
+    let lib = load_user_library(args)?;
     let scenes = lib.scenes().collect();
     Ok((lib, scenes))
 }

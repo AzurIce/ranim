@@ -1,3 +1,45 @@
+{% macro render_nav(section, current) %}
+  {% for subsection_path in section.subsections %}
+    {% set subsection = get_section(path=subsection_path) %}
+    <li>
+      <a href="{{ subsection.permalink }}"
+        class="outline-item {% if current.permalink == subsection.permalink %}active{% elif current.ancestors is containing(subsection_path) %}ancestor{% endif %}">
+        <span>{{ subsection.title }}</span>
+      </a>
+      <ul class="outline__nested">
+        {{ self::render_nav(section=subsection, current=current) }}
+      </ul>
+    </li>
+  {% endfor %}
+
+  {% for page in section.pages %}
+    <li>
+      <a href="{{ page.permalink }}"
+        class="outline-item {% if current.permalink == page.permalink %}active{% endif %}">
+        <span>{{ page.title }}</span>
+      </a>
+    </li>
+  {% endfor %}
+{% endmacro render_nav %}
+
+{% macro render_breadcrumbs(current) %}
+{% set examples_section = get_section(path="examples/_index.md") %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <a href="{{ examples_section.permalink }}">{{ examples_section.title }}</a>
+  {% for ancestor_path in current.ancestors %}
+    {% if ancestor_path != "_index.md" and ancestor_path != "examples/_index.md" %}
+      {% set ancestor = get_section(path=ancestor_path) %}
+      <span class="breadcrumbs__sep">/</span>
+      <a href="{{ ancestor.permalink }}">{{ ancestor.title }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if current.permalink != examples_section.permalink %}
+    <span class="breadcrumbs__sep">/</span>
+    <span class="breadcrumbs__current">{{ current.title }}</span>
+  {% endif %}
+</nav>
+{% endmacro render_breadcrumbs %}
+
 {% macro code_example(example_name) %}
 {% set example_data = load_data(path="data/" ~ example_name ~ ".toml") %}
 

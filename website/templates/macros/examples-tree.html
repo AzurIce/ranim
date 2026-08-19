@@ -1,0 +1,59 @@
+{% macro example_cards(section) %}
+  {% for subsection_path in section.subsections %}
+    {% set subsection = get_section(path=subsection_path) %}
+    <section class="example-group">
+      <h2 class="example-group__title">
+        <a href="{{ subsection.permalink }}">{{ subsection.title }}</a>
+      </h2>
+      <div class="card-grid">
+        {% for page in subsection.pages %}
+          {% set example_data = load_data(path="/data/" ~ page.title ~ ".toml") %}
+          <a href="{{ page.permalink }}" class="card">
+            {% if example_data.preview_imgs and example_data.preview_imgs | length > 0 %}
+              <div class="preview-grid">
+                {% for preview_img in example_data.preview_imgs %}
+                  <img src="{{ get_url(path=preview_img) }}" alt="{{ example_data.name }} 示例输出 {{ loop.index }}">
+                {% endfor %}
+              </div>
+            {% else %}
+              <img>
+            {% endif %}
+
+            <div class="card__content">
+              <h2>{{ page.title }}</h2>
+              {% if page.description %}
+                <p>{{ page.description }}</p>
+              {% endif %}
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    </section>
+  {% endfor %}
+
+  {% if section.pages | length > 0 %}
+    <div class="card-grid">
+      {% for page in section.pages %}
+        {% set example_data = load_data(path="/data/" ~ page.title ~ ".toml") %}
+        <a href="{{ page.permalink }}" class="card">
+          {% if example_data.preview_imgs and example_data.preview_imgs | length > 0 %}
+            <div class="preview-grid">
+              {% for preview_img in example_data.preview_imgs %}
+                <img src="{{ get_url(path=preview_img) }}" alt="{{ example_data.name }} 示例输出 {{ loop.index }}">
+              {% endfor %}
+            </div>
+          {% else %}
+            <img>
+          {% endif %}
+
+          <div class="card__content">
+            <h2>{{ page.title }}</h2>
+            {% if page.description %}
+              <p>{{ page.description }}</p>
+            {% endif %}
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endmacro example_cards %}

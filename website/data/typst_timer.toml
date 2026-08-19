@@ -303,6 +303,6 @@ fn formats_milliseconds() {
 }
 ```"""
 hash = "7fe9d5c8aca963583fed20a9570b4ff94fd2604f"
-preview_imgs = ["/examples/typst_timer/preview.png", "/examples/typst_timer/preview.png", "/examples/typst_timer/preview.png"]
-output_files = ["/examples/typst_timer/typst_timer_atlas_1920x1080_60.mp4", "/examples/typst_timer/typst_timer_recompile_1920x1080_60.mp4", "/examples/typst_timer/typst_timer_1920x1080_60.mp4"]
+preview_imgs = ["/examples/typst_timer/preview.png", "/examples/typst_timer/preview.png"]
+output_files = ["/examples/typst_timer/typst_timer_1920x1080_60.mp4", "/examples/typst_timer/typst_timer_recompile_1920x1080_60.mp4"]
 wasm = true

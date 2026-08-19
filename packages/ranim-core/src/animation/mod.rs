@@ -52,6 +52,9 @@ pub struct AnimationInfo {
     pub rate_func: fn(f64) -> f64,
     /// Whether this node contributes values during evaluation.
     pub enabled: bool,
+    /// The content step of iterative segments (`1/N` progress per integration
+    /// step, `N` declared via `with_steps`); `None` for other nodes.
+    pub sim_step: Option<f64>,
     /// Direct animation children in this node's content coordinates.
     pub children: Vec<AnimationInfo>,
 }
@@ -137,6 +140,7 @@ impl AnimationCell {
             content_duration_secs: self.inner.content_duration_secs(),
             rate_func: self.rate_func,
             enabled: self.enabled,
+            sim_step: self.inner.sim_step(),
             children: self.inner.child_infos(),
         }
     }

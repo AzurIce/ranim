@@ -196,26 +196,16 @@ impl Opacity for Surface {
 impl From<Surface> for MeshItem {
     fn from(value: Surface) -> Self {
         MeshItem {
-            points: value
-                .vertices
-                .iter()
-                .map(|p| p.as_vec3())
-                .collect::<Vec<_>>()
-                .into(),
+            points: value.vertices.into(),
             triangle_indices: value.triangle_indices,
-            transform: value.transform.as_mat4(),
+            transform: value.transform,
             vertex_colors: value
                 .vertex_colors
                 .into_iter()
                 .map(Rgba::from)
                 .collect::<Vec<_>>()
                 .into(),
-            vertex_normals: value
-                .vertex_normals
-                .iter()
-                .map(|n| n.as_vec3())
-                .collect::<Vec<_>>()
-                .into(),
+            vertex_normals: value.vertex_normals.into(),
         }
     }
 }

@@ -30,11 +30,12 @@ fn getting_started1(r: &mut RanimScene) {
         VItem::from(circle).unwrite().with_rate_func(smooth),
     ];
 
-    r.play(
-        CameraFrame::default()
-            .show()
-            .with_duration(content.cursor_sec()),
-    );
+    let total_secs = content.cursor_sec();
+    r.play(CameraFrame::default().show().with_duration(total_secs));
     r.play(content);
+    r.insert_time_mark(
+        total_secs / 2.0,
+        TimeMark::Capture("preview.png".to_string()),
+    );
 }
 // ANCHOR_END: construct

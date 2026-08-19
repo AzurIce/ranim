@@ -21,7 +21,7 @@ use tracing::{error, info};
 
 use crate::{
     cli::{Cli, CliArgs},
-    workspace::Workspace,
+    workspace::{Workspace, get_target_package},
 };
 
 pub mod cli;
@@ -251,6 +251,84 @@ impl From<cli::TargetArg> for Target {
     }
 }
 
+/// Resolve the cargo target and package that should be built from the CLI args.
+///
+/// This is the shared entry point for all commands that need to build a user
+/// dylib: `-p/--package` takes precedence, `--example` is resolved to the
+/// package that declares it, and the current directory is otherwise used to
+/// find the workspace member.
+pub fn resolve_build_target(
+    args: &CliArgs,
+) -> Result<(Arc<Workspace>, krates::Kid, String, Target)> {
+    let workspace = Workspace::current()?;
+    let (kid, package_name) = get_target_package(&workspace, args)?;
+    let target = Target::from(args.target.clone());
+    tracing::debug!(?kid, %package_name, ?target, "resolved build target");
+    Ok((workspace, kid, package_name, target))
+}
+
+/// Build the selected user dylib and load it as a [`RanimUserLibrary`].
+pub(crate) fn build_user_library(
+    workspace: Arc<Workspace>,
+    package_name: String,
+    target: Target,
+    args: &CliArgs,
+) -> Result<RanimUserLibrary> {
+    let current_dir = std::env::current_dir().context("Failed to get current directory")?;
+    let mut builder =
+        RanimUserLibraryBuilder::new(workspace, package_name, target, args.clone(), current_dir);
+
+    builder.start_build();
+    builder
+        .res_rx
+        .recv_blocking()
+        .context("Build worker exited without reporting")?
+}
+
+/// Resolve the target, build its dylib and load it.
+pub fn load_user_library(args: &CliArgs) -> Result<RanimUserLibrary> {
+    let (workspace, _kid, package_name, target) = resolve_build_target(args)?;
+    build_user_library(workspace, package_name, target, args)
+}
+
+/// Select one scene from a loaded user library.
+///
+/// If `name` is omitted and the library contains exactly one scene, that scene
+/// is returned. If the library contains multiple scenes, the caller must
+/// choose one and a list of available scenes is included in the error.
+pub fn select_scene(lib: &RanimUserLibrary, name: Option<&str>) -> Result<Scene> {
+    let scenes = lib.scenes().collect::<Vec<_>>();
+    select_scene_from_slice(&scenes, name).cloned()
+}
+
+pub(crate) fn select_scene_from_slice<'a>(
+    scenes: &'a [Scene],
+    name: Option<&str>,
+) -> Result<&'a Scene> {
+    if scenes.is_empty() {
+        anyhow::bail!("no scenes found in the user library");
+    }
+
+    let available = scenes
+        .iter()
+        .map(|scene| scene.name.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    match name {
+        Some(name) => scenes
+            .iter()
+            .find(|scene| scene.name == name)
+            .with_context(|| {
+                format!("failed to find scene `{name}`. Available scenes: {available}")
+            }),
+        None if scenes.len() == 1 => Ok(&scenes[0]),
+        None => anyhow::bail!(
+            "multiple scenes found, choose one explicitly. Available scenes: {available}"
+        ),
+    }
+}
+
 pub fn cargo_build(
     path: impl AsRef<Path>,
     package: &str,
@@ -392,5 +470,45 @@ pub fn main() {
     if let Err(err) = Cli::parse().run() {
         error!("{err:#}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn empty_constructor(_scene: &mut ranim::RanimScene) {}
+
+    fn scene(name: &str) -> Scene {
+        Scene {
+            name: name.to_string(),
+            constructor: empty_constructor,
+            config: Default::default(),
+            outputs: vec![],
+        }
+    }
+
+    #[test]
+    fn select_scene_uses_the_only_scene_when_name_is_omitted() {
+        let scenes = [scene("only")];
+        let selected = select_scene_from_slice(&scenes, None).unwrap();
+        assert_eq!(selected.name, "only");
+    }
+
+    #[test]
+    fn select_scene_lists_available_scenes_when_name_is_omitted() {
+        let scenes = [scene("a"), scene("b")];
+        let err = match select_scene_from_slice(&scenes, None) {
+            Ok(_) => panic!("expected an error for multiple scenes"),
+            Err(err) => err,
+        };
+        assert!(err.to_string().contains("Available scenes: a, b"));
+    }
+
+    #[test]
+    fn select_scene_finds_scene_by_name() {
+        let scenes = [scene("a"), scene("b")];
+        let selected = select_scene_from_slice(&scenes, Some("b")).unwrap();
+        assert_eq!(selected.name, "b");
     }
 }
