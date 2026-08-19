@@ -190,6 +190,12 @@ path = "examples/agents/rubiks_cube/lib.rs"
 crate-type = ["cdylib"]
 
 [[example]]
+name = "convolution_kernels"
+path = "examples/agents/convolution_kernels/lib.rs"
+crate-type = ["cdylib"]
+required-features = ["typst"]
+
+[[example]]
 name = "aabb"
 path = "examples/aabb/lib.rs"
 crate-type = ["cdylib"]
