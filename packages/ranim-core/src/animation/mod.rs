@@ -125,19 +125,6 @@ impl AnimationCell {
         self.inner.eval_dyn(alpha, output);
     }
 
-    /// Materialize this cell's typed output into the `LogicWorld` (M2).
-    ///
-    /// The typed twin of [`eval_at`](Self::eval_at): same active check, same
-    /// rate-warped `alpha`, but the inner node upserts typed components into
-    /// the world instead of pushing erased items.
-    pub(crate) fn materialize_at(&self, sec: f64, ctx: &mut crate::logic::MaterializeCtx) {
-        if !self.enabled || !self.active_at(sec) {
-            return;
-        }
-        let alpha = self.local_alpha(sec);
-        self.inner.materialize_dyn(alpha, ctx);
-    }
-
     pub(in crate::animation) fn contains_sec(&self, sec: f64, parent_duration: f64) -> bool {
         self.time_range.contains(&sec) || (sec == parent_duration && sec == self.time_range.end)
     }
