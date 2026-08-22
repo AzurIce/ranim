@@ -35,3 +35,4 @@
   - [v0.1]()
   - [v0.2]()
   - [v0.3](./designs/v0.3/README.md)
+  - [m2 LogicWorld](./designs/m2/README.md)

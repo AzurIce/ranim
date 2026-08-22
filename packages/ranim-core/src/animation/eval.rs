@@ -9,10 +9,7 @@
 //!
 //! [`AnimationCell`]: super::AnimationCell
 
-use crate::{
-    core_item::DynItem,
-    logic::{MaterializeCtx, MaterializeOut, upsert_item},
-};
+use crate::{core_item::DynItem, logic::MaterializeOut};
 
 use super::{AnimationInfo, AnimationInfoKind};
 
@@ -89,14 +86,6 @@ pub(super) trait EvalDyn {
     /// content coordinates and recurse into their active children.
     fn eval_dyn(&self, _alpha: f64, _output: &mut Vec<DynItem>) {}
 
-    /// Materialize this node's typed output into the `LogicWorld` (M2 stage 1).
-    ///
-    /// The typed twin of [`eval_dyn`](EvalDyn::eval_dyn): leaves evaluate at
-    /// `alpha` and upsert their `Output` as a typed component at the current
-    /// identity slot; containers forward to their active children. Default
-    /// no-op for nodes without a typed output.
-    fn materialize_dyn(&self, _alpha: f64, _ctx: &mut MaterializeCtx) {}
-
     fn info_kind(&self) -> AnimationInfoKind {
         AnimationInfoKind::Eval
     }
@@ -122,27 +111,6 @@ impl EvalDyn for StaticDynItems {
         output.extend(self.0.iter().cloned());
     }
 
-    fn materialize_dyn(&self, _alpha: f64, ctx: &mut MaterializeCtx) {
-        // Best effort for the core item family (already `LogicItem`); other
-        // static outputs are skipped until they become components (TODO M2).
-        use crate::core_item::{camera_frame::CameraFrame, mesh_item::MeshItem, vitem::VItem};
-        use std::any::Any;
-        for item in &self.0 {
-            let any: &dyn Any = item.0.as_ref();
-            let part = ctx.part;
-            if let Some(v) = any.downcast_ref::<VItem>() {
-                ctx.part += 1;
-                upsert_item(ctx, part, v.clone());
-            } else if let Some(m) = any.downcast_ref::<MeshItem>() {
-                ctx.part += 1;
-                upsert_item(ctx, part, m.clone());
-            } else if let Some(c) = any.downcast_ref::<CameraFrame>() {
-                ctx.part += 1;
-                upsert_item(ctx, part, c.clone());
-            }
-        }
-    }
-
     fn info_kind(&self) -> AnimationInfoKind {
         AnimationInfoKind::Static
     }
@@ -158,13 +126,7 @@ where
     E::Output: MaterializeOut,
 {
     fn eval_dyn(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        output.push(DynItem(Box::new(self.eval_alpha(alpha))));
-    }
-
-    fn materialize_dyn(&self, alpha: f64, ctx: &mut MaterializeCtx) {
-        let part = ctx.part;
-        ctx.part += 1;
-        self.eval_alpha(alpha).materialize(ctx, part);
+        output.push(DynItem::new(self.eval_alpha(alpha)));
     }
 
     fn sim_step(&self) -> Option<f64> {

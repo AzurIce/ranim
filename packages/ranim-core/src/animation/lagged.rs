@@ -185,15 +185,6 @@ impl EvalDyn for AnimLagged {
         }
     }
 
-    fn materialize_dyn(&self, alpha: f64, ctx: &mut crate::logic::MaterializeCtx) {
-        let content_sec = self.duration_secs * alpha;
-        for animation in &self.animations {
-            if animation.contains_sec(content_sec, self.duration_secs) {
-                animation.materialize_at(content_sec, ctx);
-            }
-        }
-    }
-
     fn info_kind(&self) -> AnimationInfoKind {
         AnimationInfoKind::Lagged
     }

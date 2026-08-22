@@ -4,9 +4,11 @@
 //! Stage 1 establishes the (b)-architecture foundation:
 //!
 //! - items are **typed bevy components** (`LogicItem` = `Component` + `Extract`);
-//! - materialization happens at the **typed layer** — each `Eval` leaf samples
-//!   its `Output` and upserts it into the host-owned `World` by a stable
-//!   `(animation_id, part)` identity (E4-validated pattern);
+//! - materialization is **self-describing at the output layer** — every
+//!   [`DynItem`](crate::core_item::DynItem) carries a materialize hook
+//!   monomorphized at its single erasure point, so the materialize phase is
+//!   just the shared `eval` traversal followed by each item upserting itself
+//!   by a stable `(animation_id, part)` identity (E4-validated pattern);
 //! - the per-entity [`ItemExtractor`] fn pointer is written by the typed
 //!   materializer, so the driver can extract every item without naming its
 //!   type (no global registry needed in-process);
@@ -233,13 +235,17 @@ impl ScenePlayer {
     }
 
     /// Materialize the scene at `render_secs` into the `LogicWorld`: every
-    /// active cell evaluates and upserts its typed item components by
-    /// identity; entities whose identity no longer appears are despawned
-    /// ("entity lifetime = producer lifetime").
+    /// active cell evaluates (the same pure query as the render path) and
+    /// each resulting [`DynItem`](crate::core_item::DynItem) upserts itself
+    /// as a typed component via its captured materialize hook; entities whose
+    /// identity no longer appears are despawned ("entity lifetime = producer
+    /// lifetime").
     pub fn materialize_at(&mut self, render_secs: f64) {
         let mut seen = HashSet::new();
         for (animation_id, cell) in self.cells.iter().enumerate() {
-            if !cell.active_at(render_secs) {
+            let mut items = Vec::new();
+            cell.eval_at(render_secs, &mut items);
+            if items.is_empty() {
                 continue;
             }
             let mut ctx = MaterializeCtx {
@@ -249,7 +255,11 @@ impl ScenePlayer {
                 part: 0,
                 seen: &mut seen,
             };
-            cell.materialize_at(render_secs, &mut ctx);
+            for item in items {
+                let part = ctx.part;
+                ctx.part += 1;
+                item.materialize(&mut ctx, part);
+            }
         }
         let stale: Vec<(u32, u32)> = self
             .index
@@ -453,5 +463,31 @@ mod tests {
         pl.frame(1.5, &mut frame);
         assert_eq!(frame.len(), 1);
         assert!(matches!(frame[0].1, CoreItem::MeshItem(_)));
+    }
+
+    /// A held static snapshot is type-erased at capture time; the DynItem
+    /// hook must still materialize it correctly (frame-identical to the
+    /// pure path).
+    #[test]
+    fn held_static_snapshot_materializes() {
+        use crate::animation::sequence::AnimSequence;
+
+        fn build_hold() -> SealedRanimScene {
+            let mut scene = RanimScene::new();
+            let mut s = AnimSequence::new();
+            s.push(MoveX.with_duration(1.0)).hold(1.0);
+            scene.play(s);
+            scene.seal()
+        }
+
+        let mut ev = build_hold().into_evaluator(120.0);
+        let mut pl = ScenePlayer::new(build_hold());
+        for t in [0.5, 1.0, 1.5, 2.0] {
+            let mut frame_ev = Vec::new();
+            ev.sample_at(t, &mut frame_ev);
+            let mut frame_pl = Vec::new();
+            pl.frame(t, &mut frame_pl);
+            assert_eq!(frame_pl, frame_ev, "frame mismatch at t = {t}");
+        }
     }
 }
