@@ -116,7 +116,7 @@ impl DoublePendulum {
 
 /// The full scene state: `N_PENDULUMS` near-identical pendulums plus the
 /// recent tip trajectories used for the fading trails.
-#[derive(Clone)]
+#[derive(ranim::bevy_ecs::component::Component, Clone)]
 struct ChaosState {
     pendulums: [DoublePendulum; N_PENDULUMS],
     trails: [Vec<DVec3>; N_PENDULUMS],
@@ -228,6 +228,8 @@ impl Extract for ChaosState {
         pivot_dot.extract_into(buf);
     }
 }
+
+impl ranim::core::logic::LogicItem for ChaosState {}
 
 #[scene]
 #[wasm_demo_doc]

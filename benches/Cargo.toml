@@ -27,6 +27,10 @@ name = "session"
 harness = false
 
 [[bench]]
+name = "extract_path"
+harness = false
+
+[[bench]]
 name = "render"
 harness = false
 

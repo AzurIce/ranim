@@ -69,6 +69,16 @@ impl<T: Extract<Target = CoreItem>> Extract for Batch<T> {
 /// - single items (`T: LogicItem`) upsert a typed component;
 /// - `Vec<T>` (group outputs) upsert a [`Batch<T>`] component holding the
 ///   whole vector as one entity.
+///
+/// Every implementation follows the same split (the dylib rule):
+///
+/// - **host-side** (via the fn pointer in [`MaterializeCtx`]): identity,
+///   order, and [`ExtractedItems`] components — these must be registered by
+///   the binary that owns the world, because component registration is
+///   keyed by `TypeId`, which differs across a dylib boundary;
+/// - **hook-side** (wherever the hook was monomorphized): extraction of the
+///   owned value and insertion of the typed component `T` — `TypeId`-sensitive
+///   operations on `T` are only valid on the side that knows `T`.
 pub trait MaterializeOut: AnyExtractCoreItem + Send + Sync + 'static {
     /// Materialize this output at the given slot.
     fn materialize(self, ctx: &mut MaterializeCtx, part: u32);
@@ -76,13 +86,35 @@ pub trait MaterializeOut: AnyExtractCoreItem + Send + Sync + 'static {
 
 impl<T: LogicItem> MaterializeOut for T {
     fn materialize(self, ctx: &mut MaterializeCtx, part: u32) {
-        upsert_item(ctx, part, self);
+        respawn_on_type_change::<T>(ctx, part);
+        let mut extracted = Vec::new();
+        self.extract_into(&mut extracted);
+        let entity = (ctx.upsert)(ctx, part, extracted);
+        ctx.world.entity_mut(entity).insert(self);
     }
 }
 
 impl<T: LogicItem + Clone> MaterializeOut for Vec<T> {
     fn materialize(self, ctx: &mut MaterializeCtx, part: u32) {
-        upsert_item(ctx, part, Batch(self));
+        respawn_on_type_change::<Batch<T>>(ctx, part);
+        let mut extracted = Vec::new();
+        self.extract_into(&mut extracted);
+        let entity = (ctx.upsert)(ctx, part, extracted);
+        ctx.world.entity_mut(entity).insert(Batch(self));
+    }
+}
+
+/// Respawn the slot's entity when its stored component type differs from the
+/// incoming one (e.g. a sequence switched to a child segment whose output
+/// type differs), so no stale typed component lingers. Checked hook-side,
+/// where the `TypeId` of `T` matches the side that inserted it.
+fn respawn_on_type_change<T: Component>(ctx: &mut MaterializeCtx, part: u32) {
+    let key = (ctx.animation_id, part);
+    if let Some(&entity) = ctx.index.get(&key)
+        && !ctx.world.entity(entity).contains::<T>()
+    {
+        ctx.world.despawn(entity);
+        ctx.index.remove(&key);
     }
 }
 
@@ -125,6 +157,14 @@ pub struct ExtractedItems(pub Vec<CoreItem>);
 /// output slots within the current top-level cell; every leaf materialization
 /// occupies exactly one slot (multiple extracted `CoreItem`s within a slot
 /// are expanded at collect time).
+///
+/// `upsert` is a fn pointer to host-side code (set by [`ScenePlayer`] when
+/// the context is created): the world write for host-known components
+/// ([`ItemIdentity`], [`SceneOrder`], [`ExtractedItems`]) must execute in the
+/// binary that owns the world, because bevy component registration is keyed
+/// by `TypeId`, which differs across a dylib boundary. Hooks monomorphized
+/// in a dylib call it indirectly and therefore always upsert host-registered
+/// components (the embryonic stage-3 registry shape).
 pub struct MaterializeCtx<'w> {
     /// The world being materialized into.
     pub world: &'w mut World,
@@ -136,53 +176,40 @@ pub struct MaterializeCtx<'w> {
     pub part: u32,
     /// Keys materialized this frame (drives despawn of stale entities).
     pub seen: &'w mut HashSet<(u32, u32)>,
+    /// Host-side slot upsert (see the type-level docs).
+    pub upsert: fn(&mut MaterializeCtx<'_>, u32, Vec<CoreItem>) -> Entity,
 }
 
-/// Upsert a typed item component at the given `part` slot of the current
-/// `animation_id`: create the entity on first appearance, replace the
-/// component afterwards, and record the key as seen this frame.
-///
-/// Extraction is fused into the upsert: while the typed value is still owned,
-/// its `CoreItem`s are produced into the entity's retained
-/// [`ExtractedItems`] buffer — one clone per item per frame, same as the
-/// pure path, with no separate extract pass.
-///
-/// If the slot already exists but holds a *different* component type (e.g. a
-/// sequence switched to a child segment whose output type differs), the stale
-/// entity is despawned and respawned so the stored component always matches
-/// the slot's current type.
-pub(crate) fn upsert_item<T: LogicItem>(ctx: &mut MaterializeCtx, part: u32, value: T) {
+/// Host-side slot upsert: create the entity on first appearance (with
+/// host-registered identity/order/extraction components), replace the
+/// extraction buffer afterwards, and record the key as seen this frame.
+fn upsert_slot(ctx: &mut MaterializeCtx, part: u32, extracted: Vec<CoreItem>) -> Entity {
     let key = (ctx.animation_id, part);
     let entity = match ctx.index.get(&key) {
-        Some(&entity) if ctx.world.entity(entity).contains::<T>() => entity,
-        existing => {
-            if let Some(&entity) = existing {
-                ctx.world.despawn(entity);
-            }
+        Some(&entity) => {
             ctx.world
-                .spawn((
-                    ItemIdentity {
-                        animation_id: key.0,
-                        part: key.1,
-                    },
-                    SceneOrder {
-                        animation_id: key.0,
-                        part: key.1,
-                    },
-                    ExtractedItems::default(),
-                ))
-                .id()
+                .entity_mut(entity)
+                .insert(ExtractedItems(extracted));
+            entity
         }
+        None => ctx
+            .world
+            .spawn((
+                ItemIdentity {
+                    animation_id: key.0,
+                    part: key.1,
+                },
+                SceneOrder {
+                    animation_id: key.0,
+                    part: key.1,
+                },
+                ExtractedItems(extracted),
+            ))
+            .id(),
     };
-    let mut entity_mut = ctx.world.entity_mut(entity);
-    {
-        let mut extracted = entity_mut.get_mut::<ExtractedItems>().unwrap();
-        extracted.0.clear();
-        value.extract_into(&mut extracted.0);
-    }
-    entity_mut.insert(value);
     ctx.index.insert(key, entity);
     ctx.seen.insert(key);
+    entity
 }
 
 /// The M2 driving session: owns the retained `LogicWorld` and materializes
@@ -245,6 +272,18 @@ impl ScenePlayer {
         self.index.len()
     }
 
+    /// Take the `LogicWorld` out for render-side direct extraction (world
+    /// exchange): the render side reconciles from it and hands it back via
+    /// [`put_world`](Self::put_world) before the next `materialize_at`.
+    pub fn take_world(&mut self) -> World {
+        std::mem::replace(&mut self.world, World::new())
+    }
+
+    /// Put the `LogicWorld` back after render-side direct extraction.
+    pub fn put_world(&mut self, world: World) {
+        self.world = world;
+    }
+
     /// Materialize the scene at `render_secs` into the `LogicWorld`: every
     /// active cell evaluates (the same pure query as the render path) and
     /// each resulting [`DynItem`](crate::core_item::DynItem) upserts itself
@@ -265,6 +304,7 @@ impl ScenePlayer {
                 animation_id: animation_id as u32,
                 part: 0,
                 seen: &mut seen,
+                upsert: upsert_slot,
             };
             for item in items {
                 let part = ctx.part;
