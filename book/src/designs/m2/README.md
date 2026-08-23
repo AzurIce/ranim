@@ -62,11 +62,12 @@ materialize_at(sec) = cell.eval_at(sec) 得到 Vec<DynItem>
   `(animation_id, part) → Entity` 索引；同 key 再次物化只替换组件（entity 稳定
   跨帧保留），本帧未出现的 key 对应 entity 被 despawn。
 - **槽位类型变化必须重建 entity**：sequence 切换子段后同一槽位的输出类型可能改变，
-  upsert 检测到槽位上不是目标类型时必须 despawn 并重新 spawn，不得只 insert
-  新组件（旧组件会残留，该槽位会被双重计算）。
-- **提取融合在物化里**：upsert 在仍持有 owned 值时顺手把它 extract 进 entity 的
-  `ExtractedItems(Vec<CoreItem>)`（`clear` + `extract_into`，分配跨帧复用）——
-  每个 item 每帧一次 clone，与纯路径同价，没有独立的 extract 遍历。
+  物化时检测到槽位上不是目标类型必须 despawn 并重新 spawn，不得只 insert
+  新组件（旧 typed 组件会残留并被该类型的消费者读到陈旧值）。该检测在钩子侧
+  执行（`TypeId` 只在认识 `T` 的一侧有效，见下文 dylib 规则）。
+- **提取融合在物化里**：钩子在仍持有 owned 值时顺手把它 extract 出来，经宿主侧
+  upsert 写入 entity 的 `ExtractedItems(Vec<CoreItem>)`——每个 item 每帧一次
+  clone，与纯路径同价，没有独立的 extract 遍历。
 - **顺序与身份是两件事**：ECS 查询顺序不构成场景顺序，collect 阶段按
   `SceneOrder` 显式排序，再把每个 entity 提取出的若干 `CoreItem` 扁平化为连续
   part 序号。
@@ -126,12 +127,40 @@ World 路径 (ScenePlayer::frame):
 upsert；组输出（`Vec<T>`）包进 `Batch<T>` 组件作为单个 entity。给 `LogicItem`
 加 blanket impl 会导致两条 `MaterializeOut` impl 重叠，无法编译。
 
+## 直接提取进渲染世界（world exchange）
+
+`EvaluatedFrame`/`RenderFrame` 帧缓冲是传输工件而非架构必需：离线渲染的完整路径
+可以不走缓冲——`ScenePlayer` 物化后把 `LogicWorld` 整体交给渲染线程
+（`take_world`/`put_world`，bevy 的 world exchange 同款），渲染侧
+`reconcile_logic` 按逻辑侧 `SceneOrder` 排序、drain 每个 entity 的
+`ExtractedItems`，以 move 语义直接 upsert 渲染组件（比较后替换，保留
+`Changed<T>`），然后照常跑 `RenderPrepare`/`RenderGraph`。帧缓冲路径（纯
+evaluator → `RenderFrame` → `reconcile`）不受任何影响，两条路共用渲染世界的
+身份与对账语义。离线渲染可用环境变量 `RANIM_SESSION=player` 切换到该路径。
+
+## dylib 规则：宿主可见面必须由宿主注册
+
+bevy 的组件注册以 `TypeId` 为键，而 `TypeId` 跨 dylib 边界不同。实测（dylib 构建
+的场景走直接提取路径）：在 dylib 内单态化的物化钩子若直接做 world 写入，注册出
+来的组件对宿主二进制完全不可见（world 有 2 个 entity，宿主查询命中 0 个），渲染
+侧直接 0 item。因此物化必须分侧：
+
+- **宿主侧**（`MaterializeCtx.upsert` fn 指针，由创建 ctx 的宿主代码注入）：
+  `ItemIdentity`/`SceneOrder`/`ExtractedItems` 的写入。钩子无论在哪一侧单态化，
+  都通过这个指针间接调用，宿主可见面对 dylib 场景同样成立——这是 stage 3
+  registry 的雏形。
+- **钩子侧**（钩子单态化所在的一侧）：owned 值的提取，以及 typed 组件 `T` 的
+  insert/`contains`——对 `T` 的 `TypeId` 敏感操作只在认识 `T` 的那一侧有效。
+  dylib 定义的 item 类型因此能进 world（宿主按身份/提取产物消费），但其 typed
+  组件宿主不可按类型查询，这正是 stage 3 registry 要解决的问题。
+
 ## 边界
 
-- 渲染侧不在本设计范围内：collect 输出格式与纯路径相同即是全部契约。
+- `EvaluatedFrame` 保留在三个位置：纯路径的输出契约、CLI inspect/调试接口、
+  player 与 evaluator 帧一致性测试的基准；热路径不再序列化经过它。
 - 提取结果目前在 entity 上退化为 `CoreItem`（`ExtractedItems`）；让提取产物保持
   类型化（`Extracted<T>`，供消费者按类型查询、并承接 `TextItem` 的派生缓存）是
   本设计的既定延伸，不改变身份与生命周期模型。
-- 进程内 `DynItem` 的物化钩子假设 item 类型对宿主编译期可见；让类型可以来自
-  宿主之外（dylib/wasm 注册自己的物化器）需要一个同形状的全局 registry 替代
-  钩子 fn 指针，同样不改变本设计的身份模型。
+- extract 阶段的去留：当前融合在物化里（等价于每帧全量的独立阶段）。若未来需要
+  并行 extract、变更检测跳过（与 drain 冲突，需要数据留在 world）或多消费者/帧率
+  解耦，extract 应以 schedule system 形态回归，物化侧无需改动。

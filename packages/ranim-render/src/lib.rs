@@ -151,6 +151,23 @@ impl Renderer {
         self.world.run_schedule(RenderPrepare);
         self.world.run_schedule(RenderGraph);
     }
+
+    /// Reconcile directly from a `LogicWorld` and render one frame (M2 direct
+    /// extraction): same render schedules as [`render_frame`](Self::render_frame),
+    /// but the extracted items move out of the logic world instead of being
+    /// cloned through a transport frame.
+    pub fn render_logic_frame(
+        &mut self,
+        render_textures: &mut RenderTextures,
+        clear_color: wgpu::Color,
+        logic: &mut bevy_ecs::world::World,
+    ) {
+        crate::world::reconcile_logic(&mut self.world, logic);
+        self.world
+            .insert_resource(FrameTarget::new(render_textures, clear_color));
+        self.world.run_schedule(RenderPrepare);
+        self.world.run_schedule(RenderGraph);
+    }
 }
 
 #[allow(unused)]
