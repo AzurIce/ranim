@@ -26,10 +26,10 @@ use std::collections::{HashMap, HashSet};
 use bevy_ecs::{component::Component, entity::Entity, world::World};
 
 use crate::{
-    Extract, SealedRanimScene,
-    animation::AnimationCell,
+    Extract, SealedRanimScene, TimeMark,
+    animation::{AnimationCell, AnimationInfo},
     core_item::{AnyExtractCoreItem, CoreItem},
-    scene_evaluator::EvaluatedFrame,
+    scene_evaluator::{EvaluatedFrame, SceneSession},
 };
 
 /// A top-level item that can live in the `LogicWorld` as a typed component.
@@ -203,6 +203,7 @@ pub struct ScenePlayer {
     /// `(animation_id, part)` → entity, the cross-frame identity index.
     index: HashMap<(u32, u32), Entity>,
     total_secs: f64,
+    time_marks: Vec<(f64, TimeMark)>,
     clock: f64,
 }
 
@@ -215,6 +216,7 @@ impl ScenePlayer {
             world: World::new(),
             index: HashMap::new(),
             total_secs: scene.total_secs,
+            time_marks: scene.time_marks,
             clock: 0.0,
         }
     }
@@ -227,6 +229,19 @@ impl ScenePlayer {
     /// Last materialized target time.
     pub fn clock(&self) -> f64 {
         self.clock
+    }
+
+    /// Scene time marks.
+    pub fn time_marks(&self) -> &[(f64, TimeMark)] {
+        &self.time_marks
+    }
+
+    /// Hierarchical runtime animation information for preview tooling.
+    pub fn animation_infos(&self) -> Vec<AnimationInfo> {
+        self.cells
+            .iter()
+            .map(AnimationCell::animation_info)
+            .collect()
     }
 
     /// Number of live item entities in the `LogicWorld`.
@@ -334,6 +349,32 @@ impl ScenePlayer {
         self.materialize_at(render_secs);
         self.extract();
         self.collect(out);
+    }
+}
+
+impl SceneSession for ScenePlayer {
+    fn from_sealed(scene: SealedRanimScene, _logic_fps: f64) -> Self {
+        Self::new(scene)
+    }
+
+    fn total_secs(&self) -> f64 {
+        self.total_secs()
+    }
+
+    fn clock(&self) -> f64 {
+        self.clock()
+    }
+
+    fn time_marks(&self) -> &[(f64, TimeMark)] {
+        self.time_marks()
+    }
+
+    fn animation_infos(&self) -> Vec<AnimationInfo> {
+        self.animation_infos()
+    }
+
+    fn sample_at(&mut self, render_secs: f64, out: &mut EvaluatedFrame) {
+        self.frame(render_secs, out);
     }
 }
 

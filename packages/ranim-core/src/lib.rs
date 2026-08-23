@@ -26,7 +26,7 @@ pub mod time;
 /// Fundamental traits.
 pub mod traits;
 pub use logic::ScenePlayer;
-pub use scene_evaluator::SceneEvaluator;
+pub use scene_evaluator::{EvaluatedFrame, SceneEvaluator, SceneSession};
 /// Utilities.
 pub mod utils;
 
