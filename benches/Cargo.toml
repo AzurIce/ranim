@@ -23,6 +23,10 @@ name = "eval"
 harness = false
 
 [[bench]]
+name = "session"
+harness = false
+
+[[bench]]
 name = "render"
 harness = false
 

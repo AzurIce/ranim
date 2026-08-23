@@ -73,7 +73,7 @@ materialize_at(sec) = cell.eval_at(sec) 得到 Vec<DynItem>
   `SceneOrder` 显式排序，再把每个 entity 提取出的若干 `CoreItem` 扁平化为连续
   part 序号。
 
-## ScenePlayer
+## ScenePlayer 与 SceneSession
 
 `ScenePlayer` 是 `SceneEvaluator` 的 retained-world 对照物。由于求值是纯查询
 （`eval_alpha`），它没有任何步进或 seek 簿记——方向管理内收于 `Iterative` 叶子，
@@ -82,6 +82,11 @@ session 只暴露一帧的三段式管线：
 ```text
 frame(render_secs) = materialize_at → extract → collect
 ```
+
+两者实现同一个 `SceneSession` trait（`from_sealed` / `total_secs` / `clock` /
+`time_marks` / `animation_infos` / `sample_at`），消费者对二者可互换：同一目标
+时刻的 `sample_at` 输出逐帧一致。`ScenePlayer::sample_at` 即 `frame`；
+`SceneEvaluator` 的同名方法原样委托。
 
 测试保证其与 `SceneEvaluator::sample_at` 逐帧一致，且后跳采样与前向一致。
 
