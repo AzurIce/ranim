@@ -27,10 +27,7 @@ pub type EvaluatedFrame = Vec<((usize, usize), CoreItem)>;
 /// so consumers can treat them interchangeably.
 pub trait SceneSession {
     /// Consume a sealed scene and create a driving session.
-    ///
-    /// `logic_fps` is retained only for call-site compatibility; it no longer
-    /// drives stepping (each iterative segment owns its `sim_step`).
-    fn from_sealed(scene: SealedRanimScene, logic_fps: f64) -> Self;
+    fn from_sealed(scene: SealedRanimScene) -> Self;
 
     /// Total scene duration.
     fn total_secs(&self) -> f64;
@@ -60,11 +57,7 @@ pub struct SceneEvaluator {
 
 impl SceneEvaluator {
     /// Consume a sealed scene and create a driving session.
-    ///
-    /// `logic_fps` is retained only for call-site compatibility; it no longer
-    /// drives stepping (each iterative segment owns its `sim_step`).
-    #[allow(unused_variables)]
-    pub fn new(scene: SealedRanimScene, logic_fps: f64) -> Self {
+    pub fn new(scene: SealedRanimScene) -> Self {
         Self {
             cells: scene.animations,
             total_secs: scene.total_secs,
@@ -118,8 +111,8 @@ impl SceneEvaluator {
 }
 
 impl SceneSession for SceneEvaluator {
-    fn from_sealed(scene: SealedRanimScene, logic_fps: f64) -> Self {
-        Self::new(scene, logic_fps)
+    fn from_sealed(scene: SealedRanimScene) -> Self {
+        Self::new(scene)
     }
 
     fn total_secs(&self) -> f64 {
@@ -223,7 +216,7 @@ mod tests {
         scene.play(ProgressX.with_duration(2.0));
         let sealed = scene.seal();
 
-        let mut ev = SceneEvaluator::new(sealed, 120.0);
+        let mut ev = SceneEvaluator::new(sealed);
         for sec in [0.0, 0.25, 0.5, 1.0, 1.5, 2.0] {
             let mut frame = EvaluatedFrame::new();
             ev.sample_at(sec, &mut frame);
@@ -237,7 +230,7 @@ mod tests {
     fn iterative_segment_steps_along_logic_grid() {
         let mut scene = RanimScene::new();
         scene.play(cv(1.0, 2.0).with_duration(2.0).at(0.0));
-        let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
+        let mut ev = SceneEvaluator::new(scene.seal());
 
         for sec in [0.0, 0.5, 1.0, 1.5, 2.0] {
             let mut frame = EvaluatedFrame::new();
@@ -255,7 +248,7 @@ mod tests {
         }
 
         let run = |backward: bool| {
-            let mut ev = SceneEvaluator::new(build_scene(), 120.0);
+            let mut ev = SceneEvaluator::new(build_scene());
             let mut trace = Vec::new();
             for sec in [0.3, 0.7, 1.1, 1.9, 2.6] {
                 if backward {
@@ -283,7 +276,7 @@ mod tests {
             .at(0.0),
         );
 
-        let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
+        let mut ev = SceneEvaluator::new(scene.seal());
         let mut frame = EvaluatedFrame::new();
         ev.sample_at(1.5, &mut frame);
         assert_eq!(xs_of(&frame), vec![0.5]);
@@ -308,7 +301,7 @@ mod tests {
         }
 
         let run = |backward: bool| {
-            let mut ev = SceneEvaluator::new(build_scene(), 120.0);
+            let mut ev = SceneEvaluator::new(build_scene());
             let mut trace = Vec::new();
             for sec in [0.3, 0.7, 1.1, 1.5, 1.9] {
                 if backward {

@@ -202,11 +202,8 @@ pub struct SealedRanimScene {
 
 impl SealedRanimScene {
     /// Consume this scene into a [`SceneEvaluator`] driving session.
-    ///
-    /// `logic_fps` is retained for call-site compatibility; it no longer drives
-    /// stepping (each iterative segment owns its own `sim_step`).
-    pub fn into_evaluator(self, logic_fps: f64) -> SceneEvaluator {
-        SceneEvaluator::new(self, logic_fps)
+    pub fn into_evaluator(self) -> SceneEvaluator {
+        SceneEvaluator::new(self)
     }
 
     /// Total scene duration.

@@ -158,9 +158,7 @@ pub fn render_scene_job(
     let scene = constructor.build_scene();
     trace!("Build timeline cost: {:?}", t.elapsed());
 
-    // Default logic grid 120 Hz (per the time model design); render fps only
-    // decides which logic states are sampled.
-    let mut evaluator = scene.into_evaluator(DEFAULT_LOGIC_FPS);
+    let mut evaluator = scene.into_evaluator();
 
     let mut app = RanimRenderApp::new(name, scene_config, &output, buffer_count);
     app.render_scene_with_progress(&mut evaluator, on_progress);
@@ -169,9 +167,6 @@ pub fn render_scene_job(
         app.render_capture_marks(&mut evaluator);
     }
 }
-
-/// Default logic grid resolution (Hz), per the time model design.
-const DEFAULT_LOGIC_FPS: f64 = 120.0;
 
 /// Handle to the background render thread, used to submit frame data from the main thread.
 ///

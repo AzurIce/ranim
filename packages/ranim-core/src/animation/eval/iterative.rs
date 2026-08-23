@@ -269,7 +269,7 @@ mod tests {
                 .with_steps(240)
                 .with_duration(2.0),
             );
-            scene.seal().into_evaluator(120.0)
+            scene.seal().into_evaluator()
         }
 
         let run = || {

@@ -15,7 +15,7 @@ use ranim_core::{EvaluatedFrame, SceneEvaluator, ScenePlayer, SceneSession, Seal
 /// Sample `frames` evenly spaced points across the scene, reusing one frame
 /// buffer like the render loop does.
 fn sample_loop<S: SceneSession>(scene: SealedRanimScene, frames: usize) {
-    let mut session = S::from_sealed(scene, 120.0);
+    let mut session = S::from_sealed(scene);
     let total = session.total_secs();
     let mut frame = EvaluatedFrame::new();
     for i in 0..frames {
