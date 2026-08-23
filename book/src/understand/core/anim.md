@@ -465,5 +465,5 @@ trait object，因此 crate 为所有满足 `Output` 可提取为场景元素的
 - 前进 / 回退 / 原地求值的判断在 `Iterative` 等 stateful 节点内部完成；
 - preview 拖拽和 render 采样共用同一条路径。
 
-`logic_fps` 参数仅为 API 兼容保留，不再驱动步进；步进尺度由每个迭代区段自己
-的 `sim_step` 决定。
+步进尺度由每个迭代区段自己的 `sim_step` 决定，session 上没有全局时间分辨率
+参数（早期的 `logic_fps` 已删除）。

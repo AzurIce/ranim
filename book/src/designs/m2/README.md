@@ -90,6 +90,34 @@ frame(render_secs) = materialize_at → extract → collect
 
 测试保证其与 `SceneEvaluator::sample_at` 逐帧一致，且后跳采样与前向一致。
 
+## 与纯路径的对照
+
+两条 session 共享 sealed scene 的顶层 cells、整棵类型擦除动画树（同一份
+`eval_at` 路由与同一份 `Iterative` 快照），差异从求值结果落地开始：
+
+```text
+共有:  cell.eval_at(sec) -> Vec<DynItem>          （同一棵树，同一个快照）
+
+纯路径 (SceneEvaluator::sample_at):
+  DynItem.extract() -> Vec<CoreItem>              （1→N 展开，move 进帧缓冲）
+  enumerate 得 part，直接 push
+
+World 路径 (ScenePlayer::frame):
+  materialize_at: DynItem 自物化 upsert 进 World   （HashMap 按身份 spawn/replace，
+                                                    帧末 despawn 消失的 key）
+  extract:        每 entity 经 ItemExtractor 读组件 -> ExtractedItems
+  collect:        按 SceneOrder 排序，逐 entity clone 展开进帧缓冲
+```
+
+- **数据驻留**：纯路径的帧是一次性产物；world 路径的 item 以 typed component
+  跨帧驻留，身份稳定——这是后续按类型查询与宿主外类型的地基，也是它存在的
+  全部理由。
+- **每帧拷贝**：纯路径 extract 时构造一次 `CoreItem` 并 move；world 路径
+  extract 生成一次、collect 再 clone 一次。叠加 entity/HashMap 簿记与排序，
+  这是 benchmark 中 world 路径每帧慢约 1.2–1.6 倍的来源，属于实现开销而非
+  结构差异（buffer swap、变更检测跳过未变 entity 都是既定优化方向）。
+- **确定性**：两者相同——帧一致与 seek 一致均由测试锁定。
+
 ## LogicItem 与 Batch：coherence 约束
 
 `LogicItem`（= `Component` + 可退化为 `CoreItem`）**不得有 blanket impl，必须逐个

@@ -455,7 +455,7 @@ fn frame_command(
     let scene = select_scene(lib, Some(scene_name))?;
     let sealed = scene.constructor.build_scene();
     let total_secs = sealed.total_secs();
-    let mut evaluator = sealed.into_evaluator(120.0);
+    let mut evaluator = sealed.into_evaluator();
     let infos = evaluator.animation_infos();
     let mut frame = EvaluatedFrame::new();
     evaluator.sample_at(at, &mut frame);

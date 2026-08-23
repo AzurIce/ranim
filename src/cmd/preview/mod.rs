@@ -27,9 +27,6 @@ pub enum RanimPreviewAppCmd {
     ReloadScene(Scene, Sender<()>),
 }
 
-/// Default logic grid resolution (Hz), per the time model design.
-const DEFAULT_LOGIC_FPS: f64 = 120.0;
-
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 enum ExportProgress {
     /// (current_frame, total_frames)
@@ -163,7 +160,7 @@ impl RanimPreviewApp {
         info!("Getting timelines info...");
         let animation_infos = timeline.get_animation_infos();
         let total_secs = timeline.total_secs();
-        let evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
+        let evaluator = timeline.into_evaluator();
         info!("Total {} root animations", animation_infos.len());
 
         let (cmd_tx, cmd_rx) = unbounded();
@@ -267,7 +264,7 @@ impl RanimPreviewApp {
                         TimelineState::new(timeline.total_secs(), animation_infos);
                     self.timeline_state.current_sec =
                         old_cur_second.clamp(0.0, self.timeline_state.total_sec);
-                    self.evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
+                    self.evaluator = timeline.into_evaluator();
                     self.store.update(std::iter::empty());
                     self.need_eval = true;
 

@@ -391,7 +391,7 @@ impl SceneEvaluator {
 
 - `sample_at` 是唯一的 session 交互：渲染、preview 拖拽共用这条路径；
 - 前进 / 回退 / 原地求值由 `Iterative` 等 stateful 节点内部完成，session 不再维护逻辑网格；
-- `logic_fps` 参数仅为 API 兼容保留，不再驱动步进；步进尺度由每个迭代区段自己的 `sim_step` 决定。
+- 步进尺度由每个迭代区段自己的 `sim_step` 决定（早期的 `logic_fps` 参数已删除）。
 
 ### 模块布局
 

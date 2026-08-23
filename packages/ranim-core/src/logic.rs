@@ -353,7 +353,7 @@ impl ScenePlayer {
 }
 
 impl SceneSession for ScenePlayer {
-    fn from_sealed(scene: SealedRanimScene, _logic_fps: f64) -> Self {
+    fn from_sealed(scene: SealedRanimScene) -> Self {
         Self::new(scene)
     }
 
@@ -421,7 +421,7 @@ mod tests {
     /// The world path must produce frame-identical output to the pure path.
     #[test]
     fn player_output_matches_evaluator() {
-        let mut ev = build().into_evaluator(120.0);
+        let mut ev = build().into_evaluator();
         let mut pl = ScenePlayer::new(build());
 
         for t in [0.0, 0.3, 0.7, 1.0, 1.2, 1.8, 2.5, 3.0] {
@@ -521,7 +521,7 @@ mod tests {
             scene.seal()
         }
 
-        let mut ev = build_hold().into_evaluator(120.0);
+        let mut ev = build_hold().into_evaluator();
         let mut pl = ScenePlayer::new(build_hold());
         for t in [0.5, 1.0, 1.5, 2.0] {
             let mut frame_ev = Vec::new();
