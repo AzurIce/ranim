@@ -2,10 +2,7 @@
 
 use std::{any::type_name, fmt::Debug, ops::Range};
 
-use crate::{
-    core_item::{AnyExtractCoreItem, DynItem},
-    utils::rate_functions::linear,
-};
+use crate::{core_item::DynItem, logic::MaterializeOut, utils::rate_functions::linear};
 
 /// Evaluation protocols and author-facing adapters.
 pub mod eval;
@@ -189,13 +186,13 @@ impl<A: Placeable> AnimationExt for A {}
 impl<E> Placeable for E
 where
     E: Eval + 'static,
-    E::Output: AnyExtractCoreItem,
+    E::Output: MaterializeOut,
 {
 }
 impl<E> Animation for E
 where
     E: Eval + 'static,
-    E::Output: AnyExtractCoreItem,
+    E::Output: MaterializeOut,
 {
     fn build(self) -> AnimationCell {
         AnimationCell {
@@ -351,9 +348,9 @@ pub trait AnimIterExt: Iterator + Sized {
 impl<I: Iterator> AnimIterExt for I {}
 
 /// Requirement for [`StaticAnim`].
-pub trait StaticAnimRequirement: Clone + AnyExtractCoreItem {}
+pub trait StaticAnimRequirement: Clone + MaterializeOut {}
 
-impl<T: Clone + AnyExtractCoreItem> StaticAnimRequirement for T {}
+impl<T: Clone + MaterializeOut> StaticAnimRequirement for T {}
 
 /// Convenience methods for zero-duration static animations.
 pub trait StaticAnim: StaticAnimRequirement + Sized {

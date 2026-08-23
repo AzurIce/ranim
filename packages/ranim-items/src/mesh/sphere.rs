@@ -22,7 +22,7 @@ use super::Surface;
 /// - `x = r * cos(u) * sin(v)`
 /// - `y = r * sin(u) * sin(v)`
 /// - `z = r * (-cos(v))`
-#[derive(Debug, Clone, PartialEq)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, PartialEq)]
 pub struct Sphere {
     /// Center of the sphere.
     pub center: DVec3,

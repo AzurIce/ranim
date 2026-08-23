@@ -53,7 +53,7 @@ use ranim_core::{
 ///     dvec3(0.5, 1.0, 0.0),
 /// ]);
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, PartialEq)]
 pub struct VItem {
     /// The normal vector of the projection target plane.
     /// If `None`, the normal will be derived from the points at render time.

@@ -17,13 +17,16 @@ pub mod color;
 pub mod components;
 /// Fundamental scene primitives.
 pub mod core_item;
+/// Logic-side ECS World (M2): retained `LogicWorld` + `ScenePlayer` driver.
+pub mod logic;
 /// Scene evaluation driver (lightweight session, no ECS).
 pub mod scene_evaluator;
 /// Time vocabulary for animation evaluation.
 pub mod time;
 /// Fundamental traits.
 pub mod traits;
-pub use scene_evaluator::SceneEvaluator;
+pub use logic::ScenePlayer;
+pub use scene_evaluator::{EvaluatedFrame, SceneEvaluator, SceneSession};
 /// Utilities.
 pub mod utils;
 
@@ -199,11 +202,8 @@ pub struct SealedRanimScene {
 
 impl SealedRanimScene {
     /// Consume this scene into a [`SceneEvaluator`] driving session.
-    ///
-    /// `logic_fps` is retained for call-site compatibility; it no longer drives
-    /// stepping (each iterative segment owns its own `sim_step`).
-    pub fn into_evaluator(self, logic_fps: f64) -> SceneEvaluator {
-        SceneEvaluator::new(self, logic_fps)
+    pub fn into_evaluator(self) -> SceneEvaluator {
+        SceneEvaluator::new(self)
     }
 
     /// Total scene duration.

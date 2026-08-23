@@ -8,5 +8,7 @@
 )]
 
 pub mod debug;
+/// Explicit `LogicItem` impls for built-in item types.
+pub mod logic_impls;
 pub mod mesh;
 pub mod vitem;

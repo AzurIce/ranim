@@ -22,7 +22,7 @@ use super::{line::Line, Polygon, VItem};
 ///           /   \
 /// 0.1 * -X +-----+ 0.1 * X
 /// ```
-#[derive(
+#[derive(bevy_ecs::component::Component, 
     Clone,
     Interpolatable,
     Alignable,

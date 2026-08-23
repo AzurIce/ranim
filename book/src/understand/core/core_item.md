@@ -49,7 +49,13 @@ pub trait Extract {
 
 ```rust,ignore
 pub trait AnyExtractCoreItem: Any + Extract<Target = CoreItem> + DynClone {}
-pub struct DynItem(pub Box<dyn AnyExtractCoreItem>);
+
+/// 类型擦除的 item；materialize 钩子在擦除点捕获，供 LogicWorld 物化
+/// （M2，见 [M2 LogicWorld](../../designs/m2/README.md)）。
+pub struct DynItem {
+    inner: Box<dyn AnyExtractCoreItem>,
+    materialize: fn(Self, &mut MaterializeCtx, u32),
+}
 ```
 
 `SceneEvaluator::sample_at(render_secs, out)` 对根 Stack 的每个顶层 cell 求值，

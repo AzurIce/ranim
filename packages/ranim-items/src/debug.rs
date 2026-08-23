@@ -14,7 +14,7 @@ use ranim_core::{
 use crate::vitem::geometry::Rectangle;
 
 /// Wrapper that visualizes the AABB of the inner item as a wireframe rectangle.
-#[derive(Clone)]
+#[derive(bevy_ecs::component::Component, Clone)]
 pub struct VisualizeAabbItem<T: Aabb>(pub T);
 
 impl<T: Aabb> Deref for VisualizeAabbItem<T> {

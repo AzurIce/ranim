@@ -15,6 +15,7 @@ ranim = { workspace = true, features = ["preview", "anims", "items", "typst"] }
 ranim-core.workspace = true
 ranim-items.workspace = true
 ranim-anims.workspace = true
+bevy_ecs.workspace = true
 itertools.workspace = true
 rand = "0.10.2"
 rand_chacha = "0.10.0"

@@ -24,7 +24,7 @@ pub use surface::*;
 /// This struct uses [`PointVec`] to wrap vertex data, enabling proper alignment
 /// and interpolation for animations. When extracted, it converts to the low-level
 /// [`ranim_core::core_item::mesh_item::MeshItem`] for rendering.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, PartialEq)]
 pub struct MeshItem {
     /// The vertices of the mesh
     pub points: PointVec<DVec3>,

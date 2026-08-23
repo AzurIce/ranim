@@ -17,7 +17,7 @@ use crate::vitem::{
 };
 
 /// An elliptic arc.
-#[derive(Debug, Clone, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, ranim_macros::Interpolatable)]
 pub struct EllipticArc {
     /// Axes
     pub axes: (DVec3, DVec3),

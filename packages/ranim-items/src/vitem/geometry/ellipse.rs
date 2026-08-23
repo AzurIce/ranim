@@ -14,7 +14,7 @@ use crate::vitem::{
 };
 
 /// An ellipse.
-#[derive(Clone, Debug, ranim_macros::Interpolatable)]
+#[derive(bevy_ecs::component::Component, Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Ellipse {
     /// Axes
     pub axes: (DVec3, DVec3),

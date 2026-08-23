@@ -158,11 +158,23 @@ pub fn render_scene_job(
     let scene = constructor.build_scene();
     trace!("Build timeline cost: {:?}", t.elapsed());
 
-    // Default logic grid 120 Hz (per the time model design); render fps only
-    // decides which logic states are sampled.
-    let mut evaluator = scene.into_evaluator(DEFAULT_LOGIC_FPS);
-
     let mut app = RanimRenderApp::new(name, scene_config, &output, buffer_count);
+
+    // Experimental M2 path: drive rendering from the retained `LogicWorld`
+    // (direct extraction, world exchange) instead of the transport frame.
+    if std::env::var("RANIM_SESSION").is_ok_and(|v| v.eq_ignore_ascii_case("player")) {
+        let mut player = ranim_core::ScenePlayer::new(scene);
+        app.render_scene_player_with_progress(&mut player, on_progress);
+
+        if capture_marks && !player.time_marks().is_empty() {
+            let mut evaluator = constructor.build_scene().into_evaluator();
+            app.render_capture_marks(&mut evaluator);
+        }
+        return;
+    }
+
+    let mut evaluator = scene.into_evaluator();
+
     app.render_scene_with_progress(&mut evaluator, on_progress);
 
     if capture_marks && !evaluator.time_marks().is_empty() {
@@ -170,15 +182,23 @@ pub fn render_scene_job(
     }
 }
 
-/// Default logic grid resolution (Hz), per the time model design.
-const DEFAULT_LOGIC_FPS: f64 = 120.0;
+/// Frame payload exchanged between the main thread and the render worker.
+///
+/// `Buffer` is the classic transport frame (pure path); `Logic` hands the
+/// `LogicWorld` itself over for render-side direct extraction (world
+/// exchange) and the worker hands it back after rendering.
+enum FrameExchange {
+    Buffer(RenderFrame),
+    Logic(bevy_ecs::world::World),
+}
 
 /// Handle to the background render thread, used to submit frame data from the main thread.
 ///
 /// Dropping this handle closes the submission channel and terminates the worker thread loop.
 pub struct RenderThreadHandle {
-    submit_frame_tx: async_channel::Sender<RenderFrame>,
-    back_rx: async_channel::Receiver<RenderFrame>,
+    submit_frame_tx: async_channel::Sender<FrameExchange>,
+    back_frame_rx: async_channel::Receiver<RenderFrame>,
+    back_logic_rx: async_channel::Receiver<bevy_ecs::world::World>,
     worker_rx: async_channel::Receiver<RenderWorker>,
 }
 
@@ -187,12 +207,26 @@ impl RenderThreadHandle {
     pub fn sync_and_submit(&self, f: impl FnOnce(&mut RenderFrame)) {
         let mut store = self.get_store();
         f(&mut store);
-        self.submit_frame_tx.send_blocking(store).unwrap();
+        self.submit_frame_tx
+            .send_blocking(FrameExchange::Buffer(store))
+            .unwrap();
     }
 
     /// Retrieves a previously rendered [`RenderFrame`] from the background thread for reuse.
     pub fn get_store(&self) -> RenderFrame {
-        self.back_rx.recv_blocking().unwrap()
+        self.back_frame_rx.recv_blocking().unwrap()
+    }
+
+    /// Submits the `LogicWorld` for direct extraction (world exchange).
+    pub fn submit_logic(&self, world: bevy_ecs::world::World) {
+        self.submit_frame_tx
+            .send_blocking(FrameExchange::Logic(world))
+            .unwrap();
+    }
+
+    /// Receives the `LogicWorld` back after the worker rendered it.
+    pub fn recv_logic(&self) -> bevy_ecs::world::World {
+        self.back_logic_rx.recv_blocking().unwrap()
     }
 
     /// Closes the submission channel, waits for the background thread to finish, and returns the [`RenderWorker`].
@@ -321,10 +355,11 @@ impl RenderWorker {
     /// The background thread loops over incoming [`RenderFrame`]s, rendering and outputting frames using multi-buffered async readback.
     pub fn yeet(self) -> RenderThreadHandle {
         let (submit_frame_tx, submit_frame_rx) = async_channel::bounded(1);
-        let (back_tx, back_rx) = async_channel::bounded(1);
+        let (back_frame_tx, back_frame_rx) = async_channel::bounded(1);
+        let (back_logic_tx, back_logic_rx) = async_channel::bounded(1);
         let (worker_tx, worker_rx) = async_channel::bounded(1);
 
-        back_tx.send_blocking(RenderFrame::default()).unwrap();
+        back_frame_tx.send_blocking(RenderFrame::default()).unwrap();
         std::thread::spawn(move || {
             let mut worker = self;
             let n = worker.render_textures.len();
@@ -332,7 +367,7 @@ impl RenderWorker {
             let mut cur = 0usize;
             let mut pending: VecDeque<(usize, u64)> = VecDeque::new();
 
-            while let Ok(store) = submit_frame_rx.recv_blocking() {
+            while let Ok(exchange) = submit_frame_rx.recv_blocking() {
                 // Drain oldest pending readback if all targets are occupied
                 if pending.len() >= n {
                     let (prev, prev_fc) = pending.pop_front().unwrap();
@@ -340,21 +375,33 @@ impl RenderWorker {
                     worker.output_frame_from(prev, prev_fc);
                 }
 
-                // Render current frame and start async readback
-                worker.renderer.render_frame(
-                    &mut worker.render_textures[cur],
-                    worker.clear_color,
-                    &store,
-                );
-                worker.render_textures[cur].start_readback(&worker.ctx);
+                // Render current frame and start async readback, then return
+                // the payload early so main thread can eval the next frame
+                // while GPU processes the readback
+                match exchange {
+                    FrameExchange::Buffer(store) => {
+                        worker.renderer.render_frame(
+                            &mut worker.render_textures[cur],
+                            worker.clear_color,
+                            &store,
+                        );
+                        worker.render_textures[cur].start_readback(&worker.ctx);
+                        back_frame_tx.send_blocking(store).unwrap();
+                    }
+                    FrameExchange::Logic(mut logic) => {
+                        worker.renderer.render_logic_frame(
+                            &mut worker.render_textures[cur],
+                            worker.clear_color,
+                            &mut logic,
+                        );
+                        worker.render_textures[cur].start_readback(&worker.ctx);
+                        back_logic_tx.send_blocking(logic).unwrap();
+                    }
+                };
 
                 pending.push_back((cur, frame_count));
                 frame_count += 1;
                 cur = (cur + 1) % n;
-
-                // Return store early so main thread can eval next frame
-                // while GPU processes the readback
-                back_tx.send_blocking(store).unwrap();
 
                 // Now try to drain any completed readbacks while we wait
                 // for the next frame from the main thread
@@ -378,7 +425,8 @@ impl RenderWorker {
         });
         RenderThreadHandle {
             submit_frame_tx,
-            back_rx,
+            back_frame_rx,
+            back_logic_rx,
             worker_rx,
         }
     }
@@ -565,6 +613,73 @@ impl RanimRenderApp {
             start.elapsed(),
         );
         trace!("render timeline cost: {:?}", start.elapsed());
+    }
+
+    /// Renders the entire scene driven by a [`ScenePlayer`](ranim_core::ScenePlayer)
+    /// (M2 direct extraction): each frame materializes the `LogicWorld`, hands
+    /// it to the render worker (world exchange), and takes it back — no
+    /// transport frame is materialized.
+    #[instrument(skip_all)]
+    pub fn render_scene_player_with_progress(
+        &mut self,
+        player: &mut ranim_core::ScenePlayer,
+        on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
+    ) {
+        let start = Instant::now();
+
+        let worker_thread = self.render_worker.take().unwrap().yeet();
+
+        let total_secs = player.total_secs();
+        let fps = self.fps as f64;
+        let raw_frames = total_secs * fps;
+        let n = raw_frames.ceil() as u64;
+        let num_frames = if (raw_frames - raw_frames.round()).abs() < 1e-9 {
+            n
+        } else {
+            n + 1
+        };
+        let style = ProgressStyle::with_template(
+                "[{elapsed_precise}] [{wide_bar:.cyan/blue}] frame {human_pos}/{human_len} (eta {eta}) {msg}",
+            )
+            .unwrap()
+            .with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| {
+                write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+            })
+            .progress_chars("#>-");
+
+        let span = Span::current();
+        span.pb_set_style(&style);
+        span.pb_set_length(num_frames);
+
+        (0..num_frames)
+            .map(|f| (f as f64 / fps).min(total_secs))
+            .enumerate()
+            .for_each(|(i, sec)| {
+                player.materialize_at(sec);
+                worker_thread.submit_logic(player.take_world());
+                player.put_world(worker_thread.recv_logic());
+
+                span.pb_inc(1);
+                if let Some(cb) = &on_progress {
+                    cb(i as u64 + 1, num_frames);
+                }
+                span.pb_set_message(
+                    format!(
+                        "rendering {:.1?}/{:.1?}",
+                        Duration::from_secs_f64(sec),
+                        Duration::from_secs_f64(total_secs)
+                    )
+                    .as_str(),
+                );
+            });
+        self.render_worker.replace(worker_thread.retrive());
+
+        info!(
+            "rendered {} frames({:?}) in {:?} (logic world)",
+            num_frames,
+            Duration::from_secs_f64(player.total_secs()),
+            start.elapsed(),
+        );
     }
 
     /// Renders and saves screenshots for every [`TimeMark::Capture`] mark on the timeline.

@@ -21,7 +21,7 @@ use ranim::{
 };
 
 /// The spring's state: displacement and velocity.
-#[derive(Clone)]
+#[derive(ranim::bevy_ecs::component::Component, Clone)]
 struct SpringState {
     x: f64,
     v: f64,
@@ -38,6 +38,8 @@ impl Extract for SpringState {
         ball.extract_into(buf);
     }
 }
+
+impl ranim::core::logic::LogicItem for SpringState {}
 
 const K: f64 = 25.0;
 const C: f64 = 1.0;

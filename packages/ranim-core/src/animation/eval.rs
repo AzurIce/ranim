@@ -9,7 +9,7 @@
 //!
 //! [`AnimationCell`]: super::AnimationCell
 
-use crate::core_item::{AnyExtractCoreItem, DynItem};
+use crate::{core_item::DynItem, logic::MaterializeOut};
 
 use super::{AnimationInfo, AnimationInfoKind};
 
@@ -77,7 +77,7 @@ pub trait EvalExt: Eval + Sized {
 
 impl<E: Eval + Sized> EvalExt for E {}
 
-/// An auto implemented trait for erasing `Eval<Output = T>` where T: AnyExtractCoreItem
+/// An auto implemented trait for erasing `Eval<Output = T>` where T: MaterializeOut
 pub(super) trait EvalDyn {
     /// Evaluate this node's content at its own normalized progress `alpha`,
     /// pushing the resulting erased items into `output`.
@@ -123,10 +123,10 @@ impl EvalDyn for StaticDynItems {
 impl<E> EvalDyn for E
 where
     E: Eval,
-    E::Output: AnyExtractCoreItem,
+    E::Output: MaterializeOut,
 {
     fn eval_dyn(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        output.push(DynItem(Box::new(self.eval_alpha(alpha))));
+        output.push(DynItem::new(self.eval_alpha(alpha)));
     }
 
     fn sim_step(&self) -> Option<f64> {

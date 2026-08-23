@@ -13,7 +13,7 @@ use ranim_macros::Interpolatable;
 use crate::vitem::VItem;
 
 /// A line segment.
-#[derive(Debug, Clone, Interpolatable)]
+#[derive(bevy_ecs::component::Component, Debug, Clone, Interpolatable)]
 pub struct Line {
     /// The start and end points of the line.
     pub points: [DVec3; 2],
