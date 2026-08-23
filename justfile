@@ -24,6 +24,9 @@ changelog:
 website:
     zola --root website build
 
+build-engine-demo:
+    cargo run -p xtask-examples -- build-engine-demo
+
 doc-nightly:
     RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
         cargo +nightly doc --workspace --no-deps --document-private-items --all-features \

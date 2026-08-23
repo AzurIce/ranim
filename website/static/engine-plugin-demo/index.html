@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ranim · wasm engine/plugin split demo</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; max-width: 1080px; padding: 16px;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #16181d; color: #d7dae0;
+  }
+  h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  .sub { color: #8a919c; font-size: 0.9rem; margin-bottom: 16px; }
+  a { color: #6cb6ff; }
+  section {
+    background: #1e2127; border: 1px solid #2d313a; border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 14px;
+  }
+  h2 { font-size: 1rem; margin: 0 0 10px; color: #aab3bf; }
+  #status { font-family: ui-monospace, monospace; font-size: 0.85rem; white-space: pre-wrap; }
+  #status.ok { color: #7ec699; }
+  #status.err { color: #ff8888; }
+  #dropzone {
+    border: 2px dashed #3d4450; border-radius: 8px; padding: 28px;
+    text-align: center; cursor: pointer; transition: all .15s;
+  }
+  #dropzone.drag { border-color: #6cb6ff; background: #232a35; }
+  #plugin-info { font-size: 0.85rem; color: #8a919c; margin-top: 8px; font-family: ui-monospace, monospace; }
+  .scene-card {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; background: #262b33;
+  }
+  .scene-card button {
+    background: #2f6fdb; color: white; border: none; border-radius: 5px;
+    padding: 6px 14px; cursor: pointer; font-size: 0.85rem;
+  }
+  .scene-card button:hover { background: #3b7ee8; }
+  .scene-name { font-family: ui-monospace, monospace; font-size: 0.9rem; }
+  #stage { text-align: center; }
+  #stage canvas {
+    width: 100%; aspect-ratio: 16 / 9; height: auto;
+    background: #000; border-radius: 6px;
+  }
+  details { font-size: 0.85rem; color: #8a919c; }
+  summary { cursor: pointer; color: #aab3bf; }
+  code { background: #262b33; padding: 1px 5px; border-radius: 4px; font-size: 0.82em; }
+  pre { background: #14161a; border: 1px solid #2d313a; border-radius: 6px; padding: 10px; overflow-x: auto; font-size: 0.78rem; line-height: 1.5; }
+  .warn { color: #e0b56a; font-size: 0.82rem; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<h1>ranim · wasm 引擎/场景拆分实验</h1>
+<div class="sub">
+  一个引擎模块（<code>ranim</code> lib + preview，导出共享 memory/table/分配器）
+  + 按需加载的场景插件模块（<code>--import-memory --import-table</code>）。
+  参考 <em>wasm 场景 bundle 与引擎拆分调查</em> 方案 B。
+</div>
+
+<section>
+  <h2>引擎状态</h2>
+  <div id="status">正在初始化引擎…</div>
+</section>
+
+<section>
+  <h2>加载场景插件 (.wasm)</h2>
+  <div id="dropzone">
+    拖入插件 .wasm 文件，或点击选择<br>
+    <small style="color:#8a919c">内置示例插件由 <code>just build-engine-demo</code>（cargo examples build-engine-demo）产出</small>
+  </div>
+  <input id="file-input" type="file" accept=".wasm,application/wasm" hidden>
+  <div id="plugin-info"></div>
+</section>
+
+<section>
+  <h2>插件中的场景</h2>
+  <div id="scenes"><span style="color:#8a919c;font-size:.85rem">尚未加载插件</span></div>
+</section>
+
+<section>
+  <h2>预览（eframe/egui app 运行在引擎模块里）</h2>
+  <div id="stage"></div>
+</section>
+
+<section>
+  <details>
+    <summary>如何构建自己的场景插件？</summary>
+    <p>写一个只依赖 <code>ranim</code>（不带 <code>preview</code>）的 cdylib crate，
+       用 <code>#[path]</code> 或正常依赖引入若干 <code>#[scene]</code>，
+       并启用 <code>scene-plugin</code> feature——分配器转发与引擎导入声明都内置于
+       ranim，无需任何样板：</p>
+    <pre>ranim = { version = "…", default-features = false,
+         features = ["anims", "items", "scene-plugin"] }</pre>
+    <p>然后用以下 RUSTFLAGS 构建（与引擎共享 memory/table，静态区放在 16MiB 起）：</p>
+    <pre>RUSTFLAGS='--cfg getrandom_backend="wasm_js" \
+  -C link-arg=--import-memory \
+  -C link-arg=--import-table \
+  -C link-arg=--no-stack-first \
+  -C link-arg=--global-base=16777216 \
+  -C link-arg=--table-base=65536' \
+cargo build -p your-plugin --target wasm32-unknown-unknown --release</pre>
+    <p>约束：同一引擎实例同时只能挂一个同基址插件；插件 panic 会 trap 掉整个页面；
+       插件与引擎必须使用相同 rustc 版本、相同 ranim 版本编译。</p>
+  </details>
+</section>
+
+<script type="module">
+import initEngine, {
+  register_scene,
+  preview_scene,
+  stop_preview,
+  engine_memory,
+  engine_function_table,
+  raw_engine_alloc,
+  raw_engine_alloc_zeroed,
+  raw_engine_dealloc,
+  raw_engine_realloc,
+} from './pkg/ranim.js';
+
+const $status = document.getElementById('status');
+const $scenes = document.getElementById('scenes');
+const $stage = document.getElementById('stage');
+const $pluginInfo = document.getElementById('plugin-info');
+const $dropzone = document.getElementById('dropzone');
+const $fileInput = document.getElementById('file-input');
+
+const ENGINE_RAW_FNS = {
+  engine_alloc: raw_engine_alloc,
+  engine_alloc_zeroed: raw_engine_alloc_zeroed,
+  engine_dealloc: raw_engine_dealloc,
+  engine_realloc: raw_engine_realloc,
+};
+
+let loadedScenes = [];
+
+// 探测页面可用的 WebGPU 适配器：如果显示 SwiftShader/fallback，
+// 说明浏览器把 WebGPU 跑在 CPU 软渲染上——eval/render 计时只覆盖
+// wasm 侧工作，真正的光栅化都在 GPU（或软渲染）里，那才是卡的来源。
+async function probeGpuAdapter() {
+  try {
+    if (!navigator.gpu) return 'WebGPU API 不可用';
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) return 'requestAdapter() 返回 null';
+    const info = adapter.info ?? (await adapter.requestAdapterInfo?.());
+    const bits = [
+      info?.vendor,
+      info?.architecture,
+      info?.device,
+      info?.description,
+    ].filter(Boolean);
+    if (adapter.isFallbackAdapter) bits.push('FALLBACK(软渲染)');
+    return bits.join(' ');
+  } catch (err) {
+    return `探测失败: ${err.message ?? err}`;
+  }
+}
+
+async function main() {
+  try {
+    await initEngine();
+    const mb = (engine_memory().buffer.byteLength / 1048576).toFixed(1);
+    const fnCount = engine_function_table().length;
+    const gpu = await probeGpuAdapter();
+    $status.textContent =
+      `引擎就绪  memory=${mb} MiB  table=${fnCount} entries\nWebGPU 适配器: ${gpu}`;
+    $status.className = 'ok';
+  } catch (err) {
+    $status.textContent = `引擎初始化失败: ${err}`;
+    $status.className = 'err';
+    console.error(err);
+  }
+}
+
+// Build the imports object for a raw plugin module by inspecting its actual
+// imports, wiring everything to the live engine instance.
+function buildPluginImports(wasmModule) {
+  const imports = Object.create(null);
+  const stubs = [];
+  for (const imp of WebAssembly.Module.imports(wasmModule)) {
+    let value;
+    switch (imp.kind) {
+      case 'memory':
+        value = engine_memory();
+        break;
+      case 'table':
+        value = engine_function_table();
+        break;
+      case 'function': {
+        if (imp.name.startsWith('engine_')) {
+          const fn = ENGINE_RAW_FNS[imp.name];
+          if (!fn) throw new Error(`插件引用了未知的引擎导出 ${imp.name}`);
+          value = fn;
+        } else {
+          // wasm-bindgen placeholder / getrandom 等未使用的导入：
+          // 保持可实例化，但一旦真的调用就直接抛错暴露问题。
+          stubs.push(`${imp.module}.${imp.name}`);
+          value = (...args) => {
+            throw new Error(
+              `插件调用了被 stub 的导入 ${imp.module}.${imp.name}(${args.length} args)` +
+              ' —— 该功能在拆分模式下不可用',
+            );
+          };
+        }
+        break;
+      }
+      default:
+        stubs.push(`${imp.module}.${imp.name} (${imp.kind})`);
+        value = undefined;
+    }
+    (imports[imp.module] ??= Object.create(null))[imp.name] = value;
+  }
+  return { imports, stubs };
+}
+
+// 共享表覆盖：引擎自身条目 + 插件区（base 65536 起）。预留到 128K 项，
+// 不够时 loadPlugin 会按需翻倍。
+const PLUGIN_TABLE_RESERVE = 131072;
+
+function ensureTableCapacity() {
+  const table = engine_function_table();
+  if (table.length < PLUGIN_TABLE_RESERVE) {
+    table.grow(PLUGIN_TABLE_RESERVE - table.length);
+  }
+}
+
+async function loadPlugin(bytes, label) {
+  const wasmModule = await WebAssembly.compile(bytes);
+  const { imports, stubs } = buildPluginImports(wasmModule);
+  // 插件以 --table-base=65536 落在共享表高位，其实例化声明的表最小值
+  // 通常远大于引擎当前的表长；表不会随元素段自动增长，需要先扩容。
+  ensureTableCapacity();
+  let instance;
+  try {
+    instance = await WebAssembly.instantiate(wasmModule, imports);
+  } catch (err) {
+    if (!/table import/i.test(String(err))) throw err;
+    // 按错误提示翻倍重试
+    const table = engine_function_table();
+    if (!table.grow(table.length)) throw err;
+    instance = await WebAssembly.instantiate(wasmModule, imports);
+  }
+  const exports = instance.exports;
+
+  if (typeof exports.scene_cnt !== 'function' || typeof exports.get_scene !== 'function') {
+    throw new Error('这不是场景插件模块（缺少 scene_cnt/get_scene 导出）');
+  }
+
+  // 同一引擎实例不能同时挂两个同基址插件：丢弃旧场景句柄。
+  loadedScenes.forEach((s) => s.handle = null);
+  loadedScenes = [];
+  $scenes.innerHTML = '';
+
+  const count = exports.scene_cnt();
+  for (let i = 0; i < count; i++) {
+    const ptr = exports.get_scene(i);
+    const handle = register_scene(ptr);
+    if (!handle) continue;
+    addSceneCard(handle, exports, label);
+  }
+
+  $pluginInfo.textContent =
+    `${label} · ${(bytes.byteLength / 1024).toFixed(0)} KiB · ${count} 个场景` +
+    (stubs.length ? ` · stub 导入: ${stubs.join(', ')}` : '');
+
+  if (loadedScenes.length === 0) {
+    $scenes.innerHTML = '<span style="color:#8a919c;font-size:.85rem">插件中没有注册任何 #[scene]</span>';
+  }
+}
+
+function addSceneCard(handle, pluginExports, label) {
+  const card = document.createElement('div');
+  card.className = 'scene-card';
+  const name = document.createElement('span');
+  name.className = 'scene-name';
+  name.textContent = handle.name;
+  const btn = document.createElement('button');
+  btn.textContent = 'Preview';
+  btn.onclick = () => preview(handle, label);
+  card.append(name, btn);
+  $scenes.appendChild(card);
+  loadedScenes.push({ name: handle.name, handle });
+}
+
+function preview(sceneHandle, label) {
+  // 先销毁上一个 app（释放 wgpu 资源、停掉重绘循环），再移除画布。
+  stop_preview();
+  $stage.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  canvas.id = `ranim-app-${sceneHandle.name}`;
+  canvas.width = 1280;
+  canvas.height = 720;
+  $stage.appendChild(canvas);
+  console.info(`[demo] previewing "${sceneHandle.name}" from ${label}`);
+  preview_scene(sceneHandle);
+}
+
+$dropzone.onclick = () => $fileInput.click();
+$fileInput.onchange = async () => {
+  const file = $fileInput.files[0];
+  if (file) await safeLoad(file);
+  $fileInput.value = '';
+};
+['dragenter', 'dragover'].forEach((ev) =>
+  $dropzone.addEventListener(ev, (e) => { e.preventDefault(); $dropzone.classList.add('drag'); }));
+['dragleave', 'drop'].forEach((ev) =>
+  $dropzone.addEventListener(ev, (e) => { e.preventDefault(); $dropzone.classList.remove('drag'); }));
+$dropzone.addEventListener('drop', (e) => {
+  const file = e.dataTransfer?.files?.[0];
+  if (file) safeLoad(file);
+});
+
+async function safeLoad(file) {
+  try {
+    $pluginInfo.textContent = `加载中 ${file.name}…`;
+    const bytes = await file.arrayBuffer();
+    await loadPlugin(bytes, file.name);
+  } catch (err) {
+    console.error(err);
+    $pluginInfo.textContent = `加载失败: ${err.message ?? err}`;
+  }
+}
+
+// 支持 ?plugin=<url>&preview=<scene> 直接从 URL 加载插件并预览场景。
+async function loadFromQuery() {
+  const params = new URLSearchParams(location.search);
+  const pluginUrl = params.get('plugin');
+  if (!pluginUrl) return;
+  try {
+    $pluginInfo.textContent = `加载中 ${pluginUrl}…`;
+    const bytes = await (await fetch(pluginUrl)).arrayBuffer();
+    await loadPlugin(bytes, pluginUrl);
+    const wanted = params.get('preview');
+    if (wanted) {
+      const hit = loadedScenes.find((s) => s.name === wanted) ?? loadedScenes[0];
+      if (hit) preview(hit.handle, pluginUrl);
+    }
+  } catch (err) {
+    console.error(err);
+    $pluginInfo.textContent = `URL 插件加载失败: ${err.message ?? err}`;
+  }
+}
+
+main().then(loadFromQuery);
+</script>
+</body>
+</html>
