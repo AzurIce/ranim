@@ -9,14 +9,16 @@
 //!   monomorphized at its single erasure point, so the materialize phase is
 //!   just the shared `eval` traversal followed by each item upserting itself
 //!   by a stable `(animation_id, part)` identity (E4-validated pattern);
-//! - the per-entity [`ItemExtractor`] fn pointer is written by the typed
-//!   materializer, so the driver can extract every item without naming its
-//!   type (no global registry needed in-process);
+//! - extraction is **fused into the upsert**: while the typed value is still
+//!   owned, its `CoreItem`s go straight into the entity's retained
+//!   [`ExtractedItems`] buffer — one clone per item per frame, same as the
+//!   pure path, with no separate extract pass;
 //! - [`ScenePlayer`] is the M2 driver: the retained-world counterpart of
 //!   [`SceneEvaluator`](crate::SceneEvaluator). Evaluation is a pure query
 //!   (`eval_alpha`), so there is no stepping or seek bookkeeping to mirror —
-//!   `materialize_at → extract → collect` produces a
-//!   [`EvaluatedFrame`](crate::EvaluatedFrame) identical to the pure path.
+//!   `materialize_at` (upsert with extraction fused in) plus `collect`
+//!   (drain) produces an [`EvaluatedFrame`](crate::EvaluatedFrame) identical
+//!   to the pure path.
 //!
 //! The render side is untouched: collect emits `((animation_id, part), CoreItem)`
 //! exactly like the pre-ECS path, so `RenderWorld` reconciliation keeps working.
@@ -108,27 +110,14 @@ pub struct SceneOrder {
     pub part: u32,
 }
 
-/// Type-erased per-entity extractor, written by the typed materializer.
+/// Per-entity extraction output, written at materialize time while the typed
+/// value is still owned (stage-2 `Extracted<T>` will generalize this).
 ///
-/// The driver calls this to degrade the item component to `CoreItem`s without
-/// naming its type. In-process this is a plain fn pointer; the dylib path
-/// (stage 3) uses the same shape through a global registry instead.
-#[derive(Component, Clone, Copy)]
-pub struct ItemExtractor(pub fn(Entity, &World, &mut Vec<CoreItem>));
-
-/// Per-entity extraction output. The `Vec` is retained across frames so its
-/// allocation is reused (stage-2 `Extracted<T>` will generalize this).
+/// The `Vec` is retained across frames so its allocation is reused: the
+/// materialize phase refills it (`clear` + `extract_into`), and the collect
+/// phase drains it into the frame buffer (move, not clone).
 #[derive(Component, Default)]
 pub struct ExtractedItems(pub Vec<CoreItem>);
-
-/// Build the type-erased extractor for `T` (monomorphized at the typed site).
-fn extractor_of<T: LogicItem>() -> fn(Entity, &World, &mut Vec<CoreItem>) {
-    |entity, world, out| {
-        if let Some(item) = world.entity(entity).get::<T>() {
-            item.extract_into(out);
-        }
-    }
-}
 
 /// Materialization context threaded down the cell tree.
 ///
@@ -153,17 +142,19 @@ pub struct MaterializeCtx<'w> {
 /// `animation_id`: create the entity on first appearance, replace the
 /// component afterwards, and record the key as seen this frame.
 ///
+/// Extraction is fused into the upsert: while the typed value is still owned,
+/// its `CoreItem`s are produced into the entity's retained
+/// [`ExtractedItems`] buffer — one clone per item per frame, same as the
+/// pure path, with no separate extract pass.
+///
 /// If the slot already exists but holds a *different* component type (e.g. a
 /// sequence switched to a child segment whose output type differs), the stale
-/// entity is despawned and respawned so its [`ItemExtractor`] always matches
-/// the component actually stored.
+/// entity is despawned and respawned so the stored component always matches
+/// the slot's current type.
 pub(crate) fn upsert_item<T: LogicItem>(ctx: &mut MaterializeCtx, part: u32, value: T) {
     let key = (ctx.animation_id, part);
     let entity = match ctx.index.get(&key) {
-        Some(&entity) if ctx.world.entity(entity).contains::<T>() => {
-            ctx.world.entity_mut(entity).insert(value);
-            entity
-        }
+        Some(&entity) if ctx.world.entity(entity).contains::<T>() => entity,
         existing => {
             if let Some(&entity) = existing {
                 ctx.world.despawn(entity);
@@ -178,13 +169,18 @@ pub(crate) fn upsert_item<T: LogicItem>(ctx: &mut MaterializeCtx, part: u32, val
                         animation_id: key.0,
                         part: key.1,
                     },
-                    ItemExtractor(extractor_of::<T>()),
                     ExtractedItems::default(),
-                    value,
                 ))
                 .id()
         }
     };
+    let mut entity_mut = ctx.world.entity_mut(entity);
+    {
+        let mut extracted = entity_mut.get_mut::<ExtractedItems>().unwrap();
+        extracted.0.clear();
+        value.extract_into(&mut extracted.0);
+    }
+    entity_mut.insert(value);
     ctx.index.insert(key, entity);
     ctx.seen.insert(key);
 }
@@ -290,29 +286,13 @@ impl ScenePlayer {
         self.clock = render_secs;
     }
 
-    /// Extract every live item to `CoreItem`s via its per-entity extractor.
-    pub fn extract(&mut self) {
-        let entities: Vec<Entity> = self
-            .world
-            .iter_entities()
-            .filter(|eref| eref.get::<ItemExtractor>().is_some())
-            .map(|eref| eref.id())
-            .collect();
-        for entity in entities {
-            let extractor = self.world.entity(entity).get::<ItemExtractor>().unwrap().0;
-            let mut buf = Vec::new();
-            extractor(entity, &self.world, &mut buf);
-            if let Some(mut extracted) = self.world.entity_mut(entity).get_mut::<ExtractedItems>() {
-                extracted.0 = buf;
-            }
-        }
-    }
-
     /// Collect the extracted items into an [`EvaluatedFrame`](crate::EvaluatedFrame)
-    /// sorted by scene order. The frame identity `(animation_id, part)` uses
-    /// the same flattened part indexing as the pure path, so output is
+    /// sorted by scene order, **draining** each entity's [`ExtractedItems`]
+    /// buffer (the elements are moved into `out`, the allocation stays for
+    /// the next frame). The frame identity `(animation_id, part)` uses the
+    /// same flattened part indexing as the pure path, so output is
     /// frame-identical and the renderer needs no changes.
-    pub fn collect(&self, out: &mut EvaluatedFrame) {
+    pub fn collect(&mut self, out: &mut EvaluatedFrame) {
         let mut ordered: Vec<(SceneOrder, Entity)> = Vec::new();
         for eref in self.world.iter_entities() {
             let Some(order) = eref.get::<SceneOrder>() else {
@@ -332,22 +312,28 @@ impl ScenePlayer {
                 current_animation = Some(order.animation_id);
                 flat_part = 0;
             }
-            let Some(extracted) = self.world.entity(entity).get::<ExtractedItems>() else {
+            let mut entity_mut = self.world.entity_mut(entity);
+            let Some(mut extracted) = entity_mut.get_mut::<ExtractedItems>() else {
                 continue;
             };
-            for core in &extracted.0 {
-                out.push(((order.animation_id as usize, flat_part), core.clone()));
-                flat_part += 1;
-            }
+            let animation_id = order.animation_id as usize;
+            let len = extracted.0.len();
+            out.extend(
+                extracted
+                    .0
+                    .drain(..)
+                    .enumerate()
+                    .map(|(i, core)| ((animation_id, flat_part + i), core)),
+            );
+            flat_part += len;
         }
     }
 
-    /// One frame: materialize at `render_secs`, then extract → collect into
-    /// `out`. Convenience wrapper mirroring the pure path's
+    /// One frame: materialize at `render_secs` (upsert + extract fused), then
+    /// collect into `out`. Convenience wrapper mirroring the pure path's
     /// [`SceneEvaluator::sample_at`](crate::SceneEvaluator::sample_at).
     pub fn frame(&mut self, render_secs: f64, out: &mut EvaluatedFrame) {
         self.materialize_at(render_secs);
-        self.extract();
         self.collect(out);
     }
 }
