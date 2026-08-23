@@ -62,16 +62,18 @@ materialize_at(sec) = cell.eval_at(sec) 得到 Vec<DynItem>
   `(animation_id, part) → Entity` 索引；同 key 再次物化只替换组件（entity 稳定
   跨帧保留），本帧未出现的 key 对应 entity 被 despawn。
 - **槽位类型变化必须重建 entity**：sequence 切换子段后同一槽位的输出类型可能改变，
-  此时旧 entity 上的 `ItemExtractor` 与新组件类型不匹配。upsert 检测到槽位上不是
-  目标类型时必须 despawn 并重新 spawn，不得只 insert 新组件（旧组件会残留并被
-  旧 extractor 提取出陈旧值）。
-- **提取是类型擦除的 fn 指针**：entity spawn 时由物化点写入
-  `ItemExtractor(fn(Entity, &World, &mut Vec<CoreItem>))`，driver 不需要知道具体
-  类型即可把组件退化为 `CoreItem`；每帧提取结果写回 entity 的
-  `ExtractedItems(Vec<CoreItem>)`，buffer 跨帧复用。
+  upsert 检测到槽位上不是目标类型时必须 despawn 并重新 spawn，不得只 insert
+  新组件（旧组件会残留，该槽位会被双重计算）。
+- **提取融合在物化里**：upsert 在仍持有 owned 值时顺手把它 extract 进 entity 的
+  `ExtractedItems(Vec<CoreItem>)`（`clear` + `extract_into`，分配跨帧复用）——
+  每个 item 每帧一次 clone，与纯路径同价，没有独立的 extract 遍历。
 - **顺序与身份是两件事**：ECS 查询顺序不构成场景顺序，collect 阶段按
   `SceneOrder` 显式排序，再把每个 entity 提取出的若干 `CoreItem` 扁平化为连续
   part 序号。
+- **collect 是 drain 不是 clone**：collect 把 `ExtractedItems` 里的元素 move 进
+  帧缓冲（buffer 留在 world 复用容量）。推论：world 里的提取产物不跨帧保留，
+  未来若要做"值未变就跳过 extract"的变更检测，需要重新取舍——保留数据
+  （collect 回到 clone）或双层缓冲。
 
 ## ScenePlayer 与 SceneSession
 
@@ -80,7 +82,7 @@ materialize_at(sec) = cell.eval_at(sec) 得到 Vec<DynItem>
 session 只暴露一帧的三段式管线：
 
 ```text
-frame(render_secs) = materialize_at → extract → collect
+frame(render_secs) = materialize_at（upsert 融合 extract）→ collect（drain）
 ```
 
 两者实现同一个 `SceneSession` trait（`from_sealed` / `total_secs` / `clock` /
@@ -104,18 +106,16 @@ frame(render_secs) = materialize_at → extract → collect
 
 World 路径 (ScenePlayer::frame):
   materialize_at: DynItem 自物化 upsert 进 World   （HashMap 按身份 spawn/replace，
-                                                    帧末 despawn 消失的 key）
-  extract:        每 entity 经 ItemExtractor 读组件 -> ExtractedItems
-  collect:        按 SceneOrder 排序，逐 entity clone 展开进帧缓冲
+                 同时 extract 进 ExtractedItems；   帧末 despawn 消失的 key）
+  collect:        按 SceneOrder 排序，逐 entity drain（move）展开进帧缓冲
 ```
 
 - **数据驻留**：纯路径的帧是一次性产物；world 路径的 item 以 typed component
   跨帧驻留，身份稳定——这是后续按类型查询与宿主外类型的地基，也是它存在的
   全部理由。
-- **每帧拷贝**：纯路径 extract 时构造一次 `CoreItem` 并 move；world 路径
-  extract 生成一次、collect 再 clone 一次。叠加 entity/HashMap 簿记与排序，
-  这是 benchmark 中 world 路径每帧慢约 1.2–1.6 倍的来源，属于实现开销而非
-  结构差异（buffer swap、变更检测跳过未变 entity 都是既定优化方向）。
+- **每帧拷贝**：两条路径都只有一次 extract clone（物化时融合完成），world
+  路径多出的只是 entity/HashMap 簿记与排序，属于实现开销而非结构差异
+  （变更检测跳过未变 entity 是既定优化方向）。
 - **确定性**：两者相同——帧一致与 seek 一致均由测试锁定。
 
 ## LogicItem 与 Batch：coherence 约束
@@ -132,6 +132,6 @@ upsert；组输出（`Vec<T>`）包进 `Batch<T>` 组件作为单个 entity。�
 - 提取结果目前在 entity 上退化为 `CoreItem`（`ExtractedItems`）；让提取产物保持
   类型化（`Extracted<T>`，供消费者按类型查询、并承接 `TextItem` 的派生缓存）是
   本设计的既定延伸，不改变身份与生命周期模型。
-- 进程内 fn 指针假设 item 类型对宿主编译期可见；让类型可以来自宿主之外
-  （dylib/wasm 注册自己的物化器）需要一个同形状的全局 registry 替代 fn 指针，
-  同样不改变本设计的身份模型。
+- 进程内 `DynItem` 的物化钩子假设 item 类型对宿主编译期可见；让类型可以来自
+  宿主之外（dylib/wasm 注册自己的物化器）需要一个同形状的全局 registry 替代
+  钩子 fn 指针，同样不改变本设计的身份模型。
