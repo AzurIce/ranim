@@ -148,3 +148,13 @@ impl SceneConstructor for Arc<dyn SceneConstructor> {
         self.as_ref().construct(r)
     }
 }
+
+#[cfg(all(target_arch = "wasm32", feature = "scene-engine"))]
+#[wasm_bindgen]
+impl Scene {
+    /// The scene name (JS getter).
+    #[wasm_bindgen(getter)]
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+}

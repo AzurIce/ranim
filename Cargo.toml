@@ -53,6 +53,15 @@ default = ["anims", "items"]
 anims = []
 items = []
 typst = ["ranim-items/typst"]
+# Wasm engine/plugin split experiment. Two orthogonal roles, mutually
+# exclusive; both are no-ops on non-wasm targets:
+# - `scene-engine`: host module — owns the shared memory/table and exports
+#   allocators/`register_scene`. Pair with `preview` for the interactive
+#   engine app, or with `render` for a headless one.
+# - `scene-plugin`: client module — imports the shared memory/table and
+#   forwards allocation to the engine.
+scene-engine = []
+scene-plugin = []
 profiling = [
   "ranim-render/profiling",
   "dep:puffin",
@@ -432,6 +441,15 @@ crate-type = ["cdylib"]
 
 [package.metadata.example.tetrahedron_spheres]
 wasm = true
+
+[[example]]
+name = "scenes_plugin"
+path = "examples/scenes_plugin.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.scenes_plugin]
+hide = true
+wasm = false
 
 [[example]]
 name = "solar_system"

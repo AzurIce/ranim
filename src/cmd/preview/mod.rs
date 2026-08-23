@@ -1062,8 +1062,10 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
             canvas.dyn_into::<web_sys::HtmlCanvasElement>().unwrap()
         };
 
-        wasm_bindgen_futures::spawn_local(async {
-            eframe::WebRunner::new()
+        wasm_bindgen_futures::spawn_local(async move {
+            let runner = eframe::WebRunner::new();
+            wasm::register_web_runner(runner.clone());
+            runner
                 .start(canvas, web_options, Box::new(build_app))
                 .await
                 .expect("failed to start eframe");
@@ -1105,6 +1107,16 @@ pub fn preview_scene_with_name(scene: &Scene, name: &str) {
 mod wasm {
     use super::*;
 
+    // Handle of the currently running web preview, so it can be destroyed
+    // before another one takes over the page (otherwise every previewed
+    // scene keeps its render loop alive).
+    //
+    // `WebRunner` is neither `Send` nor `Sync`, but wasm runs single-threaded.
+    thread_local! {
+        static WEB_RUNNER: std::cell::RefCell<Option<eframe::WebRunner>> =
+            const { std::cell::RefCell::new(None) };
+    }
+
     #[wasm_bindgen(start)]
     pub async fn wasm_start() {
         console_error_panic_hook::set_once();
@@ -1115,5 +1127,22 @@ mod wasm {
     #[wasm_bindgen]
     pub fn preview_scene(scene: &Scene) {
         super::preview_scene(scene);
+    }
+
+    /// Destroy the currently running preview (if any), freeing its egui/wgpu
+    /// resources and stopping its repaint loop.
+    #[wasm_bindgen]
+    pub fn stop_preview() {
+        WEB_RUNNER.with_borrow_mut(|slot| {
+            if let Some(runner) = slot.take() {
+                runner.destroy();
+            }
+        });
+    }
+
+    pub(crate) fn register_web_runner(runner: eframe::WebRunner) {
+        // Destroy any previous runner before replacing it.
+        stop_preview();
+        WEB_RUNNER.with_borrow_mut(|slot| *slot = Some(runner));
     }
 }

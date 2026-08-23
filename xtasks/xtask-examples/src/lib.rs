@@ -131,6 +131,161 @@ fn clean_legacy_example_wasm_packages(root_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+// MARK: engine/plugin split demo
+
+/// Web directory of the experimental engine+plugin demo.
+const ENGINE_DEMO_WEB_DIR: &str = "engine-plugin-demo";
+/// Root-package example built as the wasm scene plugin (requires the
+/// `scene-plugin` feature). The example name doubles as the wasm crate/artifact
+/// name (`scenes_plugin.wasm`).
+const ENGINE_PLUGIN_EXAMPLE: &str = "scenes_plugin";
+/// Dedicated target dir: link flags differ per role and would otherwise
+/// thrash the default shared cache.
+const ENGINE_SPLIT_TARGET_DIR: &str = "target/engine-split";
+
+/// Link flags for the engine module: exports its memory/table and places
+/// static data high so the plugin region below stays untouched by heap growth.
+const ENGINE_RUSTFLAGS: &str = concat!(
+    r#"--cfg getrandom_backend="wasm_js" "#,
+    "-C link-arg=--export-table ",
+    "-C link-arg=--growable-table ",
+    "-C link-arg=--no-stack-first ",
+    "-C link-arg=--global-base=67108864 ",   // 64 MiB
+    "-C link-arg=--initial-memory=83886080", // 80 MiB
+);
+
+/// Link flags for a scene plugin: imports memory/table from the engine and
+/// places data/table entries low, far away from the engine's own region.
+const PLUGIN_RUSTFLAGS: &str = concat!(
+    r#"--cfg getrandom_backend="wasm_js" "#,
+    "-C link-arg=--import-memory ",
+    "-C link-arg=--import-table ",
+    "-C link-arg=--no-stack-first ",
+    "-C link-arg=--global-base=16777216 ", // 16 MiB
+    "-C link-arg=--table-base=65536",
+);
+
+fn cargo_wasm_build(root_dir: &Path, args: &[&str], rustflags: &str, step: &str) -> Result<()> {
+    let status = Command::new("cargo")
+        .current_dir(root_dir)
+        .args(["build", "--target", "wasm32-unknown-unknown", "--release"])
+        .args(args)
+        .args(["--target-dir", ENGINE_SPLIT_TARGET_DIR])
+        .env("RUSTFLAGS", rustflags)
+        .stdout(std::process::Stdio::null())
+        .status()
+        .context(format!("failed to run cargo build ({step})"))?;
+    if !status.success() {
+        bail!("cargo build failed ({step})");
+    }
+    Ok(())
+}
+
+/// Build the experimental wasm engine + scene plugin demo into
+/// `website/static/engine-plugin-demo/`.
+///
+/// Produces three artifacts:
+///
+/// 1. `pkg/ranim.js` + `pkg/ranim_bg.wasm`: the engine (`ranim` lib with
+///    `preview`), processed with `wasm-bindgen --keep-lld-exports` so raw lld
+///    exports (`memory`, table, allocator functions) stay reachable; the
+///    generated JS gains small wrappers exporting them.
+/// 2. `pkg/scenes_plugin.wasm`: a raw scene plugin module importing
+///    the engine's memory/table/allocator.
+pub fn build_engine_plugin_demo(root_dir: impl AsRef<Path>) -> Result<()> {
+    let root_dir = root_dir.as_ref();
+    let target_base = root_dir.join(ENGINE_SPLIT_TARGET_DIR);
+    let wasm_dir = target_base.join("wasm32-unknown-unknown").join("release");
+    let out_pkg = root_dir
+        .join("website")
+        .join("static")
+        .join(ENGINE_DEMO_WEB_DIR)
+        .join("pkg");
+    std::fs::create_dir_all(&out_pkg)?;
+
+    println!("[1/5] compiling engine (ranim + preview + scene-engine) for wasm32");
+    cargo_wasm_build(
+        root_dir,
+        &["-p", "ranim", "--features", "preview,scene-engine"],
+        ENGINE_RUSTFLAGS,
+        "engine",
+    )?;
+
+    println!("[2/5] compiling scene plugin (--example {ENGINE_PLUGIN_EXAMPLE} -F scene-plugin)");
+    cargo_wasm_build(
+        root_dir,
+        &[
+            "-p",
+            "ranim",
+            "--example",
+            ENGINE_PLUGIN_EXAMPLE,
+            "--features",
+            "scene-plugin",
+        ],
+        PLUGIN_RUSTFLAGS,
+        "plugin",
+    )?;
+
+    println!("[3/5] running wasm-bindgen on the engine (--keep-lld-exports)");
+    let engine_wasm = wasm_dir.join("ranim.wasm");
+    let status = Command::new("wasm-bindgen")
+        .current_dir(root_dir)
+        .args([
+            "--out-dir",
+            out_pkg.as_os_str().to_str().unwrap(),
+            "--target",
+            "web",
+            "--keep-lld-exports",
+            engine_wasm.as_os_str().to_str().unwrap(),
+        ])
+        .status()
+        .context("failed to run wasm-bindgen; is it installed?")?;
+    if !status.success() {
+        bail!("wasm-bindgen failed for the engine module");
+    }
+
+    println!("[4/5] appending raw export wrappers to ranim.js");
+    let engine_js_path = out_pkg.join("ranim.js");
+    let engine_js = fs::read_to_string(&engine_js_path)
+        .with_context(|| format!("failed to read {}", engine_js_path.display()))?;
+    if !engine_js.contains("// --- engine-split raw exports") {
+        let patched = format!(
+            "{engine_js}\n// --- engine-split raw exports (added by xtask) ---\n{}",
+            include_str!("engine_split_glue.js")
+        );
+        fs::write(&engine_js_path, patched)
+            .with_context(|| format!("failed to write {}", engine_js_path.display()))?;
+    }
+
+    println!("[5/5] optimizing wasm modules and copying plugin");
+    optimize_wasm(&out_pkg.join("ranim_bg.wasm")).context("failed to optimize the engine wasm")?;
+
+    let plugin_wasm_src = wasm_dir
+        .join("examples")
+        .join(format!("{ENGINE_PLUGIN_EXAMPLE}.wasm"));
+    let plugin_wasm_dst = out_pkg.join(format!("{ENGINE_PLUGIN_EXAMPLE}.wasm"));
+    let optimized_plugin = plugin_wasm_src.with_extension("opt.wasm");
+    let optimized = Command::new("wasm-opt")
+        .args(["-Oz", "--output"])
+        .arg(&optimized_plugin)
+        .arg(&plugin_wasm_src)
+        .stdout(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if optimized {
+        std::fs::copy(&optimized_plugin, &plugin_wasm_dst)?;
+        let _ = std::fs::remove_file(&optimized_plugin);
+    } else {
+        eprintln!(
+            "warning: wasm-opt unavailable/failed for the plugin, copying unoptimized module"
+        );
+        std::fs::copy(&plugin_wasm_src, &plugin_wasm_dst)?;
+    }
+
+    Ok(())
+}
+
 /// Optimize a wasm-bindgen output module for website delivery.
 ///
 /// `wasm-bindgen` may rewrite the module it receives, so this must run after
@@ -762,7 +917,7 @@ mod test {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir).unwrap();
-        assert_eq!(examples.len(), 34); // + iterative_spring, nbody, cloth_wrap, agents
+        assert_eq!(examples.len(), 35); // + iterative_spring, nbody, cloth_wrap, agents, scenes_plugin
         assert_eq!(
             examples
                 .iter()
