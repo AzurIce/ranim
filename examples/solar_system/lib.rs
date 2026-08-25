@@ -192,36 +192,30 @@ fn planet_system(planet: &PlanetData) -> AnimStack {
     let mut body_layers = AnimStack::new();
 
     if planet.has_atmosphere {
-        let core = Transformed::new(
-            Surface::from(
-                Sphere::new(planet.radius * 0.9)
-                    .with_resolution((20, 10))
-                    .with_fill_color(planet.color.with_alpha(1.0)),
-            ),
-            DAffine3::from_translation(position),
-        );
+        let core = Surface::from(
+            Sphere::new(planet.radius * 0.9)
+                .with_resolution((20, 10))
+                .with_fill_color(planet.color.with_alpha(1.0)),
+        )
+        .transformed(DAffine3::from_translation(position));
         body_layers.push(body_layer(core, planet));
 
-        let atmosphere = Transformed::new(
-            Surface::from(
-                Sphere::new(planet.radius)
-                    .with_resolution((20, 10))
-                    .with_fill_color(planet.color.with_alpha(0.3)),
-            )
-            .with_smooth_normals(),
-            DAffine3::from_translation(position),
-        );
+        let atmosphere = Surface::from(
+            Sphere::new(planet.radius)
+                .with_resolution((20, 10))
+                .with_fill_color(planet.color.with_alpha(0.3)),
+        )
+        .with_smooth_normals()
+        .transformed(DAffine3::from_translation(position));
         body_layers.push(body_layer(atmosphere, planet));
     } else {
-        let surface = Transformed::new(
-            Surface::from(
-                Sphere::new(planet.radius)
-                    .with_resolution((20, 10))
-                    .with_fill_color(planet.color.with_alpha(1.0)),
-            )
-            .with_smooth_normals(),
-            DAffine3::from_translation(position),
-        );
+        let surface = Surface::from(
+            Sphere::new(planet.radius)
+                .with_resolution((20, 10))
+                .with_fill_color(planet.color.with_alpha(1.0)),
+        )
+        .with_smooth_normals()
+        .transformed(DAffine3::from_translation(position));
         body_layers.push(body_layer(surface, planet));
     }
 

@@ -455,7 +455,7 @@ fn rubiks_cube(r: &mut RanimScene) {
                 }
                 cubies.push(Cubie {
                     grid: [x, y, z],
-                    mesh: Transformed::new(cubie_mesh([x, y, z]), DAffine3::IDENTITY),
+                    mesh: cubie_mesh([x, y, z]).transformed(DAffine3::IDENTITY),
                     seq: AnimSequence::new(),
                 });
             }

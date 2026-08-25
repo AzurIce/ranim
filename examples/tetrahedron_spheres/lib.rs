@@ -63,15 +63,13 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     // Left group: smooth shading (analytical normals from Sphere)
     let left_center = DVec3::new(-x_offset, 0.0, 0.0);
     for (vertex, color) in vertices.iter().zip(colors.iter()) {
-        let mut surface = Transformed::new(
-            Surface::from(
-                Sphere::new(radius)
-                    .with_resolution(resolution)
-                    .with_fill_color(color.with_alpha(0.5)),
-            )
-            .with_smooth_normals(),
-            DAffine3::from_translation(left_center + *vertex),
-        );
+        let mut surface = Surface::from(
+            Sphere::new(radius)
+                .with_resolution(resolution)
+                .with_fill_color(color.with_alpha(0.5)),
+        )
+        .with_smooth_normals()
+        .transformed(DAffine3::from_translation(left_center + *vertex));
 
         left_group.push(
             RotateAroundZ {
@@ -90,14 +88,12 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
     let right_center = DVec3::new(x_offset, 0.0, 0.0);
     let mut right_group = AnimStack::new();
     for (vertex, color) in vertices.iter().zip(colors.iter()) {
-        let mut surface = Transformed::new(
-            Surface::from(
-                Sphere::new(radius)
-                    .with_resolution(resolution)
-                    .with_fill_color(color.with_alpha(0.5)),
-            ),
-            DAffine3::from_translation(right_center + *vertex),
-        );
+        let mut surface = Surface::from(
+            Sphere::new(radius)
+                .with_resolution(resolution)
+                .with_fill_color(color.with_alpha(0.5)),
+        )
+        .transformed(DAffine3::from_translation(right_center + *vertex));
 
         right_group.push(
             RotateAroundZ {
