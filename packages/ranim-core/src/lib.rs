@@ -48,7 +48,7 @@ pub mod prelude {
     pub use crate::animation::stack::AnimStack;
     pub use crate::animation::{AnimIterExt, Animation, AnimationExt, Placeable, StaticAnim};
     pub use crate::core_item::camera_frame::CameraFrame;
-    pub use crate::core_item::transformed::Transformed;
+    pub use crate::core_item::transformed::{Transformed, TransformedExt};
     pub use crate::{RanimScene, TimeMark};
 }
 

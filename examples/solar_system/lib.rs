@@ -24,7 +24,7 @@ trait OrbitItem: Clone {
     fn set_orbit_position(&mut self, position: DVec3);
 }
 
-impl OrbitItem for Transformed<Surface> {
+impl OrbitItem for Transformed<Surface, DAffine3> {
     fn set_orbit_position(&mut self, position: DVec3) {
         self.transform = DAffine3::from_translation(position);
     }
@@ -141,7 +141,7 @@ fn orbit<T: OrbitItem>(item: &mut T, planet: &PlanetData, z: f64) -> OrbitMotion
 }
 
 /// One body layer: stay visible through the intro, then enter the shared orbit.
-fn body_layer(mut surface: Transformed<Surface>, planet: &PlanetData) -> AnimSequence {
+fn body_layer(mut surface: Transformed<Surface, DAffine3>, planet: &PlanetData) -> AnimSequence {
     seq![
         surface.show().with_duration(INTRO_SECS),
         orbit(&mut surface, planet, 0.0)
@@ -192,12 +192,14 @@ fn planet_system(planet: &PlanetData) -> AnimStack {
     let mut body_layers = AnimStack::new();
 
     if planet.has_atmosphere {
-        let core = Transformed::new(Surface::from(
-            Sphere::new(planet.radius * 0.9)
-                .with_resolution((20, 10))
-                .with_fill_color(planet.color.with_alpha(1.0)),
-        ))
-        .with_transform(DAffine3::from_translation(position));
+        let core = Transformed::new(
+            Surface::from(
+                Sphere::new(planet.radius * 0.9)
+                    .with_resolution((20, 10))
+                    .with_fill_color(planet.color.with_alpha(1.0)),
+            ),
+            DAffine3::from_translation(position),
+        );
         body_layers.push(body_layer(core, planet));
 
         let atmosphere = Transformed::new(
@@ -207,8 +209,8 @@ fn planet_system(planet: &PlanetData) -> AnimStack {
                     .with_fill_color(planet.color.with_alpha(0.3)),
             )
             .with_smooth_normals(),
-        )
-        .with_transform(DAffine3::from_translation(position));
+            DAffine3::from_translation(position),
+        );
         body_layers.push(body_layer(atmosphere, planet));
     } else {
         let surface = Transformed::new(
@@ -218,8 +220,8 @@ fn planet_system(planet: &PlanetData) -> AnimStack {
                     .with_fill_color(planet.color.with_alpha(1.0)),
             )
             .with_smooth_normals(),
-        )
-        .with_transform(DAffine3::from_translation(position));
+            DAffine3::from_translation(position),
+        );
         body_layers.push(body_layer(surface, planet));
     }
 

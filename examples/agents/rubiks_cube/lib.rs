@@ -323,7 +323,7 @@ fn cubie_mesh(grid: IVec) -> MeshItem {
 /// animation sequence on the shared timeline.
 struct Cubie {
     grid: IVec,
-    mesh: Transformed<MeshItem>,
+    mesh: Transformed<MeshItem, DAffine3>,
     seq: AnimSequence,
 }
 
@@ -336,13 +336,13 @@ struct NetSticker {
 /// Rotate a cubie's mesh around `axis` (through the cube center at the
 /// origin) by `angle * alpha` — the 3D counterpart of one face turn.
 struct CubieTurn {
-    src: Transformed<MeshItem>,
+    src: Transformed<MeshItem, DAffine3>,
     axis: DVec3,
     angle: f64,
 }
 
 impl Eval for CubieTurn {
-    type Output = Transformed<MeshItem>;
+    type Output = Transformed<MeshItem, DAffine3>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let mut out = self.src.clone();
@@ -455,7 +455,7 @@ fn rubiks_cube(r: &mut RanimScene) {
                 }
                 cubies.push(Cubie {
                     grid: [x, y, z],
-                    mesh: Transformed::new(cubie_mesh([x, y, z])),
+                    mesh: Transformed::new(cubie_mesh([x, y, z]), DAffine3::IDENTITY),
                     seq: AnimSequence::new(),
                 });
             }

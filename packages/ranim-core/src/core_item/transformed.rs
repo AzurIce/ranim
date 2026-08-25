@@ -1,4 +1,4 @@
-//! Transformed — a wrapper that attaches an external affine transform to an item.
+//! A wrapper that attaches a typed external transform to an item.
 
 use glam::{DAffine3, DVec3, dvec3};
 
@@ -8,147 +8,116 @@ use crate::{
     color::{AlphaColor, Srgb},
     core_item::CoreItem,
     traits::{
-        Alignable, ApplyTransform, FillColor, Interpolatable, NotSimilarity, Opacity, Similarity,
-        StrokeColor,
+        Alignable, ApplyTransform, FillColor, Interpolatable, Opacity, StrokeColor, TransformGroup,
     },
 };
 
-/// A wrapper that keeps `inner` in local coordinates and stores an affine
-/// transform from those coordinates to the wrapper's parent coordinates.
-/// For an outermost wrapper, the parent coordinate system is normally world
-/// space.
+/// An item paired with an external transform represented by `G`.
 ///
-/// Applying transforms to a `Transformed<T>` never touches `inner`'s data —
-/// it only composes the stored transform (lazy "boxing"):
+/// `inner` retains its own representation while `transform` controls the
+/// extracted geometry. Composition is explicit about order:
 ///
-/// - [`ApplyTransform::apply`] / `shift` / `rotate` / `scale` — action in the
-///   parent coordinate system, using left-multiplication:
-///   `transform = G * transform`.
-/// - [`Transformed::apply_local`] — action in `inner`'s local coordinate
-///   system, using right-multiplication: `transform = transform * G`.
+/// - [`compose_outer`](Self::compose_outer): `transform = outer * transform`;
+/// - [`compose_inner`](Self::compose_inner): `transform = transform * inner`.
 ///
-/// Both accept any affine `G` because the wrapper preserves `inner`'s
-/// semantic representation. Constraints appear only when folding the stored
-/// transform back into that representation:
+/// Applying an `H` through [`ApplyTransform`] is outer composition and is only
+/// available when `H` embeds into the existing storage type (`G: From<H>`).
+/// Operations never widen the wrapper automatically. Widen explicitly with
+/// [`Into::into`] when a more general storage type is required.
 ///
-/// - [`Transformed::bake`] — unconditional, for affine-closure `T`.
-/// - [`Transformed::try_bake`] — runtime-checked, for similarity-closure
-///   `T` (the stored transform must actually be a similarity).
+/// ```compile_fail
+/// use ranim_core::{glam::DVec3, prelude::*};
 ///
-/// Nesting composes from the inside out:
-/// `Transformed { t1, inner: Transformed { t2, inner: x } }` maps `x` into
-/// the outer wrapper's parent coordinates with `t1 * t2`. Extraction folds
-/// the composed transform into the emitted [`CoreItem`]s (see
-/// [`CoreItem::apply_transform`]).
+/// let mut item = ().transformed(Similarity::IDENTITY);
+/// // `Diag` does not embed into `Similarity`; choose `DAffine3` storage first.
+/// item.scale(DVec3::new(2.0, 1.0, 1.0));
+/// ```
 ///
-/// Interpolation lerps `transform` and `inner` **independently** — this is
-/// the intended behavior. Note that for e.g. perspective-blend scenes,
-/// wrapping in `Transformed` may make points at the same world position on
-/// different faces interpolate along different paths; if a raw point-data
-/// morph is wanted, bake the transform into the underlying data (e.g.
-/// `VItem` points) and interpolate that instead.
-///
-/// The transform is stored as [`DAffine3`], so it is affine **by
-/// construction** — projective matrices are unrepresentable here.
-/// Perspective lives solely in the camera projection, never in model
-/// transforms.
+/// Extraction and [`Aabb`] calculation convert `G` to [`DAffine3`] only at the
+/// geometry boundary. Projective transforms remain outside the model-transform
+/// system.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Transformed<T> {
-    /// The affine transform from `inner`'s local coordinates to parent coordinates.
-    pub transform: DAffine3,
-    /// The item expressed in its own local coordinates.
+pub struct Transformed<T, G> {
+    /// The item expressed in its own coordinates.
     pub inner: T,
+    /// The external transform applied to `inner`.
+    pub transform: G,
 }
 
-impl<T> Transformed<T> {
-    /// Wrap `inner` with an identity transform.
-    pub fn new(inner: T) -> Self {
-        Self {
-            transform: DAffine3::IDENTITY,
-            inner,
-        }
+impl<T, G> Transformed<T, G> {
+    /// Pair `inner` with `transform` without converting either value.
+    pub fn new(inner: T, transform: G) -> Self {
+        Self { inner, transform }
     }
 
-    /// Set the transform. Returns `self` for chaining.
-    pub fn with_transform(mut self, transform: DAffine3) -> Self {
-        self.transform = transform;
+    /// Compose `outer` on the left: `transform = outer * transform`.
+    pub fn compose_outer<H>(&mut self, outer: H) -> &mut Self
+    where
+        G: TransformGroup + From<H>,
+    {
+        self.transform = G::from(outer).compose(&self.transform);
         self
     }
 
-    /// Apply a transform in `inner`'s local coordinate system
-    /// (right-multiplication: `transform = transform * G`).
-    ///
-    /// This is the generic way to transform an item along its own axes, such
-    /// as scaling a rotated rectangle along its edges.
-    pub fn apply_local<G: Into<DAffine3>>(&mut self, transform: G) -> &mut Self {
-        self.transform *= transform.into();
+    /// Compose `inner` on the right: `transform = transform * inner`.
+    pub fn compose_inner<H>(&mut self, inner: H) -> &mut Self
+    where
+        G: TransformGroup + From<H>,
+    {
+        self.transform = self.transform.compose(&G::from(inner));
         self
     }
 
-    /// Fold the stored transform into `inner`'s data and unwrap.
+    /// Bake the stored transform into `inner` and remove the wrapper.
     ///
-    /// Only available for affine-closure `T` (point-data types). For
-    /// similarity-closure types use [`Transformed::try_bake`], or
-    /// [`Extract`] the wrapper to bake into [`CoreItem`] point data instead.
+    /// This method exists only when `T` directly supports the wrapper's exact
+    /// transform representation `G`.
     pub fn bake(self) -> T
     where
-        T: ApplyTransform<DAffine3>,
+        T: ApplyTransform<G>,
     {
         let mut inner = self.inner;
         inner.apply(self.transform);
         inner
     }
+}
 
-    /// Fold the stored transform into `inner`'s data and unwrap, checking at
-    /// runtime that it is actually a similarity transform.
-    ///
-    /// Available for similarity-closure `T` (circles, spheres, ...). Fails
-    /// with [`NotSimilarity`] if the accumulated transform contains
-    /// non-uniform scale, shear, or reflection.
-    pub fn try_bake(self) -> Result<T, NotSimilarity>
-    where
-        T: ApplyTransform<Similarity>,
-    {
-        let similarity = Similarity::try_from(self.transform)?;
-        let mut inner = self.inner;
-        inner.apply(similarity);
-        Ok(inner)
+impl<T, G, H> ApplyTransform<H> for Transformed<T, G>
+where
+    G: TransformGroup + From<H>,
+{
+    fn apply(&mut self, transform: H) -> &mut Self {
+        self.compose_outer(transform)
     }
 }
 
-impl<G: Into<DAffine3>, T> ApplyTransform<G> for Transformed<T> {
-    /// Action in the parent coordinate system
-    /// (left-multiplication: `transform = G * transform`).
-    ///
-    /// Never bakes — the stored transform absorbs any affine transform and
-    /// `inner`'s data (and thus its semantics) is left untouched.
-    fn apply(&mut self, transform: G) -> &mut Self {
-        self.transform = transform.into() * self.transform;
-        self
-    }
-}
-
-impl<T: Extract<Target = CoreItem>> Extract for Transformed<T> {
+impl<T, G> Extract for Transformed<T, G>
+where
+    T: Extract<Target = CoreItem>,
+    G: Clone + Into<DAffine3>,
+{
     type Target = CoreItem;
+
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         let start = buf.len();
         self.inner.extract_into(buf);
+        let transform = self.transform.clone().into();
         for item in &mut buf[start..] {
-            item.apply_transform(&self.transform);
+            item.apply_transform(&transform);
         }
     }
 }
 
-impl<T: Interpolatable> Interpolatable for Transformed<T> {
+impl<T: Interpolatable, G: Interpolatable> Interpolatable for Transformed<T, G> {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         Self {
-            transform: self.transform.lerp(&target.transform, t),
             inner: self.inner.lerp(&target.inner, t),
+            transform: self.transform.lerp(&target.transform, t),
         }
     }
 }
 
-impl<T: Alignable> Alignable for Transformed<T> {
+impl<T: Alignable, G: Clone> Alignable for Transformed<T, G> {
     fn is_aligned(&self, other: &Self) -> bool {
         self.inner.is_aligned(&other.inner)
     }
@@ -158,10 +127,14 @@ impl<T: Alignable> Alignable for Transformed<T> {
     }
 }
 
-impl<T: Aabb> Aabb for Transformed<T> {
+impl<T, G> Aabb for Transformed<T, G>
+where
+    T: Aabb,
+    G: Clone + Into<DAffine3>,
+{
     fn aabb(&self) -> [DVec3; 2] {
         let [min, max] = self.inner.aabb();
-        // Transform the 8 corners of the inner AABB and re-bound.
+        let transform = self.transform.clone().into();
         let mut lo = DVec3::splat(f64::INFINITY);
         let mut hi = DVec3::splat(f64::NEG_INFINITY);
         for i in 0..8 {
@@ -170,22 +143,22 @@ impl<T: Aabb> Aabb for Transformed<T> {
                 if i & 2 == 0 { min.y } else { max.y },
                 if i & 4 == 0 { min.z } else { max.z },
             );
-            let p = self.transform.transform_point3(corner);
-            lo = lo.min(p);
-            hi = hi.max(p);
+            let point = transform.transform_point3(corner);
+            lo = lo.min(point);
+            hi = hi.max(point);
         }
         [lo, hi]
     }
 }
 
-impl<T: Opacity> Opacity for Transformed<T> {
+impl<T: Opacity, G> Opacity for Transformed<T, G> {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.inner.set_opacity(opacity);
         self
     }
 }
 
-impl<T: FillColor> FillColor for Transformed<T> {
+impl<T: FillColor, G> FillColor for Transformed<T, G> {
     fn fill_color(&self) -> AlphaColor<Srgb> {
         self.inner.fill_color()
     }
@@ -201,7 +174,7 @@ impl<T: FillColor> FillColor for Transformed<T> {
     }
 }
 
-impl<T: StrokeColor> StrokeColor for Transformed<T> {
+impl<T: StrokeColor, G> StrokeColor for Transformed<T, G> {
     fn stroke_color(&self) -> AlphaColor<Srgb> {
         self.inner.stroke_color()
     }
@@ -217,160 +190,214 @@ impl<T: StrokeColor> StrokeColor for Transformed<T> {
     }
 }
 
+macro_rules! impl_transformed_widening {
+    ($source:ty => $target:ty) => {
+        impl<T> From<Transformed<T, $source>> for Transformed<T, $target> {
+            fn from(value: Transformed<T, $source>) -> Self {
+                Self {
+                    inner: value.inner,
+                    transform: value.transform.into(),
+                }
+            }
+        }
+    };
+}
+
+impl_transformed_widening!(crate::traits::Translation => crate::traits::Rigid);
+impl_transformed_widening!(crate::traits::Translation => crate::traits::Similarity);
+impl_transformed_widening!(crate::traits::Translation => DAffine3);
+impl_transformed_widening!(crate::traits::Rigid => crate::traits::Similarity);
+impl_transformed_widening!(crate::traits::Rigid => DAffine3);
+impl_transformed_widening!(crate::traits::Similarity => DAffine3);
+impl_transformed_widening!(crate::traits::Diag => DAffine3);
+
+/// Extension methods for attaching an exact transform representation to a value.
+pub trait TransformedExt: Sized {
+    /// Return `self` wrapped with `transform` stored exactly as `G`.
+    fn transformed<G>(self, transform: G) -> Transformed<Self, G> {
+        Transformed::new(self, transform)
+    }
+}
+
+impl<T> TransformedExt for T {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         core_item::{mesh_item::MeshItem, vitem::VItem},
-        traits::{Diag, Rigid, ScaleTransform, ShiftTransform},
+        traits::{
+            Diag, Rigid, ScaleTransform, ShiftTransform, Similarity, Translation,
+            UniformScaleTransform,
+        },
     };
-    use glam::{DQuat, DVec3, Vec3, Vec4, dvec3};
+    use glam::{DQuat, Vec3, Vec4};
+
+    fn assert_affine_eq(actual: DAffine3, expected: DAffine3) {
+        assert!(
+            actual
+                .transform_point3(dvec3(0.3, -0.7, 1.1))
+                .abs_diff_eq(expected.transform_point3(dvec3(0.3, -0.7, 1.1)), 1e-9)
+        );
+    }
 
     #[test]
-    fn test_extract_mesh_item_composes_transform() {
+    fn extract_mesh_item_composes_transform() {
         let mesh = MeshItem {
-            transform: glam::Mat4::from_translation(Vec3::new(1.0, 0.0, 0.0)),
+            transform: glam::Mat4::from_translation(Vec3::X),
             ..Default::default()
         };
-        let wrapped =
-            Transformed::new(mesh).with_transform(DAffine3::from_translation(dvec3(0.0, 2.0, 0.0)));
+        let wrapped = mesh.transformed(Translation(dvec3(0.0, 2.0, 0.0)));
         let items = wrapped.extract();
-        assert_eq!(items.len(), 1);
         match &items[0] {
-            CoreItem::MeshItem(m) => {
+            CoreItem::MeshItem(mesh) => {
                 assert_eq!(
-                    m.transform,
+                    mesh.transform,
                     glam::Mat4::from_translation(Vec3::new(1.0, 2.0, 0.0))
                 );
-                // Vertices untouched
-                assert_eq!(m.points, vec![Vec3::ZERO; 3]);
+                assert_eq!(mesh.points, vec![Vec3::ZERO; 3]);
             }
             _ => panic!("expected MeshItem"),
         }
     }
 
     #[test]
-    fn test_extract_vitem_bakes_points() {
+    fn extract_vitem_bakes_points_and_normal() {
         let vitem = VItem {
-            points: vec![
-                Vec4::new(1.0, 0.0, 0.0, 0.0),
-                Vec4::new(0.0, 1.0, 0.0, 0.0),
-                Vec4::new(0.0, 0.0, 1.0, 0.0),
-            ],
-            ..Default::default()
-        };
-        let wrapped = Transformed::new(vitem)
-            .with_transform(DAffine3::from_translation(dvec3(0.0, 2.0, 0.0)));
-        let items = wrapped.extract();
-        match &items[0] {
-            CoreItem::VItem(v) => {
-                assert_eq!(v.points[0], Vec4::new(1.0, 2.0, 0.0, 0.0));
-                assert_eq!(v.points[1], Vec4::new(0.0, 3.0, 0.0, 0.0));
-                assert_eq!(v.points[2], Vec4::new(0.0, 2.0, 1.0, 0.0));
-            }
-            _ => panic!("expected VItem"),
-        }
-    }
-
-    #[test]
-    fn test_extract_vitem_uses_inverse_transpose_for_normal() {
-        let vitem = VItem {
+            points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
             normal: Some(Vec3::new(1.0, 1.0, 0.0).normalize()),
             ..Default::default()
         };
-        let wrapped =
-            Transformed::new(vitem).with_transform(DAffine3::from_scale(dvec3(2.0, 1.0, 1.0)));
+        let wrapped = vitem.transformed(DAffine3::from_scale_rotation_translation(
+            dvec3(2.0, 1.0, 1.0),
+            DQuat::IDENTITY,
+            dvec3(0.0, 2.0, 0.0),
+        ));
         let items = wrapped.extract();
         match &items[0] {
-            CoreItem::VItem(v) => {
+            CoreItem::VItem(vitem) => {
+                assert_eq!(vitem.points[0], Vec4::new(2.0, 2.0, 0.0, 0.0));
                 let expected = Vec3::new(0.5, 1.0, 0.0).normalize();
-                assert!(v.normal.unwrap().abs_diff_eq(expected, 1e-6));
+                assert!(vitem.normal.unwrap().abs_diff_eq(expected, 1e-6));
             }
             _ => panic!("expected VItem"),
         }
     }
 
     #[test]
-    fn test_nested_transform_composes() {
-        let inner = Transformed::new(VItem {
+    fn nested_transforms_compose_inside_out() {
+        let inner = VItem {
             points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
             ..Default::default()
-        })
-        .with_transform(DAffine3::from_translation(dvec3(1.0, 0.0, 0.0)));
-        let outer = Transformed::new(inner).with_transform(DAffine3::from_scale(DVec3::splat(2.0)));
-        let items = outer.extract();
-        match &items[0] {
-            CoreItem::VItem(v) => {
-                assert_eq!(v.points[0], Vec4::new(4.0, 0.0, 0.0, 0.0));
+        }
+        .transformed(Translation(DVec3::X));
+        let outer = inner.transformed(Diag(DVec3::splat(2.0)));
+        match &outer.extract()[0] {
+            CoreItem::VItem(vitem) => {
+                assert_eq!(vitem.points[0], Vec4::new(4.0, 0.0, 0.0, 0.0));
             }
             _ => panic!("expected VItem"),
         }
     }
 
     #[test]
-    fn test_operation_traits_compose_in_parent_coordinates() {
-        // shift/rotate/scale are blanket-derived from ApplyTransform and act
-        // in the parent coordinate system (left-multiplication).
-        let mut wrapped = Transformed::new(());
-        wrapped.shift(dvec3(1.0, 0.0, 0.0));
-        wrapped.scale(DVec3::splat(2.0));
-        assert_eq!(
+    fn generic_wrapper_composes_outer_and_inner_in_order() {
+        let mut wrapped = ().transformed(DAffine3::IDENTITY);
+        wrapped.compose_outer(Translation(DVec3::X));
+        wrapped.compose_inner(Diag(DVec3::splat(2.0)));
+        assert_affine_eq(
             wrapped.transform,
-            DAffine3::from_scale(DVec3::splat(2.0))
-                * DAffine3::from_translation(dvec3(1.0, 0.0, 0.0))
+            DAffine3::from_translation(DVec3::X) * DAffine3::from_scale(DVec3::splat(2.0)),
+        );
+
+        wrapped.apply(Translation(DVec3::Y));
+        assert_affine_eq(
+            wrapped.transform,
+            DAffine3::from_translation(DVec3::Y)
+                * DAffine3::from_translation(DVec3::X)
+                * DAffine3::from_scale(DVec3::splat(2.0)),
         );
     }
 
     #[test]
-    fn test_apply_local_composes_on_the_right() {
-        let mut wrapped = Transformed::new(());
-        wrapped.shift(dvec3(1.0, 0.0, 0.0));
-        wrapped.apply_local(Diag(DVec3::splat(2.0)));
-        assert_eq!(
-            wrapped.transform,
-            DAffine3::from_translation(dvec3(1.0, 0.0, 0.0))
-                * DAffine3::from_scale(DVec3::splat(2.0))
-        );
+    fn subgroup_operations_keep_the_same_storage_type() {
+        fn require_similarity<T>(_: &Transformed<T, Similarity>) {}
+
+        let mut wrapped = ().transformed(Similarity::IDENTITY);
+        wrapped.shift(DVec3::X).scale_uniform(2.0);
+        require_similarity(&wrapped);
+        assert_eq!(wrapped.transform.scale, 2.0);
+        assert_eq!(wrapped.transform.translation, dvec3(2.0, 0.0, 0.0));
     }
 
     #[test]
-    fn test_apply_accepts_group_typed_values() {
-        let mut wrapped = Transformed::new(());
-        wrapped.apply(Rigid {
-            rotation: DQuat::from_axis_angle(DVec3::Z, core::f64::consts::FRAC_PI_2),
-            translation: dvec3(1.0, 0.0, 0.0),
+    fn explicit_widening_preserves_numeric_transform() {
+        let translation = ().transformed(Translation(dvec3(1.0, 2.0, 3.0)));
+        let rigid: Transformed<_, Rigid> = translation.clone().into();
+        let similarity: Transformed<_, Similarity> = translation.clone().into();
+        let affine: Transformed<_, DAffine3> = translation.into();
+        assert_affine_eq(rigid.transform.into(), affine.transform);
+        assert_affine_eq(similarity.transform.into(), affine.transform);
+
+        let rigid = ().transformed(Rigid {
+            rotation: DQuat::from_rotation_z(0.7),
+            translation: DVec3::Y,
         });
-        let p = wrapped.transform.transform_point3(dvec3(1.0, 0.0, 0.0));
-        assert!(p.abs_diff_eq(dvec3(1.0, 1.0, 0.0), 1e-9));
+        let similarity: Transformed<_, Similarity> = rigid.clone().into();
+        let affine: Transformed<_, DAffine3> = rigid.into();
+        assert_affine_eq(similarity.transform.into(), affine.transform);
+
+        let similarity = ().transformed(Similarity {
+            scale: 2.5,
+            rotation: DQuat::from_rotation_x(0.4),
+            translation: DVec3::Z,
+        });
+        let affine: Transformed<_, DAffine3> = similarity.into();
+        assert_affine_eq(
+            affine.transform,
+            DAffine3::from_scale_rotation_translation(
+                DVec3::splat(2.5),
+                DQuat::from_rotation_x(0.4),
+                DVec3::Z,
+            ),
+        );
+
+        let diagonal = ().transformed(Diag(dvec3(2.0, 0.0, -3.0)));
+        let affine_diagonal: Transformed<_, DAffine3> = diagonal.into();
+        assert_eq!(affine_diagonal.transform.matrix3.y_axis, DVec3::ZERO);
+        assert_eq!(affine_diagonal.transform.matrix3.z_axis.z, -3.0);
     }
 
     #[test]
-    fn test_bake_explicitly_folds_affine_frame_into_inner() {
-        let wrapped = Transformed::new(dvec3(1.0, 0.0, 0.0))
-            .with_transform(DAffine3::from_translation(dvec3(0.0, 2.0, 0.0)));
+    fn bake_uses_the_exact_storage_group() {
+        let wrapped = dvec3(1.0, 0.0, 0.0).transformed(Translation(dvec3(0.0, 2.0, 0.0)));
         assert_eq!(wrapped.bake(), dvec3(1.0, 2.0, 0.0));
     }
 
     #[test]
-    fn test_lerp_transform_and_inner_independently() {
-        let a = Transformed::new(0.0f64)
-            .with_transform(DAffine3::from_translation(dvec3(0.0, 0.0, 0.0)));
-        let b = Transformed::new(2.0f64)
-            .with_transform(DAffine3::from_translation(dvec3(2.0, 0.0, 0.0)));
+    fn interpolation_lerps_inner_and_same_group_independently() {
+        let a = 0.0f64.transformed(Similarity::IDENTITY);
+        let b = 2.0f64.transformed(Similarity {
+            scale: 3.0,
+            rotation: DQuat::IDENTITY,
+            translation: dvec3(2.0, 0.0, 0.0),
+        });
         let mid = a.lerp(&b, 0.5);
         assert_eq!(mid.inner, 1.0);
-        assert_eq!(
-            mid.transform,
-            DAffine3::from_translation(dvec3(1.0, 0.0, 0.0))
-        );
+        assert_eq!(mid.transform.scale, 2.0);
+        assert_eq!(mid.transform.translation, DVec3::X);
     }
 
     #[test]
-    fn test_aabb_transforms_corners() {
-        let wrapped = Transformed::new(dvec3(1.0, 1.0, 1.0))
-            .with_transform(DAffine3::from_translation(dvec3(10.0, 0.0, 0.0)));
-        let [min, max] = wrapped.aabb();
-        assert_eq!(min, dvec3(11.0, 1.0, 1.0));
-        assert_eq!(max, dvec3(11.0, 1.0, 1.0));
+    fn aabb_converts_transform_at_geometry_boundary() {
+        let wrapped = dvec3(1.0, 1.0, 1.0).transformed(Translation(dvec3(10.0, 0.0, 0.0)));
+        assert_eq!(wrapped.aabb(), [dvec3(11.0, 1.0, 1.0); 2]);
+    }
+
+    #[test]
+    fn scale_operation_is_available_for_affine_storage() {
+        let mut wrapped = ().transformed(DAffine3::IDENTITY);
+        wrapped.scale(DVec3::splat(2.0));
+        assert_eq!(wrapped.transform, DAffine3::from_scale(DVec3::splat(2.0)));
     }
 }

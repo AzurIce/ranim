@@ -31,6 +31,18 @@ use glam::{DAffine3, DMat3, DQuat, DVec3};
 
 use crate::traits::Interpolatable;
 
+/// A transformation representation closed under identity and composition.
+///
+/// `compose(outer, inner)` follows the same order as affine matrix
+/// multiplication: the `inner` transform is applied first, then `outer`.
+pub trait TransformGroup: Sized {
+    /// The identity transformation.
+    fn identity() -> Self;
+
+    /// Compose `self` outside `inner`, returning `self * inner`.
+    fn compose(&self, inner: &Self) -> Self;
+}
+
 // MARK: Translation
 /// The translation group T(3): pure displacements.
 #[repr(transparent)]
@@ -221,6 +233,64 @@ impl Interpolatable for Diag {
     }
 }
 
+// MARK: Composition
+impl TransformGroup for Translation {
+    fn identity() -> Self {
+        Self(DVec3::ZERO)
+    }
+
+    fn compose(&self, inner: &Self) -> Self {
+        Self(self.0 + inner.0)
+    }
+}
+
+impl TransformGroup for Rigid {
+    fn identity() -> Self {
+        Self::IDENTITY
+    }
+
+    fn compose(&self, inner: &Self) -> Self {
+        Self {
+            rotation: self.rotation * inner.rotation,
+            translation: self.rotation * inner.translation + self.translation,
+        }
+    }
+}
+
+impl TransformGroup for Similarity {
+    fn identity() -> Self {
+        Self::IDENTITY
+    }
+
+    fn compose(&self, inner: &Self) -> Self {
+        Self {
+            scale: self.scale * inner.scale,
+            rotation: self.rotation * inner.rotation,
+            translation: self.scale * (self.rotation * inner.translation) + self.translation,
+        }
+    }
+}
+
+impl TransformGroup for Diag {
+    fn identity() -> Self {
+        Self(DVec3::ONE)
+    }
+
+    fn compose(&self, inner: &Self) -> Self {
+        Self(self.0 * inner.0)
+    }
+}
+
+impl TransformGroup for DAffine3 {
+    fn identity() -> Self {
+        Self::IDENTITY
+    }
+
+    fn compose(&self, inner: &Self) -> Self {
+        *self * *inner
+    }
+}
+
 // MARK: Embeddings
 // Lossless conversions up the group hierarchy (group containment).
 // Note: `From` is not transitive in Rust, so every edge is written out.
@@ -396,5 +466,51 @@ mod tests {
         };
         let p = sim.transform_point(dvec3(1.0, 0.0, 0.0));
         assert!(p.abs_diff_eq(dvec3(1.0, 2.0, 0.0), 1e-9));
+    }
+
+    fn assert_identity<G>(value: G)
+    where
+        G: TransformGroup + PartialEq + core::fmt::Debug,
+    {
+        assert_eq!(G::identity().compose(&value), value);
+        assert_eq!(value.compose(&G::identity()), value);
+    }
+
+    #[test]
+    fn composition_identity_holds_for_every_storage_family() {
+        assert_identity(Translation(dvec3(1.0, 2.0, 3.0)));
+        assert_identity(Rigid {
+            rotation: DQuat::from_rotation_z(0.4),
+            translation: DVec3::X,
+        });
+        assert_identity(Similarity {
+            scale: 2.0,
+            rotation: DQuat::from_rotation_y(0.3),
+            translation: DVec3::Y,
+        });
+        assert_identity(Diag(dvec3(2.0, 0.0, -1.0)));
+        assert_identity(DAffine3::from_scale_rotation_translation(
+            dvec3(2.0, 1.0, 3.0),
+            DQuat::from_rotation_x(0.2),
+            DVec3::Z,
+        ));
+    }
+
+    #[test]
+    fn composition_order_matches_affine_multiplication() {
+        let outer = Rigid::from_axis_angle(DVec3::Z, core::f64::consts::FRAC_PI_2);
+        let inner = Rigid::from_translation(DVec3::X);
+        let composed = outer.compose(&inner);
+        assert!(composed.translation.abs_diff_eq(dvec3(0.0, 1.0, 0.0), 1e-9));
+        assert_eq!(composed.rotation, outer.rotation);
+    }
+
+    #[test]
+    fn similarity_composition_scales_inner_translation() {
+        let outer = Similarity::from_scale(2.0);
+        let inner = Similarity::from(Translation(DVec3::X));
+        let composed = outer.compose(&inner);
+        assert_eq!(composed.scale, 2.0);
+        assert_eq!(composed.translation, dvec3(2.0, 0.0, 0.0));
     }
 }

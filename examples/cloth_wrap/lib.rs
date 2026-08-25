@@ -210,8 +210,10 @@ impl Extract for ClothState {
             vertex_normals: normals.into(),
         };
 
-        let ball = Transformed::new(self.ball_mesh.clone())
-            .with_transform(DAffine3::from_translation(dvec3(0.0, self.ball_y, 0.0)));
+        let ball = Transformed::new(
+            self.ball_mesh.clone(),
+            DAffine3::from_translation(dvec3(0.0, self.ball_y, 0.0)),
+        );
 
         cloth.extract_into(buf);
         ball.extract_into(buf);

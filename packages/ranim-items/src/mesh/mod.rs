@@ -23,8 +23,9 @@ pub use surface::*;
 /// [`ranim_core::core_item::mesh_item::MeshItem`] for rendering.
 ///
 /// The vertices are expressed in the mesh's local space. To place or animate the
-/// mesh with a local-to-world transform, wrap it in
-/// [`ranim_core::core_item::transformed::Transformed`].
+/// mesh with an external transform, wrap it in
+/// [`ranim_core::core_item::transformed::Transformed`], commonly storing
+/// [`ranim_core::glam::DAffine3`] as the transform representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeshItem {
     /// The vertices of the mesh (local space)

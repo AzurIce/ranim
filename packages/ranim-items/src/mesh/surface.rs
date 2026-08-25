@@ -51,8 +51,9 @@ fn colorscale_lookup(colorscale: &[(AlphaColor<Srgb>, f64)], value: f64) -> Alph
 /// To enable smooth shading, call [`Self::with_smooth_normals`] or [`Self::update_smooth_normals`] to update the normals.
 ///
 /// The vertices are expressed in the surface's local space. To place or animate
-/// the surface with a local-to-world transform, wrap it in
-/// [`ranim_core::core_item::transformed::Transformed`].
+/// the surface with an external transform, wrap it in
+/// [`ranim_core::core_item::transformed::Transformed`], commonly storing
+/// [`ranim_core::glam::DAffine3`] as the transform representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Surface {
     /// Vertices — `nu * nv` points in row-major order (local space).

@@ -240,12 +240,13 @@ impl Rectangle {
         self.size.y.abs()
     }
 
-    /// Scale along the rectangle's own axes, keeping it a rectangle.
+    /// Scale the dimensions along the rectangle's stored shape axes.
     ///
-    /// This edits the local dimensions rather than applying a world-space
-    /// diagonal transform. For world-space non-uniform scaling, use
-    /// [`ranim_core::core_item::transformed::Transformed`].
-    pub fn scale_local(&mut self, scale: DVec2) -> &mut Self {
+    /// This edits `size` without changing the stored orthogonal `axes`. To
+    /// compose a transform outside or inside a wrapper instead, use
+    /// [`ranim_core::core_item::transformed::Transformed::compose_outer`] or
+    /// [`ranim_core::core_item::transformed::Transformed::compose_inner`].
+    pub fn scale_axes(&mut self, scale: DVec2) -> &mut Self {
         self.size *= scale;
         self
     }
@@ -620,5 +621,26 @@ impl Extract for RegularPolygon {
 
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         Polygon::from(self.clone()).extract_into(buf);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ranim_core::traits::RotateTransform;
+
+    #[test]
+    fn rotated_rectangle_scale_axes_preserves_stored_axes() {
+        let mut rectangle = Rectangle::new(2.0, 3.0);
+        rectangle.rotate_on_axis(DVec3::Z, core::f64::consts::FRAC_PI_4);
+        let axes = rectangle.axes;
+        let p0 = rectangle.p0;
+
+        rectangle.scale_axes(dvec2(2.0, 0.5));
+
+        assert_eq!(rectangle.axes, axes);
+        assert_eq!(rectangle.p0, p0);
+        assert_eq!(rectangle.size, dvec2(4.0, 1.5));
+        assert!(rectangle.axes.0.dot(rectangle.axes.1).abs() < 1e-12);
     }
 }
