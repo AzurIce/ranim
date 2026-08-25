@@ -6,7 +6,7 @@
 
 成员：
 
-- [MeshItem](./mesh_item.md) — 核心类型：顶点 + 索引 + 变换 + 每顶点数据。
+- [MeshItem](./mesh_item.md) — 核心类型：顶点 + 索引 + 每顶点数据；外部变换使用 `Transformed<MeshItem>`。
 - [Surface](./surface.md) — 参数曲面：`(u, v)` 网格采样生成网格。
 - [Sphere](./sphere.md) — 球体便捷构造。
 

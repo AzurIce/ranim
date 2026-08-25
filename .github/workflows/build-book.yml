@@ -18,7 +18,11 @@ on:
       mdbook-plugins:
         description: "Comma-separated mdbook plugins"
         type: string
-        default: "mdbook-typst-math@0.3.0, mdbook-mermaid@0.17"
+        default: "mdbook-mermaid@0.17"
+      mdbook-typst-math-rev:
+        description: "mdbook-typst-math revision from duskmoon314/mdbook-typst-math"
+        type: string
+        default: "e310ec82ecaec5ae8e516ac07e9cab85fb506bc3"
       site-url:
         description: "Override site-url (e.g. /ranim-book/). If empty, derived from ref."
         type: string
@@ -41,7 +45,7 @@ jobs:
 
       - name: Compute tool cache key
         id: tool-key
-        run: echo "hash=$(echo '${{ inputs.mdbook-version }} ${{ inputs.mdbook-plugins }}' | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        run: echo "hash=$(echo '${{ inputs.mdbook-version }} ${{ inputs.mdbook-plugins }} ${{ inputs.mdbook-typst-math-rev }}' | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
       - name: Cache mdbook tools
         id: cache-mdbook
@@ -52,11 +56,15 @@ jobs:
             ~/.cargo/bin/mdbook-*
           key: mdbook-${{ steps.tool-key.outputs.hash }}
 
-      - name: Install mdbook and plugins
+      - name: Install mdbook and registry plugins
         if: steps.cache-mdbook.outputs.cache-hit != 'true'
         uses: taiki-e/install-action@v2
         with:
           tool: mdbook@${{ inputs.mdbook-version }}, ${{ inputs.mdbook-plugins }}
+
+      - name: Install mdbook-typst-math from upstream
+        if: steps.cache-mdbook.outputs.cache-hit != 'true'
+        run: cargo install --locked --git https://github.com/duskmoon314/mdbook-typst-math.git --rev "${{ inputs.mdbook-typst-math-rev }}" mdbook-typst-math
 
       - name: Patch book.toml and inject version-select
         run: |

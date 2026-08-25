@@ -86,7 +86,7 @@ fn surface_to_mesh(surface: Surface) -> MeshItem {
         mesh.set_fill_color(*first_color);
     }
 
-    mesh.with_transform(surface.transform)
+    mesh
 }
 
 /// Create a torus-like shape

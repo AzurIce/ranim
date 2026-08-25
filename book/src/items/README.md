@@ -1,7 +1,7 @@
 # Items
 
 `ranim-items` 提供**用户层 item**：编写场景时直接构造和做动画的类型。与
-core item（见 Core Items 大节）相比，它们用 f64（`DVec3` / `DMat4`）描述、
+core item（见 Core Items 大节）相比，它们用 f64（`DVec3` / `DAffine3`）描述、
 携带动画所需的辅助结构（如 `PointVec` 对齐包装），并实现了一批动画/变换
 trait（`Interpolatable`、`Alignable`、`FillColor`、`ShiftTransform` 等），可以
 直接配合 `morph`、`fade_in` 等动画使用。渲染前由 `Extract` 转为 core item

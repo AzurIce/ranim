@@ -3,10 +3,7 @@ use ranim_core::{
     color::{AlphaColor, Srgb},
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::DVec3,
-    traits::{
-        Aabb, Discard, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
-        StrokeColor, StrokeWidth, With,
-    },
+    traits::{Aabb, ApplyTransform, Discard, FillColor, Opacity, StrokeColor, StrokeWidth, With},
     utils::bezier::PathBuilder,
 };
 
@@ -59,29 +56,12 @@ impl Aabb for Parallelogram {
     }
 }
 
-impl ShiftTransform for Parallelogram {
-    fn shift(&mut self, offset: DVec3) -> &mut Self {
-        self.origin += offset;
-        self
-    }
-}
-
-impl RotateTransform for Parallelogram {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.origin.rotate_on_axis(axis, angle);
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
-        self
-    }
-}
-
-impl ScaleTransform for Parallelogram {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        self.origin.scale(scale).discard();
-        self.axes.0 *= scale;
-        self.axes.1 *= scale;
+impl<G: Into<ranim_core::glam::DAffine3>> ApplyTransform<G> for Parallelogram {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.origin = transform.transform_point3(self.origin);
+        self.axes.0 = transform.transform_vector3(self.axes.0);
+        self.axes.1 = transform.transform_vector3(self.axes.1);
         self
     }
 }

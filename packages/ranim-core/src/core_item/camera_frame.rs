@@ -71,6 +71,18 @@ impl Alignable for CameraFrame {
     fn align_with(&mut self, _other: &mut Self) {}
 }
 
+impl<G: Into<glam::DAffine3>> crate::traits::ApplyTransform<G> for CameraFrame {
+    /// `pos` transforms as a point; `up`/`facing` transform as direction
+    /// vectors (and are re-normalized).
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.pos = transform.transform_point3(self.pos);
+        self.up = transform.transform_vector3(self.up).normalize();
+        self.facing = transform.transform_vector3(self.facing).normalize();
+        self
+    }
+}
+
 impl Default for CameraFrame {
     fn default() -> Self {
         Self {

@@ -9,7 +9,7 @@ use ranim_core::{
     core_item::CoreItem,
     glam::{DAffine3, DMat3, DVec3},
     traits::{
-        Aabb, Discard, FillColor, Locate, PointsFunc, RotateTransform, ScaleTransform,
+        Aabb, ApplyTransform, Discard, FillColor, Locate, PointsFunc, ScaleTransform,
         ShiftTransform, StrokeColor, StrokeWidth, With,
     },
 };
@@ -265,30 +265,15 @@ impl Aabb for TextItem {
     }
 }
 
-impl ShiftTransform for TextItem {
-    fn shift(&mut self, offset: DVec3) -> &mut Self {
-        self.origin += offset;
-        self.transform_items(|item| item.shift(offset).discard());
-        self
-    }
-}
-
-impl RotateTransform for TextItem {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.origin.rotate_on_axis(axis, angle);
-        self.basis.0.rotate_on_axis(axis, angle);
-        self.basis.1.rotate_on_axis(axis, angle);
-        self.transform_items(|item| item.rotate_on_axis(axis, angle).discard());
-        self
-    }
-}
-
-impl ScaleTransform for TextItem {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        self.origin.scale(scale).discard();
-        self.basis.0 *= scale;
-        self.basis.1 *= scale;
-        self.transform_items(|item| item.scale(scale).discard());
+impl<G: Into<DAffine3>> ApplyTransform<G> for TextItem {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.origin = transform.transform_point3(self.origin);
+        self.basis.0 = transform.transform_vector3(self.basis.0);
+        self.basis.1 = transform.transform_vector3(self.basis.1);
+        self.transform_items(|items| {
+            items.apply(transform);
+        });
         self
     }
 }

@@ -7,7 +7,7 @@ use ranim_core::core_item::CoreItem;
 use ranim_core::{color, glam};
 
 use ranim_core::traits::{
-    Opacity, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor, With,
+    ApplyTransform, Opacity, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor, With,
 };
 
 use crate::vitem::geometry::EllipticArc;
@@ -88,20 +88,13 @@ impl Aabb for Arc {
     }
 }
 
-impl ShiftTransform for Arc {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.center.shift(shift);
-        self
-    }
-}
-
-impl RotateTransform for Arc {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.center.rotate_on_axis(axis, angle);
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
+impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Arc {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.center = transform.transform_point(self.center);
+        self.axes.0 = transform.transform_direction(self.axes.0);
+        self.axes.1 = transform.transform_direction(self.axes.1);
+        self.radius *= transform.scale;
         self
     }
 }
@@ -210,22 +203,13 @@ impl Aabb for ArcBetweenPoints {
     }
 }
 
-impl ShiftTransform for ArcBetweenPoints {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.start.shift(shift);
-        self.end.shift(shift);
-        self
-    }
-}
-
-impl RotateTransform for ArcBetweenPoints {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.start.rotate_on_axis(axis, angle);
-        self.end.rotate_on_axis(axis, angle);
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
+impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for ArcBetweenPoints {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.start = transform.transform_point(self.start);
+        self.end = transform.transform_point(self.end);
+        self.axes.0 = transform.transform_direction(self.axes.0);
+        self.axes.1 = transform.transform_direction(self.axes.1);
         self
     }
 }

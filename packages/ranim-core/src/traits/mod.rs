@@ -1,9 +1,13 @@
 /// Transform related traits
 pub mod transform {
+    mod apply;
+    mod group;
     mod rotate;
     mod scale;
     mod shift;
 
+    pub use apply::*;
+    pub use group::*;
     pub use rotate::*;
     pub use scale::*;
     pub use shift::*;
@@ -16,7 +20,8 @@ use std::ops::Range;
 
 use color::{AlphaColor, ColorSpace, OpaqueColor, Srgb};
 use glam::{
-    DAffine2, DAffine3, DMat4, DQuat, DVec2, DVec3, Mat4, USizeVec3, Vec3, Vec3Swizzles, dvec3,
+    DAffine2, DAffine3, DMat3, DMat4, DQuat, DVec2, DVec3, Mat4, USizeVec3, Vec3, Vec3Swizzles,
+    dvec3,
 };
 use num::complex::Complex64;
 
@@ -150,6 +155,21 @@ impl Interpolatable for DMat4 {
             }
         }
         result
+    }
+}
+
+impl Interpolatable for DAffine3 {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        // Component-wise lerp of `matrix3` + `translation` is trivially closed
+        // within affine transforms (no homogeneous bottom row to preserve).
+        Self {
+            matrix3: DMat3::from_cols(
+                self.matrix3.x_axis.lerp(target.matrix3.x_axis, t),
+                self.matrix3.y_axis.lerp(target.matrix3.y_axis, t),
+                self.matrix3.z_axis.lerp(target.matrix3.z_axis, t),
+            ),
+            translation: self.translation.lerp(target.translation, t),
+        }
     }
 }
 

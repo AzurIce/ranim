@@ -3,9 +3,7 @@ use ranim_core::{
     color::{AlphaColor, Srgb},
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
-    traits::{
-        Aabb, Discard, FillColor, Opacity, RotateTransform, ShiftTransform, StrokeColor, With,
-    },
+    traits::{Aabb, ApplyTransform, Discard, FillColor, Opacity, StrokeColor, With},
 };
 
 use crate::vitem::{
@@ -83,20 +81,13 @@ impl Aabb for Ellipse {
     }
 }
 
-impl ShiftTransform for Ellipse {
-    fn shift(&mut self, offset: DVec3) -> &mut Self {
-        self.center += offset;
-        self
-    }
-}
-
-impl RotateTransform for Ellipse {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
-        self.center.rotate_on_axis(axis, angle);
+impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Ellipse {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.center = transform.transform_point(self.center);
+        self.axes.0 = transform.transform_direction(self.axes.0);
+        self.axes.1 = transform.transform_direction(self.axes.1);
+        self.radius *= transform.scale;
         self
     }
 }

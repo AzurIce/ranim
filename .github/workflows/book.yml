@@ -15,7 +15,10 @@ on:
         default: "0.5.4"
       mdbook-plugins:
         description: "Comma-separated mdbook plugins"
-        default: "mdbook-typst-math@0.3.0, mdbook-mermaid@0.17"
+        default: "mdbook-mermaid@0.17"
+      mdbook-typst-math-rev:
+        description: "mdbook-typst-math revision from duskmoon314/mdbook-typst-math"
+        default: "e310ec82ecaec5ae8e516ac07e9cab85fb506bc3"
 
 permissions:
   contents: read
@@ -56,7 +59,8 @@ jobs:
       artifact-name: book-${{ matrix.ref }}
       site-url: ""
       mdbook-version: ${{ inputs.mdbook-version || '0.5.4' }}
-      mdbook-plugins: ${{ inputs.mdbook-plugins || 'mdbook-typst-math@0.3.0, mdbook-mermaid@0.17' }}
+      mdbook-plugins: ${{ inputs.mdbook-plugins || 'mdbook-mermaid@0.17' }}
+      mdbook-typst-math-rev: ${{ inputs.mdbook-typst-math-rev || 'e310ec82ecaec5ae8e516ac07e9cab85fb506bc3' }}
 
   deploy:
     needs: [determine-refs, build]

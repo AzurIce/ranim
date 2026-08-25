@@ -22,35 +22,14 @@ pub enum ScaleHint {
     PorportionalZ(f64),
 }
 
-/// Scaling operations.
+/// Scaling operations: the axis-aligned (diagonal group) scaling action.
 ///
-/// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: ScaleTransform`.
+/// This trait is blanket-implemented for all `T: ApplyTransform<Diag>`
+/// (see [`super::ApplyTransform`]). For uniform scaling of
+/// similarity-closure types, see [`super::UniformScaleTransform`].
 pub trait ScaleTransform {
     /// Scale at the origin.
     fn scale(&mut self, scale: DVec3) -> &mut Self;
-}
-
-impl ScaleTransform for DVec3 {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        *self *= scale;
-        self
-    }
-}
-
-impl<T: ScaleTransform> ScaleTransform for [T] {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.scale(scale);
-        });
-        self
-    }
-}
-
-impl<T: ScaleTransform> ScaleTransform for Vec<T> {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        self.as_mut_slice().scale(scale);
-        self
-    }
 }
 
 /// Useful extensions for scaling operations.

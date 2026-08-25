@@ -8,7 +8,7 @@ use ranim_core::{
     color,
     core_item::CoreItem,
     glam,
-    traits::{RotateTransform, ScaleTransform, ShiftTransform},
+    traits::{ApplyTransform, ScaleTransform, ShiftTransform},
 };
 
 use crate::vitem::DEFAULT_STROKE_WIDTH;
@@ -85,20 +85,13 @@ impl Aabb for Circle {
     }
 }
 
-impl ShiftTransform for Circle {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.center.shift(shift);
-        self
-    }
-}
-
-impl RotateTransform for Circle {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.center.rotate_on_axis(axis, angle);
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
+impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Circle {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.center = transform.transform_point(self.center);
+        self.axes.0 = transform.transform_direction(self.axes.0);
+        self.axes.1 = transform.transform_direction(self.axes.1);
+        self.radius *= transform.scale;
         self
     }
 }

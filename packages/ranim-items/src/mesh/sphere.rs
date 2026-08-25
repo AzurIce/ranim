@@ -7,8 +7,8 @@ use ranim_core::{
     anchor::Aabb,
     color::{self, AlphaColor, Srgb},
     core_item::CoreItem,
-    glam::{DMat4, DVec3},
-    traits::{FillColor, Interpolatable, Opacity, ShiftTransform, With},
+    glam::DVec3,
+    traits::{ApplyTransform, FillColor, Interpolatable, Opacity, With},
 };
 
 use crate::mesh::MeshItem;
@@ -91,12 +91,11 @@ impl From<Sphere> for MeshItem {
 impl From<Sphere> for Surface {
     fn from(value: Sphere) -> Self {
         Surface::from_uv_func(
-            |u, v| Sphere::points_uv_func(u, v, value.radius),
+            |u, v| Sphere::points_uv_func(u, v, value.radius) + value.center,
             (0.0, TAU),
             (0.0, PI),
             value.resolution,
         )
-        .with_transform(DMat4::from_translation(value.center))
         .with(|x| {
             x.set_fill_color(value.fill_rgba);
         })
@@ -139,9 +138,11 @@ impl Opacity for Sphere {
     }
 }
 
-impl ShiftTransform for Sphere {
-    fn shift(&mut self, offset: DVec3) -> &mut Self {
-        self.center += offset;
+impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Sphere {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.center = transform.transform_point(self.center);
+        self.radius *= transform.scale;
         self
     }
 }
@@ -163,16 +164,15 @@ impl Extract for Sphere {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ranim_core::glam::dvec3;
+    use ranim_core::{glam::dvec3, traits::ShiftTransform};
 
     #[test]
-    fn test_sphere_center_to_transform() {
+    fn test_sphere_center_baked_into_vertices() {
         let sphere = Sphere::new(1.0).with_center(dvec3(1.0, 2.0, 3.0));
         let surface = Surface::from(sphere);
-        assert_eq!(
-            surface.transform,
-            DMat4::from_translation(dvec3(1.0, 2.0, 3.0))
-        );
+        // u = 0, v = 0 → points_uv_func(0, 0, r) + center
+        let expected = Sphere::points_uv_func(0.0, 0.0, 1.0) + dvec3(1.0, 2.0, 3.0);
+        assert!(surface.vertices[0].abs_diff_eq(expected, 1e-10));
     }
 
     #[test]
@@ -207,9 +207,8 @@ mod tests {
         let surface = Surface::from(sphere);
         assert_eq!(surface.vertices.len(), 25);
         assert_eq!(surface.resolution, (5, 5));
-        assert_eq!(
-            surface.transform,
-            DMat4::from_translation(dvec3(1.0, 0.0, 0.0))
-        );
+        // The center is baked into the vertices
+        let expected = Sphere::points_uv_func(0.0, 0.0, 1.0) + dvec3(1.0, 0.0, 0.0);
+        assert!(surface.vertices[0].abs_diff_eq(expected, 1e-10));
     }
 }

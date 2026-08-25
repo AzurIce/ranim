@@ -9,6 +9,7 @@
 - [核心概念](./understand/core/README.md)
     - [动画系统](./understand/core/anim.md)
     - [CoreItem 与 Extract](./understand/core/core_item.md)
+    - [Transformed&lt;T&gt;](./understand/core/transformed.md)
     - [Core Items](./understand/core/core_items/README.md)
         - [CameraFrame](./understand/core/core_items/camera_frame.md)
         - [VItem](./understand/core/core_items/vitem.md)

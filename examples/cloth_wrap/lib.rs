@@ -15,7 +15,7 @@ use ranim::{
     core::animation::eval::iterative::Iterative,
     core::components::rgba::Rgba,
     core::core_item::CoreItem,
-    glam::{DMat4, DVec3, dvec3},
+    glam::{DAffine3, DVec3, dvec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
 };
@@ -206,13 +206,12 @@ impl Extract for ClothState {
         let cloth = MeshItem {
             points: points.into(),
             triangle_indices: self.cloth_indices.clone(),
-            transform: DMat4::IDENTITY,
             vertex_colors: vertex_colors.into(),
             vertex_normals: normals.into(),
         };
 
-        let mut ball = self.ball_mesh.clone();
-        ball.transform = DMat4::from_translation(dvec3(0.0, self.ball_y, 0.0));
+        let ball = Transformed::new(self.ball_mesh.clone())
+            .with_transform(DAffine3::from_translation(dvec3(0.0, self.ball_y, 0.0)));
 
         cloth.extract_into(buf);
         ball.extract_into(buf);

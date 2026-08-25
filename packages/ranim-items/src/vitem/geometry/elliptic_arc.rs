@@ -7,7 +7,7 @@ use ranim_core::{
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
     traits::{
-        Aabb, Discard, Opacity, RotateTransform, ShiftTransform, StrokeColor, StrokeWidth, With,
+        Aabb, ApplyTransform, Discard, Opacity, ShiftTransform, StrokeColor, StrokeWidth, With,
     },
 };
 
@@ -203,20 +203,13 @@ impl Opacity for EllipticArc {
     }
 }
 
-impl ShiftTransform for EllipticArc {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.center += shift;
-        self
-    }
-}
-
-impl RotateTransform for EllipticArc {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
-        self.center.rotate_on_axis(axis, angle);
+impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for EllipticArc {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.center = transform.transform_point(self.center);
+        self.axes.0 = transform.transform_direction(self.axes.0);
+        self.axes.1 = transform.transform_direction(self.axes.1);
+        self.radius *= transform.scale;
         self
     }
 }
