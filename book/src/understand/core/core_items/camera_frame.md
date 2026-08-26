@@ -1,5 +1,8 @@
 # Core `CameraFrame`
 
+> [!caution]
+> ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
+
 相机数据，定义于 `ranim_core::core_item::camera_frame`。它同时携带正交与透视
 两套投影参数，由 `perspective_blend` 在二者之间混合。
 

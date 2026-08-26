@@ -1,5 +1,8 @@
 # `Sphere`
 
+> [!caution]
+> ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
+
 球体便捷构造，定义于 `ranim_items::mesh`。
 
 ```rust,ignore

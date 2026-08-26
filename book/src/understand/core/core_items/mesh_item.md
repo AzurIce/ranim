@@ -1,5 +1,8 @@
 # Core `MeshItem`
 
+> [!caution]
+> ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
+
 3D 三角网格的渲染表示，定义于 `ranim_core::core_item::mesh_item`。
 
 ```rust,ignore

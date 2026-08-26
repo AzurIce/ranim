@@ -1,5 +1,8 @@
 # `MeshItem`
 
+> [!caution]
+> ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
+
 ```rust,ignore
 pub struct MeshItem {
     pub points: PointVec<DVec3>,         // 顶点（局部空间）
