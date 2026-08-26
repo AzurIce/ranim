@@ -421,7 +421,7 @@ pub fn derive_shift_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
     impl_derive(
         input,
-        quote! {#core::traits::ShiftTransform},
+        quote! {#core::traits::transform::ShiftTransform},
         |field_positions| {
             quote! {
                 fn shift(&mut self, shift: #core::glam::DVec3) -> &mut Self {
@@ -438,7 +438,7 @@ pub fn derive_rotate_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
     impl_derive(
         input,
-        quote! {#core::traits::RotateTransform},
+        quote! {#core::traits::transform::RotateTransform},
         |field_positions| {
             quote! {
                 fn rotate_on_axis(&mut self, axis: #core::glam::DVec3, angle: f64) -> &mut Self {
@@ -455,7 +455,7 @@ pub fn derive_scale_impl(input: TokenStream) -> TokenStream {
     let core = ranim_core_path();
     impl_derive(
         input,
-        quote! {#core::traits::ScaleTransform},
+        quote! {#core::traits::transform::ScaleTransform},
         |field_positions| {
             quote! {
                 fn scale(&mut self, scale: #core::glam::DVec3) -> &mut Self {

@@ -1,5 +1,8 @@
 # `VItem`
 
+> [!caution]
+> ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
+
 ```rust,ignore
 pub struct VItem {
     pub normal: Option<DVec3>,        // 投影平面法向；None 时渲染时推导

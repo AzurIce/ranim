@@ -1,7 +1,10 @@
 use ranim_core::{
     animation::eval::{Eval, EvalExt},
     glam::DVec3,
-    traits::{Aabb, AabbPoint, Locate, RotateTransform, ShiftTransformExt},
+    traits::{
+        Aabb, AabbPoint, Locate,
+        transform::{RotateTransform, ShiftTransformExt},
+    },
 };
 
 // MARK: Require Trait

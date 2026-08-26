@@ -4,33 +4,11 @@ use crate::anchor::{Aabb, AabbPoint, Locate};
 
 /// Shifting operations.
 ///
-/// This trait is automatically implemented for [`DVec3`] and `[T]` where `T: ShiftTransform`.
+/// This trait is blanket-implemented for all `T: ApplyTransform<Translation>`
+/// (see [`super::ApplyTransform`]).
 pub trait ShiftTransform {
     /// Shift the item by a given vector.
     fn shift(&mut self, offset: DVec3) -> &mut Self;
-}
-
-impl ShiftTransform for DVec3 {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        *self += shift;
-        self
-    }
-}
-
-impl<T: ShiftTransformExt> ShiftTransform for [T] {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.iter_mut().for_each(|x| {
-            x.shift(shift);
-        });
-        self
-    }
-}
-
-impl<T: ShiftTransformExt> ShiftTransform for Vec<T> {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.as_mut_slice().shift(shift);
-        self
-    }
 }
 
 /// Useful extensions for shifting operations.

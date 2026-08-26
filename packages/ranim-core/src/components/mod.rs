@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use derive_more::{Deref, DerefMut, From};
 
 use crate::{
-    prelude::{Alignable, Interpolatable},
+    traits::{Alignable, Interpolatable},
     utils::{math::interpolate_usize, resize_preserving_order},
 };
 

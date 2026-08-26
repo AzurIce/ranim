@@ -6,11 +6,8 @@ use ranim_core::{
     color::{AlphaColor, Srgb},
     components::{PointVec, rgba::Rgba},
     core_item::CoreItem,
-    glam::{DMat4, DVec3},
-    traits::{
-        Alignable, Empty, FillColor, Interpolatable, Opacity, RotateTransform, ScaleTransform,
-        ShiftTransform,
-    },
+    glam::{DVec3, Mat4},
+    traits::{Alignable, ApplyTransform, Empty, FillColor, Interpolatable, Opacity},
 };
 
 mod sphere;
@@ -24,14 +21,17 @@ pub use surface::*;
 /// This struct uses [`PointVec`] to wrap vertex data, enabling proper alignment
 /// and interpolation for animations. When extracted, it converts to the low-level
 /// [`ranim_core::core_item::mesh_item::MeshItem`] for rendering.
+///
+/// The vertices are expressed in the mesh's local space. To place or animate the
+/// mesh with an external transform, wrap it in
+/// [`ranim_core::core_item::transformed::Transformed`], commonly storing
+/// [`ranim_core::glam::DAffine3`] as the transform representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeshItem {
-    /// The vertices of the mesh
+    /// The vertices of the mesh (local space)
     pub points: PointVec<DVec3>,
     /// The triangle indices
     pub triangle_indices: Vec<u32>,
-    /// The transform matrix
-    pub transform: DMat4,
     /// Per-vertex colors
     pub vertex_colors: PointVec<Rgba>,
     /// Per-vertex normals for smooth shading.
@@ -46,7 +46,6 @@ impl MeshItem {
         Self {
             points: points.into(),
             triangle_indices: Vec::new(),
-            transform: DMat4::IDENTITY,
             vertex_colors: vec![Rgba::default(); len].into(),
             vertex_normals: vec![DVec3::ZERO; len].into(),
         }
@@ -58,16 +57,9 @@ impl MeshItem {
         Self {
             points: points.into(),
             triangle_indices,
-            transform: DMat4::IDENTITY,
             vertex_colors: vec![Rgba::default(); len].into(),
             vertex_normals: vec![DVec3::ZERO; len].into(),
         }
-    }
-
-    /// Set the transform matrix.
-    pub fn with_transform(mut self, transform: DMat4) -> Self {
-        self.transform = transform;
-        self
     }
 
     /// Set all vertex colors to the same value.
@@ -83,7 +75,7 @@ impl From<MeshItem> for ranim_core::core_item::mesh_item::MeshItem {
         Self {
             points: value.points.iter().map(|p| p.as_vec3()).collect(),
             triangle_indices: value.triangle_indices,
-            transform: value.transform.as_mat4(),
+            transform: Mat4::IDENTITY,
             vertex_colors: value.vertex_colors.iter().copied().collect(),
             vertex_normals: value.vertex_normals.iter().map(|n| n.as_vec3()).collect(),
         }
@@ -94,6 +86,22 @@ impl Extract for MeshItem {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         buf.push(CoreItem::MeshItem(self.clone().into()));
+    }
+}
+
+impl<G: Into<ranim_core::glam::DAffine3>> ApplyTransform<G> for MeshItem {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.points.apply(transform);
+        if transform.matrix3.determinant().abs() > 1e-12 {
+            let normal_matrix = transform.matrix3.inverse().transpose();
+            self.vertex_normals.iter_mut().for_each(|normal| {
+                if let Some(unit) = (normal_matrix * *normal).try_normalize() {
+                    *normal = unit;
+                }
+            });
+        }
+        self
     }
 }
 
@@ -120,7 +128,6 @@ impl Interpolatable for MeshItem {
             } else {
                 target.triangle_indices.clone()
             },
-            transform: self.transform.lerp(&target.transform, t),
             vertex_colors: self.vertex_colors.lerp(&target.vertex_colors, t),
             vertex_normals: self.vertex_normals.lerp(&target.vertex_normals, t),
         }
@@ -159,17 +166,10 @@ impl Aabb for MeshItem {
         }
 
         // TODO: do some optimize and caching
-        // Transform all points and compute bounds
-        let transformed_points: Vec<DVec3> = self
-            .points
-            .iter()
-            .map(|&p| self.transform.transform_point3(p))
-            .collect();
+        let mut min = self.points[0];
+        let mut max = self.points[0];
 
-        let mut min = transformed_points[0];
-        let mut max = transformed_points[0];
-
-        for &p in &transformed_points[1..] {
+        for &p in &self.points[1..] {
             min = min.min(p);
             max = max.max(p);
         }
@@ -178,39 +178,11 @@ impl Aabb for MeshItem {
     }
 }
 
-impl ShiftTransform for MeshItem {
-    fn shift(&mut self, offset: DVec3) -> &mut Self {
-        // Apply shift by modifying the transform matrix
-        let translation = DMat4::from_translation(offset);
-        self.transform = translation * self.transform;
-        self
-    }
-}
-
-impl RotateTransform for MeshItem {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        // Apply rotation by modifying the transform matrix
-        let rotation = DMat4::from_axis_angle(axis.normalize(), angle);
-        self.transform = rotation * self.transform;
-        self
-    }
-}
-
-impl ScaleTransform for MeshItem {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        // Apply scale by modifying the transform matrix
-        let scale_mat = DMat4::from_scale(scale);
-        self.transform = scale_mat * self.transform;
-        self
-    }
-}
-
 impl Empty for MeshItem {
     fn empty() -> Self {
         Self {
             points: Vec::new().into(),
             triangle_indices: Vec::new(),
-            transform: DMat4::IDENTITY,
             vertex_colors: Vec::new().into(),
             vertex_normals: Vec::new().into(),
         }
@@ -304,8 +276,8 @@ mod tests {
     use ranim_core::{
         anchor::Aabb,
         color::palette::css,
-        glam::{DMat4, DVec3},
-        traits::{Alignable, Empty, RotateTransform, ScaleTransform, ShiftTransform},
+        glam::DVec3,
+        traits::{Alignable, Empty},
     };
 
     #[test]
@@ -389,8 +361,7 @@ mod tests {
             vec![DVec3::new(2.0, 0.0, 0.0), DVec3::new(3.0, 0.0, 0.0)],
             vec![0, 1, 3],
         )
-        .with_color(css::GREEN.with_alpha(1.0))
-        .with_transform(DMat4::from_translation(DVec3::new(1.0, 0.0, 0.0)));
+        .with_color(css::GREEN.with_alpha(1.0));
 
         // Align first
         mesh1.align_with(&mut mesh2);
@@ -404,12 +375,6 @@ mod tests {
 
         // triangle_indices should be from mesh2 (since t >= 0.5)
         assert_eq!(interpolated.triangle_indices, vec![0, 1, 3]);
-
-        // Transform should be interpolated
-        assert_eq!(
-            interpolated.transform,
-            DMat4::from_translation(DVec3::new(0.5, 0.0, 0.0))
-        );
     }
 
     #[test]
@@ -429,57 +394,6 @@ mod tests {
         let [min, max] = mesh.aabb();
         assert_eq!(min, dvec3(-1.0, -1.0, -1.0));
         assert_eq!(max, dvec3(1.0, 1.0, 1.0));
-    }
-
-    #[test]
-    fn test_mesh_item_shift() {
-        use ranim_core::glam::dvec3;
-
-        let mut mesh = MeshItem::from_indexed_vertices(
-            vec![DVec3::new(0.0, 0.0, 0.0), DVec3::new(1.0, 0.0, 0.0)],
-            vec![0, 1],
-        );
-
-        mesh.shift(dvec3(1.0, 2.0, 3.0));
-
-        // Check AABB after shift
-        let [min, _max] = mesh.aabb();
-        assert!((min.x - 1.0).abs() < 1e-5);
-        assert!((min.y - 2.0).abs() < 1e-5);
-        assert!((min.z - 3.0).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_mesh_item_scale() {
-        use ranim_core::glam::dvec3;
-
-        let mut mesh = MeshItem::from_indexed_vertices(
-            vec![DVec3::new(1.0, 1.0, 1.0), DVec3::new(2.0, 2.0, 2.0)],
-            vec![0, 1],
-        );
-
-        mesh.scale(dvec3(2.0, 2.0, 2.0));
-
-        // Check AABB after scale
-        let [min, max] = mesh.aabb();
-        assert!((min.x - 2.0).abs() < 1e-5);
-        assert!((max.x - 4.0).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_mesh_item_rotate() {
-        use ranim_core::glam::dvec3;
-        use std::f64::consts::PI;
-
-        let mut mesh = MeshItem::from_indexed_vertices(vec![DVec3::new(1.0, 0.0, 0.0)], vec![]);
-
-        // Rotate 90 degrees around Z axis
-        mesh.rotate_on_axis(dvec3(0.0, 0.0, 1.0), PI / 2.0);
-
-        let [min, _max] = mesh.aabb();
-        // After rotation, x should be ~0, y should be ~1
-        assert!(min.x.abs() < 1e-5);
-        assert!((min.y - 1.0).abs() < 1e-5);
     }
 
     #[test]

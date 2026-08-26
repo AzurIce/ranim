@@ -1,5 +1,8 @@
 # CoreItem 与 Extract
 
+> [!caution]
+> ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
+
 场景中所有可见内容最终都归结为少数几种 **core item**。动画系统求值得到的是
 用户层 item（`ranim-items` 中的 `VItem`、`Surface` 等高层类型），而渲染器只
 认识 core item；连接二者的是 `Extract` trait。

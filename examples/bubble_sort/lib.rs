@@ -34,7 +34,7 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
             let rect = Rectangle::new(width_unit, height).with(|rect| {
                 rect.stroke_width = 0.0;
                 rect.set_fill_color(manim::WHITE.with_alpha(0.5))
-                    .scale(DVec3::splat(0.8))
+                    .scale_axes(dvec2(0.8, 0.8))
                     .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             });
             let sequence = seq![rect.show()];

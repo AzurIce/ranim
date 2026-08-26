@@ -2,7 +2,7 @@ use std::f64::consts::{PI, TAU};
 
 use ranim::{
     color::palettes::manim,
-    glam::{DMat4, DVec3},
+    glam::{DAffine3, DVec3},
     items::mesh::{Sphere, Surface},
     prelude::*,
     utils::rate_functions::{linear, smooth},
@@ -24,9 +24,9 @@ trait OrbitItem: Clone {
     fn set_orbit_position(&mut self, position: DVec3);
 }
 
-impl OrbitItem for Surface {
+impl OrbitItem for Transformed<Surface, DAffine3> {
     fn set_orbit_position(&mut self, position: DVec3) {
-        self.transform = DMat4::from_translation(position);
+        self.transform = DAffine3::from_translation(position);
     }
 }
 
@@ -141,7 +141,7 @@ fn orbit<T: OrbitItem>(item: &mut T, planet: &PlanetData, z: f64) -> OrbitMotion
 }
 
 /// One body layer: stay visible through the intro, then enter the shared orbit.
-fn body_layer(mut surface: Surface, planet: &PlanetData) -> AnimSequence {
+fn body_layer(mut surface: Transformed<Surface, DAffine3>, planet: &PlanetData) -> AnimSequence {
     seq![
         surface.show().with_duration(INTRO_SECS),
         orbit(&mut surface, planet, 0.0)
@@ -192,30 +192,30 @@ fn planet_system(planet: &PlanetData) -> AnimStack {
     let mut body_layers = AnimStack::new();
 
     if planet.has_atmosphere {
-        let mut core = Surface::from(
+        let core = Surface::from(
             Sphere::new(planet.radius * 0.9)
                 .with_resolution((20, 10))
                 .with_fill_color(planet.color.with_alpha(1.0)),
-        );
-        core.transform = DMat4::from_translation(position);
+        )
+        .transformed(DAffine3::from_translation(position));
         body_layers.push(body_layer(core, planet));
 
-        let mut atmosphere = Surface::from(
+        let atmosphere = Surface::from(
             Sphere::new(planet.radius)
                 .with_resolution((20, 10))
                 .with_fill_color(planet.color.with_alpha(0.3)),
         )
-        .with_smooth_normals();
-        atmosphere.transform = DMat4::from_translation(position);
+        .with_smooth_normals()
+        .transformed(DAffine3::from_translation(position));
         body_layers.push(body_layer(atmosphere, planet));
     } else {
-        let mut surface = Surface::from(
+        let surface = Surface::from(
             Sphere::new(planet.radius)
                 .with_resolution((20, 10))
                 .with_fill_color(planet.color.with_alpha(1.0)),
         )
-        .with_smooth_normals();
-        surface.transform = DMat4::from_translation(position);
+        .with_smooth_normals()
+        .transformed(DAffine3::from_translation(position));
         body_layers.push(body_layer(surface, planet));
     }
 

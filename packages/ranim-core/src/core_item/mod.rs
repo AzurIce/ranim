@@ -19,6 +19,8 @@ use crate::{
 pub mod camera_frame;
 /// MeshItem
 pub mod mesh_item;
+/// Transformed
+pub mod transformed;
 /// Vitem
 pub mod vitem;
 
@@ -31,6 +33,36 @@ pub enum CoreItem {
     VItem(VItem),
     /// [`MeshItem`]
     MeshItem(MeshItem),
+}
+
+impl CoreItem {
+    /// Apply a local-to-world transform to this item.
+    ///
+    /// - [`CameraFrame`]: transforms `pos` as a point, re-normalizes `up`/`facing` as vectors.
+    /// - [`VItem`]: bakes the transform into its world-space points.
+    /// - [`MeshItem`]: left-multiplies its `transform` matrix (vertices untouched).
+    pub fn apply_transform(&mut self, transform: &glam::DAffine3) {
+        match self {
+            CoreItem::CameraFrame(cam) => {
+                cam.pos = transform.transform_point3(cam.pos);
+                cam.up = transform.transform_vector3(cam.up).normalize();
+                cam.facing = transform.transform_vector3(cam.facing).normalize();
+            }
+            CoreItem::VItem(item) => {
+                let mat = glam::DMat4::from(*transform).as_mat4();
+                for p in &mut item.points {
+                    *p = mat.transform_point3(p.truncate()).extend(p.w);
+                }
+                if let Some(normal) = &mut item.normal {
+                    let normal_matrix = transform.matrix3.inverse().transpose().as_mat3();
+                    *normal = (normal_matrix * *normal).normalize_or_zero();
+                }
+            }
+            CoreItem::MeshItem(item) => {
+                item.transform = glam::DMat4::from(*transform).as_mat4() * item.transform;
+            }
+        }
+    }
 }
 
 /// The item that can be extracted to [`CoreItem`]s

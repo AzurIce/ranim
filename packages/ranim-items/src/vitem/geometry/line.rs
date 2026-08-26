@@ -3,10 +3,7 @@ use ranim_core::{
     color::{AlphaColor, Srgb},
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::DVec3,
-    traits::{
-        Aabb, Discard as _, Locate, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
-        StrokeColor, StrokeWidth, With as _,
-    },
+    traits::{Aabb, ApplyTransform, Discard, Locate, Opacity, StrokeColor, StrokeWidth, With},
 };
 use ranim_macros::Interpolatable;
 
@@ -66,26 +63,15 @@ impl Aabb for Line {
     }
 }
 
-impl ShiftTransform for Line {
-    fn shift(&mut self, offset: DVec3) -> &mut Self {
-        self.points.shift(offset);
-        self
-    }
-}
-
-impl RotateTransform for Line {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.points.rotate_on_axis(axis, angle);
-        self
-    }
-}
-
-impl ScaleTransform for Line {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        let [p1, p2] = self.points;
-        let k = ((p2 - p1).normalize() * scale).length();
-        self.points.scale(scale);
-        self.extrude.iter_mut().for_each(|e| *e *= k);
+impl<G: Into<ranim_core::glam::DAffine3>> ApplyTransform<G> for Line {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        let direction = (self.points[1] - self.points[0]).try_normalize();
+        self.points.apply(transform);
+        if let Some(direction) = direction {
+            let length_scale = transform.transform_vector3(direction).length();
+            self.extrude.iter_mut().for_each(|e| *e *= length_scale);
+        }
         self
     }
 }

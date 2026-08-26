@@ -1,5 +1,8 @@
 # Core Items
 
+> [!caution]
+> ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
+
 Core item 是渲染器直接消费的三种 primitive，定义在 `ranim-core` 的
 `core_item` 模块，即 [`CoreItem`](../core_item.md) 枚举的三个变体。与
 用户层 item（见 Items 大节）相比，它们：
