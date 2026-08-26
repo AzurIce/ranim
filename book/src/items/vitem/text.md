@@ -1,5 +1,8 @@
 # 文字物件
 
+> [!caution]
+> ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
+
 `vitem::text` 与 `vitem::typst` 提供文字物件，需要启用 `typst` feature。
 
 ## `TextItem`

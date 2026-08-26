@@ -30,10 +30,7 @@ use ranim_core::{
     components::width::Width,
     core_item::CoreItem,
     glam,
-    traits::{
-        Alignable, FillColor, Opacity, RotateTransform, ScaleTransform, ShiftTransform,
-        StrokeColor, StrokeWidth, With,
-    },
+    traits::{Alignable, ApplyTransform, FillColor, Opacity, StrokeColor, StrokeWidth, With},
 };
 
 struct TypstLruCache {
@@ -450,23 +447,9 @@ impl Aabb for TypstText {
     }
 }
 
-impl ShiftTransform for TypstText {
-    fn shift(&mut self, shift: glam::DVec3) -> &mut Self {
-        self.vitems.shift(shift);
-        self
-    }
-}
-
-impl RotateTransform for TypstText {
-    fn rotate_on_axis(&mut self, axis: glam::DVec3, angle: f64) -> &mut Self {
-        self.vitems.rotate_on_axis(axis, angle);
-        self
-    }
-}
-
-impl ScaleTransform for TypstText {
-    fn scale(&mut self, scale: glam::DVec3) -> &mut Self {
-        self.vitems.scale(scale);
+impl<G: Into<glam::DAffine3>> ApplyTransform<G> for TypstText {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        self.vitems.apply(transform.into());
         self
     }
 }

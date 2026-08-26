@@ -5,8 +5,8 @@ use ranim_core::{
     color::{self, AlphaColor, Srgb},
     components::rgba::Rgba,
     core_item::CoreItem,
-    glam::{DMat4, DVec3},
-    traits::{FillColor, Interpolatable, Opacity},
+    glam::DVec3,
+    traits::{ApplyTransform, FillColor, Interpolatable, Opacity},
 };
 
 use crate::mesh::MeshItem;
@@ -49,9 +49,14 @@ fn colorscale_lookup(colorscale: &[(AlphaColor<Srgb>, f64)], value: f64) -> Alph
 ///
 /// By default, vertex normals are all-zero, which causes flat shading.
 /// To enable smooth shading, call [`Self::with_smooth_normals`] or [`Self::update_smooth_normals`] to update the normals.
+///
+/// The vertices are expressed in the surface's local space. To place or animate
+/// the surface with an external transform, wrap it in
+/// [`ranim_core::core_item::transformed::Transformed`], commonly storing
+/// [`ranim_core::glam::DAffine3`] as the transform representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Surface {
-    /// Vertices — `nu * nv` points in row-major order.
+    /// Vertices — `nu * nv` points in row-major order (local space).
     pub vertices: Vec<DVec3>,
     /// Per-vertex colors.
     pub vertex_colors: Vec<AlphaColor<Srgb>>,
@@ -61,8 +66,6 @@ pub struct Surface {
     pub triangle_indices: Vec<u32>,
     /// Grid resolution `(nu, nv)`.
     pub resolution: (u32, u32),
-    /// Transform matrix applied when rendering.
-    pub transform: DMat4,
 }
 
 impl Surface {
@@ -98,7 +101,6 @@ impl Surface {
             resolution,
             vertex_colors,
             vertex_normals,
-            transform: DMat4::IDENTITY,
         }
     }
 
@@ -119,12 +121,6 @@ impl Surface {
             .map(|p| colorscale_lookup(colorscale, p.z))
             .collect();
         self.vertex_colors = colors;
-        self
-    }
-
-    /// Set the transform matrix. Returns `self` for chaining.
-    pub fn with_transform(mut self, transform: DMat4) -> Self {
-        self.transform = transform;
         self
     }
 
@@ -157,7 +153,6 @@ impl Interpolatable for Surface {
             },
             vertex_colors: self.vertex_colors.lerp(&target.vertex_colors, t),
             vertex_normals: self.vertex_normals.lerp(&target.vertex_normals, t),
-            transform: Interpolatable::lerp(&self.transform, &target.transform, t),
         }
     }
 }
@@ -198,7 +193,6 @@ impl From<Surface> for MeshItem {
         MeshItem {
             points: value.vertices.into(),
             triangle_indices: value.triangle_indices,
-            transform: value.transform,
             vertex_colors: value
                 .vertex_colors
                 .into_iter()
@@ -214,6 +208,22 @@ impl Extract for Surface {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         MeshItem::from(self.clone()).extract_into(buf);
+    }
+}
+
+impl<G: Into<ranim_core::glam::DAffine3>> ApplyTransform<G> for Surface {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.vertices.apply(transform);
+        if transform.matrix3.determinant().abs() > 1e-12 {
+            let normal_matrix = transform.matrix3.inverse().transpose();
+            self.vertex_normals.iter_mut().for_each(|normal| {
+                if let Some(unit) = (normal_matrix * *normal).try_normalize() {
+                    *normal = unit;
+                }
+            });
+        }
+        self
     }
 }
 

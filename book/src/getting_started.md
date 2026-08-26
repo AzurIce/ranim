@@ -1,5 +1,8 @@
 # Getting Started
 
+> [!caution]
+> 本书绝大多数内容目前均由 ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
+
 Ranim 的场景由一个 `fn(&mut RanimScene)` 函数构造。场景函数只负责定义动画；预览、渲染和输出配置由 `#[scene]`、`#[output]` 与 ranim CLI 处理。
 
 ## 准备项目

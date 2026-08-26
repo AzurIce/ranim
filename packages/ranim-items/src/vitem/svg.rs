@@ -3,7 +3,7 @@ use glam::DVec3;
 use glam::{DAffine2, dvec3};
 use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
-use ranim_core::traits::{PointsFunc, RotateTransform, ShiftTransformExt};
+use ranim_core::traits::{ApplyTransform, PointsFunc, RotateTransform, ShiftTransformExt};
 use ranim_core::{Extract, components::width::Width, utils::bezier::PathBuilder};
 use ranim_core::{color, glam};
 use tracing::warn;
@@ -16,9 +16,7 @@ use super::VItem;
 /// An Svg Item
 ///
 /// Its inner is a `Vec<VItem>`
-#[derive(
-    Clone, ranim_macros::ShiftTransform, ranim_macros::RotateTransform, ranim_macros::ScaleTransform,
-)]
+#[derive(Clone)]
 pub struct SvgItem(Vec<VItem>);
 
 impl From<SvgItem> for Vec<VItem> {
@@ -42,6 +40,13 @@ impl SvgItem {
 impl Aabb for SvgItem {
     fn aabb(&self) -> [glam::DVec3; 2] {
         self.0.aabb()
+    }
+}
+
+impl<G: Into<glam::DAffine3>> ApplyTransform<G> for SvgItem {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        self.0.apply(transform.into());
+        self
     }
 }
 

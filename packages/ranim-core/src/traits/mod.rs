@@ -1,22 +1,19 @@
-/// Transform related traits
-pub mod transform {
-    mod rotate;
-    mod scale;
-    mod shift;
-
-    pub use rotate::*;
-    pub use scale::*;
-    pub use shift::*;
-}
-pub use transform::*;
+/// Transform related things
+pub mod transform;
 
 pub use crate::anchor::{Aabb, AabbPoint, Locate};
+pub use transform::{
+    ApplyTransform, Diag, NotSimilarity, Rigid, RotateTransform, ScaleHint, ScaleTransform,
+    ScaleTransformExt, ScaleTransformStrokeExt, ShiftTransform, ShiftTransformExt, Similarity,
+    TransformGroup, Translation, UniformScaleTransform,
+};
 
 use std::ops::Range;
 
 use color::{AlphaColor, ColorSpace, OpaqueColor, Srgb};
 use glam::{
-    DAffine2, DAffine3, DMat4, DQuat, DVec2, DVec3, Mat4, USizeVec3, Vec3, Vec3Swizzles, dvec3,
+    DAffine2, DAffine3, DMat3, DMat4, DQuat, DVec2, DVec3, Mat4, USizeVec3, Vec3, Vec3Swizzles,
+    dvec3,
 };
 use num::complex::Complex64;
 
@@ -150,6 +147,21 @@ impl Interpolatable for DMat4 {
             }
         }
         result
+    }
+}
+
+impl Interpolatable for DAffine3 {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        // Component-wise lerp of `matrix3` + `translation` is trivially closed
+        // within affine transforms (no homogeneous bottom row to preserve).
+        Self {
+            matrix3: DMat3::from_cols(
+                self.matrix3.x_axis.lerp(target.matrix3.x_axis, t),
+                self.matrix3.y_axis.lerp(target.matrix3.y_axis, t),
+                self.matrix3.z_axis.lerp(target.matrix3.z_axis, t),
+            ),
+            translation: self.translation.lerp(target.translation, t),
+        }
     }
 }
 
@@ -453,7 +465,7 @@ impl<T: PointsFunc> PointsFunc for [T] {
 
 // MARK: Align
 /// Align a slice of items
-pub trait AlignSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
+pub trait AlignSlice<T: ShiftTransformExt>: AsMut<[T]> {
     /// Align items' anchors in a given axis, based on the first item.
     fn align_anchor<A>(&mut self, axis: DVec3, anchor: A) -> &mut Self
     where
@@ -488,7 +500,7 @@ pub trait AlignSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
 
 // MARK: Arrange
 /// A trait for arranging operations.
-pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
+pub trait ArrangeSlice<T: ShiftTransformExt>: AsMut<[T]> {
     /// Arrange the items by a given function.
     ///
     /// The `pos_func` takes index as input and output the center position.
@@ -559,4 +571,4 @@ pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     }
 }
 
-impl<T: transform::ShiftTransformExt, E: AsMut<[T]>> ArrangeSlice<T> for E {}
+impl<T: ShiftTransformExt, E: AsMut<[T]>> ArrangeSlice<T> for E {}

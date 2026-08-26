@@ -109,6 +109,20 @@
 
           cargoHash = "sha256-zhijQ+9vVB4IL/t1+IGLAnvJka0AB1yJRWo/qEyUfx0=";
         });
+
+        mdbook-typst-math = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
+          pname = "mdbook-typst-math";
+          version = "0.3.0-unstable-2026-08-25";
+
+          src = pkgs.fetchFromGitHub {
+            owner = "duskmoon314";
+            repo = "mdbook-typst-math";
+            rev = "e310ec82ecaec5ae8e516ac07e9cab85fb506bc3";
+            hash = "sha256-DQBUBjb1eNTmHj35sjuaN07GW4rpDlM40GFB3dWtiHg=";
+          };
+
+          cargoHash = "sha256-Mms8HDxak46oTbcICEjw2612gHGdsrO9kVLQTlNi24o=";
+        });
       in
       {
         packages = { inherit ranim-cli; };
@@ -120,6 +134,7 @@
         devShells.default = craneLib.devShell {
           packages = [
             puffin_viewer
+            mdbook-typst-math
           ]
           ++ (with pkgs; [
             git-cliff

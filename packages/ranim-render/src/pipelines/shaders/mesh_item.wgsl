@@ -105,11 +105,21 @@ fn vs_main(
     let transform = transforms[mesh_id];
     let pos_world = transform * vec4<f32>(position, 1.0);
 
+    // Normals are covectors: use the inverse transpose of the linear part.
+    let axis_x = transform[0].xyz;
+    let axis_y = transform[1].xyz;
+    let axis_z = transform[2].xyz;
+    let cofactor_x = cross(axis_y, axis_z);
+    let cofactor_y = cross(axis_z, axis_x);
+    let cofactor_z = cross(axis_x, axis_y);
+    let inverse_determinant = 1.0 / dot(axis_x, cofactor_x);
+    let normal_transform = mat3x3<f32>(cofactor_x, cofactor_y, cofactor_z) * inverse_determinant;
+
     out.frag_pos = cam_uniforms.proj_mat * cam_uniforms.view_mat * pos_world;
     out.mesh_id = mesh_id;
     out.world_pos = pos_world.xyz;
     out.vertex_color = vertex_color;
-    out.world_normal = (transform * vec4<f32>(vertex_normal, 0.0)).xyz;
+    out.world_normal = normal_transform * vertex_normal;
 
     return out;
 }

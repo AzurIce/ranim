@@ -6,7 +6,7 @@ use ranim_core::{
     color,
     core_item::CoreItem,
     glam::{DVec2, DVec3, dvec2, dvec3},
-    traits::{Discard, RotateTransform, ScaleTransform, ShiftTransform, ShiftTransformExt},
+    traits::{ApplyTransform, Discard, ScaleTransform, ShiftTransform, ShiftTransformExt},
 };
 
 use color::{AlphaColor, Srgb};
@@ -84,20 +84,13 @@ impl Aabb for Square {
     }
 }
 
-impl ShiftTransform for Square {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.center.shift(shift);
-        self
-    }
-}
-
-impl RotateTransform for Square {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.center.rotate_on_axis(axis, angle);
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
+impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Square {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.center = transform.transform_point(self.center);
+        self.axes.0 = transform.transform_direction(self.axes.0);
+        self.axes.1 = transform.transform_direction(self.axes.1);
+        self.size *= transform.scale;
         self
     }
 }
@@ -246,6 +239,17 @@ impl Rectangle {
     pub fn height(&self) -> f64 {
         self.size.y.abs()
     }
+
+    /// Scale the dimensions along the rectangle's stored shape axes.
+    ///
+    /// This edits `size` without changing the stored orthogonal `axes`. To
+    /// compose a transform outside or inside a wrapper instead, use
+    /// [`ranim_core::core_item::transformed::Transformed::compose_outer`] or
+    /// [`ranim_core::core_item::transformed::Transformed::compose_inner`].
+    pub fn scale_axes(&mut self, scale: DVec2) -> &mut Self {
+        self.size *= scale;
+        self
+    }
 }
 
 // MARK: Traits impl
@@ -258,31 +262,13 @@ impl Aabb for Rectangle {
     }
 }
 
-impl ShiftTransform for Rectangle {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.p0.shift(shift);
-        self
-    }
-}
-
-impl RotateTransform for Rectangle {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.p0.rotate_on_axis(axis, angle);
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
-        self
-    }
-}
-
-impl ScaleTransform for Rectangle {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        self.p0.scale(scale);
-        let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
-        let scale_u = scale.dot(u);
-        let scale_v = scale.dot(v);
-        self.size *= dvec2(scale_u, scale_v);
+impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Rectangle {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.p0 = transform.transform_point(self.p0);
+        self.axes.0 = transform.transform_direction(self.axes.0);
+        self.axes.1 = transform.transform_direction(self.axes.1);
+        self.size *= transform.scale;
         self
     }
 }
@@ -396,38 +382,15 @@ impl Aabb for Polygon {
     }
 }
 
-impl ShiftTransform for Polygon {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.points.shift(shift);
+impl<G: Into<ranim_core::glam::DAffine3>> ApplyTransform<G> for Polygon {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.points.apply(transform);
+        self.axes.0 = transform.transform_vector3(self.axes.0);
+        self.axes.1 = transform.transform_vector3(self.axes.1);
         self
     }
 }
-
-impl RotateTransform for Polygon {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.points.rotate_on_axis(axis, angle);
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
-        self
-    }
-}
-
-impl ScaleTransform for Polygon {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        self.points.scale(scale);
-        self
-    }
-}
-
-// impl AffineTransform for Polygon {
-//     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
-//         self.points.affine_transform_at_point(mat, origin);
-//         // TODO: how to transform axes?
-//         self
-//     }
-// }
 
 impl Alignable for Polygon {
     fn is_aligned(&self, other: &Self) -> bool {
@@ -591,20 +554,13 @@ impl Aabb for RegularPolygon {
     }
 }
 
-impl ShiftTransform for RegularPolygon {
-    fn shift(&mut self, offset: DVec3) -> &mut Self {
-        self.center.shift(offset);
-        self
-    }
-}
-
-impl RotateTransform for RegularPolygon {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.axes.0.rotate_on_axis(axis, angle);
-        self.axes.0 = self.axes.0.normalize();
-        self.axes.1.rotate_on_axis(axis, angle);
-        self.axes.1 = self.axes.1.normalize();
-        self.center.rotate_on_axis(axis, angle);
+impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for RegularPolygon {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.center = transform.transform_point(self.center);
+        self.axes.0 = transform.transform_direction(self.axes.0);
+        self.axes.1 = transform.transform_direction(self.axes.1);
+        self.radius *= transform.scale;
         self
     }
 }
@@ -665,5 +621,26 @@ impl Extract for RegularPolygon {
 
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         Polygon::from(self.clone()).extract_into(buf);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ranim_core::traits::RotateTransform;
+
+    #[test]
+    fn rotated_rectangle_scale_axes_preserves_stored_axes() {
+        let mut rectangle = Rectangle::new(2.0, 3.0);
+        rectangle.rotate_on_axis(DVec3::Z, core::f64::consts::FRAC_PI_4);
+        let axes = rectangle.axes;
+        let p0 = rectangle.p0;
+
+        rectangle.scale_axes(dvec2(2.0, 0.5));
+
+        assert_eq!(rectangle.axes, axes);
+        assert_eq!(rectangle.p0, p0);
+        assert_eq!(rectangle.size, dvec2(4.0, 1.5));
+        assert!(rectangle.axes.0.dot(rectangle.axes.1).abs() < 1e-12);
     }
 }

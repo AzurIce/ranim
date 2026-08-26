@@ -30,7 +30,7 @@ use ranim_core::{Extract, color, glam};
 use ranim_core::{
     components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
     prelude::{Alignable, Empty, FillColor, Opacity, Partial, StrokeWidth},
-    traits::{PointsFunc, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor},
+    traits::{ApplyTransform, PointsFunc, StrokeColor},
 };
 
 /// A vectorized item.
@@ -98,36 +98,24 @@ impl Aabb for VItem {
     }
 }
 
-impl ShiftTransform for VItem {
-    fn shift(&mut self, shift: DVec3) -> &mut Self {
-        self.vpoints.shift(shift);
-        self
-    }
-}
-
-impl RotateTransform for VItem {
-    fn rotate_on_axis(&mut self, axis: DVec3, angle: f64) -> &mut Self {
-        self.vpoints.rotate_on_axis(axis, angle);
-        if let Some(ref mut n) = self.normal {
-            *n = DVec3::rotate_axis(*n, axis, angle);
+impl<G: Into<glam::DAffine3>> ApplyTransform<G> for VItem {
+    fn apply(&mut self, transform: G) -> &mut Self {
+        let transform = transform.into();
+        self.vpoints.apply(transform);
+        if let Some(ref mut normal) = self.normal {
+            let matrix = transform.matrix3;
+            let transformed = if matrix.determinant().abs() > 1e-12 {
+                matrix.inverse().transpose() * *normal
+            } else {
+                matrix * *normal
+            };
+            if let Some(unit) = transformed.try_normalize() {
+                *normal = unit;
+            }
         }
         self
     }
 }
-
-impl ScaleTransform for VItem {
-    fn scale(&mut self, scale: DVec3) -> &mut Self {
-        self.vpoints.scale(scale);
-        self
-    }
-}
-
-// impl AffineTransform for VItem {
-//     fn affine_transform_at_point(&mut self, mat: DAffine3, origin: DVec3) -> &mut Self {
-//         self.vpoints.affine_transform_at_point(mat, origin);
-//         self
-//     }
-// }
 
 /// Default stroke width
 pub use ranim_core::core_item::vitem::DEFAULT_STROKE_WIDTH;
