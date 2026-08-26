@@ -15,6 +15,7 @@
 //! ```
 //!
 #![warn(missing_docs)]
+#![recursion_limit = "256"]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(rustdoc::private_intra_doc_links)]
 #![doc(
