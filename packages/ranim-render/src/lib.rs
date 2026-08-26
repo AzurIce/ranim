@@ -1,4 +1,5 @@
 //! Rendering stuff in ranim
+#![recursion_limit = "256"]
 // #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(rustdoc::private_intra_doc_links)]
