@@ -93,12 +93,12 @@ fn convolve(kernel: &Kernel) -> Vec<f64> {
     for r in 0..N {
         for c in 0..N {
             let mut acc = 0.0;
-            for kr in 0..3 {
-                for kc in 0..3 {
+            for (kr, row) in kernel.values.iter().enumerate() {
+                for (kc, &kernel_value) in row.iter().enumerate() {
                     let ir = r as i64 + kr as i64 - 1;
                     let ic = c as i64 + kc as i64 - 1;
                     if ir >= 0 && ir < N as i64 && ic >= 0 && ic < N as i64 {
-                        acc += kernel.values[kr][kc] * image_value(ir as usize, ic as usize);
+                        acc += kernel_value * image_value(ir as usize, ic as usize);
                     }
                 }
             }

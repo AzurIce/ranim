@@ -17,7 +17,7 @@ jobs:
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2026-05-01
+          toolchain: nightly-2026-08-01
           targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
@@ -70,8 +70,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install rust toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2026-08-01
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
