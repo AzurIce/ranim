@@ -8,7 +8,8 @@ use crate::{
     color::{AlphaColor, Srgb},
     core_item::CoreItem,
     traits::{
-        Alignable, ApplyTransform, FillColor, Interpolatable, Opacity, StrokeColor, TransformGroup,
+        Alignable, ApplyTransform, Diag, FillColor, Interpolatable, Opacity, Rigid, Similarity,
+        StrokeColor, TransformGroup, Translation,
     },
 };
 
@@ -203,13 +204,13 @@ macro_rules! impl_transformed_widening {
     };
 }
 
-impl_transformed_widening!(crate::traits::Translation => crate::traits::Rigid);
-impl_transformed_widening!(crate::traits::Translation => crate::traits::Similarity);
-impl_transformed_widening!(crate::traits::Translation => DAffine3);
-impl_transformed_widening!(crate::traits::Rigid => crate::traits::Similarity);
-impl_transformed_widening!(crate::traits::Rigid => DAffine3);
-impl_transformed_widening!(crate::traits::Similarity => DAffine3);
-impl_transformed_widening!(crate::traits::Diag => DAffine3);
+impl_transformed_widening!(Translation => Rigid);
+impl_transformed_widening!(Translation => Similarity);
+impl_transformed_widening!(Translation => DAffine3);
+impl_transformed_widening!(Rigid => Similarity);
+impl_transformed_widening!(Rigid => DAffine3);
+impl_transformed_widening!(Similarity => DAffine3);
+impl_transformed_widening!(Diag => DAffine3);
 
 /// Extension methods for attaching an exact transform representation to a value.
 pub trait TransformedExt: Sized {
@@ -226,10 +227,7 @@ mod tests {
     use super::*;
     use crate::{
         core_item::{mesh_item::MeshItem, vitem::VItem},
-        traits::{
-            Diag, Rigid, ScaleTransform, ShiftTransform, Similarity, Translation,
-            UniformScaleTransform,
-        },
+        traits::{ScaleTransform, ShiftTransform, UniformScaleTransform},
     };
     use glam::{DQuat, Vec3, Vec4};
 

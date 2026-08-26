@@ -1,11 +1,17 @@
-//! The core transform trait: group actions on shapes.
+/// Types of transforms based on group theory.
+pub mod group;
+mod rotate;
+mod scale;
+mod shift;
+
+pub use group::{Diag, NotSimilarity, Rigid, Similarity, TransformGroup, Translation};
+pub use rotate::RotateTransform;
+pub use scale::{
+    ScaleHint, ScaleTransform, ScaleTransformExt, ScaleTransformStrokeExt, UniformScaleTransform,
+};
+pub use shift::{ShiftTransform, ShiftTransformExt};
 
 use glam::{DAffine3, DVec3};
-
-use super::{
-    RotateTransform, ScaleTransform, ShiftTransform,
-    group::{Diag, Rigid, Similarity, Translation},
-};
 
 // MARK: ApplyTransform
 /// A group action of `G` on `Self`: baking a transform into the item's data.
@@ -73,23 +79,5 @@ impl<T: ApplyTransform<Rigid> + ?Sized> RotateTransform for T {
 impl<T: ApplyTransform<Diag> + ?Sized> ScaleTransform for T {
     fn scale(&mut self, scale: DVec3) -> &mut Self {
         self.apply(Diag(scale))
-    }
-}
-
-// MARK: UniformScaleTransform
-/// Uniform-scaling operations: the similarity-group action.
-///
-/// This trait is blanket-implemented for all `T: ApplyTransform<Similarity>`,
-/// which covers both affine-closure types (via `Similarity: Into<DAffine3>`)
-/// and similarity-closure types (circles, spheres, ...) that cannot offer
-/// the non-uniform [`ScaleTransform`].
-pub trait UniformScaleTransform {
-    /// Scale the item uniformly by `s` (at origin).
-    fn scale_uniform(&mut self, s: f64) -> &mut Self;
-}
-
-impl<T: ApplyTransform<Similarity> + ?Sized> UniformScaleTransform for T {
-    fn scale_uniform(&mut self, s: f64) -> &mut Self {
-        self.apply(Similarity::from_scale(s))
     }
 }

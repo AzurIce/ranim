@@ -6,6 +6,7 @@ use crate::{
     Extract,
     core_item::CoreItem,
     prelude::{Alignable, Interpolatable},
+    traits::ApplyTransform,
 };
 
 /// The data of a camera
@@ -71,7 +72,7 @@ impl Alignable for CameraFrame {
     fn align_with(&mut self, _other: &mut Self) {}
 }
 
-impl<G: Into<glam::DAffine3>> crate::traits::ApplyTransform<G> for CameraFrame {
+impl<G: Into<glam::DAffine3>> ApplyTransform<G> for CameraFrame {
     /// `pos` transforms as a point; `up`/`facing` transform as direction
     /// vectors (and are re-normalized).
     fn apply(&mut self, transform: G) -> &mut Self {

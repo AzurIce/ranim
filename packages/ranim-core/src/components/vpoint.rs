@@ -5,7 +5,9 @@ use glam::DVec3;
 use itertools::Itertools;
 
 use crate::anchor::Aabb;
-use crate::traits::*;
+use crate::traits::{
+    Alignable, ApplyTransform, RotateTransform, ScaleTransform, ShiftTransform, ShiftTransformExt,
+};
 use crate::utils::bezier::{get_subpath_closed_flag, trim_quad_bezier};
 use crate::utils::math::interpolate_usize;
 use crate::utils::{avg, resize_preserving_order_with_repeated_indices};
@@ -82,7 +84,7 @@ impl AsMut<[DVec3]> for VPointVec {
     }
 }
 
-impl<G: Into<glam::DAffine3>> transform::ApplyTransform<G> for VPointVec {
+impl<G: Into<glam::DAffine3>> ApplyTransform<G> for VPointVec {
     fn apply(&mut self, transform: G) -> &mut Self {
         self.0.apply(transform.into());
         self

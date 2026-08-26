@@ -19,9 +19,9 @@
 //! [`ApplyTransform`](super::ApplyTransform) with a `G: Into<...>` bound
 //! (e.g. `G: Into<DAffine3>` for affine-closure point data, or
 //! `G: Into<Similarity>` for circles and spheres); the operation traits
-//! ([`ShiftTransform`](crate::traits::ShiftTransform),
-//! [`RotateTransform`](crate::traits::RotateTransform),
-//! [`ScaleTransform`](crate::traits::ScaleTransform),
+//! ([`ShiftTransform`](super::ShiftTransform),
+//! [`RotateTransform`](super::RotateTransform),
+//! [`ScaleTransform`](super::ScaleTransform),
 //! [`UniformScaleTransform`](super::UniformScaleTransform)) are
 //! blanket-derived from it.
 

@@ -3,7 +3,12 @@ use std::cmp::Ordering;
 use glam::{DVec3, dvec3};
 use itertools::Itertools;
 
-use crate::{anchor::Aabb, traits::StrokeWidth};
+use crate::{
+    anchor::Aabb,
+    traits::{StrokeWidth, transform::group::Similarity},
+};
+
+use super::ApplyTransform;
 
 /// A hint for scaling the mobject.
 #[derive(Debug, Clone, Copy)]
@@ -126,3 +131,15 @@ pub trait ScaleTransformStrokeExt: ScaleTransform + StrokeWidth {
 }
 
 impl<T: ScaleTransform + StrokeWidth + ?Sized> ScaleTransformStrokeExt for T {}
+
+/// Uniform-scaling operations: the similarity-group action.
+pub trait UniformScaleTransform {
+    /// Scale the item uniformly by `s` (at origin).
+    fn scale_uniform(&mut self, s: f64) -> &mut Self;
+}
+
+impl<T: ApplyTransform<Similarity> + ?Sized> UniformScaleTransform for T {
+    fn scale_uniform(&mut self, s: f64) -> &mut Self {
+        self.apply(Similarity::from_scale(s))
+    }
+}

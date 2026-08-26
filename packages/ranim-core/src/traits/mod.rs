@@ -1,20 +1,12 @@
-/// Transform related traits
-pub mod transform {
-    mod apply;
-    mod group;
-    mod rotate;
-    mod scale;
-    mod shift;
-
-    pub use apply::*;
-    pub use group::*;
-    pub use rotate::*;
-    pub use scale::*;
-    pub use shift::*;
-}
-pub use transform::*;
+/// Transform related things
+pub mod transform;
 
 pub use crate::anchor::{Aabb, AabbPoint, Locate};
+pub use transform::{
+    ApplyTransform, Diag, NotSimilarity, Rigid, RotateTransform, ScaleHint, ScaleTransform,
+    ScaleTransformExt, ScaleTransformStrokeExt, ShiftTransform, ShiftTransformExt, Similarity,
+    TransformGroup, Translation, UniformScaleTransform,
+};
 
 use std::ops::Range;
 
@@ -473,7 +465,7 @@ impl<T: PointsFunc> PointsFunc for [T] {
 
 // MARK: Align
 /// Align a slice of items
-pub trait AlignSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
+pub trait AlignSlice<T: ShiftTransformExt>: AsMut<[T]> {
     /// Align items' anchors in a given axis, based on the first item.
     fn align_anchor<A>(&mut self, axis: DVec3, anchor: A) -> &mut Self
     where
@@ -508,7 +500,7 @@ pub trait AlignSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
 
 // MARK: Arrange
 /// A trait for arranging operations.
-pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
+pub trait ArrangeSlice<T: ShiftTransformExt>: AsMut<[T]> {
     /// Arrange the items by a given function.
     ///
     /// The `pos_func` takes index as input and output the center position.
@@ -579,4 +571,4 @@ pub trait ArrangeSlice<T: transform::ShiftTransformExt>: AsMut<[T]> {
     }
 }
 
-impl<T: transform::ShiftTransformExt, E: AsMut<[T]>> ArrangeSlice<T> for E {}
+impl<T: ShiftTransformExt, E: AsMut<[T]>> ArrangeSlice<T> for E {}
