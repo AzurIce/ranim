@@ -173,11 +173,11 @@ impl ClothState {
         let ball_center = dvec3(0.0, self.ball_y, 0.0);
 
         // Ball-cloth collision: push cloth particles out of the ball.
-        for i in 0..n {
-            let d = self.curr[i] - ball_center;
+        for curr in self.curr.iter_mut().take(n) {
+            let d = *curr - ball_center;
             let dist = d.length();
             if dist < BALL_RADIUS && dist > 1e-9 {
-                self.curr[i] += d / dist * (BALL_RADIUS - dist);
+                *curr += d / dist * (BALL_RADIUS - dist);
             }
         }
     }
