@@ -66,7 +66,7 @@ impl FillColor for SvgItem {
 
 impl StrokeColor for SvgItem {
     fn stroke_color(&self) -> AlphaColor<Srgb> {
-        self.0[0].fill_color()
+        self.0[0].stroke_color()
     }
     fn set_stroke_color(&mut self, color: AlphaColor<Srgb>) -> &mut Self {
         self.0.set_stroke_color(color);
