@@ -204,6 +204,14 @@ crate-type = ["cdylib"]
 wasm = true
 
 [[example]]
+name = "z_fighting"
+path = "examples/z_fighting/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.z_fighting]
+wasm = true
+
+[[example]]
 name = "animating_pi"
 path = "examples/animating_pi/lib.rs"
 crate-type = ["cdylib"]
