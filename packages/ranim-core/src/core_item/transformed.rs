@@ -298,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn extract_vitem_bakes_points_and_normal() {
+    fn extract_vitem_composes_transform_without_baking_points() {
         let vitem = VItem {
             points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
             normal: Some(Vec3::new(1.0, 1.0, 0.0).normalize()),
@@ -312,9 +312,17 @@ mod tests {
         let items = wrapped.extract();
         match &items[0] {
             CoreItem::VItem(vitem) => {
-                assert_eq!(vitem.points[0], Vec4::new(2.0, 2.0, 0.0, 0.0));
-                let expected = Vec3::new(0.5, 1.0, 0.0).normalize();
-                assert!(vitem.normal.unwrap().abs_diff_eq(expected, 1e-6));
+                // Points and the local plane normal stay untouched.
+                assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+                assert_eq!(vitem.normal, Some(Vec3::new(1.0, 1.0, 0.0).normalize()));
+                assert_eq!(
+                    vitem.transform,
+                    glam::Mat4::from_scale_rotation_translation(
+                        Vec3::new(2.0, 1.0, 1.0),
+                        glam::Quat::IDENTITY,
+                        Vec3::new(0.0, 2.0, 0.0),
+                    )
+                );
             }
             _ => panic!("expected VItem"),
         }
@@ -330,7 +338,11 @@ mod tests {
         let outer = inner.transformed(Diag(DVec3::splat(2.0)));
         match &outer.extract()[0] {
             CoreItem::VItem(vitem) => {
-                assert_eq!(vitem.points[0], Vec4::new(4.0, 0.0, 0.0, 0.0));
+                // Local data is preserved; the world placement moves to
+                // scale(2) * translate(x).
+                assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+                assert_eq!(vitem.transform.w_axis.truncate(), Vec3::new(2.0, 0.0, 0.0));
+                assert_eq!(vitem.transform.x_axis.truncate(), Vec3::new(2.0, 0.0, 0.0));
             }
             _ => panic!("expected VItem"),
         }
@@ -489,7 +501,8 @@ mod tests {
 
         match &wrapped.extract()[0] {
             CoreItem::VItem(vitem) => {
-                assert_eq!(vitem.points[0], Vec4::new(2.0, 0.0, 0.0, 0.0))
+                assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+                assert_eq!(vitem.transform.w_axis.truncate(), Vec3::X);
             }
             _ => panic!("expected VItem"),
         }
