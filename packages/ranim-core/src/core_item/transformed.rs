@@ -51,8 +51,24 @@ impl<T, G> Transformed<T, G> {
         Self { inner, transform }
     }
 
-    /// Map the transform to a new type while keeping `inner` unchanged.
-    pub fn map<H, F>(self, f: F) -> Transformed<T, H>
+    /// Map the wrapped item to a new type, keeping `transform` unchanged.
+    pub fn map_inner<U, F>(self, f: F) -> Transformed<U, G>
+    where
+        F: FnOnce(T) -> U,
+    {
+        Transformed::new(f(self.inner), self.transform)
+    }
+
+    /// Map the transform storage to a new type while keeping `inner`
+    /// unchanged.
+    ///
+    /// This is the general form of converting between transform groups —
+    /// for example widening a placement or checked-narrowing an affine
+    /// storage back to a subgroup. Lossless upward conversions need no
+    /// closure at all: [`Transformed`] implements
+    /// `From<Transformed<T, X>> for Transformed<T, Y>` whenever `X` embeds
+    /// into `Y`, so prefer plain `.into()` there.
+    pub fn map_transform<H, F>(self, f: F) -> Transformed<T, H>
     where
         F: FnOnce(G) -> H,
     {
@@ -431,32 +447,45 @@ mod tests {
     }
 
     #[test]
-    fn map_converts_transform_with_function() {
+    fn map_inner_maps_the_wrapped_item() {
+        let wrapped = VItem::default()
+            .transformed(Translation(DVec3::X))
+            .map_inner(|item: VItem| item.points.len());
+        assert_eq!(wrapped.inner, 3);
+        assert_eq!(wrapped.transform, Translation(DVec3::X));
+    }
+
+    #[test]
+    fn map_transform_converts_storage_with_function() {
         fn to_affine(translation: Translation) -> DAffine3 {
             translation.into()
         }
 
-        let wrapped = 42u32.transformed(Translation(DVec3::X)).map(to_affine);
+        let wrapped = 42u32
+            .transformed(Translation(DVec3::X))
+            .map_transform(to_affine);
         assert_eq!(wrapped.inner, 42);
         assert_affine_eq(wrapped.transform, DAffine3::from_translation(DVec3::X));
     }
 
     #[test]
-    fn map_converts_transform_with_closure() {
+    fn map_transform_converts_storage_with_closure() {
         let wrapped = 42u32
             .transformed(Translation(DVec3::X))
-            .map(Similarity::from);
+            .map_transform(Similarity::from);
         assert_eq!(wrapped.inner, 42);
         assert_eq!(wrapped.transform.translation, DVec3::X);
     }
 
     #[test]
-    fn map_result_can_be_extracted_as_affine() {
+    fn map_transform_result_can_be_extracted_as_affine() {
         let vitem = VItem {
             points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
             ..Default::default()
         };
-        let wrapped = vitem.transformed(Translation(DVec3::X)).map(DAffine3::from);
+        let wrapped = vitem
+            .transformed(Translation(DVec3::X))
+            .map_transform(DAffine3::from);
 
         match &wrapped.extract()[0] {
             CoreItem::VItem(vitem) => {
