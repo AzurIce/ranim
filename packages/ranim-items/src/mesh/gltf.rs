@@ -20,6 +20,12 @@
 //! | node children              | [`NodeContent::Children`](crate::hierarchy::NodeContent::Children), source order kept |
 //! | primitive                  | leaf [`MeshItem`] with identity transform          |
 //!
+//! glTF addresses nodes structurally by index while names are display
+//! labels: [`GltfTree::node`](crate::mesh::gltf::GltfTree::node) resolves a
+//! document node index to its tree position, and
+//! [`Node::by_id`](crate::hierarchy::Node::by_id) resolves a name to the
+//! depth-first first match.
+//!
 //! Per-primitive attributes: `POSITION` → [`MeshItem::points`], `indices` →
 //! [`MeshItem::triangle_indices`] (a non-indexed primitive gets sequential
 //! indices, because an index-less [`MeshItem`] would mean a point cloud
@@ -95,6 +101,46 @@ use crate::mesh::MeshItem;
 use ranim_core::components::rgba::Rgba;
 use ranim_core::glam::{DAffine3, DMat4, DQuat, DVec3, Vec4, dvec3};
 
+/// A glTF scene imported as a [`Node`] tree, plus the mapping from glTF node
+/// indices to index paths in the tree.
+///
+/// glTF addresses nodes structurally by index (animation channels and
+/// `skin.joints` reference the document's node array), while names are
+/// optional display labels that are neither unique nor guaranteed present.
+/// This type carries both views: [`GltfTree::node`] resolves a document
+/// index, and [`Node::by_id`](crate::hierarchy::Node::by_id) resolves a
+/// label.
+pub struct GltfTree {
+    /// The default scene (or the first scene) as a node tree; the scene's
+    /// root nodes are direct children of this synthetic root group.
+    pub tree: Node<MeshItem>,
+    /// glTF node index → index path into [`GltfTree::tree`] (see
+    /// [`Node::get`](crate::hierarchy::Node::get)). `None` for document
+    /// nodes that are not part of the imported scene.
+    pub node_paths: Vec<Option<Vec<usize>>>,
+}
+
+impl GltfTree {
+    /// The tree node for glTF node `index`, or `None` when the index is out
+    /// of range or the node is not part of the imported scene.
+    pub fn node(&self, index: usize) -> Option<&Node<MeshItem>> {
+        self.tree.get(self.node_paths.get(index)?.as_deref()?)
+    }
+
+    /// Mutable variant of [`GltfTree::node`].
+    pub fn node_mut(&mut self, index: usize) -> Option<&mut Node<MeshItem>> {
+        self.tree.get_mut(self.node_paths.get(index)?.as_deref()?)
+    }
+}
+
+impl std::ops::Deref for GltfTree {
+    type Target = Node<MeshItem>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tree
+    }
+}
+
 /// Errors from loading a glTF/GLB file via [`node_tree_from_path`].
 #[derive(Debug)]
 pub enum GltfLoadError {
@@ -122,15 +168,14 @@ impl std::error::Error for GltfLoadError {
     }
 }
 
-/// Loads a `.glb` or `.gltf` file from disk into a node tree of
-/// [`MeshItem`]s.
+/// Loads a `.glb` or `.gltf` file from disk into a [`GltfTree`].
 ///
 /// A GLB's embedded blob is used directly. For a `.gltf`, external buffer
 /// files (`"uri"` fields) are read relative to the file's directory, joined
 /// as raw paths (no percent-decoding yet); `data:` URIs are not decoded and
 /// their buffers are skipped with a warning — the affected primitives fall
 /// back to their documented defaults.
-pub fn node_tree_from_path(path: impl AsRef<Path>) -> Result<Node<MeshItem>, GltfLoadError> {
+pub fn node_tree_from_path(path: impl AsRef<Path>) -> Result<GltfTree, GltfLoadError> {
     let path = path.as_ref();
     let bytes = std::fs::read(path).map_err(GltfLoadError::Io)?;
     let gltf = gltf::Gltf::from_slice(&bytes).map_err(GltfLoadError::Parse)?;
@@ -165,7 +210,8 @@ pub fn node_tree_from_path(path: impl AsRef<Path>) -> Result<Node<MeshItem>, Glt
 }
 
 /// Builds the node tree of the default glTF scene as [`Node`]s of
-/// [`MeshItem`]s.
+/// [`MeshItem`]s, wrapped in a [`GltfTree`] with the document-index →
+/// tree-path mapping.
 ///
 /// `get_buffer_data` resolves a glTF buffer to its byte slice; returning
 /// `None` makes the affected accessors unreadable, so primitives fall back to
@@ -174,27 +220,43 @@ pub fn node_tree_from_path(path: impl AsRef<Path>) -> Result<Node<MeshItem>, Glt
 /// the returned slice only borrows the resolver's own storage (e.g. a GLB
 /// blob), never the document. See the [module docs](self) for the full
 /// mapping and the POC limitations.
-pub fn node_tree_from_gltf<'s, F>(doc: &gltf::Document, get_buffer_data: F) -> Node<MeshItem>
+pub fn node_tree_from_gltf<'s, F>(doc: &gltf::Document, get_buffer_data: F) -> GltfTree
 where
     F: Clone + for<'b> Fn(gltf::buffer::Buffer<'b>) -> Option<&'s [u8]>,
 {
+    let mut node_paths = vec![None; doc.nodes().count()];
     let scene = match doc.default_scene().or_else(|| doc.scenes().next()) {
         Some(scene) => scene,
         None => {
             tracing::warn!("glTF document has no scene, importing an empty tree");
-            return Node::group(Vec::new());
+            return GltfTree {
+                tree: Node::group(Vec::new()),
+                node_paths,
+            };
         }
     };
     let children = scene
         .nodes()
-        .map(|node| node_tree_from_gltf_node(node, &get_buffer_data))
+        .enumerate()
+        .map(|(slot, node)| {
+            node_tree_from_gltf_node(node, &[slot], &mut node_paths, &get_buffer_data)
+        })
         .collect();
-    Node::group(children)
+    GltfTree {
+        tree: Node::group(children),
+        node_paths,
+    }
 }
 
 /// Converts one glTF node (recursively, via [`gltf::scene::Node::children`]).
+///
+/// `path` is the index path of the node being converted; every visited
+/// node's document index (see [`gltf::scene::Node::index`]) is recorded in
+/// `node_paths`.
 fn node_tree_from_gltf_node<'s, F>(
     node: gltf::scene::Node<'_>,
+    path: &[usize],
+    node_paths: &mut Vec<Option<Vec<usize>>>,
     get_buffer_data: &F,
 ) -> Node<MeshItem>
 where
@@ -221,11 +283,14 @@ where
     }
     // Known debt: a glTF node may carry both a mesh and child nodes; the
     // primitives above become sibling leaves placed before the children.
-    children.extend(
-        node.children()
-            .map(|child| node_tree_from_gltf_node(child, get_buffer_data)),
-    );
+    let payload_slots = children.len();
+    children.extend(node.children().enumerate().map(|(slot, child)| {
+        let mut child_path = path.to_vec();
+        child_path.push(payload_slots + slot);
+        node_tree_from_gltf_node(child, &child_path, node_paths, get_buffer_data)
+    }));
 
+    node_paths[node.index()] = Some(path.to_vec());
     let node = Node::new(transform, NodeContent::Children(children));
     match id {
         Some(id) => node.with_id(id),
@@ -441,7 +506,7 @@ mod tests {
         pack_glb(&triangle_json(None), &triangle_bin())
     }
 
-    fn triangle_tree() -> Node<MeshItem> {
+    fn triangle_tree() -> GltfTree {
         let glb = triangle_glb();
         let gltf = gltf::Gltf::from_slice(&glb).unwrap();
         let blob = gltf.blob.clone();
@@ -595,5 +660,32 @@ mod tests {
             .unwrap();
         assert_eq!(leaf.triangle_indices, vec![0, 1, 2]);
         assert_eq!(leaf.points.len(), 3);
+    }
+
+    #[test]
+    fn node_paths_map_document_indices_to_tree_positions() {
+        let tree = triangle_tree();
+
+        // Doc node 0 ("parent") is the scene's only root; doc node 1
+        // ("child") hangs below it. The parent carries no mesh, so the
+        // child sits at slot 0.
+        let parent = tree.node(0).unwrap();
+        assert_eq!(parent.id.as_deref(), Some("parent"));
+        let child = tree.node(1).unwrap();
+        assert_eq!(child.id.as_deref(), Some("child"));
+        assert_eq!(tree.node_paths[0], Some(vec![0]));
+        assert_eq!(tree.node_paths[1], Some(vec![0, 0]));
+
+        // Out-of-range indices resolve to None; node() agrees with get().
+        assert!(tree.node(7).is_none());
+        assert_eq!(
+            tree.node(1).unwrap().id,
+            tree.get(&tree.node_paths[1].clone().unwrap()).unwrap().id
+        );
+
+        // Mutable access through the same map.
+        let mut tree = triangle_tree();
+        tree.node_mut(1).unwrap().id = Some("renamed".into());
+        assert_eq!(tree.node(1).unwrap().id.as_deref(), Some("renamed"));
     }
 }

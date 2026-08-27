@@ -19,7 +19,8 @@ const MODEL_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/models");
 /// rotating about its vertical axis and placed by shifting its root.
 fn load_model(file: &str, size: f64) -> Node<MeshItem> {
     let mut tree = node_tree_from_path(format!("{MODEL_DIR}/{file}"))
-        .unwrap_or_else(|error| panic!("failed to load {file}: {error}"));
+        .unwrap_or_else(|error| panic!("failed to load {file}: {error}"))
+        .tree;
     tree.rotate_on_axis(DVec3::X, PI / 2.0);
     let [min, max] = tree.aabb();
     let extents = max - min;
