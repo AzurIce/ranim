@@ -456,9 +456,7 @@ mod tests {
             points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
             ..Default::default()
         };
-        let wrapped = vitem
-            .transformed(Translation(DVec3::X))
-            .map(DAffine3::from);
+        let wrapped = vitem.transformed(Translation(DVec3::X)).map(DAffine3::from);
 
         match &wrapped.extract()[0] {
             CoreItem::VItem(vitem) => {
