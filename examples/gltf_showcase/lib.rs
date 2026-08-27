@@ -14,14 +14,13 @@ use ranim::{
 
 const MODEL_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/models");
 
-/// Loads a model, stands it upright (glTF is Y-up, ranim is Z-up), centers
-/// it on its own axes and normalizes its size, so it can be posed by
-/// rotating about its vertical axis and placed by shifting its root.
+/// Loads a model (the loader already converts glTF's Y-up to ranim's Z-up),
+/// centers it on its own axes and normalizes its size, so it can be posed
+/// by rotating about its vertical axis and placed by shifting its root.
 fn load_model(file: &str, size: f64) -> Node<MeshItem> {
     let mut tree = node_tree_from_path(format!("{MODEL_DIR}/{file}"))
         .unwrap_or_else(|error| panic!("failed to load {file}: {error}"))
         .tree;
-    tree.rotate_on_axis(DVec3::X, PI / 2.0);
     let [min, max] = tree.aabb();
     let extents = max - min;
     tree.shift(-(min + max) / 2.0);

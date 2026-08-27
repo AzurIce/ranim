@@ -34,8 +34,9 @@
 //! morph targets and all extensions are not interpreted — Draco-compressed
 //! primitives therefore import as empty meshes with a warning.
 //! Non-`TRIANGLES` modes import their indices unchanged after a warning.
-//! Coordinates are preserved verbatim (glTF is Y-up); see the
-//! `gltf_showcase` example for standing a model upright.
+//! glTF's mandated Y-up is converted to ranim's Z-up by composing
+//! `Rx(π/2)` into the root pose — apply the inverse there for verbatim
+//! coordinates.
 //!
 //! # Examples
 //!
@@ -115,6 +116,13 @@ impl std::ops::Deref for GltfTree {
     fn deref(&self) -> &Self::Target {
         &self.tree
     }
+}
+
+/// glTF mandates a right-handed Y-up; ranim is Z-up. The conversion is a
+/// fixed, spec-mandated convention translation, composed into the root
+/// pose so a loaded model stands upright and no vertex data moves.
+fn y_up_to_z_up() -> DAffine3 {
+    DAffine3::from_rotation_x(std::f64::consts::FRAC_PI_2)
 }
 
 /// Errors from loading a glTF/GLB file via [`node_tree_from_path`].
@@ -206,7 +214,7 @@ where
         None => {
             tracing::warn!("glTF document has no scene, importing an empty tree");
             return GltfTree {
-                tree: Node::group(Vec::new()),
+                tree: Node::group(Vec::new()).with_transform(y_up_to_z_up()),
                 node_paths,
             };
         }
@@ -219,7 +227,7 @@ where
         })
         .collect();
     GltfTree {
-        tree: Node::group(children),
+        tree: Node::group(children).with_transform(y_up_to_z_up()),
         node_paths,
     }
 }
@@ -590,13 +598,15 @@ mod tests {
     fn extraction_composes_the_world_transform_for_meshes() {
         let tree = triangle_tree();
 
-        // leaves() yields the full f64 chain: parent(T·R) * child(S2).
+        // leaves() yields the full f64 chain:
+        // flip(Y-up->Z-up) * parent(T·R) * child(S2).
+        // (1,0,0) -> S2 (2,0,0) -> Rz90 (0,2,0) -> T (1,4,3) -> flip (1,-3,4).
         // f32 source noise puts the 1e-6 tolerance on rotation contributions.
         let (world, _) = tree.leaves().next().unwrap();
         assert!(
             world
                 .transform_point3(dvec3(1.0, 0.0, 0.0))
-                .abs_diff_eq(dvec3(1.0, 4.0, 3.0), 1e-6)
+                .abs_diff_eq(dvec3(1.0, -3.0, 4.0), 1e-6)
         );
 
         // Extraction bakes the same chain into the core item's transform.
@@ -606,7 +616,7 @@ mod tests {
             CoreItem::MeshItem(mesh) => {
                 let local = Vec3::new(1.0, 0.0, 0.0);
                 let world = mesh.transform.transform_point3(local);
-                assert!((world - Vec3::new(1.0, 4.0, 3.0)).length() < 1e-4);
+                assert!((world - Vec3::new(1.0, -3.0, 4.0)).length() < 1e-4);
                 // Vertex data stays local.
                 assert_eq!(mesh.points.len(), 3);
             }
