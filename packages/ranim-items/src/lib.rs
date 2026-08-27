@@ -8,5 +8,7 @@
 )]
 
 pub mod debug;
+/// Hierarchical scene-graph composition for items.
+pub mod hierarchy;
 pub mod mesh;
 pub mod vitem;
