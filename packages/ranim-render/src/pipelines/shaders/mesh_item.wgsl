@@ -7,10 +7,16 @@ struct CameraUniforms {
     proj_mat: mat4x4<f32>,
     view_mat: mat4x4<f32>,
     half_frame_size: vec2<f32>,
+    // Per-order depth bias epsilon: later items are pulled toward the camera
+    // so coplanar surfaces resolve by scene insertion order.
+    bias_epsilon: f32,
+    _pad: u32,
 }
 @group(1) @binding(0) var<uniform> cam_uniforms: CameraUniforms;
 
 @group(2) @binding(0) var<storage> transforms: array<mat4x4<f32>>;
+// Per-mesh global scene order, consumed by the depth-order bias.
+@group(2) @binding(1) var<storage> orders: array<f32>;
 
 struct VertexOutput {
     @builtin(position) frag_pos: vec4<f32>,
@@ -20,6 +26,13 @@ struct VertexOutput {
     @location(3) world_normal: vec3<f32>,
 }
 
+// Pulls a fragment's depth toward the camera by its item's scene order.
+// Within DEPTH_ORDER_SPAN (normalized depth) this makes insertion order the
+// tie-breaker for coplanar surfaces; farther items keep true depth ordering.
+fn ordered_depth(frag_z: f32, mesh_id: u32) -> f32 {
+    return frag_z - cam_uniforms.bias_epsilon * orders[mesh_id];
+}
+
 fn pack_color(color: vec4<f32>) -> u32 {
     let c = vec4<u32>(color * 255.0);
     return (c.r) | (c.g << 8u) | (c.b << 16u) | (c.a << 24u);
@@ -27,6 +40,7 @@ fn pack_color(color: vec4<f32>) -> u32 {
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
 }
 
 fn compute_lighting(world_pos: vec3<f32>, world_normal: vec3<f32>, base_color: vec4<f32>) -> vec4<f32> {
@@ -52,12 +66,13 @@ fn fs_color(
     @location(1) world_pos: vec3<f32>,
     @location(2) vertex_color: vec4<f32>,
     @location(3) world_normal: vec3<f32>,
-) -> @location(0) vec4<f32> {
+) -> FragmentOutput {
     let color = compute_lighting(world_pos, world_normal, vertex_color);
+    let depth = ordered_depth(frag_pos.z, mesh_id);
 
     // Opaque: output directly
     if (color.a >= 0.99) {
-        return color;
+        return FragmentOutput(color, depth);
     }
 
     // Transparent: write to OIT buffer, then discard
@@ -68,11 +83,11 @@ fn fs_color(
     if (layer_idx < frame.z) {
         let buffer_idx = pixel_idx * frame.z + layer_idx;
         oit_colors[buffer_idx] = pack_color(color);
-        oit_depths[buffer_idx] = frag_pos.z;
+        oit_depths[buffer_idx] = depth;
     }
 
     discard;
-    return vec4<f32>(0.0); // To make wasm happy
+    return FragmentOutput(vec4<f32>(0.0), 1.0); // To make wasm happy
 }
 
 @fragment
@@ -90,7 +105,7 @@ fn fs_depth(
         discard;
     }
 
-    return frag_pos.z;
+    return ordered_depth(frag_pos.z, mesh_id);
 }
 
 @vertex

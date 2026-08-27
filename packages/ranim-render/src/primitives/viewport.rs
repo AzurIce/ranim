@@ -3,6 +3,15 @@ use ranim_core::prelude::CameraFrame;
 
 use crate::utils::{WgpuBuffer, WgpuContext};
 
+/// Total normalized-depth span reserved for scene-order biasing.
+///
+/// Fragments whose true depth differs by less than this span may be reordered
+/// by scene insertion order (later items on top); anything farther apart keeps
+/// true depth ordering. The span is split evenly across all items of a frame
+/// (`epsilon = DEPTH_ORDER_SPAN / item_count`) so the total offset does not
+/// grow with scene size.
+pub const DEPTH_ORDER_SPAN: f32 = 1e-4;
+
 /// Uniforms for the camera
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -10,10 +19,17 @@ pub struct ViewportUniform {
     proj_mat: Mat4,
     view_mat: Mat4,
     half_frame_size: Vec2,
-    _padding: [u32; 2],
+    /// Per-order depth bias epsilon, see [`DEPTH_ORDER_SPAN`].
+    bias_epsilon: f32,
+    _padding: u32,
 }
 impl ViewportUniform {
-    pub fn from_camera_frame(camera_frame: &CameraFrame, width: u32, height: u32) -> Self {
+    pub fn from_camera_frame(
+        camera_frame: &CameraFrame,
+        width: u32,
+        height: u32,
+        bias_epsilon: f32,
+    ) -> Self {
         let ratio = width as f64 / height as f64;
         Self {
             proj_mat: camera_frame.projection_matrix(ratio).as_mat4(),
@@ -22,7 +38,8 @@ impl ViewportUniform {
                 (camera_frame.frame_height * ratio) as f32 / 2.0,
                 camera_frame.frame_height as f32 / 2.0,
             ),
-            _padding: [0; 2],
+            bias_epsilon,
+            _padding: 0,
         }
     }
     pub(crate) fn as_bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
