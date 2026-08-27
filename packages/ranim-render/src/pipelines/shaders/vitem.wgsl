@@ -34,6 +34,7 @@ struct PlaneData {
 @group(2) @binding(4) var<storage> fill_rgbas: array<vec4<f32>>;
 @group(2) @binding(5) var<storage> stroke_rgbas: array<vec4<f32>>;
 @group(2) @binding(6) var<storage> stroke_widths: array<f32>;
+@group(2) @binding(7) var<storage> transforms: array<mat4x4<f32>>;
 
 // === Per-instance data passed from vertex to fragment ===
 
@@ -355,7 +356,11 @@ fn vs_main(
     let basis = basis_from_normal(plane_normal);
     let plane_origin = planes[instance_index].origin.xyz;
 
-    let pos3d = plane_origin + u * basis.u + v * basis.v;
+    // The plane data is expressed in the item's local space; the per-item
+    // transform maps the reconstructed position into the world frame before
+    // the camera is applied.
+    let pos_local = plane_origin + u * basis.u + v * basis.v;
+    let pos3d = (transforms[instance_index] * vec4(pos_local, 1.0)).xyz;
 
     out.frag_pos = cam_uniforms.proj_mat * cam_uniforms.view_mat * vec4(pos3d, 1.0);
     out.pos = clip_point;

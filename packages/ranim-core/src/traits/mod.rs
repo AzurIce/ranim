@@ -13,7 +13,7 @@ use std::ops::Range;
 use color::{AlphaColor, ColorSpace, OpaqueColor, Srgb};
 use glam::{
     DAffine2, DAffine3, DMat3, DMat4, DQuat, DVec2, DVec3, Mat4, USizeVec3, Vec3, Vec3Swizzles,
-    dvec3,
+    Vec4, dvec3,
 };
 use num::complex::Complex64;
 
@@ -107,6 +107,12 @@ impl Interpolatable for DVec3 {
 }
 
 impl Interpolatable for Vec3 {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        self + (target - self) * t as f32
+    }
+}
+
+impl Interpolatable for Vec4 {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         self + (target - self) * t as f32
     }
