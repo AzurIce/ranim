@@ -2,7 +2,7 @@ use ranim::{
     anims::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
     glam::dvec3,
-    items::vitem::geometry::Rectangle,
+    items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
@@ -32,12 +32,16 @@ fn hanoi(r: &mut RanimScene, n: usize) {
     let rods = [-1, 0, 1]
         .into_iter()
         .map(|i: i32| {
-            Rectangle::new(rod_width, rod_height).with(|rect| {
-                rect.set_color(manim::GREY_C).move_anchor_to(
-                    AabbPoint(dvec3(0.0, -1.0, 0.0)),
-                    dvec3(i as f64 * rod_section_width, -4.0, 0.0),
-                );
-            })
+            let mut rect: VItem = Rectangle::new(rod_width, rod_height)
+                .with(|rect| {
+                    rect.set_color(manim::GREY_C);
+                })
+                .into();
+            rect.move_anchor_to(
+                AabbPoint(dvec3(0.0, -1.0, 0.0)),
+                dvec3(i as f64 * rod_section_width, -4.0, 0.0),
+            );
+            rect
         })
         .collect::<Vec<_>>();
 
@@ -48,15 +52,18 @@ fn hanoi(r: &mut RanimScene, n: usize) {
         .map(|i| {
             let factor = i as f64 / (n - 1) as f64;
             let disk_width = min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);
-            let disk = Rectangle::new(disk_width, disk_height).with(|rect| {
-                let color =
-                    manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
-                rect.stroke_width = 0.0;
-                rect.set_color(color).move_anchor_to(
-                    AabbPoint(dvec3(0.0, -1.0, 0.0)),
-                    dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.001),
-                );
-            });
+            let mut disk: VItem = Rectangle::new(disk_width, disk_height)
+                .with(|rect| {
+                    let color =
+                        manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
+                    rect.stroke_width = 0.0;
+                    rect.set_color(color);
+                })
+                .into();
+            disk.move_anchor_to(
+                AabbPoint(dvec3(0.0, -1.0, 0.0)),
+                dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.001),
+            );
             let sequence = seq![disk.show()];
             (sequence, disk)
         })

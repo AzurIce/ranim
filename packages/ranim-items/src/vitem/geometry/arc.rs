@@ -1,101 +1,61 @@
-use color::{AlphaColor, Srgb};
-use glam::DVec3;
-use ranim_core::Extract;
-use ranim_core::anchor::{Aabb, Locate};
-use ranim_core::core_item::CoreItem;
-
-use ranim_core::{color, glam};
-
-use ranim_core::traits::{
-    ApplyTransform, Opacity, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor, With,
+use ranim_core::{
+    Extract,
+    anchor::{Aabb, AabbPoint, Locate},
+    core_item::CoreItem,
+    traits::{ApplyTransform, Opacity, ScaleTransform, ShiftTransform, StrokeColor},
+};
+use ranim_core::{
+    color::{AlphaColor, Srgb},
+    glam::{self, DVec3},
 };
 
 use crate::vitem::geometry::EllipticArc;
 use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
-use ranim_core::anchor::AabbPoint;
 
-// MARK: ### Arc ###
-/// An arc
+/// An arc centered at the origin in the XY plane.
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Arc {
-    /// Axes
-    pub axes: (DVec3, DVec3),
-    /// Center
-    pub center: DVec3,
-    /// Radius
+    /// Radius.
     pub radius: f64,
-    /// Angle
+    /// Span angle in radians.
     pub angle: f64,
-
-    /// Stroke rgba
+    /// Stroke rgba.
     pub stroke_rgba: AlphaColor<Srgb>,
-    /// Stroke width
+    /// Stroke width.
     pub stroke_width: f32,
 }
 
 impl Arc {
-    /// Constructor
+    /// Creates an arc with the given angle and radius.
     pub fn new(angle: f64, radius: f64) -> Self {
         Self {
-            axes: (DVec3::X, DVec3::Y),
-            center: DVec3::ZERO,
             radius,
             angle,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
         }
     }
-    /// Scale the arc by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::transform::ScaleTransform`]'s `DVec3`,
-    /// because this keeps the arc a arc.
+
+    /// Scales the intrinsic radius.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, AabbPoint::CENTER)
-    }
-    /// Scale the arc by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::transform::ScaleTransform`]'s `DVec3`,
-    /// because this keeps the arc a arc.
-    pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
-    where
-        T: Locate<Self>,
-    {
-        let anchor = anchor.locate(self);
         self.radius *= scale;
-        self.center
-            .shift(-anchor)
-            .scale(DVec3::splat(scale))
-            .shift(anchor);
         self
     }
-    /// The start point
+
+    /// The start point in canonical local coordinates.
     pub fn start(&self) -> DVec3 {
-        self.center + self.radius * self.axes.0.normalize()
+        DVec3::X * self.radius
     }
-    /// The end point
+
+    /// The end point in canonical local coordinates.
     pub fn end(&self) -> DVec3 {
-        let u = self.angle.cos() * self.axes.0.normalize();
-        let v = self.angle.sin() * self.axes.1.normalize();
-        self.center + self.radius * (u + v)
+        DVec3::new(self.angle.cos(), self.angle.sin(), 0.0) * self.radius
     }
 }
 
-// MARK: Traits impl
 impl Aabb for Arc {
-    /// Note that the arc's bounding box is actually same as the circle's bounding box.
     fn aabb(&self) -> [DVec3; 2] {
         VItem::from(self.clone()).aabb()
-    }
-}
-
-impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Arc {
-    fn apply(&mut self, transform: G) -> &mut Self {
-        let transform = transform.into();
-        self.center = transform.transform_point(self.center);
-        self.axes.0 = transform.transform_direction(self.axes.0);
-        self.axes.1 = transform.transform_direction(self.axes.1);
-        self.radius *= transform.scale;
-        self
     }
 }
 
@@ -120,7 +80,6 @@ impl StrokeColor for Arc {
     }
 }
 
-// MARK: Conversions
 impl From<Arc> for VItem {
     fn from(value: Arc) -> Self {
         EllipticArc::from(value).into()
@@ -134,49 +93,47 @@ impl Extract for Arc {
     }
 }
 
-// MARK: ### ArcBetweenPoints ###
-/// An arc between points
+/// An arc whose local geometry is defined by its start and end points.
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct ArcBetweenPoints {
-    /// Axes
-    pub axes: (DVec3, DVec3),
-    /// Start point
+    /// Start point.
     pub start: DVec3,
-    /// End point
+    /// End point.
     pub end: DVec3,
-    /// Arc angle
+    /// Arc angle.
     pub angle: f64,
-
-    /// Stroke rgba
+    /// Stroke rgba.
     pub stroke_rgba: AlphaColor<Srgb>,
-    /// Stroke width
+    /// Stroke width.
     pub stroke_width: f32,
 }
 
 impl ArcBetweenPoints {
-    /// Constructor
+    /// Creates an arc between two local points.
     pub fn new(start: DVec3, end: DVec3, angle: f64) -> Self {
         Self {
-            axes: (DVec3::X, DVec3::Y),
             start,
             end,
             angle,
-
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
         }
     }
-    /// Scale the arc by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::transform::ScaleTransform`]'s `DVec3`,
-    /// because this keeps the arc a arc.
+
+    /// Returns the circle center in local coordinates.
+    pub fn center(&self) -> DVec3 {
+        let chord = self.end - self.start;
+        let midpoint = (self.start + self.end) / 2.0;
+        let perpendicular = DVec3::Z.cross(chord).normalize_or_zero();
+        midpoint + perpendicular * (chord.length() / (2.0 * (self.angle / 2.0).tan()))
+    }
+
+    /// Scales the intrinsic start and end points about their AABB center.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
         self.scale_at(scale, AabbPoint::CENTER)
     }
-    /// Scale the arc by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::transform::ScaleTransform`]'s `DVec3`,
-    /// because this keeps the arc a arc.
+
+    /// Scales the intrinsic start and end points about an anchor.
     pub fn scale_at<T>(&mut self, scale: f64, anchor: T) -> &mut Self
     where
         T: Locate<Self>,
@@ -194,12 +151,9 @@ impl ArcBetweenPoints {
     }
 }
 
-// MARK: Traits impl
 impl Aabb for ArcBetweenPoints {
-    /// Note that the arc's bounding box is actually same as the circle's bounding box.
     fn aabb(&self) -> [DVec3; 2] {
-        // TODO: optimize this
-        Arc::from(self.clone()).aabb()
+        VItem::from(self.clone()).aabb()
     }
 }
 
@@ -208,8 +162,6 @@ impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for ArcBetweenP
         let transform = transform.into();
         self.start = transform.transform_point(self.start);
         self.end = transform.transform_point(self.end);
-        self.axes.0 = transform.transform_direction(self.axes.0);
-        self.axes.1 = transform.transform_direction(self.axes.1);
         self
     }
 }
@@ -235,57 +187,28 @@ impl StrokeColor for ArcBetweenPoints {
     }
 }
 
-// MARK: Conversions
-impl From<ArcBetweenPoints> for Arc {
-    fn from(value: ArcBetweenPoints) -> Arc {
-        let ArcBetweenPoints {
-            axes: proj,
-            start,
-            end,
-            angle,
-            stroke_rgba,
-            stroke_width,
-        } = value;
-        let radius = (start.distance(end) / 2.0) / (angle / 2.0).sin();
-
-        Arc {
-            axes: proj,
-            angle,
-            radius,
-            center: DVec3::ZERO,
-            stroke_rgba,
-            stroke_width,
-        }
-        .with(|arc| {
-            let cur_start = arc.start();
-
-            let v1 = arc.end() - arc.start();
-            let v2 = end - start;
-
-            let rot_angle = v1.angle_between(v2);
-            let mut rot_axis = v1.cross(v2);
-            if rot_axis.length_squared() <= f64::EPSILON {
-                rot_axis = DVec3::NEG_Z;
-            }
-            rot_axis = rot_axis.normalize();
-            arc.shift(start - cur_start);
-            arc.shift(-start);
-            arc.rotate_on_axis(rot_axis, rot_angle);
-            arc.shift(start);
-        })
-    }
-}
-
 impl From<ArcBetweenPoints> for VItem {
     fn from(value: ArcBetweenPoints) -> Self {
-        Arc::from(value).into()
+        let center = value.center();
+        let radius = value.start.distance(center);
+        let start = value.start - center;
+        let start_angle = start.y.atan2(start.x);
+        let mut item = VItem::from(EllipticArc {
+            radius: glam::DVec2::splat(radius),
+            start_angle,
+            angle: value.angle,
+            stroke_rgba: value.stroke_rgba,
+            stroke_width: value.stroke_width,
+        });
+        item.shift(center);
+        item
     }
 }
 
 impl Extract for ArcBetweenPoints {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        Arc::from(self.clone()).extract_into(buf);
+        VItem::from(self.clone()).extract_into(buf);
     }
 }
 
@@ -295,14 +218,11 @@ mod tests {
 
     use assert_float_eq::assert_float_absolute_eq;
     use glam::dvec3;
-    use ranim_core::traits::ShiftTransformExt;
-
-    use crate::vitem::geometry::anchor::Origin;
 
     use super::*;
 
     #[test]
-    fn test_arc() {
+    fn arc_is_canonical_local() {
         let arc = Arc::new(PI / 2.0, 2.0);
         assert_float_absolute_eq!(
             arc.start().distance_squared(dvec3(2.0, 0.0, 0.0)),
@@ -310,33 +230,22 @@ mod tests {
             1e-10
         );
         assert_float_absolute_eq!(arc.end().distance_squared(dvec3(0.0, 2.0, 0.0)), 0.0, 1e-10);
+    }
 
-        let arc_between_points =
-            ArcBetweenPoints::new(dvec3(2.0, 0.0, 0.0), dvec3(0.0, 2.0, 0.0), PI / 2.0);
-        let arc_between_points = Arc::from(arc_between_points);
+    #[test]
+    fn arc_between_points_preserves_endpoints() {
+        let arc = ArcBetweenPoints::new(dvec3(2.0, 0.0, 0.0), dvec3(0.0, 2.0, 0.0), PI / 2.0);
+        assert_float_absolute_eq!(arc.center().distance_squared(DVec3::ZERO), 0.0, 1e-10);
+        let item = VItem::from(arc);
         assert_float_absolute_eq!(
-            arc.center.distance_squared(arc_between_points.center),
+            item.vpoints[0].distance_squared(dvec3(2.0, 0.0, 0.0)),
             0.0,
             1e-10
         );
-        assert_float_absolute_eq!(arc.radius - arc_between_points.radius, 0.0, 1e-10);
-        assert_float_absolute_eq!(arc.angle - arc_between_points.angle, 0.0, 1e-10);
-
-        let arc_between_points =
-            ArcBetweenPoints::new(dvec3(0.0, 2.0, 0.0), dvec3(2.0, 0.0, 0.0), PI / 2.0);
-        let arc_between_points = Arc::from(arc_between_points);
-        let arc = Arc::new(PI / 2.0, 2.0).with(|arc| {
-            arc.with_origin(Origin, |x| {
-                x.rotate_on_axis(DVec3::NEG_Z, PI);
-            })
-            .shift(dvec3(2.0, 2.0, 0.0));
-        });
         assert_float_absolute_eq!(
-            arc.center.distance_squared(arc_between_points.center),
+            item.vpoints[item.vpoints.len() - 1].distance_squared(dvec3(0.0, 2.0, 0.0)),
             0.0,
             1e-10
         );
-        assert_float_absolute_eq!(arc.radius - arc_between_points.radius, 0.0, 1e-10);
-        assert_float_absolute_eq!(arc.angle - arc_between_points.angle, 0.0, 1e-10);
     }
 }

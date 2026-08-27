@@ -6,9 +6,7 @@ use ranim_core::{
     components::vpoint::VPointVec,
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
-    traits::{
-        Aabb, ApplyTransform, Discard, Opacity, ShiftTransform, StrokeColor, StrokeWidth, With,
-    },
+    traits::{Aabb, Discard, Opacity, StrokeColor, StrokeWidth, With},
 };
 
 use crate::vitem::{
@@ -16,31 +14,25 @@ use crate::vitem::{
     geometry::{Arc, Circle, Ellipse},
 };
 
-/// An elliptic arc.
+/// An elliptic arc centered at the origin in the XY plane.
 #[derive(Debug, Clone, ranim_macros::Interpolatable)]
 pub struct EllipticArc {
-    /// Axes
-    pub axes: (DVec3, DVec3),
-    /// Center
-    pub center: DVec3,
-    /// Semi-axes in the x and y directions
+    /// Semi-axes in the x and y directions.
     pub radius: DVec2,
-    /// Start angle (measured by the theta parameter in parametric equation of the ellipse) in radians
+    /// Start angle in radians.
     pub start_angle: f64,
-    /// Span angle in radians
+    /// Span angle in radians.
     pub angle: f64,
-    /// Stroke rgba
+    /// Stroke rgba.
     pub stroke_rgba: AlphaColor<Srgb>,
-    /// Stroke width
+    /// Stroke width.
     pub stroke_width: f32,
 }
 
 impl EllipticArc {
     /// Creates a new elliptic arc.
     pub fn new(start_angle: f64, angle: f64, radius: DVec2) -> Self {
-        EllipticArc {
-            axes: (DVec3::X, DVec3::Y),
-            center: DVec3::ZERO,
+        Self {
             radius,
             start_angle,
             angle,
@@ -52,35 +44,23 @@ impl EllipticArc {
     fn generate_vpoints(&self) -> Vec<DVec3> {
         const NUM_SEGMENTS: usize = 8;
         let len = 2 * NUM_SEGMENTS + 1;
-
-        let &EllipticArc {
-            axes,
-            center,
-            radius,
-            start_angle,
-            angle,
-            ..
-        } = self;
-
-        let (u, v) = (axes.0.normalize(), axes.1.normalize());
-        let DVec2 { x: rx, y: ry } = radius;
+        let DVec2 { x: rx, y: ry } = self.radius;
         let mut vpoints = (0..len)
-            .map(|i| i as f64 / NUM_SEGMENTS as f64 / 2. * angle + start_angle)
+            .map(|i| i as f64 / NUM_SEGMENTS as f64 / 2.0 * self.angle + self.start_angle)
             .map(|theta| {
                 let (mut x, mut y) = (theta.cos(), theta.sin());
                 if x.abs() < 1.8e-7 {
-                    x = 0.;
+                    x = 0.0;
                 }
                 if y.abs() < 1.8e-7 {
-                    y = 0.;
+                    y = 0.0;
                 }
-                x * rx * u + y * ry * v
+                DVec3::new(x * rx, y * ry, 0.0)
             })
             .collect::<Vec<_>>();
 
-        let k = (angle / NUM_SEGMENTS as f64 / 2.).cos();
+        let k = (self.angle / NUM_SEGMENTS as f64 / 2.0).cos();
         vpoints.iter_mut().skip(1).step_by(2).for_each(|p| *p /= k);
-        vpoints.shift(center);
         vpoints
     }
 }
@@ -88,18 +68,14 @@ impl EllipticArc {
 impl From<Arc> for EllipticArc {
     fn from(value: Arc) -> Self {
         let Arc {
-            axes,
-            center,
             radius,
             angle,
             stroke_rgba,
             stroke_width,
         } = value;
-        EllipticArc {
-            axes,
-            center,
+        Self {
             radius: DVec2::splat(radius),
-            start_angle: 0.,
+            start_angle: 0.0,
             angle,
             stroke_rgba,
             stroke_width,
@@ -110,18 +86,14 @@ impl From<Arc> for EllipticArc {
 impl From<Circle> for EllipticArc {
     fn from(value: Circle) -> Self {
         let Circle {
-            axes,
-            center,
             radius,
             stroke_rgba,
             stroke_width,
             ..
         } = value;
-        EllipticArc {
-            axes,
-            center,
+        Self {
             radius: DVec2::splat(radius),
-            start_angle: 0.,
+            start_angle: 0.0,
             angle: TAU,
             stroke_rgba,
             stroke_width,
@@ -131,11 +103,8 @@ impl From<Circle> for EllipticArc {
 
 impl From<EllipticArc> for VItem {
     fn from(value: EllipticArc) -> Self {
-        let EllipticArc {
-            stroke_rgba,
-            stroke_width,
-            ..
-        } = value;
+        let stroke_rgba = value.stroke_rgba;
+        let stroke_width = value.stroke_width;
         VItem::from_vpoints(value.generate_vpoints()).with(|vitem| {
             vitem
                 .set_stroke_color(stroke_rgba)
@@ -148,18 +117,14 @@ impl From<EllipticArc> for VItem {
 impl From<Ellipse> for EllipticArc {
     fn from(value: Ellipse) -> Self {
         let Ellipse {
-            axes,
-            center,
             radius,
             stroke_rgba,
             stroke_width,
             ..
         } = value;
-        EllipticArc {
-            axes,
-            center,
+        Self {
             radius,
-            start_angle: 0.,
+            start_angle: 0.0,
             angle: TAU,
             stroke_rgba,
             stroke_width,
@@ -169,8 +134,6 @@ impl From<Ellipse> for EllipticArc {
 
 impl Aabb for EllipticArc {
     fn aabb(&self) -> [DVec3; 2] {
-        // TODO: maybe calculate AABB by linear algebra?
-        // that would be extremely complicated
         VPointVec(self.generate_vpoints()).aabb()
     }
 }
@@ -199,17 +162,6 @@ impl StrokeColor for EllipticArc {
 impl Opacity for EllipticArc {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.set_stroke_opacity(opacity);
-        self
-    }
-}
-
-impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for EllipticArc {
-    fn apply(&mut self, transform: G) -> &mut Self {
-        let transform = transform.into();
-        self.center = transform.transform_point(self.center);
-        self.axes.0 = transform.transform_direction(self.axes.0);
-        self.axes.1 = transform.transform_direction(self.axes.1);
-        self.radius *= transform.scale;
         self
     }
 }

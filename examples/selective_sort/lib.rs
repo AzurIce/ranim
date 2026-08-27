@@ -2,7 +2,10 @@ use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};
 use ranim::{
-    anims::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle, prelude::*,
+    anims::morph::MorphAnim,
+    color::palettes::manim,
+    items::vitem::{VItem, geometry::Rectangle},
+    prelude::*,
     utils::rate_functions::linear,
 };
 
@@ -30,22 +33,23 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                 padded_frame_bl.extend(0.0) + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);
             let rect = Rectangle::new(width_unit, height).with(|rect| {
                 rect.fill_rgba = manim::WHITE.with_alpha(0.5);
-                rect.scale_axes(dvec2(0.8, 0.8))
-                    .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
+                rect.scale_axes(dvec2(0.8, 0.8));
             });
+            let mut rect = VItem::from(rect);
+            rect.move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             let sequence = seq![rect.show()];
             (sequence, rect)
         })
         .collect::<Vec<_>>();
 
-    let highlight = |rect: &mut Rectangle| {
+    let highlight = |rect: &mut VItem| {
         rect.morph(|data| {
             data.set_color(manim::RED_C).set_fill_opacity(0.5);
         })
         .with_duration(anim_step_duration)
         .with_rate_func(linear)
     };
-    let unhighlight = |rect: &mut Rectangle| {
+    let unhighlight = |rect: &mut VItem| {
         rect.morph(|data| {
             data.set_color(manim::WHITE).set_fill_opacity(0.5);
         })
@@ -54,7 +58,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
     };
 
     let shift_right = DVec3::X * width_unit;
-    let sync = |rects: &mut [(AnimSequence, Rectangle)]| {
+    let sync = |rects: &mut [(AnimSequence, VItem)]| {
         let target = rects
             .iter()
             .map(|(sequence, _)| sequence.cursor_sec())

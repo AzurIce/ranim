@@ -7,11 +7,11 @@ use ranim_core::{
     anchor::Aabb,
     color::{self, AlphaColor},
     core_item::CoreItem,
-    glam::{DVec3, dvec2},
-    traits::{RotateTransform, ScaleTransform, ShiftTransform},
+    glam::DVec3,
+    traits::{FillColor, RotateTransform, ScaleTransform, ShiftTransform, StrokeColor},
 };
 
-use crate::vitem::geometry::Rectangle;
+use crate::vitem::{VItem, geometry::Rectangle};
 
 /// Wrapper that visualizes the AABB of the inner item as a wireframe rectangle.
 #[derive(Clone)]
@@ -64,9 +64,10 @@ impl<T: Aabb + Extract<Target = CoreItem>> Extract for VisualizeAabbItem<T> {
 
         let [min, max] = self.0.aabb();
         let size = max - min;
-        let mut rect = Rectangle::from_min_size(min, dvec2(size.x, size.y));
-        rect.stroke_rgba = color::palettes::manim::YELLOW_C;
-        rect.fill_rgba = AlphaColor::TRANSPARENT;
+        let mut rect = VItem::from(Rectangle::new(size.x, size.y));
+        rect.shift(min + size / 2.0);
+        rect.set_stroke_color(color::palettes::manim::YELLOW_C);
+        rect.set_fill_color(AlphaColor::TRANSPARENT);
         rect.extract_into(buf);
     }
 }

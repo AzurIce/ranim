@@ -56,15 +56,14 @@ fn rectangle(
     color: AlphaColor<Srgb>,
     opacity: f32,
 ) -> VItem {
-    Rectangle::new(width, height)
-        .with(|rectangle| {
-            rectangle
-                .set_stroke_opacity(0.0)
-                .set_fill_color(color)
-                .set_fill_opacity(opacity)
-                .move_to(position);
-        })
-        .into()
+    let mut rectangle = VItem::from(Rectangle::new(width, height).with(|rectangle| {
+        rectangle
+            .set_stroke_opacity(0.0)
+            .set_fill_color(color)
+            .set_fill_opacity(opacity);
+    }));
+    rectangle.move_to(position);
+    rectangle
 }
 
 fn glyph_vitems(character: &str, scale: f64) -> Vec<VItem> {

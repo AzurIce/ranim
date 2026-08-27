@@ -4,7 +4,7 @@ use glam::{DAffine3, DVec3, dvec3};
 
 use crate::{
     Extract,
-    anchor::Aabb,
+    anchor::{Aabb, Locate},
     color::{AlphaColor, Srgb},
     core_item::CoreItem,
     traits::{
@@ -49,6 +49,30 @@ impl<T, G> Transformed<T, G> {
     /// Pair `inner` with `transform` without converting either value.
     pub fn new(inner: T, transform: G) -> Self {
         Self { inner, transform }
+    }
+
+    /// Map the wrapped item to a new type, keeping `transform` unchanged.
+    pub fn map_inner<U, F>(self, f: F) -> Transformed<U, G>
+    where
+        F: FnOnce(T) -> U,
+    {
+        Transformed::new(f(self.inner), self.transform)
+    }
+
+    /// Map the transform storage to a new type while keeping `inner`
+    /// unchanged.
+    ///
+    /// This is the general form of converting between transform groups —
+    /// for example widening a placement or checked-narrowing an affine
+    /// storage back to a subgroup. Lossless upward conversions need no
+    /// closure at all: [`Transformed`] implements
+    /// `From<Transformed<T, X>> for Transformed<T, Y>` whenever `X` embeds
+    /// into `Y`, so prefer plain `.into()` there.
+    pub fn map_transform<H, F>(self, f: F) -> Transformed<T, H>
+    where
+        F: FnOnce(G) -> H,
+    {
+        Transformed::new(self.inner, f(self.transform))
     }
 
     /// Compose `outer` on the left: `transform = outer * transform`.
@@ -125,6 +149,20 @@ impl<T: Alignable, G: Clone> Alignable for Transformed<T, G> {
 
     fn align_with(&mut self, other: &mut Self) {
         self.inner.align_with(&mut other.inner);
+    }
+}
+
+impl<T, G> Locate<Transformed<T, G>> for crate::anchor::Centroid
+where
+    crate::anchor::Centroid: Locate<T>,
+    G: Clone + Into<DAffine3>,
+{
+    fn locate(&self, target: &Transformed<T, G>) -> DVec3 {
+        target
+            .transform
+            .clone()
+            .into()
+            .transform_point3(self.locate(&target.inner))
     }
 }
 
@@ -393,9 +431,67 @@ mod tests {
     }
 
     #[test]
+    fn centroid_locates_in_inner_space_then_applies_external_transform() {
+        let wrapped = dvec3(1.0, 2.0, 3.0).transformed(Translation(dvec3(4.0, 5.0, 6.0)));
+        assert_eq!(
+            crate::anchor::Centroid.locate(&wrapped),
+            dvec3(5.0, 7.0, 9.0)
+        );
+    }
+
+    #[test]
     fn scale_operation_is_available_for_affine_storage() {
         let mut wrapped = ().transformed(DAffine3::IDENTITY);
         wrapped.scale(DVec3::splat(2.0));
         assert_eq!(wrapped.transform, DAffine3::from_scale(DVec3::splat(2.0)));
+    }
+
+    #[test]
+    fn map_inner_maps_the_wrapped_item() {
+        let wrapped = VItem::default()
+            .transformed(Translation(DVec3::X))
+            .map_inner(|item: VItem| item.points.len());
+        assert_eq!(wrapped.inner, 3);
+        assert_eq!(wrapped.transform, Translation(DVec3::X));
+    }
+
+    #[test]
+    fn map_transform_converts_storage_with_function() {
+        fn to_affine(translation: Translation) -> DAffine3 {
+            translation.into()
+        }
+
+        let wrapped = 42u32
+            .transformed(Translation(DVec3::X))
+            .map_transform(to_affine);
+        assert_eq!(wrapped.inner, 42);
+        assert_affine_eq(wrapped.transform, DAffine3::from_translation(DVec3::X));
+    }
+
+    #[test]
+    fn map_transform_converts_storage_with_closure() {
+        let wrapped = 42u32
+            .transformed(Translation(DVec3::X))
+            .map_transform(Similarity::from);
+        assert_eq!(wrapped.inner, 42);
+        assert_eq!(wrapped.transform.translation, DVec3::X);
+    }
+
+    #[test]
+    fn map_transform_result_can_be_extracted_as_affine() {
+        let vitem = VItem {
+            points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
+            ..Default::default()
+        };
+        let wrapped = vitem
+            .transformed(Translation(DVec3::X))
+            .map_transform(DAffine3::from);
+
+        match &wrapped.extract()[0] {
+            CoreItem::VItem(vitem) => {
+                assert_eq!(vitem.points[0], Vec4::new(2.0, 0.0, 0.0, 0.0))
+            }
+            _ => panic!("expected VItem"),
+        }
     }
 }

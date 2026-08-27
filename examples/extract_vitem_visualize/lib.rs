@@ -72,13 +72,13 @@ pub fn hello_ranim(r: &mut RanimScene) {
     let square = VisualVItem(VItem::from(Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
     })));
-    let mut circle = VisualVItem(VItem::from(Circle::new(2.0).with(|circle| {
-        circle
-            .set_color(manim::GREEN_C)
-            .with_origin(AabbPoint::CENTER, |x| {
-                x.rotate_on_z(-PI / 4.0 + PI);
-            });
-    })));
+    let mut circle_item = VItem::from(Circle::new(2.0).with(|circle| {
+        circle.set_color(manim::GREEN_C);
+    }));
+    circle_item.with_origin(AabbPoint::CENTER, |x| {
+        x.rotate_on_z(-PI / 4.0 + PI);
+    });
+    let mut circle = VisualVItem(circle_item);
 
     let mut content = seq![
         square
@@ -220,9 +220,7 @@ impl Extract for VisualVItem {
                             .set_fill_opacity(0.4);
                     })
                 }
-                .with(|circle| {
-                    circle.move_to(*p);
-                });
+                .transformed(Translation(*p));
                 point.extract_into(buf);
             });
         });

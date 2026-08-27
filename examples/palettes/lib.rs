@@ -1,7 +1,7 @@
 use ranim::{
     color::palettes::manim::*,
     glam::{dvec2, dvec3},
-    items::vitem::geometry::Rectangle,
+    items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
 };
 
@@ -37,14 +37,16 @@ fn palettes(r: &mut RanimScene) {
             let w_step = padded_frame_size.x / row.len() as f64;
             row.iter().enumerate().map(move |(j, color)| {
                 let x = j as f64 * w_step;
-                Rectangle::new(w_step as f64, h_step as f64).with(|rect| {
-                    rect.stroke_width = 0.0;
-
-                    rect.set_color(*color).move_anchor_to(
-                        AabbPoint(dvec3(-1.0, -1.0, 0.0)),
-                        padded_frame_start.extend(0.0) + dvec3(x, y, 0.0),
-                    );
-                })
+                let mut rect: VItem = Rectangle::new(w_step, h_step)
+                    .with(|rect| {
+                        rect.stroke_width = 0.0;
+                        rect.set_color(*color);
+                    })
+                    .into();
+                rect.apply(Translation(
+                    padded_frame_start.extend(0.0) + dvec3(x + w_step * 0.5, y + h_step * 0.5, 0.0),
+                ));
+                rect
             })
         })
         .collect::<Vec<_>>();

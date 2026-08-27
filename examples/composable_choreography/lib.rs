@@ -83,13 +83,14 @@ fn tile_row(y: f64) -> Vec<VItem> {
         .into_iter()
         .enumerate()
         .map(|(index, color)| {
-            VItem::from(Square::new(0.85).with(|square| {
+            let mut square = VItem::from(Square::new(0.85).with(|square| {
                 square
                     .set_fill_color(color.with_alpha(0.72))
-                    .set_stroke_color(color)
-                    .move_to(dvec3(index as f64 * 1.35 - 3.375, y, 0.0));
+                    .set_stroke_color(color);
                 square.stroke_width = 0.055;
-            }))
+            }));
+            square.shift(dvec3(index as f64 * 1.35 - 3.375, y, 0.0));
+            square
         })
         .collect()
 }

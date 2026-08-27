@@ -3,12 +3,11 @@ use std::f64::consts::PI;
 use ranim::{
     anims::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
-    glam::dvec2,
+    glam::{DQuat, DVec3, dvec2},
     items::vitem::geometry::RegularPolygon,
     prelude::*,
     utils::rate_functions::smooth,
 };
-use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
 #[wasm_demo_doc]
@@ -36,11 +35,13 @@ pub fn regular_polygon(r: &mut RanimScene) {
             let t = i as f32 / (n_layers - 1).max(1) as f32;
             let color = start_color.lerp(end_color, t, HueDirection::Increasing);
 
-            RegularPolygon::new(sides, 0.0).with(|p| {
-                p.set_stroke_color(color);
-                p.stroke_width = 0.05;
-                p.set_fill_color(color.with_alpha(0.08));
-            })
+            RegularPolygon::new(sides, 0.0)
+                .with(|p| {
+                    p.set_stroke_color(color);
+                    p.stroke_width = 0.05;
+                    p.set_fill_color(color.with_alpha(0.08));
+                })
+                .transformed(Similarity::IDENTITY)
         })
         .collect::<Vec<_>>();
 
@@ -52,7 +53,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .zip(radii.iter())
         .map(|(poly, &target_radius)| {
             poly.morph(|p| {
-                p.radius = target_radius;
+                p.inner.radius = target_radius;
             })
             .with_rate_func(smooth)
         })
@@ -69,9 +70,11 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .zip(rotations.iter())
         .map(|(poly, &rot)| {
             poly.morph(|p| {
-                p.with_origin(Origin.locate(&p.outer_circle()), |x| {
-                    x.rotate_on_z(rot);
-                });
+                p.transform = Similarity {
+                    scale: 1.0,
+                    rotation: DQuat::from_rotation_z(rot),
+                    translation: DVec3::ZERO,
+                };
             })
             .with_rate_func(smooth)
         })
@@ -91,7 +94,7 @@ pub fn regular_polygon(r: &mut RanimScene) {
         .rev()
         .map(|poly| {
             poly.morph(|p| {
-                p.radius = 0.0;
+                p.inner.radius = 0.0;
             })
             .with_rate_func(smooth)
         })
