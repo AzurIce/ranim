@@ -52,13 +52,19 @@ repository. It applies to both human contributors and AI coding agents.
 ### Language
 
 - PR titles and commit messages are always written in **English**.
-- The PR description is bilingual: English first, then Chinese, separated by a
-  `---` divider. Both versions carry the same content, including the
-  `Closes:` line and the Breaking Changes section.
+- The PR description is fully bilingual: write the **entire** description in
+  English first, then repeat the **entire** description in Chinese, separated
+  by a single `---` divider. "Entire" means every section — the summary
+  bullets, the Breaking Changes section, and all detail sections alike.
+  Translating only the top summary is the most common mistake and does not
+  count as bilingual.
 
 ### PR Description Format
 
-When creating or editing a PR, follow this structure:
+When creating or editing a PR, follow this structure. It shows **one
+language half**; the finished description is this structure twice — English
+first, then Chinese after the single `---` divider (see **The bilingual
+split** below):
 
 ```
 Closes: #<issue-number>
@@ -74,8 +80,6 @@ Closes: #<issue-number>
 
 - **API/Field name**: Description of the breaking change and migration path
 
----
-
 ## Component/Feature 1
 
 Detailed description of the first major change.
@@ -86,6 +90,15 @@ Use code blocks, mermaid diagrams, or examples as needed.
 
 ...
 ```
+
+#### The bilingual split
+
+- The `---` divider appears exactly **once**, between the English half and
+  the Chinese half — never between the summary and the detail sections.
+- Below the divider, repeat the document above **in full and in the same
+  order**: summary bullets → Breaking Changes → every detail section,
+  heading for heading. Only the language changes; the content stays
+  identical.
 
 #### Top section
 
