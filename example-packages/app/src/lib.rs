@@ -19,17 +19,18 @@ pub fn hello_ranim(r: &mut RanimScene) {
 
     let mut content = seq![square.fade_in().with_rate_func(smooth)];
 
-    let circle = Circle::new(2.0).with(|circle| {
-        circle
-            .set_color(manim::RED_C)
-            .with_origin(AabbPoint::CENTER, |x| {
-                x.rotate_on_z(PI / 4.0 + PI);
-            });
+    let mut circle: VItem = Circle::new(2.0)
+        .with(|circle| {
+            circle.set_color(manim::RED_C);
+        })
+        .into();
+    circle.with_origin(AabbPoint::CENTER, |x| {
+        x.rotate_on_z(PI / 4.0 + PI);
     });
 
     let mut vitem = VItem::from(square);
     content
-        .push(vitem.morph_to(circle.into()).with_rate_func(smooth))
+        .push(vitem.morph_to(circle).with_rate_func(smooth))
         .hold(1.0)
         .push(vitem.clone().unwrite().with_rate_func(smooth))
         .push(vitem.write().with_rate_func(smooth))

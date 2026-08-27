@@ -28,7 +28,7 @@ fn text_item(r: &mut RanimScene) {
     text_sequence
         .hold(3.0)
         .push(
-            text.clone()
+            Vec::<VItem>::from(text.clone())
                 .rotating(TAU * 4.0, DVec3::Z)
                 .with_duration(4.0)
                 .with_rate_func(smooth),
