@@ -1,22 +1,30 @@
 set windows-shell := ["powershell.exe", "-Command"]
 
+# Mirror the CI lints job (.github/workflows/build.yml): fmt + workspace-wide
+# clippy/doc with `-D warnings`. Run inside the flake dev shell so the Rust
+# toolchain matches CI's pinned nightly-2026-08-01.
+cargo_jobs := env_var_or_default("CARGO_BUILD_JOBS", "8")
+
 clean:
     -rm *.log
 
 fmt:
     cargo fmt --all
 
+fmt-check:
+    cargo fmt --all --check
+
 lint: lint-no-features
     just lint-features render
     just lint-features profiling
 
-lint-no-features: fmt
-    cargo clippy --workspace --all-targets -- -D warnings
-    cargo doc --no-deps --workspace --document-private-items
+lint-no-features: fmt-check
+    CARGO_BUILD_JOBS={{ cargo_jobs }} cargo clippy --workspace --all-targets -- -D warnings
+    RUSTDOCFLAGS="-D warnings" CARGO_BUILD_JOBS={{ cargo_jobs }} cargo doc --no-deps --workspace --document-private-items
 
-lint-features *FEATURES: fmt
-    cargo clippy --workspace --all-targets --features {{ FEATURES }} -- -D warnings
-    cargo doc --no-deps --workspace --document-private-items --features {{ FEATURES }}
+lint-features *FEATURES: fmt-check
+    CARGO_BUILD_JOBS={{ cargo_jobs }} cargo clippy --workspace --all-targets --features {{ FEATURES }} -- -D warnings
+    RUSTDOCFLAGS="-D warnings" CARGO_BUILD_JOBS={{ cargo_jobs }} cargo doc --no-deps --workspace --document-private-items --features {{ FEATURES }}
 
 changelog:
     git cliff -o CHANGELOG.md

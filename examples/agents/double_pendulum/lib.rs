@@ -11,8 +11,9 @@
 //! The state is integrated with RK4 (sub-stepped to at most 1/240 s) inside an
 //! `Iterative` animation, following the same pattern as `examples/nbody`:
 //! the closure advances the physical state by `sim_secs * delta_alpha`, and
-//! the `Extract` impl projects rods, bobs and fading tip-trails into `VItem`s
-//! once per frame.
+//! the `Extract` impl projects rods, bobs and fading tip-trails into
+//! `CoreItem`s once per frame (bobs stay semantic under `Translation`
+//! wrappers).
 
 use ranim::{
     color::{AlphaColor, Srgb, palettes::manim},
@@ -208,23 +209,20 @@ impl Extract for ChaosState {
             rod2.set_stroke_width(0.06);
             rod2.extract_into(buf);
 
-            let mut bob1 = VItem::from(Circle::new(0.10));
+            let mut bob1 = Circle::new(0.10).transformed(Translation(p1));
             bob1.set_fill_color(PALETTE[i]);
             bob1.set_stroke_opacity(0.0);
-            bob1.move_to(p1);
             bob1.extract_into(buf);
 
-            let mut bob2 = VItem::from(Circle::new(0.14));
+            let mut bob2 = Circle::new(0.14).transformed(Translation(p2));
             bob2.set_fill_color(PALETTE[i]);
             bob2.set_stroke_opacity(0.0);
-            bob2.move_to(p2);
             bob2.extract_into(buf);
         }
         // Pivot, drawn on top.
-        let mut pivot_dot = VItem::from(Circle::new(0.06));
+        let mut pivot_dot = Circle::new(0.06).transformed(Translation(self.pivot));
         pivot_dot.set_fill_color(manim::GREY_C);
         pivot_dot.set_stroke_opacity(0.0);
-        pivot_dot.move_to(self.pivot);
         pivot_dot.extract_into(buf);
     }
 }

@@ -17,34 +17,36 @@ use ranim::{
 };
 
 fn build_logo(logo_width: f64) -> [VItem; 6] {
-    let red_bg_rect = Rectangle::new(logo_width / 2.0, logo_width).with(|rect| {
+    // The logo layout is intrinsic art coordinates, so the placement is
+    // baked into point data right after converting to VItems.
+    let red_bg_rect = VItem::from(Rectangle::new(logo_width / 2.0, logo_width)).with(|rect| {
         rect.set_color(manim::RED_C.with_alpha(0.5))
             .move_to(dvec3(-logo_width / 4.0, 0.0, 0.0));
     });
-    let red_rect = Rectangle::new(logo_width / 4.0, logo_width).with(|rect| {
+    let red_rect = VItem::from(Rectangle::new(logo_width / 4.0, logo_width)).with(|rect| {
         rect.set_color(manim::RED_C).move_anchor_to(
             AabbPoint(dvec3(1.0, 0.0, 0.0)),
             dvec3(-logo_width / 4.0, 0.0, 0.0),
         );
     });
 
-    let green_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
+    let green_bg_sq = VItem::from(Square::new(logo_width / 2.0)).with(|sq| {
         sq.set_color(manim::GREEN_C.with_alpha(0.5)).move_to(dvec3(
             logo_width / 4.0,
             logo_width / 4.0,
             0.0,
         ));
     });
-    let green_triangle = Polygon::new(vec![
+    let green_triangle = VItem::from(Polygon::new(vec![
         dvec3(0.0, logo_width / 2.0, 0.0),
         dvec3(logo_width / 2.0, logo_width / 2.0, 0.0),
         dvec3(logo_width / 2.0, 0.0, 0.0),
-    ])
+    ]))
     .with(|tri| {
         tri.set_color(manim::GREEN_C);
     }); // ◥
 
-    let blue_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
+    let blue_bg_sq = VItem::from(Square::new(logo_width / 2.0)).with(|sq| {
         sq.set_color(manim::BLUE_C.with_alpha(0.5)).move_to(dvec3(
             logo_width / 4.0,
             -logo_width / 4.0,
@@ -60,12 +62,12 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     }); // ◣
 
     [
-        VItem::from(red_bg_rect),
-        VItem::from(red_rect),
-        VItem::from(green_bg_sq),
-        VItem::from(green_triangle),
-        VItem::from(blue_bg_sq),
-        VItem::from(blue_triangle),
+        red_bg_rect,
+        red_rect,
+        green_bg_sq,
+        green_triangle,
+        blue_bg_sq,
+        blue_triangle,
     ]
 }
 #[scene]

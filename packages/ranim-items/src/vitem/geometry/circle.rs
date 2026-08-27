@@ -4,95 +4,52 @@ use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::{
     Extract,
-    anchor::{Aabb, Locate},
+    anchor::Aabb,
     color,
     core_item::CoreItem,
     glam,
-    traits::{ApplyTransform, ScaleTransform, ShiftTransform},
+    traits::{FillColor, Opacity, StrokeColor, With},
 };
 
-use crate::vitem::DEFAULT_STROKE_WIDTH;
-use ranim_core::anchor::AabbPoint;
-use ranim_core::traits::{FillColor, Opacity, StrokeColor, With};
-
-use crate::vitem::VItem;
+use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
 
 use super::Arc;
 
-// MARK: ### Circle ###
-/// An circle
+/// A circle centered at the origin in the XY plane.
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Circle {
-    /// Axes
-    pub axes: (DVec3, DVec3),
-    /// Center
-    pub center: DVec3,
-    /// Radius
+    /// Radius.
     pub radius: f64,
-
-    /// Stroke rgba
+    /// Stroke rgba.
     pub stroke_rgba: AlphaColor<Srgb>,
-    /// Stroke width
+    /// Stroke width.
     pub stroke_width: f32,
-    /// Fill rgba
+    /// Fill rgba.
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
 impl Circle {
-    /// Constructor
+    /// Creates a circle with the given radius.
     pub fn new(radius: f64) -> Self {
         Self {
-            axes: (DVec3::X, DVec3::Y),
-            center: DVec3::ZERO,
             radius,
-
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
             fill_rgba: AlphaColor::TRANSPARENT,
         }
     }
-    /// Scale the circle by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::transform::ScaleTransform`]'s `DVec3`,
-    /// because this keeps the circle a circle.
+
+    /// Scales the intrinsic radius.
     pub fn scale(&mut self, scale: f64) -> &mut Self {
-        self.scale_by_anchor(scale, AabbPoint::CENTER)
-    }
-    /// Scale the circle by the given scale, with the given anchor as the center.
-    ///
-    /// Note that this accepts a `f64` scale dispite of [`ranim_core::traits::transform::ScaleTransform`]'s `DVec3`,
-    /// because this keeps the circle a circle.
-    pub fn scale_by_anchor<T>(&mut self, scale: f64, anchor: T) -> &mut Self
-    where
-        T: Locate<Self>,
-    {
-        let point = anchor.locate(self);
         self.radius *= scale;
-        self.center
-            .shift(-point)
-            .scale(DVec3::splat(scale))
-            .shift(point);
         self
     }
 }
 
-// MARK: Traits impl
 impl Aabb for Circle {
     fn aabb(&self) -> [DVec3; 2] {
-        let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
-        let r = self.radius * (u + v);
-        [self.center + r, self.center - r].aabb()
-    }
-}
-
-impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Circle {
-    fn apply(&mut self, transform: G) -> &mut Self {
-        let transform = transform.into();
-        self.center = transform.transform_point(self.center);
-        self.axes.0 = transform.transform_direction(self.axes.0);
-        self.axes.1 = transform.transform_direction(self.axes.1);
-        self.radius *= transform.scale;
-        self
+        let r = DVec3::new(self.radius, self.radius, 0.0);
+        [-r, r].aabb()
     }
 }
 
@@ -132,20 +89,15 @@ impl FillColor for Circle {
     }
 }
 
-// MARK: Conversions
 impl From<Circle> for Arc {
     fn from(value: Circle) -> Self {
         let Circle {
-            axes,
-            center,
             radius,
             stroke_rgba,
             stroke_width,
             ..
         } = value;
         Self {
-            axes,
-            center,
             radius,
             angle: 2.0 * PI,
             stroke_rgba,

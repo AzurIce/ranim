@@ -2,7 +2,47 @@
 
 ## Lints
 
-Check format and clippy before push to make sure CI happy.
+**Run all Rust tooling inside the Nix development shell.** The flake pins its
+Rust to the exact nightly CI uses (`nightly-2026-08-01`, see
+`.github/workflows/build.yml`); an arbitrary host cargo has a different lint
+set and will disagree with CI.
+
+```bash
+nix develop
+just lint   # fmt-check + workspace-wide clippy/doc, feature-gated sweeps too
+```
+
+Gotchas learned the hard way — partial sweeps are NOT equivalent:
+
+- Per-package checks (`cargo clippy -p <pkg> --all-targets`) miss `benches`,
+  `example-packages/*`, and the `packages/ranim-examples` sources, which only
+  compile under the workspace-wide sweep.
+- Feature-gated `[[example]]` targets are silently skipped by
+  `cargo check/clippy -p ranim --examples` when their features are off.
+- If a lint failure shows up in CI, fix it on the branch whose PR failed;
+  fixing it in a stacked working tree leaves the PR red.
+- When changing the pinned toolchain, update it in both places at once:
+  the CI workflows and `flake.nix`.
+
+## Build & Test Notes
+
+- **Limit cargo parallelism to avoid OOM.** A full `cargo test --workspace` or
+  `cargo build --workspace --all-targets` compiles the entire workspace
+  (wgpu, eframe/egui, 25+ cdylib examples) with one rustc job per core, which
+  can exhaust memory and freeze the machine (observed with 32 cores / 29 GiB
+  RAM). Prefer limiting parallelism and/or testing per package, e.g.:
+
+  ```bash
+  cargo test -p ranim-core -p ranim-items -j 8
+  CARGO_BUILD_JOBS=8 cargo run -p ranim-cli -- output <scene> --example <example>
+  ```
+
+## 构建与测试注意事项
+
+- **限制 cargo 并行度以避免内存耗尽。**全量 `cargo test --workspace` 或
+  `cargo build --workspace --all-targets` 会按核心数并行编译整个 workspace
+  （wgpu、eframe/egui、25+ 个 cdylib example），可能耗尽内存导致整机卡死
+  （在 32 核 / 29 GiB 内存上实际发生过）。建议限制并行度或分包测试。
 
 ## PR Authoring Guidelines
 

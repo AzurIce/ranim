@@ -14,7 +14,7 @@ use ranim_items::vitem::{VItem, text::TextItem};
 fn text_item(r: &mut RanimScene) {
     let text = "The quick brown fox jumps over the lazy dog.";
 
-    let text = TextItem::new(text, 0.5).with(|item| item.move_to(DVec3::ZERO).discard());
+    let text = TextItem::new(text, 0.5);
     let text_box = text
         .text_box()
         .with(|item| item.set_stroke_color(manim::RED_C).discard());
@@ -28,7 +28,7 @@ fn text_item(r: &mut RanimScene) {
     text_sequence
         .hold(3.0)
         .push(
-            text.clone()
+            Vec::<VItem>::from(text.clone())
                 .rotating(TAU * 4.0, DVec3::Z)
                 .with_duration(4.0)
                 .with_rate_func(smooth),

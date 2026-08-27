@@ -10,7 +10,8 @@
 简单文字（`vitem::text`）：
 
 ```rust,ignore
-let text = TextItem::new("Hello Ranim", 1.0); // 文本与 em 字号
+let text = TextItem::new("Hello Ranim", 1.0); // canonical local 文本与 em 字号
+let placed = text.transformed(Translation(dvec3(1.0, 2.0, 0.0)));
 ```
 
 字体通过 `TextFont` 配置：

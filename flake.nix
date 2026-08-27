@@ -36,13 +36,16 @@
         inherit (pkgs) lib;
         craneLib = (crane.mkLib pkgs).overrideToolchain (
           p:
-          p.rust-bin.selectLatestNightlyWith (
-            toolchain:
-            toolchain.default.override {
-              targets = [ "wasm32-unknown-unknown" ];
-              extensions = [ "rust-src" ];
-            }
-          )
+          # Keep in sync with the CI lint/build jobs
+          # (.github/workflows/build.yml pins nightly-2026-08-01).
+          p.rust-bin.nightly."2026-08-01".default.override {
+            targets = [ "wasm32-unknown-unknown" ];
+            extensions = [
+              "rust-src"
+              "rustfmt"
+              "clippy"
+            ];
+          }
         );
         src = craneLib.cleanCargoSource ./.;
 

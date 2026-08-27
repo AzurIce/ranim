@@ -3,7 +3,8 @@
 //!
 //! The spring's state (`x`, `v`) is owned by `Iterative` and advanced by a
 //! closure via semi-implicit Euler; the `Extract` impl projects the state into
-//! a `VItem` once per frame. Reset is structural — the adapter restores the
+//! a rectangle once per frame, with the displacement carried by a
+//! `Translation` wrapper. Reset is structural — the adapter restores the
 //! stored initial state, so `SceneEvaluator::sample_at` matches forward
 //! advancement for free.
 //!
@@ -12,12 +13,8 @@
 //! timeline time stay in sync.
 
 use ranim::{
-    color::palettes::manim,
-    core::Extract,
-    core::animation::eval::iterative::Iterative,
-    core::core_item::CoreItem,
-    items::vitem::{VItem, geometry::Rectangle},
-    prelude::*,
+    color::palettes::manim, core::Extract, core::animation::eval::iterative::Iterative,
+    core::core_item::CoreItem, glam::dvec3, items::vitem::geometry::Rectangle, prelude::*,
 };
 
 /// The spring's state: displacement and velocity.
@@ -31,10 +28,9 @@ impl Extract for SpringState {
     type Target = CoreItem;
 
     fn extract_into(&self, buf: &mut Vec<CoreItem>) {
-        let mut ball = VItem::from(Rectangle::new(0.6, 0.6));
+        let mut ball = Rectangle::new(0.6, 0.6).transformed(Translation(dvec3(self.x, 0.0, 0.0)));
         ball.set_fill_color(manim::BLUE_C);
         ball.set_stroke_opacity(0.0);
-        ball.move_to([self.x, 0.0, 0.0].into());
         ball.extract_into(buf);
     }
 }

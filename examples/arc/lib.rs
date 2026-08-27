@@ -1,9 +1,13 @@
 use itertools::Itertools;
 use ranim::{
-    anims::fading::FadingAnim, color, color::HueDirection, glam::dvec2,
-    items::vitem::geometry::Arc, prelude::*, utils::rate_functions::smooth,
+    anims::fading::FadingAnim,
+    color,
+    color::HueDirection,
+    glam::dvec2,
+    items::vitem::{VItem, geometry::Arc},
+    prelude::*,
+    utils::rate_functions::smooth,
 };
-use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
 #[wasm_demo_doc]
@@ -34,11 +38,14 @@ pub fn arc(r: &mut RanimScene) {
                 HueDirection::Increasing,
             );
             let offset = frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
-            Arc::new(angle, radius).with(|arc| {
-                arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
-                arc.set_stroke_color(color)
-                    .move_anchor_to(Origin, offset.extend(0.0));
-            })
+            let mut arc: VItem = Arc::new(angle, radius)
+                .with(|arc| {
+                    arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
+                    arc.set_stroke_color(color);
+                })
+                .into();
+            arc.shift(offset.extend(0.0));
+            arc
         })
         .collect::<Vec<_>>();
     let total_secs = 3.0;

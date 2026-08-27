@@ -321,9 +321,12 @@ fn cubie_mesh(grid: IVec) -> MeshItem {
 
 /// One cubie: its current mesh state, its logical grid position, and its own
 /// animation sequence on the shared timeline.
+///
+/// Face turns are rigid motions, so each cubie stores its placement in the
+/// rigid group SE(3) rather than a general affine transform.
 struct Cubie {
     grid: IVec,
-    mesh: Transformed<MeshItem, DAffine3>,
+    mesh: Transformed<MeshItem, Rigid>,
     seq: AnimSequence,
 }
 
@@ -336,18 +339,18 @@ struct NetSticker {
 /// Rotate a cubie's mesh around `axis` (through the cube center at the
 /// origin) by `angle * alpha` — the 3D counterpart of one face turn.
 struct CubieTurn {
-    src: Transformed<MeshItem, DAffine3>,
+    src: Transformed<MeshItem, Rigid>,
     axis: DVec3,
     angle: f64,
 }
 
 impl Eval for CubieTurn {
-    type Output = Transformed<MeshItem, DAffine3>;
+    type Output = Transformed<MeshItem, Rigid>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let mut out = self.src.clone();
-        out.transform = DAffine3::from_axis_angle(self.axis.normalize(), self.angle * alpha)
-            * self.src.transform;
+        out.transform =
+            Rigid::from_axis_angle(self.axis, self.angle * alpha).compose(&self.src.transform);
         out
     }
 }
@@ -455,7 +458,7 @@ fn rubiks_cube(r: &mut RanimScene) {
                 }
                 cubies.push(Cubie {
                     grid: [x, y, z],
-                    mesh: cubie_mesh([x, y, z]).transformed(DAffine3::IDENTITY),
+                    mesh: cubie_mesh([x, y, z]).transformed(Rigid::IDENTITY),
                     seq: AnimSequence::new(),
                 });
             }
@@ -472,11 +475,8 @@ fn rubiks_cube(r: &mut RanimScene) {
             let x = (bc + col) as f64 * NET_SIZE + NET_SIZE / 2.0 - 6.0 * NET_SIZE;
             let y = 4.5 * NET_SIZE - ((br + row) as f64 * NET_SIZE + NET_SIZE / 2.0);
             let pos = net_center + screen_right * x + screen_up * y;
-            let square = Square::new(NET_SIZE * 0.94).with(|sq| {
-                sq.axes = (screen_right, screen_up);
-                sq.center = pos;
-            });
-            let mut item = VItem::from(square);
+            let mut item = VItem::from(Square::new(NET_SIZE * 0.94));
+            item.apply(DAffine3::from_cols(screen_right, screen_up, DVec3::Z, pos));
             item.set_fill_color(FACE_COLORS[state[face][idx]]);
             item.set_stroke_color(manim::BLACK);
             item.set_stroke_width(0.03);

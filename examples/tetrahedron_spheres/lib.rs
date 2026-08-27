@@ -2,28 +2,30 @@ use std::f64::consts::{PI, TAU};
 
 use ranim::{
     color::palettes::manim,
-    glam::{DAffine3, DVec3},
+    glam::DVec3,
     items::mesh::{Sphere, Surface},
     prelude::*,
     utils::rate_functions::linear,
 };
-// Custom animation: rotate a Transformed<Surface, DAffine3>'s transform around the Z axis
+// Custom animation: rotate each sphere's rigid placement around the group
+// center on the Z axis. The orbit is composed outward from the vertex offset:
+// `T(group_center) ∘ Rz(angle) ∘ T(vertex_offset)`.
 struct RotateAroundZ {
-    src: Transformed<Surface, DAffine3>,
+    src: Transformed<Surface, Rigid>,
     group_center: DVec3,
     vertex_offset: DVec3,
     total_angle: f64,
 }
 
 impl Eval for RotateAroundZ {
-    type Output = Transformed<Surface, DAffine3>;
+    type Output = Transformed<Surface, Rigid>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let angle = self.total_angle * alpha;
         let mut result = self.src.clone();
-        result.transform = DAffine3::from_translation(self.group_center)
-            * DAffine3::from_rotation_z(angle)
-            * DAffine3::from_translation(self.vertex_offset);
+        result.transform = Rigid::from_translation(self.group_center)
+            .compose(&Rigid::from_axis_angle(DVec3::Z, angle))
+            .compose(&Rigid::from_translation(self.vertex_offset));
         result
     }
 }
@@ -69,7 +71,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
                 .with_fill_color(color.with_alpha(0.5)),
         )
         .with_smooth_normals()
-        .transformed(DAffine3::from_translation(left_center + *vertex));
+        .transformed(Rigid::from_translation(left_center + *vertex));
 
         left_group.push(
             RotateAroundZ {
@@ -93,7 +95,7 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
                 .with_resolution(resolution)
                 .with_fill_color(color.with_alpha(0.5)),
         )
-        .transformed(DAffine3::from_translation(right_center + *vertex));
+        .transformed(Rigid::from_translation(right_center + *vertex));
 
         right_group.push(
             RotateAroundZ {

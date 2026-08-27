@@ -81,8 +81,8 @@ pub trait ApplyTransform<G> {
 // 点数据可以吸收仿射变换及其子类型
 impl<G: Into<DAffine3>> ApplyTransform<G> for VItem { /* ... */ }
 
-// 圆、球、矩形等参数化形状只吸收相似变换及其子类型
-impl<G: Into<Similarity>> ApplyTransform<G> for Circle { /* ... */ }
+// 点集/网格数据可以吸收仿射变换
+// canonical Circle、Ellipse、Rectangle、Square、Sphere 不直接吸收 placement
 ```
 
 便利操作由这个接口派生：
@@ -94,8 +94,10 @@ impl<G: Into<Similarity>> ApplyTransform<G> for Circle { /* ... */ }
 | `scale_uniform(s)` | `Similarity` |
 | `scale(DVec3)` | `Diag` |
 
-因此裸 `Rectangle` 可以平移、旋转和均匀缩放，但不能直接接受一般非均匀
-`Diag`；后者通常会破坏相邻边正交这一表示不变量。
+canonical `Rectangle`、`Circle`、`Sphere` 等不直接实现 `ApplyTransform`；它们的
+平移、旋转和缩放都应通过 `Transformed<T, G>` 表达。`Rectangle::scale_axes` 是单独的
+内在尺寸编辑。点集型 `VItem`、`Polygon`、`Line`、`MeshItem` 和 `Surface` 才直接
+吸收一般仿射 `DAffine3`。
 
 ## 3. 构造 wrapper：参数就是精确的 `G`
 
@@ -203,12 +205,12 @@ where
 所以它是否存在完全由类型系统决定：
 
 ```rust,ignore
-let rectangle = rectangle
-    .transformed(Similarity::from_scale(2.0))
-    .bake(); // Rectangle: ApplyTransform<Similarity>
+let polygon = Polygon::new(points)
+    .transformed(DAffine3::from_scale(...))
+    .bake(); // Polygon: ApplyTransform<DAffine3>
 
-let affine = rectangle.transformed(DAffine3::from_scale(...));
-// affine.bake(); // 编译失败：Rectangle 不吸收 DAffine3
+let circle = Circle::new(1.0).transformed(Similarity::IDENTITY);
+// circle.bake(); // 编译失败：Circle 不吸收 placement；保留 wrapper
 ```
 
 wrapper 不再提供 `try_bake`。如果调用者确实需要把动态得到的 `DAffine3` 向下
@@ -221,13 +223,21 @@ wrapper 不再提供 `try_bake`。如果调用者确实需要把动态得到的 
 |---|---|
 | 点、点集、`VItem`、一般 mesh 点数据 | `DAffine3` |
 | `Parallelogram` | `DAffine3` |
-| `Circle` / `Sphere` | `Similarity` |
-| `Rectangle` / `Square` | `Similarity` |
+| `Polygon` / `Line` / `VItem` / `MeshItem` / `Surface` | `DAffine3` |
+| `Parallelogram` / `ArcBetweenPoints` | `DAffine3` / `Similarity`（按实现） |
+| canonical `Circle` / `Ellipse` / `EllipticArc` / `Sphere` / `Rectangle` / `Square` | 不直接 bake placement |
 
 一般仿射变换会把圆变成椭圆、把矩形变成平行四边形，因此不能无损地 bake 回
 原来的参数化类型。
 
-## 6. extract、Aabb 与几何边界
+## 6. anchor、extract、Aabb 与几何边界
+
+anchor 的语义首先属于 `inner` 的 local space：`Locate` 实现先在内部物件上
+定位，再把所得点通过 `G -> DAffine3` 变换到 wrapper 的外部空间。当前 wrapper
+提供这种 forwarding 的是 core 的 `Centroid`，以及 geometry primitive 的
+`Origin` / `Focus`；不存在一个无冲突的任意 anchor blanket impl（`DVec3` 已经
+对所有 target 实现 `Locate`）。因此，未列出的 anchor 仍只对它直接支持的
+`inner` 类型生效，不能假定任意 `Locate<A>` 都会自动穿过 wrapper。
 
 `Transformed<T, G>` 不要求 `T: ApplyTransform<G>` 就能 extract。只要 `G` 能
 转换为 `DAffine3`，wrapper 会在几何边界进行一次转换：
@@ -242,6 +252,23 @@ G --Into<DAffine3>--> CoreItem / Aabb geometry
 
 这使高层物件可以保留语义表示，同时渲染结果仍能包含更一般的仿射效果。
 `DAffine3` 是这里的端点；不会继续转换到 projective 模型矩阵。
+
+### 6.1 local primitive、一般 local data 与 placement
+
+canonical local primitive（例如以原点为中心的 `Circle`、`Rectangle`、`Sphere`）
+把形状参数和 local 坐标约定写在自身类型中。一般 local data（`VItem` 点集、
+`Surface` 顶点等）则只是调用者提供的坐标；两者都**不会自动中心化**。需要把
+物件放到场景中时，使用 `Transformed` 的外部 `transform`，不要把外部 placement
+误当成 primitive 的 intrinsic 参数。
+
+`Rectangle::scale_axes` 例外也不是 placement：它是 intrinsic shape-data
+操作，沿 Rectangle 已有的 canonical/intrinsic axes 修改尺寸。wrapper 的
+`compose_outer` / `compose_inner` 才是外部变换组合。
+
+`Sphere -> Surface` 只负责把 Sphere 的 canonical local 参数采样成顶点，
+`Surface` 不会再次 center；这样可避免重复 center。`bake` 是明确的边界操作：
+只有当 `T: ApplyTransform<G>` 时才把外部变换吸收到 `inner`，否则继续保留
+wrapper，并在 extract 时于几何边界转换为 `DAffine3`。
 
 ## 7. 插值
 

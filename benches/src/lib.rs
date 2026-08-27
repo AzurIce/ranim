@@ -24,9 +24,9 @@ pub mod test_scenes {
         let squares = (0..n)
             .cartesian_product(0..n)
             .map(|(i, j)| {
-                Square::new(size).with(|square| {
-                    square.move_to(start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64);
-                })
+                Square::new(size).transformed(Translation(
+                    start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64,
+                ))
             })
             .collect::<Vec<_>>();
 
@@ -44,20 +44,22 @@ pub mod test_scenes {
 
         let unit = size + buff;
         let start = dvec3(-4.0, -4.0, 0.0);
+        // Morph targets compare shapes point-by-point, so convert to VItems
+        // and bake the grid placement into their points.
         let squares = (0..n)
             .cartesian_product(0..n)
             .map(|(i, j)| {
-                VItem::from(Square::new(size).with(|square| {
+                VItem::from(Square::new(size)).with(|square| {
                     square.move_to(start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64);
-                }))
+                })
             })
             .collect::<Vec<_>>();
         let circles = (0..n)
             .cartesian_product(0..n)
             .map(|(i, j)| {
-                VItem::from(Circle::new(size / 2.0).with(|circle| {
+                VItem::from(Circle::new(size / 2.0)).with(|circle| {
                     circle.move_to(start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64);
-                }))
+                })
             })
             .collect::<Vec<_>>();
         let mut content = AnimStack::new();

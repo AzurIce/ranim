@@ -25,11 +25,15 @@ fn output_formats(r: &mut RanimScene) {
         .map(|(i, &color)| {
             let angle = i as f64 * 2.0 * PI / colors.len() as f64 + PI / 2.0;
             let offset = DVec3::new(angle.cos() * radius, angle.sin() * radius, 0.0);
-            Circle::new(radius)
-                .with(|c| {
-                    c.set_color(color.with_alpha(0.5)).move_to(offset);
-                })
-                .into()
+            {
+                let mut circle: VItem = Circle::new(radius)
+                    .with(|c| {
+                        c.set_color(color.with_alpha(0.5));
+                    })
+                    .into();
+                circle.shift(offset);
+                circle
+            }
         })
         .collect();
 

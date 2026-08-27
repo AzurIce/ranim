@@ -3,7 +3,7 @@ use ranim_core::{
     color::{AlphaColor, Srgb},
     core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
-    traits::{Aabb, ApplyTransform, Discard, FillColor, Opacity, StrokeColor, With},
+    traits::{Aabb, Discard, FillColor, Opacity, StrokeColor, With},
 };
 
 use crate::vitem::{
@@ -11,21 +11,16 @@ use crate::vitem::{
     geometry::{Circle, EllipticArc},
 };
 
-/// An ellipse.
+/// An ellipse centered at the origin in the XY plane.
 #[derive(Clone, Debug, ranim_macros::Interpolatable)]
 pub struct Ellipse {
-    /// Axes
-    pub axes: (DVec3, DVec3),
-    /// Center
-    pub center: DVec3,
-    /// Semi-axes in x and y directions
+    /// Semi-axes in the x and y directions.
     pub radius: DVec2,
-
-    /// Stroke rgba
+    /// Stroke rgba.
     pub stroke_rgba: AlphaColor<Srgb>,
-    /// Stroke width
+    /// Stroke width.
     pub stroke_width: f32,
-    /// Fill rgba
+    /// Fill rgba.
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
@@ -33,8 +28,6 @@ impl Ellipse {
     /// Creates a new ellipse.
     pub fn new(radius: DVec2) -> Self {
         Self {
-            axes: (DVec3::X, DVec3::Y),
-            center: DVec3::ZERO,
             radius,
             stroke_rgba: AlphaColor::WHITE,
             stroke_width: DEFAULT_STROKE_WIDTH,
@@ -46,16 +39,12 @@ impl Ellipse {
 impl From<Circle> for Ellipse {
     fn from(value: Circle) -> Self {
         let Circle {
-            axes,
-            center,
             radius,
             stroke_rgba,
             stroke_width,
             fill_rgba,
         } = value;
         Self {
-            axes,
-            center,
             radius: DVec2::splat(radius),
             stroke_rgba,
             stroke_width,
@@ -73,22 +62,8 @@ impl From<Ellipse> for VItem {
 
 impl Aabb for Ellipse {
     fn aabb(&self) -> [DVec3; 2] {
-        let center = self.center;
-        let (u, v) = (self.axes.0.normalize(), self.axes.1.normalize());
-        let DVec2 { x: rx, y: ry } = self.radius;
-        let r = u * rx + v * ry;
-        [center - r, center + r].aabb()
-    }
-}
-
-impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Ellipse {
-    fn apply(&mut self, transform: G) -> &mut Self {
-        let transform = transform.into();
-        self.center = transform.transform_point(self.center);
-        self.axes.0 = transform.transform_direction(self.axes.0);
-        self.axes.1 = transform.transform_direction(self.axes.1);
-        self.radius *= transform.scale;
-        self
+        let r = self.radius.extend(0.0);
+        [-r, r].aabb()
     }
 }
 

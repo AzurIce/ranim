@@ -7,10 +7,10 @@ use ranim_core::{
     Extract,
     color::{AlphaColor, Srgb},
     core_item::CoreItem,
-    glam::{DAffine3, DMat3, DVec3},
+    glam::{DMat3, DVec3},
     traits::{
-        Aabb, ApplyTransform, Discard, FillColor, Locate, PointsFunc, ScaleTransform,
-        ShiftTransform, StrokeColor, StrokeWidth, With,
+        Aabb, Discard, FillColor, Locate, PointsFunc, ScaleTransform, ShiftTransform, StrokeColor,
+        StrokeWidth, With,
     },
 };
 use typst::foundations::Repr;
@@ -75,12 +75,10 @@ impl Default for TextFont {
 /// Simple single-line text item
 #[derive(Clone, Debug)]
 pub struct TextItem {
-    /// Origin
-    origin: DVec3,
-    /// Basis
-    basis: (DVec3, DVec3),
     /// Text content
     text: String,
+    /// Intrinsic em size in local coordinates.
+    em_size: f64,
     /// Font info
     font: TextFont,
     /// Fill color
@@ -96,8 +94,8 @@ pub struct TextItem {
 }
 
 impl Locate<TextItem> for Origin {
-    fn locate(&self, target: &TextItem) -> DVec3 {
-        target.origin
+    fn locate(&self, _target: &TextItem) -> DVec3 {
+        DVec3::ZERO
     }
 }
 
@@ -105,9 +103,8 @@ impl TextItem {
     /// Create a new text item
     pub fn new(text: impl Into<String>, em_size: f64) -> Self {
         Self {
-            origin: DVec3::ZERO,
-            basis: (DVec3::X * em_size, DVec3::Y * em_size),
             text: text.into(),
+            em_size,
             font: TextFont::default(),
             fill_rgbas: AlphaColor::WHITE,
             stroke_rgbas: AlphaColor::WHITE,
@@ -129,9 +126,14 @@ impl TextItem {
         &self.font
     }
 
-    /// Get basis
+    /// Get intrinsic em size.
+    pub fn em_size(&self) -> f64 {
+        self.em_size
+    }
+
+    /// Get the canonical local basis.
     pub fn basis(&self) -> (DVec3, DVec3) {
-        self.basis
+        (DVec3::X * self.em_size, DVec3::Y * self.em_size)
     }
 
     /// Get text
@@ -145,10 +147,12 @@ impl TextItem {
         self.inline_length_em.get().unwrap()
     }
 
-    /// Returns the text outline box starting from baseline origin to the width of last character and em height.
+    /// Returns the canonical local text outline box from the baseline origin.
+    ///
+    /// Positioning and orientation are supplied by `Transformed<TextItem, G>`.
     pub fn text_box(&self) -> Parallelogram {
-        let (u, v) = self.basis;
-        Parallelogram::new(self.origin, (u * self.inline_length_em(), v))
+        let (u, v) = self.basis();
+        Parallelogram::from_origin_and_axes(DVec3::ZERO, (u * self.inline_length_em(), v))
     }
 
     fn generate_items(&self) -> Vec<VItem> {
@@ -221,22 +225,18 @@ impl TextItem {
         let baseline_em_box = items[0].aabb();
         let texts = items.split_off(1);
 
-        let &Self {
-            basis: (u, v),
-            origin,
-            fill_rgbas,
-            stroke_rgbas,
-            stroke_width,
-            ..
-        } = self;
+        let (u, v) = self.basis();
+        let fill_rgbas = self.fill_rgbas;
+        let stroke_rgbas = self.stroke_rgbas;
+        let stroke_width = self.stroke_width;
         let [min, max] = baseline_em_box;
         let h = max.y - min.y;
         self.inline_length_em.set(Some((max.x - min.x) / h));
-        let mat = DAffine3::from_mat3_translation(DMat3::from_cols(u, v, DVec3::ZERO), origin);
+        let mat = DMat3::from_cols(u, v, DVec3::ZERO);
         texts.with(|x| {
             x.shift(-min)
                 .scale(DVec3::splat(1. / h)) // Make height = 1.0
-                .apply_point_func(|p| *p = mat.transform_point3(*p))
+                .apply_point_func(|p| *p = mat * *p)
                 .set_fill_color(fill_rgbas)
                 .set_stroke_color(stroke_rgbas)
                 .set_stroke_width(stroke_width)
@@ -262,19 +262,6 @@ impl TextItem {
 impl Aabb for TextItem {
     fn aabb(&self) -> [DVec3; 2] {
         self.items().aabb()
-    }
-}
-
-impl<G: Into<DAffine3>> ApplyTransform<G> for TextItem {
-    fn apply(&mut self, transform: G) -> &mut Self {
-        let transform = transform.into();
-        self.origin = transform.transform_point3(self.origin);
-        self.basis.0 = transform.transform_vector3(self.basis.0);
-        self.basis.1 = transform.transform_vector3(self.basis.1);
-        self.transform_items(|items| {
-            items.apply(transform);
-        });
-        self
     }
 }
 
@@ -337,8 +324,8 @@ mod tests {
     #[test]
     fn test_text_item() {
         let item = TextItem::new("Hello, world!", 0.25);
-        assert_float_absolute_eq!(item.basis.0.length(), 0.25, 1e-10);
-        assert_float_absolute_eq!(item.origin.distance(DVec3::ZERO), 0.0, 1e-10);
+        assert_float_absolute_eq!(item.basis().0.length(), 0.25, 1e-10);
+        assert_float_absolute_eq!(Origin.locate(&item).distance(DVec3::ZERO), 0.0, 1e-10);
     }
 
     #[test]
