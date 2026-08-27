@@ -2,7 +2,25 @@
 
 ## Lints
 
-Check format and clippy before push to make sure CI happy.
+Replicate the CI lints job (`.github/workflows/build.yml`) before every push:
+
+```bash
+./scripts/check-ci-lints.sh
+```
+
+It runs the exact CI commands (fmt / clippy `-D warnings` / doc with
+`RUSTDOCFLAGS=-D warnings`), using the pinned `nightly-2026-08-01` toolchain
+when rustup provides it.
+
+Gotchas learned the hard way — partial sweeps are NOT equivalent:
+
+- Per-package checks (`cargo clippy -p <pkg> --all-targets`) miss `benches`,
+  `example-packages/*`, and the `packages/ranim-examples` sources, which only
+  compile under the workspace-wide sweep.
+- Feature-gated `[[example]]` targets are silently skipped by
+  `cargo check/clippy -p ranim --examples` when their features are off.
+- If a lint failure shows up in CI, fix it on the branch whose PR failed;
+  fixing it in a stacked working tree leaves the PR red.
 
 ## Build & Test Notes
 
