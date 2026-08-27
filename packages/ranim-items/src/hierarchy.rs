@@ -1,17 +1,21 @@
 //! Hierarchical scene-graph composition for items.
 //!
-//! This module lifts [`Transformed`]'s "canonical local data + external
-//! transform" model from a flat wrapper to a tree. Scene-graph composition
-//! lives in the items layer, built on top of ranim-core's transform-group
-//! algebra ([`TransformGroup`]): each node stores canonical local data (like
-//! [`Transformed::inner`] does) plus one transform from its local space into
-//! the parent's space.
+//! This module lifts
+//! [`Transformed`](ranim_core::core_item::transformed::Transformed)'s
+//! "canonical local data + external transform" model from a flat wrapper to
+//! a tree. Scene-graph composition lives in the items layer, built on top of
+//! ranim-core's transform-group algebra
+//! ([`TransformGroup`](ranim_core::traits::TransformGroup)): each node
+//! stores canonical local data (like
+//! [`Transformed::inner`](ranim_core::core_item::transformed::Transformed::inner)
+//! does) plus one transform from its local space into the parent's space.
 //!
 //! The structural rules of the model:
 //!
 //! - **Extraction flattens depth-first** and composes matrices per node,
-//!   `acc = acc * node_transform`, so the resulting [`CoreItem`] sequence
-//!   preserves painter's-algorithm draw order (front-to-back document order).
+//!   `acc = acc * node_transform`, so the resulting
+//!   [`CoreItem`](ranim_core::core_item::CoreItem) sequence preserves
+//!   painter's-algorithm draw order (front-to-back document order).
 //! - Every node's pose interpolates **independently** of its geometry:
 //!   lerping moves transforms and leaf payloads only and never bakes points
 //!   into vertices — the basis for future skeletal animation.

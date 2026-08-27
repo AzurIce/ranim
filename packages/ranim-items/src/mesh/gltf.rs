@@ -1,22 +1,21 @@
 //! glTF 2.0 scene-graph import into trees of [`MeshItem`]s.
 //!
 //! This module is a proof of concept for importing a glTF scene as a
-//! [`hierarchy::Node`] tree, validating that the generic tree works for any
-//! item type — [`MeshItem`] here, exactly like [`VItem`][crate::vitem::VItem]
-//! in the SVG pipeline. It is opt-in via the `gltf` cargo feature and stays
-//! I/O-free: callers parse the file (e.g. with
-//! [`gltf::Gltf::from_slice`]) and hand over a closure that resolves each
-//! glTF buffer to its byte slice, mirroring
-//! [`gltf::mesh::Primitive::reader`].
+//! [`Node`](crate::hierarchy::Node) tree, validating that the generic tree
+//! works for any item type — [`MeshItem`] here, exactly like
+//! [`VItem`][crate::vitem::VItem] in the SVG pipeline. It is opt-in via the
+//! `gltf` cargo feature and stays I/O-free: callers parse the file (e.g.
+//! with `gltf::Gltf::from_slice`) and hand over a closure that resolves each
+//! glTF buffer to its byte slice, mirroring `gltf::mesh::Primitive::reader`.
 //!
 //! # Mapping
 //!
 //! | glTF                       | ranim                                              |
 //! |----------------------------|----------------------------------------------------|
-//! | node TRS / matrix          | [`Node::transform`] as a [`DAffine3`] (`T * R * S`) |
-//! | node name (non-empty)      | [`Node::id`]                                        |
-//! | node children              | [`NodeContent::Children`], source order kept        |
-//! | primitive                  | leaf [`MeshItem`] with identity transform           |
+//! | node TRS / matrix          | [`Node::transform`](crate::hierarchy::Node::transform) as a [`DAffine3`](ranim_core::glam::DAffine3) (`T * R * S`) |
+//! | node name (non-empty)      | [`Node::id`](crate::hierarchy::Node::id)           |
+//! | node children              | [`NodeContent::Children`](crate::hierarchy::NodeContent::Children), source order kept |
+//! | primitive                  | leaf [`MeshItem`] with identity transform          |
 //!
 //! Per-primitive attributes: `POSITION` → [`MeshItem::points`], `indices` →
 //! [`MeshItem::triangle_indices`] (a non-indexed primitive gets sequential
@@ -32,9 +31,12 @@
 //! sRGB-to-linear conversion that normalized integer variants require — a
 //! known POC simplification.
 //!
-//! Transforms are stored as the widest [`DAffine3`] because glTF matrices
-//! may carry shear; narrowing to [`Rigid`]/[`Similarity`]
-//! can come later via [`Node::map_transform`] and `TryFrom`.
+//! Transforms are stored as the widest [`DAffine3`](ranim_core::glam::DAffine3)
+//! because glTF matrices may carry shear; narrowing to
+//! [`Rigid`](ranim_core::traits::Rigid) /
+//! [`Similarity`](ranim_core::traits::Similarity) can come later via
+//! [`Node::map_transform`](crate::hierarchy::Node::map_transform) and
+//! `TryFrom`.
 //!
 //! # Known limitations (deliberate, POC scope)
 //!
