@@ -10,7 +10,7 @@ use ranim::cmd::preview::{RanimPreviewApp, RanimPreviewAppCmd};
 
 use anyhow::{Context, Result};
 use async_channel::{Receiver, bounded, unbounded};
-use notify::RecursiveMode;
+use notify::{EventKind, RecursiveMode};
 use tracing::{error, info, trace};
 
 use crate::{RanimUserLibraryBuilder, cli::CliArgs, resolve_build_target, workspace::Workspace};
@@ -22,6 +22,13 @@ fn is_vcs_metadata(path: &Path) -> bool {
             Some(".git" | ".hg" | ".svn")
         )
     })
+}
+
+// Access events are plain reads. The build itself opens the watched manifests
+// (`.cargo/config.toml`, every crate's `Cargo.toml`, `Cargo.lock`), so reacting
+// to them makes each build trigger the next one in an endless loop.
+fn is_rebuild_event(event: &DebouncedEvent) -> bool {
+    !matches!(event.kind, EventKind::Access(_) | EventKind::Other)
 }
 
 fn watch_krate(
@@ -41,6 +48,7 @@ fn watch_krate(
                 return;
             };
             evt.retain(|event| !event.paths.iter().all(|path| is_vcs_metadata(path)));
+            evt.retain(is_rebuild_event);
             if !evt.is_empty() {
                 _ = tx.try_send(evt)
             }
@@ -213,9 +221,22 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{
+        path::{Path, PathBuf},
+        time::Instant,
+    };
 
-    use super::is_vcs_metadata;
+    use notify::event::{
+        AccessKind, AccessMode, CreateKind, DataChange, ModifyKind, RemoveKind, RenameMode,
+    };
+    use notify::{Event, EventKind};
+
+    use super::{DebouncedEvent, is_rebuild_event, is_vcs_metadata};
+
+    fn event_of_kind(kind: EventKind) -> DebouncedEvent {
+        let event = Event::new(kind).add_path(PathBuf::from("src/main.rs"));
+        DebouncedEvent::new(event, Instant::now())
+    }
 
     #[test]
     fn recognizes_vcs_metadata_at_any_depth() {
@@ -223,5 +244,29 @@ mod tests {
         assert!(is_vcs_metadata(Path::new("repo/nested/.hg/store")));
         assert!(is_vcs_metadata(Path::new("repo/.svn/wc.db")));
         assert!(!is_vcs_metadata(Path::new("repo/src/git.rs")));
+    }
+
+    #[test]
+    fn rebuild_on_create_modify_remove_only() {
+        for kind in [
+            EventKind::Create(CreateKind::File),
+            EventKind::Modify(ModifyKind::Data(DataChange::Any)),
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)),
+            EventKind::Remove(RemoveKind::File),
+        ] {
+            assert!(is_rebuild_event(&event_of_kind(kind)), "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn ignore_access_and_other_events() {
+        for kind in [
+            EventKind::Access(AccessKind::Open(AccessMode::Any)),
+            EventKind::Access(AccessKind::Close(AccessMode::Read)),
+            EventKind::Access(AccessKind::Read),
+            EventKind::Other,
+        ] {
+            assert!(!is_rebuild_event(&event_of_kind(kind)), "{kind:?}");
+        }
     }
 }
