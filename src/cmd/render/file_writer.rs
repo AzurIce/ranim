@@ -4,6 +4,8 @@ use std::{
     process::{Child, ChildStdin, Command, Stdio},
 };
 
+use ranim_core::audio::StereoFrame;
+
 use crate::OutputFormat;
 use tracing::info;
 
@@ -45,6 +47,24 @@ impl OutputFormatExt for OutputFormat {
     }
 }
 
+/// A mixed master audio track to mux into the output container.
+#[derive(Debug, Clone)]
+pub struct AudioTrack {
+    /// Interleaved stereo frames at 48 kHz, exactly the master length.
+    pub pcm: Vec<StereoFrame>,
+}
+
+/// The audio codec used per container format: `(codec, bitrate_args)`.
+fn audio_codec(format: OutputFormat) -> Option<(&'static str, &'static [&'static str])> {
+    match format {
+        OutputFormat::Mp4 => Some(("aac", &["-b:a", "192k"])),
+        OutputFormat::Webm => Some(("libopus", &["-b:a", "160k"])),
+        OutputFormat::Mov => Some(("pcm_s16le", &[])),
+        // Gif containers cannot carry audio.
+        OutputFormat::Gif => None,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FileWriterBuilder {
     pub file_path: PathBuf,
@@ -56,6 +76,11 @@ pub struct FileWriterBuilder {
     pub video_codec: String,
     pub pixel_format: String,
     pub extra_codec_args: Vec<String>,
+
+    /// Output container format; decides audio codec support.
+    pub format: OutputFormat,
+    /// Master audio track to mux alongside the video, if the scene has sound.
+    pub audio: Option<AudioTrack>,
 }
 
 impl Default for FileWriterBuilder {
@@ -70,6 +95,8 @@ impl Default for FileWriterBuilder {
             video_codec: "libx264".to_string(),
             pixel_format: "yuv420p".to_string(),
             extra_codec_args: Vec::new(),
+            format: OutputFormat::default(),
+            audio: None,
         }
     }
 }
@@ -94,6 +121,7 @@ impl FileWriterBuilder {
 
     pub fn with_output_format(mut self, format: OutputFormat) -> Self {
         let (codec, pix_fmt, ext) = format.encoding_params();
+        self.format = format;
         self.video_codec = codec.to_string();
         self.pixel_format = pix_fmt.to_string();
         self.extra_codec_args = format.extra_args().iter().map(|s| s.to_string()).collect();
@@ -147,14 +175,60 @@ impl FileWriterBuilder {
         let fps = self.fps.to_string();
         let file_path = self.file_path.to_string_lossy().to_string();
 
-        // Input options (before -i)
+        // Input options (video on stdin; the audio track goes through a temp
+        // file because std only pipelines one stdin).
         command.args([
             "-y", "-f", "rawvideo", "-s", &size, "-pix_fmt", "rgba", "-r", &fps, "-i", "-",
         ]);
+        let mut audio_temp: Option<PathBuf> = None;
+        let audio_output_args: Vec<&str>;
+        match (&self.audio, audio_codec(self.format)) {
+            (Some(track), Some((codec, bitrate))) => {
+                let temp = self.file_path.with_extension("pcm");
+                let bytes: Vec<u8> = track
+                    .pcm
+                    .iter()
+                    .flat_map(|f| [f.l.to_le_bytes(), f.r.to_le_bytes()])
+                    .flatten()
+                    .collect();
+                if let Err(e) = std::fs::write(&temp, &bytes) {
+                    panic!("failed to write audio temp file {}: {e}", temp.display());
+                }
+                info!(
+                    "muxing audio track ({} frames) from {:?}",
+                    track.pcm.len(),
+                    temp
+                );
+                command.args([
+                    "-f",
+                    "f32le",
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                    "-i",
+                    temp.to_string_lossy().as_ref(),
+                ]);
+                let mut args = vec!["-map", "0:v", "-map", "1:a", "-c:a", codec];
+                args.extend_from_slice(bitrate);
+                audio_output_args = args;
+                audio_temp = Some(temp);
+            }
+            (Some(_), None) => {
+                info!(
+                    "format {} carries no audio; dropping the audio track",
+                    self.format
+                );
+                audio_output_args = vec!["-an"];
+            }
+            (None, _) => audio_output_args = vec!["-an"],
+        }
+
         // Output options (before output file)
-        command.args(["-an", "-loglevel", "error", "-vcodec", &self.video_codec]);
+        command.args(["-loglevel", "error", "-vcodec", &self.video_codec]);
         command.args(&self.extra_codec_args);
         command.args(["-pix_fmt", &self.pixel_format]);
+        command.args(&audio_output_args);
         if !self.vf_args.is_empty() {
             let vf = self.vf_args.join(",");
             command.args(["-vf", &vf]);
@@ -167,6 +241,7 @@ impl FileWriterBuilder {
         FileWriter {
             child_in: child.stdin.take(),
             child,
+            audio_temp,
         }
     }
 }
@@ -174,6 +249,7 @@ impl FileWriterBuilder {
 pub struct FileWriter {
     child: Child,
     child_in: Option<ChildStdin>,
+    audio_temp: Option<PathBuf>,
 }
 
 impl Drop for FileWriter {
@@ -185,6 +261,9 @@ impl Drop for FileWriter {
             .expect("Failed to flush ffmpeg");
         drop(self.child_in.take());
         self.child.wait().expect("Failed to wait ffmpeg");
+        if let Some(temp) = self.audio_temp.take() {
+            let _ = std::fs::remove_file(temp);
+        }
     }
 }
 

@@ -3,8 +3,9 @@ use std::collections::VecDeque;
 
 use crate::cmd::render::file_writer::OutputFormatExt;
 use crate::{Output, Scene, SceneConfig, SceneConstructor};
-use file_writer::{FileWriter, FileWriterBuilder};
+use file_writer::{AudioTrack, FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
+use ranim_core::audio::StereoFrame;
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::{SceneEvaluator, TimeMark};
 use ranim_render::resource::RenderTextures;
@@ -15,6 +16,8 @@ use std::time::Instant;
 use tracing::{Span, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
+/// Audio decoding helpers for the render pipeline.
+pub mod audio;
 pub(crate) mod file_writer;
 
 #[cfg(feature = "profiling")]
@@ -308,6 +311,14 @@ impl RenderWorker {
         }
     }
 
+    /// Mixes a master audio track into the video writer configuration; the
+    /// next writer build muxes it alongside the video frames.
+    pub fn enable_audio(&mut self, pcm: Vec<StereoFrame>) {
+        if let Some(builder) = self.video_writer_builder.as_mut() {
+            builder.audio = Some(AudioTrack { pcm });
+        }
+    }
+
     /// Returns the directory path used to save individual frame images.
     pub fn save_frame_dir(&self) -> PathBuf {
         self.output_dir.join(format!(
@@ -506,6 +517,17 @@ impl RanimRenderApp {
             .unwrap();
             (cpu_server, gpu_server)
         };
+
+        // Mix the scene's audio plan (if any) into the writer before frames
+        // start flowing; audio never touches the per-frame path.
+        if !evaluator.audio_plan().is_empty() {
+            let plan = evaluator.audio_plan();
+            let pcm = plan.mix(evaluator.total_secs());
+            info!("mixed audio master: {} frames", pcm.len());
+            if let Some(worker) = self.render_worker.as_mut() {
+                worker.enable_audio(pcm);
+            }
+        }
 
         let worker_thread = self.render_worker.take().unwrap().yeet();
 

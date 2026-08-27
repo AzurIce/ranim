@@ -35,6 +35,10 @@ pub use ranim_render as render;
 pub mod cmd;
 pub use core::color;
 
+/// Ready-made sound sources (std-only wav decoding).
+pub mod audio_sources;
+pub use audio_sources::WavSource;
+
 /// Utils
 pub mod utils {
     pub use ranim_core::utils::*;
