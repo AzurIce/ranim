@@ -1,5 +1,7 @@
 //! A wrapper that attaches a typed external transform to an item.
 
+use std::ops::Range;
+
 use glam::{DAffine3, DVec3, dvec3};
 
 use crate::{
@@ -8,8 +10,8 @@ use crate::{
     color::{AlphaColor, Srgb},
     core_item::CoreItem,
     traits::{
-        Alignable, ApplyTransform, Diag, FillColor, Interpolatable, Opacity, Rigid, Similarity,
-        StrokeColor, TransformGroup, Translation,
+        Alignable, ApplyTransform, Diag, Empty, FillColor, Interpolatable, Opacity, Partial, Rigid,
+        Similarity, StrokeColor, TransformGroup, Translation,
     },
 };
 
@@ -226,6 +228,40 @@ impl<T: StrokeColor, G> StrokeColor for Transformed<T, G> {
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
         self.inner.set_stroke_opacity(opacity);
         self
+    }
+}
+
+impl<T: Partial, G: Clone> Partial for Transformed<T, G> {
+    /// Take a partial slice of the wrapped item, keeping the pose.
+    ///
+    /// The range is forwarded to `inner`, so the partial geometry is taken in
+    /// the item's own coordinates, while the stored transform `G` is cloned
+    /// unchanged. The wrapper therefore keeps its placement while the visible
+    /// geometry grows from the slice, which is what create-style animations
+    /// expect.
+    fn get_partial(&self, range: Range<f64>) -> Self {
+        Transformed::new(self.inner.get_partial(range), self.transform.clone())
+    }
+
+    /// Take a closed partial slice of the wrapped item, keeping the pose.
+    ///
+    /// Like [`get_partial`](Self::get_partial), but the inner slice is closed
+    /// so partially shown curves have caps at both ends; the wrapper's
+    /// transform is preserved.
+    fn get_partial_closed(&self, range: Range<f64>) -> Self {
+        Transformed::new(self.inner.get_partial_closed(range), self.transform.clone())
+    }
+}
+
+impl<T: Empty, G: TransformGroup> Empty for Transformed<T, G> {
+    /// Create an empty placeholder of a wrapped item.
+    ///
+    /// The inner item contributes `T::empty()` while the pose is `G::identity()`:
+    /// an empty placeholder carries no geometry, so there is no meaningful
+    /// placement to preserve — identity keeps it neutral for composition until
+    /// real content is placed on it.
+    fn empty() -> Self {
+        Transformed::new(T::empty(), G::identity())
     }
 }
 
@@ -543,5 +579,81 @@ mod tests {
             }
             _ => panic!("expected VItem"),
         }
+    }
+
+    /// A minimal stand-in for the geometry traits: `ranim-core` itself has no
+    /// concrete `Partial` type, so a partial slice is modelled by recording
+    /// the requested range and whether it was closed.
+    #[derive(Clone, Debug, PartialEq)]
+    struct StubShape {
+        /// The range this shape was last materialized from.
+        range: Range<f64>,
+        closed: bool,
+    }
+
+    impl Partial for StubShape {
+        fn get_partial(&self, range: Range<f64>) -> Self {
+            Self {
+                range,
+                closed: false,
+            }
+        }
+
+        fn get_partial_closed(&self, range: Range<f64>) -> Self {
+            Self {
+                range,
+                closed: true,
+            }
+        }
+    }
+
+    impl Empty for StubShape {
+        fn empty() -> Self {
+            Self {
+                range: 0.0..0.0,
+                closed: false,
+            }
+        }
+    }
+
+    #[test]
+    fn partial_forwards_the_range_and_keeps_the_pose() {
+        let wrapped = StubShape {
+            range: 0.0..1.0,
+            closed: false,
+        }
+        .transformed(Translation(DVec3::X));
+
+        let partial = wrapped.get_partial(0.2..0.8);
+        // The very same range reaches the inner item.
+        assert_eq!(partial.inner.range, 0.2..0.8);
+        assert!(!partial.inner.closed);
+        // The stored pose is cloned untouched.
+        assert_eq!(partial.transform, wrapped.transform);
+        assert_eq!(partial.transform, Translation(DVec3::X));
+
+        let closed = wrapped.get_partial_closed(0.3..0.6);
+        assert_eq!(closed.inner.range, 0.3..0.6);
+        assert!(closed.inner.closed);
+        assert_eq!(closed.transform, wrapped.transform);
+    }
+
+    #[test]
+    fn empty_wrapper_carries_an_identity_pose() {
+        let translation: Transformed<StubShape, Translation> = Empty::empty();
+        assert_eq!(translation.inner, StubShape::empty());
+        assert_eq!(translation.transform, Translation(DVec3::ZERO));
+
+        let rigid: Transformed<StubShape, Rigid> = Empty::empty();
+        assert_eq!(rigid.transform, Rigid::identity());
+
+        let similarity: Transformed<StubShape, Similarity> = Empty::empty();
+        assert_eq!(similarity.transform, Similarity::IDENTITY);
+
+        let diagonal: Transformed<StubShape, Diag> = Empty::empty();
+        assert_eq!(diagonal.transform, Diag(dvec3(1.0, 1.0, 1.0)));
+
+        let affine: Transformed<StubShape, DAffine3> = Empty::empty();
+        assert_eq!(affine.transform, DAffine3::IDENTITY);
     }
 }
