@@ -2,15 +2,15 @@
 
 ## Lints
 
-Replicate the CI lints job (`.github/workflows/build.yml`) before every push:
+**Run all Rust tooling inside the Nix development shell.** The flake pins its
+Rust to the exact nightly CI uses (`nightly-2026-08-01`, see
+`.github/workflows/build.yml`); an arbitrary host cargo has a different lint
+set and will disagree with CI.
 
 ```bash
-./scripts/check-ci-lints.sh
+nix develop
+just lint   # fmt-check + workspace-wide clippy/doc, feature-gated sweeps too
 ```
-
-It runs the exact CI commands (fmt / clippy `-D warnings` / doc with
-`RUSTDOCFLAGS=-D warnings`), using the pinned `nightly-2026-08-01` toolchain
-when rustup provides it.
 
 Gotchas learned the hard way — partial sweeps are NOT equivalent:
 
@@ -21,6 +21,8 @@ Gotchas learned the hard way — partial sweeps are NOT equivalent:
   `cargo check/clippy -p ranim --examples` when their features are off.
 - If a lint failure shows up in CI, fix it on the branch whose PR failed;
   fixing it in a stacked working tree leaves the PR red.
+- When changing the pinned toolchain, update it in both places at once:
+  the CI workflows and `flake.nix`.
 
 ## Build & Test Notes
 
