@@ -255,6 +255,11 @@ crate-type = ["cdylib"]
 wasm = true
 
 [[example]]
+name = "audio_demo"
+path = "examples/audio_demo/lib.rs"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "hello_ranim"
 path = "examples/hello_ranim/lib.rs"
 crate-type = ["cdylib"]
