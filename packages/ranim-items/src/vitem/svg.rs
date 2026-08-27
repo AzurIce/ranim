@@ -2,6 +2,7 @@ use color::{AlphaColor, Srgb, palette::css, rgb8, rgba};
 use glam::{DAffine2, DAffine3, DMat3, DVec3, dvec3};
 use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
+use ranim_core::core_item::transformed::Transformed;
 use ranim_core::traits::{ApplyTransform, FillColor, Opacity, StrokeColor, StrokeWidth};
 use ranim_core::traits::{PointsFunc, Rigid, TransformGroup};
 use ranim_core::utils::bezier::PathBuilder;
@@ -9,7 +10,7 @@ use ranim_core::{Extract, color, components::width::Width, glam};
 use tracing::warn;
 
 use super::VItem;
-use crate::hierarchy::Node;
+use crate::hierarchy::{Node, PlacedLeaves};
 
 // MARK: ### SvgItem ###
 /// An Svg Item.
@@ -24,7 +25,7 @@ use crate::hierarchy::Node;
 /// Use [`Vec::<VItem>::from`] to flatten into baked items, and
 /// [`SvgItem::by_id`] to address subtrees by their SVG element id.
 #[derive(Clone, Debug)]
-pub struct SvgItem(Node<VItem>);
+pub struct SvgItem(Transformed<Node<VItem>, DAffine3>);
 
 impl From<SvgItem> for Vec<VItem> {
     /// Flatten the hierarchy depth-first (painter's-algorithm order),
@@ -56,7 +57,7 @@ impl SvgItem {
         let mut item = Self::from_tree(&tree);
         let [min, max] = item.0.aabb();
         let center = (min + max) * 0.5;
-        item.0.transform = DAffine3::from(
+        item.0.compose_outer(
             Rigid::from_axis_angle(DVec3::X, std::f64::consts::PI)
                 .compose(&Rigid::from_translation(-center)),
         );
@@ -73,18 +74,18 @@ impl SvgItem {
         Self(build_group_node(tree.root(), usvg::Transform::identity()))
     }
 
-    /// The underlying hierarchy tree.
-    pub fn tree(&self) -> &Node<VItem> {
+    /// The underlying hierarchy tree, including its root placement.
+    pub fn tree(&self) -> &Transformed<Node<VItem>, DAffine3> {
         &self.0
     }
 
     /// The underlying hierarchy tree, mutably.
-    pub fn tree_mut(&mut self) -> &mut Node<VItem> {
+    pub fn tree_mut(&mut self) -> &mut Transformed<Node<VItem>, DAffine3> {
         &mut self.0
     }
 
-    /// Consume the item, returning the underlying hierarchy tree.
-    pub fn into_tree(self) -> Node<VItem> {
+    /// Consume the item, returning the underlying placed hierarchy tree.
+    pub fn into_tree(self) -> Transformed<Node<VItem>, DAffine3> {
         self.0
     }
 
@@ -94,19 +95,19 @@ impl SvgItem {
     /// SVG ids may be set on groups, so such lookups resolve to the group's
     /// first leaf; use [`SvgItem::tree`] for structural access.
     pub fn by_id(&self, id: &str) -> Option<&VItem> {
-        let node = self.0.by_id(id)?;
-        node.item().or_else(|| node.first_leaf())
+        let node = self.0.inner.by_id(id)?;
+        node.inner.item().or_else(|| node.inner.first_leaf())
     }
 
     /// Mutable variant of [`SvgItem::by_id`]. Mutation reaches only the
     /// matched leaf's local (canonical) data; node transforms are
     /// unaffected.
     pub fn by_id_mut(&mut self, id: &str) -> Option<&mut VItem> {
-        let node = self.0.by_id_mut(id)?;
-        if node.item_mut().is_some() {
-            node.item_mut()
+        let node = self.0.inner.by_id_mut(id)?;
+        if node.inner.item_mut().is_some() {
+            node.inner.item_mut()
         } else {
-            node.first_leaf_mut()
+            node.inner.first_leaf_mut()
         }
     }
 }
@@ -196,9 +197,12 @@ fn parse_paint(paint: &usvg::Paint) -> AlphaColor<Srgb> {
 /// The node's transform is the group's transform **relative** to its
 /// parent (`parent_abs^-1 * group_abs`), so path data is never rewritten
 /// and re-posing any level of the tree is a local operation.
-fn build_group_node(group: &usvg::Group, parent_abs: usvg::Transform) -> Node<VItem> {
+fn build_group_node(
+    group: &usvg::Group,
+    parent_abs: usvg::Transform,
+) -> Transformed<Node<VItem>, DAffine3> {
     let abs = group.abs_transform();
-    let children: Vec<Node<VItem>> = group
+    let children: Vec<Transformed<Node<VItem>, DAffine3>> = group
         .children()
         .iter()
         .filter_map(|node| match node {
@@ -209,11 +213,10 @@ fn build_group_node(group: &usvg::Group, parent_abs: usvg::Transform) -> Node<VI
         })
         .collect();
     let mut node = Node::group(children);
-    node.transform = widen_to_daffine3(rel_transform(parent_abs, abs));
     if !group.id().is_empty() {
         node.id = Some(group.id().to_string());
     }
-    node
+    Transformed::new(node, widen_to_daffine3(rel_transform(parent_abs, abs)))
 }
 
 /// Build a leaf node from a `usvg` path and the absolute transform of its
@@ -223,7 +226,10 @@ fn build_group_node(group: &usvg::Group, parent_abs: usvg::Transform) -> Node<VI
 /// flat walker did (same segment mapping, fill/stroke parsing, and empty
 /// path skipping) — but the path's placement goes onto the leaf node's
 /// transform instead of being baked into the points.
-fn build_path_leaf(path: &usvg::Path, parent_abs: usvg::Transform) -> Option<Node<VItem>> {
+fn build_path_leaf(
+    path: &usvg::Path,
+    parent_abs: usvg::Transform,
+) -> Option<Transformed<Node<VItem>, DAffine3>> {
     let mut builder = PathBuilder::new();
     for segment in path.data().segments() {
         match segment {
@@ -267,11 +273,13 @@ fn build_path_leaf(path: &usvg::Path, parent_abs: usvg::Transform) -> Option<Nod
     }
 
     let mut node = Node::leaf(vitem);
-    node.transform = widen_to_daffine3(rel_transform(parent_abs, path.abs_transform()));
     if !path.id().is_empty() {
         node.id = Some(path.id().to_string());
     }
-    Some(node)
+    Some(Transformed::new(
+        node,
+        widen_to_daffine3(rel_transform(parent_abs, path.abs_transform())),
+    ))
 }
 
 /// The transform of a node relative to its parent: `parent_abs^-1 * abs`.
@@ -379,35 +387,35 @@ mod tests {
         let svg = SvgItem::from_tree(&parse(NESTED_SVG));
         let root = svg.tree();
 
-        assert!(root.is_group());
-        assert_eq!(root.id, None);
+        assert!(root.inner.is_group());
+        assert_eq!(root.inner.id, None);
         // No viewBox scaling: the root group's relative transform is the
         // identity before normalization.
         assert_eq!(root.transform, DAffine3::IDENTITY);
 
-        let children = root.children();
+        let children = root.inner.children();
         assert_eq!(children.len(), 1);
         let outer = &children[0];
-        assert!(outer.is_group());
-        assert_eq!(outer.id, None, "the outer <g> has no id attribute");
+        assert!(outer.inner.is_group());
+        assert_eq!(outer.inner.id, None, "the outer <g> has no id attribute");
         assert_affine3_eq(outer.transform, widen_to_daffine3(outer_rel()));
 
-        let inner = &outer.children()[0];
-        assert_eq!(inner.id.as_deref(), Some("inner"));
-        assert!(inner.is_group());
+        let inner = &outer.inner.children()[0];
+        assert_eq!(inner.inner.id.as_deref(), Some("inner"));
+        assert!(inner.inner.is_group());
         assert_affine3_eq(
             inner.transform,
             widen_to_daffine3(DAffine2::from_angle(45.0f64.to_radians())),
         );
 
-        let leaf_a = &inner.children()[0];
-        assert_eq!(leaf_a.id.as_deref(), Some("leaf-a"));
-        assert!(leaf_a.is_leaf());
+        let leaf_a = &inner.inner.children()[0];
+        assert_eq!(leaf_a.inner.id.as_deref(), Some("leaf-a"));
+        assert!(leaf_a.inner.is_leaf());
         assert_eq!(leaf_a.transform, DAffine3::IDENTITY);
         // Path data stays in raw SVG coordinates; the placement lives on
-        // the node transforms. (The builder's middle point is the line's
-        // midpoint handle.)
-        let item = leaf_a.item().unwrap();
+        // the placement transforms. (The builder's middle point is the
+        // line's midpoint handle.)
+        let item = leaf_a.inner.item().unwrap();
         assert_eq!(item.vpoints.0[0], dvec3(10.0, 10.0, 0.0));
         assert_eq!(item.vpoints.0[2], dvec3(20.0, 10.0, 0.0));
     }

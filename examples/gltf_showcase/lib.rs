@@ -3,7 +3,8 @@ use std::f64::consts::{PI, TAU};
 use ranim::{
     anims::camera::CameraFrameAnim,
     color::palettes::manim,
-    glam::DVec3,
+    core::core_item::transformed::{Transformed, TransformedExt},
+    glam::{DAffine3, DVec3},
     items::{
         hierarchy::Node,
         mesh::{MeshItem, gltf::node_tree_from_path},
@@ -17,15 +18,17 @@ const MODEL_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/models");
 /// Loads a model (the loader already converts glTF's Y-up to ranim's Z-up),
 /// centers it on its own axes and normalizes its size, so it can be posed
 /// by rotating about its vertical axis and placed by shifting its root.
-fn load_model(file: &str, size: f64) -> Node<MeshItem> {
-    let mut tree = node_tree_from_path(format!("{MODEL_DIR}/{file}"))
+fn load_model(file: &str, size: f64) -> Transformed<Node<MeshItem>, DAffine3> {
+    let tree = node_tree_from_path(format!("{MODEL_DIR}/{file}"))
         .unwrap_or_else(|error| panic!("failed to load {file}: {error}"))
         .tree;
     let [min, max] = tree.aabb();
     let extents = max - min;
-    tree.shift(-(min + max) / 2.0);
-    tree.scale_uniform(size / extents.x.max(extents.y).max(extents.z));
-    tree
+    // Place the tree by wrapping it — the pose stays external.
+    let mut placed = tree.transformed(DAffine3::IDENTITY);
+    placed.shift(-(min + max) / 2.0);
+    placed.scale_uniform(size / extents.x.max(extents.y).max(extents.z));
+    placed
 }
 
 /// Rotating showcase of the three dimension-factory machines. Each model is

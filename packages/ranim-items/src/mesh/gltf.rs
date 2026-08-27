@@ -73,6 +73,8 @@ use std::path::Path;
 /// without their own matching dependency.
 pub use gltf;
 
+use ranim_core::core_item::transformed::Transformed;
+
 use crate::hierarchy::Node;
 use crate::mesh::MeshItem;
 use ranim_core::components::rgba::Rgba;
@@ -100,12 +102,12 @@ pub struct GltfTree {
 impl GltfTree {
     /// The tree node for glTF node `index`, or `None` when the index is out
     /// of range or the node is not part of the imported scene.
-    pub fn node(&self, index: usize) -> Option<&Node<MeshItem>> {
+    pub fn node(&self, index: usize) -> Option<&Transformed<Node<MeshItem>, DAffine3>> {
         self.tree.get(self.node_paths.get(index)?.as_deref()?)
     }
 
     /// Mutable variant of [`GltfTree::node`].
-    pub fn node_mut(&mut self, index: usize) -> Option<&mut Node<MeshItem>> {
+    pub fn node_mut(&mut self, index: usize) -> Option<&mut Transformed<Node<MeshItem>, DAffine3>> {
         self.tree.get_mut(self.node_paths.get(index)?.as_deref()?)
     }
 }
@@ -214,7 +216,7 @@ where
         None => {
             tracing::warn!("glTF document has no scene, importing an empty tree");
             return GltfTree {
-                tree: Node::group(Vec::new()).with_transform(y_up_to_z_up()),
+                tree: Node::frame(),
                 node_paths,
             };
         }
@@ -223,11 +225,14 @@ where
         .nodes()
         .enumerate()
         .map(|(slot, node)| {
-            node_tree_from_gltf_node(node, &[slot], &mut node_paths, &get_buffer_data)
+            let mut wrapper =
+                node_tree_from_gltf_node(node, &[slot], &mut node_paths, &get_buffer_data);
+            wrapper.compose_outer(y_up_to_z_up());
+            wrapper
         })
-        .collect();
+        .collect::<Vec<_>>();
     GltfTree {
-        tree: Node::group(children).with_transform(y_up_to_z_up()),
+        tree: Node::group(children),
         node_paths,
     }
 }
@@ -242,14 +247,14 @@ fn node_tree_from_gltf_node<'s, F>(
     path: &[usize],
     node_paths: &mut Vec<Option<Vec<usize>>>,
     get_buffer_data: &F,
-) -> Node<MeshItem>
+) -> Transformed<Node<MeshItem>, DAffine3>
 where
     F: Clone + for<'b> Fn(gltf::buffer::Buffer<'b>) -> Option<&'s [u8]>,
 {
     let transform = node_transform(node.transform());
     let mut id = non_empty(node.name()).map(str::to_string);
 
-    let mut children: Vec<Node<MeshItem>> = Vec::new();
+    let mut children: Vec<Transformed<Node<MeshItem>, DAffine3>> = Vec::new();
     let mut item: Option<MeshItem> = None;
     if let Some(mesh) = node.mesh() {
         let primitive_count = mesh.primitives().count();
@@ -270,10 +275,13 @@ where
             for (index, primitive) in mesh.primitives().enumerate() {
                 warn_if_not_triangles(&primitive, mesh.name(), index);
                 let leaf = Node::leaf(primitive_mesh_item(primitive, get_buffer_data));
-                children.push(match primitive_leaf_id(mesh.name(), node.name(), index) {
-                    Some(id) => leaf.with_id(id),
-                    None => leaf,
-                });
+                children.push(
+                    match primitive_leaf_id(mesh.name(), node.name(), index) {
+                        Some(id) => leaf.with_id(id),
+                        None => leaf,
+                    }
+                    .into(),
+                );
             }
         }
     }
@@ -285,10 +293,10 @@ where
     }));
 
     node_paths[node.index()] = Some(path.to_vec());
-    let node = Node::new(transform, item, children);
+    let node = Node::new(item, children);
     match id {
-        Some(id) => node.with_id(id),
-        None => node,
+        Some(id) => Transformed::new(node.with_id(id), transform),
+        None => Transformed::new(node, transform),
     }
 }
 
@@ -532,34 +540,37 @@ mod tests {
         assert_eq!(roots.len(), 1);
 
         let parent = &roots[0];
-        assert_eq!(parent.id.as_deref(), Some("parent"));
-        assert!(parent.is_group());
-        let parent_children = parent.children();
+        assert_eq!(parent.inner.id.as_deref(), Some("parent"));
+        assert!(parent.inner.is_group());
+        let parent_children = parent.inner.children();
         assert_eq!(parent_children.len(), 1);
 
         let child = &parent_children[0];
         // A single-primitive mesh maps natively to the node's payload.
-        assert_eq!(child.id.as_deref(), Some("child"));
-        assert!(child.is_leaf());
-        assert_eq!(child.item().unwrap().triangle_indices, vec![0, 1, 2]);
+        assert_eq!(child.inner.id.as_deref(), Some("child"));
+        assert!(child.inner.is_leaf());
+        assert_eq!(child.inner.item().unwrap().triangle_indices, vec![0, 1, 2]);
     }
 
     #[test]
     fn node_transforms_match_trs_semantics() {
         let tree = triangle_tree();
         let parent = &tree.children()[0];
-        let child = &parent.children()[0];
+        let child = &parent.inner.children()[0];
 
-        // Parent: T(1,2,3) composed with Rz(+90deg), applied after rotation.
-        // Rotation-derived values carry ~1e-7 f32 noise from the glTF source,
-        // so their tolerance is 1e-6 (translations/scales stay exact).
+        // Parent: the scene-root wrapper's pose is the loader's Y-up → Z-up
+        // flip composed outside the node's own T(1,2,3)·Rz(+90deg), so ZERO
+        // lands at flip(1,2,3) = (1,-3,4) and the node's X axis maps
+        // X -> Y -> Z. Rotation-derived values carry ~1e-7 f32 noise from
+        // the glTF source, so their tolerance is 1e-6 (translations/scales
+        // stay exact).
         let parent_t = &parent.transform;
         assert!(
             parent_t
                 .transform_point3(DVec3::ZERO)
-                .abs_diff_eq(dvec3(1.0, 2.0, 3.0), 1e-9)
+                .abs_diff_eq(dvec3(1.0, -3.0, 2.0), 1e-6)
         );
-        assert!((parent_t.matrix3 * DVec3::X).abs_diff_eq(DVec3::Y, 1e-6));
+        assert!((parent_t.matrix3 * DVec3::X).abs_diff_eq(DVec3::Z, 1e-6));
 
         // Child: pure uniform scale of 2.
         assert!(
@@ -573,7 +584,7 @@ mod tests {
     #[test]
     fn leaf_mesh_round_trips_primitive_data() {
         let tree = triangle_tree();
-        let leaf = tree.children()[0].children()[0].item().unwrap();
+        let leaf = tree.children()[0].inner.children()[0].inner.item().unwrap();
 
         let points: Vec<DVec3> = leaf.points.iter().cloned().collect();
         assert_eq!(
@@ -633,7 +644,7 @@ mod tests {
 
         let tree = loaded.unwrap();
         assert_eq!(tree.leaves().count(), 1);
-        let leaf = tree.children()[0].children()[0].item().unwrap();
+        let leaf = tree.children()[0].inner.children()[0].inner.item().unwrap();
         assert_eq!(leaf.triangle_indices, vec![0, 1, 2]);
     }
 
@@ -652,7 +663,7 @@ mod tests {
         // The vertex data round-trips, proving the external buffer was
         // resolved relative to the .gltf and read.
         let tree = loaded.unwrap();
-        let leaf = tree.children()[0].children()[0].item().unwrap();
+        let leaf = tree.children()[0].inner.children()[0].inner.item().unwrap();
         assert_eq!(leaf.triangle_indices, vec![0, 1, 2]);
         assert_eq!(leaf.points.len(), 3);
     }
@@ -665,22 +676,25 @@ mod tests {
         // ("child") hangs below it. The parent carries no mesh, so the
         // child sits at slot 0.
         let parent = tree.node(0).unwrap();
-        assert_eq!(parent.id.as_deref(), Some("parent"));
+        assert_eq!(parent.inner.id.as_deref(), Some("parent"));
         let child = tree.node(1).unwrap();
-        assert_eq!(child.id.as_deref(), Some("child"));
+        assert_eq!(child.inner.id.as_deref(), Some("child"));
         assert_eq!(tree.node_paths[0], Some(vec![0]));
         assert_eq!(tree.node_paths[1], Some(vec![0, 0]));
 
         // Out-of-range indices resolve to None; node() agrees with get().
         assert!(tree.node(7).is_none());
         assert_eq!(
-            tree.node(1).unwrap().id,
-            tree.get(&tree.node_paths[1].clone().unwrap()).unwrap().id
+            tree.node(1).unwrap().inner.id,
+            tree.get(&tree.node_paths[1].clone().unwrap())
+                .unwrap()
+                .inner
+                .id
         );
 
         // Mutable access through the same map.
         let mut tree = triangle_tree();
-        tree.node_mut(1).unwrap().id = Some("renamed".into());
-        assert_eq!(tree.node(1).unwrap().id.as_deref(), Some("renamed"));
+        tree.node_mut(1).unwrap().inner.id = Some("renamed".into());
+        assert_eq!(tree.node(1).unwrap().inner.id.as_deref(), Some("renamed"));
     }
 }
