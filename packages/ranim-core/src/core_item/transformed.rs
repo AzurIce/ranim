@@ -445,7 +445,7 @@ mod tests {
     fn map_converts_transform_with_closure() {
         let wrapped = 42u32
             .transformed(Translation(DVec3::X))
-            .map(|translation| Similarity::from(translation));
+            .map(Similarity::from);
         assert_eq!(wrapped.inner, 42);
         assert_eq!(wrapped.transform.translation, DVec3::X);
     }
@@ -458,7 +458,7 @@ mod tests {
         };
         let wrapped = vitem
             .transformed(Translation(DVec3::X))
-            .map(|translation| DAffine3::from(translation));
+            .map(DAffine3::from);
 
         match &wrapped.extract()[0] {
             CoreItem::VItem(vitem) => {
