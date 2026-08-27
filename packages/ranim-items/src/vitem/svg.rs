@@ -95,7 +95,7 @@ impl SvgItem {
     /// first leaf; use [`SvgItem::tree`] for structural access.
     pub fn by_id(&self, id: &str) -> Option<&VItem> {
         let node = self.0.by_id(id)?;
-        node.leaf_content().or_else(|| node.first_leaf())
+        node.item().or_else(|| node.first_leaf())
     }
 
     /// Mutable variant of [`SvgItem::by_id`]. Mutation reaches only the
@@ -103,8 +103,8 @@ impl SvgItem {
     /// unaffected.
     pub fn by_id_mut(&mut self, id: &str) -> Option<&mut VItem> {
         let node = self.0.by_id_mut(id)?;
-        if node.leaf_content_mut().is_some() {
-            node.leaf_content_mut()
+        if node.item_mut().is_some() {
+            node.item_mut()
         } else {
             node.first_leaf_mut()
         }
@@ -385,14 +385,14 @@ mod tests {
         // identity before normalization.
         assert_eq!(root.transform, DAffine3::IDENTITY);
 
-        let children = root.children().unwrap();
+        let children = root.children();
         assert_eq!(children.len(), 1);
         let outer = &children[0];
         assert!(outer.is_group());
         assert_eq!(outer.id, None, "the outer <g> has no id attribute");
         assert_affine3_eq(outer.transform, widen_to_daffine3(outer_rel()));
 
-        let inner = &outer.children().unwrap()[0];
+        let inner = &outer.children()[0];
         assert_eq!(inner.id.as_deref(), Some("inner"));
         assert!(inner.is_group());
         assert_affine3_eq(
@@ -400,14 +400,14 @@ mod tests {
             widen_to_daffine3(DAffine2::from_angle(45.0f64.to_radians())),
         );
 
-        let leaf_a = &inner.children().unwrap()[0];
+        let leaf_a = &inner.children()[0];
         assert_eq!(leaf_a.id.as_deref(), Some("leaf-a"));
         assert!(leaf_a.is_leaf());
         assert_eq!(leaf_a.transform, DAffine3::IDENTITY);
         // Path data stays in raw SVG coordinates; the placement lives on
         // the node transforms. (The builder's middle point is the line's
         // midpoint handle.)
-        let item = leaf_a.leaf_content().unwrap();
+        let item = leaf_a.item().unwrap();
         assert_eq!(item.vpoints.0[0], dvec3(10.0, 10.0, 0.0));
         assert_eq!(item.vpoints.0[2], dvec3(20.0, 10.0, 0.0));
     }

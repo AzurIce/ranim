@@ -64,24 +64,32 @@ use ranim_core::{
 use tracing::warn;
 
 /// One node of a scene-graph tree: an external id, a local-to-parent
-/// transform, and either leaf content or children.
+/// transform, an optional payload, and ordered children.
+///
+/// Every node is a *frame*: its payload (if any) and its children all live
+/// in the node's local space, and the node's transform places that space in
+/// the parent's. This is the same shape as a glTF node (`matrix|TRS`,
+/// `mesh?`, `children?`) or a Bevy entity (components + `Children`): a node
+/// may carry a payload and children at the same time, and a node without
+/// either is a pure anchor frame.
 ///
 /// # Examples
 ///
-/// Build trees with [`Node::leaf`], [`Node::group`], and the builders, or
-/// with struct literals when every field is known:
+/// Build trees with [`Node::leaf`], [`Node::group`], [`Node::branch`], and
+/// the builders, or with struct literals when every field is known:
 ///
 /// ```
 /// use ranim_core::glam::dvec3;
 /// use ranim_core::traits::Translation;
-/// use ranim_items::hierarchy::{Node, NodeContent};
+/// use ranim_items::hierarchy::Node;
 ///
 /// let node = Node {
 ///     id: Some("outer".into()),
 ///     transform: Translation(dvec3(1.0, 0.0, 0.0)),
-///     content: NodeContent::Leaf("geometry".to_string()),
+///     item: Some("geometry".to_string()),
+///     children: Vec::new(),
 /// };
-/// assert_eq!(node.leaf_content(), Some(&"geometry".to_string()));
+/// assert_eq!(node.item(), Some(&"geometry".to_string()));
 /// ```
 pub struct Node<I, G = DAffine3> {
     /// External identifier carried from the source format (e.g. SVG element
@@ -91,19 +99,12 @@ pub struct Node<I, G = DAffine3> {
     pub id: Option<String>,
     /// The transform from this node's local space into the parent's space.
     pub transform: G,
-    /// Either leaf content or ordered children.
-    pub content: NodeContent<I, G>,
-}
-
-/// The payload variants of a [`Node`].
-///
-/// Children are stored in source order; extraction preserves that order
-/// depth-first so downstream consumers see painter's-algorithm ordering.
-pub enum NodeContent<I, G = DAffine3> {
-    /// Leaf content in canonical local coordinates.
-    Leaf(I),
-    /// Ordered child nodes.
-    Children(Vec<Node<I, G>>),
+    /// The payload carried by this node, in canonical local coordinates.
+    pub item: Option<I>,
+    /// The ordered child nodes, living in this node's local space. Stored in
+    /// source order; extraction preserves that order depth-first so
+    /// downstream consumers see painter's-algorithm ordering.
+    pub children: Vec<Node<I, G>>,
 }
 
 // MARK: Manual basic impls
@@ -117,14 +118,18 @@ impl<I: Clone, G: Clone> Clone for Node<I, G> {
         Self {
             id: self.id.clone(),
             transform: self.transform.clone(),
-            content: self.content.clone(),
+            item: self.item.clone(),
+            children: self.children.clone(),
         }
     }
 }
 
 impl<I: PartialEq, G: PartialEq> PartialEq for Node<I, G> {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.transform == other.transform && self.content == other.content
+        self.id == other.id
+            && self.transform == other.transform
+            && self.item == other.item
+            && self.children == other.children
     }
 }
 
@@ -135,50 +140,23 @@ impl<I: fmt::Debug, G: fmt::Debug> fmt::Debug for Node<I, G> {
         f.debug_struct("Node")
             .field("id", &self.id)
             .field("transform", &self.transform)
-            .field("content", &self.content)
+            .field("item", &self.item)
+            .field("children", &self.children)
             .finish()
-    }
-}
-
-impl<I: Clone, G: Clone> Clone for NodeContent<I, G> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Leaf(item) => Self::Leaf(item.clone()),
-            Self::Children(children) => Self::Children(children.clone()),
-        }
-    }
-}
-
-impl<I: PartialEq, G: PartialEq> PartialEq for NodeContent<I, G> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Leaf(a), Self::Leaf(b)) => a == b,
-            (Self::Children(a), Self::Children(b)) => a == b,
-            _ => false,
-        }
-    }
-}
-
-impl<I: Eq, G: Eq> Eq for NodeContent<I, G> {}
-
-impl<I: fmt::Debug, G: fmt::Debug> fmt::Debug for NodeContent<I, G> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Leaf(item) => f.debug_tuple("Leaf").field(item).finish(),
-            Self::Children(children) => f.debug_tuple("Children").field(children).finish(),
-        }
     }
 }
 
 // MARK: Inherent API
 
 impl<I, G> Node<I, G> {
-    /// Pair `content` with `transform`, without any external id.
-    pub fn new(transform: G, content: NodeContent<I, G>) -> Self {
+    /// Pair a payload (if any) and children with a transform, without any
+    /// external id.
+    pub fn new(transform: G, item: Option<I>, children: Vec<Self>) -> Self {
         Self {
             id: None,
             transform,
-            content,
+            item,
+            children,
         }
     }
 
@@ -197,63 +175,47 @@ impl<I, G> Node<I, G> {
         self
     }
 
-    /// Whether this node holds leaf content.
+    /// Whether this node is a bare leaf: a payload with no children.
     pub fn is_leaf(&self) -> bool {
-        matches!(self.content, NodeContent::Leaf(_))
+        self.item.is_some() && self.children.is_empty()
     }
 
-    /// Whether this node holds children.
+    /// Whether this node is a pure frame: no payload, only (possibly empty)
+    /// children.
     pub fn is_group(&self) -> bool {
-        matches!(self.content, NodeContent::Children(_))
+        self.item.is_none()
     }
 
-    /// The leaf content, if this node is a leaf.
-    ///
-    /// (Named `leaf_content` rather than `leaf` because [`Node::leaf`] is
-    /// the leaf constructor.)
-    pub fn leaf_content(&self) -> Option<&I> {
-        match &self.content {
-            NodeContent::Leaf(item) => Some(item),
-            NodeContent::Children(_) => None,
-        }
+    /// The payload carried by this node, if any.
+    pub fn item(&self) -> Option<&I> {
+        self.item.as_ref()
     }
 
-    /// The leaf content mutably, if this node is a leaf.
-    pub fn leaf_content_mut(&mut self) -> Option<&mut I> {
-        match &mut self.content {
-            NodeContent::Leaf(item) => Some(item),
-            NodeContent::Children(_) => None,
-        }
+    /// The payload mutably, if any.
+    pub fn item_mut(&mut self) -> Option<&mut I> {
+        self.item.as_mut()
     }
 
-    /// The ordered children, if this node is a group.
-    pub fn children(&self) -> Option<&[Node<I, G>]> {
-        match &self.content {
-            NodeContent::Leaf(_) => None,
-            NodeContent::Children(children) => Some(children),
-        }
+    /// The ordered children.
+    pub fn children(&self) -> &[Node<I, G>] {
+        &self.children
     }
 
-    /// The ordered children mutably, if this node is a group.
-    pub fn children_mut(&mut self) -> Option<&mut [Node<I, G>]> {
-        match &mut self.content {
-            NodeContent::Leaf(_) => None,
-            NodeContent::Children(children) => Some(children),
-        }
+    /// The ordered children mutably.
+    pub fn children_mut(&mut self) -> &mut [Node<I, G>] {
+        &mut self.children
     }
 
     /// The first leaf payload in depth-first order, without composing any
     /// transforms. This backs the color/stroke-width getters; `None` means
-    /// the tree has no leaves at all.
+    /// the tree has no payloads at all.
     pub fn first_leaf(&self) -> Option<&I> {
         let mut stack = vec![self];
         while let Some(node) = stack.pop() {
-            match &node.content {
-                NodeContent::Leaf(item) => return Some(item),
-                NodeContent::Children(children) => {
-                    stack.extend(children.iter().rev());
-                }
+            if let Some(item) = &node.item {
+                return Some(item);
             }
+            stack.extend(node.children.iter().rev());
         }
         None
     }
@@ -265,7 +227,7 @@ impl<I, G> Node<I, G> {
     pub fn get(&self, path: &[usize]) -> Option<&Node<I, G>> {
         let mut node = self;
         for &index in path {
-            node = node.children()?.get(index)?;
+            node = node.children.get(index)?;
         }
         Some(node)
     }
@@ -274,7 +236,7 @@ impl<I, G> Node<I, G> {
     pub fn get_mut(&mut self, path: &[usize]) -> Option<&mut Node<I, G>> {
         let mut node = self;
         for &index in path {
-            node = node.children_mut()?.get_mut(index)?;
+            node = node.children.get_mut(index)?;
         }
         Some(node)
     }
@@ -289,7 +251,7 @@ impl<I, G> Node<I, G> {
         if self.id.as_deref() == Some(id) {
             return Some(self);
         }
-        self.children()?.iter().find_map(|child| child.by_id(id))
+        self.children.iter().find_map(|child| child.by_id(id))
     }
 
     /// Mutable variant of [`Node::by_id`].
@@ -297,7 +259,7 @@ impl<I, G> Node<I, G> {
         if self.id.as_deref() == Some(id) {
             return Some(self);
         }
-        self.children_mut()?
+        self.children
             .iter_mut()
             .find_map(|child| child.by_id_mut(id))
     }
@@ -313,10 +275,8 @@ impl<I, G> Node<I, G> {
         if self.id.as_deref() == Some(id) {
             matches.push(self);
         }
-        if let Some(children) = self.children() {
-            for child in children {
-                child.collect_by_id(id, matches);
-            }
+        for child in &self.children {
+            child.collect_by_id(id, matches);
         }
     }
 
@@ -327,7 +287,7 @@ impl<I, G> Node<I, G> {
         if self.id.as_deref() == Some(id) {
             return Some(Vec::new());
         }
-        for (index, child) in self.children()?.iter().enumerate() {
+        for (index, child) in self.children.iter().enumerate() {
             if let Some(mut path) = child.by_id_path(id) {
                 path.insert(0, index);
                 return Some(path);
@@ -338,12 +298,12 @@ impl<I, G> Node<I, G> {
 
     /// The first leaf payload in depth-first order, mutably.
     pub fn first_leaf_mut(&mut self) -> Option<&mut I> {
-        match &mut self.content {
-            NodeContent::Leaf(item) => Some(item),
-            NodeContent::Children(children) => {
-                children.iter_mut().find_map(|child| child.first_leaf_mut())
-            }
+        if let Some(item) = self.item.as_mut() {
+            return Some(item);
         }
+        self.children
+            .iter_mut()
+            .find_map(|child| child.first_leaf_mut())
     }
 
     /// Iterate over flattened leaves with their accumulated world affine,
@@ -375,25 +335,21 @@ impl<I, G> Node<I, G> {
     /// the tree shape unchanged. This is the recursive analog of
     /// [`Transformed::map_inner`].
     pub fn map_inner<U>(self, f: impl FnMut(I) -> U) -> Node<U, G> {
-        fn map_inner_rec<I, U, G>(node: Node<I, G>, f: &mut impl FnMut(I) -> U) -> Node<U, G> {
+        fn map_inner_rec<I, U, G>(node: Node<I, G>, mut f: &mut impl FnMut(I) -> U) -> Node<U, G> {
             let Node {
                 id,
                 transform,
-                content,
+                item,
+                children,
             } = node;
-            let content = match content {
-                NodeContent::Leaf(item) => NodeContent::Leaf(f(item)),
-                NodeContent::Children(children) => NodeContent::Children(
-                    children
-                        .into_iter()
-                        .map(|child| map_inner_rec(child, f))
-                        .collect(),
-                ),
-            };
             Node {
                 id,
                 transform,
-                content,
+                item: item.map(&mut f),
+                children: children
+                    .into_iter()
+                    .map(|child| map_inner_rec(child, f))
+                    .collect(),
             }
         }
         let mut f = f;
@@ -410,21 +366,17 @@ impl<I, G> Node<I, G> {
             let Node {
                 id,
                 transform,
-                content,
+                item,
+                children,
             } = node;
-            let content = match content {
-                NodeContent::Leaf(item) => NodeContent::Leaf(item),
-                NodeContent::Children(children) => NodeContent::Children(
-                    children
-                        .into_iter()
-                        .map(|child| map_transform_rec(child, f))
-                        .collect(),
-                ),
-            };
             Node {
                 id,
                 transform: f(transform),
-                content,
+                item,
+                children: children
+                    .into_iter()
+                    .map(|child| map_transform_rec(child, f))
+                    .collect(),
             }
         }
         let mut f = f;
@@ -433,14 +385,37 @@ impl<I, G> Node<I, G> {
 }
 
 impl<I, G: TransformGroup> Node<I, G> {
-    /// Create a leaf node with the identity transform and no id.
+    /// Create a bare leaf — a payload with no children — with the identity
+    /// transform and no id.
     pub fn leaf(item: I) -> Self {
-        Self::new(G::identity(), NodeContent::Leaf(item))
+        Self {
+            id: None,
+            transform: G::identity(),
+            item: Some(item),
+            children: Vec::new(),
+        }
     }
 
-    /// Create a group node with the identity transform and no id.
-    pub fn group(children: Vec<Node<I, G>>) -> Self {
-        Self::new(G::identity(), NodeContent::Children(children))
+    /// Create a pure frame node with the identity transform and no id; the
+    /// children live in the frame's local space.
+    pub fn group(children: Vec<Self>) -> Self {
+        Self {
+            id: None,
+            transform: G::identity(),
+            item: None,
+            children,
+        }
+    }
+
+    /// Create a branch node carrying both a payload and children, with the
+    /// identity transform and no id. The payload paints before the children.
+    pub fn branch(item: I, children: Vec<Self>) -> Self {
+        Self {
+            id: None,
+            transform: G::identity(),
+            item: Some(item),
+            children,
+        }
     }
 }
 
@@ -448,35 +423,41 @@ impl<I, G> Node<I, G>
 where
     G: TransformGroup + Clone,
 {
-    /// Collapse a single-leaf tree back into a [`Transformed`] wrapper.
+    /// Collapse a single-payload spine back into a [`Transformed`] wrapper.
     ///
-    /// Walks down chains of single-child groups composing their transforms
-    /// in `G` along the way (`acc.compose(child)`), so the storage type is
-    /// preserved exactly. Returns `None` when some group branches, because
-    /// such a tree holds more than one leaf.
+    /// Walks down chains of pure frames composing their transforms in `G`
+    /// along the way (`acc.compose(child)`), so the storage type is preserved
+    /// exactly. Returns `None` when the spine branches or ends without a
+    /// payload, because such a tree holds zero or several leaves.
     pub fn into_transformed(self) -> Option<Transformed<I, G>> {
         let Node {
-            transform, content, ..
+            transform,
+            item,
+            children,
+            ..
         } = self;
-        collapse_into_transformed(transform, content)
+        collapse_into_transformed(transform, item, children)
     }
 }
 
 /// Fold `acc` (the composed ancestors' transform, outermost first) down
-/// through a single-leaf spine into a [`Transformed`].
-fn collapse_into_transformed<I, G>(acc: G, content: NodeContent<I, G>) -> Option<Transformed<I, G>>
+/// through a single-payload spine into a [`Transformed`].
+fn collapse_into_transformed<I, G>(
+    acc: G,
+    item: Option<I>,
+    children: Vec<Node<I, G>>,
+) -> Option<Transformed<I, G>>
 where
     G: TransformGroup + Clone,
 {
-    match content {
-        NodeContent::Leaf(item) => Some(Transformed::new(item, acc)),
-        NodeContent::Children(mut children) => {
-            if children.len() != 1 {
-                return None;
-            }
+    match (item, children.len()) {
+        (Some(item), 0) => Some(Transformed::new(item, acc)),
+        (None, 1) => {
+            let mut children = children;
             let child = children.swap_remove(0);
-            collapse_into_transformed(acc.compose(&child.transform), child.content)
+            collapse_into_transformed(acc.compose(&child.transform), child.item, child.children)
         }
+        _ => None,
     }
 }
 
@@ -499,16 +480,16 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((acc, node)) = self.stack.pop() {
-            match &node.content {
-                NodeContent::Leaf(item) => return Some((acc, item)),
-                NodeContent::Children(children) => {
-                    // Pushed in reverse so popping yields children in source
-                    // (painter's-algorithm) order.
-                    for child in children.iter().rev() {
-                        let acc_child = acc.compose(&child.transform.clone().into());
-                        self.stack.push((acc_child, child));
-                    }
-                }
+            // A node may carry a payload *and* children: queue the children
+            // first (in reverse, so popping yields source order), then yield
+            // the payload — painter's-algorithm order with the payload
+            // painting before its descendants.
+            for child in node.children.iter().rev() {
+                let acc_child = acc.compose(&child.transform.clone().into());
+                self.stack.push((acc_child, child));
+            }
+            if let Some(item) = &node.item {
+                return Some((acc, item));
             }
         }
         None
@@ -526,11 +507,9 @@ impl<'a, I, G> Iterator for LeavesMut<'a, I, G> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(node) = self.stack.pop() {
-            match &mut node.content {
-                NodeContent::Leaf(item) => return Some(item),
-                NodeContent::Children(children) => {
-                    self.stack.extend(children.iter_mut().rev());
-                }
+            self.stack.extend(node.children.iter_mut().rev());
+            if let Some(item) = node.item.as_mut() {
+                return Some(item);
             }
         }
         None
@@ -548,18 +527,17 @@ where
 
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
         let start = buf.len();
-        match &self.content {
-            NodeContent::Leaf(item) => item.extract_into(buf),
-            NodeContent::Children(children) => {
-                for child in children {
-                    child.extract_into(buf);
-                }
-            }
+        if let Some(item) = &self.item {
+            item.extract_into(buf);
         }
-        // Each level post-multiplies its own affine onto whatever its subtree
-        // appended, so a chain composes as `t_root * ... * t_leaf * local`.
-        // Recursing before applying also keeps emission depth-first: paint
-        // order survives flattening.
+        for child in &self.children {
+            child.extract_into(buf);
+        }
+        // Each level post-multiplies its own affine onto whatever its payload
+        // and subtree appended, so a chain composes as
+        // `t_root * ... * t_leaf * local`. Recursing before applying also
+        // keeps emission depth-first: paint order survives flattening, and a
+        // node's own payload paints before its descendants.
         let transform = self.transform.clone().into();
         for item in &mut buf[start..] {
             item.apply_transform(&transform);
@@ -588,11 +566,12 @@ where
     I: Interpolatable,
     G: Interpolatable,
 {
-    /// Structural lerp: nodes interpolate positionally, leaf payloads and
-    /// node poses interpolate independently, and ids switch at the mid-point
-    /// like other front-loaded fields in ranim. Callers must have aligned
-    /// structures first (see [`Alignable`]); misaligned kinds panic, and
-    /// unequal sibling counts follow `Vec`'s truncating-zip precedent.
+    /// Structural lerp: nodes interpolate positionally, payloads and node
+    /// poses interpolate independently, and ids switch at the mid-point like
+    /// other front-loaded fields in ranim. Callers must have aligned
+    /// structures first (see [`Alignable`]): payload-presence mismatches
+    /// panic, and unequal sibling counts follow `Vec`'s truncating-zip
+    /// precedent.
     fn lerp(&self, target: &Self, t: f64) -> Self {
         Self {
             id: if t < 0.5 {
@@ -601,26 +580,23 @@ where
                 target.id.clone()
             },
             transform: self.transform.lerp(&target.transform, t),
-            content: lerp_contents(&self.content, &target.content, t),
+            item: lerp_items(&self.item, &target.item, t),
+            children: self
+                .children
+                .iter()
+                .zip(target.children.iter())
+                .map(|(a, b)| a.lerp(b, t))
+                .collect(),
         }
     }
 }
 
-/// Structural lerp over contents.
-fn lerp_contents<I, G>(
-    current: &NodeContent<I, G>,
-    target: &NodeContent<I, G>,
-    t: f64,
-) -> NodeContent<I, G>
-where
-    I: Interpolatable,
-    G: Interpolatable,
-{
+/// Structural lerp over payloads. `None` must pair with `None`: a presence
+/// mismatch is filled with transparent clones by [`Alignable`] first.
+fn lerp_items<I: Interpolatable>(current: &Option<I>, target: &Option<I>, t: f64) -> Option<I> {
     match (current, target) {
-        (NodeContent::Leaf(a), NodeContent::Leaf(b)) => NodeContent::Leaf(a.lerp(b, t)),
-        (NodeContent::Children(a), NodeContent::Children(b)) => {
-            NodeContent::Children(a.iter().zip(b).map(|(a, b)| a.lerp(b, t)).collect())
-        }
+        (Some(current), Some(target)) => Some(current.lerp(target, t)),
+        (None, None) => None,
         _ => panic!("interpolating unaligned hierarchies: align them with Alignable first"),
     }
 }
@@ -633,71 +609,94 @@ where
     G: TransformGroup + Clone + Into<DAffine3>,
 {
     /// Whether both sides are already structurally compatible for direct
-    /// interpolation: kinds must match positionally (leaf with leaf, group
-    /// with group), sibling counts must be equal, and every leaf pair must
-    /// satisfy [`Alignable::is_aligned`]. This mirrors the `Vec<T>`
-    /// blanket's pre-alignment contract; [`Alignable::align_with`]
-    /// establishes this state from mismatched trees.
+    /// interpolation: payload presence must match positionally, sibling
+    /// counts must be equal, and every payload and child pair must satisfy
+    /// [`Alignable::is_aligned`]. This mirrors the `Vec<T>` blanket's
+    /// pre-alignment contract; [`Alignable::align_with`] establishes this
+    /// state from mismatched trees.
     fn is_aligned(&self, other: &Self) -> bool {
-        nodes_are_aligned(self, other)
+        let items_aligned = match (&self.item, &other.item) {
+            (Some(current), Some(target)) => current.is_aligned(target),
+            (None, None) => true,
+            _ => false,
+        };
+        items_aligned
+            && self.children.len() == other.children.len()
+            && self
+                .children
+                .iter()
+                .zip(other.children.iter())
+                .all(|(current, target)| nodes_are_aligned(current, target))
     }
 
-    /// Align two trees for interpolation:
+    /// Align two trees for interpolation under one uniform rule: **absence
+    /// is filled with a transparent clone of the present side**.
     ///
-    /// 1. **Pairwise recursion** whenever kinds already match.
-    /// 2. **Lift on kind mismatch**: at the same position, whichever side is
-    ///    a leaf is lifted into a single-child group with an identity
-    ///    transform, symmetrically, so kinds match.
-    /// 3. **Pad on count mismatch**: in matched groups with unequal child
-    ///    counts, both sides are resized with
-    ///    `resize_preserving_order_with_repeated_indices`; transparently
-    ///    repeated stand-ins get `set_opacity(0.0)` before recursing
-    ///    pairwise — exactly how the `Vec<T>: Alignable` blanket treats
-    ///    repeated items.
-    ///
-    /// Policies 2 and 3 compose uniformly: a leaf opposite a multi-child
-    /// group is lifted first and then padded, so the extra positions pair
-    /// against transparent repetitions of the leaf.
+    /// 1. **Payload presence**: when only one side carries an item, the
+    ///    other side receives a transparent (`set_opacity(0.0)`) clone of
+    ///    it, so lerping fades the payload in or out smoothly instead of
+    ///    jumping.
+    /// 2. **Payload pairs**: when both sides carry items, they align with
+    ///    each other (vertex-level padding for point data).
+    /// 3. **Children**: unequal child counts are padded on both sides. A
+    ///    non-empty list grows by repeating its own entries
+    ///    (`resize_preserving_order_with_repeated_indices`, matching the
+    ///    `Vec<T>: Alignable` blanket); an *empty* list has nothing of its
+    ///    own to repeat, so it grows with transparent clones of the other
+    ///    side's children — the same absence rule as payloads. Pairs
+    ///    recurse.
     fn align_with(&mut self, other: &mut Self) {
-        if !same_kind(&self.content, &other.content) {
-            if self.is_leaf() {
-                self.lift_leaf_to_group();
-            } else {
-                other.lift_leaf_to_group();
+        match (self.item.as_mut(), other.item.as_mut()) {
+            (None, Some(target_item)) => {
+                let mut fill = target_item.clone();
+                fill.set_opacity(0.0);
+                self.item = Some(fill);
+            }
+            (Some(current_item), None) => {
+                let mut fill = current_item.clone();
+                fill.set_opacity(0.0);
+                other.item = Some(fill);
+            }
+            _ => {}
+        }
+        if let (Some(current), Some(target)) = (&mut self.item, &mut other.item) {
+            current.align_with(target);
+        }
+        let len = self.children.len().max(other.children.len());
+        match (self.children.len(), other.children.len()) {
+            (0, 0) => {}
+            (0, _) => self.children = transparent_clones(&other.children, len),
+            (_, 0) => other.children = transparent_clones(&self.children, len),
+            _ => {
+                expand_with_transparent_repeats(&mut self.children, len);
+                expand_with_transparent_repeats(&mut other.children, len);
             }
         }
-        match (&mut self.content, &mut other.content) {
-            (NodeContent::Leaf(current), NodeContent::Leaf(target)) => current.align_with(target),
-            (NodeContent::Children(a), NodeContent::Children(b)) => {
-                let len = a.len().max(b.len());
-                expand_with_transparent_repeats(a, len);
-                expand_with_transparent_repeats(b, len);
-                a.iter_mut()
-                    .zip(b.iter_mut())
-                    .for_each(|(a, b)| a.align_with(b));
-            }
-            _ => unreachable!("kinds were unified above"),
-        }
+        self.children
+            .iter_mut()
+            .zip(other.children.iter_mut())
+            .for_each(|(current, target)| current.align_with(target));
     }
 }
 
-impl<I, G> Node<I, G>
+/// Grow `source` to `len` entries by cloning entries and marking every
+/// clone transparent — the absence rule of [`Alignable::align_with`] for
+/// child lists that have nothing of their own to repeat.
+fn transparent_clones<I, G>(source: &[Node<I, G>], len: usize) -> Vec<Node<I, G>>
 where
-    G: TransformGroup,
+    I: Opacity,
+    Node<I, G>: Clone,
 {
-    /// Convert a leaf in place into a single-child group whose child keeps
-    /// the leaf content under the identity transform. A temporary empty
-    /// group parks in `content` during the swap, so no bounds on `I` are
-    /// needed to move the payload out.
-    fn lift_leaf_to_group(&mut self) {
-        if let NodeContent::Leaf(_) = self.content {
-            let content = std::mem::replace(&mut self.content, NodeContent::Children(Vec::new()));
-            let NodeContent::Leaf(item) = content else {
-                unreachable!("the content was a leaf")
-            };
-            self.content = NodeContent::Children(vec![Node::leaf(item)]);
-        }
-    }
+    source
+        .iter()
+        .cycle()
+        .take(len)
+        .map(|node| {
+            let mut fill = node.clone();
+            fill.set_opacity(0.0);
+            fill
+        })
+        .collect()
 }
 
 /// Expand `nodes` in place to `len` entries, preserving order; repeated
@@ -718,28 +717,24 @@ where
     }
 }
 
-fn same_kind<I, G>(current: &NodeContent<I, G>, target: &NodeContent<I, G>) -> bool {
-    matches!(
-        (current, target),
-        (NodeContent::Leaf(_), NodeContent::Leaf(_))
-            | (NodeContent::Children(_), NodeContent::Children(_))
-    )
-}
-
-/// Structural alignment check mirroring [`Alignable::is_aligned`]: kind and
-/// sibling-count equality at every position, with leaf payloads compared by
-/// their own alignment.
+/// Structural alignment check mirroring [`Alignable::is_aligned`]: payload
+/// presence, sibling counts, and pairwise payload/child alignment.
 fn nodes_are_aligned<I, G>(current: &Node<I, G>, target: &Node<I, G>) -> bool
 where
     I: Alignable,
 {
-    match (&current.content, &target.content) {
-        (NodeContent::Leaf(a), NodeContent::Leaf(b)) => a.is_aligned(b),
-        (NodeContent::Children(a), NodeContent::Children(b)) => {
-            a.len() == b.len() && a.iter().zip(b.iter()).all(|(a, b)| nodes_are_aligned(a, b))
-        }
+    let items_aligned = match (&current.item, &target.item) {
+        (Some(current), Some(target)) => current.is_aligned(target),
+        (None, None) => true,
         _ => false,
-    }
+    };
+    items_aligned
+        && current.children.len() == target.children.len()
+        && current
+            .children
+            .iter()
+            .zip(target.children.iter())
+            .all(|(current, target)| nodes_are_aligned(current, target))
 }
 
 // MARK: Partial
@@ -753,7 +748,15 @@ where
         Self {
             id: self.id.clone(),
             transform: self.transform.clone(),
-            content: partial_content(&self.content, range, false),
+            item: self
+                .item
+                .as_ref()
+                .map(|item| item.get_partial(range.clone())),
+            children: self
+                .children
+                .iter()
+                .map(|child| child.get_partial(range.clone()))
+                .collect(),
         }
     }
 
@@ -761,38 +764,16 @@ where
         Self {
             id: self.id.clone(),
             transform: self.transform.clone(),
-            content: partial_content(&self.content, range, true),
-        }
-    }
-}
-
-/// Forward the same range down every branch, keeping poses fixed: partial
-/// display shows sub-geometry but never moves nodes.
-fn partial_content<I, G>(
-    content: &NodeContent<I, G>,
-    range: Range<f64>,
-    closed: bool,
-) -> NodeContent<I, G>
-where
-    I: Partial,
-    G: Clone,
-{
-    match content {
-        NodeContent::Leaf(item) => NodeContent::Leaf(if closed {
-            item.get_partial_closed(range)
-        } else {
-            item.get_partial(range)
-        }),
-        NodeContent::Children(children) => NodeContent::Children(
-            children
+            item: self
+                .item
+                .as_ref()
+                .map(|item| item.get_partial_closed(range.clone())),
+            children: self
+                .children
                 .iter()
-                .map(|child| Node {
-                    id: child.id.clone(),
-                    transform: child.transform.clone(),
-                    content: partial_content(&child.content, range.clone(), closed),
-                })
+                .map(|child| child.get_partial_closed(range.clone()))
                 .collect(),
-        ),
+        }
     }
 }
 
@@ -807,7 +788,11 @@ where
         Node {
             id: None,
             transform: G::identity(),
-            content: NodeContent::Leaf(I::empty()),
+            // A payload of empty geometry (not `None`), so an `Empty`-seeded
+            // interpolation has a payload position to fade through — parity
+            // with the old leaf-only shape.
+            item: Some(I::empty()),
+            children: Vec::new(),
         }
     }
 }
@@ -819,23 +804,24 @@ where
     I: Aabb,
     G: Clone + Into<DAffine3>,
 {
-    /// Union of descendant AABBs, transforming each child's box corners by
-    /// this node's affine before folding, then applying this node's own
-    /// transform last — the recursive generalization of `Transformed::aabb`'s
-    /// 8-corner loop. An empty group warns and reports a degenerate box,
-    /// mirroring the slice impl in ranim-core.
+    /// Union of the payload's and descendants' AABBs, then applying this
+    /// node's own transform last — the recursive generalization of
+    /// `Transformed::aabb`'s 8-corner loop. A node with no payload and no
+    /// children warns and reports a degenerate box, mirroring the slice impl
+    /// in ranim-core.
     fn aabb(&self) -> [DVec3; 2] {
-        let inner_box = match &self.content {
-            NodeContent::Leaf(item) => item.aabb(),
-            NodeContent::Children(children) => children
-                .iter()
-                .map(Node::aabb)
-                .reduce(|[acc_lo, acc_hi], [lo, hi]| [acc_lo.min(lo), acc_hi.max(hi)])
-                .unwrap_or_else(|| {
-                    warn!("Empty bounding box, is the tree empty?");
-                    [DVec3::ZERO, DVec3::ZERO]
-                }),
-        };
+        let mut inner_box: Option<[DVec3; 2]> = self.item.as_ref().map(Aabb::aabb);
+        for child in &self.children {
+            let [lo, hi] = child.aabb();
+            inner_box = Some(match inner_box {
+                Some([acc_lo, acc_hi]) => [acc_lo.min(lo), acc_hi.max(hi)],
+                None => [lo, hi],
+            });
+        }
+        let inner_box = inner_box.unwrap_or_else(|| {
+            warn!("Empty bounding box, is the tree empty?");
+            [DVec3::ZERO, DVec3::ZERO]
+        });
         transformed_aabb(inner_box, self.transform.clone().into())
     }
 }
@@ -1000,7 +986,8 @@ impl<I, G> From<Transformed<I, G>> for Node<I, G> {
         Node {
             id: None,
             transform: value.transform,
-            content: NodeContent::Leaf(value.inner),
+            item: Some(value.inner),
+            children: Vec::new(),
         }
     }
 }
@@ -1067,13 +1054,15 @@ mod tests {
         };
         let tree = CoreNode::new(
             DAffine3::from(inner_similarity),
-            NodeContent::Children(vec![CoreNode::new(
+            None,
+            vec![CoreNode::new(
                 DAffine3::from(Translation(dvec3(3.0, 4.0, 5.0))),
-                NodeContent::Leaf(CoreVItem {
+                Some(CoreVItem {
                     points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
                     ..Default::default()
                 }),
-            )]),
+                Vec::new(),
+            )],
         );
 
         let expected_world =
@@ -1183,7 +1172,7 @@ mod tests {
     }
 
     #[test]
-    fn align_lifts_single_leaf_opposite_group_and_lerps() {
+    fn align_fills_absent_payloads_and_children_with_transparent_clones() {
         let left = Node::leaf(stroked_vitem(0.0));
         let right = Node::<HierarchyVItem>::group(vec![
             Node::leaf(stroked_vitem(2.0)).with_transform(DAffine3::from(Translation(DVec3::Y))),
@@ -1194,23 +1183,33 @@ mod tests {
         let mut right = right;
         left.align_with(&mut right);
 
-        // Both sides are now single-child groups with aligned leaves.
+        // Both sides now share the same shape — a payload plus one child —
+        // and each absence was filled with a transparent clone of the
+        // present side: the group gained a transparent payload, the leaf
+        // gained a transparent clone of the child.
         assert!(left.is_aligned(&right));
-        assert!(right.is_group());
-        assert_eq!(left.children().unwrap().len(), 1);
+        assert_eq!(left.children().len(), 1);
+        assert_eq!(right.children().len(), 1);
+        // The group side's filled payload is transparent; the leaf side's
+        // payload keeps its opacity.
+        assert_eq!(right.item().unwrap().stroke_rgbas[0].0.w, 0.0);
+        assert_eq!(left.item().unwrap().stroke_rgbas[0].0.w, 1.0);
 
-        // The lift and the subsequent lerp both succeed; the geometry moves
-        // to the midpoint while the lifted identity pose chases the
-        // translated one.
+        // Lerping fades both positions: the payload pair holds marker 0
+        // while its opacity goes 0 -> 1, and the child pair holds marker 2
+        // at Translation(Y) on both sides (identical geometry, so the pose
+        // is static) while its opacity fades on the leaf side.
         let mid = left.lerp(&right, 0.5);
-        assert_eq!(mid.children().unwrap().len(), 1);
-        let (mid_world, mid_leaf) = mid.leaves().next().unwrap();
-        assert!(
-            (mid_leaf.vpoints[0].x - 1.0).abs() < 1e-6,
-            "marker lerps from 0 toward 2"
-        );
-        // Halfway between the lifted identity and Translation(Y).
-        assert_affine_eq(mid_world, DAffine3::from_translation(dvec3(0.0, 0.5, 0.0)));
+        assert_eq!(mid.children().len(), 1);
+
+        let mid_item = mid.item().unwrap();
+        assert!((mid_item.vpoints[0].x - 0.0).abs() < 1e-6);
+        assert!((mid_item.stroke_rgbas[0].0.w - 0.5).abs() < 1e-6);
+
+        let (mid_world, mid_leaf) = mid.leaves().nth(1).unwrap();
+        assert!((mid_leaf.vpoints[0].x - 2.0).abs() < 1e-6);
+        assert!((mid_leaf.stroke_rgbas[0].0.w - 0.5).abs() < 1e-6);
+        assert_affine_eq(mid_world, DAffine3::from_translation(DVec3::Y));
     }
 
     #[test]
@@ -1227,14 +1226,14 @@ mod tests {
         small.align_with(&mut big);
 
         assert!(big.is_aligned(&small));
-        assert_eq!(small.children().unwrap().len(), 2);
+        assert_eq!(small.children().len(), 2);
         // The repeated stand-in became fully transparent while the original
         // kept its opacity.
-        let stand_in = &small.children().unwrap()[1];
-        let stand_in = stand_in.leaf_content().unwrap();
+        let stand_in = &small.children()[1];
+        let stand_in = stand_in.item().unwrap();
         assert_eq!(stand_in.stroke_rgbas[0].0.w, 0.0);
         assert_eq!(stand_in.fill_rgbas[0].0.w, 0.0);
-        let original = small.children().unwrap()[0].leaf_content().unwrap();
+        let original = small.children()[0].item().unwrap();
         assert_eq!(original.stroke_rgbas[0].0.w, 1.0);
     }
 
@@ -1268,7 +1267,8 @@ mod tests {
         let mut tree = Node::<(), Similarity> {
             id: None,
             transform: Similarity::IDENTITY,
-            content: NodeContent::Leaf(()),
+            item: Some(()),
+            children: Vec::new(),
         };
         tree.shift(DVec3::X).scale_uniform(2.0);
         assert_eq!(tree.transform.scale, 2.0);
@@ -1277,7 +1277,8 @@ mod tests {
         let mut rigid_tree = Node::<(), Rigid> {
             id: None,
             transform: Rigid::IDENTITY,
-            content: NodeContent::Leaf(()),
+            item: Some(()),
+            children: Vec::new(),
         };
         rigid_tree.rotate_on_axis(DVec3::Z, 0.5);
         assert!(
@@ -1323,7 +1324,7 @@ mod tests {
         let few = Node::<u32>::group(vec![Node::leaf(1)]);
         let many = Node::<u32>::group(vec![Node::leaf(1), Node::leaf(2), Node::leaf(3)]);
         let mid = many.lerp(&few, 0.5);
-        assert_eq!(mid.children().unwrap().len(), 1);
+        assert_eq!(mid.children().len(), 1);
     }
 
     #[test]
@@ -1334,20 +1335,17 @@ mod tests {
         let partial = tree.get_partial(0.25..0.75);
         assert_eq!(partial.transform, DAffine3::from(Translation(DVec3::X)));
         assert_eq!(
-            partial.leaf_content().unwrap(),
+            partial.item().unwrap(),
             &base.get_partial(0.25..0.75),
             "the range must be forwarded verbatim"
         );
 
         let closed = tree.get_partial_closed(0.25..0.75);
-        assert_eq!(
-            closed.leaf_content().unwrap(),
-            &base.get_partial_closed(0.25..0.75)
-        );
+        assert_eq!(closed.item().unwrap(), &base.get_partial_closed(0.25..0.75));
 
         let grouped = Node::<HierarchyVItem>::group(vec![Node::leaf(base.clone()); 3]);
         let partial = grouped.get_partial(0.0..0.5);
-        assert_eq!(partial.children().unwrap().len(), 3);
+        assert_eq!(partial.children().len(), 3);
     }
 
     #[test]
@@ -1373,7 +1371,7 @@ mod tests {
         ] {
             assert!(is_leaf, "{name} empties must be leaves");
         }
-        let leaf = affine_empty.leaf_content().unwrap();
+        let leaf = affine_empty.item().unwrap();
         assert_eq!(leaf.stroke_widths[0].0, 0.0);
         assert!(leaf.fill_rgbas.iter().all(|rgba| rgba.0 == Vec4::ZERO));
     }
@@ -1385,16 +1383,16 @@ mod tests {
             Node::leaf(3),
         ]);
 
-        assert_eq!(tree.get(&[]).unwrap().children().unwrap().len(), 2);
-        assert_eq!(tree.get(&[0, 1]).and_then(Node::leaf_content), Some(&2));
-        assert_eq!(tree.get(&[1]).and_then(Node::leaf_content), Some(&3));
+        assert_eq!(tree.get(&[]).unwrap().children().len(), 2);
+        assert_eq!(tree.get(&[0, 1]).and_then(Node::item), Some(&2));
+        assert_eq!(tree.get(&[1]).and_then(Node::item), Some(&3));
         assert!(tree.get(&[2]).is_none());
         // Cannot descend into a leaf.
         assert!(tree.get(&[1, 0]).is_none());
 
         let mut tree = tree;
         let target = tree.get_mut(&[0, 0]).unwrap();
-        assert_eq!(target.leaf_content(), Some(&1));
+        assert_eq!(target.item(), Some(&1));
         target.transform = DAffine3::from(Translation(DVec3::X));
         assert_eq!(
             tree.get(&[0, 0]).unwrap().transform,
@@ -1414,16 +1412,19 @@ mod tests {
         // root -> child -> grandchild -> leaf, each carrying one factor.
         let tree = CoreNode::new(
             scale,
-            NodeContent::Children(vec![CoreNode::new(
+            None,
+            vec![CoreNode::new(
                 rotate,
-                NodeContent::Children(vec![CoreNode::new(
+                None,
+                vec![CoreNode::new(
                     translate,
-                    NodeContent::Leaf(CoreVItem {
+                    Some(CoreVItem {
                         points: vec![Vec4::ZERO],
                         ..Default::default()
                     }),
-                )]),
-            )]),
+                    Vec::new(),
+                )],
+            )],
         );
 
         let expected = scale * rotate * translate;
@@ -1504,13 +1505,13 @@ mod tests {
         let mapped = tree.map_inner(|payload| payload * 10);
 
         assert_eq!(
-            mapped.get(&[0]).unwrap().leaf_content(),
+            mapped.get(&[0]).unwrap().item(),
             Some(&10),
             "ids and shape survive mapping"
         );
         assert_eq!(mapped.get(&[0]).unwrap().id.as_deref(), Some("one"));
         assert_eq!(mapped.get(&[0]).unwrap().transform, Translation(DVec3::X));
-        assert_eq!(mapped.get(&[1, 0]).unwrap().leaf_content(), Some(&20));
+        assert_eq!(mapped.get(&[1, 0]).unwrap().item(), Some(&20));
     }
 
     #[test]
@@ -1527,7 +1528,7 @@ mod tests {
         assert_ne!(a, b, "external ids participate in equality");
 
         let mut cloned = a.clone();
-        *cloned.leaf_content_mut().unwrap() = 8;
+        *cloned.item_mut().unwrap() = 8;
         assert_ne!(a, cloned, "clones must be independent");
 
         let rendered = format!("{:?}", make("dbg"));

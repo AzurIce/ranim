@@ -17,8 +17,9 @@
 //! |----------------------------|----------------------------------------------------|
 //! | node TRS / matrix          | [`Node::transform`](crate::hierarchy::Node::transform) as a [`DAffine3`](ranim_core::glam::DAffine3) (`T * R * S`) |
 //! | node name (non-empty)      | [`Node::id`](crate::hierarchy::Node::id)           |
-//! | node children              | [`NodeContent::Children`](crate::hierarchy::NodeContent::Children), source order kept |
-//! | primitive                  | leaf [`MeshItem`] with identity transform          |
+//! | node children              | [`Node::children`](crate::hierarchy::Node::children), source order kept |
+//! | mesh (single primitive)    | the node's own payload [`MeshItem`]                |
+//! | mesh (multiple primitives) | primitive leaves with identity transforms, placed before the children |
 //!
 //! glTF addresses nodes structurally by index while names are display
 //! labels: [`GltfTree::node`](crate::mesh::gltf::GltfTree::node) resolves a
@@ -97,11 +98,13 @@
 //! - **`data:` buffer URIs** are not decoded: such buffers are skipped with
 //!   a warning, and external buffer URIs are joined as raw paths (no
 //!   percent-decoding yet).
-//! - **A node carrying both a mesh and child nodes**: the tree cannot
-//!   express both as one payload, so the primitives are split off as
-//!   sibling leaves placed *before* the child nodes (each with an identity
-//!   transform); the node's own transform still applies to both. This is
-//!   the one place where a glTF node expands to more than one tree node.
+//! - **Multi-primitive meshes**: a glTF mesh may contain several
+//!   primitives, but a node carries at most one payload, so such meshes
+//!   split into primitive leaves placed *before* the child nodes (each with
+//!   an identity transform); the node's own transform still applies to all
+//!   of them. Single-primitive meshes — the common case — map natively to
+//!   the node's payload, so this is the only place where a glTF node
+//!   expands to more than one tree node.
 //! - **A missing scene** imports as an empty group rather than failing.
 //!
 //! # Examples
@@ -139,7 +142,7 @@
 
 use std::path::Path;
 
-use crate::hierarchy::{Node, NodeContent};
+use crate::hierarchy::Node;
 use crate::mesh::MeshItem;
 use ranim_core::components::rgba::Rgba;
 use ranim_core::glam::{DAffine3, DMat4, DQuat, DVec3, Vec4, dvec3};
@@ -306,26 +309,36 @@ where
     F: Clone + for<'b> Fn(gltf::buffer::Buffer<'b>) -> Option<&'s [u8]>,
 {
     let transform = node_transform(node.transform());
-    let id = non_empty(node.name());
+    let mut id = non_empty(node.name()).map(str::to_string);
 
     let mut children: Vec<Node<MeshItem>> = Vec::new();
+    let mut item: Option<MeshItem> = None;
     if let Some(mesh) = node.mesh() {
-        for (index, primitive) in mesh.primitives().enumerate() {
-            if primitive.mode() != gltf::mesh::Mode::Triangles {
-                tracing::warn!(
-                    "primitive {index} of mesh {:?} is not TRIANGLES, importing indices as-is",
-                    mesh.name()
-                );
+        let primitive_count = mesh.primitives().count();
+        if primitive_count == 1 {
+            let (index, primitive) = mesh.primitives().enumerate().next().unwrap();
+            // The common case maps natively: the node carries its single
+            // primitive as the payload, exactly like the glTF node carries
+            // its mesh. A node without a name of its own inherits the
+            // mesh's.
+            warn_if_not_triangles(&primitive, mesh.name(), index);
+            item = Some(primitive_mesh_item(primitive, get_buffer_data));
+            if id.is_none() {
+                id = non_empty(mesh.name()).map(str::to_string);
             }
-            let leaf = Node::leaf(primitive_mesh_item(primitive, get_buffer_data));
-            children.push(match primitive_leaf_id(mesh.name(), node.name(), index) {
-                Some(id) => leaf.with_id(id),
-                None => leaf,
-            });
+        } else {
+            // Known debt (narrowed to multi-primitive meshes): the
+            // primitives become sibling leaves placed before the children.
+            for (index, primitive) in mesh.primitives().enumerate() {
+                warn_if_not_triangles(&primitive, mesh.name(), index);
+                let leaf = Node::leaf(primitive_mesh_item(primitive, get_buffer_data));
+                children.push(match primitive_leaf_id(mesh.name(), node.name(), index) {
+                    Some(id) => leaf.with_id(id),
+                    None => leaf,
+                });
+            }
         }
     }
-    // Known debt: a glTF node may carry both a mesh and child nodes; the
-    // primitives above become sibling leaves placed before the children.
     let payload_slots = children.len();
     children.extend(node.children().enumerate().map(|(slot, child)| {
         let mut child_path = path.to_vec();
@@ -334,10 +347,24 @@ where
     }));
 
     node_paths[node.index()] = Some(path.to_vec());
-    let node = Node::new(transform, NodeContent::Children(children));
+    let node = Node::new(transform, item, children);
     match id {
         Some(id) => node.with_id(id),
         None => node,
+    }
+}
+
+/// Warns when a primitive's drawing mode is not `TRIANGLES` (its indices
+/// are imported as-is; no re-triangulation happens in the POC).
+fn warn_if_not_triangles(
+    primitive: &gltf::mesh::Primitive<'_>,
+    mesh_name: Option<&str>,
+    index: usize,
+) {
+    if primitive.mode() != gltf::mesh::Mode::Triangles {
+        tracing::warn!(
+            "primitive {index} of mesh {mesh_name:?} is not TRIANGLES, importing indices as-is"
+        );
     }
 }
 
@@ -563,30 +590,27 @@ mod tests {
     fn tree_shape_mirrors_the_gltf_node_graph() {
         let tree = triangle_tree();
         assert!(tree.is_group());
-        let roots = tree.children().unwrap();
+        let roots = tree.children();
         assert_eq!(roots.len(), 1);
 
         let parent = &roots[0];
         assert_eq!(parent.id.as_deref(), Some("parent"));
         assert!(parent.is_group());
-        let parent_children = parent.children().unwrap();
+        let parent_children = parent.children();
         assert_eq!(parent_children.len(), 1);
 
         let child = &parent_children[0];
+        // A single-primitive mesh maps natively to the node's payload.
         assert_eq!(child.id.as_deref(), Some("child"));
-        assert!(child.is_group());
-        let leaves = child.children().unwrap();
-        assert_eq!(leaves.len(), 1);
-        // The primitive leaf inherits the mesh name, disambiguated by index.
-        assert_eq!(leaves[0].id.as_deref(), Some("tri.0"));
-        assert!(leaves[0].is_leaf());
+        assert!(child.is_leaf());
+        assert_eq!(child.item().unwrap().triangle_indices, vec![0, 1, 2]);
     }
 
     #[test]
     fn node_transforms_match_trs_semantics() {
         let tree = triangle_tree();
-        let parent = &tree.children().unwrap()[0];
-        let child = &parent.children().unwrap()[0];
+        let parent = &tree.children()[0];
+        let child = &parent.children()[0];
 
         // Parent: T(1,2,3) composed with Rz(+90deg), applied after rotation.
         // Rotation-derived values carry ~1e-7 f32 noise from the glTF source,
@@ -611,11 +635,7 @@ mod tests {
     #[test]
     fn leaf_mesh_round_trips_primitive_data() {
         let tree = triangle_tree();
-        let leaf = tree.children().unwrap()[0].children().unwrap()[0]
-            .children()
-            .unwrap()[0]
-            .leaf_content()
-            .unwrap();
+        let leaf = tree.children()[0].children()[0].item().unwrap();
 
         let points: Vec<DVec3> = leaf.points.iter().cloned().collect();
         assert_eq!(
@@ -673,11 +693,7 @@ mod tests {
 
         let tree = loaded.unwrap();
         assert_eq!(tree.leaves().count(), 1);
-        let leaf = tree.children().unwrap()[0].children().unwrap()[0]
-            .children()
-            .unwrap()[0]
-            .leaf_content()
-            .unwrap();
+        let leaf = tree.children()[0].children()[0].item().unwrap();
         assert_eq!(leaf.triangle_indices, vec![0, 1, 2]);
     }
 
@@ -696,11 +712,7 @@ mod tests {
         // The vertex data round-trips, proving the external buffer was
         // resolved relative to the .gltf and read.
         let tree = loaded.unwrap();
-        let leaf = tree.children().unwrap()[0].children().unwrap()[0]
-            .children()
-            .unwrap()[0]
-            .leaf_content()
-            .unwrap();
+        let leaf = tree.children()[0].children()[0].item().unwrap();
         assert_eq!(leaf.triangle_indices, vec![0, 1, 2]);
         assert_eq!(leaf.points.len(), 3);
     }
