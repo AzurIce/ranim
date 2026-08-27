@@ -53,6 +53,7 @@ default = ["anims", "items"]
 anims = []
 items = []
 typst = ["ranim-items/typst"]
+gltf = ["ranim-items/gltf"]
 profiling = [
   "ranim-render/profiling",
   "dep:puffin",
@@ -408,6 +409,12 @@ crate-type = ["cdylib"]
 
 [package.metadata.example.perlin_terrain]
 wasm = true
+
+[[example]]
+name = "gltf_showcase"
+path = "examples/gltf_showcase/lib.rs"
+crate-type = ["cdylib"]
+required-features = ["gltf"]
 
 [[example]]
 name = "mesh_morph"
