@@ -279,6 +279,73 @@ impl<I, G> Node<I, G> {
         Some(node)
     }
 
+    /// The first node (depth-first preorder) whose id equals `id`.
+    ///
+    /// Ids are external labels (SVG ids, glTF node names) and are not
+    /// guaranteed unique, so duplicates resolve to the preorder-first match;
+    /// see [`Node::by_ids`] for every match and [`Node::by_id_path`] for a
+    /// reusable address. `None` when no node carries the id.
+    pub fn by_id(&self, id: &str) -> Option<&Self> {
+        if self.id.as_deref() == Some(id) {
+            return Some(self);
+        }
+        self.children()?.iter().find_map(|child| child.by_id(id))
+    }
+
+    /// Mutable variant of [`Node::by_id`].
+    pub fn by_id_mut(&mut self, id: &str) -> Option<&mut Self> {
+        if self.id.as_deref() == Some(id) {
+            return Some(self);
+        }
+        self.children_mut()?
+            .iter_mut()
+            .find_map(|child| child.by_id_mut(id))
+    }
+
+    /// Every node whose id equals `id`, in depth-first order.
+    pub fn by_ids(&self, id: &str) -> Vec<&Self> {
+        let mut matches = Vec::new();
+        self.collect_by_id(id, &mut matches);
+        matches
+    }
+
+    fn collect_by_id<'a>(&'a self, id: &str, matches: &mut Vec<&'a Self>) {
+        if self.id.as_deref() == Some(id) {
+            matches.push(self);
+        }
+        if let Some(children) = self.children() {
+            for child in children {
+                child.collect_by_id(id, matches);
+            }
+        }
+    }
+
+    /// The index path (see [`Node::get`]) of the first node in depth-first
+    /// order whose id equals `id`; the root's path is empty. Useful to reuse
+    /// an address across frames without re-searching.
+    pub fn by_id_path(&self, id: &str) -> Option<Vec<usize>> {
+        if self.id.as_deref() == Some(id) {
+            return Some(Vec::new());
+        }
+        for (index, child) in self.children()?.iter().enumerate() {
+            if let Some(mut path) = child.by_id_path(id) {
+                path.insert(0, index);
+                return Some(path);
+            }
+        }
+        None
+    }
+
+    /// The first leaf payload in depth-first order, mutably.
+    pub fn first_leaf_mut(&mut self) -> Option<&mut I> {
+        match &mut self.content {
+            NodeContent::Leaf(item) => Some(item),
+            NodeContent::Children(children) => {
+                children.iter_mut().find_map(|child| child.first_leaf_mut())
+            }
+        }
+    }
+
     /// Iterate over flattened leaves with their accumulated world affine,
     /// yielding `(world_affine, &item)` pairs in depth-first order — i.e.
     /// painter's-algorithm draw order.
@@ -1498,5 +1565,51 @@ mod tests {
         let empty = Node::<HierarchyVItem>::group(Vec::new());
         assert_eq!(empty.stroke_width(), 0.0);
         assert_eq!(empty.fill_color(), css::WHITE);
+    }
+
+    #[test]
+    fn by_id_addresses_nodes_by_their_external_label() {
+        let tree = Node::<(), DAffine3>::group(vec![
+            Node::leaf(()).with_id("dup"),
+            Node::group(vec![
+                Node::leaf(()).with_id("dup"),
+                Node::leaf(()).with_id("other"),
+            ]),
+        ]);
+
+        // Duplicates resolve to the preorder-first match.
+        assert!(tree.by_id("dup").unwrap().is_leaf());
+        assert_eq!(tree.by_ids("dup").len(), 2);
+        assert_eq!(tree.by_id_path("dup"), Some(vec![0]));
+        assert_eq!(tree.by_id_path("other"), Some(vec![1, 1]));
+        assert!(tree.by_id("missing").is_none());
+
+        // Mutation reaches exactly the addressed node.
+        let mut tree = tree;
+        tree.by_id_mut("other").unwrap().id = Some("renamed".into());
+        assert!(tree.by_id("other").is_none());
+        assert!(tree.by_id("renamed").is_some());
+
+        // An id on the root resolves to the empty path.
+        let root = Node::<(), DAffine3>::leaf(()).with_id("root");
+        assert_eq!(root.by_id_path("root"), Some(Vec::new()));
+        assert!(root.by_id("root").is_some());
+    }
+
+    #[test]
+    fn first_leaf_mut_reaches_the_first_leaf_in_depth_first_order() {
+        let mut tree = Node::<HierarchyVItem>::group(vec![
+            Node::group(vec![Node::leaf(stroked_vitem(0.0))]),
+            Node::leaf(stroked_vitem(1.0)),
+        ]);
+
+        let first = tree.first_leaf_mut().unwrap();
+        first.set_stroke_width(7.0);
+
+        let widths: Vec<f32> = tree
+            .leaves_mut()
+            .map(|leaf| leaf.stroke_widths[0].0)
+            .collect();
+        assert_eq!(widths, [7.0, 0.04]);
     }
 }

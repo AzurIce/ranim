@@ -9,7 +9,7 @@ use ranim_core::{Extract, color, components::width::Width, glam};
 use tracing::warn;
 
 use super::VItem;
-use crate::hierarchy::{Node, NodeContent};
+use crate::hierarchy::Node;
 
 // MARK: ### SvgItem ###
 /// An Svg Item.
@@ -94,14 +94,20 @@ impl SvgItem {
     /// SVG ids may be set on groups, so such lookups resolve to the group's
     /// first leaf; use [`SvgItem::tree`] for structural access.
     pub fn by_id(&self, id: &str) -> Option<&VItem> {
-        find_leaf_by_id(&self.0, id)
+        let node = self.0.by_id(id)?;
+        node.leaf_content().or_else(|| node.first_leaf())
     }
 
     /// Mutable variant of [`SvgItem::by_id`]. Mutation reaches only the
     /// matched leaf's local (canonical) data; node transforms are
     /// unaffected.
     pub fn by_id_mut(&mut self, id: &str) -> Option<&mut VItem> {
-        find_leaf_by_id_mut(&mut self.0, id)
+        let node = self.0.by_id_mut(id)?;
+        if node.leaf_content_mut().is_some() {
+            node.leaf_content_mut()
+        } else {
+            node.first_leaf_mut()
+        }
     }
 }
 
@@ -307,35 +313,6 @@ fn widen_to_daffine3(affine: DAffine2) -> DAffine3 {
 }
 
 /// The first leaf (depth-first) under the first node whose id matches.
-fn find_leaf_by_id<'a>(node: &'a Node<VItem>, id: &str) -> Option<&'a VItem> {
-    if node.id.as_deref() == Some(id) {
-        return node.first_leaf();
-    }
-    node.children()?
-        .iter()
-        .find_map(|child| find_leaf_by_id(child, id))
-}
-
-/// Mutable variant of [`find_leaf_by_id`].
-fn find_leaf_by_id_mut<'a>(node: &'a mut Node<VItem>, id: &str) -> Option<&'a mut VItem> {
-    if node.id.as_deref() == Some(id) {
-        return first_leaf_mut(node);
-    }
-    match &mut node.content {
-        NodeContent::Leaf(_) => None,
-        NodeContent::Children(children) => children
-            .iter_mut()
-            .find_map(|child| find_leaf_by_id_mut(child, id)),
-    }
-}
-
-fn first_leaf_mut(node: &mut Node<VItem>) -> Option<&mut VItem> {
-    match &mut node.content {
-        NodeContent::Leaf(item) => Some(item),
-        NodeContent::Children(children) => children.iter_mut().find_map(first_leaf_mut),
-    }
-}
-
 /// Construct a `Vec<VItem` from `&str` of a SVG
 pub fn vitems_from_svg(svg: &str) -> Vec<VItem> {
     let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap();
