@@ -114,7 +114,12 @@ impl Renderer {
         world.insert_resource(MeshItemsBuffer::new(ctx));
         world.insert_resource(primitives::viewport::ViewportGpuPacket::new(
             ctx,
-            &ViewportUniform::from_camera_frame(&Default::default(), width, height),
+            &ViewportUniform::from_camera_frame(
+                &Default::default(),
+                width,
+                height,
+                primitives::viewport::DEPTH_ORDER_SPAN,
+            ),
         ));
         world.init_resource::<CoreItemEntities>();
 

@@ -9,8 +9,19 @@ struct CameraUniforms {
     proj_mat: mat4x4<f32>,
     view_mat: mat4x4<f32>,
     half_frame_size: vec2<f32>,
+    // Per-order depth bias epsilon: later items are pulled toward the camera
+    // so coplanar surfaces resolve by scene insertion order.
+    bias_epsilon: f32,
+    _pad: u32,
 }
 @group(1) @binding(0) var<uniform> cam_uniforms: CameraUniforms;
+
+// Pulls a fragment's depth toward the camera by its item's scene order.
+// Within DEPTH_ORDER_SPAN (normalized depth) this makes insertion order the
+// tie-breaker for coplanar surfaces; farther items keep true depth ordering.
+fn ordered_depth(frag_z: f32, order: f32) -> f32 {
+    return frag_z - cam_uniforms.bias_epsilon * order;
+}
 
 // === Merged VItem data (group 2) ===
 
@@ -266,10 +277,11 @@ fn fs_main(
     var out: FragmentOutput;
     let info = item_infos[instance_id];
     let color = render(pos, info);
+    let depth = ordered_depth(frag_pos.z, planes[instance_id].origin.w);
 
     if (color.a >= 0.99) {
         out.color = color;
-        out.depth = frag_pos.z;
+        out.depth = depth;
         return out;
     }
 
@@ -281,7 +293,7 @@ fn fs_main(
     if (layer_idx < frame.z) {
         let buffer_idx = pixel_idx * frame.z + layer_idx;
         oit_colors[buffer_idx] = pack_color(color);
-        oit_depths[buffer_idx] = frag_pos.z;
+        oit_depths[buffer_idx] = depth;
     }
 
     discard;
@@ -303,7 +315,7 @@ fn fs_depth_only(
         discard;
     }
 
-    return frag_pos.z;
+    return ordered_depth(frag_pos.z, planes[instance_id].origin.w);
 }
 
 struct Basis {

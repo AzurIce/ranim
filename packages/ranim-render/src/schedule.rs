@@ -127,8 +127,16 @@ pub(crate) fn install_schedules(world: &mut World) {
     );
     view.add_systems(clear.in_set(ViewSystems::Clear));
     view.add_systems(vitem::compute.in_set(ViewSystems::Compute));
-    view.add_systems((vitem::depth, mesh_item::depth).in_set(ViewSystems::Depth));
-    view.add_systems((vitem::color, mesh_item::color).in_set(ViewSystems::Color));
+    view.add_systems(
+        (vitem::depth, mesh_item::depth)
+            .chain()
+            .in_set(ViewSystems::Depth),
+    );
+    view.add_systems(
+        (vitem::color, mesh_item::color)
+            .chain()
+            .in_set(ViewSystems::Color),
+    );
     view.add_systems(oit_resolve::resolve.in_set(ViewSystems::Resolve));
     world.add_schedule(view);
 
@@ -156,7 +164,10 @@ fn prepare_vitems(
 ) {
     let mut items = items.iter().collect::<Vec<_>>();
     items.sort_by_key(|(order, _)| order.0);
-    buffer.update(&ctx, items.into_iter().map(|(_, item)| item));
+    buffer.update(
+        &ctx,
+        items.iter().map(|&(order, item)| (order.0 as f32, item)),
+    );
 }
 
 fn prepare_mesh_items(
@@ -166,7 +177,10 @@ fn prepare_mesh_items(
 ) {
     let mut items = items.iter().collect::<Vec<_>>();
     items.sort_by_key(|(order, _)| order.0);
-    buffer.update(&ctx, items.into_iter().map(|(_, item)| item));
+    buffer.update(
+        &ctx,
+        items.iter().map(|&(order, item)| (order.0 as f32, item)),
+    );
 }
 
 fn begin_frame(ctx: Res<WgpuContext>, mut encoder: ResMut<FrameEncoder>) {
@@ -213,7 +227,17 @@ fn view_driver(world: &mut World) {
 
     let camera = take_single_camera(cameras);
     let dimensions = *world.resource::<RenderDimensions>();
-    let uniform = ViewportUniform::from_camera_frame(&camera, dimensions.width, dimensions.height);
+    // The per-order depth bias epsilon: the fixed span is split evenly across
+    // all items of the frame so the total offset stays bounded.
+    let item_count = world.resource::<VItemsBuffer>().item_count()
+        + world.resource::<MeshItemsBuffer>().item_count();
+    let bias_epsilon = crate::primitives::viewport::DEPTH_ORDER_SPAN / item_count.max(1) as f32;
+    let uniform = ViewportUniform::from_camera_frame(
+        &camera,
+        dimensions.width,
+        dimensions.height,
+        bias_epsilon,
+    );
     world.resource_scope(|world, mut viewport: Mut<ViewportGpuPacket>| {
         viewport.update(world.resource::<WgpuContext>(), &uniform);
     });
