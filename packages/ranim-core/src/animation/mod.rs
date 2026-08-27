@@ -19,6 +19,9 @@ use stack::AnimStack;
 pub mod lagged;
 /// Dynamic sequential animation container.
 pub mod sequence;
+/// The erased sound leaf node ([`Sound`](crate::audio::Sound)) and its
+/// composition impls.
+pub mod sound;
 /// Dynamic overlay animation container.
 pub mod stack;
 
@@ -35,6 +38,9 @@ pub enum AnimationInfoKind {
     Lagged,
     /// A captured, type-erased static output batch.
     Static,
+    /// A sound leaf: contributes samples to the audio plan, never visual
+    /// items.
+    Sound,
 }
 
 /// Hierarchical runtime animation information used by preview tooling.
@@ -55,6 +61,9 @@ pub struct AnimationInfo {
     /// The content step of iterative segments (`1/N` progress per integration
     /// step, `N` declared via `with_steps`); `None` for other nodes.
     pub sim_step: Option<f64>,
+    /// The sound leaf payload; `Some` exactly when `kind` is
+    /// [`AnimationInfoKind::Sound`].
+    pub sound: Option<crate::audio::SoundInfo>,
     /// Direct animation children in this node's content coordinates.
     pub children: Vec<AnimationInfo>,
 }
@@ -141,6 +150,7 @@ impl AnimationCell {
             rate_func: self.rate_func,
             enabled: self.enabled,
             sim_step: self.inner.sim_step(),
+            sound: self.inner.sound_info(),
             children: self.inner.child_infos(),
         }
     }

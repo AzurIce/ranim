@@ -102,6 +102,13 @@ pub(super) trait EvalDyn {
     fn sim_step(&self) -> Option<f64> {
         None
     }
+
+    /// The sound leaf payload, if this node is a [`Sound`] leaf.
+    ///
+    /// [`Sound`]: crate::audio::Sound
+    fn sound_info(&self) -> Option<crate::audio::SoundInfo> {
+        None
+    }
 }
 
 pub(super) struct StaticDynItems(pub(super) Vec<DynItem>);

@@ -11,6 +11,9 @@
 /// Anchors and semantic bounds.
 pub mod anchor;
 pub mod animation;
+/// Audio model: sound sources, the [`Sound`](audio::Sound) leaf, and the
+/// static [`AudioPlan`](audio::AudioPlan).
+pub mod audio;
 /// Color utilities.
 pub mod color;
 /// Component data.
@@ -47,6 +50,7 @@ pub mod prelude {
     pub use crate::animation::sequence::AnimSequence;
     pub use crate::animation::stack::AnimStack;
     pub use crate::animation::{AnimIterExt, Animation, AnimationExt, Placeable, StaticAnim};
+    pub use crate::audio::{Sound, SoundSource, StereoFrame, Synth, sound};
     pub use crate::core_item::camera_frame::CameraFrame;
     pub use crate::core_item::transformed::{Transformed, TransformedExt};
     pub use crate::{RanimScene, TimeMark};
@@ -173,11 +177,18 @@ impl RanimScene {
 
     /// Finish the definition and produce an immutable, evaluable recipe.
     pub fn seal(self) -> SealedRanimScene {
-        let total_secs = self.root.duration_secs();
+        let animations = self.root.into_built_animations();
+        let infos: Vec<AnimationInfo> = animations
+            .iter()
+            .map(AnimationCell::animation_info)
+            .collect();
+        let total_secs = audio::scene_total_secs(&infos);
+        let audio = audio::flatten_plan(&animations, total_secs);
         SealedRanimScene {
             total_secs,
-            animations: self.root.into_built_animations(),
+            animations,
             time_marks: self.time_marks,
+            audio,
         }
     }
 }
@@ -196,6 +207,7 @@ pub struct SealedRanimScene {
     total_secs: f64,
     animations: Vec<AnimationCell>,
     time_marks: Vec<(f64, TimeMark)>,
+    audio: audio::AudioPlan,
 }
 
 impl SealedRanimScene {
@@ -210,6 +222,11 @@ impl SealedRanimScene {
     /// Total scene duration.
     pub fn total_secs(&self) -> f64 {
         self.total_secs
+    }
+
+    /// The flattened audio plan of this scene.
+    pub fn audio_plan(&self) -> &audio::AudioPlan {
+        &self.audio
     }
 
     /// Scene time marks.

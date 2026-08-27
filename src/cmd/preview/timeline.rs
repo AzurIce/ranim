@@ -1085,7 +1085,7 @@ fn collect_tracks(
                 }
             }
         }
-        AnimationInfoKind::Eval | AnimationInfoKind::Static => {
+        AnimationInfoKind::Eval | AnimationInfoKind::Static | AnimationInfoKind::Sound => {
             output.push(VisibleTrack {
                 path: path.clone(),
                 depth,
@@ -1254,6 +1254,7 @@ fn animation_color(kind: AnimationInfoKind) -> Color32 {
         AnimationInfoKind::Stack => manim::ORANGE.to_rgba8(),
         AnimationInfoKind::Lagged => manim::PURPLE_C.to_rgba8(),
         AnimationInfoKind::Static => manim::YELLOW_C.to_rgba8(),
+        AnimationInfoKind::Sound => manim::GREEN_C.to_rgba8(),
     };
     Rgba::from_srgba_unmultiplied(rgba.r, rgba.g, rgba.b, rgba.a).into()
 }

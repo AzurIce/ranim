@@ -250,6 +250,7 @@ fn animation_kind_str(kind: AnimationInfoKind) -> &'static str {
         AnimationInfoKind::Stack => "stack",
         AnimationInfoKind::Lagged => "lagged",
         AnimationInfoKind::Static => "static",
+        AnimationInfoKind::Sound => "sound",
     }
 }
 
@@ -762,6 +763,7 @@ mod tests {
             rate_func: rate_functions::linear,
             enabled: true,
             sim_step: None,
+            sound: None,
             children: vec![AnimationInfo {
                 anim_name: "FadeIn<VItem>".to_string(),
                 kind: AnimationInfoKind::Eval,
@@ -770,6 +772,7 @@ mod tests {
                 rate_func: rate_functions::smooth,
                 enabled: true,
                 sim_step: None,
+                sound: None,
                 children: vec![],
             }],
         }

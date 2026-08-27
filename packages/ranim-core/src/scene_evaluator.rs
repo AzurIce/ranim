@@ -21,6 +21,7 @@ pub struct SceneEvaluator {
     cells: Vec<AnimationCell>,
     total_secs: f64,
     time_marks: Vec<(f64, TimeMark)>,
+    audio: crate::audio::AudioPlan,
     clock: f64,
 }
 
@@ -35,6 +36,7 @@ impl SceneEvaluator {
             cells: scene.animations,
             total_secs: scene.total_secs,
             time_marks: scene.time_marks,
+            audio: scene.audio,
             clock: 0.0,
         }
     }
@@ -42,6 +44,11 @@ impl SceneEvaluator {
     /// Total scene duration.
     pub fn total_secs(&self) -> f64 {
         self.total_secs
+    }
+
+    /// The flattened audio plan of the sealed scene.
+    pub fn audio_plan(&self) -> &crate::audio::AudioPlan {
+        &self.audio
     }
 
     /// Scene time marks.
