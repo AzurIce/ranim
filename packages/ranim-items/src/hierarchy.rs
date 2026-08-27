@@ -24,12 +24,13 @@
 //!
 //! ```rust
 //! use ranim_core::core_item::vitem::VItem as CoreVItem;
-//! use ranim_core::glam::dvec3;
-//! use ranim_core::traits::{Extract, ShiftTransform};
+//! use ranim_core::glam::{Vec4, dvec3};
+//! use ranim_core::traits::ShiftTransform;
+//! use ranim_core::Extract;
 //! use ranim_items::hierarchy::Node;
 //!
 //! let stroke = CoreVItem {
-//!     points: vec![glam::Vec4::new(1.0, 0.0, 0.0, 0.0)],
+//!     points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
 //!     ..Default::default()
 //! };
 //! let mut tree = Node::<CoreVItem>::group(vec![

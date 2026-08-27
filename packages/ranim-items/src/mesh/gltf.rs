@@ -4,9 +4,12 @@
 //! [`Node`](crate::hierarchy::Node) tree, validating that the generic tree
 //! works for any item type — [`MeshItem`] here, exactly like
 //! [`VItem`][crate::vitem::VItem] in the SVG pipeline. It is opt-in via the
-//! `gltf` cargo feature and stays I/O-free: callers parse the file (e.g.
-//! with `gltf::Gltf::from_slice`) and hand over a closure that resolves each
-//! glTF buffer to its byte slice, mirroring `gltf::mesh::Primitive::reader`.
+//! `gltf` cargo feature. The core builder
+//! [`node_tree_from_gltf`](crate::mesh::gltf::node_tree_from_gltf) stays
+//! I/O-free; for the common case of a file on disk,
+//! [`node_tree_from_path`](crate::mesh::gltf::node_tree_from_path) loads a
+//! `.glb` (embedded blob) or a `.gltf` (external buffer files resolved
+//! relative to the file).
 //!
 //! # Mapping
 //!
@@ -54,6 +57,20 @@
 //!
 //! # Examples
 //!
+//! Load a `.glb` straight from disk:
+//!
+//! ```rust,no_run
+//! # fn main() -> Result<(), ranim_items::mesh::gltf::GltfLoadError> {
+//! use ranim_items::mesh::gltf::node_tree_from_path;
+//!
+//! let tree = node_tree_from_path("model.glb")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! For custom I/O (embedded assets, network, archives) drop to the
+//! I/O-free core and hand over a buffer resolver:
+//!
 //! ```rust,no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! use ranim_items::mesh::gltf::node_tree_from_gltf;
@@ -71,10 +88,81 @@
 //! # }
 //! ```
 
+use std::path::Path;
+
 use crate::hierarchy::{Node, NodeContent};
 use crate::mesh::MeshItem;
 use ranim_core::components::rgba::Rgba;
 use ranim_core::glam::{DAffine3, DMat4, DQuat, DVec3, Vec4, dvec3};
+
+/// Errors from loading a glTF/GLB file via [`node_tree_from_path`].
+#[derive(Debug)]
+pub enum GltfLoadError {
+    /// The file could not be read.
+    Io(std::io::Error),
+    /// The file is not valid glTF/GLB.
+    Parse(gltf::Error),
+}
+
+impl std::fmt::Display for GltfLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GltfLoadError::Io(error) => write!(f, "failed to read glTF file: {error}"),
+            GltfLoadError::Parse(error) => write!(f, "failed to parse glTF file: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for GltfLoadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            GltfLoadError::Io(error) => Some(error),
+            GltfLoadError::Parse(error) => Some(error),
+        }
+    }
+}
+
+/// Loads a `.glb` or `.gltf` file from disk into a node tree of
+/// [`MeshItem`]s.
+///
+/// A GLB's embedded blob is used directly. For a `.gltf`, external buffer
+/// files (`"uri"` fields) are read relative to the file's directory, joined
+/// as raw paths (no percent-decoding yet); `data:` URIs are not decoded and
+/// their buffers are skipped with a warning — the affected primitives fall
+/// back to their documented defaults.
+pub fn node_tree_from_path(path: impl AsRef<Path>) -> Result<Node<MeshItem>, GltfLoadError> {
+    let path = path.as_ref();
+    let bytes = std::fs::read(path).map_err(GltfLoadError::Io)?;
+    let gltf = gltf::Gltf::from_slice(&bytes).map_err(GltfLoadError::Parse)?;
+    let blob = gltf.blob.clone();
+    let base = path.parent().unwrap_or_else(|| Path::new("."));
+
+    // External buffer files are read up-front so the returned slices
+    // outlive the resolver closure handed to [`node_tree_from_gltf`].
+    let external: Vec<Option<Vec<u8>>> = gltf
+        .document
+        .buffers()
+        .map(|buffer| match buffer.source() {
+            gltf::buffer::Source::Bin => Ok(None),
+            gltf::buffer::Source::Uri(uri) if uri.starts_with("data:") => {
+                tracing::warn!("data: buffer URIs are not supported yet, skipping buffer {uri}");
+                Ok(None)
+            }
+            gltf::buffer::Source::Uri(uri) => std::fs::read(base.join(uri))
+                .map(Some)
+                .map_err(GltfLoadError::Io),
+        })
+        .collect::<Result<_, _>>()?;
+
+    Ok(node_tree_from_gltf(&gltf.document, |buffer| {
+        match buffer.source() {
+            gltf::buffer::Source::Bin => blob.as_deref(),
+            gltf::buffer::Source::Uri(_) => external
+                .get(buffer.index())
+                .and_then(|data| data.as_deref()),
+        }
+    }))
+}
 
 /// Builds the node tree of the default glTF scene as [`Node`]s of
 /// [`MeshItem`]s.
@@ -253,9 +341,8 @@ mod tests {
         buf.extend_from_slice(&value.to_le_bytes());
     }
 
-    /// A minimal GLB: scene → "parent" (T(1,2,3)·Rz(90°)) → "child" (scale 2)
-    /// carrying one triangle mesh with POSITION, NORMAL, COLOR_0, indices.
-    fn triangle_glb() -> Vec<u8> {
+    /// The raw 132-byte buffer payload: positions, normals, colors, indices.
+    fn triangle_bin() -> Vec<u8> {
         let mut bin = Vec::new();
         for p in [[0.0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]] {
             for c in p {
@@ -280,8 +367,17 @@ mod tests {
             bin.extend_from_slice(&i.to_le_bytes());
         }
         assert_eq!(bin.len(), 132);
+        bin
+    }
 
-        let json = r#"
+    /// The document for the triangle above; `uri` switches the buffer from
+    /// GLB-embedded (`None`) to an external file reference (`Some`).
+    fn triangle_json(uri: Option<&str>) -> String {
+        let buffers = match uri {
+            Some(uri) => format!(r#"{{"uri": "{uri}", "byteLength": 132}}"#),
+            None => r#"{"byteLength": 132}"#.to_string(),
+        };
+        r#"
         {
             "asset": {"version": "2.0"},
             "scene": 0,
@@ -296,7 +392,7 @@ mod tests {
                 "attributes": {"POSITION": 0, "NORMAL": 1, "COLOR_0": 2},
                 "indices": 3
             }]}],
-            "buffers": [{"byteLength": 132}],
+            "buffers": [[BUFFERS]],
             "bufferViews": [
                 {"buffer": 0, "byteOffset": 0, "byteLength": 36},
                 {"buffer": 0, "byteOffset": 36, "byteLength": 36},
@@ -310,16 +406,22 @@ mod tests {
                 {"bufferView": 2, "componentType": 5126, "count": 3, "type": "VEC4"},
                 {"bufferView": 3, "componentType": 5125, "count": 3, "type": "SCALAR"}
             ]
-        }"#;
+        }"#
+        .replace("[BUFFERS]", &buffers)
+    }
+
+    /// Packs a JSON document and buffer payload into a GLB container.
+    fn pack_glb(json: &str, bin: &[u8]) -> Vec<u8> {
         let mut json_chunk = json.as_bytes().to_vec();
         while !json_chunk.len().is_multiple_of(4) {
             json_chunk.push(b' ');
         }
-        while !bin.len().is_multiple_of(4) {
-            bin.push(0);
+        let mut bin_chunk = bin.to_vec();
+        while !bin_chunk.len().is_multiple_of(4) {
+            bin_chunk.push(0);
         }
 
-        let total = 12 + 8 + json_chunk.len() + 8 + bin.len();
+        let total = 12 + 8 + json_chunk.len() + 8 + bin_chunk.len();
         let mut glb = Vec::with_capacity(total);
         glb.extend_from_slice(&0x46546C67u32.to_le_bytes()); // "glTF"
         glb.extend_from_slice(&2u32.to_le_bytes());
@@ -327,10 +429,16 @@ mod tests {
         glb.extend_from_slice(&(json_chunk.len() as u32).to_le_bytes());
         glb.extend_from_slice(&0x4E4F534Au32.to_le_bytes()); // "JSON"
         glb.extend_from_slice(&json_chunk);
-        glb.extend_from_slice(&(bin.len() as u32).to_le_bytes());
+        glb.extend_from_slice(&(bin_chunk.len() as u32).to_le_bytes());
         glb.extend_from_slice(&0x004E4942u32.to_le_bytes()); // "BIN\0"
-        glb.extend_from_slice(&bin);
+        glb.extend_from_slice(&bin_chunk);
         glb
+    }
+
+    /// A minimal GLB: scene → "parent" (T(1,2,3)·Rz(90°)) → "child" (scale 2)
+    /// carrying one triangle mesh with POSITION, NORMAL, COLOR_0, indices.
+    fn triangle_glb() -> Vec<u8> {
+        pack_glb(&triangle_json(None), &triangle_bin())
     }
 
     fn triangle_tree() -> Node<MeshItem> {
@@ -446,5 +554,46 @@ mod tests {
             }
             _ => panic!("expected a MeshItem"),
         }
+    }
+
+    #[test]
+    fn loads_a_glb_file_from_disk() {
+        let path = std::env::temp_dir().join(format!("ranim_gltf_test_{}.glb", std::process::id()));
+        std::fs::write(&path, triangle_glb()).unwrap();
+        let loaded = node_tree_from_path(&path);
+        let _ = std::fs::remove_file(&path);
+
+        let tree = loaded.unwrap();
+        assert_eq!(tree.leaves().count(), 1);
+        let leaf = tree.children().unwrap()[0].children().unwrap()[0]
+            .children()
+            .unwrap()[0]
+            .leaf_content()
+            .unwrap();
+        assert_eq!(leaf.triangle_indices, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn resolves_external_bin_buffers_next_to_a_gltf() {
+        let dir = std::env::temp_dir();
+        let stem = format!("ranim_gltf_ext_{}", std::process::id());
+        let gltf_path = dir.join(format!("{stem}.gltf"));
+        let bin_path = dir.join(format!("{stem}.bin"));
+        std::fs::write(&gltf_path, triangle_json(Some(&format!("{stem}.bin")))).unwrap();
+        std::fs::write(&bin_path, triangle_bin()).unwrap();
+        let loaded = node_tree_from_path(&gltf_path);
+        let _ = std::fs::remove_file(&gltf_path);
+        let _ = std::fs::remove_file(&bin_path);
+
+        // The vertex data round-trips, proving the external buffer was
+        // resolved relative to the .gltf and read.
+        let tree = loaded.unwrap();
+        let leaf = tree.children().unwrap()[0].children().unwrap()[0]
+            .children()
+            .unwrap()[0]
+            .leaf_content()
+            .unwrap();
+        assert_eq!(leaf.triangle_indices, vec![0, 1, 2]);
+        assert_eq!(leaf.points.len(), 3);
     }
 }
