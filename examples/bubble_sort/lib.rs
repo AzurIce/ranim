@@ -4,7 +4,7 @@ use ranim::{
     color::palettes::manim,
     core::animation::{StaticAnim, sequence::AnimSequence},
     glam::{DVec3, dvec2, dvec3},
-    items::vitem::geometry::Rectangle,
+    items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
     utils::rate_functions::linear,
 };
@@ -34,15 +34,16 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
             let rect = Rectangle::new(width_unit, height).with(|rect| {
                 rect.stroke_width = 0.0;
                 rect.set_fill_color(manim::WHITE.with_alpha(0.5))
-                    .scale_axes(dvec2(0.8, 0.8))
-                    .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
+                    .scale_axes(dvec2(0.8, 0.8));
             });
+            let mut rect = VItem::from(rect);
+            rect.move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             let sequence = seq![rect.show()];
             (sequence, rect)
         })
         .collect::<Vec<_>>();
 
-    let sync = |rects: &mut [(AnimSequence, Rectangle)]| {
+    let sync = |rects: &mut [(AnimSequence, VItem)]| {
         let target = rects
             .iter()
             .map(|(sequence, _)| sequence.cursor_sec())

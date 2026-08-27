@@ -7,7 +7,8 @@
 //! `sim_secs` value captured by the step closure (not a global constant), and
 //! the same value is passed to `with_duration`. Each body leaves a fading
 //! trail of recent positions; the `Extract` impl projects bodies and trails
-//! into `VItem`s once per frame.
+//! once per frame. Circles stay semantic and their positions live in
+//! `Translation` wrappers applied at extraction time.
 //!
 //! Behavior by `n`: n = 3 stays inside the frame and wobbles chaotically for
 //! the whole scene; n >= 4 destabilizes and ejects a body (a dramatic finale).
@@ -18,7 +19,7 @@ use ranim::{
     core::animation::eval::iterative::Iterative,
     core::core_item::CoreItem,
     glam::DVec3,
-    items::vitem::{VItem, geometry::Circle},
+    items::vitem::geometry::Circle,
     prelude::*,
 };
 use std::f64::consts::PI;
@@ -134,20 +135,18 @@ impl Extract for NBodyState {
         // Trails: dim dots at recent positions.
         for (i, trail) in self.trails.iter().enumerate() {
             for &p in trail {
-                let mut dot = VItem::from(Circle::new(0.02));
+                let mut dot = Circle::new(0.02).transformed(Translation(p));
                 dot.set_fill_color(self.colors[i]);
                 dot.set_fill_opacity(0.15);
                 dot.set_stroke_opacity(0.0);
-                dot.move_to(p);
                 dot.extract_into(buf);
             }
         }
         // Bodies.
         for (i, body) in self.bodies.iter().enumerate() {
-            let mut ball = VItem::from(Circle::new(0.32));
+            let mut ball = Circle::new(0.32).transformed(Translation(body.pos));
             ball.set_fill_color(self.colors[i]);
             ball.set_stroke_opacity(0.0);
-            ball.move_to(body.pos);
             ball.extract_into(buf);
         }
     }

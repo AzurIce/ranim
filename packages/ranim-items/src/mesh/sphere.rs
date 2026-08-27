@@ -8,90 +8,64 @@ use ranim_core::{
     color::{self, AlphaColor, Srgb},
     core_item::CoreItem,
     glam::DVec3,
-    traits::{ApplyTransform, FillColor, Interpolatable, Opacity, With},
+    traits::{FillColor, Interpolatable, Opacity, With},
 };
 
+use super::Surface;
 use crate::mesh::MeshItem;
 
-use super::Surface;
-
-/// A sphere defined by center, radius, and resolution.
-///
-/// The sphere is parameterized as:
-/// - `u ∈ [0, TAU]`, `v ∈ [0, PI]`
-/// - `x = r * cos(u) * sin(v)`
-/// - `y = r * sin(u) * sin(v)`
-/// - `z = r * (-cos(v))`
+/// A sphere primitive centered at the origin.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sphere {
-    /// Center of the sphere.
-    pub center: DVec3,
-    /// Radius of the sphere.
+    /// Sphere radius.
     pub radius: f64,
-    /// Grid resolution `(nu, nv)`.
+    /// UV mesh resolution `(u, v)`.
     pub resolution: (u32, u32),
-    /// Fill color (with alpha).
+    /// Sphere fill color.
     pub fill_rgba: AlphaColor<Srgb>,
 }
 
 impl Sphere {
-    /// Create a new sphere with the given radius, centered at the origin.
+    /// Creates a sphere centered at the origin.
     pub fn new(radius: f64) -> Self {
         Self {
-            center: DVec3::ZERO,
             radius,
             resolution: (101, 51),
             fill_rgba: color::palette::css::BLUE.with_alpha(1.0),
         }
     }
-
-    /// Create a unit sphere (radius = 1).
+    /// Creates a unit sphere.
     pub fn unit() -> Self {
         Self::new(1.0)
     }
-
-    /// Set the center. Returns `self` for chaining.
-    pub fn with_center(mut self, center: DVec3) -> Self {
-        self.center = center;
-        self
-    }
-
-    /// Set the resolution. Returns `self` for chaining.
+    /// Sets the UV mesh resolution.
     pub fn with_resolution(mut self, resolution: (u32, u32)) -> Self {
         self.resolution = resolution;
         self
     }
-
-    /// Set the fill color. Returns `self` for chaining.
+    /// Sets the fill color.
     pub fn with_fill_color(mut self, color: AlphaColor<Srgb>) -> Self {
         self.fill_rgba = color;
         self
     }
-
-    /// Generate a point on the sphere using UV coordinates.
+    /// Returns a point at spherical UV coordinates and radius `r`.
     pub fn points_uv_func(u: f64, v: f64, r: f64) -> DVec3 {
         Self::normals_uv_func(u, v) * r
     }
-
-    /// Generate a normal on the sphere using UV coordinates.
+    /// Returns the unit normal at spherical UV coordinates.
     pub fn normals_uv_func(u: f64, v: f64) -> DVec3 {
-        let x = u.cos() * v.sin();
-        let y = u.sin() * v.sin();
-        let z = -v.cos();
-        DVec3::new(x, y, z)
+        DVec3::new(u.cos() * v.sin(), u.sin() * v.sin(), -v.cos())
     }
 }
-
 impl From<Sphere> for MeshItem {
     fn from(value: Sphere) -> Self {
         Surface::from(value).into()
     }
 }
-
 impl From<Sphere> for Surface {
     fn from(value: Sphere) -> Self {
         Surface::from_uv_func(
-            |u, v| Sphere::points_uv_func(u, v, value.radius) + value.center,
+            |u, v| Sphere::points_uv_func(u, v, value.radius),
             (0.0, TAU),
             (0.0, PI),
             value.resolution,
@@ -101,12 +75,10 @@ impl From<Sphere> for Surface {
         })
     }
 }
-
 impl Interpolatable for Sphere {
     fn lerp(&self, target: &Self, t: f64) -> Self {
         Self {
-            center: Interpolatable::lerp(&self.center, &target.center, t),
-            radius: Interpolatable::lerp(&self.radius, &target.radius, t),
+            radius: self.radius.lerp(&target.radius, t),
             resolution: if t < 0.5 {
                 self.resolution
             } else {
@@ -116,7 +88,6 @@ impl Interpolatable for Sphere {
         }
     }
 }
-
 impl FillColor for Sphere {
     fn fill_color(&self) -> AlphaColor<Srgb> {
         self.fill_rgba
@@ -130,30 +101,18 @@ impl FillColor for Sphere {
         self
     }
 }
-
 impl Opacity for Sphere {
     fn set_opacity(&mut self, opacity: f32) -> &mut Self {
         self.fill_rgba = self.fill_rgba.with_alpha(opacity);
         self
     }
 }
-
-impl<G: Into<ranim_core::prelude::Similarity>> ApplyTransform<G> for Sphere {
-    fn apply(&mut self, transform: G) -> &mut Self {
-        let transform = transform.into();
-        self.center = transform.transform_point(self.center);
-        self.radius *= transform.scale;
-        self
-    }
-}
-
 impl Aabb for Sphere {
     fn aabb(&self) -> [DVec3; 2] {
         let r = DVec3::splat(self.radius);
-        [self.center - r, self.center + r]
+        [-r, r]
     }
 }
-
 impl Extract for Sphere {
     type Target = CoreItem;
     fn extract_into(&self, buf: &mut Vec<Self::Target>) {
@@ -164,51 +123,30 @@ impl Extract for Sphere {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ranim_core::{glam::dvec3, traits::ShiftTransform};
-
+    use ranim_core::{glam::dvec3, prelude::TransformedExt, traits::Translation};
     #[test]
-    fn test_sphere_center_baked_into_vertices() {
-        let sphere = Sphere::new(1.0).with_center(dvec3(1.0, 2.0, 3.0));
-        let surface = Surface::from(sphere);
-        // u = 0, v = 0 → points_uv_func(0, 0, r) + center
-        let expected = Sphere::points_uv_func(0.0, 0.0, 1.0) + dvec3(1.0, 2.0, 3.0);
-        assert!(surface.vertices[0].abs_diff_eq(expected, 1e-10));
+    fn sphere_surface_uses_canonical_local_vertices() {
+        let surface = Surface::from(Sphere::new(1.0).with_resolution((5, 5)));
+        assert_eq!(surface.vertices.len(), 25);
+        assert_eq!(surface.resolution, (5, 5));
+        assert!(surface.vertices[0].abs_diff_eq(Sphere::points_uv_func(0.0, 0.0, 1.0), 1e-10));
     }
-
     #[test]
-    fn test_sphere_aabb() {
-        let sphere = Sphere::new(1.0).with_center(dvec3(1.0, 2.0, 3.0));
+    fn sphere_aabb_is_canonical_local_bounds() {
+        let [min, max] = Sphere::new(1.0).aabb();
+        assert_eq!(min, dvec3(-1.0, -1.0, -1.0));
+        assert_eq!(max, dvec3(1.0, 1.0, 1.0));
+    }
+    #[test]
+    fn transformed_sphere_owns_external_position() {
+        let sphere = Sphere::new(1.0).transformed(Translation(dvec3(1.0, 2.0, 3.0)));
         let [min, max] = sphere.aabb();
         assert_eq!(min, dvec3(0.0, 1.0, 2.0));
         assert_eq!(max, dvec3(2.0, 3.0, 4.0));
     }
-
-    #[test]
-    fn test_sphere_shift() {
-        let mut sphere = Sphere::new(1.0);
-        sphere.shift(dvec3(1.0, 0.0, 0.0));
-        assert_eq!(sphere.center, dvec3(1.0, 0.0, 0.0));
-    }
-
     #[test]
     fn test_sphere_interpolation() {
-        let a = Sphere::new(1.0).with_center(dvec3(0.0, 0.0, 0.0));
-        let b = Sphere::new(3.0).with_center(dvec3(2.0, 0.0, 0.0));
-        let mid = a.lerp(&b, 0.5);
+        let mid = Sphere::new(1.0).lerp(&Sphere::new(3.0), 0.5);
         assert!((mid.radius - 2.0).abs() < 1e-10);
-        assert!((mid.center.x - 1.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_sphere_to_surface() {
-        let sphere = Sphere::new(1.0)
-            .with_center(dvec3(1.0, 0.0, 0.0))
-            .with_resolution((5, 5));
-        let surface = Surface::from(sphere);
-        assert_eq!(surface.vertices.len(), 25);
-        assert_eq!(surface.resolution, (5, 5));
-        // The center is baked into the vertices
-        let expected = Sphere::points_uv_func(0.0, 0.0, 1.0) + dvec3(1.0, 0.0, 0.0);
-        assert!(surface.vertices[0].abs_diff_eq(expected, 1e-10));
     }
 }

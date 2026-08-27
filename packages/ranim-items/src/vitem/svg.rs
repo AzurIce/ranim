@@ -202,7 +202,7 @@ pub fn vitems_from_tree(tree: &usvg::Tree) -> Vec<VItem> {
         let affine = DAffine2::from_cols_array(&[
             transform.sx as f64,
             transform.kx as f64,
-            transform.kx as f64,
+            transform.ky as f64,
             transform.sy as f64,
             transform.tx as f64,
             transform.ty as f64,
@@ -236,7 +236,7 @@ mod tests {
     use crate::vitem::{geometry::Arc, typst::typst_svg};
     use ranim_core::{
         anchor::{AabbPoint, Locate},
-        traits::{ScaleHint, ScaleTransformExt, ScaleTransformStrokeExt, With},
+        traits::{ScaleHint, ScaleTransformExt, ScaleTransformStrokeExt, ShiftTransform, With},
     };
 
     use super::*;
@@ -323,13 +323,16 @@ mod tests {
     }
 
     #[test]
-    fn test_foo2() {
+    fn arc_points_are_transformed_after_conversion_to_vitem() {
         let angle = PI / 3.0 * 2.0;
-        let arc = Arc::new(angle, 2.0).with(|arc| {
-            arc.rotate_on_axis(DVec3::Z, PI / 2.0 - angle / 2.0)
-                .move_to(dvec3(2.0, 2.0, 0.0));
-        });
-        let arc = VItem::from(arc);
+        let mut arc = VItem::from(Arc::new(angle, 2.0));
+        arc.rotate_on_axis(DVec3::Z, PI / 2.0 - angle / 2.0)
+            .shift(dvec3(2.0, 2.0, 0.0));
+        assert!(arc.vpoints[0].abs_diff_eq(dvec3(3.732050807568877, 3.0, 0.0), 1e-10));
+        assert!(
+            arc.vpoints[arc.vpoints.len() - 1]
+                .abs_diff_eq(dvec3(0.2679491924311228, 3.0, 0.0), 1e-10)
+        );
         let points = (*arc.vpoints).clone();
         println!("{points:?}");
 

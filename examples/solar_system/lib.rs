@@ -2,7 +2,7 @@ use std::f64::consts::{PI, TAU};
 
 use ranim::{
     color::palettes::manim,
-    glam::{DAffine3, DVec3},
+    glam::DVec3,
     items::mesh::{Sphere, Surface},
     prelude::*,
     utils::rate_functions::{linear, smooth},
@@ -24,9 +24,9 @@ trait OrbitItem: Clone {
     fn set_orbit_position(&mut self, position: DVec3);
 }
 
-impl OrbitItem for Transformed<Surface, DAffine3> {
+impl OrbitItem for Transformed<Surface, Translation> {
     fn set_orbit_position(&mut self, position: DVec3) {
-        self.transform = DAffine3::from_translation(position);
+        self.transform = Translation(position);
     }
 }
 
@@ -141,7 +141,7 @@ fn orbit<T: OrbitItem>(item: &mut T, planet: &PlanetData, z: f64) -> OrbitMotion
 }
 
 /// One body layer: stay visible through the intro, then enter the shared orbit.
-fn body_layer(mut surface: Transformed<Surface, DAffine3>, planet: &PlanetData) -> AnimSequence {
+fn body_layer(mut surface: Transformed<Surface, Translation>, planet: &PlanetData) -> AnimSequence {
     seq![
         surface.show().with_duration(INTRO_SECS),
         orbit(&mut surface, planet, 0.0)
@@ -153,14 +153,12 @@ fn body_layer(mut surface: Transformed<Surface, DAffine3>, planet: &PlanetData) 
 /// A label has its own intro phrase, followed by the same reusable orbit phase.
 fn planet_label(planet: &PlanetData, position: DVec3) -> AnimSequence {
     let label_z = planet.radius + 0.5;
-    let label = TextItem::new(planet.name, 0.6).with(|item| {
-        item.move_to(position.with_z(label_z))
-            .with_origin(AabbPoint::CENTER, |item| {
-                item.rotate_on_x(30.0f64.to_radians()).discard()
-            })
-            .discard()
-    });
-    let mut label = Vec::<VItem>::from(label);
+    let mut label = Vec::<VItem>::from(TextItem::new(planet.name, 0.6));
+    label
+        .move_to(position.with_z(label_z))
+        .with_origin(AabbPoint::CENTER, |items| {
+            items.rotate_on_x(30.0f64.to_radians()).discard()
+        });
 
     let mut sequence = AnimSequence::new();
     sequence
@@ -197,7 +195,7 @@ fn planet_system(planet: &PlanetData) -> AnimStack {
                 .with_resolution((20, 10))
                 .with_fill_color(planet.color.with_alpha(1.0)),
         )
-        .transformed(DAffine3::from_translation(position));
+        .transformed(Translation(position));
         body_layers.push(body_layer(core, planet));
 
         let atmosphere = Surface::from(
@@ -206,7 +204,7 @@ fn planet_system(planet: &PlanetData) -> AnimStack {
                 .with_fill_color(planet.color.with_alpha(0.3)),
         )
         .with_smooth_normals()
-        .transformed(DAffine3::from_translation(position));
+        .transformed(Translation(position));
         body_layers.push(body_layer(atmosphere, planet));
     } else {
         let surface = Surface::from(
@@ -215,7 +213,7 @@ fn planet_system(planet: &PlanetData) -> AnimStack {
                 .with_fill_color(planet.color.with_alpha(1.0)),
         )
         .with_smooth_normals()
-        .transformed(DAffine3::from_translation(position));
+        .transformed(Translation(position));
         body_layers.push(body_layer(surface, planet));
     }
 

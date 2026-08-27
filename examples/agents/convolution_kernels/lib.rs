@@ -134,10 +134,8 @@ fn cell_center(grid_center: DVec3, n: usize, cell: f64, row: usize, col: usize) 
 
 /// A single grayscale pixel square (no stroke; the gaps read as the grid).
 fn pixel_square(center: DVec3, size: f64, v: f64) -> VItem {
-    let sq = Square::new(size * 0.92).with(|sq| {
-        sq.center = center;
-    });
-    let mut item = VItem::from(sq);
+    let mut item = VItem::from(Square::new(size * 0.92));
+    item.shift(center);
     item.set_fill_color(gray(v));
     item.set_stroke_opacity(0.0);
     item
@@ -264,10 +262,8 @@ fn convolution_kernels(r: &mut RanimScene) {
 
     let mut matrix_frame: Vec<VItem> = (0..9)
         .map(|i| {
-            let sq = Square::new(KCELL * 0.96).with(|sq| {
-                sq.center = cell_center(KERNEL_CENTER, 3, KCELL, i / 3, i % 3);
-            });
-            let mut item = VItem::from(sq);
+            let mut item = VItem::from(Square::new(KCELL * 0.96));
+            item.shift(cell_center(KERNEL_CENTER, 3, KCELL, i / 3, i % 3));
             item.set_fill_color(rgb8(0x26, 0x26, 0x2e));
             item.set_stroke_color(manim::GREY_B);
             item.set_stroke_width(0.02);

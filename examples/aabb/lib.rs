@@ -104,14 +104,15 @@ fn aabb(r: &mut RanimScene) {
             p.set_color(manim::BLUE_D);
         }))
         .into(),
-        Ellipse::new(dvec2(2.0, 0.8))
-            .with(|e| {
-                e.set_color(manim::RED_D);
-                e.with_origin(AabbPoint::CENTER, |x| {
-                    x.rotate_on_z(PI / 4.0);
-                });
-            })
-            .into(),
+        {
+            let mut ellipse: VItem = Ellipse::new(dvec2(2.0, 0.8))
+                .with(|e| {
+                    e.set_color(manim::RED_D);
+                })
+                .into();
+            ellipse.rotate_on_z(PI / 4.0);
+            ellipse
+        },
         Polygon::new(star_points)
             .with(|p| {
                 p.set_color(manim::YELLOW_B);

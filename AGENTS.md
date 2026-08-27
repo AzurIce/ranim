@@ -4,6 +4,26 @@
 
 Check format and clippy before push to make sure CI happy.
 
+## Build & Test Notes
+
+- **Limit cargo parallelism to avoid OOM.** A full `cargo test --workspace` or
+  `cargo build --workspace --all-targets` compiles the entire workspace
+  (wgpu, eframe/egui, 25+ cdylib examples) with one rustc job per core, which
+  can exhaust memory and freeze the machine (observed with 32 cores / 29 GiB
+  RAM). Prefer limiting parallelism and/or testing per package, e.g.:
+
+  ```bash
+  cargo test -p ranim-core -p ranim-items -j 8
+  CARGO_BUILD_JOBS=8 cargo run -p ranim-cli -- output <scene> --example <example>
+  ```
+
+## 构建与测试注意事项
+
+- **限制 cargo 并行度以避免内存耗尽。**全量 `cargo test --workspace` 或
+  `cargo build --workspace --all-targets` 会按核心数并行编译整个 workspace
+  （wgpu、eframe/egui、25+ 个 cdylib example），可能耗尽内存导致整机卡死
+  （在 32 核 / 29 GiB 内存上实际发生过）。建议限制并行度或分包测试。
+
 ## PR Authoring Guidelines
 
 This file describes how to write and update pull request descriptions in this
