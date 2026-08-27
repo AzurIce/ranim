@@ -1,115 +1,43 @@
-//! glTF 2.0 scene-graph import into trees of [`MeshItem`]s.
+//! glTF 2.0 scene-graph import into trees of [`MeshItem`]s, opt-in via the
+//! `gltf` cargo feature. The `gltf` crate itself is re-exported here, so
+//! callers can parse documents without their own matching dependency.
 //!
-//! This module is a proof of concept for importing a glTF scene as a
-//! [`Node`](crate::hierarchy::Node) tree, validating that the generic tree
-//! works for any item type — [`MeshItem`] here, exactly like
-//! [`VItem`][crate::vitem::VItem] in the SVG pipeline. It is opt-in via the
-//! `gltf` cargo feature. The core builder
-//! [`node_tree_from_gltf`](crate::mesh::gltf::node_tree_from_gltf) stays
-//! I/O-free; for the common case of a file on disk,
-//! [`node_tree_from_path`](crate::mesh::gltf::node_tree_from_path) loads a
-//! `.glb` (embedded blob) or a `.gltf` (external buffer files resolved
-//! relative to the file).
+//! Two loaders: [`node_tree_from_path`](crate::mesh::gltf::node_tree_from_path)
+//! reads a `.glb` (embedded blob) or `.gltf` (external buffer files resolved
+//! relative to the file) from disk, and the I/O-free
+//! [`node_tree_from_gltf`](crate::mesh::gltf::node_tree_from_gltf) takes a
+//! parsed document plus a buffer resolver.
 //!
 //! # Mapping
 //!
 //! | glTF                       | ranim                                              |
 //! |----------------------------|----------------------------------------------------|
-//! | node TRS / matrix          | [`Node::transform`](crate::hierarchy::Node::transform) as a [`DAffine3`](ranim_core::glam::DAffine3) (`T * R * S`) |
-//! | node name (non-empty)      | [`Node::id`](crate::hierarchy::Node::id)           |
+//! | node TRS / matrix          | [`Node`](crate::hierarchy::Node) pose as a [`DAffine3`](ranim_core::glam::DAffine3) (`T * R * S`) |
+//! | node name (non-empty)      | [`Node::id`](crate::hierarchy::Node::id) (payload nodes fall back to the mesh name) |
 //! | node children              | [`Node::children`](crate::hierarchy::Node::children), source order kept |
 //! | mesh (single primitive)    | the node's own payload [`MeshItem`]                |
-//! | mesh (multiple primitives) | primitive leaves with identity transforms, placed before the children |
+//! | mesh (multiple primitives) | primitive leaves before the children, identity transforms |
 //!
-//! glTF addresses nodes structurally by index while names are display
-//! labels: [`GltfTree::node`](crate::mesh::gltf::GltfTree::node) resolves a
-//! document node index to its tree position, and
-//! [`Node::by_id`](crate::hierarchy::Node::by_id) resolves a name to the
-//! depth-first first match.
+//! glTF also addresses nodes by document index (animation channels,
+//! `skin.joints`) — [`GltfTree::node`](crate::mesh::gltf::GltfTree::node)
+//! resolves that, [`Node::by_id`](crate::hierarchy::Node::by_id) resolves
+//! names. `POSITION`/indices/`NORMAL`/`COLOR_0` map to the [`MeshItem`]
+//! fields with zero-normals and default colors as the absent-attribute
+//! fallbacks; `COLOR_0` is stored as-is (no sRGB conversion for normalized
+//! integer variants).
 //!
-//! **Granularity**: the imported tree *is* the default scene. Each glTF
-//! node compiles to exactly one group [`Node`](crate::hierarchy::Node)
-//! (addressable via [`GltfTree::node`](crate::mesh::gltf::GltfTree::node)),
-//! and each mesh primitive compiles to exactly one leaf [`MeshItem`]. So a
-//! [`MeshItem`] is never "the model" or "a node" — it is one primitive of
-//! one mesh of one node.
+//! # Scope
 //!
-//! Per-primitive attributes: `POSITION` → [`MeshItem::points`], `indices` →
-//! [`MeshItem::triangle_indices`] (a non-indexed primitive gets sequential
-//! indices, because an index-less [`MeshItem`] would mean a point cloud
-//! rather than triangles), `NORMAL` → [`MeshItem::vertex_normals`] (all-zero
-//! when absent, matching [`MeshItem::from_indexed_vertices`], i.e. the
-//! shader's flat-shading fallback), and `COLOR_0` →
-//! [`MeshItem::vertex_colors`] (3-component colors get alpha 1.0; when the
-//! attribute is absent the [`MeshItem`] default `Rgba::default()` is kept).
-//! All f32/u8/u16 normalized attribute variants are normalized by the glTF
-//! reader API itself. COLOR_0 values are taken as-is into `Rgba`'s linear
-//! storage, which is spec-correct for the f32 variant but skips the
-//! sRGB-to-linear conversion that normalized integer variants require — a
-//! known POC simplification.
-//!
-//! Transforms are stored as the widest [`DAffine3`](ranim_core::glam::DAffine3)
-//! because glTF matrices may carry shear; narrowing to
-//! [`Rigid`](ranim_core::traits::Rigid) /
-//! [`Similarity`](ranim_core::traits::Similarity) can come later via
-//! [`Node::map_transform`](crate::hierarchy::Node::map_transform) and
-//! `TryFrom`.
-//!
-//! # Ignored glTF features (deliberate, POC scope)
-//!
-//! Everything below is silently absent from the imported tree unless a
-//! warning is noted:
-//!
-//! - **Node cameras and lights** (including the `KHR_lights_punctual`
-//!   extension): ranim owns its camera and lighting; node camera references
-//!   are not imported.
-//! - **The whole appearance stack**: materials (PBR
-//!   metallic-roughness, `baseColorFactor`/`baseColorTexture`, …),
-//!   textures, images and samplers. A primitive's visible color comes
-//!   solely from its `COLOR_0` attribute — or from whatever you set after
-//!   loading (e.g. [`MeshItem::set_fill_color`]); models that carry their
-//!   colors only in materials import uncolored.
-//! - **Vertex streams we cannot use yet**: `TEXCOORD_*` (UVs) and
-//!   `TANGENT`.
-//! - **Animations**: no animation channels are imported — a loaded tree is
-//!   static; animate node poses yourself (per-node transforms interpolate
-//!   independently, see [`Node`](crate::hierarchy::Node)).
-//! - **Skins and morph targets**: `JOINTS_0`/`WEIGHTS_0` vertex attributes
-//!   and morph target accessors are not read.
-//! - **All extensions** are not interpreted. Notably Draco-compressed
-//!   primitives have no plain accessors, so they import as empty meshes
-//!   with a warning.
-//! - **Non-default scenes**: only the default scene (falling back to the
-//!   first scene) is imported; nodes of other scenes are absent
-//!   ([`GltfTree::node_paths`](crate::mesh::gltf::GltfTree::node_paths)
-//!   marks them `None`).
-//!
-//! # Behavioral notes
-//!
-//! - **Coordinates are preserved verbatim**: glTF is right-handed Y-up in
-//!   meters, ranim is Z-up — stand a model upright with
-//!   `rotate_on_axis(DVec3::X, PI / 2.0)` and normalize its size yourself;
-//!   see the `gltf_showcase` example.
-//! - **Primitive modes**: only `TRIANGLES` is really supported. Other modes
-//!   (strips, fans, lines, points) import their index data unchanged after a
-//!   warning — no re-triangulation — and therefore render incorrectly.
-//! - **Missing `POSITION`**: the primitive imports as an empty
-//!   [`MeshItem`] with a warning.
-//! - **`data:` buffer URIs** are not decoded: such buffers are skipped with
-//!   a warning, and external buffer URIs are joined as raw paths (no
-//!   percent-decoding yet).
-//! - **Multi-primitive meshes**: a glTF mesh may contain several
-//!   primitives, but a node carries at most one payload, so such meshes
-//!   split into primitive leaves placed *before* the child nodes (each with
-//!   an identity transform); the node's own transform still applies to all
-//!   of them. Single-primitive meshes — the common case — map natively to
-//!   the node's payload, so this is the only place where a glTF node
-//!   expands to more than one tree node.
-//! - **A missing scene** imports as an empty group rather than failing.
+//! Only the default scene imports (missing scene → empty tree). Cameras,
+//! lights, materials/textures (color comes from `COLOR_0` or whatever you
+//! set after loading), `TEXCOORD`/`TANGENT` streams, animations, skins,
+//! morph targets and all extensions are not interpreted — Draco-compressed
+//! primitives therefore import as empty meshes with a warning.
+//! Non-`TRIANGLES` modes import their indices unchanged after a warning.
+//! Coordinates are preserved verbatim (glTF is Y-up); see the
+//! `gltf_showcase` example for standing a model upright.
 //!
 //! # Examples
-//!
-//! Load a `.glb` straight from disk:
 //!
 //! ```rust,no_run
 //! # fn main() -> Result<(), ranim_items::mesh::gltf::GltfLoadError> {
@@ -120,27 +48,29 @@
 //! # }
 //! ```
 //!
-//! For custom I/O (embedded assets, network, archives) drop to the
-//! I/O-free core and hand over a buffer resolver:
+//! For custom I/O, parse yourself and hand over a buffer resolver:
 //!
 //! ```rust,no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! use ranim_items::mesh::gltf::node_tree_from_gltf;
+//! use ranim_items::mesh::gltf::{gltf, node_tree_from_gltf};
 //!
 //! let bytes = std::fs::read("model.gltf")?;
-//! let gltf = gltf::Gltf::from_slice(&bytes)?;
-//! let blob = gltf.blob.clone();
-//! // Resolve buffers the way the caller sees fit: GLB blob, data URIs,
-//! // or external files — the loader only ever asks for byte slices.
-//! let tree = node_tree_from_gltf(&gltf.document, |buffer| match buffer.source() {
+//! let parsed = gltf::Gltf::from_slice(&bytes)?;
+//! let blob = parsed.blob.clone();
+//! let tree = node_tree_from_gltf(&parsed.document, |buffer| match buffer.source() {
 //!     gltf::buffer::Source::Bin => blob.as_deref(),
-//!     gltf::buffer::Source::Uri(_) => None, // external buffers: read the file here
+//!     gltf::buffer::Source::Uri(_) => None, // read the file here
 //! });
 //! # Ok(())
 //! # }
 //! ```
 
 use std::path::Path;
+
+/// The `gltf` crate this module is built on, re-exported so callers can
+/// parse documents (and match on [`GltfLoadError::Parse`]'s error type)
+/// without their own matching dependency.
+pub use gltf;
 
 use crate::hierarchy::Node;
 use crate::mesh::MeshItem;
