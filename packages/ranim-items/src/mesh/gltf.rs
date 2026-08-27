@@ -26,6 +26,13 @@
 //! [`Node::by_id`](crate::hierarchy::Node::by_id) resolves a name to the
 //! depth-first first match.
 //!
+//! **Granularity**: the imported tree *is* the default scene. Each glTF
+//! node compiles to exactly one group [`Node`](crate::hierarchy::Node)
+//! (addressable via [`GltfTree::node`](crate::mesh::gltf::GltfTree::node)),
+//! and each mesh primitive compiles to exactly one leaf [`MeshItem`]. So a
+//! [`MeshItem`] is never "the model" or "a node" — it is one primitive of
+//! one mesh of one node.
+//!
 //! Per-primitive attributes: `POSITION` → [`MeshItem::points`], `indices` →
 //! [`MeshItem::triangle_indices`] (a non-indexed primitive gets sequential
 //! indices, because an index-less [`MeshItem`] would mean a point cloud
@@ -47,19 +54,55 @@
 //! [`Node::map_transform`](crate::hierarchy::Node::map_transform) and
 //! `TryFrom`.
 //!
-//! # Known limitations (deliberate, POC scope)
+//! # Ignored glTF features (deliberate, POC scope)
 //!
-//! - **mesh + children**: glTF allows a node to carry both a mesh and child
-//!   nodes. The tree cannot express both as one payload, so the primitives
-//!   are split off as sibling leaves placed *before* the child nodes (each
-//!   with an identity transform); the node's own transform still applies to
-//!   both. Narrowing this split needs a multi-payload node.
-//! - **single scene**: only the default scene (falling back to the first
-//!   scene) is imported.
-//! - **triangle meshes only**: primitives whose drawing mode is not
-//!   `TRIANGLES` are imported as-is after a warning; their indices are not
-//!   re-triangulated.
-//! - A missing scene imports as an empty group rather than failing.
+//! Everything below is silently absent from the imported tree unless a
+//! warning is noted:
+//!
+//! - **Node cameras and lights** (including the `KHR_lights_punctual`
+//!   extension): ranim owns its camera and lighting; node camera references
+//!   are not imported.
+//! - **The whole appearance stack**: materials (PBR
+//!   metallic-roughness, `baseColorFactor`/`baseColorTexture`, …),
+//!   textures, images and samplers. A primitive's visible color comes
+//!   solely from its `COLOR_0` attribute — or from whatever you set after
+//!   loading (e.g. [`MeshItem::set_fill_color`]); models that carry their
+//!   colors only in materials import uncolored.
+//! - **Vertex streams we cannot use yet**: `TEXCOORD_*` (UVs) and
+//!   `TANGENT`.
+//! - **Animations**: no animation channels are imported — a loaded tree is
+//!   static; animate node poses yourself (per-node transforms interpolate
+//!   independently, see [`Node`](crate::hierarchy::Node)).
+//! - **Skins and morph targets**: `JOINTS_0`/`WEIGHTS_0` vertex attributes
+//!   and morph target accessors are not read.
+//! - **All extensions** are not interpreted. Notably Draco-compressed
+//!   primitives have no plain accessors, so they import as empty meshes
+//!   with a warning.
+//! - **Non-default scenes**: only the default scene (falling back to the
+//!   first scene) is imported; nodes of other scenes are absent
+//!   ([`GltfTree::node_paths`](crate::mesh::gltf::GltfTree::node_paths)
+//!   marks them `None`).
+//!
+//! # Behavioral notes
+//!
+//! - **Coordinates are preserved verbatim**: glTF is right-handed Y-up in
+//!   meters, ranim is Z-up — stand a model upright with
+//!   `rotate_on_axis(DVec3::X, PI / 2.0)` and normalize its size yourself;
+//!   see the `gltf_showcase` example.
+//! - **Primitive modes**: only `TRIANGLES` is really supported. Other modes
+//!   (strips, fans, lines, points) import their index data unchanged after a
+//!   warning — no re-triangulation — and therefore render incorrectly.
+//! - **Missing `POSITION`**: the primitive imports as an empty
+//!   [`MeshItem`] with a warning.
+//! - **`data:` buffer URIs** are not decoded: such buffers are skipped with
+//!   a warning, and external buffer URIs are joined as raw paths (no
+//!   percent-decoding yet).
+//! - **A node carrying both a mesh and child nodes**: the tree cannot
+//!   express both as one payload, so the primitives are split off as
+//!   sibling leaves placed *before* the child nodes (each with an identity
+//!   transform); the node's own transform still applies to both. This is
+//!   the one place where a glTF node expands to more than one tree node.
+//! - **A missing scene** imports as an empty group rather than failing.
 //!
 //! # Examples
 //!
