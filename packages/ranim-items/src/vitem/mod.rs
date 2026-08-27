@@ -22,7 +22,7 @@ pub mod text;
 pub mod typst;
 
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{DVec3, Vec4, vec4};
+use glam::{DVec3, Mat4, Vec4, vec4};
 use ranim_core::anchor::Aabb;
 use ranim_core::core_item::CoreItem;
 use ranim_core::{Extract, color, glam};
@@ -195,6 +195,7 @@ impl From<VItem> for ranim_core::core_item::vitem::VItem {
         Self {
             normal: value.normal.map(|n| n.as_vec3()),
             points: value.get_render_points(),
+            transform: Mat4::IDENTITY,
             fill_rgbas: value.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: value.stroke_rgbas.iter().cloned().collect(),
             stroke_widths: value.stroke_widths.iter().cloned().collect(),

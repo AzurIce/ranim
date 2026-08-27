@@ -298,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn extract_vitem_bakes_points_and_normal() {
+    fn extract_vitem_composes_transform_without_baking_points() {
         let vitem = VItem {
             points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
             normal: Some(Vec3::new(1.0, 1.0, 0.0).normalize()),
@@ -312,9 +312,17 @@ mod tests {
         let items = wrapped.extract();
         match &items[0] {
             CoreItem::VItem(vitem) => {
-                assert_eq!(vitem.points[0], Vec4::new(2.0, 2.0, 0.0, 0.0));
-                let expected = Vec3::new(0.5, 1.0, 0.0).normalize();
-                assert!(vitem.normal.unwrap().abs_diff_eq(expected, 1e-6));
+                // Points and the local plane normal stay untouched.
+                assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+                assert_eq!(vitem.normal, Some(Vec3::new(1.0, 1.0, 0.0).normalize()));
+                assert_eq!(
+                    vitem.transform,
+                    glam::Mat4::from_scale_rotation_translation(
+                        Vec3::new(2.0, 1.0, 1.0),
+                        glam::Quat::IDENTITY,
+                        Vec3::new(0.0, 2.0, 0.0),
+                    )
+                );
             }
             _ => panic!("expected VItem"),
         }
@@ -330,7 +338,11 @@ mod tests {
         let outer = inner.transformed(Diag(DVec3::splat(2.0)));
         match &outer.extract()[0] {
             CoreItem::VItem(vitem) => {
-                assert_eq!(vitem.points[0], Vec4::new(4.0, 0.0, 0.0, 0.0));
+                // Local data is preserved; the world placement moves to
+                // scale(2) * translate(x).
+                assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+                assert_eq!(vitem.transform.w_axis.truncate(), Vec3::new(2.0, 0.0, 0.0));
+                assert_eq!(vitem.transform.x_axis.truncate(), Vec3::new(2.0, 0.0, 0.0));
             }
             _ => panic!("expected VItem"),
         }
@@ -425,6 +437,43 @@ mod tests {
     }
 
     #[test]
+    fn wrapper_lerp_moves_the_pose_while_inner_points_stay_constant() {
+        let points = vec![Vec4::new(1.0, 0.0, 0.0, 0.0)];
+        let a = VItem {
+            points: points.clone(),
+            ..Default::default()
+        }
+        .transformed(Translation(DVec3::X));
+        let b = VItem {
+            points,
+            ..Default::default()
+        }
+        .transformed(Translation(dvec3(-1.0, 2.0, 0.0)));
+
+        let mid = a.lerp(&b, 0.5);
+        // Local geometry never moves; only the pose interpolates.
+        assert_eq!(mid.inner.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+        assert_affine_eq(
+            DAffine3::from(mid.transform),
+            DAffine3::from_translation(dvec3(0.0, 1.0, 0.0)),
+        );
+    }
+
+    #[test]
+    fn rigid_wrapper_lerp_slerps_rotation() {
+        let a = 42.0f64.transformed(Rigid::IDENTITY);
+        let b = 42.0f64.transformed(Rigid::from_axis_angle(
+            DVec3::Z,
+            std::f64::consts::FRAC_PI_2,
+        ));
+
+        let mid = a.lerp(&b, 0.5);
+        let rotated = mid.transform.rotation * DVec3::X;
+        let expected = DQuat::from_axis_angle(DVec3::Z, std::f64::consts::FRAC_PI_4) * DVec3::X;
+        assert!(rotated.abs_diff_eq(expected, 1e-9));
+    }
+
+    #[test]
     fn aabb_converts_transform_at_geometry_boundary() {
         let wrapped = dvec3(1.0, 1.0, 1.0).transformed(Translation(dvec3(10.0, 0.0, 0.0)));
         assert_eq!(wrapped.aabb(), [dvec3(11.0, 1.0, 1.0); 2]);
@@ -489,7 +538,8 @@ mod tests {
 
         match &wrapped.extract()[0] {
             CoreItem::VItem(vitem) => {
-                assert_eq!(vitem.points[0], Vec4::new(2.0, 0.0, 0.0, 0.0))
+                assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+                assert_eq!(vitem.transform.w_axis.truncate(), Vec3::X);
             }
             _ => panic!("expected VItem"),
         }

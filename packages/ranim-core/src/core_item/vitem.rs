@@ -1,11 +1,11 @@
 use color::{AlphaColor, Srgb};
-use glam::{Vec3, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 
 use crate::{
     Extract,
     components::{rgba::Rgba, width::Width},
     core_item::CoreItem,
-    traits::FillColor,
+    traits::{FillColor, Interpolatable},
 };
 
 /// Default vitem stroke width
@@ -83,12 +83,15 @@ pub fn vitem_normal_from_points(points: &[Vec4]) -> Vec3 {
 #[derive(bevy_ecs::component::Component, Debug, Clone, PartialEq)]
 /// A primitive for rendering a vitem.
 pub struct VItem {
-    /// The normal vector of the projection target plane.
-    /// If `None`, the normal will be derived from the points at render time.
+    /// The normal vector of the projection target plane in local space.
+    /// If `None`, the normal will be derived from the points at render time
+    /// and converted to world space along with the item transform.
     pub normal: Option<Vec3>,
-    /// The points of the item in world space.
+    /// The points of the item in local space.
     /// (x, y, z, is_closed)
     pub points: Vec<Vec4>,
+    /// The local-to-world transform applied when flattening onto the plane.
+    pub transform: Mat4,
     /// Fill rgbas, see [`Rgba`].
     pub fill_rgbas: Vec<Rgba>,
     /// Stroke rgbs, see [`Rgba`].
@@ -102,9 +105,23 @@ impl Default for VItem {
         Self {
             normal: None,
             points: vec![Vec4::ZERO; 3],
+            transform: Mat4::IDENTITY,
             stroke_widths: vec![Width::default(); 2],
             stroke_rgbas: vec![Rgba::default(); 2],
             fill_rgbas: vec![Rgba::default(); 2],
+        }
+    }
+}
+
+impl Interpolatable for VItem {
+    fn lerp(&self, target: &Self, t: f64) -> Self {
+        Self {
+            normal: if t < 0.5 { self.normal } else { target.normal },
+            points: self.points.lerp(&target.points, t),
+            transform: self.transform.lerp(&target.transform, t),
+            fill_rgbas: self.fill_rgbas.lerp(&target.fill_rgbas, t),
+            stroke_rgbas: self.stroke_rgbas.lerp(&target.stroke_rgbas, t),
+            stroke_widths: self.stroke_widths.lerp(&target.stroke_widths, t),
         }
     }
 }

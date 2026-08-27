@@ -16,7 +16,7 @@ use ranim::{
         scene_evaluator::EvaluatedFrame,
         utils::{bezier::get_subpath_closed_flag, rate_functions},
     },
-    glam::DVec3,
+    glam::{DVec3, Mat3},
 };
 use serde::Serialize;
 
@@ -520,10 +520,14 @@ impl FrameItemDto {
 
 impl FrameItemDataDto {
     fn from_vitem(item: &VItem, verbose: bool) -> Self {
+        // Core VItem data lives in the item's local space; the inspect dump
+        // reports world-space values, so apply the stored transform here
+        // (in the same f32 precision used by the renderer).
+        let normal_matrix = Mat3::from_mat4(item.transform).inverse().transpose();
         let vpoints = VPointVec(
             item.points
                 .iter()
-                .map(|point| DVec3::new(point.x as f64, point.y as f64, point.z as f64))
+                .map(|point| item.transform.transform_point3(point.truncate()).as_dvec3())
                 .collect(),
         );
         let subpaths = if vpoints.is_empty() {
@@ -539,9 +543,10 @@ impl FrameItemDataDto {
                     .unwrap_or(false)
             })
             .collect();
-        let normal = item
+        let normal_local = item
             .normal
             .unwrap_or_else(|| vitem_normal_from_points(&item.points));
+        let normal = (normal_matrix * normal_local).normalize_or_zero();
         let bounds = dvec3_bounds(vpoints.aabb());
 
         Self::VItem(VItemDataDto {
@@ -553,7 +558,15 @@ impl FrameItemDataDto {
             stroke_widths: item.stroke_widths.iter().map(|width| width.0).collect(),
             normal: normal.to_array(),
             bounds,
-            points: verbose.then(|| item.points.iter().map(|point| point.to_array()).collect()),
+            points: verbose.then(|| {
+                item.points
+                    .iter()
+                    .map(|point| {
+                        let world = item.transform.transform_point3(point.truncate());
+                        [world.x, world.y, world.z, point.w]
+                    })
+                    .collect()
+            }),
         })
     }
 

@@ -21,6 +21,22 @@ pub struct ItemInfo {
     pub attr_count: u32,
 }
 
+/// Per-item local-to-world transform, applied by the vertex stage after
+/// reconstructing the 3D position from the plane basis.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct VitemTransform {
+    pub transform: [[f32; 4]; 4],
+}
+
+impl Default for VitemTransform {
+    fn default() -> Self {
+        Self {
+            transform: glam::Mat4::IDENTITY.to_cols_array_2d(),
+        }
+    }
+}
+
 /// Per-item plane data (normal + origin), stored as array of structs.
 /// The origin is the first point of the item (used by vertex shader).
 /// basis_u/basis_v are generated deterministically from the normal in the shader.
@@ -44,6 +60,8 @@ pub struct VItemsBuffer {
     pub(crate) planes_buffer: WgpuVecBuffer<PlaneData>,
     /// Per-item clip boxes (5 i32 each: min_x, max_x, min_y, max_y, max_w)
     pub(crate) clip_boxes_buffer: WgpuVecBuffer<i32>,
+    /// Per-item local-to-world transforms
+    pub(crate) transforms_buffer: WgpuVecBuffer<VitemTransform>,
 
     /// Merged 3D points from all VItems
     pub(crate) points3d_buffer: WgpuVecBuffer<Vec4>,
@@ -79,6 +97,12 @@ impl VItemsBuffer {
             item_infos_buffer: WgpuVecBuffer::new(ctx, Some("Merged ItemInfos"), storage_ro, 1),
             planes_buffer: WgpuVecBuffer::new(ctx, Some("Merged Planes"), storage_ro, 1),
             clip_boxes_buffer: WgpuVecBuffer::new(ctx, Some("Merged ClipBoxes"), storage_rw, 5),
+            transforms_buffer: WgpuVecBuffer::new(
+                ctx,
+                Some("Merged VItem Transforms"),
+                storage_ro,
+                1,
+            ),
             points3d_buffer: WgpuVecBuffer::new(ctx, Some("Merged Points3D"), storage_ro, 1),
             points2d_buffer: WgpuVecBuffer::new(ctx, Some("Merged Points2D"), storage_rw, 1),
             fill_rgbas_buffer: WgpuVecBuffer::new(ctx, Some("Merged FillRgbas"), storage_ro, 1),
@@ -118,6 +142,7 @@ impl VItemsBuffer {
         // Build index table and collect data
         let mut item_infos = Vec::with_capacity(item_count);
         let mut planes = Vec::with_capacity(item_count);
+        let mut transforms = Vec::with_capacity(item_count);
         let mut all_points3d = Vec::with_capacity(total_points);
         let mut all_fill_rgbas = Vec::with_capacity(total_attrs);
         let mut all_stroke_rgbas = Vec::with_capacity(total_attrs);
@@ -147,6 +172,9 @@ impl VItemsBuffer {
             });
 
             all_points3d.extend_from_slice(&vitem.points);
+            transforms.push(VitemTransform {
+                transform: vitem.transform.to_cols_array_2d(),
+            });
             all_fill_rgbas.extend_from_slice(&vitem.fill_rgbas);
             all_stroke_rgbas.extend_from_slice(&vitem.stroke_rgbas);
             all_stroke_widths.extend_from_slice(&vitem.stroke_widths);
@@ -171,6 +199,7 @@ impl VItemsBuffer {
         let mut any_realloc = false;
         any_realloc |= self.item_infos_buffer.set(ctx, &item_infos);
         any_realloc |= self.planes_buffer.set(ctx, &planes);
+        any_realloc |= self.transforms_buffer.set(ctx, &transforms);
         any_realloc |= self.clip_boxes_buffer.set(ctx, &clip_boxes);
         any_realloc |= self.points3d_buffer.set(ctx, &all_points3d);
         any_realloc |= self.points2d_buffer.set(ctx, &points2d);
@@ -237,6 +266,8 @@ impl VItemsBuffer {
                     bgl_entry(5, vf, false),
                     // binding 6: stroke_widths
                     bgl_entry(6, vf, false),
+                    // binding 7: per-item local-to-world transforms
+                    bgl_entry(7, v, false),
                 ],
             })
     }
@@ -268,6 +299,7 @@ impl VItemsBuffer {
                 bg_entry(4, &this.fill_rgbas_buffer.buffer),
                 bg_entry(5, &this.stroke_rgbas_buffer.buffer),
                 bg_entry(6, &this.stroke_widths_buffer.buffer),
+                bg_entry(7, &this.transforms_buffer.buffer),
             ],
         })
     }
@@ -296,5 +328,97 @@ fn bg_entry(binding: u32, buffer: &wgpu::Buffer) -> wgpu::BindGroupEntry<'_> {
     wgpu::BindGroupEntry {
         binding,
         resource: wgpu::BindingResource::Buffer(buffer.as_entire_buffer_binding()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use super::*;
+    use crate::{Renderer, world::RenderFrame};
+    use glam::{Mat4, Vec3};
+    use pollster::block_on;
+    use ranim_core::{
+        components::rgba::Rgba,
+        core_item::{CoreItem, camera_frame::CameraFrame},
+    };
+
+    fn test_output_path(filename: &str) -> PathBuf {
+        let output_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../output");
+        std::fs::create_dir_all(&output_dir).expect("Failed to create output directory");
+        output_dir.join(filename)
+    }
+
+    /// A closed unit square centered at the origin in local space.
+    fn square_vitem(color: Rgba, stroke: Rgba) -> VItem {
+        let p = |x: f32, y: f32| Vec4::new(x, y, 0.0, 1.0);
+        let mid = |a: Vec4, b: Vec4| Vec4::new((a.x + b.x) * 0.5, (a.y + b.y) * 0.5, 0.0, 1.0);
+        let a0 = p(-0.5, -0.5);
+        let a1 = p(0.5, -0.5);
+        let a2 = p(0.5, 0.5);
+        let a3 = p(-0.5, 0.5);
+        VItem {
+            normal: None,
+            points: vec![
+                a0,
+                mid(a0, a1),
+                a1,
+                mid(a1, a2),
+                a2,
+                mid(a2, a3),
+                a3,
+                mid(a3, a0),
+            ],
+            transform: Mat4::IDENTITY,
+            fill_rgbas: vec![color; 4],
+            stroke_rgbas: vec![stroke; 4],
+            stroke_widths: vec![ranim_core::components::width::Width(0.02); 4],
+        }
+    }
+
+    #[test]
+    fn render_transformed_vitems() {
+        let ctx = block_on(WgpuContext::new());
+        let width = 800u32;
+        let height = 600u32;
+
+        let mut renderer = Renderer::new(&ctx, width, height, 8);
+        let mut render_textures = renderer.new_render_textures(&ctx);
+        let mut store = RenderFrame::new();
+
+        // The red square is rotated around Z, the blue one scaled; both keep
+        // identity local points and are placed only through `transform`.
+        let mut red = square_vitem(
+            Rgba(glam::Vec4::new(1.0, 0.0, 0.0, 0.6)),
+            Rgba(glam::Vec4::new(1.0, 1.0, 1.0, 1.0)),
+        );
+        red.transform = Mat4::from_rotation_z(std::f32::consts::FRAC_PI_4)
+            * Mat4::from_translation(Vec3::new(2.0, 0.0, 0.0));
+        let mut blue = square_vitem(
+            Rgba(glam::Vec4::new(0.0, 0.0, 1.0, 0.6)),
+            Rgba(glam::Vec4::new(1.0, 1.0, 1.0, 1.0)),
+        );
+        blue.transform =
+            Mat4::from_scale(Vec3::splat(2.0)) * Mat4::from_translation(Vec3::new(-2.5, 0.0, 0.0));
+
+        store.update(
+            [
+                ((0, 0), CoreItem::CameraFrame(CameraFrame::default())),
+                ((1, 0), CoreItem::VItem(red)),
+                ((1, 1), CoreItem::VItem(blue)),
+            ]
+            .into_iter(),
+        );
+
+        renderer.render_frame(&mut render_textures, wgpu::Color::BLACK, &store);
+        ctx.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
+
+        let buffer = render_textures.get_rendered_texture_img_buffer(&ctx);
+        let output_path = test_output_path("vitems_transformed_render.png");
+        buffer.save(&output_path).expect("Failed to save image");
+        assert!(output_path.exists(), "Image file should be created");
     }
 }
