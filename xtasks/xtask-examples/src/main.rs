@@ -8,7 +8,8 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use xtask_examples::{
-    CleanStats, RunStatus, build_examples_wasm, clean_website_examples, get_examples,
+    CleanStats, RunStatus, build_engine_plugin_demo, build_examples_wasm, clean_website_examples,
+    get_examples,
 };
 
 #[derive(Parser)]
@@ -26,6 +27,8 @@ struct Args {
 enum Commands {
     /// Build the shared wasm bundle used by the website previews.
     Build,
+    /// Build the experimental wasm engine+plugin split demo.
+    BuildEngineDemo,
     /// Render examples and refresh website data/pages.
     Run {
         /// Skip examples whose rendered data is already up-to-date.
@@ -64,6 +67,10 @@ fn main() -> ExitCode {
 
     if matches!(&args.command, Commands::Build) {
         return build_examples_wasm_cmd(&workspace_root);
+    }
+
+    if matches!(&args.command, Commands::BuildEngineDemo) {
+        return build_engine_demo_cmd(&workspace_root);
     }
 
     let Commands::Run {
@@ -209,6 +216,20 @@ fn build_examples_wasm_cmd(workspace_root: &Path) -> ExitCode {
     }
     println!(
         "构建 wasm example bundle 完成 ({}s)",
+        format_duration(started.elapsed())
+    );
+    ExitCode::SUCCESS
+}
+
+fn build_engine_demo_cmd(workspace_root: &Path) -> ExitCode {
+    let started = Instant::now();
+    println!("构建 wasm engine+plugin demo…");
+    if let Err(err) = build_engine_plugin_demo(workspace_root) {
+        eprintln!("构建 wasm engine+plugin demo 失败: {err:#}");
+        return ExitCode::FAILURE;
+    }
+    println!(
+        "构建 wasm engine+plugin demo 完成 ({}s)",
         format_duration(started.elapsed())
     );
     ExitCode::SUCCESS

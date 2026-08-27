@@ -77,3 +77,5 @@ output/
 
 .direnv/
 profile.json.gz
+# wasm engine/plugin demo build artifacts
+website/static/engine-plugin-demo/pkg
