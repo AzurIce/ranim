@@ -123,7 +123,7 @@ impl VItemsBuffer {
     /// Pack all VItems into the merged buffers. Called once per frame.
     pub fn update<'a, I>(&mut self, ctx: &WgpuContext, vitems: I)
     where
-        I: IntoIterator<Item = &'a VItem>,
+        I: IntoIterator<Item = (f32, &'a VItem)>,
         I::IntoIter: ExactSizeIterator + Clone,
     {
         let vitems = vitems.into_iter();
@@ -136,8 +136,11 @@ impl VItemsBuffer {
         let item_count = vitems.len();
 
         // Pre-calculate total sizes
-        let total_points: usize = vitems.clone().map(|v| v.points.len()).sum();
-        let total_attrs: usize = vitems.clone().map(|v| v.points.len().div_ceil(2)).sum();
+        let total_points: usize = vitems.clone().map(|(_, v)| v.points.len()).sum();
+        let total_attrs: usize = vitems
+            .clone()
+            .map(|(_, v)| v.points.len().div_ceil(2))
+            .sum();
 
         // Build index table and collect data
         let mut item_infos = Vec::with_capacity(item_count);
@@ -151,7 +154,7 @@ impl VItemsBuffer {
         let mut point_offset: u32 = 0;
         let mut attr_offset: u32 = 0;
 
-        for vitem in vitems {
+        for (order, vitem) in vitems {
             let pc = vitem.points.len() as u32;
             let ac = pc.div_ceil(2);
 
@@ -168,7 +171,9 @@ impl VItemsBuffer {
             let origin = Vec3::new(vitem.points[0].x, vitem.points[0].y, vitem.points[0].z);
             planes.push(PlaneData {
                 normal: Vec4::from((normal, 0.0)),
-                origin: Vec4::from((origin, 0.0)),
+                // origin.w carries the item's global scene order for the
+                // depth-order bias; the plane basis ignores it.
+                origin: Vec4::from((origin, order)),
             });
 
             all_points3d.extend_from_slice(&vitem.points);
@@ -254,8 +259,8 @@ impl VItemsBuffer {
                 entries: &[
                     // binding 0: item_infos
                     bgl_entry(0, vf, false),
-                    // binding 1: planes (normal + origin)
-                    bgl_entry(1, v, false),
+                    // binding 1: planes (normal + origin; origin.w = scene order)
+                    bgl_entry(1, vf, false),
                     // binding 2: clip_boxes
                     bgl_entry(2, v, false),
                     // binding 3: points2d

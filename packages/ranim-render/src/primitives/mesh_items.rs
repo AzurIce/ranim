@@ -24,6 +24,9 @@ pub struct MeshItemsBuffer {
 
     /// Per-mesh transform matrices (storage buffer, indexed by mesh_id)
     pub(crate) transforms_buffer: WgpuVecBuffer<MeshTransform>,
+    /// Per-mesh global scene order (storage buffer, indexed by mesh_id),
+    /// consumed by the fragment depth-order bias.
+    pub(crate) orders_buffer: WgpuVecBuffer<f32>,
 
     pub(crate) item_count: u32,
     pub(crate) total_vertices: u32,
@@ -55,6 +58,7 @@ impl MeshItemsBuffer {
             ),
             indices_buffer: WgpuVecBuffer::new(ctx, Some("MeshIndices"), index_usage, 1),
             transforms_buffer: WgpuVecBuffer::new(ctx, Some("MeshTransforms"), storage_ro, 1),
+            orders_buffer: WgpuVecBuffer::new(ctx, Some("MeshOrders"), storage_ro, 1),
             item_count: 0,
             total_vertices: 0,
             total_indices: 0,
@@ -64,7 +68,7 @@ impl MeshItemsBuffer {
 
     pub fn update<'a, I>(&mut self, ctx: &WgpuContext, mesh_items: I)
     where
-        I: IntoIterator<Item = &'a MeshItem>,
+        I: IntoIterator<Item = (f32, &'a MeshItem)>,
         I::IntoIter: ExactSizeIterator + Clone,
     {
         let mesh_items = mesh_items.into_iter();
@@ -76,10 +80,14 @@ impl MeshItemsBuffer {
         }
 
         let item_count = mesh_items.len();
-        let total_vertices: usize = mesh_items.clone().map(|m| m.points.len()).sum();
-        let total_indices: usize = mesh_items.clone().map(|m| m.triangle_indices.len()).sum();
+        let total_vertices: usize = mesh_items.clone().map(|(_, m)| m.points.len()).sum();
+        let total_indices: usize = mesh_items
+            .clone()
+            .map(|(_, m)| m.triangle_indices.len())
+            .sum();
 
         let mut transforms = Vec::with_capacity(item_count);
+        let mut all_orders = Vec::with_capacity(item_count);
         let mut all_vertices = Vec::with_capacity(total_vertices);
         let mut all_mesh_ids = Vec::with_capacity(total_vertices);
         let mut all_vertex_colors = Vec::with_capacity(total_vertices);
@@ -88,12 +96,13 @@ impl MeshItemsBuffer {
 
         let mut vertex_offset: u32 = 0;
 
-        for (mesh_idx, mesh) in mesh_items.enumerate() {
+        for (mesh_idx, (order, mesh)) in mesh_items.enumerate() {
             let vc = mesh.points.len() as u32;
 
             transforms.push(MeshTransform {
                 transform: mesh.transform.to_cols_array_2d(),
             });
+            all_orders.push(order);
 
             all_vertices.extend_from_slice(&mesh.points);
             all_mesh_ids.extend(std::iter::repeat_n(mesh_idx as u32, vc as usize));
@@ -127,7 +136,8 @@ impl MeshItemsBuffer {
         self.indices_buffer.set(ctx, &all_indices);
 
         // Storage buffers (bind group recreated on realloc)
-        let any_realloc = self.transforms_buffer.set(ctx, &transforms);
+        let mut any_realloc = self.transforms_buffer.set(ctx, &transforms);
+        any_realloc |= self.orders_buffer.set(ctx, &all_orders);
 
         if any_realloc || self.render_bind_group.is_none() {
             self.render_bind_group = Some(Self::create_render_bind_group(ctx, self));
@@ -194,6 +204,8 @@ impl MeshItemsBuffer {
                 entries: &[
                     // binding 0: transforms (per-mesh, vertex stage)
                     bgl_storage_entry(0, wgpu::ShaderStages::VERTEX),
+                    // binding 1: orders (per-mesh, fragment stage, depth bias)
+                    bgl_storage_entry(1, wgpu::ShaderStages::FRAGMENT),
                 ],
             })
     }
@@ -202,7 +214,10 @@ impl MeshItemsBuffer {
         ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("MeshItems Render BG"),
             layout: &Self::render_bind_group_layout(ctx),
-            entries: &[bg_entry(0, &this.transforms_buffer.buffer)],
+            entries: &[
+                bg_entry(0, &this.transforms_buffer.buffer),
+                bg_entry(1, &this.orders_buffer.buffer),
+            ],
         })
     }
 }
