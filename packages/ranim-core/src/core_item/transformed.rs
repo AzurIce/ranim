@@ -8,10 +8,11 @@ use crate::{
     Extract,
     anchor::{Aabb, Locate},
     color::{AlphaColor, Srgb},
+    components::width::Width,
     core_item::CoreItem,
     traits::{
         Alignable, ApplyTransform, Diag, Empty, FillColor, Interpolatable, Opacity, Partial, Rigid,
-        Similarity, StrokeColor, TransformGroup, Translation,
+        Similarity, StrokeColor, StrokeWidth, TransformGroup, Translation,
     },
 };
 
@@ -227,6 +228,17 @@ impl<T: StrokeColor, G> StrokeColor for Transformed<T, G> {
 
     fn set_stroke_opacity(&mut self, opacity: f32) -> &mut Self {
         self.inner.set_stroke_opacity(opacity);
+        self
+    }
+}
+
+impl<T: StrokeWidth, G> StrokeWidth for Transformed<T, G> {
+    fn stroke_width(&self) -> f32 {
+        self.inner.stroke_width()
+    }
+
+    fn apply_stroke_func(&mut self, f: impl for<'a> Fn(&'a mut [Width])) -> &mut Self {
+        self.inner.apply_stroke_func(f);
         self
     }
 }
