@@ -12,7 +12,7 @@ bench = false
 [dependencies]
 itertools.workspace = true
 criterion = { version = "0.8.2", features = ["html_reports"] }
-ranim = { path = "../", features = ["render"] }
+ranim = { path = "../", features = ["render", "gltf"] }
 ranim-core = { path = "../packages/ranim-core" }
 ranim-render = { path = "../packages/ranim-render" }
 wgpu = { workspace = true }
@@ -32,4 +32,12 @@ harness = false
 
 [[bench]]
 name = "gpu_render"
+harness = false
+
+[[bench]]
+name = "svg_tree"
+harness = false
+
+[[bench]]
+name = "svg_hierarchy"
 harness = false

@@ -23,6 +23,13 @@ derive_more = { workspace = true, features = [
 ] }
 sha1 = { version = "0.11.0", optional = true }
 lru = { version = "0.18.1", optional = true }
+# glTF scene-graph import. `default-features` pulls `import` (image decoding
+# + HTTP); only `utils` (accessor reading) and `names` (node name access) are
+# needed, both dependency-free.
+gltf = { version = "1.4.1", default-features = false, features = [
+  "names",
+  "utils",
+], optional = true }
 usvg = "0.47.0"
 typst = { version = "0.15.1", optional = true }
 typst-kit = { version = "0.15.1", default-features = false, features = [
@@ -37,6 +44,7 @@ regex = { version = "1.13.1", optional = true }
 
 [features]
 default = []
+gltf = ["dep:gltf"]
 typst = [
   "dep:chrono",
   "dep:diff-match-patch-rs",

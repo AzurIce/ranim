@@ -13,6 +13,10 @@ use ranim_core::{
 mod sphere;
 mod surface;
 
+/// glTF scene-graph import (opt-in via the `gltf` feature).
+#[cfg(feature = "gltf")]
+pub mod gltf;
+
 pub use sphere::*;
 pub use surface::*;
 
