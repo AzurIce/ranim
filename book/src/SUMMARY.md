@@ -30,9 +30,8 @@
 
 ---
 
-# Designs
+# News
 
-- [Designs]()
-  - [v0.1]()
-  - [v0.2]()
-  - [v0.3](./designs/v0.3/README.md)
+- [v0.1](./news/v0.1/README.md)
+- [v0.2](./news/v0.2/README.md)
+- [v0.3](./news/v0.3/README.md)
