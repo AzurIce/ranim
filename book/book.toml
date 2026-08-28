@@ -12,6 +12,12 @@ build-dir = "../website/static/book/"
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
 
+# Autolinks bare `#N` references to GitHub PRs/issues (always /pull/N;
+# GitHub redirects to /issues/N for issues). A rust script (`cargo -Zscript`,
+# nightly) — the repo pins nightly-2026-08-01 locally and in Build Book CI.
+[preprocessor.issue-links]
+command = "cargo -Zscript preprocessors/issue_links.rs"
+
 [output.html]
 site-url = "/book/"
 additional-css = ["theme/pagetoc.css"]

@@ -141,6 +141,16 @@ Typst 会把相邻字母解析成一个标识符。例如，矩阵 `A` 乘向量
 `A p`，而不是 `Ap`。迁移 LaTeX 公式时，应按 Typst 的语义重新书写，不要只
 替换命令名称。
 
+## mdBook issue/PR 引用链接
+
+正文中裸写的 `#N` 引用由仓库内预处理器
+`book/preprocessors/issue_links.rs` 在构建时自动链接到 GitHub。链接
+一律指向 `/pull/N`——GitHub 对 issue 编号会 302 重定向到 `/issues/N`
+（这也是 bevy.org 的做法），因此无需区分 PR 与 issue、无任何 API 依赖。
+它是一个 rust script（`cargo -Zscript`，需要 nightly——仓库已在 flake 与
+Book CI 中固定 `nightly-2026-08-01`），不在 workspace 内，`just lint`
+不覆盖它。
+
 修改公式后，从仓库根目录构建整本书进行验证：
 
 ```bash
