@@ -45,7 +45,7 @@ jobs:
 
       - name: Compute tool cache key
         id: tool-key
-        run: echo "hash=$(echo '${{ inputs.mdbook-version }} ${{ inputs.mdbook-plugins }} ${{ inputs.mdbook-typst-math-rev }}' | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        run: echo "hash=$(echo '${{ inputs.mdbook-version }} ${{ inputs.mdbook-plugins }} ${{ inputs.mdbook-typst-math-rev }}' | sha256sum | cut -c1-16)-issue-links-$(git rev-parse HEAD:book/preprocessors/mdbook-issue-links)" >> "$GITHUB_OUTPUT"
 
       - name: Cache mdbook tools
         id: cache-mdbook
@@ -54,7 +54,14 @@ jobs:
           path: |
             ~/.cargo/bin/mdbook
             ~/.cargo/bin/mdbook-*
+            ~/.cargo/registry
           key: mdbook-${{ steps.tool-key.outputs.hash }}
+
+      # The repo-local issue-links preprocessor (book/preprocessors/
+      # issue_links.rs) is a rust script run via `cargo -Zscript` from
+      # book.toml — needs the nightly the repo pins (see flake.nix).
+      - name: Install Rust toolchain (for the issue-links preprocessor)
+        uses: dtolnay/rust-toolchain@nightly-2026-08-01
 
       - name: Install mdbook and registry plugins
         if: steps.cache-mdbook.outputs.cache-hit != 'true'
