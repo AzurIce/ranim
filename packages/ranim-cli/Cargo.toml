@@ -18,9 +18,11 @@ doc = false
 ranim = { workspace = true, features = ["render", "preview"] }
 anyhow = "1.0.104"
 cargo_toml = "1.0.0"
-clap = { version = "4.6.4", features = ["derive"] }
-ignore = "0.4.31"
-krates = "0.21.2"
+clap = { version = "4.6.6", features = ["derive"] }
+ignore = "0.4.33"
+# Pinned: 0.21.3 requires indexmap "=2.9.0" exactly, which conflicts with
+# indexmap ^2.13 needed by toml 1.1.4 elsewhere in the workspace.
+krates = "=0.21.2"
 libloading = "0.9.0"
 tracing.workspace = true
 tracing-indicatif.workspace = true

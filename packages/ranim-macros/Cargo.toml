@@ -12,7 +12,7 @@ proc-macro = true
 
 [dependencies]
 quote = "1.0.47"
-syn = { version = "3.0.3", features = ["full"] }
+syn = { version = "3.0.4", features = ["full"] }
 # darling = "0.20.10"
 # heck = "0.5.0"
 proc-macro-crate = "3.5.0"

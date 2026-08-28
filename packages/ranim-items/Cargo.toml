@@ -22,7 +22,7 @@ derive_more = { workspace = true, features = [
   "into_iterator",
 ] }
 sha1 = { version = "0.11.0", optional = true }
-lru = { version = "0.18.1", optional = true }
+lru = { version = "0.18.3", optional = true }
 # glTF scene-graph import. `default-features` pulls `import` (image decoding
 # + HTTP); only `utils` (accessor reading) and `names` (node name access) are
 # needed, both dependency-free.
@@ -30,7 +30,7 @@ gltf = { version = "1.4.1", default-features = false, features = [
   "names",
   "utils",
 ], optional = true }
-usvg = "0.47.0"
+usvg = "0.48.1"
 typst = { version = "0.15.1", optional = true }
 typst-kit = { version = "0.15.1", default-features = false, features = [
   "scan-fonts",
