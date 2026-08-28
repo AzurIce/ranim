@@ -1025,6 +1025,24 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
         Ok(Box::new(app) as Box<dyn App>)
     };
 
+    // NOTE: eframe defaults to wgpu's default limits (8 storage buffers per shader
+    // stage), but our pipelines exceed that (the VItem pipelines bind 9 storage
+    // buffers in the fragment stage). Request the adapter's full limits, matching
+    // the offline `WgpuContext::new()`, or pipeline creation panics in preview.
+    let wgpu_options = eframe::egui_wgpu::WgpuConfiguration {
+        wgpu_setup: eframe::egui_wgpu::WgpuSetup::CreateNew(
+            eframe::egui_wgpu::WgpuSetupCreateNew {
+                device_descriptor: Arc::new(|adapter| wgpu::DeviceDescriptor {
+                    label: Some("ranim device"),
+                    required_limits: adapter.limits(),
+                    ..Default::default()
+                }),
+                ..eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle()
+            },
+        ),
+        ..Default::default()
+    };
+
     #[cfg(not(target_family = "wasm"))]
     {
         let native_options = eframe::NativeOptions {
@@ -1032,6 +1050,7 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
                 .with_title(&title)
                 .with_inner_size([1280.0, 720.0]),
             renderer: eframe::Renderer::Wgpu,
+            wgpu_options,
             ..Default::default()
         };
 
@@ -1044,6 +1063,7 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
     {
         use wasm_bindgen::JsCast;
         let web_options = eframe::WebOptions {
+            wgpu_options,
             ..Default::default()
         };
 
