@@ -61,7 +61,9 @@ jobs:
       # issue_links.rs) is a rust script run via `cargo -Zscript` from
       # book.toml — needs the nightly the repo pins (see flake.nix).
       - name: Install Rust toolchain (for the issue-links preprocessor)
-        uses: dtolnay/rust-toolchain@nightly-2026-08-01
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-08-01
 
       - name: Install mdbook and registry plugins
         if: steps.cache-mdbook.outputs.cache-hit != 'true'
