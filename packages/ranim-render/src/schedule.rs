@@ -228,10 +228,11 @@ fn view_driver(world: &mut World) {
     let camera = take_single_camera(cameras);
     let dimensions = *world.resource::<RenderDimensions>();
     // The per-order depth bias epsilon: the fixed span is split evenly across
-    // all items of the frame so the total offset stays bounded.
+    // all items of the frame, with a ulp floor so it keeps breaking ties in
+    // dense scenes (see `depth_bias_epsilon`).
     let item_count = world.resource::<VItemsBuffer>().item_count()
         + world.resource::<MeshItemsBuffer>().item_count();
-    let bias_epsilon = crate::primitives::viewport::DEPTH_ORDER_SPAN / item_count.max(1) as f32;
+    let bias_epsilon = crate::primitives::viewport::depth_bias_epsilon(item_count);
     let uniform = ViewportUniform::from_camera_frame(
         &camera,
         dimensions.width,

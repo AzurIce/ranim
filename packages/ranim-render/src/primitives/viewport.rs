@@ -12,6 +12,49 @@ use crate::utils::{WgpuBuffer, WgpuContext};
 /// grow with scene size.
 pub const DEPTH_ORDER_SPAN: f32 = 1e-4;
 
+/// Lower bound for the per-order bias epsilon, in ulps of the f32 depth
+/// buffer at mid-depth.
+///
+/// `DEPTH_ORDER_SPAN / item_count` degenerates below one depth-ulp once a
+/// frame holds enough items (a text-heavy scene easily reaches thousands of
+/// per-glyph items): adjacent orders then round to the same stored depth and
+/// the bias no longer breaks ties. The floor keeps adjacent orders
+/// distinguishable at any scene size; the trade-off is that once the floor is
+/// active the effective "counts as coplanar" threshold grows linearly with
+/// item count.
+pub const MIN_ORDER_BIAS_ULPS: f32 = 16.0;
+
+/// f32 spacing at normalized depth 0.5; depths in `[0.25, 1]` share it.
+const DEPTH_ULP: f32 = f32::EPSILON / 2.0;
+
+/// Per-order depth bias epsilon for a frame holding `item_count` items.
+///
+/// Evenly splits [`DEPTH_ORDER_SPAN`] across the items, clamped from below at
+/// [`MIN_ORDER_BIAS_ULPS`] depth-ulps so the bias keeps breaking ties in
+/// dense scenes.
+pub fn depth_bias_epsilon(item_count: u32) -> f32 {
+    (DEPTH_ORDER_SPAN / item_count.max(1) as f32).max(MIN_ORDER_BIAS_ULPS * DEPTH_ULP)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn epsilon_splits_span_for_small_scenes() {
+        let eps = depth_bias_epsilon(10);
+        assert!((eps - DEPTH_ORDER_SPAN / 10.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn epsilon_never_drops_below_the_ulp_floor() {
+        let eps = depth_bias_epsilon(1839);
+        assert_eq!(eps, MIN_ORDER_BIAS_ULPS * DEPTH_ULP);
+        // adjacent orders must stay at least one depth-ulp apart
+        assert!((eps * 1839.0) > MIN_ORDER_BIAS_ULPS * DEPTH_ULP);
+    }
+}
+
 /// Uniforms for the camera
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -19,7 +62,7 @@ pub struct ViewportUniform {
     proj_mat: Mat4,
     view_mat: Mat4,
     half_frame_size: Vec2,
-    /// Per-order depth bias epsilon, see [`DEPTH_ORDER_SPAN`].
+    /// Per-order depth bias epsilon, see [`depth_bias_epsilon`].
     bias_epsilon: f32,
     _padding: u32,
 }
