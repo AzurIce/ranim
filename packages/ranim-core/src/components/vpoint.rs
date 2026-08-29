@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 
+use approx::relative_eq;
+
 use derive_more::{Deref, DerefMut};
 use glam::DVec3;
 use itertools::Itertools;
@@ -287,20 +289,27 @@ impl VPointVec {
             .and_then(|seg| seg.try_into().ok())
     }
     /// Get closed path flags
+    ///
+    /// A subpath is closed when its last point equals its first. Every point
+    /// of a closed subpath inherits the flag; the shader skips the fill of
+    /// segments whose flag is false.
     pub fn get_closepath_flags(&self) -> Vec<bool> {
-        let len = self.len();
-        let mut flags = vec![false; len];
+        let mut flags = vec![false; self.len()];
 
-        // println!("{:?}", self.0);
-        let mut i = 0;
-        while let Some((end_idx, is_closed)) = self.get(i..).and_then(get_subpath_closed_flag) {
-            // println!("{i} {end_idx} {len}");
-            let end_idx = i + end_idx + 2;
-            flags[i..=end_idx.clamp(i, len - 1)].fill(is_closed);
-            i = end_idx;
+        let mut start = 0;
+        let mut last_closed = false;
+        for subpath in self.get_subpaths() {
+            let count = subpath.len();
+            let end = (start + count).min(self.len());
+            last_closed = count >= 2 && relative_eq!(subpath[0], subpath[count - 1]);
+            flags[start..end].fill(last_closed);
+            start = end;
         }
-        // println!("{:?}", flags);
-
+        // Points left over after the parsed subpaths (e.g. a trailing closing
+        // anchor) belong to the last subpath.
+        if start < self.len() {
+            flags[start..].fill(last_closed);
+        }
         flags
     }
 
@@ -623,5 +632,83 @@ mod test {
         let [min, max] = points.aabb();
         assert_dvec3_eq(min, DVec3::ZERO);
         assert_dvec3_eq(max, DVec3::ZERO);
+    }
+    // Regression: a TextItem "i" (stem + tittle contours) must keep both
+    // subpaths flagged closed, otherwise the tittle renders unfilled.
+    #[test]
+    fn repro_textitem_i_flags() {
+        let points = vec![
+            dvec3(-1.1095102, 0.2, 0.0),
+            dvec3(-1.1095102, 0.24466859, 0.0),
+            dvec3(-1.1095102, 0.2893372, 0.0),
+            dvec3(-0.965936, 0.2893372, 0.0),
+            dvec3(-0.93119603, 0.3029707, 0.0),
+            dvec3(-0.8847263, 0.3212075, 0.0),
+            dvec3(-0.8847263, 0.39596543, 0.0),
+            dvec3(-0.8847263, 0.8008646, 0.0),
+            dvec3(-0.8847263, 1.2057637, 0.0),
+            dvec3(-0.8847263, 1.3013107, 0.0),
+            dvec3(-0.92327094, 1.3273722, 0.0),
+            dvec3(-0.96078646, 1.3527378, 0.0),
+            dvec3(-1.0979828, 1.3527378, 0.0),
+            dvec3(-1.0979828, 1.3974065, 0.0),
+            dvec3(-1.0979828, 1.442075, 0.0),
+            dvec3(-0.89625365, 1.4579251, 0.0),
+            dvec3(-0.6945245, 1.4737753, 0.0),
+            dvec3(-0.6945245, 0.93487036, 0.0),
+            dvec3(-0.6945245, 0.39596543, 0.0),
+            dvec3(-0.6945245, 0.32224214, 0.0),
+            dvec3(-0.65309805, 0.30372962, 0.0),
+            dvec3(-0.6208913, 0.2893372, 0.0),
+            dvec3(-0.49279544, 0.2893372, 0.0),
+            dvec3(-0.49279544, 0.24466859, 0.0),
+            dvec3(-0.49279544, 0.2, 0.0),
+            dvec3(-0.52158666, 0.2, 0.0),
+            dvec3(-0.60612535, 0.20347658, 0.0),
+            dvec3(-0.7318171, 0.20864554, 0.0),
+            dvec3(-0.79538906, 0.20864554, 0.0),
+            dvec3(-0.85056424, 0.20864554, 0.0),
+            dvec3(-0.9803795, 0.20371476, 0.0),
+            dvec3(-1.0781803, 0.2, 0.0),
+            dvec3(-1.1095102, 0.2, 0.0),
+            dvec3(-1.1095102, 0.2, 0.0),
+            dvec3(-1.1095102, 0.2, 0.0),
+            dvec3(-1.1095102, 0.2, 0.0),
+            dvec3(-0.8328531, 1.8224784, 0.0),
+            dvec3(-0.766148, 1.8224784, 0.0),
+            dvec3(-0.72442365, 1.8653458, 0.0),
+            dvec3(-0.68299717, 1.9079074, 0.0),
+            dvec3(-0.68299717, 1.9752162, 0.0),
+            dvec3(-0.68299717, 2.0446506, 0.0),
+            dvec3(-0.73126805, 2.0868876, 0.0),
+            dvec3(-0.7749074, 2.125072, 0.0),
+            dvec3(-0.8357349, 2.125072, 0.0),
+            dvec3(-0.89681745, 2.125072, 0.0),
+            dvec3(-0.9387609, 2.0879683, 0.0),
+            dvec3(-0.9855908, 2.0465417, 0.0),
+            dvec3(-0.9855908, 1.9752162, 0.0),
+            dvec3(-0.9855908, 1.9138817, 0.0),
+            dvec3(-0.95028824, 1.87183, 0.0),
+            dvec3(-0.9088573, 1.8224784, 0.0),
+            dvec3(-0.8328531, 1.8224784, 0.0),
+        ];
+        let vp = VPointVec(points.clone());
+        println!("n = {}", points.len());
+        println!("closepath_flags = {:?}", vp.get_closepath_flags());
+        let subpaths = vp.get_subpaths();
+        println!("subpaths = {}", subpaths.len());
+        for (i, sp) in subpaths.iter().enumerate() {
+            println!(
+                "  sp{i}: {} pts first=({:?}) last=({:?})",
+                sp.len(),
+                sp.first().unwrap(),
+                sp.last().unwrap()
+            );
+        }
+        let flags = vp.get_closepath_flags();
+        assert!(
+            flags.iter().all(|f| *f),
+            "some segments flagged open: {flags:?}"
+        );
     }
 }
