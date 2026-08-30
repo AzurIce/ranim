@@ -12,7 +12,7 @@
             {% if example_data.preview_imgs and example_data.preview_imgs | length > 0 %}
               <div class="preview-grid">
                 {% for preview_img in example_data.preview_imgs %}
-                  <img src="{{ get_url(path=preview_img) }}" alt="{{ example_data.name }} 示例输出 {{ loop.index }}">
+                  <img src="{% if preview_img is starting_with("http") %}{{ preview_img }}{% else %}{{ get_url(path=preview_img) }}{% endif %}" alt="{{ example_data.name }} 示例输出 {{ loop.index }}">
                 {% endfor %}
               </div>
             {% else %}
@@ -39,7 +39,7 @@
           {% if example_data.preview_imgs and example_data.preview_imgs | length > 0 %}
             <div class="preview-grid">
               {% for preview_img in example_data.preview_imgs %}
-                <img src="{{ get_url(path=preview_img) }}" alt="{{ example_data.name }} 示例输出 {{ loop.index }}">
+                <img src="{% if preview_img is starting_with("http") %}{{ preview_img }}{% else %}{{ get_url(path=preview_img) }}{% endif %}" alt="{{ example_data.name }} 示例输出 {{ loop.index }}">
               {% endfor %}
             </div>
           {% else %}

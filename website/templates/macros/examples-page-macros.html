@@ -61,14 +61,14 @@
     {% for output_file in example_data.output_files %}
     {% if output_file is ending_with(".mp4") or output_file is ending_with(".webm") or output_file is ending_with(".mov") %}
     <video controls>
-      <source src="{{ get_url(path=output_file) }}"
+      <source src="{% if output_file is starting_with("http") %}{{ output_file }}{% else %}{{ get_url(path=output_file) }}{% endif %}"
       {% if output_file is ending_with(".mp4") %}type="video/mp4"
       {% elif output_file is ending_with(".webm") %}type="video/webm"
       {% endif %}>
       您的浏览器不支持视频标签。
     </video>
     {% else %}
-    <img src="{{ get_url(path=output_file) }}" alt="{{ example_data.name }} 示例输出">
+    <img src="{% if output_file is starting_with("http") %}{{ output_file }}{% else %}{{ get_url(path=output_file) }}{% endif %}" alt="{{ example_data.name }} 示例输出">
     {% endif %}
     {% endfor %}
   </sl-tab-panel>

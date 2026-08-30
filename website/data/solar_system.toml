@@ -5,7 +5,7 @@ use std::f64::consts::{PI, TAU};
 
 use ranim::{
     color::palettes::manim,
-    glam::{DMat4, DVec3},
+    glam::DVec3,
     items::mesh::{Sphere, Surface},
     prelude::*,
     utils::rate_functions::{linear, smooth},
@@ -27,9 +27,9 @@ trait OrbitItem: Clone {
     fn set_orbit_position(&mut self, position: DVec3);
 }
 
-impl OrbitItem for Surface {
+impl OrbitItem for Transformed<Surface, Translation> {
     fn set_orbit_position(&mut self, position: DVec3) {
-        self.transform = DMat4::from_translation(position);
+        self.transform = Translation(position);
     }
 }
 
@@ -144,7 +144,7 @@ fn orbit<T: OrbitItem>(item: &mut T, planet: &PlanetData, z: f64) -> OrbitMotion
 }
 
 /// One body layer: stay visible through the intro, then enter the shared orbit.
-fn body_layer(mut surface: Surface, planet: &PlanetData) -> AnimSequence {
+fn body_layer(mut surface: Transformed<Surface, Translation>, planet: &PlanetData) -> AnimSequence {
     seq![
         surface.show().with_duration(INTRO_SECS),
         orbit(&mut surface, planet, 0.0)
@@ -156,14 +156,12 @@ fn body_layer(mut surface: Surface, planet: &PlanetData) -> AnimSequence {
 /// A label has its own intro phrase, followed by the same reusable orbit phase.
 fn planet_label(planet: &PlanetData, position: DVec3) -> AnimSequence {
     let label_z = planet.radius + 0.5;
-    let label = TextItem::new(planet.name, 0.6).with(|item| {
-        item.move_to(position.with_z(label_z))
-            .with_origin(AabbPoint::CENTER, |item| {
-                item.rotate_on_x(30.0f64.to_radians()).discard()
-            })
-            .discard()
-    });
-    let mut label = Vec::<VItem>::from(label);
+    let mut label = Vec::<VItem>::from(TextItem::new(planet.name, 0.6));
+    label
+        .move_to(position.with_z(label_z))
+        .with_origin(AabbPoint::CENTER, |items| {
+            items.rotate_on_x(30.0f64.to_radians()).discard()
+        });
 
     let mut sequence = AnimSequence::new();
     sequence
@@ -195,30 +193,30 @@ fn planet_system(planet: &PlanetData) -> AnimStack {
     let mut body_layers = AnimStack::new();
 
     if planet.has_atmosphere {
-        let mut core = Surface::from(
+        let core = Surface::from(
             Sphere::new(planet.radius * 0.9)
                 .with_resolution((20, 10))
                 .with_fill_color(planet.color.with_alpha(1.0)),
-        );
-        core.transform = DMat4::from_translation(position);
+        )
+        .transformed(Translation(position));
         body_layers.push(body_layer(core, planet));
 
-        let mut atmosphere = Surface::from(
+        let atmosphere = Surface::from(
             Sphere::new(planet.radius)
                 .with_resolution((20, 10))
                 .with_fill_color(planet.color.with_alpha(0.3)),
         )
-        .with_smooth_normals();
-        atmosphere.transform = DMat4::from_translation(position);
+        .with_smooth_normals()
+        .transformed(Translation(position));
         body_layers.push(body_layer(atmosphere, planet));
     } else {
-        let mut surface = Surface::from(
+        let surface = Surface::from(
             Sphere::new(planet.radius)
                 .with_resolution((20, 10))
                 .with_fill_color(planet.color.with_alpha(1.0)),
         )
-        .with_smooth_normals();
-        surface.transform = DMat4::from_translation(position);
+        .with_smooth_normals()
+        .transformed(Translation(position));
         body_layers.push(body_layer(surface, planet));
     }
 
@@ -293,7 +291,7 @@ fn solar_system(r: &mut RanimScene) {
     r.insert_time_mark(6.0, TimeMark::Capture("preview.png".to_owned()));
 }
 ```"""
-hash = "35864dd5049adcffe13d70bd5d28e902dd60d899"
-preview_imgs = ["/examples/solar_system/preview.png"]
-output_files = ["/examples/solar_system/solar_system_1920x1080_60.mp4"]
+hash = "0abc81b7a7a47b600efac99f9adb136db462b313"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/90/519f3e2bb3b7b024e7e41ff6cf67693c052075e2335cca07f1f13adc547618"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/90/519f3e2bb3b7b024e7e41ff6cf67693c052075e2335cca07f1f13adc547618", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/73/f0bbbcdb8bd3da11864886f7145e16c71428512c898f8aec7c48c6c52951af"]
 wasm = true

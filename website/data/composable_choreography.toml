@@ -86,13 +86,14 @@ fn tile_row(y: f64) -> Vec<VItem> {
         .into_iter()
         .enumerate()
         .map(|(index, color)| {
-            VItem::from(Square::new(0.85).with(|square| {
+            let mut square = VItem::from(Square::new(0.85).with(|square| {
                 square
                     .set_fill_color(color.with_alpha(0.72))
-                    .set_stroke_color(color)
-                    .move_to(dvec3(index as f64 * 1.35 - 3.375, y, 0.0));
+                    .set_stroke_color(color);
                 square.stroke_width = 0.055;
-            }))
+            }));
+            square.shift(dvec3(index as f64 * 1.35 - 3.375, y, 0.0));
+            square
         })
         .collect()
 }
@@ -128,7 +129,7 @@ fn composable_choreography(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "0fc2e735db863a161f059b49511470f12693625c"
-preview_imgs = ["/examples/composable_choreography/preview.png"]
-output_files = ["/examples/composable_choreography/composable_choreography_1920x1080_60.mp4"]
+hash = "543c0226a50945b4d75d05327fa72b5e3a4f6850"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/46/0ea7fc8bfc9c643fa876ba0294c0271bcca0faad9f8bdd85bd78b7b10f9270"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/c7/b382865adab52c60cfe5f8bbf69e4ee986ecadc01c21a9cd1b2ba21ff1ddd4", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/46/0ea7fc8bfc9c643fa876ba0294c0271bcca0faad9f8bdd85bd78b7b10f9270"]
 wasm = true

@@ -107,14 +107,15 @@ fn aabb(r: &mut RanimScene) {
             p.set_color(manim::BLUE_D);
         }))
         .into(),
-        Ellipse::new(dvec2(2.0, 0.8))
-            .with(|e| {
-                e.set_color(manim::RED_D);
-                e.with_origin(AabbPoint::CENTER, |x| {
-                    x.rotate_on_z(PI / 4.0);
-                });
-            })
-            .into(),
+        {
+            let mut ellipse: VItem = Ellipse::new(dvec2(2.0, 0.8))
+                .with(|e| {
+                    e.set_color(manim::RED_D);
+                })
+                .into();
+            ellipse.rotate_on_z(PI / 4.0);
+            ellipse
+        },
         Polygon::new(star_points)
             .with(|p| {
                 p.set_color(manim::YELLOW_B);
@@ -185,7 +186,7 @@ fn aabb(r: &mut RanimScene) {
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "df5fc8ffd1dfc11f65182ca9e06fb67c6ee45c33"
-preview_imgs = ["/examples/aabb/preview.png"]
-output_files = ["/examples/aabb/aabb_1920x1080_60.mp4"]
+hash = "f19389ed9270a31f51e4c400464ef0c1f389cd39"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/88/0d413b9c49b23d249eda43d93b8999a65a01d91781043e19c5e9fa8cc757a3"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ae/34f7448c13946e8f58ce7fbbe2812bf79e7433f85325a85742c5a1cc4b3c89", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/88/0d413b9c49b23d249eda43d93b8999a65a01d91781043e19c5e9fa8cc757a3"]
 wasm = true

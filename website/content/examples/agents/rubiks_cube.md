@@ -12,11 +12,11 @@ template = "examples-page.html"
 
 打乱完成时刻（t = 8.4 s），3D 魔方与展开图状态一致：
 
-![打乱后的魔方与展开图](/examples/rubiks_cube/preview.png)
+![打乱后的魔方与展开图](https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/9c45ad5332f72597458f948879565fdb85fd302a3a26d660a0af3f7a96164c)
 
 求解结束时刻（t = 17.52 s，视频结尾），魔方与展开图均回到还原态：
 
-![求解完成](/examples/rubiks_cube/solved.png)
+![求解完成](https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/9f/96a981ee4eea33c361843378df9ca8c8f1743f509963ba4b0f5bc6c54d57eb)
 
 两张图均来自 `ranim output --example rubiks_cube` 渲染产物中的
 `TimeMark::Capture` 截图（`output/agents/rubiks_cube/rubiks_cube_1920x1080_60/`

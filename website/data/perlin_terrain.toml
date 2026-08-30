@@ -265,6 +265,6 @@ fn fractal_erosion(r: &mut RanimScene) {
 }
 ```"""
 hash = "b239cb1ca49b1533ed2c1220729566b3a312662f"
-preview_imgs = ["/examples/perlin_terrain/preview-perlin.png", "/examples/perlin_terrain/preview-fractal-perlin.png", "/examples/perlin_terrain/preview-fractal-erosion-perlin.png"]
-output_files = ["/examples/perlin_terrain/perlin_1920x1080_60.mp4", "/examples/perlin_terrain/fractal_perlin_1920x1080_60.mp4", "/examples/perlin_terrain/perlin_terrain_1920x1080_60.mp4"]
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/20/f5c5e598aad58c38dcc113afa2b205a45b009b82d0bf006d85f76bd6935f6e", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/c8/9000fef2017ac1a11d45db505473e8bdf5e17a2789db23b055d04bb3b281a5", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5a/a6dd713ea513ed4d9daa081b0111714676951f953ae6f742aee6ae04001072"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ea/9a9d166df9622359f21aaf11855053884501e57e158b76b1008ca11ba75515", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a3/b96e5b7f6ee96e2c44ff2ff4b5bd8bd2574a6999d6f2852033d510a7e3891a", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/79/5559fe2a1f7e20a1e9a91538906e515873b048eb3a1713da615313ed97e0ff", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/20/f5c5e598aad58c38dcc113afa2b205a45b009b82d0bf006d85f76bd6935f6e", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/c8/9000fef2017ac1a11d45db505473e8bdf5e17a2789db23b055d04bb3b281a5", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5a/a6dd713ea513ed4d9daa081b0111714676951f953ae6f742aee6ae04001072"]
 wasm = true

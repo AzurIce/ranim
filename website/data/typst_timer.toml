@@ -59,15 +59,14 @@ fn rectangle(
     color: AlphaColor<Srgb>,
     opacity: f32,
 ) -> VItem {
-    Rectangle::new(width, height)
-        .with(|rectangle| {
-            rectangle
-                .set_stroke_opacity(0.0)
-                .set_fill_color(color)
-                .set_fill_opacity(opacity)
-                .move_to(position);
-        })
-        .into()
+    let mut rectangle = VItem::from(Rectangle::new(width, height).with(|rectangle| {
+        rectangle
+            .set_stroke_opacity(0.0)
+            .set_fill_color(color)
+            .set_fill_opacity(opacity);
+    }));
+    rectangle.move_to(position);
+    rectangle
 }
 
 fn glyph_vitems(character: &str, scale: f64) -> Vec<VItem> {
@@ -302,7 +301,7 @@ fn formats_milliseconds() {
     );
 }
 ```"""
-hash = "7fe9d5c8aca963583fed20a9570b4ff94fd2604f"
-preview_imgs = ["/examples/typst_timer/preview.png", "/examples/typst_timer/preview.png"]
-output_files = ["/examples/typst_timer/typst_timer_1920x1080_60.mp4", "/examples/typst_timer/typst_timer_recompile_1920x1080_60.mp4"]
+hash = "c0d141256bdc7c473199142a43e755a040a7bd7d"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/4c/f9909fbd45745ae01057bfd54964ddf8c040ec81d4ab961d52cd47ae8fefc5"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/4c/f9909fbd45745ae01057bfd54964ddf8c040ec81d4ab961d52cd47ae8fefc5", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/96/0e699424c16024991a2755942afabee88f768d8c444e3a3e7702b2e85899f0", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/96/0e699424c16024991a2755942afabee88f768d8c444e3a3e7702b2e85899f0"]
 wasm = true

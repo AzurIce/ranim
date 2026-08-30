@@ -10,11 +10,11 @@ template = "examples-page.html"
 Sharpen 卷积扫描中途（左侧输入、中间 3x3 卷积核、右侧逐像素生成的输出，
 黄色方框为当前滑动窗口位置）：
 
-![效果图](/examples/convolution_kernels/preview.png)
+![效果图](https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/34/e42feef849399ef9044b36676e369882926213198c66fb60742e780dc8536b)
 
 结尾总结：输入与四种卷积核结果的对比：
 
-![总结](/examples/convolution_kernels/summary.png)
+![总结](https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/7a/a0c3031f685d68b8a507110b7f9dcc02235c02bbd3a26a5480cd7339990d2d)
 
 两张图均来自 `ranim output --example convolution_kernels --features typst`
 处理的 `TimeMark::Capture` 截图（scene 中分别在 22.088s 与 39.2903s 插入

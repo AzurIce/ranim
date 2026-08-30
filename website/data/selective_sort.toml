@@ -5,7 +5,10 @@ use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::glam::{self, dvec3};
 use ranim::{
-    anims::morph::MorphAnim, color::palettes::manim, items::vitem::geometry::Rectangle, prelude::*,
+    anims::morph::MorphAnim,
+    color::palettes::manim,
+    items::vitem::{VItem, geometry::Rectangle},
+    prelude::*,
     utils::rate_functions::linear,
 };
 
@@ -33,22 +36,23 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
                 padded_frame_bl.extend(0.0) + DVec3::X * (width_unit * i as f64 + width_unit / 2.0);
             let rect = Rectangle::new(width_unit, height).with(|rect| {
                 rect.fill_rgba = manim::WHITE.with_alpha(0.5);
-                rect.scale(DVec3::splat(0.8))
-                    .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
+                rect.scale_axes(dvec2(0.8, 0.8));
             });
+            let mut rect = VItem::from(rect);
+            rect.move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             let sequence = seq![rect.show()];
             (sequence, rect)
         })
         .collect::<Vec<_>>();
 
-    let highlight = |rect: &mut Rectangle| {
+    let highlight = |rect: &mut VItem| {
         rect.morph(|data| {
             data.set_color(manim::RED_C).set_fill_opacity(0.5);
         })
         .with_duration(anim_step_duration)
         .with_rate_func(linear)
     };
-    let unhighlight = |rect: &mut Rectangle| {
+    let unhighlight = |rect: &mut VItem| {
         rect.morph(|data| {
             data.set_color(manim::WHITE).set_fill_opacity(0.5);
         })
@@ -57,7 +61,7 @@ fn selective_sort(r: &mut RanimScene, num: usize) {
     };
 
     let shift_right = DVec3::X * width_unit;
-    let sync = |rects: &mut [(AnimSequence, Rectangle)]| {
+    let sync = |rects: &mut [(AnimSequence, VItem)]| {
         let target = rects
             .iter()
             .map(|(sequence, _)| sequence.cursor_sec())
@@ -134,7 +138,7 @@ fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
 ```"""
-hash = "1ec182b68d2f491fd3dc58b0d7736d4b594fc207"
-preview_imgs = ["/examples/selective_sort/preview-100.png", "/examples/selective_sort/preview-10.png"]
-output_files = ["/examples/selective_sort/selective_sort_1920x1080_60.mp4", "/examples/selective_sort/selective_sort_10_1920x1080_60.mp4"]
+hash = "09a68c2f121d2d0c0e80527bad65ed70abc543c0"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/74/87eeb5e23640f0184586b0e48e82912e8b28de7c227f1b0d604aa7927a71bb", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/84/261596703d4721237fed6f7b6b2b7f12096e64ac2c975a4d072eb61f7306eb"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/74/87eeb5e23640f0184586b0e48e82912e8b28de7c227f1b0d604aa7927a71bb", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/84/261596703d4721237fed6f7b6b2b7f12096e64ac2c975a4d072eb61f7306eb", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/e5/dce6373a87ab90bf092828b4895caa5cddd0d8497fe6453d4124ae9bd7f27d", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/18/34f68bb5eb4bb85d789aebd54a460308f4d2306aa04ff95ba837c314fba6e4"]
 wasm = true

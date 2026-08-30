@@ -97,6 +97,6 @@ fn foo_2() {
 }
 ```"""
 hash = "4817dfce38fe984f653a1f7acf6269325fd871e3"
-preview_imgs = ["/examples/animating_pi/preview.png"]
-output_files = ["/examples/animating_pi/animating_pi_1920x1080_60.mp4"]
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/bd/389bd885f25fb7b5b98499db60b04988120564c65c89faf918d7bbac11ca7a"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/3d/59824bbf3e8ff9216639a81f3277b83465757a785fd05fb0806324de66c958", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/bd/389bd885f25fb7b5b98499db60b04988120564c65c89faf918d7bbac11ca7a"]
 wasm = true

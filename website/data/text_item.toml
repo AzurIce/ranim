@@ -17,7 +17,7 @@ use ranim_items::vitem::{VItem, text::TextItem};
 fn text_item(r: &mut RanimScene) {
     let text = "The quick brown fox jumps over the lazy dog.";
 
-    let text = TextItem::new(text, 0.5).with(|item| item.move_to(DVec3::ZERO).discard());
+    let text = TextItem::new(text, 0.5);
     let text_box = text
         .text_box()
         .with(|item| item.set_stroke_color(manim::RED_C).discard());
@@ -31,7 +31,7 @@ fn text_item(r: &mut RanimScene) {
     text_sequence
         .hold(3.0)
         .push(
-            text.clone()
+            Vec::<VItem>::from(text.clone())
                 .rotating(TAU * 4.0, DVec3::Z)
                 .with_duration(4.0)
                 .with_rate_func(smooth),
@@ -65,7 +65,7 @@ fn text_item(r: &mut RanimScene) {
     );
 }
 ```"""
-hash = "4cc637af87815e47cbe46b7508ca59d6bede4b8d"
-preview_imgs = ["/examples/text_item/preview.png"]
-output_files = ["/examples/text_item/text_item_1920x1080_60.mp4"]
+hash = "2e775aad6c9055a94c20d5dfeba4475e9ae16c19"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/dc/024c2008d5ce22ae8c79fb31b6cb6c453b1cef8b750a3e92ae95199714ff66"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/dc/024c2008d5ce22ae8c79fb31b6cb6c453b1cef8b750a3e92ae95199714ff66", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/b4/a13c63ee154b02e182fda34f52619d264295af3736b0a23943f0a618f26856"]
 wasm = true

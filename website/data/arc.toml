@@ -3,10 +3,14 @@ code = """
 ```rust
 use itertools::Itertools;
 use ranim::{
-    anims::fading::FadingAnim, color, color::HueDirection, glam::dvec2,
-    items::vitem::geometry::Arc, prelude::*, utils::rate_functions::smooth,
+    anims::fading::FadingAnim,
+    color,
+    color::HueDirection,
+    glam::dvec2,
+    items::vitem::{VItem, geometry::Arc},
+    prelude::*,
+    utils::rate_functions::smooth,
 };
-use ranim_items::vitem::geometry::anchor::Origin;
 
 #[scene]
 #[wasm_demo_doc]
@@ -37,11 +41,14 @@ pub fn arc(r: &mut RanimScene) {
                 HueDirection::Increasing,
             );
             let offset = frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
-            Arc::new(angle, radius).with(|arc| {
-                arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
-                arc.set_stroke_color(color)
-                    .move_anchor_to(Origin, offset.extend(0.0));
-            })
+            let mut arc: VItem = Arc::new(angle, radius)
+                .with(|arc| {
+                    arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
+                    arc.set_stroke_color(color);
+                })
+                .into();
+            arc.shift(offset.extend(0.0));
+            arc
         })
         .collect::<Vec<_>>();
     let total_secs = 3.0;
@@ -57,7 +64,7 @@ pub fn arc(r: &mut RanimScene) {
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "0c76838d709c87f122028f21bc4c52de762b429c"
-preview_imgs = ["/examples/arc/preview.png"]
-output_files = ["/examples/arc/arc_1920x1080_60.mp4"]
+hash = "ee06a2898c69eee9c716cba2740dc948c578b035"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/53/8c4bb5ca65bcee91535cb6bc6f45a7f9a31ddb8e7a17e94be2f9f6f796d81f"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/b4/518b1319740c2be462bbaff42c8fe61a4995469f0ca49e460b3bd37b34883f", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/53/8c4bb5ca65bcee91535cb6bc6f45a7f9a31ddb8e7a17e94be2f9f6f796d81f"]
 wasm = true

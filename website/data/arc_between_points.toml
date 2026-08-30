@@ -61,6 +61,6 @@ fn arc_between_points(r: &mut RanimScene) {
 }
 ```"""
 hash = "313ba4e302839c8b1e82f3c246a523e44aa11e7f"
-preview_imgs = ["/examples/arc_between_points/preview.png"]
-output_files = ["/examples/arc_between_points/arc_between_points_1920x1080_60.mp4"]
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/4f/06834d59bf26b6fa2e6bdea34ea58e1c9367e3e80d7ac7d65672524f3b925e"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/44/a0be077ec4bc882ded44ba8fb2c6baaa227fc9bc4f847c986c22b22b013a71", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/4f/06834d59bf26b6fa2e6bdea34ea58e1c9367e3e80d7ac7d65672524f3b925e"]
 wasm = true

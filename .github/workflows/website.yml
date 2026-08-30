@@ -82,6 +82,28 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      # Pinned so CI does not break on future shadow changes; bump the rev
+      # alongside changes to ranim's shadow usage.
+      - name: Install shadow
+        run: cargo install --git https://github.com/AzurIce/shadow --rev d4dc44f --locked
+
+      # The deploy switched the site to the objects referenced by origin/main;
+      # release the superseded ones (30-day grace period still applies).
+      - name: Release superseded example objects
+        env:
+          TOS_ACCESS_KEY: ${{ secrets.TOS_ACCESS_KEY }}
+          TOS_SECRET_KEY: ${{ secrets.TOS_SECRET_KEY }}
+        run: shadow free --keep-at origin/main --delete
+
       - name: Deploy GitHub Pages site
         id: deployment
         uses: actions/deploy-pages@v4

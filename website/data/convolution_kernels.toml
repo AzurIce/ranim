@@ -96,12 +96,12 @@ fn convolve(kernel: &Kernel) -> Vec<f64> {
     for r in 0..N {
         for c in 0..N {
             let mut acc = 0.0;
-            for kr in 0..3 {
-                for kc in 0..3 {
+            for (kr, row) in kernel.values.iter().enumerate() {
+                for (kc, &kernel_value) in row.iter().enumerate() {
                     let ir = r as i64 + kr as i64 - 1;
                     let ic = c as i64 + kc as i64 - 1;
                     if ir >= 0 && ir < N as i64 && ic >= 0 && ic < N as i64 {
-                        acc += kernel.values[kr][kc] * image_value(ir as usize, ic as usize);
+                        acc += kernel_value * image_value(ir as usize, ic as usize);
                     }
                 }
             }
@@ -137,10 +137,8 @@ fn cell_center(grid_center: DVec3, n: usize, cell: f64, row: usize, col: usize) 
 
 /// A single grayscale pixel square (no stroke; the gaps read as the grid).
 fn pixel_square(center: DVec3, size: f64, v: f64) -> VItem {
-    let sq = Square::new(size * 0.92).with(|sq| {
-        sq.center = center;
-    });
-    let mut item = VItem::from(sq);
+    let mut item = VItem::from(Square::new(size * 0.92));
+    item.shift(center);
     item.set_fill_color(gray(v));
     item.set_stroke_opacity(0.0);
     item
@@ -267,10 +265,8 @@ fn convolution_kernels(r: &mut RanimScene) {
 
     let mut matrix_frame: Vec<VItem> = (0..9)
         .map(|i| {
-            let sq = Square::new(KCELL * 0.96).with(|sq| {
-                sq.center = cell_center(KERNEL_CENTER, 3, KCELL, i / 3, i % 3);
-            });
-            let mut item = VItem::from(sq);
+            let mut item = VItem::from(Square::new(KCELL * 0.96));
+            item.shift(cell_center(KERNEL_CENTER, 3, KCELL, i / 3, i % 3));
             item.set_fill_color(rgb8(0x26, 0x26, 0x2e));
             item.set_stroke_color(manim::GREY_B);
             item.set_stroke_width(0.02);
@@ -409,7 +405,7 @@ fn convolution_kernels(r: &mut RanimScene) {
     r.insert_time_mark(TOTAL, TimeMark::Capture("summary.png".to_string()));
 }
 ```"""
-hash = "9fb3cdd43522491dcfbc744b99452ea2b63344c5"
-preview_imgs = ["/examples/convolution_kernels/preview.png", "/examples/convolution_kernels/summary.png"]
-output_files = ["/examples/convolution_kernels/convolution_kernels_1920x1080_60.mp4", "/examples/convolution_kernels/preview.png", "/examples/convolution_kernels/summary.png"]
+hash = "a1f2192ca46ccd713a1fe1368ef1390e1da0f801"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/34/e42feef849399ef9044b36676e369882926213198c66fb60742e780dc8536b", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/7a/a0c3031f685d68b8a507110b7f9dcc02235c02bbd3a26a5480cd7339990d2d"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/93/599736326b50146eafbec1fc527d2c5a3b0f908a07243a81e1fa8102d04124", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/34/e42feef849399ef9044b36676e369882926213198c66fb60742e780dc8536b", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/7a/a0c3031f685d68b8a507110b7f9dcc02235c02bbd3a26a5480cd7339990d2d"]
 wasm = false

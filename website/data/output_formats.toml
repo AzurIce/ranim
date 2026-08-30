@@ -28,11 +28,15 @@ fn output_formats(r: &mut RanimScene) {
         .map(|(i, &color)| {
             let angle = i as f64 * 2.0 * PI / colors.len() as f64 + PI / 2.0;
             let offset = DVec3::new(angle.cos() * radius, angle.sin() * radius, 0.0);
-            Circle::new(radius)
-                .with(|c| {
-                    c.set_color(color.with_alpha(0.5)).move_to(offset);
-                })
-                .into()
+            {
+                let mut circle: VItem = Circle::new(radius)
+                    .with(|c| {
+                        c.set_color(color.with_alpha(0.5));
+                    })
+                    .into();
+                circle.shift(offset);
+                circle
+            }
         })
         .collect();
 
@@ -69,7 +73,7 @@ fn output_formats(r: &mut RanimScene) {
     r.insert_time_mark(1.5, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "4b25f6b811dc532874256059963c4cc2bf39173a"
-preview_imgs = ["/examples/output_formats/preview.png"]
-output_files = ["/examples/output_formats/output_formats_1920x1080_60.mp4", "/examples/output_formats/output_formats_1920x1080_60.webm", "/examples/output_formats/output_formats_1920x1080_60.gif"]
+hash = "60054056f57521ada9e0bda4b4eddf8582190c74"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/48/37fc92a066040cd18b0e55aebd3217e1ef1f7b187badae94727b62f8b85137"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5e/1d0bd500006cca746f96ee5e86297fa34a52b444cae7d73156f9ea5bc5ff04", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a4/2e1b574a2bcf3dc9848c5503da553fc2b7fbf29f8279371565077e6fa418bd", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/1c/75e354b51eeaf04c9e0560678ca389fc7ef217421b81c400ed640bc5e6c0aa", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/48/37fc92a066040cd18b0e55aebd3217e1ef1f7b187badae94727b62f8b85137"]
 wasm = false

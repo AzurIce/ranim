@@ -13,6 +13,13 @@ use sha1::{Digest, Sha1};
 use toml::Table;
 use walkdir::WalkDir;
 
+mod shadow;
+
+/// File extensions synced from render outputs into the website.
+const WEBSITE_OUTPUT_EXTENSIONS: &[&str] = &["png", "jpg", "mp4", "webm", /*"mov",*/ "gif"];
+/// File extensions that count as preview images in `website/data/*.toml`.
+const PREVIEW_EXTENSIONS: &[&str] = &["png", "jpg"];
+
 fn copy_file(source: &Path, target_dir: &Path) -> Result<String> {
     let file_name = source
         .file_name()
@@ -294,8 +301,7 @@ impl Example {
 
         self.clean_output(root_dir)?;
 
-        let mut preview_imgs = vec![];
-        let mut output_files = vec![];
+        let mut files = vec![];
         for render_dir in self.render_output_dirs(root_dir)? {
             if !fs::exists(&render_dir)? {
                 continue;
@@ -311,34 +317,19 @@ impl Example {
                 let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
                     continue;
                 };
-                if ["png", "jpg"].contains(&ext) {
-                    let file = copy_file(&path, &output_dir)?;
-                    preview_imgs.push(file.clone());
-                    output_files.push(file);
-                } else if ["mp4", "webm", /*"mov",*/ "gif"].contains(&ext) {
-                    output_files.push(copy_file(&path, &output_dir)?);
+                if WEBSITE_OUTPUT_EXTENSIONS.contains(&ext) {
+                    files.push(copy_file(&path, &output_dir)?);
                 }
             }
         }
 
-        let output_data = OutputData {
-            name: self.name.clone(),
-            code: self.code.clone(),
-            hash: self.hash.clone(),
+        // README-referenced images join the published set ahead of `shadow
+        // publish` so their links resolve to shadow URLs like the renders.
+        self.sync_readme_images(root_dir)?;
+        let shadow = shadow::Shadow::load(root_dir)?;
+        shadow.publish()?;
 
-            preview_imgs: preview_imgs
-                .into_iter()
-                .map(|f| format!("/examples/{}/{}", self.name, f))
-                .collect(),
-            output_files: output_files
-                .into_iter()
-                .map(|f| format!("/examples/{}/{}", self.name, f))
-                .collect(),
-            wasm: self.meta.wasm,
-        };
-        let output_data = toml::to_string(&output_data)?;
-
-        fs::write(&data_path, output_data)?;
+        write_example_data(root_dir, self, files, &shadow)?;
         if !self.meta.hide {
             self.create_example_page(root_dir)?;
         }
@@ -399,8 +390,11 @@ template = "examples-page.html"
             let readme_content = rewrite_readme_images(
                 &readme_content,
                 example_dir,
-                &self.name,
                 &static_example_dir,
+                &|file: &str| {
+                    shadow::Shadow::try_object_url(root_dir, static_example_dir.join(file))
+                        .unwrap_or_else(|| format!("/examples/{}/{}", self.name, file))
+                },
             )?;
             md_content.push_str(&readme_content);
 
@@ -422,6 +416,29 @@ template = "examples-page.html"
         fs::write(&output_page_path, &md_content)
             .with_context(|| format!("failed to write {}", output_page_path.display()))?;
         Ok(output_page_path)
+    }
+
+    /// Copy README-referenced local images into the static example directory
+    /// ahead of `shadow publish`, so their links resolve to shadow URLs just
+    /// like the rendered outputs.
+    fn sync_readme_images(&self, root_dir: &Path) -> Result<()> {
+        let example_dir = self.path.parent().with_context(|| {
+            format!(
+                "example path {} has no parent directory",
+                self.path.display()
+            )
+        })?;
+        let readme_path = example_dir.join("README.md");
+        if !readme_path.exists() {
+            return Ok(());
+        }
+        let static_example_dir = root_dir
+            .join("website")
+            .join("static")
+            .join("examples")
+            .join(&self.name);
+        let readme = fs::read_to_string(&readme_path)?;
+        copy_readme_images(&readme, example_dir, &static_example_dir)
     }
 
     /// Directories that `ranim output` writes for this example.
@@ -504,13 +521,15 @@ fn parse_output_dirs(source: &str) -> Vec<String> {
 ///
 /// Source READMEs use `![...](preview.png)`, which Zola would resolve relative
 /// to the generated content page (`/examples/agents/<name>/preview.png`) and
-/// break. This rewrites those links to `/examples/<name>/<file>` and copies
-/// missing source images into the static example directory as a fallback.
+/// break. This rewrites those links through `resolve_url` — normally the
+/// shadow content-addressed URL, falling back to
+/// `/examples/<name>/<file>` — and copies missing source images into the
+/// static example directory as a fallback.
 fn rewrite_readme_images(
     readme: &str,
     example_dir: &Path,
-    example_name: &str,
     static_example_dir: &Path,
+    resolve_url: &dyn Fn(&str) -> String,
 ) -> Result<String> {
     let mut result = String::with_capacity(readme.len());
     let mut cursor = 0usize;
@@ -536,7 +555,7 @@ fn rewrite_readme_images(
                     )
                 })?;
             }
-            format!("/examples/{example_name}/{file_name}")
+            resolve_url(file_name)
         } else {
             path.to_string()
         };
@@ -554,6 +573,159 @@ fn next_markdown_image(source: &str, start: usize) -> Option<(usize, usize)> {
     let path_start = link_start + 2;
     let path_end = source[path_start..].find(')')? + path_start;
     Some((path_start, path_end))
+}
+
+/// Copy README-referenced local images into the static example directory so
+/// they get published with the rest of the example outputs.
+fn copy_readme_images(readme: &str, example_dir: &Path, static_example_dir: &Path) -> Result<()> {
+    let mut cursor = 0usize;
+    while let Some((path_start, path_end)) = next_markdown_image(readme, cursor) {
+        let path = readme[path_start..path_end].trim();
+        cursor = path_end;
+
+        let local_path = path.strip_prefix("./").unwrap_or(path);
+        if local_path.contains('/') {
+            continue;
+        }
+        let source_path = example_dir.join(local_path);
+        if !source_path.is_file() {
+            continue;
+        }
+        let Some(file_name) = source_path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !static_example_dir.join(file_name).exists() {
+            fs::create_dir_all(static_example_dir)
+                .with_context(|| format!("failed to create {}", static_example_dir.display()))?;
+            fs::copy(&source_path, static_example_dir.join(file_name)).with_context(|| {
+                format!(
+                    "failed to copy {} to {}",
+                    source_path.display(),
+                    static_example_dir.display()
+                )
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// Split synced output files into `preview_imgs` and `output_files` entries.
+fn split_output_files(files: &[String]) -> (Vec<String>, Vec<String>) {
+    let mut preview_imgs = vec![];
+    let mut output_files = vec![];
+    for file in files {
+        let ext = Path::new(file)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or_default();
+        if PREVIEW_EXTENSIONS.contains(&ext) {
+            preview_imgs.push(file.clone());
+            output_files.push(file.clone());
+        } else if WEBSITE_OUTPUT_EXTENSIONS.contains(&ext) {
+            output_files.push(file.clone());
+        }
+    }
+    (preview_imgs, output_files)
+}
+
+/// Write `website/data/<name>.toml`, referencing outputs by their
+/// content-addressed shadow URLs.
+///
+/// Every referenced file must have been published already — [`Example::run`]
+/// and [`publish_website_outputs`] both run `shadow publish` beforehand.
+fn write_example_data(
+    root_dir: &Path,
+    example: &Example,
+    mut files: Vec<String>,
+    shadow: &shadow::Shadow,
+) -> Result<()> {
+    #[derive(Serialize, Deserialize)]
+    struct OutputData {
+        name: String,
+        code: String,
+        hash: String,
+
+        preview_imgs: Vec<String>,
+        output_files: Vec<String>,
+        wasm: bool,
+    }
+
+    files.sort();
+
+    let (preview_imgs, output_files) = split_output_files(&files);
+    let static_example_dir = root_dir
+        .join("website")
+        .join("static")
+        .join("examples")
+        .join(&example.name);
+    let to_url = |file: &String| shadow.object_url(static_example_dir.join(file));
+    let data = OutputData {
+        name: example.name.clone(),
+        code: example.code.clone(),
+        hash: example.hash.clone(),
+        preview_imgs: preview_imgs
+            .iter()
+            .map(to_url)
+            .collect::<Result<Vec<_>>>()?,
+        output_files: output_files
+            .iter()
+            .map(to_url)
+            .collect::<Result<Vec<_>>>()?,
+        wasm: example.meta.wasm,
+    };
+
+    let data_dir = root_dir.join("website").join("data");
+    fs::create_dir_all(&data_dir)?;
+    let data_path = data_dir.join(format!("{}.toml", example.name));
+    fs::write(&data_path, toml::to_string(&data)?)
+        .with_context(|| format!("failed to write {}", data_path.display()))?;
+    Ok(())
+}
+
+/// Refresh website data and generated pages from the **existing**
+/// `website/static/examples/<name>/` outputs, linking them through shadow.
+///
+/// Unlike [`Example::run`] this never renders; it publishes whatever is on
+/// disk (usually the output of a previous render) and rewrites
+/// `website/data/*.toml` plus the generated pages to reference
+/// content-addressed object URLs.
+pub fn publish_website_outputs(root_dir: impl AsRef<Path>, examples: &[Example]) -> Result<()> {
+    let root_dir = root_dir.as_ref();
+    let shadow = shadow::Shadow::load(root_dir)?;
+    shadow.publish()?;
+
+    let static_examples = root_dir.join("website").join("static").join("examples");
+    for example in examples {
+        let output_dir = static_examples.join(&example.name);
+        if !fs::exists(&output_dir)? {
+            continue;
+        }
+        let mut files = vec![];
+        for entry in WalkDir::new(&output_dir) {
+            let path = entry
+                .with_context(|| format!("failed to walk {}", output_dir.display()))?
+                .into_path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+                continue;
+            };
+            if WEBSITE_OUTPUT_EXTENSIONS.contains(&ext) {
+                files.push(path.file_name().unwrap().to_string_lossy().into_owned());
+            }
+        }
+        if files.is_empty() {
+            continue;
+        }
+
+        write_example_data(root_dir, example, files, &shadow)?;
+        if !example.meta.hide {
+            example.create_example_page(root_dir)?;
+        }
+        println!("[published] {}", example.name);
+    }
+    Ok(())
 }
 
 fn ensure_section_index(dir: &Path, title: &str) -> Result<()> {
@@ -762,7 +934,7 @@ mod test {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir).unwrap();
-        assert_eq!(examples.len(), 34); // + iterative_spring, nbody, cloth_wrap, agents
+        assert_eq!(examples.len(), 36); // + iterative_spring, nbody, cloth_wrap, agents, gltf_showcase, z_fighting
         assert_eq!(
             examples
                 .iter()

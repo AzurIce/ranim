@@ -5,7 +5,7 @@ use ranim::{
     anims::morph::MorphAnim,
     color::{HueDirection, palettes::manim},
     glam::dvec3,
-    items::vitem::geometry::Rectangle,
+    items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
     utils::rate_functions::{ease_in_quad, ease_out_quad, linear},
 };
@@ -35,12 +35,16 @@ fn hanoi(r: &mut RanimScene, n: usize) {
     let rods = [-1, 0, 1]
         .into_iter()
         .map(|i: i32| {
-            Rectangle::new(rod_width, rod_height).with(|rect| {
-                rect.set_color(manim::GREY_C).move_anchor_to(
-                    AabbPoint(dvec3(0.0, -1.0, 0.0)),
-                    dvec3(i as f64 * rod_section_width, -4.0, 0.0),
-                );
-            })
+            let mut rect: VItem = Rectangle::new(rod_width, rod_height)
+                .with(|rect| {
+                    rect.set_color(manim::GREY_C);
+                })
+                .into();
+            rect.move_anchor_to(
+                AabbPoint(dvec3(0.0, -1.0, 0.0)),
+                dvec3(i as f64 * rod_section_width, -4.0, 0.0),
+            );
+            rect
         })
         .collect::<Vec<_>>();
 
@@ -51,15 +55,18 @@ fn hanoi(r: &mut RanimScene, n: usize) {
         .map(|i| {
             let factor = i as f64 / (n - 1) as f64;
             let disk_width = min_disk_width + (max_disk_width - min_disk_width) * (1.0 - factor);
-            let disk = Rectangle::new(disk_width, disk_height).with(|rect| {
-                let color =
-                    manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
-                rect.stroke_width = 0.0;
-                rect.set_color(color).move_anchor_to(
-                    AabbPoint(dvec3(0.0, -1.0, 0.0)),
-                    dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.001),
-                );
-            });
+            let mut disk: VItem = Rectangle::new(disk_width, disk_height)
+                .with(|rect| {
+                    let color =
+                        manim::RED_D.lerp(manim::BLUE_D, factor as f32, HueDirection::Increasing);
+                    rect.stroke_width = 0.0;
+                    rect.set_color(color);
+                })
+                .into();
+            disk.move_anchor_to(
+                AabbPoint(dvec3(0.0, -1.0, 0.0)),
+                dvec3(-rod_section_width, -4.0 + disk_height * i as f64, 0.001),
+            );
             let sequence = seq![disk.show()];
             (sequence, disk)
         })
@@ -139,7 +146,7 @@ fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
 }
 ```"""
-hash = "f554f6819bc88705c578b731946a0fd8085de0d2"
-preview_imgs = ["/examples/hanoi/preview-10.png", "/examples/hanoi/preview-5.png"]
-output_files = ["/examples/hanoi/hanoi_1920x1080_60.mp4", "/examples/hanoi/hanoi_5_1920x1080_60.mp4"]
+hash = "dbfa5da3c7b2bf7696518ce9729c0a3d3967e07c"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/0e/98fb9d0600f91944eb14ce64cf96b0779193fca69799f926cc1cfe205057d2", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/f0/8875e685ca4fe6b5e34eb31c1bc0bece7633d7e31929e38d630a06f31b4a6d"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/66/f394938333bc7f5cb719aa0cb7ea8188c5c72659c9df751f6ba27bf5033ab5", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/c9/8c863207617d08ef185800831b59b3a9539cb681ab676d58dab85ec3a6ed40", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/0e/98fb9d0600f91944eb14ce64cf96b0779193fca69799f926cc1cfe205057d2", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/f0/8875e685ca4fe6b5e34eb31c1bc0bece7633d7e31929e38d630a06f31b4a6d"]
 wasm = true

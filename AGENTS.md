@@ -44,6 +44,22 @@ Gotchas learned the hard way — partial sweeps are NOT equivalent:
   （wgpu、eframe/egui、25+ 个 cdylib example），可能耗尽内存导致整机卡死
   （在 32 核 / 29 GiB 内存上实际发生过）。建议限制并行度或分包测试。
 
+## Website example media（shadow 管理）
+
+`website/static/examples/` 下的渲染产物（mp4/png）**不入库**，由
+[shadow](https://github.com/AzurIce/shadow) 管理：xtask 在渲染后运行
+`shadow publish` 上传到 TOS，`website/data/*.toml` 里的 `output_files`/
+`preview_imgs` 引用内容寻址 URL（由 `.shadow/refs/` 里的 oid 拼出）。
+入库的只有 ref（约 200 字节/个）、`shadow.toml` 和生成的 data/pages。
+
+- 渲染 + 发布：`cargo examples run [examples...]`（需要 `shadow` 在 PATH
+  上，`cargo install --git https://github.com/AzurIce/shadow`）
+- 不渲染、只把已有产物发布并重写 data/pages：`cargo examples publish`
+- 凭证在仓库根 `.env`（`TOS_ACCESS_KEY`/`TOS_SECRET_KEY`，已 gitignore，
+  绝不提交）
+- CI 在每次网站部署成功后运行 `shadow free --keep-at origin/main --delete`
+  释放被替代的旧对象（30 天宽限期保护回滚与在途上传）
+
 ## PR Authoring Guidelines
 
 This file describes how to write and update pull request descriptions in this

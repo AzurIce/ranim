@@ -120,6 +120,6 @@ fn perspective_blend(r: &mut RanimScene) {
 }
 ```"""
 hash = "fa1c4f05100a335bd7df6afca6b489fe3abb4ed1"
-preview_imgs = ["/examples/perspective_blend/preview.png"]
-output_files = ["/examples/perspective_blend/perspective_blend_1920x1080_60.mp4"]
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/db/c620e3b6a836624d6a85140dac7b1a9b1d42f8a4280c2790f50d7b12ee0b19"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/b8/d7a387cbf11618216e914d56fe2b64e3ce75d5bbb2ba8825d221d42df755a9", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/db/c620e3b6a836624d6a85140dac7b1a9b1d42f8a4280c2790f50d7b12ee0b19"]
 wasm = true

@@ -4,7 +4,7 @@ code = """
 use ranim::{
     color::palettes::manim::*,
     glam::{dvec2, dvec3},
-    items::vitem::geometry::Rectangle,
+    items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
 };
 
@@ -40,14 +40,16 @@ fn palettes(r: &mut RanimScene) {
             let w_step = padded_frame_size.x / row.len() as f64;
             row.iter().enumerate().map(move |(j, color)| {
                 let x = j as f64 * w_step;
-                Rectangle::new(w_step as f64, h_step as f64).with(|rect| {
-                    rect.stroke_width = 0.0;
-
-                    rect.set_color(*color).move_anchor_to(
-                        AabbPoint(dvec3(-1.0, -1.0, 0.0)),
-                        padded_frame_start.extend(0.0) + dvec3(x, y, 0.0),
-                    );
-                })
+                let mut rect: VItem = Rectangle::new(w_step, h_step)
+                    .with(|rect| {
+                        rect.stroke_width = 0.0;
+                        rect.set_color(*color);
+                    })
+                    .into();
+                rect.apply(Translation(
+                    padded_frame_start.extend(0.0) + dvec3(x + w_step * 0.5, y + h_step * 0.5, 0.0),
+                ));
+                rect
             })
         })
         .collect::<Vec<_>>();
@@ -57,7 +59,7 @@ fn palettes(r: &mut RanimScene) {
     r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "faf5fc88e7d1be1643ddebcd6cc7d60fc3cf4175"
-preview_imgs = ["/examples/palettes/preview.png"]
-output_files = ["/examples/palettes/palettes_1920x1080_60.mp4"]
+hash = "f7a814b07998303b429e0e24aad170047e63fff6"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/96/6104560a290dd704cc7bf9a4161de7d92cea4233ddba897a6585e001484b0d"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/dc/fd56b4b7b293e2c3dc9ec9306b89d1be160701d88be3154b7672722bc16947", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/96/6104560a290dd704cc7bf9a4161de7d92cea4233ddba897a6585e001484b0d"]
 wasm = false

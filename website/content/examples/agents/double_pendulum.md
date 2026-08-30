@@ -7,7 +7,7 @@ template = "examples-page.html"
 
 ## 1. 效果图
 
-![效果图](/examples/double_pendulum/preview.png)
+![效果图](https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/10/deab2ce188be35287624f520652a15feeec7ae1972532bd7089ed21c677e91)
 
 上图为 `t = 24s`（场景最后一帧）的 capture：三个初始条件仅相差 0.001 rad
 的双摆此时已处于完全不同的状态。来源：

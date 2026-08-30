@@ -20,34 +20,36 @@ use ranim::{
 };
 
 fn build_logo(logo_width: f64) -> [VItem; 6] {
-    let red_bg_rect = Rectangle::new(logo_width / 2.0, logo_width).with(|rect| {
+    // The logo layout is intrinsic art coordinates, so the placement is
+    // baked into point data right after converting to VItems.
+    let red_bg_rect = VItem::from(Rectangle::new(logo_width / 2.0, logo_width)).with(|rect| {
         rect.set_color(manim::RED_C.with_alpha(0.5))
             .move_to(dvec3(-logo_width / 4.0, 0.0, 0.0));
     });
-    let red_rect = Rectangle::new(logo_width / 4.0, logo_width).with(|rect| {
+    let red_rect = VItem::from(Rectangle::new(logo_width / 4.0, logo_width)).with(|rect| {
         rect.set_color(manim::RED_C).move_anchor_to(
             AabbPoint(dvec3(1.0, 0.0, 0.0)),
             dvec3(-logo_width / 4.0, 0.0, 0.0),
         );
     });
 
-    let green_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
+    let green_bg_sq = VItem::from(Square::new(logo_width / 2.0)).with(|sq| {
         sq.set_color(manim::GREEN_C.with_alpha(0.5)).move_to(dvec3(
             logo_width / 4.0,
             logo_width / 4.0,
             0.0,
         ));
     });
-    let green_triangle = Polygon::new(vec![
+    let green_triangle = VItem::from(Polygon::new(vec![
         dvec3(0.0, logo_width / 2.0, 0.0),
         dvec3(logo_width / 2.0, logo_width / 2.0, 0.0),
         dvec3(logo_width / 2.0, 0.0, 0.0),
-    ])
+    ]))
     .with(|tri| {
         tri.set_color(manim::GREEN_C);
     }); // ◥
 
-    let blue_bg_sq = Square::new(logo_width / 2.0).with(|sq| {
+    let blue_bg_sq = VItem::from(Square::new(logo_width / 2.0)).with(|sq| {
         sq.set_color(manim::BLUE_C.with_alpha(0.5)).move_to(dvec3(
             logo_width / 4.0,
             -logo_width / 4.0,
@@ -63,12 +65,12 @@ fn build_logo(logo_width: f64) -> [VItem; 6] {
     }); // ◣
 
     [
-        VItem::from(red_bg_rect),
-        VItem::from(red_rect),
-        VItem::from(green_bg_sq),
-        VItem::from(green_triangle),
-        VItem::from(blue_bg_sq),
-        VItem::from(blue_triangle),
+        red_bg_rect,
+        red_rect,
+        green_bg_sq,
+        green_triangle,
+        blue_bg_sq,
+        blue_triangle,
     ]
 }
 #[scene]
@@ -181,7 +183,7 @@ fn ranim_logo(r: &mut RanimScene) {
     r.play(stack![content, text_sequence]);
 }
 ```"""
-hash = "a62975c9d177767039f0e156940b8880750be644"
-preview_imgs = ["/examples/ranim_logo/preview.png"]
-output_files = ["/examples/ranim_logo/ranim_logo_1920x1080_60.mp4"]
+hash = "b47e8af9e29214a0d29deca9c07353d3db5b56ff"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/f0e737821851cb63e58b6ed03362de73a94d73eb3d4f296a02a1e6648126ee"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/f0e737821851cb63e58b6ed03362de73a94d73eb3d4f296a02a1e6648126ee", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/7c/7c3d2b2c207d5ad8913e5689c05ac794b01da8f6d8642201498a2e66bb5ef0"]
 wasm = true

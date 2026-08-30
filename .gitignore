@@ -58,6 +58,7 @@ coverage.xml
 *.pot
 
 .DS_Store
+.env
 
 # Sphinx documentation
 docs/_build/
@@ -74,6 +75,10 @@ docs/_build/
 image*.png
 output/
 /output*
+/website/static/ranim-examples/
 
 .direnv/
 profile.json.gz
+
+# shadow
+/website/static/examples/**

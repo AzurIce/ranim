@@ -75,13 +75,13 @@ pub fn hello_ranim(r: &mut RanimScene) {
     let square = VisualVItem(VItem::from(Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
     })));
-    let mut circle = VisualVItem(VItem::from(Circle::new(2.0).with(|circle| {
-        circle
-            .set_color(manim::GREEN_C)
-            .with_origin(AabbPoint::CENTER, |x| {
-                x.rotate_on_z(-PI / 4.0 + PI);
-            });
-    })));
+    let mut circle_item = VItem::from(Circle::new(2.0).with(|circle| {
+        circle.set_color(manim::GREEN_C);
+    }));
+    circle_item.with_origin(AabbPoint::CENTER, |x| {
+        x.rotate_on_z(-PI / 4.0 + PI);
+    });
+    let mut circle = VisualVItem(circle_item);
 
     let mut content = seq![
         square
@@ -223,9 +223,7 @@ impl Extract for VisualVItem {
                             .set_fill_opacity(0.4);
                     })
                 }
-                .with(|circle| {
-                    circle.move_to(*p);
-                });
+                .transformed(Translation(*p));
                 point.extract_into(buf);
             });
         });
@@ -259,7 +257,7 @@ impl Empty for VisualVItem {
     }
 }
 ```"""
-hash = "ba6f1fad707ee3efd033127c5614a4b54077c2e8"
-preview_imgs = ["/examples/extract_vitem_visualize/preview-ranim_text.png", "/examples/extract_vitem_visualize/preview-hello_ranim.png"]
-output_files = ["/examples/extract_vitem_visualize/ranim_text_1920x1080_60.mp4", "/examples/extract_vitem_visualize/extract_vitem_visualize_1920x1080_60.mp4"]
+hash = "38729d681209801390382d374116de6c7264d032"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/c9dfba5bf8314658a655397dc13d8c1d103b6f8db5dcbfffccf3efbba4b89a", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/1c/45ab36f6d966cd718fe72e7de1e28eef40b1005866fd61a638840ee4df4507"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/7c/5b66fa4d18bf1a38726052afdd82f816705af9998f6ae6eaaa284e08297c32", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/c9dfba5bf8314658a655397dc13d8c1d103b6f8db5dcbfffccf3efbba4b89a", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/1c/45ab36f6d966cd718fe72e7de1e28eef40b1005866fd61a638840ee4df4507", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/9c/d0727203eb6558451ba04639285c401f5f8dddd4e9759f3e0cb17d5ff5dbc6"]
 wasm = true

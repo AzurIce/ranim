@@ -60,6 +60,6 @@ fn getting_started2(r: &mut RanimScene) {
 }
 ```"""
 hash = "173620b4e52960c9ad8414934e663c418214dfa0"
-preview_imgs = ["/examples/getting_started2/preview.png"]
-output_files = ["/examples/getting_started2/getting_started2_1920x1080_60.mp4"]
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/2e/106311d6769a950c14c64efd7186a69e2bc49a0f1287482e2b9e9880edab3a"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/01/f71eb51af04ecd68324c5bed6d549ca26d2137c51884406c030e9bbf3bb5eb", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/2e/106311d6769a950c14c64efd7186a69e2bc49a0f1287482e2b9e9880edab3a"]
 wasm = true

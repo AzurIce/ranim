@@ -7,7 +7,7 @@ use ranim::{
     color::palettes::manim,
     core::animation::{StaticAnim, sequence::AnimSequence},
     glam::{DVec3, dvec2, dvec3},
-    items::vitem::geometry::Rectangle,
+    items::vitem::{VItem, geometry::Rectangle},
     prelude::*,
     utils::rate_functions::linear,
 };
@@ -37,15 +37,16 @@ fn bubble_sort(r: &mut RanimScene, num: usize) {
             let rect = Rectangle::new(width_unit, height).with(|rect| {
                 rect.stroke_width = 0.0;
                 rect.set_fill_color(manim::WHITE.with_alpha(0.5))
-                    .scale(DVec3::splat(0.8))
-                    .move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
+                    .scale_axes(dvec2(0.8, 0.8));
             });
+            let mut rect = VItem::from(rect);
+            rect.move_anchor_to(AabbPoint(dvec3(0.0, -1.0, 0.0)), target_bc_coord);
             let sequence = seq![rect.show()];
             (sequence, rect)
         })
         .collect::<Vec<_>>();
 
-    let sync = |rects: &mut [(AnimSequence, Rectangle)]| {
+    let sync = |rects: &mut [(AnimSequence, VItem)]| {
         let target = rects
             .iter()
             .map(|(sequence, _)| sequence.cursor_sec())
@@ -126,7 +127,7 @@ fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
 }
 ```"""
-hash = "578c95772ed3e6e8a8a17bf035484df701ec4c68"
-preview_imgs = ["/examples/bubble_sort/preview-100.png", "/examples/bubble_sort/preview-10.png"]
-output_files = ["/examples/bubble_sort/bubble_sort_1920x1080_60.mp4", "/examples/bubble_sort/bubble_sort_10_1920x1080_60.mp4"]
+hash = "da8ca7b757ae05e4e3cecdc088321e966dc76ac6"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/08/1d73646363d508bbc3fc6cc6f81d2909bbbbd0b7b9f8723eb17e2110440aad", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ca/eaee7da633f3cf6c52d83c71a0a4fdf54fb762d9dd85f2064ceaf51d3b9ca3"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/7f/cb246e68b24f2417736329fe7851274d3524c22ab4dae6d363ba763ed7eab9", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/bf/5e2c1d0a92e5556847d60e44cd8cfaeb6786c61ea4dafeec24345ad5c86097", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/08/1d73646363d508bbc3fc6cc6f81d2909bbbbd0b7b9f8723eb17e2110440aad", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ca/eaee7da633f3cf6c52d83c71a0a4fdf54fb762d9dd85f2064ceaf51d3b9ca3"]
 wasm = true

@@ -106,6 +106,6 @@ fn bundled_midi_parses() {
 }
 ```"""
 hash = "d54b44e7f377dedf64a427943beb6e6c89ea6210"
-preview_imgs = ["/examples/midi_visualizer/preview.png", "/examples/midi_visualizer/preview.png"]
-output_files = ["/examples/midi_visualizer/midi_visualizer_1920x1080_30.mp4", "/examples/midi_visualizer/midi_visualizer_per_note_1920x1080_30.mp4"]
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/58/aa4bdceb665a76fa2721b6c000ec04c1552e5deb73709d887cf9bc8f90fa4a"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/69/147633fd332ae6adf384091e4198fa34055b2bf55b67abbc9fa537761bc496", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/4a/f3b48e4ca75747b589c3d0375eede2b217b2e678eccd32cd369d7574950a34", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/58/aa4bdceb665a76fa2721b6c000ec04c1552e5deb73709d887cf9bc8f90fa4a"]
 wasm = true

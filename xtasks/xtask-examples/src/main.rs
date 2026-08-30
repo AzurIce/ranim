@@ -9,6 +9,7 @@ use std::{
 use clap::{Parser, Subcommand};
 use xtask_examples::{
     CleanStats, RunStatus, build_examples_wasm, clean_website_examples, get_examples,
+    publish_website_outputs,
 };
 
 #[derive(Parser)]
@@ -44,6 +45,9 @@ enum Commands {
         #[arg(value_name = "EXAMPLES")]
         examples: Vec<String>,
     },
+    /// Publish existing website outputs through shadow and rewrite
+    /// data/pages to content-addressed URLs (no rendering).
+    Publish,
 }
 
 fn main() -> ExitCode {
@@ -64,6 +68,26 @@ fn main() -> ExitCode {
 
     if matches!(&args.command, Commands::Build) {
         return build_examples_wasm_cmd(&workspace_root);
+    }
+
+    if let Commands::Publish = args.command {
+        let all_examples = match get_examples(&workspace_root) {
+            Ok(examples) => examples,
+            Err(err) => {
+                eprintln!("读取示例列表失败: {err:#}");
+                return ExitCode::FAILURE;
+            }
+        };
+        if args.clean {
+            match clean_website_examples(&workspace_root, &all_examples) {
+                Ok(stats) => print_clean_stats(stats),
+                Err(err) => {
+                    eprintln!("清理网站 example 输出失败: {err:#}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
+        return publish_website_outputs_cmd(&workspace_root, &all_examples);
     }
 
     let Commands::Run {
@@ -211,6 +235,20 @@ fn build_examples_wasm_cmd(workspace_root: &Path) -> ExitCode {
         "构建 wasm example bundle 完成 ({}s)",
         format_duration(started.elapsed())
     );
+    ExitCode::SUCCESS
+}
+
+fn publish_website_outputs_cmd(
+    workspace_root: &Path,
+    examples: &[xtask_examples::Example],
+) -> ExitCode {
+    let started = Instant::now();
+    println!("发布网站 example 输出到 shadow…");
+    if let Err(err) = publish_website_outputs(workspace_root, examples) {
+        eprintln!("发布网站 example 输出失败: {err:#}");
+        return ExitCode::FAILURE;
+    }
+    println!("发布完成 ({}s)", format_duration(started.elapsed()));
     ExitCode::SUCCESS
 }
 

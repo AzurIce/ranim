@@ -18,7 +18,7 @@ use ranim::{
     core::animation::eval::iterative::Iterative,
     core::components::rgba::Rgba,
     core::core_item::CoreItem,
-    glam::{DMat4, DVec3, dvec3},
+    glam::{DVec3, dvec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
 };
@@ -176,11 +176,11 @@ impl ClothState {
         let ball_center = dvec3(0.0, self.ball_y, 0.0);
 
         // Ball-cloth collision: push cloth particles out of the ball.
-        for i in 0..n {
-            let d = self.curr[i] - ball_center;
+        for curr in self.curr.iter_mut().take(n) {
+            let d = *curr - ball_center;
             let dist = d.length();
             if dist < BALL_RADIUS && dist > 1e-9 {
-                self.curr[i] += d / dist * (BALL_RADIUS - dist);
+                *curr += d / dist * (BALL_RADIUS - dist);
             }
         }
     }
@@ -209,13 +209,14 @@ impl Extract for ClothState {
         let cloth = MeshItem {
             points: points.into(),
             triangle_indices: self.cloth_indices.clone(),
-            transform: DMat4::IDENTITY,
             vertex_colors: vertex_colors.into(),
             vertex_normals: normals.into(),
         };
 
-        let mut ball = self.ball_mesh.clone();
-        ball.transform = DMat4::from_translation(dvec3(0.0, self.ball_y, 0.0));
+        let ball = self
+            .ball_mesh
+            .clone()
+            .transformed(Translation(dvec3(0.0, self.ball_y, 0.0)));
 
         cloth.extract_into(buf);
         ball.extract_into(buf);
@@ -249,7 +250,7 @@ fn cloth_wrap(r: &mut RanimScene) {
     r.insert_time_mark(sim_secs, TimeMark::Capture("preview.png".to_string()));
 }
 ```"""
-hash = "97b6d16c6c156525efb6a727eb94e46dcda1c7ca"
-preview_imgs = ["/examples/cloth_wrap/preview.png"]
-output_files = ["/examples/cloth_wrap/cloth_wrap_1920x1080_60.mp4"]
+hash = "6b02da781180e15bafacadcbd9354ee0de4a986e"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/d5/6ad64eb564791a97d9b9e9d41898601bc7da10251dd13067b5f3c14549bb29"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/fb/7da8e8f5230acf1ef6030cd0cc573e305e6c04db345fee95912c13d613b7c6", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/d5/6ad64eb564791a97d9b9e9d41898601bc7da10251dd13067b5f3c14549bb29"]
 wasm = false

@@ -26,7 +26,7 @@ use ranim::{
     anims::morph::MorphAnim,
     color::{AlphaColor, Srgb, palettes::manim},
     core::components::rgba::Rgba,
-    glam::{DMat4, DVec3, dvec3},
+    glam::{DAffine3, DVec3, dvec3},
     items::{
         mesh::MeshItem,
         vitem::{VItem, geometry::Square},
@@ -324,9 +324,12 @@ fn cubie_mesh(grid: IVec) -> MeshItem {
 
 /// One cubie: its current mesh state, its logical grid position, and its own
 /// animation sequence on the shared timeline.
+///
+/// Face turns are rigid motions, so each cubie stores its placement in the
+/// rigid group SE(3) rather than a general affine transform.
 struct Cubie {
     grid: IVec,
-    mesh: MeshItem,
+    mesh: Transformed<MeshItem, Rigid>,
     seq: AnimSequence,
 }
 
@@ -339,18 +342,18 @@ struct NetSticker {
 /// Rotate a cubie's mesh around `axis` (through the cube center at the
 /// origin) by `angle * alpha` — the 3D counterpart of one face turn.
 struct CubieTurn {
-    src: MeshItem,
+    src: Transformed<MeshItem, Rigid>,
     axis: DVec3,
     angle: f64,
 }
 
 impl Eval for CubieTurn {
-    type Output = MeshItem;
+    type Output = Transformed<MeshItem, Rigid>;
 
     fn eval_alpha(&self, alpha: f64) -> Self::Output {
         let mut out = self.src.clone();
         out.transform =
-            DMat4::from_axis_angle(self.axis.normalize(), self.angle * alpha) * self.src.transform;
+            Rigid::from_axis_angle(self.axis, self.angle * alpha).compose(&self.src.transform);
         out
     }
 }
@@ -458,7 +461,7 @@ fn rubiks_cube(r: &mut RanimScene) {
                 }
                 cubies.push(Cubie {
                     grid: [x, y, z],
-                    mesh: cubie_mesh([x, y, z]),
+                    mesh: cubie_mesh([x, y, z]).transformed(Rigid::IDENTITY),
                     seq: AnimSequence::new(),
                 });
             }
@@ -475,11 +478,8 @@ fn rubiks_cube(r: &mut RanimScene) {
             let x = (bc + col) as f64 * NET_SIZE + NET_SIZE / 2.0 - 6.0 * NET_SIZE;
             let y = 4.5 * NET_SIZE - ((br + row) as f64 * NET_SIZE + NET_SIZE / 2.0);
             let pos = net_center + screen_right * x + screen_up * y;
-            let square = Square::new(NET_SIZE * 0.94).with(|sq| {
-                sq.axes = (screen_right, screen_up);
-                sq.center = pos;
-            });
-            let mut item = VItem::from(square);
+            let mut item = VItem::from(Square::new(NET_SIZE * 0.94));
+            item.apply(DAffine3::from_cols(screen_right, screen_up, DVec3::Z, pos));
             item.set_fill_color(FACE_COLORS[state[face][idx]]);
             item.set_stroke_color(manim::BLACK);
             item.set_stroke_width(0.03);
@@ -540,7 +540,7 @@ fn rubiks_cube(r: &mut RanimScene) {
     r.insert_time_mark(total_secs, TimeMark::Capture("solved.png".to_string()));
 }
 ```"""
-hash = "3492e0ab2187daa818b03c4cd250d3ad658adb14"
-preview_imgs = ["/examples/rubiks_cube/preview.png", "/examples/rubiks_cube/solved.png"]
-output_files = ["/examples/rubiks_cube/rubiks_cube_1920x1080_60.mp4", "/examples/rubiks_cube/preview.png", "/examples/rubiks_cube/solved.png"]
+hash = "f9af40263e6291f3deaf5ed91be788246b6de15d"
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/9c45ad5332f72597458f948879565fdb85fd302a3a26d660a0af3f7a96164c", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/9f/96a981ee4eea33c361843378df9ca8c8f1743f509963ba4b0f5bc6c54d57eb"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/9c45ad5332f72597458f948879565fdb85fd302a3a26d660a0af3f7a96164c", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ea/103caa74f35f0747ee5843bfc67a7f9a26c33b4b12de74839ef3f34af87272", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/9f/96a981ee4eea33c361843378df9ca8c8f1743f509963ba4b0f5bc6c54d57eb"]
 wasm = false

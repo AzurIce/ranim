@@ -36,6 +36,6 @@ fn getting_started0(r: &mut RanimScene) {
 // ANCHOR_END: construct
 ```"""
 hash = "7d6668502950ba9de3888f2123bcf8dbff666b9a"
-preview_imgs = ["/examples/getting_started0/preview.png"]
-output_files = ["/examples/getting_started0/getting_started0_1920x1080_60.mp4"]
+preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/2e/106311d6769a950c14c64efd7186a69e2bc49a0f1287482e2b9e9880edab3a"]
+output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/b9/752035929267f6193747f81ed7c5df7da5d4c126b3e9da36db1d7a40d45349", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/2e/106311d6769a950c14c64efd7186a69e2bc49a0f1287482e2b9e9880edab3a"]
 wasm = true
