@@ -131,5 +131,12 @@ fn composable_choreography(r: &mut RanimScene) {
 ```"""
 hash = "543c0226a50945b4d75d05327fa72b5e3a4f6850"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/46/0ea7fc8bfc9c643fa876ba0294c0271bcca0faad9f8bdd85bd78b7b10f9270"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/c7/b382865adab52c60cfe5f8bbf69e4ee986ecadc01c21a9cd1b2ba21ff1ddd4", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/46/0ea7fc8bfc9c643fa876ba0294c0271bcca0faad9f8bdd85bd78b7b10f9270"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/c7/b382865adab52c60cfe5f8bbf69e4ee986ecadc01c21a9cd1b2ba21ff1ddd4"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/46/0ea7fc8bfc9c643fa876ba0294c0271bcca0faad9f8bdd85bd78b7b10f9270"
+kind = "image/png"

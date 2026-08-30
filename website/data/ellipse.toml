@@ -57,5 +57,12 @@ fn ellipse(r: &mut RanimScene) {
 ```"""
 hash = "e2b90b2355ff0fae640b8029fb5391bcdaf44ed1"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/44/9f56e0136eab7b4bc8fff8a72d0f6f52d869ea1de727ee6aab281348beb9b5"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/65/eca2855162553663c900cccf30ff10736daebf9d405482b97a7daf6e674f50", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/44/9f56e0136eab7b4bc8fff8a72d0f6f52d869ea1de727ee6aab281348beb9b5"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/65/eca2855162553663c900cccf30ff10736daebf9d405482b97a7daf6e674f50"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/44/9f56e0136eab7b4bc8fff8a72d0f6f52d869ea1de727ee6aab281348beb9b5"
+kind = "image/png"

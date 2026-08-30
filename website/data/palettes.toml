@@ -61,5 +61,12 @@ fn palettes(r: &mut RanimScene) {
 ```"""
 hash = "f7a814b07998303b429e0e24aad170047e63fff6"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/96/6104560a290dd704cc7bf9a4161de7d92cea4233ddba897a6585e001484b0d"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/dc/fd56b4b7b293e2c3dc9ec9306b89d1be160701d88be3154b7672722bc16947", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/96/6104560a290dd704cc7bf9a4161de7d92cea4233ddba897a6585e001484b0d"]
 wasm = false
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/dc/fd56b4b7b293e2c3dc9ec9306b89d1be160701d88be3154b7672722bc16947"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/96/6104560a290dd704cc7bf9a4161de7d92cea4233ddba897a6585e001484b0d"
+kind = "image/png"

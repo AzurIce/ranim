@@ -132,5 +132,16 @@ fn create_disc_shape(radius: f64, resolution: (u32, u32)) -> Surface {
 ```"""
 hash = "21b7c17a0b81b36dee9f90ffc02b8486fcf38839"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a9/2be2b2265e578a0a48a06432a4d0cae9f29ac3ecb9ade1dd0830e32bc4b349", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ae/7a24d816005b92a325d3d2cb516c5b3128c590b54ff45b3bd7c2c93166ba43"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5f/1acf7bc66903fb89d5f6a5ad50ea6dff16f6b7545cb83e860824061dde1609", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a9/2be2b2265e578a0a48a06432a4d0cae9f29ac3ecb9ade1dd0830e32bc4b349", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ae/7a24d816005b92a325d3d2cb516c5b3128c590b54ff45b3bd7c2c93166ba43"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5f/1acf7bc66903fb89d5f6a5ad50ea6dff16f6b7545cb83e860824061dde1609"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a9/2be2b2265e578a0a48a06432a4d0cae9f29ac3ecb9ade1dd0830e32bc4b349"
+kind = "image/png"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ae/7a24d816005b92a325d3d2cb516c5b3128c590b54ff45b3bd7c2c93166ba43"
+kind = "image/png"

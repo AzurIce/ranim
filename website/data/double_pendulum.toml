@@ -251,5 +251,12 @@ fn double_pendulum(r: &mut RanimScene) {
 ```"""
 hash = "8e7a5224cb3361fa53c2e80be6f766ef790df05e"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/10/deab2ce188be35287624f520652a15feeec7ae1972532bd7089ed21c677e91"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/68/c43ea51ca1a24ee034faecfb8ca87e47320d2c40d7bb011e369f8891599f1c", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/10/deab2ce188be35287624f520652a15feeec7ae1972532bd7089ed21c677e91"]
 wasm = false
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/68/c43ea51ca1a24ee034faecfb8ca87e47320d2c40d7bb011e369f8891599f1c"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/10/deab2ce188be35287624f520652a15feeec7ae1972532bd7089ed21c677e91"
+kind = "image/png"

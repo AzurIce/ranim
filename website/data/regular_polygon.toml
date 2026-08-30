@@ -114,5 +114,12 @@ pub fn regular_polygon(r: &mut RanimScene) {
 ```"""
 hash = "9712d0599fecdd0a478a76e0dbf80bcbf54133d9"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ad/2f462be755b24de91116ecd205dfcc75283116171ddc3d961a84c0933907b8"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ad/2f462be755b24de91116ecd205dfcc75283116171ddc3d961a84c0933907b8", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/e7/efef33bae1ee4c204542f7a1efe25d2c01acb18ca45b49507c12aacfe43e37"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ad/2f462be755b24de91116ecd205dfcc75283116171ddc3d961a84c0933907b8"
+kind = "image/png"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/e7/efef33bae1ee4c204542f7a1efe25d2c01acb18ca45b49507c12aacfe43e37"
+kind = "video/mp4"

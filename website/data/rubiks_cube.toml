@@ -542,5 +542,16 @@ fn rubiks_cube(r: &mut RanimScene) {
 ```"""
 hash = "f9af40263e6291f3deaf5ed91be788246b6de15d"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/9c45ad5332f72597458f948879565fdb85fd302a3a26d660a0af3f7a96164c", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/9f/96a981ee4eea33c361843378df9ca8c8f1743f509963ba4b0f5bc6c54d57eb"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/9c45ad5332f72597458f948879565fdb85fd302a3a26d660a0af3f7a96164c", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ea/103caa74f35f0747ee5843bfc67a7f9a26c33b4b12de74839ef3f34af87272", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/9f/96a981ee4eea33c361843378df9ca8c8f1743f509963ba4b0f5bc6c54d57eb"]
 wasm = false
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/9c45ad5332f72597458f948879565fdb85fd302a3a26d660a0af3f7a96164c"
+kind = "image/png"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ea/103caa74f35f0747ee5843bfc67a7f9a26c33b4b12de74839ef3f34af87272"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/9f/96a981ee4eea33c361843378df9ca8c8f1743f509963ba4b0f5bc6c54d57eb"
+kind = "image/png"

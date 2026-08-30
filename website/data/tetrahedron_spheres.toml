@@ -122,5 +122,12 @@ fn tetrahedron_spheres(r: &mut RanimScene) {
 ```"""
 hash = "69e7598a24ba795bc519cf7e9bd017973443f095"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/b5/f5ad3178f4887a4114b842319b13d63b4180c8993ba1ed797272a16baa9554"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/b5/f5ad3178f4887a4114b842319b13d63b4180c8993ba1ed797272a16baa9554", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a6/843f65b609eb4fe14197d7fbac817a3dffcf84a6d7351e1dc1c44a4bef0ef7"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/b5/f5ad3178f4887a4114b842319b13d63b4180c8993ba1ed797272a16baa9554"
+kind = "image/png"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a6/843f65b609eb4fe14197d7fbac817a3dffcf84a6d7351e1dc1c44a4bef0ef7"
+kind = "video/mp4"

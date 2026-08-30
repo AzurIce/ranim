@@ -148,5 +148,20 @@ fn hanoi_10(r: &mut RanimScene) {
 ```"""
 hash = "dbfa5da3c7b2bf7696518ce9729c0a3d3967e07c"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/0e/98fb9d0600f91944eb14ce64cf96b0779193fca69799f926cc1cfe205057d2", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/f0/8875e685ca4fe6b5e34eb31c1bc0bece7633d7e31929e38d630a06f31b4a6d"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/66/f394938333bc7f5cb719aa0cb7ea8188c5c72659c9df751f6ba27bf5033ab5", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/c9/8c863207617d08ef185800831b59b3a9539cb681ab676d58dab85ec3a6ed40", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/0e/98fb9d0600f91944eb14ce64cf96b0779193fca69799f926cc1cfe205057d2", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/f0/8875e685ca4fe6b5e34eb31c1bc0bece7633d7e31929e38d630a06f31b4a6d"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/66/f394938333bc7f5cb719aa0cb7ea8188c5c72659c9df751f6ba27bf5033ab5"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/c9/8c863207617d08ef185800831b59b3a9539cb681ab676d58dab85ec3a6ed40"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/0e/98fb9d0600f91944eb14ce64cf96b0779193fca69799f926cc1cfe205057d2"
+kind = "image/png"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/f0/8875e685ca4fe6b5e34eb31c1bc0bece7633d7e31929e38d630a06f31b4a6d"
+kind = "image/png"

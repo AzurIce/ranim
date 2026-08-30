@@ -252,5 +252,12 @@ fn cloth_wrap(r: &mut RanimScene) {
 ```"""
 hash = "6b02da781180e15bafacadcbd9354ee0de4a986e"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/d5/6ad64eb564791a97d9b9e9d41898601bc7da10251dd13067b5f3c14549bb29"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/fb/7da8e8f5230acf1ef6030cd0cc573e305e6c04db345fee95912c13d613b7c6", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/d5/6ad64eb564791a97d9b9e9d41898601bc7da10251dd13067b5f3c14549bb29"]
 wasm = false
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/fb/7da8e8f5230acf1ef6030cd0cc573e305e6c04db345fee95912c13d613b7c6"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/d5/6ad64eb564791a97d9b9e9d41898601bc7da10251dd13067b5f3c14549bb29"
+kind = "image/png"

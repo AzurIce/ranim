@@ -188,5 +188,12 @@ fn aabb(r: &mut RanimScene) {
 ```"""
 hash = "f19389ed9270a31f51e4c400464ef0c1f389cd39"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/88/0d413b9c49b23d249eda43d93b8999a65a01d91781043e19c5e9fa8cc757a3"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ae/34f7448c13946e8f58ce7fbbe2812bf79e7433f85325a85742c5a1cc4b3c89", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/88/0d413b9c49b23d249eda43d93b8999a65a01d91781043e19c5e9fa8cc757a3"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ae/34f7448c13946e8f58ce7fbbe2812bf79e7433f85325a85742c5a1cc4b3c89"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/88/0d413b9c49b23d249eda43d93b8999a65a01d91781043e19c5e9fa8cc757a3"
+kind = "image/png"

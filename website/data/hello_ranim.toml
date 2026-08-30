@@ -85,5 +85,12 @@ fn hello_ranim_chained(r: &mut RanimScene) {
 ```"""
 hash = "984f0f478b8ac1927ea82c3c0fd3b6c9709f2130"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5c/ad7a00d6776aeef7bd091925f56380022f34575101852c772a949465be4923"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/42/dfd369956612665889e479eda6a520619d7cb58a1b9d48e28842622dd04a86", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5c/ad7a00d6776aeef7bd091925f56380022f34575101852c772a949465be4923"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/42/dfd369956612665889e479eda6a520619d7cb58a1b9d48e28842622dd04a86"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5c/ad7a00d6776aeef7bd091925f56380022f34575101852c772a949465be4923"
+kind = "image/png"

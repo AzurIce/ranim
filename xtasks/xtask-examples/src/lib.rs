@@ -245,7 +245,7 @@ impl Example {
             hash: String,
 
             preview_imgs: Vec<String>,
-            output_files: Vec<String>,
+            output_files: Vec<OutputFile>,
             wasm: bool,
         }
 
@@ -609,8 +609,30 @@ fn copy_readme_images(readme: &str, example_dir: &Path, static_example_dir: &Pat
     Ok(())
 }
 
+/// One entry of `output_files` in `website/data/*.toml`.
+///
+/// Content-addressed URLs carry no file extension, so the MIME type derived
+/// from the rendered file's extension is stored alongside and the website
+/// branches on it instead of the URL shape.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct OutputFile {
+    pub url: String,
+    pub kind: String,
+}
+
+fn mime_for_extension(ext: &str) -> &'static str {
+    match ext {
+        "mp4" => "video/mp4",
+        "webm" => "video/webm",
+        "mov" => "video/quicktime",
+        "gif" => "image/gif",
+        "jpg" => "image/jpeg",
+        _ => "image/png",
+    }
+}
+
 /// Split synced output files into `preview_imgs` and `output_files` entries.
-fn split_output_files(files: &[String]) -> (Vec<String>, Vec<String>) {
+fn split_output_files(files: &[String]) -> (Vec<String>, Vec<OutputFile>) {
     let mut preview_imgs = vec![];
     let mut output_files = vec![];
     for file in files {
@@ -620,9 +642,12 @@ fn split_output_files(files: &[String]) -> (Vec<String>, Vec<String>) {
             .unwrap_or_default();
         if PREVIEW_EXTENSIONS.contains(&ext) {
             preview_imgs.push(file.clone());
-            output_files.push(file.clone());
-        } else if WEBSITE_OUTPUT_EXTENSIONS.contains(&ext) {
-            output_files.push(file.clone());
+        }
+        if WEBSITE_OUTPUT_EXTENSIONS.contains(&ext) {
+            output_files.push(OutputFile {
+                url: file.clone(),
+                kind: mime_for_extension(ext).to_string(),
+            });
         }
     }
     (preview_imgs, output_files)
@@ -646,31 +671,32 @@ fn write_example_data(
         hash: String,
 
         preview_imgs: Vec<String>,
-        output_files: Vec<String>,
+        output_files: Vec<OutputFile>,
         wasm: bool,
     }
 
     files.sort();
 
-    let (preview_imgs, output_files) = split_output_files(&files);
+    let (preview_imgs, mut output_files) = split_output_files(&files);
     let static_example_dir = root_dir
         .join("website")
         .join("static")
         .join("examples")
         .join(&example.name);
     let to_url = |file: &String| shadow.object_url(static_example_dir.join(file));
+    let preview_imgs = preview_imgs
+        .iter()
+        .map(to_url)
+        .collect::<Result<Vec<_>>>()?;
+    for entry in &mut output_files {
+        entry.url = to_url(&entry.url)?;
+    }
     let data = OutputData {
         name: example.name.clone(),
         code: example.code.clone(),
         hash: example.hash.clone(),
-        preview_imgs: preview_imgs
-            .iter()
-            .map(to_url)
-            .collect::<Result<Vec<_>>>()?,
-        output_files: output_files
-            .iter()
-            .map(to_url)
-            .collect::<Result<Vec<_>>>()?,
+        preview_imgs,
+        output_files,
         wasm: example.meta.wasm,
     };
 
@@ -1021,6 +1047,39 @@ mod test {
         assert!(dirs.contains(&root_dir.join("output/perlin_terrain/erosion")));
         assert!(dirs.contains(&root_dir.join("output/perlin_terrain/fractal")));
         assert!(dirs.contains(&root_dir.join("output/perlin_terrain/perlin")));
+    }
+
+    #[test]
+    fn test_split_output_files_assigns_kinds() {
+        let files = vec![
+            "preview.png".to_string(),
+            "scene.mp4".to_string(),
+            "clip.webm".to_string(),
+            "anim.gif".to_string(),
+        ];
+        let (previews, outputs) = split_output_files(&files);
+        assert_eq!(previews, vec!["preview.png".to_string()]);
+        assert_eq!(
+            outputs,
+            vec![
+                OutputFile {
+                    url: "preview.png".to_string(),
+                    kind: "image/png".to_string()
+                },
+                OutputFile {
+                    url: "scene.mp4".to_string(),
+                    kind: "video/mp4".to_string()
+                },
+                OutputFile {
+                    url: "clip.webm".to_string(),
+                    kind: "video/webm".to_string()
+                },
+                OutputFile {
+                    url: "anim.gif".to_string(),
+                    kind: "image/gif".to_string()
+                },
+            ]
+        );
     }
 
     #[test]

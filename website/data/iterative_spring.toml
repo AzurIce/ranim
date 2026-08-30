@@ -64,5 +64,12 @@ fn iterative_spring(r: &mut RanimScene) {
 ```"""
 hash = "6ca1a76122a0f27cb5b005441575a8e2c6521f3b"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/d8/0376791ce26c5e8eecc413a6c53c3821db07c1208978c39477ac737f2e420c"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/e9/af84b22dda5b9b241c744e807b1346b3497fc816119ba34393faf38a320959", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/d8/0376791ce26c5e8eecc413a6c53c3821db07c1208978c39477ac737f2e420c"]
 wasm = false
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/e9/af84b22dda5b9b241c744e807b1346b3497fc816119ba34393faf38a320959"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/d8/0376791ce26c5e8eecc413a6c53c3821db07c1208978c39477ac737f2e420c"
+kind = "image/png"

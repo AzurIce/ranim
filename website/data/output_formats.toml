@@ -75,5 +75,20 @@ fn output_formats(r: &mut RanimScene) {
 ```"""
 hash = "60054056f57521ada9e0bda4b4eddf8582190c74"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/48/37fc92a066040cd18b0e55aebd3217e1ef1f7b187badae94727b62f8b85137"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5e/1d0bd500006cca746f96ee5e86297fa34a52b444cae7d73156f9ea5bc5ff04", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a4/2e1b574a2bcf3dc9848c5503da553fc2b7fbf29f8279371565077e6fa418bd", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/1c/75e354b51eeaf04c9e0560678ca389fc7ef217421b81c400ed640bc5e6c0aa", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/48/37fc92a066040cd18b0e55aebd3217e1ef1f7b187badae94727b62f8b85137"]
 wasm = false
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5e/1d0bd500006cca746f96ee5e86297fa34a52b444cae7d73156f9ea5bc5ff04"
+kind = "image/gif"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a4/2e1b574a2bcf3dc9848c5503da553fc2b7fbf29f8279371565077e6fa418bd"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/1c/75e354b51eeaf04c9e0560678ca389fc7ef217421b81c400ed640bc5e6c0aa"
+kind = "video/webm"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/48/37fc92a066040cd18b0e55aebd3217e1ef1f7b187badae94727b62f8b85137"
+kind = "image/png"

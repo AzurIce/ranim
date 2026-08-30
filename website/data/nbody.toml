@@ -177,5 +177,12 @@ fn nbody(r: &mut RanimScene) {
 ```"""
 hash = "c43b0e3a7b11d2dd1f39f8e60a603ee89cd96f89"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/66/c03f78304da1236f8efeae6b3cd54500fec3e60c06d0e8beb1d1a2a465b98b"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/17/729a67eeedae67a4318ecfbced062668434e1bfea79365eed107c936e8bee9", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/66/c03f78304da1236f8efeae6b3cd54500fec3e60c06d0e8beb1d1a2a465b98b"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/17/729a67eeedae67a4318ecfbced062668434e1bfea79365eed107c936e8bee9"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/66/c03f78304da1236f8efeae6b3cd54500fec3e60c06d0e8beb1d1a2a465b98b"
+kind = "image/png"

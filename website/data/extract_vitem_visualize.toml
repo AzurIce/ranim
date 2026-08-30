@@ -259,5 +259,20 @@ impl Empty for VisualVItem {
 ```"""
 hash = "38729d681209801390382d374116de6c7264d032"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/c9dfba5bf8314658a655397dc13d8c1d103b6f8db5dcbfffccf3efbba4b89a", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/1c/45ab36f6d966cd718fe72e7de1e28eef40b1005866fd61a638840ee4df4507"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/7c/5b66fa4d18bf1a38726052afdd82f816705af9998f6ae6eaaa284e08297c32", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/c9dfba5bf8314658a655397dc13d8c1d103b6f8db5dcbfffccf3efbba4b89a", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/1c/45ab36f6d966cd718fe72e7de1e28eef40b1005866fd61a638840ee4df4507", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/9c/d0727203eb6558451ba04639285c401f5f8dddd4e9759f3e0cb17d5ff5dbc6"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/7c/5b66fa4d18bf1a38726052afdd82f816705af9998f6ae6eaaa284e08297c32"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/c9dfba5bf8314658a655397dc13d8c1d103b6f8db5dcbfffccf3efbba4b89a"
+kind = "image/png"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/1c/45ab36f6d966cd718fe72e7de1e28eef40b1005866fd61a638840ee4df4507"
+kind = "image/png"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/9c/d0727203eb6558451ba04639285c401f5f8dddd4e9759f3e0cb17d5ff5dbc6"
+kind = "video/mp4"

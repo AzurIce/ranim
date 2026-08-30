@@ -293,5 +293,12 @@ fn solar_system(r: &mut RanimScene) {
 ```"""
 hash = "0abc81b7a7a47b600efac99f9adb136db462b313"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/90/519f3e2bb3b7b024e7e41ff6cf67693c052075e2335cca07f1f13adc547618"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/90/519f3e2bb3b7b024e7e41ff6cf67693c052075e2335cca07f1f13adc547618", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/73/f0bbbcdb8bd3da11864886f7145e16c71428512c898f8aec7c48c6c52951af"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/90/519f3e2bb3b7b024e7e41ff6cf67693c052075e2335cca07f1f13adc547618"
+kind = "image/png"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/73/f0bbbcdb8bd3da11864886f7145e16c71428512c898f8aec7c48c6c52951af"
+kind = "video/mp4"

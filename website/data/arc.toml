@@ -66,5 +66,12 @@ pub fn arc(r: &mut RanimScene) {
 ```"""
 hash = "ee06a2898c69eee9c716cba2740dc948c578b035"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/53/8c4bb5ca65bcee91535cb6bc6f45a7f9a31ddb8e7a17e94be2f9f6f796d81f"]
-output_files = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/b4/518b1319740c2be462bbaff42c8fe61a4995469f0ca49e460b3bd37b34883f", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/53/8c4bb5ca65bcee91535cb6bc6f45a7f9a31ddb8e7a17e94be2f9f6f796d81f"]
 wasm = true
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/b4/518b1319740c2be462bbaff42c8fe61a4995469f0ca49e460b3bd37b34883f"
+kind = "video/mp4"
+
+[[output_files]]
+url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/53/8c4bb5ca65bcee91535cb6bc6f45a7f9a31ddb8e7a17e94be2f9f6f796d81f"
+kind = "image/png"
