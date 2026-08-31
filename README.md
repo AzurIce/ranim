@@ -32,7 +32,7 @@ Ranim is an animation engine crate implemented in pure rust, inspired heavily by
 
 Related:
 - [AzurIce/ranim-doc](https://github.com/AzurIce/ranim-doc): rustdoc for main
-- [AzurIce/ranim-book](https://github.com/AzurIce/ranim-doc): ranim book
+- [AzurIce/ranim-book](https://github.com/AzurIce/ranim-book): ranim book
 - [AzurIce/ranim-one-shot](https://github.com/AzurIce/ranim-one-shot): one-shot attempts with ranim
 - [AzurIce/ranim-bench](https://github.com/AzurIce/ranim-bench): benchmarks for ranim
 
