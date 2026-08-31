@@ -15,7 +15,6 @@ website/
 
 ```text
 examples/arc/lib.rs                       -> content/examples/arc.md
-examples/agents/double_pendulum/lib.rs    -> content/examples/agents/double_pendulum.md
 ```
 
 `xtask` 会自动为缺失的目录创建 Zola `_index.md`，所以 Zola 侧不需要手工维护

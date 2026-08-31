@@ -444,9 +444,8 @@ template = "examples-page.html"
     /// Directories that `ranim output` writes for this example.
     ///
     /// The directories are parsed from the example's `#[output(dir = "...")]`
-    /// attributes, so nested examples such as `examples/agents/...` (and
-    /// multi-dir examples such as `perlin_terrain`) work without duplicating
-    /// their directory layout in the xtask.
+    /// attributes, so multi-dir examples such as `perlin_terrain` work without
+    /// duplicating their directory layout in the xtask.
     fn render_output_dirs(&self, root_dir: &Path) -> Result<Vec<PathBuf>> {
         let source = fs::read_to_string(&self.path)
             .with_context(|| format!("failed to read example source {}", self.path.display()))?;
@@ -960,7 +959,7 @@ mod test {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir).unwrap();
-        assert_eq!(examples.len(), 36); // + iterative_spring, nbody, cloth_wrap, agents, gltf_showcase, z_fighting
+        assert_eq!(examples.len(), 33); // + iterative_spring, nbody, cloth_wrap, gltf_showcase, z_fighting
         assert_eq!(
             examples
                 .iter()
@@ -976,14 +975,6 @@ mod test {
                 .unwrap()
                 .group,
             PathBuf::new()
-        );
-        assert_eq!(
-            examples
-                .iter()
-                .find(|example| example.name == "double_pendulum")
-                .unwrap()
-                .group,
-            PathBuf::from("agents")
         );
         println!("found {} examples:", examples.len());
         examples.iter().for_each(|example| {
@@ -1029,15 +1020,6 @@ mod test {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir).unwrap();
-
-        let double_pendulum = examples
-            .iter()
-            .find(|example| example.name == "double_pendulum")
-            .unwrap();
-        assert_eq!(
-            double_pendulum.render_output_dirs(&root_dir).unwrap(),
-            vec![root_dir.join("output/agents/double_pendulum")]
-        );
 
         let perlin_terrain = examples
             .iter()

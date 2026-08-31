@@ -539,16 +539,6 @@ inspect scenes → inspect tree → inspect frame → render（冒烟出图）�
 
 原则与 cli 章的表述一致：能用便宜的 `inspect` 查清的问题，不要留到昂贵的 GPU 渲染之后才发现。
 
-### `examples/agents/`：one-shot 例子的可追溯档案
-
-#192 同步建立了 agent 编写 example 的目录约定：每个例子是**一次 one-shot 任务交付**——一个原始 prompt 对应一次交付，交付前的 `inspect` 自查、渲染查看与修改都属于同一轮任务；目录里归档效果图、原始 prompt、设计思路与 ranim-cli 迭代过程，作为可追溯性记录。首批三个例子均由 agent（Kimi K3）独立完成并渲染验收：
-
-| Example | 内容 |
-|---|---|
-| `double_pendulum` | 三个初始角仅差 0.001 rad 的双摆从重叠到彻底分离，演示混沌的初值敏感性（RK4 + `Iterative` 推进物理） |
-| `rubiks_cube` | 三阶魔方"12 步打乱 → 逆序求解"全过程，3D 魔方与平面展开图同步更新 |
-| `convolution_kernels` | 12x12 网格上演示 Identity/Box Blur/Sharpen/Edge Detect 四种 3x3 卷积核的滑动窗口过程 |
-
 ### 其他
 
 - 用户层 `MeshItem` 统一为 f64（`DVec3`/`DMat4`），与 `Surface`/`VItem` 一致；渲染侧核心表示仍为 f32，`From` 转换自动完成。
