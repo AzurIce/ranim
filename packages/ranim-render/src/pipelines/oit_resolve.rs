@@ -5,7 +5,7 @@ use bevy_ecs::prelude::*;
 use crate::{
     ResolutionInfo, WgpuContext,
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT, PipelinesPool},
-    schedule::{FrameTarget, RenderContext},
+    schedule::{FrameTarget, RenderContext, RenderProfiler},
 };
 
 pub(crate) fn resolve(
@@ -14,6 +14,7 @@ pub(crate) fn resolve(
     pipelines: Res<PipelinesPool>,
     resolution: Res<ResolutionInfo>,
     target: Res<FrameTarget>,
+    profiler: Res<RenderProfiler>,
 ) {
     let mut pass = render
         .encoder()
@@ -33,10 +34,12 @@ pub(crate) fn resolve(
             occlusion_query_set: None,
             multiview_mask: None,
         });
-    pass.set_pipeline(&pipelines.get_or_init::<OITResolvePipeline>(&ctx));
-    pass.set_bind_group(0, &resolution.bind_group, &[]);
-    pass.set_bind_group(1, &target.depth_bind_group, &[]);
-    pass.draw(0..3, 0..1);
+    profiler.scope_pass("oit::resolve", &mut pass, |pass| {
+        pass.set_pipeline(&pipelines.get_or_init::<OITResolvePipeline>(&ctx));
+        pass.set_bind_group(0, &resolution.bind_group, &[]);
+        pass.set_bind_group(1, &target.depth_bind_group, &[]);
+        pass.draw(0..3, 0..1);
+    });
     drop(pass);
     render
         .encoder()

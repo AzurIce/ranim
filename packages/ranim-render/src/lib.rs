@@ -13,6 +13,9 @@ pub mod pipelines;
 pub mod primitives;
 pub mod resource;
 mod schedule;
+/// Upload instrumentation and experimental upload strategies
+/// (enabled via `RANIM_PROFILE_UPLOAD`).
+pub mod upload_probe;
 /// Rendering related utils
 pub mod utils;
 pub mod world;
@@ -36,11 +39,11 @@ use utils::WgpuContext;
 pub static PUFFIN_GPU_PROFILER: std::sync::LazyLock<std::sync::Mutex<puffin::GlobalProfiler>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
 
-#[allow(unused)]
 #[cfg(feature = "profiling")]
-mod profiling_utils {
+pub mod profiling_utils {
     use wgpu_profiler::GpuTimerQueryResult;
 
+    /// Print a `GpuTimerQueryResult` tree (label + duration) to stdout.
     pub fn scopes_to_console_recursive(results: &[GpuTimerQueryResult], indentation: u32) {
         for scope in results {
             if indentation > 0 {
@@ -63,6 +66,7 @@ mod profiling_utils {
         }
     }
 
+    #[allow(unused_variables)]
     pub fn console_output(
         results: &Option<Vec<GpuTimerQueryResult>>,
         enabled_features: wgpu::Features,
@@ -122,15 +126,7 @@ impl Renderer {
             ),
         ));
         world.init_resource::<CoreItemEntities>();
-
-        #[cfg(feature = "profiling")]
-        world.insert_resource(schedule::RenderProfiler(
-            wgpu_profiler::GpuProfiler::new(
-                &ctx.device,
-                wgpu_profiler::GpuProfilerSettings::default(),
-            )
-            .unwrap(),
-        ));
+        world.insert_resource(schedule::RenderProfiler::new(ctx));
         install_schedules(&mut world);
 
         Self {
@@ -156,6 +152,16 @@ impl Renderer {
             .insert_resource(FrameTarget::new(render_textures, clear_color));
         self.world.run_schedule(RenderPrepare);
         self.world.run_schedule(RenderGraph);
+    }
+
+    /// Take the GPU timer scopes recorded for the most recent processed frame
+    /// (`profiling` feature only, requires timer query support on the device).
+    #[cfg(feature = "profiling")]
+    pub fn take_last_gpu_scopes(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
+        self.world
+            .resource_mut::<schedule::RenderProfiler>()
+            .last_frame_scopes
+            .take()
     }
 }
 

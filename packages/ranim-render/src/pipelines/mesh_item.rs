@@ -9,9 +9,10 @@ use crate::{
         viewport::{ViewportBindGroup, ViewportGpuPacket},
     },
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT, PipelinesPool},
-    schedule::{FrameTarget, RenderContext},
+    schedule::{FrameTarget, RenderContext, RenderProfiler},
 };
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn depth(
     mut render: RenderContext,
     ctx: Res<WgpuContext>,
@@ -20,6 +21,7 @@ pub(crate) fn depth(
     target: Res<FrameTarget>,
     viewport: Res<ViewportGpuPacket>,
     merged: Res<MeshItemsBuffer>,
+    profiler: Res<RenderProfiler>,
 ) {
     if merged.item_count() == 0 {
         return;
@@ -41,21 +43,24 @@ pub(crate) fn depth(
             occlusion_query_set: None,
             multiview_mask: None,
         });
-    pass.set_pipeline(&pipelines.get_or_init::<MeshItemDepthPipeline>(&ctx));
-    pass.set_bind_group(0, &resolution.bind_group, &[]);
-    pass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
-    pass.set_bind_group(2, merged.render_bind_group.as_ref().unwrap(), &[]);
-    pass.set_vertex_buffer(0, merged.vertices_buffer.buffer.slice(..));
-    pass.set_vertex_buffer(1, merged.mesh_ids_buffer.buffer.slice(..));
-    pass.set_vertex_buffer(2, merged.vertex_colors_buffer.buffer.slice(..));
-    pass.set_vertex_buffer(3, merged.vertex_normals_buffer.buffer.slice(..));
-    pass.set_index_buffer(
-        merged.indices_buffer.buffer.slice(..),
-        wgpu::IndexFormat::Uint32,
-    );
-    pass.draw_indexed(0..merged.total_indices(), 0, 0..1);
+    profiler.scope_pass("mesh::depth", &mut pass, |pass| {
+        pass.set_pipeline(&pipelines.get_or_init::<MeshItemDepthPipeline>(&ctx));
+        pass.set_bind_group(0, &resolution.bind_group, &[]);
+        pass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
+        pass.set_bind_group(2, merged.render_bind_group.as_ref().unwrap(), &[]);
+        pass.set_vertex_buffer(0, merged.vertices_buffer.buffer.slice(..));
+        pass.set_vertex_buffer(1, merged.mesh_ids_buffer.buffer.slice(..));
+        pass.set_vertex_buffer(2, merged.vertex_colors_buffer.buffer.slice(..));
+        pass.set_vertex_buffer(3, merged.vertex_normals_buffer.buffer.slice(..));
+        pass.set_index_buffer(
+            merged.indices_buffer.buffer.slice(..),
+            wgpu::IndexFormat::Uint32,
+        );
+        pass.draw_indexed(0..merged.total_indices(), 0, 0..1);
+    });
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn color(
     mut render: RenderContext,
     ctx: Res<WgpuContext>,
@@ -64,6 +69,7 @@ pub(crate) fn color(
     target: Res<FrameTarget>,
     viewport: Res<ViewportGpuPacket>,
     merged: Res<MeshItemsBuffer>,
+    profiler: Res<RenderProfiler>,
 ) {
     if merged.item_count() == 0 {
         return;
@@ -93,19 +99,21 @@ pub(crate) fn color(
             occlusion_query_set: None,
             multiview_mask: None,
         });
-    pass.set_pipeline(&pipelines.get_or_init::<MeshItemColorPipeline>(&ctx));
-    pass.set_bind_group(0, &resolution.bind_group, &[]);
-    pass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
-    pass.set_bind_group(2, merged.render_bind_group.as_ref().unwrap(), &[]);
-    pass.set_vertex_buffer(0, merged.vertices_buffer.buffer.slice(..));
-    pass.set_vertex_buffer(1, merged.mesh_ids_buffer.buffer.slice(..));
-    pass.set_vertex_buffer(2, merged.vertex_colors_buffer.buffer.slice(..));
-    pass.set_vertex_buffer(3, merged.vertex_normals_buffer.buffer.slice(..));
-    pass.set_index_buffer(
-        merged.indices_buffer.buffer.slice(..),
-        wgpu::IndexFormat::Uint32,
-    );
-    pass.draw_indexed(0..merged.total_indices(), 0, 0..1);
+    profiler.scope_pass("mesh::color", &mut pass, |pass| {
+        pass.set_pipeline(&pipelines.get_or_init::<MeshItemColorPipeline>(&ctx));
+        pass.set_bind_group(0, &resolution.bind_group, &[]);
+        pass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
+        pass.set_bind_group(2, merged.render_bind_group.as_ref().unwrap(), &[]);
+        pass.set_vertex_buffer(0, merged.vertices_buffer.buffer.slice(..));
+        pass.set_vertex_buffer(1, merged.mesh_ids_buffer.buffer.slice(..));
+        pass.set_vertex_buffer(2, merged.vertex_colors_buffer.buffer.slice(..));
+        pass.set_vertex_buffer(3, merged.vertex_normals_buffer.buffer.slice(..));
+        pass.set_index_buffer(
+            merged.indices_buffer.buffer.slice(..),
+            wgpu::IndexFormat::Uint32,
+        );
+        pass.draw_indexed(0..merged.total_indices(), 0, 0..1);
+    });
 }
 
 pub struct MeshItemColorPipeline {

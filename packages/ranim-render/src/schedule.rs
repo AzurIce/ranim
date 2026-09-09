@@ -91,9 +91,61 @@ impl RenderContext<'_> {
     }
 }
 
-#[cfg(feature = "profiling")]
+/// Always-present render profiler resource. Without the `profiling` feature
+/// (or without timer query support) the pass scopes below are pass-through.
 #[derive(Resource)]
-pub(crate) struct RenderProfiler(pub wgpu_profiler::GpuProfiler);
+pub(crate) struct RenderProfiler {
+    #[cfg(feature = "profiling")]
+    pub(crate) inner: Option<wgpu_profiler::GpuProfiler>,
+    /// GPU timer scopes of the most recent processed frame
+    /// (`profiling` feature only).
+    #[cfg(feature = "profiling")]
+    pub(crate) last_frame_scopes: Option<Vec<wgpu_profiler::GpuTimerQueryResult>>,
+}
+
+impl RenderProfiler {
+    pub(crate) fn new(_ctx: &WgpuContext) -> Self {
+        Self {
+            #[cfg(feature = "profiling")]
+            inner: wgpu_profiler::GpuProfiler::new(
+                &_ctx.device,
+                wgpu_profiler::GpuProfilerSettings::default(),
+            )
+            .ok(),
+            #[cfg(feature = "profiling")]
+            last_frame_scopes: None,
+        }
+    }
+
+    /// Run `f` with `pass` wrapped in a GPU timer scope labeled `label`.
+    /// No-op without the `profiling` feature.
+    #[cfg(not(feature = "profiling"))]
+    pub(crate) fn scope_pass<R, T>(
+        &self,
+        _label: &str,
+        pass: &mut R,
+        f: impl FnOnce(&mut R) -> T,
+    ) -> T {
+        f(pass)
+    }
+
+    #[cfg(feature = "profiling")]
+    pub(crate) fn scope_pass<R, T>(
+        &self,
+        label: &str,
+        pass: &mut R,
+        f: impl FnOnce(&mut R) -> T,
+    ) -> T
+    where
+        R: wgpu_profiler::ProfilerCommandRecorder,
+    {
+        let Some(profiler) = self.inner.as_ref() else {
+            return f(pass);
+        };
+        let mut scope = profiler.scope(label.to_string(), pass);
+        f(&mut *scope)
+    }
+}
 
 pub(crate) fn install_schedules(world: &mut World) {
     world.init_resource::<FrameEncoder>();
@@ -190,7 +242,7 @@ fn begin_frame(ctx: Res<WgpuContext>, mut encoder: ResMut<FrameEncoder>) {
     );
 }
 
-fn clear(mut render: RenderContext, target: Res<FrameTarget>) {
+fn clear(mut render: RenderContext, target: Res<FrameTarget>, profiler: Res<RenderProfiler>) {
     let pass_desc = wgpu::RenderPassDescriptor {
         label: Some("Clear Pass"),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -214,7 +266,9 @@ fn clear(mut render: RenderContext, target: Res<FrameTarget>) {
         occlusion_query_set: None,
         multiview_mask: None,
     };
-    render.encoder().begin_render_pass(&pass_desc);
+    let encoder = render.encoder();
+    let mut pass = encoder.begin_render_pass(&pass_desc);
+    profiler.scope_pass("clear", &mut pass, |_| ());
 }
 
 fn view_driver(world: &mut World) {
@@ -261,7 +315,9 @@ fn submit(
     #[allow(unused_mut)]
     let mut encoder = encoder.0.take().expect("frame encoder was not initialized");
     #[cfg(feature = "profiling")]
-    profiler.0.resolve_queries(&mut encoder);
+    if let Some(inner) = profiler.inner.as_mut() {
+        inner.resolve_queries(&mut encoder);
+    }
     ctx.queue.submit(Some(encoder.finish()));
 }
 
@@ -271,18 +327,16 @@ fn finish_frame(
     #[cfg(feature = "profiling")] mut profiler: ResMut<RenderProfiler>,
 ) {
     #[cfg(feature = "profiling")]
-    {
-        profiler.0.end_frame().unwrap();
+    if let Some(inner) = profiler.inner.as_mut() {
+        inner.end_frame().unwrap();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();
-        if let Some(results) = profiler
-            .0
-            .process_finished_frame(ctx.queue.get_timestamp_period())
-        {
+        if let Some(results) = inner.process_finished_frame(ctx.queue.get_timestamp_period()) {
             let mut gpu_profiler = crate::PUFFIN_GPU_PROFILER.lock().unwrap();
             wgpu_profiler::puffin::output_frame_to_puffin(&mut gpu_profiler, &results);
             gpu_profiler.new_frame();
+            profiler.last_frame_scopes = Some(results);
         }
     }
     target.texture_state.mark_dirty();
