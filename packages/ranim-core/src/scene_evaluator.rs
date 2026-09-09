@@ -9,7 +9,8 @@
 
 use crate::{
     Extract, SealedRanimScene, TimeMark,
-    animation::{AnimationCell, AnimationInfo},
+    animation::{AnimNode, AnimationInfo},
+    audio::MASTER_SAMPLE_RATE,
     core_item::CoreItem,
 };
 
@@ -18,8 +19,9 @@ pub type EvaluatedFrame = Vec<((usize, usize), CoreItem)>;
 
 /// Lightweight scene evaluation session.
 pub struct SceneEvaluator {
-    cells: Vec<AnimationCell>,
+    cells: Vec<AnimNode>,
     total_secs: f64,
+    audio: std::sync::Arc<[f32]>,
     time_marks: Vec<(f64, TimeMark)>,
     clock: f64,
 }
@@ -34,6 +36,7 @@ impl SceneEvaluator {
         Self {
             cells: scene.animations,
             total_secs: scene.total_secs,
+            audio: scene.audio,
             time_marks: scene.time_marks,
             clock: 0.0,
         }
@@ -44,6 +47,47 @@ impl SceneEvaluator {
         self.total_secs
     }
 
+    /// The top-level animation cells.
+    ///
+    /// Crate-internal: the audio tests walk these with a point-semantics
+    /// reference mixer that the seal-time bake must reproduce exactly.
+    #[cfg(test)]
+    pub(crate) fn cells(&self) -> &[AnimNode] {
+        &self.cells
+    }
+
+    /// Whether any sound leaves live in the tree.
+    pub fn has_audio(&self) -> bool {
+        self.cells.iter().any(AnimNode::has_audio)
+    }
+
+    /// The baked audio plane: interleaved stereo at the master sample rate
+    /// over `[0, total_secs]` (shared, cheap to clone). Empty when the scene
+    /// has no sound leaves.
+    pub fn audio(&self) -> &std::sync::Arc<[f32]> {
+        &self.audio
+    }
+
+    /// The scene's audio over `[0, out_secs]` as a fresh interleaved stereo
+    /// buffer.
+    ///
+    /// The audio plane was already mixed once at seal
+    /// ([`RanimScene::seal`](crate::RanimScene::seal)); this is a prefix copy
+    /// of that baked buffer, zero-padded past the scene end.
+    pub fn mix_audio(&self, out_secs: f64, sample_rate: u32) -> Vec<f32> {
+        assert_eq!(
+            sample_rate, MASTER_SAMPLE_RATE,
+            "the baked audio lives at the master sample rate"
+        );
+        let out_frames = (out_secs * sample_rate as f64).ceil() as usize;
+        let baked_frames = self.audio.len() / 2;
+        let copy = out_frames.min(baked_frames);
+        let mut out = Vec::with_capacity(out_frames * 2);
+        out.extend_from_slice(&self.audio[..copy * 2]);
+        out.resize(out_frames * 2, 0.0);
+        out
+    }
+
     /// Scene time marks.
     pub fn time_marks(&self) -> &[(f64, TimeMark)] {
         &self.time_marks
@@ -51,10 +95,7 @@ impl SceneEvaluator {
 
     /// Hierarchical runtime animation information for preview tooling.
     pub fn animation_infos(&self) -> Vec<AnimationInfo> {
-        self.cells
-            .iter()
-            .map(AnimationCell::animation_info)
-            .collect()
+        self.cells.iter().map(AnimNode::animation_info).collect()
     }
 
     /// Last sampled target (the `clock` reading for preview tooling).

@@ -248,8 +248,8 @@ fn animation_kind_str(kind: AnimationInfoKind) -> &'static str {
         AnimationInfoKind::Eval => "eval",
         AnimationInfoKind::Sequence => "sequence",
         AnimationInfoKind::Stack => "stack",
-        AnimationInfoKind::Lagged => "lagged",
         AnimationInfoKind::Static => "static",
+        AnimationInfoKind::Audio => "audio",
     }
 }
 

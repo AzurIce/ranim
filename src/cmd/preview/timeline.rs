@@ -1063,7 +1063,7 @@ fn collect_tracks(
                 }
             }
         }
-        AnimationInfoKind::Stack | AnimationInfoKind::Lagged => {
+        AnimationInfoKind::Stack => {
             output.push(VisibleTrack {
                 path: path.clone(),
                 depth,
@@ -1085,7 +1085,7 @@ fn collect_tracks(
                 }
             }
         }
-        AnimationInfoKind::Eval | AnimationInfoKind::Static => {
+        AnimationInfoKind::Eval | AnimationInfoKind::Static | AnimationInfoKind::Audio => {
             output.push(VisibleTrack {
                 path: path.clone(),
                 depth,
@@ -1244,7 +1244,7 @@ fn animation_color_for_info(info: &AnimationInfo) -> Color32 {
 /// Stack-like overlay containers (stack, lagged) share the tree display logic:
 /// expandable children, rails, and depth indentation.
 fn is_stack_like(kind: AnimationInfoKind) -> bool {
-    matches!(kind, AnimationInfoKind::Stack | AnimationInfoKind::Lagged)
+    matches!(kind, AnimationInfoKind::Stack)
 }
 
 fn animation_color(kind: AnimationInfoKind) -> Color32 {
@@ -1252,8 +1252,8 @@ fn animation_color(kind: AnimationInfoKind) -> Color32 {
         AnimationInfoKind::Eval => manim::BLUE_C.to_rgba8(),
         AnimationInfoKind::Sequence => manim::TEAL_C.to_rgba8(),
         AnimationInfoKind::Stack => manim::ORANGE.to_rgba8(),
-        AnimationInfoKind::Lagged => manim::PURPLE_C.to_rgba8(),
         AnimationInfoKind::Static => manim::YELLOW_C.to_rgba8(),
+        AnimationInfoKind::Audio => manim::GREEN_C.to_rgba8(),
     };
     Rgba::from_srgba_unmultiplied(rgba.r, rgba.g, rgba.b, rgba.a).into()
 }

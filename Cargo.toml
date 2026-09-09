@@ -54,6 +54,8 @@ anims = []
 items = []
 typst = ["ranim-items/typst"]
 gltf = ["ranim-items/gltf"]
+# Preview audio playback (native only; muxing needs no extra deps)
+audio = ["dep:rodio"]
 profiling = [
   "ranim-render/profiling",
   "dep:puffin",
@@ -73,6 +75,7 @@ render = [
 ]
 preview = [
   "render",
+  "audio",
   "dep:egui",
   "dep:eframe",
   "dep:egui-phosphor",
@@ -144,6 +147,8 @@ flate2 = { version = "1.1.10", optional = true }
 reqwest = { version = "0.13.4", features = ["blocking"], optional = true }
 # app feature (native)
 eframe = { version = "0.36.1", features = ["wgpu"], optional = true }
+# audio feature (native): preview playback
+rodio = { version = "0.21", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"
@@ -195,6 +200,14 @@ crate-type = ["cdylib"]
 
 [package.metadata.example.z_fighting]
 wasm = true
+
+[[example]]
+name = "audio_demo"
+path = "examples/audio_demo/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.audio_demo]
+wasm = false
 
 [[example]]
 name = "animating_pi"

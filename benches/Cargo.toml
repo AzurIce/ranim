@@ -19,6 +19,18 @@ wgpu = { workspace = true }
 pollster = "1.0.1"
 
 [[bench]]
+name = "node_shape"
+harness = false
+
+[[bench]]
+name = "audio_block"
+harness = false
+
+[[bench]]
+name = "audio_mix"
+harness = false
+
+[[bench]]
 name = "eval"
 harness = false
 

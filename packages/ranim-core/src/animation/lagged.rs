@@ -1,13 +1,12 @@
-//! Dynamic lagged (staggered, end-filled) animation container.
+//! Lagged (staggered, end-filled) authoring combinator.
+//!
+//! [`AnimLagged`] is build-time only: it staggers children by placing them
+//! on the content axis and lowers to a plain stack of per-item sequence
+//! tracks in [`Animation::build`] — no runtime kind of its own.
 
 use std::any::type_name;
 
-use crate::{core_item::DynItem, utils::rate_functions::linear};
-
-use super::{
-    Animation, AnimationCell, AnimationInfo, AnimationInfoKind, Placeable, eval::EvalDyn,
-    sequence::AnimSequence, static_cell,
-};
+use super::{AnimNode, Animation, NodeContent, Placeable, sequence::AnimSequence, static_cell};
 
 /// How an [`AnimLagged`] fills the time outside a child's window.
 ///
@@ -52,7 +51,7 @@ pub enum LaggedFill {
 /// stateful child's trailing fill would be its initial state, not its true
 /// final state.
 pub struct AnimLagged {
-    animations: Vec<AnimationCell>,
+    animations: Vec<AnimNode>,
     lag_ratio: f64,
     /// Start offset for the next pushed child.
     cursor_sec: f64,
@@ -149,55 +148,31 @@ impl AnimLagged {
         self.duration_secs
     }
 
-    /// Borrow the direct child animations in local container coordinates.
-    pub fn built_animations(&self) -> &[AnimationCell] {
+    /// Borrow the children as placed by the stagger rule — the
+    /// pre-materialization view, before `build` turns them into filled
+    /// tracks.
+    pub fn built_animations(&self) -> &[AnimNode] {
         &self.animations
-    }
-
-    /// Consume this container into its direct child animations.
-    pub fn into_built_animations(self) -> Vec<AnimationCell> {
-        self.animations
     }
 }
 
 impl Placeable for AnimLagged {}
 impl Animation for AnimLagged {
-    fn build(mut self) -> AnimationCell {
+    /// Desugar: materialize each item into a full-extent sequence track,
+    /// then lower the whole container to a plain [`Stack`](NodeKind::Stack)
+    /// node — the stagger is ordinary window placement, so lagged needs no
+    /// runtime kind of its own. `anim_name` keeps the authoring identity.
+    fn build(mut self) -> AnimNode {
         self.materialize_fills();
         let duration_secs = self.duration_secs;
-        AnimationCell {
-            inner: Box::new(self),
-            rate_func: linear,
+        AnimNode {
+            content: NodeContent::Stack(self.animations),
+            internal_time_secs: duration_secs,
+            rate_func: None,
             time_range: 0.0..duration_secs,
             enabled: true,
             anim_name: type_name::<Self>(),
         }
-    }
-}
-
-impl EvalDyn for AnimLagged {
-    fn eval_dyn(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        let content_sec = self.duration_secs * alpha;
-        for animation in &self.animations {
-            if animation.contains_sec(content_sec, self.duration_secs) {
-                animation.eval_at(content_sec, output);
-            }
-        }
-    }
-
-    fn info_kind(&self) -> AnimationInfoKind {
-        AnimationInfoKind::Lagged
-    }
-
-    fn content_duration_secs(&self) -> f64 {
-        self.duration_secs
-    }
-
-    fn child_infos(&self) -> Vec<AnimationInfo> {
-        self.animations
-            .iter()
-            .map(AnimationCell::animation_info)
-            .collect()
     }
 }
 

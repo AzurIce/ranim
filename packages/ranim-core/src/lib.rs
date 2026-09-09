@@ -11,6 +11,8 @@
 /// Anchors and semantic bounds.
 pub mod anchor;
 pub mod animation;
+/// The audio plane of a scene.
+pub mod audio;
 /// Color utilities.
 pub mod color;
 /// Component data.
@@ -30,9 +32,11 @@ pub mod utils;
 pub use glam;
 pub use num;
 use std::fmt::Debug;
+use std::sync::Arc;
 
-use animation::{Animation, AnimationCell, stack::AnimStack};
-pub use animation::{AnimationInfo, AnimationInfoKind};
+use animation::{AnimNode, Animation, stack::AnimStack};
+pub use animation::{AnimationInfo, AnimationInfoKind, Sound};
+pub use audio::AudioTrack;
 use core_item::CoreItem;
 
 /// Commonly used ranim APIs.
@@ -46,7 +50,10 @@ pub mod prelude {
     pub use crate::animation::lagged::{AnimLagged, LaggedFill};
     pub use crate::animation::sequence::AnimSequence;
     pub use crate::animation::stack::AnimStack;
-    pub use crate::animation::{AnimIterExt, Animation, AnimationExt, Placeable, StaticAnim};
+    pub use crate::animation::{
+        AnimIterExt, Animation, AnimationExt, Placeable, StaticAnim, sound::Sound,
+    };
+    pub use crate::audio::{AudioClip, AudioTrack};
     pub use crate::core_item::camera_frame::CameraFrame;
     pub use crate::core_item::transformed::{Transformed, TransformedExt};
     pub use crate::{RanimScene, TimeMark};
@@ -150,6 +157,10 @@ pub enum TimeMark {
 #[derive(Default)]
 pub struct RanimScene {
     /// Root animation stack. Modules pushed here share the same local origin.
+    ///
+    /// Audio leaves ([`Sound`]) compose in the same tree beside visual
+    /// animations; [`RanimScene::seal`] bakes them through the same cell
+    /// remaps the visuals experience.
     pub root: AnimStack,
     time_marks: Vec<(f64, TimeMark)>,
 }
@@ -172,11 +183,20 @@ impl RanimScene {
     }
 
     /// Finish the definition and produce an immutable, evaluable recipe.
+    ///
+    /// The tree is the only animation representation: visual cells are
+    /// point-walked per frame by [`SceneEvaluator::sample_at`], and sound
+    /// leaves are baked here — see [`bake_audio`](crate::animation) — both
+    /// experiencing the same cell remaps along the path.
     pub fn seal(self) -> SealedRanimScene {
         let total_secs = self.root.duration_secs();
+        let animations = self.root.into_built_animations();
+        let sample_rate = crate::audio::MASTER_SAMPLE_RATE as f64;
+        let audio: Arc<[f32]> = animation::bake_audio(&animations, total_secs, sample_rate).into();
         SealedRanimScene {
             total_secs,
-            animations: self.root.into_built_animations(),
+            animations,
+            audio,
             time_marks: self.time_marks,
         }
     }
@@ -194,7 +214,11 @@ impl Debug for RanimScene {
 /// Immutable animation recipe produced by [`RanimScene::seal`].
 pub struct SealedRanimScene {
     total_secs: f64,
-    animations: Vec<AnimationCell>,
+    animations: Vec<AnimNode>,
+    /// The baked audio plane: interleaved stereo at the master sample rate
+    /// over `[0, total_secs]`, produced once at seal. Empty when the tree
+    /// has no sound leaves.
+    audio: Arc<[f32]>,
     time_marks: Vec<(f64, TimeMark)>,
 }
 
@@ -205,6 +229,13 @@ impl SealedRanimScene {
     /// stepping (each iterative segment owns its own `sim_step`).
     pub fn into_evaluator(self, logic_fps: f64) -> SceneEvaluator {
         SceneEvaluator::new(self, logic_fps)
+    }
+
+    /// The baked audio plane: interleaved stereo at the master sample rate
+    /// over `[0, total_secs]` (shared, cheap to clone). Empty when the scene
+    /// has no sound leaves.
+    pub fn audio(&self) -> &Arc<[f32]> {
+        &self.audio
     }
 
     /// Total scene duration.
@@ -221,7 +252,7 @@ impl SealedRanimScene {
     pub fn get_animation_infos(&self) -> Vec<AnimationInfo> {
         self.animations
             .iter()
-            .map(AnimationCell::animation_info)
+            .map(AnimNode::animation_info)
             .collect()
     }
 

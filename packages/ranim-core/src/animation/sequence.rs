@@ -2,12 +2,9 @@
 
 use std::any::type_name;
 
-use crate::{core_item::DynItem, utils::rate_functions::linear};
+use crate::core_item::DynItem;
 
-use super::{
-    Animation, AnimationCell, AnimationInfo, AnimationInfoKind, Placeable, eval::EvalDyn,
-    static_cell,
-};
+use super::{AnimNode, Animation, NodeContent, Placeable, static_cell};
 
 /// Dynamic sequential animation container.
 ///
@@ -15,7 +12,7 @@ use super::{
 /// composition hierarchy in this sequence's local coordinates.
 #[derive(Default)]
 pub struct AnimSequence {
-    pub(super) animations: Vec<AnimationCell>,
+    pub(super) animations: Vec<AnimNode>,
     pub(super) cursor_sec: f64,
 }
 
@@ -122,56 +119,28 @@ impl AnimSequence {
     }
 
     /// Borrow the direct child animations in local sequence coordinates.
-    pub fn built_animations(&self) -> &[AnimationCell] {
+    pub fn built_animations(&self) -> &[AnimNode] {
         &self.animations
     }
 
     /// Consume this sequence into its direct child animations.
-    pub fn into_built_animations(self) -> Vec<AnimationCell> {
+    pub fn into_built_animations(self) -> Vec<AnimNode> {
         self.animations
     }
 }
 
 impl Placeable for AnimSequence {}
 impl Animation for AnimSequence {
-    fn build(self) -> AnimationCell {
+    fn build(self) -> AnimNode {
         let duration_secs = self.cursor_sec;
-        AnimationCell {
-            inner: Box::new(self),
-            rate_func: linear,
+        AnimNode {
+            content: NodeContent::Sequence(self.animations),
+            internal_time_secs: duration_secs,
+            rate_func: None,
             time_range: 0.0..duration_secs,
             enabled: true,
             anim_name: type_name::<Self>(),
         }
-    }
-}
-
-impl EvalDyn for AnimSequence {
-    fn eval_dyn(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        let content_sec = self.cursor_sec * alpha;
-        if let Some(child) = self
-            .animations
-            .iter()
-            .rev()
-            .find(|child| child.contains_sec(content_sec, self.cursor_sec))
-        {
-            child.eval_at(content_sec, output);
-        }
-    }
-
-    fn info_kind(&self) -> AnimationInfoKind {
-        AnimationInfoKind::Sequence
-    }
-
-    fn content_duration_secs(&self) -> f64 {
-        self.cursor_sec
-    }
-
-    fn child_infos(&self) -> Vec<AnimationInfo> {
-        self.animations
-            .iter()
-            .map(AnimationCell::animation_info)
-            .collect()
     }
 }
 

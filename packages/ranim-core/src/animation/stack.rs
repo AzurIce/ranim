@@ -2,9 +2,7 @@
 
 use std::any::type_name;
 
-use crate::{core_item::DynItem, utils::rate_functions::linear};
-
-use super::{Animation, AnimationCell, AnimationInfo, AnimationInfoKind, Placeable, eval::EvalDyn};
+use super::{AnimNode, Animation, NodeContent, Placeable};
 
 /// Dynamic overlay animation container.
 ///
@@ -12,7 +10,7 @@ use super::{Animation, AnimationCell, AnimationInfo, AnimationInfoKind, Placeabl
 /// time and the stack duration is the maximum child extent.
 #[derive(Default)]
 pub struct AnimStack {
-    animations: Vec<AnimationCell>,
+    animations: Vec<AnimNode>,
     duration_secs: f64,
 }
 
@@ -43,53 +41,28 @@ impl AnimStack {
     }
 
     /// Borrow the direct child animations in local stack coordinates.
-    pub fn built_animations(&self) -> &[AnimationCell] {
+    pub fn built_animations(&self) -> &[AnimNode] {
         &self.animations
     }
 
     /// Consume this stack into its direct child animations.
-    pub fn into_built_animations(self) -> Vec<AnimationCell> {
+    pub fn into_built_animations(self) -> Vec<AnimNode> {
         self.animations
     }
 }
 
 impl Placeable for AnimStack {}
 impl Animation for AnimStack {
-    fn build(self) -> AnimationCell {
+    fn build(self) -> AnimNode {
         let duration_secs = self.duration_secs;
-        AnimationCell {
-            inner: Box::new(self),
-            rate_func: linear,
+        AnimNode {
+            content: NodeContent::Stack(self.animations),
+            internal_time_secs: duration_secs,
+            rate_func: None,
             time_range: 0.0..duration_secs,
             enabled: true,
             anim_name: type_name::<Self>(),
         }
-    }
-}
-
-impl EvalDyn for AnimStack {
-    fn eval_dyn(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        let content_sec = self.duration_secs * alpha;
-        for child in &self.animations {
-            if child.contains_sec(content_sec, self.duration_secs) {
-                child.eval_at(content_sec, output);
-            }
-        }
-    }
-
-    fn info_kind(&self) -> AnimationInfoKind {
-        AnimationInfoKind::Stack
-    }
-
-    fn content_duration_secs(&self) -> f64 {
-        self.duration_secs
-    }
-
-    fn child_infos(&self) -> Vec<AnimationInfo> {
-        self.animations
-            .iter()
-            .map(AnimationCell::animation_info)
-            .collect()
     }
 }
 

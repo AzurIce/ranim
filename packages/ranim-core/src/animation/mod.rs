@@ -1,8 +1,18 @@
 //! Pure animation evaluation and hierarchical type-erased composition.
+//!
+//! The runtime tree is a closed world of node content ([`NodeContent`]): the
+//! time-combinator vocabulary (sequence, stack) plus the leaf forms.
+//! Authoring is open above it — `AnimSequence`/`AnimStack`/`AnimLagged` are
+//! build-time constructors (like [`CoreItem`](crate::core_item::CoreItem)'s
+//! extraction boundary), user leaves are open through
+//! [`Eval`], and combinators expressible as
+//! placements (e.g. [`AnimLagged`]) desugar into the primitives in
+//! [`Animation::build`].
 
-use std::{any::type_name, fmt::Debug, ops::Range};
+use std::{any::type_name, ops::Range};
 
 use crate::{
+    audio::AudioTrack,
     core_item::{AnyExtractCoreItem, DynItem},
     utils::rate_functions::linear,
 };
@@ -10,10 +20,14 @@ use crate::{
 /// Evaluation protocols and author-facing adapters.
 pub mod eval;
 
-use eval::{Eval, EvalDyn, StaticDynItems};
+use eval::{Eval, EvalDyn};
 use lagged::AnimLagged;
 use sequence::AnimSequence;
 use stack::AnimStack;
+
+/// Audio leaf animation: a sound placed and composed like any animation.
+pub mod sound;
+pub use sound::Sound;
 
 /// Dynamic lagged (staggered, end-filled) animation container.
 pub mod lagged;
@@ -31,10 +45,10 @@ pub enum AnimationInfoKind {
     Sequence,
     /// An overlay animation container.
     Stack,
-    /// A lagged (staggered, end-held) animation container.
-    Lagged,
     /// A captured, type-erased static output batch.
     Static,
+    /// An audio leaf: resolved into the audio plane at seal time.
+    Audio,
 }
 
 /// Hierarchical runtime animation information used by preview tooling.
@@ -59,16 +73,103 @@ pub struct AnimationInfo {
     pub children: Vec<AnimationInfo>,
 }
 
-/// A single runtime animation node in its parent's time coordinates.
-pub struct AnimationCell {
-    pub(in crate::animation) inner: Box<dyn EvalDyn>,
-    pub(in crate::animation) rate_func: fn(f64) -> f64,
+/// What a runtime node IS — the closed vocabulary of the tree.
+///
+/// Each variant earns its seat by having non-desugarable evaluation
+/// semantics (a combinator expressible as pure window placement belongs in
+/// [`Animation::build`], not here):
+///
+/// - [`NodeContent::Sequence`] — exclusive selection: the LAST child containing
+///   the content time evaluates (children placed with `.at()` may overlap);
+/// - [`NodeContent::Stack`] — overlay: EVERY child containing the content time
+///   evaluates and the outputs sum;
+/// - [`NodeContent::Leaf`] — the open world: any user [`Eval`] implementation,
+///   the only type-erased box in the tree;
+/// - [`NodeContent::Static`] — a captured output batch replayed over a window;
+/// - [`NodeContent::Audio`] — a sound leaf, consumed by the seal-time bake.
+pub(in crate::animation) enum NodeContent {
+    /// Exclusive succession: the LAST child containing the content time
+    /// evaluates.
+    Sequence(Vec<AnimNode>),
+    /// Overlay: EVERY child containing the content time evaluates.
+    Stack(Vec<AnimNode>),
+    /// A typed evaluator (`Eval` implementation) — no children.
+    Leaf(Box<dyn EvalDyn>),
+    /// A captured, type-erased static output batch.
+    Static(Vec<DynItem>),
+    /// An audio leaf: its track resolves through the seal-time bake.
+    ///
+    /// Boxed: a track is the fattest payload in the tree, and sibling
+    /// scanning (window checks over many nodes) is cache-bound — nodes stay
+    /// slim, the track pays one indirection only when audible.
+    Audio(Box<AudioTrack>),
+}
+
+impl NodeContent {
+    fn info_kind(&self) -> AnimationInfoKind {
+        match self {
+            NodeContent::Sequence(_) => AnimationInfoKind::Sequence,
+            NodeContent::Stack(_) => AnimationInfoKind::Stack,
+            NodeContent::Leaf(_) => AnimationInfoKind::Eval,
+            NodeContent::Static(_) => AnimationInfoKind::Static,
+            NodeContent::Audio(_) => AnimationInfoKind::Audio,
+        }
+    }
+}
+
+/// A single runtime animation node: one closed [`NodeContent`] plus everything
+/// every kind shares — the subtree, the content axis, and the timing shell
+/// (window, rate, enable) in this node's parent's coordinates.
+pub struct AnimNode {
+    pub(in crate::animation) content: NodeContent,
+    /// Length of this node's content time axis, in seconds: the sequence
+    /// cursor or stack extent for containers, a sound's play window, `1.0`
+    /// for bare visual leaves, `0.0` for statics.
+    pub(in crate::animation) internal_time_secs: f64,
+    pub(in crate::animation) rate_func: Option<fn(f64) -> f64>,
     pub(in crate::animation) time_range: Range<f64>,
     pub(in crate::animation) enabled: bool,
     pub(in crate::animation) anim_name: &'static str,
 }
 
-impl AnimationCell {
+/// An affine map from global seconds to content seconds: `t = a + b·x`.
+///
+/// Composed by the seal-time audio bake ([`bake_audio`]) while every rate
+/// function along the path is linear; a non-linear rate drops it.
+#[derive(Clone, Copy)]
+pub(crate) struct MixAff {
+    a: f64,
+    b: f64,
+}
+
+impl MixAff {
+    pub(crate) const IDENTITY: Self = Self { a: 0.0, b: 1.0 };
+
+    /// Compose `y = m_a + m_b·x` after `self`: `y = m_a + m_b·(a + b·x)`.
+    fn then(self, m_a: f64, m_b: f64) -> Self {
+        Self {
+            a: m_a + m_b * self.a,
+            b: m_b * self.b,
+        }
+    }
+
+    /// The global time whose image is `y` (`b > 0` on every audio path).
+    fn inv_y(&self, y: f64) -> f64 {
+        (y - self.a) / self.b
+    }
+}
+
+impl AnimNode {
+    /// This node's children — only the container kinds have any; leaves
+    /// read as the empty slice, so traversals stay uniform without storing
+    /// an impossible empty `Vec` per leaf.
+    pub(crate) fn children(&self) -> &[AnimNode] {
+        match &self.content {
+            NodeContent::Sequence(children) | NodeContent::Stack(children) => children,
+            _ => &[],
+        }
+    }
+
     /// Global or parent-relative time range, depending on its containing plan.
     pub fn time_range(&self) -> Range<f64> {
         self.time_range.clone()
@@ -111,21 +212,128 @@ impl AnimationCell {
         } else {
             (sec - self.time_range.start) / duration
         };
-        (self.rate_func)(raw)
+        self.rate_func.map_or(raw, |rate| rate(raw))
     }
 
-    /// Evaluate this cell at a time point — the ONLY time-management entry.
+    /// Evaluate this node at a time point — the ONLY time-management entry.
     ///
-    /// Remaps the scene time to this cell's local `alpha` (via its rate
-    /// function), then evaluates the inner node at that progress (a pure query
+    /// Remaps the scene time to this node's local `alpha` (via its rate
+    /// function), then evaluates the content at that progress (a pure query
     /// on `&self`). Direction management (forward vs backward reset+replay,
     /// how many `sim_step`s to integrate) is INTERNAL to each stateful node.
+    /// Audio nodes evaluate to nothing here: their content resolves through
+    /// the seal-time audio bake ([`bake_audio`]) instead of the frame
+    /// pipeline.
     pub(crate) fn eval_at(&self, sec: f64, output: &mut Vec<DynItem>) {
         if !self.enabled || !self.active_at(sec) {
             return;
         }
         let alpha = self.local_alpha(sec);
-        self.inner.eval_dyn(alpha, output);
+        match &self.content {
+            NodeContent::Sequence(children) => {
+                let content = self.internal_time_secs * alpha;
+                eval_sequence(children, content, self.internal_time_secs, output)
+            }
+            NodeContent::Stack(children) => {
+                let content = self.internal_time_secs * alpha;
+                eval_stack(children, content, self.internal_time_secs, output)
+            }
+            NodeContent::Leaf(eval) => eval.eval_into(alpha, output),
+            NodeContent::Static(items) => output.extend(items.iter().cloned()),
+            NodeContent::Audio(_) => {}
+        }
+    }
+
+    /// Bake this subtree's audio into `pcm` (the whole timeline's interleaved
+    /// stereo buffer, absolute frame indices), collecting what cannot be
+    /// pre-mixed.
+    ///
+    /// The descent composes the affine global→content map (`aff`) while
+    /// every rate along the path is linear; a linear sound leaf then knows
+    /// its exact audible frame range and mixes it in one tight loop
+    /// ([`AudioTrack::mix_span_into`]). A leaf behind any non-linear rate has
+    /// no such map — its root-to-leaf path is pushed to `warp_paths` for the
+    /// residual pass instead. The tree is never mutated.
+    pub(crate) fn bake_into<'a>(
+        &'a self,
+        span: (f64, f64),
+        aff: Option<MixAff>,
+        path: &mut Vec<&'a Self>,
+        warp_paths: &mut Vec<Vec<&'a Self>>,
+        pcm: &mut [f32],
+        sample_rate: f64,
+    ) {
+        if !self.enabled {
+            return;
+        }
+        let lo = span.0.max(self.time_range.start);
+        let hi = span.1.min(self.time_range.end);
+        if lo >= hi {
+            return;
+        }
+        let internal = self.internal_time_secs;
+        let linear = self.rate_func.is_none();
+        // This node's map in parent coordinates: t = m_a + m_b·x.
+        let (m_a, m_b) = if linear {
+            let m_b = internal / self.duration_secs();
+            (-self.time_range.start * m_b, m_b)
+        } else {
+            (0.0, f64::NAN)
+        };
+        let new_span = if linear {
+            (m_a + m_b * lo, m_a + m_b * hi)
+        } else {
+            (0.0, internal)
+        };
+        path.push(self);
+        match &self.content {
+            NodeContent::Audio(track) => {
+                if let Some(aff) = aff.filter(|_| linear) {
+                    // Audible where content time ∈ [0, play window): the
+                    // affine inverts that range into global frames exactly.
+                    // (ceil is the exclusive upper edge; the lower edge
+                    // takes an epsilon against the seconds↔frames round
+                    // trip — both conventions match `sample_at`'s half-open
+                    // play window.)
+                    let clo = new_span.0.max(0.0);
+                    let chi = new_span.1.min(internal);
+                    if clo < chi {
+                        let total = aff.then(m_a, m_b);
+                        let g_lo =
+                            ((total.inv_y(clo) * sample_rate - 1e-9).ceil() as i64).max(0) as usize;
+                        let g_hi = ((total.inv_y(chi) * sample_rate).ceil() as i64)
+                            .min((pcm.len() / 2) as i64)
+                            .max(0) as usize;
+                        if g_lo < g_hi {
+                            track.mix_span_into(total.a, total.b, g_lo, g_hi, sample_rate, pcm);
+                        }
+                    }
+                } else {
+                    // Warped path: keep it for the residual pass.
+                    warp_paths.push(path.clone());
+                }
+            }
+            // Containers recurse; leaves read as no children.
+            _ => {
+                let new_aff = if linear {
+                    aff.map(|aff| aff.then(m_a, m_b))
+                } else {
+                    None
+                };
+                for child in self.children() {
+                    child.bake_into(new_span, new_aff, path, warp_paths, pcm, sample_rate);
+                }
+            }
+        }
+        path.pop();
+    }
+
+    /// Whether any sound leaf lives in this subtree (enabled or not).
+    pub(crate) fn has_audio(&self) -> bool {
+        match &self.content {
+            NodeContent::Audio(_) => true,
+            _ => self.children().iter().any(AnimNode::has_audio),
+        }
     }
 
     pub(in crate::animation) fn contains_sec(&self, sec: f64, parent_duration: f64) -> bool {
@@ -135,21 +343,239 @@ impl AnimationCell {
     pub(crate) fn animation_info(&self) -> AnimationInfo {
         AnimationInfo {
             anim_name: self.anim_name.to_string(),
-            kind: self.inner.info_kind(),
+            kind: self.content.info_kind(),
             range: self.time_range.clone(),
-            content_duration_secs: self.inner.content_duration_secs(),
-            rate_func: self.rate_func,
+            content_duration_secs: self.internal_time_secs,
+            rate_func: self.rate_func.unwrap_or(linear),
             enabled: self.enabled,
-            sim_step: self.inner.sim_step(),
-            children: self.inner.child_infos(),
+            sim_step: match &self.content {
+                NodeContent::Leaf(eval) => eval.sim_step(),
+                _ => None,
+            },
+            children: self
+                .children()
+                .iter()
+                .map(AnimNode::animation_info)
+                .collect(),
         }
     }
+}
+
+/// Sequence evaluation: the LAST child containing the content time runs
+/// (children placed with `.at()` inside a sequence may overlap; the later
+/// one wins — this exclusivity is what makes a sequence more than sugar for
+/// a stack of placements).
+fn eval_sequence(children: &[AnimNode], content_sec: f64, extent: f64, output: &mut Vec<DynItem>) {
+    if let Some(child) = children
+        .iter()
+        .rev()
+        .find(|child| child.contains_sec(content_sec, extent))
+    {
+        child.eval_at(content_sec, output);
+    }
+}
+
+/// Stack evaluation: EVERY child containing the content time runs, outputs
+/// sum.
+fn eval_stack(children: &[AnimNode], content_sec: f64, extent: f64, output: &mut Vec<DynItem>) {
+    for child in children {
+        if child.contains_sec(content_sec, extent) {
+            child.eval_at(content_sec, output);
+        }
+    }
+}
+
+/// The non-linear remainder of the audio plane, as a compact tree.
+///
+/// Built at bake time from the collected root-to-leaf paths of sound leaves
+/// behind non-linear rates, sharing common prefixes so ancestors evaluate
+/// once per sample. Every node carries only what the per-sample walk reads
+/// — the timing shell and the track reference, ~40 bytes — because sibling
+/// scanning is cache-bound: a warp container forces its children to be
+/// window-checked per sample, and fat nodes would stream ~2× the bytes.
+/// (Every residual node is enabled by construction — the bake skips
+/// disabled subtrees.)
+enum Residual<'a> {
+    Leaf {
+        window: Range<f64>,
+        internal: f64,
+        rate: Option<fn(f64) -> f64>,
+        track: &'a AudioTrack,
+    },
+    Node {
+        window: Range<f64>,
+        internal: f64,
+        rate: Option<fn(f64) -> f64>,
+        children: Vec<Residual<'a>>,
+    },
+}
+
+/// Construction-time residual: paths keyed by node identity, so shared
+/// prefixes merge soundly; [`ResidualLink::compact`] then flattens it into
+/// the walked form.
+enum ResidualLink<'a> {
+    Leaf(&'a AnimNode),
+    Node {
+        node: &'a AnimNode,
+        children: Vec<ResidualLink<'a>>,
+    },
+}
+
+impl<'a> ResidualLink<'a> {
+    fn node(&self) -> &'a AnimNode {
+        match self {
+            ResidualLink::Leaf(node) | ResidualLink::Node { node, .. } => node,
+        }
+    }
+
+    /// Insert a root-to-leaf `path` into the forest, reusing shared prefixes.
+    fn insert(forest: &mut Vec<ResidualLink<'a>>, path: &[&'a AnimNode]) {
+        let Some((&head, rest)) = path.split_first() else {
+            return;
+        };
+        let slot = match forest
+            .iter_mut()
+            .find(|link| std::ptr::eq(link.node(), head))
+        {
+            Some(slot) => slot,
+            None => {
+                forest.push(ResidualLink::Node {
+                    node: head,
+                    children: Vec::new(),
+                });
+                forest.last_mut().expect("just pushed")
+            }
+        };
+        match slot {
+            ResidualLink::Leaf(_) => {}
+            ResidualLink::Node { children, .. } => {
+                if rest.is_empty() {
+                    // The path's head is its only node: an audio leaf.
+                    *slot = ResidualLink::Leaf(head);
+                } else {
+                    ResidualLink::insert(children, rest);
+                }
+            }
+        }
+    }
+
+    /// Flatten into the compact walked form.
+    fn compact(&self) -> Residual<'a> {
+        let node = self.node();
+        let window = node.time_range.clone();
+        let internal = node.internal_time_secs;
+        let rate = node.rate_func;
+        match self {
+            ResidualLink::Leaf(_) => match &node.content {
+                NodeContent::Audio(track) => Residual::Leaf {
+                    window,
+                    internal,
+                    rate,
+                    track,
+                },
+                _ => unreachable!("warp paths only end at audio leaves"),
+            },
+            ResidualLink::Node { children, .. } => Residual::Node {
+                window,
+                internal,
+                rate,
+                children: children.iter().map(|c| c.compact()).collect(),
+            },
+        }
+    }
+}
+
+impl Residual<'_> {
+    /// This residual branch's stereo sample at scene time `x` — point
+    /// semantics, identical to a full-tree walk restricted to warp paths.
+    fn sample_at(&self, x: f64) -> [f32; 2] {
+        let (window, internal, rate) = match self {
+            Residual::Leaf {
+                window,
+                internal,
+                rate,
+                ..
+            }
+            | Residual::Node {
+                window,
+                internal,
+                rate,
+                ..
+            } => (window, internal, rate),
+        };
+        if x < window.start || x >= window.end {
+            return [0.0; 2];
+        }
+        let raw = (x - window.start) / (window.end - window.start);
+        let own = internal * rate.map_or(raw, |rate| rate(raw));
+        match self {
+            Residual::Leaf { track, .. } => track.sample_at(own),
+            Residual::Node { children, .. } => {
+                let mut acc = [0.0; 2];
+                for child in children {
+                    let [l, r] = child.sample_at(own);
+                    acc[0] += l;
+                    acc[1] += r;
+                }
+                acc
+            }
+        }
+    }
+}
+
+/// Bake the tree's whole audio plane over `[0, total_secs]` into one
+/// interleaved stereo buffer at `sample_rate`.
+///
+/// Two passes, neither mutating the tree: (1) a single descent pre-mixes
+/// every sound leaf whose path is entirely linear into `pcm`; (2) the
+/// collected paths of everything behind non-linear rates are folded into a
+/// [`Residual`] forest and walked once per output sample — shared ancestors
+/// evaluate once, linear and silent branches are gone entirely.
+pub(crate) fn bake_audio(animations: &[AnimNode], total_secs: f64, sample_rate: f64) -> Vec<f32> {
+    if !animations.iter().any(AnimNode::has_audio) {
+        return Vec::new();
+    }
+    let out_frames = (total_secs * sample_rate).ceil() as usize;
+    let mut pcm = vec![0.0f32; out_frames * 2];
+
+    let mut warp_paths: Vec<Vec<&AnimNode>> = Vec::new();
+    let mut path = Vec::new();
+    for cell in animations {
+        cell.bake_into(
+            (0.0, total_secs),
+            Some(MixAff::IDENTITY),
+            &mut path,
+            &mut warp_paths,
+            &mut pcm,
+            sample_rate,
+        );
+    }
+
+    let mut links: Vec<ResidualLink> = Vec::new();
+    for cells in &warp_paths {
+        ResidualLink::insert(&mut links, cells);
+    }
+    let forest: Vec<Residual> = links.iter().map(|l| l.compact()).collect();
+    if !forest.is_empty() {
+        for frame in 0..out_frames {
+            let x = frame as f64 / sample_rate;
+            let mut acc = [0.0f32; 2];
+            for root in &forest {
+                let [l, r] = root.sample_at(x);
+                acc[0] += l;
+                acc[1] += r;
+            }
+            pcm[frame * 2] += acc[0];
+            pcm[frame * 2 + 1] += acc[1];
+        }
+    }
+    pcm
 }
 
 /// A statically typed animation definition that can be lowered into a runtime animation.
 pub trait Animation: Sized {
     /// Lower this definition into its local runtime representation.
-    fn build(self) -> AnimationCell;
+    fn build(self) -> AnimNode;
 }
 
 /// Capability for animation definitions that have not been fixed in parent time coordinates.
@@ -197,11 +623,12 @@ where
     E: Eval + 'static,
     E::Output: AnyExtractCoreItem,
 {
-    fn build(self) -> AnimationCell {
-        AnimationCell {
+    fn build(self) -> AnimNode {
+        AnimNode {
+            content: NodeContent::Leaf(Box::new(self)),
+            internal_time_secs: 1.0,
             anim_name: type_name::<E>(),
-            inner: Box::new(self),
-            rate_func: linear,
+            rate_func: None,
             time_range: 0.0..1.0,
             enabled: true,
         }
@@ -211,8 +638,9 @@ where
 /// Playback parameters applied to an animation definition.
 #[derive(Debug, Clone)]
 pub(crate) struct AnimationParam {
-    /// Time remapping function.
-    pub rate_func: fn(f64) -> f64,
+    /// Time remapping function; `None` is the identity (linear) rate, kept
+    /// structural so the mixing descent can compose affine maps.
+    pub rate_func: Option<fn(f64) -> f64>,
     /// Optional duration override in seconds.
     pub duration_secs: Option<f64>,
     /// Whether this animation contributes a value.
@@ -222,7 +650,7 @@ pub(crate) struct AnimationParam {
 impl Default for AnimationParam {
     fn default() -> Self {
         Self {
-            rate_func: linear,
+            rate_func: None,
             duration_secs: None,
             enabled: true,
         }
@@ -246,7 +674,7 @@ impl<A> Paramed<A> {
 
     /// Change the animation's rate function.
     pub fn with_rate_func(mut self, rate_func: fn(f64) -> f64) -> Self {
-        self.param.rate_func = rate_func;
+        self.param.rate_func = Some(rate_func);
         self
     }
 
@@ -266,7 +694,7 @@ impl<A> Paramed<A> {
 
 impl<A: Placeable + 'static> Placeable for Paramed<A> {}
 impl<A: Placeable + 'static> Animation for Paramed<A> {
-    fn build(self) -> AnimationCell {
+    fn build(self) -> AnimNode {
         let mut cell = self.inner.build();
         if let Some(duration_secs) = self.param.duration_secs {
             cell.time_range = 0.0..duration_secs;
@@ -289,7 +717,7 @@ pub struct At<A> {
 }
 
 impl<A: Animation> Animation for At<A> {
-    fn build(self) -> AnimationCell {
+    fn build(self) -> AnimNode {
         let mut animation = self.inner.build();
         animation.shift_by(self.offset_sec);
         animation
@@ -304,16 +732,14 @@ fn assert_valid_duration(duration_secs: f64) {
 }
 
 /// Build a static cell replaying already-sampled items over `time_range`.
-pub(in crate::animation) fn static_cell(
-    state: Vec<DynItem>,
-    time_range: Range<f64>,
-) -> AnimationCell {
-    AnimationCell {
-        inner: Box::new(StaticDynItems(state)),
-        rate_func: linear,
+pub(in crate::animation) fn static_cell(state: Vec<DynItem>, time_range: Range<f64>) -> AnimNode {
+    AnimNode {
+        content: NodeContent::Static(state),
+        internal_time_secs: 0.0,
+        rate_func: None,
         time_range,
         enabled: true,
-        anim_name: type_name::<StaticDynItems>(),
+        anim_name: "Static",
     }
 }
 
@@ -440,7 +866,7 @@ mod tests {
             .collect()
     }
 
-    fn sampled_xs(animation: &AnimationCell, sec: f64) -> Vec<f32> {
+    fn sampled_xs(animation: &AnimNode, sec: f64) -> Vec<f32> {
         let mut items = Vec::new();
         animation.eval_at(sec, &mut items);
         evaluated_xs(items)
@@ -810,5 +1236,295 @@ mod tests {
         assert_eq!(stack.duration_secs(), 2.0);
         let sequence = vec![leaf(1.0, 1.0), leaf(2.0, 1.0)].into_iter().into_seq();
         assert_eq!(sequence.duration_secs(), 2.0);
+    }
+
+    // MARK: Sound leaves in the tree
+
+    use crate::RanimScene;
+    use crate::audio::{AudioClip, MASTER_SAMPLE_RATE};
+    use crate::utils::rate_functions::ease_in_quad;
+    use sound::Sound;
+
+    fn tone(secs: f64) -> AudioClip {
+        // A constant-amplitude clip: probes never land on a zero crossing.
+        let pcm = vec![0.5f32; (secs * 48_000.0) as usize];
+        AudioClip::from_pcm(pcm, 48_000, 1)
+    }
+
+    /// Mix the scene's audio and report (total, first, last) in seconds —
+    /// total scene length and the first/last sample-seconds with audible
+    /// energy.
+    fn audible_region(scene: RanimScene) -> (f64, f64, f64) {
+        let sealed = scene.seal();
+        let total = sealed.total_secs();
+        let evaluator = sealed.into_evaluator(120.0);
+        let buf = evaluator.mix_audio(total, MASTER_SAMPLE_RATE);
+        let first = buf
+            .iter()
+            .position(|s| s.abs() > 1e-4)
+            .expect("expected audible samples");
+        let last = buf.len()
+            - 1
+            - buf
+                .iter()
+                .rev()
+                .position(|s| s.abs() > 1e-4)
+                .expect("non-empty");
+        (
+            total,
+            first as f64 / 2.0 / MASTER_SAMPLE_RATE as f64,
+            last as f64 / 2.0 / MASTER_SAMPLE_RATE as f64,
+        )
+    }
+
+    #[test]
+    fn sound_in_sequence_mixes_to_its_window() {
+        let mut scene = RanimScene::new();
+        scene.play(seq![leaf(1.0, 1.0), Sound::new(tone(2.0))]);
+
+        let (total, start, end) = audible_region(scene);
+        assert!((total - 3.0).abs() < 1e-9);
+        assert!((start - 1.0).abs() < 0.01);
+        assert!((end - 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn sound_frames_push_no_items() {
+        let mut scene = RanimScene::new();
+        scene.play(Sound::new(tone(2.0)));
+        let sealed = scene.seal();
+
+        assert_eq!(sealed.eval_at_sec(1.0).count(), 0);
+    }
+
+    #[test]
+    fn at_placed_sound_shifts_the_window() {
+        let mut scene = RanimScene::new();
+        scene.play(stack![Sound::new(tone(1.0)).at(2.0)]);
+        let (_, start, end) = audible_region(scene);
+        assert!((start - 2.0).abs() < 0.01);
+        assert!((end - 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn disabled_sound_is_excluded() {
+        let mut scene = RanimScene::new();
+        scene.play(stack![Sound::new(tone(1.0)).with_enabled(false)]);
+        let evaluator = scene.seal().into_evaluator(120.0);
+        assert!(evaluator.has_audio());
+        assert!(
+            evaluator
+                .mix_audio(1.0, MASTER_SAMPLE_RATE)
+                .iter()
+                .all(|s| s.abs() < 1e-4)
+        );
+    }
+
+    #[test]
+    fn scene_without_sound_has_no_audio() {
+        let mut scene = RanimScene::new();
+        scene.play(leaf(1.0, 1.0));
+        assert!(!scene.seal().into_evaluator(120.0).has_audio());
+    }
+
+    #[test]
+    fn container_duration_override_rescales_sound() {
+        // The inner sequence's 2s of content (the sound itself) is squeezed
+        // into a 1s window: the clip is consumed twice as fast and stays
+        // audible exactly for the squeezed span.
+        let inner = seq![Sound::new(tone(2.0))];
+        let mut scene = RanimScene::new();
+        scene.play(inner.with_duration(1.0));
+        let (_, start, end) = audible_region(scene);
+        assert!((start - 0.0).abs() < 0.01);
+        assert!((end - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn container_rate_func_warps_the_sound_window() {
+        // ease_in_quad maps scene progress u to content u²; the sound occupies
+        // content [1, 2] of 2, so it becomes audible when u² >= 1/2, at scene
+        // time 2·sqrt(1/2) ≈ 1.4142.
+        let inner = seq![leaf(1.0, 1.0), Sound::new(tone(1.0))];
+        let mut scene = RanimScene::new();
+        scene.play(inner.with_rate_func(ease_in_quad));
+
+        let (_, start, end) = audible_region(scene);
+        let expected_start = 2.0 * (0.5f64).sqrt();
+        assert!((start - expected_start).abs() < 0.01, "start {start}");
+        assert!((end - 2.0).abs() < 0.01, "end {end}");
+    }
+
+    #[test]
+    fn sound_rate_func_warps_its_content_progress() {
+        // A linear ramp clip under ease_in_quad: scene time t reads clip
+        // position t², so amplitude at t=0.5 is 0.25 (not 0.5).
+        let clip = AudioClip::from_pcm(
+            (0..48_000).map(|i| i as f32 / 48_000.0).collect::<Vec<_>>(),
+            48_000,
+            1,
+        );
+        let mut scene = RanimScene::new();
+        scene.play(Sound::new(clip).with_rate_func(ease_in_quad));
+        let evaluator = scene.seal().into_evaluator(120.0);
+        let buf = evaluator.mix_audio(1.0, 48_000);
+        // Stereo-interleaved: the L sample of frame (0.5 s × 48 kHz).
+        let mid = buf[(0.5 * 48_000.0) as usize * 2];
+        assert!((mid - 0.25).abs() < 0.01, "amplitude at 0.5s was {mid}");
+    }
+
+    #[test]
+    fn warped_container_of_warped_sounds_mixes_all_of_them() {
+        // Non-linear rates everywhere: nothing is pre-bakeable, so the whole
+        // stack must resolve through the per-sample walk — every leaf, no
+        // marking. 10 overlapping constant tones of 0.25 must sum to ~2.5.
+        let clip = AudioClip::from_pcm(vec![0.25f32; 48_000], 48_000, 1);
+        let mut stack = AnimStack::new();
+        for _ in 0..10 {
+            stack.push(Sound::new(clip.clone()).with_rate_func(ease_in_quad));
+        }
+        let mut scene = RanimScene::new();
+        scene.play(stack.with_rate_func(ease_in_quad));
+        let buf = scene.seal().into_evaluator(120.0).mix_audio(0.5, 48_000);
+        for frame in [0usize, 12_000, 23_999] {
+            assert!(
+                (buf[frame * 2] - 2.5).abs() < 1e-3,
+                "frame {frame}: {} (expected 10 × 0.25)",
+                buf[frame * 2]
+            );
+        }
+    }
+
+    #[test]
+    fn nested_containers_compose_the_sound_window() {
+        let inner = seq![leaf(1.0, 1.0), Sound::new(tone(1.0))];
+        let mut scene = RanimScene::new();
+        scene.play(seq![inner, Sound::new(tone(0.5))]);
+        let evaluator = scene.seal().into_evaluator(120.0);
+        let buf = evaluator.mix_audio(evaluator.total_secs(), MASTER_SAMPLE_RATE);
+        let at = |sec: f64| buf[(sec * MASTER_SAMPLE_RATE as f64) as usize * 2];
+        // The first sound plays over [1, 2] (inside the inner sequence), the
+        // second over [2, 2.5] (after it in the outer sequence).
+        assert!(at(0.5).abs() < 1e-4);
+        assert!(at(1.5).abs() > 1e-4);
+        assert!(at(2.25).abs() > 1e-4);
+    }
+
+    #[test]
+    fn sound_with_a_tail_extends_the_scene_to_its_window() {
+        // Placement semantics are uniform: a sound's window occupies
+        // timeline space just like a visual's. Clip sample counts are
+        // quantized, so an author synthesizing to a target duration should
+        // floor (not ceil) the sample count to avoid a sub-frame tail.
+        let clip_len = 48_001; // 1.0000208..s at 48 kHz
+        let clip = AudioClip::from_pcm(vec![0.5f32; clip_len], 48_000, 1);
+        let mut scene = RanimScene::new();
+        scene.play(stack![
+            Static(VItem::default()).with_duration(1.0),
+            Sound::new(clip)
+        ]);
+        assert!((scene.seal().total_secs() - clip_len as f64 / 48_000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn linear_rate_is_structural() {
+        // A default-built cell must carry the structural linear rate
+        // (`None`), never an identity fn pointer — function pointer
+        // addresses are not guaranteed unique, so linearity cannot be
+        // detected by comparison. Future mixing fast paths compose affine
+        // maps only while every rate along the path is linear.
+        let cells = [
+            AnimSequence::new().build(),
+            AnimStack::new().build(),
+            Sound::new(tone(0.01)).build(),
+            leaf(1.0, 1.0).build(),
+        ];
+        for cell in &cells {
+            assert!(
+                cell.rate_func.is_none(),
+                "a default-built cell must carry the structural linear rate"
+            );
+        }
+        let warped = leaf(1.0, 1.0).with_rate_func(ease_in_quad).build();
+        assert!(warped.rate_func.is_some());
+    }
+
+    #[test]
+    fn baked_audio_matches_point_semantics() {
+        // One scene exercising every mixing shape: sequential and
+        // overlapping sounds, a duration override, container and leaf rate
+        // warps, fades, gain, speed, a stereo clip, and visual filler cells.
+        // The seal-time bake must equal a fresh per-sample walk of the same
+        // tree (the point-semantics spec).
+        let ramp = |i: usize| 0.4 * i as f32 / 48_000.0;
+        let stereo = AudioClip::from_pcm(
+            (0..48_000)
+                .flat_map(|i| [ramp(i), ramp(i)])
+                .collect::<Vec<_>>(),
+            48_000,
+            2,
+        );
+        let warped = seq![
+            Static(VItem::default()).with_duration(1.0),
+            Sound::new(tone(1.0))
+        ]
+        .with_rate_func(ease_in_quad);
+
+        let mut scene = RanimScene::new();
+        scene.play(stack![
+            seq![
+                Sound::new(AudioClip::sine(440.0, 1.0, 0.5))
+                    .with_fade_in(0.25)
+                    .with_gain(0.8),
+                Sound::new(stereo).with_speed(2.0),
+            ],
+            Sound::new(AudioClip::sine(880.0, 2.0, 0.3)).at(0.5),
+            seq![Sound::new(tone(2.0))].with_duration(1.7),
+            warped,
+            Sound::new(tone(1.0)).with_rate_func(ease_in_quad),
+            Static(VItem::default()).with_duration(4.0),
+        ]);
+        let sealed = scene.seal();
+        let baked = sealed.audio().clone();
+        let evaluator = sealed.into_evaluator(120.0);
+        assert_eq!(baked, evaluator.audio().clone());
+
+        fn cell_at(cell: &AnimNode, x: f64) -> [f32; 2] {
+            if !cell.enabled || x < cell.time_range.start || x >= cell.time_range.end {
+                return [0.0; 2];
+            }
+            let raw = (x - cell.time_range.start) / cell.duration_secs();
+            let own = cell.internal_time_secs * cell.rate_func.map_or(raw, |rate| rate(raw));
+            match &cell.content {
+                NodeContent::Audio(track) => track.sample_at(own),
+                _ => {
+                    let mut acc = [0.0f32; 2];
+                    for child in cell.children() {
+                        let [l, r] = cell_at(child, own);
+                        acc[0] += l;
+                        acc[1] += r;
+                    }
+                    acc
+                }
+            }
+        }
+
+        let frames = baked.len() / 2;
+        for frame in 0..frames {
+            let x = frame as f64 / MASTER_SAMPLE_RATE as f64;
+            let mut acc = [0.0f32; 2];
+            for cell in evaluator.cells() {
+                let [l, r] = cell_at(cell, x);
+                acc[0] += l;
+                acc[1] += r;
+            }
+            assert!(
+                (baked[frame * 2] - acc[0]).abs() < 1e-6
+                    && (baked[frame * 2 + 1] - acc[1]).abs() < 1e-6,
+                "frame {frame}: baked [{}, {}] vs walk {acc:?}",
+                baked[frame * 2],
+                baked[frame * 2 + 1]
+            );
+        }
     }
 }

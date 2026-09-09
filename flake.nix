@@ -169,6 +169,10 @@
             pkgs.wayland
             pkgs.libxkbcommon
             pkgs.libX11
+            # rodio/cpal audio backend (ranim `audio` feature)
+            pkgs.alsa-lib
+            pkgs.pkg-config
+            pkgs.udev
           ];
 
           shellHook = lib.optionalString pkgs.stdenv.isLinux ''
