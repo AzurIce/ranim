@@ -118,10 +118,13 @@ static(20) 的字节构成（每 item 9 点 / 5 attrs / 600B）：
 
 ## Side findings
 
-- `SealedRanimScene::eval_at_alpha` **不幂等**：有状态 segment 会
-  "reset/replay or integrate internally"，重复同 alpha 求值会推进内部状态、
-  动画集合会移位。做基准时必须求值一次后复用（`profile_gpu_upload` 的
-  FrameFeed 即如此）。
-- benches 里逐 id diff 时注意 `((id, _), item)` 解构只取到 anim_id，
-  `find` 必须比较完整 `(anim_id, part)` 元组（踩过：400 个方块共享
-  anim_id，全被误判为 changed）。
+- `SealedRanimScene::eval_at_alpha` **是幂等的**（已验证：重复同 alpha、
+  前进后重复同一时刻、来回 seek 共 7 种模式，static/morph 两类场景，401 个
+  item 逐位一致）。ranim-core 源码注释所称的 "stateful segments reset/replay
+  or integrate internally" 是 segment 内部为回答任意时刻查询所做的状态管理，
+  对外是纯查询。早期一轮 profiling 曾把它误判为"不幂等"，实际是 bench
+  代码自身的 bug，见下一条。
+- 写逐 id diff 的 bench 时注意：`for ((id, _), item)` 解构拿到的是
+  **anim_id**（`usize`），不是完整 `(anim_id, part)`；`find` 若按它匹配，
+  同一动画的所有 part 会全部命中第一项（400 个方块共享 anim_id=0，
+  全被误判为每帧 changed，且症状酷似"求值状态漂移"）。必须比较完整元组。

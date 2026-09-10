@@ -12,8 +12,8 @@
 //!
 //! Scenarios:
 //! - `static(n)`: one evaluated frame, re-rendered every frame with identical
-//!   content (steady-state / preview-idle case; `eval_at_alpha` is not
-//!   idempotent, so the frame is evaluated once and reused).
+//!   content (steady-state / preview-idle case; the frame is evaluated once
+//!   and cloned per frame, which also isolates upload cost from eval cost).
 //! - `static-pan(n)`: same, plus a camera pan applied per frame: items
 //!   unchanged, only the viewport uniform changes.
 //! - `morph(n)`: squares morphing into circles, evaluated per frame
