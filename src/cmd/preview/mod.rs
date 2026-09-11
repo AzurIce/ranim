@@ -29,7 +29,7 @@ pub enum RanimPreviewAppCmd {
 }
 
 /// Default logic grid resolution (Hz), per the time model design.
-const DEFAULT_LOGIC_FPS: f64 = 120.0;
+pub(crate) const DEFAULT_LOGIC_FPS: f64 = 120.0;
 
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 enum ExportProgress {
@@ -152,11 +152,15 @@ pub struct RanimPreviewApp {
     /// Last rendered frame's GPU pass times in μs, flattened from the
     /// wgpu-profiler scope tree. Empty when GPU timers are unavailable.
     gpu_pass_times: Vec<(String, f64)>,
-    gpu_frame_history: std::collections::VecDeque<f64>,
     /// Last rendered frame's per-buffer upload stats (drained each frame).
     upload_stats:
         std::collections::BTreeMap<&'static str, crate::render::upload_probe::UploadStats>,
-    upload_written_history: std::collections::VecDeque<f64>,
+    /// Profiling samples indexed by timeline position (one bucket per logic
+    /// frame); playing or seeking updates the bucket at the rendered
+    /// position, so the chart shows performance across scene progress.
+    progress_samples: Vec<Option<profiler::ProgressSample>>,
+    progress_total_sec: f64,
+    profiler_metric: profiler::ProfilerMetric,
 }
 
 impl RanimPreviewApp {
@@ -219,9 +223,10 @@ impl RanimPreviewApp {
             looping: false,
             profiler_open: false,
             gpu_pass_times: Vec::new(),
-            gpu_frame_history: std::collections::VecDeque::new(),
             upload_stats: std::collections::BTreeMap::new(),
-            upload_written_history: std::collections::VecDeque::new(),
+            progress_samples: Vec::new(),
+            progress_total_sec: -1.0,
+            profiler_metric: profiler::ProfilerMetric::default(),
         }
     }
 
@@ -287,6 +292,8 @@ impl RanimPreviewApp {
                     self.evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
                     self.store.update(std::iter::empty());
                     self.need_eval = true;
+                    self.progress_samples.clear();
+                    self.progress_total_sec = -1.0;
 
                     self.set_clear_color_str(&scene.config.clear_color);
 
@@ -455,27 +462,14 @@ impl RanimPreviewApp {
             if let Some(scopes) = renderer.take_last_gpu_scopes() {
                 let mut passes = Vec::new();
                 profiler::flatten_scopes(&scopes, &mut passes);
-                let total: f64 = passes.iter().map(|&(_, t)| t).sum();
-                self.gpu_frame_history.push_back(total);
-                if self.gpu_frame_history.len() > profiler::HISTORY_LEN {
-                    self.gpu_frame_history.pop_front();
-                }
                 self.gpu_pass_times = passes;
             }
             if crate::render::upload_probe::mode().enabled() {
                 self.upload_stats = crate::render::upload_probe::take_stats();
-                let written_kib: f64 = self
-                    .upload_stats
-                    .values()
-                    .map(|s| s.written_bytes as f64 / 1024.0)
-                    .sum();
-                self.upload_written_history.push_back(written_kib);
-                if self.upload_written_history.len() > profiler::HISTORY_LEN {
-                    self.upload_written_history.pop_front();
-                }
             } else {
                 self.upload_stats.clear();
             }
+            profiler::record_sample(self);
         }
     }
 

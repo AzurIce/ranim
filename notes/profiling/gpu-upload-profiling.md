@@ -31,10 +31,19 @@ cargo build --release -p benches --bin profile_gpu_upload --features gpu-scopes
 
 ### Preview app 内置 Profiler 面板
 
-顶栏 `📈 Profiler` 按钮打开，分四节：GPU pass 耗时表（含占比条）、
-GPU 总耗时历史曲线、buffer 上传统计表、written KiB/frame 曲线。
-上传策略（Off/Count/SkipEqual/DirtyRanges）可在面板里**运行时切换**，
-适合对着动画实时 A/B。
+顶栏 `📈 Profiler` 按钮打开。核心视图是**进度轴图表**：横轴 = 场景进度
+（按 120Hz 逻辑帧分桶），每次渲染把采样写入当前时间位置对应的桶——
+播放、seek、或在图上拖拽都会填充/刷新对应位置，能直观看到性能随动画
+阶段的变化。支持：
+
+- 指标切换：GPU passes（按 pass 叠色堆叠）/ GPU 总 μs / Upload written /
+  Upload total / Render ms / Eval ms
+- hover 显示该位置的采样详情；**点击/拖拽图表直接 seek**（与时间轴
+  slider 同语义，拖过之处顺带采样）
+- 播放头竖线标记当前位置；GPU pass 表（占比条）与 buffer 上传统计表
+  显示最近一帧数据
+- 上传策略（Off/Count/SkipEqual/DirtyRanges）**运行时切换**，对着动画
+  实时 A/B
 
 ```bash
 # GPU timer 可用（请求 TIMESTAMP_QUERY 系特性）：
