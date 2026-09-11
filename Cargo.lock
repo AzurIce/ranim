@@ -5292,6 +5292,7 @@ dependencies = [
  "web-sys",
  "web-time",
  "wgpu",
+ "wgpu-profiler",
  "which",
 ]
 

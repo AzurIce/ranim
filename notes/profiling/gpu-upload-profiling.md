@@ -29,6 +29,23 @@ cargo build --release -p benches --bin profile_gpu_upload --features gpu-scopes
 
 原始输出存于 `notes/profiling/profile_{count,skip,dirty,scopes}.txt`。
 
+### Preview app 内置 Profiler 面板
+
+顶栏 `📈 Profiler` 按钮打开，分四节：GPU pass 耗时表（含占比条）、
+GPU 总耗时历史曲线、buffer 上传统计表、written KiB/frame 曲线。
+上传策略（Off/Count/SkipEqual/DirtyRanges）可在面板里**运行时切换**，
+适合对着动画实时 A/B。
+
+```bash
+# GPU timer 可用（请求 TIMESTAMP_QUERY 系特性）：
+cargo run -p ranim-cli --features profiling -- preview --example <example>
+# 无 profiling feature 时面板仍可开，GPU 节显示提示，上传统计照常可用：
+cargo run -p ranim-cli -- preview --example <example>
+```
+
+注意：profiling feature 下每帧渲染后会 device poll 同步一次（wgpu-profiler
+取 timer 所需），preview 的 render 耗时会比非 profiling 构建偏高。
+
 ## 场景
 
 - `static(n)`：n² 个方块，单帧求值结果重复渲染（steady/idle 情形）

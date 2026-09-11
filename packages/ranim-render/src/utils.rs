@@ -170,6 +170,9 @@ pub(crate) struct WgpuVecBuffer<T: Default + bytemuck::Pod + bytemuck::Zeroable 
     /// Shadow copy of the last uploaded payload, kept only when upload
     /// profiling is enabled (see [`crate::upload_probe`]).
     shadow: Option<Vec<u8>>,
+    /// The [`crate::upload_probe`] mode generation this shadow was built
+    /// under; a mismatch means the shadow must be re-established.
+    shadow_gen: u64,
     _phantom: PhantomData<T>,
     // inner: Vec<T>,
 }
@@ -197,6 +200,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             usage,
             len: 0,
             shadow: None,
+            shadow_gen: 0,
             _phantom: PhantomData,
             // inner: vec![],
         }
@@ -248,6 +252,12 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         let realloc = self.buffer.size() != std::mem::size_of_val(data) as u64;
         let mode = crate::upload_probe::mode();
         let bytes = bytemuck::cast_slice(data);
+        // A mode switch may have invalidated the shadow (uploads performed
+        // under a different mode updated the GPU without touching it).
+        if self.shadow_gen != crate::upload_probe::mode_generation() {
+            self.shadow = None;
+            self.shadow_gen = crate::upload_probe::mode_generation();
+        }
 
         if realloc {
             // info!("realloc");

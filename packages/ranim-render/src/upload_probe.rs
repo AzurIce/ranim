@@ -19,12 +19,13 @@ use std::{
     collections::BTreeMap,
     sync::{
         Mutex, OnceLock,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU8, AtomicU64, Ordering},
     },
     time::Duration,
 };
 
-/// Upload instrumentation mode selected through `RANIM_PROFILE_UPLOAD`.
+/// Upload instrumentation mode, seeded from `RANIM_PROFILE_UPLOAD` and
+/// runtime-switchable via [`set_mode`] (e.g. from the preview profiler panel).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum UploadMode {
     #[default]
@@ -47,16 +48,63 @@ impl UploadMode {
         }
     }
 
+    fn as_u8(self) -> u8 {
+        match self {
+            UploadMode::Off => 0,
+            UploadMode::Count => 1,
+            UploadMode::SkipEqual => 2,
+            UploadMode::DirtyRanges => 3,
+        }
+    }
+
+    fn from_u8(v: u8) -> Self {
+        match v {
+            1 => UploadMode::Count,
+            2 => UploadMode::SkipEqual,
+            3 => UploadMode::DirtyRanges,
+            _ => UploadMode::Off,
+        }
+    }
+
     pub fn enabled(self) -> bool {
         self != UploadMode::Off
     }
 }
 
-static MODE: OnceLock<UploadMode> = OnceLock::new();
+/// `u8::MAX` marks "not seeded from the environment yet".
+static MODE: AtomicU8 = AtomicU8::new(u8::MAX);
+/// Bumped on every [`set_mode`] so shadow copies can detect that they were
+/// built under a different mode and must be re-established.
+static MODE_GENERATION: AtomicU64 = AtomicU64::new(0);
 
-/// The process-wide upload mode, parsed once from the environment.
+/// The process-wide upload mode (seeded from `RANIM_PROFILE_UPLOAD` on first
+/// use, overridable at runtime via [`set_mode`]).
 pub fn mode() -> UploadMode {
-    *MODE.get_or_init(UploadMode::from_env)
+    let raw = MODE.load(Ordering::Relaxed);
+    if raw != u8::MAX {
+        return UploadMode::from_u8(raw);
+    }
+    let seeded = UploadMode::from_env().as_u8();
+    let actual = MODE
+        .compare_exchange(u8::MAX, seeded, Ordering::Relaxed, Ordering::Relaxed)
+        .unwrap_or(seeded);
+    UploadMode::from_u8(actual)
+}
+
+/// Current mode generation; changes whenever [`set_mode`] is called.
+pub(crate) fn mode_generation() -> u64 {
+    MODE_GENERATION.load(Ordering::Relaxed)
+}
+
+/// Switch the process-wide upload mode at runtime (takes effect for uploads
+/// after this call). Any shadow copies built under the previous mode are
+/// invalidated and re-established with a full upload.
+pub fn set_mode(new_mode: UploadMode) {
+    // Resolve the unseeded sentinel first so the generation bump always
+    // compares against a real mode.
+    let _ = mode();
+    MODE.store(new_mode.as_u8(), Ordering::Relaxed);
+    MODE_GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
 /// Whether a mode needs the shadow copy maintained (`Count` does not).

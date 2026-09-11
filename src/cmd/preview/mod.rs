@@ -1,4 +1,5 @@
 mod depth_visual;
+mod profiler;
 mod timeline;
 
 use std::sync::Arc;
@@ -145,6 +146,17 @@ pub struct RanimPreviewApp {
     // Playback
     playback_speed: f64,
     looping: bool,
+
+    // GPU profiler panel
+    profiler_open: bool,
+    /// Last rendered frame's GPU pass times in μs, flattened from the
+    /// wgpu-profiler scope tree. Empty when GPU timers are unavailable.
+    gpu_pass_times: Vec<(String, f64)>,
+    gpu_frame_history: std::collections::VecDeque<f64>,
+    /// Last rendered frame's per-buffer upload stats (drained each frame).
+    upload_stats:
+        std::collections::BTreeMap<&'static str, crate::render::upload_probe::UploadStats>,
+    upload_written_history: std::collections::VecDeque<f64>,
 }
 
 impl RanimPreviewApp {
@@ -205,6 +217,11 @@ impl RanimPreviewApp {
             export_total_frames: 0,
             playback_speed: 1.0,
             looping: false,
+            profiler_open: false,
+            gpu_pass_times: Vec::new(),
+            gpu_frame_history: std::collections::VecDeque::new(),
+            upload_stats: std::collections::BTreeMap::new(),
+            upload_written_history: std::collections::VecDeque::new(),
         }
     }
 
@@ -432,6 +449,33 @@ impl RanimPreviewApp {
             }
 
             self.last_render_time = Some(start.elapsed());
+
+            // GPU profiler panel: drain per-frame data.
+            #[cfg(feature = "profiling")]
+            if let Some(scopes) = renderer.take_last_gpu_scopes() {
+                let mut passes = Vec::new();
+                profiler::flatten_scopes(&scopes, &mut passes);
+                let total: f64 = passes.iter().map(|&(_, t)| t).sum();
+                self.gpu_frame_history.push_back(total);
+                if self.gpu_frame_history.len() > profiler::HISTORY_LEN {
+                    self.gpu_frame_history.pop_front();
+                }
+                self.gpu_pass_times = passes;
+            }
+            if crate::render::upload_probe::mode().enabled() {
+                self.upload_stats = crate::render::upload_probe::take_stats();
+                let written_kib: f64 = self
+                    .upload_stats
+                    .values()
+                    .map(|s| s.written_bytes as f64 / 1024.0)
+                    .sum();
+                self.upload_written_history.push_back(written_kib);
+                if self.upload_written_history.len() > profiler::HISTORY_LEN {
+                    self.upload_written_history.pop_front();
+                }
+            } else {
+                self.upload_stats.clear();
+            }
         }
     }
 
@@ -658,6 +702,20 @@ impl eframe::App for RanimPreviewApp {
                     }
                     ui.selectable_value(&mut self.view_mode, ViewMode::Output, "Output");
                     ui.selectable_value(&mut self.view_mode, ViewMode::Depth, "Depth");
+                    ui.separator();
+
+                    {
+                        let mut btn = egui::Button::new(format!(
+                            "{} Profiler",
+                            egui_phosphor::regular::CHART_LINE_UP
+                        ));
+                        if self.profiler_open {
+                            btn = btn.fill(ui.visuals().selection.bg_fill);
+                        }
+                        if ui.add(btn).clicked() {
+                            self.profiler_open = !self.profiler_open;
+                        }
+                    }
                     ui.separator();
 
                     if let Some(duration) = self.last_render_time {
@@ -1012,6 +1070,12 @@ impl eframe::App for RanimPreviewApp {
                 }
             }
         }
+
+        // GPU profiler panel (works without the profiling feature; the GPU
+        // sections degrade to a hint).
+        if self.profiler_open {
+            profiler::ui_profiler_window(self, &ctx);
+        }
     }
 }
 
@@ -1035,6 +1099,11 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
                 device_descriptor: Arc::new(|adapter| wgpu::DeviceDescriptor {
                     label: Some("ranim device"),
                     required_limits: adapter.limits(),
+                    // GPU timer scopes for the profiler panel (no-op where the
+                    // adapter lacks them; intersected so device creation
+                    // can't fail on unsupported features).
+                    #[cfg(feature = "profiling")]
+                    required_features: adapter.features() & profiler::gpu_timer_features(),
                     ..Default::default()
                 }),
                 ..eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle()
