@@ -7,6 +7,9 @@
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
     html_favicon_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg"
 )]
+/// Lightweight CPU timing spans, drained per frame by the preview
+/// profiler panel.
+pub mod cpu_probe;
 /// The pipelines
 pub mod pipelines;
 /// The basic renderable structs
@@ -33,13 +36,6 @@ use crate::{
 use utils::WgpuContext;
 
 #[cfg(feature = "profiling")]
-// Since the timing information we get from WGPU may be several frames behind the CPU, we can't report these frames to
-// the singleton returned by `puffin::GlobalProfiler::lock`. Instead, we need our own `puffin::GlobalProfiler` that we
-// can be several frames behind puffin's main global profiler singleton.
-pub static PUFFIN_GPU_PROFILER: std::sync::LazyLock<std::sync::Mutex<puffin::GlobalProfiler>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(puffin::GlobalProfiler::default()));
-
-#[cfg(feature = "profiling")]
 pub mod profiling_utils {
     use wgpu_profiler::GpuTimerQueryResult;
 
@@ -63,27 +59,6 @@ pub mod profiling_utils {
             if !scope.nested_queries.is_empty() {
                 scopes_to_console_recursive(&scope.nested_queries, indentation + 1);
             }
-        }
-    }
-
-    #[allow(unused_variables)]
-    pub fn console_output(
-        results: &Option<Vec<GpuTimerQueryResult>>,
-        enabled_features: wgpu::Features,
-    ) {
-        puffin::profile_scope!("console_output");
-        print!("\x1B[2J\x1B[1;1H"); // Clear terminal and put cursor to first row first column
-        println!("Welcome to wgpu_profiler demo!");
-        println!();
-        println!(
-            "Press space to write out a trace file that can be viewed in chrome's chrome://tracing"
-        );
-        println!();
-        match results {
-            Some(results) => {
-                scopes_to_console_recursive(results, 0);
-            }
-            None => println!("No profiling results available yet!"),
         }
     }
 }
@@ -147,11 +122,17 @@ impl Renderer {
         clear_color: wgpu::Color,
         frame: &RenderFrame,
     ) {
-        reconcile(&mut self.world, frame);
+        {
+            let _span = cpu_probe::span("reconcile");
+            reconcile(&mut self.world, frame);
+        }
         self.world
             .insert_resource(FrameTarget::new(render_textures, clear_color));
         self.world.run_schedule(RenderPrepare);
-        self.world.run_schedule(RenderGraph);
+        {
+            let _span = cpu_probe::span("render_graph");
+            self.world.run_schedule(RenderGraph);
+        }
     }
 
     /// Take the GPU timer scopes recorded for the most recent processed frame

@@ -36,8 +36,10 @@ cargo build --release -p benches --bin profile_gpu_upload --features gpu-scopes
 播放、seek、或在图上拖拽都会填充/刷新对应位置，能直观看到性能随动画
 阶段的变化。支持：
 
-- 指标切换：GPU passes（按 pass 叠色堆叠）/ GPU 总 μs / Upload written /
-  Upload total / Render ms / Eval ms
+- 指标切换：GPU passes（按 pass 叠色堆叠）/ GPU 总 μs / **CPU spans（堆叠）**
+  / CPU 总 ms / Upload written / Upload total / Render ms / Eval ms；
+  CPU spans 来自 `cpu_probe`（eval / reconcile / prepare_vitems /
+  prepare_mesh_items / render_graph / depth_visual 的叶级 span，任一构建可用）
 - hover 显示该位置的采样详情；**点击/拖拽图表直接 seek**（与时间轴
   slider 同语义，拖过之处顺带采样）
 - 播放头竖线标记当前位置；GPU pass 表（占比条）与 buffer 上传统计表

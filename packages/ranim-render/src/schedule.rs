@@ -214,6 +214,7 @@ fn prepare_vitems(
     mut buffer: ResMut<VItemsBuffer>,
     items: Query<(&SceneOrder, &VItem)>,
 ) {
+    let _span = crate::cpu_probe::span("prepare_vitems");
     let mut items = items.iter().collect::<Vec<_>>();
     items.sort_by_key(|(order, _)| order.0);
     buffer.update(
@@ -227,6 +228,7 @@ fn prepare_mesh_items(
     mut buffer: ResMut<MeshItemsBuffer>,
     items: Query<(&SceneOrder, &MeshItem)>,
 ) {
+    let _span = crate::cpu_probe::span("prepare_mesh_items");
     let mut items = items.iter().collect::<Vec<_>>();
     items.sort_by_key(|(order, _)| order.0);
     buffer.update(
@@ -333,9 +335,6 @@ fn finish_frame(
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();
         if let Some(results) = inner.process_finished_frame(ctx.queue.get_timestamp_period()) {
-            let mut gpu_profiler = crate::PUFFIN_GPU_PROFILER.lock().unwrap();
-            wgpu_profiler::puffin::output_frame_to_puffin(&mut gpu_profiler, &results);
-            gpu_profiler.new_frame();
             profiler.last_frame_scopes = Some(results);
         }
     }

@@ -152,6 +152,9 @@ pub struct RanimPreviewApp {
     /// Last rendered frame's GPU pass times in μs, flattened from the
     /// wgpu-profiler scope tree. Empty when GPU timers are unavailable.
     gpu_pass_times: Vec<(String, f64)>,
+    /// CPU spans of the last rendered frame (ms), drained from
+    /// `cpu_probe`.
+    cpu_spans: Vec<(String, f64)>,
     /// Last rendered frame's per-buffer upload stats (drained each frame).
     upload_stats:
         std::collections::BTreeMap<&'static str, crate::render::upload_probe::UploadStats>,
@@ -223,6 +226,7 @@ impl RanimPreviewApp {
             looping: false,
             profiler_open: false,
             gpu_pass_times: Vec::new(),
+            cpu_spans: Vec::new(),
             upload_stats: std::collections::BTreeMap::new(),
             progress_samples: Vec::new(),
             progress_total_sec: -1.0,
@@ -400,11 +404,14 @@ impl RanimPreviewApp {
             self.last_sec = self.timeline_state.current_sec;
 
             let start_eval = Instant::now();
-            // Forward/backward direction management is internal to sample_at.
-            let target = self.timeline_state.current_sec;
-            let mut frame_items = Vec::new();
-            self.evaluator.sample_at(target, &mut frame_items);
-            self.store.update(frame_items.into_iter());
+            {
+                let _span = crate::render::cpu_probe::span("eval");
+                // Forward/backward direction management is internal to sample_at.
+                let target = self.timeline_state.current_sec;
+                let mut frame_items = Vec::new();
+                self.evaluator.sample_at(target, &mut frame_items);
+                self.store.update(frame_items.into_iter());
+            }
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();
@@ -414,6 +421,7 @@ impl RanimPreviewApp {
                 self.depth_visual_pipeline.as_ref(),
                 self.depth_visual_view.as_ref(),
             ) {
+                let _span = crate::render::cpu_probe::span("depth_visual");
                 let mut encoder =
                     ctx.device
                         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -469,6 +477,10 @@ impl RanimPreviewApp {
             } else {
                 self.upload_stats.clear();
             }
+            self.cpu_spans = crate::render::cpu_probe::take_frame()
+                .into_iter()
+                .map(|(label, ms)| (label.to_string(), ms))
+                .collect();
             profiler::record_sample(self);
         }
     }

@@ -7,16 +7,12 @@ license.workspace = true
 repository.workspace = true
 
 [features]
-profiling = ["dep:wgpu-profiler", "dep:puffin", "dep:profiling"]
+profiling = ["dep:wgpu-profiler"]
 
 [dependencies]
 ranim-core.workspace = true
 bevy_ecs.workspace = true
 wgpu-profiler = { workspace = true, optional = true }
-puffin = { version = "0.20.0", optional = true }
-profiling = { version = "1.0.18", optional = true, features = [
-  "profile-with-puffin",
-] }
 image.workspace = true
 tracing.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }

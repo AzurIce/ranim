@@ -1,4 +1,4 @@
-//! In-app GPU profiler panel for the preview app.
+//! In-app profiler panel for the preview app (CPU + GPU + uploads).
 //!
 //! The main view is a **progress chart**: the X axis is scene progress
 //! (0..total_sec, one bucket per logic frame) and every rendered frame
@@ -7,10 +7,10 @@
 //! revisit, refreshes) the samples, so performance variation across the
 //! animation becomes visible. The chart can be clicked/dragged to seek.
 //!
-//! GPU pass scopes need the `profiling` feature and a device with
-//! timestamp query support; the upload stats from
-//! [`crate::render::upload_probe`] work in any build and their strategy
-//! modes can be switched live.
+//! CPU spans ([`crate::render::cpu_probe`]) and upload stats
+//! ([`crate::render::upload_probe`]) work in any build; GPU pass scopes
+//! need the `profiling` feature and a device with timestamp query
+//! support. Upload strategy modes can be switched live.
 
 use eframe::egui;
 
@@ -23,6 +23,10 @@ pub(crate) struct ProgressSample {
     pub gpu_total_us: f64,
     /// Per-pass GPU times in μs (render order).
     pub gpu_passes: Vec<(String, f64)>,
+    /// CPU span total in ms (leaf-level spans, no double counting).
+    pub cpu_total_ms: f64,
+    /// CPU spans in ms (leaf-level, e.g. eval / prepare_vitems / render_graph).
+    pub cpu_spans: Vec<(String, f64)>,
     pub render_ms: f64,
     pub eval_ms: f64,
     pub upload_total_kib: f64,
@@ -36,6 +40,9 @@ pub(crate) enum ProfilerMetric {
     #[default]
     GpuStacked,
     GpuTotalUs,
+    /// Stacked CPU spans.
+    CpuStacked,
+    CpuTotalMs,
     UploadWrittenKiB,
     UploadTotalKiB,
     RenderMs,
@@ -47,6 +54,8 @@ impl ProfilerMetric {
         match self {
             ProfilerMetric::GpuStacked => "GPU passes (stacked)",
             ProfilerMetric::GpuTotalUs => "GPU total (μs)",
+            ProfilerMetric::CpuStacked => "CPU spans (stacked)",
+            ProfilerMetric::CpuTotalMs => "CPU total (ms)",
             ProfilerMetric::UploadWrittenKiB => "Upload written (KiB)",
             ProfilerMetric::UploadTotalKiB => "Upload total (KiB)",
             ProfilerMetric::RenderMs => "Render (ms)",
@@ -57,6 +66,7 @@ impl ProfilerMetric {
     fn value(self, s: &ProgressSample) -> f64 {
         match self {
             ProfilerMetric::GpuStacked | ProfilerMetric::GpuTotalUs => s.gpu_total_us,
+            ProfilerMetric::CpuStacked | ProfilerMetric::CpuTotalMs => s.cpu_total_ms,
             ProfilerMetric::UploadWrittenKiB => s.upload_written_kib,
             ProfilerMetric::UploadTotalKiB => s.upload_total_kib,
             ProfilerMetric::RenderMs => s.render_ms,
@@ -67,8 +77,18 @@ impl ProfilerMetric {
     fn unit(self) -> &'static str {
         match self {
             ProfilerMetric::GpuStacked | ProfilerMetric::GpuTotalUs => "μs",
+            ProfilerMetric::CpuStacked | ProfilerMetric::CpuTotalMs => "ms",
             ProfilerMetric::UploadWrittenKiB | ProfilerMetric::UploadTotalKiB => "KiB",
             ProfilerMetric::RenderMs | ProfilerMetric::EvalMs => "ms",
+        }
+    }
+
+    /// The stacked span list this metric draws, if any.
+    fn stacked_spans(self, s: &ProgressSample) -> Option<&[(String, f64)]> {
+        match self {
+            ProfilerMetric::GpuStacked => (!s.gpu_passes.is_empty()).then_some(&s.gpu_passes),
+            ProfilerMetric::CpuStacked => (!s.cpu_spans.is_empty()).then_some(&s.cpu_spans),
+            _ => None,
         }
     }
 }
@@ -92,6 +112,8 @@ pub(crate) fn record_sample(app: &mut RanimPreviewApp) {
     *slot = Some(ProgressSample {
         gpu_total_us: app.gpu_pass_times.iter().map(|&(_, t)| t).sum(),
         gpu_passes: app.gpu_pass_times.clone(),
+        cpu_total_ms: app.cpu_spans.iter().map(|&(_, t)| t).sum(),
+        cpu_spans: app.cpu_spans.clone(),
         render_ms: app
             .last_render_time
             .map(|d| d.as_secs_f64() * 1e3)
@@ -145,6 +167,7 @@ pub(crate) fn ui_profiler_window(app: &mut RanimPreviewApp, ctx: &egui::Context)
         .show(ctx, |ui| {
             ui_summary(app, ui);
             ui_progress_chart(app, ui);
+            ui_cpu_spans(app, ui);
             ui_gpu_passes(app, ui);
             ui_uploads(app, ui);
         });
@@ -163,6 +186,10 @@ fn ui_summary(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
             let total: f64 = app.gpu_pass_times.iter().map(|&(_, t)| t).sum();
             ui.strong(format!("GPU total: {total:.0} μs"));
         }
+        if !app.cpu_spans.is_empty() {
+            let total: f64 = app.cpu_spans.iter().map(|&(_, t)| t).sum();
+            ui.strong(format!("CPU total: {total:.2} ms"));
+        }
     });
 }
 
@@ -178,6 +205,8 @@ fn ui_progress_chart(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
                 for m in [
                     ProfilerMetric::GpuStacked,
                     ProfilerMetric::GpuTotalUs,
+                    ProfilerMetric::CpuStacked,
+                    ProfilerMetric::CpuTotalMs,
                     ProfilerMetric::UploadWrittenKiB,
                     ProfilerMetric::UploadTotalKiB,
                     ProfilerMetric::RenderMs,
@@ -221,40 +250,41 @@ fn ui_progress_chart(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
         .fold(0.0f64, f64::max)
         .max(1e-9);
 
-    // Pass order/colors come from the latest sample (stable pass set).
-    let pass_labels: Vec<String> = app.gpu_pass_times.iter().map(|(l, _)| l.clone()).collect();
+    // Pass/span order and colors come from the latest sample (stable set).
+    let stacked_labels: Vec<String> = match metric {
+        ProfilerMetric::GpuStacked => app.gpu_pass_times.iter().map(|(l, _)| l.clone()).collect(),
+        ProfilerMetric::CpuStacked => app.cpu_spans.iter().map(|(l, _)| l.clone()).collect(),
+        _ => Vec::new(),
+    };
 
     for (i, slot) in samples.iter().enumerate() {
         let Some(s) = slot else { continue };
         let x0 = egui::lerp(rect.left()..=rect.right(), i as f32 / n as f32);
         let x1 = egui::lerp(rect.left()..=rect.right(), (i + 1) as f32 / n as f32);
         let w = (x1 - x0).max(1.0);
-        match metric {
-            ProfilerMetric::GpuStacked => {
-                let mut y_base = rect.bottom();
-                for (label, us) in &s.gpu_passes {
-                    let h = ((*us / y_max) * rect.height() as f64) as f32;
-                    let h = h.min(rect.height());
-                    let seg = egui::Rect::from_min_max(
-                        egui::pos2(x0, (y_base - h).max(rect.top())),
-                        egui::pos2(x0 + w, y_base),
-                    );
-                    painter.rect_filled(seg, 0.0, pass_color(&pass_labels, label));
-                    y_base = (y_base - h).max(rect.top());
-                }
-            }
-            _ => {
-                let h = ((metric.value(s) / y_max) * rect.height() as f64) as f32;
-                let h = h.clamp(0.0, rect.height());
-                painter.rect_filled(
-                    egui::Rect::from_min_max(
-                        egui::pos2(x0, rect.bottom() - h),
-                        egui::pos2(x0 + w, rect.bottom()),
-                    ),
-                    0.0,
-                    ui.visuals().selection.bg_fill,
+        if let Some(spans) = metric.stacked_spans(s) {
+            let mut y_base = rect.bottom();
+            for (label, v) in spans {
+                let h = ((v / y_max) * rect.height() as f64) as f32;
+                let h = h.min(rect.height());
+                let seg = egui::Rect::from_min_max(
+                    egui::pos2(x0, (y_base - h).max(rect.top())),
+                    egui::pos2(x0 + w, y_base),
                 );
+                painter.rect_filled(seg, 0.0, pass_color(&stacked_labels, label));
+                y_base = (y_base - h).max(rect.top());
             }
+        } else {
+            let h = ((metric.value(s) / y_max) * rect.height() as f64) as f32;
+            let h = h.clamp(0.0, rect.height());
+            painter.rect_filled(
+                egui::Rect::from_min_max(
+                    egui::pos2(x0, rect.bottom() - h),
+                    egui::pos2(x0 + w, rect.bottom()),
+                ),
+                0.0,
+                ui.visuals().selection.bg_fill,
+            );
         }
     }
 
@@ -309,11 +339,20 @@ fn ui_progress_chart(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
         && let Some(Some(s)) = samples.get((((sec / total_sec) * n as f64) as usize).min(n - 1))
     {
         let mut text = format!(
-            "t = {:.3}s\nGPU total: {:.0} μs | render {:.2} ms | eval {:.2} ms\nupload: {:.1} KiB written / {:.1} KiB total",
-            sec, s.gpu_total_us, s.render_ms, s.eval_ms, s.upload_written_kib, s.upload_total_kib
+            "t = {:.3}s\nGPU total: {:.0} μs | CPU total: {:.2} ms\nrender {:.2} ms | eval {:.2} ms\nupload: {:.1} KiB written / {:.1} KiB total",
+            sec,
+            s.gpu_total_us,
+            s.cpu_total_ms,
+            s.render_ms,
+            s.eval_ms,
+            s.upload_written_kib,
+            s.upload_total_kib
         );
         for (label, us) in s.gpu_passes.iter().take(4) {
             text.push_str(&format!("\n  {label}: {us:.0} μs"));
+        }
+        for (label, ms) in s.cpu_spans.iter().take(4) {
+            text.push_str(&format!("\n  {label}: {ms:.2} ms"));
         }
         response.on_hover_text(text);
     }
@@ -348,14 +387,14 @@ fn pass_color(pass_labels: &[String], label: &str) -> egui::Color32 {
     PASS_PALETTE[idx % PASS_PALETTE.len()]
 }
 
-/// Legend for the stacked pass colors.
-fn ui_pass_legend(app: &RanimPreviewApp, ui: &mut egui::Ui) {
-    if app.gpu_pass_times.is_empty() {
+/// Legend for the stacked pass/span colors.
+fn ui_stacked_legend(spans: &[(String, f64)], ui: &mut egui::Ui) {
+    if spans.is_empty() {
         return;
     }
-    let labels: Vec<String> = app.gpu_pass_times.iter().map(|(l, _)| l.clone()).collect();
+    let labels: Vec<String> = spans.iter().map(|(l, _)| l.clone()).collect();
     ui.horizontal_wrapped(|ui| {
-        for (label, _) in &app.gpu_pass_times {
+        for (label, _) in spans {
             let color = pass_color(&labels, label);
             let (rect, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
             ui.painter().rect_filled(rect, 1.0, color);
@@ -364,10 +403,43 @@ fn ui_pass_legend(app: &RanimPreviewApp, ui: &mut egui::Ui) {
     });
 }
 
+fn ui_cpu_spans(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
+    ui.add_space(4.0);
+    if app.profiler_metric == ProfilerMetric::CpuStacked {
+        ui_stacked_legend(&app.cpu_spans, ui);
+    }
+    ui.heading("CPU spans");
+    if app.cpu_spans.is_empty() {
+        ui.label(egui::RichText::new("no spans recorded yet — play the animation").weak());
+        return;
+    }
+    let total: f64 = app.cpu_spans.iter().map(|&(_, t)| t).sum();
+    egui::Grid::new("cpu_span_grid")
+        .num_columns(3)
+        .striped(true)
+        .show(ui, |ui| {
+            ui.strong("span");
+            ui.strong("time");
+            ui.strong("share");
+            ui.end_row();
+            for (label, ms) in &app.cpu_spans {
+                ui.label(label);
+                ui.label(format!("{ms:.2} ms"));
+                let share = if total > 0.0 { *ms / total } else { 0.0 };
+                share_bar(ui, share as f32);
+                ui.end_row();
+            }
+            ui.strong("total");
+            ui.strong(format!("{total:.2} ms"));
+            ui.label("");
+            ui.end_row();
+        });
+}
+
 fn ui_gpu_passes(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
     if app.profiler_metric == ProfilerMetric::GpuStacked {
-        ui_pass_legend(app, ui);
+        ui_stacked_legend(&app.gpu_pass_times, ui);
     }
     ui.heading("GPU passes");
     if !cfg!(feature = "profiling") {

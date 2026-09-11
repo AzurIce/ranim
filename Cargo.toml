@@ -34,7 +34,7 @@ ranim-items = { path = "packages/ranim-items", version = "0.2.1" }
 ranim-anims = { path = "packages/ranim-anims", version = "0.2.1" }
 ranim-macros = { path = "packages/ranim-macros", version = "0.2.1" }
 ranim-render = { path = "packages/ranim-render", version = "0.2.1" }
-wgpu-profiler = { version = "0.28.0", features = ["puffin"] }
+wgpu-profiler = "0.28.0"
 wasm-bindgen = "0.2.127"
 glam = "0.33.6"
 tracing = "0.1.44"
@@ -54,13 +54,7 @@ anims = []
 items = []
 typst = ["ranim-items/typst"]
 gltf = ["ranim-items/gltf"]
-profiling = [
-  "ranim-render/profiling",
-  "dep:puffin",
-  "dep:puffin_http",
-  "dep:profiling",
-  "dep:wgpu-profiler",
-]
+profiling = ["ranim-render/profiling", "dep:wgpu-profiler"]
 # output = ["dep:async-channel"]
 render = [
   "dep:ranim-render",
@@ -113,12 +107,7 @@ egui-phosphor = { version =  "0.13.0", optional = true }
 web-time = { version = "1.1.0", optional = true }
 bytemuck = { workspace = true, features = ["derive"], optional = true }
 # profiling
-puffin = { version = "0.20.0", optional = true }
-puffin_http = { version = "0.17.0", optional = true }
 wgpu-profiler = { workspace = true, optional = true }
-profiling = { version = "1.0.18", optional = true, features = [
-  "profile-with-puffin",
-] }
 async-channel = "2.5.0"
 inventory = "0.3.24"
 

@@ -93,26 +93,6 @@
           }
         );
 
-        puffin_viewer = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
-          pname = "puffin_viewer";
-          version = "0.22.0";
-
-          cargoBuildFlags = [ "-p puffin_viewer" ];
-          cargoPatches = [ ./puffin-Cargo.lock.patch ];
-
-          src = pkgs.fetchFromGitHub {
-            owner = "EmbarkStudios";
-            repo = "puffin";
-            rev = "puffin_viewer-0.22.0";
-            hash = "sha256-ppE/f6jLRe6a1lfUQUlxTq/L29DwAD/a58u5utUJMoU=";
-          };
-
-          nativeBuildInputs = [ pkgs.pkg-config ];
-          buildInputs = [ pkgs.gtk3 ];
-
-          cargoHash = "sha256-zhijQ+9vVB4IL/t1+IGLAnvJka0AB1yJRWo/qEyUfx0=";
-        });
-
         mdbook-typst-math = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
           pname = "mdbook-typst-math";
           version = "0.3.0-unstable-2026-08-25";
@@ -136,7 +116,6 @@
         };
         devShells.default = craneLib.devShell {
           packages = [
-            puffin_viewer
             mdbook-typst-math
           ]
           ++ (with pkgs; [

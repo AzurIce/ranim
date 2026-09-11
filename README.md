@@ -126,7 +126,7 @@ ranim render -p render scene_a -- --release
 
   use `preview_scene` api to launch an preview app on a scene
   https://github.com/user-attachments/assets/5bf287e2-b06f-42f8-83b6-76f3775e298e
-- `profiling`: enable profiling with https://github.com/EmbarkStudios/puffin
+- `profiling`: enable GPU timer scopes (wgpu-profiler) for the preview profiler panel
 
   CPU uses `127.0.0.1:8585` and GPU uses `127.0.0.1:8586`
   
