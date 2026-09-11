@@ -33,16 +33,14 @@ pub(crate) struct ProgressSample {
     pub upload_written_kib: f64,
 }
 
-/// Metric drawn in the progress chart.
+/// Metric drawn in the progress chart. Stackable metrics (`GpuPasses`,
+/// `CpuSpans`) render as a stacked color chart when the panel's
+/// `profiler_stacked` toggle is on, and as a plain total otherwise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum ProfilerMetric {
-    /// Stacked per-pass GPU times.
     #[default]
-    GpuStacked,
-    GpuTotalUs,
-    /// Stacked CPU spans.
-    CpuStacked,
-    CpuTotalMs,
+    GpuPasses,
+    CpuSpans,
     UploadWrittenKiB,
     UploadTotalKiB,
     RenderMs,
@@ -52,10 +50,8 @@ pub(crate) enum ProfilerMetric {
 impl ProfilerMetric {
     fn label(self) -> &'static str {
         match self {
-            ProfilerMetric::GpuStacked => "GPU passes (stacked)",
-            ProfilerMetric::GpuTotalUs => "GPU total (μs)",
-            ProfilerMetric::CpuStacked => "CPU spans (stacked)",
-            ProfilerMetric::CpuTotalMs => "CPU total (ms)",
+            ProfilerMetric::GpuPasses => "GPU passes",
+            ProfilerMetric::CpuSpans => "CPU spans",
             ProfilerMetric::UploadWrittenKiB => "Upload written (KiB)",
             ProfilerMetric::UploadTotalKiB => "Upload total (KiB)",
             ProfilerMetric::RenderMs => "Render (ms)",
@@ -63,10 +59,15 @@ impl ProfilerMetric {
         }
     }
 
+    /// Whether the stacked view applies to this metric.
+    fn stackable(self) -> bool {
+        matches!(self, ProfilerMetric::GpuPasses | ProfilerMetric::CpuSpans)
+    }
+
     fn value(self, s: &ProgressSample) -> f64 {
         match self {
-            ProfilerMetric::GpuStacked | ProfilerMetric::GpuTotalUs => s.gpu_total_us,
-            ProfilerMetric::CpuStacked | ProfilerMetric::CpuTotalMs => s.cpu_total_ms,
+            ProfilerMetric::GpuPasses => s.gpu_total_us,
+            ProfilerMetric::CpuSpans => s.cpu_total_ms,
             ProfilerMetric::UploadWrittenKiB => s.upload_written_kib,
             ProfilerMetric::UploadTotalKiB => s.upload_total_kib,
             ProfilerMetric::RenderMs => s.render_ms,
@@ -76,8 +77,8 @@ impl ProfilerMetric {
 
     fn unit(self) -> &'static str {
         match self {
-            ProfilerMetric::GpuStacked | ProfilerMetric::GpuTotalUs => "μs",
-            ProfilerMetric::CpuStacked | ProfilerMetric::CpuTotalMs => "ms",
+            ProfilerMetric::GpuPasses => "μs",
+            ProfilerMetric::CpuSpans => "ms",
             ProfilerMetric::UploadWrittenKiB | ProfilerMetric::UploadTotalKiB => "KiB",
             ProfilerMetric::RenderMs | ProfilerMetric::EvalMs => "ms",
         }
@@ -86,8 +87,8 @@ impl ProfilerMetric {
     /// The stacked span list this metric draws, if any.
     fn stacked_spans(self, s: &ProgressSample) -> Option<&[(String, f64)]> {
         match self {
-            ProfilerMetric::GpuStacked => (!s.gpu_passes.is_empty()).then_some(&s.gpu_passes),
-            ProfilerMetric::CpuStacked => (!s.cpu_spans.is_empty()).then_some(&s.cpu_spans),
+            ProfilerMetric::GpuPasses => (!s.gpu_passes.is_empty()).then_some(&s.gpu_passes),
+            ProfilerMetric::CpuSpans => (!s.cpu_spans.is_empty()).then_some(&s.cpu_spans),
             _ => None,
         }
     }
@@ -203,10 +204,8 @@ fn ui_progress_chart(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
             .selected_text(metric.label())
             .show_ui(ui, |ui| {
                 for m in [
-                    ProfilerMetric::GpuStacked,
-                    ProfilerMetric::GpuTotalUs,
-                    ProfilerMetric::CpuStacked,
-                    ProfilerMetric::CpuTotalMs,
+                    ProfilerMetric::GpuPasses,
+                    ProfilerMetric::CpuSpans,
                     ProfilerMetric::UploadWrittenKiB,
                     ProfilerMetric::UploadTotalKiB,
                     ProfilerMetric::RenderMs,
@@ -215,6 +214,10 @@ fn ui_progress_chart(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
                     ui.selectable_value(&mut app.profiler_metric, m, m.label());
                 }
             });
+        ui.add_enabled(
+            metric.stackable(),
+            egui::Checkbox::new(&mut app.profiler_stacked, "stacked"),
+        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.weak("click / drag to seek");
         });
@@ -251,9 +254,10 @@ fn ui_progress_chart(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
         .max(1e-9);
 
     // Pass/span order and colors come from the latest sample (stable set).
+    let stacked = metric.stackable() && app.profiler_stacked;
     let stacked_labels: Vec<String> = match metric {
-        ProfilerMetric::GpuStacked => app.gpu_pass_times.iter().map(|(l, _)| l.clone()).collect(),
-        ProfilerMetric::CpuStacked => app.cpu_spans.iter().map(|(l, _)| l.clone()).collect(),
+        ProfilerMetric::GpuPasses => app.gpu_pass_times.iter().map(|(l, _)| l.clone()).collect(),
+        ProfilerMetric::CpuSpans => app.cpu_spans.iter().map(|(l, _)| l.clone()).collect(),
         _ => Vec::new(),
     };
 
@@ -262,7 +266,7 @@ fn ui_progress_chart(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
         let x0 = egui::lerp(rect.left()..=rect.right(), i as f32 / n as f32);
         let x1 = egui::lerp(rect.left()..=rect.right(), (i + 1) as f32 / n as f32);
         let w = (x1 - x0).max(1.0);
-        if let Some(spans) = metric.stacked_spans(s) {
+        if stacked && let Some(spans) = metric.stacked_spans(s) {
             let mut y_base = rect.bottom();
             for (label, v) in spans {
                 let h = ((v / y_max) * rect.height() as f64) as f32;
@@ -405,7 +409,7 @@ fn ui_stacked_legend(spans: &[(String, f64)], ui: &mut egui::Ui) {
 
 fn ui_cpu_spans(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
-    if app.profiler_metric == ProfilerMetric::CpuStacked {
+    if app.profiler_metric == ProfilerMetric::CpuSpans && app.profiler_stacked {
         ui_stacked_legend(&app.cpu_spans, ui);
     }
     ui.heading("CPU spans");
@@ -438,7 +442,7 @@ fn ui_cpu_spans(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
 
 fn ui_gpu_passes(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
-    if app.profiler_metric == ProfilerMetric::GpuStacked {
+    if app.profiler_metric == ProfilerMetric::GpuPasses && app.profiler_stacked {
         ui_stacked_legend(&app.gpu_pass_times, ui);
     }
     ui.heading("GPU passes");

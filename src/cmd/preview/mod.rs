@@ -164,6 +164,9 @@ pub struct RanimPreviewApp {
     progress_samples: Vec<Option<profiler::ProgressSample>>,
     progress_total_sec: f64,
     profiler_metric: profiler::ProfilerMetric,
+    /// Whether stackable chart metrics render stacked (per-pass colors)
+    /// instead of a plain total.
+    profiler_stacked: bool,
 }
 
 impl RanimPreviewApp {
@@ -231,6 +234,7 @@ impl RanimPreviewApp {
             progress_samples: Vec::new(),
             progress_total_sec: -1.0,
             profiler_metric: profiler::ProfilerMetric::default(),
+            profiler_stacked: true,
         }
     }
 
