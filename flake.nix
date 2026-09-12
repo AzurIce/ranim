@@ -155,9 +155,8 @@
             typst
             gh
             ffmpeg
-            # wasm-bindgen-cli_0_2_106
+            # wasm-bindgen-cli is pinned in ./wasm-bindgen-cli.nix.
             # mdbook-katex
-            # wasm-bindgen-cli
             # mdbook-i18n-helpers
           ])
           ++ [
