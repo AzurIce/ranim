@@ -1,4 +1,4 @@
-//! Preview audio playback (native, `audio` feature only).
+//! Preview audio playback (native only).
 //!
 //! The scene's mixed audio buffer is played through rodio. The player keeps
 //! the output device open across play/pause cycles; its position readout is a

@@ -13,7 +13,7 @@
 - 音频平面
   - `AudioClip`/`AudioTrack`/`Sound`：音频作为叶子与视觉动画并列编排，支持 gain、fade、speed、trim
   - `RanimScene::seal` 时一次性 bake 成 master stereo/48 kHz buffer；线性路径预混，非线性路径走 residual forest
-  - preview 原生播放（`audio` feature）与 render 端 ffmpeg muxing（MP4/MOV AAC，WebM libopus，GIF 丢弃）
+  - preview 原生播放（随 `preview` feature）与 render 端 ffmpeg muxing（MP4/MOV AAC，WebM libopus，GIF 丢弃）
 - 可组合动画编排系统（见 "Composable Animation Arrangement" 一节）
   - `AnimSequence`/`AnimStack` 容器与 `seq!`/`stack!` 宏，`hold`/`forward`/`extend` 等编排 API
   - `AnimLagged` 容器（stagger 排布 + 窗口外静态填充）与 `lagged!` 宏、迭代器容器收集（`collect::<AnimStack>()`/`collect::<AnimSequence>()`、`into_stack`/`into_seq`/`into_lagged`）

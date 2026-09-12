@@ -8,7 +8,9 @@
 //! pulls. Consumers (video muxing, preview playback) read the baked buffer;
 //! the visual evaluation stack is untouched.
 
-use std::{f64::consts::TAU, fmt, io::Write, path::Path, process::Command, sync::Arc};
+#[cfg(not(target_family = "wasm"))]
+use std::process::Command;
+use std::{f64::consts::TAU, fmt, io::Write, path::Path, sync::Arc};
 
 /// Master sample rate every mixed buffer lives on.
 pub const MASTER_SAMPLE_RATE: u32 = 48_000;

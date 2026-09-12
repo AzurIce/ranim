@@ -1,4 +1,4 @@
-#[cfg(all(feature = "audio", not(target_family = "wasm")))]
+#[cfg(not(target_family = "wasm"))]
 mod audio;
 mod depth_visual;
 mod playback;
