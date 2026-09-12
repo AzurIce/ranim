@@ -30,7 +30,6 @@ pub use scene_evaluator::SceneEvaluator;
 pub mod utils;
 
 pub use glam;
-pub use num;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -39,7 +38,6 @@ use animation::{
     compose::stack::AnimStack,
     node::{AnimNode, AnimationInfo, bake_audio},
 };
-pub use audio::AudioTrack;
 use core_item::CoreItem;
 
 /// Commonly used ranim APIs.
