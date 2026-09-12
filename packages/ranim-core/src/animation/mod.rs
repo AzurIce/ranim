@@ -31,9 +31,9 @@ pub mod sound;
 #[cfg(test)]
 mod tests {
     use super::{
-        build::{IntoAnimNode, PlaybackExt, StaticAnim, Unplaced},
+        build::{IntoAnimNode, PlaybackExt, Unplaced},
         compose::{AnimIterExt, lagged::LaggedFill, sequence::AnimSequence, stack::AnimStack},
-        eval::{Eval, EvalExt, Static, pure::Pure},
+        eval::{Eval, EvalExt, Static, StaticAnim, pure::Pure},
         node::{AnimNode, AnimationInfoKind, NodeContent},
     };
     use crate::{

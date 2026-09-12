@@ -11,7 +11,10 @@ use std::{f64::consts::TAU, sync::Arc};
 
 use midi::parse_song;
 use ranim::{glam::DVec3, prelude::*, utils::rate_functions::linear};
-use ranim_core::animation::build::{IntoAnimNode, StaticAnim, Unplaced};
+use ranim_core::animation::{
+    build::{IntoAnimNode, Unplaced},
+    eval::StaticAnim,
+};
 use visual::{
     FRAME_HEIGHT, HitEffectsEval, MidiNotesEval, PianoKeyboardEval, PianoLayout, SingleNoteEval,
     make_background,

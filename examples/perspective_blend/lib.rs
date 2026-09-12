@@ -7,7 +7,7 @@ use ranim::{
     prelude::*,
     utils::rate_functions::{linear, smooth},
 };
-use ranim_core::animation::build::StaticAnim;
+use ranim_core::animation::eval::StaticAnim;
 
 #[scene]
 #[wasm_demo_doc]

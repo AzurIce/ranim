@@ -47,7 +47,7 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
-    pub use crate::animation::build::{IntoAnimNode, PlaybackExt, StaticAnim, Unplaced};
+    pub use crate::animation::build::{IntoAnimNode, PlaybackExt, Unplaced};
     pub use crate::animation::compose::{
         AnimIterExt,
         lagged::{AnimLagged, LaggedFill},
@@ -55,7 +55,7 @@ pub mod prelude {
         stack::AnimStack,
     };
     pub use crate::animation::eval::{
-        Eval, EvalExt, Static,
+        Eval, EvalExt, Static, StaticAnim,
         iterative::{Iterative, IterativeEval, IterativeFn},
         pure::Pure,
     };

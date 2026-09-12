@@ -9,6 +9,8 @@
 
 use crate::core_item::{AnyExtractCoreItem, DynItem};
 
+use super::build::{Paramed, PlaybackExt};
+
 /// Iterative (stateful, stepped) evaluation.
 pub mod iterative;
 /// Pure (closed-form) evaluation adapters.
@@ -111,5 +113,28 @@ impl<T: Clone> Eval for Static<T> {
 
     fn eval_alpha(&self, _alpha: f64) -> Self::Output {
         self.0.clone()
+    }
+}
+
+/// Requirement for [`StaticAnim`].
+pub trait StaticAnimRequirement: Clone + AnyExtractCoreItem {}
+
+impl<T: Clone + AnyExtractCoreItem> StaticAnimRequirement for T {}
+
+/// Convenience methods for zero-duration static animations.
+pub trait StaticAnim: StaticAnimRequirement + Sized {
+    /// Show this value.
+    fn show(&self) -> Paramed<Static<Self>>;
+    /// Hide this value.
+    fn hide(&self) -> Paramed<Static<Self>>;
+}
+
+impl<T: StaticAnimRequirement + 'static> StaticAnim for T {
+    fn show(&self) -> Paramed<Static<Self>> {
+        Static(self.clone()).with_duration(0.0)
+    }
+
+    fn hide(&self) -> Paramed<Static<Self>> {
+        Static(self.clone()).with_enabled(false).with_duration(0.0)
     }
 }

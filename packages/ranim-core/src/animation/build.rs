@@ -14,7 +14,7 @@ use std::any::type_name;
 use crate::core_item::AnyExtractCoreItem;
 
 use super::{
-    eval::{Eval, Static},
+    eval::Eval,
     node::{AnimNode, NodeContent},
 };
 
@@ -178,27 +178,4 @@ fn assert_valid_duration(duration_secs: f64) {
         duration_secs.is_finite() && duration_secs >= 0.0,
         "animation duration must be finite and non-negative"
     );
-}
-
-/// Requirement for [`StaticAnim`].
-pub trait StaticAnimRequirement: Clone + AnyExtractCoreItem {}
-
-impl<T: Clone + AnyExtractCoreItem> StaticAnimRequirement for T {}
-
-/// Convenience methods for zero-duration static animations.
-pub trait StaticAnim: StaticAnimRequirement + Sized {
-    /// Show this value.
-    fn show(&self) -> Paramed<Static<Self>>;
-    /// Hide this value.
-    fn hide(&self) -> Paramed<Static<Self>>;
-}
-
-impl<T: StaticAnimRequirement + 'static> StaticAnim for T {
-    fn show(&self) -> Paramed<Static<Self>> {
-        Static(self.clone()).with_duration(0.0)
-    }
-
-    fn hide(&self) -> Paramed<Static<Self>> {
-        Static(self.clone()).with_enabled(false).with_duration(0.0)
-    }
 }

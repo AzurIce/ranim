@@ -8,7 +8,7 @@ use ranim::{
     utils::rate_functions::smooth,
 };
 use ranim_anims::morph::MorphAnim;
-use ranim_core::animation::build::StaticAnim;
+use ranim_core::animation::eval::StaticAnim;
 use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 
 #[scene(clear_color = "#000000")]

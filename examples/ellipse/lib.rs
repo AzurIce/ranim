@@ -1,7 +1,7 @@
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
     color::palettes::manim,
-    core::animation::build::StaticAnim,
+    core::animation::eval::StaticAnim,
     glam::dvec2,
     items::vitem::{
         VItem,
