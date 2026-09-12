@@ -25,6 +25,28 @@ use ranim::{
 };
 ```
 
+### Prelude 覆盖什么
+
+`ranim::prelude::*` 覆盖日常作者 API：`Eval` / `IntoAnimNode` / `Unplaced`
+/ `PlaybackExt` 等动画协议，`AnimSequence` / `AnimStack` / `AnimLagged` 与
+`seq!` / `stack!` / `lagged!`，`Pure` / `Iterative` / `Static`，`Sound` /
+`AudioClip`，以及 `RanimScene` / `TimeMark`。
+
+以下类型有意**不**放进 prelude，需要时显式导入：
+
+```rust,ignore
+use ranim_core::Extract;
+use ranim_core::audio::AudioError;
+use ranim_core::animation::build::{At, Paramed};
+use ranim_core::animation::node::{AnimNode, AnimationInfo};
+use ranim_core::core_item::CoreItem;
+```
+
+- `Extract` / `CoreItem`：只在实现自定义 `Eval::Output` 的提取契约时需要；
+- `AnimNode` / `AnimationInfo`：运行时 introspection API；
+- `At` / `Paramed`：需要给返回值命名的 timing wrapper；
+- `AudioError`：音频解码/文件错误处理。
+
 ## 第一个场景
 
 下面的场景让一个蓝色正方形淡入、保持一秒，再淡出。相机作为独立 Sequence 与内容并行播放：
