@@ -161,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn computes_normal_from_interleaved_polygon_anchors() {
+    fn inferred_normal_matches_the_polygon_plane() {
         let anchors = [
             Vec3::new(2.0, -1.0, -1.0),
             Vec3::new(2.0, 1.0, -1.0),
@@ -181,25 +181,18 @@ mod tests {
     }
 
     #[test]
-    fn falls_back_to_control_points_for_single_curved_segment() {
-        let points = [point(Vec3::ZERO), point(Vec3::Y), point(Vec3::X)];
+    fn normal_inference_falls_back_for_degenerate_inputs() {
+        // A single curved segment has no polygon loop: use its control points.
+        let curved = [point(Vec3::ZERO), point(Vec3::Y), point(Vec3::X)];
+        assert!(vitem_normal_from_points(&curved).abs_diff_eq(Vec3::NEG_Z, 1e-6));
 
-        let normal = vitem_normal_from_points(&points);
-        assert!(normal.abs_diff_eq(Vec3::NEG_Z, 1e-6));
-    }
+        // Collinear geometry has no unique plane: use the default normal.
+        let collinear = [point(Vec3::ZERO), point(Vec3::X), point(Vec3::X * 2.0)];
+        assert_eq!(vitem_normal_from_points(&collinear), Vec3::Z);
 
-    #[test]
-    fn collinear_points_use_default_normal() {
-        let points = [point(Vec3::ZERO), point(Vec3::X), point(Vec3::X * 2.0)];
-
-        assert_eq!(vitem_normal_from_points(&points), Vec3::Z);
-    }
-
-    #[test]
-    fn vertical_line_uses_a_plane_containing_the_line() {
-        let points = [point(Vec3::ZERO), point(Vec3::Z), point(Vec3::Z * 2.0)];
-
-        let normal = vitem_normal_from_points(&points);
+        // A vertical line picks a plane that contains the line.
+        let vertical = [point(Vec3::ZERO), point(Vec3::Z), point(Vec3::Z * 2.0)];
+        let normal = vitem_normal_from_points(&vertical);
         assert!(normal.abs_diff_eq(Vec3::X, 1e-6));
         assert!(normal.dot(Vec3::Z).abs() < 1e-6);
     }

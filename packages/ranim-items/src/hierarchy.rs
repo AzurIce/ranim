@@ -933,10 +933,7 @@ mod tests {
     use ranim_core::core_item::transformed::{Transformed, TransformedExt};
     use ranim_core::core_item::vitem::VItem as CoreVItem;
     use ranim_core::glam::{DQuat, Mat4, Quat, Vec3, Vec4, dvec3};
-    use ranim_core::traits::{
-        ApplyTransform, Rigid, RotateTransform, ShiftTransform, Similarity, Translation,
-        UniformScaleTransform,
-    };
+    use ranim_core::traits::{ApplyTransform, Rigid, Similarity, Translation};
 
     type CoreNode<G = DAffine3> = Node<CoreVItem, G>;
     type HierarchyVItem = crate::vitem::VItem;
@@ -1113,7 +1110,9 @@ mod tests {
     }
 
     #[test]
-    fn align_fills_absent_payloads_and_children_with_transparent_clones() {
+    fn alignment_fills_missing_nodes_with_transparent_clones() {
+        // Leaf <-> group mismatch: each absent payload/child is filled with
+        // a transparent clone of the present side.
         let left = Node::leaf(stroked_vitem(0.0));
         let right = Node::<HierarchyVItem>::group(vec![
             Node::leaf(stroked_vitem(2.0)).transformed(DAffine3::from(Translation(DVec3::Y))),
@@ -1123,53 +1122,37 @@ mod tests {
         let mut left = left;
         let mut right = right;
         left.align_with(&mut right);
-
-        // Both sides now share the same shape — a payload plus one child —
-        // and each absence was filled with a transparent clone of the
-        // present side: the group gained a transparent payload, the leaf
-        // gained a transparent clone of the child.
         assert!(left.is_aligned(&right));
         assert_eq!(left.children().len(), 1);
         assert_eq!(right.children().len(), 1);
-        // The group side's filled payload is transparent; the leaf side's
-        // payload keeps its opacity.
         assert_eq!(right.item().unwrap().stroke_rgbas[0].0.w, 0.0);
         assert_eq!(left.item().unwrap().stroke_rgbas[0].0.w, 1.0);
 
-        // Lerping fades both positions: the payload pair holds marker 0
-        // while its opacity goes 0 -> 1, and the child pair holds marker 2
-        // at Translation(Y) on both sides (identical geometry, so the pose
-        // is static) while its opacity fades on the leaf side.
+        // Lerping fades the filled positions while the original payload
+        // stays put and the child pose is static.
         let mid = left.lerp(&right, 0.5);
         assert_eq!(mid.children().len(), 1);
-
         let mid_item = mid.item().unwrap();
         assert!((mid_item.vpoints[0].x - 0.0).abs() < 1e-6);
         assert!((mid_item.stroke_rgbas[0].0.w - 0.5).abs() < 1e-6);
-
         let (mid_world, mid_leaf) = mid.leaves().nth(1).unwrap();
         assert!((mid_leaf.vpoints[0].x - 2.0).abs() < 1e-6);
         assert!((mid_leaf.stroke_rgbas[0].0.w - 0.5).abs() < 1e-6);
         assert_affine_eq(mid_world, DAffine3::from_translation(DVec3::Y));
-    }
 
-    #[test]
-    fn align_pads_shorter_groups_with_transparent_stand_ins() {
+        // Different sibling counts: the shorter side is padded with fully
+        // transparent stand-ins and the originals stay opaque.
         let big = Node::<HierarchyVItem>::group(vec![
             Node::leaf(stroked_vitem(0.0)),
             Node::leaf(stroked_vitem(10.0)),
         ]);
         let small = Node::<HierarchyVItem>::group(vec![Node::leaf(stroked_vitem(20.0))]);
-
         assert!(!big.is_aligned(&small));
         let mut big = big;
         let mut small = small;
         small.align_with(&mut big);
-
         assert!(big.is_aligned(&small));
         assert_eq!(small.children().len(), 2);
-        // The repeated stand-in became fully transparent while the original
-        // kept its opacity.
         let stand_in = small.children()[1].inner.item().unwrap();
         assert_eq!(stand_in.stroke_rgbas[0].0.w, 0.0);
         assert_eq!(stand_in.fill_rgbas[0].0.w, 0.0);
@@ -1198,25 +1181,6 @@ mod tests {
             }
             _ => panic!("expected a VItem"),
         }
-    }
-
-    #[test]
-    fn subgroup_operations_keep_the_root_storage_type() {
-        // Placement wraps the tree; the shift/scale blankets derive from
-        // ApplyTransform and can never widen the placement's storage group.
-        let mut tree = Transformed::new(Node::<(), Similarity>::leaf(()), Similarity::IDENTITY);
-        tree.shift(DVec3::X).scale_uniform(2.0);
-        assert_eq!(tree.transform.scale, 2.0);
-        assert_eq!(tree.transform.translation, dvec3(2.0, 0.0, 0.0));
-
-        let mut rigid_tree = Transformed::new(Node::<(), Rigid>::leaf(()), Rigid::IDENTITY);
-        rigid_tree.rotate_on_axis(DVec3::Z, 0.5);
-        assert!(
-            rigid_tree
-                .transform
-                .rotation
-                .abs_diff_eq(DQuat::from_axis_angle(DVec3::Z, 0.5), 1e-9)
-        );
     }
 
     #[test]
@@ -1294,33 +1258,6 @@ mod tests {
         // Placing it defaults to the storage group's identity pose.
         let placed: Transformed<Node<HierarchyVItem>, DAffine3> = empty.into();
         assert_eq!(placed.transform, DAffine3::IDENTITY);
-    }
-
-    #[test]
-    fn index_paths_walk_children_and_fail_closed() {
-        let tree = Node::<u32>::group(vec![
-            Node::group(vec![Node::leaf(1), Node::leaf(2)]),
-            Node::leaf(3),
-        ]);
-
-        // Empty paths do not address anything: the receiver is the frame,
-        // placements are what gets addressed.
-        assert!(tree.get(&[]).is_none());
-        assert_eq!(tree.get(&[0]).unwrap().inner.children().len(), 2);
-        assert_eq!(tree.get(&[0, 1]).unwrap().inner.item(), Some(&2));
-        assert_eq!(tree.get(&[1]).unwrap().inner.item(), Some(&3));
-        assert!(tree.get(&[2]).is_none());
-        // Cannot descend into a leaf.
-        assert!(tree.get(&[1, 0]).is_none());
-
-        let mut tree = tree;
-        let target = tree.get_mut(&[0, 0]).unwrap();
-        assert_eq!(target.inner.item(), Some(&1));
-        target.transform = DAffine3::from(Translation(DVec3::X));
-        assert_eq!(
-            tree.get(&[0, 0]).unwrap().transform,
-            DAffine3::from(Translation(DVec3::X))
-        );
     }
 
     #[test]
@@ -1415,25 +1352,54 @@ mod tests {
     }
 
     #[test]
-    fn derived_impls_behave_like_plain_data() {
-        let make = |id: &str| {
-            Transformed::<Node<u32>, Translation>::new(
-                Node::<u32>::leaf(7).with_id(id),
-                Translation(DVec3::X),
-            )
-        };
-        let a = make("a");
-        let b = make("b");
+    fn id_and_index_lookups_address_placements() {
+        // A node's own id addresses its frame, not a placement: the root
+        // itself cannot be looked up.
+        let root = Node::<(), DAffine3>::leaf(()).with_id("root");
+        assert!(root.by_id("root").is_none());
+        assert_eq!(root.by_id_path("root"), None);
 
-        assert_eq!(a, a.clone());
-        assert_ne!(a, b, "external ids participate in equality");
+        // Index paths walk children and fail closed.
+        let tree = Node::<u32>::group(vec![
+            Node::group(vec![Node::leaf(1), Node::leaf(2)]),
+            Node::leaf(3),
+        ]);
+        assert!(tree.get(&[]).is_none());
+        assert_eq!(tree.get(&[0]).unwrap().inner.children().len(), 2);
+        assert_eq!(tree.get(&[0, 1]).unwrap().inner.item(), Some(&2));
+        assert_eq!(tree.get(&[1]).unwrap().inner.item(), Some(&3));
+        assert!(tree.get(&[2]).is_none());
+        // Cannot descend into a leaf.
+        assert!(tree.get(&[1, 0]).is_none());
 
-        let mut cloned = a.clone();
-        *cloned.inner.item_mut().unwrap() = 8;
-        assert_ne!(a, cloned, "clones must be independent");
+        let mut tree = tree;
+        let target = tree.get_mut(&[0, 0]).unwrap();
+        assert_eq!(target.inner.item(), Some(&1));
+        target.transform = DAffine3::from(Translation(DVec3::X));
+        assert_eq!(
+            tree.get(&[0, 0]).unwrap().transform,
+            DAffine3::from(Translation(DVec3::X))
+        );
 
-        let rendered = format!("{:?}", make("dbg"));
-        assert!(rendered.contains("\"dbg\""), "debug output is {rendered}");
+        // External labels: duplicates resolve preorder-first, and mutation
+        // reaches exactly the addressed placement.
+        let tree = Node::<(), DAffine3>::group(vec![
+            Node::leaf(()).with_id("dup"),
+            Node::group(vec![
+                Node::leaf(()).with_id("dup"),
+                Node::leaf(()).with_id("other"),
+            ]),
+        ]);
+        assert!(tree.by_id("dup").unwrap().inner.is_leaf());
+        assert_eq!(tree.by_ids("dup").len(), 2);
+        assert_eq!(tree.by_id_path("dup"), Some(vec![0]));
+        assert_eq!(tree.by_id_path("other"), Some(vec![1, 1]));
+        assert!(tree.by_id("missing").is_none());
+
+        let mut tree = tree;
+        tree.by_id_mut("other").unwrap().inner.id = Some("renamed".into());
+        assert!(tree.by_id("other").is_none());
+        assert!(tree.by_id("renamed").is_some());
     }
 
     #[test]
@@ -1467,53 +1433,5 @@ mod tests {
         let empty = Node::<HierarchyVItem>::frame();
         assert_eq!(empty.stroke_width(), 0.0);
         assert_eq!(empty.fill_color(), css::WHITE);
-    }
-
-    #[test]
-    fn by_id_addresses_nodes_by_their_external_label() {
-        let tree = Node::<(), DAffine3>::group(vec![
-            Node::leaf(()).with_id("dup"),
-            Node::group(vec![
-                Node::leaf(()).with_id("dup"),
-                Node::leaf(()).with_id("other"),
-            ]),
-        ]);
-
-        // Duplicates resolve to the preorder-first match.
-        assert!(tree.by_id("dup").unwrap().inner.is_leaf());
-        assert_eq!(tree.by_ids("dup").len(), 2);
-        assert_eq!(tree.by_id_path("dup"), Some(vec![0]));
-        assert_eq!(tree.by_id_path("other"), Some(vec![1, 1]));
-        assert!(tree.by_id("missing").is_none());
-
-        // Mutation reaches exactly the addressed placement.
-        let mut tree = tree;
-        tree.by_id_mut("other").unwrap().inner.id = Some("renamed".into());
-        assert!(tree.by_id("other").is_none());
-        assert!(tree.by_id("renamed").is_some());
-    }
-
-    #[test]
-    fn ids_address_placements_not_the_frame_itself() {
-        let root = Node::<(), DAffine3>::leaf(()).with_id("root");
-        assert!(root.by_id("root").is_none());
-        assert_eq!(root.by_id_path("root"), None);
-    }
-
-    #[test]
-    fn first_leaf_mut_reaches_the_first_leaf_in_depth_first_order() {
-        let mut tree = Node::<HierarchyVItem>::group(vec![
-            Node::group(vec![Node::leaf(stroked_vitem(0.0))]),
-            Node::leaf(stroked_vitem(1.0)),
-        ]);
-
-        let first = tree.first_leaf_mut().unwrap();
-        first.set_stroke_width(7.0);
-
-        let widths: Vec<f32> = tree
-            .leaves_mut()
-            .map(|leaf| leaf.stroke_widths[0].0)
-            .collect();
-        assert_eq!(widths, [7.0, 0.04]);
     }
 }

@@ -733,32 +733,21 @@ mod tests {
     use super::render_output_basename;
 
     #[test]
-    fn test_render_output_basename_default_template() {
-        assert_eq!(
-            render_output_basename("{name}_{width}x{height}_{fps}", "my_scene", 1920, 1080, 60),
-            "my_scene_1920x1080_60"
-        );
-    }
-
-    #[test]
-    fn test_render_output_basename_custom_template() {
-        assert_eq!(
-            render_output_basename(
+    fn render_output_basename_substitutes_template_placeholders() {
+        let cases = [
+            ("{name}_{width}x{height}_{fps}", "my_scene_1920x1080_60"),
+            (
                 "{name}_{fps}fps_{width}x{height}",
-                "my_scene",
-                1920,
-                1080,
-                60
+                "my_scene_60fps_1920x1080",
             ),
-            "my_scene_60fps_1920x1080"
-        );
-    }
-
-    #[test]
-    fn test_render_output_basename_name_only() {
-        assert_eq!(
-            render_output_basename("{name}", "my_scene", 1920, 1080, 60),
-            "my_scene"
-        );
+            ("{name}", "my_scene"),
+        ];
+        for (template, expected) in cases {
+            assert_eq!(
+                render_output_basename(template, "my_scene", 1920, 1080, 60),
+                expected,
+                "template {template}"
+            );
+        }
     }
 }

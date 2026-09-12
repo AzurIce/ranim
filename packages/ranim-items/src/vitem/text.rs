@@ -327,14 +327,4 @@ mod tests {
         assert_float_absolute_eq!(item.basis().0.length(), 0.25, 1e-10);
         assert_float_absolute_eq!(Origin.locate(&item).distance(DVec3::ZERO), 0.0, 1e-10);
     }
-
-    #[test]
-    fn test_font() {
-        let font = TextFont::new(["Arial", "Helvetica"])
-            .with_weight(FontWeight::BOLD)
-            .with_style(FontStyle::Italic)
-            .with_stretch(FontStretch::CONDENSED)
-            .with_features([("liga", 1), ("dlig", 1)]);
-        dbg!(&font);
-    }
 }

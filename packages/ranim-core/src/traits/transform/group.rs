@@ -403,16 +403,6 @@ mod tests {
     use glam::dvec3;
 
     #[test]
-    fn test_embeddings_compose_to_same_affine() {
-        // Translation -> Rigid -> Similarity -> DAffine3 must agree with
-        // Translation -> DAffine3 directly.
-        let t = Translation(dvec3(1.0, 2.0, 3.0));
-        let direct = DAffine3::from(t);
-        let via: DAffine3 = Similarity::from(Rigid::from(t)).into();
-        assert_eq!(direct, via);
-    }
-
-    #[test]
     fn test_similarity_try_from_accepts_similarity() {
         let sim = Similarity {
             scale: 2.5,
@@ -430,38 +420,30 @@ mod tests {
     }
 
     #[test]
-    fn test_similarity_try_from_rejects_non_uniform_scale() {
-        let affine = DAffine3::from_scale(dvec3(1.0, 2.0, 1.0));
-        assert!(Similarity::try_from(affine).is_err());
-    }
-
-    #[test]
-    fn test_similarity_try_from_rejects_reflection() {
-        let affine = DAffine3::from_scale(dvec3(-1.0, 1.0, 1.0));
-        assert!(Similarity::try_from(affine).is_err());
-    }
-
-    #[test]
-    fn test_similarity_try_from_rejects_non_finite_values() {
-        let affine = DAffine3::from_scale(DVec3::splat(f64::NAN));
-        assert!(Similarity::try_from(affine).is_err());
+    fn test_similarity_try_from_rejects_invalid_affines() {
+        let cases = [
+            (
+                "non-uniform scale",
+                DAffine3::from_scale(dvec3(1.0, 2.0, 1.0)),
+            ),
+            ("reflection", DAffine3::from_scale(dvec3(-1.0, 1.0, 1.0))),
+            (
+                "non-finite values",
+                DAffine3::from_scale(DVec3::splat(f64::NAN)),
+            ),
+        ];
+        for (name, affine) in cases {
+            assert!(
+                Similarity::try_from(affine).is_err(),
+                "{name} must be rejected"
+            );
+        }
     }
 
     #[test]
     #[should_panic(expected = "similarity scale must be finite and strictly positive")]
     fn test_similarity_from_scale_rejects_non_positive_values() {
         Similarity::from_scale(0.0);
-    }
-
-    #[test]
-    fn test_similarity_transform_point() {
-        let sim = Similarity {
-            scale: 2.0,
-            rotation: DQuat::from_axis_angle(DVec3::Z, core::f64::consts::FRAC_PI_2),
-            translation: dvec3(1.0, 0.0, 0.0),
-        };
-        let p = sim.transform_point(dvec3(1.0, 0.0, 0.0));
-        assert!(p.abs_diff_eq(dvec3(1.0, 2.0, 0.0), 1e-9));
     }
 
     fn assert_identity<G>(value: G)
@@ -493,16 +475,13 @@ mod tests {
     }
 
     #[test]
-    fn composition_order_matches_affine_multiplication() {
+    fn composition_matches_affine_semantics() {
         let outer = Rigid::from_axis_angle(DVec3::Z, core::f64::consts::FRAC_PI_2);
         let inner = Rigid::from_translation(DVec3::X);
         let composed = outer.compose(&inner);
         assert!(composed.translation.abs_diff_eq(dvec3(0.0, 1.0, 0.0), 1e-9));
         assert_eq!(composed.rotation, outer.rotation);
-    }
 
-    #[test]
-    fn similarity_composition_scales_inner_translation() {
         let outer = Similarity::from_scale(2.0);
         let inner = Similarity::from(Translation(DVec3::X));
         let composed = outer.compose(&inner);

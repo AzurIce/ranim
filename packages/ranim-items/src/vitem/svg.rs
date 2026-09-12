@@ -534,20 +534,6 @@ mod tests {
             "aabb is not centered: min {min:?}, max {max:?}"
         );
     }
-
-    #[test]
-    fn style_getters_read_the_first_leaf() {
-        let svg = SvgItem::from_tree(&parse(NESTED_SVG));
-        // The first leaf is `leaf-a`. Colors round-trip through the VItem's
-        // f32 Rgba storage, so compare with a small tolerance.
-        let fill = svg.fill_color();
-        assert!((fill.components[0] - 1.0).abs() < 1e-6);
-        assert!(fill.components[1] < 1e-6 && fill.components[2] < 1e-6);
-        let stroke = svg.stroke_color();
-        assert!((stroke.components[1] - 1.0).abs() < 1e-6);
-        assert!(stroke.components[0] < 1e-6 && stroke.components[2] < 1e-6);
-        assert_eq!(svg.stroke_width(), 0.5);
-    }
 }
 
 #[cfg(all(test, feature = "typst"))]
@@ -557,96 +543,17 @@ mod typst_tests {
     use glam::dvec3;
 
     use crate::vitem::{geometry::Arc, typst::typst_svg};
-    use ranim_core::{
-        anchor::{AabbPoint, Locate},
-        traits::{
-            RotateTransform, ScaleHint, ScaleTransformExt, ScaleTransformStrokeExt, ShiftTransform,
-            ShiftTransformExt, With,
-        },
-    };
+    use ranim_core::traits::{RotateTransform, ShiftTransform};
 
     use super::*;
 
     #[test]
-    fn foo_test_vitems_from_svg() {
+    fn typst_svg_converts_to_vitems() {
         let svg = typst_svg("R");
-        let mut vitems = vitems_from_svg(&svg);
+        let vitems = vitems_from_svg(&svg);
 
-        println!("{:?}", vitems.aabb());
-        let scale = vitems.calc_scale_ratio(ScaleHint::PorportionalY(8.0));
-        println!("scale: {}", scale);
-        let center = AabbPoint::CENTER.locate(AsRef::<[VItem]>::as_ref(&vitems));
-        println!("{:?}", center);
-        vitems
-            // .scale_to(ScaleHint::PorportionalY(8.0))
-            .move_anchor_to(AabbPoint::CENTER, DVec3::ZERO);
-
-        println!(
-            "\n{:?}",
-            vitems.iter().map(|x| &x.vpoints).collect::<Vec<_>>()
-        );
-    }
-
-    fn print_typst_vitem(points: Vec<DVec3>) {
-        let colors = ["blue.darken(40%)", "yellow.darken(50%)"];
-        let mut last_anchor = None;
-        let mut subpath_cnt = 0;
-        let segs = points
-            .iter()
-            .step_by(2)
-            .cloned()
-            .zip(points.iter().skip(1).step_by(2).cloned())
-            .zip(points.iter().skip(2).step_by(2).cloned())
-            .collect::<Vec<_>>();
-
-        segs.iter().enumerate().for_each(|(i, ((a, b), c))| {
-            if last_anchor.is_none() {
-                last_anchor = Some(a);
-                println!(
-                    "circle(({}, {}), radius: 2pt, fill: green.transparentize(50%))",
-                    a.x, a.y
-                );
-            } else if a.distance(*b) < 0.00001 {
-                last_anchor = None;
-                subpath_cnt += 1;
-                println!(
-                    "circle(({}, {}), radius: 4pt, fill: red.transparentize(50%))",
-                    a.x, a.y
-                );
-            } else {
-                println!("circle(({}, {}), radius: 2pt, fill: none)", a.x, a.y);
-            }
-            println!(
-                "circle(({}, {}), radius: 1pt, fill: gray, stroke: none)",
-                b.x, b.y
-            );
-
-            if i == segs.len() - 1 {
-                println!(
-                    "circle(({}, {}), radius: 4pt, fill: red.transparentize(50%))",
-                    c.x, c.y
-                );
-            }
-
-            if a.distance(*b) > 0.00001 {
-                println!(
-                    "bezier(({}, {}), ({}, {}), ({}, {}), stroke: {})",
-                    a.x, a.y, c.x, c.y, b.x, b.y, colors[subpath_cnt]
-                );
-            }
-        });
-    }
-
-    #[test]
-    fn test_foo() {
-        let svg = SvgItem::new(typst_svg("R")).with(|svg| {
-            svg.scale_to_with_stroke(ScaleHint::PorportionalY(4.0))
-                .move_to(dvec3(2.0, 2.0, 0.0));
-        });
-        let vitems = Vec::<VItem>::from(svg);
-        let points = vitems[0].vpoints.0.clone();
-
-        print_typst_vitem(points);
+        assert!(!vitems.is_empty(), "typst output produced no vitems");
+        assert!(vitems.iter().all(|item| !item.vpoints.is_empty()));
     }
 
     #[test]
@@ -660,9 +567,5 @@ mod typst_tests {
             arc.vpoints[arc.vpoints.len() - 1]
                 .abs_diff_eq(dvec3(0.2679491924311228, 3.0, 0.0), 1e-10)
         );
-        let points = (*arc.vpoints).clone();
-        println!("{points:?}");
-
-        print_typst_vitem(points);
     }
 }

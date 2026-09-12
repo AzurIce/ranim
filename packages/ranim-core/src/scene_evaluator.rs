@@ -218,46 +218,17 @@ mod tests {
     }
 
     #[test]
-    fn iterative_segment_steps_along_logic_grid() {
+    fn iterative_leaves_step_along_the_logic_grid() {
         let mut scene = RanimScene::new();
         scene.play(cv(1.0, 2.0).with_duration(2.0).at(0.0));
         let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
-
         for sec in [0.0, 0.5, 1.0, 1.5, 2.0] {
             let mut frame = EvaluatedFrame::new();
             ev.sample_at(sec, &mut frame);
             assert_eq!(xs_of(&frame), vec![sec as f32], "at sec={sec}");
         }
-    }
 
-    #[test]
-    fn iterative_eval_is_deterministic_and_seek_matches_forward() {
-        fn build_scene() -> SealedRanimScene {
-            let mut scene = RanimScene::new();
-            scene.play(cv(2.0, 3.0).with_duration(3.0).at(0.0));
-            scene.seal()
-        }
-
-        let run = |backward: bool| {
-            let mut ev = SceneEvaluator::new(build_scene(), 120.0);
-            let mut trace = Vec::new();
-            for sec in [0.3, 0.7, 1.1, 1.9, 2.6] {
-                if backward {
-                    ev.sample_at(0.4, &mut EvaluatedFrame::new()); // backward jump
-                }
-                let mut frame = EvaluatedFrame::new();
-                ev.sample_at(sec, &mut frame);
-                trace.push(xs_of(&frame));
-            }
-            trace
-        };
-
-        assert_eq!(run(false), run(true));
-        assert_eq!(run(false)[2], vec![(2.0 * 1.1) as f32]);
-    }
-
-    #[test]
-    fn iterative_leaf_inside_sequence_steps() {
+        // Nested inside a sequence the leaf still steps on its own timeline.
         let mut scene = RanimScene::new();
         scene.play(
             seq![
@@ -266,20 +237,42 @@ mod tests {
             ]
             .at(0.0),
         );
-
         let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
-        let mut frame = EvaluatedFrame::new();
-        ev.sample_at(1.5, &mut frame);
-        assert_eq!(xs_of(&frame), vec![0.5]);
-
-        let mut frame = EvaluatedFrame::new();
-        ev.sample_at(2.0, &mut frame);
-        assert_eq!(xs_of(&frame), vec![1.0]);
+        for (sec, expected) in [(1.5, 0.5), (2.0, 1.0)] {
+            let mut frame = EvaluatedFrame::new();
+            ev.sample_at(sec, &mut frame);
+            assert_eq!(xs_of(&frame), vec![expected], "at sec={sec}");
+        }
     }
 
     #[test]
-    fn seek_resets_iterative_leaves_nested_in_containers() {
-        fn build_scene() -> SealedRanimScene {
+    fn iterative_seek_matches_forward_and_resets_nested_leaves() {
+        fn run(scene: SealedRanimScene, backward: bool) -> Vec<Vec<f32>> {
+            let mut ev = SceneEvaluator::new(scene, 120.0);
+            let mut trace = Vec::new();
+            for sec in [0.3, 0.7, 1.1, 1.9, 2.6] {
+                if backward {
+                    // Jump backwards below the first sample so every leaf
+                    // has to re-simulate from the start.
+                    ev.sample_at(0.2, &mut EvaluatedFrame::new());
+                }
+                let mut frame = EvaluatedFrame::new();
+                ev.sample_at(sec, &mut frame);
+                trace.push(xs_of(&frame));
+            }
+            trace
+        }
+
+        let single = || {
+            let mut scene = RanimScene::new();
+            scene.play(cv(2.0, 3.0).with_duration(3.0).at(0.0));
+            scene.seal()
+        };
+        let forward = run(single(), false);
+        assert_eq!(forward, run(single(), true));
+        assert_eq!(forward[2], vec![(2.0 * 1.1) as f32]);
+
+        let nested = || {
             let mut scene = RanimScene::new();
             scene.play(
                 seq![
@@ -289,22 +282,7 @@ mod tests {
                 .at(0.0),
             );
             scene.seal()
-        }
-
-        let run = |backward: bool| {
-            let mut ev = SceneEvaluator::new(build_scene(), 120.0);
-            let mut trace = Vec::new();
-            for sec in [0.3, 0.7, 1.1, 1.5, 1.9] {
-                if backward {
-                    ev.sample_at(0.2, &mut EvaluatedFrame::new()); // backward jump
-                }
-                let mut frame = EvaluatedFrame::new();
-                ev.sample_at(sec, &mut frame);
-                trace.push(xs_of(&frame));
-            }
-            trace
         };
-
-        assert_eq!(run(false), run(true));
+        assert_eq!(run(nested(), false), run(nested(), true));
     }
 }

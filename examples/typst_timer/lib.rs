@@ -280,14 +280,11 @@ fn typst_timer_recompile(r: &mut RanimScene) {
 }
 
 #[test]
-fn timer_derives_milliseconds_from_its_own_duration() {
+fn timer_derives_milliseconds_and_formats_them() {
     assert_eq!(Timer::new(10.0).milliseconds_at_alpha(0.0), 0);
     assert_eq!(Timer::new(2.0).milliseconds_at_alpha(0.5), 1_000);
     assert_eq!(Timer::new(2.0).milliseconds_at_alpha(1.0), 2_000);
-}
 
-#[test]
-fn formats_milliseconds() {
     assert_eq!(
         format_milliseconds(0),
         ['0', '0', ':', '0', '0', '.', '0', '0', '0']

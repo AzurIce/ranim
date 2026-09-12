@@ -312,16 +312,30 @@ mod tests {
     }
 
     #[test]
-    fn scene_play_pushes_into_the_root_stack() {
+    fn scene_play_places_sequences_on_the_root_timeline() {
+        // A plain sequence is sized from its children.
         let mut scene = RanimScene::new();
         scene.play(seq![leaf(2.0), leaf(3.0)]);
         let sealed = scene.seal();
-
         assert_eq!(sealed.total_secs(), 5.0);
         let infos = sealed.get_animation_infos();
         assert_eq!(infos[0].range, 0.0..5.0);
         assert_eq!(infos[0].children[0].range, 0.0..2.0);
         assert_eq!(infos[0].children[1].range, 2.0..5.0);
+
+        // A reusable sequence module keeps its local gaps on the root stack,
+        // and later modules start at the root origin.
+        let mut reusable = AnimSequence::new();
+        reusable.push(leaf(2.0)).forward(1.0).push(leaf(1.0));
+        let mut scene = RanimScene::new();
+        scene.play(reusable);
+        scene.root.push(leaf(5.0));
+        let sealed = scene.seal();
+        assert_eq!(sealed.total_secs(), 5.0);
+        let infos = sealed.get_animation_infos();
+        assert_eq!(infos[0].range, 0.0..4.0);
+        assert_eq!(infos[0].children[1].range, 3.0..4.0);
+        assert_eq!(infos[1].range, 0.0..5.0);
     }
 
     #[test]
@@ -336,24 +350,6 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(ids, [(0, 0), (0, 1)]);
-    }
-
-    #[test]
-    fn scene_modules_share_the_root_origin() {
-        let mut reusable = AnimSequence::new();
-        reusable.push(leaf(2.0)).forward(1.0).push(leaf(1.0));
-
-        let mut scene = RanimScene::new();
-        scene.play(reusable);
-        scene.root.push(leaf(5.0));
-        let sealed = scene.seal();
-
-        assert_eq!(sealed.total_secs(), 5.0);
-        let infos = sealed.get_animation_infos();
-        assert_eq!(infos[0].range, 0.0..4.0);
-        assert_eq!(infos[0].children[0].range, 0.0..2.0);
-        assert_eq!(infos[0].children[1].range, 3.0..4.0);
-        assert_eq!(infos[1].range, 0.0..5.0);
     }
 
     #[test]

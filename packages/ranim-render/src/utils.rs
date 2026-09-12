@@ -485,15 +485,3 @@ impl ReadbackWgpuTexture {
         &self.bytes
     }
 }
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test() {
-        // let x = vec![0, 1, 2, 3];
-        // assert_eq!(
-        //     bytemuck::bytes_of(&[x.as_slice()]),
-        //     bytemuck::bytes_of(&x)
-        // )
-    }
-}

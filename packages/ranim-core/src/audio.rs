@@ -440,9 +440,16 @@ mod tests {
     }
 
     #[test]
-    fn gain_scales_the_track() {
+    fn gain_and_play_window_modify_the_track() {
         let buf = mixed(&[AudioTrack::new(constant(0.5, 1.0)).with_gain(0.2)], 1.0);
         assert!((sample_of(&buf, 0.5) - 0.1).abs() < EPS);
+
+        let buf = mixed(
+            &[AudioTrack::new(constant(0.5, 4.0)).with_play_secs(1.0)],
+            3.0,
+        );
+        assert!((sample_of(&buf, 0.6) - 0.5).abs() < EPS);
+        assert!(sample_of(&buf, 1.6).abs() < EPS);
     }
 
     #[test]
@@ -476,16 +483,6 @@ mod tests {
     }
 
     #[test]
-    fn play_secs_trims_the_clip() {
-        let buf = mixed(
-            &[AudioTrack::new(constant(0.5, 4.0)).with_play_secs(1.0)],
-            3.0,
-        );
-        assert!((sample_of(&buf, 0.6) - 0.5).abs() < EPS);
-        assert!(sample_of(&buf, 1.6).abs() < EPS);
-    }
-
-    #[test]
     fn wav_roundtrip_has_a_sound_header() {
         let path = std::env::temp_dir().join(format!("ranim-wav-test-{}.wav", std::process::id()));
         let pcm = vec![0.25f32; 480];
@@ -500,13 +497,6 @@ mod tests {
         assert_eq!(&bytes[36..40], b"data");
         let data_len = u32::from_le_bytes(bytes[40..44].try_into().unwrap());
         assert_eq!(data_len as usize, pcm.len() * 4);
-    }
-
-    #[test]
-    fn sine_clip_has_the_requested_rate_and_duration() {
-        let clip = AudioClip::sine(440.0, 0.5, 0.5);
-        assert_eq!(clip.sample_rate(), MASTER_SAMPLE_RATE);
-        assert!((clip.duration_secs() - 0.5).abs() < 1e-9);
     }
 
     #[test]

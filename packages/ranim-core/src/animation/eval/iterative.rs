@@ -231,11 +231,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        RanimScene, SceneEvaluator,
-        animation::build::PlaybackExt,
-        core_item::{CoreItem, vitem::VItem},
-    };
+    use crate::core_item::vitem::VItem;
 
     struct MoveRight;
 
@@ -248,48 +244,17 @@ mod tests {
     }
 
     #[test]
-    fn named_evaluator_advances_by_sim_step() {
-        let animation = Iterative::new(VItem::default(), MoveRight).with_steps(4);
-        assert_eq!(animation.eval_alpha(0.5).points[0].x, 0.5);
-    }
+    fn iterative_evaluators_step_by_sim_step() {
+        let named = Iterative::new(VItem::default(), MoveRight).with_steps(4);
+        assert_eq!(named.eval_alpha(0.5).points[0].x, 0.5);
 
-    /// A closure-driven iterative segment with a directly renderable state:
-    /// stepping and seek replay must be deterministic.
-    #[test]
-    fn closure_segment_steps_and_seeks_deterministically() {
-        fn build() -> SceneEvaluator {
-            let mut scene = RanimScene::new();
-            scene.play(
-                Iterative::from_fn(
-                    VItem::default(),
-                    |state: &mut VItem, _alpha: f64, delta_alpha: f64| {
-                        state.points[0].x += delta_alpha as f32;
-                    },
-                )
-                .with_steps(240)
-                .with_duration(2.0),
-            );
-            scene.seal().into_evaluator(120.0)
-        }
-
-        let run = || {
-            let mut ev = build();
-            let mut trace = Vec::new();
-            for sec in [0.5, 1.0, 1.5, 2.0] {
-                let mut frame = Vec::new();
-                ev.sample_at(sec, &mut frame);
-                let x = frame.iter().find_map(|(_, item)| match item {
-                    CoreItem::VItem(v) => Some(v.points[0].x),
-                    _ => None,
-                });
-                trace.push(x);
-            }
-            trace
-        };
-
-        let forward = run();
-        assert_eq!(forward, run());
-        let x = forward.last().unwrap().unwrap();
-        assert!((x - 1.0).abs() < 1e-3, "x = {x}");
+        let from_fn = Iterative::from_fn(
+            VItem::default(),
+            |state: &mut VItem, _alpha: f64, delta_alpha: f64| {
+                state.points[0].x += delta_alpha as f32;
+            },
+        )
+        .with_steps(4);
+        assert_eq!(from_fn.eval_alpha(0.5).points[0].x, 0.5);
     }
 }

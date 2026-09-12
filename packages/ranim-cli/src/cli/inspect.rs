@@ -788,10 +788,7 @@ mod tests {
         assert_eq!(node.children[0].path, [0, 0]);
         assert_eq!(node.children[0].kind, "eval");
         assert_eq!(node.children[0].rate_func, "smooth");
-    }
 
-    #[test]
-    fn maps_unknown_rate_func_to_custom() {
         fn custom(_t: f64) -> f64 {
             0.0
         }
@@ -835,10 +832,7 @@ mod tests {
         assert_eq!(data.fill_colors, ["#ffffffff"]);
         assert_eq!(data.stroke_colors, ["#000000ff"]);
         assert!(data.points.is_none());
-    }
 
-    #[test]
-    fn maps_dvec3_bounds() {
         let bounds = dvec3_bounds([DVec3::new(-1.0, -2.0, -3.0), DVec3::new(1.0, 2.0, 3.0)]);
         assert_eq!(bounds.min, [-1.0, -2.0, -3.0]);
         assert_eq!(bounds.max, [1.0, 2.0, 3.0]);
