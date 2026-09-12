@@ -49,6 +49,7 @@ mod scene;
 pub use scene::*;
 
 pub use core::glam;
+pub use core::num;
 pub use ranim_core::{RanimScene, lagged, seq, stack};
 
 /// The preludes

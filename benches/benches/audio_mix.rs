@@ -2,7 +2,7 @@
 //!
 //! - `bake_*` — the shipped path: build the scene, `seal()`, which bakes
 //!   the whole audio plane by walking the tree per output sample
-//!   (`AnimationCell::mix_at`). Iterations include tree construction
+//!   (`audio-bake descent`). Iterations include tree construction
 //!   (dominated by the bake on every non-trivial shape).
 //! - `flat_*` — a hand-rolled mixer over a flattened track list
 //!   (start frame, window length, clip, gain): per-track tight loops with

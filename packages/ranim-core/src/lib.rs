@@ -43,6 +43,11 @@ pub use audio::AudioTrack;
 use core_item::CoreItem;
 
 /// Commonly used ranim APIs.
+///
+/// The prelude is grouped by surface: colors and traits; the authoring and
+/// extraction protocols (`Eval`, `IntoAnimNode`, `Unplaced`, `PlaybackExt`,
+/// `Extract`); built-in composition containers; audio leaves; and the scene
+/// definition types.
 pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
@@ -61,9 +66,10 @@ pub mod prelude {
     };
     pub use crate::animation::sound::Sound;
     pub use crate::audio::{AudioClip, AudioTrack};
+    pub use crate::core_item::CoreItem;
     pub use crate::core_item::camera_frame::CameraFrame;
     pub use crate::core_item::transformed::{Transformed, TransformedExt};
-    pub use crate::{RanimScene, TimeMark};
+    pub use crate::{Extract, RanimScene, TimeMark};
 }
 
 /// Extract one or more target values from a reference.

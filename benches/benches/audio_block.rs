@@ -1,6 +1,6 @@
 //! Spike: three mixing strategies on a semantics-equivalent toy cell tree.
 //!
-//! The toy mirrors `AnimationCell::mix_at`: each cell owns a window in its
+//! The toy mirrors `AnimNode::eval_at / audio bake`: each cell owns a window in its
 //! parent's content coordinates and maps parent time to content time via
 //! `t = internal · rate((x − start) / dur)`; audio leaves sample their clip at
 //! content time. Strategies compared:
@@ -36,7 +36,7 @@ fn smooth(t: f64) -> f64 {
     t * t * (3.0 - 2.0 * t)
 }
 
-// MARK: toy tree (mirrors AnimationCell::mix_at semantics)
+// MARK: toy tree (mirrors the audio-bake descent semantics)
 
 #[derive(Clone)]
 struct Track {

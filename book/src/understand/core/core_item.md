@@ -59,7 +59,7 @@ pub struct DynItem(pub Box<dyn AnyExtractCoreItem>);
 再把每个产出 item 逐个 `extract()` 展开，得到一帧的 core item 列表：
 
 ```text
-AnimationCell::eval_at(sec)  ->  Vec<DynItem>
+AnimNode::eval_at(sec)  ->  Vec<DynItem>
   每个 DynItem.extract()     ->  Vec<CoreItem>      （这里发生 1→N）
   汇总                       ->  EvaluatedFrame
                                  = Vec<((animation_id, part), CoreItem)>

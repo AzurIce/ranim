@@ -9,8 +9,8 @@
 //!
 //! Because progress is the only coordinate, there are no `Time`/`DeltaTime`
 //! point/span structs anymore — their `secs` payloads only ever made sense at
-//! the `AnimationCell` level (start/duration/rate live there), and stripping
-//! them keeps the evaluation protocol free of cell time configuration.
+//! the `AnimNode` level (start/duration/rate live there), and stripping
+//! them keeps the evaluation protocol free of node time configuration.
 //!
 //! Evaluators receive a plain `f64` progress (`alpha`) and a plain `f64`
 //! progress step (`delta_alpha`), so this module is nothing but the
