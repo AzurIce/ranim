@@ -1,11 +1,11 @@
 //! Evaluation protocols and the standard author-facing adapters.
 //!
-//! [`Eval`] is the single visual leaf protocol;
+//! [`Eval`](crate::animation::eval::Eval) is the single visual leaf protocol;
 //! [`EvalExt`](crate::animation::eval::EvalExt) adds build-time conveniences;
 //! [`pure::Pure`](crate::animation::eval::pure::Pure) adapts a closure
 //! and [`iterative::Iterative`](crate::animation::eval::iterative::Iterative)
-//! adapts a stepping function into that protocol. [`EvalDyn`] is the
-//! runtime-erased leaf dispatch held by `NodeKind::Leaf`.
+//! adapts a stepping function into that protocol. `EvalDyn` is the
+//! runtime-erased leaf dispatch held by `NodeContent::Leaf`.
 
 use crate::core_item::{AnyExtractCoreItem, DynItem};
 
@@ -76,9 +76,8 @@ impl<E: Eval + Sized> EvalExt for E {}
 /// The erased visual-leaf protocol: [`Eval`] without its type.
 ///
 /// This is the only type-erased box in the runtime tree
-/// ([`NodeKind::Leaf`](super::NodeKind)) — the open world of user
-/// evaluators. Containers are closed `NodeKind` variants and never
-/// implement this.
+/// (`NodeContent::Leaf`) — the open world of user evaluators. Containers are
+/// closed runtime variants and never implement this.
 pub(super) trait EvalDyn {
     /// Evaluate this leaf's content at its normalized progress `alpha`,
     /// pushing the resulting erased items into `output`.
@@ -101,5 +100,16 @@ where
 
     fn sim_step(&self) -> Option<f64> {
         Eval::sim_step(self)
+    }
+}
+
+/// A constant evaluator.
+pub struct Static<T: Clone>(pub T);
+
+impl<T: Clone> Eval for Static<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, _alpha: f64) -> Self::Output {
+        self.0.clone()
     }
 }

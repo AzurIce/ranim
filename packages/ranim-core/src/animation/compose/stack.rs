@@ -2,7 +2,8 @@
 
 use std::any::type_name;
 
-use super::{AnimNode, Animation, NodeContent, Placeable};
+use crate::animation::build::{IntoAnimNode, Unplaced};
+use crate::animation::node::{AnimNode, NodeContent};
 
 /// Dynamic overlay animation container.
 ///
@@ -21,8 +22,8 @@ impl AnimStack {
     }
 
     /// Add an animation without advancing the other children.
-    pub fn push<A: Animation + 'static>(&mut self, animation: A) -> &mut Self {
-        let animation = animation.build();
+    pub fn push<A: IntoAnimNode + 'static>(&mut self, animation: A) -> &mut Self {
+        let animation = animation.into_anim_node();
         self.duration_secs = self.duration_secs.max(animation.time_range.end);
         self.animations.push(animation);
         self
@@ -51,9 +52,9 @@ impl AnimStack {
     }
 }
 
-impl Placeable for AnimStack {}
-impl Animation for AnimStack {
-    fn build(self) -> AnimNode {
+impl Unplaced for AnimStack {}
+impl IntoAnimNode for AnimStack {
+    fn into_anim_node(self) -> AnimNode {
         let duration_secs = self.duration_secs;
         AnimNode {
             content: NodeContent::Stack(self.animations),
@@ -72,14 +73,14 @@ macro_rules! stack {
     ($($animation:expr),* $(,)?) => {
         {
             #[allow(unused_mut)]
-            let mut stack = $crate::animation::stack::AnimStack::new();
+            let mut stack = $crate::animation::compose::stack::AnimStack::new();
             $(stack.push($animation);)*
             stack
         }
     };
 }
 
-impl<A: Animation + 'static> FromIterator<A> for AnimStack {
+impl<A: IntoAnimNode + 'static> FromIterator<A> for AnimStack {
     fn from_iter<I: IntoIterator<Item = A>>(iter: I) -> Self {
         let mut stack = AnimStack::new();
         for animation in iter {

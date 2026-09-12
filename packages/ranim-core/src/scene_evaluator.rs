@@ -9,7 +9,7 @@
 
 use crate::{
     Extract, SealedRanimScene, TimeMark,
-    animation::{AnimNode, AnimationInfo},
+    animation::node::{AnimNode, AnimationInfo},
     audio::MASTER_SAMPLE_RATE,
     core_item::CoreItem,
 };
@@ -129,7 +129,10 @@ mod tests {
     use super::*;
     use crate::{
         RanimScene, SealedRanimScene,
-        animation::{AnimationExt, Placeable, eval::Eval},
+        animation::{
+            build::{PlaybackExt, Unplaced},
+            eval::Eval,
+        },
         core_item::vitem::VItem,
         seq,
     };

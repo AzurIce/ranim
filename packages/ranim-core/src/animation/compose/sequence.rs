@@ -4,7 +4,8 @@ use std::any::type_name;
 
 use crate::core_item::DynItem;
 
-use super::{AnimNode, Animation, NodeContent, Placeable, static_cell};
+use crate::animation::build::{IntoAnimNode, Unplaced};
+use crate::animation::node::{AnimNode, NodeContent, static_cell};
 
 /// Dynamic sequential animation container.
 ///
@@ -34,8 +35,8 @@ impl AnimSequence {
     }
 
     /// Append an animation at the current cursor and advance by its local extent.
-    pub fn push<A: Placeable + 'static>(&mut self, animation: A) -> &mut Self {
-        let mut animation = animation.build();
+    pub fn push<A: Unplaced + 'static>(&mut self, animation: A) -> &mut Self {
+        let mut animation = animation.into_anim_node();
         let duration_secs = animation.duration_secs();
         animation.shift_by(self.cursor_sec);
         self.animations.push(animation);
@@ -129,9 +130,9 @@ impl AnimSequence {
     }
 }
 
-impl Placeable for AnimSequence {}
-impl Animation for AnimSequence {
-    fn build(self) -> AnimNode {
+impl Unplaced for AnimSequence {}
+impl IntoAnimNode for AnimSequence {
+    fn into_anim_node(self) -> AnimNode {
         let duration_secs = self.cursor_sec;
         AnimNode {
             content: NodeContent::Sequence(self.animations),
@@ -150,14 +151,14 @@ macro_rules! seq {
     ($($animation:expr),* $(,)?) => {
         {
             #[allow(unused_mut)]
-            let mut sequence = $crate::animation::sequence::AnimSequence::new();
+            let mut sequence = $crate::animation::compose::sequence::AnimSequence::new();
             $(sequence.push($animation);)*
             sequence
         }
     };
 }
 
-impl<A: Placeable + 'static> FromIterator<A> for AnimSequence {
+impl<A: Unplaced + 'static> FromIterator<A> for AnimSequence {
     fn from_iter<I: IntoIterator<Item = A>>(iter: I) -> Self {
         let mut sequence = AnimSequence::new();
         for animation in iter {

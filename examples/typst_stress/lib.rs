@@ -11,7 +11,7 @@ use ranim::{
     prelude::*,
 };
 use ranim_anims::morph::MorphAnim;
-use ranim_core::animation::StaticAnim;
+use ranim_core::animation::build::StaticAnim;
 use ranim::utils::rate_functions::smooth;
 
 const BEHAVIOR_CELLS: &[&str] = &[

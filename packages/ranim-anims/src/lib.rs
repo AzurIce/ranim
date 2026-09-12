@@ -3,8 +3,10 @@
 //! Each module contains named, closed-form animation types plus the
 //! convenience traits used to construct them from an item (e.g.
 //! [`fading::FadingAnim`]). Every animation type implements
-//! [`Eval`](ranim_core::animation::eval::Eval) directly; generic authoring adapters
-//! live in `ranim_core::animation`:
+//! [`Eval`](ranim_core::animation::eval::Eval) directly; composition
+//! containers (`AnimSequence`, `AnimStack`, `AnimLagged`) live in
+//! [`ranim_core::animation::compose`], and generic authoring adapters live in
+//! `ranim_core::animation`:
 //!
 //! - [`Pure`](ranim_core::animation::eval::pure::Pure) wraps a raw
 //!   `Fn(f64) -> T` closure into an `Eval`;

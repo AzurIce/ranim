@@ -34,8 +34,11 @@ pub use num;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use animation::{AnimNode, Animation, stack::AnimStack};
-pub use animation::{AnimationInfo, AnimationInfoKind, Sound};
+use animation::{
+    build::IntoAnimNode,
+    compose::stack::AnimStack,
+    node::{AnimNode, AnimationInfo, bake_audio},
+};
 pub use audio::AudioTrack;
 use core_item::CoreItem;
 
@@ -44,15 +47,19 @@ pub mod prelude {
     pub use crate::color::prelude::*;
     pub use crate::traits::*;
 
-    pub use crate::animation::eval::iterative::{Iterative, IterativeEval, IterativeFn};
-    pub use crate::animation::eval::pure::Pure;
-    pub use crate::animation::eval::{Eval, EvalExt};
-    pub use crate::animation::lagged::{AnimLagged, LaggedFill};
-    pub use crate::animation::sequence::AnimSequence;
-    pub use crate::animation::stack::AnimStack;
-    pub use crate::animation::{
-        AnimIterExt, Animation, AnimationExt, Placeable, StaticAnim, sound::Sound,
+    pub use crate::animation::build::{IntoAnimNode, PlaybackExt, StaticAnim, Unplaced};
+    pub use crate::animation::compose::{
+        AnimIterExt,
+        lagged::{AnimLagged, LaggedFill},
+        sequence::AnimSequence,
+        stack::AnimStack,
     };
+    pub use crate::animation::eval::{
+        Eval, EvalExt, Static,
+        iterative::{Iterative, IterativeEval, IterativeFn},
+        pure::Pure,
+    };
+    pub use crate::animation::sound::Sound;
     pub use crate::audio::{AudioClip, AudioTrack};
     pub use crate::core_item::camera_frame::CameraFrame;
     pub use crate::core_item::transformed::{Transformed, TransformedExt};
@@ -158,7 +165,7 @@ pub enum TimeMark {
 pub struct RanimScene {
     /// Root animation stack. Modules pushed here share the same local origin.
     ///
-    /// Audio leaves ([`Sound`]) compose in the same tree beside visual
+    /// Audio leaves ([`Sound`](crate::animation::sound::Sound)) compose in the same tree beside visual
     /// animations; [`RanimScene::seal`] bakes them through the same cell
     /// remaps the visuals experience.
     pub root: AnimStack,
@@ -172,7 +179,7 @@ impl RanimScene {
     }
 
     /// Push an animation module into the root stack.
-    pub fn play<A: Animation + 'static>(&mut self, animation: A) -> &mut Self {
+    pub fn play<A: IntoAnimNode + 'static>(&mut self, animation: A) -> &mut Self {
         self.root.push(animation);
         self
     }
@@ -192,7 +199,7 @@ impl RanimScene {
         let total_secs = self.root.duration_secs();
         let animations = self.root.into_built_animations();
         let sample_rate = crate::audio::MASTER_SAMPLE_RATE as f64;
-        let audio: Arc<[f32]> = animation::bake_audio(&animations, total_secs, sample_rate).into();
+        let audio: Arc<[f32]> = bake_audio(&animations, total_secs, sample_rate).into();
         SealedRanimScene {
             total_secs,
             animations,
@@ -292,11 +299,15 @@ impl SealedRanimScene {
 mod tests {
     use super::*;
     use crate::{
-        animation::{AnimationExt, Placeable, Static, sequence::AnimSequence},
+        animation::{
+            build::{PlaybackExt, Unplaced},
+            compose::sequence::AnimSequence,
+            eval::Static,
+        },
         core_item::vitem::VItem,
     };
 
-    fn leaf(duration: f64) -> impl Placeable {
+    fn leaf(duration: f64) -> impl Unplaced {
         Static(VItem::default()).with_duration(duration)
     }
 

@@ -157,9 +157,9 @@ fn which_bin(bin: &str) -> bool {
 ///
 /// Purely substance — clip trim, gain envelope, playback rate. Everything
 /// time-positional (placement, window duration, enable, rate warps) lives on
-/// the cell layer (`Placeable::at`, `with_duration`, `with_rate_func`,
+/// the cell layer (`Unplaced::at`, `with_duration`, `with_rate_func`,
 /// `with_enabled`), exactly like a visual item's data versus its
-/// [`AnimNode`](crate::animation::AnimNode).
+/// [`AnimNode`](crate::animation::node::AnimNode).
 #[derive(Debug, Clone)]
 pub struct AudioTrack {
     clip: AudioClip,

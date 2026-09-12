@@ -28,7 +28,7 @@ const BAR_WIDTH: f64 = 8.1;
 ///
 /// The duration lives here instead of in a global constant, and each timer
 /// animation owns a copy. Both the elapsed-milliseconds mapping and the
-/// playback duration passed to [`AnimationExt::with_duration`] are derived
+/// playback duration passed to [`PlaybackExt::with_duration`] are derived
 /// from this field, so they can never drift apart.
 #[derive(Clone, Copy)]
 struct Timer {
@@ -167,7 +167,7 @@ impl AtlasTimerEval {
         Self { atlas, timer }
     }
 
-    fn into_animation(self) -> impl Animation {
+    fn into_animation(self) -> impl IntoAnimNode {
         let duration_secs = self.timer.duration_secs;
         self.with_duration(duration_secs).with_rate_func(linear)
     }
@@ -204,7 +204,7 @@ impl RecompileTimerEval {
         Self { glyph_scale, timer }
     }
 
-    fn into_animation(self) -> impl Animation {
+    fn into_animation(self) -> impl IntoAnimNode {
         let duration_secs = self.timer.duration_secs;
         self.with_duration(duration_secs).with_rate_func(linear)
     }
@@ -233,7 +233,7 @@ impl Eval for RecompileTimerEval {
     }
 }
 
-fn timer_camera(timer: Timer) -> impl Animation {
+fn timer_camera(timer: Timer) -> impl IntoAnimNode {
     CameraFrame {
         frame_height: 5.0,
         ..Default::default()
@@ -242,7 +242,7 @@ fn timer_camera(timer: Timer) -> impl Animation {
     .with_duration(timer.duration_secs)
 }
 
-fn timer_label(timer: Timer) -> impl Animation {
+fn timer_label(timer: Timer) -> impl IntoAnimNode {
     let mut label = TypstText::new("ELAPSED TIME");
     label
         .scale_to(ScaleHint::PorportionalY(0.32))

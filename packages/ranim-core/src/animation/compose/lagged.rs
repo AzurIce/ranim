@@ -2,11 +2,13 @@
 //!
 //! [`AnimLagged`] is build-time only: it staggers children by placing them
 //! on the content axis and lowers to a plain stack of per-item sequence
-//! tracks in [`Animation::build`] — no runtime kind of its own.
+//! tracks in [`IntoAnimNode::into_anim_node`] — no runtime kind of its own.
 
 use std::any::type_name;
 
-use super::{AnimNode, Animation, NodeContent, Placeable, sequence::AnimSequence, static_cell};
+use crate::animation::build::{IntoAnimNode, Unplaced};
+use crate::animation::compose::sequence::AnimSequence;
+use crate::animation::node::{AnimNode, NodeContent, static_cell};
 
 /// How an [`AnimLagged`] fills the time outside a child's window.
 ///
@@ -24,7 +26,7 @@ pub enum LaggedFill {
 
 /// Dynamic lagged (staggered, end-filled) animation container.
 ///
-/// Children are pushed un-placed ([`Placeable`]); the container computes the
+/// Children are pushed un-placed ([`Unplaced`]); the container computes the
 /// placement itself: child `i` starts at `start_{i-1} + lag_ratio · d_{i-1}`.
 /// `lag_ratio` interpolates between the other two containers:
 ///
@@ -97,8 +99,8 @@ impl AnimLagged {
     }
 
     /// Add an animation, placed by the container's stagger rule.
-    pub fn push<A: Placeable + 'static>(&mut self, animation: A) -> &mut Self {
-        let mut animation = animation.build();
+    pub fn push<A: Unplaced + 'static>(&mut self, animation: A) -> &mut Self {
+        let mut animation = animation.into_anim_node();
         let duration_secs = animation.duration_secs();
         animation.shift_by(self.cursor_sec);
         self.duration_secs = self.duration_secs.max(animation.time_range.end);
@@ -138,7 +140,7 @@ impl AnimLagged {
                 }
             }
             track.cursor_sec = total;
-            animations.push(track.build());
+            animations.push(track.into_anim_node());
         }
         self.animations = animations;
     }
@@ -156,13 +158,13 @@ impl AnimLagged {
     }
 }
 
-impl Placeable for AnimLagged {}
-impl Animation for AnimLagged {
+impl Unplaced for AnimLagged {}
+impl IntoAnimNode for AnimLagged {
     /// Desugar: materialize each item into a full-extent sequence track,
-    /// then lower the whole container to a plain [`Stack`](NodeKind::Stack)
-    /// node — the stagger is ordinary window placement, so lagged needs no
+    /// then lower the whole container to a plain runtime stack node — the
+    /// stagger is ordinary window placement, so lagged needs no
     /// runtime kind of its own. `anim_name` keeps the authoring identity.
-    fn build(mut self) -> AnimNode {
+    fn into_anim_node(mut self) -> AnimNode {
         self.materialize_fills();
         let duration_secs = self.duration_secs;
         AnimNode {
@@ -182,7 +184,7 @@ macro_rules! lagged {
     ($lag_ratio:expr; $($animation:expr),* $(,)?) => {
         {
             #[allow(unused_mut)]
-            let mut lagged = $crate::animation::lagged::AnimLagged::new($lag_ratio);
+            let mut lagged = $crate::animation::compose::lagged::AnimLagged::new($lag_ratio);
             $(lagged.push($animation);)*
             lagged
         }

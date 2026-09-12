@@ -233,7 +233,7 @@ mod tests {
     use super::*;
     use crate::{
         RanimScene, SceneEvaluator,
-        animation::AnimationExt,
+        animation::build::PlaybackExt,
         core_item::{CoreItem, vitem::VItem},
     };
 

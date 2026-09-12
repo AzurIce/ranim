@@ -5,7 +5,10 @@ use egui::{
     TextStyle, Ui, pos2, vec2,
 };
 
-use crate::core::{AnimationInfo, AnimationInfoKind, color::palettes::manim};
+use crate::core::{
+    animation::node::{AnimationInfo, AnimationInfoKind},
+    color::palettes::manim,
+};
 
 const HEADER_HEIGHT: f32 = 26.0;
 const TRACK_HEIGHT: f32 = 28.0;

@@ -1,8 +1,8 @@
 //! Audio leaf animation: a sound placed and composed like any animation.
 //!
-//! [`Sound`] makes the audio plane part of the animation tree: a sound sits
+//! [`Sound`](crate::animation::sound::Sound) makes the audio plane part of the animation tree: a sound sits
 //! in `seq!`/`stack!`/`lagged!` beside visual animations, shares their
-//! placement vocabulary ([`Placeable::at`], duration overrides, enable), and
+//! placement vocabulary ([`Unplaced::at`](crate::animation::build::Unplaced::at), duration overrides, enable), and
 //! never enters the per-frame evaluation pipeline.
 //!
 //! The leaf contract mirrors `Eval`: content is a pure span, and all time
@@ -15,7 +15,8 @@ use std::any::type_name;
 
 use crate::audio::{AudioClip, AudioTrack};
 
-use super::{AnimNode, Animation, NodeContent, Placeable};
+use crate::animation::build::{IntoAnimNode, Unplaced};
+use crate::animation::node::{AnimNode, NodeContent};
 
 /// An audio leaf: plays a clip's span inside its placed window.
 ///
@@ -76,9 +77,9 @@ impl Sound {
     }
 }
 
-impl Placeable for Sound {}
-impl Animation for Sound {
-    fn build(self) -> AnimNode {
+impl Unplaced for Sound {}
+impl IntoAnimNode for Sound {
+    fn into_anim_node(self) -> AnimNode {
         let window = self.duration_secs();
         AnimNode {
             content: NodeContent::Audio(Box::new(self.track)),

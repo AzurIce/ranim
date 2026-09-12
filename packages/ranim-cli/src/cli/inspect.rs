@@ -5,7 +5,7 @@ use ranim::{
     color::{AlphaColor, Srgb},
     core::{
         anchor::Aabb,
-        animation::{AnimationInfo, AnimationInfoKind},
+        animation::node::{AnimationInfo, AnimationInfoKind},
         components::{rgba::Rgba, vpoint::VPointVec},
         core_item::{
             CoreItem,
@@ -747,7 +747,7 @@ fn print_json<T: Serialize>(output: &T) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use ranim::{
-        core::{animation::AnimationInfo, utils::rate_functions},
+        core::{animation::node::AnimationInfo, utils::rate_functions},
         glam::{DVec3, Vec4},
     };
 
