@@ -79,6 +79,10 @@ jobs:
         with:
           shared-key: "build"
 
+      # rodio/cpal builds alsa-sys on native targets when preview/audio is enabled.
+      - name: Install ALSA headers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
       - name: Run cargo fmt
         run: cargo fmt --all --check
 
