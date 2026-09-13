@@ -4,7 +4,7 @@ pub mod test_scenes {
     use itertools::Itertools;
     use ranim::{
         anims::morph::MorphAnim,
-        core::animation::{StaticAnim, stack::AnimStack},
+        core::animation::{compose::stack::AnimStack, eval::StaticAnim},
         glam::{DVec3, dvec3},
         items::vitem::{
             VItem,

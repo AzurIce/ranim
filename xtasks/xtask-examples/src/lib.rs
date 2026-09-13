@@ -983,15 +983,15 @@ mod test {
         });
     }
 
-    /// Renders an example end-to-end (requires a GPU); ignored by default.
+    /// Runs the first example end-to-end and then cleans its outputs
+    /// (requires a GPU); ignored by default.
     #[test]
     #[ignore]
-    fn test_example_run() {
-        let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let root_dir = xtask_root.join("../../");
+    fn test_example_run_and_clean_output() {
+        let root_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
         let examples = get_examples(&root_dir).unwrap();
-        println!("{:?}", examples[0].name);
         examples[0].run(&root_dir, false).unwrap();
+        examples[0].clean_output(&root_dir).unwrap();
     }
 
     /// Builds the shared wasm scene bundle (requires the wasm32 target,
@@ -1002,17 +1002,6 @@ mod test {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         build_examples_wasm(&root_dir).unwrap();
-    }
-
-    /// Destructive: deletes the example's website outputs; ignored by default.
-    #[test]
-    #[ignore]
-    fn test_example_clean_output() {
-        let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let root_dir = xtask_root.join("../../");
-        let examples = get_examples(&root_dir).unwrap();
-        println!("{:?}", examples[0].name);
-        examples[0].clean_output(&root_dir).unwrap();
     }
 
     #[test]

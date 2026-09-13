@@ -285,27 +285,19 @@ mod tests {
     };
 
     #[test]
-    fn test_generate_grid_indices_2x2() {
-        // 2×2 grid → 1 quad → 2 triangles → 6 indices
+    fn generate_grid_indices_follows_quad_layout() {
+        // 2x2 grid -> 1 quad -> 2 triangles -> 6 indices, with the
+        // documented vertex order (tl, tr, bl, br).
         let indices = generate_grid_indices(2, 2);
-        assert_eq!(indices.len(), 6);
-        // Vertices: 0=tl, 1=tr, 2=bl, 3=br
         assert_eq!(indices, vec![0, 2, 1, 1, 2, 3]);
-    }
 
-    #[test]
-    fn test_generate_grid_indices_3x3() {
-        // 3×3 grid → 4 quads → 8 triangles → 24 indices
-        let indices = generate_grid_indices(3, 3);
-        assert_eq!(indices.len(), 24);
-    }
-
-    #[test]
-    fn test_generate_grid_indices_count() {
+        // General count: 6 indices per cell.
         let nu = 10;
         let nv = 5;
-        let indices = generate_grid_indices(nu, nv);
-        assert_eq!(indices.len(), 6 * (nu as usize - 1) * (nv as usize - 1));
+        assert_eq!(
+            generate_grid_indices(nu, nv).len(),
+            6 * (nu as usize - 1) * (nv as usize - 1)
+        );
     }
 
     #[test]
@@ -382,8 +374,12 @@ mod tests {
     }
 
     #[test]
-    fn test_mesh_item_aabb() {
-        use ranim_core::glam::dvec3;
+    fn mesh_item_empty_and_bounds() {
+        let mesh = MeshItem::empty();
+        assert_eq!(mesh.points.len(), 0);
+        assert_eq!(mesh.triangle_indices.len(), 0);
+        assert_eq!(mesh.vertex_colors.len(), 0);
+        assert_eq!(mesh.vertex_normals.len(), 0);
 
         let mesh = MeshItem::from_indexed_vertices(
             vec![
@@ -394,18 +390,8 @@ mod tests {
             ],
             vec![0, 1, 2],
         );
-
         let [min, max] = mesh.aabb();
-        assert_eq!(min, dvec3(-1.0, -1.0, -1.0));
-        assert_eq!(max, dvec3(1.0, 1.0, 1.0));
-    }
-
-    #[test]
-    fn test_mesh_item_empty() {
-        let mesh = MeshItem::empty();
-        assert_eq!(mesh.points.len(), 0);
-        assert_eq!(mesh.triangle_indices.len(), 0);
-        assert_eq!(mesh.vertex_colors.len(), 0);
-        assert_eq!(mesh.vertex_normals.len(), 0);
+        assert_eq!(min, DVec3::splat(-1.0));
+        assert_eq!(max, DVec3::splat(1.0));
     }
 }

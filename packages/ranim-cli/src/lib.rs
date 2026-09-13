@@ -489,25 +489,17 @@ mod tests {
     }
 
     #[test]
-    fn select_scene_uses_the_only_scene_when_name_is_omitted() {
-        let scenes = [scene("only")];
-        let selected = select_scene_from_slice(&scenes, None).unwrap();
-        assert_eq!(selected.name, "only");
-    }
+    fn select_scene_resolves_omitted_and_named_scenes() {
+        let single = [scene("only")];
+        assert_eq!(select_scene_from_slice(&single, None).unwrap().name, "only");
 
-    #[test]
-    fn select_scene_lists_available_scenes_when_name_is_omitted() {
         let scenes = [scene("a"), scene("b")];
         let err = match select_scene_from_slice(&scenes, None) {
             Ok(_) => panic!("expected an error for multiple scenes"),
             Err(err) => err,
         };
         assert!(err.to_string().contains("Available scenes: a, b"));
-    }
 
-    #[test]
-    fn select_scene_finds_scene_by_name() {
-        let scenes = [scene("a"), scene("b")];
         let selected = select_scene_from_slice(&scenes, Some("b")).unwrap();
         assert_eq!(selected.name, "b");
     }

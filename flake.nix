@@ -155,9 +155,8 @@
             typst
             gh
             ffmpeg
-            # wasm-bindgen-cli_0_2_106
+            # wasm-bindgen-cli is pinned in ./wasm-bindgen-cli.nix.
             # mdbook-katex
-            # wasm-bindgen-cli
             # mdbook-i18n-helpers
           ])
           ++ [
@@ -169,6 +168,10 @@
             pkgs.wayland
             pkgs.libxkbcommon
             pkgs.libX11
+            # rodio/cpal preview audio backend (ranim `preview` feature)
+            pkgs.alsa-lib
+            pkgs.pkg-config
+            pkgs.udev
           ];
 
           shellHook = lib.optionalString pkgs.stdenv.isLinux ''

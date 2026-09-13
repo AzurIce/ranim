@@ -35,7 +35,7 @@ ranim-anims = { path = "packages/ranim-anims", version = "0.2.1" }
 ranim-macros = { path = "packages/ranim-macros", version = "0.2.1" }
 ranim-render = { path = "packages/ranim-render", version = "0.2.1" }
 wgpu-profiler = { version = "0.28.0", features = ["puffin"] }
-wasm-bindgen = "0.2.127"
+wasm-bindgen = "0.2.128"
 glam = "0.33.6"
 tracing = "0.1.44"
 tracing-indicatif = "0.3.14"
@@ -46,6 +46,18 @@ wgpu = "30.0.1"
 image = "0.25.10"
 derive_more = "2.1.1"
 bevy_ecs = { version = "0.19.1", default-features = false, features = ["std"] }
+# audio-decode feature (ranim-core): pure-Rust audio decoding + resampling
+symphonia = { version = "0.5.5", default-features = false, features = [
+  "aac",
+  "flac",
+  "mp3",
+  "pcm",
+  "vorbis",
+  "isomp4",
+  "ogg",
+  "wav",
+] }
+rubato = "5.0"
 
 [features]
 # default = ["output"]
@@ -61,6 +73,7 @@ profiling = [
   "dep:profiling",
 ]
 # output = ["dep:async-channel"]
+audio-decode = ["ranim-core/audio-decode"]
 render = [
   "dep:ranim-render",
   "dep:wgpu",
@@ -73,6 +86,7 @@ render = [
 ]
 preview = [
   "render",
+  "dep:rodio",
   "dep:egui",
   "dep:eframe",
   "dep:egui-phosphor",
@@ -129,8 +143,8 @@ eframe = { version = "0.36.1", default-features = false, features = [
     "web_screen_reader",
     "wgpu",
 ], optional = true }
-wasm-bindgen-futures = { version = "0.4.77", optional = true }
-web-sys = { version = "0.3.104", optional = true }
+wasm-bindgen-futures = { version = "0.4.78", optional = true }
+web-sys = { version = "0.3.105", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 wasm-tracing = { version = "2.1.0", optional = true }
 
@@ -144,6 +158,8 @@ flate2 = { version = "1.1.10", optional = true }
 reqwest = { version = "0.13.4", features = ["blocking"], optional = true }
 # app feature (native)
 eframe = { version = "0.36.1", features = ["wgpu"], optional = true }
+# preview feature (native): audio playback via rodio
+rodio = { version = "0.21", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pretty_env_logger = "0.5.0"
@@ -195,6 +211,14 @@ crate-type = ["cdylib"]
 
 [package.metadata.example.z_fighting]
 wasm = true
+
+[[example]]
+name = "audio_demo"
+path = "examples/audio_demo/lib.rs"
+crate-type = ["cdylib"]
+
+[package.metadata.example.audio_demo]
+wasm = false
 
 [[example]]
 name = "animating_pi"

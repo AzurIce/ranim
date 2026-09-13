@@ -222,7 +222,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn arc_is_canonical_local() {
+    fn arcs_preserve_their_endpoints() {
         let arc = Arc::new(PI / 2.0, 2.0);
         assert_float_absolute_eq!(
             arc.start().distance_squared(dvec3(2.0, 0.0, 0.0)),
@@ -230,10 +230,7 @@ mod tests {
             1e-10
         );
         assert_float_absolute_eq!(arc.end().distance_squared(dvec3(0.0, 2.0, 0.0)), 0.0, 1e-10);
-    }
 
-    #[test]
-    fn arc_between_points_preserves_endpoints() {
         let arc = ArcBetweenPoints::new(dvec3(2.0, 0.0, 0.0), dvec3(0.0, 2.0, 0.0), PI / 2.0);
         assert_float_absolute_eq!(arc.center().distance_squared(DVec3::ZERO), 0.0, 1e-10);
         let item = VItem::from(arc);

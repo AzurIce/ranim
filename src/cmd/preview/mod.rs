@@ -1,4 +1,7 @@
+#[cfg(not(target_family = "wasm"))]
+mod audio;
 mod depth_visual;
+mod playback;
 mod timeline;
 
 use std::sync::Arc;
@@ -16,6 +19,7 @@ use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
 use async_channel::{Receiver, Sender, unbounded};
 use depth_visual::DepthVisualPipeline;
 use eframe::{App, egui};
+use playback::PlaybackEngine;
 use timeline::TimelineState;
 use tracing::{error, info};
 use web_time::Instant;
@@ -111,7 +115,7 @@ pub struct RanimPreviewApp {
     last_sec: f64,
     store: RenderFrame,
     timeline_state: TimelineState,
-    play_prev_t: Option<Instant>,
+    playback_engine: PlaybackEngine,
 
     // Rendering
     renderer: Option<Renderer>,
@@ -168,6 +172,8 @@ impl RanimPreviewApp {
 
         let (cmd_tx, cmd_rx) = unbounded();
 
+        let playback_engine = PlaybackEngine::new(&evaluator);
+
         Self {
             cmd_rx,
             cmd_tx,
@@ -181,7 +187,7 @@ impl RanimPreviewApp {
             need_eval: false,
             last_sec: -1.0,
             store: RenderFrame::default(),
-            play_prev_t: None,
+            playback_engine,
             renderer: None,
             render_textures: None,
             texture_id: None,
@@ -268,6 +274,7 @@ impl RanimPreviewApp {
                     self.timeline_state.current_sec =
                         old_cur_second.clamp(0.0, self.timeline_state.total_sec);
                     self.evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
+                    self.playback_engine.reload_scene(&self.evaluator);
                     self.store.update(std::iter::empty());
                     self.need_eval = true;
 
@@ -361,6 +368,56 @@ impl RanimPreviewApp {
         self.wgpu_ctx = Some(ctx);
         self.resolution_dirty = false;
         self.need_eval = true; // Force re-render with new resolution
+    }
+
+    // MARK: Playback
+
+    fn is_playing(&self) -> bool {
+        self.playback_engine.is_playing()
+    }
+
+    /// Start playback from the playhead (wrapping to 0.0 at the end).
+    fn play(&mut self) {
+        let total = self.timeline_state.total_sec;
+        self.timeline_state.current_sec =
+            self.playback_engine
+                .play(self.timeline_state.current_sec, total, self.playback_speed);
+    }
+
+    /// Stop playback, freezing the playhead at the clock's current reading.
+    fn pause(&mut self) {
+        if self.playback_engine.is_playing() {
+            self.timeline_state.current_sec = self
+                .playback_engine
+                .pause()
+                .clamp(0.0, self.timeline_state.total_sec);
+        }
+    }
+
+    /// Move the playhead, keeping the active clock consistent with it.
+    fn scrub_to(&mut self, sec: f64) {
+        let sec = sec.clamp(0.0, self.timeline_state.total_sec);
+        self.timeline_state.current_sec = sec;
+        self.playback_engine.scrub_to(sec);
+    }
+
+    /// Read the playing clock into the playhead and handle end-of-scene
+    /// (loop or stop). Returns whether the UI should keep repainting.
+    fn tick_playback(&mut self) -> bool {
+        let scrub_audible = self.playback_engine.tick_scrub();
+        let Some(pos) = self.playback_engine.pos_secs() else {
+            return scrub_audible;
+        };
+        let total = self.timeline_state.total_sec;
+        self.timeline_state.current_sec = pos.min(total);
+        if pos >= total {
+            if self.looping {
+                self.play();
+            } else {
+                self.pause();
+            }
+        }
+        self.playback_engine.is_playing() || scrub_audible
     }
 
     fn render_animation(&mut self) {
@@ -489,13 +546,10 @@ impl eframe::App for RanimPreviewApp {
 
         // Space bar toggles play/pause
         if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
-            if self.play_prev_t.is_some() {
-                self.play_prev_t = None;
+            if self.is_playing() {
+                self.pause();
             } else {
-                if self.timeline_state.current_sec >= self.timeline_state.total_sec {
-                    self.timeline_state.current_sec = 0.0;
-                }
-                self.play_prev_t = Some(Instant::now());
+                self.play();
             }
         }
 
@@ -503,33 +557,17 @@ impl eframe::App for RanimPreviewApp {
         {
             let frame_dur = 1.0 / self.export_config.fps as f64;
             if ctx.input(|i| i.key_pressed(egui::Key::ArrowLeft)) {
-                self.play_prev_t = None;
-                self.timeline_state.current_sec =
-                    (self.timeline_state.current_sec - frame_dur).max(0.0);
+                self.pause();
+                self.scrub_to(self.timeline_state.current_sec - frame_dur);
             }
             if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
-                self.play_prev_t = None;
-                self.timeline_state.current_sec = (self.timeline_state.current_sec + frame_dur)
-                    .min(self.timeline_state.total_sec);
+                self.pause();
+                self.scrub_to(self.timeline_state.current_sec + frame_dur);
             }
         }
 
-        if let Some(play_prev_t) = self.play_prev_t {
-            let elapsed = play_prev_t.elapsed().as_secs_f64() * self.playback_speed;
-            self.timeline_state.current_sec =
-                (self.timeline_state.current_sec + elapsed).min(self.timeline_state.total_sec);
-            if self.timeline_state.current_sec >= self.timeline_state.total_sec {
-                if self.looping {
-                    self.timeline_state.current_sec = 0.0;
-                    self.play_prev_t = Some(Instant::now());
-                    ctx.request_repaint();
-                } else {
-                    self.play_prev_t = None;
-                }
-            } else {
-                self.play_prev_t = Some(Instant::now());
-                ctx.request_repaint();
-            }
+        if self.tick_playback() {
+            ctx.request_repaint();
         }
 
         self.render_animation();
@@ -678,6 +716,7 @@ impl eframe::App for RanimPreviewApp {
             .min_size(150.0)
             .max_size(600.0)
             .show(ui, |ui| {
+                let pre_panel_sec = self.timeline_state.current_sec;
                 ui.label("Timeline");
 
                 ui.horizontal(|ui| {
@@ -690,8 +729,8 @@ impl eframe::App for RanimPreviewApp {
                         .on_hover_text("Jump to start")
                         .clicked()
                     {
-                        self.timeline_state.current_sec = 0.0;
-                        self.play_prev_t = None;
+                        self.pause();
+                        self.scrub_to(0.0);
                     }
 
                     // < Step back one frame
@@ -700,13 +739,12 @@ impl eframe::App for RanimPreviewApp {
                         .on_hover_text("Step back one frame")
                         .clicked()
                     {
-                        self.play_prev_t = None;
-                        self.timeline_state.current_sec =
-                            (self.timeline_state.current_sec - frame_dur).max(0.0);
+                        self.pause();
+                        self.scrub_to(self.timeline_state.current_sec - frame_dur);
                     }
 
                     // Play / Pause
-                    let is_playing = self.play_prev_t.is_some();
+                    let is_playing = self.is_playing();
                     let play_label = if is_playing {
                         egui_phosphor::regular::PAUSE
                     } else {
@@ -715,12 +753,9 @@ impl eframe::App for RanimPreviewApp {
                     let play_tooltip = if is_playing { "Pause" } else { "Play" };
                     if ui.button(play_label).on_hover_text(play_tooltip).clicked() {
                         if is_playing {
-                            self.play_prev_t = None;
+                            self.pause();
                         } else {
-                            if self.timeline_state.current_sec >= self.timeline_state.total_sec {
-                                self.timeline_state.current_sec = 0.0;
-                            }
-                            self.play_prev_t = Some(Instant::now());
+                            self.play();
                         }
                     }
 
@@ -730,10 +765,8 @@ impl eframe::App for RanimPreviewApp {
                         .on_hover_text("Step forward one frame")
                         .clicked()
                     {
-                        self.play_prev_t = None;
-                        self.timeline_state.current_sec = (self.timeline_state.current_sec
-                            + frame_dur)
-                            .min(self.timeline_state.total_sec);
+                        self.pause();
+                        self.scrub_to(self.timeline_state.current_sec + frame_dur);
                     }
 
                     // >| Jump to end
@@ -742,8 +775,8 @@ impl eframe::App for RanimPreviewApp {
                         .on_hover_text("Jump to end")
                         .clicked()
                     {
-                        self.timeline_state.current_sec = self.timeline_state.total_sec;
-                        self.play_prev_t = None;
+                        self.pause();
+                        self.scrub_to(self.timeline_state.total_sec);
                     }
 
                     ui.separator();
@@ -769,13 +802,17 @@ impl eframe::App for RanimPreviewApp {
 
                     // Speed control
                     let drag_speed = (self.playback_speed * 0.02).max(0.01);
-                    ui.add(
-                        egui::DragValue::new(&mut self.playback_speed)
-                            .speed(drag_speed)
-                            .range(0.1..=10.0)
-                            .suffix("x"),
-                    )
-                    .on_hover_text("Playback speed");
+                    let speed_response = ui
+                        .add(
+                            egui::DragValue::new(&mut self.playback_speed)
+                                .speed(drag_speed)
+                                .range(0.1..=10.0)
+                                .suffix("x"),
+                        )
+                        .on_hover_text("Playback speed");
+                    if speed_response.changed() {
+                        self.playback_engine.set_speed(self.playback_speed);
+                    }
 
                     ui.separator();
 
@@ -806,6 +843,12 @@ impl eframe::App for RanimPreviewApp {
                 });
 
                 self.timeline_state.ui_main_timeline(ui);
+
+                // Any direct playhead edit (slider, time input, timeline drag)
+                // must rebase the active clock so audio follows the picture.
+                if self.timeline_state.current_sec != pre_panel_sec {
+                    self.scrub_to(self.timeline_state.current_sec);
+                }
             });
 
         egui::CentralPanel::default().show(ui, |ui| {

@@ -214,9 +214,14 @@ mod test {
     }
 
     #[test]
-    fn tset_apart_alpha() {
-        let a = apart_alpha(1.0, 10, 1e-3);
-        println!("{a}");
-        println!("{}", merge_alpha(1.0, 10));
+    fn apart_alpha_round_trips_through_merge() {
+        for (alpha, n) in [(0.0, 1), (0.25, 4), (0.5, 10), (1.0, 3)] {
+            let single = apart_alpha(alpha, n, 1e-6);
+            let merged = merge_alpha(single, n);
+            assert!(
+                (merged - alpha).abs() < 1e-3,
+                "alpha={alpha} n={n}: merged back to {merged}"
+            );
+        }
     }
 }

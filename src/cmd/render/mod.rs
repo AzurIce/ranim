@@ -15,6 +15,7 @@ use std::time::Instant;
 use tracing::{Span, info, instrument, trace};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 
+pub(crate) mod audio;
 pub(crate) mod file_writer;
 
 #[cfg(feature = "profiling")]
@@ -168,6 +169,29 @@ pub fn render_scene_job(
     if capture_marks && !evaluator.time_marks().is_empty() {
         app.render_capture_marks(&mut evaluator);
     }
+
+    // The audio plane was baked in one offline pass at seal: mux the baked
+    // buffer into the finished file.
+    if evaluator.has_audio() {
+        match audio::audio_codec(output.format) {
+            Some(_) => {
+                let pcm = evaluator.audio();
+                // Finalize the encoder before reading the file back for muxing.
+                app.finish_video();
+                let video_path = app.video_path();
+                if !video_path.exists() {
+                    tracing::warn!("no video file was written, skipping audio muxing");
+                } else if let Err(err) = audio::mux_audio_into_video(video_path, pcm, output.format)
+                {
+                    tracing::error!("failed to mux audio into {}: {err:#}", video_path.display());
+                }
+            }
+            None => tracing::warn!(
+                "the scene has audio, but the {:?} format cannot store it; rendering silently",
+                output.format
+            ),
+        }
+    }
 }
 
 /// Default logic grid resolution (Hz), per the time model design.
@@ -211,6 +235,7 @@ pub struct RenderWorker {
     // video writer
     video_writer: Option<FileWriter>,
     video_writer_builder: Option<FileWriterBuilder>,
+    video_path: PathBuf,
     save_frames: bool,
     output_dir: PathBuf,
     scene_name: String,
@@ -273,6 +298,20 @@ impl RenderWorker {
         let [r, g, b, a] = clear_color.components.map(|x| x as f64);
         let clear_color = wgpu::Color { r, g, b, a };
         let (_, _, ext) = output.format.encoding_params();
+        let video_path = output_dir.join({
+            let template = output
+                .name_template
+                .as_deref()
+                .unwrap_or("{name}_{width}x{height}_{fps}");
+            let base_name = render_output_basename(
+                template,
+                output.name.as_deref().unwrap_or(&scene_name),
+                output.width,
+                output.height,
+                output.fps,
+            );
+            format!("{base_name}.{ext}")
+        });
         Self {
             ctx,
             renderer,
@@ -283,22 +322,10 @@ impl RenderWorker {
                 FileWriterBuilder::default()
                     .with_fps(output.fps)
                     .with_size(output.width, output.height)
-                    .with_file_path(output_dir.join({
-                        let template = output
-                            .name_template
-                            .as_deref()
-                            .unwrap_or("{name}_{width}x{height}_{fps}");
-                        let base_name = render_output_basename(
-                            template,
-                            output.name.as_deref().unwrap_or(&scene_name),
-                            output.width,
-                            output.height,
-                            output.fps,
-                        );
-                        format!("{base_name}.{ext}")
-                    }))
+                    .with_file_path(video_path.clone())
                     .with_output_format(output.format),
             ),
+            video_path,
             save_frames: output.save_frames,
             output_dir,
             scene_name,
@@ -314,6 +341,19 @@ impl RenderWorker {
             "{}_{}x{}_{}-frames",
             self.scene_name, self.width, self.height, self.fps
         ))
+    }
+
+    /// Returns the path of the video file being written.
+    pub fn video_path(&self) -> &Path {
+        &self.video_path
+    }
+
+    /// Finalize the video file: flush the encoder and wait for it to exit.
+    ///
+    /// After this call the file on disk is complete (valid container index)
+    /// and no further frames can be written.
+    pub fn finish_video(&mut self) {
+        self.video_writer = None;
     }
 
     /// Moves this [`RenderWorker`] into a newly spawned background thread and returns a [`RenderThreadHandle`].
@@ -477,6 +517,21 @@ impl RanimRenderApp {
             render_worker: Some(render_worker),
             fps: output.fps,
             store: RenderFrame::default(),
+        }
+    }
+
+    /// Returns the path of the video file written by this app's worker.
+    pub fn video_path(&self) -> &Path {
+        self.render_worker
+            .as_ref()
+            .expect("render worker must exist outside rendering")
+            .video_path()
+    }
+
+    /// Finalizes the video file (flushes the encoder and waits for it).
+    pub fn finish_video(&mut self) {
+        if let Some(worker) = self.render_worker.as_mut() {
+            worker.finish_video();
         }
     }
 
@@ -678,32 +733,21 @@ mod tests {
     use super::render_output_basename;
 
     #[test]
-    fn test_render_output_basename_default_template() {
-        assert_eq!(
-            render_output_basename("{name}_{width}x{height}_{fps}", "my_scene", 1920, 1080, 60),
-            "my_scene_1920x1080_60"
-        );
-    }
-
-    #[test]
-    fn test_render_output_basename_custom_template() {
-        assert_eq!(
-            render_output_basename(
+    fn render_output_basename_substitutes_template_placeholders() {
+        let cases = [
+            ("{name}_{width}x{height}_{fps}", "my_scene_1920x1080_60"),
+            (
                 "{name}_{fps}fps_{width}x{height}",
-                "my_scene",
-                1920,
-                1080,
-                60
+                "my_scene_60fps_1920x1080",
             ),
-            "my_scene_60fps_1920x1080"
-        );
-    }
-
-    #[test]
-    fn test_render_output_basename_name_only() {
-        assert_eq!(
-            render_output_basename("{name}", "my_scene", 1920, 1080, 60),
-            "my_scene"
-        );
+            ("{name}", "my_scene"),
+        ];
+        for (template, expected) in cases {
+            assert_eq!(
+                render_output_basename(template, "my_scene", 1920, 1080, 60),
+                expected,
+                "template {template}"
+            );
+        }
     }
 }

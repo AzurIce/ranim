@@ -220,14 +220,11 @@ mod tests {
     }
 
     #[test]
-    fn try_object_url_falls_back_to_none_without_config() {
+    fn try_object_url_is_none_when_unavailable() {
         let root = temp_root("missing");
         assert!(Shadow::try_object_url(&root, "any/path.png").is_none());
         let _ = fs::remove_dir_all(&root);
-    }
 
-    #[test]
-    fn try_object_url_is_none_for_unpublished_paths() {
         let root = temp_root("unpublished");
         write_config(&root, "");
         assert!(Shadow::try_object_url(&root, "any/path.png").is_none());

@@ -113,12 +113,7 @@ mod test {
 
     #[test]
     fn test_cli() {
-        let parse_args = |args: &[&str]| {
-            println!("parsing args {:?}", args);
-            let cli = Cli::try_parse_from(args);
-            println!("result: {:?}", cli);
-            cli
-        };
+        let parse_args = |args: &[&str]| Cli::try_parse_from(args);
         let cli = parse_args(&["ranim", "output", "-p", "package"]).unwrap();
         let Commands::Output { scenes, .. } = &cli.command else {
             unreachable!()

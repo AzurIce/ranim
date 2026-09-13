@@ -1,17 +1,15 @@
 //! Evaluation protocols and the standard author-facing adapters.
 //!
-//! [`Eval`] is the single leaf protocol;
+//! [`Eval`](crate::animation::eval::Eval) is the single visual leaf protocol;
 //! [`EvalExt`](crate::animation::eval::EvalExt) adds build-time conveniences;
 //! [`pure::Pure`](crate::animation::eval::pure::Pure) adapts a closure
 //! and [`iterative::Iterative`](crate::animation::eval::iterative::Iterative)
-//! adapts a stepping function into that protocol. [`EvalDyn`] is the
-//! runtime-erased counterpart used by [`AnimationCell`].
-//!
-//! [`AnimationCell`]: super::AnimationCell
+//! adapts a stepping function into that protocol. `EvalDyn` is the
+//! runtime-erased leaf dispatch held by `NodeContent::Leaf`.
 
 use crate::core_item::{AnyExtractCoreItem, DynItem};
 
-use super::{AnimationInfo, AnimationInfoKind};
+use super::build::{Paramed, PlaybackExt};
 
 /// Iterative (stateful, stepped) evaluation.
 pub mod iterative;
@@ -77,46 +75,19 @@ pub trait EvalExt: Eval + Sized {
 
 impl<E: Eval + Sized> EvalExt for E {}
 
-/// An auto implemented trait for erasing `Eval<Output = T>` where T: AnyExtractCoreItem
+/// The erased visual-leaf protocol: [`Eval`] without its type.
+///
+/// This is the only type-erased box in the runtime tree
+/// (`NodeContent::Leaf`) — the open world of user evaluators. Containers are
+/// closed runtime variants and never implement this.
 pub(super) trait EvalDyn {
-    /// Evaluate this node's content at its own normalized progress `alpha`,
+    /// Evaluate this leaf's content at its normalized progress `alpha`,
     /// pushing the resulting erased items into `output`.
-    ///
-    /// Leaves evaluate/project at `alpha`; containers remap `alpha` into their
-    /// content coordinates and recurse into their active children.
-    fn eval_dyn(&self, _alpha: f64, _output: &mut Vec<DynItem>) {}
+    fn eval_into(&self, alpha: f64, output: &mut Vec<DynItem>);
 
-    fn info_kind(&self) -> AnimationInfoKind {
-        AnimationInfoKind::Eval
-    }
-
-    fn content_duration_secs(&self) -> f64 {
-        1.0
-    }
-
-    fn child_infos(&self) -> Vec<AnimationInfo> {
-        Vec::new()
-    }
-
-    /// The iterative content step, if this node is an iterative segment.
+    /// The iterative content step, if this leaf is an iterative segment.
     fn sim_step(&self) -> Option<f64> {
         None
-    }
-}
-
-pub(super) struct StaticDynItems(pub(super) Vec<DynItem>);
-
-impl EvalDyn for StaticDynItems {
-    fn eval_dyn(&self, _alpha: f64, output: &mut Vec<DynItem>) {
-        output.extend(self.0.iter().cloned());
-    }
-
-    fn info_kind(&self) -> AnimationInfoKind {
-        AnimationInfoKind::Static
-    }
-
-    fn content_duration_secs(&self) -> f64 {
-        0.0
     }
 }
 
@@ -125,11 +96,45 @@ where
     E: Eval,
     E::Output: AnyExtractCoreItem,
 {
-    fn eval_dyn(&self, alpha: f64, output: &mut Vec<DynItem>) {
+    fn eval_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
         output.push(DynItem(Box::new(self.eval_alpha(alpha))));
     }
 
     fn sim_step(&self) -> Option<f64> {
         Eval::sim_step(self)
+    }
+}
+
+/// A constant evaluator.
+pub struct Static<T: Clone>(pub T);
+
+impl<T: Clone> Eval for Static<T> {
+    type Output = T;
+
+    fn eval_alpha(&self, _alpha: f64) -> Self::Output {
+        self.0.clone()
+    }
+}
+
+/// Requirement for [`StaticAnim`].
+pub trait StaticAnimRequirement: Clone + AnyExtractCoreItem {}
+
+impl<T: Clone + AnyExtractCoreItem> StaticAnimRequirement for T {}
+
+/// Convenience methods for zero-duration static animations.
+pub trait StaticAnim: StaticAnimRequirement + Sized {
+    /// Show this value.
+    fn show(&self) -> Paramed<Static<Self>>;
+    /// Hide this value.
+    fn hide(&self) -> Paramed<Static<Self>>;
+}
+
+impl<T: StaticAnimRequirement + 'static> StaticAnim for T {
+    fn show(&self) -> Paramed<Static<Self>> {
+        Static(self.clone()).with_duration(0.0)
+    }
+
+    fn hide(&self) -> Paramed<Static<Self>> {
+        Static(self.clone()).with_enabled(false).with_duration(0.0)
     }
 }

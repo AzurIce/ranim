@@ -132,13 +132,11 @@ mod tests {
         assert!(surface.vertices[0].abs_diff_eq(Sphere::points_uv_func(0.0, 0.0, 1.0), 1e-10));
     }
     #[test]
-    fn sphere_aabb_is_canonical_local_bounds() {
+    fn sphere_aabb_tracks_placement() {
         let [min, max] = Sphere::new(1.0).aabb();
         assert_eq!(min, dvec3(-1.0, -1.0, -1.0));
         assert_eq!(max, dvec3(1.0, 1.0, 1.0));
-    }
-    #[test]
-    fn transformed_sphere_owns_external_position() {
+
         let sphere = Sphere::new(1.0).transformed(Translation(dvec3(1.0, 2.0, 3.0)));
         let [min, max] = sphere.aabb();
         assert_eq!(min, dvec3(0.0, 1.0, 2.0));

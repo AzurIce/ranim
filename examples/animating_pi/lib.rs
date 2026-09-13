@@ -8,9 +8,7 @@ use ranim::{
     utils::rate_functions::smooth,
 };
 use ranim_anims::morph::MorphAnim;
-use ranim_core::animation::StaticAnim;
-#[cfg(test)]
-use ranim_items::vitem::typst::compile_typst_code;
+use ranim_core::animation::eval::StaticAnim;
 use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
 
 #[scene(clear_color = "#000000")]
@@ -79,16 +77,4 @@ fn animating_pi(r: &mut RanimScene) {
     r.play(cam.show().with_duration(content.cursor_sec()));
     r.play(content);
     r.insert_time_mark(5.0, TimeMark::Capture("preview.png".to_string()));
-}
-
-#[test]
-fn foo() {
-    let svg = typst_svg("R");
-    println!("{svg}");
-}
-
-#[test]
-fn foo_2() {
-    let svg = compile_typst_code("R");
-    println!("{svg}");
 }

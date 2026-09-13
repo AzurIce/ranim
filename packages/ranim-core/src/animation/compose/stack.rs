@@ -2,9 +2,8 @@
 
 use std::any::type_name;
 
-use crate::{core_item::DynItem, utils::rate_functions::linear};
-
-use super::{Animation, AnimationCell, AnimationInfo, AnimationInfoKind, Placeable, eval::EvalDyn};
+use crate::animation::build::{IntoAnimNode, Unplaced};
+use crate::animation::node::{AnimNode, NodeContent};
 
 /// Dynamic overlay animation container.
 ///
@@ -12,7 +11,7 @@ use super::{Animation, AnimationCell, AnimationInfo, AnimationInfoKind, Placeabl
 /// time and the stack duration is the maximum child extent.
 #[derive(Default)]
 pub struct AnimStack {
-    animations: Vec<AnimationCell>,
+    animations: Vec<AnimNode>,
     duration_secs: f64,
 }
 
@@ -23,8 +22,8 @@ impl AnimStack {
     }
 
     /// Add an animation without advancing the other children.
-    pub fn push<A: Animation + 'static>(&mut self, animation: A) -> &mut Self {
-        let animation = animation.build();
+    pub fn push<A: IntoAnimNode + 'static>(&mut self, animation: A) -> &mut Self {
+        let animation = animation.into_anim_node();
         self.duration_secs = self.duration_secs.max(animation.time_range.end);
         self.animations.push(animation);
         self
@@ -43,53 +42,28 @@ impl AnimStack {
     }
 
     /// Borrow the direct child animations in local stack coordinates.
-    pub fn built_animations(&self) -> &[AnimationCell] {
+    pub fn built_animations(&self) -> &[AnimNode] {
         &self.animations
     }
 
     /// Consume this stack into its direct child animations.
-    pub fn into_built_animations(self) -> Vec<AnimationCell> {
+    pub fn into_built_animations(self) -> Vec<AnimNode> {
         self.animations
     }
 }
 
-impl Placeable for AnimStack {}
-impl Animation for AnimStack {
-    fn build(self) -> AnimationCell {
+impl Unplaced for AnimStack {}
+impl IntoAnimNode for AnimStack {
+    fn into_anim_node(self) -> AnimNode {
         let duration_secs = self.duration_secs;
-        AnimationCell {
-            inner: Box::new(self),
-            rate_func: linear,
+        AnimNode {
+            content: NodeContent::Stack(self.animations),
+            internal_time_secs: duration_secs,
+            rate_func: None,
             time_range: 0.0..duration_secs,
             enabled: true,
             anim_name: type_name::<Self>(),
         }
-    }
-}
-
-impl EvalDyn for AnimStack {
-    fn eval_dyn(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        let content_sec = self.duration_secs * alpha;
-        for child in &self.animations {
-            if child.contains_sec(content_sec, self.duration_secs) {
-                child.eval_at(content_sec, output);
-            }
-        }
-    }
-
-    fn info_kind(&self) -> AnimationInfoKind {
-        AnimationInfoKind::Stack
-    }
-
-    fn content_duration_secs(&self) -> f64 {
-        self.duration_secs
-    }
-
-    fn child_infos(&self) -> Vec<AnimationInfo> {
-        self.animations
-            .iter()
-            .map(AnimationCell::animation_info)
-            .collect()
     }
 }
 
@@ -99,14 +73,14 @@ macro_rules! stack {
     ($($animation:expr),* $(,)?) => {
         {
             #[allow(unused_mut)]
-            let mut stack = $crate::animation::stack::AnimStack::new();
+            let mut stack = $crate::animation::compose::stack::AnimStack::new();
             $(stack.push($animation);)*
             stack
         }
     };
 }
 
-impl<A: Animation + 'static> FromIterator<A> for AnimStack {
+impl<A: IntoAnimNode + 'static> FromIterator<A> for AnimStack {
     fn from_iter<I: IntoIterator<Item = A>>(iter: I) -> Self {
         let mut stack = AnimStack::new();
         for animation in iter {

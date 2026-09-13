@@ -338,9 +338,8 @@ fn bg_entry(binding: u32, buffer: &wgpu::Buffer) -> wgpu::BindGroupEntry<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
-
     use super::*;
+    use crate::primitives::test_output_path;
     use crate::{Renderer, world::RenderFrame};
     use glam::{Mat4, Vec3};
     use pollster::block_on;
@@ -348,12 +347,6 @@ mod tests {
         components::rgba::Rgba,
         core_item::{CoreItem, camera_frame::CameraFrame},
     };
-
-    fn test_output_path(filename: &str) -> PathBuf {
-        let output_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../output");
-        std::fs::create_dir_all(&output_dir).expect("Failed to create output directory");
-        output_dir.join(filename)
-    }
 
     /// A closed unit square centered at the origin in local space.
     fn square_vitem(color: Rgba, stroke: Rgba) -> VItem {
@@ -383,6 +376,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires a GPU"]
     fn render_transformed_vitems() {
         let ctx = block_on(WgpuContext::new());
         let width = 800u32;

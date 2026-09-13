@@ -4,7 +4,7 @@ use glam::DVec3;
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim},
     color::palettes::manim,
-    core::animation::StaticAnim,
+    core::animation::eval::StaticAnim,
     items::vitem::{VItem, svg::SvgItem, typst::typst_svg},
     prelude::*,
     utils::rate_functions::smooth,

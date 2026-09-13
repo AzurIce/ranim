@@ -5,7 +5,7 @@ use ranim::{
     color::{AlphaColor, Srgb},
     core::{
         anchor::Aabb,
-        animation::{AnimationInfo, AnimationInfoKind},
+        animation::node::{AnimationInfo, AnimationInfoKind},
         components::{rgba::Rgba, vpoint::VPointVec},
         core_item::{
             CoreItem,
@@ -248,8 +248,8 @@ fn animation_kind_str(kind: AnimationInfoKind) -> &'static str {
         AnimationInfoKind::Eval => "eval",
         AnimationInfoKind::Sequence => "sequence",
         AnimationInfoKind::Stack => "stack",
-        AnimationInfoKind::Lagged => "lagged",
         AnimationInfoKind::Static => "static",
+        AnimationInfoKind::Audio => "audio",
     }
 }
 
@@ -747,7 +747,7 @@ fn print_json<T: Serialize>(output: &T) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use ranim::{
-        core::{animation::AnimationInfo, utils::rate_functions},
+        core::{animation::node::AnimationInfo, utils::rate_functions},
         glam::{DVec3, Vec4},
     };
 
@@ -788,10 +788,7 @@ mod tests {
         assert_eq!(node.children[0].path, [0, 0]);
         assert_eq!(node.children[0].kind, "eval");
         assert_eq!(node.children[0].rate_func, "smooth");
-    }
 
-    #[test]
-    fn maps_unknown_rate_func_to_custom() {
         fn custom(_t: f64) -> f64 {
             0.0
         }
@@ -835,10 +832,7 @@ mod tests {
         assert_eq!(data.fill_colors, ["#ffffffff"]);
         assert_eq!(data.stroke_colors, ["#000000ff"]);
         assert!(data.points.is_none());
-    }
 
-    #[test]
-    fn maps_dvec3_bounds() {
         let bounds = dvec3_bounds([DVec3::new(-1.0, -2.0, -3.0), DVec3::new(1.0, 2.0, 3.0)]);
         assert_eq!(bounds.min, [-1.0, -2.0, -3.0]);
         assert_eq!(bounds.max, [1.0, 2.0, 3.0]);

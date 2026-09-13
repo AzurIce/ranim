@@ -1,13 +1,14 @@
-//! Dynamic lagged (staggered, end-filled) animation container.
+//! Lagged (staggered, end-filled) authoring combinator.
+//!
+//! [`AnimLagged`] is build-time only: it staggers children by placing them
+//! on the content axis and lowers to a plain stack of per-item sequence
+//! tracks in [`IntoAnimNode::into_anim_node`] — no runtime kind of its own.
 
 use std::any::type_name;
 
-use crate::{core_item::DynItem, utils::rate_functions::linear};
-
-use super::{
-    Animation, AnimationCell, AnimationInfo, AnimationInfoKind, Placeable, eval::EvalDyn,
-    sequence::AnimSequence, static_cell,
-};
+use crate::animation::build::{IntoAnimNode, Unplaced};
+use crate::animation::compose::sequence::AnimSequence;
+use crate::animation::node::{AnimNode, NodeContent, static_cell};
 
 /// How an [`AnimLagged`] fills the time outside a child's window.
 ///
@@ -25,7 +26,7 @@ pub enum LaggedFill {
 
 /// Dynamic lagged (staggered, end-filled) animation container.
 ///
-/// Children are pushed un-placed ([`Placeable`]); the container computes the
+/// Children are pushed un-placed ([`Unplaced`]); the container computes the
 /// placement itself: child `i` starts at `start_{i-1} + lag_ratio · d_{i-1}`.
 /// `lag_ratio` interpolates between the other two containers:
 ///
@@ -52,7 +53,7 @@ pub enum LaggedFill {
 /// stateful child's trailing fill would be its initial state, not its true
 /// final state.
 pub struct AnimLagged {
-    animations: Vec<AnimationCell>,
+    animations: Vec<AnimNode>,
     lag_ratio: f64,
     /// Start offset for the next pushed child.
     cursor_sec: f64,
@@ -98,8 +99,8 @@ impl AnimLagged {
     }
 
     /// Add an animation, placed by the container's stagger rule.
-    pub fn push<A: Placeable + 'static>(&mut self, animation: A) -> &mut Self {
-        let mut animation = animation.build();
+    pub fn push<A: Unplaced + 'static>(&mut self, animation: A) -> &mut Self {
+        let mut animation = animation.into_anim_node();
         let duration_secs = animation.duration_secs();
         animation.shift_by(self.cursor_sec);
         self.duration_secs = self.duration_secs.max(animation.time_range.end);
@@ -139,7 +140,7 @@ impl AnimLagged {
                 }
             }
             track.cursor_sec = total;
-            animations.push(track.build());
+            animations.push(track.into_anim_node());
         }
         self.animations = animations;
     }
@@ -149,55 +150,31 @@ impl AnimLagged {
         self.duration_secs
     }
 
-    /// Borrow the direct child animations in local container coordinates.
-    pub fn built_animations(&self) -> &[AnimationCell] {
+    /// Borrow the children as placed by the stagger rule — the
+    /// pre-materialization view, before `build` turns them into filled
+    /// tracks.
+    pub fn built_animations(&self) -> &[AnimNode] {
         &self.animations
-    }
-
-    /// Consume this container into its direct child animations.
-    pub fn into_built_animations(self) -> Vec<AnimationCell> {
-        self.animations
     }
 }
 
-impl Placeable for AnimLagged {}
-impl Animation for AnimLagged {
-    fn build(mut self) -> AnimationCell {
+impl Unplaced for AnimLagged {}
+impl IntoAnimNode for AnimLagged {
+    /// Desugar: materialize each item into a full-extent sequence track,
+    /// then lower the whole container to a plain runtime stack node — the
+    /// stagger is ordinary window placement, so lagged needs no
+    /// runtime kind of its own. `anim_name` keeps the authoring identity.
+    fn into_anim_node(mut self) -> AnimNode {
         self.materialize_fills();
         let duration_secs = self.duration_secs;
-        AnimationCell {
-            inner: Box::new(self),
-            rate_func: linear,
+        AnimNode {
+            content: NodeContent::Stack(self.animations),
+            internal_time_secs: duration_secs,
+            rate_func: None,
             time_range: 0.0..duration_secs,
             enabled: true,
             anim_name: type_name::<Self>(),
         }
-    }
-}
-
-impl EvalDyn for AnimLagged {
-    fn eval_dyn(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        let content_sec = self.duration_secs * alpha;
-        for animation in &self.animations {
-            if animation.contains_sec(content_sec, self.duration_secs) {
-                animation.eval_at(content_sec, output);
-            }
-        }
-    }
-
-    fn info_kind(&self) -> AnimationInfoKind {
-        AnimationInfoKind::Lagged
-    }
-
-    fn content_duration_secs(&self) -> f64 {
-        self.duration_secs
-    }
-
-    fn child_infos(&self) -> Vec<AnimationInfo> {
-        self.animations
-            .iter()
-            .map(AnimationCell::animation_info)
-            .collect()
     }
 }
 
@@ -207,7 +184,7 @@ macro_rules! lagged {
     ($lag_ratio:expr; $($animation:expr),* $(,)?) => {
         {
             #[allow(unused_mut)]
-            let mut lagged = $crate::animation::lagged::AnimLagged::new($lag_ratio);
+            let mut lagged = $crate::animation::compose::lagged::AnimLagged::new($lag_ratio);
             $(lagged.push($animation);)*
             lagged
         }

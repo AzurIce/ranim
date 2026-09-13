@@ -544,98 +544,18 @@ pub fn compile_typst_code(typst_code: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
     use super::*;
 
-    /*
-    fonts search: 322.844709ms
-    world construct: 1.901541ms
-    set source: 958ns
-    file: 736
-    file: 818
-    document compile: 89.835583ms
-    svg output: 185.458µs
-    get element: 730.792µs
-     */
     #[test]
-    fn test_single_file_typst_world_foo() {
-        let start = Instant::now();
-        fonts();
-        println!("fonts search: {:?}", start.elapsed());
-
-        let start = Instant::now();
-        let world = TypstWorld::new();
-        println!("world construct: {:?}", start.elapsed());
-
-        let start = Instant::now();
-        let world = world.with_source_str("r");
-        println!("set source: {:?}", start.elapsed());
-
-        let start = Instant::now();
-        let document = typst::compile(&world)
-            .output
-            .expect("failed to compile typst source");
-        println!("document compile: {:?}", start.elapsed());
-
-        let start = Instant::now();
-        let svg = typst_svg::svg_merged(&document, &typst_svg::SvgOptions::default(), Abs::pt(2.0));
-        println!("{svg}");
-        println!("svg output: {:?}", start.elapsed());
-
-        let start = Instant::now();
-        let res = get_typst_element(&svg);
-        println!("get element: {:?}", start.elapsed());
-
-        println!("{res}");
-        // println!("{}", typst_svg!(source))
-    }
-
-    ///
-    /// ```
-    /// <svg class="typst-doc" viewBox="0 0 11.483999999999998 11" width="11.483999999999998pt" height="11pt" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:h5="http://www.w3.org/1999/xhtml">
-    ///    <path class="typst-shape" fill="#ffffff" fill-rule="nonzero" d="M 0 0v 11 h 11.484 v -11 Z "/>
-    ///    <g>
-    ///        <g class="typst-text" transform="matrix(1 0 0 -1 0 11)">
-    ///            <use xlink:href="#gB5279FC30F2C6542A76CE0CDC73F9462" x="0" y="0" fill="#000000" fill-rule="nonzero"/>
-    ///            <use xlink:href="#gC5A0A6F735BE491513D9F5FD3BD367ED" x="6.457" y="0" fill="#000000" fill-rule="nonzero"/>
-    ///        </g>
-    ///    </g>
-    /// ```
-    /// ```
-    /// <svg class="typst-doc" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:h5="http://www.w3.org/1999/xhtml">
-    /// <g>
-    ///     <g class="typst-text" transform="matrix(1 0 0 -1 0 11)">
-    ///         <use xlink:href="#gB5279FC30F2C6542A76CE0CDC73F9462" x="0" y="0" fill="#000000" fill-rule="nonzero"/>
-    ///         <use xlink:href="#gC5A0A6F735BE491513D9F5FD3BD367ED" x="6.457" y="0" fill="#000000" fill-rule="nonzero"/>
-    ///     </g>
-    /// </g>
-    /// ```
-    #[test]
-    fn foo_page() {
-        let text = r#"Ra"#;
-        let res = compile_typst_code(text);
-        println!("{res}");
-
-        let res = typst_svg(text);
-        println!("{res}");
+    fn typst_element_strips_background_paths_and_canvas_size() {
+        let svg = r#"<svg viewBox="0 0 5 5" width="5pt" height="5pt"><path d="M0 0"/><g/></svg>"#;
+        assert_eq!(get_typst_element(svg), "<svg><g/></svg>");
     }
 
     #[test]
-    fn foo() {
-        let code_a = r#"#include <iostream>
-using namespace std;
-
-int main() {
-    cout << "Hello World!" << endl;
-}
-"#;
-        let mut code_a = TypstText::new_multiline_code(code_a, Some("cpp"));
-        let code_b = r#"fn main() {
-    println!("Hello World!");
-}"#;
-        let mut code_b = TypstText::new_multiline_code(code_b, Some("rust"));
-
-        code_a.align_with(&mut code_b);
+    fn typst_svg_compiles_and_is_cached() {
+        let svg = typst_svg("R");
+        assert!(svg.contains("<svg"), "unexpected typst svg: {svg}");
+        assert_eq!(svg, typst_svg("R"), "cached compiles must be deterministic");
     }
 }

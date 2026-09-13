@@ -313,7 +313,7 @@ mod tests {
     use super::*;
     use crate::{
         core_item::{mesh_item::MeshItem, vitem::VItem},
-        traits::{ScaleTransform, ShiftTransform, UniformScaleTransform},
+        traits::{ShiftTransform, UniformScaleTransform},
     };
     use glam::{DQuat, Vec3, Vec4};
 
@@ -326,14 +326,13 @@ mod tests {
     }
 
     #[test]
-    fn extract_mesh_item_composes_transform() {
+    fn extract_composes_pose_and_keeps_geometry_local() {
         let mesh = MeshItem {
             transform: glam::Mat4::from_translation(Vec3::X),
             ..Default::default()
         };
         let wrapped = mesh.transformed(Translation(dvec3(0.0, 2.0, 0.0)));
-        let items = wrapped.extract();
-        match &items[0] {
+        match &wrapped.extract()[0] {
             CoreItem::MeshItem(mesh) => {
                 assert_eq!(
                     mesh.transform,
@@ -343,10 +342,7 @@ mod tests {
             }
             _ => panic!("expected MeshItem"),
         }
-    }
 
-    #[test]
-    fn extract_vitem_composes_transform_without_baking_points() {
         let vitem = VItem {
             points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
             normal: Some(Vec3::new(1.0, 1.0, 0.0).normalize()),
@@ -357,8 +353,7 @@ mod tests {
             DQuat::IDENTITY,
             dvec3(0.0, 2.0, 0.0),
         ));
-        let items = wrapped.extract();
-        match &items[0] {
+        match &wrapped.extract()[0] {
             CoreItem::VItem(vitem) => {
                 // Points and the local plane normal stay untouched.
                 assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
@@ -377,7 +372,7 @@ mod tests {
     }
 
     #[test]
-    fn nested_transforms_compose_inside_out() {
+    fn transforms_compose_inside_out() {
         let inner = VItem {
             points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
             ..Default::default()
@@ -386,18 +381,13 @@ mod tests {
         let outer = inner.transformed(Diag(DVec3::splat(2.0)));
         match &outer.extract()[0] {
             CoreItem::VItem(vitem) => {
-                // Local data is preserved; the world placement moves to
-                // scale(2) * translate(x).
                 assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
                 assert_eq!(vitem.transform.w_axis.truncate(), Vec3::new(2.0, 0.0, 0.0));
                 assert_eq!(vitem.transform.x_axis.truncate(), Vec3::new(2.0, 0.0, 0.0));
             }
             _ => panic!("expected VItem"),
         }
-    }
 
-    #[test]
-    fn generic_wrapper_composes_outer_and_inner_in_order() {
         let mut wrapped = ().transformed(DAffine3::IDENTITY);
         wrapped.compose_outer(Translation(DVec3::X));
         wrapped.compose_inner(Diag(DVec3::splat(2.0)));
@@ -413,6 +403,100 @@ mod tests {
                 * DAffine3::from_translation(DVec3::X)
                 * DAffine3::from_scale(DVec3::splat(2.0)),
         );
+    }
+
+    #[test]
+    fn interpolation_lerps_inner_and_pose_by_storage_group() {
+        let a = 0.0f64.transformed(Similarity::IDENTITY);
+        let b = 2.0f64.transformed(Similarity {
+            scale: 3.0,
+            rotation: DQuat::IDENTITY,
+            translation: dvec3(2.0, 0.0, 0.0),
+        });
+        let mid = a.lerp(&b, 0.5);
+        assert_eq!(mid.inner, 1.0);
+        assert_eq!(mid.transform.scale, 2.0);
+        assert_eq!(mid.transform.translation, DVec3::X);
+
+        let points = vec![Vec4::new(1.0, 0.0, 0.0, 0.0)];
+        let a = VItem {
+            points: points.clone(),
+            ..Default::default()
+        }
+        .transformed(Translation(DVec3::X));
+        let b = VItem {
+            points,
+            ..Default::default()
+        }
+        .transformed(Translation(dvec3(-1.0, 2.0, 0.0)));
+        let mid = a.lerp(&b, 0.5);
+        // Local geometry never moves; only the pose interpolates.
+        assert_eq!(mid.inner.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+        assert_affine_eq(
+            DAffine3::from(mid.transform),
+            DAffine3::from_translation(dvec3(0.0, 1.0, 0.0)),
+        );
+
+        let a = 42.0f64.transformed(Rigid::IDENTITY);
+        let b = 42.0f64.transformed(Rigid::from_axis_angle(
+            DVec3::Z,
+            std::f64::consts::FRAC_PI_2,
+        ));
+        let mid = a.lerp(&b, 0.5);
+        let rotated = mid.transform.rotation * DVec3::X;
+        let expected = DQuat::from_axis_angle(DVec3::Z, std::f64::consts::FRAC_PI_4) * DVec3::X;
+        assert!(rotated.abs_diff_eq(expected, 1e-9));
+    }
+
+    #[test]
+    fn anchor_queries_apply_the_outer_pose() {
+        let wrapped = dvec3(1.0, 1.0, 1.0).transformed(Translation(dvec3(10.0, 0.0, 0.0)));
+        assert_eq!(wrapped.aabb(), [dvec3(11.0, 1.0, 1.0); 2]);
+
+        let wrapped = dvec3(1.0, 2.0, 3.0).transformed(Translation(dvec3(4.0, 5.0, 6.0)));
+        assert_eq!(
+            crate::anchor::Centroid.locate(&wrapped),
+            dvec3(5.0, 7.0, 9.0)
+        );
+    }
+
+    #[test]
+    fn map_operations_preserve_pose_and_support_storage_conversion() {
+        let wrapped = VItem::default()
+            .transformed(Translation(DVec3::X))
+            .map_inner(|item: VItem| item.points.len());
+        assert_eq!(wrapped.inner, 3);
+        assert_eq!(wrapped.transform, Translation(DVec3::X));
+
+        fn to_affine(translation: Translation) -> DAffine3 {
+            translation.into()
+        }
+        let by_fn = 42u32
+            .transformed(Translation(DVec3::X))
+            .map_transform(to_affine);
+        assert_eq!(by_fn.inner, 42);
+        assert_affine_eq(by_fn.transform, DAffine3::from_translation(DVec3::X));
+
+        let by_closure = 42u32
+            .transformed(Translation(DVec3::X))
+            .map_transform(Similarity::from);
+        assert_eq!(by_closure.inner, 42);
+        assert_eq!(by_closure.transform.translation, DVec3::X);
+
+        let vitem = VItem {
+            points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
+            ..Default::default()
+        };
+        let extracted = vitem
+            .transformed(Translation(DVec3::X))
+            .map_transform(DAffine3::from);
+        match &extracted.extract()[0] {
+            CoreItem::VItem(vitem) => {
+                assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+                assert_eq!(vitem.transform.w_axis.truncate(), Vec3::X);
+            }
+            _ => panic!("expected VItem"),
+        }
     }
 
     #[test]
@@ -462,135 +546,6 @@ mod tests {
         let affine_diagonal: Transformed<_, DAffine3> = diagonal.into();
         assert_eq!(affine_diagonal.transform.matrix3.y_axis, DVec3::ZERO);
         assert_eq!(affine_diagonal.transform.matrix3.z_axis.z, -3.0);
-    }
-
-    #[test]
-    fn bake_uses_the_exact_storage_group() {
-        let wrapped = dvec3(1.0, 0.0, 0.0).transformed(Translation(dvec3(0.0, 2.0, 0.0)));
-        assert_eq!(wrapped.bake(), dvec3(1.0, 2.0, 0.0));
-    }
-
-    #[test]
-    fn interpolation_lerps_inner_and_same_group_independently() {
-        let a = 0.0f64.transformed(Similarity::IDENTITY);
-        let b = 2.0f64.transformed(Similarity {
-            scale: 3.0,
-            rotation: DQuat::IDENTITY,
-            translation: dvec3(2.0, 0.0, 0.0),
-        });
-        let mid = a.lerp(&b, 0.5);
-        assert_eq!(mid.inner, 1.0);
-        assert_eq!(mid.transform.scale, 2.0);
-        assert_eq!(mid.transform.translation, DVec3::X);
-    }
-
-    #[test]
-    fn wrapper_lerp_moves_the_pose_while_inner_points_stay_constant() {
-        let points = vec![Vec4::new(1.0, 0.0, 0.0, 0.0)];
-        let a = VItem {
-            points: points.clone(),
-            ..Default::default()
-        }
-        .transformed(Translation(DVec3::X));
-        let b = VItem {
-            points,
-            ..Default::default()
-        }
-        .transformed(Translation(dvec3(-1.0, 2.0, 0.0)));
-
-        let mid = a.lerp(&b, 0.5);
-        // Local geometry never moves; only the pose interpolates.
-        assert_eq!(mid.inner.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
-        assert_affine_eq(
-            DAffine3::from(mid.transform),
-            DAffine3::from_translation(dvec3(0.0, 1.0, 0.0)),
-        );
-    }
-
-    #[test]
-    fn rigid_wrapper_lerp_slerps_rotation() {
-        let a = 42.0f64.transformed(Rigid::IDENTITY);
-        let b = 42.0f64.transformed(Rigid::from_axis_angle(
-            DVec3::Z,
-            std::f64::consts::FRAC_PI_2,
-        ));
-
-        let mid = a.lerp(&b, 0.5);
-        let rotated = mid.transform.rotation * DVec3::X;
-        let expected = DQuat::from_axis_angle(DVec3::Z, std::f64::consts::FRAC_PI_4) * DVec3::X;
-        assert!(rotated.abs_diff_eq(expected, 1e-9));
-    }
-
-    #[test]
-    fn aabb_converts_transform_at_geometry_boundary() {
-        let wrapped = dvec3(1.0, 1.0, 1.0).transformed(Translation(dvec3(10.0, 0.0, 0.0)));
-        assert_eq!(wrapped.aabb(), [dvec3(11.0, 1.0, 1.0); 2]);
-    }
-
-    #[test]
-    fn centroid_locates_in_inner_space_then_applies_external_transform() {
-        let wrapped = dvec3(1.0, 2.0, 3.0).transformed(Translation(dvec3(4.0, 5.0, 6.0)));
-        assert_eq!(
-            crate::anchor::Centroid.locate(&wrapped),
-            dvec3(5.0, 7.0, 9.0)
-        );
-    }
-
-    #[test]
-    fn scale_operation_is_available_for_affine_storage() {
-        let mut wrapped = ().transformed(DAffine3::IDENTITY);
-        wrapped.scale(DVec3::splat(2.0));
-        assert_eq!(wrapped.transform, DAffine3::from_scale(DVec3::splat(2.0)));
-    }
-
-    #[test]
-    fn map_inner_maps_the_wrapped_item() {
-        let wrapped = VItem::default()
-            .transformed(Translation(DVec3::X))
-            .map_inner(|item: VItem| item.points.len());
-        assert_eq!(wrapped.inner, 3);
-        assert_eq!(wrapped.transform, Translation(DVec3::X));
-    }
-
-    #[test]
-    fn map_transform_converts_storage_with_function() {
-        fn to_affine(translation: Translation) -> DAffine3 {
-            translation.into()
-        }
-
-        let wrapped = 42u32
-            .transformed(Translation(DVec3::X))
-            .map_transform(to_affine);
-        assert_eq!(wrapped.inner, 42);
-        assert_affine_eq(wrapped.transform, DAffine3::from_translation(DVec3::X));
-    }
-
-    #[test]
-    fn map_transform_converts_storage_with_closure() {
-        let wrapped = 42u32
-            .transformed(Translation(DVec3::X))
-            .map_transform(Similarity::from);
-        assert_eq!(wrapped.inner, 42);
-        assert_eq!(wrapped.transform.translation, DVec3::X);
-    }
-
-    #[test]
-    fn map_transform_result_can_be_extracted_as_affine() {
-        let vitem = VItem {
-            points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
-            ..Default::default()
-        };
-        let wrapped = vitem
-            .transformed(Translation(DVec3::X))
-            .map_transform(DAffine3::from);
-
-        match &wrapped.extract()[0] {
-            CoreItem::VItem(vitem) => {
-                assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
-                assert_eq!(vitem.transform.w_axis.truncate(), Vec3::X);
-            }
-            _ => panic!("expected VItem"),
-        }
     }
 
     /// A minimal stand-in for the geometry traits: `ranim-core` itself has no

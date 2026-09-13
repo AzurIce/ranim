@@ -18,30 +18,26 @@ fn hello_ranim(r: &mut RanimScene) {
     let mut square = Square::new(2.0);
     square.set_color(manim::BLUE_C);
 
-    let mut content = seq![square.clone().fade_in().with_rate_func(smooth)];
+    let circle: VItem = VItem::from(Circle::new(2.0)).with(|circle| {
+        circle.set_color(manim::RED_C).rotate_on_z(PI / 4.0 - PI);
+    });
 
-    let mut circle: VItem = Circle::new(2.0)
-        .with(|circle| {
-            circle.set_color(manim::RED_C);
-        })
-        .into();
-    circle.rotate_on_z(PI / 4.0 - PI);
+    let mut vitem = VItem::from(square.clone());
 
-    let mut vitem = VItem::from(square);
-
-    content.extend(seq![
+    let seq = seq![
+        square.fade_in().with_rate_func(smooth),
         vitem.morph_to(circle).with_rate_func(smooth),
         vitem.show(),
         vitem.clone().unwrite().with_rate_func(smooth),
         vitem.write().with_rate_func(smooth),
         vitem.fade_out().with_rate_func(smooth),
-    ]);
+    ];
     r.play(
         CameraFrame::default()
             .show()
-            .with_duration(content.cursor_sec()),
+            .with_duration(seq.cursor_sec()),
     );
-    r.play(content);
+    r.play(seq);
 
     r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
 }

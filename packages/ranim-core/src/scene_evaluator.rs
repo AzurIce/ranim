@@ -9,7 +9,8 @@
 
 use crate::{
     Extract, SealedRanimScene, TimeMark,
-    animation::{AnimationCell, AnimationInfo},
+    animation::node::{AnimNode, AnimationInfo},
+    audio::MASTER_SAMPLE_RATE,
     core_item::CoreItem,
 };
 
@@ -18,8 +19,9 @@ pub type EvaluatedFrame = Vec<((usize, usize), CoreItem)>;
 
 /// Lightweight scene evaluation session.
 pub struct SceneEvaluator {
-    cells: Vec<AnimationCell>,
+    cells: Vec<AnimNode>,
     total_secs: f64,
+    audio: std::sync::Arc<[f32]>,
     time_marks: Vec<(f64, TimeMark)>,
     clock: f64,
 }
@@ -34,6 +36,7 @@ impl SceneEvaluator {
         Self {
             cells: scene.animations,
             total_secs: scene.total_secs,
+            audio: scene.audio,
             time_marks: scene.time_marks,
             clock: 0.0,
         }
@@ -44,6 +47,47 @@ impl SceneEvaluator {
         self.total_secs
     }
 
+    /// The top-level animation cells.
+    ///
+    /// Crate-internal: the audio tests walk these with a point-semantics
+    /// reference mixer that the seal-time bake must reproduce exactly.
+    #[cfg(test)]
+    pub(crate) fn cells(&self) -> &[AnimNode] {
+        &self.cells
+    }
+
+    /// Whether any sound leaves live in the tree.
+    pub fn has_audio(&self) -> bool {
+        self.cells.iter().any(AnimNode::has_audio)
+    }
+
+    /// The baked audio plane: interleaved stereo at the master sample rate
+    /// over `[0, total_secs]` (shared, cheap to clone). Empty when the scene
+    /// has no sound leaves.
+    pub fn audio(&self) -> &std::sync::Arc<[f32]> {
+        &self.audio
+    }
+
+    /// The scene's audio over `[0, out_secs]` as a fresh interleaved stereo
+    /// buffer.
+    ///
+    /// The audio plane was already mixed once at seal
+    /// ([`RanimScene::seal`](crate::RanimScene::seal)); this is a prefix copy
+    /// of that baked buffer, zero-padded past the scene end.
+    pub fn mix_audio(&self, out_secs: f64, sample_rate: u32) -> Vec<f32> {
+        assert_eq!(
+            sample_rate, MASTER_SAMPLE_RATE,
+            "the baked audio lives at the master sample rate"
+        );
+        let out_frames = (out_secs * sample_rate as f64).ceil() as usize;
+        let baked_frames = self.audio.len() / 2;
+        let copy = out_frames.min(baked_frames);
+        let mut out = Vec::with_capacity(out_frames * 2);
+        out.extend_from_slice(&self.audio[..copy * 2]);
+        out.resize(out_frames * 2, 0.0);
+        out
+    }
+
     /// Scene time marks.
     pub fn time_marks(&self) -> &[(f64, TimeMark)] {
         &self.time_marks
@@ -51,10 +95,7 @@ impl SceneEvaluator {
 
     /// Hierarchical runtime animation information for preview tooling.
     pub fn animation_infos(&self) -> Vec<AnimationInfo> {
-        self.cells
-            .iter()
-            .map(AnimationCell::animation_info)
-            .collect()
+        self.cells.iter().map(AnimNode::animation_info).collect()
     }
 
     /// Last sampled target (the `clock` reading for preview tooling).
@@ -88,7 +129,10 @@ mod tests {
     use super::*;
     use crate::{
         RanimScene, SealedRanimScene,
-        animation::{AnimationExt, Placeable, eval::Eval},
+        animation::{
+            build::{PlaybackExt, Unplaced},
+            eval::Eval,
+        },
         core_item::vitem::VItem,
         seq,
     };
@@ -174,46 +218,17 @@ mod tests {
     }
 
     #[test]
-    fn iterative_segment_steps_along_logic_grid() {
+    fn iterative_leaves_step_along_the_logic_grid() {
         let mut scene = RanimScene::new();
         scene.play(cv(1.0, 2.0).with_duration(2.0).at(0.0));
         let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
-
         for sec in [0.0, 0.5, 1.0, 1.5, 2.0] {
             let mut frame = EvaluatedFrame::new();
             ev.sample_at(sec, &mut frame);
             assert_eq!(xs_of(&frame), vec![sec as f32], "at sec={sec}");
         }
-    }
 
-    #[test]
-    fn iterative_eval_is_deterministic_and_seek_matches_forward() {
-        fn build_scene() -> SealedRanimScene {
-            let mut scene = RanimScene::new();
-            scene.play(cv(2.0, 3.0).with_duration(3.0).at(0.0));
-            scene.seal()
-        }
-
-        let run = |backward: bool| {
-            let mut ev = SceneEvaluator::new(build_scene(), 120.0);
-            let mut trace = Vec::new();
-            for sec in [0.3, 0.7, 1.1, 1.9, 2.6] {
-                if backward {
-                    ev.sample_at(0.4, &mut EvaluatedFrame::new()); // backward jump
-                }
-                let mut frame = EvaluatedFrame::new();
-                ev.sample_at(sec, &mut frame);
-                trace.push(xs_of(&frame));
-            }
-            trace
-        };
-
-        assert_eq!(run(false), run(true));
-        assert_eq!(run(false)[2], vec![(2.0 * 1.1) as f32]);
-    }
-
-    #[test]
-    fn iterative_leaf_inside_sequence_steps() {
+        // Nested inside a sequence the leaf still steps on its own timeline.
         let mut scene = RanimScene::new();
         scene.play(
             seq![
@@ -222,20 +237,42 @@ mod tests {
             ]
             .at(0.0),
         );
-
         let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
-        let mut frame = EvaluatedFrame::new();
-        ev.sample_at(1.5, &mut frame);
-        assert_eq!(xs_of(&frame), vec![0.5]);
-
-        let mut frame = EvaluatedFrame::new();
-        ev.sample_at(2.0, &mut frame);
-        assert_eq!(xs_of(&frame), vec![1.0]);
+        for (sec, expected) in [(1.5, 0.5), (2.0, 1.0)] {
+            let mut frame = EvaluatedFrame::new();
+            ev.sample_at(sec, &mut frame);
+            assert_eq!(xs_of(&frame), vec![expected], "at sec={sec}");
+        }
     }
 
     #[test]
-    fn seek_resets_iterative_leaves_nested_in_containers() {
-        fn build_scene() -> SealedRanimScene {
+    fn iterative_seek_matches_forward_and_resets_nested_leaves() {
+        fn run(scene: SealedRanimScene, backward: bool) -> Vec<Vec<f32>> {
+            let mut ev = SceneEvaluator::new(scene, 120.0);
+            let mut trace = Vec::new();
+            for sec in [0.3, 0.7, 1.1, 1.9, 2.6] {
+                if backward {
+                    // Jump backwards below the first sample so every leaf
+                    // has to re-simulate from the start.
+                    ev.sample_at(0.2, &mut EvaluatedFrame::new());
+                }
+                let mut frame = EvaluatedFrame::new();
+                ev.sample_at(sec, &mut frame);
+                trace.push(xs_of(&frame));
+            }
+            trace
+        }
+
+        let single = || {
+            let mut scene = RanimScene::new();
+            scene.play(cv(2.0, 3.0).with_duration(3.0).at(0.0));
+            scene.seal()
+        };
+        let forward = run(single(), false);
+        assert_eq!(forward, run(single(), true));
+        assert_eq!(forward[2], vec![(2.0 * 1.1) as f32]);
+
+        let nested = || {
             let mut scene = RanimScene::new();
             scene.play(
                 seq![
@@ -245,22 +282,7 @@ mod tests {
                 .at(0.0),
             );
             scene.seal()
-        }
-
-        let run = |backward: bool| {
-            let mut ev = SceneEvaluator::new(build_scene(), 120.0);
-            let mut trace = Vec::new();
-            for sec in [0.3, 0.7, 1.1, 1.5, 1.9] {
-                if backward {
-                    ev.sample_at(0.2, &mut EvaluatedFrame::new()); // backward jump
-                }
-                let mut frame = EvaluatedFrame::new();
-                ev.sample_at(sec, &mut frame);
-                trace.push(xs_of(&frame));
-            }
-            trace
         };
-
-        assert_eq!(run(false), run(true));
+        assert_eq!(run(nested(), false), run(nested(), true));
     }
 }

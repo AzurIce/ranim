@@ -2,7 +2,7 @@ use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
     anims::morph::MorphAnim,
     color::palettes::manim,
-    core::animation::{StaticAnim, sequence::AnimSequence},
+    core::animation::{compose::sequence::AnimSequence, eval::StaticAnim},
     glam::{DVec3, dvec2, dvec3},
     items::vitem::{VItem, geometry::Rectangle},
     prelude::*,

@@ -244,19 +244,12 @@ fn bg_entry(binding: u32, buffer: &wgpu::Buffer) -> wgpu::BindGroupEntry<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
-
     use super::*;
+    use crate::primitives::test_output_path;
     use crate::{Renderer, world::RenderFrame};
     use glam::{Mat4, Vec3};
     use pollster::block_on;
     use ranim_core::{components::rgba::Rgba, core_item::CoreItem};
-
-    fn test_output_path(filename: &str) -> PathBuf {
-        let output_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../output");
-        std::fs::create_dir_all(&output_dir).expect("Failed to create output directory");
-        output_dir.join(filename)
-    }
 
     fn create_triangle_mesh(color: Rgba, offset: Vec3) -> MeshItem {
         MeshItem {
@@ -341,6 +334,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires a GPU"]
     fn render_mesh_items() {
         use ranim_core::core_item::camera_frame::CameraFrame;
 
@@ -400,6 +394,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires a GPU"]
     fn test_nested_transparent_spheres() {
         use ranim_core::core_item::camera_frame::CameraFrame;
 

@@ -27,11 +27,15 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: wasm-bindgen
+          tool: wasm-bindgen@0.2.128
 
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: "doc"
+
+      # rodio/cpal builds alsa-sys on native targets when preview/audio is enabled.
+      - name: Install ALSA headers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
       - name: Build rustdoc
         run: RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" cargo doc --workspace --no-deps --document-private-items --all-features --exclude app --exclude xtask-examples --exclude benches

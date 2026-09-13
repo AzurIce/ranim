@@ -45,7 +45,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: just, zola@0.22, wasm-bindgen
+          tool: just, zola@0.22, wasm-bindgen@0.2.128
 
       # Binaryen must be >= 110. Older versions (e.g. Ubuntu 22.04's apt
       # binaryen 105) mislabel the `__wbindgen_externrefs` export as the funcref
@@ -63,6 +63,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: "wasm-examples"
+
+      # rodio/cpal builds alsa-sys on native targets when preview/audio is enabled.
+      - name: Install ALSA headers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
       - name: Build wasm example bundle
         run: cargo examples build

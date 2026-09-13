@@ -247,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_on_create_modify_remove_only() {
+    fn rebuild_event_classification() {
         for kind in [
             EventKind::Create(CreateKind::File),
             EventKind::Modify(ModifyKind::Data(DataChange::Any)),
@@ -256,10 +256,6 @@ mod tests {
         ] {
             assert!(is_rebuild_event(&event_of_kind(kind)), "{kind:?}");
         }
-    }
-
-    #[test]
-    fn ignore_access_and_other_events() {
         for kind in [
             EventKind::Access(AccessKind::Open(AccessMode::Any)),
             EventKind::Access(AccessKind::Close(AccessMode::Read)),
