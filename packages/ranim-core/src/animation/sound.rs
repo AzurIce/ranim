@@ -12,6 +12,7 @@
 //! surrounding motion, pitch movement included.
 
 use std::any::type_name;
+use std::ops::Range;
 
 use crate::audio::{AudioClip, AudioTrack};
 
@@ -62,6 +63,14 @@ impl Sound {
     /// Fade out linearly over the last `secs` of the sound.
     pub fn with_fade_out(mut self, secs: f64) -> Self {
         self.track = self.track.with_fade_out(secs);
+        self
+    }
+
+    /// Play only the clip's seconds within `range` — a content trim, unlike
+    /// the cell layer's `with_duration`, which resamples the sound to fit a
+    /// new window length.
+    pub fn with_play_secs(mut self, range: Range<f64>) -> Self {
+        self.track = self.track.with_play_secs(range);
         self
     }
 

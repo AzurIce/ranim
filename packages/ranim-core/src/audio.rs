@@ -10,6 +10,7 @@
 
 #[cfg(feature = "audio-decode")]
 use std::io::Cursor;
+use std::ops::Range;
 use std::{f64::consts::TAU, fmt, io::Write, path::Path, sync::Arc};
 #[cfg(feature = "audio-decode")]
 use symphonia::core::{
@@ -257,7 +258,7 @@ pub struct AudioTrack {
     gain: f64,
     fade_in_secs: f64,
     fade_out_secs: f64,
-    play_secs: Option<f64>,
+    play_range: Option<Range<f64>>,
     speed: f64,
 }
 
@@ -269,7 +270,7 @@ impl AudioTrack {
             gain: 1.0,
             fade_in_secs: 0.0,
             fade_out_secs: 0.0,
-            play_secs: None,
+            play_range: None,
             speed: 1.0,
         }
     }
@@ -292,11 +293,16 @@ impl AudioTrack {
         self
     }
 
-    /// Play only the first `secs` of the clip — a content trim, unlike the
-    /// cell layer's `with_duration`, which resamples the sound to fit a new
-    /// window length.
-    pub fn with_play_secs(mut self, secs: f64) -> Self {
-        self.play_secs = Some(secs);
+    /// Play only the clip's seconds within `range` — a content trim, unlike
+    /// the cell layer's `with_duration`, which resamples the sound to fit a
+    /// new window length.
+    ///
+    /// The range is clamped to the clip: a start before the clip pulls to
+    /// zero, an end past the clip's duration truncates, and an empty or
+    /// reversed span collapses to silence. Content-time zero always plays
+    /// `range.start` seconds into the clip.
+    pub fn with_play_secs(mut self, range: Range<f64>) -> Self {
+        self.play_range = Some(range);
         self
     }
 
@@ -310,11 +316,23 @@ impl AudioTrack {
         self
     }
 
+    /// The clip-second span actually played: `play_range` clamped to the
+    /// clip's extent.
+    fn source_span(&self) -> (f64, f64) {
+        let duration = self.clip.duration_secs();
+        match &self.play_range {
+            None => (0.0, duration),
+            Some(range) => {
+                let start = range.start.max(0.0);
+                (start, range.end.min(duration).max(start))
+            }
+        }
+    }
+
     /// The track's play length (its whole content axis).
     pub(crate) fn play_window_secs(&self) -> f64 {
-        self.play_secs
-            .unwrap_or(f64::INFINITY)
-            .min(self.clip.duration_secs() / self.speed)
+        let (start, end) = self.source_span();
+        (end - start) / self.speed
     }
 }
 
@@ -330,7 +348,8 @@ impl AudioTrack {
         if clip_frames == 0 {
             return SILENCE;
         }
-        let play_len = self.play_window_secs();
+        let (start, end) = self.source_span();
+        let play_len = (end - start) / self.speed;
         if !(0.0..play_len).contains(&own) {
             return SILENCE;
         }
@@ -342,8 +361,9 @@ impl AudioTrack {
             envelope *= ((play_len - own) / self.fade_out_secs).min(1.0);
         }
         let envelope = envelope as f32;
-        // Clip seconds consumed per content second.
-        let src_pos = own * self.speed * self.clip.sample_rate as f64;
+        // The trimmed span's start, consumed at `speed` clip seconds per
+        // content second.
+        let src_pos = (start + own * self.speed) * self.clip.sample_rate as f64;
         let f0 = src_pos.floor() as usize;
         if f0 >= clip_frames {
             return SILENCE;
@@ -380,7 +400,8 @@ impl AudioTrack {
         sample_rate: f64,
         pcm: &mut [f32],
     ) {
-        let play_len = self.play_window_secs();
+        let (start, end) = self.source_span();
+        let play_len = (end - start) / self.speed;
         let clip_frames = self.clip.frames();
         if clip_frames == 0 || play_len <= 0.0 {
             return;
@@ -405,7 +426,7 @@ impl AudioTrack {
                 envelope *= ((play_len - own) / self.fade_out_secs).min(1.0);
             }
             let envelope = envelope as f32;
-            let src_pos = own * self.speed * clip_rate;
+            let src_pos = (start + own * self.speed) * clip_rate;
             let f0 = src_pos.floor() as usize;
             if f0 >= clip_frames {
                 continue;
@@ -536,11 +557,42 @@ mod tests {
         assert!((sample_of(&buf, 0.5) - 0.1).abs() < EPS);
 
         let buf = mixed(
-            &[AudioTrack::new(constant(0.5, 4.0)).with_play_secs(1.0)],
+            &[AudioTrack::new(constant(0.5, 4.0)).with_play_secs(0.0..1.0)],
             3.0,
         );
         assert!((sample_of(&buf, 0.6) - 0.5).abs() < EPS);
         assert!(sample_of(&buf, 1.6).abs() < EPS);
+    }
+
+    #[test]
+    fn play_range_skips_into_the_clip() {
+        // A 4 Hz ramp whose frame values encode their position; playing
+        // 1.0..3.0 makes content-time zero read frame 4 and the window end
+        // at 2 content seconds.
+        let ramp: Vec<f32> = (0..16).flat_map(|i| [i as f32, i as f32]).collect();
+        let clip = AudioClip::from_pcm(ramp, 4, 2);
+        let track = AudioTrack::new(clip).with_play_secs(1.0..3.0);
+        assert!((sampled(&track, 0.0)[0] - 4.0).abs() < EPS);
+        assert!((sampled(&track, 1.0)[0] - 8.0).abs() < EPS);
+        assert!(sampled(&track, 2.0)[0].abs() < EPS);
+        assert!((track.play_window_secs() - 2.0).abs() < f64::from(EPS));
+    }
+
+    #[test]
+    fn play_range_is_clamped_to_the_clip() {
+        let clip = AudioClip::from_pcm(vec![0.5; 8], 4, 1);
+        // End past the duration truncates; the window is the whole clip.
+        let track = AudioTrack::new(clip.clone()).with_play_secs(0.0..10.0);
+        assert!((track.play_window_secs() - 2.0).abs() < f64::from(EPS));
+        // A negative start pulls to zero.
+        let track = AudioTrack::new(clip.clone()).with_play_secs(-1.0..2.0);
+        assert!((track.play_window_secs() - 2.0).abs() < f64::from(EPS));
+        // Reversed or past-the-end spans are silence.
+        let track = AudioTrack::new(clip.clone()).with_play_secs(3.0..1.0);
+        assert_eq!(track.play_window_secs(), 0.0);
+        assert!(sampled(&track, 0.0)[0].abs() < EPS);
+        let track = AudioTrack::new(clip).with_play_secs(5.0..9.0);
+        assert_eq!(track.play_window_secs(), 0.0);
     }
 
     #[test]
