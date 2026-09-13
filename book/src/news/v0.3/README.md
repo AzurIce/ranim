@@ -12,6 +12,7 @@
 
 - 音频平面
   - `AudioClip`/`AudioTrack`/`Sound`：音频作为叶子与视觉动画并列编排，支持 gain、fade、speed、trim
+  - `AudioClip::from_file`/`from_bytes`（随 `audio-decode` feature）纯 Rust 解码（symphonia，WAV/MP3/FLAC/AAC/Ogg Vorbis）并经 rubato FFT 重采样归一到 48 kHz 立体声，不再依赖 ffmpeg 二进制
   - `RanimScene::seal` 时一次性 bake 成 master stereo/48 kHz buffer；线性路径预混，非线性路径走 residual forest
   - preview 原生播放（随 `preview` feature）与 render 端 ffmpeg muxing（MP4/MOV AAC，WebM libopus，GIF 丢弃）
 - 可组合动画编排系统（见 "Composable Animation Arrangement" 一节）

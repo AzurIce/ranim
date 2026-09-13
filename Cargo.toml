@@ -46,6 +46,18 @@ wgpu = "30.0.1"
 image = "0.25.10"
 derive_more = "2.1.1"
 bevy_ecs = { version = "0.19.1", default-features = false, features = ["std"] }
+# audio-decode feature (ranim-core): pure-Rust audio decoding + resampling
+symphonia = { version = "0.5.5", default-features = false, features = [
+  "aac",
+  "flac",
+  "mp3",
+  "pcm",
+  "vorbis",
+  "isomp4",
+  "ogg",
+  "wav",
+] }
+rubato = "5.0"
 
 [features]
 # default = ["output"]
@@ -61,6 +73,7 @@ profiling = [
   "dep:profiling",
 ]
 # output = ["dep:async-channel"]
+audio-decode = ["ranim-core/audio-decode"]
 render = [
   "dep:ranim-render",
   "dep:wgpu",

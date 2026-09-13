@@ -517,7 +517,8 @@ enabled / active，再用自己的 `time_range` 和 `rate_func` 把 `sec` 映射
 
 ## 音频叶子
 
-`Sound` 是音频平面的叶子 atom，使用方式与视觉动画一致：
+`Sound` 是音频平面的叶子 atom，使用方式与视觉动画一致（`from_file` 需要
+`audio-decode` feature）：
 
 ```rust,ignore
 let mut scene = RanimScene::new();

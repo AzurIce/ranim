@@ -8,9 +8,18 @@
 //! pulls. Consumers (video muxing, preview playback) read the baked buffer;
 //! the visual evaluation stack is untouched.
 
-#[cfg(not(target_family = "wasm"))]
-use std::process::Command;
+#[cfg(feature = "audio-decode")]
+use std::io::Cursor;
 use std::{f64::consts::TAU, fmt, io::Write, path::Path, sync::Arc};
+#[cfg(feature = "audio-decode")]
+use symphonia::core::{
+    codecs::{CODEC_TYPE_NULL, DecoderOptions},
+    errors::Error as SymphoniaError,
+    formats::FormatOptions,
+    io::MediaSourceStream,
+    meta::MetadataOptions,
+    probe::Hint,
+};
 
 /// Master sample rate every mixed buffer lives on.
 pub const MASTER_SAMPLE_RATE: u32 = 48_000;
@@ -71,53 +80,29 @@ impl AudioClip {
         Self::from_pcm(pcm, sample_rate, 1)
     }
 
-    /// Decode an audio file by piping it through `ffmpeg` (found on `PATH` or
-    /// in the working directory, matching the render pipeline's discovery).
+    /// Decode audio bytes in memory (requires the `audio-decode` feature).
     ///
-    /// Output is normalized to `f32` stereo at the master sample rate.
-    #[cfg(not(target_family = "wasm"))]
-    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, AudioError> {
-        let path = path.as_ref();
-        let ffmpeg = ["ffmpeg", "./ffmpeg"]
-            .into_iter()
-            .find(|bin| which_bin(bin) || Path::new(bin).is_file())
-            .ok_or(AudioError(
-                "ffmpeg not found on PATH or in the working directory".to_string(),
-            ))?;
+    /// Any format symphonia supports decodes: WAV, MP3, FLAC, AAC/M4A, Ogg
+    /// Vorbis. Output is normalized to [`MASTER_SAMPLE_RATE`] and
+    /// [`MASTER_CHANNELS`] — other sample rates are resampled with rubato's
+    /// FFT resampler, mono is duplicated to stereo, and beyond-stereo channel
+    /// layouts keep their front left/right pair.
+    ///
+    /// This is the whole-file entry point that works everywhere `std::io`
+    /// does, including wasm; [`AudioClip::from_file`] is a thin wrapper.
+    #[cfg(feature = "audio-decode")]
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AudioError> {
+        decode(bytes)
+    }
 
-        let output = Command::new(ffmpeg)
-            .args(["-v", "error", "-i"])
-            .arg(path)
-            .args([
-                "-vn",
-                "-acodec",
-                "pcm_f32le",
-                "-ac",
-                &MASTER_CHANNELS.to_string(),
-                "-ar",
-                &MASTER_SAMPLE_RATE.to_string(),
-                "-f",
-                "f32le",
-                "pipe:1",
-            ])
-            .output()
-            .map_err(AudioError::from)?;
-        if !output.status.success() {
-            return Err(AudioError(format!(
-                "ffmpeg failed ({}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            )));
-        }
-        let mut pcm = Vec::with_capacity(output.stdout.len() / 4);
-        for chunk in output.stdout.as_chunks::<4>().0 {
-            pcm.push(f32::from_le_bytes(*chunk));
-        }
-        Ok(Self {
-            sample_rate: MASTER_SAMPLE_RATE,
-            channels: MASTER_CHANNELS,
-            pcm: pcm.into(),
-        })
+    /// Decode an audio file (requires the `audio-decode` feature).
+    ///
+    /// Pure-Rust decoding via symphonia — no ffmpeg binary on `PATH`. See
+    /// [`AudioClip::from_bytes`] for the supported formats and the
+    /// normalization applied to the output.
+    #[cfg(feature = "audio-decode")]
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, AudioError> {
+        Self::from_bytes(&std::fs::read(path)?)
     }
 
     /// Sample rate of the PCM data.
@@ -145,14 +130,118 @@ impl AudioClip {
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
-fn which_bin(bin: &str) -> bool {
-    let Ok(path) = std::env::var("PATH") else {
-        return false;
+/// Decode interleaved `f32` PCM from encoded audio bytes.
+///
+/// Malformed packets are skipped (matching rodio's leniency); a stream that
+/// changes signal spec mid-way is rejected instead of silently misaligned.
+#[cfg(feature = "audio-decode")]
+fn decode(bytes: &[u8]) -> Result<AudioClip, AudioError> {
+    use symphonia::core::audio::SampleBuffer;
+    use symphonia::core::units::Duration;
+
+    let mss = MediaSourceStream::new(
+        // MediaSourceStream owns its source; keep the bytes via an owned copy.
+        Box::new(Cursor::new(bytes.to_vec())),
+        Default::default(),
+    );
+    let mut probed = symphonia::default::get_probe()
+        .format(
+            &Hint::new(),
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
+        .map_err(|err| AudioError(format!("failed to probe audio: {err}")))?;
+    let format = &mut probed.format;
+    let track = format
+        .tracks()
+        .iter()
+        .find(|track| track.codec_params.codec != CODEC_TYPE_NULL)
+        .ok_or_else(|| AudioError("no decodable audio track".to_string()))?;
+    let track_id = track.id;
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &DecoderOptions::default())
+        .map_err(|err| AudioError(format!("unsupported codec: {err}")))?;
+
+    let mut pcm = Vec::new();
+    let mut spec = None;
+    loop {
+        let packet = match format.next_packet() {
+            Ok(packet) => packet,
+            // Symphonia signals end of stream as an io error.
+            Err(SymphoniaError::IoError(_)) => break,
+            Err(err) => return Err(AudioError(format!("failed to read packet: {err}"))),
+        };
+        if packet.track_id() != track_id {
+            continue;
+        }
+        let decoded = match decoder.decode(&packet) {
+            Ok(decoded) => decoded,
+            Err(SymphoniaError::DecodeError(_)) => continue,
+            Err(SymphoniaError::IoError(_)) => break,
+            Err(err) => return Err(AudioError(format!("failed to decode packet: {err}"))),
+        };
+        if spec.unwrap_or(*decoded.spec()) != *decoded.spec() {
+            return Err(AudioError("stream changes format mid-way".to_string()));
+        }
+        spec = Some(*decoded.spec());
+        let mut buffer = SampleBuffer::<f32>::new(decoded.capacity() as Duration, *decoded.spec());
+        buffer.copy_interleaved_ref(decoded);
+        pcm.extend_from_slice(buffer.samples());
+    }
+    let spec = spec.ok_or_else(|| AudioError("no audio frames decoded".to_string()))?;
+
+    // Adapt to master stereo: mono is duplicated, beyond-stereo layouts keep
+    // their front left/right pair.
+    let src_channels = spec.channels.count();
+    let frames = pcm.len() / src_channels;
+    let mut stereo = vec![0.0; frames * MASTER_CHANNELS as usize];
+    for (frame, out) in stereo
+        .as_chunks_mut::<{ MASTER_CHANNELS as usize }>()
+        .0
+        .iter_mut()
+        .enumerate()
+    {
+        for (channel, slot) in out.iter_mut().enumerate() {
+            let src = frame * src_channels + channel.min(src_channels - 1);
+            *slot = pcm[src];
+        }
+    }
+    let pcm = if spec.rate != MASTER_SAMPLE_RATE {
+        resample_to_master(stereo, spec.rate)?
+    } else {
+        stereo
     };
-    std::env::split_paths(&path)
-        .map(|dir| dir.join(bin))
-        .any(|candidate| candidate.is_file())
+    Ok(AudioClip {
+        sample_rate: MASTER_SAMPLE_RATE,
+        channels: MASTER_CHANNELS,
+        pcm: pcm.into(),
+    })
+}
+
+/// Resample interleaved master-stereo PCM to [`MASTER_SAMPLE_RATE`] with
+/// rubato's FFT (synchronous) resampler in one offline pass.
+#[cfg(feature = "audio-decode")]
+fn resample_to_master(pcm: Vec<f32>, src_rate: u32) -> Result<Vec<f32>, AudioError> {
+    use rubato::audioadapter_buffers::owned::InterleavedOwned;
+    use rubato::{Fft, FixedSync, Resampler};
+
+    let channels = MASTER_CHANNELS as usize;
+    let frames = pcm.len() / channels;
+    let input = InterleavedOwned::<f32>::new_from(pcm, channels, frames)
+        .map_err(|err| AudioError(format!("resampler input: {err}")))?;
+    let mut resampler = Fft::<f32>::new(
+        src_rate as usize,
+        MASTER_SAMPLE_RATE as usize,
+        1024,
+        channels,
+        FixedSync::Both,
+    )
+    .map_err(|err| AudioError(format!("failed to init resampler: {err}")))?;
+    let output = resampler
+        .process_all(&input, frames, None)
+        .map_err(|err| AudioError(format!("resampling failed: {err}")))?;
+    Ok(output.take_data())
 }
 
 /// A sound's content data: the clip plus how to play it.
@@ -502,7 +591,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires ffmpeg on PATH"]
+    #[cfg(feature = "audio-decode")]
     fn from_file_decodes_the_written_wav() {
         let path =
             std::env::temp_dir().join(format!("ranim-decode-test-{}.wav", std::process::id()));
@@ -514,5 +603,63 @@ mod tests {
         assert_eq!(clip.channels(), MASTER_CHANNELS);
         assert!((clip.duration_secs() - 480.0 / MASTER_SAMPLE_RATE as f64).abs() < 1e-9);
         assert!((clip.pcm()[0] - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    #[cfg(feature = "audio-decode")]
+    fn decoding_resamples_to_master_rate() {
+        // A 24 kHz stereo wav with a click at 0.5 s; decoding must keep the
+        // click at 0.5 s on the 48 kHz grid (resampler delay trimmed) and
+        // scale the duration.
+        let rate = 24_000u32;
+        let click = rate as usize / 2;
+        let mut pcm = vec![0.0f32; rate as usize * 2];
+        pcm[click * 2] = 1.0;
+        pcm[click * 2 + 1] = 1.0;
+        let path =
+            std::env::temp_dir().join(format!("ranim-resample-test-{}.wav", std::process::id()));
+        write_wav(&path, &pcm, rate, MASTER_CHANNELS).unwrap();
+        let clip = AudioClip::from_file(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(clip.sample_rate(), MASTER_SAMPLE_RATE);
+        assert_eq!(clip.channels(), MASTER_CHANNELS);
+        let samples = clip.pcm();
+        let peak = samples
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1[0].abs().total_cmp(&b.1[0].abs()))
+            .unwrap()
+            .0;
+        assert!(
+            (peak as i64 - 24_000).abs() < 1_000,
+            "click at frame {peak}, expected ~24000"
+        );
+        assert!(
+            (samples.len() as i64 / 2 - 48_000).abs() < 2_000,
+            "duration {} frames, expected ~48000",
+            samples.len() / 2
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "audio-decode")]
+    fn decoding_duplicates_mono_to_stereo() {
+        let pcm = vec![0.5f32; MASTER_SAMPLE_RATE as usize];
+        let path = std::env::temp_dir().join(format!("ranim-mono-test-{}.wav", std::process::id()));
+        write_wav(&path, &pcm, MASTER_SAMPLE_RATE, 1).unwrap();
+        let clip = AudioClip::from_file(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(clip.sample_rate(), MASTER_SAMPLE_RATE);
+        assert_eq!(clip.channels(), MASTER_CHANNELS);
+        assert_eq!(clip.pcm().len(), MASTER_SAMPLE_RATE as usize * 2);
+        assert!(clip.pcm().iter().all(|&s| (s - 0.5).abs() < 1e-6));
+    }
+
+    #[test]
+    #[cfg(feature = "audio-decode")]
+    fn decoding_garbage_is_an_error() {
+        assert!(AudioClip::from_bytes(b"not an audio file").is_err());
     }
 }
