@@ -621,10 +621,11 @@ mod tests {
     #[test]
     fn baked_audio_matches_point_semantics() {
         // One scene exercising every mixing shape: sequential and
-        // overlapping sounds, a duration override, container and leaf rate
-        // warps, fades, gain, speed, a stereo clip, and visual filler cells.
-        // The seal-time bake must equal a fresh per-sample walk of the same
-        // tree (the point-semantics spec).
+        // overlapping sounds, duration overrides (one acting as a linear
+        // speed change on a sound), container and leaf rate warps, fades,
+        // gain, a stereo clip, and visual filler cells. The seal-time bake
+        // must equal a fresh per-sample walk of the same tree (the
+        // point-semantics spec).
         let ramp = |i: usize| 0.4 * i as f32 / 48_000.0;
         let stereo = AudioClip::from_pcm(
             (0..48_000)
@@ -645,7 +646,8 @@ mod tests {
                 Sound::new(AudioClip::sine(440.0, 1.0, 0.5))
                     .with_fade_in(0.25)
                     .with_gain(0.8),
-                Sound::new(stereo).with_speed(2.0),
+                // A 2x speed change: half the window, pitch up an octave.
+                Sound::new(stereo).with_duration(0.5),
             ],
             Sound::new(AudioClip::sine(880.0, 2.0, 0.3)).at(0.5),
             seq![Sound::new(tone(2.0))].with_duration(1.7),

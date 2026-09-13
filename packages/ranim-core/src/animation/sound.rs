@@ -43,7 +43,7 @@ impl Sound {
         }
     }
 
-    /// A sound from a shaped track (gain, fades, speed, play length).
+    /// A sound from a shaped track (gain, fades, play range).
     pub fn from_track(track: AudioTrack) -> Self {
         Self { track }
     }
@@ -71,12 +71,6 @@ impl Sound {
     /// new window length.
     pub fn with_play_secs(mut self, range: Range<f64>) -> Self {
         self.track = self.track.with_play_secs(range);
-        self
-    }
-
-    /// Resample the clip: `speed` 2.0 plays twice as fast (one octave up).
-    pub fn with_speed(mut self, speed: f64) -> Self {
-        self.track = self.track.with_speed(speed);
         self
     }
 

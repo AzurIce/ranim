@@ -247,11 +247,11 @@ fn resample_to_master(pcm: Vec<f32>, src_rate: u32) -> Result<Vec<f32>, AudioErr
 
 /// A sound's content data: the clip plus how to play it.
 ///
-/// Purely substance — clip trim, gain envelope, playback rate. Everything
-/// time-positional (placement, window duration, enable, rate warps) lives on
-/// the cell layer (`Unplaced::at`, `with_duration`, `with_rate_func`,
-/// `with_enabled`), exactly like a visual item's data versus its
-/// [`AnimNode`](crate::animation::node::AnimNode).
+/// Purely substance — clip trim and gain envelope. Everything time-positional
+/// (placement, window duration, enable, rate warps — including linear speed
+/// changes via `with_duration`) lives on the cell layer (`Unplaced::at`,
+/// `with_duration`, `with_rate_func`, `with_enabled`), exactly like a visual
+/// item's data versus its [`AnimNode`](crate::animation::node::AnimNode).
 #[derive(Debug, Clone)]
 pub struct AudioTrack {
     clip: AudioClip,
@@ -259,7 +259,6 @@ pub struct AudioTrack {
     fade_in_secs: f64,
     fade_out_secs: f64,
     play_range: Option<Range<f64>>,
-    speed: f64,
 }
 
 impl AudioTrack {
@@ -271,7 +270,6 @@ impl AudioTrack {
             fade_in_secs: 0.0,
             fade_out_secs: 0.0,
             play_range: None,
-            speed: 1.0,
         }
     }
 
@@ -306,16 +304,6 @@ impl AudioTrack {
         self
     }
 
-    /// Resample the clip: `speed` 2.0 consumes the clip twice as fast within
-    /// the same window (one octave up, trailing window silent) — a linear
-    /// content-rate knob, unlike the cell layer's `with_rate_func`, which
-    /// warps the whole content span non-uniformly.
-    pub fn with_speed(mut self, speed: f64) -> Self {
-        assert!(speed.is_finite() && speed > 0.0, "speed must be positive");
-        self.speed = speed;
-        self
-    }
-
     /// The clip-second span actually played: `play_range` clamped to the
     /// clip's extent.
     fn source_span(&self) -> (f64, f64) {
@@ -332,7 +320,7 @@ impl AudioTrack {
     /// The track's play length (its whole content axis).
     pub(crate) fn play_window_secs(&self) -> f64 {
         let (start, end) = self.source_span();
-        (end - start) / self.speed
+        end - start
     }
 }
 
@@ -349,7 +337,7 @@ impl AudioTrack {
             return SILENCE;
         }
         let (start, end) = self.source_span();
-        let play_len = (end - start) / self.speed;
+        let play_len = end - start;
         if !(0.0..play_len).contains(&own) {
             return SILENCE;
         }
@@ -361,9 +349,8 @@ impl AudioTrack {
             envelope *= ((play_len - own) / self.fade_out_secs).min(1.0);
         }
         let envelope = envelope as f32;
-        // The trimmed span's start, consumed at `speed` clip seconds per
-        // content second.
-        let src_pos = (start + own * self.speed) * self.clip.sample_rate as f64;
+        // One clip second per content second, offset into the trimmed span.
+        let src_pos = (start + own) * self.clip.sample_rate as f64;
         let f0 = src_pos.floor() as usize;
         if f0 >= clip_frames {
             return SILENCE;
@@ -401,7 +388,7 @@ impl AudioTrack {
         pcm: &mut [f32],
     ) {
         let (start, end) = self.source_span();
-        let play_len = (end - start) / self.speed;
+        let play_len = end - start;
         let clip_frames = self.clip.frames();
         if clip_frames == 0 || play_len <= 0.0 {
             return;
@@ -426,7 +413,7 @@ impl AudioTrack {
                 envelope *= ((play_len - own) / self.fade_out_secs).min(1.0);
             }
             let envelope = envelope as f32;
-            let src_pos = (start + own * self.speed) * clip_rate;
+            let src_pos = (start + own) * clip_rate;
             let f0 = src_pos.floor() as usize;
             if f0 >= clip_frames {
                 continue;

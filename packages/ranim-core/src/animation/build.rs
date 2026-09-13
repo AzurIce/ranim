@@ -128,6 +128,10 @@ impl<A> Paramed<A> {
     }
 
     /// Change the animation's duration.
+    ///
+    /// For a [`Sound`](crate::animation::sound::Sound) this resamples the
+    /// audio linearly: playing a clip faster also shifts its pitch up, since
+    /// the whole content span is warped onto the new window.
     pub fn with_duration(mut self, duration_secs: f64) -> Self {
         assert_valid_duration(duration_secs);
         self.param.duration_secs = Some(duration_secs);
