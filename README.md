@@ -126,6 +126,10 @@ ranim render -p render scene_a -- --release
 
   use `preview_scene` api to launch an preview app on a scene
   https://github.com/user-attachments/assets/5bf287e2-b06f-42f8-83b6-76f3775e298e
+- `audio-decode`: enable audio file decoding (`AudioClip::from_file` / `from_bytes`)
+
+  pure-Rust decoding via symphonia (WAV, MP3, FLAC, AAC/M4A, Ogg Vorbis) with rubato
+  resampling to the 48 kHz master rate — no ffmpeg binary required
 - `profiling`: enable profiling with https://github.com/EmbarkStudios/puffin
 
   CPU uses `127.0.0.1:8585` and GPU uses `127.0.0.1:8586`
