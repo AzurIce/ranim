@@ -1,11 +1,14 @@
 //! GPU upload profiling: quantifies the per-frame full-buffer upload cost of
 //! the merged VItem/MeshItem buffers.
 //!
-//! Upload counting is enabled process-wide via `RANIM_PROFILE_UPLOAD=1`
-//! (or any value; see `ranim_render::upload_probe`).
+//! The upload strategy is selected process-wide via `RANIM_PROFILE_UPLOAD`
+//! (`count` baseline, or the experimental `skip-equal` / `dirty-ranges`
+//! strategies from `ranim_render::upload_probe`):
 //!
 //! ```bash
-//! RANIM_PROFILE_UPLOAD=1 cargo run -p benches --bin profile_gpu_upload --release
+//! RANIM_PROFILE_UPLOAD=count        cargo run -p benches --bin profile_gpu_upload --release
+//! RANIM_PROFILE_UPLOAD=skip-equal   cargo run -p benches --bin profile_gpu_upload --release
+//! RANIM_PROFILE_UPLOAD=dirty-ranges cargo run -p benches --bin profile_gpu_upload --release
 //! ```
 //!
 //! Scenarios:
@@ -21,7 +24,7 @@
 //! - eval time (frame acquisition, CPU only)
 //! - submit time (`Renderer::render_frame`, CPU side, no GPU wait)
 //! - full frame time (render + device poll, i.e. GPU-inclusive)
-//! - uploaded bytes and CPU time spent in write calls
+//! - uploaded vs actually-written bytes and CPU time spent in write calls
 //!
 //! It also prints a content-redundancy analysis: how many bytes of the
 //! full upload actually changed between consecutive frames (the upper bound
@@ -186,38 +189,54 @@ fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
     };
 
     let mut total_bytes = 0u64;
+    let mut total_written = 0u64;
     let mut total_cpu = Duration::ZERO;
+    let mut total_diff = Duration::ZERO;
     println!(
         "\n=== {} (upload mode: {:?}) ===",
         scenario.name,
         upload_probe::mode()
     );
     println!(
-        "{:<28} {:>8} {:>10} {:>9} {:>10}",
-        "buffer", "calls/f", "bytes/f", "KiB/f", "cpu μs/f"
+        "{:<28} {:>8} {:>10} {:>9} {:>9} {:>10}",
+        "buffer", "calls/f", "bytes/f", "KiB/f", "written", "cpu μs/f"
     );
     for (label, s) in &stats {
         total_bytes += s.bytes;
+        total_written += s.written_bytes;
         total_cpu += s.cpu_time;
+        total_diff += s.diff_time;
+        let written_pct = if s.bytes > 0 {
+            100.0 * s.written_bytes as f64 / s.bytes as f64
+        } else {
+            0.0
+        };
         println!(
-            "{:<28} {:>8.1} {:>10.0} {:>9.1} {:>10.1}",
+            "{:<28} {:>8.1} {:>10.0} {:>9.1} {:>8.1}% {:>10.1}",
             label,
             s.calls as f64 / frames,
             s.bytes as f64 / frames,
             s.bytes as f64 / frames / 1024.0,
+            written_pct,
             s.cpu_time.as_secs_f64() * 1e6 / frames,
         );
     }
+    let total_written_pct = if total_bytes > 0 {
+        100.0 * total_written as f64 / total_bytes as f64
+    } else {
+        0.0
+    };
     println!(
-        "{:<28} {:>8} {:>10.0} {:>9.1} {:>10.1}",
+        "{:<28} {:>8} {:>10.0} {:>9.1} {:>8.1}% {:>10.1}",
         "TOTAL",
         "",
         total_bytes as f64 / frames,
         total_bytes as f64 / frames / 1024.0,
+        total_written_pct,
         total_cpu.as_secs_f64() * 1e6 / frames,
     );
     println!(
-        "eval avg {:>7.2} ms | submit avg {:>7.2} ms | full avg {:>7.2} ms (max {:>7.2} ms) | upload cpu {:>6.2} ms",
+        "eval avg {:>7.2} ms | submit avg {:>7.2} ms | full avg {:>7.2} ms (max {:>7.2} ms) | upload cpu {:>6.2} ms | diff cpu {:>6.2} ms",
         avg(|t| t.eval).as_secs_f64() * 1e3,
         avg(|t| t.submit).as_secs_f64() * 1e3,
         avg(|t| t.full).as_secs_f64() * 1e3,
@@ -229,6 +248,7 @@ fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
             .as_secs_f64()
             * 1e3,
         total_cpu.as_secs_f64() * 1e3 / frames,
+        total_diff.as_secs_f64() * 1e3 / frames,
     );
 
     if let Some(scopes) = renderer.take_last_gpu_scopes() {
@@ -336,7 +356,9 @@ fn main() {
     println!("profile_gpu_upload v2 (frame-feed)");
     match upload_probe::mode() {
         UploadMode::Off => {
-            eprintln!("set RANIM_PROFILE_UPLOAD=1 to enable upload profiling");
+            eprintln!(
+                "set RANIM_PROFILE_UPLOAD=count|skip-equal|dirty-ranges to enable upload profiling"
+            );
             std::process::exit(2);
         }
         mode => println!("upload mode: {mode:?}"),

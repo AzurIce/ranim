@@ -116,6 +116,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
                 std::mem::size_of_val(&data) as u64,
                 std::mem::size_of_val(&data) as u64,
                 start.elapsed().as_nanos() as u64,
+                0,
             );
         }
         // ctx.queue.submit([]);
@@ -161,6 +162,12 @@ pub(crate) struct WgpuVecBuffer<T: Default + bytemuck::Pod + bytemuck::Zeroable 
     usage: wgpu::BufferUsages,
     /// Keep match to the buffer size
     len: usize,
+    /// Shadow copy of the last uploaded payload, kept only when upload
+    /// profiling is enabled (see [`crate::upload_probe`]).
+    shadow: Option<Vec<u8>>,
+    /// The [`crate::upload_probe`] mode generation this shadow was built
+    /// under; a mismatch means the shadow must be re-established.
+    shadow_gen: u64,
     _phantom: PhantomData<T>,
     // inner: Vec<T>,
 }
@@ -187,6 +194,8 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             }),
             usage,
             len: 0,
+            shadow: None,
+            shadow_gen: 0,
             _phantom: PhantomData,
             // inner: vec![],
         }
@@ -225,6 +234,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                 usage: self.usage,
                 mapped_at_creation: false,
             });
+            self.shadow = None;
         }
         realloc
     }
@@ -235,8 +245,14 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         // self.inner.copy_from_slice(data);
         self.len = data.len();
         let realloc = self.buffer.size() != std::mem::size_of_val(data) as u64;
-        let count = crate::upload_probe::mode().enabled();
+        let mode = crate::upload_probe::mode();
         let bytes = bytemuck::cast_slice(data);
+        // A mode switch may have invalidated the shadow (uploads performed
+        // under a different mode updated the GPU without touching it).
+        if self.shadow_gen != crate::upload_probe::mode_generation() {
+            self.shadow = None;
+            self.shadow_gen = crate::upload_probe::mode_generation();
+        }
 
         if realloc {
             // info!("realloc");
@@ -249,37 +265,84 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             });
             let start = std::time::Instant::now();
             ctx.queue.write_buffer(&buffer, 0, bytes);
-            if count {
+            if mode.enabled() {
                 crate::upload_probe::record(
                     self.label,
                     bytes.len() as u64,
                     bytes.len() as u64,
                     start.elapsed().as_nanos() as u64,
+                    0,
                 );
             }
             // info!("new");
             self.buffer = buffer;
+            self.shadow = crate::upload_probe::needs_shadow(mode).then(|| bytes.to_vec());
         } else {
-            // info!("queue copy");
-            let start = std::time::Instant::now();
-            {
-                let mut view = ctx
-                    .queue
-                    .write_buffer_with(
-                        &self.buffer,
-                        0,
-                        wgpu::BufferSize::new((std::mem::size_of_val(data)) as u64).unwrap(),
-                    )
-                    .unwrap();
-                view.copy_from_slice(bytes);
-            }
-            if count {
-                crate::upload_probe::record(
-                    self.label,
-                    bytes.len() as u64,
-                    bytes.len() as u64,
-                    start.elapsed().as_nanos() as u64,
-                );
+            let (decision, diff_time) =
+                crate::upload_probe::decide(mode, self.label, self.shadow.as_deref(), bytes);
+            let written = match decision {
+                crate::upload_probe::UploadDecision::Skip => {
+                    if mode.enabled() {
+                        crate::upload_probe::record(
+                            self.label,
+                            bytes.len() as u64,
+                            0,
+                            0,
+                            diff_time.as_nanos() as u64,
+                        );
+                    }
+                    0
+                }
+                crate::upload_probe::UploadDecision::Ranges(ranges) => {
+                    let start = std::time::Instant::now();
+                    let mut written = 0u64;
+                    for (offset, len) in ranges {
+                        ctx.queue.write_buffer(
+                            &self.buffer,
+                            offset as u64,
+                            &bytes[offset..offset + len],
+                        );
+                        written += len as u64;
+                    }
+                    if mode.enabled() {
+                        crate::upload_probe::record(
+                            self.label,
+                            bytes.len() as u64,
+                            written,
+                            start.elapsed().as_nanos() as u64,
+                            diff_time.as_nanos() as u64,
+                        );
+                    }
+                    written
+                }
+                crate::upload_probe::UploadDecision::Full => {
+                    let start = std::time::Instant::now();
+                    {
+                        let mut view = ctx
+                            .queue
+                            .write_buffer_with(
+                                &self.buffer,
+                                0,
+                                wgpu::BufferSize::new((std::mem::size_of_val(data)) as u64)
+                                    .unwrap(),
+                            )
+                            .unwrap();
+                        view.copy_from_slice(bytes);
+                    }
+                    if mode.enabled() {
+                        crate::upload_probe::record(
+                            self.label,
+                            bytes.len() as u64,
+                            bytes.len() as u64,
+                            start.elapsed().as_nanos() as u64,
+                            diff_time.as_nanos() as u64,
+                        );
+                    }
+                    bytes.len() as u64
+                }
+            };
+            if crate::upload_probe::needs_shadow(mode) && written > 0 {
+                self.shadow = Some(bytes.to_vec());
             }
             // ctx.queue.submit([]);
         }

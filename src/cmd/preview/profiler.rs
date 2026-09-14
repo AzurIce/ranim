@@ -507,13 +507,19 @@ fn ui_uploads(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
     ui.horizontal(|ui| {
         ui.heading("Buffer uploads");
-        let mut track = crate::render::upload_probe::mode().enabled();
-        if ui.checkbox(&mut track, "Track uploads").changed() {
-            crate::render::upload_probe::set_mode(if track {
-                UploadMode::Count
-            } else {
-                UploadMode::Off
+        ui.label("mode:");
+        let prev = crate::render::upload_probe::mode();
+        let mut mode = prev;
+        egui::ComboBox::from_id_salt("upload_probe_mode")
+            .selected_text(format!("{mode:?}"))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut mode, UploadMode::Off, "Off");
+                ui.selectable_value(&mut mode, UploadMode::Count, "Count");
+                ui.selectable_value(&mut mode, UploadMode::SkipEqual, "SkipEqual");
+                ui.selectable_value(&mut mode, UploadMode::DirtyRanges, "DirtyRanges");
             });
+        if mode != prev {
+            crate::render::upload_probe::set_mode(mode);
         }
     });
 
