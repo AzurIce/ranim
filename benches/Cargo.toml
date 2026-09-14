@@ -53,8 +53,3 @@ harness = false
 [[bench]]
 name = "svg_hierarchy"
 harness = false
-
-[features]
-# Enables wgpu-profiler GPU pass scopes in the profiling binaries.
-# Forces a device poll per frame (see profile_gpu_upload --help text).
-gpu-scopes = ["ranim-render/profiling"]
