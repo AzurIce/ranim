@@ -132,10 +132,14 @@ ranim render -p render scene_a -- --release
   resampling to the 48 kHz master rate — no ffmpeg binary required
 - `profiling`: enable GPU timer scopes (wgpu-profiler) for the preview profiler panel
 
-  CPU uses `127.0.0.1:8585` and GPU uses `127.0.0.1:8586`
-  
-  ![image](https://github.com/user-attachments/assets/36bf841c-e30f-45cc-adbc-bd4bfff9bc4c)
-   
+The preview app has a built-in profiler panel (top bar `Profiler` button):
+a progress-axis chart of GPU pass times / CPU spans / buffer-upload stats
+with click-to-seek. GPU timer scopes (wgpu-profiler) are runtime-toggled
+in the panel or via `RANIM_PROFILE_GPU=1`; upload tracking via
+`RANIM_PROFILE_UPLOAD=1`. While GPU timers are enabled, each frame pays a
+device poll.
+
+![profiler panel](https://github.com/user-attachments/assets/746d044c-8fe8-44d8-a0dc-ee00eceb9284)
 
 ## Contributing
 

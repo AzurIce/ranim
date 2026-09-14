@@ -139,7 +139,6 @@ pub(crate) fn record_sample(app: &mut RanimPreviewApp) {
 /// GPU timer features requested from eframe's device so wgpu-profiler
 /// scopes produce results (intersected with adapter support at the call
 /// site, so device creation can never fail because of them).
-#[cfg(feature = "profiling")]
 pub(crate) fn gpu_timer_features() -> wgpu::Features {
     wgpu::Features::TIMESTAMP_QUERY
         | wgpu::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS
@@ -147,7 +146,6 @@ pub(crate) fn gpu_timer_features() -> wgpu::Features {
 }
 
 /// Flatten a wgpu-profiler scope tree into `(label, μs)` pairs.
-#[cfg(feature = "profiling")]
 pub(crate) fn flatten_scopes(
     scopes: &[wgpu_profiler::GpuTimerQueryResult],
     out: &mut Vec<(String, f64)>,
@@ -445,19 +443,38 @@ fn ui_gpu_passes(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
     if app.profiler_metric == ProfilerMetric::GpuPasses && app.profiler_stacked {
         ui_stacked_legend(&app.gpu_pass_times, ui);
     }
-    ui.heading("GPU passes");
-    if !cfg!(feature = "profiling") {
-        ui.label(
-            egui::RichText::new("GPU timers unavailable — rebuild with `--features profiling`")
-                .weak(),
-        );
+    ui.horizontal(|ui| {
+        ui.heading("GPU passes");
+        let supported = app
+            .renderer
+            .as_ref()
+            .is_some_and(|r| r.gpu_timers_supported());
+        if supported {
+            let mut enabled = app
+                .renderer
+                .as_ref()
+                .is_some_and(|r| r.gpu_timers_enabled());
+            if ui.checkbox(&mut enabled, "GPU timers").changed()
+                && let Some(r) = app.renderer.as_mut()
+            {
+                r.set_gpu_timers_enabled(enabled);
+            }
+        }
+    });
+    if !app
+        .renderer
+        .as_ref()
+        .is_some_and(|r| r.gpu_timers_supported())
+    {
+        ui.label(egui::RichText::new("GPU timers unsupported on this device").weak());
         return;
     }
     if app.gpu_pass_times.is_empty() {
         ui.label(
             egui::RichText::new(
-                "no GPU timer data yet — play the animation, or the adapter may \
-                 lack timestamp query support",
+                "GPU timers are off or no frame was rendered yet — enable them \
+                 above and play the animation (note: while enabled, each frame \
+                 pays a device poll)",
             )
             .weak(),
         );
@@ -488,21 +505,15 @@ fn ui_gpu_passes(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
 
 fn ui_uploads(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
-    ui.heading("Buffer uploads");
     ui.horizontal(|ui| {
-        ui.label("mode:");
-        let prev = crate::render::upload_probe::mode();
-        let mut mode = prev;
-        egui::ComboBox::from_id_salt("upload_probe_mode")
-            .selected_text(format!("{mode:?}"))
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut mode, UploadMode::Off, "Off");
-                ui.selectable_value(&mut mode, UploadMode::Count, "Count");
-                ui.selectable_value(&mut mode, UploadMode::SkipEqual, "SkipEqual");
-                ui.selectable_value(&mut mode, UploadMode::DirtyRanges, "DirtyRanges");
+        ui.heading("Buffer uploads");
+        let mut track = crate::render::upload_probe::mode().enabled();
+        if ui.checkbox(&mut track, "Track uploads").changed() {
+            crate::render::upload_probe::set_mode(if track {
+                UploadMode::Count
+            } else {
+                UploadMode::Off
             });
-        if mode != prev {
-            crate::render::upload_probe::set_mode(mode);
         }
     });
 

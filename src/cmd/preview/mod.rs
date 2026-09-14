@@ -527,7 +527,6 @@ impl RanimPreviewApp {
             self.last_render_time = Some(start.elapsed());
 
             // GPU profiler panel: drain per-frame data.
-            #[cfg(feature = "profiling")]
             if let Some(scopes) = renderer.take_last_gpu_scopes() {
                 let mut passes = Vec::new();
                 profiler::flatten_scopes(&scopes, &mut passes);
@@ -1155,7 +1154,6 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
                     // GPU timer scopes for the profiler panel (no-op where the
                     // adapter lacks them; intersected so device creation
                     // can't fail on unsupported features).
-                    #[cfg(feature = "profiling")]
                     required_features: adapter.features() & profiler::gpu_timer_features(),
                     ..Default::default()
                 }),
