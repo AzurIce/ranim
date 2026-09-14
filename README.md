@@ -130,7 +130,7 @@ ranim render -p render scene_a -- --release
 
   pure-Rust decoding via symphonia (WAV, MP3, FLAC, AAC/M4A, Ogg Vorbis) with rubato
   resampling to the 48 kHz master rate — no ffmpeg binary required
-- `profiling`: enable profiling with https://github.com/EmbarkStudios/puffin
+- `profiling`: enable GPU timer scopes (wgpu-profiler) for the preview profiler panel
 
   CPU uses `127.0.0.1:8585` and GPU uses `127.0.0.1:8586`
   
