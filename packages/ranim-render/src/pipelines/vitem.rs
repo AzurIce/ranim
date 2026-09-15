@@ -9,7 +9,7 @@ use crate::{
         vitems::VItemsBuffer,
     },
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT, PipelinesPool},
-    schedule::{FrameTarget, RenderContext},
+    schedule::{FrameTarget, RenderContext, RenderProfiler},
 };
 
 pub(crate) fn compute(
@@ -17,6 +17,7 @@ pub(crate) fn compute(
     ctx: Res<WgpuContext>,
     pipelines: Res<PipelinesPool>,
     merged: Res<VItemsBuffer>,
+    profiler: Res<RenderProfiler>,
 ) {
     if merged.item_count() == 0 {
         return;
@@ -27,11 +28,14 @@ pub(crate) fn compute(
             label: Some("Merged VItem Map Points Compute Pass"),
             timestamp_writes: None,
         });
-    pass.set_pipeline(&pipelines.get_or_init::<VItemComputePipeline>(&ctx));
-    pass.set_bind_group(0, merged.compute_bind_group.as_ref().unwrap(), &[]);
-    pass.dispatch_workgroups(merged.total_points().div_ceil(256), 1, 1);
+    profiler.scope_pass("vitem::compute", &mut pass, |pass| {
+        pass.set_pipeline(&pipelines.get_or_init::<VItemComputePipeline>(&ctx));
+        pass.set_bind_group(0, merged.compute_bind_group.as_ref().unwrap(), &[]);
+        pass.dispatch_workgroups(merged.total_points().div_ceil(256), 1, 1);
+    });
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn depth(
     mut render: RenderContext,
     ctx: Res<WgpuContext>,
@@ -40,6 +44,7 @@ pub(crate) fn depth(
     target: Res<FrameTarget>,
     viewport: Res<ViewportGpuPacket>,
     merged: Res<VItemsBuffer>,
+    profiler: Res<RenderProfiler>,
 ) {
     if merged.item_count() == 0 {
         return;
@@ -61,13 +66,16 @@ pub(crate) fn depth(
             occlusion_query_set: None,
             multiview_mask: None,
         });
-    pass.set_pipeline(&pipelines.get_or_init::<VItemDepthPipeline>(&ctx));
-    pass.set_bind_group(0, &resolution.bind_group, &[]);
-    pass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
-    pass.set_bind_group(2, merged.render_bind_group.as_ref().unwrap(), &[]);
-    pass.draw(0..4, 0..merged.item_count());
+    profiler.scope_pass("vitem::depth", &mut pass, |pass| {
+        pass.set_pipeline(&pipelines.get_or_init::<VItemDepthPipeline>(&ctx));
+        pass.set_bind_group(0, &resolution.bind_group, &[]);
+        pass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
+        pass.set_bind_group(2, merged.render_bind_group.as_ref().unwrap(), &[]);
+        pass.draw(0..4, 0..merged.item_count());
+    });
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn color(
     mut render: RenderContext,
     ctx: Res<WgpuContext>,
@@ -76,6 +84,7 @@ pub(crate) fn color(
     target: Res<FrameTarget>,
     viewport: Res<ViewportGpuPacket>,
     merged: Res<VItemsBuffer>,
+    profiler: Res<RenderProfiler>,
 ) {
     if merged.item_count() == 0 {
         return;
@@ -105,11 +114,13 @@ pub(crate) fn color(
             occlusion_query_set: None,
             multiview_mask: None,
         });
-    pass.set_pipeline(&pipelines.get_or_init::<VItemColorPipeline>(&ctx));
-    pass.set_bind_group(0, &resolution.bind_group, &[]);
-    pass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
-    pass.set_bind_group(2, merged.render_bind_group.as_ref().unwrap(), &[]);
-    pass.draw(0..4, 0..merged.item_count());
+    profiler.scope_pass("vitem::color", &mut pass, |pass| {
+        pass.set_pipeline(&pipelines.get_or_init::<VItemColorPipeline>(&ctx));
+        pass.set_bind_group(0, &resolution.bind_group, &[]);
+        pass.set_bind_group(1, &viewport.uniforms_bind_group.bind_group, &[]);
+        pass.set_bind_group(2, merged.render_bind_group.as_ref().unwrap(), &[]);
+        pass.draw(0..4, 0..merged.item_count());
+    });
 }
 
 // MARK: Compute pipeline

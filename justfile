@@ -16,7 +16,6 @@ fmt-check:
 
 lint: lint-no-features
     just lint-features render
-    just lint-features profiling
     just lint-features audio-decode
 
 lint-no-features: fmt-check

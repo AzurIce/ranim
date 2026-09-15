@@ -2,6 +2,7 @@
 mod audio;
 mod depth_visual;
 mod playback;
+mod profiler;
 mod timeline;
 
 use std::sync::Arc;
@@ -32,7 +33,7 @@ pub enum RanimPreviewAppCmd {
 }
 
 /// Default logic grid resolution (Hz), per the time model design.
-const DEFAULT_LOGIC_FPS: f64 = 120.0;
+pub(crate) const DEFAULT_LOGIC_FPS: f64 = 120.0;
 
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 enum ExportProgress {
@@ -149,6 +150,27 @@ pub struct RanimPreviewApp {
     // Playback
     playback_speed: f64,
     looping: bool,
+
+    // GPU profiler panel
+    profiler_open: bool,
+    /// Last rendered frame's GPU pass times in μs, flattened from the
+    /// wgpu-profiler scope tree. Empty when GPU timers are unavailable.
+    gpu_pass_times: Vec<(String, f64)>,
+    /// CPU spans of the last rendered frame (ms), drained from
+    /// `cpu_probe`.
+    cpu_spans: Vec<(String, f64)>,
+    /// Last rendered frame's per-buffer upload stats (drained each frame).
+    upload_stats:
+        std::collections::BTreeMap<&'static str, crate::render::upload_probe::UploadStats>,
+    /// Profiling samples indexed by timeline position (one bucket per logic
+    /// frame); playing or seeking updates the bucket at the rendered
+    /// position, so the chart shows performance across scene progress.
+    progress_samples: Vec<Option<profiler::ProgressSample>>,
+    progress_total_sec: f64,
+    profiler_metric: profiler::ProfilerMetric,
+    /// Whether stackable chart metrics render stacked (per-pass colors)
+    /// instead of a plain total.
+    profiler_stacked: bool,
 }
 
 impl RanimPreviewApp {
@@ -211,6 +233,14 @@ impl RanimPreviewApp {
             export_total_frames: 0,
             playback_speed: 1.0,
             looping: false,
+            profiler_open: false,
+            gpu_pass_times: Vec::new(),
+            cpu_spans: Vec::new(),
+            upload_stats: std::collections::BTreeMap::new(),
+            progress_samples: Vec::new(),
+            progress_total_sec: -1.0,
+            profiler_metric: profiler::ProfilerMetric::default(),
+            profiler_stacked: true,
         }
     }
 
@@ -277,6 +307,8 @@ impl RanimPreviewApp {
                     self.playback_engine.reload_scene(&self.evaluator);
                     self.store.update(std::iter::empty());
                     self.need_eval = true;
+                    self.progress_samples.clear();
+                    self.progress_total_sec = -1.0;
 
                     self.set_clear_color_str(&scene.config.clear_color);
 
@@ -433,11 +465,14 @@ impl RanimPreviewApp {
             self.last_sec = self.timeline_state.current_sec;
 
             let start_eval = Instant::now();
-            // Forward/backward direction management is internal to sample_at.
-            let target = self.timeline_state.current_sec;
-            let mut frame_items = Vec::new();
-            self.evaluator.sample_at(target, &mut frame_items);
-            self.store.update(frame_items.into_iter());
+            {
+                let _span = crate::render::cpu_probe::span("eval");
+                // Forward/backward direction management is internal to sample_at.
+                let target = self.timeline_state.current_sec;
+                let mut frame_items = Vec::new();
+                self.evaluator.sample_at(target, &mut frame_items);
+                self.store.update(frame_items.into_iter());
+            }
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();
@@ -447,6 +482,7 @@ impl RanimPreviewApp {
                 self.depth_visual_pipeline.as_ref(),
                 self.depth_visual_view.as_ref(),
             ) {
+                let _span = crate::render::cpu_probe::span("depth_visual");
                 let mut encoder =
                     ctx.device
                         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -489,6 +525,23 @@ impl RanimPreviewApp {
             }
 
             self.last_render_time = Some(start.elapsed());
+
+            // GPU profiler panel: drain per-frame data.
+            if let Some(scopes) = renderer.take_last_gpu_scopes() {
+                let mut passes = Vec::new();
+                profiler::flatten_scopes(&scopes, &mut passes);
+                self.gpu_pass_times = passes;
+            }
+            if crate::render::upload_probe::mode().enabled() {
+                self.upload_stats = crate::render::upload_probe::take_stats();
+            } else {
+                self.upload_stats.clear();
+            }
+            self.cpu_spans = crate::render::cpu_probe::take_frame()
+                .into_iter()
+                .map(|(label, ms)| (label.to_string(), ms))
+                .collect();
+            profiler::record_sample(self);
         }
     }
 
@@ -696,6 +749,20 @@ impl eframe::App for RanimPreviewApp {
                     }
                     ui.selectable_value(&mut self.view_mode, ViewMode::Output, "Output");
                     ui.selectable_value(&mut self.view_mode, ViewMode::Depth, "Depth");
+                    ui.separator();
+
+                    {
+                        let mut btn = egui::Button::new(format!(
+                            "{} Profiler",
+                            egui_phosphor::regular::CHART_LINE_UP
+                        ));
+                        if self.profiler_open {
+                            btn = btn.fill(ui.visuals().selection.bg_fill);
+                        }
+                        if ui.add(btn).clicked() {
+                            self.profiler_open = !self.profiler_open;
+                        }
+                    }
                     ui.separator();
 
                     if let Some(duration) = self.last_render_time {
@@ -1055,6 +1122,12 @@ impl eframe::App for RanimPreviewApp {
                 }
             }
         }
+
+        // GPU profiler panel (works without the profiling feature; the GPU
+        // sections degrade to a hint).
+        if self.profiler_open {
+            profiler::ui_profiler_window(self, &ctx);
+        }
     }
 }
 
@@ -1078,6 +1151,10 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
                 device_descriptor: Arc::new(|adapter| wgpu::DeviceDescriptor {
                     label: Some("ranim device"),
                     required_limits: adapter.limits(),
+                    // GPU timer scopes for the profiler panel (no-op where the
+                    // adapter lacks them; intersected so device creation
+                    // can't fail on unsupported features).
+                    required_features: adapter.features() & profiler::gpu_timer_features(),
                     ..Default::default()
                 }),
                 ..eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle()

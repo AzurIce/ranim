@@ -91,9 +91,65 @@ impl RenderContext<'_> {
     }
 }
 
-#[cfg(feature = "profiling")]
+/// Always-present render profiler resource. GPU timer scopes are
+/// **runtime-toggled** (`RANIM_PROFILE_GPU=1` at startup or
+/// [`RenderProfiler::set_enabled`]): when off (the default) scope wrapping
+/// is a pass-through and no queries are resolved or polled, so profiling
+/// costs nothing; when on, each processed frame's scope tree is stored in
+/// `last_frame_scopes`. `inner` is `None` when the device lacks timestamp
+/// query support.
 #[derive(Resource)]
-pub(crate) struct RenderProfiler(pub wgpu_profiler::GpuProfiler);
+pub(crate) struct RenderProfiler {
+    pub(crate) inner: Option<wgpu_profiler::GpuProfiler>,
+    enabled: std::sync::atomic::AtomicBool,
+    /// GPU timer scopes of the most recent processed frame.
+    pub(crate) last_frame_scopes: Option<Vec<wgpu_profiler::GpuTimerQueryResult>>,
+}
+
+impl RenderProfiler {
+    pub(crate) fn new(_ctx: &WgpuContext) -> Self {
+        Self {
+            inner: wgpu_profiler::GpuProfiler::new(
+                &_ctx.device,
+                wgpu_profiler::GpuProfilerSettings::default(),
+            )
+            .ok(),
+            enabled: std::sync::atomic::AtomicBool::new(
+                std::env::var("RANIM_PROFILE_GPU").is_ok_and(|v| v != "0" && !v.is_empty()),
+            ),
+            last_frame_scopes: None,
+        }
+    }
+
+    pub(crate) fn is_enabled(&self) -> bool {
+        self.enabled.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub(crate) fn set_enabled(&self, on: bool) {
+        self.enabled.store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Run `f` with `pass` wrapped in a GPU timer scope labeled `label`.
+    /// Pass-through while GPU timers are disabled or unsupported.
+    pub(crate) fn scope_pass<R, T>(
+        &self,
+        label: &str,
+        pass: &mut R,
+        f: impl FnOnce(&mut R) -> T,
+    ) -> T
+    where
+        R: wgpu_profiler::ProfilerCommandRecorder,
+    {
+        if !self.is_enabled() {
+            return f(pass);
+        }
+        let Some(profiler) = self.inner.as_ref() else {
+            return f(pass);
+        };
+        let mut scope = profiler.scope(label.to_string(), pass);
+        f(&mut *scope)
+    }
+}
 
 pub(crate) fn install_schedules(world: &mut World) {
     world.init_resource::<FrameEncoder>();
@@ -162,6 +218,7 @@ fn prepare_vitems(
     mut buffer: ResMut<VItemsBuffer>,
     items: Query<(&SceneOrder, &VItem)>,
 ) {
+    let _span = crate::cpu_probe::span("prepare_vitems");
     let mut items = items.iter().collect::<Vec<_>>();
     items.sort_by_key(|(order, _)| order.0);
     buffer.update(
@@ -175,6 +232,7 @@ fn prepare_mesh_items(
     mut buffer: ResMut<MeshItemsBuffer>,
     items: Query<(&SceneOrder, &MeshItem)>,
 ) {
+    let _span = crate::cpu_probe::span("prepare_mesh_items");
     let mut items = items.iter().collect::<Vec<_>>();
     items.sort_by_key(|(order, _)| order.0);
     buffer.update(
@@ -190,7 +248,7 @@ fn begin_frame(ctx: Res<WgpuContext>, mut encoder: ResMut<FrameEncoder>) {
     );
 }
 
-fn clear(mut render: RenderContext, target: Res<FrameTarget>) {
+fn clear(mut render: RenderContext, target: Res<FrameTarget>, profiler: Res<RenderProfiler>) {
     let pass_desc = wgpu::RenderPassDescriptor {
         label: Some("Clear Pass"),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -214,7 +272,9 @@ fn clear(mut render: RenderContext, target: Res<FrameTarget>) {
         occlusion_query_set: None,
         multiview_mask: None,
     };
-    render.encoder().begin_render_pass(&pass_desc);
+    let encoder = render.encoder();
+    let mut pass = encoder.begin_render_pass(&pass_desc);
+    profiler.scope_pass("clear", &mut pass, |_| ());
 }
 
 fn view_driver(world: &mut World) {
@@ -256,33 +316,33 @@ fn take_single_camera(mut cameras: Vec<(usize, CameraFrame)>) -> CameraFrame {
 fn submit(
     ctx: Res<WgpuContext>,
     mut encoder: ResMut<FrameEncoder>,
-    #[cfg(feature = "profiling")] mut profiler: ResMut<RenderProfiler>,
+    mut profiler: ResMut<RenderProfiler>,
 ) {
-    #[allow(unused_mut)]
     let mut encoder = encoder.0.take().expect("frame encoder was not initialized");
-    #[cfg(feature = "profiling")]
-    profiler.0.resolve_queries(&mut encoder);
+    if profiler.is_enabled()
+        && let Some(inner) = profiler.inner.as_mut()
+    {
+        inner.resolve_queries(&mut encoder);
+    }
     ctx.queue.submit(Some(encoder.finish()));
 }
 
 fn finish_frame(
     target: Res<FrameTarget>,
-    #[cfg(feature = "profiling")] ctx: Res<WgpuContext>,
-    #[cfg(feature = "profiling")] mut profiler: ResMut<RenderProfiler>,
+    ctx: Res<WgpuContext>,
+    mut profiler: ResMut<RenderProfiler>,
 ) {
-    #[cfg(feature = "profiling")]
+    // Processing timer queries forces a device poll (a sync point), so it
+    // only happens while GPU timers are explicitly enabled.
+    if profiler.is_enabled()
+        && let Some(inner) = profiler.inner.as_mut()
+        && inner.end_frame().is_ok()
     {
-        profiler.0.end_frame().unwrap();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();
-        if let Some(results) = profiler
-            .0
-            .process_finished_frame(ctx.queue.get_timestamp_period())
-        {
-            let mut gpu_profiler = crate::PUFFIN_GPU_PROFILER.lock().unwrap();
-            wgpu_profiler::puffin::output_frame_to_puffin(&mut gpu_profiler, &results);
-            gpu_profiler.new_frame();
+        if let Some(results) = inner.process_finished_frame(ctx.queue.get_timestamp_period()) {
+            profiler.last_frame_scopes = Some(results);
         }
     }
     target.texture_state.mark_dirty();

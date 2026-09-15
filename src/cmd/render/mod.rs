@@ -18,9 +18,6 @@ use tracing_indicatif::span_ext::IndicatifSpanExt;
 pub(crate) mod audio;
 pub(crate) mod file_writer;
 
-#[cfg(feature = "profiling")]
-use ranim_render::PUFFIN_GPU_PROFILER;
-
 /// Render the output basename template by replacing placeholders.
 ///
 /// Supported placeholders:
@@ -425,19 +422,8 @@ impl RenderWorker {
 
     /// Renders a single frame synchronously on this worker (typically used for captures).
     pub fn render_store(&mut self, store: &RenderFrame) {
-        #[cfg(feature = "profiling")]
-        profiling::scope!("frame");
-
-        {
-            #[cfg(feature = "profiling")]
-            profiling::scope!("render");
-
-            self.renderer
-                .render_frame(&mut self.render_textures[0], self.clear_color, store);
-        }
-
-        #[cfg(feature = "profiling")]
-        profiling::finish_frame!();
+        self.renderer
+            .render_frame(&mut self.render_textures[0], self.clear_color, store);
     }
 
     /// Write and save (if [`Self::save_frames`] is true)
@@ -545,23 +531,6 @@ impl RanimRenderApp {
         on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
     ) {
         let start = Instant::now();
-        #[cfg(feature = "profiling")]
-        let (_cpu_server, _gpu_server) = {
-            puffin::set_scopes_on(true);
-            // default global profiler
-            let cpu_server =
-                puffin_http::Server::new(&format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT))
-                    .unwrap();
-            // custom gpu profiler in `PUFFIN_GPU_PROFILER`
-            let gpu_server = puffin_http::Server::new_custom(
-                &format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT + 1),
-                |sink| PUFFIN_GPU_PROFILER.lock().unwrap().add_sink(sink),
-                |id| _ = PUFFIN_GPU_PROFILER.lock().unwrap().remove_sink(id),
-            )
-            .unwrap();
-            (cpu_server, gpu_server)
-        };
-
         let worker_thread = self.render_worker.take().unwrap().yeet();
 
         let total_secs = evaluator.total_secs();

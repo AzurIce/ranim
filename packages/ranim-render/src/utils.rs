@@ -29,19 +29,14 @@ impl WgpuContext {
             .unwrap();
         info!("wgpu adapter info: {:?}", adapter.get_info());
         let required_limits = adapter.limits();
-
-        #[cfg(feature = "profiling")]
+        // Timer features for GPU profiler scopes (intersected with adapter
+        // support so device creation can't fail; profiling stays a no-op
+        // while disabled).
+        let required_features =
+            adapter.features() & wgpu_profiler::GpuProfiler::ALL_WGPU_TIMER_FEATURES;
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                required_features: wgpu_profiler::GpuProfiler::ALL_WGPU_TIMER_FEATURES,
-                required_limits,
-                ..Default::default()
-            })
-            .await
-            .unwrap();
-        #[cfg(not(feature = "profiling"))]
-        let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
+                required_features,
                 required_limits,
                 ..Default::default()
             })
@@ -103,6 +98,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
     }
 
     pub(crate) fn set(&mut self, ctx: &WgpuContext, data: T) {
+        let start = std::time::Instant::now();
         {
             let mut view = ctx
                 .queue
@@ -113,6 +109,14 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
                 )
                 .unwrap();
             view.copy_from_slice(bytemuck::bytes_of(&data));
+        }
+        if crate::upload_probe::mode().enabled() {
+            crate::upload_probe::record(
+                self.label,
+                std::mem::size_of_val(&data) as u64,
+                std::mem::size_of_val(&data) as u64,
+                start.elapsed().as_nanos() as u64,
+            );
         }
         // ctx.queue.submit([]);
         self.inner = data;
@@ -220,7 +224,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                 size,
                 usage: self.usage,
                 mapped_at_creation: false,
-            })
+            });
         }
         realloc
     }
@@ -231,6 +235,8 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
         // self.inner.copy_from_slice(data);
         self.len = data.len();
         let realloc = self.buffer.size() != std::mem::size_of_val(data) as u64;
+        let count = crate::upload_probe::mode().enabled();
+        let bytes = bytemuck::cast_slice(data);
 
         if realloc {
             // info!("realloc");
@@ -241,12 +247,21 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                 usage: self.usage,
                 mapped_at_creation: false,
             });
-            ctx.queue
-                .write_buffer(&buffer, 0, bytemuck::cast_slice(data));
+            let start = std::time::Instant::now();
+            ctx.queue.write_buffer(&buffer, 0, bytes);
+            if count {
+                crate::upload_probe::record(
+                    self.label,
+                    bytes.len() as u64,
+                    bytes.len() as u64,
+                    start.elapsed().as_nanos() as u64,
+                );
+            }
             // info!("new");
             self.buffer = buffer;
         } else {
             // info!("queue copy");
+            let start = std::time::Instant::now();
             {
                 let mut view = ctx
                     .queue
@@ -256,7 +271,15 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                         wgpu::BufferSize::new((std::mem::size_of_val(data)) as u64).unwrap(),
                     )
                     .unwrap();
-                view.copy_from_slice(bytemuck::cast_slice(data));
+                view.copy_from_slice(bytes);
+            }
+            if count {
+                crate::upload_probe::record(
+                    self.label,
+                    bytes.len() as u64,
+                    bytes.len() as u64,
+                    start.elapsed().as_nanos() as u64,
+                );
             }
             // ctx.queue.submit([]);
         }
