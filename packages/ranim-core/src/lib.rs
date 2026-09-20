@@ -2,6 +2,10 @@
 
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// The `arena` feature previews the post-stabilization shape: allocator-
+// generic render items built with std `Vec<T, A>`. Default builds stay
+// stable.
+#![cfg_attr(feature = "arena", feature(allocator_api))]
 #![allow(rustdoc::private_intra_doc_links)]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
@@ -11,6 +15,9 @@
 /// Anchors and semantic bounds.
 pub mod anchor;
 pub mod animation;
+/// Allocator-generic render items for the arena extraction path.
+#[cfg(feature = "arena")]
+pub mod arena;
 /// The audio plane of a scene.
 pub mod audio;
 /// Color utilities.

@@ -41,13 +41,14 @@ use std::{
 use bumpalo::Bump;
 use ranim::{
     SceneConstructor,
-    glam::{DVec3, Vec3, Vec4, dvec3},
+    glam::{DVec3, Mat4, dvec3},
     items::vitem::{
         VItem as AnimVItem,
         geometry::{Circle, Square},
     },
     prelude::*,
 };
+use ranim_core::arena::VItem as ArenaCoreVItem;
 use ranim_core::{
     components::{rgba::Rgba, width::Width},
     traits::Alignable,
@@ -151,17 +152,8 @@ fn bump_collect<'a, T>(bump: &'a Bump, iter: impl Iterator<Item = T>) -> BVec<'a
     v
 }
 
-#[allow(dead_code)] // the spike only consumes the item count; writes go through the arena
-struct BumpCoreVItem<'a> {
-    normal: Option<Vec3>,
-    points: BVec<'a, Vec4>,
-    fill_rgbas: BVec<'a, Rgba>,
-    stroke_rgbas: BVec<'a, Rgba>,
-    stroke_widths: BVec<'a, Width>,
-}
-
 struct BumpFrame<'a> {
-    items: BVec<'a, BumpCoreVItem<'a>>,
+    items: BVec<'a, ArenaCoreVItem<&'a Bump>>,
 }
 
 fn lerp_rgba(a: Rgba, b: Rgba, t: f64) -> Rgba {
@@ -199,13 +191,14 @@ fn bump_core_from_anim<'a>(
     bump: &'a Bump,
     anim: &BumpAnimVItem<'a>,
     normal: Option<DVec3>,
-) -> BumpCoreVItem<'a> {
+) -> ArenaCoreVItem<&'a Bump> {
     let n = anim.vpoints.len();
     let closed = n >= 2 && anim.vpoints[0] == anim.vpoints[n - 1];
     let mut flags = Vec::with_capacity_in(n, bump);
     flags.resize(n, closed);
-    BumpCoreVItem {
+    ArenaCoreVItem {
         normal: normal.map(|n| n.as_vec3()),
+        transform: Mat4::IDENTITY,
         points: bump_collect(
             bump,
             anim.vpoints
@@ -220,7 +213,7 @@ fn bump_core_from_anim<'a>(
 }
 
 /// S1 static: anim clone -> core From -> push into the frame vec.
-fn s1_extract<'a>(bump: &'a Bump, src: &AnimVItem, out: &mut BVec<'a, BumpCoreVItem<'a>>) {
+fn s1_extract<'a>(bump: &'a Bump, src: &AnimVItem, out: &mut BVec<'a, ArenaCoreVItem<&'a Bump>>) {
     let cl = bump_anim_clone(bump, src);
     let core = bump_core_from_anim(bump, &cl, src.normal);
     out.push(core);
@@ -232,7 +225,7 @@ fn s1_extract_lerped<'a>(
     a: &AnimVItem,
     b: &AnimVItem,
     t: f64,
-    out: &mut BVec<'a, BumpCoreVItem<'a>>,
+    out: &mut BVec<'a, ArenaCoreVItem<&'a Bump>>,
 ) {
     let lerped = BumpAnimVItem {
         vpoints: bump_collect(
@@ -266,67 +259,6 @@ fn s1_extract_lerped<'a>(
     };
     let core = bump_core_from_anim(bump, &lerped, if t < 0.5 { a.normal } else { b.normal });
     out.push(core);
-}
-
-/// S2 static: direct build into the final arrays; closepath flags come from
-/// the build-time cache.
-fn s2_extract<'a>(
-    bump: &'a Bump,
-    src: &AnimVItem,
-    flags: &[bool],
-    out: &mut BVec<'a, BumpCoreVItem<'a>>,
-) {
-    let mut points = Vec::with_capacity_in(src.vpoints.len(), bump);
-    for (p, f) in src.vpoints.iter().zip(flags.iter()) {
-        points.push(p.as_vec3().extend(if *f { 1.0 } else { 0.0 }));
-    }
-    out.push(BumpCoreVItem {
-        normal: src.normal.map(|n| n.as_vec3()),
-        points,
-        fill_rgbas: bump_collect(bump, src.fill_rgbas.iter().cloned()),
-        stroke_rgbas: bump_collect(bump, src.stroke_rgbas.iter().cloned()),
-        stroke_widths: bump_collect(bump, src.stroke_widths.iter().cloned()),
-    });
-}
-
-/// S2 morph: lerp fused straight into the final arrays (flags cached).
-fn s2_extract_lerped<'a>(
-    bump: &'a Bump,
-    a: &AnimVItem,
-    b: &AnimVItem,
-    t: f64,
-    flags: &[bool],
-    out: &mut BVec<'a, BumpCoreVItem<'a>>,
-) {
-    let mut points = Vec::with_capacity_in(a.vpoints.len(), bump);
-    for ((p, q), f) in a.vpoints.iter().zip(b.vpoints.iter()).zip(flags.iter()) {
-        points.push(p.lerp(q, t).as_vec3().extend(if *f { 1.0 } else { 0.0 }));
-    }
-    out.push(BumpCoreVItem {
-        normal: if t < 0.5 { a.normal } else { b.normal }.map(|n| n.as_vec3()),
-        points,
-        fill_rgbas: bump_collect(
-            bump,
-            a.fill_rgbas
-                .iter()
-                .zip(b.fill_rgbas.iter())
-                .map(|(p, q)| lerp_rgba(*p, *q, t)),
-        ),
-        stroke_rgbas: bump_collect(
-            bump,
-            a.stroke_rgbas
-                .iter()
-                .zip(b.stroke_rgbas.iter())
-                .map(|(p, q)| lerp_rgba(*p, *q, t)),
-        ),
-        stroke_widths: bump_collect(
-            bump,
-            a.stroke_widths
-                .iter()
-                .zip(b.stroke_widths.iter())
-                .map(|(p, q)| lerp_width(*p, *q, t)),
-        ),
-    });
 }
 
 // MARK: scene sources (real ranim types, built once)
@@ -467,7 +399,7 @@ fn main() {
                 items: Vec::with_capacity_in(items, &bump),
             };
             for (idx, src) in statics.iter().enumerate() {
-                s2_extract(&bump, src, &flags_static[idx], &mut frame.items);
+                src.extract_into_arena(&flags_static[idx], &bump, &mut frame.items);
             }
             black_box(frame.items.len());
             drop(frame);
@@ -481,7 +413,7 @@ fn main() {
                 items: Vec::with_capacity_in(items, &bump),
             };
             for (idx, (a, b)) in pairs.iter().enumerate() {
-                s2_extract_lerped(&bump, a, b, 0.5, &flags_pair[idx], &mut frame.items);
+                a.lerp_extract_into_arena(b, 0.5, &flags_pair[idx], &bump, &mut frame.items);
             }
             black_box(frame.items.len());
             drop(frame);

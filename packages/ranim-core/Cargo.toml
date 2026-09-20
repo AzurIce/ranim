@@ -30,11 +30,16 @@ color = "0.3.3"
 variadics_please = "2.0.0"
 symphonia = { workspace = true, optional = true }
 rubato = { workspace = true, optional = true }
+# `arena` feature: allocator-generic render items (nightly `allocator_api`).
+bumpalo = { version = "3", optional = true, features = ["allocator_api"] }
 
 [features]
 # Decoding audio files (AudioClip::from_file / from_bytes) with pure-Rust
 # symphonia and rubato, instead of piping through an ffmpeg binary.
 audio-decode = ["dep:symphonia", "dep:rubato"]
+# Allocator-generic render items + arena extraction path. Nightly-only
+# (gates `allocator_api`); default builds stay stable.
+arena = ["dep:bumpalo"]
 
 [dev-dependencies]
 assert_float_eq = "1.2.0"
