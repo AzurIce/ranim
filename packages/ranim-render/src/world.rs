@@ -10,6 +10,8 @@ use ranim_core::core_item::{
 
 pub type CoreItemId = (usize, usize);
 
+use std::alloc::Allocator;
+
 type CoreItemIdBuildHasher = BuildHasherDefault<CoreItemIdHasher>;
 type CoreItemIdMap<V> = HashMap<CoreItemId, V, CoreItemIdBuildHasher>;
 type CoreItemIdSet = HashSet<CoreItemId, CoreItemIdBuildHasher>;
@@ -55,6 +57,21 @@ impl RenderFrame {
     pub fn update(&mut self, items: impl Iterator<Item = (CoreItemId, CoreItem)>) {
         self.items.clear();
         self.items.extend(items);
+    }
+
+    /// Ingest an arena-evaluated frame ([`CoreItem`]s owned by any
+    /// allocator, e.g. `&Bump` via `eval_at_sec_in`).
+    ///
+    /// The render world's bevy components live on the global heap, so this
+    /// is the one owning copy at the eval→render boundary; everything before
+    /// it is arena-resident.
+    pub fn update_in<A: Allocator + Clone>(
+        &mut self,
+        items: impl Iterator<Item = (CoreItemId, CoreItem<A>)>,
+    ) {
+        self.items.clear();
+        self.items
+            .extend(items.map(|(id, item)| (id, item.into_global())));
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &(CoreItemId, CoreItem)> {

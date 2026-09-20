@@ -1,29 +1,17 @@
-//! Arena spike for the per-frame eval/extract allocation churn, written in
-//! the **std `allocator_api`** shape: `#![feature(allocator_api)]` +
-//! `Vec<T, &Bump>` with `Bump: Allocator` (bumpalo's `allocator_api`
-//! feature). This is exactly the code that becomes legal, feature-gate-free
-//! once the `allocator_api` stabilization lands — the spike doubles as a
-//! preview of that API surface.
+//! Arena end-to-end profile: the real production path
+//! `eval_at_alpha_in` -> `RenderFrame::update_in` -> `Renderer::render_frame`
+//! against the current `eval_at_alpha` chain, plus the S1/S2 decomposition
+//! from the earlier spike rounds.
 //!
-//! Decomposes the measured churn (see alloc_probe) into:
-//! - S1 "arena only": the *same* per-frame work structure as the real chain
-//!   (anim clone -> From rebuild (closepath flags + render points + attr
-//!   collects) -> core pushed into the output vec; morph adds the lerp
-//!   stage), but every vector is arena-allocated. Isolates allocator
-//!   overhead.
-//! - S2 "arena + direct": the target shape — one pass writing straight into
-//!   the final arena-allocated render arrays (lerp fused, closepath flags
-//!   cached at build time: they are structural and invariant under point
-//!   lerp).
-//!
-//! The counting `#[global_allocator]` below is only the *measurement
-//! instrument*: it counts malloc events outside the arena. Steady-state
-//! arena frames should report 0 allocations because the `Bump` reuses its
-//! chunks across `reset()`s.
-//!
-//! Baseline is the real `timeline.eval_at_alpha(..).collect()` chain.
-//! Lives in a gitignored bin; no library code is touched. Requires the
-//! pinned nightly (`nix develop`).
+//! - baseline: `timeline.eval_at_alpha(..).collect()` (global heap)
+//! - e2e_arena: `timeline.eval_at_alpha_in(.., &bump)` +
+//!   `RenderFrame::update_in` (arena ingestion; the render world's bevy
+//!   components stay on the global heap by design — one owning copy at the
+//!   boundary)
+//! - s1_arena: probe-side mirror of the unrefactored chain, arena-allocated
+//!   (isolates allocator overhead + wrapper-stage removal)
+//! - s2_direct: `VItem::extract_into_arena` / `lerp_extract_into_arena`
+//!   library calls (extract-layer target shape)
 //!
 //! ```text
 //! cargo run -p benches --bin alloc_probe_arena --release -- --json alloc-report/arena_results.json
@@ -41,18 +29,16 @@ use std::{
 use bumpalo::Bump;
 use ranim::{
     SceneConstructor,
-    glam::{DVec3, Mat4, dvec3},
-    items::vitem::{
-        VItem as AnimVItem,
-        geometry::{Circle, Square},
-    },
+    glam::{DVec3, dvec3},
+    items::vitem::VItem as AnimVItem,
     prelude::*,
 };
-use ranim_core::arena::VItem as ArenaCoreVItem;
 use ranim_core::{
     components::{rgba::Rgba, width::Width},
+    core_item::vitem::VItem as ArenaCoreVItem,
     traits::Alignable,
 };
+use ranim_render::{Renderer, utils::WgpuContext, world::RenderFrame};
 
 // MARK: counting allocator (measurement instrument only)
 
@@ -136,24 +122,15 @@ impl Snap {
     }
 }
 
-// MARK: arena-allocated mirrors of the per-frame data
-//
-// `BVec<'a, T>` is the plain std `Vec<T, &'a Bump>` — no wrapper collection,
-// the same type that `Vec::new_in`/`with_capacity_in` produce once
-// `allocator_api` stabilizes.
+// MARK: S1 probe-side mirror (same shape as the unrefactored chain, arena-allocated)
 
 type BVec<'a, T> = std::vec::Vec<T, &'a Bump>;
 
-/// `Vec::from_iter_in` equivalent: reserve from the size hint, then extend.
-fn bump_collect<'a, T>(bump: &'a Bump, iter: impl Iterator<Item = T>) -> BVec<'a, T> {
-    let (lo, _) = iter.size_hint();
-    let mut v = Vec::with_capacity_in(lo, bump);
-    v.extend(iter);
-    v
-}
-
-struct BumpFrame<'a> {
-    items: BVec<'a, ArenaCoreVItem<&'a Bump>>,
+struct BumpAnimVItem<'a> {
+    vpoints: BVec<'a, DVec3>,
+    stroke_widths: BVec<'a, Width>,
+    stroke_rgbas: BVec<'a, Rgba>,
+    fill_rgbas: BVec<'a, Rgba>,
 }
 
 fn lerp_rgba(a: Rgba, b: Rgba, t: f64) -> Rgba {
@@ -164,7 +141,6 @@ fn lerp_width(a: Width, b: Width, t: f64) -> Width {
     Width(a.0 + (b.0 - a.0) * t as f32)
 }
 
-/// Mirrors `self.clone()` on the animation-side VItem.
 fn bump_anim_clone<'a>(bump: &'a Bump, src: &AnimVItem) -> BumpAnimVItem<'a> {
     BumpAnimVItem {
         vpoints: bump_collect(bump, src.vpoints.iter().copied()),
@@ -174,19 +150,13 @@ fn bump_anim_clone<'a>(bump: &'a Bump, src: &AnimVItem) -> BumpAnimVItem<'a> {
     }
 }
 
-struct BumpAnimVItem<'a> {
-    vpoints: BVec<'a, DVec3>,
-    stroke_widths: BVec<'a, Width>,
-    stroke_rgbas: BVec<'a, Rgba>,
-    fill_rgbas: BVec<'a, Rgba>,
+fn bump_collect<'a, T>(bump: &'a Bump, iter: impl Iterator<Item = T>) -> BVec<'a, T> {
+    let (lo, _) = iter.size_hint();
+    let mut v = Vec::with_capacity_in(lo, bump);
+    v.extend(iter);
+    v
 }
 
-/// Mirrors `From<ranim_items::VItem> for core VItem`: a closepath flags vec +
-/// a render points collect + 3 attr collects, all arena-allocated.
-///
-/// Squares/circles are a single closed subpath, so the flag scan collapses to
-/// an endpoint comparison — same allocation shape as
-/// `VPointVec::get_closepath_flags` (one bool vec), same result here.
 fn bump_core_from_anim<'a>(
     bump: &'a Bump,
     anim: &BumpAnimVItem<'a>,
@@ -198,7 +168,7 @@ fn bump_core_from_anim<'a>(
     flags.resize(n, closed);
     ArenaCoreVItem {
         normal: normal.map(|n| n.as_vec3()),
-        transform: Mat4::IDENTITY,
+        transform: ranim::glam::Mat4::IDENTITY,
         points: bump_collect(
             bump,
             anim.vpoints
@@ -212,14 +182,12 @@ fn bump_core_from_anim<'a>(
     }
 }
 
-/// S1 static: anim clone -> core From -> push into the frame vec.
 fn s1_extract<'a>(bump: &'a Bump, src: &AnimVItem, out: &mut BVec<'a, ArenaCoreVItem<&'a Bump>>) {
     let cl = bump_anim_clone(bump, src);
     let core = bump_core_from_anim(bump, &cl, src.normal);
     out.push(core);
 }
 
-/// S1 morph: + the lerp stage (anim VItem lerp allocates 4 fresh vectors).
 fn s1_extract_lerped<'a>(
     bump: &'a Bump,
     a: &AnimVItem,
@@ -274,14 +242,15 @@ fn build_sources(grid: usize) -> (Vec<AnimVItem>, Vec<(AnimVItem, AnimVItem)>) {
     for i in 0..grid {
         for j in 0..grid {
             let pos = start + unit * DVec3::X * j as f64 + unit * DVec3::Y * i as f64;
-            let mut sq = AnimVItem::from(Square::new(size));
+            let mut sq = AnimVItem::from(ranim::items::vitem::geometry::Square::new(size));
             for p in sq.vpoints.0.iter_mut() {
                 *p += pos;
             }
             statics.push(sq.clone());
 
             let circ_size = (8.0 / grid as f64 - buff).max(0.02);
-            let mut circle = AnimVItem::from(Circle::new(circ_size / 2.0));
+            let mut circle =
+                AnimVItem::from(ranim::items::vitem::geometry::Circle::new(circ_size / 2.0));
             for p in circle.vpoints.0.iter_mut() {
                 *p += pos;
             }
@@ -345,12 +314,12 @@ fn main() {
             .map(|(a, _)| a.vpoints.get_closepath_flags())
             .collect();
 
-        // Baselines: the real chain.
         let static_timeline =
             (|r: &mut RanimScene| benches::test_scenes::static_squares(r, grid)).build_scene();
         let morph_timeline =
             (|r: &mut RanimScene| benches::test_scenes::transform_squares(r, grid)).build_scene();
 
+        // Baselines: the current chain.
         let s = Snap::measure(iters, || {
             black_box(static_timeline.eval_at_alpha(0.5).collect::<Vec<_>>());
         });
@@ -363,17 +332,33 @@ fn main() {
         report(&mut json, "baseline", "morph", items, &s);
         print_row("baseline", "morph", items, &s);
 
-        // Arena variants share one bump per grid; reset between frames.
+        // E2E: the production arena path (eval_in + update_in).
         let mut bump = Bump::with_capacity(32 * 1024 * 1024);
+        let mut store = RenderFrame::new();
 
         let s = Snap::measure(iters, || {
-            let mut frame = BumpFrame {
-                items: Vec::with_capacity_in(items, &bump),
-            };
+            let frame = static_timeline.eval_at_alpha_in(0.5, &bump);
+            store.update_in(frame.into_iter());
+            bump.reset();
+        });
+        report(&mut json, "e2e_arena", "static", items, &s);
+        print_row("e2e_arena", "static", items, &s);
+
+        let s = Snap::measure(iters, || {
+            let frame = morph_timeline.eval_at_alpha_in(0.5, &bump);
+            store.update_in(frame.into_iter());
+            bump.reset();
+        });
+        report(&mut json, "e2e_arena", "morph", items, &s);
+        print_row("e2e_arena", "morph", items, &s);
+
+        // S1: probe-side mirror.
+        let s = Snap::measure(iters, || {
+            let mut frame = BVec::with_capacity_in(items, &bump);
             for src in &statics {
-                s1_extract(&bump, src, &mut frame.items);
+                s1_extract(&bump, src, &mut frame);
             }
-            black_box(frame.items.len());
+            black_box(frame.len());
             drop(frame);
             bump.reset();
         });
@@ -381,27 +366,24 @@ fn main() {
         print_row("s1_arena", "static", items, &s);
 
         let s = Snap::measure(iters, || {
-            let mut frame = BumpFrame {
-                items: Vec::with_capacity_in(items, &bump),
-            };
+            let mut frame = BVec::with_capacity_in(items, &bump);
             for (a, b) in &pairs {
-                s1_extract_lerped(&bump, a, b, 0.5, &mut frame.items);
+                s1_extract_lerped(&bump, a, b, 0.5, &mut frame);
             }
-            black_box(frame.items.len());
+            black_box(frame.len());
             drop(frame);
             bump.reset();
         });
         report(&mut json, "s1_arena", "morph", items, &s);
         print_row("s1_arena", "morph", items, &s);
 
+        // S2: library extract-layer calls.
         let s = Snap::measure(iters, || {
-            let mut frame = BumpFrame {
-                items: Vec::with_capacity_in(items, &bump),
-            };
+            let mut frame = BVec::with_capacity_in(items, &bump);
             for (idx, src) in statics.iter().enumerate() {
-                src.extract_into_arena(&flags_static[idx], &bump, &mut frame.items);
+                src.extract_into_arena(&flags_static[idx], &bump, &mut frame);
             }
-            black_box(frame.items.len());
+            black_box(frame.len());
             drop(frame);
             bump.reset();
         });
@@ -409,18 +391,45 @@ fn main() {
         print_row("s2_direct", "static", items, &s);
 
         let s = Snap::measure(iters, || {
-            let mut frame = BumpFrame {
-                items: Vec::with_capacity_in(items, &bump),
-            };
+            let mut frame = BVec::with_capacity_in(items, &bump);
             for (idx, (a, b)) in pairs.iter().enumerate() {
-                a.lerp_extract_into_arena(b, 0.5, &flags_pair[idx], &bump, &mut frame.items);
+                a.lerp_extract_into_arena(b, 0.5, &flags_pair[idx], &bump, &mut frame);
             }
-            black_box(frame.items.len());
+            black_box(frame.len());
             drop(frame);
             bump.reset();
         });
         report(&mut json, "s2_direct", "morph", items, &s);
         print_row("s2_direct", "morph", items, &s);
+    }
+
+    // Pipeline proof: ten real wgpu frames rendered from the arena path.
+    println!("-- wgpu pipeline proof --");
+    let gpu = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let ctx = pollster::block_on(WgpuContext::new());
+        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
+        let mut textures = renderer.new_render_textures(&ctx);
+        let grid = 32;
+        let timeline =
+            (|r: &mut RanimScene| benches::test_scenes::static_squares(r, grid)).build_scene();
+        let bump = Bump::with_capacity(16 * 1024 * 1024);
+        let mut store = RenderFrame::new();
+        let before = ALLOC_COUNT.load(Ordering::Relaxed);
+        for frame_idx in 0..10 {
+            let frame = timeline.eval_at_alpha_in(frame_idx as f64 / 10.0, &bump);
+            store.update_in(frame.into_iter());
+            renderer.render_frame(&mut textures, wgpu::Color::BLACK, &store);
+        }
+        ctx.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
+        let total = ALLOC_COUNT.load(Ordering::Relaxed) - before;
+        println!(
+            "10 arena-evaluated frames evaluated, ingested and rendered on wgpu ({total} global allocs total, {total}/10 per frame incl. render)"
+        );
+    }));
+    if gpu.is_err() {
+        println!("wgpu unavailable; pipeline proof skipped");
     }
 
     if let Some(path) = json_path {

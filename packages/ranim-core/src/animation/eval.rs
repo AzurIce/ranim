@@ -41,6 +41,14 @@ pub trait Eval {
     /// Evaluate the segment's content at normalized progress `alpha`.
     fn eval_alpha(&self, alpha: f64) -> Self::Output;
 
+    /// If this evaluator is constant, capture its output once at seal time
+    /// so the runtime can replay a static snapshot instead of evaluating per
+    /// frame. Constant evaluators (e.g. [`Static`]) override this; the
+    /// default is `None` (a genuinely dynamic animation).
+    fn capture_static(&self) -> Option<Vec<DynItem>> {
+        None
+    }
+
     /// The content resolution declared by iterative segments: `1/N` progress
     /// per integration step (`N` declared via
     /// [`Iterative::with_steps`](crate::animation::eval::iterative::Iterative::with_steps)).
@@ -108,11 +116,15 @@ where
 /// A constant evaluator.
 pub struct Static<T: Clone>(pub T);
 
-impl<T: Clone> Eval for Static<T> {
+impl<T: Clone + AnyExtractCoreItem> Eval for Static<T> {
     type Output = T;
 
     fn eval_alpha(&self, _alpha: f64) -> Self::Output {
         self.0.clone()
+    }
+
+    fn capture_static(&self) -> Option<Vec<DynItem>> {
+        Some(vec![DynItem(Box::new(self.0.clone()))])
     }
 }
 

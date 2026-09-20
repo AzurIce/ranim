@@ -217,12 +217,11 @@ impl Extract for VItem {
 // `From` rebuild clone, no owning output vec. Closepath flags are taken from
 // the caller: they are structural (subpath closure), so unlike the per-frame
 // point data they can be cached at build time.
-#[cfg(feature = "arena")]
 mod arena_ext {
     use std::alloc::Allocator;
 
     use super::glam::Mat4;
-    use ranim_core::arena::VItem as ArenaVItem;
+    use ranim_core::core_item::vitem::VItem as ArenaVItem;
     use ranim_core::traits::Interpolatable;
 
     use super::VItem;

@@ -44,8 +44,6 @@ regex = { version = "1.13.1", optional = true }
 
 [features]
 default = []
-# Arena extraction (nightly `allocator_api` via ranim-core's `arena`).
-arena = ["ranim-core/arena"]
 gltf = ["dep:gltf"]
 typst = [
   "dep:chrono",

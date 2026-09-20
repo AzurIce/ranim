@@ -1,3 +1,5 @@
+use std::alloc::Allocator;
+
 /// Bezier related stuffs
 pub mod bezier;
 /// Math stuffs
@@ -201,6 +203,19 @@ pub fn wrap_point_func_with_point(
     }
 }
 
+/// Collect an iterator into a [`Vec`] owned by `alloc` (std `allocator_api`).
+///
+/// Reserves from the iterator's size hint, then extends — the shape
+/// `Vec::from_iter_in` is expected to take once the API stabilizes.
+pub fn vec_from_iter_in<T, A: Allocator + Clone>(
+    alloc: A,
+    iter: impl Iterator<Item = T>,
+) -> Vec<T, A> {
+    let (lo, _) = iter.size_hint();
+    let mut v = Vec::with_capacity_in(lo, alloc.clone());
+    v.extend(iter);
+    v
+}
 #[cfg(test)]
 mod test {
     use super::*;
