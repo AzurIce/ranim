@@ -11,6 +11,7 @@ bench = false
 
 [dependencies]
 itertools.workspace = true
+bumpalo = { version = "3", features = ["allocator_api"] }
 criterion = { version = "0.8.2", features = ["html_reports"] }
 ranim = { path = "../", features = ["render", "gltf"] }
 ranim-core = { path = "../packages/ranim-core" }
