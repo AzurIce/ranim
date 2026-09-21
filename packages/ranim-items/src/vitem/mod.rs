@@ -210,6 +210,117 @@ impl Extract for VItem {
     }
 }
 
+// MARK: Arena extraction (nightly `allocator_api`; enable `ranim-items/arena`)
+//
+// These build the render-ready item in a single pass straight into vectors
+// owned by the caller's allocator — no intermediate animation-item clone, no
+// `From` rebuild clone, no owning output vec. Closepath flags are taken from
+// the caller: they are structural (subpath closure), so unlike the per-frame
+// point data they can be cached at build time.
+mod arena_ext {
+    use std::alloc::Allocator;
+
+    use super::glam::Mat4;
+    use ranim_core::core_item::vitem::VItem as ArenaVItem;
+    use ranim_core::traits::Interpolatable;
+
+    use super::VItem;
+
+    fn lerp_rgba(a: Rgba, b: Rgba, t: f64) -> Rgba {
+        Rgba(a.0.lerp(b.0, t as f32))
+    }
+
+    fn lerp_width(a: Width, b: Width, t: f64) -> Width {
+        Width(a.0 + (b.0 - a.0) * t as f32)
+    }
+
+    fn collect_in<A: Allocator + Clone, T>(alloc: A, iter: impl Iterator<Item = T>) -> Vec<T, A> {
+        let (lo, _) = iter.size_hint();
+        let mut v = Vec::with_capacity_in(lo, alloc.clone());
+        v.extend(iter);
+        v
+    }
+
+    use ranim_core::components::{rgba::Rgba, width::Width};
+
+    impl VItem {
+        /// Extract into an arena-allocated render item, appended to `out`.
+        ///
+        /// Every vector is allocated from `alloc` in one pass; `flags` are
+        /// `self.vpoints`' closepath flags (see
+        /// `VPointVec::get_closepath_flags`) and may be cached by the caller.
+        pub fn extract_into_arena<A: Allocator + Clone>(
+            &self,
+            flags: &[bool],
+            alloc: A,
+            out: &mut Vec<ArenaVItem<A>, A>,
+        ) {
+            let mut points = Vec::with_capacity_in(self.vpoints.len(), alloc.clone());
+            for (p, f) in self.vpoints.iter().zip(flags.iter()) {
+                points.push(p.as_vec3().extend(if *f { 1.0 } else { 0.0 }));
+            }
+            out.push(ArenaVItem {
+                normal: self.normal.map(|n| n.as_vec3()),
+                points,
+                transform: Mat4::IDENTITY,
+                fill_rgbas: collect_in(alloc.clone(), self.fill_rgbas.iter().cloned()),
+                stroke_rgbas: collect_in(alloc.clone(), self.stroke_rgbas.iter().cloned()),
+                stroke_widths: collect_in(alloc.clone(), self.stroke_widths.iter().cloned()),
+            });
+        }
+
+        /// Fused `lerp` + arena extraction: write `self.lerp(target, t)`
+        /// straight into the final arena-allocated render item.
+        ///
+        /// `flags` must be the (shared, structural) closepath flags of the
+        /// aligned pair.
+        pub fn lerp_extract_into_arena<A: Allocator + Clone>(
+            &self,
+            target: &Self,
+            t: f64,
+            flags: &[bool],
+            alloc: A,
+            out: &mut Vec<ArenaVItem<A>, A>,
+        ) {
+            let mut points = Vec::with_capacity_in(self.vpoints.len(), alloc.clone());
+            for ((p, q), f) in self
+                .vpoints
+                .iter()
+                .zip(target.vpoints.iter())
+                .zip(flags.iter())
+            {
+                points.push(p.lerp(q, t).as_vec3().extend(if *f { 1.0 } else { 0.0 }));
+            }
+            out.push(ArenaVItem {
+                normal: if t < 0.5 { self.normal } else { target.normal }.map(|n| n.as_vec3()),
+                points,
+                transform: Mat4::IDENTITY,
+                fill_rgbas: collect_in(
+                    alloc.clone(),
+                    self.fill_rgbas
+                        .iter()
+                        .zip(target.fill_rgbas.iter())
+                        .map(|(p, q)| lerp_rgba(*p, *q, t)),
+                ),
+                stroke_rgbas: collect_in(
+                    alloc.clone(),
+                    self.stroke_rgbas
+                        .iter()
+                        .zip(target.stroke_rgbas.iter())
+                        .map(|(p, q)| lerp_rgba(*p, *q, t)),
+                ),
+                stroke_widths: collect_in(
+                    alloc.clone(),
+                    self.stroke_widths
+                        .iter()
+                        .zip(target.stroke_widths.iter())
+                        .map(|(p, q)| lerp_width(*p, *q, t)),
+                ),
+            });
+        }
+    }
+}
+
 // MARK: Anim traits impl
 impl Alignable for VItem {
     fn is_aligned(&self, other: &Self) -> bool {

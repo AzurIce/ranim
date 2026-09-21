@@ -11,7 +11,13 @@
 
 use std::ops::Range;
 
-use crate::{audio::AudioTrack, core_item::DynItem, utils::rate_functions::linear};
+use crate::{
+    Extract,
+    audio::AudioTrack,
+    core_item::{CoreItem, DynItem},
+    utils::rate_functions::linear,
+};
+use std::alloc::Allocator;
 
 use super::eval::EvalDyn;
 
@@ -75,7 +81,14 @@ pub(in crate::animation) enum NodeContent {
     /// A typed evaluator (`Eval` implementation) — no children.
     Leaf(Box<dyn EvalDyn>),
     /// A captured, type-erased static output batch.
-    Static(Vec<DynItem>),
+    ///
+    /// `snapshot` is pre-extracted once at seal time (in `std::alloc::Global`); the
+    /// arena walk replays it per frame via `clone_in` — zero clones of the
+    /// type-erased boxes, zero global allocations.
+    Static {
+        items: Vec<DynItem>,
+        snapshot: Vec<CoreItem>,
+    },
     /// An audio leaf: its track resolves through the seal-time bake.
     ///
     /// Boxed: a track is the fattest payload in the tree, and sibling
@@ -90,7 +103,7 @@ impl NodeContent {
             NodeContent::Sequence(_) => AnimationInfoKind::Sequence,
             NodeContent::Stack(_) => AnimationInfoKind::Stack,
             NodeContent::Leaf(_) => AnimationInfoKind::Eval,
-            NodeContent::Static(_) => AnimationInfoKind::Static,
+            NodeContent::Static { .. } => AnimationInfoKind::Static,
             NodeContent::Audio(_) => AnimationInfoKind::Audio,
         }
     }
@@ -203,6 +216,77 @@ impl AnimNode {
     /// Audio nodes evaluate to nothing here: their content resolves through
     /// the seal-time audio bake ([`bake_audio`]) instead of the frame
     /// pipeline.
+    /// Arena walk: same traversal as [`Self::eval_at`], but every output is
+    /// an allocator-owned [`CoreItem`]. Static subtrees replay their
+    /// seal-time snapshots (zero clones, zero global allocations); leaf
+    /// evaluators still produce owned values (the `Eval` trait is
+    /// value-semantics), which are moved into the arena afterwards.
+    pub(crate) fn eval_at_in<A: Allocator + Clone>(
+        &self,
+        sec: f64,
+        alloc: A,
+        output: &mut Vec<((usize, usize), CoreItem<A>), A>,
+    ) {
+        if !self.enabled || !self.active_at(sec) {
+            return;
+        }
+        let alpha = self.local_alpha(sec);
+        let content = self.internal_time_secs * alpha;
+        match &self.content {
+            NodeContent::Sequence(children) => {
+                Self::eval_sequence_in(children, content, self.internal_time_secs, alloc, output)
+            }
+            NodeContent::Stack(children) => {
+                Self::eval_stack_in(children, content, self.internal_time_secs, alloc, output)
+            }
+            NodeContent::Leaf(eval) => {
+                let mut owned: Vec<DynItem> = Vec::new();
+                eval.eval_into(alpha, &mut owned);
+                for item in owned {
+                    let mut extracted: Vec<CoreItem> = Vec::new();
+                    item.extract_into(&mut extracted);
+                    out_extend_in(output, alloc.clone(), extracted);
+                }
+            }
+            NodeContent::Static { snapshot, .. } => {
+                for item in snapshot {
+                    output.push(((0, 0), item.clone_in(alloc.clone())));
+                }
+            }
+            NodeContent::Audio(_) => {}
+        }
+    }
+
+    fn eval_sequence_in<A: Allocator + Clone>(
+        children: &[AnimNode],
+        content_sec: f64,
+        extent: f64,
+        alloc: A,
+        output: &mut Vec<((usize, usize), CoreItem<A>), A>,
+    ) {
+        if let Some(child) = children
+            .iter()
+            .rev()
+            .find(|child| child.contains_sec(content_sec, extent))
+        {
+            child.eval_at_in(content_sec, alloc, output);
+        }
+    }
+
+    fn eval_stack_in<A: Allocator + Clone>(
+        children: &[AnimNode],
+        content_sec: f64,
+        extent: f64,
+        alloc: A,
+        output: &mut Vec<((usize, usize), CoreItem<A>), A>,
+    ) {
+        for child in children {
+            if child.contains_sec(content_sec, extent) {
+                child.eval_at_in(content_sec, alloc.clone(), output);
+            }
+        }
+    }
+
     pub(crate) fn eval_at(&self, sec: f64, output: &mut Vec<DynItem>) {
         if !self.enabled || !self.active_at(sec) {
             return;
@@ -218,7 +302,7 @@ impl AnimNode {
                 eval_stack(children, content, self.internal_time_secs, output)
             }
             NodeContent::Leaf(eval) => eval.eval_into(alpha, output),
-            NodeContent::Static(items) => output.extend(items.iter().cloned()),
+            NodeContent::Static { items, .. } => output.extend(items.iter().cloned()),
             NodeContent::Audio(_) => {}
         }
     }
@@ -344,6 +428,22 @@ impl AnimNode {
 /// (children placed with `.at()` inside a sequence may overlap; the later
 /// one wins — this exclusivity is what makes a sequence more than sugar for
 /// a stack of placements).
+/// Move a batch of owning [`CoreItem`]s into an arena-owned output vec.
+fn out_extend_in<A: Allocator + Clone>(
+    output: &mut Vec<((usize, usize), CoreItem<A>), A>,
+    alloc: A,
+    items: Vec<CoreItem>,
+) {
+    let (lo, _) = items
+        .len()
+        .checked_sub(0)
+        .map_or((0, None), |n| (n, Some(n)));
+    output.reserve(lo);
+    for item in items {
+        output.push(((0, 0), item.into_arena(alloc.clone())));
+    }
+}
+
 fn eval_sequence(children: &[AnimNode], content_sec: f64, extent: f64, output: &mut Vec<DynItem>) {
     if let Some(child) = children
         .iter()
@@ -553,8 +653,15 @@ pub(crate) fn bake_audio(animations: &[AnimNode], total_secs: f64, sample_rate: 
 
 /// Build a static cell replaying already-sampled items over `time_range`.
 pub(in crate::animation) fn static_cell(state: Vec<DynItem>, time_range: Range<f64>) -> AnimNode {
+    let mut snapshot = Vec::new();
+    for item in &state {
+        item.extract_into(&mut snapshot);
+    }
     AnimNode {
-        content: NodeContent::Static(state),
+        content: NodeContent::Static {
+            items: state,
+            snapshot,
+        },
         internal_time_secs: 0.0,
         rate_func: None,
         time_range,

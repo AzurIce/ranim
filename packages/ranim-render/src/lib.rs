@@ -1,4 +1,6 @@
 //! Rendering stuff in ranim
+// std `allocator_api` for RenderFrame::update_in (arena ingestion).
+#![feature(allocator_api)]
 #![recursion_limit = "256"]
 // #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]

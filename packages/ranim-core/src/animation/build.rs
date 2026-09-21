@@ -73,6 +73,12 @@ where
     E::Output: AnyExtractCoreItem,
 {
     fn into_anim_node(self) -> AnimNode {
+        // Constant evaluators become static snapshot cells: replayed from a
+        // seal-time capture instead of evaluated per frame (and the arena
+        // walk replays the snapshot with zero allocations).
+        if let Some(items) = Eval::capture_static(&self) {
+            return crate::animation::node::static_cell(items, 0.0..1.0);
+        }
         AnimNode {
             content: NodeContent::Leaf(Box::new(self)),
             internal_time_secs: 1.0,

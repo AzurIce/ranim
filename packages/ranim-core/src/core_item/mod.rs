@@ -6,6 +6,7 @@
 //! - [`crate::core_item::camera_frame::CameraFrame`]: The camera frame.
 //! - [`crate::core_item::vitem::VItem`]: The vitem primitive.
 //! - [`crate::core_item::mesh_item::MeshItem`]: The mesh primitive.
+use std::alloc::{Allocator, Global};
 use std::any::Any;
 
 use dyn_clone::DynClone;
@@ -24,18 +25,30 @@ pub mod transformed;
 /// Vitem
 pub mod vitem;
 
-/// The core ranim builtin items
-#[derive(Debug, Clone, PartialEq)]
-pub enum CoreItem {
+/// The core ranim builtin items, with vectors living in allocator `A`
+/// (default [`Global`]). See [`VItem::clone_in`][vitem::VItem].
+#[derive(Debug, Clone)]
+pub enum CoreItem<A: Allocator = Global> {
     /// [`CameraFrame`]
     CameraFrame(CameraFrame),
     /// [`VItem`]
-    VItem(VItem),
+    VItem(VItem<A>),
     /// [`MeshItem`]
-    MeshItem(MeshItem),
+    MeshItem(MeshItem<A>),
 }
 
-impl CoreItem {
+impl PartialEq for CoreItem {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::CameraFrame(a), Self::CameraFrame(b)) => a == b,
+            (Self::VItem(a), Self::VItem(b)) => a == b,
+            (Self::MeshItem(a), Self::MeshItem(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl<A: Allocator> CoreItem<A> {
     /// Apply a local-to-world transform to this item.
     ///
     /// - [`CameraFrame`]: transforms `pos` as a point, re-normalizes `up`/`facing` as vectors.
@@ -54,6 +67,33 @@ impl CoreItem {
             CoreItem::MeshItem(item) => {
                 item.transform = glam::DMat4::from(*transform).as_mat4() * item.transform;
             }
+        }
+    }
+
+    /// Move into `alloc`'s memory, producing an allocator-owned item.
+    ///
+    /// Element data is copied into the new allocator; no global allocation
+    /// is added by this call itself.
+    pub fn into_arena<A2: Allocator + Clone>(self, alloc: A2) -> CoreItem<A2> {
+        match self {
+            CoreItem::CameraFrame(item) => CoreItem::CameraFrame(item),
+            CoreItem::VItem(item) => CoreItem::VItem(item.into_arena(alloc)),
+            CoreItem::MeshItem(item) => CoreItem::MeshItem(item.into_arena(alloc)),
+        }
+    }
+
+    /// Move back into the global heap (the boundary the render world —
+    /// bevy components — lives on).
+    pub fn into_global(self) -> CoreItem {
+        self.into_arena(Global)
+    }
+
+    /// Copy into `alloc`'s memory, producing an allocator-owned item.
+    pub fn clone_in<A2: Allocator + Clone>(&self, alloc: A2) -> CoreItem<A2> {
+        match self {
+            CoreItem::CameraFrame(item) => CoreItem::CameraFrame(item.clone()),
+            CoreItem::VItem(item) => CoreItem::VItem(item.clone_in(alloc)),
+            CoreItem::MeshItem(item) => CoreItem::MeshItem(item.clone_in(alloc)),
         }
     }
 }

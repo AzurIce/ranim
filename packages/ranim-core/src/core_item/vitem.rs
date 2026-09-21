@@ -1,3 +1,5 @@
+use std::alloc::{Allocator, Global};
+
 use color::{AlphaColor, Srgb};
 use glam::{Mat4, Vec3, Vec4};
 
@@ -80,24 +82,82 @@ pub fn vitem_normal_from_points(points: &[Vec4]) -> Vec3 {
     Vec3::Z
 }
 
-#[derive(bevy_ecs::component::Component, Debug, Clone, PartialEq)]
 /// A primitive for rendering a vitem.
-pub struct VItem {
+///
+/// The vectors live in the allocator `A` (default [`Global`]); `VItem` built
+/// against an arena (`&Bump`, std `allocator_api`) carries its per-frame data
+/// without touching the global heap. See [`clone_in`](VItem::clone_in).
+#[derive(Debug, Clone)]
+pub struct VItem<A: Allocator = Global> {
     /// The normal vector of the projection target plane in local space.
     /// If `None`, the normal will be derived from the points at render time
     /// and converted to world space along with the item transform.
     pub normal: Option<Vec3>,
     /// The points of the item in local space.
     /// (x, y, z, is_closed)
-    pub points: Vec<Vec4>,
+    pub points: Vec<Vec4, A>,
     /// The local-to-world transform applied when flattening onto the plane.
     pub transform: Mat4,
     /// Fill rgbas, see [`Rgba`].
-    pub fill_rgbas: Vec<Rgba>,
+    pub fill_rgbas: Vec<Rgba, A>,
     /// Stroke rgbs, see [`Rgba`].
-    pub stroke_rgbas: Vec<Rgba>,
+    pub stroke_rgbas: Vec<Rgba, A>,
     /// Stroke widths, see [`Width`].
-    pub stroke_widths: Vec<Width>,
+    pub stroke_widths: Vec<Width, A>,
+}
+
+impl<A: Allocator> PartialEq for VItem<A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.normal == other.normal
+            && self.points == other.points
+            && self.transform == other.transform
+            && self.fill_rgbas == other.fill_rgbas
+            && self.stroke_rgbas == other.stroke_rgbas
+            && self.stroke_widths == other.stroke_widths
+    }
+}
+
+impl bevy_ecs::component::Component for VItem {
+    const STORAGE_TYPE: bevy_ecs::component::StorageType = bevy_ecs::component::StorageType::Table;
+    type Mutability = bevy_ecs::component::Mutable;
+}
+
+impl<A: Allocator> VItem<A> {
+    /// Move into `alloc`'s memory, producing an allocator-owned item.
+    pub fn into_arena<A2: Allocator + Clone>(self, alloc: A2) -> VItem<A2> {
+        VItem {
+            normal: self.normal,
+            points: crate::utils::vec_from_iter_in(alloc.clone(), self.points.into_iter()),
+            transform: self.transform,
+            fill_rgbas: crate::utils::vec_from_iter_in(alloc.clone(), self.fill_rgbas.into_iter()),
+            stroke_rgbas: crate::utils::vec_from_iter_in(
+                alloc.clone(),
+                self.stroke_rgbas.into_iter(),
+            ),
+            stroke_widths: crate::utils::vec_from_iter_in(alloc, self.stroke_widths.into_iter()),
+        }
+    }
+
+    /// Copy into `alloc`'s memory, producing an allocator-owned item.
+    pub fn clone_in<A2: Allocator + Clone>(&self, alloc: A2) -> VItem<A2> {
+        VItem {
+            normal: self.normal,
+            points: crate::utils::vec_from_iter_in(alloc.clone(), self.points.iter().copied()),
+            transform: self.transform,
+            fill_rgbas: crate::utils::vec_from_iter_in(
+                alloc.clone(),
+                self.fill_rgbas.iter().cloned(),
+            ),
+            stroke_rgbas: crate::utils::vec_from_iter_in(
+                alloc.clone(),
+                self.stroke_rgbas.iter().cloned(),
+            ),
+            stroke_widths: crate::utils::vec_from_iter_in(
+                alloc.clone(),
+                self.stroke_widths.iter().cloned(),
+            ),
+        }
+    }
 }
 
 impl Default for VItem {

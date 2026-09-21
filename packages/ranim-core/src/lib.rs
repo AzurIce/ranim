@@ -2,6 +2,10 @@
 
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// Allocator-generic render items (`Vec<T, A>`) preview the post-
+// stabilization shape of `allocator_api`; the workspace targets the pinned
+// nightly.
+#![feature(allocator_api)]
 #![allow(rustdoc::private_intra_doc_links)]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/AzurIce/ranim/refs/heads/main/assets/ranim.svg",
@@ -30,6 +34,7 @@ pub use scene_evaluator::SceneEvaluator;
 pub mod utils;
 
 pub use glam;
+use std::alloc::Allocator;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -286,6 +291,45 @@ impl SealedRanimScene {
                     .enumerate()
                     .map(move |(part, item)| ((animation_id, part), item))
             })
+    }
+
+    /// Arena variant of [`Self::eval_at_sec`]: every output is an
+    /// allocator-owned [`CoreItem`] collected into a vec allocated from
+    /// `alloc` (std `allocator_api`; the workspace targets the pinned
+    /// nightly).
+    ///
+    /// Static subtrees replay their seal-time snapshots — zero clones of the
+    /// type-erased boxes and zero global allocations. Leaf evaluators are
+    /// value-semantics (`Eval::eval_alpha` returns owned values), so their
+    /// per-frame outputs are produced on the global heap and moved into the
+    /// arena right after; arena-ifying the `Eval` layer is #118's remaining
+    /// inplace-evaluation/interpolation work.
+    pub fn eval_at_sec_in<A: Allocator + Clone>(
+        &self,
+        target_sec: f64,
+        alloc: A,
+    ) -> Vec<((usize, usize), CoreItem<A>), A> {
+        let mut out = Vec::new_in(alloc.clone());
+        for (animation_id, animation) in self.animations.iter().enumerate() {
+            if !animation.enabled() {
+                continue;
+            }
+            let start = out.len();
+            animation.eval_at_in(target_sec, alloc.clone(), &mut out);
+            for (part, slot) in out[start..].iter_mut().enumerate() {
+                slot.0 = (animation_id, part);
+            }
+        }
+        out
+    }
+
+    /// [`Self::eval_at_sec_in`] by normalized scene progress.
+    pub fn eval_at_alpha_in<A: Allocator + Clone>(
+        &self,
+        alpha: f64,
+        alloc: A,
+    ) -> Vec<((usize, usize), CoreItem<A>), A> {
+        self.eval_at_sec_in(self.total_secs * alpha, alloc)
     }
 
     /// Evaluate by normalized scene progress.
