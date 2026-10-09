@@ -16,7 +16,7 @@
 //! to be a uniform-scale rotation).
 //!
 //! Shapes declare their *closure group* by implementing
-//! [`ApplyTransform`] with a `G: Into<...>` bound (e.g. `G: Into<DAffine3>`
+//! [`super::ApplyTransform`] with a `G: Into<...>` bound (e.g. `G: Into<DAffine3>`
 //! for affine-closure point data, or `G: Into<Similarity>` for circles and
 //! spheres); the operation traits (`ShiftTransform`, `RotateTransform`,
 //! `ScaleTransform`, `UniformScaleTransform`) are blanket-derived from it.

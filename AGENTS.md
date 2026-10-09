@@ -3,7 +3,7 @@
 ## Lints
 
 **Run all Rust tooling inside the Nix development shell.** The flake pins its
-Rust to the exact nightly CI uses (`nightly-2026-08-01`, see
+Rust to the exact nightly CI uses (`nightly-2026-10-01`, see
 `.github/workflows/build.yml`); an arbitrary host cargo has a different lint
 set and will disagree with CI.
 
@@ -164,7 +164,7 @@ Typst 会把相邻字母解析成一个标识符。例如，矩阵 `A` 乘向量
 一律指向 `/pull/N`——GitHub 对 issue 编号会 302 重定向到 `/issues/N`
 （这也是 bevy.org 的做法），因此无需区分 PR 与 issue、无任何 API 依赖。
 它是一个 rust script（`cargo -Zscript`，需要 nightly——仓库已在 flake 与
-Book CI 中固定 `nightly-2026-08-01`），不在 workspace 内，`just lint`
+Book CI 中固定 `nightly-2026-10-01`），不在 workspace 内，`just lint`
 不覆盖它。
 
 修改公式后，从仓库根目录构建整本书进行验证：
@@ -175,6 +175,6 @@ nix develop --command mdbook build book
 
 无需单独安装预处理器：Nix 开发环境和 Book CI 都固定使用上游
 `duskmoon314/mdbook-typst-math` 的提交
-`e310ec82ecaec5ae8e516ac07e9cab85fb506bc3`。升级该提交时，应同时更新
+`52341bd8ec2ffde6db92cfd5e5d7503076fbd94e`。升级该提交时，应同时更新
 `flake.nix`、`.github/workflows/build-book.yml` 和 `.github/workflows/book.yml`，
 并重新执行完整的书籍构建。

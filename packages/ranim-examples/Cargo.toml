@@ -16,7 +16,7 @@ ranim-core.workspace = true
 ranim-items.workspace = true
 ranim-anims.workspace = true
 itertools.workspace = true
-rand = "0.10.2"
+rand = "0.10.3"
 rand_chacha = "0.10.0"
 midly = "0.5.3"
 getrandom = { version = "0.4.3", features = ["wasm_js"] }

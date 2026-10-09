@@ -2,7 +2,7 @@ set windows-shell := ["powershell.exe", "-Command"]
 
 # Mirror the CI lints job (.github/workflows/build.yml): fmt + workspace-wide
 # clippy/doc with `-D warnings`. Run inside the flake dev shell so the Rust
-# toolchain matches CI's pinned nightly-2026-08-01.
+# toolchain matches CI's pinned nightly-2026-10-01.
 cargo_jobs := env_var_or_default("CARGO_BUILD_JOBS", "8")
 
 clean:

@@ -2,17 +2,17 @@
 //! `gltf` cargo feature. The `gltf` crate itself is re-exported here, so
 //! callers can parse documents without their own matching dependency.
 //!
-//! Two loaders: [`node_tree_from_path`](crate::mesh::gltf::node_tree_from_path)
+//! Two loaders: [`node_tree_from_path`]
 //! reads a `.glb` (embedded blob) or `.gltf` (external buffer files resolved
 //! relative to the file) from disk, and the I/O-free
-//! [`node_tree_from_gltf`](crate::mesh::gltf::node_tree_from_gltf) takes a
+//! [`node_tree_from_gltf`] takes a
 //! parsed document plus a buffer resolver.
 //!
 //! # Mapping
 //!
 //! | glTF                       | ranim                                              |
 //! |----------------------------|----------------------------------------------------|
-//! | node TRS / matrix          | [`Node`](crate::hierarchy::Node) pose as a [`DAffine3`](ranim_core::glam::DAffine3) (`T * R * S`) |
+//! | node TRS / matrix          | [`Node`] pose as a [`DAffine3`] (`T * R * S`) |
 //! | node name (non-empty)      | [`Node::id`](crate::hierarchy::Node::id) (payload nodes fall back to the mesh name) |
 //! | node children              | [`Node::children`](crate::hierarchy::Node::children), source order kept |
 //! | mesh (single primitive)    | the node's own payload [`MeshItem`]                |

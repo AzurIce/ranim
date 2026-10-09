@@ -1,13 +1,13 @@
 //! Authoring protocol and playback wrappers for animation definitions.
 //!
-//! [`IntoAnimNode`](crate::animation::build::IntoAnimNode) is the lowering protocol: it turns an authoring definition
-//! into an [`AnimNode`](crate::animation::node::AnimNode). It is intentionally
-//! separate from [`Eval`](crate::animation::eval::Eval), the typed visual-leaf
-//! protocol. Every `Eval` gets an [`IntoAnimNode`](crate::animation::build::IntoAnimNode) implementation by blanket
+//! [`IntoAnimNode`] is the lowering protocol: it turns an authoring definition
+//! into an [`AnimNode`]. It is intentionally
+//! separate from [`Eval`], the typed visual-leaf
+//! protocol. Every `Eval` gets an [`IntoAnimNode`] implementation by blanket
 //! impl; the built-in containers implement it directly.
 //!
-//! [`Unplaced`](crate::animation::build::Unplaced) marks definitions that have not been fixed to a parent time
-//! coordinate yet, so containers and [`Unplaced::at`](crate::animation::build::Unplaced::at) may schedule them.
+//! [`Unplaced`] marks definitions that have not been fixed to a parent time
+//! coordinate yet, so containers and [`Unplaced::at`] may schedule them.
 
 use std::any::type_name;
 

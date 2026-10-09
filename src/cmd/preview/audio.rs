@@ -9,7 +9,7 @@
 use std::{sync::Arc, time::Duration, time::Instant};
 
 use rodio::{
-    Sink,
+    ChannelCount, Player, SampleRate,
     source::{SeekError, Source},
 };
 
@@ -67,12 +67,12 @@ impl Source for PcmSource {
         Some(self.pcm.len() - self.next)
     }
 
-    fn channels(&self) -> u16 {
-        MASTER_CHANNELS
+    fn channels(&self) -> ChannelCount {
+        ChannelCount::new(MASTER_CHANNELS).unwrap()
     }
 
-    fn sample_rate(&self) -> u32 {
-        MASTER_SAMPLE_RATE
+    fn sample_rate(&self) -> SampleRate {
+        SampleRate::new(MASTER_SAMPLE_RATE).unwrap()
     }
 
     fn total_duration(&self) -> Option<Duration> {
@@ -98,12 +98,12 @@ enum PlayerState {
 const SCRUB_GAIN: f32 = 0.6;
 const SCRUB_IDLE: Duration = Duration::from_millis(120);
 
-/// Owns the output device and the playback sink for one scene's audio.
+/// Owns the output device and the playback player for one scene's audio.
 pub(crate) struct AudioPlayer {
     mixed: MixedAudio,
-    sink: Sink,
-    // The output stream must outlive the sink; dropped last.
-    _stream: rodio::OutputStream,
+    player: Player,
+    // The device sink must outlive the player; dropped last.
+    _device_sink: rodio::MixerDeviceSink,
     state: PlayerState,
     speed: f64,
     /// Last scrub move while a scrub voice is audible; `None` otherwise.
@@ -118,13 +118,13 @@ impl AudioPlayer {
         if mixed.is_empty() {
             return None;
         }
-        let stream = rodio::OutputStreamBuilder::open_default_stream().ok()?;
-        let sink = Sink::connect_new(stream.mixer());
-        sink.pause();
+        let device_sink = rodio::DeviceSinkBuilder::open_default_sink().ok()?;
+        let player = Player::connect_new(device_sink.mixer());
+        player.pause();
         Some(Self {
             mixed,
-            sink,
-            _stream: stream,
+            player,
+            _device_sink: device_sink,
             state: PlayerState::Paused { at_sec: 0.0 },
             speed: 1.0,
             scrub_at: None,
@@ -147,14 +147,14 @@ impl AudioPlayer {
     pub fn play_from(&mut self, sec: f64, speed: f64) {
         let sec = sec.clamp(0.0, self.mixed.total_secs());
         self.speed = speed;
-        self.sink.set_volume(1.0);
-        self.sink.set_speed(speed as f32);
-        self.sink.clear();
-        self.sink.append(PcmSource {
+        self.player.set_volume(1.0);
+        self.player.set_speed(speed as f32);
+        self.player.clear();
+        self.player.append(PcmSource {
             pcm: self.mixed.pcm.clone(),
             next: (sec * MASTER_SAMPLE_RATE as f64) as usize * MASTER_CHANNELS as usize,
         });
-        self.sink.play();
+        self.player.play();
         self.scrub_at = None;
         self.state = PlayerState::Playing {
             started_at: Instant::now(),
@@ -166,8 +166,8 @@ impl AudioPlayer {
     pub fn pause(&mut self) {
         let pos = self.pos_secs();
         self.scrub_at = None;
-        self.sink.set_volume(1.0);
-        self.sink.pause();
+        self.player.set_volume(1.0);
+        self.player.pause();
         self.state = PlayerState::Paused { at_sec: pos };
     }
 
@@ -194,14 +194,14 @@ impl AudioPlayer {
     /// the queue empty (scrubbing to the scene end does this), a seek is a
     /// no-op and the source must be re-appended at the target instead.
     fn ensure_source_at(&mut self, sec: f64) {
-        if self.sink.empty() {
-            self.sink.clear();
-            self.sink.append(PcmSource {
+        if self.player.empty() {
+            self.player.clear();
+            self.player.append(PcmSource {
                 pcm: self.mixed.pcm.clone(),
                 next: (sec * MASTER_SAMPLE_RATE as f64) as usize * MASTER_CHANNELS as usize,
             });
         } else {
-            let _ = self.sink.try_seek(Duration::from_secs_f64(sec));
+            let _ = self.player.try_seek(Duration::from_secs_f64(sec));
         }
     }
 
@@ -211,9 +211,9 @@ impl AudioPlayer {
     /// it once the playhead stops moving.
     pub fn scrub(&mut self, sec: f64) {
         let sec = sec.clamp(0.0, self.mixed.total_secs());
-        self.sink.set_volume(SCRUB_GAIN);
+        self.player.set_volume(SCRUB_GAIN);
         self.ensure_source_at(sec);
-        self.sink.play();
+        self.player.play();
         self.scrub_at = Some(Instant::now());
         self.state = PlayerState::Playing {
             started_at: Instant::now(),
@@ -241,7 +241,7 @@ impl AudioPlayer {
     pub fn set_speed(&mut self, speed: f64) {
         let pos = self.pos_secs();
         self.speed = speed;
-        self.sink.set_speed(speed as f32);
+        self.player.set_speed(speed as f32);
         if matches!(self.state, PlayerState::Playing { .. }) {
             self.state = PlayerState::Playing {
                 started_at: Instant::now(),

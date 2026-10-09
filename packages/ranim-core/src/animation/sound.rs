@@ -1,8 +1,8 @@
 //! Audio leaf animation: a sound placed and composed like any animation.
 //!
-//! [`Sound`](crate::animation::sound::Sound) makes the audio plane part of the animation tree: a sound sits
+//! [`Sound`] makes the audio plane part of the animation tree: a sound sits
 //! in `seq!`/`stack!`/`lagged!` beside visual animations, shares their
-//! placement vocabulary ([`Unplaced::at`](crate::animation::build::Unplaced::at), duration overrides, enable), and
+//! placement vocabulary ([`Unplaced::at`], duration overrides, enable), and
 //! never enters the per-frame evaluation pipeline.
 //!
 //! The leaf contract mirrors `Eval`: content is a pure span, and all time

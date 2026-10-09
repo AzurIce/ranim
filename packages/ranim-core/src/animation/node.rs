@@ -1,7 +1,7 @@
 //! Runtime animation nodes and their interpreters.
 //!
-//! This is the closed core of the animation tree: [`NodeContent`](crate::animation::node::NodeContent) is the
-//! runtime vocabulary (children or a leaf), [`AnimNode`](crate::animation::node::AnimNode)
+//! This is the closed core of the animation tree: [`NodeContent`] is the
+//! runtime vocabulary (children or a leaf), [`AnimNode`]
 //! wraps it with the timing shell, and all structural traversals — visual
 //! evaluation, seal-time audio baking, and preview introspection — live here.
 //!

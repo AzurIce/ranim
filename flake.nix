@@ -37,7 +37,7 @@
         craneLib = (crane.mkLib pkgs).overrideToolchain (
           p:
           # Keep in sync with the CI lint/build jobs
-          # (.github/workflows/build.yml pins nightly-2026-08-01).
+          # (.github/workflows/build.yml pins nightly-2026-10-01).
           p.rust-bin.nightly."2026-10-01".default.override {
             targets = [ "wasm32-unknown-unknown" ];
             extensions = [
@@ -56,7 +56,7 @@
           buildInputs = [
             # Add additional build inputs here
           ]
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+          ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
             # Additional darwin specific inputs can be set here
             pkgs.libiconv
           ];
@@ -130,13 +130,13 @@
             src = fileSetForCrate ./packages/ranim-cli;
             meta.mainProgram = "ranim";
             # alsa-sys locates libasound via pkg-config at build time
-            nativeBuildInputs = [ pkgs.makeWrapper ] ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.pkg-config ];
+            nativeBuildInputs = [ pkgs.makeWrapper ] ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.pkg-config ];
             buildInputs =
-              individualCrateArgs.buildInputs ++ lib.optionals pkgs.stdenv.isLinux [ pkgs.alsa-lib ];
+              individualCrateArgs.buildInputs ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.alsa-lib ];
             postInstall = ''
               wrapProgram "$out/bin/ranim" \
                 --prefix PATH : ${lib.makeBinPath [ pkgs.ffmpeg ]} \
-                ${lib.optionalString pkgs.stdenv.isLinux ''
+                ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
                   --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath ranimCliRuntimeLibs}
                 ''}
             '';
@@ -145,16 +145,16 @@
 
         mdbook-typst-math = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
           pname = "mdbook-typst-math";
-          version = "0.3.0-unstable-2026-08-25";
+          version = "0.4.0";
 
           src = pkgs.fetchFromGitHub {
             owner = "duskmoon314";
             repo = "mdbook-typst-math";
-            rev = "e310ec82ecaec5ae8e516ac07e9cab85fb506bc3";
-            hash = "sha256-DQBUBjb1eNTmHj35sjuaN07GW4rpDlM40GFB3dWtiHg=";
+            rev = "52341bd8ec2ffde6db92cfd5e5d7503076fbd94e";
+            hash = "sha256-0tBtRI3R19f4UA6uEzRZoKgptc/OgUEOOYm6hammweo=";
           };
 
-          cargoHash = "sha256-Mms8HDxak46oTbcICEjw2612gHGdsrO9kVLQTlNi24o=";
+          cargoHash = "sha256-PMgo5PnDPUQgLwpN3S6N7tFYXv2Jb0FTepf7HOHXpjY=";
         });
       in
       {
@@ -195,11 +195,11 @@
             gh
             ffmpeg
             wasm-bindgen-cli_0_2_129
-            # wasm-bindgen-cli is pinned in ./wasm-bindgen-cli.nix.
+            # Match the wasm-bindgen version in Cargo.lock.
             # mdbook-katex
             # mdbook-i18n-helpers
           ])
-          ++ lib.optionals pkgs.stdenv.isLinux [
+          ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
             pkgs.vulkan-loader
             pkgs.wayland
             pkgs.libxkbcommon
@@ -210,7 +210,7 @@
             pkgs.udev
           ];
 
-          shellHook = lib.optionalString pkgs.stdenv.isLinux ''
+          shellHook = lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
             export LD_LIBRARY_PATH="${
               lib.makeLibraryPath [
                 pkgs.vulkan-loader

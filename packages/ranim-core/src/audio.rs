@@ -14,12 +14,11 @@ use std::ops::Range;
 use std::{f64::consts::TAU, fmt, io::Write, path::Path, sync::Arc};
 #[cfg(feature = "audio-decode")]
 use symphonia::core::{
-    codecs::{CODEC_TYPE_NULL, DecoderOptions},
+    codecs::audio::{AudioDecoderOptions, CODEC_ID_NULL_AUDIO},
     errors::Error as SymphoniaError,
-    formats::FormatOptions,
+    formats::{FormatOptions, probe::Hint},
     io::MediaSourceStream,
     meta::MetadataOptions,
-    probe::Hint,
 };
 
 /// Master sample rate every mixed buffer lives on.
@@ -137,43 +136,41 @@ impl AudioClip {
 /// changes signal spec mid-way is rejected instead of silently misaligned.
 #[cfg(feature = "audio-decode")]
 fn decode(bytes: &[u8]) -> Result<AudioClip, AudioError> {
-    use symphonia::core::audio::SampleBuffer;
-    use symphonia::core::units::Duration;
-
     let mss = MediaSourceStream::new(
         // MediaSourceStream owns its source; keep the bytes via an owned copy.
         Box::new(Cursor::new(bytes.to_vec())),
         Default::default(),
     );
-    let mut probed = symphonia::default::get_probe()
-        .format(
+    let mut format = symphonia::default::get_probe()
+        .probe(
             &Hint::new(),
             mss,
-            &FormatOptions::default(),
-            &MetadataOptions::default(),
+            FormatOptions::default(),
+            MetadataOptions::default(),
         )
         .map_err(|err| AudioError(format!("failed to probe audio: {err}")))?;
-    let format = &mut probed.format;
-    let track = format
+    let (track_id, codec_params) = format
         .tracks()
         .iter()
-        .find(|track| track.codec_params.codec != CODEC_TYPE_NULL)
+        .find_map(|track| {
+            let params = track.codec_params.as_ref()?.audio()?;
+            (params.codec != CODEC_ID_NULL_AUDIO).then_some((track.id, params))
+        })
         .ok_or_else(|| AudioError("no decodable audio track".to_string()))?;
-    let track_id = track.id;
     let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &DecoderOptions::default())
+        .make_audio_decoder(codec_params, &AudioDecoderOptions::default())
         .map_err(|err| AudioError(format!("unsupported codec: {err}")))?;
 
     let mut pcm = Vec::new();
     let mut spec = None;
     loop {
         let packet = match format.next_packet() {
-            Ok(packet) => packet,
-            // Symphonia signals end of stream as an io error.
+            Ok(Some(packet)) => packet,
+            Ok(None) => break,
             Err(SymphoniaError::IoError(_)) => break,
             Err(err) => return Err(AudioError(format!("failed to read packet: {err}"))),
         };
-        if packet.track_id() != track_id {
+        if packet.track_id != track_id {
             continue;
         }
         let decoded = match decoder.decode(&packet) {
@@ -182,19 +179,19 @@ fn decode(bytes: &[u8]) -> Result<AudioClip, AudioError> {
             Err(SymphoniaError::IoError(_)) => break,
             Err(err) => return Err(AudioError(format!("failed to decode packet: {err}"))),
         };
-        if spec.unwrap_or(*decoded.spec()) != *decoded.spec() {
+        if spec.as_ref().is_some_and(|spec| spec != decoded.spec()) {
             return Err(AudioError("stream changes format mid-way".to_string()));
         }
-        spec = Some(*decoded.spec());
-        let mut buffer = SampleBuffer::<f32>::new(decoded.capacity() as Duration, *decoded.spec());
-        buffer.copy_interleaved_ref(decoded);
-        pcm.extend_from_slice(buffer.samples());
+        spec.get_or_insert_with(|| decoded.spec().clone());
+        let start = pcm.len();
+        pcm.resize(start + decoded.samples_interleaved(), 0.0);
+        decoded.copy_to_slice_interleaved(&mut pcm[start..]);
     }
     let spec = spec.ok_or_else(|| AudioError("no audio frames decoded".to_string()))?;
 
     // Adapt to master stereo: mono is duplicated, beyond-stereo layouts keep
     // their front left/right pair.
-    let src_channels = spec.channels.count();
+    let src_channels = spec.channels().count();
     let frames = pcm.len() / src_channels;
     let mut stereo = vec![0.0; frames * MASTER_CHANNELS as usize];
     for (frame, out) in stereo
@@ -208,8 +205,8 @@ fn decode(bytes: &[u8]) -> Result<AudioClip, AudioError> {
             *slot = pcm[src];
         }
     }
-    let pcm = if spec.rate != MASTER_SAMPLE_RATE {
-        resample_to_master(stereo, spec.rate)?
+    let pcm = if spec.rate() != MASTER_SAMPLE_RATE {
+        resample_to_master(stereo, spec.rate())?
     } else {
         stereo
     };

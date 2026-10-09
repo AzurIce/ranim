@@ -1,9 +1,9 @@
 //! Evaluation protocols and the standard author-facing adapters.
 //!
-//! [`Eval`](crate::animation::eval::Eval) is the single visual leaf protocol;
-//! [`EvalExt`](crate::animation::eval::EvalExt) adds build-time conveniences;
-//! [`pure::Pure`](crate::animation::eval::pure::Pure) adapts a closure
-//! and [`iterative::Iterative`](crate::animation::eval::iterative::Iterative)
+//! [`Eval`] is the single visual leaf protocol;
+//! [`EvalExt`] adds build-time conveniences;
+//! [`pure::Pure`] adapts a closure
+//! and [`iterative::Iterative`]
 //! adapts a stepping function into that protocol. `EvalDyn` is the
 //! runtime-erased leaf dispatch held by `LeafContent::Anim`.
 

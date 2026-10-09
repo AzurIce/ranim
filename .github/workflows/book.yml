@@ -18,7 +18,7 @@ on:
         default: "mdbook-mermaid@0.17"
       mdbook-typst-math-rev:
         description: "mdbook-typst-math revision from duskmoon314/mdbook-typst-math"
-        default: "e310ec82ecaec5ae8e516ac07e9cab85fb506bc3"
+        default: "52341bd8ec2ffde6db92cfd5e5d7503076fbd94e"
 
 permissions:
   contents: read
@@ -60,7 +60,7 @@ jobs:
       site-url: ""
       mdbook-version: ${{ inputs.mdbook-version || '0.5.4' }}
       mdbook-plugins: ${{ inputs.mdbook-plugins || 'mdbook-mermaid@0.17' }}
-      mdbook-typst-math-rev: ${{ inputs.mdbook-typst-math-rev || 'e310ec82ecaec5ae8e516ac07e9cab85fb506bc3' }}
+      mdbook-typst-math-rev: ${{ inputs.mdbook-typst-math-rev || '52341bd8ec2ffde6db92cfd5e5d7503076fbd94e' }}
 
   deploy:
     needs: [determine-refs, build]

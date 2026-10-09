@@ -1,7 +1,7 @@
 //! Iterative (stateful, stepped) evaluation: the
-//! [`IterativeEval`](crate::animation::eval::iterative::IterativeEval)
+//! [`IterativeEval`]
 //! capability trait and its
-//! [`Iterative`](crate::animation::eval::iterative::Iterative) adapter into the
+//! [`Iterative`] adapter into the
 //! general [`Eval`] protocol.
 //!
 //! **Content is sequence**: an iterative segment owns its simulation step
