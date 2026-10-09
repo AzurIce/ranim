@@ -38,7 +38,7 @@
           p:
           # Keep in sync with the CI lint/build jobs
           # (.github/workflows/build.yml pins nightly-2026-08-01).
-          p.rust-bin.nightly."2026-08-01".default.override {
+          p.rust-bin.nightly."2026-10-01".default.override {
             targets = [ "wasm32-unknown-unknown" ];
             extensions = [
               "rust-src"
@@ -180,7 +180,7 @@
           ]
           ++ (with pkgs; [
             git-cliff
-            # cargo-release
+            cargo-release
             cargo-edit
             samply
             cargo-udeps
@@ -194,14 +194,11 @@
             typst
             gh
             ffmpeg
+            wasm-bindgen-cli_0_2_129
             # wasm-bindgen-cli is pinned in ./wasm-bindgen-cli.nix.
             # mdbook-katex
             # mdbook-i18n-helpers
           ])
-          ++ [
-            (pkgs.callPackage ./cargo-release.nix { })
-            (pkgs.callPackage ./wasm-bindgen-cli.nix { })
-          ]
           ++ lib.optionals pkgs.stdenv.isLinux [
             pkgs.vulkan-loader
             pkgs.wayland

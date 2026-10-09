@@ -218,6 +218,7 @@ mod tests {
 
     use assert_float_eq::assert_float_absolute_eq;
     use glam::dvec3;
+    use ranim_core::traits::{RotateTransform, ShiftTransform};
 
     use super::*;
 
@@ -230,6 +231,20 @@ mod tests {
             1e-10
         );
         assert_float_absolute_eq!(arc.end().distance_squared(dvec3(0.0, 2.0, 0.0)), 0.0, 1e-10);
+
+        let angle = PI * 2.0 / 3.0;
+        let mut placed = VItem::from(Arc::new(angle, 2.0));
+        placed
+            .rotate_on_axis(DVec3::Z, PI / 2.0 - angle / 2.0)
+            .shift(dvec3(2.0, 2.0, 0.0));
+        assert!(placed.vpoints[0].abs_diff_eq(dvec3(3.732050807568877, 3.0, 0.0), 1e-10));
+        assert!(
+            placed
+                .vpoints
+                .last()
+                .unwrap()
+                .abs_diff_eq(dvec3(0.2679491924311228, 3.0, 0.0), 1e-10)
+        );
 
         let arc = ArcBetweenPoints::new(dvec3(2.0, 0.0, 0.0), dvec3(0.0, 2.0, 0.0), PI / 2.0);
         assert_float_absolute_eq!(arc.center().distance_squared(DVec3::ZERO), 0.0, 1e-10);

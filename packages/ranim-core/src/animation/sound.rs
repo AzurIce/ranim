@@ -17,7 +17,7 @@ use std::ops::Range;
 use crate::audio::{AudioClip, AudioTrack};
 
 use crate::animation::build::{IntoAnimNode, Unplaced};
-use crate::animation::node::{AnimNode, NodeContent};
+use crate::animation::node::{AnimNode, LeafContent, NodeContent};
 
 /// An audio leaf: plays a clip's span inside its placed window.
 ///
@@ -85,10 +85,11 @@ impl IntoAnimNode for Sound {
     fn into_anim_node(self) -> AnimNode {
         let window = self.duration_secs();
         AnimNode {
-            content: NodeContent::Audio(Box::new(self.track)),
+            content: NodeContent::Leaf(LeafContent::Audio(Box::new(self.track))),
             internal_time_secs: window,
             rate_func: None,
             time_range: 0.0..window,
+            end_inclusive: true,
             enabled: true,
             anim_name: type_name::<Self>(),
         }

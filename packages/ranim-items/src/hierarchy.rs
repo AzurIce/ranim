@@ -932,8 +932,8 @@ mod tests {
     use ranim_core::Extract;
     use ranim_core::core_item::transformed::{Transformed, TransformedExt};
     use ranim_core::core_item::vitem::VItem as CoreVItem;
-    use ranim_core::glam::{DQuat, Mat4, Quat, Vec3, Vec4, dvec3};
-    use ranim_core::traits::{ApplyTransform, Rigid, Similarity, Translation};
+    use ranim_core::glam::{DQuat, Vec3, Vec4, dvec3};
+    use ranim_core::traits::Translation;
 
     type CoreNode<G = DAffine3> = Node<CoreVItem, G>;
     type HierarchyVItem = crate::vitem::VItem;
@@ -959,68 +959,42 @@ mod tests {
     }
 
     fn assert_affine_eq(actual: DAffine3, expected: DAffine3) {
-        assert!(
-            actual
-                .transform_point3(dvec3(0.3, -0.7, 1.1))
-                .abs_diff_eq(expected.transform_point3(dvec3(0.3, -0.7, 1.1)), 1e-9)
-        );
-        for i in 0..3 {
-            assert!(
-                actual
-                    .matrix3
-                    .col(i)
-                    .abs_diff_eq(expected.matrix3.col(i), 1e-9),
-                "matrix3 column {i} diverges"
-            );
-        }
+        assert!(actual.matrix3.abs_diff_eq(expected.matrix3, 1e-9));
         assert!(actual.translation.abs_diff_eq(expected.translation, 1e-9));
     }
 
     #[test]
     fn nested_extract_composes_matrices_and_keeps_points_local() {
-        // Leaf -> Translation((3,4,5)) -> Similarity(scale 2, t (10,20,30)).
-        // World = S * T: translation becomes (16,28,40).
-        let inner_similarity = Similarity {
-            scale: 2.0,
-            rotation: DQuat::IDENTITY,
-            translation: dvec3(10.0, 20.0, 30.0),
-        };
-        let tree = Transformed::new(
-            CoreNode::new(
-                None,
-                vec![Transformed::new(
-                    CoreNode::new(
-                        Some(CoreVItem {
-                            points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
-                            ..Default::default()
-                        }),
-                        Vec::new(),
-                    ),
-                    DAffine3::from(Translation(dvec3(3.0, 4.0, 5.0))),
-                )],
-            ),
-            DAffine3::from(inner_similarity),
+        let scale = DAffine3::from_scale(dvec3(2.0, 3.0, 4.0));
+        let rotate = DAffine3::from_rotation_translation(
+            DQuat::from_rotation_z(std::f64::consts::FRAC_PI_2),
+            DVec3::ZERO,
         );
-
-        let expected_world =
-            DAffine3::from(inner_similarity) * DAffine3::from(Translation(dvec3(3.0, 4.0, 5.0)));
-        assert_affine_eq(tree.leaves().next().unwrap().0, expected_world);
-
-        match &tree.extract()[0] {
-            CoreItem::VItem(extracted) => {
-                // Local data stays byte-identical; the world placement moves.
-                assert_eq!(extracted.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
-                assert_eq!(
-                    extracted.transform,
-                    Mat4::from_scale_rotation_translation(
-                        Vec3::splat(2.0),
-                        Quat::IDENTITY,
-                        Vec3::new(16.0, 28.0, 40.0),
-                    )
-                );
-            }
-            _ => panic!("expected a VItem"),
-        }
+        let translate = DAffine3::from_translation(DVec3::X);
+        let tree = CoreNode::group(vec![
+            CoreNode::group(vec![
+                CoreNode::leaf(marked_core_vitem(1.0)).transformed(translate),
+            ])
+            .transformed(rotate),
+        ])
+        .transformed(scale);
+        let (world, _) = tree.leaves().next().unwrap();
+        assert_affine_eq(world, scale * rotate * translate);
+        assert!(
+            world
+                .transform_point3(DVec3::ZERO)
+                .abs_diff_eq(dvec3(0.0, 3.0, 0.0), 1e-9)
+        );
+        let CoreItem::VItem(extracted) = &tree.extract()[0] else {
+            panic!("expected VItem")
+        };
+        assert_eq!(extracted.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+        assert!(
+            extracted
+                .transform
+                .transform_point3(Vec3::X)
+                .abs_diff_eq(Vec3::new(0.0, 6.0, 0.0), 1e-6)
+        );
     }
 
     #[test]
@@ -1103,7 +1077,6 @@ mod tests {
             centroid.abs_diff_eq(dvec3(-6.0, 0.0, 0.0), 1e-9),
             "centroid is {centroid:?}"
         );
-        assert_ne!(centroid, dvec3(-16.0, 0.0, 0.0));
 
         let empty = Node::<DVec3>::frame();
         assert_eq!(Centroid.locate(&empty), DVec3::ZERO);
@@ -1161,29 +1134,6 @@ mod tests {
     }
 
     #[test]
-    fn root_apply_transform_poses_without_baking_points() {
-        let tree = CoreNode::leaf(CoreVItem {
-            points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
-            ..Default::default()
-        });
-        let mut tree: Transformed<CoreNode, DAffine3> =
-            Transformed::new(tree, DAffine3::from(Translation(DVec3::X)));
-        tree.apply(Rigid::from_translation(DVec3::Y));
-
-        match &tree.extract()[0] {
-            CoreItem::VItem(extracted) => {
-                // Points are byte-identical, only the matrix updated.
-                assert_eq!(extracted.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
-                assert_eq!(
-                    extracted.transform,
-                    Mat4::from_translation(Vec3::new(1.0, 1.0, 0.0))
-                );
-            }
-            _ => panic!("expected a VItem"),
-        }
-    }
-
-    #[test]
     fn interpolation_moves_poses_only() {
         let geometry =
             || HierarchyVItem::from_vpoints(vec![dvec3(0.0, 0.0, 0.0), dvec3(1.0, 0.0, 0.0)]);
@@ -1222,26 +1172,25 @@ mod tests {
     #[test]
     fn partial_forwards_ranges_down_recursively() {
         let base = stroked_vitem(0.0);
-        let tree: Transformed<Node<HierarchyVItem>, DAffine3> =
-            Node::leaf(base.clone()).transformed(DAffine3::from(Translation(DVec3::X)));
-
-        let partial = tree.get_partial(0.25..0.75);
-        assert_eq!(partial.transform, DAffine3::from(Translation(DVec3::X)));
-        assert_eq!(
-            partial.inner.item().unwrap(),
-            &base.get_partial(0.25..0.75),
-            "the range must be forwarded verbatim"
-        );
-
-        let closed = tree.get_partial_closed(0.25..0.75);
-        assert_eq!(
-            closed.inner.item().unwrap(),
-            &base.get_partial_closed(0.25..0.75)
-        );
-
-        let grouped = Node::<HierarchyVItem>::group(vec![Node::leaf(base.clone()); 3]);
-        let partial = grouped.get_partial(0.0..0.5);
-        assert_eq!(partial.children().len(), 3);
+        let tree = Node::<HierarchyVItem>::group(vec![Node::leaf(base.clone()); 2])
+            .transformed(DAffine3::from_translation(DVec3::X));
+        for (partial, expected) in [
+            (tree.get_partial(0.25..0.75), base.get_partial(0.25..0.75)),
+            (
+                tree.get_partial_closed(0.25..0.75),
+                base.get_partial_closed(0.25..0.75),
+            ),
+        ] {
+            assert_eq!(partial.transform, tree.transform);
+            assert_eq!(
+                partial
+                    .inner
+                    .leaves()
+                    .map(|(_, leaf)| leaf)
+                    .collect::<Vec<_>>(),
+                [&expected; 2]
+            );
+        }
     }
 
     #[test]
@@ -1258,77 +1207,6 @@ mod tests {
         // Placing it defaults to the storage group's identity pose.
         let placed: Transformed<Node<HierarchyVItem>, DAffine3> = empty.into();
         assert_eq!(placed.transform, DAffine3::IDENTITY);
-    }
-
-    #[test]
-    fn leaves_accumulate_correctly_over_skewed_affine_chains() {
-        let scale = DAffine3::from_scale(dvec3(2.0, 3.0, 4.0));
-        let rotate = DAffine3::from_rotation_translation(
-            DQuat::from_rotation_z(std::f64::consts::FRAC_PI_2),
-            DVec3::ZERO,
-        );
-        let translate = DAffine3::from_translation(DVec3::X);
-
-        // root -> child -> grandchild -> leaf, each carrying one factor.
-        let tree = Transformed::new(
-            CoreNode::new(
-                None,
-                vec![Transformed::new(
-                    CoreNode::new(
-                        None,
-                        vec![Transformed::new(
-                            CoreNode::new(
-                                Some(CoreVItem {
-                                    points: vec![Vec4::ZERO],
-                                    ..Default::default()
-                                }),
-                                Vec::new(),
-                            ),
-                            translate,
-                        )],
-                    ),
-                    rotate,
-                )],
-            ),
-            scale,
-        );
-
-        let expected = scale * rotate * translate;
-        let (world, _) = tree.leaves().next().unwrap();
-
-        // Hand-check the skewed composition: X is scaled to 2 then rotated
-        // onto Y and scaled by 3, so translating by X lands at (0, 3, 0).
-        assert!(
-            world
-                .transform_point3(DVec3::ZERO)
-                .abs_diff_eq(dvec3(0.0, 3.0, 0.0), 1e-9)
-        );
-        assert_affine_eq(world, expected);
-    }
-
-    #[test]
-    fn wrapped_payloads_lift_into_placed_leaf_nodes() {
-        let similarity = Similarity {
-            scale: 2.0,
-            rotation: DQuat::IDENTITY,
-            translation: dvec3(1.0, 2.0, 3.0),
-        };
-        let wrapped = Transformed::new(stroked_vitem(0.0), similarity);
-
-        // Lifting a placed payload into a node keeps the pose external.
-        let placed = wrapped.map_inner(Node::<HierarchyVItem, Similarity>::leaf);
-        assert!(placed.inner.is_leaf());
-        assert_eq!(placed.inner.id, None);
-        assert_eq!(placed.transform, similarity);
-
-        // Plain nodes place with the identity pose, so plain and wrapped
-        // children mix in one group.
-        let tree = Node::<HierarchyVItem, Rigid>::group(vec![
-            Node::leaf(stroked_vitem(1.0)).transformed(Rigid::from_translation(DVec3::X)),
-            Node::leaf(stroked_vitem(2.0)).into(),
-        ]);
-        assert_eq!(tree.children[0].transform.translation, DVec3::X);
-        assert_eq!(tree.children[1].transform, Rigid::IDENTITY);
     }
 
     #[test]

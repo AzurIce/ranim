@@ -15,7 +15,7 @@ Eval<Output = T>                        visual leaf content
 ```
 
 - 定义期（open）：叶子实现 `Eval`；容器/Sugar 位于 `animation::compose`，通过 `IntoAnimNode` lower 到运行时。
-- 运行期（closed）：所有定义都 lower 成 `AnimNode`，其 `NodeContent` 是封闭的核心语言（`Sequence`、`Stack`、`Leaf`、`Static`、`Audio`）。视觉求值、音频烘焙、preview introspection 都是这棵树上的 interpreter。
+- 运行期（closed）：所有定义都 lower 成 `AnimNode`，其 `NodeContent` 是封闭的核心语言（`Children` 或 `Leaf`，叶子载荷为动画或音频）。视觉求值、音频烘焙、preview introspection 都是这棵树上的 interpreter。
 - [`Eval`、`IntoAnimNode`、容器与运行时](./anim.md) 描述叶子动画如何根据局部进度产生状态、附加播放参数，以及顺序 / 并行 / 交错容器如何把场景组织成动画树。
 - [`CoreItem` 与 `Extract`](./core_item.md) 描述动画求值结果如何经 `Extract` 展开为渲染器消费的 core item。
 - [Core Items](./core_items/README.md) 逐个介绍三种 core item（`CameraFrame`、`VItem`、`MeshItem`）的字段与渲染语义。

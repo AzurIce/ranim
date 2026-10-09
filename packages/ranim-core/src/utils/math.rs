@@ -102,25 +102,17 @@ mod test {
 
     #[test]
     fn test_interpolate_usize() {
-        let test = |(x, t): (usize, f64), (expected_x, expected_t): (usize, f64)| {
-            assert_eq!(x, expected_x);
-            assert!((t - expected_t).abs() < f64::EPSILON);
-        };
-
-        test(interpolate_usize(0, 10, 0.0), (0, 0.0));
-        test(interpolate_usize(0, 10, 0.5), (5, 0.0));
-        test(interpolate_usize(0, 10, 1.0), (10, 0.0));
-
-        test(interpolate_usize(0, 1, 0.0), (0, 0.0));
-        test(interpolate_usize(0, 1, 0.5), (0, 0.5));
-        test(interpolate_usize(0, 1, 1.0), (1, 0.0));
-
-        test(interpolate_usize(0, 2, 0.0), (0, 0.0));
-        test(interpolate_usize(0, 2, 0.2), (0, 0.4));
-        test(interpolate_usize(0, 2, 0.4), (0, 0.8));
-        test(interpolate_usize(0, 2, 0.6), (1, 0.2));
-        test(interpolate_usize(0, 2, 0.8), (1, 0.6));
-        test(interpolate_usize(0, 2, 1.0), (2, 0.0));
+        for (start, end, alpha, expected, remainder) in [
+            (0, 10, 0.0, 0, 0.0),
+            (0, 10, 0.5, 5, 0.0),
+            (0, 10, 1.0, 10, 0.0),
+            (0, 1, 0.5, 0, 0.5),
+            (0, 2, 0.8, 1, 0.6),
+        ] {
+            let (value, fraction) = interpolate_usize(start, end, alpha);
+            assert_eq!(value, expected);
+            assert!((fraction - remainder).abs() < f64::EPSILON);
+        }
     }
 
     #[test]

@@ -302,45 +302,22 @@ mod tests {
 
     #[test]
     fn test_mesh_item_alignable() {
-        let mut mesh1 = MeshItem::from_indexed_vertices(
-            vec![DVec3::new(0.0, 0.0, 0.0), DVec3::new(1.0, 0.0, 0.0)],
-            vec![0, 1, 2],
-        );
-
-        let mut mesh2 = MeshItem::from_indexed_vertices(
-            vec![
-                DVec3::new(0.0, 0.0, 0.0),
-                DVec3::new(1.0, 0.0, 0.0),
-                DVec3::new(0.0, 1.0, 0.0),
-                DVec3::new(1.0, 1.0, 0.0),
-            ],
+        let mut short = MeshItem::from_indexed_vertices(vec![DVec3::ZERO, DVec3::X], vec![0, 1, 2]);
+        let mut long = MeshItem::from_indexed_vertices(
+            vec![DVec3::ZERO, DVec3::X, DVec3::Y, DVec3::X + DVec3::Y],
             vec![0, 1, 2, 1, 3, 2],
         );
-
-        // Initially not aligned
-        assert!(!mesh1.is_aligned(&mesh2));
-
-        // Align them
-        mesh1.align_with(&mut mesh2);
-
-        // Now they should be aligned
-        assert!(mesh1.is_aligned(&mesh2));
-
-        // All vertex arrays should have same length
-        assert_eq!(mesh1.points.len(), 4);
-        assert_eq!(mesh2.points.len(), 4);
-        assert_eq!(mesh1.vertex_colors.len(), 4);
-        assert_eq!(mesh2.vertex_colors.len(), 4);
-        assert_eq!(mesh1.vertex_normals.len(), 4);
-        assert_eq!(mesh2.vertex_normals.len(), 4);
-
-        // mesh1's new points should be last point repeated (from PointVec::align_with)
-        assert_eq!(mesh1.points[2], DVec3::new(1.0, 0.0, 0.0));
-        assert_eq!(mesh1.points[3], DVec3::new(1.0, 0.0, 0.0));
-
-        // mesh2's points should remain unchanged (it was already longer)
-        assert_eq!(mesh2.points[0], DVec3::new(0.0, 0.0, 0.0));
-        assert_eq!(mesh2.points[3], DVec3::new(1.0, 1.0, 0.0));
+        let original = long.points.clone();
+        assert!(!short.is_aligned(&long));
+        short.align_with(&mut long);
+        assert!(short.is_aligned(&long));
+        assert_eq!(
+            short.points.as_slice(),
+            &[DVec3::ZERO, DVec3::X, DVec3::X, DVec3::X]
+        );
+        assert_eq!(short.vertex_colors.len(), 4);
+        assert_eq!(short.vertex_normals.len(), 4);
+        assert_eq!(long.points, original);
     }
 
     #[test]

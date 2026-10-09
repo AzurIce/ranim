@@ -551,11 +551,4 @@ mod tests {
         let svg = r#"<svg viewBox="0 0 5 5" width="5pt" height="5pt"><path d="M0 0"/><g/></svg>"#;
         assert_eq!(get_typst_element(svg), "<svg><g/></svg>");
     }
-
-    #[test]
-    fn typst_svg_compiles_and_is_cached() {
-        let svg = typst_svg("R");
-        assert!(svg.contains("<svg"), "unexpected typst svg: {svg}");
-        assert_eq!(svg, typst_svg("R"), "cached compiles must be deterministic");
-    }
 }

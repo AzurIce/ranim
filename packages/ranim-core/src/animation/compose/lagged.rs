@@ -1,18 +1,18 @@
 //! Lagged (staggered, end-filled) authoring combinator.
 //!
 //! [`AnimLagged`] is build-time only: it staggers children by placing them
-//! on the content axis and lowers to a plain stack of per-item sequence
+//! on the content axis and lowers to nested children containing per-item
 //! tracks in [`IntoAnimNode::into_anim_node`] — no runtime kind of its own.
 
 use std::any::type_name;
 
 use crate::animation::build::{IntoAnimNode, Unplaced};
 use crate::animation::compose::sequence::AnimSequence;
-use crate::animation::node::{AnimNode, NodeContent, static_cell};
+use crate::animation::node::{AnimNode, NodeContent, constant_node};
 
 /// How an [`AnimLagged`] fills the time outside a child's window.
 ///
-/// Fills are materialized as real static cells at `build` time (sampled from
+/// Fills are materialized as constant animation leaves at `build` time (sampled from
 /// the child's window edges), so the preview timeline shows exactly what is
 /// rendered — there is no hidden clamping rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,8 +34,8 @@ pub enum LaggedFill {
 /// - `1.0` — each child starts when the previous ends (like [`AnimSequence`]);
 /// - in between — overlapping succession.
 ///
-/// By default the time outside a child's window is **filled with real static
-/// cells** ([`LaggedFill::Hold`] on both ends): each item is materialized at
+/// By default the time outside a child's window is **filled with constant animation
+/// leaves** ([`LaggedFill::Hold`] on both ends): each item is materialized at
 /// build time as a per-item sequence track `[leading fill][anim][trailing
 /// fill]` spanning the whole extent — before its start the item shows its
 /// initial state, after its end it keeps showing its final state, and the
@@ -114,7 +114,7 @@ impl AnimLagged {
     ///
     /// The lagged container is thus a stack of per-item sequences — each
     /// item's track spans the whole extent, with its window-edge states held
-    /// by real static cells.
+    /// by constant animation leaves.
     fn materialize_fills(&mut self) {
         let total = self.duration_secs;
         let children = std::mem::take(&mut self.animations);
@@ -127,7 +127,7 @@ impl AnimLagged {
                 let mut state = Vec::new();
                 child.eval_at(start, &mut state);
                 if !state.is_empty() {
-                    track.animations.push(static_cell(state, 0.0..start));
+                    track.animations.push(constant_node(state, 0.0..start));
                 }
             }
             track.animations.push(child);
@@ -136,7 +136,7 @@ impl AnimLagged {
                 let mut state = Vec::new();
                 child.eval_at(end, &mut state);
                 if !state.is_empty() {
-                    track.animations.push(static_cell(state, end..total));
+                    track.animations.push(constant_node(state, end..total));
                 }
             }
             track.cursor_sec = total;
@@ -161,17 +161,18 @@ impl AnimLagged {
 impl Unplaced for AnimLagged {}
 impl IntoAnimNode for AnimLagged {
     /// Desugar: materialize each item into a full-extent sequence track,
-    /// then lower the whole container to a plain runtime stack node — the
+    /// then lower the whole container to a runtime children node — the
     /// stagger is ordinary window placement, so lagged needs no
     /// runtime kind of its own. `anim_name` keeps the authoring identity.
     fn into_anim_node(mut self) -> AnimNode {
         self.materialize_fills();
         let duration_secs = self.duration_secs;
         AnimNode {
-            content: NodeContent::Stack(self.animations),
+            content: NodeContent::Children(self.animations),
             internal_time_secs: duration_secs,
             rate_func: None,
             time_range: 0.0..duration_secs,
+            end_inclusive: true,
             enabled: true,
             anim_name: type_name::<Self>(),
         }

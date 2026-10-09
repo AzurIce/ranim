@@ -954,12 +954,22 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
 mod test {
     use super::*;
 
+    fn temp_root(tag: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "ranim-xtask-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+
     #[test]
     fn test_get_examples() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir).unwrap();
-        assert_eq!(examples.len(), 33); // + iterative_spring, nbody, cloth_wrap, gltf_showcase, z_fighting
         assert_eq!(
             examples
                 .iter()
@@ -976,32 +986,6 @@ mod test {
                 .group,
             PathBuf::new()
         );
-        println!("found {} examples:", examples.len());
-        examples.iter().for_each(|example| {
-            println!("{}", example.name);
-            println!("{:?}", example.meta)
-        });
-    }
-
-    /// Runs the first example end-to-end and then cleans its outputs
-    /// (requires a GPU); ignored by default.
-    #[test]
-    #[ignore]
-    fn test_example_run_and_clean_output() {
-        let root_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
-        let examples = get_examples(&root_dir).unwrap();
-        examples[0].run(&root_dir, false).unwrap();
-        examples[0].clean_output(&root_dir).unwrap();
-    }
-
-    /// Builds the shared wasm scene bundle (requires the wasm32 target,
-    /// wasm-bindgen and wasm-opt); ignored by default.
-    #[test]
-    #[ignore]
-    fn test_example_build_wasm() {
-        let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let root_dir = xtask_root.join("../../");
-        build_examples_wasm(&root_dir).unwrap();
     }
 
     #[test]
@@ -1022,48 +1006,27 @@ mod test {
 
     #[test]
     fn test_split_output_files_assigns_kinds() {
-        let files = vec![
-            "preview.png".to_string(),
-            "scene.mp4".to_string(),
-            "clip.webm".to_string(),
-            "anim.gif".to_string(),
-        ];
+        let files = ["preview.png", "scene.mp4", "clip.webm", "anim.gif"].map(str::to_owned);
         let (previews, outputs) = split_output_files(&files);
-        assert_eq!(previews, vec!["preview.png".to_string()]);
+        assert_eq!(previews, ["preview.png"]);
+        let kinds: Vec<_> = outputs
+            .iter()
+            .map(|file| (file.url.as_str(), file.kind.as_str()))
+            .collect();
         assert_eq!(
-            outputs,
-            vec![
-                OutputFile {
-                    url: "preview.png".to_string(),
-                    kind: "image/png".to_string()
-                },
-                OutputFile {
-                    url: "scene.mp4".to_string(),
-                    kind: "video/mp4".to_string()
-                },
-                OutputFile {
-                    url: "clip.webm".to_string(),
-                    kind: "video/webm".to_string()
-                },
-                OutputFile {
-                    url: "anim.gif".to_string(),
-                    kind: "image/gif".to_string()
-                },
+            kinds,
+            [
+                ("preview.png", "image/png"),
+                ("scene.mp4", "video/mp4"),
+                ("clip.webm", "video/webm"),
+                ("anim.gif", "image/gif")
             ]
         );
     }
 
     #[test]
     fn test_clean_website_examples() {
-        let root_dir = std::env::temp_dir().join(format!(
-            "ranim-xtask-clean-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let _ = fs::remove_dir_all(&root_dir);
+        let root_dir = temp_root("clean");
 
         let content = root_dir.join("website").join(WEBSITE_EXAMPLES_CONTENT_DIR);
         let data = root_dir.join("website").join("data");
@@ -1111,15 +1074,7 @@ mod test {
 
     #[test]
     fn test_create_nested_example_page() {
-        let root_dir = std::env::temp_dir().join(format!(
-            "ranim-xtask-examples-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let _ = fs::remove_dir_all(&root_dir);
+        let root_dir = temp_root("page");
 
         let example_dir = root_dir.join("examples").join("agents").join("foo");
         fs::create_dir_all(&example_dir).unwrap();

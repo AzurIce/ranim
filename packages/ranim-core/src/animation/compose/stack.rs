@@ -57,10 +57,11 @@ impl IntoAnimNode for AnimStack {
     fn into_anim_node(self) -> AnimNode {
         let duration_secs = self.duration_secs;
         AnimNode {
-            content: NodeContent::Stack(self.animations),
+            content: NodeContent::Children(self.animations),
             internal_time_secs: duration_secs,
             rate_func: None,
             time_range: 0.0..duration_secs,
+            end_inclusive: true,
             enabled: true,
             anim_name: type_name::<Self>(),
         }

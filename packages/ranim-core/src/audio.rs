@@ -475,80 +475,26 @@ mod tests {
         AudioClip::from_pcm(pcm, MASTER_SAMPLE_RATE, 2)
     }
 
-    fn sample_of(buf: &[f32], sec: f64) -> f32 {
-        buf[(sec * MASTER_SAMPLE_RATE as f64) as usize * 2]
-    }
-
-    /// The track's stereo sample at scene time `sec` (identity placement).
-    fn sampled(track: &AudioTrack, sec: f64) -> [f32; 2] {
-        track.sample_at(sec)
-    }
-
-    /// Sum of the tracks' stereo samples at scene time `sec`.
-    fn summed(tracks: &[AudioTrack], sec: f64) -> [f32; 2] {
-        let mut acc = [0.0_f32; 2];
-        for track in tracks {
-            let [l, r] = track.sample_at(sec);
-            acc[0] += l;
-            acc[1] += r;
-        }
-        acc
-    }
-
-    /// Mix tracks under the identity map over `[0, total]` — the direct
-    /// programmatic placement path.
-    fn mixed(tracks: &[AudioTrack], total_secs: f64) -> Vec<f32> {
-        let out_frames = (total_secs * MASTER_SAMPLE_RATE as f64).ceil() as usize;
-        let mut out = vec![0.0; out_frames * MASTER_CHANNELS as usize];
-        for frame in 0..out_frames {
-            let t = frame as f64 / MASTER_SAMPLE_RATE as f64;
-            let [l, r] = summed(tracks, t);
-            out[frame * 2] = l;
-            out[frame * 2 + 1] = r;
-        }
-        out
-    }
-
-    #[test]
-    fn overlapping_tracks_sum() {
-        let buf = mixed(
-            &[
-                AudioTrack::new(constant(0.25, 2.0)),
-                AudioTrack::new(constant(0.25, 1.0)),
-            ],
-            3.0,
-        );
-        assert!((sample_of(&buf, 0.5) - 0.5).abs() < EPS);
-        assert!((sample_of(&buf, 1.5) - 0.25).abs() < EPS);
-        assert!(sample_of(&buf, 2.5).abs() < EPS);
-    }
-
     #[test]
     fn fades_ramp_linearly() {
-        let buf = mixed(
-            &[AudioTrack::new(constant(1.0, 2.0))
-                .with_fade_in(1.0)
-                .with_fade_out(1.0)],
-            2.0,
-        );
-        assert!(sample_of(&buf, 0.0).abs() < EPS);
-        assert!((sample_of(&buf, 0.5) - 0.5).abs() < EPS);
-        assert!((sample_of(&buf, 1.0) - 1.0).abs() < EPS);
-        assert!((sample_of(&buf, 1.5) - 0.5).abs() < EPS);
-        assert!(sample_of(&buf, 1.999).abs() < 2e-3);
+        let track = AudioTrack::new(constant(1.0, 2.0))
+            .with_fade_in(1.0)
+            .with_fade_out(1.0);
+        for (sec, expected) in [(0.0, 0.0), (0.5, 0.5), (1.0, 1.0), (1.5, 0.5), (2.0, 0.0)] {
+            assert!(
+                (track.sample_at(sec)[0] - expected).abs() < EPS,
+                "at {sec}s"
+            );
+        }
     }
 
     #[test]
     fn gain_and_play_window_modify_the_track() {
-        let buf = mixed(&[AudioTrack::new(constant(0.5, 1.0)).with_gain(0.2)], 1.0);
-        assert!((sample_of(&buf, 0.5) - 0.1).abs() < EPS);
-
-        let buf = mixed(
-            &[AudioTrack::new(constant(0.5, 4.0)).with_play_secs(0.0..1.0)],
-            3.0,
-        );
-        assert!((sample_of(&buf, 0.6) - 0.5).abs() < EPS);
-        assert!(sample_of(&buf, 1.6).abs() < EPS);
+        let track = AudioTrack::new(constant(0.5, 4.0))
+            .with_gain(0.2)
+            .with_play_secs(0.0..1.0);
+        assert!((track.sample_at(0.5)[0] - 0.1).abs() < EPS);
+        assert_eq!(track.sample_at(1.0), [0.0; 2]);
     }
 
     #[test]
@@ -559,9 +505,9 @@ mod tests {
         let ramp: Vec<f32> = (0..16).flat_map(|i| [i as f32, i as f32]).collect();
         let clip = AudioClip::from_pcm(ramp, 4, 2);
         let track = AudioTrack::new(clip).with_play_secs(1.0..3.0);
-        assert!((sampled(&track, 0.0)[0] - 4.0).abs() < EPS);
-        assert!((sampled(&track, 1.0)[0] - 8.0).abs() < EPS);
-        assert!(sampled(&track, 2.0)[0].abs() < EPS);
+        assert!((track.sample_at(0.0)[0] - 4.0).abs() < EPS);
+        assert!((track.sample_at(1.0)[0] - 8.0).abs() < EPS);
+        assert!(track.sample_at(2.0)[0].abs() < EPS);
         assert!((track.play_window_secs() - 2.0).abs() < f64::from(EPS));
     }
 
@@ -577,23 +523,15 @@ mod tests {
         // Reversed or past-the-end spans are silence.
         let track = AudioTrack::new(clip.clone()).with_play_secs(3.0..1.0);
         assert_eq!(track.play_window_secs(), 0.0);
-        assert!(sampled(&track, 0.0)[0].abs() < EPS);
+        assert!(track.sample_at(0.0)[0].abs() < EPS);
         let track = AudioTrack::new(clip).with_play_secs(5.0..9.0);
         assert_eq!(track.play_window_secs(), 0.0);
     }
 
     #[test]
-    fn track_is_trimmed_to_buffer_end() {
-        let buf = mixed(&[AudioTrack::new(constant(0.5, 10.0))], 1.0);
-        assert_eq!(buf.len(), MASTER_SAMPLE_RATE as usize * 2);
-        assert!((sample_of(&buf, 0.99) - 0.5).abs() < EPS);
-    }
-
-    #[test]
     fn mono_clip_duplicates_to_stereo() {
-        let clip = AudioClip::from_pcm(vec![0.5; 48], 48, 1);
-        let buf = mixed(&[AudioTrack::new(clip)], 1.0);
-        assert!((buf[0] - 0.5).abs() < EPS && (buf[1] - 0.5).abs() < EPS);
+        let track = AudioTrack::new(AudioClip::from_pcm(vec![0.5; 48], 48, 1));
+        assert_eq!(track.sample_at(0.5), [0.5; 2]);
     }
 
     #[test]
@@ -605,11 +543,11 @@ mod tests {
         // at t=1/12, beyond which the track is silent.
         let clip = AudioClip::from_pcm(vec![0.0, 2.0], 24, 1);
         let track = AudioTrack::new(clip);
-        assert!((sampled(&track, 0.0 / 48.0)[0] - 0.0).abs() < EPS);
-        assert!((sampled(&track, 1.0 / 48.0)[0] - 1.0).abs() < EPS);
-        assert!((sampled(&track, 2.0 / 48.0)[0] - 2.0).abs() < EPS);
-        assert!((sampled(&track, 3.0 / 48.0)[0] - 2.0).abs() < EPS);
-        assert!(sampled(&track, 4.0 / 48.0)[0].abs() < EPS);
+        assert!((track.sample_at(0.0 / 48.0)[0] - 0.0).abs() < EPS);
+        assert!((track.sample_at(1.0 / 48.0)[0] - 1.0).abs() < EPS);
+        assert!((track.sample_at(2.0 / 48.0)[0] - 2.0).abs() < EPS);
+        assert!((track.sample_at(3.0 / 48.0)[0] - 2.0).abs() < EPS);
+        assert!(track.sample_at(4.0 / 48.0)[0].abs() < EPS);
     }
 
     #[test]

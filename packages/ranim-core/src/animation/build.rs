@@ -15,13 +15,19 @@ use crate::core_item::AnyExtractCoreItem;
 
 use super::{
     eval::Eval,
-    node::{AnimNode, NodeContent},
+    node::{AnimNode, LeafContent, NodeContent},
 };
 
 /// A definition that can be lowered into the runtime animation tree.
 pub trait IntoAnimNode: Sized {
     /// Lower this definition into its local runtime representation.
     fn into_anim_node(self) -> AnimNode;
+}
+
+impl IntoAnimNode for AnimNode {
+    fn into_anim_node(self) -> AnimNode {
+        self
+    }
 }
 
 /// Capability for animation definitions that have not been fixed in parent
@@ -74,11 +80,12 @@ where
 {
     fn into_anim_node(self) -> AnimNode {
         AnimNode {
-            content: NodeContent::Leaf(Box::new(self)),
+            content: NodeContent::Leaf(LeafContent::Anim(Box::new(self))),
             internal_time_secs: 1.0,
             anim_name: type_name::<E>(),
             rate_func: None,
             time_range: 0.0..1.0,
+            end_inclusive: true,
             enabled: true,
         }
     }

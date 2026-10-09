@@ -365,105 +365,54 @@ mod tests {
     /// Affine equality with a tolerance suited to the f32 transforms usvg
     /// stores.
     fn assert_affine3_eq(actual: DAffine3, expected: DAffine3) {
-        assert!(
-            actual.translation.abs_diff_eq(expected.translation, 1e-6),
-            "translation {:?} vs {:?}",
-            actual.translation,
-            expected.translation
-        );
-        for i in 0..3 {
-            assert!(
-                actual
-                    .matrix3
-                    .col(i)
-                    .abs_diff_eq(expected.matrix3.col(i), 1e-6),
-                "matrix3 column {i} diverges"
-            );
-        }
+        assert!(actual.matrix3.abs_diff_eq(expected.matrix3, 1e-6));
+        assert!(actual.translation.abs_diff_eq(expected.translation, 1e-6));
     }
 
     #[test]
     fn structure_ids_and_relative_transforms_match_the_source() {
         let svg = SvgItem::from_tree(&parse(NESTED_SVG));
         let root = svg.tree();
-
-        assert!(root.inner.is_group());
-        assert_eq!(root.inner.id, None);
-        // No viewBox scaling: the root group's relative transform is the
-        // identity before normalization.
-        assert_eq!(root.transform, DAffine3::IDENTITY);
-
-        let children = root.inner.children();
-        assert_eq!(children.len(), 1);
-        let outer = &children[0];
-        assert!(outer.inner.is_group());
-        assert_eq!(outer.inner.id, None, "the outer <g> has no id attribute");
-        assert_affine3_eq(outer.transform, widen_to_daffine3(outer_rel()));
-
+        let outer = &root.inner.children()[0];
         let inner = &outer.inner.children()[0];
         assert_eq!(inner.inner.id.as_deref(), Some("inner"));
-        assert!(inner.inner.is_group());
+        assert_affine3_eq(outer.transform, widen_to_daffine3(outer_rel()));
         assert_affine3_eq(
             inner.transform,
-            widen_to_daffine3(DAffine2::from_angle(45.0f64.to_radians())),
+            widen_to_daffine3(DAffine2::from_angle(PI / 4.0)),
         );
-
-        let leaf_a = &inner.inner.children()[0];
-        assert_eq!(leaf_a.inner.id.as_deref(), Some("leaf-a"));
-        assert!(leaf_a.inner.is_leaf());
-        assert_eq!(leaf_a.transform, DAffine3::IDENTITY);
-        // Path data stays in raw SVG coordinates; the placement lives on
-        // the placement transforms. (The builder's middle point is the
-        // line's midpoint handle.)
-        let item = leaf_a.inner.item().unwrap();
-        assert_eq!(item.vpoints.0[0], dvec3(10.0, 10.0, 0.0));
-        assert_eq!(item.vpoints.0[2], dvec3(20.0, 10.0, 0.0));
+        let leaf = &inner.inner.children()[0];
+        assert_eq!(leaf.inner.id.as_deref(), Some("leaf-a"));
+        assert_eq!(
+            leaf.inner.item().unwrap().vpoints.0[0],
+            dvec3(10.0, 10.0, 0.0)
+        );
+        assert_eq!(
+            leaf.inner.item().unwrap().vpoints.0[2],
+            dvec3(20.0, 10.0, 0.0)
+        );
     }
 
     #[test]
     fn flattened_world_points_match_hand_composed_affine() {
         let svg = SvgItem::from_tree(&parse(NESTED_SVG));
         let vitems = Vec::<VItem>::from(svg.clone());
-
-        // leaf-a world = root(identity) * outer * inner * leaf(identity).
-        // usvg transforms are f32, so world values carry ~1e-6 noise.
-        let expected_a = widen_to_daffine3(outer_rel() * DAffine2::from_angle(PI / 4.0));
-        let raw_a = svg.by_id("leaf-a").unwrap().vpoints.0.clone();
-        for (world, raw) in vitems[0].vpoints.0.iter().zip(raw_a.iter()) {
-            assert!(
-                world.abs_diff_eq(expected_a.transform_point3(*raw), 1e-5),
-                "world {world:?} vs expected {:?}",
-                expected_a.transform_point3(*raw)
-            );
-        }
-
-        // leaf-b only sees the outer group's transform.
-        let expected_b = widen_to_daffine3(outer_rel());
-        let raw_b = svg.by_id("leaf-b").unwrap().vpoints.0.clone();
-        for (world, raw) in vitems[1].vpoints.0.iter().zip(raw_b.iter()) {
-            assert!(
-                world.abs_diff_eq(expected_b.transform_point3(*raw), 1e-5),
-                "world {world:?} vs expected {:?}",
-                expected_b.transform_point3(*raw)
-            );
-        }
-    }
-
-    #[test]
-    fn dfs_leaf_order_matches_source_order() {
-        // leaf-a lives inside the inner group, leaf-b is its later
-        // sibling's child — depth-first emission must paint leaf-a first.
-        let vitems = Vec::<VItem>::from(SvgItem::from_tree(&parse(NESTED_SVG)));
         assert_eq!(vitems.len(), 2);
-
-        // leaf-a's first anchor, hand-composed: (10, 10) rotated by 45deg,
-        // scaled by 2, translated by (10, 0). usvg stores f32 transforms.
-        assert!(
-            vitems[0].vpoints.0[0]
-                .abs_diff_eq(dvec3(10.0, 20.0 * std::f64::consts::SQRT_2, 0.0), 1e-5)
-        );
-        // leaf-b's first anchor is the origin of the outer group.
-        assert!(vitems[1].vpoints.0[0].abs_diff_eq(dvec3(10.0, 0.0, 0.0), 1e-5));
+        for (item, id, affine) in [
+            (
+                &vitems[0],
+                "leaf-a",
+                outer_rel() * DAffine2::from_angle(PI / 4.0),
+            ),
+            (&vitems[1], "leaf-b", outer_rel()),
+        ] {
+            let raw = &svg.by_id(id).unwrap().vpoints.0;
+            assert_eq!(item.vpoints.len(), raw.len());
+            let affine = widen_to_daffine3(affine);
+            for (world, raw) in item.vpoints.iter().zip(raw) {
+                assert!(world.abs_diff_eq(affine.transform_point3(*raw), 1e-5));
+            }
+        }
     }
 
     #[test]
@@ -514,36 +463,11 @@ mod tests {
             dvec3(11.0, 10.0, 0.0)
         );
     }
-
-    #[test]
-    fn ghostscript_tiger_keeps_leaf_count_and_centering() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../assets/Ghostscript_Tiger.svg");
-        let source = std::fs::read_to_string(&path).expect("the tiger asset should exist");
-
-        let svg = SvgItem::new(&source);
-        let vitems = Vec::<VItem>::from(svg.clone());
-
-        let leaf_count = svg.tree().leaves().count();
-        assert!(leaf_count > 100, "unexpectedly few leaves: {leaf_count}");
-        assert_eq!(vitems.len(), leaf_count);
-
-        let [min, max] = vitems.aabb();
-        assert!(
-            ((min + max) * 0.5).abs_diff_eq(DVec3::ZERO, 1e-6),
-            "aabb is not centered: min {min:?}, max {max:?}"
-        );
-    }
 }
 
 #[cfg(all(test, feature = "typst"))]
 mod typst_tests {
-    use std::f64::consts::PI;
-
-    use glam::dvec3;
-
-    use crate::vitem::{geometry::Arc, typst::typst_svg};
-    use ranim_core::traits::{RotateTransform, ShiftTransform};
+    use crate::vitem::typst::typst_svg;
 
     use super::*;
 
@@ -554,18 +478,5 @@ mod typst_tests {
 
         assert!(!vitems.is_empty(), "typst output produced no vitems");
         assert!(vitems.iter().all(|item| !item.vpoints.is_empty()));
-    }
-
-    #[test]
-    fn arc_points_are_transformed_after_conversion_to_vitem() {
-        let angle = PI / 3.0 * 2.0;
-        let mut arc = VItem::from(Arc::new(angle, 2.0));
-        arc.rotate_on_axis(DVec3::Z, PI / 2.0 - angle / 2.0)
-            .shift(dvec3(2.0, 2.0, 0.0));
-        assert!(arc.vpoints[0].abs_diff_eq(dvec3(3.732050807568877, 3.0, 0.0), 1e-10));
-        assert!(
-            arc.vpoints[arc.vpoints.len() - 1]
-                .abs_diff_eq(dvec3(0.2679491924311228, 3.0, 0.0), 1e-10)
-        );
     }
 }

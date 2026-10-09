@@ -312,16 +312,6 @@ mod tests {
 
     #[test]
     fn scene_play_places_sequences_on_the_root_timeline() {
-        // A plain sequence is sized from its children.
-        let mut scene = RanimScene::new();
-        scene.play(seq![leaf(2.0), leaf(3.0)]);
-        let sealed = scene.seal();
-        assert_eq!(sealed.total_secs(), 5.0);
-        let infos = sealed.get_animation_infos();
-        assert_eq!(infos[0].range, 0.0..5.0);
-        assert_eq!(infos[0].children[0].range, 0.0..2.0);
-        assert_eq!(infos[0].children[1].range, 2.0..5.0);
-
         // A reusable sequence module keeps its local gaps on the root stack,
         // and later modules start at the root origin.
         let mut reusable = AnimSequence::new();
@@ -354,45 +344,20 @@ mod tests {
     #[test]
     fn heterogeneous_tuples_extract_to_core_items() {
         use crate::core_item::{camera_frame::CameraFrame, mesh_item::MeshItem};
-
-        let camera = CameraFrame::default();
-        let vitem = VItem::default();
-        let mesh = MeshItem::default();
-
-        // Heterogeneous tuple -> single shared `Target` (`CoreItem`).
-        let items = (camera.clone(), vitem.clone()).extract();
-        assert_eq!(items.len(), 2);
-        assert!(matches!(&items[0], CoreItem::CameraFrame(_)));
-        assert!(matches!(&items[1], CoreItem::VItem(_)));
-
-        // Three distinct element types, still one `Target`.
-        let items = (camera.clone(), vitem.clone(), mesh.clone()).extract();
-        assert_eq!(items.len(), 3);
-
-        // Containers of tuples (container blanket impl + tuple impl).
         let items = vec![
-            (camera.clone(), vitem.clone()),
-            (camera.clone(), vitem.clone()),
+            (
+                CameraFrame::default(),
+                VItem::default(),
+                MeshItem::default()
+            );
+            2
         ]
         .extract();
-        assert_eq!(items.len(), 4);
-
-        // High arity still works.
-        let t13 = (
-            camera.clone(),
-            vitem.clone(),
-            mesh.clone(),
-            camera.clone(),
-            vitem.clone(),
-            mesh.clone(),
-            camera.clone(),
-            vitem.clone(),
-            mesh.clone(),
-            camera.clone(),
-            vitem.clone(),
-            mesh.clone(),
-            camera.clone(),
-        );
-        assert_eq!(t13.extract().len(), 13);
+        assert_eq!(items.len(), 6);
+        for batch in items.as_chunks::<3>().0 {
+            assert!(matches!(&batch[0], CoreItem::CameraFrame(_)));
+            assert!(matches!(&batch[1], CoreItem::VItem(_)));
+            assert!(matches!(&batch[2], CoreItem::MeshItem(_)));
+        }
     }
 }

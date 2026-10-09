@@ -131,43 +131,11 @@ mod tests {
         RanimScene, SealedRanimScene,
         animation::{
             build::{PlaybackExt, Unplaced},
-            eval::Eval,
+            eval::{Eval, iterative::Iterative},
         },
         core_item::vitem::VItem,
         seq,
     };
-
-    /// A constant-velocity iterative segment: x accumulates with progress.
-    /// `sim_step` is the content's own step (1/N); `logical_secs` scales it
-    /// back to physical seconds. State lives behind a `RefCell` because
-    /// `eval_alpha` is a `&self` query.
-    struct ConstantVelocity {
-        v: f64,
-        logical_secs: f64,
-        sim_step: f64,
-        state: std::cell::RefCell<(f64, f64)>, // (x, alpha)
-    }
-
-    impl Eval for ConstantVelocity {
-        type Output = VItem;
-
-        fn eval_alpha(&self, target: f64) -> VItem {
-            let mut s = self.state.borrow_mut();
-            if target < s.1 {
-                s.0 = 0.0;
-                s.1 = 0.0;
-            }
-            let start_idx = (s.1 / self.sim_step).floor() as usize;
-            let end_idx = (target / self.sim_step).floor() as usize;
-            for _ in start_idx..end_idx {
-                s.0 += self.v * self.sim_step * self.logical_secs;
-            }
-            s.1 = target;
-            let mut item = VItem::default();
-            item.points[0].x = s.0 as f32;
-            item
-        }
-    }
 
     /// A stateless segment: x = alpha.
     struct ProgressX;
@@ -192,13 +160,20 @@ mod tests {
             .collect()
     }
 
-    fn cv(v: f64, logical_secs: f64) -> ConstantVelocity {
-        ConstantVelocity {
-            v,
-            logical_secs,
-            sim_step: 1.0 / 120.0,
-            state: std::cell::RefCell::new((0.0, 0.0)),
-        }
+    fn cv(v: f64, logical_secs: f64) -> impl Unplaced {
+        Iterative::from_fn(VItem::default(), move |state: &mut VItem, _, delta| {
+            state.points[0].x += (v * logical_secs * delta) as f32;
+        })
+        .with_steps(120)
+    }
+
+    fn assert_x(frame: &EvaluatedFrame, expected: f32) {
+        let values = xs_of(frame);
+        assert_eq!(values.len(), 1);
+        assert!(
+            (values[0] - expected).abs() < 1e-5,
+            "{values:?} vs {expected}"
+        );
     }
 
     #[test]
@@ -225,7 +200,7 @@ mod tests {
         for sec in [0.0, 0.5, 1.0, 1.5, 2.0] {
             let mut frame = EvaluatedFrame::new();
             ev.sample_at(sec, &mut frame);
-            assert_eq!(xs_of(&frame), vec![sec as f32], "at sec={sec}");
+            assert_x(&frame, sec as f32);
         }
 
         // Nested inside a sequence the leaf still steps on its own timeline.
@@ -241,7 +216,7 @@ mod tests {
         for (sec, expected) in [(1.5, 0.5), (2.0, 1.0)] {
             let mut frame = EvaluatedFrame::new();
             ev.sample_at(sec, &mut frame);
-            assert_eq!(xs_of(&frame), vec![expected], "at sec={sec}");
+            assert_x(&frame, expected);
         }
     }
 
@@ -270,7 +245,7 @@ mod tests {
         };
         let forward = run(single(), false);
         assert_eq!(forward, run(single(), true));
-        assert_eq!(forward[2], vec![(2.0 * 1.1) as f32]);
+        assert!((forward[2][0] - 2.2).abs() < 1e-5);
 
         let nested = || {
             let mut scene = RanimScene::new();

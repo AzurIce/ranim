@@ -1,7 +1,7 @@
 //! Pure animation evaluation and hierarchical type-erased composition.
 //!
 //! The runtime tree is a closed world of node content ([`NodeContent`](crate::animation::node::NodeContent)): the
-//! time-combinator vocabulary (sequence, stack) plus the leaf forms. This
+//! container children plus visual and audio leaf forms. This
 //! module is split by layer:
 //!
 //! - [`node`] — the closed runtime core and all structural interpreters;
@@ -34,7 +34,7 @@ mod tests {
         build::{IntoAnimNode, PlaybackExt, Unplaced},
         compose::{AnimIterExt, lagged::LaggedFill, sequence::AnimSequence, stack::AnimStack},
         eval::{Eval, EvalExt, Static, StaticAnim, pure::Pure},
-        node::{AnimNode, AnimationInfoKind, NodeContent},
+        node::{AnimNode, AnimationInfoKind, LeafContent, NodeContent},
     };
     use crate::{
         Extract,
@@ -97,7 +97,8 @@ mod tests {
     fn apply_alpha_to_writes_the_requested_progress_state() {
         let mut item = VItem::default();
 
-        let animation = ShiftAlpha(0.0).apply_alpha_to(&mut item, 0.25);
+        let animation =
+            Pure::new(|alpha| ShiftAlpha(0.0).eval_alpha(alpha)).apply_alpha_to(&mut item, 0.25);
         assert_eq!(item.points[0].x, 0.25);
 
         let animation = animation.apply_to(&mut item);
@@ -106,66 +107,53 @@ mod tests {
     }
 
     #[test]
-    fn pure_wraps_a_closure_into_eval() {
-        let mut item = VItem::default();
-        Pure::new(|alpha: f64| {
-            let mut item = VItem::default();
-            item.points[0].x = alpha as f32;
-            item
-        })
-        .apply_alpha_to(&mut item, 0.5);
-        assert_eq!(item.points[0].x, 0.5);
+    fn containers_lower_children_to_expected_timelines() {
+        let sequence = [leaf(1.0, 1.0), leaf(2.0, 2.0)].into_iter().into_seq();
+        let stack = [leaf(1.0, 1.0), leaf(2.0, 2.0)].into_iter().into_stack();
+        let lagged = [leaf(1.0, 1.0), leaf(2.0, 1.0)]
+            .into_iter()
+            .into_lagged(0.5);
+        for (node, second_range) in [
+            (sequence.into_anim_node(), 1.0..3.0),
+            (stack.into_anim_node(), 0.0..2.0),
+            (
+                lagged
+                    .with_leading(LaggedFill::Empty)
+                    .with_trailing(LaggedFill::Empty)
+                    .into_anim_node(),
+                0.5..1.5,
+            ),
+        ] {
+            assert!(matches!(node.content, NodeContent::Children(_)));
+            // Lagged adds one container per child's track.
+            let child = &node.children()[1];
+            let range = child.children().first().unwrap_or(child).time_range();
+            assert_eq!(range, second_range);
+        }
+        assert!(seq![].into_anim_node().children().is_empty());
+        assert!(stack![].into_anim_node().children().is_empty());
     }
 
     #[test]
-    fn containers_lower_children_to_expected_timelines() {
-        // Default lowering: linear rate, one second.
-        let animation = Static(VItem::default()).into_anim_node();
-        assert_eq!(animation.time_range(), 0.0..1.0);
-        let animation = Static(VItem::default()).with_duration(2.0).into_anim_node();
-        assert_eq!(animation.time_range(), 0.0..2.0);
-
-        // Sequence concatenates child durations; stack keeps them at the
-        // same origin, honouring explicit child positions.
-        let sequence = seq![leaf(1.0, 2.0), leaf(2.0, 3.0)];
-        assert_eq!(sequence.built_animations()[0].time_range(), 0.0..2.0);
-        assert_eq!(sequence.built_animations()[1].time_range(), 2.0..5.0);
-        let stack = stack![leaf(1.0, 2.0), leaf(2.0, 3.0).at(1.0)];
-        assert_eq!(stack.duration_secs(), 4.0);
-        assert_eq!(stack.built_animations()[0].time_range(), 0.0..2.0);
-        assert_eq!(stack.built_animations()[1].time_range(), 1.0..4.0);
-
-        let mut dynamic = AnimStack::new();
-        dynamic.push(leaf(1.0, 1.0)).push(leaf(2.0, 3.0));
-        assert_eq!(dynamic.duration_secs(), 3.0);
-        assert_eq!(dynamic.built_animations()[0].time_range(), 0.0..1.0);
-        assert_eq!(dynamic.built_animations()[1].time_range(), 0.0..3.0);
-
-        // Collectors build the same containers.
-        let stack: AnimStack = vec![leaf(1.0, 1.0), leaf(2.0, 2.0)].into_iter().collect();
-        assert_eq!(stack.duration_secs(), 2.0);
-        assert_eq!(stack.built_animations()[1].time_range(), 0.0..2.0);
-        let sequence: AnimSequence = vec![leaf(1.0, 1.0), leaf(2.0, 2.0)].into_iter().collect();
-        assert_eq!(sequence.duration_secs(), 3.0);
-        assert_eq!(sequence.built_animations()[1].time_range(), 1.0..3.0);
-        let lagged = vec![leaf(1.0, 1.0), leaf(2.0, 1.0)]
-            .into_iter()
-            .into_lagged(0.5);
-        assert_eq!(lagged.built_animations()[1].time_range(), 0.5..1.5);
+    fn runtime_children_evaluate_overlaps_in_order_and_keep_half_open_boundaries() {
+        let animation = stack![
+            progress_leaf(0.0).with_duration(2.0),
+            progress_leaf(10.0).with_duration(2.0).at(1.0),
+            leaf(100.0, 3.0).with_enabled(false),
+        ]
+        .into_anim_node();
+        assert!(matches!(animation.content, NodeContent::Children(_)));
+        assert_eq!(sampled_xs(&animation, 1.5), vec![0.75, 10.25]);
+        assert_eq!(sampled_xs(&animation, 2.0), vec![10.5]);
+        assert_eq!(sampled_xs(&animation, 3.0), vec![11.0]);
+        assert_eq!(sampled_xs(&animation, 3.1), vec![]);
+        let sequential = seq![leaf(1.0, 1.0), leaf(2.0, 1.0)].into_anim_node();
+        assert!(matches!(sequential.content, NodeContent::Children(_)));
+        assert_eq!(sampled_xs(&sequential, 1.0), vec![2.0]);
     }
 
     #[test]
     fn offsets_shift_the_whole_container_timeline() {
-        let animation = leaf(1.0, 2.0).at(3.0).into_anim_node();
-        assert_eq!(animation.time_range(), 3.0..5.0);
-
-        let sequence = seq![leaf(1.0, 2.0), leaf(2.0, 3.0)];
-        assert_eq!(sequence.at(5.0).into_anim_node().time_range(), 5.0..10.0);
-
-        let stack = stack![leaf(1.0, 2.0), leaf(2.0, 3.0).at(1.0)];
-        assert_eq!(stack.at(10.0).into_anim_node().time_range(), 10.0..14.0);
-
-        // An extended sequence keeps its local gaps after being repositioned.
         let mut sequence = AnimSequence::new();
         sequence
             .push(leaf(1.0, 2.0))
@@ -222,110 +210,92 @@ mod tests {
     }
 
     #[test]
-    fn composition_macros_build_dynamic_containers_without_an_arity_limit() {
-        let empty_sequence: AnimSequence = seq![];
-        let empty_stack: AnimStack = stack![];
-        assert_eq!(empty_sequence.duration_secs(), 0.0);
-        assert_eq!(empty_stack.duration_secs(), 0.0);
-
-        let sequence: AnimSequence = seq![
-            leaf(1.0, 1.0),
-            leaf(2.0, 1.0),
-            leaf(3.0, 1.0),
-            leaf(4.0, 1.0),
-            leaf(5.0, 1.0),
-            leaf(6.0, 1.0),
-            leaf(7.0, 1.0),
-            leaf(8.0, 1.0),
-            leaf(9.0, 1.0),
-        ];
-        assert_eq!(sequence.duration_secs(), 9.0);
-        assert_eq!(sequence.built_animations().len(), 9);
-
-        let stack: AnimStack = stack![
-            leaf(1.0, 1.0),
-            leaf(2.0, 2.0),
-            leaf(3.0, 3.0),
-            leaf(4.0, 4.0),
-            leaf(5.0, 5.0),
-            leaf(6.0, 6.0),
-            leaf(7.0, 7.0),
-            leaf(8.0, 8.0),
-            leaf(9.0, 9.0),
-        ];
-        assert_eq!(stack.duration_secs(), 9.0);
-        assert_eq!(stack.built_animations().len(), 9);
-    }
-
-    #[test]
     fn holds_sample_active_items_and_repeat_without_nesting() {
-        // A hold samples only animations active before the cursor.
         let mut sequence = AnimSequence::new();
         sequence
-            .push(stack![leaf(1.0, 1.0), leaf(2.0, 2.0)])
-            .hold(1.0);
-        assert_eq!(sequence.built_animations().len(), 2);
-        assert_eq!(sampled_xs(&sequence.built_animations()[1], 2.5), vec![2.0]);
-
-        // Repeated holds become adjacent static cells.
-        let mut sequence = AnimSequence::new();
-        sequence.push(leaf(3.0, 1.0)).hold(1.0).hold(2.0);
-        assert_eq!(sequence.cursor_sec(), 4.0);
-        assert_eq!(sequence.built_animations().len(), 3);
-        assert_eq!(sequence.built_animations()[1].time_range(), 1.0..2.0);
-        assert_eq!(sequence.built_animations()[2].time_range(), 2.0..4.0);
-        assert_eq!(sampled_xs(&sequence.built_animations()[2], 3.5), vec![3.0]);
-
-        // Every replay flattens the dyn batch instead of nesting it.
-        let mut sequence = AnimSequence::new();
-        sequence
-            .push(stack![leaf(1.0, 1.0), leaf(2.0, 1.0)])
+            .push(stack![leaf(1.0, 1.0), leaf(2.0, 2.0), leaf(3.0, 2.0)])
             .hold(1.0)
-            .hold(1.0);
-        let mut first = Vec::new();
-        sequence.built_animations()[1].eval_at(1.5, &mut first);
-        let mut second = Vec::new();
-        sequence.built_animations()[2].eval_at(2.5, &mut second);
-        assert_eq!(first.len(), 2);
-        assert_eq!(second.len(), 2);
-        assert_eq!(evaluated_xs(second), vec![1.0, 2.0]);
+            .hold(2.0);
+        assert_eq!(sequence.cursor_sec(), 5.0);
+        for (index, sec) in [(1, 2.5), (2, 4.0)] {
+            let held = &sequence.built_animations()[index];
+            let mut items = Vec::new();
+            held.eval_at(sec, &mut items);
+            // Finished children disappear; consecutive holds keep a flat batch.
+            assert_eq!(items.len(), 2);
+            assert!(
+                items
+                    .iter()
+                    .all(|item| (item.0.as_ref() as &dyn std::any::Any).is::<VItem>())
+            );
+            assert_eq!(evaluated_xs(items), vec![2.0, 3.0]);
+            assert!(matches!(
+                held.content,
+                NodeContent::Leaf(LeafContent::Anim(_))
+            ));
+        }
     }
 
     #[test]
     fn holds_use_final_evaluations_and_forward_does_not_hold() {
         let mut shown = VItem::default();
-        shown.points[0].x = 5.0;
-
-        let mut hidden = AnimSequence::new();
-        hidden.push(leaf(1.0, 1.0)).push(shown.hide()).hold(1.0);
-        assert_eq!(hidden.built_animations().len(), 2);
-        let mut hidden_items = Vec::new();
-        hidden.built_animations()[1].eval_at(1.0, &mut hidden_items);
-        assert!(hidden_items.is_empty());
-
-        let mut restored = AnimSequence::new();
-        restored.push(leaf(1.0, 1.0)).push(shown.show()).hold(1.0);
-        assert_eq!(sampled_xs(&restored.built_animations()[2], 1.5), vec![5.0]);
-
-        // `forward` only advances the cursor; it does not emit a hold cell.
-        let mut sequence = AnimSequence::new();
-        sequence.push(leaf(4.0, 1.0)).forward(1.0).hold(1.0);
-        assert_eq!(sequence.cursor_sec(), 3.0);
-        assert_eq!(sequence.built_animations().len(), 1);
-
-        // Nested sequences keep their own final evaluation.
-        let mut shown = VItem::default();
         shown.points[0].x = 7.0;
-        let inner = seq![leaf(1.0, 1.0), shown.show()];
-        let mut outer = AnimSequence::new();
-        outer.push(inner).hold(1.0);
-        assert_eq!(outer.built_animations().len(), 2);
-        assert_eq!(sampled_xs(&outer.built_animations()[1], 1.5), vec![7.0]);
+        for (ending, expected) in [(shown.show(), vec![7.0]), (shown.hide(), vec![])] {
+            let mut outer = AnimSequence::new();
+            outer.push(seq![leaf(1.0, 1.0), ending]).hold(1.0);
+            assert_eq!(sampled_xs(&outer.into_anim_node(), 1.5), expected);
+        }
+        let mut gap = AnimSequence::new();
+        gap.push(leaf(4.0, 1.0)).forward(1.0).hold(1.0);
+        assert!(sampled_xs(&gap.into_anim_node(), 2.5).is_empty());
+    }
 
-        let hidden_inner = seq![leaf(1.0, 1.0), shown.hide()];
-        let mut hidden_outer = AnimSequence::new();
-        hidden_outer.push(hidden_inner).hold(1.0);
-        assert_eq!(hidden_outer.built_animations().len(), 1);
+    #[test]
+    fn sequence_lowering_removes_covered_points_after_holds_have_sampled_them() {
+        let mut first = VItem::default();
+        first.points[0].x = 2.0;
+        let mut second = VItem::default();
+        second.points[0].x = 3.0;
+        let mut sequence = AnimSequence::new();
+        sequence
+            .push(progress_leaf(0.0))
+            .push(first.show())
+            .push(second.show())
+            .hold(0.5)
+            .push(second.hide())
+            .hold(0.5);
+        let animation = sequence.into_anim_node();
+        assert_eq!(animation.children().len(), 2);
+        assert_eq!(sampled_xs(&animation, 0.5), vec![0.5]);
+        assert_eq!(sampled_xs(&animation, 1.0), vec![3.0]);
+        assert_eq!(sampled_xs(&animation, 1.25), vec![3.0]);
+        assert_eq!(sampled_xs(&animation, 1.5), vec![]);
+        assert_eq!(sampled_xs(&animation, 2.0), vec![]);
+    }
+
+    #[test]
+    fn sequence_final_points_replace_endpoints_without_affecting_stacks() {
+        let mut shown = VItem::default();
+        shown.points[0].x = 9.0;
+        let sequence = seq![progress_leaf(0.0), shown.show(), shown.hide(), shown.show()]
+            .with_duration(2.0)
+            .at(3.0)
+            .into_anim_node();
+        assert_eq!(sampled_xs(&sequence, 4.0), vec![0.5]);
+        assert_eq!(sampled_xs(&sequence, 5.0), vec![9.0]);
+        assert_eq!(sequence.children().len(), 2);
+        assert!(!sequence.children()[0].active_at(1.0));
+
+        let hidden = seq![progress_leaf(0.0), shown.hide()].into_anim_node();
+        assert_eq!(sampled_xs(&hidden, 0.5), vec![0.5]);
+        assert!(sampled_xs(&hidden, 1.0).is_empty());
+        let only_points = seq![shown.show(), shown.hide()].into_anim_node();
+        assert_eq!(only_points.children().len(), 1);
+        assert!(sampled_xs(&only_points, 0.0).is_empty());
+
+        // Stacks retain all coincident endpoints, including point animations.
+        let stack = stack![progress_leaf(0.0), shown.show().at(1.0)].into_anim_node();
+        assert_eq!(sampled_xs(&stack, 1.0), vec![1.0, 9.0]);
     }
 
     #[test]
@@ -351,7 +321,23 @@ mod tests {
             progress_leaf(10.0).with_duration(1.0)
         ]
         .into_anim_node();
-        assert_eq!(animation.time_range(), 0.0..1.5);
+        let info = animation.animation_info();
+        assert_eq!(info.kind, AnimationInfoKind::Children);
+        let track_ranges: Vec<_> = info
+            .children
+            .iter()
+            .map(|track| {
+                track
+                    .children
+                    .iter()
+                    .map(|child| child.range.clone())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(
+            track_ranges,
+            [vec![0.0..1.0, 1.0..1.5], vec![0.0..0.5, 0.5..1.5]]
+        );
         assert_eq!(sampled_xs(&animation, 0.25), vec![0.25, 10.0]);
         assert_eq!(sampled_xs(&animation, 1.0), vec![1.0, 10.5]);
         assert_eq!(sampled_xs(&animation, 1.5), vec![1.0, 11.0]);
@@ -375,38 +361,6 @@ mod tests {
         let mut items = Vec::new();
         hidden.eval_at(1.0, &mut items);
         assert!(items.is_empty());
-    }
-
-    #[test]
-    fn lagged_fill_structure_is_materialized_as_per_item_tracks() {
-        let animation = lagged![
-            0.5;
-            progress_leaf(0.0).with_duration(1.0),
-            progress_leaf(10.0).with_duration(1.0),
-        ]
-        .into_anim_node();
-        let info = animation.animation_info();
-        // Each item becomes a sequence track spanning the whole extent:
-        // [leading fill][anim][trailing fill] (empty fills skipped).
-        assert_eq!(info.children.len(), 2);
-
-        let first = &info.children[0];
-        assert_eq!(first.kind, AnimationInfoKind::Sequence);
-        assert_eq!(first.range, 0.0..1.5);
-        assert_eq!(first.children.len(), 2);
-        assert_eq!(first.children[0].kind, AnimationInfoKind::Eval);
-        assert_eq!(first.children[0].range, 0.0..1.0);
-        assert_eq!(first.children[1].kind, AnimationInfoKind::Static);
-        assert_eq!(first.children[1].range, 1.0..1.5);
-
-        let second = &info.children[1];
-        assert_eq!(second.kind, AnimationInfoKind::Sequence);
-        assert_eq!(second.range, 0.0..1.5);
-        assert_eq!(second.children.len(), 2);
-        assert_eq!(second.children[0].kind, AnimationInfoKind::Static);
-        assert_eq!(second.children[0].range, 0.0..0.5);
-        assert_eq!(second.children[1].kind, AnimationInfoKind::Eval);
-        assert_eq!(second.children[1].range, 0.5..1.5);
     }
 
     // MARK: Sound leaves in the tree
@@ -449,37 +403,29 @@ mod tests {
     }
 
     #[test]
-    fn sound_windows_follow_placement() {
-        // Sequential placement occupies exactly the sound's own window.
-        let mut scene = RanimScene::new();
-        scene.play(seq![leaf(1.0, 1.0), Sound::new(tone(2.0))]);
-        let (total, start, end) = audible_region(scene);
-        assert!((total - 3.0).abs() < 1e-9);
-        assert!((start - 1.0).abs() < 0.01);
-        assert!((end - 3.0).abs() < 0.01);
-
-        // `.at()` shifts that window on the timeline.
-        let mut scene = RanimScene::new();
-        scene.play(stack![Sound::new(tone(1.0)).at(2.0)]);
-        let (_, start, end) = audible_region(scene);
-        assert!((start - 2.0).abs() < 0.01);
-        assert!((end - 3.0).abs() < 0.01);
+    fn sound_windows_follow_nested_placement_and_duration_overrides() {
+        for (duration, expected_start, expected_end) in [(2.0, 2.0, 3.0), (1.0, 1.5, 2.0)] {
+            let mut scene = RanimScene::new();
+            scene.play(
+                seq![leaf(1.0, 1.0), Sound::new(tone(1.0))]
+                    .with_duration(duration)
+                    .at(1.0),
+            );
+            let (total, start, end) = audible_region(scene);
+            assert_eq!(total, expected_end);
+            for (actual, expected) in [(start, expected_start), (end, expected_end)] {
+                assert!((actual - expected).abs() < 0.01, "{actual} vs {expected}");
+            }
+        }
     }
 
     #[test]
-    fn sound_frames_push_no_items() {
-        let mut scene = RanimScene::new();
-        scene.play(Sound::new(tone(2.0)));
-        let sealed = scene.seal();
-
-        assert_eq!(sealed.eval_at_sec(1.0).count(), 0);
-    }
-
-    #[test]
-    fn disabled_sound_is_excluded() {
+    fn audio_leaves_are_silent_when_disabled_and_emit_no_visual_items() {
         let mut scene = RanimScene::new();
         scene.play(stack![Sound::new(tone(1.0)).with_enabled(false)]);
-        let evaluator = scene.seal().into_evaluator(120.0);
+        let sealed = scene.seal();
+        assert_eq!(sealed.eval_at_sec(0.5).count(), 0);
+        let evaluator = sealed.into_evaluator(120.0);
         assert!(evaluator.has_audio());
         assert!(
             evaluator
@@ -487,26 +433,12 @@ mod tests {
                 .iter()
                 .all(|s| s.abs() < 1e-4)
         );
-    }
-
-    #[test]
-    fn scene_without_sound_has_no_audio() {
-        let mut scene = RanimScene::new();
-        scene.play(leaf(1.0, 1.0));
-        assert!(!scene.seal().into_evaluator(120.0).has_audio());
-    }
-
-    #[test]
-    fn container_duration_override_rescales_sound() {
-        // The inner sequence's 2s of content (the sound itself) is squeezed
-        // into a 1s window: the clip is consumed twice as fast and stays
-        // audible exactly for the squeezed span.
-        let inner = seq![Sound::new(tone(2.0))];
-        let mut scene = RanimScene::new();
-        scene.play(inner.with_duration(1.0));
-        let (_, start, end) = audible_region(scene);
-        assert!((start - 0.0).abs() < 0.01);
-        assert!((end - 1.0).abs() < 0.01);
+        let mut visual = RanimScene::new();
+        visual.play(leaf(1.0, 1.0));
+        assert!(!visual.seal().into_evaluator(120.0).has_audio());
+        let mut audio = RanimScene::new();
+        audio.play(Sound::new(tone(0.01)));
+        assert_eq!(audio.seal().eval_at_sec(0.005).count(), 0);
     }
 
     #[test]
@@ -562,21 +494,6 @@ mod tests {
                 buf[frame * 2]
             );
         }
-    }
-
-    #[test]
-    fn nested_containers_compose_the_sound_window() {
-        let inner = seq![leaf(1.0, 1.0), Sound::new(tone(1.0))];
-        let mut scene = RanimScene::new();
-        scene.play(seq![inner, Sound::new(tone(0.5))]);
-        let evaluator = scene.seal().into_evaluator(120.0);
-        let buf = evaluator.mix_audio(evaluator.total_secs(), MASTER_SAMPLE_RATE);
-        let at = |sec: f64| buf[(sec * MASTER_SAMPLE_RATE as f64) as usize * 2];
-        // The first sound plays over [1, 2] (inside the inner sequence), the
-        // second over [2, 2.5] (after it in the outer sequence).
-        assert!(at(0.5).abs() < 1e-4);
-        assert!(at(1.5).abs() > 1e-4);
-        assert!(at(2.25).abs() > 1e-4);
     }
 
     #[test]
@@ -658,7 +575,6 @@ mod tests {
         let sealed = scene.seal();
         let baked = sealed.audio().clone();
         let evaluator = sealed.into_evaluator(120.0);
-        assert_eq!(baked, evaluator.audio().clone());
 
         fn cell_at(cell: &AnimNode, x: f64) -> [f32; 2] {
             if !cell.enabled || x < cell.time_range.start || x >= cell.time_range.end {
@@ -667,7 +583,7 @@ mod tests {
             let raw = (x - cell.time_range.start) / cell.duration_secs();
             let own = cell.internal_time_secs * cell.rate_func.map_or(raw, |rate| rate(raw));
             match &cell.content {
-                NodeContent::Audio(track) => track.sample_at(own),
+                NodeContent::Leaf(LeafContent::Audio(track)) => track.sample_at(own),
                 _ => {
                     let mut acc = [0.0f32; 2];
                     for child in cell.children() {

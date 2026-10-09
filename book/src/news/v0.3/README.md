@@ -39,6 +39,7 @@
 - 动画组织系统
   - 弃用 `Timeline`（迁移到 `AnimSequence`/`AnimStack`）
   - 运行时节点统一为 `AnimNode { timing shell, NodeContent }`；`AnimationCell<T>` 不再存在，播放参数改为 `Paramed<A>` / `At<A>`，放置状态由 `Unplaced` 表达
+  - `AnimationInfoKind` 收敛为 `Anim` / `Children` / `Audio`；检查动画树时按子片段窗口判断顺序或重叠，`inspect tree` 的 `kind` 对应为 `anim` / `children` / `audio`
   - 作者协议改名与分层：`Animation` → `IntoAnimNode`（`build()` → `into_anim_node()`），`Placeable` → `Unplaced`，`AnimationExt` → `PlaybackExt`
   - 模块路径分层：`animation::node`（运行时核心）、`animation::eval`（叶子协议与适配器）、`animation::build`（lowering / playback）、`animation::compose`（sequence/stack/lagged）、`animation::sound`（音频叶子）
   - *ranim-anims* 中全部内置动画创建工具方法现在默认用 `linear` 速率函数和 `1.0` 持续秒数
@@ -130,12 +131,16 @@ r.play(seq![anim.clone(), anim]);
 
 ```text
 NodeContent
-├─ Sequence(Vec<AnimNode>)
-├─ Stack(Vec<AnimNode>)
-├─ Leaf(Box<dyn EvalDyn>)
-├─ Static(Vec<DynItem>)
-└─ Audio(Box<AudioTrack>)
+├─ Children(Vec<AnimNode>)
+└─ Leaf(LeafContent)
+   ├─ Anim(Box<dyn EvalDyn>)
+   └─ Audio(Box<AudioTrack>)
 ```
+
+顺序、并行与交错组合都在构造期安排时间窗口，运行时统一遍历命中的 children。
+`AnimSequence::into_anim_node` 消解被覆盖的零时长片段，并排除被末尾
+`show()` / `hide()` 覆盖的前一片段的右端点；嵌套 sequence 保留相同的末态。
+静态保持和 lagged 的边缘填充也统一为 `Static<Vec<DynItem>>` 动画叶子。
 
 叶子通过 `Eval` 保持开放，lowering 协议则是 `IntoAnimNode`：
 
@@ -524,7 +529,7 @@ v0.3 后期 ranim 的一个明确用户是 **coding agent**：它没有稳定的
 **验证分层，贵的留到最后。** 新增的 `inspect` 三个子命令全部纯 CPU、不创建 GPU context、支持 `--format json`（顶层带 `schema_version`，供脚本解析）：
 
 - `inspect scenes`：不调用场景构造函数，只列出 dylib 里注册的场景与 `#[output]` 摘要——开工第一步确认场景注册成功、输出配置无误；
-- `inspect tree`：构建场景并输出层级动画树，每个节点含 `kind`（eval/sequence/stack/lagged/static）、`anim_name`、父局部坐标下的 `range`、`content_duration_secs`、`rate_func`、`enabled`，迭代节点额外报告自己的 `sim_step`——时序与组织是否正确，无需渲染即可确认；
+- `inspect tree`：构建场景并输出层级动画树，每个节点含 `kind`（anim/children/audio）、`anim_name`、父局部坐标下的 `range`、`content_duration_secs`、`rate_func`、`enabled`，迭代节点额外报告自己的 `sim_step`——时序与组织是否正确，无需渲染即可确认；
 - `inspect frame <scene> --at <sec>`：以 120 Hz 逻辑时钟采样一帧，报告每个 CoreItem 的 `z_order`、id/kind、来源与几何摘要（AABB、点数、颜色；`--verbose` 给完整几何）——"某时刻物件不对/位置不对/z-order 不对"不再需要上 GPU 盲调。
 
 **快速冒烟与正式交付分离。** 原 `ranim render` 一分为二：`ranim output [scenes...]` 批量渲染每个声明的 `#[output]`、处理 `TimeMark::Capture` 截图，是交付前的最终验证；`ranim render <scene>` 用固定默认设置（1080p60 mp4）把单个场景快速渲一次，忽略 `#[output]` 与 Capture——迭代中只想看效果时用。内部由 `RenderJob` 抽象统一两条路径。

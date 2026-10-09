@@ -5,7 +5,7 @@ use std::any::type_name;
 use crate::core_item::DynItem;
 
 use crate::animation::build::{IntoAnimNode, Unplaced};
-use crate::animation::node::{AnimNode, NodeContent, static_cell};
+use crate::animation::node::{AnimNode, NodeContent, constant_node};
 
 /// Dynamic sequential animation container.
 ///
@@ -90,8 +90,10 @@ impl AnimSequence {
         self.eval_at_content_sec(self.cursor_sec, &mut state);
 
         if !state.is_empty() {
-            self.animations
-                .push(static_cell(state, self.cursor_sec..self.cursor_sec + secs));
+            self.animations.push(constant_node(
+                state,
+                self.cursor_sec..self.cursor_sec + secs,
+            ));
         }
         self.cursor_sec += secs;
         self
@@ -132,13 +134,38 @@ impl AnimSequence {
 
 impl Unplaced for AnimSequence {}
 impl IntoAnimNode for AnimSequence {
+    /// Lower placements to children, discarding covered point animations and
+    /// excluding earlier endpoints when a final point supplies the final frame.
     fn into_anim_node(self) -> AnimNode {
         let duration_secs = self.cursor_sec;
+        // Point clips only match at the final content boundary. Holds have
+        // already sampled the authoring sequence, so earlier point clips can
+        // now be removed, including points covered by a later final clip.
+        let last_at_end = self
+            .animations
+            .iter()
+            .rposition(|animation| animation.contains_sec(duration_secs, duration_secs));
+        let children = self
+            .animations
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, mut animation)| {
+                if animation.duration_secs() == 0.0 && Some(index) != last_at_end {
+                    None
+                } else {
+                    if animation.time_range.end == duration_secs && Some(index) != last_at_end {
+                        animation.end_inclusive = false;
+                    }
+                    Some(animation)
+                }
+            })
+            .collect();
         AnimNode {
-            content: NodeContent::Sequence(self.animations),
+            content: NodeContent::Children(children),
             internal_time_secs: duration_secs,
             rate_func: None,
             time_range: 0.0..duration_secs,
+            end_inclusive: true,
             enabled: true,
             anim_name: type_name::<Self>(),
         }

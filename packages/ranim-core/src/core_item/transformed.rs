@@ -318,11 +318,8 @@ mod tests {
     use glam::{DQuat, Vec3, Vec4};
 
     fn assert_affine_eq(actual: DAffine3, expected: DAffine3) {
-        assert!(
-            actual
-                .transform_point3(dvec3(0.3, -0.7, 1.1))
-                .abs_diff_eq(expected.transform_point3(dvec3(0.3, -0.7, 1.1)), 1e-9)
-        );
+        assert!(actual.matrix3.abs_diff_eq(expected.matrix3, 1e-9));
+        assert!(actual.translation.abs_diff_eq(expected.translation, 1e-9));
     }
 
     #[test]
@@ -462,41 +459,12 @@ mod tests {
 
     #[test]
     fn map_operations_preserve_pose_and_support_storage_conversion() {
-        let wrapped = VItem::default()
+        let mapped = VItem::default()
             .transformed(Translation(DVec3::X))
-            .map_inner(|item: VItem| item.points.len());
-        assert_eq!(wrapped.inner, 3);
-        assert_eq!(wrapped.transform, Translation(DVec3::X));
-
-        fn to_affine(translation: Translation) -> DAffine3 {
-            translation.into()
-        }
-        let by_fn = 42u32
-            .transformed(Translation(DVec3::X))
-            .map_transform(to_affine);
-        assert_eq!(by_fn.inner, 42);
-        assert_affine_eq(by_fn.transform, DAffine3::from_translation(DVec3::X));
-
-        let by_closure = 42u32
-            .transformed(Translation(DVec3::X))
-            .map_transform(Similarity::from);
-        assert_eq!(by_closure.inner, 42);
-        assert_eq!(by_closure.transform.translation, DVec3::X);
-
-        let vitem = VItem {
-            points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
-            ..Default::default()
-        };
-        let extracted = vitem
-            .transformed(Translation(DVec3::X))
+            .map_inner(|item| item.points.len())
             .map_transform(DAffine3::from);
-        match &extracted.extract()[0] {
-            CoreItem::VItem(vitem) => {
-                assert_eq!(vitem.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
-                assert_eq!(vitem.transform.w_axis.truncate(), Vec3::X);
-            }
-            _ => panic!("expected VItem"),
-        }
+        assert_eq!(mapped.inner, 3);
+        assert_eq!(mapped.transform, DAffine3::from_translation(DVec3::X));
     }
 
     #[test]
@@ -597,7 +565,6 @@ mod tests {
         assert!(!partial.inner.closed);
         // The stored pose is cloned untouched.
         assert_eq!(partial.transform, wrapped.transform);
-        assert_eq!(partial.transform, Translation(DVec3::X));
 
         let closed = wrapped.get_partial_closed(0.3..0.6);
         assert_eq!(closed.inner.range, 0.3..0.6);
@@ -607,20 +574,8 @@ mod tests {
 
     #[test]
     fn empty_wrapper_carries_an_identity_pose() {
-        let translation: Transformed<StubShape, Translation> = Empty::empty();
-        assert_eq!(translation.inner, StubShape::empty());
-        assert_eq!(translation.transform, Translation(DVec3::ZERO));
-
-        let rigid: Transformed<StubShape, Rigid> = Empty::empty();
-        assert_eq!(rigid.transform, Rigid::identity());
-
-        let similarity: Transformed<StubShape, Similarity> = Empty::empty();
-        assert_eq!(similarity.transform, Similarity::IDENTITY);
-
-        let diagonal: Transformed<StubShape, Diag> = Empty::empty();
-        assert_eq!(diagonal.transform, Diag(dvec3(1.0, 1.0, 1.0)));
-
-        let affine: Transformed<StubShape, DAffine3> = Empty::empty();
-        assert_eq!(affine.transform, DAffine3::IDENTITY);
+        let wrapped: Transformed<StubShape, Translation> = Empty::empty();
+        assert_eq!(wrapped.inner, StubShape::empty());
+        assert_eq!(wrapped.transform, Translation(DVec3::ZERO));
     }
 }

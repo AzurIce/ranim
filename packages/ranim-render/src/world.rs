@@ -151,7 +151,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reconciliation_preserves_identity_and_change_ticks() {
+    fn reconciliation_preserves_identity_skips_unchanged_items_and_replaces_kinds() {
         let mut world = World::new();
         world.init_resource::<CoreItemEntities>();
         let mut frame = RenderFrame::new();
@@ -165,16 +165,6 @@ mod tests {
 
         assert_eq!(world.resource::<CoreItemEntities>().0[&(1, 2)], entity);
         assert_eq!(changed.iter(&world).count(), 0);
-    }
-
-    #[test]
-    fn reconciliation_replaces_the_core_item_kind() {
-        let mut world = World::new();
-        world.init_resource::<CoreItemEntities>();
-        let mut frame = RenderFrame::new();
-        frame.update([((1, 2), CoreItem::VItem(VItem::default()))].into_iter());
-        reconcile(&mut world, &frame);
-        let entity = world.resource::<CoreItemEntities>().0[&(1, 2)];
 
         frame.update([((1, 2), CoreItem::MeshItem(MeshItem::default()))].into_iter());
         reconcile(&mut world, &frame);

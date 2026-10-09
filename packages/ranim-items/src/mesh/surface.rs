@@ -238,28 +238,17 @@ mod tests {
             Surface::from_uv_func(|u, v| dvec3(u, v, 0.0), (0.0, 1.0), (0.0, 1.0), (3, 3));
         assert_eq!(surface.vertices.len(), 9);
         assert_eq!(surface.triangle_indices.len(), 24);
-        assert_eq!(surface.resolution, (3, 3));
+        let CoreItem::MeshItem(mesh) = &surface.extract()[0] else {
+            panic!("expected MeshItem")
+        };
+        assert_eq!(mesh.points.len(), surface.vertices.len());
+        assert_eq!(mesh.triangle_indices, surface.triangle_indices);
 
         // Check corners
         assert_eq!(surface.vertices[0], dvec3(0.0, 0.0, 0.0));
         assert_eq!(surface.vertices[2], dvec3(0.0, 1.0, 0.0));
         assert_eq!(surface.vertices[6], dvec3(1.0, 0.0, 0.0));
         assert_eq!(surface.vertices[8], dvec3(1.0, 1.0, 0.0));
-    }
-
-    #[test]
-    fn test_surface_extract() {
-        let surface =
-            Surface::from_uv_func(|u, v| dvec3(u, v, 0.0), (0.0, 1.0), (0.0, 1.0), (2, 2));
-        let items = surface.extract();
-        assert_eq!(items.len(), 1);
-        match &items[0] {
-            CoreItem::MeshItem(mesh) => {
-                assert_eq!(mesh.points.len(), 4);
-                assert_eq!(mesh.triangle_indices.len(), 6);
-            }
-            _ => panic!("expected MeshItem"),
-        }
     }
 
     #[test]

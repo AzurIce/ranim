@@ -5,7 +5,7 @@
 //! [`pure::Pure`](crate::animation::eval::pure::Pure) adapts a closure
 //! and [`iterative::Iterative`](crate::animation::eval::iterative::Iterative)
 //! adapts a stepping function into that protocol. `EvalDyn` is the
-//! runtime-erased leaf dispatch held by `NodeContent::Leaf`.
+//! runtime-erased leaf dispatch held by `LeafContent::Anim`.
 
 use crate::core_item::{AnyExtractCoreItem, DynItem};
 
@@ -78,7 +78,7 @@ impl<E: Eval + Sized> EvalExt for E {}
 /// The erased visual-leaf protocol: [`Eval`] without its type.
 ///
 /// This is the only type-erased box in the runtime tree
-/// (`NodeContent::Leaf`) — the open world of user evaluators. Containers are
+/// (`LeafContent::Anim`) — the open world of user evaluators. Containers are
 /// closed runtime variants and never implement this.
 pub(super) trait EvalDyn {
     /// Evaluate this leaf's content at its normalized progress `alpha`,
@@ -97,7 +97,13 @@ where
     E::Output: AnyExtractCoreItem,
 {
     fn eval_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        output.push(DynItem(Box::new(self.eval_alpha(alpha))));
+        let mut value = self.eval_alpha(alpha);
+        // Captured batches are already erased; flatten them to avoid nested holds.
+        if let Some(items) = (&mut value as &mut dyn std::any::Any).downcast_mut::<Vec<DynItem>>() {
+            output.append(items);
+        } else {
+            output.push(DynItem(Box::new(value)));
+        }
     }
 
     fn sim_step(&self) -> Option<f64> {
@@ -106,6 +112,7 @@ where
 }
 
 /// A constant evaluator.
+#[derive(Clone)]
 pub struct Static<T: Clone>(pub T);
 
 impl<T: Clone> Eval for Static<T> {

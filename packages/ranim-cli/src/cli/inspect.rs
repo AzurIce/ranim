@@ -245,10 +245,8 @@ fn range_to_array(range: &std::ops::Range<f64>) -> [f64; 2] {
 
 fn animation_kind_str(kind: AnimationInfoKind) -> &'static str {
     match kind {
-        AnimationInfoKind::Eval => "eval",
-        AnimationInfoKind::Sequence => "sequence",
-        AnimationInfoKind::Stack => "stack",
-        AnimationInfoKind::Static => "static",
+        AnimationInfoKind::Anim => "anim",
+        AnimationInfoKind::Children => "children",
         AnimationInfoKind::Audio => "audio",
     }
 }
@@ -756,7 +754,7 @@ mod tests {
     fn sample_animation_info() -> AnimationInfo {
         AnimationInfo {
             anim_name: "AnimSequence".to_string(),
-            kind: AnimationInfoKind::Sequence,
+            kind: AnimationInfoKind::Children,
             range: 0.0..8.0,
             content_duration_secs: 8.0,
             rate_func: rate_functions::linear,
@@ -764,7 +762,7 @@ mod tests {
             sim_step: None,
             children: vec![AnimationInfo {
                 anim_name: "FadeIn<VItem>".to_string(),
-                kind: AnimationInfoKind::Eval,
+                kind: AnimationInfoKind::Anim,
                 range: 0.0..3.0,
                 content_duration_secs: 3.0,
                 rate_func: rate_functions::smooth,
@@ -779,14 +777,14 @@ mod tests {
     fn maps_animation_info_to_tree_dto() {
         let node = animation_info_to_tree_node(&sample_animation_info(), vec![0]);
         assert_eq!(node.path, [0]);
-        assert_eq!(node.kind, "sequence");
+        assert_eq!(node.kind, "children");
         assert_eq!(node.anim_name, "AnimSequence");
         assert_eq!(node.range, [0.0, 8.0]);
         assert_eq!(node.rate_func, "linear");
         assert!(node.enabled);
         assert_eq!(node.children.len(), 1);
         assert_eq!(node.children[0].path, [0, 0]);
-        assert_eq!(node.children[0].kind, "eval");
+        assert_eq!(node.children[0].kind, "anim");
         assert_eq!(node.children[0].rate_func, "smooth");
 
         fn custom(_t: f64) -> f64 {

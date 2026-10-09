@@ -28,11 +28,11 @@ type AnimationPath = Vec<usize>;
 struct VisibleClip {
     path: AnimationPath,
     global_range: Range<f64>,
-    sequence_depth: usize,
+    serial_depth: usize,
 }
 
 #[derive(Clone)]
-struct SequenceBand {
+struct SerialBand {
     path: AnimationPath,
     global_range: Range<f64>,
     depth: usize,
@@ -43,10 +43,10 @@ struct VisibleTrack {
     depth: usize,
     global_range: Range<f64>,
     clips: Vec<VisibleClip>,
-    sequence_bands: Vec<SequenceBand>,
+    serial_bands: Vec<SerialBand>,
 }
 
-struct ExpandedStack {
+struct ExpandedContainer {
     path: AnimationPath,
     global_range: Range<f64>,
 }
@@ -427,9 +427,9 @@ impl TimelineState {
                 &font_id,
                 &small_font_id,
             );
-            self.paint_sequence_bands(&painter, time_track_rect, track);
+            self.paint_serial_bands(&painter, time_track_rect, track);
             self.paint_track_clips(ui, &painter, time_track_rect, track, &font_id);
-            self.paint_stack_rails(
+            self.paint_container_rails(
                 &painter,
                 time_rect,
                 tracks,
@@ -507,8 +507,8 @@ impl TimelineState {
         }
 
         let indent_x = rect.left() + 6.0 + track.depth as f32 * INDENT_WIDTH;
-        let is_expandable_stack = is_stack_like(info.kind) && !info.children.is_empty();
-        let label_x = if is_expandable_stack {
+        let expandable = is_expandable_container(info) && !info.children.is_empty();
+        let label_x = if expandable {
             let marker = if self.expanded.contains(&track.path) {
                 egui_phosphor::regular::CARET_DOWN
             } else {
@@ -547,7 +547,7 @@ impl TimelineState {
         painter.with_clip_rect(label_rect).text(
             pos2(label_x, rect.center().y),
             Align2::LEFT_CENTER,
-            display_anim_name(info),
+            short_anim_name(&info.anim_name),
             font_id.clone(),
             text_color,
         );
@@ -563,7 +563,7 @@ impl TimelineState {
             self.selected = Some(track.path.clone());
         }
 
-        if is_expandable_stack {
+        if expandable {
             let toggle_rect = Rect::from_min_size(
                 pos2(indent_x, rect.top() + 4.0),
                 vec2(18.0, rect.height() - 8.0),
@@ -580,13 +580,8 @@ impl TimelineState {
         }
     }
 
-    fn paint_sequence_bands(
-        &self,
-        painter: &egui::Painter,
-        track_rect: Rect,
-        track: &VisibleTrack,
-    ) {
-        for band in &track.sequence_bands {
+    fn paint_serial_bands(&self, painter: &egui::Painter, track_rect: Rect, track: &VisibleTrack) {
+        for band in &track.serial_bands {
             let start_x = self.x_from_sec(track_rect, band.global_range.start);
             let end_x = self.x_from_sec(track_rect, band.global_range.end);
             if track_rect.right() < start_x || end_x < track_rect.left() {
@@ -614,7 +609,7 @@ impl TimelineState {
                     .stroke
                     .color
             } else {
-                animation_color(AnimationInfoKind::Sequence).gamma_multiply(0.55)
+                animation_color(AnimationInfoKind::Children).gamma_multiply(0.55)
             };
             painter.rect_filled(rect, CornerRadius::same(3), color.gamma_multiply(0.12));
             painter.line_segment(
@@ -642,7 +637,7 @@ impl TimelineState {
                 continue;
             }
 
-            let nested_inset = (5.0 + clip.sequence_depth as f32 * 1.5).min(9.0);
+            let nested_inset = (5.0 + clip.serial_depth as f32 * 1.5).min(9.0);
             let zero_duration =
                 (clip.global_range.end - clip.global_range.start).abs() < f64::EPSILON;
             let visible_start = start_x.max(track_rect.left());
@@ -684,7 +679,7 @@ impl TimelineState {
 
                     run_end_sec = next.global_range.end;
                     run_end_x = run_end_x.max(next_visible_end);
-                    run_inset = run_inset.max((5.0 + next.sequence_depth as f32 * 1.5).min(9.0));
+                    run_inset = run_inset.max((5.0 + next.serial_depth as f32 * 1.5).min(9.0));
                     run_selected |= self.selected.as_ref() == Some(&next.path);
                     clip_index += 1;
                 }
@@ -747,7 +742,8 @@ impl TimelineState {
                 self.selected = Some(clip.path.clone());
             }
 
-            if is_stack_like(info.kind) && !info.children.is_empty() && clip.path != track.path {
+            if is_expandable_container(info) && !info.children.is_empty() && clip.path != track.path
+            {
                 let marker = if self.expanded.contains(&clip.path) {
                     egui_phosphor::regular::CARET_DOWN
                 } else {
@@ -785,7 +781,7 @@ impl TimelineState {
         selected: bool,
         hovered: bool,
     ) {
-        let mut color = animation_color(AnimationInfoKind::Sequence).gamma_multiply(0.78);
+        let mut color = animation_color(AnimationInfoKind::Children).gamma_multiply(0.78);
         if hovered {
             color = color.gamma_multiply(1.15);
         }
@@ -869,7 +865,7 @@ impl TimelineState {
             }
         }
 
-        let label_inset = if is_stack_like(info.kind) && !info.children.is_empty() {
+        let label_inset = if is_expandable_container(info) && !info.children.is_empty() {
             17.0
         } else {
             5.0
@@ -882,14 +878,14 @@ impl TimelineState {
             painter.with_clip_rect(label_rect).text(
                 pos2(label_rect.left(), label_rect.center().y),
                 Align2::LEFT_CENTER,
-                display_anim_name(info),
+                short_anim_name(&info.anim_name),
                 font_id.clone(),
                 Color32::BLACK,
             );
         }
     }
 
-    fn paint_stack_rails(
+    fn paint_container_rails(
         &self,
         painter: &egui::Painter,
         time_rect: Rect,
@@ -900,7 +896,7 @@ impl TimelineState {
     ) {
         for clip in &track.clips {
             let info = animation_info_at_path(&self.animation_infos, &clip.path);
-            if !is_stack_like(info.kind) || !self.expanded.contains(&clip.path) {
+            if !is_expandable_container(info) || !self.expanded.contains(&clip.path) {
                 continue;
             }
 
@@ -1000,16 +996,16 @@ impl TimelineState {
 fn collect_default_expanded(
     infos: &[AnimationInfo],
     path: &mut AnimationPath,
-    stack_depth: usize,
+    container_depth: usize,
     expanded: &mut HashSet<AnimationPath>,
 ) {
     for (index, info) in infos.iter().enumerate() {
         path.push(index);
-        if is_stack_like(info.kind) && !info.children.is_empty() && stack_depth < 2 {
+        if is_expandable_container(info) && !info.children.is_empty() && container_depth < 2 {
             expanded.insert(path.clone());
         }
-        let next_stack_depth = stack_depth + usize::from(is_stack_like(info.kind));
-        collect_default_expanded(&info.children, path, next_stack_depth, expanded);
+        let next_container_depth = container_depth + usize::from(is_expandable_container(info));
+        collect_default_expanded(&info.children, path, next_container_depth, expanded);
         path.pop();
     }
 }
@@ -1024,125 +1020,108 @@ fn collect_tracks(
     expanded: &HashSet<AnimationPath>,
     output: &mut Vec<VisibleTrack>,
 ) {
-    match info.kind {
-        AnimationInfoKind::Sequence => {
-            let mut clips = Vec::new();
-            let mut sequence_bands = Vec::new();
-            let mut expanded_stacks = Vec::new();
-            collect_sequence_content(
-                info,
-                path,
-                global_range.clone(),
-                0,
-                expanded,
-                &mut clips,
-                &mut sequence_bands,
-                &mut expanded_stacks,
-            );
-            output.push(VisibleTrack {
-                path: path.clone(),
-                depth,
-                global_range,
-                clips,
-                sequence_bands,
-            });
+    if is_serial_container(info) {
+        let mut clips = Vec::new();
+        let mut serial_bands = Vec::new();
+        let mut expanded_containers = Vec::new();
+        collect_serial_content(
+            info,
+            path,
+            global_range.clone(),
+            0,
+            expanded,
+            &mut clips,
+            &mut serial_bands,
+            &mut expanded_containers,
+        );
+        output.push(VisibleTrack {
+            path: path.clone(),
+            depth,
+            global_range,
+            clips,
+            serial_bands,
+        });
 
-            for stack in expanded_stacks {
-                let stack_info = animation_info_at_path(roots, &stack.path);
-                for (index, child) in stack_info.children.iter().enumerate() {
-                    let mut child_path = stack.path.clone();
-                    child_path.push(index);
-                    let child_range =
-                        map_child_range(stack_info, &stack.global_range, &child.range);
-                    collect_tracks(
-                        roots,
-                        child,
-                        &mut child_path,
-                        depth + 1,
-                        child_range,
-                        expanded,
-                        output,
-                    );
-                }
+        for container in expanded_containers {
+            let container_info = animation_info_at_path(roots, &container.path);
+            for (index, child) in container_info.children.iter().enumerate() {
+                let mut child_path = container.path.clone();
+                child_path.push(index);
+                let child_range =
+                    map_child_range(container_info, &container.global_range, &child.range);
+                collect_tracks(
+                    roots,
+                    child,
+                    &mut child_path,
+                    depth + 1,
+                    child_range,
+                    expanded,
+                    output,
+                );
             }
         }
-        AnimationInfoKind::Stack => {
-            output.push(VisibleTrack {
+    } else {
+        output.push(VisibleTrack {
+            path: path.clone(),
+            depth,
+            global_range: global_range.clone(),
+            clips: vec![VisibleClip {
                 path: path.clone(),
-                depth,
                 global_range: global_range.clone(),
-                clips: vec![VisibleClip {
-                    path: path.clone(),
-                    global_range: global_range.clone(),
-                    sequence_depth: 0,
-                }],
-                sequence_bands: Vec::new(),
-            });
-
-            if expanded.contains(path) {
-                for (index, child) in info.children.iter().enumerate() {
-                    path.push(index);
-                    let child_range = map_child_range(info, &global_range, &child.range);
-                    collect_tracks(roots, child, path, depth + 1, child_range, expanded, output);
-                    path.pop();
-                }
+                serial_depth: 0,
+            }],
+            serial_bands: Vec::new(),
+        });
+        if info.kind == AnimationInfoKind::Children && expanded.contains(path) {
+            for (index, child) in info.children.iter().enumerate() {
+                path.push(index);
+                let child_range = map_child_range(info, &global_range, &child.range);
+                collect_tracks(roots, child, path, depth + 1, child_range, expanded, output);
+                path.pop();
             }
-        }
-        AnimationInfoKind::Eval | AnimationInfoKind::Static | AnimationInfoKind::Audio => {
-            output.push(VisibleTrack {
-                path: path.clone(),
-                depth,
-                global_range: global_range.clone(),
-                clips: vec![VisibleClip {
-                    path: path.clone(),
-                    global_range,
-                    sequence_depth: 0,
-                }],
-                sequence_bands: Vec::new(),
-            });
         }
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn collect_sequence_content(
+fn collect_serial_content(
     info: &AnimationInfo,
     path: &mut AnimationPath,
     global_range: Range<f64>,
-    sequence_depth: usize,
+    serial_depth: usize,
     expanded: &HashSet<AnimationPath>,
     clips: &mut Vec<VisibleClip>,
-    bands: &mut Vec<SequenceBand>,
-    expanded_stacks: &mut Vec<ExpandedStack>,
+    bands: &mut Vec<SerialBand>,
+    expanded_containers: &mut Vec<ExpandedContainer>,
 ) {
-    bands.push(SequenceBand {
+    bands.push(SerialBand {
         path: path.clone(),
         global_range: global_range.clone(),
-        depth: sequence_depth,
+        depth: serial_depth,
     });
 
     for (index, child) in info.children.iter().enumerate() {
         path.push(index);
         let child_range = map_child_range(info, &global_range, &child.range);
-        if child.kind == AnimationInfoKind::Sequence {
-            collect_sequence_content(
+        if is_serial_container(child) {
+            collect_serial_content(
                 child,
                 path,
                 child_range,
-                sequence_depth + 1,
+                serial_depth + 1,
                 expanded,
                 clips,
                 bands,
-                expanded_stacks,
+                expanded_containers,
             );
         } else {
             clips.push(VisibleClip {
                 path: path.clone(),
                 global_range: child_range.clone(),
-                sequence_depth,
+                serial_depth,
             });
-            if is_stack_like(child.kind) && expanded.contains(path) {
-                expanded_stacks.push(ExpandedStack {
+            if is_expandable_container(child) && expanded.contains(path) {
+                expanded_containers.push(ExpandedContainer {
                     path: path.clone(),
                     global_range: child_range,
                 });
@@ -1186,14 +1165,6 @@ fn toggle_path(expanded: &mut HashSet<AnimationPath>, path: &[usize]) {
     }
 }
 
-fn display_anim_name(info: &AnimationInfo) -> &str {
-    if info.kind == AnimationInfoKind::Static {
-        "Hold"
-    } else {
-        short_anim_name(&info.anim_name)
-    }
-}
-
 fn short_anim_name(name: &str) -> &str {
     // Trim the Pure<...>/Iterative<...> adapter wrappers to show the inner type.
     let name = [
@@ -1213,20 +1184,20 @@ fn short_anim_name(name: &str) -> &str {
 }
 
 fn preferred_tree_width(infos: &[AnimationInfo]) -> f32 {
-    fn required_width(infos: &[AnimationInfo], stack_depth: usize, widest: &mut f32) {
+    fn required_width(infos: &[AnimationInfo], container_depth: usize, widest: &mut f32) {
         for info in infos {
-            if info.kind != AnimationInfoKind::Sequence || !info.children.is_empty() {
-                let indent = stack_depth as f32 * INDENT_WIDTH;
-                let toggle = if is_stack_like(info.kind) && !info.children.is_empty() {
+            if info.kind != AnimationInfoKind::Children || !info.children.is_empty() {
+                let indent = container_depth as f32 * INDENT_WIDTH;
+                let toggle = if is_expandable_container(info) && !info.children.is_empty() {
                     20.0
                 } else {
                     4.0
                 };
-                let label = display_anim_name(info).chars().count() as f32 * 7.25;
+                let label = short_anim_name(&info.anim_name).chars().count() as f32 * 7.25;
                 let duration_column = 54.0;
                 *widest = widest.max(6.0 + indent + toggle + label + duration_column);
             }
-            let child_depth = stack_depth + usize::from(is_stack_like(info.kind));
+            let child_depth = container_depth + usize::from(is_expandable_container(info));
             required_width(&info.children, child_depth, widest);
         }
     }
@@ -1237,25 +1208,32 @@ fn preferred_tree_width(infos: &[AnimationInfo]) -> f32 {
 }
 
 fn animation_color_for_info(info: &AnimationInfo) -> Color32 {
-    if info.kind == AnimationInfoKind::Eval && info.anim_name.contains("::Static<") {
-        animation_color(AnimationInfoKind::Static)
+    if info.kind == AnimationInfoKind::Anim && info.anim_name.contains("::Static<") {
+        let rgba = manim::YELLOW_C.to_rgba8();
+        Rgba::from_srgba_unmultiplied(rgba.r, rgba.g, rgba.b, rgba.a).into()
     } else {
         animation_color(info.kind)
     }
 }
 
-/// Stack-like overlay containers (stack, lagged) share the tree display logic:
-/// expandable children, rails, and depth indentation.
-fn is_stack_like(kind: AnimationInfoKind) -> bool {
-    matches!(kind, AnimationInfoKind::Stack)
+/// Ordered, non-overlapping children can share one visual track.
+fn is_serial_container(info: &AnimationInfo) -> bool {
+    info.kind == AnimationInfoKind::Children
+        && info
+            .children
+            .windows(2)
+            .all(|pair| pair[0].range.end <= pair[1].range.start)
+}
+
+/// Overlapping children use expandable tracks instead of a shared row.
+fn is_expandable_container(info: &AnimationInfo) -> bool {
+    info.kind == AnimationInfoKind::Children && !is_serial_container(info)
 }
 
 fn animation_color(kind: AnimationInfoKind) -> Color32 {
     let rgba = match kind {
-        AnimationInfoKind::Eval => manim::BLUE_C.to_rgba8(),
-        AnimationInfoKind::Sequence => manim::TEAL_C.to_rgba8(),
-        AnimationInfoKind::Stack => manim::ORANGE.to_rgba8(),
-        AnimationInfoKind::Static => manim::YELLOW_C.to_rgba8(),
+        AnimationInfoKind::Anim => manim::BLUE_C.to_rgba8(),
+        AnimationInfoKind::Children => manim::ORANGE.to_rgba8(),
         AnimationInfoKind::Audio => manim::GREEN_C.to_rgba8(),
     };
     Rgba::from_srgba_unmultiplied(rgba.r, rgba.g, rgba.b, rgba.a).into()
@@ -1296,4 +1274,63 @@ fn format_duration(sec: f64) -> String {
 
 fn format_time(sec: f64) -> String {
     format!("{sec:.3}s")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ranim_core::utils::rate_functions::linear;
+
+    fn animation(kind: AnimationInfoKind, range: Range<f64>) -> AnimationInfo {
+        AnimationInfo {
+            anim_name: "test".to_owned(),
+            kind,
+            content_duration_secs: range.end - range.start,
+            range,
+            rate_func: linear,
+            enabled: true,
+            sim_step: None,
+            children: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn children_are_laid_out_by_placement_instead_of_authoring_type() {
+        let mut group = animation(AnimationInfoKind::Children, 0.0..3.0);
+        group.children = vec![
+            animation(AnimationInfoKind::Anim, 0.0..1.0),
+            animation(AnimationInfoKind::Anim, 1.0..3.0),
+        ];
+        let mut tracks = Vec::new();
+        collect_tracks(
+            std::slice::from_ref(&group),
+            &group,
+            &mut vec![0],
+            0,
+            10.0..16.0,
+            &HashSet::from([vec![0]]),
+            &mut tracks,
+        );
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].clips.len(), 2);
+        assert_eq!(tracks[0].clips[0].global_range, 10.0..12.0);
+        assert_eq!(tracks[0].clips[1].global_range, 12.0..16.0);
+
+        group.children[0].range.end = 2.0;
+        tracks.clear();
+        collect_tracks(
+            std::slice::from_ref(&group),
+            &group,
+            &mut vec![0],
+            0,
+            10.0..16.0,
+            &HashSet::from([vec![0]]),
+            &mut tracks,
+        );
+        assert_eq!(tracks.len(), 3);
+        assert_eq!(tracks[1].path, vec![0, 0]);
+        assert_eq!(tracks[1].global_range, 10.0..14.0);
+        assert_eq!(tracks[2].path, vec![0, 1]);
+        assert_eq!(tracks[2].global_range, 12.0..16.0);
+    }
 }

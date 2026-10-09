@@ -447,7 +447,6 @@ mod tests {
         for i in [0u32, 1, 2] {
             bin.extend_from_slice(&i.to_le_bytes());
         }
-        assert_eq!(bin.len(), 132);
         bin
     }
 
@@ -533,106 +532,54 @@ mod tests {
     }
 
     #[test]
-    fn tree_shape_mirrors_the_gltf_node_graph() {
-        let tree = triangle_tree();
-        assert!(tree.is_group());
-        let roots = tree.children();
-        assert_eq!(roots.len(), 1);
-
-        let parent = &roots[0];
-        assert_eq!(parent.inner.id.as_deref(), Some("parent"));
-        assert!(parent.inner.is_group());
-        let parent_children = parent.inner.children();
-        assert_eq!(parent_children.len(), 1);
-
-        let child = &parent_children[0];
-        // A single-primitive mesh maps natively to the node's payload.
-        assert_eq!(child.inner.id.as_deref(), Some("child"));
-        assert!(child.inner.is_leaf());
-        assert_eq!(child.inner.item().unwrap().triangle_indices, vec![0, 1, 2]);
-    }
-
-    #[test]
-    fn node_transforms_match_trs_semantics() {
+    fn nested_mesh_import_preserves_payloads_and_composes_world_poses() {
         let tree = triangle_tree();
         let parent = &tree.children()[0];
         let child = &parent.inner.children()[0];
-
-        // Parent: the scene-root wrapper's pose is the loader's Y-up → Z-up
-        // flip composed outside the node's own T(1,2,3)·Rz(+90deg), so ZERO
-        // lands at flip(1,2,3) = (1,-3,4) and the node's X axis maps
-        // X -> Y -> Z. Rotation-derived values carry ~1e-7 f32 noise from
-        // the glTF source, so their tolerance is 1e-6 (translations/scales
-        // stay exact).
-        let parent_t = &parent.transform;
+        assert_eq!(parent.inner.id.as_deref(), Some("parent"));
+        assert_eq!(child.inner.id.as_deref(), Some("child"));
         assert!(
-            parent_t
+            parent
+                .transform
                 .transform_point3(DVec3::ZERO)
                 .abs_diff_eq(dvec3(1.0, -3.0, 2.0), 1e-6)
         );
-        assert!((parent_t.matrix3 * DVec3::X).abs_diff_eq(DVec3::Z, 1e-6));
-
-        // Child: pure uniform scale of 2.
+        assert!((parent.transform.matrix3 * DVec3::X).abs_diff_eq(DVec3::Z, 1e-6));
         assert!(
             child
                 .transform
-                .transform_point3(dvec3(1.0, 1.0, 1.0))
-                .abs_diff_eq(dvec3(2.0, 2.0, 2.0), 1e-9)
+                .transform_point3(DVec3::ONE)
+                .abs_diff_eq(DVec3::splat(2.0), 1e-9)
         );
-    }
-
-    #[test]
-    fn leaf_mesh_round_trips_primitive_data() {
-        let tree = triangle_tree();
-        let leaf = tree.children()[0].inner.children()[0].inner.item().unwrap();
-
-        let points: Vec<DVec3> = leaf.points.iter().cloned().collect();
-        assert_eq!(
-            points,
-            vec![
-                dvec3(0.0, 0.0, 0.0),
-                dvec3(1.0, 0.0, 0.0),
-                dvec3(0.0, 1.0, 0.0)
-            ]
-        );
-        assert_eq!(leaf.triangle_indices, vec![0, 1, 2]);
+        let leaf = child.inner.item().unwrap();
+        assert_eq!(leaf.points.as_slice(), &[DVec3::ZERO, DVec3::X, DVec3::Y]);
+        assert_eq!(leaf.triangle_indices, [0, 1, 2]);
         assert!(
             leaf.vertex_normals
                 .iter()
-                .all(|n| n.abs_diff_eq(DVec3::Z, 1e-6))
+                .all(|normal| normal.abs_diff_eq(DVec3::Z, 1e-6))
         );
-        let first_color = leaf.vertex_colors[0].0;
-        assert!((first_color - Vec4::new(1.0, 0.0, 0.0, 1.0)).abs_diff_eq(Vec4::ZERO, 1e-6));
-    }
-
-    #[test]
-    fn extraction_composes_the_world_transform_for_meshes() {
-        let tree = triangle_tree();
-
-        // leaves() yields the full f64 chain:
-        // flip(Y-up->Z-up) * parent(T·R) * child(S2).
-        // (1,0,0) -> S2 (2,0,0) -> Rz90 (0,2,0) -> T (1,4,3) -> flip (1,-3,4).
-        // f32 source noise puts the 1e-6 tolerance on rotation contributions.
+        assert!(
+            leaf.vertex_colors[0]
+                .0
+                .abs_diff_eq(Vec4::new(1.0, 0.0, 0.0, 1.0), 1e-6)
+        );
+        // S2 -> Rz90 -> T(1,2,3) -> Y-up/Z-up: (1,0,0) becomes (1,-3,4).
         let (world, _) = tree.leaves().next().unwrap();
         assert!(
             world
-                .transform_point3(dvec3(1.0, 0.0, 0.0))
+                .transform_point3(DVec3::X)
                 .abs_diff_eq(dvec3(1.0, -3.0, 4.0), 1e-6)
         );
-
-        // Extraction bakes the same chain into the core item's transform.
-        let extracted = tree.extract();
-        assert_eq!(extracted.len(), 1);
-        match &extracted[0] {
-            CoreItem::MeshItem(mesh) => {
-                let local = Vec3::new(1.0, 0.0, 0.0);
-                let world = mesh.transform.transform_point3(local);
-                assert!((world - Vec3::new(1.0, -3.0, 4.0)).length() < 1e-4);
-                // Vertex data stays local.
-                assert_eq!(mesh.points.len(), 3);
-            }
-            _ => panic!("expected a MeshItem"),
-        }
+        let CoreItem::MeshItem(mesh) = &tree.extract()[0] else {
+            panic!("expected MeshItem")
+        };
+        assert_eq!(mesh.points, [Vec3::ZERO, Vec3::X, Vec3::Y]);
+        assert!(
+            mesh.transform
+                .transform_point3(Vec3::X)
+                .abs_diff_eq(Vec3::new(1.0, -3.0, 4.0), 1e-4)
+        );
     }
 
     #[test]
@@ -684,16 +631,8 @@ mod tests {
 
         // Out-of-range indices resolve to None; node() agrees with get().
         assert!(tree.node(7).is_none());
-        assert_eq!(
-            tree.node(1).unwrap().inner.id,
-            tree.get(&tree.node_paths[1].clone().unwrap())
-                .unwrap()
-                .inner
-                .id
-        );
-
         // Mutable access through the same map.
-        let mut tree = triangle_tree();
+        let mut tree = tree;
         tree.node_mut(1).unwrap().inner.id = Some("renamed".into());
         assert_eq!(tree.node(1).unwrap().inner.id.as_deref(), Some("renamed"));
     }

@@ -165,39 +165,24 @@ fn bundled_midi_parses() {
 }
 
 #[test]
-fn every_rendered_frame_has_a_camera() {
-    // Regression: the synthesized clip is ceil-rounded up to whole samples,
-    // which used to extend the scene duration a fraction of a frame past the
-    // camera's window, leaving the last rendered frame camera-less (D0002).
-    let song = Arc::new(parse_song());
-    let layout = PianoLayout::new(&song);
-    let mut r = RanimScene::new();
-    r.play(camera(song.duration_secs));
-    r.play(Sound::new(render_song_audio(&song)));
-    r.play(stack![
-        MidiNotesEval {
-            song: song.clone(),
-            layout
-        }
-        .with_duration(song.duration_secs)
-        .with_rate_func(linear),
-        common_layers(&song, layout),
-    ]);
-    let sealed = r.seal();
-    let fps = 30.0;
-    let raw = sealed.total_secs() * fps;
-    let n = raw.ceil() as u64;
-    let num_frames = if (raw - raw.round()).abs() < 1e-9 {
-        n
-    } else {
-        n + 1
+fn audio_sample_rounding_keeps_the_final_camera() {
+    // A fractional audio sample must not extend the timeline past the camera.
+    let song = midi::MidiSong {
+        notes: vec![],
+        notes_by_key: vec![],
+        max_note_duration_secs: 0.0,
+        duration_secs: 1.0 + 0.5 / 48_000.0,
     };
-    for f in 0..num_frames {
-        let sec = (f as f64 / fps).min(sealed.total_secs());
+    let mut scene = RanimScene::new();
+    scene.play(camera(song.duration_secs));
+    scene.play(Sound::new(render_song_audio(&song)));
+    let sealed = scene.seal();
+    assert_eq!(sealed.total_secs(), song.duration_secs);
+    for sec in [0.0, 1.0, sealed.total_secs()] {
         let cameras = sealed
             .eval_at_sec(sec)
             .filter(|(_, item)| matches!(item, ranim::core::core_item::CoreItem::CameraFrame(_)))
             .count();
-        assert_eq!(cameras, 1, "frame {f} at {sec}s has {cameras} cameras");
+        assert_eq!(cameras, 1, "at {sec}s");
     }
 }

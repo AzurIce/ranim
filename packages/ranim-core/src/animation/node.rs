@@ -1,7 +1,7 @@
 //! Runtime animation nodes and their interpreters.
 //!
 //! This is the closed core of the animation tree: [`NodeContent`](crate::animation::node::NodeContent) is the
-//! runtime vocabulary (sequence, stack, leaf, static, audio), [`AnimNode`](crate::animation::node::AnimNode)
+//! runtime vocabulary (children or a leaf), [`AnimNode`](crate::animation::node::AnimNode)
 //! wraps it with the timing shell, and all structural traversals — visual
 //! evaluation, seal-time audio baking, and preview introspection — live here.
 //!
@@ -13,19 +13,15 @@ use std::ops::Range;
 
 use crate::{audio::AudioTrack, core_item::DynItem, utils::rate_functions::linear};
 
-use super::eval::EvalDyn;
+use super::eval::{EvalDyn, Static};
 
 /// Runtime animation content category used by preview tooling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnimationInfoKind {
     /// A typed evaluator without animation children.
-    Eval,
-    /// A sequential animation container.
-    Sequence,
-    /// An overlay animation container.
-    Stack,
-    /// A captured, type-erased static output batch.
-    Static,
+    Anim,
+    /// A container of animations placed in its local content coordinates.
+    Children,
     /// An audio leaf: resolved into the audio plane at seal time.
     Audio,
 }
@@ -33,7 +29,7 @@ pub enum AnimationInfoKind {
 /// Hierarchical runtime animation information used by preview tooling.
 #[derive(Clone)]
 pub struct AnimationInfo {
-    /// Concrete evaluator or container type name.
+    /// Node display name, normally its concrete evaluator or container type name.
     pub anim_name: String,
     /// Runtime content category.
     pub kind: AnimationInfoKind,
@@ -52,30 +48,22 @@ pub struct AnimationInfo {
     pub children: Vec<AnimationInfo>,
 }
 
-/// What a runtime node IS — the closed vocabulary of the tree.
+/// Runtime structure: either placed children or one leaf payload.
 ///
-/// Each variant earns its seat by having non-desugarable evaluation
-/// semantics (a combinator expressible as pure window placement belongs in
-/// [`IntoAnimNode::into_anim_node`](crate::animation::build::IntoAnimNode::into_anim_node), not here):
-///
-/// - [`NodeContent::Sequence`] — exclusive selection: the LAST child containing
-///   the content time evaluates (children placed with `.at()` may overlap);
-/// - [`NodeContent::Stack`] — overlay: EVERY child containing the content time
-///   evaluates and the outputs sum;
-/// - [`NodeContent::Leaf`] — the open world: any user [`Eval`](crate::animation::eval::Eval) implementation,
-///   the only type-erased box in the tree;
-/// - [`NodeContent::Static`] — a captured output batch replayed over a window;
-/// - [`NodeContent::Audio`] — a sound leaf, consumed by the seal-time bake.
+/// Sequential, parallel, and staggered placement belong to authoring
+/// combinators. Every container evaluates all children containing its content
+/// time, in insertion order.
 pub(in crate::animation) enum NodeContent {
-    /// Exclusive succession: the LAST child containing the content time
-    /// evaluates.
-    Sequence(Vec<AnimNode>),
-    /// Overlay: EVERY child containing the content time evaluates.
-    Stack(Vec<AnimNode>),
+    /// Animations placed in this node's local content coordinates.
+    Children(Vec<AnimNode>),
+    /// A visual or audio leaf without animation children.
+    Leaf(LeafContent),
+}
+
+/// The payloads interpreted at the leaves of the runtime tree.
+pub(in crate::animation) enum LeafContent {
     /// A typed evaluator (`Eval` implementation) — no children.
-    Leaf(Box<dyn EvalDyn>),
-    /// A captured, type-erased static output batch.
-    Static(Vec<DynItem>),
+    Anim(Box<dyn EvalDyn>),
     /// An audio leaf: its track resolves through the seal-time bake.
     ///
     /// Boxed: a track is the fattest payload in the tree, and sibling
@@ -87,11 +75,9 @@ pub(in crate::animation) enum NodeContent {
 impl NodeContent {
     fn info_kind(&self) -> AnimationInfoKind {
         match self {
-            NodeContent::Sequence(_) => AnimationInfoKind::Sequence,
-            NodeContent::Stack(_) => AnimationInfoKind::Stack,
-            NodeContent::Leaf(_) => AnimationInfoKind::Eval,
-            NodeContent::Static(_) => AnimationInfoKind::Static,
-            NodeContent::Audio(_) => AnimationInfoKind::Audio,
+            NodeContent::Children(_) => AnimationInfoKind::Children,
+            NodeContent::Leaf(LeafContent::Anim(_)) => AnimationInfoKind::Anim,
+            NodeContent::Leaf(LeafContent::Audio(_)) => AnimationInfoKind::Audio,
         }
     }
 }
@@ -103,10 +89,13 @@ pub struct AnimNode {
     pub(in crate::animation) content: NodeContent,
     /// Length of this node's content time axis, in seconds: the sequence
     /// cursor or stack extent for containers, a sound's play window, `1.0`
-    /// for bare visual leaves, `0.0` for statics.
+    /// for bare visual leaves, `0.0` for captured constant batches.
     pub(in crate::animation) internal_time_secs: f64,
     pub(in crate::animation) rate_func: Option<fn(f64) -> f64>,
     pub(in crate::animation) time_range: Range<f64>,
+    /// Whether the final parent boundary may include this node's right endpoint.
+    /// Sequence lowering closes it when a later point animation wins.
+    pub(in crate::animation) end_inclusive: bool,
     pub(in crate::animation) enabled: bool,
     pub(in crate::animation) anim_name: &'static str,
 }
@@ -142,10 +131,18 @@ impl AnimNode {
     /// This node's children — only the container kinds have any; leaves
     /// read as the empty slice, so traversals stay uniform without storing
     /// an impossible empty `Vec` per leaf.
-    pub(crate) fn children(&self) -> &[AnimNode] {
+    pub fn children(&self) -> &[AnimNode] {
         match &self.content {
-            NodeContent::Sequence(children) | NodeContent::Stack(children) => children,
+            NodeContent::Children(children) => children,
             _ => &[],
+        }
+    }
+
+    /// Mutable access to placed children; leaves return an empty slice.
+    pub fn children_mut(&mut self) -> &mut [AnimNode] {
+        match &mut self.content {
+            NodeContent::Children(children) => children,
+            _ => &mut [],
         }
     }
 
@@ -169,14 +166,16 @@ impl AnimNode {
         self.enabled
     }
 
-    /// Concrete evaluator type name captured before erasure.
+    /// Display name, normally the concrete evaluator type name captured before erasure.
     pub fn anim_name(&self) -> &str {
         self.anim_name
     }
 
-    /// Whether the given scene time is inside this clip's inclusive range.
+    /// Whether the given scene time is inside this clip's window, including
+    /// the right endpoint unless it was excluded during sequence lowering.
     pub fn active_at(&self, sec: f64) -> bool {
-        sec >= self.time_range.start && sec <= self.time_range.end
+        sec >= self.time_range.start
+            && (sec < self.time_range.end || (self.end_inclusive && sec == self.time_range.end))
     }
 
     /// Compute the rate-warped progress in this cell's local coordinates.
@@ -209,17 +208,12 @@ impl AnimNode {
         }
         let alpha = self.local_alpha(sec);
         match &self.content {
-            NodeContent::Sequence(children) => {
+            NodeContent::Children(children) => {
                 let content = self.internal_time_secs * alpha;
-                eval_sequence(children, content, self.internal_time_secs, output)
+                eval_children(children, content, self.internal_time_secs, output)
             }
-            NodeContent::Stack(children) => {
-                let content = self.internal_time_secs * alpha;
-                eval_stack(children, content, self.internal_time_secs, output)
-            }
-            NodeContent::Leaf(eval) => eval.eval_into(alpha, output),
-            NodeContent::Static(items) => output.extend(items.iter().cloned()),
-            NodeContent::Audio(_) => {}
+            NodeContent::Leaf(LeafContent::Anim(eval)) => eval.eval_into(alpha, output),
+            NodeContent::Leaf(LeafContent::Audio(_)) => {}
         }
     }
 
@@ -266,7 +260,7 @@ impl AnimNode {
         };
         path.push(self);
         match &self.content {
-            NodeContent::Audio(track) => {
+            NodeContent::Leaf(LeafContent::Audio(track)) => {
                 if let Some(aff) = aff.filter(|_| linear) {
                     // Audible where content time ∈ [0, play window): the
                     // affine inverts that range into global frames exactly.
@@ -310,16 +304,18 @@ impl AnimNode {
     /// Whether any sound leaf lives in this subtree (enabled or not).
     pub(crate) fn has_audio(&self) -> bool {
         match &self.content {
-            NodeContent::Audio(_) => true,
+            NodeContent::Leaf(LeafContent::Audio(_)) => true,
             _ => self.children().iter().any(AnimNode::has_audio),
         }
     }
 
     pub(in crate::animation) fn contains_sec(&self, sec: f64, parent_duration: f64) -> bool {
-        self.time_range.contains(&sec) || (sec == parent_duration && sec == self.time_range.end)
+        self.time_range.contains(&sec)
+            || (self.end_inclusive && sec == parent_duration && sec == self.time_range.end)
     }
 
-    pub(crate) fn animation_info(&self) -> AnimationInfo {
+    /// Describe this node and its descendants for inspection tools.
+    pub fn animation_info(&self) -> AnimationInfo {
         AnimationInfo {
             anim_name: self.anim_name.to_string(),
             kind: self.content.info_kind(),
@@ -328,7 +324,7 @@ impl AnimNode {
             rate_func: self.rate_func.unwrap_or(linear),
             enabled: self.enabled,
             sim_step: match &self.content {
-                NodeContent::Leaf(eval) => eval.sim_step(),
+                NodeContent::Leaf(LeafContent::Anim(eval)) => eval.sim_step(),
                 _ => None,
             },
             children: self
@@ -340,23 +336,8 @@ impl AnimNode {
     }
 }
 
-/// Sequence evaluation: the LAST child containing the content time runs
-/// (children placed with `.at()` inside a sequence may overlap; the later
-/// one wins — this exclusivity is what makes a sequence more than sugar for
-/// a stack of placements).
-fn eval_sequence(children: &[AnimNode], content_sec: f64, extent: f64, output: &mut Vec<DynItem>) {
-    if let Some(child) = children
-        .iter()
-        .rev()
-        .find(|child| child.contains_sec(content_sec, extent))
-    {
-        child.eval_at(content_sec, output);
-    }
-}
-
-/// Stack evaluation: EVERY child containing the content time runs, outputs
-/// sum.
-fn eval_stack(children: &[AnimNode], content_sec: f64, extent: f64, output: &mut Vec<DynItem>) {
+/// Evaluate every child containing the content time, preserving output order.
+fn eval_children(children: &[AnimNode], content_sec: f64, extent: f64, output: &mut Vec<DynItem>) {
     for child in children {
         if child.contains_sec(content_sec, extent) {
             child.eval_at(content_sec, output);
@@ -446,7 +427,7 @@ impl<'a> ResidualLink<'a> {
         let rate = node.rate_func;
         match self {
             ResidualLink::Leaf(_) => match &node.content {
-                NodeContent::Audio(track) => Residual::Leaf {
+                NodeContent::Leaf(LeafContent::Audio(track)) => Residual::Leaf {
                     window,
                     internal,
                     rate,
@@ -551,14 +532,15 @@ pub(crate) fn bake_audio(animations: &[AnimNode], total_secs: f64, sample_rate: 
     pcm
 }
 
-/// Build a static cell replaying already-sampled items over `time_range`.
-pub(in crate::animation) fn static_cell(state: Vec<DynItem>, time_range: Range<f64>) -> AnimNode {
+/// Build a constant animation replaying sampled items over `time_range`.
+pub(in crate::animation) fn constant_node(state: Vec<DynItem>, time_range: Range<f64>) -> AnimNode {
     AnimNode {
-        content: NodeContent::Static(state),
+        content: NodeContent::Leaf(LeafContent::Anim(Box::new(Static(state)))),
         internal_time_secs: 0.0,
         rate_func: None,
         time_range,
+        end_inclusive: true,
         enabled: true,
-        anim_name: "Static",
+        anim_name: std::any::type_name::<Static<Vec<DynItem>>>(),
     }
 }
