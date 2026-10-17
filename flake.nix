@@ -89,6 +89,7 @@
                   ./benches
                   ./example-packages/app
                   ./packages/ranim-anims
+                  ./packages/ranim-app
                   ./packages/ranim-cli
                   ./packages/ranim-core
                   ./packages/ranim-examples

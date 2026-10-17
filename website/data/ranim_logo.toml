@@ -1,5 +1,7 @@
 name = "ranim_logo"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use ranim::glam;
 use std::f64::consts::PI;
@@ -182,7 +184,31 @@ fn ranim_logo(r: &mut RanimScene) {
     r.play(CameraFrame::default().show().with_duration(total_secs));
     r.play(stack![content, text_sequence]);
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([ranim_logo::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "b47e8af9e29214a0d29deca9c07353d3db5b56ff"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/f0e737821851cb63e58b6ed03362de73a94d73eb3d4f296a02a1e6648126ee"]
 wasm = true

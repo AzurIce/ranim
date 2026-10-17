@@ -1,5 +1,7 @@
 name = "hanoi"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use ranim::{
     anims::morph::MorphAnim,
@@ -145,7 +147,31 @@ fn hanoi_5(r: &mut RanimScene) {
 fn hanoi_10(r: &mut RanimScene) {
     hanoi(r, 10);
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([hanoi_5::scene(), hanoi_10::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "dbfa5da3c7b2bf7696518ce9729c0a3d3967e07c"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/0e/98fb9d0600f91944eb14ce64cf96b0779193fca69799f926cc1cfe205057d2", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/f0/8875e685ca4fe6b5e34eb31c1bc0bece7633d7e31929e38d630a06f31b4a6d"]
 wasm = true

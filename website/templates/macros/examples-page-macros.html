@@ -75,8 +75,8 @@
       import init, * as ranim from '{{ get_url(path="ranim-examples/pkg/ranim_examples.js") }}';
       window.ranim_examples = init().then(() => ranim);
 
-      const { find_scene, preview_scene } = await ranim_examples;
-      preview_scene(find_scene("{{ example_name }}"));
+      const { preview_scene } = await ranim_examples;
+      preview_scene("{{ example_name }}");
     </script>
     <canvas id="ranim-app-{{ example_name }}" width="1280" height="1020" style="width: 100%; aspect-ratio: 16 / 12;"></canvas>
 

@@ -1,0 +1,127 @@
+use std::f64::consts::{PI, TAU};
+
+use ranim::{
+    color::palettes::manim,
+    glam::DVec3,
+    items::mesh::{Sphere, Surface},
+    prelude::*,
+    utils::rate_functions::linear,
+};
+// Custom animation: rotate each sphere's rigid placement around the group
+// center on the Z axis. The orbit is composed outward from the vertex offset:
+// `T(group_center) ∘ Rz(angle) ∘ T(vertex_offset)`.
+struct RotateAroundZ {
+    src: Transformed<Surface, Rigid>,
+    group_center: DVec3,
+    vertex_offset: DVec3,
+    total_angle: f64,
+}
+
+impl Eval for RotateAroundZ {
+    type Output = Transformed<Surface, Rigid>;
+
+    fn eval_alpha(&self, alpha: f64) -> Self::Output {
+        let angle = self.total_angle * alpha;
+        let mut result = self.src.clone();
+        result.transform = Rigid::from_translation(self.group_center)
+            .compose(&Rigid::from_axis_angle(DVec3::Z, angle))
+            .compose(&Rigid::from_translation(self.vertex_offset));
+        result
+    }
+}
+
+#[scene]
+#[wasm_demo_doc]
+#[output(dir = "./output/tetrahedron_spheres")]
+fn tetrahedron_spheres(r: &mut RanimScene) {
+    let phi = 60.0 * PI / 180.0;
+    let theta = PI / 2.0;
+    let distance = 6.0;
+
+    // Fixed camera, Z-up
+    let cam = CameraFrame::from_spherical(phi, theta, distance);
+
+    // Regular tetrahedron centered at the origin, edge length `a`.
+    // Z is the vertical axis; the three base vertices share the same Z coordinate.
+    let a: f64 = 2.5;
+    let sqrt6 = 6.0_f64.sqrt();
+    let sqrt3 = 3.0_f64.sqrt();
+
+    let vertices = [
+        DVec3::new(0.0, 0.0, a * sqrt6 / 4.0),               // apex
+        DVec3::new(0.0, a * sqrt3 / 3.0, -a * sqrt6 / 12.0), // base
+        DVec3::new(-a / 2.0, -a * sqrt3 / 6.0, -a * sqrt6 / 12.0), // base
+        DVec3::new(a / 2.0, -a * sqrt3 / 6.0, -a * sqrt6 / 12.0), // base
+    ];
+
+    let colors = [manim::BLUE_C, manim::RED_C, manim::GREEN_C, manim::YELLOW_C];
+
+    let radius = 0.6 * a;
+    let resolution = (31, 16);
+    let x_offset = 3.5;
+
+    let mut left_group = AnimStack::new();
+
+    // Left group: smooth shading (analytical normals from Sphere)
+    let left_center = DVec3::new(-x_offset, 0.0, 0.0);
+    for (vertex, color) in vertices.iter().zip(colors.iter()) {
+        let mut surface = Surface::from(
+            Sphere::new(radius)
+                .with_resolution(resolution)
+                .with_fill_color(color.with_alpha(0.5)),
+        )
+        .with_smooth_normals()
+        .transformed(Rigid::from_translation(left_center + *vertex));
+
+        left_group.push(
+            RotateAroundZ {
+                src: surface.clone(),
+                group_center: left_center,
+                vertex_offset: *vertex,
+                total_angle: TAU,
+            }
+            .apply_to(&mut surface)
+            .with_duration(8.0)
+            .with_rate_func(linear),
+        );
+    }
+
+    // Right group: flat shading (normals zeroed out)
+    let right_center = DVec3::new(x_offset, 0.0, 0.0);
+    let mut right_group = AnimStack::new();
+    for (vertex, color) in vertices.iter().zip(colors.iter()) {
+        let mut surface = Surface::from(
+            Sphere::new(radius)
+                .with_resolution(resolution)
+                .with_fill_color(color.with_alpha(0.5)),
+        )
+        .transformed(Rigid::from_translation(right_center + *vertex));
+
+        right_group.push(
+            RotateAroundZ {
+                src: surface.clone(),
+                group_center: right_center,
+                vertex_offset: *vertex,
+                total_angle: TAU,
+            }
+            .apply_to(&mut surface)
+            .with_duration(8.0)
+            .with_rate_func(linear),
+        );
+    }
+
+    let total_secs = left_group.duration_secs().max(right_group.duration_secs());
+    r.play(cam.show().with_duration(total_secs));
+    r.play(stack![left_group, right_group]);
+
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
+}
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([tetrahedron_spheres::scene()]);
+    }
+}

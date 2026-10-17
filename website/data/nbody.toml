@@ -1,5 +1,7 @@
 name = "nbody"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 //! N-body gravitational simulation — a canonical "iterative only" animation:
 //! no closed-form solution, chaotic, and inherently stateful across frames.
@@ -174,7 +176,31 @@ fn nbody(r: &mut RanimScene) {
     );
     r.insert_time_mark(sim_secs / 2.0, TimeMark::Capture("preview.png".to_string()));
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([nbody::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "c43b0e3a7b11d2dd1f39f8e60a603ee89cd96f89"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/66/c03f78304da1236f8efeae6b3cd54500fec3e60c06d0e8beb1d1a2a465b98b"]
 wasm = true

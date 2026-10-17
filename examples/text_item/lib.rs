@@ -1,63 +1,10 @@
-use std::f64::consts::TAU;
+mod scenes;
 
-use ranim::utils::rate_functions::smooth;
-use ranim::{color::palettes::manim, glam::DVec3, prelude::*};
-use ranim_anims::{
-    creation::{CreationAnim, WritingAnim},
-    rotating::RotatingAnim,
-};
-use ranim_items::vitem::{VItem, text::TextItem};
+pub use scenes::ScenesPlugin;
 
-#[scene]
-#[wasm_demo_doc]
-#[output(dir = "./output/text_item")]
-fn text_item(r: &mut RanimScene) {
-    let text = "The quick brown fox jumps over the lazy dog.";
-
-    let text = TextItem::new(text, 0.5);
-    let text_box = text
-        .text_box()
-        .with(|item| item.set_stroke_color(manim::RED_C).discard());
-
-    let mut text_sequence = seq![
-        Vec::<VItem>::from(text.clone())
-            .iter_mut()
-            .map(|item| item.write().with_rate_func(smooth))
-            .into_lagged(0.1)
-    ];
-    text_sequence
-        .hold(3.0)
-        .push(
-            Vec::<VItem>::from(text.clone())
-                .rotating(TAU * 4.0, DVec3::Z)
-                .with_duration(4.0)
-                .with_rate_func(smooth),
-        )
-        .hold(1.0)
-        .push(
-            Vec::<VItem>::from(text.clone())
-                .iter_mut()
-                .map(|item| item.unwrite().with_rate_func(smooth))
-                .into_lagged(0.1),
-        )
-        .hold(1.0);
-
-    let mut box_sequence = AnimSequence::new();
-    box_sequence
-        .forward(1.0)
-        .push(
-            VItem::from(text_box.clone())
-                .create()
-                .with_rate_func(smooth),
-        )
-        .push(VItem::from(text_box).uncreate().with_rate_func(smooth));
-
-    let total_secs = text_sequence.cursor_sec().max(box_sequence.cursor_sec());
-    r.play(CameraFrame::default().show().with_duration(total_secs));
-    r.play(stack![text_sequence, box_sequence]);
-
-    r.insert_time_mark(
-        total_secs / 2.0,
-        TimeMark::Capture("preview.png".to_string()),
-    );
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
 }

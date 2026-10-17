@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::{Subcommand, ValueEnum};
 use ranim::{
-    SceneConstructor,
     color::{AlphaColor, Srgb},
     core::{
         anchor::Aabb,
@@ -105,10 +104,12 @@ const DEFAULT_NAME_TEMPLATE: &str = "{name}_{width}x{height}_{fps}";
 
 fn scenes_output(lib: &RanimUserLibrary) -> ScenesOutput {
     let scenes = lib
+        .app()
         .scenes()
+        .iter()
         .map(|scene| SceneDto {
-            name: scene.name,
-            clear_color: scene.config.clear_color,
+            name: scene.name.clone(),
+            clear_color: scene.config.clear_color.clone(),
             outputs: scene
                 .outputs
                 .iter()
@@ -289,7 +290,7 @@ fn short_anim_name(anim_name: &str) -> &str {
 
 fn tree_command(lib: &RanimUserLibrary, scene_name: Option<&str>, format: FormatArg) -> Result<()> {
     let scene = select_scene(lib, scene_name)?;
-    let sealed = scene.constructor.build_scene();
+    let sealed = scene.build_scene();
     let time_marks = sealed
         .time_marks()
         .iter()
@@ -451,7 +452,7 @@ fn frame_command(
     verbose: bool,
 ) -> Result<()> {
     let scene = select_scene(lib, Some(scene_name))?;
-    let sealed = scene.constructor.build_scene();
+    let sealed = scene.build_scene();
     let total_secs = sealed.total_secs();
     let mut evaluator = sealed.into_evaluator(120.0);
     let infos = evaluator.animation_infos();

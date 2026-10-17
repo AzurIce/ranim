@@ -33,13 +33,16 @@ fn copy_file(source: &Path, target_dir: &Path) -> Result<String> {
     Ok(file_name)
 }
 
-/// The package and wasm names of the shared wasm scene bundle.
+/// The package containing the example plugins and their preview host.
 const EXAMPLES_BUNDLE_PACKAGE: &str = "ranim-examples";
+/// Binary that assembles the App and exports the website's preview entry point.
+const EXAMPLES_PREVIEW_BINARY: &str = "ranim-examples-preview";
+/// Stable JavaScript module name used by website pages and rustdoc previews.
+const EXAMPLES_WASM_MODULE: &str = "ranim_examples";
 /// Root directory of generated Zola example pages, relative to the website root.
 const WEBSITE_EXAMPLES_CONTENT_DIR: &str = "content/examples";
 /// Top-level title used when `content/examples/_index.md` does not exist yet.
 const WEBSITE_EXAMPLES_TITLE: &str = "例子";
-const EXAMPLES_BUNDLE_CRATE: &str = "ranim_examples";
 const EXAMPLES_BUNDLE_WEB_DIR: &str = "ranim-examples";
 
 fn clean_examples_wasm(root_dir: &Path) -> Result<()> {
@@ -55,10 +58,11 @@ fn clean_examples_wasm(root_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Build the shared wasm bundle containing every example scene.
+/// Build the shared wasm preview host containing every example plugin.
 ///
-/// The bundle is built once with the full feature set (`preview`, `anims`,
-/// `items` and `typst`) and exposed to the website as
+/// The host constructs an App and installs the bundle's plugin. It is built
+/// once with the full feature set (`preview`, `anims`, `items` and `typst`)
+/// and exposed to the website as
 /// `website/static/ranim-examples/pkg/ranim_examples.js`.
 pub fn build_examples_wasm(root_dir: impl AsRef<Path>) -> Result<()> {
     let root_dir = root_dir.as_ref();
@@ -68,13 +72,15 @@ pub fn build_examples_wasm(root_dir: impl AsRef<Path>) -> Result<()> {
 
     clean_examples_wasm(root_dir)?;
 
-    println!("[1/3] compiling {EXAMPLES_BUNDLE_PACKAGE} for wasm32-unknown-unknown");
+    println!("[1/3] compiling {EXAMPLES_PREVIEW_BINARY} for wasm32-unknown-unknown");
     let status = Command::new("cargo")
         .current_dir(root_dir)
         .args([
             "build",
             "-p",
             EXAMPLES_BUNDLE_PACKAGE,
+            "--bin",
+            EXAMPLES_PREVIEW_BINARY,
             "--target",
             "wasm32-unknown-unknown",
             "--release",
@@ -90,7 +96,7 @@ pub fn build_examples_wasm(root_dir: impl AsRef<Path>) -> Result<()> {
         .join("target")
         .join("wasm32-unknown-unknown")
         .join("release")
-        .join(format!("{EXAMPLES_BUNDLE_CRATE}.wasm"));
+        .join(format!("{EXAMPLES_PREVIEW_BINARY}.wasm"));
     let pkg_dir = output_dir.join("pkg");
     let status = Command::new("wasm-bindgen")
         .current_dir(root_dir)
@@ -99,6 +105,8 @@ pub fn build_examples_wasm(root_dir: impl AsRef<Path>) -> Result<()> {
             pkg_dir.as_os_str().to_str().unwrap(),
             "--target",
             "web",
+            "--out-name",
+            EXAMPLES_WASM_MODULE,
             wasm_path.as_os_str().to_str().unwrap(),
         ])
         .stdout(std::process::Stdio::null())
@@ -109,7 +117,7 @@ pub fn build_examples_wasm(root_dir: impl AsRef<Path>) -> Result<()> {
     }
 
     println!("[3/3] optimizing wasm with wasm-opt");
-    let bg_wasm = pkg_dir.join(format!("{EXAMPLES_BUNDLE_CRATE}_bg.wasm"));
+    let bg_wasm = pkg_dir.join(format!("{EXAMPLES_WASM_MODULE}_bg.wasm"));
     optimize_wasm(&bg_wasm).context("failed to optimize the wasm example bundle")?;
 
     clean_legacy_example_wasm_packages(root_dir)?;
@@ -923,13 +931,39 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
                 .map(str::to_owned)
                 .collect();
 
-            let path = root_dir.join(item["path"].as_str().unwrap());
-            let code = fs::read_to_string(&path)
+            let entry_path = root_dir.join(item["path"].as_str().unwrap());
+            // The bundle reuses plugin definitions without the individual
+            // examples' fixed native dynamic-library exports.
+            let scenes_path = entry_path.with_file_name("scenes.rs");
+            let path = if scenes_path.is_file() {
+                scenes_path
+            } else {
+                entry_path.clone()
+            };
+            let source = fs::read_to_string(&path)
                 .with_context(|| format!("failed to read example source {}", path.display()))?;
+            let entry = (path != entry_path)
+                .then(|| {
+                    fs::read_to_string(&entry_path).with_context(|| {
+                        format!("failed to read project entry {}", entry_path.display())
+                    })
+                })
+                .transpose()?;
             let hash = {
                 let mut hasher = Sha1::new();
-                hasher.update(code.as_bytes());
+                hasher.update(source.as_bytes());
+                if let Some(entry) = &entry {
+                    hasher.update(entry.as_bytes());
+                }
                 base16ct::lower::encode_string(&hasher.finalize())
+            };
+            let code = if let Some(entry) = entry {
+                format!(
+                    "`scenes.rs`（场景与注册）\n\n```rust\n{source}```\n\n\
+                     `lib.rs`（插件入口）\n\n```rust\n{entry}```"
+                )
+            } else {
+                format!("```rust\n{source}```")
             };
             let group = path
                 .parent()
@@ -942,7 +976,7 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
                 name,
                 group,
                 path,
-                code: format!("```rust\n{code}```"),
+                code,
                 hash,
                 required_features,
             })
@@ -978,14 +1012,16 @@ mod test {
                 .required_features,
             ["typst"]
         );
-        assert_eq!(
-            examples
-                .iter()
-                .find(|example| example.name == "arc")
-                .unwrap()
-                .group,
-            PathBuf::new()
-        );
+        let arc = examples
+            .iter()
+            .find(|example| example.name == "arc")
+            .unwrap();
+        assert_eq!(arc.group, PathBuf::new());
+        assert_eq!(arc.path.file_name().unwrap(), "scenes.rs");
+        assert!(arc.code.contains("fn arc(r: &mut RanimScene)"));
+        assert!(arc.code.starts_with("`scenes.rs`"));
+        assert!(arc.code.contains("`lib.rs`（插件入口）"));
+        assert!(arc.code.contains("#[ranim::export_plugin]"));
     }
 
     #[test]

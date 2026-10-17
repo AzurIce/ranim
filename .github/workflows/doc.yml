@@ -27,7 +27,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: wasm-bindgen@0.2.128
+          tool: wasm-bindgen@0.2.129
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -42,8 +42,8 @@ jobs:
 
       - name: Build example doc wasm
         run: |
-          cargo build -p ranim-examples --release --target wasm32-unknown-unknown
-          wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_examples.wasm --out-dir target/doc/ranim_examples/pkg
+          cargo build -p ranim-examples --bin ranim-examples-preview --release --target wasm32-unknown-unknown
+          wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim-examples-preview.wasm --out-name ranim_examples --out-dir target/doc/ranim_examples/pkg
 
       - uses: actions/upload-artifact@v4
         with:

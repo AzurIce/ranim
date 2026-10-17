@@ -1,5 +1,7 @@
 name = "iterative_spring"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 //! Iterative animation example: a damped spring (state stepped by a closure,
 //! no ECS required).
@@ -61,7 +63,31 @@ fn iterative_spring(r: &mut RanimScene) {
     );
     r.insert_time_mark(sim_secs / 2.0, TimeMark::Capture("preview.png".to_string()));
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([iterative_spring::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "6ca1a76122a0f27cb5b005441575a8e2c6521f3b"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/d8/0376791ce26c5e8eecc413a6c53c3821db07c1208978c39477ac737f2e420c"]
 wasm = false

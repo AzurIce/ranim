@@ -1,5 +1,7 @@
 name = "arc"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use itertools::Itertools;
 use ranim::{
@@ -63,7 +65,31 @@ pub fn arc(r: &mut RanimScene) {
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([arc::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "ee06a2898c69eee9c716cba2740dc948c578b035"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/53/8c4bb5ca65bcee91535cb6bc6f45a7f9a31ddb8e7a17e94be2f9f6f796d81f"]
 wasm = true

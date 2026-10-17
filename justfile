@@ -45,16 +45,16 @@ doc:
     just _build-example-doc-assets
 
 _build-example-doc-assets:
-    cargo build -p ranim-examples --release --target wasm32-unknown-unknown
-    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_examples.wasm \
+    CARGO_BUILD_JOBS={{ cargo_jobs }} cargo build -p ranim-examples --bin ranim-examples-preview --release --target wasm32-unknown-unknown
+    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim-examples-preview.wasm --out-name ranim_examples \
         --out-dir target/doc/ranim_examples/pkg
 
 doc-examples:
     RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
         cargo doc --no-deps -p ranim-examples --document-private-items --all-features \
         --target-dir packages/ranim-examples/target
-    cargo build -p ranim-examples --release --target wasm32-unknown-unknown
-    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim_examples.wasm \
+    CARGO_BUILD_JOBS={{ cargo_jobs }} cargo build -p ranim-examples --bin ranim-examples-preview --release --target wasm32-unknown-unknown
+    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim-examples-preview.wasm --out-name ranim_examples \
         --out-dir packages/ranim-examples/target/doc/ranim_examples/pkg
 
 book:

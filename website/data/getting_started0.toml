@@ -1,5 +1,7 @@
 name = "getting_started0"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use ranim::{
     anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,
@@ -34,7 +36,31 @@ fn getting_started0(r: &mut RanimScene) {
     r.insert_time_mark(1.0, TimeMark::Capture("preview.png".to_string()));
 }
 // ANCHOR_END: construct
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([getting_started0::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "7d6668502950ba9de3888f2123bcf8dbff666b9a"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/2e/106311d6769a950c14c64efd7186a69e2bc49a0f1287482e2b9e9880edab3a"]
 wasm = true

@@ -1,5 +1,7 @@
 name = "perlin_terrain"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use std::f64::consts::PI;
 
@@ -263,7 +265,35 @@ fn fractal_erosion(r: &mut RanimScene) {
         TimeMark::Capture("preview-fractal-erosion-perlin.png".to_string()),
     );
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([
+            perlin::scene(),
+            fractal_perlin::scene(),
+            fractal_erosion::scene(),
+        ]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "b239cb1ca49b1533ed2c1220729566b3a312662f"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/20/f5c5e598aad58c38dcc113afa2b205a45b009b82d0bf006d85f76bd6935f6e", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/c8/9000fef2017ac1a11d45db505473e8bdf5e17a2789db23b055d04bb3b281a5", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5a/a6dd713ea513ed4d9daa081b0111714676951f953ae6f742aee6ae04001072"]
 wasm = true

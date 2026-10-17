@@ -1,5 +1,7 @@
 name = "arc_between_points"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use itertools::Itertools;
 use ranim::{
@@ -59,7 +61,31 @@ fn arc_between_points(r: &mut RanimScene) {
 
     r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([arc_between_points::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "313ba4e302839c8b1e82f3c246a523e44aa11e7f"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/4f/06834d59bf26b6fa2e6bdea34ea58e1c9367e3e80d7ac7d65672524f3b925e"]
 wasm = true

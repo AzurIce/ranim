@@ -1,33 +1,10 @@
-use ranim::{
-    anims::fading::FadingAnim, color::palettes::manim, items::vitem::geometry::Square, prelude::*,
-    utils::rate_functions::smooth,
-};
+mod scenes;
 
-// ANCHOR: construct
-#[scene]
-#[wasm_demo_doc]
-#[output(dir = "./output/getting_started0")]
-fn getting_started0(r: &mut RanimScene) {
-    // A Square with size 2.0 and color blue
-    let square = Square::new(2.0).with(|square| {
-        square.set_color(manim::BLUE_C);
-    });
+pub use scenes::ScenesPlugin;
 
-    let mut content = seq![square.clone().fade_in().with_rate_func(smooth)];
-    content
-        .hold(1.0)
-        .push(square.hide())
-        .forward(1.0)
-        .push(square.show())
-        .hold(1.0)
-        .push(square.clone().fade_out().with_rate_func(smooth));
-
-    r.play(
-        CameraFrame::default()
-            .show()
-            .with_duration(content.cursor_sec()),
-    );
-    r.play(content);
-    r.insert_time_mark(1.0, TimeMark::Capture("preview.png".to_string()));
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
 }
-// ANCHOR_END: construct

@@ -1,34 +1,22 @@
 use anyhow::{Result, bail};
 use ranim::{
-    Output, Scene,
+    Output, SceneHandle,
     cmd::{render_scene, render_scene_once},
 };
 use tracing::{error, info};
 
-use crate::{RanimUserLibrary, cli::CliArgs, load_user_library};
-
-/// Load the user library and collect its scenes.
-///
-/// The returned [`RanimUserLibrary`] must be kept alive for as long as the
-/// scenes are used: `Scene::constructor` is a function pointer into the
-/// dylib, so dropping the library unmaps the code it points to.
-fn load_scenes(args: &CliArgs) -> Result<(RanimUserLibrary, Vec<Scene>)> {
-    let lib = load_user_library(args)?;
-    let scenes = lib.scenes().collect();
-    Ok((lib, scenes))
-}
+use crate::{cli::CliArgs, load_user_library, select_scene};
 
 /// Render every `#[output(...)]` declared by the selected scenes.
 pub fn output_command(args: &CliArgs, scenes: &[String], buffer_count: usize) -> Result<()> {
-    let (_lib, all_scenes) = load_scenes(args)?;
-    let scenes_to_render: Vec<&Scene> = if scenes.is_empty() {
-        all_scenes.iter().collect()
-    } else {
-        all_scenes
-            .iter()
-            .filter(|scene| scenes.iter().any(|s| s == &scene.name))
-            .collect()
-    };
+    let lib = load_user_library(args)?;
+    let app = lib.app();
+    let all_scenes = app.scenes();
+    let scenes_to_render: Vec<SceneHandle> = all_scenes
+        .iter()
+        .filter(|scene| scenes.is_empty() || scenes.iter().any(|name| name == &scene.name))
+        .map(|scene| app.scene(&scene.name).unwrap())
+        .collect();
 
     if scenes_to_render.is_empty() {
         if scenes.is_empty() {
@@ -45,7 +33,7 @@ pub fn output_command(args: &CliArgs, scenes: &[String], buffer_count: usize) ->
 
     for scene in scenes_to_render {
         info!("Rendering scene: {}", scene.name);
-        render_scene(scene, buffer_count);
+        render_scene(&scene, buffer_count);
     }
     Ok(())
 }
@@ -55,28 +43,14 @@ pub fn output_command(args: &CliArgs, scenes: &[String], buffer_count: usize) ->
 /// not read any `#[output(...)]` declaration and does not process
 /// `TimeMark::Capture`.
 pub fn render_command(args: &CliArgs, scene_name: &str, buffer_count: usize) -> Result<()> {
-    let (_lib, all_scenes) = load_scenes(args)?;
-
-    let Some(scene) = all_scenes.iter().find(|scene| scene.name == scene_name) else {
-        error!("No matching scene found for: {scene_name:?}");
-        error!(
-            "Available scenes: {:?}",
-            all_scenes.iter().map(|s| &s.name).collect::<Vec<_>>()
-        );
-        bail!("No scene to render");
-    };
+    let lib = load_user_library(args)?;
+    let scene = select_scene(&lib, Some(scene_name))?;
 
     let output = Output::default();
     info!(
         "Rendering scene {:?} once with default output: {}x{} {}fps {}",
         scene.name, output.width, output.height, output.fps, output.format
     );
-    render_scene_once(
-        scene.constructor,
-        scene.name.clone(),
-        &scene.config,
-        &output,
-        buffer_count,
-    );
+    render_scene_once(&scene, &output, buffer_count);
     Ok(())
 }

@@ -1,77 +1,10 @@
-use std::f64::consts::PI;
+mod scenes;
 
-use ranim::{
-    anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
-    color::palettes::manim,
-    items::vitem::{
-        VItem,
-        geometry::{Circle, Square},
-    },
-    prelude::*,
-    utils::rate_functions::smooth,
-};
+pub use scenes::ScenesPlugin;
 
-#[scene]
-#[wasm_demo_doc]
-#[output(dir = "./output/hello_ranim")]
-fn hello_ranim(r: &mut RanimScene) {
-    let mut square = Square::new(2.0);
-    square.set_color(manim::BLUE_C);
-
-    let circle: VItem = VItem::from(Circle::new(2.0)).with(|circle| {
-        circle.set_color(manim::RED_C).rotate_on_z(PI / 4.0 - PI);
-    });
-
-    let mut vitem = VItem::from(square.clone());
-
-    let seq = seq![
-        square.fade_in().with_rate_func(smooth),
-        vitem.morph_to(circle).with_rate_func(smooth),
-        vitem.show(),
-        vitem.clone().unwrite().with_rate_func(smooth),
-        vitem.write().with_rate_func(smooth),
-        vitem.fade_out().with_rate_func(smooth),
-    ];
-    r.play(
-        CameraFrame::default()
-            .show()
-            .with_duration(seq.cursor_sec()),
-    );
-    r.play(seq);
-
-    r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
-}
-
-#[allow(unused)]
-fn hello_ranim_chained(r: &mut RanimScene) {
-    let square = Square::new(2.0).with(|square| {
-        square.set_color(manim::BLUE_C);
-    });
-
-    let mut content = seq![square.clone().fade_in().with_rate_func(smooth)];
-
-    let circle: VItem = Circle::new(2.0)
-        .with(|circle| {
-            circle.set_color(manim::RED_C);
-        })
-        .into();
-
-    let mut vitem = VItem::from(square);
-    content
-        .push(vitem.morph_to(circle).with_rate_func(smooth))
-        .hold(1.0)
-        .extend(seq![
-            vitem.clone().unwrite().with_rate_func(smooth),
-            vitem.write().with_rate_func(smooth),
-            vitem.fade_out().with_rate_func(smooth),
-        ]);
-
-    r.play(
-        CameraFrame::default()
-            .show()
-            .with_duration(content.cursor_sec()),
-    );
-    r.play(content);
-
-    r.insert_time_mark(3.7, TimeMark::Capture("preview.png".to_string()));
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
 }

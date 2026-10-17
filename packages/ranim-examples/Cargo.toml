@@ -7,8 +7,12 @@ repository.workspace = true
 publish = false
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["rlib", "cdylib"]
 path = "../../examples/ranim_examples_bundle.rs"
+
+[[bin]]
+name = "ranim-examples-preview"
+path = "src/main.rs"
 
 [dependencies]
 ranim = { workspace = true, features = ["preview", "anims", "items", "typst"] }
@@ -20,6 +24,11 @@ rand = "0.10.3"
 rand_chacha = "0.10.0"
 midly = "0.5.3"
 getrandom = { version = "0.4.3", features = ["wasm_js"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
+console_error_panic_hook = "0.1.7"
+wasm-tracing = "2.1.0"
 
 [package.metadata.docs.rs]
 all-features = true

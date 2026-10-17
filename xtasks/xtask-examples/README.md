@@ -14,16 +14,17 @@ website/
 其中 `<group>` 从 example 在 `examples/` 下的相对目录推导：
 
 ```text
-examples/arc/lib.rs                       -> content/examples/arc.md
+examples/arc/scenes.rs                    -> content/examples/arc.md
 ```
 
 `xtask` 会自动为缺失的目录创建 Zola `_index.md`，所以 Zola 侧不需要手工维护
-目录结构。
+目录结构。`data/<name>.toml` 的 `code` 同时展示 `scenes.rs`（场景与显式注册）
+和 `lib.rs`（`#[ranim::export_plugin]` 插件工厂入口），各自附有文件名。
 
 ## Commands
 
 ```bash
-# 构建共享 wasm bundle
+# 构建共享 wasm 预览宿主
 cargo examples build
 
 # 渲染全部 example 并刷新 website 输出
@@ -53,3 +54,8 @@ Zola 页面中仍使用 `!example-<name>` 插入 example 内容。列表页和�
 
 `just doc-examples` 会为 `ranim-examples` 生成带 `#[wasm_demo_doc]` 实时预览的
 rustdoc。
+
+`ranim-examples` 的 library 只定义和导出 `ExamplesPlugin`。网站和 rustdoc
+使用同包的 `ranim-examples-preview` binary 作为 WASM 宿主，由宿主创建
+`App`、安装插件并提供 `preview_scene(name)`。构建时显式选择该 binary，
+再通过 `wasm-bindgen --out-name ranim_examples` 保持前端模块路径一致。

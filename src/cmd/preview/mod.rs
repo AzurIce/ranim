@@ -8,7 +8,7 @@ mod timeline;
 use std::sync::Arc;
 
 use crate::{
-    Output, Scene, SceneConfig, SceneConstructor,
+    Output, SceneHandle,
     core::{
         SceneEvaluator,
         color::{self, LinearSrgb},
@@ -25,11 +25,8 @@ use timeline::TimelineState;
 use tracing::{error, info};
 use web_time::Instant;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-
 pub enum RanimPreviewAppCmd {
-    ReloadScene(Scene, Sender<()>),
+    ReloadScene(SceneHandle, Sender<()>),
 }
 
 /// Default logic grid resolution (Hz), per the time model design.
@@ -106,10 +103,6 @@ pub struct RanimPreviewApp {
     #[allow(unused)]
     title: String,
     clear_color: wgpu::Color,
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-    scene_constructor: Arc<dyn SceneConstructor>,
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-    scene_config: SceneConfig,
     resolution: Resolution,
     evaluator: SceneEvaluator,
     need_eval: bool,
@@ -171,19 +164,18 @@ pub struct RanimPreviewApp {
     /// Whether stackable chart metrics render stacked (per-pass colors)
     /// instead of a plain total.
     profiler_stacked: bool,
+
+    // Keep the project and its dynamic library alive until all session state
+    // (including evaluator code and audio) has been destroyed.
+    scene: SceneHandle,
 }
 
 impl RanimPreviewApp {
-    pub fn new(
-        scene_constructor: impl SceneConstructor + 'static,
-        title: String,
-        scene_config: SceneConfig,
-    ) -> Self {
+    pub fn new(scene: SceneHandle) -> Self {
         let t = Instant::now();
-        let scene_constructor = Arc::new(scene_constructor);
 
         info!("building scene...");
-        let timeline = scene_constructor.build_scene();
+        let timeline = scene.build_scene();
         info!("Scene built, cost: {:?}", t.elapsed());
 
         info!("Getting timelines info...");
@@ -196,13 +188,12 @@ impl RanimPreviewApp {
 
         let playback_engine = PlaybackEngine::new(&evaluator);
 
-        Self {
+        let clear_color = scene.config.clear_color.clone();
+        let mut preview = Self {
             cmd_rx,
             cmd_tx,
-            title,
+            title: scene.name.clone(),
             clear_color: wgpu::Color::TRANSPARENT,
-            scene_constructor,
-            scene_config,
             resolution: Resolution::QHD,
             timeline_state: TimelineState::new(total_secs, animation_infos),
             evaluator,
@@ -241,7 +232,10 @@ impl RanimPreviewApp {
             progress_total_sec: -1.0,
             profiler_metric: profiler::ProfilerMetric::default(),
             profiler_stacked: true,
-        }
+            scene,
+        };
+        preview.set_clear_color_str(&clear_color);
+        preview
     }
 
     /// Set clear color str
@@ -296,7 +290,7 @@ impl RanimPreviewApp {
         if let Ok(cmd) = self.cmd_rx.try_recv() {
             match cmd {
                 RanimPreviewAppCmd::ReloadScene(scene, tx) => {
-                    let timeline = scene.constructor.build_scene();
+                    let timeline = scene.build_scene();
                     let animation_infos = timeline.get_animation_infos();
                     let old_cur_second = self.timeline_state.current_sec;
                     self.timeline_state =
@@ -311,6 +305,8 @@ impl RanimPreviewApp {
                     self.progress_total_sec = -1.0;
 
                     self.set_clear_color_str(&scene.config.clear_color);
+                    self.title = scene.name.clone();
+                    self.scene = scene;
 
                     if let Err(err) = tx.try_send(()) {
                         error!("Failed to send reloaded signal: {err:?}");
@@ -550,19 +546,15 @@ impl RanimPreviewApp {
         let (progress_tx, progress_rx) = unbounded();
         self.export_progress_rx = Some(progress_rx);
 
-        let constructor = self.scene_constructor.clone();
-        let scene_config = self.scene_config.clone();
+        let scene = self.scene.clone();
         let output = self.export_config.clone();
-        let name = self.title.clone();
 
         std::thread::spawn(move || {
             let progress_tx_cb = progress_tx.clone();
             let ctx_cb = ctx.clone();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 crate::cmd::render::render_scene_output_with_progress(
-                    constructor,
-                    name,
-                    &scene_config,
+                    &scene,
                     &output,
                     2,
                     Some(Box::new(move |current, total| {
@@ -1211,49 +1203,66 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
     }
 }
 
-pub fn preview_constructor_with_name(
-    scene: impl SceneConstructor + 'static,
-    name: &str,
-    scene_config: &SceneConfig,
-) {
-    let app = RanimPreviewApp::new(scene, name.to_string(), scene_config.clone());
+/// Preview a registered scene, retaining its application for the session.
+pub fn preview_scene(scene: SceneHandle) {
+    #[cfg(target_arch = "wasm32")]
+    let container_id = format!("ranim-app-{}", scene.name);
+    let app = RanimPreviewApp::new(scene);
     run_app(
         app,
         #[cfg(target_arch = "wasm32")]
-        format!("ranim-app-{name}"),
+        container_id,
     );
 }
 
-/// Preview a scene
-pub fn preview_scene(scene: &Scene) {
-    preview_scene_with_name(scene, &scene.name);
-}
-
-/// Preview a scene with a custom name
-pub fn preview_scene_with_name(scene: &Scene, name: &str) {
-    let mut app = RanimPreviewApp::new(scene.constructor, name.to_string(), scene.config.clone());
-    app.set_clear_color_str(&scene.config.clear_color);
-    run_app(
-        app,
-        #[cfg(target_arch = "wasm32")]
-        format!("ranim-app-{name}"),
-    );
-}
-
-// WASM support needs refactoring, mostly keeping it commented or adapting basic entry point.
-#[cfg(target_arch = "wasm32")]
-mod wasm {
+#[cfg(all(test, not(target_family = "wasm")))]
+mod tests {
     use super::*;
+    use crate::{App as ProjectApp, Scene, prelude::*};
 
-    #[wasm_bindgen(start)]
-    pub async fn wasm_start() {
-        console_error_panic_hook::set_once();
-        wasm_tracing::set_as_global_default();
+    fn project(seconds: f64, generation: u32, clear_color: &str) -> Arc<ProjectApp> {
+        let mut app = ProjectApp::new();
+        let mut scene = Scene::new("preview", move |r: &mut RanimScene| {
+            r.play(Static(CameraFrame::default()).with_duration(seconds));
+        });
+        scene.config.clear_color = clear_color.to_string();
+        app.insert_resource(generation).add_scene(scene);
+        Arc::new(app)
     }
 
-    /// WASM wrapper: preview a scene (accepts owned [`Scene`] from `find_scene`)
-    #[wasm_bindgen]
-    pub fn preview_scene(scene: &Scene) {
-        super::preview_scene(scene);
+    #[test]
+    fn reload_replaces_the_export_scene_and_retains_in_flight_generations() {
+        let old = project(2.0, 1, "#000000");
+        let weak_old = Arc::downgrade(&old);
+        let mut preview = RanimPreviewApp::new(old.scene("preview").unwrap());
+        drop(old);
+        preview.timeline_state.current_sec = 1.5;
+
+        // An export started before reload owns its original project generation.
+        let in_flight_export = preview.scene.clone();
+        let new = project(1.0, 2, "#ffffff");
+        let (ack_tx, ack_rx) = async_channel::bounded(1);
+        assert!(
+            preview
+                .cmd_tx
+                .send_blocking(RanimPreviewAppCmd::ReloadScene(
+                    new.scene("preview").unwrap(),
+                    ack_tx,
+                ))
+                .is_ok()
+        );
+        preview.handle_events();
+        assert!(ack_rx.try_recv().is_ok());
+
+        assert_eq!(preview.timeline_state.current_sec, 1.0);
+        assert_eq!(preview.evaluator.total_secs(), 1.0);
+        assert_eq!(preview.scene.build_scene().total_secs(), 1.0);
+        assert_eq!(*preview.scene.app().resource::<u32>(), 2);
+        assert_eq!(preview.clear_color, wgpu::Color::WHITE);
+        assert_eq!(in_flight_export.build_scene().total_secs(), 2.0);
+        assert!(weak_old.upgrade().is_some());
+
+        drop(in_flight_export);
+        assert!(weak_old.upgrade().is_none());
     }
 }

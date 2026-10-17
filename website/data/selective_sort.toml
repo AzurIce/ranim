@@ -1,5 +1,7 @@
 name = "selective_sort"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use glam::{DVec3, dvec2};
 use rand::{SeedableRng, seq::SliceRandom};
@@ -137,7 +139,31 @@ fn selective_sort_10(r: &mut RanimScene) {
 fn selective_sort_100(r: &mut RanimScene) {
     selective_sort(r, 100);
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([selective_sort_10::scene(), selective_sort_100::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "09a68c2f121d2d0c0e80527bad65ed70abc543c0"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/74/87eeb5e23640f0184586b0e48e82912e8b28de7c227f1b0d604aa7927a71bb", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/84/261596703d4721237fed6f7b6b2b7f12096e64ac2c975a4d072eb61f7306eb"]
 wasm = true

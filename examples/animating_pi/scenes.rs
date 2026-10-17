@@ -1,0 +1,89 @@
+use std::f64::consts::TAU;
+
+use itertools::Itertools;
+use ranim::{
+    color::palettes::manim,
+    glam::{DVec3, usizevec3},
+    prelude::*,
+    utils::rate_functions::smooth,
+};
+use ranim_anims::morph::MorphAnim;
+use ranim_core::animation::eval::StaticAnim;
+use ranim_items::vitem::{VItem, svg::SvgItem, typst::typst_svg};
+
+#[scene(clear_color = "#000000")]
+#[wasm_demo_doc]
+#[output(dir = "./output/animating_pi")]
+fn animating_pi(r: &mut RanimScene) {
+    let cam = CameraFrame::default();
+
+    let (w, h) = (10, 10);
+    let mut pis = (0..h)
+        .cartesian_product(0..w)
+        .map(|(_, _)| {
+            SvgItem::new(typst_svg("$pi$"))
+                .with(|x| {
+                    x.set_color(manim::WHITE);
+                })
+                .with(|x| {
+                    x.scale_to_min(&[
+                        ScaleHint::PorportionalY(cam.frame_height / h as f64),
+                        ScaleHint::PorportionalX(cam.frame_height / w as f64),
+                    ])
+                    .discard()
+                })
+        })
+        .collect::<Vec<_>>();
+    pis.arrange_in_grid(
+        usizevec3(10, 10, usize::MAX),
+        DVec3::splat(8.0 / 10.0),
+        DVec3::splat(0.2),
+    )
+    .move_to(DVec3::ZERO);
+
+    let mut vitems = pis
+        .into_iter()
+        .flat_map(Vec::<VItem>::from)
+        .collect::<Vec<_>>();
+    vitems
+        .scale_to(ScaleHint::PorportionalY(TAU - 0.25))
+        .move_to(DVec3::ZERO);
+
+    let mut content = seq![vitems.clone().show()];
+    content
+        .hold(1.0)
+        .push(
+            vitems
+                .morph(|x| {
+                    x.apply_complex_map(|c| c.exp());
+                })
+                .with_duration(5.0)
+                .with_rate_func(smooth),
+        )
+        .hold(1.0)
+        .push(
+            vitems
+                .morph(|x| {
+                    x.apply_point_func(|p| {
+                        p.x += 0.5 * p.y.sin();
+                        p.y += 0.5 * p.x.cos();
+                    });
+                })
+                .with_duration(5.0)
+                .with_rate_func(smooth),
+        )
+        .hold(1.0);
+
+    r.play(cam.show().with_duration(content.cursor_sec()));
+    r.play(content);
+    r.insert_time_mark(5.0, TimeMark::Capture("preview.png".to_string()));
+}
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([animating_pi::scene()]);
+    }
+}

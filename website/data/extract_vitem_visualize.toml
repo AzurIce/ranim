@@ -1,5 +1,7 @@
 name = "extract_vitem_visualize"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use ranim::glam;
 use ranim_core::core_item::CoreItem;
@@ -256,7 +258,31 @@ impl Empty for VisualVItem {
         Self(VItem::empty())
     }
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([ranim_text::scene(), hello_ranim::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "38729d681209801390382d374116de6c7264d032"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/31/c9dfba5bf8314658a655397dc13d8c1d103b6f8db5dcbfffccf3efbba4b89a", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/1c/45ab36f6d966cd718fe72e7de1e28eef40b1005866fd61a638840ee4df4507"]
 wasm = true

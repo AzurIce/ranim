@@ -1,7 +1,7 @@
 # Ranim CLI
 
 `ranim-cli` 是 Ranim 的命令行工具，二进制名为 `ranim`。它负责把场景代码构建成
-dylib、加载其中通过 `#[scene]` 注册的场景，并围绕场景提供四个子命令：
+dylib、加载其中的插件并安装到宿主 App，再围绕 App 中显式注册的场景提供四个子命令：
 
 ```text
 ranim <command>
@@ -20,9 +20,44 @@ cargo install --path packages/ranim-cli   # 之后可直接使用 ranim <command
 
 ## 工作方式
 
-每次调用都会先 `cargo build` 目标（lib 或 example，需为 `cdylib`），再加载 dylib
-中的 scene inventory。因此命令报错时应先看 cargo 的编译输出——大多数失败是场景
-代码本身的编译错误。
+每次调用都会先 `cargo build` 目标（lib 或 example，需为 `cdylib`），再加载动态库
+导出的 `ranim_plugin` 工厂。项目在 crate 根导出插件：
+
+```rust,ignore
+use ranim::prelude::*;
+
+#[scene]
+fn hello(_r: &mut RanimScene) {}
+
+pub struct ScenesPlugin;
+
+impl Plugin for ScenesPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_scene(hello::scene());
+        // 在此 app.add_plugins(...) 安装依赖插件和项目资源。
+    }
+}
+
+#[ranim::export_plugin]
+pub fn plugin() -> impl Plugin {
+    ScenesPlugin
+}
+```
+
+`#[scene]` 只生成 `hello::scene()` 描述符，加入 App 后 CLI 才能发现它。
+`inspect`、`render`、`output` 和 `preview` 各自创建 App，并安装同一个导出插件。
+Rust 应用也可直接调用 `app.add_plugins(my_project::ScenesPlugin)` 或
+`app.add_plugins(my_project::plugin())`，将插件装配到自己的 App。
+热重载会创建新的 App 并安装重载后的插件；旧预览、导出和场景句柄使用的动态库
+会保留至这些对象销毁。
+
+工厂使用 Rust ABI，CLI 与目标项目必须使用匹配的 Ranim 版本和 Rust 工具链。
+WASM 预览宿主也可安装同一个插件；宿主负责创建 App、选择场景并启动预览。
+`#[ranim::export_plugin]` 保留 Rust 工厂函数并生成唯一的动态库入口，Web 入口写在宿主二进制中。
+项目资源归所属 App 管理，渲染和预览通过 `SceneHandle` 保持它们的生命周期。
+
+命令报错时先看 Cargo 编译输出；构建成功但场景未显示时，检查插件的 `build` 是否显式
+调用了 `add_scene` / `add_scenes`，以及目标是否导出了统一入口。
 
 ## 通用 target 参数
 
@@ -104,9 +139,9 @@ output/hello_1920x1080_60/<filename>     TimeMark::Capture 截图
 ranim inspect scenes --example hello_ranim
 ```
 
-不调用场景构造函数，只列出 dylib 中注册的场景及其 `#[output(...)]` 摘要（尺寸、
-fps、格式、输出目录、`name_template`、`save_frames`）。适合开工第一步：确认场景
-名拼写、场景是否注册成功、输出配置是否符合预期。
+先创建宿主 App 并安装导出插件，再列出 App 中注册的场景及其 `#[output(...)]` 摘要（尺寸、
+fps、格式、输出目录、`name_template`、`save_frames`），不调用场景构造函数。
+适合开工第一步：确认场景名拼写、场景是否注册成功、输出配置是否符合预期。
 
 ### `ranim inspect tree [SCENE]`
 

@@ -1,5 +1,7 @@
 name = "regular_polygon"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use std::f64::consts::PI;
 
@@ -111,7 +113,31 @@ pub fn regular_polygon(r: &mut RanimScene) {
     );
     r.play(content);
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([regular_polygon::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "9712d0599fecdd0a478a76e0dbf80bcbf54133d9"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ad/2f462be755b24de91116ecd205dfcc75283116171ddc3d961a84c0933907b8"]
 wasm = true

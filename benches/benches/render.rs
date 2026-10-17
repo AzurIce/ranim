@@ -1,6 +1,7 @@
 use benches::test_scenes::{static_squares, transform_squares};
 use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
-use ranim::{Output, SceneConfig, cmd::render_scene_output, prelude::*};
+use ranim::{Output, Scene, cmd::render_scene_output, prelude::*};
+use std::sync::Arc;
 
 // 渲染性能测试函数
 fn render_benchmark(c: &mut Criterion) {
@@ -9,13 +10,27 @@ fn render_benchmark(c: &mut Criterion) {
 
     // 测试不同规模的场景
     for n in [5, 10, 20, 40].iter() {
-        group.bench_with_input(BenchmarkId::new("static_squares", n), n, |b, n| {
+        let count = *n;
+        let mut app = App::new();
+        app.add_scenes([
+            Scene::new(format!("static_squares_{n}"), move |r: &mut RanimScene| {
+                static_squares(r, count);
+            }),
+            Scene::new(
+                format!("transform_squares_{n}"),
+                move |r: &mut RanimScene| {
+                    transform_squares(r, count);
+                },
+            ),
+        ]);
+        let app = Arc::new(app);
+        let static_scene = app.scene(&format!("static_squares_{n}")).unwrap();
+        let transform_scene = app.scene(&format!("transform_squares_{n}")).unwrap();
+        group.bench_with_input(BenchmarkId::new("static_squares", n), n, |b, _| {
             b.iter(|| {
                 // 执行渲染
                 render_scene_output(
-                    |r: &mut RanimScene| static_squares(r, *n),
-                    format!("static_squares_{n}"),
-                    &SceneConfig::default(),
+                    &static_scene,
                     &Output {
                         dir: "./output/bench".to_string(),
                         ..Default::default()
@@ -24,13 +39,11 @@ fn render_benchmark(c: &mut Criterion) {
                 );
             });
         });
-        group.bench_with_input(BenchmarkId::new("transform_squares", n), n, |b, n| {
+        group.bench_with_input(BenchmarkId::new("transform_squares", n), n, |b, _| {
             b.iter(|| {
                 // 执行渲染
                 render_scene_output(
-                    |r: &mut RanimScene| transform_squares(r, *n),
-                    format!("transform_squares_{n}"),
-                    &SceneConfig::default(),
+                    &transform_scene,
                     &Output {
                         dir: "./output/bench".to_string(),
                         ..Default::default()

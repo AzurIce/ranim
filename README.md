@@ -58,6 +58,86 @@ You can also use from git for the latest updates:
 ranim = { git = "https://github.com/azurice/ranim" }
 ```
 
+### Project entry and plugins
+
+The host creates an `App` and installs plugins to configure its scene catalog
+and typed resources. Export a plugin once from the crate root:
+
+```rust
+use ranim::prelude::*;
+
+#[scene]
+fn hello(_scene: &mut RanimScene) {
+    // Define the animation here.
+}
+
+pub struct ScenesPlugin;
+
+impl Plugin for ScenesPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_scene(hello::scene());
+    }
+}
+
+#[ranim::export_plugin]
+pub fn plugin() -> impl Plugin {
+    ScenesPlugin
+}
+```
+
+`#[scene]` creates an owned descriptor through `hello::scene()`; add it with
+`add_scene` or `add_scenes` to make it available. `#[ranim::export_plugin]` keeps
+the typed Rust factory and adds the native `ranim_plugin` entry used by the CLI.
+Each host creates its own App, installs the exported plugin, and chooses how
+to render or preview scenes. Plugins can also install other
+plugins through `app.add_plugins(...)`.
+
+The factory may have any name and return a concrete plugin type or `impl Plugin`.
+It must be a safe, synchronous, nongeneric function with no arguments. Configure
+the plugin in its body; `Default` is not required. The native entry boxes the
+plugin and catches construction panics as `Result<Box<dyn Plugin>, String>`.
+
+For a native lib loaded by the CLI, set `crate-type = ["rlib", "cdylib"]` in
+`[lib]`. The loader uses the Rust ABI, so the CLI and project must use matching
+Ranim versions and Rust toolchains.
+
+To call the APIs directly, install the same plugin in a host App and select a scene handle
+(`render` / `preview` features enable the corresponding functions):
+
+```rust,ignore
+let mut app = App::new();
+app.add_plugins(ScenesPlugin); // Or my_project::plugin() from another crate.
+let project = std::sync::Arc::new(app);
+let scene = project.scene("hello").expect("hello is registered");
+ranim::cmd::render_scene(&scene, 2);
+ranim::cmd::preview_scene(scene);
+```
+
+A `SceneHandle` keeps its App and project resources alive through rendering,
+preview resizing, and export. Plugins configure that App; item and render
+registration will build on this boundary in a later step.
+
+For a WebAssembly preview, keep the plugin in `src/lib.rs` and put the host
+in `src/main.rs`. The binary constructs the App and starts the preview using
+the same Rust API. Build the binary for `wasm32-unknown-unknown` and process
+its `.wasm` with `wasm-bindgen`; `#[ranim::export_plugin]` only exports the plugin.
+See the [example app](./example-packages/app) for both Trunk and manual builds.
+
+Native hosts can enable the `dylib` feature and install a dynamically loaded
+plugin in the same App:
+
+```rust,ignore
+use ranim::{App, DynamicPlugin};
+
+let mut app = App::new();
+// The library must use matching Ranim versions and Rust toolchains.
+let plugin = unsafe { DynamicPlugin::load("./libmy_project.so")? };
+app.try_add_plugins(plugin)?;
+```
+
+The App retains the library while its plugins, resources, and scene handles
+remain in use.
+
 For the usage, check out the [examples](./examples) folder. You can run the examples with:
 
 ```bash

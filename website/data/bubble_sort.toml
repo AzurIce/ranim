@@ -1,5 +1,7 @@
 name = "bubble_sort"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use rand::{SeedableRng, seq::SliceRandom};
 use ranim::{
@@ -126,7 +128,31 @@ fn bubble_sort_10(r: &mut RanimScene) {
 fn bubble_sort_100(r: &mut RanimScene) {
     bubble_sort(r, 100);
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([bubble_sort_10::scene(), bubble_sort_100::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "da8ca7b757ae05e4e3cecdc088321e966dc76ac6"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/08/1d73646363d508bbc3fc6cc6f81d2909bbbbd0b7b9f8723eb17e2110440aad", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ca/eaee7da633f3cf6c52d83c71a0a4fdf54fb762d9dd85f2064ceaf51d3b9ca3"]
 wasm = true

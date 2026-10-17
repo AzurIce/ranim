@@ -1,0 +1,50 @@
+use ranim::{
+    anims::{creation::WritingAnim, morph::MorphAnim},
+    color::palettes::manim,
+    items::vitem::{
+        VItem,
+        geometry::{Circle, Square},
+    },
+    prelude::*,
+    utils::rate_functions::smooth,
+};
+
+// ANCHOR: construct
+#[scene]
+#[wasm_demo_doc]
+#[output(dir = "./output/getting_started1")]
+fn getting_started1(r: &mut RanimScene) {
+    // A Square with size 2.0 and color blue
+    let square = Square::new(2.0).with(|square| {
+        square.set_color(manim::BLUE_C);
+    });
+
+    let circle = Circle::new(2.0).with(|circle| {
+        circle.set_color(manim::RED_C);
+    });
+
+    let content = seq![
+        VItem::from(square)
+            .morph_to(VItem::from(circle.clone()))
+            .with_rate_func(smooth),
+        VItem::from(circle).unwrite().with_rate_func(smooth),
+    ];
+
+    let total_secs = content.cursor_sec();
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(content);
+    r.insert_time_mark(
+        total_secs / 2.0,
+        TimeMark::Capture("preview.png".to_string()),
+    );
+}
+// ANCHOR_END: construct
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([getting_started1::scene()]);
+    }
+}

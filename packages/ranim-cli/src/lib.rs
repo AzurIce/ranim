@@ -8,8 +8,7 @@
 
 use anyhow::{Context, Result};
 use async_channel::{Receiver, Sender, bounded};
-use libloading::{Library, Symbol};
-use ranim::{Scene, StaticScene};
+use ranim::{App, DynamicPlugin, SceneHandle};
 use std::{
     fmt,
     path::{Path, PathBuf},
@@ -74,11 +73,11 @@ impl BuildProcess {
                 &self.target,
                 &self.args.args,
             );
-            // let tmp_dir = std::env::temp_dir();
             info!("loading {dylib_path:?}...");
 
-            let lib = RanimUserLibrary::load(dylib_path);
-            self.res_tx.send_blocking(Ok(lib)).unwrap();
+            self.res_tx
+                .send_blocking(RanimUserLibrary::load(dylib_path))
+                .unwrap();
         }
     }
 }
@@ -150,85 +149,24 @@ impl Drop for RanimUserLibraryBuilder {
 }
 
 pub struct RanimUserLibrary {
-    inner: Option<Library>,
-    temp_path: PathBuf,
-}
-
-pub struct RanimUserLibrarySceneIter<'a> {
-    lib: &'a RanimUserLibrary,
-    idx: usize,
-}
-
-impl Iterator for RanimUserLibrarySceneIter<'_> {
-    type Item = Scene;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let res = self.lib.get_scene(self.idx);
-        self.idx += 1;
-        res
-    }
+    app: Arc<App>,
 }
 
 impl RanimUserLibrary {
-    pub fn load(dylib_path: impl AsRef<Path>) -> Self {
+    pub fn load(dylib_path: impl AsRef<Path>) -> Result<Self> {
         let dylib_path = dylib_path.as_ref();
-
-        let temp_dir = std::env::temp_dir();
-        let file_name = dylib_path.file_name().unwrap();
-
-        // 使用时间戳和随机数确保每次都有唯一的临时文件名
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let temp_path = temp_dir.join(format!(
-            "ranim_{}_{}_{}",
-            std::process::id(),
-            timestamp,
-            file_name.to_string_lossy()
-        ));
-
-        std::fs::copy(dylib_path, &temp_path).unwrap();
-
-        let lib = unsafe { Library::new(&temp_path).unwrap() };
-        Self {
-            inner: Some(lib),
-            temp_path,
-        }
+        // The CLI and plugin are built with the same Rust toolchain and
+        // dependency versions, as required by the plugin's Rust ABI.
+        let plugin = unsafe { DynamicPlugin::load(dylib_path) }
+            .with_context(|| format!("failed to load user plugin {}", dylib_path.display()))?;
+        let mut app = App::new();
+        app.try_add_plugins(plugin)
+            .context("failed to initialize project plugin")?;
+        Ok(Self { app: Arc::new(app) })
     }
 
-    pub fn scene_cnt(&self) -> usize {
-        let scene_cnt: Symbol<extern "C" fn() -> usize> =
-            unsafe { self.inner.as_ref().unwrap().get(b"scene_cnt").unwrap() };
-        scene_cnt()
-    }
-
-    pub fn get_scene(&self, idx: usize) -> Option<Scene> {
-        let get_scene: Symbol<extern "C" fn(usize) -> *const StaticScene> =
-            unsafe { self.inner.as_ref().unwrap().get(b"get_scene").unwrap() };
-        if self.scene_cnt() <= idx {
-            None
-        } else {
-            Some(Scene::from(unsafe { &*get_scene(idx) }))
-        }
-    }
-
-    pub fn scenes(&self) -> impl Iterator<Item = Scene> {
-        RanimUserLibrarySceneIter { lib: self, idx: 0 }
-    }
-
-    pub fn get_preview_func(&self) -> Result<Scene> {
-        self.scenes().next().context("no scene found")
-    }
-}
-
-impl Drop for RanimUserLibrary {
-    fn drop(&mut self) {
-        tracing::debug!(?self.temp_path, "dropping user library");
-        drop(self.inner.take());
-        if let Err(err) = std::fs::remove_file(&self.temp_path) {
-            tracing::warn!("failed to remove temp dylib {:?}: {err}", self.temp_path);
-        }
+    pub fn app(&self) -> &Arc<App> {
+        &self.app
     }
 }
 
@@ -296,15 +234,9 @@ pub fn load_user_library(args: &CliArgs) -> Result<RanimUserLibrary> {
 /// If `name` is omitted and the library contains exactly one scene, that scene
 /// is returned. If the library contains multiple scenes, the caller must
 /// choose one and a list of available scenes is included in the error.
-pub fn select_scene(lib: &RanimUserLibrary, name: Option<&str>) -> Result<Scene> {
-    let scenes = lib.scenes().collect::<Vec<_>>();
-    select_scene_from_slice(&scenes, name).cloned()
-}
-
-pub(crate) fn select_scene_from_slice<'a>(
-    scenes: &'a [Scene],
-    name: Option<&str>,
-) -> Result<&'a Scene> {
+pub fn select_scene(lib: &RanimUserLibrary, name: Option<&str>) -> Result<SceneHandle> {
+    let app = lib.app();
+    let scenes = app.scenes();
     if scenes.is_empty() {
         anyhow::bail!("no scenes found in the user library");
     }
@@ -316,13 +248,10 @@ pub(crate) fn select_scene_from_slice<'a>(
         .join(", ");
 
     match name {
-        Some(name) => scenes
-            .iter()
-            .find(|scene| scene.name == name)
-            .with_context(|| {
-                format!("failed to find scene `{name}`. Available scenes: {available}")
-            }),
-        None if scenes.len() == 1 => Ok(&scenes[0]),
+        Some(name) => app.scene(name).with_context(|| {
+            format!("failed to find scene `{name}`. Available scenes: {available}")
+        }),
+        None if scenes.len() == 1 => Ok(app.first_scene().unwrap()),
         None => anyhow::bail!(
             "multiple scenes found, choose one explicitly. Available scenes: {available}"
         ),
@@ -475,32 +404,81 @@ pub fn main() {
 
 #[cfg(test)]
 mod tests {
+    use ranim::Scene;
+
     use super::*;
 
     fn empty_constructor(_scene: &mut ranim::RanimScene) {}
 
     fn scene(name: &str) -> Scene {
-        Scene {
-            name: name.to_string(),
-            constructor: empty_constructor,
-            config: Default::default(),
-            outputs: vec![],
-        }
+        Scene::new(name, empty_constructor)
     }
 
     #[test]
     fn select_scene_resolves_omitted_and_named_scenes() {
-        let single = [scene("only")];
-        assert_eq!(select_scene_from_slice(&single, None).unwrap().name, "only");
+        let mut app = App::new();
+        app.add_scene(scene("only"));
+        let single = RanimUserLibrary { app: Arc::new(app) };
+        assert_eq!(select_scene(&single, None).unwrap().name, "only");
 
-        let scenes = [scene("a"), scene("b")];
-        let err = match select_scene_from_slice(&scenes, None) {
+        let mut app = App::new();
+        app.add_scenes([scene("a"), scene("b")]);
+        let lib = RanimUserLibrary { app: Arc::new(app) };
+        let err = match select_scene(&lib, None) {
             Ok(_) => panic!("expected an error for multiple scenes"),
             Err(err) => err,
         };
         assert!(err.to_string().contains("Available scenes: a, b"));
 
-        let selected = select_scene_from_slice(&scenes, Some("b")).unwrap();
+        let selected = select_scene(&lib, Some("b")).unwrap();
         assert_eq!(selected.name, "b");
+        drop(lib);
+        assert_eq!(selected.build_scene().total_secs(), 0.0);
+    }
+
+    #[test]
+    fn select_scene_reports_empty_and_missing_scenes() {
+        let mut lib = RanimUserLibrary {
+            app: Arc::new(App::new()),
+        };
+        let Err(err) = select_scene(&lib, None) else {
+            panic!("expected an error for an empty project");
+        };
+        assert!(err.to_string().contains("no scenes found"));
+
+        Arc::get_mut(&mut lib.app)
+            .unwrap()
+            .add_scene(scene("available"));
+        let Err(err) = select_scene(&lib, Some("missing")) else {
+            panic!("expected an error for an unknown scene");
+        };
+        assert!(err.to_string().contains("failed to find scene `missing`"));
+        assert!(err.to_string().contains("Available scenes: available"));
+    }
+
+    #[test]
+    fn scene_handle_keeps_project_resources_alive() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        struct ResourceGuard(Arc<AtomicBool>);
+
+        impl Drop for ResourceGuard {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+
+        let dropped = Arc::new(AtomicBool::new(false));
+        let mut app = App::new();
+        app.add_scene(scene("test"))
+            .insert_resource(ResourceGuard(Arc::clone(&dropped)));
+        let lib = RanimUserLibrary { app: Arc::new(app) };
+        let selected = select_scene(&lib, Some("test")).unwrap();
+
+        drop(lib);
+        assert!(!dropped.load(Ordering::SeqCst));
+        assert_eq!(selected.build_scene().total_secs(), 0.0);
+        drop(selected);
+        assert!(dropped.load(Ordering::SeqCst));
     }
 }

@@ -43,3 +43,17 @@ pub fn hello_ranim(r: &mut RanimScene) {
     );
     r.play(content);
 }
+
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([hello_ranim::scene()]);
+    }
+}
+
+// Export one native entry; hosts own the App and preview.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}

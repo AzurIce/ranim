@@ -12,6 +12,7 @@ use crate::{
     animation::node::{AnimNode, AnimationInfo},
     audio::MASTER_SAMPLE_RATE,
     core_item::CoreItem,
+    lifetime::KeepAlive,
 };
 
 /// A reusable frame-local output buffer of `((animation_id, part), CoreItem)`.
@@ -24,6 +25,8 @@ pub struct SceneEvaluator {
     audio: std::sync::Arc<[f32]>,
     time_marks: Vec<(f64, TimeMark)>,
     clock: f64,
+    // Keep external animation code loaded until all cells have been destroyed.
+    _keep_alive: KeepAlive,
 }
 
 impl SceneEvaluator {
@@ -39,6 +42,7 @@ impl SceneEvaluator {
             audio: scene.audio,
             time_marks: scene.time_marks,
             clock: 0.0,
+            _keep_alive: scene.keep_alive,
         }
     }
 

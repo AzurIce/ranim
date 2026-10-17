@@ -6,7 +6,7 @@
 <script type="module">
   const rootPath = document.querySelector('meta[name="rustdoc-vars"]')?.dataset.rootPath ?? '';
   window.ranim_examples = import(`${rootPath}ranim_examples/pkg/ranim_examples.js`).then(
-    ({ default: init, find_scene, preview_scene }) =>
-      init().then(() => ({ find_scene, preview_scene }))
+    ({ default: init, preview_scene }) =>
+      init().then(() => ({ preview_scene }))
   );
 </script>

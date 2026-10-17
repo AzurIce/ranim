@@ -1,5 +1,7 @@
 name = "text_item"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use std::f64::consts::TAU;
 
@@ -64,7 +66,31 @@ fn text_item(r: &mut RanimScene) {
         TimeMark::Capture("preview.png".to_string()),
     );
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([text_item::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "2e775aad6c9055a94c20d5dfeba4475e9ae16c19"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/dc/024c2008d5ce22ae8c79fb31b6cb6c453b1cef8b750a3e92ae95199714ff66"]
 wasm = true

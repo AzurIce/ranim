@@ -162,24 +162,29 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
         .context("Build worker exited without reporting")??;
 
     let scene = match scene_name {
-        Some(scene) => lib.scenes().find(|s| s.name == *scene),
-        None => lib.scenes().next(),
+        Some(scene) => lib.app().scene(scene),
+        None => lib.app().first_scene(),
     }
-    .ok_or(anyhow::anyhow!("Failed to find preview scene"))?;
-    // error!("Failed to get preview scene, available scenes:");
-    // for scene in lib.scenes() {
-    //     info!("- {:?}", scene.name);
-    // }
-    // panic!("Failed to get preview scene");
-    let mut app = RanimPreviewApp::new(scene.constructor, scene.name.clone(), scene.config.clone());
-    app.set_clear_color_str(&scene.config.clear_color);
+    .with_context(|| {
+        format!(
+            "failed to find preview scene. Available scenes: {}",
+            lib.app()
+                .scenes()
+                .iter()
+                .map(|scene| scene.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    })?;
+    // Keep the selected scene even if a reload changes scene registration order.
+    let scene_name = scene.name.clone();
+    let app = RanimPreviewApp::new(scene);
     let cmd_tx = app.cmd_tx.clone();
+    drop(lib);
 
-    let scene_name = scene_name.clone();
     let res_rx = builder.res_rx.clone();
     let (shutdown_tx, shutdown_rx) = bounded(1);
     let daemon = thread::spawn(move || {
-        let mut lib = Some(lib);
         loop {
             if let Ok(events) = rx.try_recv() {
                 for event in events {
@@ -187,24 +192,24 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
                 }
                 builder.start_build();
             }
-            if let Ok(new_lib) = res_rx.try_recv()
-                && let Ok(new_lib) = new_lib
-            {
-                let scene = match &scene_name {
-                    Some(name) => new_lib.scenes().find(|s| s.name == *name),
-                    None => new_lib.scenes().next(),
+            if let Ok(result) = res_rx.try_recv() {
+                match result {
+                    Ok(new_lib) => {
+                        let Some(scene) = new_lib.app().scene(&scene_name) else {
+                            error!("Failed to find preview scene `{scene_name}` after rebuild");
+                            continue;
+                        };
+                        let (tx, rx) = bounded(1);
+                        if cmd_tx
+                            .send_blocking(RanimPreviewAppCmd::ReloadScene(scene, tx))
+                            .is_err()
+                            || rx.recv_blocking().is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Err(err) => error!("Failed to reload project: {err:#}"),
                 }
-                .ok_or(anyhow::anyhow!("Failed to find preview scene"));
-                if let Err(err) = scene {
-                    error!("Failed to find preview scene: {err}");
-                    continue;
-                }
-                let (tx, rx) = bounded(1);
-                cmd_tx
-                    .send_blocking(RanimPreviewAppCmd::ReloadScene(scene.unwrap(), tx))
-                    .unwrap();
-                rx.recv_blocking().unwrap();
-                lib.replace(new_lib);
             }
             if shutdown_rx.try_recv().is_ok() {
                 info!("exiting event loop...");
@@ -214,7 +219,7 @@ pub fn preview_command(args: &CliArgs, scene_name: &Option<String>) -> Result<()
         }
     });
     ranim::cmd::preview::run_app(app);
-    shutdown_tx.send_blocking(()).unwrap();
+    let _ = shutdown_tx.send_blocking(());
     daemon.join().unwrap();
     Ok(())
 }

@@ -314,9 +314,11 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 name = "app"
 version = "0.1.0"
 dependencies = [
+ "console_error_panic_hook",
  "log",
  "pretty_env_logger",
  "ranim",
+ "wasm-tracing",
 ]
 
 [[package]]
@@ -3568,15 +3570,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "inventory"
-version = "0.3.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6928282826c822ad91bf1c9a1cb90a30ba1c26770749929b4656cd6be829cd7c"
-dependencies = [
- "rustversion",
-]
-
-[[package]]
 name = "ipnet"
 version = "2.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5489,7 +5482,6 @@ dependencies = [
  "assert_float_eq",
  "async-channel",
  "bytemuck",
- "console_error_panic_hook",
  "derive_more",
  "eframe",
  "egui",
@@ -5497,7 +5489,6 @@ dependencies = [
  "flate2",
  "getrandom 0.4.3",
  "indicatif",
- "inventory",
  "itertools 0.15.0",
  "midly",
  "pollster",
@@ -5505,6 +5496,7 @@ dependencies = [
  "rand 0.10.3",
  "rand_chacha 0.10.0",
  "ranim-anims",
+ "ranim-app",
  "ranim-core",
  "ranim-items",
  "ranim-macros",
@@ -5515,7 +5507,6 @@ dependencies = [
  "tracing-indicatif",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-tracing",
  "web-sys",
  "web-time",
  "wgpu",
@@ -5532,6 +5523,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ranim-app"
+version = "0.2.1"
+dependencies = [
+ "libloading 0.9.0",
+ "ranim-core",
+]
+
+[[package]]
 name = "ranim-cli"
 version = "0.2.1"
 dependencies = [
@@ -5541,7 +5540,6 @@ dependencies = [
  "clap",
  "ignore",
  "krates",
- "libloading 0.9.0",
  "notify",
  "notify-debouncer-full",
  "ranim",
@@ -5578,6 +5576,7 @@ dependencies = [
 name = "ranim-examples"
 version = "0.2.1"
 dependencies = [
+ "console_error_panic_hook",
  "getrandom 0.4.3",
  "itertools 0.15.0",
  "midly",
@@ -5587,6 +5586,8 @@ dependencies = [
  "ranim-anims",
  "ranim-core",
  "ranim-items",
+ "wasm-bindgen",
+ "wasm-tracing",
 ]
 
 [[package]]

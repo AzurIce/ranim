@@ -1,5 +1,5 @@
 use ranim::glam;
-use std::f64::consts::PI;
+use std::{f64::consts::PI, sync::Arc};
 
 use glam::dvec3;
 use ranim::{
@@ -106,9 +106,25 @@ fn transform(r: &mut RanimScene) {
     r.play(animation);
 }
 
+struct ScenesPlugin;
+
+impl Plugin for ScenesPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_scenes([
+            fading::scene(),
+            creation::scene(),
+            writing::scene(),
+            transform::scene(),
+        ]);
+    }
+}
+
 fn main() {
-    ranim::render_scene!(fading);
-    ranim::render_scene!(creation);
-    ranim::render_scene!(writing);
-    ranim::render_scene!(transform);
+    let mut app = App::new();
+    app.add_plugins(ScenesPlugin);
+    let app = Arc::new(app);
+    for name in ["fading", "creation", "writing", "transform"] {
+        let scene = app.scene(name).expect("the scene is registered");
+        ranim::cmd::render_scene(&scene, 3);
+    }
 }

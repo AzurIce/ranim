@@ -1,5 +1,7 @@
 name = "typst_timer"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 //! Two seekable millisecond timers for comparing Typst evaluation strategies.
 //!
@@ -283,14 +285,11 @@ fn typst_timer_recompile(r: &mut RanimScene) {
 }
 
 #[test]
-fn timer_derives_milliseconds_from_its_own_duration() {
+fn timer_derives_milliseconds_and_formats_them() {
     assert_eq!(Timer::new(10.0).milliseconds_at_alpha(0.0), 0);
     assert_eq!(Timer::new(2.0).milliseconds_at_alpha(0.5), 1_000);
     assert_eq!(Timer::new(2.0).milliseconds_at_alpha(1.0), 2_000);
-}
 
-#[test]
-fn formats_milliseconds() {
     assert_eq!(
         format_milliseconds(0),
         ['0', '0', ':', '0', '0', '.', '0', '0', '0']
@@ -300,7 +299,31 @@ fn formats_milliseconds() {
         ['0', '1', ':', '0', '3', '.', '4', '5', '6']
     );
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([typst_timer_atlas::scene(), typst_timer_recompile::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "c0d141256bdc7c473199142a43e755a040a7bd7d"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/4c/f9909fbd45745ae01057bfd54964ddf8c040ec81d4ab961d52cd47ae8fefc5"]
 wasm = true

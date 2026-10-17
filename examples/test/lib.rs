@@ -1,51 +1,10 @@
-#![allow(clippy::all)]
-#![allow(unused)]
-use ranim::glam;
-use std::{f64::consts::PI, time::Duration};
+mod scenes;
 
-use glam::{DVec3, dvec3};
-use ranim::{
-    anims::{
-        creation::{CreationAnim, WritingAnim},
-        fading::FadingAnim,
-        morph::MorphAnim,
-    },
-    color::palettes::{
-        css,
-        manim::{self, BLUE_C, RED_C},
-    },
-    items::vitem::{
-        self, VItem,
-        geometry::{ArcBetweenPoints, Polygon, Rectangle, Square},
-    },
-    prelude::*,
-    utils::rate_functions::smooth,
-};
+pub use scenes::ScenesPlugin;
 
-// const SVG: &str = include_str!("../../assets/Ghostscript_Tiger.svg");
-
-#[scene]
-#[wasm_demo_doc]
-#[output(save_frames = true, dir = "./output/output")]
-fn test(r: &mut RanimScene) {
-    let camera_frame = CameraFrame::default().with(|x| {
-        x.perspective_blend = 1.0;
-        x.pos = DVec3::Z * 5.0;
-    });
-    let mut square = VItem::from(Square::new(4.0).with(|x| {
-        x.set_color(manim::BLUE_C).set_fill_opacity(0.5);
-    }));
-    let mut content = seq![
-        square
-            .morph(|x| {
-                x.with_origin(AabbPoint::CENTER, |x| {
-                    x.rotate_on_y(PI / 2.0);
-                });
-            })
-            .with_rate_func(smooth)
-    ];
-    content.hold(1.0);
-
-    r.play(camera_frame.show().with_duration(content.cursor_sec()));
-    r.play(content);
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
 }

@@ -3,30 +3,51 @@
 //! These types describe *what* to render (scene metadata, output settings)
 //! rather than *how* to animate (which lives in `ranim-core`).
 
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
-use ranim_core::{RanimScene, SealedRanimScene};
-
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
+use ranim_core::{RanimScene, SealedRanimScene, lifetime::KeepAlive};
 
 /// A scene descriptor bundling a constructor, config, and outputs.
-#[doc(hidden)]
 #[derive(Clone)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct Scene {
     /// Scene name
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub name: String,
-    /// Scene constructor
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
-    pub constructor: fn(&mut RanimScene),
+    constructor: Arc<dyn SceneConstructor>,
     /// Scene config
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub config: SceneConfig,
     /// Scene outputs
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub outputs: Vec<Output>,
+    // Keep callback code loaded through construction and its final destructor.
+    keep_alive: KeepAlive,
+}
+
+impl Scene {
+    /// Describe a scene with default rendering configuration and output.
+    ///
+    /// The constructor may capture plugin configuration. It runs only when a
+    /// selected scene is built, and may run again for another session.
+    pub fn new(name: impl Into<String>, constructor: impl SceneConstructor + 'static) -> Self {
+        Self {
+            name: name.into(),
+            constructor: Arc::new(constructor),
+            config: SceneConfig::default(),
+            outputs: vec![Output::default()],
+            keep_alive: KeepAlive::default(),
+        }
+    }
+
+    pub(crate) fn retain_owner(&mut self, owner: Arc<dyn Any + Send + Sync>) {
+        self.keep_alive.push(owner);
+    }
+}
+
+impl SceneConstructor for Scene {
+    fn construct(&self, r: &mut RanimScene) {
+        for owner in self.keep_alive.iter() {
+            r.keep_alive(Arc::clone(owner));
+        }
+        self.constructor.construct(r);
+    }
 }
 
 /// Scene config

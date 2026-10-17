@@ -1,0 +1,69 @@
+//! Iterative animation example: a damped spring (state stepped by a closure,
+//! no ECS required).
+//!
+//! The spring's state (`x`, `v`) is owned by `Iterative` and advanced by a
+//! closure via semi-implicit Euler; the `Extract` impl projects the state into
+//! a rectangle once per frame, with the displacement carried by a
+//! `Translation` wrapper. Reset is structural — the adapter restores the
+//! stored initial state, so `SceneEvaluator::sample_at` matches forward
+//! advancement for free.
+//!
+//! The spring's logical duration is the local `sim_secs` value captured by the
+//! closure; the same value is passed to `with_duration`, so physical time and
+//! timeline time stay in sync.
+
+use ranim::{
+    color::palettes::manim, core::Extract, core::animation::eval::iterative::Iterative,
+    core::core_item::CoreItem, glam::dvec3, items::vitem::geometry::Rectangle, prelude::*,
+};
+
+/// The spring's state: displacement and velocity.
+#[derive(Clone)]
+struct SpringState {
+    x: f64,
+    v: f64,
+}
+
+impl Extract for SpringState {
+    type Target = CoreItem;
+
+    fn extract_into(&self, buf: &mut Vec<CoreItem>) {
+        let mut ball = Rectangle::new(0.6, 0.6).transformed(Translation(dvec3(self.x, 0.0, 0.0)));
+        ball.set_fill_color(manim::BLUE_C);
+        ball.set_stroke_opacity(0.0);
+        ball.extract_into(buf);
+    }
+}
+
+const K: f64 = 25.0;
+const C: f64 = 1.0;
+
+#[scene]
+#[wasm_demo_doc]
+#[output(dir = "./output/iterative_spring")]
+fn iterative_spring(r: &mut RanimScene) {
+    let sim_secs = 4.0;
+    r.play(CameraFrame::default().show().with_duration(sim_secs));
+    r.play(
+        Iterative::from_fn(
+            SpringState { x: 1.0, v: 0.0 },
+            move |state: &mut SpringState, _alpha: f64, delta_alpha: f64| {
+                let dt = sim_secs * delta_alpha;
+                let acc = -K * state.x - C * state.v;
+                state.v += acc * dt;
+                state.x += state.v * dt;
+            },
+        )
+        .with_duration(sim_secs),
+    );
+    r.insert_time_mark(sim_secs / 2.0, TimeMark::Capture("preview.png".to_string()));
+}
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([iterative_spring::scene()]);
+    }
+}

@@ -2,7 +2,7 @@
 use std::collections::VecDeque;
 
 use crate::cmd::render::file_writer::OutputFormatExt;
-use crate::{Output, Scene, SceneConfig, SceneConstructor};
+use crate::{Output, SceneConfig, SceneHandle};
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
@@ -34,7 +34,7 @@ fn render_output_basename(template: &str, name: &str, width: u32, height: u32, f
 }
 
 /// Render a scene with all its outputs
-pub fn render_scene(scene: &Scene, buffer_count: usize) {
+pub fn render_scene(scene: &SceneHandle, buffer_count: usize) {
     for (i, output) in scene.outputs.iter().enumerate() {
         info!(
             "Rendering output {}/{} ({})",
@@ -42,25 +42,13 @@ pub fn render_scene(scene: &Scene, buffer_count: usize) {
             scene.outputs.len(),
             output.format
         );
-        render_scene_output(
-            scene.constructor,
-            scene.name.to_string(),
-            &scene.config,
-            output,
-            buffer_count,
-        );
+        render_scene_output(scene, output, buffer_count);
     }
 }
 
 /// Render a scene output
-pub fn render_scene_output(
-    constructor: impl SceneConstructor,
-    name: String,
-    scene_config: &SceneConfig,
-    output: &Output,
-    buffer_count: usize,
-) {
-    render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None);
+pub fn render_scene_output(scene: &SceneHandle, output: &Output, buffer_count: usize) {
+    render_scene_output_with_progress(scene, output, buffer_count, None);
 }
 
 /// A single rendering job: one [`Output`] plus whether capture marks should
@@ -92,17 +80,13 @@ impl RenderJob {
 ///
 /// The callback receives `(current_frame, total_frames)` each frame.
 pub fn render_scene_output_with_progress(
-    constructor: impl SceneConstructor,
-    name: String,
-    scene_config: &SceneConfig,
+    scene: &SceneHandle,
     output: &Output,
     buffer_count: usize,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
 ) {
     render_scene_job(
-        constructor,
-        name,
-        scene_config,
+        scene,
         RenderJob::full(output.clone(), true),
         buffer_count,
         on_progress,
@@ -114,17 +98,9 @@ pub fn render_scene_output_with_progress(
 /// This is the low-level rendering entry point used by `ranim render`: it
 /// renders the whole scene once with the given [`Output`], but unlike
 /// [`render_scene_output_with_progress`] it does not process capture marks.
-pub fn render_scene_once(
-    constructor: impl SceneConstructor,
-    name: String,
-    scene_config: &SceneConfig,
-    output: &Output,
-    buffer_count: usize,
-) {
+pub fn render_scene_once(scene: &SceneHandle, output: &Output, buffer_count: usize) {
     render_scene_job(
-        constructor,
-        name,
-        scene_config,
+        scene,
         RenderJob::full(output.clone(), false),
         buffer_count,
         None,
@@ -133,9 +109,7 @@ pub fn render_scene_once(
 
 /// Build the scene and run a [`RenderJob`].
 pub fn render_scene_job(
-    constructor: impl SceneConstructor,
-    name: String,
-    scene_config: &SceneConfig,
+    scene: &SceneHandle,
     job: RenderJob,
     buffer_count: usize,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
@@ -153,14 +127,14 @@ pub fn render_scene_job(
     );
 
     let t = Instant::now();
-    let scene = constructor.build_scene();
+    let timeline = scene.build_scene();
     trace!("Build timeline cost: {:?}", t.elapsed());
 
     // Default logic grid 120 Hz (per the time model design); render fps only
     // decides which logic states are sampled.
-    let mut evaluator = scene.into_evaluator(DEFAULT_LOGIC_FPS);
+    let mut evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
 
-    let mut app = RanimRenderApp::new(name, scene_config, &output, buffer_count);
+    let mut app = RanimRenderApp::new(scene.name.clone(), &scene.config, &output, buffer_count);
     app.render_scene_with_progress(&mut evaluator, on_progress);
 
     if capture_marks && !evaluator.time_marks().is_empty() {

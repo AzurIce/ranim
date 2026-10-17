@@ -1,5 +1,7 @@
 name = "palettes"
-code = """
+code = '''
+`scenes.rs`（场景与注册）
+
 ```rust
 use ranim::{
     color::palettes::manim::*,
@@ -58,7 +60,31 @@ fn palettes(r: &mut RanimScene) {
     r.play(squares.show().with_duration(total_secs));
     r.insert_time_mark(0.0, TimeMark::Capture("preview.png".to_string()));
 }
-```"""
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut ranim::App) {
+        app.add_scenes([palettes::scene()]);
+    }
+}
+```
+
+`lib.rs`（插件入口）
+
+```rust
+mod scenes;
+
+pub use scenes::ScenesPlugin;
+
+// Keep the exported factory here: the bundle reuses `scenes.rs` without
+// generating multiple native `ranim_plugin` entry symbols.
+#[ranim::export_plugin]
+pub fn plugin() -> impl ranim::Plugin {
+    ScenesPlugin
+}
+```'''
 hash = "f7a814b07998303b429e0e24aad170047e63fff6"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/96/6104560a290dd704cc7bf9a4161de7d92cea4233ddba897a6585e001484b0d"]
 wasm = false

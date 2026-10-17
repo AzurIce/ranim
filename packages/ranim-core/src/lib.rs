@@ -19,6 +19,8 @@ pub mod color;
 pub mod components;
 /// Fundamental scene primitives.
 pub mod core_item;
+#[doc(hidden)]
+pub mod lifetime;
 /// Scene evaluation driver (lightweight session, no ECS).
 pub mod scene_evaluator;
 /// Time vocabulary for animation evaluation.
@@ -39,6 +41,7 @@ use animation::{
     node::{AnimNode, AnimationInfo, bake_audio},
 };
 use core_item::CoreItem;
+use lifetime::KeepAlive;
 
 /// Commonly used ranim APIs.
 pub mod prelude {
@@ -169,12 +172,22 @@ pub struct RanimScene {
     /// remaps the visuals experience.
     pub root: AnimStack,
     time_marks: Vec<(f64, TimeMark)>,
+    // External code owners must outlive animation values and their destructors.
+    keep_alive: KeepAlive,
 }
 
 impl RanimScene {
     /// Create an empty scene definition.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Retain an external owner for this scene and every evaluator built from it.
+    ///
+    /// Project loaders use this to keep dynamically loaded animation code alive
+    /// until the animation tree has been destroyed.
+    pub fn keep_alive(&mut self, owner: Arc<dyn std::any::Any + Send + Sync>) {
+        self.keep_alive.push(owner);
     }
 
     /// Push an animation module into the root stack.
@@ -204,6 +217,7 @@ impl RanimScene {
             animations,
             audio,
             time_marks: self.time_marks,
+            keep_alive: self.keep_alive,
         }
     }
 }
@@ -226,6 +240,8 @@ pub struct SealedRanimScene {
     /// has no sound leaves.
     audio: Arc<[f32]>,
     time_marks: Vec<(f64, TimeMark)>,
+    // Dropped after the animation tree, whose vtables may belong to this owner.
+    keep_alive: KeepAlive,
 }
 
 impl SealedRanimScene {
