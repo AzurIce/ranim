@@ -12,7 +12,7 @@ use ranim::{
             mesh_item::MeshItem,
             vitem::{VItem, vitem_normal_from_points},
         },
-        scene_evaluator::EvaluatedFrame,
+        frame::EvaluatedFrame,
         utils::{bezier::get_subpath_closed_flag, rate_functions},
     },
     glam::{DVec3, Mat3},
@@ -460,10 +460,18 @@ fn frame_command(
     evaluator.sample_at(at, &mut frame);
 
     let items = frame
+        .items::<CoreItem>()
         .iter()
-        .enumerate()
-        .map(|(z_order, ((animation_id, part), item))| {
-            FrameItemDto::from_core_item(*animation_id, *part, item, &infos, z_order, verbose)
+        .map(|item| {
+            let (animation_id, part) = item.id;
+            FrameItemDto::from_core_item(
+                animation_id,
+                part,
+                &item.value,
+                &infos,
+                item.order,
+                verbose,
+            )
         })
         .collect();
 

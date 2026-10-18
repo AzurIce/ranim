@@ -36,13 +36,12 @@
 use std::time::{Duration, Instant};
 
 use benches::test_scenes::{static_squares, transform_squares};
-use ranim::{SceneConstructor, prelude::*};
-use ranim_core::{SealedRanimScene, core_item::CoreItem};
+use ranim::{CoreItemExtractPlugin, SceneConstructor, prelude::*};
+use ranim_core::{SealedRanimScene, core_item::CoreItem, frame::EvaluatedFrame};
 use ranim_render::{
     BuiltinRenderPlugins, Renderer,
     upload_probe::{self, UploadMode},
     utils::WgpuContext,
-    world::RenderFrame,
 };
 
 const WIDTH: u32 = 1920;
@@ -143,9 +142,15 @@ struct FrameTimings {
 fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
     let total = WARMUP_FRAMES + MEASURED_FRAMES;
     let mut feed = FrameFeed::new(scenario, total);
-    let mut renderer = Renderer::new(ctx, WIDTH, HEIGHT, 8, BuiltinRenderPlugins);
+    let mut renderer = Renderer::new(
+        ctx,
+        WIDTH,
+        HEIGHT,
+        8,
+        (CoreItemExtractPlugin, BuiltinRenderPlugins),
+    );
     let mut render_textures = renderer.new_render_textures(ctx);
-    let mut store = RenderFrame::new();
+    let mut store = EvaluatedFrame::new();
     let clear_color = wgpu::Color::BLACK;
     // GPU pass scopes are runtime-toggled; the forced per-frame poll they
     // incur also syncs the full-frame measurement.
@@ -159,9 +164,9 @@ fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
         }
         let (items, evaluated) = feed.next();
         let t0 = Instant::now();
-        store.update(items.into_iter());
+        store.update(items);
         let t1 = Instant::now();
-        renderer.render_frame(&mut render_textures, clear_color, &store);
+        renderer.render_frame(&mut render_textures, clear_color, &mut store);
         let t2 = Instant::now();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())

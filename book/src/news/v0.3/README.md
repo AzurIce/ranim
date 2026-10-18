@@ -32,7 +32,7 @@
 - VItem 法向投影：`Basis2d` 移除，`normal: Option` + shader 内现场生成正交基（见"VItem 法向投影"一节）
 - 元组 `Extract`：1..=15 元直接实现，无需 `Group` 包装，ranim-core 保持 stable 兼容
 - CLI：`ranim output` / `ranim render <scene>` 拆分；`inspect scenes/tree/frame` 无 GPU 检查子命令；`examples/agents/` agent one-shot 例子档案（见"CLI"一节）
-- 渲染与输出：独立 render `SubApp` 与显式渲染插件组合；渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 打包为单一 `ranim-examples` wasm 包并经 `#[wasm_demo_doc]` 恢复 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
+- 渲染与输出：独立 render `SubApp`、core 中按类型批次传输的 `EvaluatedFrame` 与显式渲染插件组合；渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 打包为单一 `ranim-examples` wasm 包并经 `#[wasm_demo_doc]` 恢复 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
 
 ## BREAKING CHANGES
 
@@ -56,7 +56,9 @@
   - 核心 `VItem` 的 `points`/`normal` 变为局部空间值，定位存放在新增的 `transform: Mat4`；消费提取点数据的代码需先应用 transform
   - `ranim_items::mesh::MeshItem` 用户层类型由 f32（`Vec3`/`Mat4`）改为 f64（`DVec3`/`DMat4`）
 - 渲染与 CLI
-  - `Renderer::new` 新增第五个参数，显式传入渲染插件；使用内置 VItem 与 Mesh 渲染时传入 `BuiltinRenderPlugins`
+  - `Renderer::new` 新增第五个参数，显式传入渲染插件；渲染现有 `CoreItem` 场景时组合 `ranim::CoreItemExtractPlugin` 与 `ranim_render::BuiltinRenderPlugins`，分别负责输入适配和内置 GPU 管线
+  - 帧数据统一为 `ranim_core::frame::EvaluatedFrame`：替换 `ranim_render::world::RenderFrame` 与原来的 `scene_evaluator::EvaluatedFrame` Vec 别名，item ID 使用 `ranim_core::frame::FrameItemId`；`Renderer::render_frame` 与 `RenderWorker::render_store` 改为接收 `&mut EvaluatedFrame`，渲染完成后返还帧数据供复用
+  - `SceneEvaluator::sample_at` 直接替换 `EvaluatedFrame` 的内容；读取内置结果改用 `frame.items::<CoreItem>()`，每项的 `id`、`order`、`value` 分别提供身份、顺序与求值数据
   - `VItemsBuffer::update`/`MeshItemsBuffer::update` 的迭代项改为 `(scene_order, item)` 对
   - `ranim render` 语义变化：批量渲染所有 `#[output]` 改用 `ranim output`；`ranim render <scene>` 只做单场景临时渲染，忽略 `#[output]` 与 Capture mark
   - `ranim_items::vitem::Basis2d` 移除，`VItem.basis` 改为 `normal: Option<DVec3>`（构造迁移：`with_basis(Basis2d::XY)` → `with_normal(...)` 或留空自动计算）
@@ -237,7 +239,7 @@ pub struct At<A> {
 
 https://github.com/AzurIce/ranim/pull/175
 
-渲染侧的 ECS 化：渲染原语进入独立 render `SubApp` 的 `World`，渲染准备与 GPU pass 由 schedule 组织，VItem 和 Mesh 的 GPU 资源与系统通过插件安装。用户级 item、动画求值仍停留在 World 之外，求值结果作为帧级数据传入渲染器。
+渲染侧的 ECS 化：渲染原语进入独立 render `SubApp` 的 `World`，按类型批次传入的帧数据由插件注册的提取系统同步到这个 World，渲染准备与 GPU pass 再由 schedule 组织。VItem 和 Mesh 的 GPU 资源与系统通过插件安装。用户级 item、动画求值仍停留在 World 之外。
 
 ### 之前：`CoreItemStore` 兼任传输与查询
 
@@ -266,81 +268,85 @@ pub struct CoreItemStore {
 
 它既用于承载并传输求值结果，又用于渲染管线查询访问——两种职责混在一起。
 
-### 现在：`RenderFrame` 传输 + render `SubApp`
+### 现在：core 生产 `EvaluatedFrame`，render `SubApp` 消费
 
-拆分为了 `RenderFrame`（帧级传输缓冲）和 `Renderer` 持有的 render `SubApp`：
+`ranim_core::frame::EvaluatedFrame` 是求值侧生产的纯 CPU 帧数据，不依赖 renderer。`SceneEvaluator::sample_at` 直接填入这个帧缓冲，预览与导出将同一个缓冲交给 renderer 消费，省去中间 Vec 的搬运。`Renderer` 持有的 render `SubApp` 承载渲染实体、资源、变更检测与 schedule，可以独立运行，无须把项目 `App` 或动画求值改成 ECS。
 
-```rust
-/// A reusable, frame-local transport buffer between evaluation and rendering.
-#[derive(Default)]
-pub struct RenderFrame {
-    items: Vec<(CoreItemId, CoreItem)>,
-}
-```
+帧缓冲按类型保存批次，类型擦除发生在整个批次上，同类型的条目保存在连续存储中。每个 `FrameItem<T>` 携带 `id`、全局 `order` 与 `value`；不同类型的条目也共享写入顺序，提取系统可以据此保持跨类型的场景顺序，无须依赖批次容器的遍历顺序：
 
 ```rust
-pub struct Renderer {
-    width: u32,
-    height: u32,
-    render_app: SubApp,
-}
+use ranim_core::core_item::{CoreItem, camera_frame::CameraFrame};
+use ranim_core::frame::EvaluatedFrame;
+
+let mut frame = EvaluatedFrame::new();
+frame.push((0, 0), CoreItem::CameraFrame(CameraFrame::default()));
+frame.push((1, 0), 42_u32);
+assert_eq!(frame.items::<CoreItem>()[0].order, 0);
+assert_eq!(frame.items::<u32>()[0].order, 1);
+assert_eq!(frame.len(), 2);
 ```
 
-前者只用于传输（求值线程 → 渲染线程），后者用于承载渲染实体、资源、变更检测与 schedule。这个 `SubApp` 可以独立运行，无须把项目 `App` 或动画求值改成 ECS。
+`update` 清空整帧后写入一个类型的批次，现有场景可以继续传入求值所得的 `CoreItem` 迭代器；`push` 用于追加条目，`items::<T>()` 读取指定类型的批次，`clear` 清空整帧。自定义宿主可以写入其他类型，再为这些批次注册对应的渲染侧提取系统。
 
 ### 显式组合渲染插件
 
-`Renderer` 负责共享的帧生命周期、相机、OIT 与渲染目标；VItem 和 Mesh 各自的 GPU 资源、准备系统与绘制系统由 `VItemRenderPlugin`、`MeshRenderPlugin` 安装。`BuiltinRenderPlugins` 将两者组合成内置渲染能力，预览、导出和 GPU benchmark 都显式传入这一组合：
+`ranim-render` 提供帧消费、渲染调度与管线的通用入口。`Renderer` 负责共享的帧生命周期、相机、OIT 与渲染目标；VItem 和 Mesh 各自的 GPU 资源、准备系统与绘制系统由 `VItemRenderPlugin`、`MeshRenderPlugin` 安装，`BuiltinRenderPlugins` 组合这两套 GPU 管线。
+
+现有逻辑输出的 `CoreItem` 由顶层 `ranim::CoreItemExtractPlugin` 适配为渲染组件。它向 `RenderExtract` 安装提取系统，与 GPU 管线分别注册；预览、导出和 GPU benchmark 都显式组合输入适配与内置管线：
 
 ```rust,ignore
+use ranim::CoreItemExtractPlugin;
 use ranim_render::{BuiltinRenderPlugins, Renderer};
 
 // Before
 let renderer = Renderer::new(&ctx, width, height, oit_layers);
 
 // After
-let renderer = Renderer::new(&ctx, width, height, oit_layers, BuiltinRenderPlugins);
+let renderer = Renderer::new(
+    &ctx,
+    width,
+    height,
+    oit_layers,
+    (CoreItemExtractPlugin, BuiltinRenderPlugins),
+);
 ```
 
 第五个参数接受 Bevy 插件组合，用于选择内置 item renderer、注册资源，以及向公开的渲染 schedule 添加系统。这些配置作用于每个 `Renderer` 自己的 render `SubApp`；项目侧 `ranim::App` 的插件入口与逻辑侧的 `CoreItem` 提取协议仍保持现有职责。
 
+例如，输入仍为 `CoreItem`、只需要 VItem 管线时，可以显式组合 `(ranim::CoreItemExtractPlugin, ranim_render::VItemRenderPlugin)`。自定义帧类型可由各自的提取插件接入同一个 `RenderExtract`，动画侧现有的 `Extract` 仍负责产生 `CoreItem`。
+
 构造器接收已经初始化的 GPU context，插件需要同步完成 `build` 并达到 ready 状态。`finish` 与 `cleanup` 在进入逐帧渲染之前各执行一次。
 
-### Reconcile：按身份增量更新实体
+### `RenderExtract`：按身份增量更新实体
 
-每帧从 `RenderFrame` 更新 render `SubApp` 的 `World`，设置渲染目标，再运行一次 `SubApp::update()`：
+`render_frame` 临时把 `EvaluatedFrame` 的整帧批次移入 render `SubApp` 的 Resource，再运行一次 `SubApp::update()`。`RenderExtract` 中的系统读取相应类型的批次并更新渲染 World；所有阶段结束后，整帧批次移回调用者，保留数据与容量供重复绘制或下一帧复用。这个交换避免复制输入批次，因此渲染入口改为可变借用：
 
-```rust
-/// Reconcile and render one evaluated frame.
-pub fn render_frame(
-    &mut self,
-    render_textures: &mut RenderTextures,
-    clear_color: wgpu::Color,
-    frame: &RenderFrame,
-) {
-    let world = self.render_app.world_mut();
-    reconcile(world, frame);
-    world
-        .insert_resource(FrameTarget::new(render_textures, clear_color));
-    self.render_app.update();
-}
+```rust,ignore
+// Before
+use ranim_render::world::RenderFrame;
+renderer.render_frame(&mut textures, clear_color, &frame);
+
+// After
+use ranim_core::frame::EvaluatedFrame;
+renderer.render_frame(&mut textures, clear_color, &mut frame);
 ```
 
-reconcile 以 `CoreItemIdentity(animation_id, part)` 为跨帧 key，从 `RenderFrame` 更新渲染 `World`：
+内置提取系统以 `(animation_id, part)` 为跨帧 key，从 `CoreItem` 批次更新渲染 World：
 
-- 每个实体携带 `CoreItemIdentity` 与 `SceneOrder`；值相同则不写组件（保留 `Changed<T>`），值变化才替换，本帧消失的 key 对应实体被移除；
-- **身份与顺序是两件事**：`CoreItemIdentity` 回答"是否是上一帧的同一项"，`SceneOrder` 回答"本帧按什么顺序消费"——ECS query 顺序不构成绘制顺序，prepare 阶段显式按 `SceneOrder` 排序分桶；
+- 提取器通过私有的 key → entity 映射维护跨帧身份，实体携带 `SceneOrder`；值相同则不写组件（保留 `Changed<T>`），值变化才替换，本帧消失的 key 对应实体被移除；
+- **身份与顺序是两件事**：跨帧映射回答"是否是上一帧的同一项"，`SceneOrder` 回答"本帧按什么顺序消费"——ECS query 顺序不构成绘制顺序，prepare 阶段显式按 `SceneOrder` 排序分桶；
 
 ### Schedule 组织渲染阶段
 
 ```text
-RenderUpdate: First → RenderPrepare → RenderGraph
+RenderUpdate: First → RenderExtract → RenderPrepare → RenderGraph
+  ├─ RenderExtract: 按类型批次更新渲染 World
   ├─ RenderPrepare: item GPU 数据准备、上传与绑定组更新
   └─ RenderGraph:   Begin → Render → Submit → Finish
        └─ ViewRender: Clear → Compute → Depth → Color → OITResolve
 ```
 
-- 内部的 `RenderUpdate` 是 render `SubApp` 的根 schedule，依次运行 `First`、`RenderPrepare` 与 `RenderGraph`；所有阶段完成后，`SubApp::update()` 清理本帧变更追踪。插件通过公开的 `RenderPrepare`、`ViewRender` 和 `ViewSystems` 注册准备与绘制系统；
+- 内部的 `RenderUpdate` 是 render `SubApp` 的根 schedule，依次运行 `First`、`RenderExtract`、`RenderPrepare` 与 `RenderGraph`；所有阶段完成后，`SubApp::update()` 清理本帧变更追踪。插件通过公开的 `RenderExtract`、`RenderPrepare`、`ViewRender` 和 `ViewSystems` 注册提取、准备与绘制系统；
 - `RenderPrepare` 把组件展开为 GPU 输入（storage/index/uniform 数据、上传、绑定组）；
 - `RenderGraph` 驱动整个画面生命周期：`Begin` 创建 frame encoder，`Render` 运行逐 view 子 schedule，`Submit` 提交 command buffer，`Finish` 结束 profiling frame；
 - 单相机也走完整的 `ViewRender` 子 schedule（clear、VItem compute、depth、color、OIT resolve），避免单 view 成为以后多 view 的特殊路径；
@@ -448,16 +454,16 @@ pub type DeltaAlpha = f64;  // 均匀进度步长
 
 ### `SceneEvaluator`：单入口会话驱动
 
-```rust
-pub type EvaluatedFrame = Vec<((usize, usize), CoreItem)>;
+```rust,ignore
+use ranim_core::{core_item::CoreItem, frame::EvaluatedFrame};
 
-impl SceneEvaluator {
-    /// 对当前 render 时刻采样，输出 (animation_id, item) 流。
-    pub fn sample_at(&mut self, render_secs: f64, out: &mut EvaluatedFrame);
-}
+let mut frame = EvaluatedFrame::new();
+evaluator.sample_at(render_secs, &mut frame);
+let items = frame.items::<CoreItem>();
 ```
 
 - `sample_at` 是唯一的 session 交互：渲染、preview 拖拽共用这条路径；
+- 每次采样替换整帧内容，将现有逻辑 `Extract` 产生的 `CoreItem` 写入对应类型批次；frame 自身保留各类型批次的容量供下次复用；
 - 前进 / 回退 / 原地求值由 `Iterative` 等 stateful 节点内部完成，session 不再维护逻辑网格；
 - `logic_fps` 参数仅为 API 兼容保留，不再驱动步进；步进尺度由每个迭代区段自己的 `sim_step` 决定。
 

@@ -8,8 +8,9 @@ use std::hint::black_box;
 
 use benches::test_scenes::static_squares;
 use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
-use ranim::{SceneConstructor, prelude::*};
-use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext, world::RenderFrame};
+use ranim::{CoreItemExtractPlugin, SceneConstructor, prelude::*};
+use ranim_core::frame::EvaluatedFrame;
+use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext};
 
 /// Pure GPU render benchmark: only measures `Renderer::render_frame` + `device.poll`.
 fn gpu_render_benchmark(c: &mut Criterion) {
@@ -23,10 +24,16 @@ fn gpu_render_benchmark(c: &mut Criterion) {
 
         // Build the scene and evaluate it into a reusable cross-thread frame.
         let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
-        let mut store = RenderFrame::new();
+        let mut store = EvaluatedFrame::new();
         store.update(scene.eval_at_alpha(0.5));
 
-        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8, BuiltinRenderPlugins);
+        let mut renderer = Renderer::new(
+            &ctx,
+            1920,
+            1080,
+            8,
+            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+        );
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
             r: 0.2,
@@ -36,7 +43,7 @@ fn gpu_render_benchmark(c: &mut Criterion) {
         };
 
         // Warm up: render once to initialize all GPU resources
-        renderer.render_frame(&mut render_textures, clear_color, &store);
+        renderer.render_frame(&mut render_textures, clear_color, &mut store);
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();
@@ -46,7 +53,7 @@ fn gpu_render_benchmark(c: &mut Criterion) {
             &vitem_count,
             |b, _| {
                 b.iter(|| {
-                    renderer.render_frame(&mut render_textures, clear_color, &store);
+                    renderer.render_frame(&mut render_textures, clear_color, &mut store);
                     // Wait for GPU to finish so we measure actual GPU time too
                     ctx.device
                         .poll(wgpu::PollType::wait_indefinitely())
@@ -71,10 +78,16 @@ fn cpu_submit_benchmark(c: &mut Criterion) {
         let vitem_count = n * n;
 
         let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
-        let mut store = RenderFrame::new();
+        let mut store = EvaluatedFrame::new();
         store.update(scene.eval_at_alpha(0.5));
 
-        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8, BuiltinRenderPlugins);
+        let mut renderer = Renderer::new(
+            &ctx,
+            1920,
+            1080,
+            8,
+            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+        );
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
             r: 0.2,
@@ -84,7 +97,7 @@ fn cpu_submit_benchmark(c: &mut Criterion) {
         };
 
         // Warm up
-        renderer.render_frame(&mut render_textures, clear_color, &store);
+        renderer.render_frame(&mut render_textures, clear_color, &mut store);
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();
@@ -94,7 +107,7 @@ fn cpu_submit_benchmark(c: &mut Criterion) {
             &vitem_count,
             |b, _| {
                 b.iter(|| {
-                    renderer.render_frame(&mut render_textures, clear_color, &store);
+                    renderer.render_frame(&mut render_textures, clear_color, &mut store);
                     // Don't wait — measures pure CPU submission overhead
                     black_box(());
                 });
@@ -116,10 +129,16 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
         let vitem_count = n * n;
 
         let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
-        let mut store = RenderFrame::new();
+        let mut store = EvaluatedFrame::new();
         store.update(scene.eval_at_alpha(0.5));
 
-        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8, BuiltinRenderPlugins);
+        let mut renderer = Renderer::new(
+            &ctx,
+            1920,
+            1080,
+            8,
+            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+        );
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
             r: 0.2,
@@ -129,7 +148,7 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
         };
 
         // Warm up
-        renderer.render_frame(&mut render_textures, clear_color, &store);
+        renderer.render_frame(&mut render_textures, clear_color, &mut store);
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();
@@ -139,7 +158,7 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
             &vitem_count,
             |b, _| {
                 b.iter(|| {
-                    renderer.render_frame(&mut render_textures, clear_color, &store);
+                    renderer.render_frame(&mut render_textures, clear_color, &mut store);
                     ctx.device
                         .poll(wgpu::PollType::wait_indefinitely())
                         .unwrap();
@@ -163,10 +182,16 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
         let vitem_count = n * n;
 
         let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
-        let mut store = RenderFrame::new();
+        let mut store = EvaluatedFrame::new();
         store.update(scene.eval_at_alpha(0.5));
 
-        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8, BuiltinRenderPlugins);
+        let mut renderer = Renderer::new(
+            &ctx,
+            1920,
+            1080,
+            8,
+            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+        );
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
             r: 0.2,
@@ -176,7 +201,7 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
         };
 
         // Warm up
-        renderer.render_frame(&mut render_textures, clear_color, &store);
+        renderer.render_frame(&mut render_textures, clear_color, &mut store);
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
             .unwrap();
@@ -186,7 +211,7 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
             &vitem_count,
             |b, _| {
                 b.iter(|| {
-                    renderer.render_frame(&mut render_textures, clear_color, &store);
+                    renderer.render_frame(&mut render_textures, clear_color, &mut store);
                     black_box(());
                 });
             },

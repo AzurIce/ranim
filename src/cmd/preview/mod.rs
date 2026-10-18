@@ -8,15 +8,12 @@ mod timeline;
 use std::sync::Arc;
 
 use crate::{
-    Output, SceneHandle,
+    CoreItemExtractPlugin, Output, SceneHandle,
     core::{
         SceneEvaluator,
         color::{self, LinearSrgb},
     },
-    render::{
-        BuiltinRenderPlugins, Renderer, resource::RenderTextures, utils::WgpuContext,
-        world::RenderFrame,
-    },
+    render::{BuiltinRenderPlugins, Renderer, resource::RenderTextures, utils::WgpuContext},
 };
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
@@ -24,6 +21,7 @@ use async_channel::{Receiver, Sender, unbounded};
 use depth_visual::DepthVisualPipeline;
 use eframe::{App, egui};
 use playback::PlaybackEngine;
+use ranim_core::frame::EvaluatedFrame;
 use timeline::TimelineState;
 use tracing::{error, info};
 use web_time::Instant;
@@ -110,7 +108,7 @@ pub struct RanimPreviewApp {
     evaluator: SceneEvaluator,
     need_eval: bool,
     last_sec: f64,
-    store: RenderFrame,
+    store: EvaluatedFrame,
     timeline_state: TimelineState,
     playback_engine: PlaybackEngine,
 
@@ -202,7 +200,7 @@ impl RanimPreviewApp {
             evaluator,
             need_eval: false,
             last_sec: -1.0,
-            store: RenderFrame::default(),
+            store: EvaluatedFrame::default(),
             playback_engine,
             renderer: None,
             render_textures: None,
@@ -302,7 +300,7 @@ impl RanimPreviewApp {
                         old_cur_second.clamp(0.0, self.timeline_state.total_sec);
                     self.evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
                     self.playback_engine.reload_scene(&self.evaluator);
-                    self.store.update(std::iter::empty());
+                    self.store.clear();
                     self.need_eval = true;
                     self.progress_samples.clear();
                     self.progress_total_sec = -1.0;
@@ -351,7 +349,13 @@ impl RanimPreviewApp {
 
         let (width, height) = (self.resolution.width, self.resolution.height);
         let oit_layers = self.calculate_oit_layers(&ctx, width, height);
-        let renderer = Renderer::new(&ctx, width, height, oit_layers, BuiltinRenderPlugins);
+        let renderer = Renderer::new(
+            &ctx,
+            width,
+            height,
+            oit_layers,
+            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+        );
         let render_textures = renderer.new_render_textures(&ctx);
 
         // Init Depth Visual Pipeline
@@ -468,14 +472,12 @@ impl RanimPreviewApp {
                 let _span = crate::render::cpu_probe::span("eval");
                 // Forward/backward direction management is internal to sample_at.
                 let target = self.timeline_state.current_sec;
-                let mut frame_items = Vec::new();
-                self.evaluator.sample_at(target, &mut frame_items);
-                self.store.update(frame_items.into_iter());
+                self.evaluator.sample_at(target, &mut self.store);
             }
             self.last_eval_time = Some(start_eval.elapsed());
 
             let start = Instant::now();
-            renderer.render_frame(render_textures, self.clear_color, &self.store);
+            renderer.render_frame(render_textures, self.clear_color, &mut self.store);
 
             if let (Some(pipeline), Some(view)) = (
                 self.depth_visual_pipeline.as_ref(),

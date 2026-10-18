@@ -28,6 +28,7 @@ pub mod world;
 use bevy_app::{Plugins, PluginsState, SubApp};
 use bevy_ecs::prelude::*;
 use glam::{UVec3, uvec3};
+use ranim_core::frame::EvaluatedFrame;
 
 pub use plugin::{BuiltinRenderPlugins, MeshRenderPlugin, VItemRenderPlugin};
 
@@ -36,7 +37,6 @@ use crate::{
     resource::{PipelinesPool, RenderTextures},
     schedule::{FrameTarget, RenderDimensions, RenderProfiler, install_schedules},
     utils::{WgpuBuffer, WgpuVecBuffer},
-    world::{CoreItemEntities, RenderFrame, reconcile},
 };
 use utils::WgpuContext;
 
@@ -90,8 +90,9 @@ impl Renderer {
     /// Create an independent render runtime with an explicit set of plugins.
     ///
     /// Shared frame, camera, and OIT infrastructure is installed before
-    /// `plugins`. Pass [`BuiltinRenderPlugins`] for both built-in item types,
-    /// an individual item plugin, or a tuple including custom Bevy plugins.
+    /// `plugins`. Combine your extraction plugins with [`BuiltinRenderPlugins`]
+    /// or individual rendering plugins in a tuple. Extraction systems can read the
+    /// current [`EvaluatedFrame`] resource during [`schedule::RenderExtract`].
     /// Plugins configure the render world directly; no logic world is created.
     ///
     /// # Panics
@@ -121,7 +122,7 @@ impl Renderer {
             ))
             .insert_resource(RenderProfiler::new(ctx))
             .init_resource::<PipelinesPool>()
-            .init_resource::<CoreItemEntities>();
+            .init_resource::<EvaluatedFrame>();
         install_schedules(&mut render_app);
         render_app.add_plugins(plugins);
         assert_eq!(
@@ -143,20 +144,28 @@ impl Renderer {
         RenderTextures::new(ctx, self.width, self.height)
     }
 
-    /// Reconcile and render one evaluated frame.
+    /// Extract and render one evaluated frame.
+    ///
+    /// The frame is temporarily swapped into the render world, then returned
+    /// with its input data intact so its batches can be reused or rendered again.
+    /// Extraction systems should only read the frame.
     pub fn render_frame(
         &mut self,
         render_textures: &mut RenderTextures,
         clear_color: wgpu::Color,
-        frame: &RenderFrame,
+        frame: &mut EvaluatedFrame,
     ) {
-        {
-            let _span = cpu_probe::span("reconcile");
-            reconcile(self.render_app.world_mut(), frame);
-        }
+        std::mem::swap(
+            frame,
+            &mut self.render_app.world_mut().resource_mut::<EvaluatedFrame>(),
+        );
         self.render_app
             .insert_resource(FrameTarget::new(render_textures, clear_color));
         self.render_app.update();
+        std::mem::swap(
+            frame,
+            &mut self.render_app.world_mut().resource_mut::<EvaluatedFrame>(),
+        );
     }
 
     /// Take the GPU timer scopes recorded for the most recent processed

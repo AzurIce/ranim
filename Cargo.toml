@@ -73,6 +73,8 @@ gltf = ["ranim-items/gltf"]
 audio-decode = ["ranim-core/audio-decode"]
 render = [
   "dep:ranim-render",
+  "dep:bevy_app",
+  "dep:bevy_ecs",
   "dep:wgpu",
   "dep:pollster",
   "dep:which",
@@ -116,6 +118,8 @@ derive_more = { workspace = true, features = [
 ] }
 anyhow = "1.0.104"
 ranim-render = { workspace = true, optional = true }
+bevy_app = { workspace = true, optional = true }
+bevy_ecs = { workspace = true, optional = true }
 # render feature (wasm-compatible deps here, rest in target-specific section below)
 wgpu = { workspace = true, optional = true }
 # app feature

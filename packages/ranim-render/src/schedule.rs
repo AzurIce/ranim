@@ -1,18 +1,25 @@
 use bevy_app::{First, SubApp};
 use bevy_ecs::{prelude::*, schedule::ScheduleLabel, system::SystemParam};
-use ranim_core::core_item::camera_frame::CameraFrame;
+use ranim_core::{core_item::camera_frame::CameraFrame, frame::EvaluatedFrame};
 
 use crate::{
     pipelines::oit_resolve,
     primitives::viewport::{DEPTH_ORDER_SPAN, ViewportGpuPacket, ViewportUniform},
     resource::{RenderTextureState, RenderTextures},
     utils::WgpuContext,
-    world::{CoreItemEntities, SceneOrder},
+    world::SceneOrder,
 };
 
-/// Drives one render update: frame maintenance, preparation, and command submission.
+/// Drives one render update: maintenance, extraction, preparation, and submission.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
 struct RenderUpdate;
+
+/// Extracts the current [`EvaluatedFrame`] into render components or resources.
+///
+/// Plugins register systems here and read their inputs with
+/// [`EvaluatedFrame::items`]. All extraction completes before [`RenderPrepare`].
+#[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RenderExtract;
 
 /// Prepares render resources before encoding a frame.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
@@ -148,6 +155,7 @@ impl RenderProfiler {
 pub(crate) fn install_schedules(app: &mut SubApp) {
     app.update_schedule = Some(RenderUpdate.intern());
     app.init_resource::<FrameEncoder>()
+        .init_schedule(RenderExtract)
         .init_schedule(RenderPrepare)
         .add_systems(RenderUpdate, render_update);
     app.configure_sets(
@@ -175,6 +183,7 @@ pub(crate) fn install_schedules(app: &mut SubApp) {
 
 fn render_update(world: &mut World) {
     world.run_schedule(First);
+    world.run_schedule(RenderExtract);
     world.run_schedule(RenderPrepare);
     let _span = crate::cpu_probe::span("render_graph");
     world.run_schedule(RenderGraph);
@@ -226,7 +235,7 @@ fn view_driver(world: &mut World) {
 
     let camera = take_single_camera(cameras);
     let dimensions = *world.resource::<RenderDimensions>();
-    let order_span = world.resource::<CoreItemEntities>().scene_order_span();
+    let order_span = world.resource::<EvaluatedFrame>().len().saturating_sub(1);
     // Omitted render plugins can leave gaps in scene orders. Use the full
     // input range so the total depth offset stays bounded in that case too.
     let bias_epsilon = DEPTH_ORDER_SPAN / order_span.max(1) as f32;
@@ -291,7 +300,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn render_update_runs_maintenance_and_prepare_before_graph() {
+    fn render_update_runs_extraction_before_preparation_and_graph() {
         #[derive(Resource, Default)]
         struct ExecutionLog(Vec<&'static str>);
 
@@ -300,6 +309,9 @@ mod tests {
         app.init_resource::<ExecutionLog>();
         app.add_systems(First, |mut log: ResMut<ExecutionLog>| {
             log.0.push("first");
+        });
+        app.add_systems(RenderExtract, |mut log: ResMut<ExecutionLog>| {
+            log.0.push("extract");
         });
         app.add_systems(RenderPrepare, |mut log: ResMut<ExecutionLog>| {
             log.0.push("prepare");
@@ -315,7 +327,7 @@ mod tests {
         app.update();
         assert_eq!(
             app.world().resource::<ExecutionLog>().0,
-            ["first", "prepare", "graph"].repeat(2)
+            ["first", "extract", "prepare", "graph"].repeat(2)
         );
     }
 

@@ -69,6 +69,7 @@ impl Plugin for MeshRenderPlugin {
 ///
 /// Vector items draw before meshes within each depth and color phase. All
 /// depth systems still complete before any color system runs.
+/// Supply extraction plugins separately when constructing the renderer.
 pub struct BuiltinRenderPlugins;
 
 impl PluginGroup for BuiltinRenderPlugins {

@@ -11,12 +11,9 @@ use crate::{
     Extract, SealedRanimScene, TimeMark,
     animation::node::{AnimNode, AnimationInfo},
     audio::MASTER_SAMPLE_RATE,
-    core_item::CoreItem,
+    frame::EvaluatedFrame,
     lifetime::KeepAlive,
 };
-
-/// A reusable frame-local output buffer of `((animation_id, part), CoreItem)`.
-pub type EvaluatedFrame = Vec<((usize, usize), CoreItem)>;
 
 /// Lightweight scene evaluation session.
 pub struct SceneEvaluator {
@@ -112,18 +109,22 @@ impl SceneEvaluator {
     /// Every top-level cell evaluates itself at the target (forward/backward
     /// direction management is internal), and the extracted items carry the
     /// `(animation_id, part)` identities of `SealedRanimScene::eval_at_sec`.
+    /// Replaces `out` with the new sample while reusing its batch storage.
     pub fn sample_at(&mut self, render_secs: f64, out: &mut EvaluatedFrame) {
-        for (animation_id, cell) in self.cells.iter().enumerate() {
-            let mut items = Vec::new();
-            cell.eval_at(render_secs, &mut items);
-            for (part, item) in items
-                .into_iter()
-                .flat_map(|item| item.extract())
+        out.update(
+            self.cells
+                .iter()
                 .enumerate()
-            {
-                out.push(((animation_id, part), item));
-            }
-        }
+                .flat_map(|(animation_id, cell)| {
+                    let mut items = Vec::new();
+                    cell.eval_at(render_secs, &mut items);
+                    items
+                        .into_iter()
+                        .flat_map(|item| item.extract())
+                        .enumerate()
+                        .map(move |(part, item)| ((animation_id, part), item))
+                }),
+        );
         self.clock = render_secs;
     }
 }
@@ -137,7 +138,7 @@ mod tests {
             build::{PlaybackExt, Unplaced},
             eval::{Eval, iterative::Iterative},
         },
-        core_item::vitem::VItem,
+        core_item::{CoreItem, vitem::VItem},
         seq,
     };
 
@@ -156,8 +157,9 @@ mod tests {
 
     fn xs_of(frame: &EvaluatedFrame) -> Vec<f32> {
         frame
+            .items::<CoreItem>()
             .iter()
-            .filter_map(|(_, item)| match item {
+            .filter_map(|item| match &item.value {
                 CoreItem::VItem(v) => Some(v.points[0].x),
                 _ => None,
             })
@@ -193,6 +195,26 @@ mod tests {
             let expected = (sec / 2.0) as f32;
             let got = xs_of(&frame);
             assert_eq!(got, vec![expected], "at sec={sec}");
+        }
+    }
+
+    #[test]
+    fn repeated_samples_replace_the_whole_output_frame() {
+        let mut scene = RanimScene::new();
+        scene.play(ProgressX.with_duration(2.0));
+        let mut ev = SceneEvaluator::new(scene.seal(), 120.0);
+        let mut frame = EvaluatedFrame::new();
+        frame.push((99, 0), String::from("previous output"));
+
+        for sec in [0.5, 1.5, 0.25, 1.5] {
+            ev.sample_at(sec, &mut frame);
+
+            assert_eq!(frame.len(), 1);
+            assert!(frame.items::<String>().is_empty());
+            let items = frame.items::<CoreItem>();
+            assert_eq!(items[0].id, (0, 0));
+            assert_eq!(items[0].order, 0);
+            assert_x(&frame, (sec / 2.0) as f32);
         }
     }
 

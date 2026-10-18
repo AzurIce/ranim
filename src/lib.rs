@@ -49,6 +49,11 @@
 
 extern crate self as ranim;
 
+#[cfg(feature = "render")]
+mod core_item_extract;
+#[cfg(feature = "render")]
+pub use core_item_extract::CoreItemExtractPlugin;
+
 #[cfg(feature = "anims")]
 pub use ranim_anims as anims;
 pub use ranim_core as core;

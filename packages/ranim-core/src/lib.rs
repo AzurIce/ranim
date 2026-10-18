@@ -19,6 +19,8 @@ pub mod color;
 pub mod components;
 /// Fundamental scene primitives.
 pub mod core_item;
+/// Reusable typed output of scene evaluation.
+pub mod frame;
 #[doc(hidden)]
 pub mod lifetime;
 /// Scene evaluation driver (lightweight session, no ECS).

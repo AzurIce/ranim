@@ -2,13 +2,13 @@
 use std::collections::VecDeque;
 
 use crate::cmd::render::file_writer::OutputFormatExt;
-use crate::{Output, SceneConfig, SceneHandle};
+use crate::{CoreItemExtractPlugin, Output, SceneConfig, SceneHandle};
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
-use ranim_core::{SceneEvaluator, TimeMark};
+use ranim_core::{SceneEvaluator, TimeMark, frame::EvaluatedFrame};
 use ranim_render::resource::RenderTextures;
-use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext, world::RenderFrame};
+use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::Instant;
@@ -172,21 +172,21 @@ const DEFAULT_LOGIC_FPS: f64 = 120.0;
 ///
 /// Dropping this handle closes the submission channel and terminates the worker thread loop.
 pub struct RenderThreadHandle {
-    submit_frame_tx: async_channel::Sender<RenderFrame>,
-    back_rx: async_channel::Receiver<RenderFrame>,
+    submit_frame_tx: async_channel::Sender<EvaluatedFrame>,
+    back_rx: async_channel::Receiver<EvaluatedFrame>,
     worker_rx: async_channel::Receiver<RenderWorker>,
 }
 
 impl RenderThreadHandle {
-    /// Reuses a [`RenderFrame`], applies `f` to it, and submits it to the background render thread.
-    pub fn sync_and_submit(&self, f: impl FnOnce(&mut RenderFrame)) {
+    /// Reuses an [`EvaluatedFrame`], applies `f` to it, and submits it to the background render thread.
+    pub fn sync_and_submit(&self, f: impl FnOnce(&mut EvaluatedFrame)) {
         let mut store = self.get_store();
         f(&mut store);
         self.submit_frame_tx.send_blocking(store).unwrap();
     }
 
-    /// Retrieves a previously rendered [`RenderFrame`] from the background thread for reuse.
-    pub fn get_store(&self) -> RenderFrame {
+    /// Retrieves a previously rendered [`EvaluatedFrame`] from the background thread for reuse.
+    pub fn get_store(&self) -> EvaluatedFrame {
         self.back_rx.recv_blocking().unwrap()
     }
 
@@ -259,7 +259,13 @@ impl RenderWorker {
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir().unwrap().join(output_dir);
         }
-        let renderer = Renderer::new(&ctx, output.width, output.height, 8, BuiltinRenderPlugins);
+        let renderer = Renderer::new(
+            &ctx,
+            output.width,
+            output.height,
+            8,
+            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+        );
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
             .map(|_| renderer.new_render_textures(&ctx))
             .collect();
@@ -329,13 +335,16 @@ impl RenderWorker {
 
     /// Moves this [`RenderWorker`] into a newly spawned background thread and returns a [`RenderThreadHandle`].
     ///
-    /// The background thread loops over incoming [`RenderFrame`]s, rendering and outputting frames using multi-buffered async readback.
+    /// The background thread loops over incoming [`EvaluatedFrame`]s, rendering and outputting frames using multi-buffered async readback.
     pub fn yeet(self) -> RenderThreadHandle {
         let (submit_frame_tx, submit_frame_rx) = async_channel::bounded(1);
-        let (back_tx, back_rx) = async_channel::bounded(1);
+        let (back_tx, back_rx) = async_channel::bounded(2);
         let (worker_tx, worker_rx) = async_channel::bounded(1);
 
-        back_tx.send_blocking(RenderFrame::default()).unwrap();
+        // Evaluate one frame while the worker renders the other, reusing both.
+        for _ in 0..2 {
+            back_tx.send_blocking(EvaluatedFrame::default()).unwrap();
+        }
         std::thread::spawn(move || {
             let mut worker = self;
             let n = worker.render_textures.len();
@@ -343,7 +352,7 @@ impl RenderWorker {
             let mut cur = 0usize;
             let mut pending: VecDeque<(usize, u64)> = VecDeque::new();
 
-            while let Ok(store) = submit_frame_rx.recv_blocking() {
+            while let Ok(mut store) = submit_frame_rx.recv_blocking() {
                 // Drain oldest pending readback if all targets are occupied
                 if pending.len() >= n {
                     let (prev, prev_fc) = pending.pop_front().unwrap();
@@ -355,7 +364,7 @@ impl RenderWorker {
                 worker.renderer.render_frame(
                     &mut worker.render_textures[cur],
                     worker.clear_color,
-                    &store,
+                    &mut store,
                 );
                 worker.render_textures[cur].start_readback(&worker.ctx);
 
@@ -395,7 +404,9 @@ impl RenderWorker {
     }
 
     /// Renders a single frame synchronously on this worker (typically used for captures).
-    pub fn render_store(&mut self, store: &RenderFrame) {
+    ///
+    /// The frame's data and capacity remain available for reuse after rendering.
+    pub fn render_store(&mut self, store: &mut EvaluatedFrame) {
         self.renderer
             .render_frame(&mut self.render_textures[0], self.clear_color, store);
     }
@@ -461,7 +472,7 @@ impl RenderWorker {
 pub struct RanimRenderApp {
     render_worker: Option<RenderWorker>,
     fps: u32,
-    store: RenderFrame,
+    store: EvaluatedFrame,
 }
 
 impl RanimRenderApp {
@@ -476,7 +487,7 @@ impl RanimRenderApp {
         Self {
             render_worker: Some(render_worker),
             fps: output.fps,
-            store: RenderFrame::default(),
+            store: EvaluatedFrame::default(),
         }
     }
 
@@ -535,10 +546,8 @@ impl RanimRenderApp {
             .map(|f| (f as f64 / fps).min(total_secs))
             .enumerate()
             .for_each(|(i, sec)| {
-                let mut frame_items = Vec::new();
-                evaluator.sample_at(sec, &mut frame_items);
-                worker_thread.sync_and_submit(move |store| {
-                    store.update(frame_items.into_iter());
+                worker_thread.sync_and_submit(|store| {
+                    evaluator.sample_at(sec, store);
                 });
 
                 span.pb_inc(1);
@@ -594,11 +603,9 @@ impl RanimRenderApp {
         for (sec, TimeMark::Capture(filename)) in timemarks {
             // The render has advanced to the end; captures seek back and replay
             // (deterministic contract, direction handled inside sample_at).
-            let mut frame_items = Vec::new();
-            evaluator.sample_at(sec, &mut frame_items);
-            self.store.update(frame_items.into_iter());
+            evaluator.sample_at(sec, &mut self.store);
             let worker = self.render_worker.as_mut().unwrap();
-            worker.render_store(&self.store);
+            worker.render_store(&mut self.store);
             worker.capture_frame(filename);
             span.pb_inc(1);
             captured += 1;
