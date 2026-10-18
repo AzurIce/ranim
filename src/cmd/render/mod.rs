@@ -8,7 +8,7 @@ use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::{SceneEvaluator, TimeMark};
 use ranim_render::resource::RenderTextures;
-use ranim_render::{Renderer, utils::WgpuContext, world::RenderFrame};
+use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext, world::RenderFrame};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::Instant;
@@ -259,7 +259,7 @@ impl RenderWorker {
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir().unwrap().join(output_dir);
         }
-        let renderer = Renderer::new(&ctx, output.width, output.height, 8);
+        let renderer = Renderer::new(&ctx, output.width, output.height, 8, BuiltinRenderPlugins);
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
             .map(|_| renderer.new_render_textures(&ctx))
             .collect();

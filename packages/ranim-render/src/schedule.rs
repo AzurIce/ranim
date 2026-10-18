@@ -1,49 +1,43 @@
+use bevy_app::{First, SubApp};
 use bevy_ecs::{prelude::*, schedule::ScheduleLabel, system::SystemParam};
-use ranim_core::core_item::{camera_frame::CameraFrame, mesh_item::MeshItem, vitem::VItem};
+use ranim_core::core_item::camera_frame::CameraFrame;
 
 use crate::{
-    pipelines::{mesh_item, oit_resolve, vitem},
-    primitives::{
-        mesh_items::MeshItemsBuffer,
-        viewport::{ViewportGpuPacket, ViewportUniform},
-        vitems::VItemsBuffer,
-    },
+    pipelines::oit_resolve,
+    primitives::viewport::{DEPTH_ORDER_SPAN, ViewportGpuPacket, ViewportUniform},
     resource::{RenderTextureState, RenderTextures},
     utils::WgpuContext,
-    world::SceneOrder,
+    world::{CoreItemEntities, SceneOrder},
 };
 
+/// Drives one render update: frame maintenance, preparation, and command submission.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct RenderPrepare;
+struct RenderUpdate;
 
+/// Prepares render resources before encoding a frame.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct RenderGraph;
+pub struct RenderPrepare;
 
+/// Encodes and submits a frame, running [`ViewRender`] for its active view.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-struct ViewRender;
+struct RenderGraph;
 
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-enum PrepareSystems {
-    Collect,
-    PrepareResources,
-    Upload,
-    PrepareBindGroups,
-}
+/// Runs the ordered compute and draw phases for the active view.
+#[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ViewRender;
 
+/// Ordered phases in [`ViewRender`], shared by all render plugins.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-enum RenderGraphSystems {
-    Begin,
-    Render,
-    Submit,
-    Finish,
-}
-
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-enum ViewSystems {
+pub enum ViewSystems {
+    /// Clear the frame's color and depth targets.
     Clear,
+    /// Run compute work needed by subsequent draw passes.
     Compute,
+    /// Draw all depth prepasses before any color passes.
     Depth,
+    /// Draw color and collect transparent fragments.
     Color,
+    /// Resolve the accumulated transparent fragments.
     Resolve,
 }
 
@@ -151,27 +145,13 @@ impl RenderProfiler {
     }
 }
 
-pub(crate) fn install_schedules(world: &mut World) {
-    world.init_resource::<FrameEncoder>();
-    let mut prepare = Schedule::new(RenderPrepare);
-    prepare.configure_sets(
-        (
-            PrepareSystems::Collect,
-            PrepareSystems::PrepareResources,
-            PrepareSystems::Upload,
-            PrepareSystems::PrepareBindGroups,
-        )
-            .chain(),
-    );
-    prepare.add_systems(
-        (prepare_vitems, prepare_mesh_items)
-            .in_set(PrepareSystems::PrepareResources)
-            .ambiguous_with_all(),
-    );
-    world.add_schedule(prepare);
-
-    let mut view = Schedule::new(ViewRender);
-    view.configure_sets(
+pub(crate) fn install_schedules(app: &mut SubApp) {
+    app.update_schedule = Some(RenderUpdate.intern());
+    app.init_resource::<FrameEncoder>()
+        .init_schedule(RenderPrepare)
+        .add_systems(RenderUpdate, render_update);
+    app.configure_sets(
+        ViewRender,
         (
             ViewSystems::Clear,
             ViewSystems::Compute,
@@ -181,64 +161,23 @@ pub(crate) fn install_schedules(world: &mut World) {
         )
             .chain(),
     );
-    view.add_systems(clear.in_set(ViewSystems::Clear));
-    view.add_systems(vitem::compute.in_set(ViewSystems::Compute));
-    view.add_systems(
-        (vitem::depth, mesh_item::depth)
-            .chain()
-            .in_set(ViewSystems::Depth),
+    app.add_systems(ViewRender, clear.in_set(ViewSystems::Clear));
+    app.add_systems(
+        ViewRender,
+        oit_resolve::resolve.in_set(ViewSystems::Resolve),
     );
-    view.add_systems(
-        (vitem::color, mesh_item::color)
-            .chain()
-            .in_set(ViewSystems::Color),
-    );
-    view.add_systems(oit_resolve::resolve.in_set(ViewSystems::Resolve));
-    world.add_schedule(view);
 
-    let mut graph = Schedule::new(RenderGraph);
-    graph.configure_sets(
-        (
-            RenderGraphSystems::Begin,
-            RenderGraphSystems::Render,
-            RenderGraphSystems::Submit,
-            RenderGraphSystems::Finish,
-        )
-            .chain(),
-    );
-    graph.add_systems(begin_frame.in_set(RenderGraphSystems::Begin));
-    graph.add_systems(view_driver.in_set(RenderGraphSystems::Render));
-    graph.add_systems(submit.in_set(RenderGraphSystems::Submit));
-    graph.add_systems(finish_frame.in_set(RenderGraphSystems::Finish));
-    world.add_schedule(graph);
-}
-
-fn prepare_vitems(
-    ctx: Res<WgpuContext>,
-    mut buffer: ResMut<VItemsBuffer>,
-    items: Query<(&SceneOrder, &VItem)>,
-) {
-    let _span = crate::cpu_probe::span("prepare_vitems");
-    let mut items = items.iter().collect::<Vec<_>>();
-    items.sort_by_key(|(order, _)| order.0);
-    buffer.update(
-        &ctx,
-        items.iter().map(|&(order, item)| (order.0 as f32, item)),
+    app.add_systems(
+        RenderGraph,
+        (begin_frame, view_driver, submit, finish_frame).chain(),
     );
 }
 
-fn prepare_mesh_items(
-    ctx: Res<WgpuContext>,
-    mut buffer: ResMut<MeshItemsBuffer>,
-    items: Query<(&SceneOrder, &MeshItem)>,
-) {
-    let _span = crate::cpu_probe::span("prepare_mesh_items");
-    let mut items = items.iter().collect::<Vec<_>>();
-    items.sort_by_key(|(order, _)| order.0);
-    buffer.update(
-        &ctx,
-        items.iter().map(|&(order, item)| (order.0 as f32, item)),
-    );
+fn render_update(world: &mut World) {
+    world.run_schedule(First);
+    world.run_schedule(RenderPrepare);
+    let _span = crate::cpu_probe::span("render_graph");
+    world.run_schedule(RenderGraph);
 }
 
 fn begin_frame(ctx: Res<WgpuContext>, mut encoder: ResMut<FrameEncoder>) {
@@ -287,11 +226,10 @@ fn view_driver(world: &mut World) {
 
     let camera = take_single_camera(cameras);
     let dimensions = *world.resource::<RenderDimensions>();
-    // The per-order depth bias epsilon: the fixed span is split evenly across
-    // all items of the frame so the total offset stays bounded.
-    let item_count = world.resource::<VItemsBuffer>().item_count()
-        + world.resource::<MeshItemsBuffer>().item_count();
-    let bias_epsilon = crate::primitives::viewport::DEPTH_ORDER_SPAN / item_count.max(1) as f32;
+    let order_span = world.resource::<CoreItemEntities>().scene_order_span();
+    // Omitted render plugins can leave gaps in scene orders. Use the full
+    // input range so the total depth offset stays bounded in that case too.
+    let bias_epsilon = DEPTH_ORDER_SPAN / order_span.max(1) as f32;
     let uniform = ViewportUniform::from_camera_frame(
         &camera,
         dimensions.width,
@@ -351,6 +289,35 @@ fn finish_frame(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn render_update_runs_maintenance_and_prepare_before_graph() {
+        #[derive(Resource, Default)]
+        struct ExecutionLog(Vec<&'static str>);
+
+        let mut app = SubApp::new();
+        install_schedules(&mut app);
+        app.init_resource::<ExecutionLog>();
+        app.add_systems(First, |mut log: ResMut<ExecutionLog>| {
+            log.0.push("first");
+        });
+        app.add_systems(RenderPrepare, |mut log: ResMut<ExecutionLog>| {
+            log.0.push("prepare");
+        });
+        // Replace only GPU execution; retain the installed update and prepare
+        // schedules so this exercises their ordering without creating a device.
+        app.add_schedule(Schedule::new(RenderGraph));
+        app.add_systems(RenderGraph, |mut log: ResMut<ExecutionLog>| {
+            log.0.push("graph")
+        });
+
+        app.update();
+        app.update();
+        assert_eq!(
+            app.world().resource::<ExecutionLog>().0,
+            ["first", "prepare", "graph"].repeat(2)
+        );
+    }
 
     #[test]
     fn single_camera_is_accepted() {

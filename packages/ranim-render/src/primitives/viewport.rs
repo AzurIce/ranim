@@ -7,9 +7,9 @@ use crate::utils::{WgpuBuffer, WgpuContext};
 ///
 /// Fragments whose true depth differs by less than this span may be reordered
 /// by scene insertion order (later items on top); anything farther apart keeps
-/// true depth ordering. The span is split evenly across all items of a frame
-/// (`epsilon = DEPTH_ORDER_SPAN / item_count`) so the total offset does not
-/// grow with scene size.
+/// true depth ordering. The per-order epsilon divides this span by the frame's
+/// full scene-order span (at least one). This keeps offsets bounded even when
+/// omitted render plugins leave gaps in the prepared items' scene orders.
 pub const DEPTH_ORDER_SPAN: f32 = 1e-4;
 
 /// Uniforms for the camera

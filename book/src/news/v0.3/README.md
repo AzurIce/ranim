@@ -32,7 +32,7 @@
 - VItem 法向投影：`Basis2d` 移除，`normal: Option` + shader 内现场生成正交基（见"VItem 法向投影"一节）
 - 元组 `Extract`：1..=15 元直接实现，无需 `Group` 包装，ranim-core 保持 stable 兼容
 - CLI：`ranim output` / `ranim render <scene>` 拆分；`inspect scenes/tree/frame` 无 GPU 检查子命令；`examples/agents/` agent one-shot 例子档案（见"CLI"一节）
-- 渲染与输出：渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 打包为单一 `ranim-examples` wasm 包并经 `#[wasm_demo_doc]` 恢复 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
+- 渲染与输出：独立 render `SubApp` 与显式渲染插件组合；渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 打包为单一 `ranim-examples` wasm 包并经 `#[wasm_demo_doc]` 恢复 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
 
 ## BREAKING CHANGES
 
@@ -56,6 +56,7 @@
   - 核心 `VItem` 的 `points`/`normal` 变为局部空间值，定位存放在新增的 `transform: Mat4`；消费提取点数据的代码需先应用 transform
   - `ranim_items::mesh::MeshItem` 用户层类型由 f32（`Vec3`/`Mat4`）改为 f64（`DVec3`/`DMat4`）
 - 渲染与 CLI
+  - `Renderer::new` 新增第五个参数，显式传入渲染插件；使用内置 VItem 与 Mesh 渲染时传入 `BuiltinRenderPlugins`
   - `VItemsBuffer::update`/`MeshItemsBuffer::update` 的迭代项改为 `(scene_order, item)` 对
   - `ranim render` 语义变化：批量渲染所有 `#[output]` 改用 `ranim output`；`ranim render <scene>` 只做单场景临时渲染，忽略 `#[output]` 与 Capture mark
   - `ranim_items::vitem::Basis2d` 移除，`VItem.basis` 改为 `normal: Option<DVec3>`（构造迁移：`with_basis(Basis2d::XY)` → `with_normal(...)` 或留空自动计算）
@@ -236,7 +237,7 @@ pub struct At<A> {
 
 https://github.com/AzurIce/ranim/pull/175
 
-渲染侧的 ECS 化：渲染原语进入内部 `RenderWorld`，渲染准备与 GPU pass 由 schedule 组织；用户级 item、动画求值仍停留在 World 之外。
+渲染侧的 ECS 化：渲染原语进入独立 render `SubApp` 的 `World`，渲染准备与 GPU pass 由 schedule 组织，VItem 和 Mesh 的 GPU 资源与系统通过插件安装。用户级 item、动画求值仍停留在 World 之外，求值结果作为帧级数据传入渲染器。
 
 ### 之前：`CoreItemStore` 兼任传输与查询
 
@@ -265,9 +266,9 @@ pub struct CoreItemStore {
 
 它既用于承载并传输求值结果，又用于渲染管线查询访问——两种职责混在一起。
 
-### 现在：`RenderFrame` 传输 + `RenderWorld` 查询
+### 现在：`RenderFrame` 传输 + render `SubApp`
 
-拆分为了 `RenderFrame`（帧级传输缓冲）和 `Renderer` 内部的 ECS World：
+拆分为了 `RenderFrame`（帧级传输缓冲）和 `Renderer` 持有的 render `SubApp`：
 
 ```rust
 /// A reusable, frame-local transport buffer between evaluation and rendering.
@@ -281,15 +282,33 @@ pub struct RenderFrame {
 pub struct Renderer {
     width: u32,
     height: u32,
-    world: World,
+    render_app: SubApp,
 }
 ```
 
-前者只用于传输（求值线程 → 渲染线程），后者用于承载运行时的查询、变更检测与 schedule。
+前者只用于传输（求值线程 → 渲染线程），后者用于承载渲染实体、资源、变更检测与 schedule。这个 `SubApp` 可以独立运行，无须把项目 `App` 或动画求值改成 ECS。
+
+### 显式组合渲染插件
+
+`Renderer` 负责共享的帧生命周期、相机、OIT 与渲染目标；VItem 和 Mesh 各自的 GPU 资源、准备系统与绘制系统由 `VItemRenderPlugin`、`MeshRenderPlugin` 安装。`BuiltinRenderPlugins` 将两者组合成内置渲染能力，预览、导出和 GPU benchmark 都显式传入这一组合：
+
+```rust,ignore
+use ranim_render::{BuiltinRenderPlugins, Renderer};
+
+// Before
+let renderer = Renderer::new(&ctx, width, height, oit_layers);
+
+// After
+let renderer = Renderer::new(&ctx, width, height, oit_layers, BuiltinRenderPlugins);
+```
+
+第五个参数接受 Bevy 插件组合，用于选择内置 item renderer、注册资源，以及向公开的渲染 schedule 添加系统。这些配置作用于每个 `Renderer` 自己的 render `SubApp`；项目侧 `ranim::App` 的插件入口与逻辑侧的 `CoreItem` 提取协议仍保持现有职责。
+
+构造器接收已经初始化的 GPU context，插件需要同步完成 `build` 并达到 ready 状态。`finish` 与 `cleanup` 在进入逐帧渲染之前各执行一次。
 
 ### Reconcile：按身份增量更新实体
 
-每帧从 `RenderFrame` 更新 `World`，再运行渲染 Schedule：
+每帧从 `RenderFrame` 更新 render `SubApp` 的 `World`，设置渲染目标，再运行一次 `SubApp::update()`：
 
 ```rust
 /// Reconcile and render one evaluated frame.
@@ -299,11 +318,11 @@ pub fn render_frame(
     clear_color: wgpu::Color,
     frame: &RenderFrame,
 ) {
-    reconcile(&mut self.world, frame);
-    self.world
+    let world = self.render_app.world_mut();
+    reconcile(world, frame);
+    world
         .insert_resource(FrameTarget::new(render_textures, clear_color));
-    self.world.run_schedule(RenderPrepare);
-    self.world.run_schedule(RenderGraph);
+    self.render_app.update();
 }
 ```
 
@@ -315,11 +334,13 @@ reconcile 以 `CoreItemIdentity(animation_id, part)` 为跨帧 key，从 `Render
 ### Schedule 组织渲染阶段
 
 ```text
-RenderPrepare:  Collect → PrepareResources → Upload → PrepareBindGroups
-RenderGraph:    Begin → Render → Submit → Finish
-  └─ ViewRender: Clear → Compute → Depth → Color → OITResolve
+RenderUpdate: First → RenderPrepare → RenderGraph
+  ├─ RenderPrepare: item GPU 数据准备、上传与绑定组更新
+  └─ RenderGraph:   Begin → Render → Submit → Finish
+       └─ ViewRender: Clear → Compute → Depth → Color → OITResolve
 ```
 
+- 内部的 `RenderUpdate` 是 render `SubApp` 的根 schedule，依次运行 `First`、`RenderPrepare` 与 `RenderGraph`；所有阶段完成后，`SubApp::update()` 清理本帧变更追踪。插件通过公开的 `RenderPrepare`、`ViewRender` 和 `ViewSystems` 注册准备与绘制系统；
 - `RenderPrepare` 把组件展开为 GPU 输入（storage/index/uniform 数据、上传、绑定组）；
 - `RenderGraph` 驱动整个画面生命周期：`Begin` 创建 frame encoder，`Render` 运行逐 view 子 schedule，`Submit` 提交 command buffer，`Finish` 结束 profiling frame；
 - 单相机也走完整的 `ViewRender` 子 schedule（clear、VItem compute、depth、color、OIT resolve），避免单 view 成为以后多 view 的特殊路径；

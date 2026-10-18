@@ -8,7 +8,7 @@ use std::{
 
 use benches::test_scenes::{static_squares, transform_squares};
 use ranim::{SceneConstructor, prelude::*};
-use ranim_render::{Renderer, utils::WgpuContext, world::RenderFrame};
+use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext, world::RenderFrame};
 
 #[global_allocator]
 static ALLOC: CountingAlloc = CountingAlloc;
@@ -74,7 +74,7 @@ fn main() {
     }
 
     let ctx = pollster::block_on(WgpuContext::new());
-    let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
+    let mut renderer = Renderer::new(&ctx, 1920, 1080, 8, BuiltinRenderPlugins);
     let mut render_textures = renderer.new_render_textures(&ctx);
     let clear_color = wgpu::Color::BLACK;
 

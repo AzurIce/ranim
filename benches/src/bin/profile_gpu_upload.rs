@@ -39,7 +39,7 @@ use benches::test_scenes::{static_squares, transform_squares};
 use ranim::{SceneConstructor, prelude::*};
 use ranim_core::{SealedRanimScene, core_item::CoreItem};
 use ranim_render::{
-    Renderer,
+    BuiltinRenderPlugins, Renderer,
     upload_probe::{self, UploadMode},
     utils::WgpuContext,
     world::RenderFrame,
@@ -143,7 +143,7 @@ struct FrameTimings {
 fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
     let total = WARMUP_FRAMES + MEASURED_FRAMES;
     let mut feed = FrameFeed::new(scenario, total);
-    let mut renderer = Renderer::new(ctx, WIDTH, HEIGHT, 8);
+    let mut renderer = Renderer::new(ctx, WIDTH, HEIGHT, 8, BuiltinRenderPlugins);
     let mut render_textures = renderer.new_render_textures(ctx);
     let mut store = RenderFrame::new();
     let clear_color = wgpu::Color::BLACK;

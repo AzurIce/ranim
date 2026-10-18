@@ -71,6 +71,16 @@ pub(crate) struct SceneOrder(pub usize);
 #[derive(Resource, Default)]
 pub(crate) struct CoreItemEntities(CoreItemIdMap<Entity>);
 
+impl CoreItemEntities {
+    /// Highest scene order after reconciliation, including unrendered item types.
+    ///
+    /// Reconciliation assigns dense orders across the complete frame input and
+    /// removes stale entities, so the entity count determines the final order.
+    pub(crate) fn scene_order_span(&self) -> usize {
+        self.0.len().saturating_sub(1)
+    }
+}
+
 pub(crate) fn reconcile(world: &mut World, frame: &RenderFrame) {
     let mut seen = CoreItemIdSet::with_capacity_and_hasher(
         frame.items.len(),
@@ -149,6 +159,45 @@ mod tests {
     use bevy_ecs::query::Changed;
 
     use super::*;
+
+    #[test]
+    fn scene_order_span_tracks_complete_input_and_shrinks_with_frame() {
+        let mut world = World::new();
+        world.init_resource::<CoreItemEntities>();
+        let mut frame = RenderFrame::new();
+        frame.update((0..=100).map(|order| {
+            let item = match order {
+                0 => CoreItem::CameraFrame(CameraFrame::default()),
+                1 | 100 => CoreItem::VItem(VItem::default()),
+                _ => CoreItem::MeshItem(MeshItem::default()),
+            };
+            ((order, 0), item)
+        }));
+        reconcile(&mut world, &frame);
+
+        assert_eq!(world.query::<&VItem>().iter(&world).count(), 2);
+        assert_eq!(world.resource::<CoreItemEntities>().scene_order_span(), 100);
+        world.spawn_empty();
+        assert_eq!(world.resource::<CoreItemEntities>().scene_order_span(), 100);
+
+        frame.update(
+            [
+                ((0, 0), CoreItem::CameraFrame(CameraFrame::default())),
+                ((1, 0), CoreItem::VItem(VItem::default())),
+            ]
+            .into_iter(),
+        );
+        reconcile(&mut world, &frame);
+        assert_eq!(world.resource::<CoreItemEntities>().scene_order_span(), 1);
+
+        frame.update([((0, 0), CoreItem::CameraFrame(CameraFrame::default()))].into_iter());
+        reconcile(&mut world, &frame);
+        assert_eq!(world.resource::<CoreItemEntities>().scene_order_span(), 0);
+
+        frame.update(std::iter::empty());
+        reconcile(&mut world, &frame);
+        assert_eq!(world.resource::<CoreItemEntities>().scene_order_span(), 0);
+    }
 
     #[test]
     fn reconciliation_preserves_identity_skips_unchanged_items_and_replaces_kinds() {

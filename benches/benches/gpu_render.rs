@@ -9,7 +9,7 @@ use std::hint::black_box;
 use benches::test_scenes::static_squares;
 use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
 use ranim::{SceneConstructor, prelude::*};
-use ranim_render::{Renderer, utils::WgpuContext, world::RenderFrame};
+use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext, world::RenderFrame};
 
 /// Pure GPU render benchmark: only measures `Renderer::render_frame` + `device.poll`.
 fn gpu_render_benchmark(c: &mut Criterion) {
@@ -26,7 +26,7 @@ fn gpu_render_benchmark(c: &mut Criterion) {
         let mut store = RenderFrame::new();
         store.update(scene.eval_at_alpha(0.5));
 
-        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
+        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8, BuiltinRenderPlugins);
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
             r: 0.2,
@@ -74,7 +74,7 @@ fn cpu_submit_benchmark(c: &mut Criterion) {
         let mut store = RenderFrame::new();
         store.update(scene.eval_at_alpha(0.5));
 
-        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
+        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8, BuiltinRenderPlugins);
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
             r: 0.2,
@@ -119,7 +119,7 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
         let mut store = RenderFrame::new();
         store.update(scene.eval_at_alpha(0.5));
 
-        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
+        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8, BuiltinRenderPlugins);
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
             r: 0.2,
@@ -166,7 +166,7 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
         let mut store = RenderFrame::new();
         store.update(scene.eval_at_alpha(0.5));
 
-        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
+        let mut renderer = Renderer::new(&ctx, 1920, 1080, 8, BuiltinRenderPlugins);
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
             r: 0.2,

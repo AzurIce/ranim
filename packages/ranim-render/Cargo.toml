@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 ranim-core.workspace = true
 bevy_ecs.workspace = true
+bevy_app.workspace = true
 wgpu-profiler = { workspace = true }
 image.workspace = true
 tracing.workspace = true

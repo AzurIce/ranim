@@ -47,6 +47,7 @@ wgpu = "30.0.1"
 image = "0.25.10"
 derive_more = "2.1.1"
 bevy_ecs = { version = "0.20.0", default-features = false, features = ["std"] }
+bevy_app = { version = "0.20.0", default-features = false, features = ["std"] }
 # audio-decode feature (ranim-core): pure-Rust audio decoding + resampling
 symphonia = { version = "0.6.1", default-features = false, features = [
   "aac",

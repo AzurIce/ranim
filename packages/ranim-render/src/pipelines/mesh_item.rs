@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use bevy_ecs::prelude::*;
+use ranim_core::core_item::mesh_item::MeshItem;
 
 use crate::{
     ResolutionInfo, WgpuContext,
@@ -10,7 +11,22 @@ use crate::{
     },
     resource::{GpuResource, OUTPUT_TEXTURE_FORMAT, PipelinesPool},
     schedule::{FrameTarget, RenderContext, RenderProfiler},
+    world::SceneOrder,
 };
+
+pub(crate) fn prepare_mesh_items(
+    ctx: Res<WgpuContext>,
+    mut buffer: ResMut<MeshItemsBuffer>,
+    items: Query<(&SceneOrder, &MeshItem)>,
+) {
+    let _span = crate::cpu_probe::span("prepare_mesh_items");
+    let mut items = items.iter().collect::<Vec<_>>();
+    items.sort_by_key(|(order, _)| order.0);
+    buffer.update(
+        &ctx,
+        items.iter().map(|&(order, item)| (order.0 as f32, item)),
+    );
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn depth(

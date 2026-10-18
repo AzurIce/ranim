@@ -13,7 +13,10 @@ use crate::{
         SceneEvaluator,
         color::{self, LinearSrgb},
     },
-    render::{Renderer, resource::RenderTextures, utils::WgpuContext, world::RenderFrame},
+    render::{
+        BuiltinRenderPlugins, Renderer, resource::RenderTextures, utils::WgpuContext,
+        world::RenderFrame,
+    },
 };
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
@@ -348,7 +351,7 @@ impl RanimPreviewApp {
 
         let (width, height) = (self.resolution.width, self.resolution.height);
         let oit_layers = self.calculate_oit_layers(&ctx, width, height);
-        let renderer = Renderer::new(&ctx, width, height, oit_layers);
+        let renderer = Renderer::new(&ctx, width, height, oit_layers, BuiltinRenderPlugins);
         let render_textures = renderer.new_render_textures(&ctx);
 
         // Init Depth Visual Pipeline

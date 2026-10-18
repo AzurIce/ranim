@@ -12,10 +12,12 @@
 pub mod cpu_probe;
 /// The pipelines
 pub mod pipelines;
+mod plugin;
 /// The basic renderable structs
 pub mod primitives;
 pub mod resource;
-mod schedule;
+/// Render schedules and ordered extension points.
+pub mod schedule;
 /// Upload instrumentation and experimental upload strategies
 /// (enabled via `RANIM_PROFILE_UPLOAD`).
 pub mod upload_probe;
@@ -23,13 +25,16 @@ pub mod upload_probe;
 pub mod utils;
 pub mod world;
 
+use bevy_app::{Plugins, PluginsState, SubApp};
 use bevy_ecs::prelude::*;
 use glam::{UVec3, uvec3};
 
+pub use plugin::{BuiltinRenderPlugins, MeshRenderPlugin, VItemRenderPlugin};
+
 use crate::{
-    primitives::{mesh_items::MeshItemsBuffer, viewport::ViewportUniform, vitems::VItemsBuffer},
+    primitives::viewport::{DEPTH_ORDER_SPAN, ViewportGpuPacket, ViewportUniform},
     resource::{PipelinesPool, RenderTextures},
-    schedule::{FrameTarget, RenderDimensions, RenderGraph, RenderPrepare, install_schedules},
+    schedule::{FrameTarget, RenderDimensions, RenderProfiler, install_schedules},
     utils::{WgpuBuffer, WgpuVecBuffer},
     world::{CoreItemEntities, RenderFrame, reconcile},
 };
@@ -66,7 +71,7 @@ pub mod profiling_utils {
 pub struct Renderer {
     width: u32,
     height: u32,
-    world: World,
+    render_app: SubApp,
 }
 
 impl Renderer {
@@ -82,31 +87,55 @@ impl Renderer {
         self.width as f32 / self.height as f32
     }
 
-    pub fn new(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> Self {
-        let mut world = World::new();
-        world.insert_resource(ctx.clone());
-        world.insert_resource(RenderDimensions { width, height });
-        world.insert_resource(ResolutionInfo::new(ctx, width, height, oit_layers));
-        world.init_resource::<PipelinesPool>();
-        world.insert_resource(VItemsBuffer::new(ctx));
-        world.insert_resource(MeshItemsBuffer::new(ctx));
-        world.insert_resource(primitives::viewport::ViewportGpuPacket::new(
-            ctx,
-            &ViewportUniform::from_camera_frame(
-                &Default::default(),
-                width,
-                height,
-                primitives::viewport::DEPTH_ORDER_SPAN,
-            ),
-        ));
-        world.init_resource::<CoreItemEntities>();
-        world.insert_resource(schedule::RenderProfiler::new(ctx));
-        install_schedules(&mut world);
+    /// Create an independent render runtime with an explicit set of plugins.
+    ///
+    /// Shared frame, camera, and OIT infrastructure is installed before
+    /// `plugins`. Pass [`BuiltinRenderPlugins`] for both built-in item types,
+    /// an individual item plugin, or a tuple including custom Bevy plugins.
+    /// Plugins configure the render world directly; no logic world is created.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a plugin is not ready after installation. This constructor
+    /// supports synchronous setup using the already initialized GPU context.
+    pub fn new<M>(
+        ctx: &WgpuContext,
+        width: u32,
+        height: u32,
+        oit_layers: usize,
+        plugins: impl Plugins<M>,
+    ) -> Self {
+        let mut render_app = SubApp::new();
+        render_app
+            .insert_resource(ctx.clone())
+            .insert_resource(RenderDimensions { width, height })
+            .insert_resource(ResolutionInfo::new(ctx, width, height, oit_layers))
+            .insert_resource(ViewportGpuPacket::new(
+                ctx,
+                &ViewportUniform::from_camera_frame(
+                    &Default::default(),
+                    width,
+                    height,
+                    DEPTH_ORDER_SPAN,
+                ),
+            ))
+            .insert_resource(RenderProfiler::new(ctx))
+            .init_resource::<PipelinesPool>()
+            .init_resource::<CoreItemEntities>();
+        install_schedules(&mut render_app);
+        render_app.add_plugins(plugins);
+        assert_eq!(
+            render_app.plugins_state(),
+            PluginsState::Ready,
+            "render plugins must be ready after synchronous installation"
+        );
+        render_app.finish();
+        render_app.cleanup();
 
         Self {
             width,
             height,
-            world,
+            render_app,
         }
     }
 
@@ -123,22 +152,19 @@ impl Renderer {
     ) {
         {
             let _span = cpu_probe::span("reconcile");
-            reconcile(&mut self.world, frame);
+            reconcile(self.render_app.world_mut(), frame);
         }
-        self.world
+        self.render_app
             .insert_resource(FrameTarget::new(render_textures, clear_color));
-        self.world.run_schedule(RenderPrepare);
-        {
-            let _span = cpu_probe::span("render_graph");
-            self.world.run_schedule(RenderGraph);
-        }
+        self.render_app.update();
     }
 
     /// Take the GPU timer scopes recorded for the most recent processed
     /// frame (empty unless GPU timers are enabled and the device supports
     /// timestamp queries).
     pub fn take_last_gpu_scopes(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
-        self.world
+        self.render_app
+            .world_mut()
             .resource_mut::<schedule::RenderProfiler>()
             .last_frame_scopes
             .take()
@@ -146,7 +172,8 @@ impl Renderer {
 
     /// Whether the device supports GPU timestamp queries.
     pub fn gpu_timers_supported(&self) -> bool {
-        self.world
+        self.render_app
+            .world()
             .resource::<schedule::RenderProfiler>()
             .inner
             .is_some()
@@ -155,7 +182,8 @@ impl Renderer {
     /// Whether GPU timer scopes are currently being recorded (see
     /// [`Renderer::set_gpu_timers_enabled`]).
     pub fn gpu_timers_enabled(&self) -> bool {
-        self.world
+        self.render_app
+            .world()
             .resource::<schedule::RenderProfiler>()
             .is_enabled()
     }
@@ -163,7 +191,8 @@ impl Renderer {
     /// Enable/disable GPU timer recording at runtime. While enabled, each
     /// frame pays a device poll to read the timers back.
     pub fn set_gpu_timers_enabled(&mut self, on: bool) {
-        self.world
+        self.render_app
+            .world_mut()
             .resource_mut::<schedule::RenderProfiler>()
             .set_enabled(on);
     }
