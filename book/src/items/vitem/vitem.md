@@ -37,8 +37,8 @@ let vitem = VItem::from_vpoints(vec![
 ## 渲染语义：平面投影
 
 渲染时假设 `VItem` 的所有点共面，实际渲染的是它在投影平面上的投影
-（共面时投影即其本身）。语义细节见 Core Items 的
-[VItem](../../understand/core/core_items/vitem.md)。
+（共面时投影即其本身）。语义细节见 渲染表示的
+[VItem](../../understand/rendering/vitem.md)。
 
 `normal` 一般保持默认的 `None` 即可：投影平面在渲染时从**当前点数据**推导，
 动画中间帧的插值点总是推导出与之一致的法向，不会漂移。反之，显式

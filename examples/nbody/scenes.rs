@@ -15,9 +15,7 @@
 
 use ranim::{
     color::{AlphaColor, Srgb, palettes::manim},
-    core::Extract,
     core::animation::eval::iterative::Iterative,
-    core::core_item::CoreItem,
     glam::DVec3,
     items::vitem::geometry::Circle,
     prelude::*,
@@ -128,10 +126,9 @@ impl NBodyState {
     }
 }
 
-impl Extract for NBodyState {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<CoreItem>) {
+#[cfg(feature = "render")]
+impl ranim::render::extract::Extract for NBodyState {
+    fn extract(&self, ctx: &mut ranim::render::extract::ExtractContext<'_>) {
         // Trails: dim dots at recent positions.
         for (i, trail) in self.trails.iter().enumerate() {
             for &p in trail {
@@ -139,7 +136,7 @@ impl Extract for NBodyState {
                 dot.set_fill_color(self.colors[i]);
                 dot.set_fill_opacity(0.15);
                 dot.set_stroke_opacity(0.0);
-                dot.extract_into(buf);
+                dot.extract(ctx);
             }
         }
         // Bodies.
@@ -147,7 +144,7 @@ impl Extract for NBodyState {
             let mut ball = Circle::new(0.32).transformed(Translation(body.pos));
             ball.set_fill_color(self.colors[i]);
             ball.set_stroke_opacity(0.0);
-            ball.extract_into(buf);
+            ball.extract(ctx);
         }
     }
 }
@@ -170,6 +167,13 @@ fn nbody(r: &mut RanimScene) {
         .with_duration(sim_secs),
     );
     r.insert_time_mark(sim_secs / 2.0, TimeMark::Capture("preview.png".to_string()));
+}
+
+#[cfg(feature = "render")]
+pub(crate) fn configure_render(app: &mut bevy_app::App) {
+    use ranim::render::extract::ExtractPlugin;
+
+    app.add_plugins(ExtractPlugin::<NBodyState>::default());
 }
 
 /// Register the scenes provided by this example.

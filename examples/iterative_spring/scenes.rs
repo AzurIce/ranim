@@ -13,8 +13,8 @@
 //! timeline time stay in sync.
 
 use ranim::{
-    color::palettes::manim, core::Extract, core::animation::eval::iterative::Iterative,
-    core::core_item::CoreItem, glam::dvec3, items::vitem::geometry::Rectangle, prelude::*,
+    color::palettes::manim, core::animation::eval::iterative::Iterative, glam::dvec3,
+    items::vitem::geometry::Rectangle, prelude::*,
 };
 
 /// The spring's state: displacement and velocity.
@@ -24,14 +24,13 @@ struct SpringState {
     v: f64,
 }
 
-impl Extract for SpringState {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<CoreItem>) {
+#[cfg(feature = "render")]
+impl ranim::render::extract::Extract for SpringState {
+    fn extract(&self, ctx: &mut ranim::render::extract::ExtractContext<'_>) {
         let mut ball = Rectangle::new(0.6, 0.6).transformed(Translation(dvec3(self.x, 0.0, 0.0)));
         ball.set_fill_color(manim::BLUE_C);
         ball.set_stroke_opacity(0.0);
-        ball.extract_into(buf);
+        ball.extract(ctx);
     }
 }
 
@@ -57,6 +56,13 @@ fn iterative_spring(r: &mut RanimScene) {
         .with_duration(sim_secs),
     );
     r.insert_time_mark(sim_secs / 2.0, TimeMark::Capture("preview.png".to_string()));
+}
+
+#[cfg(feature = "render")]
+pub(crate) fn configure_render(app: &mut bevy_app::App) {
+    use ranim::render::extract::ExtractPlugin;
+
+    app.add_plugins(ExtractPlugin::<SpringState>::default());
 }
 
 /// Register the scenes provided by this example.

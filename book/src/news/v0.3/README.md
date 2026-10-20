@@ -4,9 +4,9 @@
 > 已覆盖 #166–#202 中的全部特性与架构类 PR；基建/修复类（#178、#179、#188、#191、#199、#203）不入篇（见[目录约定](../AGENTS.md)）。
 
 本篇是 v0.3 的 News 纪事（体裁类似 Bevy News，写作约定见
-[本目录 AGENTS.md](../AGENTS.md)）。其中编排系统与渲染侧的 ECS 化沿用了
-各自 PR 的设计；求值协议一节按当前实现（content-is-sequence 收敛后的
-版本）编写。
+[本目录 AGENTS.md](../AGENTS.md)）。编排、求值输出与渲染侧按当前实现编写：
+完整 `Eval::Output` 原样进入类型化帧，独立 render SubApp 通过值级 `Extract`
+和显式泛型插件消费这些输出。
 
 ## 新增
 
@@ -27,12 +27,12 @@
 - 类型化变换系统（见"类型化变换系统"一节）
   - `Transformed<T, G>` 包装器、`ApplyTransform<G>` primitive trait 与类型化变换群（`Translation`/`Rigid`/`Similarity`/`Diag`/`DAffine3`），语义闭包约束的 `bake()`
   - 规范局部原语：语义形状移除定位字段，placement 只存在于 `Transformed`（"canonical local primitives" 教义）
-  - 核心 `VItem` 携带局部到世界 `transform: Mat4`，渲染侧 per-item transform storage buffer，插值契约（wrapper lerp 动位姿、morph 是显式 bake）
+  - 渲染组件 `RenderVItem` 携带局部到世界 `transform: Mat4`，渲染侧 per-item transform storage buffer，插值契约（wrapper lerp 动位姿、morph 是显式 bake）
   - 场景图层级 `hierarchy::Node` 与 glTF/GLB 导入（见"场景图层级与 glTF 导入"一节）
 - VItem 法向投影：`Basis2d` 移除，`normal: Option` + shader 内现场生成正交基（见"VItem 法向投影"一节）
-- 元组 `Extract`：1..=15 元直接实现，无需 `Group` 包装，ranim-core 保持 stable 兼容
-- CLI：`ranim output` / `ranim render <scene>` 拆分；`inspect scenes/tree/frame` 无 GPU 检查子命令；`examples/agents/` agent one-shot 例子档案（见"CLI"一节）
-- 渲染与输出：独立 render `SubApp`、core 中按类型批次传输的 `EvaluatedFrame` 与显式渲染插件组合；渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 打包为单一 `ranim-examples` wasm 包并经 `#[wasm_demo_doc]` 恢复 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
+- 完整求值输出与值级 `Extract`：容器、异构元组、层级树与变换 wrapper 原样入帧，渲染侧递归提取；`ExtractPlugin<T>` 为实际完整类型显式注册入口
+- 命令行入口：项目二进制经 `App::run()` 自带 `preview` / `output` / `render` / `inspect` 子命令；`App`/`Plugin`/`Scene` 等装配类型位于根 crate 的 `ranim::app` 并从 crate 根再导出，`App::new().add_scenes([...]).run()` 即最小项目；`inspect scenes/tree/frame` 无 GPU 检查；`examples/agents/` agent one-shot 例子档案（见"CLI"一节）
+- 渲染与输出：独立 render `SubApp`、core 中按类型批次传输的 `EvaluatedFrame` 与项目提供的 `RenderSetup`（未注册时回退到安装 `RanimItemsPlugin` 的默认渲染配置）；渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 打包为单一 `ranim-examples` wasm 包并经 `#[wasm_demo_doc]` 恢复 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
 
 ## BREAKING CHANGES
 
@@ -50,17 +50,26 @@
   - `Pure` 与 `Iterative` 从 *ranim-anims* 移入 *ranim-core* 的 `animation::eval::{pure, iterative}`
   - `CameraFrame::orbit` 移到 *ranim-anims* 的 `CameraFrameAnim`
   - 删除 *ranim-anims* 的 `Lagged` 求值器与 `lagged` 模块（`LaggedAnim` 糖），stagger 排布改用 `AnimLagged` 容器
+  - 删除 core 中原有的 `Extract<Target = CoreItem>`、`AnyExtractCoreItem`、`DynItem` 与封闭的 `CoreItem` 枚举；求值保留完整输出。渲染协议改为 `ranim_render::extract::Extract::extract(&self, ctx)`，由宿主显式安装 `ExtractPlugin<实际完整输出类型>`
+  - 动画叶子的 `Output` 要求 `Clone + Send + Sync + 'static`；纯 CPU 求值不要求实现渲染 trait
 - 变换与物件模型（见"类型化变换系统"一节）
   - `MeshItem`/`Surface` 移除内嵌 transform 字段与 `with_transform`，外挂变换改用 `.transformed(...)`
   - `Square`/`Rectangle`/`Circle`/`Sphere`/`Arc`/`Ellipse`/`EllipticArc`/`TextItem` 等语义形状移除 `center`/`axes`/`p0`/`origin` 等定位字段：构造后用 `.transformed(Translation(...))` 放置；裸值不再实现 `ApplyTransform`，`shift`/`rotate_*`/非均匀 `scale` 需先包裹（或转为 `Polygon`/`VItem` 等点集类型）
-  - 核心 `VItem` 的 `points`/`normal` 变为局部空间值，定位存放在新增的 `transform: Mat4`；消费提取点数据的代码需先应用 transform
+  - 渲染组件 `RenderVItem` 的 `points`/`normal` 变为局部空间值，定位存放在新增的 `transform: Mat4`；消费提取点数据的代码需先应用 transform
   - `ranim_items::mesh::MeshItem` 用户层类型由 f32（`Vec3`/`Mat4`）改为 f64（`DVec3`/`DMat4`）
 - 渲染与 CLI
-  - `Renderer::new` 新增第五个参数，显式传入渲染插件；渲染现有 `CoreItem` 场景时组合 `ranim::CoreItemExtractPlugin` 与 `ranim_render::BuiltinRenderPlugins`，分别负责输入适配和内置 GPU 管线
+  - `Renderer::new` 新增第五个参数，接受项目提供的 `RenderSetup` 或直接传入 Bevy 插件组合。项目可将 setup 存为 App resource，装配 `ranim_items::RanimItemsPlugin`（捆绑内置相机、矢量与网格物件插件）与未覆盖完整类型的 `ExtractPlugin<T>`；项目未注册 setup 时，preview 与 output 回退到仅含 `RanimItemsPlugin` 的默认配置，渲染宿主不再硬编码物件插件
+  - `RenderWorker::new` / `RanimRenderApp::new` 改为接收 `SceneHandle`、`Output` 和缓冲数量；场景名称、配置与渲染装配从所属项目取得
+  - 项目二进制的 `App::run()` 提供 `preview` / `output` / `render` / `inspect` 四个子命令；装配 API（`App`/`Plugin`/`Scene`/`SceneHandle`/`Output` 等）定义于根 crate 的 `ranim::app` 并从 crate 根再导出。`inspect` 可查询包含延迟 setup 的项目，仍不初始化 GPU
+  - 删除 `ranim_core::core_item`：通用变换移到 `ranim_core::transformed`；相机移到 `ranim_items::camera`；render world 组件改为 items 的 `vitem::render::RenderVItem` / `mesh::render::RenderMeshItem`，对应缓冲、管线与系统同归该物件模块，通过 items 的 `render` feature 提供
   - 帧数据统一为 `ranim_core::frame::EvaluatedFrame`：替换 `ranim_render::world::RenderFrame` 与原来的 `scene_evaluator::EvaluatedFrame` Vec 别名，item ID 使用 `ranim_core::frame::FrameItemId`；`Renderer::render_frame` 与 `RenderWorker::render_store` 改为接收 `&mut EvaluatedFrame`，渲染完成后返还帧数据供复用
-  - `SceneEvaluator::sample_at` 直接替换 `EvaluatedFrame` 的内容；读取内置结果改用 `frame.items::<CoreItem>()`，每项的 `id`、`order`、`value` 分别提供身份、顺序与求值数据
+  - `SceneEvaluator::sample_at` 直接替换 `EvaluatedFrame` 的内容；`SealedRanimScene::eval_at_sec` / `eval_at_alpha` 同样接收 `&mut EvaluatedFrame`。结果按具体类型用 `frame.items::<T>()` 读取，每项包含 `id`、`order` 与完整的 `value`
+  - 自定义物件通过值级 `Extract` 递归复用现有实现，或经 `ExtractContext` 写入实体和资源；`ExtractPlugin<T>` 只匹配精确的帧类型，注册 `T` 不会自动读取 `Vec<T>` 或 `Transformed<T, G>`
+  - `TextItem` / `TypstText` 保留自身类型，项目启用 `typst`；裸文字类型的提取由 `VItemPlugin` 提供（默认渲染配置已包含）
+  - typed frame 按实际 `TypeId` 匹配；inspect 保留未适配输入的 opaque 元数据，提取系统只能读取匹配类型的批次，不按同名类型强转
+  - `inspect frame` 的 JSON schema 升级到 `2`，完整输出的输入顺序为 `order`，新增 `input_type`；支持的裸内置类型提供 CPU 几何投影，未适配的完整类型保留为 opaque 元数据
   - `VItemsBuffer::update`/`MeshItemsBuffer::update` 的迭代项改为 `(scene_order, item)` 对
-  - `ranim render` 语义变化：批量渲染所有 `#[output]` 改用 `ranim output`；`ranim render <scene>` 只做单场景临时渲染，忽略 `#[output]` 与 Capture mark
+  - `render` 子命令语义变化：批量渲染所有 `#[output]` 改用 `output`；`render <scene>` 只做单场景临时渲染，忽略 `#[output]` 与 Capture mark
   - `ranim_items::vitem::Basis2d` 移除，`VItem.basis` 改为 `normal: Option<DVec3>`（构造迁移：`with_basis(Basis2d::XY)` → `with_normal(...)` 或留空自动计算）
   - `SvgItem` 内部改为放置树（`Transformed<Node<VItem>, DAffine3>`）：`tree()`/`tree_mut()`/`into_tree()` 返回放置而非裸节点（用 `.inner` 取 frame）；glTF 支持为 opt-in 的 `gltf` feature
 
@@ -143,7 +152,8 @@ NodeContent
 顺序、并行与交错组合都在构造期安排时间窗口，运行时统一遍历命中的 children。
 `AnimSequence::into_anim_node` 消解被覆盖的零时长片段，并排除被末尾
 `show()` / `hide()` 覆盖的前一片段的右端点；嵌套 sequence 保留相同的末态。
-静态保持和 lagged 的边缘填充也统一为 `Static<Vec<DynItem>>` 动画叶子。
+静态保持和 lagged 的边缘填充捕获可克隆的原始输出值，内部通过 `HeldOutput`
+按原类型重放；普通叶子直接将完整求值结果写入帧。
 
 叶子通过 `Eval` 保持开放，lowering 协议则是 `IntoAnimNode`：
 
@@ -155,7 +165,7 @@ pub trait IntoAnimNode: Sized {
 }
 ```
 
-所有的 `E: Eval where E::Output: AnyExtractCoreItem` 都自动实现 `IntoAnimNode`，因此动画创建直接返回自身即可使用，不需要手写 lowering：
+所有的 `E: Eval where E::Output: Clone + Send + Sync + 'static` 都自动实现 `IntoAnimNode`，因此动画创建直接返回自身即可使用，不需要手写 lowering：
 
 ```rust
 impl<T: FadingRequirement + Sized + 'static> FadingAnim for T {
@@ -235,122 +245,190 @@ pub struct At<A> {
 
 ![composable_choreography.png](./composable_choreography.png)
 
-## ECS Schedule 取代 RenderGraph
+## 完整求值帧、值级 Extract 与 render SubApp
 
 https://github.com/AzurIce/ranim/pull/175
 
-渲染侧的 ECS 化：渲染原语进入独立 render `SubApp` 的 `World`，按类型批次传入的帧数据由插件注册的提取系统同步到这个 World，渲染准备与 GPU pass 再由 schedule 组织。VItem 和 Mesh 的 GPU 资源与系统通过插件安装。用户级 item、动画求值仍停留在 World 之外。
+Ranim 现在把完整动画输出保留到渲染侧。求值只产生 CPU 值，独立 render
+`SubApp` 通过已注册的泛型提取系统解释这些值，再准备 GPU 数据。动画树和
+用户层物件继续位于 ECS World 之外，core 不依赖 renderer。
 
-### 之前：`CoreItemStore` 兼任传输与查询
+### 完整 `Eval::Output` 保留语义
 
-旧实现里，求值结果由 `CoreItemStore` 承载：
+动画树的 children 负责时间映射与遍历；普通叶子调用 `eval_alpha(alpha)` 后，
+直接把返回值写入类型化帧。若返回 `Vec<(Circle, Line)>`，帧中保存的就是这个
+完整类型，而不是预先拆出的 `Circle` 和 `Line` 批次。`Node`、`SvgItem`、模拟
+状态与 `Transformed<T, G>` 同样保留自己的结构。
 
-```rust
-/// A store of [`CoreItem`]s.
-#[derive(Default, Clone)]
-pub struct CoreItemStore {
-    /// Id of [`CameraFrame`]s
-    pub camera_frame_ids: Vec<(usize, usize)>,
-    /// [`CameraFrame`]s
-    pub camera_frames: Vec<CameraFrame>,
+求值协议因此不需要知道“哪些值最终可见”或“一个值对应几个实体”。同一个
+完整输出可以由渲染侧决定细节层次、分解方式和资源表示，也可以只用于 CPU
+检查。`Output` 的要求是 `Clone + Send + Sync + 'static`：`Clone` 供 `hold`
+和 lagged 静态填充捕获原始值，线程安全要求用于帧传输。捕获路径内部保存
+`DynOutput`，保持区间按原类型重放；连续 hold 不会把捕获列表变成新的公开帧
+类型。普通采样直接写入批次，无需为每个值装箱。
 
-    /// Id of [`VItem`]s
-    pub vitem_ids: Vec<(usize, usize)>,
-    /// [`VItem`]s
-    pub vitems: Vec<VItem>,
+### 值级 `Extract` 复用已有表示
 
-    /// Id of [`MeshItem`]s
-    pub mesh_item_ids: Vec<(usize, usize)>,
-    /// [`MeshItem`]s
-    pub mesh_items: Vec<MeshItem>,
+渲染协议位于 `ranim_render::extract`，借用输入并通过 `ExtractContext` 更新
+World。自定义值可以委托给内部物件的实现，也可以直接生成组件或资源：
+
+```rust,ignore
+use ranim_items::vitem::geometry::Circle;
+use ranim_render::extract::{Extract, ExtractContext};
+
+#[derive(Clone)]
+struct Marker {
+    radius: f64,
+}
+
+impl Extract for Marker {
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        Circle::new(self.radius).extract(ctx);
+    }
 }
 ```
 
-它既用于承载并传输求值结果，又用于渲染管线查询访问——两种职责混在一起。
+这替代了原有 `Extract<Target = CoreItem>` 的提前投影。新协议没有关联输出
+类型，也不要求返回一个公共图元列表。`Vec<T>`、数组、`Option<T>`、1..=15 元组
+和 `Transformed<T, G>` 在 renderer 中递归调用成员的 `Extract`；items 的 `Node`
+按 payload、子节点顺序递归。具体形状则转换到合适的表示，再委托其提取实现。
+这些调用共享同一个上下文，组合不会多出一套容器实体或要求逻辑使用 ECS。
 
-### 现在：core 生产 `EvaluatedFrame`，render `SubApp` 消费
+`ctx.entity::<Bundle>()` 以 bundle 类型领取本输入的下一个持久输出实体；同一
+位置改变 bundle 类型时重建实体，避免旧形态组件残留。`ctx.world_mut()` 可
+更新资源或执行自定义 World 操作，直接创建的实体需自行管理生命周期。
+`ctx.transform()` 读取累计变换，`with_transform` 在 `parent * child` 下递归。
+变换仍保存在原始 wrapper 中，提取时才组合到 primitive 的渲染矩阵；输入的
+局部几何不会因渲染而被改写。完整 API 与使用方式见
+[完整求值帧与渲染提取](../../understand/core/extract.md)。
 
-`ranim_core::frame::EvaluatedFrame` 是求值侧生产的纯 CPU 帧数据，不依赖 renderer。`SceneEvaluator::sample_at` 直接填入这个帧缓冲，预览与导出将同一个缓冲交给 renderer 消费，省去中间 Vec 的搬运。`Renderer` 持有的 render `SubApp` 承载渲染实体、资源、变更检测与 schedule，可以独立运行，无须把项目 `App` 或动画求值改成 ECS。
+### core 生产 `EvaluatedFrame`，render SubApp 消费
 
-帧缓冲按类型保存批次，类型擦除发生在整个批次上，同类型的条目保存在连续存储中。每个 `FrameItem<T>` 携带 `id`、全局 `order` 与 `value`；不同类型的条目也共享写入顺序，提取系统可以据此保持跨类型的场景顺序，无须依赖批次容器的遍历顺序：
+`ranim_core::frame::EvaluatedFrame` 按具体类型保存可复用批次，整个批次统一
+擦除类型。`SceneEvaluator::sample_at` 直接填入缓冲，预览与导出再将它交给
+renderer。`FrameItem<T>` 携带 `id`、全局 `order` 与完整的 `value`；不同类型
+共享插入顺序，无须依赖批次容器的遍历顺序：
 
-```rust
-use ranim_core::core_item::{CoreItem, camera_frame::CameraFrame};
+```rust,ignore
+use ranim_items::camera::CameraFrame;
 use ranim_core::frame::EvaluatedFrame;
+use ranim_items::vitem::geometry::Circle;
 
 let mut frame = EvaluatedFrame::new();
-frame.push((0, 0), CoreItem::CameraFrame(CameraFrame::default()));
-frame.push((1, 0), 42_u32);
-assert_eq!(frame.items::<CoreItem>()[0].order, 0);
-assert_eq!(frame.items::<u32>()[0].order, 1);
+frame.push((0, 0), CameraFrame::default());
+frame.push((1, 0), vec![Circle::new(1.0), Circle::new(2.0)]);
+assert_eq!(frame.items::<CameraFrame>()[0].order, 0);
+assert_eq!(frame.items::<Vec<Circle>>()[0].order, 1);
+assert!(frame.items::<Circle>().is_empty());
 assert_eq!(frame.len(), 2);
 ```
 
-`update` 清空整帧后写入一个类型的批次，现有场景可以继续传入求值所得的 `CoreItem` 迭代器；`push` 用于追加条目，`items::<T>()` 读取指定类型的批次，`clear` 清空整帧。自定义宿主可以写入其他类型，再为这些批次注册对应的渲染侧提取系统。
+`id` 中的 `(animation_id, part)` 标识顶层动画与其完整输出序号，容器成员不在
+求值阶段占用额外 ID。`clear` 保留批次容量；`update` 清空整帧后填入一个类型
+的批次。输入可产生多个实体或只更新资源，`frame.len()` 因而不表示渲染输出数。
 
-### 显式组合渲染插件
+`Renderer` 持有独立 Bevy `SubApp`，承载渲染实体、资源、变更检测与 schedule，
+无需把项目 App 或动画求值改成 ECS。
 
-`ranim-render` 提供帧消费、渲染调度与管线的通用入口。`Renderer` 负责共享的帧生命周期、相机、OIT 与渲染目标；VItem 和 Mesh 各自的 GPU 资源、准备系统与绘制系统由 `VItemRenderPlugin`、`MeshRenderPlugin` 安装，`BuiltinRenderPlugins` 组合这两套 GPU 管线。
+### 显式组合精确输入类型与 GPU 管线
 
-现有逻辑输出的 `CoreItem` 由顶层 `ranim::CoreItemExtractPlugin` 适配为渲染组件。它向 `RenderExtract` 安装提取系统，与 GPU 管线分别注册；预览、导出和 GPU benchmark 都显式组合输入适配与内置管线：
+`ExtractPlugin<T>` 将值级协议接到 `RenderSchedules.extract` 阶段；它读取的精确批次
+是 `frame.items::<T>()`。例如 `ExtractPlugin<Vec<Circle>>` 可以复用容器与圆的
+递归实现，但只有 `ExtractPlugin<Circle>` 时不会消费该容器输入。带变换、元组
+或树的输出也需注册实际完整类型，内部的递归委托无需再安装成员类型插件。
+
+`ranim-items` 的 `CameraFramePlugin` 注册裸相机输入与 viewport 准备，
+`VItemPlugin` 注册裸矢量、`Vec<VItem>`、几何、SVG 与文字类型，`MeshItemPlugin`
+注册裸网格、曲面和球体；三者同时安装各自的 GPU 渲染，并由 `RanimItemsPlugin`
+捆绑为一——它与单个物件插件互斥（Bevy 插件唯一，重复安装会 panic）。矢量和
+网格的渲染组件分别名为 `RenderVItem`、`RenderMeshItem`，与缓冲、管线和系统
+一同放在对应 items 的 `render` 模块；纯 CPU 的逻辑 `VItem` / `MeshItem` 保持
+原来的职责。`ranim-core` 只保留通用变换 `transformed`，renderer 本体无需认识
+具体物件类型。
+
+物件插件覆盖裸内置输入，不枚举容器和 wrapper 组合。文字支持随项目的
+`typst` feature 提供。项目未注册 `RenderSetup` 时使用默认配置（仅安装
+`RanimItemsPlugin`）；需要额外输入类型时，项目插件保存一份自定义渲染装配，
+场景插件仅注册场景：
 
 ```rust,ignore
-use ranim::CoreItemExtractPlugin;
-use ranim_render::{BuiltinRenderPlugins, Renderer};
+use ranim::{App, Plugin};
+use ranim_items::{RanimItemsPlugin, vitem::geometry::Circle};
+use ranim_render::{RenderSetup, extract::ExtractPlugin};
 
-// Before
-let renderer = Renderer::new(&ctx, width, height, oit_layers);
+pub struct ProjectPlugin;
 
-// After
-let renderer = Renderer::new(
-    &ctx,
-    width,
-    height,
-    oit_layers,
-    (CoreItemExtractPlugin, BuiltinRenderPlugins),
-);
+impl Plugin for ProjectPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(ScenesPlugin);
+        app.insert_resource(RenderSetup::new(|render_app| {
+            render_app.add_plugins((
+                RanimItemsPlugin,
+                ExtractPlugin::<Vec<Circle>>::default(),
+                ExtractPlugin::<Marker>::default(),
+            ));
+        }));
+    }
+}
 ```
 
-第五个参数接受 Bevy 插件组合，用于选择内置 item renderer、注册资源，以及向公开的渲染 schedule 添加系统。这些配置作用于每个 `Renderer` 自己的 render `SubApp`；项目侧 `ranim::App` 的插件入口与逻辑侧的 `CoreItem` 提取协议仍保持现有职责。
+`RenderSetup` 保存可重复调用的配置，存储时不创建 GPU。output 与
+preview 从场景所属 App 读取 setup（缺省时回退到默认配置），克隆后传给
+`Renderer::new` 的第五个参数。
+每个 renderer 使用独立的 SubApp，分辨率重建、多个输出和后台导出都重放同一
+项目的配置。renderer 继续接受普通 Bevy 插件组合，低层调用不必经过项目层。
 
-例如，输入仍为 `CoreItem`、只需要 VItem 管线时，可以显式组合 `(ranim::CoreItemExtractPlugin, ranim_render::VItemRenderPlugin)`。自定义帧类型可由各自的提取插件接入同一个 `RenderExtract`，动画侧现有的 `Extract` 仍负责产生 `CoreItem`。
+纯 CPU 的场景查询、求值和 `inspect` 不执行 GPU 装配。
 
-构造器接收已经初始化的 GPU context，插件需要同步完成 `build` 并达到 ready 状态。`finish` 与 `cleanup` 在进入逐帧渲染之前各执行一次。
+渲染插件使用已经初始化的 GPU context，同步达到 ready 后，`finish` 与
+`cleanup` 各执行一次，再开始逐帧渲染。
 
-### `RenderExtract`：按身份增量更新实体
+### 持久输出、变更检测与展开顺序
 
-`render_frame` 临时把 `EvaluatedFrame` 的整帧批次移入 render `SubApp` 的 Resource，再运行一次 `SubApp::update()`。`RenderExtract` 中的系统读取相应类型的批次并更新渲染 World；所有阶段结束后，整帧批次移回调用者，保留数据与容量供重复绘制或下一帧复用。这个交换避免复制输入批次，因此渲染入口改为可变借用：
+`render_frame` 临时将整帧 Resource 与 render SubApp 中的缓冲交换，运行一次
+`SubApp::update()` 后再交换回来，输入数据与批次容量保持完整。入口因此接收
+`&mut EvaluatedFrame`，提取只借用帧中的原始值：
 
 ```rust,ignore
-// Before
-use ranim_render::world::RenderFrame;
-renderer.render_frame(&mut textures, clear_color, &frame);
-
-// After
-use ranim_core::frame::EvaluatedFrame;
 renderer.render_frame(&mut textures, clear_color, &mut frame);
 ```
 
-内置提取系统以 `(animation_id, part)` 为跨帧 key，从 `CoreItem` 批次更新渲染 World：
+泛型提取系统按完整输入类型维护私有身份映射。输入 ID 与递归提取的输出位置
+共同定位实体，同类型、同 ID、同输出位置复用实体。内置 primitive 的值相同
+则跳过组件写入，保留 `Changed<T>` 增量语义；自定义组件是否需要写入由其
+`Extract` 实现决定。输入消失或输出数量变少时，未被 `ctx.entity::<Bundle>()` 领取的
+实体自动删除。不同来源类型的映射彼此独立，不会因生成相同 primitive 而
+互相清理。
 
-- 提取器通过私有的 key → entity 映射维护跨帧身份，实体携带 `SceneOrder`；值相同则不写组件（保留 `Changed<T>`），值变化才替换，本帧消失的 key 对应实体被移除；
-- **身份与顺序是两件事**：跨帧映射回答"是否是上一帧的同一项"，`SceneOrder` 回答"本帧按什么顺序消费"——ECS query 顺序不构成绘制顺序，prepare 阶段显式按 `SceneOrder` 排序分桶；
+身份与顺序分开维护。上下文为实体写入
+`SourceOrder { order: frame_item.order, part: output_part }`；renderer 在提取
+完成后统一排序成连续的 `SceneOrder`，再准备 GPU 数据。一个文字、SVG 或
+容器输入产生的多个输出因而仍排在相邻输入之间，深度偏置范围依据最终渲染
+rank，不把输入数量当作渲染实体数量。
 
 ### Schedule 组织渲染阶段
 
 ```text
-RenderUpdate: First → RenderExtract → RenderPrepare → RenderGraph
-  ├─ RenderExtract: 按类型批次更新渲染 World
-  ├─ RenderPrepare: item GPU 数据准备、上传与绑定组更新
-  └─ RenderGraph:   Begin → Render → Submit → Finish
-       └─ ViewRender: Clear → Compute → Depth → Color → OITResolve
+render update: First → extract → resolve SceneOrder → prepare → render graph
+  ├─ extract: 按类型批次更新渲染 World
+  ├─ prepare: item GPU 数据准备、上传与绑定组更新
+  └─ render graph: Begin → Render → Submit → Finish
+       └─ view: clear → compute → depth → color → resolve
 ```
 
-- 内部的 `RenderUpdate` 是 render `SubApp` 的根 schedule，依次运行 `First`、`RenderExtract`、`RenderPrepare` 与 `RenderGraph`；所有阶段完成后，`SubApp::update()` 清理本帧变更追踪。插件通过公开的 `RenderExtract`、`RenderPrepare`、`ViewRender` 和 `ViewSystems` 注册提取、准备与绘制系统；
-- `RenderPrepare` 把组件展开为 GPU 输入（storage/index/uniform 数据、上传、绑定组）；
-- `RenderGraph` 驱动整个画面生命周期：`Begin` 创建 frame encoder，`Render` 运行逐 view 子 schedule，`Submit` 提交 command buffer，`Finish` 结束 profiling frame；
-- 单相机也走完整的 `ViewRender` 子 schedule（clear、VItem compute、depth、color、OIT resolve），避免单 view 成为以后多 view 的特殊路径；
-- 自制的 `Graph<NodeKey, Box<dyn RenderNode>>` 节点图被移除——节点 trait、拓扑容器和查询都在重复 ECS schedule 已提供的能力。
+- 内部 render update 是 SubApp 的根 schedule，所有阶段完成后由
+  `SubApp::update()` 清理本帧变更追踪。宿主初始化 `RenderSchedules` resource，
+  插件读取其 `extract`、`prepare`、`view` handles 注册系统；
+- `prepare` 从组件准备 GPU 输入，显式按 `SceneOrder` 排序，ECS query
+  顺序不构成绘制顺序；
+- render graph 驱动画面生命周期：创建 encoder、运行 view 子 schedule、提交
+  command buffer、结束 profiling frame；
+- `view_systems` 携带五个公共 phase 的 handles，保证所有 depth pass 先于 color
+  pass；各物件插件自行注册对应 phase，不规定 VItem 与 Mesh 管线之间的先后顺序；
+- 渲染插件统一使用 renderer 创建的公共 handles，不重新 intern 同名 label，
+  保证各插件注册的系统参与相同调度；插件内部的 label / set 仍可自行定义；
+- 自制的 `Graph<NodeKey, Box<dyn RenderNode>>` 节点图被移除，依赖关系与执行
+  生命周期交由 Bevy schedule 管理。
 
 ## 求值与迭代式动画区段
 
@@ -436,7 +514,9 @@ let animation = Iterative::from_fn(
 - 闭包的状态类型位于 `Fn` 输入位置，stable Rust 无法从闭包类型反推出关联 `Output`，所以 `Iterative::from_fn` 通过 `IterativeFn<S, F>` 显式绑定二者；
 - 迭代逻辑较复杂、需要多个字段或复用方法时，实现命名 `IterativeEval` 结构体，并把 `sim_secs` 等参数放在 `self` 上；
 - 可变状态全部住在 `Output` 里，适配器持有初始状态值，恢复是结构性的；
-- 状态与渲染内容不同时，为状态类型实现 `Extract`（每帧投影一次），如 `nbody` 的 bodies+trails → `VItem`。
+- 状态与可见内容不同时，可以让完整状态进入帧，再为它实现值级 `Extract`，
+  在渲染侧生成几何。例如 `nbody` 的 bodies+trails 可以复用矢量物件的提取；
+  宿主需为该状态的实际类型显式注册 `ExtractPlugin<T>`。
 
 ### 进度是唯一坐标
 
@@ -455,15 +535,17 @@ pub type DeltaAlpha = f64;  // 均匀进度步长
 ### `SceneEvaluator`：单入口会话驱动
 
 ```rust,ignore
-use ranim_core::{core_item::CoreItem, frame::EvaluatedFrame};
+use ranim_core::frame::EvaluatedFrame;
+use ranim_items::vitem::VItem;
 
 let mut frame = EvaluatedFrame::new();
 evaluator.sample_at(render_secs, &mut frame);
-let items = frame.items::<CoreItem>();
+let items = frame.items::<VItem>(); // 读取该具体类型的批次
 ```
 
 - `sample_at` 是唯一的 session 交互：渲染、preview 拖拽共用这条路径；
-- 每次采样替换整帧内容，将现有逻辑 `Extract` 产生的 `CoreItem` 写入对应类型批次；frame 自身保留各类型批次的容量供下次复用；
+- 每次采样替换整帧内容，普通叶子将完整 `eval_alpha(...)` 结果写入实际类型的
+  批次，容器和 wrapper 不提前展开；frame 保留批次容量供下次复用；
 - 前进 / 回退 / 原地求值由 `Iterative` 等 stateful 节点内部完成，session 不再维护逻辑网格；
 - `logic_fps` 参数仅为 API 兼容保留，不再驱动步进；步进尺度由每个迭代区段自己的 `sim_step` 决定。
 
@@ -490,7 +572,7 @@ ranim::anims
 
 - `iterative_spring`：阻尼弹簧，简单闭包步进，`sim_secs` 为过程局部变量；
 - `nbody`：N 体引力模拟（velocity Verlet、混沌弹射终场、无边界），同样是局部 `sim_secs` + 闭包；
-- `cloth_wrap`：零重力布料（弹簧力 + 自碰撞 + 球-布碰撞，MeshItem 曲面渲染；球的 kinematic 状态由 `sim_secs * alpha` 驱动，`Extract` 投影）。
+- `cloth_wrap`：零重力布料（弹簧力 + 自碰撞 + 球-布碰撞，MeshItem 曲面渲染；球的 kinematic 状态由 `sim_secs * alpha` 驱动，值级 `Extract` 生成几何）。
 
 ## VItem 法向投影：带宽优先于 ALU
 
@@ -498,26 +580,43 @@ https://github.com/AzurIce/ranim/pull/166
 
 `Basis2d` 投影抽象被移除，VItem 的投影平面改由单个法向量表达：
 
-- *ranim-items* 的 `VItem` 字段 `basis: Basis2d` 改为 `normal: Option<DVec3>`（核心 `VItem` 同样持有 `normal: Option<Vec3>`）。不显式设置时由前三点自动计算（`vitem_normal_from_points`，共线时回退 `Z` 轴），`RotateTransform` 随点数据一同旋转法向；
+- *ranim-items* 的 `VItem` 字段 `basis: Basis2d` 改为 `normal: Option<DVec3>`（渲染组件 `RenderVItem` 同样持有 `normal: Option<Vec3>`）。不显式设置时由前三点自动计算（`vitem_normal_from_points`，共线时回退 `Z` 轴），`RotateTransform` 随点数据一同旋转法向；
 - 渲染侧 per-instance 的 `PlaneData` 从 3 个 vec4（origin + basis_u + basis_v）缩减为 2 个（normal + origin），u/v 基由 shader 内的 `basis_from_normal()` 现场生成：任选一根与法向足够不平行的轴，两次叉乘得到确定性正交基，compute 与 vertex 阶段复用同一 WGSL 函数保证 bit-exact。
 
 设计原则是**带宽贵于 ALU**：每 item 的 per-instance 数据少 16 字节（-33%），代价只是几次 cross/normalize——vertex 阶段每 item 仅 4 个顶点，compute 阶段完全并行且本就 ALU-bound。确需固定投影面的场景仍可显式 `with_normal` 覆盖。
 
 > 注：本节落地时 points 尚为世界坐标；"类型化变换系统"一节中 #198 进一步把提取语义调整为局部坐标 + `transform` 矩阵。
 
-## 元组 `Extract`
+## 结构容器与异构元组的值级提取
 
 https://github.com/AzurIce/ranim/pull/185
 
-`Extract` 直接为 1..=15 元元组实现，异构物件组可以整体提取：
+容器和异构元组现在可以直接成为完整动画输出。求值帧保留它们的原始结构，
+渲染侧的递归 `Extract` 再处理各成员，成员无需共享一种输出 primitive：
 
-```rust
-let items = (circle, line).extract(); // Vec<CoreItem>
+```rust,ignore
+use ranim_core::frame::EvaluatedFrame;
+use ranim_items::vitem::geometry::{Circle, Line};
+use ranim_render::extract::ExtractPlugin;
+
+type Input = (Circle, Vec<Line>);
+let mut frame = EvaluatedFrame::new();
+frame.push((0, 0), (circle, vec![line]));
+assert_eq!(frame.items::<Input>().len(), 1);
+assert!(frame.items::<Circle>().is_empty());
+
+// 把这个精确类型的插件加入项目 RenderSetup 的插件组合。
+let plugin = ExtractPlugin::<Input>::default();
 ```
 
-- 容器 blanket impl 改由 sealed marker trait（`IntoExtractIter`）约束：所有 impl 都在 crate 内可见，coherence 可以证明元组不满足它，因此元组的直接 impl 不再与 blanket 冲突（E0119）——不需要 `Group<T: Tuple>` newtype，也移除了 `#![feature(tuple_trait)]`，*ranim-core* 保持 stable 兼容；
-- blanket 覆盖的容器集合与原先一致（`Vec`、`[E; N]`、`&[E]`、`VecDeque`、`LinkedList`、`HashSet`、`BTreeSet`、`BinaryHeap`、`Option`），下游自定义集合仍可手工实现 `Extract`；
-- 各元数经 `variadics_please::all_tuples!` 生成，与既有 `Interpolatable` 元组 impl 同一套模式，无 `group!` 宏。
+当前递归实现覆盖 `Vec<T>`、数组、`Option<T>`、1..=15 元组、单位类型和变换
+wrapper。items 的 `Node` 也通过同一值级接口递归。它们共享上下文的输出序号
+与累计变换，可以直接组合出多层嵌套，而不引入统一的返回列表。
+
+插件注册与递归能力是两个边界：`ExtractPlugin<Input>` 注册完整帧类型，容器
+实现负责其内部遍历。单独注册 `Circle` 或 `Line` 并不会读取 `Input` 批次；
+内部委托 `.extract(ctx)` 则不要求再注册成员插件。这样实际输出类型与 renderer
+能力由宿主明确列出，纯 CPU 求值仍可以保存任何满足传输约束的输出。
 
 ## 渲染与输出体系
 
@@ -539,7 +638,7 @@ fn my_scene(r: &mut RanimScene) { /* ... */ }
 
 ### `ranim-examples` wasm bundle 与 rustdoc 实时预览
 
-全部 examples 经 `#[path]` 引用原始源码（根目录 `ranim render --example` 等用法不受影响），编译进单一 `ranim_examples.wasm`——此前每个 example 独立链接完整 preview 引擎并各自跑 wasm-bindgen/wasm-opt。场景可标注 `#[wasm_demo_doc]`：`#[scene]` 宏据此在生成的公开函数文档上注入画布元素与 module script，页面加载后 `find_scene("<注册名>")` 取出场景交给 `preview_scene`，在 rustdoc 页里直接跑起与 `ranim preview` 相同的应用（注入的是场景注册名而非函数名，`#[scene(name = "hanoi")]` 场景仍能正确解析）。
+全部 examples 经 `#[path]` 引用原始源码（根目录 `cargo run --example <name> --features preview -- <command>` 等用法不受影响），编译进单一 `ranim_examples.wasm`——此前每个 example 独立链接完整 preview 引擎并各自跑 wasm-bindgen/wasm-opt。场景可标注 `#[wasm_demo_doc]`：`#[scene]` 宏据此在生成的公开函数文档上注入画布元素与 module script，页面加载后 `find_scene("<注册名>")` 取出场景交给 `preview_scene`，在 rustdoc 页里启动与 `preview` 子命令相同的应用（注入的是场景注册名而非函数名，`#[scene(name = "hanoi")]` 场景仍能正确解析）。组合项目在顶层 `RenderSetup` 中统一登记物件插件和各示例的精确输入类型；WASM 与原生宿主都从项目配置创建自己的 renderer。
 
 ### coplanar z-fighting 按 scene-order 深度偏置
 
@@ -551,23 +650,28 @@ fn my_scene(r: &mut RanimScene) { /* ... */ }
 
 ### 出发点：让 agent 自主完成"写场景 → 自查 → 出片"
 
-v0.3 后期 ranim 的一个明确用户是 **coding agent**：它没有稳定的桌面环境，用不了交互式预览，却要独立走完"写场景代码 → 验证结构与时序 → 渲染出图 → 视觉检查 → 修改"的完整闭环。CLI 的演进由这个初衷牵引，落在两条设计原则上。
+v0.3 后期 ranim 的一个明确用户是 **coding agent**：它没有稳定的桌面环境，用不了交互式预览，却要独立走完"写场景代码 → 验证结构与时序 → 渲染出图 → 视觉检查 → 修改"的完整闭环。命令行的演进由这个初衷牵引，落在两条设计原则上。
 
-**验证分层，贵的留到最后。** 新增的 `inspect` 三个子命令全部纯 CPU、不创建 GPU context、支持 `--format json`（顶层带 `schema_version`，供脚本解析）：
+每个项目二进制经 `App::run()` 自带 `preview` / `output` / `render` / `inspect` 子命令，无需安装额外工具；本仓库中的示例以 `cargo run --example <name> --features preview -- <command>` 调用。装配 API 位于根 crate 的 `ranim::app`（从 crate 根再导出）；最小项目只需 `App::new().add_scenes([...]).run()`——未注册 `RenderSetup` 的项目使用默认渲染配置（内置相机与矢量/网格物件渲染，即 `ranim_items::RanimItemsPlugin`），无需装配样板。
 
-- `inspect scenes`：不调用场景构造函数，只列出 dylib 里注册的场景与 `#[output]` 摘要——开工第一步确认场景注册成功、输出配置无误；
+**验证分层，贵的留到最后。** `inspect` 的三个子命令全部纯 CPU、不创建 GPU context、支持 `--format json`（顶层带 `schema_version`，供脚本解析）：
+
+- `inspect scenes`：不调用场景构造函数，只列出 App 中注册的场景与 `#[output]` 摘要——开工第一步确认场景注册成功、输出配置无误；
 - `inspect tree`：构建场景并输出层级动画树，每个节点含 `kind`（anim/children/audio）、`anim_name`、父局部坐标下的 `range`、`content_duration_secs`、`rate_func`、`enabled`，迭代节点额外报告自己的 `sim_step`——时序与组织是否正确，无需渲染即可确认；
-- `inspect frame <scene> --at <sec>`：以 120 Hz 逻辑时钟采样一帧，报告每个 CoreItem 的 `z_order`、id/kind、来源与几何摘要（AABB、点数、颜色；`--verbose` 给完整几何）——"某时刻物件不对/位置不对/z-order 不对"不再需要上 GPU 盲调。
+- `inspect frame <scene> --at <sec>`：直接采样类型化帧，JSON `schema_version` 为
+  `2`，报告每个完整输入的 `order`、`input_type`、身份与来源；支持的裸内置类型
+  附带矢量/网格/相机或分组的 CPU 投影数据，未适配的完整类型保留 opaque 元数据。
+  `--verbose` 提供完整几何，迭代动画遵循自身内容步长，无需 GPU 或渲染插件。
 
-**快速冒烟与正式交付分离。** 原 `ranim render` 一分为二：`ranim output [scenes...]` 批量渲染每个声明的 `#[output]`、处理 `TimeMark::Capture` 截图，是交付前的最终验证；`ranim render <scene>` 用固定默认设置（1080p60 mp4）把单个场景快速渲一次，忽略 `#[output]` 与 Capture——迭代中只想看效果时用。内部由 `RenderJob` 抽象统一两条路径。
+**快速冒烟与正式交付分离。** 渲染命令一分为二：`output [scenes...]` 批量渲染每个声明的 `#[output]`、处理 `TimeMark::Capture` 截图，是交付前的最终验证；`render <scene>` 用固定默认设置（1080p60 mp4）把单个场景快速渲一次，忽略 `#[output]` 与 Capture——迭代中只想看效果时用。内部由 `RenderJob` 抽象统一两条路径。
 
-配合既有的 `preview`（watch + 热重载）与 dylib 加载方式，这条工作流可以完全无头完成：
+其中 `inspect` / `render` / `output` 完全无头，可以在没有桌面环境的会话中运行；`preview` 子命令提供交互调试：
 
 ```text
 inspect scenes → inspect tree → inspect frame → render（冒烟出图）→ 视觉检查 → 修改 → output（交付）
 ```
 
-原则与 cli 章的表述一致：能用便宜的 `inspect` 查清的问题，不要留到昂贵的 GPU 渲染之后才发现。
+原则与[命令行入口](../../cli.md)一章的表述一致：能用便宜的 `inspect` 查清的问题，不要留到昂贵的 GPU 渲染之后才发现。
 
 ### 其他
 
@@ -599,7 +703,7 @@ pub trait ApplyTransform<G> {
 }
 ```
 
-- 变换群类型：`Translation`、`Rigid`、`Similarity`、`Diag`，到一般仿射边界 `DAffine3`；同族内组合，**跨族不隐式加宽**——需要更一般的表示时显式升级（`Translation` → `Rigid` → `Similarity` → `DAffine3`，`Diag` → `DAffine3`），让加宽点在源码里可见（阶梯图解见[理解 Ranim · Transformed](../../../understand/core/transformed.md)，此处不赘）；
+- 变换群类型：`Translation`、`Rigid`、`Similarity`、`Diag`，到一般仿射边界 `DAffine3`；同族内组合，**跨族不隐式加宽**——需要更一般的表示时显式升级（`Translation` → `Rigid` → `Similarity` → `DAffine3`，`Diag` → `DAffine3`），让加宽点在源码里可见（阶梯图解见[理解 Ranim · Transformed](../../understand/core/transformed.md)，此处不赘）；
 - 外内组合显式命名：`.transformed(inner).compose_outer(outer)` 与 `.transformed(outer).compose_inner(inner)` 都得到 `outer * inner`；wrapper 自己的 `ApplyTransform` 实现做外乘，嵌套 wrapper 从内向外扁平化；
 - 便捷操作连接到 primitive action：`shift` 要求 `ApplyTransform<Translation>`、`rotate_on_axis` 要求 `Rigid`、非均匀 `scale` 要求 `Diag`、等比缩放要求 `Similarity`、AABB 系操作走既有 `ScaleTransform`/`Aabb`——每个物件只暴露保持其表示的操作；
 - 模型变换止步于仿射：一般 projective `Mat4` 带非仿射齐次行、需要透视除法，属于相机投影而非模型变换；
@@ -630,11 +734,14 @@ let circle = Circle::new(2.0).transformed(Translation(pos));
 
 ### 变换贯穿核心与渲染管线
 
-核心 `VItem` 新增局部到世界 `transform: Mat4`，`CoreItem::apply_transform` 对它做矩阵组合而非重写点数据——提取一个 `Transformed` 只写一个矩阵。渲染侧 per-item transform 进只读 storage buffer，vitem vertex stage 在从平面基重建 3D 位置后应用 `transforms[instance]`。由此确立**插值契约**：wrapper 的 lerp 只动位姿、inner 几何恒定；经典 morph 是显式的 bake 进裸 `VItem`/`MeshItem`。提取出的核心 `VItem::points` 与可选 `normal` 由此变为局部空间值——消费方需先应用 transform（`ranim-cli inspect` 已按此报告世界空间）。
+渲染组件 `RenderVItem` 携带局部到世界 `transform: Mat4`。完整 `Transformed` 保留在求值
+帧中，渲染侧的值级 `Extract` 通过上下文累计外层变换，再将它左乘 primitive
+自身的矩阵，局部点数据保持不变。渲染侧 per-item transform 进只读 storage buffer，vitem vertex stage 在从平面基重建 3D 位置后应用 `transforms[instance]`。由此确立**插值契约**：wrapper 的 lerp 只动位姿、inner 几何恒定；经典 morph 是显式的 bake 进裸 `VItem`/`MeshItem`。提取出的核心 `VItem::points` 与可选 `normal` 由此变为局部空间值——消费方需先应用 transform；`inspect` 的已知类型投影同样遵循这一约定。
 
 ```mermaid
 flowchart LR
-    U["用户空间<br/>Transformed&lt;T, G&gt;<br/>位姿在 wrapper，inner 恒定"] -->|"extract：组合为一个矩阵"| K["core VItem<br/>points/normal 局部坐标<br/>+ transform: Mat4"]
+    U["用户空间<br/>Transformed&lt;T, G&gt;<br/>位姿在 wrapper，inner 恒定"] -->|"完整 Eval::Output"| F["typed EvaluatedFrame"]
+    F -->|"值级 Extract：组合矩阵"| K["RenderVItem<br/>points/normal 局部坐标<br/>+ transform: Mat4"]
     K -->|"update：只读 storage buffer"| G["渲染侧<br/>per-item transforms"]
     G --> V["vertex stage：<br/>平面基重建后按实例应用 transform"]
 ```
@@ -669,14 +776,15 @@ flowchart TB
 
 位姿住在边上——图中每条 `pose` 边都是一个 `Transformed` 包裹：
 
-- `Node` 是纯结构（id + 可选 payload + 子节点），每个子节点的位姿住在边上的 `Transformed` 里；全部递归代数——extract、lerp、align、partial/empty、AABB、centroid、样式转发、按 id 寻址（`by_id`/`by_ids`/`by_id_path`）——由 `Transformed` 自身的实现组合而来，`Node` 不再依赖 `TransformGroup`；
+- `Node` 是纯结构（id + 可选 payload + 子节点），每个子节点的位姿住在边上的 `Transformed` 里；全部递归代数——渲染提取、lerp、align、partial/empty、AABB、centroid、样式转发、按 id 寻址（`by_id`/`by_ids`/`by_id_path`）——由 `Transformed` 自身的实现组合而来，`Node` 不再依赖 `TransformGroup`；
 - 对齐遵循统一规则：**缺席侧用对侧的透明克隆填充**（payload 缺席、空/非空子列表同理），跨结构 lerp 平滑淡入淡出；`leaf()`/`group()`/`branch()` 构造器保持调用点简短，裸节点与包裹节点可在同一 `vec![...]` 里混排（裸节点按 identity 位姿放置）；
-- `SvgItem` 重建在该树上：`<g>` 映射为纯 frame、`<path>` 为 payload 叶子，元素 id 全程可寻址——`svg.by_id("stripes")?.set_fill_color(BLACK)`；`SvgItem::new` 把居中 + Y 翻转**组合**到根放置上（而非替换根变换），viewBox 缩放得以保留；提取按深度优先保持 painter's-algorithm 顺序，`From<SvgItem> for Vec<VItem>` 保留旧的 bake 工作流（`TextItem` 依赖于此）；
+- `SvgItem` 重建在该树上：`<g>` 映射为纯 frame、`<path>` 为 payload 叶子，元素 id 全程可寻址——`svg.by_id("stripes")?.set_fill_color(BLACK)`；`SvgItem::new` 把居中 + Y 翻转**组合**到根放置上（而非替换根变换），viewBox 缩放得以保留；提取插件按深度优先保持 painter's-algorithm 顺序，`From<SvgItem> for Vec<VItem>` 保留旧的 bake 工作流（`TextItem` 依赖于此）；
 - glTF/GLB 导入（新 `gltf` feature，opt-in）：`node_tree_from_path`/`node_tree_from_gltf` 返回 `GltfTree`（节点树 + 文档索引→路径映射），名字（`by_id`）与文档索引（`node`，动画 channel 与 `skin.joints` 的寻址方式）双寻址；glTF 强制的 Y-up 自动转为 ranim 的 Z-up（翻转组合进场景根放置）；单 primitive mesh 直接作 payload，多 primitive 拆为兄弟叶子。首版不含 materials/skins/morph targets/动画/`data:` buffer；
-- 性能：posing 从微秒级控制点重写变为纳秒级矩阵组合——posing 移出每帧 profile；extract 因遍历放置与组合矩阵带小常数，整体帧成本反而更低；渲染与原实现持平（GPU 应用 per-item 矩阵顶替了原先的预烘焙）。Ghostscript Tiger（138 paths）上的对照：
+- 整树 posing 只组合根矩阵，不重写所有控制点。#202 中 Ghostscript Tiger
+  （138 paths）的 posing 对照记录如下；当前求值帧传输与 render extract 已分开，
+  该记录不作为完整新管线的性能测量：
 
   | 操作（整树） | 旧（baked） | 新（树上） |
   |---|---|---|
   | pose：rotate | 4.57 µs | 18.9 ns（~250×） |
   | pose：shift | 4.52 µs | 9.5 ns（~500×） |
-  | extract | 54.5 µs | 59.5 µs（+~9%） |

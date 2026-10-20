@@ -7,9 +7,14 @@
 //! The projection target plane has the initial basis and normal defined as `(DVec3::X, DVec3::Y)` and `DVec3::Z` respectively, and it contains the first point of the VItem.
 //!
 //! So the normal way to use a [`VItem`] is to make sure that all points are in the same plane, at this time the **projection** is equivalent to the VItem itself. Or you may break this, and let ranim renders the **projection** of it.
-// pub mod arrow;
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 /// Geometry items
 pub mod geometry;
+/// Render-world components and GPU implementation.
+#[cfg(feature = "render")]
+pub mod render;
 /// Svg item
 pub mod svg;
 /// Simple text items
@@ -21,11 +26,25 @@ pub mod text;
 #[cfg_attr(docsrs, doc(cfg(feature = "typst")))]
 pub mod typst;
 
+/// Installs vector-item extraction, GPU preparation, and rendering.
+///
+/// Registers the built-in vector shapes, SVG, and, with `typst`, text inputs.
+/// Composite frame payloads still require an
+/// [`ExtractPlugin`](ranim_render::extract::ExtractPlugin) for their exact type.
+#[cfg(feature = "render")]
+pub struct VItemPlugin;
+
+#[cfg(feature = "render")]
+impl bevy_app::Plugin for VItemPlugin {
+    fn build(&self, app: &mut bevy_app::App) {
+        render::install(app);
+    }
+}
+
 use color::{AlphaColor, Srgb, palette::css};
-use glam::{DVec3, Mat4, Vec4, vec4};
+use glam::{DVec3, Vec4, vec4};
 use ranim_core::anchor::Aabb;
-use ranim_core::core_item::CoreItem;
-use ranim_core::{Extract, color, glam};
+use ranim_core::{color, glam};
 
 use ranim_core::{
     components::{PointVec, VecResizeTrait, rgba::Rgba, vpoint::VPointVec, width::Width},
@@ -118,7 +137,7 @@ impl<G: Into<glam::DAffine3>> ApplyTransform<G> for VItem {
 }
 
 /// Default stroke width
-pub use ranim_core::core_item::vitem::DEFAULT_STROKE_WIDTH;
+pub const DEFAULT_STROKE_WIDTH: f32 = 0.02;
 
 impl VItem {
     /// Close the VItem
@@ -176,6 +195,7 @@ impl VItem {
         self.stroke_widths.resize_with_last(len.div_ceil(2));
     }
 
+    #[cfg(feature = "render")]
     pub(crate) fn get_render_points(&self) -> Vec<Vec4> {
         self.vpoints
             .iter()
@@ -190,12 +210,13 @@ impl VItem {
     }
 }
 
-impl From<VItem> for ranim_core::core_item::vitem::VItem {
+#[cfg(feature = "render")]
+impl From<VItem> for render::RenderVItem {
     fn from(value: VItem) -> Self {
         Self {
             normal: value.normal.map(|n| n.as_vec3()),
             points: value.get_render_points(),
-            transform: Mat4::IDENTITY,
+            transform: glam::Mat4::IDENTITY,
             fill_rgbas: value.fill_rgbas.iter().cloned().collect(),
             stroke_rgbas: value.stroke_rgbas.iter().cloned().collect(),
             stroke_widths: value.stroke_widths.iter().cloned().collect(),
@@ -203,10 +224,15 @@ impl From<VItem> for ranim_core::core_item::vitem::VItem {
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for VItem {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        ranim_core::core_item::vitem::VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        let mut value = render::RenderVItem::from(self.clone());
+        value.transform = glam::DMat4::from(ctx.transform()).as_mat4() * value.transform;
+        let mut entity = ctx.entity::<render::RenderVItem>();
+        if entity.get::<render::RenderVItem>() != Some(&value) {
+            entity.insert(value);
+        }
     }
 }
 
@@ -321,10 +347,7 @@ impl StrokeWidth for VItem {
 
 #[cfg(test)]
 mod tests {
-    use ranim_core::{
-        core_item::vitem::vitem_normal_from_points,
-        traits::{Empty, Interpolatable, RotateTransform},
-    };
+    use ranim_core::traits::{Empty, Interpolatable, RotateTransform};
 
     use super::{VItem, geometry::Square};
 
@@ -341,11 +364,11 @@ mod tests {
         let interpolated = source.lerp(&target, 0.4);
         assert!(interpolated.normal.is_none());
 
-        let core_item = ranim_core::core_item::vitem::VItem::from(interpolated);
-        let normal = vitem_normal_from_points(&core_item.points);
-        let origin = core_item.points[0].truncate();
-        for point in &core_item.points {
-            let distance = (point.truncate() - origin).dot(normal).abs();
+        let points = &interpolated.vpoints;
+        let origin = points[0];
+        let normal = (points[1] - origin).cross(points[3] - origin).normalize();
+        for point in points.iter() {
+            let distance = (*point - origin).dot(normal).abs();
             assert!(distance < 1e-5, "point is {distance} away from its plane");
         }
     }

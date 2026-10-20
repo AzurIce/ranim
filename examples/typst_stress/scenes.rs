@@ -5,8 +5,8 @@ use ranim::{
     color::palettes::manim,
     glam::{DVec3, usizevec3},
     items::vitem::{
-        TypstText, VItem,
-        typst::{CompileOptions, compile, compile_with_options},
+        VItem,
+        typst::{CompileOptions, TypstText, compile, compile_with_options},
     },
     prelude::*,
 };

@@ -1,13 +1,14 @@
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use ranim_core::{
-    Extract,
     color::{AlphaColor, Srgb},
-    core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
     traits::{Aabb, Discard, FillColor, Opacity, StrokeColor, With},
 };
 
 use crate::vitem::{
-    VItem,
+    DEFAULT_STROKE_WIDTH, VItem,
     geometry::{Circle, EllipticArc},
 };
 
@@ -106,10 +107,9 @@ impl Opacity for Ellipse {
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for Ellipse {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }

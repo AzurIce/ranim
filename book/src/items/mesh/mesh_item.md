@@ -12,7 +12,7 @@ pub struct MeshItem {
 }
 ```
 
-与 core `MeshItem` 一一对应，但使用 f64 类型，且顶点/颜色/法线包在
+与渲染组件 `RenderMeshItem` 一一对应，但使用 f64 类型，且顶点/颜色/法线包在
 `PointVec` 里以支持对齐与插值，因此可以直接参与 `morph` 等动画。
 
 构造与常用操作：
@@ -48,8 +48,10 @@ let mesh = mesh.transformed::<DAffine3>(DAffine3::IDENTITY);
 `Transformed<T, G>` 实现了 `Interpolatable`（`transform` 与内部数据分别插值）、
 `Aabb`、`Alignable`，并在 `G: From<H>` 时通过 `ApplyTransform<H>` 做 outer
 composition。它不会自动 widening；需要更一般的存储时显式转换为
-`Transformed<_, DAffine3>`。extract 时才把 `G` 转为 `DAffine3` 并展平进
-CoreItem：`MeshItem` 左乘其渲染用 `transform` 矩阵，`VItem` 则逐点烘焙。
+`Transformed<_, DAffine3>`。完整 wrapper 保留在求值帧中；渲染提取时将 `G`
+转为 `DAffine3`，通过 `ExtractContext` 与父变换组合，再左乘 primitive 的
+`transform`。`MeshItem` 和 `VItem` 的局部几何都保持不变。宿主需注册与帧
+输入一致的 `ExtractPlugin<Transformed<MeshItem, G>>`，裸类型插件不会匹配它。
 层旋转、整体移动这类动画应优先用 wrapper（或像
 `examples/tetrahedron_spheres` 那样在自定义 Eval 中直接更新公开的
 `transform` 字段），而不是逐顶点改 `points`。

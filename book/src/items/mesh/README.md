@@ -4,8 +4,8 @@
 > ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
 
 `ranim_items::mesh` 模块：三维网格物件。这一类物件渲染的是真正的 3D 三角
-网格（每顶点颜色/法线，法线全零时 flat shading），语义细节见 Core Items 的
-[MeshItem](../../understand/core/core_items/mesh_item.md)。
+网格（每顶点颜色/法线，法线全零时 flat shading），语义细节见 渲染表示的
+[MeshItem](../../understand/rendering/mesh_item.md)。
 
 成员：
 

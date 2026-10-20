@@ -8,6 +8,10 @@ repository.workspace = true
 
 [dependencies]
 ranim-core.workspace = true
+ranim-render = { workspace = true, optional = true }
+bevy_app = { workspace = true, optional = true }
+bevy_ecs = { workspace = true, optional = true }
+bytemuck = { workspace = true, features = ["derive"], optional = true }
 ranim-macros.workspace = true
 tracing.workspace = true
 itertools.workspace = true
@@ -42,8 +46,15 @@ chrono = { version = "0.4.45", optional = true }
 diff-match-patch-rs = { version = "0.5.1", optional = true }
 regex = { version = "1.13.1", optional = true }
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+wgpu = { workspace = true, optional = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wgpu = { workspace = true, features = ["fragile-send-sync-non-atomic-wasm"], optional = true }
+
 [features]
 default = []
+render = ["dep:ranim-render", "dep:bevy_app", "dep:bevy_ecs", "dep:bytemuck", "dep:wgpu"]
 gltf = ["dep:gltf"]
 typst = [
   "dep:chrono",
@@ -58,6 +69,8 @@ typst = [
 
 [dev-dependencies]
 assert_float_eq = "1.2.0"
+bevy_app.workspace = true
+bevy_ecs.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

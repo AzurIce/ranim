@@ -1,5 +1,4 @@
 use ranim::glam;
-use ranim_core::core_item::CoreItem;
 use ranim_items::vitem::DEFAULT_STROKE_WIDTH;
 use std::f64::consts::PI;
 
@@ -7,7 +6,7 @@ use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim, morph::MorphAnim},
     color,
     color::palettes::manim,
-    core::{Extract, components::width::Width},
+    core::components::width::Width,
     items::vitem::{
         VItem,
         geometry::{Circle, Square},
@@ -186,11 +185,11 @@ impl StrokeWidth for VisualVItem {
     }
 }
 
-impl Extract for VisualVItem {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+#[cfg(feature = "render")]
+impl ranim::render::extract::Extract for VisualVItem {
+    fn extract(&self, ctx: &mut ranim::render::extract::ExtractContext<'_>) {
         // The VItem itself
-        self.0.extract_into(buf);
+        self.0.extract(ctx);
 
         // VItem's vpoints as circles
         self.0.vpoints.get_subpaths().iter().for_each(|subpath| {
@@ -221,7 +220,7 @@ impl Extract for VisualVItem {
                     })
                 }
                 .transformed(Translation(*p));
-                point.extract_into(buf);
+                point.extract(ctx);
             });
         });
         // lines between VItem's vpoints
@@ -237,12 +236,12 @@ impl Extract for VisualVItem {
                         .with(|x| {
                             x.set_stroke_width(DEFAULT_STROKE_WIDTH * 0.75);
                         })
-                        .extract_into(buf);
+                        .extract(ctx);
                     VItem::from_vpoints(vec![*p1, (p1 + p2) / 2.0, *p2])
                         .with(|x| {
                             x.set_stroke_width(DEFAULT_STROKE_WIDTH * 0.75);
                         })
-                        .extract_into(buf);
+                        .extract(ctx);
                 }
             });
     }
@@ -252,6 +251,16 @@ impl Empty for VisualVItem {
     fn empty() -> Self {
         Self(VItem::empty())
     }
+}
+
+#[cfg(feature = "render")]
+pub(crate) fn configure_render(app: &mut bevy_app::App) {
+    use ranim::render::extract::ExtractPlugin;
+
+    app.add_plugins((
+        ExtractPlugin::<VisualVItem>::default(),
+        ExtractPlugin::<Vec<VisualVItem>>::default(),
+    ));
 }
 
 /// Register the scenes provided by this example.

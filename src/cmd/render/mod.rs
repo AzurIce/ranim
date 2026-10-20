@@ -2,13 +2,13 @@
 use std::collections::VecDeque;
 
 use crate::cmd::render::file_writer::OutputFormatExt;
-use crate::{CoreItemExtractPlugin, Output, SceneConfig, SceneHandle};
+use crate::{Output, SceneHandle};
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::{SceneEvaluator, TimeMark, frame::EvaluatedFrame};
 use ranim_render::resource::RenderTextures;
-use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext};
+use ranim_render::{RenderSetup, Renderer, utils::WgpuContext};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::Instant;
@@ -134,7 +134,7 @@ pub fn render_scene_job(
     // decides which logic states are sampled.
     let mut evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
 
-    let mut app = RanimRenderApp::new(scene.name.clone(), &scene.config, &output, buffer_count);
+    let mut app = RanimRenderApp::new(scene.clone(), &output, buffer_count);
     app.render_scene_with_progress(&mut evaluator, on_progress);
 
     if capture_marks && !evaluator.time_marks().is_empty() {
@@ -223,13 +223,14 @@ impl RenderWorker {
     /// # Panics
     ///
     /// Panics if `buffer_count < 1`.
-    pub fn new(
-        scene_name: String,
-        scene_config: &SceneConfig,
-        output: &Output,
-        buffer_count: usize,
-    ) -> Self {
+    pub fn new(scene: SceneHandle, output: &Output, buffer_count: usize) -> Self {
         assert!(buffer_count >= 1, "buffer_count must be at least 1");
+        let setup = scene
+            .app()
+            .get_resource::<RenderSetup>()
+            .cloned()
+            .unwrap_or_else(crate::cmd::default_render_setup);
+        let scene_name = scene.name.clone();
         info!("Checking ffmpeg...");
         let t = Instant::now();
         if let Ok(ffmpeg_path) = which::which("ffmpeg") {
@@ -259,17 +260,11 @@ impl RenderWorker {
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir().unwrap().join(output_dir);
         }
-        let renderer = Renderer::new(
-            &ctx,
-            output.width,
-            output.height,
-            8,
-            (CoreItemExtractPlugin, BuiltinRenderPlugins),
-        );
+        let renderer = Renderer::new(&ctx, output.width, output.height, 8, setup);
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
             .map(|_| renderer.new_render_textures(&ctx))
             .collect();
-        let clear_color = color::try_color(&scene_config.clear_color)
+        let clear_color = color::try_color(&scene.config.clear_color)
             .unwrap_or(color::color("#333333ff"))
             .convert::<LinearSrgb>();
         let [r, g, b, a] = clear_color.components.map(|x| x as f64);
@@ -477,13 +472,8 @@ pub struct RanimRenderApp {
 
 impl RanimRenderApp {
     /// Creates the application and initializes the internal [`RenderWorker`].
-    pub fn new(
-        scene_name: String,
-        scene_config: &SceneConfig,
-        output: &Output,
-        buffer_count: usize,
-    ) -> Self {
-        let render_worker = RenderWorker::new(scene_name, scene_config, output, buffer_count);
+    pub fn new(scene: SceneHandle, output: &Output, buffer_count: usize) -> Self {
+        let render_worker = RenderWorker::new(scene, output, buffer_count);
         Self {
             render_worker: Some(render_worker),
             fps: output.fps,

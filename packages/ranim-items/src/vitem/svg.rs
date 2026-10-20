@@ -1,12 +1,14 @@
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use color::{AlphaColor, Srgb, palette::css, rgb8, rgba};
 use glam::{DAffine2, DAffine3, DMat3, DVec3, dvec3};
 use ranim_core::anchor::Aabb;
-use ranim_core::core_item::CoreItem;
-use ranim_core::core_item::transformed::Transformed;
 use ranim_core::traits::{ApplyTransform, FillColor, Opacity, StrokeColor, StrokeWidth};
 use ranim_core::traits::{PointsFunc, Rigid, TransformGroup};
+use ranim_core::transformed::Transformed;
 use ranim_core::utils::bezier::PathBuilder;
-use ranim_core::{Extract, color, components::width::Width, glam};
+use ranim_core::{color, components::width::Width, glam};
 use tracing::warn;
 
 use super::VItem;
@@ -176,10 +178,10 @@ impl StrokeWidth for SvgItem {
 }
 
 // MARK: Conversions
+#[cfg(feature = "render")]
 impl Extract for SvgItem {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        self.0.extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        self.0.extract(ctx);
     }
 }
 

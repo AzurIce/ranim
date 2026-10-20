@@ -8,16 +8,16 @@ mod timeline;
 use std::sync::Arc;
 
 use crate::{
-    CoreItemExtractPlugin, Output, SceneHandle,
+    Output, SceneHandle,
     core::{
         SceneEvaluator,
         color::{self, LinearSrgb},
     },
-    render::{BuiltinRenderPlugins, Renderer, resource::RenderTextures, utils::WgpuContext},
+    render::{RenderSetup, Renderer, resource::RenderTextures, utils::WgpuContext},
 };
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
-use async_channel::{Receiver, Sender, unbounded};
+use async_channel::{Receiver, unbounded};
 use depth_visual::DepthVisualPipeline;
 use eframe::{App, egui};
 use playback::PlaybackEngine;
@@ -25,10 +25,6 @@ use ranim_core::frame::EvaluatedFrame;
 use timeline::TimelineState;
 use tracing::{error, info};
 use web_time::Instant;
-
-pub enum RanimPreviewAppCmd {
-    ReloadScene(SceneHandle, Sender<()>),
-}
 
 /// Default logic grid resolution (Hz), per the time model design.
 pub(crate) const DEFAULT_LOGIC_FPS: f64 = 120.0;
@@ -99,8 +95,6 @@ impl Resolution {
 }
 
 pub struct RanimPreviewApp {
-    cmd_rx: Receiver<RanimPreviewAppCmd>,
-    pub cmd_tx: Sender<RanimPreviewAppCmd>,
     #[allow(unused)]
     title: String,
     clear_color: wgpu::Color,
@@ -166,8 +160,7 @@ pub struct RanimPreviewApp {
     /// instead of a plain total.
     profiler_stacked: bool,
 
-    // Keep the project and its dynamic library alive until all session state
-    // (including evaluator code and audio) has been destroyed.
+    // Keep the project alive for the whole session (evaluator, audio, etc.).
     scene: SceneHandle,
 }
 
@@ -185,14 +178,10 @@ impl RanimPreviewApp {
         let evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
         info!("Total {} root animations", animation_infos.len());
 
-        let (cmd_tx, cmd_rx) = unbounded();
-
         let playback_engine = PlaybackEngine::new(&evaluator);
 
         let clear_color = scene.config.clear_color.clone();
         let mut preview = Self {
-            cmd_rx,
-            cmd_tx,
             title: scene.name.clone(),
             clear_color: wgpu::Color::TRANSPARENT,
             resolution: Resolution::QHD,
@@ -287,36 +276,6 @@ impl RanimPreviewApp {
         oit_layers
     }
 
-    fn handle_events(&mut self) {
-        if let Ok(cmd) = self.cmd_rx.try_recv() {
-            match cmd {
-                RanimPreviewAppCmd::ReloadScene(scene, tx) => {
-                    let timeline = scene.build_scene();
-                    let animation_infos = timeline.get_animation_infos();
-                    let old_cur_second = self.timeline_state.current_sec;
-                    self.timeline_state =
-                        TimelineState::new(timeline.total_secs(), animation_infos);
-                    self.timeline_state.current_sec =
-                        old_cur_second.clamp(0.0, self.timeline_state.total_sec);
-                    self.evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
-                    self.playback_engine.reload_scene(&self.evaluator);
-                    self.store.clear();
-                    self.need_eval = true;
-                    self.progress_samples.clear();
-                    self.progress_total_sec = -1.0;
-
-                    self.set_clear_color_str(&scene.config.clear_color);
-                    self.title = scene.name.clone();
-                    self.scene = scene;
-
-                    if let Err(err) = tx.try_send(()) {
-                        error!("Failed to send reloaded signal: {err:?}");
-                    }
-                }
-            }
-        }
-    }
-
     fn prepare_renderer(&mut self, frame: &eframe::Frame) {
         // Check if we need to recreate renderer
         let needs_init = self.renderer.is_none();
@@ -349,13 +308,13 @@ impl RanimPreviewApp {
 
         let (width, height) = (self.resolution.width, self.resolution.height);
         let oit_layers = self.calculate_oit_layers(&ctx, width, height);
-        let renderer = Renderer::new(
-            &ctx,
-            width,
-            height,
-            oit_layers,
-            (CoreItemExtractPlugin, BuiltinRenderPlugins),
-        );
+        let setup = self
+            .scene
+            .app()
+            .get_resource::<RenderSetup>()
+            .cloned()
+            .unwrap_or_else(crate::cmd::default_render_setup);
+        let renderer = Renderer::new(&ctx, width, height, oit_layers, setup);
         let render_textures = renderer.new_render_textures(&ctx);
 
         // Init Depth Visual Pipeline
@@ -383,12 +342,19 @@ impl RanimPreviewApp {
 
         // Register texture with egui
         let texture_view = &render_textures.linear_render_view;
-        let texture_id = render_state.renderer.write().register_native_texture(
+        let mut egui_renderer = render_state.renderer.write();
+        if let Some(id) = self.texture_id.take() {
+            egui_renderer.free_texture(&id);
+        }
+        if let Some(id) = self.depth_texture_id.take() {
+            egui_renderer.free_texture(&id);
+        }
+        let texture_id = egui_renderer.register_native_texture(
             &render_state.device,
             texture_view,
             wgpu::FilterMode::Linear,
         );
-        let depth_id = render_state.renderer.write().register_native_texture(
+        let depth_id = egui_renderer.register_native_texture(
             &render_state.device,
             &depth_visual_view,
             wgpu::FilterMode::Nearest,
@@ -592,7 +558,6 @@ impl eframe::App for RanimPreviewApp {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.prepare_renderer(frame);
-        self.handle_events();
 
         // Space bar toggles play/pause
         if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
@@ -1218,56 +1183,4 @@ pub fn preview_scene(scene: SceneHandle) {
         #[cfg(target_arch = "wasm32")]
         container_id,
     );
-}
-
-#[cfg(all(test, not(target_family = "wasm")))]
-mod tests {
-    use super::*;
-    use crate::{App as ProjectApp, Scene, prelude::*};
-
-    fn project(seconds: f64, generation: u32, clear_color: &str) -> Arc<ProjectApp> {
-        let mut app = ProjectApp::new();
-        let mut scene = Scene::new("preview", move |r: &mut RanimScene| {
-            r.play(Static(CameraFrame::default()).with_duration(seconds));
-        });
-        scene.config.clear_color = clear_color.to_string();
-        app.insert_resource(generation).add_scene(scene);
-        Arc::new(app)
-    }
-
-    #[test]
-    fn reload_replaces_the_export_scene_and_retains_in_flight_generations() {
-        let old = project(2.0, 1, "#000000");
-        let weak_old = Arc::downgrade(&old);
-        let mut preview = RanimPreviewApp::new(old.scene("preview").unwrap());
-        drop(old);
-        preview.timeline_state.current_sec = 1.5;
-
-        // An export started before reload owns its original project generation.
-        let in_flight_export = preview.scene.clone();
-        let new = project(1.0, 2, "#ffffff");
-        let (ack_tx, ack_rx) = async_channel::bounded(1);
-        assert!(
-            preview
-                .cmd_tx
-                .send_blocking(RanimPreviewAppCmd::ReloadScene(
-                    new.scene("preview").unwrap(),
-                    ack_tx,
-                ))
-                .is_ok()
-        );
-        preview.handle_events();
-        assert!(ack_rx.try_recv().is_ok());
-
-        assert_eq!(preview.timeline_state.current_sec, 1.0);
-        assert_eq!(preview.evaluator.total_secs(), 1.0);
-        assert_eq!(preview.scene.build_scene().total_secs(), 1.0);
-        assert_eq!(*preview.scene.app().resource::<u32>(), 2);
-        assert_eq!(preview.clear_color, wgpu::Color::WHITE);
-        assert_eq!(in_flight_export.build_scene().total_secs(), 2.0);
-        assert!(weak_old.upgrade().is_some());
-
-        drop(in_flight_export);
-        assert!(weak_old.upgrade().is_none());
-    }
 }

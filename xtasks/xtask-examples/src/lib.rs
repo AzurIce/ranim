@@ -1,13 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
-    env, fs,
+    fs,
     path::{Path, PathBuf},
     process::Command,
 };
 
 use anyhow::{Context, Result, bail};
-use clap::Parser;
-use ranim_cli::cli::Cli;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use toml::Table;
@@ -281,31 +279,28 @@ impl Example {
             return Ok(RunStatus::UpToDate);
         }
 
-        // `ranim output` renders every `#[output(...)]` declared by the
+        // `<example> output` renders every `#[output(...)]` declared by the
         // example (and processes `TimeMark::Capture`), which is exactly what
-        // the website artifacts need. `ranim render` only exists for quick
+        // the website artifacts need. `render <scene>` only exists for quick
         // single-scene smoke renders and requires an explicit scene name.
-        let mut args = vec!["ranim", "output", "--example", &self.name];
+        let mut command = Command::new("cargo");
+        command.args(["run", "--release", "--example", &self.name]);
         let features = self.required_features.join(",");
         if !features.is_empty() {
-            args.extend(["--features", &features]);
+            command.args(["--features", &features]);
         }
+        command.arg("--").arg("output");
 
-        // Output dirs in `#[output(...)]` are relative to the directory from
-        // which `ranim output` is invoked, so run it from the workspace root.
-        let previous_cwd = env::current_dir().context("failed to read current directory")?;
-        if previous_cwd != root_dir {
-            env::set_current_dir(root_dir).with_context(|| {
-                format!("failed to set current directory to {}", root_dir.display())
-            })?;
+        // Output dirs in `#[output(...)]` are relative to the working
+        // directory of the example process, so run it from the workspace
+        // root. stdio is inherited so the render progress bars stay live.
+        let status = command
+            .current_dir(root_dir)
+            .status()
+            .with_context(|| format!("failed to render example <{}>", self.name))?;
+        if !status.success() {
+            bail!("failed to render example <{}> ({status})", self.name);
         }
-        let render_result = Cli::parse_from(args)
-            .run()
-            .with_context(|| format!("failed to render example <{}>", self.name));
-        if previous_cwd != root_dir {
-            let _ = env::set_current_dir(previous_cwd);
-        }
-        render_result?;
 
         self.clean_output(root_dir)?;
 
@@ -932,8 +927,8 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
                 .collect();
 
             let entry_path = root_dir.join(item["path"].as_str().unwrap());
-            // The bundle reuses plugin definitions without the individual
-            // examples' fixed native dynamic-library exports.
+            // The bundle reuses the examples' scenes modules; the entry file
+            // keeps the per-example plugin and `main`.
             let scenes_path = entry_path.with_file_name("scenes.rs");
             let path = if scenes_path.is_file() {
                 scenes_path
@@ -960,7 +955,7 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
             let code = if let Some(entry) = entry {
                 format!(
                     "`scenes.rs`（场景与注册）\n\n```rust\n{source}```\n\n\
-                     `lib.rs`（插件入口）\n\n```rust\n{entry}```"
+                     `main.rs`（项目入口）\n\n```rust\n{entry}```"
                 )
             } else {
                 format!("```rust\n{source}```")
@@ -1010,7 +1005,7 @@ mod test {
                 .find(|example| example.name == "basic")
                 .unwrap()
                 .required_features,
-            ["typst"]
+            ["preview", "typst"]
         );
         let arc = examples
             .iter()
@@ -1020,8 +1015,11 @@ mod test {
         assert_eq!(arc.path.file_name().unwrap(), "scenes.rs");
         assert!(arc.code.contains("fn arc(r: &mut RanimScene)"));
         assert!(arc.code.starts_with("`scenes.rs`"));
-        assert!(arc.code.contains("`lib.rs`（插件入口）"));
-        assert!(arc.code.contains("#[ranim::export_plugin]"));
+        assert!(arc.code.contains("`main.rs`（项目入口）"));
+        assert!(
+            arc.code
+                .contains("App::new().add_plugins(scenes::ScenesPlugin).run()")
+        );
     }
 
     #[test]

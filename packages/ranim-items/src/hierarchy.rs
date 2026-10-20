@@ -7,14 +7,14 @@
 //! ranim-core's transform-group algebra
 //! ([`TransformGroup`]): each node
 //! stores canonical local data (like
-//! [`Transformed::inner`](ranim_core::core_item::transformed::Transformed::inner)
+//! [`Transformed::inner`](ranim_core::transformed::Transformed::inner)
 //! does) plus one transform from its local space into the parent's space.
 //!
 //! The structural rules of the model:
 //!
-//! - **Extraction flattens depth-first** and composes matrices per node,
+//! - **Render extraction flattens depth-first** and composes placements per node,
 //!   `acc = acc * node_transform`, so the resulting
-//!   [`CoreItem`] sequence preserves
+//!   render entities preserve
 //!   painter's-algorithm draw order (front-to-back document order).
 //! - Every node's pose interpolates **independently** of its geometry:
 //!   lerping moves transforms and leaf payloads only and never bakes points
@@ -23,21 +23,18 @@
 //! # Examples
 //!
 //! ```rust
-//! use ranim_core::core_item::transformed::{Transformed, TransformedExt};
-//! use ranim_core::core_item::vitem::VItem as CoreVItem;
-//! use ranim_core::glam::{DAffine3, Vec4, dvec3};
+//! use ranim_core::transformed::{Transformed, TransformedExt};
+//! use ranim_items::vitem::VItem;
+//! use ranim_core::glam::{DAffine3, dvec3};
 //! use ranim_core::traits::ShiftTransform;
-//! use ranim_core::Extract;
-//! use ranim_items::hierarchy::Node;
+//! use ranim_core::frame::EvaluatedFrame;
+//! use ranim_items::hierarchy::{Node, PlacedLeaves};
 //!
-//! let stroke = CoreVItem {
-//!     points: vec![Vec4::new(1.0, 0.0, 0.0, 0.0)],
-//!     ..Default::default()
-//! };
+//! let stroke = VItem::from_vpoints(vec![dvec3(1.0, 0.0, 0.0)]);
 //! // A tree is placed by wrapping it — root posing is O(1) and never
 //! // bakes points.
 //! let mut tree = Transformed::new(
-//!     Node::<CoreVItem>::group(vec![
+//!     Node::<VItem>::group(vec![
 //!         Node::leaf(stroke.clone()).with_id("a"),
 //!         Node::leaf(stroke).with_id("b"),
 //!     ]),
@@ -45,20 +42,20 @@
 //! );
 //! tree.shift(dvec3(1.0, 0.0, 0.0));
 //!
-//! let extracted = tree.extract();
-//! assert_eq!(extracted.len(), 2);
+//! let mut frame = EvaluatedFrame::new();
+//! frame.push((0, 0), tree);
+//! let tree = &frame.items::<Transformed<Node<VItem>, DAffine3>>()[0].value;
+//! assert_eq!(tree.leaves().count(), 2);
 //! ```
 
 use std::fmt;
 use std::ops::Range;
 
 use ranim_core::components::width::Width;
-use ranim_core::core_item::transformed::Transformed;
+use ranim_core::transformed::Transformed;
 use ranim_core::{
-    Extract,
     anchor::{Aabb, Centroid, Locate},
     color::{AlphaColor, Srgb, palette::css},
-    core_item::CoreItem,
     glam::{DAffine3, DVec3},
     traits::{
         Alignable, Empty, FillColor, Interpolatable, Opacity, Partial, StrokeColor, StrokeWidth,
@@ -67,6 +64,9 @@ use ranim_core::{
     utils::resize_preserving_order_with_repeated_indices,
 };
 use tracing::warn;
+
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
 
 /// A node of a scene-graph tree: pure structure — an external id, an
 /// optional payload, and a list of *placed* children.
@@ -86,10 +86,10 @@ use tracing::warn;
 /// # Examples
 ///
 /// Build trees with [`Node::leaf`], [`Node::group`], [`Node::branch`], and
-/// the builders; place a child with [`transformed`](ranim_core::core_item::transformed::TransformedExt::transformed):
+/// the builders; place a child with [`transformed`](ranim_core::transformed::TransformedExt::transformed):
 ///
 /// ```
-/// use ranim_core::core_item::transformed::TransformedExt;
+/// use ranim_core::transformed::TransformedExt;
 /// use ranim_core::glam::dvec3;
 /// use ranim_core::traits::Translation;
 /// use ranim_items::hierarchy::Node;
@@ -106,14 +106,14 @@ use tracing::warn;
 /// ```
 pub struct Node<I, G = DAffine3> {
     /// External identifier carried from the source format (e.g. SVG element
-    /// id, glTF node name). Ignored by rendering/extraction beyond being
+    /// id, glTF node name). Ignored by rendering beyond being
     /// transported: alignment preserves it, and lerping switches ids at the
     /// mid-point exactly like other front-loaded fields in ranim.
     pub id: Option<String>,
     /// The payload carried by this node, in canonical local coordinates.
     pub item: Option<I>,
     /// The placed child nodes, living in this node's local space. Stored in
-    /// source order; extraction preserves that order depth-first so
+    /// source order; render extraction preserves that order depth-first so
     /// downstream consumers see painter's-algorithm ordering, and a node's
     /// own payload paints before its descendants.
     pub children: Vec<Transformed<Node<I, G>, G>>,
@@ -321,8 +321,8 @@ impl<I, G> Node<I, G> {
     /// The world affine composes top-down through every placement's
     /// transform, starting from the identity at the receiver: the receiver
     /// is an unplaced frame, so wrapping the tree in [`Transformed`] places
-    /// it (see [`PlacedLeaves`]). The same placement [`Extract`] composes
-    /// into core items. Implemented with an explicit stack, so deep trees
+    /// it (see [`PlacedLeaves`]). Render extraction composes the same placement
+    /// into typed frame entries. Implemented with an explicit stack, so deep trees
     /// cannot overflow the call stack.
     pub fn leaves(&self) -> Leaves<'_, I, G>
     where
@@ -529,24 +529,19 @@ where
 
 // MARK: Extract
 
+#[cfg(feature = "render")]
 impl<I, G> Extract for Node<I, G>
 where
-    I: Extract<Target = CoreItem>,
+    I: Extract,
     G: Clone + Into<DAffine3>,
 {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
         if let Some(item) = &self.item {
-            item.extract_into(buf);
+            item.extract(ctx);
         }
-        // Placements extract their own subtree and compose their own pose
-        // onto the appended slice (via `Transformed`'s `Extract`), so a
-        // chain composes as `t_root * ... * t_leaf * local`, emission stays
-        // depth-first, and a node's own payload paints before its
-        // descendants.
+        // A node's own payload precedes its placed descendants.
         for child in &self.children {
-            child.extract_into(buf);
+            child.extract(ctx);
         }
     }
 }
@@ -929,22 +924,18 @@ where
 mod tests {
     use super::*;
     use crate::hierarchy::PlacedLeaves;
-    use ranim_core::Extract;
-    use ranim_core::core_item::transformed::{Transformed, TransformedExt};
-    use ranim_core::core_item::vitem::VItem as CoreVItem;
-    use ranim_core::glam::{DQuat, Vec3, Vec4, dvec3};
+    use ranim_core::frame::EvaluatedFrame;
+    use ranim_core::glam::{DQuat, Vec4, dvec3};
     use ranim_core::traits::Translation;
+    use ranim_core::transformed::{Transformed, TransformedExt};
 
-    type CoreNode<G = DAffine3> = Node<CoreVItem, G>;
+    type VItemNode<G = DAffine3> = Node<HierarchyVItem, G>;
     type HierarchyVItem = crate::vitem::VItem;
 
-    /// A core VItem whose single anchor carries a marker on the x axis, so
-    /// tests can identify which leaf was emitted.
-    fn marked_core_vitem(marker: f32) -> CoreVItem {
-        CoreVItem {
-            points: vec![Vec4::new(marker, 0.0, 0.0, 0.0)],
-            ..Default::default()
-        }
+    /// A VItem whose single anchor carries a marker on the x axis, so
+    /// tests can identify each visited leaf.
+    fn marked_vitem(marker: f64) -> HierarchyVItem {
+        HierarchyVItem::from_vpoints(vec![dvec3(marker, 0.0, 0.0)])
     }
 
     /// A high-level VItem with opaque strokes, used for opacity inspection.
@@ -964,16 +955,16 @@ mod tests {
     }
 
     #[test]
-    fn nested_extract_composes_matrices_and_keeps_points_local() {
+    fn raw_frame_keeps_nested_hierarchy_placement_and_local_points() {
         let scale = DAffine3::from_scale(dvec3(2.0, 3.0, 4.0));
         let rotate = DAffine3::from_rotation_translation(
             DQuat::from_rotation_z(std::f64::consts::FRAC_PI_2),
             DVec3::ZERO,
         );
         let translate = DAffine3::from_translation(DVec3::X);
-        let tree = CoreNode::group(vec![
-            CoreNode::group(vec![
-                CoreNode::leaf(marked_core_vitem(1.0)).transformed(translate),
+        let tree = VItemNode::group(vec![
+            VItemNode::group(vec![
+                VItemNode::leaf(marked_vitem(1.0)).transformed(translate),
             ])
             .transformed(rotate),
         ])
@@ -985,20 +976,21 @@ mod tests {
                 .transform_point3(DVec3::ZERO)
                 .abs_diff_eq(dvec3(0.0, 3.0, 0.0), 1e-9)
         );
-        let CoreItem::VItem(extracted) = &tree.extract()[0] else {
-            panic!("expected VItem")
-        };
-        assert_eq!(extracted.points[0], Vec4::new(1.0, 0.0, 0.0, 0.0));
+        let mut frame = EvaluatedFrame::new();
+        frame.push((0, 0), tree);
+        let stored = &frame.items::<Transformed<VItemNode, DAffine3>>()[0].value;
+        let (placement, item) = stored.leaves().next().unwrap();
+        assert_eq!(item.vpoints[0], DVec3::X);
+        assert_affine_eq(placement, scale * rotate * translate);
         assert!(
-            extracted
-                .transform
-                .transform_point3(Vec3::X)
-                .abs_diff_eq(Vec3::new(0.0, 6.0, 0.0), 1e-6)
+            placement
+                .transform_point3(DVec3::X)
+                .abs_diff_eq(dvec3(0.0, 6.0, 0.0), 1e-9)
         );
     }
 
     #[test]
-    fn dfs_emission_matches_painters_order_on_three_levels() {
+    fn stored_hierarchy_retains_painters_order_on_three_levels() {
         //        root
         //        /   \
         //      g1    leaf(2)
@@ -1006,24 +998,86 @@ mod tests {
         //      g2
         //      |
         //    leaf(1), leaf(3)
-        let tree = CoreNode::<DAffine3>::group(vec![
-            CoreNode::<DAffine3>::group(vec![CoreNode::<DAffine3>::group(vec![
-                CoreNode::leaf(marked_core_vitem(1.0)),
-                CoreNode::leaf(marked_core_vitem(3.0)),
+        let tree = VItemNode::<DAffine3>::group(vec![
+            VItemNode::<DAffine3>::group(vec![VItemNode::<DAffine3>::group(vec![
+                VItemNode::leaf(marked_vitem(1.0)),
+                VItemNode::leaf(marked_vitem(3.0)),
             ])]),
-            CoreNode::leaf(marked_core_vitem(2.0)),
+            VItemNode::leaf(marked_vitem(2.0)),
         ]);
 
-        let markers: Vec<f32> = tree
-            .extract()
-            .into_iter()
-            .map(|item| match item {
-                CoreItem::VItem(vitem) => vitem.points[0].x,
-                _ => panic!("expected a VItem"),
-            })
+        let mut frame = EvaluatedFrame::new();
+        frame.push((0, 0), tree);
+        let markers: Vec<f64> = frame.items::<VItemNode>()[0]
+            .value
+            .leaves()
+            .map(|(_, item)| item.vpoints[0].x)
             .collect();
         // Depth-first: the deeply nested branch paints entirely first.
         assert_eq!(markers, [1.0, 3.0, 2.0]);
+    }
+
+    #[cfg(feature = "render")]
+    #[test]
+    fn render_extraction_preserves_order_pose_and_removes_missing_leaves() {
+        use crate::vitem::render::RenderVItem;
+        use bevy_app::SubApp;
+        use bevy_ecs::prelude::*;
+        use ranim_core::glam::DMat4;
+        use ranim_render::{extract::ExtractPlugin, schedule::RenderSchedules, world::SourceOrder};
+
+        type Input = Transformed<VItemNode, DAffine3>;
+
+        let outer = DAffine3::from_scale(dvec3(2.0, 3.0, 1.0));
+        let first_pose =
+            DAffine3::from_translation(DVec3::X) * DAffine3::from_translation(DVec3::Z);
+        let second_pose = DAffine3::from_translation(DVec3::Y);
+        let first = marked_vitem(1.0);
+        let input = VItemNode::group(vec![
+            VItemNode::leaf(first.clone()).transformed(first_pose),
+            VItemNode::leaf(marked_vitem(2.0)).transformed(second_pose),
+        ])
+        .transformed(outer);
+        let mut frame = EvaluatedFrame::new();
+        frame.push((7, 0), input);
+
+        let mut app = SubApp::new();
+        app.init_resource::<RenderSchedules>();
+        app.update_schedule = Some(app.world().resource::<RenderSchedules>().extract);
+        app.insert_resource(frame)
+            .add_plugins(ExtractPlugin::<Input>::default());
+        app.update();
+
+        let world = app.world_mut();
+        let mut outputs = world
+            .query::<(Entity, &SourceOrder, &RenderVItem)>()
+            .iter(world)
+            .map(|(entity, order, item)| (entity, *order, item.clone()))
+            .collect::<Vec<_>>();
+        outputs.sort_by_key(|(_, order, _)| *order);
+        assert_eq!(outputs.len(), 2);
+        assert_eq!(outputs[0].1, SourceOrder { order: 0, part: 0 });
+        assert_eq!(outputs[1].1, SourceOrder { order: 0, part: 1 });
+        assert_eq!(outputs[0].2.points, RenderVItem::from(first.clone()).points);
+        assert_eq!(
+            outputs[0].2.transform,
+            DMat4::from(outer * first_pose).as_mat4()
+        );
+        assert_eq!(
+            outputs[1].2.transform,
+            DMat4::from(outer * second_pose).as_mat4()
+        );
+        let retained = outputs[0].0;
+        let removed = outputs[1].0;
+
+        let smaller = VItemNode::group(vec![VItemNode::leaf(first).transformed(first_pose)])
+            .transformed(outer);
+        world
+            .resource_mut::<EvaluatedFrame>()
+            .update([((7, 0), smaller)]);
+        app.update();
+        assert!(app.world().entities().contains(retained));
+        assert!(!app.world().entities().contains(removed));
     }
 
     #[test]

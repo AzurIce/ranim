@@ -51,7 +51,9 @@ enum Commands {
 }
 
 fn main() -> ExitCode {
-    ranim_cli::init_tracing();
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     let args = Args::parse();
 

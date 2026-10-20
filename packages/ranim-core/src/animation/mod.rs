@@ -33,25 +33,22 @@ mod tests {
     use super::{
         build::{IntoAnimNode, PlaybackExt, Unplaced},
         compose::{AnimIterExt, lagged::LaggedFill, sequence::AnimSequence, stack::AnimStack},
-        eval::{Eval, EvalExt, Static, StaticAnim, pure::Pure},
+        eval::{DynOutput, Eval, EvalExt, OutputContext, Static, StaticAnim, pure::Pure},
         node::{AnimNode, AnimationInfoKind, LeafContent, NodeContent},
     };
-    use crate::{
-        Extract,
-        core_item::{CoreItem, DynItem, vitem::VItem},
-        lagged, seq, stack,
-    };
+    use crate::{frame::EvaluatedFrame, lagged, seq, stack};
 
-    /// A stateless test double: a `VItem` shifted to a fixed x.
+    #[derive(Clone, Default)]
+    struct PositionX(f32);
+
+    /// A stateless test double: a position fixed at x.
     struct ShiftX(f32);
 
     impl Eval for ShiftX {
-        type Output = VItem;
+        type Output = PositionX;
 
         fn eval_alpha(&self, _alpha: f64) -> Self::Output {
-            let mut item = VItem::default();
-            item.points[0].x = self.0;
-            item
+            PositionX(self.0)
         }
     }
 
@@ -59,12 +56,10 @@ mod tests {
     struct ShiftAlpha(f32);
 
     impl Eval for ShiftAlpha {
-        type Output = VItem;
+        type Output = PositionX;
 
         fn eval_alpha(&self, alpha: f64) -> Self::Output {
-            let mut item = VItem::default();
-            item.points[0].x = self.0 + alpha as f32;
-            item
+            PositionX(self.0 + alpha as f32)
         }
     }
 
@@ -76,34 +71,40 @@ mod tests {
         ShiftAlpha(offset)
     }
 
-    fn evaluated_xs(items: Vec<DynItem>) -> Vec<f32> {
-        items
-            .into_iter()
-            .flat_map(|item| item.extract())
-            .filter_map(|item| match item {
-                CoreItem::VItem(item) => Some(item.points[0].x),
-                CoreItem::CameraFrame(_) | CoreItem::MeshItem(_) => None,
-            })
+    fn evaluated_xs(items: Vec<DynOutput>) -> Vec<f32> {
+        let mut frame = EvaluatedFrame::new();
+        let mut output = OutputContext::new(&mut frame, 0);
+        for value in items {
+            value.write(&mut output);
+        }
+        frame
+            .items::<PositionX>()
+            .iter()
+            .map(|item| item.value.0)
             .collect()
     }
 
     fn sampled_xs(animation: &AnimNode, sec: f64) -> Vec<f32> {
-        let mut items = Vec::new();
-        animation.eval_at(sec, &mut items);
-        evaluated_xs(items)
+        let mut frame = EvaluatedFrame::new();
+        animation.eval_at(sec, &mut OutputContext::new(&mut frame, 0));
+        frame
+            .items::<PositionX>()
+            .iter()
+            .map(|item| item.value.0)
+            .collect()
     }
 
     #[test]
     fn apply_alpha_to_writes_the_requested_progress_state() {
-        let mut item = VItem::default();
+        let mut item = PositionX::default();
 
         let animation =
             Pure::new(|alpha| ShiftAlpha(0.0).eval_alpha(alpha)).apply_alpha_to(&mut item, 0.25);
-        assert_eq!(item.points[0].x, 0.25);
+        assert_eq!(item.0, 0.25);
 
         let animation = animation.apply_to(&mut item);
-        assert_eq!(item.points[0].x, 1.0);
-        assert_eq!(animation.eval_alpha(0.5).points[0].x, 0.5);
+        assert_eq!(item.0, 1.0);
+        assert_eq!(animation.eval_alpha(0.5).0, 0.5);
     }
 
     #[test]
@@ -220,14 +221,9 @@ mod tests {
         for (index, sec) in [(1, 2.5), (2, 4.0)] {
             let held = &sequence.built_animations()[index];
             let mut items = Vec::new();
-            held.eval_at(sec, &mut items);
+            held.capture_at(sec, &mut items);
             // Finished children disappear; consecutive holds keep a flat batch.
             assert_eq!(items.len(), 2);
-            assert!(
-                items
-                    .iter()
-                    .all(|item| (item.0.as_ref() as &dyn std::any::Any).is::<VItem>())
-            );
             assert_eq!(evaluated_xs(items), vec![2.0, 3.0]);
             assert!(matches!(
                 held.content,
@@ -238,8 +234,7 @@ mod tests {
 
     #[test]
     fn holds_use_final_evaluations_and_forward_does_not_hold() {
-        let mut shown = VItem::default();
-        shown.points[0].x = 7.0;
+        let shown = PositionX(7.0);
         for (ending, expected) in [(shown.show(), vec![7.0]), (shown.hide(), vec![])] {
             let mut outer = AnimSequence::new();
             outer.push(seq![leaf(1.0, 1.0), ending]).hold(1.0);
@@ -252,10 +247,8 @@ mod tests {
 
     #[test]
     fn sequence_lowering_removes_covered_points_after_holds_have_sampled_them() {
-        let mut first = VItem::default();
-        first.points[0].x = 2.0;
-        let mut second = VItem::default();
-        second.points[0].x = 3.0;
+        let first = PositionX(2.0);
+        let second = PositionX(3.0);
         let mut sequence = AnimSequence::new();
         sequence
             .push(progress_leaf(0.0))
@@ -275,8 +268,7 @@ mod tests {
 
     #[test]
     fn sequence_final_points_replace_endpoints_without_affecting_stacks() {
-        let mut shown = VItem::default();
-        shown.points[0].x = 9.0;
+        let shown = PositionX(9.0);
         let sequence = seq![progress_leaf(0.0), shown.show(), shown.hide(), shown.show()]
             .with_duration(2.0)
             .at(3.0)
@@ -354,13 +346,10 @@ mod tests {
         assert_eq!(sampled_xs(&empty_leading, 1.0), vec![1.0, 10.5]);
 
         // A child ending with `hide` stays hidden after its own window.
-        let mut shown = VItem::default();
-        shown.points[0].x = 2.0;
+        let shown = PositionX(2.0);
         let hidden = lagged![0.5; seq![leaf(2.0, 1.0), shown.hide()]].into_anim_node();
         assert_eq!(sampled_xs(&hidden, 0.5), vec![2.0]);
-        let mut items = Vec::new();
-        hidden.eval_at(1.0, &mut items);
-        assert!(items.is_empty());
+        assert!(sampled_xs(&hidden, 1.0).is_empty());
     }
 
     // MARK: Sound leaves in the tree
@@ -424,7 +413,9 @@ mod tests {
         let mut scene = RanimScene::new();
         scene.play(stack![Sound::new(tone(1.0)).with_enabled(false)]);
         let sealed = scene.seal();
-        assert_eq!(sealed.eval_at_sec(0.5).count(), 0);
+        let mut frame = EvaluatedFrame::new();
+        sealed.eval_at_sec(0.5, &mut frame);
+        assert!(frame.is_empty());
         let evaluator = sealed.into_evaluator(120.0);
         assert!(evaluator.has_audio());
         assert!(
@@ -438,7 +429,8 @@ mod tests {
         assert!(!visual.seal().into_evaluator(120.0).has_audio());
         let mut audio = RanimScene::new();
         audio.play(Sound::new(tone(0.01)));
-        assert_eq!(audio.seal().eval_at_sec(0.005).count(), 0);
+        audio.seal().eval_at_sec(0.005, &mut frame);
+        assert!(frame.is_empty());
     }
 
     #[test]
@@ -506,7 +498,7 @@ mod tests {
         let clip = AudioClip::from_pcm(vec![0.5f32; clip_len], 48_000, 1);
         let mut scene = RanimScene::new();
         scene.play(stack![
-            Static(VItem::default()).with_duration(1.0),
+            Static(PositionX::default()).with_duration(1.0),
             Sound::new(clip)
         ]);
         assert!((scene.seal().total_secs() - clip_len as f64 / 48_000.0).abs() < 1e-9);
@@ -552,7 +544,7 @@ mod tests {
             2,
         );
         let warped = seq![
-            Static(VItem::default()).with_duration(1.0),
+            Static(PositionX::default()).with_duration(1.0),
             Sound::new(tone(1.0))
         ]
         .with_rate_func(ease_in_quad);
@@ -570,7 +562,7 @@ mod tests {
             seq![Sound::new(tone(2.0))].with_duration(1.7),
             warped,
             Sound::new(tone(1.0)).with_rate_func(ease_in_quad),
-            Static(VItem::default()).with_duration(4.0),
+            Static(PositionX::default()).with_duration(4.0),
         ]);
         let sealed = scene.seal();
         let baked = sealed.audio().clone();

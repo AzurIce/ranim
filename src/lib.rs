@@ -1,9 +1,24 @@
 //! Ranim is an animation engine written in rust based on wgpu, inspired by [3b1b/manim](https://github.com/3b1b/manim/) and [jkjkil4/JAnim](https://github.com/jkjkil4/JAnim).
 //!
-//! Export a project's plugin factory for Rust hosts and native dynamic loading:
+//! A project binary registers its scenes and hands control to the command
+//! line interface:
+//!
+//! ```ignore
+//! use ranim::prelude::*;
+//!
+//! #[scene]
+//! fn hello(r: &mut RanimScene) { /* ... */ }
+//!
+//! fn main() {
+//!     // cargo run -- preview | output | render hello | inspect scenes
+//!     App::new().add_scenes([hello::scene()]).run();
+//! }
+//! ```
+//!
+//! Plugins organize larger projects and custom render configurations:
 //!
 //! ```
-//! use ranim::{App, Plugin, export_plugin};
+//! use ranim::{App, Plugin};
 //!
 //! struct ProjectPlugin;
 //!
@@ -13,17 +28,10 @@
 //!     }
 //! }
 //!
-//! #[export_plugin]
-//! pub fn project_plugin() -> impl Plugin {
-//!     ProjectPlugin
-//! }
-//!
 //! let mut app = App::new();
-//! app.add_plugins(project_plugin());
+//! app.add_plugins(ProjectPlugin);
 //! assert_eq!(*app.resource::<u32>(), 42);
 //! ```
-//!
-//! The host constructs the App and chooses how to render or preview its scenes.
 //!
 //! ## Coordinate System
 //!
@@ -49,11 +57,6 @@
 
 extern crate self as ranim;
 
-#[cfg(feature = "render")]
-mod core_item_extract;
-#[cfg(feature = "render")]
-pub use core_item_extract::CoreItemExtractPlugin;
-
 #[cfg(feature = "anims")]
 pub use ranim_anims as anims;
 pub use ranim_core as core;
@@ -62,6 +65,8 @@ pub use ranim_items as items;
 #[cfg(feature = "render")]
 pub use ranim_render as render;
 
+/// The project application: scenes, plugins, and resources
+pub mod app;
 /// Commands like preview and render
 pub mod cmd;
 pub use core::color;
@@ -71,11 +76,7 @@ pub mod utils {
     pub use ranim_core::utils::*;
 }
 
-pub use ranim_macros::export_plugin;
-
-#[cfg(all(feature = "dylib", not(target_family = "wasm")))]
-pub use ranim_app::DynamicPlugin;
-pub use ranim_app::{
+pub use app::{
     App, Output, OutputFormat, Plugin, PluginError, Scene, SceneConfig, SceneConstructor,
     SceneHandle,
 };
@@ -83,16 +84,13 @@ pub use ranim_app::{
 pub use core::glam;
 pub use ranim_core::{RanimScene, lagged, seq, stack};
 
-/// Implementation dependencies used by exported macros.
-#[doc(hidden)]
-pub mod __private {
-    pub use ranim_app::catch_plugin_panic;
-}
-
 /// The preludes
 pub mod prelude {
-    pub use ranim_app::{App, Plugin};
+    pub use crate::app::{App, Plugin};
+    #[cfg(all(not(target_family = "wasm"), feature = "render"))]
+    pub use crate::cmd::AppRunExt;
     pub use ranim_core::prelude::*;
     pub use ranim_core::{lagged, seq, stack};
-    pub use ranim_macros::{export_plugin, output, scene, wasm_demo_doc};
+    pub use ranim_items::camera::CameraFrame;
+    pub use ranim_macros::{output, scene, wasm_demo_doc};
 }

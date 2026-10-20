@@ -1,61 +1,107 @@
 use bevy_app::{First, SubApp};
-use bevy_ecs::{prelude::*, schedule::ScheduleLabel, system::SystemParam};
-use ranim_core::{core_item::camera_frame::CameraFrame, frame::EvaluatedFrame};
+use bevy_ecs::{
+    prelude::*,
+    schedule::{InternedScheduleLabel, InternedSystemSet, ScheduleLabel},
+    system::SystemParam,
+};
 
 use crate::{
     pipelines::oit_resolve,
-    primitives::viewport::{DEPTH_ORDER_SPAN, ViewportGpuPacket, ViewportUniform},
     resource::{RenderTextureState, RenderTextures},
     utils::WgpuContext,
-    world::SceneOrder,
+    world::resolve_scene_order,
 };
 
 /// Drives one render update: maintenance, extraction, preparation, and submission.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
 struct RenderUpdate;
 
-/// Extracts the current [`EvaluatedFrame`] into render components or resources.
-///
-/// Plugins register systems here and read their inputs with
-/// [`EvaluatedFrame::items`]. All extraction completes before [`RenderPrepare`].
-#[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RenderExtract;
-
-/// Prepares render resources before encoding a frame.
-#[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RenderPrepare;
-
-/// Encodes and submits a frame, running [`ViewRender`] for its active view.
+/// Encodes and submits a frame, running the active view's schedule.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
 struct RenderGraph;
 
-/// Runs the ordered compute and draw phases for the active view.
+// These values are interned only by the render runtime that creates the handles.
+// Bevy's interned identity includes the address, so independently interning the
+// same non-zero-sized label in a dylib would create a different schedule or set.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ViewRender;
+enum RenderSchedule {
+    Extract,
+    Prepare,
+    View,
+}
 
-/// Ordered phases in [`ViewRender`], shared by all render plugins.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ViewSystems {
-    /// Clear the frame's color and depth targets.
+enum ViewPhase {
     Clear,
-    /// Run compute work needed by subsequent draw passes.
     Compute,
-    /// Draw all depth prepasses before any color passes.
     Depth,
-    /// Draw color and collect transparent fragments.
     Color,
-    /// Resolve the accumulated transparent fragments.
     Resolve,
 }
 
+/// Canonical handles for the ordered phases of [`RenderSchedules::view`].
+///
+/// Plugins copy these handles from the runtime's [`RenderSchedules`] resource
+/// instead of interning their own labels across dynamic library boundaries.
+#[derive(Clone, Copy)]
+pub struct ViewSystems {
+    /// Clear the frame's color and depth targets.
+    pub clear: InternedSystemSet,
+    /// Run compute work needed by subsequent draw passes.
+    pub compute: InternedSystemSet,
+    /// Draw all depth prepasses before any color passes.
+    pub depth: InternedSystemSet,
+    /// Draw color and collect transparent fragments.
+    pub color: InternedSystemSet,
+    /// Resolve the accumulated transparent fragments.
+    pub resolve: InternedSystemSet,
+}
+
+/// Shared schedule and phase identities created by the render runtime.
+///
+/// [`Renderer::new`](crate::Renderer::new) installs this resource before plugins
+/// run. Plugins read it to register systems into the same schedules and sets,
+/// including when their code comes from a dynamic library. A standalone CPU
+/// render world can initialize it with [`Default`]. Shared SDK build conditions
+/// still apply; independently interned custom labels do not acquire this identity.
 #[derive(Resource, Clone, Copy)]
-pub(crate) struct RenderDimensions {
+pub struct RenderSchedules {
+    /// Extract the current [`EvaluatedFrame`](ranim_core::frame::EvaluatedFrame).
+    /// Systems read complete typed batches and update render components or resources.
+    pub extract: InternedScheduleLabel,
+    /// Prepare and upload render resources after extraction and scene ordering.
+    pub prepare: InternedScheduleLabel,
+    /// Run the active view's ordered compute and draw phases.
+    pub view: InternedScheduleLabel,
+    /// Ordered phases shared by all plugins in [`Self::view`].
+    pub view_systems: ViewSystems,
+}
+
+impl Default for RenderSchedules {
+    fn default() -> Self {
+        Self {
+            extract: RenderSchedule::Extract.intern(),
+            prepare: RenderSchedule::Prepare.intern(),
+            view: RenderSchedule::View.intern(),
+            view_systems: ViewSystems {
+                clear: ViewPhase::Clear.intern(),
+                compute: ViewPhase::Compute.intern(),
+                depth: ViewPhase::Depth.intern(),
+                color: ViewPhase::Color.intern(),
+                resolve: ViewPhase::Resolve.intern(),
+            },
+        }
+    }
+}
+
+#[derive(Resource, Clone, Copy)]
+pub struct RenderDimensions {
     pub width: u32,
     pub height: u32,
 }
 
 #[derive(Resource)]
-pub(crate) struct FrameTarget {
+pub struct FrameTarget {
     pub(crate) render_view: wgpu::TextureView,
     pub(crate) depth_stencil_view: wgpu::TextureView,
     pub(crate) depth_bind_group: wgpu::BindGroup,
@@ -64,6 +110,16 @@ pub(crate) struct FrameTarget {
 }
 
 impl FrameTarget {
+    /// Color attachment for this frame's draw passes.
+    pub fn render_view(&self) -> &wgpu::TextureView {
+        &self.render_view
+    }
+
+    /// Depth attachment shared by the frame's depth and color passes.
+    pub fn depth_stencil_view(&self) -> &wgpu::TextureView {
+        &self.depth_stencil_view
+    }
+
     pub(crate) fn new(textures: &RenderTextures, clear_color: wgpu::Color) -> Self {
         Self {
             render_view: textures.render_view.clone(),
@@ -79,12 +135,12 @@ impl FrameTarget {
 struct FrameEncoder(Option<wgpu::CommandEncoder>);
 
 #[derive(SystemParam)]
-pub(crate) struct RenderContext<'w> {
+pub struct RenderContext<'w> {
     encoder: ResMut<'w, FrameEncoder>,
 }
 
 impl RenderContext<'_> {
-    pub(crate) fn encoder(&mut self) -> &mut wgpu::CommandEncoder {
+    pub fn encoder(&mut self) -> &mut wgpu::CommandEncoder {
         self.encoder
             .0
             .as_mut()
@@ -100,7 +156,7 @@ impl RenderContext<'_> {
 /// `last_frame_scopes`. `inner` is `None` when the device lacks timestamp
 /// query support.
 #[derive(Resource)]
-pub(crate) struct RenderProfiler {
+pub struct RenderProfiler {
     pub(crate) inner: Option<wgpu_profiler::GpuProfiler>,
     enabled: std::sync::atomic::AtomicBool,
     /// GPU timer scopes of the most recent processed frame.
@@ -132,12 +188,7 @@ impl RenderProfiler {
 
     /// Run `f` with `pass` wrapped in a GPU timer scope labeled `label`.
     /// Pass-through while GPU timers are disabled or unsupported.
-    pub(crate) fn scope_pass<R, T>(
-        &self,
-        label: &str,
-        pass: &mut R,
-        f: impl FnOnce(&mut R) -> T,
-    ) -> T
+    pub fn scope_pass<R, T>(&self, label: &str, pass: &mut R, f: impl FnOnce(&mut R) -> T) -> T
     where
         R: wgpu_profiler::ProfilerCommandRecorder,
     {
@@ -153,27 +204,27 @@ impl RenderProfiler {
 }
 
 pub(crate) fn install_schedules(app: &mut SubApp) {
+    app.init_resource::<RenderSchedules>();
+    let schedules = *app.world().resource::<RenderSchedules>();
+    let phases = schedules.view_systems;
     app.update_schedule = Some(RenderUpdate.intern());
     app.init_resource::<FrameEncoder>()
-        .init_schedule(RenderExtract)
-        .init_schedule(RenderPrepare)
+        .init_schedule(schedules.extract)
+        .init_schedule(schedules.prepare)
         .add_systems(RenderUpdate, render_update);
     app.configure_sets(
-        ViewRender,
+        schedules.view,
         (
-            ViewSystems::Clear,
-            ViewSystems::Compute,
-            ViewSystems::Depth,
-            ViewSystems::Color,
-            ViewSystems::Resolve,
+            phases.clear,
+            phases.compute,
+            phases.depth,
+            phases.color,
+            phases.resolve,
         )
             .chain(),
     );
-    app.add_systems(ViewRender, clear.in_set(ViewSystems::Clear));
-    app.add_systems(
-        ViewRender,
-        oit_resolve::resolve.in_set(ViewSystems::Resolve),
-    );
+    app.add_systems(schedules.view, clear.in_set(phases.clear));
+    app.add_systems(schedules.view, oit_resolve::resolve.in_set(phases.resolve));
 
     app.add_systems(
         RenderGraph,
@@ -182,9 +233,11 @@ pub(crate) fn install_schedules(app: &mut SubApp) {
 }
 
 fn render_update(world: &mut World) {
+    let schedules = *world.resource::<RenderSchedules>();
     world.run_schedule(First);
-    world.run_schedule(RenderExtract);
-    world.run_schedule(RenderPrepare);
+    world.run_schedule(schedules.extract);
+    resolve_scene_order(world);
+    world.run_schedule(schedules.prepare);
     let _span = crate::cpu_probe::span("render_graph");
     world.run_schedule(RenderGraph);
 }
@@ -226,38 +279,8 @@ fn clear(mut render: RenderContext, target: Res<FrameTarget>, profiler: Res<Rend
 }
 
 fn view_driver(world: &mut World) {
-    let mut cameras = world
-        .query::<(&SceneOrder, &CameraFrame)>()
-        .iter(world)
-        .map(|(order, camera)| (order.0, camera.clone()))
-        .collect::<Vec<_>>();
-    cameras.sort_by_key(|(order, _)| *order);
-
-    let camera = take_single_camera(cameras);
-    let dimensions = *world.resource::<RenderDimensions>();
-    let order_span = world.resource::<EvaluatedFrame>().len().saturating_sub(1);
-    // Omitted render plugins can leave gaps in scene orders. Use the full
-    // input range so the total depth offset stays bounded in that case too.
-    let bias_epsilon = DEPTH_ORDER_SPAN / order_span.max(1) as f32;
-    let uniform = ViewportUniform::from_camera_frame(
-        &camera,
-        dimensions.width,
-        dimensions.height,
-        bias_epsilon,
-    );
-    world.resource_scope(|world, mut viewport: Mut<ViewportGpuPacket>| {
-        viewport.update(world.resource::<WgpuContext>(), &uniform);
-    });
-    world.run_schedule(ViewRender);
-}
-
-fn take_single_camera(mut cameras: Vec<(usize, CameraFrame)>) -> CameraFrame {
-    assert_eq!(
-        cameras.len(),
-        1,
-        "D0002 requires exactly one active CameraFrame per rendered frame"
-    );
-    cameras.pop().unwrap().1
+    let view = world.resource::<RenderSchedules>().view;
+    world.run_schedule(view);
 }
 
 fn submit(
@@ -297,7 +320,92 @@ fn finish_frame(
 
 #[cfg(test)]
 mod tests {
+    use bevy_ecs::intern::Interner;
+
     use super::*;
+
+    #[test]
+    fn canonical_handles_keep_identity_without_reinterning_in_another_pool() {
+        let schedules = RenderSchedules::default();
+        let other_schedules = Interner::<dyn ScheduleLabel>::new();
+        for (label, handle) in [
+            (RenderSchedule::Extract, schedules.extract),
+            (RenderSchedule::Prepare, schedules.prepare),
+            (RenderSchedule::View, schedules.view),
+        ] {
+            // A second runtime can have matching TypeIds but its own interner.
+            assert_ne!(other_schedules.intern(&label), handle);
+            // Registration with the supplied handle bypasses that local pool.
+            assert_eq!(handle.intern(), handle);
+        }
+
+        let phases = schedules.view_systems;
+        let other_sets = Interner::<dyn SystemSet>::new();
+        for (label, handle) in [
+            (ViewPhase::Clear, phases.clear),
+            (ViewPhase::Compute, phases.compute),
+            (ViewPhase::Depth, phases.depth),
+            (ViewPhase::Color, phases.color),
+            (ViewPhase::Resolve, phases.resolve),
+        ] {
+            assert_ne!(other_sets.intern(&label), handle);
+            assert_eq!(handle.intern(), handle);
+        }
+        assert_eq!(
+            [
+                phases.clear,
+                phases.compute,
+                phases.depth,
+                phases.color,
+                phases.resolve
+            ]
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len(),
+            5
+        );
+    }
+
+    #[test]
+    fn copied_phase_handles_enforce_the_shared_view_order() {
+        #[derive(Resource, Default)]
+        struct ExecutionLog(Vec<&'static str>);
+
+        let mut app = SubApp::new();
+        app.init_resource::<RenderSchedules>()
+            .init_resource::<ExecutionLog>();
+        let schedules = *app.world().resource::<RenderSchedules>();
+        let phases = schedules.view_systems;
+        app.update_schedule = Some(schedules.view);
+        app.configure_sets(
+            schedules.view,
+            (
+                phases.clear,
+                phases.compute,
+                phases.depth,
+                phases.color,
+                phases.resolve,
+            )
+                .chain(),
+        );
+        // Deliberately register in reverse order, using the same copied handles
+        // that a separately loaded plugin receives from the runtime resource.
+        app.add_systems(
+            schedules.view,
+            (
+                (|mut log: ResMut<ExecutionLog>| log.0.push("resolve")).in_set(phases.resolve),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("color")).in_set(phases.color),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("depth")).in_set(phases.depth),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("compute")).in_set(phases.compute),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("clear")).in_set(phases.clear),
+            ),
+        );
+        app.update();
+        assert_eq!(
+            app.world().resource::<ExecutionLog>().0,
+            ["clear", "compute", "depth", "color", "resolve"]
+        );
+    }
 
     #[test]
     fn render_update_runs_extraction_before_preparation_and_graph() {
@@ -306,14 +414,15 @@ mod tests {
 
         let mut app = SubApp::new();
         install_schedules(&mut app);
+        let schedules = *app.world().resource::<RenderSchedules>();
         app.init_resource::<ExecutionLog>();
         app.add_systems(First, |mut log: ResMut<ExecutionLog>| {
             log.0.push("first");
         });
-        app.add_systems(RenderExtract, |mut log: ResMut<ExecutionLog>| {
+        app.add_systems(schedules.extract, |mut log: ResMut<ExecutionLog>| {
             log.0.push("extract");
         });
-        app.add_systems(RenderPrepare, |mut log: ResMut<ExecutionLog>| {
+        app.add_systems(schedules.prepare, |mut log: ResMut<ExecutionLog>| {
             log.0.push("prepare");
         });
         // Replace only GPU execution; retain the installed update and prepare
@@ -329,27 +438,5 @@ mod tests {
             app.world().resource::<ExecutionLog>().0,
             ["first", "extract", "prepare", "graph"].repeat(2)
         );
-    }
-
-    #[test]
-    fn single_camera_is_accepted() {
-        let camera = CameraFrame::default();
-
-        assert_eq!(take_single_camera(vec![(7, camera.clone())]), camera);
-    }
-
-    #[test]
-    #[should_panic(expected = "D0002 requires exactly one active CameraFrame")]
-    fn missing_camera_is_rejected() {
-        take_single_camera(Vec::new());
-    }
-
-    #[test]
-    #[should_panic(expected = "D0002 requires exactly one active CameraFrame")]
-    fn multiple_cameras_are_rejected() {
-        take_single_camera(vec![
-            (0, CameraFrame::default()),
-            (1, CameraFrame::default()),
-        ]);
     }
 }

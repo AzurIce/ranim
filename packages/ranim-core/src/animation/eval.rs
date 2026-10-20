@@ -7,7 +7,9 @@
 //! adapts a stepping function into that protocol. `EvalDyn` is the
 //! runtime-erased leaf dispatch held by `LeafContent::Anim`.
 
-use crate::core_item::{AnyExtractCoreItem, DynItem};
+use dyn_clone::DynClone;
+
+use crate::frame::EvaluatedFrame;
 
 use super::build::{Paramed, PlaybackExt};
 
@@ -36,6 +38,9 @@ pub mod pure;
 /// exotic segments.
 pub trait Eval {
     /// Value produced by this evaluator.
+    ///
+    /// Playback requires `Clone + Send + Sync + 'static`. Each sample retains
+    /// the complete value, including any containers or placement wrappers.
     type Output;
 
     /// Evaluate the segment's content at normalized progress `alpha`.
@@ -75,15 +80,58 @@ pub trait EvalExt: Eval + Sized {
 
 impl<E: Eval + Sized> EvalExt for E {}
 
-/// The erased visual-leaf protocol: [`Eval`] without its type.
+/// Frame insertion state shared by the leaves of one top-level animation.
+pub(crate) struct OutputContext<'a> {
+    frame: &'a mut EvaluatedFrame,
+    source_id: usize,
+    start_order: usize,
+}
+
+impl<'a> OutputContext<'a> {
+    pub(crate) fn new(frame: &'a mut EvaluatedFrame, source_id: usize) -> Self {
+        let start_order = frame.len();
+        Self {
+            frame,
+            source_id,
+            start_order,
+        }
+    }
+
+    fn push<T: Send + Sync + 'static>(&mut self, value: T) {
+        let part = self.frame.len() - self.start_order;
+        self.frame.push((self.source_id, part), value);
+    }
+}
+
+/// A cloneable complete output captured by a hold.
+#[derive(Clone)]
+pub(crate) struct DynOutput(Box<dyn CapturedOutput>);
+
+trait CapturedOutput: DynClone + Send + Sync {
+    fn write_box(self: Box<Self>, output: &mut OutputContext<'_>);
+}
+
+impl<T: Clone + Send + Sync + 'static> CapturedOutput for T {
+    fn write_box(self: Box<Self>, output: &mut OutputContext<'_>) {
+        output.push(*self);
+    }
+}
+
+dyn_clone::clone_trait_object!(CapturedOutput);
+
+impl DynOutput {
+    pub(super) fn write(self, output: &mut OutputContext<'_>) {
+        self.0.write_box(output);
+    }
+}
+
+/// The erased visual-leaf protocol held by the runtime tree.
 ///
-/// This is the only type-erased box in the runtime tree
-/// (`LeafContent::Anim`) — the open world of user evaluators. Containers are
-/// closed runtime variants and never implement this.
+/// Ordinary sampling inserts each complete typed output directly. Holds capture
+/// the same raw values and replay them without introducing a container payload.
 pub(super) trait EvalDyn {
-    /// Evaluate this leaf's content at its normalized progress `alpha`,
-    /// pushing the resulting erased items into `output`.
-    fn eval_into(&self, alpha: f64, output: &mut Vec<DynItem>);
+    fn eval_frame(&self, alpha: f64, output: &mut OutputContext<'_>);
+    fn eval_capture(&self, alpha: f64, output: &mut Vec<DynOutput>);
 
     /// The iterative content step, if this leaf is an iterative segment.
     fn sim_step(&self) -> Option<f64> {
@@ -94,20 +142,39 @@ pub(super) trait EvalDyn {
 impl<E> EvalDyn for E
 where
     E: Eval,
-    E::Output: AnyExtractCoreItem,
+    E::Output: Clone + Send + Sync + 'static,
 {
-    fn eval_into(&self, alpha: f64, output: &mut Vec<DynItem>) {
-        let mut value = self.eval_alpha(alpha);
-        // Captured batches are already erased; flatten them to avoid nested holds.
-        if let Some(items) = (&mut value as &mut dyn std::any::Any).downcast_mut::<Vec<DynItem>>() {
-            output.append(items);
-        } else {
-            output.push(DynItem(Box::new(value)));
-        }
+    fn eval_frame(&self, alpha: f64, output: &mut OutputContext<'_>) {
+        output.push(self.eval_alpha(alpha));
+    }
+
+    fn eval_capture(&self, alpha: f64, output: &mut Vec<DynOutput>) {
+        output.push(DynOutput(Box::new(self.eval_alpha(alpha))));
     }
 
     fn sim_step(&self) -> Option<f64> {
         Eval::sim_step(self)
+    }
+}
+
+/// A held batch replays each captured value with its original concrete type.
+pub(super) struct HeldOutput(Vec<DynOutput>);
+
+impl HeldOutput {
+    pub(super) fn new(values: Vec<DynOutput>) -> Self {
+        Self(values)
+    }
+}
+
+impl EvalDyn for HeldOutput {
+    fn eval_frame(&self, _alpha: f64, output: &mut OutputContext<'_>) {
+        for value in &self.0 {
+            value.clone().write(output);
+        }
+    }
+
+    fn eval_capture(&self, _alpha: f64, output: &mut Vec<DynOutput>) {
+        output.extend(self.0.iter().cloned());
     }
 }
 
@@ -124,9 +191,9 @@ impl<T: Clone> Eval for Static<T> {
 }
 
 /// Requirement for [`StaticAnim`].
-pub trait StaticAnimRequirement: Clone + AnyExtractCoreItem {}
+pub trait StaticAnimRequirement: Clone + Send + Sync + 'static {}
 
-impl<T: Clone + AnyExtractCoreItem> StaticAnimRequirement for T {}
+impl<T: Clone + Send + Sync + 'static> StaticAnimRequirement for T {}
 
 /// Convenience methods for zero-duration static animations.
 pub trait StaticAnim: StaticAnimRequirement + Sized {

@@ -1,5 +1,5 @@
+#[cfg(target_arch = "wasm32")]
 use std::sync::Arc;
-
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
@@ -16,26 +16,23 @@ fn main() {
     }
 
     let mut app = ranim::App::new();
-    app.add_plugins(ranim_examples::plugin());
-    let app = Arc::new(app);
-
-    #[cfg(target_arch = "wasm32")]
-    APP.with(|state| {
-        assert!(
-            state.set(app).is_ok(),
-            "preview host is already initialized"
-        );
-    });
+    app.add_plugins(ranim_examples::ProjectPlugin);
 
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let scene = match std::env::args().nth(1) {
-            Some(name) => app
-                .scene(&name)
-                .unwrap_or_else(|| panic!("scene '{name}' is not registered")),
-            None => app.first_scene().expect("at least one scene is registered"),
-        };
-        ranim::cmd::preview_scene(scene);
+        use ranim::prelude::*;
+        app.run();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let app = Arc::new(app);
+        APP.with(|state| {
+            assert!(
+                state.set(app).is_ok(),
+                "preview host is already initialized"
+            );
+        });
     }
 }
 

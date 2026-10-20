@@ -2,22 +2,22 @@
 
 - [Getting Started](./getting_started.md)
 - [Ranim Packages](./packages.md)
-- [Ranim CLI](./cli.md)
+- [命令行入口](./cli.md)
 
 # 理解 Ranim
 
 - [核心概念](./understand/core/README.md)
     - [动画系统](./understand/core/anim.md)
-    - [CoreItem 与 Extract](./understand/core/core_item.md)
+    - [完整求值帧与渲染提取](./understand/core/extract.md)
     - [Transformed&lt;T&gt;](./understand/core/transformed.md)
-    - [Core Items](./understand/core/core_items/README.md)
-        - [CameraFrame](./understand/core/core_items/camera_frame.md)
-        - [VItem](./understand/core/core_items/vitem.md)
-        - [MeshItem](./understand/core/core_items/mesh_item.md)
+- [渲染表示与物件插件](./understand/rendering/README.md)
+    - [RenderVItem](./understand/rendering/vitem.md)
+    - [RenderMeshItem](./understand/rendering/mesh_item.md)
 
 # Items
 
 - [Items](./items/README.md)
+    - [CameraFrame](./items/camera.md)
     - [VItem 类](./items/vitem/README.md)
         - [VItem](./items/vitem/vitem.md)
         - [几何构造器](./items/vitem/geometry.md)

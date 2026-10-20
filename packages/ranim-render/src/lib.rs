@@ -10,14 +10,15 @@
 /// Lightweight CPU timing spans, drained per frame by the preview
 /// profiler panel.
 pub mod cpu_probe;
+pub mod extract;
 /// The pipelines
 pub mod pipelines;
-mod plugin;
 /// The basic renderable structs
 pub mod primitives;
 pub mod resource;
 /// Render schedules and ordered extension points.
 pub mod schedule;
+mod setup;
 /// Upload instrumentation and experimental upload strategies
 /// (enabled via `RANIM_PROFILE_UPLOAD`).
 pub mod upload_probe;
@@ -30,10 +31,10 @@ use bevy_ecs::prelude::*;
 use glam::{UVec3, uvec3};
 use ranim_core::frame::EvaluatedFrame;
 
-pub use plugin::{BuiltinRenderPlugins, MeshRenderPlugin, VItemRenderPlugin};
+pub use setup::RenderSetup;
 
 use crate::{
-    primitives::viewport::{DEPTH_ORDER_SPAN, ViewportGpuPacket, ViewportUniform},
+    primitives::viewport::{ViewportGpuPacket, ViewportUniform},
     resource::{PipelinesPool, RenderTextures},
     schedule::{FrameTarget, RenderDimensions, RenderProfiler, install_schedules},
     utils::{WgpuBuffer, WgpuVecBuffer},
@@ -89,10 +90,10 @@ impl Renderer {
 
     /// Create an independent render runtime with an explicit set of plugins.
     ///
-    /// Shared frame, camera, and OIT infrastructure is installed before
-    /// `plugins`. Combine your extraction plugins with [`BuiltinRenderPlugins`]
-    /// or individual rendering plugins in a tuple. Extraction systems can read the
-    /// current [`EvaluatedFrame`] resource during [`schedule::RenderExtract`].
+    /// Shared frame, viewport, and OIT infrastructure is installed before
+    /// `plugins`. Item plugins install their own extraction and GPU systems.
+    /// Extraction systems can read the
+    /// current [`EvaluatedFrame`] resource during [`schedule::RenderSchedules::extract`].
     /// Plugins configure the render world directly; no logic world is created.
     ///
     /// # Panics
@@ -111,15 +112,7 @@ impl Renderer {
             .insert_resource(ctx.clone())
             .insert_resource(RenderDimensions { width, height })
             .insert_resource(ResolutionInfo::new(ctx, width, height, oit_layers))
-            .insert_resource(ViewportGpuPacket::new(
-                ctx,
-                &ViewportUniform::from_camera_frame(
-                    &Default::default(),
-                    width,
-                    height,
-                    DEPTH_ORDER_SPAN,
-                ),
-            ))
+            .insert_resource(ViewportGpuPacket::new(ctx, &ViewportUniform::default()))
             .insert_resource(RenderProfiler::new(ctx))
             .init_resource::<PipelinesPool>()
             .init_resource::<EvaluatedFrame>();
@@ -218,6 +211,11 @@ pub struct ResolutionInfo {
 }
 
 impl ResolutionInfo {
+    /// Shared per-pixel OIT storage bound by item rendering pipelines.
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
+    }
+
     pub fn new(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> Self {
         let buffer = WgpuBuffer::new_init(
             ctx,

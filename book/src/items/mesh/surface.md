@@ -21,8 +21,10 @@ let surface = Surface::from_uv_func(
 `Transformed<Surface, G>` 保存 placement，而不是修改采样坐标。
 
 - `with_vertex_colors(colors)` 直接指定每顶点颜色；
-- `From<Surface> for MeshItem` 完成到 `MeshItem` 的转换；`Surface` 自身也实现
-  了 `Extract`，可直接作为动画输出类型。
+- `From<Surface> for MeshItem` 完成到 `MeshItem` 的转换；帧也可以直接保留
+  完整的 `Surface` 输出。启用 items 的 `render` feature 后，它的值级 `Extract`
+  在渲染侧完成转换；裸输出注册 `ExtractPlugin<Surface>`，带 wrapper 时注册
+  实际的完整输出类型。
 
 从 `Sphere` 转成 `Surface` 时，球面的 canonical local 原点已经由 Sphere 的
 采样函数确定；`Surface` 不会再次执行 center，因此不会发生重复 center。若

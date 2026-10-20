@@ -8,11 +8,13 @@
 //! target.
 
 use crate::{
-    Extract, SealedRanimScene, TimeMark,
-    animation::node::{AnimNode, AnimationInfo},
+    SealedRanimScene, TimeMark,
+    animation::{
+        eval::OutputContext,
+        node::{AnimNode, AnimationInfo},
+    },
     audio::MASTER_SAMPLE_RATE,
     frame::EvaluatedFrame,
-    lifetime::KeepAlive,
 };
 
 /// Lightweight scene evaluation session.
@@ -22,8 +24,6 @@ pub struct SceneEvaluator {
     audio: std::sync::Arc<[f32]>,
     time_marks: Vec<(f64, TimeMark)>,
     clock: f64,
-    // Keep external animation code loaded until all cells have been destroyed.
-    _keep_alive: KeepAlive,
 }
 
 impl SceneEvaluator {
@@ -39,7 +39,6 @@ impl SceneEvaluator {
             audio: scene.audio,
             time_marks: scene.time_marks,
             clock: 0.0,
-            _keep_alive: scene.keep_alive,
         }
     }
 
@@ -107,24 +106,14 @@ impl SceneEvaluator {
     /// Sample the scene at `render_secs` — the ONLY session interaction.
     ///
     /// Every top-level cell evaluates itself at the target (forward/backward
-    /// direction management is internal), and the extracted items carry the
+    /// direction management is internal), and complete leaf outputs carry the
     /// `(animation_id, part)` identities of `SealedRanimScene::eval_at_sec`.
     /// Replaces `out` with the new sample while reusing its batch storage.
     pub fn sample_at(&mut self, render_secs: f64, out: &mut EvaluatedFrame) {
-        out.update(
-            self.cells
-                .iter()
-                .enumerate()
-                .flat_map(|(animation_id, cell)| {
-                    let mut items = Vec::new();
-                    cell.eval_at(render_secs, &mut items);
-                    items
-                        .into_iter()
-                        .flat_map(|item| item.extract())
-                        .enumerate()
-                        .map(move |(part, item)| ((animation_id, part), item))
-                }),
-        );
+        out.clear();
+        for (source_id, cell) in self.cells.iter().enumerate() {
+            cell.eval_at(render_secs, &mut OutputContext::new(out, source_id));
+        }
         self.clock = render_secs;
     }
 }
@@ -138,38 +127,38 @@ mod tests {
             build::{PlaybackExt, Unplaced},
             eval::{Eval, iterative::Iterative},
         },
-        core_item::{CoreItem, vitem::VItem},
         seq,
     };
+
+    #[derive(Clone, Default)]
+    struct PositionX(f32);
 
     /// A stateless segment: x = alpha.
     struct ProgressX;
 
     impl Eval for ProgressX {
-        type Output = VItem;
+        type Output = PositionX;
 
-        fn eval_alpha(&self, alpha: f64) -> VItem {
-            let mut item = VItem::default();
-            item.points[0].x = alpha as f32;
-            item
+        fn eval_alpha(&self, alpha: f64) -> PositionX {
+            PositionX(alpha as f32)
         }
     }
 
     fn xs_of(frame: &EvaluatedFrame) -> Vec<f32> {
         frame
-            .items::<CoreItem>()
+            .items::<PositionX>()
             .iter()
-            .filter_map(|item| match &item.value {
-                CoreItem::VItem(v) => Some(v.points[0].x),
-                _ => None,
-            })
+            .map(|item| item.value.0)
             .collect()
     }
 
     fn cv(v: f64, logical_secs: f64) -> impl Unplaced {
-        Iterative::from_fn(VItem::default(), move |state: &mut VItem, _, delta| {
-            state.points[0].x += (v * logical_secs * delta) as f32;
-        })
+        Iterative::from_fn(
+            PositionX::default(),
+            move |state: &mut PositionX, _, delta| {
+                state.0 += (v * logical_secs * delta) as f32;
+            },
+        )
         .with_steps(120)
     }
 
@@ -211,10 +200,96 @@ mod tests {
 
             assert_eq!(frame.len(), 1);
             assert!(frame.items::<String>().is_empty());
-            let items = frame.items::<CoreItem>();
+            let items = frame.items::<PositionX>();
             assert_eq!(items[0].id, (0, 0));
             assert_eq!(items[0].order, 0);
             assert_x(&frame, (sec / 2.0) as f32);
+        }
+    }
+
+    #[test]
+    fn ordinary_samples_move_complete_outputs_and_holds_replay_original_types() {
+        use crate::animation::{compose::sequence::AnimSequence, eval::pure::Pure};
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        struct Raw {
+            values: Vec<u32>,
+            clones: Arc<AtomicUsize>,
+        }
+        impl Clone for Raw {
+            fn clone(&self) -> Self {
+                self.clones.fetch_add(1, Ordering::SeqCst);
+                Self {
+                    values: self.values.clone(),
+                    clones: Arc::clone(&self.clones),
+                }
+            }
+        }
+
+        let clones = Arc::new(AtomicUsize::new(0));
+        let animation = {
+            let clones = Arc::clone(&clones);
+            Pure::new(move |_| Raw {
+                values: vec![42, 43],
+                clones: Arc::clone(&clones),
+            })
+        };
+        let mut sequence = AnimSequence::new();
+        sequence.push(animation.with_duration(1.0)).hold(1.0);
+        assert_eq!(clones.load(Ordering::SeqCst), 0);
+        let mut scene = RanimScene::new();
+        scene.play(sequence);
+        let mut evaluator = scene.seal().into_evaluator(120.0);
+        let mut frame = EvaluatedFrame::new();
+
+        evaluator.sample_at(0.5, &mut frame);
+        assert_eq!(clones.load(Ordering::SeqCst), 0);
+        assert_eq!(frame.items::<Raw>()[0].value.values, [42, 43]);
+        evaluator.sample_at(1.5, &mut frame);
+        assert_eq!(clones.load(Ordering::SeqCst), 1);
+        assert_eq!(frame.items::<Raw>()[0].id, (0, 0));
+        assert_eq!(frame.items::<Raw>()[0].value.values, [42, 43]);
+    }
+
+    #[test]
+    fn repeated_holds_preserve_heterogeneous_container_and_transform_outputs() {
+        use crate::{
+            animation::{compose::sequence::AnimSequence, eval::Static},
+            glam::DVec3,
+            stack,
+            traits::Translation,
+            transformed::Transformed,
+        };
+
+        type Wrapped = Transformed<Vec<(u32, String)>, Translation>;
+        let wrapped = Wrapped::new(vec![(7, String::from("nested"))], Translation(DVec3::X));
+        let mut sequence = AnimSequence::new();
+        sequence
+            .push(stack![
+                Static(vec![10_u32, 20]).with_duration(1.0),
+                Static(wrapped.clone()).with_duration(1.0),
+            ])
+            .hold(1.0)
+            .hold(1.0);
+        let mut scene = RanimScene::new();
+        scene.play(sequence);
+        let mut evaluator = scene.seal().into_evaluator(120.0);
+        let mut frame = EvaluatedFrame::new();
+
+        for sec in [0.5, 1.5, 2.5] {
+            evaluator.sample_at(sec, &mut frame);
+            assert_eq!(frame.len(), 2);
+            let vector = &frame.items::<Vec<u32>>()[0];
+            assert_eq!(vector.value, [10, 20]);
+            assert_eq!((vector.id, vector.order), ((0, 0), 0));
+            let item = &frame.items::<Wrapped>()[0];
+            assert_eq!(item.value, wrapped);
+            assert_eq!((item.id, item.order), ((0, 1), 1));
+            assert!(frame.items::<u32>().is_empty());
+            assert!(frame.items::<(u32, String)>().is_empty());
         }
     }
 

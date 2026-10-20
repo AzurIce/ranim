@@ -1,4 +1,3 @@
-mod export_plugin;
 mod scene;
 mod utils;
 
@@ -45,34 +44,6 @@ fn ranim_core_path() -> proc_macro2::TokenStream {
         }
     }
     ranim_path()
-}
-
-/// Export a plugin factory for direct Rust use and native dynamic loading.
-///
-/// Apply this once per dynamic library to a safe, synchronous, nongeneric
-/// function with no arguments and an explicit plugin return type. The factory
-/// keeps its name, visibility, attributes, and return type, so Rust hosts can
-/// call it directly.
-///
-/// ```ignore
-/// #[ranim::export_plugin]
-/// pub fn plugin() -> impl ranim::Plugin {
-///     ScenesPlugin
-/// }
-/// ```
-///
-/// On native targets the macro also exports the `ranim_plugin` constructor,
-/// which boxes the returned plugin and catches constructor panics. This
-/// dynamic protocol uses the Rust ABI and requires matching Ranim versions,
-/// Rust toolchains, and build settings. On WebAssembly only the original
-/// factory is emitted. App construction and preview startup belong to the
-/// host.
-#[proc_macro_attribute]
-pub fn export_plugin(args: TokenStream, input: TokenStream) -> TokenStream {
-    let ranim = ranim_path();
-    export_plugin::expand(args.into(), input.into(), ranim)
-        .unwrap_or_else(syn::Error::into_compile_error)
-        .into()
 }
 
 /// 解析单个属性（#[scene(...)] /  / #[output(...)]）

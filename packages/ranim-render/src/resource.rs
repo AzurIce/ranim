@@ -12,7 +12,7 @@ use image::{ImageBuffer, Luma, Rgba};
 use crate::utils::{ReadbackWgpuTexture, WgpuContext};
 
 /// A render resource.
-pub(crate) trait GpuResource {
+pub trait GpuResource {
     fn new(ctx: &WgpuContext) -> Self
     where
         Self: Sized;
@@ -25,10 +25,7 @@ pub struct PipelinesPool {
 }
 
 impl PipelinesPool {
-    pub(crate) fn get_or_init<P: GpuResource + Send + Sync + 'static>(
-        &self,
-        ctx: &WgpuContext,
-    ) -> Arc<P> {
+    pub fn get_or_init<P: GpuResource + Send + Sync + 'static>(&self, ctx: &WgpuContext) -> Arc<P> {
         let id = std::any::TypeId::of::<P>();
         {
             let inner = self.inner.read().unwrap();
@@ -93,7 +90,7 @@ pub struct RenderTextures {
     state: RenderTextureState,
 }
 
-pub(crate) const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+pub const OUTPUT_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 impl RenderTextures {
     pub fn width(&self) -> u32 {
         self.width

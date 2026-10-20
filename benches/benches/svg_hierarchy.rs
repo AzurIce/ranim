@@ -4,12 +4,12 @@
 
 use std::hint::black_box;
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use ranim::{
-    core::Extract,
     core::anchor::Aabb,
-    core::core_item::transformed::Transformed,
+    core::frame::EvaluatedFrame,
     core::traits::{Interpolatable, ShiftTransform},
+    core::transformed::Transformed,
     glam::{DAffine3, DVec3},
     items::{hierarchy::Node, mesh::gltf, vitem::svg::SvgItem},
 };
@@ -59,8 +59,17 @@ fn hierarchy_benches(c: &mut Criterion) {
         b.iter(|| black_box(black_box(&start).lerp(&end, 0.5)));
     });
 
-    group.bench_function("extract placed tree (tiger)", |b| {
-        b.iter(|| black_box(black_box(&tree).extract()));
+    group.bench_function("replace frame with whole placed tree (tiger)", |b| {
+        let mut frame = EvaluatedFrame::new();
+        b.iter_batched(
+            || tree.clone(),
+            |tree| {
+                frame.clear();
+                frame.push((0, 0), tree);
+                black_box(&frame);
+            },
+            BatchSize::SmallInput,
+        );
     });
 
     group.bench_function("aabb placed tree (tiger)", |b| {

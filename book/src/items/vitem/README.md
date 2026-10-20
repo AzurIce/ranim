@@ -5,8 +5,8 @@
 
 `ranim_items::vitem` 模块：矢量物件。这类物件的点本来就是三维点，可以任意
 摆放、旋转在 3D 空间中；只是渲染时假设单个 item 的所有点共面，实际渲染的
-是它在投影平面上的投影（共面时投影即其本身），语义细节见 Core Items 的
-[VItem](../../understand/core/core_items/vitem.md)。
+是它在投影平面上的投影（共面时投影即其本身），语义细节见 渲染表示的
+[VItem](../../understand/rendering/vitem.md)。
 
 成员：
 

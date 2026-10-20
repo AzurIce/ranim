@@ -41,7 +41,7 @@ name = "render"
 harness = false
 
 [[bench]]
-name = "extract"
+name = "frame"
 harness = false
 
 [[bench]]

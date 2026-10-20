@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use benches::test_scenes::{static_squares, transform_squares};
 use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
-use ranim::{SceneConstructor, prelude::*};
+use ranim::{SceneConstructor, core::frame::EvaluatedFrame, prelude::*};
 
 fn eval_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("eval");
@@ -13,14 +13,18 @@ fn eval_benchmark(c: &mut Criterion) {
     for n in [10, 100, 1000].iter() {
         group.bench_with_input(BenchmarkId::new("eval_static_squares", n), n, |b, n| {
             let timeline = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
+            let mut frame = EvaluatedFrame::new();
             b.iter(|| {
-                black_box(timeline.eval_at_alpha(0.5).collect::<Vec<_>>());
+                timeline.eval_at_alpha(0.5, &mut frame);
+                black_box(&frame);
             });
         });
         group.bench_with_input(BenchmarkId::new("eval_transform_squares", n), n, |b, n| {
             let timeline = (|r: &mut RanimScene| transform_squares(r, *n)).build_scene();
+            let mut frame = EvaluatedFrame::new();
             b.iter(|| {
-                black_box(timeline.eval_at_alpha(0.5).collect::<Vec<_>>());
+                timeline.eval_at_alpha(0.5, &mut frame);
+                black_box(&frame);
             });
         });
     }

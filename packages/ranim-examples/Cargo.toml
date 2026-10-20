@@ -7,14 +7,19 @@ repository.workspace = true
 publish = false
 
 [lib]
-crate-type = ["rlib", "cdylib"]
+crate-type = ["rlib"]
 path = "../../examples/ranim_examples_bundle.rs"
 
 [[bin]]
 name = "ranim-examples-preview"
 path = "src/main.rs"
 
+[features]
+default = ["render"]
+render = ["ranim/render", "dep:bevy_app"]
+
 [dependencies]
+bevy_app = { workspace = true, optional = true }
 ranim = { workspace = true, features = ["preview", "anims", "items", "typst"] }
 ranim-core.workspace = true
 ranim-items.workspace = true

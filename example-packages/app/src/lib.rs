@@ -51,9 +51,3 @@ impl ranim::Plugin for ScenesPlugin {
         app.add_scenes([hello_ranim::scene()]);
     }
 }
-
-// Export one native entry; hosts own the App and preview.
-#[ranim::export_plugin]
-pub fn plugin() -> impl ranim::Plugin {
-    ScenesPlugin
-}

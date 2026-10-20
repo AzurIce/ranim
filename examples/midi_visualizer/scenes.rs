@@ -180,11 +180,10 @@ fn audio_sample_rounding_keeps_the_final_camera() {
     scene.play(Sound::new(render_song_audio(&song)));
     let sealed = scene.seal();
     assert_eq!(sealed.total_secs(), song.duration_secs);
+    let mut frame = ranim_core::frame::EvaluatedFrame::new();
     for sec in [0.0, 1.0, sealed.total_secs()] {
-        let cameras = sealed
-            .eval_at_sec(sec)
-            .filter(|(_, item)| matches!(item, ranim::core::core_item::CoreItem::CameraFrame(_)))
-            .count();
+        sealed.eval_at_sec(sec, &mut frame);
+        let cameras = frame.items::<CameraFrame>().len();
         assert_eq!(cameras, 1, "at {sec}s");
     }
 }

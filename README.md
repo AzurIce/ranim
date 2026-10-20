@@ -55,58 +55,96 @@ You can also use from git for the latest updates:
 
 ```toml
 [dependencies]
-ranim = { git = "https://github.com/azurice/ranim" }
+ranim = { git = "https://github.com/azurice/ranim", features = ["render"] }
 ```
 
 ### Project entry and plugins
 
-The host creates an `App` and installs plugins to configure its scene catalog
-and typed resources. Export a plugin once from the crate root:
+A Ranim project is its own binary crate. `main` assembles an `App` with the
+project's scenes, then hands over to the command line interface through
+`App::run()`:
+
+```toml
+# Cargo.toml
+[dependencies]
+ranim = { version = "0.3", features = ["preview"] }
+```
+
+The `preview` feature implies `render`; depend on `features = ["render"]` alone
+when the interactive preview is not needed.
 
 ```rust
-use ranim::prelude::*;
+// src/main.rs
+use ranim::{items::vitem::geometry::Square, prelude::*};
 
 #[scene]
-fn hello(_scene: &mut RanimScene) {
-    // Define the animation here.
+fn hello(scene: &mut RanimScene) {
+    scene.play(CameraFrame::default().show().with_duration(2.0));
+    scene.play(Square::new(2.0).show().with_duration(2.0));
 }
 
-pub struct ScenesPlugin;
-
-impl Plugin for ScenesPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_scene(hello::scene());
-    }
-}
-
-#[ranim::export_plugin]
-pub fn plugin() -> impl Plugin {
-    ScenesPlugin
+fn main() {
+    App::new().add_scenes([hello::scene()]).run();
 }
 ```
 
 `#[scene]` creates an owned descriptor through `hello::scene()`; add it with
-`add_scene` or `add_scenes` to make it available. `#[ranim::export_plugin]` keeps
-the typed Rust factory and adds the native `ranim_plugin` entry used by the CLI.
-Each host creates its own App, installs the exported plugin, and chooses how
-to render or preview scenes. Plugins can also install other
-plugins through `app.add_plugins(...)`.
+`add_scene` or `add_scenes` to make it available. Only registered scenes appear
+in the command line interface.
 
-The factory may have any name and return a concrete plugin type or `impl Plugin`.
-It must be a safe, synchronous, nongeneric function with no arguments. Configure
-the plugin in its body; `Default` is not required. The native entry boxes the
-plugin and catches construction panics as `Result<Box<dyn Plugin>, String>`.
+Rendering needs no boilerplate: when the project does not register a
+`ranim::render::RenderSetup`, rendering and preview fall back to a default
+configuration that installs the built-in camera, vector-item, and mesh-item
+plugins (`ranim::items::RanimItemsPlugin`).
 
-For a native lib loaded by the CLI, set `crate-type = ["rlib", "cdylib"]` in
-`[lib]`. The loader uses the Rust ABI, so the CLI and project must use matching
-Ranim versions and Rust toolchains.
+`Plugin` is an optional mechanism for organizing scenes and a custom render
+setup. A plugin installs scenes, resources, or further plugins in
+`build(&self, app)`; `app.add_plugins(...)` also accepts tuples, so a project
+can compose scene collections and configuration from smaller pieces.
 
-To call the APIs directly, install the same plugin in a host App and select a scene handle
-(`render` / `preview` features enable the corresponding functions):
+#### Custom render setup
+
+Register a `RenderSetup` when the project renders more than the types covered
+by the built-in plugins — composite outputs such as `Vec<Circle>` or
+`Transformed<T, G>`, or custom types, need an `ExtractPlugin<T>` for the exact
+frame type:
+
+```rust
+use ranim::{
+    items::RanimItemsPlugin,
+    prelude::*,
+    render::{RenderSetup, extract::ExtractPlugin},
+};
+
+struct ProjectPlugin;
+
+impl Plugin for ProjectPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_scenes([hello::scene()]);
+        app.insert_resource(RenderSetup::new(|render_app| {
+            render_app.add_plugins((RanimItemsPlugin, ExtractPlugin::<MyItem>::default()));
+        }));
+    }
+}
+
+fn main() {
+    App::new().add_plugins(ProjectPlugin).run();
+}
+```
+
+`RenderSetup` declares the project's rendering assembly and is replayed for each
+GPU runtime (output rendering, preview, preview resolution changes).
+`RanimItemsPlugin` bundles the three built-in item plugins
+(`CameraFramePlugin`, `VItemPlugin`, `MeshItemPlugin`) — the default
+configuration is exactly this plugin. Do not combine it with the individual
+plugins: bevy plugins are unique, and installing one twice panics.
+
+To drive the APIs directly instead of the command line, select a scene handle
+and call the corresponding function (`render` / `preview` features enable them):
 
 ```rust,ignore
 let mut app = App::new();
-app.add_plugins(ScenesPlugin); // Or my_project::plugin() from another crate.
+app.add_scenes([hello::scene()]);
 let project = std::sync::Arc::new(app);
 let scene = project.scene("hello").expect("hello is registered");
 ranim::cmd::render_scene(&scene, 2);
@@ -114,81 +152,50 @@ ranim::cmd::preview_scene(scene);
 ```
 
 A `SceneHandle` keeps its App and project resources alive through rendering,
-preview resizing, and export. Plugins configure that App; item and render
-registration will build on this boundary in a later step.
+preview resizing, and export.
 
-For a WebAssembly preview, keep the plugin in `src/lib.rs` and put the host
-in `src/main.rs`. The binary constructs the App and starts the preview using
-the same Rust API. Build the binary for `wasm32-unknown-unknown` and process
-its `.wasm` with `wasm-bindgen`; `#[ranim::export_plugin]` only exports the plugin.
-See the [example app](./example-packages/app) for both Trunk and manual builds.
+For a WebAssembly preview, the same binary constructs the App and starts the
+preview directly: `AppRunExt::run` is native-only, so select the scene and call
+`ranim::cmd::preview_scene` from `main`. Build the binary for
+`wasm32-unknown-unknown` and process its `.wasm` with `wasm-bindgen`. See the
+[example app](./example-packages/app) for both Trunk and manual builds.
 
-Native hosts can enable the `dylib` feature and install a dynamically loaded
-plugin in the same App:
+### Command line interface
 
-```rust,ignore
-use ranim::{App, DynamicPlugin};
+`App::run()` (the `ranim::cmd::AppRunExt` trait, re-exported by the prelude)
+parses the process arguments and serves four subcommands:
 
-let mut app = App::new();
-// The library must use matching Ranim versions and Rust toolchains.
-let plugin = unsafe { DynamicPlugin::load("./libmy_project.so")? };
-app.try_add_plugins(plugin)?;
+- `preview [SCENE]`: Launch the interactive preview app. Requires the `preview`
+  feature; defaults to the first scene.
+- `output [SCENES...] [--buffer-count N]`: Render every `#[output(...)]`
+  declared by the selected scenes, including capture marks. When no scene name
+  is specified, render all scenes.
+- `render <SCENE> [--buffer-count N]`: Render one scene once with default output
+  settings (`1920x1080`, 60 fps, mp4). This is the low-level/ad-hoc render
+  command: it ignores `#[output(...)]` and does not process capture marks.
+- `inspect scenes [--format text|json]`: List available scenes and their output
+  summaries.
+- `inspect tree [SCENE] [--format text|json]`: Build a scene and print its
+  animation tree. The scene name can be omitted when there is only one scene.
+- `inspect frame <SCENE> --at <SEC> [--format text|json] [--verbose]`: Sample a
+  scene at a time and print the evaluated frame items.
+
+```bash
+cargo run -- preview
+cargo run -- output hello
+cargo run -- render hello
+cargo run -- inspect frame hello --at 1.5
 ```
-
-The App retains the library while its plugins, resources, and scene handles
-remain in use.
 
 For the usage, check out the [examples](./examples) folder. You can run the examples with:
 
 ```bash
-cargo run -p ranim-cli --release -- preview --example <example-name> # run a preview app for the example
-cargo run -p ranim-cli --release -- output --example <example-name> # render every declared output of the example
+cargo run --example <example-name> --features preview -- preview # run a preview app for the example
+cargo run --example <example-name> --features preview -- output  # render every declared output of the example
 ```
 
-See Ranim Cli for more.
-
-### Ranim Cli
-
-Ranim cli is a command line tool to help you build the animation. It enables animation previewing with hot reload through dylib.
-
-Please notice that you can use ranim without ranim-cli, the previewing and rendering process can be achieved by simply invoking apis provided by *ranim*, but it may enhance your experience.
-
-You can install it with:
-
-```bash
-cargo install ranim-cli
-```
-
-Or install from git:
-
-```bash
-cargo install --git https://github.com/azurice/ranim ranim-cli --locked
-```
-
-Or you can create a bin, and run cli from `ranim_cli` directly (this can make sure the version of `ranim` matches `ranim_cli`):
-
-```rust
-fn main() {
-    ranim_cli::main();
-}
-```
-
-Basic Usage:
-- `ranim preview[ <scene_name>]`: Launch a preview app and invoke cargo to build your library automatically when the source code is changed, then reload it through *libloading* and show it in the preview app.
-- `ranim output[ <scene-name1> <scene_name2> ...]`: Render every `#[output(...)]` declared by the selected scenes, including capture marks. When no scene name is specified, render all scenes.
-- `ranim render <scene_name>`: Render one scene once with default output settings (`1920x1080`, 60 fps, mp4). This is the low-level/ad-hoc render command, ignores `#[output(...)]`, and does not process capture marks.
-- `ranim inspect scenes [--format text|json]`: List available scenes and their output summaries.
-- `ranim inspect tree [<scene_name>] [--format text|json]`: Build a scene and print its animation tree. The scene name can be omitted when there is only one scene.
-- `ranim inspect frame <scene_name> --at <sec> [--format text|json] [--verbose]`: Sample a scene at a time and print the evaluated frame items.
-
-You can specify the package with `--package` and `--example` (just like cargo, note that your anim target should have crate-type of `dylib` or `cdylib`), and other aditional arguments you want to pass to `cargo build` can be passed after `--`.
-
-For example:
-
-```bash
-ranim output -p render scene_a scene_b -- --release
-ranim render -p render scene_a -- --release
-```
+Examples behind `required-features` (e.g. `typst`, `gltf`) also need the
+corresponding feature.
 
 ## Feature Flags
 
@@ -198,11 +205,12 @@ ranim render -p render scene_a -- --release
 
   - `items`: re-export `ranim-items`, default on.
 
-- `render`: enable render api in cmd module
+- `render`: enable the render api and the command line interface in the cmd module
   
-  use `render_scene` or `render_scene_output` to render scene to output
+  use `render_scene` or `render_scene_output` to render scene to output, or call
+  `App::run()` from the project binary
 
-- `preview`: enbale preview api in cmd module
+- `preview`: enable preview api in cmd module (implies `render`)
 
   use `preview_scene` api to launch an preview app on a scene
   https://github.com/user-attachments/assets/5bf287e2-b06f-42f8-83b6-76f3775e298e

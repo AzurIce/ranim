@@ -1,87 +1,80 @@
-# Ranim CLI
+# 命令行入口
 
-`ranim-cli` 是 Ranim 的命令行工具，二进制名为 `ranim`。它负责把场景代码构建成
-dylib、加载其中的插件并安装到宿主 App，再围绕 App 中显式注册的场景提供四个子命令：
+每个 Ranim 项目是自己的二进制 crate。`main` 装配 `App` 后调用
+`App::run()`（trait `ranim::cmd::AppRunExt`，prelude 已导出），进程参数随即
+解析为四个子命令：
+
+```rust,ignore
+use ranim::prelude::*;
+
+fn main() {
+    App::new().add_scenes([hello::scene()]).run();
+}
+```
 
 ```text
-ranim <command>
-├── preview   启动预览 app，watch 场景代码并在变更时自动重建 dylib
+<project> <command>
+├── preview   启动交互预览 app（需要 preview feature）
 ├── output    渲染场景声明的所有 #[output(...)]（成片输出）
 ├── render    用默认输出设置快速渲染一个场景一次（冒烟）
 └── inspect   不渲染，纯 CPU 检查场景 / 动画树 / 单帧物件
 ```
 
-在仓库内可以直接用 cargo 运行；也可以安装到 PATH：
+在自己的项目中以 `cargo run -- <command>` 调用；在本仓库中运行示例：
 
 ```bash
-cargo run -p ranim-cli -- <command> ...
-cargo install --path packages/ranim-cli   # 之后可直接使用 ranim <command> ...
+cargo run --example <example> --features preview -- <command> ...
 ```
 
-## 工作方式
+带 `required-features`（如 `typst`、`gltf`）的示例需同时开启对应 feature。
+仓库为 dev profile 开了 `opt-level = 1`、依赖 `opt-level = 3`，`inspect` 是纯
+CPU 查询，渲染也足够快，调试迭代一般不需要 release。
 
-每次调用都会先 `cargo build` 目标（lib 或 example，需为 `cdylib`），再加载动态库
-导出的 `ranim_plugin` 工厂。项目在 crate 根导出插件：
+## 项目装配
+
+子命令只能看到 App 中显式注册的场景；在 `main` 或插件的 `build` 中通过
+`add_scene` / `add_scenes` 注册（完整示例见
+[Getting Started](./getting_started.md)）：
 
 ```rust,ignore
-use ranim::prelude::*;
+fn main() {
+    App::new().add_scenes([hello::scene()]).run();
+}
+```
 
-#[scene]
-fn hello(_r: &mut RanimScene) {}
+渲染装配是可选的：项目不注册 `RenderSetup` 时，渲染与预览使用默认配置，
+即注册内置相机与矢量/网格物件渲染（`ranim_items::RanimItemsPlugin`）。需要
+渲染默认配置未覆盖的完整输出（容器、变换 wrapper、自定义类型）时，才在插件
+中提供自己的 `RenderSetup`：
 
-pub struct ScenesPlugin;
+```rust,ignore
+pub struct ProjectPlugin;
 
-impl Plugin for ScenesPlugin {
+impl Plugin for ProjectPlugin {
     fn build(&self, app: &mut App) {
-        app.add_scene(hello::scene());
-        // 在此 app.add_plugins(...) 安装依赖插件和项目资源。
+        app.add_plugins(ScenesPlugin);
+        app.insert_resource(RenderSetup::new(|render_app| {
+            render_app.add_plugins((
+                RanimItemsPlugin,
+                ExtractPlugin::<MyOutput>::default(), // 实际完整输出类型
+            ));
+        }));
     }
 }
-
-#[ranim::export_plugin]
-pub fn plugin() -> impl Plugin {
-    ScenesPlugin
-}
 ```
 
-`#[scene]` 只生成 `hello::scene()` 描述符，加入 App 后 CLI 才能发现它。
-`inspect`、`render`、`output` 和 `preview` 各自创建 App，并安装同一个导出插件。
-Rust 应用也可直接调用 `app.add_plugins(my_project::ScenesPlugin)` 或
-`app.add_plugins(my_project::plugin())`，将插件装配到自己的 App。
-热重载会创建新的 App 并安装重载后的插件；旧预览、导出和场景句柄使用的动态库
-会保留至这些对象销毁。
+项目的 `RenderSetup` 在每次创建 GPU renderer 时重放，安装提取与渲染插件。
+`inspect` 只查询 CPU 数据，不执行 setup 中的 GPU 装配。
 
-工厂使用 Rust ABI，CLI 与目标项目必须使用匹配的 Ranim 版本和 Rust 工具链。
-WASM 预览宿主也可安装同一个插件；宿主负责创建 App、选择场景并启动预览。
-`#[ranim::export_plugin]` 保留 Rust 工厂函数并生成唯一的动态库入口，Web 入口写在宿主二进制中。
-项目资源归所属 App 管理，渲染和预览通过 `SceneHandle` 保持它们的生命周期。
+命令报错时先看编译输出；运行成功但场景未出现时，检查 `main` 或插件的
+`build` 是否显式调用了 `add_scene` / `add_scenes`。
 
-命令报错时先看 Cargo 编译输出；构建成功但场景未显示时，检查插件的 `build` 是否显式
-调用了 `add_scene` / `add_scenes`，以及目标是否导出了统一入口。
+## `preview [SCENE]`
 
-## 通用 target 参数
+启动交互预览 app。需要 `preview` feature（它同时启用 `render`）；不传场景名时
+预览第一个场景。适合编写场景时的实时调试。
 
-以下参数对所有子命令可用：
-
-```text
--p, --package <PACKAGE>   指定 workspace 中的 package（优先于当前目录推断）
-    --lib                 使用 package 的 lib target（与 --example 互斥）
-    --example <EXAMPLE>   构建并加载指定的 example target，并自动解析到声明它的 package
-    --features <FEATURES> 透传给 cargo build
--- <cargo args>...        其余 cargo 构建参数，例如 `-- --release`
-```
-
-- 不显式指定时，CLI 根据当前目录推断 package 并使用其 lib target。
-- `-- --release` 只影响场景 dylib 的 profile，CLI 本体的 profile 由外层 cargo 决定。
-- 调试迭代一般不需要 release：仓库为 dev profile 开了 `opt-level = 1`、依赖
-  `opt-level = 3`，`inspect` 是纯 CPU 查询，渲染也足够快。
-
-## `ranim preview [SCENE]`
-
-启动预览 app，并 watch 场景代码，文件变更时自动重建 dylib 刷新画面。适合编写场景
-时的实时调试。
-
-## `ranim output [SCENES...]`
+## `output [SCENES...]`
 
 渲染每个选中场景声明的**所有** `#[output(...)]`；不指定场景时渲染全部场景。这是
 交付前的最终验证命令。
@@ -118,63 +111,67 @@ output/hello_1920x1080_60/<filename>     TimeMark::Capture 截图
 `--buffer-count <N>`（默认 2）控制 GPU readback 缓冲数量：越大并行度越高，但占用
 更多显存。
 
-需要 GPU 与 ffmpeg；PATH 中找不到 ffmpeg 时 CLI 会尝试在当前目录查找或下载。
+需要 GPU 与 ffmpeg；PATH 中找不到 ffmpeg 时会尝试在当前目录查找或下载。
 
-## `ranim render <SCENE>`
+## `render <SCENE>`
 
 用固定默认设置（`1920x1080`、60 fps、mp4）把单个场景快速渲染一次，输出到
 `./output/<scene>_1920x1080_60.mp4`。
 
 它**不读取**任何 `#[output(...)]` 声明，也**不处理** `TimeMark::Capture`。适合
-迭代中只想快速看整体效果的情况；正式验收仍应使用 `ranim output`。
+迭代中只想快速看整体效果的情况；正式验收仍应使用 `output`。
 
-## `ranim inspect`
+## `inspect`
 
 纯 CPU 检查，不创建 GPU context，可以在无 GPU 的环境运行。所有子命令支持
 `--format text|json`（默认 `text`；JSON 输出顶层含 `schema_version`，适合脚本化）。
 
-### `ranim inspect scenes`
+### `inspect scenes`
 
 ```bash
-ranim inspect scenes --example hello_ranim
+cargo run --example hello_ranim --features preview -- inspect scenes
 ```
 
-先创建宿主 App 并安装导出插件，再列出 App 中注册的场景及其 `#[output(...)]` 摘要（尺寸、
-fps、格式、输出目录、`name_template`、`save_frames`），不调用场景构造函数。
+列出 App 中注册的场景及其 `#[output(...)]` 摘要（尺寸、fps、格式、输出目录、
+`name_template`、`save_frames`），不调用场景构造函数。
 适合开工第一步：确认场景名拼写、场景是否注册成功、输出配置是否符合预期。
 
-### `ranim inspect tree [SCENE]`
+### `inspect tree [SCENE]`
 
 ```bash
-ranim inspect tree hello_ranim --example hello_ranim
+cargo run --example hello_ranim --features preview -- inspect tree hello_ranim
 ```
 
 构建场景并输出层级动画树。每个节点包含：DFS `path`、`kind`
-（eval/sequence/stack/lagged/static）、`anim_name`、父局部坐标下的 `range`、
+（anim/children/audio）、`anim_name`、父局部坐标下的 `range`、
 `content_duration_secs`、`rate_func`、`enabled` 与 `children`；iterative 节点
 额外包含 `sim_step`（`with_steps(N)` 声明的进度步长 `1/N`，未声明时为默认值）。
-当库里只有一个场景时 `[SCENE]` 可省略。
+当项目里只有一个场景时 `[SCENE]` 可省略。
 
 注意 `range` 是**父局部坐标**，不要直接当成全局时间。
 
-### `ranim inspect frame <SCENE> --at <sec>`
+### `inspect frame <SCENE> --at <sec>`
 
 ```bash
-ranim inspect frame hello_ranim --at 1.5 --example hello_ranim --verbose
+cargo run --example hello_ranim --features preview -- inspect frame hello_ranim --at 1.5 --verbose
 ```
 
-以 120 Hz 逻辑时钟在 `<sec>` 采样一帧，输出该帧的物件列表。每个物件包含
-`z_order`（帧内渲染/遮挡顺序）、`id` / `animation_id` / `part`、`kind`
-（camera/vitem/mesh）、来源根动画 `source` 和 `data` 摘要（VItem 的点数/颜色/
-AABB，Mesh 的点数/三角形数/transform/AABB，Camera 的 pos/facing/up/投影参数）。
-`--verbose` 追加完整几何数据（VItem points、Mesh 顶点/索引/颜色/法线）。
+在 `<sec>` 直接采样类型化帧；迭代动画使用各自声明的内容步长。JSON frame
+输出的 `schema_version` 为 `2`。每个输入包含 `order`（完整输出的全局插入
+顺序）、`id` / `animation_id` / `part`、`input_type` 与来源根动画 `source`。
+已支持的裸内置类型还提供 CPU 投影数据：矢量、网格、相机，或 SVG / 文字的
+图元分组；`--verbose` 追加完整几何数据。未提供检查适配的复合或自定义类型
+保留为 opaque 输入元数据，不需要 GPU 或该类型的渲染插件。
 
 用于渲染前定位「某时刻物件不对 / 位置不对 / z-order 不对 / 颜色不对」等问题，
 避免直接上 GPU 盲调。已知局限（如实输出，不要误读）：
 
 - `source` 只能回溯到根动画的 `animation_id`，不能定位树内叶子节点；
-- `SvgItem` / `TypstText` 等用户层 item 会 extract 成多个 CoreItem（1→N），此时
-  `part` 是 extract 后的序号，不是用户层 item 的序号。
+- `part` 是根动画中完整求值输出的序号，跨活跃叶子与类型连续递增；容器成员
+  不单独占用输入序号。一个 `SvgItem` 或 `TypstText` 是一条输入，其 CPU 投影
+  数据可以包含多个图元；
+- `order` 是输入顺序。渲染器在提取后还会按 `SourceOrder { order, part }` 排序
+  生成最终 `SceneOrder`，不能把输入序号直接当作 render entity 数量或最终 rank。
 
 ## 推荐工作流
 

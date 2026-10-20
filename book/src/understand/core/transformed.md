@@ -230,7 +230,7 @@ wrapper 不再提供 `try_bake`。如果调用者确实需要把动态得到的 
 一般仿射变换会把圆变成椭圆、把矩形变成平行四边形，因此不能无损地 bake 回
 原来的参数化类型。
 
-## 6. anchor、extract、Aabb 与几何边界
+## 6. anchor、渲染提取、Aabb 与几何边界
 
 anchor 的语义首先属于 `inner` 的 local space：`Locate` 实现先在内部物件上
 定位，再把所得点通过 `G -> DAffine3` 变换到 wrapper 的外部空间。当前 wrapper
@@ -239,19 +239,25 @@ anchor 的语义首先属于 `inner` 的 local space：`Locate` 实现先在内�
 对所有 target 实现 `Locate`）。因此，未列出的 anchor 仍只对它直接支持的
 `inner` 类型生效，不能假定任意 `Locate<A>` 都会自动穿过 wrapper。
 
-`Transformed<T, G>` 不要求 `T: ApplyTransform<G>` 就能 extract。只要 `G` 能
-转换为 `DAffine3`，wrapper 会在几何边界进行一次转换：
+`Transformed<T, G>` 在求值帧中保留完整 wrapper，不要求 `T` 实现渲染 trait。
+到了渲染侧，只要 `T: Extract`、`G: Clone + Into<DAffine3>`，就能通过值级
+`Extract` 组合变换并递归处理内部值：
 
 ```text
-G --Into<DAffine3>--> CoreItem / Aabb geometry
+G --Into<DAffine3>--> ExtractContext 累计变换 --> primitive 的渲染矩阵
 ```
 
-- `VItem`：仿射变换烘焙到点，法线使用逆转置；
-- core `MeshItem`：仿射矩阵左乘已有渲染矩阵，顶点保持不变；
+- `Extract`：`ctx.with_transform` 按 `parent * child` 组合本层变换，递归提取
+  内部值，保留局部几何；
+- 逻辑物件：VItem/MeshItem 提取时把累计变换写入渲染组件的矩阵，顶点保持不变；
+  相机则变换位置与方向；
 - `Aabb`：变换内部包围盒的八个角点，再重新取界。
 
-这使高层物件可以保留语义表示，同时渲染结果仍能包含更一般的仿射效果。
-`DAffine3` 是这里的端点；不会继续转换到 projective 模型矩阵。
+宿主需为完整输出注册 `ExtractPlugin<Transformed<T, G>>`；只注册 `T` 的插件
+不会读取 wrapper 批次。值级协议与插件装配见
+[完整求值帧与渲染提取](./extract.md)。这使高层物件可以保留语义表示，同时
+渲染结果仍能包含更一般的仿射效果。`DAffine3` 是这里的端点，不会继续转换到
+projective 模型矩阵。
 
 ### 6.1 local primitive、一般 local data 与 placement
 
@@ -268,7 +274,7 @@ canonical local primitive（例如以原点为中心的 `Circle`、`Rectangle`�
 `Sphere -> Surface` 只负责把 Sphere 的 canonical local 参数采样成顶点，
 `Surface` 不会再次 center；这样可避免重复 center。`bake` 是明确的边界操作：
 只有当 `T: ApplyTransform<G>` 时才把外部变换吸收到 `inner`，否则继续保留
-wrapper，并在 extract 时于几何边界转换为 `DAffine3`。
+wrapper，直到渲染提取时才将变换转为 `DAffine3`，与父上下文组合。
 
 ## 7. 插值
 
@@ -337,6 +343,6 @@ ranim 中：
 - `ApplyTransform<G>` 描述物件表示对这个群是否闭包；
 - `Transformed<T, G>` 把外部组合与 `T` 的参数化语义分离；
 - `bake` 在编译期重新要求闭包；
-- `extract` 在仿射几何端点生成最终视觉数据。
+- 求值帧保留完整 wrapper，值级 `Extract` 在渲染侧的仿射边界组合变换并生成视觉数据。
 
 这个分层让变换的数学顺序、Rust 类型与物件几何语义保持一致。

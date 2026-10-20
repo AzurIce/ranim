@@ -1,10 +1,11 @@
 //! Surface — a parametric surface mesh item.
 
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use ranim_core::{
-    Extract,
     color::{self, AlphaColor, Srgb},
     components::rgba::Rgba,
-    core_item::CoreItem,
     glam::DVec3,
     traits::{ApplyTransform, FillColor, Interpolatable, Opacity},
 };
@@ -52,7 +53,7 @@ fn colorscale_lookup(colorscale: &[(AlphaColor<Srgb>, f64)], value: f64) -> Alph
 ///
 /// The vertices are expressed in the surface's local space. To place or animate
 /// the surface with an external transform, wrap it in
-/// [`ranim_core::core_item::transformed::Transformed`], commonly storing
+/// [`ranim_core::transformed::Transformed`], commonly storing
 /// [`ranim_core::glam::DAffine3`] as the transform representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Surface {
@@ -204,10 +205,10 @@ impl From<Surface> for MeshItem {
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for Surface {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        MeshItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        MeshItem::from(self.clone()).extract(ctx);
     }
 }
 
@@ -238,9 +239,7 @@ mod tests {
             Surface::from_uv_func(|u, v| dvec3(u, v, 0.0), (0.0, 1.0), (0.0, 1.0), (3, 3));
         assert_eq!(surface.vertices.len(), 9);
         assert_eq!(surface.triangle_indices.len(), 24);
-        let CoreItem::MeshItem(mesh) = &surface.extract()[0] else {
-            panic!("expected MeshItem")
-        };
+        let mesh = MeshItem::from(surface.clone());
         assert_eq!(mesh.points.len(), surface.vertices.len());
         assert_eq!(mesh.triangle_indices, surface.triangle_indices);
 

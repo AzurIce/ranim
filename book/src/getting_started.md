@@ -3,16 +3,31 @@
 > [!caution]
 > 本书绝大多数内容目前均由 ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
 
-Ranim 的场景由一个 `fn(&mut RanimScene)` 函数构造。场景函数只负责定义动画；Plugin 注册场景与项目资源，CLI、Rust 应用和 Web 预览各自创建 App，再安装同一个插件。
+Ranim 的场景由一个 `fn(&mut RanimScene)` 函数构造。场景函数只负责定义动画。项目是自己的二进制 crate：`main` 创建 App、注册场景，再通过 `App::run()` 提供命令行入口；Plugin 是组织场景与自定义渲染配置的可选机制，Web 预览宿主使用同一份装配。
 
 ## 准备项目
 
-使用 CLI 热加载 lib target 时，crate 需要生成动态库：
+`Cargo.toml` 只需要 `ranim` 依赖：
 
 ```toml
-[lib]
-crate-type = ["rlib", "cdylib"]
+[dependencies]
+ranim = { version = "...", features = ["preview"] }
 ```
+
+`preview` feature 蕴含 `render`；不需要交互预览时可以只开 `render`。
+`src/main.rs` 注册场景并交给命令行入口（`AppRunExt` 已由 prelude 导出）：
+
+```rust,ignore
+use ranim::prelude::*;
+
+fn main() {
+    App::new().add_scenes([hello::scene()]).run();
+}
+```
+
+`App::run()` 提供 `preview` / `output` / `render` / `inspect` 子命令，详见
+[命令行入口](./cli.md)。`inspect` 是纯 CPU 查询，不执行渲染装配
+（`RenderSetup`）的 GPU 回调。
 
 动画代码通常从 prelude、item 类型和对应的动画扩展 trait 中导入 API：
 
@@ -35,14 +50,13 @@ use ranim::{
 以下类型有意**不**放进 prelude，需要时显式导入：
 
 ```rust,ignore
-use ranim_core::Extract;
 use ranim_core::audio::AudioError;
 use ranim_core::animation::build::{At, Paramed};
 use ranim_core::animation::node::{AnimNode, AnimationInfo};
-use ranim_core::core_item::CoreItem;
+use ranim_core::frame::EvaluatedFrame;
 ```
 
-- `Extract` / `CoreItem`：只在实现自定义 `Eval::Output` 的提取契约时需要；
+- `EvaluatedFrame`：读取求值结果或直接驱动渲染时使用；
 - `AnimNode` / `AnimationInfo`：运行时 introspection API；
 - `At` / `Paramed`：需要给返回值命名的 timing wrapper；
 - `AudioError`：音频解码/文件错误处理。
@@ -84,36 +98,42 @@ fn hello(r: &mut RanimScene) {
 
 `#[scene]` 保留场景函数，并生成同名模块中的 `hello::scene() -> Scene`。
 每次调用都创建一个 owned 描述符，其中包含名称、构造函数、配置和输出列表。
-接着在插件中显式注册，再从 crate 根导出统一入口：
+把描述符注册进 App，再交给 `App::run()`：
+
+```rust,ignore
+fn main() {
+    App::new().add_scenes([hello::scene()]).run();
+    // 多个场景：add_scenes([first::scene(), second::scene()])
+}
+```
+
+只有加入 App 的场景才会出现在命令行和 Web 入口中。
+场景目录保留显式注册顺序，场景名称必须唯一。
+
+渲染上面的场景不需要任何装配：场景输出裸 `Square` 和 `CameraFrame`，项目未注册
+`RenderSetup` 时渲染与预览回退到默认配置，内置相机与矢量/网格渲染开箱即用
+（见下文「自定义渲染配置」）。
+
+### 用 Plugin 组织项目（可选）
+
+插件持有自己的配置，在 `build(&self, app: &mut App)` 中安装项目能力。场景变多、
+需要跨二进制复用，或要携带自定义渲染配置时，把它们收进插件：
 
 ```rust,ignore
 pub struct DemoScenesPlugin;
 
 impl Plugin for DemoScenesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_scene(hello::scene());
-        // 多个场景也可以用 app.add_scenes([first::scene(), second::scene()]);
+        app.add_scenes([hello::scene()]);
     }
 }
 
-#[ranim::export_plugin]
-pub fn plugin() -> impl Plugin {
-    DemoScenesPlugin
+fn main() {
+    App::new().add_plugins(DemoScenesPlugin).run();
 }
 ```
 
-每个插件 crate 用一次 `#[ranim::export_plugin]` 标注入口工厂函数。
-宏保留这个具有原返回类型的 Rust 函数，供宿主直接安装；原生动态库另导出
-`ranim_plugin`，供 CLI 加载。这个统一入口将插件装箱，并捕获构造时的 panic，
-返回 `Result<Box<dyn Plugin>, String>`。
-App 的构造、场景选择和预览启动由宿主负责，包括 WASM 宿主。
-只有加入 App 的场景才会出现在 CLI 和 Web 入口中。
-场景目录保留显式注册顺序，场景名称必须唯一。
-
-### 用 Plugin 装配项目
-
-插件持有自己的配置，在 `build(&self, app: &mut App)` 中安装项目能力。
-Rust 宿主既可以直接安装插件类型，也可以安装另一个 crate 导出的插件：
+宿主既可以直接安装插件类型，也可以安装另一个 crate 的普通 Rust 工厂函数：
 
 ```rust,ignore
 let mut app = App::new();
@@ -126,12 +146,53 @@ app.add_plugins(my_project::plugin());
 
 插件在添加时执行构建，也可以通过 `app.add_plugins(...)` 继续安装依赖插件。
 多个插件可写成元组，例如 `app.add_plugins((GeometryPlugin, TextPlugin))`。
-工厂函数可以任意命名，返回具体插件类型或 `impl Plugin`；函数必须无参数、无泛型，
-且是安全的同步函数。带配置的插件直接在函数体中构造，例如
-`DemoPlugin { quality: 4 }`，不要求实现 `Default`。App 由宿主配置和持有。
-项目资源保存在各自的 App 中，多个项目互不共享全局注册表；渲染、预览和导出会持有
-相应 App，保持项目资源的生命周期。当前插件层负责装配场景和资源，具体 item 的渲染
-注册将在后续扩展。
+带配置的插件直接构造，例如 `DemoPlugin { quality: 4 }`，不要求实现 `Default`。
+项目资源保存在各自的 App 中，多个项目互不共享全局注册表。
+
+### 自定义渲染配置（可选）
+
+渲染配置依赖 `ranim` 的 `render` feature（`preview` 会同时启用它）。项目未注册
+`RenderSetup` 时，渲染与预览使用的默认配置等价于：
+
+```rust,ignore
+RenderSetup::new(|render_app| {
+    render_app.add_plugins(RanimItemsPlugin);
+})
+```
+
+`ranim_items::RanimItemsPlugin` 捆绑三个内置物件插件（`CameraFramePlugin`、
+`VItemPlugin`、`MeshItemPlugin`），覆盖裸内置类型与 `Vec<VItem>`。它与三个单件
+插件互斥：Bevy 插件在 App 内唯一，重复安装会 panic。
+
+若完整输出是默认配置未覆盖的类型——如 `Vec<Circle>`、`Transformed<T, G>` 或
+自定义类型——在插件中注册自己的 `RenderSetup`，为实际完整类型加入
+`ExtractPlugin<T>`（只注册 `T` 不会读取这些组合）：
+
+```rust,ignore
+use ranim::{
+    items::RanimItemsPlugin,
+    render::{RenderSetup, extract::ExtractPlugin},
+};
+
+pub struct ProjectPlugin;
+
+impl Plugin for ProjectPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_scenes([hello::scene()]);
+        app.insert_resource(RenderSetup::new(|render_app| {
+            render_app.add_plugins((
+                RanimItemsPlugin,
+                ExtractPlugin::<MyOutput>::default(),
+            ));
+        }));
+    }
+}
+```
+
+`RenderSetup` 保存在项目 App 中，preview / output 从所属 App 取得并在每次创建
+renderer 时重放，分辨率变化和后台导出也使用同一项目的配置。保存 setup 不会
+初始化 GPU，纯 CPU 求值与 `inspect` 也不执行该回调。详见
+[完整求值帧与渲染提取](./understand/core/extract.md)。
 
 ## Scene 的根是并行 Stack
 
@@ -252,11 +313,11 @@ r.play(layers);
 
 ## 预览与渲染
 
-直接在 Rust 应用中运行时，创建 App 并安装插件，再选择 `SceneHandle`：
+`App::run()` 已把常用流程做成子命令；需要在 Rust 代码里直接驱动时，创建 App、注册场景，再选择 `SceneHandle`：
 
 ```rust,ignore
 let mut app = App::new();
-app.add_plugins(DemoScenesPlugin); // 也可以使用 my_project::plugin()。
+app.add_scenes([hello::scene()]); // 或安装项目插件：app.add_plugins(my_project::plugin())
 let project = std::sync::Arc::new(app);
 let scene = project.scene("hello").expect("hello is registered");
 
@@ -267,36 +328,16 @@ ranim::cmd::preview_scene(scene);
 ```
 
 `SceneHandle` 保留 App 的所有权，预览重建渲染器和后台导出时都能继续访问同一项目。
-CLI 通过动态库的 `ranim_plugin` 入口加载同一个插件，再安装到自己创建的 App 中。
-Rust 原生宿主也可以启用 `dylib` feature 后自行加载：
-
-```rust,ignore
-use ranim::{App, DynamicPlugin};
-
-let mut app = App::new();
-// 调用方保证动态库使用匹配的 Ranim 版本和 Rust 工具链。
-let plugin = unsafe { DynamicPlugin::load("./libmy_project.so")? };
-app.try_add_plugins(plugin)?;
-```
-
-App 会持有加载的动态库，直到相关插件、资源与场景句柄全部释放。
-动态加载入口使用 Rust ABI，宿主与插件必须使用匹配的 Ranim 版本和 Rust 工具链。
 
 ### WASM 预览宿主
 
-把场景、`DemoScenesPlugin` 和带 `#[ranim::export_plugin]` 的工厂函数放在 `src/lib.rs`，再用
-`src/main.rs` 编写预览宿主。普通项目可以把场景和插件定义直接写在 `lib.rs`；
-是否拆成多个模块取决于代码组织需要。
-
-WASM 宿主启用 `preview`，创建 App 后安装库导出的插件，再启动所选场景的预览。
-插件库可以继续供原生 CLI 加载；Web 构建选择宿主二进制。
+`App::run()` 是原生入口；WASM 预览由自己的宿主二进制启动。把场景（以及
+可选的项目插件）放在 `src/lib.rs`（小项目也可以全部写进 `main.rs`），
+`src/main.rs` 创建 App、注册场景并启动所选场景的预览。
 
 在 `Cargo.toml` 中为 `ranim` 开启预览功能，并给宿主二进制单独命名：
 
 ```toml
-[lib]
-crate-type = ["rlib", "cdylib"]
-
 [[bin]]
 name = "my-project-preview"
 path = "src/main.rs"
@@ -314,7 +355,7 @@ use std::sync::Arc;
 
 fn main() {
     let mut app = ranim::App::new();
-    app.add_plugins(my_project::plugin());
+    app.add_scenes([my_project::hello::scene()]);
     let app = Arc::new(app);
     let scene = app.scene("hello").expect("hello is registered");
     ranim::cmd::preview_scene(scene);
@@ -343,51 +384,34 @@ wasm-bindgen --target web --out-dir pkg --out-name my_project target/wasm32-unkn
 如果页面需要按名称启动多个场景，可以像 `ranim-examples-preview` 一样，
 由宿主自行导出 `preview_scene(name)`；这时宿主需要直接依赖 `wasm-bindgen`。
 
-### CLI 渲染与预览
+### 命令行：预览与渲染
 
-安装 CLI：
-
-```bash
-cargo install ranim-cli
-```
-
-预览或渲染当前 package 的 lib target：
+项目二进制的 `App::run()` 提供全部命令行入口：
 
 ```bash
-ranim preview
-ranim output
-ranim output hello
-ranim render hello
-```
-
-指定 workspace package 或 example target：
-
-```bash
-ranim preview -p package_name --example example_name
-ranim output -p package_name --example example_name
-ranim render -p package_name --example example_name hello
+cargo run -- preview
+cargo run -- output
+cargo run -- output hello
+cargo run -- render hello
 ```
 
 不渲染、只查询场景信息时使用 `inspect`：
 
 ```bash
-ranim inspect scenes --example example_name
-ranim inspect tree --example example_name
-ranim inspect frame <scene_name> --at 1.0 --example example_name
+cargo run -- inspect scenes
+cargo run -- inspect tree
+cargo run -- inspect frame hello --at 1.0
 ```
 
 `tree` 的 Scene 名称在只有一个 Scene 时可以省略；`frame` 必须指定 Scene 名称，`--at` 为采样时间（秒）。需要完整几何数据时给 `frame` 加 `--verbose`，机器可读输出加 `--format json`。
 
-`preview` 可以接收一个可选 Scene 名称；`output` 可以接收零个或多个 Scene 名称，并渲染它们声明的所有 `#[output(...)]`；`render` 接收恰好一个 Scene 名称，使用默认输出设置（`1920x1080`、60 fps、mp4）做一次临时渲染，不读取 `#[output(...)]`。额外的 Cargo 构建参数放在 `--` 后，例如：
+`preview` 可以接收一个可选 Scene 名称；`output` 可以接收零个或多个 Scene 名称，并渲染它们声明的所有 `#[output(...)]`；`render` 接收恰好一个 Scene 名称，使用默认输出设置（`1920x1080`、60 fps、mp4）做一次临时渲染，不读取 `#[output(...)]`。完整说明见[命令行入口](./cli.md)。
+
+在本仓库中运行示例：
 
 ```bash
-ranim output hello -- --release
-ranim render hello -- --release
+cargo run --example getting_started0 --features preview -- preview
+cargo run --example getting_started0 --features preview -- output
 ```
 
-在本仓库中可以直接运行 CLI package：
-
-```bash
-cargo run -p ranim-cli --release -- preview --example getting_started0
-cargo run -p ranim-cli --release -- output --example getting_started0
-```
+带 `required-features`（如 `typst`、`gltf`）的示例需要同时开启对应 feature。

@@ -8,9 +8,18 @@ use std::hint::black_box;
 
 use benches::test_scenes::static_squares;
 use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
-use ranim::{CoreItemExtractPlugin, SceneConstructor, prelude::*};
+use ranim::{
+    SceneConstructor,
+    items::{
+        camera::CameraFramePlugin,
+        vitem::{VItemPlugin, geometry::Square},
+    },
+    prelude::*,
+};
 use ranim_core::frame::EvaluatedFrame;
-use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext};
+use ranim_render::{Renderer, extract::ExtractPlugin, utils::WgpuContext};
+
+type PlacedSquare = Transformed<Square, Translation>;
 
 /// Pure GPU render benchmark: only measures `Renderer::render_frame` + `device.poll`.
 fn gpu_render_benchmark(c: &mut Criterion) {
@@ -25,14 +34,18 @@ fn gpu_render_benchmark(c: &mut Criterion) {
         // Build the scene and evaluate it into a reusable cross-thread frame.
         let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
         let mut store = EvaluatedFrame::new();
-        store.update(scene.eval_at_alpha(0.5));
+        scene.eval_at_alpha(0.5, &mut store);
 
         let mut renderer = Renderer::new(
             &ctx,
             1920,
             1080,
             8,
-            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+            (
+                CameraFramePlugin,
+                ExtractPlugin::<PlacedSquare>::default(),
+                VItemPlugin,
+            ),
         );
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
@@ -79,14 +92,18 @@ fn cpu_submit_benchmark(c: &mut Criterion) {
 
         let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
         let mut store = EvaluatedFrame::new();
-        store.update(scene.eval_at_alpha(0.5));
+        scene.eval_at_alpha(0.5, &mut store);
 
         let mut renderer = Renderer::new(
             &ctx,
             1920,
             1080,
             8,
-            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+            (
+                CameraFramePlugin,
+                ExtractPlugin::<PlacedSquare>::default(),
+                VItemPlugin,
+            ),
         );
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
@@ -130,14 +147,18 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
 
         let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
         let mut store = EvaluatedFrame::new();
-        store.update(scene.eval_at_alpha(0.5));
+        scene.eval_at_alpha(0.5, &mut store);
 
         let mut renderer = Renderer::new(
             &ctx,
             1920,
             1080,
             8,
-            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+            (
+                CameraFramePlugin,
+                ExtractPlugin::<PlacedSquare>::default(),
+                VItemPlugin,
+            ),
         );
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {
@@ -183,14 +204,18 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
 
         let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
         let mut store = EvaluatedFrame::new();
-        store.update(scene.eval_at_alpha(0.5));
+        scene.eval_at_alpha(0.5, &mut store);
 
         let mut renderer = Renderer::new(
             &ctx,
             1920,
             1080,
             8,
-            (CoreItemExtractPlugin, BuiltinRenderPlugins),
+            (
+                CameraFramePlugin,
+                ExtractPlugin::<PlacedSquare>::default(),
+                VItemPlugin,
+            ),
         );
         let mut render_textures = renderer.new_render_textures(&ctx);
         let clear_color = wgpu::Color {

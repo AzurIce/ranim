@@ -59,9 +59,10 @@ pub trait Eval {
 
 运行期的 `LeafContent::Anim` 持有 `Box<dyn EvalDyn>`，它是 `Eval` 的擦除
 对应物：`Eval` 带有关联类型 `Output`，不能直接作为 trait object，因此
-`animation::eval` 为所有满足 `Output: AnyExtractCoreItem` 的 `E: Eval`
-自动实现了 `EvalDyn`。只有用户叶子会进入 `Leaf`；内置容器是 core 自己的
-variant。
+`animation::eval` 为所有满足 `Output: Clone + Send + Sync + 'static` 的 `E: Eval`
+自动实现了 `EvalDyn`。普通采样将完整输出直接写入类型化帧；hold 捕获同样的
+原始值供后续克隆，不改变其具体类型。
+只有用户叶子会进入 `Leaf`；内置容器是 core 自己的 variant。
 
 `EvalExt` 提供两个 build 期便捷方法：
 
@@ -150,7 +151,7 @@ let animation = Iterative::from_fn(
 - 闭包的状态类型位于 `Fn` 输入位置，无法从闭包类型反推出关联 `Output`，所以
   `Iterative::from_fn` 通过 `IterativeFn<S, F>` 显式绑定二者。
 
-`Iterative` 实现的 `Eval::sim_step()` 返回 `Some(1/N)`，供 `ranim inspect tree`
+`Iterative` 实现的 `Eval::sim_step()` 返回 `Some(1/N)`，供 `inspect tree`
 等工具内省；它不影响求值本身。
 
 ## 从 `Eval` 到可播放的动画
@@ -190,15 +191,15 @@ impl<T: FadingRequirement> Eval for FadeIn<T> {
 }
 ```
 
-**第 3 层：blanket impl。** 任何 `Eval` 实现，只要 `Output` 可提取为场景元素
-（`AnyExtractCoreItem`），就自动实现 `IntoAnimNode`，默认参数为 linear、时长
+**第 3 层：blanket impl。** 任何 `Eval` 实现，只要 `Output` 满足
+`Clone + Send + Sync + 'static`，就自动实现 `IntoAnimNode`，默认参数为 linear、时长
 1 秒、enabled：
 
 ```rust,ignore
 impl<E> IntoAnimNode for E
 where
     E: Eval + 'static,
-    E::Output: AnyExtractCoreItem,
+    E::Output: Clone + Send + Sync + 'static,
 {
     fn into_anim_node(self) -> AnimNode {
         AnimNode {
@@ -286,7 +287,7 @@ r.play(intro.at(2.0));
 
 - `forward(secs)` 只推进 cursor，产生的空白区间没有输出。
 - `hold(secs)` 取得 cursor 处的 Sequence 状态，将它保存为持续 `secs` 的
-  普通静态动画叶子（`Static<Vec<DynItem>>`）。
+  内部保持叶子。保存的是可克隆的原始 `Eval::Output`，播放时按原类型写回帧。
 - `forward_to(target)` 和 `hold_to(target)` 是对应的绝对 cursor 版本。
 
 `hold` 没有额外的状态协议，它直接采用 Sequence 在 cursor 处的正常求值结果。
@@ -488,15 +489,19 @@ enabled / active，再用自己的 `time_range` 和 `rate_func` 把 `sec` 映射
 `alpha`，最后交给 `NodeContent`：
 
 - `Children` 求值所有包含 content 时间的子节点；
-- 动画叶子调用擦除后的 `EvalDyn::eval_into(alpha, out)`；
+- 动画叶子调用擦除后的 `EvalDyn::eval_frame(alpha, ctx)`，将
+  `eval_alpha(alpha)` 的完整输出按实际类型写入帧；
 - 音频叶子由 seal 时的音频 interpreter 处理。
 
 子片段使用左闭右开区间，父容器末尾允许包含子片段的右端点。
 Sequence 在 `into_anim_node` 时移除被覆盖的零时长片段，并关闭被末尾
 `show()` / `hide()` 覆盖的前一片段的右端点。这个标记是固定的区间元数据，
 求值时无需维护可变的显示状态。普通 stack 的重叠片段仍然全部求值。
-`hold` 和 lagged 的边缘填充使用 `Static<Vec<DynItem>>` 动画叶子；输出批次
-会直接展开，连续 hold 不会产生嵌套批次。
+`hold` 和 lagged 的边缘填充通过 `eval_capture` 保存原始值，内部用
+`HeldOutput` 叶子克隆重放；每个被捕获的完整输出仍写回原来的类型批次，连续
+hold 不会嵌套捕获。普通叶子无需先产生 `Vec<DynOutput>`。`Vec<T>`、元组、树与
+变换 wrapper 等完整输出一直保留到[渲染提取](./extract.md)阶段，再由值级
+`Extract` 递归解释。
 
 这里的关键是：运行时核心是封闭的，因此不同 consumer 可以各自遍历同一棵树，
 互不污染：

@@ -11,9 +11,9 @@
 
 use std::ops::Range;
 
-use crate::{audio::AudioTrack, core_item::DynItem, utils::rate_functions::linear};
+use crate::{audio::AudioTrack, utils::rate_functions::linear};
 
-use super::eval::{EvalDyn, Static};
+use super::eval::{DynOutput, EvalDyn, HeldOutput, OutputContext};
 
 /// Runtime animation content category used by preview tooling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -202,7 +202,16 @@ impl AnimNode {
     /// Audio nodes evaluate to nothing here: their content resolves through
     /// the seal-time audio bake ([`bake_audio`]) instead of the frame
     /// pipeline.
-    pub(crate) fn eval_at(&self, sec: f64, output: &mut Vec<DynItem>) {
+    pub(crate) fn eval_at(&self, sec: f64, output: &mut OutputContext<'_>) {
+        self.eval_at_with(sec, &mut |eval, alpha| eval.eval_frame(alpha, output));
+    }
+
+    /// Capture complete raw leaf values for a hold.
+    pub(in crate::animation) fn capture_at(&self, sec: f64, output: &mut Vec<DynOutput>) {
+        self.eval_at_with(sec, &mut |eval, alpha| eval.eval_capture(alpha, output));
+    }
+
+    fn eval_at_with(&self, sec: f64, eval_leaf: &mut impl FnMut(&dyn EvalDyn, f64)) {
         if !self.enabled || !self.active_at(sec) {
             return;
         }
@@ -210,9 +219,9 @@ impl AnimNode {
         match &self.content {
             NodeContent::Children(children) => {
                 let content = self.internal_time_secs * alpha;
-                eval_children(children, content, self.internal_time_secs, output)
+                eval_children(children, content, self.internal_time_secs, eval_leaf)
             }
-            NodeContent::Leaf(LeafContent::Anim(eval)) => eval.eval_into(alpha, output),
+            NodeContent::Leaf(LeafContent::Anim(eval)) => eval_leaf(eval.as_ref(), alpha),
             NodeContent::Leaf(LeafContent::Audio(_)) => {}
         }
     }
@@ -337,10 +346,15 @@ impl AnimNode {
 }
 
 /// Evaluate every child containing the content time, preserving output order.
-fn eval_children(children: &[AnimNode], content_sec: f64, extent: f64, output: &mut Vec<DynItem>) {
+fn eval_children(
+    children: &[AnimNode],
+    content_sec: f64,
+    extent: f64,
+    eval_leaf: &mut impl FnMut(&dyn EvalDyn, f64),
+) {
     for child in children {
         if child.contains_sec(content_sec, extent) {
-            child.eval_at(content_sec, output);
+            child.eval_at_with(content_sec, eval_leaf);
         }
     }
 }
@@ -533,14 +547,17 @@ pub(crate) fn bake_audio(animations: &[AnimNode], total_secs: f64, sample_rate: 
 }
 
 /// Build a constant animation replaying sampled items over `time_range`.
-pub(in crate::animation) fn constant_node(state: Vec<DynItem>, time_range: Range<f64>) -> AnimNode {
+pub(in crate::animation) fn constant_node(
+    state: Vec<DynOutput>,
+    time_range: Range<f64>,
+) -> AnimNode {
     AnimNode {
-        content: NodeContent::Leaf(LeafContent::Anim(Box::new(Static(state)))),
+        content: NodeContent::Leaf(LeafContent::Anim(Box::new(HeldOutput::new(state)))),
         internal_time_secs: 0.0,
         rate_func: None,
         time_range,
         end_inclusive: true,
         enabled: true,
-        anim_name: std::any::type_name::<Static<Vec<DynItem>>>(),
+        anim_name: std::any::type_name::<HeldOutput>(),
     }
 }

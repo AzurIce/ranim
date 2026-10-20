@@ -72,9 +72,10 @@ pub mod text_item;
 #[path = "typst_timer/scenes.rs"]
 pub mod typst_timer;
 
-pub struct ExamplesPlugin;
+/// Registers the example scenes and their combined rendering support.
+pub struct ProjectPlugin;
 
-impl ranim::Plugin for ExamplesPlugin {
+impl ranim::Plugin for ProjectPlugin {
     fn build(&self, app: &mut ranim::App) {
         app.add_plugins((
             aabb::ScenesPlugin,
@@ -111,11 +112,33 @@ impl ranim::Plugin for ExamplesPlugin {
             text_item::ScenesPlugin,
             typst_timer::ScenesPlugin,
         ));
-    }
-}
 
-// Export one native entry; hosts own the App and preview.
-#[ranim::export_plugin]
-pub fn plugin() -> impl ranim::Plugin {
-    ExamplesPlugin
+        use ranim::{
+            core::{
+                traits::{Rigid, Similarity, Translation},
+                transformed::Transformed,
+            },
+            items::{
+                RanimItemsPlugin,
+                debug::VisualizeAabbItem,
+                mesh::Surface,
+                vitem::{VItem, geometry::RegularPolygon},
+            },
+            render::{RenderSetup, extract::ExtractPlugin},
+        };
+
+        app.insert_resource(RenderSetup::new(|render_app| {
+            render_app.add_plugins((
+                RanimItemsPlugin,
+                ExtractPlugin::<VisualizeAabbItem<VItem>>::default(),
+                ExtractPlugin::<Transformed<RegularPolygon, Similarity>>::default(),
+                ExtractPlugin::<Transformed<Surface, Rigid>>::default(),
+                ExtractPlugin::<Transformed<Surface, Translation>>::default(),
+            ));
+            cloth_wrap::configure_render(render_app);
+            extract_vitem_visualize::configure_render(render_app);
+            iterative_spring::configure_render(render_app);
+            nbody::configure_render(render_app);
+        }));
+    }
 }

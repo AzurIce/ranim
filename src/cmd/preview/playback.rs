@@ -191,16 +191,4 @@ impl PlaybackEngine {
             None => {}
         }
     }
-
-    /// Swap in a freshly built scene: stop playback and rebuild the audio
-    /// player from the new scene's audio plane.
-    pub fn reload_scene(&mut self, evaluator: &SceneEvaluator) {
-        self.clock = None;
-        #[cfg(target_family = "wasm")]
-        let _ = evaluator;
-        #[cfg(not(target_family = "wasm"))]
-        {
-            self.player = Self::build_player(evaluator);
-        }
-    }
 }

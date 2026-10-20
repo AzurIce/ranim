@@ -1,13 +1,14 @@
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use ranim_core::{
-    Extract,
     color::{AlphaColor, Srgb},
-    core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::DVec3,
     traits::{Aabb, ApplyTransform, Discard, Locate, Opacity, StrokeColor, StrokeWidth, With},
 };
 use ranim_macros::Interpolatable;
 
-use crate::vitem::VItem;
+use crate::vitem::{DEFAULT_STROKE_WIDTH, VItem};
 
 /// A line segment.
 #[derive(Debug, Clone, Interpolatable)]
@@ -110,10 +111,9 @@ impl Opacity for Line {
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for Line {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }

@@ -1,15 +1,16 @@
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use ranim_core::{
-    Extract,
     anchor::Aabb,
     color::{AlphaColor, Srgb},
-    core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DAffine3, DVec3},
     traits::{ApplyTransform, Discard, FillColor, Opacity, StrokeColor, StrokeWidth, With},
     utils::bezier::PathBuilder,
 };
 
 use crate::vitem::{
-    VItem,
+    DEFAULT_STROKE_WIDTH, VItem,
     geometry::{Polygon, Rectangle, Square},
 };
 
@@ -152,9 +153,9 @@ impl From<Parallelogram> for VItem {
         })
     }
 }
+#[cfg(feature = "render")]
 impl Extract for Parallelogram {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf)
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }

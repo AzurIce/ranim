@@ -3,7 +3,7 @@ use std::f64::consts::{PI, TAU};
 use ranim::{
     anims::camera::CameraFrameAnim,
     color::palettes::manim,
-    core::core_item::transformed::{Transformed, TransformedExt},
+    core::transformed::{Transformed, TransformedExt},
     glam::{DAffine3, DVec3},
     items::{
         hierarchy::Node,

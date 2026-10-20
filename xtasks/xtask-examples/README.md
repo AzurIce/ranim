@@ -1,8 +1,8 @@
 # Examples
 
-`cargo examples` 会扫描根 `Cargo.toml` 中的所有 `[[example]]`，通过
-`ranim output --example <name>` 渲染它们声明的 `#[output(...)]`，并把 website
-需要的产物写入：
+`cargo examples` 会扫描根 `Cargo.toml` 中的所有 `[[example]]`，通过运行各 example
+二进制的 `output` 子命令（`cargo run --release --example <name> --features ... -- output`）
+渲染它们声明的 `#[output(...)]`，并把 website 需要的产物写入：
 
 ```text
 website/
@@ -18,8 +18,8 @@ examples/arc/scenes.rs                    -> content/examples/arc.md
 ```
 
 `xtask` 会自动为缺失的目录创建 Zola `_index.md`，所以 Zola 侧不需要手工维护
-目录结构。`data/<name>.toml` 的 `code` 同时展示 `scenes.rs`（场景与显式注册）
-和 `lib.rs`（`#[ranim::export_plugin]` 插件工厂入口），各自附有文件名。
+目录结构。`data/<name>.toml` 的 `code` 同时展示 `scenes.rs`（场景与注册）
+和 `main.rs`（项目入口），各自附有文件名。
 
 ## Commands
 
@@ -55,7 +55,7 @@ Zola 页面中仍使用 `!example-<name>` 插入 example 内容。列表页和�
 `just doc-examples` 会为 `ranim-examples` 生成带 `#[wasm_demo_doc]` 实时预览的
 rustdoc。
 
-`ranim-examples` 的 library 只定义和导出 `ExamplesPlugin`。网站和 rustdoc
-使用同包的 `ranim-examples-preview` binary 作为 WASM 宿主，由宿主创建
+`ranim-examples` 的 library 聚合所有 example 的 scenes 并定义 `ProjectPlugin`。
+网站和 rustdoc 使用同包的 `ranim-examples-preview` binary 作为 WASM 宿主，由宿主创建
 `App`、安装插件并提供 `preview_scene(name)`。构建时显式选择该 binary，
 再通过 `wasm-bindgen --out-name ranim_examples` 保持前端模块路径一致。

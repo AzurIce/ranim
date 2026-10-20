@@ -10,6 +10,7 @@ repository.workspace = true
 ranim-core.workspace = true
 bevy_ecs.workspace = true
 bevy_app.workspace = true
+variadics_please = "2.0.0"
 wgpu-profiler = { workspace = true }
 image.workspace = true
 tracing.workspace = true

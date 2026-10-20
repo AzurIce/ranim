@@ -1,4 +1,4 @@
-//! Per-frame profile for the animation model on the pre-ECS store.
+//! Per-frame evaluation, typed frame storage, and rendering profile.
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -7,9 +7,18 @@ use std::{
 };
 
 use benches::test_scenes::{static_squares, transform_squares};
-use ranim::{CoreItemExtractPlugin, SceneConstructor, prelude::*};
+use ranim::{
+    SceneConstructor,
+    items::{
+        camera::CameraFramePlugin,
+        vitem::{VItemPlugin, geometry::Square},
+    },
+    prelude::*,
+};
 use ranim_core::frame::EvaluatedFrame;
-use ranim_render::{BuiltinRenderPlugins, Renderer, utils::WgpuContext};
+use ranim_render::{Renderer, extract::ExtractPlugin, utils::WgpuContext};
+
+type PlacedSquare = Transformed<Square, Translation>;
 
 #[global_allocator]
 static ALLOC: CountingAlloc = CountingAlloc;
@@ -62,12 +71,14 @@ fn main() {
     let scene = (|r: &mut RanimScene| static_squares(r, n)).build_scene();
 
     profile("eval_at_alpha (400 items)", cpu_iters, || {
-        std::hint::black_box(scene.eval_at_alpha(0.5).collect::<Vec<_>>());
+        let mut frame = EvaluatedFrame::new();
+        scene.eval_at_alpha(0.5, &mut frame);
+        std::hint::black_box(frame);
     });
 
     let mut store = EvaluatedFrame::new();
-    profile("eval + store.update", cpu_iters, || {
-        store.update(scene.eval_at_alpha(0.5));
+    profile("eval into reused frame", cpu_iters, || {
+        scene.eval_at_alpha(0.5, &mut store);
     });
 
     if cpu_only {
@@ -80,7 +91,11 @@ fn main() {
         1920,
         1080,
         8,
-        (CoreItemExtractPlugin, BuiltinRenderPlugins),
+        (
+            CameraFramePlugin,
+            ExtractPlugin::<PlacedSquare>::default(),
+            VItemPlugin,
+        ),
     );
     let mut render_textures = renderer.new_render_textures(&ctx);
     let clear_color = wgpu::Color::BLACK;
@@ -107,7 +122,7 @@ fn main() {
     profile("animated frame (eval+update+render)", frames, || {
         let alpha = frame as f64 / frames as f64;
         frame += 1;
-        animated_store.update(animated.eval_at_alpha(alpha));
+        animated.eval_at_alpha(alpha, &mut animated_store);
         renderer.render_frame(&mut render_textures, clear_color, &mut animated_store);
     });
 

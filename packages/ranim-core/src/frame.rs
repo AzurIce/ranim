@@ -7,12 +7,12 @@ use std::{
 
 use bevy_ecs::prelude::Resource;
 
-/// Stable identity of an evaluated item within its scene.
+/// Item identity: a top-level animation source and its evaluated output part.
 pub type FrameItemId = (usize, usize);
 
 /// One evaluated item and its order among all items in the frame.
 pub struct FrameItem<T> {
-    /// Stable identity of the item.
+    /// Source-local identity of the item.
     pub id: FrameItemId,
     /// Insertion order across every item type in the frame.
     pub order: usize,
@@ -20,20 +20,50 @@ pub struct FrameItem<T> {
     pub value: T,
 }
 
+/// Type-independent identity of one evaluated frame item.
+#[derive(Debug, Clone, Copy)]
+pub struct FrameItemMetadata<'a> {
+    /// Identity within the scene.
+    pub id: FrameItemId,
+    /// Insertion order across all item types.
+    pub order: usize,
+    /// Concrete type of the evaluated CPU value.
+    pub type_id: TypeId,
+    /// Concrete type name for diagnostics and inspection.
+    pub type_name: &'a str,
+}
+
 trait ErasedItems: Any + Send + Sync {
     fn clear(&mut self);
+    fn len(&self) -> usize;
+    fn metadata_at(&self, index: usize) -> FrameItemMetadata<'_>;
 }
 
 impl<T: Send + Sync + 'static> ErasedItems for Vec<FrameItem<T>> {
     fn clear(&mut self) {
         Vec::clear(self);
     }
+
+    fn len(&self) -> usize {
+        Vec::len(self)
+    }
+
+    fn metadata_at(&self, index: usize) -> FrameItemMetadata<'_> {
+        let item = &self[index];
+        FrameItemMetadata {
+            id: item.id,
+            order: item.order,
+            type_id: TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        }
+    }
 }
 
 /// An evaluated frame stored in reusable batches by item type.
 ///
 /// Extraction systems read their input with [`Self::items`]. Items retain a
-/// global insertion order even when different types share a frame.
+/// global insertion order even when different types share a frame. Evaluator
+/// outputs retain their complete types and nested structure.
 #[derive(Resource, Default)]
 pub struct EvaluatedFrame {
     batches: HashMap<TypeId, Box<dyn ErasedItems>>,
@@ -99,6 +129,16 @@ impl EvaluatedFrame {
             .as_slice()
     }
 
+    /// Visit every item's metadata without reading its payload.
+    ///
+    /// Batch iteration is unordered; use [`FrameItemMetadata::order`] when
+    /// scene insertion order is needed.
+    pub fn item_metadata(&self) -> impl Iterator<Item = FrameItemMetadata<'_>> + '_ {
+        self.batches
+            .values()
+            .flat_map(|batch| (0..batch.len()).map(move |index| batch.metadata_at(index)))
+    }
+
     fn batch_mut<T: Send + Sync + 'static>(&mut self) -> &mut Vec<FrameItem<T>> {
         let batch = self
             .batches
@@ -139,6 +179,27 @@ mod tests {
         assert_eq!(strings[0].id, (1, 0));
         assert_eq!(strings[0].order, 1);
         assert_eq!(strings[0].value, "middle");
+    }
+
+    #[test]
+    fn metadata_reports_all_payload_types_without_retained_empty_batches() {
+        let mut frame = EvaluatedFrame::new();
+        frame.push((0, 0), 10_u32);
+        frame.push((0, 1), String::from("text"));
+        let mut metadata = frame.item_metadata().collect::<Vec<_>>();
+        metadata.sort_by_key(|item| item.order);
+        assert_eq!(metadata.len(), 2);
+        assert_eq!(metadata[0].id, (0, 0));
+        assert_eq!(metadata[0].type_id, TypeId::of::<u32>());
+        assert_eq!(metadata[1].id, (0, 1));
+        assert_eq!(metadata[1].type_name, std::any::type_name::<String>());
+        frame.clear();
+        assert_eq!(frame.item_metadata().count(), 0);
+        frame.push((1, 0), 20_u32);
+        let metadata = frame.item_metadata().collect::<Vec<_>>();
+        assert_eq!(metadata.len(), 1);
+        assert_eq!(metadata[0].type_id, TypeId::of::<u32>());
+        assert_eq!(metadata[0].type_name, "u32");
     }
 
     #[test]

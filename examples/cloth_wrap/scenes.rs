@@ -11,10 +11,8 @@
 
 use ranim::{
     color::palettes::manim,
-    core::Extract,
     core::animation::eval::iterative::Iterative,
     core::components::rgba::Rgba,
-    core::core_item::CoreItem,
     glam::{DVec3, dvec3},
     items::mesh::{MeshItem, Sphere, Surface},
     prelude::*,
@@ -183,11 +181,10 @@ impl ClothState {
     }
 }
 
-impl Extract for ClothState {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<CoreItem>) {
-        let points: Vec<DVec3> = self.curr.clone();
+#[cfg(feature = "render")]
+impl ranim::render::extract::Extract for ClothState {
+    fn extract(&self, ctx: &mut ranim::render::extract::ExtractContext<'_>) {
+        let points = self.curr.clone();
 
         // Smooth normals: accumulate face normals, then normalize.
         let mut normals = vec![DVec3::ZERO; points.len()];
@@ -215,8 +212,8 @@ impl Extract for ClothState {
             .clone()
             .transformed(Translation(dvec3(0.0, self.ball_y, 0.0)));
 
-        cloth.extract_into(buf);
-        ball.extract_into(buf);
+        cloth.extract(ctx);
+        ball.extract(ctx);
     }
 }
 
@@ -245,6 +242,13 @@ fn cloth_wrap(r: &mut RanimScene) {
         .with_duration(sim_secs),
     );
     r.insert_time_mark(sim_secs, TimeMark::Capture("preview.png".to_string()));
+}
+
+#[cfg(feature = "render")]
+pub(crate) fn configure_render(app: &mut bevy_app::App) {
+    use ranim::render::extract::ExtractPlugin;
+
+    app.add_plugins(ExtractPlugin::<ClothState>::default());
 }
 
 /// Register the scenes provided by this example.
