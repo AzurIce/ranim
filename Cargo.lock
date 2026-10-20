@@ -5633,6 +5633,7 @@ dependencies = [
  "pollster",
  "ranim-core",
  "tracing",
+ "web-time",
  "wgpu",
  "wgpu-profiler",
 ]

@@ -9,7 +9,9 @@
 //! (e.g. the CLI render worker thread), it self-clears at a span cap so
 //! memory stays bounded.
 
-use std::{cell::RefCell, time::Instant};
+use std::cell::RefCell;
+
+use web_time::Instant;
 
 /// Upper bound on buffered spans; exceeding it clears the buffer (the
 /// consumer is expected to drain every frame).
