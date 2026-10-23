@@ -1,11 +1,15 @@
 <script type="module">
   const rootPath = document.querySelector('meta[name="rustdoc-vars"]')?.dataset.rootPath ?? '';
   // These assets are emitted by `cargo examples build --out-dir …`.
-  if (document.querySelector('ranim-player[data-module-path]')) {
-    await import(`${rootPath}ranim_examples/ranim-player.js`);
-    for (const player of document.querySelectorAll('ranim-player[data-module-path]')) {
-      const example = player.dataset.modulePath.split('::')[1];
-      player.setAttribute('src', `${rootPath}ranim_examples/examples/${example}/pkg/ranim_example.js`);
+  if (document.querySelector('ranim-viewport[data-module-path]')) {
+    await Promise.all([
+      import(`${rootPath}ranim_examples/ranim-viewport.js`),
+      import(`${rootPath}ranim_examples/ranim-controls.js`),
+    ]);
+    for (const viewport of document.querySelectorAll('ranim-viewport[data-module-path]')) {
+      viewport.parentElement.querySelector('ranim-controls').target = viewport;
+      const example = viewport.dataset.modulePath.split('::')[1];
+      viewport.setAttribute('src', `${rootPath}ranim_examples/examples/${example}/pkg/ranim_example.js`);
     }
   }
 </script>

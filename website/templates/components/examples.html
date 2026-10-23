@@ -68,9 +68,16 @@
   {% if example_data.wasm %}
   <sl-tab-panel name="app">
     <script type="module">
-      import '{{ get_url(path="ranim-player.js") }}';
+      import '{{ get_url(path="ranim-viewport.js") }}';
+      import '{{ get_url(path="ranim-controls.js") }}';
+      for (const preview of document.querySelectorAll('.ranim-preview')) {
+        preview.querySelector('ranim-controls').target = preview.querySelector('ranim-viewport');
+      }
     </script>
-    <ranim-player src="{{ get_url(path='examples/' ~ example_name ~ '/pkg/ranim_example.js') }}"></ranim-player>
+    <div class="ranim-preview" style="display:grid;gap:8px">
+      <ranim-viewport src="{{ get_url(path='examples/' ~ example_name ~ '/pkg/ranim_example.js') }}"></ranim-viewport>
+      <ranim-controls></ranim-controls>
+    </div>
   </sl-tab-panel>
   {% endif %}
 </sl-tab-group>

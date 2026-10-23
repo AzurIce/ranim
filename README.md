@@ -204,8 +204,10 @@ share their scenes and rendering setup through `scenes.rs`. JavaScript
 initializes the module and calls `await app().createPreview(canvas, name)`.
 The returned session renders directly to the canvas with `renderAt(seconds)`;
 Web UI and playback scheduling stay in JavaScript. The shared
-[`<ranim-player>` component](./website/README.md) supplies play/pause and seeking
-for the website and rustdoc. egui/eframe are only used by the native preview.
+[`<ranim-viewport>` and `<ranim-controls>` components](./website/README.md)
+separate rendering from playback controls for the website and rustdoc. Controls
+can bind to any viewport by ID or a JavaScript reference. egui/eframe are only
+used by the native preview.
 
 ```bash
 cargo build --example arc-wasm --target wasm32-unknown-unknown --features render

@@ -82,7 +82,7 @@ just website
 ```
 
 修改 Rust 场景后，在另一个开发 shell 中重新运行 `cargo examples build arc`。
-播放器源码直接位于 `website/static/ranim-player.js`，修改后 Zola 会自动刷新，
+组件源码直接位于 `website/static/ranim-viewport.js` 与 `ranim-controls.js`，修改后 Zola 会自动刷新，
 无需重新构建 WASM。Rust 场景重建后，Zola 也会监听更新后的静态文件并刷新页面。
 只预览实时 WASM 不需要运行 `cargo examples run`，也不需要 shadow 凭证；
 后者用于渲染和发布 Preview 页签的媒体。
@@ -95,7 +95,7 @@ Zola 页面中仍使用 `!example-<name>` 插入 example 内容。列表页和�
 会按 `content/examples` 的目录层级渲染；嵌套 example 的页面会带 `Examples /
 <group> / <name>` 面包屑。
 Tera 组件在 `website/templates/components/` 中，`examples.player` 输出共享的
-`<ranim-player>` Web Component。
+`<ranim-viewport>` 与 `<ranim-controls>` Web Components，显式绑定后组合展示。
 
 `just doc-examples` 会为 `ranim-examples` 生成带 `#[wasm_demo_doc]` 实时预览的
 rustdoc。
@@ -111,8 +111,9 @@ rustdoc。
 Typst 等可选依赖。随后分别运行 `wasm-bindgen` 和 `wasm-opt`。产物位于
 `website/static/examples/<name>/pkg/ranim_example.js` 和对应的 `_bg.wasm`。
 `--out-dir` 改变输出根目录，仍保留 `examples/<name>/pkg/` 层级。
-播放器源码由 Zola 的 `website/static/ranim-player.js` 管理；网站直接使用，
-指定其他 `--out-dir`（如 rustdoc 目录）时才复制到输出根目录。网站和 rustdoc 共用
-`<ranim-player>` 组件：组件调用 `await app().createPreview(canvas, name)`，
-用 Web 端播放时钟驱动 `renderAt(seconds)`。WASM 只需要 `render`，
+组件源码由 Zola 的 `website/static/ranim-viewport.js` 和 `ranim-controls.js`
+管理；网站直接使用，指定其他 `--out-dir`（如 rustdoc 目录）时将两个文件
+复制到输出根目录。视口调用 `await app().createPreview(canvas, name)`，
+用 Web 端播放时钟驱动 `renderAt(seconds)`；独立控制条通过 `for="视口ID"`
+或 `controls.target = viewport` 连接，布局和数量由宿主决定。WASM 只需要 `render`，
 egui/eframe 属于 native 的 `preview`。

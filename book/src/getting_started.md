@@ -439,14 +439,19 @@ WASM 不自行启动事件循环。每个 `WasmApp` 创建一次预览；需要�
 调用 `app()`。
 
 仓库的 `cargo examples build [EXAMPLES...]` 会完成编译、`wasm-bindgen`
-和 `wasm-opt`。播放器源码位于 `website/static/ranim-player.js`，由 Zola 直接
-提供；为 rustdoc 等其他输出目录构建时，会复制同一份组件到输出根目录。
-网站和 rustdoc 使用同一个 `<ranim-player>`，提供播放、暂停、进度拖动与
-时间显示，无需 egui：
+和 `wasm-opt`。视口与控制条源码分别位于 `website/static/ranim-viewport.js`
+和 `website/static/ranim-controls.js`，由 Zola 直接提供；为 rustdoc 等其他
+输出目录构建时，会复制这两个组件到输出根目录。
+`<ranim-viewport>` 负责 canvas 和播放时钟，`<ranim-controls>` 通过 `for`
+绑定同一 DOM 根中的视口 ID，可放在页面任意位置；同一视口也能绑定多个
+控制条。JavaScript 可以用 `controls.target = viewport` 显式绑定，包括跨
+Shadow DOM 的组合。网站和 rustdoc 都用这两个组件，无需 egui：
 
 ```html
-<script type="module" src="./ranim-player.js"></script>
-<ranim-player src="./examples/arc/pkg/ranim_example.js" scene="arc"></ranim-player>
+<script type="module" src="./ranim-viewport.js"></script>
+<script type="module" src="./ranim-controls.js"></script>
+<ranim-viewport id="arc-view" src="./examples/arc/pkg/ranim_example.js" scene="arc"></ranim-viewport>
+<ranim-controls for="arc-view"></ranim-controls>
 ```
 
 ### 命令行：预览与渲染

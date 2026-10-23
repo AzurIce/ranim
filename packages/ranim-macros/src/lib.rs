@@ -152,7 +152,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let doc = if attrs.wasm_demo_doc {
         quote! {
-            #[doc = concat!("<ranim-player data-module-path=\"", module_path!(), "\" scene=\"", #scene_name, "\"></ranim-player>")]
+            #[doc = concat!("<div class=\"ranim-preview\" style=\"display:grid;gap:8px\"><ranim-viewport data-module-path=\"", module_path!(), "\" scene=\"", #scene_name, "\"></ranim-viewport><ranim-controls></ranim-controls></div>\n\n")]
         }
     } else {
         quote! {}

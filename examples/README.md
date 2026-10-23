@@ -17,8 +17,9 @@ WASM 入口通过 `#[wasm_bindgen] pub fn app()` 返回 `ranim::wasm::WasmApp`�
 JavaScript 调用 `await app().createPreview(canvas, name)` 创建预览会话，
 再用 `renderAt(seconds)` 驱动画面；`sceneNames()` 返回以换行分隔的注册场景名。
 每个项目 handle 创建一次预览，需要另一个预览时重新调用 `app()`。
-网站和 rustdoc 共用 [`<ranim-player>`](../website/README.md)，由 Web 组件提供
-播放、暂停和拖动进度；WASM 直接呈现到 canvas，不依赖 egui。
+网站和 rustdoc 共用 [`<ranim-viewport>` 与 `<ranim-controls>`](../website/README.md)：
+视口负责 canvas 和播放会话，独立控制条通过 `for` 或 `target` 绑定视口，
+提供播放、暂停和拖动进度；WASM 直接呈现到 canvas，不依赖 egui。
 
 原生 target 名为 `<name>`，需要 `preview`；WASM target 名为 `<name>-wasm`，
 设置 `crate-type = ["cdylib"]`，只需要 `render`。需要 `typst` 等额外

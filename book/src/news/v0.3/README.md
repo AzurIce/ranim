@@ -655,9 +655,12 @@ native 继续使用 egui 预览。自定义物件的精确输出类型
 
 `ranim-examples` 通过 `#[path]` 引用各个 `scenes.rs` 来生成 rustdoc。
 场景可标注 `#[wasm_demo_doc]`：`#[scene]` 在公开函数文档中注入
-`<ranim-player>`，根据所属 example 加载其独立的 WASM 模块，按注册名创建会话。
-网站与 rustdoc 共用这个 Web 组件，提供播放、暂停和拖动进度；组件卸载时释放
-GPU 资源。`#[scene(name = "hanoi")]` 等自定义注册名同样可用。
+`<ranim-viewport>` 与 `<ranim-controls>`，根据所属 example 加载其独立的 WASM
+模块，按注册名创建会话。视口负责渲染和播放时钟，控制条通过 `for` 属性或
+JavaScript 的 `target` 引用绑定视口；控制条可放在任意位置，也可让多个
+控制条操作同一视口。视口卸载时释放 GPU 资源；控制条的移动、卸载或重新绑定
+只改变 UI 连接，渲染会话继续由视口持有。网站与 rustdoc 都显式组合这两个
+组件。`#[scene(name = "hanoi")]` 等自定义注册名同样可用。
 `cargo examples build [EXAMPLES...]` 编译选定的 cdylib，并分别生成
 wasm-bindgen 绑定、运行 wasm-opt；`just doc-examples` 复用同一构建流程。
 

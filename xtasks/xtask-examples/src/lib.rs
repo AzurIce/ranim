@@ -38,6 +38,8 @@ const WEBSITE_EXAMPLES_CONTENT_DIR: &str = "content/examples";
 const WEBSITE_EXAMPLES_TITLE: &str = "例子";
 /// Module basename shared by the individual WASM packages.
 const EXAMPLES_WASM_MODULE: &str = "ranim_example";
+/// Independent components shared by the website and rustdoc.
+const PREVIEW_COMPONENTS: &[&str] = &["ranim-viewport.js", "ranim-controls.js"];
 
 /// Build each selected example's WASM cdylib and JavaScript bindings.
 ///
@@ -79,7 +81,7 @@ pub fn build_examples_wasm(
     for (features, examples) in groups {
         build_wasm_group(root_dir, &features, &examples, &output_dir)?;
     }
-    copy_player_component(root_dir, &output_dir)?;
+    copy_preview_components(root_dir, &output_dir)?;
     if output_dir.canonicalize()? == root_dir.join("website/static").canonicalize()? {
         for example in examples {
             example.refresh_website_sources(root_dir)?;
@@ -88,19 +90,21 @@ pub fn build_examples_wasm(
     Ok(())
 }
 
-/// Reuse the website's component for other hosts, such as rustdoc.
-fn copy_player_component(root_dir: &Path, output_dir: &Path) -> Result<()> {
-    let source = root_dir
-        .join("website/static/ranim-player.js")
-        .canonicalize()
-        .context("failed to find the website preview component")?;
+/// Reuse the website's components for other hosts, such as rustdoc.
+fn copy_preview_components(root_dir: &Path, output_dir: &Path) -> Result<()> {
     fs::create_dir_all(output_dir)?;
-    let target = output_dir.join("ranim-player.js");
-    // The default output is already the component's source directory. Resolve
-    // aliases like `--out-dir ./website/static` too: copying onto the source
-    // would truncate it.
-    if target.canonicalize().ok().as_ref() != Some(&source) {
-        fs::copy(&source, &target).context("failed to copy the website preview component")?;
+    for name in PREVIEW_COMPONENTS {
+        let source = root_dir
+            .join("website/static")
+            .join(name)
+            .canonicalize()
+            .with_context(|| format!("failed to find preview component {name}"))?;
+        let target = output_dir.join(name);
+        // Resolve aliases too: copying onto a source would truncate it.
+        if target.canonicalize().ok().as_ref() != Some(&source) {
+            fs::copy(&source, &target)
+                .with_context(|| format!("failed to copy preview component {name}"))?;
+        }
     }
     Ok(())
 }
@@ -1099,32 +1103,31 @@ mod test {
     }
 
     #[test]
-    fn test_player_component_copies_without_overwriting_its_source() {
+    fn test_preview_components_copy_without_overwriting_their_sources() {
         let root = temp_root("player-component");
         let website = root.join("website/static");
         fs::create_dir_all(&website).unwrap();
-        let source = website.join("ranim-player.js");
-        let contents = "export const player = true;\n";
-        fs::write(&source, contents).unwrap();
+        for name in PREVIEW_COMPONENTS {
+            fs::write(website.join(name), format!("// {name}\n")).unwrap();
+        }
 
-        copy_player_component(&root, &website).unwrap();
-        copy_player_component(&root, &website.join("../static")).unwrap();
-        assert_eq!(fs::read_to_string(&source).unwrap(), contents);
+        copy_preview_components(&root, &website).unwrap();
+        copy_preview_components(&root, &website.join("../static")).unwrap();
 
         let docs = root.join("docs/ranim_examples");
-        copy_player_component(&root, &docs).unwrap();
-        assert_eq!(
-            fs::read_to_string(docs.join("ranim-player.js")).unwrap(),
-            contents
-        );
-        let updated = "export const player = false;\n";
-        fs::write(&source, updated).unwrap();
-        copy_player_component(&root, &docs).unwrap();
-        assert_eq!(fs::read_to_string(&source).unwrap(), updated);
-        assert_eq!(
-            fs::read_to_string(docs.join("ranim-player.js")).unwrap(),
-            updated
-        );
+        copy_preview_components(&root, &docs).unwrap();
+        for name in PREVIEW_COMPONENTS {
+            let contents = format!("// {name}\n");
+            assert_eq!(fs::read_to_string(website.join(name)).unwrap(), contents);
+            assert_eq!(fs::read_to_string(docs.join(name)).unwrap(), contents);
+            fs::write(website.join(name), format!("// updated {name}\n")).unwrap();
+        }
+        copy_preview_components(&root, &docs).unwrap();
+        for name in PREVIEW_COMPONENTS {
+            let updated = format!("// updated {name}\n");
+            assert_eq!(fs::read_to_string(website.join(name)).unwrap(), updated);
+            assert_eq!(fs::read_to_string(docs.join(name)).unwrap(), updated);
+        }
         fs::remove_dir_all(root).unwrap();
     }
 
