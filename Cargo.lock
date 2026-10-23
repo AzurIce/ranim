@@ -314,6 +314,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 name = "app"
 version = "0.1.0"
 dependencies = [
+ "bevy_app",
  "ranim",
 ]
 
@@ -5317,6 +5318,7 @@ dependencies = [
  "bevy_ecs",
  "bytemuck",
  "clap",
+ "console_error_panic_hook",
  "derive_more",
  "eframe",
  "egui",
@@ -5386,7 +5388,6 @@ name = "ranim-examples"
 version = "0.2.1"
 dependencies = [
  "bevy_app",
- "console_error_panic_hook",
  "getrandom 0.4.3",
  "itertools 0.15.0",
  "midly",
@@ -5396,8 +5397,6 @@ dependencies = [
  "ranim-anims",
  "ranim-core",
  "ranim-items",
- "wasm-bindgen",
- "wasm-tracing",
 ]
 
 [[package]]
@@ -5443,6 +5442,7 @@ version = "0.2.1"
 dependencies = [
  "async-channel",
  "bevy_app",
+ "bevy_derive",
  "bevy_ecs",
  "bytemuck",
  "glam 0.34.1",
@@ -5451,6 +5451,7 @@ dependencies = [
  "ranim-core",
  "tracing",
  "variadics_please",
+ "web-time",
  "wgpu",
  "wgpu-profiler",
 ]
@@ -5459,6 +5460,7 @@ dependencies = [
 name = "ranim-render-plugin-example"
 version = "0.1.0"
 dependencies = [
+ "bevy_app",
  "ranim",
 ]
 
@@ -8134,17 +8136,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wasm-tracing"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11ab253baf6d3772bbdb37a0966b67d37ab80657ccd1a084b4d7b3de3232375d"
-dependencies = [
- "tracing",
- "tracing-subscriber",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "wasmi"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9149,6 +9140,7 @@ dependencies = [
  "base16ct",
  "clap",
  "serde",
+ "serde_json",
  "sha1",
  "toml 1.1.8+spec-1.1.0",
  "tracing",

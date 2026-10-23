@@ -7,9 +7,9 @@
 
     <div class="content container">
       {% if section %}
-      {{ public_draft::warning(section=section) }}
+      {{ <public_draft.warning section={section} /> }}
       {% elif page %}
-      {{ public_draft::warning(section=page) }}
+      {{ <public_draft.warning section={page} /> }}
       {% endif %}
       {% block content %}{% endblock content %}
     </div>

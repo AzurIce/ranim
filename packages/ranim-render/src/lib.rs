@@ -26,7 +26,8 @@ pub mod upload_probe;
 pub mod utils;
 pub mod world;
 
-use bevy_app::{Plugins, PluginsState, SubApp};
+use bevy_app::{App, PluginsState, SubApp};
+use bevy_derive::AppLabel;
 use bevy_ecs::prelude::*;
 use glam::{UVec3, uvec3};
 use ranim_core::frame::EvaluatedFrame;
@@ -68,81 +69,114 @@ pub mod profiling_utils {
     }
 }
 
-// MARK: Renderer
-pub struct Renderer {
-    width: u32,
-    height: u32,
-    render_app: SubApp,
+/// The [`App`] label of a ranim render sub-app.
+///
+/// Installed by [`install_render_app`]; read it back with
+/// `app.get_sub_app(RanimRenderApp)`.
+#[derive(AppLabel, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RanimRenderApp;
+
+/// Create an independent render runtime with the shared frame, viewport, and
+/// OIT infrastructure installed.
+///
+/// Item plugins install their own extraction and GPU systems on top.
+/// Extraction systems can read the current [`EvaluatedFrame`] resource during
+/// [`RenderSchedule::Extract`](crate::schedule::RenderSchedule::Extract).
+/// Plugins configure the render world directly; no logic world is created.
+pub fn build_render_app(ctx: &WgpuContext, width: u32, height: u32, oit_layers: usize) -> SubApp {
+    let mut render_app = SubApp::new();
+    render_app
+        .insert_resource(ctx.clone())
+        .insert_resource(RenderDimensions { width, height })
+        .insert_resource(ResolutionInfo::new(ctx, width, height, oit_layers))
+        .insert_resource(ViewportGpuPacket::new(ctx, &ViewportUniform::default()))
+        .insert_resource(RenderProfiler::new(ctx))
+        .init_resource::<PipelinesPool>()
+        .init_resource::<EvaluatedFrame>();
+    install_schedules(&mut render_app);
+    render_app
 }
 
-impl Renderer {
-    pub fn width(&self) -> u32 {
-        self.width
-    }
+/// Build and install the render sub-app for `app`, with the project's
+/// [`RenderSetup`] applied.
+///
+/// On every [`App::update`], right after the main schedule ran, the sub-app's
+/// extract hook swaps the main world's current [`EvaluatedFrame`] into the
+/// render world (the render world's previous batch storage moves back, so
+/// both sides keep reusing their allocations).
+///
+/// # Panics
+///
+/// Panics if a plugin is not ready after installation. This supports
+/// synchronous setup using the already initialized GPU context.
+pub fn install_render_app(
+    app: &mut App,
+    ctx: &WgpuContext,
+    width: u32,
+    height: u32,
+    oit_layers: usize,
+    setup: RenderSetup,
+) {
+    let mut render_app = build_render_app(ctx, width, height, oit_layers);
+    render_app.add_plugins(setup);
+    assert_eq!(
+        render_app.plugins_state(),
+        PluginsState::Ready,
+        "render plugins must be ready after synchronous installation"
+    );
+    render_app.finish();
+    render_app.cleanup();
+    render_app.set_extract(|main, render| {
+        let Some(mut frame) = main.get_resource_mut::<EvaluatedFrame>() else {
+            return;
+        };
+        std::mem::swap(&mut *frame, &mut *render.resource_mut::<EvaluatedFrame>());
+    });
+    app.insert_sub_app(RanimRenderApp, render_app);
+}
 
-    pub fn height(&self) -> u32 {
-        self.height
-    }
-
-    pub fn ratio(&self) -> f32 {
-        self.width as f32 / self.height as f32
-    }
-
-    /// Create an independent render runtime with an explicit set of plugins.
+/// Manual driving of a standalone render sub-app built by [`build_render_app`].
+pub trait RenderAppExt {
+    /// Point the render world at the frame's output target.
     ///
-    /// Shared frame, viewport, and OIT infrastructure is installed before
-    /// `plugins`. Item plugins install their own extraction and GPU systems.
-    /// Extraction systems can read the
-    /// current [`EvaluatedFrame`] resource during [`schedule::RenderSchedules::extract`].
-    /// Plugins configure the render world directly; no logic world is created.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a plugin is not ready after installation. This constructor
-    /// supports synchronous setup using the already initialized GPU context.
-    pub fn new<M>(
-        ctx: &WgpuContext,
-        width: u32,
-        height: u32,
-        oit_layers: usize,
-        plugins: impl Plugins<M>,
-    ) -> Self {
-        let mut render_app = SubApp::new();
-        render_app
-            .insert_resource(ctx.clone())
-            .insert_resource(RenderDimensions { width, height })
-            .insert_resource(ResolutionInfo::new(ctx, width, height, oit_layers))
-            .insert_resource(ViewportGpuPacket::new(ctx, &ViewportUniform::default()))
-            .insert_resource(RenderProfiler::new(ctx))
-            .init_resource::<PipelinesPool>()
-            .init_resource::<EvaluatedFrame>();
-        install_schedules(&mut render_app);
-        render_app.add_plugins(plugins);
-        assert_eq!(
-            render_app.plugins_state(),
-            PluginsState::Ready,
-            "render plugins must be ready after synchronous installation"
-        );
-        render_app.finish();
-        render_app.cleanup();
+    /// Cheap: the frame target clones the textures' views. Inserted per frame
+    /// when the output rotates over multiple readback buffers.
+    fn set_frame_target(&mut self, render_textures: &RenderTextures, clear_color: wgpu::Color);
 
-        Self {
-            width,
-            height,
-            render_app,
-        }
-    }
-
-    pub fn new_render_textures(&self, ctx: &WgpuContext) -> RenderTextures {
-        RenderTextures::new(ctx, self.width, self.height)
-    }
-
-    /// Extract and render one evaluated frame.
+    /// Extract and render one evaluated frame into `render_textures`.
     ///
     /// The frame is temporarily swapped into the render world, then returned
-    /// with its input data intact so its batches can be reused or rendered again.
-    /// Extraction systems should only read the frame.
-    pub fn render_frame(
+    /// with its input data intact so its batches can be reused or rendered
+    /// again. Extraction systems should only read the frame.
+    fn render_frame(
+        &mut self,
+        render_textures: &mut RenderTextures,
+        clear_color: wgpu::Color,
+        frame: &mut EvaluatedFrame,
+    );
+
+    /// Take the GPU timer scopes recorded for the most recent processed
+    /// frame (empty unless GPU timers are enabled and the device supports
+    /// timestamp queries).
+    fn take_last_gpu_scopes(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>>;
+
+    /// Whether the device supports GPU timestamp queries.
+    fn gpu_timers_supported(&self) -> bool;
+
+    /// Whether GPU timer scopes are currently being recorded.
+    fn gpu_timers_enabled(&self) -> bool;
+
+    /// Enable/disable GPU timer recording at runtime. While enabled, each
+    /// frame pays a device poll to read the timers back.
+    fn set_gpu_timers_enabled(&self, on: bool);
+}
+
+impl RenderAppExt for SubApp {
+    fn set_frame_target(&mut self, render_textures: &RenderTextures, clear_color: wgpu::Color) {
+        self.insert_resource(FrameTarget::new(render_textures, clear_color));
+    }
+
+    fn render_frame(
         &mut self,
         render_textures: &mut RenderTextures,
         clear_color: wgpu::Color,
@@ -150,53 +184,33 @@ impl Renderer {
     ) {
         std::mem::swap(
             frame,
-            &mut self.render_app.world_mut().resource_mut::<EvaluatedFrame>(),
+            &mut self.world_mut().resource_mut::<EvaluatedFrame>(),
         );
-        self.render_app
-            .insert_resource(FrameTarget::new(render_textures, clear_color));
-        self.render_app.update();
+        self.insert_resource(FrameTarget::new(render_textures, clear_color));
+        self.update();
         std::mem::swap(
             frame,
-            &mut self.render_app.world_mut().resource_mut::<EvaluatedFrame>(),
+            &mut self.world_mut().resource_mut::<EvaluatedFrame>(),
         );
     }
 
-    /// Take the GPU timer scopes recorded for the most recent processed
-    /// frame (empty unless GPU timers are enabled and the device supports
-    /// timestamp queries).
-    pub fn take_last_gpu_scopes(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
-        self.render_app
-            .world_mut()
-            .resource_mut::<schedule::RenderProfiler>()
+    fn take_last_gpu_scopes(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
+        self.world_mut()
+            .resource_mut::<RenderProfiler>()
             .last_frame_scopes
             .take()
     }
 
-    /// Whether the device supports GPU timestamp queries.
-    pub fn gpu_timers_supported(&self) -> bool {
-        self.render_app
-            .world()
-            .resource::<schedule::RenderProfiler>()
-            .inner
-            .is_some()
+    fn gpu_timers_supported(&self) -> bool {
+        self.world().resource::<RenderProfiler>().inner.is_some()
     }
 
-    /// Whether GPU timer scopes are currently being recorded (see
-    /// [`Renderer::set_gpu_timers_enabled`]).
-    pub fn gpu_timers_enabled(&self) -> bool {
-        self.render_app
-            .world()
-            .resource::<schedule::RenderProfiler>()
-            .is_enabled()
+    fn gpu_timers_enabled(&self) -> bool {
+        self.world().resource::<RenderProfiler>().is_enabled()
     }
 
-    /// Enable/disable GPU timer recording at runtime. While enabled, each
-    /// frame pays a device poll to read the timers back.
-    pub fn set_gpu_timers_enabled(&mut self, on: bool) {
-        self.render_app
-            .world_mut()
-            .resource_mut::<schedule::RenderProfiler>()
-            .set_enabled(on);
+    fn set_gpu_timers_enabled(&self, on: bool) {
+        self.world().resource::<RenderProfiler>().set_enabled(on);
     }
 }
 

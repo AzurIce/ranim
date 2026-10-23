@@ -1022,9 +1022,9 @@ mod tests {
     fn render_extraction_preserves_order_pose_and_removes_missing_leaves() {
         use crate::vitem::render::RenderVItem;
         use bevy_app::SubApp;
-        use bevy_ecs::prelude::*;
+        use bevy_ecs::{prelude::*, schedule::ScheduleLabel};
         use ranim_core::glam::DMat4;
-        use ranim_render::{extract::ExtractPlugin, schedule::RenderSchedules, world::SourceOrder};
+        use ranim_render::{extract::ExtractPlugin, schedule::RenderSchedule, world::SourceOrder};
 
         type Input = Transformed<VItemNode, DAffine3>;
 
@@ -1042,8 +1042,7 @@ mod tests {
         frame.push((7, 0), input);
 
         let mut app = SubApp::new();
-        app.init_resource::<RenderSchedules>();
-        app.update_schedule = Some(app.world().resource::<RenderSchedules>().extract);
+        app.update_schedule = Some(RenderSchedule::Extract.intern());
         app.insert_resource(frame)
             .add_plugins(ExtractPlugin::<Input>::default());
         app.update();

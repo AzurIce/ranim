@@ -255,7 +255,7 @@ fn flicker(r: &mut RanimScene) {
 pub struct ScenesPlugin;
 
 impl ranim::Plugin for ScenesPlugin {
-    fn build(&self, app: &mut ranim::App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([
             opaque_front::scene(),
             opaque_angled::scene(),
@@ -265,5 +265,26 @@ impl ranim::Plugin for ScenesPlugin {
             z_sweep::scene(),
             flicker::scene(),
         ]);
+
+        #[cfg(feature = "render")]
+        {
+            use ranim::{
+                core::traits::Translation,
+                core::transformed::Transformed,
+                items::{
+                    RanimItemsPlugin,
+                    vitem::geometry::{Circle, Square},
+                },
+                render::{RenderSetup, extract::ExtractPlugin},
+            };
+
+            app.insert_resource(RenderSetup::new(|render_app| {
+                render_app.add_plugins((
+                    RanimItemsPlugin,
+                    ExtractPlugin::<Transformed<Square, Translation>>::default(),
+                    ExtractPlugin::<Transformed<Circle, Translation>>::default(),
+                ));
+            }));
+        }
     }
 }

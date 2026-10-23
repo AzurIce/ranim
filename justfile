@@ -17,6 +17,7 @@ fmt-check:
 lint: lint-no-features
     just lint-features render
     just lint-features audio-decode
+    just lint-features preview,typst,gltf
 
 lint-no-features: fmt-check
     CARGO_BUILD_JOBS={{ cargo_jobs }} cargo clippy --workspace --all-targets -- -D warnings
@@ -32,11 +33,10 @@ changelog:
 website:
     zola --root website build
 
-doc-nightly:
-    RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
-        cargo +nightly doc --workspace --no-deps --document-private-items --all-features \
-        --exclude app --exclude xtask-examples --exclude benches
-    just _build-example-doc-assets
+# Build the requested WASM examples (all by default), then serve Zola locally.
+website-preview *EXAMPLES:
+    CARGO_BUILD_JOBS={{ cargo_jobs }} cargo examples build {{ EXAMPLES }}
+    zola --root website serve --base-url http://127.0.0.1
 
 doc:
     RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
@@ -45,17 +45,13 @@ doc:
     just _build-example-doc-assets
 
 _build-example-doc-assets:
-    CARGO_BUILD_JOBS={{ cargo_jobs }} cargo build -p ranim-examples --bin ranim-examples-preview --release --target wasm32-unknown-unknown
-    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim-examples-preview.wasm --out-name ranim_examples \
-        --out-dir target/doc/ranim_examples/pkg
+    CARGO_BUILD_JOBS={{ cargo_jobs }} cargo examples build --out-dir target/doc/ranim_examples
 
 doc-examples:
     RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
         cargo doc --no-deps -p ranim-examples --document-private-items --all-features \
         --target-dir packages/ranim-examples/target
-    CARGO_BUILD_JOBS={{ cargo_jobs }} cargo build -p ranim-examples --bin ranim-examples-preview --release --target wasm32-unknown-unknown
-    wasm-bindgen --target web target/wasm32-unknown-unknown/release/ranim-examples-preview.wasm --out-name ranim_examples \
-        --out-dir packages/ranim-examples/target/doc/ranim_examples/pkg
+    CARGO_BUILD_JOBS={{ cargo_jobs }} cargo examples build --out-dir packages/ranim-examples/target/doc/ranim_examples
 
 book:
     mdbook build book

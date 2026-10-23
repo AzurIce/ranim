@@ -292,7 +292,24 @@ fn solar_system(r: &mut RanimScene) {
 pub struct ScenesPlugin;
 
 impl ranim::Plugin for ScenesPlugin {
-    fn build(&self, app: &mut ranim::App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([solar_system::scene()]);
+
+        #[cfg(feature = "render")]
+        {
+            use ranim::{
+                core::traits::Translation,
+                core::transformed::Transformed,
+                items::{RanimItemsPlugin, mesh::Surface},
+                render::{RenderSetup, extract::ExtractPlugin},
+            };
+
+            app.insert_resource(RenderSetup::new(|render_app| {
+                render_app.add_plugins((
+                    RanimItemsPlugin,
+                    ExtractPlugin::<Transformed<Surface, Translation>>::default(),
+                ));
+            }));
+        }
     }
 }

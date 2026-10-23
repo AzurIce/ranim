@@ -1,41 +1,55 @@
 # Examples
 
-每个 example 是 `examples/` 下的一个独立目录（入口为 `main.rs`），需要在根
-`Cargo.toml` 中显式注册 `[[example]]`（根 crate 设置了 `autoexamples = false`）。
-所有 example 都声明 `required-features = ["preview"]`；需要额外 feature 的
-例子在此基础上合并（如 `["preview", "typst"]`、`["preview", "gltf"]`）。
+每个 example 在根 `Cargo.toml` 中显式注册（`autoexamples = false`）。
+支持浏览器预览的 example 使用三个文件：
 
-每个目录的 `scenes.rs` 保存场景实现和 `ScenesPlugin`，只通过
-`app.add_scenes([...])` 注册场景。简单 example 的 `main.rs` 只有
-`mod scenes;` 与 `fn main()`，直接把 `ScenesPlugin` 装进 App；项目未注册
-`RenderSetup` 时，渲染与预览自动回退到内建的 `RanimItemsPlugin`
-（camera frame、VItem、MeshItem）。只有需要自定义渲染的 example 才在
-`main.rs` 中定义 `ProjectPlugin`，向项目 App 插入 `RenderSetup`，闭包内以
-`RanimItemsPlugin` 为基础，再叠加该项目完整输出类型对应的
-`ExtractPlugin<T>` 或场景私有的渲染配置（`scenes::configure_render`）。
-`Vec<VItem>` 已由 `VItemPlugin`（内含于 `RanimItemsPlugin`）注册；其余
-`Vec<T>`、`Transformed<T, G>` 等组合输出仍需显式注册完整类型，嵌套值由
-`Extract` 实现递归处理。私有输出类型的注册保留在相应 `scenes.rs` 中。
+```text
+examples/arc/
+├── main.rs    # [[example]] bin：mod scenes; run_cli(app.build())
+├── wasm.rs    # [[example]] cdylib：mod scenes; 导出 app() -> WasmApp
+└── scenes.rs  # 两个 target 共享的场景、插件和渲染装配
+```
 
-`main.rs` 末尾的 `fn main()` 通过
-`App::new().add_plugins(scenes::ScenesPlugin).run()`（有 `ProjectPlugin`
-的 example 换成它）把项目交给命令行入口
-（`ranim::cmd::AppRunExt`，由 `ranim::prelude` 在 native + `render` feature
-下导出），提供 `preview` / `output` / `render` / `inspect` 子命令。
-`#[scene]` 生成同名模块中的 owned `scene()` 描述符，注册由插件完成。
+`ScenesPlugin` 注册场景，并在需要时插入项目自己的 `RenderSetup`；
+自定义输出的 `ExtractPlugin<T>` 也在这里装配。两个入口创建 App、安装同一个
+`scenes::ScenesPlugin`，再调用 `app.build()` 定稿。原生入口交给 `run_cli`，
+WASM 入口通过 `#[wasm_bindgen] pub fn app()` 返回 `ranim::wasm::WasmApp`。
+JavaScript 调用 `await app().createPreview(canvas, name)` 创建预览会话，
+再用 `renderAt(seconds)` 驱动画面；`sceneNames()` 返回以换行分隔的注册场景名。
+每个项目 handle 创建一次预览，需要另一个预览时重新调用 `app()`。
+网站和 rustdoc 共用 [`<ranim-player>`](../website/README.md)，由 Web 组件提供
+播放、暂停和拖动进度；WASM 直接呈现到 canvas，不依赖 egui。
 
-这里拆分 `scenes.rs` 与 `main.rs` 是为了复用示例源码：共享库通过 `#[path]`
-只引用各例子的 `scenes.rs`（场景与 `ScenesPlugin`），而每个 example 的
-`fn main`（以及可选的 `ProjectPlugin`）留在 `main.rs` 中。普通项目可以把
-场景、插件定义和 `main` 放在同一个 `main.rs` 中。
+原生 target 名为 `<name>`，需要 `preview`；WASM target 名为 `<name>-wasm`，
+设置 `crate-type = ["cdylib"]`，只需要 `render`。需要 `typst` 等额外
+feature 的例子在两个 target 中一致声明。
+`main.rs` 使用以下 crate 级属性限定原生代码：
 
-共享的 `ranim-examples` 库（纯 rlib）由自己的 `ProjectPlugin` 组合各个
-`ScenesPlugin`，以 `RanimItemsPlugin` 统一声明内建渲染插件并注册公共输出
-类型，再叠加各模块的私有输出类型与渲染配置。
-独立的 `ranim-examples-preview` 二进制创建 App 并安装组合插件：native 下走
-`AppRunExt::run()` 命令行入口，wasm 下为网站与 rustdoc 导出
-`preview_scene("注册名")`。Web 构建选择该二进制。网站展示场景实现与插件入口，
-rustdoc 的示例来自 `scenes.rs`。
+```rust
+#![cfg_attr(target_arch = "wasm32", no_main)]
+#![cfg(not(target_arch = "wasm32"))]
+```
+
+WASM 批量检查时整个原生入口（含 `mod scenes` 与 CLI）被排除；`no_main` 让这个
+空的 bin target 无需提供 `main`。`wasm.rs` 则通过
+`#![cfg(target_arch = "wasm32")]` 限定 WASM 代码，原生批量检查时该 cdylib 为空。
+编译时用 `--example <name>` / `--example <name>-wasm` 显式选择入口，
+用 `--target wasm32-unknown-unknown` 指定 WASM 平台；Cargo 不会按平台自动切换
+example 名称。批量构建 WASM 包使用 `cargo examples build`。
+`gltf_showcase` 通过 `include_bytes!` 嵌入 GLB 模型，原生与 WASM 使用同一套
+无文件系统 I/O 的模型加载与项目装配。
+
+未提供 `RenderSetup` 时，渲染与预览使用默认的 `RanimItemsPlugin`。
+它包含 camera frame、VItem、MeshItem 及 `Vec<VItem>` 的渲染支持；其他
+`Vec<T>`、`Transformed<T, G>` 等输出需要显式注册完整类型。
+`#[scene]` 生成同名模块中的 `scene()` 描述符，插件通过 `app.add_scenes([...])`
+注册它们。
+
+`ranim-examples` 仅作为 rustdoc 库，库入口保留在
+`examples/ranim_examples_bundle.rs`，通过 `#[path]` 引用各例子的 `scenes.rs`，
+该布局用于规避 rust-analyzer 的问题。
+聚合库只启用渲染装配，不依赖 native `preview`。
+网站和 rustdoc 都加载各 example 自己的 WASM 模块，使用与原生入口相同的项目装配。
 
 ## 运行
 
@@ -51,6 +65,16 @@ cargo run --example <name> --features preview -- render <SCENE>
 
 # 需要额外 feature 的 example 把对应 feature 一并开启
 cargo run --example text_item --features preview,typst -- preview
+
+# 只编译 arc 的 WASM cdylib
+cargo build --example arc-wasm --target wasm32-unknown-unknown --features render
+
+# 批量检查全部 example target，原生入口在 WASM 下为空
+cargo check -p ranim --examples --target wasm32-unknown-unknown --features preview,typst,gltf
+
+# 构建网站需要的各例子 WASM 包（也可只构建 arc）
+cargo examples build
+cargo examples build arc
 
 # 渲染全部 example 并刷新 website 产物
 cargo examples run

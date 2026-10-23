@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use clap::{Subcommand, ValueEnum};
 use ranim::{
-    App,
+    App, AppExt, SceneConstructor,
     color::{AlphaColor, Srgb},
     core::{
         anchor::Aabb,
@@ -72,7 +70,7 @@ pub enum InspectCommand {
 }
 
 /// Run an `inspect` subcommand against the project.
-pub fn inspect_command(app: &Arc<App>, command: InspectCommand) -> Result<()> {
+pub fn inspect_command(app: &App, command: InspectCommand) -> Result<()> {
     match command {
         InspectCommand::Scenes { format } => scenes_command(app, format),
         InspectCommand::Tree { scene, format } => tree_command(app, scene.as_deref(), format),
@@ -298,7 +296,7 @@ fn short_anim_name(anim_name: &str) -> &str {
         .unwrap_or(without_generics)
 }
 
-fn tree_command(app: &Arc<App>, scene_name: Option<&str>, format: FormatArg) -> Result<()> {
+fn tree_command(app: &App, scene_name: Option<&str>, format: FormatArg) -> Result<()> {
     let scene = select_scene(app, scene_name)?;
     let sealed = scene.build_scene();
     let time_marks = sealed
@@ -458,7 +456,7 @@ struct CameraDataDto {
 }
 
 fn frame_command(
-    app: &Arc<App>,
+    app: &App,
     scene_name: &str,
     at: f64,
     format: FormatArg,

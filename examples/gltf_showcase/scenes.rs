@@ -7,21 +7,38 @@ use ranim::{
     glam::{DAffine3, DVec3},
     items::{
         hierarchy::Node,
-        mesh::{MeshItem, gltf::node_tree_from_path},
+        mesh::{
+            MeshItem,
+            gltf::{gltf, node_tree_from_gltf},
+        },
     },
     prelude::*,
     utils::rate_functions::linear,
 };
 
-const MODEL_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/models");
+const MODELS: [(&str, &[u8]); 3] = [
+    ("belt.glb", include_bytes!("../../assets/models/belt.glb")),
+    (
+        "storage.glb",
+        include_bytes!("../../assets/models/storage.glb"),
+    ),
+    (
+        "generator.glb",
+        include_bytes!("../../assets/models/generator.glb"),
+    ),
+];
 
 /// Loads a model (the loader already converts glTF's Y-up to ranim's Z-up),
 /// centers it on its own axes and normalizes its size, so it can be posed
 /// by rotating about its vertical axis and placed by shifting its root.
-fn load_model(file: &str, size: f64) -> Transformed<Node<MeshItem>, DAffine3> {
-    let tree = node_tree_from_path(format!("{MODEL_DIR}/{file}"))
-        .unwrap_or_else(|error| panic!("failed to load {file}: {error}"))
-        .tree;
+fn load_model(name: &str, bytes: &[u8], size: f64) -> Transformed<Node<MeshItem>, DAffine3> {
+    let parsed = gltf::Gltf::from_slice(bytes)
+        .unwrap_or_else(|error| panic!("failed to parse embedded {name}: {error}"));
+    let tree = node_tree_from_gltf(&parsed.document, |buffer| match buffer.source() {
+        gltf::buffer::Source::Bin => parsed.blob.as_deref(),
+        gltf::buffer::Source::Uri(_) => None,
+    })
+    .tree;
     let [min, max] = tree.aabb();
     let extents = max - min;
     // Place the tree by wrapping it — the pose stays external.
@@ -39,6 +56,7 @@ fn load_model(file: &str, size: f64) -> Transformed<Node<MeshItem>, DAffine3> {
 /// The POC glTF loader ignores materials, so each machine is tinted with a
 /// palette color instead.
 #[scene]
+#[wasm_demo_doc]
 #[output(dir = "./output/gltf_showcase")]
 fn gltf_showcase(r: &mut RanimScene) {
     let total_secs = 10.0;
@@ -55,10 +73,8 @@ fn gltf_showcase(r: &mut RanimScene) {
 
     let slots = [-3.6, 0.0, 3.6];
     let colors = [manim::BLUE_D, manim::TEAL_D, manim::PURPLE_D];
-    let files = ["belt.glb", "storage.glb", "generator.glb"];
-
-    for (i, (file, &slot)) in files.iter().zip(slots.iter()).enumerate() {
-        let mut tree = load_model(file, 2.2);
+    for (i, ((name, bytes), &slot)) in MODELS.iter().zip(slots.iter()).enumerate() {
+        let mut tree = load_model(name, bytes, 2.2);
         tree.set_fill_color(colors[i]);
 
         // Spin about the model's own vertical axis while fading in over the
@@ -85,7 +101,24 @@ fn gltf_showcase(r: &mut RanimScene) {
 pub struct ScenesPlugin;
 
 impl ranim::Plugin for ScenesPlugin {
-    fn build(&self, app: &mut ranim::App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([gltf_showcase::scene()]);
+
+        #[cfg(feature = "render")]
+        {
+            use ranim::{
+                core::transformed::Transformed,
+                glam::DAffine3,
+                items::{RanimItemsPlugin, hierarchy::Node, mesh::MeshItem},
+                render::{RenderSetup, extract::ExtractPlugin},
+            };
+
+            app.insert_resource(RenderSetup::new(|render_app| {
+                render_app.add_plugins((
+                    RanimItemsPlugin,
+                    ExtractPlugin::<Transformed<Node<MeshItem>, DAffine3>>::default(),
+                ));
+            }));
+        }
     }
 }

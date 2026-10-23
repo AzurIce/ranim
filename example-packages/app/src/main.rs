@@ -1,4 +1,6 @@
 fn main() {
     use ranim::prelude::*;
-    App::new().add_plugins(app::ScenesPlugin).run();
+    let mut app = App::new();
+    app.add_plugins(app::ScenesPlugin);
+    run_cli(app.build());
 }

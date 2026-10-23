@@ -14,7 +14,7 @@ use ranim_core::{
     transformed::Transformed,
 };
 
-use crate::{schedule::RenderSchedules, world::SourceOrder};
+use crate::{schedule::RenderSchedule, world::SourceOrder};
 
 /// Extract an evaluated value into render-world entities or resources.
 ///
@@ -33,7 +33,7 @@ pub trait Extract {
 /// For example, a frame containing `Vec<T>` needs `ExtractPlugin<Vec<T>>`;
 /// installing `ExtractPlugin<T>` alone does not visit that batch. Recursive
 /// [`Extract`] implementations handle the values inside the registered type.
-/// Handwritten systems can also be added to [`RenderSchedules::extract`].
+/// Handwritten systems can also be added to [`RenderSchedule::Extract`].
 pub struct ExtractPlugin<T>(PhantomData<fn() -> T>);
 
 impl<T> Default for ExtractPlugin<T> {
@@ -44,9 +44,8 @@ impl<T> Default for ExtractPlugin<T> {
 
 impl<T: Extract + Send + Sync + 'static> Plugin for ExtractPlugin<T> {
     fn build(&self, app: &mut App) {
-        let extract = app.world().resource::<RenderSchedules>().extract;
         app.init_resource::<ExtractedEntities<T>>()
-            .add_systems(extract, extract_items::<T>);
+            .add_systems(RenderSchedule::Extract, extract_items::<T>);
     }
 }
 
@@ -251,7 +250,7 @@ variadics_please::all_tuples!(impl_extract_for_tuple, 1, 15, T, value);
 #[cfg(test)]
 mod tests {
     use bevy_app::SubApp;
-    use bevy_ecs::query::Changed;
+    use bevy_ecs::{query::Changed, schedule::ScheduleLabel};
     use ranim_core::glam::{DMat4, DVec3};
 
     use super::*;
@@ -286,8 +285,7 @@ mod tests {
 
     fn extraction_app<T: Extract + Send + Sync + 'static>() -> SubApp {
         let mut app = SubApp::new();
-        app.init_resource::<RenderSchedules>();
-        app.update_schedule = Some(app.world().resource::<RenderSchedules>().extract);
+        app.update_schedule = Some(RenderSchedule::Extract.intern());
         app.init_resource::<EvaluatedFrame>()
             .add_plugins(ExtractPlugin::<T>::default());
         app
@@ -336,9 +334,8 @@ mod tests {
         struct Changes(Vec<usize>);
 
         let mut app = extraction_app::<Vec<TestItem>>();
-        let extract = app.world().resource::<RenderSchedules>().extract;
         app.init_resource::<Changes>().add_systems(
-            extract,
+            RenderSchedule::Extract,
             (|items: Query<Entity, Changed<TestItem>>, mut changes: ResMut<Changes>| {
                 changes.0.push(items.iter().count());
             })

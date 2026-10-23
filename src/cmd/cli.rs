@@ -1,19 +1,17 @@
-//! The command line interface served by [`AppRunExt::run`].
-
-use std::sync::Arc;
+//! The command line interface served by [`run_cli`].
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use tracing::{error, info};
 
-use crate::{App, Output, SceneHandle};
+use crate::{App, AppExt, Output, RanimApp, Scene, app::render_setup_of};
 
 use super::inspect::{self, InspectCommand};
 
 /// Initialize tracing logging for a project binary.
 ///
-/// Called automatically by [`AppRunExt::run`]. `RUST_LOG` overrides the
-/// default `ranim=info` directives.
+/// Called by [`run_cli`]. `RUST_LOG` overrides the default
+/// `ranim=info` directive.
 pub fn init_tracing() {
     use tracing::level_filters::LevelFilter;
     use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
@@ -45,7 +43,7 @@ pub fn init_tracing() {
 /// If `name` is omitted and the project contains exactly one scene, that scene
 /// is returned. If the project contains multiple scenes, the caller must
 /// choose one and a list of available scenes is included in the error.
-pub fn select_scene(app: &Arc<App>, name: Option<&str>) -> Result<SceneHandle> {
+pub fn select_scene(app: &App, name: Option<&str>) -> Result<Scene> {
     let scenes = app.scenes();
     if scenes.is_empty() {
         bail!("no scenes found in the project");
@@ -68,15 +66,16 @@ pub fn select_scene(app: &Arc<App>, name: Option<&str>) -> Result<SceneHandle> {
     }
 }
 
-/// Render every [`crate::Scene`] output declared with `#[output(...)]`.
-pub fn output_command(app: &Arc<App>, scenes: &[String], buffer_count: usize) -> Result<()> {
+/// Render every [`Scene`] output declared with `#[output(...)]`.
+pub fn output_command(app: &App, scenes: &[String], buffer_count: usize) -> Result<()> {
     use super::render::render_scene;
 
+    let setup = render_setup_of(app);
     let all_scenes = app.scenes();
-    let scenes_to_render: Vec<SceneHandle> = all_scenes
+    let scenes_to_render: Vec<Scene> = all_scenes
         .iter()
         .filter(|scene| scenes.is_empty() || scenes.iter().any(|name| name == &scene.name))
-        .map(|scene| app.scene(&scene.name).unwrap())
+        .cloned()
         .collect();
 
     if scenes_to_render.is_empty() {
@@ -94,7 +93,7 @@ pub fn output_command(app: &Arc<App>, scenes: &[String], buffer_count: usize) ->
 
     for scene in scenes_to_render {
         info!("Rendering scene: {}", scene.name);
-        render_scene(&scene, buffer_count);
+        render_scene(&scene, &setup, buffer_count);
     }
     Ok(())
 }
@@ -103,7 +102,7 @@ pub fn output_command(app: &Arc<App>, scenes: &[String], buffer_count: usize) ->
 /// (`1920x1080`, 60 fps, mp4). Unlike [`output_command`], this command does
 /// not read any `#[output(...)]` declaration and does not process
 /// `TimeMark::Capture`.
-pub fn render_command(app: &Arc<App>, scene_name: &str, buffer_count: usize) -> Result<()> {
+pub fn render_command(app: &App, scene_name: &str, buffer_count: usize) -> Result<()> {
     use super::render::render_scene_once;
 
     let scene = select_scene(app, Some(scene_name))?;
@@ -113,13 +112,13 @@ pub fn render_command(app: &Arc<App>, scene_name: &str, buffer_count: usize) -> 
         "Rendering scene {:?} once with default output: {}x{} {}fps {}",
         scene.name, output.width, output.height, output.fps, output.format
     );
-    render_scene_once(&scene, &output, buffer_count);
+    render_scene_once(&scene, &render_setup_of(app), &output, buffer_count);
     Ok(())
 }
 
 /// Preview a scene in the interactive preview app.
 #[cfg(feature = "preview")]
-pub fn preview_command(app: &Arc<App>, scene_name: Option<&str>) -> Result<()> {
+pub fn preview_command(app: RanimApp, scene_name: Option<&str>) -> Result<()> {
     let scene = match scene_name {
         Some(scene) => app.scene(scene),
         None => app.first_scene(),
@@ -134,7 +133,7 @@ pub fn preview_command(app: &Arc<App>, scene_name: Option<&str>) -> Result<()> {
                 .join(", ")
         )
     })?;
-    super::preview::preview_scene(scene);
+    super::preview::preview_scene(app, scene);
     Ok(())
 }
 
@@ -176,16 +175,16 @@ struct ProjectCli {
 }
 
 impl ProjectCli {
-    fn run(self, app: Arc<App>) -> Result<()> {
+    fn run(self, app: RanimApp) -> Result<()> {
         match self.command {
             Commands::Preview { scene } => {
                 #[cfg(feature = "preview")]
                 {
-                    preview_command(&app, scene.as_deref())
+                    preview_command(app, scene.as_deref())
                 }
                 #[cfg(not(feature = "preview"))]
                 {
-                    let _ = scene;
+                    let _ = (app, scene);
                     bail!("this binary was built without the `preview` feature")
                 }
             }
@@ -202,57 +201,46 @@ impl ProjectCli {
     }
 }
 
-/// Command line entry point for a Ranim project binary.
-///
-/// A project binary assembles its [`App`] and calls
-/// [`run`](AppRunExt::run) to serve the `preview`, `output`, `render`, and
-/// `inspect` subcommands:
+/// Parse the process arguments and serve the `preview`, `output`, `render`,
+/// and `inspect` subcommands of this project binary:
 ///
 /// ```ignore
 /// use ranim::prelude::*;
 ///
 /// fn main() {
-///     App::new().add_plugins(/* project plugins */()).run();
+///     let mut app = App::new();
+///     app.add_plugins(scenes::ScenesPlugin);
+///     run_cli(app.build());
 /// }
 /// ```
-pub trait AppRunExt {
-    /// Parse the process arguments and run the requested command.
-    ///
-    /// The app's scenes and resources are moved into the running session.
-    /// On a command failure the error is logged and the process exits with
-    /// a non-zero status.
-    fn run(&mut self);
-}
-
-impl AppRunExt for App {
-    fn run(&mut self) {
-        init_tracing();
-        let result = ProjectCli::parse().run(Arc::new(std::mem::take(self)));
-        if let Err(err) = result {
-            error!("{err:#}");
-            std::process::exit(1);
-        }
+///
+/// On a command failure the error is logged and the process exits with a
+/// non-zero status.
+pub fn run_cli(app: RanimApp) {
+    init_tracing();
+    if let Err(err) = ProjectCli::parse().run(app) {
+        error!("{err:#}");
+        std::process::exit(1);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SceneConstructor;
 
-    fn scene(name: &str) -> crate::Scene {
-        crate::Scene::new(name, |_: &mut crate::RanimScene| {})
+    fn scene(name: &str) -> Scene {
+        Scene::new(name, |_: &mut crate::RanimScene| {})
     }
 
     #[test]
     fn select_scene_resolves_omitted_and_named_scenes() {
         let mut app = App::new();
         app.add_scene(scene("only"));
-        let app = Arc::new(app);
         assert_eq!(select_scene(&app, None).unwrap().name, "only");
 
         let mut app = App::new();
         app.add_scenes([scene("a"), scene("b")]);
-        let app = Arc::new(app);
         let err = match select_scene(&app, None) {
             Ok(_) => panic!("expected an error for multiple scenes"),
             Err(err) => err,
@@ -266,7 +254,7 @@ mod tests {
 
     #[test]
     fn select_scene_reports_empty_and_missing_scenes() {
-        let app = Arc::new(App::new());
+        let app = App::new();
         let Err(err) = select_scene(&app, None) else {
             panic!("expected an error for an empty project");
         };
@@ -274,7 +262,6 @@ mod tests {
 
         let mut app = App::new();
         app.add_scene(scene("available"));
-        let app = Arc::new(app);
         let Err(err) = select_scene(&app, Some("missing")) else {
             panic!("expected an error for an unknown scene");
         };

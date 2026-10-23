@@ -60,9 +60,15 @@ ranim = { git = "https://github.com/azurice/ranim", features = ["render"] }
 
 ### Project entry and plugins
 
-A Ranim project is its own binary crate. `main` assembles an `App` with the
-project's scenes, then hands over to the command line interface through
-`App::run()`:
+A Ranim project is its own binary crate built on a bevy `App`: `ranim::App`
+is a direct re-export of `bevy_app::App`, and the scene methods
+(`add_scene` / `add_scenes` / `scenes` / `scene(name)` / `first_scene()`)
+come from `ranim::AppExt`, an extension trait the prelude exports for it.
+`main` registers the project's scenes, finalizes the app with `app.build()`
+(`ranim::RanimAppExt`, also exported from the prelude), and hands the
+resulting `ranim::RanimApp` to the free function `run_cli` (exported from
+the prelude), which installs tracing, parses the process arguments, and
+dispatches the command line subcommands:
 
 ```toml
 # Cargo.toml
@@ -84,23 +90,49 @@ fn hello(scene: &mut RanimScene) {
 }
 
 fn main() {
-    App::new().add_scenes([hello::scene()]).run();
+    let mut app = App::new();
+    app.add_scenes([hello::scene()]);
+    run_cli(app.build());
 }
 ```
 
-`#[scene]` creates an owned descriptor through `hello::scene()`; add it with
-`add_scene` or `add_scenes` to make it available. Only registered scenes appear
-in the command line interface.
+`app.build()` is the explicit "finalize, then serve" step from a building
+app to a session-ready project: it asserts the plugins are ready, runs
+bevy's plugin `finish()` and `cleanup()` exactly once, and returns a
+`ranim::RanimApp`. `RanimApp` is the session-time face of the project — it
+dereferences to the bevy `App`, so scene selection, resource access, and
+render sub-app installation keep working through it, but it is no longer a
+plugin-construction target. `run_cli`, `preview_scene`, and `WasmApp::new`
+take a `RanimApp`; offline render workers take a selected `Scene` and the
+project's `RenderSetup`.
+
+`#[scene]` creates an owned descriptor through `hello::scene()`; register it
+with `add_scene` or `add_scenes` to make it available. Only registered scenes
+appear in the command line interface. Projects that organize scenes into
+plugins compose them instead:
+
+```rust,ignore
+let mut app = App::new();
+app.add_plugins(scenes::ScenesPlugin);
+run_cli(app.build());
+```
 
 Rendering needs no boilerplate: when the project does not register a
 `ranim::render::RenderSetup`, rendering and preview fall back to a default
 configuration that installs the built-in camera, vector-item, and mesh-item
 plugins (`ranim::items::RanimItemsPlugin`).
 
-`Plugin` is an optional mechanism for organizing scenes and a custom render
-setup. A plugin installs scenes, resources, or further plugins in
-`build(&self, app)`; `app.add_plugins(...)` also accepts tuples, so a project
-can compose scene collections and configuration from smaller pieces.
+`Plugin` — bevy's plugin trait, re-exported as `ranim::Plugin` — is an
+optional mechanism for organizing scenes and a custom render setup. A plugin
+installs scenes, resources, or further plugins in
+`fn build(&self, app: &mut bevy_app::App)`; because `ranim::App` is the same
+type as `bevy_app::App`, writing `&mut App` there is equivalent. The `AppExt`
+trait, exported by the prelude, provides the scene methods (`add_scene` /
+`add_scenes` / `scene` / `first_scene`) on the app. `app.add_plugins(...)`
+also accepts tuples, so a project
+can compose scene collections and configuration from smaller pieces. Project
+resources are plain bevy resources: store them with `app.insert_resource(...)`
+(the type derives `ranim::Resource`) and read them back through `app.world()`.
 
 #### Custom render setup
 
@@ -119,7 +151,7 @@ use ranim::{
 struct ProjectPlugin;
 
 impl Plugin for ProjectPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([hello::scene()]);
         app.insert_resource(RenderSetup::new(|render_app| {
             render_app.add_plugins((RanimItemsPlugin, ExtractPlugin::<MyItem>::default()));
@@ -128,42 +160,71 @@ impl Plugin for ProjectPlugin {
 }
 
 fn main() {
-    App::new().add_plugins(ProjectPlugin).run();
+    let mut app = App::new();
+    app.add_plugins(ProjectPlugin);
+    run_cli(app.build());
 }
 ```
 
-`RenderSetup` declares the project's rendering assembly and is replayed for each
+`RenderSetup` is a bevy `Resource` (and itself a non-unique bevy `Plugin`) that
+declares the project's rendering assembly and is replayed for each
 GPU runtime (output rendering, preview, preview resolution changes).
 `RanimItemsPlugin` bundles the three built-in item plugins
 (`CameraFramePlugin`, `VItemPlugin`, `MeshItemPlugin`) — the default
 configuration is exactly this plugin. Do not combine it with the individual
 plugins: bevy plugins are unique, and installing one twice panics.
 
-To drive the APIs directly instead of the command line, select a scene handle
-and call the corresponding function (`render` / `preview` features enable them):
+To drive the APIs directly instead of the command line, select a scene and
+call the corresponding function (`render` / `preview` features enable them):
 
 ```rust,ignore
 let mut app = App::new();
 app.add_scenes([hello::scene()]);
-let project = std::sync::Arc::new(app);
-let scene = project.scene("hello").expect("hello is registered");
-ranim::cmd::render_scene(&scene, 2);
-ranim::cmd::preview_scene(scene);
+let scene = app.scene("hello").expect("hello is registered");
+let setup = app
+    .world()
+    .get_resource::<ranim::render::RenderSetup>()
+    .cloned()
+    .unwrap_or_else(|| {
+        ranim::render::RenderSetup::new(|render_app| {
+            render_app.add_plugins(ranim::items::RanimItemsPlugin);
+        })
+    });
+ranim::cmd::render_scene(&scene, &setup, 2);
+ranim::cmd::preview_scene(app.build(), scene);
 ```
 
-A `SceneHandle` keeps its App and project resources alive through rendering,
-preview resizing, and export.
+`app.scene(name)` returns a cloned scene descriptor; the preview app takes
+ownership of the finalized project (`RanimApp`) so project resources stay
+available through rendering, preview resizing, and export.
 
-For a WebAssembly preview, the same binary constructs the App and starts the
-preview directly: `AppRunExt::run` is native-only, so select the scene and call
-`ranim::cmd::preview_scene` from `main`. Build the binary for
-`wasm32-unknown-unknown` and process its `.wasm` with `wasm-bindgen`. See the
-[example app](./example-packages/app) for both Trunk and manual builds.
+Examples use separate compilation entries: `main.rs` is the native binary,
+`wasm.rs` is a cdylib exporting `app() -> ranim::wasm::WasmApp`, and both
+share their scenes and rendering setup through `scenes.rs`. JavaScript
+initializes the module and calls `await app().createPreview(canvas, name)`.
+The returned session renders directly to the canvas with `renderAt(seconds)`;
+Web UI and playback scheduling stay in JavaScript. The shared
+[`<ranim-player>` component](./website/README.md) supplies play/pause and seeking
+for the website and rustdoc. egui/eframe are only used by the native preview.
+
+```bash
+cargo build --example arc-wasm --target wasm32-unknown-unknown --features render
+cargo examples build arc  # wasm-bindgen + wasm-opt, ready for the website
+```
+
+Inside `nix develop`, run `CARGO_BUILD_JOBS=4 just website-preview arc` to build
+the example and serve Zola at `http://127.0.0.1:1111/examples/arc/`.
+Select **App** for the live canvas player. See the
+[website build/preview workflow](./xtasks/xtask-examples/README.md#zola).
+
+See [examples](./examples/README.md) for the layout and build commands.
+The [example app](./example-packages/app) demonstrates a native binary host.
 
 ### Command line interface
 
-`App::run()` (the `ranim::cmd::AppRunExt` trait, re-exported by the prelude)
-parses the process arguments and serves four subcommands:
+`run_cli(app.build())` (native targets with the `render` feature) installs tracing,
+parses the process arguments, and serves four subcommands — its name stays
+clear of the bevy `App::run()` runner API:
 
 - `preview [SCENE]`: Launch the interactive preview app. Requires the `preview`
   feature; defaults to the first scene.
@@ -205,12 +266,13 @@ corresponding feature.
 
   - `items`: re-export `ranim-items`, default on.
 
-- `render`: enable the render api and the command line interface in the cmd module
+- `render`: enable rendering, the native command line interface, and the WASM canvas host
   
   use `render_scene` or `render_scene_output` to render scene to output, or call
-  `App::run()` from the project binary
+  `run_cli(app.build())` from the native project binary. WASM projects export
+  a `WasmApp` and let JavaScript drive `WasmPreview`.
 
-- `preview`: enable preview api in cmd module (implies `render`)
+- `preview`: enable the native egui preview API in the cmd module (implies `render`)
 
   use `preview_scene` api to launch an preview app on a scene
   https://github.com/user-attachments/assets/5bf287e2-b06f-42f8-83b6-76f3775e298e
@@ -218,9 +280,8 @@ corresponding feature.
 
   pure-Rust decoding via symphonia (WAV, MP3, FLAC, AAC/M4A, Ogg Vorbis) with rubato
   resampling to the 48 kHz master rate — no ffmpeg binary required
-- `profiling`: enable GPU timer scopes (wgpu-profiler) for the preview profiler panel
 
-The preview app has a built-in profiler panel (top bar `Profiler` button):
+The native preview app has a built-in profiler panel (top bar `Profiler` button):
 a progress-axis chart of GPU pass times / CPU spans / buffer-upload stats
 with click-to-seek. GPU timer scopes (wgpu-profiler) are runtime-toggled
 in the panel or via `RANIM_PROFILE_GPU=1`; upload tracking via

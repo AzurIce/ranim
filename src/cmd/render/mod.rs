@@ -2,13 +2,14 @@
 use std::collections::VecDeque;
 
 use crate::cmd::render::file_writer::OutputFormatExt;
-use crate::{Output, SceneHandle};
+use crate::{Output, Scene, SceneConstructor};
+use bevy_app::SubApp;
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
 use ranim_core::{SceneEvaluator, TimeMark, frame::EvaluatedFrame};
 use ranim_render::resource::RenderTextures;
-use ranim_render::{RenderSetup, Renderer, utils::WgpuContext};
+use ranim_render::{RenderAppExt, RenderSetup, build_render_app, utils::WgpuContext};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::Instant;
@@ -34,7 +35,7 @@ fn render_output_basename(template: &str, name: &str, width: u32, height: u32, f
 }
 
 /// Render a scene with all its outputs
-pub fn render_scene(scene: &SceneHandle, buffer_count: usize) {
+pub fn render_scene(scene: &Scene, setup: &RenderSetup, buffer_count: usize) {
     for (i, output) in scene.outputs.iter().enumerate() {
         info!(
             "Rendering output {}/{} ({})",
@@ -42,13 +43,18 @@ pub fn render_scene(scene: &SceneHandle, buffer_count: usize) {
             scene.outputs.len(),
             output.format
         );
-        render_scene_output(scene, output, buffer_count);
+        render_scene_output(scene, setup, output, buffer_count);
     }
 }
 
 /// Render a scene output
-pub fn render_scene_output(scene: &SceneHandle, output: &Output, buffer_count: usize) {
-    render_scene_output_with_progress(scene, output, buffer_count, None);
+pub fn render_scene_output(
+    scene: &Scene,
+    setup: &RenderSetup,
+    output: &Output,
+    buffer_count: usize,
+) {
+    render_scene_output_with_progress(scene, setup, output, buffer_count, None);
 }
 
 /// A single rendering job: one [`Output`] plus whether capture marks should
@@ -80,13 +86,15 @@ impl RenderJob {
 ///
 /// The callback receives `(current_frame, total_frames)` each frame.
 pub fn render_scene_output_with_progress(
-    scene: &SceneHandle,
+    scene: &Scene,
+    setup: &RenderSetup,
     output: &Output,
     buffer_count: usize,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
 ) {
     render_scene_job(
         scene,
+        setup,
         RenderJob::full(output.clone(), true),
         buffer_count,
         on_progress,
@@ -98,9 +106,10 @@ pub fn render_scene_output_with_progress(
 /// This is the low-level rendering entry point used by `ranim render`: it
 /// renders the whole scene once with the given [`Output`], but unlike
 /// [`render_scene_output_with_progress`] it does not process capture marks.
-pub fn render_scene_once(scene: &SceneHandle, output: &Output, buffer_count: usize) {
+pub fn render_scene_once(scene: &Scene, setup: &RenderSetup, output: &Output, buffer_count: usize) {
     render_scene_job(
         scene,
+        setup,
         RenderJob::full(output.clone(), false),
         buffer_count,
         None,
@@ -109,7 +118,8 @@ pub fn render_scene_once(scene: &SceneHandle, output: &Output, buffer_count: usi
 
 /// Build the scene and run a [`RenderJob`].
 pub fn render_scene_job(
-    scene: &SceneHandle,
+    scene: &Scene,
+    setup: &RenderSetup,
     job: RenderJob,
     buffer_count: usize,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
@@ -134,7 +144,7 @@ pub fn render_scene_job(
     // decides which logic states are sampled.
     let mut evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
 
-    let mut app = RanimRenderApp::new(scene.clone(), &output, buffer_count);
+    let mut app = RanimRenderApp::new(scene, setup, &output, buffer_count);
     app.render_scene_with_progress(&mut evaluator, on_progress);
 
     if capture_marks && !evaluator.time_marks().is_empty() {
@@ -197,10 +207,10 @@ impl RenderThreadHandle {
     }
 }
 
-/// Background rendering worker that owns the wgpu context, renderer, output textures, and video/image writers.
+/// Background rendering worker that owns the wgpu context, render sub-app, output textures, and video/image writers.
 pub struct RenderWorker {
     ctx: WgpuContext,
-    renderer: Renderer,
+    render_app: SubApp,
     render_textures: Vec<RenderTextures>,
     clear_color: wgpu::Color,
     // video writer
@@ -218,18 +228,14 @@ pub struct RenderWorker {
 impl RenderWorker {
     /// Creates a new [`RenderWorker`].
     ///
-    /// This checks for or downloads `ffmpeg`, initializes the wgpu context and renderer, and configures the video writer from [`Output`].
+    /// This checks for or downloads `ffmpeg`, initializes the wgpu context and the
+    /// render sub-app (configured by `setup`), and configures the video writer from [`Output`].
     ///
     /// # Panics
     ///
     /// Panics if `buffer_count < 1`.
-    pub fn new(scene: SceneHandle, output: &Output, buffer_count: usize) -> Self {
+    pub fn new(scene: &Scene, setup: &RenderSetup, output: &Output, buffer_count: usize) -> Self {
         assert!(buffer_count >= 1, "buffer_count must be at least 1");
-        let setup = scene
-            .app()
-            .get_resource::<RenderSetup>()
-            .cloned()
-            .unwrap_or_else(crate::cmd::default_render_setup);
         let scene_name = scene.name.clone();
         info!("Checking ffmpeg...");
         let t = Instant::now();
@@ -260,9 +266,12 @@ impl RenderWorker {
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir().unwrap().join(output_dir);
         }
-        let renderer = Renderer::new(&ctx, output.width, output.height, 8, setup);
+        let mut render_app = build_render_app(&ctx, output.width, output.height, 8);
+        render_app.add_plugins(setup.clone());
+        render_app.finish();
+        render_app.cleanup();
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
-            .map(|_| renderer.new_render_textures(&ctx))
+            .map(|_| RenderTextures::new(&ctx, output.width, output.height))
             .collect();
         let clear_color = color::try_color(&scene.config.clear_color)
             .unwrap_or(color::color("#333333ff"))
@@ -286,7 +295,7 @@ impl RenderWorker {
         });
         Self {
             ctx,
-            renderer,
+            render_app,
             render_textures,
             clear_color,
             video_writer: None,
@@ -356,7 +365,7 @@ impl RenderWorker {
                 }
 
                 // Render current frame and start async readback
-                worker.renderer.render_frame(
+                worker.render_app.render_frame(
                     &mut worker.render_textures[cur],
                     worker.clear_color,
                     &mut store,
@@ -402,7 +411,7 @@ impl RenderWorker {
     ///
     /// The frame's data and capacity remain available for reuse after rendering.
     pub fn render_store(&mut self, store: &mut EvaluatedFrame) {
-        self.renderer
+        self.render_app
             .render_frame(&mut self.render_textures[0], self.clear_color, store);
     }
 
@@ -472,8 +481,8 @@ pub struct RanimRenderApp {
 
 impl RanimRenderApp {
     /// Creates the application and initializes the internal [`RenderWorker`].
-    pub fn new(scene: SceneHandle, output: &Output, buffer_count: usize) -> Self {
-        let render_worker = RenderWorker::new(scene, output, buffer_count);
+    pub fn new(scene: &Scene, setup: &RenderSetup, output: &Output, buffer_count: usize) -> Self {
+        let render_worker = RenderWorker::new(scene, setup, output, buffer_count);
         Self {
             render_worker: Some(render_worker),
             fps: output.fps,

@@ -95,7 +95,7 @@ render world 的提取阶段，成员通过同一个上下文共享输出顺序�
 ## `ExtractPlugin<T>`：注册精确的帧类型
 
 实现 `Extract` 使一个值能够被解释；`ExtractPlugin<T>` 把解释入口注册到
-renderer 的提取阶段（`RenderSchedules.extract`）。`T` 必须是帧实际保存的完整类型：
+渲染 SubApp 的提取阶段（`RenderSchedule::Extract`）。`T` 必须是帧实际保存的完整类型：
 
 ```rust,ignore
 use ranim::{App, Plugin};
@@ -137,51 +137,52 @@ family plugin 不枚举容器或 wrapper 组合。项目插件可保存一份
 组合多个场景时重复安装同一 Bevy plugin。`RenderSetup::new` 保存可重复执行
 的装配回调，构造 setup 不创建 GPU 对象。
 
-output 与 preview 从 `SceneHandle` 所属 App 读取这份 resource（缺省时回退到
-默认配置），克隆后传给
-`Renderer::new` 的第五个参数。低层宿主也可这样调用：
+output 与 preview 从项目 App 读取这份 resource（缺省时回退到默认配置），克隆后
+交给渲染 SubApp 的安装函数。低层宿主也可自行装配：
 
 ```rust,ignore
-use ranim_render::{RenderSetup, Renderer};
+use ranim_render::{RenderSetup, install_render_app};
 
-let setup = project.resource::<RenderSetup>().clone();
-let renderer = Renderer::new(&ctx, width, height, oit_layers, setup);
+let setup = app.world().resource::<RenderSetup>().clone();
+install_render_app(&mut app, &ctx, width, height, oit_layers, setup);
 ```
 
-`project` 是 `Arc<ranim::App>`。`RenderSetup` 是普通 Bevy plugin；每次创建独立
-GPU renderer（输出、预览、分辨率重建）时重放回调，安装新的 systems、组件和
-GPU 资源。直接驱动低层 Renderer 时，也可以继续传普通的 Bevy plugin 元组。
+`RenderSetup` 是 bevy `Resource`，也是 `is_unique = false` 的普通 bevy plugin；
+每次安装渲染 SubApp（输出、预览、分辨率重建）时重放回调，安装新的 systems、
+组件和 GPU 资源。`install_render_app` 把构建好的 SubApp 以 `RanimRenderApp`
+标签挂进项目 App，并挂 extract 钩子：每次 `App::update()` 主 schedule 结束后，
+主世界的 `EvaluatedFrame` 被交换进渲染世界。只需要裸渲染图时也可以直接用
+`build_render_app(ctx, width, height, oit_layers)` 创建独立的 `SubApp`。
 
 纯 CPU 求值与 `inspect` 不执行这份渲染装配；未知检查类型仍保留输入元数据。
 
-## 公共 schedule 与 phase handles
+## 公共 schedule 与 phase
 
-`Renderer` 创建 render SubApp 时初始化 `ranim_render::schedule::RenderSchedules`。
-手写插件从这份 resource 取得公共阶段的 handle，再注册系统：
+渲染 SubApp 的公共阶段是 `ranim_render::schedule` 中 pub 的枚举：
+`RenderSchedule::{Extract, Prepare, View}` 是 schedule label，
+`ViewPhase::{Clear, Compute, Depth, Color, Resolve}` 是 `View` schedule 内
+按序排列的 system set。手写插件直接引用这些值注册系统：
 
 ```rust,ignore
 use bevy_ecs::schedule::IntoScheduleConfigs;
-use ranim_render::schedule::RenderSchedules;
+use ranim_render::schedule::{RenderSchedule, ViewPhase};
 
-let schedules = *render_app.world().resource::<RenderSchedules>();
-render_app.add_systems(schedules.extract, my_extract_system);
-render_app.add_systems(schedules.prepare, my_prepare_system);
+render_app.add_systems(RenderSchedule::Extract, my_extract_system);
+render_app.add_systems(RenderSchedule::Prepare, my_prepare_system);
 render_app.add_systems(
-    schedules.view,
-    my_color_pass.in_set(schedules.view_systems.color),
+    RenderSchedule::View,
+    my_color_pass.in_set(ViewPhase::Color),
 );
 ```
 
-`extract`、`prepare`、`view` 是 renderer 生成的 schedule handles；`view_systems`
-包含 `clear`、`compute`、`depth`、`color`、`resolve` 五个 phase handles。渲染插件
-统一使用这些运行时创建的句柄，不重新 intern 同名 label，确保系统进入同一阶段
-并遵循同一顺序。只在插件内部使用的 schedule label 或 system set 仍可照常定义，
-通过公共阶段建立所需依赖。
+`ExtractPlugin<T>` 同样注册到 `RenderSchedule::Extract`。枚举值即阶段身份：
+所有插件的系统进入同一阶段并遵循同一顺序（`View` 内五个 phase 已 `chain`），
+不需要任何句柄 resource。只在插件内部使用的 schedule label 或 system set 仍可
+照常定义，通过公共阶段建立所需依赖。
 
-独立 CPU 测试不经过 `Renderer` 时，由测试宿主先执行
-`app.init_resource::<RenderSchedules>()`，再读取 handle 并初始化所需 schedule。
-`ExtractPlugin<T>` 也使用已有的 `schedules.extract`；读取和注册都不创建 GPU。
-共享 handles 统一的是调度阶段身份。
+独立 CPU 测试不经过 `install_render_app` 时，由测试宿主自行
+`init_schedule(RenderSchedule::Extract)` 等初始化所需阶段；读取和注册都不创建
+GPU。
 
 ## 持久输出、变更检测与顺序
 
@@ -196,9 +197,9 @@ render_app.add_systems(
 再准备 GPU 数据。这样文字、SVG 和容器内部的顺序都排在相邻输入之间，深度
 偏置范围由实际渲染顺序决定。
 
-`Renderer::render_frame` 接收 `&mut EvaluatedFrame`，临时将帧作为 Resource
-交换进 render SubApp，完成一次更新后归还输入与批次容量。`Extract` 借用输入，
-不会把渲染后的 primitive 写回原帧。
+`RenderAppExt::render_frame`（`SubApp` 的扩展 trait）接收 `&mut EvaluatedFrame`，
+临时将帧作为 Resource 交换进渲染 SubApp，完成一次 `update()` 后归还输入与批次
+容量。`Extract` 借用输入，不会把渲染后的 primitive 写回原帧。
 
 ## 类型身份
 

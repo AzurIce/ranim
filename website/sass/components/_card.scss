@@ -38,6 +38,14 @@
       }
     }
 
+    &__placeholder {
+      display: grid;
+      place-items: center;
+      flex: 1;
+      color: #70d3e8;
+      background: linear-gradient(135deg, #1b1e25, #303b48);
+    }
+
     &__content {
       display: flex;
       flex-direction: column;

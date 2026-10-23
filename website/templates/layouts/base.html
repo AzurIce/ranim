@@ -1,5 +1,3 @@
-{% import "macros/public-draft.html" as public_draft %}
-
 {% if section and section.title %}
 {% set page_title = "Ranim: " ~ section.title %}
 {% elif page and page.title %}
@@ -38,14 +36,7 @@
   <script type="module"
     src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
 
-  <!-- TODO: feed -->
-  <!-- {% if config.generate_feed %}
-    <link rel="alternate"
-      type={% if config.feed_filename == "atom.xml" %}"application/atom+xml"{% else %}"application/rss+xml"{% endif %}
-      title="RSS" href="{{ get_url(path=config.feed_filename) | safe }}">
-    {% endif %} -->
-
-  <title>{% if page.extra.public_draft or section.extra.public_draft %}[DRAFT] {% endif %}{{ page_title }}</title>
+  <title>{% if section_or_page and section_or_page.extra.public_draft %}[DRAFT] {% endif %}{{ page_title }}</title>
   {% block head_extensions %}{% endblock head_extensions %}
 </head>
 

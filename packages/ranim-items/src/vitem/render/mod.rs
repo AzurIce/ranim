@@ -10,12 +10,14 @@ use ranim_core::{
 
 pub(super) fn install(app: &mut bevy_app::App) {
     use bevy_ecs::schedule::IntoScheduleConfigs;
-    use ranim_render::{extract::ExtractPlugin, schedule::RenderSchedules, utils::WgpuContext};
+    use ranim_render::{
+        extract::ExtractPlugin,
+        schedule::{RenderSchedule, ViewPhase},
+        utils::WgpuContext,
+    };
 
     use super::{VItem, geometry::*, svg::SvgItem};
 
-    let schedules = *app.world().resource::<RenderSchedules>();
-    let phases = schedules.view_systems;
     let buffer = buffer::VItemsBuffer::new(app.world().resource::<WgpuContext>());
     app.insert_resource(buffer).add_plugins((
         ExtractPlugin::<VItem>::default(),
@@ -39,13 +41,13 @@ pub(super) fn install(app: &mut bevy_app::App) {
         ExtractPlugin::<super::typst::TypstText>::default(),
     ));
 
-    app.add_systems(schedules.prepare, pipeline::prepare_vitems)
+    app.add_systems(RenderSchedule::Prepare, pipeline::prepare_vitems)
         .add_systems(
-            schedules.view,
+            RenderSchedule::View,
             (
-                pipeline::compute.in_set(phases.compute),
-                pipeline::depth.in_set(phases.depth),
-                pipeline::color.in_set(phases.color),
+                pipeline::compute.in_set(ViewPhase::Compute),
+                pipeline::depth.in_set(ViewPhase::Depth),
+                pipeline::color.in_set(ViewPhase::Color),
             ),
         );
 }

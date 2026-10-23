@@ -4,7 +4,7 @@ use ranim_core::{glam::Vec2, traits::ApplyTransform};
 use ranim_render::{
     extract::{Extract, ExtractContext, ExtractPlugin},
     primitives::viewport::{DEPTH_ORDER_SPAN, ViewportGpuPacket, ViewportUniform},
-    schedule::{RenderDimensions, RenderSchedules},
+    schedule::{RenderDimensions, RenderSchedule},
     utils::WgpuContext,
     world::SceneOrder,
 };
@@ -19,9 +19,8 @@ pub struct CameraFramePlugin;
 
 impl Plugin for CameraFramePlugin {
     fn build(&self, app: &mut App) {
-        let prepare = app.world().resource::<RenderSchedules>().prepare;
         app.add_plugins(ExtractPlugin::<CameraFrame>::default())
-            .add_systems(prepare, prepare_camera);
+            .add_systems(RenderSchedule::Prepare, prepare_camera);
     }
 }
 

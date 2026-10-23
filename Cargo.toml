@@ -36,6 +36,7 @@ ranim-macros = { path = "packages/ranim-macros", version = "0.2.1" }
 ranim-render = { path = "packages/ranim-render", version = "0.2.1" }
 wgpu-profiler = "0.28.0"
 wasm-bindgen = "0.2.129"
+web-time = "1.1.0"
 glam = "0.34.1"
 tracing = "0.1.44"
 tracing-indicatif = "0.3.14"
@@ -47,6 +48,7 @@ image = "0.25.10"
 derive_more = "2.1.1"
 bevy_ecs = { version = "0.20.0", default-features = false, features = ["std"] }
 bevy_app = { version = "0.20.0", default-features = false, features = ["std"] }
+bevy_derive = { version = "0.20.0", default-features = false }
 # audio-decode feature (ranim-core): pure-Rust audio decoding + resampling
 symphonia = { version = "0.6.1", default-features = false, features = [
   "aac",
@@ -61,19 +63,15 @@ symphonia = { version = "0.6.1", default-features = false, features = [
 rubato = "5.0"
 
 [features]
-# default = ["output"]
 default = ["anims", "items"]
 anims = []
 items = []
 typst = ["ranim-items/typst"]
 gltf = ["ranim-items/gltf"]
-# output = ["dep:async-channel"]
 audio-decode = ["ranim-core/audio-decode"]
 render = [
   "ranim-items/render",
   "dep:ranim-render",
-  "dep:bevy_app",
-  "dep:bevy_ecs",
   "dep:wgpu",
   "dep:pollster",
   "dep:which",
@@ -85,6 +83,10 @@ render = [
   "dep:clap",
   "dep:serde",
   "dep:serde_json",
+  "dep:wasm-bindgen",
+  "dep:wasm-bindgen-futures",
+  "dep:web-sys",
+  "dep:console_error_panic_hook",
 ]
 preview = [
   "render",
@@ -94,12 +96,8 @@ preview = [
   "dep:egui-phosphor",
   "dep:web-time",
   "dep:bytemuck",
-  "dep:wasm-bindgen",
-  "dep:wasm-bindgen-futures",
-  "dep:web-sys",
   "dep:wgpu-profiler",
 ]
-# serde = ["dep:serde", "glam/serde"]
 
 [dependencies]
 ranim-core.workspace = true
@@ -108,6 +106,8 @@ ranim-anims.workspace = true
 ranim-macros.workspace = true
 itertools.workspace = true
 tracing.workspace = true
+bevy_app.workspace = true
+bevy_ecs.workspace = true
 derive_more = { workspace = true, features = [
   "deref_mut",
   "deref",
@@ -120,33 +120,15 @@ derive_more = { workspace = true, features = [
 ] }
 anyhow = "1.0.104"
 ranim-render = { workspace = true, optional = true }
-bevy_app = { workspace = true, optional = true }
-bevy_ecs = { workspace = true, optional = true }
 # render feature (wasm-compatible deps here, rest in target-specific section below)
 wgpu = { workspace = true, optional = true }
-clap = { version = "4.6.7", features = ["derive"], optional = true }
-serde = { version = "1.0.229", features = ["derive"], optional = true }
-serde_json = { version = "1.0.151", optional = true }
-# app feature
-egui = { version = "0.36.2", optional = true }
-egui-phosphor = { version = "0.14.0", optional = true }
-web-time = { version = "1.1.0", optional = true }
-bytemuck = { workspace = true, features = ["derive"], optional = true }
-# profiling
-wgpu-profiler = { workspace = true, optional = true }
 async-channel = "2.5.0"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen = { workspace = true, optional = true }
-# app feature (wasm)
-eframe = { version = "0.36.2", default-features = false, features = [
-    "accesskit",
-    "default_fonts",
-    "web_screen_reader",
-    "wgpu",
-], optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 wasm-bindgen-futures = { version = "0.4.79", optional = true }
-web-sys = { version = "0.3.106", optional = true }
+web-sys = { version = "0.3.106", features = ["HtmlCanvasElement"], optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 # render deps (wasm-incompatible, only used in cfg(not(wasm)) code)
@@ -157,7 +139,16 @@ tracing-indicatif = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"], optional = true }
 flate2 = { version = "1.1.10", optional = true }
 reqwest = { version = "0.13.5", features = ["blocking"], optional = true }
-# app feature (native)
+# cli/inspect (native only)
+clap = { version = "4.6.7", features = ["derive"], optional = true }
+serde = { version = "1.0.229", features = ["derive"], optional = true }
+serde_json = { version = "1.0.151", optional = true }
+# preview feature (native)
+egui = { version = "0.36.2", optional = true }
+egui-phosphor = { version = "0.14.0", optional = true }
+web-time = { workspace = true, optional = true }
+bytemuck = { workspace = true, features = ["derive"], optional = true }
+wgpu-profiler = { workspace = true, optional = true }
 eframe = { version = "0.36.2", features = ["wgpu"], optional = true }
 # preview feature (native): audio playback via rodio
 rodio = { version = "0.22", optional = true }
@@ -199,64 +190,88 @@ name = "aabb"
 path = "examples/aabb/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.aabb]
-wasm = true
+[[example]]
+name = "aabb-wasm"
+path = "examples/aabb/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "z_fighting"
 path = "examples/z_fighting/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.z_fighting]
-wasm = true
+[[example]]
+name = "z_fighting-wasm"
+path = "examples/z_fighting/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "audio_demo"
 path = "examples/audio_demo/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.audio_demo]
-wasm = false
+[[example]]
+name = "audio_demo-wasm"
+path = "examples/audio_demo/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "animating_pi"
 path = "examples/animating_pi/main.rs"
 required-features = ["preview", "typst"]
 
-[package.metadata.example.animating_pi]
-wasm = true
+[[example]]
+name = "animating_pi-wasm"
+path = "examples/animating_pi/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render", "typst"]
 
 [[example]]
 name = "arc"
 path = "examples/arc/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.arc]
-wasm = true
+[[example]]
+name = "arc-wasm"
+path = "examples/arc/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "arc_between_points"
 path = "examples/arc_between_points/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.arc_between_points]
-wasm = true
+[[example]]
+name = "arc_between_points-wasm"
+path = "examples/arc_between_points/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "basic"
 path = "examples/basic/main.rs"
 required-features = ["preview", "typst"]
 
-[package.metadata.example.basic]
-wasm = true
+[[example]]
+name = "basic-wasm"
+path = "examples/basic/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render", "typst"]
 
 [[example]]
 name = "hanoi"
 path = "examples/hanoi/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.hanoi]
-wasm = true
+[[example]]
+name = "hanoi-wasm"
+path = "examples/hanoi/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "hello_ranim"
@@ -264,33 +279,54 @@ path = "examples/hello_ranim/main.rs"
 required-features = ["preview"]
 
 [[example]]
+name = "hello_ranim-wasm"
+path = "examples/hello_ranim/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
+
+[[example]]
 name = "iterative_spring"
 path = "examples/iterative_spring/main.rs"
 required-features = ["preview"]
+
+[[example]]
+name = "iterative_spring-wasm"
+path = "examples/iterative_spring/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "nbody"
 path = "examples/nbody/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.nbody]
-wasm = true
+[[example]]
+name = "nbody-wasm"
+path = "examples/nbody/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "cloth_wrap"
 path = "examples/cloth_wrap/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.hello_ranim]
-wasm = true
+[[example]]
+name = "cloth_wrap-wasm"
+path = "examples/cloth_wrap/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "composable_choreography"
 path = "examples/composable_choreography/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.composable_choreography]
-wasm = true
+[[example]]
+name = "composable_choreography-wasm"
+path = "examples/composable_choreography/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "palettes"
@@ -298,53 +334,81 @@ path = "examples/palettes/main.rs"
 required-features = ["preview"]
 
 [[example]]
+name = "palettes-wasm"
+path = "examples/palettes/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
+
+[[example]]
 name = "perspective_blend"
 path = "examples/perspective_blend/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.perspective_blend]
-wasm = true
+[[example]]
+name = "perspective_blend-wasm"
+path = "examples/perspective_blend/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "ranim_logo"
 path = "examples/ranim_logo/main.rs"
 required-features = ["preview", "typst"]
 
-[package.metadata.example.ranim_logo]
-wasm = true
+[[example]]
+name = "ranim_logo-wasm"
+path = "examples/ranim_logo/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render", "typst"]
 
 [[example]]
 name = "extract_vitem_visualize"
 path = "examples/extract_vitem_visualize/main.rs"
 required-features = ["preview", "typst"]
 
-[package.metadata.example.extract_vitem_visualize]
-wasm = true
+[[example]]
+name = "extract_vitem_visualize-wasm"
+path = "examples/extract_vitem_visualize/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render", "typst"]
 
 [[example]]
 name = "test"
 path = "examples/test/main.rs"
 required-features = ["preview"]
 
+[[example]]
+name = "test-wasm"
+path = "examples/test/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
+
 [package.metadata.example.test]
 hide = true
-wasm = false
 
 [[example]]
 name = "bubble_sort"
 path = "examples/bubble_sort/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.bubble_sort]
-wasm = true
+[[example]]
+name = "bubble_sort-wasm"
+path = "examples/bubble_sort/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "getting_started0"
 path = "examples/getting_started0/main.rs"
 required-features = ["preview"]
 
+[[example]]
+name = "getting_started0-wasm"
+path = "examples/getting_started0/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
+
 [package.metadata.example.getting_started0]
-wasm = true
 hide = true
 
 [[example]]
@@ -352,8 +416,13 @@ name = "getting_started1"
 path = "examples/getting_started1/main.rs"
 required-features = ["preview"]
 
+[[example]]
+name = "getting_started1-wasm"
+path = "examples/getting_started1/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
+
 [package.metadata.example.getting_started1]
-wasm = true
 hide = true
 
 [[example]]
@@ -361,8 +430,13 @@ name = "getting_started2"
 path = "examples/getting_started2/main.rs"
 required-features = ["preview"]
 
+[[example]]
+name = "getting_started2-wasm"
+path = "examples/getting_started2/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
+
 [package.metadata.example.getting_started2]
-wasm = true
 hide = true
 
 [[example]]
@@ -370,24 +444,33 @@ name = "selective_sort"
 path = "examples/selective_sort/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.selective_sort]
-wasm = true
+[[example]]
+name = "selective_sort-wasm"
+path = "examples/selective_sort/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "regular_polygon"
 path = "examples/regular_polygon/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.regular_polygon]
-wasm = true
+[[example]]
+name = "regular_polygon-wasm"
+path = "examples/regular_polygon/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "ellipse"
 path = "examples/ellipse/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.ellipse]
-wasm = true
+[[example]]
+name = "ellipse-wasm"
+path = "examples/ellipse/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "output_formats"
@@ -395,28 +478,43 @@ path = "examples/output_formats/main.rs"
 required-features = ["preview"]
 
 [[example]]
+name = "output_formats-wasm"
+path = "examples/output_formats/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
+
+[[example]]
 name = "text_item"
 path = "examples/text_item/main.rs"
 required-features = ["preview", "typst"]
 
-[package.metadata.example.text_item]
-wasm = true
+[[example]]
+name = "text_item-wasm"
+path = "examples/text_item/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render", "typst"]
 
 [[example]]
 name = "typst_timer"
 path = "examples/typst_timer/main.rs"
 required-features = ["preview", "typst"]
 
-[package.metadata.example.typst_timer]
-wasm = true
+[[example]]
+name = "typst_timer-wasm"
+path = "examples/typst_timer/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render", "typst"]
 
 [[example]]
 name = "perlin_terrain"
 path = "examples/perlin_terrain/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.perlin_terrain]
-wasm = true
+[[example]]
+name = "perlin_terrain-wasm"
+path = "examples/perlin_terrain/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "gltf_showcase"
@@ -424,33 +522,51 @@ path = "examples/gltf_showcase/main.rs"
 required-features = ["preview", "gltf"]
 
 [[example]]
+name = "gltf_showcase-wasm"
+path = "examples/gltf_showcase/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render", "gltf"]
+
+[[example]]
 name = "mesh_morph"
 path = "examples/mesh_morph/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.mesh_morph]
-wasm = true
+[[example]]
+name = "mesh_morph-wasm"
+path = "examples/mesh_morph/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "midi_visualizer"
 path = "examples/midi_visualizer/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.midi_visualizer]
-wasm = true
+[[example]]
+name = "midi_visualizer-wasm"
+path = "examples/midi_visualizer/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "tetrahedron_spheres"
 path = "examples/tetrahedron_spheres/main.rs"
 required-features = ["preview"]
 
-[package.metadata.example.tetrahedron_spheres]
-wasm = true
+[[example]]
+name = "tetrahedron_spheres-wasm"
+path = "examples/tetrahedron_spheres/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render"]
 
 [[example]]
 name = "solar_system"
 path = "examples/solar_system/main.rs"
 required-features = ["preview", "typst"]
 
-[package.metadata.example.solar_system]
-wasm = true
+[[example]]
+name = "solar_system-wasm"
+path = "examples/solar_system/wasm.rs"
+crate-type = ["cdylib"]
+required-features = ["render", "typst"]

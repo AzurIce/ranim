@@ -1,9 +1,5 @@
 use bevy_app::{First, SubApp};
-use bevy_ecs::{
-    prelude::*,
-    schedule::{InternedScheduleLabel, InternedSystemSet, ScheduleLabel},
-    system::SystemParam,
-};
+use bevy_ecs::{prelude::*, schedule::ScheduleLabel, system::SystemParam};
 
 use crate::{
     pipelines::oit_resolve,
@@ -20,78 +16,31 @@ struct RenderUpdate;
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
 struct RenderGraph;
 
-// These values are interned only by the render runtime that creates the handles.
-// Bevy's interned identity includes the address, so independently interning the
-// same non-zero-sized label in a dylib would create a different schedule or set.
+/// The schedules of the render world, in execution order.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-enum RenderSchedule {
+pub enum RenderSchedule {
+    /// Extract the current [`EvaluatedFrame`](ranim_core::frame::EvaluatedFrame).
+    /// Systems read complete typed batches and update render components or resources.
     Extract,
+    /// Prepare and upload render resources after extraction and scene ordering.
     Prepare,
+    /// Run the active view's ordered compute and draw phases.
     View,
 }
 
+/// The ordered phases of [`RenderSchedule::View`] shared by all item plugins.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-enum ViewPhase {
-    Clear,
-    Compute,
-    Depth,
-    Color,
-    Resolve,
-}
-
-/// Canonical handles for the ordered phases of [`RenderSchedules::view`].
-///
-/// Plugins copy these handles from the runtime's [`RenderSchedules`] resource
-/// instead of interning their own labels across dynamic library boundaries.
-#[derive(Clone, Copy)]
-pub struct ViewSystems {
+pub enum ViewPhase {
     /// Clear the frame's color and depth targets.
-    pub clear: InternedSystemSet,
+    Clear,
     /// Run compute work needed by subsequent draw passes.
-    pub compute: InternedSystemSet,
+    Compute,
     /// Draw all depth prepasses before any color passes.
-    pub depth: InternedSystemSet,
+    Depth,
     /// Draw color and collect transparent fragments.
-    pub color: InternedSystemSet,
+    Color,
     /// Resolve the accumulated transparent fragments.
-    pub resolve: InternedSystemSet,
-}
-
-/// Shared schedule and phase identities created by the render runtime.
-///
-/// [`Renderer::new`](crate::Renderer::new) installs this resource before plugins
-/// run. Plugins read it to register systems into the same schedules and sets,
-/// including when their code comes from a dynamic library. A standalone CPU
-/// render world can initialize it with [`Default`]. Shared SDK build conditions
-/// still apply; independently interned custom labels do not acquire this identity.
-#[derive(Resource, Clone, Copy)]
-pub struct RenderSchedules {
-    /// Extract the current [`EvaluatedFrame`](ranim_core::frame::EvaluatedFrame).
-    /// Systems read complete typed batches and update render components or resources.
-    pub extract: InternedScheduleLabel,
-    /// Prepare and upload render resources after extraction and scene ordering.
-    pub prepare: InternedScheduleLabel,
-    /// Run the active view's ordered compute and draw phases.
-    pub view: InternedScheduleLabel,
-    /// Ordered phases shared by all plugins in [`Self::view`].
-    pub view_systems: ViewSystems,
-}
-
-impl Default for RenderSchedules {
-    fn default() -> Self {
-        Self {
-            extract: RenderSchedule::Extract.intern(),
-            prepare: RenderSchedule::Prepare.intern(),
-            view: RenderSchedule::View.intern(),
-            view_systems: ViewSystems {
-                clear: ViewPhase::Clear.intern(),
-                compute: ViewPhase::Compute.intern(),
-                depth: ViewPhase::Depth.intern(),
-                color: ViewPhase::Color.intern(),
-                resolve: ViewPhase::Resolve.intern(),
-            },
-        }
-    }
+    Resolve,
 }
 
 #[derive(Resource, Clone, Copy)]
@@ -204,27 +153,27 @@ impl RenderProfiler {
 }
 
 pub(crate) fn install_schedules(app: &mut SubApp) {
-    app.init_resource::<RenderSchedules>();
-    let schedules = *app.world().resource::<RenderSchedules>();
-    let phases = schedules.view_systems;
     app.update_schedule = Some(RenderUpdate.intern());
     app.init_resource::<FrameEncoder>()
-        .init_schedule(schedules.extract)
-        .init_schedule(schedules.prepare)
+        .init_schedule(RenderSchedule::Extract)
+        .init_schedule(RenderSchedule::Prepare)
         .add_systems(RenderUpdate, render_update);
     app.configure_sets(
-        schedules.view,
+        RenderSchedule::View,
         (
-            phases.clear,
-            phases.compute,
-            phases.depth,
-            phases.color,
-            phases.resolve,
+            ViewPhase::Clear,
+            ViewPhase::Compute,
+            ViewPhase::Depth,
+            ViewPhase::Color,
+            ViewPhase::Resolve,
         )
             .chain(),
     );
-    app.add_systems(schedules.view, clear.in_set(phases.clear));
-    app.add_systems(schedules.view, oit_resolve::resolve.in_set(phases.resolve));
+    app.add_systems(RenderSchedule::View, clear.in_set(ViewPhase::Clear));
+    app.add_systems(
+        RenderSchedule::View,
+        oit_resolve::resolve.in_set(ViewPhase::Resolve),
+    );
 
     app.add_systems(
         RenderGraph,
@@ -233,11 +182,10 @@ pub(crate) fn install_schedules(app: &mut SubApp) {
 }
 
 fn render_update(world: &mut World) {
-    let schedules = *world.resource::<RenderSchedules>();
     world.run_schedule(First);
-    world.run_schedule(schedules.extract);
+    world.run_schedule(RenderSchedule::Extract);
     resolve_scene_order(world);
-    world.run_schedule(schedules.prepare);
+    world.run_schedule(RenderSchedule::Prepare);
     let _span = crate::cpu_probe::span("render_graph");
     world.run_schedule(RenderGraph);
 }
@@ -279,8 +227,7 @@ fn clear(mut render: RenderContext, target: Res<FrameTarget>, profiler: Res<Rend
 }
 
 fn view_driver(world: &mut World) {
-    let view = world.resource::<RenderSchedules>().view;
-    world.run_schedule(view);
+    world.run_schedule(RenderSchedule::View);
 }
 
 fn submit(
@@ -320,84 +267,36 @@ fn finish_frame(
 
 #[cfg(test)]
 mod tests {
-    use bevy_ecs::intern::Interner;
-
     use super::*;
 
     #[test]
-    fn canonical_handles_keep_identity_without_reinterning_in_another_pool() {
-        let schedules = RenderSchedules::default();
-        let other_schedules = Interner::<dyn ScheduleLabel>::new();
-        for (label, handle) in [
-            (RenderSchedule::Extract, schedules.extract),
-            (RenderSchedule::Prepare, schedules.prepare),
-            (RenderSchedule::View, schedules.view),
-        ] {
-            // A second runtime can have matching TypeIds but its own interner.
-            assert_ne!(other_schedules.intern(&label), handle);
-            // Registration with the supplied handle bypasses that local pool.
-            assert_eq!(handle.intern(), handle);
-        }
-
-        let phases = schedules.view_systems;
-        let other_sets = Interner::<dyn SystemSet>::new();
-        for (label, handle) in [
-            (ViewPhase::Clear, phases.clear),
-            (ViewPhase::Compute, phases.compute),
-            (ViewPhase::Depth, phases.depth),
-            (ViewPhase::Color, phases.color),
-            (ViewPhase::Resolve, phases.resolve),
-        ] {
-            assert_ne!(other_sets.intern(&label), handle);
-            assert_eq!(handle.intern(), handle);
-        }
-        assert_eq!(
-            [
-                phases.clear,
-                phases.compute,
-                phases.depth,
-                phases.color,
-                phases.resolve
-            ]
-            .into_iter()
-            .collect::<std::collections::HashSet<_>>()
-            .len(),
-            5
-        );
-    }
-
-    #[test]
-    fn copied_phase_handles_enforce_the_shared_view_order() {
+    fn registered_phases_enforce_the_shared_view_order() {
         #[derive(Resource, Default)]
         struct ExecutionLog(Vec<&'static str>);
 
         let mut app = SubApp::new();
-        app.init_resource::<RenderSchedules>()
-            .init_resource::<ExecutionLog>();
-        let schedules = *app.world().resource::<RenderSchedules>();
-        let phases = schedules.view_systems;
-        app.update_schedule = Some(schedules.view);
+        app.init_resource::<ExecutionLog>();
+        app.update_schedule = Some(RenderSchedule::View.intern());
         app.configure_sets(
-            schedules.view,
+            RenderSchedule::View,
             (
-                phases.clear,
-                phases.compute,
-                phases.depth,
-                phases.color,
-                phases.resolve,
+                ViewPhase::Clear,
+                ViewPhase::Compute,
+                ViewPhase::Depth,
+                ViewPhase::Color,
+                ViewPhase::Resolve,
             )
                 .chain(),
         );
-        // Deliberately register in reverse order, using the same copied handles
-        // that a separately loaded plugin receives from the runtime resource.
+        // Deliberately register in reverse order.
         app.add_systems(
-            schedules.view,
+            RenderSchedule::View,
             (
-                (|mut log: ResMut<ExecutionLog>| log.0.push("resolve")).in_set(phases.resolve),
-                (|mut log: ResMut<ExecutionLog>| log.0.push("color")).in_set(phases.color),
-                (|mut log: ResMut<ExecutionLog>| log.0.push("depth")).in_set(phases.depth),
-                (|mut log: ResMut<ExecutionLog>| log.0.push("compute")).in_set(phases.compute),
-                (|mut log: ResMut<ExecutionLog>| log.0.push("clear")).in_set(phases.clear),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("resolve")).in_set(ViewPhase::Resolve),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("color")).in_set(ViewPhase::Color),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("depth")).in_set(ViewPhase::Depth),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("compute")).in_set(ViewPhase::Compute),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("clear")).in_set(ViewPhase::Clear),
             ),
         );
         app.update();
@@ -414,15 +313,14 @@ mod tests {
 
         let mut app = SubApp::new();
         install_schedules(&mut app);
-        let schedules = *app.world().resource::<RenderSchedules>();
         app.init_resource::<ExecutionLog>();
         app.add_systems(First, |mut log: ResMut<ExecutionLog>| {
             log.0.push("first");
         });
-        app.add_systems(schedules.extract, |mut log: ResMut<ExecutionLog>| {
+        app.add_systems(RenderSchedule::Extract, |mut log: ResMut<ExecutionLog>| {
             log.0.push("extract");
         });
-        app.add_systems(schedules.prepare, |mut log: ResMut<ExecutionLog>| {
+        app.add_systems(RenderSchedule::Prepare, |mut log: ResMut<ExecutionLog>| {
             log.0.push("prepare");
         });
         // Replace only GPU execution; retain the installed update and prepare

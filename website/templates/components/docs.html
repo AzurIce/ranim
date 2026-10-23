@@ -1,9 +1,6 @@
-{% macro section_item(section) %}
-  {% set subsections = [] %}
-  {% for section in section.subsections %}
-    {% set_global subsections = subsections | concat(with=get_section(path=section)) %}
-  {% endfor %}
-  {% set subitems = section.pages | concat(with=subsections) | sort(attribute="extra.weight") %}
+{% component docs.section_item(section, current_path) %}
+  {% set subsections = [get_section(path=path) for path in section.subsections] %}
+  {% set subitems = [...section.pages, ...subsections] | sort(attribute="extra.weight") %}
 
   {% if subitems %}
     {% for p in subitems %}
@@ -15,7 +12,7 @@
       {% if is_active %}
         {% set class = class ~ " tree-menu__item--active" %}
       {% endif %}
-      {% set is_section = subsections is containing(p) %}
+      {% set is_section = p in subsections %}
       {% if is_section %}
         {% set label_class = label_class ~ " tree-menu__label--with-chevron" %}
         <input id="{{ id }}" type="checkbox" class="tree-menu__state"
@@ -37,16 +34,16 @@
         </div>
         {% if is_section %}
           <ul class="tree-menu">
-            {{ docs::section_item(section=p) }}
+            {{ <docs.section_item section={p} current_path={current_path} /> }}
           </ul>
         {% endif %}
       </li>
     {% endfor %}
   {% endif %}
-{% endmacro %}
+{% endcomponent docs.section_item %}
 
-{% macro menu(root) %}
+{% component docs.menu(root, current_path) %}
   <ul class="tree-menu">
-    {{ docs::section_item(section=root) }}
+    {{ <docs.section_item section={root} current_path={current_path} /> }}
   </ul>
-{% endmacro %}
+{% endcomponent docs.menu %}

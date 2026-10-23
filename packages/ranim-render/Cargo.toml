@@ -10,6 +10,7 @@ repository.workspace = true
 ranim-core.workspace = true
 bevy_ecs.workspace = true
 bevy_app.workspace = true
+bevy_derive.workspace = true
 variadics_please = "2.0.0"
 wgpu-profiler = { workspace = true }
 image.workspace = true
@@ -18,6 +19,7 @@ bytemuck = { workspace = true, features = ["derive"] }
 glam = { workspace = true, features = ["bytemuck"] }
 pollster = "1.0.1"
 async-channel = "2.5.0"
+web-time.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 wgpu.workspace = true

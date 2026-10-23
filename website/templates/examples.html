@@ -1,5 +1,3 @@
-{% import "macros/examples-page-macros.html" as examples_macros %}
-{% import "macros/examples-tree.html" as examples_tree %}
 {% extends "layouts/three-col.html" %}
 
 {% block left_side %}
@@ -7,7 +5,7 @@
 <div class="outline">
   <div class="outline__content">
     <ul>
-      {{ examples_macros::render_nav(section=examples_section, current=section_or_page) }}
+      {{ <examples.nav section={examples_section} current={section_or_page} /> }}
     </ul>
   </div>
 </div>
@@ -15,9 +13,9 @@
 
 {% block content %}
 <article class="markdown-body examples-article">
-  {{ examples_macros::render_breadcrumbs(current=section_or_page) }}
+  {{ <examples.breadcrumbs current={section_or_page} /> }}
   <div class="examples-list">
-    {{ examples_tree::example_cards(section=section) }}
+    {{ <examples.cards section={section} /> }}
   </div>
 </article>
 {% endblock content %}

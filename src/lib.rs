@@ -11,26 +11,32 @@
 //!
 //! fn main() {
 //!     // cargo run -- preview | output | render hello | inspect scenes
-//!     App::new().add_scenes([hello::scene()]).run();
+//!     let mut app = App::new();
+//!     app.add_scenes([hello::scene()]);
+//!     run_cli(app.build());
 //! }
 //! ```
 //!
 //! Plugins organize larger projects and custom render configurations:
 //!
 //! ```
-//! use ranim::{App, Plugin};
+//! use ranim::{App, Plugin, Resource};
+//!
+//! /// Project resources must implement bevy's `Resource`.
+//! #[derive(Resource)]
+//! struct ProjectConfig(u32);
 //!
 //! struct ProjectPlugin;
 //!
 //! impl Plugin for ProjectPlugin {
-//!     fn build(&self, app: &mut App) {
-//!         app.insert_resource(42_u32);
+//!     fn build(&self, app: &mut bevy_app::App) {
+//!         app.insert_resource(ProjectConfig(42));
 //!     }
 //! }
 //!
 //! let mut app = App::new();
 //! app.add_plugins(ProjectPlugin);
-//! assert_eq!(*app.resource::<u32>(), 42);
+//! assert_eq!(app.world().resource::<ProjectConfig>().0, 42);
 //! ```
 //!
 //! ## Coordinate System
@@ -76,19 +82,26 @@ pub mod utils {
     pub use ranim_core::utils::*;
 }
 
+/// The WebAssembly host for project binaries
+#[cfg(all(target_arch = "wasm32", feature = "render"))]
+pub mod wasm;
+
 pub use app::{
-    App, Output, OutputFormat, Plugin, PluginError, Scene, SceneConfig, SceneConstructor,
-    SceneHandle,
+    AppExt, Output, OutputFormat, RanimApp, RanimAppExt, Scene, SceneConfig, SceneConstructor,
+    Scenes,
 };
+pub use bevy_app::{App, Plugin};
+pub use bevy_ecs::prelude::Resource;
 
 pub use core::glam;
 pub use ranim_core::{RanimScene, lagged, seq, stack};
 
 /// The preludes
 pub mod prelude {
-    pub use crate::app::{App, Plugin};
+    pub use crate::app::{AppExt, RanimAppExt};
     #[cfg(all(not(target_family = "wasm"), feature = "render"))]
-    pub use crate::cmd::AppRunExt;
+    pub use crate::cmd::cli::run_cli;
+    pub use crate::{App, Plugin};
     pub use ranim_core::prelude::*;
     pub use ranim_core::{lagged, seq, stack};
     pub use ranim_items::camera::CameraFrame;

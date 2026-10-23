@@ -1,4 +1,3 @@
-{% import "macros/examples-page-macros.html" as code_examples %}
 {% extends "layouts/three-col.html" %}
 
 {% block left_side %}
@@ -25,7 +24,6 @@
 
 {% block content %}
 <article class="markdown-body">
-  {{ code_examples::process_code_block(content=section_or_page.content) | safe }}
-  <!-- {{ section_or_page.content | safe }} -->
+  {{ <examples.content content={section_or_page.content} /> }}
 </article>
 {% endblock content %}

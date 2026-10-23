@@ -22,9 +22,8 @@ style = "class"
 # If you use a single theme, put its name here. See the syntax highlighting  page for the possible choices.
 theme = "catppuccin-mocha"
 
-# If you want light/dark themes, use the 2 fields below instead. See the syntax highlighting  page for the possible choices.
-light_theme = ""
-dark_theme = ""
+# To use separate light/dark themes, replace `theme` with both `light_theme`
+# and `dark_theme`. Empty values still count as a second configuration in Zola.
 
 # A list of files for additional JSON TextMate grammars
 extra_grammars = []

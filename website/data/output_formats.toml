@@ -1,6 +1,6 @@
 name = "output_formats"
-code = '''
-`scenes.rs`（场景与注册）
+code = """
+`scenes.rs`（共享场景与项目装配）
 
 ```rust
 use std::f64::consts::PI;
@@ -79,29 +79,49 @@ fn output_formats(r: &mut RanimScene) {
 pub struct ScenesPlugin;
 
 impl ranim::Plugin for ScenesPlugin {
-    fn build(&self, app: &mut ranim::App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([output_formats::scene()]);
     }
 }
 ```
 
-`lib.rs`（插件入口）
+`main.rs`（原生入口）
 
 ```rust
+#![cfg_attr(target_arch = "wasm32", no_main)]
+#![cfg(not(target_arch = "wasm32"))]
+
 mod scenes;
 
-pub use scenes::ScenesPlugin;
-
-// Keep the exported factory here: the bundle reuses `scenes.rs` without
-// generating multiple native `ranim_plugin` entry symbols.
-#[ranim::export_plugin]
-pub fn plugin() -> impl ranim::Plugin {
-    ScenesPlugin
+fn main() {
+    use ranim::prelude::*;
+    let mut app = App::new();
+    app.add_plugins(scenes::ScenesPlugin);
+    run_cli(app.build());
 }
-```'''
+```
+
+`wasm.rs`（WASM 入口）
+
+```rust
+//! WebAssembly entry; project assembly is shared with the native binary.
+
+#![cfg(target_arch = "wasm32")]
+
+mod scenes;
+
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn app() -> ranim::wasm::WasmApp {
+    use ranim::prelude::*;
+
+    let mut app = App::new();
+    app.add_plugins(scenes::ScenesPlugin);
+    ranim::wasm::WasmApp::new(app.build())
+}
+```"""
 hash = "60054056f57521ada9e0bda4b4eddf8582190c74"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/48/37fc92a066040cd18b0e55aebd3217e1ef1f7b187badae94727b62f8b85137"]
-wasm = false
+wasm = true
 
 [[output_files]]
 url = "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/5e/1d0bd500006cca746f96ee5e86297fa34a52b444cae7d73156f9ea5bc5ff04"

@@ -1,6 +1,6 @@
 name = "mesh_morph"
-code = '''
-`scenes.rs`（场景与注册）
+code = """
+`scenes.rs`（共享场景与项目装配）
 
 ```rust
 use std::f64::consts::PI;
@@ -136,26 +136,46 @@ fn create_disc_shape(radius: f64, resolution: (u32, u32)) -> Surface {
 pub struct ScenesPlugin;
 
 impl ranim::Plugin for ScenesPlugin {
-    fn build(&self, app: &mut ranim::App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([mesh_morph::scene()]);
     }
 }
 ```
 
-`lib.rs`（插件入口）
+`main.rs`（原生入口）
 
 ```rust
+#![cfg_attr(target_arch = "wasm32", no_main)]
+#![cfg(not(target_arch = "wasm32"))]
+
 mod scenes;
 
-pub use scenes::ScenesPlugin;
-
-// Keep the exported factory here: the bundle reuses `scenes.rs` without
-// generating multiple native `ranim_plugin` entry symbols.
-#[ranim::export_plugin]
-pub fn plugin() -> impl ranim::Plugin {
-    ScenesPlugin
+fn main() {
+    use ranim::prelude::*;
+    let mut app = App::new();
+    app.add_plugins(scenes::ScenesPlugin);
+    run_cli(app.build());
 }
-```'''
+```
+
+`wasm.rs`（WASM 入口）
+
+```rust
+//! WebAssembly entry; project assembly is shared with the native binary.
+
+#![cfg(target_arch = "wasm32")]
+
+mod scenes;
+
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn app() -> ranim::wasm::WasmApp {
+    use ranim::prelude::*;
+
+    let mut app = App::new();
+    app.add_plugins(scenes::ScenesPlugin);
+    ranim::wasm::WasmApp::new(app.build())
+}
+```"""
 hash = "21b7c17a0b81b36dee9f90ffc02b8486fcf38839"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/a9/2be2b2265e578a0a48a06432a4d0cae9f29ac3ecb9ade1dd0830e32bc4b349", "https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/ae/7a24d816005b92a325d3d2cb516c5b3128c590b54ff45b3bd7c2c93166ba43"]
 wasm = true

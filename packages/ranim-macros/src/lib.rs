@@ -152,11 +152,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let doc = if attrs.wasm_demo_doc {
         quote! {
-            #[doc = concat!("<canvas id=\"ranim-app-", #scene_name, "\" width=\"1280\" height=\"720\" style=\"width: 100%;\"></canvas>")]
-            #[doc = concat!("<script type=\"module\">")]
-            #[doc = concat!("  const { preview_scene } = await ranim_examples;")]
-            #[doc = concat!("  preview_scene(\"", #scene_name, "\");")]
-            #[doc = "</script>"]
+            #[doc = concat!("<ranim-player data-module-path=\"", module_path!(), "\" scene=\"", #scene_name, "\"></ranim-player>")]
         }
     } else {
         quote! {}

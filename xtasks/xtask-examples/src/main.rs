@@ -1,7 +1,7 @@
 use std::{
     collections::HashSet,
     env,
-    path::Path,
+    path::{Path, PathBuf},
     process::ExitCode,
     time::{Duration, Instant},
 };
@@ -25,8 +25,15 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Build the shared wasm bundle used by the website previews.
-    Build,
+    /// Build individual WASM examples for the website or rustdoc.
+    Build {
+        /// Output root; packages go under examples/<name>/pkg.
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
+        /// Build only these examples. Defaults to all WASM examples.
+        #[arg(value_name = "EXAMPLES")]
+        examples: Vec<String>,
+    },
     /// Render examples and refresh website data/pages.
     Run {
         /// Skip examples whose rendered data is already up-to-date.
@@ -68,8 +75,8 @@ fn main() -> ExitCode {
         }
     }
 
-    if matches!(&args.command, Commands::Build) {
-        return build_examples_wasm_cmd(&workspace_root);
+    if let Commands::Build { examples, out_dir } = &args.command {
+        return build_examples_wasm_cmd(&workspace_root, examples, out_dir.as_deref());
     }
 
     if let Commands::Publish = args.command {
@@ -226,16 +233,20 @@ fn main() -> ExitCode {
     }
 }
 
-fn build_examples_wasm_cmd(workspace_root: &Path) -> ExitCode {
+fn build_examples_wasm_cmd(
+    workspace_root: &Path,
+    examples: &[String],
+    out_dir: Option<&Path>,
+) -> ExitCode {
     let started = Instant::now();
-    println!("构建 wasm example bundle…");
-    if let Err(err) = build_examples_wasm(workspace_root) {
-        eprintln!("构建 wasm example bundle 失败: {err:#}");
+    println!("构建 WASM examples…");
+    if let Err(err) = build_examples_wasm(workspace_root, examples, out_dir) {
+        eprintln!("构建 WASM examples 失败: {err:#}");
         return ExitCode::FAILURE;
     }
     println!(
-        "构建 wasm example bundle 完成 ({}s)",
-        format_duration(started.elapsed())
+        "构建 WASM examples 完成 ({:.1}s)",
+        started.elapsed().as_secs_f64()
     );
     ExitCode::SUCCESS
 }

@@ -16,7 +16,10 @@ use ranim::{
     prelude::*,
 };
 use ranim_core::frame::EvaluatedFrame;
-use ranim_render::{Renderer, extract::ExtractPlugin, utils::WgpuContext};
+use ranim_render::{
+    RenderAppExt, build_render_app, extract::ExtractPlugin, resource::RenderTextures,
+    utils::WgpuContext,
+};
 
 type PlacedSquare = Transformed<Square, Translation>;
 
@@ -86,18 +89,15 @@ fn main() {
     }
 
     let ctx = pollster::block_on(WgpuContext::new());
-    let mut renderer = Renderer::new(
-        &ctx,
-        1920,
-        1080,
-        8,
-        (
-            CameraFramePlugin,
-            ExtractPlugin::<PlacedSquare>::default(),
-            VItemPlugin,
-        ),
-    );
-    let mut render_textures = renderer.new_render_textures(&ctx);
+    let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
+    renderer.add_plugins((
+        CameraFramePlugin,
+        ExtractPlugin::<PlacedSquare>::default(),
+        VItemPlugin,
+    ));
+    renderer.finish();
+    renderer.cleanup();
+    let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
     let clear_color = wgpu::Color::BLACK;
 
     let cold = Instant::now();

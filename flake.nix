@@ -73,10 +73,8 @@
             samply
             cargo-udeps
             miniserve
-            trunk
             zola
             mdbook
-            wasm-pack
             binaryen
             mdbook-mermaid
             typst

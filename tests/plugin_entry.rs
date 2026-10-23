@@ -1,8 +1,8 @@
 //! Verify that a project plugin assembles scenes, outputs, and resources into
-//! a host App through direct `add_plugins` installation.
+//! the App through direct `add_plugins` installation.
 
-use ranim::{App, OutputFormat, Plugin, prelude::*};
-use std::sync::Arc;
+use bevy_ecs::prelude::Resource;
+use ranim::{App, AppExt, OutputFormat, Plugin, SceneConstructor, prelude::*};
 
 #[scene(name = "registered", clear_color = "#112233")]
 #[output(width = 320, height = 180, fps = 24, format = "webm", name = "clip")]
@@ -12,11 +12,17 @@ fn registered_scene(_r: &mut RanimScene) {}
 #[scene]
 fn unregistered_scene(_r: &mut RanimScene) {}
 
+#[derive(Resource)]
+struct HostConfig(String);
+
+#[derive(Resource)]
+struct ProjectConfig(u32);
+
 struct ProjectPlugin(u32);
 
 impl Plugin for ProjectPlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(self.0)
+    fn build(&self, app: &mut bevy_app::App) {
+        app.insert_resource(ProjectConfig(self.0))
             .add_scene(registered_scene::scene());
     }
 }
@@ -24,13 +30,15 @@ impl Plugin for ProjectPlugin {
 #[test]
 fn project_plugin_installs_only_explicit_scenes() {
     let mut project = App::new();
-    project.insert_resource(String::from("host configuration"));
+    project.insert_resource(HostConfig(String::from("host configuration")));
     assert!(project.scenes().is_empty());
     project.add_plugins(ProjectPlugin(42));
-    let project = Arc::new(project);
 
-    assert_eq!(project.resource::<String>(), "host configuration");
-    assert_eq!(*project.resource::<u32>(), 42);
+    assert_eq!(
+        project.world().resource::<HostConfig>().0,
+        "host configuration"
+    );
+    assert_eq!(project.world().resource::<ProjectConfig>().0, 42);
     assert!(project.is_plugin_added::<ProjectPlugin>());
     assert_eq!(project.scenes().len(), 1);
     assert!(project.scene("unregistered_scene").is_none());
@@ -47,14 +55,13 @@ fn project_plugin_installs_only_explicit_scenes() {
 }
 
 #[test]
-fn boxed_and_direct_plugins_share_the_same_registration_identity() {
+fn duplicate_plugin_types_are_rejected() {
     let mut project = App::new();
     project.add_plugins(ProjectPlugin(42));
-    let boxed: Box<dyn Plugin> = Box::new(ProjectPlugin(42));
-    let Err(error) = project.try_add_plugins(boxed) else {
-        panic!("the same plugin was already registered directly");
-    };
-    assert!(error.to_string().contains("ProjectPlugin"));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        project.add_plugins(ProjectPlugin(99));
+    }));
+    assert!(result.is_err());
     assert_eq!(project.scenes().len(), 1);
 }
 

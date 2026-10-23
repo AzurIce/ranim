@@ -1,12 +1,11 @@
-<style>
-  canvas {
-    width: 100%;
-  }
-</style>
 <script type="module">
   const rootPath = document.querySelector('meta[name="rustdoc-vars"]')?.dataset.rootPath ?? '';
-  window.ranim_examples = import(`${rootPath}ranim_examples/pkg/ranim_examples.js`).then(
-    ({ default: init, preview_scene }) =>
-      init().then(() => ({ preview_scene }))
-  );
+  // These assets are emitted by `cargo examples build --out-dir …`.
+  if (document.querySelector('ranim-player[data-module-path]')) {
+    await import(`${rootPath}ranim_examples/ranim-player.js`);
+    for (const player of document.querySelectorAll('ranim-player[data-module-path]')) {
+      const example = player.dataset.modulePath.split('::')[1];
+      player.setAttribute('src', `${rootPath}ranim_examples/examples/${example}/pkg/ranim_example.js`);
+    }
+  }
 </script>

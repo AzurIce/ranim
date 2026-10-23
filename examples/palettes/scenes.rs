@@ -12,7 +12,7 @@ fn palettes(r: &mut RanimScene) {
     let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
     let padded_frame_size = frame_size * 0.9;
 
-    let colors = vec![
+    let colors = [
         vec![BLUE_E, BLUE_D, BLUE_C, BLUE_B, BLUE_A],
         vec![TEAL_E, TEAL_D, TEAL_C, TEAL_B, TEAL_A],
         vec![GREEN_E, GREEN_D, GREEN_C, GREEN_B, GREEN_A],
@@ -60,7 +60,7 @@ fn palettes(r: &mut RanimScene) {
 pub struct ScenesPlugin;
 
 impl ranim::Plugin for ScenesPlugin {
-    fn build(&self, app: &mut ranim::App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([palettes::scene()]);
     }
 }

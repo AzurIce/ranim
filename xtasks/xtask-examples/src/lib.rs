@@ -1,8 +1,9 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fs,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 
 use anyhow::{Context, Result, bail};
@@ -31,115 +32,166 @@ fn copy_file(source: &Path, target_dir: &Path) -> Result<String> {
     Ok(file_name)
 }
 
-/// The package containing the example plugins and their preview host.
-const EXAMPLES_BUNDLE_PACKAGE: &str = "ranim-examples";
-/// Binary that assembles the App and exports the website's preview entry point.
-const EXAMPLES_PREVIEW_BINARY: &str = "ranim-examples-preview";
-/// Stable JavaScript module name used by website pages and rustdoc previews.
-const EXAMPLES_WASM_MODULE: &str = "ranim_examples";
 /// Root directory of generated Zola example pages, relative to the website root.
 const WEBSITE_EXAMPLES_CONTENT_DIR: &str = "content/examples";
 /// Top-level title used when `content/examples/_index.md` does not exist yet.
 const WEBSITE_EXAMPLES_TITLE: &str = "例子";
-const EXAMPLES_BUNDLE_WEB_DIR: &str = "ranim-examples";
+/// Module basename shared by the individual WASM packages.
+const EXAMPLES_WASM_MODULE: &str = "ranim_example";
 
-fn clean_examples_wasm(root_dir: &Path) -> Result<()> {
-    let output_dir = root_dir
-        .join("website")
-        .join("static")
-        .join(EXAMPLES_BUNDLE_WEB_DIR)
-        .join("pkg");
-    if std::fs::exists(&output_dir)? {
-        std::fs::remove_dir_all(&output_dir)
-            .with_context(|| format!("failed to clean {}", output_dir.display()))?;
-    }
-    Ok(())
-}
-
-/// Build the shared wasm preview host containing every example plugin.
+/// Build each selected example's WASM cdylib and JavaScript bindings.
 ///
-/// The host constructs an App and installs the bundle's plugin. It is built
-/// once with the full feature set (`preview`, `anims`, `items` and `typst`)
-/// and exposed to the website as
-/// `website/static/ranim-examples/pkg/ranim_examples.js`.
-pub fn build_examples_wasm(root_dir: impl AsRef<Path>) -> Result<()> {
+/// With no selection, builds all examples with a WASM target. Packages are
+/// written to `<output_dir>/examples/<name>/pkg`, where `output_dir` defaults
+/// to `website/static`. Rustdoc uses its own crate documentation directory.
+/// Website builds also refresh source listings and pages, preserving published media.
+pub fn build_examples_wasm(
+    root_dir: impl AsRef<Path>,
+    selected: &[String],
+    output_dir: Option<&Path>,
+) -> Result<()> {
     let root_dir = root_dir.as_ref();
-    let website_root = root_dir.join("website");
-    let output_dir = website_root.join("static").join(EXAMPLES_BUNDLE_WEB_DIR);
-    std::fs::create_dir_all(&output_dir)?;
-
-    clean_examples_wasm(root_dir)?;
-
-    println!("[1/3] compiling {EXAMPLES_PREVIEW_BINARY} for wasm32-unknown-unknown");
-    let status = Command::new("cargo")
-        .current_dir(root_dir)
-        .args([
-            "build",
-            "-p",
-            EXAMPLES_BUNDLE_PACKAGE,
-            "--bin",
-            EXAMPLES_PREVIEW_BINARY,
-            "--target",
-            "wasm32-unknown-unknown",
-            "--release",
-        ])
-        .stdout(std::process::Stdio::null())
-        .status()
-        .context("failed to run cargo build for the wasm example bundle")?;
-    if !status.success() {
-        bail!("failed to build the wasm example bundle");
+    let examples = get_examples(root_dir)?;
+    for name in selected {
+        if !examples
+            .iter()
+            .any(|example| example.name == *name && example.meta.wasm)
+        {
+            bail!("example `{name}` has no WASM target");
+        }
     }
-    println!("[2/3] running wasm-bindgen");
-    let wasm_path = root_dir
-        .join("target")
-        .join("wasm32-unknown-unknown")
-        .join("release")
-        .join(format!("{EXAMPLES_PREVIEW_BINARY}.wasm"));
-    let pkg_dir = output_dir.join("pkg");
-    let status = Command::new("wasm-bindgen")
-        .current_dir(root_dir)
-        .args([
-            "--out-dir",
-            pkg_dir.as_os_str().to_str().unwrap(),
-            "--target",
-            "web",
-            "--out-name",
-            EXAMPLES_WASM_MODULE,
-            wasm_path.as_os_str().to_str().unwrap(),
-        ])
-        .stdout(std::process::Stdio::null())
-        .status()
-        .context("failed to run wasm-bindgen; is it installed?")?;
-    if !status.success() {
-        bail!("wasm-bindgen failed for the wasm example bundle");
+    let output_dir = root_dir.join(output_dir.unwrap_or(Path::new("website/static")));
+    let examples: Vec<_> = examples
+        .iter()
+        .filter(|example| {
+            example.meta.wasm && (selected.is_empty() || selected.contains(&example.name))
+        })
+        .collect();
+    // Cargo unifies features within one invocation. Keep Typst and other
+    // optional dependencies out of examples that do not request them.
+    let mut groups: BTreeMap<Vec<String>, Vec<&Example>> = BTreeMap::new();
+    for example in &examples {
+        let mut features = example.wasm_features.clone();
+        features.sort();
+        features.dedup();
+        groups.entry(features).or_default().push(*example);
     }
-
-    println!("[3/3] optimizing wasm with wasm-opt");
-    let bg_wasm = pkg_dir.join(format!("{EXAMPLES_WASM_MODULE}_bg.wasm"));
-    optimize_wasm(&bg_wasm).context("failed to optimize the wasm example bundle")?;
-
-    clean_legacy_example_wasm_packages(root_dir)?;
+    for (features, examples) in groups {
+        build_wasm_group(root_dir, &features, &examples, &output_dir)?;
+    }
+    copy_player_component(root_dir, &output_dir)?;
+    if output_dir.canonicalize()? == root_dir.join("website/static").canonicalize()? {
+        for example in examples {
+            example.refresh_website_sources(root_dir)?;
+        }
+    }
     Ok(())
 }
 
-/// Remove per-example wasm packages left over from website builds that
-/// predate the shared `ranim-examples` bundle.
-fn clean_legacy_example_wasm_packages(root_dir: &Path) -> Result<()> {
-    let examples_root = root_dir.join("website").join("static").join("examples");
-    if !std::fs::exists(&examples_root)? {
-        return Ok(());
+/// Reuse the website's component for other hosts, such as rustdoc.
+fn copy_player_component(root_dir: &Path, output_dir: &Path) -> Result<()> {
+    let source = root_dir
+        .join("website/static/ranim-player.js")
+        .canonicalize()
+        .context("failed to find the website preview component")?;
+    fs::create_dir_all(output_dir)?;
+    let target = output_dir.join("ranim-player.js");
+    // The default output is already the component's source directory. Resolve
+    // aliases like `--out-dir ./website/static` too: copying onto the source
+    // would truncate it.
+    if target.canonicalize().ok().as_ref() != Some(&source) {
+        fs::copy(&source, &target).context("failed to copy the website preview component")?;
     }
+    Ok(())
+}
 
-    for entry in std::fs::read_dir(&examples_root)? {
-        let entry = entry?;
-        if !entry.file_type()?.is_dir() {
+fn build_wasm_group(
+    root_dir: &Path,
+    features: &[String],
+    examples: &[&Example],
+    output_dir: &Path,
+) -> Result<()> {
+    let mut build = Command::new("cargo");
+    build.env(
+        "CARGO_BUILD_JOBS",
+        std::env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| "8".to_string()),
+    );
+    build.current_dir(root_dir).args([
+        "build",
+        "-p",
+        "ranim",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--release",
+        "--message-format=json-render-diagnostics",
+    ]);
+    for example in examples {
+        build.args(["--example", &format!("{}-wasm", example.name)]);
+    }
+    build.args(["--features", &features.join(",")]);
+    println!(
+        "[1/3] compiling {} WASM examples ({})",
+        examples.len(),
+        features.join(",")
+    );
+    let mut child = build
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("failed to run cargo build for WASM examples")?;
+    let stdout = child
+        .stdout
+        .take()
+        .context("Cargo stdout was not captured")?;
+    // Use Cargo's reported paths, including custom CARGO_TARGET_DIR settings.
+    let mut artifacts = HashMap::new();
+    for line in BufReader::new(stdout).lines() {
+        let line = line.context("failed to read Cargo output")?;
+        let Ok(message) = serde_json::from_str::<serde_json::Value>(&line) else {
+            continue;
+        };
+        if message["reason"] != "compiler-artifact" {
             continue;
         }
-        let pkg_dir = entry.path().join("pkg");
-        if std::fs::exists(&pkg_dir)? {
-            std::fs::remove_dir_all(&pkg_dir)
-                .with_context(|| format!("failed to clean {}", pkg_dir.display()))?;
+        if let (Some(name), Some(files)) = (
+            message["target"]["name"].as_str(),
+            message["filenames"].as_array(),
+        ) && let Some(path) = files
+            .iter()
+            .filter_map(|file| file.as_str())
+            .find(|file| file.ends_with(".wasm"))
+        {
+            artifacts.insert(name.to_string(), PathBuf::from(path));
         }
+    }
+    if !child.wait().context("failed to wait for Cargo")?.success() {
+        bail!("failed to build WASM examples");
+    }
+    for example in examples {
+        let target = format!("{}-wasm", example.name);
+        let wasm_path = artifacts
+            .get(&target)
+            .with_context(|| format!("Cargo did not report a WASM artifact for {target}"))?;
+        let pkg_dir = output_dir.join("examples").join(&example.name).join("pkg");
+        fs::create_dir_all(&pkg_dir)?;
+        println!("[2/3] running wasm-bindgen for {}", example.name);
+        let status = Command::new("wasm-bindgen")
+            .current_dir(root_dir)
+            .args([
+                "--target",
+                "web",
+                "--out-name",
+                EXAMPLES_WASM_MODULE,
+                "--out-dir",
+            ])
+            .arg(&pkg_dir)
+            .arg(wasm_path)
+            .status()
+            .context("failed to run wasm-bindgen; is it installed?")?;
+        if !status.success() {
+            bail!("wasm-bindgen failed for {}", example.name);
+        }
+        println!("[3/3] optimizing {} with wasm-opt", example.name);
+        optimize_wasm(&pkg_dir.join(format!("{EXAMPLES_WASM_MODULE}_bg.wasm")))?;
     }
     Ok(())
 }
@@ -216,6 +268,8 @@ pub struct Example {
     pub code: String,
     pub hash: String,
     pub required_features: Vec<String>,
+    /// Features required by the paired WASM cdylib, independent of native UI.
+    pub wasm_features: Vec<String>,
 
     pub meta: ExampleMeta,
 }
@@ -229,9 +283,21 @@ impl Example {
             .join("static")
             .join("examples")
             .join(&self.name);
-        if std::fs::exists(&output_dir)? {
-            std::fs::remove_dir_all(&output_dir)
-                .with_context(|| format!("failed to clean {}", output_dir.display()))?;
+        if output_dir.exists() {
+            for entry in fs::read_dir(&output_dir)? {
+                let entry = entry?;
+                // Rendering refreshes media while the independently built
+                // WASM package remains available to the website.
+                if entry.file_name() == "pkg" && entry.file_type()?.is_dir() {
+                    continue;
+                }
+                let path = entry.path();
+                if entry.file_type()?.is_dir() {
+                    fs::remove_dir_all(&path)?;
+                } else {
+                    fs::remove_file(&path)?;
+                }
+            }
         }
         std::fs::create_dir_all(&output_dir)?;
         Ok(())
@@ -244,17 +310,6 @@ impl Example {
     /// The render runs **before** any existing website output is cleaned, so a
     /// failed render leaves the previous outputs untouched.
     pub fn run(&self, root_dir: impl AsRef<Path>, lazy: bool) -> Result<RunStatus> {
-        #[derive(Serialize, Deserialize)]
-        struct OutputData {
-            name: String,
-            code: String,
-            hash: String,
-
-            preview_imgs: Vec<String>,
-            output_files: Vec<OutputFile>,
-            wasm: bool,
-        }
-
         let root_dir = root_dir.as_ref();
         let website_root = root_dir.join("website");
         let output_dir = website_root
@@ -337,6 +392,29 @@ impl Example {
             self.create_example_page(root_dir)?;
         }
         Ok(RunStatus::Rendered)
+    }
+
+    /// Refresh source listings and WASM availability without rendering or publishing.
+    fn refresh_website_sources(&self, root_dir: &Path) -> Result<()> {
+        let data_dir = root_dir.join("website/data");
+        fs::create_dir_all(&data_dir)?;
+        let data_path = data_dir.join(format!("{}.toml", self.name));
+        let mut data = if data_path.try_exists()? {
+            toml::from_str::<OutputData>(&fs::read_to_string(&data_path)?)
+                .with_context(|| format!("failed to parse {}", data_path.display()))?
+        } else {
+            OutputData::default()
+        };
+        data.name.clone_from(&self.name);
+        data.code.clone_from(&self.code);
+        data.wasm = self.meta.wasm;
+        // `hash` describes the last media render. Updating it here would make
+        // `run --lazy-run` incorrectly skip media for changed scenes.
+        fs::write(&data_path, toml::to_string(&data)?)?;
+        if !self.meta.hide {
+            self.create_example_page(root_dir)?;
+        }
+        Ok(())
     }
 
     /// Generate (or refresh) the Zola page for this example.
@@ -622,6 +700,17 @@ pub struct OutputFile {
     pub kind: String,
 }
 
+/// Shared website data for media publication and source-only refreshes.
+#[derive(Serialize, Deserialize, Default)]
+struct OutputData {
+    name: String,
+    code: String,
+    hash: String,
+    preview_imgs: Vec<String>,
+    output_files: Vec<OutputFile>,
+    wasm: bool,
+}
+
 fn mime_for_extension(ext: &str) -> &'static str {
     match ext {
         "mp4" => "video/mp4",
@@ -666,17 +755,6 @@ fn write_example_data(
     mut files: Vec<String>,
     shadow: &shadow::Shadow,
 ) -> Result<()> {
-    #[derive(Serialize, Deserialize)]
-    struct OutputData {
-        name: String,
-        code: String,
-        hash: String,
-
-        preview_imgs: Vec<String>,
-        output_files: Vec<OutputFile>,
-        wasm: bool,
-    }
-
     files.sort();
 
     let (preview_imgs, mut output_files) = split_output_files(&files);
@@ -887,7 +965,7 @@ fn is_generated_example_page(path: &Path) -> Result<bool> {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ExampleMeta {
-    #[serde(default)]
+    #[serde(skip)]
     wasm: bool,
     #[serde(default)]
     hide: bool,
@@ -905,16 +983,25 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
         .parse::<Table>()
         .context("failed to parse workspace Cargo.toml")?;
 
-    let metadatas = manifest["package"]["metadata"]["example"]
-        .clone()
+    let metadatas = manifest
+        .get("package")
+        .and_then(|package| package.get("metadata"))
+        .and_then(|metadata| metadata.get("example"))
+        .cloned()
+        .unwrap_or_else(|| toml::Value::Table(Table::new()))
         .try_into::<HashMap<String, ExampleMeta>>()
         .context("failed to parse [package.metadata.example]")?;
 
-    manifest["example"]
+    let targets = manifest["example"]
         .as_array()
-        .context("no [[example]] targets in workspace Cargo.toml")?
+        .context("no [[example]] targets in workspace Cargo.toml")?;
+
+    targets
         .iter()
         .map(|v| v.as_table().unwrap())
+        // The `<name>-wasm` cdylib entries are the WASM hosts of the examples,
+        // not renderable examples themselves.
+        .filter(|item| !item["name"].as_str().unwrap().ends_with("-wasm"))
         .map(|item| {
             let name = item["name"].as_str().unwrap().to_string();
             let required_features = item
@@ -927,39 +1014,55 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
                 .collect();
 
             let entry_path = root_dir.join(item["path"].as_str().unwrap());
-            // The bundle reuses the examples' scenes modules; the entry file
-            // keeps the per-example plugin and `main`.
-            let scenes_path = entry_path.with_file_name("scenes.rs");
-            let path = if scenes_path.is_file() {
-                scenes_path
-            } else {
-                entry_path.clone()
-            };
-            let source = fs::read_to_string(&path)
-                .with_context(|| format!("failed to read example source {}", path.display()))?;
-            let entry = (path != entry_path)
-                .then(|| {
-                    fs::read_to_string(&entry_path).with_context(|| {
-                        format!("failed to read project entry {}", entry_path.display())
-                    })
-                })
-                .transpose()?;
-            let hash = {
-                let mut hasher = Sha1::new();
-                hasher.update(source.as_bytes());
-                if let Some(entry) = &entry {
-                    hasher.update(entry.as_bytes());
+            let path = entry_path.with_file_name("scenes.rs");
+            let wasm_target = targets
+                .iter()
+                .find(|target| target["name"].as_str() == Some(&format!("{name}-wasm")));
+            let wasm_features = wasm_target
+                .and_then(|target| target.get("required-features"))
+                .and_then(toml::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(toml::Value::as_str)
+                .map(str::to_owned)
+                .collect();
+            let mut meta = metadatas.get(&name).cloned().unwrap_or_default();
+            meta.wasm = wasm_target.is_some();
+            if let Some(target) = wasm_target {
+                let expected_path = entry_path.with_file_name("wasm.rs");
+                let target_path =
+                    root_dir.join(target["path"].as_str().context("WASM target has no path")?);
+                if target_path != expected_path
+                    || target["crate-type"]
+                        .as_array()
+                        .is_none_or(|types| types.len() != 1 || types[0].as_str() != Some("cdylib"))
+                {
+                    bail!(
+                        "{name}-wasm must be a cdylib at {}",
+                        expected_path.display()
+                    );
                 }
-                base16ct::lower::encode_string(&hasher.finalize())
-            };
-            let code = if let Some(entry) = entry {
-                format!(
-                    "`scenes.rs`（场景与注册）\n\n```rust\n{source}```\n\n\
-                     `main.rs`（项目入口）\n\n```rust\n{entry}```"
-                )
-            } else {
-                format!("```rust\n{source}```")
-            };
+            }
+            let mut hasher = Sha1::new();
+            let mut code = String::new();
+            for (file, label) in [
+                ("scenes.rs", "共享场景与项目装配"),
+                ("main.rs", "原生入口"),
+                ("wasm.rs", "WASM 入口"),
+            ] {
+                if file == "wasm.rs" && !meta.wasm {
+                    continue;
+                }
+                let source_path = entry_path.with_file_name(file);
+                let source = fs::read_to_string(&source_path)
+                    .with_context(|| format!("failed to read {}", source_path.display()))?;
+                hasher.update(source.as_bytes());
+                if !code.is_empty() {
+                    code.push_str("\n\n");
+                }
+                code.push_str(&format!("`{file}`（{label}）\n\n```rust\n{source}```"));
+            }
+            let hash = base16ct::lower::encode_string(&hasher.finalize());
             let group = path
                 .parent()
                 .and_then(|dir| dir.strip_prefix(&examples_root).ok())
@@ -967,13 +1070,14 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
                 .map(Path::to_path_buf)
                 .unwrap_or_default();
             Ok(Example {
-                meta: metadatas.get(&name).cloned().unwrap_or_default(),
+                meta,
                 name,
                 group,
                 path,
                 code,
                 hash,
                 required_features,
+                wasm_features,
             })
         })
         .collect()
@@ -995,10 +1099,52 @@ mod test {
     }
 
     #[test]
+    fn test_player_component_copies_without_overwriting_its_source() {
+        let root = temp_root("player-component");
+        let website = root.join("website/static");
+        fs::create_dir_all(&website).unwrap();
+        let source = website.join("ranim-player.js");
+        let contents = "export const player = true;\n";
+        fs::write(&source, contents).unwrap();
+
+        copy_player_component(&root, &website).unwrap();
+        copy_player_component(&root, &website.join("../static")).unwrap();
+        assert_eq!(fs::read_to_string(&source).unwrap(), contents);
+
+        let docs = root.join("docs/ranim_examples");
+        copy_player_component(&root, &docs).unwrap();
+        assert_eq!(
+            fs::read_to_string(docs.join("ranim-player.js")).unwrap(),
+            contents
+        );
+        let updated = "export const player = false;\n";
+        fs::write(&source, updated).unwrap();
+        copy_player_component(&root, &docs).unwrap();
+        assert_eq!(fs::read_to_string(&source).unwrap(), updated);
+        assert_eq!(
+            fs::read_to_string(docs.join("ranim-player.js")).unwrap(),
+            updated
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn test_get_examples() {
         let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root_dir = xtask_root.join("../../");
         let examples = get_examples(&root_dir).unwrap();
+        for entry in fs::read_dir(root_dir.join("examples")).unwrap() {
+            let path = entry.unwrap().path();
+            if path.join("main.rs").exists() {
+                assert!(
+                    examples
+                        .iter()
+                        .any(|example| example.path == path.join("scenes.rs")),
+                    "unregistered example entry: {}",
+                    path.display()
+                );
+            }
+        }
         assert_eq!(
             examples
                 .iter()
@@ -1015,11 +1161,160 @@ mod test {
         assert_eq!(arc.path.file_name().unwrap(), "scenes.rs");
         assert!(arc.code.contains("fn arc(r: &mut RanimScene)"));
         assert!(arc.code.starts_with("`scenes.rs`"));
-        assert!(arc.code.contains("`main.rs`（项目入口）"));
+        assert!(arc.code.contains("`main.rs`（原生入口）"));
+        assert!(arc.code.contains("`wasm.rs`（WASM 入口）"));
+        assert!(arc.meta.wasm);
+        assert_eq!(arc.wasm_features, ["render"]);
+        assert!(
+            examples
+                .iter()
+                .all(|example| !example.name.ends_with("-wasm"))
+        );
+        assert!(examples.iter().all(|example| example.meta.wasm));
+        assert_eq!(
+            examples
+                .iter()
+                .find(|example| example.name == "gltf_showcase")
+                .unwrap()
+                .required_features,
+            ["preview", "gltf"]
+        );
+        assert_eq!(
+            examples
+                .iter()
+                .find(|example| example.name == "gltf_showcase")
+                .unwrap()
+                .wasm_features,
+            ["render", "gltf"]
+        );
         assert!(
             arc.code
-                .contains("App::new().add_plugins(scenes::ScenesPlugin).run()")
+                .contains("app.add_plugins(scenes::ScenesPlugin);\n    run_cli(app.build());")
         );
+    }
+
+    #[test]
+    fn test_website_source_refresh_preserves_rendered_media_and_hash() {
+        let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut example = get_examples(workspace)
+            .unwrap()
+            .into_iter()
+            .find(|example| example.name == "arc")
+            .unwrap();
+        let root = temp_root("source-refresh");
+        example.path = root.join("examples/arc/scenes.rs");
+        fs::create_dir_all(example.path.parent().unwrap()).unwrap();
+
+        example.refresh_website_sources(&root).unwrap();
+        let data_path = root.join("website/data/arc.toml");
+        let mut data: OutputData =
+            toml::from_str(&fs::read_to_string(&data_path).unwrap()).unwrap();
+        assert_eq!(data.code, example.code);
+        assert!(data.wasm);
+        assert!(data.hash.is_empty());
+        assert!(data.output_files.is_empty());
+        assert!(root.join("website/content/examples/arc.md").exists());
+
+        data.hash = "previous-media-source-hash".into();
+        data.preview_imgs = vec!["https://media.example/preview-oid".into()];
+        data.output_files = vec![OutputFile {
+            url: "https://media.example/video-oid".into(),
+            kind: "video/mp4".into(),
+        }];
+        fs::write(&data_path, toml::to_string(&data).unwrap()).unwrap();
+        example.code = "updated shared scenes and entry points".into();
+        example.refresh_website_sources(&root).unwrap();
+        let refreshed: OutputData =
+            toml::from_str(&fs::read_to_string(&data_path).unwrap()).unwrap();
+        assert_eq!(refreshed.code, example.code);
+        assert_eq!(refreshed.hash, data.hash);
+        assert_eq!(refreshed.preview_imgs, data.preview_imgs);
+        assert_eq!(refreshed.output_files, data.output_files);
+
+        example.name = "hidden".into();
+        example.meta.hide = true;
+        example.refresh_website_sources(&root).unwrap();
+        assert!(root.join("website/data/hidden.toml").exists());
+        assert!(!root.join("website/content/examples/hidden.md").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn test_wasm_targets_require_render_and_shared_scene_features() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let manifest = fs::read_to_string(root.join("Cargo.toml"))
+            .unwrap()
+            .parse::<Table>()
+            .unwrap();
+        let targets = manifest["example"].as_array().unwrap();
+        for target in targets
+            .iter()
+            .filter(|target| target["name"].as_str().unwrap().ends_with("-wasm"))
+        {
+            let name = target["name"]
+                .as_str()
+                .unwrap()
+                .strip_suffix("-wasm")
+                .unwrap();
+            let native = targets
+                .iter()
+                .find(|target| target["name"].as_str() == Some(name))
+                .unwrap();
+            let features: Vec<_> = native["required-features"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|feature| {
+                    if feature.as_str() == Some("preview") {
+                        toml::Value::String("render".into())
+                    } else {
+                        feature.clone()
+                    }
+                })
+                .collect();
+            assert_eq!(
+                target["required-features"].as_array().unwrap(),
+                &features,
+                "{name}"
+            );
+            assert_eq!(
+                target["crate-type"].as_array().unwrap(),
+                &[toml::Value::String("cdylib".into())]
+            );
+        }
+    }
+
+    #[test]
+    fn test_wasm_entry_changes_invalidate_source_hash() {
+        let root = temp_root("wasm-hash");
+        let source_dir = root.join("examples/foo");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::write(
+            root.join("Cargo.toml"),
+            r#"
+[package]
+name = "ranim"
+[[example]]
+name = "foo"
+path = "examples/foo/main.rs"
+[[example]]
+name = "foo-wasm"
+path = "examples/foo/wasm.rs"
+crate-type = ["cdylib"]
+"#,
+        )
+        .unwrap();
+        fs::write(source_dir.join("scenes.rs"), "// shared assembly\n").unwrap();
+        fs::write(source_dir.join("main.rs"), "fn main() {}\n").unwrap();
+        fs::write(source_dir.join("wasm.rs"), "// first entry\n").unwrap();
+        let before = get_examples(&root).unwrap();
+        fs::write(source_dir.join("wasm.rs"), "// changed entry\n").unwrap();
+        let after = get_examples(&root).unwrap();
+        assert_eq!(before.len(), 1);
+        assert!(after[0].meta.wasm);
+        assert_ne!(before[0].hash, after[0].hash);
+        assert!(after[0].code.contains("// changed entry"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -1059,6 +1354,31 @@ mod test {
     }
 
     #[test]
+    fn test_render_cleanup_preserves_wasm_package() {
+        let root = temp_root("render-clean");
+        let output = root.join("website/static/examples/foo");
+        fs::create_dir_all(output.join("pkg")).unwrap();
+        fs::create_dir_all(output.join("stale")).unwrap();
+        fs::write(output.join("preview.png"), "old render").unwrap();
+        fs::write(output.join("pkg/ranim_example.js"), "WASM bindings").unwrap();
+        let example = Example {
+            name: "foo".into(),
+            path: root.join("examples/foo/scenes.rs"),
+            group: PathBuf::new(),
+            code: String::new(),
+            hash: String::new(),
+            required_features: vec![],
+            wasm_features: vec![],
+            meta: ExampleMeta::default(),
+        };
+        example.clean_output(&root).unwrap();
+        assert!(output.join("pkg/ranim_example.js").is_file());
+        assert!(!output.join("preview.png").exists());
+        assert!(!output.join("stale").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn test_clean_website_examples() {
         let root_dir = temp_root("clean");
 
@@ -1087,6 +1407,7 @@ mod test {
             code: "```rust\nfn main() {}\n```".to_string(),
             hash: "deadbeef".to_string(),
             required_features: vec![],
+            wasm_features: vec![],
             meta: ExampleMeta::default(),
         }];
 
@@ -1127,6 +1448,7 @@ mod test {
             code: "```rust\nfn main() {}\n```".to_string(),
             hash: "deadbeef".to_string(),
             required_features: vec![],
+            wasm_features: vec![],
             meta: ExampleMeta::default(),
         };
 

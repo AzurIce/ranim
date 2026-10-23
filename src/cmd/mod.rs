@@ -1,17 +1,6 @@
 /// The command line interface for project binaries
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
 pub mod cli;
-#[cfg(all(not(target_family = "wasm"), feature = "render"))]
-pub use cli::AppRunExt;
-
-/// The render setup used when the project does not register one: the built-in
-/// camera, vector-item, and mesh-item plugins.
-#[cfg(feature = "render")]
-pub(crate) fn default_render_setup() -> ranim_render::RenderSetup {
-    ranim_render::RenderSetup::new(|app| {
-        app.add_plugins(ranim_items::RanimItemsPlugin);
-    })
-}
 
 /// Inspect scenes, animation trees, or evaluated frames without rendering
 #[cfg(all(not(target_family = "wasm"), feature = "render"))]
@@ -27,8 +16,8 @@ pub use render::{
 };
 
 /// The preview application
-#[cfg(feature = "preview")]
+#[cfg(all(not(target_family = "wasm"), feature = "preview"))]
 #[allow(missing_docs)]
 pub mod preview;
-#[cfg(feature = "preview")]
+#[cfg(all(not(target_family = "wasm"), feature = "preview"))]
 pub use preview::preview_scene;

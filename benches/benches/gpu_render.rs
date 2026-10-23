@@ -1,4 +1,4 @@
-//! GPU rendering benchmark — isolates the pure `Renderer::render_frame` cost.
+//! GPU rendering benchmark — isolates the pure `RenderAppExt::render_frame` cost.
 //!
 //! Measures:
 //! - CPU-side submission time (buffer upload + command encoding + queue submit)
@@ -17,11 +17,14 @@ use ranim::{
     prelude::*,
 };
 use ranim_core::frame::EvaluatedFrame;
-use ranim_render::{Renderer, extract::ExtractPlugin, utils::WgpuContext};
+use ranim_render::{
+    RenderAppExt, build_render_app, extract::ExtractPlugin, resource::RenderTextures,
+    utils::WgpuContext,
+};
 
 type PlacedSquare = Transformed<Square, Translation>;
 
-/// Pure GPU render benchmark: only measures `Renderer::render_frame` + `device.poll`.
+/// Pure GPU render benchmark: only measures `RenderAppExt::render_frame` + `device.poll`.
 fn gpu_render_benchmark(c: &mut Criterion) {
     let ctx = pollster::block_on(WgpuContext::new());
 
@@ -36,18 +39,15 @@ fn gpu_render_benchmark(c: &mut Criterion) {
         let mut store = EvaluatedFrame::new();
         scene.eval_at_alpha(0.5, &mut store);
 
-        let mut renderer = Renderer::new(
-            &ctx,
-            1920,
-            1080,
-            8,
-            (
-                CameraFramePlugin,
-                ExtractPlugin::<PlacedSquare>::default(),
-                VItemPlugin,
-            ),
-        );
-        let mut render_textures = renderer.new_render_textures(&ctx);
+        let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
+        renderer.add_plugins((
+            CameraFramePlugin,
+            ExtractPlugin::<PlacedSquare>::default(),
+            VItemPlugin,
+        ));
+        renderer.finish();
+        renderer.cleanup();
+        let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
         let clear_color = wgpu::Color {
             r: 0.2,
             g: 0.2,
@@ -94,18 +94,15 @@ fn cpu_submit_benchmark(c: &mut Criterion) {
         let mut store = EvaluatedFrame::new();
         scene.eval_at_alpha(0.5, &mut store);
 
-        let mut renderer = Renderer::new(
-            &ctx,
-            1920,
-            1080,
-            8,
-            (
-                CameraFramePlugin,
-                ExtractPlugin::<PlacedSquare>::default(),
-                VItemPlugin,
-            ),
-        );
-        let mut render_textures = renderer.new_render_textures(&ctx);
+        let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
+        renderer.add_plugins((
+            CameraFramePlugin,
+            ExtractPlugin::<PlacedSquare>::default(),
+            VItemPlugin,
+        ));
+        renderer.finish();
+        renderer.cleanup();
+        let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
         let clear_color = wgpu::Color {
             r: 0.2,
             g: 0.2,
@@ -149,18 +146,15 @@ fn merged_gpu_render_benchmark(c: &mut Criterion) {
         let mut store = EvaluatedFrame::new();
         scene.eval_at_alpha(0.5, &mut store);
 
-        let mut renderer = Renderer::new(
-            &ctx,
-            1920,
-            1080,
-            8,
-            (
-                CameraFramePlugin,
-                ExtractPlugin::<PlacedSquare>::default(),
-                VItemPlugin,
-            ),
-        );
-        let mut render_textures = renderer.new_render_textures(&ctx);
+        let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
+        renderer.add_plugins((
+            CameraFramePlugin,
+            ExtractPlugin::<PlacedSquare>::default(),
+            VItemPlugin,
+        ));
+        renderer.finish();
+        renderer.cleanup();
+        let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
         let clear_color = wgpu::Color {
             r: 0.2,
             g: 0.2,
@@ -206,18 +200,15 @@ fn merged_cpu_submit_benchmark(c: &mut Criterion) {
         let mut store = EvaluatedFrame::new();
         scene.eval_at_alpha(0.5, &mut store);
 
-        let mut renderer = Renderer::new(
-            &ctx,
-            1920,
-            1080,
-            8,
-            (
-                CameraFramePlugin,
-                ExtractPlugin::<PlacedSquare>::default(),
-                VItemPlugin,
-            ),
-        );
-        let mut render_textures = renderer.new_render_textures(&ctx);
+        let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
+        renderer.add_plugins((
+            CameraFramePlugin,
+            ExtractPlugin::<PlacedSquare>::default(),
+            VItemPlugin,
+        ));
+        renderer.finish();
+        renderer.cleanup();
+        let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
         let clear_color = wgpu::Color {
             r: 0.2,
             g: 0.2,

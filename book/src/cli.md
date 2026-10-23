@@ -1,14 +1,20 @@
 # 命令行入口
 
-每个 Ranim 项目是自己的二进制 crate。`main` 装配 `App` 后调用
-`App::run()`（trait `ranim::cmd::AppRunExt`，prelude 已导出），进程参数随即
-解析为四个子命令：
+每个 Ranim 项目是自己的二进制 crate：一个 bevy App（`ranim::App` 就是
+`bevy_app::App` 的再导出）。`main` 装配 `App` 后用 `app.build()`
+（`RanimAppExt`，prelude 导出）定稿插件构建——断言插件就绪、执行一次
+bevy 的 `finish()` / `cleanup()`——得到 `ranim::RanimApp`，把它交给自由
+函数 `run_cli`（prelude 导出，native + `render` feature 门控；命名刻意避开
+bevy App 自带的 `run()` runner 入口）：它安装 tracing、解析进程参数，
+随即分发为四个子命令：
 
 ```rust,ignore
 use ranim::prelude::*;
 
 fn main() {
-    App::new().add_scenes([hello::scene()]).run();
+    let mut app = App::new();
+    app.add_scenes([hello::scene()]);
+    run_cli(app.build());
 }
 ```
 
@@ -33,12 +39,15 @@ CPU 查询，渲染也足够快，调试迭代一般不需要 release。
 ## 项目装配
 
 子命令只能看到 App 中显式注册的场景；在 `main` 或插件的 `build` 中通过
-`add_scene` / `add_scenes` 注册（完整示例见
+`add_scene` / `add_scenes` 注册（场景方法由 `AppExt` 提供；插件 `build` 的
+`app: &mut bevy_app::App` 与 `&mut App` 是同一类型；完整示例见
 [Getting Started](./getting_started.md)）：
 
 ```rust,ignore
 fn main() {
-    App::new().add_scenes([hello::scene()]).run();
+    let mut app = App::new();
+    app.add_scenes([hello::scene()]);
+    run_cli(app.build());
 }
 ```
 
@@ -51,7 +60,7 @@ fn main() {
 pub struct ProjectPlugin;
 
 impl Plugin for ProjectPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_plugins(ScenesPlugin);
         app.insert_resource(RenderSetup::new(|render_app| {
             render_app.add_plugins((
@@ -63,7 +72,7 @@ impl Plugin for ProjectPlugin {
 }
 ```
 
-项目的 `RenderSetup` 在每次创建 GPU renderer 时重放，安装提取与渲染插件。
+项目的 `RenderSetup` 在每次安装渲染 SubApp 时重放，安装提取与渲染插件。
 `inspect` 只查询 CPU 数据，不执行 setup 中的 GPU 装配。
 
 命令报错时先看编译输出；运行成功但场景未出现时，检查 `main` 或插件的

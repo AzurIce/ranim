@@ -7,7 +7,6 @@ use ranim::{
     prelude::*,
     render::{RenderSetup, extract::ExtractPlugin},
 };
-use std::sync::Arc;
 
 // 渲染性能测试函数
 fn render_benchmark(c: &mut Criterion) {
@@ -35,7 +34,7 @@ fn render_benchmark(c: &mut Criterion) {
                 },
             ),
         ]);
-        let app = Arc::new(app);
+        let setup = app.world().resource::<RenderSetup>().clone();
         let static_scene = app.scene(&format!("static_squares_{n}")).unwrap();
         let transform_scene = app.scene(&format!("transform_squares_{n}")).unwrap();
         group.bench_with_input(BenchmarkId::new("static_squares", n), n, |b, _| {
@@ -43,6 +42,7 @@ fn render_benchmark(c: &mut Criterion) {
                 // 执行渲染
                 render_scene_output(
                     &static_scene,
+                    &setup,
                     &Output {
                         dir: "./output/bench".to_string(),
                         ..Default::default()
@@ -56,6 +56,7 @@ fn render_benchmark(c: &mut Criterion) {
                 // 执行渲染
                 render_scene_output(
                     &transform_scene,
+                    &setup,
                     &Output {
                         dir: "./output/bench".to_string(),
                         ..Default::default()

@@ -1,6 +1,6 @@
 name = "midi_visualizer"
-code = '''
-`scenes.rs`（场景与注册）
+code = """
+`scenes.rs`（共享场景与项目装配）
 
 ```rust
 //! Scrolling piano-roll visualization of the bundled Nyan Cat MIDI file,
@@ -185,11 +185,10 @@ fn audio_sample_rounding_keeps_the_final_camera() {
     scene.play(Sound::new(render_song_audio(&song)));
     let sealed = scene.seal();
     assert_eq!(sealed.total_secs(), song.duration_secs);
+    let mut frame = ranim_core::frame::EvaluatedFrame::new();
     for sec in [0.0, 1.0, sealed.total_secs()] {
-        let cameras = sealed
-            .eval_at_sec(sec)
-            .filter(|(_, item)| matches!(item, ranim::core::core_item::CoreItem::CameraFrame(_)))
-            .count();
+        sealed.eval_at_sec(sec, &mut frame);
+        let cameras = frame.items::<CameraFrame>().len();
         assert_eq!(cameras, 1, "at {sec}s");
     }
 }
@@ -198,26 +197,46 @@ fn audio_sample_rounding_keeps_the_final_camera() {
 pub struct ScenesPlugin;
 
 impl ranim::Plugin for ScenesPlugin {
-    fn build(&self, app: &mut ranim::App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([midi_visualizer::scene(), midi_visualizer_per_note::scene()]);
     }
 }
 ```
 
-`lib.rs`（插件入口）
+`main.rs`（原生入口）
 
 ```rust
+#![cfg_attr(target_arch = "wasm32", no_main)]
+#![cfg(not(target_arch = "wasm32"))]
+
 mod scenes;
 
-pub use scenes::ScenesPlugin;
-
-// Keep the exported factory here: the bundle reuses `scenes.rs` without
-// generating multiple native `ranim_plugin` entry symbols.
-#[ranim::export_plugin]
-pub fn plugin() -> impl ranim::Plugin {
-    ScenesPlugin
+fn main() {
+    use ranim::prelude::*;
+    let mut app = App::new();
+    app.add_plugins(scenes::ScenesPlugin);
+    run_cli(app.build());
 }
-```'''
+```
+
+`wasm.rs`（WASM 入口）
+
+```rust
+//! WebAssembly entry; project assembly is shared with the native binary.
+
+#![cfg(target_arch = "wasm32")]
+
+mod scenes;
+
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn app() -> ranim::wasm::WasmApp {
+    use ranim::prelude::*;
+
+    let mut app = App::new();
+    app.add_plugins(scenes::ScenesPlugin);
+    ranim::wasm::WasmApp::new(app.build())
+}
+```"""
 hash = "d54b44e7f377dedf64a427943beb6e6c89ea6210"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/58/aa4bdceb665a76fa2721b6c000ec04c1552e5deb73709d887cf9bc8f90fa4a"]
 wasm = true

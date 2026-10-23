@@ -1,0 +1,45 @@
+{% component examples.card(page) %}
+  {% set example_data = load_data(path="/data/" ~ page.title ~ ".toml") %}
+  <a href="{{ page.permalink }}" class="card">
+    {% if example_data.preview_imgs %}
+      <div class="preview-grid">
+        {% for preview_img in example_data.preview_imgs %}
+          <img src="{% if preview_img is starting_with(pat="http") %}{{ preview_img }}{% else %}{{ get_url(path=preview_img) }}{% endif %}" alt="{{ example_data.name }} 示例输出 {{ loop.index }}">
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card__placeholder" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </div>
+    {% endif %}
+    <div class="card__content">
+      <h2>{{ page.title }}</h2>
+      {% if page.description %}
+        <p>{{ page.description }}</p>
+      {% endif %}
+    </div>
+  </a>
+{% endcomponent examples.card %}
+
+{% component examples.cards(section) %}
+  {% for subsection_path in section.subsections %}
+    {% set subsection = get_section(path=subsection_path) %}
+    <section class="example-group">
+      <h2 class="example-group__title">
+        <a href="{{ subsection.permalink }}">{{ subsection.title }}</a>
+      </h2>
+      <div class="card-grid">
+        {% for page in subsection.pages %}
+          {{ <examples.card page={page} /> }}
+        {% endfor %}
+      </div>
+    </section>
+  {% endfor %}
+  {% if section.pages %}
+    <div class="card-grid">
+      {% for page in section.pages %}
+        {{ <examples.card page={page} /> }}
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endcomponent examples.cards %}

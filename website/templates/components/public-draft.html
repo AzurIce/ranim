@@ -1,4 +1,4 @@
-{% macro warning(current=true, section) %}
+{% component public_draft.warning(section, current=true) %}
   {% if section and section.extra.public_draft %}
     {% set public_draft = section.extra.public_draft %}
     {% set issue = public_draft / 1 %}
@@ -11,7 +11,7 @@
       <h1 class="warning">This page is hidden because an ancestor is hidden</h1>
     {% endif %}
   {% elif section.components %}
-    {% set next_path = section.components | slice(end=-1) | concat(with="_index.md") | join(sep="/") %}
-    {{ public_draft::warning(current=false, section=get_section(path=next_path) ) }}
+    {% set next_path = [...section.components[:-1], "_index.md"] | join(sep="/") %}
+    {{ <public_draft.warning current={false} section={get_section(path=next_path)} /> }}
   {% endif %}
-{% endmacro warning %}
+{% endcomponent public_draft.warning %}

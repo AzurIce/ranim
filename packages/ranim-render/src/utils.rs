@@ -98,7 +98,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuBuffer<T> {
     }
 
     pub(crate) fn set(&mut self, ctx: &WgpuContext, data: T) {
-        let start = std::time::Instant::now();
+        let start = web_time::Instant::now();
         {
             let mut view = ctx
                 .queue
@@ -257,7 +257,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
                 usage: self.usage,
                 mapped_at_creation: false,
             });
-            let start = std::time::Instant::now();
+            let start = web_time::Instant::now();
             ctx.queue.write_buffer(&buffer, 0, bytes);
             if count {
                 crate::upload_probe::record(
@@ -271,7 +271,7 @@ impl<T: Default + bytemuck::Pod + bytemuck::Zeroable + Debug> WgpuVecBuffer<T> {
             self.buffer = buffer;
         } else {
             // info!("queue copy");
-            let start = std::time::Instant::now();
+            let start = web_time::Instant::now();
             {
                 let mut view = ctx
                     .queue

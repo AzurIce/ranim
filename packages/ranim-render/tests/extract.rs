@@ -2,7 +2,7 @@ use bevy_app::{App, Plugin, SubApp};
 use bevy_ecs::prelude::*;
 use ranim_core::frame::{EvaluatedFrame, FrameItemId};
 use ranim_render::extract::{Extract, ExtractContext, ExtractPlugin};
-use ranim_render::schedule::RenderSchedules;
+use ranim_render::schedule::RenderSchedule;
 use ranim_render::world::SourceOrder;
 
 // Input values need neither Component nor Clone.
@@ -17,9 +17,8 @@ struct SamplePlugin;
 
 impl Plugin for SamplePlugin {
     fn build(&self, app: &mut App) {
-        let extract = app.world().resource::<RenderSchedules>().extract;
         app.init_resource::<ExtractedSamples>()
-            .add_systems(extract, extract_samples);
+            .add_systems(RenderSchedule::Extract, extract_samples);
     }
 }
 
@@ -39,8 +38,6 @@ fn extract_samples(frame: Res<EvaluatedFrame>, mut samples: ResMut<ExtractedSamp
 #[test]
 fn external_plugin_extracts_typed_inputs_into_its_own_resource() {
     let mut app = SubApp::new();
-    app.init_resource::<RenderSchedules>();
-    let extract = app.world().resource::<RenderSchedules>().extract;
     app.init_resource::<EvaluatedFrame>()
         .add_plugins(SamplePlugin);
     {
@@ -50,7 +47,7 @@ fn external_plugin_extracts_typed_inputs_into_its_own_resource() {
         frame.push((3, 0), Sample { values: vec![8] });
     }
 
-    app.world_mut().run_schedule(extract);
+    app.world_mut().run_schedule(RenderSchedule::Extract);
     assert_eq!(
         app.world().resource::<ExtractedSamples>().0,
         [((2, 0), 1, 3), ((2, 0), 1, 5), ((3, 0), 2, 8)]
@@ -58,7 +55,7 @@ fn external_plugin_extracts_typed_inputs_into_its_own_resource() {
     assert_eq!(app.world().resource::<EvaluatedFrame>().len(), 3);
 
     app.world_mut().resource_mut::<EvaluatedFrame>().clear();
-    app.world_mut().run_schedule(extract);
+    app.world_mut().run_schedule(RenderSchedule::Extract);
     assert!(app.world().resource::<ExtractedSamples>().0.is_empty());
 }
 
@@ -87,8 +84,6 @@ impl Extract for PackedValues {
 fn generic_plugin_extracts_raw_compositions_into_bundles_and_resources() {
     type Input = Vec<Option<PackedValues>>;
     let mut app = SubApp::new();
-    app.init_resource::<RenderSchedules>();
-    let extract = app.world().resource::<RenderSchedules>().extract;
     app.init_resource::<EvaluatedFrame>()
         .init_resource::<ExtractCalls>()
         .add_plugins(ExtractPlugin::<Input>::default());
@@ -100,7 +95,7 @@ fn generic_plugin_extracts_raw_compositions_into_bundles_and_resources() {
             Some(PackedValues(vec![8])),
         ],
     );
-    app.world_mut().run_schedule(extract);
+    app.world_mut().run_schedule(RenderSchedule::Extract);
 
     let world = app.world_mut();
     let mut outputs = world
@@ -127,7 +122,7 @@ fn generic_plugin_extracts_raw_compositions_into_bundles_and_resources() {
     world
         .resource_mut::<EvaluatedFrame>()
         .update([((5, 0), Input::new())]);
-    world.run_schedule(extract);
+    world.run_schedule(RenderSchedule::Extract);
     for (_, _, entity) in outputs {
         assert!(!world.entities().contains(entity));
     }
@@ -136,19 +131,17 @@ fn generic_plugin_extracts_raw_compositions_into_bundles_and_resources() {
 #[test]
 fn a_leaf_plugin_does_not_implicitly_extract_a_container_batch() {
     let mut app = SubApp::new();
-    app.init_resource::<RenderSchedules>();
-    let extract = app.world().resource::<RenderSchedules>().extract;
     app.init_resource::<EvaluatedFrame>()
         .init_resource::<ExtractCalls>()
         .add_plugins(ExtractPlugin::<PackedValues>::default());
     app.world_mut()
         .resource_mut::<EvaluatedFrame>()
         .push((1, 0), vec![PackedValues(vec![7])]);
-    app.world_mut().run_schedule(extract);
+    app.world_mut().run_schedule(RenderSchedule::Extract);
     assert_eq!(app.world().resource::<ExtractCalls>().0, 0);
 
     app.add_plugins(ExtractPlugin::<Vec<PackedValues>>::default());
-    app.world_mut().run_schedule(extract);
+    app.world_mut().run_schedule(RenderSchedule::Extract);
     assert_eq!(app.world().resource::<ExtractCalls>().0, 1);
     let world = app.world_mut();
     assert_eq!(world.query::<&Value>().single(world).unwrap(), &Value(7));

@@ -48,7 +48,7 @@ tag 的源码（`git show v0.X:<path>`）核实 API 断言，**不按当前实�
 
 - **按主题分节**（一个特性或一次架构变更一节），不按 PR 逐条罗列；同一
   主题的多个 PR 在节内合并叙述，节首给出相关 PR 链接。正文中裸写的 `#N`
-  引用由 `issue-links` 预处理器（`book/preprocessors/mdbook-issue-links/`）
+  引用由 `issue-links` 预处理器（`book/preprocessors/issue_links.rs`）
   在构建时自动链接到 GitHub（issue 编号经 GitHub 重定向落到 `/issues/N`），
   无需手写链接；代码块、行内代码与 URL 内不生效。
 - 破坏性变更加 `## BREAKING CHANGES` 小节，写清迁移路径，用 before/after

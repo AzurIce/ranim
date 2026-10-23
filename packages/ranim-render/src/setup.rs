@@ -3,14 +3,15 @@
 use std::sync::Arc;
 
 use bevy_app::{App, Plugin};
+use bevy_ecs::prelude::Resource;
 
 /// Deferred configuration for an independent render runtime.
 ///
-/// Store this value in project resources and clone it into the plugin argument
-/// of [`Renderer::new`](crate::Renderer::new). Creating or cloning a setup does
-/// not initialize a GPU. Its callback runs for each renderer after shared GPU
-/// resources and schedules have been installed.
-#[derive(Clone)]
+/// Store this value in project resources and clone it into the argument of
+/// [`install_render_app`](crate::install_render_app). Creating or cloning a
+/// setup does not initialize a GPU. Its callback runs for each renderer after
+/// shared GPU resources and schedules have been installed.
+#[derive(Clone, Resource)]
 pub struct RenderSetup {
     configure: Arc<dyn Fn(&mut App) + Send + Sync>,
 }

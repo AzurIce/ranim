@@ -6,9 +6,9 @@
 //!
 //! Scenes marked with [`wasm_demo_doc`](ranim::prelude::wasm_demo_doc)
 //! embed a live preview into their rustdoc page. Run `just doc-examples`
-//! to build this crate's docs together with the `ranim-examples-preview`
-//! WASM host. This library defines the example plugins; the binary creates
-//! the application and starts previews.
+//! to build this crate's docs together with each example's WASM cdylib.
+//! Each module shares its scene and project assembly with its native and
+//! WebAssembly entry points.
 #[path = "aabb/scenes.rs"]
 pub mod aabb;
 #[path = "animating_pi/scenes.rs"]
@@ -17,6 +17,8 @@ pub mod animating_pi;
 pub mod arc;
 #[path = "arc_between_points/scenes.rs"]
 pub mod arc_between_points;
+#[path = "audio_demo/scenes.rs"]
+pub mod audio_demo;
 #[path = "basic/scenes.rs"]
 pub mod basic;
 #[path = "bubble_sort/scenes.rs"]
@@ -35,6 +37,8 @@ pub mod getting_started0;
 pub mod getting_started1;
 #[path = "getting_started2/scenes.rs"]
 pub mod getting_started2;
+#[path = "gltf_showcase/scenes.rs"]
+pub mod gltf_showcase;
 #[path = "hanoi/scenes.rs"]
 pub mod hanoi;
 #[path = "hello_ranim/scenes.rs"]
@@ -71,74 +75,5 @@ pub mod tetrahedron_spheres;
 pub mod text_item;
 #[path = "typst_timer/scenes.rs"]
 pub mod typst_timer;
-
-/// Registers the example scenes and their combined rendering support.
-pub struct ProjectPlugin;
-
-impl ranim::Plugin for ProjectPlugin {
-    fn build(&self, app: &mut ranim::App) {
-        app.add_plugins((
-            aabb::ScenesPlugin,
-            animating_pi::ScenesPlugin,
-            arc::ScenesPlugin,
-            arc_between_points::ScenesPlugin,
-            basic::ScenesPlugin,
-            bubble_sort::ScenesPlugin,
-            cloth_wrap::ScenesPlugin,
-            composable_choreography::ScenesPlugin,
-            ellipse::ScenesPlugin,
-            extract_vitem_visualize::ScenesPlugin,
-            getting_started0::ScenesPlugin,
-            getting_started1::ScenesPlugin,
-            getting_started2::ScenesPlugin,
-            hanoi::ScenesPlugin,
-            hello_ranim::ScenesPlugin,
-            iterative_spring::ScenesPlugin,
-        ));
-        app.add_plugins((
-            mesh_morph::ScenesPlugin,
-            midi_visualizer::ScenesPlugin,
-            nbody::ScenesPlugin,
-            output_formats::ScenesPlugin,
-            palettes::ScenesPlugin,
-            perlin_terrain::ScenesPlugin,
-            perspective_blend::ScenesPlugin,
-            ranim_logo::ScenesPlugin,
-            regular_polygon::ScenesPlugin,
-            selective_sort::ScenesPlugin,
-            solar_system::ScenesPlugin,
-            test::ScenesPlugin,
-            tetrahedron_spheres::ScenesPlugin,
-            text_item::ScenesPlugin,
-            typst_timer::ScenesPlugin,
-        ));
-
-        use ranim::{
-            core::{
-                traits::{Rigid, Similarity, Translation},
-                transformed::Transformed,
-            },
-            items::{
-                RanimItemsPlugin,
-                debug::VisualizeAabbItem,
-                mesh::Surface,
-                vitem::{VItem, geometry::RegularPolygon},
-            },
-            render::{RenderSetup, extract::ExtractPlugin},
-        };
-
-        app.insert_resource(RenderSetup::new(|render_app| {
-            render_app.add_plugins((
-                RanimItemsPlugin,
-                ExtractPlugin::<VisualizeAabbItem<VItem>>::default(),
-                ExtractPlugin::<Transformed<RegularPolygon, Similarity>>::default(),
-                ExtractPlugin::<Transformed<Surface, Rigid>>::default(),
-                ExtractPlugin::<Transformed<Surface, Translation>>::default(),
-            ));
-            cloth_wrap::configure_render(render_app);
-            extract_vitem_visualize::configure_render(render_app);
-            iterative_spring::configure_render(render_app);
-            nbody::configure_render(render_app);
-        }));
-    }
-}
+#[path = "z_fighting/scenes.rs"]
+pub mod z_fighting;

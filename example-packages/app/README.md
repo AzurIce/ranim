@@ -8,8 +8,11 @@ without one fall back to those built-in plugins for each new GPU renderer,
 including resolution changes.
 
 `src/main.rs` is the project binary: it assembles the App with
-`app::ScenesPlugin` and hands over to `ranim::cmd::AppRunExt::run`, which
-serves the `preview`, `output`, `render`, and `inspect` subcommands.
+`app::ScenesPlugin`, finalizes plugin construction with `app.build()`
+(`ranim::RanimAppExt`), and hands the resulting `ranim::RanimApp` to the
+free function `run_cli` (`ranim::cmd::cli::run_cli`, exported from the
+prelude), which serves the `preview`, `output`, `render`, and `inspect`
+subcommands.
 
 ## Run
 

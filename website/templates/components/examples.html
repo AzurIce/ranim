@@ -1,13 +1,13 @@
-{% macro render_nav(section, current) %}
+{% component examples.nav(section, current) %}
   {% for subsection_path in section.subsections %}
     {% set subsection = get_section(path=subsection_path) %}
     <li>
       <a href="{{ subsection.permalink }}"
-        class="outline-item {% if current.permalink == subsection.permalink %}active{% elif current.ancestors is containing(subsection_path) %}ancestor{% endif %}">
+        class="outline-item {% if current.permalink == subsection.permalink %}active{% elif subsection_path in current.ancestors %}ancestor{% endif %}">
         <span>{{ subsection.title }}</span>
       </a>
       <ul class="outline__nested">
-        {{ self::render_nav(section=subsection, current=current) }}
+        {{ <examples.nav section={subsection} current={current} /> }}
       </ul>
     </li>
   {% endfor %}
@@ -20,9 +20,9 @@
       </a>
     </li>
   {% endfor %}
-{% endmacro render_nav %}
+{% endcomponent examples.nav %}
 
-{% macro render_breadcrumbs(current) %}
+{% component examples.breadcrumbs(current) %}
 {% set examples_section = get_section(path="examples/_index.md") %}
 <nav class="breadcrumbs" aria-label="Breadcrumb">
   <a href="{{ examples_section.permalink }}">{{ examples_section.title }}</a>
@@ -38,28 +38,23 @@
     <span class="breadcrumbs__current">{{ current.title }}</span>
   {% endif %}
 </nav>
-{% endmacro render_breadcrumbs %}
+{% endcomponent examples.breadcrumbs %}
 
-{% macro code_example(example_name) %}
+{% component examples.player(example_name) %}
 {% set example_data = load_data(path="data/" ~ example_name ~ ".toml") %}
 
-<!-- {% if example_data.wasm %}
-<script type="module">
-  import init from '{{ get_url(path="examples/" ~ example_name ~ "/pkg/" ~ example_name ~ ".js") }}';
-  init();
-</script>
-<canvas id="app" width="1280" height="720" style="width: 100%; min-height: 400;"></canvas>
-{% endif %} -->
-
 <sl-tab-group>
+  {% if example_data.output_files %}
   <sl-tab slot="nav" panel="preview">Preview</sl-tab>
+  {% endif %}
   {% if example_data.wasm %}
   <sl-tab slot="nav" panel="app">App</sl-tab>
   {% endif %}
 
+  {% if example_data.output_files %}
   <sl-tab-panel name="preview">
     {% for output_file in example_data.output_files %}
-    {% if output_file.kind is starting_with("video/") %}
+    {% if output_file.kind is starting_with(pat="video/") %}
     <video controls>
       <source src="{{ output_file.url }}" type="{{ output_file.kind }}">
       您的浏览器不支持视频标签。
@@ -69,42 +64,31 @@
     {% endif %}
     {% endfor %}
   </sl-tab-panel>
+  {% endif %}
   {% if example_data.wasm %}
   <sl-tab-panel name="app">
     <script type="module">
-      import init, * as ranim from '{{ get_url(path="ranim-examples/pkg/ranim_examples.js") }}';
-      window.ranim_examples = init().then(() => ranim);
-
-      const { preview_scene } = await ranim_examples;
-      preview_scene("{{ example_name }}");
+      import '{{ get_url(path="ranim-player.js") }}';
     </script>
-    <canvas id="ranim-app-{{ example_name }}" width="1280" height="1020" style="width: 100%; aspect-ratio: 16 / 12;"></canvas>
-
+    <ranim-player src="{{ get_url(path='examples/' ~ example_name ~ '/pkg/ranim_example.js') }}"></ranim-player>
   </sl-tab-panel>
   {% endif %}
 </sl-tab-group>
 
 
-{{ example_data.code | markdown }}
-{% endmacro %}
+{{ example_data.code | markdown | safe }}
+{% endcomponent examples.player %}
 
-{% macro process_code_block(content) %}
-{% set lines = content | split(pat="\n") %}
-{% set result = [] %}
-{% set i = 0 %}
-{% set in_code_block = false %}
-{% set code_block_content = [] %}
-
-{% for line in lines %}
-{% if line is starting_with("<p>!example-") and not in_code_block %}
-  {% set parts = line | split(pat="!example-") %}
-  {% set example_info = parts[1] | split(pat="</p>") %}
-{% set example_block = self::code_example(example_name=example_info[0]) %}
-{% set_global result = result | concat(with=example_block) %}
-{% else %}
-{% set_global result = result | concat(with=line) %}
-{% endif %}
-{% endfor %}
-
-{{ result | join(sep="\n") | safe }}
-{% endmacro %}
+{# Render trusted Zola HTML, expanding the repository's !example markers. #}
+{% component examples.content(content) -%}
+{%- for line in content | split(pat="\n") -%}
+  {%- if line is starting_with(pat="<p>!example-") -%}
+    {%- set parts = line | split(pat="!example-") -%}
+    {%- set example_info = parts[1] | split(pat="</p>") -%}
+    {{ <examples.player example_name={example_info[0]} /> }}
+  {%- else -%}
+    {{ line | safe }}
+  {%- endif -%}
+  {{ "\n" }}
+{%- endfor -%}
+{%- endcomponent examples.content %}

@@ -180,7 +180,17 @@ pub(crate) fn configure_render(app: &mut bevy_app::App) {
 pub struct ScenesPlugin;
 
 impl ranim::Plugin for ScenesPlugin {
-    fn build(&self, app: &mut ranim::App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([nbody::scene()]);
+
+        #[cfg(feature = "render")]
+        {
+            use ranim::{items::RanimItemsPlugin, render::RenderSetup};
+
+            app.insert_resource(RenderSetup::new(|render_app| {
+                render_app.add_plugins(RanimItemsPlugin);
+                configure_render(render_app);
+            }));
+        }
     }
 }

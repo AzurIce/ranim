@@ -104,7 +104,8 @@ impl RenderTextures {
         self.width as f32 / self.height as f32
     }
 
-    pub(crate) fn new(ctx: &WgpuContext, width: u32, height: u32) -> Self {
+    /// Create render textures of the given size.
+    pub fn new(ctx: &WgpuContext, width: u32, height: u32) -> Self {
         let format = OUTPUT_TEXTURE_FORMAT;
         let render_texture = ReadbackWgpuTexture::new(
             ctx,

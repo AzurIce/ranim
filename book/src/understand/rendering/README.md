@@ -19,9 +19,13 @@ viewport 准备，矢量/网格插件注册各自族内裸逻辑类型的值级�
 变换 wrapper 或自定义类型时，项目把自定义装配保存为 App 的
 `ranim_render::RenderSetup` resource：回调中安装 `RanimItemsPlugin`（或按需单个
 安装三个物件插件——两种写法互斥，Bevy 插件唯一，重复安装会 panic），并为完整
-类型另加 `ExtractPlugin<T>`。output / preview 从项目 App 取得该 setup 并传给
-`Renderer::new`，每个 GPU runtime 独立重放。renderer 本体只提供通用提取上下文、
-schedule、渲染目标和提交生命周期，不依赖这些具体组件。
+类型另加 `ExtractPlugin<T>`。output / preview 从项目 App 取得该 setup，经
+`ranim_render::install_render_app` 应用后以 `RanimRenderApp` 标签挂为项目 App
+的渲染 SubApp，每个 GPU runtime 独立重放；提取靠 bevy SubApp 的提取钩子——
+每次 `App::update()` 主 schedule 结束后，主世界的 `EvaluatedFrame` 被交换进渲染
+世界。`ranim-render` 本体不再持有 `Renderer` 结构体，只提供通用提取上下文、
+schedule、渲染目标和提交生命周期（`build_render_app` / `install_render_app` /
+`RenderAppExt`），不依赖这些具体组件。
 
 完整输入类型的注册与递归提取见[完整求值帧与渲染提取](../core/extract.md)。
 逻辑物件只需 CPU features 即可用于求值；渲染组件及插件通过 items 的 `render`

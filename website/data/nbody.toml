@@ -1,6 +1,6 @@
 name = "nbody"
-code = '''
-`scenes.rs`（场景与注册）
+code = """
+`scenes.rs`（共享场景与项目装配）
 
 ```rust
 //! N-body gravitational simulation — a canonical "iterative only" animation:
@@ -20,9 +20,7 @@ code = '''
 
 use ranim::{
     color::{AlphaColor, Srgb, palettes::manim},
-    core::Extract,
     core::animation::eval::iterative::Iterative,
-    core::core_item::CoreItem,
     glam::DVec3,
     items::vitem::geometry::Circle,
     prelude::*,
@@ -133,10 +131,9 @@ impl NBodyState {
     }
 }
 
-impl Extract for NBodyState {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<CoreItem>) {
+#[cfg(feature = "render")]
+impl ranim::render::extract::Extract for NBodyState {
+    fn extract(&self, ctx: &mut ranim::render::extract::ExtractContext<'_>) {
         // Trails: dim dots at recent positions.
         for (i, trail) in self.trails.iter().enumerate() {
             for &p in trail {
@@ -144,7 +141,7 @@ impl Extract for NBodyState {
                 dot.set_fill_color(self.colors[i]);
                 dot.set_fill_opacity(0.15);
                 dot.set_stroke_opacity(0.0);
-                dot.extract_into(buf);
+                dot.extract(ctx);
             }
         }
         // Bodies.
@@ -152,7 +149,7 @@ impl Extract for NBodyState {
             let mut ball = Circle::new(0.32).transformed(Translation(body.pos));
             ball.set_fill_color(self.colors[i]);
             ball.set_stroke_opacity(0.0);
-            ball.extract_into(buf);
+            ball.extract(ctx);
         }
     }
 }
@@ -177,30 +174,67 @@ fn nbody(r: &mut RanimScene) {
     r.insert_time_mark(sim_secs / 2.0, TimeMark::Capture("preview.png".to_string()));
 }
 
+#[cfg(feature = "render")]
+pub(crate) fn configure_render(app: &mut bevy_app::App) {
+    use ranim::render::extract::ExtractPlugin;
+
+    app.add_plugins(ExtractPlugin::<NBodyState>::default());
+}
+
 /// Register the scenes provided by this example.
 pub struct ScenesPlugin;
 
 impl ranim::Plugin for ScenesPlugin {
-    fn build(&self, app: &mut ranim::App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.add_scenes([nbody::scene()]);
+
+        #[cfg(feature = "render")]
+        {
+            use ranim::{items::RanimItemsPlugin, render::RenderSetup};
+
+            app.insert_resource(RenderSetup::new(|render_app| {
+                render_app.add_plugins(RanimItemsPlugin);
+                configure_render(render_app);
+            }));
+        }
     }
 }
 ```
 
-`lib.rs`（插件入口）
+`main.rs`（原生入口）
 
 ```rust
+#![cfg_attr(target_arch = "wasm32", no_main)]
+#![cfg(not(target_arch = "wasm32"))]
+
 mod scenes;
 
-pub use scenes::ScenesPlugin;
-
-// Keep the exported factory here: the bundle reuses `scenes.rs` without
-// generating multiple native `ranim_plugin` entry symbols.
-#[ranim::export_plugin]
-pub fn plugin() -> impl ranim::Plugin {
-    ScenesPlugin
+fn main() {
+    use ranim::prelude::*;
+    let mut app = App::new();
+    app.add_plugins(scenes::ScenesPlugin);
+    run_cli(app.build());
 }
-```'''
+```
+
+`wasm.rs`（WASM 入口）
+
+```rust
+//! WebAssembly entry; project assembly is shared with the native binary.
+
+#![cfg(target_arch = "wasm32")]
+
+mod scenes;
+
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn app() -> ranim::wasm::WasmApp {
+    use ranim::prelude::*;
+
+    let mut app = App::new();
+    app.add_plugins(scenes::ScenesPlugin);
+    ranim::wasm::WasmApp::new(app.build())
+}
+```"""
 hash = "c43b0e3a7b11d2dd1f39f8e60a603ee89cd96f89"
 preview_imgs = ["https://azurice-shadow.tos-cn-beijing.volces.com/ranim/objects/sha256/66/c03f78304da1236f8efeae6b3cd54500fec3e60c06d0e8beb1d1a2a465b98b"]
 wasm = true

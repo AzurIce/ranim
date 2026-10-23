@@ -12,4 +12,5 @@ name = "app-preview"
 path = "src/main.rs"
 
 [dependencies]
+bevy_app.workspace = true
 ranim = { workspace = true, features = ["preview", "anims", "items"] }

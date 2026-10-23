@@ -12,8 +12,11 @@ yet the scene can still play it. It implements
 knows how to draw the private output.
 
 `src/main.rs` is the project binary: it assembles the App with
-`ProjectPlugin` and hands over to `ranim::cmd::AppRunExt::run`, which serves
-the `preview`, `output`, `render`, and `inspect` subcommands.
+`ProjectPlugin`, finalizes plugin construction with `app.build()`
+(`ranim::RanimAppExt`), and hands the resulting `ranim::RanimApp` to the
+free function `run_cli` (`ranim::cmd::cli::run_cli`, exported from the
+prelude), which serves the `preview`, `output`, `render`, and `inspect`
+subcommands.
 
 ## Run
 

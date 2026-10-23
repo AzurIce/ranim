@@ -6,21 +6,19 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+# Keep the crate root beside the example modules for rust-analyzer.
 [lib]
 crate-type = ["rlib"]
 path = "../../examples/ranim_examples_bundle.rs"
 
-[[bin]]
-name = "ranim-examples-preview"
-path = "src/main.rs"
-
 [features]
 default = ["render"]
-render = ["ranim/render", "dep:bevy_app"]
+# Matches the shared scenes' render configuration gates without native UI.
+render = ["ranim/render"]
 
 [dependencies]
-bevy_app = { workspace = true, optional = true }
-ranim = { workspace = true, features = ["preview", "anims", "items", "typst"] }
+bevy_app.workspace = true
+ranim = { workspace = true, features = ["anims", "items", "typst", "gltf"] }
 ranim-core.workspace = true
 ranim-items.workspace = true
 ranim-anims.workspace = true
@@ -29,11 +27,6 @@ rand = "0.10.3"
 rand_chacha = "0.10.0"
 midly = "0.5.3"
 getrandom = { version = "0.4.3", features = ["wasm_js"] }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen.workspace = true
-console_error_panic_hook = "0.1.7"
-wasm-tracing = "2.1.0"
 
 [package.metadata.docs.rs]
 all-features = true

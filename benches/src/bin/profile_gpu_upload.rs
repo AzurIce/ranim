@@ -47,8 +47,9 @@ use ranim_core::{
     glam::{DAffine3, DMat4},
 };
 use ranim_render::{
-    Renderer,
+    RenderAppExt, build_render_app,
     extract::ExtractPlugin,
+    resource::RenderTextures,
     upload_probe::{self, UploadMode},
     utils::WgpuContext,
 };
@@ -177,18 +178,15 @@ struct FrameTimings {
 fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
     let total = WARMUP_FRAMES + MEASURED_FRAMES;
     let mut feed = FrameFeed::new(scenario, total);
-    let mut renderer = Renderer::new(
-        ctx,
-        WIDTH,
-        HEIGHT,
-        8,
-        (
-            CameraFramePlugin,
-            ExtractPlugin::<PlacedSquare>::default(),
-            VItemPlugin,
-        ),
-    );
-    let mut render_textures = renderer.new_render_textures(ctx);
+    let mut renderer = build_render_app(ctx, WIDTH, HEIGHT, 8);
+    renderer.add_plugins((
+        CameraFramePlugin,
+        ExtractPlugin::<PlacedSquare>::default(),
+        VItemPlugin,
+    ));
+    renderer.finish();
+    renderer.cleanup();
+    let mut render_textures = RenderTextures::new(ctx, WIDTH, HEIGHT);
     let clear_color = wgpu::Color::BLACK;
     // GPU pass scopes are runtime-toggled; the forced per-frame poll they
     // incur also syncs the full-frame measurement.

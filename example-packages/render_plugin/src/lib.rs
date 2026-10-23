@@ -1,7 +1,7 @@
 //! A project with a private animation output type and its own render setup.
 
 use ranim::{
-    App, Plugin, RanimScene, Scene,
+    AppExt, Plugin, RanimScene, Scene,
     color::palette::css,
     items::{
         RanimItemsPlugin,
@@ -58,7 +58,7 @@ fn scene(scene: &mut RanimScene) {
 pub struct ProjectPlugin;
 
 impl Plugin for ProjectPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(&self, app: &mut bevy_app::App) {
         app.insert_resource(RenderSetup::new(|render_app| {
             render_app.add_plugins((RanimItemsPlugin, ExtractPlugin::<PrivateDrawing>::default()));
         }))
