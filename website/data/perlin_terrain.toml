@@ -280,31 +280,29 @@ impl ranim::Plugin for ScenesPlugin {
 }
 ```
 
-`main.rs`（原生入口）
+`main.rs`（平台入口）
 
 ```rust
-#![cfg_attr(target_arch = "wasm32", no_main)]
-#![cfg(not(target_arch = "wasm32"))]
-
 mod scenes;
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    use ranim::prelude::*;
-    let mut app = App::new();
-    app.add_plugins(scenes::ScenesPlugin);
-    run_cli(app.build());
+    #[cfg(feature = "cmd-render")]
+    {
+        use ranim::prelude::*;
+        let mut app = App::new();
+        app.add_plugins(scenes::ScenesPlugin);
+        run_cli(app.build());
+    }
+    #[cfg(not(feature = "cmd-render"))]
+    compile_error!("native examples require the `cmd-render` feature (enabled by default)");
 }
-```
 
-`wasm.rs`（WASM 入口）
+// The WASM module is driven by JavaScript through app().
+#[cfg(target_arch = "wasm32")]
+fn main() {}
 
-```rust
-//! WebAssembly entry; project assembly is shared with the native binary.
-
-#![cfg(target_arch = "wasm32")]
-
-mod scenes;
-
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn app() -> ranim::wasm::WasmApp {
     use ranim::prelude::*;

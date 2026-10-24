@@ -1,13 +1,12 @@
 # Examples
 
 每个 example 在根 `Cargo.toml` 中显式注册（`autoexamples = false`）。
-支持浏览器预览的 example 使用三个文件：
+支持浏览器预览的 example 使用两个文件：
 
 ```text
 examples/arc/
-├── main.rs    # [[example]] bin：mod scenes; run_cli(app.build())
-├── wasm.rs    # [[example]] cdylib：mod scenes; 导出 app() -> WasmApp
-└── scenes.rs  # 两个 target 共享的场景、插件和渲染装配
+├── main.rs    # 唯一 [[example]] bin：native CLI / WASM 空 main 和 app() 导出
+└── scenes.rs  # native 与 WASM 共享的场景、插件和渲染装配
 ```
 
 `ScenesPlugin` 注册场景，并在需要时插入项目自己的 `RenderSetup`；
@@ -27,22 +26,44 @@ JavaScript 调用 `await app().createPreview(canvas, name)` 创建预览会话�
 画面跟随音频时钟；播放、暂停和定位保持同步，暂停中定位不发声。
 扬声器按钮可调节音量或静音，同一视口的控制条共享音量设置。
 
-原生 target 名为 `<name>`，需要 `anims,cmd-render`；WASM target 名为 `<name>-wasm`，
-设置 `crate-type = ["cdylib"]`，需要 `anims,render`（其中 `anims` 启用内置物件）。需要 `typst` 等额外
-feature 的例子在两个 target 中一致声明。
-`main.rs` 使用以下 crate 级属性限定原生代码：
+native 与 WASM 共用同一个 `<name>` example，`required-features` 只声明共享能力：
 
-```rust
-#![cfg_attr(target_arch = "wasm32", no_main)]
-#![cfg(not(target_arch = "wasm32"))]
+```toml
+[[example]]
+name = "arc"
+path = "examples/arc/main.rs"
+required-features = ["anims", "render"]
 ```
 
-WASM 批量检查时整个原生入口（含 `mod scenes` 与 CLI）被排除；`no_main` 让这个
-空的 bin target 无需提供 `main`。`wasm.rs` 则通过
-`#![cfg(target_arch = "wasm32")]` 限定 WASM 代码，原生批量检查时该 cdylib 为空。
-编译时用 `--example <name>` / `--example <name>-wasm` 显式选择入口，
-用 `--target wasm32-unknown-unknown` 指定 WASM 平台；Cargo 不会按平台自动切换
-example 名称。批量构建 WASM 包使用 `cargo examples build`。
+需要 `typst`、`gltf` 等额外 feature 的例子也在这里声明。原生 CLI 另需
+`cmd-render`（默认已启用）；xtask 原生导出时自动加上它。WASM 只需共享 features。
+`main.rs` 声明 `mod scenes`，按 target 编译原生 CLI 或 WASM 导出：
+
+```rust,ignore
+mod scenes;
+
+#[cfg(not(target_arch = "wasm32"))]
+fn main() { /* 创建 App，安装 ScenesPlugin，调用 run_cli(app.build()) */ }
+
+#[cfg(target_arch = "wasm32")]
+fn main() {}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn app() -> ranim::wasm::WasmApp { /* 创建并返回项目 */ }
+```
+
+两个平台都在此文件中通过 `scenes::ScenesPlugin` 复用装配。`--example <name>` 在两种平台完全相同，
+`--target wasm32-unknown-unknown` 决定编译 WASM 分支；原生 CLI 代码不会进入 WASM。
+批量构建网站或 rustdoc 的 WASM 包使用 `cargo examples build`。
+
+WASM bin 仍要求 `main()`。wasm-bindgen 会把它接入模块初始化，空函数立即返回，
+不创建 App、不申请 GPU、不启动播放；返回后模块实例和导出的函数仍然可用。
+JS 先 `await init()`，再按需调用 `app()`、`createPreview(canvas, name)` 和
+`renderAt(seconds)`。`cdylib` 不要求 `main()`；在 `wasm32-unknown-unknown` 下，
+两者都生成 `.wasm` 模块，都可通过 wasm-bindgen 导出 API。`cdylib` 仍会执行
+绑定运行时初始化，以及显式声明的 `#[wasm_bindgen(start)]`；本项目没有自动启动应用的函数。
+
 `gltf_showcase` 通过 `include_bytes!` 嵌入 GLB 模型，原生与 WASM 使用同一套
 无文件系统 I/O 的模型加载与项目装配。
 
@@ -73,11 +94,11 @@ cargo run --example <name> --no-default-features --features anims,cmd-render -- 
 # 需要额外 feature 的 example 把对应 feature 一并开启
 cargo run --example text_item --features typst -- preview
 
-# 只编译 arc 的 WASM cdylib
-cargo build --example arc-wasm --target wasm32-unknown-unknown --no-default-features --features anims,render
+# 将同一个 arc example 编译为 WASM bin
+cargo build --example arc --target wasm32-unknown-unknown --no-default-features --features anims,render
 
-# 批量检查全部 example target，原生入口在 WASM 下为空
-cargo check -p ranim --examples --target wasm32-unknown-unknown --no-default-features --features anims,cmd-preview,typst,gltf
+# 按 WASM 平台批量检查全部 example（不编译原生 CLI）
+cargo check -p ranim --examples --target wasm32-unknown-unknown --no-default-features --features anims,render,typst,gltf
 
 # 构建网站需要的各例子 WASM 包（也可只构建 arc）
 cargo examples build

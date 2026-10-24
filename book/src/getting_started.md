@@ -362,23 +362,20 @@ ranim::cmd::preview_scene(app.build(), scene);
 ### WASM 预览宿主
 
 命令行入口 `run_cli` 只面向原生目标（需要 `cmd-render` feature）。仓库的 example
-将编译入口拆成三个文件：
+把平台入口与共享装配放在两个文件中：
 
 ```text
 examples/arc/
-├── main.rs    # 原生 bin
-├── wasm.rs    # WASM cdylib
+├── main.rs    # 唯一 bin target：native CLI / WASM 空 main 和 app() 导出
 └── scenes.rs  # 共享场景、ScenesPlugin 与 RenderSetup
 ```
 
-`main.rs` 创建 App、安装 `scenes::ScenesPlugin` 后调用 `run_cli(app.build())`。
-`wasm.rs` 使用同一套装配，但把定稿后的项目交给 JavaScript：
+`main.rs` 声明 `mod scenes`。原生 `main()` 创建 App、安装 `scenes::ScenesPlugin`
+后调用 `run_cli(app.build())`；WASM 下则提供空 `main()`，并在同一文件中
+导出 `app()`，使用同一套装配，把定稿后的项目交给 JavaScript：
 
 ```rust,ignore
-#![cfg(target_arch = "wasm32")]
-
-mod scenes;
-
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn app() -> ranim::wasm::WasmApp {
     use ranim::prelude::*;
@@ -389,36 +386,44 @@ pub fn app() -> ranim::wasm::WasmApp {
 }
 ```
 
-在根 `Cargo.toml` 中分别声明两个 target：
+在根 `Cargo.toml` 中只声明一个 example，两种平台都使用它：
 
 ```toml
 [[example]]
 name = "arc"
 path = "examples/arc/main.rs"
-required-features = ["anims", "cmd-render"]
-
-[[example]]
-name = "arc-wasm"
-path = "examples/arc/wasm.rs"
-crate-type = ["cdylib"]
 required-features = ["anims", "render"]
 ```
 
-native 的 egui 预览默认由 `cmd-preview` 提供；示例的最小原生入口只需要
-`anims,cmd-render`，可用于无 GUI 的导出。WASM 示例需要 `anims,render`；
-场景需要的 `typst`、`gltf` 等额外 feature 在两个 target 中一致声明。
-仓库的 `main.rs` 使用
-`#![cfg(not(target_arch = "wasm32"))]` 排除 WASM 下的原生代码，并用
-`#![cfg_attr(target_arch = "wasm32", no_main)]` 让空 bin 无需 `main`；`wasm.rs`
-通过 `#![cfg(target_arch = "wasm32")]` 限定 WASM 代码。两种平台的批量检查均会
-排除另一种入口的实现。
-`--example` 选择入口，`--target` 指定平台，Cargo 不会按平台自动切换 example 名称。
-独立项目也可以使用 `[lib] crate-type = ["cdylib"]`，开启 `ranim/render` 并
-直接依赖 `wasm-bindgen`，由自己的库导出上述 `app()`。
+`required-features` 声明共享能力，场景所需的 `typst`、`gltf` 等 feature 也在其中。
+原生 CLI 还需 `cmd-render`，egui 预览由 `cmd-preview` 提供；两者默认均启用。
+关闭 default 的原生导出使用 `anims,cmd-render`，WASM 使用 `anims,render`。
+原生未开启 `cmd-render` 时，入口给出编译错误，提示启用该 feature。
+
+`main.rs` 用函数级 `cfg` 切换入口；`app()` 导出也只在 WASM 下编译：
+
+```rust,ignore
+mod scenes;
+
+#[cfg(not(target_arch = "wasm32"))]
+fn main() { /* 创建项目，run_cli(app.build()) */ }
+
+#[cfg(target_arch = "wasm32")]
+fn main() {}
+```
+
+WASM bin 和 `cdylib` 在该平台都生成 `.wasm` 模块，且都支持 wasm-bindgen 导出。
+bin 需要 `main()`，wasm-bindgen 将它接入模块初始化；这里的空函数立即返回，
+模块与导出函数继续存在。加载模块不会自动装配项目或启动预览，JavaScript
+在 `await init()` 后显式调用 `app()` 创建项目，再调用 `createPreview` 申请 GPU。
+`cdylib` 无需 `main()`，但绑定运行时初始化和显式的 `#[wasm_bindgen(start)]`
+仍会在加载时执行。本项目没有声明自动启动应用的函数。
+独立项目仍可选择 `[lib] crate-type = ["cdylib"]`，开启 `ranim/render` 并直接依赖
+`wasm-bindgen`；库入口直接声明 `mod scenes` 并导出 `app()` 即可。
 
 ```bash
-cargo build --example arc-wasm --target wasm32-unknown-unknown --no-default-features --features anims,render
-wasm-bindgen --target web --out-dir pkg --out-name arc target/wasm32-unknown-unknown/debug/examples/arc_wasm.wasm
+cargo build --example arc --target wasm32-unknown-unknown --no-default-features --features anims,render
+wasm-bindgen --target web --out-dir pkg --out-name arc target/wasm32-unknown-unknown/debug/examples/arc.wasm
 ```
 
 页面初始化模块后，显式选择场景并启动预览：

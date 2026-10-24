@@ -32,7 +32,7 @@
 - VItem 法向投影：`Basis2d` 移除，`normal: Option` + shader 内现场生成正交基（见"VItem 法向投影"一节）
 - 完整求值输出与值级 `Extract`：容器、异构元组、层级树与变换 wrapper 原样入帧，渲染侧递归提取；`ExtractPlugin<T>` 为实际完整类型显式注册入口
 - 命令行入口：`ranim::App` 与 `ranim::Plugin` 分别是 `bevy_app::App` / `bevy_app::Plugin` 的直接再导出；场景注册/选择（`add_scene`/`add_scenes`/`scenes`/`scene(name)`/`first_scene()`）由 `ranim::app::AppExt`（prelude 已导出）在 App 上提供，`scene(name)`/`first_scene()` 返回克隆的 `Scene`。`ranim::RanimAppExt::build`（prelude 已导出）把构建中的 App 定稿为 `ranim::RanimApp`：断言插件 Ready 并执行一次 bevy 的 `finish()`/`cleanup()`；`RanimApp` 是项目的会话期形态——`Deref`/`DerefMut` 到 bevy `App`，update、渲染 SubApp 安装、资源访问与场景选择照常工作，但不再是插件构建目标，「会话入口要求插件已构建完毕」由此成为显式的类型前提。CLI 入口是自由函数 `ranim::cmd::cli::run_cli`（接收 `RanimApp`，prelude 导出为 `run_cli`，native + `cmd-render` 门控），与 `preview_scene(app.build(), scene)`、`render_scene(&scene, &setup, ...)` 同风格：安装 tracing、解析进程参数并分发 `preview` / `output` / `render` / `inspect` 子命令，出错时打印并以非零状态退出；命名避开 bevy App 自带的 `run()` runner 入口。`App::new()` + `add_scenes([...])` + `run_cli(app.build())` 即最小项目；插件 `build` 的 `&mut bevy_app::App` 与 `&mut App` 是同一类型；`inspect scenes/tree/frame` 无 GPU 检查；agent one-shot 例子已迁至独立仓库 `ranim-one-shot`（见"CLI"一节）
-- 渲染与输出：`Renderer` 结构体溶解为渲染 SubApp 的安装与驱动 API——`ranim_render::build_render_app(ctx, width, height, oit_layers)` 构建裸渲染 `SubApp`，`install_render_app` 应用项目 `RenderSetup` 后以 `RanimRenderApp` 标签挂进 App 并挂 extract 钩子（每次 `App::update()` 主 schedule 结束后把主世界的 `EvaluatedFrame` 交换进渲染世界），`RenderAppExt` 为 SubApp 提供手动驱动与 GPU profiler 访问器；公共阶段改为 pub 的 `RenderSchedule::{Extract, Prepare, View}` 与 `ViewPhase::{Clear, Compute, Depth, Color, Resolve}` 枚举（`RenderSchedules` 句柄 resource 已删除）；core 中按类型批次传输的 `EvaluatedFrame` 与项目提供的 `RenderSetup`（未注册时按 `items` 是否启用，分别回退到安装 `RanimItemsPlugin` 的默认渲染配置或空配置）；渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 以 native bin / WASM cdylib 双入口共享装配，并经 `#[wasm_demo_doc]` 提供 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
+- 渲染与输出：`Renderer` 结构体溶解为渲染 SubApp 的安装与驱动 API——`ranim_render::build_render_app(ctx, width, height, oit_layers)` 构建裸渲染 `SubApp`，`install_render_app` 应用项目 `RenderSetup` 后以 `RanimRenderApp` 标签挂进 App 并挂 extract 钩子（每次 `App::update()` 主 schedule 结束后把主世界的 `EvaluatedFrame` 交换进渲染世界），`RenderAppExt` 为 SubApp 提供手动驱动与 GPU profiler 访问器；公共阶段改为 pub 的 `RenderSchedule::{Extract, Prepare, View}` 与 `ViewPhase::{Clear, Compute, Depth, Color, Resolve}` 枚举（`RenderSchedules` 句柄 resource 已删除）；core 中按类型批次传输的 `EvaluatedFrame` 与项目提供的 `RenderSetup`（未注册时按 `items` 是否启用，分别回退到安装 `RanimItemsPlugin` 的默认渲染配置或空配置）；渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 用同一个 bin target 按平台选择 native CLI 与 WASM 导出，共享装配，并经 `#[wasm_demo_doc]` 提供 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
 
 ## BREAKING CHANGES
 
@@ -662,14 +662,17 @@ canvas 宿主。`cmd-preview` 只需要 rodio 的 PCM 播放能力，音频文�
 旧 `preview` feature 已移除，原生预览调用方迁移到 `cmd-preview`；
 旧 `render` 中的原生命令与导出能力迁移到 `cmd-render`，纯渲染代码继续用
 `render`。离线导出可用 `--no-default-features --features anims,cmd-render`，
-WASM 内置示例用 `--no-default-features --features anims,render`。两个入口的
-`required-features` 声明完整的最低能力，xtask 按它们分组构建，并关闭 default。
+WASM 内置示例用 `--no-default-features --features anims,render`。同一个 example 的
+`required-features` 声明共享能力，xtask 按它们分组构建并关闭 default，原生导出另加 `cmd-render`。
 日常预览直接运行 `cargo run --example arc -- preview`。
 
-### examples 双入口与 rustdoc 实时预览
+### examples 单 target 与 rustdoc 实时预览
 
-每个支持浏览器预览的 example 用 `main.rs` 与 `wasm.rs` 分别承载 native bin 和
-WASM cdylib，两者共享 `scenes.rs` 中的场景、插件和 `RenderSetup`。原生入口把
+每个支持浏览器预览的 example 只声明一个 bin target。`main.rs` 声明 `mod scenes`，
+按 target 编译原生 CLI 或 WASM 的空 `main()` 与 `app()` 导出，
+共用 `scenes.rs` 中的场景、插件和 `RenderSetup`。wasm-bindgen 将空 main 接入模块
+初始化，返回后模块继续接受 JS 调用；应用装配、GPU 初始化与播放仍由 JS 显式驱动。
+原生入口把
 定稿后的 `RanimApp` 交给 `run_cli`；WASM 入口导出 `app() -> WasmApp`，由
 JavaScript 调用 `await project.createPreview(canvas, name)` 选择已注册场景。
 WASM 直接向 canvas 呈现，Web 端通过 `renderAt(seconds)` 驱动画面；
@@ -697,7 +700,7 @@ JavaScript 自有声道数组，由 Web Audio 播放。画面跟随音频输出�
 共享视口的音量设置，切换场景后保留。
 点击播放时才打开音频设备，切换场景或卸载视口会关闭它。试试 `midi_visualizer`
 的 Web App 预览，拖动进度条或展开后的 timeline 可同时定位画面和声音。
-`cargo examples build [EXAMPLES...]` 编译选定的 cdylib，并分别生成
+`cargo examples build [EXAMPLES...]` 把选定的同名 example 编译为 WASM bin，并分别生成
 wasm-bindgen 绑定、运行 wasm-opt；`just doc-examples` 复用同一构建流程。
 
 ### coplanar z-fighting 按 scene-order 深度偏置

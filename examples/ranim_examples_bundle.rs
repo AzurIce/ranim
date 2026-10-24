@@ -6,7 +6,7 @@
 //!
 //! Scenes marked with [`wasm_demo_doc`](ranim::prelude::wasm_demo_doc)
 //! embed a live preview into their rustdoc page. Run `just doc-examples`
-//! to build this crate's docs together with each example's WASM cdylib.
+//! to build this crate's docs together with each example's WASM binary.
 //! Each module shares its scene and project assembly with its native and
 //! WebAssembly entry points.
 #[path = "aabb/scenes.rs"]

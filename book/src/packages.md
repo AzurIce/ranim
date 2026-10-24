@@ -48,14 +48,14 @@ resource）由 `ranim::AppExt` trait 在 App 上提供（prelude 已导出）—
 解析进程参数并分发 preview / output / render / inspect，出错时打印并以非零
 状态退出；命名避开 bevy App 自带的 `run()` runner 入口）与渲染、预览 API
 （`render_scene`、`preview_scene`）。项目二进制在 `main` 中创建 App、注册
-场景，`build()` 定稿后调用 `run_cli(app.build())`。WASM 入口使用单独的 cdylib，
+场景，`build()` 定稿后调用 `run_cli(app.build())`。同一个 example 在 WASM 平台编译为 bin，
 导出 `app() -> ranim::wasm::WasmApp`，由 JavaScript 调用
 `await project.createPreview(canvas, name)` 获得会话，再以 `renderAt(seconds)`
 驱动。Web 预览只需要 `render`，直接向 canvas 呈现；native 的 `cmd-preview`
 使用 egui/eframe。
 
-每个 example 的 `main.rs` 和 `wasm.rs` 都引用 `scenes.rs`，共享场景注册与渲染
-装配。`ranim-examples` 仅引用这些模块生成 rustdoc；网站和 rustdoc 直接加载
+每个 example 的 `main.rs` 同时提供原生 CLI 与 WASM `app()` 导出，按 target 编译，
+通过 `mod scenes` 共享场景注册与渲染装配；WASM `main()` 为空，应用由 JS 显式创建。`ranim-examples` 仅引用这些模块生成 rustdoc；网站和 rustdoc 直接加载
 各 example 自己的 WASM 模块。
 
 `ranim-core` 将完整的 `Eval::Output` 写入类型化 `EvaluatedFrame`，保留容器、

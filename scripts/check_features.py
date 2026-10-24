@@ -72,8 +72,9 @@ run([
     "cargo", "clippy", "-p", "ranim", "--examples", "--no-default-features",
     "--features", "anims,cmd-render,typst,gltf", "--", "-D", "warnings",
 ])
-run([
-    "cargo", "clippy", "-p", "ranim", "--examples", "--no-default-features",
-    "--target", "wasm32-unknown-unknown", "--features", "anims,cmd-preview,typst,gltf",
-    "--", "-D", "warnings",
-])
+for features in ["anims,render,typst,gltf", "anims,cmd-preview,typst,gltf"]:
+    run([
+        "cargo", "clippy", "-p", "ranim", "--examples", "--no-default-features",
+        "--target", "wasm32-unknown-unknown", "--features", features,
+        "--", "-D", "warnings",
+    ])

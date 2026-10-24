@@ -48,6 +48,28 @@ function newViewport(id) {
 
 const passed = [];
 try {
+  // A WASM bin runs its empty main during initialization. It must remain
+  // available for explicit app() calls and defer GPU work until createPreview.
+  const requestAdapter = navigator.gpu.requestAdapter;
+  let gpuRequests = 0;
+  navigator.gpu.requestAdapter = function (...args) {
+    gpuRequests++;
+    return requestAdapter.apply(this, args);
+  };
+  try {
+    const { default: init, app } = await import(src);
+    await init();
+    for (let i = 0; i < 2; i++) {
+      const project = app();
+      assert(project.sceneNames() === "arc", "Empty main left the module unusable");
+      project.free();
+    }
+    assert(gpuRequests === 0 && fixtures.childElementCount === 0, "Module initialization started a preview");
+  } finally {
+    navigator.gpu.requestAdapter = requestAdapter;
+  }
+  passed.push("WASM bin initialization / explicit app creation / deferred GPU setup");
+
   // Property binding before module registration must survive element upgrade.
   const primary = document.createElement("ranim-viewport");
   primary.id = "primary-preview";

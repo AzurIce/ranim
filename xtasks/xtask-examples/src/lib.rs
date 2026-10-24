@@ -47,9 +47,9 @@ const PREVIEW_COMPONENTS: &[&str] = &[
     "ranim-timeline.js",
 ];
 
-/// Build each selected example's WASM cdylib and JavaScript bindings.
+/// Build each selected example's WASM binary and JavaScript bindings.
 ///
-/// With no selection, builds all examples with a WASM target. Packages are
+/// With no selection, builds all registered examples for WebAssembly. Packages are
 /// written to `<output_dir>/examples/<name>/pkg`, where `output_dir` defaults
 /// to `website/static`. Rustdoc uses its own crate documentation directory.
 /// Website builds also refresh source listings and pages, preserving published media.
@@ -61,25 +61,20 @@ pub fn build_examples_wasm(
     let root_dir = root_dir.as_ref();
     let examples = get_examples(root_dir)?;
     for name in selected {
-        if !examples
-            .iter()
-            .any(|example| example.name == *name && example.meta.wasm)
-        {
-            bail!("example `{name}` has no WASM target");
+        if !examples.iter().any(|example| example.name == *name) {
+            bail!("unknown example `{name}`");
         }
     }
     let output_dir = root_dir.join(output_dir.unwrap_or(Path::new("website/static")));
     let examples: Vec<_> = examples
         .iter()
-        .filter(|example| {
-            example.meta.wasm && (selected.is_empty() || selected.contains(&example.name))
-        })
+        .filter(|example| selected.is_empty() || selected.contains(&example.name))
         .collect();
     // Cargo unifies features within one invocation. Keep Typst and other
     // optional dependencies out of examples that do not request them.
     let mut groups: BTreeMap<Vec<String>, Vec<&Example>> = BTreeMap::new();
     for example in &examples {
-        let mut features = example.wasm_features.clone();
+        let mut features = example.required_features.clone();
         features.sort();
         features.dedup();
         groups.entry(features).or_default().push(*example);
@@ -137,7 +132,7 @@ fn build_wasm_group(
         "--message-format=json-render-diagnostics",
     ]);
     for example in examples {
-        build.args(["--example", &format!("{}-wasm", example.name)]);
+        build.args(["--example", &example.name]);
     }
     build.args(["--features", &features.join(",")]);
     println!(
@@ -178,9 +173,9 @@ fn build_wasm_group(
         bail!("failed to build WASM examples");
     }
     for example in examples {
-        let target = format!("{}-wasm", example.name);
+        let target = &example.name;
         let wasm_path = artifacts
-            .get(&target)
+            .get(target)
             .with_context(|| format!("Cargo did not report a WASM artifact for {target}"))?;
         let pkg_dir = output_dir.join("examples").join(&example.name).join("pkg");
         fs::create_dir_all(&pkg_dir)?;
@@ -279,8 +274,6 @@ pub struct Example {
     pub code: String,
     pub hash: String,
     pub required_features: Vec<String>,
-    /// Features required by the paired WASM cdylib, independent of native UI.
-    pub wasm_features: Vec<String>,
 
     pub meta: ExampleMeta,
 }
@@ -357,10 +350,14 @@ impl Example {
             "--example",
             &self.name,
         ]);
-        let features = self.required_features.join(",");
-        if !features.is_empty() {
-            command.args(["--features", &features]);
-        }
+        let features = self
+            .required_features
+            .iter()
+            .map(String::as_str)
+            .chain(["cmd-render"])
+            .collect::<Vec<_>>()
+            .join(",");
+        command.args(["--features", &features]);
         command.arg("--").arg("output");
 
         // Output dirs in `#[output(...)]` are relative to the working
@@ -424,7 +421,7 @@ impl Example {
         };
         data.name.clone_from(&self.name);
         data.code.clone_from(&self.code);
-        data.wasm = self.meta.wasm;
+        data.wasm = true;
         // `hash` describes the last media render. Updating it here would make
         // `run --lazy-run` incorrectly skip media for changed scenes.
         fs::write(&data_path, toml::to_string(&data)?)?;
@@ -794,7 +791,7 @@ fn write_example_data(
         hash: example.hash.clone(),
         preview_imgs,
         output_files,
-        wasm: example.meta.wasm,
+        wasm: true,
     };
 
     let data_dir = root_dir.join("website").join("data");
@@ -982,8 +979,6 @@ fn is_generated_example_page(path: &Path) -> Result<bool> {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ExampleMeta {
-    #[serde(skip)]
-    wasm: bool,
     #[serde(default)]
     hide: bool,
 }
@@ -1016,9 +1011,6 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
     targets
         .iter()
         .map(|v| v.as_table().unwrap())
-        // The `<name>-wasm` cdylib entries are the WASM hosts of the examples,
-        // not renderable examples themselves.
-        .filter(|item| !item["name"].as_str().unwrap().ends_with("-wasm"))
         .map(|item| {
             let name = item["name"].as_str().unwrap().to_string();
             let required_features = item
@@ -1032,44 +1024,11 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
 
             let entry_path = root_dir.join(item["path"].as_str().unwrap());
             let path = entry_path.with_file_name("scenes.rs");
-            let wasm_target = targets
-                .iter()
-                .find(|target| target["name"].as_str() == Some(&format!("{name}-wasm")));
-            let wasm_features = wasm_target
-                .and_then(|target| target.get("required-features"))
-                .and_then(toml::Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(toml::Value::as_str)
-                .map(str::to_owned)
-                .collect();
-            let mut meta = metadatas.get(&name).cloned().unwrap_or_default();
-            meta.wasm = wasm_target.is_some();
-            if let Some(target) = wasm_target {
-                let expected_path = entry_path.with_file_name("wasm.rs");
-                let target_path =
-                    root_dir.join(target["path"].as_str().context("WASM target has no path")?);
-                if target_path != expected_path
-                    || target["crate-type"]
-                        .as_array()
-                        .is_none_or(|types| types.len() != 1 || types[0].as_str() != Some("cdylib"))
-                {
-                    bail!(
-                        "{name}-wasm must be a cdylib at {}",
-                        expected_path.display()
-                    );
-                }
-            }
+            let meta = metadatas.get(&name).cloned().unwrap_or_default();
             let mut hasher = Sha1::new();
             let mut code = String::new();
-            for (file, label) in [
-                ("scenes.rs", "共享场景与项目装配"),
-                ("main.rs", "原生入口"),
-                ("wasm.rs", "WASM 入口"),
-            ] {
-                if file == "wasm.rs" && !meta.wasm {
-                    continue;
-                }
+            for (file, label) in [("scenes.rs", "共享场景与项目装配"), ("main.rs", "平台入口")]
+            {
                 let source_path = entry_path.with_file_name(file);
                 let source = fs::read_to_string(&source_path)
                     .with_context(|| format!("failed to read {}", source_path.display()))?;
@@ -1094,7 +1053,6 @@ pub fn get_examples(root_dir: impl AsRef<Path>) -> Result<Vec<Example>> {
                 code,
                 hash,
                 required_features,
-                wasm_features,
             })
         })
         .collect()
@@ -1167,7 +1125,7 @@ mod test {
                 .find(|example| example.name == "basic")
                 .unwrap()
                 .required_features,
-            ["anims", "cmd-render", "typst"]
+            ["anims", "render", "typst"]
         );
         let arc = examples
             .iter()
@@ -1177,35 +1135,25 @@ mod test {
         assert_eq!(arc.path.file_name().unwrap(), "scenes.rs");
         assert!(arc.code.contains("fn arc(r: &mut RanimScene)"));
         assert!(arc.code.starts_with("`scenes.rs`"));
-        assert!(arc.code.contains("`main.rs`（原生入口）"));
-        assert!(arc.code.contains("`wasm.rs`（WASM 入口）"));
-        assert!(arc.meta.wasm);
-        assert_eq!(arc.wasm_features, ["anims", "render"]);
+        assert!(arc.code.contains("`main.rs`（平台入口）"));
+        assert!(arc.code.contains("pub fn app() -> ranim::wasm::WasmApp"));
+        assert_eq!(arc.required_features, ["anims", "render"]);
         assert!(
             examples
                 .iter()
                 .all(|example| !example.name.ends_with("-wasm"))
         );
-        assert!(examples.iter().all(|example| example.meta.wasm));
         assert_eq!(
             examples
                 .iter()
                 .find(|example| example.name == "gltf_showcase")
                 .unwrap()
                 .required_features,
-            ["anims", "cmd-render", "gltf"]
-        );
-        assert_eq!(
-            examples
-                .iter()
-                .find(|example| example.name == "gltf_showcase")
-                .unwrap()
-                .wasm_features,
             ["anims", "render", "gltf"]
         );
         assert!(
             arc.code
-                .contains("app.add_plugins(scenes::ScenesPlugin);\n    run_cli(app.build());")
+                .contains("app.add_plugins(scenes::ScenesPlugin);\n        run_cli(app.build());")
         );
     }
 
@@ -1256,52 +1204,37 @@ mod test {
     }
 
     #[test]
-    fn test_wasm_targets_require_render_and_shared_scene_features() {
+    fn test_examples_share_one_bin_target_across_platforms() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let manifest = fs::read_to_string(root.join("Cargo.toml"))
             .unwrap()
             .parse::<Table>()
             .unwrap();
         let targets = manifest["example"].as_array().unwrap();
-        for target in targets
-            .iter()
-            .filter(|target| target["name"].as_str().unwrap().ends_with("-wasm"))
-        {
-            let name = target["name"]
-                .as_str()
-                .unwrap()
-                .strip_suffix("-wasm")
-                .unwrap();
-            let native = targets
-                .iter()
-                .find(|target| target["name"].as_str() == Some(name))
-                .unwrap();
-            let features: Vec<_> = native["required-features"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|feature| {
-                    if feature.as_str() == Some("cmd-render") {
-                        toml::Value::String("render".into())
-                    } else {
-                        feature.clone()
-                    }
-                })
-                .collect();
-            assert_eq!(
-                target["required-features"].as_array().unwrap(),
-                &features,
+        let examples = get_examples(&root).unwrap();
+        assert_eq!(targets.len(), examples.len());
+        for target in targets {
+            let name = target["name"].as_str().unwrap();
+            assert!(!name.ends_with("-wasm"));
+            assert!(target.get("crate-type").is_none());
+            let features = target["required-features"].as_array().unwrap();
+            assert!(
+                features
+                    .iter()
+                    .any(|value| value.as_str() == Some("render")),
                 "{name}"
             );
-            assert_eq!(
-                target["crate-type"].as_array().unwrap(),
-                &[toml::Value::String("cdylib".into())]
+            assert!(
+                !features
+                    .iter()
+                    .any(|value| value.as_str() == Some("cmd-render")),
+                "{name}"
             );
         }
     }
 
     #[test]
-    fn test_wasm_entry_changes_invalidate_source_hash() {
+    fn test_platform_entry_changes_invalidate_source_hash() {
         let root = temp_root("wasm-hash");
         let source_dir = root.join("examples/foo");
         fs::create_dir_all(&source_dir).unwrap();
@@ -1313,21 +1246,19 @@ name = "ranim"
 [[example]]
 name = "foo"
 path = "examples/foo/main.rs"
-[[example]]
-name = "foo-wasm"
-path = "examples/foo/wasm.rs"
-crate-type = ["cdylib"]
 "#,
         )
         .unwrap();
         fs::write(source_dir.join("scenes.rs"), "// shared assembly\n").unwrap();
-        fs::write(source_dir.join("main.rs"), "fn main() {}\n").unwrap();
-        fs::write(source_dir.join("wasm.rs"), "// first entry\n").unwrap();
+        fs::write(source_dir.join("main.rs"), "fn main() {}\n// first entry\n").unwrap();
         let before = get_examples(&root).unwrap();
-        fs::write(source_dir.join("wasm.rs"), "// changed entry\n").unwrap();
+        fs::write(
+            source_dir.join("main.rs"),
+            "fn main() {}\n// changed entry\n",
+        )
+        .unwrap();
         let after = get_examples(&root).unwrap();
         assert_eq!(before.len(), 1);
-        assert!(after[0].meta.wasm);
         assert_ne!(before[0].hash, after[0].hash);
         assert!(after[0].code.contains("// changed entry"));
         fs::remove_dir_all(root).unwrap();
@@ -1384,7 +1315,6 @@ crate-type = ["cdylib"]
             code: String::new(),
             hash: String::new(),
             required_features: vec![],
-            wasm_features: vec![],
             meta: ExampleMeta::default(),
         };
         example.clean_output(&root).unwrap();
@@ -1423,7 +1353,6 @@ crate-type = ["cdylib"]
             code: "```rust\nfn main() {}\n```".to_string(),
             hash: "deadbeef".to_string(),
             required_features: vec![],
-            wasm_features: vec![],
             meta: ExampleMeta::default(),
         }];
 
@@ -1464,7 +1393,6 @@ crate-type = ["cdylib"]
             code: "```rust\nfn main() {}\n```".to_string(),
             hash: "deadbeef".to_string(),
             required_features: vec![],
-            wasm_features: vec![],
             meta: ExampleMeta::default(),
         };
 

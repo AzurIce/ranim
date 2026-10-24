@@ -203,9 +203,12 @@ ranim::cmd::preview_scene(app.build(), scene);
 ownership of the finalized project (`RanimApp`) so project resources stay
 available through rendering, preview resizing, and export.
 
-Examples use separate compilation entries: `main.rs` is the native binary,
-`wasm.rs` is a cdylib exporting `app() -> ranim::wasm::WasmApp`, and both
-share their scenes and rendering setup through `scenes.rs`. JavaScript
+Each example has one `[[example]]` binary target for native and WASM.
+`main.rs` calls the CLI on native; on WASM it provides an empty `main()` and
+exports `app() -> ranim::wasm::WasmApp` directly.
+Both platforms share scenes and rendering setup through `scenes.rs`.
+wasm-bindgen runs the empty WASM main during module initialization; application
+construction and rendering remain explicitly driven by JavaScript. JavaScript
 initializes the module and calls `await app().createPreview(canvas, name)`.
 The returned session renders directly to the canvas with `renderAt(seconds)`;
 Web UI and playback scheduling stay in JavaScript. The shared
@@ -218,7 +221,7 @@ egui/eframe are only
 used by the native preview.
 
 ```bash
-cargo build --example arc-wasm --target wasm32-unknown-unknown --no-default-features --features anims,render
+cargo build --example arc --target wasm32-unknown-unknown --no-default-features --features anims,render
 cargo examples build arc  # wasm-bindgen + wasm-opt, ready for the website
 ```
 

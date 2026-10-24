@@ -1,6 +1,6 @@
 //! The WebAssembly host for a finalized Ranim project.
 //!
-//! A project compiled to a wasm cdylib exports a constructor returning
+//! A project compiled to WebAssembly exports a constructor returning
 //! [`WasmApp`]. JavaScript creates a canvas preview, then drives its time:
 //!
 //! ```javascript
