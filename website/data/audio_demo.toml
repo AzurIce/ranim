@@ -5,8 +5,8 @@ code = """
 ```rust
 //! A scene with a synthesized soundtrack: sounds compose in the same tree as
 //! visual animations (`seq!`/`stack!`/`at`) and flatten into the audio plane
-//! at seal time — muxed into the rendered video, or played as the native preview
-//! clock. The browser player currently previews the visuals without audio.
+//! at seal time — muxed into the rendered video, or played as the native and
+//! browser preview clock.
 
 use ranim::{
     anims::{creation::WritingAnim, fading::FadingAnim},

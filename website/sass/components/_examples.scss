@@ -66,3 +66,27 @@
   padding-top: 1.5rem;
   border-top: 1px solid #e5e7eb;
 }
+
+.ranim-preview {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--borderColor-muted, #e5e7eb);
+  border-radius: 8px;
+  background: var(--bgColor-default, #fff);
+
+  ranim-viewport::part(viewport) {
+    border: 0;
+    border-radius: 0;
+  }
+
+  ranim-controls::part(controls) {
+    border: 0;
+    border-top: 1px solid var(--borderColor-muted, #e5e7eb);
+    border-radius: 0;
+  }
+
+  ranim-controls::part(timeline) {
+    border: 0;
+    border-radius: 0;
+  }
+}

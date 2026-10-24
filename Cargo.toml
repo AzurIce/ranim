@@ -86,6 +86,7 @@ render = [
   "dep:wasm-bindgen",
   "dep:wasm-bindgen-futures",
   "dep:web-sys",
+  "dep:js-sys",
   "dep:console_error_panic_hook",
 ]
 preview = [
@@ -125,6 +126,7 @@ wgpu = { workspace = true, optional = true }
 async-channel = "2.5.0"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
+js-sys = { version = "0.3.106", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 wasm-bindgen-futures = { version = "0.4.79", optional = true }

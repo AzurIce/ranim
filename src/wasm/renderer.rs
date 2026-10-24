@@ -2,6 +2,7 @@
 
 use ranim_core::{
     SceneEvaluator,
+    animation::node::AnimationInfo,
     color::{self, LinearSrgb},
     frame::EvaluatedFrame,
 };
@@ -94,6 +95,14 @@ impl CanvasRenderer {
 
     pub fn duration(&self) -> f64 {
         self.evaluator.total_secs()
+    }
+
+    pub fn animation_infos(&self) -> Vec<AnimationInfo> {
+        self.evaluator.animation_infos()
+    }
+
+    pub fn audio(&self) -> &[f32] {
+        self.evaluator.audio()
     }
 
     pub fn resize(&mut self, width: u32, height: u32) -> Result<(), JsValue> {

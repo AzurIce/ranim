@@ -38,8 +38,14 @@ const WEBSITE_EXAMPLES_CONTENT_DIR: &str = "content/examples";
 const WEBSITE_EXAMPLES_TITLE: &str = "例子";
 /// Module basename shared by the individual WASM packages.
 const EXAMPLES_WASM_MODULE: &str = "ranim_example";
-/// Independent components shared by the website and rustdoc.
-const PREVIEW_COMPONENTS: &[&str] = &["ranim-viewport.js", "ranim-controls.js"];
+/// Preview components and supporting modules shared by the website and rustdoc.
+const PREVIEW_COMPONENTS: &[&str] = &[
+    "ranim-theme.js",
+    "ranim-audio.js",
+    "ranim-viewport.js",
+    "ranim-controls.js",
+    "ranim-timeline.js",
+];
 
 /// Build each selected example's WASM cdylib and JavaScript bindings.
 ///

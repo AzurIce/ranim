@@ -113,7 +113,18 @@ Typst 等可选依赖。随后分别运行 `wasm-bindgen` 和 `wasm-opt`。产�
 `--out-dir` 改变输出根目录，仍保留 `examples/<name>/pkg/` 层级。
 组件源码由 Zola 的 `website/static/ranim-viewport.js` 和 `ranim-controls.js`
 管理；网站直接使用，指定其他 `--out-dir`（如 rustdoc 目录）时将两个文件
-复制到输出根目录。视口调用 `await app().createPreview(canvas, name)`，
+复制到输出根目录，同时复制视口使用的 `ranim-audio.js` 和控制条使用的
+`ranim-timeline.js`，以及共用主题模块 `ranim-theme.js`。
+组件继承宿主字体和配色；网站把画布、控制条与 timeline 放进同一个细边框容器。
+视口调用 `await app().createPreview(canvas, name)`，
 用 Web 端播放时钟驱动 `renderAt(seconds)`；独立控制条通过 `for="视口ID"`
 或 `controls.target = viewport` 连接，布局和数量由宿主决定。WASM 只需要 `render`，
 egui/eframe 属于 native 的 `preview`。
+
+有声音的场景通过 `WasmPreview.audio()` 读取一次预混音 PCM，由 Web Audio 播放；
+画面跟随音频输出时钟，播放、暂停和定位同时控制声音。无声音场景使用墙钟。
+切换场景或卸载视口会停止音源并关闭音频设备，移动或增减控制条不影响音频会话。
+
+控制条可通过右侧展开按钮、`timeline-expanded` 或 `timelineExpanded` 属性打开
+动画 timeline。视口就绪时缓存一次 `WasmPreview.timeline()` 的元数据，控制条
+据此显示动画树和片段；播放帧只同步指针，不重复读取动画树。

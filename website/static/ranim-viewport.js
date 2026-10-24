@@ -1,3 +1,6 @@
+import { AudioPlayback } from "./ranim-audio.js";
+import { previewTheme } from "./ranim-theme.js";
+
 const modules = new Map();
 
 function loadProjectModule(url) {
@@ -20,16 +23,17 @@ export class RanimViewport extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" }).innerHTML = `
       <style>
-        :host { display: block; min-width: 0; color-scheme: dark; }
+        ${previewTheme}
+        :host { display: block; min-width: 0; }
         .viewport {
-          overflow: hidden; border: 1px solid #ffffff12; border-radius: 12px;
-          background: #333; box-shadow: 0 2px 4px #00000008, 0 10px 30px -12px #00000040;
+          overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius);
+          background: #333;
         }
         canvas { display: block; width: 100%; aspect-ratio: 16 / 9; background: #333; }
         .status {
-          margin: 0; padding: 10px 16px; border-top: 1px solid #ffffff0d;
-          background: #1b1e25; color: #b7c2d1;
-          font: 12px/1.6 Inter, ui-sans-serif, system-ui, sans-serif;
+          margin: 0; padding: 10px 12px; border-top: 1px solid var(--border);
+          background: var(--surface); color: var(--muted);
+          font: inherit; font-size: 12px; line-height: 1.6;
           overflow-wrap: anywhere;
         }
         .status:empty { display: none; }
@@ -41,9 +45,13 @@ export class RanimViewport extends HTMLElement {
     this._canvas = this.shadowRoot.querySelector("canvas");
     this._status = this.shadowRoot.querySelector(".status");
     this._session = null;
+    this._audio = null;
+    this._volume = 1;
+    this._muted = false;
     this._generation = 0;
     this._raf = 0;
     this._duration = 0;
+    this._timeline = null;
     this._time = 0;
     this._playing = false;
     this._dirty = false;
@@ -52,6 +60,13 @@ export class RanimViewport extends HTMLElement {
   }
 
   connectedCallback() {
+    for (const property of ["volume", "muted"]) {
+      if (Object.hasOwn(this, property)) {
+        const value = this[property];
+        delete this[property];
+        this[property] = value;
+      }
+    }
     window.addEventListener("resize", this._onResize);
     this._load();
   }
@@ -67,10 +82,31 @@ export class RanimViewport extends HTMLElement {
   }
 
   get ready() { return this._session !== null; }
+  get timeline() { return this._timeline; }
   get duration() { return this._duration; }
   get currentTime() { return this._position(performance.now()); }
   set currentTime(seconds) { this.seek(seconds); }
   get paused() { return !this._playing; }
+  get hasAudio() { return this._audio !== null; }
+  get volume() { return this._volume; }
+  set volume(value) {
+    if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError("Volume must be between 0 and 1");
+    if (value === this._volume) return;
+    this._volume = value;
+    this._updateVolume();
+  }
+  get muted() { return this._muted; }
+  set muted(value) {
+    value = Boolean(value);
+    if (value === this._muted) return;
+    this._muted = value;
+    this._updateVolume();
+  }
+
+  _updateVolume() {
+    this._audio?.setVolume(this._muted ? 0 : this._volume);
+    this.dispatchEvent(new Event("volumechange"));
+  }
 
   play() {
     if (!this._session || this._playing || this._duration <= 0) return;
@@ -78,6 +114,8 @@ export class RanimViewport extends HTMLElement {
     this._anchorTime = this._time;
     this._anchorNow = performance.now();
     this._playing = true;
+    this._startAudio();
+    if (!this._playing) return;
     this._schedule();
     this.dispatchEvent(new Event("play"));
   }
@@ -86,6 +124,7 @@ export class RanimViewport extends HTMLElement {
     if (!this._playing) return;
     this._time = this.currentTime;
     this._playing = false;
+    this._audio?.stop();
     this._invalidate();
     this.dispatchEvent(new Event("pause"));
   }
@@ -96,6 +135,7 @@ export class RanimViewport extends HTMLElement {
     this._time = Math.max(0, Math.min(seconds, this._duration));
     this._anchorTime = this._time;
     this._anchorNow = performance.now();
+    if (this._playing) this._startAudio();
     this._invalidate();
     this.dispatchEvent(new Event("timeupdate"));
   }
@@ -129,6 +169,10 @@ export class RanimViewport extends HTMLElement {
       }
       this._session = session;
       this._duration = session.duration;
+      this._timeline = session.timeline();
+      const audio = session.audio();
+      this._audio = audio ? new AudioPlayback(audio, this._duration) : null;
+      this._audio?.setVolume(this._muted ? 0 : this._volume);
       this._status.textContent = "";
       this._resizeObserver.observe(canvas);
       this._invalidate();
@@ -145,6 +189,8 @@ export class RanimViewport extends HTMLElement {
     cancelAnimationFrame(this._raf);
     this._raf = 0;
     this._resizeObserver.disconnect();
+    this._audio?.dispose();
+    this._audio = null;
     if (this._session) {
       const session = this._session;
       this._session = null;
@@ -161,13 +207,28 @@ export class RanimViewport extends HTMLElement {
     this._dirty = false;
     this._time = 0;
     this._duration = 0;
+    this._timeline = null;
     this.dispatchEvent(new Event("emptied"));
   }
 
   _position(now) {
     return this._playing
-      ? Math.min(this._duration, this._anchorTime + (now - this._anchorNow) / 1000)
+      ? this._audio?.position() ?? Math.min(this._duration, this._anchorTime + (now - this._anchorNow) / 1000)
       : this._time;
+  }
+
+  _startAudio() {
+    const audio = this._audio;
+    if (!audio) return;
+    const failed = (error) => {
+      if (this._audio !== audio || !this._playing) return;
+      this.pause();
+      this._status.textContent = `Unable to play audio: ${error instanceof Error ? error.message : error}`;
+      this.dispatchEvent(new CustomEvent("error", { detail: error }));
+    };
+    this._status.textContent = "";
+    try { audio.play(this._time).catch(failed); }
+    catch (error) { failed(error); }
   }
 
   _invalidate() {
@@ -191,7 +252,10 @@ export class RanimViewport extends HTMLElement {
       return;
     }
     const ended = this._playing && this._time >= this._duration;
-    if (ended) this._playing = false;
+    if (ended) {
+      this._playing = false;
+      this._audio?.stop();
+    }
     this.dispatchEvent(new Event("timeupdate"));
     if (ended) {
       this.dispatchEvent(new Event("pause"));

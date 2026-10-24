@@ -24,7 +24,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::{AppExt, RanimApp};
 
+mod audio;
 mod renderer;
+mod timeline;
 use renderer::CanvasRenderer;
 
 /// A finalized Ranim project exported to JavaScript.
@@ -107,6 +109,28 @@ impl WasmPreview {
     #[wasm_bindgen(getter)]
     pub fn duration(&self) -> Result<f64, JsValue> {
         Ok(self.renderer()?.duration())
+    }
+
+    /// Snapshot the animation tree used by the native timeline.
+    ///
+    /// Returns `{ duration, roots }`. Each node has `name`, `kind` (`anim`,
+    /// `children`, or `audio`), `range` in parent-local seconds,
+    /// `contentDuration`, `enabled`, `simStep`, and `children`.
+    /// The snapshot contains ordinary JavaScript objects, independent of the
+    /// renderer's lifetime. Fetch once when a scene is ready, not each frame.
+    pub fn timeline(&self) -> Result<JsValue, JsValue> {
+        let renderer = self.renderer()?;
+        timeline::snapshot(renderer.duration(), renderer.animation_infos())
+    }
+
+    /// Copy the scene's baked mix into JavaScript-owned PCM channel arrays.
+    ///
+    /// Returns `null` for scenes without audio, otherwise `{ sampleRate,
+    /// channels }`, where each channel is a `Float32Array`. Fetch once per
+    /// session; the snapshot remains valid after disposal. Playback and its
+    /// audio clock belong to the host.
+    pub fn audio(&self) -> Result<JsValue, JsValue> {
+        audio::snapshot(self.renderer()?.audio())
     }
 
     /// Evaluate and present the requested time, clamped to the scene duration.

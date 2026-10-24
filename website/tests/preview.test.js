@@ -36,6 +36,7 @@ async function eventually(predicate) {
 
 const button = (controls) => controls.shadowRoot.querySelector("button");
 const slider = (controls) => controls.shadowRoot.querySelector("input");
+const timeline = (controls) => controls.shadowRoot.querySelector("[part=timeline]").shadowRoot;
 
 function newViewport(id) {
   const viewport = document.createElement("ranim-viewport");
@@ -73,6 +74,45 @@ try {
   assert(direct.target === primary && !button(direct).disabled, "Pre-upgrade property target was lost");
   assert(!primary.shadowRoot.querySelector("button"), "Viewport contains playback controls");
   assert(primary.ready && primary.duration === 3 && primary.paused, "Expected a paused three-second scene");
+
+  assert(primary.timeline.duration === 3 && primary.timeline.roots.length > 0, "Viewport did not expose animation metadata");
+  const { projectTimeline } = await import("../static/ranim-timeline.js");
+  const projected = projectTimeline(primary.timeline);
+  const lagged = projected.find((node) => node.children.length === 100);
+  assert(lagged && Math.abs(lagged.children.at(-1).end - 3) < 1e-6, "WASM content timing was not projected into scene seconds");
+  assert(!controls.timelineExpanded, "Timeline should start collapsed");
+  const originalCanvas = primary.shadowRoot.querySelector("canvas");
+  controls.shadowRoot.querySelector(".timeline-toggle").click();
+  assert(controls.timelineExpanded && controls.target === primary, "Opening timeline changed target binding");
+  const rowsBefore = timeline(controls).querySelectorAll(".row").length;
+  assert(rowsBefore >= 100, "Animation tree did not disclose its parallel tracks");
+  primary.seek(1.5);
+  assert(timeline(controls).querySelector("[role=slider]").getAttribute("aria-valuenow") === "1.5", "Timeline playhead missed seek state");
+  const clip = timeline(controls).querySelector(".clip");
+  clip.click();
+  assert(primary.currentTime === 1.5, "Selecting a clip changed the playhead");
+  assert(clip.getAttribute("aria-pressed") === "true", "Clip selection did not update inspection state");
+  assert(timeline(controls).querySelector(".selection-range").textContent.includes("—"), "Selected clip has no timing inspector");
+  timeline(controls).querySelector(".tree-toggle").click();
+  const collapsedRows = timeline(controls).querySelectorAll(".row").length;
+  assert(collapsedRows < rowsBefore, "Collapsing animation group did not hide tracks");
+  controls.timelineExpanded = false;
+  controls.timelineExpanded = true;
+  assert(timeline(controls).querySelectorAll(".row").length === collapsedRows, "Closing timeline lost its tree expansion state");
+  timeline(controls).querySelector(".zoom-in").click();
+  assert(timeline(controls).querySelector(".zoom-level").textContent === "200%", "Timeline zoom failed");
+  timeline(controls).querySelector(".fit").click();
+  assert(timeline(controls).querySelector(".zoom-level").textContent === "100%", "Fit did not reset timeline zoom");
+  timeline(controls).querySelector("[role=slider]").dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+  assert(primary.currentTime === 3, "Timeline keyboard seek failed");
+  direct.timelineExpanded = true;
+  primary.seek(1.25);
+  assert(timeline(direct).querySelector("[role=slider]").getAttribute("aria-valuenow") === "1.25", "Second timeline did not synchronize");
+  assert(timeline(direct).querySelectorAll(".row").length === rowsBefore, "Control bars shared tree expansion state");
+  assert(primary.shadowRoot.querySelector("canvas") === originalCanvas && primary.ready, "Expanding controls recreated the renderer");
+  controls.timelineExpanded = direct.timelineExpanded = false;
+  primary.seek(0);
+  passed.push("WASM tree metadata / projected timing / expandable tracks / selection / zoom / synchronized timelines");
 
   await expectEvent(primary, "timeupdate", () => {
     slider(controls).value = "1.5";
@@ -154,10 +194,13 @@ try {
   assert(controls.target === replacement, "ID changes were not observed");
   passed.push("independent canvases / target switching / ID changes / replacement / viewport reconnection");
 
+  controls.timelineExpanded = true;
   await expectEvent(replacement, "error", () => replacement.setAttribute("scene", "not-a-scene"));
   assert(button(controls).disabled && !replacement.ready, "Failed preview left controls enabled");
+  assert(replacement.timeline === null && !timeline(controls).querySelector(".row"), "Failed preview retained the old animation tree");
   await expectEvent(replacement, "ready", () => replacement.setAttribute("scene", "arc"));
   assert(!button(controls).disabled, "Recovered preview did not enable controls");
+  assert(timeline(controls).querySelector(".row"), "Recovered preview did not restore its animation tree");
   replacement.removeAttribute("src");
   assert(!replacement.ready && button(controls).disabled, "Clearing source did not clear controls");
   passed.push("load failure / recovery / source removal reset bound controls");
@@ -204,12 +247,19 @@ try {
     session.resize(480, 270);
     session.renderAt(2);
     assert(rawCanvas.width === 480 && rawCanvas.height === 270, "Resize did not update the canvas");
+    const snapshot = session.timeline();
+    assert(snapshot.duration === 3 && snapshot.roots.length > 0, "WASM timeline snapshot is empty");
     session.dispose();
     session.dispose();
+    assert(snapshot.roots.length > 0, "Disposing renderer invalidated its metadata snapshot");
     let disposed = false;
     try { session.renderAt(0); }
     catch (error) { disposed = String(error).includes("disposed"); }
     assert(disposed, "Disposed session still renders");
+    disposed = false;
+    try { session.timeline(); }
+    catch (error) { disposed = String(error).includes("disposed"); }
+    assert(disposed, "Disposed session still exposes a live timeline getter");
   } finally {
     session.free();
     rawCanvas.remove();

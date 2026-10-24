@@ -441,7 +441,7 @@ WASM 不自行启动事件循环。每个 `WasmApp` 创建一次预览；需要�
 仓库的 `cargo examples build [EXAMPLES...]` 会完成编译、`wasm-bindgen`
 和 `wasm-opt`。视口与控制条源码分别位于 `website/static/ranim-viewport.js`
 和 `website/static/ranim-controls.js`，由 Zola 直接提供；为 rustdoc 等其他
-输出目录构建时，会复制这两个组件到输出根目录。
+输出目录构建时，会把这两个组件及其音频和 timeline 模块复制到输出根目录。
 `<ranim-viewport>` 负责 canvas 和播放时钟，`<ranim-controls>` 通过 `for`
 绑定同一 DOM 根中的视口 ID，可放在页面任意位置；同一视口也能绑定多个
 控制条。JavaScript 可以用 `controls.target = viewport` 显式绑定，包括跨
@@ -453,6 +453,21 @@ Shadow DOM 的组合。网站和 rustdoc 都用这两个组件，无需 egui：
 <ranim-viewport id="arc-view" src="./examples/arc/pkg/ranim_example.js" scene="arc"></ranim-viewport>
 <ranim-controls for="arc-view"></ranim-controls>
 ```
+
+进度条右侧的展开按钮会打开动画 timeline，显示与原生 egui 相同来源的动画树和
+时间片段；点击片段只选中并查看详情，点击或拖动上方时间刻度才改变进度。
+还可折叠子轨道、缩放时间轴。给控制条添加
+`timeline-expanded`，或设置 `controls.timelineExpanded = true` 可默认展开。
+视口在会话就绪时读取一次 `WasmPreview.timeline()`，通过 `viewport.timeline`
+提供元数据；播放时只更新指针，不会反复跨 WASM 读取整棵动画树。
+
+场景有声音时，视口在初始化时读取一次 `WasmPreview.audio()` 的预混音声道，
+点击播放后通过 Web Audio 播放，画面时间跟随音频输出时钟。播放、暂停和拖动
+进度条会同时控制声音；暂停中定位保持安静，播放中定位从新位置继续。
+切换场景或卸载视口会关闭音频设备，无声音场景仍按墙钟播放。
+控制条的扬声器按钮可调音量或静音；同一视口的多个控制条共享设置，切换场景
+后保留音量。自定义宿主可设置 `viewport.volume`（0–1）和 `viewport.muted`，
+并监听 `volumechange`。
 
 ### 命令行：预览与渲染
 

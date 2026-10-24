@@ -206,7 +206,10 @@ The returned session renders directly to the canvas with `renderAt(seconds)`;
 Web UI and playback scheduling stay in JavaScript. The shared
 [`<ranim-viewport>` and `<ranim-controls>` components](./website/README.md)
 separate rendering from playback controls for the website and rustdoc. Controls
-can bind to any viewport by ID or a JavaScript reference. egui/eframe are only
+can bind to any viewport by ID or a JavaScript reference, and expand the progress
+bar into an interactive animation timeline. Scenes with sound play through Web
+Audio, with the visual playhead following the audio clock across pause and seeks.
+egui/eframe are only
 used by the native preview.
 
 ```bash

@@ -5327,6 +5327,7 @@ dependencies = [
  "getrandom 0.4.3",
  "indicatif",
  "itertools 0.15.0",
+ "js-sys",
  "midly",
  "pollster",
  "pretty_env_logger",

@@ -42,8 +42,8 @@
       display: grid;
       place-items: center;
       flex: 1;
-      color: #70d3e8;
-      background: linear-gradient(135deg, #1b1e25, #303b48);
+      color: var(--sl-color-primary-600, #0284c7);
+      background: #f6f8fa;
     }
 
     &__content {

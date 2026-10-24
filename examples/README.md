@@ -20,6 +20,12 @@ JavaScript 调用 `await app().createPreview(canvas, name)` 创建预览会话�
 网站和 rustdoc 共用 [`<ranim-viewport>` 与 `<ranim-controls>`](../website/README.md)：
 视口负责 canvas 和播放会话，独立控制条通过 `for` 或 `target` 绑定视口，
 提供播放、暂停和拖动进度；WASM 直接呈现到 canvas，不依赖 egui。
+控制条右侧的展开按钮可打开动画树与片段轨道，点击片段只查看详情，
+点击或拖动上方时间刻度可定位，还支持缩放和折叠节点；
+也可通过 `timeline-expanded` 属性或 `controls.timelineExpanded = true` 默认展开。
+有声音的场景（如 `midi_visualizer`）在点击播放后通过 Web Audio 发声，
+画面跟随音频时钟；播放、暂停和定位保持同步，暂停中定位不发声。
+扬声器按钮可调节音量或静音，同一视口的控制条共享音量设置。
 
 原生 target 名为 `<name>`，需要 `preview`；WASM target 名为 `<name>-wasm`，
 设置 `crate-type = ["cdylib"]`，只需要 `render`。需要 `typst` 等额外

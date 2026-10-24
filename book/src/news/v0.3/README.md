@@ -14,7 +14,7 @@
   - `AudioClip`/`AudioTrack`/`Sound`：音频作为叶子与视觉动画并列编排，支持 gain、fade、trim（`with_play_secs` 接受源轴 range）；线性变速与视觉动画统一走 cell 层的 `with_duration`/`with_rate_func`（磁带式变速，音高随窗口缩放）
   - `AudioClip::from_file`/`from_bytes`（随 `audio-decode` feature）纯 Rust 解码（symphonia，WAV/MP3/FLAC/AAC/Ogg Vorbis）并经 rubato FFT 重采样归一到 48 kHz 立体声，不再依赖 ffmpeg 二进制
   - `RanimScene::seal` 时一次性 bake 成 master stereo/48 kHz buffer；线性路径预混，非线性路径走 residual forest
-  - preview 原生播放（随 `preview` feature）与 render 端 ffmpeg muxing（MP4/MOV AAC，WebM libopus，GIF 丢弃）
+  - preview 原生播放（随 `preview` feature）、Web Audio 同步播放与 render 端 ffmpeg muxing（MP4/MOV AAC，WebM libopus，GIF 丢弃）
 - 可组合动画编排系统（见 "Composable Animation Arrangement" 一节）
   - `AnimSequence`/`AnimStack` 容器与 `seq!`/`stack!` 宏，`hold`/`forward`/`extend` 等编排 API
   - `AnimLagged` 容器（stagger 排布 + 窗口外静态填充）与 `lagged!` 宏、迭代器容器收集（`collect::<AnimStack>()`/`collect::<AnimSequence>()`、`into_stack`/`into_seq`/`into_lagged`）
@@ -658,9 +658,22 @@ native 继续使用 egui 预览。自定义物件的精确输出类型
 `<ranim-viewport>` 与 `<ranim-controls>`，根据所属 example 加载其独立的 WASM
 模块，按注册名创建会话。视口负责渲染和播放时钟，控制条通过 `for` 属性或
 JavaScript 的 `target` 引用绑定视口；控制条可放在任意位置，也可让多个
-控制条操作同一视口。视口卸载时释放 GPU 资源；控制条的移动、卸载或重新绑定
+控制条操作同一视口。视口卸载时释放 GPU 和音频资源；控制条的移动、卸载或重新绑定
 只改变 UI 连接，渲染会话继续由视口持有。网站与 rustdoc 都显式组合这两个
 组件。`#[scene(name = "hanoi")]` 等自定义注册名同样可用。
+控制条还可向下展开为动画 timeline：顺序片段共用轨道，重叠子动画可折叠为
+多行，并提供时间刻度、播放指针、片段选择和缩放。片段点击只更新详情，
+上方时间刻度负责定位。动画元数据来自核心层的
+同一棵树，在视口初始化时跨 WASM 读取一次；各控制条独立保存展开和缩放状态，
+同时继续共享视口的播放时钟。
+有声音的场景通过 `WasmPreview.audio()` 把 seal 时已混合的 PCM 复制到
+JavaScript 自有声道数组，由 Web Audio 播放。画面跟随音频输出位置，暂停时同时
+停止音源并固定播放位置；播放中定位会从新位置重启音源，暂停中定位保持安静。
+音频缓冲每个场景只读取一次，定位和重播都复用它，无声音场景继续使用墙钟。
+控制条的扬声器按钮可调节音量和静音，增益平滑变化且不重启音源；多个控制条
+共享视口的音量设置，切换场景后保留。
+点击播放时才打开音频设备，切换场景或卸载视口会关闭它。试试 `midi_visualizer`
+的 Web App 预览，拖动进度条或展开后的 timeline 可同时定位画面和声音。
 `cargo examples build [EXAMPLES...]` 编译选定的 cdylib，并分别生成
 wasm-bindgen 绑定、运行 wasm-opt；`just doc-examples` 复用同一构建流程。
 
