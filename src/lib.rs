@@ -99,11 +99,12 @@ pub use ranim_core::{RanimScene, lagged, seq, stack};
 /// The preludes
 pub mod prelude {
     pub use crate::app::{AppExt, RanimAppExt};
-    #[cfg(all(not(target_family = "wasm"), feature = "render"))]
+    #[cfg(all(not(target_family = "wasm"), feature = "cmd-render"))]
     pub use crate::cmd::cli::run_cli;
     pub use crate::{App, Plugin};
     pub use ranim_core::prelude::*;
     pub use ranim_core::{lagged, seq, stack};
+    #[cfg(feature = "items")]
     pub use ranim_items::camera::CameraFrame;
     pub use ranim_macros::{output, scene, wasm_demo_doc};
 }

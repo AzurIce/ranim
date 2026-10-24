@@ -14,7 +14,7 @@
   - `AudioClip`/`AudioTrack`/`Sound`：音频作为叶子与视觉动画并列编排，支持 gain、fade、trim（`with_play_secs` 接受源轴 range）；线性变速与视觉动画统一走 cell 层的 `with_duration`/`with_rate_func`（磁带式变速，音高随窗口缩放）
   - `AudioClip::from_file`/`from_bytes`（随 `audio-decode` feature）纯 Rust 解码（symphonia，WAV/MP3/FLAC/AAC/Ogg Vorbis）并经 rubato FFT 重采样归一到 48 kHz 立体声，不再依赖 ffmpeg 二进制
   - `RanimScene::seal` 时一次性 bake 成 master stereo/48 kHz buffer；线性路径预混，非线性路径走 residual forest
-  - preview 原生播放（随 `preview` feature）、Web Audio 同步播放与 render 端 ffmpeg muxing（MP4/MOV AAC，WebM libopus，GIF 丢弃）
+  - preview 原生播放（随 `cmd-preview` feature）、Web Audio 同步播放与 render 端 ffmpeg muxing（MP4/MOV AAC，WebM libopus，GIF 丢弃）
 - 可组合动画编排系统（见 "Composable Animation Arrangement" 一节）
   - `AnimSequence`/`AnimStack` 容器与 `seq!`/`stack!` 宏，`hold`/`forward`/`extend` 等编排 API
   - `AnimLagged` 容器（stagger 排布 + 窗口外静态填充）与 `lagged!` 宏、迭代器容器收集（`collect::<AnimStack>()`/`collect::<AnimSequence>()`、`into_stack`/`into_seq`/`into_lagged`）
@@ -31,8 +31,8 @@
   - 场景图层级 `hierarchy::Node` 与 glTF/GLB 导入（见"场景图层级与 glTF 导入"一节）
 - VItem 法向投影：`Basis2d` 移除，`normal: Option` + shader 内现场生成正交基（见"VItem 法向投影"一节）
 - 完整求值输出与值级 `Extract`：容器、异构元组、层级树与变换 wrapper 原样入帧，渲染侧递归提取；`ExtractPlugin<T>` 为实际完整类型显式注册入口
-- 命令行入口：`ranim::App` 与 `ranim::Plugin` 分别是 `bevy_app::App` / `bevy_app::Plugin` 的直接再导出；场景注册/选择（`add_scene`/`add_scenes`/`scenes`/`scene(name)`/`first_scene()`）由 `ranim::app::AppExt`（prelude 已导出）在 App 上提供，`scene(name)`/`first_scene()` 返回克隆的 `Scene`。`ranim::RanimAppExt::build`（prelude 已导出）把构建中的 App 定稿为 `ranim::RanimApp`：断言插件 Ready 并执行一次 bevy 的 `finish()`/`cleanup()`；`RanimApp` 是项目的会话期形态——`Deref`/`DerefMut` 到 bevy `App`，update、渲染 SubApp 安装、资源访问与场景选择照常工作，但不再是插件构建目标，「会话入口要求插件已构建完毕」由此成为显式的类型前提。CLI 入口是自由函数 `ranim::cmd::cli::run_cli`（接收 `RanimApp`，prelude 导出为 `run_cli`，native + `render` 门控），与 `preview_scene(app.build(), scene)`、`render_scene(&scene, &setup, ...)` 同风格：安装 tracing、解析进程参数并分发 `preview` / `output` / `render` / `inspect` 子命令，出错时打印并以非零状态退出；命名避开 bevy App 自带的 `run()` runner 入口。`App::new()` + `add_scenes([...])` + `run_cli(app.build())` 即最小项目；插件 `build` 的 `&mut bevy_app::App` 与 `&mut App` 是同一类型；`inspect scenes/tree/frame` 无 GPU 检查；agent one-shot 例子已迁至独立仓库 `ranim-one-shot`（见"CLI"一节）
-- 渲染与输出：`Renderer` 结构体溶解为渲染 SubApp 的安装与驱动 API——`ranim_render::build_render_app(ctx, width, height, oit_layers)` 构建裸渲染 `SubApp`，`install_render_app` 应用项目 `RenderSetup` 后以 `RanimRenderApp` 标签挂进 App 并挂 extract 钩子（每次 `App::update()` 主 schedule 结束后把主世界的 `EvaluatedFrame` 交换进渲染世界），`RenderAppExt` 为 SubApp 提供手动驱动与 GPU profiler 访问器；公共阶段改为 pub 的 `RenderSchedule::{Extract, Prepare, View}` 与 `ViewPhase::{Clear, Compute, Depth, Color, Resolve}` 枚举（`RenderSchedules` 句柄 resource 已删除）；core 中按类型批次传输的 `EvaluatedFrame` 与项目提供的 `RenderSetup`（未注册时回退到安装 `RanimItemsPlugin` 的默认渲染配置）；渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 以 native bin / WASM cdylib 双入口共享装配，并经 `#[wasm_demo_doc]` 提供 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
+- 命令行入口：`ranim::App` 与 `ranim::Plugin` 分别是 `bevy_app::App` / `bevy_app::Plugin` 的直接再导出；场景注册/选择（`add_scene`/`add_scenes`/`scenes`/`scene(name)`/`first_scene()`）由 `ranim::app::AppExt`（prelude 已导出）在 App 上提供，`scene(name)`/`first_scene()` 返回克隆的 `Scene`。`ranim::RanimAppExt::build`（prelude 已导出）把构建中的 App 定稿为 `ranim::RanimApp`：断言插件 Ready 并执行一次 bevy 的 `finish()`/`cleanup()`；`RanimApp` 是项目的会话期形态——`Deref`/`DerefMut` 到 bevy `App`，update、渲染 SubApp 安装、资源访问与场景选择照常工作，但不再是插件构建目标，「会话入口要求插件已构建完毕」由此成为显式的类型前提。CLI 入口是自由函数 `ranim::cmd::cli::run_cli`（接收 `RanimApp`，prelude 导出为 `run_cli`，native + `cmd-render` 门控），与 `preview_scene(app.build(), scene)`、`render_scene(&scene, &setup, ...)` 同风格：安装 tracing、解析进程参数并分发 `preview` / `output` / `render` / `inspect` 子命令，出错时打印并以非零状态退出；命名避开 bevy App 自带的 `run()` runner 入口。`App::new()` + `add_scenes([...])` + `run_cli(app.build())` 即最小项目；插件 `build` 的 `&mut bevy_app::App` 与 `&mut App` 是同一类型；`inspect scenes/tree/frame` 无 GPU 检查；agent one-shot 例子已迁至独立仓库 `ranim-one-shot`（见"CLI"一节）
+- 渲染与输出：`Renderer` 结构体溶解为渲染 SubApp 的安装与驱动 API——`ranim_render::build_render_app(ctx, width, height, oit_layers)` 构建裸渲染 `SubApp`，`install_render_app` 应用项目 `RenderSetup` 后以 `RanimRenderApp` 标签挂进 App 并挂 extract 钩子（每次 `App::update()` 主 schedule 结束后把主世界的 `EvaluatedFrame` 交换进渲染世界），`RenderAppExt` 为 SubApp 提供手动驱动与 GPU profiler 访问器；公共阶段改为 pub 的 `RenderSchedule::{Extract, Prepare, View}` 与 `ViewPhase::{Clear, Compute, Depth, Color, Resolve}` 枚举（`RenderSchedules` 句柄 resource 已删除）；core 中按类型批次传输的 `EvaluatedFrame` 与项目提供的 `RenderSetup`（未注册时按 `items` 是否启用，分别回退到安装 `RanimItemsPlugin` 的默认渲染配置或空配置）；渲染 worker API（`RenderWorker`/`RenderThreadHandle`/`RanimRenderApp`）公开；`Output::name_template` 输出名模板；examples 以 native bin / WASM cdylib 双入口共享装配，并经 `#[wasm_demo_doc]` 提供 rustdoc 实时预览；coplanar z-fighting 按 scene-order 深度偏置解决
 
 ## BREAKING CHANGES
 
@@ -59,9 +59,9 @@
   - `ranim_items::mesh::MeshItem` 用户层类型由 f32（`Vec3`/`Mat4`）改为 f64（`DVec3`/`DMat4`）
 - 渲染与 CLI
   - 项目模型切换到 bevy App：`ranim::App` 与 `ranim::Plugin` 分别是 `bevy_app::App` / `bevy_app::Plugin` 的直接再导出；`SceneHandle` / `PluginError` 已删除。场景注册与选择（`add_scene` / `add_scenes` / `scene` / `first_scene` / `scenes`）由 `ranim::app::AppExt` trait（prelude 已导出）在 App 上提供，场景存于 `Scenes` resource；`app.scene(name)` / `app.first_scene()` 返回克隆的 `Scene`。插件 `build` 的 `app: &mut bevy_app::App` 与 `&mut ranim::App` 是同一类型，两种写法等价；项目资源是普通 bevy resource（类型 `#[derive(Resource)]`，`ranim::Resource` 已再导出，`insert_resource` 存入、`world()` 读取）
-  - 命令行入口是自由函数 `ranim::cmd::cli::run_cli`（接收 `ranim::RanimApp`，prelude 导出为 `run_cli`，native + `render` 门控）：安装 tracing、解析进程参数并分发子命令，出错时打印并以非零状态退出；最小项目注册场景后以 `app.build()`（`ranim::RanimAppExt`，prelude 导出）定稿插件构建——断言插件 Ready，执行一次 bevy `finish()`/`cleanup()`——再调用 `run_cli(app.build())`，子命令 `preview` / `output` / `render` / `inspect` 不变。`RanimApp` `Deref`/`DerefMut` 到 bevy `App`，是 update、SubApp 安装与资源访问的会话期形态，不再是插件构建目标。命名刻意避开 bevy App 自带的 `run()`（runner 模型）。`inspect` 可查询包含延迟 setup 的项目，仍不初始化 GPU
+  - 命令行入口是自由函数 `ranim::cmd::cli::run_cli`（接收 `ranim::RanimApp`，prelude 导出为 `run_cli`，native + `cmd-render` 门控）：安装 tracing、解析进程参数并分发子命令，出错时打印并以非零状态退出；最小项目注册场景后以 `app.build()`（`ranim::RanimAppExt`，prelude 导出）定稿插件构建——断言插件 Ready，执行一次 bevy `finish()`/`cleanup()`——再调用 `run_cli(app.build())`，子命令 `preview` / `output` / `render` / `inspect` 不变。`RanimApp` `Deref`/`DerefMut` 到 bevy `App`，是 update、SubApp 安装与资源访问的会话期形态，不再是插件构建目标。命名刻意避开 bevy App 自带的 `run()`（runner 模型）。`inspect` 可查询包含延迟 setup 的项目，仍不初始化 GPU
   - `Renderer` 结构体溶解：`ranim_render::build_render_app(ctx, width, height, oit_layers)` 构建裸渲染 `SubApp`；`install_render_app(app, ctx, width, height, oit_layers, setup)` 应用项目 `RenderSetup` 后以 `RanimRenderApp` 标签挂进 App，并挂 extract 钩子（每次 `App::update()` 主 schedule 结束后把主世界的 `EvaluatedFrame` 交换进渲染世界）；`RenderAppExt` 为 `SubApp` 提供 `render_frame(textures, clear_color, frame)` 手动驱动与 GPU profiler 访问器。`RenderSchedule::{Extract, Prepare, View}` 与 `ViewPhase::{Clear, Compute, Depth, Color, Resolve}` 是 pub 的 label / set 枚举，渲染插件直接引用（`RenderSchedules` 句柄 resource 已删除）
-  - `RenderSetup` 现在是 bevy `Resource` + bevy `Plugin`（`is_unique = false`），语义不变：项目可将 setup 存为 App resource，装配 `ranim_items::RanimItemsPlugin`（捆绑内置相机、矢量与网格物件插件）与未覆盖完整类型的 `ExtractPlugin<T>`；项目未注册 setup 时，preview 与 output 回退到仅含 `RanimItemsPlugin` 的默认配置，渲染宿主不再硬编码物件插件
+  - `RenderSetup` 现在是 bevy `Resource` + bevy `Plugin`（`is_unique = false`）：项目可将 setup 存为 App resource，装配 `ranim_items::RanimItemsPlugin`（捆绑内置相机、矢量与网格物件插件）与未覆盖完整类型的 `ExtractPlugin<T>`；项目未注册 setup 时，启用 `items` 的宿主回退到仅含 `RanimItemsPlugin` 的默认配置，未启用时使用空配置，渲染宿主不再硬编码物件插件
   - `RenderWorker::new` / `RanimRenderApp::new` 等离线渲染 API 改为接收 `(scene: &Scene, setup: &RenderSetup, output, buffer_count)`；`render_scene*` / `render_scene_output*` 帮助函数同样接收 `&Scene` 与 `&RenderSetup`；preview 为 `preview_scene(app: RanimApp, scene)`
   - 删除 `ranim_core::core_item`：通用变换移到 `ranim_core::transformed`；相机移到 `ranim_items::camera`；render world 组件改为 items 的 `vitem::render::RenderVItem` / `mesh::render::RenderMeshItem`，对应缓冲、管线与系统同归该物件模块，通过 items 的 `render` feature 提供
   - 帧数据统一为 `ranim_core::frame::EvaluatedFrame`：替换 `ranim_render::world::RenderFrame` 与原来的 `scene_evaluator::EvaluatedFrame` Vec 别名，item ID 使用 `ranim_core::frame::FrameItemId`；`RenderAppExt::render_frame` 与 `RenderWorker::render_store` 改为接收 `&mut EvaluatedFrame`，渲染完成后返还帧数据供复用
@@ -350,7 +350,7 @@ assert_eq!(frame.len(), 2);
 具体物件类型。
 
 物件插件覆盖裸内置输入，不枚举容器和 wrapper 组合。文字支持随项目的
-`typst` feature 提供。项目未注册 `RenderSetup` 时使用默认配置（仅安装
+`typst` feature 提供。启用 `items` 的项目未注册 `RenderSetup` 时使用默认配置（仅安装
 `RanimItemsPlugin`）；需要额外输入类型时，项目插件保存一份自定义渲染装配，
 场景插件仅注册场景：
 
@@ -643,6 +643,29 @@ wrapper。items 的 `Node` 也通过同一值级接口递归。它们共享上�
 fn my_scene(r: &mut RanimScene) { /* ... */ }
 ```
 
+### 按模块与命令划分 feature
+
+默认依赖 `ranim` 即可使用内置物件、动画、渲染与原生预览：
+`default = ["anims", "items", "cmd-preview"]`。命令能力依赖链是
+`cmd-preview → cmd-render → render`：预览窗口包含导出面板，`cmd-render`
+提供 CLI、离线导出及 ffmpeg 支持；纯 `render` 提供 GPU 渲染 API 与 WASM
+canvas 宿主。`cmd-preview` 只需要 rodio 的 PCM 播放能力，音频文件解码仍由
+独立的 `audio-decode` 控制。
+
+`anims`、`items` 同时控制 optional dependency 和 re-export，`anims` 启用所需的
+`items`。纯渲染通过 `ranim-items?/render` 接入物件：仅在 items 已开启时编译
+内置物件的提取插件，因此自定义渲染项目可以完全不依赖内置物件。
+默认宿主装配也遵循这条边界：开启 items 时安装 `RanimItemsPlugin`，否则为空；
+显式注册的 `RenderSetup` 在两种配置中都保持有效。无 items 的 `inspect frame`
+仍保留每项的类型、身份、来源与顺序，只省略内置物件的几何投影。
+
+旧 `preview` feature 已移除，原生预览调用方迁移到 `cmd-preview`；
+旧 `render` 中的原生命令与导出能力迁移到 `cmd-render`，纯渲染代码继续用
+`render`。离线导出可用 `--no-default-features --features anims,cmd-render`，
+WASM 内置示例用 `--no-default-features --features anims,render`。两个入口的
+`required-features` 声明完整的最低能力，xtask 按它们分组构建，并关闭 default。
+日常预览直接运行 `cargo run --example arc -- preview`。
+
 ### examples 双入口与 rustdoc 实时预览
 
 每个支持浏览器预览的 example 用 `main.rs` 与 `wasm.rs` 分别承载 native bin 和
@@ -689,7 +712,7 @@ wasm-bindgen 绑定、运行 wasm-opt；`just doc-examples` 复用同一构建�
 
 v0.3 后期 ranim 的一个明确用户是 **coding agent**：它没有稳定的桌面环境，用不了交互式预览，却要独立走完"写场景代码 → 验证结构与时序 → 渲染出图 → 视觉检查 → 修改"的完整闭环。命令行的演进由这个初衷牵引，落在两条设计原则上。
 
-每个项目二进制自带 `preview` / `output` / `render` / `inspect` 子命令，无需安装额外工具；本仓库中的示例以 `cargo run --example <name> --features preview -- <command>` 调用。项目架在 bevy App 上：`ranim::App` 与 `ranim::Plugin` 分别是 `bevy_app::App` / `bevy_app::Plugin` 的直接再导出，场景注册与选择由 `ranim::app::AppExt`（prelude 已导出）提供；最小项目只需创建 App、`add_scenes([...])` 注册场景、`app.build()`（`RanimAppExt`，prelude 已导出）定稿插件构建，再把得到的 `RanimApp` 交给自由函数 `run_cli`——它安装 tracing 并解析进程参数；未注册 `RenderSetup` 的项目使用默认渲染配置（内置相机与矢量/网格物件渲染，即 `ranim_items::RanimItemsPlugin`），无需装配样板。
+每个项目二进制自带 `preview` / `output` / `render` / `inspect` 子命令，无需安装额外工具；本仓库中的示例以 `cargo run --example <name> -- <command>` 调用。项目架在 bevy App 上：`ranim::App` 与 `ranim::Plugin` 分别是 `bevy_app::App` / `bevy_app::Plugin` 的直接再导出，场景注册与选择由 `ranim::app::AppExt`（prelude 已导出）提供；最小项目只需创建 App、`add_scenes([...])` 注册场景、`app.build()`（`RanimAppExt`，prelude 已导出）定稿插件构建，再把得到的 `RanimApp` 交给自由函数 `run_cli`——它安装 tracing 并解析进程参数；启用 `items` 且未注册 `RenderSetup` 的项目使用默认渲染配置（内置相机与矢量/网格物件渲染，即 `ranim_items::RanimItemsPlugin`），无需装配样板。
 
 **验证分层，贵的留到最后。** `inspect` 的三个子命令全部纯 CPU、不创建 GPU context、支持 `--format json`（顶层带 `schema_version`，供脚本解析）：
 

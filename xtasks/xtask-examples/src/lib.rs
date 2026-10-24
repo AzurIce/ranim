@@ -133,6 +133,7 @@ fn build_wasm_group(
         "--target",
         "wasm32-unknown-unknown",
         "--release",
+        "--no-default-features",
         "--message-format=json-render-diagnostics",
     ]);
     for example in examples {
@@ -349,7 +350,13 @@ impl Example {
         // the website artifacts need. `render <scene>` only exists for quick
         // single-scene smoke renders and requires an explicit scene name.
         let mut command = Command::new("cargo");
-        command.args(["run", "--release", "--example", &self.name]);
+        command.args([
+            "run",
+            "--release",
+            "--no-default-features",
+            "--example",
+            &self.name,
+        ]);
         let features = self.required_features.join(",");
         if !features.is_empty() {
             command.args(["--features", &features]);
@@ -1160,7 +1167,7 @@ mod test {
                 .find(|example| example.name == "basic")
                 .unwrap()
                 .required_features,
-            ["preview", "typst"]
+            ["anims", "cmd-render", "typst"]
         );
         let arc = examples
             .iter()
@@ -1173,7 +1180,7 @@ mod test {
         assert!(arc.code.contains("`main.rs`（原生入口）"));
         assert!(arc.code.contains("`wasm.rs`（WASM 入口）"));
         assert!(arc.meta.wasm);
-        assert_eq!(arc.wasm_features, ["render"]);
+        assert_eq!(arc.wasm_features, ["anims", "render"]);
         assert!(
             examples
                 .iter()
@@ -1186,7 +1193,7 @@ mod test {
                 .find(|example| example.name == "gltf_showcase")
                 .unwrap()
                 .required_features,
-            ["preview", "gltf"]
+            ["anims", "cmd-render", "gltf"]
         );
         assert_eq!(
             examples
@@ -1194,7 +1201,7 @@ mod test {
                 .find(|example| example.name == "gltf_showcase")
                 .unwrap()
                 .wasm_features,
-            ["render", "gltf"]
+            ["anims", "render", "gltf"]
         );
         assert!(
             arc.code
@@ -1274,7 +1281,7 @@ mod test {
                 .unwrap()
                 .iter()
                 .map(|feature| {
-                    if feature.as_str() == Some("preview") {
+                    if feature.as_str() == Some("cmd-render") {
                         toml::Value::String("render".into())
                     } else {
                         feature.clone()

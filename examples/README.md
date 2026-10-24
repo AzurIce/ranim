@@ -27,8 +27,8 @@ JavaScript 调用 `await app().createPreview(canvas, name)` 创建预览会话�
 画面跟随音频时钟；播放、暂停和定位保持同步，暂停中定位不发声。
 扬声器按钮可调节音量或静音，同一视口的控制条共享音量设置。
 
-原生 target 名为 `<name>`，需要 `preview`；WASM target 名为 `<name>-wasm`，
-设置 `crate-type = ["cdylib"]`，只需要 `render`。需要 `typst` 等额外
+原生 target 名为 `<name>`，需要 `anims,cmd-render`；WASM target 名为 `<name>-wasm`，
+设置 `crate-type = ["cdylib"]`，需要 `anims,render`（其中 `anims` 启用内置物件）。需要 `typst` 等额外
 feature 的例子在两个 target 中一致声明。
 `main.rs` 使用以下 crate 级属性限定原生代码：
 
@@ -55,29 +55,29 @@ example 名称。批量构建 WASM 包使用 `cargo examples build`。
 `ranim-examples` 仅作为 rustdoc 库，库入口保留在
 `examples/ranim_examples_bundle.rs`，通过 `#[path]` 引用各例子的 `scenes.rs`，
 该布局用于规避 rust-analyzer 的问题。
-聚合库只启用渲染装配，不依赖 native `preview`。
+聚合库只启用渲染装配，不依赖 native `cmd-preview`。
 网站和 rustdoc 都加载各 example 自己的 WASM 模块，使用与原生入口相同的项目装配。
 
 ## 运行
 
 ```bash
 # 交互式预览（缺省第一个场景，可指定场景名）
-cargo run --example <name> --features preview -- preview [SCENE]
+cargo run --example <name> -- preview [SCENE]
 
 # 渲染该 example 声明的全部 #[output(...)]（产物写到 #[output(dir)] 声明的目录）
-cargo run --example <name> --features preview -- output
+cargo run --example <name> --no-default-features --features anims,cmd-render -- output
 
 # 以默认输出设置（1920x1080、60fps、mp4）渲染单个场景
-cargo run --example <name> --features preview -- render <SCENE>
+cargo run --example <name> --no-default-features --features anims,cmd-render -- render <SCENE>
 
 # 需要额外 feature 的 example 把对应 feature 一并开启
-cargo run --example text_item --features preview,typst -- preview
+cargo run --example text_item --features typst -- preview
 
 # 只编译 arc 的 WASM cdylib
-cargo build --example arc-wasm --target wasm32-unknown-unknown --features render
+cargo build --example arc-wasm --target wasm32-unknown-unknown --no-default-features --features anims,render
 
 # 批量检查全部 example target，原生入口在 WASM 下为空
-cargo check -p ranim --examples --target wasm32-unknown-unknown --features preview,typst,gltf
+cargo check -p ranim --examples --target wasm32-unknown-unknown --no-default-features --features anims,cmd-preview,typst,gltf
 
 # 构建网站需要的各例子 WASM 包（也可只构建 arc）
 cargo examples build

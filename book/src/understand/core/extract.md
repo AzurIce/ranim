@@ -71,7 +71,7 @@ impl Extract for Marker {
 ```
 
 `ranim-items` 的 `render` feature 提供内置物件的这类实现，顶层 `ranim` 的
-`render` feature 会启用它。renderer 为 `Vec<T>`、数组、`Option<T>`、1..=15
+`render` feature 在 items 已启用时通过弱依赖 `ranim-items?/render` 启用它。renderer 为 `Vec<T>`、数组、`Option<T>`、1..=15
 元组及 `Transformed<T, G>` 提供递归实现，`Node` 则由 items 实现。递归发生在
 render world 的提取阶段，成员通过同一个上下文共享输出顺序与身份。
 
@@ -126,8 +126,8 @@ impl Plugin for ProjectPlugin {
 三个物件插件来自 `ranim-items`：`CameraFramePlugin` 注册裸相机输入及 viewport
 准备，`VItemPlugin` 注册裸 `VItem`、`Vec<VItem>`、几何、SVG 与启用 `typst` 后的
 文字输入；`MeshItemPlugin` 注册裸 `MeshItem`、`Surface` 与 `Sphere`。它们同时安装
-对应 GPU 缓冲、管线和渲染系统，并由 `RanimItemsPlugin` 捆绑为一——项目未注册
-`RenderSetup` 时的默认配置就是它；`RanimItemsPlugin` 与三个单件插件互斥
+对应 GPU 缓冲、管线和渲染系统，并由 `RanimItemsPlugin` 捆绑为一——启用 `items` 的项目未注册
+`RenderSetup` 时的默认配置就是它，未启用 `items` 时使用空配置；`RanimItemsPlugin` 与三个单件插件互斥
 （Bevy 插件唯一，重复安装会 panic）。`RenderVItem` / `RenderMeshItem` 也归各自
 items 的 `render` 模块，renderer 本体不依赖这些具体组件。它们是 render world
 的数据组件，不实现动画或值级提取协议，普通动画输出使用逻辑物件。

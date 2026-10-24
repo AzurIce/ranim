@@ -11,10 +11,12 @@ Ranim 的场景由一个 `fn(&mut RanimScene)` 函数构造。场景函数只负
 
 ```toml
 [dependencies]
-ranim = { version = "...", features = ["preview"] }
+ranim = "..."
 ```
 
-`preview` feature 蕴含 `render`；不需要交互预览时可以只开 `render`。
+默认启用 `anims`、`items`、`cmd-preview`；`cmd-preview → cmd-render → render`。
+只需原生导出时，设置 `default-features = false` 并开启 `anims,cmd-render`。
+`render` 本身只提供渲染器和 WASM 宿主，不包含内置物件或原生命令。
 `src/main.rs` 注册场景，`build()` 定稿后交给 `run_cli`：
 
 ```rust,ignore
@@ -122,7 +124,7 @@ fn main() {
 只有加入 App 的场景才会出现在命令行和 Web 入口中。
 场景目录保留显式注册顺序，场景名称必须唯一。
 
-渲染上面的场景不需要任何装配：场景输出裸 `Square` 和 `CameraFrame`，项目未注册
+渲染上面的场景不需要任何装配：场景输出裸 `Square` 和 `CameraFrame`，启用 `items` 的项目未注册
 `RenderSetup` 时渲染与预览回退到默认配置，内置相机与矢量/网格渲染开箱即用
 （见下文「自定义渲染配置」）。
 
@@ -167,7 +169,7 @@ app.add_plugins(my_project::plugin());
 
 ### 自定义渲染配置（可选）
 
-渲染配置依赖 `ranim` 的 `render` feature（`preview` 会同时启用它）。项目未注册
+渲染配置依赖 `ranim` 的 `render` feature（默认的 `cmd-preview` 会间接启用它）。启用 `items` 的项目未注册
 `RenderSetup` 时，渲染与预览使用的默认配置等价于：
 
 ```rust,ignore
@@ -179,6 +181,9 @@ RenderSetup::new(|render_app| {
 `ranim_items::RanimItemsPlugin` 捆绑三个内置物件插件（`CameraFramePlugin`、
 `VItemPlugin`、`MeshItemPlugin`），覆盖裸内置类型与 `Vec<VItem>`。它与三个单件
 插件互斥：Bevy 插件在 App 内唯一，重复安装会 panic。
+
+关闭 `items` 时默认配置为空，通用 `render` 不会引入内置物件；自定义渲染项目
+通过 `RenderSetup` 安装自己的插件。
 
 若完整输出是默认配置未覆盖的类型——如 `Vec<Circle>`、`Transformed<T, G>` 或
 自定义类型——在插件中注册自己的 `RenderSetup`，为实际完整类型加入
@@ -348,15 +353,15 @@ let setup = app
         })
     });
 
-// 需要 render feature，渲染场景声明的所有输出；2 是 readback 缓冲数量。
+// 需要 cmd-render feature，渲染场景声明的所有输出；2 是 readback 缓冲数量。
 ranim::cmd::render_scene(&scene, &setup, 2);
-// 需要 preview feature，预览 app 接管定稿后的项目（RanimApp），项目资源全程可用。
+// 需要 cmd-preview feature，预览 app 接管定稿后的项目（RanimApp），项目资源全程可用。
 ranim::cmd::preview_scene(app.build(), scene);
 ```
 
 ### WASM 预览宿主
 
-命令行入口 `run_cli` 只面向原生目标（需要 `render` feature）。仓库的 example
+命令行入口 `run_cli` 只面向原生目标（需要 `cmd-render` feature）。仓库的 example
 将编译入口拆成三个文件：
 
 ```text
@@ -390,16 +395,17 @@ pub fn app() -> ranim::wasm::WasmApp {
 [[example]]
 name = "arc"
 path = "examples/arc/main.rs"
-required-features = ["preview"]
+required-features = ["anims", "cmd-render"]
 
 [[example]]
 name = "arc-wasm"
 path = "examples/arc/wasm.rs"
 crate-type = ["cdylib"]
-required-features = ["render"]
+required-features = ["anims", "render"]
 ```
 
-native 的 egui 预览需要 `preview`，WASM 直接向 canvas 呈现，只需要 `render`；
+native 的 egui 预览默认由 `cmd-preview` 提供；示例的最小原生入口只需要
+`anims,cmd-render`，可用于无 GUI 的导出。WASM 示例需要 `anims,render`；
 场景需要的 `typst`、`gltf` 等额外 feature 在两个 target 中一致声明。
 仓库的 `main.rs` 使用
 `#![cfg(not(target_arch = "wasm32"))]` 排除 WASM 下的原生代码，并用
@@ -411,7 +417,7 @@ native 的 egui 预览需要 `preview`，WASM 直接向 canvas 呈现，只需�
 直接依赖 `wasm-bindgen`，由自己的库导出上述 `app()`。
 
 ```bash
-cargo build --example arc-wasm --target wasm32-unknown-unknown --features render
+cargo build --example arc-wasm --target wasm32-unknown-unknown --no-default-features --features anims,render
 wasm-bindgen --target web --out-dir pkg --out-name arc target/wasm32-unknown-unknown/debug/examples/arc_wasm.wasm
 ```
 
@@ -495,8 +501,8 @@ cargo run -- inspect frame hello --at 1.0
 在本仓库中运行示例：
 
 ```bash
-cargo run --example getting_started0 --features preview -- preview
-cargo run --example getting_started0 --features preview -- output
+cargo run --example getting_started0 -- preview
+cargo run --example getting_started0 --no-default-features --features anims,cmd-render -- output
 ```
 
 带 `required-features`（如 `typst`、`gltf`）的示例需要同时开启对应 feature。

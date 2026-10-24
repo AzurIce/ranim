@@ -2,13 +2,19 @@ use anyhow::Result;
 use clap::{Subcommand, ValueEnum};
 use ranim::{
     App, AppExt, SceneConstructor,
+    core::{
+        animation::node::{AnimationInfo, AnimationInfoKind},
+        frame::{EvaluatedFrame, FrameItemMetadata},
+        utils::rate_functions,
+    },
+};
+#[cfg(feature = "items")]
+use ranim::{
     color::{AlphaColor, Srgb},
     core::{
         anchor::Aabb,
-        animation::node::{AnimationInfo, AnimationInfoKind},
         components::{rgba::Rgba, vpoint::VPointVec},
-        frame::{EvaluatedFrame, FrameItemMetadata},
-        utils::{bezier::get_subpath_closed_flag, rate_functions},
+        utils::bezier::get_subpath_closed_flag,
     },
     glam::{DAffine3, DMat4, DVec3, Mat3},
     items::{
@@ -399,19 +405,27 @@ struct SourceDto {
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 enum FrameItemDataDto {
+    #[cfg(feature = "items")]
     VItem(VItemDataDto),
+    #[cfg(feature = "items")]
     Mesh(MeshDataDto),
+    #[cfg(feature = "items")]
     Camera(CameraDataDto),
-    Group { items: Vec<FrameItemDataDto> },
+    #[cfg(feature = "items")]
+    Group {
+        items: Vec<FrameItemDataDto>,
+    },
     Opaque {},
 }
 
+#[cfg(feature = "items")]
 #[derive(Debug, Serialize)]
 struct BoundsDto {
     min: [f64; 3],
     max: [f64; 3],
 }
 
+#[cfg(feature = "items")]
 #[derive(Debug, Serialize)]
 struct VItemDataDto {
     point_count: usize,
@@ -426,6 +440,7 @@ struct VItemDataDto {
     points: Option<Vec<[f32; 4]>>,
 }
 
+#[cfg(feature = "items")]
 #[derive(Debug, Serialize)]
 struct MeshDataDto {
     point_count: usize,
@@ -442,6 +457,7 @@ struct MeshDataDto {
     vertex_normals: Option<Vec<[f32; 3]>>,
 }
 
+#[cfg(feature = "items")]
 #[derive(Debug, Serialize)]
 struct CameraDataDto {
     pos: [f64; 3],
@@ -498,13 +514,16 @@ fn frame_command(
 fn inspect_frame(
     frame: &EvaluatedFrame,
     infos: &[AnimationInfo],
-    verbose: bool,
+    _verbose: bool,
 ) -> Vec<FrameItemDto> {
-    let mut data = std::collections::HashMap::new();
-    for item in frame.items::<CameraFrame>() {
-        data.insert(item.order, FrameItemDataDto::from_camera(&item.value));
-    }
-    macro_rules! vector_inputs {
+    let mut data = std::collections::HashMap::<usize, FrameItemDataDto>::new();
+    #[cfg(feature = "items")]
+    {
+        let verbose = _verbose;
+        for item in frame.items::<CameraFrame>() {
+            data.insert(item.order, FrameItemDataDto::from_camera(&item.value));
+        }
+        macro_rules! vector_inputs {
         ($($input:ty),* $(,)?) => {$({
             for item in frame.items::<$input>() {
                 let value = RenderVItem::from(vitem::VItem::from(item.value.clone()));
@@ -512,40 +531,40 @@ fn inspect_frame(
             }
         })*};
     }
-    vector_inputs!(
-        vitem::VItem,
-        vitem::geometry::Arc,
-        vitem::geometry::ArcBetweenPoints,
-        vitem::geometry::Circle,
-        vitem::geometry::Ellipse,
-        vitem::geometry::EllipticArc,
-        vitem::geometry::Line,
-        vitem::geometry::Parallelogram,
-        vitem::geometry::Polygon,
-        vitem::geometry::Rectangle,
-        vitem::geometry::Square,
-    );
-    for item in frame.items::<vitem::geometry::RegularPolygon>() {
-        let value = RenderVItem::from(vitem::VItem::from(vitem::geometry::Polygon::from(
-            item.value.clone(),
-        )));
-        data.insert(
-            item.order,
-            inspect_vitem(value, DAffine3::IDENTITY, verbose),
+        vector_inputs!(
+            vitem::VItem,
+            vitem::geometry::Arc,
+            vitem::geometry::ArcBetweenPoints,
+            vitem::geometry::Circle,
+            vitem::geometry::Ellipse,
+            vitem::geometry::EllipticArc,
+            vitem::geometry::Line,
+            vitem::geometry::Parallelogram,
+            vitem::geometry::Polygon,
+            vitem::geometry::Rectangle,
+            vitem::geometry::Square,
         );
-    }
-    for item in frame.items::<vitem::svg::SvgItem>() {
-        let items = item
-            .value
-            .tree()
-            .leaves()
-            .map(|(placement, value)| {
-                inspect_vitem(RenderVItem::from(value.clone()), placement, verbose)
-            })
-            .collect();
-        data.insert(item.order, FrameItemDataDto::Group { items });
-    }
-    macro_rules! mesh_inputs {
+        for item in frame.items::<vitem::geometry::RegularPolygon>() {
+            let value = RenderVItem::from(vitem::VItem::from(vitem::geometry::Polygon::from(
+                item.value.clone(),
+            )));
+            data.insert(
+                item.order,
+                inspect_vitem(value, DAffine3::IDENTITY, verbose),
+            );
+        }
+        for item in frame.items::<vitem::svg::SvgItem>() {
+            let items = item
+                .value
+                .tree()
+                .leaves()
+                .map(|(placement, value)| {
+                    inspect_vitem(RenderVItem::from(value.clone()), placement, verbose)
+                })
+                .collect();
+            data.insert(item.order, FrameItemDataDto::Group { items });
+        }
+        macro_rules! mesh_inputs {
         ($($input:ty),* $(,)?) => {$({
             for item in frame.items::<$input>() {
                 let value = RenderMeshItem::from(mesh::MeshItem::from(item.value.clone()));
@@ -553,10 +572,10 @@ fn inspect_frame(
             }
         })*};
     }
-    mesh_inputs!(mesh::MeshItem, mesh::Sphere, mesh::Surface);
-    #[cfg(feature = "typst")]
-    {
-        macro_rules! text_inputs {
+        mesh_inputs!(mesh::MeshItem, mesh::Sphere, mesh::Surface);
+        #[cfg(feature = "typst")]
+        {
+            macro_rules! text_inputs {
             ($($input:ty),* $(,)?) => {$({
                 for item in frame.items::<$input>() {
                     let items = item.value.vitems().iter().cloned()
@@ -566,7 +585,8 @@ fn inspect_frame(
                 }
             })*};
         }
-        text_inputs!(vitem::text::TextItem, vitem::typst::TypstText);
+            text_inputs!(vitem::text::TextItem, vitem::typst::TypstText);
+        }
     }
     let mut items = frame
         .item_metadata()
@@ -581,11 +601,13 @@ fn inspect_frame(
     items
 }
 
+#[cfg(feature = "items")]
 fn inspect_vitem(mut value: RenderVItem, placement: DAffine3, verbose: bool) -> FrameItemDataDto {
     value.transform = DMat4::from(placement).as_mat4() * value.transform;
     FrameItemDataDto::from_vitem(&value, verbose)
 }
 
+#[cfg(feature = "items")]
 fn inspect_mesh(mut value: RenderMeshItem, placement: DAffine3, verbose: bool) -> FrameItemDataDto {
     value.transform = DMat4::from(placement).as_mat4() * value.transform;
     FrameItemDataDto::from_mesh(&value, verbose)
@@ -599,9 +621,13 @@ impl FrameItemDto {
     ) -> Self {
         let (animation_id, part) = metadata.id;
         let kind = match &data {
+            #[cfg(feature = "items")]
             FrameItemDataDto::VItem(_) => "vitem",
+            #[cfg(feature = "items")]
             FrameItemDataDto::Mesh(_) => "mesh",
+            #[cfg(feature = "items")]
             FrameItemDataDto::Camera(_) => "camera",
+            #[cfg(feature = "items")]
             FrameItemDataDto::Group { .. } => "group",
             FrameItemDataDto::Opaque {} => "opaque",
         };
@@ -618,6 +644,7 @@ impl FrameItemDto {
     }
 }
 
+#[cfg(feature = "items")]
 impl FrameItemDataDto {
     fn from_vitem(item: &RenderVItem, verbose: bool) -> Self {
         // RenderVItem data lives in the item's local space; the inspect dump
@@ -732,6 +759,7 @@ fn source_from_infos(infos: &[AnimationInfo], animation_id: usize) -> SourceDto 
         })
 }
 
+#[cfg(feature = "items")]
 fn dvec3_bounds(bounds: [DVec3; 2]) -> BoundsDto {
     BoundsDto {
         min: dvec3_to_array(bounds[0]),
@@ -739,6 +767,7 @@ fn dvec3_bounds(bounds: [DVec3; 2]) -> BoundsDto {
     }
 }
 
+#[cfg(feature = "items")]
 fn vec3_bounds(points: &[ranim::glam::Vec3]) -> BoundsDto {
     if points.is_empty() {
         return BoundsDto {
@@ -758,10 +787,12 @@ fn vec3_bounds(points: &[ranim::glam::Vec3]) -> BoundsDto {
     }
 }
 
+#[cfg(feature = "items")]
 fn dvec3_to_array(v: DVec3) -> [f64; 3] {
     [v.x, v.y, v.z]
 }
 
+#[cfg(feature = "items")]
 fn rgba_to_hex(rgba: &Rgba) -> String {
     let srgb: AlphaColor<Srgb> = (*rgba).into();
     let [r, g, b, a] = srgb.to_rgba8().to_u8_array();
@@ -792,6 +823,7 @@ fn print_frame_item(item: &FrameItemDto) {
 
 fn print_frame_item_data(data: &FrameItemDataDto) {
     match data {
+        #[cfg(feature = "items")]
         FrameItemDataDto::VItem(data) => {
             println!(
                 "  point_count={} subpath_count={} closed={:?}",
@@ -809,6 +841,7 @@ fn print_frame_item_data(data: &FrameItemDataDto) {
                 println!("  points={points:?}");
             }
         }
+        #[cfg(feature = "items")]
         FrameItemDataDto::Mesh(data) => {
             println!(
                 "  point_count={} triangle_count={} bounds=min:{:?} max:{:?}",
@@ -827,6 +860,7 @@ fn print_frame_item_data(data: &FrameItemDataDto) {
                 println!("  vertex_normals={vertex_normals:?}");
             }
         }
+        #[cfg(feature = "items")]
         FrameItemDataDto::Camera(data) => {
             println!(
                 "  pos={:?} facing={:?} up={:?} near={} far={} perspective_blend={} frame_height={} scale={} fovy={}",
@@ -841,6 +875,7 @@ fn print_frame_item_data(data: &FrameItemDataDto) {
                 data.fovy
             );
         }
+        #[cfg(feature = "items")]
         FrameItemDataDto::Group { items } => {
             println!("  rendered_parts={}", items.len());
             for item in items {
@@ -858,12 +893,11 @@ fn print_json<T: Serialize>(output: &T) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use ranim::{
-        core::{animation::node::AnimationInfo, utils::rate_functions},
-        glam::{DVec3, Vec4},
-    };
+    use ranim::core::{animation::node::AnimationInfo, utils::rate_functions};
 
     use super::*;
+    #[cfg(feature = "items")]
+    use ranim::glam::{DVec3, Vec4};
 
     fn sample_animation_info() -> AnimationInfo {
         AnimationInfo {
@@ -908,6 +942,24 @@ mod tests {
     }
 
     #[test]
+    fn custom_inputs_keep_metadata_without_builtin_inspectors() {
+        struct CustomInput;
+        let mut frame = EvaluatedFrame::new();
+        frame.push((0, 3), CustomInput);
+        let items = inspect_frame(&frame, &[sample_animation_info()], true);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, [0, 3]);
+        assert_eq!(items[0].kind, "opaque");
+        assert_eq!(items[0].input_type, std::any::type_name::<CustomInput>());
+        assert_eq!(items[0].source.anim_name, "AnimSequence");
+        assert_eq!(
+            serde_json::to_value(&items[0].data).unwrap(),
+            serde_json::json!({})
+        );
+    }
+
+    #[cfg(feature = "items")]
+    #[test]
     fn maps_vitem_to_frame_dto() {
         let vitem = vitem::VItem {
             vpoints: VPointVec(vec![
@@ -945,6 +997,7 @@ mod tests {
         assert_eq!(bounds.max, [1.0, 2.0, 3.0]);
     }
 
+    #[cfg(feature = "items")]
     #[test]
     fn typed_inputs_keep_order_and_unknown_payloads() {
         struct CustomInput;
@@ -983,6 +1036,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "items")]
     #[test]
     fn whole_transformed_vectors_keep_their_type_and_identity_as_opaque_inputs() {
         use ranim::core::transformed::Transformed;

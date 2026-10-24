@@ -127,3 +127,31 @@ fn scene_descriptors_and_resources_drop_with_the_app() {
     drop(descriptor);
     assert_eq!(*dropped.lock().unwrap(), ["resource", "callback"]);
 }
+
+#[cfg(all(not(target_family = "wasm"), feature = "cmd-render"))]
+#[test]
+fn session_hosts_keep_custom_render_setup() {
+    let mut project = App::new();
+    project.insert_resource(ranim_render::RenderSetup::new(|render_app| {
+        render_app.insert_resource(Configured(73));
+    }));
+    let mut render_app = App::new();
+    render_setup_of(&project).build(&mut render_app);
+    assert_eq!(render_app.world().resource::<Configured>().0, 73);
+}
+
+#[cfg(all(
+    not(target_family = "wasm"),
+    feature = "cmd-render",
+    not(feature = "items")
+))]
+#[test]
+fn session_hosts_without_items_have_a_gpu_independent_empty_setup() {
+    let mut render_app = App::new();
+    render_setup_of(&App::new()).build(&mut render_app);
+    assert!(
+        render_app
+            .get_sub_app(ranim_render::RanimRenderApp)
+            .is_none()
+    );
+}

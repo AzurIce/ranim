@@ -14,18 +14,22 @@ fmt:
 fmt-check:
     cargo fmt --all --check
 
-lint: lint-no-features
-    just lint-features render
+lint: lint-default
+    just lint-feature-boundaries
     just lint-features audio-decode
-    just lint-features preview,typst,gltf
+    just lint-features cmd-preview,typst,gltf
 
-lint-no-features: fmt-check
+lint-default: fmt-check
     CARGO_BUILD_JOBS={{ cargo_jobs }} cargo clippy --workspace --all-targets -- -D warnings
     RUSTDOCFLAGS="-D warnings" CARGO_BUILD_JOBS={{ cargo_jobs }} cargo doc --no-deps --workspace --document-private-items
 
 lint-features *FEATURES: fmt-check
     CARGO_BUILD_JOBS={{ cargo_jobs }} cargo clippy --workspace --all-targets --features {{ FEATURES }} -- -D warnings
     RUSTDOCFLAGS="-D warnings" CARGO_BUILD_JOBS={{ cargo_jobs }} cargo doc --no-deps --workspace --document-private-items --features {{ FEATURES }}
+
+# Run separately from workspace sweeps so other packages cannot enable features.
+lint-feature-boundaries:
+    CARGO_BUILD_JOBS={{ cargo_jobs }} python3 scripts/check_features.py
 
 changelog:
     git cliff -o CHANGELOG.md
@@ -57,4 +61,4 @@ book:
     mdbook build book
 
 preview EXAMPLE:
-    cargo run --example {{ EXAMPLE }} --features preview -- preview
+    cargo run --example {{ EXAMPLE }} -- preview

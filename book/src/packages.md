@@ -44,14 +44,14 @@ resource）由 `ranim::AppExt` trait 在 App 上提供（prelude 已导出）—
 照常工作，但不再是插件构建目标；`run_cli`、`preview_scene` 和
 `WasmApp::new` 接收它，离线渲染 worker 则接收选定的 `Scene` 与项目的
 `RenderSetup`。`ranim::cmd` 提供命令行入口自由函数
-`run_cli(app.build())`（prelude 导出，native + `render` 门控：安装 tracing、
+`run_cli(app.build())`（prelude 导出，native + `cmd-render` 门控：安装 tracing、
 解析进程参数并分发 preview / output / render / inspect，出错时打印并以非零
 状态退出；命名避开 bevy App 自带的 `run()` runner 入口）与渲染、预览 API
 （`render_scene`、`preview_scene`）。项目二进制在 `main` 中创建 App、注册
 场景，`build()` 定稿后调用 `run_cli(app.build())`。WASM 入口使用单独的 cdylib，
 导出 `app() -> ranim::wasm::WasmApp`，由 JavaScript 调用
 `await project.createPreview(canvas, name)` 获得会话，再以 `renderAt(seconds)`
-驱动。Web 预览只需要 `render`，直接向 canvas 呈现；native 的 `preview`
+驱动。Web 预览只需要 `render`，直接向 canvas 呈现；native 的 `cmd-preview`
 使用 egui/eframe。
 
 每个 example 的 `main.rs` 和 `wasm.rs` 都引用 `scenes.rs`，共享场景注册与渲染
@@ -70,7 +70,8 @@ schedule label 与 `ViewPhase::{Clear, Compute, Depth, Color, Resolve}` system
 set，渲染插件直接引用这些枚举值；仅插件内部使用的自定义 label / set 仍可正常
 定义，提取协议则是值级的 `extract::Extract`。
 `ranim-items` 通过可选的 `render` feature 实现内置物件的提取，顶层 `ranim`
-的 `render` feature 会启用它。`ExtractPlugin<T>` 为帧实际保存的完整类型注册
+的 `render` feature 仅在 items 已启用时通过 `ranim-items?/render` 启用它，
+不会主动引入内置物件。`ExtractPlugin<T>` 为帧实际保存的完整类型注册
 提取系统。`ranim_items::camera::CameraFramePlugin`、`vitem::VItemPlugin` 与
 `mesh::MeshItemPlugin` 各自注册裸逻辑类型的提取和相机/矢量/网格渲染能力，
 render world 组件、GPU 缓冲与管线归对应的 items 模块。矢量插件同时注册
@@ -82,7 +83,8 @@ render world 组件、GPU 缓冲与管线归对应的 items 模块。矢量插�
 项目可以把 `ranim_render::RenderSetup` 存为 App resource，回调中安装
 `RanimItemsPlugin` 与额外完整类型的 `ExtractPlugin<T>`；`RanimItemsPlugin`
 与三个单件插件互斥（Bevy 插件唯一，重复安装会 panic）。项目未注册 setup 时，
-preview、output 回退到默认配置（仅安装 `RanimItemsPlugin`）；setup 在每次安装
+启用 `items` 时，preview、output 回退到内置物件配置（安装 `RanimItemsPlugin`）；
+未启用 `items` 时使用空配置，项目可自行注册任意物件插件；setup 在每次安装
 渲染 SubApp 时重放。`Transformed<T, G>` 等未被内置插件覆盖的完整输出需在该
 setup 中注册精确类型。项目装配层无需依赖 renderer，纯 CPU 场景查询和求值也
 不会执行 GPU 装配。详见[完整求值帧与渲染提取](./understand/core/extract.md)。

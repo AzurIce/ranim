@@ -11,7 +11,7 @@ bench = false
 
 [dependencies]
 itertools.workspace = true
-ranim = { path = "../", features = ["render", "gltf"] }
+ranim = { workspace = true, features = ["anims", "render", "gltf"] }
 ranim-core = { path = "../packages/ranim-core" }
 ranim-render = { path = "../packages/ranim-render" }
 wgpu = { workspace = true }

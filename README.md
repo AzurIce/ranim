@@ -55,7 +55,7 @@ You can also use from git for the latest updates:
 
 ```toml
 [dependencies]
-ranim = { git = "https://github.com/azurice/ranim", features = ["render"] }
+ranim = { git = "https://github.com/azurice/ranim" }
 ```
 
 ### Project entry and plugins
@@ -73,11 +73,13 @@ dispatches the command line subcommands:
 ```toml
 # Cargo.toml
 [dependencies]
-ranim = { version = "0.3", features = ["preview"] }
+ranim = "0.3"
 ```
 
-The `preview` feature implies `render`; depend on `features = ["render"]` alone
-when the interactive preview is not needed.
+The default features include built-in items, animations, and `cmd-preview`.
+For native export without the interactive UI, use `default-features = false`
+and `features = ["anims", "cmd-render"]`. The `render` feature alone provides
+the renderer and WASM canvas host, with no native commands or built-in items.
 
 ```rust
 // src/main.rs
@@ -120,7 +122,8 @@ run_cli(app.build());
 Rendering needs no boilerplate: when the project does not register a
 `ranim::render::RenderSetup`, rendering and preview fall back to a default
 configuration that installs the built-in camera, vector-item, and mesh-item
-plugins (`ranim::items::RanimItemsPlugin`).
+plugins (`ranim::items::RanimItemsPlugin`) when `items` is enabled. Without
+`items`, the default setup is empty; register a `RenderSetup` for custom types.
 
 `Plugin` — bevy's plugin trait, re-exported as `ranim::Plugin` — is an
 optional mechanism for organizing scenes and a custom render setup. A plugin
@@ -171,11 +174,13 @@ declares the project's rendering assembly and is replayed for each
 GPU runtime (output rendering, preview, preview resolution changes).
 `RanimItemsPlugin` bundles the three built-in item plugins
 (`CameraFramePlugin`, `VItemPlugin`, `MeshItemPlugin`) — the default
-configuration is exactly this plugin. Do not combine it with the individual
+configuration installs this plugin when `items` is enabled. Without `items`,
+the default setup is empty; custom render plugins can be registered through
+`RenderSetup` without depending on built-in items. Do not combine it with the individual
 plugins: bevy plugins are unique, and installing one twice panics.
 
 To drive the APIs directly instead of the command line, select a scene and
-call the corresponding function (`render` / `preview` features enable them):
+call the corresponding function (`cmd-render` / `cmd-preview` features enable them):
 
 ```rust,ignore
 let mut app = App::new();
@@ -213,7 +218,7 @@ egui/eframe are only
 used by the native preview.
 
 ```bash
-cargo build --example arc-wasm --target wasm32-unknown-unknown --features render
+cargo build --example arc-wasm --target wasm32-unknown-unknown --no-default-features --features anims,render
 cargo examples build arc  # wasm-bindgen + wasm-opt, ready for the website
 ```
 
@@ -227,11 +232,11 @@ The [example app](./example-packages/app) demonstrates a native binary host.
 
 ### Command line interface
 
-`run_cli(app.build())` (native targets with the `render` feature) installs tracing,
+`run_cli(app.build())` (native targets with the `cmd-render` feature) installs tracing,
 parses the process arguments, and serves four subcommands — its name stays
 clear of the bevy `App::run()` runner API:
 
-- `preview [SCENE]`: Launch the interactive preview app. Requires the `preview`
+- `preview [SCENE]`: Launch the interactive preview app. Requires the `cmd-preview`
   feature; defaults to the first scene.
 - `output [SCENES...] [--buffer-count N]`: Render every `#[output(...)]`
   declared by the selected scenes, including capture marks. When no scene name
@@ -256,8 +261,8 @@ cargo run -- inspect frame hello --at 1.5
 For the usage, check out the [examples](./examples) folder. You can run the examples with:
 
 ```bash
-cargo run --example <example-name> --features preview -- preview # run a preview app for the example
-cargo run --example <example-name> --features preview -- output  # render every declared output of the example
+cargo run --example <example-name> -- preview # run a preview app for the example
+cargo run --example <example-name> --no-default-features --features anims,cmd-render -- output  # render every declared output of the example
 ```
 
 Examples behind `required-features` (e.g. `typst`, `gltf`) also need the
@@ -265,26 +270,27 @@ corresponding feature.
 
 ## Feature Flags
 
-- Default features
+Defaults are `anims`, `items`, and `cmd-preview`.
 
-  - `anims`: re-export `ranim-anims`, default on.
+| Feature | Capability |
+| --- | --- |
+| `items` | Built-in item types and their re-export; optional dependency |
+| `anims` | Built-in animations and their re-export; enables `items` |
+| `render` | GPU rendering API and WASM canvas host; independent of built-in items and native commands |
+| `cmd-render` | Native CLI (`output`, `render`, `inspect`) and offline export; enables `render` |
+| `cmd-preview` | Native egui preview and PCM playback, including the export panel; enables `cmd-render` |
+| `typst` | Typst text support; enables `items` |
+| `gltf` | glTF import; enables `items` |
+| `audio-decode` | Audio file decoding with symphonia and resampling with rubato |
 
-  - `items`: re-export `ranim-items`, default on.
-
-- `render`: enable rendering, the native command line interface, and the WASM canvas host
-  
-  use `render_scene` or `render_scene_output` to render scene to output, or call
-  `run_cli(app.build())` from the native project binary. WASM projects export
-  a `WasmApp` and let JavaScript drive `WasmPreview`.
-
-- `preview`: enable the native egui preview API in the cmd module (implies `render`)
-
-  use `preview_scene` api to launch an preview app on a scene
-  https://github.com/user-attachments/assets/5bf287e2-b06f-42f8-83b6-76f3775e298e
-- `audio-decode`: enable audio file decoding (`AudioClip::from_file` / `from_bytes`)
-
-  pure-Rust decoding via symphonia (WAV, MP3, FLAC, AAC/M4A, Ogg Vorbis) with rubato
-  resampling to the 48 kHz master rate — no ffmpeg binary required
+`render` forwards `ranim-items?/render`: built-in extraction plugins are compiled
+only when items are also enabled. Custom render projects need no built-in items.
+`--no-default-features` leaves core scene evaluation and project assembly.
+`audio-decode` adds `AudioClip::from_file` / `from_bytes` for WAV, MP3, FLAC,
+AAC/M4A, and Ogg Vorbis; PCM synthesis, mixing, and playback need no decoder.
+Native command dependencies are target-gated and are not compiled for WASM.
+The previous `preview` feature has been removed; use `cmd-preview`. Native CLI
+and export users of the former `render` bundle must select `cmd-render`.
 
 The native preview app has a built-in profiler panel (top bar `Profiler` button):
 a progress-axis chart of GPU pass times / CPU spans / buffer-upload stats

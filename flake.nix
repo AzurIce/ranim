@@ -90,7 +90,7 @@
             pkgs.wayland
             pkgs.libxkbcommon
             pkgs.libX11
-            # rodio/cpal preview audio backend (ranim `preview` feature)
+            # rodio/cpal preview audio backend (ranim `cmd-preview` feature)
             pkgs.alsa-lib
             pkgs.pkg-config
             pkgs.udev

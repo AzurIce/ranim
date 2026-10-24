@@ -1,7 +1,7 @@
 # Examples
 
 `cargo examples` 会扫描根 `Cargo.toml` 中的原生 `[[example]]`（跳过 `-wasm` target），通过运行各 example
-二进制的 `output` 子命令（`cargo run --release --example <name> --features ... -- output`）
+二进制的 `output` 子命令（`cargo run --release --no-default-features --example <name> --features ... -- output`）
 渲染它们声明的 `#[output(...)]`，并把 website 需要的产物写入：
 
 ```text
@@ -101,13 +101,13 @@ Tera 组件在 `website/templates/components/` 中，`examples.player` 输出共
 rustdoc。
 
 `ranim-examples` 的 library 引用各 example 的 `scenes.rs`，用于生成文档。
-它仅依赖共享场景和 `render`，不启用 native `preview`。
+它仅依赖共享场景和 `render`，不启用 native `cmd-preview`。
 每个例子的 `<name>-wasm` target 独立导出 `app() -> WasmApp`，共享该例子原生
 入口使用的完整项目装配。是否支持 WASM 由配对的 cdylib target 推导，
 `package.metadata.example` 只保存 `hide` 等展示设置。
 
 `cargo examples build` 按 `required-features` 对所选 target 分组编译，显式选择
-`<name>-wasm` 入口与 `wasm32-unknown-unknown` 平台。只有声明需要的例子才会链接
+`--no-default-features`，选择 `<name>-wasm` 入口与 `wasm32-unknown-unknown` 平台。只有声明需要的例子才会链接
 Typst 等可选依赖。随后分别运行 `wasm-bindgen` 和 `wasm-opt`。产物位于
 `website/static/examples/<name>/pkg/ranim_example.js` 和对应的 `_bg.wasm`。
 `--out-dir` 改变输出根目录，仍保留 `examples/<name>/pkg/` 层级。
@@ -118,8 +118,9 @@ Typst 等可选依赖。随后分别运行 `wasm-bindgen` 和 `wasm-opt`。产�
 组件继承宿主字体和配色；网站把画布、控制条与 timeline 放进同一个细边框容器。
 视口调用 `await app().createPreview(canvas, name)`，
 用 Web 端播放时钟驱动 `renderAt(seconds)`；独立控制条通过 `for="视口ID"`
-或 `controls.target = viewport` 连接，布局和数量由宿主决定。WASM 只需要 `render`，
-egui/eframe 属于 native 的 `preview`。
+或 `controls.target = viewport` 连接，布局和数量由宿主决定。WASM 宿主只需要 `render`，内置示例另声明 `anims`；
+egui/eframe 属于 native 的 `cmd-preview`。原生导出同样关闭 default，
+按 `anims,cmd-render` 及场景额外 feature 构建，不编译预览窗口。
 
 有声音的场景通过 `WasmPreview.audio()` 读取一次预混音 PCM，由 Web Audio 播放；
 画面跟随音频输出时钟，播放、暂停和定位同时控制声音。无声音场景使用墙钟。

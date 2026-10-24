@@ -117,7 +117,7 @@ pub fn render_command(app: &App, scene_name: &str, buffer_count: usize) -> Resul
 }
 
 /// Preview a scene in the interactive preview app.
-#[cfg(feature = "preview")]
+#[cfg(feature = "cmd-preview")]
 pub fn preview_command(app: RanimApp, scene_name: Option<&str>) -> Result<()> {
     let scene = match scene_name {
         Some(scene) => app.scene(scene),
@@ -140,6 +140,7 @@ pub fn preview_command(app: RanimApp, scene_name: Option<&str>) -> Result<()> {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Launch the interactive preview app (defaults to the first scene)
+    #[cfg(feature = "cmd-preview")]
     Preview { scene: Option<String> },
     /// Render every `#[output(...)]` declared by the selected scenes
     Output {
@@ -177,17 +178,8 @@ struct ProjectCli {
 impl ProjectCli {
     fn run(self, app: RanimApp) -> Result<()> {
         match self.command {
-            Commands::Preview { scene } => {
-                #[cfg(feature = "preview")]
-                {
-                    preview_command(app, scene.as_deref())
-                }
-                #[cfg(not(feature = "preview"))]
-                {
-                    let _ = (app, scene);
-                    bail!("this binary was built without the `preview` feature")
-                }
-            }
+            #[cfg(feature = "cmd-preview")]
+            Commands::Preview { scene } => preview_command(app, scene.as_deref()),
             Commands::Output {
                 scenes,
                 buffer_count,
@@ -291,8 +283,13 @@ mod tests {
             } if scene == "intro"
         ));
 
-        let cli = parse(&["demo", "preview"]).unwrap();
-        assert!(matches!(cli.command, Commands::Preview { scene: None }));
+        #[cfg(feature = "cmd-preview")]
+        {
+            let cli = parse(&["demo", "preview"]).unwrap();
+            assert!(matches!(cli.command, Commands::Preview { scene: None }));
+        }
+        #[cfg(not(feature = "cmd-preview"))]
+        assert!(parse(&["demo", "preview"]).is_err());
 
         let cli = parse(&["demo", "inspect", "scenes", "--format", "json"]).unwrap();
         assert!(matches!(

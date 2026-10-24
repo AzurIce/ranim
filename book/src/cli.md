@@ -4,7 +4,7 @@
 `bevy_app::App` 的再导出）。`main` 装配 `App` 后用 `app.build()`
 （`RanimAppExt`，prelude 导出）定稿插件构建——断言插件就绪、执行一次
 bevy 的 `finish()` / `cleanup()`——得到 `ranim::RanimApp`，把它交给自由
-函数 `run_cli`（prelude 导出，native + `render` feature 门控；命名刻意避开
+函数 `run_cli`（prelude 导出，native + `cmd-render` feature 门控；命名刻意避开
 bevy App 自带的 `run()` runner 入口）：它安装 tracing、解析进程参数，
 随即分发为四个子命令：
 
@@ -20,7 +20,7 @@ fn main() {
 
 ```text
 <project> <command>
-├── preview   启动交互预览 app（需要 preview feature）
+├── preview   启动交互预览 app（需要 cmd-preview feature）
 ├── output    渲染场景声明的所有 #[output(...)]（成片输出）
 ├── render    用默认输出设置快速渲染一个场景一次（冒烟）
 └── inspect   不渲染，纯 CPU 检查场景 / 动画树 / 单帧物件
@@ -29,8 +29,11 @@ fn main() {
 在自己的项目中以 `cargo run -- <command>` 调用；在本仓库中运行示例：
 
 ```bash
-cargo run --example <example> --features preview -- <command> ...
+cargo run --example <example> -- <command> ...
 ```
+
+默认包含 `cmd-preview`，开启全部四类子命令；关闭 default 并只开启 `cmd-render`
+时，CLI 只提供 `output`、`render` 和 `inspect`，帮助中不显示 preview。
 
 带 `required-features`（如 `typst`、`gltf`）的示例需同时开启对应 feature。
 仓库为 dev profile 开了 `opt-level = 1`、依赖 `opt-level = 3`，`inspect` 是纯
@@ -51,8 +54,9 @@ fn main() {
 }
 ```
 
-渲染装配是可选的：项目不注册 `RenderSetup` 时，渲染与预览使用默认配置，
-即注册内置相机与矢量/网格物件渲染（`ranim_items::RanimItemsPlugin`）。需要
+渲染装配是可选的：启用 `items` 的项目不注册 `RenderSetup` 时，渲染与预览使用默认配置，
+即注册内置相机与矢量/网格物件渲染（`ranim_items::RanimItemsPlugin`）。关闭 `items`
+时默认配置为空，自定义渲染项目应注册自己的 `RenderSetup`。需要
 渲染默认配置未覆盖的完整输出（容器、变换 wrapper、自定义类型）时，才在插件
 中提供自己的 `RenderSetup`：
 
@@ -80,7 +84,7 @@ impl Plugin for ProjectPlugin {
 
 ## `preview [SCENE]`
 
-启动交互预览 app。需要 `preview` feature（它同时启用 `render`）；不传场景名时
+启动交互预览 app。需要 `cmd-preview` feature（它启用 `cmd-render`，后者启用 `render`）；不传场景名时
 预览第一个场景。适合编写场景时的实时调试。
 
 ## `output [SCENES...]`
@@ -138,7 +142,7 @@ output/hello_1920x1080_60/<filename>     TimeMark::Capture 截图
 ### `inspect scenes`
 
 ```bash
-cargo run --example hello_ranim --features preview -- inspect scenes
+cargo run --example hello_ranim --no-default-features --features anims,cmd-render -- inspect scenes
 ```
 
 列出 App 中注册的场景及其 `#[output(...)]` 摘要（尺寸、fps、格式、输出目录、
@@ -148,7 +152,7 @@ cargo run --example hello_ranim --features preview -- inspect scenes
 ### `inspect tree [SCENE]`
 
 ```bash
-cargo run --example hello_ranim --features preview -- inspect tree hello_ranim
+cargo run --example hello_ranim --no-default-features --features anims,cmd-render -- inspect tree hello_ranim
 ```
 
 构建场景并输出层级动画树。每个节点包含：DFS `path`、`kind`
@@ -162,7 +166,7 @@ cargo run --example hello_ranim --features preview -- inspect tree hello_ranim
 ### `inspect frame <SCENE> --at <sec>`
 
 ```bash
-cargo run --example hello_ranim --features preview -- inspect frame hello_ranim --at 1.5 --verbose
+cargo run --example hello_ranim --no-default-features --features anims,cmd-render -- inspect frame hello_ranim --at 1.5 --verbose
 ```
 
 在 `<sec>` 直接采样类型化帧；迭代动画使用各自声明的内容步长。JSON frame

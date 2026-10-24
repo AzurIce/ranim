@@ -12,10 +12,11 @@
 - [CameraFrame](../../items/camera.md)：`ranim_items::camera::CameraFrame`，保留 f64
   相机参数；渲染插件把它用于视图和投影配置。
 
-默认渲染配置已包含三个内置物件插件——`ranim_items::RanimItemsPlugin` 捆绑
+启用顶层 `ranim` 的 `items` feature 时，默认渲染配置包含三个内置物件插件——`ranim_items::RanimItemsPlugin` 捆绑
 `CameraFramePlugin`、`VItemPlugin`、`MeshItemPlugin`：相机插件注册裸相机提取与
 viewport 准备，矢量/网格插件注册各自族内裸逻辑类型的值级提取和 GPU 渲染系统。
-项目未注册 `RenderSetup` 时，output / preview 回退到该默认配置。需要渲染容器、
+项目未注册 `RenderSetup` 时，output / preview 回退到该默认配置；未启用 `items`
+时则使用空配置，通用 `render` 本身不依赖内置物件。需要渲染容器、
 变换 wrapper 或自定义类型时，项目把自定义装配保存为 App 的
 `ranim_render::RenderSetup` resource：回调中安装 `RanimItemsPlugin`（或按需单个
 安装三个物件插件——两种写法互斥，Bevy 插件唯一，重复安装会 panic），并为完整

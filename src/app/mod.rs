@@ -13,14 +13,18 @@ mod scene;
 pub use scene::{Output, OutputFormat, Scene, SceneConfig, SceneConstructor};
 
 /// Resolve the project's rendering configuration for every session host.
-#[cfg(feature = "render")]
+#[cfg(any(
+    feature = "cmd-render",
+    all(target_family = "wasm", feature = "render")
+))]
 pub(crate) fn render_setup_of(app: &App) -> ranim_render::RenderSetup {
     app.world()
         .get_resource::<ranim_render::RenderSetup>()
         .cloned()
         .unwrap_or_else(|| {
-            ranim_render::RenderSetup::new(|render_app| {
-                render_app.add_plugins(ranim_items::RanimItemsPlugin);
+            ranim_render::RenderSetup::new(|_render_app| {
+                #[cfg(feature = "items")]
+                _render_app.add_plugins(ranim_items::RanimItemsPlugin);
             })
         })
 }

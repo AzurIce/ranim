@@ -9,4 +9,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 bevy_app.workspace = true
-ranim = { workspace = true, features = ["preview", "items"] }
+ranim = { workspace = true, features = ["cmd-preview", "items"] }

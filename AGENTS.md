@@ -9,7 +9,7 @@ set and will disagree with CI.
 
 ```bash
 nix develop
-just lint   # fmt-check + workspace-wide clippy/doc, feature-gated sweeps too
+just lint   # workspace clippy/doc + isolated minimal and WASM feature checks
 ```
 
 Gotchas learned the hard way — partial sweeps are NOT equivalent:
@@ -34,7 +34,7 @@ Gotchas learned the hard way — partial sweeps are NOT equivalent:
 
   ```bash
   cargo test -p ranim-core -p ranim-items -j 8
-  CARGO_BUILD_JOBS=8 cargo run --example <example> --features preview -- output
+  CARGO_BUILD_JOBS=8 cargo run --example <example> --no-default-features --features anims,cmd-render -- output
   ```
 
 ## 构建与测试注意事项
