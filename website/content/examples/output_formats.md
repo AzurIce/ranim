@@ -1,6 +1,1 @@
-+++
-title = "output_formats"
-template = "examples-page.html"
-+++
-
-!example-output_formats
+@!(title: "output_formats", template: "example", example: "output_formats")

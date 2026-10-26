@@ -1,6 +1,1 @@
-+++
-title = "regular_polygon"
-template = "examples-page.html"
-+++
-
-!example-regular_polygon
+@!(title: "regular_polygon", template: "example", example: "regular_polygon")

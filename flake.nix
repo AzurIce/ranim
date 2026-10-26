@@ -14,6 +14,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     crane.url = "github:ipetkov/crane";
+    notist.url = "github:AzurIce/notist";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -26,6 +27,7 @@
       crane,
       rust-overlay,
       flake-utils,
+      notist,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -62,9 +64,11 @@
         });
       in
       {
+        packages.notist = notist.packages.${system}.notist;
         devShells.default = craneLib.devShell {
           packages = [
             mdbook-typst-math
+            notist.packages.${system}.notist
           ]
           ++ (with pkgs; [
             git-cliff
@@ -73,7 +77,6 @@
             samply
             cargo-udeps
             miniserve
-            zola
             mdbook
             binaryen
             mdbook-mermaid

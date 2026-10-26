@@ -3,6 +3,8 @@ set windows-shell := ["powershell.exe", "-Command"]
 # Mirror the CI lints job (.github/workflows/build.yml): fmt + workspace-wide
 # clippy/doc with `-D warnings`. Run inside the flake dev shell so the Rust
 # toolchain matches CI's pinned nightly-2026-10-01.
+notist := env_var_or_default("NOTIST", "notist")
+
 cargo_jobs := env_var_or_default("CARGO_BUILD_JOBS", "8")
 
 clean:
@@ -35,12 +37,12 @@ changelog:
     git cliff -o CHANGELOG.md
 
 website:
-    zola --root website build
+    {{ notist }} ssg build website
 
-# Build the requested WASM examples (all by default), then serve Zola locally.
+# Build the requested WASM examples (all by default), then serve the Notist site locally.
 website-preview *EXAMPLES:
     CARGO_BUILD_JOBS={{ cargo_jobs }} cargo examples build {{ EXAMPLES }}
-    zola --root website serve --base-url http://127.0.0.1
+    {{ notist }} ssg serve website
 
 doc:
     RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \

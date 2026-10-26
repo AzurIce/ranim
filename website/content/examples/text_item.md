@@ -1,6 +1,1 @@
-+++
-title = "text_item"
-template = "examples-page.html"
-+++
-
-!example-text_item
+@!(title: "text_item", template: "example", example: "text_item")

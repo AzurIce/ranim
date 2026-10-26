@@ -1,6 +1,1 @@
-+++
-title = "animating_pi"
-template = "examples-page.html"
-+++
-
-!example-animating_pi
+@!(title: "animating_pi", template: "example", example: "animating_pi")

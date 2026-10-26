@@ -1,12 +1,7 @@
-+++
-title = "palettes"
-template = "examples-page.html"
-+++
+@!(title: "palettes", template: "example", example: "palettes")
 
 # Palettes
 
 Palettes from manim
 
-![palette](../../assets/palettes.png)
-
-!example-palettes
+![palette](/examples/palettes/palettes.png)

@@ -1,6 +1,1 @@
-+++
-title = "tetrahedron_spheres"
-template = "examples-page.html"
-+++
-
-!example-tetrahedron_spheres
+@!(title: "tetrahedron_spheres", template: "example", example: "tetrahedron_spheres")

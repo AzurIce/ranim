@@ -1,6 +1,1 @@
-+++
-title = "bubble_sort"
-template = "examples-page.html"
-+++
-
-!example-bubble_sort
+@!(title: "bubble_sort", template: "example", example: "bubble_sort")

@@ -1,6 +1,1 @@
-+++
-title = "midi_visualizer"
-template = "examples-page.html"
-+++
-
-!example-midi_visualizer
+@!(title: "midi_visualizer", template: "example", example: "midi_visualizer")

@@ -7,7 +7,7 @@
 ```text
 website/
 ├── static/examples/<name>/       # 预览图 / 视频
-├── data/<name>.toml              # 模板和短代码读取的数据
+├── data/<name>.toml              # 站点模板读取的数据
 └── content/examples/<group>/<name>.md
 ```
 
@@ -17,7 +17,7 @@ website/
 examples/arc/scenes.rs                    -> content/examples/arc.md
 ```
 
-`xtask` 会自动为缺失的目录创建 Zola `_index.md`，所以 Zola 侧不需要手工维护
+`xtask` 会自动为缺失的目录创建 Notist SSG `index.md`，所以 Notist SSG 侧不需要手工维护
 目录结构。`data/<name>.toml` 的 `code` 同时展示 `scenes.rs`（场景与注册）
 与 `main.rs`（平台入口），各自附有文件名。
 
@@ -52,19 +52,19 @@ cargo examples run --fail-fast
 cargo examples run --clean
 ```
 
-## Zola
+## Notist SSG
 
-从仓库根目录进入开发环境（Zola 0.23.6，与 CI 一致）：
+从仓库根目录进入开发环境，其中包含固定的 Rust 工具链与 flake.lock 锁定的 Notist；CI 使用相同的 Notist 版本：
 
 ```bash
 nix develop
 export CARGO_BUILD_JOBS=4
 
-# 构建 arc 的 WASM，然后启动 Zola 开发服务器
+# 构建 arc 的 WASM，然后启动 Notist SSG 开发服务器
 just website-preview arc
 ```
 
-打开 `http://127.0.0.1:1111/examples/arc/`，切换到 **App** 页签使用实时
+打开 `http://127.0.0.1:8000/examples/arc.html`，切换到 **App** 页签使用实时
 canvas 播放器；**Preview** 页签显示预渲染的视频或图片。
 `just website-preview` 不带参数会先构建所有支持 WASM 的例子。
 
@@ -75,15 +75,15 @@ canvas 播放器；**Preview** 页签显示预渲染的视频或图片。
 cargo examples build arc gltf_showcase
 
 # 第二步：开发预览（监听 website 下的文件并自动刷新）
-zola --root website serve --base-url http://127.0.0.1
+notist ssg serve website
 
 # 或生成 website/public/；发布前先用 cargo examples build 构建全部例子
 just website
 ```
 
 修改 Rust 场景后，在另一个开发 shell 中重新运行 `cargo examples build arc`。
-组件源码直接位于 `website/static/ranim-viewport.js` 与 `ranim-controls.js`，修改后 Zola 会自动刷新，
-无需重新构建 WASM。Rust 场景重建后，Zola 也会监听更新后的静态文件并刷新页面。
+组件源码直接位于 `website/static/ranim-viewport.js` 与 `ranim-controls.js`，修改后 Notist SSG 会自动刷新，
+无需重新构建 WASM。Rust 场景重建后，Notist SSG 也会监听更新后的静态文件并刷新页面。
 只预览实时 WASM 不需要运行 `cargo examples run`，也不需要 shadow 凭证；
 后者用于渲染和发布 Preview 页签的媒体。
 
@@ -91,10 +91,10 @@ just website
 直接显示 App 页签。已有媒体 URL 和上次渲染的 hash 保持不变，后续
 `cargo examples run --lazy-run` 仍能识别需要重新渲染的场景。
 
-Zola 页面中仍使用 `!example-<name>` 插入 example 内容。列表页和样例页左侧导航
+示例页通过 `@!(template: "example", example: "<name>")` 声明模板和数据键。列表页和样例页左侧导航
 会按 `content/examples` 的目录层级渲染；嵌套 example 的页面会带 `Examples /
 <group> / <name>` 面包屑。
-Tera 组件在 `website/templates/components/` 中，`examples.player` 输出共享的
+Handlebars 局部模板在 `website/templates/components/` 中，`player.hbs` 输出共享的
 `<ranim-viewport>` 与 `<ranim-controls>` Web Components，显式绑定后组合展示。
 
 `just doc-examples` 会为 `ranim-examples` 生成带 `#[wasm_demo_doc]` 实时预览的
@@ -112,7 +112,7 @@ xtask 不再依赖额外文件识别 WASM 支持；`package.metadata.example` �
 Typst 等可选依赖。随后分别运行 `wasm-bindgen` 和 `wasm-opt`。产物位于
 `website/static/examples/<name>/pkg/ranim_example.js` 和对应的 `_bg.wasm`。
 `--out-dir` 改变输出根目录，仍保留 `examples/<name>/pkg/` 层级。
-组件源码由 Zola 的 `website/static/ranim-viewport.js` 和 `ranim-controls.js`
+组件源码由 Notist SSG 的 `website/static/ranim-viewport.js` 和 `ranim-controls.js`
 管理；网站直接使用，指定其他 `--out-dir`（如 rustdoc 目录）时将两个文件
 复制到输出根目录，同时复制视口使用的 `ranim-audio.js` 和控制条使用的
 `ranim-timeline.js`，以及共用主题模块 `ranim-theme.js`。

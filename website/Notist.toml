@@ -1,0 +1,6 @@
+[ssg]
+title = "Ranim"
+base_url = "https://azurice.github.io/ranim/"
+content = "content"
+output = "public"
+template = "page"

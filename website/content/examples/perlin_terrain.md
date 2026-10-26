@@ -1,6 +1,1 @@
-+++
-title = "perlin_terrain"
-template = "examples-page.html"
-+++
-
-!example-perlin_terrain
+@!(title: "perlin_terrain", template: "example", example: "perlin_terrain")

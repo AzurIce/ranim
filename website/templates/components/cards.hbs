@@ -1,0 +1,20 @@
+{{#each directories}}
+  {{#with (lookup @root.site.directories this)}}
+    <section class="example-group">
+      <h2 class="example-group__title">{{#if index}}<a href="{{url index.route.url}}">{{index.title}}</a>{{else}}{{name}}{{/if}}</h2>
+      {{> components/cards}}
+    </section>
+  {{/with}}
+{{/each}}
+{{#if pages}}<div class="card-grid">
+  {{#each pages}}
+    <a href="{{url route.url}}" class="card">
+      {{#with (lookup @root.site.data attrs.example)}}
+        {{#if preview_imgs}}<div class="preview-grid">
+          {{#each preview_imgs}}<img src="{{url this}}" alt="{{../name}} 示例输出 {{@index}}" loading="lazy">{{/each}}
+        </div>{{else}}<div class="card__placeholder" aria-hidden="true">▶</div>{{/if}}
+      {{/with}}
+      <div class="card__content"><h2>{{title}}</h2>{{#if attrs.description}}<p>{{attrs.description}}</p>{{/if}}</div>
+    </a>
+  {{/each}}
+</div>{{/if}}

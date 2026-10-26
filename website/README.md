@@ -1,14 +1,15 @@
 # Website
 
-The Zola website owns two independent Web Components: `<ranim-viewport>` in
+The Notist SSG website owns two independent Web Components: `<ranim-viewport>` in
 `static/ranim-viewport.js` and `<ranim-controls>` in `static/ranim-controls.js`.
 The **App** tab composes their live WebGPU canvas and playback controls;
-**Preview** shows prerendered media. Tera components live
-in `templates/components/`. The Nix development shell and CI use Zola 0.23.6.
+**Preview** shows prerendered media. Handlebars partials live
+in `templates/components/`. The site is built with `notist ssg`; templates use document attributes and the directory tree.
 
 ## Build and preview
 
-From the repository root:
+From the repository root, enter the Nix development shell. It includes the
+Notist version pinned by `flake.lock`, which CI also uses:
 
 ```sh
 nix develop
@@ -16,7 +17,10 @@ export CARGO_BUILD_JOBS=4
 just website-preview arc
 ```
 
-Open `http://127.0.0.1:1111/examples/arc/` and select **App**. Omit `arc` to
+Set `NOTIST=/path/to/notist` to test a different local build. Update the pinned
+generator with `nix flake update notist`.
+
+Open `http://127.0.0.1:8000/examples/arc.html` and select **App**. Omit `arc` to
 build every WASM example before starting the server. WebGPU requires a secure
 context (HTTPS or localhost).
 
@@ -27,12 +31,12 @@ cargo examples build
 just website
 ```
 
-The output is `website/public/`. `just website` runs only Zola, so it expects
+The output is `website/public/`. `just website` runs only Notist SSG, so it expects
 the WASM packages to have been built already.
 
-While Zola is serving, rebuild changed Rust scenes with `cargo examples build arc`
+While Notist SSG is serving, rebuild changed Rust scenes with `cargo examples build arc`
 in another development shell. Changes to the preview JavaScript files are
-watched directly by Zola and require no WASM rebuild or component copy. No media
+watched directly by Notist SSG and require no WASM rebuild or component copy. No media
 rendering or shadow upload is needed for the App tab.
 
 Website WASM builds also refresh the selected examples' source listings and
@@ -40,6 +44,17 @@ pages, including examples without prerendered media. Existing media URLs and
 the last render's source hash are preserved, so `cargo examples run --lazy-run`
 still detects scenes that need rendering. Examples without media open directly
 on the App tab.
+
+## Site structure
+
+`Notist.toml` configures `notist ssg`. Documents under `content/` keep their
+relative paths, with the extension changed to `.html`; `index.md` provides a
+directory's landing page. The generator creates `index.md` for example groups.
+Document metadata uses Notist root annotations, shared by Markdown and `.not`.
+`templates/*.hbs` and `templates/components/*.hbs` render the page and directory
+data; `data/*.toml` supplies player metadata and source listings. `sass/` compiles
+to CSS and `static/` is copied to the output root. Deployment uses the configured
+`https://azurice.github.io/ranim/` prefix; local preview uses `/`.
 
 ## Composing a viewport and controls
 
@@ -229,7 +244,7 @@ real WASM module and a WebGPU device to cover independent imports, ID/property
 binding, multiple controls, timeline metadata/expansion/zoom/selection, rebinding,
 shadow roots, playback, independent canvases,
 unmount/reconnect, input validation, rendering, resize, and disposal. Test files
-live in `website/tests/`, outside the published Zola static assets.
+live in `website/tests/`, outside the published Notist SSG static assets.
 
 For audio integration checks, build `cargo examples build arc audio_demo midi_visualizer`,
 open `http://127.0.0.1:8000/website/tests/audio.test.html`, and click **Run with audio**.

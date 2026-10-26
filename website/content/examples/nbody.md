@@ -1,6 +1,1 @@
-+++
-title = "nbody"
-template = "examples-page.html"
-+++
-
-!example-nbody
+@!(title: "nbody", template: "example", example: "nbody")

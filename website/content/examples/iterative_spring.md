@@ -1,6 +1,1 @@
-+++
-title = "iterative_spring"
-template = "examples-page.html"
-+++
-
-!example-iterative_spring
+@!(title: "iterative_spring", template: "example", example: "iterative_spring")

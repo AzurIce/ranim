@@ -32,9 +32,9 @@ fn copy_file(source: &Path, target_dir: &Path) -> Result<String> {
     Ok(file_name)
 }
 
-/// Root directory of generated Zola example pages, relative to the website root.
+/// Root directory of generated Notist example pages, relative to the website root.
 const WEBSITE_EXAMPLES_CONTENT_DIR: &str = "content/examples";
-/// Top-level title used when `content/examples/_index.md` does not exist yet.
+/// Top-level title used when `content/examples/index.md` does not exist yet.
 const WEBSITE_EXAMPLES_TITLE: &str = "例子";
 /// Module basename shared by the individual WASM packages.
 const EXAMPLES_WASM_MODULE: &str = "ranim_example";
@@ -249,7 +249,7 @@ pub enum RunStatus {
 /// Removed stale website artifacts, split by artifact kind.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CleanStats {
-    /// Removed generated Zola example pages.
+    /// Removed generated Notist example pages.
     pub pages: usize,
     /// Removed generated `website/data/*.toml` files.
     pub data: usize,
@@ -268,8 +268,8 @@ pub struct Example {
     pub path: PathBuf,
     /// The name of the example, corresponding to the string passed to `--example`
     pub name: String,
-    /// Path of the Zola section that owns this example, relative to
-    /// `website/content/examples/`. Empty means the examples root section.
+    /// Directory that owns this example, relative to
+    /// `website/content/examples/`. Empty means the examples root directory.
     pub group: PathBuf,
     pub code: String,
     pub hash: String,
@@ -308,7 +308,7 @@ impl Example {
     }
 
     /// Render the scene and refresh `website/static/examples/<example-name>/`,
-    /// `website/data/<example-name>.toml`, and the generated Zola page under
+    /// `website/data/<example-name>.toml`, and the generated Notist page under
     /// `website/content/examples/<group>/<example-name>.md`.
     ///
     /// The render runs **before** any existing website output is cleaned, so a
@@ -397,7 +397,7 @@ impl Example {
 
         // README-referenced images join the published set ahead of `shadow
         // publish` so their links resolve to shadow URLs like the renders.
-        self.sync_readme_images(root_dir)?;
+        self.sync_readme_assets(root_dir)?;
         let shadow = shadow::Shadow::load(root_dir)?;
         shadow.publish()?;
 
@@ -431,7 +431,7 @@ impl Example {
         Ok(())
     }
 
-    /// Generate (or refresh) the Zola page for this example.
+    /// Generate (or refresh) the Notist page for this example.
     ///
     /// The page is written below `website/content/examples/<group>/` so the
     /// generated content tree mirrors the layout of the `examples/` directory.
@@ -440,7 +440,7 @@ impl Example {
         let website_root = root_dir.join("website");
         let content_examples = website_root.join(WEBSITE_EXAMPLES_CONTENT_DIR);
 
-        self.ensure_section_indexes(&content_examples)?;
+        self.ensure_directory_indexes(&content_examples)?;
 
         let page_dir = if self.group.as_os_str().is_empty() {
             content_examples.clone()
@@ -464,15 +464,12 @@ impl Example {
         })?;
         let readme_path = example_dir.join("README.md");
 
-        // 创建markdown内容
+        // Document annotations select the site template and example data.
         let mut md_content = format!(
-            r#"+++
-title = "{}"
-template = "examples-page.html"
-+++
+            r#"@!(title: "{}", template: "example", example: "{}")
 
 "#,
-            self.name
+            self.name, self.name
         );
 
         // 如果README.md存在，则复制其内容
@@ -482,7 +479,7 @@ template = "examples-page.html"
                 .join("static")
                 .join("examples")
                 .join(&self.name);
-            let readme_content = rewrite_readme_images(
+            let readme_content = rewrite_readme_assets(
                 &readme_content,
                 example_dir,
                 &static_example_dir,
@@ -504,19 +501,17 @@ template = "examples-page.html"
             }
         }
 
-        // 添加示例标记
-        md_content.push_str(&format!("!example-{}\n", self.name));
-
-        // 写入markdown文件
+        // Keep generated documents free of trailing blank lines.
+        let md_content = format!("{}\n", md_content.trim_end());
         fs::write(&output_page_path, &md_content)
             .with_context(|| format!("failed to write {}", output_page_path.display()))?;
         Ok(output_page_path)
     }
 
-    /// Copy README-referenced local images into the static example directory
+    /// Copy README-referenced local resources into the static example directory
     /// ahead of `shadow publish`, so their links resolve to shadow URLs just
     /// like the rendered outputs.
-    fn sync_readme_images(&self, root_dir: &Path) -> Result<()> {
+    fn sync_readme_assets(&self, root_dir: &Path) -> Result<()> {
         let example_dir = self.path.parent().with_context(|| {
             format!(
                 "example path {} has no parent directory",
@@ -533,7 +528,7 @@ template = "examples-page.html"
             .join("examples")
             .join(&self.name);
         let readme = fs::read_to_string(&readme_path)?;
-        copy_readme_images(&readme, example_dir, &static_example_dir)
+        copy_readme_assets(&readme, example_dir, &static_example_dir)
     }
 
     /// Directories that `ranim output` writes for this example.
@@ -561,15 +556,15 @@ template = "examples-page.html"
         Ok(dirs)
     }
 
-    fn ensure_section_indexes(&self, content_examples: &Path) -> Result<()> {
-        // Keep the root examples section available even on fresh checkouts.
-        ensure_section_index(content_examples, WEBSITE_EXAMPLES_TITLE)?;
+    fn ensure_directory_indexes(&self, content_examples: &Path) -> Result<()> {
+        // Keep the root examples index available even on fresh checkouts.
+        ensure_directory_index(content_examples, WEBSITE_EXAMPLES_TITLE)?;
 
         let mut current = content_examples.to_path_buf();
         for component in self.group.components() {
             current.push(component);
             let title = component.as_os_str().to_string_lossy();
-            ensure_section_index(&current, &title)?;
+            ensure_directory_index(&current, &title)?;
         }
         Ok(())
     }
@@ -610,16 +605,16 @@ fn parse_output_dirs(source: &str) -> Vec<String> {
     dirs
 }
 
-/// Rewrite local markdown image references from an example README so Zola
+/// Rewrite local Markdown resource references from an example README so Notist
 /// serves them from `website/static/examples/<name>/`.
 ///
-/// Source READMEs use `![...](preview.png)`, which Zola would resolve relative
+/// Source READMEs use `![...](preview.png)`, which Notist would resolve relative
 /// to the generated content page (`/examples/agents/<name>/preview.png`) and
 /// break. This rewrites those links through `resolve_url` — normally the
 /// shadow content-addressed URL, falling back to
-/// `/examples/<name>/<file>` — and copies missing source images into the
+/// `/examples/<name>/<file>` — and copies missing source resources into the
 /// static example directory as a fallback.
-fn rewrite_readme_images(
+fn rewrite_readme_assets(
     readme: &str,
     example_dir: &Path,
     static_example_dir: &Path,
@@ -628,13 +623,16 @@ fn rewrite_readme_images(
     let mut result = String::with_capacity(readme.len());
     let mut cursor = 0usize;
 
-    while let Some((path_start, path_end)) = next_markdown_image(readme, cursor) {
+    while let Some((path_start, path_end)) = next_markdown_link(readme, cursor) {
         let path = readme[path_start..path_end].trim();
         result.push_str(&readme[cursor..path_start]);
 
         let local_path = path.strip_prefix("./").unwrap_or(path);
         let source_path = example_dir.join(local_path);
-        let rewritten = if local_path.contains('/') || !source_path.is_file() {
+        let rewritten = if Path::new(local_path).is_absolute()
+            || local_path.contains("://")
+            || !source_path.is_file()
+        {
             path.to_string()
         } else if let Some(file_name) = source_path.file_name().and_then(|name| name.to_str()) {
             if !static_example_dir.join(file_name).exists() {
@@ -662,23 +660,23 @@ fn rewrite_readme_images(
     Ok(result)
 }
 
-fn next_markdown_image(source: &str, start: usize) -> Option<(usize, usize)> {
+fn next_markdown_link(source: &str, start: usize) -> Option<(usize, usize)> {
     let link_start = source[start..].find("](")? + start;
     let path_start = link_start + 2;
     let path_end = source[path_start..].find(')')? + path_start;
     Some((path_start, path_end))
 }
 
-/// Copy README-referenced local images into the static example directory so
+/// Copy README-referenced local resources into the static example directory so
 /// they get published with the rest of the example outputs.
-fn copy_readme_images(readme: &str, example_dir: &Path, static_example_dir: &Path) -> Result<()> {
+fn copy_readme_assets(readme: &str, example_dir: &Path, static_example_dir: &Path) -> Result<()> {
     let mut cursor = 0usize;
-    while let Some((path_start, path_end)) = next_markdown_image(readme, cursor) {
+    while let Some((path_start, path_end)) = next_markdown_link(readme, cursor) {
         let path = readme[path_start..path_end].trim();
         cursor = path_end;
 
         let local_path = path.strip_prefix("./").unwrap_or(path);
-        if local_path.contains('/') {
+        if Path::new(local_path).is_absolute() || local_path.contains("://") {
             continue;
         }
         let source_path = example_dir.join(local_path);
@@ -848,18 +846,16 @@ pub fn publish_website_outputs(root_dir: impl AsRef<Path>, examples: &[Example])
     Ok(())
 }
 
-fn ensure_section_index(dir: &Path, title: &str) -> Result<()> {
+fn ensure_directory_index(dir: &Path, title: &str) -> Result<()> {
     fs::create_dir_all(dir).with_context(|| format!("failed to create {}", dir.display()))?;
-    let index_path = dir.join("_index.md");
+    let index_path = dir.join("index.md");
     if index_path.exists() {
         return Ok(());
     }
 
     let title = title.replace('\"', "\\\"");
-    let frontmatter = format!(
-        "+++\ntitle = \"{title}\"\ntemplate = \"examples.html\"\nsort_by = \"slug\"\ninsert_anchor_links = \"right\"\n+++\n"
-    );
-    fs::write(&index_path, frontmatter)
+    let annotation = format!("@!(title: \"{title}\", template: \"examples\")\n");
+    fs::write(&index_path, annotation)
         .with_context(|| format!("failed to write {}", index_path.display()))?;
     Ok(())
 }
@@ -910,7 +906,7 @@ pub fn clean_website_examples(
             if !path.is_file() {
                 continue;
             }
-            if path.file_name().and_then(|name| name.to_str()) == Some("_index.md") {
+            if path.file_name().and_then(|name| name.to_str()) == Some("index.md") {
                 continue;
             }
             let Some(stem) = path.file_stem().and_then(|name| name.to_str()) else {
@@ -974,7 +970,7 @@ pub fn clean_website_examples(
 fn is_generated_example_page(path: &Path) -> Result<bool> {
     let content =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
-    Ok(content.contains("template = \"examples-page.html\""))
+    Ok(content.contains("template: \"example\""))
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -1336,11 +1332,11 @@ path = "examples/foo/main.rs"
         fs::create_dir_all(&outputs).unwrap();
 
         let generated_page = |name: &str| {
-            format!("+++\ntitle = \"{name}\"\ntemplate = \"examples-page.html\"\n+++\n")
+            format!("@!(title: \"{name}\", template: \"example\", example: \"{name}\")\n")
         };
         fs::write(content.join("stale.md"), generated_page("stale")).unwrap();
         fs::write(content.join("foo.md"), generated_page("foo")).unwrap();
-        fs::write(content.join("manual.md"), "+++\ntitle = \"manual\"\n+++\n").unwrap();
+        fs::write(content.join("manual.md"), "@!(title: \"manual\")\n").unwrap();
         fs::write(data.join("stale.toml"), "name = \"stale\"\n").unwrap();
         fs::write(data.join("foo.toml"), "name = \"foo\"\n").unwrap();
         fs::create_dir_all(outputs.join("stale")).unwrap();
@@ -1370,6 +1366,34 @@ path = "examples/foo/main.rs"
         assert!(outputs.join("foo").exists());
 
         let _ = fs::remove_dir_all(&root_dir);
+    }
+
+    #[test]
+    fn readme_assets_outside_the_example_directory_are_published() {
+        let root = temp_root("readme-assets");
+        let example_dir = root.join("examples/foo");
+        let static_dir = root.join("website/static/examples/foo");
+        fs::create_dir_all(&example_dir).unwrap();
+        fs::create_dir_all(root.join("assets")).unwrap();
+        fs::write(root.join("assets/image.png"), "image bytes").unwrap();
+        fs::write(root.join("assets/clip.mp4"), "video bytes").unwrap();
+        let readme = "![Image](../../assets/image.png)\n[Video](../../assets/clip.mp4)\n[Remote](https://example.com/a.png)";
+        let rewritten = rewrite_readme_assets(readme, &example_dir, &static_dir, &|file| {
+            format!("/examples/foo/{file}")
+        })
+        .unwrap();
+        assert!(rewritten.contains("](/examples/foo/image.png)"));
+        assert!(rewritten.contains("](/examples/foo/clip.mp4)"));
+        assert!(rewritten.contains("](https://example.com/a.png)"));
+        assert_eq!(
+            fs::read_to_string(static_dir.join("image.png")).unwrap(),
+            "image bytes"
+        );
+        assert_eq!(
+            fs::read_to_string(static_dir.join("clip.mp4")).unwrap(),
+            "video bytes"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -1406,11 +1430,11 @@ path = "examples/foo/main.rs"
                 .join("foo.md")
         );
         let page_content = fs::read_to_string(&page).unwrap();
-        assert!(page_content.contains("template = \"examples-page.html\""));
-        assert!(page_content.contains("!example-foo"));
+        assert!(page_content.contains("template: \"example\""));
+        assert!(page_content.contains("example: \"foo\""));
         assert!(page_content.contains("# Foo Example"));
         assert!(page_content.contains("](/examples/foo/preview.png)"));
-        assert!(page_content.ends_with("!example-foo\n"));
+        assert!(!page_content.contains("!example-"));
         assert!(
             root_dir
                 .join("website/static/examples/foo/preview.png")
@@ -1420,7 +1444,7 @@ path = "examples/foo/main.rs"
             root_dir
                 .join("website")
                 .join(WEBSITE_EXAMPLES_CONTENT_DIR)
-                .join("_index.md")
+                .join("index.md")
                 .exists()
         );
         assert!(
@@ -1428,7 +1452,7 @@ path = "examples/foo/main.rs"
                 .join("website")
                 .join(WEBSITE_EXAMPLES_CONTENT_DIR)
                 .join("agents")
-                .join("_index.md")
+                .join("index.md")
                 .exists()
         );
 

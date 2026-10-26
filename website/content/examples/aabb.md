@@ -1,6 +1,1 @@
-+++
-title = "aabb"
-template = "examples-page.html"
-+++
-
-!example-aabb
+@!(title: "aabb", template: "example", example: "aabb")

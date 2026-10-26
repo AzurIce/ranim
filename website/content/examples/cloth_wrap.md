@@ -1,6 +1,1 @@
-+++
-title = "cloth_wrap"
-template = "examples-page.html"
-+++
-
-!example-cloth_wrap
+@!(title: "cloth_wrap", template: "example", example: "cloth_wrap")

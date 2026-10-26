@@ -1,6 +1,1 @@
-+++
-title = "perspective_blend"
-template = "examples-page.html"
-+++
-
-!example-perspective_blend
+@!(title: "perspective_blend", template: "example", example: "perspective_blend")

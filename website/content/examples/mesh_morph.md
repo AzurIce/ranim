@@ -1,6 +1,1 @@
-+++
-title = "mesh_morph"
-template = "examples-page.html"
-+++
-
-!example-mesh_morph
+@!(title: "mesh_morph", template: "example", example: "mesh_morph")

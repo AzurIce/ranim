@@ -7,6 +7,11 @@ pre code {
   overflow: auto;
 }
 
+pre:has(.z-source) {
+  color: #c0c5ce;
+  background-color: $syntax-theme-background;
+}
+
 /* The line numbers already provide some kind of left/right padding */
 pre[data-linenos] {
   padding: 1rem 0;

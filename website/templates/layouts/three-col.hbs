@@ -1,0 +1,15 @@
+{{#> layouts/base}}
+  <aside class="side left">
+    <nav class="outline" aria-label="Examples">
+      <div class="outline__content"><ul>
+        {{#with (lookup site.directories 'examples')}}{{> components/navigation}}{{/with}}
+      </ul></div>
+    </nav>
+  </aside>
+  <div class="content container">{{> @partial-block}}</div>
+  <aside class="side right">
+    <nav class="outline" aria-label="On this page"><div class="outline__content"><ul>
+      {{#each page.headings}}<li><a class="outline-item" href="#{{anchor}}">{{title}}</a></li>{{/each}}
+    </ul></div></nav>
+  </aside>
+{{/layouts/base}}

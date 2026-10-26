@@ -226,9 +226,9 @@ cargo examples build arc  # wasm-bindgen + wasm-opt, ready for the website
 ```
 
 Inside `nix develop`, run `CARGO_BUILD_JOBS=4 just website-preview arc` to build
-the example and serve Zola at `http://127.0.0.1:1111/examples/arc/`.
+the example and serve Notist SSG at `http://127.0.0.1:8000/examples/arc.html`.
 Select **App** for the live canvas player. See the
-[website build/preview workflow](./xtasks/xtask-examples/README.md#zola).
+[website build/preview workflow](./xtasks/xtask-examples/README.md#notist-ssg).
 
 See [examples](./examples/README.md) for the layout and build commands.
 The [example app](./example-packages/app) demonstrates a native binary host.

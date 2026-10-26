@@ -1,6 +1,1 @@
-+++
-title = "extract_vitem_visualize"
-template = "examples-page.html"
-+++
-
-!example-extract_vitem_visualize
+@!(title: "extract_vitem_visualize", template: "example", example: "extract_vitem_visualize")

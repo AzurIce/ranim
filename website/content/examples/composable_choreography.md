@@ -1,6 +1,1 @@
-+++
-title = "composable_choreography"
-template = "examples-page.html"
-+++
-
-!example-composable_choreography
+@!(title: "composable_choreography", template: "example", example: "composable_choreography")
