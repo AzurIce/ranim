@@ -25,6 +25,8 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Prepare example pages and data for Notist SSG over JSON stdio.
+    Site,
     /// Build individual WASM examples for the website or rustdoc.
     Build {
         /// Output root; packages go under examples/<name>/pkg.
@@ -34,9 +36,9 @@ enum Commands {
         #[arg(value_name = "EXAMPLES")]
         examples: Vec<String>,
     },
-    /// Render examples and refresh website data/pages.
+    /// Render examples, publish media and record successful render hashes.
     Run {
-        /// Skip examples whose rendered data is already up-to-date.
+        /// Skip examples whose last successful render has the current source hash.
         #[arg(long)]
         lazy_run: bool,
 
@@ -52,28 +54,33 @@ enum Commands {
         #[arg(value_name = "EXAMPLES")]
         examples: Vec<String>,
     },
-    /// Publish existing website outputs through shadow and rewrite
-    /// data/pages to content-addressed URLs (no rendering).
+    /// Publish existing website outputs through shadow (no rendering).
     Publish,
 }
 
 fn main() -> ExitCode {
     tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
     let args = Args::parse();
 
+    if let Commands::Site = args.command {
+        return match xtask_examples::site::exchange(
+            std::io::stdin().lock(),
+            std::io::stdout().lock(),
+        ) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("site extension IO failed: {error:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+
     let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workspace_root = xtask_root.join("../../");
-
-    let website_root = workspace_root.join("website");
-    for dir in ["static/examples", "content/examples", "data"] {
-        if let Err(err) = std::fs::create_dir_all(website_root.join(dir)) {
-            eprintln!("无法创建目录 {}: {err}", website_root.join(dir).display());
-            return ExitCode::FAILURE;
-        }
-    }
 
     if let Commands::Build { examples, out_dir } = &args.command {
         return build_examples_wasm_cmd(&workspace_root, examples, out_dir.as_deref());
@@ -279,8 +286,7 @@ fn print_clean_stats(stats: CleanStats) {
         return;
     }
     println!("已清理:");
-    println!("  - 页面: {}", stats.pages);
-    println!("  - 数据: {}", stats.data);
+    println!("  - 渲染记录: {}", stats.renders);
     println!("  - 静态输出: {}", stats.outputs);
 }
 

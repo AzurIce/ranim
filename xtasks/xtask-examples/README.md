@@ -1,25 +1,29 @@
 # Examples
 
-`cargo examples` 会扫描根 `Cargo.toml` 中的`[[example]]`（每个场景集合只有一个 bin target），通过运行各 example
-二进制的 `output` 子命令（`cargo run --release --no-default-features --example <name> --features ... -- output`）
-渲染它们声明的 `#[output(...)]`，并把 website 需要的产物写入：
+`cargo examples` 从根 `Cargo.toml` 的 `[[example]]` 发现例子，通过
+`package.metadata.example.<name>.hide` 控制页面是否展示。每个例子只有一个 bin
+target；`scenes.rs` 保存场景与注册，`main.rs` 保存平台入口。
+
+网站在每次 `notist ssg build/serve website` 时通过 Experimental SSG 扩展
+`cargo examples site` 生成页面和模板数据。只需要修改 Cargo 配置、Rust 源码和
+README，无需维护或提交 `website/content/examples/`、`website/data/*.toml`。
 
 ```text
-website/
-├── static/examples/<name>/       # 预览图 / 视频
-├── data/<name>.toml              # 站点模板读取的数据
-└── content/examples/<group>/<name>.md
+Cargo.toml + examples/**/{scenes.rs,main.rs,README.md}
+    → cargo examples site（prepare 阶段，JSON stdio）
+    → 内存中的 examples/<group>/<name>.md + site.data.<name>
+    → Notist 解析、模板渲染 → website/public/
+
+.shadow/refs/ + shadow.toml → 已发布媒体 URL
+website/render-state.json → 上次成功渲染的源码 hash
+website/static/examples/<name>/pkg/ → 实际存在的 WASM 模块
 ```
 
-其中 `<group>` 从 example 在 `examples/` 下的相对目录推导：
-
-```text
-examples/arc/scenes.rs                    -> content/examples/arc.md
-```
-
-`xtask` 会自动为缺失的目录创建 Notist SSG `index.md`，所以 Notist SSG 侧不需要手工维护
-目录结构。`data/<name>.toml` 的 `code` 同时展示 `scenes.rs`（场景与注册）
-与 `main.rs`（平台入口），各自附有文件名。
+`<group>` 从例子所在目录推导，例如
+`examples/geometry/arc/main.rs` → `examples/geometry/arc.md`。扩展同时生成
+各级目录的 `index.md`，并以例子的 README 作为正文。`examples/` 是扩展管理的
+文档命名空间，手写文章放在 `content/` 的其他目录。隐藏例子不生成页面，仍提供数据，
+供首页等模板引用。源码展示每次构建直接读取 `scenes.rs` 与 `main.rs`。
 
 ## Commands
 
@@ -39,7 +43,7 @@ cargo examples run
 # 只渲染指定 example
 cargo examples run hanoi arc
 
-# 已有数据未变化时跳过渲染，但会补齐缺失的 content 页面
+# 源码 hash 与上次成功渲染一致时跳过渲染
 cargo examples run --lazy-run
 
 # 仅输出错误和最终摘要
@@ -48,8 +52,8 @@ cargo examples run --quiet
 # 一个失败后立即停止
 cargo examples run --fail-fast
 
-# 清理已经不存在的 example 留下的 data / static / content 产物
-cargo examples run --clean
+# 清理已经不存在的 example 留下的渲染记录和本地静态产物
+cargo examples --clean run
 ```
 
 ## Notist SSG
@@ -74,7 +78,7 @@ canvas 播放器；**Preview** 页签显示预渲染的视频或图片。
 # 第一步：构建选定例子的 WASM；省略名字则构建全部
 cargo examples build arc gltf_showcase
 
-# 第二步：开发预览（监听 website 下的文件并自动刷新）
+# 第二步：开发预览（也监听 Cargo 配置、例子源码、README 和 shadow refs）
 notist ssg serve website
 
 # 或生成 website/public/；发布前先用 cargo examples build 构建全部例子
@@ -87,13 +91,28 @@ just website
 只预览实时 WASM 不需要运行 `cargo examples run`，也不需要 shadow 凭证；
 后者用于渲染和发布 Preview 页签的媒体。
 
-构建到网站目录时也会同步所选例子的源码展示和页面；没有预渲染媒体的例子
-直接显示 App 页签。已有媒体 URL 和上次渲染的 hash 保持不变，后续
-`cargo examples run --lazy-run` 仍能识别需要重新渲染的场景。
+`just website` 会调用扩展并生成当前页面与数据；无需先运行 WASM 构建或媒体
+渲染。只有 JS 与 WASM 文件都存在时才显示 **App** 页签；**Preview** 使用 tracked
+shadow refs，不需要本地下载媒体或 shadow 凭证。README 引用的本地文件会同步到
+忽略入库的静态目录；已发布的资源链接使用 shadow URL，其余使用站内 URL。
 
-示例页通过 `@!(template: "example", example: "<name>")` 声明模板和数据键。列表页和样例页左侧导航
-会按 `content/examples` 的目录层级渲染；嵌套 example 的页面会带 `Examples /
-<group> / <name>` 面包屑。
+`cargo examples run` 运行每个例子的 `output` 子命令、同步媒体并执行
+`shadow publish`，成功后才更新 `website/render-state.json`。`cargo examples publish`
+只发布已有静态产物。构建页面、WASM 或仅发布媒体均不会改变上次成功渲染的 hash，
+因此 `--lazy-run` 仍能发现需要重渲染的场景。提交媒体变更时提交 `.shadow/refs/`
+和渲染记录，不提交静态媒体、生成的页面或模板数据。
+
+扩展配置位于 `website/Notist.toml` 的 `[[ssg.extensions]]`。Notist 从站点目录
+启动 `cargo examples site`，通过 stdin 传入 `version: 1`、`stage: "prepare"`、
+`root`、`config` 和 `input: {documents, data}`；命令 stdout 返回
+`{version: 1, input: {documents, data}, errors: []}`，日志走 stderr。扩展保留其他
+页面和数据，重建 `examples/` 文档与各例子的数据键。`watch` 额外监听项目输入，
+所以修改例子、Cargo 配置或媒体 refs 会在开发服务器中重新生成页面。
+协议仍为 Experimental，随 Notist 固定版本更新。
+
+示例页通过 `@!(template: "example", example: "<name>")` 声明模板和数据键。
+列表页和样例页左侧导航按生成的目录层级渲染；嵌套 example 的页面带
+`Examples / <group> / <name>` 面包屑。
 Handlebars 局部模板在 `website/templates/components/` 中，`player.hbs` 输出共享的
 `<ranim-viewport>` 与 `<ranim-controls>` Web Components，显式绑定后组合展示。
 

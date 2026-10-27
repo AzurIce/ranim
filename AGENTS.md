@@ -48,13 +48,18 @@ Gotchas learned the hard way — partial sweeps are NOT equivalent:
 
 `website/static/examples/` 下的渲染产物（mp4/png）**不入库**，由
 [shadow](https://github.com/AzurIce/shadow) 管理：xtask 在渲染后运行
-`shadow publish` 上传到 TOS，`website/data/*.toml` 里的 `output_files`/
-`preview_imgs` 引用内容寻址 URL（由 `.shadow/refs/` 里的 oid 拼出）。
-入库的只有 ref（约 200 字节/个）、`shadow.toml` 和生成的 data/pages。
+`shadow publish` 上传到 TOS。SSG 构建时通过 Experimental prepare 扩展
+`cargo examples site` 从 Cargo targets、源码、README 和 `.shadow/refs/` 生成
+内存中的页面与模板数据，媒体 URL 由 refs 中的 oid 解析。
+入库的是 ref、`shadow.toml` 和 `website/render-state.json`（上次成功渲染的 hash）；
+不再维护 `website/data/*.toml` 或 `website/content/examples/`。
 
+- 构建网站：`just website`，扩展自动生成 example 页面与数据，无需渲染、下载媒体或凭证。
+- WASM：`cargo examples build [examples...]`；实际存在的 JS/WASM 决定是否显示 App 页签。
 - 渲染 + 发布：`cargo examples run [examples...]`（需要 `shadow` 在 PATH
-  上，`cargo install --git https://github.com/AzurIce/shadow`）
-- 不渲染、只把已有产物发布并重写 data/pages：`cargo examples publish`
+  上，`cargo install --git https://github.com/AzurIce/shadow`）；成功后更新 render state。
+- 不渲染、只发布已有产物：`cargo examples publish`，保持上次成功渲染的 hash。
+- `--lazy-run` 仅比较 render state；网站与 WASM 构建不得覆盖该 hash。
 - 凭证在仓库根 `.env`（`TOS_ACCESS_KEY`/`TOS_SECRET_KEY`，已 gitignore，
   绝不提交）
 - CI 在每次网站部署成功后运行 `shadow free --keep-at origin/main --delete`

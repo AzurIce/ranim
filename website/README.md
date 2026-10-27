@@ -31,30 +31,53 @@ cargo examples build
 just website
 ```
 
-The output is `website/public/`. `just website` runs only Notist SSG, so it expects
-the WASM packages to have been built already.
+The output is `website/public/`. Every Notist SSG build generates example pages
+and data through `cargo examples site`. `just website` also works without a WASM
+build; the App tab appears only when both JS and WASM packages exist. Preview
+media is resolved from tracked shadow refs without local downloads or credentials.
 
 While Notist SSG is serving, rebuild changed Rust scenes with `cargo examples build arc`
 in another development shell. Changes to the preview JavaScript files are
 watched directly by Notist SSG and require no WASM rebuild or component copy. No media
 rendering or shadow upload is needed for the App tab.
 
-Website WASM builds also refresh the selected examples' source listings and
-pages, including examples without prerendered media. Existing media URLs and
-the last render's source hash are preserved, so `cargo examples run --lazy-run`
-still detects scenes that need rendering. Examples without media open directly
-on the App tab.
+Notist also watches `Cargo.toml`, `examples/`, shared README assets, the extension
+sources, shadow refs/config, and `render-state.json`. Source listings and README
+content refresh on each site build; changed scenes still need an explicit WASM
+rebuild to update the live App. Examples without media open on the App tab when
+its package is available.
 
 ## Site structure
 
 `Notist.toml` configures `notist ssg`. Documents under `content/` keep their
 relative paths, with the extension changed to `.html`; `index.md` provides a
-directory's landing page. The generator creates `index.md` for example groups.
-Document metadata uses Notist root annotations, shared by Markdown and `.not`.
-`templates/*.hbs` and `templates/components/*.hbs` render the page and directory
-data; `data/*.toml` supplies player metadata and source listings. `sass/` compiles
-to CSS and `static/` is copied to the output root. Deployment uses the configured
+directory's landing page. Metadata uses Notist root annotations.
+`templates/*.hbs` and `templates/components/*.hbs` render document attributes,
+the directory tree and `site.data`; `sass/` compiles to CSS and `static/` is
+copied to the output root. Deployment uses the configured
 `https://azurice.github.io/ranim/` prefix; local preview uses `/`.
+
+The Experimental `prepare` extension configured in `[[ssg.extensions]]` invokes
+`cargo examples site` through JSON stdio, from the website directory. It reads
+the workspace `[[example]]` targets, `scenes.rs`, `main.rs`, and README files to
+create `examples/<group>/<name>.md`, group indexes, and `site.data.<name>` in
+memory. `examples/` belongs to the extension; put authored documents elsewhere
+under `content/`. `package.metadata.example.<name>.hide` suppresses a page while
+keeping its data available to other templates. There are no generated example
+source files or per-example TOML files to commit.
+
+Published media URLs come from `.shadow/refs/` and `shadow.toml`. README resources
+use published URLs when available; local resources are copied into the ignored
+`static/examples/<name>/` directory only when their contents change. Preparing a
+site never renders scenes or uploads media.
+
+`cargo examples run [names...]` renders and publishes media, then records the
+successful source hash in `render-state.json`. `--lazy-run` compares that record
+with the current scene and entrypoint sources. `cargo examples publish` only
+publishes existing media. Site/WASM builds and publish-only runs preserve render
+provenance. Commit changed refs and render state after successful renders;
+static media and packages stay ignored. See [the xtask guide](../xtasks/xtask-examples/README.md)
+for commands and the stdio contract.
 
 ## Composing a viewport and controls
 

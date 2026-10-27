@@ -81,3 +81,5 @@ profile.json.gz
 
 # shadow
 /website/static/examples/**
+
+/website/render-state.json.tmp

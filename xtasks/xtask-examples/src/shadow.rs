@@ -40,6 +40,35 @@ pub struct Shadow {
 }
 
 impl Shadow {
+    /// Enumerate published media from tracked refs, including on a checkout
+    /// without downloaded worktree media. No network access is performed.
+    pub fn published_files(&self, worktree_directory: impl AsRef<Path>) -> Result<Vec<String>> {
+        let directory = self.root.join(".shadow/refs").join(worktree_directory);
+        if !directory.try_exists()? {
+            return Ok(vec![]);
+        }
+        let mut files = vec![];
+        for entry in walkdir::WalkDir::new(&directory) {
+            let entry = entry?;
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let relative = entry.path().strip_prefix(&directory)?;
+            let Some(file) = relative.to_str().and_then(|path| path.strip_suffix(".ref")) else {
+                continue;
+            };
+            if Path::new(file)
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| crate::WEBSITE_OUTPUT_EXTENSIONS.contains(&e))
+            {
+                files.push(file.to_string());
+            }
+        }
+        files.sort();
+        Ok(files)
+    }
+
     pub fn load(root_dir: impl AsRef<Path>) -> Result<Self> {
         let root_dir = root_dir.as_ref();
         let path = root_dir.join("shadow.toml");
@@ -121,17 +150,6 @@ impl Shadow {
             bail!("invalid oid {} in {}", reference.oid, ref_path.display());
         }
         Ok(self.url_for_oid_hex(hex))
-    }
-
-    /// Like [`Self::object_url`], but returns `None` instead of failing when
-    /// shadow is not configured for `root_dir` or the path is unpublished.
-    pub fn try_object_url(
-        root_dir: impl AsRef<Path>,
-        worktree_path: impl AsRef<Path>,
-    ) -> Option<String> {
-        Self::load(root_dir)
-            .and_then(|shadow| shadow.object_url(worktree_path))
-            .ok()
     }
 
     fn url_for_oid_hex(&self, hex: &str) -> String {
@@ -220,14 +238,19 @@ mod tests {
     }
 
     #[test]
-    fn try_object_url_is_none_when_unavailable() {
+    fn missing_config_or_ref_is_an_error() {
         let root = temp_root("missing");
-        assert!(Shadow::try_object_url(&root, "any/path.png").is_none());
+        assert!(Shadow::load(&root).is_err());
         let _ = fs::remove_dir_all(&root);
 
         let root = temp_root("unpublished");
         write_config(&root, "");
-        assert!(Shadow::try_object_url(&root, "any/path.png").is_none());
+        assert!(
+            Shadow::load(&root)
+                .unwrap()
+                .object_url("any/path.png")
+                .is_err()
+        );
         let _ = fs::remove_dir_all(&root);
     }
 
