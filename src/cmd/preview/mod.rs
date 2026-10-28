@@ -1,5 +1,7 @@
 mod audio;
 mod depth_visual;
+#[cfg(feature = "subsecond")]
+mod hot_reload;
 mod playback;
 mod profiler;
 mod timeline;
@@ -162,6 +164,8 @@ pub struct RanimPreviewApp {
     app: crate::RanimApp,
     // Retained for native export.
     scene: Scene,
+    #[cfg(feature = "subsecond")]
+    hot_reload: Option<hot_reload::HotReload>,
 }
 
 impl RanimPreviewApp {
@@ -222,9 +226,60 @@ impl RanimPreviewApp {
             profiler_stacked: true,
             app,
             scene,
+            #[cfg(feature = "subsecond")]
+            hot_reload: None,
         };
         preview.set_clear_color_str(&clear_color);
         preview
+    }
+
+    /// Replace scene-owned state, not the project or the preview's GPU device.
+    /// A failed build leaves the previous scene available, paused in place.
+    #[cfg(feature = "subsecond")]
+    fn reload_scene(&mut self) {
+        self.pause();
+        let position = self.timeline_state.current_sec;
+        let start = Instant::now();
+        info!("rebuilding scene after hotpatch...");
+        let rebuilt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let timeline = self.scene.build_scene();
+            let infos = timeline.get_animation_infos();
+            let total = timeline.total_secs();
+            let evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
+            let playback = PlaybackEngine::new(&evaluator);
+            let mut state = TimelineState::new(total, infos);
+            state.current_sec = position.clamp(0.0, total);
+            (evaluator, playback, state)
+        }));
+        let (evaluator, playback, state) = match rebuilt {
+            Ok(rebuilt) => rebuilt,
+            Err(_) => {
+                error!(
+                    "scene rebuild panicked; keeping the previous scene. Fix the scene or restart preview"
+                );
+                return;
+            }
+        };
+        self.evaluator = evaluator;
+        self.playback_engine = playback;
+        self.timeline_state = state;
+        // Frame identities and custom extract state belong to the old scene.
+        // Recreate the render sub-app on the same device on the next repaint.
+        self.app
+            .world_mut()
+            .resource_mut::<EvaluatedFrame>()
+            .clear();
+        self.resolution_dirty = true;
+        self.need_eval = true;
+        self.last_sec = -1.0;
+        self.last_eval_time = None;
+        self.last_render_time = None;
+        self.progress_samples.clear();
+        self.progress_total_sec = -1.0;
+        self.gpu_pass_times.clear();
+        self.cpu_spans.clear();
+        self.upload_stats.clear();
+        info!("Scene reloaded, cost: {:?}", start.elapsed());
     }
 
     /// Set clear color str
@@ -578,6 +633,15 @@ impl RanimPreviewApp {
 impl eframe::App for RanimPreviewApp {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        #[cfg(feature = "subsecond")]
+        if self.export_progress_rx.is_none()
+            && self
+                .hot_reload
+                .as_ref()
+                .is_some_and(|reload| reload.take_pending())
+        {
+            self.reload_scene();
+        }
         self.prepare_renderer(frame);
 
         // Space bar toggles play/pause
@@ -958,6 +1022,10 @@ impl eframe::App for RanimPreviewApp {
 
                 if done {
                     self.export_progress_rx = None;
+                    // A hotpatch may have arrived while export owned the old
+                    // scene. Give the deferred rebuild another UI pass.
+                    #[cfg(feature = "subsecond")]
+                    ctx.request_repaint();
                     self.export_current_frame = 0;
                     self.export_total_frames = 0;
                     if let Some(err) = error_msg {
@@ -1114,6 +1182,12 @@ impl eframe::App for RanimPreviewApp {
 pub fn run_app(app: RanimPreviewApp) {
     let title = app.title.clone();
     let build_app = |cc: &eframe::CreationContext| {
+        #[cfg(feature = "subsecond")]
+        let app = {
+            let mut app = app;
+            app.hot_reload = Some(hot_reload::HotReload::new(cc.egui_ctx.clone()));
+            app
+        };
         let mut fonts = egui::FontDefinitions::default();
         egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
         cc.egui_ctx.set_fonts(fonts);
@@ -1156,4 +1230,78 @@ pub fn run_app(app: RanimPreviewApp) {
 /// Preview a registered scene in the interactive preview app.
 pub fn preview_scene(app: crate::RanimApp, scene: Scene) {
     run_app(RanimPreviewApp::new(app, scene));
+}
+
+#[cfg(all(test, feature = "subsecond"))]
+mod hot_reload_tests {
+    use super::*;
+    use crate::{App, RanimAppExt, RanimScene};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    fn preview(duration: Arc<AtomicUsize>, fail: Arc<AtomicBool>) -> RanimPreviewApp {
+        let scene = Scene::new("reload", move |r: &mut RanimScene| {
+            assert!(!fail.load(Ordering::Relaxed), "test rebuild failure");
+            let mut sequence = ranim_core::animation::compose::sequence::AnimSequence::new();
+            sequence.forward(duration.load(Ordering::Relaxed) as f64);
+            r.play(sequence);
+        });
+        RanimPreviewApp::new(App::new().build(), scene)
+    }
+
+    #[test]
+    fn rebuild_replaces_timeline_clamps_time_and_preserves_host_settings() {
+        let duration = Arc::new(AtomicUsize::new(10));
+        let mut preview = preview(Arc::clone(&duration), Arc::new(AtomicBool::new(false)));
+        preview.timeline_state.current_sec = 8.0;
+        preview.playback_speed = 2.0;
+        preview.looping = true;
+        preview.resolution = Resolution::HD;
+        preview.progress_total_sec = 10.0;
+        duration.store(3, Ordering::Relaxed);
+
+        preview.reload_scene();
+
+        assert_eq!(preview.evaluator.total_secs(), 3.0);
+        assert_eq!(preview.timeline_state.total_sec, 3.0);
+        assert_eq!(preview.timeline_state.current_sec, 3.0);
+        assert_eq!(preview.playback_speed, 2.0);
+        assert!(preview.looping);
+        assert_eq!(preview.resolution, Resolution::HD);
+        assert!(!preview.is_playing());
+        assert!(preview.need_eval);
+        assert!(preview.resolution_dirty);
+        assert_eq!(preview.progress_total_sec, -1.0);
+    }
+
+    #[test]
+    fn rebuild_pauses_playback_and_keeps_absolute_position() {
+        let mut preview = preview(
+            Arc::new(AtomicUsize::new(10)),
+            Arc::new(AtomicBool::new(false)),
+        );
+        preview.timeline_state.current_sec = 4.0;
+        preview.play();
+        preview.reload_scene();
+        assert!(!preview.is_playing());
+        assert!(preview.timeline_state.current_sec >= 4.0);
+        assert!(preview.timeline_state.current_sec <= 10.0);
+    }
+
+    #[test]
+    fn failed_rebuild_keeps_previous_scene_and_allows_retry() {
+        let duration = Arc::new(AtomicUsize::new(10));
+        let fail = Arc::new(AtomicBool::new(false));
+        let mut preview = preview(Arc::clone(&duration), Arc::clone(&fail));
+        preview.timeline_state.current_sec = 4.0;
+        fail.store(true, Ordering::Relaxed);
+        preview.reload_scene();
+        assert_eq!(preview.evaluator.total_secs(), 10.0);
+        assert_eq!(preview.timeline_state.current_sec, 4.0);
+
+        fail.store(false, Ordering::Relaxed);
+        duration.store(0, Ordering::Relaxed);
+        preview.reload_scene();
+        assert_eq!(preview.evaluator.total_secs(), 0.0);
+        assert_eq!(preview.timeline_state.current_sec, 0.0);
+    }
 }

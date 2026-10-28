@@ -15,6 +15,13 @@
     flake-utils.url = "github:numtide/flake-utils";
     crane.url = "github:ipetkov/crane";
     notist.url = "github:AzurIce/notist";
+    # Includes the workspace hotpatch cascade fix missing from dx 0.7.10.
+    dioxus = {
+      url = "github:DioxusLabs/dioxus/7bd964ae9469daafcb76b73556162d9082be255b";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.crane.follows = "crane";
+      inputs.rust-overlay.follows = "rust-overlay";
+    };
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -28,6 +35,7 @@
       rust-overlay,
       flake-utils,
       notist,
+      dioxus,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -53,12 +61,15 @@
         notistPackage = notist.packages.${system}.notist.overrideAttrs (_: {
           src = notist.outPath;
         });
+        dioxusPackage = dioxus.packages.${system}.dioxus-cli;
       in
       {
         packages.notist = notistPackage;
+        packages.dioxus-cli = dioxusPackage;
         devShells.default = craneLib.devShell {
           packages = [
             notistPackage
+            dioxusPackage
           ]
           ++ (with pkgs; [
             git-cliff

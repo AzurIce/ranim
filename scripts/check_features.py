@@ -56,6 +56,9 @@ def check(features, target=None, defaults=False):
             label, package
         )
     assert "symphonia" not in packages, "PCM playback must not enable file decoding"
+    assert ("dioxus-devtools" in packages) == (not target and "subsecond" in enabled), (
+        label, "dioxus-devtools"
+    )
 
     run(["cargo", "clippy", "-p", "ranim", "--lib", "--tests", *flags, "--", "-D", "warnings"])
     run(
@@ -64,9 +67,9 @@ def check(features, target=None, defaults=False):
     )
 
 
-for feature_set in ["", "items", "anims", "render", "render,items", "cmd-render", "cmd-preview"]:
+for feature_set in ["", "items", "anims", "render", "render,items", "cmd-render", "cmd-preview", "subsecond"]:
     check(feature_set)
-for feature_set, defaults in [("render", False), ("anims,render", False), ("", True)]:
+for feature_set, defaults in [("render", False), ("anims,render", False), ("render,subsecond", False), ("", True)]:
     check(feature_set, "wasm32-unknown-unknown", defaults)
 run([
     "cargo", "clippy", "-p", "ranim", "--examples", "--no-default-features",

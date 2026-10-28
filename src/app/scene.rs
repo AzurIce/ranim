@@ -25,12 +25,27 @@ impl Scene {
     /// The constructor may capture plugin configuration. It runs only when a
     /// selected scene is built, and may run again for another session.
     pub fn new(name: impl Into<String>, constructor: impl SceneConstructor + 'static) -> Self {
+        #[cfg(all(feature = "subsecond", not(target_family = "wasm")))]
+        let constructor = HotSceneConstructor(constructor);
         Self {
             name: name.into(),
             constructor: Arc::new(constructor),
             config: SceneConfig::default(),
             outputs: vec![Output::default()],
         }
+    }
+}
+
+// Keep the concrete constructor type at the hot-call boundary, before erasing
+// it behind Arc<dyn SceneConstructor>. Like Bevy's FunctionSystem, this lets
+// Subsecond redirect the monomorphized call into the project's patched code.
+#[cfg(all(feature = "subsecond", not(target_family = "wasm")))]
+struct HotSceneConstructor<F>(F);
+
+#[cfg(all(feature = "subsecond", not(target_family = "wasm")))]
+impl<F: SceneConstructor> SceneConstructor for HotSceneConstructor<F> {
+    fn construct(&self, r: &mut RanimScene) {
+        dioxus_devtools::subsecond::call(|| self.0.construct(r));
     }
 }
 

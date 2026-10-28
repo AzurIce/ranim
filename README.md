@@ -137,6 +137,55 @@ can compose scene collections and configuration from smaller pieces. Project
 resources are plain bevy resources: store them with `app.insert_resource(...)`
 (the type derives `ranim::Resource`) and read them back through `app.world()`.
 
+#### Experimental scene hot reload
+
+Enable the optional `subsecond` feature alongside `cmd-preview` (included in
+the defaults), then run your project with Dioxus CLI 0.7.10:
+
+```toml
+[dependencies]
+ranim = { version = "0.2.1", features = ["subsecond"] }
+```
+
+```sh
+cargo install dioxus-cli --version 0.7.10 --locked
+dx serve --hotpatch --desktop --args preview
+```
+
+For this repository's examples, use `dx` from `nix develop`: the flake pins
+upstream Dioxus commit `7bd964ae9469daafcb76b73556162d9082be255b`, which includes
+the workspace cascade fix missing from dx 0.7.10. The released CLI can fail
+with `Missing rustc args for replay: 'app'` by including unrelated reverse
+dependencies in its patch rebuild. The examples remain ordinary Cargo examples:
+
+```sh
+dx serve --hotpatch --desktop --example hello_ranim --features subsecond --args preview
+```
+
+The pinned main build still needs end-to-end validation with Ranim's 0.7
+Subsecond runtime. Ordinary `cargo run --example hello_ranim -- preview` is
+unaffected.
+
+Scene constructors registered with `Scene::new` (including `#[scene]` scenes)
+are hot-call boundaries. After a patch, native preview rebuilds the selected
+scene, its timeline, and audio, then pauses at the previous time (clamped to
+the new duration). The window, GPU device, resolution, and playback settings
+survive. Rebuilds are deferred until an active export finishes; a constructor
+panic keeps the previous scene paused and logs an error. Constructors should
+be repeatable: their external side effects are not rolled back.
+
+This is **scene reconstruction, not state migration**. Restart preview after
+changing plugins, registration, scene metadata (`#[scene]` / `#[output]`),
+captured configuration, dependencies, features, or type/capture layouts.
+For this supported workflow, keep scene implementations in `main.rs` or its
+modules. dx 0.7.10 also attempts workspace dependency patching, but that path
+has the cascade limitation above; do not rely on it for changes outside the
+scene host. Helper functions in the host crate can also update when reached
+through the scene's hot-call boundary.
+The feature does not enable Bevy system hotpatching or WASM hot reload, and
+does not replace compilation with dx. Ordinary `cargo run` still works without
+a devserver.
+
 #### Custom render setup
 
 Register a `RenderSetup` when the project renders more than the types covered

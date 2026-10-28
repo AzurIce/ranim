@@ -19,6 +19,7 @@ fmt-check:
 lint: lint-default
     just lint-feature-boundaries
     just lint-features audio-decode
+    just lint-features subsecond
     just lint-features cmd-preview,typst,gltf
 
 lint-default: fmt-check
