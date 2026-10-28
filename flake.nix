@@ -49,26 +49,16 @@
             ];
           }
         );
-        mdbook-typst-math = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
-          pname = "mdbook-typst-math";
-          version = "0.4.0";
-
-          src = pkgs.fetchFromGitHub {
-            owner = "duskmoon314";
-            repo = "mdbook-typst-math";
-            rev = "52341bd8ec2ffde6db92cfd5e5d7503076fbd94e";
-            hash = "sha256-0tBtRI3R19f4UA6uEzRZoKgptc/OgUEOOYm6hammweo=";
-          };
-
-          cargoHash = "sha256-PMgo5PnDPUQgLwpN3S6N7tFYXv2Jb0FTepf7HOHXpjY=";
+        # Upstream source filtering currently omits notist-html highlight.css.
+        notistPackage = notist.packages.${system}.notist.overrideAttrs (_: {
+          src = notist.outPath;
         });
       in
       {
-        packages.notist = notist.packages.${system}.notist;
+        packages.notist = notistPackage;
         devShells.default = craneLib.devShell {
           packages = [
-            mdbook-typst-math
-            notist.packages.${system}.notist
+            notistPackage
           ]
           ++ (with pkgs; [
             git-cliff
@@ -77,16 +67,12 @@
             samply
             cargo-udeps
             miniserve
-            mdbook
             binaryen
-            mdbook-mermaid
             typst
             gh
             ffmpeg
             wasm-bindgen-cli_0_2_129
             # Match the wasm-bindgen version in Cargo.lock.
-            # mdbook-katex
-            # mdbook-i18n-helpers
           ])
           ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
             pkgs.vulkan-loader

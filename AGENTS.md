@@ -143,43 +143,12 @@ Use code blocks, mermaid diagrams, or examples as needed.
   - Before/after comparisons for refactorings.
 - Omit implementation noise unless it is the point.
 
-## mdBook 数学公式
+## Book 数学公式与 issue 引用
 
-Ranim Book 通过 `mdbook-typst-math` 将公式渲染为 SVG。行内公式使用
-`$...$`，独立公式使用 `$$...$$`；分隔符中的内容必须是 **Typst math
-syntax**，不能直接粘贴 LaTeX。
+Book 使用 notist-book 构建，Typst 和 Pele 组件位于 `book/_components/`。
+行内公式使用 `$...$`（Typst math syntax）；独立公式使用
+`#typst.math<BlockContent>(...)` 并导入 typst 组件。图表使用
+`#pele.diagram(...)`。issue/PR 引用使用 `#issue("123")`，并导入
+相对路径的 `_components/issue.notc`；链接指向 GitHub `/pull/N`。
 
-常用写法：
-
-- 分式：`frac(a, b)`
-- 矩阵：`mat(a, b; c, d)`，分号分隔行
-- 黑板粗体：`RR`、`ZZ`
-- 命名算子：`op("rank")`
-- 粗体符号：`bold(v)`
-- 点乘符号：`a dot b`
-
-Typst 会把相邻字母解析成一个标识符。例如，矩阵 `A` 乘向量 `p` 应写成
-`A p`，而不是 `Ap`。迁移 LaTeX 公式时，应按 Typst 的语义重新书写，不要只
-替换命令名称。
-
-## mdBook issue/PR 引用链接
-
-正文中裸写的 `#N` 引用由仓库内预处理器
-`book/preprocessors/issue_links.rs` 在构建时自动链接到 GitHub。链接
-一律指向 `/pull/N`——GitHub 对 issue 编号会 302 重定向到 `/issues/N`
-（这也是 bevy.org 的做法），因此无需区分 PR 与 issue、无任何 API 依赖。
-它是一个 rust script（`cargo -Zscript`，需要 nightly——仓库已在 flake 与
-Book CI 中固定 `nightly-2026-10-01`），不在 workspace 内，`just lint`
-不覆盖它。
-
-修改公式后，从仓库根目录构建整本书进行验证：
-
-```bash
-nix develop --command mdbook build book
-```
-
-无需单独安装预处理器：Nix 开发环境和 Book CI 都固定使用上游
-`duskmoon314/mdbook-typst-math` 的提交
-`52341bd8ec2ffde6db92cfd5e5d7503076fbd94e`。升级该提交时，应同时更新
-`flake.nix`、`.github/workflows/build-book.yml` 和 `.github/workflows/book.yml`，
-并重新执行完整的书籍构建。
+修改 Book 后运行 `nix develop --command just book` 验证。

@@ -1,0 +1,76 @@
+#import "./lib.notc" as pele;
+= Pele
+
+Pele 使用 Mermaid 图形语法，输出由 CSS 变量控制主题的 SVG。lib.notc 声明块级图形函数：
+
+```notc
+fn diagram(source: String, theme: String = "auto") -> BlockContent;
+```
+
+source 是图形源码。theme 支持 auto、light、dark；其他值按 auto 处理。auto 使用宿主的颜色与字体变量，没有宿主颜色时按宿主的 color-scheme 选择回退配色，宿主未明确明暗模式时跟随系统；light / dark 固定颜色。组件上的 --pele-* CSS 变量可覆盖配色。
+
+浏览器组件使用固定版本 [Pele 1.6.0](https://github.com/obsidianmd/pele/releases/tag/1.6.0) 的 CDN ESM，首次呈现需要网络，无需单独构建模块。Notist 管线只保存调用参数；HTML host 注册 diagram/index.js 默认导出的 HTMLElement 类，由它在 Shadow DOM 中绘图。宿主的普通标签样式不影响 SVG，CSS 变量仍可继承。
+
+组件复用 Pele 的 mount，随源码、可用宽度和加载中的字体更新布局，图形缩小时提供缩放控件。断开时释放观察器与交互事件，重连时重新挂载；加载期间的旧请求不会覆盖新输入。颜色变化通过 CSS 生效，不重新绘图。renderedSvg 在当前输入成功绘制且组件连接时返回 SVG，更新中或失败时返回 null。
+
+源码错误由 Pele 在组件内显示，并保留上一次成功图形作为淡化预览；修改源码后可恢复。依赖加载失败也显示在组件内。
+
+本函数与 [Mermaid](https://github.com/AzurIce/notist/blob/main/modules/mermaid/README.not) 使用相同签名及 auto / light / dark 主题约定，可作为项目 diagram 声明的 transform 目标。公共调用的源码使用二者共同支持的 Mermaid 语法；项目声明与切换方式见 [Vault 组件示例](https://github.com/AzurIce/notist/blob/main/docs/components/README.not)。
+
+== 使用
+
+Markup 通过相对路径导入，并调用 `#pele.diagram(...)`。Code 使用相同的路径与函数，import 声明和函数调用均不带 `#`。
+
+```not
+#import "../modules/pele/lib.notc" as pele;
+
+#pele.diagram("flowchart LR; Source --> Item")
+```
+
+#pele.diagram(r#"""
+flowchart LR
+    source[源码] --> analyze[分析]
+    analyze --> item([Item 树])
+"""#)
+
+subgraph 可指定自己的布局方向：
+
+#pele.diagram(r#"""
+flowchart LR
+    source[源码] --> analysis
+    subgraph analysis[共享 Markup 管线]
+        direction TB
+        resolve[Resolve] --> shape[Shape]
+        shape --> materialize[Materialize]
+    end
+    analysis --> item([求值前 Item 树])
+    item --> evaluate[Evaluate]
+    evaluate --> result([求值后 Item 树])
+"""#)
+
+== 语法与主题
+
+该模块使用 Pele 自身的 Mermaid 语法实现。标签由 SVG text / tspan 呈现，不使用 foreignObject；不能依赖任意 HTML 标签或宿主 CSS 为标签排版。Mermaid 的 theme / themeVariables 配色配置不生效，使用组件 theme 参数或 --pele-* 变量。具体语法差异见 [Pele compatibility](https://pele.run/compatibility)，变量见 [Pele theming](https://pele.run/theming)。
+
+auto 将宿主的 --bg、--fg、--muted、--line、--surface、--code 和 --accent 映射到图形颜色，将 --font-ui / --font-code 映射到图形字体。自定义样式可以按函数属性选择组件：
+
+```css
+[notist-function$="/pele/lib.notc.diagram"] {
+    --pele-accent: #6486d9;
+    --pele-radius: 6px;
+}
+```
+
+== 构建与验证
+
+在仓库根目录执行：
+
+```sh
+cargo run -p notist-cli -- check modules/pele/README.not
+cargo run -p notist-cli -- html modules/pele/README.not --out-dir target/pele-demo
+python3 -m http.server
+```
+
+通过 HTTP 打开 /target/pele-demo/。Web 预览的资源根使用 ../modules/pele/，输出配置留空，源码路径使用 README.not。组件资源发布与参数协议见 [内容函数与输出绑定](https://github.com/AzurIce/notist/blob/main/docs/designs/content-functions.not)。
+
+tests/browser.cjs 使用 Playwright 检查发布后的 HTML、中文与长标签、CSS 隔离、主题、窄屏与缩放、更新与重连、错误恢复。先生成 target/pele-demo，再通过 HTTP 服务仓库，并在 NODE_PATH 上提供 Playwright，执行 `node modules/pele/tests/browser.cjs`。NOTIST_TEST_URL 指定服务地址，NOTIST_CHROMIUM 可指定浏览器路径。

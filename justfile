@@ -60,7 +60,7 @@ doc-examples:
     CARGO_BUILD_JOBS={{ cargo_jobs }} cargo examples build --out-dir packages/ranim-examples/target/doc/ranim_examples
 
 book:
-    mdbook build book
+    {{ notist }} book build book
 
 preview EXAMPLE:
     cargo run --example {{ EXAMPLE }} -- preview
