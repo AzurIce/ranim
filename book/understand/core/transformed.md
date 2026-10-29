@@ -7,7 +7,7 @@
 
 ranim 把“物件自身的数据”和“附加在物件外的变换”分开表达：
 
-```rust,ignore
+```rust
 pub struct Transformed<T, G> {
     pub inner: T,
     pub transform: G,
@@ -73,7 +73,7 @@ op("compose")(g_2, g_1) = g_2 g_1
 
 基础接口是：
 
-```rust,ignore
+```rust
 pub trait ApplyTransform<G> {
     fn apply(&mut self, transform: G) -> &mut Self;
 }
@@ -81,7 +81,7 @@ pub trait ApplyTransform<G> {
 
 物件通过实现范围声明自己的闭包：
 
-```rust,ignore
+```rust
 // 点数据可以吸收仿射变换及其子类型
 impl<G: Into<DAffine3>> ApplyTransform<G> for VItem { /* ... */ }
 
@@ -107,20 +107,20 @@ canonical `Rectangle`、`Circle`、`Sphere` 等不直接实现 `ApplyTransform`�
 
 构造器同时接收物件与变换：
 
-```rust,ignore
+```rust
 let item = Transformed::new(mesh, DAffine3::IDENTITY);
 ```
 
 prelude 还导出了 blanket extension trait，可以写成：
 
-```rust,ignore
+```rust
 let item = mesh.transformed::<DAffine3>(DAffine3::IDENTITY);
 ```
 
 `.transformed::<G>(g)` 的参数必须恰好是 `G`；这个入口不会替调用者选择更宽的
 存储类型。通常可以让类型推断直接从参数得到 `G`：
 
-```rust,ignore
+```rust
 let item = mesh.transformed(Translation(offset));
 // 类型是 Transformed<MeshItem, Translation>
 ```
@@ -142,7 +142,7 @@ F_("inner")' = F H
 
 对应 API：
 
-```rust,ignore
+```rust
 item.compose_outer(h); // transform = h * transform
 item.compose_inner(h); // transform = transform * h
 ```
@@ -150,7 +150,7 @@ item.compose_inner(h); // transform = transform * h
 `ApplyTransform<H> for Transformed<T, G>` 使用 **outer composition**，所以
 `shift`、`rotate`、`scale_uniform` 和 `scale` 在可用时也都走左乘：
 
-```rust,ignore
+```rust
 item.apply(h); // 等价于 item.compose_outer(h)
 ```
 
@@ -161,7 +161,7 @@ item.apply(h); // 等价于 item.compose_outer(h)
 
 下面的 wrapper 保持 `Similarity` 存储：
 
-```rust,ignore
+```rust
 let mut item = sphere.transformed(Similarity::IDENTITY);
 item.shift(offset);        // Translation -> Similarity
 item.scale_uniform(2.0);   // 仍是 Transformed<Sphere, Similarity>
@@ -171,7 +171,7 @@ item.scale_uniform(2.0);   // 仍是 Transformed<Sphere, Similarity>
 类型改成 `Transformed<_, DAffine3>`，而是在编译期不可用。需要更一般的组合时，
 显式 widening：
 
-```rust,ignore
+```rust
 let narrow = mesh.transformed(Translation(offset));
 let mut affine: Transformed<_, DAffine3> = narrow.into();
 affine.scale(DVec3::new(2.0, 1.0, 1.0));
@@ -200,7 +200,7 @@ Transformed {
 
 `bake` 的签名直接使用 wrapper 的 `G`：
 
-```rust,ignore
+```rust
 pub fn bake(self) -> T
 where
     T: ApplyTransform<G>;
@@ -208,7 +208,7 @@ where
 
 所以它是否存在完全由类型系统决定：
 
-```rust,ignore
+```rust
 let polygon = Polygon::new(points)
     .transformed(DAffine3::from_scale(...))
     .bake(); // Polygon: ApplyTransform<DAffine3>
@@ -284,7 +284,7 @@ wrapper，直到渲染提取时才将变换转为 `DAffine3`，与父上下文�
 
 只有两个 wrapper 的 `T` 与 `G` 都相同时才能直接插值：
 
-```rust,ignore
+```rust
 Self {
     inner: self.inner.lerp(&target.inner, t),
     transform: self.transform.lerp(&target.transform, t),
@@ -324,7 +324,7 @@ wrapper 的独立插值意味着：同一点集在不同放置下的过渡**始�
 
 它不同于 wrapper 组合：
 
-```rust,ignore
+```rust
 rectangle.scale_axes(dvec2(2.0, 0.5));
 // 修改 Rectangle 的维度参数
 

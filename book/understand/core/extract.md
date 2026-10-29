@@ -15,7 +15,7 @@ renderer 或逻辑 ECS World。
 整个批次上，同类型的输出连续保存。`SceneEvaluator::sample_at(sec, &mut frame)`
 先清空上一帧，再写入当前结果；`clear` 保留各批次容量。
 
-```rust,ignore
+```rust
 use ranim_core::frame::EvaluatedFrame;
 use ranim_items::vitem::geometry::Circle;
 
@@ -44,7 +44,7 @@ call 的数量互不等同。
 
 渲染协议定义在 `ranim_render::extract`：
 
-```rust,ignore
+```rust
 pub trait Extract {
     fn extract(&self, ctx: &mut ExtractContext<'_>);
 }
@@ -54,7 +54,7 @@ pub trait Extract {
 列表。一个物件可以委托给已有表示的 `Extract`，也可以直接写入自己的组件或
 资源。例如自定义标记复用圆的提取实现：
 
-```rust,ignore
+```rust
 use ranim_items::vitem::geometry::Circle;
 use ranim_render::extract::{Extract, ExtractContext};
 
@@ -97,7 +97,7 @@ render world 的提取阶段，成员通过同一个上下文共享输出顺序�
 实现 `Extract` 使一个值能够被解释；`ExtractPlugin<T>` 把解释入口注册到
 渲染 SubApp 的提取阶段（`RenderSchedule::Extract`）。`T` 必须是帧实际保存的完整类型：
 
-```rust,ignore
+```rust
 use ranim::{App, Plugin};
 use ranim_items::{RanimItemsPlugin, vitem::geometry::Circle};
 use ranim_render::{RenderSetup, extract::ExtractPlugin};
@@ -140,7 +140,7 @@ family plugin 不枚举容器或 wrapper 组合。项目插件可保存一份
 output 与 preview 从项目 App 读取这份 resource（缺省时回退到默认配置），克隆后
 交给渲染 SubApp 的安装函数。低层宿主也可自行装配：
 
-```rust,ignore
+```rust
 use ranim_render::{RenderSetup, install_render_app};
 
 let setup = app.world().resource::<RenderSetup>().clone();
@@ -163,7 +163,7 @@ install_render_app(&mut app, &ctx, width, height, oit_layers, setup);
 `ViewPhase::{Clear, Compute, Depth, Color, Resolve}` 是 `View` schedule 内
 按序排列的 system set。手写插件直接引用这些值注册系统：
 
-```rust,ignore
+```rust
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use ranim_render::schedule::{RenderSchedule, ViewPhase};
 

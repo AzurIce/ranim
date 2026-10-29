@@ -41,7 +41,7 @@ RanimScene 根 AnimStack  →  SceneEvaluator 采样
 Ranim 的叶子动画核心是一个统一的求值协议。动画内容一旦定义就不可变：它是自身
 归一化进度 `alpha ∈ [0, 1]` 的纯函数。
 
-```rust,ignore
+```rust
 pub trait Eval {
     type Output;
 
@@ -66,7 +66,7 @@ pub trait Eval {
 
 `EvalExt` 提供两个 build 期便捷方法：
 
-```rust,ignore
+```rust
 pub trait EvalExt: Eval + Sized {
     fn apply_alpha_to(self, item: &mut Self::Output, alpha: f64) -> Self;
     fn apply_to(self, item: &mut Self::Output) -> Self; // alpha = 1.0
@@ -80,7 +80,7 @@ pub trait EvalExt: Eval + Sized {
 
 `ranim::core::time` 只有两个类型别名：
 
-```rust,ignore
+```rust
 pub type Alpha = f64;       // 归一化进度
 pub type DeltaAlpha = f64;  // 均匀进度步长
 ```
@@ -99,7 +99,7 @@ pub type DeltaAlpha = f64;  // 均匀进度步长
 
 闭包是匿名类型，不能按名字实现 `Eval`，所以用 `Pure` 包一层：
 
-```rust,ignore
+```rust
 use ranim::core::animation::eval::pure::Pure;
 
 let animation = Pure::new(|alpha| Square::new(alpha)).with_duration(2.0);
@@ -112,7 +112,7 @@ wrapper。
 
 物理模拟、混沌系统等没有闭式的内容，用逐步推进的方式定义：
 
-```rust,ignore
+```rust
 pub trait IterativeEval {
     type Output;
 
@@ -124,7 +124,7 @@ pub trait IterativeEval {
 `Iterative::new(initial, evaluator)` 持有不可变的定义（初始状态、`sim_step`、
 step 逻辑），把积分快照放在内部 `RefCell<Snapshot>` 中：
 
-```rust,ignore
+```rust
 let sim_secs = 4.0;
 
 let animation = Iterative::from_fn(
@@ -158,7 +158,7 @@ let animation = Iterative::from_fn(
 
 以一行最常见的代码为例，自顶向下拆开它经过的每一层：
 
-```rust,ignore
+```rust
 let animation = square.fade_in().with_duration(1.0);
 ```
 
@@ -168,7 +168,7 @@ evaluator `FadeIn<T>`，并通过 `EvalExt::apply_to` 把 `square` 就地置为�
 态——所以动画创建完成时，item 本身已经是「播完」的样子，后续 build 出的新
 状态都从这个末态出发：
 
-```rust,ignore
+```rust
 fn fade_in(&mut self) -> FadeIn<Self> {
     FadeIn::new(self.clone()).apply_to(self)
 }
@@ -177,7 +177,7 @@ fn fade_in(&mut self) -> FadeIn<Self> {
 **第 2 层：`FadeIn<T>`。** 它就是一个普通的 `Eval` 实现——持有初末两个状态，
 按 `alpha` 插值：
 
-```rust,ignore
+```rust
 pub struct FadeIn<T: FadingRequirement> {
     src: T,
     dst: T,
@@ -195,7 +195,7 @@ impl<T: FadingRequirement> Eval for FadeIn<T> {
 `Clone + Send + Sync + 'static`，就自动实现 `IntoAnimNode`，默认参数为 linear、时长
 1 秒、enabled：
 
-```rust,ignore
+```rust
 impl<E> IntoAnimNode for E
 where
     E: Eval + 'static,
@@ -232,7 +232,7 @@ ranim::anims
 所有尚未固定父时间坐标的 `Unplaced` 动画通过 `PlaybackExt` 获得统一的播放
 参数 API：
 
-```rust,ignore
+```rust
 animation
     .with_duration(2.0)
     .with_rate_func(smooth)
@@ -242,7 +242,7 @@ animation
 `At<A>` 表示已经固定在父时间坐标中的 entry，不再实现 `Unplaced`，因此参数
 必须在 placement 之前设置：
 
-```rust,ignore
+```rust
 animation.with_duration(2.0).at(3.0); // At<Paramed<A>>
 ```
 
@@ -256,7 +256,7 @@ animation.with_duration(2.0).at(3.0); // At<Paramed<A>>
 `AnimSequence::push` 先将动画 lower 为局部 `AnimNode`，再把它移动到当前
 cursor，并按 node duration 推进 cursor：
 
-```rust,ignore
+```rust
 let mut intro = AnimSequence::new();
 intro
     .push(square.clone().fade_in())
@@ -277,7 +277,7 @@ Sequence 自己通过 cursor 决定子动画的位置，因此 `push` 只接受�
 Sequence 本身仍实现 `IntoAnimNode` 与 `Unplaced`，所以可以先独立构造，再整体
 使用 `at` 放置或加入另一个组合：
 
-```rust,ignore
+```rust
 r.play(intro.at(2.0));
 ```
 
@@ -316,7 +316,7 @@ hold at 2 -> 只保持 B 的左侧终态
 末尾的 `show()` 会成为最终求值结果，末尾的 `hide()` 则自然得到空结果；`hold`
 只负责把这个结果保存为静态动画。
 
-```rust,ignore
+```rust
 let mut content = AnimSequence::new();
 content
     .push(square.show())
@@ -330,7 +330,7 @@ content
 
 如果两个物件需要独立生命周期，应分别使用两个 Sequence：
 
-```rust,ignore
+```rust
 r.play(square_sequence);
 r.play(circle_sequence);
 ```
@@ -342,7 +342,7 @@ r.play(circle_sequence);
 `AnimStack::push` 不推进其他子动画；Stack duration 是所有子动画 duration 的
 最大值：
 
-```rust,ignore
+```rust
 let animation = stack![
     background.show().with_duration(5.0),
     content.at(1.0),
@@ -357,7 +357,7 @@ Stack 接受普通 `Unplaced` 动画和已经放置的 `At<A>`。普通动画从
 
 `RanimScene` 自带一个根 `AnimStack`：
 
-```rust,ignore
+```rust
 pub fn play<A: IntoAnimNode + 'static>(&mut self, animation: A) -> &mut Self {
     self.root.push(animation);
     self
@@ -369,7 +369,7 @@ pub fn play<A: IntoAnimNode + 'static>(&mut self, animation: A) -> &mut Self {
 
 运行时数量不固定时可以直接构造 `AnimStack`：
 
-```rust,ignore
+```rust
 let mut layers = AnimStack::new();
 for animation in animations {
     layers.push(animation);
@@ -384,7 +384,7 @@ Scene 总时长是根 Stack 中最长子动画的 duration。新模型不会像�
 
 需要全程存在的内容应显式指定生命周期：
 
-```rust,ignore
+```rust
 let total_secs = content.cursor_sec();
 
 let mut camera = AnimSequence::new();
@@ -408,7 +408,7 @@ r.play(content);
 - `1.0` —— 首尾相接（类似 `AnimSequence`）；
 - 中间值 —— 重叠相继。
 
-```rust,ignore
+```rust
 let animation = lagged![0.2;
     square.fade_in(),
     circle.fade_in(),
@@ -430,7 +430,7 @@ r.play(animation);
 
 对一组元素施加同一个动画时，用迭代器收集（core 的 `AnimIterExt`）：
 
-```rust,ignore
+```rust
 let animation = group
     .iter_mut()
     .map(|item| item.fade_in().with_rate_func(smooth))
@@ -444,7 +444,7 @@ let animation = group
 
 固定写法可以使用宏简化：
 
-```rust,ignore
+```rust
 let intro = seq![
     square.clone().fade_in(),
     square.fade_out(),
@@ -529,7 +529,7 @@ hold 不会嵌套捕获。普通叶子无需先产生 `Vec<DynOutput>`。`Vec<T>
 `Sound` 是音频平面的叶子 atom，使用方式与视觉动画一致（`from_file` 需要
 `audio-decode` feature）：
 
-```rust,ignore
+```rust
 let mut scene = RanimScene::new();
 scene.play(seq![
     square.fade_in(),

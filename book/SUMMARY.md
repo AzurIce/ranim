@@ -3,6 +3,7 @@
 [首页](README.md)
 
 - [Getting Started](./getting_started.md)
+- [项目入口：场景库与跨平台宿主](./project-entry.md)
 - [Ranim Packages](./packages.md)
 - [命令行入口](./cli.md)
 

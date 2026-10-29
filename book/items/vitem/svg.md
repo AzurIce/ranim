@@ -5,7 +5,7 @@
 
 从 SVG 构造的矢量物件，定义于 `ranim_items::vitem::svg`。
 
-```rust,ignore
+```rust
 pub struct SvgItem(Transformed<Node<VItem>, DAffine3>);
 
 let svg = SvgItem::new(svg_str); // svg_str: impl AsRef<str>

@@ -39,7 +39,7 @@ required-features = ["anims", "render"]
 `cmd-render`（默认已启用）；xtask 原生导出时自动加上它。WASM 只需共享 features。
 `main.rs` 声明 `mod scenes`，按 target 编译原生 CLI 或 WASM 导出：
 
-```rust,ignore
+```rust
 mod scenes;
 
 #[cfg(not(target_arch = "wasm32"))]

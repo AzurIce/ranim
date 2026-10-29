@@ -275,7 +275,7 @@ Ranim 现在把完整动画输出保留到渲染侧。求值只产生 CPU 值，
 渲染协议位于 `ranim_render::extract`，借用输入并通过 `ExtractContext` 更新
 World。自定义值可以委托给内部物件的实现，也可以直接生成组件或资源：
 
-```rust,ignore
+```rust
 use ranim_items::vitem::geometry::Circle;
 use ranim_render::extract::{Extract, ExtractContext};
 
@@ -312,7 +312,7 @@ impl Extract for Marker {
 renderer。`FrameItem<T>` 携带 `id`、全局 `order` 与完整的 `value`；不同类型
 共享插入顺序，无须依赖批次容器的遍历顺序：
 
-```rust,ignore
+```rust
 use ranim_items::camera::CameraFrame;
 use ranim_core::frame::EvaluatedFrame;
 use ranim_items::vitem::geometry::Circle;
@@ -355,7 +355,7 @@ assert_eq!(frame.len(), 2);
 `RanimItemsPlugin`）；需要额外输入类型时，项目插件保存一份自定义渲染装配，
 场景插件仅注册场景：
 
-```rust,ignore
+```rust
 use ranim::{App, Plugin};
 use ranim_items::{RanimItemsPlugin, vitem::geometry::Circle};
 use ranim_render::{RenderSetup, extract::ExtractPlugin};
@@ -395,7 +395,7 @@ preview 从项目 App 读取 setup（缺省时回退到默认配置），经
 渲染 SubApp 中的缓冲交换，运行一次 `SubApp::update()` 后再交换回来，输入数据与
 批次容量保持完整。入口因此接收 `&mut EvaluatedFrame`，提取只借用帧中的原始值：
 
-```rust,ignore
+```rust
 render_app.render_frame(&mut textures, clear_color, &mut frame);
 ```
 
@@ -542,7 +542,7 @@ pub type DeltaAlpha = f64;  // 均匀进度步长
 
 ### `SceneEvaluator`：单入口会话驱动
 
-```rust,ignore
+```rust
 use ranim_core::frame::EvaluatedFrame;
 use ranim_items::vitem::VItem;
 
@@ -602,7 +602,7 @@ https://github.com/AzurIce/ranim/pull/185
 容器和异构元组现在可以直接成为完整动画输出。求值帧保留它们的原始结构，
 渲染侧的递归 `Extract` 再处理各成员，成员无需共享一种输出 primitive：
 
-```rust,ignore
+```rust
 use ranim_core::frame::EvaluatedFrame;
 use ranim_items::vitem::geometry::{Circle, Line};
 use ranim_render::extract::ExtractPlugin;

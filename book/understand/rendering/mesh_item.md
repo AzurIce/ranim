@@ -5,7 +5,7 @@
 
 3D 三角网格的渲染组件，需要 items 的 `render` feature，定义于 `ranim_items::mesh::render`。
 
-```rust,ignore
+```rust
 pub struct RenderMeshItem {
     /// 顶点（局部空间）
     pub points: Vec<Vec3>,

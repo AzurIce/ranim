@@ -3,7 +3,14 @@
 > [!caution]
 > 本书绝大多数内容目前均由 ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
 
-Ranim 的场景由一个 `fn(&mut RanimScene)` 函数构造。场景函数只负责定义动画。项目是自己的二进制 crate：`ranim::App` 就是 `bevy_app::App` 的直接再导出，场景注册与选择（`add_scene` / `add_scenes` / `scenes` / `scene(name)` / `first_scene()`）由 `ranim::AppExt` trait（prelude 已导出）在 App 上提供；`main` 创建 App、注册场景，再用 `app.build()`（`ranim::RanimAppExt`，prelude 已导出）把构建中的 App 定稿为 `ranim::RanimApp`，交给自由函数 `run_cli`（prelude 已导出）解析进程参数、分发命令行子命令；`ranim::Plugin` 是 bevy `Plugin` 的再导出，是组织场景与自定义渲染配置的可选机制，Web 预览宿主使用同一份装配。
+Ranim 的场景仍由一个 `fn(&mut RanimScene)` 函数构造，只负责定义动画，
+可以写在 `src/lib.rs`、普通模块或独立的库 crate 中；**不要求把场景搬进二进制**。
+变化在运行入口：宿主二进制用 `App` 显式注册场景与项目配置，`app.build()` 定稿后，
+native 下交给 `run_cli`，WASM 下包装为 `WasmApp`，通过导出的 `app()` 供 JavaScript 使用。
+`Plugin` 只是复用注册和配置的可选工具，并不替代场景函数。
+
+本章介绍场景的编写。完整的 lib / bin 布局、两种平台入口和构建命令见
+[项目入口：场景库与跨平台宿主](./project-entry.md)。
 
 ## 准备项目
 
@@ -17,10 +24,12 @@ ranim = "..."
 默认启用 `anims`、`items`、`cmd-preview`；`cmd-preview → cmd-render → render`。
 只需原生导出时，设置 `default-features = false` 并开启 `anims,cmd-render`。
 `render` 本身只提供渲染器和 WASM 宿主，不包含内置物件或原生命令。
-`src/main.rs` 注册场景，`build()` 定稿后交给 `run_cli`：
+例如包名为 `my-animation`，场景定义在 `src/lib.rs` 时，native 的
+`src/main.rs` 从库中导入并注册场景，`build()` 定稿后交给 `run_cli`：
 
-```rust,ignore
+```rust
 use ranim::prelude::*;
+use my_animation::hello;
 
 fn main() {
     let mut app = App::new();
@@ -43,7 +52,7 @@ fn main() {
 
 动画代码通常从 prelude、item 类型和对应的动画扩展 trait 中导入 API：
 
-```rust,ignore
+```rust
 use ranim::{
     anims::fading::FadingAnim,
     color::palettes::manim,
@@ -61,7 +70,7 @@ use ranim::{
 
 以下类型有意**不**放进 prelude，需要时显式导入：
 
-```rust,ignore
+```rust
 use ranim_core::audio::AudioError;
 use ranim_core::animation::build::{At, Paramed};
 use ranim_core::animation::node::{AnimNode, AnimationInfo};
@@ -77,7 +86,8 @@ use ranim_core::frame::EvaluatedFrame;
 
 下面的场景让一个蓝色正方形淡入、保持一秒，再淡出。相机作为独立 Sequence 与内容并行播放：
 
-```rust,ignore
+```rust
+// src/lib.rs
 use ranim::{
     anims::fading::FadingAnim,
     color::palettes::manim,
@@ -87,7 +97,7 @@ use ranim::{
 
 #[scene(clear_color = "#000000")]
 #[output(width = 1280, height = 720, fps = 30, format = "mp4")]
-fn hello(r: &mut RanimScene) {
+pub fn hello(r: &mut RanimScene) {
     let square = Square::new(2.0).with(|square| {
         square.set_color(manim::BLUE_C);
     });
@@ -110,9 +120,15 @@ fn hello(r: &mut RanimScene) {
 
 `#[scene]` 保留场景函数，并生成同名模块中的 `hello::scene() -> Scene`。
 每次调用都创建一个 owned 描述符，其中包含名称、构造函数、配置和输出列表。
+这里的 `pub` 同时使场景函数和生成的同名模块对二进制可见；在 lib 中定义场景
+不会自动注册它，也不会启动渲染。
 把描述符注册进 App（`add_scene` / `add_scenes` 由 `AppExt` 提供），`build()` 定稿后交给 `run_cli`：
 
-```rust,ignore
+```rust
+// src/main.rs（native）
+use my_animation::hello;
+use ranim::prelude::*;
+
 fn main() {
     let mut app = App::new();
     app.add_scenes([hello::scene()]);
@@ -133,14 +149,23 @@ fn main() {
 `ranim::Plugin` 就是 bevy 的 `Plugin`。插件持有自己的配置，在 `build` 中安装项目能力——`build` 的签名是 `fn build(&self, app: &mut bevy_app::App)`；`ranim::App` 与 `bevy_app::App` 是同一类型，写成 `&mut App` 完全等价。场景注册等方法由 `AppExt` trait（prelude 已导出）在 App 上提供。场景变多、
 需要跨二进制复用，或要携带自定义渲染配置时，把它们收进插件：
 
-```rust,ignore
+```rust
+// 追加到 src/lib.rs
 pub struct DemoScenesPlugin;
 
 impl Plugin for DemoScenesPlugin {
-    fn build(&self, app: &mut bevy_app::App) {
+    fn build(&self, app: &mut App) {
         app.add_scenes([hello::scene()]);
     }
 }
+```
+
+二进制入口安装库导出的插件，场景定义仍留在 lib 中：
+
+```rust
+// src/main.rs（native）
+use my_animation::DemoScenesPlugin;
+use ranim::prelude::*;
 
 fn main() {
     let mut app = App::new();
@@ -151,7 +176,7 @@ fn main() {
 
 宿主既可以直接安装插件类型，也可以安装另一个 crate 的普通 Rust 工厂函数：
 
-```rust,ignore
+```rust
 let mut app = App::new();
 app.add_plugins(DemoScenesPlugin);
 
@@ -172,7 +197,7 @@ app.add_plugins(my_project::plugin());
 渲染配置依赖 `ranim` 的 `render` feature（默认的 `cmd-preview` 会间接启用它）。启用 `items` 的项目未注册
 `RenderSetup` 时，渲染与预览使用的默认配置等价于：
 
-```rust,ignore
+```rust
 RenderSetup::new(|render_app| {
     render_app.add_plugins(RanimItemsPlugin);
 })
@@ -189,7 +214,7 @@ RenderSetup::new(|render_app| {
 自定义类型——在插件中注册自己的 `RenderSetup`，为实际完整类型加入
 `ExtractPlugin<T>`（只注册 `T` 不会读取这些组合）：
 
-```rust,ignore
+```rust
 use ranim::{
     items::RanimItemsPlugin,
     render::{RenderSetup, extract::ExtractPlugin},
@@ -219,7 +244,7 @@ App 取得并在每次安装渲染 SubApp 时重放，分辨率变化和后台�
 
 `RanimScene::play` 等价于向根 `AnimStack` 执行 `push`：
 
-```rust,ignore
+```rust
 r.play(camera);
 r.play(content);
 ```
@@ -243,7 +268,7 @@ r.play(content);
 
 完整的 show/hide 示例可以直接查看：
 
-```rust,ignore
+```rust
 {{#rustdoc_include ../../examples/getting_started0/scenes.rs:construct}}
 ```
 
@@ -251,7 +276,7 @@ r.play(content);
 
 `forward` 表示明确的空白时间；`hold` 表示把当前状态延长一段时间。新模型不会隐式认为一个动画结束后物件仍然存在。
 
-```rust,ignore
+```rust
 sequence
     .push(square.fade_in())
     .hold(1.0)    // 保持淡入后的状态
@@ -263,7 +288,7 @@ sequence
 
 `show()` 和 `hide()` 是用于 Sequence 状态切换的零时长事件。cursor 上出现状态事件时，后续 `hold` 使用这些事件组成新的完整状态快照，不再继承左侧状态。
 
-```rust,ignore
+```rust
 sequence
     .push(square.show())
     .hold(1.0)
@@ -277,7 +302,7 @@ sequence
 
 固定数量的并行动画可以使用 `stack!`：
 
-```rust,ignore
+```rust
 let scene = stack![
     background.show().with_duration(total_secs),
     content,
@@ -288,7 +313,7 @@ r.play(scene);
 
 运行时动态生成的动画使用 `AnimStack`：
 
-```rust,ignore
+```rust
 let mut layers = AnimStack::new();
 for animation in animations {
     layers.push(animation);
@@ -304,13 +329,13 @@ r.play(layers);
 
 有些动画只对更底层的 `VItem` 实现。几何 item 可以通过 `VItem::from` 或 `.into()` 转换：
 
-```rust,ignore
+```rust
 {{#rustdoc_include ../../examples/getting_started1/scenes.rs:construct}}
 ```
 
 多个独立 Sequence 的组合示例：
 
-```rust,ignore
+```rust
 {{#rustdoc_include ../../examples/getting_started2/scenes.rs}}
 ```
 
@@ -337,7 +362,7 @@ r.play(layers);
 `run_cli` 已把常用流程做成子命令；需要在 Rust 代码里直接驱动时，创建 App、
 注册场景，再选择场景（`app.scene(name)` 返回克隆的描述符）：
 
-```rust,ignore
+```rust
 let mut app = App::new();
 app.add_scenes([hello::scene()]); // 或安装项目插件：app.add_plugins(my_project::plugin())
 let scene = app.scene("hello").expect("hello is registered");
@@ -361,6 +386,11 @@ ranim::cmd::preview_scene(app.build(), scene);
 
 ### WASM 预览宿主
 
+WASM 的入口同样来自宿主装配，不限制场景源码的位置：场景可以继续放在 lib 中，
+入口从库中取得描述符或 Plugin，再导出 `app() -> WasmApp`。
+本节展示仓库 example 的写法；普通项目的 `src/lib.rs` + `src/main.rs` 完整示例见
+[项目入口](./project-entry.md)。
+
 命令行入口 `run_cli` 只面向原生目标（需要 `cmd-render` feature）。仓库的 example
 把平台入口与共享装配放在两个文件中：
 
@@ -374,7 +404,7 @@ examples/arc/
 后调用 `run_cli(app.build())`；WASM 下则提供空 `main()`，并在同一文件中
 导出 `app()`，使用同一套装配，把定稿后的项目交给 JavaScript：
 
-```rust,ignore
+```rust
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn app() -> ranim::wasm::WasmApp {
@@ -402,7 +432,7 @@ required-features = ["anims", "render"]
 
 `main.rs` 用函数级 `cfg` 切换入口；`app()` 导出也只在 WASM 下编译：
 
-```rust,ignore
+```rust
 mod scenes;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -451,7 +481,7 @@ WASM 不自行启动事件循环。每个 `WasmApp` 创建一次预览；需要�
 
 仓库的 `cargo examples build [EXAMPLES...]` 会完成编译、`wasm-bindgen`
 和 `wasm-opt`。视口与控制条源码分别位于 `website/static/ranim-viewport.js`
-和 `website/static/ranim-controls.js`，由 Zola 直接提供；为 rustdoc 等其他
+和 `website/static/ranim-controls.js`，由 Notist SSG 直接提供；为 rustdoc 等其他
 输出目录构建时，会把这两个组件及其音频和 timeline 模块复制到输出根目录。
 `<ranim-viewport>` 负责 canvas 和播放时钟，`<ranim-controls>` 通过 `for`
 绑定同一 DOM 根中的视口 ID，可放在页面任意位置；同一视口也能绑定多个

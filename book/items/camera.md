@@ -6,7 +6,7 @@
 相机数据，定义于 `ranim_items::camera`。它同时携带正交与透视
 两套投影参数，由 `perspective_blend` 在二者之间混合。
 
-```rust,ignore
+```rust
 pub struct CameraFrame {
     pub pos: DVec3,              // 位置
     pub up: DVec3,               // 上方向单位向量
@@ -26,7 +26,7 @@ pub struct CameraFrame {
 
 ## 投影
 
-```rust,ignore
+```rust
 let view = cam.view_matrix();                       // look_to(pos, facing, up)
 let proj = cam.projection_matrix(aspect_ratio);
 //   = orthographic_mat(aspect).lerp(perspective_mat(aspect), perspective_blend)
@@ -39,7 +39,7 @@ let proj = cam.projection_matrix(aspect_ratio);
 
 ## 3D 定位
 
-```rust,ignore
+```rust
 // 球坐标定位（Z-up），看向原点；perspective_blend 自动设为 1.0
 let cam = CameraFrame::from_spherical(phi, theta, distance);
 // phi：与 +Z 的极角（0 = 正上方，π/2 = XY 平面）

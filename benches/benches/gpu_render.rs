@@ -1,12 +1,19 @@
-//! GPU rendering benchmark — isolates the pure `RenderAppExt::render_frame` cost.
+//! Frame rendering benchmarks, including evaluation and render extraction.
 //!
-//! Measures:
-//! - CPU-side submission time (buffer upload + command encoding + queue submit)
-//! - Scales with VItem count to identify bottleneck (draw calls vs SDF vs upload)
+//! Low-level conversion moved from evaluation into extraction. Evaluating once
+//! outside the measured loop would therefore compare different amounts of work
+//! across renderer architectures, and does not model the playback/export path.
+//!
+//! - `frame_latency`: evaluate, extract, submit, and wait for GPU completion.
+//! - `frame_cpu`: evaluate, extract, and submit; GPU completion is waited for
+//!   outside each timed interval, so queued frames cannot accumulate.
+//!
+//! Neither metric is pure GPU time. Use GPU timestamp scopes for individual
+//! passes. Scene construction, initialization, and readback are excluded here.
 
-use std::hint::black_box;
+use std::time::{Duration, Instant};
 
-use benches::test_scenes::static_squares;
+use benches::test_scenes::{static_squares, transform_squares};
 use criterion::{BenchmarkId, Criterion, SamplingMode, criterion_group, criterion_main};
 use ranim::{
     SceneConstructor,
@@ -18,230 +25,99 @@ use ranim::{
 };
 use ranim_core::frame::EvaluatedFrame;
 use ranim_render::{
-    RenderAppExt, build_render_app, extract::ExtractPlugin, resource::RenderTextures,
+    RenderAppExt, build_render_app,
+    extract::ExtractPlugin,
+    resource::RenderTextures,
+    upload_probe::{self, UploadMode},
     utils::WgpuContext,
 };
 
 type PlacedSquare = Transformed<Square, Translation>;
 
-/// Pure GPU render benchmark: only measures `RenderAppExt::render_frame` + `device.poll`.
-fn gpu_render_benchmark(c: &mut Criterion) {
+fn frame_benchmark(c: &mut Criterion) {
     let ctx = pollster::block_on(WgpuContext::new());
+    upload_probe::set_mode(UploadMode::Off);
 
-    let mut group = c.benchmark_group("gpu_render");
-    group.sampling_mode(SamplingMode::Flat).sample_size(50);
+    for cpu_only in [false, true] {
+        let mut group = c.benchmark_group(if cpu_only {
+            "frame_cpu"
+        } else {
+            "frame_latency"
+        });
+        group.sampling_mode(SamplingMode::Flat).sample_size(50);
 
-    for n in [5, 10, 20, 40, 60].iter() {
-        let vitem_count = n * n;
+        for morph in [false, true] {
+            for n in [5, 10, 20, 40, 60] {
+                let scene = (|r: &mut RanimScene| {
+                    if morph {
+                        transform_squares(r, n);
+                    } else {
+                        static_squares(r, n);
+                    }
+                })
+                .build_scene();
+                let mut store = EvaluatedFrame::new();
+                let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
+                renderer.add_plugins((
+                    CameraFramePlugin,
+                    ExtractPlugin::<PlacedSquare>::default(),
+                    VItemPlugin,
+                ));
+                renderer.finish();
+                renderer.cleanup();
+                renderer.set_gpu_timers_enabled(false);
+                let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
+                let clear_color = wgpu::Color {
+                    r: 0.2,
+                    g: 0.2,
+                    b: 0.2,
+                    a: 1.0,
+                };
 
-        // Build the scene and evaluate it into a reusable cross-thread frame.
-        let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
-        let mut store = EvaluatedFrame::new();
-        scene.eval_at_alpha(0.5, &mut store);
-
-        let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
-        renderer.add_plugins((
-            CameraFramePlugin,
-            ExtractPlugin::<PlacedSquare>::default(),
-            VItemPlugin,
-        ));
-        renderer.finish();
-        renderer.cleanup();
-        let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
-        let clear_color = wgpu::Color {
-            r: 0.2,
-            g: 0.2,
-            b: 0.2,
-            a: 1.0,
-        };
-
-        // Warm up: render once to initialize all GPU resources
-        renderer.render_frame(&mut render_textures, clear_color, &mut store);
-        ctx.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .unwrap();
-
-        group.bench_with_input(
-            BenchmarkId::new("submit", vitem_count),
-            &vitem_count,
-            |b, _| {
-                b.iter(|| {
-                    renderer.render_frame(&mut render_textures, clear_color, &mut store);
-                    // Wait for GPU to finish so we measure actual GPU time too
-                    ctx.device
-                        .poll(wgpu::PollType::wait_indefinitely())
-                        .unwrap();
-                    black_box(());
-                });
-            },
-        );
-    }
-
-    group.finish();
-}
-
-/// Measures just the CPU-side submission cost (no GPU wait)
-fn cpu_submit_benchmark(c: &mut Criterion) {
-    let ctx = pollster::block_on(WgpuContext::new());
-
-    let mut group = c.benchmark_group("cpu_submit");
-    group.sampling_mode(SamplingMode::Flat).sample_size(50);
-
-    for n in [5, 10, 20, 40, 60].iter() {
-        let vitem_count = n * n;
-
-        let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
-        let mut store = EvaluatedFrame::new();
-        scene.eval_at_alpha(0.5, &mut store);
-
-        let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
-        renderer.add_plugins((
-            CameraFramePlugin,
-            ExtractPlugin::<PlacedSquare>::default(),
-            VItemPlugin,
-        ));
-        renderer.finish();
-        renderer.cleanup();
-        let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
-        let clear_color = wgpu::Color {
-            r: 0.2,
-            g: 0.2,
-            b: 0.2,
-            a: 1.0,
-        };
-
-        // Warm up
-        renderer.render_frame(&mut render_textures, clear_color, &mut store);
-        ctx.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .unwrap();
-
-        group.bench_with_input(
-            BenchmarkId::new("no_wait", vitem_count),
-            &vitem_count,
-            |b, _| {
-                b.iter(|| {
-                    renderer.render_frame(&mut render_textures, clear_color, &mut store);
-                    // Don't wait — measures pure CPU submission overhead
-                    black_box(());
-                });
-            },
-        );
-    }
-
-    group.finish();
-}
-
-/// Merged buffer path: GPU render benchmark (with GPU wait)
-fn merged_gpu_render_benchmark(c: &mut Criterion) {
-    let ctx = pollster::block_on(WgpuContext::new());
-
-    let mut group = c.benchmark_group("merged_gpu_render");
-    group.sampling_mode(SamplingMode::Flat).sample_size(50);
-
-    for n in [5, 10, 20, 40, 60].iter() {
-        let vitem_count = n * n;
-
-        let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
-        let mut store = EvaluatedFrame::new();
-        scene.eval_at_alpha(0.5, &mut store);
-
-        let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
-        renderer.add_plugins((
-            CameraFramePlugin,
-            ExtractPlugin::<PlacedSquare>::default(),
-            VItemPlugin,
-        ));
-        renderer.finish();
-        renderer.cleanup();
-        let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
-        let clear_color = wgpu::Color {
-            r: 0.2,
-            g: 0.2,
-            b: 0.2,
-            a: 1.0,
-        };
-
-        // Warm up
-        renderer.render_frame(&mut render_textures, clear_color, &mut store);
-        ctx.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .unwrap();
-
-        group.bench_with_input(
-            BenchmarkId::new("submit", vitem_count),
-            &vitem_count,
-            |b, _| {
-                b.iter(|| {
+                // A deterministic changing playhead, including for static
+                // content. Reset for every Criterion batch so both metrics
+                // and revisions receive exactly the same time sequence.
+                let alpha_at = |i: u64| 0.1 + 0.5 * (i % 120) as f64 / 120.0;
+                for i in 0..20 {
+                    scene.eval_at_alpha(alpha_at(i), &mut store);
                     renderer.render_frame(&mut render_textures, clear_color, &mut store);
                     ctx.device
                         .poll(wgpu::PollType::wait_indefinitely())
                         .unwrap();
-                    black_box(());
-                });
-            },
-        );
-    }
+                }
 
-    group.finish();
+                group.bench_function(
+                    BenchmarkId::new(if morph { "morph" } else { "static" }, n * n),
+                    |b| {
+                        b.iter_custom(|iterations| {
+                            let mut measured = Duration::ZERO;
+                            for i in 0..iterations {
+                                let start = Instant::now();
+                                scene.eval_at_alpha(alpha_at(i), &mut store);
+                                renderer.render_frame(
+                                    &mut render_textures,
+                                    clear_color,
+                                    &mut store,
+                                );
+                                if cpu_only {
+                                    measured += start.elapsed();
+                                }
+                                ctx.device
+                                    .poll(wgpu::PollType::wait_indefinitely())
+                                    .unwrap();
+                                if !cpu_only {
+                                    measured += start.elapsed();
+                                }
+                            }
+                            measured
+                        });
+                    },
+                );
+            }
+        }
+        group.finish();
+    }
 }
 
-/// Merged buffer path: CPU-only submission benchmark (no GPU wait)
-fn merged_cpu_submit_benchmark(c: &mut Criterion) {
-    let ctx = pollster::block_on(WgpuContext::new());
-
-    let mut group = c.benchmark_group("merged_cpu_submit");
-    group.sampling_mode(SamplingMode::Flat).sample_size(50);
-
-    for n in [5, 10, 20, 40, 60].iter() {
-        let vitem_count = n * n;
-
-        let scene = (|r: &mut RanimScene| static_squares(r, *n)).build_scene();
-        let mut store = EvaluatedFrame::new();
-        scene.eval_at_alpha(0.5, &mut store);
-
-        let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
-        renderer.add_plugins((
-            CameraFramePlugin,
-            ExtractPlugin::<PlacedSquare>::default(),
-            VItemPlugin,
-        ));
-        renderer.finish();
-        renderer.cleanup();
-        let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
-        let clear_color = wgpu::Color {
-            r: 0.2,
-            g: 0.2,
-            b: 0.2,
-            a: 1.0,
-        };
-
-        // Warm up
-        renderer.render_frame(&mut render_textures, clear_color, &mut store);
-        ctx.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .unwrap();
-
-        group.bench_with_input(
-            BenchmarkId::new("no_wait", vitem_count),
-            &vitem_count,
-            |b, _| {
-                b.iter(|| {
-                    renderer.render_frame(&mut render_textures, clear_color, &mut store);
-                    black_box(());
-                });
-            },
-        );
-    }
-
-    group.finish();
-}
-
-criterion_group!(
-    benches,
-    gpu_render_benchmark,
-    cpu_submit_benchmark,
-    merged_gpu_render_benchmark,
-    merged_cpu_submit_benchmark
-);
+criterion_group!(benches, frame_benchmark);
 criterion_main!(benches);

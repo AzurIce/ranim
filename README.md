@@ -44,8 +44,6 @@ Runtime dependencies:
 
 ## Installation
 
-Currently, it is experimental on crates.io:
-
 ```toml
 [dependencies]
 ranim = "0.2.1"
@@ -58,22 +56,29 @@ You can also use from git for the latest updates:
 ranim = { git = "https://github.com/azurice/ranim" }
 ```
 
-### Project entry and plugins
+### Scenes, project assembly, and platform entry points
 
-A Ranim project is its own binary crate built on a bevy `App`: `ranim::App`
-is a direct re-export of `bevy_app::App`, and the scene methods
-(`add_scene` / `add_scenes` / `scenes` / `scene(name)` / `first_scene()`)
-come from `ranim::AppExt`, an extension trait the prelude exports for it.
-`main` registers the project's scenes, finalizes the app with `app.build()`
-(`ranim::RanimAppExt`, also exported from the prelude), and hands the
-resulting `ranim::RanimApp` to the free function `run_cli` (exported from
-the prelude), which installs tracing, parses the process arguments, and
-dispatches the command line subcommands:
+v0.3(WIP, main) has a huge change on the usage paradigm of ranim.
+
+**Scenes are still ordinary Rust functions and can live in a library.**
+Rendering and preview run through a host that explicitly assembles an `App`:
+
+- **Scene library**: defines animations and exposes scene descriptors or optional plugins.
+- **Native binary**: registers scenes in an `App`, then calls `run_cli(app.build())`.
+- **WASM binary**: performs the same assembly, but exports
+  `app() -> ranim::wasm::WasmApp` for JavaScript instead of running a CLI.
+
+For example, a package named `my-animation` can have both `src/lib.rs` and
+`src/main.rs`. The following examples describe the current git API:
 
 ```toml
 # Cargo.toml
 [dependencies]
-ranim = "0.3"
+ranim = { git = "https://github.com/AzurIce/ranim" }
+
+# Needed when exporting app() from the WASM host.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2.129"
 ```
 
 The default features include built-in items, animations, and `cmd-preview`.
@@ -82,21 +87,50 @@ and `features = ["anims", "cmd-render"]`. The `render` feature alone provides
 the renderer and WASM canvas host, with no native commands or built-in items.
 
 ```rust
-// src/main.rs
+// src/lib.rs — reusable scene definition; no CLI, GPU, or browser startup.
 use ranim::{items::vitem::geometry::Square, prelude::*};
 
 #[scene]
-fn hello(scene: &mut RanimScene) {
+pub fn hello(scene: &mut RanimScene) {
     scene.play(CameraFrame::default().show().with_duration(2.0));
     scene.play(Square::new(2.0).show().with_duration(2.0));
 }
+```
 
-fn main() {
+```rust
+// src/main.rs — the same binary target serves native and WASM.
+use ranim::prelude::*;
+
+fn project() -> ranim::RanimApp {
     let mut app = App::new();
-    app.add_scenes([hello::scene()]);
-    run_cli(app.build());
+    app.add_scenes([my_animation::hello::scene()]);
+    app.build()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn main() {
+    run_cli(project());
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() {}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn app() -> ranim::wasm::WasmApp {
+    ranim::wasm::WasmApp::new(project())
 }
 ```
+
+The `#[scene]` macro preserves `hello(&mut RanimScene)` and generates
+`hello::scene() -> Scene`; `pub` makes both available to the binary or other
+crates. It does **not** register the scene globally. Only descriptors added to
+the host's `App` are available to its CLI or browser sessions. The host can
+select scenes from several libraries without moving their implementations.
+
+`ranim::App` is a re-export of `bevy_app::App`. `AppExt` supplies the scene
+registration/selection methods and `RanimAppExt` supplies `build()`; both traits
+are exported by the prelude.
 
 `app.build()` is the explicit "finalize, then serve" step from a building
 app to a session-ready project: it asserts the plugins are ready, runs
@@ -108,16 +142,24 @@ plugin-construction target. `run_cli`, `preview_scene`, and `WasmApp::new`
 take a `RanimApp`; offline render workers take a selected `Scene` and the
 project's `RenderSetup`.
 
-`#[scene]` creates an owned descriptor through `hello::scene()`; register it
-with `add_scene` or `add_scenes` to make it available. Only registered scenes
-appear in the command line interface. Projects that organize scenes into
-plugins compose them instead:
+Plugins are optional: a library can expose a `ScenesPlugin` that registers
+its scenes, and the binary installs that plugin instead of individual
+descriptors:
 
-```rust,ignore
+```rust
 let mut app = App::new();
-app.add_plugins(scenes::ScenesPlugin);
+app.add_plugins(my_animation::ScenesPlugin);
 run_cli(app.build());
 ```
+
+On native, use `cargo run -- preview hello` or `cargo run -- output hello`.
+On WASM, the empty `main()` does not start an application: after wasm-bindgen
+initialization, JavaScript calls the exported `app()`, then
+`await project.createPreview(canvas, "hello")` and `preview.renderAt(seconds)`.
+The browser owns the UI and playback clock. Compile the same binary with
+`cargo build --bin my-animation --target wasm32-unknown-unknown`.
+See the Book's [project entry chapter](./book/project-entry.md) for the complete
+Cargo setup, native commands, WASM bindings, and the library/binary boundary.
 
 Rendering needs no boilerplate: when the project does not register a
 `ranim::render::RenderSetup`, rendering and preview fall back to a default
@@ -144,7 +186,7 @@ the defaults), then run your project with Dioxus CLI 0.7.10:
 
 ```toml
 [dependencies]
-ranim = { version = "0.2.1", features = ["subsecond"] }
+ranim = { git = "https://github.com/AzurIce/ranim", features = ["subsecond"] }
 ```
 
 ```sh
@@ -177,11 +219,12 @@ be repeatable: their external side effects are not rolled back.
 This is **scene reconstruction, not state migration**. Restart preview after
 changing plugins, registration, scene metadata (`#[scene]` / `#[output]`),
 captured configuration, dependencies, features, or type/capture layouts.
-For this supported workflow, keep scene implementations in `main.rs` or its
-modules. dx 0.7.10 also attempts workspace dependency patching, but that path
-has the cascade limitation above; do not rely on it for changes outside the
-scene host. Helper functions in the host crate can also update when reached
-through the scene's hot-call boundary.
+Scene libraries remain supported; hotpatchability is a separate, experimental
+tooling constraint, not a requirement to move scenes into `main.rs`.
+The tested dx 0.7.10 workflow updates scenes in the binary's own modules;
+patching library/workspace crates depends on dx's workspace support. The pinned
+main CLI contains the cascade fix but has not yet been validated end to end
+here. Helper functions can also update when reached through a hot-call boundary.
 The feature does not enable Bevy system hotpatching or WASM hot reload, and
 does not replace compilation with dx. Ordinary `cargo run` still works without
 a devserver.
@@ -231,7 +274,7 @@ plugins: bevy plugins are unique, and installing one twice panics.
 To drive the APIs directly instead of the command line, select a scene and
 call the corresponding function (`cmd-render` / `cmd-preview` features enable them):
 
-```rust,ignore
+```rust
 let mut app = App::new();
 app.add_scenes([hello::scene()]);
 let scene = app.scene("hello").expect("hello is registered");

@@ -3,7 +3,7 @@
 > [!caution]
 > ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
 
-```rust,ignore
+```rust
 pub struct VItem {
     pub normal: Option<DVec3>,        // 投影平面法向；None 时渲染时推导
     pub vpoints: VPointVec,           // 点列（二次贝塞尔）
@@ -20,7 +20,7 @@ pub struct VItem {
 对齐（长度 = 点数 / 2 向上取整），因此可以给一个 item 的不同段设置不同
 颜色/线宽。
 
-```rust,ignore
+```rust
 // 直接用点列构造（默认：白描边 0.02、无填充）
 let vitem = VItem::from_vpoints(vec![
     dvec3(0.0, 0.0, 0.0),
@@ -52,7 +52,7 @@ let vitem = VItem::from_vpoints(vec![
 `VItem` 实现了 `Interpolatable`（逐点/逐颜色插值）与 `Alignable`（点数不同
 时自动补齐对齐，`morph` 依赖它），因此可以直接：
 
-```rust,ignore
+```rust
 let anim = square.morph(|sq| {
     sq.set_fill_color(manim::BLUE_C);
     sq.shift(DVec3::X * 2.0);

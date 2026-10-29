@@ -3,7 +3,7 @@
 > [!caution]
 > ai 生成，可能叙事逻辑和表述并不是很好，仅供参考。
 
-```rust,ignore
+```rust
 pub struct MeshItem {
     pub points: PointVec<DVec3>,         // 顶点（局部空间）
     pub triangle_indices: Vec<u32>,      // 三角形索引
@@ -17,7 +17,7 @@ pub struct MeshItem {
 
 构造与常用操作：
 
-```rust,ignore
+```rust
 // 仅顶点（无索引，适合点云）或 顶点+索引
 let mesh = MeshItem::from_vertices(points);
 let mesh = MeshItem::from_indexed_vertices(points, triangle_indices);
@@ -32,7 +32,7 @@ mesh.vertex_colors = colors.into();        // 或逐顶点自定义
 旋转、缩放时，用 [`Transformed<T, G>`](../../understand/core/transformed.md)
 包裹。现有 mesh/surface 场景通常以 `DAffine3` 作为存储上界：
 
-```rust,ignore
+```rust
 let mesh: Transformed<_, DAffine3> = Transformed::new(
     mesh,
     DAffine3::from_translation(...),
@@ -41,7 +41,7 @@ let mesh: Transformed<_, DAffine3> = Transformed::new(
 
 也可以用 prelude 中的 extension trait：
 
-```rust,ignore
+```rust
 let mesh = mesh.transformed::<DAffine3>(DAffine3::IDENTITY);
 ```
 

@@ -33,7 +33,7 @@
 `Rectangle::scale_axes` 是 intrinsic shape-data 编辑：它改变尺寸参数，而不是
 给 wrapper 做矩阵组合，也不会改变“外部 placement”的职责。
 
-```rust,ignore
+```rust
 let vitem = VItem::from(
     Square::new(2.0).with(|sq| {
         sq.set_color(manim::RED_C);

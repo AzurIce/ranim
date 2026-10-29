@@ -5,7 +5,7 @@
 
 参数曲面：在 `(u, v)` 网格上采样生成网格数据。
 
-```rust,ignore
+```rust
 let surface = Surface::from_uv_func(
     |u, v| dvec3(u, v, (u * u + v * v).sin()),
     (0.0, 1.0),   // u 范围

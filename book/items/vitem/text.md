@@ -9,14 +9,14 @@
 
 简单文字（`vitem::text`）：
 
-```rust,ignore
+```rust
 let text = TextItem::new("Hello Ranim", 1.0); // canonical local 文本与 em 字号
 let placed = text.transformed(Translation(dvec3(1.0, 2.0, 0.0)));
 ```
 
 字体通过 `TextFont` 配置：
 
-```rust,ignore
+```rust
 let font = TextFont::new(["Noto Sans CJK SC", "serif"]); // 按序回退的字体族
 ```
 
@@ -24,7 +24,7 @@ let font = TextFont::new(["Noto Sans CJK SC", "serif"]); // 按序回退的字�
 
 Typst 排版（`vitem::typst`），支持行内/多行代码与数学公式：
 
-```rust,ignore
+```rust
 let formula = TypstText::new("$ integral_0^1 x^2 dif x $");
 let code = TypstText::new_inline_code("let x = 1;");
 let block = TypstText::new_multiline_code("fn main() {}", Some("rust"));

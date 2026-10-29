@@ -7,7 +7,7 @@
 （局部空间），`transform` 给出局部到世界的变换。「共面」是渲染时的假设
 （见下文「平面投影渲染」）。
 
-```rust,ignore
+```rust
 pub struct RenderVItem {
     /// 投影目标平面的法向；None 时由渲染器从点推导
     pub normal: Option<Vec3>,

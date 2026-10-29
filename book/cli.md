@@ -1,15 +1,21 @@
 # 命令行入口
 
-每个 Ranim 项目是自己的二进制 crate：一个 bevy App（`ranim::App` 就是
-`bevy_app::App` 的再导出）。`main` 装配 `App` 后用 `app.build()`
+CLI 是 Ranim 项目的 **native 二进制入口**，不是场景定义本身。
+场景仍可定义在 `src/lib.rs` 或独立的库 crate 中；二进制选择要暴露的场景，
+组装成一个 bevy App（`ranim::App` 就是 `bevy_app::App` 的再导出）。
+WASM 不运行这套 CLI，而由宿主导出 `app() -> WasmApp`，供 JavaScript 显式创建预览。
+两种入口与场景库的完整关系见[项目入口](./project-entry.md)。
+
+native 的 `main` 装配 `App` 后用 `app.build()`
 （`RanimAppExt`，prelude 导出）定稿插件构建——断言插件就绪、执行一次
 bevy 的 `finish()` / `cleanup()`——得到 `ranim::RanimApp`，把它交给自由
 函数 `run_cli`（prelude 导出，native + `cmd-render` feature 门控；命名刻意避开
 bevy App 自带的 `run()` runner 入口）：它安装 tracing、解析进程参数，
 随即分发为四个子命令：
 
-```rust,ignore
+```rust
 use ranim::prelude::*;
+use my_animation::hello; // 场景定义来自本包的 src/lib.rs，也可以来自其他库。
 
 fn main() {
     let mut app = App::new();
@@ -46,7 +52,7 @@ CPU 查询，渲染也足够快，调试迭代一般不需要 release。
 `app: &mut bevy_app::App` 与 `&mut App` 是同一类型；完整示例见
 [Getting Started](./getting_started.md)）：
 
-```rust,ignore
+```rust
 fn main() {
     let mut app = App::new();
     app.add_scenes([hello::scene()]);
@@ -60,7 +66,7 @@ fn main() {
 渲染默认配置未覆盖的完整输出（容器、变换 wrapper、自定义类型）时，才在插件
 中提供自己的 `RenderSetup`：
 
-```rust,ignore
+```rust
 pub struct ProjectPlugin;
 
 impl Plugin for ProjectPlugin {
@@ -95,7 +101,7 @@ impl Plugin for ProjectPlugin {
 `#[output(...)]` 可用的属性（默认值：`1920x1080`、60 fps、mp4、
 `dir = "./output"`、`save_frames = false`）：
 
-```rust,ignore
+```rust
 #[output(
     width = 1920,            // 像素宽
     height = 1080,           // 像素高

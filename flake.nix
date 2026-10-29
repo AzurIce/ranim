@@ -57,10 +57,8 @@
             ];
           }
         );
-        # Upstream source filtering currently omits notist-html highlight.css.
-        notistPackage = notist.packages.${system}.notist.overrideAttrs (_: {
-          src = notist.outPath;
-        });
+        # The pinned upstream package includes the HTML highlighting assets.
+        notistPackage = notist.packages.${system}.notist;
         dioxusPackage = dioxus.packages.${system}.dioxus-cli;
       in
       {
