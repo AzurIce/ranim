@@ -4,7 +4,7 @@
 `package.metadata.example.<name>.hide` 控制页面是否展示。每个例子只有一个 bin
 target；`scenes.rs` 保存场景与注册，`main.rs` 保存平台入口。
 
-网站在每次 `notist ssg build/serve website` 时通过 Experimental SSG 扩展
+网站在每次 `notist build/serve -p ranim-website` 时通过 Experimental Site 扩展
 `cargo examples site` 生成页面和模板数据。只需要修改 Cargo 配置、Rust 源码和
 README，无需维护或提交 `website/content/examples/`、`website/data/*.toml`。
 
@@ -12,7 +12,7 @@ README，无需维护或提交 `website/content/examples/`、`website/data/*.tom
 Cargo.toml + examples/**/{scenes.rs,main.rs,README.md}
     → cargo examples site（prepare 阶段，JSON stdio）
     → 内存中的 examples/<group>/<name>.md + site.data.<name>
-    → Notist 解析、模板渲染 → website/public/
+    → Notist 解析、模板渲染 → dist/ranim-website/website/
 
 .shadow/refs/ + shadow.toml → 已发布媒体 URL
 website/render-state.json → 上次成功渲染的源码 hash
@@ -79,9 +79,9 @@ canvas 播放器；**Preview** 页签显示预渲染的视频或图片。
 cargo examples build arc gltf_showcase
 
 # 第二步：开发预览（也监听 Cargo 配置、例子源码、README 和 shadow refs）
-notist ssg serve website
+notist serve -p ranim-website
 
-# 或生成 website/public/；发布前先用 cargo examples build 构建全部例子
+# 或生成 dist/ranim-website/website/；发布前先用 cargo examples build 构建全部例子
 just website
 ```
 
@@ -102,7 +102,8 @@ shadow refs，不需要本地下载媒体或 shadow 凭证。README 引用的本
 因此 `--lazy-run` 仍能发现需要重渲染的场景。提交媒体变更时提交 `.shadow/refs/`
 和渲染记录，不提交静态媒体、生成的页面或模板数据。
 
-扩展配置位于 `website/Notist.toml` 的 `[[ssg.extensions]]`。Notist 从站点目录
+根 `Notist.toml` 声明 Book 与 Website 两个 workspace 成员；扩展配置位于
+`website/Notist.toml` 的 `[[site.extensions]]`。Notist 仍从站点目录
 启动 `cargo examples site`，通过 stdin 传入 `version: 1`、`stage: "prepare"`、
 `root`、`config` 和 `input: {documents, data}`；命令 stdout 返回
 `{version: 1, input: {documents, data}, errors: []}`，日志走 stderr。扩展保留其他

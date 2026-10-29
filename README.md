@@ -202,6 +202,16 @@ or upload tracking with `RANIM_PROFILE_UPLOAD=1`.
 
 ## Contributing
 
+### Book and website builds
+
+The root `Notist.toml` groups `book/` and `website/` into a workspace; each member
+keeps its own configuration. Inside `nix develop`, run `just book`, `just website`,
+or `just publications` to build both. Outputs are `dist/ranim-book/book/` and
+`dist/ranim-website/website/`, with independent deployment URLs.
+Use `notist serve -p ranim-book` or `notist serve -p ranim-website` for preview.
+Website builds generate example pages without rendering or uploading media;
+see the [website guide](./website/README.md) for WASM and media preparation.
+
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 ## Design

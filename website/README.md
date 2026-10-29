@@ -4,7 +4,8 @@ The Notist SSG website owns two independent Web Components: `<ranim-viewport>` i
 `static/ranim-viewport.js` and `<ranim-controls>` in `static/ranim-controls.js`.
 The **App** tab composes their live WebGPU canvas and playback controls;
 **Preview** shows prerendered media. Handlebars partials live
-in `templates/components/`. The site is built with `notist ssg`; templates use document attributes and the directory tree.
+in `templates/components/`. The site is built as the `ranim-website` Notist project;
+templates use document attributes and the directory tree.
 
 ## Build and preview
 
@@ -31,7 +32,7 @@ cargo examples build
 just website
 ```
 
-The output is `website/public/`. Every Notist SSG build generates example pages
+The output is `dist/ranim-website/website/`. Every Notist Site build generates example pages
 and data through `cargo examples site`. `just website` also works without a WASM
 build; the App tab appears only when both JS and WASM packages exist. Preview
 media is resolved from tracked shadow refs without local downloads or credentials.
@@ -49,7 +50,16 @@ its package is available.
 
 ## Site structure
 
-`Notist.toml` configures `notist ssg`. Documents under `content/` keep their
+The repository-root `Notist.toml` declares a workspace with the `book/` and
+`website/` member projects. `website/Notist.toml` declares the `ranim-website`
+project and its `[[site]]` target. From the repository root, use
+`notist build -p ranim-website` or `notist serve -p ranim-website`; inside
+`website/`, `notist build` and `notist serve` select this project automatically.
+`just publications` builds both projects, with the Book output in
+`dist/ranim-book/book/`. The two publications retain their independent deployment
+URLs; workspace membership does not combine their pages or configuration.
+
+Documents under `content/` keep their
 relative paths, with the extension changed to `.html`; `index.md` provides a
 directory's landing page. Metadata uses Notist root annotations.
 `templates/*.hbs` and `templates/components/*.hbs` render document attributes,
@@ -57,7 +67,7 @@ the directory tree and `site.data`; `sass/` compiles to CSS and `static/` is
 copied to the output root. Deployment uses the configured
 `https://azurice.github.io/ranim/` prefix; local preview uses `/`.
 
-The Experimental `prepare` extension configured in `[[ssg.extensions]]` invokes
+The Experimental `prepare` extension configured in `[[site.extensions]]` invokes
 `cargo examples site` through JSON stdio, from the website directory. It reads
 the workspace `[[example]]` targets, `scenes.rs`, `main.rs`, and README files to
 create `examples/<group>/<name>.md`, group indexes, and `site.data.<name>` in

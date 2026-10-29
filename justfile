@@ -38,12 +38,12 @@ changelog:
     git cliff -o CHANGELOG.md
 
 website:
-    {{ notist }} ssg build website
+    {{ notist }} build -p ranim-website
 
 # Build the requested WASM examples (all by default), then serve the Notist site locally.
 website-preview *EXAMPLES:
     CARGO_BUILD_JOBS={{ cargo_jobs }} cargo examples build {{ EXAMPLES }}
-    {{ notist }} ssg serve website
+    {{ notist }} serve -p ranim-website
 
 doc:
     RUSTDOCFLAGS="--cfg docsrs --html-in-header packages/ranim-examples/docs-rs/header.html" \
@@ -61,7 +61,11 @@ doc-examples:
     CARGO_BUILD_JOBS={{ cargo_jobs }} cargo examples build --out-dir packages/ranim-examples/target/doc/ranim_examples
 
 book:
-    {{ notist }} book build book
+    {{ notist }} build -p ranim-book
+
+# Build both independent publications without rendering or uploading example media.
+publications:
+    {{ notist }} build --workspace
 
 preview EXAMPLE:
     cargo run --example {{ EXAMPLE }} -- preview

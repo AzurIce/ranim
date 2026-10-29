@@ -1,11 +1,14 @@
-[book]
+[project]
+name = "ranim-book"
+
+[[book]]
+name = "book"
 title = "Ranim Book"
-output = "../target/book"
 exclude = ["**/AGENTS.md", "_components/**"]
 additional-css = ["version-select.css"]
 additional-js = ["version-select.js"]
 
-[[extensions]]
+[[book.extensions]]
 kind = "replace"
 imports = { typst = "_components/typst/lib.notc" }
 from = "notist.math"

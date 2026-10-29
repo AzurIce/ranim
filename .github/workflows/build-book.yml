@@ -51,6 +51,13 @@ jobs:
           else
             echo "notist=false" >> "$GITHUB_OUTPUT"
           fi
+          if [ -f Notist.toml ] && [ -f book/Notist.toml ]; then
+            echo "workspace=true" >> "$GITHUB_OUTPUT"
+            echo "book-output=dist/ranim-book/book" >> "$GITHUB_OUTPUT"
+          else
+            echo "workspace=false" >> "$GITHUB_OUTPUT"
+            echo "book-output=book/build" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install Nix
         if: steps.format.outputs.notist == 'true'
@@ -61,7 +68,12 @@ jobs:
         run: |
           mkdir -p target
           nix build .#notist --out-link target/notist
-          target/notist/bin/notist book build book --out-dir book/build
+          if [ "${{ steps.format.outputs.workspace }}" = "true" ]; then
+            target/notist/bin/notist build -p ranim-book
+          else
+            # Older Notist revisions still use the standalone book configuration.
+            target/notist/bin/notist book build book --out-dir book/build
+          fi
 
       - name: Compute tool cache key
         if: steps.format.outputs.notist != 'true'
@@ -134,4 +146,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}
-          path: book/build
+          path: ${{ steps.format.outputs.book-output }}
