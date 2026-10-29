@@ -82,7 +82,7 @@ jobs:
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v1.0.7
         with:
-          path: ./dist/ranim-website/website
+          path: ./dist/ranim-website
 
   deploy-website:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

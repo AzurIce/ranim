@@ -32,7 +32,7 @@ cargo examples build
 just website
 ```
 
-The output is `dist/ranim-website/website/`. Every Notist Site build generates example pages
+The output is `dist/ranim-website/`. Every Notist Site build generates example pages
 and data through `cargo examples site`. `just website` also works without a WASM
 build; the App tab appears only when both JS and WASM packages exist. Preview
 media is resolved from tracked shadow refs without local downloads or credentials.
@@ -56,7 +56,7 @@ project and its `[[site]]` target. From the repository root, use
 `notist build -p ranim-website` or `notist serve -p ranim-website`; inside
 `website/`, `notist build` and `notist serve` select this project automatically.
 `just publications` builds both projects, with the Book output in
-`dist/ranim-book/book/`. The two publications retain their independent deployment
+`dist/ranim-book/`. The two publications retain their independent deployment
 URLs; workspace membership does not combine their pages or configuration.
 
 Documents under `content/` keep their

@@ -53,7 +53,7 @@ jobs:
           fi
           if [ -f Notist.toml ] && [ -f book/Notist.toml ]; then
             echo "workspace=true" >> "$GITHUB_OUTPUT"
-            echo "book-output=dist/ranim-book/book" >> "$GITHUB_OUTPUT"
+            echo "book-output=dist/ranim-book" >> "$GITHUB_OUTPUT"
           else
             echo "workspace=false" >> "$GITHUB_OUTPUT"
             echo "book-output=book/build" >> "$GITHUB_OUTPUT"

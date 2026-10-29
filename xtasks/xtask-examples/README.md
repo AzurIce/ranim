@@ -12,7 +12,7 @@ README，无需维护或提交 `website/content/examples/`、`website/data/*.tom
 Cargo.toml + examples/**/{scenes.rs,main.rs,README.md}
     → cargo examples site（prepare 阶段，JSON stdio）
     → 内存中的 examples/<group>/<name>.md + site.data.<name>
-    → Notist 解析、模板渲染 → dist/ranim-website/website/
+    → Notist 解析、模板渲染 → dist/ranim-website/
 
 .shadow/refs/ + shadow.toml → 已发布媒体 URL
 website/render-state.json → 上次成功渲染的源码 hash
@@ -81,7 +81,7 @@ cargo examples build arc gltf_showcase
 # 第二步：开发预览（也监听 Cargo 配置、例子源码、README 和 shadow refs）
 notist serve -p ranim-website
 
-# 或生成 dist/ranim-website/website/；发布前先用 cargo examples build 构建全部例子
+# 或生成 dist/ranim-website/；发布前先用 cargo examples build 构建全部例子
 just website
 ```
 

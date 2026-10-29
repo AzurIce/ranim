@@ -2,7 +2,7 @@
 name = "ranim-book"
 
 [[book]]
-name = "book"
+name = "ranim-book"
 title = "Ranim Book"
 exclude = ["**/AGENTS.md", "_components/**"]
 additional-css = ["version-select.css"]

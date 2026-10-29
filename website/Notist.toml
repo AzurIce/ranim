@@ -2,7 +2,7 @@
 name = "ranim-website"
 
 [[site]]
-name = "website"
+name = "ranim-website"
 title = "Ranim"
 base_url = "https://azurice.github.io/ranim/"
 content = "content"
