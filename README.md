@@ -44,21 +44,27 @@ Runtime dependencies:
 
 ## Installation
 
+### Published release: v0.2.1
+
 ```toml
 [dependencies]
 ranim = "0.2.1"
 ```
 
-You can also use from git for the latest updates:
+Uses the previous project/CLI API. See the
+[v0.2.1 guide](https://github.com/AzurIce/ranim/blob/v0.2.1/README.md) and
+[API reference](https://docs.rs/ranim/0.2.1/ranim/).
+
+### Development: v0.3 (unreleased)
 
 ```toml
 [dependencies]
-ranim = { git = "https://github.com/azurice/ranim" }
+ranim = { git = "https://github.com/AzurIce/ranim" }
 ```
 
-### Project entry
+The examples below use the new App/Plugin API, **not the v0.2.1 API**.
 
-v0.3(WIP, main) has a huge change on the usage paradigm of ranim.
+### Project entry
 
 **Scenes remain ordinary Rust functions and can live in a library.** A host
 registers them in an `App`: native runs its CLI; WASM exports the same project
