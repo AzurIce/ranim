@@ -1,0 +1,7 @@
+{{#> layouts/three-col}}
+  <article class="markdown-body examples-article">
+    {{> components/breadcrumbs}}
+    {{{page.html}}}
+    <div class="examples-list">{{#with directory}}{{> components/cards}}{{/with}}</div>
+  </article>
+{{/layouts/three-col}}

@@ -1,0 +1,136 @@
+use std::f64::consts::PI;
+
+use ranim::{
+    anims::morph::MorphAnim,
+    color::{HueDirection, palettes::manim},
+    glam::{DQuat, DVec3, dvec2},
+    items::vitem::geometry::RegularPolygon,
+    prelude::*,
+    utils::rate_functions::smooth,
+};
+
+#[scene]
+#[wasm_demo_doc]
+#[output(dir = "./output/regular_polygon")]
+pub fn regular_polygon(r: &mut RanimScene) {
+    let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
+    let max_radius = frame_size.x.max(frame_size.y) / 2.0 * 0.9;
+
+    let n_layers = 12;
+    let total_rotation = PI / 2.0; // 90° total rotation spread
+
+    // Colors
+    let start_color = manim::BLUE_C;
+    let end_color = manim::RED_C;
+
+    // Target radii
+    let radii: Vec<f64> = (0..n_layers)
+        .map(|i| max_radius * (i + 1) as f64 / n_layers as f64)
+        .collect();
+
+    // Create polygons starting from zero radius
+    let mut polygons = (0..n_layers)
+        .map(|i| {
+            let sides = i + 3;
+            let t = i as f32 / (n_layers - 1).max(1) as f32;
+            let color = start_color.lerp(end_color, t, HueDirection::Increasing);
+
+            RegularPolygon::new(sides, 0.0)
+                .with(|p| {
+                    p.set_stroke_color(color);
+                    p.stroke_width = 0.05;
+                    p.set_fill_color(color.with_alpha(0.08));
+                })
+                .transformed(Similarity::IDENTITY)
+        })
+        .collect::<Vec<_>>();
+
+    let mut content = AnimSequence::new();
+
+    // Phase 1: Expand from center with lagged effect
+    let expand = polygons
+        .iter_mut()
+        .zip(radii.iter())
+        .map(|(poly, &target_radius)| {
+            poly.morph(|p| {
+                p.inner.radius = target_radius;
+            })
+            .with_rate_func(smooth)
+        })
+        .into_lagged(0.2);
+    content.push(expand.with_duration(1.0));
+
+    // Phase 2: Rotate each layer at different speeds
+    let rotations: Vec<f64> = (0..n_layers)
+        .map(|i| total_rotation * (n_layers - i) as f64 / n_layers as f64)
+        .collect();
+
+    let rotate = polygons
+        .iter_mut()
+        .zip(rotations.iter())
+        .map(|(poly, &rot)| {
+            poly.morph(|p| {
+                p.transform = Similarity {
+                    scale: 1.0,
+                    rotation: DQuat::from_rotation_z(rot),
+                    translation: DVec3::ZERO,
+                };
+            })
+            .with_rate_func(smooth)
+        })
+        .into_lagged(0.2);
+    content.push(rotate.with_duration(1.0));
+
+    r.insert_time_mark(
+        content.cursor_sec(),
+        TimeMark::Capture("preview.png".to_string()),
+    );
+
+    content.hold(0.5);
+
+    // Phase 3: Collapse back to center (reverse order - outer first)
+    let collapse = polygons
+        .iter_mut()
+        .rev()
+        .map(|poly| {
+            poly.morph(|p| {
+                p.inner.radius = 0.0;
+            })
+            .with_rate_func(smooth)
+        })
+        .into_lagged(0.2);
+    content.push(collapse.with_duration(1.0));
+
+    r.play(
+        CameraFrame::default()
+            .show()
+            .with_duration(content.cursor_sec()),
+    );
+    r.play(content);
+}
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut bevy_app::App) {
+        app.add_scenes([regular_polygon::scene()]);
+
+        #[cfg(feature = "render")]
+        {
+            use ranim::{
+                core::traits::Similarity,
+                core::transformed::Transformed,
+                items::{RanimItemsPlugin, vitem::geometry::RegularPolygon},
+                render::{RenderSetup, extract::ExtractPlugin},
+            };
+
+            app.insert_resource(RenderSetup::new(|render_app| {
+                render_app.add_plugins((
+                    RanimItemsPlugin,
+                    ExtractPlugin::<Transformed<RegularPolygon, Similarity>>::default(),
+                ));
+            }));
+        }
+    }
+}

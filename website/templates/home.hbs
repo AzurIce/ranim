@@ -1,0 +1,11 @@
+{{#> layouts/base}}
+  <div class="container content">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; margin: 2rem auto">
+      <img src="{{url 'ranim.svg'}}" width="200" alt="Ranim logo">
+      <article class="markdown-body">
+        {{{page.html}}}
+        {{#with (lookup site.data page.attrs.example)}}{{> components/player}}{{/with}}
+      </article>
+    </div>
+  </div>
+{{/layouts/base}}

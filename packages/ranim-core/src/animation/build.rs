@@ -3,15 +3,14 @@
 //! [`IntoAnimNode`] is the lowering protocol: it turns an authoring definition
 //! into an [`AnimNode`]. It is intentionally
 //! separate from [`Eval`], the typed visual-leaf
-//! protocol. Every `Eval` gets an [`IntoAnimNode`] implementation by blanket
-//! impl; the built-in containers implement it directly.
+//! protocol. An `Eval` whose output is `Clone + Send + Sync + 'static` gets an
+//! [`IntoAnimNode`] implementation by blanket impl; the built-in animation
+//! containers implement it directly.
 //!
 //! [`Unplaced`] marks definitions that have not been fixed to a parent time
 //! coordinate yet, so containers and [`Unplaced::at`] may schedule them.
 
 use std::any::type_name;
-
-use crate::core_item::AnyExtractCoreItem;
 
 use super::{
     eval::Eval,
@@ -69,14 +68,14 @@ impl<A: Unplaced> PlaybackExt for A {}
 impl<E> Unplaced for E
 where
     E: Eval + 'static,
-    E::Output: AnyExtractCoreItem,
+    E::Output: Clone + Send + Sync + 'static,
 {
 }
 
 impl<E> IntoAnimNode for E
 where
     E: Eval + 'static,
-    E::Output: AnyExtractCoreItem,
+    E::Output: Clone + Send + Sync + 'static,
 {
     fn into_anim_node(self) -> AnimNode {
         AnimNode {

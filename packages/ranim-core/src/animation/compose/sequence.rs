@@ -2,7 +2,7 @@
 
 use std::any::type_name;
 
-use crate::core_item::DynItem;
+use crate::animation::eval::DynOutput;
 
 use crate::animation::build::{IntoAnimNode, Unplaced};
 use crate::animation::node::{AnimNode, NodeContent, constant_node};
@@ -23,14 +23,14 @@ impl AnimSequence {
         Self::default()
     }
 
-    fn eval_at_content_sec(&self, target_sec: f64, output: &mut Vec<DynItem>) {
+    fn eval_at_content_sec(&self, target_sec: f64, output: &mut Vec<DynOutput>) {
         if let Some(animation) = self
             .animations
             .iter()
             .rev()
             .find(|animation| animation.contains_sec(target_sec, self.cursor_sec))
         {
-            animation.eval_at(target_sec, output);
+            animation.capture_at(target_sec, output);
         }
     }
 

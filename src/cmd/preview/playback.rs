@@ -15,7 +15,6 @@ use web_time::Instant;
 
 use ranim_core::SceneEvaluator;
 
-#[cfg(not(target_family = "wasm"))]
 use super::audio::{AudioPlayer, MixedAudio};
 
 /// The active clock while playing.
@@ -25,8 +24,9 @@ enum PlaybackClock {
         base_sec: f64,
         speed: f64,
     },
-    #[cfg(not(target_family = "wasm"))]
-    Audio { player: AudioPlayer },
+    Audio {
+        player: AudioPlayer,
+    },
 }
 
 impl PlaybackClock {
@@ -37,7 +37,6 @@ impl PlaybackClock {
                 base_sec,
                 speed,
             } => base_sec + started_at.elapsed().as_secs_f64() * speed,
-            #[cfg(not(target_family = "wasm"))]
             PlaybackClock::Audio { player } => player.pos_secs(),
         }
     }
@@ -47,23 +46,18 @@ impl PlaybackClock {
 /// output device survives pause cycles) and the active clock while playing.
 pub(crate) struct PlaybackEngine {
     clock: Option<PlaybackClock>,
-    #[cfg(not(target_family = "wasm"))]
     player: Option<AudioPlayer>,
 }
 
 impl PlaybackEngine {
     /// Build an engine for a scene, preparing its mixed audio for playback.
     pub fn new(evaluator: &SceneEvaluator) -> Self {
-        #[cfg(target_family = "wasm")]
-        let _ = evaluator;
         Self {
             clock: None,
-            #[cfg(not(target_family = "wasm"))]
             player: Self::build_player(evaluator),
         }
     }
 
-    #[cfg(not(target_family = "wasm"))]
     fn build_player(evaluator: &SceneEvaluator) -> Option<AudioPlayer> {
         if !evaluator.has_audio() {
             return None;
@@ -87,25 +81,16 @@ impl PlaybackEngine {
     /// Returns the effective start position.
     pub fn play(&mut self, from: f64, total: f64, speed: f64) -> f64 {
         let start = if from >= total { 0.0 } else { from };
-        self.clock = Some({
-            #[cfg(not(target_family = "wasm"))]
-            match self.player.take() {
-                Some(mut player) => {
-                    player.play_from(start, speed);
-                    PlaybackClock::Audio { player }
-                }
-                None => PlaybackClock::Wall {
-                    started_at: Instant::now(),
-                    base_sec: start,
-                    speed,
-                },
+        self.clock = Some(match self.player.take() {
+            Some(mut player) => {
+                player.play_from(start, speed);
+                PlaybackClock::Audio { player }
             }
-            #[cfg(target_family = "wasm")]
-            PlaybackClock::Wall {
+            None => PlaybackClock::Wall {
                 started_at: Instant::now(),
                 base_sec: start,
                 speed,
-            }
+            },
         });
         start
     }
@@ -118,7 +103,6 @@ impl PlaybackEngine {
                 base_sec,
                 speed,
             }) => base_sec + started_at.elapsed().as_secs_f64() * speed,
-            #[cfg(not(target_family = "wasm"))]
             Some(PlaybackClock::Audio { mut player }) => {
                 player.pause();
                 let pos = player.pos_secs();
@@ -146,16 +130,12 @@ impl PlaybackEngine {
                 *base_sec = sec;
                 *started_at = Instant::now();
             }
-            #[cfg(not(target_family = "wasm"))]
             Some(PlaybackClock::Audio { player }) => player.seek_to(sec),
-            #[cfg(not(target_family = "wasm"))]
             None => {
                 if let Some(player) = &mut self.player {
                     player.scrub(sec);
                 }
             }
-            #[cfg(target_family = "wasm")]
-            None => {}
         }
     }
 
@@ -163,7 +143,6 @@ impl PlaybackEngine {
     /// paused. Returns whether a scrub voice is still audible (the caller
     /// should keep repainting so the staleness check can run).
     pub fn tick_scrub(&mut self) -> bool {
-        #[cfg(not(target_family = "wasm"))]
         if self.clock.is_none()
             && let Some(player) = &mut self.player
         {
@@ -186,21 +165,8 @@ impl PlaybackEngine {
                 *started_at = Instant::now();
                 *old_speed = speed;
             }
-            #[cfg(not(target_family = "wasm"))]
             Some(PlaybackClock::Audio { player }) => player.set_speed(speed),
             None => {}
-        }
-    }
-
-    /// Swap in a freshly built scene: stop playback and rebuild the audio
-    /// player from the new scene's audio plane.
-    pub fn reload_scene(&mut self, evaluator: &SceneEvaluator) {
-        self.clock = None;
-        #[cfg(target_family = "wasm")]
-        let _ = evaluator;
-        #[cfg(not(target_family = "wasm"))]
-        {
-            self.player = Self::build_player(evaluator);
         }
     }
 }

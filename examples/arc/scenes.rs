@@ -1,0 +1,71 @@
+use itertools::Itertools;
+use ranim::{
+    anims::fading::FadingAnim,
+    color,
+    color::HueDirection,
+    glam::dvec2,
+    items::vitem::{VItem, geometry::Arc},
+    prelude::*,
+    utils::rate_functions::smooth,
+};
+
+#[scene]
+#[wasm_demo_doc]
+#[output(dir = "./output/arc")]
+pub fn arc(r: &mut RanimScene) {
+    // let frame_size = app.camera().size;
+    let frame_size = dvec2(8.0 * 16.0 / 9.0, 8.0);
+    let frame_start = dvec2(frame_size.x / -2.0, frame_size.y / -2.0);
+
+    let start_color = color::color("#FF8080FF");
+    let end_color = color::color("#58C4DDFF");
+
+    let nrow = 10;
+    let ncol = 10;
+    let step_x = frame_size.x / ncol as f64;
+    let step_y = frame_size.y / nrow as f64;
+
+    let mut arcs = (0..nrow)
+        .cartesian_product(0..ncol)
+        .map(|(i, j)| {
+            let (i, j) = (i as f64, j as f64);
+
+            let angle = std::f64::consts::PI * (j + 1.0) / ncol as f64 * 360.0 / 180.0;
+            let radius = step_y / 2.0 * 0.8;
+            let color = start_color.lerp(
+                end_color,
+                i as f32 / (nrow - 1) as f32,
+                HueDirection::Increasing,
+            );
+            let offset = frame_start + dvec2(j * step_x + step_x / 2.0, i * step_y + step_y / 2.0);
+            let mut arc: VItem = Arc::new(angle, radius)
+                .with(|arc| {
+                    arc.stroke_width = 0.12 * (j as f32 + 0.02) / ncol as f32;
+                    arc.set_stroke_color(color);
+                })
+                .into();
+            arc.shift(offset.extend(0.0));
+            arc
+        })
+        .collect::<Vec<_>>();
+    let total_secs = 3.0;
+    let content = arcs
+        .iter_mut()
+        .map(|arc| arc.fade_in().with_rate_func(smooth))
+        .into_lagged(0.2)
+        .with_duration(total_secs);
+
+    r.play(CameraFrame::default().show().with_duration(total_secs));
+    r.play(content);
+
+    r.insert_time_mark(total_secs, TimeMark::Capture("preview.png".to_string()));
+}
+
+/// Register the scenes provided by this example.
+pub struct ScenesPlugin;
+
+impl ranim::Plugin for ScenesPlugin {
+    fn build(&self, app: &mut bevy_app::App) {
+        app.add_scenes([arc::scene()]);
+    }
+}

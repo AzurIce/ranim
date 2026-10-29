@@ -14,6 +14,14 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     crane.url = "github:ipetkov/crane";
+    notist.url = "github:AzurIce/notist";
+    # Includes the workspace hotpatch cascade fix missing from dx 0.7.10.
+    dioxus = {
+      url = "github:DioxusLabs/dioxus/7bd964ae9469daafcb76b73556162d9082be255b";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.crane.follows = "crane";
+      inputs.rust-overlay.follows = "rust-overlay";
+    };
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -26,6 +34,8 @@
       crane,
       rust-overlay,
       flake-utils,
+      notist,
+      dioxus,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -47,136 +57,17 @@
             ];
           }
         );
-        src = craneLib.cleanCargoSource ./.;
-
-        commonArgs = {
-          inherit src;
-          strictDeps = true;
-
-          buildInputs = [
-            # Add additional build inputs here
-          ]
-          ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
-            # Additional darwin specific inputs can be set here
-            pkgs.libiconv
-          ];
-        };
-        # Build *just* the cargo dependencies (of the entire workspace),
-        # so we can reuse all of that work (e.g. via cachix) when running in CI
-        # It is *highly* recommended to use something like cargo-hakari to avoid
-        # cache misses when building individual top-level-crates
-        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-        # Building a single package still makes cargo resolve the whole
-        # workspace, so every member's manifest *and* its target sources
-        # must be present (a declared `[lib]`/`[[bin]]` is validated during
-        # manifest parsing); ranim-cli additionally compiles the root `ranim`
-        # crate and its path-dep crates, so their sources are included too.
-        fileSetForCrate =
-          crate:
-          lib.fileset.toSource {
-            root = ./.;
-            fileset = lib.fileset.unions (
-              [
-                ./Cargo.toml
-                ./Cargo.lock
-                ./src
-                # crane's commonCargoSources only carries Cargo.toml + *.rs;
-                # ranim-render embeds its .wgsl shaders via include_wgsl!.
-                ./packages/ranim-render/src
-              ]
-              ++ map craneLib.fileset.commonCargoSources (
-                [
-                  ./benches
-                  ./example-packages/app
-                  ./packages/ranim-anims
-                  ./packages/ranim-cli
-                  ./packages/ranim-core
-                  ./packages/ranim-examples
-                  ./packages/ranim-items
-                  ./packages/ranim-macros
-                  ./packages/ranim-render
-                  ./xtasks/xtask-examples
-                ]
-                ++ [ crate ]
-              )
-            );
-          };
-        individualCrateArgs = commonArgs // {
-          inherit cargoArtifacts;
-          inherit (craneLib.crateNameFromCargoToml { inherit src; }) version;
-          # NB: we disable tests since we'll run them all via cargo-nextest
-          doCheck = false;
-        };
-        # Libraries dlopen'd at runtime by winit/wgpu (GUI) and cpal/rodio
-        # (preview audio). They never show up in the binary's ELF NEEDED
-        # list, so Nix cannot discover them — they have to be wrapped in.
-        ranimCliRuntimeLibs = with pkgs; [
-          alsa-lib
-          libGL
-          libX11
-          libXcursor
-          libXi
-          libXrandr
-          libxkbcommon
-          vulkan-loader
-          wayland
-        ];
-
-        ranim-cli = craneLib.buildPackage (
-          individualCrateArgs
-          // {
-            pname = "ranim-cli";
-            cargoExtraArgs = "-p ranim-cli";
-            src = fileSetForCrate ./packages/ranim-cli;
-            meta.mainProgram = "ranim";
-            # alsa-sys locates libasound via pkg-config at build time
-            nativeBuildInputs = [ pkgs.makeWrapper ] ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.pkg-config ];
-            buildInputs =
-              individualCrateArgs.buildInputs ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.alsa-lib ];
-            postInstall = ''
-              wrapProgram "$out/bin/ranim" \
-                --prefix PATH : ${lib.makeBinPath [ pkgs.ffmpeg ]} \
-                ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
-                  --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath ranimCliRuntimeLibs}
-                ''}
-            '';
-          }
-        );
-
-        mdbook-typst-math = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
-          pname = "mdbook-typst-math";
-          version = "0.4.0";
-
-          src = pkgs.fetchFromGitHub {
-            owner = "duskmoon314";
-            repo = "mdbook-typst-math";
-            rev = "52341bd8ec2ffde6db92cfd5e5d7503076fbd94e";
-            hash = "sha256-0tBtRI3R19f4UA6uEzRZoKgptc/OgUEOOYm6hammweo=";
-          };
-
-          cargoHash = "sha256-PMgo5PnDPUQgLwpN3S6N7tFYXv2Jb0FTepf7HOHXpjY=";
-        });
+        # The pinned upstream package includes the HTML highlighting assets.
+        notistPackage = notist.packages.${system}.notist;
+        dioxusPackage = dioxus.packages.${system}.dioxus-cli;
       in
       {
-        packages = {
-          default = ranim-cli;
-          inherit ranim-cli;
-        };
-        apps =
-          let
-            # The binary installs as `ranim` (the [[bin]] name), not `ranim-cli`.
-            ranimCliApp = {
-              type = "app";
-              program = "${ranim-cli}/bin/ranim";
-            };
-          in
-          {
-            default = ranimCliApp;
-            ranim-cli = ranimCliApp;
-          };
+        packages.notist = notistPackage;
+        packages.dioxus-cli = dioxusPackage;
         devShells.default = craneLib.devShell {
           packages = [
-            mdbook-typst-math
+            notistPackage
+            dioxusPackage
           ]
           ++ (with pkgs; [
             git-cliff
@@ -185,26 +76,19 @@
             samply
             cargo-udeps
             miniserve
-            trunk
-            zola
-            mdbook
-            wasm-pack
             binaryen
-            mdbook-mermaid
             typst
             gh
             ffmpeg
             wasm-bindgen-cli_0_2_129
             # Match the wasm-bindgen version in Cargo.lock.
-            # mdbook-katex
-            # mdbook-i18n-helpers
           ])
           ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
             pkgs.vulkan-loader
             pkgs.wayland
             pkgs.libxkbcommon
             pkgs.libX11
-            # rodio/cpal preview audio backend (ranim `preview` feature)
+            # rodio/cpal preview audio backend (ranim `cmd-preview` feature)
             pkgs.alsa-lib
             pkgs.pkg-config
             pkgs.udev

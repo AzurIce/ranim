@@ -2,13 +2,14 @@
 use std::collections::VecDeque;
 
 use crate::cmd::render::file_writer::OutputFormatExt;
-use crate::{Output, Scene, SceneConfig, SceneConstructor};
+use crate::{Output, Scene, SceneConstructor};
+use bevy_app::SubApp;
 use file_writer::{FileWriter, FileWriterBuilder};
 use indicatif::{ProgressState, ProgressStyle};
 use ranim_core::color::{self, LinearSrgb};
-use ranim_core::{SceneEvaluator, TimeMark};
+use ranim_core::{SceneEvaluator, TimeMark, frame::EvaluatedFrame};
 use ranim_render::resource::RenderTextures;
-use ranim_render::{Renderer, utils::WgpuContext, world::RenderFrame};
+use ranim_render::{RenderAppExt, RenderSetup, build_render_app, utils::WgpuContext};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::Instant;
@@ -34,7 +35,7 @@ fn render_output_basename(template: &str, name: &str, width: u32, height: u32, f
 }
 
 /// Render a scene with all its outputs
-pub fn render_scene(scene: &Scene, buffer_count: usize) {
+pub fn render_scene(scene: &Scene, setup: &RenderSetup, buffer_count: usize) {
     for (i, output) in scene.outputs.iter().enumerate() {
         info!(
             "Rendering output {}/{} ({})",
@@ -42,25 +43,18 @@ pub fn render_scene(scene: &Scene, buffer_count: usize) {
             scene.outputs.len(),
             output.format
         );
-        render_scene_output(
-            scene.constructor,
-            scene.name.to_string(),
-            &scene.config,
-            output,
-            buffer_count,
-        );
+        render_scene_output(scene, setup, output, buffer_count);
     }
 }
 
 /// Render a scene output
 pub fn render_scene_output(
-    constructor: impl SceneConstructor,
-    name: String,
-    scene_config: &SceneConfig,
+    scene: &Scene,
+    setup: &RenderSetup,
     output: &Output,
     buffer_count: usize,
 ) {
-    render_scene_output_with_progress(constructor, name, scene_config, output, buffer_count, None);
+    render_scene_output_with_progress(scene, setup, output, buffer_count, None);
 }
 
 /// A single rendering job: one [`Output`] plus whether capture marks should
@@ -92,17 +86,15 @@ impl RenderJob {
 ///
 /// The callback receives `(current_frame, total_frames)` each frame.
 pub fn render_scene_output_with_progress(
-    constructor: impl SceneConstructor,
-    name: String,
-    scene_config: &SceneConfig,
+    scene: &Scene,
+    setup: &RenderSetup,
     output: &Output,
     buffer_count: usize,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
 ) {
     render_scene_job(
-        constructor,
-        name,
-        scene_config,
+        scene,
+        setup,
         RenderJob::full(output.clone(), true),
         buffer_count,
         on_progress,
@@ -114,17 +106,10 @@ pub fn render_scene_output_with_progress(
 /// This is the low-level rendering entry point used by `ranim render`: it
 /// renders the whole scene once with the given [`Output`], but unlike
 /// [`render_scene_output_with_progress`] it does not process capture marks.
-pub fn render_scene_once(
-    constructor: impl SceneConstructor,
-    name: String,
-    scene_config: &SceneConfig,
-    output: &Output,
-    buffer_count: usize,
-) {
+pub fn render_scene_once(scene: &Scene, setup: &RenderSetup, output: &Output, buffer_count: usize) {
     render_scene_job(
-        constructor,
-        name,
-        scene_config,
+        scene,
+        setup,
         RenderJob::full(output.clone(), false),
         buffer_count,
         None,
@@ -133,9 +118,8 @@ pub fn render_scene_once(
 
 /// Build the scene and run a [`RenderJob`].
 pub fn render_scene_job(
-    constructor: impl SceneConstructor,
-    name: String,
-    scene_config: &SceneConfig,
+    scene: &Scene,
+    setup: &RenderSetup,
     job: RenderJob,
     buffer_count: usize,
     on_progress: Option<Box<dyn Fn(u64, u64) + Send>>,
@@ -153,14 +137,14 @@ pub fn render_scene_job(
     );
 
     let t = Instant::now();
-    let scene = constructor.build_scene();
+    let timeline = scene.build_scene();
     trace!("Build timeline cost: {:?}", t.elapsed());
 
     // Default logic grid 120 Hz (per the time model design); render fps only
     // decides which logic states are sampled.
-    let mut evaluator = scene.into_evaluator(DEFAULT_LOGIC_FPS);
+    let mut evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
 
-    let mut app = RanimRenderApp::new(name, scene_config, &output, buffer_count);
+    let mut app = RanimRenderApp::new(scene, setup, &output, buffer_count);
     app.render_scene_with_progress(&mut evaluator, on_progress);
 
     if capture_marks && !evaluator.time_marks().is_empty() {
@@ -198,21 +182,21 @@ const DEFAULT_LOGIC_FPS: f64 = 120.0;
 ///
 /// Dropping this handle closes the submission channel and terminates the worker thread loop.
 pub struct RenderThreadHandle {
-    submit_frame_tx: async_channel::Sender<RenderFrame>,
-    back_rx: async_channel::Receiver<RenderFrame>,
+    submit_frame_tx: async_channel::Sender<EvaluatedFrame>,
+    back_rx: async_channel::Receiver<EvaluatedFrame>,
     worker_rx: async_channel::Receiver<RenderWorker>,
 }
 
 impl RenderThreadHandle {
-    /// Reuses a [`RenderFrame`], applies `f` to it, and submits it to the background render thread.
-    pub fn sync_and_submit(&self, f: impl FnOnce(&mut RenderFrame)) {
+    /// Reuses an [`EvaluatedFrame`], applies `f` to it, and submits it to the background render thread.
+    pub fn sync_and_submit(&self, f: impl FnOnce(&mut EvaluatedFrame)) {
         let mut store = self.get_store();
         f(&mut store);
         self.submit_frame_tx.send_blocking(store).unwrap();
     }
 
-    /// Retrieves a previously rendered [`RenderFrame`] from the background thread for reuse.
-    pub fn get_store(&self) -> RenderFrame {
+    /// Retrieves a previously rendered [`EvaluatedFrame`] from the background thread for reuse.
+    pub fn get_store(&self) -> EvaluatedFrame {
         self.back_rx.recv_blocking().unwrap()
     }
 
@@ -223,10 +207,10 @@ impl RenderThreadHandle {
     }
 }
 
-/// Background rendering worker that owns the wgpu context, renderer, output textures, and video/image writers.
+/// Background rendering worker that owns the wgpu context, render sub-app, output textures, and video/image writers.
 pub struct RenderWorker {
     ctx: WgpuContext,
-    renderer: Renderer,
+    render_app: SubApp,
     render_textures: Vec<RenderTextures>,
     clear_color: wgpu::Color,
     // video writer
@@ -244,18 +228,15 @@ pub struct RenderWorker {
 impl RenderWorker {
     /// Creates a new [`RenderWorker`].
     ///
-    /// This checks for or downloads `ffmpeg`, initializes the wgpu context and renderer, and configures the video writer from [`Output`].
+    /// This checks for or downloads `ffmpeg`, initializes the wgpu context and the
+    /// render sub-app (configured by `setup`), and configures the video writer from [`Output`].
     ///
     /// # Panics
     ///
     /// Panics if `buffer_count < 1`.
-    pub fn new(
-        scene_name: String,
-        scene_config: &SceneConfig,
-        output: &Output,
-        buffer_count: usize,
-    ) -> Self {
+    pub fn new(scene: &Scene, setup: &RenderSetup, output: &Output, buffer_count: usize) -> Self {
         assert!(buffer_count >= 1, "buffer_count must be at least 1");
+        let scene_name = scene.name.clone();
         info!("Checking ffmpeg...");
         let t = Instant::now();
         if let Ok(ffmpeg_path) = which::which("ffmpeg") {
@@ -285,11 +266,14 @@ impl RenderWorker {
         if !output_dir.is_absolute() {
             output_dir = std::env::current_dir().unwrap().join(output_dir);
         }
-        let renderer = Renderer::new(&ctx, output.width, output.height, 8);
+        let mut render_app = build_render_app(&ctx, output.width, output.height, 8);
+        render_app.add_plugins(setup.clone());
+        render_app.finish();
+        render_app.cleanup();
         let render_textures: Vec<RenderTextures> = (0..buffer_count)
-            .map(|_| renderer.new_render_textures(&ctx))
+            .map(|_| RenderTextures::new(&ctx, output.width, output.height))
             .collect();
-        let clear_color = color::try_color(&scene_config.clear_color)
+        let clear_color = color::try_color(&scene.config.clear_color)
             .unwrap_or(color::color("#333333ff"))
             .convert::<LinearSrgb>();
         let [r, g, b, a] = clear_color.components.map(|x| x as f64);
@@ -311,7 +295,7 @@ impl RenderWorker {
         });
         Self {
             ctx,
-            renderer,
+            render_app,
             render_textures,
             clear_color,
             video_writer: None,
@@ -355,13 +339,16 @@ impl RenderWorker {
 
     /// Moves this [`RenderWorker`] into a newly spawned background thread and returns a [`RenderThreadHandle`].
     ///
-    /// The background thread loops over incoming [`RenderFrame`]s, rendering and outputting frames using multi-buffered async readback.
+    /// The background thread loops over incoming [`EvaluatedFrame`]s, rendering and outputting frames using multi-buffered async readback.
     pub fn yeet(self) -> RenderThreadHandle {
         let (submit_frame_tx, submit_frame_rx) = async_channel::bounded(1);
-        let (back_tx, back_rx) = async_channel::bounded(1);
+        let (back_tx, back_rx) = async_channel::bounded(2);
         let (worker_tx, worker_rx) = async_channel::bounded(1);
 
-        back_tx.send_blocking(RenderFrame::default()).unwrap();
+        // Evaluate one frame while the worker renders the other, reusing both.
+        for _ in 0..2 {
+            back_tx.send_blocking(EvaluatedFrame::default()).unwrap();
+        }
         std::thread::spawn(move || {
             let mut worker = self;
             let n = worker.render_textures.len();
@@ -369,7 +356,7 @@ impl RenderWorker {
             let mut cur = 0usize;
             let mut pending: VecDeque<(usize, u64)> = VecDeque::new();
 
-            while let Ok(store) = submit_frame_rx.recv_blocking() {
+            while let Ok(mut store) = submit_frame_rx.recv_blocking() {
                 // Drain oldest pending readback if all targets are occupied
                 if pending.len() >= n {
                     let (prev, prev_fc) = pending.pop_front().unwrap();
@@ -378,10 +365,10 @@ impl RenderWorker {
                 }
 
                 // Render current frame and start async readback
-                worker.renderer.render_frame(
+                worker.render_app.render_frame(
                     &mut worker.render_textures[cur],
                     worker.clear_color,
-                    &store,
+                    &mut store,
                 );
                 worker.render_textures[cur].start_readback(&worker.ctx);
 
@@ -421,8 +408,10 @@ impl RenderWorker {
     }
 
     /// Renders a single frame synchronously on this worker (typically used for captures).
-    pub fn render_store(&mut self, store: &RenderFrame) {
-        self.renderer
+    ///
+    /// The frame's data and capacity remain available for reuse after rendering.
+    pub fn render_store(&mut self, store: &mut EvaluatedFrame) {
+        self.render_app
             .render_frame(&mut self.render_textures[0], self.clear_color, store);
     }
 
@@ -487,22 +476,17 @@ impl RenderWorker {
 pub struct RanimRenderApp {
     render_worker: Option<RenderWorker>,
     fps: u32,
-    store: RenderFrame,
+    store: EvaluatedFrame,
 }
 
 impl RanimRenderApp {
     /// Creates the application and initializes the internal [`RenderWorker`].
-    pub fn new(
-        scene_name: String,
-        scene_config: &SceneConfig,
-        output: &Output,
-        buffer_count: usize,
-    ) -> Self {
-        let render_worker = RenderWorker::new(scene_name, scene_config, output, buffer_count);
+    pub fn new(scene: &Scene, setup: &RenderSetup, output: &Output, buffer_count: usize) -> Self {
+        let render_worker = RenderWorker::new(scene, setup, output, buffer_count);
         Self {
             render_worker: Some(render_worker),
             fps: output.fps,
-            store: RenderFrame::default(),
+            store: EvaluatedFrame::default(),
         }
     }
 
@@ -561,10 +545,8 @@ impl RanimRenderApp {
             .map(|f| (f as f64 / fps).min(total_secs))
             .enumerate()
             .for_each(|(i, sec)| {
-                let mut frame_items = Vec::new();
-                evaluator.sample_at(sec, &mut frame_items);
-                worker_thread.sync_and_submit(move |store| {
-                    store.update(frame_items.into_iter());
+                worker_thread.sync_and_submit(|store| {
+                    evaluator.sample_at(sec, store);
                 });
 
                 span.pb_inc(1);
@@ -620,11 +602,9 @@ impl RanimRenderApp {
         for (sec, TimeMark::Capture(filename)) in timemarks {
             // The render has advanced to the end; captures seek back and replay
             // (deterministic contract, direction handled inside sample_at).
-            let mut frame_items = Vec::new();
-            evaluator.sample_at(sec, &mut frame_items);
-            self.store.update(frame_items.into_iter());
+            evaluator.sample_at(sec, &mut self.store);
             let worker = self.render_worker.as_mut().unwrap();
-            worker.render_store(&self.store);
+            worker.render_store(&mut self.store);
             worker.capture_frame(filename);
             span.pb_inc(1);
             captured += 1;

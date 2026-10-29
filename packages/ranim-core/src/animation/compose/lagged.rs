@@ -125,7 +125,7 @@ impl AnimLagged {
             let mut track = AnimSequence::new();
             if self.leading == LaggedFill::Hold && start > 0.0 && child.duration_secs() > 0.0 {
                 let mut state = Vec::new();
-                child.eval_at(start, &mut state);
+                child.capture_at(start, &mut state);
                 if !state.is_empty() {
                     track.animations.push(constant_node(state, 0.0..start));
                 }
@@ -134,7 +134,7 @@ impl AnimLagged {
             if self.trailing == LaggedFill::Hold && end < total {
                 let child = track.animations.last().unwrap();
                 let mut state = Vec::new();
-                child.eval_at(end, &mut state);
+                child.capture_at(end, &mut state);
                 if !state.is_empty() {
                     track.animations.push(constant_node(state, end..total));
                 }

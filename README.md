@@ -44,104 +44,173 @@ Runtime dependencies:
 
 ## Installation
 
-Currently, it is experimental on crates.io:
+### Published release: v0.2.1
 
 ```toml
 [dependencies]
 ranim = "0.2.1"
 ```
 
-You can also use from git for the latest updates:
+Documentation:
+[v0.2.1 guide](https://github.com/AzurIce/ranim/blob/v0.2.1/README.md) and
+[API reference](https://docs.rs/ranim/0.2.1/ranim/).
+
+### Development: v0.3 (unreleased)
 
 ```toml
 [dependencies]
-ranim = { git = "https://github.com/azurice/ranim" }
+ranim = { git = "https://github.com/AzurIce/ranim" }
 ```
 
-For the usage, check out the [examples](./examples) folder. You can run the examples with:
+The following examples target the v0.3 App/Plugin API.
 
-```bash
-cargo run -p ranim-cli --release -- preview --example <example-name> # run a preview app for the example
-cargo run -p ranim-cli --release -- output --example <example-name> # render every declared output of the example
+### Project entry
+
+Define scenes as Rust functions in a library or module, then register their
+descriptors in an `App`. Native hosts run the CLI; WASM hosts export the project
+to JavaScript. For a package named `my-animation`:
+
+```toml
+# Cargo.toml
+[dependencies]
+ranim = { git = "https://github.com/AzurIce/ranim" }
+
+# Needed when exporting app() from the WASM host.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2.129"
 ```
-
-See Ranim Cli for more.
-
-### Ranim Cli
-
-Ranim cli is a command line tool to help you build the animation. It enables animation previewing with hot reload through dylib.
-
-Please notice that you can use ranim without ranim-cli, the previewing and rendering process can be achieved by simply invoking apis provided by *ranim*, but it may enhance your experience.
-
-You can install it with:
-
-```bash
-cargo install ranim-cli
-```
-
-Or install from git:
-
-```bash
-cargo install --git https://github.com/azurice/ranim ranim-cli --locked
-```
-
-Or you can create a bin, and run cli from `ranim_cli` directly (this can make sure the version of `ranim` matches `ranim_cli`):
 
 ```rust
-fn main() {
-    ranim_cli::main();
+// src/lib.rs — reusable scene definition; no CLI, GPU, or browser startup.
+use ranim::{items::vitem::geometry::Square, prelude::*};
+
+#[scene]
+pub fn hello(scene: &mut RanimScene) {
+    scene.play(CameraFrame::default().show().with_duration(2.0));
+    scene.play(Square::new(2.0).show().with_duration(2.0));
 }
 ```
 
-Basic Usage:
-- `ranim preview[ <scene_name>]`: Launch a preview app and invoke cargo to build your library automatically when the source code is changed, then reload it through *libloading* and show it in the preview app.
-- `ranim output[ <scene-name1> <scene_name2> ...]`: Render every `#[output(...)]` declared by the selected scenes, including capture marks. When no scene name is specified, render all scenes.
-- `ranim render <scene_name>`: Render one scene once with default output settings (`1920x1080`, 60 fps, mp4). This is the low-level/ad-hoc render command, ignores `#[output(...)]`, and does not process capture marks.
-- `ranim inspect scenes [--format text|json]`: List available scenes and their output summaries.
-- `ranim inspect tree [<scene_name>] [--format text|json]`: Build a scene and print its animation tree. The scene name can be omitted when there is only one scene.
-- `ranim inspect frame <scene_name> --at <sec> [--format text|json] [--verbose]`: Sample a scene at a time and print the evaluated frame items.
+```rust
+// src/main.rs — the same binary target serves native and WASM.
+use ranim::prelude::*;
 
-You can specify the package with `--package` and `--example` (just like cargo, note that your anim target should have crate-type of `dylib` or `cdylib`), and other aditional arguments you want to pass to `cargo build` can be passed after `--`.
+fn project() -> ranim::RanimApp {
+    let mut app = App::new();
+    app.add_scenes([my_animation::hello::scene()]);
+    app.build()
+}
 
-For example:
+#[cfg(not(target_arch = "wasm32"))]
+fn main() {
+    run_cli(project());
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() {}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn app() -> ranim::wasm::WasmApp {
+    ranim::wasm::WasmApp::new(project())
+}
+```
+
+`#[scene]` generates `hello::scene()` for explicit registration.
+`App` and `Plugin` are Bevy types. Plugins optionally group scenes, resources,
+and render configuration; `app.build()` finalizes the project for either host.
+See [project entry](./book/project-entry.md) for setup and platform bindings.
+
+#### Experimental scene hot reload
+
+Enable `subsecond` with `cmd-preview` and use Dioxus CLI:
+
+```sh
+dx serve --hotpatch --desktop --example hello_ranim --features subsecond --args preview
+```
+
+Patches rebuild the scene and pause at the previous time, preserving the
+window/GPU. This is **scene reconstruction, not state migration**; structural
+changes require a restart. Native only. The flake pins a dx workspace fix;
+that CLI/runtime combination awaits end-to-end validation. See
+[limitations](./book/project-entry.md#热重载不会改变场景库与宿主的边界).
+
+#### Custom render setup
+
+Built-in camera, vector, and mesh rendering needs no setup when `items` is
+enabled. For custom types or composite outputs, register a `RenderSetup` with
+an `ExtractPlugin<T>` matching the complete frame type. See
+[render extraction](./book/understand/core/extract.md).
+
+### Web examples
+
+Examples share native/WASM entries in one binary target. Browser UI and playback
+use independent [viewport and controls components](./website/README.md), with
+an expandable timeline and synchronized Web Audio. Native preview uses egui.
 
 ```bash
-ranim output -p render scene_a scene_b -- --release
-ranim render -p render scene_a -- --release
+cargo examples build arc  # WASM + bindings + optimization
+CARGO_BUILD_JOBS=4 just website-preview arc  # build and serve locally
 ```
+
+Run inside `nix develop`, then open `http://127.0.0.1:8000/examples/arc.html`
+and select **App**. See [examples](./examples/README.md) for layout and commands.
+
+### Command line interface
+
+| Command | Purpose |
+| --- | --- |
+| `preview [SCENE]` | Interactive native preview; defaults to the first scene |
+| `output [SCENES...]` | Render declared outputs and capture marks; defaults to all scenes |
+| `render <SCENE>` | One default-settings export, ignoring declared outputs and captures |
+| `inspect scenes\|tree\|frame` | Inspect registration, animation trees, or evaluated items |
+
+```bash
+cargo run -- preview hello
+cargo run -- output hello
+cargo run -- inspect frame hello --at 1.5
+cargo run --example hello_ranim -- preview  # repository example
+```
+
+See [CLI reference](./book/cli.md) for options. Some examples require `typst` or
+`gltf`; native export without the UI uses `--no-default-features --features anims,cmd-render`.
 
 ## Feature Flags
 
-- Default features
+Defaults are `anims`, `items`, and `cmd-preview`.
 
-  - `anims`: re-export `ranim-anims`, default on.
+| Feature | Capability |
+| --- | --- |
+| `items` | Built-in item types and their re-export; optional dependency |
+| `anims` | Built-in animations and their re-export; enables `items` |
+| `render` | GPU rendering API and WASM canvas host; independent of built-in items and native commands |
+| `cmd-render` | Native CLI (`output`, `render`, `inspect`) and offline export; enables `render` |
+| `cmd-preview` | Native egui preview and PCM playback, including the export panel; enables `cmd-render` |
+| `typst` | Typst text support; enables `items` |
+| `gltf` | glTF import; enables `items` |
+| `audio-decode` | Audio file decoding with symphonia and resampling with rubato |
+| `subsecond` | Experimental native scene hot reload with Dioxus CLI |
 
-  - `items`: re-export `ranim-items`, default on.
+`--no-default-features` keeps core evaluation and project assembly. Native command
+dependencies are excluded from WASM.
 
-- `render`: enable render api in cmd module
-  
-  use `render_scene` or `render_scene_output` to render scene to output
-
-- `preview`: enbale preview api in cmd module
-
-  use `preview_scene` api to launch an preview app on a scene
-  https://github.com/user-attachments/assets/5bf287e2-b06f-42f8-83b6-76f3775e298e
-- `audio-decode`: enable audio file decoding (`AudioClip::from_file` / `from_bytes`)
-
-  pure-Rust decoding via symphonia (WAV, MP3, FLAC, AAC/M4A, Ogg Vorbis) with rubato
-  resampling to the 48 kHz master rate — no ffmpeg binary required
-- `profiling`: enable GPU timer scopes (wgpu-profiler) for the preview profiler panel
-
-The preview app has a built-in profiler panel (top bar `Profiler` button):
-a progress-axis chart of GPU pass times / CPU spans / buffer-upload stats
-with click-to-seek. GPU timer scopes (wgpu-profiler) are runtime-toggled
-in the panel or via `RANIM_PROFILE_GPU=1`; upload tracking via
-`RANIM_PROFILE_UPLOAD=1`. While GPU timers are enabled, each frame pays a
-device poll.
+The native **Profiler** panel shows GPU passes, CPU spans, and upload stats.
+Enable GPU timestamps with `RANIM_PROFILE_GPU=1` (adds a per-frame device poll),
+or upload tracking with `RANIM_PROFILE_UPLOAD=1`.
 
 ![profiler panel](https://github.com/user-attachments/assets/746d044c-8fe8-44d8-a0dc-ee00eceb9284)
 
 ## Contributing
+
+### Book and website builds
+
+The root `Notist.toml` groups `book/` and `website/` into a workspace; each member
+keeps its own configuration. Inside `nix develop`, run `just book`, `just website`,
+or `just publications` to build both. Outputs are `dist/ranim-book/` and
+`dist/ranim-website/`, with independent deployment URLs.
+Use `notist serve -p ranim-book` or `notist serve -p ranim-website` for preview.
+Website builds generate example pages without rendering or uploading media;
+see the [website guide](./website/README.md) for WASM and media preparation.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 

@@ -1,16 +1,17 @@
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use std::f64::consts::TAU;
 
 use ranim_core::{
-    Extract,
     color::{AlphaColor, Srgb},
     components::vpoint::VPointVec,
-    core_item::{CoreItem, vitem::DEFAULT_STROKE_WIDTH},
     glam::{DVec2, DVec3},
     traits::{Aabb, Discard, Opacity, StrokeColor, StrokeWidth, With},
 };
 
 use crate::vitem::{
-    VItem,
+    DEFAULT_STROKE_WIDTH, VItem,
     geometry::{Arc, Circle, Ellipse},
 };
 
@@ -138,10 +139,10 @@ impl Aabb for EllipticArc {
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for EllipticArc {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }
 

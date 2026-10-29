@@ -1,12 +1,13 @@
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use std::f64::consts::{PI, TAU};
 
 use color::{AlphaColor, Srgb};
 use itertools::Itertools;
 use ranim_core::{
-    Extract,
     anchor::Aabb,
     color,
-    core_item::CoreItem,
     glam::{DVec2, DVec3},
     traits::{Alignable, ApplyTransform, FillColor, Opacity, StrokeColor, StrokeWidth, With},
 };
@@ -128,10 +129,10 @@ impl From<Square> for VItem {
         Rectangle::from(value).into()
     }
 }
+#[cfg(feature = "render")]
 impl Extract for Square {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }
 
@@ -235,10 +236,10 @@ impl From<Rectangle> for VItem {
         Polygon::from(value).into()
     }
 }
+#[cfg(feature = "render")]
 impl Extract for Rectangle {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }
 
@@ -341,10 +342,10 @@ impl From<Polygon> for VItem {
         })
     }
 }
+#[cfg(feature = "render")]
 impl Extract for Polygon {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }
 
@@ -438,9 +439,9 @@ impl From<RegularPolygon> for Polygon {
         })
     }
 }
+#[cfg(feature = "render")]
 impl Extract for RegularPolygon {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        Polygon::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        Polygon::from(self.clone()).extract(ctx);
     }
 }

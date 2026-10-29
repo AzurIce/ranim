@@ -1,0 +1,21 @@
+<sl-tab-group>
+  {{#if output_files}}<sl-tab slot="nav" panel="preview">Preview</sl-tab>{{/if}}
+  {{#if wasm}}<sl-tab slot="nav" panel="app">App</sl-tab>{{/if}}
+  {{#if output_files}}
+    <sl-tab-panel name="preview">
+      {{#each output_files}}
+        {{#if (starts_with kind 'video/')}}<video controls><source src="{{this.url}}" type="{{kind}}">您的浏览器不支持视频标签。</video>
+        {{else}}<img src="{{this.url}}" alt="{{../name}} 示例输出">{{/if}}
+      {{/each}}
+    </sl-tab-panel>
+  {{/if}}
+  {{#if wasm}}
+    <sl-tab-panel name="app">
+      <div class="ranim-preview">
+        <ranim-viewport src="{{url (concat 'examples/' name '/pkg/ranim_example.js')}}"></ranim-viewport>
+        <ranim-controls></ranim-controls>
+      </div>
+    </sl-tab-panel>
+  {{/if}}
+</sl-tab-group>
+{{{markdown code}}}

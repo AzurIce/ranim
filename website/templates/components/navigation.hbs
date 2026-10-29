@@ -1,0 +1,11 @@
+{{#each directories}}
+  {{#with (lookup @root.site.directories this)}}
+    <li>
+      {{#if index}}<a href="{{url index.route.url}}" class="outline-item {{#if (eq @root.page.route.path index.route.path)}}active{{/if}}">{{index.title}}</a>{{else}}<span>{{name}}</span>{{/if}}
+      <ul class="outline__nested">{{> components/navigation}}</ul>
+    </li>
+  {{/with}}
+{{/each}}
+{{#each pages}}
+  <li><a href="{{url route.url}}" class="outline-item {{#if (eq @root.page.route.path route.path)}}active{{/if}}">{{title}}</a></li>
+{{/each}}

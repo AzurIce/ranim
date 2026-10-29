@@ -12,15 +12,13 @@ use crate::scene::parse_scene_attrs;
 const RANIM_CRATE_NAME: &str = "ranim";
 
 fn ranim_path() -> proc_macro2::TokenStream {
-    match (
-        crate_name(RANIM_CRATE_NAME),
-        std::env::var("CARGO_CRATE_NAME").as_deref(),
-    ) {
-        (Ok(FoundCrate::Itself), Ok(RANIM_CRATE_NAME)) => quote!(crate),
-        (Ok(FoundCrate::Name(name)), _) => {
+    match crate_name(RANIM_CRATE_NAME) {
+        Ok(FoundCrate::Name(name)) => {
             let ident = Ident::new(&name, Span::call_site());
             quote!(::#ident)
         }
+        // The canonical self import in ranim also works in doctests, whose
+        // CARGO_CRATE_NAME still names the library rather than the test crate.
         _ => quote!(::ranim),
     }
 }
@@ -86,6 +84,7 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
         let vis = &input_fn.vis;
         quote!(#vis)
     };
+    let signature = &input_fn.sig;
     let fn_body = &input_fn.block;
     let doc_attrs: Vec<_> = input_fn
         .attrs
@@ -96,15 +95,15 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     // 场景名称
     let scene_name = attrs.name.unwrap_or_else(|| fn_name.to_string());
 
-    // StaticSceneConfig
+    // Scene configuration
     let clear_color = attrs.clear_color.unwrap_or("#333333ff".to_string());
     let scene_config = quote! {
-        #ranim::StaticSceneConfig {
-            clear_color: #clear_color,
+        #ranim::SceneConfig {
+            clear_color: #clear_color.to_string(),
         }
     };
 
-    // StaticOutput 列表
+    // Owned output descriptors
     let mut outputs = Vec::new();
     for OutputDef {
         width,
@@ -118,11 +117,11 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
     } in attrs.outputs
     {
         let name_token = match name.as_deref() {
-            Some(n) if !n.is_empty() => quote! { Some(#n) },
+            Some(n) if !n.is_empty() => quote! { Some(#n.to_string()) },
             _ => quote! { None },
         };
         let name_template_token = match name_template.as_deref() {
-            Some(n) if !n.is_empty() => quote! { Some(#n) },
+            Some(n) if !n.is_empty() => quote! { Some(#n.to_string()) },
             _ => quote! { None },
         };
         let format_token = match format.as_deref() {
@@ -133,68 +132,50 @@ pub fn scene(args: TokenStream, input: TokenStream) -> TokenStream {
             Some(other) => panic!("unknown output format: {other:?}"),
         };
         outputs.push(quote! {
-            #ranim::StaticOutput {
+            #ranim::Output {
                 width: #width,
                 height: #height,
                 fps: #fps,
                 save_frames: #save_frames,
                 name: #name_token,
                 name_template: #name_template_token,
-                dir: #dir,
+                dir: #dir.to_string(),
                 format: #format_token,
             }
         });
     }
     if outputs.is_empty() {
         outputs.push(quote! {
-            #ranim::StaticOutput::DEFAULT
+            #ranim::Output::default()
         });
     }
 
     let doc = if attrs.wasm_demo_doc {
         quote! {
-            #[doc = concat!("<canvas id=\"ranim-app-", #scene_name, "\" width=\"1280\" height=\"720\" style=\"width: 100%;\"></canvas>")]
-            #[doc = concat!("<script type=\"module\">")]
-            #[doc = concat!("  const { find_scene, preview_scene } = await ranim_examples;")]
-            #[doc = concat!("  preview_scene(find_scene(\"", #scene_name, "\"));")]
-            #[doc = "</script>"]
+            #[doc = concat!("<div class=\"ranim-preview\" style=\"display:grid;gap:8px\"><ranim-viewport data-module-path=\"", module_path!(), "\" scene=\"", #scene_name, "\"></ranim-viewport><ranim-controls></ranim-controls></div>\n\n")]
         }
     } else {
         quote! {}
     };
 
-    let static_output_name = syn::Ident::new("__OUTPUTS", fn_name.span());
-    let static_scene_name = syn::Ident::new("__SCENE", fn_name.span());
-
-    let output_cnt = outputs.len();
-
     let scene = quote! {
-        #ranim::StaticScene {
-            name: #scene_name,
-            constructor: super::#fn_name,
-            config: #scene_config,
-            outputs: &#static_output_name,
-        }
+        let mut scene = #ranim::Scene::new(#scene_name, super::#fn_name);
+        scene.config = #scene_config;
+        scene.outputs = vec![#(#outputs),*];
+        scene
     };
 
     // ANCHOR: SCENE_MACRO
     let expanded = quote! {
         #doc
         #(#doc_attrs)*
-        #vis fn #fn_name(r: &mut #ranim::RanimScene) #fn_body
+        #vis #signature #fn_body
 
         #[doc(hidden)]
         #vis mod #fn_name {
-            /// The static outputs.
-            pub static #static_output_name: [#ranim::StaticOutput; #output_cnt] = [#(#outputs),*];
-            /// The static scene descriptor.
-            pub static #static_scene_name: #ranim::StaticScene = #scene;
-            #ranim::inventory::submit!{
-                #scene
-            }
-
+            /// Construct this scene's descriptor for explicit registration in an App.
             pub fn scene() -> #ranim::Scene {
-                #ranim::Scene::from(&#static_scene_name)
+                #scene
             }
         }
     };

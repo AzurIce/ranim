@@ -73,7 +73,7 @@ use std::path::Path;
 /// without their own matching dependency.
 pub use gltf;
 
-use ranim_core::core_item::transformed::Transformed;
+use ranim_core::transformed::Transformed;
 
 use crate::hierarchy::Node;
 use crate::mesh::MeshItem;
@@ -413,8 +413,7 @@ fn non_empty(name: Option<&str>) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use ranim_core::core_item::CoreItem;
-    use ranim_core::{Extract, glam::Vec3};
+    use ranim_core::frame::EvaluatedFrame;
 
     use super::*;
 
@@ -571,14 +570,16 @@ mod tests {
                 .transform_point3(DVec3::X)
                 .abs_diff_eq(dvec3(1.0, -3.0, 4.0), 1e-6)
         );
-        let CoreItem::MeshItem(mesh) = &tree.extract()[0] else {
-            panic!("expected MeshItem")
-        };
-        assert_eq!(mesh.points, [Vec3::ZERO, Vec3::X, Vec3::Y]);
+        let mut frame = EvaluatedFrame::new();
+        frame.push((0, 0), tree.tree);
+        let stored = &frame.items::<Node<MeshItem>>()[0].value;
+        let (placement, mesh) = stored.leaves().next().unwrap();
+        assert_eq!(mesh.points.as_slice(), &[DVec3::ZERO, DVec3::X, DVec3::Y]);
+        assert!(placement.abs_diff_eq(world, 1e-9));
         assert!(
-            mesh.transform
-                .transform_point3(Vec3::X)
-                .abs_diff_eq(Vec3::new(1.0, -3.0, 4.0), 1e-4)
+            placement
+                .transform_point3(DVec3::X)
+                .abs_diff_eq(dvec3(1.0, -3.0, 4.0), 1e-6)
         );
     }
 

@@ -1,5 +1,4 @@
 use glam::{Mat4, Vec2};
-use ranim_core::prelude::CameraFrame;
 
 use crate::utils::{WgpuBuffer, WgpuContext};
 
@@ -7,9 +6,9 @@ use crate::utils::{WgpuBuffer, WgpuContext};
 ///
 /// Fragments whose true depth differs by less than this span may be reordered
 /// by scene insertion order (later items on top); anything farther apart keeps
-/// true depth ordering. The span is split evenly across all items of a frame
-/// (`epsilon = DEPTH_ORDER_SPAN / item_count`) so the total offset does not
-/// grow with scene size.
+/// true depth ordering. The per-order epsilon divides this span by the frame's
+/// full scene-order span (at least one). This keeps offsets bounded even when
+/// omitted render plugins leave gaps in the prepared items' scene orders.
 pub const DEPTH_ORDER_SPAN: f32 = 1e-4;
 
 /// Uniforms for the camera
@@ -23,21 +22,14 @@ pub struct ViewportUniform {
     bias_epsilon: f32,
     _padding: u32,
 }
+
 impl ViewportUniform {
-    pub fn from_camera_frame(
-        camera_frame: &CameraFrame,
-        width: u32,
-        height: u32,
-        bias_epsilon: f32,
-    ) -> Self {
-        let ratio = width as f64 / height as f64;
+    /// Build a view packet from projection, view and frame-size data.
+    pub fn new(proj_mat: Mat4, view_mat: Mat4, half_frame_size: Vec2, bias_epsilon: f32) -> Self {
         Self {
-            proj_mat: camera_frame.projection_matrix(ratio).as_mat4(),
-            view_mat: camera_frame.view_matrix().as_mat4(),
-            half_frame_size: Vec2::new(
-                (camera_frame.frame_height * ratio) as f32 / 2.0,
-                camera_frame.frame_height as f32 / 2.0,
-            ),
+            proj_mat,
+            view_mat,
+            half_frame_size,
             bias_epsilon,
             _padding: 0,
         }
@@ -56,6 +48,12 @@ impl ViewportUniform {
     }
 }
 
+impl Default for ViewportUniform {
+    fn default() -> Self {
+        Self::new(Mat4::IDENTITY, Mat4::IDENTITY, Vec2::ONE, 0.0)
+    }
+}
+
 pub struct ViewportBindGroup {
     pub bind_group: wgpu::BindGroup,
 }
@@ -67,7 +65,7 @@ impl AsRef<wgpu::BindGroup> for ViewportBindGroup {
 }
 
 impl ViewportBindGroup {
-    pub(crate) fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
+    pub fn bind_group_layout(ctx: &WgpuContext) -> wgpu::BindGroupLayout {
         ctx.device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Viewport Bind Group Layout"),
@@ -97,6 +95,11 @@ pub struct ViewportGpuPacket {
 }
 
 impl ViewportGpuPacket {
+    /// Bind the current view data in an item rendering pipeline.
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.uniforms_bind_group.bind_group
+    }
+
     pub(crate) fn new(ctx: &WgpuContext, data: &ViewportUniform) -> Self {
         let uniforms_buffer = WgpuBuffer::new_init(
             ctx,
@@ -112,7 +115,7 @@ impl ViewportGpuPacket {
         }
     }
 
-    pub(crate) fn update(&mut self, ctx: &WgpuContext, data: &ViewportUniform) {
+    pub fn update(&mut self, ctx: &WgpuContext, data: &ViewportUniform) {
         self.uniforms_buffer.set(ctx, *data);
     }
 }

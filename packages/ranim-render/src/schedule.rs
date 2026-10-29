@@ -1,60 +1,56 @@
+use bevy_app::{First, SubApp};
 use bevy_ecs::{prelude::*, schedule::ScheduleLabel, system::SystemParam};
-use ranim_core::core_item::{camera_frame::CameraFrame, mesh_item::MeshItem, vitem::VItem};
 
 use crate::{
-    pipelines::{mesh_item, oit_resolve, vitem},
-    primitives::{
-        mesh_items::MeshItemsBuffer,
-        viewport::{ViewportGpuPacket, ViewportUniform},
-        vitems::VItemsBuffer,
-    },
+    pipelines::oit_resolve,
     resource::{RenderTextureState, RenderTextures},
     utils::WgpuContext,
-    world::SceneOrder,
+    world::resolve_scene_order,
 };
 
+/// Drives one render update: maintenance, extraction, preparation, and submission.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct RenderPrepare;
+struct RenderUpdate;
 
+/// Encodes and submits a frame, running the active view's schedule.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct RenderGraph;
+struct RenderGraph;
 
+/// The schedules of the render world, in execution order.
 #[derive(ScheduleLabel, Debug, Clone, PartialEq, Eq, Hash)]
-struct ViewRender;
-
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-enum PrepareSystems {
-    Collect,
-    PrepareResources,
-    Upload,
-    PrepareBindGroups,
+pub enum RenderSchedule {
+    /// Extract the current [`EvaluatedFrame`](ranim_core::frame::EvaluatedFrame).
+    /// Systems read complete typed batches and update render components or resources.
+    Extract,
+    /// Prepare and upload render resources after extraction and scene ordering.
+    Prepare,
+    /// Run the active view's ordered compute and draw phases.
+    View,
 }
 
+/// The ordered phases of [`RenderSchedule::View`] shared by all item plugins.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-enum RenderGraphSystems {
-    Begin,
-    Render,
-    Submit,
-    Finish,
-}
-
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-enum ViewSystems {
+pub enum ViewPhase {
+    /// Clear the frame's color and depth targets.
     Clear,
+    /// Run compute work needed by subsequent draw passes.
     Compute,
+    /// Draw all depth prepasses before any color passes.
     Depth,
+    /// Draw color and collect transparent fragments.
     Color,
+    /// Resolve the accumulated transparent fragments.
     Resolve,
 }
 
 #[derive(Resource, Clone, Copy)]
-pub(crate) struct RenderDimensions {
+pub struct RenderDimensions {
     pub width: u32,
     pub height: u32,
 }
 
 #[derive(Resource)]
-pub(crate) struct FrameTarget {
+pub struct FrameTarget {
     pub(crate) render_view: wgpu::TextureView,
     pub(crate) depth_stencil_view: wgpu::TextureView,
     pub(crate) depth_bind_group: wgpu::BindGroup,
@@ -63,6 +59,16 @@ pub(crate) struct FrameTarget {
 }
 
 impl FrameTarget {
+    /// Color attachment for this frame's draw passes.
+    pub fn render_view(&self) -> &wgpu::TextureView {
+        &self.render_view
+    }
+
+    /// Depth attachment shared by the frame's depth and color passes.
+    pub fn depth_stencil_view(&self) -> &wgpu::TextureView {
+        &self.depth_stencil_view
+    }
+
     pub(crate) fn new(textures: &RenderTextures, clear_color: wgpu::Color) -> Self {
         Self {
             render_view: textures.render_view.clone(),
@@ -78,12 +84,12 @@ impl FrameTarget {
 struct FrameEncoder(Option<wgpu::CommandEncoder>);
 
 #[derive(SystemParam)]
-pub(crate) struct RenderContext<'w> {
+pub struct RenderContext<'w> {
     encoder: ResMut<'w, FrameEncoder>,
 }
 
 impl RenderContext<'_> {
-    pub(crate) fn encoder(&mut self) -> &mut wgpu::CommandEncoder {
+    pub fn encoder(&mut self) -> &mut wgpu::CommandEncoder {
         self.encoder
             .0
             .as_mut()
@@ -99,7 +105,7 @@ impl RenderContext<'_> {
 /// `last_frame_scopes`. `inner` is `None` when the device lacks timestamp
 /// query support.
 #[derive(Resource)]
-pub(crate) struct RenderProfiler {
+pub struct RenderProfiler {
     pub(crate) inner: Option<wgpu_profiler::GpuProfiler>,
     enabled: std::sync::atomic::AtomicBool,
     /// GPU timer scopes of the most recent processed frame.
@@ -131,12 +137,7 @@ impl RenderProfiler {
 
     /// Run `f` with `pass` wrapped in a GPU timer scope labeled `label`.
     /// Pass-through while GPU timers are disabled or unsupported.
-    pub(crate) fn scope_pass<R, T>(
-        &self,
-        label: &str,
-        pass: &mut R,
-        f: impl FnOnce(&mut R) -> T,
-    ) -> T
+    pub fn scope_pass<R, T>(&self, label: &str, pass: &mut R, f: impl FnOnce(&mut R) -> T) -> T
     where
         R: wgpu_profiler::ProfilerCommandRecorder,
     {
@@ -151,94 +152,42 @@ impl RenderProfiler {
     }
 }
 
-pub(crate) fn install_schedules(world: &mut World) {
-    world.init_resource::<FrameEncoder>();
-    let mut prepare = Schedule::new(RenderPrepare);
-    prepare.configure_sets(
+pub(crate) fn install_schedules(app: &mut SubApp) {
+    app.update_schedule = Some(RenderUpdate.intern());
+    app.init_resource::<FrameEncoder>()
+        .init_schedule(RenderSchedule::Extract)
+        .init_schedule(RenderSchedule::Prepare)
+        .add_systems(RenderUpdate, render_update);
+    app.configure_sets(
+        RenderSchedule::View,
         (
-            PrepareSystems::Collect,
-            PrepareSystems::PrepareResources,
-            PrepareSystems::Upload,
-            PrepareSystems::PrepareBindGroups,
+            ViewPhase::Clear,
+            ViewPhase::Compute,
+            ViewPhase::Depth,
+            ViewPhase::Color,
+            ViewPhase::Resolve,
         )
             .chain(),
     );
-    prepare.add_systems(
-        (prepare_vitems, prepare_mesh_items)
-            .in_set(PrepareSystems::PrepareResources)
-            .ambiguous_with_all(),
+    app.add_systems(RenderSchedule::View, clear.in_set(ViewPhase::Clear));
+    app.add_systems(
+        RenderSchedule::View,
+        oit_resolve::resolve.in_set(ViewPhase::Resolve),
     );
-    world.add_schedule(prepare);
 
-    let mut view = Schedule::new(ViewRender);
-    view.configure_sets(
-        (
-            ViewSystems::Clear,
-            ViewSystems::Compute,
-            ViewSystems::Depth,
-            ViewSystems::Color,
-            ViewSystems::Resolve,
-        )
-            .chain(),
-    );
-    view.add_systems(clear.in_set(ViewSystems::Clear));
-    view.add_systems(vitem::compute.in_set(ViewSystems::Compute));
-    view.add_systems(
-        (vitem::depth, mesh_item::depth)
-            .chain()
-            .in_set(ViewSystems::Depth),
-    );
-    view.add_systems(
-        (vitem::color, mesh_item::color)
-            .chain()
-            .in_set(ViewSystems::Color),
-    );
-    view.add_systems(oit_resolve::resolve.in_set(ViewSystems::Resolve));
-    world.add_schedule(view);
-
-    let mut graph = Schedule::new(RenderGraph);
-    graph.configure_sets(
-        (
-            RenderGraphSystems::Begin,
-            RenderGraphSystems::Render,
-            RenderGraphSystems::Submit,
-            RenderGraphSystems::Finish,
-        )
-            .chain(),
-    );
-    graph.add_systems(begin_frame.in_set(RenderGraphSystems::Begin));
-    graph.add_systems(view_driver.in_set(RenderGraphSystems::Render));
-    graph.add_systems(submit.in_set(RenderGraphSystems::Submit));
-    graph.add_systems(finish_frame.in_set(RenderGraphSystems::Finish));
-    world.add_schedule(graph);
-}
-
-fn prepare_vitems(
-    ctx: Res<WgpuContext>,
-    mut buffer: ResMut<VItemsBuffer>,
-    items: Query<(&SceneOrder, &VItem)>,
-) {
-    let _span = crate::cpu_probe::span("prepare_vitems");
-    let mut items = items.iter().collect::<Vec<_>>();
-    items.sort_by_key(|(order, _)| order.0);
-    buffer.update(
-        &ctx,
-        items.iter().map(|&(order, item)| (order.0 as f32, item)),
+    app.add_systems(
+        RenderGraph,
+        (begin_frame, view_driver, submit, finish_frame).chain(),
     );
 }
 
-fn prepare_mesh_items(
-    ctx: Res<WgpuContext>,
-    mut buffer: ResMut<MeshItemsBuffer>,
-    items: Query<(&SceneOrder, &MeshItem)>,
-) {
-    let _span = crate::cpu_probe::span("prepare_mesh_items");
-    let mut items = items.iter().collect::<Vec<_>>();
-    items.sort_by_key(|(order, _)| order.0);
-    buffer.update(
-        &ctx,
-        items.iter().map(|&(order, item)| (order.0 as f32, item)),
-    );
+fn render_update(world: &mut World) {
+    world.run_schedule(First);
+    world.run_schedule(RenderSchedule::Extract);
+    resolve_scene_order(world);
+    world.run_schedule(RenderSchedule::Prepare);
+    let _span = crate::cpu_probe::span("render_graph");
+    world.run_schedule(RenderGraph);
 }
 
 fn begin_frame(ctx: Res<WgpuContext>, mut encoder: ResMut<FrameEncoder>) {
@@ -278,39 +227,7 @@ fn clear(mut render: RenderContext, target: Res<FrameTarget>, profiler: Res<Rend
 }
 
 fn view_driver(world: &mut World) {
-    let mut cameras = world
-        .query::<(&SceneOrder, &CameraFrame)>()
-        .iter(world)
-        .map(|(order, camera)| (order.0, camera.clone()))
-        .collect::<Vec<_>>();
-    cameras.sort_by_key(|(order, _)| *order);
-
-    let camera = take_single_camera(cameras);
-    let dimensions = *world.resource::<RenderDimensions>();
-    // The per-order depth bias epsilon: the fixed span is split evenly across
-    // all items of the frame so the total offset stays bounded.
-    let item_count = world.resource::<VItemsBuffer>().item_count()
-        + world.resource::<MeshItemsBuffer>().item_count();
-    let bias_epsilon = crate::primitives::viewport::DEPTH_ORDER_SPAN / item_count.max(1) as f32;
-    let uniform = ViewportUniform::from_camera_frame(
-        &camera,
-        dimensions.width,
-        dimensions.height,
-        bias_epsilon,
-    );
-    world.resource_scope(|world, mut viewport: Mut<ViewportGpuPacket>| {
-        viewport.update(world.resource::<WgpuContext>(), &uniform);
-    });
-    world.run_schedule(ViewRender);
-}
-
-fn take_single_camera(mut cameras: Vec<(usize, CameraFrame)>) -> CameraFrame {
-    assert_eq!(
-        cameras.len(),
-        1,
-        "D0002 requires exactly one active CameraFrame per rendered frame"
-    );
-    cameras.pop().unwrap().1
+    world.run_schedule(RenderSchedule::View);
 }
 
 fn submit(
@@ -353,24 +270,71 @@ mod tests {
     use super::*;
 
     #[test]
-    fn single_camera_is_accepted() {
-        let camera = CameraFrame::default();
+    fn registered_phases_enforce_the_shared_view_order() {
+        #[derive(Resource, Default)]
+        struct ExecutionLog(Vec<&'static str>);
 
-        assert_eq!(take_single_camera(vec![(7, camera.clone())]), camera);
+        let mut app = SubApp::new();
+        app.init_resource::<ExecutionLog>();
+        app.update_schedule = Some(RenderSchedule::View.intern());
+        app.configure_sets(
+            RenderSchedule::View,
+            (
+                ViewPhase::Clear,
+                ViewPhase::Compute,
+                ViewPhase::Depth,
+                ViewPhase::Color,
+                ViewPhase::Resolve,
+            )
+                .chain(),
+        );
+        // Deliberately register in reverse order.
+        app.add_systems(
+            RenderSchedule::View,
+            (
+                (|mut log: ResMut<ExecutionLog>| log.0.push("resolve")).in_set(ViewPhase::Resolve),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("color")).in_set(ViewPhase::Color),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("depth")).in_set(ViewPhase::Depth),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("compute")).in_set(ViewPhase::Compute),
+                (|mut log: ResMut<ExecutionLog>| log.0.push("clear")).in_set(ViewPhase::Clear),
+            ),
+        );
+        app.update();
+        assert_eq!(
+            app.world().resource::<ExecutionLog>().0,
+            ["clear", "compute", "depth", "color", "resolve"]
+        );
     }
 
     #[test]
-    #[should_panic(expected = "D0002 requires exactly one active CameraFrame")]
-    fn missing_camera_is_rejected() {
-        take_single_camera(Vec::new());
-    }
+    fn render_update_runs_extraction_before_preparation_and_graph() {
+        #[derive(Resource, Default)]
+        struct ExecutionLog(Vec<&'static str>);
 
-    #[test]
-    #[should_panic(expected = "D0002 requires exactly one active CameraFrame")]
-    fn multiple_cameras_are_rejected() {
-        take_single_camera(vec![
-            (0, CameraFrame::default()),
-            (1, CameraFrame::default()),
-        ]);
+        let mut app = SubApp::new();
+        install_schedules(&mut app);
+        app.init_resource::<ExecutionLog>();
+        app.add_systems(First, |mut log: ResMut<ExecutionLog>| {
+            log.0.push("first");
+        });
+        app.add_systems(RenderSchedule::Extract, |mut log: ResMut<ExecutionLog>| {
+            log.0.push("extract");
+        });
+        app.add_systems(RenderSchedule::Prepare, |mut log: ResMut<ExecutionLog>| {
+            log.0.push("prepare");
+        });
+        // Replace only GPU execution; retain the installed update and prepare
+        // schedules so this exercises their ordering without creating a device.
+        app.add_schedule(Schedule::new(RenderGraph));
+        app.add_systems(RenderGraph, |mut log: ResMut<ExecutionLog>| {
+            log.0.push("graph")
+        });
+
+        app.update();
+        app.update();
+        assert_eq!(
+            app.world().resource::<ExecutionLog>().0,
+            ["first", "extract", "prepare", "graph"].repeat(2)
+        );
     }
 }

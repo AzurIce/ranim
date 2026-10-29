@@ -1,17 +1,13 @@
-//! Benchmarks comparing the old (flat, baked-points) and new (hierarchical,
-//! placed-tree) `SvgItem` implementations on identical user-level code:
-//! parse + construction, one animation frame (clone + pose + extract),
-//! isolated pose operations, extraction alone, and AABB queries.
+//! SVG parsing, whole-value frame insertion, posing, interpolation, and AABB benchmarks.
 //!
-//! Both branches compile this file unchanged; run it on each and compare.
 //! The asset is the Ghostscript Tiger — the largest SVG in the repository.
 
 use std::hint::black_box;
 
-use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use ranim::{
-    core::Extract,
     core::anchor::Aabb,
+    core::frame::EvaluatedFrame,
     core::traits::{Interpolatable, RotateTransform, ShiftTransform},
     glam::DVec3,
     items::vitem::{VItem, svg::SvgItem},
@@ -26,10 +22,7 @@ fn tiger() -> SvgItem {
 fn svg_benches(c: &mut Criterion) {
     let mut group = c.benchmark_group("svg_bench");
 
-    // Parse + construction. The old implementation bakes every group
-    // transform into the control points and then rewrites all points twice
-    // more (move-to-origin + Y flip); the new one builds the tree and keeps
-    // those as a root pose.
+    // Parse and construct canonical SVG geometry.
     let probed = tiger();
     let points: usize = Vec::<VItem>::from(probed.clone())
         .iter()
@@ -41,14 +34,17 @@ fn svg_benches(c: &mut Criterion) {
         b.iter(|| black_box(tiger()));
     });
 
-    // One animation frame that moves the whole item: clone, pose, extract.
-    group.bench_function("anim frame: clone + rotate + shift + extract", |b| {
+    // One animation frame that moves and stores the complete SVG item.
+    group.bench_function("anim frame: clone + rotate + shift + frame push", |b| {
         let svg = tiger();
+        let mut output = EvaluatedFrame::new();
         b.iter(|| {
             let mut frame = black_box(&svg).clone();
             frame.rotate_on_axis(DVec3::Z, 0.05);
             frame.shift(DVec3::X * 0.01);
-            black_box(frame.extract())
+            output.clear();
+            output.push((0, 0), frame);
+            black_box(&output);
         });
     });
 
@@ -67,10 +63,19 @@ fn svg_benches(c: &mut Criterion) {
         });
     });
 
-    // Extraction alone.
-    group.bench_function("extract (tiger)", |b| {
+    // Replace the frame with one whole SVG, preparing its clone outside timing.
+    group.bench_function("replace frame with whole SVG (tiger)", |b| {
         let svg = tiger();
-        b.iter(|| black_box(black_box(&svg).extract()));
+        let mut frame = EvaluatedFrame::new();
+        b.iter_batched(
+            || svg.clone(),
+            |svg| {
+                frame.clear();
+                frame.push((0, 0), svg);
+                black_box(&frame);
+            },
+            BatchSize::SmallInput,
+        );
     });
 
     // Interpolating between two baked states of the item (state-change

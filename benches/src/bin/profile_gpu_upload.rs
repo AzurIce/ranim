@@ -11,7 +11,7 @@
 //! Scenarios:
 //! - `static(n)`: one evaluated frame, re-rendered every frame with identical
 //!   content (steady-state / preview-idle case; the frame is evaluated once
-//!   and cloned per frame, which also isolates upload cost from eval cost).
+//!   and reused, which isolates upload cost from eval cost).
 //! - `static-pan(n)`: same, plus a camera pan applied per frame: items
 //!   unchanged, only the viewport uniform changes.
 //! - `morph(n)`: squares morphing into circles, evaluated per frame
@@ -26,7 +26,7 @@
 //! It also prints a content-redundancy analysis: how many bytes of the
 //! full upload actually changed between consecutive frames (the upper bound
 //! any change-tracking upload scheme could reach), derived from the
-//! `CoreItem` payloads without touching the renderer.
+//! typed Square/VItem inputs projected on the CPU without touching the renderer.
 //!
 //! GPU pass scopes are recorded for the last frame of each scenario and
 //! printed to the console (timer features are requested from the adapter;
@@ -36,14 +36,25 @@
 use std::time::{Duration, Instant};
 
 use benches::test_scenes::{static_squares, transform_squares};
+use ranim::items::{
+    camera::{CameraFrame, CameraFramePlugin},
+    vitem::{VItem, VItemPlugin, geometry::Square, render::RenderVItem},
+};
 use ranim::{SceneConstructor, prelude::*};
-use ranim_core::{SealedRanimScene, core_item::CoreItem};
+use ranim_core::{
+    SealedRanimScene,
+    frame::{EvaluatedFrame, FrameItemId},
+    glam::{DAffine3, DMat4},
+};
 use ranim_render::{
-    Renderer,
+    RenderAppExt, build_render_app,
+    extract::ExtractPlugin,
+    resource::RenderTextures,
     upload_probe::{self, UploadMode},
     utils::WgpuContext,
-    world::RenderFrame,
 };
+
+type PlacedSquare = Transformed<Square, Translation>;
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
@@ -78,15 +89,13 @@ impl Scenario {
     }
 }
 
-type Frame = Vec<((usize, usize), CoreItem)>;
-
-/// Produces the per-frame `CoreItem` payload for a scenario. `Static` kinds
-/// evaluate the scene once and reuse the payload (with camera mutation for
-/// `StaticPan`); `Morph` re-evaluates at an advancing alpha.
+/// Supplies reusable typed inputs. Static geometry is evaluated once;
+/// camera-only motion rebuilds those inputs without reevaluating the scene.
 struct FrameFeed {
     scene: SealedRanimScene,
     kind: ScenarioKind,
-    base: Frame,
+    base: EvaluatedFrame,
+    output: EvaluatedFrame,
     frame: usize,
     total: usize,
 }
@@ -94,43 +103,69 @@ struct FrameFeed {
 impl FrameFeed {
     fn new(scenario: &Scenario, total: usize) -> Self {
         let scene = scenario.build_scene();
-        let base = match scenario.kind {
+        let mut base = EvaluatedFrame::new();
+        if scenario.kind != ScenarioKind::Morph {
             // End state: all staggered show()s complete.
-            ScenarioKind::Static | ScenarioKind::StaticPan => scene.eval_at_alpha(1.0).collect(),
-            ScenarioKind::Morph => Vec::new(),
+            scene.eval_at_alpha(1.0, &mut base);
+        }
+        let output = if scenario.kind == ScenarioKind::Static {
+            std::mem::take(&mut base)
+        } else {
+            EvaluatedFrame::new()
         };
         Self {
             scene,
             kind: scenario.kind,
             base,
+            output,
             frame: 0,
             total,
         }
     }
 
-    /// (frame payload, was-evaluated): eval is only measured when it happens.
-    fn next(&mut self) -> (Frame, bool) {
+    /// Returns the frame and whether scene evaluation happened this time.
+    fn next(&mut self) -> (&mut EvaluatedFrame, bool) {
         let frame = self.frame;
         self.frame += 1;
-        match self.kind {
-            ScenarioKind::Static => (self.base.clone(), false),
+        let evaluated = match self.kind {
+            ScenarioKind::Static => false,
             ScenarioKind::StaticPan => {
-                let mut items = self.base.clone();
-                let t = frame as f64 / self.total as f64;
-                for (_, item) in &mut items {
-                    if let CoreItem::CameraFrame(cam) = item {
-                        cam.pos.x += t * 0.8;
-                        cam.pos.y += t * 0.4;
-                    }
-                }
-                (items, false)
+                self.pan_static_camera(frame as f64 / self.total as f64);
+                false
             }
             ScenarioKind::Morph => {
                 // t in [0.1, 0.6): inside the morph window.
                 let alpha = 0.1 + 0.5 * (frame as f64 / self.total as f64);
-                (self.scene.eval_at_alpha(alpha).collect(), true)
+                self.scene.eval_at_alpha(alpha, &mut self.output);
+                true
+            }
+        };
+        (&mut self.output, evaluated)
+    }
+
+    fn pan_static_camera(&mut self, t: f64) {
+        self.output.clear();
+        let mut squares = self.base.items::<PlacedSquare>().iter().peekable();
+        let mut cameras = self.base.items::<CameraFrame>().iter().peekable();
+        // Merge the complete typed values in their original global order.
+        while squares.peek().is_some() || cameras.peek().is_some() {
+            let square_first = cameras.peek().is_none_or(|camera| {
+                squares
+                    .peek()
+                    .is_some_and(|square| square.order < camera.order)
+            });
+            if square_first {
+                let item = squares.next().unwrap();
+                self.output.push(item.id, item.value.clone());
+            } else {
+                let item = cameras.next().unwrap();
+                let mut camera = item.value.clone();
+                camera.pos.x += t * 0.8;
+                camera.pos.y += t * 0.4;
+                self.output.push(item.id, camera);
             }
         }
+        assert_eq!(self.output.len(), self.base.len());
     }
 }
 
@@ -143,9 +178,15 @@ struct FrameTimings {
 fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
     let total = WARMUP_FRAMES + MEASURED_FRAMES;
     let mut feed = FrameFeed::new(scenario, total);
-    let mut renderer = Renderer::new(ctx, WIDTH, HEIGHT, 8);
-    let mut render_textures = renderer.new_render_textures(ctx);
-    let mut store = RenderFrame::new();
+    let mut renderer = build_render_app(ctx, WIDTH, HEIGHT, 8);
+    renderer.add_plugins((
+        CameraFramePlugin,
+        ExtractPlugin::<PlacedSquare>::default(),
+        VItemPlugin,
+    ));
+    renderer.finish();
+    renderer.cleanup();
+    let mut render_textures = RenderTextures::new(ctx, WIDTH, HEIGHT);
     let clear_color = wgpu::Color::BLACK;
     // GPU pass scopes are runtime-toggled; the forced per-frame poll they
     // incur also syncs the full-frame measurement.
@@ -157,11 +198,10 @@ fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
             // Drop counters accumulated during warmup (reallocs etc.).
             let _ = upload_probe::take_stats();
         }
-        let (items, evaluated) = feed.next();
         let t0 = Instant::now();
-        store.update(items.into_iter());
+        let (store, evaluated) = feed.next();
         let t1 = Instant::now();
-        renderer.render_frame(&mut render_textures, clear_color, &store);
+        renderer.render_frame(&mut render_textures, clear_color, store);
         let t2 = Instant::now();
         ctx.device
             .poll(wgpu::PollType::wait_indefinitely())
@@ -169,11 +209,11 @@ fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
         let t3 = Instant::now();
         if frame >= WARMUP_FRAMES {
             timings.push(FrameTimings {
-                // Only count eval when it actually happened (morph); the
-                // static clone is bookkeeping, reported as ~0.
+                // Static input reuse and camera-only reconstruction are
+                // bookkeeping; only morph performs scene evaluation.
                 eval: if evaluated { t1 - t0 } else { Duration::ZERO },
                 submit: t2 - t1,
-                full: t3 - t2,
+                full: t3 - t1,
             });
         }
     }
@@ -238,12 +278,12 @@ fn run_scenario(ctx: &WgpuContext, scenario: &Scenario) {
 }
 
 /// How many bytes of the per-frame full upload actually differ between
-/// consecutive frames, derived from the evaluated `CoreItem` payloads.
+/// consecutive frames, derived from CPU projections of the typed inputs.
 /// This is the upper bound any change-tracking upload scheme could reach.
 fn redundancy_analysis(scenario: &Scenario) {
     let total = MEASURED_FRAMES;
     let mut feed = FrameFeed::new(scenario, total);
-    let mut prev = feed.next().0;
+    let mut prev = project_vitems(feed.next().0);
     let mut full_bytes = 0u64;
     let mut changed_bytes = 0u64;
     let mut items_changed = 0usize;
@@ -251,7 +291,7 @@ fn redundancy_analysis(scenario: &Scenario) {
     let (mut pts_d, mut fill_d, mut stroke_d, mut xform_d) = (0usize, 0usize, 0usize, 0usize);
 
     for _ in 1..total {
-        let curr = feed.next().0;
+        let curr = project_vitems(feed.next().0);
         items_total = curr.len();
         for (id, item) in &curr {
             let prev_item = prev.iter().find(|(pid, _)| *pid == *id).map(|(_, p)| p);
@@ -262,7 +302,8 @@ fn redundancy_analysis(scenario: &Scenario) {
                 items_changed += 1;
             }
             changed_bytes += changed;
-            if let (Some(CoreItem::VItem(p)), CoreItem::VItem(v)) = (prev_item, item) {
+            if let Some(p) = prev_item {
+                let v = item;
                 pts_d += usize::from(v.points != p.points);
                 fill_d += usize::from(v.fill_rgbas != p.fill_rgbas);
                 stroke_d += usize::from(
@@ -289,21 +330,44 @@ fn redundancy_analysis(scenario: &Scenario) {
     );
 }
 
+/// This harness profiles only placed Square and plain VItem scenes. Convert those inputs
+/// to their GPU-facing CPU fields solely for the independent redundancy model.
+fn project_vitems(frame: &EvaluatedFrame) -> Vec<(FrameItemId, RenderVItem)> {
+    let items = frame
+        .items::<PlacedSquare>()
+        .iter()
+        .map(|item| {
+            let mut value = RenderVItem::from(VItem::from(item.value.inner.clone()));
+            let placement = DAffine3::from(item.value.transform);
+            value.transform = DMat4::from(placement).as_mat4() * value.transform;
+            (item.id, value)
+        })
+        .chain(
+            frame
+                .items::<VItem>()
+                .iter()
+                .map(|item| (item.id, RenderVItem::from(item.value.clone()))),
+        )
+        .collect::<Vec<_>>();
+    assert_eq!(
+        items.len() + frame.items::<CameraFrame>().len(),
+        frame.len()
+    );
+    items
+}
+
 /// (full bytes, changed bytes) for one item against its previous version.
 /// Buffer classes per VItem (see `VItemsBuffer::update`):
 /// item_infos 16B, planes 32B, transforms 64B, clip_boxes 20B (re-init),
 /// points3d 16B/pt, points2d 16B/pt (zero-init), fills/strokes 16B/attr,
 /// widths 4B/attr (attrs = ceil(points/2)). Camera -> viewport uniform
 /// (small, always re-uploaded) is ignored here.
-fn model_item_bytes(prev: Option<&CoreItem>, curr: &CoreItem) -> (u64, u64) {
-    let CoreItem::VItem(v) = curr else {
-        return (0, 0);
-    };
+fn model_item_bytes(prev: Option<&RenderVItem>, v: &RenderVItem) -> (u64, u64) {
     let pts = v.points.len() as u64;
     let attrs = pts.div_ceil(2);
     let full = 16 + 32 + 64 + 20 + 16 * pts + 16 * pts + 16 * attrs + 16 * attrs + 4 * attrs;
 
-    let Some(CoreItem::VItem(p)) = prev else {
+    let Some(p) = prev else {
         return (full, full); // newly appeared item
     };
     let points_dirty = v.points != p.points;
@@ -333,7 +397,7 @@ fn model_item_bytes(prev: Option<&CoreItem>, curr: &CoreItem) -> (u64, u64) {
 }
 
 fn main() {
-    println!("profile_gpu_upload v2 (frame-feed)");
+    println!("profile_gpu_upload v3 (typed frame feed)");
     match upload_probe::mode() {
         UploadMode::Off => {
             eprintln!("set RANIM_PROFILE_UPLOAD=1 to enable upload profiling");

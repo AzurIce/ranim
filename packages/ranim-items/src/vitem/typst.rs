@@ -1,3 +1,6 @@
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use std::{
     collections::HashMap,
     io::Write,
@@ -22,13 +25,11 @@ use typst::{
 use typst_kit::fonts::FontStore;
 
 use crate::vitem::{VItem, svg::SvgItem};
-use ranim_core::Extract;
 use ranim_core::traits::Interpolatable;
 use ranim_core::{
     anchor::Aabb,
     color,
     components::width::Width,
-    core_item::CoreItem,
     glam,
     traits::{Alignable, ApplyTransform, FillColor, Opacity, StrokeColor, StrokeWidth, With},
 };
@@ -303,6 +304,11 @@ impl TypstText {
         assert_eq!(chars.len(), vitems.len());
         Self { chars, vitems }
     }
+
+    /// Borrow the canonical local vector outlines of this text.
+    pub fn vitems(&self) -> &[VItem] {
+        &self.vitems
+    }
 }
 
 impl Alignable for TypstText {
@@ -434,10 +440,12 @@ impl From<TypstText> for Vec<VItem> {
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for TypstText {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        self.vitems.extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        for item in self.vitems() {
+            item.extract(ctx);
+        }
     }
 }
 

@@ -1,13 +1,13 @@
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use std::f64::consts::PI;
 
 use color::{AlphaColor, Srgb};
 use glam::DVec3;
 use ranim_core::{
-    Extract,
     anchor::Aabb,
-    color,
-    core_item::CoreItem,
-    glam,
+    color, glam,
     traits::{FillColor, Opacity, StrokeColor, With},
 };
 
@@ -115,9 +115,9 @@ impl From<Circle> for VItem {
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for Circle {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }

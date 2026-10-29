@@ -6,12 +6,19 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+# Keep the crate root beside the example modules for rust-analyzer.
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["rlib"]
 path = "../../examples/ranim_examples_bundle.rs"
 
+[features]
+default = ["render"]
+# Matches the shared scenes' render configuration gates without native UI.
+render = ["ranim/render"]
+
 [dependencies]
-ranim = { workspace = true, features = ["preview", "anims", "items", "typst"] }
+bevy_app.workspace = true
+ranim = { workspace = true, features = ["anims", "items", "typst", "gltf"] }
 ranim-core.workspace = true
 ranim-items.workspace = true
 ranim-anims.workspace = true

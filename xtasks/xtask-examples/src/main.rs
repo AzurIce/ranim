@@ -1,7 +1,7 @@
 use std::{
     collections::HashSet,
     env,
-    path::Path,
+    path::{Path, PathBuf},
     process::ExitCode,
     time::{Duration, Instant},
 };
@@ -25,11 +25,20 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Build the shared wasm bundle used by the website previews.
-    Build,
-    /// Render examples and refresh website data/pages.
+    /// Prepare example pages and data for Notist SSG over JSON stdio.
+    Site,
+    /// Build individual WASM examples for the website or rustdoc.
+    Build {
+        /// Output root; packages go under examples/<name>/pkg.
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
+        /// Build only these examples. Defaults to all WASM examples.
+        #[arg(value_name = "EXAMPLES")]
+        examples: Vec<String>,
+    },
+    /// Render examples, publish media and record successful render hashes.
     Run {
-        /// Skip examples whose rendered data is already up-to-date.
+        /// Skip examples whose last successful render has the current source hash.
         #[arg(long)]
         lazy_run: bool,
 
@@ -45,29 +54,36 @@ enum Commands {
         #[arg(value_name = "EXAMPLES")]
         examples: Vec<String>,
     },
-    /// Publish existing website outputs through shadow and rewrite
-    /// data/pages to content-addressed URLs (no rendering).
+    /// Publish existing website outputs through shadow (no rendering).
     Publish,
 }
 
 fn main() -> ExitCode {
-    ranim_cli::init_tracing();
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     let args = Args::parse();
+
+    if let Commands::Site = args.command {
+        return match xtask_examples::site::exchange(
+            std::io::stdin().lock(),
+            std::io::stdout().lock(),
+        ) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("site extension IO failed: {error:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
 
     let xtask_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workspace_root = xtask_root.join("../../");
 
-    let website_root = workspace_root.join("website");
-    for dir in ["static/examples", "content/examples", "data"] {
-        if let Err(err) = std::fs::create_dir_all(website_root.join(dir)) {
-            eprintln!("无法创建目录 {}: {err}", website_root.join(dir).display());
-            return ExitCode::FAILURE;
-        }
-    }
-
-    if matches!(&args.command, Commands::Build) {
-        return build_examples_wasm_cmd(&workspace_root);
+    if let Commands::Build { examples, out_dir } = &args.command {
+        return build_examples_wasm_cmd(&workspace_root, examples, out_dir.as_deref());
     }
 
     if let Commands::Publish = args.command {
@@ -224,16 +240,20 @@ fn main() -> ExitCode {
     }
 }
 
-fn build_examples_wasm_cmd(workspace_root: &Path) -> ExitCode {
+fn build_examples_wasm_cmd(
+    workspace_root: &Path,
+    examples: &[String],
+    out_dir: Option<&Path>,
+) -> ExitCode {
     let started = Instant::now();
-    println!("构建 wasm example bundle…");
-    if let Err(err) = build_examples_wasm(workspace_root) {
-        eprintln!("构建 wasm example bundle 失败: {err:#}");
+    println!("构建 WASM examples…");
+    if let Err(err) = build_examples_wasm(workspace_root, examples, out_dir) {
+        eprintln!("构建 WASM examples 失败: {err:#}");
         return ExitCode::FAILURE;
     }
     println!(
-        "构建 wasm example bundle 完成 ({}s)",
-        format_duration(started.elapsed())
+        "构建 WASM examples 完成 ({:.1}s)",
+        started.elapsed().as_secs_f64()
     );
     ExitCode::SUCCESS
 }
@@ -266,8 +286,7 @@ fn print_clean_stats(stats: CleanStats) {
         return;
     }
     println!("已清理:");
-    println!("  - 页面: {}", stats.pages);
-    println!("  - 数据: {}", stats.data);
+    println!("  - 渲染记录: {}", stats.renders);
     println!("  - 静态输出: {}", stats.outputs);
 }
 

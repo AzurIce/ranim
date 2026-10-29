@@ -1,12 +1,13 @@
 //! Sphere — a sphere mesh item.
 
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use std::f64::consts::{PI, TAU};
 
 use ranim_core::{
-    Extract,
     anchor::Aabb,
     color::{self, AlphaColor, Srgb},
-    core_item::CoreItem,
     glam::DVec3,
     traits::{FillColor, Interpolatable, Opacity, With},
 };
@@ -113,10 +114,10 @@ impl Aabb for Sphere {
         [-r, r]
     }
 }
+#[cfg(feature = "render")]
 impl Extract for Sphere {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        Surface::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        MeshItem::from(self.clone()).extract(ctx);
     }
 }
 

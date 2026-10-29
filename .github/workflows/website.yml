@@ -45,7 +45,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: just, zola@0.22, wasm-bindgen@0.2.128
+          tool: just, wasm-bindgen@0.2.129
 
       # Binaryen must be >= 110. Older versions (e.g. Ubuntu 22.04's apt
       # binaryen 105) mislabel the `__wbindgen_externrefs` export as the funcref
@@ -64,19 +64,25 @@ jobs:
         with:
           shared-key: "wasm-examples"
 
-      # rodio/cpal builds alsa-sys on native targets when preview/audio is enabled.
+      # rodio/cpal builds alsa-sys on native targets when cmd-preview is enabled.
       - name: Install ALSA headers
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
-      - name: Build wasm example bundle
+      - name: Build individual wasm examples
         run: cargo examples build
 
-      - run: just website
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Build website with the locked Notist flake
+        run: |
+          nix build .#notist --out-link target/notist
+          NOTIST="$PWD/target/notist/bin/notist" just website
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v1.0.7
         with:
-          path: ./website/public
+          path: ./dist/ranim-website
 
   deploy-website:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

@@ -1,0 +1,12 @@
+[package]
+name = "ranim-render-plugin-example"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+bevy_app.workspace = true
+ranim = { workspace = true, features = ["cmd-preview", "items"] }

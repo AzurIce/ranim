@@ -1,4 +1,4 @@
-//! Per-frame profile for the animation model on the pre-ECS store.
+//! Per-frame evaluation, typed frame storage, and rendering profile.
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -7,8 +7,21 @@ use std::{
 };
 
 use benches::test_scenes::{static_squares, transform_squares};
-use ranim::{SceneConstructor, prelude::*};
-use ranim_render::{Renderer, utils::WgpuContext, world::RenderFrame};
+use ranim::{
+    SceneConstructor,
+    items::{
+        camera::CameraFramePlugin,
+        vitem::{VItemPlugin, geometry::Square},
+    },
+    prelude::*,
+};
+use ranim_core::frame::EvaluatedFrame;
+use ranim_render::{
+    RenderAppExt, build_render_app, extract::ExtractPlugin, resource::RenderTextures,
+    utils::WgpuContext,
+};
+
+type PlacedSquare = Transformed<Square, Translation>;
 
 #[global_allocator]
 static ALLOC: CountingAlloc = CountingAlloc;
@@ -61,12 +74,14 @@ fn main() {
     let scene = (|r: &mut RanimScene| static_squares(r, n)).build_scene();
 
     profile("eval_at_alpha (400 items)", cpu_iters, || {
-        std::hint::black_box(scene.eval_at_alpha(0.5).collect::<Vec<_>>());
+        let mut frame = EvaluatedFrame::new();
+        scene.eval_at_alpha(0.5, &mut frame);
+        std::hint::black_box(frame);
     });
 
-    let mut store = RenderFrame::new();
-    profile("eval + store.update", cpu_iters, || {
-        store.update(scene.eval_at_alpha(0.5));
+    let mut store = EvaluatedFrame::new();
+    profile("eval into reused frame", cpu_iters, || {
+        scene.eval_at_alpha(0.5, &mut store);
     });
 
     if cpu_only {
@@ -74,12 +89,19 @@ fn main() {
     }
 
     let ctx = pollster::block_on(WgpuContext::new());
-    let mut renderer = Renderer::new(&ctx, 1920, 1080, 8);
-    let mut render_textures = renderer.new_render_textures(&ctx);
+    let mut renderer = build_render_app(&ctx, 1920, 1080, 8);
+    renderer.add_plugins((
+        CameraFramePlugin,
+        ExtractPlugin::<PlacedSquare>::default(),
+        VItemPlugin,
+    ));
+    renderer.finish();
+    renderer.cleanup();
+    let mut render_textures = RenderTextures::new(&ctx, 1920, 1080);
     let clear_color = wgpu::Color::BLACK;
 
     let cold = Instant::now();
-    renderer.render_frame(&mut render_textures, clear_color, &store);
+    renderer.render_frame(&mut render_textures, clear_color, &mut store);
     ctx.device
         .poll(wgpu::PollType::wait_indefinitely())
         .unwrap();
@@ -90,18 +112,18 @@ fn main() {
     );
 
     profile("static frame (steady)", 20, || {
-        renderer.render_frame(&mut render_textures, clear_color, &store);
+        renderer.render_frame(&mut render_textures, clear_color, &mut store);
     });
 
     let animated = (|r: &mut RanimScene| transform_squares(r, n)).build_scene();
-    let mut animated_store = RenderFrame::new();
+    let mut animated_store = EvaluatedFrame::new();
     let frames = 30;
     let mut frame = 0;
     profile("animated frame (eval+update+render)", frames, || {
         let alpha = frame as f64 / frames as f64;
         frame += 1;
-        animated_store.update(animated.eval_at_alpha(alpha));
-        renderer.render_frame(&mut render_textures, clear_color, &animated_store);
+        animated.eval_at_alpha(alpha, &mut animated_store);
+        renderer.render_frame(&mut render_textures, clear_color, &mut animated_store);
     });
 
     ctx.device

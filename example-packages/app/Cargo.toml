@@ -4,7 +4,13 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[lib]
+crate-type = ["rlib"]
+
+[[bin]]
+name = "app-preview"
+path = "src/main.rs"
+
 [dependencies]
-log = "0.4.34"
-pretty_env_logger = "0.5.0"
-ranim = { workspace = true, features = ["preview", "anims", "items"] }
+bevy_app.workspace = true
+ranim = { workspace = true, features = ["cmd-preview", "anims", "items"] }

@@ -1,14 +1,19 @@
 //! Mesh-based items (Surface, Sphere, etc.)
 
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use ranim_core::{
-    Extract,
     anchor::Aabb,
     color::{AlphaColor, Srgb},
     components::{PointVec, rgba::Rgba},
-    core_item::CoreItem,
-    glam::{DVec3, Mat4},
+    glam::DVec3,
     traits::{Alignable, ApplyTransform, Empty, FillColor, Interpolatable, Opacity},
 };
+
+/// Render-world components and GPU implementation.
+#[cfg(feature = "render")]
+pub mod render;
 
 mod sphere;
 mod surface;
@@ -20,15 +25,30 @@ pub mod gltf;
 pub use sphere::*;
 pub use surface::*;
 
+/// Installs mesh-item extraction, GPU preparation, and rendering.
+///
+/// Registers [`MeshItem`], [`Sphere`], and [`Surface`]. Composite frame payloads
+/// require an [`ExtractPlugin`](ranim_render::extract::ExtractPlugin) for their
+/// exact type.
+#[cfg(feature = "render")]
+pub struct MeshItemPlugin;
+
+#[cfg(feature = "render")]
+impl bevy_app::Plugin for MeshItemPlugin {
+    fn build(&self, app: &mut bevy_app::App) {
+        render::install(app);
+    }
+}
+
 /// A high-level mesh item with per-vertex data wrapped in PointVec for animation support.
 ///
 /// This struct uses [`PointVec`] to wrap vertex data, enabling proper alignment
 /// and interpolation for animations. When extracted, it converts to the low-level
-/// [`ranim_core::core_item::mesh_item::MeshItem`] for rendering.
+/// `RenderMeshItem` for rendering.
 ///
 /// The vertices are expressed in the mesh's local space. To place or animate the
 /// mesh with an external transform, wrap it in
-/// [`ranim_core::core_item::transformed::Transformed`], commonly storing
+/// [`ranim_core::transformed::Transformed`], commonly storing
 /// [`ranim_core::glam::DAffine3`] as the transform representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeshItem {
@@ -74,22 +94,29 @@ impl MeshItem {
     }
 }
 
-impl From<MeshItem> for ranim_core::core_item::mesh_item::MeshItem {
+#[cfg(feature = "render")]
+impl From<MeshItem> for render::RenderMeshItem {
     fn from(value: MeshItem) -> Self {
         Self {
             points: value.points.iter().map(|p| p.as_vec3()).collect(),
             triangle_indices: value.triangle_indices,
-            transform: Mat4::IDENTITY,
+            transform: ranim_core::glam::Mat4::IDENTITY,
             vertex_colors: value.vertex_colors.iter().copied().collect(),
             vertex_normals: value.vertex_normals.iter().map(|n| n.as_vec3()).collect(),
         }
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for MeshItem {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        buf.push(CoreItem::MeshItem(self.clone().into()));
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        let mut value = render::RenderMeshItem::from(self.clone());
+        value.transform =
+            ranim_core::glam::DMat4::from(ctx.transform()).as_mat4() * value.transform;
+        let mut entity = ctx.entity::<render::RenderMeshItem>();
+        if entity.get::<render::RenderMeshItem>() != Some(&value) {
+            entity.insert(value);
+        }
     }
 }
 

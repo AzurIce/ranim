@@ -231,30 +231,26 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core_item::vitem::VItem;
 
     struct MoveRight;
 
     impl IterativeEval for MoveRight {
-        type Output = VItem;
+        type Output = f64;
 
         fn step(&self, state: &mut Self::Output, _alpha: f64, delta_alpha: f64) {
-            state.points[0].x += delta_alpha as f32;
+            *state += delta_alpha;
         }
     }
 
     #[test]
     fn iterative_evaluators_step_by_sim_step() {
-        let named = Iterative::new(VItem::default(), MoveRight).with_steps(4);
-        assert_eq!(named.eval_alpha(0.5).points[0].x, 0.5);
+        let named = Iterative::new(0.0, MoveRight).with_steps(4);
+        assert_eq!(named.eval_alpha(0.5), 0.5);
 
-        let from_fn = Iterative::from_fn(
-            VItem::default(),
-            |state: &mut VItem, _alpha: f64, delta_alpha: f64| {
-                state.points[0].x += delta_alpha as f32;
-            },
-        )
+        let from_fn = Iterative::from_fn(0.0, |state: &mut f64, _alpha: f64, delta_alpha: f64| {
+            *state += delta_alpha;
+        })
         .with_steps(4);
-        assert_eq!(from_fn.eval_alpha(0.5).points[0].x, 0.5);
+        assert_eq!(from_fn.eval_alpha(0.5), 0.5);
     }
 }

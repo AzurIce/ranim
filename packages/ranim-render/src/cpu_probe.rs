@@ -10,7 +10,6 @@
 //! memory stays bounded.
 
 use std::cell::RefCell;
-
 use web_time::Instant;
 
 /// Upper bound on buffered spans; exceeding it clears the buffer (the

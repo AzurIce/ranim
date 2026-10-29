@@ -1,30 +1,27 @@
-## Run Native
+# App example
 
-```
-cargo run
-```
+`src/lib.rs` defines `hello_ranim` and its scene-only `ScenesPlugin`.
+This scene emits bare `CameraFrame`, `Square`, and `VItem` values, which the
+built-in `RanimItemsPlugin` (camera frame, vector, and mesh plugins) already
+covers, so the project stores no custom `ranim::render::RenderSetup`: projects
+without one fall back to those built-in plugins for each new GPU renderer,
+including resolution changes.
 
-## Run on web
+`src/main.rs` is the project binary: it assembles the App with
+`app::ScenesPlugin`, finalizes plugin construction with `app.build()`
+(`ranim::RanimAppExt`), and hands the resulting `ranim::RanimApp` to the
+free function `run_cli` (`ranim::cmd::cli::run_cli`, exported from the
+prelude), which serves the `preview`, `output`, `render`, and `inspect`
+subcommands.
 
-### Using trunk
+## Run
 
-See [index.html](./index.html)
+From the repository root:
 
-```
-trunk serve
-```
-
-### Manually
-
-See [manual.html](./manual.html)
-
-```
-cargo build --target wasm32-unknown-unknown
-wasm-bindgen --out-dir ./out --target web ../../target/wasm32-unknown-unknown/debug/app.wasm
-```
-
-Then use a file server to host the manual.html:
-
-```
-miniserve .
+```sh
+cargo run -p app -- preview            # interactive preview (defaults to the first scene)
+cargo run -p app -- preview hello_ranim
+cargo run -p app -- render hello_ranim # render once at 1920x1080 60fps mp4
+cargo run -p app -- output             # render every #[output(...)] declaration
+cargo run -p app -- inspect scenes     # list scenes without rendering
 ```

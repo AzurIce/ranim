@@ -1,6 +1,7 @@
-#[cfg(not(target_family = "wasm"))]
 mod audio;
 mod depth_visual;
+#[cfg(feature = "subsecond")]
+mod hot_reload;
 mod playback;
 mod profiler;
 mod timeline;
@@ -8,34 +9,33 @@ mod timeline;
 use std::sync::Arc;
 
 use crate::{
-    Output, Scene, SceneConfig, SceneConstructor,
+    Output, Scene, SceneConstructor,
+    app::render_setup_of,
     core::{
         SceneEvaluator,
         color::{self, LinearSrgb},
     },
-    render::{Renderer, resource::RenderTextures, utils::WgpuContext, world::RenderFrame},
+    render::{
+        RanimRenderApp, RenderAppExt, install_render_app, resource::RenderTextures,
+        utils::WgpuContext,
+    },
 };
-#[cfg(all(not(target_family = "wasm"), feature = "render"))]
 use crate::{OutputFormat, cmd::render::file_writer::OutputFormatExt};
-use async_channel::{Receiver, Sender, unbounded};
+use async_channel::{Receiver, unbounded};
+use bevy_app::SubApp;
+use bevy_ecs::prelude::Mut;
 use depth_visual::DepthVisualPipeline;
-use eframe::{App, egui};
+use eframe::egui;
 use playback::PlaybackEngine;
+use ranim_core::frame::EvaluatedFrame;
 use timeline::TimelineState;
-use tracing::{error, info};
+use tracing::error;
+use tracing::info;
 use web_time::Instant;
-
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-
-pub enum RanimPreviewAppCmd {
-    ReloadScene(Scene, Sender<()>),
-}
 
 /// Default logic grid resolution (Hz), per the time model design.
 pub(crate) const DEFAULT_LOGIC_FPS: f64 = 120.0;
 
-#[cfg(all(not(target_family = "wasm"), feature = "render"))]
 enum ExportProgress {
     /// (current_frame, total_frames)
     Progress(u64, u64),
@@ -101,25 +101,17 @@ impl Resolution {
 }
 
 pub struct RanimPreviewApp {
-    cmd_rx: Receiver<RanimPreviewAppCmd>,
-    pub cmd_tx: Sender<RanimPreviewAppCmd>,
     #[allow(unused)]
     title: String,
     clear_color: wgpu::Color,
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-    scene_constructor: Arc<dyn SceneConstructor>,
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-    scene_config: SceneConfig,
     resolution: Resolution,
     evaluator: SceneEvaluator,
     need_eval: bool,
     last_sec: f64,
-    store: RenderFrame,
     timeline_state: TimelineState,
     playback_engine: PlaybackEngine,
 
     // Rendering
-    renderer: Option<Renderer>,
     render_textures: Option<RenderTextures>,
     texture_id: Option<egui::TextureId>,
     depth_texture_id: Option<egui::TextureId>,
@@ -137,14 +129,10 @@ pub struct RanimPreviewApp {
     resolution_dirty: bool,
 
     // Export
-    #[cfg(all(not(target_family = "wasm"), feature = "render"))]
     export_dialog_open: bool,
     export_config: Output,
-    #[cfg(all(not(target_family = "wasm"), feature = "render"))]
     export_progress_rx: Option<Receiver<ExportProgress>>,
-    #[cfg(all(not(target_family = "wasm"), feature = "render"))]
     export_current_frame: u64,
-    #[cfg(all(not(target_family = "wasm"), feature = "render"))]
     export_total_frames: u64,
 
     // Playback
@@ -171,19 +159,25 @@ pub struct RanimPreviewApp {
     /// Whether stackable chart metrics render stacked (per-pass colors)
     /// instead of a plain total.
     profiler_stacked: bool,
+
+    // The project provides the render setup; the scene drives the session.
+    app: crate::RanimApp,
+    // Retained for native export.
+    scene: Scene,
+    #[cfg(feature = "subsecond")]
+    hot_reload: Option<hot_reload::HotReload>,
 }
 
 impl RanimPreviewApp {
-    pub fn new(
-        scene_constructor: impl SceneConstructor + 'static,
-        title: String,
-        scene_config: SceneConfig,
-    ) -> Self {
+    pub fn new(app: crate::RanimApp, scene: Scene) -> Self {
+        let mut app = app;
+        // The extract hook reads the evaluated frame from the main world.
+        app.init_resource::<EvaluatedFrame>();
+
         let t = Instant::now();
-        let scene_constructor = Arc::new(scene_constructor);
 
         info!("building scene...");
-        let timeline = scene_constructor.build_scene();
+        let timeline = scene.build_scene();
         info!("Scene built, cost: {:?}", t.elapsed());
 
         info!("Getting timelines info...");
@@ -192,25 +186,18 @@ impl RanimPreviewApp {
         let evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
         info!("Total {} root animations", animation_infos.len());
 
-        let (cmd_tx, cmd_rx) = unbounded();
-
         let playback_engine = PlaybackEngine::new(&evaluator);
 
-        Self {
-            cmd_rx,
-            cmd_tx,
-            title,
+        let clear_color = scene.config.clear_color.clone();
+        let mut preview = Self {
+            title: scene.name.clone(),
             clear_color: wgpu::Color::TRANSPARENT,
-            scene_constructor,
-            scene_config,
             resolution: Resolution::QHD,
             timeline_state: TimelineState::new(total_secs, animation_infos),
             evaluator,
             need_eval: false,
             last_sec: -1.0,
-            store: RenderFrame::default(),
             playback_engine,
-            renderer: None,
             render_textures: None,
             texture_id: None,
             depth_texture_id: None,
@@ -222,14 +209,10 @@ impl RanimPreviewApp {
             depth_visual_texture: None,
             depth_visual_view: None,
             resolution_dirty: false,
-            #[cfg(all(not(target_family = "wasm"), feature = "render"))]
             export_dialog_open: false,
             export_config: Output::default(),
-            #[cfg(all(not(target_family = "wasm"), feature = "render"))]
             export_progress_rx: None,
-            #[cfg(all(not(target_family = "wasm"), feature = "render"))]
             export_current_frame: 0,
-            #[cfg(all(not(target_family = "wasm"), feature = "render"))]
             export_total_frames: 0,
             playback_speed: 1.0,
             looping: false,
@@ -241,7 +224,62 @@ impl RanimPreviewApp {
             progress_total_sec: -1.0,
             profiler_metric: profiler::ProfilerMetric::default(),
             profiler_stacked: true,
-        }
+            app,
+            scene,
+            #[cfg(feature = "subsecond")]
+            hot_reload: None,
+        };
+        preview.set_clear_color_str(&clear_color);
+        preview
+    }
+
+    /// Replace scene-owned state, not the project or the preview's GPU device.
+    /// A failed build leaves the previous scene available, paused in place.
+    #[cfg(feature = "subsecond")]
+    fn reload_scene(&mut self) {
+        self.pause();
+        let position = self.timeline_state.current_sec;
+        let start = Instant::now();
+        info!("rebuilding scene after hotpatch...");
+        let rebuilt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let timeline = self.scene.build_scene();
+            let infos = timeline.get_animation_infos();
+            let total = timeline.total_secs();
+            let evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
+            let playback = PlaybackEngine::new(&evaluator);
+            let mut state = TimelineState::new(total, infos);
+            state.current_sec = position.clamp(0.0, total);
+            (evaluator, playback, state)
+        }));
+        let (evaluator, playback, state) = match rebuilt {
+            Ok(rebuilt) => rebuilt,
+            Err(_) => {
+                error!(
+                    "scene rebuild panicked; keeping the previous scene. Fix the scene or restart preview"
+                );
+                return;
+            }
+        };
+        self.evaluator = evaluator;
+        self.playback_engine = playback;
+        self.timeline_state = state;
+        // Frame identities and custom extract state belong to the old scene.
+        // Recreate the render sub-app on the same device on the next repaint.
+        self.app
+            .world_mut()
+            .resource_mut::<EvaluatedFrame>()
+            .clear();
+        self.resolution_dirty = true;
+        self.need_eval = true;
+        self.last_sec = -1.0;
+        self.last_eval_time = None;
+        self.last_render_time = None;
+        self.progress_samples.clear();
+        self.progress_total_sec = -1.0;
+        self.gpu_pass_times.clear();
+        self.cpu_spans.clear();
+        self.upload_stats.clear();
+        info!("Scene reloaded, cost: {:?}", start.elapsed());
     }
 
     /// Set clear color str
@@ -292,38 +330,11 @@ impl RanimPreviewApp {
         oit_layers
     }
 
-    fn handle_events(&mut self) {
-        if let Ok(cmd) = self.cmd_rx.try_recv() {
-            match cmd {
-                RanimPreviewAppCmd::ReloadScene(scene, tx) => {
-                    let timeline = scene.constructor.build_scene();
-                    let animation_infos = timeline.get_animation_infos();
-                    let old_cur_second = self.timeline_state.current_sec;
-                    self.timeline_state =
-                        TimelineState::new(timeline.total_secs(), animation_infos);
-                    self.timeline_state.current_sec =
-                        old_cur_second.clamp(0.0, self.timeline_state.total_sec);
-                    self.evaluator = timeline.into_evaluator(DEFAULT_LOGIC_FPS);
-                    self.playback_engine.reload_scene(&self.evaluator);
-                    self.store.update(std::iter::empty());
-                    self.need_eval = true;
-                    self.progress_samples.clear();
-                    self.progress_total_sec = -1.0;
-
-                    self.set_clear_color_str(&scene.config.clear_color);
-
-                    if let Err(err) = tx.try_send(()) {
-                        error!("Failed to send reloaded signal: {err:?}");
-                    }
-                }
-            }
-        }
-    }
-
     fn prepare_renderer(&mut self, frame: &eframe::Frame) {
-        // Check if we need to recreate renderer
-        let needs_init = self.renderer.is_none();
-        let needs_resize = self.resolution_dirty && self.renderer.is_some();
+        // The render sub-app appears once eframe shares its device, and is
+        // rebuilt on resolution change.
+        let needs_init = self.app.get_sub_app(RanimRenderApp).is_none();
+        let needs_resize = self.resolution_dirty && !needs_init;
 
         if !needs_init && !needs_resize {
             return;
@@ -352,8 +363,12 @@ impl RanimPreviewApp {
 
         let (width, height) = (self.resolution.width, self.resolution.height);
         let oit_layers = self.calculate_oit_layers(&ctx, width, height);
-        let renderer = Renderer::new(&ctx, width, height, oit_layers);
-        let render_textures = renderer.new_render_textures(&ctx);
+        let setup = render_setup_of(&self.app);
+        // Drop the old render world before building the new one, so its GPU
+        // resources release before the new sub-app allocates.
+        self.app.remove_sub_app(RanimRenderApp);
+        install_render_app(&mut self.app, &ctx, width, height, oit_layers, setup);
+        let render_textures = RenderTextures::new(&ctx, width, height);
 
         // Init Depth Visual Pipeline
         if self.depth_visual_pipeline.is_none() {
@@ -380,12 +395,19 @@ impl RanimPreviewApp {
 
         // Register texture with egui
         let texture_view = &render_textures.linear_render_view;
-        let texture_id = render_state.renderer.write().register_native_texture(
+        let mut egui_renderer = render_state.renderer.write();
+        if let Some(id) = self.texture_id.take() {
+            egui_renderer.free_texture(&id);
+        }
+        if let Some(id) = self.depth_texture_id.take() {
+            egui_renderer.free_texture(&id);
+        }
+        let texture_id = egui_renderer.register_native_texture(
             &render_state.device,
             texture_view,
             wgpu::FilterMode::Linear,
         );
-        let depth_id = render_state.renderer.write().register_native_texture(
+        let depth_id = egui_renderer.register_native_texture(
             &render_state.device,
             &depth_visual_view,
             wgpu::FilterMode::Nearest,
@@ -396,13 +418,21 @@ impl RanimPreviewApp {
         self.depth_visual_texture = Some(depth_visual_texture);
         self.depth_visual_view = Some(depth_visual_view);
         self.render_textures = Some(render_textures);
-        self.renderer = Some(renderer);
         self.wgpu_ctx = Some(ctx);
         self.resolution_dirty = false;
         self.need_eval = true; // Force re-render with new resolution
     }
 
     // MARK: Playback
+
+    /// The installed render sub-app, once eframe has shared its device.
+    pub(crate) fn render_app(&self) -> Option<&SubApp> {
+        self.app.get_sub_app(RanimRenderApp)
+    }
+
+    pub(crate) fn render_app_mut(&mut self) -> Option<&mut SubApp> {
+        self.app.get_sub_app_mut(RanimRenderApp)
+    }
 
     fn is_playing(&self) -> bool {
         self.playback_engine.is_playing()
@@ -453,116 +483,125 @@ impl RanimPreviewApp {
     }
 
     fn render_animation(&mut self) {
-        if let (Some(ctx), Some(renderer), Some(render_textures)) = (
-            self.wgpu_ctx.as_ref(),
-            self.renderer.as_mut(),
-            self.render_textures.as_mut(),
+        if self.wgpu_ctx.is_none()
+            || self.render_textures.is_none()
+            || self.app.get_sub_app(RanimRenderApp).is_none()
+        {
+            return;
+        }
+        if self.last_sec == self.timeline_state.current_sec && !self.need_eval {
+            return;
+        }
+        self.need_eval = false;
+        self.last_sec = self.timeline_state.current_sec;
+
+        let start_eval = Instant::now();
+        {
+            let _span = crate::render::cpu_probe::span("eval");
+            // Forward/backward direction management is internal to sample_at.
+            let target = self.timeline_state.current_sec;
+            self.app
+                .world_mut()
+                .resource_scope(|_world, mut store: Mut<EvaluatedFrame>| {
+                    self.evaluator.sample_at(target, &mut store);
+                });
+        }
+        self.last_eval_time = Some(start_eval.elapsed());
+
+        let start = Instant::now();
+        let clear_color = self.clear_color;
+        self.app
+            .sub_app_mut(RanimRenderApp)
+            .set_frame_target(self.render_textures.as_mut().unwrap(), clear_color);
+        self.app.update();
+
+        let ctx = self.wgpu_ctx.as_ref().unwrap();
+        let render_textures = self.render_textures.as_ref().unwrap();
+        if let (Some(pipeline), Some(view)) = (
+            self.depth_visual_pipeline.as_ref(),
+            self.depth_visual_view.as_ref(),
         ) {
-            if self.last_sec == self.timeline_state.current_sec && !self.need_eval {
-                return;
-            }
-            self.need_eval = false;
-            self.last_sec = self.timeline_state.current_sec;
-
-            let start_eval = Instant::now();
-            {
-                let _span = crate::render::cpu_probe::span("eval");
-                // Forward/backward direction management is internal to sample_at.
-                let target = self.timeline_state.current_sec;
-                let mut frame_items = Vec::new();
-                self.evaluator.sample_at(target, &mut frame_items);
-                self.store.update(frame_items.into_iter());
-            }
-            self.last_eval_time = Some(start_eval.elapsed());
-
-            let start = Instant::now();
-            renderer.render_frame(render_textures, self.clear_color, &self.store);
-
-            if let (Some(pipeline), Some(view)) = (
-                self.depth_visual_pipeline.as_ref(),
-                self.depth_visual_view.as_ref(),
-            ) {
-                let _span = crate::render::cpu_probe::span("depth_visual");
-                let mut encoder =
-                    ctx.device
-                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("Depth Visual Encoder"),
-                        });
-
-                let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("Depth Visual Bind Group"),
-                    layout: &pipeline.bind_group_layout,
-                    entries: &[wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(
-                            &render_textures.depth_texture_view,
-                        ),
-                    }],
+            let _span = crate::render::cpu_probe::span("depth_visual");
+            let mut encoder = ctx
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Depth Visual Encoder"),
                 });
 
-                {
-                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("Depth Visual Pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view,
-                            resolve_target: None,
-                            depth_slice: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                        multiview_mask: None,
-                    });
-                    rpass.set_pipeline(&pipeline.pipeline);
-                    rpass.set_bind_group(0, &bind_group, &[]);
-                    rpass.draw(0..3, 0..1);
-                }
-                ctx.queue.submit(Some(encoder.finish()));
-            }
+            let bind_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Depth Visual Bind Group"),
+                layout: &pipeline.bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(
+                        &render_textures.depth_texture_view,
+                    ),
+                }],
+            });
 
-            self.last_render_time = Some(start.elapsed());
-
-            // GPU profiler panel: drain per-frame data.
-            if let Some(scopes) = renderer.take_last_gpu_scopes() {
-                let mut passes = Vec::new();
-                profiler::flatten_scopes(&scopes, &mut passes);
-                self.gpu_pass_times = passes;
+            {
+                let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Depth Visual Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view,
+                        resolve_target: None,
+                        depth_slice: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                rpass.set_pipeline(&pipeline.pipeline);
+                rpass.set_bind_group(0, &bind_group, &[]);
+                rpass.draw(0..3, 0..1);
             }
-            if crate::render::upload_probe::mode().enabled() {
-                self.upload_stats = crate::render::upload_probe::take_stats();
-            } else {
-                self.upload_stats.clear();
-            }
-            self.cpu_spans = crate::render::cpu_probe::take_frame()
-                .into_iter()
-                .map(|(label, ms)| (label.to_string(), ms))
-                .collect();
-            profiler::record_sample(self);
+            ctx.queue.submit(Some(encoder.finish()));
         }
+
+        self.last_render_time = Some(start.elapsed());
+
+        // GPU profiler panel: drain per-frame data.
+        if let Some(scopes) = self
+            .app
+            .get_sub_app_mut(RanimRenderApp)
+            .and_then(|render_app| render_app.take_last_gpu_scopes())
+        {
+            let mut passes = Vec::new();
+            profiler::flatten_scopes(&scopes, &mut passes);
+            self.gpu_pass_times = passes;
+        }
+        if crate::render::upload_probe::mode().enabled() {
+            self.upload_stats = crate::render::upload_probe::take_stats();
+        } else {
+            self.upload_stats.clear();
+        }
+        self.cpu_spans = crate::render::cpu_probe::take_frame()
+            .into_iter()
+            .map(|(label, ms)| (label.to_string(), ms))
+            .collect();
+        profiler::record_sample(self);
     }
 
-    #[cfg(all(not(target_family = "wasm"), feature = "render"))]
     fn start_export(&mut self, ctx: egui::Context) {
         let (progress_tx, progress_rx) = unbounded();
         self.export_progress_rx = Some(progress_rx);
 
-        let constructor = self.scene_constructor.clone();
-        let scene_config = self.scene_config.clone();
+        let scene = self.scene.clone();
+        let setup = render_setup_of(&self.app);
         let output = self.export_config.clone();
-        let name = self.title.clone();
 
         std::thread::spawn(move || {
             let progress_tx_cb = progress_tx.clone();
             let ctx_cb = ctx.clone();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 crate::cmd::render::render_scene_output_with_progress(
-                    constructor,
-                    name,
-                    &scene_config,
+                    &scene,
+                    &setup,
                     &output,
                     2,
                     Some(Box::new(move |current, total| {
@@ -594,8 +633,16 @@ impl RanimPreviewApp {
 impl eframe::App for RanimPreviewApp {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        #[cfg(feature = "subsecond")]
+        if self.export_progress_rx.is_none()
+            && self
+                .hot_reload
+                .as_ref()
+                .is_some_and(|reload| reload.take_pending())
+        {
+            self.reload_scene();
+        }
         self.prepare_renderer(frame);
-        self.handle_events();
 
         // Space bar toggles play/pause
         if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
@@ -736,7 +783,6 @@ impl eframe::App for RanimPreviewApp {
                     }
 
                     ui.separator();
-                    #[cfg(all(not(target_family = "wasm"), feature = "render"))]
                     {
                         let exporting = self.export_progress_rx.is_some();
                         if ui
@@ -952,7 +998,6 @@ impl eframe::App for RanimPreviewApp {
         });
 
         // Export (native only)
-        #[cfg(all(not(target_family = "wasm"), feature = "render"))]
         {
             // Poll export progress
             if let Some(rx) = &self.export_progress_rx {
@@ -977,6 +1022,10 @@ impl eframe::App for RanimPreviewApp {
 
                 if done {
                     self.export_progress_rx = None;
+                    // A hotpatch may have arrived while export owned the old
+                    // scene. Give the deferred rebuild another UI pass.
+                    #[cfg(feature = "subsecond")]
+                    ctx.request_repaint();
                     self.export_current_frame = 0;
                     self.export_total_frames = 0;
                     if let Some(err) = error_msg {
@@ -1123,22 +1172,26 @@ impl eframe::App for RanimPreviewApp {
             }
         }
 
-        // GPU profiler panel (works without the profiling feature; the GPU
-        // sections degrade to a hint).
+        // GPU sections show a hint when timestamp queries are unavailable.
         if self.profiler_open {
             profiler::ui_profiler_window(self, &ctx);
         }
     }
 }
 
-pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id: String) {
-    #[cfg(not(target_arch = "wasm32"))]
+pub fn run_app(app: RanimPreviewApp) {
     let title = app.title.clone();
     let build_app = |cc: &eframe::CreationContext| {
+        #[cfg(feature = "subsecond")]
+        let app = {
+            let mut app = app;
+            app.hot_reload = Some(hot_reload::HotReload::new(cc.egui_ctx.clone()));
+            app
+        };
         let mut fonts = egui::FontDefinitions::default();
         egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
         cc.egui_ctx.set_fonts(fonts);
-        Ok(Box::new(app) as Box<dyn App>)
+        Ok(Box::new(app) as Box<dyn eframe::App>)
     };
 
     // NOTE: eframe defaults to wgpu's default limits (8 storage buffers per shader
@@ -1163,97 +1216,92 @@ pub fn run_app(app: RanimPreviewApp, #[cfg(target_arch = "wasm32")] container_id
         ..Default::default()
     };
 
-    #[cfg(not(target_family = "wasm"))]
-    {
-        let native_options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_title(&title)
-                .with_inner_size([1280.0, 720.0]),
-            renderer: eframe::Renderer::Wgpu,
-            wgpu_options,
-            ..Default::default()
-        };
-
-        // We need to clone title because run_native takes String (or &str) and app is moved into closure
-
-        eframe::run_native(&title, native_options, Box::new(build_app)).unwrap();
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        use wasm_bindgen::JsCast;
-        let web_options = eframe::WebOptions {
-            wgpu_options,
-            ..Default::default()
-        };
-
-        // Handling canvas creation if not found to ensure compatibility
-        let document = web_sys::window().unwrap().document().unwrap();
-        let canvas = document
-            .get_element_by_id(&container_id)
-            .and_then(|c| c.dyn_into::<web_sys::HtmlCanvasElement>().ok());
-
-        let canvas = if let Some(canvas) = canvas {
-            canvas
-        } else {
-            let canvas = document.create_element("canvas").unwrap();
-            canvas.set_id(&container_id);
-            document.body().unwrap().append_child(&canvas).unwrap();
-            canvas.dyn_into::<web_sys::HtmlCanvasElement>().unwrap()
-        };
-
-        wasm_bindgen_futures::spawn_local(async {
-            eframe::WebRunner::new()
-                .start(canvas, web_options, Box::new(build_app))
-                .await
-                .expect("failed to start eframe");
-        });
-    }
+    let native_options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_title(&title)
+            .with_inner_size([1280.0, 720.0]),
+        renderer: eframe::Renderer::Wgpu,
+        wgpu_options,
+        ..Default::default()
+    };
+    eframe::run_native(&title, native_options, Box::new(build_app)).unwrap();
 }
 
-pub fn preview_constructor_with_name(
-    scene: impl SceneConstructor + 'static,
-    name: &str,
-    scene_config: &SceneConfig,
-) {
-    let app = RanimPreviewApp::new(scene, name.to_string(), scene_config.clone());
-    run_app(
-        app,
-        #[cfg(target_arch = "wasm32")]
-        format!("ranim-app-{name}"),
-    );
+/// Preview a registered scene in the interactive preview app.
+pub fn preview_scene(app: crate::RanimApp, scene: Scene) {
+    run_app(RanimPreviewApp::new(app, scene));
 }
 
-/// Preview a scene
-pub fn preview_scene(scene: &Scene) {
-    preview_scene_with_name(scene, &scene.name);
-}
-
-/// Preview a scene with a custom name
-pub fn preview_scene_with_name(scene: &Scene, name: &str) {
-    let mut app = RanimPreviewApp::new(scene.constructor, name.to_string(), scene.config.clone());
-    app.set_clear_color_str(&scene.config.clear_color);
-    run_app(
-        app,
-        #[cfg(target_arch = "wasm32")]
-        format!("ranim-app-{name}"),
-    );
-}
-
-// WASM support needs refactoring, mostly keeping it commented or adapting basic entry point.
-#[cfg(target_arch = "wasm32")]
-mod wasm {
+#[cfg(all(test, feature = "subsecond"))]
+mod hot_reload_tests {
     use super::*;
+    use crate::{App, RanimAppExt, RanimScene};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-    #[wasm_bindgen(start)]
-    pub async fn wasm_start() {
-        console_error_panic_hook::set_once();
-        wasm_tracing::set_as_global_default();
+    fn preview(duration: Arc<AtomicUsize>, fail: Arc<AtomicBool>) -> RanimPreviewApp {
+        let scene = Scene::new("reload", move |r: &mut RanimScene| {
+            assert!(!fail.load(Ordering::Relaxed), "test rebuild failure");
+            let mut sequence = ranim_core::animation::compose::sequence::AnimSequence::new();
+            sequence.forward(duration.load(Ordering::Relaxed) as f64);
+            r.play(sequence);
+        });
+        RanimPreviewApp::new(App::new().build(), scene)
     }
 
-    /// WASM wrapper: preview a scene (accepts owned [`Scene`] from `find_scene`)
-    #[wasm_bindgen]
-    pub fn preview_scene(scene: &Scene) {
-        super::preview_scene(scene);
+    #[test]
+    fn rebuild_replaces_timeline_clamps_time_and_preserves_host_settings() {
+        let duration = Arc::new(AtomicUsize::new(10));
+        let mut preview = preview(Arc::clone(&duration), Arc::new(AtomicBool::new(false)));
+        preview.timeline_state.current_sec = 8.0;
+        preview.playback_speed = 2.0;
+        preview.looping = true;
+        preview.resolution = Resolution::HD;
+        preview.progress_total_sec = 10.0;
+        duration.store(3, Ordering::Relaxed);
+
+        preview.reload_scene();
+
+        assert_eq!(preview.evaluator.total_secs(), 3.0);
+        assert_eq!(preview.timeline_state.total_sec, 3.0);
+        assert_eq!(preview.timeline_state.current_sec, 3.0);
+        assert_eq!(preview.playback_speed, 2.0);
+        assert!(preview.looping);
+        assert_eq!(preview.resolution, Resolution::HD);
+        assert!(!preview.is_playing());
+        assert!(preview.need_eval);
+        assert!(preview.resolution_dirty);
+        assert_eq!(preview.progress_total_sec, -1.0);
+    }
+
+    #[test]
+    fn rebuild_pauses_playback_and_keeps_absolute_position() {
+        let mut preview = preview(
+            Arc::new(AtomicUsize::new(10)),
+            Arc::new(AtomicBool::new(false)),
+        );
+        preview.timeline_state.current_sec = 4.0;
+        preview.play();
+        preview.reload_scene();
+        assert!(!preview.is_playing());
+        assert!(preview.timeline_state.current_sec >= 4.0);
+        assert!(preview.timeline_state.current_sec <= 10.0);
+    }
+
+    #[test]
+    fn failed_rebuild_keeps_previous_scene_and_allows_retry() {
+        let duration = Arc::new(AtomicUsize::new(10));
+        let fail = Arc::new(AtomicBool::new(false));
+        let mut preview = preview(Arc::clone(&duration), Arc::clone(&fail));
+        preview.timeline_state.current_sec = 4.0;
+        fail.store(true, Ordering::Relaxed);
+        preview.reload_scene();
+        assert_eq!(preview.evaluator.total_secs(), 10.0);
+        assert_eq!(preview.timeline_state.current_sec, 4.0);
+
+        fail.store(false, Ordering::Relaxed);
+        duration.store(0, Ordering::Relaxed);
+        preview.reload_scene();
+        assert_eq!(preview.evaluator.total_secs(), 0.0);
+        assert_eq!(preview.timeline_state.current_sec, 0.0);
     }
 }

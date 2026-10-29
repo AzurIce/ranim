@@ -43,11 +43,45 @@ jobs:
           sparse-checkout: .github/book-assets
           path: __main
 
+      - name: Detect book format
+        id: format
+        run: |
+          if [ -f book/Notist.toml ]; then
+            echo "notist=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "notist=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f Notist.toml ] && [ -f book/Notist.toml ]; then
+            echo "workspace=true" >> "$GITHUB_OUTPUT"
+            echo "book-output=dist/ranim-book" >> "$GITHUB_OUTPUT"
+          else
+            echo "workspace=false" >> "$GITHUB_OUTPUT"
+            echo "book-output=book/build" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Nix
+        if: steps.format.outputs.notist == 'true'
+        uses: cachix/install-nix-action@v31
+
+      - name: Build Notist book
+        if: steps.format.outputs.notist == 'true'
+        run: |
+          mkdir -p target
+          nix build .#notist --out-link target/notist
+          if [ "${{ steps.format.outputs.workspace }}" = "true" ]; then
+            target/notist/bin/notist build -p ranim-book
+          else
+            # Older Notist revisions still use the standalone book configuration.
+            target/notist/bin/notist book build book --out-dir book/build
+          fi
+
       - name: Compute tool cache key
+        if: steps.format.outputs.notist != 'true'
         id: tool-key
         run: echo "hash=$(echo '${{ inputs.mdbook-version }} ${{ inputs.mdbook-plugins }} ${{ inputs.mdbook-typst-math-rev }}' | sha256sum | cut -c1-16)-issue-links-$(git rev-parse HEAD:book/preprocessors/issue_links.rs)" >> "$GITHUB_OUTPUT"
 
       - name: Cache mdbook tools
+        if: steps.format.outputs.notist != 'true'
         id: cache-mdbook
         uses: actions/cache@v4
         with:
@@ -61,21 +95,23 @@ jobs:
       # issue_links.rs) is a rust script run via `cargo -Zscript` from
       # book.toml — needs the nightly the repo pins (see flake.nix).
       - name: Install Rust toolchain (for the issue-links preprocessor)
+        if: steps.format.outputs.notist != 'true'
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-10-01
 
       - name: Install mdbook and registry plugins
-        if: steps.cache-mdbook.outputs.cache-hit != 'true'
+        if: steps.format.outputs.notist != 'true' && steps.cache-mdbook.outputs.cache-hit != 'true'
         uses: taiki-e/install-action@v2
         with:
           tool: mdbook@${{ inputs.mdbook-version }}, ${{ inputs.mdbook-plugins }}
 
       - name: Install mdbook-typst-math from upstream
-        if: steps.cache-mdbook.outputs.cache-hit != 'true'
+        if: steps.format.outputs.notist != 'true' && steps.cache-mdbook.outputs.cache-hit != 'true'
         run: cargo install --locked --git https://github.com/duskmoon314/mdbook-typst-math.git --rev "${{ inputs.mdbook-typst-math-rev }}" mdbook-typst-math
 
       - name: Patch book.toml and inject version-select
+        if: steps.format.outputs.notist != 'true'
         run: |
           SITE_URL="${{ inputs.site-url }}"
           if [ -z "$SITE_URL" ]; then
@@ -103,10 +139,11 @@ jobs:
             echo 'additional-js = ["version-select.js"]' >> book/book.toml
           fi
 
-      - name: Build book
+      - name: Build legacy mdBook
+        if: steps.format.outputs.notist != 'true'
         run: mdbook build book
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}
-          path: book/build
+          path: ${{ steps.format.outputs.book-output }}

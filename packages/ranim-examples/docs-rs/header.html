@@ -1,12 +1,15 @@
-<style>
-  canvas {
-    width: 100%;
-  }
-</style>
 <script type="module">
   const rootPath = document.querySelector('meta[name="rustdoc-vars"]')?.dataset.rootPath ?? '';
-  window.ranim_examples = import(`${rootPath}ranim_examples/pkg/ranim_examples.js`).then(
-    ({ default: init, find_scene, preview_scene }) =>
-      init().then(() => ({ find_scene, preview_scene }))
-  );
+  // These assets are emitted by `cargo examples build --out-dir …`.
+  if (document.querySelector('ranim-viewport[data-module-path]')) {
+    await Promise.all([
+      import(`${rootPath}ranim_examples/ranim-viewport.js`),
+      import(`${rootPath}ranim_examples/ranim-controls.js`),
+    ]);
+    for (const viewport of document.querySelectorAll('ranim-viewport[data-module-path]')) {
+      viewport.parentElement.querySelector('ranim-controls').target = viewport;
+      const example = viewport.dataset.modulePath.split('::')[1];
+      viewport.setAttribute('src', `${rootPath}ranim_examples/examples/${example}/pkg/ranim_example.js`);
+    }
+  }
 </script>

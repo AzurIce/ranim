@@ -1,42 +1,23 @@
+/// The command line interface for project binaries
+#[cfg(all(not(target_family = "wasm"), feature = "cmd-render"))]
+pub mod cli;
+
+/// Inspect scenes, animation trees, or evaluated frames without rendering
+#[cfg(all(not(target_family = "wasm"), feature = "cmd-render"))]
+pub mod inspect;
+
 /// Things for render to video
-#[cfg(all(not(target_family = "wasm"), feature = "render"))]
+#[cfg(all(not(target_family = "wasm"), feature = "cmd-render"))]
 pub mod render;
-#[cfg(all(not(target_family = "wasm"), feature = "render"))]
+#[cfg(all(not(target_family = "wasm"), feature = "cmd-render"))]
 pub use render::{
     RenderJob, render_scene, render_scene_job, render_scene_once, render_scene_output,
     render_scene_output_with_progress,
 };
 
-/// Render a scene by name.
-///
-/// ```rust,ignore
-/// render_scene!(fading);
-/// render_scene!(ranim_020::code_structure);
-/// ```
-#[cfg(all(not(target_family = "wasm"), feature = "render"))]
-#[macro_export]
-macro_rules! render_scene {
-    ($($scene:tt)::+) => {
-        $crate::cmd::render_scene(&$($scene)::+::scene(), 2)
-    };
-}
-
 /// The preview application
-#[cfg(feature = "preview")]
+#[cfg(all(not(target_family = "wasm"), feature = "cmd-preview"))]
 #[allow(missing_docs)]
 pub mod preview;
-#[cfg(feature = "preview")]
-pub use preview::{preview_constructor_with_name, preview_scene, preview_scene_with_name};
-
-/// Preview a scene by name.
-///
-/// ```rust,ignore
-/// ranim::preview_scene!(fading);
-/// ranim::preview_scene!(ranim_020::code_structure);
-/// ```
-#[macro_export]
-macro_rules! preview_scene {
-    ($($scene:tt)::+) => {
-        $crate::cmd::preview_scene(&$($scene)::+::scene())
-    };
-}
+#[cfg(all(not(target_family = "wasm"), feature = "cmd-preview"))]
+pub use preview::preview_scene;

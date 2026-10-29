@@ -1,3 +1,2 @@
-pub mod mesh_items;
+//! Shared GPU view data.
 pub mod viewport;
-pub mod vitems;

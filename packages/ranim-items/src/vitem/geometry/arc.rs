@@ -1,7 +1,8 @@
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
 use ranim_core::{
-    Extract,
     anchor::{Aabb, AabbPoint, Locate},
-    core_item::CoreItem,
     traits::{ApplyTransform, Opacity, ScaleTransform, ShiftTransform, StrokeColor},
 };
 use ranim_core::{
@@ -86,10 +87,10 @@ impl From<Arc> for VItem {
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for Arc {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }
 
@@ -205,10 +206,10 @@ impl From<ArcBetweenPoints> for VItem {
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for ArcBetweenPoints {
-    type Target = CoreItem;
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        VItem::from(self.clone()).extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        VItem::from(self.clone()).extract(ctx);
     }
 }
 

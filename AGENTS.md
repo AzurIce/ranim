@@ -9,7 +9,7 @@ set and will disagree with CI.
 
 ```bash
 nix develop
-just lint   # fmt-check + workspace-wide clippy/doc, feature-gated sweeps too
+just lint   # workspace clippy/doc + isolated minimal and WASM feature checks
 ```
 
 Gotchas learned the hard way — partial sweeps are NOT equivalent:
@@ -28,33 +28,38 @@ Gotchas learned the hard way — partial sweeps are NOT equivalent:
 
 - **Limit cargo parallelism to avoid OOM.** A full `cargo test --workspace` or
   `cargo build --workspace --all-targets` compiles the entire workspace
-  (wgpu, eframe/egui, 25+ cdylib examples) with one rustc job per core, which
+  (wgpu, eframe/egui, 25+ examples) with one rustc job per core, which
   can exhaust memory and freeze the machine (observed with 32 cores / 29 GiB
   RAM). Prefer limiting parallelism and/or testing per package, e.g.:
 
   ```bash
   cargo test -p ranim-core -p ranim-items -j 8
-  CARGO_BUILD_JOBS=8 cargo run -p ranim-cli -- output <scene> --example <example>
+  CARGO_BUILD_JOBS=8 cargo run --example <example> --no-default-features --features anims,cmd-render -- output
   ```
 
 ## 构建与测试注意事项
 
 - **限制 cargo 并行度以避免内存耗尽。**全量 `cargo test --workspace` 或
   `cargo build --workspace --all-targets` 会按核心数并行编译整个 workspace
-  （wgpu、eframe/egui、25+ 个 cdylib example），可能耗尽内存导致整机卡死
+  （wgpu、eframe/egui、25+ 个 example），可能耗尽内存导致整机卡死
   （在 32 核 / 29 GiB 内存上实际发生过）。建议限制并行度或分包测试。
 
 ## Website example media（shadow 管理）
 
 `website/static/examples/` 下的渲染产物（mp4/png）**不入库**，由
 [shadow](https://github.com/AzurIce/shadow) 管理：xtask 在渲染后运行
-`shadow publish` 上传到 TOS，`website/data/*.toml` 里的 `output_files`/
-`preview_imgs` 引用内容寻址 URL（由 `.shadow/refs/` 里的 oid 拼出）。
-入库的只有 ref（约 200 字节/个）、`shadow.toml` 和生成的 data/pages。
+`shadow publish` 上传到 TOS。SSG 构建时通过 Experimental prepare 扩展
+`cargo examples site` 从 Cargo targets、源码、README 和 `.shadow/refs/` 生成
+内存中的页面与模板数据，媒体 URL 由 refs 中的 oid 解析。
+入库的是 ref、`shadow.toml` 和 `website/render-state.json`（上次成功渲染的 hash）；
+不再维护 `website/data/*.toml` 或 `website/content/examples/`。
 
+- 构建网站：`just website`，扩展自动生成 example 页面与数据，无需渲染、下载媒体或凭证。
+- WASM：`cargo examples build [examples...]`；实际存在的 JS/WASM 决定是否显示 App 页签。
 - 渲染 + 发布：`cargo examples run [examples...]`（需要 `shadow` 在 PATH
-  上，`cargo install --git https://github.com/AzurIce/shadow`）
-- 不渲染、只把已有产物发布并重写 data/pages：`cargo examples publish`
+  上，`cargo install --git https://github.com/AzurIce/shadow`）；成功后更新 render state。
+- 不渲染、只发布已有产物：`cargo examples publish`，保持上次成功渲染的 hash。
+- `--lazy-run` 仅比较 render state；网站与 WASM 构建不得覆盖该 hash。
 - 凭证在仓库根 `.env`（`TOS_ACCESS_KEY`/`TOS_SECRET_KEY`，已 gitignore，
   绝不提交）
 - CI 在每次网站部署成功后运行 `shadow free --keep-at origin/main --delete`
@@ -138,43 +143,12 @@ Use code blocks, mermaid diagrams, or examples as needed.
   - Before/after comparisons for refactorings.
 - Omit implementation noise unless it is the point.
 
-## mdBook 数学公式
+## Book 数学公式与 issue 引用
 
-Ranim Book 通过 `mdbook-typst-math` 将公式渲染为 SVG。行内公式使用
-`$...$`，独立公式使用 `$$...$$`；分隔符中的内容必须是 **Typst math
-syntax**，不能直接粘贴 LaTeX。
+Book 使用 notist-book 构建，Typst 和 Pele 组件位于 `book/_components/`。
+行内公式使用 `$...$`（Typst math syntax）；独立公式使用
+`#typst.math<BlockContent>(...)` 并导入 typst 组件。图表使用
+`#pele.diagram(...)`。issue/PR 引用使用 `#issue("123")`，并导入
+相对路径的 `_components/issue.notc`；链接指向 GitHub `/pull/N`。
 
-常用写法：
-
-- 分式：`frac(a, b)`
-- 矩阵：`mat(a, b; c, d)`，分号分隔行
-- 黑板粗体：`RR`、`ZZ`
-- 命名算子：`op("rank")`
-- 粗体符号：`bold(v)`
-- 点乘符号：`a dot b`
-
-Typst 会把相邻字母解析成一个标识符。例如，矩阵 `A` 乘向量 `p` 应写成
-`A p`，而不是 `Ap`。迁移 LaTeX 公式时，应按 Typst 的语义重新书写，不要只
-替换命令名称。
-
-## mdBook issue/PR 引用链接
-
-正文中裸写的 `#N` 引用由仓库内预处理器
-`book/preprocessors/issue_links.rs` 在构建时自动链接到 GitHub。链接
-一律指向 `/pull/N`——GitHub 对 issue 编号会 302 重定向到 `/issues/N`
-（这也是 bevy.org 的做法），因此无需区分 PR 与 issue、无任何 API 依赖。
-它是一个 rust script（`cargo -Zscript`，需要 nightly——仓库已在 flake 与
-Book CI 中固定 `nightly-2026-10-01`），不在 workspace 内，`just lint`
-不覆盖它。
-
-修改公式后，从仓库根目录构建整本书进行验证：
-
-```bash
-nix develop --command mdbook build book
-```
-
-无需单独安装预处理器：Nix 开发环境和 Book CI 都固定使用上游
-`duskmoon314/mdbook-typst-math` 的提交
-`52341bd8ec2ffde6db92cfd5e5d7503076fbd94e`。升级该提交时，应同时更新
-`flake.nix`、`.github/workflows/build-book.yml` 和 `.github/workflows/book.yml`，
-并重新执行完整的书籍构建。
+修改 Book 后运行 `nix develop --command just book` 验证。

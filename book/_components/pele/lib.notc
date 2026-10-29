@@ -1,0 +1,1 @@
+fn diagram(source: String, theme: String = "auto") -> BlockContent;

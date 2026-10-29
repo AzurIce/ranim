@@ -17,14 +17,16 @@ pub mod audio;
 pub mod color;
 /// Component data.
 pub mod components;
-/// Fundamental scene primitives.
-pub mod core_item;
+/// Reusable typed output of scene evaluation.
+pub mod frame;
 /// Scene evaluation driver (lightweight session, no ECS).
 pub mod scene_evaluator;
 /// Time vocabulary for animation evaluation.
 pub mod time;
 /// Fundamental traits.
 pub mod traits;
+/// Generic values paired with typed external transforms.
+pub mod transformed;
 pub use scene_evaluator::SceneEvaluator;
 /// Utilities.
 pub mod utils;
@@ -36,9 +38,10 @@ use std::sync::Arc;
 use animation::{
     build::IntoAnimNode,
     compose::stack::AnimStack,
+    eval::OutputContext,
     node::{AnimNode, AnimationInfo, bake_audio},
 };
-use core_item::CoreItem;
+use frame::EvaluatedFrame;
 
 /// Commonly used ranim APIs.
 pub mod prelude {
@@ -59,94 +62,9 @@ pub mod prelude {
     };
     pub use crate::animation::sound::Sound;
     pub use crate::audio::{AudioClip, AudioTrack};
-    pub use crate::core_item::CoreItem;
-    pub use crate::core_item::camera_frame::CameraFrame;
-    pub use crate::core_item::transformed::{Transformed, TransformedExt};
-    pub use crate::{Extract, RanimScene, TimeMark};
+    pub use crate::transformed::{Transformed, TransformedExt};
+    pub use crate::{RanimScene, TimeMark};
 }
-
-/// Extract one or more target values from a reference.
-pub trait Extract {
-    /// Extraction target.
-    type Target: Clone;
-    /// Append extracted values to `buf`.
-    fn extract_into(&self, buf: &mut Vec<Self::Target>);
-    /// Extract into a newly allocated vector.
-    fn extract(&self) -> Vec<Self::Target> {
-        let mut buf = Vec::new();
-        self.extract_into(&mut buf);
-        buf
-    }
-}
-
-/// Sealed marker: types whose references iterate over `&Self::Item`.
-///
-/// `Extract` is blanket-implemented for these containers. Keeping the bound on a
-/// local (sealed) trait instead of raw `IntoIterator` lets coherence prove that
-/// tuples are disjoint, which is what makes the direct tuple impls below possible
-/// without a newtype wrapper or nightly `tuple_trait`.
-mod sealed {
-    pub trait IntoExtractIter {
-        type Item;
-    }
-    impl<E> IntoExtractIter for Vec<E> {
-        type Item = E;
-    }
-    impl<E> IntoExtractIter for std::collections::VecDeque<E> {
-        type Item = E;
-    }
-    impl<E> IntoExtractIter for std::collections::LinkedList<E> {
-        type Item = E;
-    }
-    impl<E> IntoExtractIter for std::collections::HashSet<E> {
-        type Item = E;
-    }
-    impl<E> IntoExtractIter for std::collections::BTreeSet<E> {
-        type Item = E;
-    }
-    impl<E> IntoExtractIter for std::collections::BinaryHeap<E> {
-        type Item = E;
-    }
-    impl<E> IntoExtractIter for Option<E> {
-        type Item = E;
-    }
-    impl<E, const N: usize> IntoExtractIter for [E; N] {
-        type Item = E;
-    }
-}
-use sealed::IntoExtractIter;
-
-impl<I: IntoExtractIter> Extract for I
-where
-    I::Item: Extract,
-    for<'a> &'a I: IntoIterator<Item = &'a I::Item>,
-{
-    type Target = <I::Item as Extract>::Target;
-
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        for element in self {
-            element.extract_into(buf);
-        }
-    }
-}
-
-/// Direct `Extract` impls for tuples. All elements must extract to the same
-/// `Target`, which is the natural semantics of a single `Target` associated type.
-macro_rules! impl_extract_for_tuple {
-    ($(($E:ident, $e:ident)),*) => {
-        impl<T: Clone, $($E: Extract<Target = T>),*> Extract for ($($E,)*) {
-            type Target = T;
-
-            fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-                let ($($e,)*) = self;
-                $($e.extract_into(buf);)*
-            }
-        }
-    };
-}
-
-// Arity 1..=15, same as the sibling `impl_interpolatable_tuple` pattern.
-variadics_please::all_tuples!(impl_extract_for_tuple, 1, 15, E, e);
 
 /// A marker attached to a time in a scene definition.
 #[derive(Debug, Clone)]
@@ -262,52 +180,34 @@ impl SealedRanimScene {
             .collect()
     }
 
-    /// Sample all clips active at `target_sec` and extract scene primitives.
+    /// Sample all clips active at `target_sec` into typed CPU batches.
     ///
-    /// Pure query path: every active cell evaluates itself at `target_sec`
-    /// (stateful segments reset/replay or integrate internally as needed).
-    pub fn eval_at_sec(&self, target_sec: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
-        self.animations
-            .iter()
-            .enumerate()
-            .filter_map(move |(animation_id, animation)| {
-                if !animation.enabled() {
-                    return None;
-                }
-
-                let mut items = Vec::new();
-                animation.eval_at(target_sec, &mut items);
-                (!items.is_empty()).then_some((animation_id, items))
-            })
-            .flat_map(|(animation_id, items)| {
-                items
-                    .into_iter()
-                    .flat_map(|item| item.extract())
-                    .enumerate()
-                    .map(move |(part, item)| ((animation_id, part), item))
-            })
+    /// Replaces the whole frame while reusing its batch storage. Each active
+    /// leaf contributes its complete output under its top-level animation source.
+    pub fn eval_at_sec(&self, target_sec: f64, out: &mut EvaluatedFrame) {
+        out.clear();
+        for (source_id, animation) in self.animations.iter().enumerate() {
+            animation.eval_at(target_sec, &mut OutputContext::new(out, source_id));
+        }
     }
 
-    /// Evaluate by normalized scene progress.
-    pub fn eval_at_alpha(&self, alpha: f64) -> impl Iterator<Item = ((usize, usize), CoreItem)> {
-        self.eval_at_sec(self.total_secs * alpha)
+    /// Sample by normalized scene progress, replacing `out`.
+    pub fn eval_at_alpha(&self, alpha: f64, out: &mut EvaluatedFrame) {
+        self.eval_at_sec(self.total_secs * alpha, out);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        animation::{
-            build::{PlaybackExt, Unplaced},
-            compose::sequence::AnimSequence,
-            eval::Static,
-        },
-        core_item::vitem::VItem,
+    use crate::animation::{
+        build::{PlaybackExt, Unplaced},
+        compose::sequence::AnimSequence,
+        eval::Static,
     };
 
     fn leaf(duration: f64) -> impl Unplaced {
-        Static(VItem::default()).with_duration(duration)
+        Static(0_u8).with_duration(duration)
     }
 
     #[test]
@@ -328,36 +228,27 @@ mod tests {
     }
 
     #[test]
-    fn extracted_items_have_unique_semantic_part_ids() {
+    fn leaf_outputs_keep_containers_whole_while_children_share_source_parts() {
         let mut scene = RanimScene::new();
-        scene.play(Static(vec![VItem::default(), VItem::default()]).with_duration(1.0));
+        scene.play(crate::stack![
+            Static(vec![1_u8, 2]).with_duration(1.0),
+            Static(3_u8).with_duration(1.0),
+            Static((42_u32, String::from("tuple"))).with_duration(1.0),
+        ]);
         let sealed = scene.seal();
+        let mut frame = EvaluatedFrame::new();
+        sealed.eval_at_sec(0.5, &mut frame);
 
-        let ids = sealed
-            .eval_at_sec(0.5)
-            .map(|(id, _)| id)
-            .collect::<Vec<_>>();
-
-        assert_eq!(ids, [(0, 0), (0, 1)]);
-    }
-
-    #[test]
-    fn heterogeneous_tuples_extract_to_core_items() {
-        use crate::core_item::{camera_frame::CameraFrame, mesh_item::MeshItem};
-        let items = vec![
-            (
-                CameraFrame::default(),
-                VItem::default(),
-                MeshItem::default()
-            );
-            2
-        ]
-        .extract();
-        assert_eq!(items.len(), 6);
-        for batch in items.as_chunks::<3>().0 {
-            assert!(matches!(&batch[0], CoreItem::CameraFrame(_)));
-            assert!(matches!(&batch[1], CoreItem::VItem(_)));
-            assert!(matches!(&batch[2], CoreItem::MeshItem(_)));
-        }
+        assert_eq!(frame.len(), 3);
+        let vector = &frame.items::<Vec<u8>>()[0];
+        assert_eq!(vector.value, [1, 2]);
+        assert_eq!((vector.id, vector.order), ((0, 0), 0));
+        let item = &frame.items::<u8>()[0];
+        assert_eq!(item.value, 3);
+        assert_eq!((item.id, item.order), ((0, 1), 1));
+        let tuple = &frame.items::<(u32, String)>()[0];
+        assert_eq!(tuple.value, (42, String::from("tuple")));
+        assert_eq!((tuple.id, tuple.order), ((0, 2), 2));
+        assert!(frame.items::<u32>().is_empty());
     }
 }

@@ -8,13 +8,14 @@
 //! animation becomes visible. The chart can be clicked/dragged to seek.
 //!
 //! CPU spans ([`crate::render::cpu_probe`]) and upload stats
-//! ([`crate::render::upload_probe`]) work in any build; GPU pass scopes
-//! need the `profiling` feature and a device with timestamp query
+//! ([`crate::render::upload_probe`]) are available in the native preview;
+//! GPU pass scopes are enabled at runtime on devices with timestamp query
 //! support. Upload strategy modes can be switched live.
 
 use eframe::egui;
 
 use super::RanimPreviewApp;
+use crate::render::RenderAppExt;
 use crate::render::upload_probe::UploadMode;
 
 /// One sampled rendering of the scene at a specific timeline position.
@@ -446,23 +447,23 @@ fn ui_gpu_passes(app: &mut RanimPreviewApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.heading("GPU passes");
         let supported = app
-            .renderer
+            .render_app()
             .as_ref()
             .is_some_and(|r| r.gpu_timers_supported());
         if supported {
             let mut enabled = app
-                .renderer
+                .render_app()
                 .as_ref()
                 .is_some_and(|r| r.gpu_timers_enabled());
             if ui.checkbox(&mut enabled, "GPU timers").changed()
-                && let Some(r) = app.renderer.as_mut()
+                && let Some(r) = app.render_app_mut()
             {
                 r.set_gpu_timers_enabled(enabled);
             }
         }
     });
     if !app
-        .renderer
+        .render_app()
         .as_ref()
         .is_some_and(|r| r.gpu_timers_supported())
     {

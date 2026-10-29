@@ -1,12 +1,10 @@
-use std::{
-    cell::{Cell, Ref, RefCell},
-    collections::HashMap,
-};
+#[cfg(feature = "render")]
+use ranim_render::extract::{Extract, ExtractContext};
+
+use std::{collections::HashMap, sync::OnceLock};
 
 use ranim_core::{
-    Extract,
     color::{AlphaColor, Srgb},
-    core_item::CoreItem,
     glam::{DMat3, DVec3},
     traits::{
         Aabb, Discard, FillColor, Locate, PointsFunc, ScaleTransform, ShiftTransform, StrokeColor,
@@ -88,9 +86,9 @@ pub struct TextItem {
     /// Stroke width
     stroke_width: f32,
     /// Cached items
-    items: RefCell<Option<Vec<VItem>>>,
+    items: OnceLock<Vec<VItem>>,
     /// cached text inline size
-    inline_length_em: Cell<Option<f64>>,
+    inline_length_em: OnceLock<f64>,
 }
 
 impl Locate<TextItem> for Origin {
@@ -109,8 +107,8 @@ impl TextItem {
             fill_rgbas: AlphaColor::WHITE,
             stroke_rgbas: AlphaColor::WHITE,
             stroke_width: 0.0,
-            items: RefCell::default(),
-            inline_length_em: Cell::default(),
+            items: OnceLock::new(),
+            inline_length_em: OnceLock::new(),
         }
     }
 
@@ -118,6 +116,7 @@ impl TextItem {
     pub fn with_font(mut self, font: TextFont) -> Self {
         self.font = font;
         self.items.take();
+        self.inline_length_em.take();
         self
     }
 
@@ -143,8 +142,8 @@ impl TextItem {
 
     /// Get inline length in em units
     pub fn inline_length_em(&self) -> f64 {
-        let _ = self.items(); // ensure items are generated
-        self.inline_length_em.get().unwrap()
+        let _ = self.vitems(); // ensure outlines are generated
+        *self.inline_length_em.get().unwrap()
     }
 
     /// Returns the canonical local text outline box from the baseline origin.
@@ -231,7 +230,7 @@ impl TextItem {
         let stroke_width = self.stroke_width;
         let [min, max] = baseline_em_box;
         let h = max.y - min.y;
-        self.inline_length_em.set(Some((max.x - min.x) / h));
+        let _ = self.inline_length_em.set((max.x - min.x) / h);
         let mat = DMat3::from_cols(u, v, DVec3::ZERO);
         texts.with(|x| {
             x.shift(-min)
@@ -244,16 +243,13 @@ impl TextItem {
         })
     }
 
-    fn items(&self) -> Ref<'_, Vec<VItem>> {
-        if self.items.borrow().is_none() {
-            let items = self.generate_items();
-            self.items.replace(Some(items));
-        }
-        Ref::map(self.items.borrow(), |v| v.as_ref().unwrap())
+    /// Borrow the canonical local outlines, generating and caching them on first use.
+    pub fn vitems(&self) -> &[VItem] {
+        self.items.get_or_init(|| self.generate_items())
     }
 
-    fn transform_items(&self, transformation: impl FnOnce(&mut Vec<VItem>)) {
-        if let Some(v) = self.items.borrow_mut().as_mut() {
+    fn transform_items(&mut self, transformation: impl FnOnce(&mut Vec<VItem>)) {
+        if let Some(v) = self.items.get_mut() {
             transformation(v);
         }
     }
@@ -261,7 +257,7 @@ impl TextItem {
 
 impl Aabb for TextItem {
     fn aabb(&self) -> [DVec3; 2] {
-        self.items().aabb()
+        self.vitems().aabb()
     }
 }
 
@@ -302,16 +298,17 @@ impl StrokeColor for TextItem {
 }
 
 impl From<TextItem> for Vec<VItem> {
-    fn from(item: TextItem) -> Self {
-        item.items().clone()
+    fn from(mut item: TextItem) -> Self {
+        item.items.take().unwrap_or_else(|| item.generate_items())
     }
 }
 
+#[cfg(feature = "render")]
 impl Extract for TextItem {
-    type Target = CoreItem;
-
-    fn extract_into(&self, buf: &mut Vec<Self::Target>) {
-        self.items().extract_into(buf);
+    fn extract(&self, ctx: &mut ExtractContext<'_>) {
+        for item in self.vitems() {
+            item.extract(ctx);
+        }
     }
 }
 

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{site.title}}: {{page.title}}</title>
+  <link rel="stylesheet" href="{{url 'index.css'}}">
+  <link rel="stylesheet" href="{{url 'github-markdown.css'}}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{url 'apple-touch-icon.png'}}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{url 'favicon-32x32.png'}}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{url 'favicon-16x16.png'}}">
+  <link rel="manifest" href="{{url 'site.webmanifest'}}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+  <script type="module" src="{{url 'site.js'}}"></script>
+</head>
+<body class="layout">
+  <header class="layout__header">
+    <div class="back"></div>
+    <nav class="nav">
+      <a href="{{url '/'}}" class="home nav-btn"><img src="{{url 'ranim.png'}}" alt="Ranim Icon"><span>Ranim</span></a>
+      <a href="https://azurice.github.io/ranim-book/main/" class="section-btn nav-btn" rel="noopener noreferrer" target="_blank">指南 ↗</a>
+      <a href="https://azurice.github.io/ranim-doc/ranim/" class="section-btn nav-btn" rel="noopener noreferrer" target="_blank">文档 ↗</a>
+      {{#with (lookup site.directories '')}}
+        {{#each directories}}
+          {{#with (lookup @root.site.directories this)}}
+            {{#if index}}<a href="{{url index.route.url}}" class="section-btn nav-btn">{{index.title}}</a>{{/if}}
+          {{/with}}
+        {{/each}}
+      {{/with}}
+      <a href="https://github.com/AzurIce/ranim" class="icon-btn nav-btn" target="_blank" rel="noreferrer">GitHub</a>
+    </nav>
+  </header>
+  <main class="layout__body">{{> @partial-block}}</main>
+  {{#if assets.components}}<script type="module" src="{{assets.components}}"></script>{{/if}}
+</body>
+</html>

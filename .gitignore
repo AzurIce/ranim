@@ -1,4 +1,5 @@
 /target
+/dist
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -75,10 +76,11 @@ docs/_build/
 image*.png
 output/
 /output*
-/website/static/ranim-examples/
 
 .direnv/
 profile.json.gz
 
 # shadow
 /website/static/examples/**
+
+/website/render-state.json.tmp

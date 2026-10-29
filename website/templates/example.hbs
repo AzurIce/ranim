@@ -1,0 +1,7 @@
+{{#> layouts/three-col}}
+  <article class="markdown-body examples-article">
+    {{> components/breadcrumbs}}
+    {{{page.html}}}
+    {{#with (lookup site.data page.attrs.example)}}{{> components/player}}{{/with}}
+  </article>
+{{/layouts/three-col}}

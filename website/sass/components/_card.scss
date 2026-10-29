@@ -38,6 +38,14 @@
       }
     }
 
+    &__placeholder {
+      display: grid;
+      place-items: center;
+      flex: 1;
+      color: var(--sl-color-primary-600, #0284c7);
+      background: #f6f8fa;
+    }
+
     &__content {
       display: flex;
       flex-direction: column;

@@ -1,0 +1,16 @@
+[project]
+name = "ranim-website"
+
+[[site]]
+name = "ranim-website"
+title = "Ranim"
+base_url = "https://azurice.github.io/ranim/"
+content = "content"
+template = "page"
+
+# Experimental Notist SSG prepare command. Pages and site.data are generated
+# from Cargo sources and tracked shadow refs on every build, without uploads.
+[[site.extensions]]
+kind = "command"
+command = ["cargo", "examples", "site"]
+watch = ["../Cargo.toml", "../examples", "../assets", "../xtasks/xtask-examples", "../.shadow/refs", "../shadow.toml", "render-state.json"]

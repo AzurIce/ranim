@@ -1,0 +1,20 @@
+.markdown-body {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    .heading-anchor {
+      margin-left: 0.5rem;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+
+    }
+
+    &:hover .heading-anchor {
+      opacity: 1;
+    }
+  }
+}
