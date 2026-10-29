@@ -51,7 +51,7 @@ Runtime dependencies:
 ranim = "0.2.1"
 ```
 
-Uses the previous project/CLI API. See the
+Documentation:
 [v0.2.1 guide](https://github.com/AzurIce/ranim/blob/v0.2.1/README.md) and
 [API reference](https://docs.rs/ranim/0.2.1/ranim/).
 
@@ -62,12 +62,12 @@ Uses the previous project/CLI API. See the
 ranim = { git = "https://github.com/AzurIce/ranim" }
 ```
 
-The examples below use the new App/Plugin API, **not the v0.2.1 API**.
+The following examples target the v0.3 App/Plugin API.
 
 ### Project entry
 
-**Scenes remain ordinary Rust functions and can live in a library.** A host
-registers them in an `App`: native runs its CLI; WASM exports the same project
+Define scenes as Rust functions in a library or module, then register their
+descriptors in an `App`. Native hosts run the CLI; WASM hosts export the project
 to JavaScript. For a package named `my-animation`:
 
 ```toml
@@ -116,7 +116,7 @@ pub fn app() -> ranim::wasm::WasmApp {
 }
 ```
 
-`#[scene]` generates `hello::scene()`; registration is explicit, not global.
+`#[scene]` generates `hello::scene()` for explicit registration.
 `App` and `Plugin` are Bevy types. Plugins optionally group scenes, resources,
 and render configuration; `app.build()` finalizes the project for either host.
 See [project entry](./book/project-entry.md) for setup and platform bindings.
@@ -131,8 +131,8 @@ dx serve --hotpatch --desktop --example hello_ranim --features subsecond --args 
 
 Patches rebuild the scene and pause at the previous time, preserving the
 window/GPU. This is **scene reconstruction, not state migration**; structural
-changes require a restart. Native only. The flake pins a dx workspace fix, but
-that CLI/runtime combination still needs end-to-end validation; see
+changes require a restart. Native only. The flake pins a dx workspace fix;
+that CLI/runtime combination awaits end-to-end validation. See
 [limitations](./book/project-entry.md#热重载不会改变场景库与宿主的边界).
 
 #### Custom render setup
@@ -146,7 +146,7 @@ an `ExtractPlugin<T>` matching the complete frame type. See
 
 Examples share native/WASM entries in one binary target. Browser UI and playback
 use independent [viewport and controls components](./website/README.md), with
-an expandable timeline and synchronized Web Audio; egui remains native-only.
+an expandable timeline and synchronized Web Audio. Native preview uses egui.
 
 ```bash
 cargo examples build arc  # WASM + bindings + optimization
@@ -192,8 +192,7 @@ Defaults are `anims`, `items`, and `cmd-preview`.
 | `subsecond` | Experimental native scene hot reload with Dioxus CLI |
 
 `--no-default-features` keeps core evaluation and project assembly. Native command
-dependencies are excluded from WASM. Migration: `preview` → `cmd-preview`;
-native users of the former `render` bundle → `cmd-render`.
+dependencies are excluded from WASM.
 
 The native **Profiler** panel shows GPU passes, CPU spans, and upload stats.
 Enable GPU timestamps with `RANIM_PROFILE_GPU=1` (adds a per-frame device poll),
