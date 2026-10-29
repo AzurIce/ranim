@@ -231,3 +231,34 @@ examples/hello_ranim/
 
 本仓库 flake 固定的 dx main 包含 0.7.10 缺少的 workspace 级联筛选修复；
 该 main CLI 与当前 0.7 Subsecond runtime 的端到端兼容性尚待验证。
+
+### 启动与工具版本
+
+同时启用 `cmd-preview` 与 `subsecond`。普通二进制的 dx 0.7.10 工作流：
+
+```sh
+cargo install dioxus-cli --version 0.7.10 --locked
+dx serve --hotpatch --desktop --features subsecond --args preview
+```
+
+仓库 example 使用 `nix develop` 提供的 dx：
+
+```sh
+dx serve --hotpatch --desktop --example hello_ranim --features subsecond --args preview
+```
+
+dx 0.7.10 的 workspace 级联可能错误包含无关的反向依赖，报
+`Missing rustc args for replay: 'app'`；flake 固定的 Dioxus
+`7bd964ae9469daafcb76b73556162d9082be255b` 包含此问题的修复，但仍待上述端到端验证。
+已验证的 0.7.10 路径针对二进制自身模块中的场景；库/workspace 补丁能力不能据此保证。
+普通 `cargo run` 不依赖 dx，也不受此限制。
+
+### 重建范围与失败处理
+
+`Scene::new` 注册的 constructor（包括 `#[scene]` 场景）是 hot-call 边界。
+补丁后重建场景、时间线与音频，保留窗口、GPU、分辨率与播放设置，并暂停在原时间
+（超出新时长时截断）。正在导出时延后重建；constructor panic 保留旧场景并记录错误。
+构造函数应可重复执行，其外部副作用不会自动回滚。
+
+这不是状态迁移。修改插件、场景注册、`#[scene]`/`#[output]` 元数据、捕获配置、
+依赖、features 或类型/捕获布局后，需要重启。它不提供 Bevy system hotpatch 或 WASM 热重载。
